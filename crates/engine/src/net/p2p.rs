@@ -26,23 +26,13 @@ fn runtime() -> &'static tokio::runtime::Runtime {
     })
 }
 
-/// This install's identity. Generated once, kept in the config directory. Servers key player
-/// saves by it, so a key that cannot be read is never replaced and one that cannot be written is
-/// an error: a new identity every launch would be a new player everywhere.
+/// This player's network identity: the key of the account's words (`chiacraft_account`), so the
+/// same words give the same key, and the same player, on any computer. Servers key player saves
+/// by it. The account is made quietly on the first start; one that cannot be read is an error and
+/// is never replaced, because a new key would be a new player everywhere.
 pub fn identity(run_dir: &Path) -> Result<SecretKey, String> {
-    let path = run_dir.join("config").join("identity.key");
-    match std::fs::read_to_string(&path) {
-        Ok(s) => return s.trim().parse::<SecretKey>().map_err(|_| format!("{} is not a key; fix or delete it", path.display())),
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(format!("reading {}: {e}", path.display())),
-        Err(_) => {}
-    }
-    let key = SecretKey::generate();
-    let hex: String = key.to_bytes().iter().map(|b| format!("{b:02x}")).collect();
-    if let Some(d) = path.parent() {
-        let _ = std::fs::create_dir_all(d);
-    }
-    std::fs::write(&path, hex).map_err(|e| format!("saving the identity to {}: {e}", path.display()))?;
-    Ok(key)
+    let session = chiacraft_account::open(run_dir)?;
+    Ok(SecretKey::from_bytes(session.network_seed()))
 }
 
 /// The player's identity for servers, or empty (keyed by name) when there is none.
@@ -336,16 +326,16 @@ pub fn join(ticket: &str, settings: &Settings) -> Result<ClientConn, String> {
 
 #[cfg(test)]
 mod tests {
+    /// The identity is the account's network key: made on the first call, the same afterwards.
     #[test]
-    fn identity_is_kept_and_never_replaced() {
+    fn identity_is_the_accounts_network_key() {
         let dir = std::env::temp_dir().join(format!("weft-identity-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
+        chiacraft_account::use_file_store();
         let a = super::identity(&dir).expect("a new identity");
-        assert_eq!(super::identity(&dir).expect("read again").public(), a.public());
-        let file = dir.join("config").join("identity.key");
-        std::fs::write(&file, "not a key").unwrap();
-        assert!(super::identity(&dir).is_err());
-        assert_eq!(std::fs::read_to_string(&file).unwrap(), "not a key");
+        assert_eq!(super::identity(&dir).expect("asked again").public(), a.public());
+        let session = chiacraft_account::current().expect("the account is open");
+        assert_eq!(a.to_bytes(), *session.network_seed());
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

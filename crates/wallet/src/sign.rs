@@ -70,6 +70,37 @@ impl IdentitySigner {
         self.index
     }
 }
+/// What a network key's seed is made from: this label, then the identity key's secret.
+/// Fixed forever: changing it gives every player a new address and a new player on every world.
+const NETWORK_KEY_LABEL: &[u8] = b"chiacraft network key v1";
+
+impl IdentitySigner {
+    /// The 32-byte seed of this identity's **network key**: the Ed25519 key of the game's
+    /// peer-to-peer endpoint (iroh), so the same words give the same address, and the same player
+    /// on every world, on any computer. One-way from the identity key's secret (SHA-256 under its
+    /// own label): the network key reveals nothing about the identity key, and as an Ed25519 key it
+    /// can sign nothing a Chia wallet would accept.
+    pub fn network_seed(&self) -> Secret<[u8; 32]> {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(NETWORK_KEY_LABEL);
+        h.update(self.secret.expose());
+        Secret::new(h.finalize().into())
+    }
+}
+
+/// The text an identity key signs to vouch for a network key (`endpoint`: the network key's
+/// public half as the network writes it), so a world that sees the endpoint learns the identity,
+/// and through it the DID, behind it.
+pub fn network_link_text(endpoint: &str) -> String {
+    format!("{PREFIX}network key v1\nendpoint: {endpoint}")
+}
+
+/// Whether `signature` is `identity` vouching for the network key `endpoint`.
+pub fn verify_network_link(identity: &IdentityKey, endpoint: &str, signature: &[u8]) -> bool {
+    verify(identity, network_link_text(endpoint).as_bytes(), signature)
+}
+
 impl Signer for IdentitySigner {
     fn identity(&self) -> IdentityKey {
         self.public
@@ -223,6 +254,28 @@ mod tests {
         assert!(!verify(&s.identity(), text.as_bytes(), &sig[..95]));
         assert!(s.sign("a coin spend").is_err());
         assert!(!format!("{s:?}").contains(&keys_hex(&s)));
+    }
+
+    #[test]
+    fn network_key_follows_the_words_and_is_vouched_for() {
+        let m = Mnemonic::generate().unwrap();
+        let a = IdentitySigner::from_mnemonic(&m, 0);
+        // The same words on another computer: the same network key.
+        let again = IdentitySigner::from_mnemonic(&Mnemonic::parse(&m.words().expose().join(" ")).unwrap(), 0);
+        assert_eq!(a.network_seed().expose(), again.network_seed().expose());
+        // Another identity of the same account, or another account: another key.
+        let second = IdentitySigner::from_mnemonic(&m, 1);
+        assert_ne!(a.network_seed().expose(), second.network_seed().expose());
+        let other = IdentitySigner::from_mnemonic(&Mnemonic::generate().unwrap(), 0);
+        assert_ne!(a.network_seed().expose(), other.network_seed().expose());
+        // Not the identity key's own secret.
+        assert_ne!(a.network_seed().expose(), a.secret.expose());
+
+        let endpoint = "5f3c0d9e1a";
+        let sig = a.sign(&network_link_text(endpoint)).unwrap();
+        assert!(verify_network_link(&a.identity(), endpoint, &sig));
+        assert!(!verify_network_link(&a.identity(), "5f3c0d9e1b", &sig));
+        assert!(!verify_network_link(&other.identity(), endpoint, &sig));
     }
 
     fn keys_hex(s: &IdentitySigner) -> String {

@@ -308,6 +308,14 @@ impl App {
         let cache = self.opts.run_dir.join("cache");
         let mods = modloader::load(&self.opts.mod_dirs, &cache)?;
         crate::config::set_automated(self.opts.automated);
+        // The account, before anything needs the network key: made quietly on the first start.
+        // Automated runs keep theirs in the run directory's file store, never the OS keystore.
+        if self.opts.automated {
+            chiacraft_account::use_file_store();
+        }
+        if let Err(e) = chiacraft_account::open(&self.opts.run_dir) {
+            log::error!("{e}; this run plays without an account, keyed by name");
+        }
         crate::settings::migrate(&self.opts.run_dir);
         crate::config::load(&self.opts.run_dir);
         if self.opts.no_vsync {

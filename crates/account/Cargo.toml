@@ -1,0 +1,11 @@
+[package]
+name = "chiacraft-account"
+version = "0.1.0"
+edition.workspace = true
+license = "MIT"
+rust-version.workspace = true
+description = "The player's account in the game: opens it at start (made quietly the first time) and gives the engine its network key"
+
+[dependencies]
+chiacraft-wallet = { path = "../wallet" }
+log.workspace = true
