@@ -161,7 +161,12 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 /// Loads every library, then calls all `init`s in parallel and freezes the registries.
-pub fn load(mod_dirs: &[PathBuf], cache: &Path) -> Result<Vec<LoadedMod>, String> {
+/// The `packages` mod's entry for registering one data package (chiacraft), see
+/// `mods/packages`.
+type RegisterPackage = unsafe extern "C" fn(*const abi::Host, ModId, *mut abi::Registrar, abi::Str) -> u32;
+const REGISTER_PACKAGE: &[u8] = b"chiacraft_register_package\0";
+
+pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path) -> Result<Vec<LoadedMod>, String> {
     let start = Instant::now();
     let shadow = cache.join("mods");
     std::fs::create_dir_all(&shadow).ok();
@@ -191,9 +196,33 @@ pub fn load(mod_dirs: &[PathBuf], cache: &Path) -> Result<Vec<LoadedMod>, String
         mods.push(LoadedMod { id, assets: dir.join("assets"), _lib: lib, decl });
     }
     mods.sort_by(|a, b| a.id.cmp(&b.id));
-    let _ = NAMES.set(mods.iter().map(|m| m.id.clone()).collect());
 
-    let metas: Vec<ModMeta> = mods
+    // Data packages (chiacraft) take the slots after the code mods: each its own namespace.
+    let mut packages: Vec<(chiacraft_packages::Manifest, PathBuf)> = Vec::new();
+    // A package is data someone else wrote: one with mistakes is left out, not fatal.
+    for dir in chiacraft_packages::discover(package_dirs) {
+        let m = match chiacraft_packages::load(&dir) {
+            Ok(p) => p.manifest,
+            Err(errors) => {
+                log::error!("package {} left out:\n  {}", dir.display(), errors.join("\n  "));
+                continue;
+            }
+        };
+        if mods.iter().any(|x| x.id == m.id) || packages.iter().any(|(p, _)| p.id == m.id) {
+            log::error!("package {} left out: the id {} is taken by a mod or another package", dir.display(), m.id);
+            continue;
+        }
+        packages.push((m, dir));
+    }
+    let register_package = if packages.is_empty() {
+        None
+    } else {
+        let found = mods.iter().find_map(|m| unsafe { m._lib.get::<RegisterPackage>(REGISTER_PACKAGE).ok().map(|f| *f) });
+        Some(found.ok_or("data packages need the packages mod")?)
+    };
+    let _ = NAMES.set(mods.iter().map(|m| m.id.clone()).chain(packages.iter().map(|(m, _)| m.id.clone())).collect());
+
+    let mut metas: Vec<ModMeta> = mods
         .iter()
         .map(|m| unsafe {
             ModMeta {
@@ -202,9 +231,18 @@ pub fn load(mod_dirs: &[PathBuf], cache: &Path) -> Result<Vec<LoadedMod>, String
                 deps: m.decl.deps.as_slice().iter().map(|d| d.as_str().to_string()).collect(),
                 order: 0,
                 assets: m.assets.clone(),
+                package: false,
             }
         })
         .collect();
+    metas.extend(packages.iter().map(|(m, dir)| ModMeta {
+        id: m.id.clone(),
+        version: m.version.clone(),
+        deps: m.dependencies.keys().cloned().collect(),
+        order: 0,
+        assets: dir.join("assets"),
+        package: true,
+    }));
     for m in &metas {
         for d in &m.deps {
             if !metas.iter().any(|o| &o.id == d) {
@@ -227,6 +265,19 @@ pub fn load(mod_dirs: &[PathBuf], cache: &Path) -> Result<Vec<LoadedMod>, String
             reg
         })
         .collect();
+    let mut regs = regs;
+    for (i, (m, dir)) in packages.iter().enumerate() {
+        let id = ModId((mods.len() + i) as u32);
+        let mut reg = RawRegistrar::new(id);
+        let path = dir.to_string_lossy();
+        let register = register_package.expect("packages present");
+        let r = unsafe { register(&crate::host::HOST, id, &mut reg as *mut _ as *mut abi::Registrar, abi::Str::new(&path)) };
+        if r != 0 {
+            reg.errors.push("registration panicked".into());
+        }
+        log::info!("package {} {} from {}", m.id, m.version, dir.display());
+        regs.push(reg);
+    }
 
     let content = content::freeze(metas, regs).map_err(|e| e.join("\n"))?;
     log::info!(

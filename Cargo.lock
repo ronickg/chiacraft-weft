@@ -1282,6 +1282,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chiacraft-packages"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml 1.1.8+spec-1.1.0",
+]
+
+[[package]]
 name = "chiacraft-wallet"
 version = "0.1.0"
 dependencies = [
@@ -4847,6 +4855,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "packages"
+version = "0.1.0"
+dependencies = [
+ "chiacraft-packages",
+ "weft_sdk",
+]
+
+[[package]]
 name = "papaya"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7569,6 +7585,7 @@ dependencies = [
  "arboard",
  "bytemuck",
  "chiacraft-account",
+ "chiacraft-packages",
  "crossbeam-channel",
  "glam 0.34.1",
  "iroh",

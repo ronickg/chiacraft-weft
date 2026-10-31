@@ -1,0 +1,11 @@
+[package]
+name = "chiacraft-packages"
+version = "0.1.0"
+edition.workspace = true
+license = "MIT"
+rust-version.workspace = true
+description = "Data-only content packages (chiacraft plan, phase 2): reads and checks a package's manifest and definitions"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "1.1"

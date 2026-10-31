@@ -1,0 +1,5 @@
+hardness = 5.0
+sound = "stone"
+mineable = "pickaxe"
+tags = ["ore_blocks/ruby"]
+tab = "base:building"

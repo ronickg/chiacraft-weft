@@ -1,0 +1,3 @@
+pattern = ["RRR", "RRR", "RRR"]
+key = { R = "ruby" }
+result = "ruby_block"

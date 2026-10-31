@@ -6,6 +6,7 @@ mod extend;
 mod gameplay;
 mod liquids;
 mod looks;
+mod packages;
 mod probe;
 mod scene;
 mod sync;
@@ -30,6 +31,7 @@ pub fn all() -> Vec<TestDef> {
         scene::scene,
         ui::screens,
         account::account,
+        packages::packages,
         ui::scrollbar,
         ui::rebind,
         ui::f3,

@@ -37,6 +37,8 @@ pub type BackendFactory = fn(&BackendDesc) -> Result<Box<dyn Backend>, weft_rend
 pub struct Options {
     pub run_dir: PathBuf,
     pub mod_dirs: Vec<PathBuf>,
+    /// Folders of data packages (chiacraft), earlier ones winning for a package found twice.
+    pub package_dirs: Vec<PathBuf>,
     pub gpu_debug: bool,
     /// Automation: skip the menu and play this world (created if missing).
     pub world: Option<String>,
@@ -306,7 +308,7 @@ impl App {
     fn start(&mut self, el: &ActiveEventLoop) -> Result<Running, String> {
         // Mods first: the engine's settings are `core:` configs like theirs.
         let cache = self.opts.run_dir.join("cache");
-        let mods = modloader::load(&self.opts.mod_dirs, &cache)?;
+        let mods = modloader::load(&self.opts.mod_dirs, &self.opts.package_dirs, &cache)?;
         crate::config::set_automated(self.opts.automated);
         // The account, before anything needs the network key: made quietly on the first start.
         // Automated runs keep theirs in the run directory's file store, never the OS keystore.
@@ -350,7 +352,8 @@ impl App {
         .map_err(|e| e.to_string())?;
 
         let mut roots: Vec<(String, PathBuf)> = vec![("core".into(), engine_assets(self.opts.dev))];
-        roots.extend(mods.iter().map(|m| (m.id.clone(), m.assets.clone())));
+        // Code mods' and data packages' assets alike.
+        roots.extend(crate::content::content().mods.iter().map(|m| (m.id.clone(), m.assets.clone())));
         let packs_now = (settings.resource_packs(), settings.shader_pack());
         let packs = crate::packs::enabled(&self.opts.run_dir, &settings.resource_packs());
         crate::packs::set_shader_pack(settings.shader_pack().as_ref().map(|p| crate::packs::shader_dir(&self.opts.run_dir).join(p)));

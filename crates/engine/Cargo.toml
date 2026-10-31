@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 weft_abi.workspace = true
+chiacraft-packages = { path = "../packages" }
 weft_noise.workspace = true
 weft_render.workspace = true
 winit.workspace = true

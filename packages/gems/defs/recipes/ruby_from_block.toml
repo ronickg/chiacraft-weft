@@ -1,0 +1,3 @@
+inputs = ["ruby_block"]
+result = "ruby"
+count = 9

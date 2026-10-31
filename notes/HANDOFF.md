@@ -44,9 +44,16 @@ to it (it was refused); `chiacraft_*` crates log at info; bare `cargo run` start
 - `cargo run --release -- --test account` runs one testkit test against the real game; `--test
   list` names them. Line scripts (`--script`, see `mods/testkit/src/script.rs`) drive host/join.
 
+## Phase 2, packages
+
+Slice 1 (local packages) is done: `crates/packages` (format), `mods/packages` (registers them),
+the engine's loader gives each package a slot after the code mods (`modloader.rs`, `ModMeta.package`,
+the sort in `content::freeze`). Example `packages/gems`; author guide `docs/packages.md`; in-game test
+`--test packages`. The unit tests in `crates/packages` have not run: there is no CI for tests yet.
+
 ## Next steps
 
-1. Phase 2 (packages) per the plan.
+1. Phase 2 slice 2 (identity and store) per `notes/PLAN.md`.
 
 ## Notes
 

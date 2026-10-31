@@ -1,0 +1,3 @@
+pattern = [" R ", "RGR", " R "]
+key = { R = "ruby", G = "base:glowstone" }
+result = "ruby_lamp"

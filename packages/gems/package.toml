@@ -1,0 +1,9 @@
+# An example data package: no code, only these files. See crates/packages for the format.
+format = "1.0"
+id = "gems"
+version = "0.1.0"
+name = "Gems"
+description = "Rubies: an item, a block of them and a lamp."
+
+[dependencies]
+base = "*"

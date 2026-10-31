@@ -29,6 +29,8 @@ fn main() {
         run_dir: root.join("run"),
         // Mod sources of the game itself; players' mods go into `run/mods`, added below.
         mod_dirs: vec![root.join("mods")],
+        // Data packages (chiacraft) of the game itself; players' go into `run/packages`, added below.
+        package_dirs: vec![root.join("packages")],
         gpu_debug: false,
         world: None,
         seed: None,
@@ -81,6 +83,7 @@ fn main() {
     opts.automated = extra.iter().any(|(k, _)| k == "script" || k == "test");
     weft_engine::set_launch_options(extra);
     let player_mods = opts.run_dir.join("mods");
+    opts.package_dirs.insert(0, opts.run_dir.join("packages"));
     if let Some(dir) = pack {
         match weft_engine::modloader::pack(&dir, &player_mods) {
             Ok(path) => println!("packed {}", path.display()),

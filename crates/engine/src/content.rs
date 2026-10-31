@@ -393,6 +393,9 @@ pub struct ModMeta {
     pub order: u32,
     /// Its `assets` folder (block and item model files are read at freeze).
     pub assets: std::path::PathBuf,
+    /// A data package (chiacraft), not a code mod: its blocks and items take ids after every
+    /// code mod's, so a package never moves a code mod's ids.
+    pub package: bool,
 }
 
 /// Ids of components the engine reads, resolved once.
@@ -1054,8 +1057,9 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         biomes.extend(r.biomes);
         dims.extend(r.dims);
     }
-    blocks.par_sort_by(|a, b| a.1.name.cmp(&b.1.name).then(a.1.replace.cmp(&b.1.replace)));
-    items.par_sort_by(|a, b| a.1.name.cmp(&b.1.name));
+    let package = |m: ModId| mods[m.0 as usize].package;
+    blocks.par_sort_by(|a, b| package(a.0).cmp(&package(b.0)).then(a.1.name.cmp(&b.1.name)).then(a.1.replace.cmp(&b.1.replace)));
+    items.par_sort_by(|a, b| package(a.0).cmp(&package(b.0)).then(a.1.name.cmp(&b.1.name)));
     // A replacement wins over the original if its mod depends on the original's mod. The
     // original's item stays (it already points at the block by name).
     let depends = |m: ModId, on: ModId| mods[m.0 as usize].deps.contains(&mods[on.0 as usize].id);
@@ -2160,7 +2164,7 @@ mod tests {
     use super::*;
 
     fn meta(id: &str, deps: &[&str]) -> ModMeta {
-        ModMeta { id: id.into(), version: "1".into(), deps: deps.iter().map(|d| d.to_string()).collect(), order: 0, assets: Default::default() }
+        ModMeta { id: id.into(), version: "1".into(), deps: deps.iter().map(|d| d.to_string()).collect(), order: 0, assets: Default::default(), package: false }
     }
 
     #[test]

@@ -126,9 +126,28 @@ The smallest version that works is phases 1-4.
 1. **Account.** Wallet crate builds and passes its tests here; login key from the words replaces
    Weft's random `identity.key`; join proves the login key's link to the DID; Account screen
    (fingerprint, show words once, I wrote them down, restore); one signing interface.
-2. **Packages.** Data packages through Weft's registry; package list with hashes on join; consent
-   screen with trust memory; download over iroh; cache; switch content in place (Weft freezes
-   content at load today; Horizon's `content_swap.rs` solved the same problem).
+2. **Packages.** Decided 2026-10-31 after research (`reports/Data packages for moddable voxel
+   games.md`), in slices:
+   1. *Local packages* (done): `package.toml` + `defs/<kind>/<path>.toml` (TOML; id from the path)
+      + `assets/` like a mod's; registered through the SDK by the `packages` mod into their own
+      slots; package ids sort after code mods' so packages never move them; broken packages are
+      left out, not fatal. Format: `docs/packages.md`.
+   2. *Identity and store*: a package is the BLAKE3 hash of a canonical manifest listing every
+      file's path, size and BLAKE3 (not a hash of a zip); files cached by hash in
+      `run/cache/blobs/`, never unpacked to author-chosen paths; each world keeps a lockfile of
+      exact package hashes; unknown blocks in saves load as a placeholder that keeps their name.
+   3. *Content swap between worlds*: an atomic pointer to `Content` interned by hash (each kept
+      once); swap only with no world loaded; native mods re-resolve package ids by name per swap.
+   4. *Configuration phase and transfer*: protocol 4; the hello carries the world's lock hash; then
+      offer, have/need/declined, verified streaming (bao-tree) on extra streams of the iroh
+      connection, status per package, and the hash of the content actually loaded before play.
+      Joining stops freezing the window (a progress screen instead).
+   5. *Signing and trust*: a content-signing key derived from the words on its own path and
+      certified by the account (DID later); signatures in an envelope outside the pinned hash;
+      join sheet with sizes, creators and key fingerprints; trust defaults to this package or this
+      world's set, trusting a creator is a deliberate step.
+   6. *Hardening*: format allow-list, decode and size limits, host serves only pinned hashes.
+   Later: iroh-blobs for downloads from other players and mirrors, reviewer lists, key rotation.
 3. **Portals.** World addresses (key, DID later); link requests inbox with pre-allow; links
    signed by both worlds, revocable; portal blocks; travel with the connection prepared ahead; a
    safe return when a world goes offline; keep your own world open while you visit others.
@@ -154,3 +173,5 @@ is the content.
 - Verify Chia full nodes return hinted coins for an arbitrary hint fast enough for a world list.
 - Weft upstream: keep merging (proposed) or cut loose.
 - The Horizon-based project: frozen as it is, W7-W9 work left in its worktrees.
+- Phase 3, "keep your own world open while you visit others": `Content` is one per process, so
+  both worlds share a package set unless the server gets its own `Content`. Decide at Phase 3.
