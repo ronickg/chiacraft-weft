@@ -22,7 +22,7 @@ use std::sync::{Arc, OnceLock};
 
 use chiacraft_wallet::accounts::env_passphrase;
 use chiacraft_wallet::sign::network_link_text;
-use chiacraft_wallet::{AccountInfo, Accounts, IdentitySigner, Secret, Signer, StoreChoice};
+use chiacraft_wallet::{AccountInfo, Accounts, IdentitySigner, Mnemonic, Secret, Signer, StoreChoice};
 
 /// The OS keystore's service name for chiacraft's accounts.
 pub const SERVICE: &str = "chiacraft";
@@ -32,6 +32,7 @@ pub const DEFAULT_NAME: &str = "Player";
 /// The open account: its public facts and its identity signer.
 pub struct Session {
     pub home: PathBuf,
+    choice: StoreChoice,
     pub info: AccountInfo,
     pub signer: Arc<IdentitySigner>,
     network: Secret<[u8; 32]>,
@@ -59,6 +60,76 @@ impl Session {
     pub fn vouch(&self, endpoint: &str) -> Result<[u8; 96], String> {
         self.signer.sign(&network_link_text(endpoint)).map_err(|e| e.to_string())
     }
+
+    /// What a joining game sends a world beside its network key: `<identity hex>:<signature hex>`,
+    /// the identity key vouching for `endpoint` (the network key as the network writes it).
+    pub fn vouch_line(&self, endpoint: &str) -> Option<String> {
+        match self.vouch(endpoint) {
+            Ok(sig) => Some(format!("{}:{}", self.identity_hex(), chiacraft_wallet::keys::hex(&sig))),
+            Err(e) => {
+                log::warn!("vouching for the network key: {e}");
+                None
+            }
+        }
+    }
+
+    fn accounts(&self) -> Result<Accounts, String> {
+        Accounts::load(&self.home, self.choice.clone()).map_err(|e| format!("reading the accounts: {e}"))
+    }
+
+    /// The open account's facts as `accounts.json` has them now (the backup state changes while
+    /// the game runs).
+    pub fn fresh_info(&self) -> AccountInfo {
+        self.accounts().ok().and_then(|a| a.get(self.info.fingerprint).cloned()).unwrap_or_else(|| self.info.clone())
+    }
+
+    /// Whether the player still has to write the words down.
+    pub fn needs_backup(&self) -> bool {
+        !self.fresh_info().backed_up
+    }
+
+    /// The 24 words, for the backup screen only: shown on screen, never copied, logged or sent.
+    pub fn words(&self) -> Result<Secret<Vec<String>>, String> {
+        let mnemonic = self.accounts()?.reveal(self.info.fingerprint, env_passphrase()).map_err(|e| format!("reading the words: {e}"))?;
+        Ok(mnemonic.words())
+    }
+
+    /// The player confirmed writing the words down.
+    pub fn mark_backed_up(&self) -> Result<(), String> {
+        self.accounts()?.mark_backed_up(self.info.fingerprint).map_err(|e| e.to_string())
+    }
+
+    /// A play session ended (the backup reminder waits for the first one).
+    pub fn session_ended(&self) {
+        if let Err(e) = self.accounts().and_then(|mut a| a.session_ended(self.info.fingerprint).map_err(|e| e.to_string())) {
+            log::warn!("counting the play session: {e}");
+        }
+    }
+
+    /// Whether to remind the player to write the words down (after their first session).
+    pub fn wants_backup(&self) -> bool {
+        self.fresh_info().wants_backup()
+    }
+
+    /// Restores an account from words typed by the player and makes it the default; it is the
+    /// account from the next start on (this run keeps its network key). Returns its fingerprint.
+    pub fn restore(&self, words: &str) -> Result<u32, String> {
+        let mnemonic = Mnemonic::parse(words).map_err(|p| p.to_string())?;
+        let mut accounts = self.accounts()?;
+        let info = accounts.restore(&mnemonic, DEFAULT_NAME).map_err(|e| e.to_string())?;
+        accounts.set_default(info.fingerprint).map_err(|e| e.to_string())?;
+        log::info!("restored account {}; it is used from the next start", info.fingerprint);
+        Ok(info.fingerprint)
+    }
+}
+
+/// A world's check of a joining player's [`Session::vouch_line`] against the network key it
+/// authenticated (`endpoint`): the identity key, hex, when the line is that key's valid vouching.
+pub fn check_vouch(line: &str, endpoint: &str) -> Option<String> {
+    let (identity, sig) = line.split_once(':')?;
+    let key = chiacraft_wallet::IdentityKey::from_hex(identity)?;
+    let sig = chiacraft_wallet::keys::from_hex(sig)?;
+    chiacraft_wallet::sign::verify_network_link(&key, endpoint, &sig).then(|| key.hex())
 }
 
 static SESSION: OnceLock<Result<Session, String>> = OnceLock::new();
@@ -91,7 +162,7 @@ fn start(run_dir: &Path) -> Result<Session, String> {
     let home = home(run_dir);
     let file_only = !OS_KEYSTORE.load(Ordering::Relaxed);
     let choice = StoreChoice::for_home(&home, SERVICE, file_only);
-    let mut accounts = Accounts::load(&home, choice).map_err(|e| format!("opening the account in {}: {e}", home.display()))?;
+    let mut accounts = Accounts::load(&home, choice.clone()).map_err(|e| format!("opening the account in {}: {e}", home.display()))?;
     let made = accounts.current().is_none();
     let info = accounts.ensure_default(DEFAULT_NAME).map_err(|e| format!("making an account: {e}"))?;
     if made {
@@ -106,7 +177,7 @@ fn start(run_dir: &Path) -> Result<Session, String> {
     })?;
     let network = unlocked.signer.network_seed();
     log::info!("account {} open, identity {}", unlocked.info.fingerprint, unlocked.info.identity);
-    Ok(Session { home, info: unlocked.info, signer: unlocked.signer, network })
+    Ok(Session { home, choice, info: unlocked.info, signer: unlocked.signer, network })
 }
 
 #[cfg(test)]
@@ -127,6 +198,10 @@ mod tests {
         assert!(!format!("{first:?}").contains(&hex(first.network_seed())));
         let sig = first.vouch("abc").unwrap();
         assert!(chiacraft_wallet::sign::verify_network_link(&first.signer.identity(), "abc", &sig));
+        let line = first.vouch_line("abc").unwrap();
+        assert_eq!(check_vouch(&line, "abc"), Some(first.identity_hex()));
+        assert_eq!(check_vouch(&line, "abd"), None);
+        assert_eq!(check_vouch("nonsense", "abc"), None);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

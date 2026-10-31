@@ -408,7 +408,8 @@ impl Client {
         let render = WorldRenderer::new(gpu, c, textures, assets)?;
         let entity_render = EntityRenderer::new(gpu, assets)?;
         let particles = particles::Particles::new(gpu, assets);
-        conn.send(ToServer::Join { name: name.to_string(), key: key.to_string() });
+        let account = chiacraft_account::current().and_then(|s| s.vouch_line(key)).unwrap_or_default();
+        conn.send(ToServer::Join { name: name.to_string(), key: key.to_string(), account });
         conn.send(ToServer::View(view_radius as u32));
         if let Some(png) = skin {
             conn.send(ToServer::Skin(png));

@@ -114,6 +114,7 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
         "core:tags" => Box::new(crate::game_screens::TagList::default()),
         "core:mods" => Box::new(ModList::default()),
         "core:profile" => Box::new(Profile::default()),
+        "core:account" => Box::new(crate::account_screen::Account::default()),
         _ => return None,
     })
 }
@@ -264,6 +265,11 @@ impl Screen for Profile {
                 button(ui, cx, "profile.copy", &[], 120.0, move |_| {
                     crate::clipboard::set(&copy);
                 });
+                // The key comes from the account's 24 words (chiacraft): the account and its words.
+                if chiacraft_account::current().is_some_and(|s| s.needs_backup()) {
+                    label(ui, cx, "profile.account_backup", &[], "dim");
+                }
+                button(ui, cx, "profile.account", &[], 160.0, |c| c.requests.push(Request::Screen("core:account".into())));
                 ui.add(Kind::Container { class: None }, Style::default().h(4.0));
                 label(ui, cx, "profile.skin", &[], "default");
                 label(ui, cx, "profile.skin_hint", &[], "dim");
@@ -406,6 +412,10 @@ impl Screen for Title {
                     ui.nodes[p].tooltip = Some(cx.t("menu.profile", &[]));
                     ui.set_id(p, "profile");
                 });
+                // After the first play session, until the words are written down (chiacraft).
+                if chiacraft_account::current().is_some_and(|s| s.wants_backup()) {
+                    button(ui, cx, "menu.write_words", &[], 156.0, |c| open(c, "core:account"));
+                }
                 icon_button(ui, cx, "button", "menu_mods", "menu.mods", &[Arg::Int(cx.mods as i64)], 156.0, |c| open(c, "core:mods"));
                 icon_button(ui, cx, "button", "menu_settings", "menu.settings", &[], 156.0, |c| open(c, "core:settings"));
                 parts(ui, cx, "core:title", "buttons");

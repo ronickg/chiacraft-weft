@@ -601,6 +601,12 @@ impl Running {
 
     fn leave_world(&mut self) {
         self.leave_world_silent();
+        // A finished play session: the title screen asks for the words after the first one.
+        if !crate::config::automated() {
+            if let Some(s) = chiacraft_account::current() {
+                s.session_ended();
+            }
+        }
         self.screens.clear();
         self.open(screens::engine("core:title"));
     }

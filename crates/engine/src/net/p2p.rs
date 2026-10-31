@@ -16,7 +16,8 @@ use super::{ClientConn, Conn, ServerConn, ToClient, ToServer};
 use crate::settings::Settings;
 
 const ALPN: &[u8] = b"weft/1";
-const PROTOCOL: u32 = 2;
+/// 3: `Join` carries the account's vouching (chiacraft).
+const PROTOCOL: u32 = 3;
 const MAX_FRAME: usize = 64 << 20;
 
 fn runtime() -> &'static tokio::runtime::Runtime {

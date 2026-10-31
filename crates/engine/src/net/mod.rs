@@ -239,7 +239,9 @@ messages! {
     #[derive(Clone)]
     pub enum ToServer: ServerTag, to_server = true; {
         /// `key`: the player's public key, their identity across sessions and addresses.
-        Join { name: String, key: String },
+        /// `account`: the player's account identity vouching for `key` (`chiacraft_account`
+        /// `vouch_line`), or empty; the world checks it and learns the identity behind the key.
+        Join { name: String, key: String, account: String },
         /// `frame`: the body it rides and its position relative to that body as the client shows it
         /// (the client shows bodies behind the server; only the relative position agrees).
         Move { pos: DVec3, yaw: f32, pitch: f32, on_ground: bool, crouched: bool, frame: Option<(u64, DVec3)> },

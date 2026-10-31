@@ -61,6 +61,8 @@ pub struct Player {
     skin: Option<Arc<Vec<u8>>>,
     /// Public key: the identity saves are keyed by.
     pub key: String,
+    /// The account identity key (hex) that vouched for `key` on join, checked; None without one.
+    pub identity: Option<String>,
     conn: ServerConn,
     pub dim: u32,
     pub entity: u64,
@@ -427,6 +429,7 @@ impl Server {
                 skin: None,
                 name: String::new(),
                 key: String::new(),
+                identity: None,
                 conn,
                 dim: 0,
                 entity: 0,
@@ -790,7 +793,15 @@ impl Server {
 
     fn handle(&mut self, c: &'static Content, pi: usize, msg: ToServer) {
         match msg {
-            ToServer::Join { name, key } => self.join(c, pi, name, key),
+            ToServer::Join { name, key, account } => {
+                // The account identity behind the key, when the player's game vouched for it.
+                let identity = if account.is_empty() { None } else { chiacraft_account::check_vouch(&account, &key) };
+                if identity.is_none() && !account.is_empty() {
+                    log::warn!("player {name}: the account's vouching for key {key} does not check out; joined without an identity");
+                }
+                self.players[pi].identity = identity;
+                self.join(c, pi, name, key)
+            }
             ToServer::Move { pos, yaw, pitch, on_ground, crouched, frame } => {
                 if !pos.is_finite() || self.players[pi].dead {
                     return;
