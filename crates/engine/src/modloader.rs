@@ -408,7 +408,28 @@ pub fn use_packages(set: &[PackageRef]) -> Result<bool, String> {
     set_names(content.mods.iter().map(|m| m.id.clone()).collect());
     content::set(content);
     l.current = Some(key);
+    for p in set {
+        l.store.touch(&p.hash);
+    }
     Ok(true)
+}
+
+/// Packages no world here pins are kept up to this much, those used most recently first: the
+/// worlds joined lately, which are likely joined again.
+const SPARE_PACKAGES: u64 = 512 << 20;
+
+/// Tidies the package store: keeps the installed packages and every package a world in `saves`
+/// pins, the most recently used others within `SPARE_PACKAGES`, and removes the rest.
+pub fn tidy_store(saves: &Path) {
+    let Some(store) = store() else { return };
+    let mut keep: Vec<chiacraft_packages::identity::Hash> = installed().iter().map(|p| p.hash).collect();
+    for w in crate::saves::list(saves) {
+        keep.extend(w.packages.iter().filter_map(|(_, hex)| chiacraft_packages::identity::Hash::from_hex(hex)));
+    }
+    let done = store.tidy(&keep, SPARE_PACKAGES);
+    if done != Default::default() {
+        log::info!("package store: removed {} packages and {} files ({} KiB)", done.packages, done.files, done.bytes >> 10);
+    }
 }
 
 fn build(l: &Loader, set: &[PackageRef]) -> Result<content::Content, String> {

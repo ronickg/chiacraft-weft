@@ -317,6 +317,7 @@ impl App {
         // Mods first: the engine's settings are `core:` configs like theirs.
         let cache = self.opts.run_dir.join("cache");
         let mods = modloader::load(&self.opts.mod_dirs, &self.opts.package_dirs, &cache)?;
+        modloader::tidy_store(&self.opts.run_dir.join("saves"));
         crate::config::set_automated(self.opts.automated);
         // The account, before anything needs the network key: made quietly on the first start.
         // Automated runs keep theirs in the run directory's file store, never the OS keystore.

@@ -20,9 +20,45 @@ use std::path::{Path, PathBuf};
 const HEADER: &str = "chiacraft package 1";
 
 /// A package's files may not exceed these: it is data someone else wrote.
-pub const MAX_FILES: usize = 10_000;
+pub const MAX_FILES: usize = 4096;
 pub const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
 pub const MAX_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
+
+/// The files a package may hold, by where they are and what they end in, and how big each kind
+/// may be: only formats the game reads, decoded by its own pure-Rust code. Anything else is
+/// refused before it is downloaded or stored.
+const ALLOWED: &[(&str, &[&str], u64)] = &[
+    ("defs/blocks/", &["toml"], 256 << 10),
+    ("defs/items/", &["toml"], 256 << 10),
+    ("defs/recipes/", &["toml"], 256 << 10),
+    ("defs/tags/", &["toml"], 256 << 10),
+    ("assets/lang/", &["lang"], 1 << 20),
+    ("assets/textures/", &["png"], 16 << 20),
+    ("assets/textures/", &["anim", "ctm", "gui"], 64 << 10),
+    ("assets/models/", &["json"], 1 << 20),
+    ("assets/sounds/", &["ogg", "wav"], MAX_FILE_BYTES),
+];
+
+/// Whether a package may hold a file at `path` of `size` bytes; why not if it may not.
+pub fn check_file(path: &str, size: u64) -> Result<(), String> {
+    if !valid_file_path(path) {
+        return Err(format!("{path}: name files and folders with letters, digits, `_`, `-` and `.`"));
+    }
+    let max = if path == "package.toml" {
+        64 << 10
+    } else {
+        let ext = path.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
+        let kind = ALLOWED.iter().find(|(dir, exts, _)| path.starts_with(dir) && exts.contains(&ext));
+        let Some((_, _, max)) = kind else {
+            return Err(format!("{path}: not a file a package may hold (see docs/packages.md, \"What a package may hold\")"));
+        };
+        *max
+    };
+    if size > max {
+        return Err(format!("{path}: bigger than {} KiB", max >> 10));
+    }
+    Ok(())
+}
 
 /// A BLAKE3 hash: of a file, or of a manifest (then it names a package).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -103,11 +139,10 @@ impl FileManifest {
             if files.len() >= MAX_FILES {
                 return Err(format!("more than {MAX_FILES} files"));
             }
+            check_file(&rel, std::fs::metadata(&full).map_err(|e| format!("{rel}: {e}"))?.len())?;
             let bytes = std::fs::read(&full).map_err(|e| format!("{rel}: {e}"))?;
             let size = bytes.len() as u64;
-            if size > MAX_FILE_BYTES {
-                return Err(format!("{rel}: bigger than {} MiB", MAX_FILE_BYTES >> 20));
-            }
+            check_file(&rel, size)?;
             total += size;
             if total > MAX_TOTAL_BYTES {
                 return Err(format!("more than {} MiB in all", MAX_TOTAL_BYTES >> 20));
@@ -147,14 +182,12 @@ impl FileManifest {
             let (Some(path), Some(size), Some(hash), None) = (parts.next(), parts.next(), parts.next(), parts.next()) else {
                 return Err(format!("bad line `{l}`"));
             };
-            if !valid_file_path(path) {
-                return Err(format!("bad path `{path}`"));
-            }
             let size = size.parse().map_err(|_| format!("bad size in `{l}`"))?;
+            check_file(path, size)?;
             let hash = Hash::from_hex(hash).ok_or_else(|| format!("bad hash in `{l}`"))?;
             files.push(FileEntry { path: path.to_string(), size, hash });
         }
-        if files.len() > MAX_FILES || files.iter().map(|f| f.size).sum::<u64>() > MAX_TOTAL_BYTES || files.iter().any(|f| f.size > MAX_FILE_BYTES) {
+        if files.len() > MAX_FILES || files.iter().map(|f| f.size).sum::<u64>() > MAX_TOTAL_BYTES {
             return Err("over the size limits".into());
         }
         let m = FileManifest { id, version, files };
@@ -227,6 +260,29 @@ mod tests {
         assert!(FileManifest::parse(&text.replace("defs/items/ruby.toml", "../ruby.toml")).is_err());
         assert!(FileManifest::parse(&format!("{text}\n")).is_err());
         assert!(!valid_file_path("a/../b") && !valid_file_path("/etc/passwd") && !valid_file_path("a/.hidden") && valid_file_path("assets/lang/en_us.lang"));
+        let _ = std::fs::remove_dir_all(&a);
+    }
+
+    /// Only the kinds of file the game reads, each within its size.
+    #[test]
+    fn allow_list() {
+        assert!(check_file("package.toml", 100).is_ok());
+        assert!(check_file("defs/blocks/ruby.toml", 100).is_ok());
+        assert!(check_file("assets/textures/block/ruby.png", 4096).is_ok());
+        assert!(check_file("assets/textures/block/water.anim", 100).is_ok());
+        assert!(check_file("assets/sounds/music/calm.ogg", 10 << 20).is_ok());
+        assert!(check_file("assets/textures/block/ruby.exe", 10).is_err());
+        assert!(check_file("assets/lang/en_us.png", 10).is_err());
+        assert!(check_file("defs/blocks/ruby.json", 10).is_err());
+        assert!(check_file("README.md", 10).is_err());
+        assert!(check_file("assets/textures/block/ruby.png", 17 << 20).is_err());
+        assert!(check_file("defs/items/ruby.toml", 300 << 10).is_err());
+        let a = package("allow");
+        std::fs::write(a.join("notes.txt"), "hi").unwrap();
+        assert!(FileManifest::of_dir(&a).unwrap_err().contains("notes.txt"));
+        std::fs::remove_file(a.join("notes.txt")).unwrap();
+        let text = FileManifest::of_dir(&a).unwrap().text();
+        assert!(FileManifest::parse(&text.replace("defs/items/ruby.toml", "defs/items/ruby.dll")).is_err());
         let _ = std::fs::remove_dir_all(&a);
     }
 }

@@ -32,7 +32,9 @@ static CURRENT: Mutex<Option<Package>> = Mutex::new(None);
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn chiacraft_register_package(host: *const Host, me: ModId, reg: *mut Registrar, dir: Str) -> u32 {
     let dir = std::path::PathBuf::from(unsafe { dir.as_str() });
-    let pkg = match chiacraft_packages::load(&dir) {
+    // Someone else's files must not take the game down, and a panic may not cross into the engine.
+    let loaded = std::panic::catch_unwind(|| chiacraft_packages::load(&dir)).unwrap_or_else(|_| Err(vec!["reading the package failed".into()]));
+    let pkg = match loaded {
         Ok(p) => p,
         Err(errors) => {
             for e in errors {

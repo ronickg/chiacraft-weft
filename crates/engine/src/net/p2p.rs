@@ -30,6 +30,20 @@ const GET_MANIFEST: u8 = 0;
 const GET_FILE: u8 = 1;
 const MAX_MANIFEST: u64 = 1 << 20;
 
+/// Limits on joining (chiacraft): the hello and the ready are small; a player has this long to
+/// download the world's packages and load them; the host serves this many players' downloads at
+/// once, this many requests of each at once.
+const MAX_HELLO: usize = 1 << 10;
+const MAX_OFFER: usize = 1 << 20;
+const CONFIGURE_TIME: Duration = Duration::from_secs(15 * 60);
+const MAX_CONFIGURING: usize = 8;
+const PEER_STREAMS: usize = 4;
+/// A world offers at most this many packages, this much in all.
+const MAX_OFFERS: usize = 256;
+const MAX_JOIN_BYTES: u64 = 1 << 30;
+/// A download that sends nothing for this long has stalled.
+const STALL: Duration = Duration::from_secs(30);
+
 fn runtime() -> &'static tokio::runtime::Runtime {
     static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
     RT.get_or_init(|| {
@@ -135,16 +149,29 @@ async fn write_frame(send: &mut iroh::endpoint::SendStream, data: &[u8]) -> Resu
 }
 
 async fn read_frame(recv: &mut iroh::endpoint::RecvStream) -> Result<Vec<u8>, String> {
+    read_frame_max(recv, MAX_FRAME).await
+}
+
+/// A frame of at most `max` bytes, unpacked: the size a packed frame claims is checked before
+/// anything is allocated for it (chiacraft: a few bytes could otherwise claim gigabytes).
+async fn read_frame_max(recv: &mut iroh::endpoint::RecvStream, max: usize) -> Result<Vec<u8>, String> {
     let mut h = [0u8; 4];
     recv.read_exact(&mut h).await.map_err(|e| e.to_string())?;
     let header = u32::from_le_bytes(h);
     let len = (header >> 1) as usize;
-    if len > MAX_FRAME {
+    if len > max {
         return Err("frame too large".into());
     }
     let mut buf = vec![0u8; len];
     recv.read_exact(&mut buf).await.map_err(|e| e.to_string())?;
-    if header & 1 == 1 { lz4_flex::decompress_size_prepended(&buf).map_err(|e| e.to_string()) } else { Ok(buf) }
+    if header & 1 == 0 {
+        return Ok(buf);
+    }
+    let unpacked = buf.get(..4).map(|b| u32::from_le_bytes(b.try_into().unwrap()) as usize).ok_or("frame too short")?;
+    if unpacked > max {
+        return Err("frame too large".into());
+    }
+    lz4_flex::decompress_size_prepended(&buf).map_err(|e| e.to_string())
 }
 
 /// Ticket: `id;relay;ip:port,ip:port`. The id alone is enough with n0 address lookup; the
@@ -216,11 +243,15 @@ pub fn stop_hosting() {
 async fn accept(incoming: iroh::endpoint::Incoming, connect: crossbeam_channel::Sender<ServerConn>) -> Result<(), String> {
     let conn = incoming.await.map_err(|e| e.to_string())?;
     let peer = conn.remote_id();
-    let (mut send, mut recv) = conn.accept_bi().await.map_err(|e| e.to_string())?;
-    let hello = read_frame(&mut recv).await?;
+    let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi()).await.map_err(|_| "no hello")?.map_err(|e| e.to_string())?;
+    let hello = tokio::time::timeout(Duration::from_secs(10), read_frame_max(&mut recv, MAX_HELLO)).await.map_err(|_| "no hello")??;
     let (proto, native) = <(u32, u64) as codec::Wire>::get(&mut codec::R(&hello)).ok_or("bad hello")?;
     let offers = crate::modloader::current_packages();
-    let refusal = if proto != PROTOCOL {
+    // Joins still configuring hold a place until this goes out of scope.
+    let place = Configuring::take();
+    let refusal = if place.is_none() {
+        "the world is busy with other players joining; try again in a minute".to_string()
+    } else if proto != PROTOCOL {
         format!("protocol mismatch: server {PROTOCOL}, client {proto}")
     } else if native != native_hash() {
         format!("different mods; server runs: {}", mod_list())
@@ -235,8 +266,10 @@ async fn accept(incoming: iroh::endpoint::Incoming, connect: crossbeam_channel::
     }
     // The joining game downloads the packages it lacks, then says what content it loaded.
     let serving = tokio::spawn(serve_packages(conn.clone(), offers));
-    let ready = read_frame(&mut recv).await;
+    let ready = tokio::time::timeout(CONFIGURE_TIME, read_frame_max(&mut recv, MAX_HELLO)).await;
     serving.abort();
+    drop(place);
+    let ready = ready.map_err(|_| "took too long to download and load the world's packages")?;
     let loaded = <u64 as codec::Wire>::get(&mut codec::R(&ready?)).ok_or("bad ready")?;
     let refusal = if loaded != content_hash() { "the content does not match this world's after its packages".to_string() } else { String::new() };
     write_frame(&mut send, refusal.as_bytes()).await?;
@@ -274,35 +307,117 @@ async fn serve_packages(conn: iroh::endpoint::Connection, offers: Vec<Offer>) {
     let Some(store) = crate::modloader::store() else { return };
     let mut manifests = rustc_hash::FxHashSet::default();
     let mut files = rustc_hash::FxHashSet::default();
+    let mut offered = 0u64;
     for (_, _, hex, ..) in &offers {
         let Some(h) = Hash::from_hex(hex) else { continue };
         if let Ok(m) = store.manifest(&h) {
             manifests.insert(h);
             files.extend(m.files.iter().map(|f| f.hash));
+            offered += m.files.iter().map(|f| f.size).sum::<u64>() + MAX_MANIFEST;
         }
     }
+    // Each player may fetch what is offered about twice over, a few requests at a time: enough
+    // for a retry, never an endless drain of the host's upload.
+    let budget = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(offered * 2));
+    let requests = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new((manifests.len() + files.len()) * 2 + 16));
+    let streams = std::sync::Arc::new(tokio::sync::Semaphore::new(PEER_STREAMS));
     let (manifests, files) = (std::sync::Arc::new(manifests), std::sync::Arc::new(files));
     while let Ok((mut send, mut recv)) = conn.accept_bi().await {
-        let (store, manifests, files) = (chiacraft_packages::store::Store::new(store.root()), manifests.clone(), files.clone());
+        use std::sync::atomic::Ordering::Relaxed;
+        if requests.fetch_update(Relaxed, Relaxed, |n| n.checked_sub(1)).is_err() {
+            log::warn!("{}: too many package requests", conn.remote_id());
+            conn.close(1u32.into(), b"too many requests");
+            return;
+        }
+        let Ok(permit) = streams.clone().acquire_owned().await else { return };
+        let (store, manifests, files, budget) = (chiacraft_packages::store::Store::new(store.root()), manifests.clone(), files.clone(), budget.clone());
         tokio::spawn(async move {
-            let Ok(req) = read_frame(&mut recv).await else { return };
+            let _permit = permit;
+            let Ok(Ok(req)) = tokio::time::timeout(STALL, read_frame_max(&mut recv, 256)).await else { return };
             let Some((kind, hex)) = <(u32, String) as codec::Wire>::get(&mut codec::R(&req)) else { return };
             let h = Hash::from_hex(&hex);
-            let bytes: Result<Vec<u8>, String> = match (kind as u8, h) {
-                (GET_MANIFEST, Some(h)) if manifests.contains(&h) => store.manifest_text(&h).map(String::into_bytes),
-                (GET_FILE, Some(h)) if files.contains(&h) => store.blob_path(&h).ok_or("not in the store".to_string()).and_then(|p| std::fs::read(p).map_err(|e| e.to_string())),
+            let answer: Result<Body, String> = match (kind as u8, h) {
+                (GET_MANIFEST, Some(h)) if manifests.contains(&h) => store.manifest_text(&h).map(|t| Body::Bytes(t.into_bytes())),
+                (GET_FILE, Some(h)) if files.contains(&h) => store
+                    .blob_path(&h)
+                    .ok_or("not in the store".to_string())
+                    .and_then(|p| Ok(Body::File(std::fs::metadata(&p).map_err(|e| e.to_string())?.len(), p))),
                 _ => Err("not offered".into()),
             };
-            let (err, bytes) = match bytes {
-                Ok(b) => (String::new(), b),
-                Err(e) => (e, Vec::new()),
-            };
+            let answer = answer.and_then(|a| match budget.fetch_update(Relaxed, Relaxed, |b| b.checked_sub(a.len())) {
+                Ok(_) => Ok(a),
+                Err(_) => Err("this player has downloaded too much".into()),
+            });
             let mut w = codec::W::default();
-            codec::Wire::put(&(err, bytes.len() as u64), &mut w);
-            if write_frame(&mut send, &w.0).await.is_ok() && send.write_all(&bytes).await.is_ok() {
-                let _ = send.finish();
+            match answer {
+                Err(e) => {
+                    codec::Wire::put(&(e, 0u64), &mut w);
+                    let _ = write_frame(&mut send, &w.0).await;
+                }
+                Ok(body) => {
+                    codec::Wire::put(&(String::new(), body.len()), &mut w);
+                    if write_frame(&mut send, &w.0).await.is_err() {
+                        return;
+                    }
+                    let sent = match &body {
+                        Body::Bytes(b) => send.write_all(b).await.is_ok(),
+                        Body::File(len, p) => send_file(&mut send, p, *len).await.is_ok(),
+                    };
+                    if !sent {
+                        return;
+                    }
+                }
             }
+            let _ = send.finish();
         });
+    }
+}
+
+/// What a package request is answered with: a manifest's text, or a stored file of this length.
+enum Body {
+    Bytes(Vec<u8>),
+    File(u64, std::path::PathBuf),
+}
+
+impl Body {
+    fn len(&self) -> u64 {
+        match self {
+            Body::Bytes(b) => b.len() as u64,
+            Body::File(len, _) => *len,
+        }
+    }
+}
+
+/// Streams `len` bytes of the file at `path`, a piece at a time (never the whole file in memory).
+async fn send_file(send: &mut iroh::endpoint::SendStream, path: &Path, len: u64) -> Result<(), String> {
+    use tokio::io::AsyncReadExt;
+    let mut file = tokio::fs::File::open(path).await.map_err(|e| e.to_string())?.take(len);
+    let mut buf = vec![0u8; 256 << 10];
+    loop {
+        let n = file.read(&mut buf).await.map_err(|e| e.to_string())?;
+        if n == 0 {
+            return Ok(());
+        }
+        tokio::time::timeout(STALL, send.write_all(&buf[..n])).await.map_err(|_| "stalled".to_string())?.map_err(|e| e.to_string())?;
+    }
+}
+
+/// A place among the joins the host is configuring at once ([`MAX_CONFIGURING`]); given back on
+/// drop.
+struct Configuring;
+
+static CONFIGURING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+impl Configuring {
+    fn take() -> Option<Configuring> {
+        use std::sync::atomic::Ordering::SeqCst;
+        CONFIGURING.fetch_update(SeqCst, SeqCst, |n| (n < MAX_CONFIGURING).then_some(n + 1)).ok().map(|_| Configuring)
+    }
+}
+
+impl Drop for Configuring {
+    fn drop(&mut self) {
+        CONFIGURING.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -312,7 +427,7 @@ async fn fetch(conn: &iroh::endpoint::Connection, kind: u8, hash: &chiacraft_pac
     let mut w = codec::W::default();
     codec::Wire::put(&(kind as u32, hash.hex()), &mut w);
     write_frame(&mut send, &w.0).await?;
-    let head = read_frame(&mut recv).await?;
+    let head = tokio::time::timeout(STALL, read_frame_max(&mut recv, 1024)).await.map_err(|_| "the download stalled")??;
     let (err, len) = <(String, u64) as codec::Wire>::get(&mut codec::R(&head)).ok_or("bad answer")?;
     if !err.is_empty() {
         return Err(format!("the host: {err}"));
@@ -321,7 +436,15 @@ async fn fetch(conn: &iroh::endpoint::Connection, kind: u8, hash: &chiacraft_pac
         return Err(format!("the host sent {len} bytes where {max} were expected"));
     }
     let mut buf = vec![0u8; len as usize];
-    recv.read_exact(&mut buf).await.map_err(|e| e.to_string())?;
+    let mut got = 0;
+    while got < buf.len() {
+        match tokio::time::timeout(STALL, recv.read(&mut buf[got..])).await {
+            Err(_) => return Err("the download stalled".into()),
+            Ok(Err(e)) => return Err(e.to_string()),
+            Ok(Ok(None)) => return Err("the host stopped sending".into()),
+            Ok(Ok(Some(n))) => got += n,
+        }
+    }
     Ok(buf)
 }
 
@@ -358,6 +481,9 @@ async fn download(conn: &iroh::endpoint::Connection, missing: &[Offer], events: 
     use chiacraft_packages::identity::{FileManifest, Hash, MAX_TOTAL_BYTES};
     let store = crate::modloader::store().ok_or("mods are not loaded")?;
     let total: u64 = missing.iter().map(|o| o.3).sum();
+    if missing.len() > MAX_OFFERS || total > MAX_JOIN_BYTES {
+        return Err(format!("the world wants {} packages, {} MiB: more than this game downloads", missing.len(), total >> 20));
+    }
     let mut done = 0u64;
     for (id, _, hex, size, sig) in missing {
         let h = Hash::from_hex(hex).ok_or_else(|| format!("package {id}: a bad hash"))?;
@@ -441,6 +567,25 @@ async fn connect(settings: &Settings, addr: EndpointAddr) -> Result<(Endpoint, i
     Err(last)
 }
 
+/// What a host offers is shown to the player and fetched: only well-formed offers, within limits.
+fn check_offers(offers: &[Offer]) -> Result<(), String> {
+    if offers.len() > MAX_OFFERS {
+        return Err(format!("the world plays with {} packages: more than this game takes", offers.len()));
+    }
+    for (id, version, hash, _, sig) in offers {
+        let fine = (1..=64).contains(&id.len())
+            && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+            && (1..=64).contains(&version.len())
+            && version.chars().all(|c| c.is_ascii_alphanumeric() || ".+-".contains(c))
+            && chiacraft_packages::identity::Hash::from_hex(hash).is_some()
+            && sig.len() <= 4096;
+        if !fine {
+            return Err("the host offered a package this game can't read".into());
+        }
+    }
+    Ok(())
+}
+
 /// Starts joining a host. The join runs in the background and reports through `events`: the
 /// world's packages to download (with consent), progress, the packages to load, and finally the
 /// connection, or why it failed.
@@ -456,11 +601,12 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
             let mut hello = codec::W::default();
             codec::Wire::put(&(PROTOCOL, native_hash()), &mut hello);
             write_frame(&mut send, &hello.0).await?;
-            let reply = read_frame(&mut recv).await?;
+            let reply = tokio::time::timeout(Duration::from_secs(30), read_frame_max(&mut recv, MAX_OFFER)).await.map_err(|_| "the host didn't answer")??;
             let (refusal, offers) = <(String, Vec<Offer>) as codec::Wire>::get(&mut codec::R(&reply)).ok_or("the host answered in an unknown way (another version?)")?;
             if !refusal.is_empty() {
-                return Err(refusal);
+                return Err(refusal.chars().take(500).collect());
             }
+            check_offers(&offers)?;
             let store = crate::modloader::store().ok_or("mods are not loaded")?;
             let missing: Vec<Offer> = offers
                 .iter()
@@ -484,7 +630,7 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
             let mut w = codec::W::default();
             codec::Wire::put(&loaded, &mut w);
             write_frame(&mut send, &w.0).await?;
-            let verdict = read_frame(&mut recv).await?;
+            let verdict = tokio::time::timeout(Duration::from_secs(30), read_frame_max(&mut recv, MAX_HELLO)).await.map_err(|_| "the host didn't answer")??;
             if !verdict.is_empty() {
                 return Err(String::from_utf8_lossy(&verdict).into_owned());
             }

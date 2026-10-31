@@ -151,10 +151,23 @@ pub struct Image {
     pub rgba: Vec<u8>,
 }
 
+/// Textures larger than this on a side are refused before they are decoded: data packages come
+/// from other players (chiacraft).
+const MAX_PNG_SIDE: u32 = 4096;
+
 pub fn decode_png(bytes: &[u8]) -> Option<Image> {
-    let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
+    // Decoding someone else's file must never take the game down.
+    std::panic::catch_unwind(|| decode_png_inner(bytes)).ok().flatten()
+}
+
+fn decode_png_inner(bytes: &[u8]) -> Option<Image> {
+    let limits = png::Limits { bytes: (MAX_PNG_SIDE * MAX_PNG_SIDE * 4) as usize };
+    let mut decoder = png::Decoder::new_with_limits(std::io::Cursor::new(bytes), limits);
     decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16 | png::Transformations::ALPHA);
     let mut reader = decoder.read_info().ok()?;
+    if reader.info().width > MAX_PNG_SIDE || reader.info().height > MAX_PNG_SIDE {
+        return None;
+    }
     let mut buf = vec![0; reader.output_buffer_size()?];
     let info = reader.next_frame(&mut buf).ok()?;
     let (w, h) = (info.width, info.height);

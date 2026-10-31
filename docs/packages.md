@@ -100,6 +100,26 @@ time = 200
 entries = ["ruby", "ruby_block", "#other_tag"]
 ```
 
+## What a package may hold
+
+A package holds only files the game reads, each kind within a size. Anything else (a `README.md`,
+a script, an archive, a texture in another format) and the package is left out with the reason in
+the log; a joining game refuses such a package before downloading any of it.
+
+| Where | Files | Each at most |
+|---|---|---|
+| top level | `package.toml` | 64 KiB |
+| `defs/blocks/`, `defs/items/`, `defs/recipes/`, `defs/tags/` | `.toml` | 256 KiB |
+| `assets/lang/` | `.lang` | 1 MiB |
+| `assets/textures/` | `.png` (at most 4096 pixels a side) | 16 MiB |
+| `assets/textures/` | `.anim`, `.ctm`, `.gui` | 64 KiB |
+| `assets/models/` | `.json` | 1 MiB |
+| `assets/sounds/` | `.ogg`, `.wav` | 64 MiB |
+
+A package has at most 4096 files and 256 MiB in all, and at most 4096 definitions. A texture
+larger than 4096 pixels on a side shows as the missing texture. `package.sig` (see below) and hidden
+files are not part of the package.
+
 ## How a package is named
 
 A package is named by a hash of its exact files: the BLAKE3 hash of a manifest that lists every
@@ -110,6 +130,10 @@ game shows its first 12 hex digits (`gems 0.1.0 (7a73bcf1cf25)` in the log).
 On start each package is copied into the store in `run/cache` (each file once, by hash), checked
 against its hash, and loaded from there, the same way packages downloaded from other players will be.
 File names may use letters, digits, `_`, `-` and `.`; hidden files (starting with a dot) are left out.
+
+The store keeps every package a world on this computer pins and every installed package. Other
+packages (those downloaded for friends' worlds) are kept up to 512 MiB, the most recently used
+first; on start the game removes the rest, and any file no kept package needs.
 
 ## Worlds remember their packages
 
@@ -130,6 +154,12 @@ file and the package's manifest against their hashes (and the sizes the host dec
 the store, loads exactly the host's set, and then shows the host the hash of the content it loaded:
 only a match gets in. The host serves nothing but the packages its world uses. Code mods are not
 downloaded: both games must have the same ones.
+
+Limits keep a join from hurting either side. A world offers at most 256 packages and 1 GiB in all;
+a download that sends nothing for 30 seconds has stalled. The host serves a player each offered
+package about twice at most, four requests at a time, and lets eight players download at once
+(others are asked to try again in a minute); a player has 15 minutes to download and load the
+world's packages.
 
 ## Signing a package
 

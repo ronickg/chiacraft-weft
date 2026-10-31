@@ -147,7 +147,15 @@ The smallest version that works is phases 1-4.
       certified by the account (DID later); signatures in an envelope outside the pinned hash;
       join sheet with sizes, creators and key fingerprints; trust defaults to this package or this
       world's set, trusting a creator is a deliberate step.
-   6. *Hardening*: format allow-list, decode and size limits, host serves only pinned hashes.
+   6. *Hardening* (done): format allow-list by folder and extension with a size per kind
+      (`identity::check_file`, enforced on import and on every downloaded manifest); PNGs capped at
+      4096 a side and decoded under `catch_unwind`; package reading can't panic across the FFI;
+      packed frames checked before decompressing; time limits on the hello, the configuration
+      phase and stalled downloads; the host serves only offered hashes, at most twice each, four
+      streams a peer, eight joins at once, files streamed in pieces; the guest refuses malformed or
+      oversized offers; store tidy at start (pins + installed kept, 512 MiB LRU for the rest,
+      orphan files and crash leftovers removed); cargo-fuzz targets for the manifest, signature
+      and definition parsers (`crates/packages/fuzz`, nightly, not run in CI yet).
    Later: iroh-blobs for downloads from other players and mirrors, reviewer lists, key rotation.
 3. **Portals.** World addresses (key, DID later); link requests inbox with pre-allow; links
    signed by both worlds, revocable; portal blocks; travel with the connection prepared ahead; a

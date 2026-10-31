@@ -94,12 +94,31 @@ first join asks and trusts the creator; that creator's next version downloads wi
 unsigned package asks again; a tampered signature shows as refused. testkit's script line
 `tap <screen> <element>` clicks through screens.
 
+Slice 6 (hardening) is done, and with it Phase 2's slices. The allow-list is
+`identity::check_file` (folder, extension and size per kind; `docs/packages.md`, "What a package may
+hold"), checked by `FileManifest::of_dir` and `FileManifest::parse`, so a local package with other
+files is left out and a joining game refuses such a manifest before fetching anything.
+`assets::decode_png` refuses textures over 4096 a side and runs under `catch_unwind`; the
+`packages` mod catches panics while reading a package. In `net/p2p.rs`: `read_frame_max` checks a
+packed frame's claimed size before decompressing (that was open to any peer, before admission);
+the hello, offer, ready and verdict have small size caps and time limits; the configuration phase
+has 15 minutes; `serve_packages` gives each peer a byte budget (twice what is offered), a request
+cap and four streams, and streams files in 256 KiB pieces (`send_file`); `Configuring` caps joins
+in progress at eight; the guest checks offers (`check_offers`), totals and stalls. `Store::tidy`
+runs at start (`modloader::tidy_store`): keeps installed packages and every world's pins, keeps the
+most recently used others within 512 MiB (`Store::touch` on use), removes orphan files and crash
+leftovers. Fuzz targets in `crates/packages/fuzz` (own workspace; `cargo +nightly fuzz run
+manifest`, also `signature`, `defs`); not run yet. Checked with two copies: a 2.4 MB sound streamed
+to the guest; a package holding `run.sh` was left out; an 8192-pixel texture showed as missing
+without a crash; the store tidy removed a half-done package and stray files and kept the pinned
+ones. The per-peer limits and the frame check weren't exercised by a hostile client.
+
 ## Next steps
 
-1. Phase 2 slice 6 (hardening) per `notes/PLAN.md`: format allow-list, decode and size limits,
-   host per-peer limits, store garbage collection; then the "later" items (bao-tree verified
-   streaming and resume, iroh-blobs for downloads from other players, reviewer lists, key
-   rotation).
+1. Phase 2 "later" items: bao-tree verified streaming and resume, iroh-blobs for downloads from
+   other players and mirrors, reviewer lists, key rotation; running the fuzz targets (nightly,
+   perhaps a scheduled CI job).
+2. Phase 3 (portals) per `notes/PLAN.md`, starting with the per-world `Content` decision in Open.
 
 ## Notes
 
