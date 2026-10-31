@@ -103,9 +103,9 @@ impl Screen for Account {
             ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(360.0), |ui| {
                 label(ui, cx, "account.restore_title", &[], "default");
                 label(ui, cx, "account.restore_hint", &[], "dim");
-                let input = ui.add(Kind::input("", 400), Style::default().h(18.0).stretch());
+                let input = ui.add(Kind::input("", 400), Style::default().h(18.0).w(344.0));
                 ui.set_id(input, "restore_words");
-                button(ui, cx, "account.restore", &[], 160.0, |c| {
+                let restore = button(ui, cx, "account.restore", &[], 160.0, |c| {
                     let words = c.input_text("restore_words").unwrap_or_default();
                     let result = chiacraft_account::current().map(|s| s.restore(&words));
                     update(c, |a| {
@@ -116,6 +116,7 @@ impl Screen for Account {
                         });
                     });
                 });
+                ui.set_id(restore, "restore");
             });
 
             if let Some((key, arg)) = &note {

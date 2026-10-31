@@ -120,7 +120,7 @@ fn short(target: &str) -> &str {
 }
 
 fn is_ours(target: &str) -> bool {
-    target.starts_with("weft") || target.starts_with("mod:") || target == "vulkan" || CHANNELS.iter().any(|c| c.0 == target)
+    target.starts_with("weft") || target.starts_with("chiacraft") || target.starts_with("mod:") || target == "vulkan" || CHANNELS.iter().any(|c| c.0 == target)
 }
 
 /// `verbose` is `--verbose` (debug for everything of ours), `spec` the `--log` filters.

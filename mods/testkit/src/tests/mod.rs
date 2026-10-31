@@ -1,5 +1,6 @@
 //! The test list. Each test is an `async fn(T) -> R`; failed checks are collected, `?` stops it.
 
+mod account;
 mod bodies;
 mod extend;
 mod gameplay;
@@ -28,6 +29,7 @@ pub fn all() -> Vec<TestDef> {
     crate::tests![
         scene::scene,
         ui::screens,
+        account::account,
         ui::scrollbar,
         ui::rebind,
         ui::f3,

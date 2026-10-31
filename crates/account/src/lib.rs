@@ -8,8 +8,8 @@
 //! back the same address and the same player on every world.
 //!
 //! Where things are:
-//! - `accounts.json` (public facts only) in the account home: `<run dir>/account`, or
-//!   `CHIACRAFT_ACCOUNT_HOME`;
+//! - `accounts.json` (public facts only) in the account home: `<run dir>/account` (automated runs:
+//!   `<run dir>/test-account`, beside the player's), or `CHIACRAFT_ACCOUNT_HOME`;
 //! - the secret in the OS keystore (macOS Keychain, Windows Credential Manager, Linux Secret
 //!   Service), or in the account home's encrypted file store for automated runs and machines
 //!   without a keystore ([`use_file_store`], or `HORIZON_WALLET_STORE=file`).
@@ -116,10 +116,14 @@ impl Session {
     pub fn restore(&self, words: &str) -> Result<u32, String> {
         let mnemonic = Mnemonic::parse(words).map_err(|p| p.to_string())?;
         let mut accounts = self.accounts()?;
-        let info = accounts.restore(&mnemonic, DEFAULT_NAME).map_err(|e| e.to_string())?;
-        accounts.set_default(info.fingerprint).map_err(|e| e.to_string())?;
-        log::info!("restored account {}; it is used from the next start", info.fingerprint);
-        Ok(info.fingerprint)
+        // Words of an account this computer already lists (going back to an earlier one) switch to it.
+        let mut fingerprint = chiacraft_wallet::keys::facts_of(&mnemonic).fingerprint;
+        if accounts.get(fingerprint).is_none() {
+            fingerprint = accounts.restore(&mnemonic, DEFAULT_NAME).map_err(|e| e.to_string())?.fingerprint;
+        }
+        accounts.set_default(fingerprint).map_err(|e| e.to_string())?;
+        log::info!("restored account {fingerprint}; it is used from the next start");
+        Ok(fingerprint)
     }
 }
 
@@ -135,15 +139,17 @@ pub fn check_vouch(line: &str, endpoint: &str) -> Option<String> {
 static SESSION: OnceLock<Result<Session, String>> = OnceLock::new();
 static OS_KEYSTORE: AtomicBool = AtomicBool::new(true);
 
-/// Keep this process's secrets in the account home's file store, never the OS keystore. Automated
-/// runs call it before anything opens the account, so tests never reach the real keystore.
+/// Keep this process's secrets in the account home's file store, never the OS keystore, and that
+/// home apart from the player's. Automated runs call it before anything opens the account, so
+/// tests never reach the real keystore or the player's account.
 pub fn use_file_store() {
     OS_KEYSTORE.store(false, Ordering::Relaxed);
 }
 
 /// The account home for a run directory.
 pub fn home(run_dir: &Path) -> PathBuf {
-    std::env::var_os("CHIACRAFT_ACCOUNT_HOME").map(PathBuf::from).unwrap_or_else(|| run_dir.join("account"))
+    let dir = if OS_KEYSTORE.load(Ordering::Relaxed) { "account" } else { "test-account" };
+    std::env::var_os("CHIACRAFT_ACCOUNT_HOME").map(PathBuf::from).unwrap_or_else(|| run_dir.join(dir))
 }
 
 /// Opens the account once per process (making it the first time) and keeps it open. Later calls
@@ -202,6 +208,27 @@ mod tests {
         assert_eq!(check_vouch(&line, "abc"), Some(first.identity_hex()));
         assert_eq!(check_vouch(&line, "abd"), None);
         assert_eq!(check_vouch("nonsense", "abc"), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Restoring words makes their account the next start's, also when this computer lists it
+    /// already (going back to an earlier account), and nonsense words change nothing.
+    #[test]
+    fn restore_switches_accounts_and_back() {
+        let dir = std::env::temp_dir().join(format!("chiacraft-account-restore-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let first = start_file(&dir).expect("a new account");
+        let words = first.words().unwrap().expose().join(" ");
+        let other = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art";
+        assert!(first.restore("these are not the words").is_err());
+        assert_eq!(start_file(&dir).unwrap().info.fingerprint, first.info.fingerprint);
+        let restored = first.restore(other).expect("restoring other words");
+        assert_ne!(restored, first.info.fingerprint);
+        assert_eq!(start_file(&dir).unwrap().info.fingerprint, restored);
+        assert_eq!(first.restore(&words).expect("going back to the first account"), first.info.fingerprint);
+        let back = start_file(&dir).unwrap();
+        assert_eq!(back.info.fingerprint, first.info.fingerprint);
+        assert_eq!(back.network_seed(), first.network_seed());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

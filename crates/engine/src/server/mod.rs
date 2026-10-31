@@ -1225,7 +1225,10 @@ impl Server {
         p.entity = id;
         p.last_y = pos.y;
         p.first_sync = true;
-        log::info!("{} joined", p.name);
+        match &p.identity {
+            Some(identity) => log::info!("{} joined (account identity {identity})", p.name),
+            None => log::info!("{} joined", p.name),
+        }
         p.conn.send(ToClient::Welcome { player: id, dim, pos, seed: self.cfg.seed });
         p.conn.send(ToClient::Edits { dim, specs: self.dims[dim as usize].edits.iter().map(|e| e.spec(c)).collect(), all: true });
         p.conn.send(ToClient::Configs(crate::config::synced()));
