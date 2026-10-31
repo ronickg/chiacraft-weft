@@ -43,7 +43,7 @@ erase what they earned.
 | Discovery | Decentralised: on chain and/or DIG (see "Finding worlds") |
 | Mod consent | Asked the first time; trusted mods and creators are not asked again |
 | Personal mods | Allowed or not per world, owner's choice |
-| Native Weft mods | Still allowed, for freedom; a separate trust tier (see "Native mods") |
+| Native Weft mods | Allowed, off by default; each native mod set is its own universe, entered with a restart (see "Native mods") |
 | Inventory carry-over | Per world (or per link), owner's choice, off chain |
 | Bans | By login key and DID; probation, DID age and shared lists make them stick |
 | Gating | Open by default; owners combine rules (allow lists, DID age, achievements, NFTs later) |
@@ -89,15 +89,28 @@ sponsors (free DIDs).
 Each world pins exact package versions by hash; the cache keeps versions side by side; the game
 switches content when a player walks through a portal.
 
-### Native mods (proposed)
+### Native mods: their own universes
 
-Full freedom, clearly labelled:
-- never downloaded automatically; the player installs them and sees an "unsandboxed" warning;
-- worlds that need them say so on their listing and portal ("requires unsandboxed mods: X, Y"),
-  with links to where to get them;
-- while any native mod is loaded, the account's secrets are not in the game process: signing and
-  login go through a small signer helper the game starts (the separate process from the security
-  discussion). Without native mods the helper is optional.
+Full freedom, clearly separated (decided 2026-10-31):
+- **The main universe is package-based worlds.** They all link to each other; travel by portal is
+  seamless (download, swap content in place, no restart).
+- **Each native mod set is its own universe.** Native code can't be unloaded and Weft freezes
+  content at start, so a set of native mods is fixed while the game runs. Worlds with the same set
+  (the same hashes for every native mod) link and travel seamlessly among themselves.
+- **Between universes is a restart.** A portal or link into a native universe asks "This world
+  needs unsandboxed mods: X, Y. Restart into it?"; the game restarts itself with that set and joins
+  the world. Coming back is another restart. Each universe gets its own mod profile, like a
+  modpack instance, so the player's own setup is untouched.
+- **Off by default.** Setting: "Allow native mods from creators I trust", with a clear warning.
+  Listings and portals mark these worlds "unsandboxed".
+- **Checks:** a hash per system (Windows, Linux, macOS) proves the file is the published one and
+  that everyone runs the same build; the creator's DID signature proves who made it; reviewers'
+  signed hash lists (on DIG) add trust. Hashes prove integrity, not safety. Reproducible builds
+  later.
+- **Account safety:** while any native mod is loaded, the account's secrets are not in the game
+  process: signing and login go through a small signer helper the game starts.
+- **A bridge for authors:** our WebAssembly mod interface mirrors Weft's SDK where it can, so many
+  Weft mods recompile to WebAssembly with few changes and join the main universe.
 
 ### Inventory carry-over (proposed)
 
