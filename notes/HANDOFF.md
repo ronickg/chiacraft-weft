@@ -70,9 +70,20 @@ follow the content. Checked with scripts across runs (two worlds, two versions o
 session) and testkit's new script lines `open <world>` and `leave`. Tests click through menus
 with `T::click_until_screen`, since a click during a menu rebuild is lost.
 
+Slice 4 (joining downloads packages) is done: protocol 4 (`net/p2p.rs`). The hello carries the
+code mods' hash (`native_hash`); the host answers with its world's packages (`Offer`: id, version,
+hash, size) and serves their manifests and files from its store on extra streams of the same
+connection (`serve_packages`), nothing else; the joining game downloads what its store lacks
+(`download`: every manifest and file checked against its hash and the declared sizes), loads exactly
+the host's set (`use_packages`) and sends the hash of its loaded content, which the host checks
+before letting it in. Joining no longer blocks the window: `start_join` reports `JoinEvent`s that
+`Running::poll_join` answers, with a `core:joining` screen. Checked with two copies (host with gems,
+guest with no packages: it downloads, loads and sees the host's blocks). Not yet: piece-by-piece
+verified streaming (bao-tree), resuming, downloading from other players.
+
 ## Next steps
 
-1. Phase 2 slice 4 (configuration phase and transfer) per `notes/PLAN.md`.
+1. Phase 2 slice 5 (signing and trust) per `notes/PLAN.md`.
 
 ## Notes
 

@@ -26,8 +26,8 @@ pub fn host(server: &crate::server::ServerHandle, settings: &crate::settings::Se
     p2p::host(server.connect.clone(), settings);
 }
 
-pub fn join(ticket: &str, settings: &crate::settings::Settings) -> Result<ClientConn, String> {
-    p2p::join(ticket, settings)
+pub fn start_join(ticket: &str, settings: &crate::settings::Settings) -> Result<p2p::Joining, String> {
+    p2p::start_join(ticket, settings)
 }
 
 /// A struct that travels in messages, written field by field.

@@ -121,3 +121,12 @@ joins it the next time it is opened. Opening a world whose package version is in
 folders nor the store asks first. Blocks of a missing package show as
 unknown blocks (magenta and black) and keep their real names in the save, so they come back when the
 package does.
+
+## Joining a friend's world
+
+When you join, the host offers the packages its world plays with (name, version, hash and size).
+Your game downloads the ones it doesn't have from the host, over the same connection, checks every
+file and the package's manifest against their hashes (and the sizes the host declared), keeps them in
+the store, loads exactly the host's set, and then shows the host the hash of the content it loaded:
+only a match gets in. The host serves nothing but the packages its world uses. Code mods are not
+downloaded: both games must have the same ones.

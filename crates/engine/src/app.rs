@@ -76,6 +76,8 @@ pub enum Request {
     LeaveWorld,
     Host,
     Join(String),
+    /// Stops the join in progress (chiacraft).
+    CancelJoin,
     Respawn,
     SendChat(String),
     /// Re-read packs and assets, as the reload key does.
@@ -190,6 +192,8 @@ pub(crate) struct Running {
     screens: Vec<(Box<dyn Screen>, Ui)>,
     hud: Hud,
     game: Option<Game>,
+    /// Joining a friend's world, until it is let in (chiacraft: packages are downloaded first).
+    joining: Option<net::p2p::Joining>,
     last: Instant,
     shot_pending: bool,
     fps: f32,
@@ -401,6 +405,7 @@ impl App {
                 h
             },
             game: None,
+            joining: None,
             last: Instant::now(),
             shot_pending: false,
             fps: 0.0,
@@ -602,6 +607,76 @@ impl Running {
         self.reload_assets();
     }
 
+    /// The join in progress: answers what it reports, until the game is let in or it fails.
+    fn poll_join(&mut self) {
+        use net::p2p::{JoinAnswer, JoinEvent};
+        let Some(j) = &self.joining else { return };
+        let events: Vec<JoinEvent> = j.events.try_iter().collect();
+        for ev in events {
+            let answer = |app: &Self, a: JoinAnswer| {
+                if let Some(j) = &app.joining {
+                    let _ = j.answers.send(a);
+                }
+            };
+            match ev {
+                JoinEvent::Offer(all, missing) => {
+                    let bytes: u64 = missing.iter().map(|o| o.3).sum();
+                    log::info!("the world plays with {} data packages; downloading {} ({} KB)", all.len(), missing.len(), bytes.div_ceil(1024));
+                    net::screens::set_join_status("multiplayer.downloading", &[missing.len().to_string(), "0".into(), bytes.div_ceil(1024).to_string()]);
+                    answer(self, JoinAnswer::Accept);
+                }
+                JoinEvent::Progress(done, total) => {
+                    // The package count stays as the offer set it.
+                    let count = net::screens::JOIN_STATUS.lock().1.first().cloned().unwrap_or_default();
+                    net::screens::set_join_status("multiplayer.downloading", &[count, done.div_ceil(1024).to_string(), total.div_ceil(1024).to_string()]);
+                }
+                JoinEvent::Packages(hashes) => {
+                    net::screens::set_join_status("multiplayer.loading_packages", &[]);
+                    let set: Result<Vec<modloader::PackageRef>, String> = hashes
+                        .iter()
+                        .map(|h| chiacraft_packages::identity::Hash::from_hex(h).ok_or_else(|| "a bad package hash".to_string()).and_then(modloader::stored_package))
+                        .collect();
+                    match set.and_then(|s| modloader::use_packages(&s)) {
+                        Ok(changed) => {
+                            if changed {
+                                self.content_changed();
+                            }
+                            answer(self, JoinAnswer::Ready(net::p2p::content_hash()));
+                        }
+                        Err(e) => answer(self, JoinAnswer::Cancel(e)),
+                    }
+                }
+                JoinEvent::Admitted(conn) => {
+                    self.joining = None;
+                    self.enter_remote(conn);
+                    return;
+                }
+                JoinEvent::Failed(e) => {
+                    log::warn!("joining failed: {e}");
+                    self.joining = None;
+                    self.screens.clear();
+                    self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] }));
+                    return;
+                }
+            }
+        }
+    }
+
+    /// Plays in a friend's world over `conn`.
+    fn enter_remote(&mut self, conn: net::ClientConn) {
+        let key = net::p2p::player_key(&self.settings.run_dir);
+        match Client::new(&mut *self.gpu, &self.assets, &self.textures, conn, &self.settings.name(), &key, self.settings.view_distance(), std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok()) {
+            Ok(mut client) => {
+                client.sent = load_chat_history(&self.settings.run_dir);
+                self.game = Some(Game { client, server: None });
+                self.screens.clear();
+                self.hud.invalidate();
+                self.set_capture(true);
+            }
+            Err(e) => log::error!("{e}"),
+        }
+    }
+
     fn start_world(&mut self, meta: WorldMeta) {
         log::info!("opening world '{}' (seed {})", meta.name, meta.seed);
         if meta.format != saves::SAVE_FORMAT {
@@ -758,23 +833,27 @@ impl Running {
                         }
                     }
                 }
-                Request::Join(ticket) => match net::join(&ticket, &self.settings) {
-                    Ok(conn) => {
-                        self.leave_world_silent();
-                        let key = net::p2p::player_key(&self.settings.run_dir);
-                        match Client::new(&mut *self.gpu, &self.assets, &self.textures, conn, &self.settings.name(), &key, self.settings.view_distance(), std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok()) {
-                            Ok(mut client) => {
-                                client.sent = load_chat_history(&self.settings.run_dir);
-                                self.game = Some(Game { client, server: None });
-                                self.screens.clear();
-                                self.hud.invalidate();
-                                self.set_capture(true);
-                            }
-                            Err(e) => log::error!("{e}"),
+                Request::Join(ticket) => {
+                    // Content may be built again for the world's packages: no world may be loaded.
+                    self.leave_world_silent();
+                    self.joining = None;
+                    match net::start_join(&ticket, &self.settings) {
+                        Ok(j) => {
+                            net::screens::set_join_status("multiplayer.connecting", &[]);
+                            self.joining = Some(j);
+                            self.screens.clear();
+                            self.open(Box::new(net::screens::Joining));
                         }
+                        Err(e) => self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] })),
                     }
-                    Err(e) => self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] })),
-                },
+                }
+                Request::CancelJoin => {
+                    if let Some(j) = self.joining.take() {
+                        let _ = j.answers.send(net::p2p::JoinAnswer::Cancel("cancelled".into()));
+                    }
+                    self.screens.clear();
+                    self.open(screens::engine("core:title"));
+                }
             }
         }
     }
@@ -1640,6 +1719,7 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
         r.set_capture(true);
         r.quads_dirty = true;
     }
+    r.poll_join();
     if let Some(reason) = r.game.as_ref().and_then(|g| g.client.disconnected.clone()) {
         log::info!("disconnected: {reason}");
         r.leave_world_silent();

@@ -303,6 +303,32 @@ fn install(store: &chiacraft_packages::store::Store, dirs: &[PathBuf], mods: &[M
     out
 }
 
+/// The package store (in `run/cache`).
+pub fn store() -> Option<chiacraft_packages::store::Store> {
+    LOADER.lock().as_ref().map(|l| chiacraft_packages::store::Store::new(l.store.root()))
+}
+
+/// A package in the store, checked again, as a `PackageRef`.
+pub fn stored_package(hash: chiacraft_packages::identity::Hash) -> Result<PackageRef, String> {
+    let store = store().ok_or("mods are not loaded")?;
+    package_ref(&store, hash)
+}
+
+/// The data packages of the content in force: (id, version, hash, size in bytes).
+pub fn current_packages() -> Vec<(String, String, String, u64)> {
+    let Some(store) = store() else { return Vec::new() };
+    content::content()
+        .mods
+        .iter()
+        .filter_map(|m| {
+            let hex = m.package.as_ref()?;
+            let h = chiacraft_packages::identity::Hash::from_hex(hex)?;
+            let size = store.manifest(&h).ok()?.files.iter().map(|f| f.size).sum();
+            Some((m.id.clone(), m.version.clone(), hex.clone(), size))
+        })
+        .collect()
+}
+
 /// The packages in the package folders.
 pub fn installed() -> Vec<PackageRef> {
     LOADER.lock().as_ref().map_or_else(Vec::new, |l| l.installed.clone())

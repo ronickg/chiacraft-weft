@@ -16,9 +16,18 @@ use super::{ClientConn, Conn, ServerConn, ToClient, ToServer};
 use crate::settings::Settings;
 
 const ALPN: &[u8] = b"weft/1";
-/// 3: `Join` carries the account's vouching (chiacraft).
-const PROTOCOL: u32 = 3;
+/// 3: `Join` carries the account's vouching (chiacraft). 4: the hello offers the world's data
+/// packages, which the joining game downloads and loads before it is let in (chiacraft).
+const PROTOCOL: u32 = 4;
 const MAX_FRAME: usize = 64 << 20;
+
+/// A data package the host's world plays with: id, version, hash (hex), size in bytes.
+pub type Offer = (String, String, String, u64);
+
+/// Requests on the extra streams a joining game opens to download packages.
+const GET_MANIFEST: u8 = 0;
+const GET_FILE: u8 = 1;
+const MAX_MANIFEST: u64 = 1 << 20;
 
 fn runtime() -> &'static tokio::runtime::Runtime {
     static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
@@ -42,6 +51,18 @@ pub fn player_key(run_dir: &Path) -> String {
         log::error!("{e}; this world keys the player by name");
         String::new()
     })
+}
+
+/// Hash over the code mods (id and version): what a joining game must bring itself. Its data
+/// packages it can download.
+pub fn native_hash() -> u64 {
+    let mut h = weft_noise::FNV;
+    for m in crate::content::content().mods.iter().filter(|m| m.package.is_none()) {
+        for b in m.id.bytes().chain([0]).chain(m.version.bytes()).chain([0]) {
+            h = weft_noise::fnv_step(h, b as u64);
+        }
+    }
+    h
 }
 
 /// Hash over mods and every registered name: equal hash means equal runtime ids.
@@ -88,7 +109,7 @@ pub fn content_hash() -> u64 {
 }
 
 fn mod_list() -> String {
-    crate::content::content().mods.iter().map(|m| format!("{} {}", m.id, m.version)).collect::<Vec<_>>().join(", ")
+    crate::content::content().mods.iter().filter(|m| m.package.is_none()).map(|m| format!("{} {}", m.id, m.version)).collect::<Vec<_>>().join(", ")
 }
 
 fn relay_mode(settings: &Settings) -> RelayMode {
@@ -196,17 +217,30 @@ async fn accept(incoming: iroh::endpoint::Incoming, connect: crossbeam_channel::
     let peer = conn.remote_id();
     let (mut send, mut recv) = conn.accept_bi().await.map_err(|e| e.to_string())?;
     let hello = read_frame(&mut recv).await?;
-    let (proto, hash) = <(u32, u64) as codec::Wire>::get(&mut codec::R(&hello)).ok_or("bad hello")?;
-    let reply = if proto != PROTOCOL {
+    let (proto, native) = <(u32, u64) as codec::Wire>::get(&mut codec::R(&hello)).ok_or("bad hello")?;
+    let offers = crate::modloader::current_packages();
+    let refusal = if proto != PROTOCOL {
         format!("protocol mismatch: server {PROTOCOL}, client {proto}")
-    } else if hash != content_hash() {
+    } else if native != native_hash() {
         format!("different mods; server runs: {}", mod_list())
     } else {
         String::new()
     };
-    write_frame(&mut send, reply.as_bytes()).await?;
-    if !reply.is_empty() {
-        return Err(reply);
+    let mut w = codec::W::default();
+    codec::Wire::put(&(refusal.clone(), offers.clone()), &mut w);
+    write_frame(&mut send, &w.0).await?;
+    if !refusal.is_empty() {
+        return Err(refusal);
+    }
+    // The joining game downloads the packages it lacks, then says what content it loaded.
+    let serving = tokio::spawn(serve_packages(conn.clone(), offers));
+    let ready = read_frame(&mut recv).await;
+    serving.abort();
+    let loaded = <u64 as codec::Wire>::get(&mut codec::R(&ready?)).ok_or("bad ready")?;
+    let refusal = if loaded != content_hash() { "the content does not match this world's after its packages".to_string() } else { String::new() };
+    write_frame(&mut send, refusal.as_bytes()).await?;
+    if !refusal.is_empty() {
+        return Err(refusal);
     }
     log::info!("player {peer} connected");
     let (to_server_tx, to_server_rx) = unbounded::<ToServer>();
@@ -229,6 +263,128 @@ async fn accept(incoming: iroh::endpoint::Incoming, connect: crossbeam_channel::
     pump_out(to_client_rx, send, codec::encode_client).await;
     reader.abort();
     conn.close(0u32.into(), b"bye");
+    Ok(())
+}
+
+/// Answers a joining game's package downloads, each on a stream of its own: the manifests of the
+/// offered packages and their files, from the store, and nothing else.
+async fn serve_packages(conn: iroh::endpoint::Connection, offers: Vec<Offer>) {
+    use chiacraft_packages::identity::Hash;
+    let Some(store) = crate::modloader::store() else { return };
+    let mut manifests = rustc_hash::FxHashSet::default();
+    let mut files = rustc_hash::FxHashSet::default();
+    for (_, _, hex, _) in &offers {
+        let Some(h) = Hash::from_hex(hex) else { continue };
+        if let Ok(m) = store.manifest(&h) {
+            manifests.insert(h);
+            files.extend(m.files.iter().map(|f| f.hash));
+        }
+    }
+    let (manifests, files) = (std::sync::Arc::new(manifests), std::sync::Arc::new(files));
+    while let Ok((mut send, mut recv)) = conn.accept_bi().await {
+        let (store, manifests, files) = (chiacraft_packages::store::Store::new(store.root()), manifests.clone(), files.clone());
+        tokio::spawn(async move {
+            let Ok(req) = read_frame(&mut recv).await else { return };
+            let Some((kind, hex)) = <(u32, String) as codec::Wire>::get(&mut codec::R(&req)) else { return };
+            let h = Hash::from_hex(&hex);
+            let bytes: Result<Vec<u8>, String> = match (kind as u8, h) {
+                (GET_MANIFEST, Some(h)) if manifests.contains(&h) => store.manifest_text(&h).map(String::into_bytes),
+                (GET_FILE, Some(h)) if files.contains(&h) => store.blob_path(&h).ok_or("not in the store".to_string()).and_then(|p| std::fs::read(p).map_err(|e| e.to_string())),
+                _ => Err("not offered".into()),
+            };
+            let (err, bytes) = match bytes {
+                Ok(b) => (String::new(), b),
+                Err(e) => (e, Vec::new()),
+            };
+            let mut w = codec::W::default();
+            codec::Wire::put(&(err, bytes.len() as u64), &mut w);
+            if write_frame(&mut send, &w.0).await.is_ok() && send.write_all(&bytes).await.is_ok() {
+                let _ = send.finish();
+            }
+        });
+    }
+}
+
+/// Fetches one manifest or file from the host on a stream of its own; at most `max` bytes.
+async fn fetch(conn: &iroh::endpoint::Connection, kind: u8, hash: &chiacraft_packages::identity::Hash, max: u64) -> Result<Vec<u8>, String> {
+    let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+    let mut w = codec::W::default();
+    codec::Wire::put(&(kind as u32, hash.hex()), &mut w);
+    write_frame(&mut send, &w.0).await?;
+    let head = read_frame(&mut recv).await?;
+    let (err, len) = <(String, u64) as codec::Wire>::get(&mut codec::R(&head)).ok_or("bad answer")?;
+    if !err.is_empty() {
+        return Err(format!("the host: {err}"));
+    }
+    if len > max {
+        return Err(format!("the host sent {len} bytes where {max} were expected"));
+    }
+    let mut buf = vec![0u8; len as usize];
+    recv.read_exact(&mut buf).await.map_err(|e| e.to_string())?;
+    Ok(buf)
+}
+
+/// What a join in progress reports to the game, in order.
+pub enum JoinEvent {
+    /// The world plays with these packages; the second list is what this game lacks. Answer
+    /// `Accept` to download them or `Decline`.
+    Offer(Vec<Offer>, Vec<Offer>),
+    /// Bytes downloaded of the total.
+    Progress(u64, u64),
+    /// Every package is in the store: load exactly these (hashes), then answer `Ready`.
+    Packages(Vec<String>),
+    Admitted(ClientConn),
+    Failed(String),
+}
+
+pub enum JoinAnswer {
+    Accept,
+    Decline,
+    /// The content hash after loading the world's packages.
+    Ready(u64),
+    Cancel(String),
+}
+
+/// A join in progress: its events, and where the game answers them.
+pub struct Joining {
+    pub events: crossbeam_channel::Receiver<JoinEvent>,
+    pub answers: tokio::sync::mpsc::UnboundedSender<JoinAnswer>,
+}
+
+/// Downloads the offered packages this game lacks into the store, checking every manifest and
+/// file against its hash and the sizes the host declared.
+async fn download(conn: &iroh::endpoint::Connection, missing: &[Offer], events: &crossbeam_channel::Sender<JoinEvent>) -> Result<(), String> {
+    use chiacraft_packages::identity::{FileManifest, Hash, MAX_TOTAL_BYTES};
+    let store = crate::modloader::store().ok_or("mods are not loaded")?;
+    let total: u64 = missing.iter().map(|o| o.3).sum();
+    let mut done = 0u64;
+    for (id, _, hex, size) in missing {
+        let h = Hash::from_hex(hex).ok_or_else(|| format!("package {id}: a bad hash"))?;
+        if *size > MAX_TOTAL_BYTES {
+            return Err(format!("package {id} is too big ({size} bytes)"));
+        }
+        let text = fetch(conn, GET_MANIFEST, &h, MAX_MANIFEST).await?;
+        if Hash::of(&text) != h {
+            return Err(format!("package {id}: the host sent a manifest that doesn't match its hash"));
+        }
+        let manifest = FileManifest::parse(std::str::from_utf8(&text).map_err(|e| e.to_string())?).map_err(|e| format!("package {id}: {e}"))?;
+        if &manifest.id != id || manifest.files.iter().map(|f| f.size).sum::<u64>() != *size {
+            return Err(format!("package {id}: the manifest doesn't match what the host offered"));
+        }
+        for f in &manifest.files {
+            if !store.has_blob(&f.hash) {
+                let bytes = fetch(conn, GET_FILE, &f.hash, f.size).await?;
+                if bytes.len() as u64 != f.size {
+                    return Err(format!("package {id}: {} came short", f.path));
+                }
+                store.put_blob(&f.hash, &bytes).map_err(|e| format!("package {id}: {}: {e}", f.path))?;
+            }
+            done += f.size;
+            let _ = events.send(JoinEvent::Progress(done, total));
+        }
+        store.lay_out(&manifest)?;
+        log::info!("downloaded package {id} ({})", h.short());
+    }
     Ok(())
 }
 
@@ -280,21 +436,52 @@ async fn connect(settings: &Settings, addr: EndpointAddr) -> Result<(Endpoint, i
     Err(last)
 }
 
-/// Connects to a host. Blocks up to 30 seconds.
-pub fn join(ticket: &str, settings: &Settings) -> Result<ClientConn, String> {
+/// Starts joining a host. The join runs in the background and reports through `events`: the
+/// world's packages to download (with consent), progress, the packages to load, and finally the
+/// connection, or why it failed.
+pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> {
     let addr = parse_ticket(ticket)?;
     let settings = settings.clone();
-    let (ready_tx, ready_rx) = crossbeam_channel::bounded::<Result<ClientConn, String>>(1);
+    let (events, events_rx) = unbounded::<JoinEvent>();
+    let (answers, mut answers_rx) = tokio::sync::mpsc::unbounded_channel::<JoinAnswer>();
     runtime().spawn(async move {
         let result = async {
             let (ep, conn) = connect(&settings, addr).await?;
             let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
             let mut hello = codec::W::default();
-            codec::Wire::put(&(PROTOCOL, content_hash()), &mut hello);
+            codec::Wire::put(&(PROTOCOL, native_hash()), &mut hello);
             write_frame(&mut send, &hello.0).await?;
             let reply = read_frame(&mut recv).await?;
-            if !reply.is_empty() {
-                return Err(String::from_utf8_lossy(&reply).into_owned());
+            let (refusal, offers) = <(String, Vec<Offer>) as codec::Wire>::get(&mut codec::R(&reply)).ok_or("the host answered in an unknown way (another version?)")?;
+            if !refusal.is_empty() {
+                return Err(refusal);
+            }
+            let store = crate::modloader::store().ok_or("mods are not loaded")?;
+            let missing: Vec<Offer> = offers
+                .iter()
+                .filter(|o| chiacraft_packages::identity::Hash::from_hex(&o.2).is_none_or(|h| store.verify(&h).is_err()))
+                .cloned()
+                .collect();
+            if !missing.is_empty() {
+                let _ = events.send(JoinEvent::Offer(offers.clone(), missing.clone()));
+                match answers_rx.recv().await {
+                    Some(JoinAnswer::Accept) => download(&conn, &missing, &events).await?,
+                    Some(JoinAnswer::Cancel(e)) => return Err(e),
+                    _ => return Err("declined the world's packages".into()),
+                }
+            }
+            let _ = events.send(JoinEvent::Packages(offers.iter().map(|o| o.2.clone()).collect()));
+            let loaded = match answers_rx.recv().await {
+                Some(JoinAnswer::Ready(h)) => h,
+                Some(JoinAnswer::Cancel(e)) => return Err(e),
+                _ => return Err("cancelled".into()),
+            };
+            let mut w = codec::W::default();
+            codec::Wire::put(&loaded, &mut w);
+            write_frame(&mut send, &w.0).await?;
+            let verdict = read_frame(&mut recv).await?;
+            if !verdict.is_empty() {
+                return Err(String::from_utf8_lossy(&verdict).into_owned());
             }
             Ok((ep, conn, send, recv))
         }
@@ -303,7 +490,7 @@ pub fn join(ticket: &str, settings: &Settings) -> Result<ClientConn, String> {
             Ok((ep, conn, send, mut recv)) => {
                 let (to_server_tx, to_server_rx) = unbounded::<ToServer>();
                 let (to_client_tx, to_client_rx) = unbounded::<ToClient>();
-                let _ = ready_tx.send(Ok(Conn::new(to_server_tx, to_client_rx)));
+                let _ = events.send(JoinEvent::Admitted(Conn::new(to_server_tx, to_client_rx)));
                 let reader = tokio::spawn(async move {
                     while let Ok(frame) = read_frame(&mut recv).await {
                         let Some(msg) = codec::decode_client(&frame) else { break };
@@ -319,11 +506,11 @@ pub fn join(ticket: &str, settings: &Settings) -> Result<ClientConn, String> {
                 ep.close().await;
             }
             Err(e) => {
-                let _ = ready_tx.send(Err(e));
+                let _ = events.send(JoinEvent::Failed(e));
             }
         }
     });
-    ready_rx.recv_timeout(Duration::from_secs(30)).map_err(|_| "timed out".to_string())?
+    Ok(Joining { events: events_rx, answers })
 }
 
 #[cfg(test)]

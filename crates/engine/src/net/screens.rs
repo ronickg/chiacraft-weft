@@ -59,3 +59,35 @@ impl Screen for Multiplayer {
         });
     }
 }
+
+/// What the join in progress is doing (chiacraft): a lang key and its arguments.
+pub static JOIN_STATUS: parking_lot::Mutex<(String, Vec<String>)> = parking_lot::Mutex::new((String::new(), Vec::new()));
+
+pub fn set_join_status(key: &str, args: &[String]) {
+    *JOIN_STATUS.lock() = (key.to_string(), args.to_vec());
+}
+
+/// Shown while joining a friend's world: connecting, downloading its packages, loading them.
+pub struct Joining;
+
+impl Screen for Joining {
+    fn name(&self) -> &str {
+        "core:joining"
+    }
+
+    fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
+        frame(ui, cx, "multiplayer.joining", |ui| {
+            ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(340.0), |ui| {
+                let status = ui.text_bound(
+                    "default",
+                    Box::new(|_: &Ctx| {
+                        let (key, args) = JOIN_STATUS.lock().clone();
+                        (key, args.into_iter().map(Arg::Text).collect())
+                    }),
+                );
+                ui.set_id(status, "join_status");
+            });
+            button(ui, cx, "menu.cancel", &[], 200.0, |c| c.requests.push(Request::CancelJoin));
+        });
+    }
+}

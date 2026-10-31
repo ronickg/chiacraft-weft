@@ -33,6 +33,25 @@ impl Store {
         self.root.join("packages").join(h.hex())
     }
 
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// A blob's file, if the store has it.
+    pub fn blob_path(&self, h: &Hash) -> Option<PathBuf> {
+        let p = self.blob(h);
+        p.is_file().then_some(p)
+    }
+
+    /// A laid-out package's manifest text, checked against its hash.
+    pub fn manifest_text(&self, h: &Hash) -> Result<String, String> {
+        let text = std::fs::read_to_string(self.package(h).join("manifest.txt")).map_err(|e| format!("package {h:?}: {e}"))?;
+        if Hash::of(text.as_bytes()) != *h {
+            return Err(format!("package {h:?}: its manifest doesn't match its hash"));
+        }
+        Ok(text)
+    }
+
     /// Whether the store has a blob with these bytes.
     pub fn has_blob(&self, h: &Hash) -> bool {
         self.blob(h).is_file()
