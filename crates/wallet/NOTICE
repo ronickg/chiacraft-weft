@@ -1,0 +1,35 @@
+chiacraft-wallet: chiacraft's built-in Chia wallet core. MIT licensed (LICENSE-MIT in this folder;
+the rest of the repository is MPL-2.0, from Weft).
+
+It ports the identity parts of Ronald Goedeke's wallet (ronickg/chia, packages/core: wallet.ts,
+state.ts and the CHIP-0002 signing helper in dapp.ts) and, in src/chain/ (the `chain` feature),
+its light-wallet parts (sync.ts's peer pool and coin sync, did.ts, offer.ts), which he contributes
+under MIT.
+
+It builds on, and in places follows, code under the Apache License, Version 2.0 (LICENSE-APACHE in
+this folder):
+
+- Sage (https://github.com/xch-dev/sage), crate sage-keychain, src/encrypt.rs, by the Sage
+  authors (xch-dev). src/store/file.rs follows its scheme: an AES-256-GCM key derived from a
+  passphrase by Argon2 (the argon2 crate's defaults) with a random 32-byte salt and a random
+  nonce. Changed: our own JSON container per account instead of Sage's bincode keys.bin; the
+  passphrase may be real (Sage always passes an empty one); only the mnemonic's entropy is kept.
+
+- chia-wallet-sdk (https://github.com/xch-dev/chia-wallet-sdk) 0.37.1 and the chia_rs crates it
+  pins (chia-bls, clvm-utils, chia-puzzle-types, chia-protocol, chia-sdk-utils), by Brandon
+  Haggstrom (Rigidity) and the Chia Network authors: used as dependencies, not copied. The
+  derivation paths and the signed-message hash follow their documented behaviour.
+
+- chia-wallet-sdk 0.37.1's chia-sdk-client, chia-sdk-driver, chia-sdk-signer, chia-sdk-types and
+  chia-sdk-test (Apache-2.0, same authors), used by src/chain/ as dependencies (chia-sdk-test in
+  the tests only). src/chain/tls.rs is a modified copy of chia-sdk-client's
+  `create_rustls_connector` (src/tls.rs): changed to name rustls's aws-lc-rs provider instead of
+  the process default and to return our error type. The offer building in src/chain/offer.rs
+  follows the pattern of chia-sdk-driver's own action-system offer tests. The wallet sync in
+  src/chain/sync.rs and the peer pool in src/chain/reader.rs follow Sage's light wallet sync
+  (https://github.com/xch-dev/sage, crate sage-wallet) as Ronald's sync.ts does: the request and
+  subscription order, hinted-coin subscriptions, reorg roll-back and peak-lag fail-over.
+
+The test vectors in src/mnemonic.rs and src/keys.rs (the BIP-39 seed prefix, master fingerprint
+3781984839 and the address of m/12381/8444/2/0) are the ones Ronald's wallet checks
+(chia-wallet-app/__tests__/keys.harness.ts).

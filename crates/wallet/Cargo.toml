@@ -1,0 +1,99 @@
+[package]
+name = "chiacraft-wallet"
+version = "0.1.0"
+edition.workspace = true
+license = "MIT"
+rust-version.workspace = true
+description = "chiacraft's built-in Chia wallet core: the 24-word account, its keys, the identity key and a narrow signer; usable outside the game"
+
+[dependencies]
+# Chia's BLS12-381 keys (EIP-2333 derivation, AugSchemeMPL), CLVM tree hashes, the standard
+# puzzle and bech32m addresses: the crates chia-wallet-sdk 0.37.1 is built from, at the versions it
+# pins. Not the `chia-wallet-sdk` facade itself: its dependencies are not optional and bring the
+# peer client, coinset, daemon client and simulator (tokio, TLS), which I1-I5 never use (no
+# network). The chain rows (I6 on) add chia-sdk-client and chia-sdk-driver beside these.
+chia-bls = "0.52.1"
+clvm-utils = "0.52.1"
+chia-puzzle-types = "0.52.1"
+chia-protocol = "0.52.1"
+chia-sdk-utils = "0.37.1"
+bip39 = { version = "2.2", default-features = false, features = ["std", "zeroize"] }
+zeroize = { version = "1.8", features = ["derive"] }
+sha2 = "0.10"
+getrandom = "0.3"
+# The file store: Sage's scheme (an Argon2 key from a passphrase, AES-256-GCM).
+argon2 = "0.5"
+aes-gcm = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.151"
+log = "0.4"
+
+# The chain reader (feature `chain`, I6): the light wallet protocol over TLS (chia-sdk-client with
+# rustls), the puzzle drivers for DIDs and offers (chia-sdk-driver), signing requirements
+# (chia-sdk-signer) and a tokio runtime of its own. All optional: the game without `chain` builds
+# none of it.
+chia-sdk-client = { version = "0.37.1", optional = true, features = ["rustls"] }
+chia-sdk-driver = { version = "0.37.1", optional = true, features = ["offer-compression"] }
+chia-sdk-types = { version = "0.37.1", optional = true }
+chia-sdk-signer = { version = "0.37.1", optional = true }
+chia-ssl = { version = "0.52.1", optional = true }
+chia-traits = { version = "0.52.1", optional = true }
+clvm-traits = { version = "0.52.1", optional = true }
+clvmr = { version = "0.21.0", optional = true }
+tokio = { version = "1", optional = true, features = ["rt-multi-thread", "time", "sync", "net", "macros"] }
+rustls = { version = "0.23.32", optional = true, default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
+chia-puzzles = { version = "0.20.3", optional = true }
+indexmap = { version = "2", optional = true }
+futures-util = { version = "0.3", optional = true, default-features = false, features = ["std"] }
+# Plain websocket peers on loopback only (`ws://127.0.0.1:port`): the checks' local simulator.
+tokio-tungstenite = { version = "0.30", optional = true, default-features = false, features = ["connect"] }
+# A local chain for tests and checks (feature `sim`): chia-sdk-test's peer simulator.
+chia-sdk-test = { version = "0.37.1", optional = true, features = ["peer-simulator"] }
+
+[features]
+default = []
+chain = [
+    "dep:chia-sdk-client",
+    "dep:chia-sdk-driver",
+    "dep:chia-sdk-types",
+    "dep:chia-sdk-signer",
+    "dep:chia-ssl",
+    "dep:chia-traits",
+    "dep:clvm-traits",
+    "dep:clvmr",
+    "dep:tokio",
+    "dep:rustls",
+    "dep:chia-puzzles",
+    "dep:indexmap",
+    "dep:futures-util",
+    "dep:tokio-tungstenite",
+]
+# `chain::sim` and the `chain-sim` example: the simulator for horizon-client's admission tests and
+# the checks (never a real network).
+sim = ["chain", "dep:chia-sdk-test"]
+
+[[example]]
+name = "chain-sim"
+required-features = ["sim"]
+
+# The live test tool an operator runs step by step (identity row I12; docs/identity-live-test.md).
+[[bin]]
+name = "chiacraft-wallet-test"
+path = "src/bin/chiacraft-wallet-test.rs"
+required-features = ["chain"]
+
+[dev-dependencies]
+chia-sdk-test = { version = "0.37.1", features = ["peer-simulator"] }
+
+# The OS keystores (store/os.rs). macOS: the Keychain through keyring (as the launcher). Windows:
+# our own Credential Manager call, because keyring writes CRED_PERSIST_ENTERPRISE (roams to other
+# computers) and the wallet's item must stay on this one (CRED_PERSIST_LOCAL_MACHINE). Linux: the
+# Secret Service through oo7, as the launcher and gpui use it.
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
+oo7 = { version = "0.5", default-features = false, features = ["async-std", "native_crypto"] }
+futures-lite = "2"
+
