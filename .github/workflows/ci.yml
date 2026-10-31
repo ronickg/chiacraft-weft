@@ -1,0 +1,43 @@
+# Builds the workspace, lints it and runs the unit tests on every push to main and every pull
+# request. Linux is enough: nothing here opens a window or needs a GPU, so the in-game testkit
+# tests (`--test ...`) are left out.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: System libraries
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Build
+        run: cargo build --workspace
+
+      # mut_from_ref fires in Weft's own crates/sdk/src/game.rs, which stays as upstream has it.
+      - name: Clippy
+        run: cargo clippy --workspace -- -A clippy::mut_from_ref
+
+      - name: Tests (chiacraft crates)
+        run: cargo test -p chiacraft-wallet -p chiacraft-account -p chiacraft-packages --lib
+
+      - name: Tests (engine)
+        run: cargo test -p weft_engine
