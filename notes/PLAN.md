@@ -83,7 +83,7 @@ sponsors (free DIDs).
 | Shader packs | automatically, with consent | validated before the GPU runs them |
 | Client mods (HUD, screens, effects, prediction) | automatically, with consent | sandboxed WebAssembly |
 | Personal mods (minimap, tweaks) | installed by the player | sandboxed; allowed per world |
-| Native Weft mods | never downloaded; installed by hand | unsandboxed, separate trust tier |
+| Native Weft mods | only if the player allows trusted creators; restart into their universe | unsandboxed, own universe |
 | Engine features (renderer, physics, networking) | part of the game | built in |
 
 Each world pins exact package versions by hash; the cache keeps versions side by side; the game
