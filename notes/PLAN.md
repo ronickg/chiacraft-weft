@@ -141,10 +141,12 @@ The smallest version that works is phases 1-4.
 7. **Headless server and administration.** No window or GPU (Weft's CPU terrain path),
    `server.toml`, console, operators and command permissions (today any player can `/give`),
    movement checks, our own relay, load tests (`horizon-bots`).
-8. **The game.** Base content and open art from Horizon's `content/base`; realism crafting W1-W9
-   on Weft's machines with catch-up; gameplay systems (damage types, stats, actions, taming, death).
-9. **Later.** Wallet view and spending with the confirm dialog, items on chain, offers, passes,
+8. **Later.** Wallet view and spending with the confirm dialog, items on chain, offers, passes,
    paid links, portal-rights NFTs; launcher and signed updates.
+
+Game content (blocks, items, crafting, gameplay systems) is out of this plan on purpose: it gets
+its own plan once the server, universe and account foundations stand. Until then Weft's base game
+is the content.
 
 ## Open
 
