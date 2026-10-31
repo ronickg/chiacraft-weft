@@ -45,6 +45,7 @@ fn main() {
     let mut log_spec = String::new();
     let mut pack: Option<PathBuf> = None;
     let mut dist: Option<PathBuf> = None;
+    let mut sign: Option<PathBuf> = None;
     // Options the engine does not know go to mods (`--test furnace`, `--script x.txt`).
     let mut extra: Vec<(String, String)> = Vec::new();
     let mut args = std::env::args().skip(1).peekable();
@@ -66,6 +67,7 @@ fn main() {
             "--view" => opts.view = value().parse().ok(),
             "--pack-mod" => pack = Some(PathBuf::from(value())),
             "--dist" => dist = Some(PathBuf::from(value())),
+            "--sign-package" => sign = Some(PathBuf::from(value())),
             "--size" => {
                 let v: Vec<u32> = value().split('x').filter_map(|s| s.parse().ok()).collect();
                 if v.len() == 2 {
@@ -89,6 +91,14 @@ fn main() {
         match weft_engine::modloader::pack(&dir, &player_mods) {
             Ok(path) => println!("packed {}", path.display()),
             Err(e) => eprintln!("cannot pack {}: {e}", dir.display()),
+        }
+        return;
+    }
+    // Signs a data package with the account's content key (chiacraft): writes its package.sig.
+    if let Some(dir) = sign {
+        match weft_engine::package_trust::sign_with_account(&opts.run_dir, &dir) {
+            Ok((hash, c)) => println!("signed {} ({}) as content key {} of identity {}", dir.display(), &hash[..12], weft_engine::package_trust::fingerprint(&c.key), &c.identity[..12]),
+            Err(e) => eprintln!("cannot sign {}: {e}", dir.display()),
         }
         return;
     }

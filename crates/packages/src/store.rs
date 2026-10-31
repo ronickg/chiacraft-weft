@@ -6,6 +6,7 @@
 //! <root>/packages/<package hash>/manifest.txt
 //! <root>/packages/<package hash>/files/…   the package's files, as the manifest lists them
 //! <root>/packages/<package hash>/.done
+//! <root>/packages/<package hash>/package.sig   who made it, if signed (not covered by the hash)
 //! ```
 //!
 //! Paths under `files/` come only from a checked manifest (`identity::valid_file_path`), never
@@ -88,6 +89,9 @@ impl Store {
         let manifest = FileManifest::of_dir(dir)?;
         let h = manifest.hash();
         if self.dir(&h).is_some() {
+            if let Ok(sig) = std::fs::read_to_string(dir.join(crate::signature::SIG_FILE)) {
+                self.put_signature(&h, &sig)?;
+            }
             return Ok(h);
         }
         for f in &manifest.files {
@@ -98,7 +102,27 @@ impl Store {
             }
         }
         self.lay_out(&manifest)?;
+        if let Ok(sig) = std::fs::read_to_string(dir.join(crate::signature::SIG_FILE)) {
+            self.put_signature(&h, &sig)?;
+        }
         Ok(h)
+    }
+
+    /// Keeps a package's signature envelope beside it (checking it is the caller's).
+    pub fn put_signature(&self, h: &Hash, text: &str) -> Result<(), String> {
+        if self.dir(h).is_none() {
+            return Err(format!("package {h:?} is not in the store"));
+        }
+        let e = crate::signature::Envelope::parse(text)?;
+        if e.package != h.hex() {
+            return Err("the signature is for another package".into());
+        }
+        write_atomic(&self.package(h).join(crate::signature::SIG_FILE), e.text().as_bytes())
+    }
+
+    /// A package's signature envelope, if it has one (not yet checked).
+    pub fn signature(&self, h: &Hash) -> Option<String> {
+        std::fs::read_to_string(self.package(h).join(crate::signature::SIG_FILE)).ok()
     }
 
     /// Lays out a package whose blobs are all in the store.

@@ -130,3 +130,25 @@ file and the package's manifest against their hashes (and the sizes the host dec
 the store, loads exactly the host's set, and then shows the host the hash of the content it loaded:
 only a match gets in. The host serves nothing but the packages its world uses. Code mods are not
 downloaded: both games must have the same ones.
+
+## Signing a package
+
+```sh
+cargo run --release -- --sign-package path/to/mypackage
+```
+
+signs the package with your account's content key and writes `package.sig` beside its files. The
+content key is derived from your 24 words on its own path (it is neither your identity key nor
+your network key), and your account's identity key vouches for it, so a signature says which
+account made the package, not just a name anyone could copy. `package.sig` is not one of the files
+the package's hash covers: signing (or adding other signatures later) never changes the package or
+any world's pin. Change a file and you need to sign again.
+
+## Who you trust
+
+When a world needs packages you don't have, the game asks first, showing each package's size and who
+made it (the first digits of the creator's content key and account), or that it is unsigned, or
+that its signature is refused. "Download and Join" trusts those exact packages; "Download, Trust
+These Creators" also trusts their creators, so later packages and versions from them download
+without asking. Nothing is asked about packages you already have or trust. What you accept is kept
+in `run/trust.txt`.

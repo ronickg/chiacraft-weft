@@ -81,9 +81,25 @@ before letting it in. Joining no longer blocks the window: `start_join` reports 
 guest with no packages: it downloads, loads and sees the host's blocks). Not yet: piece-by-piece
 verified streaming (bao-tree), resuming, downloading from other players.
 
+Slice 5 (signing and trust) is done. The content key: `IdentitySigner::content_seed` (wallet,
+own label), vouched for by the identity key (`content_link_text`, `Session::content_vouch_line`,
+`check_content_vouch`). The envelope `package.sig` (`crates/packages/src/signature.rs`) sits beside
+the package, outside its hash, and is kept beside it in the store. Signing and checking are in
+`crates/engine/src/package_trust.rs` (Ed25519 via iroh's key types), with `weft --sign-package <dir>`.
+Offers carry the envelope; a downloaded one is kept only if it checks out. Trust (`trust.txt`,
+`test-trust.txt` in automated runs) holds trusted package hashes and creators. When a join needs
+untrusted packages, the join sheet (`core:join_sheet`) asks: Download and Join, or also trust the
+creators. `examples/packages/gems` is signed by a throwaway example account. Checked with two copies:
+first join asks and trusts the creator; that creator's next version downloads without asking; an
+unsigned package asks again; a tampered signature shows as refused. testkit's script line
+`tap <screen> <element>` clicks through screens.
+
 ## Next steps
 
-1. Phase 2 slice 5 (signing and trust) per `notes/PLAN.md`.
+1. Phase 2 slice 6 (hardening) per `notes/PLAN.md`: format allow-list, decode and size limits,
+   host per-peer limits, store garbage collection; then the "later" items (bao-tree verified
+   streaming and resume, iroh-blobs for downloads from other players, reviewer lists, key
+   rotation).
 
 ## Notes
 

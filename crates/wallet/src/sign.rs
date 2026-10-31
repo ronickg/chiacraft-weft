@@ -73,6 +73,7 @@ impl IdentitySigner {
 /// What a network key's seed is made from: this label, then the identity key's secret.
 /// Fixed forever: changing it gives every player a new address and a new player on every world.
 const NETWORK_KEY_LABEL: &[u8] = b"chiacraft network key v1";
+const CONTENT_KEY_LABEL: &[u8] = b"chiacraft content key v1";
 
 impl IdentitySigner {
     /// The 32-byte seed of this identity's **network key**: the Ed25519 key of the game's
@@ -87,6 +88,28 @@ impl IdentitySigner {
         h.update(self.secret.expose());
         Secret::new(h.finalize().into())
     }
+
+    /// The Ed25519 seed of the content key, which signs the data packages this player makes:
+    /// one-way from this identity key on its own label, like the network key, so a content key
+    /// that leaks gives away neither the identity nor the network key.
+    pub fn content_seed(&self) -> Secret<[u8; 32]> {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(CONTENT_KEY_LABEL);
+        h.update(self.secret.expose());
+        Secret::new(h.finalize().into())
+    }
+}
+
+/// The text an identity key signs to vouch for a content key (`key`: its public half, hex), so a
+/// package signed by the content key is known to come from this identity.
+pub fn content_link_text(key: &str) -> String {
+    format!("{PREFIX}content key v1\nkey: {key}")
+}
+
+/// Whether `signature` is `identity` vouching for the content key `key`.
+pub fn verify_content_link(identity: &IdentityKey, key: &str, signature: &[u8]) -> bool {
+    verify(identity, content_link_text(key).as_bytes(), signature)
 }
 
 /// The text an identity key signs to vouch for a network key (`endpoint`: the network key's

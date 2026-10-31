@@ -91,3 +91,63 @@ impl Screen for Joining {
         });
     }
 }
+
+/// A package a world needs and this game lacks, as the join sheet shows it.
+#[derive(Clone)]
+pub struct OfferRow {
+    pub id: String,
+    pub version: String,
+    pub hash: String,
+    pub size: u64,
+    /// Who made it, if it is signed and the signature checks out.
+    pub creator: Option<crate::package_trust::Creator>,
+    /// Why a signature it carries doesn't check out.
+    pub problem: Option<String>,
+    pub trusted: bool,
+}
+
+/// Asks before downloading packages the player has not trusted yet (chiacraft): each with its
+/// size and who made it (content key fingerprint and account), or that nobody vouches for it.
+pub struct JoinSheet {
+    pub rows: Vec<OfferRow>,
+}
+
+impl Screen for JoinSheet {
+    fn name(&self) -> &str {
+        "core:join_sheet"
+    }
+
+    fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
+        let rows = self.rows.clone();
+        frame(ui, cx, "join_sheet.title", |ui| {
+            label(ui, cx, "join_sheet.question", &[], "default");
+            ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(380.0), |ui| {
+                for r in &rows {
+                    label(ui, cx, "join_sheet.package", &[Arg::Text(r.id.clone()), Arg::Text(r.version.clone()), Arg::Text(r.size.div_ceil(1024).to_string())], "default");
+                    match (&r.creator, &r.problem) {
+                        (Some(c), _) => {
+                            let key = if r.trusted { "join_sheet.trusted" } else { "join_sheet.by" };
+                            label(ui, cx, key, &[Arg::Text(crate::package_trust::fingerprint(&c.key)), Arg::Text(c.identity.get(..12).unwrap_or(&c.identity).to_string())], "dim");
+                        }
+                        (None, Some(p)) => {
+                            label(ui, cx, "join_sheet.bad_signature", &[Arg::Text(p.clone())], "dim");
+                        }
+                        (None, None) => {
+                            label(ui, cx, "join_sheet.unsigned", &[], "dim");
+                        }
+                    }
+                }
+            });
+            label(ui, cx, "join_sheet.note", &[], "dim");
+            ui.container(Style::row().gap(6.0), |ui| {
+                let go = button(ui, cx, "join_sheet.download", &[], 150.0, |c| c.requests.push(Request::JoinConsent(false)));
+                ui.set_id(go, "download");
+                if rows.iter().any(|r| r.creator.is_some()) {
+                    let trust = button(ui, cx, "join_sheet.trust_creators", &[], 220.0, |c| c.requests.push(Request::JoinConsent(true)));
+                    ui.set_id(trust, "trust");
+                }
+            });
+            button(ui, cx, "menu.cancel", &[], 150.0, |c| c.requests.push(Request::CancelJoin));
+        });
+    }
+}

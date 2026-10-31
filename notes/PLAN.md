@@ -143,7 +143,7 @@ The smallest version that works is phases 1-4.
       offer, have/need/declined, verified streaming (bao-tree) on extra streams of the iroh
       connection, status per package, and the hash of the content actually loaded before play.
       Joining stops freezing the window (a progress screen instead).
-   5. *Signing and trust*: a content-signing key derived from the words on its own path and
+   5. *Signing and trust* (done): a content-signing key derived from the words on its own path and
       certified by the account (DID later); signatures in an envelope outside the pinned hash;
       join sheet with sizes, creators and key fingerprints; trust defaults to this package or this
       world's set, trusting a creator is a deliberate step.

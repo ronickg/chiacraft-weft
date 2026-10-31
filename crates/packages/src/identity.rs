@@ -11,6 +11,8 @@
 //! file assets/lang/en_us.lang 70 6f1c…
 //! file defs/blocks/ruby_block.toml 101 a93e…
 //! ```
+//!
+//! Hidden files and the signature envelope (`package.sig`, see `signature`) are not part of it.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -167,7 +169,9 @@ fn walk(root: &Path, dir: &Path, out: &mut Vec<(String, PathBuf)>) -> Result<(),
     let entries = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     for e in entries.flatten() {
         let name = e.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') {
+        // Hidden files, and the signature envelope (it names the package's hash, so it can't be
+        // one of the files that hash covers).
+        if name.starts_with('.') || (dir == root && name == crate::signature::SIG_FILE) {
             continue;
         }
         let p = e.path();

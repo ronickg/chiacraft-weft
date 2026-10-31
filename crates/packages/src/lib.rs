@@ -14,6 +14,7 @@
 //! the game registers them through the `packages` mod.
 
 pub mod identity;
+pub mod signature;
 pub mod store;
 
 use std::collections::BTreeMap;

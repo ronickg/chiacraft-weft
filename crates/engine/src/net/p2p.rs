@@ -21,8 +21,9 @@ const ALPN: &[u8] = b"weft/1";
 const PROTOCOL: u32 = 4;
 const MAX_FRAME: usize = 64 << 20;
 
-/// A data package the host's world plays with: id, version, hash (hex), size in bytes.
-pub type Offer = (String, String, String, u64);
+/// A data package the host's world plays with: id, version, hash (hex), size in bytes, and its
+/// signature envelope (empty if unsigned).
+pub type Offer = (String, String, String, u64, String);
 
 /// Requests on the extra streams a joining game opens to download packages.
 const GET_MANIFEST: u8 = 0;
@@ -273,7 +274,7 @@ async fn serve_packages(conn: iroh::endpoint::Connection, offers: Vec<Offer>) {
     let Some(store) = crate::modloader::store() else { return };
     let mut manifests = rustc_hash::FxHashSet::default();
     let mut files = rustc_hash::FxHashSet::default();
-    for (_, _, hex, _) in &offers {
+    for (_, _, hex, ..) in &offers {
         let Some(h) = Hash::from_hex(hex) else { continue };
         if let Ok(m) = store.manifest(&h) {
             manifests.insert(h);
@@ -358,7 +359,7 @@ async fn download(conn: &iroh::endpoint::Connection, missing: &[Offer], events: 
     let store = crate::modloader::store().ok_or("mods are not loaded")?;
     let total: u64 = missing.iter().map(|o| o.3).sum();
     let mut done = 0u64;
-    for (id, _, hex, size) in missing {
+    for (id, _, hex, size, sig) in missing {
         let h = Hash::from_hex(hex).ok_or_else(|| format!("package {id}: a bad hash"))?;
         if *size > MAX_TOTAL_BYTES {
             return Err(format!("package {id} is too big ({size} bytes)"));
@@ -383,6 +384,10 @@ async fn download(conn: &iroh::endpoint::Connection, missing: &[Offer], events: 
             let _ = events.send(JoinEvent::Progress(done, total));
         }
         store.lay_out(&manifest)?;
+        // Who made it travels beside it, kept only when it checks out.
+        if !sig.is_empty() && crate::package_trust::verify(sig, hex).is_ok() {
+            store.put_signature(&h, sig)?;
+        }
         log::info!("downloaded package {id} ({})", h.short());
     }
     Ok(())

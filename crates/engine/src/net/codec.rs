@@ -146,7 +146,7 @@ macro_rules! tuples {
         impl<$($t: Wire),*> Item for ($($t,)*) {}
     )*};
 }
-tuples!((0 A, 1 B), (0 A, 1 B, 2 C), (0 A, 1 B, 2 C, 3 D), (0 A, 1 B, 2 C, 3 D, 4 E, 5 F));
+tuples!((0 A, 1 B), (0 A, 1 B, 2 C), (0 A, 1 B, 2 C, 3 D), (0 A, 1 B, 2 C, 3 D, 4 E), (0 A, 1 B, 2 C, 3 D, 4 E, 5 F));
 
 impl Wire for IVec3 {
     fn put(&self, w: &mut W) {

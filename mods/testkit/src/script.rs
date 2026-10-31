@@ -20,6 +20,7 @@
 //! join ticket.txt     # join with the ticket from that file (waits for it)
 //! open name           # leave this world and open (or make) the saved world called name
 //! leave               # leave the world for the title screen
+//! tap screen query    # once `screen` is open, clicks the element `query` (`id:x`, `text:x`) until it closes
 //! origin              # later via points are relative to where the player stands now
 //! where label        # logs the player's position
 //! rec start|stop     # logs a marker; tools/rec.ps1 presses the OBS hotkeys on it
@@ -112,6 +113,17 @@ pub async fn run(t: T, src: String) -> R {
                 t.frames(3).await?;
                 t.until("the world open", Duration::from_secs(60), |t| t.flag(cf::JOINED)).await?;
                 t.loaded().await?;
+            }
+            "tap" => {
+                let (screen, query) = rest.split_once(' ').ok_or("tap: a screen and an element")?;
+                t.screen(screen).await?;
+                for _ in 0..10 {
+                    t.click_ui(query, 0);
+                    t.frames(15).await?;
+                    if t.c().screen() != screen {
+                        break;
+                    }
+                }
             }
             "leave" => {
                 t.c().leave_world();

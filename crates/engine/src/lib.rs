@@ -24,6 +24,7 @@ pub mod loot;
 pub mod model;
 pub mod modloader;
 pub mod net;
+pub mod package_trust;
 pub mod packs;
 pub mod physics;
 pub mod post;

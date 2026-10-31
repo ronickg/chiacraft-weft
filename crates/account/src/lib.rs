@@ -50,6 +50,19 @@ impl Session {
         self.network.expose()
     }
 
+    /// The seed of the content key (Ed25519), which signs the packages this player makes. Only for
+    /// signing; never log it.
+    pub fn content_seed(&self) -> [u8; 32] {
+        *self.signer.content_seed().expose()
+    }
+
+    /// The identity key vouching for the content key `key` (its public half, hex), as
+    /// `<identity hex>:<signature hex>`.
+    pub fn content_vouch_line(&self, key: &str) -> Result<String, String> {
+        let sig = self.signer.sign(&chiacraft_wallet::sign::content_link_text(key)).map_err(|e| e.to_string())?;
+        Ok(format!("{}:{}", self.identity_hex(), chiacraft_wallet::keys::hex(&sig)))
+    }
+
     /// The identity key, hex: the player's identity on every world.
     pub fn identity_hex(&self) -> String {
         self.signer.identity().hex()
@@ -129,6 +142,15 @@ impl Session {
 
 /// A world's check of a joining player's [`Session::vouch_line`] against the network key it
 /// authenticated (`endpoint`): the identity key, hex, when the line is that key's valid vouching.
+/// The identity behind a content key: `line` is `<identity hex>:<signature hex>` vouching for
+/// `key` (hex). Gives the identity (hex) when it checks out.
+pub fn check_content_vouch(line: &str, key: &str) -> Option<String> {
+    let (identity, sig) = line.split_once(':')?;
+    let id = chiacraft_wallet::IdentityKey::from_hex(identity)?;
+    let sig = chiacraft_wallet::keys::from_hex(sig)?;
+    chiacraft_wallet::sign::verify_content_link(&id, key, &sig).then(|| id.hex())
+}
+
 pub fn check_vouch(line: &str, endpoint: &str) -> Option<String> {
     let (identity, sig) = line.split_once(':')?;
     let key = chiacraft_wallet::IdentityKey::from_hex(identity)?;

@@ -298,6 +298,11 @@ fn install(store: &chiacraft_packages::store::Store, dirs: &[PathBuf], mods: &[M
             log::error!("package {} left out: the id {} is taken by a mod or another package", src.display(), p.id);
             continue;
         }
+        match store.signature(&p.hash).map(|sig| crate::package_trust::verify(&sig, &p.hash.hex())) {
+            Some(Ok(c)) => log::info!("package {} is signed by content key {}", p.id, crate::package_trust::fingerprint(&c.key)),
+            Some(Err(e)) => log::warn!("package {}: its signature is refused ({e}); players joining see it as unsigned", p.id),
+            None => {}
+        }
         out.push(p);
     }
     out
@@ -314,8 +319,9 @@ pub fn stored_package(hash: chiacraft_packages::identity::Hash) -> Result<Packag
     package_ref(&store, hash)
 }
 
-/// The data packages of the content in force: (id, version, hash, size in bytes).
-pub fn current_packages() -> Vec<(String, String, String, u64)> {
+/// The data packages of the content in force: (id, version, hash, size in bytes, signature
+/// envelope or empty).
+pub fn current_packages() -> Vec<(String, String, String, u64, String)> {
     let Some(store) = store() else { return Vec::new() };
     content::content()
         .mods
@@ -324,7 +330,7 @@ pub fn current_packages() -> Vec<(String, String, String, u64)> {
             let hex = m.package.as_ref()?;
             let h = chiacraft_packages::identity::Hash::from_hex(hex)?;
             let size = store.manifest(&h).ok()?.files.iter().map(|f| f.size).sum();
-            Some((m.id.clone(), m.version.clone(), hex.clone(), size))
+            Some((m.id.clone(), m.version.clone(), hex.clone(), size, store.signature(&h).unwrap_or_default()))
         })
         .collect()
 }

@@ -78,6 +78,8 @@ pub enum Request {
     Join(String),
     /// Stops the join in progress (chiacraft).
     CancelJoin,
+    /// The join sheet's answer: download the world's packages; true also trusts their creators.
+    JoinConsent(bool),
     Respawn,
     SendChat(String),
     /// Re-read packs and assets, as the reload key does.
@@ -194,6 +196,8 @@ pub(crate) struct Running {
     game: Option<Game>,
     /// Joining a friend's world, until it is let in (chiacraft: packages are downloaded first).
     joining: Option<net::p2p::Joining>,
+    /// The packages the join sheet asks about.
+    join_offer: Option<Vec<net::screens::OfferRow>>,
     last: Instant,
     shot_pending: bool,
     fps: f32,
@@ -406,6 +410,7 @@ impl App {
             },
             game: None,
             joining: None,
+            join_offer: None,
             last: Instant::now(),
             shot_pending: false,
             fps: 0.0,
@@ -620,10 +625,30 @@ impl Running {
             };
             match ev {
                 JoinEvent::Offer(all, missing) => {
+                    let trust = crate::package_trust::Trust::load(&self.settings.run_dir);
+                    let rows: Vec<net::screens::OfferRow> = missing
+                        .iter()
+                        .map(|o| {
+                            let (creator, problem) = match (!o.4.is_empty()).then(|| crate::package_trust::verify(&o.4, &o.2)) {
+                                None => (None, None),
+                                Some(Ok(c)) => (Some(c), None),
+                                Some(Err(e)) => (None, Some(e)),
+                            };
+                            let trusted = trust.trusts(&o.2, creator.as_ref());
+                            net::screens::OfferRow { id: o.0.clone(), version: o.1.clone(), hash: o.2.clone(), size: o.3, creator, problem, trusted }
+                        })
+                        .collect();
                     let bytes: u64 = missing.iter().map(|o| o.3).sum();
-                    log::info!("the world plays with {} data packages; downloading {} ({} KB)", all.len(), missing.len(), bytes.div_ceil(1024));
-                    net::screens::set_join_status("multiplayer.downloading", &[missing.len().to_string(), "0".into(), bytes.div_ceil(1024).to_string()]);
-                    answer(self, JoinAnswer::Accept);
+                    if rows.iter().all(|r| r.trusted) {
+                        log::info!("the world plays with {} data packages; downloading {} ({} KB), all trusted", all.len(), missing.len(), bytes.div_ceil(1024));
+                        net::screens::set_join_status("multiplayer.downloading", &[missing.len().to_string(), "0".into(), bytes.div_ceil(1024).to_string()]);
+                        answer(self, JoinAnswer::Accept);
+                    } else {
+                        log::info!("the world plays with {} data packages; asking before downloading {} ({} KB)", all.len(), missing.len(), bytes.div_ceil(1024));
+                        self.join_offer = Some(rows.clone());
+                        self.screens.clear();
+                        self.open(Box::new(net::screens::JoinSheet { rows }));
+                    }
                 }
                 JoinEvent::Progress(done, total) => {
                     // The package count stays as the offer set it.
@@ -654,6 +679,7 @@ impl Running {
                 JoinEvent::Failed(e) => {
                     log::warn!("joining failed: {e}");
                     self.joining = None;
+                    self.join_offer = None;
                     self.screens.clear();
                     self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] }));
                     return;
@@ -847,7 +873,25 @@ impl Running {
                         Err(e) => self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] })),
                     }
                 }
+                Request::JoinConsent(trust_creators) => {
+                    if let (Some(rows), Some(j)) = (self.join_offer.take(), &self.joining) {
+                        let mut trust = crate::package_trust::Trust::load(&self.settings.run_dir);
+                        for r in &rows {
+                            trust.add_package(&r.hash);
+                            if let (true, Some(c)) = (trust_creators, &r.creator) {
+                                trust.add_creator(c);
+                            }
+                        }
+                        trust.save();
+                        let bytes: u64 = rows.iter().map(|r| r.size).sum();
+                        net::screens::set_join_status("multiplayer.downloading", &[rows.len().to_string(), "0".into(), bytes.div_ceil(1024).to_string()]);
+                        let _ = j.answers.send(net::p2p::JoinAnswer::Accept);
+                        self.screens.clear();
+                        self.open(Box::new(net::screens::Joining));
+                    }
+                }
                 Request::CancelJoin => {
+                    self.join_offer = None;
                     if let Some(j) = self.joining.take() {
                         let _ = j.answers.send(net::p2p::JoinAnswer::Cancel("cancelled".into()));
                     }
