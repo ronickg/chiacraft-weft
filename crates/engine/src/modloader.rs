@@ -198,21 +198,31 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path) -> Res
     mods.sort_by(|a, b| a.id.cmp(&b.id));
 
     // Data packages (chiacraft) take the slots after the code mods: each its own namespace.
-    let mut packages: Vec<(chiacraft_packages::Manifest, PathBuf)> = Vec::new();
+    // Each is copied into the store and used from there, under its hash, checked on every start.
+    let store = chiacraft_packages::store::Store::new(cache);
+    let mut packages: Vec<(chiacraft_packages::Manifest, PathBuf, chiacraft_packages::identity::Hash)> = Vec::new();
     // A package is data someone else wrote: one with mistakes is left out, not fatal.
-    for dir in chiacraft_packages::discover(package_dirs) {
-        let m = match chiacraft_packages::load(&dir) {
-            Ok(p) => p.manifest,
-            Err(errors) => {
-                log::error!("package {} left out:\n  {}", dir.display(), errors.join("\n  "));
+    for src in chiacraft_packages::discover(package_dirs) {
+        let stored = store.import_dir(&src).and_then(|h| store.verify(&h).map(|dir| (h, dir)));
+        let (hash, dir) = match stored {
+            Ok(x) => x,
+            Err(e) => {
+                log::error!("package {} left out: {e}", src.display());
                 continue;
             }
         };
-        if mods.iter().any(|x| x.id == m.id) || packages.iter().any(|(p, _)| p.id == m.id) {
-            log::error!("package {} left out: the id {} is taken by a mod or another package", dir.display(), m.id);
+        let m = match chiacraft_packages::load(&dir) {
+            Ok(p) => p.manifest,
+            Err(errors) => {
+                log::error!("package {} left out:\n  {}", src.display(), errors.join("\n  "));
+                continue;
+            }
+        };
+        if mods.iter().any(|x| x.id == m.id) || packages.iter().any(|(p, ..)| p.id == m.id) {
+            log::error!("package {} left out: the id {} is taken by a mod or another package", src.display(), m.id);
             continue;
         }
-        packages.push((m, dir));
+        packages.push((m, dir, hash));
     }
     let register_package = if packages.is_empty() {
         None
@@ -220,7 +230,7 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path) -> Res
         let found = mods.iter().find_map(|m| unsafe { m._lib.get::<RegisterPackage>(REGISTER_PACKAGE).ok().map(|f| *f) });
         Some(found.ok_or("data packages need the packages mod")?)
     };
-    let _ = NAMES.set(mods.iter().map(|m| m.id.clone()).chain(packages.iter().map(|(m, _)| m.id.clone())).collect());
+    let _ = NAMES.set(mods.iter().map(|m| m.id.clone()).chain(packages.iter().map(|(m, ..)| m.id.clone())).collect());
 
     let mut metas: Vec<ModMeta> = mods
         .iter()
@@ -231,17 +241,17 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path) -> Res
                 deps: m.decl.deps.as_slice().iter().map(|d| d.as_str().to_string()).collect(),
                 order: 0,
                 assets: m.assets.clone(),
-                package: false,
+                package: None,
             }
         })
         .collect();
-    metas.extend(packages.iter().map(|(m, dir)| ModMeta {
+    metas.extend(packages.iter().map(|(m, dir, hash)| ModMeta {
         id: m.id.clone(),
         version: m.version.clone(),
         deps: m.dependencies.keys().cloned().collect(),
         order: 0,
         assets: dir.join("assets"),
-        package: true,
+        package: Some(hash.hex()),
     }));
     for m in &metas {
         for d in &m.deps {
@@ -266,7 +276,7 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path) -> Res
         })
         .collect();
     let mut regs = regs;
-    for (i, (m, dir)) in packages.iter().enumerate() {
+    for (i, (m, dir, hash)) in packages.iter().enumerate() {
         let id = ModId((mods.len() + i) as u32);
         let mut reg = RawRegistrar::new(id);
         let path = dir.to_string_lossy();
@@ -275,7 +285,7 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path) -> Res
         if r != 0 {
             reg.errors.push("registration panicked".into());
         }
-        log::info!("package {} {} from {}", m.id, m.version, dir.display());
+        log::info!("package {} {} ({})", m.id, m.version, hash.short());
         regs.push(reg);
     }
 

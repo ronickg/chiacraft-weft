@@ -53,6 +53,7 @@ fn main() {
         match a.as_str() {
             "--run-dir" => opts.run_dir = PathBuf::from(value()),
             "--mods" => opts.mod_dirs.push(PathBuf::from(value())),
+            "--packages" => opts.package_dirs.push(PathBuf::from(value())),
             "--gpu-debug" => opts.gpu_debug = true,
             "--verbose" => verbose = true,
             "--log" => log_spec = value(),

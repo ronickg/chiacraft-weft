@@ -44,6 +44,8 @@ pub struct WorldMeta {
     pub configs: Vec<(String, f64)>,
     /// Mods (id, version) the world was last played with.
     pub mods: Vec<(String, String)>,
+    /// Data packages (chiacraft): id and hash (hex) of the exact package it was last played with.
+    pub packages: Vec<(String, String)>,
 }
 
 pub fn now_secs() -> u64 {
@@ -53,7 +55,7 @@ pub fn now_secs() -> u64 {
 impl WorldMeta {
     pub fn load(dir: &Path) -> Option<WorldMeta> {
         let src = std::fs::read_to_string(dir.join("world.txt")).ok()?;
-        let mut m = WorldMeta { dir: dir.to_path_buf(), format: 1, name: String::new(), seed: 0, last_played: 0, times: Vec::new(), edits: Vec::new(), next_entity: 1, configs: Vec::new(), mods: Vec::new() };
+        let mut m = WorldMeta { dir: dir.to_path_buf(), format: 1, name: String::new(), seed: 0, last_played: 0, times: Vec::new(), edits: Vec::new(), next_entity: 1, configs: Vec::new(), mods: Vec::new(), packages: Vec::new() };
         for (_, k, v) in crate::kv::pairs(&src) {
             match k {
                 "name" => m.name = v.to_string(),
@@ -72,6 +74,8 @@ impl WorldMeta {
                         m.configs.push((r.to_string(), v.parse().unwrap_or(0.0)));
                     } else if let Some(id) = k.strip_prefix("mod.") {
                         m.mods.push((id.to_string(), v.to_string()));
+                    } else if let Some(id) = k.strip_prefix("package.") {
+                        m.packages.push((id.to_string(), v.to_string()));
                     }
                 }
             }
@@ -96,15 +100,27 @@ impl WorldMeta {
         for (id, v) in &self.mods {
             s.push_str(&format!("mod.{id} = {v}\n"));
         }
+        for (id, h) in &self.packages {
+            s.push_str(&format!("package.{id} = {h}\n"));
+        }
         let _ = std::fs::create_dir_all(&self.dir);
         if let Err(e) = std::fs::write(self.dir.join("world.txt"), s) {
             log::error!("saving world info: {e}");
         }
     }
 
-    /// Mods the world was played with that are not loaded now, as "id version".
+    /// Mods and packages the world was played with that are not loaded now, as "id version", and
+    /// packages loaded in another version than the world's (by hash).
     pub fn missing_mods(&self, c: &Content) -> Vec<String> {
-        self.mods.iter().filter(|(id, _)| !c.mods.iter().any(|m| &m.id == id)).map(|(id, v)| format!("{id} {v}")).collect()
+        let mut out: Vec<String> = self.mods.iter().filter(|(id, _)| !c.mods.iter().any(|m| &m.id == id)).map(|(id, v)| format!("{id} {v}")).collect();
+        for (id, want) in &self.packages {
+            let have = c.mods.iter().find(|m| &m.id == id).and_then(|m| m.package.as_deref());
+            if let Some(have) = have.filter(|h| h != want) {
+                let short = |h: &str| h.get(..12).unwrap_or(h).to_string();
+                out.push(format!("{id}: another version (the world's {}, this one {})", short(want), short(have)));
+            }
+        }
+        out
     }
 }
 
@@ -128,7 +144,7 @@ pub fn create(saves: &Path, name: &str, seed: u64) -> WorldMeta {
         n += 1;
         dir = saves.join(format!("{base}_{n}"));
     }
-    let m = WorldMeta { dir, format: SAVE_FORMAT, name: name.to_string(), seed, last_played: now_secs(), times: Vec::new(), edits: Vec::new(), next_entity: 1, configs: Vec::new(), mods: Vec::new() };
+    let m = WorldMeta { dir, format: SAVE_FORMAT, name: name.to_string(), seed, last_played: now_secs(), times: Vec::new(), edits: Vec::new(), next_entity: 1, configs: Vec::new(), mods: Vec::new(), packages: Vec::new() };
     m.save();
     m
 }
@@ -144,10 +160,18 @@ pub fn parse_seed(s: &str) -> u64 {
 
 // ---------------------------------------------------------------- id table
 
+/// What a saved block shows as while its mod or package is missing (registered by the
+/// `packages` mod; air without it). The save keeps the block's real name.
+pub const UNKNOWN_BLOCK: &str = "packages:unknown";
+
 pub struct IdTable {
     names: Vec<String>,
     to_runtime: Vec<u32>,
     to_world: FxHashMap<u32, u32>,
+    /// World ids whose names no loaded content has.
+    missing: FxHashSet<u32>,
+    /// The runtime state they show as.
+    unknown: u32,
     dirty: bool,
 }
 
@@ -156,21 +180,31 @@ impl IdTable {
         let names: Vec<String> = std::fs::read_to_string(dir.join("ids.txt"))
             .map(|s| s.lines().map(str::to_string).collect())
             .unwrap_or_default();
-        let mut missing = Vec::new();
+        let unknown = c.state_by_name(UNKNOWN_BLOCK).unwrap_or(AIR);
+        let mut missing = FxHashSet::default();
         let to_runtime: Vec<u32> = names
             .iter()
-            .map(|n| {
+            .enumerate()
+            .map(|(i, n)| {
                 c.state_by_name(n).unwrap_or_else(|| {
-                    missing.push(n.clone());
-                    AIR
+                    missing.insert(i as u32);
+                    unknown
                 })
             })
             .collect();
         if !missing.is_empty() {
-            log::warn!("world contains {} block states from missing mods (shown as air): {}", missing.len(), missing.join(", "));
+            let mut list: Vec<&str> = missing.iter().map(|&w| names[w as usize].as_str()).collect();
+            list.sort();
+            let shown = if unknown == AIR { "air" } else { "unknown blocks, keeping their names" };
+            log::warn!("world contains {} block states from missing mods or packages (shown as {shown}): {}", list.len(), list.join(", "));
         }
-        let to_world = to_runtime.iter().enumerate().filter(|(i, r)| **r != AIR || names[*i] == "core:air").map(|(i, &r)| (r, i as u32)).collect();
-        IdTable { names, to_runtime, to_world, dirty: false }
+        let to_world = to_runtime
+            .iter()
+            .enumerate()
+            .filter(|(i, r)| !missing.contains(&(*i as u32)) && (**r != AIR || names[*i] == "core:air"))
+            .map(|(i, &r)| (r, i as u32))
+            .collect();
+        IdTable { names, to_runtime, to_world, missing, unknown, dirty: false }
     }
 
     pub fn world_id(&mut self, c: &Content, runtime: u32) -> u32 {
@@ -259,6 +293,9 @@ pub struct Storage {
     /// Per dimension, the cubes saved: what differs from generation (clients generate the
     /// rest themselves).
     saved: Vec<FxHashSet<IVec3>>,
+    /// Blocks of missing mods or packages in loaded cubes: (dimension, cube) to (block index,
+    /// world id), so saving the cube writes their real names back while they are untouched.
+    unknown: FxHashMap<(u32, IVec3), Vec<(usize, u32)>>,
 }
 
 fn region_of(cube: IVec3) -> (IVec3, usize) {
@@ -269,7 +306,12 @@ fn region_of(cube: IVec3) -> (IVec3, usize) {
 
 impl Storage {
     pub fn open(mut meta: WorldMeta, c: &Content) -> Storage {
-        meta.mods = c.mods.iter().map(|m| (m.id.clone(), m.version.clone())).collect();
+        // What isn't loaded stays listed: its blocks are kept by name until it comes back.
+        let loaded = |id: &str| c.mods.iter().any(|m| m.id == id);
+        let old_mods: Vec<_> = meta.mods.drain(..).filter(|(id, _)| !loaded(id)).collect();
+        let old_packages: Vec<_> = meta.packages.drain(..).filter(|(id, _)| !loaded(id)).collect();
+        meta.mods = c.mods.iter().map(|m| (m.id.clone(), m.version.clone())).chain(old_mods).collect();
+        meta.packages = c.mods.iter().filter_map(|m| Some((m.id.clone(), m.package.clone()?))).chain(old_packages).collect();
         let ids = IdTable::load(&meta.dir, c);
         let dim_dirs: Vec<PathBuf> = c.dims.iter().map(|d| meta.dir.join("dims").join(d.name.replace(':', "_"))).collect();
         let mut on_disk = FxHashSet::default();
@@ -294,7 +336,7 @@ impl Storage {
                 }
             }
         }
-        Storage { meta, ids, regions: FxHashMap::default(), dim_dirs, on_disk, saved }
+        Storage { meta, ids, regions: FxHashMap::default(), dim_dirs, on_disk, saved, unknown: FxHashMap::default() }
     }
 
     fn region(&mut self, dim: u32, r: IVec3) -> Option<&mut Region> {
@@ -340,6 +382,16 @@ impl Storage {
         if cube.is_none() {
             log::error!("corrupt cube {pos} in dimension {dim}, regenerating it");
         }
+        // Read again as world ids to remember which blocks were of missing content.
+        self.unknown.remove(&(dim, pos));
+        if !ids.missing.is_empty() {
+            if let Some(raw) = Cube::read(&mut data.get(4..4 + len)?, |w| w) {
+                if raw.palette().iter().any(|w| ids.missing.contains(w)) {
+                    let cells: Vec<(usize, u32)> = (0..crate::world::cube::VOLUME).filter_map(|i| Some((i, raw.get(i))).filter(|(_, w)| ids.missing.contains(w))).collect();
+                    self.unknown.insert((dim, pos), cells);
+                }
+            }
+        }
         Some((cube?, data[4 + len..].to_vec()))
     }
 
@@ -349,10 +401,26 @@ impl Storage {
         }
         let mut buf = Vec::new();
         let mut cube = cube.clone();
+        // Blocks of missing content still in place get their real names back: each world id
+        // stands in as a state no content has (from u32::MAX down) and maps back below.
+        let mut kept: FxHashMap<u32, u32> = FxHashMap::default();
+        if let Some(cells) = self.unknown.get_mut(&(dim, pos)) {
+            cells.retain(|&(i, _)| cube.get(i) == self.ids.unknown);
+            for &(i, w) in cells.iter() {
+                let n = kept.len() as u32;
+                let stand_in = *kept.iter().find(|(_, v)| **v == w).map(|(k, _)| k).unwrap_or(&(u32::MAX - n));
+                kept.insert(stand_in, w);
+                cube.set(i, stand_in);
+            }
+        }
         cube.compact();
         let mut map: FxHashMap<u32, u32> = FxHashMap::default();
         for &s in cube.palette() {
-            map.insert(s, self.ids.world_id(c, s));
+            let w = match kept.get(&s) {
+                Some(&w) => w,
+                None => self.ids.world_id(c, s),
+            };
+            map.insert(s, w);
         }
         buf.extend_from_slice(&[0; 4]);
         cube.write(&mut buf, |s| map[&s]);

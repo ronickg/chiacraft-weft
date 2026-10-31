@@ -2,12 +2,14 @@
 
 A data package adds blocks, items, recipes and tags with files only: no code, nothing to compile.
 Worlds will name the packages they need, and players who join download them (chiacraft plan,
-phase 2). `packages/gems` is a complete example.
+phase 2). `examples/packages/gems` is a complete example; start the game with
+`--packages examples/packages` to try it.
 
 ## Where packages go
 
 - `run/packages/<folder>/`: yours.
-- `packages/<folder>/` in the game's folder: the game's own and examples.
+- `packages/<folder>/` in the game's folder: the game's own.
+- any folder given with `--packages <folder>`.
 
 A package with mistakes is left out when the game starts; the log says which file and line.
 
@@ -97,3 +99,21 @@ time = 200
 ```toml
 entries = ["ruby", "ruby_block", "#other_tag"]
 ```
+
+## How a package is named
+
+A package is named by a hash of its exact files: the BLAKE3 hash of a manifest that lists every
+file's path, size and BLAKE3 hash (`crates/packages/src/identity.rs`). The same files give the same
+hash on every computer, however they were copied or zipped; changing any file gives a new one. The
+game shows its first 12 hex digits (`gems 0.1.0 (7a73bcf1cf25)` in the log).
+
+On start each package is copied into the store in `run/cache` (each file once, by hash), checked
+against its hash, and loaded from there, the same way packages downloaded from other players will be.
+File names may use letters, digits, `_`, `-` and `.`; hidden files (starting with a dot) are left out.
+
+## Worlds remember their packages
+
+A world's `world.txt` lists the exact package it was played with: `package.gems = 7a73bc…`. Opening it
+without that package, or with another version of it, asks first. Blocks of a missing package show as
+unknown blocks (magenta and black) and keep their real names in the save, so they come back when the
+package does.

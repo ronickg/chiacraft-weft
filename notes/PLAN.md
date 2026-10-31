@@ -132,7 +132,7 @@ The smallest version that works is phases 1-4.
       + `assets/` like a mod's; registered through the SDK by the `packages` mod into their own
       slots; package ids sort after code mods' so packages never move them; broken packages are
       left out, not fatal. Format: `docs/packages.md`.
-   2. *Identity and store*: a package is the BLAKE3 hash of a canonical manifest listing every
+   2. *Identity and store* (done): a package is the BLAKE3 hash of a canonical manifest listing every
       file's path, size and BLAKE3 (not a hash of a zip); files cached by hash in
       `run/cache/blobs/`, never unpacked to author-chosen paths; each world keeps a lockfile of
       exact package hashes; unknown blocks in saves load as a placeholder that keeps their name.

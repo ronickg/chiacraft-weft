@@ -13,6 +13,9 @@
 //! (`#ores/ruby`) are shared vocabulary and stay as written. This crate reads and checks packages;
 //! the game registers them through the `packages` mod.
 
+pub mod identity;
+pub mod store;
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 

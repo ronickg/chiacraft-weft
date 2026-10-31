@@ -4,7 +4,8 @@
 //!
 //! The engine gives every package its own mod slot (its namespace and `assets/`) and calls
 //! [`chiacraft_register_package`] once per package after the code mods have registered. The mod's
-//! own `init` registers nothing.
+//! own `init` registers one block: `packages:unknown`, what a saved block shows as while the mod or
+//! package it came from is missing (the save keeps its real name).
 
 use std::sync::Mutex;
 
@@ -14,7 +15,11 @@ use weft_sdk::*;
 
 declare_mod!(deps: [], init: init);
 
-fn init(_: &mut Registry) {}
+static UNKNOWN: Block = Block::named("unknown");
+
+fn init(r: &mut Registry) {
+    r.block(&UNKNOWN).hardness(0.5).drops_nothing().no_item();
+}
 
 /// The package being registered: `__init` takes a plain function.
 static CURRENT: Mutex<Option<Package>> = Mutex::new(None);

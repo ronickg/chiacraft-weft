@@ -56,6 +56,7 @@ pub fn content_hash() -> u64 {
     for m in &c.mods {
         eat(&m.id);
         eat(&m.version);
+        eat(m.package.as_deref().unwrap_or(""));
     }
     for b in &c.blocks {
         eat(&b.name);

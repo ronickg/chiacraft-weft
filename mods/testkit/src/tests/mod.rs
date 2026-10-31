@@ -32,6 +32,7 @@ pub fn all() -> Vec<TestDef> {
         ui::screens,
         account::account,
         packages::packages,
+        packages::package_pins,
         ui::scrollbar,
         ui::rebind,
         ui::f3,

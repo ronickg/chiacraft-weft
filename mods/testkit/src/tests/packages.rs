@@ -1,5 +1,6 @@
-//! Data packages (chiacraft plan, phase 2): the `gems` example package in `packages/gems` is only
-//! files, and its blocks, items, recipes and tags work like a code mod's.
+//! Data packages (chiacraft plan, phase 2): the `gems` example package is only files, and its
+//! blocks, items, recipes and tags work like a code mod's. Run with the examples' packages:
+//! `weft --packages examples/packages --test packages`.
 
 use std::time::Duration;
 
@@ -67,5 +68,40 @@ pub async fn packages(t: T) -> R {
     t.c().teleport([block[0] as f64 + 0.5, block[1] as f64, block[2] as f64 + 0.5]);
     let picked = t.until("a ruby block picked up", Duration::from_secs(5), |t| (0..36).any(|i| t.c().inventory_slot(i).item == block_item)).await;
     t.check(picked.is_ok(), "mining the ruby block gave the block");
+    Ok(())
+}
+
+/// A world names the exact packages it was played with (`package.<id> = <hash>` in `world.txt`):
+/// opening it with another version of one, or without one, asks first.
+pub async fn package_pins(t: T) -> R {
+    if Item::lookup("gems:ruby").is_none() {
+        t.note("needs the examples' packages (--packages examples/packages); skipped");
+        return Ok(());
+    }
+    t.screen("core:title").await?;
+    let dir = format!("{}/saves/test-package_pins", t.c().run_dir());
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let zeros = "0".repeat(64);
+    let world = format!(
+        "format = 3\nname = Pinned World\nseed = 1\nlast_played = 99999999999\nnext_entity = 1\nmod.base = 26.10.2\nmod.gems = 0.1.0\nmod.gone = 1.0\npackage.gems = {zeros}\npackage.gone = {}\n",
+        "1".repeat(64)
+    );
+    std::fs::write(format!("{dir}/world.txt"), world).map_err(|e| e.to_string())?;
+
+    t.check(t.c().open_screen(&screens::WORLDS), "cannot open the world list");
+    t.screen("core:worlds").await?;
+    t.frames(2).await?;
+    t.check(t.click_ui("text:Pinned World", 0), "the pinned world in the list");
+    t.frames(6).await?;
+    t.shot("selected").await?;
+    t.check(t.click_ui("id:play", 0), "the Play button");
+    t.screen("core:missing_mods").await?;
+    t.frames(2).await?;
+    t.shot("pins").await?;
+    t.laid_out(&["text:gone 1.0", "text:gems: another version", "text:000000000000", "id:continue"]);
+    t.check(t.c().ui_rect("text:base 26").is_none(), "a loaded mod is not listed");
+    t.c().close_screen();
+    let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }

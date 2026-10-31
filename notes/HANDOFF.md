@@ -48,12 +48,20 @@ to it (it was refused); `chiacraft_*` crates log at info; bare `cargo run` start
 
 Slice 1 (local packages) is done: `crates/packages` (format), `mods/packages` (registers them),
 the engine's loader gives each package a slot after the code mods (`modloader.rs`, `ModMeta.package`,
-the sort in `content::freeze`). Example `packages/gems`; author guide `docs/packages.md`; in-game test
-`--test packages`. The unit tests in `crates/packages` have not run: there is no CI for tests yet.
+the sort in `content::freeze`). Author guide `docs/packages.md`.
+
+Slice 2 (identity and store) is done: `crates/packages/src/{identity,store}.rs` (BLAKE3 manifest,
+store in `run/cache/{blobs,packages}`, verified on every start, packages loaded from the store);
+`ModMeta.package` holds the hash and the content hash covers it; `world.txt` pins
+`package.<id> = <hash>` and the missing-mods screen lists packages missing or in another version;
+blocks of missing content load as `packages:unknown` and keep their names in the save
+(`saves.rs`, `Storage.unknown`). The example moved to `examples/packages/gems`; run the game or
+tests with `--packages examples/packages` to load it. Tests: `--test packages,package_pins` (with
+that flag); the keep-the-name case was checked across three restarts with scripts.
 
 ## Next steps
 
-1. Phase 2 slice 2 (identity and store) per `notes/PLAN.md`.
+1. Phase 2 slice 3 (content swap between worlds) per `notes/PLAN.md`.
 
 ## Notes
 
