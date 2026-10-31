@@ -18,6 +18,8 @@
 //! bench 5 label       # BENCH line over 5 seconds
 //! host ticket.txt     # host, write the join ticket there
 //! join ticket.txt     # join with the ticket from that file (waits for it)
+//! open name           # leave this world and open (or make) the saved world called name
+//! leave               # leave the world for the title screen
 //! origin              # later via points are relative to where the player stands now
 //! where label        # logs the player's position
 //! rec start|stop     # logs a marker; tools/rec.ps1 presses the OBS hotkeys on it
@@ -103,6 +105,17 @@ pub async fn run(t: T, src: String) -> R {
                 t.c().host_world();
                 t.until("hosting", Duration::from_secs(60), |t| t.flag(cf::HOSTING)).await?;
                 let _ = std::fs::write(rest, t.c().ticket());
+            }
+            "open" => {
+                t.c().open_world(rest, 1);
+                // The old world's client is gone by the next frames; then wait for the new one.
+                t.frames(3).await?;
+                t.until("the world open", Duration::from_secs(60), |t| t.flag(cf::JOINED)).await?;
+                t.loaded().await?;
+            }
+            "leave" => {
+                t.c().leave_world();
+                t.screen("core:title").await?;
             }
             "join" => {
                 let mut ticket = String::new();

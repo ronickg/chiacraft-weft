@@ -13,6 +13,7 @@ use weft_noise::fixed::{Fields, ONE, div_floor, hash, perlin2, perlin3, q4, q12,
 use crate::host;
 
 /// One `TerrainDesc` as sent, owned.
+#[derive(Clone)]
 pub struct RawTerrain {
     pub owner: ModId,
     pub dimension: String,
@@ -190,12 +191,14 @@ impl Mask {
     }
 }
 
+#[derive(Clone)]
 pub enum Height {
     /// `abi::terrain_preset` and its parameters (Q4).
     Preset(u32, [i32; 4]),
     Custom(ModId, Callback),
 }
 
+#[derive(Clone)]
 pub struct Feature {
     pub name: String,
     pub height: Height,
@@ -232,6 +235,7 @@ impl Feature {
 }
 
 /// A biome rule with names resolved: block states and biome ids.
+#[derive(Clone)]
 pub struct Rule {
     pub biome: u32,
     /// Ranges in Q12.
@@ -251,12 +255,14 @@ pub struct Rule {
     pub ice: Option<u32>,
 }
 
+#[derive(Clone)]
 pub struct Caves {
     pub lava: u32,
     pub lava_from: i32,
     pub lava_to: i32,
 }
 
+#[derive(Clone)]
 pub struct CaveBiome {
     pub biome: u32,
     pub depth: i32,
@@ -271,6 +277,7 @@ pub struct Columns {
     pub rules: [u32; 256],
 }
 
+#[derive(Clone)]
 pub struct Terrain {
     pub stone: u32,
     /// Q4.
@@ -763,6 +770,13 @@ const SHARDS: usize = 32;
 pub struct ColumnCache<T> {
     shards: [Mutex<FxHashMap<(u64, i32, i32), Arc<std::sync::OnceLock<Arc<T>>>>>; SHARDS],
     per_shard: usize,
+}
+
+/// A clone is an empty cache of the same size: what it held is computed again on demand.
+impl<T> Clone for ColumnCache<T> {
+    fn clone(&self) -> Self {
+        ColumnCache::new(self.per_shard * SHARDS)
+    }
 }
 
 impl<T> ColumnCache<T> {

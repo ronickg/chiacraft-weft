@@ -341,6 +341,21 @@ impl T {
     }
 
     /// Clicks a UI element (`slot:N`, `id:x`, `text:words`) of the top screen.
+    /// Clicks `query` until screen `screen` is open: a click that lands while the menu is being
+    /// rebuilt (after an asset reload, or before a selection shows) is lost.
+    pub async fn click_until_screen(&self, query: &str, screen: &str) -> R {
+        for _ in 0..10 {
+            self.click_ui(query, 0);
+            for _ in 0..15 {
+                self.frames(1).await?;
+                if self.c().screen() == screen {
+                    return Ok(());
+                }
+            }
+        }
+        Err(format!("clicking {query} never opened {screen}"))
+    }
+
     pub fn click_ui(&self, query: &str, button: u32) -> bool {
         let ok = self.c().click_ui(query, button);
         if !ok {

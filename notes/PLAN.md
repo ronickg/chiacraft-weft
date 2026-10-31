@@ -136,7 +136,7 @@ The smallest version that works is phases 1-4.
       file's path, size and BLAKE3 (not a hash of a zip); files cached by hash in
       `run/cache/blobs/`, never unpacked to author-chosen paths; each world keeps a lockfile of
       exact package hashes; unknown blocks in saves load as a placeholder that keeps their name.
-   3. *Content swap between worlds*: an atomic pointer to `Content` interned by hash (each kept
+   3. *Content swap between worlds* (done): an atomic pointer to `Content` interned by hash (each kept
       once); swap only with no world loaded; native mods re-resolve package ids by name per swap.
    4. *Configuration phase and transfer*: protocol 4; the hello carries the world's lock hash; then
       offer, have/need/declined, verified streaming (bao-tree) on extra streams of the iroh

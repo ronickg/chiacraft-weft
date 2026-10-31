@@ -1018,11 +1018,10 @@ unsafe extern "C" fn find(kind: u32, name: Str, count: *mut u32) -> u32 {
 }
 
 unsafe extern "C" fn name_of(kind: u32, id: u32) -> Str {
-    static STATE_NAMES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
     let Some(c) = try_content() else { return Str::EMPTY };
     let name: Option<&str> = match kind {
         abi::entry_kind::BLOCK => {
-            let names = STATE_NAMES.get_or_init(|| (0..c.states.len() as u32).map(|s| c.state_name(s)).collect());
+            let names = c.state_names.get_or_init(|| (0..c.states.len() as u32).map(|s| c.state_name(s)).collect());
             names.get(id as usize).map(|s| s.as_str())
         }
         abi::entry_kind::ITEM => c.items.get(id as usize).map(|i| i.name.as_str()),

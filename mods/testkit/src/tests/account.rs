@@ -29,8 +29,7 @@ pub async fn account(t: T) -> R {
     t.laid_out(&["text:from your account's 24 words", "text:Copy Key", "text:Account and Words"]);
     let needs_backup = shown(&t, "aren't written down");
 
-    t.check(t.click_ui("text:Account and Words", 0), "the profile's Account and Words button");
-    t.screen("core:account").await?;
+    t.click_until_screen("text:Account and Words", "core:account").await?;
     t.frames(2).await?;
     t.shot("account").await?;
     t.laid_out(&["text:Account ", "text:Identity ", "text:Kept in a file", "text:Show My 24 Words", "text:Restore from words", "id:restore_words"]);
@@ -70,8 +69,7 @@ pub async fn account(t: T) -> R {
     // A fresh screen has an empty field.
     t.c().close_screen();
     t.screen("core:profile").await?;
-    t.check(t.click_ui("text:Account and Words", 0), "the Account and Words button again");
-    t.screen("core:account").await?;
+    t.click_until_screen("text:Account and Words", "core:account").await?;
     t.frames(2).await?;
     t.check(t.click_ui("id:restore_words", 0), "the restore field again");
     t.frames(2).await?;

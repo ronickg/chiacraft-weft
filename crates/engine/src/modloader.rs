@@ -1,7 +1,6 @@
 //! Finds mod libraries, loads them and runs registration in parallel.
 
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
 use std::time::Instant;
 
 use rayon::prelude::*;
@@ -16,10 +15,19 @@ pub struct LoadedMod {
     decl: &'static abi::ModDecl,
 }
 
-static NAMES: OnceLock<Vec<String>> = OnceLock::new();
+/// Mod and package ids by `ModId`, for the content being built or in force. Kept for the life of
+/// the game (a few per package set), so names handed out stay valid.
+static NAMES: parking_lot::RwLock<&'static [String]> = parking_lot::RwLock::new(&[]);
 
 pub fn mod_id_name(m: ModId) -> &'static str {
-    NAMES.get().and_then(|n| n.get(m.0 as usize)).map_or("?", |s| s.as_str())
+    let names: &'static [String] = *NAMES.read();
+    names.get(m.0 as usize).map_or("?", |s| s.as_str())
+}
+
+fn set_names(names: Vec<String>) {
+    if **NAMES.read() != names[..] {
+        *NAMES.write() = Box::leak(names.into_boxed_slice());
+    }
 }
 
 /// Mods found in `mod_dirs`, earlier dirs winning: a folder (`assets/` and the library) or the
@@ -197,42 +205,8 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path) -> Res
     }
     mods.sort_by(|a, b| a.id.cmp(&b.id));
 
-    // Data packages (chiacraft) take the slots after the code mods: each its own namespace.
-    // Each is copied into the store and used from there, under its hash, checked on every start.
-    let store = chiacraft_packages::store::Store::new(cache);
-    let mut packages: Vec<(chiacraft_packages::Manifest, PathBuf, chiacraft_packages::identity::Hash)> = Vec::new();
-    // A package is data someone else wrote: one with mistakes is left out, not fatal.
-    for src in chiacraft_packages::discover(package_dirs) {
-        let stored = store.import_dir(&src).and_then(|h| store.verify(&h).map(|dir| (h, dir)));
-        let (hash, dir) = match stored {
-            Ok(x) => x,
-            Err(e) => {
-                log::error!("package {} left out: {e}", src.display());
-                continue;
-            }
-        };
-        let m = match chiacraft_packages::load(&dir) {
-            Ok(p) => p.manifest,
-            Err(errors) => {
-                log::error!("package {} left out:\n  {}", src.display(), errors.join("\n  "));
-                continue;
-            }
-        };
-        if mods.iter().any(|x| x.id == m.id) || packages.iter().any(|(p, ..)| p.id == m.id) {
-            log::error!("package {} left out: the id {} is taken by a mod or another package", src.display(), m.id);
-            continue;
-        }
-        packages.push((m, dir, hash));
-    }
-    let register_package = if packages.is_empty() {
-        None
-    } else {
-        let found = mods.iter().find_map(|m| unsafe { m._lib.get::<RegisterPackage>(REGISTER_PACKAGE).ok().map(|f| *f) });
-        Some(found.ok_or("data packages need the packages mod")?)
-    };
-    let _ = NAMES.set(mods.iter().map(|m| m.id.clone()).chain(packages.iter().map(|(m, ..)| m.id.clone())).collect());
-
-    let mut metas: Vec<ModMeta> = mods
+    let register = mods.iter().find_map(|m| unsafe { m._lib.get::<RegisterPackage>(REGISTER_PACKAGE).ok().map(|f| *f) });
+    let metas: Vec<ModMeta> = mods
         .iter()
         .map(|m| unsafe {
             ModMeta {
@@ -245,22 +219,6 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path) -> Res
             }
         })
         .collect();
-    metas.extend(packages.iter().map(|(m, dir, hash)| ModMeta {
-        id: m.id.clone(),
-        version: m.version.clone(),
-        deps: m.dependencies.keys().cloned().collect(),
-        order: 0,
-        assets: dir.join("assets"),
-        package: Some(hash.hex()),
-    }));
-    for m in &metas {
-        for d in &m.deps {
-            if !metas.iter().any(|o| &o.id == d) {
-                return Err(format!("mod {} requires missing mod {d}", m.id));
-            }
-        }
-    }
-
     let regs: Vec<RawRegistrar> = mods
         .par_iter()
         .enumerate()
@@ -275,38 +233,184 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path) -> Res
             reg
         })
         .collect();
-    let mut regs = regs;
-    for (i, (m, dir, hash)) in packages.iter().enumerate() {
-        let id = ModId((mods.len() + i) as u32);
+    log::info!("{} mods registered in {:.1} ms", mods.len(), start.elapsed().as_secs_f64() * 1000.0);
+    let store = chiacraft_packages::store::Store::new(cache);
+    let installed = install(&store, package_dirs, &metas);
+    *LOADER.lock() = Some(Loader { metas, regs, register, store, installed: installed.clone(), current: None, built: Vec::new() });
+    use_packages(&installed)?;
+    Ok(mods)
+}
+
+// ---------------------------------------------------------------- data packages (chiacraft)
+//
+// The code mods register once, at start; their registrations are kept. The content is then
+// built (frozen) from them plus a set of data packages, and built again from them plus another
+// set when a world needs one (`use_packages`). Code mods' content takes the first ids, so their
+// ids are the same in every build. Each build is kept for the life of the game, once per set.
+
+/// A data package ready to use: in the store, checked, under its hash.
+#[derive(Clone, Debug)]
+pub struct PackageRef {
+    pub id: String,
+    pub version: String,
+    pub deps: Vec<String>,
+    /// Its laid-out folder in the store.
+    pub dir: PathBuf,
+    pub hash: chiacraft_packages::identity::Hash,
+}
+
+struct Loader {
+    /// The code mods' metas and registrations, in `ModId` order.
+    metas: Vec<ModMeta>,
+    regs: Vec<RawRegistrar>,
+    register: Option<RegisterPackage>,
+    store: chiacraft_packages::store::Store,
+    /// The packages in the package folders: what a new world gets.
+    installed: Vec<PackageRef>,
+    /// The package hashes of the content in force.
+    current: Option<Vec<String>>,
+    /// Every content built: by its sorted package hashes.
+    built: Vec<(Vec<String>, &'static content::Content)>,
+}
+
+static LOADER: parking_lot::Mutex<Option<Loader>> = parking_lot::Mutex::new(None);
+
+/// Reads a package from the store (checking it again) as a `PackageRef`.
+fn package_ref(store: &chiacraft_packages::store::Store, hash: chiacraft_packages::identity::Hash) -> Result<PackageRef, String> {
+    let dir = store.verify(&hash)?;
+    let m = chiacraft_packages::load(&dir).map_err(|e| e.join("\n  "))?.manifest;
+    Ok(PackageRef { id: m.id, version: m.version, deps: m.dependencies.keys().cloned().collect(), dir, hash })
+}
+
+/// The packages in `dirs`, each copied into the store and checked. A package is data someone else
+/// wrote: one with mistakes is left out, not fatal.
+fn install(store: &chiacraft_packages::store::Store, dirs: &[PathBuf], mods: &[ModMeta]) -> Vec<PackageRef> {
+    let mut out: Vec<PackageRef> = Vec::new();
+    for src in chiacraft_packages::discover(dirs) {
+        let p = match store.import_dir(&src).and_then(|h| package_ref(store, h)) {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("package {} left out:\n  {e}", src.display());
+                continue;
+            }
+        };
+        if mods.iter().any(|m| m.id == p.id) || out.iter().any(|o| o.id == p.id) {
+            log::error!("package {} left out: the id {} is taken by a mod or another package", src.display(), p.id);
+            continue;
+        }
+        out.push(p);
+    }
+    out
+}
+
+/// The packages in the package folders.
+pub fn installed() -> Vec<PackageRef> {
+    LOADER.lock().as_ref().map_or_else(Vec::new, |l| l.installed.clone())
+}
+
+/// The packages a world plays with: the exact version it was played with (from the store), and
+/// installed packages it has not met yet. Also, as "id version", what it needs and the store
+/// lacks.
+pub fn for_world(meta: &crate::saves::WorldMeta) -> (Vec<PackageRef>, Vec<String>) {
+    let guard = LOADER.lock();
+    let Some(l) = guard.as_ref() else { return (Vec::new(), Vec::new()) };
+    let mut set = Vec::new();
+    let mut missing = Vec::new();
+    for (id, hex) in &meta.packages {
+        match chiacraft_packages::identity::Hash::from_hex(hex).ok_or_else(|| "a bad hash".to_string()).and_then(|h| package_ref(&l.store, h)) {
+            Ok(p) => set.push(p),
+            Err(_) => match l.installed.iter().find(|p| &p.id == id) {
+                Some(p) => missing.push(format!("{id}: another version (the world's {}, this one {})", hex.get(..12).unwrap_or(hex), p.hash.short())),
+                None => {
+                    let version = meta.mods.iter().find(|(m, _)| m == id).map_or("", |(_, v)| v.as_str());
+                    missing.push(format!("{id} {version}").trim_end().to_string());
+                }
+            },
+        }
+    }
+    for p in &l.installed {
+        if !meta.packages.iter().any(|(id, _)| id == &p.id) {
+            set.push(p.clone());
+        }
+    }
+    (set, missing)
+}
+
+/// Makes the content the code mods' plus exactly these packages, building it the first time this
+/// set is asked for. Only while no world is loaded. True if the content changed.
+pub fn use_packages(set: &[PackageRef]) -> Result<bool, String> {
+    let start = Instant::now();
+    let mut guard = LOADER.lock();
+    let l = guard.as_mut().ok_or("mods are not loaded")?;
+    let mut key: Vec<String> = set.iter().map(|p| p.hash.hex()).collect();
+    key.sort();
+    if l.current.as_ref() == Some(&key) {
+        return Ok(false);
+    }
+    let content = match l.built.iter().find(|(k, _)| *k == key) {
+        Some((_, c)) => *c,
+        None => {
+            let c: &'static content::Content = Box::leak(Box::new(build(l, set)?));
+            l.built.push((key.clone(), c));
+            log::info!(
+                "content: {} mods and packages, {} blocks ({} states), {} items, {} dimensions in {:.1} ms",
+                c.mods.len(),
+                c.blocks.len(),
+                c.states.len(),
+                c.items.len(),
+                c.dims.len(),
+                start.elapsed().as_secs_f64() * 1000.0
+            );
+            // Load order is part of the game's behaviour (later mods win on conflicts).
+            let mut order: Vec<&ModMeta> = c.mods.iter().collect();
+            order.sort_by_key(|m| m.order);
+            for m in order {
+                match &m.package {
+                    Some(h) => log::info!("loaded package {} {} ({}) (load position {})", m.id, m.version, &h[..12], m.order),
+                    None => log::info!("loaded mod {} {} (load position {})", m.id, m.version, m.order),
+                }
+            }
+            c
+        }
+    };
+    set_names(content.mods.iter().map(|m| m.id.clone()).collect());
+    content::set(content);
+    l.current = Some(key);
+    Ok(true)
+}
+
+fn build(l: &Loader, set: &[PackageRef]) -> Result<content::Content, String> {
+    let mut metas = l.metas.clone();
+    metas.extend(set.iter().map(|p| ModMeta {
+        id: p.id.clone(),
+        version: p.version.clone(),
+        deps: p.deps.clone(),
+        order: 0,
+        assets: p.dir.join("assets"),
+        package: Some(p.hash.hex()),
+    }));
+    for m in &metas {
+        for d in &m.deps {
+            if !metas.iter().any(|o| &o.id == d) {
+                return Err(format!("mod {} requires missing mod {d}", m.id));
+            }
+        }
+    }
+    // Names of the slots for registration messages, before the content is in force.
+    set_names(metas.iter().map(|m| m.id.clone()).collect());
+    let mut regs = l.regs.clone();
+    for (i, p) in set.iter().enumerate() {
+        let id = ModId((l.metas.len() + i) as u32);
+        let register = l.register.ok_or("data packages need the packages mod")?;
         let mut reg = RawRegistrar::new(id);
-        let path = dir.to_string_lossy();
-        let register = register_package.expect("packages present");
+        let path = p.dir.to_string_lossy();
         let r = unsafe { register(&crate::host::HOST, id, &mut reg as *mut _ as *mut abi::Registrar, abi::Str::new(&path)) };
         if r != 0 {
             reg.errors.push("registration panicked".into());
         }
-        log::info!("package {} {} ({})", m.id, m.version, hash.short());
         regs.push(reg);
     }
-
-    let content = content::freeze(metas, regs).map_err(|e| e.join("\n"))?;
-    log::info!(
-        "{} mods, {} blocks ({} states), {} items, {} dimensions in {:.1} ms",
-        mods.len(),
-        content.blocks.len(),
-        content.states.len(),
-        content.items.len(),
-        content.dims.len(),
-        start.elapsed().as_secs_f64() * 1000.0
-    );
-    // Load order is part of the game's behaviour (later mods win on conflicts), so every mod is logged.
-    let mut order: Vec<&ModMeta> = content.mods.iter().collect();
-    order.sort_by_key(|m| m.order);
-    for m in order {
-        log::info!("loaded mod {} {} (load position {})", m.id, m.version, m.order);
-    }
-    content::set(content);
-    Ok(mods)
+    content::freeze(metas, regs).map_err(|e| e.join("\n"))
 }
 
 #[cfg(test)]

@@ -92,10 +92,17 @@ pub async fn package_pins(t: T) -> R {
     t.check(t.c().open_screen(&screens::WORLDS), "cannot open the world list");
     t.screen("core:worlds").await?;
     t.frames(2).await?;
-    t.check(t.click_ui("text:Pinned World", 0), "the pinned world in the list");
-    t.frames(6).await?;
-    t.shot("selected").await?;
-    t.check(t.click_ui("id:play", 0), "the Play button");
+    // Select, then Play: either click can land while the list rebuilds and be lost, so the pair
+    // is repeated until the gate opens.
+    for _ in 0..10 {
+        t.click_ui("text:Pinned World", 0);
+        t.frames(10).await?;
+        t.click_ui("id:play", 0);
+        t.frames(15).await?;
+        if t.c().screen() == "core:missing_mods" {
+            break;
+        }
+    }
     t.screen("core:missing_mods").await?;
     t.frames(2).await?;
     t.shot("pins").await?;

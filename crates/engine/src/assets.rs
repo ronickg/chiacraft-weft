@@ -28,6 +28,11 @@ impl Assets {
         self.packs = packs;
     }
 
+    /// The assets folder of each mod and data package, by id (the set changes with the content).
+    pub fn set_mods(&mut self, mods: impl IntoIterator<Item = (String, PathBuf)>) {
+        self.mods = mods.into_iter().collect();
+    }
+
     /// Re-lists files after they changed on disk (hot reload).
     pub fn rescan(&mut self) {
         let mut files = FxHashSet::default();

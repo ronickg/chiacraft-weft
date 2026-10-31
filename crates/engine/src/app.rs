@@ -565,6 +565,43 @@ impl Running {
         self.input.captured = on;
     }
 
+    /// Reads every asset again (resource packs, textures, sounds, languages, the look) and
+    /// redraws.
+    fn reload_assets(&mut self) {
+        let run_dir = self.settings.run_dir.clone();
+        self.assets.set_packs(crate::packs::enabled(&run_dir, &self.settings.resource_packs()));
+        crate::packs::set_shader_pack(self.settings.shader_pack().as_ref().map(|p| crate::packs::shader_dir(&run_dir).join(p)));
+        self.assets.rescan();
+        crate::assets::set_current(&self.assets);
+        self.hud.load_layout(&run_dir);
+        self.ui.reload(&mut *self.gpu, &self.assets);
+        self.post.reload(&mut *self.gpu, &self.assets);
+        self.lang = Lang::load(&self.assets, &self.settings.language(), self.lang.dev);
+        self.look = Look::new(&self.assets, &mod_ids(), &self.lang);
+        self.textures.reload(&mut *self.gpu, content(), &self.assets);
+        if let Some(a) = &mut self.audio {
+            a.reload();
+        }
+        if let Some(g) = &mut self.game {
+            g.client.render.reload_shaders(&mut *self.gpu, &self.textures, &self.assets);
+            g.client.render.set_textures(&mut *self.gpu, &self.textures);
+            g.client.entity_render.reload(&mut *self.gpu, &self.assets);
+            g.client.particles.reload(&mut *self.gpu, &self.assets);
+            g.client.world.remesh_all();
+        }
+        self.rebuild_all();
+        log::info!("assets reloaded");
+    }
+
+    /// After the content was built for another set of data packages (no world loaded): their
+    /// assets, and everything drawn from the content, again.
+    fn content_changed(&mut self) {
+        let mut roots: Vec<(String, PathBuf)> = vec![("core".into(), engine_assets(self.lang.dev))];
+        roots.extend(content().mods.iter().map(|m| (m.id.clone(), m.assets.clone())));
+        self.assets.set_mods(roots);
+        self.reload_assets();
+    }
+
     fn start_world(&mut self, meta: WorldMeta) {
         log::info!("opening world '{}' (seed {})", meta.name, meta.seed);
         if meta.format != saves::SAVE_FORMAT {
@@ -573,8 +610,20 @@ impl Running {
             self.open(Box::new(screens::Message { title: "world.open_failed".into(), args: vec![Arg::Key("world.old_format".into())] }));
             return;
         }
-        for m in meta.missing_mods(content()) {
-            log::warn!("the world was played with mod {m}, which is not loaded");
+        // The world's data packages (chiacraft): content is built again for another set.
+        let (packages, missing) = modloader::for_world(&meta);
+        match modloader::use_packages(&packages) {
+            Ok(true) => self.content_changed(),
+            Ok(false) => {}
+            Err(e) => {
+                log::error!("{e}");
+                self.screens.clear();
+                self.open(Box::new(screens::Message { title: "world.open_failed".into(), args: vec![Arg::Text(e)] }));
+                return;
+            }
+        }
+        for m in meta.missing_mods(content()).into_iter().chain(missing) {
+            log::warn!("the world was played with {m}, which is not loaded");
         }
         let storage = saves::Storage::open(meta.clone(), content());
         let server = server::spawn(
@@ -679,7 +728,8 @@ impl Running {
                     self.rebuild_all();
                 }
                 Request::StartWorld(meta) => {
-                    let missing = meta.missing_mods(content());
+                    let mut missing = meta.missing_mods(content());
+                    missing.extend(modloader::for_world(&meta).1);
                     if missing.is_empty() {
                         self.start_world(meta);
                     } else {
@@ -1490,28 +1540,7 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
         r.apply_settings();
     }
     if r.input.pressed("core:reload") || f3_reload || std::mem::take(&mut r.reload_requested) {
-        r.assets.set_packs(crate::packs::enabled(&opts.run_dir, &r.settings.resource_packs()));
-        crate::packs::set_shader_pack(r.settings.shader_pack().as_ref().map(|p| crate::packs::shader_dir(&opts.run_dir).join(p)));
-        r.assets.rescan();
-        crate::assets::set_current(&r.assets);
-        r.hud.load_layout(&opts.run_dir);
-        r.ui.reload(&mut *r.gpu, &r.assets);
-        r.post.reload(&mut *r.gpu, &r.assets);
-        r.lang = Lang::load(&r.assets, &r.settings.language(), r.lang.dev);
-        r.look = Look::new(&r.assets, &mod_ids(), &r.lang);
-        r.textures.reload(&mut *r.gpu, content(), &r.assets);
-        if let Some(a) = &mut r.audio {
-            a.reload();
-        }
-        if let Some(g) = &mut r.game {
-            g.client.render.reload_shaders(&mut *r.gpu, &r.textures, &r.assets);
-            g.client.render.set_textures(&mut *r.gpu, &r.textures);
-            g.client.entity_render.reload(&mut *r.gpu, &r.assets);
-            g.client.particles.reload(&mut *r.gpu, &r.assets);
-            g.client.world.remesh_all();
-        }
-        r.rebuild_all();
-        log::info!("assets reloaded");
+        r.reload_assets();
     }
     if r.input.pressed("core:screenshot") {
         r.gpu.request_capture();

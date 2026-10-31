@@ -75,12 +75,14 @@ pub struct RawPool {
     pub entries: Vec<RawEntry>,
 }
 
+#[derive(Clone)]
 pub struct RawLoot {
     pub owner: ModId,
     pub name: String,
     pub pools: Vec<RawPool>,
 }
 
+#[derive(Clone)]
 pub struct RawLootMod {
     pub owner: ModId,
     pub table: String,

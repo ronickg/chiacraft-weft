@@ -93,6 +93,7 @@ pub enum Target {
     Dimension(String),
 }
 
+#[derive(Clone)]
 pub struct RawSet {
     pub owner: ModId,
     pub target: Target,

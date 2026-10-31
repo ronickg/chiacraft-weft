@@ -59,9 +59,20 @@ blocks of missing content load as `packages:unknown` and keep their names in the
 tests with `--packages examples/packages` to load it. Tests: `--test packages,package_pins` (with
 that flag); the keep-the-name case was checked across three restarts with scripts.
 
+Slice 3 (content swap between worlds) is done: the code mods register once and their
+registrations are kept (the raw registration types are `Clone`; a `ColumnCache` clones empty);
+`modloader::use_packages(set)` builds the content from them plus a package set, keeps each build
+for the life of the game (once per set) and puts it in force (`content::set` is an atomic pointer);
+`modloader::for_world` picks a world's set (its pinned versions from the store, plus installed
+packages it has not met); `start_world` switches and `Running::content_changed` rebuilds the
+client's assets. Mod names by slot (`modloader::NAMES`) and state names (`Content::state_names`)
+follow the content. Checked with scripts across runs (two worlds, two versions of gems, A, B, A in one
+session) and testkit's new script lines `open <world>` and `leave`. Tests click through menus
+with `T::click_until_screen`, since a click during a menu rebuild is lost.
+
 ## Next steps
 
-1. Phase 2 slice 3 (content swap between worlds) per `notes/PLAN.md`.
+1. Phase 2 slice 4 (configuration phase and transfer) per `notes/PLAN.md`.
 
 ## Notes
 

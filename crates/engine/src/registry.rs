@@ -86,6 +86,7 @@ pub struct Part {
     pub mesh: Vec<weft_abi::MeshVertex>,
 }
 
+#[derive(Clone)]
 pub struct EntityKind {
     pub name: String,
     pub owner: ModId,
@@ -136,6 +137,7 @@ pub struct ComponentDef {
     pub runtime: bool,
 }
 
+#[derive(Clone)]
 pub struct MenuDef {
     pub name: String,
     pub owner: ModId,
@@ -277,6 +279,7 @@ impl Recipe {
 }
 
 /// How the recipe viewer shows a kind of recipe (`abi::RecipeKindDesc`).
+#[derive(Clone)]
 pub struct RecipeKindDef {
     pub owner: ModId,
     pub input_grid: [u32; 2],
@@ -286,6 +289,7 @@ pub struct RecipeKindDef {
     pub display: Option<Callback>,
 }
 
+#[derive(Clone)]
 pub struct RawRecipeKind {
     pub owner: ModId,
     pub name: String,
@@ -380,6 +384,7 @@ pub struct Game {
     pub config_names: FxHashMap<String, u32>,
 }
 
+#[derive(Clone)]
 pub struct SoundDef {
     pub name: String,
     pub files: Vec<String>,
@@ -391,6 +396,7 @@ pub struct SoundDef {
     pub range: f32,
 }
 
+#[derive(Clone)]
 pub struct MusicDef {
     pub name: String,
     pub tracks: Vec<String>,
@@ -412,6 +418,7 @@ pub struct ParticleDef {
     pub shader: String,
 }
 
+#[derive(Clone)]
 pub struct RawParticle {
     pub name: String,
     pub cell: usize,
@@ -434,6 +441,7 @@ pub struct PacketDef {
 
 // ---------------------------------------------------------------- raw registration
 
+#[derive(Clone)]
 pub struct RawEntity {
     pub name: String,
     pub cell: usize,
@@ -442,13 +450,14 @@ pub struct RawEntity {
     pub components: Vec<RawValue>,
 }
 
+#[derive(Clone)]
 pub struct RawComponent {
     pub owner: ModId,
     pub def: ComponentDef,
     pub schema: String,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RawRecipe {
     pub kind: String,
     pub pattern: Vec<String>,
@@ -464,7 +473,7 @@ pub struct RawRecipe {
     pub flags: u32,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RawGame {
     pub entities: Vec<RawEntity>,
     pub components: Vec<RawComponent>,
@@ -544,6 +553,7 @@ pub struct RawGame {
 }
 
 /// A spawning rule as registered (names).
+#[derive(Clone)]
 pub struct RawSpawn {
     pub entity: String,
     pub biome: String,
@@ -571,6 +581,7 @@ pub struct SpawnRule {
 }
 
 /// A mod's addition to a command registered elsewhere.
+#[derive(Clone)]
 pub enum CommandExtension {
     /// `client`: the branch was written for a client command (its callback wants a client).
     Branch { command: String, usage: String, client: bool, cb: Callback },
@@ -737,6 +748,7 @@ pub fn name_hash(s: &str) -> u64 {
     weft_noise::fnv(s.as_bytes())
 }
 
+#[derive(Clone)]
 pub struct RawOre {
     /// Empty: every dimension but bare ones.
     pub dimensions: Vec<String>,
@@ -749,6 +761,7 @@ pub struct RawOre {
     pub biome: String,
 }
 
+#[derive(Clone)]
 pub struct RawScatter {
     pub owner: ModId,
     pub name: String,
@@ -759,11 +772,13 @@ pub struct RawScatter {
     pub shape: Callback,
 }
 
+#[derive(Clone)]
 pub struct RawTemplate {
     pub name: String,
     pub blocks: Vec<([i32; 3], String)>,
 }
 
+#[derive(Clone)]
 pub struct RawStructure {
     pub template: String,
     pub dimension: String,

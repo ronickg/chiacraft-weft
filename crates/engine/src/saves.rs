@@ -109,18 +109,11 @@ impl WorldMeta {
         }
     }
 
-    /// Mods and packages the world was played with that are not loaded now, as "id version", and
-    /// packages loaded in another version than the world's (by hash).
+    /// Code mods the world was played with that are not loaded now, as "id version". Its data
+    /// packages are `modloader::for_world`'s.
     pub fn missing_mods(&self, c: &Content) -> Vec<String> {
-        let mut out: Vec<String> = self.mods.iter().filter(|(id, _)| !c.mods.iter().any(|m| &m.id == id)).map(|(id, v)| format!("{id} {v}")).collect();
-        for (id, want) in &self.packages {
-            let have = c.mods.iter().find(|m| &m.id == id).and_then(|m| m.package.as_deref());
-            if let Some(have) = have.filter(|h| h != want) {
-                let short = |h: &str| h.get(..12).unwrap_or(h).to_string();
-                out.push(format!("{id}: another version (the world's {}, this one {})", short(want), short(have)));
-            }
-        }
-        out
+        let package = |id: &str| self.packages.iter().any(|(p, _)| p == id);
+        self.mods.iter().filter(|(id, _)| !package(id) && !c.mods.iter().any(|m| &m.id == id)).map(|(id, v)| format!("{id} {v}")).collect()
     }
 }
 

@@ -113,7 +113,11 @@ File names may use letters, digits, `_`, `-` and `.`; hidden files (starting wit
 
 ## Worlds remember their packages
 
-A world's `world.txt` lists the exact package it was played with: `package.gems = 7a73bc…`. Opening it
-without that package, or with another version of it, asks first. Blocks of a missing package show as
+A world's `world.txt` lists the exact package it was played with: `package.gems = 7a73bc…`, and plays
+with exactly that version from then on, even after you install a newer one: two worlds can use two
+versions of the same package, and switching between them needs no restart (the game builds its
+content again for the other world's packages). A package a world has not met yet (newly installed)
+joins it the next time it is opened. Opening a world whose package version is in neither the package
+folders nor the store asks first. Blocks of a missing package show as
 unknown blocks (magenta and black) and keep their real names in the save, so they come back when the
 package does.

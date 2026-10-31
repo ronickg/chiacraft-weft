@@ -234,12 +234,14 @@ pub struct CreativeTab {
     pub items: Vec<u32>,
 }
 
+#[derive(Clone)]
 pub struct BiomeDef {
     pub name: String,
     /// Color (0xRRGGBB) per tint kind, by `Content::tint_kinds` index.
     pub tints: Vec<u32>,
 }
 
+#[derive(Clone)]
 pub struct DimensionDef {
     pub name: String,
     pub owner: ModId,
@@ -288,6 +290,7 @@ pub struct DimensionDef {
     pub custom_cache: crate::server::terrain::ColumnCache<Vec<i32>>,
 }
 
+#[derive(Clone)]
 pub struct ScatterDef {
     pub owner: ModId,
     pub name: String,
@@ -372,6 +375,7 @@ pub struct TemplateDef {
     pub blocks: Vec<(glam::IVec3, u32)>,
 }
 
+#[derive(Clone)]
 pub struct StructureDef {
     pub name: String,
     /// (offset from the lowest corner, state).
@@ -384,6 +388,7 @@ pub struct StructureDef {
     pub salt: u64,
 }
 
+#[derive(Clone)]
 pub struct ModMeta {
     pub id: String,
     pub version: String,
@@ -481,22 +486,27 @@ pub struct Content {
     pub loot: FxHashMap<String, crate::loot::Table>,
     /// `abi::stack_flags` of stack components by component id.
     pub stack_flags: FxHashMap<u32, u32>,
+    /// Every state's full name, made the first time a mod asks (`host::name_of`).
+    pub state_names: OnceLock<Vec<String>>,
 }
 
-static CONTENT: OnceLock<Content> = OnceLock::new();
+/// The content in force. Each frozen `Content` lives as long as the game (kept once per set of
+/// data packages, see `modloader::use_packages`), so references to an earlier one stay valid; it
+/// is swapped only while no world is loaded.
+static CONTENT: std::sync::atomic::AtomicPtr<Content> = std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
 
 pub fn content() -> &'static Content {
-    CONTENT.get().expect("content not frozen yet")
+    try_content().expect("content not frozen yet")
 }
 
 pub fn try_content() -> Option<&'static Content> {
-    CONTENT.get()
+    let p = CONTENT.load(std::sync::atomic::Ordering::Acquire);
+    // SAFETY: only `set` stores here, a `&'static Content`.
+    (!p.is_null()).then(|| unsafe { &*p })
 }
 
-pub(crate) fn set(c: Content) {
-    if CONTENT.set(c).is_err() {
-        panic!("content frozen twice");
-    }
+pub(crate) fn set(c: &'static Content) {
+    CONTENT.store(c as *const Content as *mut Content, std::sync::atomic::Ordering::Release);
 }
 
 /// Color (0xRRGGBB) of a tint kind on items, which have no biome: the kind's default.
@@ -655,6 +665,7 @@ impl Content {
 // ---------------------------------------------------------------- registration side
 
 /// Owned copy of everything one mod registered. Filled without locks, one per mod thread.
+#[derive(Clone)]
 pub struct RawRegistrar {
     pub owner: ModId,
     pub blocks: Vec<RawBlock>,
@@ -683,6 +694,7 @@ pub struct RawState {
     pub components: Vec<RawValue>,
 }
 
+#[derive(Clone)]
 pub struct RawBlock {
     pub name: String,
     pub cell: usize,
@@ -700,6 +712,7 @@ pub struct RawBlock {
     pub extra_cells: Vec<usize>,
 }
 
+#[derive(Clone)]
 pub struct RawItem {
     pub name: String,
     pub cell: usize,
@@ -2044,6 +2057,7 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
     spread_tags.dedup();
     let tight = states.iter().map(|s| Tight { flags: s.flags, opacity: s.opacity, light: s.light, absorb: s.absorb }).collect();
     Ok(Content {
+        state_names: OnceLock::new(),
         spread_tags,
         mods,
         tight,
