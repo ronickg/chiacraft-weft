@@ -21,9 +21,11 @@ pub fn current_ticket() -> Option<String> {
     p2p::HOSTING.lock().as_ref().and_then(|h| h.ticket.clone())
 }
 
-pub fn host(server: &crate::server::ServerHandle, settings: &crate::settings::Settings) {
+/// Hosts the world `server` runs, under the world's own key (`identity`, chiacraft).
+pub fn host(server: &crate::server::ServerHandle, identity: std::sync::Arc<crate::world_address::WorldIdentity>, name: &str, settings: &crate::settings::Settings) {
     server.shared.hosting.store(true, std::sync::atomic::Ordering::Relaxed);
-    p2p::host(server.connect.clone(), server.content, settings);
+    let hw = p2p::HostWorld { identity, name: name.to_string(), shared: server.shared.clone() };
+    p2p::host(server.connect.clone(), server.content, hw, settings);
 }
 
 pub fn start_join(ticket: &str, settings: &crate::settings::Settings) -> Result<p2p::Joining, String> {

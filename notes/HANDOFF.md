@@ -128,9 +128,29 @@ copies swapping worlds (each hosting its own, with different packages, each visi
 the other was away): each guest saw the other world's blocks, both came back to their own through
 the pause menu, and a guest whose host quit was taken home.
 
+Phase 3 research (`reports/World addresses links and portals.md`) was adopted into the plan.
+Slice 2 (world addresses) is done. `IdentitySigner::world_seed(index, generation)` (wallet, label
+"chiacraft world key v1") and `world_cert_text`; `Session::world_seed`, `world_cert_line`,
+`check_world_cert` (account). `crates/engine/src/world_address.rs`: `WorldIdentity` (key and
+`WorldCert`), `for_world` (gives an old world a random index, saved), the `chiacraft://w/` address
+and its parser (old tickets still parse). `WorldMeta.key_index`, `key_generation`, `created`
+(`world.txt`). `Game`/`Home` carry the identity; `net::host` hosts under the world key
+(`p2p::HostWorld`); `p2p::endpoint(settings, Who)`: the player's key (joins), a world's key (hosting:
+ALPNs `weft/1` and `chiacraft/status/1`, publishes to n0 DNS and the Mainline DHT through
+`iroh-mainline-address-lookup`), or a throwaway key (status pings). `serve_status`/`status_of`/
+`ping`: name, certificate (checked against the key that answered), players, packages. Hosting
+first pings its own key and refuses if the world answers. `crates/engine/src/saved_worlds.rs`:
+`worlds.txt` in the run folder, remembered on a successful join, pinged while the Multiplayer
+screen shows it (online with players and packages, or offline with last seen; owner from the
+certificate). Checked with copies: a guest joined by the bare key (looked up, no hints); the
+saved list showed the world online, then offline after the host quit, with the owner's identity;
+a second copy of the same account and world was refused hosting while the first ran; the
+world-swap test from slice 1 still passes with joins on the player's own key.
+
 ## Next steps
 
-1. Phase 3 slice 2 (world addresses) per `notes/PLAN.md`.
+1. Phase 3 slice 3 (link requests; the account endpoint as inbox, friends' worlds) per
+   `notes/PLAN.md`.
 2. Phase 2 "later" items: bao-tree verified streaming and resume, iroh-blobs for downloads from
    other players and mirrors, reviewer lists, key rotation; running the fuzz targets (nightly,
    perhaps a scheduled CI job).

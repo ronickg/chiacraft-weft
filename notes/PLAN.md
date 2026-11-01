@@ -17,7 +17,8 @@ erase what they earned.
    work fully offline. If we disappeared, players keep their identity, achievements, worlds and
    links; they lose only conveniences.
 2. **Freedom for owners.** The game gates nothing. Every gate (admission rules, personal mods,
-   inventory carry-over, native mods) is the world owner's choice. Defaults are open.
+   inventory carry-over, native mods) is the world owner's choice. Defaults are open to
+   *receiving* (requests, visitors), never to auto-accepting strangers.
 3. **The chain only where it adds trust.** Now: accounts (DIDs) and achievements. Never in the
    game loop. Not for portal links, bans or inventories.
 4. **Leave Weft's engine alone where we can.** Our features live in our own crates and mods; the
@@ -168,15 +169,35 @@ The smallest version that works is phases 1-4.
       `config::for_thread`/`with`), so the game can switch content for another world meanwhile.
       Joining another world while yours is hosted keeps it running (`Running.home`); "Back to
       <world>" in the pause menu; back home automatically when the visited world goes away or the
-      join fails. Joins go out through the hosting endpoint (two endpoints with one key took the
-      relay from each other).
-   2. *World addresses*: a key per world (not per player), joinable by address alone; saved
-      worlds and friends' worlds to join again.
-   3. *Link requests*: request, inbox, accept or pre-allow; a link signed by both worlds' keys,
-      kept by both, revocable.
-   4. *Portal blocks* bound to a link; walking in travels.
-   5. *Travel prepared ahead*: connect and download while the player nears the portal; arrive at
-      the linked portal; return through it, and to the origin world when the other goes offline.
+      join fails. Joins went out through the hosting endpoint while both used the login key;
+      slice 2 gives worlds their own keys and joins go back to the account's.
+   Decided 2026-10-31 after research (`reports/World addresses links and portals.md`):
+   2. *World addresses* (done): each world has its own Ed25519 key, derived from the words on its own
+      label with a **random** index saved in the world (a counter would collide across machines)
+      and a generation (to replace a leaked key); the account signs a world certificate. The world
+      key is the address and its hosting endpoint's id; joins go out through the account's key.
+      Address `chiacraft://w/<key>?n=<name>&r=<relay>&a=<ip:port,..>` (the key alone is enough;
+      the old ticket still works). Found through n0 DNS/pkarr and the Mainline DHT, relay URL
+      only. A world answers `chiacraft/status/1` (name, certificate, players, packages, join
+      policy); before hosting, the game pings its own world key so one world never runs twice. A
+      saved-worlds list (proposed name, owner, last seen, status). Not yet: petnames, the join
+      policy in the status answer, rotating a key (the generation is kept; the "world moved"
+      notice needs slice 3's account endpoint).
+   3. *Link requests*: the account endpoint runs while the game does and is the inbox for all
+      the owner's worlds (worlds are offline most of the time); requesters keep an outbox and
+      retry; friends' worlds and "world moved" notices are served there (`chiacraft/worlds/1`).
+      A link is one labelled record both world keys sign over the same bytes (id: its BLAKE3);
+      declines are silent; either side revokes alone with a permanent tombstone; pre-allow by
+      world or owner key, or an invite token. Signatures carry key ids, so world DIDs replace
+      only the certificate later.
+   4. *Portal blocks*: built into the game (not a package, whose blocks differ per world), holding
+      only a link id; binding one needs the world owner (anyone can `/give` today); portal
+      positions stay in each world.
+   5. *Travel prepared ahead*: in zones as the player nears a portal (connect, ask admission and
+      download with consent, commit); a 60-second travel ticket signed by the origin world, its
+      player key checked against the connection; the origin keeps the player until the
+      destination confirms arrival; return ladder destination, origin, home, title; arrivals
+      placed clear of the portal, a few seconds' protection, a re-entry cooldown.
 4. **DIDs and achievements.** Player and world DIDs through sponsors; world ownership both ways;
    achievements signed by the world DID, anchored in batches, opt-in; profile view; admission
    rules (allow lists, probation, DID age, achievements); shared ban lists.

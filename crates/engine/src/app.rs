@@ -162,6 +162,9 @@ pub struct Game {
     pub server: Option<ServerHandle>,
     /// The world's name (empty for a world joined over the network).
     pub world: String,
+    /// The world's own key and certificate (chiacraft), for hosting it; none for a world joined
+    /// over the network or without an account.
+    pub identity: Option<Arc<crate::world_address::WorldIdentity>>,
 }
 
 /// Your own world, kept running while you visit others because players are in it (it is
@@ -169,6 +172,7 @@ pub struct Game {
 pub(crate) struct Home {
     server: ServerHandle,
     world: String,
+    identity: Option<Arc<crate::world_address::WorldIdentity>>,
 }
 
 /// Commands the engine runs on the client that types them: name, usage, handler. One table for
@@ -211,6 +215,8 @@ pub(crate) struct Running {
     join_offer: Option<Vec<net::screens::OfferRow>>,
     /// Your world, running on while you visit another.
     home: Option<Home>,
+    /// The address of the join in progress, saved once it lets the player in.
+    join_address: Option<String>,
     last: Instant,
     shot_pending: bool,
     fps: f32,
@@ -426,6 +432,7 @@ impl App {
             joining: None,
             join_offer: None,
             home: None,
+            join_address: None,
             last: Instant::now(),
             shot_pending: false,
             fps: 0.0,
@@ -689,6 +696,9 @@ impl Running {
                 }
                 JoinEvent::Admitted(conn) => {
                     self.joining = None;
+                    if let Some(a) = self.join_address.take() {
+                        crate::saved_worlds::remember(&self.settings.run_dir, &a);
+                    }
                     self.enter_remote(conn);
                     return;
                 }
@@ -711,7 +721,7 @@ impl Running {
         match Client::new(&mut *self.gpu, &self.assets, &self.textures, conn, &self.settings.name(), &key, self.settings.view_distance(), std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok()) {
             Ok(mut client) => {
                 client.sent = load_chat_history(&self.settings.run_dir);
-                self.game = Some(Game { client, server: None, world: String::new() });
+                self.game = Some(Game { client, server: None, world: String::new(), identity: None });
                 self.screens.clear();
                 self.hud.invalidate();
                 self.set_capture(true);
@@ -720,7 +730,7 @@ impl Running {
         }
     }
 
-    fn start_world(&mut self, meta: WorldMeta) {
+    fn start_world(&mut self, mut meta: WorldMeta) {
         log::info!("opening world '{}' (seed {})", meta.name, meta.seed);
         if meta.format != saves::SAVE_FORMAT {
             log::error!("world '{}' was saved in format {}, this build reads {}", meta.name, meta.format, saves::SAVE_FORMAT);
@@ -743,23 +753,32 @@ impl Running {
         for m in meta.missing_mods(content()).into_iter().chain(missing) {
             log::warn!("the world was played with {m}, which is not loaded");
         }
+        // The world's own key (chiacraft): made now for a world that has none yet, and saved
+        // with it before the server takes over the world's info.
+        let identity = match crate::world_address::for_world(&mut meta) {
+            Ok(id) => Some(Arc::new(id)),
+            Err(e) => {
+                log::warn!("'{}' has no address of its own: {e}", meta.name);
+                None
+            }
+        };
         let storage = saves::Storage::open(meta.clone(), content());
         let server = server::spawn(
             ServerConfig { seed: meta.seed, view_radius: self.settings.view_distance() },
             Some(storage),
         );
-        self.play_local(server, meta.name.clone());
+        self.play_local(server, meta.name.clone(), identity);
     }
 
     /// Plays in the world `server` runs in this process.
-    fn play_local(&mut self, server: ServerHandle, world: String) {
+    fn play_local(&mut self, server: ServerHandle, world: String, identity: Option<Arc<crate::world_address::WorldIdentity>>) {
         let (client_conn, server_conn) = net::local_pair();
         let _ = server.connect.send(server_conn);
         let key = net::p2p::player_key(&self.settings.run_dir);
         match Client::new(&mut *self.gpu, &self.assets, &self.textures, client_conn, &self.settings.name(), &key, self.settings.view_distance(), std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok()) {
             Ok(mut client) => {
                 client.sent = load_chat_history(&self.settings.run_dir);
-                self.game = Some(Game { client, server: Some(server), world });
+                self.game = Some(Game { client, server: Some(server), world, identity });
                 self.screens.clear();
                 self.hud.invalidate();
                 self.quads_dirty = true;
@@ -790,7 +809,7 @@ impl Running {
             // It may have been paused by the menu this was chosen from.
             server.set_paused(false);
             log::info!("'{}' keeps running while you are away", g.world);
-            self.home = Some(Home { server, world: g.world });
+            self.home = Some(Home { server, world: g.world, identity: g.identity });
         }
         self.set_capture(false);
     }
@@ -807,7 +826,7 @@ impl Running {
         if modloader::use_built(home.server.content) {
             self.content_changed();
         }
-        self.play_local(home.server, home.world);
+        self.play_local(home.server, home.world, home.identity);
     }
 
     /// Stops your own world if it was left running.
@@ -907,8 +926,12 @@ impl Running {
                 Request::StartWorldAnyway(meta) => self.start_world(meta),
                 Request::LeaveWorld => self.leave_world(),
                 Request::Host => {
-                    if let Some(Game { server: Some(s), .. }) = &self.game {
-                        net::host(s, &self.settings);
+                    match &self.game {
+                        Some(Game { server: Some(s), identity: Some(id), world, .. }) => net::host(s, id.clone(), world, &self.settings),
+                        Some(Game { server: Some(_), identity: None, .. }) => {
+                            *net::p2p::HOSTING.lock() = Some(net::p2p::Hosting { ticket: None, error: Some("this world has no address: no account is open".into()) });
+                        }
+                        _ => {}
                     }
                     self.rebuild_all();
                 }
@@ -928,6 +951,7 @@ impl Running {
                 }
                 Request::Join(ticket) => {
                     self.leave_for_another();
+                    self.join_address = Some(ticket.clone());
                     self.joining = None;
                     match net::start_join(&ticket, &self.settings) {
                         Ok(j) => {

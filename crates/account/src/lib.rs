@@ -63,6 +63,19 @@ impl Session {
         Ok(format!("{}:{}", self.identity_hex(), chiacraft_wallet::keys::hex(&sig)))
     }
 
+    /// The seed of a world's key (Ed25519): see `IdentitySigner::world_seed`. Only for building the
+    /// world's endpoint; never log it.
+    pub fn world_seed(&self, index: u32, generation: u32) -> [u8; 32] {
+        *self.signer.world_seed(index, generation).expose()
+    }
+
+    /// The identity key certifying the world `world` (its key as the network writes it), as
+    /// `<identity hex>:<signature hex>`.
+    pub fn world_cert_line(&self, world: &str, generation: u32, created: u64) -> Result<String, String> {
+        let sig = self.signer.sign(&chiacraft_wallet::sign::world_cert_text(world, generation, created)).map_err(|e| e.to_string())?;
+        Ok(format!("{}:{}", self.identity_hex(), chiacraft_wallet::keys::hex(&sig)))
+    }
+
     /// The identity key, hex: the player's identity on every world.
     pub fn identity_hex(&self) -> String {
         self.signer.identity().hex()
@@ -149,6 +162,14 @@ pub fn check_content_vouch(line: &str, key: &str) -> Option<String> {
     let id = chiacraft_wallet::IdentityKey::from_hex(identity)?;
     let sig = chiacraft_wallet::keys::from_hex(sig)?;
     chiacraft_wallet::sign::verify_content_link(&id, key, &sig).then(|| id.hex())
+}
+
+/// The owner (identity hex) if `line` (`<identity hex>:<signature hex>`) certifies the world.
+pub fn check_world_cert(line: &str, world: &str, generation: u32, created: u64) -> Option<String> {
+    let (identity, sig) = line.split_once(':')?;
+    let id = chiacraft_wallet::IdentityKey::from_hex(identity)?;
+    let sig = chiacraft_wallet::keys::from_hex(sig)?;
+    chiacraft_wallet::sign::verify_world_cert(&id, world, generation, created, &sig).then(|| id.hex())
 }
 
 pub fn check_vouch(line: &str, endpoint: &str) -> Option<String> {

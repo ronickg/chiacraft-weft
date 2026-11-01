@@ -29,6 +29,7 @@ serde_json.workspace = true
 mimalloc.workspace = true
 # The player's account (MIT, ours): the network key follows the account's 24 words.
 chiacraft-account = { path = "../account" }
+iroh-mainline-address-lookup = "0.6.1"
 
 [dev-dependencies]
 naga.workspace = true

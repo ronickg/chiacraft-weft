@@ -30,6 +30,7 @@ pub mod physics;
 pub mod post;
 pub mod refs;
 pub mod registry;
+pub mod saved_worlds;
 pub mod saves;
 pub mod screens;
 pub mod server;
@@ -38,6 +39,7 @@ pub mod shaders;
 pub mod stack;
 pub mod ui;
 pub mod world;
+pub mod world_address;
 
 pub use app::api::{exit_code, set_launch_options};
 pub use app::{BackendFactory, Options, run};

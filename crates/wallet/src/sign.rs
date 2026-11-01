@@ -74,6 +74,7 @@ impl IdentitySigner {
 /// Fixed forever: changing it gives every player a new address and a new player on every world.
 const NETWORK_KEY_LABEL: &[u8] = b"chiacraft network key v1";
 const CONTENT_KEY_LABEL: &[u8] = b"chiacraft content key v1";
+const WORLD_KEY_LABEL: &[u8] = b"chiacraft world key v1";
 
 impl IdentitySigner {
     /// The 32-byte seed of this identity's **network key**: the Ed25519 key of the game's
@@ -99,6 +100,33 @@ impl IdentitySigner {
         h.update(self.secret.expose());
         Secret::new(h.finalize().into())
     }
+}
+
+impl IdentitySigner {
+    /// The Ed25519 seed of a world's key: its address and the id of the endpoint that hosts it.
+    /// One-way from this identity key on its own label, like the network key; `index` is a random
+    /// number the world keeps (so worlds made on two computers never share a key) and `generation`
+    /// replaces a key that leaked.
+    pub fn world_seed(&self, index: u32, generation: u32) -> Secret<[u8; 32]> {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(WORLD_KEY_LABEL);
+        h.update(self.secret.expose());
+        h.update(index.to_le_bytes());
+        h.update(generation.to_le_bytes());
+        Secret::new(h.finalize().into())
+    }
+}
+
+/// The text an identity key signs to certify that it owns a world: the world's key (`world`, as
+/// the network writes it), its generation, and when the world was made (seconds since 1970).
+pub fn world_cert_text(world: &str, generation: u32, created: u64) -> String {
+    format!("{PREFIX}world v1\nworld: {world}\ngeneration: {generation}\ncreated: {created}")
+}
+
+/// Whether `signature` is `identity` certifying the world `world`.
+pub fn verify_world_cert(identity: &IdentityKey, world: &str, generation: u32, created: u64, signature: &[u8]) -> bool {
+    verify(identity, world_cert_text(world, generation, created).as_bytes(), signature)
 }
 
 /// The text an identity key signs to vouch for a content key (`key`: its public half, hex), so a

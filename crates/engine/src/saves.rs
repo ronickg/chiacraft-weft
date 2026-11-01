@@ -46,6 +46,11 @@ pub struct WorldMeta {
     pub mods: Vec<(String, String)>,
     /// Data packages (chiacraft): id and hash (hex) of the exact package it was last played with.
     pub packages: Vec<(String, String)>,
+    /// The world's key (chiacraft, `world_address`): its random index (none until the world first
+    /// needs its key) and generation, and when the world was made.
+    pub key_index: Option<u32>,
+    pub key_generation: u32,
+    pub created: u64,
 }
 
 pub fn now_secs() -> u64 {
@@ -55,7 +60,7 @@ pub fn now_secs() -> u64 {
 impl WorldMeta {
     pub fn load(dir: &Path) -> Option<WorldMeta> {
         let src = std::fs::read_to_string(dir.join("world.txt")).ok()?;
-        let mut m = WorldMeta { dir: dir.to_path_buf(), format: 1, name: String::new(), seed: 0, last_played: 0, times: Vec::new(), edits: Vec::new(), next_entity: 1, configs: Vec::new(), mods: Vec::new(), packages: Vec::new() };
+        let mut m = WorldMeta { dir: dir.to_path_buf(), format: 1, name: String::new(), seed: 0, last_played: 0, times: Vec::new(), edits: Vec::new(), next_entity: 1, configs: Vec::new(), mods: Vec::new(), packages: Vec::new(), key_index: None, key_generation: 0, created: 0 };
         for (_, k, v) in crate::kv::pairs(&src) {
             match k {
                 "name" => m.name = v.to_string(),
@@ -63,6 +68,9 @@ impl WorldMeta {
                 "seed" => m.seed = v.parse().unwrap_or(0),
                 "last_played" => m.last_played = v.parse().unwrap_or(0),
                 "next_entity" => m.next_entity = v.parse().unwrap_or(1),
+                "key_index" => m.key_index = v.parse().ok(),
+                "key_generation" => m.key_generation = v.parse().unwrap_or(0),
+                "created" => m.created = v.parse().unwrap_or(0),
                 _ => {
                     if let Some(d) = k.strip_prefix("time.") {
                         m.times.push((d.to_string(), v.parse().unwrap_or(0)));
@@ -88,6 +96,9 @@ impl WorldMeta {
             "format = {}\nname = {}\nseed = {}\nlast_played = {}\nnext_entity = {}\n",
             self.format, self.name, self.seed, self.last_played, self.next_entity
         );
+        if let Some(i) = self.key_index {
+            s.push_str(&format!("key_index = {i}\nkey_generation = {}\ncreated = {}\n", self.key_generation, self.created));
+        }
         for (d, t) in &self.times {
             s.push_str(&format!("time.{d} = {t}\n"));
         }
@@ -137,7 +148,7 @@ pub fn create(saves: &Path, name: &str, seed: u64) -> WorldMeta {
         n += 1;
         dir = saves.join(format!("{base}_{n}"));
     }
-    let m = WorldMeta { dir, format: SAVE_FORMAT, name: name.to_string(), seed, last_played: now_secs(), times: Vec::new(), edits: Vec::new(), next_entity: 1, configs: Vec::new(), mods: Vec::new(), packages: Vec::new() };
+    let m = WorldMeta { dir, format: SAVE_FORMAT, name: name.to_string(), seed, last_played: now_secs(), times: Vec::new(), edits: Vec::new(), next_entity: 1, configs: Vec::new(), mods: Vec::new(), packages: Vec::new(), key_index: Some(crate::world_address::random_index()), key_generation: 0, created: now_secs() };
     m.save();
     m
 }

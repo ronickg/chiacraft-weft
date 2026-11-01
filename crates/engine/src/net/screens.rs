@@ -55,9 +55,41 @@ impl Screen for Multiplayer {
                     },
                 );
             });
+            saved_worlds(ui, cx);
             button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
+}
+
+/// The worlds this player has joined (chiacraft), each with its status, to join again.
+fn saved_worlds(ui: &mut Ui, cx: &BuildCx) {
+    let run_dir = cx.settings.run_dir.clone();
+    let worlds = crate::saved_worlds::load(&run_dir);
+    crate::saved_worlds::ping_all(&run_dir, cx.settings);
+    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(340.0), |ui| {
+        label(ui, cx, "multiplayer.saved", &[], "default");
+        if worlds.is_empty() {
+            label(ui, cx, "multiplayer.saved_none", &[], "dim");
+        }
+        for w in worlds.into_iter().take(8) {
+            ui.container(Style::row().gap(6.0).stretch(), |ui| {
+                ui.container(Style::col().gap(1.0).stretch(), |ui| {
+                    let saved = w.clone();
+                    ui.text_bound("default", Box::new(move |_: &Ctx| crate::saved_worlds::title_line(&saved)));
+                    let (dir, key) = (run_dir.clone(), w.key.clone());
+                    ui.text_bound("dim", Box::new(move |_: &Ctx| crate::saved_worlds::status_line(&dir, &key)));
+                });
+                let address = w.address.clone();
+                let id = button(ui, cx, "multiplayer.join", &[], 60.0, move |c| c.requests.push(Request::Join(address.clone())));
+                ui.set_id(id, &format!("join:{}", w.name));
+                let key = w.key.clone();
+                button(ui, cx, "multiplayer.remove", &[], 60.0, move |c| {
+                    crate::saved_worlds::forget(&c.settings.run_dir, &key);
+                    c.requests.push(Request::Rebuild);
+                });
+            });
+        }
+    });
 }
 
 /// What the join in progress is doing (chiacraft): a lang key and its arguments.
