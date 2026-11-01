@@ -264,6 +264,7 @@ command.error.bad_limit = неверный лимит {0}
 command.error.unknown_entity = неизвестная сущность {0}
 command.error.missing = не хватает {0}
 command.error.expected = ожидалось {0}
+command.error.unknown_word = неизвестно {0} (может быть, {1})
 command.error.whole_number = {0} должно быть целым числом
 command.error.number = {0} должно быть числом
 command.error.unknown_item = неизвестный предмет {0}

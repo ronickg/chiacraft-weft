@@ -1462,7 +1462,7 @@ impl Running {
         let here = crate::commands::Origin { pos: p.pos, yaw: p.yaw, pitch: p.pitch };
         let players = g.client.players.clone();
         let reply = match def.parse(content(), &tokens[1..], here, &players) {
-            Err(e) => vec![Msg::new("command.error_usage", vec![Arg::Msg(e), Arg::Text(def.name.clone()), Arg::Text(def.usage.clone())])],
+            Err(e) => vec![Msg::new("command.error_usage", vec![Arg::Msg(e), Arg::Text(def.name.clone()), Arg::Text(def.usage_for(&tokens[1..]))])],
             Ok((args, handler)) => match handler {
                 None => match CLIENT_COMMANDS.iter().find(|c| c.0 == def.name) {
                     Some(c) => (c.2)(self, &args),

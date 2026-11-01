@@ -1431,7 +1431,7 @@ impl Server {
         let players: Vec<String> = self.players.iter().filter(|p| p.joined).map(|p| p.name.clone()).collect();
         let (args, handler) = match def.parse(c, &tokens[1..], here, &players) {
             Ok(a) => a,
-            Err(e) => return vec![Msg::new("command.error_usage", vec![Arg::Msg(e), Arg::Text(def.name.clone()), Arg::Text(def.usage.clone())])],
+            Err(e) => return vec![Msg::new("command.error_usage", vec![Arg::Msg(e), Arg::Text(def.name.clone()), Arg::Text(def.usage_for(&tokens[1..]))])],
         };
         // Selectors become entity ids before mods see them.
         let selected: Vec<Option<String>> = args

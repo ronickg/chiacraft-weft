@@ -360,17 +360,52 @@ impl CommandDef {
     /// alternatives, as its usage string declares them.
     pub fn parse(&self, c: &Content, tokens: &[&str], here: Origin, players: &[String]) -> Result<(Args, Option<(ModId, Callback)>), Msg> {
         let mut first_err = None;
+        let first = tokens.first().copied();
+        let picked = self.alts.iter().any(|a| head(a) == first);
         for (i, alt) in self.alts.iter().enumerate() {
             let owner = self.owners[i];
             let own: Vec<Alt> = self.alts.iter().zip(&self.owners).filter(|(_, o)| **o == owner).map(|(a, _)| a.clone()).collect();
             match parse_alt(c, alt, tokens, here, players, &slots(&own)) {
                 Ok(a) => return Ok((a, if owner == 0 { self.handler } else { Some(self.branches[owner - 1]) })),
-                Err(e) => {
+                // The mistake worth telling is in an alternative starting with the word typed.
+                Err(e) if !picked || head(alt) == first => {
                     first_err.get_or_insert(e);
                 }
+                Err(_) => {}
             }
         }
+        if let (false, Some(word)) = (picked, first)
+            && self.alts.iter().all(|a| head(a).is_some())
+        {
+            let near = self.heads().into_iter().min_by_key(|h| edit_distance(word, h)).unwrap_or_default();
+            return Err(Msg::new("command.error.unknown_word", vec![Arg::Text(word.to_string()), Arg::Text(near)]));
+        }
         Err(first_err.unwrap_or_else(|| Msg::new("command.error.bad_arguments", Vec::new())))
+    }
+
+    /// The usage to show after a mistake in `tokens`: only the alternatives starting with the
+    /// word typed first (`/tk spawn x` shows how spawn goes, not all of /tk), or with the word
+    /// nearest to it when none does (`/tk spwan` too).
+    pub fn usage_for(&self, tokens: &[&str]) -> String {
+        let mut first = tokens.first().map(|t| t.to_string());
+        if let Some(word) = &first
+            && !self.alts.iter().any(|a| head(a) == Some(word.as_str()))
+        {
+            first = self.heads().into_iter().min_by_key(|h| edit_distance(word, h));
+        }
+        let matching: Vec<Alt> = self.alts.iter().filter(|a| head(a).is_some() && head(a) == first.as_deref()).cloned().collect();
+        if matching.is_empty() { self.usage.clone() } else { usage_text(&matching) }
+    }
+
+    /// The first words of the alternatives, each once, in order.
+    fn heads(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for h in self.alts.iter().filter_map(|a| head(a)) {
+            if !out.iter().any(|o| o == h) {
+                out.push(h.to_string());
+            }
+        }
+        out
     }
 
     /// Another mod's alternatives with its own handler.
@@ -463,6 +498,30 @@ pub fn log_command(spec: &str) -> Vec<Msg> {
 }
 
 /// A parse error: `command.error.<key>` about `what` (a word typed, or a parameter's name).
+/// An alternative's first word, when it starts with one.
+fn head(alt: &Alt) -> Option<&str> {
+    match alt.first().map(|p| &p.kind) {
+        Some(Kind::Literal(l)) => Some(l.as_str()),
+        _ => None,
+    }
+}
+
+/// How many single-letter edits turn `a` into `b`.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut prev = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let cur = row[j + 1];
+            row[j + 1] = (prev + usize::from(ca != *cb)).min(row[j] + 1).min(cur + 1);
+            prev = cur;
+        }
+    }
+    row[b.len()]
+}
+
 fn err(key: &str, what: &str) -> Msg {
     Msg::new(&format!("command.error.{key}"), vec![Arg::Text(what.to_string())])
 }

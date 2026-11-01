@@ -387,6 +387,7 @@ command.error.bad_limit = bad limit {0}
 command.error.unknown_entity = unknown entity {0}
 command.error.missing = missing {0}
 command.error.expected = expected {0}
+command.error.unknown_word = unknown {0} (did you mean {1})
 command.error.whole_number = {0} must be a whole number
 command.error.number = {0} must be a number
 command.error.unknown_item = unknown item {0}
