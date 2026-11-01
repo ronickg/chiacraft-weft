@@ -584,6 +584,16 @@ impl Screen for WorldSelect {
                 if let Kind::Button { enabled, .. } = &mut ui.nodes[del].kind {
                     *enabled = selected.is_some();
                 }
+                let sel = selected.and_then(|i| worlds.get(i)).cloned();
+                let addr = button(ui, cx, "world.new_address", &[], 70.0, move |c| {
+                    if let Some(w) = &sel {
+                        c.requests.push(Request::Open(Box::new(crate::friends::ConfirmNewAddress { world: w.clone() })));
+                    }
+                });
+                if let Kind::Button { enabled, .. } = &mut ui.nodes[addr].kind {
+                    *enabled = selected.is_some();
+                }
+                ui.set_id(addr, "new_address");
                 let dir = cx.settings.run_dir.join("saves");
                 let open = button(ui, cx, "world.folder", &[], 70.0, move |_| crate::packs::open_folder(&dir));
                 ui.set_id(open, "saves_folder");

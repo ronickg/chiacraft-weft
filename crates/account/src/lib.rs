@@ -76,6 +76,13 @@ impl Session {
         Ok(format!("{}:{}", self.identity_hex(), chiacraft_wallet::keys::hex(&sig)))
     }
 
+    /// The identity key saying its world `from` moved to `to` (generation `generation`), as a
+    /// signature hex.
+    pub fn world_moved_sig(&self, from: &str, to: &str, generation: u32) -> Result<String, String> {
+        let sig = self.signer.sign(&chiacraft_wallet::sign::world_moved_text(from, to, generation)).map_err(|e| e.to_string())?;
+        Ok(chiacraft_wallet::keys::hex(&sig))
+    }
+
     /// The identity key, hex: the player's identity on every world.
     pub fn identity_hex(&self) -> String {
         self.signer.identity().hex()
@@ -170,6 +177,12 @@ pub fn check_world_cert(line: &str, world: &str, generation: u32, created: u64) 
     let id = chiacraft_wallet::IdentityKey::from_hex(identity)?;
     let sig = chiacraft_wallet::keys::from_hex(sig)?;
     chiacraft_wallet::sign::verify_world_cert(&id, world, generation, created, &sig).then(|| id.hex())
+}
+
+/// Whether `identity` (hex) signed (`sig`, hex) that its world `from` moved to `to`.
+pub fn check_world_moved(identity: &str, from: &str, to: &str, generation: u32, sig: &str) -> bool {
+    let (Some(id), Some(sig)) = (chiacraft_wallet::IdentityKey::from_hex(identity), chiacraft_wallet::keys::from_hex(sig)) else { return false };
+    chiacraft_wallet::sign::verify_world_moved(&id, from, to, generation, &sig)
 }
 
 pub fn check_vouch(line: &str, endpoint: &str) -> Option<String> {

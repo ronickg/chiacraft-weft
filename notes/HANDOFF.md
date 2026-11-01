@@ -198,11 +198,26 @@ portal took her home beside hers; with bob's game closed her portal left her in 
 "The portal couldn't take you there: timed out". Not checked: going back to a world joined before
 (needs three games).
 
+Phase 3 extras are done. Invites: `links::invite` (world-signed token, `i=` in the address,
+`invites_used`), `Request::MakeInvite`, Links screen "Make an Invite". Warm-up: the portals mod's
+`near_portals` (within 4 blocks, about twice a second, once per link per 30 s) sends
+`portals:near`; the client asks the bridge `warm <key>` (`p2p::warm`: status through the account
+endpoint, `warmed`). Arrival protection: `ARRIVAL_PROTECTION` (100 ticks of `hurt_cooldown`).
+Friends: `crates/engine/src/friends.rs` (`friends.json`: friends and this player's moves;
+`answer_for`, `new_address`, `follow`, the Friends and ConfirmNewAddress screens), `p2p::serve_worlds`
+/ `ask_worlds` (`chiacraft/worlds/1`; worlds only to friends, certificates and moves checked
+against the friend's identity). Saved worlds keep the owner's inbox (sixth column), learn it right
+after a join, and follow a move (`Ping::Following`). World list: "Address" gives the selected world
+a new key. Checked with two copies: an invite linked without asking; walking up to a portal warmed
+the trip ("on the way"); both added each other from the link; alice joined bob's world from her
+Friends screen; bob gave his world a new address; alice's saved entry followed it. Test scripts:
+build scripts that contain addresses with Python, not sed (`&` in the replacement).
+
 ## Next steps
 
-1. Phase 3 leftovers: warming the trip up as a player walks toward a portal, arrival protection,
-   friends' worlds, "world moved" notices, invite tokens, a scrolling Links screen.
-2. Phase 4 (DIDs and achievements) per `notes/PLAN.md`.
+1. Phase 4 (DIDs and achievements) per `notes/PLAN.md`.
+2. Small Phase 3 leftovers: links carried over to a world's new address; arrival spots in other
+   dimensions.
 2. Phase 2 "later" items: bao-tree verified streaming and resume, iroh-blobs for downloads from
    other players and mirrors, reviewer lists, key rotation; running the fuzz targets (nightly,
    perhaps a scheduled CI job).

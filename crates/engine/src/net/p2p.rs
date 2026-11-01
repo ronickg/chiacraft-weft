@@ -20,6 +20,8 @@ const ALPN: &[u8] = b"weft/1";
 const STATUS_ALPN: &[u8] = b"chiacraft/status/1";
 /// Link requests and answers between owners' account endpoints (chiacraft, `links`).
 const LINKS_ALPN: &[u8] = b"chiacraft/links/1";
+/// A player's worlds, for their friends, and where their worlds moved, for anyone (`friends`).
+const WORLDS_ALPN: &[u8] = b"chiacraft/worlds/1";
 /// 3: `Join` carries the account's vouching (chiacraft). 4: the hello offers the world's data
 /// packages, which the joining game downloads and loads before it is let in (chiacraft). 5: the
 /// hello may carry a travel ticket from a linked world's portal (chiacraft, `travel`).
@@ -152,7 +154,7 @@ async fn endpoint(settings: &Settings, who: Who) -> Result<Endpoint, String> {
     use iroh_mainline_address_lookup::DhtAddressLookup;
     let b = Endpoint::builder(presets::N0).relay_mode(relay_mode(settings));
     let b = match who {
-        Who::Player => b.secret_key(identity(&settings.run_dir)?).alpns(vec![LINKS_ALPN.to_vec()]).address_lookup(DhtAddressLookup::builder()),
+        Who::Player => b.secret_key(identity(&settings.run_dir)?).alpns(vec![LINKS_ALPN.to_vec(), WORLDS_ALPN.to_vec()]).address_lookup(DhtAddressLookup::builder()),
         Who::World(key) => b.secret_key(*key).alpns(vec![ALPN.to_vec(), STATUS_ALPN.to_vec()]).address_lookup(DhtAddressLookup::builder()),
         Who::Anonymous => b.secret_key(throwaway_key()),
     };
@@ -232,7 +234,9 @@ async fn account(settings: &Settings) -> Result<Endpoint, String> {
                 while let Some(incoming) = serving.accept().await {
                     tokio::spawn(async move {
                         let Ok(conn) = incoming.await else { return };
-                        if conn.alpn() == LINKS_ALPN
+                        if conn.alpn() == WORLDS_ALPN {
+                            serve_worlds(conn).await;
+                        } else if conn.alpn() == LINKS_ALPN
                             && let Err(e) = serve_links(conn).await
                         {
                             log::warn!("link message: {e}");
@@ -313,6 +317,55 @@ async fn serve_links(conn: iroh::endpoint::Connection) -> Result<(), String> {
     let _ = send.finish();
     let _ = tokio::time::timeout(Duration::from_secs(5), conn.closed()).await;
     Ok(())
+}
+
+/// Answers `chiacraft/worlds/1`: this player's worlds if the asker is a friend, and where worlds
+/// moved.
+async fn serve_worlds(conn: iroh::endpoint::Connection) {
+    let peer = conn.remote_id().to_string();
+    let Ok(Ok((mut send, mut recv))) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi()).await else { return };
+    let _ = tokio::time::timeout(Duration::from_secs(10), read_frame_max(&mut recv, 64)).await;
+    let hosted = HOST_ENDPOINT.lock().as_ref().map(|e| e.id().to_string());
+    let answer = tokio::task::spawn_blocking(move || crate::friends::answer_for(&peer, hosted)).await.unwrap_or_default();
+    if let Ok(bytes) = serde_json::to_vec(&answer)
+        && write_frame(&mut send, &bytes).await.is_ok()
+    {
+        let _ = send.finish();
+        let _ = tokio::time::timeout(Duration::from_secs(5), conn.closed()).await;
+    }
+}
+
+/// Asks the player at account endpoint `account` (whose identity is `identity`) for their worlds
+/// and moves, in the background. Only worlds whose certificates that identity signed, and moves it
+/// signed, are kept.
+pub fn ask_worlds(account: &str, identity: &str, settings: &Settings) -> crossbeam_channel::Receiver<Result<crate::friends::Answer, String>> {
+    let (tx, rx) = crossbeam_channel::bounded(1);
+    let (account, identity, settings) = (account.to_string(), identity.to_string(), settings.clone());
+    runtime().spawn(async move {
+        let result = async {
+            let ep = self::account(&settings).await?;
+            let id: EndpointId = account.parse().map_err(|_| "a bad account")?;
+            tokio::time::timeout(Duration::from_secs(10), async {
+                let conn = ep.connect(EndpointAddr::from_parts(id, Vec::<TransportAddr>::new()), WORLDS_ALPN).await.map_err(|e| e.to_string())?;
+                let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+                write_frame(&mut send, &[]).await?;
+                let frame = read_frame_max(&mut recv, 256 << 10).await?;
+                conn.close(0u32.into(), b"thanks");
+                let mut a: crate::friends::Answer = serde_json::from_slice(&frame).map_err(|e| e.to_string())?;
+                a.worlds.retain(|w| {
+                    crate::world_address::WorldCert::parse(&w.cert).ok().filter(|c| c.world == w.key).and_then(|c| c.verify()).as_deref() == Some(identity.as_str())
+                });
+                a.moved.retain(|m| chiacraft_account::check_world_moved(&identity, &m.from, &m.to, m.generation, &m.sig));
+                Ok::<_, String>(a)
+            })
+            .await
+            .unwrap_or_else(|_| Err("no answer".into()))
+        }
+        .await;
+        let _ = tx.send(result);
+        crate::friends::GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    });
+    rx
 }
 
 /// Delivers queued link messages, again and again until they arrive (or give up after two weeks).

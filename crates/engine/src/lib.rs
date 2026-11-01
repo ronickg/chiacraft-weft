@@ -13,6 +13,7 @@ pub mod client;
 pub mod commands;
 pub mod config;
 pub mod components;
+pub mod friends;
 pub mod game_screens;
 pub mod clipboard;
 pub mod content;

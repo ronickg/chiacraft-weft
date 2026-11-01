@@ -134,7 +134,7 @@ footer { font-size: 13px; color: var(--muted); }
           <text class="mn" x="56" y="290">world key · weft/1 · status/1</text>
           <rect class="netbox" x="40" y="330" width="280" height="58" rx="5"/>
           <text class="t" x="56" y="354">Account endpoint</text>
-          <text class="mn" x="56" y="374">account key · joins · links/1 inbox</text>
+          <text class="mn" x="56" y="374">account key · joins · links/1 · worlds/1</text>
           <rect class="dim" x="40" y="414" width="280" height="54" rx="5"/>
           <text class="s" x="56" y="436">run/ folder</text>
           <text class="m" x="56" y="456">saves/ cache/ links.json worlds.txt</text>
@@ -158,7 +158,7 @@ footer { font-size: 13px; color: var(--muted); }
           <text class="mn" x="696" y="290">world key · weft/1 · status/1</text>
           <rect class="netbox" x="680" y="330" width="280" height="58" rx="5"/>
           <text class="t" x="696" y="354">Account endpoint</text>
-          <text class="mn" x="696" y="374">account key · joins · links/1 inbox</text>
+          <text class="mn" x="696" y="374">account key · joins · links/1 · worlds/1</text>
           <rect class="dim" x="680" y="414" width="280" height="54" rx="5"/>
           <text class="s" x="696" y="436">run/ folder</text>
           <text class="m" x="696" y="456">saves/ cache/ links.json worlds.txt</text>
@@ -508,7 +508,8 @@ footer { font-size: 13px; color: var(--muted); }
           <tr><td>engine/src/world_address.rs</td><td>World key, world certificate, the chiacraft:// address.</td></tr>
           <tr><td>engine/src/links.rs</td><td>Link records and signatures, inbox checks, outbox, links.json.</td></tr>
           <tr><td>engine/src/travel.rs</td><td>Travel tickets (issue, admit once), arrival spots per world (portals.txt).</td></tr>
-          <tr><td>engine/src/saved_worlds.rs</td><td>Worlds you've joined (worlds.txt) and their status.</td></tr>
+          <tr><td>engine/src/saved_worlds.rs</td><td>Worlds you've joined (worlds.txt) and their status; follows a world that moved.</td></tr>
+          <tr><td>engine/src/friends.rs</td><td>Friends (friends.json), worlds/1 answers, new addresses and their signed notices.</td></tr>
           <tr><td>engine/src/package_trust.rs</td><td>Signing packages, checking creators, trust.txt.</td></tr>
           <tr><td>engine/src/bridge.rs</td><td>Answers chiacraft's mods beyond Weft's interface: is this player the owner, which links the world has.</td></tr>
           <tr><td>mods/portals</td><td>The portal block: holds a link id, bound by the owner, sends players who step in to the linked world.</td></tr>
@@ -526,7 +527,7 @@ footer { font-size: 13px; color: var(--muted); }
       <div class="step"><span class="ph">Phase 1</span><span class="what">Account: 24 words, login key, identity on join</span><span class="chip done">done</span></div>
       <div class="step"><span class="ph">Phase 2</span><span class="what">Data packages: format, identity and store, switching, downloads on join, signing and trust, hardening</span><span class="chip done">done</span></div>
       <div class="step"><span class="ph">Phase 3</span><span class="what">Your world runs on, world addresses, link requests, portal blocks, travel with signed tickets and arrival at the linked portal</span><span class="chip done">done</span></div>
-      <div class="step"><span class="ph">Phase 3 extras</span><span class="what">Warm-up as you approach a portal, arrival protection, friends' worlds, invite tokens</span><span class="chip next">next</span></div>
+      <div class="step"><span class="ph">Phase 3 extras</span><span class="what">Invites, warm-up near portals, arrival protection, friends and their worlds, world-moved notices</span><span class="chip done">done</span></div>
       <div class="step"><span class="ph">Phase 4–5</span><span class="what">DIDs and achievements on Chia; finding worlds through on-chain listings and DIG</span><span class="chip later">later</span></div>
       <div class="step"><span class="ph">Phase 6–8</span><span class="what">Sandboxed code mods (WebAssembly), headless servers, wallet and items</span><span class="chip later">later</span></div>
     </div>

@@ -376,6 +376,8 @@ impl App {
         let mut settings = Settings::new(&self.opts.run_dir);
         // Links between worlds, and the inbox for them, open while the game runs (chiacraft).
         crate::links::init(&self.opts.run_dir, &settings.saves_dir());
+        crate::friends::init(&self.opts.run_dir, &settings.saves_dir());
+        crate::saved_worlds::set_settings(&settings);
         if chiacraft_account::current().is_some() {
             net::p2p::start_account(&settings);
         }
@@ -1722,10 +1724,10 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
 
     r.frame_no += 1;
     // Link requests and answers arrive in the background: the links screen shows them as they do.
-    let links_now = crate::links::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
+    let links_now = crate::links::GENERATION.load(std::sync::atomic::Ordering::Relaxed) + crate::friends::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
     if links_now != r.links_seen {
         r.links_seen = links_now;
-        if r.screens.last().is_some_and(|(s, _)| s.name() == "core:links" || s.name() == "core:multiplayer") {
+        if r.screens.last().is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends"].contains(&s.name())) {
             r.rebuild_all();
         }
     }

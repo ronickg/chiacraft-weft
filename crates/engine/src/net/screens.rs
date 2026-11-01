@@ -57,8 +57,12 @@ impl Screen for Multiplayer {
             });
             saved_worlds(ui, cx);
             let waiting = crate::links::snapshot().incoming.len();
-            let id = button(ui, cx, "links.open", &[Arg::Text(waiting.to_string())], 200.0, |c| c.requests.push(Request::Open(Box::new(Links))));
-            ui.set_id(id, "links");
+            ui.container(Style::row().gap(6.0), |ui| {
+                let id = button(ui, cx, "links.open", &[Arg::Text(waiting.to_string())], 160.0, |c| c.requests.push(Request::Open(Box::new(Links))));
+                ui.set_id(id, "links");
+                let id = button(ui, cx, "friends.open", &[], 160.0, |c| c.requests.push(Request::Open(Box::new(crate::friends::Friends))));
+                ui.set_id(id, "friends");
+            });
             button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
@@ -85,6 +89,14 @@ fn saved_worlds(ui: &mut Ui, cx: &BuildCx) {
                 let address = w.address.clone();
                 let id = button(ui, cx, "multiplayer.join", &[], 60.0, move |c| c.requests.push(Request::Join(address.clone())));
                 ui.set_id(id, &format!("join:{}", w.name));
+                if !w.inbox.is_empty() && !w.owner.is_empty() && !crate::friends::is_friend(&w.inbox) {
+                    let (inbox, owner, name) = (w.inbox.clone(), w.owner.clone(), w.name.clone());
+                    let id = button(ui, cx, "friends.add", &[], 60.0, move |c| {
+                        crate::friends::add(&inbox, &owner, &name);
+                        c.requests.push(Request::Rebuild);
+                    });
+                    ui.set_id(id, &format!("befriend:{}", w.name));
+                }
                 let key = w.key.clone();
                 button(ui, cx, "multiplayer.remove", &[], 60.0, move |c| {
                     crate::saved_worlds::forget(&c.settings.run_dir, &key);
@@ -299,6 +311,17 @@ impl Screen for Links {
                     for (i, l) in store.links.iter().enumerate() {
                         ui.container(Style::row().gap(6.0).stretch(), |ui| {
                             label(ui, cx, "links.link", &[Arg::Text(l.from_name.clone()), Arg::Text(l.to_name.clone())], "default");
+                            // The other world's owner, as a friend: their account is where answers went.
+                            let mine = chiacraft_account::current().map(|s| s.identity_hex()).unwrap_or_default();
+                            let (other_owner, other_name) = if l.from_owner == mine { (l.to_owner.clone(), l.to_name.clone()) } else { (l.from_owner.clone(), l.from_name.clone()) };
+                            if !l.peer_inbox.is_empty() && !crate::friends::is_friend(&l.peer_inbox) {
+                                let inbox = l.peer_inbox.clone();
+                                let n = button(ui, cx, "friends.add", &[], 70.0, move |c| {
+                                    crate::friends::add(&inbox, &other_owner, &other_name);
+                                    c.requests.push(Request::Rebuild);
+                                });
+                                ui.set_id(n, &format!("befriend{i}"));
+                            }
                             let id = l.id();
                             let n = button(ui, cx, "links.end", &[], 80.0, move |c| {
                                 if let Err(e) = crate::links::revoke(&id) {

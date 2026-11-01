@@ -207,6 +207,16 @@ The smallest version that works is phases 1-4.
       packages are ready (a failed trip leaves them where they were); when a world reached through
       a portal goes away, back to the world joined before it, else home, else the title; a
       second outside every portal before a portal sends anyone.
+   Extras (done): invites (a token the world signs, in its address as `i=`, one use within a
+   week; a request carrying it is accepted without asking); warm-up as a player nears a bound
+   portal (their game asks the destination's status through its own endpoint, and says where the
+   portal leads); five seconds' protection after arriving; a scrolling Links screen; friends
+   (added from a saved world's owner or a link, mutual; `chiacraft/worlds/1` on the account
+   endpoint lists a player's worlds to friends, open ones joinable from the Friends screen);
+   "world moved" notices (a world given a new address from the world list leaves a notice its
+   owner's identity signs; saved entries follow it when the old address stops answering). Left:
+   arrival spots in dimensions other than the spawn's (the SDK has no dimension id), carrying
+   links over to a world's new address.
 4. **DIDs and achievements.** Player and world DIDs through sponsors; world ownership both ways;
    achievements signed by the world DID, anchored in batches, opt-in; profile view; admission
    rules (allow lists, probation, DID age, achievements); shared ban lists.

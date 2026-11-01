@@ -245,7 +245,10 @@ const NEAR_BLOCKS: i32 = 4;
 
 /// When each player was last looked at and last told about each link, so the search runs about
 /// twice a second and a player hears about a portal once every half minute.
-static NEARBY: Mutex<Option<std::collections::HashMap<u64, (std::time::Instant, Vec<(String, std::time::Instant)>)>>> = Mutex::new(None);
+static NEARBY: Mutex<Option<std::collections::HashMap<u64, Nearby>>> = Mutex::new(None);
+
+/// When a player was last looked at, and which links they were told about when.
+type Nearby = (std::time::Instant, Vec<(String, std::time::Instant)>);
 
 /// Players walking up to a bound portal: their game warms up the trip (see `bridge`'s `warm`).
 fn near_portals(w: &World) {

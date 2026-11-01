@@ -129,6 +129,17 @@ pub fn verify_world_cert(identity: &IdentityKey, world: &str, generation: u32, c
     verify(identity, world_cert_text(world, generation, created).as_bytes(), signature)
 }
 
+/// The text an identity key signs when its world moves to a new key (a new generation): the old
+/// address leads to the new one.
+pub fn world_moved_text(from: &str, to: &str, generation: u32) -> String {
+    format!("{PREFIX}world moved v1\nfrom: {from}\nto: {to}\ngeneration: {generation}")
+}
+
+/// Whether `signature` is `identity` saying its world `from` moved to `to`.
+pub fn verify_world_moved(identity: &IdentityKey, from: &str, to: &str, generation: u32, signature: &[u8]) -> bool {
+    verify(identity, world_moved_text(from, to, generation).as_bytes(), signature)
+}
+
 /// The text an identity key signs to vouch for a content key (`key`: its public half, hex), so a
 /// package signed by the content key is known to come from this identity.
 pub fn content_link_text(key: &str) -> String {
