@@ -92,11 +92,14 @@ Both live in the `animals` mod, each with its source next to the assets:
 - [mods/animals/source/raptor](../mods/animals/source/raptor/README.md): a feathered Velociraptor,
   the first two-legged animal (bird legs in a crouch, eyes on the sides of the head, feather
   panels for the crest, wings and tail fan). Start birds and other dinosaurs from this one.
+- [mods/animals/source/capybara](../mods/animals/source/capybara/README.md): a stocky four-legged
+  grazer with no tail, eyes on the sides, a chewing jaw and grazing fitted to the ground. Start
+  heavy herbivores (pigs, sheep, deer, bears) from this one.
 
 To update one in the game after changing it:
 
 ```
-cd mods/animals/source/chihuahua      # or cat, raptor
+cd mods/animals/source/chihuahua      # or cat, raptor, capybara
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once (the cat uses ../chihuahua/.venv)
 .venv/bin/python build.py
 ```

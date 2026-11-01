@@ -1,4 +1,5 @@
-//! The animals mod: chihuahuas (this file), cats (`cat.rs`) and velociraptors (`raptor.rs`).
+//! The animals mod: chihuahuas (this file), cats (`cat.rs`), velociraptors (`raptor.rs`) and
+//! capybaras (`capybara.rs`).
 //!
 //! Chihuahuas: small long-haired dogs on grassland, each with its own coat (8 colors, 6 patterns,
 //! 2 marking layouts: 96 coats). Tame one with bones (a third of the time it
@@ -25,6 +26,7 @@ use weft_sdk::*;
 
 declare_mod!(deps: ["base"], init: init);
 
+mod capybara;
 mod cat;
 mod raptor;
 
@@ -137,6 +139,7 @@ fn look_name(coat: u32, puppy: bool, pose: Pose) -> String {
 
 fn init(r: &mut Registry) {
     cat::init(r);
+    capybara::init(r);
     raptor::init(r);
     r.entity_component(&DOG, Dog::default(), component_flags::SAVE);
     r.entity_component(&SEEN, Seen::default(), 0);

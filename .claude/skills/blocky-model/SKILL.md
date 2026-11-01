@@ -96,6 +96,9 @@ Appendages
 - **Cute proportions**: ears, eyes and heads read better slightly bigger than a realistic sheet;
   scale a part about its base and paint it from the sheet at the original size (map each texel
   back by 1/scale before sampling) so colors and outline still line up.
+- **Dark spots on a face read as eyes**: nostrils, a mouth and pads drawn as dark squares
+  turn a snout's front into a second face. Draw nostrils as thin slits (one row), a mouth as a
+  thin line, and keep the real eyes the darkest, roundest marks with a catchlight.
 - No one-way cut-out quads where they're seen side-on (a face-on cheek-fluff quad reads as an
   extra ear from the side): put such fringe on parts that have width.
 
@@ -140,7 +143,13 @@ Animation
 - **Gaits move forward**: a foot in the air swings forward, a foot on the ground pushes back.
   With the swing's sign flipped against the lift, the creature moonwalks (easy to get wrong:
   +X pitches the foot back). Check with `ground.gait(spec, "walk", feet)`: positive for every
-  foot, in walk and run; build scripts assert it.
+  foot, in walk and run; build scripts assert it. Short legs need a clear lift (a big knee
+  bend, a small swing) and fine keyframes (20-24 a cycle), or the foot only shuffles and the
+  check can't tell forward from back.
+- **Grazing, drinking, sniffing the ground**: fit the neck and head angles that bring the mouth
+  to the ground (about half a unit up) with forward kinematics, like the resting poses; then
+  blend into it inside the idle (look about, head down, chew, head up) so the engine plays it
+  without code.
 - **Feet flat**: a foot's pitch cancels the sum of its parents' pitches. Likewise any part that
   should keep its own direction when a pose tilts the body (an upright tail when sitting, a
   level head) cancels the parent's tilt; a fixed angle added on top of the tilt folds it into
@@ -289,6 +298,8 @@ Worked examples, in the chiacraft repo's `animals` mod (each README explains it)
   this folder.**
 - `mods/animals/source/raptor`: a feathered Velociraptor, the two-legged example (bird legs,
   eyes on the sides, feather panels). Start birds and dinosaurs here.
+- `mods/animals/source/capybara`: a stocky grazer (no tail, side eyes, chewing, grazing fitted
+  to the ground). Start heavy herbivores here.
 - `mods/animals/source/chihuahua`: built from a concept sheet (`tools/blocky.py`, colors read
   from the flat turnaround), with eyelids, jaw, tongue, solid ears, toes, a V bib.
 
