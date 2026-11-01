@@ -26,11 +26,16 @@ use weft_sdk::*;
 
 declare_mod!(deps: ["base"], init: init);
 
+mod animal;
 mod capybara;
 mod cat;
 mod raptor;
+mod screen;
+mod species;
 
-static CHIHUAHUA: Entity = Entity::named("chihuahua");
+use animal::OWNER;
+
+pub(crate) static CHIHUAHUA: Entity = Entity::named("chihuahua");
 static HEART: Particle = Particle::named("heart");
 static POOF: Particle = Particle::named("core:poof");
 static BONE: Item = Item::named("base:bone");
@@ -80,8 +85,6 @@ value! {
 
 static DOG: Component<Dog> = Component::named("dog");
 static SEEN: Component<Seen> = Component::named("seen");
-/// The owner's player key (64 hex digits), zeros while wild.
-static OWNER: Component<[u8; 64]> = Component::named("owner");
 
 // ------------------------------------------------------------------ the engine's bridge
 
@@ -141,9 +144,10 @@ fn init(r: &mut Registry) {
     cat::init(r);
     capybara::init(r);
     raptor::init(r);
+    animal::init(r);
+    screen::init(r);
     r.entity_component(&DOG, Dog::default(), component_flags::SAVE);
     r.entity_component(&SEEN, Seen::default(), 0);
-    r.entity_component(&OWNER, [0u8; 64], component_flags::SAVE);
     r.particle(&HEART)
         .textures(&["animals:heart"])
         .life(0.8, 1.2)
@@ -182,7 +186,6 @@ fn init(r: &mut Registry) {
         .texture(TEXTURE)
         .attach(&DOG)
         .attach(&SEEN)
-        .attach(&OWNER)
         .goals(goals())
         .on_interact(interact)
         .on_hurt(|w, h| {
@@ -204,6 +207,7 @@ fn init(r: &mut Registry) {
 
 fn goals() -> Goals {
     Goals::new()
+        .then(animal::upkeep(0))
         .then(upkeep)
         .then(|w: &World, id: u64, st: &EntityState| {
             // Hurt: runs about for three seconds.
@@ -242,6 +246,15 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     d.panic = d.panic.saturating_sub(1);
     d.age = d.age.saturating_sub(1);
     let (coat, puppy, sitting) = (d.coat - 1, d.age > 0, d.tamed != 0 && d.sitting != 0);
+    let stage = match d.age * 3 / GROW_TICKS.max(1) {
+        _ if d.age == 0 => animal::ADULT,
+        2.. => animal::BABY,
+        1 => animal::JUVENILE,
+        _ => animal::ADOLESCENT,
+    };
+    if let Some(a) = w.component_mut(id, &animal::ANIMAL) {
+        a.stage = stage;
+    }
     let Some(s) = w.component_mut(id, &SEEN) else { return false };
     s.sat = if sitting { s.sat.saturating_add(1) } else { 0 };
     let pose = match (sitting, s.sat > LIE_TICKS) {
@@ -385,6 +398,9 @@ fn take_one(w: &World, player: u64) {
 /// follow.
 fn interact(e: &mut EntityEvent) {
     let (w, id, player) = (e.world(), e.entity(), e.other());
+    if screen::interact(&w, id, player) {
+        return;
+    }
     let Some(st) = w.entity(id) else { return };
     let held = w.inventory(player).get(w.selected_slot(player));
     let Some(d) = w.component(id, &DOG).copied() else { return };
@@ -405,6 +421,9 @@ fn interact(e: &mut EntityEvent) {
                 d.tamed = 1;
                 d.sitting = 1;
             }
+            if let Some(a) = w.component_mut(id, &animal::ANIMAL) {
+                a.bond = a.bond.max(25);
+            }
             weft_sdk::info!("chihuahua {id} tamed");
             if let Some(s) = w.component_mut(id, &SEEN) {
                 s.owner = player;
@@ -423,6 +442,7 @@ fn interact(e: &mut EntityEvent) {
         return;
     }
     if MEATS.iter().any(|m| m.id() == held.item) {
+        animal::feed(&w, id, 20);
         if d.age > 0 {
             take_one(&w, player);
             if let Some(d) = w.component_mut(id, &DOG) {
@@ -445,5 +465,15 @@ fn interact(e: &mut EntityEvent) {
     }
     if w.navigating(id) {
         w.navigate(id, st.pos, 0.0);
+    }
+}
+
+/// `/animal tame` made `id` `player`'s: a dog keeps its own record of that too.
+fn tamed_by_command(w: &World, id: u64, player: u64) {
+    if let Some(d) = w.component_mut(id, &DOG) {
+        d.tamed = 1;
+    }
+    if let Some(s) = w.component_mut(id, &SEEN) {
+        s.owner = player;
     }
 }

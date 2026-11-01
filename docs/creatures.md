@@ -61,6 +61,12 @@ about the model's footprint. Bones named `head` follow where the creature looks;
 bones `leg0`..`leg3` unless you want the engine's own leg swing (an animation with `walk` turns
 it off anyway).
 
+Then give it stats: a row in `mods/animals/src/species.rs` (base values of the nine stats, its
+diet, how it is tamed; see `notes/ANIMALS.md`), `.then(crate::animal::upkeep(<its row>))` first in
+its goals (its wild level, sex, stats applied) and
+`.on_interact(|e| { crate::screen::interact(&e.world(), e.entity(), e.other()); })` so the
+spyglass and the animal screen work on it.
+
 To see it: build (`cargo build --release`), then run a script that spawns it and takes shots:
 
 ```

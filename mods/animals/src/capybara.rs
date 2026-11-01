@@ -7,7 +7,7 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-static CAPYBARA: Entity = Entity::named("capybara");
+pub(crate) static CAPYBARA: Entity = Entity::named("capybara");
 const TEXTURE: &str = "capybara/capybara";
 /// Resting this long (thirty seconds), a sitting capybara lies down.
 const LIE_TICKS: u32 = 600;
@@ -51,7 +51,10 @@ pub fn init(r: &mut Registry) {
         .animations("capybara")
         .texture(TEXTURE)
         .attach(&STATE)
-        .goals(Goals::new().then(settle).then(ai::wander(0.35, 6.0)))  // slow and calm
+        .on_interact(|e| {
+            crate::screen::interact(&e.world(), e.entity(), e.other());
+        })
+        .goals(Goals::new().then(crate::animal::upkeep(2)).then(settle).then(ai::wander(0.35, 6.0)))  // slow and calm
         .on_hurt(|w, h| {
             if let Some(c) = w.component_mut(h.entity, &STATE) {
                 c.rest = 0;

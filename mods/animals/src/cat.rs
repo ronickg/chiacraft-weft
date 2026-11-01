@@ -6,7 +6,7 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-static CAT: Entity = Entity::named("cat");
+pub(crate) static CAT: Entity = Entity::named("cat");
 const TEXTURE: &str = "cat/cat";
 /// Resting this long (thirty seconds), a sitting cat lies down.
 const LIE_TICKS: u32 = 600;
@@ -50,7 +50,10 @@ pub fn init(r: &mut Registry) {
         .animations("cat")
         .texture(TEXTURE)
         .attach(&STATE)
-        .goals(Goals::new().then(settle).then(ai::wander(0.5, 7.0)))
+        .on_interact(|e| {
+            crate::screen::interact(&e.world(), e.entity(), e.other());
+        })
+        .goals(Goals::new().then(crate::animal::upkeep(1)).then(settle).then(ai::wander(0.5, 7.0)))
         .on_hurt(|w, h| {
             if let Some(c) = w.component_mut(h.entity, &STATE) {
                 c.rest = 0;

@@ -1,0 +1,418 @@
+# Animals: taming, stats, breeding (design)
+
+Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Step 1 of
+the build order (the core) is built; see "Built so far" at the end. "Proposed" marks numbers and
+details that still need his yes. Reference: ARK, made to
+fit chiacraft (worlds owned by their players, linked by portals, the chain only where it adds
+trust; see `notes/PLAN.md`).
+
+## The decisions
+
+| Topic | Decision |
+|---|---|
+| Feel | Deep, like ARK: wild levels, stat points, breeding lines, mutations. Achievement, some grind |
+| Tameable | Almost every creature; bosses and a few others wild-only |
+| Purpose (now) | Riding (raptor), following and fighting (dogs); more roles later |
+| Players | Solo and multiplayer equally |
+| Taming method | Per species: knock out and feed (big, dangerous), passive feeding (small, calm), trust over time (some) |
+| Taming time | Scales with size and level: a minute or two for a small one, 5-15 min for a raptor |
+| Taming food | Anything in its diet; its favorite foods are faster; crafted kibble is best |
+| Taming effectiveness | Yes: damage, waking, poor food lower it; a clean tame gives bonus levels |
+| Wild young | Steal eggs (parents defend them), find wild babies, raise them |
+| Taming risks | Predators attack a sleeping or feeding animal; it wakes or flees; its pack defends it |
+| Ownership | The tamer's; shareable with a tribe (command, ride, breed) |
+| Tame cap | A world setting, none by default |
+| Stats | Health, stamina, food, damage, speed, carry weight, oxygen, torpor, fortitude |
+| Wild levels | Random, like ARK |
+| Growth | XP from fighting, working, riding; a stat point to place each level |
+| Numbers | All visible: stat values and points per stat |
+| Commands | Follow, stay, wander; stances; whistles for groups; guard an area |
+| Riding | A saddle crafted per species |
+| Inventory | Each tame has one, limited by carry weight |
+| Jobs | Gather, hunt and fetch, produce goods: designed now, built later |
+| Hunger | They eat from their inventory or a trough; starving hurts and lowers bond; long neglect and they go wild (not die) |
+| Bond | Matters: obedience, small stat bonuses, unlocks |
+| Death | Permanent |
+| Storage | A crafted capsule (like ARK's cryopod) |
+| Mating | Hard and earned: adult, in heat, healthy, happy, bonded pair, the right place |
+| Birth | Eggs (raptors, birds) and live births (mammals) |
+| Babies | ARK-style imprinting |
+| Growth time | A world setting |
+| Inheritance | Each stat whole from one parent (55% the better one) |
+| Mutations | ARK-style, with limits |
+| Colors | Inherited coats and patterns, rare ones prized, can mutate |
+| Pedigree | Full family tree; inbreeding has a cost |
+| Heat | Cycles per species |
+| Breeding conditions | Adult and healthy; happy and bonded; the pair has courted; the right place |
+| Aging | Young, adult, elder: fertile years; no death of old age |
+| Litters | Per species |
+| Portals | World owners decide whether tames come through |
+| Chain | Achievements now; an optional pedigree NFT later. Never in the game loop |
+| Trading | Hand over a capsule; the pedigree keeps the breeder |
+| PvP | World owners decide; protected by default |
+| UI | An animal screen; a radial command menu and whistle keys; a spyglass to scout; a creature journal |
+| Chihuahua | Alarm and tracker |
+| Cat | Lucky finds |
+| Capybara | Calm aura |
+| Raptor | Mount; pack hunter |
+| Order | This design first, then code |
+
+## Species are data
+
+Every species is a definition (a Rust table in the mod, or a JSON file per species: proposed),
+so adding an animal is mostly numbers:
+
+- **Body**: size class (small, medium, large, huge), model, sexes, life stages.
+- **Diet**: carnivore, herbivore, omnivore; the foods it eats with their food value and taming
+  value; its favorite foods; its kibble tier.
+- **Taming**: method (passive, knockout, trust), base taming time, torpor (knockout only),
+  fleeing and aggression.
+- **Stats**: a base value and per-level increments (wild and tamed) for each of the nine stats.
+- **Abilities**: its signature ability (below) and its jobs.
+- **Riding**: rideable, saddle recipe, the level that unlocks the saddle.
+- **Breeding**: heat cycle (length, interval, season), courtship time, the place it needs (nest,
+  den, burrow; biome; temperature), gestation or incubation time and temperature range, litter
+  or clutch size, recovery time, growth time per stage.
+- **Looks**: color regions and the colors each can take, patterns, rare colors.
+
+## Stats and levels
+
+Nine stats: **health**, **stamina** (running, attacking, jumping when ridden), **food** (how
+much it can eat before starving), **damage**, **speed**, **carry weight**, **oxygen**
+(underwater), **torpor** (how much it takes to knock out; only goes down, never placed by
+players) and **fortitude** (heat, cold, poison resistance).
+
+**Wild levels.** A wild animal spawns with a level, 1 to 150 (proposed, a world setting; ARK's
+difficulty), most of them low: proposed weights 1-30 common, 31-90 uncommon, 91-150 rare. Each
+level is one **wild point** placed on a random stat (never torpor alone). Its stats are known
+from its level and its points, so two level-100 raptors differ: one with 30 points in speed is a
+different animal from one with 30 in health.
+
+**A stat's value** (proposed, ARK's shape):
+
+```
+value = base * (1 + wild_points * wild_step) * (1 + tamed_points * tamed_step) * (1 + bonus)
+```
+
+`wild_step` and `tamed_step` are per species and stat (about 0.2 health, 0.05 damage, 0.01
+speed); `bonus` is the imprint bonus (up to +20%) plus the bond bonus (up to +5%).
+
+**Taming bonus.** A tame gains `floor(level * effectiveness / 2)` bonus levels, placed like wild
+points. A clean tame of a level-100 animal becomes level 150.
+
+**Growth after taming.** Tames earn XP by fighting, working, being ridden and being near their
+owner (slowly). Each level up gives a **tamed point** the owner places in the animal screen.
+Proposed: up to 75 tamed points (a world setting). Players see every number: the value, wild
+points and tamed points per stat.
+
+## Taming
+
+Every method ends the same way: the taming bar fills, the animal becomes the tamer's (and their
+tribe's, if shared), with its level plus the taming bonus. Effectiveness starts at 100%.
+
+### Passive (chihuahua, cat, capybara)
+
+- Approach slowly (sneaking); running, fighting or hurting it nearby scares it, and it flees.
+- When it's calm it shows that it would take food (a speech bubble with what it wants). Offer it.
+  Each feeding fills the taming bar and starts a wait before the next (proposed 10-30 s).
+- Feeding when it isn't asking, or something it dislikes, lowers effectiveness and can scare it.
+- Small animals take 2-5 feedings; a high level takes more.
+
+### Knock out and feed (raptor, big animals)
+
+- **Knock out**: hit it with blunt weapons, clubs or tranquilizer darts and arrows to raise its
+  torpor. Once torpor passes its maximum it falls unconscious. Damage taken while awake doesn't
+  lower effectiveness; damage after it's out does.
+- **Keep it under**: torpor drains over time. Feed it sleepy berries (or a sedative) to keep it
+  up. If torpor reaches zero it wakes, angry, and the tame fails.
+- **Feed**: put food in its inventory. It eats on its own every so often; each bite fills the
+  taming bar. Favorite food and kibble fill faster and keep effectiveness higher. Effectiveness
+  drops with each hit it takes and with every bite of poor food.
+- **Risks**: a sleeping animal draws predators; its pack comes to defend it (raptors); the player
+  defends it.
+- Proposed time: a level-1 raptor about 5 minutes on kibble, a level-150 one about 15.
+
+### Trust over time
+
+For shy or proud species (later: wolves, horses): visit it, feed it, stay near it across in-game
+days; a trust meter fills; fail by hurting or scaring it.
+
+### Eggs and wild babies
+
+- **Eggs**: wild nests hold eggs; take one and its parents chase you. Incubate it (the right
+  temperature) and the baby that hatches is yours, imprinting on the first player who cares for
+  it.
+- **Wild babies**: a baby near its mother can be passively tamed fast, but the mother defends it.
+
+### Kibble
+
+Crafted food that tames faster than anything (proposed: tiers by the egg it's made from, each
+species preferring one tier). Recipe: an egg, meat or a vegetable, a fiber, water, cooked in a
+pot. Gives eggs a purpose and links species together (raptors lay the eggs other species'
+kibble needs: proposed).
+
+## Bond, needs and life
+
+**Bond** (0-100): rises by feeding, petting, fighting beside you, riding, imprinting; falls by
+starving, being hurt by its owner, long absence. Effects: obedience (a low-bond tame ignores
+some commands and wanders), up to +5% stats at 100, unlocks (riding needs bond 25 on top of the
+saddle; tricks later), breeding needs bond 50.
+
+**Hunger**: tames eat from their own inventory, then from a trough nearby (a block that feeds
+tames in range). Starving hurts slowly and lowers bond. At bond 0 and starving for a while
+(proposed 3 in-game days) it **goes wild**: it leaves, unowned, with its stats. It never dies of
+hunger.
+
+**Life stages**: baby, juvenile, adolescent, adult, elder. Only adults breed; elders are less
+fertile but give more XP to others nearby (wise), and never die of age. Proposed: elder after a
+long time (many in-game weeks; a world setting).
+
+**Death is permanent.** No revival. Capsules keep tames safe while you travel; protected worlds
+keep others from killing them.
+
+## Commands, riding and inventory
+
+**Commands** (radial menu on the animal; whistle keys for every tame in range):
+
+- **Follow** (at a set distance), **stay**, **wander** (around where you left it).
+- **Stances**: passive (never fights, flees), neutral (fights back), aggressive (attacks anything
+  hostile nearby), attack my target (follows your attack).
+- **Whistles**: all follow, all stay, all attack my target, all passive, all come here.
+- **Guard**: patrol or hold an area (a radius around a point, or your base); attack intruders by
+  stance.
+
+**Riding**: each rideable species has a saddle, unlocked at a player level (proposed) and
+crafted. Saddles have quality and armor. Ridden, it uses its stamina and speed; it can sprint,
+jump and attack. **Needs engine work**: Weft has no riding (mounts, passengers, rider input,
+camera) yet. That is the biggest engine piece in this design.
+
+**Inventory**: every tame has one, limited by its carry weight; overloaded, it slows down and
+then can't move. It can pick up items and eat from it.
+
+**Jobs** (designed now, built later):
+
+| Job | What it does | Who |
+|---|---|---|
+| Gather | Harvest plants, wood, stone or meat with a species bonus | Big tames later |
+| Hunt and fetch | Bring back game, dropped items | Dogs |
+| Produce | Eggs, wool, milk, fertilizer over time | Livestock, birds |
+
+## Breeding
+
+Breeding is hard and earned.
+
+**Who can breed.** A male and a female of the same species, both:
+
+- **Adult** and not elder (elders: low fertility), **healthy** (health over 75%), **well fed**,
+  not recovering from a birth.
+- **Happy and bonded**: bond 50 or more with their owner (or tribe), and safe (no hostile in range
+  for a while).
+- **A courting pair**: they spend time near each other (proposed: a pair bond meter that fills
+  while they're together and both content; some species pick a partner, and refuse others once
+  paired).
+- **In the right place**: the species' nest, den or burrow (a placeable block), in a biome and
+  temperature it likes.
+- **The female in heat.**
+
+**Heat.** Adult females come into heat on a cycle per species, shown by behavior and particles:
+
+| Species | Heat lasts | Every | Notes (proposed) |
+|---|---|---|---|
+| Chihuahua | 1 in-game day | 6 in-game days | |
+| Cat | 1 day | 3 days | Often, small litters |
+| Capybara | 1 day | 8 days | |
+| Raptor | 2 days | once a season | Spring only |
+
+**Mating.** When everything holds, the pair mates (an animation), then a cooldown for both.
+
+**Birth.**
+
+- **Mammals** carry the baby for a gestation time (proposed: chihuahua and cat 2 in-game days,
+  capybara 4) shown on the mother; then the litter is born at the den.
+- **Eggs**: the raptor lays a clutch in its nest. Eggs hatch after an incubation time if kept in a
+  temperature range (proposed: warm: near fire or in warm biomes; too cold or hot and they don't
+  progress; much too far and they die). Parents can sit on them.
+- **Litters** per species (proposed): chihuahua 1-4, cat 2-5, capybara 2-6, raptor 2-4 eggs.
+  Recovery before the female can breed again: chihuahua and cat 4 days, capybara 6, raptor a
+  season.
+
+## Babies and imprinting
+
+Babies go baby, juvenile, adolescent, adult; growth time is a world setting (proposed default:
+about a real hour for small species, several for big ones).
+
+- Babies need food (from a trough, the mother, or you) and die only if hurt (permanent death);
+  starving babies stop growing.
+- **Imprinting**: now and then (proposed: every in-game half day) a baby asks for care: feed it a
+  certain food, cuddle it, walk it a distance. Each request done raises imprint. Fully imprinted
+  (100%), it grows into an adult with up to +20% to its stats and a strong bond with that player
+  (+5% more when that player rides it: proposed). Missed requests are lost, not punished.
+
+## Genetics
+
+**Stats.** For each stat, the baby takes the wild points of one parent whole: the parent with more
+points in it 55% of the time (proposed, ARK's), the other 45%. Tamed points and imprint aren't
+inherited. A breeder combines the best stats of different animals over generations.
+
+**Mutations.** At each birth, three rolls of about 2.5% each (proposed). A mutation adds 2 wild
+points to a random stat and changes one color region to a new color. Each animal carries a
+mutation count from its mother's line and its father's line. A parent whose line has 20 or more
+mutations can't pass on more (proposed, ARK's limit), so breeders manage lines.
+
+**Colors.** Each species has color regions (coat, markings, belly, eyes for some) and a palette
+per region. Babies take each region from either parent. Mutations bring colors outside the wild
+palette: rare and prized. Patterns (the chihuahua's 96 coats: solid, marked, piebald, tricolor,
+sable, patched) are inherited the same way.
+
+**Pedigree.** Every animal knows its mother, father, their parents and so on, its generation,
+its mutation counts, who tamed its wild ancestors and who bred it. **Inbreeding**: parents who
+share recent ancestors have lower fertility and a chance of a small stat penalty in the baby
+(proposed: the inbreeding coefficient from shared ancestors in the last 4 generations).
+
+## The four animals
+
+| | Chihuahua | Cat | Capybara | Raptor |
+|---|---|---|---|---|
+| Size | Small | Small | Medium | Medium |
+| Diet | Carnivore | Carnivore | Herbivore | Carnivore |
+| Favorite food | Cooked meat, bones | Fish | Melon, sugar cane | Raw prime meat |
+| Taming | Passive | Passive (shy) | Passive (easy) | Knock out |
+| Tame time (proposed) | 1-3 min | 2-4 min | 1-2 min | 5-15 min |
+| Signature | Alarm and tracker | Lucky finds | Calm aura | Mount, pack hunter |
+| Rideable | No | No | No (later?) | Yes, saddle |
+| Fights | Yes, quick bites | Small prey | No | Yes, leaps |
+| Breeding place | Den | Den (indoors, a bed) | Burrow near water | Nest, warm |
+| Birth | Litter 1-4 | Litter 2-5 | Litter 2-6 | Clutch 2-4 eggs |
+| Heat | Every 6 days | Every 3 days | Every 8 days | Once a spring |
+
+**Signatures** (proposed details):
+
+- **Chihuahua, alarm and tracker**: barks when a hostile comes within range (more range with
+  level), and the bark marks it for you for a few seconds. **Track**: give it something an animal
+  dropped (or a player's item) and it leads you toward that kind or person. Later: sniffs out
+  buried things.
+- **Cat, lucky finds**: now and then (more often with bond) it brings you a gift: string, a
+  feather, a rare item from a loot table that grows with its level; on rare occasions something
+  special.
+- **Capybara, calm aura**: animals within range calm down: wild ones flee less and tolerate you,
+  passive tames go faster, scared tames settle; tames resting near it recover bond. The aura
+  grows with level and bond. The capybara famously gets along with everything.
+- **Raptor, mount and pack hunter**: rideable with a saddle: fast, jumps high, a leap attack.
+  Wild raptors hunt in packs and come to each other's aid; tamed raptors near each other fight
+  better together (a small pack bonus: proposed).
+
+## Players, tribes and worlds
+
+**Ownership.** A tame belongs to its tamer; it can be shared with a **tribe** (a group of players
+in a world; proposed: tribes are a world feature, later linked to DIDs) so members can command,
+ride and breed it.
+
+**World settings** (the owner decides, chiacraft's rule), with defaults:
+
+| Setting | Default |
+|---|---|
+| Tame cap per player or tribe | None |
+| Wild level range | 1-150 |
+| Taming speed, breeding interval, growth speed | 1x |
+| Tames from other worlds through portals | Owner's choice per world or link (proposed default: off) |
+| Highest level of a visiting tame | No limit |
+| Others can hurt or steal your tames (PvP) | No (protected) |
+
+Death is permanent everywhere (Ronald's decision, not a setting).
+
+**Capsules.** A crafted item that holds one tame, with everything about it (stats, pedigree,
+inventory, bond). Release it to place it out again. Used to travel, through portals where allowed,
+and to trade: handing over the capsule moves ownership; the pedigree keeps the breeder's name.
+
+**Portals.** A tame comes through only if the destination allows it (and within its level cap);
+otherwise the capsule stays sealed there and the animal comes back with you.
+
+## On chain
+
+Following `notes/PLAN.md` ("the chain only where it adds trust"):
+
+- **Now: achievements** anchored to the player's DID, for example the first tame, the first
+  tame of each species, a level-150 tame, the first mutation, a 10-generation line, a rare color,
+  a fully imprinted adult, every species in the journal.
+- **Later: a pedigree certificate**, an optional NFT a breeder mints for a prized animal (its
+  stats, colors, mutation counts, parents, breeder), so its line can be proven anywhere.
+- **Never** in the game loop: taming, breeding and stats are all off chain.
+
+## What the player sees
+
+- **Animal screen** (sneak and use): name (rename), species, sex, age stage, level and XP, every
+  stat with its value and wild/tamed points (place points here), bond, imprint, hunger,
+  inventory, color regions, mutation counts, pedigree (opens a family tree), owner and tribe,
+  stance and command.
+- **Radial menu** (hold a key on an animal): follow, stay, wander, stance, guard, ride, feed,
+  open inventory, allow mating, rename.
+- **Whistle keys** for every tame in range.
+- **Spyglass**: a crafted item; looking through it at a wild animal shows its species, sex,
+  level and, at a higher tier (proposed), its stat points and colors.
+- **Creature journal**: an entry per species, filled in as you meet, tame and breed it: diet and
+  favorite foods, how to tame it, where it lives, its heat and breeding needs, the colors and
+  mutations you've seen, your best one of each.
+- **Above the animal**: its name; a heat, pregnancy or imprint-request icon when it matters.
+
+## What it needs from the engine
+
+Most of this fits in the `animals` mod with Weft's SDK as it is: components for every animal's
+state (saved), entity inventories, custom screens and menus, attack and damage, attribute
+modifiers (bond and aura bonuses), biome and time lookups, looks for poses. Engine work (proposed,
+general features worth offering upstream):
+
+1. **Riding**: mounts, passengers, rider input and camera. The biggest piece.
+2. **One-off animations over the pose**: bark, lick, mate, eat while sitting (see the earlier
+   engine notes in `notes/HANDOFF.md`).
+3. **A run animation picked by speed**.
+4. **A scale per kind**: babies grow smoothly instead of a model file per size.
+5. Projectiles for tranquilizer darts (if Weft's aren't enough).
+
+## Building it (proposed order)
+
+1. **Core**: species data, the animal state (level, points, sex, age, owner, bond, hunger), stats
+   applied to entities, the animal screen, the spyglass. Wild levels on spawn.
+2. **Taming**: passive (chihuahua, cat, capybara), effectiveness, bonus levels, favorite foods,
+   kibble.
+3. **Commands**: follow, stay, wander, stances, whistles, guard; tribes.
+4. **Signatures**: alarm and tracker, lucky finds, calm aura.
+5. **Knockout taming and the raptor**: torpor, sedatives, clubs, darts; packs.
+6. **Riding** (engine) and the raptor's saddle.
+7. **Breeding**: heat, courtship, dens and nests, gestation, eggs and incubation, litters.
+8. **Babies**: growth, imprinting; **genetics**: inheritance, mutations, colors, pedigree.
+9. **Capsules**, portals, trading; achievements on chain.
+10. **Jobs**, the journal, the pedigree NFT.
+
+## Open questions
+
+- Tribes: a world feature only, or tied to player DIDs across worlds?
+- Is the in-game day/season long enough for heat cycles to feel right (Weft's day length)?
+- Kibble: how many tiers, and which species' eggs make which?
+- Capsule: durability, a cost to use, how many a player can carry?
+- Should elders eventually pass a trait to babies (like a "wise" line)?
+- Cat and capybara: anything beyond their signatures (the cat was "idk yet")?
+
+## Built so far
+
+**Step 1, the core** (2026-11-01, `mods/animals/src`):
+
+- `species.rs`: the four species as rows: size, diet, taming method, the nine stats' base values,
+  wild and tamed steps (one shared table for now: health 0.2/0.1, damage 0.05/0.04, speed
+  0.01/0.015...), hunger rate.
+- `animal.rs`: the `animal` component (saved; sent to whoever has its screen open): species,
+  sex, life stage, bond, imprint, command, wild and tamed points per stat, unspent points, food,
+  XP. A new animal rolls its level (60% 1-30, 30% 31-90, 10% 91-150) and places a point per level
+  on a random stat. Health and speed are attribute modifiers (`animals:stats`, applied again
+  after loading); damage is a step of `chain::ATTACK_DAMAGE`; the rest are kept and shown. Tames
+  use food at their species' rate (meat feeds a chihuahua); nothing happens at 0 yet. The owner
+  is the `owner` component (a player key) on all four now, not only the dog.
+- `screen.rs`: the animal screen (sneak-use your own, or anyone's in creative): heading, sex,
+  stage, tamed or wild, health, food, bond, a table of every stat (value, wild, tamed) with a
+  button to place an unspent point (not on torpor; up to 75). The scout screen (species, level,
+  sex, stage, size, diet, how it is tamed) through the spyglass: use it on an animal up to 64
+  blocks away (a ray against the animals' boxes, stopped by blocks), or right click one with it.
+  `/animal [show|tame|points N|wild]` (game masters) for testing.
+
+Not yet: XP and earning points (the command gives them), naming, the higher spyglass tier, tame
+caps and other world settings. Engine note: clients don't see other entities' attribute
+modifiers, so the screen takes max health from the stat.

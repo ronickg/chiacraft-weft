@@ -7,7 +7,7 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-static RAPTOR: Entity = Entity::named("raptor");
+pub(crate) static RAPTOR: Entity = Entity::named("raptor");
 const TEXTURE: &str = "raptor/raptor";
 
 value! {
@@ -49,7 +49,10 @@ pub fn init(r: &mut Registry) {
         .animations("raptor")
         .texture(TEXTURE)
         .attach(&STATE)
-        .goals(Goals::new().then(settle).then(ai::wander(0.6, 9.0)))
+        .on_interact(|e| {
+            crate::screen::interact(&e.world(), e.entity(), e.other());
+        })
+        .goals(Goals::new().then(crate::animal::upkeep(3)).then(settle).then(ai::wander(0.6, 9.0)))
         .on_hurt(|w, h| {
             if let Some(c) = w.component_mut(h.entity, &STATE) {
                 c.rest = 0;
