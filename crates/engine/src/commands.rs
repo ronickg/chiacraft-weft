@@ -57,13 +57,25 @@ pub fn parse_usage(usage: &str) -> Result<Vec<Alt>, String> {
                     continue;
                 }
             };
-            let inner = tok.strip_prefix(open).and_then(|t| t.strip_suffix(close)).ok_or_else(|| format!("bad parameter {tok}"))?;
-            let (name, ty) = inner.split_once(':').ok_or_else(|| format!("parameter {tok} needs a type"))?;
+            let inner = tok
+                .strip_prefix(open)
+                .and_then(|t| t.strip_suffix(close))
+                .ok_or_else(|| format!("bad parameter {tok}"))?;
+            let (name, ty) = inner
+                .split_once(':')
+                .ok_or_else(|| format!("parameter {tok} needs a type"))?;
             let kind = match ty {
                 "int" => Kind::Int,
                 "float" => Kind::Float,
                 "word" => Kind::Word(Vec::new()),
-                w if w.starts_with("word(") && w.ends_with(')') => Kind::Word(w[5..w.len() - 1].split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from).collect()),
+                w if w.starts_with("word(") && w.ends_with(')') => Kind::Word(
+                    w[5..w.len() - 1]
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(String::from)
+                        .collect(),
+                ),
                 "text" => Kind::Text,
                 "item" => Kind::Item,
                 "block" => Kind::Block,
@@ -136,12 +148,18 @@ fn parse_selector(c: &Content, tok: &str, players: &[String]) -> Result<Selector
         return Ok(s);
     };
     let mut chars = rest.chars();
-    s.base = chars.next().filter(|b| "paesr".contains(*b)).ok_or_else(|| err("unknown_selector", tok))?;
+    s.base = chars
+        .next()
+        .filter(|b| "paesr".contains(*b))
+        .ok_or_else(|| err("unknown_selector", tok))?;
     let filters = chars.as_str();
     if filters.is_empty() {
         return Ok(s);
     }
-    let inner = filters.strip_prefix('[').and_then(|f| f.strip_suffix(']')).ok_or_else(|| err("bad_selector", tok))?;
+    let inner = filters
+        .strip_prefix('[')
+        .and_then(|f| f.strip_suffix(']'))
+        .ok_or_else(|| err("bad_selector", tok))?;
     for f in inner.split(',').filter(|f| !f.is_empty()) {
         let (k, v) = f.split_once('=').ok_or_else(|| err("bad_filter", f))?;
         match k.trim() {
@@ -176,7 +194,10 @@ pub struct Args {
 
 impl Args {
     pub fn get(&self, name: &str) -> Option<&Value> {
-        self.names.iter().position(|n| n == name).and_then(|i| self.values[i].as_ref())
+        self.names
+            .iter()
+            .position(|n| n == name)
+            .and_then(|i| self.values[i].as_ref())
     }
     pub fn int(&self, name: &str) -> Option<i64> {
         match self.get(name)? {
@@ -210,11 +231,16 @@ pub fn resolve<'a>(names: impl Iterator<Item = &'a String> + Clone, typed: &str)
     if typed.contains(':') {
         return names.into_iter().find(|n| n.as_str() == typed).cloned();
     }
-    let matches: Vec<&String> = names.filter(|n| n.split_once(':').is_some_and(|(_, p)| p == typed)).collect();
+    let matches: Vec<&String> = names
+        .filter(|n| n.split_once(':').is_some_and(|(_, p)| p == typed))
+        .collect();
     match matches.as_slice() {
         [one] => Some((*one).clone()),
         [] => None,
-        many => many.iter().find(|n| n.starts_with("base:")).map(|n| (*n).clone()),
+        many => many
+            .iter()
+            .find(|n| n.starts_with("base:"))
+            .map(|n| (*n).clone()),
     }
 }
 
@@ -224,6 +250,7 @@ fn coordinate(tok: &str, base: f64) -> Option<f64> {
         Some(rest) => rest.parse::<f64>().ok().map(|v| base + v),
         None => tok.parse().ok(),
     }
+    .filter(|v: &f64| v.is_finite())
 }
 
 /// Three coordinate tokens: absolute and `~` mixed per axis, or all `^` (left, up, forward from
@@ -347,12 +374,16 @@ pub struct CommandDef {
     /// Per alternative: 0 = the command's own, i = `branches[i - 1]` (added by another mod).
     pub owners: Vec<usize>,
     pub branches: Vec<(ModId, Callback)>,
+    /// The `permission` level it asks for.
+    pub level: u32,
 }
 
 impl CommandDef {
     pub fn new(name: &str, usage: &str, alts: Vec<Alt>, handler: Option<(ModId, Callback)>, client: bool) -> CommandDef {
         let owners = vec![0; alts.len()];
-        CommandDef { name: name.to_string(), usage: usage.to_string(), alts, handler, client, owners, branches: Vec::new() }
+        // Commands on a player's own client are its own business.
+        let level = if client { weft_abi::permission::EVERYONE } else { weft_abi::permission::GAME_MASTER };
+        CommandDef { name: name.to_string(), usage: usage.to_string(), alts, handler, client, owners, branches: Vec::new(), level }
     }
 
     /// Parses `tokens` and says who handles them: the command's own handler (`None` for the
@@ -364,7 +395,13 @@ impl CommandDef {
         let picked = self.alts.iter().any(|a| head(a) == first);
         for (i, alt) in self.alts.iter().enumerate() {
             let owner = self.owners[i];
-            let own: Vec<Alt> = self.alts.iter().zip(&self.owners).filter(|(_, o)| **o == owner).map(|(a, _)| a.clone()).collect();
+            let own: Vec<Alt> = self
+                .alts
+                .iter()
+                .zip(&self.owners)
+                .filter(|(_, o)| **o == owner)
+                .map(|(a, _)| a.clone())
+                .collect();
             match parse_alt(c, alt, tokens, here, players, &slots(&own)) {
                 Ok(a) => return Ok((a, if owner == 0 { self.handler } else { Some(self.branches[owner - 1]) })),
                 // The mistake worth telling is in an alternative starting with the word typed.
@@ -377,7 +414,11 @@ impl CommandDef {
         if let (false, Some(word)) = (picked, first)
             && self.alts.iter().all(|a| head(a).is_some())
         {
-            let near = self.heads().into_iter().min_by_key(|h| edit_distance(word, h)).unwrap_or_default();
+            let near = self
+                .heads()
+                .into_iter()
+                .min_by_key(|h| edit_distance(word, h))
+                .unwrap_or_default();
             return Err(Msg::new("command.error.unknown_word", vec![Arg::Text(word.to_string()), Arg::Text(near)]));
         }
         Err(first_err.unwrap_or_else(|| Msg::new("command.error.bad_arguments", Vec::new())))
@@ -391,9 +432,17 @@ impl CommandDef {
         if let Some(word) = &first
             && !self.alts.iter().any(|a| head(a) == Some(word.as_str()))
         {
-            first = self.heads().into_iter().min_by_key(|h| edit_distance(word, h));
+            first = self
+                .heads()
+                .into_iter()
+                .min_by_key(|h| edit_distance(word, h));
         }
-        let matching: Vec<Alt> = self.alts.iter().filter(|a| head(a).is_some() && head(a) == first.as_deref()).cloned().collect();
+        let matching: Vec<Alt> = self
+            .alts
+            .iter()
+            .filter(|a| head(a).is_some() && head(a) == first.as_deref())
+            .cloned()
+            .collect();
         if matching.is_empty() { self.usage.clone() } else { usage_text(&matching) }
     }
 
@@ -454,7 +503,6 @@ pub fn usage_text(alts: &[Alt]) -> String {
         .join(" | ")
 }
 
-
 /// Command values as mods receive them; `selected` holds resolved targets per slot. The values
 /// point into `args` and `selected`.
 pub fn abi_values(args: &Args, selected: &[Option<String>]) -> Vec<weft_abi::CommandValue> {
@@ -463,7 +511,14 @@ pub fn abi_values(args: &Args, selected: &[Option<String>]) -> Vec<weft_abi::Com
         .iter()
         .enumerate()
         .map(|(i, v)| {
-            let mut out = weft_abi::CommandValue { kind: cv::NONE, int: 0, float: 0.0, text: Str::new(""), pos: [0.0; 3], name: Str::new(&args.names[i]) };
+            let mut out = weft_abi::CommandValue {
+                kind: cv::NONE,
+                int: 0,
+                float: 0.0,
+                text: Str::new(""),
+                pos: [0.0; 3],
+                name: Str::new(&args.names[i]),
+            };
             match v {
                 None => {}
                 Some(Value::Int(n)) => (out.kind, out.int, out.float) = (cv::INT, *n, *n as f64),
@@ -534,13 +589,19 @@ pub struct Completion {
     pub hint: String,
 }
 
-pub fn complete(c: &Content, line: &str, players: &[String]) -> Completion {
+pub fn complete(c: &Content, line: &str, players: &[String], permission: u32) -> Completion {
     let from = line.rfind(' ').map_or(0, |i| i + 1);
     let partial = &line[from..];
     let done: Vec<&str> = line[..from].split_whitespace().collect();
     let mut out = Completion { suggestions: Vec::new(), from, hint: String::new() };
     if done.is_empty() {
-        let mut names: Vec<String> = c.commands.iter().map(|d| d.name.clone()).filter(|n| n.starts_with(partial)).collect();
+        let mut names: Vec<String> = c
+            .commands
+            .iter()
+            .filter(|d| d.level <= permission)
+            .map(|d| d.name.clone())
+            .filter(|n| n.starts_with(partial))
+            .collect();
         names.sort();
         out.suggestions = names;
         return out;
@@ -553,7 +614,13 @@ pub fn complete(c: &Content, line: &str, players: &[String]) -> Completion {
         let mut at = 0;
         let mut found = None;
         for (pi, p) in alt.iter().enumerate() {
-            let width = if p.kind == Kind::Pos { 3 } else if p.kind == Kind::Text { usize::MAX / 2 } else { 1 };
+            let width = if p.kind == Kind::Pos {
+                3
+            } else if p.kind == Kind::Text {
+                usize::MAX / 2
+            } else {
+                1
+            };
             // An optional selector or position the typed word cannot be skips to what follows.
             let fits = |w: &str| match p.kind {
                 Kind::Targets => w.starts_with('@') || players.iter().any(|n| n == w),
@@ -580,7 +647,11 @@ pub fn complete(c: &Content, line: &str, players: &[String]) -> Completion {
         let names_from = |keys: Vec<&String>| -> Vec<String> {
             let mut v: Vec<String> = keys
                 .into_iter()
-                .filter(|n| n.starts_with(partial) || n.split_once(':').is_some_and(|(_, path)| path.starts_with(partial)))
+                .filter(|n| {
+                    n.starts_with(partial)
+                        || n.split_once(':')
+                            .is_some_and(|(_, path)| path.starts_with(partial))
+                })
                 .cloned()
                 .collect();
             v.sort();
@@ -589,16 +660,47 @@ pub fn complete(c: &Content, line: &str, players: &[String]) -> Completion {
         let list = match &p.kind {
             Kind::Literal(l) if l.starts_with(partial) => vec![l.clone()],
             Kind::Word(options) => {
-                let set = |o: &String| o.strip_prefix('#').map(|s| c.word_sets.get(s).cloned().unwrap_or_default()).unwrap_or_else(|| vec![o.clone()]);
-                names_from(options.iter().flat_map(set).collect::<Vec<_>>().iter().collect())
+                let set = |o: &String| {
+                    o.strip_prefix('#')
+                        .map(|s| c.word_sets.get(s).cloned().unwrap_or_default())
+                        .unwrap_or_else(|| vec![o.clone()])
+                };
+                names_from(
+                    options
+                        .iter()
+                        .flat_map(set)
+                        .collect::<Vec<_>>()
+                        .iter()
+                        .collect(),
+                )
             }
             Kind::Item => names_from(c.item_names.keys().collect()),
             Kind::Block => names_from(c.block_names.keys().collect()),
-            Kind::Entity => names_from(c.game.entity_names.iter().filter(|(_, k)| !c.game.is_block_entity(**k)).map(|(n, _)| n).collect()),
+            Kind::Entity => names_from(
+                c.game
+                    .entity_names
+                    .iter()
+                    .filter(|(_, k)| !c.game.is_block_entity(**k))
+                    .map(|(n, _)| n)
+                    .collect(),
+            ),
             Kind::Dim => names_from(c.dim_names.keys().collect()),
-            Kind::Player => players.iter().filter(|n| n.starts_with(partial)).cloned().collect(),
-            Kind::Targets => ["@p", "@a", "@e", "@s", "@r"].iter().map(|s| s.to_string()).chain(players.iter().cloned()).filter(|n| n.starts_with(partial)).collect(),
-            Kind::Time => TIMES.iter().map(|t| t.0.to_string()).filter(|n| n.starts_with(partial)).collect(),
+            Kind::Player => players
+                .iter()
+                .filter(|n| n.starts_with(partial))
+                .cloned()
+                .collect(),
+            Kind::Targets => ["@p", "@a", "@e", "@s", "@r"]
+                .iter()
+                .map(|s| s.to_string())
+                .chain(players.iter().cloned())
+                .filter(|n| n.starts_with(partial))
+                .collect(),
+            Kind::Time => TIMES
+                .iter()
+                .map(|t| t.0.to_string())
+                .filter(|n| n.starts_with(partial))
+                .collect(),
             Kind::Pos if partial.is_empty() || partial == "~" => vec![if within == 0 { "~ ~ ~".to_string() } else { "~".to_string() }],
             Kind::Pos if partial == "^" => vec![if within == 0 { "^ ^ ^".to_string() } else { "^".to_string() }],
             _ => Vec::new(),
@@ -626,4 +728,20 @@ pub fn complete(c: &Content, line: &str, players: &[String]) -> Completion {
 
 fn hint_name(name: &str, k: &Kind) -> String {
     if *k == Kind::Pos { "x y z".into() } else { name.to_string() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_mods_command_asks_for_game_master_whatever_its_name() {
+        // The engine's table says what its own /rule and /help ask for; a mod's isn't in it.
+        for name in ["rule", "help", "anything"] {
+            let d = CommandDef::new(name, "", parse_usage("").unwrap(), None, false);
+            assert_eq!(d.level, weft_abi::permission::GAME_MASTER);
+        }
+        let d = CommandDef::new("x", "", parse_usage("").unwrap(), None, true);
+        assert_eq!(d.level, weft_abi::permission::EVERYONE);
+    }
 }

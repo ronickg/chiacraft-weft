@@ -60,20 +60,12 @@ pub async fn nft_coin<S: ChainSource>(source: &S, coin_id: Bytes32) -> Result<Nf
     let nft = fetch_nft(source, &mut ctx, state.coin, created)
         .await?
         .ok_or_else(|| Error::new("that coin isn't an NFT"))?;
-    Ok(NftFacts {
-        launcher_id: nft.info.launcher_id,
-        coin_id,
-        owner: nft.info.p2_puzzle_hash,
-        owner_did: nft.info.current_owner,
-    })
+    Ok(NftFacts { launcher_id: nft.info.launcher_id, coin_id, owner: nft.info.p2_puzzle_hash, owner_did: nft.info.current_owner })
 }
 
 /// The DID an NFT was minted with (its collection): the owner its first spend after the launch
 /// assigned. None if it was minted without one (or its first coin was never spent).
-pub async fn nft_minter<S: ChainSource>(
-    source: &S,
-    launcher_id: Bytes32,
-) -> Result<Option<Bytes32>> {
+pub async fn nft_minter<S: ChainSource>(source: &S, launcher_id: Bytes32) -> Result<Option<Bytes32>> {
     let launcher = source
         .coin_state(vec![launcher_id], false)
         .await?
@@ -81,9 +73,7 @@ pub async fn nft_minter<S: ChainSource>(
         .next()
         .ok_or_else(|| Error::new("no such NFT: its launcher isn't on chain"))?;
     if launcher.coin.puzzle_hash != Bytes32::from(SINGLETON_LAUNCHER_HASH) {
-        return Err(Error::new(
-            "not an NFT: the coin isn't a singleton launcher",
-        ));
+        return Err(Error::new("not an NFT: the coin isn't a singleton launcher"));
     }
     let Some(eve) = source
         .children(launcher_id)
@@ -118,12 +108,7 @@ pub fn cat_puzzle_hash(asset_id: Bytes32, owner: Bytes32) -> Bytes32 {
 /// The amount of CAT `asset_id` in `coin_ids` held by `owner`: each coin unspent, at the CAT
 /// puzzle hash of `owner`, and a real child of a CAT spend of the same asset (its parent's spend
 /// parsed). Coins that fail any of that count nothing.
-pub async fn cat_amount<S: ChainSource>(
-    source: &S,
-    asset_id: Bytes32,
-    owner: Bytes32,
-    coin_ids: Vec<Bytes32>,
-) -> Result<u64> {
+pub async fn cat_amount<S: ChainSource>(source: &S, asset_id: Bytes32, owner: Bytes32, coin_ids: Vec<Bytes32>) -> Result<u64> {
     let want = cat_puzzle_hash(asset_id, owner);
     let mut total: u64 = 0;
     for state in source.coin_state(coin_ids, false).await? {
@@ -148,11 +133,11 @@ pub async fn cat_amount<S: ChainSource>(
         let puzzle = puzzle.to_clvm(&mut *ctx).map_err(failed("CAT"))?;
         let solution = solution.to_clvm(&mut *ctx).map_err(failed("CAT"))?;
         let parsed = Puzzle::parse(&ctx, puzzle);
-        let children =
-            Cat::parse_children(&mut ctx, parent.coin, parsed, solution).map_err(failed("CAT"))?;
-        let real = children.unwrap_or_default().iter().any(|c| {
-            c.coin == state.coin && c.info.asset_id == asset_id && c.info.p2_puzzle_hash == owner
-        });
+        let children = Cat::parse_children(&mut ctx, parent.coin, parsed, solution).map_err(failed("CAT"))?;
+        let real = children
+            .unwrap_or_default()
+            .iter()
+            .any(|c| c.coin == state.coin && c.info.asset_id == asset_id && c.info.p2_puzzle_hash == owner);
         if real {
             total = total.saturating_add(state.coin.amount);
         }
@@ -161,10 +146,7 @@ pub async fn cat_amount<S: ChainSource>(
 }
 
 /// The NFTs the wallet holds among its synced hinted coins: (launcher id, coin id, owner p2).
-pub async fn own_nfts<S: ChainSource>(
-    source: &S,
-    wallet: &WalletSync,
-) -> Result<Vec<(Bytes32, Bytes32, Bytes32)>> {
+pub async fn own_nfts<S: ChainSource>(source: &S, wallet: &WalletSync) -> Result<Vec<(Bytes32, Bytes32, Bytes32)>> {
     let mut out = Vec::new();
     for c in wallet.unspent_hinted() {
         let Some(created) = c.created else { continue };

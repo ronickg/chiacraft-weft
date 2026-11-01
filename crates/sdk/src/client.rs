@@ -102,7 +102,12 @@ impl Client {
 
     /// Turns the local player, in degrees like the F3 screen.
     pub fn look(&self, yaw_deg: f32, pitch_deg: f32) {
-        self.control(&abi::PlayerControl { mask: abi::control_mask::LOOK, yaw: yaw_deg.to_radians(), pitch: pitch_deg.to_radians(), ..abi::PlayerControl::DEFAULT });
+        self.control(&abi::PlayerControl {
+            mask: abi::control_mask::LOOK,
+            yaw: yaw_deg.to_radians(),
+            pitch: pitch_deg.to_radians(),
+            ..abi::PlayerControl::DEFAULT
+        });
     }
 
     /// Puts the local player's feet at `pos` (the server takes it as a move).
@@ -116,6 +121,12 @@ impl Client {
 
     pub fn fly(&self, on: bool) {
         self.control(&abi::PlayerControl { mask: abi::control_mask::FLYING, flying: on as u32, ..abi::PlayerControl::DEFAULT });
+    }
+
+    /// Lies down with its feet toward `yaw` (radians) and stays there, or gets up with `None`. Other
+    /// players see it. Where it lies is the server's to say (`World::teleport`).
+    pub fn lie_down(&self, yaw: Option<f32>) {
+        self.control(&abi::PlayerControl { mask: abi::control_mask::LYING, lying: yaw.unwrap_or(f32::NAN), ..abi::PlayerControl::DEFAULT });
     }
 
     pub fn fly_speed(&self, mul: f32) {
@@ -191,7 +202,11 @@ impl Client {
     }
 
     fn text(&self, which: u32, index: u32) -> String {
-        unsafe { (host().client_text)(self.raw, which, index).as_str().to_string() }
+        unsafe {
+            (host().client_text)(self.raw, which, index)
+                .as_str()
+                .to_string()
+        }
     }
 
     pub fn ticket(&self) -> String {
@@ -220,6 +235,17 @@ impl Client {
     pub fn block(&self, pos: [i32; 3]) -> Option<u32> {
         let b = unsafe { (host().client_block)(self.raw, &pos) };
         (b != u32::MAX).then_some(b)
+    }
+
+    /// The block the client has at `pos` of moving structure `entity`.
+    pub fn structure_block(&self, entity: u64, pos: [i32; 3]) -> Option<u32> {
+        let b = unsafe { (host().client_structure_block)(self.raw, entity, &pos) };
+        (b != u32::MAX).then_some(b)
+    }
+
+    /// Whether the cube holding `pos` is here and has been drawn.
+    pub fn cube_shown(&self, pos: [i32; 3]) -> bool {
+        unsafe { (host().client_cube_shown)(self.raw, &pos) != 0 }
     }
 
     /// The light the client has at `pos` (sky level in the low byte, then block red, green,
@@ -284,7 +310,9 @@ impl Client {
     #[allow(clippy::too_many_arguments)]
     fn draw(&self, group: Option<&crate::GizmoGroup>, kind: u32, a: [f64; 3], b: [f64; 3], color: u32, key: &str, args: &[crate::Arg]) {
         let raw = crate::ui::raw_args(args);
-        unsafe { (host().client_draw)(self.raw, s(group.map_or("", |g| g.name())), kind, &a, &b, color, s(key), crate::abi::Slice::new(&raw)) }
+        unsafe {
+            (host().client_draw)(self.raw, s(group.map_or("", |g| g.name())), kind, &a, &b, color, s(key), crate::abi::Slice::new(&raw))
+        }
     }
 
     /// The server's `draw_*` for this frame only: always, or with a `group` while the player
@@ -309,7 +337,7 @@ impl Client {
     }
 
     /// The translation `key` with `args`, centered at fractions of the window, `size` times as
-    /// big as menu text.
+    /// big as menu text. Part of the GUI: F1 hides it with the rest.
     #[allow(clippy::too_many_arguments)]
     pub fn screen_text(&self, x: f32, y: f32, key: &str, args: &[crate::Arg], color: u32, size: f32) {
         self.draw(None, gk::SCREEN_LABEL, [x as f64, y as f64, 0.0], [size as f64, 0.0, 0.0], color, key, args);
@@ -492,8 +520,49 @@ impl World {
         unsafe { (host().entity_teleport)(self.raw(), id, d, &pos) }
     }
 
-    pub fn set_time(&self, time: u64) {
+    /// Rain or thunder in this dimension for `ticks`, after which it changes by itself.
+    pub fn set_weather(&self, raining: bool, thunder: bool, ticks: u32) {
+        unsafe { (host().set_weather)(self.raw(), raining as u32, thunder as u32, ticks) }
+    }
+
+    pub fn raining(&self) -> bool {
+        unsafe { (host().raining)(self.raw()) != 0 }
+    }
+
+    pub fn thundering(&self) -> bool {
+        unsafe { (host().thundering)(self.raw()) != 0 }
+    }
+
+    /// A white flash on an entity for everyone who sees it (a creeper about to go off).
+    pub fn flash(&self, id: u64) {
+        unsafe { (host().entity_flash)(self.raw(), id) }
+    }
+
+    /// A player's `abi::permission` level: ask it before anything only some may do.
+    pub fn permission(&self, player: u64) -> u32 {
+        unsafe { (host().player_permission)(self.raw(), player) }
+    }
+
+    /// Gives a player a level, remembered with the world.
+    pub fn set_permission(&self, player: u64, level: u32) {
+        unsafe { (host().set_player_permission)(self.raw(), player, level) }
+    }
+
+    /// Sets this dimension's time of day (0 sunrise, 6000 noon, 18000 midnight). Only the sky and
+    /// what follows the day move: what waits on ticks keeps its pace.
+    pub fn set_day_time(&self, time: u64) {
         unsafe { (host().set_time)(self.raw(), time) }
+    }
+
+    /// This dimension's time of day, counting on past a day. `w.time()` is another clock: ticks
+    /// the world has run, which nothing moves.
+    pub fn day_time(&self) -> u64 {
+        unsafe { (host().day_time)(self.raw()) }
+    }
+
+    /// As if `ticks` passed at once: the day moves on, and growth, machines and timers catch up.
+    pub fn skip_ticks(&self, ticks: u64) {
+        unsafe { (host().skip_ticks)(self.raw(), ticks) }
     }
 
     /// 0 survival, 1 creative, 2 spectator.
@@ -513,7 +582,9 @@ impl Registry {
     /// instead of the engine's steps, idle noises and death smoke; `e.engine_effects()` keeps
     /// those. One per kind: a later mod's replaces an earlier one's.
     pub fn client_entity_tick(&mut self, kind: &crate::Entity, f: impl Fn(&Client, &ClientEntity) + Send + Sync + 'static) {
-        let cb = callback(move |a: &mut abi::ClientEntityArgs| f(&Client::from_raw(a.client), unsafe { &*(a as *const abi::ClientEntityArgs as *const ClientEntity) }));
+        let cb = callback(move |a: &mut abi::ClientEntityArgs| {
+            f(&Client::from_raw(a.client), unsafe { &*(a as *const abi::ClientEntityArgs as *const ClientEntity) })
+        });
         unsafe { (host().reg_client_entity_tick)(self.raw, s(kind.name()), cb) }
     }
 

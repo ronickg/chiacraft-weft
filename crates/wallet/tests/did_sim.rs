@@ -6,10 +6,7 @@
 
 use chiacraft_wallet::{
     Accounts, Mnemonic, OwnerSigner, Secret, StoreChoice, StoreKind,
-    chain::{
-        Bytes32, ChainConfig, ChainNetwork, ChainReader, PushOutcome, WalletKeys, did, holdings,
-        sim::Sim,
-    },
+    chain::{Bytes32, ChainConfig, ChainNetwork, ChainReader, PushOutcome, WalletKeys, did, holdings, sim::Sim},
     keys,
 };
 use std::time::Duration;
@@ -49,11 +46,7 @@ fn a_did_paid_by_the_wallet_is_made_watched_and_found_ours() {
     sim.pay(keys.primary(), 1_000).unwrap();
     assert!(until(|| r.status().balance == 1_000), "{:?}", r.status());
     let made = r.create_did(&keys, 10, WAIT).unwrap();
-    assert!(
-        !matches!(made.push, PushOutcome::Rejected { .. }),
-        "{:?}",
-        made.push
-    );
+    assert!(!matches!(made.push, PushOutcome::Rejected { .. }), "{:?}", made.push);
     let record = r.wait_did(made.launcher_id, STEP, WAIT).unwrap();
     assert_eq!(record.launcher_id, made.launcher_id);
     let owner = record.owner().expect("a wallet-made DID shows its owner");
@@ -63,11 +56,7 @@ fn a_did_paid_by_the_wallet_is_made_watched_and_found_ours() {
     let signer = OwnerSigner::find(&words, owner.to_bytes(), 20).unwrap();
     assert!(holdings::did_owned_by_key(&record, &signer.public()));
     // The wallet paid 1 mojo and the fee.
-    assert!(
-        until(|| r.status().balance == 1_000 - 11),
-        "{:?}",
-        r.status()
-    );
+    assert!(until(|| r.status().balance == 1_000 - 11), "{:?}", r.status());
 }
 
 #[test]
@@ -81,10 +70,7 @@ fn a_sponsored_did_is_the_players_while_still_eve() {
     assert!(record.is_eve());
     assert_eq!(record.owner(), None, "an eve DID shows no owner");
     assert!(record.owned_by(keys.primary()));
-    assert_eq!(
-        record.current().unwrap().puzzle_hash,
-        did::eve_puzzle_hash(launcher, keys.primary())
-    );
+    assert_eq!(record.current().unwrap().puzzle_hash, did::eve_puzzle_hash(launcher, keys.primary()));
     let me = OwnerSigner::from_mnemonic(&words, 0, false);
     assert!(holdings::did_owned_by_key(&record, &me.public()));
     // Someone else's key doesn't own it.
@@ -115,9 +101,7 @@ fn coins_at_hardened_addresses_are_found_and_spent() {
     let record = r.wait_did(made.launcher_id, STEP, WAIT).unwrap();
     let owner = record.owner().unwrap();
     assert!(keys.puzzle_hashes().contains(&owner));
-    assert!(until(
-        || sim.balance(keys.primary()) == 699 || sim.balance(owner) >= 699
-    ));
+    assert!(until(|| sim.balance(keys.primary()) == 699 || sim.balance(owner) >= 699));
     assert_eq!(sim.balance(at), 0);
     // A DID at a hardened address is found by the owner search too.
     let found = OwnerSigner::find(&words, hardened[1], 20).unwrap();

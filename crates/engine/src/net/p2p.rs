@@ -54,7 +54,12 @@ const STALL: Duration = Duration::from_secs(30);
 fn runtime() -> &'static tokio::runtime::Runtime {
     static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
     RT.get_or_init(|| {
-        tokio::runtime::Builder::new_multi_thread().worker_threads(2).thread_name("net").enable_all().build().expect("tokio runtime")
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .thread_name("net")
+            .enable_all()
+            .build()
+            .expect("tokio runtime")
     })
 }
 
@@ -69,17 +74,23 @@ pub fn identity(run_dir: &Path) -> Result<SecretKey, String> {
 
 /// The player's identity for servers, or empty (keyed by name) when there is none.
 pub fn player_key(run_dir: &Path) -> String {
-    identity(run_dir).map(|k| k.public().to_string()).unwrap_or_else(|e| {
-        log::error!("{e}; this world keys the player by name");
-        String::new()
-    })
+    identity(run_dir)
+        .map(|k| k.public().to_string())
+        .unwrap_or_else(|e| {
+            log::error!("{e}; this world keys the player by name");
+            String::new()
+        })
 }
 
 /// Hash over the code mods (id and version): what a joining game must bring itself. Its data
 /// packages it can download.
 pub fn native_hash() -> u64 {
     let mut h = weft_noise::FNV;
-    for m in crate::content::content().mods.iter().filter(|m| m.package.is_none()) {
+    for m in crate::content::content()
+        .mods
+        .iter()
+        .filter(|m| m.package.is_none())
+    {
         for b in m.id.bytes().chain([0]).chain(m.version.bytes()).chain([0]) {
             h = weft_noise::fnv_step(h, b as u64);
         }
@@ -118,10 +129,22 @@ pub fn content_hash() -> u64 {
         eat(&k.name);
     }
     // Everything else that crosses the wire by id.
-    for n in c.biomes.iter().map(|b| &b.name).chain(c.dims.iter().map(|d| &d.name)) {
+    for n in c
+        .biomes
+        .iter()
+        .map(|b| &b.name)
+        .chain(c.dims.iter().map(|d| &d.name))
+    {
         eat(n);
     }
-    for n in c.game.sounds.iter().map(|s| &s.name).chain(c.game.particles.iter().map(|p| &p.name)).chain(c.game.configs.iter().map(|k| &k.name)) {
+    for n in c
+        .game
+        .sounds
+        .iter()
+        .map(|s| &s.name)
+        .chain(c.game.particles.iter().map(|p| &p.name))
+        .chain(c.game.configs.iter().map(|k| &k.name))
+    {
         eat(n);
     }
     for a in &c.game.attributes {
@@ -131,11 +154,21 @@ pub fn content_hash() -> u64 {
 }
 
 fn mod_list() -> String {
-    crate::content::content().mods.iter().filter(|m| m.package.is_none()).map(|m| format!("{} {}", m.id, m.version)).collect::<Vec<_>>().join(", ")
+    crate::content::content()
+        .mods
+        .iter()
+        .filter(|m| m.package.is_none())
+        .map(|m| format!("{} {}", m.id, m.version))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn relay_mode(settings: &Settings) -> RelayMode {
-    let custom: Vec<RelayUrl> = settings.relays().iter().filter_map(|r| r.parse().ok()).collect();
+    let custom: Vec<RelayUrl> = settings
+        .relays()
+        .iter()
+        .filter_map(|r| r.parse().ok())
+        .collect();
     if custom.is_empty() { RelayMode::Default } else { RelayMode::custom(custom) }
 }
 
@@ -154,8 +187,14 @@ async fn endpoint(settings: &Settings, who: Who) -> Result<Endpoint, String> {
     use iroh_mainline_address_lookup::DhtAddressLookup;
     let b = Endpoint::builder(presets::N0).relay_mode(relay_mode(settings));
     let b = match who {
-        Who::Player => b.secret_key(identity(&settings.run_dir)?).alpns(vec![LINKS_ALPN.to_vec(), WORLDS_ALPN.to_vec()]).address_lookup(DhtAddressLookup::builder()),
-        Who::World(key) => b.secret_key(*key).alpns(vec![ALPN.to_vec(), STATUS_ALPN.to_vec()]).address_lookup(DhtAddressLookup::builder()),
+        Who::Player => b
+            .secret_key(identity(&settings.run_dir)?)
+            .alpns(vec![LINKS_ALPN.to_vec(), WORLDS_ALPN.to_vec()])
+            .address_lookup(DhtAddressLookup::builder()),
+        Who::World(key) => b
+            .secret_key(*key)
+            .alpns(vec![ALPN.to_vec(), STATUS_ALPN.to_vec()])
+            .address_lookup(DhtAddressLookup::builder()),
         Who::Anonymous => b.secret_key(throwaway_key()),
     };
     b.bind().await.map_err(|e| format!("network: {e}"))
@@ -166,7 +205,12 @@ fn throwaway_key() -> iroh::SecretKey {
     use std::hash::{BuildHasher, Hasher};
     let mut bytes = [0u8; 32];
     for chunk in bytes.chunks_mut(8) {
-        chunk.copy_from_slice(&std::collections::hash_map::RandomState::new().build_hasher().finish().to_le_bytes());
+        chunk.copy_from_slice(
+            &std::collections::hash_map::RandomState::new()
+                .build_hasher()
+                .finish()
+                .to_le_bytes(),
+        );
     }
     iroh::SecretKey::from_bytes(&bytes)
 }
@@ -175,7 +219,9 @@ async fn write_frame(send: &mut iroh::endpoint::SendStream, data: &[u8]) -> Resu
     let packed = if data.len() > 256 { lz4_flex::compress_prepend_size(data) } else { data.to_vec() };
     let flag = (data.len() > 256) as u32;
     let header = (packed.len() as u32) << 1 | flag;
-    send.write_all(&header.to_le_bytes()).await.map_err(|e| e.to_string())?;
+    send.write_all(&header.to_le_bytes())
+        .await
+        .map_err(|e| e.to_string())?;
     send.write_all(&packed).await.map_err(|e| e.to_string())
 }
 
@@ -198,7 +244,10 @@ async fn read_frame_max(recv: &mut iroh::endpoint::RecvStream, max: usize) -> Re
     if header & 1 == 0 {
         return Ok(buf);
     }
-    let unpacked = buf.get(..4).map(|b| u32::from_le_bytes(b.try_into().unwrap()) as usize).ok_or("frame too short")?;
+    let unpacked = buf
+        .get(..4)
+        .map(|b| u32::from_le_bytes(b.try_into().unwrap()) as usize)
+        .ok_or("frame too short")?;
     if unpacked > max {
         return Err("frame too large".into());
     }
@@ -264,7 +313,10 @@ pub fn warm(key: &str) {
         match status_on(&ep, addr, Duration::from_secs(8)).await {
             Ok(st) => {
                 log::info!("a portal leads to '{}' ({} playing): on the way", st.name, st.players);
-                WARMED.lock().get_or_insert_with(Default::default).insert(key, (st, std::time::Instant::now()));
+                WARMED
+                    .lock()
+                    .get_or_insert_with(Default::default)
+                    .insert(key, (st, std::time::Instant::now()));
             }
             Err(e) => {
                 log::info!("a portal leads to a world that doesn't answer: {e}");
@@ -278,7 +330,12 @@ pub fn warm(key: &str) {
 
 /// What the world with key `key` answered when warmed in the last minute.
 pub fn warmed(key: &str) -> Option<Status> {
-    WARMED.lock().as_ref()?.get(key).filter(|(_, t)| t.elapsed().as_secs() < 60).map(|(s, _)| s.clone())
+    WARMED
+        .lock()
+        .as_ref()?
+        .get(key)
+        .filter(|(_, t)| t.elapsed().as_secs() < 60)
+        .map(|(s, _)| s.clone())
 }
 
 /// Opens the player's endpoint in the background: link requests can reach this game from now on.
@@ -306,8 +363,13 @@ pub fn wake_outbox() {
 /// (taken) or an error.
 async fn serve_links(conn: iroh::endpoint::Connection) -> Result<(), String> {
     let peer = conn.remote_id().to_string();
-    let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi()).await.map_err(|_| "nothing sent")?.map_err(|e| e.to_string())?;
-    let frame = tokio::time::timeout(Duration::from_secs(10), read_frame_max(&mut recv, 16 << 10)).await.map_err(|_| "nothing sent")??;
+    let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi())
+        .await
+        .map_err(|_| "nothing sent")?
+        .map_err(|e| e.to_string())?;
+    let frame = tokio::time::timeout(Duration::from_secs(10), read_frame_max(&mut recv, 16 << 10))
+        .await
+        .map_err(|_| "nothing sent")??;
     let message: crate::links::Message = serde_json::from_slice(&frame).map_err(|e| format!("a message this game can't read: {e}"))?;
     let answer = crate::links::receive(&peer, message);
     if let Err(e) = &answer {
@@ -326,7 +388,9 @@ async fn serve_worlds(conn: iroh::endpoint::Connection) {
     let Ok(Ok((mut send, mut recv))) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi()).await else { return };
     let _ = tokio::time::timeout(Duration::from_secs(10), read_frame_max(&mut recv, 64)).await;
     let hosted = HOST_ENDPOINT.lock().as_ref().map(|e| e.id().to_string());
-    let answer = tokio::task::spawn_blocking(move || crate::friends::answer_for(&peer, hosted)).await.unwrap_or_default();
+    let answer = tokio::task::spawn_blocking(move || crate::friends::answer_for(&peer, hosted))
+        .await
+        .unwrap_or_default();
     if let Ok(bytes) = serde_json::to_vec(&answer)
         && write_frame(&mut send, &bytes).await.is_ok()
     {
@@ -338,7 +402,11 @@ async fn serve_worlds(conn: iroh::endpoint::Connection) {
 /// Asks the player at account endpoint `account` (whose identity is `identity`) for their worlds
 /// and moves, in the background. Only worlds whose certificates that identity signed, and moves it
 /// signed, are kept.
-pub fn ask_worlds(account: &str, identity: &str, settings: &Settings) -> crossbeam_channel::Receiver<Result<crate::friends::Answer, String>> {
+pub fn ask_worlds(
+    account: &str,
+    identity: &str,
+    settings: &Settings,
+) -> crossbeam_channel::Receiver<Result<crate::friends::Answer, String>> {
     let (tx, rx) = crossbeam_channel::bounded(1);
     let (account, identity, settings) = (account.to_string(), identity.to_string(), settings.clone());
     runtime().spawn(async move {
@@ -346,16 +414,25 @@ pub fn ask_worlds(account: &str, identity: &str, settings: &Settings) -> crossbe
             let ep = self::account(&settings).await?;
             let id: EndpointId = account.parse().map_err(|_| "a bad account")?;
             tokio::time::timeout(Duration::from_secs(10), async {
-                let conn = ep.connect(EndpointAddr::from_parts(id, Vec::<TransportAddr>::new()), WORLDS_ALPN).await.map_err(|e| e.to_string())?;
+                let conn = ep
+                    .connect(EndpointAddr::from_parts(id, Vec::<TransportAddr>::new()), WORLDS_ALPN)
+                    .await
+                    .map_err(|e| e.to_string())?;
                 let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
                 write_frame(&mut send, &[]).await?;
                 let frame = read_frame_max(&mut recv, 256 << 10).await?;
                 conn.close(0u32.into(), b"thanks");
                 let mut a: crate::friends::Answer = serde_json::from_slice(&frame).map_err(|e| e.to_string())?;
                 a.worlds.retain(|w| {
-                    crate::world_address::WorldCert::parse(&w.cert).ok().filter(|c| c.world == w.key).and_then(|c| c.verify()).as_deref() == Some(identity.as_str())
+                    crate::world_address::WorldCert::parse(&w.cert)
+                        .ok()
+                        .filter(|c| c.world == w.key)
+                        .and_then(|c| c.verify())
+                        .as_deref()
+                        == Some(identity.as_str())
                 });
-                a.moved.retain(|m| chiacraft_account::check_world_moved(&identity, &m.from, &m.to, m.generation, &m.sig));
+                a.moved
+                    .retain(|m| chiacraft_account::check_world_moved(&identity, &m.from, &m.to, m.generation, &m.sig));
                 Ok::<_, String>(a)
             })
             .await
@@ -382,7 +459,11 @@ async fn outbox(ep: Endpoint) {
                     inbox = st.inbox;
                 }
             }
-            let delivered = !inbox.is_empty() && deliver(&ep, &inbox, &q.message).await.inspect_err(|e| log::info!("link message not delivered yet: {e}")).is_ok();
+            let delivered = !inbox.is_empty()
+                && deliver(&ep, &inbox, &q.message)
+                    .await
+                    .inspect_err(|e| log::info!("link message not delivered yet: {e}"))
+                    .is_ok();
             crate::links::tried(&q, &inbox, delivered);
         }
         let _ = tokio::time::timeout(Duration::from_secs(20), OUTBOX.notified()).await;
@@ -392,7 +473,10 @@ async fn outbox(ep: Endpoint) {
 async fn deliver(ep: &Endpoint, inbox: &str, message: &crate::links::Message) -> Result<(), String> {
     let id: EndpointId = inbox.parse().map_err(|_| "a bad inbox")?;
     tokio::time::timeout(Duration::from_secs(20), async {
-        let conn = ep.connect(EndpointAddr::from_parts(id, Vec::<TransportAddr>::new()), LINKS_ALPN).await.map_err(|e| e.to_string())?;
+        let conn = ep
+            .connect(EndpointAddr::from_parts(id, Vec::<TransportAddr>::new()), LINKS_ALPN)
+            .await
+            .map_err(|e| e.to_string())?;
         let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
         write_frame(&mut send, &serde_json::to_vec(message).map_err(|e| e.to_string())?).await?;
         let answer = read_frame_max(&mut recv, 1024).await?;
@@ -500,7 +584,10 @@ async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::c
     let Ok(Ok((mut send, _recv))) = tokio::time::timeout(Duration::from_secs(5), conn.accept_bi()).await else { return };
     let packages = crate::content::with(world, crate::modloader::current_packages);
     let players = hw.shared.views.read().len() as u32;
-    let answer = ((PROTOCOL, hw.name.clone(), hw.identity.cert.text(), players, packages.len() as u32, packages.iter().map(|p| p.3).sum::<u64>()), hw.inbox.clone());
+    let answer = (
+        (PROTOCOL, hw.name.clone(), hw.identity.cert.text(), players, packages.len() as u32, packages.iter().map(|p| p.3).sum::<u64>()),
+        hw.inbox.clone(),
+    );
     let mut w = codec::W::default();
     codec::Wire::put(&answer, &mut w);
     if write_frame(&mut send, &w.0).await.is_ok() {
@@ -519,18 +606,39 @@ async fn status_of(settings: &Settings, addr: EndpointAddr, wait: Duration) -> R
 
 async fn status_on(ep: &Endpoint, addr: EndpointAddr, wait: Duration) -> Result<Status, String> {
     tokio::time::timeout(wait, async {
-        let conn = ep.connect(addr.clone(), STATUS_ALPN).await.map_err(|e| e.to_string())?;
+        let conn = ep
+            .connect(addr.clone(), STATUS_ALPN)
+            .await
+            .map_err(|e| e.to_string())?;
         let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
         // A stream is only seen by the other side once something is written on it.
         write_frame(&mut send, &[]).await?;
         let frame = read_frame_max(&mut recv, 8 << 10).await?;
         conn.close(0u32.into(), b"thanks");
         let ((protocol, name, cert, players, packages, package_bytes), (inbox, vouch)) =
-            <((u32, String, String, u32, u32, u64), (String, String)) as codec::Wire>::get(&mut codec::R(&frame)).ok_or("a status this game can't read")?;
+            <((u32, String, String, u32, u32, u64), (String, String)) as codec::Wire>::get(&mut codec::R(&frame))
+                .ok_or("a status this game can't read")?;
         // The certificate must be for the key that answered, and the inbox the owner's.
-        let owner = crate::world_address::WorldCert::parse(&cert).ok().filter(|c| c.world == addr.id.to_string()).and_then(|c| c.verify()).unwrap_or_default();
-        let inbox = if !owner.is_empty() && chiacraft_account::check_vouch(&vouch, &inbox).as_deref() == Some(owner.as_str()) { inbox } else { String::new() };
-        Ok::<Status, String>(Status { protocol, name: name.chars().take(64).collect(), owner, cert, players, packages, package_bytes, inbox })
+        let owner = crate::world_address::WorldCert::parse(&cert)
+            .ok()
+            .filter(|c| c.world == addr.id.to_string())
+            .and_then(|c| c.verify())
+            .unwrap_or_default();
+        let inbox = if !owner.is_empty() && chiacraft_account::check_vouch(&vouch, &inbox).as_deref() == Some(owner.as_str()) {
+            inbox
+        } else {
+            String::new()
+        };
+        Ok::<Status, String>(Status {
+            protocol,
+            name: name.chars().take(64).collect(),
+            owner,
+            cert,
+            players,
+            packages,
+            package_bytes,
+            inbox,
+        })
     })
     .await
     .unwrap_or_else(|_| Err("no answer".into()))
@@ -562,11 +670,21 @@ pub fn stop_hosting() {
     }
 }
 
-async fn accept(conn: iroh::endpoint::Connection, connect: crossbeam_channel::Sender<ServerConn>, world: &'static crate::content::Content, me: &str) -> Result<(), String> {
+async fn accept(
+    conn: iroh::endpoint::Connection,
+    connect: crossbeam_channel::Sender<ServerConn>,
+    world: &'static crate::content::Content,
+    me: &str,
+) -> Result<(), String> {
     use crate::content::with;
     let peer = conn.remote_id();
-    let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi()).await.map_err(|_| "no hello")?.map_err(|e| e.to_string())?;
-    let hello = tokio::time::timeout(Duration::from_secs(10), read_frame_max(&mut recv, MAX_HELLO)).await.map_err(|_| "no hello")??;
+    let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi())
+        .await
+        .map_err(|_| "no hello")?
+        .map_err(|e| e.to_string())?;
+    let hello = tokio::time::timeout(Duration::from_secs(10), read_frame_max(&mut recv, MAX_HELLO))
+        .await
+        .map_err(|_| "no hello")??;
     let mut r = codec::R(&hello);
     let (proto, native) = <(u32, u64) as codec::Wire>::get(&mut r).ok_or("bad hello")?;
     // Through a portal: a travel ticket from the linked world places the player at its portal.
@@ -602,7 +720,11 @@ async fn accept(conn: iroh::endpoint::Connection, connect: crossbeam_channel::Se
     drop(place);
     let ready = ready.map_err(|_| "took too long to download and load the world's packages")?;
     let loaded = <u64 as codec::Wire>::get(&mut codec::R(&ready?)).ok_or("bad ready")?;
-    let refusal = if loaded != with(world, content_hash) { "the content does not match this world's after its packages".to_string() } else { String::new() };
+    let refusal = if loaded != with(world, content_hash) {
+        "the content does not match this world's after its packages".to_string()
+    } else {
+        String::new()
+    };
     write_frame(&mut send, refusal.as_bytes()).await?;
     if !refusal.is_empty() {
         return Err(refusal);
@@ -610,7 +732,9 @@ async fn accept(conn: iroh::endpoint::Connection, connect: crossbeam_channel::Se
     log::info!("player {peer} connected");
     let (to_server_tx, to_server_rx) = unbounded::<ToServer>();
     let (to_client_tx, to_client_rx) = unbounded::<ToClient>();
-    connect.send(Conn::new(to_client_tx, to_server_rx)).map_err(|_| "server stopped")?;
+    connect
+        .send(Conn::new(to_client_tx, to_server_rx))
+        .map_err(|_| "server stopped")?;
     let peer_key = peer.to_string();
     // Incoming: the authenticated key replaces whatever key the client claims.
     let reader = tokio::spawn(async move {
@@ -655,13 +779,17 @@ async fn serve_packages(conn: iroh::endpoint::Connection, offers: Vec<Offer>) {
     let (manifests, files) = (std::sync::Arc::new(manifests), std::sync::Arc::new(files));
     while let Ok((mut send, mut recv)) = conn.accept_bi().await {
         use std::sync::atomic::Ordering::Relaxed;
-        if requests.fetch_update(Relaxed, Relaxed, |n| n.checked_sub(1)).is_err() {
+        if requests
+            .fetch_update(Relaxed, Relaxed, |n| n.checked_sub(1))
+            .is_err()
+        {
             log::warn!("{}: too many package requests", conn.remote_id());
             conn.close(1u32.into(), b"too many requests");
             return;
         }
         let Ok(permit) = streams.clone().acquire_owned().await else { return };
-        let (store, manifests, files, budget) = (chiacraft_packages::store::Store::new(store.root()), manifests.clone(), files.clone(), budget.clone());
+        let (store, manifests, files, budget) =
+            (chiacraft_packages::store::Store::new(store.root()), manifests.clone(), files.clone(), budget.clone());
         tokio::spawn(async move {
             let _permit = permit;
             let Ok(Ok(req)) = tokio::time::timeout(STALL, read_frame_max(&mut recv, 256)).await else { return };
@@ -722,14 +850,20 @@ impl Body {
 /// Streams `len` bytes of the file at `path`, a piece at a time (never the whole file in memory).
 async fn send_file(send: &mut iroh::endpoint::SendStream, path: &Path, len: u64) -> Result<(), String> {
     use tokio::io::AsyncReadExt;
-    let mut file = tokio::fs::File::open(path).await.map_err(|e| e.to_string())?.take(len);
+    let mut file = tokio::fs::File::open(path)
+        .await
+        .map_err(|e| e.to_string())?
+        .take(len);
     let mut buf = vec![0u8; 256 << 10];
     loop {
         let n = file.read(&mut buf).await.map_err(|e| e.to_string())?;
         if n == 0 {
             return Ok(());
         }
-        tokio::time::timeout(STALL, send.write_all(&buf[..n])).await.map_err(|_| "stalled".to_string())?.map_err(|e| e.to_string())?;
+        tokio::time::timeout(STALL, send.write_all(&buf[..n]))
+            .await
+            .map_err(|_| "stalled".to_string())?
+            .map_err(|e| e.to_string())?;
     }
 }
 
@@ -742,7 +876,10 @@ static CONFIGURING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUs
 impl Configuring {
     fn take() -> Option<Configuring> {
         use std::sync::atomic::Ordering::SeqCst;
-        CONFIGURING.fetch_update(SeqCst, SeqCst, |n| (n < MAX_CONFIGURING).then_some(n + 1)).ok().map(|_| Configuring)
+        CONFIGURING
+            .fetch_update(SeqCst, SeqCst, |n| (n < MAX_CONFIGURING).then_some(n + 1))
+            .ok()
+            .map(|_| Configuring)
     }
 }
 
@@ -753,12 +890,19 @@ impl Drop for Configuring {
 }
 
 /// Fetches one manifest or file from the host on a stream of its own; at most `max` bytes.
-async fn fetch(conn: &iroh::endpoint::Connection, kind: u8, hash: &chiacraft_packages::identity::Hash, max: u64) -> Result<Vec<u8>, String> {
+async fn fetch(
+    conn: &iroh::endpoint::Connection,
+    kind: u8,
+    hash: &chiacraft_packages::identity::Hash,
+    max: u64,
+) -> Result<Vec<u8>, String> {
     let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
     let mut w = codec::W::default();
     codec::Wire::put(&(kind as u32, hash.hex()), &mut w);
     write_frame(&mut send, &w.0).await?;
-    let head = tokio::time::timeout(STALL, read_frame_max(&mut recv, 1024)).await.map_err(|_| "the download stalled")??;
+    let head = tokio::time::timeout(STALL, read_frame_max(&mut recv, 1024))
+        .await
+        .map_err(|_| "the download stalled")??;
     let (err, len) = <(String, u64) as codec::Wire>::get(&mut codec::R(&head)).ok_or("bad answer")?;
     if !err.is_empty() {
         return Err(format!("the host: {err}"));
@@ -808,7 +952,11 @@ pub struct Joining {
 
 /// Downloads the offered packages this game lacks into the store, checking every manifest and
 /// file against its hash and the sizes the host declared.
-async fn download(conn: &iroh::endpoint::Connection, missing: &[Offer], events: &crossbeam_channel::Sender<JoinEvent>) -> Result<(), String> {
+async fn download(
+    conn: &iroh::endpoint::Connection,
+    missing: &[Offer],
+    events: &crossbeam_channel::Sender<JoinEvent>,
+) -> Result<(), String> {
     use chiacraft_packages::identity::{FileManifest, Hash, MAX_TOTAL_BYTES};
     let store = crate::modloader::store().ok_or("mods are not loaded")?;
     let total: u64 = missing.iter().map(|o| o.3).sum();
@@ -825,7 +973,8 @@ async fn download(conn: &iroh::endpoint::Connection, missing: &[Offer], events: 
         if Hash::of(&text) != h {
             return Err(format!("package {id}: the host sent a manifest that doesn't match its hash"));
         }
-        let manifest = FileManifest::parse(std::str::from_utf8(&text).map_err(|e| e.to_string())?).map_err(|e| format!("package {id}: {e}"))?;
+        let manifest =
+            FileManifest::parse(std::str::from_utf8(&text).map_err(|e| e.to_string())?).map_err(|e| format!("package {id}: {e}"))?;
         if &manifest.id != id || manifest.files.iter().map(|f| f.size).sum::<u64>() != *size {
             return Err(format!("package {id}: the manifest doesn't match what the host offered"));
         }
@@ -835,7 +984,9 @@ async fn download(conn: &iroh::endpoint::Connection, missing: &[Offer], events: 
                 if bytes.len() as u64 != f.size {
                     return Err(format!("package {id}: {} came short", f.path));
                 }
-                store.put_blob(&f.hash, &bytes).map_err(|e| format!("package {id}: {}: {e}", f.path))?;
+                store
+                    .put_blob(&f.hash, &bytes)
+                    .map_err(|e| format!("package {id}: {}: {e}", f.path))?;
             }
             done += f.size;
             let _ = events.send(JoinEvent::Progress(done, total));
@@ -852,7 +1003,11 @@ async fn download(conn: &iroh::endpoint::Connection, missing: &[Offer], events: 
 
 /// Forwards a crossbeam channel into a stream. The channel is read on a blocking thread because
 /// the engine side is synchronous.
-async fn pump_out<T: Send + crate::net::Message + 'static>(rx: crossbeam_channel::Receiver<T>, mut send: iroh::endpoint::SendStream, encode: fn(&T) -> Vec<u8>) {
+async fn pump_out<T: Send + crate::net::Message + 'static>(
+    rx: crossbeam_channel::Receiver<T>,
+    mut send: iroh::endpoint::SendStream,
+    encode: fn(&T) -> Vec<u8>,
+) {
     let (tx, mut arx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
     std::thread::Builder::new()
         .name("net-out".into())
@@ -882,9 +1037,19 @@ async fn pump_out<T: Send + crate::net::Message + 'static>(rx: crossbeam_channel
 ///
 /// Both tries go out through the player's account endpoint (one endpoint per key).
 async fn connect(settings: &Settings, addr: EndpointAddr) -> Result<iroh::endpoint::Connection, String> {
-    let relayed = EndpointAddr::from_parts(addr.id, addr.relay_urls().cloned().map(TransportAddr::Relay).collect::<Vec<_>>());
+    let relayed = EndpointAddr::from_parts(
+        addr.id,
+        addr.relay_urls()
+            .cloned()
+            .map(TransportAddr::Relay)
+            .collect::<Vec<_>>(),
+    );
     // An address with no hints is looked up (the relay-only try would have nothing to go on).
-    let attempts = if relayed.relay_urls().next().is_some() { vec![(addr, Duration::from_secs(3)), (relayed, Duration::from_secs(20))] } else { vec![(addr, Duration::from_secs(20))] };
+    let attempts = if relayed.relay_urls().next().is_some() {
+        vec![(addr, Duration::from_secs(3)), (relayed, Duration::from_secs(20))]
+    } else {
+        vec![(addr, Duration::from_secs(20))]
+    };
     let mut last = String::new();
     let ep = account(settings).await?;
     let tries = attempts.len();
@@ -908,9 +1073,13 @@ fn check_offers(offers: &[Offer]) -> Result<(), String> {
     }
     for (id, version, hash, _, sig) in offers {
         let fine = (1..=64).contains(&id.len())
-            && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+            && id
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
             && (1..=64).contains(&version.len())
-            && version.chars().all(|c| c.is_ascii_alphanumeric() || ".+-".contains(c))
+            && version
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || ".+-".contains(c))
             && chiacraft_packages::identity::Hash::from_hex(hash).is_some()
             && sig.len() <= 4096;
         if !fine {
@@ -925,7 +1094,9 @@ fn check_offers(offers: &[Offer]) -> Result<(), String> {
 /// connection, or why it failed.
 pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> {
     let addr = parse_ticket(ticket)?;
-    let travel = crate::world_address::parse(ticket).map(|p| p.ticket).unwrap_or_default();
+    let travel = crate::world_address::parse(ticket)
+        .map(|p| p.ticket)
+        .unwrap_or_default();
     let settings = settings.clone();
     let (events, events_rx) = unbounded::<JoinEvent>();
     let (answers, mut answers_rx) = tokio::sync::mpsc::unbounded_channel::<JoinAnswer>();
@@ -936,8 +1107,11 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
             let mut hello = codec::W::default();
             codec::Wire::put(&(PROTOCOL, native_hash(), travel.clone()), &mut hello);
             write_frame(&mut send, &hello.0).await?;
-            let reply = tokio::time::timeout(Duration::from_secs(30), read_frame_max(&mut recv, MAX_OFFER)).await.map_err(|_| "the host didn't answer")??;
-            let (refusal, offers) = <(String, Vec<Offer>) as codec::Wire>::get(&mut codec::R(&reply)).ok_or("the host answered in an unknown way (another version?)")?;
+            let reply = tokio::time::timeout(Duration::from_secs(30), read_frame_max(&mut recv, MAX_OFFER))
+                .await
+                .map_err(|_| "the host didn't answer")??;
+            let (refusal, offers) = <(String, Vec<Offer>) as codec::Wire>::get(&mut codec::R(&reply))
+                .ok_or("the host answered in an unknown way (another version?)")?;
             if !refusal.is_empty() {
                 return Err(refusal.chars().take(500).collect());
             }
@@ -965,7 +1139,9 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
             let mut w = codec::W::default();
             codec::Wire::put(&loaded, &mut w);
             write_frame(&mut send, &w.0).await?;
-            let verdict = tokio::time::timeout(Duration::from_secs(30), read_frame_max(&mut recv, MAX_HELLO)).await.map_err(|_| "the host didn't answer")??;
+            let verdict = tokio::time::timeout(Duration::from_secs(30), read_frame_max(&mut recv, MAX_HELLO))
+                .await
+                .map_err(|_| "the host didn't answer")??;
             if !verdict.is_empty() {
                 return Err(String::from_utf8_lossy(&verdict).into_owned());
             }

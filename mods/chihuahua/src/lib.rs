@@ -24,7 +24,8 @@ static CHIHUAHUA: Entity = Entity::named("chihuahua");
 static HEART: Particle = Particle::named("heart");
 static POOF: Particle = Particle::named("core:poof");
 static BONE: Item = Item::named("base:bone");
-static MEATS: [Item; 4] = [Item::named("base:beef"), Item::named("base:cooked_beef"), Item::named("base:porkchop"), Item::named("base:cooked_porkchop")];
+static MEATS: [Item; 4] =
+    [Item::named("base:beef"), Item::named("base:cooked_beef"), Item::named("base:porkchop"), Item::named("base:cooked_porkchop")];
 
 const COLORS: u32 = 8;
 const PATTERNS: u32 = 6;
@@ -86,7 +87,14 @@ pub unsafe extern "C" fn chiacraft_bridge(q: Query) {
 
 /// A player's key: what their saves are keyed by, the same after a restart.
 fn player_key(player: u64) -> String {
-    BRIDGE.get().map(|f| unsafe { f(Str::new("player_key"), Str::new(&player.to_string())).as_str().to_string() }).unwrap_or_default()
+    BRIDGE
+        .get()
+        .map(|f| unsafe {
+            f(Str::new("player_key"), Str::new(&player.to_string()))
+                .as_str()
+                .to_string()
+        })
+        .unwrap_or_default()
 }
 
 // ------------------------------------------------------------------ looks
@@ -121,14 +129,31 @@ fn init(r: &mut Registry) {
     r.entity_component(&DOG, Dog::default(), component_flags::SAVE);
     r.entity_component(&SEEN, Seen::default(), 0);
     r.entity_component(&OWNER, [0u8; 64], component_flags::SAVE);
-    r.particle(&HEART).textures(&["chihuahua:heart"]).life(0.8, 1.2).size(0.12, 0.16).gravity(-0.4).drag(0.9).fullbright();
+    r.particle(&HEART)
+        .textures(&["chihuahua:heart"])
+        .life(0.8, 1.2)
+        .size(0.12, 0.16)
+        .gravity(-0.4)
+        .drag(0.9)
+        .fullbright();
     // The looks, drawn in place of a dog with that coat, age and pose.
     for coat in 0..COATS {
         for puppy in [false, true] {
             for pose in POSES {
-                let kind = Entity::generated(look_name(coat, puppy, pose).trim_start_matches("chihuahua:").to_string());
+                let kind = Entity::generated(
+                    look_name(coat, puppy, pose)
+                        .trim_start_matches("chihuahua:")
+                        .to_string(),
+                );
                 let model = if puppy { "chihuahua_pup" } else { "chihuahua" };
-                drop(r.entity(kind).size(0.35, 0.5).passive().model_file(model).animations(&format!("{model}{}", pose.suffix())).texture(&format!("chihuahua/coat_{coat}")));
+                drop(
+                    r.entity(kind)
+                        .size(0.35, 0.5)
+                        .passive()
+                        .model_file(model)
+                        .animations(&format!("{model}{}", pose.suffix()))
+                        .texture(&format!("chihuahua/coat_{coat}")),
+                );
             }
         }
     }
@@ -152,7 +177,12 @@ fn init(r: &mut Registry) {
             }
         });
     // Now and then a pair on grassland by day, rarer than pigs and cows.
-    r.spawn(&CHIHUAHUA).biome("#animals").ground("#animal_spawn").light(7, 15).group(1, 2).chance(0.02);
+    r.spawn(&CHIHUAHUA)
+        .biome("#animals")
+        .ground("#animal_spawn")
+        .light(7, 15)
+        .group(1, 2)
+        .chance(0.02);
 }
 
 // ------------------------------------------------------------------ behavior
@@ -174,7 +204,9 @@ fn goals() -> Goals {
         .then(breed)
         .then(|w: &World, id: u64, st: &EntityState| {
             // Sitting: stays put.
-            let sitting = w.component(id, &DOG).is_some_and(|d| d.tamed != 0 && d.sitting != 0);
+            let sitting = w
+                .component(id, &DOG)
+                .is_some_and(|d| d.tamed != 0 && d.sitting != 0);
             if sitting && w.navigating(id) {
                 w.navigate(id, st.pos, 0.0);
             }
@@ -214,7 +246,10 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
 
 /// The owner's entity, if they are here (looked up by key now and then).
 fn owner_of(w: &World, id: u64) -> Option<u64> {
-    let key = w.component(id, &OWNER).filter(|k| k[0] != 0).map(|k| String::from_utf8_lossy(k).into_owned())?;
+    let key = w
+        .component(id, &OWNER)
+        .filter(|k| k[0] != 0)
+        .map(|k| String::from_utf8_lossy(k).into_owned())?;
     let cached = w.component(id, &SEEN).map_or(0, |s| s.owner);
     if cached != 0 && w.entity(cached).is_some() && (w.time() + id) % 40 != 0 {
         return Some(cached);
@@ -252,7 +287,14 @@ fn follow_owner(w: &World, id: u64, st: &EntityState) -> bool {
 /// puppy.
 fn breed(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(me) = w.component(id, &DOG).copied().filter(|d| d.love > 0) else { return false };
-    let partner = w.near(st.pos, 8.0, Some(&CHIHUAHUA)).into_iter().find(|&o| o != id && w.component(o, &DOG).is_some_and(|d| d.love > 0 && d.age == 0));
+    let partner = w
+        .near(st.pos, 8.0, Some(&CHIHUAHUA))
+        .into_iter()
+        .find(|&o| {
+            o != id
+                && w.component(o, &DOG)
+                    .is_some_and(|d| d.love > 0 && d.age == 0)
+        });
     let Some(partner) = partner else { return false };
     let Some(ps) = w.entity(partner) else { return false };
     let d2 = (ps.pos[0] - st.pos[0]).powi(2) + (ps.pos[2] - st.pos[2]).powi(2);
@@ -303,7 +345,12 @@ fn inherit(w: &World, a: u32, b: u32) -> u32 {
 }
 
 fn hearts(w: &World, at: [f64; 3]) {
-    drop(w.spawn_particles(&HEART, [at[0], at[1] + 0.6, at[2]]).count(5).spread(0.3).velocity([0.0, 0.6, 0.0]));
+    drop(
+        w.spawn_particles(&HEART, [at[0], at[1] + 0.6, at[2]])
+            .count(5)
+            .spread(0.3)
+            .velocity([0.0, 0.6, 0.0]),
+    );
 }
 
 /// A held item from the player's hand, used up (unless in creative).
@@ -327,7 +374,9 @@ fn interact(e: &mut EntityEvent) {
     let held = w.inventory(player).get(w.selected_slot(player));
     let Some(d) = w.component(id, &DOG).copied() else { return };
     let key = player_key(player);
-    let mine = w.component(id, &OWNER).is_some_and(|k| k[0] != 0 && String::from_utf8_lossy(k) == key);
+    let mine = w
+        .component(id, &OWNER)
+        .is_some_and(|k| k[0] != 0 && String::from_utf8_lossy(k) == key);
     if d.tamed == 0 {
         if held.item != BONE.id() || key.len() != 64 {
             return;
@@ -347,7 +396,11 @@ fn interact(e: &mut EntityEvent) {
             }
             hearts(&w, st.pos);
         } else {
-            drop(w.spawn_particles(&POOF, [st.pos[0], st.pos[1] + 0.5, st.pos[2]]).count(4).spread(0.2));
+            drop(
+                w.spawn_particles(&POOF, [st.pos[0], st.pos[1] + 0.5, st.pos[2]])
+                    .count(4)
+                    .spread(0.2),
+            );
         }
         return;
     }

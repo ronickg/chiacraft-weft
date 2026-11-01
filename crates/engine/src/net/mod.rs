@@ -22,13 +22,25 @@ pub fn current_ticket() -> Option<String> {
 }
 
 /// Hosts the world `server` runs, under the world's own key (`identity`, chiacraft).
-pub fn host(server: &crate::server::ServerHandle, identity: std::sync::Arc<crate::world_address::WorldIdentity>, name: &str, settings: &crate::settings::Settings) {
-    server.shared.hosting.store(true, std::sync::atomic::Ordering::Relaxed);
+pub fn host(
+    server: &crate::server::ServerHandle,
+    identity: std::sync::Arc<crate::world_address::WorldIdentity>,
+    name: &str,
+    settings: &crate::settings::Settings,
+) {
+    server
+        .shared
+        .hosting
+        .store(true, std::sync::atomic::Ordering::Relaxed);
     // Link requests for this world go to its owner's inbox, which the owner vouches for.
     let inbox = p2p::account_key(settings)
         .ok()
         .map(|k| k.public().to_string())
-        .and_then(|me| chiacraft_account::current().and_then(|s| s.vouch_line(&me)).map(|v| (me, v)))
+        .and_then(|me| {
+            chiacraft_account::current()
+                .and_then(|s| s.vouch_line(&me))
+                .map(|v| (me, v))
+        })
         .unwrap_or_default();
     let hw = p2p::HostWorld { identity, name: name.to_string(), shared: server.shared.clone(), inbox };
     p2p::host(server.connect.clone(), server.content, hw, settings);
@@ -139,7 +151,6 @@ macro_rules! messages {
     };
 }
 
-
 wire_struct! {
     #[derive(Clone, Debug)]
     pub struct EntityView {
@@ -169,17 +180,16 @@ wire_struct! {
 
 /// An entity's move: id, position, yaw, pitch, crouching, and its frame: the solid body it
 /// stands on (0: the world), which clients draw it relative to.
-pub type Move = (u64, DVec3, f32, f32, bool, u64);
+pub type Move = (u64, DVec3, f32, f32, crate::world::Pose, u64);
 
 messages! {
     #[derive(Clone)]
     pub enum ToClient: ClientTag, to_server = false; {
-        Welcome { player: u64, dim: u32, pos: DVec3, seed: u64 },
+        /// `look` (yaw, pitch), `selected` and `flying` as it left them.
+        Welcome { player: u64, dim: u32, pos: DVec3, seed: u64, look: [f32; 2], selected: u32, flying: bool },
         /// `edit`: sent again because blocks in it changed (shown whole, at once), not loading.
-        Cube { dim: u32, pos: IVec3, cube: Arc<Cube>, edit: bool },
-        /// Cubes of a moving structure (entity `id`), in its own coordinates; `full`: all of them
-        /// (the structure was not known), otherwise the ones that changed.
-        Structure { id: u64, cubes: Vec<(IVec3, Arc<Cube>)>, full: bool },
+        /// `frame`: the body it is a cube of, in that body's coordinates; 0 for the world.
+        Cube { dim: u32, frame: u64, pos: IVec3, cube: Arc<Cube>, edit: bool },
         Unload { dim: u32, pos: IVec3 },
         /// Cubes in view that differ from generation (saved, or changed while loaded): the
         /// client does not generate them and waits for them to be sent.
@@ -187,7 +197,12 @@ messages! {
         /// Area edits of the dimension (`AreaFill::spec`): `all` replaces what the client has,
         /// otherwise they come after it. Clients make them on what they generate.
         Edits { dim: u32, specs: Vec<String>, all: bool },
-        Blocks { dim: u32, changes: Vec<(IVec3, u32)> },
+        /// Of the world, or of body `frame`.
+        Blocks { dim: u32, frame: u64, changes: Vec<(IVec3, u32)> },
+        /// The world's light on body `frame`, by its cubes.
+        BodyLight { frame: u64, lights: Vec<(IVec3, u32)> },
+        /// Power of pieces of wire: (cell, face, level), of the world or of body `frame`.
+        Signals { dim: u32, frame: u64, changes: Vec<(IVec3, u8, u8)> },
         Time { dim: u32, time: u64 },
         /// `frame`: the solid body it was put on and the position relative to that body (clients
         /// draw bodies ahead of the server, so only the relative position is right for them).
@@ -200,8 +215,8 @@ messages! {
         Despawn(Vec<(u64, bool)>),
         /// Items picked up: (item entity, who took it). They fly to the taker before going.
         Taken(Vec<(u64, u64)>),
-        /// A use (right click) did something: the arm swings.
-        Swing,
+        /// A use (right click) did something: the arm swings, and dips if the held item was used.
+        Swing { used_item: bool },
         GameMode(crate::world::GameMode),
         /// Everyone online, sent when someone joins or leaves.
         Players(Vec<String>),
@@ -214,7 +229,23 @@ messages! {
         /// (knockback, a mod's push).
         Push(([f32; 3], bool)),
         /// The player's walking speed and jump multipliers.
-        Movement { speed: f32, jump: f32 },
+        /// The player's attributes that changed, by id.
+        Attributes(Vec<(u32, f32)>),
+        /// Mining that block is not allowed (`question::BREAK_BLOCK`).
+        BreakRefused { frame: u64, pos: IVec3 },
+        /// Holding the use button started on an item that takes this many ticks, or it ended.
+        Using(Option<u32>),
+        Weather { raining: bool, thunder: bool },
+        /// A white flash on an entity.
+        Flash(u64),
+        /// Someone else's arm swings: a hit, a use, mining.
+        EntitySwing(u64),
+        /// Who is mining what, and how far along (0..1), besides this player.
+        Cracks(Vec<(u64, IVec3, f32)>),
+        /// The player's `permission` level, for what its client offers.
+        Permission(u32),
+        /// A sprinting hit landed, which ends the sprint.
+        StopSprint,
         /// `block`: the state it was opened on (0: none), `name`: what it belongs to is called.
         OpenMenu { kind: u32, window: u32, slots: u32, owner: u64, block: u32, name: String },
         MenuSlots(Vec<(u32, ItemStack)>),
@@ -252,10 +283,16 @@ messages! {
         Join { name: String, key: String, account: String },
         /// `frame`: the body it rides and its position relative to that body as the client shows it
         /// (the client shows bodies behind the server; only the relative position agrees).
-        Move { pos: DVec3, yaw: f32, pitch: f32, on_ground: bool, crouched: bool, frame: Option<(u64, DVec3)> },
+        Move { pos: DVec3, yaw: f32, pitch: f32, on_ground: bool, pose: crate::world::Pose, sprint: bool, flying: bool, frame: Option<(u64, DVec3)> },
+        /// Started mining this block (`frame` like `Break`'s).
+        StartBreak { pos: IVec3, frame: u64 },
+        /// Stopped mining without finishing.
+        StopBreak,
+        /// Let go of the use button before the item took effect.
+        StopUsing,
         /// `frame`: the structure (entity) the block is part of, its position in the structure's
-        /// coordinates; 0 for the world.
-        Break { pos: IVec3, frame: u64 },
+        /// coordinates; 0 for the world. `face`: of its selection that was hit.
+        Break { pos: IVec3, face: u8, frame: u64 },
         /// Right click on a block: the block reacts first (chests), otherwise the held item is used or
         /// placed against the clicked face. `frame` like `Break`'s; `look` in world space.
         Use { pos: IVec3, face: u8, look: [f32; 3], sneak: bool, frame: u64 },

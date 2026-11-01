@@ -1,18 +1,21 @@
 //! The base game. It is an ordinary mod: everything here goes through `weft_sdk`, nothing in the
 //! engine knows about stone, water or zombies.
 
+mod advancements;
+mod beds;
 mod blocks;
 mod items;
 mod machines;
 mod mobs;
 mod player;
 mod recipes;
+mod redstone;
 mod sounds;
 mod worldgen;
 
 use weft_sdk::*;
 
-pub use base_api::{FLATLANDS, OVERWORLD, tabs};
+pub use base_api::{CLOUDS, FLATLANDS, MOON, OVERWORLD, STARS, SUN, tabs};
 
 declare_mod!(deps: [], init: init);
 
@@ -27,6 +30,7 @@ fn init(r: &mut Registry) {
         (&tabs::COMBAT, &Item::named("iron_sword")),
         (&tabs::FOOD, &Item::named("apple")),
         (&tabs::INGREDIENTS, &items::IRON_INGOT),
+        (&tabs::REDSTONE, &Item::named("redstone")),
     ] {
         r.creative_tab(tab, icon);
     }
@@ -38,11 +42,15 @@ fn init(r: &mut Registry) {
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);
+    advancements::register(r);
+    beds::register(r);
+    redstone::register(r);
     // Its terrain is described in `worldgen`.
     r.dimension(&OVERWORLD)
         .player_spawn()
         .sky_above(16)
-        .day_length(24000);
+        .day_length(24000)
+        .weather();
     // Second dimension on purpose: nothing in the engine may assume there is only one world.
     r.dimension(&FLATLANDS)
         .generator(worldgen::flat)
@@ -53,4 +61,19 @@ fn init(r: &mut Registry) {
         .fixed_time(6000)
         .gravity(20.0)
         .sky(0xb0c8ff, 0xe0e8ff);
+    for dim in [&OVERWORLD, &FLATLANDS] {
+        r.sky_stars(dim, &STARS).count(1500);
+        r.sky_clouds(dim, &CLOUDS).texture("clouds");
+        r.sky_body(dim, &SUN)
+            .texture("sun")
+            .additive()
+            .size(33.0)
+            .glow(0xFFE633);
+        r.sky_body(dim, &MOON)
+            .texture("moon_phases")
+            .additive()
+            .frames(4, 2)
+            .size(23.0)
+            .phase(0.5);
+    }
 }

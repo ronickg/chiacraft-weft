@@ -49,22 +49,14 @@ impl WalletKeys {
     /// The first `count` addresses of an account.
     pub fn from_mnemonic(mnemonic: &Mnemonic, network: ChainNetwork, count: u32) -> Self {
         let master = crate::keys::master(&mnemonic.seed());
-        let wallet = [
-            crate::keys::CHIA_ROOT[0],
-            crate::keys::CHIA_ROOT[1],
-            crate::keys::WALLET_PURPOSE,
-        ]
-        .iter()
-        .fold(master, |k, i| k.derive_unhardened(*i));
+        let wallet = [crate::keys::CHIA_ROOT[0], crate::keys::CHIA_ROOT[1], crate::keys::WALLET_PURPOSE]
+            .iter()
+            .fold(master, |k, i| k.derive_unhardened(*i));
         let keys = (0..count.max(1))
             .map(|i| {
                 let synthetic = wallet.derive_unhardened(i).derive_synthetic();
                 let public = synthetic.public_key();
-                Key {
-                    puzzle_hash: StandardArgs::curry_tree_hash(public).into(),
-                    public,
-                    secret: Secret::new(synthetic.to_bytes()),
-                }
+                Key { puzzle_hash: StandardArgs::curry_tree_hash(public).into(), public, secret: Secret::new(synthetic.to_bytes()) }
             })
             .collect();
         Self { network, keys }
@@ -74,31 +66,17 @@ impl WalletKeys {
     /// (`m/12381'/8444'/2'/i'`, as Sage also derives: identity row I8), so coins and DIDs that
     /// words imported from Sage hold at either kind of address can be spent. The primary
     /// (unhardened index 0) stays first.
-    pub fn with_hardened(
-        mnemonic: &Mnemonic,
-        network: ChainNetwork,
-        count: u32,
-        hardened: u32,
-    ) -> Self {
+    pub fn with_hardened(mnemonic: &Mnemonic, network: ChainNetwork, count: u32, hardened: u32) -> Self {
         let mut out = Self::from_mnemonic(mnemonic, network, count);
         let master = crate::keys::master(&mnemonic.seed());
         out.keys.extend((0..hardened).map(|i| {
             let synthetic = crate::keys::derive_hardened(
                 &master,
-                &[
-                    crate::keys::CHIA_ROOT[0],
-                    crate::keys::CHIA_ROOT[1],
-                    crate::keys::WALLET_PURPOSE,
-                    i,
-                ],
+                &[crate::keys::CHIA_ROOT[0], crate::keys::CHIA_ROOT[1], crate::keys::WALLET_PURPOSE, i],
             )
             .derive_synthetic();
             let public = synthetic.public_key();
-            Key {
-                puzzle_hash: StandardArgs::curry_tree_hash(public).into(),
-                public,
-                secret: Secret::new(synthetic.to_bytes()),
-            }
+            Key { puzzle_hash: StandardArgs::curry_tree_hash(public).into(), public, secret: Secret::new(synthetic.to_bytes()) }
         }));
         out
     }
@@ -130,12 +108,8 @@ impl WalletKeys {
     /// build). Nothing about the keys or the messages is logged.
     pub fn sign(&self, coin_spends: &[CoinSpend]) -> Result<Signature> {
         let mut allocator = Allocator::new();
-        let required = RequiredSignature::from_coin_spends(
-            &mut allocator,
-            coin_spends,
-            &AggSigConstants::new(self.network.agg_sig_me()),
-        )
-        .map_err(failed("signatures needed"))?;
+        let required = RequiredSignature::from_coin_spends(&mut allocator, coin_spends, &AggSigConstants::new(self.network.agg_sig_me()))
+            .map_err(failed("signatures needed"))?;
         let mut signature = Signature::default();
         for r in required {
             let RequiredSignature::Bls(r) = r else {
@@ -146,8 +120,7 @@ impl WalletKeys {
                 .iter()
                 .find(|k| k.public == r.public_key)
                 .ok_or_else(|| Error::new("a spend asks for a key this wallet doesn't have"))?;
-            let secret = SecretKey::from_bytes(key.secret.expose())
-                .map_err(|_| Error::new("wallet key damaged in memory"))?;
+            let secret = SecretKey::from_bytes(key.secret.expose()).map_err(|_| Error::new("wallet key damaged in memory"))?;
             signature += &chia_bls::sign(&secret, r.message());
         }
         Ok(signature)
@@ -178,16 +151,10 @@ mod tests {
         let keys = WalletKeys::from_mnemonic(&m, ChainNetwork::Testnet11, 3);
         let facts = crate::keys::facts_of(&m);
         for (i, ph) in keys.puzzle_hashes().iter().enumerate() {
-            assert_eq!(
-                ph.to_bytes(),
-                crate::keys::wallet_puzzle_hash(&facts.master, i as u32).unwrap()
-            );
+            assert_eq!(ph.to_bytes(), crate::keys::wallet_puzzle_hash(&facts.master, i as u32).unwrap());
         }
         let shown = format!("{keys:?}");
-        assert!(
-            shown.contains("txch1") && shown.contains("[redacted]"),
-            "{shown}"
-        );
+        assert!(shown.contains("txch1") && shown.contains("[redacted]"), "{shown}");
         for k in &keys.keys {
             assert!(!shown.contains(&crate::keys::hex(k.secret.expose())));
         }
@@ -195,9 +162,7 @@ mod tests {
         // A wallet key and its synthetic key name the same address.
         let wallet_key = [12381, 8444, 2, 0]
             .iter()
-            .fold(crate::keys::master(&m.seed()), |k, i| {
-                k.derive_unhardened(*i)
-            })
+            .fold(crate::keys::master(&m.seed()), |k, i| k.derive_unhardened(*i))
             .public_key();
         assert_eq!(standard_puzzle_hash(&wallet_key), keys.primary());
         assert_eq!(p2_of_synthetic(&keys.keys[0].public), keys.primary());

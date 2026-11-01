@@ -5,9 +5,7 @@
 //! built: section 1.5's fallback for networks that block port 8444).
 use super::{ChainNetwork, failed};
 use crate::{Error, Result};
-use chia_protocol::{
-    Bytes32, CoinState, CoinStateFilters, Program, RejectStateReason, SpendBundle,
-};
+use chia_protocol::{Bytes32, CoinState, CoinStateFilters, Program, RejectStateReason, SpendBundle};
 use chia_sdk_client::Peer;
 use std::future::Future;
 
@@ -58,17 +56,9 @@ pub trait ChainSource: Send + Sync {
         subscribe: bool,
     ) -> impl Future<Output = Result<std::result::Result<PuzzleStatePage, Refused>>> + Send;
     /// Current states of `coin_ids` (unknown coins are left out); `subscribe` asks for updates.
-    fn coin_state(
-        &self,
-        coin_ids: Vec<Bytes32>,
-        subscribe: bool,
-    ) -> impl Future<Output = Result<Vec<CoinState>>> + Send;
+    fn coin_state(&self, coin_ids: Vec<Bytes32>, subscribe: bool) -> impl Future<Output = Result<Vec<CoinState>>> + Send;
     /// The puzzle reveal and solution a coin was spent with at `height`.
-    fn puzzle_and_solution(
-        &self,
-        coin_id: Bytes32,
-        height: u32,
-    ) -> impl Future<Output = Result<(Program, Program)>> + Send;
+    fn puzzle_and_solution(&self, coin_id: Bytes32, height: u32) -> impl Future<Output = Result<(Program, Program)>> + Send;
     /// The coins a coin's spend created.
     fn children(&self, coin_id: Bytes32) -> impl Future<Output = Result<Vec<CoinState>>> + Send;
     /// Send a spend bundle to the mempool.
@@ -108,22 +98,13 @@ impl ChainSource for PeerSource {
         };
         let reply = self
             .peer
-            .request_puzzle_state(
-                puzzle_hashes,
-                height,
-                header,
-                CoinStateFilters::new(true, true, true, 0),
-                subscribe,
-            )
+            .request_puzzle_state(puzzle_hashes, height, header, CoinStateFilters::new(true, true, true, 0), subscribe)
             .await
             .map_err(failed("puzzle state"))?;
         Ok(match reply {
-            Ok(r) => Ok(PuzzleStatePage {
-                coin_states: r.coin_states,
-                height: r.height,
-                header_hash: r.header_hash,
-                finished: r.is_finished,
-            }),
+            Ok(r) => {
+                Ok(PuzzleStatePage { coin_states: r.coin_states, height: r.height, header_hash: r.header_hash, finished: r.is_finished })
+            }
             Err(rejected) => Err(refused(rejected.reason)),
         })
     }
@@ -136,18 +117,11 @@ impl ChainSource for PeerSource {
             .map_err(failed("coin state"))?;
         match reply {
             Ok(r) => Ok(r.coin_states),
-            Err(rejected) => Err(Error::new(format!(
-                "coin state refused: {:?}",
-                refused(rejected.reason)
-            ))),
+            Err(rejected) => Err(Error::new(format!("coin state refused: {:?}", refused(rejected.reason)))),
         }
     }
 
-    async fn puzzle_and_solution(
-        &self,
-        coin_id: Bytes32,
-        height: u32,
-    ) -> Result<(Program, Program)> {
+    async fn puzzle_and_solution(&self, coin_id: Bytes32, height: u32) -> Result<(Program, Program)> {
         let reply = self
             .peer
             .request_puzzle_and_solution(coin_id, height)
@@ -155,10 +129,7 @@ impl ChainSource for PeerSource {
             .map_err(failed("puzzle and solution"))?;
         match reply {
             Ok(r) => Ok((r.puzzle, r.solution)),
-            Err(_) => Err(Error::new(format!(
-                "the peer has no spend of coin {} at height {height}",
-                super::hex32(coin_id)
-            ))),
+            Err(_) => Err(Error::new(format!("the peer has no spend of coin {} at height {height}", super::hex32(coin_id)))),
         }
     }
 
@@ -180,10 +151,7 @@ impl ChainSource for PeerSource {
         Ok(match (ack.status, ack.error) {
             (1, _) => PushOutcome::Accepted { txid: ack.txid },
             (2, _) => PushOutcome::Pending { txid: ack.txid },
-            (_, error) => PushOutcome::Rejected {
-                txid: ack.txid,
-                error: error.unwrap_or_else(|| "rejected".into()),
-            },
+            (_, error) => PushOutcome::Rejected { txid: ack.txid, error: error.unwrap_or_else(|| "rejected".into()) },
         })
     }
 }

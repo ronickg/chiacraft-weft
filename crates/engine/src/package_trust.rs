@@ -41,8 +41,10 @@ pub fn verify(envelope: &str, package_hex: &str) -> Result<Creator, String> {
     }
     let key = iroh::PublicKey::from_bytes(&unhex::<32>(&e.creator).ok_or("a bad creator key")?).map_err(|_| "a bad creator key")?;
     let sig = iroh::Signature::from_bytes(&unhex::<64>(&e.signature).ok_or("a bad signature")?);
-    key.verify(signed_text(package_hex).as_bytes(), &sig).map_err(|_| "the signature doesn't check out")?;
-    let identity = chiacraft_account::check_content_vouch(&e.vouch, &e.creator).ok_or("the creator's account doesn't vouch for the key that signed")?;
+    key.verify(signed_text(package_hex).as_bytes(), &sig)
+        .map_err(|_| "the signature doesn't check out")?;
+    let identity = chiacraft_account::check_content_vouch(&e.vouch, &e.creator)
+        .ok_or("the creator's account doesn't vouch for the key that signed")?;
     Ok(Creator { key: e.creator, identity })
 }
 
@@ -87,7 +89,9 @@ impl Trust {
         for line in std::fs::read_to_string(&t.path).unwrap_or_default().lines() {
             let mut parts = line.split_whitespace();
             match (parts.next(), parts.next(), parts.next()) {
-                (Some("creator"), Some(key), Some(identity)) => t.creators.push(Creator { key: key.into(), identity: identity.into() }),
+                (Some("creator"), Some(key), Some(identity)) => t
+                    .creators
+                    .push(Creator { key: key.into(), identity: identity.into() }),
                 (Some("package"), Some(hash), None) => t.packages.push(hash.into()),
                 _ => {}
             }

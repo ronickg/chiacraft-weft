@@ -12,8 +12,7 @@ use chia_sdk_test::{PeerSimulator, to_program, to_puzzle};
 use chiacraft_wallet::{
     Error, Mnemonic,
     chain::{
-        ChainConfig, ChainNetwork, ChainReader, OfferGive, OfferState, Phase, PushOutcome,
-        WalletKeys,
+        ChainConfig, ChainNetwork, ChainReader, OfferGive, OfferState, Phase, PushOutcome, WalletKeys,
         did::{self, DidRecord},
         offer::{self, MakeOffer},
         reader::{BoxFuture, Connection, Dialer},
@@ -92,10 +91,7 @@ impl World {
             match ack.status {
                 1 => PushOutcome::Accepted { txid: ack.txid },
                 2 => PushOutcome::Pending { txid: ack.txid },
-                _ => PushOutcome::Rejected {
-                    txid: ack.txid,
-                    error: ack.error.unwrap_or_default(),
-                },
+                _ => PushOutcome::Rejected { txid: ack.txid, error: ack.error.unwrap_or_default() },
             }
         })
     }
@@ -123,11 +119,7 @@ impl Drop for World {
 }
 
 fn throwaway(count: u32) -> WalletKeys {
-    WalletKeys::from_mnemonic(
-        &Mnemonic::generate().unwrap(),
-        ChainNetwork::Testnet11,
-        count,
-    )
+    WalletKeys::from_mnemonic(&Mnemonic::generate().unwrap(), ChainNetwork::Testnet11, count)
 }
 
 /// Build, sign (with our own signer) and return a bundle from actions over `coins` of `keys`.
@@ -141,12 +133,7 @@ fn spend(
     add(&mut spends);
     let deltas = spends.apply(ctx, actions).unwrap();
     let outputs = spends
-        .finish_with_keys(
-            ctx,
-            &deltas,
-            Relation::AssertConcurrent,
-            &keys.synthetic_keys(),
-        )
+        .finish_with_keys(ctx, &deltas, Relation::AssertConcurrent, &keys.synthetic_keys())
         .unwrap();
     let coin_spends = ctx.take();
     let signature = keys.sign(&coin_spends).unwrap();
@@ -185,26 +172,13 @@ fn sync_watch_cache_and_offline_answers() {
     assert_eq!(watched.spent(), None);
     assert!(watched.state.is_some());
     // Spending it pays 5 mojos to our second address: the subscription brings both.
-    let pay = to_program(
-        chia_sdk_types::Conditions::<clvmr::NodePtr>::new().create_coin(phs[1], 5, Memos::None),
-    )
-    .unwrap();
-    let outcome = w.push(SpendBundle::new(
-        vec![CoinSpend::new(other, reveal, pay)],
-        chia_bls::Signature::default(),
-    ));
-    assert!(
-        matches!(outcome, PushOutcome::Accepted { .. }),
-        "{outcome:?}"
-    );
+    let pay = to_program(chia_sdk_types::Conditions::<clvmr::NodePtr>::new().create_coin(phs[1], 5, Memos::None)).unwrap();
+    let outcome = w.push(SpendBundle::new(vec![CoinSpend::new(other, reveal, pay)], chia_bls::Signature::default()));
+    assert!(matches!(outcome, PushOutcome::Accepted { .. }), "{outcome:?}");
     let spent_at = reader
         .wait_spent(other.coin_id(), WAIT)
         .expect("seen spent");
-    assert!(
-        until(|| reader.status().balance == 1_505),
-        "{:?}",
-        reader.status()
-    );
+    assert!(until(|| reader.status().balance == 1_505), "{:?}", reader.status());
     assert!(
         reader
             .watched(other.coin_id())
@@ -219,11 +193,7 @@ fn sync_watch_cache_and_offline_answers() {
     let live = reader.resolve_did(launcher, WAIT).unwrap();
     assert!(live.live);
     assert!(live.record.owned_by(phs[0]));
-    assert!(
-        until(|| reader.status().balance == 1_504),
-        "{:?}",
-        reader.status()
-    );
+    assert!(until(|| reader.status().balance == 1_504), "{:?}", reader.status());
     reader.stop();
 
     let mut config = ChainConfig::new(ChainNetwork::Testnet11);
@@ -232,11 +202,7 @@ fn sync_watch_cache_and_offline_answers() {
     let offline = ChainReader::start_with(config, DeadDialer).unwrap();
     assert!(until(|| offline.status().phase == Phase::Offline));
     let status = offline.status();
-    assert_eq!(
-        status.balance,
-        1_505 - 1,
-        "the cached coins (one mojo became the DID)"
-    );
+    assert_eq!(status.balance, 1_505 - 1, "the cached coins (one mojo became the DID)");
     assert!(status.synced_height.is_some());
     let cached = offline
         .resolve_did(launcher, Duration::from_secs(1))
@@ -265,12 +231,7 @@ fn make_did(w: &World, keys: &WalletKeys) -> Bytes32 {
             .max_by_key(|c| c.amount)
             .unwrap();
     let mut ctx = SpendContext::new();
-    let (outputs, bundle) = spend(
-        &mut ctx,
-        keys,
-        |s| s.add(coin),
-        &[Action::create_empty_did()],
-    );
+    let (outputs, bundle) = spend(&mut ctx, keys, |s| s.add(coin), &[Action::create_empty_did()]);
     assert!(matches!(w.push(bundle), PushOutcome::Accepted { .. }));
     outputs.dids[&Id::New(0)].info.launcher_id
 }
@@ -282,12 +243,7 @@ fn dids_resolve_with_their_owner_and_history() {
     let bob = throwaway(1);
     let coin = w.fund(alice.primary(), 10);
     let mut ctx = SpendContext::new();
-    let (outputs, bundle) = spend(
-        &mut ctx,
-        &alice,
-        |s| s.add(coin),
-        &[Action::create_empty_did()],
-    );
+    let (outputs, bundle) = spend(&mut ctx, &alice, |s| s.add(coin), &[Action::create_empty_did()]);
     assert!(matches!(w.push(bundle), PushOutcome::Accepted { .. }));
     let did = outputs.dids[&Id::New(0)];
     let launcher = did.info.launcher_id;
@@ -304,12 +260,7 @@ fn dids_resolve_with_their_owner_and_history() {
 
     // Alice transfers it to Bob: the record follows, from the cached one.
     let hint = ctx.hint(bob.primary()).unwrap();
-    let (_, bundle) = spend(
-        &mut ctx,
-        &alice,
-        |s| s.add(did),
-        &[Action::send(Id::Existing(launcher), bob.primary(), 1, hint)],
-    );
+    let (_, bundle) = spend(&mut ctx, &alice, |s| s.add(did), &[Action::send(Id::Existing(launcher), bob.primary(), 1, hint)]);
     assert!(matches!(w.push(bundle), PushOutcome::Accepted { .. }));
     let after =
         w.rt.block_on(did::resolve(&source, launcher, Some(rec.clone()), 5))
@@ -325,10 +276,7 @@ fn dids_resolve_with_their_owner_and_history() {
             .unwrap();
     assert_eq!(fresh.owners(), after.owners());
     // The owner is the standard puzzle of a synthetic key (Sage's p2), here Bob's wallet key.
-    assert_ne!(
-        standard_puzzle_hash(&chia_bls::PublicKey::default()),
-        bob.primary()
-    );
+    assert_ne!(standard_puzzle_hash(&chia_bls::PublicKey::default()), bob.primary());
 
     // Not DIDs.
     let plain = w.fund(alice.primary(), 3);
@@ -356,16 +304,7 @@ fn offers_made_by_the_server_and_taken_by_a_player() {
     // Section 3.6, variant A: the server gives 1 mojo for 300, valid for an hour.
     let expires = offer::now_seconds() + 3_600;
     let made = server_reader
-        .make_offer(
-            MakeOffer {
-                give: OfferGive::Xch(1),
-                price: 300,
-                expires_at: Some(expires),
-                fee: 0,
-            },
-            &server,
-            WAIT,
-        )
+        .make_offer(MakeOffer { give: OfferGive::Xch(1), price: 300, expires_at: Some(expires), fee: 0 }, &server, WAIT)
         .unwrap();
     assert!(made.text.starts_with("offer1"));
     assert_eq!(server_reader.offer_state(&made), OfferState::Open);
@@ -378,16 +317,7 @@ fn offers_made_by_the_server_and_taken_by_a_player() {
     // Its coin is locked: a second offer finds no spendable XCH.
     assert!(
         server_reader
-            .make_offer(
-                MakeOffer {
-                    give: OfferGive::Xch(1),
-                    price: 5,
-                    expires_at: None,
-                    fee: 0
-                },
-                &server,
-                WAIT
-            )
+            .make_offer(MakeOffer { give: OfferGive::Xch(1), price: 5, expires_at: None, fee: 0 }, &server, WAIT)
             .is_err()
     );
     // A wallet the reader doesn't follow can't take it.
@@ -400,18 +330,11 @@ fn offers_made_by_the_server_and_taken_by_a_player() {
     let taken = player_reader
         .take_offer(&made.text, &player, 0, WAIT)
         .unwrap();
-    assert!(
-        matches!(taken.push, PushOutcome::Accepted { .. }),
-        "{:?}",
-        taken.push
-    );
+    assert!(matches!(taken.push, PushOutcome::Accepted { .. }), "{:?}", taken.push);
     let offered = chiacraft_wallet::chain::parse_hex32(&made.offered_coins[0]).unwrap();
     assert!(server_reader.wait_spent(offered, WAIT).is_some());
     assert!(
-        until(|| matches!(
-            server_reader.offer_state(&made),
-            OfferState::Taken { paid: true, .. }
-        )),
+        until(|| matches!(server_reader.offer_state(&made), OfferState::Taken { paid: true, .. })),
         "{:?}",
         server_reader.offer_state(&made)
     );
@@ -424,16 +347,7 @@ fn offers_made_by_the_server_and_taken_by_a_player() {
 
     // An expired offer is refused by the check, and by the chain if pushed anyway.
     let stale = server_reader
-        .make_offer(
-            MakeOffer {
-                give: OfferGive::Xch(1),
-                price: 10,
-                expires_at: Some(100),
-                fee: 0,
-            },
-            &server,
-            WAIT,
-        )
+        .make_offer(MakeOffer { give: OfferGive::Xch(1), price: 10, expires_at: Some(100), fee: 0 }, &server, WAIT)
         .unwrap();
     let refused = player_reader.take_offer(&stale.text, &player, 0, WAIT);
     assert!(refused.unwrap_err().to_string().contains("expired"));
@@ -456,18 +370,8 @@ fn an_nft_offer_with_a_royalty() {
     w.fund(player.primary(), 2_000);
     // The server mints a membership NFT with a 3% royalty to the artist.
     let mut ctx = SpendContext::new();
-    let (outputs, bundle) = spend(
-        &mut ctx,
-        &server,
-        |s| s.add(coin),
-        &[Action::mint_nft(
-            HashedPtr::NIL,
-            Bytes32::default(),
-            artist.primary(),
-            300,
-            1,
-        )],
-    );
+    let (outputs, bundle) =
+        spend(&mut ctx, &server, |s| s.add(coin), &[Action::mint_nft(HashedPtr::NIL, Bytes32::default(), artist.primary(), 300, 1)]);
     assert!(matches!(w.push(bundle), PushOutcome::Accepted { .. }));
     let launcher = outputs.nfts[&Id::New(0)].info.launcher_id;
     let server_reader = w.reader(&server, "server.json");
@@ -475,61 +379,28 @@ fn an_nft_offer_with_a_royalty() {
     assert_eq!(server_reader.cache().wallet.unspent_hinted().len(), 1);
 
     let made = server_reader
-        .make_offer(
-            MakeOffer {
-                give: OfferGive::Nft(launcher),
-                price: 1_000,
-                expires_at: None,
-                fee: 0,
-            },
-            &server,
-            WAIT,
-        )
+        .make_offer(MakeOffer { give: OfferGive::Nft(launcher), price: 1_000, expires_at: None, fee: 0 }, &server, WAIT)
         .unwrap();
     let summary = offer::summarize(&made.text).unwrap();
-    assert_eq!(
-        summary.offered_nfts,
-        vec![chiacraft_wallet::chain::hex32(launcher)]
-    );
+    assert_eq!(summary.offered_nfts, vec![chiacraft_wallet::chain::hex32(launcher)]);
     assert_eq!(summary.requested_xch, 1_000);
     assert_eq!(summary.royalties_xch, 30);
     // Giving an NFT the wallet doesn't hold fails.
     assert!(
         server_reader
-            .make_offer(
-                MakeOffer {
-                    give: OfferGive::Nft(Bytes32::new([4; 32])),
-                    price: 1,
-                    expires_at: None,
-                    fee: 0
-                },
-                &server,
-                WAIT
-            )
+            .make_offer(MakeOffer { give: OfferGive::Nft(Bytes32::new([4; 32])), price: 1, expires_at: None, fee: 0 }, &server, WAIT)
             .is_err()
     );
 
     let taken = player_reader
         .take_offer(&made.text, &player, 0, WAIT)
         .unwrap();
-    assert!(
-        matches!(taken.push, PushOutcome::Accepted { .. }),
-        "{:?}",
-        taken.push
-    );
-    assert!(until(|| matches!(
-        server_reader.offer_state(&made),
-        OfferState::Taken { paid: true, .. }
-    )));
+    assert!(matches!(taken.push, PushOutcome::Accepted { .. }), "{:?}", taken.push);
+    assert!(until(|| matches!(server_reader.offer_state(&made), OfferState::Taken { paid: true, .. })));
     assert_eq!(w.balance(artist.primary()), 30);
     assert_eq!(w.balance(server.primary()), 10 - 1 + 1_000);
     // The NFT now sits with the player (a hinted coin of the player's wallet).
-    assert!(until(|| player_reader
-        .cache()
-        .wallet
-        .unspent_hinted()
-        .len()
-        == 1));
+    assert!(until(|| player_reader.cache().wallet.unspent_hinted().len() == 1));
 }
 
 #[test]

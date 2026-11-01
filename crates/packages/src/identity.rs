@@ -48,7 +48,9 @@ pub fn check_file(path: &str, size: u64) -> Result<(), String> {
         64 << 10
     } else {
         let ext = path.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
-        let kind = ALLOWED.iter().find(|(dir, exts, _)| path.starts_with(dir) && exts.contains(&ext));
+        let kind = ALLOWED
+            .iter()
+            .find(|(dir, exts, _)| path.starts_with(dir) && exts.contains(&ext));
         let Some((_, _, max)) = kind else {
             return Err(format!("{path}: not a file a package may hold (see docs/packages.md, \"What a package may hold\")"));
         };
@@ -123,7 +125,12 @@ pub struct FileManifest {
 pub fn valid_file_path(path: &str) -> bool {
     !path.is_empty()
         && path.len() <= 255
-        && path.split('/').all(|s| !s.is_empty() && !s.starts_with('.') && s.chars().all(|c| c.is_ascii_alphanumeric() || "_-.".contains(c)))
+        && path.split('/').all(|s| {
+            !s.is_empty()
+                && !s.starts_with('.')
+                && s.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || "_-.".contains(c))
+        })
 }
 
 impl FileManifest {
@@ -139,7 +146,12 @@ impl FileManifest {
             if files.len() >= MAX_FILES {
                 return Err(format!("more than {MAX_FILES} files"));
             }
-            check_file(&rel, std::fs::metadata(&full).map_err(|e| format!("{rel}: {e}"))?.len())?;
+            check_file(
+                &rel,
+                std::fs::metadata(&full)
+                    .map_err(|e| format!("{rel}: {e}"))?
+                    .len(),
+            )?;
             let bytes = std::fs::read(&full).map_err(|e| format!("{rel}: {e}"))?;
             let size = bytes.len() as u64;
             check_file(&rel, size)?;
@@ -174,11 +186,22 @@ impl FileManifest {
         if lines.next() != Some(HEADER) {
             return Err("not a package manifest".into());
         }
-        let id = lines.next().and_then(|l| l.strip_prefix("id ")).ok_or("no id line")?.to_string();
-        let version = lines.next().and_then(|l| l.strip_prefix("version ")).ok_or("no version line")?.to_string();
+        let id = lines
+            .next()
+            .and_then(|l| l.strip_prefix("id "))
+            .ok_or("no id line")?
+            .to_string();
+        let version = lines
+            .next()
+            .and_then(|l| l.strip_prefix("version "))
+            .ok_or("no version line")?
+            .to_string();
         let mut files = Vec::new();
         for l in lines {
-            let mut parts = l.strip_prefix("file ").ok_or_else(|| format!("bad line `{l}`"))?.split(' ');
+            let mut parts = l
+                .strip_prefix("file ")
+                .ok_or_else(|| format!("bad line `{l}`"))?
+                .split(' ');
             let (Some(path), Some(size), Some(hash), None) = (parts.next(), parts.next(), parts.next(), parts.next()) else {
                 return Err(format!("bad line `{l}`"));
             };
@@ -208,7 +231,11 @@ fn walk(root: &Path, dir: &Path, out: &mut Vec<(String, PathBuf)>) -> Result<(),
             continue;
         }
         let p = e.path();
-        let rel = p.strip_prefix(root).unwrap_or(&p).to_string_lossy().replace('\\', "/");
+        let rel = p
+            .strip_prefix(root)
+            .unwrap_or(&p)
+            .to_string_lossy()
+            .replace('\\', "/");
         // Links could lead out of the package.
         let t = e.file_type().map_err(|e| format!("{rel}: {e}"))?;
         if t.is_dir() {
@@ -259,7 +286,12 @@ mod tests {
         let text = FileManifest::of_dir(&a).unwrap().text();
         assert!(FileManifest::parse(&text.replace("defs/items/ruby.toml", "../ruby.toml")).is_err());
         assert!(FileManifest::parse(&format!("{text}\n")).is_err());
-        assert!(!valid_file_path("a/../b") && !valid_file_path("/etc/passwd") && !valid_file_path("a/.hidden") && valid_file_path("assets/lang/en_us.lang"));
+        assert!(
+            !valid_file_path("a/../b")
+                && !valid_file_path("/etc/passwd")
+                && !valid_file_path("a/.hidden")
+                && valid_file_path("assets/lang/en_us.lang")
+        );
         let _ = std::fs::remove_dir_all(&a);
     }
 

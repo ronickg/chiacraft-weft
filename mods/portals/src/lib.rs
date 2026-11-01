@@ -59,7 +59,10 @@ pub unsafe extern "C" fn chiacraft_bridge(q: Query) {
 }
 
 fn ask(q: &str, arg: &str) -> String {
-    BRIDGE.get().map(|f| unsafe { f(Str::new(q), Str::new(arg)).as_str().to_string() }).unwrap_or_default()
+    BRIDGE
+        .get()
+        .map(|f| unsafe { f(Str::new(q), Str::new(arg)).as_str().to_string() })
+        .unwrap_or_default()
 }
 
 fn is_owner(player: u64) -> bool {
@@ -76,22 +79,31 @@ fn link(id: &str) -> Option<(String, String)> {
 // ------------------------------------------------------------------ registration
 
 fn init(r: &mut Registry) {
-    r.block(&PORTAL).hardness(1.5).not_solid().translucent().light(11).tab(&BUILDING).on_use(|u| {
-        let (w, player, pos) = (u.world(), u.player(), u.pos());
-        let owner = is_owner(player);
-        let mut msg = format!("{}\n{} {} {}\n", if owner { "owner" } else { "guest" }, pos[0], pos[1], pos[2]);
-        if owner {
-            for l in ask("links", "").lines() {
-                let mut f = l.split('\t');
-                if let (Some(id), Some(name)) = (f.next(), f.next()) {
-                    msg.push_str(&format!("{id}\t{name}\n"));
+    r.block(&PORTAL)
+        .hardness(1.5)
+        .not_solid()
+        .translucent()
+        .light(11)
+        .tab(&BUILDING)
+        .on_use(|u| {
+            let (w, player, pos) = (u.world(), u.player(), u.pos());
+            let owner = is_owner(player);
+            let mut msg = format!("{}\n{} {} {}\n", if owner { "owner" } else { "guest" }, pos[0], pos[1], pos[2]);
+            if owner {
+                for l in ask("links", "").lines() {
+                    let mut f = l.split('\t');
+                    if let (Some(id), Some(name)) = (f.next(), f.next()) {
+                        msg.push_str(&format!("{id}\t{name}\n"));
+                    }
                 }
             }
-        }
-        w.send(player, &OPEN, &msg);
-        true
-    });
-    drop(r.entity(&PORTAL_ENTITY).flags(abi::entity_flags::NO_GRAVITY | abi::entity_flags::INVULNERABLE));
+            w.send(player, &OPEN, &msg);
+            true
+        });
+    drop(
+        r.entity(&PORTAL_ENTITY)
+            .flags(abi::entity_flags::NO_GRAVITY | abi::entity_flags::INVULNERABLE),
+    );
     r.entity_component(&LINK, [0u8; 64], abi::component_flags::SAVE);
     r.attach(&PORTAL_ENTITY, &LINK);
     r.block_entity(&PORTAL, &PORTAL_ENTITY, 0);
@@ -214,12 +226,17 @@ fn walk_in(w: &World) {
     for player in w.each_player() {
         let Some(st) = w.entity(player) else { continue };
         let feet = [st.pos[0].floor() as i32, st.pos[1].floor() as i32, st.pos[2].floor() as i32];
-        let at = [feet, [feet[0], feet[1] + 1, feet[2]]].into_iter().find(|p| PORTAL.is(w.get(*p)));
+        let at = [feet, [feet[0], feet[1] + 1, feet[2]]]
+            .into_iter()
+            .find(|p| PORTAL.is(w.get(*p)));
         let mut steps = STEPS.lock().unwrap();
         let steps = steps.get_or_insert_with(Steps::default);
         let Some(at) = at else {
             steps.inside.remove(&player);
-            steps.outside_since.entry(player).or_insert_with(std::time::Instant::now);
+            steps
+                .outside_since
+                .entry(player)
+                .or_insert_with(std::time::Instant::now);
             continue;
         };
         let out_for = steps.outside_since.remove(&player).map(|t| t.elapsed());
@@ -255,7 +272,10 @@ fn near_portals(w: &World) {
     for player in w.each_player() {
         let Some(st) = w.entity(player) else { continue };
         let mut nearby = NEARBY.lock().unwrap();
-        let entry = nearby.get_or_insert_with(Default::default).entry(player).or_insert_with(|| (std::time::Instant::now(), Vec::new()));
+        let entry = nearby
+            .get_or_insert_with(Default::default)
+            .entry(player)
+            .or_insert_with(|| (std::time::Instant::now(), Vec::new()));
         if entry.0.elapsed().as_millis() < 500 {
             continue;
         }
@@ -306,7 +326,10 @@ fn client(r: &mut Registry) {
         let mut lines = text.lines();
         let owner = lines.next() == Some("owner");
         let pos = lines.next().unwrap_or("").to_string();
-        let links = lines.filter_map(|l| l.split_once('\t')).map(|(id, name)| (id.to_string(), name.to_string())).collect();
+        let links = lines
+            .filter_map(|l| l.split_once('\t'))
+            .map(|(id, name)| (id.to_string(), name.to_string()))
+            .collect();
         *MENU.lock().unwrap() = Some(Menu { owner, pos, links });
         c.open_screen(&SCREEN);
     });
@@ -329,7 +352,12 @@ fn client(r: &mut Registry) {
         let mut address = format!("chiacraft://w/{key}");
         if !ticket.is_empty() {
             address.push_str("?t=");
-            address.push_str(&ticket.replace('%', "%25").replace(' ', "%20").replace('&', "%26"));
+            address.push_str(
+                &ticket
+                    .replace('%', "%25")
+                    .replace(' ', "%20")
+                    .replace('&', "%26"),
+            );
         }
         *GO.lock().unwrap() = Some(address);
     });

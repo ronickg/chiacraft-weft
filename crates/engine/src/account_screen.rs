@@ -63,21 +63,19 @@ impl Screen for Account {
             });
 
             if show_words {
-                ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(360.0), |ui| {
-                    match s.words() {
-                        Ok(words) => {
-                            label(ui, cx, "account.words_warning", &[], "dim");
-                            for (r, row) in words.expose().chunks(4).enumerate() {
-                                ui.container(Style::row().gap(8.0), |ui| {
-                                    for (i, w) in row.iter().enumerate() {
-                                        label(ui, cx, "account.word", &[Arg::Int((r * 4 + i + 1) as i64), Arg::Text(w.clone())], "default");
-                                    }
-                                });
-                            }
+                ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(360.0), |ui| match s.words() {
+                    Ok(words) => {
+                        label(ui, cx, "account.words_warning", &[], "dim");
+                        for (r, row) in words.expose().chunks(4).enumerate() {
+                            ui.container(Style::row().gap(8.0), |ui| {
+                                for (i, w) in row.iter().enumerate() {
+                                    label(ui, cx, "account.word", &[Arg::Int((r * 4 + i + 1) as i64), Arg::Text(w.clone())], "default");
+                                }
+                            });
                         }
-                        Err(e) => {
-                            label(ui, cx, "account.error", &[Arg::Text(e)], "default");
-                        }
+                    }
+                    Err(e) => {
+                        label(ui, cx, "account.error", &[Arg::Text(e)], "default");
                     }
                 });
                 ui.container(Style::row().gap(6.0), |ui| {

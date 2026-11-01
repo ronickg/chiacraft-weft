@@ -72,19 +72,11 @@ fn run_args(sim: Option<&Sim>, wallet: Option<&Wallet>, args: Vec<String>, answe
     let mut out = Vec::new();
     let make = sim.map(|s| {
         let inner = s.sim.clone();
-        move || -> Box<dyn Dialer> {
-            Box::new(chiacraft_wallet::chain::sim::SimDialer(inner.clone()))
-        }
+        move || -> Box<dyn Dialer> { Box::new(chiacraft_wallet::chain::sim::SimDialer(inner.clone())) }
     });
     let make_ref: Option<&dyn Fn() -> Box<dyn Dialer>> = make.as_ref().map(|m| m as _);
-    let mut io = Io {
-        var: &var,
-        ask: &mut ask,
-        out: &mut out,
-        dialer: make_ref,
-        wait: Duration::from_secs(20),
-        step: Duration::from_millis(100),
-    };
+    let mut io =
+        Io { var: &var, ask: &mut ask, out: &mut out, dialer: make_ref, wait: Duration::from_secs(20), step: Duration::from_millis(100) };
     let result = tool::run(&args, &mut io).map_err(|e| e.to_string());
     let out = String::from_utf8(out).unwrap();
     if let Some(w) = wallet {
@@ -101,10 +93,7 @@ fn no_words(text: &str, words: &str) {
     assert!(!text.contains(words), "the words leaked");
     let w: Vec<&str> = words.split(' ').collect();
     for three in w.windows(3) {
-        assert!(
-            !text.contains(&three.join(" ")),
-            "three words in a row leaked"
-        );
+        assert!(!text.contains(&three.join(" ")), "three words in a row leaked");
     }
 }
 
@@ -141,11 +130,7 @@ fn mainnet_needs_the_confirmation_and_words_stay_out_of_sight() {
     assert!(!r.out.contains("txch1"), "{}", r.out);
     // testnet11 by default.
     let r = run(None, Some(&w), "addresses", true);
-    assert!(
-        r.out.contains("testnet11 · test coins") && r.out.contains("txch1"),
-        "{}",
-        r.out
-    );
+    assert!(r.out.contains("testnet11 · test coins") && r.out.contains("txch1"), "{}", r.out);
     // No words anywhere: refused, naming where to put them.
     let r = run(None, None, "addresses", true);
     let e = r.result.unwrap_err();
@@ -162,11 +147,7 @@ fn mainnet_needs_the_confirmation_and_words_stay_out_of_sight() {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
     }
-    let args = vec![
-        "--words-file".into(),
-        file.display().to_string(),
-        "addresses".into(),
-    ];
+    let args = vec!["--words-file".into(), file.display().to_string(), "addresses".into()];
     let r = run_args(None, None, args, true);
     r.result.unwrap();
     no_words(&r.out, &w.words);
@@ -180,12 +161,7 @@ fn create_did_says_what_it_spends_asks_and_keeps_to_the_caps() {
     let w = Wallet::new();
     sim.pay(w.keys.primary(), 1_000_000).unwrap();
     // Above the cap: refused before anything is asked.
-    let r = run(
-        Some(&sim),
-        Some(&w),
-        "--max-did-fee 5 create-did --fee 10",
-        true,
-    );
+    let r = run(Some(&sim), Some(&w), "--max-did-fee 5 create-did --fee 10", true);
     let e = r.result.unwrap_err();
     assert!(e.contains("max-did-fee"), "{e}");
     assert_eq!(r.asked, 0);
@@ -233,41 +209,19 @@ fn an_offer_made_by_one_wallet_is_taken_by_another() {
     sim.pay(taker.keys.primary(), 1_000_000).unwrap();
     let dir = scratch("offer");
     let file = dir.join("admission.offer");
-    let r = run(
-        Some(&sim),
-        Some(&maker),
-        &format!(
-            "make-offer --price 5000 --minutes 30 --out {} --yes",
-            file.display()
-        ),
-        true,
-    );
+    let r = run(Some(&sim), Some(&maker), &format!("make-offer --price 5000 --minutes 30 --out {} --yes", file.display()), true);
     r.result.unwrap();
     assert!(r.out.contains("gives 1 mojos"), "{}", r.out);
     assert!(r.out.contains("asks 5000 mojos"), "{}", r.out);
     assert!(file.exists());
     // The taker sees the price and the fee before paying.
-    let r = run(
-        Some(&sim),
-        Some(&taker),
-        &format!("take-offer {} --fee 7", file.display()),
-        true,
-    );
+    let r = run(Some(&sim), Some(&taker), &format!("take-offer {} --fee 7", file.display()), true);
     r.result.unwrap();
     assert!(r.out.contains("pay 5007 mojos"), "{}", r.out);
     assert!(r.out.contains("receive 1 mojos"), "{}", r.out);
-    assert!(
-        until(|| sim.balance(maker.keys.primary()) == 10 - 1 + 5000),
-        "{}",
-        sim.balance(maker.keys.primary())
-    );
+    assert!(until(|| sim.balance(maker.keys.primary()) == 10 - 1 + 5000), "{}", sim.balance(maker.keys.primary()));
     // A cap on taking: refused with the cap named.
-    let r = run(
-        Some(&sim),
-        Some(&taker),
-        &format!("--max-take 4999 take-offer {}", file.display()),
-        true,
-    );
+    let r = run(Some(&sim), Some(&taker), &format!("--max-take 4999 take-offer {}", file.display()), true);
     assert!(r.result.unwrap_err().contains("max-take"));
 }
 
@@ -277,54 +231,25 @@ fn mainnet_steps_are_capped_and_signed_for_mainnet() {
     let w = Wallet::new();
     sim.pay(w.keys.primary(), 1_000_000_000).unwrap();
     let base = |rest: &str| {
-        let mut a = vec![
-            "--network".to_owned(),
-            "mainnet".into(),
-            "--mainnet-confirm".into(),
-            MAINNET_CONFIRM.into(),
-        ];
+        let mut a = vec!["--network".to_owned(), "mainnet".into(), "--mainnet-confirm".into(), MAINNET_CONFIRM.into()];
         a.extend(rest.split_whitespace().map(str::to_owned));
-        a.splice(
-            0..0,
-            [
-                "--data".to_owned(),
-                scratch("mainnet").display().to_string(),
-            ],
-        );
+        a.splice(0..0, ["--data".to_owned(), scratch("mainnet").display().to_string()]);
         a
     };
     // mainnet's default caps.
-    let r = run_args(
-        Some(&sim),
-        Some(&w),
-        base("make-offer --price 10000000001 --yes"),
-        true,
-    );
+    let r = run_args(Some(&sim), Some(&w), base("make-offer --price 10000000001 --yes"), true);
     assert!(r.result.unwrap_err().contains("max-offer-price"));
-    let r = run_args(
-        Some(&sim),
-        Some(&w),
-        base("create-did --fee 100000001 --yes"),
-        true,
-    );
+    let r = run_args(Some(&sim), Some(&w), base("create-did --fee 100000001 --yes"), true);
     assert!(r.result.unwrap_err().contains("max-did-fee"));
     let r = run_args(Some(&sim), Some(&w), base("caps"), true);
-    assert!(
-        r.out.contains("max-fee = 100000000 mojos (0.0001 XCH)"),
-        "{}",
-        r.out
-    );
+    assert!(r.out.contains("max-fee = 100000000 mojos (0.0001 XCH)"), "{}", r.out);
     // Under the caps the plan names mainnet and real XCH; the spend is signed for mainnet, which
     // this testnet11-checking simulator refuses.
     let r = run_args(Some(&sim), Some(&w), base("create-did --fee 1000"), true);
     assert_eq!(r.asked, 1);
     assert!(r.out.contains("MAINNET · real XCH"), "{}", r.out);
     assert!(r.out.contains("REAL XCH"), "{}", r.out);
-    assert!(
-        r.out.contains("1001 mojos (0.000000001001 XCH)"),
-        "{}",
-        r.out
-    );
+    assert!(r.out.contains("1001 mojos (0.000000001001 XCH)"), "{}", r.out);
     assert!(r.out.contains("xch1"), "{}", r.out);
     let e = r.result.unwrap_err();
     assert!(e.contains("the chain refused the spend"), "{e}");
@@ -379,32 +304,14 @@ fn a_sponsor_request_spends_nothing_and_the_did_arrives() {
         .unwrap();
         req
     });
-    let r = run(
-        Some(&sim),
-        Some(&w),
-        &format!("sponsor-request http://127.0.0.1:{port} --wait --yes"),
-        true,
-    );
+    let r = run(Some(&sim), Some(&w), &format!("sponsor-request http://127.0.0.1:{port} --wait --yes"), true);
     r.result.unwrap();
     let req = served.join().unwrap();
     assert_eq!(req.network, "testnet11");
     assert!(req.address.starts_with("txch1"));
-    assert!(
-        r.out.contains("spend nothing from this wallet"),
-        "{}",
-        r.out
-    );
-    assert!(
-        r.out.contains("held by this wallet's first address"),
-        "{}",
-        r.out
-    );
+    assert!(r.out.contains("spend nothing from this wallet"), "{}", r.out);
+    assert!(r.out.contains("held by this wallet's first address"), "{}", r.out);
     // https isn't spoken (the game's own sponsor call is).
-    let r = run(
-        Some(&sim),
-        Some(&w),
-        "sponsor-request https://example.org --yes",
-        true,
-    );
+    let r = run(Some(&sim), Some(&w), "sponsor-request https://example.org --yes", true);
     assert!(r.result.unwrap_err().contains("http://"));
 }

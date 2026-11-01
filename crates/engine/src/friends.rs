@@ -52,7 +52,10 @@ static STATE: Mutex<Option<State>> = Mutex::new(None);
 
 pub fn init(run_dir: &Path, saves: &Path) {
     let path = run_dir.join("friends.json");
-    let store = std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    let store = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
     *STATE.lock() = Some(State { path, saves: saves.to_path_buf(), store });
 }
 
@@ -82,7 +85,9 @@ pub fn add(account: &str, identity: &str, met: &str) {
         if account.is_empty() || identity.is_empty() || s.store.friends.iter().any(|f| f.account == account) {
             return;
         }
-        s.store.friends.push(Friend { account: account.into(), identity: identity.into(), met: met.chars().take(64).collect() });
+        s.store
+            .friends
+            .push(Friend { account: account.into(), identity: identity.into(), met: met.chars().take(64).collect() });
         save(s);
         log::info!("added a friend (identity {}), met through '{met}'", &identity[..12.min(identity.len())]);
     });
@@ -145,7 +150,9 @@ pub fn new_address(meta: &mut crate::saves::WorldMeta) -> Result<String, String>
     let new = crate::world_address::for_world(meta)?.key();
     let sig = session.world_moved_sig(&old, &new, meta.key_generation)?;
     with(|s| {
-        s.store.moved.push(Moved { from: old.clone(), to: new.clone(), generation: meta.key_generation, sig });
+        s.store
+            .moved
+            .push(Moved { from: old.clone(), to: new.clone(), generation: meta.key_generation, sig });
         save(s);
     });
     log::info!("'{}' has a new address: {new} (was {old})", meta.name);
@@ -156,7 +163,10 @@ pub fn new_address(meta: &mut crate::saves::WorldMeta) -> Result<String, String>
 pub fn follow(moved: &[Moved], key: &str, owner: &str) -> Option<String> {
     let mut at = key.to_string();
     let mut seen = 0;
-    while let Some(m) = moved.iter().find(|m| m.from == at && chiacraft_account::check_world_moved(owner, &m.from, &m.to, m.generation, &m.sig)) {
+    while let Some(m) = moved
+        .iter()
+        .find(|m| m.from == at && chiacraft_account::check_world_moved(owner, &m.from, &m.to, m.generation, &m.sig))
+    {
         at = m.to.clone();
         seen += 1;
         if seen > 16 {
@@ -222,50 +232,76 @@ impl Screen for Friends {
         ask_all(cx.settings);
         let friends = list();
         frame(ui, cx, "friends.title", |ui| {
-            let body = ui.container(Style::default().gap(10.0).w(400.0).h(0.0).grow().min_h(60.0).scroll(), |ui| {
-                if friends.is_empty() {
-                    ui.panel("panel", Style::default().pad(8.0).stretch(), |ui| {
-                        label(ui, cx, "friends.none", &[], "dim");
-                    });
-                }
-                for (i, f) in friends.iter().enumerate() {
-                    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch(), |ui| {
-                        ui.container(Style::row().gap(6.0).stretch(), |ui| {
-                            label(ui, cx, "friends.friend", &[Arg::Text(f.identity.chars().take(12).collect()), Arg::Text(f.met.clone())], "default");
-                            let account = f.account.clone();
-                            button(ui, cx, "friends.remove", &[], 80.0, move |c| {
-                                remove(&account);
-                                c.requests.push(Request::Rebuild);
-                            });
+            let body = ui.container(
+                Style::default()
+                    .gap(10.0)
+                    .w(400.0)
+                    .h(0.0)
+                    .grow()
+                    .min_h(60.0)
+                    .scroll(),
+                |ui| {
+                    if friends.is_empty() {
+                        ui.panel("panel", Style::default().pad(8.0).stretch(), |ui| {
+                            label(ui, cx, "friends.none", &[], "dim");
                         });
-                        match worlds_of(&f.account) {
-                            None => {
-                                label(ui, cx, "friends.asking", &[], "dim");
-                            }
-                            Some(Err(_)) => {
-                                label(ui, cx, "friends.away", &[], "dim");
-                            }
-                            Some(Ok(a)) if a.worlds.is_empty() => {
-                                label(ui, cx, "friends.not_mutual", &[], "dim");
-                            }
-                            Some(Ok(a)) => {
-                                for (j, w) in a.worlds.iter().enumerate() {
-                                    ui.container(Style::row().gap(6.0).stretch(), |ui| {
-                                        label(ui, cx, if w.open { "friends.world_open" } else { "friends.world_closed" }, &[Arg::Text(w.name.clone())], "default");
-                                        if w.open {
-                                            let address = crate::world_address::address(&w.key, &w.name, None, &[]);
-                                            let id = ui.button("button", Style::default().min_w(60.0).min_h(20.0).pad_xy(6.0, 4.0), Rc::new(move |c: &mut Ctx| c.requests.push(Request::Join(address.clone()))), |ui| {
-                                                ui.text(cx.t("multiplayer.join", &[]), "button");
-                                            });
-                                            ui.set_id(id, &format!("join{i}_{j}"));
-                                        }
-                                    });
+                    }
+                    for (i, f) in friends.iter().enumerate() {
+                        ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch(), |ui| {
+                            ui.container(Style::row().gap(6.0).stretch(), |ui| {
+                                label(
+                                    ui,
+                                    cx,
+                                    "friends.friend",
+                                    &[Arg::Text(f.identity.chars().take(12).collect()), Arg::Text(f.met.clone())],
+                                    "default",
+                                );
+                                let account = f.account.clone();
+                                button(ui, cx, "friends.remove", &[], 80.0, move |c| {
+                                    remove(&account);
+                                    c.requests.push(Request::Rebuild);
+                                });
+                            });
+                            match worlds_of(&f.account) {
+                                None => {
+                                    label(ui, cx, "friends.asking", &[], "dim");
+                                }
+                                Some(Err(_)) => {
+                                    label(ui, cx, "friends.away", &[], "dim");
+                                }
+                                Some(Ok(a)) if a.worlds.is_empty() => {
+                                    label(ui, cx, "friends.not_mutual", &[], "dim");
+                                }
+                                Some(Ok(a)) => {
+                                    for (j, w) in a.worlds.iter().enumerate() {
+                                        ui.container(Style::row().gap(6.0).stretch(), |ui| {
+                                            label(
+                                                ui,
+                                                cx,
+                                                if w.open { "friends.world_open" } else { "friends.world_closed" },
+                                                &[Arg::Text(w.name.clone())],
+                                                "default",
+                                            );
+                                            if w.open {
+                                                let address = crate::world_address::address(&w.key, &w.name, None, &[]);
+                                                let id = ui.button(
+                                                    "button",
+                                                    Style::default().min_w(60.0).min_h(20.0).pad_xy(6.0, 4.0),
+                                                    Rc::new(move |c: &mut Ctx| c.requests.push(Request::Join(address.clone()))),
+                                                    |ui| {
+                                                        ui.text(cx.t("multiplayer.join", &[]), "button");
+                                                    },
+                                                );
+                                                ui.set_id(id, &format!("join{i}_{j}"));
+                                            }
+                                        });
+                                    }
                                 }
                             }
-                        }
-                    });
-                }
-            });
+                        });
+                    }
+                },
+            );
             ui.set_id(body, "friends_list");
             button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
         });

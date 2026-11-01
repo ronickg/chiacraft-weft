@@ -86,7 +86,7 @@ impl Cube {
         let mut palette: Vec<u32> = Vec::new();
         let mut last = u32::MAX;
         let mut last_i = 0u32;
-        let mut indices = vec![0u16; VOLUME];
+        let mut indices = [0u16; VOLUME];
         for (i, &s) in states.iter().enumerate() {
             if s != last {
                 last = s;
@@ -101,12 +101,33 @@ impl Cube {
             indices[i] = last_i as u16;
         }
         let bits = bits_for(palette.len());
-        let mut words = vec![0u64; VOLUME * bits as usize / 64].into_boxed_slice();
-        for (i, &p) in indices.iter().enumerate() {
-            put(&mut words, bits, i, p as u32);
-        }
+        // A word at a time, like `decode`.
+        let words: Box<[u64]> = indices
+            .chunks_exact(64 / bits as usize)
+            .map(|group| {
+                group
+                    .iter()
+                    .enumerate()
+                    .fold(0u64, |w, (k, &p)| w | (p as u64) << (k as u32 * bits))
+            })
+            .collect();
         c.blocks = Blocks::Packed { palette, bits, words };
         c
+    }
+
+    /// Every block's position in `palette()`, without looking its state up there.
+    pub fn palette_indices(&self, out: &mut [u8; VOLUME]) {
+        match &self.blocks {
+            Blocks::Uniform(_) => out.fill(0),
+            Blocks::Packed { bits, words, .. } => {
+                let (per, mask) = (64 / *bits as usize, (1u64 << *bits) - 1);
+                for (w, &word) in words.iter().enumerate() {
+                    for k in 0..per {
+                        out[w * per + k] = ((word >> (k as u32 * *bits)) & mask) as u8;
+                    }
+                }
+            }
+        }
     }
 
     #[inline]
@@ -179,7 +200,9 @@ impl Cube {
     pub fn changed_around(&self, old: &Cube) -> Option<u32> {
         let same_blocks = match (&self.blocks, &old.blocks) {
             (Blocks::Uniform(a), Blocks::Uniform(b)) => a == b,
-            (Blocks::Packed { palette: p, bits: b, words: w }, Blocks::Packed { palette: op, bits: ob, words: ow }) => p == op && b == ob && w == ow,
+            (Blocks::Packed { palette: p, bits: b, words: w }, Blocks::Packed { palette: op, bits: ob, words: ow }) => {
+                p == op && b == ob && w == ow
+            }
             _ => false,
         };
         let same_light = match (&self.light, &old.light) {
@@ -190,7 +213,9 @@ impl Cube {
         if same_blocks && same_light {
             return None;
         }
-        if let (Blocks::Uniform(_), Blocks::Uniform(_), Light::Uniform(_), Light::Uniform(_)) = (&self.blocks, &old.blocks, &self.light, &old.light) {
+        if let (Blocks::Uniform(_), Blocks::Uniform(_), Light::Uniform(_), Light::Uniform(_)) =
+            (&self.blocks, &old.blocks, &self.light, &old.light)
+        {
             return Some(ALL_AROUND);
         }
         // Something changed; inside blocks are read by this cube alone, so only the outer
@@ -374,7 +399,10 @@ impl Cube {
             }
             let count = VOLUME * bits as usize / 64;
             let raw = take_bytes(data, count * 8)?;
-            let words: Box<[u64]> = raw.chunks_exact(8).map(|c| u64::from_le_bytes(c.try_into().unwrap())).collect();
+            let words: Box<[u64]> = raw
+                .chunks_exact(8)
+                .map(|c| u64::from_le_bytes(c.try_into().unwrap()))
+                .collect();
             Blocks::Packed { palette, bits, words }
         };
         let light = match take_bytes(data, 1)?[0] {
@@ -455,7 +483,9 @@ pub const ALL_CONNECTED: u16 = 0x7FFF;
 
 /// Faces reachable from face `from` through the inside of a cube with connectivity `conn`.
 pub fn exits(conn: u16, from: usize) -> u8 {
-    (0..6).filter(|&f| f != from && conn & face_pair(from, f) != 0).fold(0, |m, f| m | 1 << f)
+    (0..6)
+        .filter(|&f| f != from && conn & face_pair(from, f) != 0)
+        .fold(0, |m, f| m | 1 << f)
 }
 
 impl Cube {

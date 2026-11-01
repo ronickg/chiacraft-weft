@@ -61,19 +61,12 @@ pub fn eve_puzzle_hash(launcher_id: Bytes32, owner: Bytes32) -> Bytes32 {
 
 /// Launch one DID per owner from `coins` (the sponsor's spendable coins; the largest first are
 /// used until they cover a mojo per DID plus `fee`), signed with `keys`.
-pub fn build_eve_dids(
-    keys: &WalletKeys,
-    coins: &[Coin],
-    owners: &[Bytes32],
-    fee: u64,
-) -> Result<SponsorBundle> {
+pub fn build_eve_dids(keys: &WalletKeys, coins: &[Coin], owners: &[Bytes32], fee: u64) -> Result<SponsorBundle> {
     if owners.is_empty() {
         return Err(Error::new("no DID to launch"));
     }
     if owners.len() > MAX_BATCH {
-        return Err(Error::new(format!(
-            "at most {MAX_BATCH} DIDs in one bundle"
-        )));
+        return Err(Error::new(format!("at most {MAX_BATCH} DIDs in one bundle")));
     }
     let need = (owners.len() as u64)
         .checked_add(fee)
@@ -95,9 +88,7 @@ pub fn build_eve_dids(
         selected.push(c);
     }
     if total < need {
-        return Err(Error::new(format!(
-            "not enough spendable coins: {total} of {need} mojos"
-        )));
+        return Err(Error::new(format!("not enough spendable coins: {total} of {need} mojos")));
     }
     let change = total - need;
     let parent = selected[0];
@@ -112,11 +103,7 @@ pub fn build_eve_dids(
             .create_eve_did(&mut ctx, *owner, None, 1, HashedPtr::NIL)
             .map_err(failed("DID launch"))?;
         conditions = conditions.with(create).extend(launch);
-        dids.push(EveDid {
-            launcher_id,
-            coin: did.coin,
-            owner: *owner,
-        });
+        dids.push(EveDid { launcher_id, coin: did.coin, owner: *owner });
     }
     if change > 0 {
         conditions = conditions.create_coin(keys.primary(), change, Memos::None);
@@ -137,11 +124,7 @@ pub fn build_eve_dids(
         .map_err(failed("sponsor spend"))?;
     for other in &selected[1..] {
         layer(other)?
-            .spend(
-                &mut ctx,
-                *other,
-                Conditions::new().assert_concurrent_spend(parent.coin_id()),
-            )
+            .spend(&mut ctx, *other, Conditions::new().assert_concurrent_spend(parent.coin_id()))
             .map_err(failed("sponsor spend"))?;
     }
     let coin_spends = ctx.take();

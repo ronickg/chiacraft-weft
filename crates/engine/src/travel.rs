@@ -38,7 +38,10 @@ pub struct Ticket {
 
 impl Ticket {
     fn body(&self) -> String {
-        format!("{HEADER};player={};from={};to={};link={};expires={};nonce={}", self.player, self.from, self.to, self.link, self.expires, self.nonce)
+        format!(
+            "{HEADER};player={};from={};to={};link={};expires={};nonce={}",
+            self.player, self.from, self.to, self.link, self.expires, self.nonce
+        )
     }
 
     fn signed(&self) -> Vec<u8> {
@@ -57,7 +60,13 @@ impl Ticket {
         if parts.next()? != HEADER {
             return None;
         }
-        let mut field = |name: &str| parts.next()?.strip_prefix(name)?.strip_prefix('=').map(str::to_string);
+        let mut field = |name: &str| {
+            parts
+                .next()?
+                .strip_prefix(name)?
+                .strip_prefix('=')
+                .map(str::to_string)
+        };
         Some(Ticket {
             player: field("player")?,
             from: field("from")?,
@@ -77,8 +86,21 @@ fn hex(b: &[u8]) -> String {
 /// The origin world's ticket for `player` (their key) to go through `link` to the world `to`.
 pub fn issue(world: &crate::world_address::WorldIdentity, player: &str, link: &str, to: &str) -> String {
     use std::hash::{BuildHasher, Hasher};
-    let nonce = format!("{:016x}", std::collections::hash_map::RandomState::new().build_hasher().finish());
-    let mut t = Ticket { player: player.into(), from: world.key(), to: to.into(), link: link.into(), expires: crate::saves::now_secs() + LIFETIME, nonce, sig: String::new() };
+    let nonce = format!(
+        "{:016x}",
+        std::collections::hash_map::RandomState::new()
+            .build_hasher()
+            .finish()
+    );
+    let mut t = Ticket {
+        player: player.into(),
+        from: world.key(),
+        to: to.into(),
+        link: link.into(),
+        expires: crate::saves::now_secs() + LIFETIME,
+        nonce,
+        sig: String::new(),
+    };
     t.sig = hex(&world.secret.sign(&t.signed()).to_bytes());
     t.text()
 }
@@ -100,10 +122,15 @@ pub fn admit(text: &str, peer: &str, me: &str) -> Result<(), String> {
         return Err("an expired travel ticket".into());
     }
     let (Ok(from), Some(sig)) = (t.from.parse::<iroh::PublicKey>(), unhex64(&t.sig)) else { return Err("a bad travel ticket".into()) };
-    if from.verify(&t.signed(), &iroh::Signature::from_bytes(&sig)).is_err() {
+    if from
+        .verify(&t.signed(), &iroh::Signature::from_bytes(&sig))
+        .is_err()
+    {
         return Err("a travel ticket its world didn't sign".into());
     }
-    let linked = crate::links::of_world(me).iter().any(|l| l.id() == t.link && (l.body.from == t.from || l.body.to == t.from));
+    let linked = crate::links::of_world(me)
+        .iter()
+        .any(|l| l.id() == t.link && (l.body.from == t.from || l.body.to == t.from));
     if !linked {
         return Err("a travel ticket for a link this world doesn't have".into());
     }
@@ -113,14 +140,20 @@ pub fn admit(text: &str, peer: &str, me: &str) -> Result<(), String> {
     if used.insert(t.nonce.clone(), t.expires).is_some() {
         return Err("a travel ticket used already".into());
     }
-    ARRIVING.lock().get_or_insert_with(HashMap::new).insert(t.player, (t.link, Instant::now()));
+    ARRIVING
+        .lock()
+        .get_or_insert_with(HashMap::new)
+        .insert(t.player, (t.link, Instant::now()));
     Ok(())
 }
 
 /// Coming home through a portal (to the world this game runs): the player's own world needs no
 /// ticket checked; they are placed at its portal for `link`.
 pub fn expect(player: &str, link: &str) {
-    ARRIVING.lock().get_or_insert_with(HashMap::new).insert(player.to_string(), (link.to_string(), Instant::now()));
+    ARRIVING
+        .lock()
+        .get_or_insert_with(HashMap::new)
+        .insert(player.to_string(), (link.to_string(), Instant::now()));
 }
 
 fn unhex64(s: &str) -> Option<[u8; 64]> {
@@ -141,7 +174,10 @@ pub fn arrival(dir: &Path, key: &str) -> Option<[f64; 3]> {
     if when.elapsed() > Duration::from_secs(120) {
         return None;
     }
-    let spot = spots(dir).into_iter().find(|(l, _)| *l == link).map(|(_, p)| p);
+    let spot = spots(dir)
+        .into_iter()
+        .find(|(l, _)| *l == link)
+        .map(|(_, p)| p);
     if spot.is_none() {
         log::info!("{key} came through a portal, but this world has no portal for that link: placed as usual");
     }
@@ -169,7 +205,10 @@ pub fn set_spot(dir: &Path, link: &str, pos: Option<[i32; 3]>) {
     if let Some(p) = pos {
         all.push((link.to_string(), p));
     }
-    let text: String = all.iter().map(|(l, p)| format!("{l} {} {} {}\n", p[0], p[1], p[2])).collect();
+    let text: String = all
+        .iter()
+        .map(|(l, p)| format!("{l} {} {} {}\n", p[0], p[1], p[2]))
+        .collect();
     if let Err(e) = std::fs::write(dir.join("portals.txt"), text) {
         log::warn!("saving portal spots: {e}");
     }
@@ -182,14 +221,28 @@ mod tests {
     #[test]
     fn ticket_round_trip_and_signature() {
         let k = iroh::SecretKey::from_bytes(&[9; 32]);
-        let mut t = Ticket { player: "p".into(), from: k.public().to_string(), to: "w".into(), link: "l".into(), expires: 5, nonce: "0011223344556677".into(), sig: String::new() };
+        let mut t = Ticket {
+            player: "p".into(),
+            from: k.public().to_string(),
+            to: "w".into(),
+            link: "l".into(),
+            expires: 5,
+            nonce: "0011223344556677".into(),
+            sig: String::new(),
+        };
         t.sig = hex(&k.sign(&t.signed()).to_bytes());
         let back = Ticket::parse(&t.text()).unwrap();
         assert_eq!(back, t);
         let pk: iroh::PublicKey = back.from.parse().unwrap();
-        assert!(pk.verify(&back.signed(), &iroh::Signature::from_bytes(&unhex64(&back.sig).unwrap())).is_ok());
+        assert!(
+            pk.verify(&back.signed(), &iroh::Signature::from_bytes(&unhex64(&back.sig).unwrap()))
+                .is_ok()
+        );
         let forged = Ticket { player: "q".into(), ..back };
-        assert!(pk.verify(&forged.signed(), &iroh::Signature::from_bytes(&unhex64(&forged.sig).unwrap())).is_err());
+        assert!(
+            pk.verify(&forged.signed(), &iroh::Signature::from_bytes(&unhex64(&forged.sig).unwrap()))
+                .is_err()
+        );
         assert!(Ticket::parse("hello").is_none());
     }
 

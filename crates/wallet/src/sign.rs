@@ -14,11 +14,7 @@ pub const PREFIX: &str = "chiacraft ";
 
 /// The 32 bytes a Chia wallet signs for `message` (CHIP-0002).
 pub fn message_hash(message: &[u8]) -> [u8; 32] {
-    tree_hash_pair(
-        tree_hash_atom(b"Chia Signed Message"),
-        tree_hash_atom(message),
-    )
-    .to_bytes()
+    tree_hash_pair(tree_hash_atom(b"Chia Signed Message"), tree_hash_atom(message)).to_bytes()
 }
 
 /// Whether `signature` is `key`'s signature of `message` as a Chia signed message.
@@ -26,10 +22,7 @@ pub fn verify(key: &IdentityKey, message: &[u8], signature: &[u8]) -> bool {
     let Ok(signature): std::result::Result<[u8; 96], _> = signature.try_into() else {
         return false;
     };
-    let (Ok(public), Ok(signature)) = (
-        PublicKey::from_bytes(&key.0),
-        Signature::from_bytes(&signature),
-    ) else {
+    let (Ok(public), Ok(signature)) = (PublicKey::from_bytes(&key.0), Signature::from_bytes(&signature)) else {
         return false;
     };
     chia_bls::verify(&signature, &public, message_hash(message))
@@ -56,11 +49,7 @@ impl std::fmt::Debug for IdentitySigner {
 impl IdentitySigner {
     pub(crate) fn new(master: &SecretKey, index: u32) -> Self {
         let secret = crate::keys::identity_secret(master, index);
-        Self {
-            index,
-            public: IdentityKey(secret.public_key().to_bytes()),
-            secret: Secret::new(secret.to_bytes()),
-        }
+        Self { index, public: IdentityKey(secret.public_key().to_bytes()), secret: Secret::new(secret.to_bytes()) }
     }
     /// A signer for identity key `index` of `mnemonic`.
     pub fn from_mnemonic(mnemonic: &crate::Mnemonic, index: u32) -> Self {
@@ -169,12 +158,9 @@ impl Signer for IdentitySigner {
     }
     fn sign(&self, message: &str) -> Result<[u8; 96]> {
         if !message.starts_with(PREFIX) {
-            return Err(Error::new(
-                "the identity key signs only chiacraft's own texts",
-            ));
+            return Err(Error::new("the identity key signs only chiacraft's own texts"));
         }
-        let secret = SecretKey::from_bytes(self.secret.expose())
-            .map_err(|_| Error::new("identity key damaged in memory"))?;
+        let secret = SecretKey::from_bytes(self.secret.expose()).map_err(|_| Error::new("identity key damaged in memory"))?;
         Ok(chia_bls::sign(&secret, message_hash(message.as_bytes())).to_bytes())
     }
 }
@@ -194,12 +180,7 @@ pub struct OwnerSigner {
 }
 impl std::fmt::Debug for OwnerSigner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "OwnerSigner({}{}, [redacted])",
-            self.index,
-            if self.hardened { "h" } else { "" }
-        )
+        write!(f, "OwnerSigner({}{}, [redacted])", self.index, if self.hardened { "h" } else { "" })
     }
 }
 impl OwnerSigner {
@@ -211,24 +192,11 @@ impl OwnerSigner {
         use chia_bls::DerivableKey;
         use chia_puzzle_types::DeriveSynthetic;
         let master = master.clone();
-        let path = [
-            crate::keys::CHIA_ROOT[0],
-            crate::keys::CHIA_ROOT[1],
-            crate::keys::WALLET_PURPOSE,
-            index,
-        ];
-        let key = if hardened {
-            crate::keys::derive_hardened(&master, &path)
-        } else {
-            path.iter().fold(master, |k, i| k.derive_unhardened(*i))
-        };
+        let path = [crate::keys::CHIA_ROOT[0], crate::keys::CHIA_ROOT[1], crate::keys::WALLET_PURPOSE, index];
+        let key =
+            if hardened { crate::keys::derive_hardened(&master, &path) } else { path.iter().fold(master, |k, i| k.derive_unhardened(*i)) };
         let synthetic = key.derive_synthetic();
-        Self {
-            index,
-            hardened,
-            public: synthetic.public_key().to_bytes(),
-            secret: Secret::new(synthetic.to_bytes()),
-        }
+        Self { index, hardened, public: synthetic.public_key().to_bytes(), secret: Secret::new(synthetic.to_bytes()) }
     }
     /// The wallet address of `mnemonic` whose standard puzzle hash is `owner`, among its first
     /// `count` unhardened and hardened addresses (linking a DID: which key owns it).
@@ -258,12 +226,9 @@ impl OwnerSigner {
     /// Sign `message` as a Chia signed message; refused unless it starts with [`PREFIX`].
     pub fn sign(&self, message: &str) -> Result<[u8; 96]> {
         if !message.starts_with(PREFIX) {
-            return Err(Error::new(
-                "a wallet key signs only chiacraft's own texts here",
-            ));
+            return Err(Error::new("a wallet key signs only chiacraft's own texts here"));
         }
-        let secret = SecretKey::from_bytes(self.secret.expose())
-            .map_err(|_| Error::new("wallet key damaged in memory"))?;
+        let secret = SecretKey::from_bytes(self.secret.expose()).map_err(|_| Error::new("wallet key damaged in memory"))?;
         Ok(chia_bls::sign(&secret, message_hash(message.as_bytes())).to_bytes())
     }
 }
@@ -284,10 +249,7 @@ mod tests {
         let m = Mnemonic::generate().unwrap();
         let o = OwnerSigner::from_mnemonic(&m, 0, false);
         let facts = crate::keys::facts_of(&m);
-        assert_eq!(
-            o.puzzle_hash(),
-            crate::keys::wallet_puzzle_hash(&facts.master, 0).unwrap()
-        );
+        assert_eq!(o.puzzle_hash(), crate::keys::wallet_puzzle_hash(&facts.master, 0).unwrap());
         let text = "chiacraft sign-in v1\nsession: 00";
         let sig = o.sign(text).unwrap();
         assert!(verify_owner(&o.public(), text.as_bytes(), &sig));
@@ -306,11 +268,7 @@ mod tests {
         let text = "chiacraft sign-in v2\nsession: 00";
         let sig = s.sign(text).unwrap();
         assert!(verify(&s.identity(), text.as_bytes(), &sig));
-        assert!(!verify(
-            &s.identity(),
-            b"chiacraft sign-in v2\nsession: 01",
-            &sig
-        ));
+        assert!(!verify(&s.identity(), b"chiacraft sign-in v2\nsession: 01", &sig));
         let other = IdentitySigner::from_mnemonic(&Mnemonic::generate().unwrap(), 0);
         assert!(!verify(&other.identity(), text.as_bytes(), &sig));
         assert!(!verify(&s.identity(), text.as_bytes(), &sig[..95]));

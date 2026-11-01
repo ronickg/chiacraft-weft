@@ -37,6 +37,12 @@ pub struct WorldMeta {
     pub seed: u64,
     pub last_played: u64,
     pub times: Vec<(String, u64)>,
+    /// What `/time` moved each dimension's time of day by.
+    pub day_offsets: Vec<(String, i64)>,
+    /// Each dimension's weather: raining, thunder, the tick it changes.
+    pub weather: Vec<(String, bool, bool, u64)>,
+    /// Players given a permission level: their key and the level.
+    pub ops: Vec<(String, u32)>,
     /// Area edits per dimension (`server::area::AreaFill::spec`), in order.
     pub edits: Vec<(String, String)>,
     pub next_entity: u64,
@@ -54,13 +60,33 @@ pub struct WorldMeta {
 }
 
 pub fn now_secs() -> u64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
 }
 
 impl WorldMeta {
     pub fn load(dir: &Path) -> Option<WorldMeta> {
         let src = std::fs::read_to_string(dir.join("world.txt")).ok()?;
-        let mut m = WorldMeta { dir: dir.to_path_buf(), format: 1, name: String::new(), seed: 0, last_played: 0, times: Vec::new(), edits: Vec::new(), next_entity: 1, configs: Vec::new(), mods: Vec::new(), packages: Vec::new(), key_index: None, key_generation: 0, created: 0 };
+        let mut m = WorldMeta {
+            dir: dir.to_path_buf(),
+            format: 1,
+            name: String::new(),
+            seed: 0,
+            last_played: 0,
+            times: Vec::new(),
+            day_offsets: Vec::new(),
+            ops: Vec::new(),
+            weather: Vec::new(),
+            edits: Vec::new(),
+            next_entity: 1,
+            configs: Vec::new(),
+            mods: Vec::new(),
+            packages: Vec::new(),
+            key_index: None,
+            key_generation: 0,
+            created: 0,
+        };
         for (_, k, v) in crate::kv::pairs(&src) {
             match k {
                 "name" => m.name = v.to_string(),
@@ -72,7 +98,20 @@ impl WorldMeta {
                 "key_generation" => m.key_generation = v.parse().unwrap_or(0),
                 "created" => m.created = v.parse().unwrap_or(0),
                 _ => {
-                    if let Some(d) = k.strip_prefix("time.") {
+                    if let Some(d) = k.strip_prefix("weather.") {
+                        let n: Vec<u64> = v
+                            .split_whitespace()
+                            .filter_map(|x| x.parse().ok())
+                            .collect();
+                        if let [rain, thunder, until] = n[..] {
+                            m.weather
+                                .push((d.to_string(), rain != 0, thunder != 0, until));
+                        }
+                    } else if let Some(key) = k.strip_prefix("op.") {
+                        m.ops.push((key.to_string(), v.parse().unwrap_or(0)));
+                    } else if let Some(d) = k.strip_prefix("day_offset.") {
+                        m.day_offsets.push((d.to_string(), v.parse().unwrap_or(0)));
+                    } else if let Some(d) = k.strip_prefix("time.") {
                         m.times.push((d.to_string(), v.parse().unwrap_or(0)));
                     } else if let Some(d) = k.strip_prefix("edit.") {
                         // `edit.<dimension>.<n>`: the dimension's name has a colon, not a dot.
@@ -99,6 +138,15 @@ impl WorldMeta {
         if let Some(i) = self.key_index {
             s.push_str(&format!("key_index = {i}\nkey_generation = {}\ncreated = {}\n", self.key_generation, self.created));
         }
+        for (d, rain, thunder, until) in &self.weather {
+            s.push_str(&format!("weather.{d} = {} {} {until}\n", *rain as u8, *thunder as u8));
+        }
+        for (key, level) in &self.ops {
+            s.push_str(&format!("op.{key} = {level}\n"));
+        }
+        for (d, t) in &self.day_offsets {
+            s.push_str(&format!("day_offset.{d} = {t}\n"));
+        }
         for (d, t) in &self.times {
             s.push_str(&format!("time.{d} = {t}\n"));
         }
@@ -115,7 +163,9 @@ impl WorldMeta {
             s.push_str(&format!("package.{id} = {h}\n"));
         }
         let _ = std::fs::create_dir_all(&self.dir);
-        if let Err(e) = std::fs::write(self.dir.join("world.txt"), s) {
+        // Whole or not at all: a crash in the middle must not leave half of it.
+        let tmp = self.dir.join("world.new");
+        if let Err(e) = std::fs::write(&tmp, s).and_then(|_| std::fs::rename(&tmp, self.dir.join("world.txt"))) {
             log::error!("saving world info: {e}");
         }
     }
@@ -124,7 +174,11 @@ impl WorldMeta {
     /// packages are `modloader::for_world`'s.
     pub fn missing_mods(&self, c: &Content) -> Vec<String> {
         let package = |id: &str| self.packages.iter().any(|(p, _)| p == id);
-        self.mods.iter().filter(|(id, _)| !package(id) && !c.mods.iter().any(|m| &m.id == id)).map(|(id, v)| format!("{id} {v}")).collect()
+        self.mods
+            .iter()
+            .filter(|(id, _)| !package(id) && !c.mods.iter().any(|m| &m.id == id))
+            .map(|(id, v)| format!("{id} {v}"))
+            .collect()
     }
 }
 
@@ -140,26 +194,71 @@ pub fn list(saves: &Path) -> Vec<WorldMeta> {
 }
 
 pub fn create(saves: &Path, name: &str, seed: u64) -> WorldMeta {
-    let base: String = name.chars().map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect();
-    let base = if base.is_empty() { "world".to_string() } else { base };
+    let base = folder_name(name);
     let mut dir = saves.join(&base);
     let mut n = 1;
     while dir.exists() {
         n += 1;
         dir = saves.join(format!("{base}_{n}"));
     }
-    let m = WorldMeta { dir, format: SAVE_FORMAT, name: name.to_string(), seed, last_played: now_secs(), times: Vec::new(), edits: Vec::new(), next_entity: 1, configs: Vec::new(), mods: Vec::new(), packages: Vec::new(), key_index: Some(crate::world_address::random_index()), key_generation: 0, created: now_secs() };
+    let m = WorldMeta {
+        dir,
+        format: SAVE_FORMAT,
+        name: name.to_string(),
+        seed,
+        last_played: now_secs(),
+        times: Vec::new(),
+        day_offsets: Vec::new(),
+        ops: Vec::new(),
+        weather: Vec::new(),
+        edits: Vec::new(),
+        next_entity: 1,
+        configs: Vec::new(),
+        mods: Vec::new(),
+        packages: Vec::new(),
+        key_index: Some(crate::world_address::random_index()),
+        key_generation: 0,
+        created: now_secs(),
+    };
     m.save();
     m
 }
 
+/// The folder `create` gives a world called `name`, if it is free.
+fn folder_name(name: &str) -> String {
+    let base: String = name
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .collect();
+    if base.is_empty() { "world".to_string() } else { base }
+}
+
+/// Whether this is the world a new one called the same would overwrite: one in the folder of its
+/// own name. A folder somebody renamed or copied a world into still has the name inside, and
+/// isn't to go because of it.
+pub fn in_own_folder(w: &WorldMeta) -> bool {
+    w.dir
+        .file_name()
+        .is_some_and(|f| f.to_string_lossy() == folder_name(&w.name))
+}
+
 /// Seed from user text: numbers are used as is, anything else is hashed.
+/// A seed the way `parse_seed` takes it back.
+pub fn shown_seed(seed: u64) -> String {
+    (seed as i64).to_string()
+}
+
 pub fn parse_seed(s: &str) -> u64 {
     let s = s.trim();
     if s.is_empty() {
         return weft_noise::mix(now_secs() ^ (std::process::id() as u64) << 32);
     }
-    s.parse::<i64>().map(|v| v as u64).unwrap_or_else(|_| crate::world::mix(s.bytes().fold(0u64, |h, b| h.wrapping_mul(31).wrapping_add(b as u64))))
+    s.parse::<i64>().map(|v| v as u64).unwrap_or_else(|_| {
+        crate::world::mix(
+            s.bytes()
+                .fold(0u64, |h, b| h.wrapping_mul(31).wrapping_add(b as u64)),
+        )
+    })
 }
 
 // ---------------------------------------------------------------- id table
@@ -197,7 +296,10 @@ impl IdTable {
             })
             .collect();
         if !missing.is_empty() {
-            let mut list: Vec<&str> = missing.iter().map(|&w| names[w as usize].as_str()).collect();
+            let mut list: Vec<&str> = missing
+                .iter()
+                .map(|&w| names[w as usize].as_str())
+                .collect();
             list.sort();
             let shown = if unknown == AIR { "air" } else { "unknown blocks, keeping their names" };
             log::warn!("world contains {} block states from missing mods or packages (shown as {shown}): {}", list.len(), list.join(", "));
@@ -247,7 +349,12 @@ impl Region {
         if let Some(d) = path.parent() {
             std::fs::create_dir_all(d)?;
         }
-        let mut file = OpenOptions::new().read(true).write(true).create(true).truncate(false).open(path)?;
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path)?;
         let len = file.metadata()?.len();
         let mut header = vec![(0u32, 0u32); ENTRIES];
         if len >= (ENTRIES * 8) as u64 {
@@ -261,7 +368,45 @@ impl Region {
         } else {
             file.write_all(&vec![0u8; ENTRIES * 8])?;
         }
-        Ok(Region { file, header })
+        let mut region = Region { file, header };
+        region.compact(path, len)?;
+        Ok(region)
+    }
+
+    /// New versions of a cube go at the end, so old ones pile up: once more than half of a file
+    /// is that, it is written again with what is in use. Whole or not at all.
+    fn compact(&mut self, path: &Path, len: u64) -> std::io::Result<()> {
+        let head = (ENTRIES * 8) as u64;
+        let used: u64 = self.header.iter().map(|h| h.1 as u64).sum();
+        if len <= (used + head) * 2 + (1 << 20) {
+            return Ok(());
+        }
+        let tmp = path.with_extension("compact");
+        let mut out = File::create(&tmp)?;
+        out.write_all(&vec![0u8; ENTRIES * 8])?;
+        let mut header = vec![(0u32, 0u32); ENTRIES];
+        let mut at = head as u32;
+        for i in 0..ENTRIES {
+            if let Some(data) = self.read(i) {
+                out.write_all(&data)?;
+                header[i] = (at, data.len() as u32);
+                at += data.len() as u32;
+            }
+        }
+        out.seek(SeekFrom::Start(0))?;
+        for (o, l) in &header {
+            out.write_all(&o.to_le_bytes())?;
+            out.write_all(&l.to_le_bytes())?;
+        }
+        drop(out);
+        // Windows won't replace an open file: this one is reopened for it.
+        let placeholder = File::open(&tmp)?;
+        self.file = placeholder;
+        std::fs::rename(&tmp, path)?;
+        self.file = OpenOptions::new().read(true).write(true).open(path)?;
+        self.header = header;
+        log::info!("{}: {} KB of old versions dropped", path.display(), (len - at as u64) / 1024);
+        Ok(())
     }
 
     fn read(&mut self, i: usize) -> Option<Vec<u8>> {
@@ -277,6 +422,9 @@ impl Region {
 
     fn write(&mut self, i: usize, data: &[u8]) -> std::io::Result<()> {
         let end = self.file.seek(SeekFrom::End(0))?;
+        if end + data.len() as u64 > u32::MAX as u64 {
+            return Err(std::io::Error::other("region file over 4 GB until it is reopened and compacted"));
+        }
         self.file.write_all(data)?;
         self.header[i] = (end as u32, data.len() as u32);
         self.file.seek(SeekFrom::Start((i * 8) as u64))?;
@@ -300,6 +448,8 @@ pub struct Storage {
     /// Blocks of missing mods or packages in loaded cubes: (dimension, cube) to (block index,
     /// world id), so saving the cube writes their real names back while they are untouched.
     unknown: FxHashMap<(u32, IVec3), Vec<(usize, u32)>>,
+    /// What was last written for a cube this session: an unchanged one is not appended again.
+    last_written: FxHashMap<(u32, IVec3), u64>,
 }
 
 fn region_of(cube: IVec3) -> (IVec3, usize) {
@@ -313,23 +463,47 @@ impl Storage {
         // What isn't loaded stays listed: its blocks are kept by name until it comes back.
         let loaded = |id: &str| c.mods.iter().any(|m| m.id == id);
         let old_mods: Vec<_> = meta.mods.drain(..).filter(|(id, _)| !loaded(id)).collect();
-        let old_packages: Vec<_> = meta.packages.drain(..).filter(|(id, _)| !loaded(id)).collect();
-        meta.mods = c.mods.iter().map(|m| (m.id.clone(), m.version.clone())).chain(old_mods).collect();
-        meta.packages = c.mods.iter().filter_map(|m| Some((m.id.clone(), m.package.clone()?))).chain(old_packages).collect();
+        let old_packages: Vec<_> = meta
+            .packages
+            .drain(..)
+            .filter(|(id, _)| !loaded(id))
+            .collect();
+        meta.mods = c
+            .mods
+            .iter()
+            .map(|m| (m.id.clone(), m.version.clone()))
+            .chain(old_mods)
+            .collect();
+        meta.packages = c
+            .mods
+            .iter()
+            .filter_map(|m| Some((m.id.clone(), m.package.clone()?)))
+            .chain(old_packages)
+            .collect();
         let ids = IdTable::load(&meta.dir, c);
-        let dim_dirs: Vec<PathBuf> = c.dims.iter().map(|d| meta.dir.join("dims").join(d.name.replace(':', "_"))).collect();
+        let dim_dirs: Vec<PathBuf> = c
+            .dims
+            .iter()
+            .map(|d| meta.dir.join("dims").join(d.name.replace(':', "_")))
+            .collect();
         let mut on_disk = FxHashSet::default();
         let mut saved = vec![FxHashSet::default(); dim_dirs.len()];
         for (dim, dir) in dim_dirs.iter().enumerate() {
             for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
                 let name = e.file_name().to_string_lossy().into_owned();
-                let parts: Vec<i32> = name.strip_prefix("r.").and_then(|n| n.strip_suffix(".bin")).map_or(Vec::new(), |n| n.split('.').filter_map(|v| v.parse().ok()).collect());
+                let parts: Vec<i32> = name
+                    .strip_prefix("r.")
+                    .and_then(|n| n.strip_suffix(".bin"))
+                    .map_or(Vec::new(), |n| n.split('.').filter_map(|v| v.parse().ok()).collect());
                 if let [x, y, z] = parts[..] {
                     let r = IVec3::new(x, y, z);
                     on_disk.insert((dim as u32, r));
                     // The header says which of its cubes are there.
                     let mut raw = vec![0u8; ENTRIES * 8];
-                    if std::fs::File::open(e.path()).and_then(|mut f| f.read_exact(&mut raw)).is_ok() {
+                    if std::fs::File::open(e.path())
+                        .and_then(|mut f| f.read_exact(&mut raw))
+                        .is_ok()
+                    {
                         for i in 0..ENTRIES {
                             if raw[i * 8 + 4..i * 8 + 8] != [0; 4] {
                                 let i = i as i32;
@@ -340,7 +514,16 @@ impl Storage {
                 }
             }
         }
-        Storage { meta, ids, regions: FxHashMap::default(), dim_dirs, on_disk, saved, unknown: FxHashMap::default() }
+        Storage {
+            meta,
+            ids,
+            regions: FxHashMap::default(),
+            dim_dirs,
+            on_disk,
+            saved,
+            unknown: FxHashMap::default(),
+            last_written: FxHashMap::default(),
+        }
     }
 
     fn region(&mut self, dim: u32, r: IVec3) -> Option<&mut Region> {
@@ -391,7 +574,9 @@ impl Storage {
         if !ids.missing.is_empty() {
             if let Some(raw) = Cube::read(&mut data.get(4..4 + len)?, |w| w) {
                 if raw.palette().iter().any(|w| ids.missing.contains(w)) {
-                    let cells: Vec<(usize, u32)> = (0..crate::world::cube::VOLUME).filter_map(|i| Some((i, raw.get(i))).filter(|(_, w)| ids.missing.contains(w))).collect();
+                    let cells: Vec<(usize, u32)> = (0..crate::world::cube::VOLUME)
+                        .filter_map(|i| Some((i, raw.get(i))).filter(|(_, w)| ids.missing.contains(w)))
+                        .collect();
                     self.unknown.insert((dim, pos), cells);
                 }
             }
@@ -412,7 +597,11 @@ impl Storage {
             cells.retain(|&(i, _)| cube.get(i) == self.ids.unknown);
             for &(i, w) in cells.iter() {
                 let n = kept.len() as u32;
-                let stand_in = *kept.iter().find(|(_, v)| **v == w).map(|(k, _)| k).unwrap_or(&(u32::MAX - n));
+                let stand_in = *kept
+                    .iter()
+                    .find(|(_, v)| **v == w)
+                    .map(|(k, _)| k)
+                    .unwrap_or(&(u32::MAX - n));
                 kept.insert(stand_in, w);
                 cube.set(i, stand_in);
             }
@@ -431,6 +620,15 @@ impl Storage {
         let len = (buf.len() - 4) as u32;
         buf[..4].copy_from_slice(&len.to_le_bytes());
         buf.extend_from_slice(entities);
+        let hash = {
+            use std::hash::{Hash, Hasher};
+            let mut h = rustc_hash::FxHasher::default();
+            buf.hash(&mut h);
+            h.finish()
+        };
+        if self.last_written.insert((dim, pos), hash) == Some(hash) {
+            return;
+        }
         let packed = lz4_flex::compress_prepend_size(&buf);
         let (r, i) = region_of(pos);
         if let Some(reg) = self.region(dim, r) {
@@ -451,7 +649,10 @@ impl Storage {
     }
 
     pub fn player_path(&self, name: &str) -> PathBuf {
-        let safe: String = name.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect();
+        let safe: String = name
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '_' })
+            .collect();
         self.meta.dir.join("players").join(format!("{safe}.txt"))
     }
 }
@@ -480,8 +681,9 @@ impl Screen for ConfirmDelete {
                         let trash = parent.join(".trash");
                         let _ = std::fs::create_dir_all(&trash);
                         let target = trash.join(format!("{}-{}", leaf.to_string_lossy(), now_secs()));
-                        if std::fs::rename(&dir, &target).is_err() {
-                            let _ = std::fs::remove_dir_all(&dir);
+                        // The screen promised it can be got back, so failing means keeping it.
+                        if let Err(e) = std::fs::rename(&dir, &target) {
+                            log::error!("could not move {} to the trash, it stays where it is: {e}", dir.display());
                         }
                     }
                     c.requests.push(Request::Close);
@@ -513,7 +715,9 @@ impl Screen for MissingMods {
             label(ui, cx, "world.missing_mods.note", &[], "dim");
             ui.container(Style::row().gap(6.0), |ui| {
                 let world = self.world.clone();
-                let go = button(ui, cx, "world.missing_mods.continue", &[], 145.0, move |c| c.requests.push(Request::StartWorldAnyway(world.clone())));
+                let go = button(ui, cx, "world.missing_mods.continue", &[], 145.0, move |c| {
+                    c.requests.push(Request::StartWorldAnyway(world.clone()))
+                });
                 ui.set_id(go, "continue");
                 button(ui, cx, "menu.cancel", &[], 145.0, |c| c.requests.push(Request::Close));
             });
@@ -534,32 +738,63 @@ impl Screen for WorldSelect {
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
         let worlds = list(&cx.settings.saves_dir());
-        let selected = worlds.iter().position(|w| self.selected.as_ref() == Some(&w.dir));
+        let selected = worlds
+            .iter()
+            .position(|w| self.selected.as_ref() == Some(&w.dir));
         frame(ui, cx, "world.select", |ui| {
             // The list takes whatever height is left and scrolls; the buttons below always show.
-            let list = ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(300.0).h(0.0).grow().min_h(60.0).scroll(), |ui| {
-                if worlds.is_empty() {
-                    label(ui, cx, "world.empty", &[], "dim");
-                }
-                for (i, w) in worlds.iter().enumerate() {
-                    let when = format_age(now_secs().saturating_sub(w.last_played));
-                    let info = cx.t("world.info", &[Arg::Text(w.dir.file_name().unwrap_or_default().to_string_lossy().into()), Arg::Text(when)]);
-                    let (name, dir) = (w.name.clone(), w.dir.clone());
-                    let b = ui.button("button", Style::default().pad(4.0).stretch().gap(2.0), Rc::new(move |c: &mut Ctx| {
-                        if let Some(s) = c.screen::<WorldSelect>() {
-                            s.selected = Some(dir.clone());
-                        }
-                        c.requests.push(Request::Rebuild);
-                    }), |ui| {
-                        ui.text(text::plain(&name), "button");
-                        ui.text(info, "dim");
-                    });
-                    if let Kind::Button { selected: s, .. } = &mut ui.nodes[b].kind {
-                        *s = selected == Some(i);
+            let list = ui.panel(
+                "panel",
+                Style::default()
+                    .pad(8.0)
+                    .gap(4.0)
+                    .stretch()
+                    .w(300.0)
+                    .h(0.0)
+                    .grow()
+                    .min_h(60.0)
+                    .scroll(),
+                |ui| {
+                    if worlds.is_empty() {
+                        label(ui, cx, "world.empty", &[], "dim");
                     }
-                    ui.set_id(b, &format!("world:{i}"));
-                }
-            });
+                    for (i, w) in worlds.iter().enumerate() {
+                        let when = format_age(now_secs().saturating_sub(w.last_played));
+                        let info = cx.t(
+                            "world.info",
+                            &[
+                                Arg::Text(
+                                    w.dir
+                                        .file_name()
+                                        .unwrap_or_default()
+                                        .to_string_lossy()
+                                        .into(),
+                                ),
+                                Arg::Text(when),
+                            ],
+                        );
+                        let (name, dir) = (w.name.clone(), w.dir.clone());
+                        let b = ui.button(
+                            "button",
+                            Style::default().pad(4.0).stretch().gap(2.0),
+                            Rc::new(move |c: &mut Ctx| {
+                                if let Some(s) = c.screen::<WorldSelect>() {
+                                    s.selected = Some(dir.clone());
+                                }
+                                c.requests.push(Request::Rebuild);
+                            }),
+                            |ui| {
+                                ui.text(text::plain(&name), "button");
+                                ui.text(info, "dim");
+                            },
+                        );
+                        if let Kind::Button { selected: s, .. } = &mut ui.nodes[b].kind {
+                            *s = selected == Some(i);
+                        }
+                        ui.set_id(b, &format!("world:{i}"));
+                    }
+                },
+            );
             ui.set_id(list, "worlds");
             ui.container(Style::row().gap(6.0), |ui| {
                 let sel = selected.and_then(|i| worlds.get(i)).cloned();
@@ -578,7 +813,8 @@ impl Screen for WorldSelect {
                 let sel = selected.and_then(|i| worlds.get(i)).cloned();
                 let del = button(ui, cx, "world.delete", &[], 145.0, move |c| {
                     if let Some(w) = &sel {
-                        c.requests.push(Request::Open(Box::new(ConfirmDelete { world: w.clone() })));
+                        c.requests
+                            .push(Request::Open(Box::new(ConfirmDelete { world: w.clone() })));
                     }
                 });
                 if let Kind::Button { enabled, .. } = &mut ui.nodes[del].kind {
@@ -587,7 +823,8 @@ impl Screen for WorldSelect {
                 let sel = selected.and_then(|i| worlds.get(i)).cloned();
                 let addr = button(ui, cx, "world.new_address", &[], 70.0, move |c| {
                     if let Some(w) = &sel {
-                        c.requests.push(Request::Open(Box::new(crate::friends::ConfirmNewAddress { world: w.clone() })));
+                        c.requests
+                            .push(Request::Open(Box::new(crate::friends::ConfirmNewAddress { world: w.clone() })));
                     }
                 });
                 if let Kind::Button { enabled, .. } = &mut ui.nodes[addr].kind {
@@ -634,10 +871,36 @@ impl Screen for CreateWorld {
                     let name = c.input_text("name").unwrap_or_default();
                     let seed = parse_seed(&c.input_text("seed").unwrap_or_default());
                     let name = if name.trim().is_empty() { "World".to_string() } else { name.trim().to_string() };
-                    c.requests.push(Request::StartWorldAnyway(create(&c.settings.saves_dir(), &name, seed)));
+                    c.requests
+                        .push(Request::StartWorldAnyway(create(&c.settings.saves_dir(), &name, seed)));
                 });
                 button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
             });
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_shown_seed_makes_the_same_world() {
+        for seed in [0, 5, u64::MAX, 1 << 63, 0x9E37_79B9_7F4A_7C15] {
+            assert_eq!(parse_seed(&shown_seed(seed)), seed);
+        }
+    }
+
+    #[test]
+    fn a_renamed_copy_is_not_its_own_folder() {
+        let dir = std::env::temp_dir().join(format!("weft-saves-{}", std::process::id()));
+        let w = create(&dir, "test-thing", 1);
+        assert!(in_own_folder(&w));
+        let copy = dir.join("my_build");
+        std::fs::rename(&w.dir, &copy).unwrap();
+        let moved = list(&dir).into_iter().next().unwrap();
+        assert_eq!(moved.name, "test-thing");
+        assert!(!in_own_folder(&moved));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

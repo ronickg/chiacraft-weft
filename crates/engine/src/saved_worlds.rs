@@ -56,7 +56,15 @@ pub fn load(run_dir: &Path) -> Vec<SavedWorld> {
 fn save(run_dir: &Path, worlds: &[SavedWorld]) {
     let mut s = String::from("# Worlds this player has joined (chiacraft): key, address, name, owner, last seen, owner's inbox.\n");
     for w in worlds {
-        s.push_str(&format!("{}\t{}\t{}\t{}\t{}\t{}\n", clean(&w.key), clean(&w.address), clean(&w.name), clean(&w.owner), w.last_seen, clean(&w.inbox)));
+        s.push_str(&format!(
+            "{}\t{}\t{}\t{}\t{}\t{}\n",
+            clean(&w.key),
+            clean(&w.address),
+            clean(&w.name),
+            clean(&w.owner),
+            w.last_seen,
+            clean(&w.inbox)
+        ));
     }
     if let Err(e) = std::fs::write(path(run_dir), s) {
         log::warn!("saving the worlds list: {e}");
@@ -67,8 +75,18 @@ fn save(run_dir: &Path, worlds: &[SavedWorld]) {
 pub fn remember(run_dir: &Path, address: &str) {
     let Some(p) = crate::world_address::parse(address) else { return };
     let mut worlds = load(run_dir);
-    let old = worlds.iter().position(|w| w.key == p.key).map(|i| worlds.remove(i));
-    let mut w = old.unwrap_or(SavedWorld { key: p.key.clone(), address: String::new(), name: String::new(), owner: String::new(), last_seen: 0, inbox: String::new() });
+    let old = worlds
+        .iter()
+        .position(|w| w.key == p.key)
+        .map(|i| worlds.remove(i));
+    let mut w = old.unwrap_or(SavedWorld {
+        key: p.key.clone(),
+        address: String::new(),
+        name: String::new(),
+        owner: String::new(),
+        last_seen: 0,
+        inbox: String::new(),
+    });
     w.address = address.trim().to_string();
     if !p.name.is_empty() {
         w.name = p.name;
@@ -201,7 +219,11 @@ pub fn status_line(run_dir: &Path, key: &str) -> (String, Vec<crate::ui::text::A
         && let Ok(answer) = rx.try_recv()
     {
         let mut worlds = load(run_dir);
-        let moved_to = worlds.iter().find(|w| w.key == key).and_then(|w| answer.ok().and_then(|a| crate::friends::follow(&a.moved, key, &w.owner)));
+        let moved_to = worlds.iter().find(|w| w.key == key).and_then(|w| {
+            answer
+                .ok()
+                .and_then(|a| crate::friends::follow(&a.moved, key, &w.owner))
+        });
         match moved_to {
             Some(to) => {
                 if let Some(w) = worlds.iter_mut().find(|w| w.key == key) {
@@ -218,9 +240,14 @@ pub fn status_line(run_dir: &Path, key: &str) -> (String, Vec<crate::ui::text::A
         }
     }
     match pings.get(key) {
-        Some(Ping::Online(st, _)) => ("multiplayer.status.online".into(), vec![Arg::Text(st.players.to_string()), Arg::Text(st.packages.to_string())]),
+        Some(Ping::Online(st, _)) => {
+            ("multiplayer.status.online".into(), vec![Arg::Text(st.players.to_string()), Arg::Text(st.packages.to_string())])
+        }
         Some(Ping::Offline(_)) => {
-            let seen = load(run_dir).into_iter().find(|w| w.key == key).map_or(0, |w| w.last_seen);
+            let seen = load(run_dir)
+                .into_iter()
+                .find(|w| w.key == key)
+                .map_or(0, |w| w.last_seen);
             if seen == 0 {
                 ("multiplayer.status.offline".into(), Vec::new())
             } else {

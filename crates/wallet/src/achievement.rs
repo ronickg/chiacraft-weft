@@ -153,14 +153,7 @@ pub fn player_id(identity: &[u8; 48]) -> u128 {
 /// A player id as `8-4-4-4-12` hex.
 pub fn id_string(id: u128) -> String {
     let h = format!("{id:032x}");
-    format!(
-        "{}-{}-{}-{}-{}",
-        &h[0..8],
-        &h[8..12],
-        &h[12..16],
-        &h[16..20],
-        &h[20..32]
-    )
+    format!("{}-{}-{}-{}-{}", &h[0..8], &h[8..12], &h[12..16], &h[16..20], &h[20..32])
 }
 
 /// An identity key's fingerprint (32 hex digits; horizon-protocol's `identity_fingerprint_hex`).
@@ -175,11 +168,7 @@ pub fn fingerprint(identity: &[u8; 48]) -> String {
 /// The text a DID's owner key signs to vouch for an issuer key: its own first line, the DID's
 /// launcher id and the issuer key, so it stands for nothing else.
 pub fn issuer_did_text(launcher: &[u8; 32], issuer: &[u8; 48]) -> String {
-    format!(
-        "chiacraft achievement issuer v1\ndid: {}\nissuer: {}",
-        hex(launcher),
-        hex(issuer)
-    )
+    format!("chiacraft achievement issuer v1\ndid: {}\nissuer: {}", hex(launcher), hex(issuer))
 }
 
 /// 16 fresh random bytes as hex.
@@ -238,10 +227,7 @@ impl Credential {
         Self {
             v: FORMAT,
             issuer,
-            subject: Subject {
-                key: hex(subject_key),
-                player: id_string(player_id(subject_key)),
-            },
+            subject: Subject { key: hex(subject_key), player: id_string(player_id(subject_key)) },
             achievement,
             issued,
             nonce,
@@ -307,18 +293,12 @@ impl Credential {
         too_long("the issuer name", &self.issuer.name, MAX_NAME)?;
         too_long("the id", &self.achievement.id, MAX_ID)?;
         too_long("the title", &self.achievement.title, MAX_TITLE)?;
-        too_long(
-            "the description",
-            &self.achievement.description,
-            MAX_DESCRIPTION,
-        )?;
+        too_long("the description", &self.achievement.description, MAX_DESCRIPTION)?;
         if let Some(i) = &self.achievement.icon {
             too_long("the icon", i, MAX_ICON)?;
         }
         if self.data.as_ref().is_some_and(|d| d.len() > MAX_DATA) {
-            return Err(Error::new(format!(
-                "the data is longer than {MAX_DATA} bytes"
-            )));
+            return Err(Error::new(format!("the data is longer than {MAX_DATA} bytes")));
         }
         if let Some(s) = &self.status {
             too_long("the status address", s, MAX_STATUS)?;
@@ -347,12 +327,10 @@ impl Credential {
         let did = match &self.issuer.did {
             None => None,
             Some(d) => {
-                let launcher = crate::keys::decode_did(&d.did)
-                    .ok_or_else(|| Error::new("the issuer DID isn't a did:chia"))?;
+                let launcher = crate::keys::decode_did(&d.did).ok_or_else(|| Error::new("the issuer DID isn't a did:chia"))?;
                 let owner = key48(&d.owner, "the DID owner")?;
                 let sig = from_hex(&d.sig).unwrap_or_default();
-                if !sign::verify_owner(&owner, issuer_did_text(&launcher, &issuer).as_bytes(), &sig)
-                {
+                if !sign::verify_owner(&owner, issuer_did_text(&launcher, &issuer).as_bytes(), &sig) {
                     return Err(Error::new("the issuer's DID proof doesn't check"));
                 }
                 Some(d.did.clone())
@@ -363,11 +341,7 @@ impl Credential {
             Some(a) if a.check(self.hash()) => Some(a.day),
             Some(_) => return Err(Error::new("the anchor proof doesn't lead to its root")),
         };
-        Ok(Checked {
-            self_signed: self.self_signed(),
-            did,
-            anchored,
-        })
+        Ok(Checked { self_signed: self.self_signed(), did, anchored })
     }
 
     pub fn from_json(text: &str) -> Result<Self> {
@@ -405,27 +379,13 @@ impl Revocations {
     }
 
     /// A signed list (`revoked` sorted and deduplicated here).
-    pub fn signed(
-        signer: &dyn Signer,
-        seq: u64,
-        updated: u64,
-        mut revoked: Vec<String>,
-    ) -> Result<Self> {
+    pub fn signed(signer: &dyn Signer, seq: u64, updated: u64, mut revoked: Vec<String>) -> Result<Self> {
         revoked.sort();
         revoked.dedup();
         if revoked.len() > MAX_REVOKED {
-            return Err(Error::new(format!(
-                "a revocation list holds at most {MAX_REVOKED} nonces"
-            )));
+            return Err(Error::new(format!("a revocation list holds at most {MAX_REVOKED} nonces")));
         }
-        let mut r = Self {
-            v: FORMAT,
-            issuer: signer.identity().hex(),
-            seq,
-            updated,
-            revoked,
-            sig: String::new(),
-        };
+        let mut r = Self { v: FORMAT, issuer: signer.identity().hex(), seq, updated, revoked, sig: String::new() };
         r.sig = hex(&signer.sign(&r.signing_text())?);
         Ok(r)
     }
@@ -435,9 +395,7 @@ impl Revocations {
             return Err(Error::new("unknown revocation list format"));
         }
         if self.revoked.len() > MAX_REVOKED || self.revoked.windows(2).any(|w| w[0] >= w[1]) {
-            return Err(Error::new(
-                "the revocation list isn't sorted or is too long",
-            ));
+            return Err(Error::new("the revocation list isn't sorted or is too long"));
         }
         let issuer = key48(&self.issuer, "the issuer")?;
         let sig = from_hex(&self.sig).unwrap_or_default();
@@ -478,13 +436,7 @@ pub fn merkle_root(leaves: &[[u8; 32]]) -> [u8; 32] {
     while level.len() > 1 {
         level = level
             .chunks(2)
-            .map(|p| {
-                if p.len() == 2 {
-                    node(&p[0], &p[1])
-                } else {
-                    p[0]
-                }
-            })
+            .map(|p| if p.len() == 2 { node(&p[0], &p[1]) } else { p[0] })
             .collect();
     }
     level[0]
@@ -501,13 +453,7 @@ pub fn merkle_path(leaves: &[[u8; 32]], mut index: usize) -> Vec<(bool, [u8; 32]
         }
         level = level
             .chunks(2)
-            .map(|p| {
-                if p.len() == 2 {
-                    node(&p[0], &p[1])
-                } else {
-                    p[0]
-                }
-            })
+            .map(|p| if p.len() == 2 { node(&p[0], &p[1]) } else { p[0] })
             .collect();
         index /= 2;
     }
@@ -516,12 +462,9 @@ pub fn merkle_path(leaves: &[[u8; 32]], mut index: usize) -> Vec<(bool, [u8; 32]
 
 /// Whether `leaf` reaches `root` along `path`.
 pub fn merkle_check(leaf: [u8; 32], path: &[(bool, [u8; 32])], root: [u8; 32]) -> bool {
-    path.iter().fold(
-        leaf,
-        |h, (left, sib)| {
-            if *left { node(sib, &h) } else { node(&h, sib) }
-        },
-    ) == root
+    path.iter()
+        .fold(leaf, |h, (left, sib)| if *left { node(sib, &h) } else { node(&h, sib) })
+        == root
 }
 
 impl Anchor {
@@ -576,11 +519,7 @@ mod tests {
 
     fn credential(issuer: &IdentitySigner, subject: &[u8; 48]) -> Credential {
         Credential::unsigned(
-            Issuer {
-                key: issuer.identity().hex(),
-                name: "Stormhold\nfake: line".into(),
-                did: None,
-            },
+            Issuer { key: issuer.identity().hex(), name: "Stormhold\nfake: line".into(), did: None },
             subject,
             Achievement {
                 id: "trophies:miner".into(),
@@ -656,11 +595,7 @@ mod tests {
             .sign(&issuer_did_text(&launcher, &server.identity().0))
             .unwrap();
         let mut u = credential(&server, &me.identity().0);
-        u.issuer.did = Some(IssuerDid {
-            did: did.clone(),
-            owner: hex(&owner.public()),
-            sig: hex(&proof),
-        });
+        u.issuer.did = Some(IssuerDid { did: did.clone(), owner: hex(&owner.public()), sig: hex(&proof) });
         let c = u.sign(&server).unwrap();
         assert_eq!(c.verify().unwrap().did.as_deref(), Some(did.as_str()));
         // The same proof for another issuer key fails.

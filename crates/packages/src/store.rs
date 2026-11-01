@@ -106,7 +106,8 @@ impl Store {
             if !self.has_blob(&f.hash) {
                 let bytes = std::fs::read(dir.join(&f.path)).map_err(|e| format!("{}: {e}", f.path))?;
                 // Changed while being read: the hash taken a moment ago no longer holds.
-                self.put_blob(&f.hash, &bytes).map_err(|_| format!("{} changed while being read", f.path))?;
+                self.put_blob(&f.hash, &bytes)
+                    .map_err(|_| format!("{} changed while being read", f.path))?;
             }
         }
         self.lay_out(&manifest)?;
@@ -140,7 +141,10 @@ impl Store {
             return Ok(d);
         }
         let dest = self.package(&h);
-        let tmp = self.root.join("packages").join(format!(".{}-{}", h.hex(), std::process::id()));
+        let tmp = self
+            .root
+            .join("packages")
+            .join(format!(".{}-{}", h.hex(), std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp);
         let files = tmp.join("files");
         for f in &manifest.files {
@@ -163,7 +167,10 @@ impl Store {
     /// Marks a package as just used: the packages used longest ago are the first to go when the
     /// store is tidied.
     pub fn touch(&self, h: &Hash) {
-        if let Ok(f) = std::fs::File::options().write(true).open(self.package(h).join(".done")) {
+        if let Ok(f) = std::fs::File::options()
+            .write(true)
+            .open(self.package(h).join(".done"))
+        {
             let _ = f.set_modified(std::time::SystemTime::now());
         }
     }
@@ -174,10 +181,20 @@ impl Store {
     /// never removed.
     pub fn tidy(&self, keep: &[Hash], budget: u64) -> Tidied {
         let mut done = Tidied::default();
-        let stale = |p: &Path| p.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_some_and(|age| age.as_secs() > 3600);
+        let stale = |p: &Path| {
+            p.metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.elapsed().ok())
+                .is_some_and(|age| age.as_secs() > 3600)
+        };
         let mut kept: Vec<FileManifest> = Vec::new();
         let mut spare: Vec<(std::time::SystemTime, u64, Hash, FileManifest)> = Vec::new();
-        for e in std::fs::read_dir(self.root.join("packages")).into_iter().flatten().flatten() {
+        for e in std::fs::read_dir(self.root.join("packages"))
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             let path = e.path();
             let name = e.file_name().to_string_lossy().into_owned();
             let Some(h) = Hash::from_hex(&name) else {
@@ -187,11 +204,18 @@ impl Store {
                 }
                 continue;
             };
-            let manifest = self.dir(&h).ok_or(String::new()).and_then(|_| self.manifest(&h));
+            let manifest = self
+                .dir(&h)
+                .ok_or(String::new())
+                .and_then(|_| self.manifest(&h));
             match manifest {
                 Ok(m) if keep.contains(&h) => kept.push(m),
                 Ok(m) => {
-                    let used = path.join(".done").metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH);
+                    let used = path
+                        .join(".done")
+                        .metadata()
+                        .and_then(|m| m.modified())
+                        .unwrap_or(std::time::UNIX_EPOCH);
                     spare.push((used, m.files.iter().map(|f| f.size).sum(), h, m));
                 }
                 Err(_) => {
@@ -210,8 +234,15 @@ impl Store {
                 done.packages += 1;
             }
         }
-        let needed: std::collections::HashSet<Hash> = kept.iter().flat_map(|m| m.files.iter().map(|f| f.hash)).collect();
-        for e in std::fs::read_dir(self.root.join("blobs")).into_iter().flatten().flatten() {
+        let needed: std::collections::HashSet<Hash> = kept
+            .iter()
+            .flat_map(|m| m.files.iter().map(|f| f.hash))
+            .collect();
+        for e in std::fs::read_dir(self.root.join("blobs"))
+            .into_iter()
+            .flatten()
+            .flatten()
+        {
             let path = e.path();
             let name = e.file_name().to_string_lossy().into_owned();
             let remove = match Hash::from_hex(&name) {
@@ -232,7 +263,9 @@ impl Store {
     /// Checks a laid-out package against its hash: the manifest, and every file's size and hash,
     /// with nothing extra. Gives its folder.
     pub fn verify(&self, h: &Hash) -> Result<PathBuf, String> {
-        let dir = self.dir(h).ok_or_else(|| format!("package {h:?} is not in the store"))?;
+        let dir = self
+            .dir(h)
+            .ok_or_else(|| format!("package {h:?} is not in the store"))?;
         let manifest = self.manifest(h)?;
         let mut found = Vec::new();
         list(&dir, &dir, &mut found);
@@ -315,10 +348,21 @@ mod tests {
             h
         };
         let (pinned, old, recent) = (make(1), make(2), make(3));
-        let size = store.manifest(&recent).unwrap().files.iter().map(|f| f.size).sum::<u64>();
+        let size = store
+            .manifest(&recent)
+            .unwrap()
+            .files
+            .iter()
+            .map(|f| f.size)
+            .sum::<u64>();
         let past = std::time::SystemTime::now() - std::time::Duration::from_secs(1000);
         for h in [pinned, old] {
-            std::fs::File::options().write(true).open(store.package(&h).join(".done")).unwrap().set_modified(past).unwrap();
+            std::fs::File::options()
+                .write(true)
+                .open(store.package(&h).join(".done"))
+                .unwrap()
+                .set_modified(past)
+                .unwrap();
         }
         store.touch(&recent);
         std::fs::write(store.blob(&Hash::of(b"stray")), b"stray").unwrap();

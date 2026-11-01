@@ -84,6 +84,17 @@ fn blocks(_r: &mut Registry) {
     // static BUTTON: Block = Block::named("button");
     // r.block(&BUTTON).on_use(|u| { u.world(); u.pos(); u.player(); true });
     //
+    // Redstone: say what it is and the engine runs it (docs/redstone.md):
+    // static CRYSTAL: Block = Block::named("crystal");
+    // static ALARM: Block = Block::named("alarm");
+    // static AND_GATE: Block = Block::named("and_gate");
+    // r.block(&CRYSTAL).signal_block();                        // always on
+    // r.block(&ALARM).signal_sink().on_signal(|e| { e.rising(); e.world(); });
+    // r.block(&AND_GATE)
+    //     .signal_logic(2, |s| if s.rear() > 0 && s.sides().iter().any(|v| *v > 0) { 15 } else { 0 })
+    //     .model_box([0.0, 0.0, 0.0], [16.0, 2.0, 16.0])
+    //     .not_solid();
+    //
     // A family of blocks made in a loop gets its handles from the names:
     // for color in ["red", "blue"] {
     //     r.block(Block::generated(format!("{color}_brick"))).hardness(2.0);
@@ -122,6 +133,9 @@ fn worldgen(_r: &mut Registry) {
     // static SHRINE: Template = Template::named("shrine");
     // r.template(&SHRINE).layer(&["ccc", "c c", "ccc"]).key('c', "base:cobblestone");
     // r.structure(&OVERWORLD, &SHRINE).spacing(256).chance(0.3);
+    // Something new in the sky, on an orbit of its own (textures/sky/planet.png):
+    // static PLANET: SkyObject = SkyObject::named("planet");
+    // r.sky_body(&OVERWORLD, &PLANET).texture("planet").size(6.0).orbit(96000.0).phase(0.1).tilt(20.0);
 }
 
 /// Mobs and other entities
@@ -145,7 +159,8 @@ fn events(r: &mut Registry) {
         }
         let w = batch.world();
         for joined in batch.iter() {
-            w.inventory(joined.player).insert(ItemStack::new(EXAMPLE_ITEM.id(), 1));
+            w.inventory(joined.player)
+                .insert(ItemStack::new(EXAMPLE_ITEM.id(), 1));
             info!("gave player {} an example item", joined.player);
         }
     });

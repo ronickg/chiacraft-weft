@@ -12,8 +12,8 @@
 //! The logic lives here (not in the binary) so the simulator tests run it: [`run`] takes its
 //! environment, its question and its output as [`Io`].
 use super::{
-    Bytes32, ChainConfig, ChainNetwork, ChainReader, MakeOffer, OfferGive, OfferState, PushOutcome,
-    WalletKeys, did_string, hex32, offer, parse_did, reader::Dialer,
+    Bytes32, ChainConfig, ChainNetwork, ChainReader, MakeOffer, OfferGive, OfferState, PushOutcome, WalletKeys, did_string, hex32, offer,
+    parse_did, reader::Dialer,
 };
 use crate::{
     Error, IdentitySigner, Mnemonic, Result, Secret, keys,
@@ -86,10 +86,7 @@ impl Dialer for Box<dyn Dialer> {
     fn candidates(&self) -> super::reader::BoxFuture<'_, Vec<String>> {
         (**self).candidates()
     }
-    fn dial(
-        &self,
-        address: String,
-    ) -> super::reader::BoxFuture<'_, Result<super::reader::Connection>> {
+    fn dial(&self, address: String) -> super::reader::BoxFuture<'_, Result<super::reader::Connection>> {
         (**self).dial(address)
     }
 }
@@ -124,10 +121,7 @@ fn number<T: std::str::FromStr>(flag: &str, value: Option<String>) -> Result<T> 
 }
 
 fn parse_args(args: &[String]) -> Result<Opts> {
-    let mut o = Opts {
-        addresses: super::wallet::DEFAULT_ADDRESSES,
-        ..Opts::default()
-    };
+    let mut o = Opts { addresses: super::wallet::DEFAULT_ADDRESSES, ..Opts::default() };
     let mut it = args.iter().cloned();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -194,9 +188,7 @@ pub fn run(args: &[String], io: &mut Io<'_>) -> Result<()> {
         "did" => tool.did(),
         "send" => tool.send(),
         "sponsor-request" => tool.sponsor_request(),
-        other => Err(Error::new(format!(
-            "unknown command {other:?} (try --help)"
-        ))),
+        other => Err(Error::new(format!("unknown command {other:?} (try --help)"))),
     }
 }
 
@@ -208,18 +200,11 @@ fn new_wallet(o: &Opts, io: &mut Io<'_>) -> Result<()> {
         .clone()
         .ok_or_else(|| Error::new("new-wallet needs --out FILE (where the words go)"))?;
     if path.exists() {
-        return Err(Error::new(format!(
-            "{} exists already: new-wallet never overwrites a file",
-            path.display()
-        )));
+        return Err(Error::new(format!("{} exists already: new-wallet never overwrites a file", path.display())));
     }
-    let dir =
-        std::path::absolute(&path).map_err(|e| Error::new(format!("{}: {e}", path.display())))?;
+    let dir = std::path::absolute(&path).map_err(|e| Error::new(format!("{}: {e}", path.display())))?;
     if dir.ancestors().skip(1).any(|d| d.join(".git").exists()) {
-        return Err(Error::new(format!(
-            "{} is inside a git checkout: keep wallet words outside any repository",
-            path.display()
-        )));
+        return Err(Error::new(format!("{} is inside a git checkout: keep wallet words outside any repository", path.display())));
     }
     let network = match o
         .network
@@ -266,12 +251,7 @@ impl<'a, 'b> Tool<'a, 'b> {
             .clone()
             .or_else(|| (io.var)(CONFIRM_VAR))
             .unwrap_or_default();
-        let (net, consent) = spending::choose_network(
-            &network,
-            &confirm,
-            "--network",
-            "--mainnet-confirm (or HORIZON_MAINNET_CONFIRM)",
-        )?;
+        let (net, consent) = spending::choose_network(&network, &confirm, "--network", "--mainnet-confirm (or HORIZON_MAINNET_CONFIRM)")?;
         let caps = SpendCaps::for_network(net).with_overrides("--", |name| {
             o.caps
                 .iter()
@@ -279,13 +259,7 @@ impl<'a, 'b> Tool<'a, 'b> {
                 .find(|(n, _)| n == name)
                 .map(|(_, v)| v.clone())
         })?;
-        Ok(Self {
-            o,
-            io,
-            network: net.into(),
-            consent,
-            caps,
-        })
+        Ok(Self { o, io, network: net.into(), consent, caps })
     }
 
     fn net(&self) -> crate::Network {
@@ -312,9 +286,7 @@ impl<'a, 'b> Tool<'a, 'b> {
 
     /// The wallet's words: the environment, else a file. Never printed.
     fn read_words(&mut self) -> Result<Mnemonic> {
-        let (text, from) = if let Some(w) =
-            (self.io.var)(WORDS_VAR).filter(|w| !w.trim().is_empty())
-        {
+        let (text, from) = if let Some(w) = (self.io.var)(WORDS_VAR).filter(|w| !w.trim().is_empty()) {
             (Secret::new(w), WORDS_VAR.to_owned())
         } else {
             let path = (self.io.var)(WORDS_FILE_VAR)
@@ -332,19 +304,14 @@ impl<'a, 'b> Tool<'a, 'b> {
                 if let Ok(meta) = std::fs::metadata(&path)
                     && meta.permissions().mode() & 0o077 != 0
                 {
-                    let line = format!(
-                        "warning: {} can be read by other users (chmod 600 it)",
-                        path.display()
-                    );
+                    let line = format!("warning: {} can be read by other users (chmod 600 it)", path.display());
                     self.say(line);
                 }
             }
-            let text = std::fs::read_to_string(&path)
-                .map_err(|e| Error::new(format!("the words file {}: {e}", path.display())))?;
+            let text = std::fs::read_to_string(&path).map_err(|e| Error::new(format!("the words file {}: {e}", path.display())))?;
             (Secret::new(text), path.display().to_string())
         };
-        Mnemonic::parse(text.expose())
-            .map_err(|problem| Error::new(format!("the words in {from}: {problem}")))
+        Mnemonic::parse(text.expose()).map_err(|problem| Error::new(format!("the words in {from}: {problem}")))
     }
 
     fn keys(&self, words: &Mnemonic) -> WalletKeys {
@@ -356,11 +323,7 @@ impl<'a, 'b> Tool<'a, 'b> {
     }
 
     /// A reader for `puzzle_hashes` (none: DID lookups only), synced.
-    fn reader(
-        &mut self,
-        fingerprint: Option<u32>,
-        puzzle_hashes: Vec<Bytes32>,
-    ) -> Result<ChainReader> {
+    fn reader(&mut self, fingerprint: Option<u32>, puzzle_hashes: Vec<Bytes32>) -> Result<ChainReader> {
         let mut config = ChainConfig::chosen(self.net(), self.consent);
         config.caps = self.caps;
         config.puzzle_hashes = puzzle_hashes;
@@ -394,18 +357,10 @@ impl<'a, 'b> Tool<'a, 'b> {
                 .status()
                 .last_error
                 .unwrap_or_else(|| "no peer answered".into());
-            return Err(Error::new(format!(
-                "not synced with {} within {} s ({why})",
-                self.network,
-                self.io.wait.as_secs()
-            )));
+            return Err(Error::new(format!("not synced with {} within {} s ({why})", self.network, self.io.wait.as_secs())));
         }
         let s = reader.status();
-        self.say(format!(
-            "Synced at height {} with {} peer(s)",
-            s.synced_height.unwrap_or(0),
-            s.peers.len()
-        ));
+        self.say(format!("Synced at height {} with {} peer(s)", s.synced_height.unwrap_or(0), s.peers.len()));
         Ok(reader)
     }
 
@@ -420,19 +375,13 @@ impl<'a, 'b> Tool<'a, 'b> {
             return Ok(());
         }
         let question = format!("Go ahead on {}? [y/N] ", self.network.name().to_uppercase());
-        if (self.io.ask)(&question) {
-            Ok(())
-        } else {
-            Err(Error::new("cancelled: nothing was spent"))
-        }
+        if (self.io.ask)(&question) { Ok(()) } else { Err(Error::new("cancelled: nothing was spent")) }
     }
 
     fn pushed(&mut self, push: &PushOutcome) -> Result<String> {
         match push {
             PushOutcome::Accepted { txid } | PushOutcome::Pending { txid } => Ok(hex32(*txid)),
-            PushOutcome::Rejected { error, .. } => {
-                Err(Error::new(format!("the chain refused the spend: {error}")))
-            }
+            PushOutcome::Rejected { error, .. } => Err(Error::new(format!("the chain refused the spend: {error}"))),
         }
     }
 
@@ -450,14 +399,7 @@ impl<'a, 'b> Tool<'a, 'b> {
         self.say(format!("Account fingerprint {}", facts.fingerprint));
         for (i, ph) in unhardened.puzzle_hashes().iter().enumerate() {
             let a = self.address(*ph);
-            self.say(format!(
-                "  {i:>2}  {a}{}",
-                if i == 0 {
-                    "  (primary: fund this one)"
-                } else {
-                    ""
-                }
-            ));
+            self.say(format!("  {i:>2}  {a}{}", if i == 0 { "  (primary: fund this one)" } else { "" }));
         }
         for (i, ph) in hardened.iter().enumerate() {
             let a = self.address(*ph);
@@ -493,10 +435,7 @@ impl<'a, 'b> Tool<'a, 'b> {
         let total = self.amount(s.balance);
         let spendable = self.amount(r.spendable_balance());
         let primary = self.address(keys.primary());
-        self.say(format!(
-            "Balance: {total} in {} coin(s); spendable {spendable}; primary address {primary}",
-            s.coins
-        ));
+        self.say(format!("Balance: {total} in {} coin(s); spendable {spendable}; primary address {primary}", s.coins));
         Ok(())
     }
 
@@ -517,10 +456,7 @@ impl<'a, 'b> Tool<'a, 'b> {
                 self.address(keys.primary()),
                 self.amount(fee)
             ),
-            format!(
-                "the wallet has {} spendable",
-                self.amount(r.spendable_balance())
-            ),
+            format!("the wallet has {} spendable", self.amount(r.spendable_balance())),
         ];
         self.confirm(&plan)?;
         let made = r.create_did(&keys, fee, self.io.wait)?;
@@ -533,11 +469,7 @@ impl<'a, 'b> Tool<'a, 'b> {
         self.say(format!(
             "Confirmed at height {}: {did}, held by {owner} ({})",
             record.launched().unwrap_or(0),
-            if keys.puzzle_hashes().iter().any(|p| record.owned_by(*p)) {
-                "this wallet"
-            } else {
-                "NOT this wallet"
-            }
+            if keys.puzzle_hashes().iter().any(|p| record.owned_by(*p)) { "this wallet" } else { "NOT this wallet" }
         ));
         Ok(())
     }
@@ -559,10 +491,7 @@ impl<'a, 'b> Tool<'a, 'b> {
             ChainNetwork::Testnet11 => "txch1",
         };
         if !to_text.trim().starts_with(prefix) {
-            return Err(Error::new(format!(
-                "{to_text} isn't a {} address (it should start with {prefix})",
-                self.network.name()
-            )));
+            return Err(Error::new(format!("{to_text} isn't a {} address (it should start with {prefix})", self.network.name())));
         }
         let to = super::parse_address(&to_text)?;
         self.caps.check_fee(fee)?;
@@ -581,19 +510,12 @@ impl<'a, 'b> Tool<'a, 'b> {
                 to_text.trim(),
                 self.amount(fee)
             ),
-            format!(
-                "the wallet has {} spendable",
-                self.amount(r.spendable_balance())
-            ),
+            format!("the wallet has {} spendable", self.amount(r.spendable_balance())),
         ];
         self.confirm(&plan)?;
         let push = r.send(&keys, to, amount, fee, self.io.wait)?;
         let tx = self.pushed(&push)?;
-        self.say(format!(
-            "Pushed transaction {tx}: {} to {}",
-            self.amount(amount),
-            to_text.trim()
-        ));
+        self.say(format!("Pushed transaction {tx}: {} to {}", self.amount(amount), to_text.trim()));
         Ok(())
     }
 
@@ -625,22 +547,10 @@ impl<'a, 'b> Tool<'a, 'b> {
                 self.address(keys.primary())
             ),
             format!("lock the coin it gives until it is taken or expires in {minutes} minutes"),
-            format!(
-                "pay {} fee now (nothing moves until someone takes it)",
-                self.amount(fee)
-            ),
+            format!("pay {} fee now (nothing moves until someone takes it)", self.amount(fee)),
         ];
         self.confirm(&plan)?;
-        let made = r.make_offer(
-            MakeOffer {
-                give: OfferGive::Xch(give),
-                price,
-                expires_at: Some(expires),
-                fee,
-            },
-            &keys,
-            self.io.wait,
-        )?;
+        let made = r.make_offer(MakeOffer { give: OfferGive::Xch(give), price, expires_at: Some(expires), fee }, &keys, self.io.wait)?;
         let path = self
             .o
             .out
@@ -655,9 +565,7 @@ impl<'a, 'b> Tool<'a, 'b> {
         if !self.o.wait {
             return Ok(());
         }
-        self.say(
-            "Waiting for it to be taken and paid (Ctrl-C stops waiting; the offer stays open)…",
-        );
+        self.say("Waiting for it to be taken and paid (Ctrl-C stops waiting; the offer stays open)…");
         let end = Instant::now() + Duration::from_secs(minutes * 60);
         loop {
             match r.offer_state(&made) {
@@ -680,10 +588,12 @@ impl<'a, 'b> Tool<'a, 'b> {
     }
 
     fn take_offer(&mut self) -> Result<()> {
-        let source =
-            self.o.positional.first().cloned().ok_or_else(|| {
-                Error::new("take-offer needs the offer's file (or its offer1… text)")
-            })?;
+        let source = self
+            .o
+            .positional
+            .first()
+            .cloned()
+            .ok_or_else(|| Error::new("take-offer needs the offer's file (or its offer1… text)"))?;
         let text = if source.trim().starts_with("offer1") {
             source
         } else {
@@ -693,15 +603,10 @@ impl<'a, 'b> Tool<'a, 'b> {
         let fee = self.o.fee.unwrap_or(0);
         let pays = summary.requested_xch.saturating_add(summary.royalties_xch);
         self.caps.check_fee(fee)?;
-        self.caps.check(
-            "max-take",
-            "taking the offer (its price and royalties)",
-            pays,
-        )?;
+        self.caps
+            .check("max-take", "taking the offer (its price and royalties)", pays)?;
         if !summary.requested_cats.is_empty() || !summary.requested_nfts.is_empty() {
-            return Err(Error::new(
-                "the offer asks for CATs or NFTs: this wallet pays XCH only",
-            ));
+            return Err(Error::new("the offer asks for CATs or NFTs: this wallet pays XCH only"));
         }
         let words = self.read_words()?;
         let keys = self.keys(&words);
@@ -726,29 +631,16 @@ impl<'a, 'b> Tool<'a, 'b> {
                 self.amount(pays.saturating_add(fee)),
                 self.address(keys.primary()),
                 self.amount(summary.requested_xch),
-                if summary.royalties_xch > 0 {
-                    format!(" + {} royalties", self.amount(summary.royalties_xch))
-                } else {
-                    String::new()
-                },
+                if summary.royalties_xch > 0 { format!(" + {} royalties", self.amount(summary.royalties_xch)) } else { String::new() },
                 self.amount(fee)
             ),
-            format!(
-                "receive {}",
-                if gets.is_empty() {
-                    "nothing".to_owned()
-                } else {
-                    gets.join(", ")
-                }
-            ),
+            format!("receive {}", if gets.is_empty() { "nothing".to_owned() } else { gets.join(", ") }),
             "a payment can't be undone".into(),
         ];
         self.confirm(&plan)?;
         let taken = r.take_offer(&text, &keys, fee, self.io.wait)?;
         let tx = self.pushed(&taken.push)?;
-        self.say(format!(
-            "Took the offer: transaction {tx}; it confirms in the next blocks (about a minute)"
-        ));
+        self.say(format!("Took the offer: transaction {tx}; it confirms in the next blocks (about a minute)"));
         Ok(())
     }
 
@@ -783,9 +675,12 @@ impl<'a, 'b> Tool<'a, 'b> {
     }
 
     fn sponsor_request(&mut self) -> Result<()> {
-        let url = self.o.positional.first().cloned().ok_or_else(|| {
-            Error::new("sponsor-request needs the sponsor's address (http://127.0.0.1:8080)")
-        })?;
+        let url = self
+            .o
+            .positional
+            .first()
+            .cloned()
+            .ok_or_else(|| Error::new("sponsor-request needs the sponsor's address (http://127.0.0.1:8080)"))?;
         let words = self.read_words()?;
         let keys = self.keys(&words);
         let fingerprint = keys::facts_of(&words).fingerprint;
@@ -794,27 +689,18 @@ impl<'a, 'b> Tool<'a, 'b> {
         self.banner();
         let address = self.address(keys.primary());
         let plan = vec![
-            format!(
-                "send {url} your first address {address}, your identity key (public) and its signature of the request"
-            ),
+            format!("send {url} your first address {address}, your identity key (public) and its signature of the request"),
             "spend nothing from this wallet: the sponsor pays the DID's mojo and fee".into(),
         ];
         self.confirm(&plan)?;
-        let request = crate::sponsor::Request::sign(
-            &signer,
-            self.network.name(),
-            &address,
-            offer::now_seconds(),
-        )?;
+        let request = crate::sponsor::Request::sign(&signer, self.network.name(), &address, offer::now_seconds())?;
         drop(signer);
         let (status, body) = http_post(&url, crate::sponsor::PATH, &request.to_json())?;
         let reply = crate::sponsor::read_answer(status, &body)?;
         let launcher = Bytes32::from(reply.launcher_id()?);
         let did = did_string(launcher);
         if reply.status == crate::sponsor::EXISTING {
-            self.say(format!(
-                "The sponsor already launched {did} for this identity"
-            ));
+            self.say(format!("The sponsor already launched {did} for this identity"));
         } else {
             self.say(format!("The sponsor launched {did} ({})", reply.status));
         }
@@ -829,11 +715,7 @@ impl<'a, 'b> Tool<'a, 'b> {
         self.say(format!(
             "On chain at height {}: {did}, {}",
             record.launched().unwrap_or(0),
-            if ours {
-                "held by this wallet's first address"
-            } else {
-                "NOT held by this wallet"
-            }
+            if ours { "held by this wallet's first address" } else { "NOT held by this wallet" }
         ));
         Ok(())
     }
@@ -844,24 +726,20 @@ impl<'a, 'b> Tool<'a, 'b> {
 pub fn http_post(base: &str, path: &str, body: &str) -> Result<(u16, String)> {
     use std::io::Read;
     let base = base.trim().trim_end_matches('/');
-    let rest = base.strip_prefix("http://").ok_or_else(|| {
-        Error::new("the tool speaks plain http:// only (a sponsor on this computer: http://127.0.0.1:8080)")
-    })?;
+    let rest = base
+        .strip_prefix("http://")
+        .ok_or_else(|| Error::new("the tool speaks plain http:// only (a sponsor on this computer: http://127.0.0.1:8080)"))?;
     let (host, prefix) = match rest.split_once('/') {
         Some((h, p)) => (h, format!("/{p}")),
         None => (rest, String::new()),
     };
-    let addr = if host.contains(':') {
-        host.to_owned()
-    } else {
-        format!("{host}:80")
-    };
+    let addr = if host.contains(':') { host.to_owned() } else { format!("{host}:80") };
     let socket = std::net::ToSocketAddrs::to_socket_addrs(&addr)
         .map_err(|e| Error::new(format!("{addr}: {e}")))?
         .next()
         .ok_or_else(|| Error::new(format!("{addr}: no address")))?;
-    let mut stream = std::net::TcpStream::connect_timeout(&socket, Duration::from_secs(10))
-        .map_err(|e| Error::new(format!("{addr}: {e}")))?;
+    let mut stream =
+        std::net::TcpStream::connect_timeout(&socket, Duration::from_secs(10)).map_err(|e| Error::new(format!("{addr}: {e}")))?;
     stream.set_read_timeout(Some(Duration::from_secs(150))).ok();
     let request = format!(
         "POST {prefix}{path} HTTP/1.1\r\nHost: {host}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
@@ -879,15 +757,10 @@ pub fn http_post(base: &str, path: &str, body: &str) -> Result<(u16, String)> {
         .nth(1)
         .and_then(|s| s.parse().ok())
         .ok_or_else(|| Error::new("the sponsor's answer has no status"))?;
-    let chunked = head.lines().any(|l| {
-        l.to_ascii_lowercase().starts_with("transfer-encoding:")
-            && l.to_ascii_lowercase().contains("chunked")
-    });
-    let body = if chunked {
-        dechunk(payload)
-    } else {
-        payload.to_owned()
-    };
+    let chunked = head
+        .lines()
+        .any(|l| l.to_ascii_lowercase().starts_with("transfer-encoding:") && l.to_ascii_lowercase().contains("chunked"));
+    let body = if chunked { dechunk(payload) } else { payload.to_owned() };
     Ok((status, body))
 }
 
@@ -913,10 +786,7 @@ mod tests {
     #[test]
     fn arguments() {
         let a = |s: &str| s.split_whitespace().map(str::to_owned).collect::<Vec<_>>();
-        let o = parse_args(&a(
-            "--network mainnet --max-fee 5 make-offer --price 7 --yes",
-        ))
-        .unwrap();
+        let o = parse_args(&a("--network mainnet --max-fee 5 make-offer --price 7 --yes")).unwrap();
         assert_eq!(o.command, "make-offer");
         assert_eq!(o.price, Some(7));
         assert!(o.yes);

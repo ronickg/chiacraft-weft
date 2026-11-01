@@ -14,9 +14,7 @@ use rustls::{
     ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme,
     client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
     crypto::{CryptoProvider, verify_tls12_signature, verify_tls13_signature},
-    pki_types::{
-        CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName, UnixTime, pem::PemObject,
-    },
+    pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName, UnixTime, pem::PemObject},
 };
 use std::sync::Arc;
 
@@ -42,12 +40,7 @@ impl ServerCertVerifier for PeerCertificates {
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> std::result::Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls12_signature(
-            message,
-            cert,
-            dss,
-            &self.0.signature_verification_algorithms,
-        )
+        verify_tls12_signature(message, cert, dss, &self.0.signature_verification_algorithms)
     }
     fn verify_tls13_signature(
         &self,
@@ -55,12 +48,7 @@ impl ServerCertVerifier for PeerCertificates {
         cert: &CertificateDer<'_>,
         dss: &DigitallySignedStruct,
     ) -> std::result::Result<HandshakeSignatureValid, rustls::Error> {
-        verify_tls13_signature(
-            message,
-            cert,
-            dss,
-            &self.0.signature_verification_algorithms,
-        )
+        verify_tls13_signature(message, cert, dss, &self.0.signature_verification_algorithms)
     }
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
         self.0.signature_verification_algorithms.supported_schemes()
@@ -82,10 +70,9 @@ pub fn connector_for(cert: &ChiaCertificate) -> Result<Connector> {
         .ok_or_else(|| crate::Error::new("the Chia CA is missing"))?
         .map_err(failed("the Chia CA"))?;
     roots.add(ca).map_err(failed("the Chia CA"))?;
-    let chain: Vec<CertificateDer<'static>> =
-        CertificateDer::pem_slice_iter(cert.cert_pem.as_bytes())
-            .collect::<std::result::Result<_, _>>()
-            .map_err(failed("TLS certificate"))?;
+    let chain: Vec<CertificateDer<'static>> = CertificateDer::pem_slice_iter(cert.cert_pem.as_bytes())
+        .collect::<std::result::Result<_, _>>()
+        .map_err(failed("TLS certificate"))?;
     let key = PrivatePkcs8KeyDer::pem_slice_iter(cert.key_pem.as_bytes())
         .next()
         .ok_or_else(|| crate::Error::new("TLS certificate key missing"))?

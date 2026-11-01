@@ -32,7 +32,9 @@ pub fn write(e: &mut Entities, c: &Content, id: u64, v: Energy) {
 
 pub fn insert(e: &mut Entities, c: &Content, id: u64, amount: i64, simulate: bool) -> i64 {
     let Some(mut v) = read(e, c, id) else { return 0 };
-    let n = amount.clamp(0, v.max_in.max(0)).min((v.capacity - v.stored).max(0));
+    let n = amount
+        .clamp(0, v.max_in.max(0))
+        .min((v.capacity - v.stored).max(0));
     if !simulate && n > 0 {
         v.stored += n;
         write(e, c, id, v);
@@ -52,12 +54,27 @@ pub fn extract(e: &mut Entities, c: &Content, id: u64, amount: i64, simulate: bo
 
 impl Grid {
     pub fn cube_loaded(&mut self, c: &Content, pos: IVec3, cube: &Cube) {
-        if !cube.palette().iter().any(|&s| c.states[s as usize].conductor) {
+        // A machine arriving next to cables that are here already belongs to their network.
+        if !self.conductors.is_empty()
+            && cube.palette().iter().any(|&s| {
+                c.game
+                    .block_entities
+                    .contains_key(&c.states[s as usize].block)
+            })
+        {
+            self.dirty = true;
+        }
+        if !cube
+            .palette()
+            .iter()
+            .any(|&s| c.states[s as usize].conductor)
+        {
             return;
         }
         for i in 0..4096usize {
             if c.states[cube.get(i) as usize].conductor {
-                self.conductors.insert(pos * 16 + crate::world::cube::offset(i));
+                self.conductors
+                    .insert(pos * 16 + crate::world::cube::offset(i));
             }
         }
         self.dirty = true;
@@ -82,7 +99,7 @@ impl Grid {
         }
     }
 
-    fn rebuild(&mut self, e: &Entities, c: &Content) {
+    fn rebuild(&mut self, e: &Entities, frame: u64, c: &Content) {
         self.dirty = false;
         self.nets.clear();
         let mut seen: FxHashSet<IVec3> = FxHashSet::default();
@@ -101,7 +118,7 @@ impl Grid {
                         if seen.insert(n) {
                             stack.push(n);
                         }
-                    } else if let Some(&id) = e.anchors.get(&n) {
+                    } else if let Some(&id) = e.anchors.get(&(frame, n)) {
                         if e.comps.contains_key(&(id, c.game.energy)) {
                             ends.push(id);
                         }
@@ -118,9 +135,9 @@ impl Grid {
 
     /// `catch_up`: a part of a catch-up, the machines making up ticks and how many (their rates
     /// count that many times); the others sit it out.
-    pub fn tick(&mut self, e: &mut Entities, c: &Content, catch_up: Option<&FxHashMap<u64, u32>>) {
+    pub fn tick(&mut self, e: &mut Entities, frame: u64, c: &Content, catch_up: Option<&FxHashMap<u64, u32>>) {
         if self.dirty {
-            self.rebuild(e, c);
+            self.rebuild(e, frame, c);
         }
         for net in &self.nets {
             let mut offer: Vec<(u64, i64)> = Vec::new();

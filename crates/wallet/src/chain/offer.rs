@@ -24,9 +24,8 @@ use chia_puzzle_types::{
 };
 use chia_puzzles::SETTLEMENT_PAYMENT_HASH;
 use chia_sdk_driver::{
-    Action, AssetInfo, Id, Nft, Offer, Puzzle, Relation, RequestedPayments, SpendContext, Spends,
-    TransferNftById, calculate_royalty_payments, calculate_trade_price_amounts,
-    calculate_trade_prices, decode_offer, encode_offer,
+    Action, AssetInfo, Id, Nft, Offer, Puzzle, Relation, RequestedPayments, SpendContext, Spends, TransferNftById,
+    calculate_royalty_payments, calculate_trade_price_amounts, calculate_trade_prices, decode_offer, encode_offer,
 };
 use chia_sdk_types::{Condition, run_puzzle};
 use clvm_traits::{FromClvm, ToClvm};
@@ -126,12 +125,10 @@ fn summary_of(ctx: &mut SpendContext, offer: &Offer) -> Result<OfferSummary> {
         for c in conditions {
             match c {
                 Condition::AssertBeforeSecondsAbsolute(c) => {
-                    s.expires_at_seconds =
-                        Some(s.expires_at_seconds.map_or(c.seconds, |e| e.min(c.seconds)));
+                    s.expires_at_seconds = Some(s.expires_at_seconds.map_or(c.seconds, |e| e.min(c.seconds)));
                 }
                 Condition::AssertBeforeHeightAbsolute(c) => {
-                    s.expires_at_height =
-                        Some(s.expires_at_height.map_or(c.height, |e| e.min(c.height)));
+                    s.expires_at_height = Some(s.expires_at_height.map_or(c.height, |e| e.min(c.height)));
                 }
                 _ => {}
             }
@@ -149,12 +146,7 @@ pub fn now_seconds() -> u64 {
 
 /// Whether the offer can still be taken: not expired at `now` / `peak`, and every coin the maker
 /// spends exists unspent on the chain.
-pub async fn check<S: ChainSource>(
-    source: &S,
-    summary: &OfferSummary,
-    now: u64,
-    peak: Option<u32>,
-) -> Result<()> {
+pub async fn check<S: ChainSource>(source: &S, summary: &OfferSummary, now: u64, peak: Option<u32>) -> Result<()> {
     if summary.expires_at_seconds.is_some_and(|t| now >= t) {
         return Err(Error::new("the offer has expired"));
     }
@@ -195,9 +187,7 @@ pub fn select(coins: &[Coin], need: u64) -> Result<Vec<Coin>> {
         picked.push(c);
     }
     if total < u128::from(need) || picked.is_empty() {
-        return Err(Error::new(format!(
-            "not enough XCH: {need} mojos needed, {total} spendable"
-        )));
+        return Err(Error::new(format!("not enough XCH: {need} mojos needed, {total} spendable")));
     }
     Ok(picked)
 }
@@ -219,20 +209,14 @@ pub fn build_take(text: &str, keys: &WalletKeys, coins: &[Coin], fee: u64) -> Re
     let summary = summary_of(&mut ctx, &offer)?;
     let requested = offer.requested_payments();
     if !requested.cats.is_empty() || !requested.nfts.is_empty() || !requested.options.is_empty() {
-        return Err(Error::new(
-            "this wallet takes only offers that ask for XCH (no CATs, NFTs or options yet)",
-        ));
+        return Err(Error::new("this wallet takes only offers that ask for XCH (no CATs, NFTs or options yet)"));
     }
     let need = summary
         .requested_xch
         .checked_add(summary.royalties_xch)
         .and_then(|n| n.checked_add(fee))
         .ok_or_else(|| Error::new("the offer's amounts overflow"))?;
-    let picked = if need > 0 {
-        select(coins, need)?
-    } else {
-        Vec::new()
-    };
+    let picked = if need > 0 { select(coins, need)? } else { Vec::new() };
     let mut spends = Spends::new(keys.primary());
     spends.add(offer.offered_coins().clone());
     for c in &picked {
@@ -242,8 +226,7 @@ pub fn build_take(text: &str, keys: &WalletKeys, coins: &[Coin], fee: u64) -> Re
     let royalties = offer.requested_royalties();
     if !royalties.is_empty() {
         let prices = calculate_trade_price_amounts(&requested.amounts(), royalties.len());
-        let payments = calculate_royalty_payments(&mut ctx, &prices, &royalties)
-            .map_err(failed("royalties"))?;
+        let payments = calculate_royalty_payments(&mut ctx, &prices, &royalties).map_err(failed("royalties"))?;
         actions.extend(payments.actions());
     }
     if fee > 0 {
@@ -251,20 +234,11 @@ pub fn build_take(text: &str, keys: &WalletKeys, coins: &[Coin], fee: u64) -> Re
     }
     let deltas = spends.apply(&mut ctx, &actions).map_err(failed("take"))?;
     spends
-        .finish_with_keys(
-            &mut ctx,
-            &deltas,
-            Relation::AssertConcurrent,
-            &keys.synthetic_keys(),
-        )
+        .finish_with_keys(&mut ctx, &deltas, Relation::AssertConcurrent, &keys.synthetic_keys())
         .map_err(failed("take"))?;
     let coin_spends = ctx.take();
     let signature = keys.sign(&coin_spends)?;
-    Ok(Taken {
-        bundle: offer.take(SpendBundle::new(coin_spends, signature)),
-        summary,
-        spent: picked.iter().map(Coin::coin_id).collect(),
-    })
+    Ok(Taken { bundle: offer.take(SpendBundle::new(coin_spends, signature)), summary, spent: picked.iter().map(Coin::coin_id).collect() })
 }
 
 /// What the server gives in an offer it makes.
@@ -304,13 +278,7 @@ pub struct MadeOffer {
 
 /// Make an offer from the wallet: `coins` are its spendable XCH, `nft` the NFT to give (fetched
 /// into the same `ctx` with [`fetch_nft`]) when `spec.give` is an NFT.
-pub fn build_offer(
-    ctx: &mut SpendContext,
-    spec: MakeOffer,
-    keys: &WalletKeys,
-    coins: &[Coin],
-    nft: Option<Nft>,
-) -> Result<MadeOffer> {
+pub fn build_offer(ctx: &mut SpendContext, spec: MakeOffer, keys: &WalletKeys, coins: &[Coin], nft: Option<Nft>) -> Result<MadeOffer> {
     if spec.price == 0 {
         return Err(Error::new("an offer needs a price"));
     }
@@ -324,12 +292,7 @@ pub fn build_offer(
             if amount == 0 {
                 return Err(Error::new("give at least 1 mojo"));
             }
-            actions.push(Action::send(
-                Id::Xch,
-                SETTLEMENT_PAYMENT_HASH.into(),
-                amount,
-                Memos::None,
-            ));
+            actions.push(Action::send(Id::Xch, SETTLEMENT_PAYMENT_HASH.into(), amount, Memos::None));
             amount
         }
         OfferGive::Nft(launcher) => {
@@ -347,46 +310,28 @@ pub fn build_offer(
     let need = xch_needed
         .checked_add(spec.fee)
         .ok_or_else(|| Error::new("the offer's amounts overflow"))?;
-    let picked = if need > 0 {
-        select(coins, need)?
-    } else {
-        Vec::new()
-    };
+    let picked = if need > 0 { select(coins, need)? } else { Vec::new() };
     inputs.extend(picked.iter().map(Coin::coin_id));
     for c in &picked {
         spends.add(*c);
     }
     let hint = ctx.hint(primary).map_err(failed("offer"))?;
     let mut requested = RequestedPayments::new();
-    requested.xch.push(NotarizedPayment::new(
-        Offer::nonce(inputs.clone()),
-        vec![Payment::new(primary, spec.price, hint)],
-    ));
+    requested
+        .xch
+        .push(NotarizedPayment::new(Offer::nonce(inputs.clone()), vec![Payment::new(primary, spec.price, hint)]));
     let asset_info = AssetInfo::new();
     if let Some(nft) = nft_input {
         let id = Id::Existing(nft.info.launcher_id);
         // A royalty NFT is told the trade price, so the taker's royalty is enforced.
         let trade_prices = if nft.info.royalty_basis_points > 0 {
-            calculate_trade_prices(
-                &calculate_trade_price_amounts(&requested.amounts(), 1),
-                &asset_info,
-            )
-            .map_err(failed("offer"))?
+            calculate_trade_prices(&calculate_trade_price_amounts(&requested.amounts(), 1), &asset_info).map_err(failed("offer"))?
         } else {
             Vec::new()
         };
         spends.add(nft);
-        actions.push(Action::update_nft(
-            id,
-            vec![],
-            Some(TransferNftById::new(None, trade_prices)),
-        ));
-        actions.push(Action::send(
-            id,
-            SETTLEMENT_PAYMENT_HASH.into(),
-            1,
-            Memos::None,
-        ));
+        actions.push(Action::update_nft(id, vec![], Some(TransferNftById::new(None, trade_prices))));
+        actions.push(Action::send(id, SETTLEMENT_PAYMENT_HASH.into(), 1, Memos::None));
     }
     if spec.fee > 0 {
         actions.push(Action::fee(spec.fee));
@@ -404,22 +349,12 @@ pub fn build_offer(
     }
     let deltas = spends.apply(ctx, &actions).map_err(failed("offer"))?;
     spends
-        .finish_with_keys(
-            ctx,
-            &deltas,
-            Relation::AssertConcurrent,
-            &keys.synthetic_keys(),
-        )
+        .finish_with_keys(ctx, &deltas, Relation::AssertConcurrent, &keys.synthetic_keys())
         .map_err(failed("offer"))?;
     let coin_spends = ctx.take();
     let signature = keys.sign(&coin_spends)?;
-    let offer = Offer::from_input_spend_bundle(
-        ctx,
-        SpendBundle::new(coin_spends, signature),
-        requested,
-        asset_info,
-    )
-    .map_err(failed("offer"))?;
+    let offer =
+        Offer::from_input_spend_bundle(ctx, SpendBundle::new(coin_spends, signature), requested, asset_info).map_err(failed("offer"))?;
     let bundle = offer.to_spend_bundle(ctx).map_err(failed("offer"))?;
     Ok(MadeOffer {
         text: encode_offer(&bundle).map_err(failed("offer"))?,
@@ -432,12 +367,7 @@ pub fn build_offer(
 
 /// Read the NFT a hinted coin holds, into `ctx`, from its parent's spend (`fetchNft`). None if the
 /// coin isn't an NFT.
-pub async fn fetch_nft<S: ChainSource>(
-    source: &S,
-    ctx: &mut SpendContext,
-    coin: Coin,
-    created: u32,
-) -> Result<Option<Nft>> {
+pub async fn fetch_nft<S: ChainSource>(source: &S, ctx: &mut SpendContext, coin: Coin, created: u32) -> Result<Option<Nft>> {
     let parent = source
         .coin_state(vec![coin.parent_coin_info], false)
         .await?

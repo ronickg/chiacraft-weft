@@ -66,10 +66,7 @@ pub struct WalletSync {
 
 impl WalletSync {
     pub fn new(puzzle_hashes: Vec<Bytes32>) -> Self {
-        Self {
-            puzzle_hashes,
-            ..Self::default()
-        }
+        Self { puzzle_hashes, ..Self::default() }
     }
 
     /// Whether `puzzle_hash` is one of ours.
@@ -91,9 +88,7 @@ impl WalletSync {
         let record = CoinRecord::from(state);
         let id = state.coin.coin_id();
         self.coins.insert(id, record);
-        !self.is_ours(&record.puzzle_hash)
-            && record.spent.is_none()
-            && !self.subscribed.contains(&id)
+        !self.is_ours(&record.puzzle_hash) && record.spent.is_none() && !self.subscribed.contains(&id)
     }
 
     /// Roll back to `fork_height`: coins created above it never existed, spends above it are
@@ -172,20 +167,14 @@ impl WalletSync {
         let hinted: Vec<Bytes32> = self
             .coins
             .iter()
-            .filter(|(id, c)| {
-                !self.is_ours(&c.puzzle_hash) && c.spent.is_none() && !self.subscribed.contains(id)
-            })
+            .filter(|(id, c)| !self.is_ours(&c.puzzle_hash) && c.spent.is_none() && !self.subscribed.contains(id))
             .map(|(id, _)| *id)
             .collect();
         self.subscribe_hinted(source, hinted).await
     }
 
     /// Subscribe to hinted coins by id and record their current state (`subscribeHinted`).
-    pub async fn subscribe_hinted<S: ChainSource>(
-        &mut self,
-        source: &S,
-        coin_ids: Vec<Bytes32>,
-    ) -> Result<()> {
+    pub async fn subscribe_hinted<S: ChainSource>(&mut self, source: &S, coin_ids: Vec<Bytes32>) -> Result<()> {
         if coin_ids.is_empty() {
             return Ok(());
         }
@@ -275,15 +264,10 @@ mod coin_map {
     use chia_protocol::Bytes32;
     use serde::{Deserialize, Deserializer, Serializer};
     use std::collections::BTreeMap;
-    pub fn serialize<S: Serializer>(
-        v: &BTreeMap<Bytes32, CoinRecord>,
-        s: S,
-    ) -> Result<S::Ok, S::Error> {
+    pub fn serialize<S: Serializer>(v: &BTreeMap<Bytes32, CoinRecord>, s: S) -> Result<S::Ok, S::Error> {
         s.collect_seq(v.values())
     }
-    pub fn deserialize<'de, D: Deserializer<'de>>(
-        d: D,
-    ) -> Result<BTreeMap<Bytes32, CoinRecord>, D::Error> {
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<BTreeMap<Bytes32, CoinRecord>, D::Error> {
         Ok(Vec::<CoinRecord>::deserialize(d)?
             .into_iter()
             .map(|c| (c.id(), c))
@@ -296,15 +280,7 @@ mod tests {
     use super::*;
 
     fn state(ph: u8, amount: u64, created: u32, spent: Option<u32>) -> CoinState {
-        CoinState::new(
-            Coin::new(
-                Bytes32::new([amount as u8; 32]),
-                Bytes32::new([ph; 32]),
-                amount,
-            ),
-            spent,
-            Some(created),
-        )
+        CoinState::new(Coin::new(Bytes32::new([amount as u8; 32]), Bytes32::new([ph; 32]), amount), spent, Some(created))
     }
 
     #[test]
@@ -319,12 +295,7 @@ mod tests {
         assert_eq!(s.unspent_hinted().len(), 1);
         // a spent at 9, then a reorg back to 6: b (created at 7) and the spend vanish.
         let spent = state(1, 10, 5, Some(9));
-        s.apply_update(&CoinStateUpdate::new(
-            9,
-            9,
-            Bytes32::new([9; 32]),
-            vec![spent],
-        ));
+        s.apply_update(&CoinStateUpdate::new(9, 9, Bytes32::new([9; 32]), vec![spent]));
         assert_eq!(s.balance(), 20);
         s.apply_update(&CoinStateUpdate::new(10, 6, Bytes32::new([10; 32]), vec![]));
         assert_eq!(s.balance(), 10);

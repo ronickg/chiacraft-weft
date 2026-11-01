@@ -6,7 +6,17 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use winit::keyboard::KeyCode;
 
 /// The hotbar slot actions, first to ninth.
-pub const HOTBAR: [&str; 9] = ["core:hotbar1", "core:hotbar2", "core:hotbar3", "core:hotbar4", "core:hotbar5", "core:hotbar6", "core:hotbar7", "core:hotbar8", "core:hotbar9"];
+pub const HOTBAR: [&str; 9] = [
+    "core:hotbar1",
+    "core:hotbar2",
+    "core:hotbar3",
+    "core:hotbar4",
+    "core:hotbar5",
+    "core:hotbar6",
+    "core:hotbar7",
+    "core:hotbar8",
+    "core:hotbar9",
+];
 
 /// The engine's actions and their default keys.
 pub const ENGINE_KEYS: &[(&str, Key)] = {
@@ -27,6 +37,8 @@ pub const ENGINE_KEYS: &[(&str, Key)] = {
         ("core:debug", Key::Code(F3)),
         ("core:screenshot", Key::Code(F2)),
         ("core:perspective", Key::Code(F5)),
+        ("core:fullscreen", Key::Code(F11)),
+        ("core:player_list", Key::Code(Tab)),
         ("core:hide_hud", Key::Code(F1)),
         // Also F3+T, like vanilla.
         ("core:reload", Key::Code(F8)),
@@ -137,7 +149,8 @@ impl Input {
         if self.lookup.contains_key(action) {
             return;
         }
-        self.binds.push(Bind { action: action.to_string(), default, key: default });
+        self.binds
+            .push(Bind { action: action.to_string(), default, key: default });
         self.lookup.insert(action.to_string(), default);
     }
 
@@ -166,11 +179,15 @@ impl Input {
     }
 
     pub fn held(&self, action: &str) -> bool {
-        self.lookup.get(action).is_some_and(|&c| self.active(c, &self.held))
+        self.lookup
+            .get(action)
+            .is_some_and(|&c| self.active(c, &self.held))
     }
 
     pub fn pressed(&self, action: &str) -> bool {
-        self.lookup.get(action).is_some_and(|&c| self.active(c, &self.pressed))
+        self.lookup
+            .get(action)
+            .is_some_and(|&c| self.active(c, &self.pressed))
     }
 
     /// Modifiers held now (`Chord` bits).
@@ -185,7 +202,11 @@ impl Input {
             return false;
         }
         let held = self.mods();
-        held & c.mods == c.mods && !self.binds.iter().any(|b| b.key.key == c.key && b.key.mods != c.mods && b.key.mods & c.mods == c.mods && held & b.key.mods == b.key.mods)
+        held & c.mods == c.mods
+            && !self
+                .binds
+                .iter()
+                .any(|b| b.key.key == c.key && b.key.mods != c.mods && b.key.mods & c.mods == c.mods && held & b.key.mods == b.key.mods)
     }
 
     pub fn held_key(&self, k: Key) -> bool {
@@ -257,7 +278,10 @@ pub fn key_name(k: Key) -> String {
         Key::Mouse(n) => format!("Mouse{}", n + 1),
         Key::Code(c) => {
             let s = format!("{c:?}");
-            s.strip_prefix("Key").or_else(|| s.strip_prefix("Digit")).unwrap_or(&s).to_string()
+            s.strip_prefix("Key")
+                .or_else(|| s.strip_prefix("Digit"))
+                .unwrap_or(&s)
+                .to_string()
         }
     }
 }

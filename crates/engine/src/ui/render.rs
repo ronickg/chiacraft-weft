@@ -8,15 +8,15 @@ use weft_render::*;
 use std::sync::Arc;
 
 use super::font::Font;
-use crate::model::{Animation, Prop};
-use super::text::Placed;
 use super::look::Look;
+use super::text::Placed;
 use super::{Kind, Rect, Style, Ui};
 use crate::assets::{Assets, decode_png};
-use crate::shaders::{Hook, Slots};
 use crate::client::textures::GameTextures;
 use crate::content::Content;
 pub use crate::gpu_layout::Quad;
+use crate::model::{Animation, Prop};
+use crate::shaders::{Hook, Slots};
 
 /// Quads of a node and its children moved by keyframes every frame: `animation = ns:name` in the
 /// `.gui` of a class's texture names `animations/<name>.animation.json`, whose `open` animation
@@ -42,7 +42,12 @@ pub fn animate(quads: &mut [Quad], list: &[Animated]) {
             (_, Some(i)) => (i, crate::shaders::time().rem_euclid(i.length)),
             _ => continue,
         };
-        let get = |prop: Prop, default: [f32; 3]| anim.channels.iter().find(|c| c.prop == prop).map_or(default, |c| c.sample(t));
+        let get = |prop: Prop, default: [f32; 3]| {
+            anim.channels
+                .iter()
+                .find(|c| c.prop == prop)
+                .map_or(default, |c| c.sample(t))
+        };
         let (pos, rot, sc) = (get(Prop::Position, [0.0; 3]), get(Prop::Rotation, [0.0; 3]), get(Prop::Scale, [1.0; 3]));
         let (s, c) = rot[2].to_radians().sin_cos();
         let turn = |p: [f32; 2]| {
@@ -65,10 +70,16 @@ pub fn animate(quads: &mut [Quad], list: &[Animated]) {
 pub enum Slicing {
     /// Corners keep their size, edges and center stretch; borders left, top, right, bottom in GUI
     /// pixels of an image `size` GUI pixels big.
-    Nine { size: [f32; 2], border: [f32; 4] },
+    Nine {
+        size: [f32; 2],
+        border: [f32; 4],
+    },
     /// `turn = random`: each tile of a square texture turned and mirrored its own way, so the
     /// repeat does not show.
-    Tile { size: [f32; 2], turn: bool },
+    Tile {
+        size: [f32; 2],
+        turn: bool,
+    },
     Stretch,
 }
 
@@ -101,9 +112,20 @@ fn parse_gui(src: &str, pixels: [f32; 2]) -> Slicing {
     let mut size = pixels;
     let mut turn = false;
     for (_, k, v) in crate::kv::pairs(src) {
-        let nums: Vec<f32> = v.split_whitespace().filter_map(|n| n.parse().ok()).collect();
+        let nums: Vec<f32> = v
+            .split_whitespace()
+            .filter_map(|n| n.parse().ok())
+            .collect();
         match k {
-            "scaling" => kind = if v.trim() == "tile" { "tile" } else if v.trim() == "stretch" { "stretch" } else { "nine_slice" },
+            "scaling" => {
+                kind = if v.trim() == "tile" {
+                    "tile"
+                } else if v.trim() == "stretch" {
+                    "stretch"
+                } else {
+                    "nine_slice"
+                }
+            }
             "border" if nums.len() == 1 => border = [nums[0]; 4],
             "border" if nums.len() == 4 => border = [nums[0], nums[1], nums[2], nums[3]],
             "size" if nums.len() == 2 => size = [nums[0], nums[1]],
@@ -148,15 +170,8 @@ pub struct UiRenderer {
     pub animated: Vec<Animated>,
 }
 
-pub const FX: Hook = Hook {
-    kind: "fx",
-    entry: "effect",
-    dispatch: "apply_fx",
-    params: "g: Glyph",
-    args: "g",
-    ret: "Glyph",
-    fallback: "return g;",
-};
+pub const FX: Hook =
+    Hook { kind: "fx", entry: "effect", dispatch: "apply_fx", params: "g: Glyph", args: "g", ret: "Glyph", fallback: "return g;" };
 
 pub const GUI: Hook = Hook {
     kind: "gui",
@@ -176,12 +191,19 @@ fn load_shader(assets: &Assets) -> Result<(Shader, Slots, Slots), ShaderError> {
     Ok((shader, fx, gui))
 }
 
+/// The part (u0, v0, u1, v1) of a rectangle.
+fn cropped(r: Rect, c: [f32; 4]) -> Rect {
+    Rect { x: r.x + r.w * c[0], y: r.y + r.h * c[1], w: r.w * (c[2] - c[0]), h: r.h * (c[3] - c[1]) }
+}
+
 impl UiRenderer {
     pub fn new(gpu: &mut dyn Backend, assets: &Assets) -> Result<UiRenderer, String> {
         let (pipeline, fx, gui) = Self::pipeline(gpu, assets)?;
         let (font, font_tex, font_idx) = Self::load_font(gpu, assets).ok_or("font missing")?;
         let frames = gpu.frames_in_flight();
-        let screen = (0..frames).map(|_| gpu.create_buffer(16, usage::STORAGE | usage::HOST, "ui screen")).collect();
+        let screen = (0..frames)
+            .map(|_| gpu.create_buffer(16, usage::STORAGE | usage::HOST, "ui screen"))
+            .collect();
         Ok(UiRenderer {
             pipeline,
             font,
@@ -208,9 +230,15 @@ impl UiRenderer {
     /// `core:fonts/default` (atlas and its `.font`) over `core:fonts/unifont`; packs can replace either.
     fn load_font(gpu: &mut dyn Backend, assets: &Assets) -> Option<(Font, TextureId, u32)> {
         // Built in too: text must show even without the engine's asset folder.
-        let hex = assets.read("core:fonts/unifont", "", "hex").unwrap_or_else(|| include_bytes!("../../assets/fonts/unifont.hex").to_vec());
-        let desc = assets.read("core:fonts/default", "", "font").unwrap_or_else(|| include_bytes!("../../assets/fonts/default.font").to_vec());
-        let img = assets.read("core:fonts/default", "", "png").unwrap_or_else(|| include_bytes!("../../assets/fonts/default.png").to_vec());
+        let hex = assets
+            .read("core:fonts/unifont", "", "hex")
+            .unwrap_or_else(|| include_bytes!("../../assets/fonts/unifont.hex").to_vec());
+        let desc = assets
+            .read("core:fonts/default", "", "font")
+            .unwrap_or_else(|| include_bytes!("../../assets/fonts/default.font").to_vec());
+        let img = assets
+            .read("core:fonts/default", "", "png")
+            .unwrap_or_else(|| include_bytes!("../../assets/fonts/default.png").to_vec());
         let (desc, img) = (Some(desc), crate::assets::decode_png(&img));
         let desc = desc.map(|d| String::from_utf8_lossy(&d).into_owned());
         let font = Font::new(&String::from_utf8_lossy(&hex), desc.as_deref().zip(img.as_ref()));
@@ -225,18 +253,19 @@ impl UiRenderer {
 
     fn pipeline(gpu: &mut dyn Backend, assets: &Assets) -> Result<(PipelineId, Slots, Slots), String> {
         let (shader, fx, gui) = load_shader(assets).map_err(|e| e.0)?;
-        let p = gpu.create_pipeline(&PipelineDesc {
-            label: "ui",
-            shader: &shader,
-            vertex: "vs",
-            fragment: Some("fs"),
-            color: Some(Format::Surface),
-            depth: None,
-            blend: Blend::Alpha,
-            cull_back: false,
-            topology: Topology::Triangles,
-        })
-        .map_err(|e| e.0)?;
+        let p = gpu
+            .create_pipeline(&PipelineDesc {
+                label: "ui",
+                shader: &shader,
+                vertex: "vs",
+                fragment: Some("fs"),
+                color: Some(Format::Surface),
+                depth: None,
+                blend: Blend::Alpha,
+                cull_back: false,
+                topology: Topology::Triangles,
+            })
+            .map_err(|e| e.0)?;
         Ok((p, fx, gui))
     }
 
@@ -262,7 +291,16 @@ impl UiRenderer {
         if slot == 0 {
             return false;
         }
-        self.quads.push(Quad { p0: [r.x, r.y], u: [r.w, 0.0], v: [0.0, r.h], uv: [0.0, 0.0, 1.0, 1.0], color, mode: ui_mode::GUI, fx: slot, ..Default::default() });
+        self.quads.push(Quad {
+            p0: [r.x, r.y],
+            u: [r.w, 0.0],
+            v: [0.0, r.h],
+            uv: [0.0, 0.0, 1.0, 1.0],
+            color,
+            mode: ui_mode::GUI,
+            fx: slot,
+            ..Default::default()
+        });
         true
     }
 
@@ -296,39 +334,58 @@ impl UiRenderer {
             return *t;
         }
         if let Some(path) = name.strip_prefix(FACE) {
-            let kind = crate::content::try_content().map(|c| c.game.entities[c.game.player_kind as usize].texture.clone()).unwrap_or_default();
-            let skin = std::fs::read(path).ok().or_else(|| assets.read(&kind, "textures", "png"));
-            let loaded = skin.as_deref().and_then(decode_png).and_then(|img| face_of(&img)).map(|rgba| {
-                let t = gpu.create_texture(&TextureDesc { width: 8, height: 8, mips: 1, format: Format::Rgba8Srgb, render_target: false }, "face");
-                gpu.write_texture(t, 0, &rgba);
-                self.owned.push(t);
-                (gpu.texture_index(t), 8, 8)
-            });
+            let kind = crate::content::try_content()
+                .map(|c| c.game.entities[c.game.player_kind as usize].texture.clone())
+                .unwrap_or_default();
+            let skin = std::fs::read(path)
+                .ok()
+                .or_else(|| assets.read(&kind, "textures", "png"));
+            let loaded = skin
+                .as_deref()
+                .and_then(decode_png)
+                .and_then(|img| face_of(&img))
+                .map(|rgba| {
+                    let t = gpu.create_texture(
+                        &TextureDesc { width: 8, height: 8, mips: 1, format: Format::Rgba8Srgb, render_target: false },
+                        "face",
+                    );
+                    gpu.write_texture(t, 0, &rgba);
+                    self.owned.push(t);
+                    (gpu.texture_index(t), 8, 8)
+                });
             self.textures.insert(name.to_string(), loaded);
             return loaded;
         }
-        let anim = assets.read(name, "textures", "anim").map(|b| String::from_utf8_lossy(&b).into_owned());
-        let loaded = assets.read(name, "textures", "png").and_then(|b| decode_png(&b)).map(|img| {
-            let t = gpu.create_texture(
-                &TextureDesc { width: img.width, height: img.height, mips: 1, format: Format::Rgba8Srgb, render_target: false },
-                name,
-            );
-            gpu.write_texture(t, 0, &img.rgba);
-            self.owned.push(t);
-            let idx = gpu.texture_index(t);
-            // Animated like a block texture: frames stacked down (square, or `frame_height` pixels
-            // high), `frametime` ticks each.
-            let num = |src: &str, k: &str| crate::kv::get(src, k).and_then(|v| v.parse::<u32>().ok());
-            let frame = anim.as_deref().map(|src| num(src, "frame_height").unwrap_or(img.width).max(1));
-            match (anim.as_deref(), frame) {
-                (Some(src), Some(fh)) if img.height > fh && img.height % fh == 0 => {
-                    let ticks = num(src, "frametime").unwrap_or(1);
-                    self.strips.insert(idx, (img.height / fh).min(0xFFFF) | ticks.clamp(1, 0xFFFF) << 16);
-                    (idx, img.width, fh)
+        let anim = assets
+            .read(name, "textures", "anim")
+            .map(|b| String::from_utf8_lossy(&b).into_owned());
+        let loaded = assets
+            .read(name, "textures", "png")
+            .and_then(|b| decode_png(&b))
+            .map(|img| {
+                let t = gpu.create_texture(
+                    &TextureDesc { width: img.width, height: img.height, mips: 1, format: Format::Rgba8Srgb, render_target: false },
+                    name,
+                );
+                gpu.write_texture(t, 0, &img.rgba);
+                self.owned.push(t);
+                let idx = gpu.texture_index(t);
+                // Animated like a block texture: frames stacked down (square, or `frame_height` pixels
+                // high), `frametime` ticks each.
+                let num = |src: &str, k: &str| crate::kv::get(src, k).and_then(|v| v.parse::<u32>().ok());
+                let frame = anim
+                    .as_deref()
+                    .map(|src| num(src, "frame_height").unwrap_or(img.width).max(1));
+                match (anim.as_deref(), frame) {
+                    (Some(src), Some(fh)) if img.height > fh && img.height % fh == 0 => {
+                        let ticks = num(src, "frametime").unwrap_or(1);
+                        self.strips
+                            .insert(idx, (img.height / fh).min(0xFFFF) | ticks.clamp(1, 0xFFFF) << 16);
+                        (idx, img.width, fh)
+                    }
+                    _ => (idx, img.width, img.height),
                 }
-                _ => (idx, img.width, img.height),
-            }
-        });
+            });
         if loaded.is_none() {
             log::warn!("missing gui texture {name}");
         }
@@ -340,10 +397,16 @@ impl UiRenderer {
         if let Some(s) = self.slicing.get(name) {
             return *s;
         }
-        let read = |ext: &str| assets.read(name, "textures", ext).map(|b| String::from_utf8_lossy(&b).into_owned());
+        let read = |ext: &str| {
+            assets
+                .read(name, "textures", ext)
+                .map(|b| String::from_utf8_lossy(&b).into_owned())
+        };
         let gui = read("gui");
         let outset = gui.as_deref().and_then(|src| {
-            crate::kv::pairs(src).find(|p| p.1 == "outset").and_then(|(line, k, v)| crate::kv::number(name, line, k, v))
+            crate::kv::pairs(src)
+                .find(|p| p.1 == "outset")
+                .and_then(|(line, k, v)| crate::kv::number(name, line, k, v))
         });
         self.outset.insert(name.to_string(), outset.unwrap_or(0.0));
         let s = gui.map(|src| parse_gui(&src, pixels));
@@ -362,7 +425,16 @@ impl UiRenderer {
 
     /// Draws GUI texture `name` over `r` the way the texture asks for (its `.gui`), or with
     /// `fallback` when it says nothing. False if the texture is missing.
-    pub fn draw_gui(&mut self, gpu: &mut dyn Backend, assets: &Assets, name: &str, r: Rect, scale: f32, color: u32, fallback: Slicing) -> bool {
+    pub fn draw_gui(
+        &mut self,
+        gpu: &mut dyn Backend,
+        assets: &Assets,
+        name: &str,
+        r: Rect,
+        scale: f32,
+        color: u32,
+        fallback: Slicing,
+    ) -> bool {
         let Some(tex) = self.texture(gpu, assets, name) else { return false };
         let pixels = [tex.1 as f32, tex.2 as f32];
         let declared = self.declared_slicing(assets, name, pixels);
@@ -389,9 +461,21 @@ impl UiRenderer {
                 return;
             }
         }
-        let drawn = look.texture_or_plain(class, state).is_some_and(|n| self.draw_gui(gpu, assets, &n, r, scale, 0xFFFFFFFF, Slicing::Stretch));
+        let drawn = look
+            .texture_or_plain(class, state)
+            .is_some_and(|n| self.draw_gui(gpu, assets, &n, r, scale, 0xFFFFFFFF, Slicing::Stretch));
         if !drawn {
             self.checker(r, scale);
+        }
+    }
+
+    /// Share `v` of a picture in `r`: its nearest state, or cut off toward `dir` (`ui::meter`).
+    #[allow(clippy::too_many_arguments)]
+    fn meter_picture(&mut self, gpu: &mut dyn Backend, assets: &Assets, name: &str, v: f32, dir: u32, r: Rect, scale: f32) {
+        let Some((picture, crop)) = super::meter::part(name, v, dir) else { return };
+        match self.texture(gpu, assets, &picture) {
+            Some((idx, _, _)) => self.image(cropped(r, crop), idx, crop, 0xFFFFFFFF),
+            None => self.checker(cropped(r, crop), scale),
         }
     }
 
@@ -412,11 +496,18 @@ impl UiRenderer {
     pub fn draw_loaded(&mut self, name: &str, r: Rect, scale: f32, color: u32) -> bool {
         let Some(Some(tex)) = self.textures.get(name).copied() else { return false };
         let pixels = [tex.1 as f32, tex.2 as f32];
-        let slicing = self.slicing.get(name).copied().flatten().unwrap_or(Slicing::Stretch);
+        let slicing = self
+            .slicing
+            .get(name)
+            .copied()
+            .flatten()
+            .unwrap_or(Slicing::Stretch);
         let o = self.outset.get(name).copied().unwrap_or(0.0) * scale;
         let r = Rect { x: r.x - o, y: r.y - o, w: r.w + 2.0 * o, h: r.h + 2.0 * o };
         match slicing {
-            Slicing::Nine { size, border } => self.nine_sliced(r, tex.0, if size == [0.0; 2] { pixels } else { size }, border, scale, color),
+            Slicing::Nine { size, border } => {
+                self.nine_sliced(r, tex.0, if size == [0.0; 2] { pixels } else { size }, border, scale, color)
+            }
             Slicing::Tile { size, turn } => self.tile(r, tex, size[0] * scale, turn, color),
             Slicing::Stretch => self.image(r, tex.0, [0.0, 0.0, 1.0, 1.0], color),
         }
@@ -424,16 +515,28 @@ impl UiRenderer {
     }
 
     pub fn rect(&mut self, r: Rect, color: u32) {
-        self.quads.push(Quad { p0: [r.x, r.y], u: [r.w, 0.0], v: [0.0, r.h], uv: [0.0; 4], color, mode: ui_mode::SOLID, ..Default::default() });
+        self.quads.push(Quad {
+            p0: [r.x, r.y],
+            u: [r.w, 0.0],
+            v: [0.0, r.h],
+            uv: [0.0; 4],
+            color,
+            mode: ui_mode::SOLID,
+            ..Default::default()
+        });
     }
 
     pub fn image(&mut self, r: Rect, tex: u32, uv: [f32; 4], color: u32) {
-        self.quads.push(Quad { p0: [r.x, r.y], u: [r.w, 0.0], v: [0.0, r.h], uv, color, tex, mode: ui_mode::TEXTURE, ..Default::default() });
-    }
-
-    /// 9-slice: corners keep their size (scaled), edges and center stretch.
-    pub fn nine(&mut self, r: Rect, tex: (u32, u32, u32), border: f32, scale: f32, color: u32) {
-        self.nine_sliced(r, tex.0, [tex.1 as f32, tex.2 as f32], [border; 4], scale, color);
+        self.quads.push(Quad {
+            p0: [r.x, r.y],
+            u: [r.w, 0.0],
+            v: [0.0, r.h],
+            uv,
+            color,
+            tex,
+            mode: ui_mode::TEXTURE,
+            ..Default::default()
+        });
     }
 
     /// 9-slice with its own border per side, in GUI pixels of an image `size` GUI pixels big.
@@ -490,8 +593,10 @@ impl UiRenderer {
                     };
                     // The texture rectangle the visible part shows, drawn along turned edges.
                     let corners = [to_tex([0.0, 0.0]), to_tex([fw, 0.0]), to_tex([0.0, fh]), to_tex([fw, fh])];
-                    let (u0, v0) = (corners.iter().map(|c| c[0]).fold(1.0f32, f32::min), corners.iter().map(|c| c[1]).fold(1.0f32, f32::min));
-                    let (u1, v1) = (corners.iter().map(|c| c[0]).fold(0.0f32, f32::max), corners.iter().map(|c| c[1]).fold(0.0f32, f32::max));
+                    let (u0, v0) =
+                        (corners.iter().map(|c| c[0]).fold(1.0f32, f32::min), corners.iter().map(|c| c[1]).fold(1.0f32, f32::min));
+                    let (u1, v1) =
+                        (corners.iter().map(|c| c[0]).fold(0.0f32, f32::max), corners.iter().map(|c| c[1]).fold(0.0f32, f32::max));
                     let at = |t: [f32; 2]| {
                         let s = to_tile(t);
                         [x + s[0] * size, y + s[1] * size]
@@ -519,7 +624,16 @@ impl UiRenderer {
         }
     }
 
-    pub fn glyph_run(&mut self, items: &[Placed], x: f32, y: f32, px: f32, default_color: u32, shadow: Option<u32>, icons: &mut Vec<(f32, f32, f32, u32)>) {
+    pub fn glyph_run(
+        &mut self,
+        items: &[Placed],
+        x: f32,
+        y: f32,
+        px: f32,
+        default_color: u32,
+        shadow: Option<u32>,
+        icons: &mut Vec<(f32, f32, f32, u32)>,
+    ) {
         for pass in [true, false] {
             if pass && shadow.is_none() {
                 continue;
@@ -535,11 +649,7 @@ impl UiRenderer {
                         let g = self.font.glyph(ch);
                         let uv = self.font.uv(g);
                         let w = (g.advance as f32 - 1.0) * px;
-                        let c = if pass {
-                            shadow.unwrap()
-                        } else {
-                            color.map_or(default_color, |c| c << 8 | (default_color & 0xFF))
-                        };
+                        let c = if pass { shadow.unwrap() } else { color.map_or(default_color, |c| c << 8 | (default_color & 0xFF)) };
                         // Whole physical pixels: centered text starts mid-pixel, and nearest sampling
                         // at texel borders would drop or double glyph columns.
                         self.quads.push(Quad {
@@ -556,11 +666,13 @@ impl UiRenderer {
                         });
                     }
                     Placed::Icon { x: ix, y: iy, item } if !pass => icons.push((x + ix * px, y + iy * px, 16.0 * px, item)),
-                    Placed::Block { x: ix, y: iy, state } if !pass => icons.push((x + ix * px, y + iy * px, 16.0 * px, state | super::text::STATE_ICON)),
+                    Placed::Block { x: ix, y: iy, state } if !pass => {
+                        icons.push((x + ix * px, y + iy * px, 16.0 * px, state | super::text::STATE_ICON))
+                    }
                     // Loaded by `load_images` before.
-                    Placed::Image { x: ix, y: iy, w, h, image } if !pass => {
+                    Placed::Image { x: ix, y: iy, w, h, image, crop } if !pass => {
                         if let Some(Some(t)) = super::text::image_name(image).and_then(|n| self.textures.get(&n).copied()) {
-                            self.image(Rect { x: x + ix * px, y: y + iy * px, w: w * px, h: h * px }, t.0, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
+                            self.image(cropped(Rect { x: x + ix * px, y: y + iy * px, w: w * px, h: h * px }, crop), t.0, crop, 0xFFFFFFFF);
                         }
                     }
                     _ => {}
@@ -571,20 +683,10 @@ impl UiRenderer {
 
     /// Item icon: flat sprite, or an isometric cube for block items.
     pub fn item_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, item: u32) {
-        let Some(def) = c.items.get(item as usize) else { return };
-        if item == 0 {
-            return;
-        }
         let looks = crate::client::looks::current();
-        let look = looks.item(item);
-        let model = look.and_then(|l| l.model.as_deref()).unwrap_or(&def.model);
-        let icon = look.and_then(|l| l.icon).unwrap_or(def.icon);
-        if !model.is_empty() {
-            self.boxes_icon(tex, x, y, size, model, &c.states[0]);
-            return;
-        }
-        if icon != u32::MAX {
-            self.quads.push(Quad {
+        match looks.item_draw(c, item) {
+            crate::client::looks::ItemDraw::Model(model) => self.boxes_icon(tex, x, y, size, model, &c.states[0]),
+            crate::client::looks::ItemDraw::Icon(icon) => self.quads.push(Quad {
                 p0: [x, y],
                 u: [size, 0.0],
                 v: [0.0, size],
@@ -593,17 +695,17 @@ impl UiRenderer {
                 tex: tex.texture(icon),
                 mode: ui_mode::ICON,
                 ..Default::default()
-            });
-            return;
+            }),
+            crate::client::looks::ItemDraw::Block(state) => self.state_icon(c, tex, x, y, size, state),
+            crate::client::looks::ItemDraw::Nothing => {}
         }
-        let Some(state) = def.block else { return };
-        self.state_icon(c, tex, x, y, size, state);
     }
 
     /// A block state the way block items show: a sprite for flat blocks, else an isometric model.
     pub fn state_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, state: u32) {
         let Some(s) = c.states.get(state as usize) else { return };
-        if let Some(t) = s.item_sprite() {
+        let looks = crate::client::looks::current();
+        if let Some(t) = looks.block_sprite(state, s) {
             let tint = if s.tint == 0 || s.tint_faces & 1 == 0 { 0xFFFFFFFF } else { crate::content::item_tint(s.tint) << 8 | 0xFF };
             self.quads.push(Quad {
                 p0: [x, y],
@@ -617,11 +719,19 @@ impl UiRenderer {
             });
             return;
         }
-        self.boxes_icon(tex, x, y, size, &s.item_shape(), s);
+        self.boxes_icon(tex, x, y, size, &looks.block_shape(state, s), s);
     }
 
     /// Model boxes drawn isometric, tinted like `s` (air for an item's own model).
-    fn boxes_icon(&mut self, tex: &GameTextures, x: f32, y: f32, size: f32, boxes: &[crate::content::ModelBox], s: &crate::content::StateInfo) {
+    fn boxes_icon(
+        &mut self,
+        tex: &GameTextures,
+        x: f32,
+        y: f32,
+        size: f32,
+        boxes: &[crate::content::ModelBox],
+        s: &crate::content::StateInfo,
+    ) {
         let tint = |face: usize| -> u32 {
             if s.tint == 0 || s.tint_faces & (1 << face) == 0 {
                 return 0xFFFFFFFF;
@@ -632,30 +742,50 @@ impl UiRenderer {
             let ch = |s: u32| (((c >> s) & 255) as f32 * k) as u32;
             ch(24) << 24 | ch(16) << 16 | ch(8) << 8 | 0xFF
         };
-        // Isometric: block point (X, Y, Z) lands at origin + X*ex + Y*ey + Z*ez.
-        let (h, q) = (size / 2.0, size / 4.0);
-        let o = [x + h, y + size * 0.03 + h];
-        let at = |p: [f32; 3]| [o[0] + (p[0] - p[2]) * h, o[1] + (p[0] + p[2]) * q - p[1] * h];
+        // As block.json shows it in a slot: rotation 30 225 0, scale 0.625, the block's middle in
+        // the middle. Along x or z a block goes cos 45 across and sin 30 sin 45 down, up it goes
+        // cos 30, all times 0.625.
+        let (h, q, up) = (size * 0.625 * 0.707_106_8, size * 0.625 * 0.353_553_4, size * 0.625 * 0.866_025_4);
+        let o = [x + size / 2.0, y + size / 2.0];
+        let at = |p: [f32; 3]| [o[0] + (p[0] - p[2]) * h, o[1] + (p[0] + p[2] - 1.0) * q - (p[1] - 0.5) * up];
+        // Toward the one looking, from that same turn.
+        let toward = glam::Vec3::new(0.612_372_4, 0.5, 0.612_372_4);
         let grass = crate::content::item_tint(s.tint) << 8 | 0xFF;
         let mut shape = boxes.to_vec();
         // Back to front.
         shape.sort_by(|a, b| (a.min[0] + a.min[1] + a.min[2]).total_cmp(&(b.min[0] + b.min[1] + b.min[2])));
         for b in &shape {
-            let (n, m) = (b.min, b.max);
-            let (dx, dy, dz) = (m[0] - n[0], m[1] - n[1], m[2] - n[2]);
-            // (corner, u edge, v edge, face, shade, uv rect): the faces seen from the front, with
-            // the part of the texture the world mesher shows there.
-            let faces = [
-                (at([n[0], m[1], m[2]]), [dx * h, dx * q], [0.0, dy * h], 5, 0.8, [n[0], 1.0 - m[1], m[0], 1.0 - n[1]]),
-                (at([m[0], m[1], m[2]]), [dz * h, -dz * q], [0.0, dy * h], 1, 0.62, [1.0 - m[2], 1.0 - m[1], 1.0 - n[2], 1.0 - n[1]]),
-                (at([n[0], m[1], n[2]]), [dx * h, dx * q], [-dz * h, dz * q], 3, 1.0, [n[0], n[2], m[0], m[2]]),
-            ];
-            for (p0, u, v, face, k, uv) in faces {
-                self.quads.push(Quad { p0, u, v, uv, color: shade(tint(face), k), tex: tex.texture(b.textures[face]), mode: ui_mode::ICON, ..Default::default() });
+            for face in 0..6 {
+                let Some((corners, uv)) = crate::client::mesher::box_face(b, face) else { continue };
+                let (n, k) = crate::client::mesher::face_look(&corners);
+                if n.dot(toward) <= 0.0 {
+                    continue;
+                }
+                // A quad starts at the top left of its picture: the fourth corner of a face.
+                let [bottom_left, _, top_right, top_left] = corners.map(at);
+                let p0 = top_left;
+                let u = [top_right[0] - p0[0], top_right[1] - p0[1]];
+                let v = [bottom_left[0] - p0[0], bottom_left[1] - p0[1]];
+                let uv = uv.map(|t| t / 16.0);
+                self.quads.push(Quad {
+                    p0,
+                    u,
+                    v,
+                    uv,
+                    color: shade(tint(face), k),
+                    tex: tex.texture(b.textures[face]),
+                    mode: ui_mode::ICON,
+                    ..Default::default()
+                });
                 // Tinted overlay on top of its face.
-                if let Some(&ov) = tex.overlays.get(b.textures[face] as usize).filter(|&&ov| ov != 0) {
+                if let Some(&ov) = tex
+                    .overlays
+                    .get(b.textures[face] as usize)
+                    .filter(|&&ov| ov != 0)
+                {
                     let color = shade(if s.tint == 0 { 0xFFFFFFFF } else { grass }, k);
-                    self.quads.push(Quad { p0, u, v, uv, color, tex: tex.texture(ov - 1), mode: ui_mode::ICON, ..Default::default() });
+                    self.quads
+                        .push(Quad { p0, u, v, uv, color, tex: tex.texture(ov - 1), mode: ui_mode::ICON, ..Default::default() });
                 }
             }
         }
@@ -735,15 +865,38 @@ impl UiRenderer {
             let px = scale * text_unit;
             let layout = super::text::layout(&super::text::plain(&stack.count.to_string()), &self.font, None);
             let mut none = Vec::new();
-            self.glyph_run(&layout.items, x + s - layout.width * px + scale, y + s - 16.0 * px + scale, px, 0xFFFFFFFF, Some(0x3F3F3FFF), &mut none);
+            self.glyph_run(
+                &layout.items,
+                x + s - layout.width * px + scale,
+                y + s - 16.0 * px + scale,
+                px,
+                0xFFFFFFFF,
+                Some(0x3F3F3FFF),
+                &mut none,
+            );
         }
     }
 
     /// The hovered node's tooltip next to the mouse (physical pixels), drawn every frame on top:
     /// a `tooltip` panel with the text in it, like any other part of the UI.
     #[allow(clippy::too_many_arguments)]
-    pub fn tooltip(&mut self, gpu: &mut dyn Backend, assets: &Assets, ui: &Ui, look: &Look, scale: f32, at: glam::Vec2, game: Option<(&Content, &GameTextures)>) {
-        let Some(tip) = ui.hovered.and_then(|h| ui.nodes.get(h)).and_then(|n| n.tooltip.as_ref()) else { return };
+    pub fn tooltip(
+        &mut self,
+        gpu: &mut dyn Backend,
+        assets: &Assets,
+        ui: &Ui,
+        look: &Look,
+        scale: f32,
+        at: glam::Vec2,
+        game: Option<(&Content, &GameTextures)>,
+    ) {
+        let Some(tip) = ui
+            .hovered
+            .and_then(|h| ui.nodes.get(h))
+            .and_then(|n| n.tooltip.as_ref())
+        else {
+            return;
+        };
         let mut t = Ui::new();
         t.text_unit = ui.text_unit;
         let place = |t: &mut Ui, x: f32, y: f32| t.nodes[1].style.at = Some([x, y, 0.0, 0.0]);
@@ -795,6 +948,9 @@ impl UiRenderer {
         let r = Rect { x: n.rect.x * scale, y: n.rect.y * scale, w: n.rect.w * scale, h: n.rect.h * scale };
         let (quad_start, icon_start) = (self.quads.len(), icons.len());
         let hovered = ui.hovered == Some(id);
+        if let Some(color) = n.style.fill {
+            self.rect(r, color);
+        }
         let mut background = |me: &mut UiRenderer, class: &str, state: &str| me.class_background(gpu, assets, look, class, state, r, scale);
         match &n.kind {
             Kind::Container { class: Some(class) } => background(self, class, ""),
@@ -809,14 +965,23 @@ impl UiRenderer {
                 } else {
                     ""
                 };
-                background(self, class, state);
+                // No class: nothing of its own, only what it contains.
+                if !class.is_empty() {
+                    background(self, class, state);
+                }
             }
             Kind::Text(t) => {
                 let px = scale * ui.text_unit * t.scale;
                 let parent = ui.nodes.iter().position(|p| p.children.contains(&id));
                 let parent_hover = parent.is_some_and(|p| ui.hovered == Some(p));
                 let parent_disabled = parent.is_some_and(|p| matches!(ui.nodes[p].kind, Kind::Button { enabled: false, .. }));
-                let state = if parent_disabled { "disabled" } else if parent_hover { "hover" } else { "" };
+                let state = if parent_disabled {
+                    "disabled"
+                } else if parent_hover {
+                    "hover"
+                } else {
+                    ""
+                };
                 // Generic classes inherit from the surface: `default` its text color, `dim` its
                 // dim color.
                 let class = match (t.class.as_str(), surface) {
@@ -829,7 +994,12 @@ impl UiRenderer {
                 };
                 let default = t.color.unwrap_or_else(|| look.text(class, state));
                 // A shadow fades with its text (the held item's name).
-                let shadow = if parent_disabled { None } else { look.shadow(class).map(|s| (s & !0xFF) | (s & 0xFF) * (default & 0xFF) / 255) };
+                let shadow = if parent_disabled {
+                    None
+                } else {
+                    look.shadow(class)
+                        .map(|s| (s & !0xFF) | (s & 0xFF) * (default & 0xFF) / 255)
+                };
                 let x = if t.center { r.x + (r.w - t.layout.width * px) / 2.0 } else { r.x };
                 self.load_images(gpu, assets, &t.layout);
                 self.glyph_run(&t.layout.items, x, r.y, px, default, shadow, icons);
@@ -841,41 +1011,43 @@ impl UiRenderer {
             }
             Kind::Item { last, .. } => {
                 if last.0 != 0 {
-                    let clip = n.clip.map_or([0.0; 4], |c| [c.x * scale, c.y * scale, (c.x + c.w) * scale, (c.y + c.h) * scale]);
-                    self.stacks.push((r, weft_abi::ItemStack::new(last.0, last.1.max(1)), clip));
+                    let clip = n
+                        .clip
+                        .map_or([0.0; 4], |c| [c.x * scale, c.y * scale, (c.x + c.w) * scale, (c.y + c.h) * scale]);
+                    self.stacks
+                        .push((r, weft_abi::ItemStack::new(last.0, last.1.max(1)), clip));
                 }
             }
+            Kind::Progress { value, .. } if *value < 0.0 => {}
             Kind::Progress { class, value, dir, .. } => {
                 background(self, class, "");
-                let fill = look.texture(class, "fill").and_then(|n| self.texture(gpu, assets, &n));
                 let v = value.clamp(0.0, 1.0);
-                let (fr, uv) = match *dir {
-                    weft_abi::ui_dir::UP => (Rect { y: r.y + r.h * (1.0 - v), h: r.h * v, ..r }, [0.0, 1.0 - v, 1.0, 1.0]),
-                    weft_abi::ui_dir::LEFT => (Rect { x: r.x + r.w * (1.0 - v), w: r.w * v, ..r }, [1.0 - v, 0.0, 1.0, 1.0]),
-                    weft_abi::ui_dir::DOWN => (Rect { h: r.h * v, ..r }, [0.0, 0.0, 1.0, v]),
-                    _ => (Rect { w: r.w * v, ..r }, [0.0, 0.0, v, 1.0]),
-                };
-                match fill {
-                    Some((idx, _, _)) => self.image(fr, idx, uv, 0xFFFFFFFF),
-                    None => self.checker(fr, scale),
+                match look.texture(class, "fill") {
+                    Some(fill) => self.meter_picture(gpu, assets, &fill, v, *dir, r, scale),
+                    None => self.checker(cropped(r, super::meter::crop(v, *dir)), scale),
                 }
             }
-            Kind::Icons { class, count, value, rtl, .. } if *value >= 0.0 => {
-                let names = ["full", "half", "empty"].map(|s| look.texture(class, s));
-                let tex = names.map(|n| n.and_then(|n| self.texture(gpu, assets, &n)));
+            Kind::Icons { class, count, value, dir, shake, .. } if *value >= 0.0 => {
+                use weft_abi::ui_dir;
+                let tick = (crate::shaders::clock() * crate::world::TPS as f32) as i64;
+                let full = look.texture(class, "full");
+                let empty = look
+                    .texture(class, "empty")
+                    .and_then(|n| self.texture(gpu, assets, &n));
                 for i in 0..*count {
-                    let v = *value - i as f32 * 2.0;
-                    let which = if v >= 2.0 { 0 } else if v >= 1.0 { 1 } else { 2 };
-                    let slot = if *rtl { count - 1 - i } else { i };
-                    let rr = Rect { x: r.x + slot as f32 * 8.0 * scale, y: r.y, w: 9.0 * scale, h: 9.0 * scale };
-                    if let Some((idx, _, _)) = tex[2] {
+                    // A value counts halves of an icon, as vanilla's bars do.
+                    let v = *value / 2.0 - i as f32;
+                    let slot = if matches!(*dir, ui_dir::LEFT | ui_dir::UP) { count - 1 - i } else { i } as f32 * 8.0 * scale;
+                    let jump = if *shake && *value <= 4.0 { (weft_noise::hash(0, tick, i as i64, 0) & 1) as f32 } else { 0.0 };
+                    let (dx, dy) = if matches!(*dir, ui_dir::UP | ui_dir::DOWN) { (0.0, slot) } else { (slot, 0.0) };
+                    let rr = Rect { x: r.x + dx, y: r.y + dy + jump * scale, w: 9.0 * scale, h: 9.0 * scale };
+                    if let Some((idx, _, _)) = empty {
                         self.image(rr, idx, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
                     }
-                    if which < 2 {
-                        if let Some((idx, _, _)) = tex[which] {
-                            self.image(rr, idx, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
-                        } else {
-                            self.checker(rr, scale);
+                    if v > 0.0 {
+                        match &full {
+                            Some(full) => self.meter_picture(gpu, assets, full, v.min(1.0), *dir, rr, scale),
+                            None => self.checker(rr, scale),
                         }
                     }
                 }
@@ -901,13 +1073,31 @@ impl UiRenderer {
                 let ty = r.y + (r.h - 16.0 * px) / 2.0;
                 let start = self.quads.len();
                 if let Some(a) = ui.anchor.filter(|&a| ui.focused == Some(id) && a != *caret) {
-                    let x_at = |n: usize| super::text::layout(&super::text::plain(&value.chars().take(n).collect::<String>()), &self.font, None).width * px;
+                    let x_at = |n: usize| {
+                        super::text::layout(&super::text::plain(&value.chars().take(n).collect::<String>()), &self.font, None).width * px
+                    };
                     let (x0, x1) = (x_at(a.min(*caret)), x_at(a.max(*caret)));
-                    self.class_background(gpu, assets, look, "input_selection", "", Rect { x: tx + x0, y: ty, w: x1 - x0, h: 16.0 * px }, scale);
+                    self.class_background(
+                        gpu,
+                        assets,
+                        look,
+                        "input_selection",
+                        "",
+                        Rect { x: tx + x0, y: ty, w: x1 - x0, h: 16.0 * px },
+                        scale,
+                    );
                 }
                 self.glyph_run(&layout.items, tx, ty, px, look.text("input", ""), None, icons);
                 if ui.focused == Some(id) {
-                    self.class_background(gpu, assets, look, "caret", "", Rect { x: tx + caret_x, y: ty, w: px.max(1.0), h: 16.0 * px }, scale);
+                    self.class_background(
+                        gpu,
+                        assets,
+                        look,
+                        "caret",
+                        "",
+                        Rect { x: tx + caret_x, y: ty, w: px.max(1.0), h: 16.0 * px },
+                        scale,
+                    );
                 }
                 let field = [r.x + 2.0 * scale, r.y, r.x + r.w - 2.0 * scale, r.y + r.h];
                 for q in &mut self.quads[start..] {
@@ -923,7 +1113,11 @@ impl UiRenderer {
                         }
                     }
                 }
-                let icon = n.icon.clone().and_then(|i| self.texture(gpu, assets, &i)).map(|t| t.0);
+                let icon = n
+                    .icon
+                    .clone()
+                    .and_then(|i| self.texture(gpu, assets, &i))
+                    .map(|t| t.0);
                 custom(self, *tag, *data, r, hovered, icon)
             }
         }
@@ -933,7 +1127,9 @@ impl UiRenderer {
             _ => None,
         };
         let inner_surface = own.or(surface);
-        let clip = n.clip.map_or([0.0; 4], |c| [c.x * scale, c.y * scale, (c.x + c.w) * scale, (c.y + c.h) * scale]);
+        let clip = n
+            .clip
+            .map_or([0.0; 4], |c| [c.x * scale, c.y * scale, (c.x + c.w) * scale, (c.y + c.h) * scale]);
         if n.clip.is_some() {
             for q in &mut self.quads[quad_start..] {
                 // Quads may carry their own clip (text fields): keep the overlap of both.
@@ -964,14 +1160,19 @@ impl UiRenderer {
             }
         }
         let class = match &n.kind {
-            Kind::Container { class: Some(c) } | Kind::Button { class: c, .. } | Kind::Progress { class: c, .. } | Kind::Icons { class: c, .. } => Some(c.as_str()),
+            Kind::Container { class: Some(c) }
+            | Kind::Button { class: c, .. }
+            | Kind::Progress { class: c, .. }
+            | Kind::Icons { class: c, .. } => Some(c.as_str()),
             Kind::Text(t) => Some(t.class.as_str()),
             _ => None,
         };
         // Item icons are queued apart and do not follow these animations yet.
         if let Some(file) = class.and_then(|c| look.sidecar(c, "animation")) {
             let list = self.anims.entry(file.clone()).or_insert_with(|| {
-                let src = assets.read(&file, "animations", "animation.json").map(|b| String::from_utf8_lossy(&b).into_owned());
+                let src = assets
+                    .read(&file, "animations", "animation.json")
+                    .map(|b| String::from_utf8_lossy(&b).into_owned());
                 match src.map(|s| crate::model::load_animations(&s)) {
                     Some(Ok(list)) => list.into_iter().map(Arc::new).collect(),
                     Some(Err(e)) => {
@@ -988,7 +1189,8 @@ impl UiRenderer {
             let (open, idle) = (pick("open"), pick("idle"));
             if open.is_some() || idle.is_some() {
                 let center = [r.x + r.w / 2.0, r.y + r.h / 2.0];
-                self.animated.push(Animated { quads: quad_start..self.quads.len(), open, idle, since: ui.shown, center, scale });
+                self.animated
+                    .push(Animated { quads: quad_start..self.quads.len(), open, idle, since: ui.shown, center, scale });
             }
         }
     }
@@ -1004,7 +1206,15 @@ impl UiRenderer {
                 }
             }
         }
-        let buf = crate::gpu_layout::frame_buffer(gpu, &mut self.buffers, frame.slot, self.quads.len() as u32, size_of::<Quad>() as u64, usage::STORAGE, "ui quads");
+        let buf = crate::gpu_layout::frame_buffer(
+            gpu,
+            &mut self.buffers,
+            frame.slot,
+            self.quads.len() as u32,
+            size_of::<Quad>() as u64,
+            usage::STORAGE,
+            "ui quads",
+        );
         gpu.mapped(buf)[..self.quads.len() * size_of::<Quad>()].copy_from_slice(bytemuck::cast_slice(&self.quads));
         let sb = self.screen[frame.slot];
         let time = crate::shaders::time();
@@ -1013,10 +1223,6 @@ impl UiRenderer {
         list.bind(crate::gpu_layout::bind::ui::QUADS, buf);
         list.bind(crate::gpu_layout::bind::ui::SCREEN, sb);
         list.draw(self.quads.len() as u32 * 6, 1);
-    }
-
-    pub fn destroy(&mut self, gpu: &mut dyn Backend) {
-        gpu.destroy_texture(self.font_tex);
     }
 }
 
@@ -1040,13 +1246,22 @@ mod animation_tests {
     fn keyframes_move_quads() {
         let src = r#"{"animations":{"animation.ui.idle":{"loop":true,"animation_length":2,"bones":{"node":{
             "position":{"0":[2,1,0]},"rotation":{"0":[0,0,90]}}}}}}"#;
-        let idle = crate::model::load_animations(src).unwrap().pop().map(Arc::new);
+        let idle = crate::model::load_animations(src)
+            .unwrap()
+            .pop()
+            .map(Arc::new);
         let a = Animated { quads: 0..1, open: None, idle, since: 0.0, center: [10.0, 10.0], scale: 2.0 };
         let mut q = [Quad { p0: [12.0, 10.0], u: [4.0, 0.0], v: [0.0, 4.0], ..Default::default() }];
         crate::shaders::pin_time(true);
         animate(&mut q, &[a]);
         // A quarter turn clockwise about the center, then 2 and 1 GUI pixels right and up.
         let near = |a: [f32; 2], b: [f32; 2]| (a[0] - b[0]).abs() < 1e-4 && (a[1] - b[1]).abs() < 1e-4;
-        assert!(near(q[0].p0, [14.0, 10.0]) && near(q[0].u, [0.0, 4.0]) && near(q[0].v, [-4.0, 0.0]), "{:?} {:?} {:?}", q[0].p0, q[0].u, q[0].v);
+        assert!(
+            near(q[0].p0, [14.0, 10.0]) && near(q[0].u, [0.0, 4.0]) && near(q[0].v, [-4.0, 0.0]),
+            "{:?} {:?} {:?}",
+            q[0].p0,
+            q[0].u,
+            q[0].v
+        );
     }
 }

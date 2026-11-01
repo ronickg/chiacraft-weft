@@ -50,34 +50,77 @@ fn answer(q: &str, arg: &str) -> String {
             crate::net::p2p::warm(arg);
             return String::new();
         }
-        "warmed" => return crate::net::p2p::warmed(arg).map(|s| format!("{}\t{}", s.name.replace(['\t', '\n'], " "), s.players)).unwrap_or_default(),
+        "warmed" => {
+            return crate::net::p2p::warmed(arg)
+                .map(|s| format!("{}\t{}", s.name.replace(['\t', '\n'], " "), s.players))
+                .unwrap_or_default();
+        }
         _ => {}
     }
     let Some(info) = crate::server::current_info() else { return String::new() };
     match q {
         "player_key" => {
             let Ok(entity) = arg.parse::<u64>() else { return String::new() };
-            info.shared.players.read().iter().find(|(e, _)| *e == entity).map(|(_, k)| k.clone()).unwrap_or_default()
+            info.shared
+                .players
+                .read()
+                .iter()
+                .find(|(e, _)| *e == entity)
+                .map(|(_, k)| k.clone())
+                .unwrap_or_default()
         }
         "owner" => {
             let Ok(entity) = arg.parse::<u64>() else { return String::new() };
-            let key = info.shared.players.read().iter().find(|(e, _)| *e == entity).map(|(_, k)| k.clone());
-            let mine = chiacraft_account::current().map(|s| iroh::SecretKey::from_bytes(s.network_seed()).public().to_string());
+            let key = info
+                .shared
+                .players
+                .read()
+                .iter()
+                .find(|(e, _)| *e == entity)
+                .map(|(_, k)| k.clone());
+            let mine = chiacraft_account::current().map(|s| {
+                iroh::SecretKey::from_bytes(s.network_seed())
+                    .public()
+                    .to_string()
+            });
             if key.is_some() && key == mine { "1".into() } else { String::new() }
         }
         "links" => {
             let Some(world) = &info.world_key else { return String::new() };
-            crate::links::of_world(world).iter().map(|l| format!("{}\t{}\n", l.id(), other(world, l))).collect()
+            crate::links::of_world(world)
+                .iter()
+                .map(|l| format!("{}\t{}\n", l.id(), other(world, l)))
+                .collect()
         }
         "link" => {
             let Some(world) = &info.world_key else { return String::new() };
-            crate::links::of_world(world).iter().find(|l| l.id() == arg).map(|l| other(world, l)).unwrap_or_default()
+            crate::links::of_world(world)
+                .iter()
+                .find(|l| l.id() == arg)
+                .map(|l| other(world, l))
+                .unwrap_or_default()
         }
         "ticket" => {
-            let (Some((entity, link)), Some(id), Some(world)) = (arg.split_once(' '), &info.identity, &info.world_key) else { return String::new() };
+            let (Some((entity, link)), Some(id), Some(world)) = (arg.split_once(' '), &info.identity, &info.world_key) else {
+                return String::new();
+            };
             let Ok(entity) = entity.parse::<u64>() else { return String::new() };
-            let Some(player) = info.shared.players.read().iter().find(|(e, _)| *e == entity).map(|(_, k)| k.clone()) else { return String::new() };
-            let Some(l) = crate::links::of_world(world).into_iter().find(|l| l.id() == link) else { return String::new() };
+            let Some(player) = info
+                .shared
+                .players
+                .read()
+                .iter()
+                .find(|(e, _)| *e == entity)
+                .map(|(_, k)| k.clone())
+            else {
+                return String::new();
+            };
+            let Some(l) = crate::links::of_world(world)
+                .into_iter()
+                .find(|l| l.id() == link)
+            else {
+                return String::new();
+            };
             let to = if l.body.from == *world { &l.body.to } else { &l.body.from };
             crate::travel::issue(id, &player, link, to)
         }

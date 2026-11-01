@@ -47,7 +47,10 @@ pub struct Body {
 
 impl Body {
     pub fn text(&self) -> String {
-        format!("chiacraft link 1\nfrom {}\nto {}\ncreated {}\nnonce {}\nnote {}\n", self.from, self.to, self.created, self.nonce, self.note)
+        format!(
+            "chiacraft link 1\nfrom {}\nto {}\ncreated {}\nnonce {}\nnote {}\n",
+            self.from, self.to, self.created, self.nonce, self.note
+        )
     }
 
     pub fn id(&self) -> String {
@@ -201,7 +204,10 @@ pub static UNSEEN: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::
 /// Reads `links.json` in `run_dir`; this player's worlds are in `saves`.
 pub fn init(run_dir: &Path, saves: &Path) {
     let path = run_dir.join("links.json");
-    let store = std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+    let store = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default();
     *STATE.lock() = Some(State { path, saves: saves.to_path_buf(), store });
 }
 
@@ -251,38 +257,66 @@ fn verify(key: &str, msg: &[u8], sig: &str) -> bool {
 
 /// This player's world with key `key`: its key pair and name.
 fn my_world(saves: &Path, key: &str) -> Option<(crate::world_address::WorldIdentity, String)> {
-    crate::saves::list(saves).into_iter().filter(|m| m.key_index.is_some()).find_map(|mut m| {
-        let id = crate::world_address::for_world(&mut m).ok()?;
-        (id.key() == key).then(|| (id, m.name.clone()))
-    })
+    crate::saves::list(saves)
+        .into_iter()
+        .filter(|m| m.key_index.is_some())
+        .find_map(|mut m| {
+            let id = crate::world_address::for_world(&mut m).ok()?;
+            (id.key() == key).then(|| (id, m.name.clone()))
+        })
 }
 
 fn nonce() -> String {
     use std::hash::{BuildHasher, Hasher};
-    format!("{:016x}", std::collections::hash_map::RandomState::new().build_hasher().finish())
+    format!(
+        "{:016x}",
+        std::collections::hash_map::RandomState::new()
+            .build_hasher()
+            .finish()
+    )
 }
 
 fn queue(s: &mut State, inbox: &str, world: &str, address: &str, message: Message) {
     let now = crate::saves::now_secs();
-    s.store.outbox.push(Queued { inbox: inbox.into(), world: world.into(), address: address.into(), message, queued: now, tries: 0, next_try: now });
+    s.store.outbox.push(Queued {
+        inbox: inbox.into(),
+        world: world.into(),
+        address: address.into(),
+        message,
+        queued: now,
+        tries: 0,
+        next_try: now,
+    });
 }
 
 /// The player's account endpoint and their identity's vouching for it: where answers come back.
 fn reply_address(account_key: &iroh::SecretKey) -> Result<(String, String), String> {
     let session = chiacraft_account::current().ok_or("no account is open")?;
     let me = account_key.public().to_string();
-    let vouch = session.vouch_line(&me).ok_or("the account can't vouch for its network key")?;
+    let vouch = session
+        .vouch_line(&me)
+        .ok_or("the account can't vouch for its network key")?;
     Ok((me, vouch))
 }
 
 /// Asks the world at `address` to link with this player's world `from` (named `from_name`).
-pub fn request(account_key: &iroh::SecretKey, from: &crate::world_address::WorldIdentity, from_name: &str, address: &str, note: &str) -> Result<(), String> {
+pub fn request(
+    account_key: &iroh::SecretKey,
+    from: &crate::world_address::WorldIdentity,
+    from_name: &str,
+    address: &str,
+    note: &str,
+) -> Result<(), String> {
     let target = crate::world_address::parse(address).ok_or("that is not a world address")?;
     if target.key.parse::<iroh::PublicKey>().is_err() {
         return Err("that is not a world address".into());
     }
     let (reply_to, reply_vouch) = reply_address(account_key)?;
-    let note: String = note.chars().filter(|c| !c.is_control()).take(MAX_NOTE).collect();
+    let note: String = note
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(MAX_NOTE)
+        .collect();
     let body = Body { from: from.key(), to: target.key.clone(), created: crate::saves::now_secs(), nonce: nonce(), note };
     let request = Request {
         from_sig: hex(&from.secret.sign(&body.signed()).to_bytes()),
@@ -294,13 +328,22 @@ pub fn request(account_key: &iroh::SecretKey, from: &crate::world_address::World
         invite: target.invite.clone(),
     };
     with(|s| {
-        if s.store.links.iter().any(|l| (l.body.from == request.body.from && l.body.to == request.body.to) || (l.body.from == request.body.to && l.body.to == request.body.from)) {
+        if s.store.links.iter().any(|l| {
+            (l.body.from == request.body.from && l.body.to == request.body.to)
+                || (l.body.from == request.body.to && l.body.to == request.body.from)
+        }) {
             return Err("these worlds are linked already".to_string());
         }
-        s.store.outgoing.retain(|o| !(o.request.body.from == request.body.from && o.request.body.to == request.body.to));
-        s.store.outbox.retain(|q| !matches!(&q.message, Message::Request(r) if r.body.from == request.body.from && r.body.to == request.body.to));
+        s.store
+            .outgoing
+            .retain(|o| !(o.request.body.from == request.body.from && o.request.body.to == request.body.to));
+        s.store
+            .outbox
+            .retain(|q| !matches!(&q.message, Message::Request(r) if r.body.from == request.body.from && r.body.to == request.body.to));
         queue(s, "", &target.key, address, Message::Request(request.clone()));
-        s.store.outgoing.push(Outgoing { request, to_name: target.name });
+        s.store
+            .outgoing
+            .push(Outgoing { request, to_name: target.name });
         save(s);
         Ok(())
     })
@@ -312,7 +355,12 @@ pub fn request(account_key: &iroh::SecretKey, from: &crate::world_address::World
 /// Accepts waiting request `id` (a link id); `always` also accepts this owner from now on.
 pub fn accept(id: &str, always: bool) -> Result<(), String> {
     with(|s| {
-        let i = s.store.incoming.iter().position(|r| r.request.body.id() == id).ok_or_else(|| "no such request".to_string())?;
+        let i = s
+            .store
+            .incoming
+            .iter()
+            .position(|r| r.request.body.id() == id)
+            .ok_or_else(|| "no such request".to_string())?;
         let inc = s.store.incoming.remove(i);
         if always && !s.store.allow.contains(&inc.owner) {
             s.store.allow.push(inc.owner.clone());
@@ -350,7 +398,12 @@ fn accept_request(s: &mut State, r: &Request, owner: &str) -> Result<(), String>
 /// from now on.
 pub fn decline(id: &str, block: bool) {
     with(|s| {
-        if let Some(i) = s.store.incoming.iter().position(|r| r.request.body.id() == id) {
+        if let Some(i) = s
+            .store
+            .incoming
+            .iter()
+            .position(|r| r.request.body.id() == id)
+        {
             let inc = s.store.incoming.remove(i);
             if block && !s.store.blocked.contains(&inc.owner) {
                 s.store.blocked.push(inc.owner);
@@ -363,9 +416,17 @@ pub fn decline(id: &str, block: bool) {
 /// Ends link `id`: for good, on both sides (the other side is told when it can be reached).
 pub fn revoke(id: &str) -> Result<(), String> {
     with(|s| {
-        let i = s.store.links.iter().position(|l| l.id() == id).ok_or("no such link")?;
+        let i = s
+            .store
+            .links
+            .iter()
+            .position(|l| l.id() == id)
+            .ok_or("no such link")?;
         let link = s.store.links[i].clone();
-        let mine = [&link.body.from, &link.body.to].into_iter().find_map(|k| my_world(&s.saves, k)).ok_or("neither world is on this computer")?;
+        let mine = [&link.body.from, &link.body.to]
+            .into_iter()
+            .find_map(|k| my_world(&s.saves, k))
+            .ok_or("neither world is on this computer")?;
         let mut r = Revoke { link: id.to_string(), by: mine.0.key(), created: crate::saves::now_secs(), sig: String::new() };
         r.sig = hex(&mine.0.secret.sign(&r.signed()).to_bytes());
         s.store.links.remove(i);
@@ -385,7 +446,9 @@ pub fn revoke(id: &str) -> Result<(), String> {
 pub fn withdraw(id: &str) {
     with(|s| {
         s.store.outgoing.retain(|o| o.request.body.id() != id);
-        s.store.outbox.retain(|q| !matches!(&q.message, Message::Request(r) if r.body.id() == id));
+        s.store
+            .outbox
+            .retain(|q| !matches!(&q.message, Message::Request(r) if r.body.id() == id));
         save(s);
     });
 }
@@ -416,12 +479,21 @@ fn receive_request(s: &mut State, peer: &str, r: Request) -> Result<(), String> 
         return Err("a request its world didn't sign".into());
     }
     let cert = crate::world_address::WorldCert::parse(&r.from_cert)?;
-    let owner = (cert.world == r.body.from).then(|| cert.verify()).flatten().ok_or("a request whose world's certificate doesn't check out")?;
+    let owner = (cert.world == r.body.from)
+        .then(|| cert.verify())
+        .flatten()
+        .ok_or("a request whose world's certificate doesn't check out")?;
     if chiacraft_account::check_vouch(&r.reply_vouch, &r.reply_to).as_deref() != Some(owner.as_str()) {
         return Err("a request whose answer would go to someone other than its owner".into());
     }
     let id = r.body.id();
-    if s.store.blocked.iter().any(|b| *b == owner || *b == r.body.from) || s.store.revoked.contains(&id) || s.store.links.iter().any(|l| l.id() == id) {
+    if s.store
+        .blocked
+        .iter()
+        .any(|b| *b == owner || *b == r.body.from)
+        || s.store.revoked.contains(&id)
+        || s.store.links.iter().any(|l| l.id() == id)
+    {
         return Ok(());
     }
     let Some((_, to_name)) = my_world(&s.saves, &r.body.to) else {
@@ -443,19 +515,28 @@ fn receive_request(s: &mut State, peer: &str, r: Request) -> Result<(), String> 
         }
     }
     // One waiting request per pair of worlds; the oldest go when there are too many.
-    s.store.incoming.retain(|i| !(i.request.body.from == r.body.from && i.request.body.to == r.body.to));
+    s.store
+        .incoming
+        .retain(|i| !(i.request.body.from == r.body.from && i.request.body.to == r.body.to));
     while s.store.incoming.len() >= MAX_INCOMING {
         s.store.incoming.remove(0);
     }
     log::info!("link request from '{}' (owner {}) for '{to_name}'", r.from_name, &owner[..12.min(owner.len())]);
-    s.store.incoming.push(Incoming { request: r, owner, to_name });
+    s.store
+        .incoming
+        .push(Incoming { request: r, owner, to_name });
     UNSEEN.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     Ok(())
 }
 
 fn receive_accept(s: &mut State, peer: &str, a: Accept) -> Result<(), String> {
     let id = a.body.id();
-    let Some(i) = s.store.outgoing.iter().position(|o| o.request.body.id() == id) else {
+    let Some(i) = s
+        .store
+        .outgoing
+        .iter()
+        .position(|o| o.request.body.id() == id)
+    else {
         return Ok(());
     };
     let o = s.store.outgoing[i].clone();
@@ -463,10 +544,17 @@ fn receive_accept(s: &mut State, peer: &str, a: Accept) -> Result<(), String> {
         return Err("an answer the asked world didn't sign".into());
     }
     let cert = crate::world_address::WorldCert::parse(&a.to_cert)?;
-    let to_owner = (cert.world == a.body.to).then(|| cert.verify()).flatten().ok_or("an answer whose world's certificate doesn't check out")?;
-    let from_owner = crate::world_address::WorldCert::parse(&o.request.from_cert).map(|c| c.owner_identity().to_string()).unwrap_or_default();
+    let to_owner = (cert.world == a.body.to)
+        .then(|| cert.verify())
+        .flatten()
+        .ok_or("an answer whose world's certificate doesn't check out")?;
+    let from_owner = crate::world_address::WorldCert::parse(&o.request.from_cert)
+        .map(|c| c.owner_identity().to_string())
+        .unwrap_or_default();
     s.store.outgoing.remove(i);
-    s.store.outbox.retain(|q| !matches!(&q.message, Message::Request(r) if r.body.id() == id));
+    s.store
+        .outbox
+        .retain(|q| !matches!(&q.message, Message::Request(r) if r.body.id() == id));
     log::info!("'{}' accepted the link with '{}'", a.to_name, o.request.from_name);
     s.store.links.push(Link {
         body: a.body,
@@ -508,16 +596,26 @@ const INVITE_LIFETIME: u64 = 7 * 86_400;
 /// with it is linked without being asked about, once, within a week. Signed by the world's key.
 pub fn invite(world: &crate::world_address::WorldIdentity, name: &str) -> String {
     let body = format!("{INVITE_HEADER};world={};expires={};nonce={}", world.key(), crate::saves::now_secs() + INVITE_LIFETIME, nonce());
-    let sig = hex(&world.secret.sign(format!("{INVITE_LABEL}{body}").as_bytes()).to_bytes());
+    let sig = hex(&world
+        .secret
+        .sign(format!("{INVITE_LABEL}{body}").as_bytes())
+        .to_bytes());
     let address = crate::world_address::address(&world.key(), name, None, &[]);
     crate::world_address::with_hint(&address, "i", &format!("{body};sig={sig}"))
 }
 
 /// The invite's nonce if it is world `world`'s, signed by it, and not expired.
 fn check_invite(text: &str, world: &str) -> Result<String, String> {
-    let (body, sig) = text.rsplit_once(";sig=").ok_or("an invite this game can't read")?;
+    let (body, sig) = text
+        .rsplit_once(";sig=")
+        .ok_or("an invite this game can't read")?;
     let mut f = body.split(';');
-    let field = |f: &mut std::str::Split<'_, char>, name: &str| f.next().and_then(|p| p.strip_prefix(name)).and_then(|p| p.strip_prefix('=')).map(str::to_string);
+    let field = |f: &mut std::str::Split<'_, char>, name: &str| {
+        f.next()
+            .and_then(|p| p.strip_prefix(name))
+            .and_then(|p| p.strip_prefix('='))
+            .map(str::to_string)
+    };
     if f.next() != Some(INVITE_HEADER) {
         return Err("an invite this game can't read".into());
     }
@@ -544,7 +642,13 @@ pub fn due() -> Vec<(usize, Queued)> {
     let now = crate::saves::now_secs();
     with(|s| {
         s.store.outbox.retain(|q| q.queued + MAX_AGE > now);
-        s.store.outbox.iter().cloned().enumerate().filter(|(_, q)| q.next_try <= now).collect()
+        s.store
+            .outbox
+            .iter()
+            .cloned()
+            .enumerate()
+            .filter(|(_, q)| q.next_try <= now)
+            .collect()
     })
     .unwrap_or_default()
 }
@@ -553,7 +657,14 @@ pub fn due() -> Vec<(usize, Queued)> {
 /// learned meanwhile, is kept).
 pub fn tried(q: &Queued, inbox: &str, delivered: bool) {
     with(|s| {
-        let Some(slot) = s.store.outbox.iter_mut().position(|x| x.queued == q.queued && x.world == q.world && same(&x.message, &q.message)) else { return };
+        let Some(slot) = s
+            .store
+            .outbox
+            .iter_mut()
+            .position(|x| x.queued == q.queued && x.world == q.world && same(&x.message, &q.message))
+        else {
+            return;
+        };
         if delivered {
             s.store.outbox.remove(slot);
         } else {
@@ -572,7 +683,15 @@ fn same(a: &Message, b: &Message) -> bool {
 
 /// The links of world `key` (for its portals, and screens).
 pub fn of_world(key: &str) -> Vec<Link> {
-    with(|s| s.store.links.iter().filter(|l| l.body.from == key || l.body.to == key).cloned().collect()).unwrap_or_default()
+    with(|s| {
+        s.store
+            .links
+            .iter()
+            .filter(|l| l.body.from == key || l.body.to == key)
+            .cloned()
+            .collect()
+    })
+    .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -587,7 +706,11 @@ mod tests {
         assert_eq!(b.id().len(), 64);
         assert!(b.check().is_ok());
         assert!(Body { note: "a\nb".into(), ..b.clone() }.check().is_err());
-        assert!(Body { created: now - MAX_AGE - 1, ..b.clone() }.check().is_err());
+        assert!(
+            Body { created: now - MAX_AGE - 1, ..b.clone() }
+                .check()
+                .is_err()
+        );
         assert!(Body { to: "a".into(), ..b.clone() }.check().is_err());
     }
 
@@ -596,7 +719,9 @@ mod tests {
         let k = iroh::SecretKey::from_bytes(&[3; 32]);
         let world = k.public().to_string();
         let body = format!("{INVITE_HEADER};world={world};expires={};nonce=abc", crate::saves::now_secs() + 60);
-        let sig = hex(&k.sign(format!("{INVITE_LABEL}{body}").as_bytes()).to_bytes());
+        let sig = hex(&k
+            .sign(format!("{INVITE_LABEL}{body}").as_bytes())
+            .to_bytes());
         assert_eq!(check_invite(&format!("{body};sig={sig}"), &world).unwrap(), "abc");
         assert!(check_invite(&format!("{body};sig={sig}"), "another").is_err());
         assert!(check_invite(&format!("{};sig={sig}", body.replace("nonce=abc", "nonce=abd")), &world).is_err());

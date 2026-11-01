@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 
 use rayon::prelude::*;
 use rustc_hash::FxHashMap;
-use weft_abi::{self as abi, Callback, Layer, Model, ModId};
+use weft_abi::{self as abi, Callback, Layer, ModId, Model};
 
 use crate::components::{self as comps, Components, RawSet, RawValue, Target};
 
@@ -17,6 +17,34 @@ pub struct ModelBox {
     pub textures: [u32; 6],
     /// Per face texels (u0, v0, u1, v1, 0..16), negative: from the box's position.
     pub uv: [[f32; 4]; 6],
+    /// Per face quarter turns of the picture.
+    pub turn: [u8; 6],
+    /// Origin in block units.
+    pub tilt: weft_abi::BoxTilt,
+}
+
+impl ModelBox {
+    /// A whole cube showing these textures.
+    pub fn whole(textures: [u32; 6]) -> ModelBox {
+        ModelBox { min: [0.0; 3], max: [1.0; 3], textures, uv: [[-1.0; 4]; 6], turn: [0; 6], tilt: weft_abi::BoxTilt::NONE }
+    }
+}
+
+/// What a state is to redstone (`abi::SignalDesc`, worked out for quick reading).
+#[derive(Clone, Copy, Default)]
+pub struct Signal {
+    pub kind: u32,
+    /// What it gives now.
+    pub level: u8,
+    pub attach: u8,
+    pub front: u8,
+    pub delay: u8,
+    pub mode: u8,
+    /// How many values its `power` property has (0: none), and states between them.
+    pub levels: u8,
+    pub stride: u32,
+    /// A piston's head block.
+    pub head: Option<u32>,
 }
 
 pub struct StateInfo {
@@ -57,6 +85,7 @@ pub struct StateInfo {
     pub smother: Option<(u32, f64)>,
     /// Sound events break, place, step, hit (`u32::MAX` none), from its `sound` component.
     pub sounds: [u32; 4],
+    pub signal: Signal,
 }
 
 impl StateInfo {
@@ -67,17 +96,8 @@ impl StateInfo {
             return Some(self.textures[3]);
         }
         match self.model {
-            Model::Cross | Model::None => Some(self.textures[0]),
+            Model::Cross | Model::None | Model::Wire => Some(self.textures[0]),
             _ => None,
-        }
-    }
-
-    /// Boxes an item of this block is drawn with when it is not a sprite (block units).
-    pub fn item_shape(&self) -> Vec<ModelBox> {
-        if self.model == Model::Boxes && !self.boxes.is_empty() {
-            self.boxes.clone()
-        } else {
-            vec![ModelBox { min: [0.0; 3], max: [1.0; 3], textures: self.textures, uv: [[-1.0; 4]; 6] }]
         }
     }
 }
@@ -87,10 +107,14 @@ pub struct BlockCallbacks {
     pub on_use: Option<Callback>,
     pub on_neighbor: Option<Callback>,
     pub on_scheduled: Option<Callback>,
+    pub on_pass: Option<Callback>,
+    pub signal_read: Option<Callback>,
     pub placement: Option<Callback>,
     pub on_grow: Option<Callback>,
     /// Growth over time: (mean ticks per step, light needed).
     pub grow: Option<(f64, u32)>,
+    pub on_signal: Option<Callback>,
+    pub signal_logic: Option<Callback>,
 }
 
 pub struct BlockDef {
@@ -117,7 +141,9 @@ pub struct Prop {
 impl BlockDef {
     /// The value index of every property in state `i` of this block (0-based within the block).
     pub fn prop_values(&self, i: u32) -> impl Iterator<Item = (&Prop, u32)> {
-        self.props.iter().map(move |p| (p, (i / p.stride) % p.values.len() as u32))
+        self.props
+            .iter()
+            .map(move |p| (p, (i / p.stride) % p.values.len() as u32))
     }
 
     /// `state` with property `name` at value index `v`.
@@ -133,7 +159,10 @@ impl BlockDef {
         if self.props.is_empty() {
             return self.name.clone();
         }
-        let props: Vec<String> = self.prop_values(state - self.first_state).map(|(p, v)| format!("{}={}", p.name, p.values[v as usize])).collect();
+        let props: Vec<String> = self
+            .prop_values(state - self.first_state)
+            .map(|(p, v)| format!("{}={}", p.name, p.values[v as usize]))
+            .collect();
         format!("{}[{}]", self.name, props.join(","))
     }
 
@@ -141,8 +170,16 @@ impl BlockDef {
     pub fn state_of(&self, props: &[(&str, &str)]) -> Result<u32, String> {
         let mut state = self.first_state;
         for (k, v) in props {
-            let pi = self.props.iter().position(|p| p.name == *k).ok_or_else(|| format!("{} has no property {k}", self.name))?;
-            let vi = self.props[pi].values.iter().position(|x| x == v).ok_or_else(|| format!("{} property {k} has no value {v} (values: {})", self.name, self.props[pi].values.join(", ")))?;
+            let pi = self
+                .props
+                .iter()
+                .position(|p| p.name == *k)
+                .ok_or_else(|| format!("{} has no property {k}", self.name))?;
+            let vi = self.props[pi]
+                .values
+                .iter()
+                .position(|x| x == v)
+                .ok_or_else(|| format!("{} property {k} has no value {v} (values: {})", self.name, self.props[pi].values.join(", ")))?;
             state = self.with_value(state, pi, vi as u32);
         }
         Ok(state)
@@ -155,7 +192,11 @@ impl BlockDef {
         for (name, value) in props {
             let Some(pi) = self.props.iter().position(|p| p.name == *name) else {
                 let known: Vec<&str> = self.props.iter().map(|p| p.name.as_str()).collect();
-                return Err(format!("{} has no property {name} (it has: {})", self.name, if known.is_empty() { "none".into() } else { known.join(", ") }));
+                return Err(format!(
+                    "{} has no property {name} (it has: {})",
+                    self.name,
+                    if known.is_empty() { "none".into() } else { known.join(", ") }
+                ));
             };
             let p = &self.props[pi];
             let Some(v) = p.values.iter().position(|x| x == value) else {
@@ -163,7 +204,14 @@ impl BlockDef {
             };
             fixed.push((p, v as u32));
         }
-        Ok((0..self.states).filter(|&i| fixed.iter().all(|(p, v)| (i / p.stride) % p.values.len() as u32 == *v)).map(|i| self.first_state + i).collect())
+        Ok((0..self.states)
+            .filter(|&i| {
+                fixed
+                    .iter()
+                    .all(|(p, v)| (i / p.stride) % p.values.len() as u32 == *v)
+            })
+            .map(|i| self.first_state + i)
+            .collect())
     }
 }
 
@@ -195,6 +243,8 @@ pub struct ItemDef {
     pub order: u64,
     /// The player's equipment slot it is worn in (`worn/<slot>` tag), by index.
     pub equip: Option<u32>,
+    /// Held like a tool in third person (`handheld` tag).
+    pub handheld: bool,
     /// Boxes from its model file (`models/item/<name>.json`) in block units, drawn instead of
     /// the icon in hands, on the ground and in slots; empty: none.
     pub model: Vec<ModelBox>,
@@ -202,6 +252,22 @@ pub struct ItemDef {
 
 /// A creative inventory tab: translated as `tab.<ns>.<name>`, or the mod's name for the tab a mod
 /// gets automatically for items it put in no tab.
+/// Ticks of holding the use button an item asks for, 0 for at once.
+pub fn use_ticks(c: &Content, item: u32) -> u32 {
+    c.item_value::<u32>(item, c.ids.use_ticks).unwrap_or(0)
+}
+
+/// Full swings per second with an item in hand.
+pub fn swings_per_second(c: &Content, item: u32) -> f32 {
+    c.item_value::<f32>(item, c.ids.attack_speed).unwrap_or(4.0)
+}
+
+/// How charged a swing is after that many ticks, 0..1. Client and server have to agree, with
+/// `speed` the `core:attack_speed` attribute.
+pub fn swing_charge(c: &Content, item: u32, ticks: f32, speed: f32) -> f32 {
+    ((ticks + 0.5) * swings_per_second(c, item) * speed / crate::world::TPS as f32).clamp(0.0, 1.0)
+}
+
 /// A liquid the engine flows (`abi::LiquidDesc`); its block has 16 states.
 pub struct LiquidDef {
     pub name: String,
@@ -213,6 +279,13 @@ pub struct LiquidDef {
     /// Lighter than air: flows up.
     pub rises: bool,
     pub temperature: u32,
+    pub swimmable: bool,
+    /// 0xRRGGBB, `None` for the average of its texture.
+    pub fog_color: Option<u32>,
+    pub fog_distance: f32,
+    /// Asset name, empty for its own texture.
+    pub overlay: String,
+    pub overlay_opacity: f32,
 }
 
 /// A block or any block with a tag.
@@ -276,6 +349,8 @@ pub struct DimensionDef {
     pub terrain: Option<Box<crate::server::terrain::Terrain>>,
     /// `dim_flags::BARE`: only ores, scatters and decorations that name it.
     pub bare: bool,
+    /// `dim_flags::WEATHER`.
+    pub weather: bool,
     /// In name order, placed after `generator`.
     pub scatters: Vec<ScatterDef>,
     /// (mod, callback) run after the generator and scatters, in load order.
@@ -293,7 +368,6 @@ pub struct DimensionDef {
 #[derive(Clone)]
 pub struct ScatterDef {
     pub owner: ModId,
-    pub name: String,
     pub cell: i32,
     pub reach: i32,
     /// Biome component (f32) with the chance of a site per cell.
@@ -312,7 +386,8 @@ impl DimensionDef {
         let cb = self.column?;
         Some(self.column_cache.get(seed, cx, cz, || {
             std::array::from_fn(|i| {
-                let mut a = abi::ColumnArgs { seed, x: cx * 16 + (i % 16) as i32, z: cz * 16 + (i / 16) as i32, height: i32::MIN, biome: 0 };
+                let mut a =
+                    abi::ColumnArgs { seed, x: cx * 16 + (i % 16) as i32, z: cz * 16 + (i / 16) as i32, height: i32::MIN, biome: 0 };
                 crate::host::invoke(self.owner, cb, &mut a);
                 abi::TerrainColumn { height: a.height, biome: a.biome }
             })
@@ -330,12 +405,16 @@ impl DimensionDef {
 
     /// Whether caves took the surface block of column (`x`, `z`).
     pub fn carved(&self, seed: u64, x: i32, z: i32) -> bool {
-        self.terrain.as_ref().is_some_and(|t| t.surface_carved(seed, x, z))
+        self.terrain
+            .as_ref()
+            .is_some_and(|t| t.surface_carved(seed, x, z))
     }
 
     /// The block the terrain leaves at the top of column (`x`, `z`), 0 if none.
     pub fn surface_block(&self, seed: u64, x: i32, z: i32) -> u32 {
-        self.terrain.as_ref().map_or(0, |t| t.surface_block(seed, x, z))
+        self.terrain
+            .as_ref()
+            .map_or(0, |t| t.surface_block(seed, x, z))
     }
 
     /// The terrain's sea level, if it has a sea.
@@ -343,14 +422,22 @@ impl DimensionDef {
         self.terrain.as_ref().and_then(|t| t.sea_level())
     }
 
-    /// Fraction of full daylight (0..1) at world time `time`: a sine over the day, flat at night.
+    /// How far the day has gone around the sky at world time `time`, in turns: 0 the sun rising,
+    /// 0.25 noon, 0.75 midnight. Vanilla's easing: slower than the clock around noon and midnight.
+    pub fn day_turn(&self, time: f64) -> f64 {
+        let (t, len) =
+            if self.day_length == 0 { (self.fixed_time as f64, 24000.0) } else { (time % self.day_length as f64, self.day_length as f64) };
+        let from_noon = (t / len - 0.25).rem_euclid(1.0);
+        let eased = 0.5 - (from_noon * std::f64::consts::PI).cos() / 2.0;
+        (0.25 + (from_noon * 2.0 + eased) / 3.0).rem_euclid(1.0)
+    }
+
+    /// Fraction of full daylight (0..1) at world time `time`, vanilla's curve.
     pub fn daylight(&self, time: u64) -> f32 {
         if !self.sky_light {
             return 0.0;
         }
-        let (t, len) = if self.day_length == 0 { (self.fixed_time as f64, 24000.0) } else { ((time % self.day_length as u64) as f64, self.day_length as f64) };
-        // 0 = sunrise, 0.25 = noon, 0.75 = midnight.
-        ((t / len * std::f64::consts::TAU).sin() * 2.0 + 0.6).clamp(0.0, 1.0) as f32
+        ((self.day_turn(time as f64) * std::f64::consts::TAU).sin() * 2.0 + 0.5).clamp(0.0, 1.0) as f32
     }
 }
 
@@ -419,6 +506,12 @@ pub struct Ids {
     pub worn: Option<u32>,
     pub worn_texture: Option<u32>,
     pub wear_per_hit: Option<u32>,
+    pub spawn_egg: Option<u32>,
+    pub attack_speed: Option<u32>,
+    pub use_ticks: Option<u32>,
+    pub sweeps: Option<u32>,
+    pub no_creative_break: Option<u32>,
+    pub snowy: Option<u32>,
 }
 
 /// What lighting and meshing read of a state for every block they pass, packed tight: a
@@ -540,10 +633,20 @@ pub(crate) fn set(c: &'static Content) {
 
 /// Color (0xRRGGBB) of a tint kind on items, which have no biome: the kind's default.
 pub fn item_tint(tint: u8) -> u32 {
-    (tint as usize).checked_sub(1).and_then(|i| content().tint_kinds.get(i)).map_or(0xFFFFFF, |k| k.1)
+    (tint as usize)
+        .checked_sub(1)
+        .and_then(|i| content().tint_kinds.get(i))
+        .map_or(0xFFFFFF, |k| k.1)
 }
 
 impl Content {
+    /// In creative this item doesn't break blocks.
+    pub fn no_creative_break(&self, item: u32) -> bool {
+        self.ids
+            .no_creative_break
+            .is_some_and(|t| self.components.has(comps::ITEM, item, t))
+    }
+
     pub fn block_of(&self, state: u32) -> &BlockDef {
         &self.blocks[self.states[state as usize].block as usize]
     }
@@ -551,7 +654,8 @@ impl Content {
     /// Whether a block in `state` has growth steps ahead of it: (mean ticks, light needed).
     pub fn grows(&self, state: u32) -> Option<(f64, u32)> {
         let b = self.block_of(state);
-        b.cb.grow.filter(|_| b.cb.on_grow.is_some() || self.grown(state).is_some())
+        b.cb.grow
+            .filter(|_| b.cb.on_grow.is_some() || self.grown(state).is_some())
     }
 
     /// Whether something may happen to a block in `state` with time: it grows, something could
@@ -564,7 +668,9 @@ impl Content {
 
     /// Some block spreads onto this state.
     pub fn spread_target(&self, state: u32) -> bool {
-        self.spread_tags.iter().any(|&t| self.components.has(crate::components::BLOCK, state, t))
+        self.spread_tags
+            .iter()
+            .any(|&t| self.components.has(crate::components::BLOCK, state, t))
     }
 
     /// The default growth step: the `age` property one higher, `None` at the last age.
@@ -576,13 +682,30 @@ impl Content {
         (v + 1 < p.values.len() as u32).then(|| b.with_value(state, pi, v + 1))
     }
 
+    /// The spawn egg of an entity kind.
+    pub fn spawn_egg_of(&self, kind: u32) -> Option<u32> {
+        let (name, egg) = (&self.game.entities.get(kind as usize)?.name, self.ids.spawn_egg?);
+        (1..self.items.len() as u32).find(|&i| self.components.text(comps::ITEM, i, egg) == Some(name.as_str()))
+    }
+
     /// The item a middle click on this block picks: the block's own item, else the first its
     /// loot table names.
     pub fn pick_item(&self, state: u32) -> Option<u32> {
         let b = self.block_of(state);
-        self.items.iter().position(|i| i.block == Some(b.first_state)).map(|i| i as u32).filter(|&i| i != 0).or_else(|| {
-            self.loot.get(&b.name)?.pools.iter().flat_map(|p| &p.entries).map(|e| e.item).find(|&i| i != 0)
-        })
+        self.items
+            .iter()
+            .position(|i| i.block == Some(b.first_state))
+            .map(|i| i as u32)
+            .filter(|&i| i != 0)
+            .or_else(|| {
+                self.loot
+                    .get(&b.name)?
+                    .pools
+                    .iter()
+                    .flat_map(|p| &p.entries)
+                    .map(|e| e.item)
+                    .find(|&i| i != 0)
+            })
     }
 
     #[inline]
@@ -618,7 +741,11 @@ impl Content {
         if let Some(e) = self.items.get(item as usize).and_then(|d| d.equip) {
             w.roles = self.game.player_layout.equipment[e as usize].parts;
         }
-        Some((w, self.components.text(comps::ITEM, item, self.ids.worn_texture?)?))
+        Some((
+            w,
+            self.components
+                .text(comps::ITEM, item, self.ids.worn_texture?)?,
+        ))
     }
 
     pub fn matches(&self, m: &Match, state: u32) -> bool {
@@ -627,24 +754,35 @@ impl Content {
 
     /// Tool level a block needs (`harvest_level`, see `abi::tool_tier`).
     pub fn harvest_level(&self, state: u32) -> u32 {
-        self.block_value::<u32>(state, self.ids.harvest_level).unwrap_or(0)
+        self.block_value::<u32>(state, self.ids.harvest_level)
+            .unwrap_or(0)
     }
 
     /// Has a `harvest_level`: drops its loot only to a fitting tool.
     pub fn needs_tool(&self, state: u32) -> bool {
-        self.block_value::<u32>(state, self.ids.harvest_level).is_some()
+        self.block_value::<u32>(state, self.ids.harvest_level)
+            .is_some()
     }
 
     /// The tool is of a class the block is mineable with (`mineable/pickaxe` on the block,
     /// `tools/pickaxe` on the item).
     pub fn tool_fits(&self, state: u32, tool: u32) -> bool {
-        tool != 0 && self.tool_classes.iter().any(|&(mineable, tools)| self.components.has(comps::BLOCK, state, mineable) && self.item_has(tool, tools))
+        tool != 0
+            && self
+                .tool_classes
+                .iter()
+                .any(|&(mineable, tools)| self.components.has(comps::BLOCK, state, mineable) && self.item_has(tool, tools))
     }
 
     /// Mining the block with `tool` (0 = hand) harvests it: it needs no tool, or this one fits
     /// and is of a high enough level.
     pub fn harvests(&self, state: u32, tool: u32) -> bool {
-        !self.needs_tool(state) || (self.tool_fits(state, tool) && self.item_value::<u32>(tool, self.ids.tool_level).unwrap_or(0) >= self.harvest_level(state))
+        !self.needs_tool(state)
+            || (self.tool_fits(state, tool)
+                && self
+                    .item_value::<u32>(tool, self.ids.tool_level)
+                    .unwrap_or(0)
+                    >= self.harvest_level(state))
     }
 
     pub fn max_stack(&self, item: u32) -> u32 {
@@ -652,7 +790,9 @@ impl Content {
     }
 
     pub fn mod_name(&self, id: ModId) -> &str {
-        self.mods.get(id.0 as usize).map_or("engine", |m| m.id.as_str())
+        self.mods
+            .get(id.0 as usize)
+            .map_or("engine", |m| m.id.as_str())
     }
 
     /// Full name of a state for saves, the network and players: `base:furnace[facing=north,lit=false]`.
@@ -672,7 +812,9 @@ impl Content {
 
     /// An item by reference: its name, or the preferred item of a tag (`#ingots/iron`).
     pub fn item_by_ref(&self, text: &str) -> Option<u32> {
-        crate::refs::Ref::parse(text).and_then(|r| crate::refs::item(&r, &self.item_names, &self.components, &self.tag_items)).ok()
+        crate::refs::Ref::parse(text)
+            .and_then(|r| crate::refs::item(&r, &self.item_names, &self.components, &self.tag_items))
+            .ok()
     }
 
     /// The value of property `name` in `state`.
@@ -709,6 +851,16 @@ pub struct RawRegistrar {
 }
 
 #[derive(Clone)]
+pub struct RawSignal {
+    pub kind: u32,
+    pub attach: u8,
+    pub front: u8,
+    pub delay: u8,
+    pub mode: u8,
+    pub head: String,
+}
+
+#[derive(Clone)]
 pub struct RawState {
     pub flags: u32,
     pub filter: [u8; 3],
@@ -716,10 +868,11 @@ pub struct RawState {
     pub layer: Layer,
     pub model: Model,
     pub textures: [String; 6],
-    /// (min, max, textures, uv) per box, see `abi::ModelBox`.
-    pub boxes: Vec<([f32; 3], [f32; 3], [String; 6], [[f32; 4]; 6])>,
+    /// (min, max, textures, uv, turn, tilt) per box, see `abi::ModelBox`.
+    pub boxes: Vec<([f32; 3], [f32; 3], [String; 6], [[f32; 4]; 6], [u8; 6], weft_abi::BoxTilt)>,
     pub collision: Vec<[f32; 6]>,
     pub selection: Vec<[f32; 6]>,
+    pub signal: RawSignal,
     pub components: Vec<RawValue>,
 }
 
@@ -794,14 +947,24 @@ fn inherit_states(b: &mut RawBlock, old: &RawBlock) {
             let mut s = o.clone();
             s.components.extend(own.components.iter().cloned());
             s.textures.iter_mut().for_each(rename);
-            for (_, _, t, _) in &mut s.boxes {
+            for (_, _, t, _, _, _) in &mut s.boxes {
                 t.iter_mut().for_each(rename);
             }
             s
         })
         .collect();
     let (n, o) = (&mut b.cb, &old.cb);
-    for (mine, theirs) in [(&mut n.on_use, o.on_use), (&mut n.on_neighbor, o.on_neighbor), (&mut n.on_scheduled, o.on_scheduled), (&mut n.placement, o.placement), (&mut n.on_grow, o.on_grow)] {
+    for (mine, theirs) in [
+        (&mut n.on_pass, o.on_pass),
+        (&mut n.signal_read, o.signal_read),
+        (&mut n.on_signal, o.on_signal),
+        (&mut n.signal_logic, o.signal_logic),
+        (&mut n.on_use, o.on_use),
+        (&mut n.on_neighbor, o.on_neighbor),
+        (&mut n.on_scheduled, o.on_scheduled),
+        (&mut n.placement, o.placement),
+        (&mut n.on_grow, o.on_grow),
+    ] {
         if mine.is_none() {
             *mine = theirs;
         }
@@ -829,7 +992,11 @@ fn apply_model(b: &mut RawBlock, m: &crate::block_model::FileModel) {
         if s.layer == Layer::Opaque {
             s.layer = Layer::Cutout;
         }
-        s.boxes = m.boxes.iter().map(|x| (x.min, x.max, x.textures.clone(), x.uv)).collect();
+        s.boxes = m
+            .boxes
+            .iter()
+            .map(|x| (x.min, x.max, x.textures.clone(), x.uv, x.turn, x.tilt))
+            .collect();
     }
 }
 
@@ -838,7 +1005,9 @@ pub(crate) unsafe fn copy_block(d: &abi::BlockDesc) -> RawBlock {
         let mut states = Vec::new();
         d.states.as_slice().iter().copied().for_each(|s| {
             let mut boxes = Vec::new();
-            s.boxes.as_slice().iter().copied().for_each(|b| boxes.push((b.min, b.max, std::array::from_fn(|i| b.textures[i].as_str().to_string()), b.uv)));
+            s.boxes.as_slice().iter().copied().for_each(|b| {
+                boxes.push((b.min, b.max, std::array::from_fn(|i| b.textures[i].as_str().to_string()), b.uv, b.turn, b.tilt))
+            });
             states.push(RawState {
                 flags: s.flags,
                 filter: s.filter,
@@ -849,6 +1018,14 @@ pub(crate) unsafe fn copy_block(d: &abi::BlockDesc) -> RawBlock {
                 boxes,
                 collision: s.collision.as_slice().to_vec(),
                 selection: s.selection.as_slice().to_vec(),
+                signal: RawSignal {
+                    kind: s.signal.kind,
+                    attach: s.signal.attach as u8,
+                    front: s.signal.front as u8,
+                    delay: s.signal.delay.min(31) as u8,
+                    mode: s.signal.mode as u8,
+                    head: s.signal.head.as_str().to_string(),
+                },
                 components: RawValue::list(s.components),
             })
         });
@@ -856,19 +1033,42 @@ pub(crate) unsafe fn copy_block(d: &abi::BlockDesc) -> RawBlock {
             name: d.name.as_str().to_string(),
             cell: d.cell as usize,
             states,
-            props: d.props.as_slice().iter().map(|p| (p.name.as_str().to_string(), p.values.as_slice().iter().map(|v| v.as_str().to_string()).collect())).collect(),
+            props: d
+                .props
+                .as_slice()
+                .iter()
+                .map(|p| {
+                    (
+                        p.name.as_str().to_string(),
+                        p.values
+                            .as_slice()
+                            .iter()
+                            .map(|v| v.as_str().to_string())
+                            .collect(),
+                    )
+                })
+                .collect(),
             components: RawValue::list(d.components),
             cb: BlockCallbacks {
                 on_use: cb(d.on_use),
                 on_neighbor: cb(d.on_neighbor),
                 on_scheduled: cb(d.on_scheduled),
+                on_pass: cb(d.on_pass),
+                signal_read: cb(d.signal_read),
                 placement: cb(d.placement),
                 on_grow: cb(d.on_grow),
+                on_signal: cb(d.on_signal),
+                signal_logic: cb(d.signal_logic),
                 grow: (d.grow_seconds > 0.0).then_some((d.grow_seconds as f64 * crate::world::TPS as f64, d.grow_light)),
             },
             replace: d.replace != 0,
             own_states: d.own_states != 0,
-            retexture: d.retexture.as_slice().chunks_exact(2).map(|p| (p[0].as_str().to_string(), p[1].as_str().to_string())).collect(),
+            retexture: d
+                .retexture
+                .as_slice()
+                .chunks_exact(2)
+                .map(|p| (p[0].as_str().to_string(), p[1].as_str().to_string()))
+                .collect(),
             opens: d.opens.as_str().to_string(),
             extra_cells: Vec::new(),
         }
@@ -918,6 +1118,7 @@ pub(crate) unsafe fn copy_dimension(owner: ModId, d: &abi::DimensionDesc) -> (Di
                 structures: Vec::new(),
                 terrain: None,
                 bare: d.flags & abi::dim_flags::BARE != 0,
+                weather: d.flags & abi::dim_flags::WEATHER != 0,
                 scatters: Vec::new(),
                 decorations: Vec::new(),
                 column_cache: crate::server::terrain::ColumnCache::new(4096),
@@ -959,6 +1160,7 @@ fn void_dimension() -> DimensionDef {
         structures: Vec::new(),
         terrain: None,
         bare: true,
+        weather: false,
         scatters: Vec::new(),
         decorations: Vec::new(),
         column_cache: crate::server::terrain::ColumnCache::new(1),
@@ -1021,7 +1223,14 @@ pub fn load_order(mods: &[ModMeta]) -> Vec<u32> {
     let mut placed: Vec<Option<u32>> = vec![None; mods.len()];
     let mut next = 0;
     while next < mods.len() as u32 {
-        let ready = (0..mods.len()).find(|&i| placed[i].is_none() && mods[i].deps.iter().all(|d| mods.iter().position(|m| &m.id == d).is_none_or(|j| placed[j].is_some())));
+        let ready = (0..mods.len()).find(|&i| {
+            placed[i].is_none()
+                && mods[i].deps.iter().all(|d| {
+                    mods.iter()
+                        .position(|m| &m.id == d)
+                        .is_none_or(|j| placed[j].is_some())
+                })
+        });
         // A dependency cycle: place the rest by id rather than loop forever.
         let i = ready.unwrap_or_else(|| (0..mods.len()).find(|&i| placed[i].is_none()).unwrap());
         placed[i] = Some(next);
@@ -1032,7 +1241,25 @@ pub fn load_order(mods: &[ModMeta]) -> Vec<u32> {
 
 /// Registered tabs in mod order, filled with their tagged items in registration order; every mod
 /// with leftover items gets one more tab of its own.
-fn creative_tabs(mods: &[ModMeta], games: &[crate::registry::RawGame], items: &[ItemDef], item_names: &FxHashMap<String, u32>, c: &Components, errors: &mut Vec<String>) -> Vec<CreativeTab> {
+/// Whether the mod a texture's name points at has that file.
+fn picture_exists(mods: &[ModMeta], name: &str) -> bool {
+    let Some((ns, path)) = name.split_once(':') else { return false };
+    mods.iter().find(|m| m.id == ns).is_some_and(|m| {
+        m.assets
+            .join("textures")
+            .join(format!("{path}.png"))
+            .is_file()
+    })
+}
+
+fn creative_tabs(
+    mods: &[ModMeta],
+    games: &[crate::registry::RawGame],
+    items: &[ItemDef],
+    item_names: &FxHashMap<String, u32>,
+    c: &Components,
+    errors: &mut Vec<String>,
+) -> Vec<CreativeTab> {
     let mut tabs: Vec<CreativeTab> = Vec::new();
     for g in games {
         for (name, icon) in &g.creative_tabs {
@@ -1043,8 +1270,14 @@ fn creative_tabs(mods: &[ModMeta], games: &[crate::registry::RawGame], items: &[
             tabs.push(CreativeTab { name: name.clone(), icon, items: Vec::new() });
         }
     }
+    // Every entity's egg goes here, whichever mod's it is. Its icon is the first of them.
+    tabs.push(CreativeTab { name: "core:spawn_eggs".into(), icon: 0, items: Vec::new() });
     // The tag `tab/<name>` of each tab, by component id.
-    let tab_of: FxHashMap<u32, usize> = tabs.iter().enumerate().filter_map(|(i, t)| c.id(&format!("tab/{}", t.name)).map(|id| (id, i))).collect();
+    let tab_of: FxHashMap<u32, usize> = tabs
+        .iter()
+        .enumerate()
+        .filter_map(|(i, t)| c.id(&format!("tab/{}", t.name)).map(|id| (id, i)))
+        .collect();
     let mut ordered: Vec<u32> = (1..items.len() as u32).collect();
     ordered.sort_by_key(|&i| items[i as usize].order);
     let mut leftover: Vec<(usize, Vec<u32>)> = Vec::new();
@@ -1053,7 +1286,12 @@ fn creative_tabs(mods: &[ModMeta], games: &[crate::registry::RawGame], items: &[
         // A misspelt tab would quietly send the item to misc.
         for id in c.of(comps::ITEM, i).filter(|id| !tab_of.contains_key(id)) {
             if let Some(tab) = c.names[id as usize].strip_prefix("tab/") {
-                errors.push(format!("{}: {} is in creative tab {tab}, which no mod registers", mods.get(def.owner.0 as usize).map_or("core", |m| m.id.as_str()), def.name));
+                errors.push(format!(
+                    "{}: {} is in creative tab {tab}, which no mod registers",
+                    mods.get(def.owner.0 as usize)
+                        .map_or("core", |m| m.id.as_str()),
+                    def.name
+                ));
             }
         }
         match c.of(comps::ITEM, i).find_map(|id| tab_of.get(&id).copied()) {
@@ -1069,40 +1307,316 @@ fn creative_tabs(mods: &[ModMeta], games: &[crate::registry::RawGame], items: &[
         tabs.push(CreativeTab { name, icon: list[0], items: list });
     }
     tabs.retain(|t| !t.items.is_empty());
+    for t in tabs.iter_mut().filter(|t| t.icon == 0) {
+        t.icon = t.items[0];
+    }
     for t in &tabs {
-        log::debug!("creative tab {}: {}", t.name, t.items.iter().map(|&i| items[i as usize].name.as_str()).collect::<Vec<_>>().join(" "));
+        log::debug!(
+            "creative tab {}: {}",
+            t.name,
+            t.items
+                .iter()
+                .map(|&i| items[i as usize].name.as_str())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
     }
     tabs
 }
 
+/// One list of every texture by name, for blocks, items and particles alike.
+struct TextureList {
+    names: Vec<String>,
+    index: FxHashMap<String, u32>,
+}
+
+impl TextureList {
+    fn new() -> Self {
+        let mut index = FxHashMap::default();
+        index.insert("core:missing".to_string(), 0);
+        Self { names: vec!["core:missing".into()], index }
+    }
+
+    fn intern(&mut self, name: &str) -> u32 {
+        if name.is_empty() {
+            return 0;
+        }
+        if let Some(&i) = self.index.get(name) {
+            return i;
+        }
+        self.names.push(name.to_string());
+        self.index
+            .insert(name.to_string(), self.names.len() as u32 - 1);
+        self.names.len() as u32 - 1
+    }
+}
+
+type RawBiome = (BiomeDef, usize, Vec<RawValue>, crate::server::terrain::RawRule);
+type RawDim = (DimensionDef, usize, Vec<RawValue>);
+
+/// What the registrars brought, put together.
+struct Merged {
+    blocks: Vec<(ModId, RawBlock)>,
+    items: Vec<(ModId, RawItem)>,
+    biomes: Vec<RawBiome>,
+    dims: Vec<RawDim>,
+    tint_kinds: Vec<(String, u32)>,
+    biome_tints: Vec<(u32, (String, String, u32))>,
+    games: Vec<crate::registry::RawGame>,
+}
+
+struct BlockTables {
+    states: Vec<StateInfo>,
+    block_defs: Vec<BlockDef>,
+    /// Per block: (block components, per-state components) for the component pass.
+    block_values: Vec<(ModId, Vec<RawValue>, Vec<Vec<RawValue>>)>,
+    /// What each registered block opens, by menu name (resolved once menus are frozen).
+    opens_names: Vec<String>,
+    block_names: FxHashMap<String, u32>,
+}
+
+struct ItemTables {
+    item_defs: Vec<ItemDef>,
+    item_values: Vec<(ModId, Vec<RawValue>)>,
+    item_names: FxHashMap<String, u32>,
+}
+
+struct BiomeTables {
+    biome_defs: Vec<BiomeDef>,
+    biome_values: Vec<Vec<RawValue>>,
+    biome_rules: Vec<crate::server::terrain::RawRule>,
+    biome_names: FxHashMap<String, u32>,
+}
+
+struct DimTables {
+    dim_defs: Vec<DimensionDef>,
+    dim_values: Vec<(ModId, Vec<RawValue>)>,
+    dim_names: FxHashMap<String, u32>,
+    spawn_dim: u32,
+    void_dim: u32,
+}
+
+/// What later stages look names up in, once the components are known.
+#[derive(Clone, Copy)]
+struct Lookups<'a> {
+    mods: &'a [ModMeta],
+    block_defs: &'a [BlockDef],
+    block_names: &'a FxHashMap<String, u32>,
+    dim_names: &'a FxHashMap<String, u32>,
+    components: &'a Components,
+    state_count: u32,
+}
+
 /// Merges per-mod registrars into frozen content. Ids are assigned in name order, so they do not
-/// depend on which mod finished registering first.
+/// depend on which mod finished registering first. The order of the stages is the meaning here:
+/// each one reads what the ones before it settled.
 pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content, Vec<String>> {
     let order = load_order(&mods);
     for (m, o) in mods.iter_mut().zip(&order) {
         m.order = *o;
     }
     let mut errors: Vec<String> = Vec::new();
+    let Merged { blocks, mut items, mut biomes, mut dims, tint_kinds, biome_tints, mut games } = merge_registrars(&mods, regs, &mut errors);
+    let mut blocks = apply_replacements(&mods, blocks, &mut items);
+    apply_block_models(&mods, &mut blocks, &mut errors);
+    let tint_kinds = freeze_tints(tint_kinds, biome_tints, &mut biomes, &mut errors);
+    check_unique(&mods, &blocks, &mut items, &mut biomes, &mut dims, &mut errors);
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    let mut textures = TextureList::new();
+    let crack_textures: [u32; 10] = std::array::from_fn(|i| textures.intern(&format!("core:block/destroy_{i}")));
+    let fire_texture = textures.intern("core:block/fire");
+    let block_tables = number_blocks(&mods, blocks, &mut textures, &mut errors);
+    let item_tables = number_items(&mods, items, &block_tables, &mut textures, &mut errors);
+    let biome_tables = number_biomes(biomes);
+    let dim_tables = number_dimensions(&mods, dims);
+    let entities = crate::registry::freeze_entities(&mut games, &mut errors);
+
+    let sets = take_sets(&mods, &mut games);
+    let builder = declare_components(&mods, &games, &sets, &block_tables, &item_tables, &entities, &biome_tables, &dim_tables, &mut errors);
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+    let (components, ref_lists) = fill_components(
+        builder,
+        &mods,
+        &sets,
+        &block_tables,
+        &item_tables,
+        &entities,
+        &biome_tables,
+        &dim_tables,
+        &tint_kinds,
+        &mut errors,
+    );
+    let BlockTables { mut states, mut block_defs, opens_names, block_names, .. } = block_tables;
+    let ItemTables { mut item_defs, item_names, .. } = item_tables;
+    let BiomeTables { biome_defs, biome_rules, biome_names, .. } = biome_tables;
+    let DimTables { mut dim_defs, dim_names, spawn_dim, void_dim, .. } = dim_tables;
+    let ids = component_ids(&components);
+    flatten_components(&mut states, &mut item_defs, &components, &ids);
+    let tool_classes = tool_classes(&components);
+
+    let look = Lookups {
+        mods: &mods,
+        block_defs: &block_defs,
+        block_names: &block_names,
+        dim_names: &dim_names,
+        components: &components,
+        state_count: states.len() as u32,
+    };
+    place_features(&mut games, &mut dim_defs, look, &mut errors);
+    let (templates, template_names) = freeze_templates(&mut games, look, &mut errors);
+    place_structures(&mut games, &mut dim_defs, &templates, &template_names, look, &mut errors);
+    build_terrains(&mut games, &mut dim_defs, &biome_names, &biome_rules, look, &mut errors);
+    let commands = freeze_commands(&mods, &mut games, &mut errors);
+    let mut word_sets = collect_word_sets(&mut games);
+    let (liquids, reactions) = freeze_liquids(&mut games, &mut states, &block_defs, &block_names, &components, &mut errors);
+    let (item_liquid, containers) = item_containers(&item_defs, &liquids, &components, &mut errors);
+    let creative_tabs = creative_tabs(&mods, &games, &item_defs, &item_names, &components, &mut errors);
+    let mut ordered_items: Vec<u32> = (1..item_defs.len() as u32).collect();
+    ordered_items.sort_by_key(|&i| item_defs[i as usize].order);
+    let tag_items = crate::refs::tag_items(&components, &ordered_items);
+    let loot = freeze_loot(&mut games, &item_defs, &item_names, &tag_items, look, &mut errors);
+    let stack_flags = collect_stack_flags(&games, &components);
+    // The first block with a tag, for `fluid:#tag` in recipes.
+    let order_of = |m: ModId| mods.get(m.0 as usize).map_or(u32::MAX, |m| m.order);
+    let block_of_tag = |tag: &str| {
+        components
+            .id(tag)
+            .and_then(|t| {
+                block_defs[1..]
+                    .iter()
+                    .find(|b| components.has(crate::components::BLOCK, b.first_state, t))
+            })
+            .map(|b| b.name.clone())
+    };
+    let mut game = crate::registry::freeze(
+        games,
+        entities,
+        &block_names,
+        &item_names,
+        &item_defs,
+        &dim_names,
+        &components,
+        &tag_items,
+        &block_of_tag,
+        &order_of,
+        &mut errors,
+    );
+    link_particles(&mut game, &mut textures);
+    check_ambient_particles(&game, &components, states.len() as u32, &mut errors);
+    link_entity_templates(&mut game, &templates, &template_names, &mut errors);
+    link_equipment(&game, &mut item_defs, &components);
+    link_menus(&mut game, &mut block_defs, &item_defs, &opens_names, &mods, &mut errors);
+    word_sets.entry("core:rules".into()).or_default().extend(
+        game.configs
+            .iter()
+            .filter(|d| d.scope == abi::config_scope::WORLD)
+            .map(|d| d.name.clone()),
+    );
+    check_loot_smelting(&loot, &game, &mut errors);
+    resolve_sounds(&mut states, &mut game, &block_defs, &components, &mut errors);
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+    let mut spread_tags: Vec<u32> = states
+        .iter()
+        .filter_map(|s| s.spread.map(|sp| sp.0))
+        .collect();
+    spread_tags.sort_unstable();
+    spread_tags.dedup();
+    let tight = states
+        .iter()
+        .map(|s| Tight { flags: s.flags, opacity: s.opacity, light: s.light, absorb: s.absorb })
+        .collect();
+    Ok(Content {
+        state_names: OnceLock::new(),
+        spread_tags,
+        mods,
+        tight,
+        states,
+        blocks: block_defs,
+        items: item_defs,
+        biomes: biome_defs,
+        templates,
+        template_names,
+        ref_lists,
+        word_sets,
+        tint_kinds,
+        dims: dim_defs,
+        components,
+        ids,
+        tool_classes,
+        tag_items,
+        textures: textures.names,
+        crack_textures,
+        fire_texture,
+        commands,
+        block_names,
+        item_names,
+        creative_tabs,
+        dim_names,
+        spawn_dim,
+        void_dim,
+        biome_names,
+        game,
+        liquids,
+        reactions,
+        item_liquid,
+        containers,
+        loot,
+        stack_flags,
+    })
+}
+
+fn merge_registrars(mods: &[ModMeta], regs: Vec<RawRegistrar>, errors: &mut Vec<String>) -> Merged {
     let mut blocks: Vec<(ModId, RawBlock)> = Vec::new();
     let mut items: Vec<(ModId, RawItem)> = Vec::new();
     let mut biomes: Vec<(BiomeDef, usize, Vec<RawValue>, crate::server::terrain::RawRule)> = Vec::new();
     let mut dims: Vec<(DimensionDef, usize, Vec<RawValue>)> = Vec::new();
-    let mut tint_kinds: Vec<(String, u32)> = vec![("core:grass".into(), 0x8db360), ("core:foliage".into(), 0x77ab2f), ("core:water".into(), 0x3f76e4)];
+    let mut tint_kinds: Vec<(String, u32)> =
+        vec![("core:grass".into(), 0x8db360), ("core:foliage".into(), 0x77ab2f), ("core:water".into(), 0x3f76e4)];
     let mut biome_tints = Vec::new();
     let mut games = Vec::new();
     for r in regs {
         games.push(r.game);
         tint_kinds.extend(r.tint_kinds);
-        biome_tints.extend(r.biome_tints.into_iter().map(|t| (mods[r.owner.0 as usize].order, t)));
-        errors.extend(r.errors.into_iter().map(|e| format!("{}: {e}", mods[r.owner.0 as usize].id)));
+        biome_tints.extend(
+            r.biome_tints
+                .into_iter()
+                .map(|t| (mods[r.owner.0 as usize].order, t)),
+        );
+        errors.extend(
+            r.errors
+                .into_iter()
+                .map(|e| format!("{}: {e}", mods[r.owner.0 as usize].id)),
+        );
         blocks.extend(r.blocks.into_iter().map(|b| (r.owner, b)));
         items.extend(r.items.into_iter().map(|i| (r.owner, i)));
         biomes.extend(r.biomes);
         dims.extend(r.dims);
     }
+    Merged { blocks, items, biomes, dims, tint_kinds, biome_tints, games }
+}
+
+fn apply_replacements(mods: &[ModMeta], mut blocks: Vec<(ModId, RawBlock)>, items: &mut Vec<(ModId, RawItem)>) -> Vec<(ModId, RawBlock)> {
+    // A data package's blocks and items come after every code mod's (chiacraft), so a package
+    // never moves a code mod's ids.
     let package = |m: ModId| mods[m.0 as usize].package.is_some();
-    blocks.par_sort_by(|a, b| package(a.0).cmp(&package(b.0)).then(a.1.name.cmp(&b.1.name)).then(a.1.replace.cmp(&b.1.replace)));
-    items.par_sort_by(|a, b| package(a.0).cmp(&package(b.0)).then(a.1.name.cmp(&b.1.name)));
+    blocks.par_sort_by(|a, b| {
+        package(a.0)
+            .cmp(&package(b.0))
+            .then(a.1.name.cmp(&b.1.name))
+            .then(a.1.replace.cmp(&b.1.replace))
+    });
+    items.par_sort_by(|a, b| {
+        package(a.0)
+            .cmp(&package(b.0))
+            .then(a.1.name.cmp(&b.1.name))
+    });
     // A replacement wins over the original if its mod depends on the original's mod. The
     // original's item stays (it already points at the block by name).
     let depends = |m: ModId, on: ModId| mods[m.0 as usize].deps.contains(&mods[on.0 as usize].id);
@@ -1115,7 +1629,10 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
                 let mut b = b;
                 if !b.own_states {
                     inherit_states(&mut b, &old);
-                    for (_, item) in items.iter_mut().filter(|(_, i)| i.name == b.name || i.block == b.name) {
+                    for (_, item) in items
+                        .iter_mut()
+                        .filter(|(_, i)| i.name == b.name || i.block == b.name)
+                    {
                         if let Some((_, to)) = b.retexture.iter().find(|r| r.0 == item.texture) {
                             item.texture = to.clone();
                         }
@@ -1128,15 +1645,14 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             _ => kept.push((owner, b)),
         }
     }
-    let mut blocks = kept;
-    // Shapes from model files (`models/block/<name>.json`) in the block's namespace's mod: read
-    // here, so collision and selection follow them on the server and every client alike.
-    let read_model = |name: &str| -> Option<String> {
-        let (ns, path) = name.split_once(':')?;
-        let dir = &mods.iter().find(|m| m.id == ns)?.assets;
-        std::fs::read_to_string(dir.join("models").join(format!("{path}.json"))).ok()
-    };
-    for (_, b) in &mut blocks {
+    kept
+}
+
+/// Shapes from model files (`models/block/<name>.json`) in the block's namespace's mod: read
+/// here, so collision and selection follow them on the server and every client alike.
+fn apply_block_models(mods: &[ModMeta], blocks: &mut [(ModId, RawBlock)], errors: &mut Vec<String>) {
+    let read_model = |name: &str| model_file(mods, name);
+    for (_, b) in blocks.iter_mut() {
         let Some((ns, path)) = b.name.split_once(':') else { continue };
         match crate::block_model::load(&format!("{ns}:block/{path}"), &read_model) {
             Ok(Some(m)) => apply_model(b, &m),
@@ -1144,6 +1660,20 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             Err(e) => errors.push(e),
         }
     }
+}
+
+fn model_file(mods: &[ModMeta], name: &str) -> Option<String> {
+    let (ns, path) = name.split_once(':')?;
+    let dir = &mods.iter().find(|m| m.id == ns)?.assets;
+    std::fs::read_to_string(dir.join("models").join(format!("{path}.json"))).ok()
+}
+
+fn freeze_tints(
+    mut tint_kinds: Vec<(String, u32)>,
+    mut biome_tints: Vec<(u32, (String, String, u32))>,
+    biomes: &mut [RawBiome],
+    errors: &mut Vec<String>,
+) -> Vec<(String, u32)> {
     if tint_kinds.len() > abi::tint::MAX as usize {
         errors.push(format!("{} tint kinds registered, at most {} fit", tint_kinds.len(), abi::tint::MAX));
     }
@@ -1152,9 +1682,14 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             errors.push(format!("tint kind {name} registered twice"));
         }
     }
-    let tint_id = |name: &str| tint_kinds.iter().position(|k| k.0 == name).filter(|i| *i < abi::tint::MAX as usize).map(|i| i as u8 + 1);
-    let tint_names: Vec<String> = tint_kinds.iter().take(abi::tint::MAX as usize).map(|k| k.0.clone()).collect();
-    for (b, ..) in &mut biomes {
+    let tint_id = |name: &str| {
+        tint_kinds
+            .iter()
+            .position(|k| k.0 == name)
+            .filter(|i| *i < abi::tint::MAX as usize)
+            .map(|i| i as u8 + 1)
+    };
+    for (b, ..) in biomes.iter_mut() {
         b.tints.extend(tint_kinds.iter().map(|k| k.1));
     }
     // In load order: a mod's colors win over those of the mods it depends on.
@@ -1166,6 +1701,17 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         }
     }
     tint_kinds.truncate(abi::tint::MAX as usize);
+    tint_kinds
+}
+
+fn check_unique(
+    mods: &[ModMeta],
+    blocks: &[(ModId, RawBlock)],
+    items: &mut Vec<(ModId, RawItem)>,
+    biomes: &mut [RawBiome],
+    dims: &mut [RawDim],
+    errors: &mut Vec<String>,
+) {
     let mut seen = rustc_hash::FxHashSet::default();
     items.retain(|(_, i)| seen.insert(i.name.clone()));
     biomes.sort_by(|a, b| a.0.name.cmp(&b.0.name));
@@ -1185,28 +1731,12 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
     if biomes.len() > 32768 {
         errors.push(format!("{} biomes registered, at most 32768 fit", biomes.len()));
     }
-    if !errors.is_empty() {
-        return Err(errors);
-    }
+}
 
-    // One list of every texture by name, for blocks, items and particles alike.
-    let mut textures: Vec<String> = vec!["core:missing".into()];
-    let mut tex_index: FxHashMap<String, u32> = FxHashMap::default();
-    tex_index.insert("core:missing".into(), 0);
-    let intern = |textures: &mut Vec<String>, tex_index: &mut FxHashMap<String, u32>, name: &str| -> u32 {
-        if name.is_empty() {
-            return 0;
-        }
-        *tex_index.entry(name.to_string()).or_insert_with(|| {
-            textures.push(name.to_string());
-            textures.len() as u32 - 1
-        })
-    };
-    let mut tex = |name: &str| intern(&mut textures, &mut tex_index, name);
-    let crack_textures: [u32; 10] = std::array::from_fn(|i| tex(&format!("core:block/destroy_{i}")));
-    let fire_texture = tex("core:block/fire");
-
+fn number_blocks(mods: &[ModMeta], blocks: Vec<(ModId, RawBlock)>, textures: &mut TextureList, errors: &mut Vec<String>) -> BlockTables {
+    let mut tex = |name: &str| textures.intern(name);
     let mut states = vec![StateInfo {
+        signal: Signal::default(),
         block: 0,
         flags: abi::block_flags::REPLACEABLE | abi::block_flags::NOT_TARGETABLE,
         light: [0; 3],
@@ -1232,7 +1762,6 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         smother: None,
         sounds: [u32::MAX; 4],
     }];
-    // What each registered block opens, by menu name (resolved once menus are frozen).
     let mut opens_names: Vec<String> = Vec::new();
     let mut block_defs = vec![BlockDef {
         name: "core:air".into(),
@@ -1243,6 +1772,7 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         opens: None,
         cb: BlockCallbacks::default(),
     }];
+    let mut heads: Vec<(usize, String)> = Vec::new();
     // Per block: (block components, per-state components) for the component pass.
     let mut block_values: Vec<(ModId, Vec<RawValue>, Vec<Vec<RawValue>>)> = vec![(ModId(u32::MAX), Vec::new(), vec![Vec::new()])];
     for (owner, b) in blocks {
@@ -1254,10 +1784,15 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         }
         let mut state_values = Vec::new();
         for s in b.states {
+            if !s.signal.head.is_empty() {
+                heads.push((states.len(), s.signal.head.clone()));
+            }
             let mut boxes: Vec<ModelBox> = s
                 .boxes
                 .iter()
-                .map(|(min, max, t, uv)| ModelBox {
+                .map(|(min, max, t, uv, turn, tilt)| ModelBox {
+                    turn: *turn,
+                    tilt: weft_abi::BoxTilt { origin: tilt.origin.map(|v| v / 16.0), ..*tilt },
                     min: min.map(|v| v / 16.0),
                     max: max.map(|v| v / 16.0),
                     textures: std::array::from_fn(|i| tex(if t[i].is_empty() { &s.textures[i] } else { &t[i] })),
@@ -1283,7 +1818,10 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             } else if !collision.is_empty() {
                 collision.clone()
             } else if !boxes.is_empty() {
-                boxes.iter().map(|b| [b.min[0], b.min[1], b.min[2], b.max[0], b.max[1], b.max[2]]).collect()
+                boxes
+                    .iter()
+                    .map(|b| [b.min[0], b.min[1], b.min[2], b.max[0], b.max[1], b.max[2]])
+                    .collect()
             } else if s.model == Model::Cross {
                 vec![[0.125, 0.0, 0.125, 0.875, 0.8, 0.875]]
             } else {
@@ -1302,11 +1840,15 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
                 level: 0,
                 model: s.model,
                 // A box model's faces default to these (the particles of breaking it show them too).
-                textures: if s.model == Model::None {
-                    [0; 6]
-                } else {
-                    std::array::from_fn(|i| tex(&s.textures[i]))
+                signal: Signal {
+                    kind: s.signal.kind,
+                    attach: s.signal.attach,
+                    front: s.signal.front,
+                    delay: s.signal.delay,
+                    mode: s.signal.mode,
+                    ..Signal::default()
                 },
+                textures: if s.model == Model::None { [0; 6] } else { std::array::from_fn(|i| tex(&s.textures[i])) },
                 boxes,
                 collision,
                 selection,
@@ -1332,27 +1874,63 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             stride *= values.len().max(1) as u32;
         }
         props.reverse();
+        // What a state gives, from its `power` property: two values are off and full.
+        let power = props
+            .iter()
+            .find(|p: &&Prop| p.name == "power")
+            .map(|p| (p.values.len() as u32, p.stride));
+        for (i, st) in states[first as usize..].iter_mut().enumerate() {
+            match power {
+                Some((n, each)) if n > 0 => {
+                    let at = (i as u32 / each) % n;
+                    st.signal.levels = n.min(16) as u8;
+                    st.signal.stride = each;
+                    st.signal.level = if n == 2 { at as u8 * 15 } else { at.min(15) as u8 };
+                }
+                _ if st.signal.kind == weft_abi::signal_kind::SOURCE => st.signal.level = 15,
+                _ => {}
+            }
+        }
         if stride != count {
-            errors.push(format!("{}: block {} has {count} states, its properties make {stride}", mods.get(owner.0 as usize).map_or("engine", |m| m.id.as_str()), b.name));
+            errors.push(format!(
+                "{}: block {} has {count} states, its properties make {stride}",
+                mods.get(owner.0 as usize)
+                    .map_or("engine", |m| m.id.as_str()),
+                b.name
+            ));
         }
         if b.cb.grow.is_some() && b.cb.on_grow.is_none() && !b.props.iter().any(|p| p.0 == "age") {
-            errors.push(format!("{}: block {} grows, but has no `age` property and no on_grow", mods.get(owner.0 as usize).map_or("engine", |m| m.id.as_str()), b.name));
+            errors.push(format!(
+                "{}: block {} grows, but has no `age` property and no on_grow",
+                mods.get(owner.0 as usize)
+                    .map_or("engine", |m| m.id.as_str()),
+                b.name
+            ));
         }
         opens_names.push(b.opens.clone());
-        block_defs.push(BlockDef {
-            opens: None,
-            name: b.name,
-            owner,
-            first_state: first,
-            states: count,
-            props,
-            cb: b.cb,
-        });
+        block_defs.push(BlockDef { opens: None, name: b.name, owner, first_state: first, states: count, props, cb: b.cb });
     }
 
-    let block_names: FxHashMap<String, u32> =
-        block_defs.iter().enumerate().map(|(i, b)| (b.name.clone(), i as u32)).collect();
+    let block_names: FxHashMap<String, u32> = block_defs
+        .iter()
+        .enumerate()
+        .map(|(i, b)| (b.name.clone(), i as u32))
+        .collect();
+    for (state, name) in heads {
+        states[state].signal.head = block_names.get(&name).copied();
+    }
+    BlockTables { states, block_defs, block_values, opens_names, block_names }
+}
 
+fn number_items(
+    mods: &[ModMeta],
+    items: Vec<(ModId, RawItem)>,
+    blocks: &BlockTables,
+    textures: &mut TextureList,
+    errors: &mut Vec<String>,
+) -> ItemTables {
+    let BlockTables { block_defs, block_names, .. } = blocks;
+    let read_model = |name: &str| model_file(mods, name);
     let mut item_defs = vec![ItemDef {
         name: "core:empty".into(),
         owner: ModId(u32::MAX),
@@ -1364,10 +1942,11 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         on_use: None,
         order: 0,
         equip: None,
+        handheld: false,
         model: Vec::new(),
     }];
     let mut item_values: Vec<(ModId, Vec<RawValue>)> = vec![(ModId(u32::MAX), Vec::new())];
-    for (owner, it) in items {
+    for (owner, mut it) in items {
         let id = item_defs.len() as u32;
         write_cell(it.cell, id);
         let block = if it.block.is_empty() {
@@ -1381,7 +1960,11 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
                 }
             }
         };
-        let mut icon = if it.texture.is_empty() && block.is_some() { u32::MAX } else { intern(&mut textures, &mut tex_index, &it.texture) };
+        // An egg its mod drew no picture for. Packs can still replace the generic one.
+        if it.components.iter().any(|v| v.name == abi::comp::SPAWN_EGG) && !picture_exists(mods, &it.texture) {
+            it.texture = "core:item/spawn_egg".into();
+        }
+        let mut icon = if it.texture.is_empty() && block.is_some() { u32::MAX } else { textures.intern(&it.texture) };
         // Its model file: a flat item of another texture, or boxes (faces it leaves to the item
         // show the icon).
         let mut model = Vec::new();
@@ -1389,18 +1972,13 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             match crate::block_model::load(&format!("{ns}:item/{path}"), &read_model) {
                 Ok(Some(m)) => {
                     if let Some(t) = m.sprite.filter(|t| !t.is_empty()) {
-                        icon = intern(&mut textures, &mut tex_index, &t);
+                        icon = textures.intern(&t);
                     }
                     let own = if icon == u32::MAX { 0 } else { icon };
                     model = m
                         .boxes
                         .iter()
-                        .map(|b| ModelBox {
-                            min: b.min.map(|v| v / 16.0),
-                            max: b.max.map(|v| v / 16.0),
-                            textures: std::array::from_fn(|i| if b.textures[i].is_empty() { own } else { intern(&mut textures, &mut tex_index, &b.textures[i]) }),
-                            uv: b.uv,
-                        })
+                        .map(|b| b.model_box(|t, _| if t.is_empty() { own } else { textures.intern(t) }))
                         .collect();
                 }
                 Ok(None) => {}
@@ -1419,12 +1997,19 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             on_use: it.on_use,
             order: (mods[owner.0 as usize].order as u64) << 32 | it.seq as u64,
             equip: None,
+            handheld: false,
             model,
         });
     }
-    let item_names: FxHashMap<String, u32> =
-        item_defs.iter().enumerate().map(|(i, b)| (b.name.clone(), i as u32)).collect();
+    let item_names: FxHashMap<String, u32> = item_defs
+        .iter()
+        .enumerate()
+        .map(|(i, b)| (b.name.clone(), i as u32))
+        .collect();
+    ItemTables { item_defs, item_values, item_names }
+}
 
+fn number_biomes(biomes: Vec<RawBiome>) -> BiomeTables {
     let mut biome_values = Vec::new();
     let mut biome_rules = Vec::new();
     let biome_defs: Vec<BiomeDef> = biomes
@@ -1437,7 +2022,15 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             b
         })
         .collect();
-    let biome_names: FxHashMap<String, u32> = biome_defs.iter().enumerate().map(|(i, b)| (b.name.clone(), i as u32)).collect();
+    let biome_names: FxHashMap<String, u32> = biome_defs
+        .iter()
+        .enumerate()
+        .map(|(i, b)| (b.name.clone(), i as u32))
+        .collect();
+    BiomeTables { biome_defs, biome_values, biome_rules, biome_names }
+}
+
+fn number_dimensions(mods: &[ModMeta], dims: Vec<RawDim>) -> DimTables {
     let mut dim_values = Vec::new();
     let mut dim_defs: Vec<DimensionDef> = dims
         .into_iter()
@@ -1461,96 +2054,171 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         .enumerate()
         .filter(|(_, d)| d.player_spawn)
         .max_by_key(|(_, d)| order_of_mod(d.owner))
-        .or_else(|| dim_defs[..void_dim as usize].iter().enumerate().min_by_key(|(_, d)| order_of_mod(d.owner)))
+        .or_else(|| {
+            dim_defs[..void_dim as usize]
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, d)| order_of_mod(d.owner))
+        })
         .map_or(void_dim, |(i, _)| i as u32);
-    let dim_names: FxHashMap<String, u32> = dim_defs.iter().enumerate().map(|(i, d)| (d.name.clone(), i as u32)).collect();
+    let dim_names: FxHashMap<String, u32> = dim_defs
+        .iter()
+        .enumerate()
+        .map(|(i, d)| (d.name.clone(), i as u32))
+        .collect();
+    DimTables { dim_defs, dim_values, dim_names, spawn_dim, void_dim }
+}
 
-    let entities = crate::registry::freeze_entities(&mut games, &mut errors);
+fn take_sets(mods: &[ModMeta], games: &mut [crate::registry::RawGame]) -> Vec<RawSet> {
+    let mut sets: Vec<RawSet> = games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.sets))
+        .collect();
+    // Stable sort keeps registration order within a mod.
+    sets.sort_by_key(|s| mods[s.owner.0 as usize].order);
+    sets
+}
 
-    // ------------------------------------------------ components
+#[allow(clippy::too_many_arguments)]
+fn declare_components(
+    mods: &[ModMeta],
+    games: &[crate::registry::RawGame],
+    sets: &[RawSet],
+    blocks: &BlockTables,
+    items: &ItemTables,
+    entities: &crate::registry::Entities,
+    biomes: &BiomeTables,
+    dims: &DimTables,
+    errors: &mut Vec<String>,
+) -> comps::Builder {
+    let BlockTables { block_defs, block_values, .. } = blocks;
+    let ItemTables { item_defs, item_values, .. } = items;
+    let BiomeTables { biome_defs, biome_values, .. } = biomes;
+    let DimTables { dim_defs, dim_values, .. } = dims;
     let mut cb = comps::Builder::default();
     let who = |m: ModId, entry: &str| format!("{}: {entry}", mods.get(m.0 as usize).map_or("engine", |m| m.id.as_str()));
     for (i, (owner, bv, sv)) in block_values.iter().enumerate() {
         let name = &block_defs[i].name;
         for v in bv.iter().chain(sv.iter().flatten()) {
-            cb.declare_value(v, &|| who(*owner, name), &mut errors);
+            cb.declare_value(v, &|| who(*owner, name), errors);
         }
     }
     for (i, (owner, v)) in item_values.iter().enumerate() {
         for v in v {
-            cb.declare_value(v, &|| who(*owner, &item_defs[i].name), &mut errors);
+            cb.declare_value(v, &|| who(*owner, &item_defs[i].name), errors);
         }
     }
     for (k, (owner, v)) in entities.values.iter().enumerate() {
         for v in v {
-            cb.declare_value(v, &|| who(*owner, &entities.kinds[k].name), &mut errors);
+            cb.declare_value(v, &|| who(*owner, &entities.kinds[k].name), errors);
         }
     }
     for (i, v) in biome_values.iter().enumerate() {
         for v in v {
-            cb.declare_value(v, &|| format!("biome {}", biome_defs[i].name), &mut errors);
+            cb.declare_value(v, &|| format!("biome {}", biome_defs[i].name), errors);
         }
     }
     for (i, (owner, v)) in dim_values.iter().enumerate() {
         for v in v {
-            cb.declare_value(v, &|| who(*owner, &dim_defs[i].name), &mut errors);
+            cb.declare_value(v, &|| who(*owner, &dim_defs[i].name), errors);
         }
     }
-    let mut sets: Vec<RawSet> = games.iter_mut().flat_map(|g| std::mem::take(&mut g.sets)).collect();
-    // Stable sort keeps registration order within a mod.
-    sets.sort_by_key(|s| mods[s.owner.0 as usize].order);
-    for s in &sets {
+    for s in sets {
         if s.remove {
-            cb.declare(&s.value.name, &s.value.schema, None, &|| who(s.owner, &format!("set on {:?}", s.target)), &mut errors);
+            cb.declare(&s.value.name, &s.value.schema, None, &|| who(s.owner, &format!("set on {:?}", s.target)), errors);
         } else {
-            cb.declare_value(&s.value, &|| who(s.owner, &format!("set on {:?}", s.target)), &mut errors);
+            cb.declare_value(&s.value, &|| who(s.owner, &format!("set on {:?}", s.target)), errors);
         }
     }
-    for g in &games {
+    for g in games {
         // Values recipes carry may be on nothing else.
         for v in g.recipes.iter().flat_map(|r| &r.values) {
-            cb.declare_value(v, &|| format!("a {} recipe", v.name), &mut errors);
+            cb.declare_value(v, &|| format!("a {} recipe", v.name), errors);
         }
         for rc in &g.components {
-            cb.declare(&rc.def.name, &rc.schema, Some(rc.def.size as usize), &|| who(rc.owner, "entity component"), &mut errors);
+            cb.declare(&rc.def.name, &rc.schema, Some(rc.def.size as usize), &|| who(rc.owner, "entity component"), errors);
         }
     }
-    cb.declare(crate::registry::MODIFIERS, "bytes", None, &|| "the engine".into(), &mut errors);
-    cb.declare(crate::registry::TIMERS, "bytes", None, &|| "the engine".into(), &mut errors);
-    cb.declare(abi::comp::NAME, "bytes", None, &|| "the engine".into(), &mut errors);
-    for (name, schema) in [(crate::registry::HEALTH, "[f32;2]"), (crate::registry::BURNING, "u8"), (crate::registry::WORN, "bytes"), (crate::registry::SHAPE, "bytes"), (crate::registry::SIMULATED, "u64")] {
-        cb.declare(name, schema, None, &|| "the engine".into(), &mut errors);
+    cb.declare(crate::registry::MODIFIERS, "bytes", None, &|| "the engine".into(), errors);
+    cb.declare(crate::registry::TIMERS, "bytes", None, &|| "the engine".into(), errors);
+    cb.declare(abi::comp::NAME, "bytes", None, &|| "the engine".into(), errors);
+    for (name, schema) in [
+        (crate::registry::HEALTH, "[f32;2]"),
+        (crate::registry::BURNING, "u8"),
+        (crate::registry::WORN, "bytes"),
+        (crate::registry::HELD, "u32"),
+        (crate::registry::SHAPE, "bytes"),
+        (crate::registry::SIMULATED, "u64"),
+    ] {
+        cb.declare(name, schema, None, &|| "the engine".into(), errors);
     }
-    for g in &games {
+    for g in games {
         for (name, schema, _) in &g.stack_components {
-            cb.declare(name, schema, None, &|| format!("stack component {name}"), &mut errors);
+            cb.declare(name, schema, None, &|| format!("stack component {name}"), errors);
         }
     }
-    if !errors.is_empty() {
-        return Err(errors);
-    }
+    cb
+}
+
+#[allow(clippy::too_many_arguments)]
+fn fill_components(
+    mut cb: comps::Builder,
+    mods: &[ModMeta],
+    sets: &[RawSet],
+    blocks: &BlockTables,
+    items: &ItemTables,
+    entities: &crate::registry::Entities,
+    biomes: &BiomeTables,
+    dims: &DimTables,
+    tint_kinds: &[(String, u32)],
+    errors: &mut Vec<String>,
+) -> (Components, Vec<Vec<[u32; 2]>>) {
+    let BlockTables { states, block_defs, block_values, block_names, .. } = blocks;
+    let ItemTables { item_defs, item_values, item_names } = items;
+    let BiomeTables { biome_defs, biome_values, biome_names, .. } = biomes;
+    let DimTables { dim_defs, dim_values, dim_names, .. } = dims;
+    let tint_names: Vec<String> = tint_kinds.iter().map(|k| k.0.clone()).collect();
     cb.start([states.len(), item_defs.len(), entities.kinds.len(), biome_defs.len(), dim_defs.len()]);
     // References in values (`block`, `blocks`, `item`) become ids here, so a typo is a load error.
     let ref_lists: std::rc::Rc<std::cell::RefCell<Vec<Vec<[u32; 2]>>>> = Default::default();
     {
-        let blocks: FxHashMap<String, (u32, Vec<Prop>)> = block_defs.iter().map(|b| (b.name.clone(), (b.first_state, b.props.clone()))).collect();
+        let blocks: FxHashMap<String, (u32, Vec<Prop>)> = block_defs
+            .iter()
+            .map(|b| (b.name.clone(), (b.first_state, b.props.clone())))
+            .collect();
         let lists = ref_lists.clone();
         let items = item_names.clone();
         let state = move |text: &str| -> Result<u32, String> {
             let (name, props) = split_state(text)?;
-            let (first, defs) = blocks.get(name).ok_or_else(|| format!("unknown block {name}"))?;
+            let (first, defs) = blocks
+                .get(name)
+                .ok_or_else(|| format!("unknown block {name}"))?;
             let mut s = *first;
             for (k, v) in props {
-                let p = defs.iter().find(|p| p.name == k).ok_or_else(|| format!("{name} has no property {k}"))?;
-                let vi = p.values.iter().position(|x| x == v).ok_or_else(|| format!("{name} property {k} has no value {v}"))?;
+                let p = defs
+                    .iter()
+                    .find(|p| p.name == k)
+                    .ok_or_else(|| format!("{name} has no property {k}"))?;
+                let vi = p
+                    .values
+                    .iter()
+                    .position(|x| x == v)
+                    .ok_or_else(|| format!("{name} property {k} has no value {v}"))?;
                 s += vi as u32 * p.stride;
             }
             Ok(s)
         };
         cb.refs = Some(Box::new(move |schema: &str, text: &str| match schema {
             "block" => state(text.trim()).map(|s| s.to_le_bytes().to_vec()),
-            "item" => items.get(text.trim()).map(|i| i.to_le_bytes().to_vec()).ok_or_else(|| format!("unknown item {}", text.trim())),
-            "tint" => tint_names.iter().position(|k| k == text.trim()).map(|i| (i as u32 + 1).to_le_bytes().to_vec()).ok_or_else(|| format!("no tint kind {}", text.trim())),
+            "item" => items
+                .get(text.trim())
+                .map(|i| i.to_le_bytes().to_vec())
+                .ok_or_else(|| format!("unknown item {}", text.trim())),
+            "tint" => tint_names
+                .iter()
+                .position(|k| k == text.trim())
+                .map(|i| (i as u32 + 1).to_le_bytes().to_vec())
+                .ok_or_else(|| format!("no tint kind {}", text.trim())),
             _ => {
                 let mut list = Vec::new();
                 for e in text.split_whitespace() {
@@ -1604,7 +2272,7 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
     }
     // Sets by name first, then by tag, so a tag added by name is seen by tag patterns.
     for pass in 0..2 {
-        for s in &sets {
+        for s in sets {
             if matches!(s.target, Target::Tagged(_)) != (pass == 1) {
                 continue;
             }
@@ -1631,12 +2299,22 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
                     }
                 }
                 Target::Tagged(pattern) => {
-                    let tags: Vec<u32> = cb.names().iter().enumerate().filter(|(_, n)| comps::matches(pattern, n)).map(|(i, _)| i as u32).collect();
+                    let tags: Vec<u32> = cb
+                        .names()
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, n)| comps::matches(pattern, n))
+                        .map(|(i, _)| i as u32)
+                        .collect();
                     if tags.is_empty() {
                         errors.push(format!("{}: component {} set on tag #{pattern}, which no tag matches", m.1, s.value.name));
                     }
                     for kind in [comps::BLOCK, comps::ITEM] {
-                        hits.extend(cb.entries_with_any(kind, &tags).into_iter().map(|e| (kind, e)));
+                        hits.extend(
+                            cb.entries_with_any(kind, &tags)
+                                .into_iter()
+                                .map(|e| (kind, e)),
+                        );
                     }
                 }
                 Target::Entity(n) => hits.extend(entities.names.get(n).map(|&k| (comps::ENTITY, k))),
@@ -1648,7 +2326,9 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             }
             for (kind, e) in hits {
                 let label = || match kind {
-                    comps::BLOCK => states.get(e as usize).map_or_else(String::new, |st| block_defs[st.block as usize].name.clone()),
+                    comps::BLOCK => states
+                        .get(e as usize)
+                        .map_or_else(String::new, |st| block_defs[st.block as usize].name.clone()),
                     comps::ITEM => item_defs[e as usize].name.clone(),
                     comps::ENTITY => entities.kinds[e as usize].name.clone(),
                     comps::BIOME => biome_defs[e as usize].name.clone(),
@@ -1664,8 +2344,13 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
     }
     errors.append(&mut cb.errors);
     let components = cb.finish();
+    let lists = std::mem::take(&mut *ref_lists.borrow_mut());
+    (components, lists)
+}
+
+fn component_ids(components: &Components) -> Ids {
     let id = |n: &str| components.id(n);
-    let ids = Ids {
+    Ids {
         max_stack: id(abi::comp::MAX_STACK),
         durability: id(abi::comp::DURABILITY),
         attack_damage: id(abi::comp::ATTACK_DAMAGE),
@@ -1678,14 +2363,26 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         worn: id(abi::comp::WORN),
         worn_texture: id(abi::comp::WORN_TEXTURE),
         wear_per_hit: id(abi::comp::WEAR_PER_HIT),
-    };
-    // What hot code reads per state (physics, light, breaking) goes into flat fields.
+        spawn_egg: id(abi::comp::SPAWN_EGG),
+        attack_speed: id(abi::comp::ATTACK_SPEED),
+        use_ticks: id(abi::comp::USE_TICKS),
+        sweeps: id(abi::comp::SWEEPS),
+        no_creative_break: id(abi::comp::NO_CREATIVE_BREAK),
+        snowy: id(abi::comp::SNOWY),
+    }
+}
+
+/// What hot code reads per state (physics, light, breaking) goes into flat fields.
+fn flatten_components(states: &mut [StateInfo], item_defs: &mut [ItemDef], components: &Components, ids: &Ids) {
+    let id = |n: &str| components.id(n);
     let get = |state: u32, name: &str| id(name).and_then(|c| components.bytes(comps::BLOCK, state, c));
     let f32_of = |state: u32, name: &str| get(state, name).map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]));
     let u32_of = |state: u32, name: &str| get(state, name).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
     for (i, s) in states.iter_mut().enumerate() {
         let st = i as u32;
-        s.conductor = ids.conductor.is_some_and(|c| components.has(comps::BLOCK, st, c));
+        s.conductor = ids
+            .conductor
+            .is_some_and(|c| components.has(comps::BLOCK, st, c));
         s.hardness = f32_of(st, abi::comp::HARDNESS).unwrap_or(s.hardness);
         s.friction = f32_of(st, abi::comp::FRICTION).unwrap_or(s.friction);
         s.drag = f32_of(st, abi::comp::DRAG).unwrap_or(s.drag);
@@ -1705,25 +2402,44 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         if let Some(into) = u32_of(st, abi::comp::SMOTHERED_INTO) {
             s.smother = Some((into, f32_of(st, abi::comp::SMOTHER_TIME).unwrap_or(68.0) as f64 * crate::world::TPS as f64));
         }
-        if let Some(face) = get(st, abi::comp::SUPPORT_FACE).map(|f| f[0]).filter(|&f| f < 6) {
+        if let Some(face) = get(st, abi::comp::SUPPORT_FACE)
+            .map(|f| f[0])
+            .filter(|&f| f < 6)
+        {
             s.support = Some((face, u32_of(st, abi::comp::SUPPORT)));
             s.support_near = u32_of(st, abi::comp::SUPPORT_NEAR);
         }
     }
     for (i, d) in item_defs.iter_mut().enumerate() {
         let i = i as u32;
-        d.max_stack = components.get::<u32>(comps::ITEM, i, ids.max_stack.unwrap_or(u32::MAX)).unwrap_or(64).max(1);
-        d.durability = components.get::<u32>(comps::ITEM, i, ids.durability.unwrap_or(u32::MAX)).unwrap_or(0);
-        d.attack = components.get::<f32>(comps::ITEM, i, ids.attack_damage.unwrap_or(u32::MAX)).unwrap_or(1.0);
+        d.max_stack = components
+            .get::<u32>(comps::ITEM, i, ids.max_stack.unwrap_or(u32::MAX))
+            .unwrap_or(64)
+            .max(1);
+        d.durability = components
+            .get::<u32>(comps::ITEM, i, ids.durability.unwrap_or(u32::MAX))
+            .unwrap_or(0);
+        d.attack = components
+            .get::<f32>(comps::ITEM, i, ids.attack_damage.unwrap_or(u32::MAX))
+            .unwrap_or(1.0);
     }
-    let tool_classes: Vec<(u32, Option<u32>)> = components
+}
+
+fn tool_classes(components: &Components) -> Vec<(u32, Option<u32>)> {
+    components
         .names
         .iter()
         .enumerate()
-        .filter_map(|(i, n)| n.strip_prefix("mineable/").map(|class| (i as u32, components.id(&format!("tools/{class}")))))
-        .collect();
+        .filter_map(|(i, n)| {
+            n.strip_prefix("mineable/")
+                .map(|class| (i as u32, components.id(&format!("tools/{class}"))))
+        })
+        .collect()
+}
 
-    let mut dim_defs = dim_defs;
+/// Ores, scatters and decorations go into the dimensions they name, or every one but bare ones.
+fn place_features(games: &mut [crate::registry::RawGame], dim_defs: &mut [DimensionDef], look: Lookups, errors: &mut Vec<String>) {
+    let Lookups { mods, block_defs, block_names, dim_names, components, state_count } = look;
     // Ores, scatters and decorations go into the dimensions they name, or every one but bare ones.
     let not_bare: Vec<usize> = (0..dim_defs.len()).filter(|&d| !dim_defs[d].bare).collect();
     let targets = |what: &str, names: &[String], errors: &mut Vec<String>| -> Vec<usize> {
@@ -1741,7 +2457,10 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             })
             .collect()
     };
-    let mut raw_ores: Vec<crate::registry::RawOre> = games.iter_mut().flat_map(|g| std::mem::take(&mut g.ores)).collect();
+    let mut raw_ores: Vec<crate::registry::RawOre> = games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.ores))
+        .collect();
     raw_ores.sort_by(|a, b| a.block.cmp(&b.block));
     let mut ore_defs: Vec<(Vec<usize>, OreDef)> = Vec::new();
     for o in raw_ores {
@@ -1749,10 +2468,10 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             errors.push(format!("ore {}: unknown block", o.block));
             continue;
         };
-        let dims = targets(&format!("ore {}", o.block), &o.dimensions, &mut errors);
+        let dims = targets(&format!("ore {}", o.block), &o.dimensions, errors);
         let mut replace: Vec<u32> = Vec::new();
         for r in &o.replace {
-            match crate::refs::Ref::parse(r).and_then(|r| crate::refs::blocks(&r, &block_names, &block_defs, &components, states.len() as u32)) {
+            match crate::refs::Ref::parse(r).and_then(|r| crate::refs::blocks(&r, block_names, block_defs, components, state_count)) {
                 Ok(b) => replace.extend(b),
                 Err(e) => errors.push(format!("ore {}: replace: {e}", o.block)),
             }
@@ -1762,7 +2481,7 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         let salt = crate::registry::name_hash(&o.block);
         let biome = match o.biome.as_str() {
             "" => None,
-            t => match crate::refs::tag(&components, t) {
+            t => match crate::refs::tag(components, t) {
                 Ok(t) => Some(t),
                 Err(e) => {
                     errors.push(format!("ore {}: biome: {e}", o.block));
@@ -1770,27 +2489,35 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
                 }
             },
         };
-        ore_defs.push((dims, OreDef {
-            state: block_defs[b as usize].first_state,
-            replace,
-            min_y: o.min_y,
-            max_y: o.max_y,
-            veins: o.veins,
-            size: o.size,
-            salt,
-            biome,
-        }));
+        ore_defs.push((
+            dims,
+            OreDef {
+                state: block_defs[b as usize].first_state,
+                replace,
+                min_y: o.min_y,
+                max_y: o.max_y,
+                veins: o.veins,
+                size: o.size,
+                salt,
+                biome,
+            },
+        ));
     }
     for (dims, o) in ore_defs {
         for d in dims {
             dim_defs[d].ores.push(o.clone());
         }
     }
-    let mut raw_scatters: Vec<crate::registry::RawScatter> = games.iter_mut().flat_map(|g| std::mem::take(&mut g.scatters)).collect();
+    let mut raw_scatters: Vec<crate::registry::RawScatter> = games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.scatters))
+        .collect();
     raw_scatters.sort_by(|a, b| a.name.cmp(&b.name));
     for s in raw_scatters {
         let what = format!("scatter {}", s.name);
-        let density = (!s.density.is_empty()).then(|| components.id(&s.density)).flatten();
+        let density = (!s.density.is_empty())
+            .then(|| components.id(&s.density))
+            .flatten();
         if density.is_none() {
             errors.push(format!("{what}: density component {:?} is not set on any biome", s.density));
         }
@@ -1798,19 +2525,40 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             errors.push(format!("{what}: cell {} and reach {} (cell at least 1)", s.cell, s.reach));
             continue;
         }
-        for d in targets(&what, &s.dimensions, &mut errors) {
-            dim_defs[d].scatters.push(ScatterDef { owner: s.owner, name: s.name.clone(), cell: s.cell, reach: s.reach, density, salt: crate::registry::name_hash(&s.name), shape: s.shape });
+        for d in targets(&what, &s.dimensions, errors) {
+            dim_defs[d].scatters.push(ScatterDef {
+                owner: s.owner,
+                cell: s.cell,
+                reach: s.reach,
+                density,
+                salt: crate::registry::name_hash(&s.name),
+                shape: s.shape,
+            });
         }
     }
-    let mut raw_decorations: Vec<(ModId, Vec<String>, Callback)> = games.iter_mut().flat_map(|g| std::mem::take(&mut g.decorations)).collect();
+    let mut raw_decorations: Vec<(ModId, Vec<String>, Callback)> = games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.decorations))
+        .collect();
     raw_decorations.sort_by_key(|d| mods[d.0.0 as usize].order);
     for (owner, dims, cb) in raw_decorations {
-        for d in targets(&format!("decoration of {}", mods[owner.0 as usize].id), &dims, &mut errors) {
+        for d in targets(&format!("decoration of {}", mods[owner.0 as usize].id), &dims, errors) {
             dim_defs[d].decorations.push((owner, cb));
         }
     }
-    // Templates: block names resolved once, so a typo is a load error, not a missing block later.
-    let mut raw_templates: Vec<crate::registry::RawTemplate> = games.iter_mut().flat_map(|g| std::mem::take(&mut g.templates)).collect();
+}
+
+/// Block names resolved once, so a typo is a load error, not a missing block later.
+fn freeze_templates(
+    games: &mut [crate::registry::RawGame],
+    look: Lookups,
+    errors: &mut Vec<String>,
+) -> (Vec<TemplateDef>, FxHashMap<String, u32>) {
+    let Lookups { block_defs, block_names, .. } = look;
+    let mut raw_templates: Vec<crate::registry::RawTemplate> = games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.templates))
+        .collect();
     raw_templates.sort_by(|a, b| a.name.cmp(&b.name));
     let mut templates: Vec<TemplateDef> = Vec::new();
     for t in raw_templates {
@@ -1821,7 +2569,12 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         let mut blocks = Vec::with_capacity(t.blocks.len());
         for (p, name) in &t.blocks {
             // `base:furnace[facing=east]`: that state, other properties at their defaults.
-            let state = split_state(name).and_then(|(block, props)| block_defs[*block_names.get(block).ok_or_else(|| format!("unknown block {block}"))? as usize].state_of(&props));
+            let state = split_state(name).and_then(|(block, props)| {
+                block_defs[*block_names
+                    .get(block)
+                    .ok_or_else(|| format!("unknown block {block}"))? as usize]
+                    .state_of(&props)
+            });
             match state {
                 Ok(st) => blocks.push((glam::IVec3::from_array(*p), st)),
                 Err(e) => errors.push(format!("template {}: {e}", t.name)),
@@ -1829,8 +2582,27 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         }
         templates.push(TemplateDef { name: t.name, blocks });
     }
-    let template_names: FxHashMap<String, u32> = templates.iter().enumerate().map(|(i, t)| (t.name.clone(), i as u32)).collect();
-    let mut raw_structures: Vec<crate::registry::RawStructure> = games.iter_mut().flat_map(|g| std::mem::take(&mut g.structures)).collect();
+    let template_names: FxHashMap<String, u32> = templates
+        .iter()
+        .enumerate()
+        .map(|(i, t)| (t.name.clone(), i as u32))
+        .collect();
+    (templates, template_names)
+}
+
+fn place_structures(
+    games: &mut [crate::registry::RawGame],
+    dim_defs: &mut [DimensionDef],
+    templates: &[TemplateDef],
+    template_names: &FxHashMap<String, u32>,
+    look: Lookups,
+    errors: &mut Vec<String>,
+) {
+    let Lookups { dim_names, components, .. } = look;
+    let mut raw_structures: Vec<crate::registry::RawStructure> = games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.structures))
+        .collect();
     raw_structures.sort_by(|a, b| (&a.template, &a.dimension).cmp(&(&b.template, &b.dimension)));
     for s in raw_structures {
         let Some(&d) = dim_names.get(&s.dimension) else {
@@ -1844,7 +2616,7 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         let blocks = templates[t as usize].blocks.clone();
         let biome = match s.biome.as_str() {
             "" => None,
-            t => match crate::refs::tag(&components, t) {
+            t => match crate::refs::tag(components, t) {
                 Ok(t) => Some(t),
                 Err(e) => {
                     errors.push(format!("structure {}: biome: {e}", s.template));
@@ -1852,12 +2624,37 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
                 }
             },
         };
-        let extent = blocks.iter().fold(glam::IVec3::ZERO, |m, (p, _)| m.max(*p + glam::IVec3::ONE));
+        let extent = blocks
+            .iter()
+            .fold(glam::IVec3::ZERO, |m, (p, _)| m.max(*p + glam::IVec3::ONE));
         let salt = crate::registry::name_hash(&s.template);
-        dim_defs[d as usize].structures.push(StructureDef { name: s.template, blocks, extent, spacing: s.spacing.max(1) as i32, chance: s.chance, biome, sink: s.sink, salt });
+        dim_defs[d as usize].structures.push(StructureDef {
+            name: s.template,
+            blocks,
+            extent,
+            spacing: s.spacing.max(1) as i32,
+            chance: s.chance,
+            biome,
+            sink: s.sink,
+            salt,
+        });
     }
-    // Terrains: the owner's description first, then other mods' edits in load order.
-    let mut raw_terrain: Vec<crate::server::terrain::RawTerrain> = games.iter_mut().flat_map(|g| std::mem::take(&mut g.terrain)).collect();
+}
+
+/// The owner's description first, then other mods' edits in load order.
+fn build_terrains(
+    games: &mut [crate::registry::RawGame],
+    dim_defs: &mut [DimensionDef],
+    biome_names: &FxHashMap<String, u32>,
+    biome_rules: &[crate::server::terrain::RawRule],
+    look: Lookups,
+    errors: &mut Vec<String>,
+) {
+    let Lookups { mods, block_defs, block_names, dim_names, .. } = look;
+    let mut raw_terrain: Vec<crate::server::terrain::RawTerrain> = games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.terrain))
+        .collect();
     raw_terrain.retain(|t| {
         let known = dim_names.contains_key(&t.dimension);
         if !known {
@@ -1879,36 +2676,89 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         }
         let def = &dim_defs[d];
         if ops[0].owner != def.owner {
-            log::warn!("{}: edits the terrain of {}, which has none (its mod generates it in code), edits skipped", mods[ops[0].owner.0 as usize].id, def.name);
+            log::warn!(
+                "{}: edits the terrain of {}, which has none (its mod generates it in code), edits skipped",
+                mods[ops[0].owner.0 as usize].id,
+                def.name
+            );
             continue;
         }
         let names = crate::server::terrain::Names {
-            block: &|n| block_names.get(n).map(|&b| block_defs[b as usize].first_state),
+            block: &|n| {
+                block_names
+                    .get(n)
+                    .map(|&b| block_defs[b as usize].first_state)
+            },
             biome: &|n| biome_names.get(n).copied(),
             biome_rule: &|n| biome_names.get(n).map(|&b| &biome_rules[b as usize]),
         };
-        let t = crate::server::terrain::build(&def.name, &|m| mods[m.0 as usize].id.clone(), ops, &names, &mut errors);
+        let t = crate::server::terrain::build(&def.name, &|m| mods[m.0 as usize].id.clone(), ops, &names, errors);
         dim_defs[d].terrain = Some(Box::new(t));
     }
-    // The engine's commands first, through the same list mods add to (and may replace them in).
-    let mut commands: Vec<crate::commands::CommandDef> = Vec::new();
-    let engine_commands = crate::server::BUILTIN_COMMANDS.iter().map(|c| (c.0, c.1, false)).chain(crate::app::CLIENT_COMMANDS.iter().map(|c| (c.0, c.1, true)));
-    for (name, usage, client) in engine_commands {
-        let alts = crate::commands::parse_usage(usage).expect("engine command usage");
-        commands.push(crate::commands::CommandDef::new(name, usage, alts, None, client));
-    }
+}
+
+fn collect_word_sets(games: &mut [crate::registry::RawGame]) -> FxHashMap<String, Vec<String>> {
     // Word sets for `word(#set)` parameters: the engine's, then what mods add in load order.
     let mut word_sets: FxHashMap<String, Vec<String>> = FxHashMap::default();
-    word_sets.insert("core:gizmos".into(), crate::client::gizmo::BUILTIN.iter().map(|g| g.to_string()).collect());
-    let mut added: Vec<(u32, (String, Vec<String>))> = games.iter_mut().zip(0u32..).flat_map(|(g, i)| std::mem::take(&mut g.words).into_iter().map(move |w| (i, w))).collect();
+    word_sets.insert(
+        "core:gizmos".into(),
+        crate::client::gizmo::BUILTIN
+            .iter()
+            .map(|g| g.to_string())
+            .collect(),
+    );
+    let mut added: Vec<(u32, (String, Vec<String>))> = games
+        .iter_mut()
+        .zip(0u32..)
+        .flat_map(|(g, i)| {
+            std::mem::take(&mut g.words)
+                .into_iter()
+                .map(move |w| (i, w))
+        })
+        .collect();
     added.sort_by_key(|w| w.0);
     for (_, (set, words)) in added {
         let list = word_sets.entry(set).or_default();
-        list.extend(words.into_iter().filter(|w| !list.contains(w)).collect::<Vec<_>>());
+        list.extend(
+            words
+                .into_iter()
+                .filter(|w| !list.contains(w))
+                .collect::<Vec<_>>(),
+        );
+    }
+    word_sets
+}
+
+fn freeze_commands(mods: &[ModMeta], games: &mut [crate::registry::RawGame], errors: &mut Vec<String>) -> Vec<crate::commands::CommandDef> {
+    let mod_name = |m: ModId| mods[m.0 as usize].id.clone();
+    // The engine's commands first, through the same list mods add to (and may replace them in).
+    let mut commands: Vec<crate::commands::CommandDef> = Vec::new();
+    let engine_commands = crate::server::BUILTIN_COMMANDS
+        .iter()
+        .map(|c| (c.0, c.1, c.3, false))
+        .chain(
+            crate::app::CLIENT_COMMANDS
+                .iter()
+                .map(|c| (c.0, c.1, abi::permission::EVERYONE, true)),
+        );
+    for (name, usage, level, client) in engine_commands {
+        let alts = crate::commands::parse_usage(usage).expect("engine command usage");
+        let mut def = crate::commands::CommandDef::new(name, usage, alts, None, client);
+        def.level = level;
+        commands.push(def);
     }
     let mut mod_commands: Vec<(ModId, String, String, Callback, bool)> = games
         .iter()
-        .flat_map(|g| g.commands.iter().map(|c| (c.0, c.1.clone(), c.2.clone(), c.3, false)).chain(g.client_commands.iter().map(|c| (c.0, c.1.clone(), c.2.clone(), c.3, true))))
+        .flat_map(|g| {
+            g.commands
+                .iter()
+                .map(|c| (c.0, c.1.clone(), c.2.clone(), c.3, false))
+                .chain(
+                    g.client_commands
+                        .iter()
+                        .map(|c| (c.0, c.1.clone(), c.2.clone(), c.3, true)),
+                )
+        })
         .collect();
     mod_commands.sort_by(|a, b| a.1.cmp(&b.1));
     for (owner, name, usage, cb, client) in mod_commands {
@@ -1930,24 +2780,46 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             None => commands.push(def),
         }
     }
+    for (name, level) in games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.command_permissions))
+    {
+        match commands.iter_mut().find(|d| d.name == name) {
+            Some(d) => d.level = level.min(abi::permission::OWNER),
+            None => errors.push(format!("permission of unknown command /{name}")),
+        }
+    }
     // Other mods extend existing commands, in load order: more completion words, more branches.
-    let mut extensions: Vec<(ModId, crate::registry::CommandExtension)> = games.iter_mut().flat_map(|g| std::mem::take(&mut g.command_extensions)).collect();
+    let mut extensions: Vec<(ModId, crate::registry::CommandExtension)> = games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.command_extensions))
+        .collect();
     extensions.sort_by_key(|e| mods.get(e.0.0 as usize).map_or(u32::MAX, |m| m.order));
     for (owner, ext) in extensions {
         let who = mod_name(owner);
         match ext {
-            crate::registry::CommandExtension::Branch { command, usage, client, cb } => match (commands.iter_mut().find(|d| d.name == command), crate::commands::parse_usage(&usage)) {
-                (Some(d), Ok(_)) if d.client != client => {
-                    let (is, use_) = if d.client { ("the client", "client_command_branch") } else { ("the server", "command_branch") };
-                    errors.push(format!("{who}: /{command} runs on {is}: its branches are added with {use_}"));
+            crate::registry::CommandExtension::Branch { command, usage, client, cb } => {
+                match (commands.iter_mut().find(|d| d.name == command), crate::commands::parse_usage(&usage)) {
+                    (Some(d), Ok(_)) if d.client != client => {
+                        let (is, use_) = if d.client { ("the client", "client_command_branch") } else { ("the server", "command_branch") };
+                        errors.push(format!("{who}: /{command} runs on {is}: its branches are added with {use_}"));
+                    }
+                    (Some(d), Ok(alts)) => d.add_branch(alts, (owner, cb)),
+                    (None, _) => errors.push(format!("{who}: extends unknown command /{command}")),
+                    (_, Err(e)) => errors.push(format!("{who}: branch of /{command}: {e}")),
                 }
-                (Some(d), Ok(alts)) => d.add_branch(alts, (owner, cb)),
-                (None, _) => errors.push(format!("{who}: extends unknown command /{command}")),
-                (_, Err(e)) => errors.push(format!("{who}: branch of /{command}: {e}")),
-            },
+            }
         }
     }
-    let (liquids, reactions) = freeze_liquids(&mut games, &mut states, &block_defs, &block_names, &components, &mut errors);
+    commands
+}
+
+fn item_containers(
+    item_defs: &[ItemDef],
+    liquids: &[LiquidDef],
+    components: &Components,
+    errors: &mut Vec<String>,
+) -> (FxHashMap<u32, (u16, u32)>, FxHashMap<(u32, u16), u32>) {
     let (mut item_liquid, mut containers) = (FxHashMap::default(), FxHashMap::default());
     if let (Some(lc), Some(rc)) = (components.id(abi::comp::LIQUID), components.id(abi::comp::REMAINDER)) {
         for i in 1..item_defs.len() as u32 {
@@ -1963,46 +2835,91 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             }
         }
     }
-    let creative_tabs = creative_tabs(&mods, &games, &item_defs, &item_names, &components, &mut errors);
-    let mut ordered_items: Vec<u32> = (1..item_defs.len() as u32).collect();
-    ordered_items.sort_by_key(|&i| item_defs[i as usize].order);
-    let tag_items = crate::refs::tag_items(&components, &ordered_items);
+    (item_liquid, containers)
+}
+
+fn freeze_loot(
+    games: &mut [crate::registry::RawGame],
+    item_defs: &[ItemDef],
+    item_names: &FxHashMap<String, u32>,
+    tag_items: &FxHashMap<u32, Vec<u32>>,
+    look: Lookups,
+    errors: &mut Vec<String>,
+) -> FxHashMap<String, crate::loot::Table> {
+    let Lookups { mods, block_defs, components, .. } = look;
     let mut defaults: FxHashMap<String, crate::loot::Table> = FxHashMap::default();
     // A block without a table of its own drops its item when harvested.
     for b in &block_defs[1..] {
-        if let Some(item) = item_defs.iter().position(|i| i.block == Some(b.first_state)).filter(|&i| i != 0) {
+        if let Some(item) = item_defs
+            .iter()
+            .position(|i| i.block == Some(b.first_state))
+            .filter(|&i| i != 0)
+        {
             defaults.insert(b.name.clone(), crate::loot::harvested(item as u32, 1));
         }
     }
-    let raw_loot: Vec<crate::loot::RawLoot> = games.iter_mut().flat_map(|g| std::mem::take(&mut g.loot)).collect();
-    let raw_mods: Vec<crate::loot::RawLootMod> = games.iter_mut().flat_map(|g| std::mem::take(&mut g.loot_mods)).collect();
-    let resolve = crate::loot::Resolve { items: &item_names, tag_items: &tag_items, components: &components };
+    let raw_loot: Vec<crate::loot::RawLoot> = games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.loot))
+        .collect();
+    let raw_mods: Vec<crate::loot::RawLootMod> = games
+        .iter_mut()
+        .flat_map(|g| std::mem::take(&mut g.loot_mods))
+        .collect();
+    let resolve = crate::loot::Resolve { items: item_names, tag_items, components };
     let order_of = |m: ModId| mods.get(m.0 as usize).map_or(u32::MAX, |m| m.order);
-    let loot = crate::loot::freeze(raw_loot, raw_mods, &order_of, &resolve, defaults, &mut errors);
+    crate::loot::freeze(raw_loot, raw_mods, &order_of, &resolve, defaults, errors)
+}
+
+fn collect_stack_flags(games: &[crate::registry::RawGame], components: &Components) -> FxHashMap<u32, u32> {
     let mut stack_flags: FxHashMap<u32, u32> = FxHashMap::default();
-    for g in &games {
+    for g in games {
         for (name, _, flags) in &g.stack_components {
             if let Some(id) = components.id(name) {
                 *stack_flags.entry(id).or_default() |= flags;
             }
         }
     }
-    // The first block with a tag, for `fluid:#tag` in recipes.
-    let block_of_tag = |tag: &str| components.id(tag).and_then(|t| block_defs[1..].iter().find(|b| components.has(crate::components::BLOCK, b.first_state, t))).map(|b| b.name.clone());
-    let mut game = crate::registry::freeze(games, entities, &block_names, &item_names, &item_defs, &dim_names, &components, &tag_items, &block_of_tag, &order_of, &mut errors);
+    stack_flags
+}
+
+fn link_particles(game: &mut crate::registry::Game, textures: &mut TextureList) {
     for p in &mut game.particles {
         for f in &mut p.frames {
-            *f = intern(&mut textures, &mut tex_index, &game.particle_textures[*f as usize]);
+            *f = textures.intern(&game.particle_textures[*f as usize]);
         }
     }
     game.particle_textures.clear();
+}
+
+fn check_ambient_particles(game: &crate::registry::Game, components: &Components, state_count: u32, errors: &mut Vec<String>) {
     if let Some(ap) = components.id(abi::comp::AMBIENT_PARTICLE) {
-        let mut named: Vec<&str> = (0..states.len() as u32).filter_map(|s| components.text(comps::BLOCK, s, ap)).filter(|n| !game.particle_names.contains_key(*n)).collect();
+        let mut named: Vec<&str> = (0..state_count)
+            .filter_map(|s| components.text(comps::BLOCK, s, ap))
+            .flat_map(|n| n.split(','))
+            .filter(|n| !game.particle_names.contains_key(*n))
+            .collect();
         named.dedup();
-        errors.extend(named.into_iter().map(|n| format!("ambient_particle: unknown particle {n}")));
+        errors.extend(
+            named
+                .into_iter()
+                .map(|n| format!("ambient_particle: unknown particle {n}")),
+        );
     }
-    // A structure's box is what its blocks fill; a set size would only disagree with them.
-    for kind in game.entities.iter_mut().filter(|k| !k.template_name.is_empty()) {
+}
+
+/// A structure's box is what its blocks fill; a set size would only disagree with them.
+fn link_entity_templates(
+    game: &mut crate::registry::Game,
+    templates: &[TemplateDef],
+    template_names: &FxHashMap<String, u32>,
+    errors: &mut Vec<String>,
+) {
+    for kind in game
+        .entities
+        .iter_mut()
+        .filter(|k| !k.template_name.is_empty())
+    {
         match template_names.get(&kind.template_name) {
             Some(&t) => {
                 kind.template = Some(t);
@@ -2013,7 +2930,16 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             None => errors.push(format!("entity {}: no template {}", kind.name, kind.template_name)),
         }
     }
-    // Items worn in an equipment slot carry its `worn/<slot>` tag.
+}
+
+/// Items worn in an equipment slot carry its `worn/<slot>` tag, and the ones held like tools
+/// `handheld`.
+fn link_equipment(game: &crate::registry::Game, item_defs: &mut [ItemDef], components: &Components) {
+    if let Some(t) = components.id("handheld") {
+        for (i, d) in item_defs.iter_mut().enumerate() {
+            d.handheld = components.has(comps::ITEM, i as u32, t);
+        }
+    }
     for (e, slot) in game.player_layout.equipment.iter().enumerate() {
         if let Some(t) = components.id(&format!("worn/{}", slot.name)) {
             for (i, d) in item_defs.iter_mut().enumerate() {
@@ -2023,33 +2949,74 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             }
         }
     }
-    // Blocks open their menus; one with recipe kinds makes the block a station of them.
+}
+
+/// Blocks open their menus; one with recipe kinds makes the block a station of them.
+fn link_menus(
+    game: &mut crate::registry::Game,
+    block_defs: &mut [BlockDef],
+    item_defs: &[ItemDef],
+    opens_names: &[String],
+    mods: &[ModMeta],
+    errors: &mut Vec<String>,
+) {
     for (b, menu) in opens_names.iter().enumerate().filter(|m| !m.1.is_empty()) {
         let def = &mut block_defs[b + 1];
         match game.menu_names.get(menu) {
             Some(&m) => {
                 def.opens = Some(m);
-                if let Some(item) = item_defs.iter().position(|i| i.block == Some(def.first_state)) {
+                if let Some(item) = item_defs
+                    .iter()
+                    .position(|i| i.block == Some(def.first_state))
+                {
                     for kind in &game.menus[m as usize].recipes {
-                        game.recipe_stations.entry(kind.clone()).or_default().push(item as u32);
+                        game.recipe_stations
+                            .entry(kind.clone())
+                            .or_default()
+                            .push(item as u32);
                     }
                 }
             }
-            None => errors.push(format!("{}: block {} opens unknown menu {menu}", mods.get(def.owner.0 as usize).map_or("engine", |m| m.id.as_str()), def.name)),
+            None => errors.push(format!(
+                "{}: block {} opens unknown menu {menu}",
+                mods.get(def.owner.0 as usize)
+                    .map_or("engine", |m| m.id.as_str()),
+                def.name
+            )),
         }
     }
-    word_sets.entry("core:rules".into()).or_default().extend(game.configs.iter().filter(|d| d.scope == abi::config_scope::WORLD).map(|d| d.name.clone()));
-    for (table, t) in &loot {
-        for k in t.pools.iter().flat_map(|p| &p.entries).filter_map(|e| e.smelt.as_ref()) {
+}
+
+fn check_loot_smelting(loot: &FxHashMap<String, crate::loot::Table>, game: &crate::registry::Game, errors: &mut Vec<String>) {
+    for (table, t) in loot {
+        for k in t
+            .pools
+            .iter()
+            .flat_map(|p| &p.entries)
+            .filter_map(|e| e.smelt.as_ref())
+        {
             if !game.recipe_kinds.contains(k) {
                 errors.push(format!("loot table {table} smelts by recipe kind {k}, which no mod registers"));
             }
         }
     }
-    // Sound events named by `sound` prefixes, resolved once.
+}
+
+/// Sound events named by `sound` prefixes, resolved once.
+fn resolve_sounds(
+    states: &mut [StateInfo],
+    game: &mut crate::registry::Game,
+    block_defs: &[BlockDef],
+    components: &Components,
+    errors: &mut Vec<String>,
+) {
     if let Some(sc) = components.id(abi::comp::SOUND) {
         let resolve = |prefix: Option<&str>, parts: [&str; 4]| -> [u32; 4] {
-            parts.map(|p| prefix.and_then(|pre| game.sound_names.get(&format!("{pre}.{p}")).copied()).unwrap_or(u32::MAX))
+            parts.map(|p| {
+                prefix
+                    .and_then(|pre| game.sound_names.get(&format!("{pre}.{p}")).copied())
+                    .unwrap_or(u32::MAX)
+            })
         };
         // A prefix with none of its events registered is a typo (`.sounds("stnoe")`).
         let mut unknown: Vec<(String, String)> = Vec::new();
@@ -2078,51 +3045,6 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
             errors.push(format!("{what}: no sound events named {prefix}.*"));
         }
     }
-    if !errors.is_empty() {
-        return Err(errors);
-    }
-    let mut spread_tags: Vec<u32> = states.iter().filter_map(|s| s.spread.map(|sp| sp.0)).collect();
-    spread_tags.sort_unstable();
-    spread_tags.dedup();
-    let tight = states.iter().map(|s| Tight { flags: s.flags, opacity: s.opacity, light: s.light, absorb: s.absorb }).collect();
-    Ok(Content {
-        state_names: OnceLock::new(),
-        spread_tags,
-        mods,
-        tight,
-        states,
-        blocks: block_defs,
-        items: item_defs,
-        biomes: biome_defs,
-        templates,
-        template_names,
-        ref_lists: std::mem::take(&mut *ref_lists.borrow_mut()),
-        word_sets,
-        tint_kinds,
-        dims: dim_defs,
-        components,
-        ids,
-        tool_classes,
-        tag_items,
-        textures,
-        crack_textures,
-        fire_texture,
-        commands,
-        block_names,
-        item_names,
-        creative_tabs,
-        dim_names,
-        spawn_dim,
-        void_dim,
-        biome_names,
-        game,
-        liquids,
-        reactions,
-        item_liquid,
-        containers,
-        loot,
-        stack_flags,
-    })
 }
 
 fn freeze_liquids(
@@ -2135,9 +3057,11 @@ fn freeze_liquids(
 ) -> (Vec<LiquidDef>, Vec<ReactionDef>) {
     let mut raw: Vec<abi::LiquidDesc> = Vec::new();
     let mut names: Vec<String> = Vec::new();
+    let mut overlays: Vec<String> = Vec::new();
     for g in games.iter_mut() {
-        for (name, d) in std::mem::take(&mut g.liquids) {
+        for (name, overlay, d) in std::mem::take(&mut g.liquids) {
             names.push(name);
+            overlays.push(overlay);
             raw.push(d);
         }
     }
@@ -2172,10 +3096,41 @@ fn freeze_liquids(
             renewable: d.renewable,
             rises: d.density < 0,
             temperature: d.temperature,
+            swimmable: d.swimmable != 0,
+            fog_color: (d.fog_color != u32::MAX).then_some(d.fog_color),
+            fog_distance: d.fog_distance.max(0.1),
+            overlay: overlays[i].clone(),
+            overlay_opacity: d.overlay_opacity.clamp(0.0, 1.0),
         });
     }
+    // Later mods' say on how any of them looks and whether it can be swum in.
+    for g in games.iter_mut() {
+        for (name, overlay, d) in std::mem::take(&mut g.liquid_changes) {
+            let Some(l) = liquids.iter_mut().find(|l| l.name == name) else {
+                errors.push(format!("change of liquid {name}: no such liquid"));
+                continue;
+            };
+            if d.swimmable != u32::MAX {
+                l.swimmable = d.swimmable != 0;
+            }
+            if d.fog_color != u32::MAX {
+                l.fog_color = Some(d.fog_color);
+            }
+            if !d.fog_distance.is_nan() {
+                l.fog_distance = d.fog_distance.max(0.1);
+            }
+            if !overlay.is_empty() {
+                l.overlay = overlay;
+            }
+            if !d.overlay_opacity.is_nan() {
+                l.overlay_opacity = d.overlay_opacity.clamp(0.0, 1.0);
+            }
+        }
+    }
     let matcher = |s: &str, errors: &mut Vec<String>| -> Option<Match> {
-        match crate::refs::Ref::parse(s).and_then(|r| crate::refs::blocks(&r, block_names, blocks, components, blocks.iter().map(|b| b.states).sum())) {
+        match crate::refs::Ref::parse(s)
+            .and_then(|r| crate::refs::blocks(&r, block_names, blocks, components, blocks.iter().map(|b| b.states).sum()))
+        {
             Ok(b) => Some(Match(b)),
             Err(e) => {
                 errors.push(format!("liquid reaction: {e}"));
@@ -2197,7 +3152,13 @@ fn freeze_liquids(
     for g in games.iter_mut() {
         for r in std::mem::take(&mut g.reactions) {
             let (Some(liquid), Some(touching)) = (matcher(&r[0], errors), matcher(&r[1], errors)) else { continue };
-            reactions.push(ReactionDef { liquid, touching, source: result(&r[2], errors), flowing: result(&r[3], errors), falls_into: result(&r[4], errors) });
+            reactions.push(ReactionDef {
+                liquid,
+                touching,
+                source: result(&r[2], errors),
+                flowing: result(&r[3], errors),
+                falls_into: result(&r[4], errors),
+            });
         }
     }
     (liquids, reactions)
@@ -2208,7 +3169,14 @@ mod tests {
     use super::*;
 
     fn meta(id: &str, deps: &[&str]) -> ModMeta {
-        ModMeta { id: id.into(), version: "1".into(), deps: deps.iter().map(|d| d.to_string()).collect(), order: 0, assets: Default::default(), package: None }
+        ModMeta {
+            id: id.into(),
+            version: "1".into(),
+            deps: deps.iter().map(|d| d.to_string()).collect(),
+            order: 0,
+            assets: Default::default(),
+            package: None,
+        }
     }
 
     #[test]

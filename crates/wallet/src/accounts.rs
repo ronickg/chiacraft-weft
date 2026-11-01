@@ -111,11 +111,7 @@ impl StoreChoice {
             .ok()
             .and_then(|s| StoreKind::parse(s.trim()));
         Self {
-            kind: env.unwrap_or(if home_given {
-                StoreKind::File
-            } else {
-                StoreKind::Os
-            }),
+            kind: env.unwrap_or(if home_given { StoreKind::File } else { StoreKind::Os }),
             service: service.to_owned(),
             file_dir: home.join(WALLET_DIR),
         }
@@ -179,24 +175,14 @@ impl Accounts {
     pub fn load(home: &Path, choice: StoreChoice) -> Result<Self> {
         let path = home.join(FILE);
         let doc: Doc = match std::fs::read_to_string(&path) {
-            Ok(text) => serde_json::from_str(&text)
-                .map_err(|e| Error::new(format!("{}: {e}", path.display())))?,
+            Ok(text) => serde_json::from_str(&text).map_err(|e| Error::new(format!("{}: {e}", path.display())))?,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Doc::default(),
             Err(e) => return Err(e.into()),
         };
-        Ok(Self {
-            path,
-            choice,
-            default: doc.default,
-            list: doc.accounts,
-        })
+        Ok(Self { path, choice, default: doc.default, list: doc.accounts })
     }
     pub fn save(&self) -> Result<()> {
-        let doc = Doc {
-            v: 1,
-            default: self.default,
-            accounts: self.list.clone(),
-        };
+        let doc = Doc { v: 1, default: self.default, accounts: self.list.clone() };
         if let Some(dir) = self.path.parent() {
             std::fs::create_dir_all(dir)?;
         }
@@ -347,18 +333,12 @@ impl Accounts {
         if info.identity_key() != Some(crate::sign::Signer::identity(&*signer)) {
             return Err(Error::new("accounts.json disagrees with the stored secret"));
         }
-        let did = info.did.as_ref().map(|d| {
-            Arc::new(crate::sign::OwnerSigner::from_mnemonic(
-                &mnemonic, d.index, d.hardened,
-            ))
-        });
+        let did = info
+            .did
+            .as_ref()
+            .map(|d| Arc::new(crate::sign::OwnerSigner::from_mnemonic(&mnemonic, d.index, d.hardened)));
         let hardened = keys::hardened_puzzle_hashes(&mnemonic, keys::HARDENED_ADDRESSES);
-        Ok(Unlocked {
-            info,
-            signer,
-            did,
-            hardened,
-        })
+        Ok(Unlocked { info, signer, did, hardened })
     }
     /// Link `did` to an account (None: unlink). Public facts only: the owner key is derived again
     /// when the account unlocks.
@@ -376,9 +356,7 @@ impl Accounts {
             .get(fingerprint)
             .ok_or_else(|| Error::new("no such account"))?;
         if info.store_kind() != StoreKind::File {
-            return Err(Error::new(
-                "only an account kept in the wallet folder has a passphrase",
-            ));
+            return Err(Error::new("only an account kept in the wallet folder has a passphrase"));
         }
         let mnemonic = self.mnemonic(fingerprint, old)?;
         self.choice
@@ -434,11 +412,7 @@ mod tests {
     #[test]
     fn a_silent_account_restores_to_the_same_identity_elsewhere() {
         let a = home("a");
-        let choice = StoreChoice {
-            kind: StoreKind::File,
-            service: "chiacraft wallet test".into(),
-            file_dir: a.join(WALLET_DIR),
-        };
+        let choice = StoreChoice { kind: StoreKind::File, service: "chiacraft wallet test".into(), file_dir: a.join(WALLET_DIR) };
         let mut accounts = Accounts::load(&a, choice.clone()).unwrap();
         let first = accounts.ensure_default("Account 1").unwrap();
         assert_eq!(accounts.ensure_default("x").unwrap(), first);
@@ -455,11 +429,7 @@ mod tests {
         let b = home("b");
         let mut other = Accounts::load(
             &b,
-            StoreChoice {
-                kind: StoreKind::File,
-                service: "chiacraft wallet test".into(),
-                file_dir: b.join(WALLET_DIR),
-            },
+            StoreChoice { kind: StoreKind::File, service: "chiacraft wallet test".into(), file_dir: b.join(WALLET_DIR) },
         )
         .unwrap();
         let typed = Mnemonic::parse(&words.expose().join(" ")).unwrap();
@@ -469,10 +439,7 @@ mod tests {
         let unlocked = other
             .unlock(restored.fingerprint, Secret::new(String::new()))
             .unwrap();
-        assert_eq!(
-            crate::sign::Signer::identity(&*unlocked.signer).hex(),
-            first.identity
-        );
+        assert_eq!(crate::sign::Signer::identity(&*unlocked.signer).hex(), first.identity);
         // No secret in accounts.json.
         let text = std::fs::read_to_string(b.join(FILE)).unwrap();
         assert!(!text.contains(&words.expose()[..3].join(" ")));
@@ -487,11 +454,7 @@ mod tests {
         let a = home("p");
         let mut accounts = Accounts::load(
             &a,
-            StoreChoice {
-                kind: StoreKind::File,
-                service: "chiacraft wallet test".into(),
-                file_dir: a.join(WALLET_DIR),
-            },
+            StoreChoice { kind: StoreKind::File, service: "chiacraft wallet test".into(), file_dir: a.join(WALLET_DIR) },
         )
         .unwrap();
         let info = accounts.create("A").unwrap().0;
@@ -517,15 +480,8 @@ mod tests {
     #[test]
     fn memory_accounts_keep_nothing_on_disk_but_the_list() {
         let a = home("m");
-        let mut accounts = Accounts::load(
-            &a,
-            StoreChoice {
-                kind: StoreKind::Memory,
-                service: String::new(),
-                file_dir: a.join(WALLET_DIR),
-            },
-        )
-        .unwrap();
+        let mut accounts =
+            Accounts::load(&a, StoreChoice { kind: StoreKind::Memory, service: String::new(), file_dir: a.join(WALLET_DIR) }).unwrap();
         let info = accounts.ensure_default("M").unwrap();
         assert!(!a.join(WALLET_DIR).exists());
         assert!(
@@ -539,11 +495,7 @@ mod tests {
     #[test]
     fn words_provided_make_the_folders_one_account() {
         let a = home("provide");
-        let choice = StoreChoice {
-            kind: StoreKind::Memory,
-            service: String::new(),
-            file_dir: a.join(WALLET_DIR),
-        };
+        let choice = StoreChoice { kind: StoreKind::Memory, service: String::new(), file_dir: a.join(WALLET_DIR) };
         let words = Mnemonic::generate().unwrap();
         let mut accounts = Accounts::load(&a, choice.clone()).unwrap();
         let info = accounts.provide(&words, "server").unwrap();

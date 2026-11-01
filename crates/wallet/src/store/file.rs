@@ -22,10 +22,7 @@ pub struct FileStore {
 }
 impl FileStore {
     pub fn new(dir: impl Into<PathBuf>, passphrase: Passphrase) -> Self {
-        Self {
-            dir: dir.into(),
-            passphrase,
-        }
+        Self { dir: dir.into(), passphrase }
     }
     fn path(&self, account: u32) -> PathBuf {
         self.dir.join(format!("{account}.key"))

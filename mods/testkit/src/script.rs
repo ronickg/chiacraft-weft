@@ -49,7 +49,10 @@ pub async fn run(t: T, src: String) -> R {
         }
         let (cmd, rest) = line.split_once(' ').unwrap_or((line, ""));
         let rest = rest.trim();
-        let nums: Vec<f32> = rest.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+        let nums: Vec<f32> = rest
+            .split_whitespace()
+            .filter_map(|s| s.parse().ok())
+            .collect();
         let num = |i: usize, d: f32| nums.get(i).copied().unwrap_or(d);
         match cmd {
             "wait" => t.secs(num(0, 1.0)).await?,
@@ -105,14 +108,16 @@ pub async fn run(t: T, src: String) -> R {
             }
             "host" => {
                 t.c().host_world();
-                t.until("hosting", Duration::from_secs(60), |t| t.flag(cf::HOSTING)).await?;
+                t.until("hosting", Duration::from_secs(60), |t| t.flag(cf::HOSTING))
+                    .await?;
                 let _ = std::fs::write(rest, t.c().ticket());
             }
             "open" => {
                 t.c().open_world(rest, 1);
                 // The old world's client is gone by the next frames; then wait for the new one.
                 t.frames(3).await?;
-                t.until("the world open", Duration::from_secs(60), |t| t.flag(cf::JOINED)).await?;
+                t.until("the world open", Duration::from_secs(60), |t| t.flag(cf::JOINED))
+                    .await?;
                 t.loaded().await?;
             }
             "tap" => {
@@ -134,9 +139,12 @@ pub async fn run(t: T, src: String) -> R {
             "tap_once" => {
                 // Only the screen's name: a focused text field keeps a screen from ever being
                 // "ready" (its caret redraws it).
-                let (screen, query) = rest.split_once(' ').ok_or("tap_once: a screen and an element")?;
+                let (screen, query) = rest
+                    .split_once(' ')
+                    .ok_or("tap_once: a screen and an element")?;
                 let name = screen.to_string();
-                t.until(&format!("screen {screen}"), Duration::from_secs(60), move |t| t.c().screen() == name).await?;
+                t.until(&format!("screen {screen}"), Duration::from_secs(60), move |t| t.c().screen() == name)
+                    .await?;
                 t.frames(15).await?;
                 t.click_ui(query, 0);
                 t.frames(15).await?;
@@ -148,7 +156,10 @@ pub async fn run(t: T, src: String) -> R {
             "join" => {
                 let mut ticket = String::new();
                 t.until("ticket file", Duration::from_secs(120), |_| {
-                    ticket = std::fs::read_to_string(rest).unwrap_or_default().trim().to_string();
+                    ticket = std::fs::read_to_string(rest)
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string();
                     !ticket.is_empty()
                 })
                 .await?;
@@ -198,10 +209,16 @@ fn waypoint(origin: [f64; 3], rest: &str) -> Option<[f64; 5]> {
         Some((h, a)) => (h, Some(a)),
         None => (rest, None),
     };
-    let n: Vec<f64> = head.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+    let n: Vec<f64> = head
+        .split_whitespace()
+        .filter_map(|s| s.parse().ok())
+        .collect();
     match at {
         Some(a) => {
-            let m: Vec<f64> = a.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+            let m: Vec<f64> = a
+                .split_whitespace()
+                .filter_map(|s| s.parse().ok())
+                .collect();
             if n.len() < 3 || m.len() < 3 {
                 return None;
             }
@@ -270,7 +287,13 @@ async fn fly(t: &T, mut pts: Vec<[f64; 5]>, secs: f64, eye: f64) -> R {
         };
         let (a, la) = dense[i.saturating_sub(1)];
         let (b, lb) = dense[i];
-        let f = if turn { 0.0 } else if lb > la { ((e * len - la) / (lb - la)).clamp(0.0, 1.0) } else { 1.0 };
+        let f = if turn {
+            0.0
+        } else if lb > la {
+            ((e * len - la) / (lb - la)).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
         let mut p = [0.0; 5];
         for k in 0..5 {
             p[k] = a[k] + (b[k] - a[k]) * f;

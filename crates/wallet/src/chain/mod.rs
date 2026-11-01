@@ -49,9 +49,7 @@ pub mod wallet;
 pub use cache::{ChainCache, WatchedCoin};
 pub use did::{DidRecord, DidStep};
 pub use offer::{MadeOffer, MakeOffer, OfferGive, OfferSummary};
-pub use reader::{
-    ChainConfig, ChainReader, ChainStatus, CreatedDid, DidLookup, OfferState, Phase, TakeOutcome,
-};
+pub use reader::{ChainConfig, ChainReader, ChainStatus, CreatedDid, DidLookup, OfferState, Phase, TakeOutcome};
 pub use source::{ChainSource, PeerSource, PushOutcome};
 pub use sponsor::{EveDid, SponsorBundle};
 pub use sync::{CoinRecord, WalletSync};
@@ -145,8 +143,7 @@ pub fn parse_did(text: &str) -> Result<Bytes32> {
     {
         return Ok(id.into());
     }
-    let address = chia_sdk_utils::Address::decode(text)
-        .map_err(|_| Error::new(format!("not a DID: {text:?}")))?;
+    let address = chia_sdk_utils::Address::decode(text).map_err(|_| Error::new(format!("not a DID: {text:?}")))?;
     if address.prefix != DID_PREFIX {
         return Err(Error::new(format!("not a DID: {text:?}")));
     }
@@ -182,8 +179,7 @@ pub(crate) fn failed<E: std::fmt::Display>(what: &'static str) -> impl Fn(E) -> 
 
 /// A puzzle hash as an address on `network`.
 pub fn address(puzzle_hash: Bytes32, network: ChainNetwork) -> String {
-    crate::keys::address(puzzle_hash.to_bytes(), network.address_network())
-        .unwrap_or_else(|_| hex32(puzzle_hash))
+    crate::keys::address(puzzle_hash.to_bytes(), network.address_network()).unwrap_or_else(|_| hex32(puzzle_hash))
 }
 
 /// The standard puzzle hash of an address (`xch1…`/`txch1…`) or 64 hex digits.
@@ -215,23 +211,14 @@ mod tests {
 
     #[test]
     fn networks() {
-        assert_eq!(
-            ChainNetwork::parse("testnet11"),
-            Some(ChainNetwork::Testnet11)
-        );
+        assert_eq!(ChainNetwork::parse("testnet11"), Some(ChainNetwork::Testnet11));
         assert_eq!(ChainNetwork::parse("off"), None);
-        assert_ne!(
-            ChainNetwork::Testnet11.genesis_challenge(),
-            ChainNetwork::Mainnet.genesis_challenge()
-        );
+        assert_ne!(ChainNetwork::Testnet11.genesis_challenge(), ChainNetwork::Mainnet.genesis_challenge());
         assert_eq!(ChainNetwork::Testnet11.introducers().default_port, 58444);
         // Mainnet: Chia's own introducers and port 8444, the network id `mainnet`, xch1 addresses.
         assert_eq!(ChainNetwork::Mainnet.introducers().default_port, 8444);
         assert_eq!(ChainNetwork::Mainnet.network_id(), "mainnet");
         assert!(address(Bytes32::new([1; 32]), ChainNetwork::Mainnet).starts_with("xch1"));
-        assert_eq!(
-            ChainNetwork::from(crate::Network::Mainnet),
-            ChainNetwork::Mainnet
-        );
+        assert_eq!(ChainNetwork::from(crate::Network::Mainnet), ChainNetwork::Mainnet);
     }
 }

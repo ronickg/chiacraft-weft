@@ -50,7 +50,10 @@ impl Envelope {
         }
         let mut field = |name: &str| -> Result<String, String> {
             let line = lines.next().ok_or_else(|| format!("no {name} line"))?;
-            let v = line.strip_prefix(name).and_then(|r| r.strip_prefix(' ')).ok_or_else(|| format!("expected a {name} line"))?;
+            let v = line
+                .strip_prefix(name)
+                .and_then(|r| r.strip_prefix(' '))
+                .ok_or_else(|| format!("expected a {name} line"))?;
             if v.is_empty() || !v.chars().all(|c| c.is_ascii_hexdigit() || c == ':') {
                 return Err(format!("bad {name}"));
             }
@@ -73,7 +76,12 @@ mod tests {
 
     #[test]
     fn round_trip_and_refusals() {
-        let e = Envelope { package: "ab".repeat(32), creator: "cd".repeat(32), vouch: format!("{}:{}", "ef".repeat(48), "01".repeat(96)), signature: "23".repeat(64) };
+        let e = Envelope {
+            package: "ab".repeat(32),
+            creator: "cd".repeat(32),
+            vouch: format!("{}:{}", "ef".repeat(48), "01".repeat(96)),
+            signature: "23".repeat(64),
+        };
         assert_eq!(Envelope::parse(&e.text()).unwrap(), e);
         assert!(Envelope::parse(&e.text().replace("creator", "maker")).is_err());
         assert!(Envelope::parse("hello").is_err());

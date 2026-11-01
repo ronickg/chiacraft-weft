@@ -81,13 +81,11 @@ pub struct Reply {
 impl Reply {
     /// The launcher id, checked against the `did:chia:1…` text when both are given.
     pub fn launcher_id(&self) -> Result<[u8; 32]> {
-        let from_hex = crate::keys::from_hex(self.launcher.trim().trim_start_matches("0x"))
-            .and_then(|b| <[u8; 32]>::try_from(b.as_slice()).ok());
+        let from_hex =
+            crate::keys::from_hex(self.launcher.trim().trim_start_matches("0x")).and_then(|b| <[u8; 32]>::try_from(b.as_slice()).ok());
         let from_did = crate::keys::decode_did(&self.did);
         match (from_hex, from_did) {
-            (Some(a), Some(b)) if a != b => {
-                Err(Error::new("the sponsor's answer names two different DIDs"))
-            }
+            (Some(a), Some(b)) if a != b => Err(Error::new("the sponsor's answer names two different DIDs")),
             (Some(a), _) | (None, Some(a)) => Ok(a),
             (None, None) => Err(Error::new("the sponsor's answer names no DID")),
         }
@@ -119,20 +117,14 @@ struct Existing {
 /// identity reads as a [`Reply`] with status [`EXISTING`].
 pub fn read_answer(status: u16, body: &str) -> Result<Reply> {
     if status == 200 {
-        let reply: Reply = serde_json::from_str(body)
-            .map_err(|e| Error::new(format!("the sponsor's answer can't be read: {e}")))?;
+        let reply: Reply = serde_json::from_str(body).map_err(|e| Error::new(format!("the sponsor's answer can't be read: {e}")))?;
         reply.launcher_id()?;
         return Ok(reply);
     }
     if status == 403
         && let Ok(e) = serde_json::from_str::<Existing>(body)
     {
-        let reply = Reply {
-            did: e.did,
-            launcher: e.launcher,
-            coin: String::new(),
-            status: EXISTING.into(),
-        };
+        let reply = Reply { did: e.did, launcher: e.launcher, coin: String::new(), status: EXISTING.into() };
         if reply.launcher_id().is_ok() {
             return Ok(reply);
         }
@@ -177,25 +169,16 @@ mod tests {
     fn answers_read() {
         let id = [9u8; 32];
         let did = crate::keys::encode_did(&id).unwrap();
-        let body = format!(
-            r#"{{"did":"{did}","launcher":"{}","coin":"00","status":"pending"}}"#,
-            crate::keys::hex(&id)
-        );
+        let body = format!(r#"{{"did":"{did}","launcher":"{}","coin":"00","status":"pending"}}"#, crate::keys::hex(&id));
         assert_eq!(read_answer(200, &body).unwrap().launcher_id().unwrap(), id);
         let wrong = body.replace(&crate::keys::hex(&id), &crate::keys::hex(&[8u8; 32]));
         assert!(read_answer(200, &wrong).is_err());
         let e = read_answer(429, r#"{"error":"daily budget"}"#).unwrap_err();
         assert!(e.to_string().contains("daily budget"), "{e}");
         // The identity already has one: that DID, to watch and link.
-        let had = format!(
-            r#"{{"error":"this identity already has a DID","did":"{did}","launcher":"{}"}}"#,
-            crate::keys::hex(&id)
-        );
+        let had = format!(r#"{{"error":"this identity already has a DID","did":"{did}","launcher":"{}"}}"#, crate::keys::hex(&id));
         let r = read_answer(403, &had).unwrap();
-        assert_eq!(
-            (r.status.as_str(), r.launcher_id().unwrap()),
-            (EXISTING, id)
-        );
+        assert_eq!((r.status.as_str(), r.launcher_id().unwrap()), (EXISTING, id));
         let e = read_answer(403, r#"{"error":"network not served"}"#).unwrap_err();
         assert!(e.to_string().contains("not served"), "{e}");
         assert!(read_answer(503, r#"{"error":"not synced"}"#).is_err());

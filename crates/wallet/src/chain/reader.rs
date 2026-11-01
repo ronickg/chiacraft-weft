@@ -21,9 +21,7 @@ use crate::{
     Error, Result,
     spending::{MainnetConsent, SpendCaps},
 };
-use chia_protocol::{
-    Bytes32, CoinStateUpdate, Message, NewPeakWallet, ProtocolMessageTypes, SpendBundle,
-};
+use chia_protocol::{Bytes32, CoinStateUpdate, Message, NewPeakWallet, ProtocolMessageTypes, SpendBundle};
 use chia_sdk_client::{Peer, PeerOptions};
 use chia_traits::Streamable;
 use std::{
@@ -57,11 +55,7 @@ pub struct TlsDialer {
 
 impl TlsDialer {
     pub fn new(network: ChainNetwork, peers: Vec<String>) -> Result<Self> {
-        Ok(Self {
-            network,
-            peers,
-            connector: super::tls::connector()?,
-        })
+        Ok(Self { network, peers, connector: super::tls::connector()? })
     }
 }
 
@@ -117,14 +111,9 @@ impl Dialer for TlsDialer {
                     .next()
                     .ok_or_else(|| Error::new(format!("no address for {address}")))?,
             };
-            chia_sdk_client::connect_peer(
-                self.network.network_id().to_owned(),
-                self.connector.clone(),
-                addr,
-                PeerOptions::default(),
-            )
-            .await
-            .map_err(failed("connect"))
+            chia_sdk_client::connect_peer(self.network.network_id().to_owned(), self.connector.clone(), addr, PeerOptions::default())
+                .await
+                .map_err(failed("connect"))
         })
     }
 }
@@ -335,11 +324,7 @@ impl ChainReader {
             return Err(Error::new("the spending caps are for another network"));
         }
         if config.network == ChainNetwork::Mainnet {
-            log::warn!(
-                "{}; caps: {}",
-                crate::spending::mainnet_warning("The chain reader"),
-                config.caps.describe()
-            );
+            log::warn!("{}; caps: {}", crate::spending::mainnet_warning("The chain reader"), config.caps.describe());
         }
         let cache = match &config.cache_file {
             Some(path) => ChainCache::load(path, config.network, config.puzzle_hashes.clone()),
@@ -366,10 +351,7 @@ impl ChainReader {
             wake: Notify::new(),
         });
         runtime.spawn(supervise(shared.clone(), Arc::new(dialer)));
-        Ok(Self {
-            shared,
-            runtime: Some(runtime),
-        })
+        Ok(Self { shared, runtime: Some(runtime) })
     }
 
     fn state(&self) -> std::sync::MutexGuard<'_, State> {
@@ -407,11 +389,7 @@ impl ChainReader {
             peers: s
                 .pool
                 .iter()
-                .map(|p| PeerInfo {
-                    address: p.address.clone(),
-                    peak: p.peak.map(|(h, _)| h),
-                    active: Some(p.id) == s.active,
-                })
+                .map(|p| PeerInfo { address: p.address.clone(), peak: p.peak.map(|(h, _)| h), active: Some(p.id) == s.active })
                 .collect(),
             peak: s.cache.peak,
             synced_height: wallet.height,
@@ -462,40 +440,25 @@ impl ChainReader {
         let key = hex32(launcher_id);
         let (source, known, peak) = {
             let s = self.state();
-            (
-                s.any_source(),
-                s.cache.dids.get(&key).cloned(),
-                s.cache.peak.unwrap_or(0),
-            )
+            (s.any_source(), s.cache.dids.get(&key).cloned(), s.cache.peak.unwrap_or(0))
         };
         let Some(source) = source else {
             return known
-                .map(|record| DidLookup {
-                    record,
-                    live: false,
-                })
+                .map(|record| DidLookup { record, live: false })
                 .ok_or_else(|| Error::new("no chain peer reachable and the DID isn't cached"));
         };
-        let record = match self.run(
-            timeout,
-            did::resolve(&source, launcher_id, known.clone(), peak),
-        ) {
+        let record = match self.run(timeout, did::resolve(&source, launcher_id, known.clone(), peak)) {
             Ok(r) => r,
             Err(e) => {
                 return known
-                    .map(|record| DidLookup {
-                        record,
-                        live: false,
-                    })
+                    .map(|record| DidLookup { record, live: false })
                     .ok_or(e);
             }
         };
         // Follow its current coin on the subscribed peer: a transfer or melt marks the cached
         // record stale (each new subscribed peer subscribes it again).
         let active = self.state().active_source();
-        if let (Some(current), Some(active)) =
-            (record.current().filter(|c| c.spent.is_none()), active)
-        {
+        if let (Some(current), Some(active)) = (record.current().filter(|c| c.spent.is_none()), active) {
             let id = current.coin_id;
             let _ = self.run(timeout, async { active.coin_state(vec![id], true).await });
         }
@@ -517,17 +480,12 @@ impl ChainReader {
             s.cache
                 .watched
                 .entry(hex32(coin_id))
-                .or_insert(WatchedCoin {
-                    coin_id,
-                    state: None,
-                });
+                .or_insert(WatchedCoin { coin_id, state: None });
             s.dirty = true;
             s.active_source()
         };
         if let Some(source) = source {
-            let states = self.run(timeout, async {
-                source.coin_state(vec![coin_id], true).await
-            })?;
+            let states = self.run(timeout, async { source.coin_state(vec![coin_id], true).await })?;
             let mut s = self.state();
             if let Some(w) = s.cache.watched.get_mut(&hex32(coin_id)) {
                 w.state = states.first().map(CoinRecord::from);
@@ -587,28 +545,15 @@ impl ChainReader {
     /// address (the change too): the pool of 1-mojo coins a server gives in admission offers
     /// (identity-research.md 3.6, step 5), so each offer locks a coin of its own rather than the
     /// wallet's whole balance. Pushed; the spent coin is kept out of other spends until settled.
-    pub fn split(
-        &self,
-        keys: &WalletKeys,
-        count: u32,
-        amount: u64,
-        fee: u64,
-        timeout: Duration,
-    ) -> Result<PushOutcome> {
+    pub fn split(&self, keys: &WalletKeys, count: u32, amount: u64, fee: u64, timeout: Duration) -> Result<PushOutcome> {
         use chia_puzzle_types::Memos;
         use chia_sdk_driver::{Action, Id, Relation, SpendContext, Spends};
         let caps = self.caps();
         caps.check_fee(fee)?;
-        caps.check(
-            "max-split",
-            "the split",
-            u64::from(count).saturating_mul(amount),
-        )?;
+        caps.check("max-split", "the split", u64::from(count).saturating_mul(amount))?;
         self.check_keys(keys)?;
         if count == 0 || amount == 0 {
-            return Err(Error::new(
-                "split into at least one coin of at least 1 mojo",
-            ));
+            return Err(Error::new("split into at least one coin of at least 1 mojo"));
         }
         let need = u64::from(count)
             .checked_mul(amount)
@@ -640,18 +585,11 @@ impl ChainReader {
         }
         let deltas = spends.apply(&mut ctx, &actions).map_err(failed("split"))?;
         spends
-            .finish_with_keys(
-                &mut ctx,
-                &deltas,
-                Relation::AssertConcurrent,
-                &keys.synthetic_keys(),
-            )
+            .finish_with_keys(&mut ctx, &deltas, Relation::AssertConcurrent, &keys.synthetic_keys())
             .map_err(failed("split"))?;
         let coin_spends = ctx.take();
         let signature = keys.sign(&coin_spends)?;
-        let push = self.run(timeout, async {
-            source.push(SpendBundle::new(coin_spends, signature)).await
-        })?;
+        let push = self.run(timeout, async { source.push(SpendBundle::new(coin_spends, signature)).await })?;
         if !matches!(push, PushOutcome::Rejected { .. }) {
             let mut s = self.state();
             s.cache
@@ -665,14 +603,7 @@ impl ChainReader {
     /// Send `amount` mojos from the wallet's spendable coins to `to` (a p2 puzzle hash), paying
     /// `fee`; the change comes back to the primary address. Pushed; the spent coins are kept out of
     /// other spends until settled. Capped by `max-send` and `max-fee`.
-    pub fn send(
-        &self,
-        keys: &WalletKeys,
-        to: Bytes32,
-        amount: u64,
-        fee: u64,
-        timeout: Duration,
-    ) -> Result<PushOutcome> {
+    pub fn send(&self, keys: &WalletKeys, to: Bytes32, amount: u64, fee: u64, timeout: Duration) -> Result<PushOutcome> {
         use chia_puzzle_types::Memos;
         use chia_sdk_driver::{Action, Id, Relation, SpendContext, Spends};
         let caps = self.caps();
@@ -693,11 +624,8 @@ impl ChainReader {
                 s.cache.spendable(),
             )
         };
-        let chosen = offer::select(&coins, need).map_err(|_| {
-            Error::new(format!(
-                "the wallet needs at least {need} mojos to send ({amount} + {fee} fee)"
-            ))
-        })?;
+        let chosen = offer::select(&coins, need)
+            .map_err(|_| Error::new(format!("the wallet needs at least {need} mojos to send ({amount} + {fee} fee)")))?;
         let mut ctx = SpendContext::new();
         let mut spends = Spends::new(keys.primary());
         for c in &chosen {
@@ -709,18 +637,11 @@ impl ChainReader {
         }
         let deltas = spends.apply(&mut ctx, &actions).map_err(failed("send"))?;
         spends
-            .finish_with_keys(
-                &mut ctx,
-                &deltas,
-                Relation::AssertConcurrent,
-                &keys.synthetic_keys(),
-            )
+            .finish_with_keys(&mut ctx, &deltas, Relation::AssertConcurrent, &keys.synthetic_keys())
             .map_err(failed("send"))?;
         let coin_spends = ctx.take();
         let signature = keys.sign(&coin_spends)?;
-        let push = self.run(timeout, async {
-            source.push(SpendBundle::new(coin_spends, signature)).await
-        })?;
+        let push = self.run(timeout, async { source.push(SpendBundle::new(coin_spends, signature)).await })?;
         if !matches!(push, PushOutcome::Rejected { .. }) {
             let now = offer::now_seconds();
             let mut s = self.state();
@@ -789,11 +710,8 @@ impl ChainReader {
         let need = fee
             .checked_add(1)
             .ok_or_else(|| Error::new("the fee overflows"))?;
-        let chosen = offer::select(&coins, need).map_err(|_| {
-            Error::new(format!(
-                "the wallet needs at least {need} mojos to make a DID (1 for the DID, {fee} fee)"
-            ))
-        })?;
+        let chosen = offer::select(&coins, need)
+            .map_err(|_| Error::new(format!("the wallet needs at least {need} mojos to make a DID (1 for the DID, {fee} fee)")))?;
         let mut ctx = SpendContext::new();
         let mut spends = Spends::new(keys.primary());
         for c in &chosen {
@@ -807,12 +725,7 @@ impl ChainReader {
             .apply(&mut ctx, &actions)
             .map_err(failed("making a DID"))?;
         let outputs = spends
-            .finish_with_keys(
-                &mut ctx,
-                &deltas,
-                Relation::AssertConcurrent,
-                &keys.synthetic_keys(),
-            )
+            .finish_with_keys(&mut ctx, &deltas, Relation::AssertConcurrent, &keys.synthetic_keys())
             .map_err(failed("making a DID"))?;
         let did = outputs
             .dids
@@ -822,15 +735,11 @@ impl ChainReader {
             launcher_id: did.info.launcher_id,
             coin_id: did.coin.coin_id(),
             owner: did.info.p2_puzzle_hash,
-            push: PushOutcome::Pending {
-                txid: Bytes32::default(),
-            },
+            push: PushOutcome::Pending { txid: Bytes32::default() },
         };
         let coin_spends = ctx.take();
         let signature = keys.sign(&coin_spends)?;
-        let push = self.run(timeout, async {
-            source.push(SpendBundle::new(coin_spends, signature)).await
-        })?;
+        let push = self.run(timeout, async { source.push(SpendBundle::new(coin_spends, signature)).await })?;
         if !matches!(push, PushOutcome::Rejected { .. }) {
             let now = offer::now_seconds();
             let mut s = self.state();
@@ -845,12 +754,7 @@ impl ChainReader {
     /// Wait until a DID launched by `launcher_id` is on chain (its launcher spent, its singleton
     /// made), asking every `every` up to `timeout`: its record, read live. A sponsored DID is
     /// watched this way too (the sponsor answers with its launcher id before it confirms).
-    pub fn wait_did(
-        &self,
-        launcher_id: Bytes32,
-        every: Duration,
-        timeout: Duration,
-    ) -> Result<DidRecord> {
+    pub fn wait_did(&self, launcher_id: Bytes32, every: Duration, timeout: Duration) -> Result<DidRecord> {
         let until = Instant::now() + timeout;
         loop {
             let left = until.saturating_duration_since(Instant::now());
@@ -869,13 +773,7 @@ impl ChainReader {
     /// The achievements' daily anchor (I10): one of the wallet's coins (the smallest above the
     /// fee) spent back to its primary address with `root` in the memos, pushed. The new coin is the
     /// anchor (its id returned); the spent coin is kept out of other spends until settled.
-    pub fn anchor(
-        &self,
-        keys: &WalletKeys,
-        root: [u8; 32],
-        fee: u64,
-        timeout: Duration,
-    ) -> Result<(PushOutcome, Bytes32)> {
+    pub fn anchor(&self, keys: &WalletKeys, root: [u8; 32], fee: u64, timeout: Duration) -> Result<(PushOutcome, Bytes32)> {
         self.caps()
             .check("max-anchor-fee", "the anchor's fee", fee)?;
         self.check_keys(keys)?;
@@ -894,9 +792,7 @@ impl ChainReader {
             .copied()
             .ok_or_else(|| Error::new(format!("no coin above {fee} mojos to anchor with")))?;
         let (coin_spends, signature, made) = super::anchor::build(keys, coin, root, fee)?;
-        let push = self.run(timeout, async {
-            source.push(SpendBundle::new(coin_spends, signature)).await
-        })?;
+        let push = self.run(timeout, async { source.push(SpendBundle::new(coin_spends, signature)).await })?;
         if !matches!(push, PushOutcome::Rejected { .. }) {
             let mut s = self.state();
             s.cache
@@ -909,9 +805,7 @@ impl ChainReader {
 
     /// The root an anchor coin carries on chain (none while it isn't there).
     pub fn anchor_root(&self, coin_id: Bytes32, timeout: Duration) -> Result<Option<[u8; 32]>> {
-        self.read(timeout, move |source| async move {
-            super::anchor::anchor_root(&source, coin_id).await
-        })
+        self.read(timeout, move |source| async move { super::anchor::anchor_root(&source, coin_id).await })
     }
 
     /// Spendable XCH of the wallet, in mojos (unspent coins no offer or pending spend holds).
@@ -959,9 +853,7 @@ impl ChainReader {
             .iter()
             .any(|ph| !s.cache.wallet.is_ours(ph))
         {
-            return Err(Error::new(
-                "the reader doesn't follow this wallet's addresses",
-            ));
+            return Err(Error::new("the reader doesn't follow this wallet's addresses"));
         }
         if s.phase != Phase::Synced {
             return Err(Error::new("the wallet isn't synced with a live peer yet"));
@@ -971,21 +863,11 @@ impl ChainReader {
 
     /// Check and take an offer with `keys` (the wallet the reader follows), paying `fee`, and
     /// push it. The coins it spends are kept out of other spends until the chain settles them.
-    pub fn take_offer(
-        &self,
-        text: &str,
-        keys: &WalletKeys,
-        fee: u64,
-        timeout: Duration,
-    ) -> Result<TakeOutcome> {
+    pub fn take_offer(&self, text: &str, keys: &WalletKeys, fee: u64, timeout: Duration) -> Result<TakeOutcome> {
         let summary = offer::summarize(text)?;
         let caps = self.caps();
         caps.check_fee(fee)?;
-        caps.check(
-            "max-take",
-            "taking the offer (its price and royalties)",
-            summary.requested_xch.saturating_add(summary.royalties_xch),
-        )?;
+        caps.check("max-take", "taking the offer (its price and royalties)", summary.requested_xch.saturating_add(summary.royalties_xch))?;
         self.check_keys(keys)?;
         let (source, coins, peak) = {
             let s = self.state();
@@ -996,10 +878,7 @@ impl ChainReader {
                 s.cache.peak,
             )
         };
-        self.run(
-            timeout,
-            offer::check(&source, &summary, offer::now_seconds(), peak),
-        )?;
+        self.run(timeout, offer::check(&source, &summary, offer::now_seconds(), peak))?;
         let taken = offer::build_take(text, keys, &coins, fee)?;
         let push = self.run(timeout, async { source.push(taken.bundle).await })?;
         if !matches!(push, PushOutcome::Rejected { .. }) {
@@ -1010,20 +889,12 @@ impl ChainReader {
             }
             s.save();
         }
-        Ok(TakeOutcome {
-            summary: taken.summary,
-            push,
-        })
+        Ok(TakeOutcome { summary: taken.summary, push })
     }
 
     /// Make an offer with `keys`: give XCH or an NFT the wallet holds, request a price. Its coins
     /// are watched and kept out of other spends until it is taken or expires.
-    pub fn make_offer(
-        &self,
-        spec: MakeOffer,
-        keys: &WalletKeys,
-        timeout: Duration,
-    ) -> Result<MadeOffer> {
+    pub fn make_offer(&self, spec: MakeOffer, keys: &WalletKeys, timeout: Duration) -> Result<MadeOffer> {
         let caps = self.caps();
         caps.check_fee(spec.fee)?;
         caps.check("max-offer-price", "the offer's price", spec.price)?;
@@ -1096,22 +967,18 @@ impl ChainReader {
         let state = match spent {
             Some(height) => {
                 let payment = super::parse_hex32(&made.payment_puzzle_hash).ok();
-                let paid = s.cache.wallet.coins.values().any(|c| {
-                    Some(c.puzzle_hash) == payment
-                        && c.amount == made.price
-                        && c.created == Some(height)
-                });
+                let paid = s
+                    .cache
+                    .wallet
+                    .coins
+                    .values()
+                    .any(|c| Some(c.puzzle_hash) == payment && c.amount == made.price && c.created == Some(height));
                 OfferState::Taken { height, paid }
             }
-            None if made.expires_at.is_some_and(|t| offer::now_seconds() >= t) => {
-                OfferState::Expired
-            }
+            None if made.expires_at.is_some_and(|t| offer::now_seconds() >= t) => OfferState::Expired,
             None => OfferState::Open,
         };
-        if matches!(
-            state,
-            OfferState::Expired | OfferState::Taken { paid: true, .. }
-        ) {
+        if matches!(state, OfferState::Expired | OfferState::Taken { paid: true, .. }) {
             s.cache.offers.retain(|o| o.text != made.text);
             s.dirty = true;
         }
@@ -1186,12 +1053,7 @@ async fn pump(id: u64, mut rx: mpsc::Receiver<Message>, events: mpsc::Sender<Eve
 }
 
 /// Dial until the pool reaches its target (waves of 4, failures banned for 10 minutes).
-async fn fill_pool(
-    shared: &Arc<Shared>,
-    dialer: &Arc<dyn Dialer>,
-    events: &mpsc::Sender<Event>,
-    next_id: &mut u64,
-) {
+async fn fill_pool(shared: &Arc<Shared>, dialer: &Arc<dyn Dialer>, events: &mpsc::Sender<Event>, next_id: &mut u64) {
     let (target, known) = {
         let s = lock(shared);
         (s.config.target_peers.max(1), s.cache.peers.clone())
@@ -1237,12 +1099,8 @@ async fn fill_pool(
                     *next_id += 1;
                     log::info!("chain: connected to {addr}");
                     tokio::spawn(pump(id, rx, events.clone()));
-                    s.pool.push(PoolPeer {
-                        id,
-                        address: addr.clone(),
-                        peer,
-                        peak: None,
-                    });
+                    s.pool
+                        .push(PoolPeer { id, address: addr.clone(), peer, peak: None });
                     if !s.cache.peers.contains(&addr) {
                         s.cache.peers.insert(0, addr);
                         s.cache.peers.truncate(16);
@@ -1336,11 +1194,7 @@ async fn subscribe_best(shared: &Arc<Shared>) -> Result<()> {
             s.active = Some(id);
             s.phase = Phase::Synced;
             s.last_error = None;
-            log::info!(
-                "chain: synced to height {} ({} coins)",
-                s.cache.wallet.height.unwrap_or(0),
-                s.cache.wallet.coins.len()
-            );
+            log::info!("chain: synced to height {} ({} coins)", s.cache.wallet.height.unwrap_or(0), s.cache.wallet.coins.len());
             s.save();
             Ok(())
         }
@@ -1380,8 +1234,7 @@ async fn apply_update(shared: &Arc<Shared>, id: u64, update: CoinStateUpdate) {
             })
             .copied()
             .collect();
-        let wallet_update =
-            CoinStateUpdate::new(update.height, update.fork_height, update.peak_hash, ours);
+        let wallet_update = CoinStateUpdate::new(update.height, update.fork_height, update.peak_hash, ours);
         let hinted = s.cache.wallet.apply_update(&wallet_update);
         for st in &update.items {
             let key = hex32(st.coin.coin_id());
@@ -1428,9 +1281,7 @@ async fn supervise(shared: Arc<Shared>, dialer: Arc<dyn Dialer>) {
             let s = lock(&shared);
             s.pool.len() < s.config.target_peers.max(1)
         };
-        if want_more
-            && last_fill.elapsed() > Duration::from_secs(if failures == 0 { 5 } else { 15 })
-        {
+        if want_more && last_fill.elapsed() > Duration::from_secs(if failures == 0 { 5 } else { 15 }) {
             last_fill = Instant::now();
             fill_pool(&shared, &dialer, &events_tx, &mut next_id).await;
         }

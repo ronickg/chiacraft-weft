@@ -8,8 +8,7 @@
 use chiacraft_wallet::{
     Mnemonic, OwnerSigner,
     chain::{
-        Bytes32, ChainConfig, ChainNetwork, ChainReader, OfferGive, OfferState, Phase, PushOutcome,
-        WalletKeys, holdings,
+        Bytes32, ChainConfig, ChainNetwork, ChainReader, OfferGive, OfferState, Phase, PushOutcome, WalletKeys, holdings,
         offer::{self, MakeOffer},
         sim::Sim,
     },
@@ -78,9 +77,7 @@ fn nft_and_cat_holdings_found_by_the_holder_and_checked_by_the_server() {
     let wallet = player.cache().wallet;
     // The holder's side: its NFT and its CAT coins, by owner address.
     let nfts = player
-        .read(WAIT, |src| async move {
-            holdings::own_nfts(&src, &wallet).await
-        })
+        .read(WAIT, |src| async move { holdings::own_nfts(&src, &wallet).await })
         .unwrap();
     assert_eq!(nfts.len(), 1, "{nfts:?}");
     let (l, coin, owner) = nfts[0];
@@ -94,51 +91,37 @@ fn nft_and_cat_holdings_found_by_the_holder_and_checked_by_the_server() {
     // The server's side, from the coins named in a proof.
     let server = reader(&sim, &account().1);
     let seen = server
-        .read(
-            WAIT,
-            |src| async move { holdings::nft_coin(&src, coin).await },
-        )
+        .read(WAIT, |src| async move { holdings::nft_coin(&src, coin).await })
         .unwrap();
     assert_eq!((seen.launcher_id, seen.owner), (launcher, keys.primary()));
     let minter = server
-        .read(WAIT, |src| async move {
-            holdings::nft_minter(&src, launcher).await
-        })
+        .read(WAIT, |src| async move { holdings::nft_minter(&src, launcher).await })
         .unwrap();
     assert_eq!(minter, None, "minted without a DID");
     let ids = cat_coins.clone();
     let amount = server
-        .read(WAIT, |src| async move {
-            holdings::cat_amount(&src, asset, primary, ids).await
-        })
+        .read(WAIT, |src| async move { holdings::cat_amount(&src, asset, primary, ids).await })
         .unwrap();
     assert_eq!(amount, 3_000);
     // Not the owner's: nothing counts.
     let ids = cat_coins.clone();
     let stranger = Bytes32::new([3; 32]);
     let none = server
-        .read(WAIT, |src| async move {
-            holdings::cat_amount(&src, asset, stranger, ids).await
-        })
+        .read(WAIT, |src| async move { holdings::cat_amount(&src, asset, stranger, ids).await })
         .unwrap();
     assert_eq!(none, 0);
     // A plain coin made at the CAT's puzzle hash (anyone can): not a CAT, counts nothing.
     let fake = sim.fund(holdings::cat_puzzle_hash(asset, keys.primary()), 9_000);
     let ids = vec![fake.coin_id()];
     let faked = server
-        .read(WAIT, |src| async move {
-            holdings::cat_amount(&src, asset, primary, ids).await
-        })
+        .read(WAIT, |src| async move { holdings::cat_amount(&src, asset, primary, ids).await })
         .unwrap();
     assert_eq!(faked, 0);
     // A coin that isn't an NFT.
     let plain = sim.fund(keys.primary(), 4).coin_id();
     assert!(
         server
-            .read(
-                WAIT,
-                |src| async move { holdings::nft_coin(&src, plain).await }
-            )
+            .read(WAIT, |src| async move { holdings::nft_coin(&src, plain).await })
             .is_err()
     );
 }
@@ -153,12 +136,7 @@ fn the_offer_pool_is_split_and_used() {
     assert!(matches!(push, PushOutcome::Accepted { .. }), "{push:?}");
     assert!(until(|| server.coins_of(1) == 4), "{:?}", server.coins());
     // Two offers at once, each on a pool coin; the big change coin stays spendable.
-    let spec = |price| MakeOffer {
-        give: OfferGive::Xch(1),
-        price,
-        expires_at: Some(offer::now_seconds() + 3_600),
-        fee: 0,
-    };
+    let spec = |price| MakeOffer { give: OfferGive::Xch(1), price, expires_at: Some(offer::now_seconds() + 3_600), fee: 0 };
     let a = server.make_offer(spec(100), &keys, WAIT).unwrap();
     let b = server.make_offer(spec(100), &keys, WAIT).unwrap();
     assert_ne!(a.offered_coins, b.offered_coins);
@@ -169,10 +147,7 @@ fn the_offer_pool_is_split_and_used() {
     let player = reader(&sim, &pk);
     let taken = player.take_offer(&a.text, &pk, 0, WAIT).unwrap();
     assert!(matches!(taken.push, PushOutcome::Accepted { .. }));
-    assert!(until(|| matches!(
-        server.offer_state(&a),
-        OfferState::Taken { paid: true, .. }
-    )));
+    assert!(until(|| matches!(server.offer_state(&a), OfferState::Taken { paid: true, .. })));
     assert_eq!(server.offer_state(&b), OfferState::Open);
 }
 
@@ -195,11 +170,7 @@ fn the_simulator_is_reached_over_its_ws_address() {
     far.peers = vec!["ws://192.0.2.1:58444".into()];
     far.puzzle_hashes = keys.puzzle_hashes();
     let r = ChainReader::start(far).unwrap();
-    assert!(
-        until(|| r.status().phase == Phase::Offline),
-        "{:?}",
-        r.status()
-    );
+    assert!(until(|| r.status().phase == Phase::Offline), "{:?}", r.status());
     assert!(r.status().peers.is_empty());
 }
 
@@ -225,15 +196,8 @@ fn a_reader_resuming_from_its_cache_finds_an_nft_minted_since() {
     let again = start();
     let wallet = again.cache().wallet;
     let nfts = again
-        .read(WAIT, |src| async move {
-            holdings::own_nfts(&src, &wallet).await
-        })
+        .read(WAIT, |src| async move { holdings::own_nfts(&src, &wallet).await })
         .unwrap();
-    assert_eq!(
-        nfts.iter().map(|n| n.0).collect::<Vec<_>>(),
-        vec![launcher],
-        "{:?}",
-        again.cache().wallet.unspent_hinted()
-    );
+    assert_eq!(nfts.iter().map(|n| n.0).collect::<Vec<_>>(), vec![launcher], "{:?}", again.cache().wallet.unspent_hinted());
     let _ = std::fs::remove_dir_all(&dir);
 }

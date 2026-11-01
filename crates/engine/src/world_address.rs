@@ -59,7 +59,14 @@ impl WorldCert {
         if lines.next() != Some(CERT_HEADER) {
             return Err("not a world certificate".into());
         }
-        let mut field = |name: &str| lines.next().and_then(|l| l.strip_prefix(name)).and_then(|r| r.strip_prefix(' ')).map(str::to_string).ok_or_else(|| format!("no {name} line"));
+        let mut field = |name: &str| {
+            lines
+                .next()
+                .and_then(|l| l.strip_prefix(name))
+                .and_then(|r| r.strip_prefix(' '))
+                .map(str::to_string)
+                .ok_or_else(|| format!("no {name} line"))
+        };
         let world = field("world")?;
         let generation = field("generation")?.parse().map_err(|_| "bad generation")?;
         let created = field("created")?.parse().map_err(|_| "bad created")?;
@@ -80,7 +87,9 @@ impl WorldCert {
 
 /// A random index for a new world's key: worlds made on two computers never share one.
 pub fn random_index() -> u32 {
-    let n = std::collections::hash_map::RandomState::new().build_hasher().finish();
+    let n = std::collections::hash_map::RandomState::new()
+        .build_hasher()
+        .finish();
     (n as u32) & 0x7FFF_FFFF
 }
 
@@ -149,7 +158,13 @@ pub fn parse(text: &str) -> Option<Parsed> {
             match k {
                 "n" => p.name = v.chars().take(64).collect(),
                 "r" => p.relay = v,
-                "a" => p.addrs = v.split(',').filter(|s| !s.is_empty()).map(str::to_string).collect(),
+                "a" => {
+                    p.addrs = v
+                        .split(',')
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string)
+                        .collect()
+                }
                 "t" => p.ticket = v,
                 "i" => p.invite = v,
                 _ => {}
@@ -160,7 +175,13 @@ pub fn parse(text: &str) -> Option<Parsed> {
     let mut parts = text.split(';');
     let key = parts.next()?.to_string();
     let relay = parts.next().unwrap_or("").to_string();
-    let addrs = parts.next().unwrap_or("").split(',').filter(|s| !s.is_empty()).map(str::to_string).collect();
+    let addrs = parts
+        .next()
+        .unwrap_or("")
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
     (!key.is_empty()).then_some(Parsed { key, name: String::new(), relay, addrs, ticket: String::new(), invite: String::new() })
 }
 
@@ -208,8 +229,23 @@ mod tests {
         let a = address("abc123", "Ruby Hills & co", Some("https://relay.example/"), &["1.2.3.4:5".into(), "[::1]:6".into()]);
         assert!(a.starts_with("chiacraft://w/abc123?n=Ruby%20Hills%20%26%20co&r=https://relay.example/&a="));
         let p = parse(&a).unwrap();
-        assert_eq!(p, Parsed { key: "abc123".into(), name: "Ruby Hills & co".into(), relay: "https://relay.example/".into(), addrs: vec!["1.2.3.4:5".into(), "[::1]:6".into()], ticket: String::new(), invite: String::new() });
-        assert_eq!(parse("chiacraft://w/abc?t=chiacraft%20travel%201;player=p").unwrap().ticket, "chiacraft travel 1;player=p");
+        assert_eq!(
+            p,
+            Parsed {
+                key: "abc123".into(),
+                name: "Ruby Hills & co".into(),
+                relay: "https://relay.example/".into(),
+                addrs: vec!["1.2.3.4:5".into(), "[::1]:6".into()],
+                ticket: String::new(),
+                invite: String::new()
+            }
+        );
+        assert_eq!(
+            parse("chiacraft://w/abc?t=chiacraft%20travel%201;player=p")
+                .unwrap()
+                .ticket,
+            "chiacraft travel 1;player=p"
+        );
         assert_eq!(parse("chiacraft://w/abc123").unwrap().key, "abc123");
         let old = parse("abc123;https://relay.example/;1.2.3.4:5").unwrap();
         assert_eq!((old.key.as_str(), old.relay.as_str(), old.addrs.len()), ("abc123", "https://relay.example/", 1));

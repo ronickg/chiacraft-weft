@@ -33,7 +33,8 @@ static CURRENT: Mutex<Option<Package>> = Mutex::new(None);
 pub unsafe extern "C" fn chiacraft_register_package(host: *const Host, me: ModId, reg: *mut Registrar, dir: Str) -> u32 {
     let dir = std::path::PathBuf::from(unsafe { dir.as_str() });
     // Someone else's files must not take the game down, and a panic may not cross into the engine.
-    let loaded = std::panic::catch_unwind(|| chiacraft_packages::load(&dir)).unwrap_or_else(|_| Err(vec!["reading the package failed".into()]));
+    let loaded =
+        std::panic::catch_unwind(|| chiacraft_packages::load(&dir)).unwrap_or_else(|_| Err(vec!["reading the package failed".into()]));
     let pkg = match loaded {
         Ok(p) => p,
         Err(errors) => {
@@ -183,7 +184,11 @@ fn recipe(r: &mut Registry, d: &RecipeDef) {
         r.shapeless(kind, &d.result, d.count, &inputs, d.time);
     } else {
         let pattern: Vec<&str> = d.pattern.iter().map(String::as_str).collect();
-        let keys: Vec<(char, &str)> = d.key.iter().filter_map(|(k, v)| Some((k.chars().next()?, v.as_str()))).collect();
+        let keys: Vec<(char, &str)> = d
+            .key
+            .iter()
+            .filter_map(|(k, v)| Some((k.chars().next()?, v.as_str())))
+            .collect();
         r.shaped(kind, &d.result, d.count, &pattern, &keys);
     }
 }
