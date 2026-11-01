@@ -213,6 +213,20 @@ the trip ("on the way"); both added each other from the link; alice joined bob's
 Friends screen; bob gave his world a new address; alice's saved entry followed it. Test scripts:
 build scripts that contain addresses with Python, not sed (`&` in the replacement).
 
+## Side mods
+
+`mods/chihuahua` (MIT): wild chihuahuas on grassland (spawn rule like pigs', rarer). 96 coats,
+8 colors x 6 patterns x 2 marking layouts, painted by `tools/coats.py` (deterministic; rerun after
+changing it and commit the pictures). Each dog draws as a generated look kind per coat, grown or
+puppy, standing or sitting (`set_look`), so no two dogs need to match. A bone tames (1 in 3); a
+tamed dog sits on the start, the owner's empty-handed or non-food right-click toggles sitting, it
+follows its owner (teleports when 24 blocks behind). Meat puts two tamed adults in love; they meet
+and have a puppy whose coat mixes theirs (color from one, pattern from either, now and then a
+mutation), half the size, grown after a day (meat speeds it up). The owner is the player's key,
+asked of the engine bridge (`player_key`, added to `bridge.rs`). Checked in the game: model, coats,
+poses, taming, sitting, love. Not yet seen in the game: a puppy being born (CoreSimulator had the
+Mac's IOSurface clients used up, so the game would not start).
+
 ## Next steps
 
 1. Phase 4 (DIDs and achievements) per `notes/PLAN.md`.

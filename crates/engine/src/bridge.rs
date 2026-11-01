@@ -4,6 +4,7 @@
 //! handed packages, so Weft's interface stays as it is.
 //!
 //! Questions, asked on a server's threads (from a mod's server hooks):
+//! - `player_key <player entity>`: that player's key (what saves are keyed by), or empty;
 //! - `owner <player entity>`: `1` if that player is the world's owner (their key is this game's
 //!   account key), else empty;
 //! - `links`: the world's links, a line each: `<link id>\t<other world's name>\t<other world's key>`;
@@ -54,6 +55,10 @@ fn answer(q: &str, arg: &str) -> String {
     }
     let Some(info) = crate::server::current_info() else { return String::new() };
     match q {
+        "player_key" => {
+            let Ok(entity) = arg.parse::<u64>() else { return String::new() };
+            info.shared.players.read().iter().find(|(e, _)| *e == entity).map(|(_, k)| k.clone()).unwrap_or_default()
+        }
         "owner" => {
             let Ok(entity) = arg.parse::<u64>() else { return String::new() };
             let key = info.shared.players.read().iter().find(|(e, _)| *e == entity).map(|(_, k)| k.clone());
