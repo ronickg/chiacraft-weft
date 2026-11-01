@@ -7,7 +7,10 @@
 //! - `owner <player entity>`: `1` if that player is the world's owner (their key is this game's
 //!   account key), else empty;
 //! - `links`: the world's links, a line each: `<link id>\t<other world's name>\t<other world's key>`;
-//! - `link <id>`: `<other world's name>\t<other world's key>` if the world has that link, else empty.
+//! - `link <id>`: `<other world's name>\t<other world's key>` if the world has that link, else empty;
+//! - `ticket <player entity> <link id>`: a travel ticket (`travel`) this world signs for that player
+//!   to go through the link, or empty;
+//! - `spot <link id> <x> <y> <z>`: arrivals through the link stand here; `unspot <link id>` forgets it.
 
 use std::cell::RefCell;
 
@@ -51,6 +54,27 @@ fn answer(q: &str, arg: &str) -> String {
         "link" => {
             let Some(world) = &info.world_key else { return String::new() };
             crate::links::of_world(world).iter().find(|l| l.id() == arg).map(|l| other(world, l)).unwrap_or_default()
+        }
+        "ticket" => {
+            let (Some((entity, link)), Some(id), Some(world)) = (arg.split_once(' '), &info.identity, &info.world_key) else { return String::new() };
+            let Ok(entity) = entity.parse::<u64>() else { return String::new() };
+            let Some(player) = info.shared.players.read().iter().find(|(e, _)| *e == entity).map(|(_, k)| k.clone()) else { return String::new() };
+            let Some(l) = crate::links::of_world(world).into_iter().find(|l| l.id() == link) else { return String::new() };
+            let to = if l.body.from == *world { &l.body.to } else { &l.body.from };
+            crate::travel::issue(id, &player, link, to)
+        }
+        "spot" | "unspot" => {
+            let Some(dir) = &info.dir else { return String::new() };
+            let mut f = arg.split(' ');
+            let link = f.next().unwrap_or("");
+            let p: Vec<i32> = f.filter_map(|n| n.parse().ok()).collect();
+            let pos = match (q, &p[..]) {
+                ("spot", [x, y, z]) => Some([*x, *y, *z]),
+                ("spot", _) => return String::new(),
+                _ => None,
+            };
+            crate::travel::set_spot(dir, link, pos);
+            "1".into()
         }
         _ => String::new(),
     }

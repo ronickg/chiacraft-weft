@@ -27,7 +27,8 @@ static BUILDING: CreativeTab = CreativeTab::named("base:building");
 static OPEN: Channel<String> = Channel::named("open");
 /// Client to server: bind the portal at `x y z` to link `id` (empty: unbind).
 static BIND: Channel<String> = Channel::named("bind");
-/// Server to a client: go to the world with this key (`key\tname`).
+/// Server to a client: go to the world with this key, carrying the travel ticket this world signed
+/// (`key\tname\tticket`).
 static TRAVEL: Channel<String> = Channel::named("travel");
 /// Server to a client: a line to show the player, as a translation key and one argument
 /// (`key\targ`), so it reads in the player's own language.
@@ -120,6 +121,7 @@ fn bind(p: &Packet, text: &str) {
     if !PORTAL.is(w.get([x, y, z])) {
         return;
     }
+    let old = link_at(&w, [x, y, z]);
     let mut value = [0u8; 64];
     let name = if id.is_empty() {
         String::new()
@@ -137,10 +139,12 @@ fn bind(p: &Packet, text: &str) {
     // The whole portal: every portal block connected to this one, within reason.
     let mut todo = vec![[x, y, z]];
     let mut seen = HashSet::new();
+    let mut blocks = Vec::new();
     while let Some(at) = todo.pop() {
         if seen.len() >= 64 || !seen.insert(at) || !PORTAL.is(w.get(at)) {
             continue;
         }
+        blocks.push(at);
         let e = w.block_entity(at);
         if let Some(v) = (e != 0).then(|| w.component_mut(e, &LINK)).flatten() {
             *v = value;
@@ -149,11 +153,43 @@ fn bind(p: &Packet, text: &str) {
             todo.push([at[0] + d[0], at[1] + d[1], at[2] + d[2]]);
         }
     }
+    // Where arrivals through this link stand: beside the portal, on solid ground, with room. The
+    // link it led to before no longer arrives here.
+    if let Some(old) = old.filter(|o| o != id) {
+        ask("unspot", &old);
+    }
+    if !id.is_empty() {
+        match arrival_spot(&w, &blocks) {
+            Some(s) => {
+                ask("spot", &format!("{id} {} {} {}", s[0], s[1], s[2]));
+            }
+            None => say(&w, player, "portals.msg.no_room", ""),
+        }
+    }
     if name.is_empty() {
         say(&w, player, "portals.msg.unbound", &seen.len().to_string());
     } else {
         say(&w, player, "portals.msg.bound", &name);
     }
+}
+
+/// A place beside the portal to put arrivals: next to one of its blocks, not in it, with two
+/// blocks of room and solid ground below; the lowest such place.
+fn arrival_spot(w: &World, blocks: &[[i32; 3]]) -> Option<[i32; 3]> {
+    let solid = |p: [i32; 3]| w.flags(p) & abi::block_flags::SOLID != 0;
+    let mut best: Option<[i32; 3]> = None;
+    for b in blocks {
+        for d in [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]] {
+            let at = [b[0] + d[0], b[1], b[2] + d[2]];
+            let up = [at[0], at[1] + 1, at[2]];
+            let down = [at[0], at[1] - 1, at[2]];
+            let free = |p: [i32; 3]| !solid(p) && !PORTAL.is(w.get(p));
+            if free(at) && free(up) && solid(down) && best.is_none_or(|b| at[1] < b[1]) {
+                best = Some(at);
+            }
+        }
+    }
+    best
 }
 
 /// Players standing in a portal, so entering (not standing) sends them; and since when each player
@@ -189,7 +225,10 @@ fn walk_in(w: &World) {
         match link_at(w, at) {
             None => say(w, player, "portals.msg.unbound_portal", ""),
             Some(id) => match link(&id) {
-                Some((name, key)) => w.send(player, &TRAVEL, &format!("{key}\t{name}")),
+                Some((name, key)) => {
+                    let ticket = ask("ticket", &format!("{player} {id}"));
+                    w.send(player, &TRAVEL, &format!("{key}\t{name}\t{ticket}"));
+                }
                 None => say(w, player, "portals.msg.ended", ""),
             },
         }
@@ -206,7 +245,7 @@ struct Menu {
 }
 
 static MENU: Mutex<Option<Menu>> = Mutex::new(None);
-/// A world to go to, picked up by the next frame (joining tears down the world in play, which
+/// A world to go to (an address carrying the travel ticket), picked up by the next frame (joining tears down the world in play, which
 /// must not happen in the middle of handling its messages).
 static GO: Mutex<Option<String>> = Mutex::new(None);
 
@@ -226,10 +265,16 @@ fn client(r: &mut Registry) {
         c.chat(&format!("/portal_note {key} {arg}"));
     });
     r.client_packet(&TRAVEL, |c, text| {
-        let (key, name) = text.split_once('\t').unwrap_or((&text, ""));
-        weft_sdk::info!("going to '{name}' through a portal (this game's player {})", c.state().player);
+        let mut f = text.split('\t');
+        let (key, name, ticket) = (f.next().unwrap_or(""), f.next().unwrap_or(""), f.next().unwrap_or(""));
+        weft_sdk::info!("going to '{name}' through a portal");
         c.chat(&format!("/portal_note portals.msg.going {name}"));
-        *GO.lock().unwrap() = Some(key.to_string());
+        let mut address = format!("chiacraft://w/{key}");
+        if !ticket.is_empty() {
+            address.push_str("?t=");
+            address.push_str(&ticket.replace('%', "%25").replace(' ', "%20").replace('&', "%26"));
+        }
+        *GO.lock().unwrap() = Some(address);
     });
     r.client_frame(|c| {
         if let Some(key) = GO.lock().unwrap().take() {

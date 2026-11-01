@@ -132,6 +132,7 @@ links.no_links = No links yet.
 links.link = '{0}' and '{1}'
 links.end = End
 links.failed = Couldn't ask: {0}
+travel.failed = The portal couldn't take you there: {0}
 multiplayer.copy = Copy
 multiplayer.copied = Copied!
 multiplayer.connecting = Connecting...

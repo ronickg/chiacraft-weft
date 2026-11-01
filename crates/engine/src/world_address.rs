@@ -125,6 +125,8 @@ pub struct Parsed {
     pub name: String,
     pub relay: String,
     pub addrs: Vec<String>,
+    /// A travel ticket (`travel`): the join came through a portal.
+    pub ticket: String,
 }
 
 /// Reads an address, or the older `<key>;<relay>;<ip:port,...>` ticket.
@@ -140,6 +142,7 @@ pub fn parse(text: &str) -> Option<Parsed> {
                 "n" => p.name = v.chars().take(64).collect(),
                 "r" => p.relay = v,
                 "a" => p.addrs = v.split(',').filter(|s| !s.is_empty()).map(str::to_string).collect(),
+                "t" => p.ticket = v,
                 _ => {}
             }
         }
@@ -149,7 +152,7 @@ pub fn parse(text: &str) -> Option<Parsed> {
     let key = parts.next()?.to_string();
     let relay = parts.next().unwrap_or("").to_string();
     let addrs = parts.next().unwrap_or("").split(',').filter(|s| !s.is_empty()).map(str::to_string).collect();
-    (!key.is_empty()).then_some(Parsed { key, name: String::new(), relay, addrs })
+    (!key.is_empty()).then_some(Parsed { key, name: String::new(), relay, addrs, ticket: String::new() })
 }
 
 fn encode(v: &str) -> String {
@@ -196,7 +199,8 @@ mod tests {
         let a = address("abc123", "Ruby Hills & co", Some("https://relay.example/"), &["1.2.3.4:5".into(), "[::1]:6".into()]);
         assert!(a.starts_with("chiacraft://w/abc123?n=Ruby%20Hills%20%26%20co&r=https://relay.example/&a="));
         let p = parse(&a).unwrap();
-        assert_eq!(p, Parsed { key: "abc123".into(), name: "Ruby Hills & co".into(), relay: "https://relay.example/".into(), addrs: vec!["1.2.3.4:5".into(), "[::1]:6".into()] });
+        assert_eq!(p, Parsed { key: "abc123".into(), name: "Ruby Hills & co".into(), relay: "https://relay.example/".into(), addrs: vec!["1.2.3.4:5".into(), "[::1]:6".into()], ticket: String::new() });
+        assert_eq!(parse("chiacraft://w/abc?t=chiacraft%20travel%201;player=p").unwrap().ticket, "chiacraft travel 1;player=p");
         assert_eq!(parse("chiacraft://w/abc123").unwrap().key, "abc123");
         let old = parse("abc123;https://relay.example/;1.2.3.4:5").unwrap();
         assert_eq!((old.key.as_str(), old.relay.as_str(), old.addrs.len()), ("abc123", "https://relay.example/", 1));

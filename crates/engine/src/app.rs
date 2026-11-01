@@ -169,6 +169,11 @@ pub struct Game {
     pub identity: Option<Arc<crate::world_address::WorldIdentity>>,
 }
 
+/// A trip through a portal (chiacraft): whether the player has left the world they set out from.
+pub(crate) struct Travel {
+    left: bool,
+}
+
 /// Your own world, kept running while you visit others because players are in it (it is
 /// hosted; chiacraft). It keeps its own content and settings (`server::Scope`).
 pub(crate) struct Home {
@@ -221,6 +226,14 @@ pub(crate) struct Running {
     join_address: Option<String>,
     /// `links::GENERATION` last shown.
     links_seen: u64,
+    /// A trip through a portal in progress (chiacraft): the player stays in the world they are in
+    /// until the destination is reached and its packages are downloaded.
+    travel: Option<Travel>,
+    /// The address of the world joined over the network that is in play.
+    remote_address: Option<String>,
+    /// Where to go back to if the world in play goes away: the world joined over the network that
+    /// the player came from through a portal (their own world is `home`).
+    came_from: Option<String>,
     last: Instant,
     shot_pending: bool,
     fps: f32,
@@ -443,6 +456,9 @@ impl App {
             home: None,
             join_address: None,
             links_seen: 0,
+            travel: None,
+            remote_address: None,
+            came_from: None,
             last: Instant::now(),
             shot_pending: false,
             fps: 0.0,
@@ -689,6 +705,12 @@ impl Running {
                     net::screens::set_join_status("multiplayer.downloading", &[count, done.div_ceil(1024).to_string(), total.div_ceil(1024).to_string()]);
                 }
                 JoinEvent::Packages(hashes) => {
+                    // A trip leaves the world it set out from only now: the destination answered
+                    // and its packages are here, and loading them changes what the game shows.
+                    if let Some(t) = self.travel.as_mut().filter(|t| !t.left) {
+                        t.left = true;
+                        self.leave_for_another();
+                    }
                     net::screens::set_join_status("multiplayer.loading_packages", &[]);
                     let set: Result<Vec<modloader::PackageRef>, String> = hashes
                         .iter()
@@ -706,8 +728,11 @@ impl Running {
                 }
                 JoinEvent::Admitted(conn) => {
                     self.joining = None;
+                    self.travel = None;
                     if let Some(a) = self.join_address.take() {
                         crate::saved_worlds::remember(&self.settings.run_dir, &a);
+                        // The address without a travel ticket: joining it again goes in as usual.
+                        self.remote_address = crate::world_address::parse(&a).map(|p| crate::world_address::address(&p.key, &p.name, Some(&p.relay), &p.addrs));
                     }
                     self.enter_remote(conn);
                     return;
@@ -716,6 +741,12 @@ impl Running {
                     log::warn!("joining failed: {e}");
                     self.joining = None;
                     self.join_offer = None;
+                    // A trip that never left: the player is still where they were.
+                    if self.travel.take().is_some_and(|t| !t.left) {
+                        self.screens.clear();
+                        self.open(Box::new(screens::Message { title: "travel.failed".into(), args: vec![Arg::Text(e)] }));
+                        return;
+                    }
                     self.return_home();
                     self.screens.clear();
                     self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] }));
@@ -774,7 +805,7 @@ impl Running {
         };
         let storage = saves::Storage::open(meta.clone(), content());
         let server = server::spawn(
-            ServerConfig { seed: meta.seed, view_radius: self.settings.view_distance(), world_key: identity.as_ref().map(|id| id.key()) },
+            ServerConfig { seed: meta.seed, view_radius: self.settings.view_distance(), identity: identity.clone() },
             Some(storage),
         );
         self.play_local(server, meta.name.clone(), identity);
@@ -865,6 +896,7 @@ impl Running {
             if g.server.is_none() {
                 // A remote server's synced settings were in force; back to our own.
                 crate::config::load(&self.settings.run_dir);
+                self.remote_address = None;
             }
             g.client.leave();
             self.gpu.wait_idle();
@@ -961,20 +993,36 @@ impl Running {
                 }
                 Request::Join(ticket) => {
                     // Your own world, left running: going there is going home, not joining it.
-                    let key = crate::world_address::parse(&ticket).map(|p| p.key);
+                    let parsed = crate::world_address::parse(&ticket);
+                    let key = parsed.as_ref().map(|p| p.key.clone());
                     if key.is_some() && key == self.home.as_ref().and_then(|h| h.identity.as_ref()).map(|i| i.key()) {
+                        // Through a portal: placed at home's portal for that link.
+                        if let Some(t) = parsed.and_then(|p| crate::travel::Ticket::parse(&p.ticket)) {
+                            crate::travel::expect(&net::p2p::player_key(&self.settings.run_dir), &t.link);
+                        }
                         self.return_home();
                         continue;
                     }
-                    self.leave_for_another();
+                    // Through a portal: the player stays where they are until the trip is ready.
+                    let portal = self.game.is_some() && crate::world_address::parse(&ticket).is_some_and(|p| !p.ticket.is_empty());
+                    if portal {
+                        self.came_from = self.game.as_ref().is_some_and(|g| g.server.is_none()).then(|| self.remote_address.clone()).flatten();
+                        self.travel = Some(Travel { left: false });
+                    } else {
+                        self.came_from = None;
+                        self.travel = None;
+                        self.leave_for_another();
+                    }
                     self.join_address = Some(ticket.clone());
                     self.joining = None;
                     match net::start_join(&ticket, &self.settings) {
                         Ok(j) => {
                             net::screens::set_join_status("multiplayer.connecting", &[]);
                             self.joining = Some(j);
-                            self.screens.clear();
-                            self.open(Box::new(net::screens::Joining));
+                            if !portal {
+                                self.screens.clear();
+                                self.open(Box::new(net::screens::Joining));
+                            }
                         }
                         Err(e) => self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] })),
                     }
@@ -1902,7 +1950,11 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
         log::info!("disconnected: {reason}");
         r.leave_world_silent();
         r.screens.clear();
-        if r.home.is_some() {
+        if let Some(origin) = r.came_from.take() {
+            // The world reached through a portal went away: back to the one the player came from.
+            log::info!("back to the world before");
+            r.handle(vec![Request::Join(origin)]);
+        } else if r.home.is_some() {
             // The world you visited went away: back to your own, which kept running.
             r.return_home();
         } else {

@@ -13,3 +13,4 @@ portals.msg.unbound = The portal leads nowhere now ({0} blocks).
 portals.msg.unbound_portal = This portal leads nowhere yet: the world's owner chooses where.
 portals.msg.ended = This portal's link has ended.
 portals.msg.going = Going to '{0}'...
+portals.msg.no_room = There is no room beside this portal for arrivals; they will land at the world's spawn.

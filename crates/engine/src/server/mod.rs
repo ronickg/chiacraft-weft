@@ -53,8 +53,9 @@ pub struct ServerConfig {
     pub seed: u64,
     /// View radius in cubes, sideways and up and down alike.
     pub view_radius: i32,
-    /// The world's own key (chiacraft, `world_address`): its links are this key's.
-    pub world_key: Option<String>,
+    /// The world's own key and certificate (chiacraft, `world_address`): its links are this key's,
+    /// and it signs travel tickets.
+    pub identity: Option<Arc<crate::world_address::WorldIdentity>>,
 }
 
 pub struct Player {
@@ -255,6 +256,9 @@ pub struct Scope {
 pub struct ServerInfo {
     pub shared: Arc<Shared>,
     pub world_key: Option<String>,
+    pub identity: Option<Arc<crate::world_address::WorldIdentity>>,
+    /// The world's folder (none for a world that isn't saved).
+    pub dir: Option<std::path::PathBuf>,
 }
 
 thread_local! {
@@ -303,7 +307,12 @@ pub fn spawn(cfg: ServerConfig, storage: Option<Storage>) -> ServerHandle {
     let shared = Arc::new(Shared::default());
     let sh = shared.clone();
     let mut scope = Scope::now();
-    scope.info = Some(Arc::new(ServerInfo { shared: shared.clone(), world_key: cfg.world_key.clone() }));
+    scope.info = Some(Arc::new(ServerInfo {
+        shared: shared.clone(),
+        world_key: cfg.identity.as_ref().map(|i| i.key()),
+        identity: cfg.identity.clone(),
+        dir: storage.as_ref().map(|s| s.meta.dir.clone()),
+    }));
     let world_content = scope.content;
     let thread = std::thread::Builder::new()
         .name("server".into())
@@ -1266,7 +1275,7 @@ impl Server {
         }
         let saved = self.storage.as_ref().and_then(|s| load_player(c, &s.lock(), &key));
         let spawn = || (c.spawn_dim, self.dims[c.spawn_dim as usize].spawn_point(c));
-        let (dim, pos, health, inv, comps) = match saved {
+        let (mut dim, mut pos, health, inv, comps) = match saved {
             // A dimension that is gone (its mod removed), or the void while a real one exists:
             // everything else is kept, the player starts at the spawn.
             Some(s) => {
@@ -1284,6 +1293,12 @@ impl Server {
                 (d, p, -1.0, None, Vec::new())
             }
         };
+        // Through a portal (chiacraft): beside this world's portal for that link.
+        if let Some(at) = self.storage.as_ref().map(|s| s.lock().meta.dir.clone()).and_then(|d| crate::travel::arrival(&d, &key)) {
+            dim = c.spawn_dim;
+            pos = glam::DVec3::from_array(at);
+            log::info!("{name} arrives through a portal at {:.0} {:.0} {:.0}", pos.x, pos.y, pos.z);
+        }
         let time = self.dims[dim as usize].time;
         let r = self.dims[dim as usize].ensure_region(c, pos);
         let id = r.new_id();

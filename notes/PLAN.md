@@ -197,12 +197,16 @@ The smallest version that works is phases 1-4.
       linked world (at its spawn until slice 5), or goes home if it is yours; a player is sent only
       after a second outside every portal, so arriving in one never bounces. The mod asks the engine
       what Weft's interface doesn't carry through `bridge` (owner? links?).
-   5. *Travel prepared ahead*: in zones as the player nears a portal (connect, ask admission and
-      download with consent, commit); a 60-second travel ticket signed by the origin world, its
-      player key checked against the connection; the origin keeps the player until the
-      destination confirms arrival; return ladder destination, origin, home, title; arrivals
-      placed clear of the portal, a few seconds' protection, a re-entry cooldown. Slice 4 showed
-      why: arrivals land on the spawn point and push whoever stands there.
+   5. *Travel prepared ahead* (done, apart from warming up before the player reaches the portal
+      and the few seconds' protection): a 60-second travel ticket signed by the origin world
+      (`travel`), carried in the protocol 5 hello, its player key checked against the
+      connection, used once, for a link the destination has with the origin; arrivals stand
+      beside the destination's portal for that link (the spot the mod finds when the owner binds
+      it, kept in the world's `portals.txt`), coming home too; the player stays in the world they
+      are in while the trip connects, asks and downloads, and leaves only when the destination's
+      packages are ready (a failed trip leaves them where they were); when a world reached through
+      a portal goes away, back to the world joined before it, else home, else the title; a
+      second outside every portal before a portal sends anyone.
 4. **DIDs and achievements.** Player and world DIDs through sponsors; world ownership both ways;
    achievements signed by the world DID, anchored in batches, opt-in; profile view; admission
    rules (allow lists, probation, DID age, achievements); shared ban lists.

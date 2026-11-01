@@ -21,8 +21,9 @@ const STATUS_ALPN: &[u8] = b"chiacraft/status/1";
 /// Link requests and answers between owners' account endpoints (chiacraft, `links`).
 const LINKS_ALPN: &[u8] = b"chiacraft/links/1";
 /// 3: `Join` carries the account's vouching (chiacraft). 4: the hello offers the world's data
-/// packages, which the joining game downloads and loads before it is let in (chiacraft).
-const PROTOCOL: u32 = 4;
+/// packages, which the joining game downloads and loads before it is let in (chiacraft). 5: the
+/// hello may carry a travel ticket from a linked world's portal (chiacraft, `travel`).
+const PROTOCOL: u32 = 5;
 const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, and its
@@ -37,7 +38,7 @@ const MAX_MANIFEST: u64 = 1 << 20;
 /// Limits on joining (chiacraft): the hello and the ready are small; a player has this long to
 /// download the world's packages and load them; the host serves this many players' downloads at
 /// once, this many requests of each at once.
-const MAX_HELLO: usize = 1 << 10;
+const MAX_HELLO: usize = 2 << 10;
 const MAX_OFFER: usize = 1 << 20;
 const CONFIGURE_TIME: Duration = Duration::from_secs(15 * 60);
 const MAX_CONFIGURING: usize = 8;
@@ -381,7 +382,7 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
         }
         let hw = std::sync::Arc::new(hw);
         while let Some(incoming) = ep.accept().await {
-            let (connect, hw) = (connect.clone(), hw.clone());
+            let (connect, hw, key) = (connect.clone(), hw.clone(), key.clone());
             tokio::spawn(async move {
                 let conn = match incoming.await {
                     Ok(c) => c,
@@ -389,7 +390,7 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
                 };
                 if conn.alpn() == STATUS_ALPN {
                     serve_status(conn, world, &hw).await;
-                } else if let Err(e) = accept(conn, connect, world).await {
+                } else if let Err(e) = accept(conn, connect, world, &key).await {
                     log::warn!("incoming player: {e}");
                 }
             });
@@ -479,12 +480,21 @@ pub fn stop_hosting() {
     }
 }
 
-async fn accept(conn: iroh::endpoint::Connection, connect: crossbeam_channel::Sender<ServerConn>, world: &'static crate::content::Content) -> Result<(), String> {
+async fn accept(conn: iroh::endpoint::Connection, connect: crossbeam_channel::Sender<ServerConn>, world: &'static crate::content::Content, me: &str) -> Result<(), String> {
     use crate::content::with;
     let peer = conn.remote_id();
     let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi()).await.map_err(|_| "no hello")?.map_err(|e| e.to_string())?;
     let hello = tokio::time::timeout(Duration::from_secs(10), read_frame_max(&mut recv, MAX_HELLO)).await.map_err(|_| "no hello")??;
-    let (proto, native) = <(u32, u64) as codec::Wire>::get(&mut codec::R(&hello)).ok_or("bad hello")?;
+    let mut r = codec::R(&hello);
+    let (proto, native) = <(u32, u64) as codec::Wire>::get(&mut r).ok_or("bad hello")?;
+    // Through a portal: a travel ticket from the linked world places the player at its portal.
+    let ticket = <String as codec::Wire>::get(&mut r).unwrap_or_default();
+    if !ticket.is_empty() {
+        match crate::travel::admit(&ticket, &peer.to_string(), me) {
+            Ok(()) => log::info!("{peer} comes through a portal"),
+            Err(e) => log::info!("{peer}: {e}; placed as usual"),
+        }
+    }
     let offers = with(world, crate::modloader::current_packages);
     // Joins still configuring hold a place until this goes out of scope.
     let place = Configuring::take();
@@ -795,13 +805,14 @@ async fn connect(settings: &Settings, addr: EndpointAddr) -> Result<iroh::endpoi
     let attempts = if relayed.relay_urls().next().is_some() { vec![(addr, Duration::from_secs(3)), (relayed, Duration::from_secs(20))] } else { vec![(addr, Duration::from_secs(20))] };
     let mut last = String::new();
     let ep = account(settings).await?;
+    let tries = attempts.len();
     for (i, (addr, wait)) in attempts.into_iter().enumerate() {
         match tokio::time::timeout(wait, ep.connect(addr, ALPN)).await {
             Ok(Ok(conn)) => return Ok(conn),
             Ok(Err(e)) => last = e.to_string(),
             Err(_) => last = "timed out".into(),
         }
-        if i == 0 {
+        if i == 0 && tries > 1 {
             log::info!("connecting directly failed ({last}), trying through the relay");
         }
     }
@@ -832,6 +843,7 @@ fn check_offers(offers: &[Offer]) -> Result<(), String> {
 /// connection, or why it failed.
 pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> {
     let addr = parse_ticket(ticket)?;
+    let travel = crate::world_address::parse(ticket).map(|p| p.ticket).unwrap_or_default();
     let settings = settings.clone();
     let (events, events_rx) = unbounded::<JoinEvent>();
     let (answers, mut answers_rx) = tokio::sync::mpsc::unbounded_channel::<JoinAnswer>();
@@ -840,7 +852,7 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
             let conn = connect(&settings, addr).await?;
             let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
             let mut hello = codec::W::default();
-            codec::Wire::put(&(PROTOCOL, native_hash()), &mut hello);
+            codec::Wire::put(&(PROTOCOL, native_hash(), travel.clone()), &mut hello);
             write_frame(&mut send, &hello.0).await?;
             let reply = tokio::time::timeout(Duration::from_secs(30), read_frame_max(&mut recv, MAX_OFFER)).await.map_err(|_| "the host didn't answer")??;
             let (refusal, offers) = <(String, Vec<Offer>) as codec::Wire>::get(&mut codec::R(&reply)).ok_or("the host answered in an unknown way (another version?)")?;

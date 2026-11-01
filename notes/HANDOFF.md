@@ -182,10 +182,27 @@ listed the link and bound the portal; stepping in took alice to bob's world whil
 guest's right-click got "only the owner"; bob's portal took her home without bouncing back. Test
 scripts: player names via `config/core.txt` (`name = alice`).
 
+Slice 5 (travel) is done, and with it Phase 3's slices. `crates/engine/src/travel.rs`: `Ticket`
+(one line, signed by the origin world after `chiacraft travel v1\n`), `issue`, `admit` (player =
+connection, to = this world, not expired, signed, a link this world has with the origin, nonce
+used once), `ARRIVING` (player key → link), `arrival(world dir, key)`, `set_spot`, `expect` (coming
+home). `ServerConfig.identity`, `ServerInfo.identity` and `dir`; `Server::join` places an arriving
+player at the spot. Bridge: `ticket <entity> <link>`, `spot`/`unspot`. Protocol 5: the hello is
+`(protocol, native hash, travel ticket)`. Addresses carry a ticket as `t=`. The portals mod sends
+the ticket with `portals:travel` and finds the arrival spot when binding (`arrival_spot`). In
+`app.rs`: `Running.travel` (a trip stays in the world it set out from until `JoinEvent::Packages`),
+`remote_address`, `came_from` (on a disconnect: the world joined before, else home, else the
+title); a failed trip shows `travel.failed` and the player stays. Checked with two copies: alice's
+trip to bob's world placed her beside bob's portal ("arrives through a portal at 16 95 0"); bob's
+portal took her home beside hers; with bob's game closed her portal left her in her world with
+"The portal couldn't take you there: timed out". Not checked: going back to a world joined before
+(needs three games).
+
 ## Next steps
 
-1. Phase 3 slice 5 (travel prepared ahead, arrival at the linked portal, safe return) per
-   `notes/PLAN.md`.
+1. Phase 3 leftovers: warming the trip up as a player walks toward a portal, arrival protection,
+   friends' worlds, "world moved" notices, invite tokens, a scrolling Links screen.
+2. Phase 4 (DIDs and achievements) per `notes/PLAN.md`.
 2. Phase 2 "later" items: bao-tree verified streaming and resume, iroh-blobs for downloads from
    other players and mirrors, reviewer lists, key rotation; running the fuzz targets (nightly,
    perhaps a scheduled CI job).

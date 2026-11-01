@@ -93,7 +93,7 @@ footer { font-size: 13px; color: var(--muted); }
 <div class="wrap">
   <header>
     <h1>chia<span>craft</span></h1>
-    <p class="lede">How players, worlds, packages and links fit together on the Weft engine, as built through Phase 3 slice 4 (31 October 2026). Every arrow below is something the code does today, unless it is marked as next.</p>
+    <p class="lede">How players, worlds, packages and links fit together on the Weft engine, as built through Phase 3 (31 October 2026). Every arrow below is something the code does today, unless it is marked as next.</p>
     <nav aria-label="Sections">
       <a href="#overview">Overview</a>
       <a href="#keys">Keys</a>
@@ -243,7 +243,7 @@ footer { font-size: 13px; color: var(--muted); }
   </section>
 
   <section id="join">
-    <div class="eyebrow">Protocol 4</div>
+    <div class="eyebrow">Protocol 5</div>
     <h2>Joining a world downloads its packages first</h2>
     <p>Code mods must match exactly. Data packages travel: the host offers what its world plays with, the guest downloads what it lacks (after the player agrees), loads exactly that set, and proves it by hash before it is let in.</p>
     <figure>
@@ -264,7 +264,7 @@ footer { font-size: 13px; color: var(--muted); }
 
           <line class="ln" x1="172" y1="100" x2="616" y2="100" marker-end="url(#j-a)"/>
           <text class="s" x="395" y="92" text-anchor="middle">hello</text>
-          <text class="m" x="395" y="116" text-anchor="middle">protocol 4 · hash of the code mods</text>
+          <text class="m" x="395" y="116" text-anchor="middle">protocol 5 · hash of the code mods · travel ticket?</text>
           <line class="ln" x1="618" y1="152" x2="174" y2="152" marker-end="url(#j-a)"/>
           <text class="s" x="395" y="144" text-anchor="middle">offers, or why not</text>
           <text class="m" x="395" y="168" text-anchor="middle">id · version · hash · size · signature</text>
@@ -445,7 +445,7 @@ footer { font-size: 13px; color: var(--muted); }
           <text class="m" x="810" y="130">read on entry</text>
         </svg>
       </div>
-      <figcaption>Arrival lands on the linked world's spawn for now. Slice 5 prepares the trip as the player walks up, lands them at the linked portal and keeps them in the origin world until the destination confirms.</figcaption>
+      <figcaption>The origin world signs a 60-second travel ticket for the player (player, both worlds, link, nonce). The destination checks it once and places the player at the spot beside its own portal for that link, found when its owner bound it. The player stays in the origin world until the destination answers and its packages are downloaded; a failed trip leaves them where they were.</figcaption>
     </figure>
   </section>
 
@@ -507,6 +507,7 @@ footer { font-size: 13px; color: var(--muted); }
           <tr><td>engine/src/net/p2p.rs</td><td>Endpoints, protocol 4 join and downloads, status/1, links/1 transport, the outbox loop.</td></tr>
           <tr><td>engine/src/world_address.rs</td><td>World key, world certificate, the chiacraft:// address.</td></tr>
           <tr><td>engine/src/links.rs</td><td>Link records and signatures, inbox checks, outbox, links.json.</td></tr>
+          <tr><td>engine/src/travel.rs</td><td>Travel tickets (issue, admit once), arrival spots per world (portals.txt).</td></tr>
           <tr><td>engine/src/saved_worlds.rs</td><td>Worlds you've joined (worlds.txt) and their status.</td></tr>
           <tr><td>engine/src/package_trust.rs</td><td>Signing packages, checking creators, trust.txt.</td></tr>
           <tr><td>engine/src/bridge.rs</td><td>Answers chiacraft's mods beyond Weft's interface: is this player the owner, which links the world has.</td></tr>
@@ -524,8 +525,8 @@ footer { font-size: 13px; color: var(--muted); }
     <div class="roadmap">
       <div class="step"><span class="ph">Phase 1</span><span class="what">Account: 24 words, login key, identity on join</span><span class="chip done">done</span></div>
       <div class="step"><span class="ph">Phase 2</span><span class="what">Data packages: format, identity and store, switching, downloads on join, signing and trust, hardening</span><span class="chip done">done</span></div>
-      <div class="step"><span class="ph">Phase 3 · 1–4</span><span class="what">Your world runs on, world addresses, link requests, portal blocks bound to links</span><span class="chip done">done</span></div>
-      <div class="step"><span class="ph">Phase 3 · 5</span><span class="what">Travel prepared as you approach: signed travel ticket, origin keeps you until arrival, safe return</span><span class="chip next">next</span></div>
+      <div class="step"><span class="ph">Phase 3</span><span class="what">Your world runs on, world addresses, link requests, portal blocks, travel with signed tickets and arrival at the linked portal</span><span class="chip done">done</span></div>
+      <div class="step"><span class="ph">Phase 3 extras</span><span class="what">Warm-up as you approach a portal, arrival protection, friends' worlds, invite tokens</span><span class="chip next">next</span></div>
       <div class="step"><span class="ph">Phase 4–5</span><span class="what">DIDs and achievements on Chia; finding worlds through on-chain listings and DIG</span><span class="chip later">later</span></div>
       <div class="step"><span class="ph">Phase 6–8</span><span class="what">Sandboxed code mods (WebAssembly), headless servers, wallet and items</span><span class="chip later">later</span></div>
     </div>

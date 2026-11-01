@@ -39,6 +39,7 @@ pub mod server;
 pub mod settings;
 pub mod shaders;
 pub mod stack;
+pub mod travel;
 pub mod ui;
 pub mod world;
 pub mod world_address;
