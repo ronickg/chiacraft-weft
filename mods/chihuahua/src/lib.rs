@@ -182,14 +182,6 @@ fn goals() -> Goals {
     Goals::new()
         .then(upkeep)
         .then(|w: &World, id: u64, st: &EntityState| {
-            // Sitting: stays put.
-            let sitting = w.component(id, &DOG).is_some_and(|d| d.tamed != 0 && d.sitting != 0);
-            if sitting && w.navigating(id) {
-                w.navigate(id, st.pos, 0.0);
-            }
-            sitting
-        })
-        .then(|w: &World, id: u64, st: &EntityState| {
             // Hurt: runs about for three seconds.
             if w.component(id, &DOG).is_none_or(|d| d.panic == 0) {
                 return false;
@@ -201,6 +193,14 @@ fn goals() -> Goals {
             true
         })
         .then(breed)
+        .then(|w: &World, id: u64, st: &EntityState| {
+            // Sitting: stays put.
+            let sitting = w.component(id, &DOG).is_some_and(|d| d.tamed != 0 && d.sitting != 0);
+            if sitting && w.navigating(id) {
+                w.navigate(id, st.pos, 0.0);
+            }
+            sitting
+        })
         .then(follow_owner)
         .then(ai::wander(0.45, 6.0))
 }
@@ -264,16 +264,18 @@ fn follow_owner(w: &World, id: u64, st: &EntityState) -> bool {
     false
 }
 
-/// In love: goes to another dog in love nearby; when they meet, a puppy.
+/// In love: goes to another dog in love nearby (or waits for it, sitting); when they meet, a
+/// puppy.
 fn breed(w: &World, id: u64, st: &EntityState) -> bool {
-    if w.component(id, &DOG).is_none_or(|d| d.love == 0) {
-        return false;
-    }
+    let Some(me) = w.component(id, &DOG).copied().filter(|d| d.love > 0) else { return false };
     let partner = w.near(st.pos, 8.0, Some(&CHIHUAHUA)).into_iter().find(|&o| o != id && w.component(o, &DOG).is_some_and(|d| d.love > 0 && d.age == 0));
     let Some(partner) = partner else { return false };
     let Some(ps) = w.entity(partner) else { return false };
     let d2 = (ps.pos[0] - st.pos[0]).powi(2) + (ps.pos[2] - st.pos[2]).powi(2);
     if d2 > 1.2 * 1.2 {
+        if me.tamed != 0 && me.sitting != 0 {
+            return false;
+        }
         w.navigate(id, ps.pos, 1.0);
         return true;
     }
@@ -379,7 +381,6 @@ fn interact(e: &mut EntityEvent) {
             take_one(&w, player);
             if let Some(d) = w.component_mut(id, &DOG) {
                 d.love = LOVE_TICKS;
-                d.sitting = 0;
             }
             weft_sdk::info!("chihuahua {id} in love");
             hearts(&w, st.pos);
