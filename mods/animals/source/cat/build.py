@@ -33,5 +33,11 @@ if __name__ == "__main__":
     from to_bedrock import export  # noqa: E402
 
     spec = json.load(open(os.path.join(OUT, "spec.json")))
+    from ground import gait, joints  # noqa: E402
+    loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
+    assert not loose, f"loose joints: {loose}"
+    for anim in ("walk", "run"):  # a foot in the air must swing forward, or it moonwalks
+        back = {f: v for f, v in gait(spec, anim, ["leg_FL_paw", "leg_FR_paw", "leg_BL_paw", "leg_BR_paw"]).items() if v is not None and v <= 0}
+        assert not back, f"{anim} goes backwards: {back}"
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "cat", SCALE, "cat/cat", pose_files=POSES)
     print("wrote", made, "into", os.path.normpath(ASSETS))

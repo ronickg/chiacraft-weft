@@ -232,7 +232,7 @@ build scripts that contain addresses with Python, not sed (`&` in the replacemen
 
 ## Side mods
 
-`mods/animals` (MIT, was `mods/chihuahua` until 2026-11-01, so entity ids are `animals:*` now): wild long-haired chihuahuas and orange tabby cats on grassland (spawn rules like pigs', rarer). Cats (`src/cat.rs`) wander and now and then sit, then lie down as a loaf; their source is `source/cat` (built from research alone, see its README).
+`mods/animals` (MIT, was `mods/chihuahua` until 2026-11-01, so entity ids are `animals:*` now): wild long-haired chihuahuas, orange tabby cats and small packs of feathered velociraptors on grassland (spawn rules like pigs', rarer). Cats (`src/cat.rs`) wander and now and then sit, then lie down as a loaf; their source is `source/cat` (built from research alone, see its README). Velociraptors (`src/raptor.rs`, `source/raptor`) wander and now and then rest; they don't hunt yet.
 The dog (2026-11-01) is a papillon-style chihuahua built in Blockbench the way Hytale makes
 creatures: 49 boxes and flat fur panels with a hand-painted 512x96 texture, big solid butterfly
 ears, a jaw and a tongue, eyelids that blink, toes; animations idle (panting, blinking), walk,

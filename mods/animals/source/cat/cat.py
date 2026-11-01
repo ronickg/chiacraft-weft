@@ -159,7 +159,7 @@ def elements():
             E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (x - 2.5, 8, z - 2.5), (x + 2.5, 15, z + 2.5)))  # wider than the lower leg
         else:
             z = -12.5
-            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 3, 8.5, z - 4), (x + 3, 18, z + 4)))
+            E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (x - 3, 7.5, z - 4), (x + 3, 18, z + 4)))  # holds the knee (y = 8)
         E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (x - 2, 2.5, z - 2), (x + 2, 8, z + 2)))
         E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (x - 3.5, 0, z - 2.5), (x + 3.5, 2.5, z + 3.5)))
     return E

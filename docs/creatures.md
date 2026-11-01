@@ -89,11 +89,14 @@ Both live in the `animals` mod, each with its source next to the assets:
   sheet): proportions from real cats, the look from Minecraft's and Hytale's cats; its colors are
   rules (`area()` in `cat.py`: tabby stripes, the M, white bib, belly, muzzle and socks). The
   simplest place to start a new animal: copy the folder, change the boxes, colors and poses.
+- [mods/animals/source/raptor](../mods/animals/source/raptor/README.md): a feathered Velociraptor,
+  the first two-legged animal (bird legs in a crouch, eyes on the sides of the head, feather
+  panels for the crest, wings and tail fan). Start birds and other dinosaurs from this one.
 
 To update one in the game after changing it:
 
 ```
-cd mods/animals/source/chihuahua      # or cat
+cd mods/animals/source/chihuahua      # or cat, raptor
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once (the cat uses ../chihuahua/.venv)
 .venv/bin/python build.py
 ```

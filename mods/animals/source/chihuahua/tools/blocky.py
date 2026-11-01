@@ -119,7 +119,7 @@ L = {
     "spine_y": 19, "hip_z": -14, "mid_z": -1,
     "neck": (0, 26, 9), "head": (0, 31, 9),
     "ear_x": 9, "ear_y": 43, "ear_z": 7,
-    "tail": [(0, 22, -17), (0, 28, -23), (0, 34, -19)],
+    "tail": [(0, 22, -17), (0, 24, -19.5), (0, 34, -19)],  # each joint inside both parts it joins
     "leg_x_f": 4.5, "leg_x_b": 6, "leg_z_f": 9, "leg_z_b": -15,
     "leg_top": 14, "knee": 8, "ankle": 3,
     # Sit and lie, fit with tools/ground.py so the paws and body rest on the ground.
@@ -166,7 +166,7 @@ def elements():
     # The tongue: a base lying in the mouth on the jaw, then two parts that bend over the lip's
     # top edge (each hinged on its top surface, so the top stays one surface), narrowing 5-4-3.
     E.append(el("tongue_base", "jaw", (-2.5, 29.4, 19.5), (2.5, 30.4, 22)))
-    E.append(el("tongue", "tongue", (-2, 29.4, 22.5), (2, 30.4, 24.6)))
+    E.append(el("tongue", "tongue", (-2, 29.4, 22.2), (2, 30.4, 24.6)))  # its hinge (z 22.2) within reach of the base
     E.append(el("tongue_tip", "tongue_tip", (-1.5, 29.4, 24.6), (1.5, 30.4, 27.6)))
     # Eyelids: a quad per eye, hinged at the eye's top. Open (the rest pose), it lies flat inside
     # the head; a blink swings it down over the eye (-90 on X). Rotation only, so every format
@@ -911,7 +911,7 @@ def skeleton(L=L):
     """voxdog's bones plus the jaw (hinged at the back of the mouth), the tongue (pivots at the
     lip, then its tip) and the eyelids (hinged at the top of each eye)."""
     lids = [(name, "head", ((x0 + x1) / 2, top, LID_Z)) for name, x0, x1, top, _ in eyelid_boxes()]
-    return vd.skeleton(L) + [("jaw", "head", (0.0, 29.0, 17.0)), ("tongue", "jaw", (0.0, 30.4, 22.5)),
+    return vd.skeleton(L) + [("jaw", "head", (0.0, 29.0, 17.75)), ("tongue", "jaw", (0.0, 30.2, 22.2)),
                              ("tongue_tip", "tongue", (0.0, 30.4, 24.6))] + lids
 
 

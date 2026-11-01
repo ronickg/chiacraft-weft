@@ -59,3 +59,70 @@ def lowest(spec, pose, groups):
             if test(e["name"]):
                 out[g] = min(out.get(g, np.inf), y)
     return out
+
+
+def gait(spec, anim, feet, forward=(0.0, 0.0, 1.0)):
+    """Whether a walk or run moves forward. Relative to the body, a foot in the air swings forward
+    and a foot on the ground pushes back; a gait with the swing reversed moonwalks (feet lift going
+    back, plant going forward). For each foot: its average forward speed while it's in the upper
+    half of its lift, minus while it's in the lower half, in units per second. Positive is right;
+    negative runs backwards. `feet`: element names; `forward`: the way the creature faces (+z)."""
+    els = {e["name"]: e for e in spec["elements"]}
+    piv = {b["name"]: np.array(b["pivot"], float) for b in spec["bones"]}
+    fwd = np.array(forward, float)
+    a = spec["animations"][anim]
+    frames, length = a["frames"], a["length"]
+    out = {}
+    for f in feet:
+        e = els[f]
+        rows = []
+        for fr in frames[:-1]:  # the last frame repeats the first
+            W = world(spec["bones"], dict(fr["rot"], root=(0, 0, 0)))  # the body's frame: no bob
+            R, t = W[e["bone"]]
+            c = (corners(e) - piv[e["bone"]]) @ R.T + t
+            rows.append((fr["t"], c[:, 1].min(), c.mean(0) @ fwd))
+        rows = np.array(rows)
+        n = len(rows)
+        tt = np.r_[rows[:, 0], rows[0, 0] + length]
+        zz = np.r_[rows[:, 2], rows[0, 2]]
+        v = np.diff(zz) / np.maximum(np.diff(tt), 1e-6)  # forward speed from each frame to the next
+        h = rows[:, 1]
+        mid = (h.min() + h.max()) / 2
+        up, down = h > mid, h <= mid
+        out[f] = round(float(v[up].mean() - v[down].mean()), 1) if up.any() and down.any() and h.max() - h.min() > 0.3 else None
+    return out
+
+
+def _inside(p, e, tol):
+    """Whether point p (rest pose) is inside element e's box (rotated about its origin), or within tol of it."""
+    lo, hi = np.array(e["lo"], float), np.array(e["hi"], float)
+    if e.get("rot"):
+        o = np.array(e["origin"], float)
+        p = rot(*e["rot"]).T @ (p - o) + o  # into the box's own unrotated frame
+    return bool(np.all(p >= lo - tol) and np.all(p <= hi + tol))
+
+
+def joints(spec, tol=0.25, skip=("root",)):
+    """Whether every joint holds its parts together: a bone's pivot must lie inside a box of the
+    bone and a box of its parent (both at rest). Then they turn about a point they share and can't
+    come apart in any pose; a pivot outside one of them leaves a gap that opens as the joint turns
+    (a head floating above its neck). Bones without boxes pass their check up to their children
+    (their parent must hold the pivot). Returns [(bone, what's wrong)]."""
+    boxes = {}
+    for e in spec["elements"]:
+        if not e.get("quad"):
+            boxes.setdefault(e["bone"], []).append(e)
+    parent = {b["name"]: b.get("parent") for b in spec["bones"]}
+    bad = []
+    for b in spec["bones"]:
+        n, par = b["name"], b.get("parent")
+        if n in skip or not par or n not in boxes:
+            continue
+        p = np.array(b["pivot"], float)
+        while par and par not in boxes:  # a bone with only panels or nothing: the next one up holds it
+            par = parent.get(par)
+        if not any(_inside(p, e, tol) for e in boxes[n]):
+            bad.append((n, "its pivot is outside its own boxes"))
+        if par and not any(_inside(p, e, tol) for e in boxes[par]):
+            bad.append((n, f"its pivot is outside its parent's ({par}) boxes"))
+    return bad

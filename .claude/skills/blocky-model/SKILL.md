@@ -38,6 +38,14 @@ Geometry
   - When the check reports a pair, read which faces and which animation, then move the smaller
     part, change one size, or nudge the pose angle; run it again (fixes move collisions around).
 - One part per bone, clear names (head, jaw, ear_L, tail_0, leg_FL_upper...). Rigid, no weights.
+- **Every joint inside both parts it joins**: a bone's pivot must lie inside one of its own boxes
+  and one of its parent's. Then the two turn about a point they share and can't come apart in
+  any pose; a pivot outside either (a head hinged above its neck, a shoulder outside the chest, a
+  knee below the thigh) opens a gap the moment the joint turns. Lay a neck, tail or limb out as
+  a box from inside the parent to the child's joint (`base + length * direction`), and put the
+  child's pivot at that end, inside the child. `ground.joints(spec)` lists every loose joint;
+  build scripts assert none. (Hinges on a surface, like a tongue folding over a lip, still need
+  the pivot within a quarter unit of both parts.)
 
 Texture (paint it like an illustration; each face is a small pixel painting)
 - One light, from above and a bit front-left, baked in: tops lightest, sides mid, bottoms
@@ -120,6 +128,19 @@ Animation
   ground, curling along one side toward the front paws for a sitting or loafing cat) and solve
   the joint angles with forward kinematics and an optimizer (scipy `minimize`, Powell), with a
   penalty for going below the ground (`fit_tail` in the cat).
+- **Two-legged creatures** (birds, dinosaurs): model the leg straight (thigh, shin, foot, toes,
+  each thinner than the last) and give every pose a crouched stance on top (knee forward, ankle
+  back, toes flat: the angles sum to 0), with the drop to the ground from forward kinematics. Hold
+  the head above the back with a raised neck and a counter-rotated head (a fixed offset added in
+  every pose). A bird's head moves in holds and snaps (keys that hold, then jump), not smooth
+  waves; walking, it bobs forward and back.
+- **Eyes on the sides** (birds, dinosaurs, horses, rabbits): stamp them on the head's side faces;
+  their eyelids hinge on the side and swing down about Z (+90 on the +x side, -90 on the other),
+  lying inside the head when open.
+- **Gaits move forward**: a foot in the air swings forward, a foot on the ground pushes back.
+  With the swing's sign flipped against the lift, the creature moonwalks (easy to get wrong:
+  +X pitches the foot back). Check with `ground.gait(spec, "walk", feet)`: positive for every
+  foot, in walk and run; build scripts assert it.
 - **Feet flat**: a foot's pitch cancels the sum of its parents' pitches. Likewise any part that
   should keep its own direction when a pose tilts the body (an upright tail when sitting, a
   level head) cancels the parent's tilt; a fixed angle added on top of the tilt folds it into
@@ -213,13 +234,15 @@ Animation
          pose: nothing flickers
    - [ ] two eyes on the front only; no stray eye/nose texels on sides or top; face reads cute;
          a blink frame closes the eyes completely
-   - [ ] no part reads wrong side-on (stray flaps); thin parts solid, no gaps between layers
+   - [ ] no part reads wrong side-on (stray flaps); thin parts solid, no gaps between layers;
+         `ground.joints` empty: nothing comes apart at a joint (look at neck, shoulders, knees, tail
+         while the animations play)
    - [ ] colors: one coat hue across head, ears, body; no grey/dirty shading on light areas;
          no colors bleeding onto the wrong part
    - [ ] mouth: opens, no dark gaps at hinges, tongue bend hidden, tongue narrows
    - [ ] feet: toes and pads; flat on the ground in every resting pose; nothing below ground;
          no part (tail, ears) folded into the body in any pose
-   - [ ] swinging parts swing, not twist
+   - [ ] swinging parts swing, not twist; walk and run go forward (`ground.gait` positive)
    - [ ] compare with a screenshot of the target game's own creature at the same angle
 8. **Save a version before each big change** (`<out>_vN/` with the scripts that built it and a
    README on restoring it): users often want to compare or revert.
@@ -235,7 +258,9 @@ Animation
   `ramp`/`paint_face` (flat five-step look).
 - `scripts/rig.py` — `quat`, `qmul`, `qmat`, `euler`, `swing` (wag about the axis across a
   part), `fit` (grid search for pose parameters).
-- `scripts/ground.py` — `lowest(spec, pose, groups)`: each group's lowest world y in a pose.
+- `scripts/ground.py` — `lowest(spec, pose, groups)`: each group's lowest world y in a pose;
+  `joints(spec)`: joints whose pivot isn't inside both parts (parts that come apart);
+  `gait(spec, anim, feet)`: whether a walk or run moves forward (positive per foot).
 - `scripts/variants.py model.glb out.json name=tex.png ...` — texture variants padded to the
   GLB's texture size, as data URLs for the viewer.
 - `scripts/viewer.html` — the viewer page: a switcher between creatures (`animals.json`), a
@@ -262,6 +287,8 @@ Worked examples, in the chiacraft repo's `animals` mod (each README explains it)
   (`cat.py`): boxes, color areas as rules, eyes, poses fitted to the ground (legs with `rig.fit`,
   the tail on ground targets), animations; `build.py` exports it. **Start a new animal by copying
   this folder.**
+- `mods/animals/source/raptor`: a feathered Velociraptor, the two-legged example (bird legs,
+  eyes on the sides, feather panels). Start birds and dinosaurs here.
 - `mods/animals/source/chihuahua`: built from a concept sheet (`tools/blocky.py`, colors read
   from the flat turnaround), with eyelids, jaw, tongue, solid ears, toes, a V bib.
 
