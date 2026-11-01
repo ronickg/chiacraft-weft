@@ -92,7 +92,18 @@ def render(geo, tex, anim, t, yaw, pitch, size=360, zoom=None):
     view = rot(math.radians(pitch), 0, 0) @ rot(0, math.radians(yaw), 0)
     tris = []
     for b, m in zip(bones, mats):
-        for c in b["cubes"]:
+        pm = b.get("poly_mesh")
+        if pm:
+            pos, uv = pm["positions"], pm["uvs"]
+            for poly in pm["polys"]:
+                pts = [view @ (m @ np.append(np.array(pos[c[0]], float), 1.0))[:3] for c in poly]
+                uvs = [(uv[c[2]][0] / tw, uv[c[2]][1] / th) for c in poly]
+                n = np.cross(pts[1] - pts[0], pts[2] - pts[0])
+                n = view.T @ (n / (np.linalg.norm(n) + 1e-9))
+                shade = n[0] ** 2 * 0.6 + n[2] ** 2 * 0.8 + n[1] ** 2 * (1.0 if n[1] > 0 else 0.5)
+                for a, bb, cc in ((0, 1, 2), (0, 2, 3)):
+                    tris.append((pts[a], pts[bb], pts[cc], uvs[a], uvs[bb], uvs[cc], shade))
+        for c in b.get("cubes", []):
             o, s = np.array(c["origin"], float), np.array(c["size"], float)
             for f, name in enumerate(FACES):
                 fu = c["uv"][name]
@@ -125,7 +136,8 @@ def render(geo, tex, anim, t, yaw, pitch, size=360, zoom=None):
         if x1 < x0 or y1 < y0:
             continue
         area = (P[1, 0] - P[0, 0]) * (P[2, 1] - P[0, 1]) - (P[2, 0] - P[0, 0]) * (P[1, 1] - P[0, 1])
-        if abs(area) < 1e-9:
+        # Back faces are culled, as in the engine.
+        if area > -1e-9:
             continue
         xs, ys = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
         w0 = ((P[1, 0] - xs) * (P[2, 1] - ys) - (P[2, 0] - xs) * (P[1, 1] - ys)) / area

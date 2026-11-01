@@ -4,6 +4,8 @@
 //! Models and animations come from code or from files (`model.rs`); files win, so resource packs
 //! can change any entity's model.
 
+use std::collections::HashMap;
+
 use glam::Mat4;
 use rayon::prelude::*;
 use weft_abi::comp;
@@ -84,30 +86,31 @@ pub struct Models {
     counts: Vec<usize>,
 }
 
-/// The kind's model: the file named by its `model` component, else `<ns>:<name>` if a model
-/// file of that name exists, else its parts from code.
-fn load_kind(assets: &Assets, k: u32) -> (Vec<Part>, Option<[u32; 2]>, Vec<model::Animation>) {
-    let c = content();
-    let kind = &c.game.entities[k as usize];
-    let named = |key: &str| c.components.id(key).and_then(|id| c.components.text(ENTITY, k, id)).map(str::to_string);
-    let file = |name: &str, kind: &str, ext: &str| assets.read(name, kind, ext).map(|b| String::from_utf8_lossy(&b).into_owned());
-    let (mut parts, mut texture) = (kind.parts.clone(), None);
-    let model_name = named(comp::MODEL).unwrap_or_else(|| kind.name.clone());
-    if let Some(src) = file(&model_name, "models", "geo.json") {
-        match model::load_geo(&src) {
-            Ok(g) => (parts, texture) = (g.parts, g.texture),
-            Err(e) => log::error!("model {model_name}: {e}"),
-        }
-    }
-    let anim_name = named(comp::ANIMATIONS).unwrap_or_else(|| kind.name.clone());
-    let anims = match file(&anim_name, "animations", "animation.json") {
+/// A model file read once: its parts, texture size and where its boxes and triangles sit in the
+/// tables. Kinds naming the same file share it (a mod's coats and poses as kinds, say).
+struct Shared {
+    parts: Vec<Part>,
+    texture: Option<[u32; 2]>,
+    cuboids: (u32, u32),
+    corners: (u32, u32),
+}
+
+fn read(assets: &Assets, name: &str, kind: &str, ext: &str) -> Option<String> {
+    assets.read(name, kind, ext).map(|b| String::from_utf8_lossy(&b).into_owned())
+}
+
+fn geo_file(assets: &Assets, name: &str) -> Option<model::Geo> {
+    model::load_geo(&read(assets, name, "models", "geo.json")?).map_err(|e| log::error!("model {name}: {e}")).ok()
+}
+
+fn anim_file(assets: &Assets, name: &str) -> Vec<model::Animation> {
+    match read(assets, name, "animations", "animation.json") {
         Some(src) => model::load_animations(&src).unwrap_or_else(|e| {
-            log::error!("animations {anim_name}: {e}");
+            log::error!("animations {name}: {e}");
             Vec::new()
         }),
         None => Vec::new(),
-    };
-    (parts, texture, anims)
+    }
 }
 
 impl Models {
@@ -132,21 +135,47 @@ impl Models {
         let mut cuboids: Vec<GpuCuboid> = Vec::new();
         let mut corners: Vec<GpuCorner> = Vec::new();
         self.kinds.clear();
+        // A kind's model is the file named by its `model` component, else `<ns>:<name>` if a
+        // model file of that name exists, else its parts from code; its animations likewise.
+        let mut shared: HashMap<String, Shared> = HashMap::new();
+        let mut anim_files: HashMap<String, Vec<model::Animation>> = HashMap::new();
         for k in 0..content().game.entities.len() as u32 {
-            let (parts, texture, anims) = load_kind(assets, k);
-            let c0 = cuboids.len() as u32;
-            let v0 = corners.len() as u32;
-            for (b, p) in parts.iter().enumerate() {
-                for cu in &p.cuboids {
-                    let origin = [p.pivot[0] + cu.origin[0], p.pivot[1] + cu.origin[1], p.pivot[2] + cu.origin[2]];
-                    cuboids.push(GpuCuboid { origin, bone: b as u32, size: cu.size, inflate: cu.inflate, faces: cu.face_rects(), role: p.role, pad0: 0, pad1: 0, pad2: 0 });
+            let c = content();
+            let kind = &c.game.entities[k as usize];
+            let named = |key: &str| c.components.id(key).and_then(|id| c.components.text(ENTITY, k, id)).map(str::to_string);
+            let model_name = named(comp::MODEL).unwrap_or_else(|| kind.name.clone());
+            let anim_name = named(comp::ANIMATIONS).unwrap_or_else(|| kind.name.clone());
+            let mut push = |parts: &[Part]| {
+                let (c0, v0) = (cuboids.len() as u32, corners.len() as u32);
+                for (b, p) in parts.iter().enumerate() {
+                    for cu in &p.cuboids {
+                        let origin = [p.pivot[0] + cu.origin[0], p.pivot[1] + cu.origin[1], p.pivot[2] + cu.origin[2]];
+                        cuboids.push(GpuCuboid { origin, bone: b as u32, size: cu.size, inflate: cu.inflate, faces: cu.face_rects(), role: p.role, pad0: 0, pad1: 0, pad2: 0 });
+                    }
+                    corners.extend(p.mesh.iter().map(|v| GpuCorner { pos: v.pos, bone: b as u32, uv: v.uv, role: p.role, pad: 0 }));
                 }
-                corners.extend(p.mesh.iter().map(|v| GpuCorner { pos: v.pos, bone: b as u32, uv: v.uv, role: p.role, pad: 0 }));
+                ((c0, cuboids.len() as u32 - c0), (v0, corners.len() as u32 - v0))
+            };
+            if !shared.contains_key(&model_name)
+                && let Some(mut g) = geo_file(assets, &model_name)
+            {
+                let (cu, co) = push(&g.parts);
+                // The triangles are on the GPU now; every kind sharing the file would copy them.
+                g.parts.iter_mut().for_each(|p| p.mesh = Vec::new());
+                shared.insert(model_name.clone(), Shared { parts: g.parts, texture: g.texture, cuboids: cu, corners: co });
             }
+            let (parts, texture, cu, co) = match shared.get(&model_name) {
+                Some(s) => (s.parts.clone(), s.texture, s.cuboids, s.corners),
+                None => {
+                    let (cu, co) = push(&kind.parts);
+                    (kind.parts.clone(), None, cu, co)
+                }
+            };
+            let anims = anim_files.entry(anim_name.clone()).or_insert_with(|| anim_file(assets, &anim_name)).clone();
             let anims: Vec<Bound> = anims.into_iter().map(|a| Bound::new(a, &parts)).collect();
             let find = |n: &str| anims.iter().position(|a| a.anim.name == n);
             let (idle, walk) = (find("idle"), find("walk"));
-            self.kinds.push(KindModel { cuboids: (c0, cuboids.len() as u32 - c0), corners: (v0, corners.len() as u32 - v0), parts, anims, idle, walk, texture });
+            self.kinds.push(KindModel { cuboids: cu, corners: co, parts, anims, idle, walk, texture });
         }
         // Buffers may not be empty.
         cuboids.push(GpuCuboid::default());

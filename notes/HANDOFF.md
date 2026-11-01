@@ -218,10 +218,17 @@ build scripts that contain addresses with Python, not sed (`&` in the replacemen
 `mods/chihuahua` (MIT): wild long-haired chihuahuas on grassland (spawn rule like pigs', rarer).
 `tools/chihuahua.py` writes the model (`models/chihuahua.geo.json` and a puppy one with a bigger
 head; Bedrock geometry, so Blockbench opens it), its animations (`animations/chihuahua[_pup][_sit|_lie]`:
-`idle` holds the pose with a little life, `walk` by distance) and 96 coats on a 128x128 sheet, 8
-colors x 6 patterns x 2 marking layouts. The body is boxes; the fur is flat panels (ears, face and
-neck ruff, chest, skirt, leg feathering, plume tail) whose clear texels the engine cuts out, locks
-along their edges. Deterministic: rerun it after changing it and commit what it writes.
+`idle` holds the pose with a little life, `walk` by distance) and 96 coats on a 256x256 sheet, 8
+colors x 6 patterns x 2 marking layouts. Made the way Hytale makes creatures: about 40 chunky boxes
+(tilted parts in their own bones) and textures painted like illustrations (soft light as if each
+box were round, baked shadow where parts meet, cool shadows, soft fur tufts, a light blur, painted
+eyes, toes and claws; ears and fluffy edges cut out of the texture). Every proportion is a named
+setting (`SHAPE`); `tools/shape.json`, when present, overrides them. The Chihuahua Shaper artifact
+(https://claude.ai/artifact/Syo5TJLDfLebf7u8BR5eY5) shows the same boxes with sliders and saves
+designs to its `designs` collection (read it with ArtifactData, write the `shape` field to
+`tools/shape.json`, rerun). Deterministic: rerun it after changing it and commit what it writes.
+The engine shares one copy of a model file between all kinds naming it (`client/models.rs`), so
+the 576 look kinds cost two models. Voxel models were tried and dropped (grainy).
 `tools/preview.py` draws the files from five sides without the game. Each dog draws as a generated
 look kind per coat, grown or puppy, and pose (stand, sit, lie down after 30 s sitting), so the pose
 reaches every player that comes by (a played animation is a one-off event). A bone tames (1 in 3); a
