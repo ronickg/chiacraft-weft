@@ -5184,6 +5184,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "portals"
+version = "0.1.0"
+dependencies = [
+ "weft_sdk",
+]
+
+[[package]]
 name = "portmapper"
 version = "0.19.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

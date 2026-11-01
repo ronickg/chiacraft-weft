@@ -8,6 +8,7 @@ pub mod audio;
 
 pub mod bench;
 pub mod block_model;
+pub mod bridge;
 pub mod client;
 pub mod commands;
 pub mod config;

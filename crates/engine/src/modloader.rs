@@ -206,6 +206,12 @@ pub fn load(mod_dirs: &[PathBuf], package_dirs: &[PathBuf], cache: &Path) -> Res
     mods.sort_by(|a, b| a.id.cmp(&b.id));
 
     let register = mods.iter().find_map(|m| unsafe { m._lib.get::<RegisterPackage>(REGISTER_PACKAGE).ok().map(|f| *f) });
+    // chiacraft's own mods get the engine's answers to what Weft's interface doesn't cover.
+    for m in &mods {
+        if let Ok(install) = unsafe { m._lib.get::<crate::bridge::Install>(crate::bridge::INSTALL) } {
+            unsafe { install(crate::bridge::query) };
+        }
+    }
     let metas: Vec<ModMeta> = mods
         .iter()
         .map(|m| unsafe {

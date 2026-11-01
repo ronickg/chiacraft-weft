@@ -53,6 +53,8 @@ pub struct ServerConfig {
     pub seed: u64,
     /// View radius in cubes, sideways and up and down alike.
     pub view_radius: i32,
+    /// The world's own key (chiacraft, `world_address`): its links are this key's.
+    pub world_key: Option<String>,
 }
 
 pub struct Player {
@@ -118,6 +120,8 @@ const FAR_PER_TICK: usize = 256;
 /// State the client thread may read or poke while the server runs.
 #[derive(Default)]
 pub struct Shared {
+    /// Players in the world (chiacraft): entity and key, for mods asking who a player is.
+    pub players: parking_lot::RwLock<Vec<(u64, String)>>,
     pub paused: AtomicBool,
     pub hosting: AtomicBool,
     pub tick_us: AtomicU64,
@@ -243,27 +247,52 @@ impl Drop for ServerHandle {
 pub struct Scope {
     pub content: &'static Content,
     configs: Arc<crate::config::ServerValues>,
+    info: Option<Arc<ServerInfo>>,
+}
+
+/// What chiacraft's mods may ask of the server whose thread they run on (`bridge`): its players
+/// and its world's key.
+pub struct ServerInfo {
+    pub shared: Arc<Shared>,
+    pub world_key: Option<String>,
+}
+
+thread_local! {
+    static INFO: std::cell::RefCell<Option<Arc<ServerInfo>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The server this thread is running, if it is a server's.
+pub fn current_info() -> Option<Arc<ServerInfo>> {
+    INFO.with(|i| i.borrow().clone())
 }
 
 impl Scope {
     /// The game's content and settings as they are now: what a world opened now plays with.
     pub fn now() -> Scope {
-        Scope { content: content(), configs: crate::config::server_values() }
+        Scope { content: content(), configs: crate::config::server_values(), info: None }
     }
 
     /// This thread's own scope, if it is a server's.
     fn current() -> Option<Scope> {
-        Some(Scope { content: content(), configs: crate::config::thread_values()? })
+        Some(Scope { content: content(), configs: crate::config::thread_values()?, info: current_info() })
     }
 
     /// This thread is the server's from now on.
     fn enter(&self) {
         crate::content::for_thread(self.content);
         crate::config::for_thread(Some(self.configs.clone()));
+        INFO.with(|i| *i.borrow_mut() = self.info.clone());
     }
 
     /// Runs `f` as the server's (its jobs on the pools the game shares).
     pub fn with<R>(&self, f: impl FnOnce() -> R) -> R {
+        struct Restore(Option<Arc<ServerInfo>>);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                INFO.with(|i| *i.borrow_mut() = self.0.take());
+            }
+        }
+        let _restore = Restore(INFO.with(|i| std::mem::replace(&mut *i.borrow_mut(), self.info.clone())));
         crate::content::with(self.content, || crate::config::with(self.configs.clone(), f))
     }
 }
@@ -273,7 +302,8 @@ pub fn spawn(cfg: ServerConfig, storage: Option<Storage>) -> ServerHandle {
     let (stop, stop_rx) = unbounded::<()>();
     let shared = Arc::new(Shared::default());
     let sh = shared.clone();
-    let scope = Scope::now();
+    let mut scope = Scope::now();
+    scope.info = Some(Arc::new(ServerInfo { shared: shared.clone(), world_key: cfg.world_key.clone() }));
     let world_content = scope.content;
     let thread = std::thread::Builder::new()
         .name("server".into())
@@ -521,6 +551,10 @@ impl Server {
         self.receive_generated(c, start + Duration::from_millis(15));
         lap(0, &self.shared);
         self.handle_messages(c);
+        let players: Vec<(u64, String)> = self.players.iter().map(|p| (p.entity, p.key.clone())).collect();
+        if *self.shared.players.read() != players {
+            *self.shared.players.write() = players;
+        }
         self.send_configs();
         lap(1, &self.shared);
 

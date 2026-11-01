@@ -167,9 +167,25 @@ through the world's status), was accepted, ended from the other side; "Always fr
 the next request without asking; an ending sent while the other game was closed waited in the
 outbox and arrived seconds after both games started again.
 
+Slice 4 (portal blocks) is done. `mods/portals` (MIT): the block `portals:portal` (not solid,
+translucent, light 11, animated texture) with a block entity holding the link id
+(`portals:link`, `[u8; 64]`, saved). Right-click sends the owner's game the world's links
+(`portals:open`), the screen `portals:portal` picks one and sends `portals:bind`; the server checks
+the owner again and binds every connected portal block (up to 64). `world_tick` sends a player who
+steps in (after a second outside every portal) `portals:travel`; the client joins the world's key
+next frame. Messages go through `/portal_note <key> <arg>` so they are translated. The engine side:
+`crates/engine/src/bridge.rs` (`chiacraft_bridge` handed to mods at load; `owner`, `links`,
+`link`), `server::ServerInfo` (the server's players and world key, on its threads through the
+Scope), `Shared.players`, `ServerConfig.world_key`. Joining your own home world's address returns
+home. Checked with two copies (alice and bob; same names made `/tp` confusing): the owner's screen
+listed the link and bound the portal; stepping in took alice to bob's world while hers ran on; a
+guest's right-click got "only the owner"; bob's portal took her home without bouncing back. Test
+scripts: player names via `config/core.txt` (`name = alice`).
+
 ## Next steps
 
-1. Phase 3 slice 4 (portal blocks bound to a link) per `notes/PLAN.md`.
+1. Phase 3 slice 5 (travel prepared ahead, arrival at the linked portal, safe return) per
+   `notes/PLAN.md`.
 2. Phase 2 "later" items: bao-tree verified streaming and resume, iroh-blobs for downloads from
    other players and mirrors, reviewer lists, key rotation; running the fuzz targets (nightly,
    perhaps a scheduled CI job).

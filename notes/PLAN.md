@@ -191,14 +191,18 @@ The smallest version that works is phases 1-4.
       declines are silent; either side revokes alone with a permanent tombstone; pre-allow by
       world or owner key, or an invite token. Signatures carry key ids, so world DIDs replace
       only the certificate later.
-   4. *Portal blocks*: built into the game (not a package, whose blocks differ per world), holding
-      only a link id; binding one needs the world owner (anyone can `/give` today); portal
-      positions stay in each world.
+   4. *Portal blocks* (done): built into the game (the `portals` mod, not a package, whose blocks
+      differ per world), holding only a link id; binding one needs the world owner (checked on the
+      server; anyone can `/give` today); portal positions stay in each world. Walking in joins the
+      linked world (at its spawn until slice 5), or goes home if it is yours; a player is sent only
+      after a second outside every portal, so arriving in one never bounces. The mod asks the engine
+      what Weft's interface doesn't carry through `bridge` (owner? links?).
    5. *Travel prepared ahead*: in zones as the player nears a portal (connect, ask admission and
       download with consent, commit); a 60-second travel ticket signed by the origin world, its
       player key checked against the connection; the origin keeps the player until the
       destination confirms arrival; return ladder destination, origin, home, title; arrivals
-      placed clear of the portal, a few seconds' protection, a re-entry cooldown.
+      placed clear of the portal, a few seconds' protection, a re-entry cooldown. Slice 4 showed
+      why: arrivals land on the spawn point and push whoever stands there.
 4. **DIDs and achievements.** Player and world DIDs through sponsors; world ownership both ways;
    achievements signed by the world DID, anchored in batches, opt-in; profile view; admission
    rules (allow lists, probation, DID age, achievements); shared ban lists.

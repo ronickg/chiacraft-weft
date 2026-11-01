@@ -774,7 +774,7 @@ impl Running {
         };
         let storage = saves::Storage::open(meta.clone(), content());
         let server = server::spawn(
-            ServerConfig { seed: meta.seed, view_radius: self.settings.view_distance() },
+            ServerConfig { seed: meta.seed, view_radius: self.settings.view_distance(), world_key: identity.as_ref().map(|id| id.key()) },
             Some(storage),
         );
         self.play_local(server, meta.name.clone(), identity);
@@ -960,6 +960,12 @@ impl Running {
                     }
                 }
                 Request::Join(ticket) => {
+                    // Your own world, left running: going there is going home, not joining it.
+                    let key = crate::world_address::parse(&ticket).map(|p| p.key);
+                    if key.is_some() && key == self.home.as_ref().and_then(|h| h.identity.as_ref()).map(|i| i.key()) {
+                        self.return_home();
+                        continue;
+                    }
                     self.leave_for_another();
                     self.join_address = Some(ticket.clone());
                     self.joining = None;

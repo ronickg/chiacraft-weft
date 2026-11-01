@@ -93,13 +93,14 @@ footer { font-size: 13px; color: var(--muted); }
 <div class="wrap">
   <header>
     <h1>chia<span>craft</span></h1>
-    <p class="lede">How players, worlds, packages and links fit together on the Weft engine, as built through Phase 3 slice 3 (31 October 2026). Every arrow below is something the code does today, unless it is marked as next.</p>
+    <p class="lede">How players, worlds, packages and links fit together on the Weft engine, as built through Phase 3 slice 4 (31 October 2026). Every arrow below is something the code does today, unless it is marked as next.</p>
     <nav aria-label="Sections">
       <a href="#overview">Overview</a>
       <a href="#keys">Keys</a>
       <a href="#join">Joining</a>
       <a href="#scope">World scope</a>
       <a href="#links">Links</a>
+      <a href="#portals">Portals</a>
       <a href="#packages">Packages</a>
       <a href="#code">Code map</a>
       <a href="#roadmap">Roadmap</a>
@@ -402,6 +403,52 @@ footer { font-size: 13px; color: var(--muted); }
     </figure>
   </section>
 
+  <section id="portals">
+    <div class="eyebrow">Phase 3 slice 4</div>
+    <h2>A portal holds a link id and nothing else</h2>
+    <p>The portal block lives in the game's own <code>portals</code> mod, so it means the same in every world whatever packages they play with. Its hidden block entity keeps one link id. Only the world's owner can choose it; the server asks the engine (through the bridge) before it changes anything.</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 900 250" role="img" aria-label="The owner right-clicks a portal; the server checks ownership through the engine bridge and sends the world's links; the owner picks one and the server stores its id in every connected portal block; a player who steps in after a second outside is told to join the linked world, or goes home if it is theirs.">
+          <defs>
+            <marker id="g-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+            <marker id="g-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="heada"/></marker>
+          </defs>
+          <rect class="box" x="20" y="30" width="170" height="60" rx="5"/>
+          <text class="t" x="36" y="54">Owner right-clicks</text>
+          <text class="m" x="36" y="74">on_use → portals:open</text>
+          <line class="ln" x1="190" y1="60" x2="248" y2="60" marker-end="url(#g-a)"/>
+          <rect class="netbox" x="250" y="30" width="190" height="60" rx="5"/>
+          <text class="t" x="266" y="54">Engine bridge</text>
+          <text class="mn" x="266" y="74">owner? · links of this world</text>
+          <line class="ln" x1="440" y1="60" x2="498" y2="60" marker-end="url(#g-a)"/>
+          <rect class="box" x="500" y="30" width="180" height="60" rx="5"/>
+          <text class="t" x="516" y="54">Pick a link</text>
+          <text class="m" x="516" y="74">portals:bind (checked again)</text>
+          <line class="ln" x1="680" y1="60" x2="718" y2="60" marker-end="url(#g-a)"/>
+          <rect class="hotbox" x="720" y="30" width="160" height="60" rx="5"/>
+          <text class="t" x="736" y="54">Portal blocks</text>
+          <text class="mi" x="736" y="74">link id, saved</text>
+          <rect class="box" x="20" y="160" width="250" height="60" rx="5"/>
+          <text class="t" x="36" y="184">A player steps in</text>
+          <text class="m" x="36" y="204">after a second outside every portal</text>
+          <line class="lna" x1="270" y1="190" x2="418" y2="190" marker-end="url(#g-acc)"/>
+          <text class="ma" x="344" y="182" text-anchor="middle">portals:travel</text>
+          <rect class="box" x="420" y="160" width="220" height="60" rx="5"/>
+          <text class="t" x="436" y="184">Their game joins</text>
+          <text class="m" x="436" y="204">the other world's key</text>
+          <line class="ln" x1="640" y1="190" x2="718" y2="190" marker-end="url(#g-a)"/>
+          <rect class="box" x="720" y="160" width="160" height="60" rx="5"/>
+          <text class="t" x="736" y="184">or goes home</text>
+          <text class="m" x="736" y="204">if it is their world</text>
+          <line class="dash" x1="800" y1="90" x2="800" y2="158"/>
+          <text class="m" x="810" y="130">read on entry</text>
+        </svg>
+      </div>
+      <figcaption>Arrival lands on the linked world's spawn for now. Slice 5 prepares the trip as the player walks up, lands them at the linked portal and keeps them in the origin world until the destination confirms.</figcaption>
+    </figure>
+  </section>
+
   <section id="packages">
     <div class="eyebrow">Phase 2</div>
     <h2>A package is named by its exact files</h2>
@@ -462,6 +509,8 @@ footer { font-size: 13px; color: var(--muted); }
           <tr><td>engine/src/links.rs</td><td>Link records and signatures, inbox checks, outbox, links.json.</td></tr>
           <tr><td>engine/src/saved_worlds.rs</td><td>Worlds you've joined (worlds.txt) and their status.</td></tr>
           <tr><td>engine/src/package_trust.rs</td><td>Signing packages, checking creators, trust.txt.</td></tr>
+          <tr><td>engine/src/bridge.rs</td><td>Answers chiacraft's mods beyond Weft's interface: is this player the owner, which links the world has.</td></tr>
+          <tr><td>mods/portals</td><td>The portal block: holds a link id, bound by the owner, sends players who step in to the linked world.</td></tr>
           <tr><td>mods/packages</td><td>Registers data packages through the SDK; the unknown-block placeholder.</td></tr>
           <tr><td>mods/testkit</td><td>In-game tests and line scripts (host, join, tap, shot) that check all of the above.</td></tr>
         </tbody>
@@ -475,13 +524,12 @@ footer { font-size: 13px; color: var(--muted); }
     <div class="roadmap">
       <div class="step"><span class="ph">Phase 1</span><span class="what">Account: 24 words, login key, identity on join</span><span class="chip done">done</span></div>
       <div class="step"><span class="ph">Phase 2</span><span class="what">Data packages: format, identity and store, switching, downloads on join, signing and trust, hardening</span><span class="chip done">done</span></div>
-      <div class="step"><span class="ph">Phase 3 · 1–3</span><span class="what">Your world runs on, world addresses, link requests</span><span class="chip done">done</span></div>
-      <div class="step"><span class="ph">Phase 3 · 4</span><span class="what">Portal blocks: built into the game, holding a link id, bound only by the world's owner</span><span class="chip next">next</span></div>
+      <div class="step"><span class="ph">Phase 3 · 1–4</span><span class="what">Your world runs on, world addresses, link requests, portal blocks bound to links</span><span class="chip done">done</span></div>
       <div class="step"><span class="ph">Phase 3 · 5</span><span class="what">Travel prepared as you approach: signed travel ticket, origin keeps you until arrival, safe return</span><span class="chip next">next</span></div>
       <div class="step"><span class="ph">Phase 4–5</span><span class="what">DIDs and achievements on Chia; finding worlds through on-chain listings and DIG</span><span class="chip later">later</span></div>
       <div class="step"><span class="ph">Phase 6–8</span><span class="what">Sandboxed code mods (WebAssembly), headless servers, wallet and items</span><span class="chip later">later</span></div>
     </div>
   </section>
 
-  <footer>Source: notes/PLAN.md, notes/HANDOFF.md and the code at commit 1acdfe6. Research behind the decisions: reports/.</footer>
+  <footer>Source: notes/PLAN.md, notes/HANDOFF.md and the code as of Phase 3 slice 4. Research behind the decisions: reports/.</footer>
 </div>
