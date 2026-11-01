@@ -122,16 +122,19 @@ def occlusion(p, n, du, dv, boxes, own=None):
 
 
 def paint_face_smooth(areas, tone_sets, face, coat=(), y_world=None, occ=None, quad=False, seed=0,
-                      tuft=True, occ_strength=2.2):
+                      tuft=True, occ_strength=2.2, down=None, merge=True):
     """Paint one face the smooth way. `areas`: (h, w) ints into `tone_sets` (one `tones()` array
     per material). `coat`: material ids that are fur (simplified into big shapes, tufted and
     blended at their edges, streaked); others (eyes, nose, inner ear) stay crisp. `occ`: from
-    `occlusion()`. Returns (h, w, 3)."""
+    `occlusion()`. `down`: (h, w) 0..1 from the top of the whole part, for boxes stacked into one
+    part (an ear, a wing): it replaces each box's own top-to-bottom light and drops its edge
+    highlights, so the stack is lit as one piece. `merge=False` keeps thin coat areas (stripes)
+    instead of merging them into big shapes. Returns (h, w, 3)."""
     h, w = areas.shape
     n = len(tone_sets)
     coat = list(coat)
     is_coat = np.isin(areas, coat)
-    if min(h, w) >= 3 and coat:  # big simple shapes
+    if merge and min(h, w) >= 3 and coat:  # big simple shapes
         score = np.stack([ndimage.gaussian_filter((areas == m).astype(float), 1.1) for m in range(n)])
         score[[m for m in range(n) if m not in coat]] = -1
         areas = np.where(is_coat, score.argmax(0), areas)
@@ -143,8 +146,8 @@ def paint_face_smooth(areas, tone_sets, face, coat=(), y_world=None, occ=None, q
     uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
     L = np.full((h, w), FACE_LIGHT[face])
     if face not in ("up", "down"):
-        L += 0.6 - 1.2 * vv / h
-        if not quad:
+        L += 0.6 - 1.2 * (vv / h if down is None else down)
+        if not quad and down is None:
             L += 0.5 * np.exp(-(vv - 0.5)) - 0.3 * np.exp(-(h - vv - 0.5) / 1.2)
             if w >= 6:
                 L -= 0.35 * (np.exp(-(uu - 0.5) / 1.3) + np.exp(-(w - uu - 0.5) / 1.3))

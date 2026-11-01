@@ -1,5 +1,6 @@
-entity.chihuahua.chihuahua = Chihuahua
+entity.animals.chihuahua = Chihuahua
 chihuahua.tamed = The chihuahua is yours.
 chihuahua.sits = Sits.
 chihuahua.stands = Follows you.
 chihuahua.puppy = A puppy!
+entity.animals.cat = Cat

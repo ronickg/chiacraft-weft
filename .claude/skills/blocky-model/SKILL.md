@@ -24,7 +24,19 @@ Geometry
   Texture sizes in multiples of 32 (Hytale) / powers of two (Minecraft).
 - **No two faces in the same plane where both can be seen** (z-fighting flickers as the camera
   moves): offset touching boxes ≥ 0.5 unit; never two quads in one plane. `scripts/boxcheck.py`
-  must report 0 after every change; new parts tend to land in a neighbor's plane.
+  must report 0 after every change, **at rest and in every keyframe** (it checks both; build
+  scripts run it and stop on a failure). Most flicker only appears in a pose, so design against it:
+  - **Joined parts of a chain differ in size**: a lower leg 1 texel thinner than the upper leg
+    (and a paw wider), each tail segment 0.4 a side thinner than the one before. Same-width
+    neighbors share their side planes whenever the joint folds or straightens.
+  - **Neighbors across a bending joint** (chest and hips, front and back fur panels) differ by
+    ≥ 0.5 in width and height, so breathing or a bend never lines their faces up.
+  - **No exact right angles in resting poses** (hip -90, a fold of exactly 180): they turn one
+    part's face into another part's plane. Use -86, 160...
+  - **Flat panels hanging beside legs** (belly fur, a bib) sit ≥ 0.5 from every leg and paw side
+    plane: legs swing about X, so their side faces stay in the same planes as the panels.
+  - When the check reports a pair, read which faces and which animation, then move the smaller
+    part, change one size, or nudge the pose angle; run it again (fixes move collisions around).
 - One part per bone, clear names (head, jaw, ear_L, tail_0, leg_FL_upper...). Rigid, no weights.
 
 Texture (paint it like an illustration; each face is a small pixel painting)
@@ -40,6 +52,8 @@ Texture (paint it like an illustration; each face is a small pixel painting)
 - **Soft tufted edges** between colors (the upper color hangs into the lower in short points,
   then ~1 texel of blend). **Ambient occlusion** computed from the boxes where parts meet and
   near the ground. **Fur as gentle streaks** along the fur, not dashes, not noise.
+- **Faces only seen in poses** (the undersides of legs, tails, folded parts) are lit like back
+  faces, not as near-black bottoms: they show when a pose folds them.
 - Pad each face's atlas island with a 1-texel gutter copied from its edge; nearest filtering.
 
 ## Creature defaults: build these in from the start
@@ -94,9 +108,18 @@ Animation
 - **Swing about the axis across the part** (`rig.swing`): tails, necks, antennae, trunks. A part
   pointing up that swings about the world's vertical only twists in place.
 - **Fit resting poses to the ground** (sit, lie, crouch, perch) with forward kinematics
-  (`ground.lowest`) and a grid search (`rig.fit`), never by eye: feet at 0, nothing below 0, the
+  (`ground.lowest`) and a grid search (`rig.fit`), never by eye. **Search a wide enough range**
+  (a body tilt of 15-55°, not just the steep end) and print the fitted lowest points: if the
+  front feet float, the range or the weights are wrong (weight the feet more). For a sitting
+  quadruped the tilt follows from leg length: with the rump on the ground the shoulders must sit at
+  front-leg height, so short front legs mean a lower tilt. feet at 0, nothing below 0, the
   body resting where it should. Count fringes separately (they may brush the ground). Numbers
   tuned for one model never carry over to another.
+- **Tails, trunks and other chains in resting poses**: don't hand-tune them (each joint's
+  turn compounds the rest pose's curve); set target points for each segment's end (on the
+  ground, curling along one side toward the front paws for a sitting or loafing cat) and solve
+  the joint angles with forward kinematics and an optimizer (scipy `minimize`, Powell), with a
+  penalty for going below the ground (`fit_tail` in the cat).
 - **Feet flat**: a foot's pitch cancels the sum of its parents' pitches. Likewise any part that
   should keep its own direction when a pose tilts the body (an upright tail when sitting, a
   level head) cancels the parent's tilt; a fixed angle added on top of the tilt folds it into
@@ -110,7 +133,9 @@ Animation
   format plays it, and a missing keyframe leaves the eyes open. Add keyframes at the blink's
   edges and middle (even steps are too coarse); blink in idle, sit and lie, not walk or run.
   If eye designs are swapped as texture variants, keep the lid size fixed (one eye type's) so
-  every variant shares the UV layout.
+  every variant shares the UV layout. **Place the lid with the same rounding as the painted eye**
+  (`stamp_eyes` rounds the eye to whole texels; compute the lid box from that, not from the eye's
+  nominal center), or the closed lid sits half a row off and the eye peeks out under the lash.
 - **Licking** (or any quick tongue move): animate the jaw/tongue chain from (phase, value)
   keys with fine sampling (~0.05 s): jaw opens, tongue out level, tip curls up over the nose
   (-X), sweeps side to side (Y), folds back under the upper jaw (tip 180°) to hide; squint the
@@ -121,6 +146,23 @@ Animation
 
 ## Workflow
 
+0. **Research the animal first** (web search and fetch), before laying out a single box, and
+   write what you found into the creature's source README:
+   - **The real animal**: shoulder height, head-and-body length, tail length, head size against
+     the body (e.g. a house cat: 23-25 cm at the shoulder, 46 cm head and body, 30 cm tail, head
+     about a quarter of the body). Turn them into units (pick the shoulder height in units, scale
+     the rest), so the body reads as that animal before any styling.
+   - **Its block-game versions**: Minecraft's model is public: fetch
+     `https://raw.githubusercontent.com/Mojang/bedrock-samples/main/resource_pack/models/entity/<animal>.geo.json`
+     for its boxes (what the fewest boxes that still read as the animal are). Hytale's creatures
+     (screenshots, its blog, mods that show unused models): head size, eyes, which areas are white
+     or recolorable. Vintage Story too when it has the animal.
+   - **What makes it recognizable**: ear shape, muzzle, markings (a tabby's M and stripes), eye
+     color and pupil shape, tail carriage, typical poses (a cat sits upright with its tail around
+     its paws, lies as a loaf).
+   - Then decide: real proportions for the body, cute exaggeration only on head, eyes and ears
+     (Hytale's way), chunky limbs (not Minecraft's 2-texel sticks), and list the creature's
+     signature animations.
 1. **References.** Best: a flat orthographic turnaround (front, back, left, right, top, bottom),
    same scale, flat unlit colors, plain grey background; plus a blockout (fur removed, parts by
    role). If the user has only concept art, give them this prompt for an image model:
@@ -167,8 +209,10 @@ Animation
    other) next to both originals, and make the pick the model's default.
 7. **Review checklist** before showing (`scripts/bbshot.py` for four angles; animation frames
    via `Modes.options.animate.select(); anim.select(); Timeline.setTime(t); Animator.preview();`):
-   - [ ] `boxcheck` 0; move the camera: nothing flickers
-   - [ ] two eyes on the front only; no stray eye/nose texels on sides or top; face reads cute
+   - [ ] `boxcheck` 0 at rest and in poses; look from below and from the side at every resting
+         pose: nothing flickers
+   - [ ] two eyes on the front only; no stray eye/nose texels on sides or top; face reads cute;
+         a blink frame closes the eyes completely
    - [ ] no part reads wrong side-on (stray flaps); thin parts solid, no gaps between layers
    - [ ] colors: one coat hue across head, ears, body; no grey/dirty shading on light areas;
          no colors bleeding onto the wrong part
@@ -184,7 +228,8 @@ Animation
 
 - `scripts/bb.py` — run JS in a running Blockbench over CDP (`BB_PORT`, default 9333).
 - `scripts/bbshot.py out.png` — the open Blockbench project from four angles, side by side.
-- `scripts/boxcheck.py spec.json` — coplanar overlapping faces (z-fighting); exit 1 if any.
+- `scripts/boxcheck.py spec.json` — coplanar overlapping faces (z-fighting) at rest and, with
+  animations in the spec, in every keyframe (`check_posed`); exit 1 if any.
 - `scripts/paint.py` — `tones`, `occlusion`, `paint_face_smooth` (default look), `EYES` (ten eye
   types: six Hytale-style, four cute) and `stamp_eyes`, `stamp`, `majority`, `pack`;
   `ramp`/`paint_face` (flat five-step look).
@@ -193,7 +238,11 @@ Animation
 - `scripts/ground.py` — `lowest(spec, pose, groups)`: each group's lowest world y in a pose.
 - `scripts/variants.py model.glb out.json name=tex.png ...` — texture variants padded to the
   GLB's texture size, as data URLs for the viewer.
-- `scripts/viewer.html` — the viewer page (animations + variant switcher, three.js r147).
+- `scripts/viewer.html` — the viewer page: a switcher between creatures (`animals.json`), a
+  button per animation and per texture variant (three.js r147).
+- `scripts/bb_build.py <dir>` — builds `<dir>/spec.json` + `texture.png` in a running Blockbench
+  as a Hytale Character and saves `<name>.blockymodel`, `anims/*.blockyanim`, `<name>.glb`,
+  `<name>.bbmodel`.
 - `scripts/to_bedrock.py spec.json texture.png <assets> --name <animal> --scale <s> --texture-name <mod>/<animal> [--pup 0.5]`
   — the game files (Bedrock `.geo.json`, per-pose `.animation.json`, texture) for Weft/chiacraft
   or Minecraft Bedrock: turns the model to face -Z, gives tilted boxes their own bones, bakes the
@@ -208,11 +257,13 @@ Engine limits that shape the model: bones rotate but single boxes don't; no per-
 `idle` and `walk` play by themselves (poses are look kinds with their own file); a played
 animation replaces idle while it plays; no Molang; cut-out alpha only (no blending).
 
-Worked example: the chiacraft chihuahua (a papillon), source in the repo at
-`mods/chihuahua/source` (its README explains it): `tools/blocky.py` builds 51 boxes/quads on 27
-bones with all the defaults above (eyelids, jaw, tongue, solid ears, toes, a V bib),
-`tools/bb_build.py` builds it in Blockbench, `tools/ground.py` and the fitted `sit_*`/`lie_*`
-values, `build.py` exports it into the mod. Copy that folder to start a new animal.
+Worked examples, in the chiacraft repo's `animals` mod (each README explains it):
+- `mods/animals/source/cat`: built from research alone (no concept sheet), one script
+  (`cat.py`): boxes, color areas as rules, eyes, poses fitted to the ground (legs with `rig.fit`,
+  the tail on ground targets), animations; `build.py` exports it. **Start a new animal by copying
+  this folder.**
+- `mods/animals/source/chihuahua`: built from a concept sheet (`tools/blocky.py`, colors read
+  from the flat turnaround), with eyelids, jaw, tongue, solid ears, toes, a V bib.
 
 ## Sources
 

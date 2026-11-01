@@ -124,7 +124,7 @@ L = {
     "leg_top": 14, "knee": 8, "ankle": 3,
     # Sit and lie, fit with tools/ground.py so the paws and body rest on the ground.
     "sit_angle": 19, "sit_hip": -70, "sit_knee": 144, "sit_drop": 7.5, "sit_back": 0,
-    "lie_front": -77.5, "lie_hip": -90, "lie_knee": 160, "lie_drop": 8.4, "lie_neck": 70, "lie_head": -58,
+    "lie_front": -74, "lie_hip": -86, "lie_knee": 160, "lie_drop": 8.4, "lie_neck": 70, "lie_head": -58,
 }
 FACES = {"north": (2, -1), "south": (2, 1), "west": (0, -1), "east": (0, 1), "down": (1, -1), "up": (1, 1)}
 
@@ -143,7 +143,7 @@ def elements():
     E = []
     # Body: the front half on spine_1, the back half on spine_0.
     E.append(el("chest", "spine_1", (-8, 12, -1), (8, 26, 13)))
-    E.append(el("hips", "spine_0", (-8, 13, -19), (8, 26, -1)))
+    E.append(el("hips", "spine_0", (-7.5, 13, -19), (7.5, 24.6, -1)))  # a bit inside the chest: the two bend apart
     E.append(el("britches", "spine_0", (-7, 14, -22), (7, 24, -19)))
     E.append(el("neck", "neck", (-7.5, 22, 1), (7.5, 31, 11)))
     # The bib: a solid block and a quad in front of it cut to the sheet's locks.
@@ -151,16 +151,17 @@ def elements():
     E.append(el("bib_locks", "spine_1", (-12, 4, 16.5), (12, 30, 16.5), quad="south", cut=True))
     # Belly fringe along both sides, cut from the side views.
     for side, face in ((1, "east"), (-1, "west")):
-        x = side * 8.6
+        x = side * 9  # clear of the front paws' sides, which swing in the same plane
+        xb = side * 10.6  # outside the front one (9), the thigh (9.5) and the back paw (10)
         E.append(el(f"fringe_front_{'l' if side > 0 else 'r'}", "spine_1", (x, 8, -1), (x, 16, 14), quad=face, cut=True))
-        E.append(el(f"fringe_back_{'l' if side > 0 else 'r'}", "spine_0", (x, 8, -22), (x, 16, -1), quad=face, cut=True))
+        E.append(el(f"fringe_back_{'l' if side > 0 else 'r'}", "spine_0", (xb, 8, -22), (xb, 16, -1), quad=face, cut=True))
     # Head.
     E.append(el("skull", "head", (-11, 28, 0), (11, 46, 20)))
     # Muzzle: the upper part on the head, the lower jaw on its own bone (hinged at the back) so
     # the mouth opens; a dark box inside is the mouth you see when it does; the tongue on its
     # own bone pivots at the lip so it can hang out over the jaw.
     E.append(el("muzzle", "head", (-5, 30, 16), (5, 35, 25)))
-    E.append(el("mouth", "head", (-3.5, 28.5, 17), (3.5, 31, 21.3)))
+    E.append(el("mouth", "head", (-3.5, 28.5, 18), (3.5, 31, 21.3)))
     E.append(el("jaw", "jaw", (-4, 27, 17.5), (4, 30, 22.5)))  # shorter than the muzzle: the tongue bends out of sight
     # The tongue: a base lying in the mouth on the jaw, then two parts that bend over the lip's
     # top edge (each hinged on its top surface, so the top stays one surface), narrowing 5-4-3.
@@ -194,7 +195,7 @@ def elements():
         lx = (L["leg_x_f"] if front else L["leg_x_b"]) * (1 if leg[1] == "L" else -1)
         lz = L["leg_z_f"] if front else L["leg_z_b"]
         E.append(el(f"leg_{leg}_upper", f"leg_{leg}_upper", (lx - 3, 8, lz - 3), (lx + 3, 14, lz + 3)))
-        E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (lx - 3, 3, lz - 3), (lx + 3, 8, lz + 3)))
+        E.append(el(f"leg_{leg}_lower", f"leg_{leg}_lower", (lx - 2.5, 3, lz - 2.5), (lx + 2.5, 8, lz + 2.5)))  # thinner than the upper leg: folded, their sides never share a plane
         E.append(el(f"leg_{leg}_paw", f"leg_{leg}_paw", (lx - 4, 0, lz - 3.5), (lx + 4, 3, lz + 4.5)))  # 8 wide: three toes
         if not front:
             E.append(el(f"thigh_{leg}", f"leg_{leg}_upper", (lx - 3.5, 10, lz - 5), (lx + 3.5, 21, lz + 5)))

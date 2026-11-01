@@ -19,6 +19,8 @@ it first; this page is the chiacraft side.
 
 ## The steps
 
+0. **Research** the animal (the skill's first step): real measurements, how Minecraft and
+   Hytale make it, what makes it recognizable. Write it into the source README.
 1. **References**: a flat turnaround (front, back, sides, top) and, if you can, a blockout
    (fur removed). Crop each view.
 2. **Boxes**: lay the parts out in code as boxes and quads on bones (`head`, `jaw`, `ear_L`,
@@ -53,7 +55,7 @@ and `textures/entity/<mod>/<animal>.png`. It takes care of what the engine needs
   the standing file for `World::play_animation`, which replaces idle while it plays (so an action
   on a sitting dog stands it up for that time). Blinks are part of each idle.
 
-Register it like the chihuahua (`mods/chihuahua/src/lib.rs`): `.model_file("<animal>")`,
+Register it like the cat (`mods/animals/src/cat.rs`, the simplest) or the chihuahua (`mods/animals/src/lib.rs`): `.model_file("<animal>")`,
 `.animations("<animal>[_sit|_lie]")`, `.texture("<mod>/<animal>")`, and a hitbox `.size(..)`
 about the model's footprint. Bones named `head` follow where the creature looks; don't name
 bones `leg0`..`leg3` unless you want the engine's own leg swing (an animation with `walk` turns
@@ -76,18 +78,25 @@ quit
 `cargo run --release -- --world creature-check --script that.txt` writes `run/screenshots/<animal>.png`.
 F3+T reloads models, animations and textures while the game runs.
 
-## The chihuahua, as the worked example
+## The worked examples: the chihuahua and the cat
 
-Its source is in the mod: [mods/chihuahua/source](../mods/chihuahua/source/README.md).
-`tools/blocky.py` lays out and paints the dog (51 boxes and quads with eyelids, jaw and tongue;
-`EYES`, `BLINKS`, `lick_keys`), `tools/voxdog.py` has the poses, `tools/bb_build.py` builds it in
-Blockbench. To update the dog in the game after changing it:
+Both live in the `animals` mod, each with its source next to the assets:
+
+- [mods/animals/source/chihuahua](../mods/animals/source/chihuahua/README.md): built from a
+  concept sheet (colors read from the flat turnaround). `tools/blocky.py` lays out and paints the
+  dog (eyelids, jaw and tongue, solid ears, a V bib, toes; `EYES`, `BLINKS`, `lick_keys`).
+- [mods/animals/source/cat](../mods/animals/source/cat/README.md): built from research alone (no
+  sheet): proportions from real cats, the look from Minecraft's and Hytale's cats; its colors are
+  rules (`area()` in `cat.py`: tabby stripes, the M, white bib, belly, muzzle and socks). The
+  simplest place to start a new animal: copy the folder, change the boxes, colors and poses.
+
+To update one in the game after changing it:
 
 ```
-cd mods/chihuahua/source
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once
+cd mods/animals/source/chihuahua      # or cat
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once (the cat uses ../chihuahua/.venv)
 .venv/bin/python build.py
 ```
 
-For a new animal, copy that folder next to the new mod's assets and change `blocky.py`'s
-elements, painting and poses; `build.py` names the files.
+To see them side by side, publish the skill's `viewer.html` with an `animals.json` listing each
+creature's GLB (from `bb_build.py`) and its texture options (from `variants.py`).

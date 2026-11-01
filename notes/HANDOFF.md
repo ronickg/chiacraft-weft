@@ -232,11 +232,11 @@ build scripts that contain addresses with Python, not sed (`&` in the replacemen
 
 ## Side mods
 
-`mods/chihuahua` (MIT): wild long-haired chihuahuas on grassland (spawn rule like pigs', rarer).
+`mods/animals` (MIT, was `mods/chihuahua` until 2026-11-01, so entity ids are `animals:*` now): wild long-haired chihuahuas and orange tabby cats on grassland (spawn rules like pigs', rarer). Cats (`src/cat.rs`) wander and now and then sit, then lie down as a loaf; their source is `source/cat` (built from research alone, see its README).
 The dog (2026-11-01) is a papillon-style chihuahua built in Blockbench the way Hytale makes
 creatures: 49 boxes and flat fur panels with a hand-painted 512x96 texture, big solid butterfly
 ears, a jaw and a tongue, eyelids that blink, toes; animations idle (panting, blinking), walk,
-run, sit, lie and lick. Its source is `mods/chihuahua/source` (rebuild with `source/build.py`); the
+run, sit, lie and lick. Its source is `mods/animals/source/chihuahua` (rebuild with its `build.py`); the
 files are exported with the `blocky-model` skill's `to_bedrock.py`
 ([docs/creatures.md](../docs/creatures.md) has the recipe and the commands). All coats draw with
 one texture for now (the coat is still chosen and inherited). The old generator

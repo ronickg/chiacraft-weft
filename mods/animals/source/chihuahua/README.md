@@ -2,9 +2,9 @@
 
 Everything needed to rebuild the dog: a papillon-style long-haired chihuahua made the way Hytale
 makes creatures, a few dozen boxes and flat fur panels with a hand-painted pixel texture. The
-recipe for making another animal like it is [docs/creatures.md](../../../docs/creatures.md); the
+recipe for making another animal like it is [docs/creatures.md](../../../../docs/creatures.md); the
 rules and scripts are the `blocky-model` skill in
-[.claude/skills/blocky-model](../../../.claude/skills/blocky-model/SKILL.md).
+[.claude/skills/blocky-model](../../../../.claude/skills/blocky-model/SKILL.md).
 
 ## Rebuild
 
@@ -14,8 +14,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once
 ```
 
 `build.py` paints the model and its animations (`tools/blocky.py`, into `out/d_blocky/`, not
-committed), checks no faces flicker (`tools/boxcheck.py`) and exports the game's files into
-`../assets` with the skill's `to_bedrock.py` (scale 0.17, a puppy at half size with a 1.3x
+committed), checks no faces flicker, at rest or in any keyframe (the skill's `boxcheck.py`) and exports the game's files into
+`../../assets` with the skill's `to_bedrock.py` (scale 0.17, a puppy at half size with a 1.3x
 head). Commit what it writes there; F3+T reloads them in a running game.
 
 To open or edit it in Blockbench (and get Hytale `.blockymodel`/`.blockyanim`, a `.glb` and a
@@ -42,7 +42,7 @@ To open or edit it in Blockbench (and get Hytale `.blockymodel`/`.blockyanim`, a
 - `tools/voxdog.py`: the base skeleton, the palette and the poses (idle, walk, run, sit, lie;
   `tail_wag` swings the tail about the axis across each segment).
 - `tools/ground.py`: each part's lowest point in a pose, to fit sit and lie to the ground.
-- `tools/boxcheck.py`: lists faces that would flicker (two in one plane); must report 0.
+- Flicker is checked with the skill's `boxcheck.py` (rest pose and every keyframe), which `build.py` runs.
 - `tools/bb.py`, `bb_build.py`, `bbshot.py`: drive Blockbench (build, export, screenshots).
 
 ## How it's made (and what each fix was)

@@ -1,3 +1,5 @@
+//! The animals mod: chihuahuas (this file) and cats (`cat.rs`).
+//!
 //! Chihuahuas: small long-haired dogs on grassland, each with its own coat (8 colors, 6 patterns,
 //! 2 marking layouts: 96 coats). Tame one with bones (a third of the time it
 //! takes), make it sit or follow by right clicking it, breed two tamed ones with meat: the puppy
@@ -7,7 +9,7 @@
 //! The model is a papillon-style long-haired chihuahua made of boxes and flat fur panels with a
 //! hand-painted texture (Hytale's style), built in Blockbench: `models/chihuahua.geo.json`,
 //! `animations/chihuahua[_pup][_sit|_lie].animation.json` and `textures/entity/chihuahua/chihuahua.png`
-//! are built from its source in `source/` (`source/build.py`; see `docs/creatures.md`). All coats draw with that
+//! are built from its source in `source/chihuahua` (`build.py`; see `docs/creatures.md`). All coats draw with that
 //! one texture for now; the coat is still chosen and inherited. A coat is a look
 //! (`World::set_look`): one entity kind per coat, age and pose, drawn in place of the dog. Puppies
 //! have their own model file (half size, a bigger head) on the same layout, so the same picture
@@ -22,6 +24,8 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 declare_mod!(deps: ["base"], init: init);
+
+mod cat;
 
 static CHIHUAHUA: Entity = Entity::named("chihuahua");
 static HEART: Particle = Particle::named("heart");
@@ -125,17 +129,18 @@ impl Pose {
 
 /// The kind a dog is drawn as: one per coat, grown or puppy, and pose.
 fn look_name(coat: u32, puppy: bool, pose: Pose) -> String {
-    format!("chihuahua:{}{}_{coat}", if puppy { "pup" } else { "coat" }, pose.suffix())
+    format!("animals:chihuahua_{}{}_{coat}", if puppy { "pup" } else { "coat" }, pose.suffix())
 }
 
 // ------------------------------------------------------------------ registration
 
 fn init(r: &mut Registry) {
+    cat::init(r);
     r.entity_component(&DOG, Dog::default(), component_flags::SAVE);
     r.entity_component(&SEEN, Seen::default(), 0);
     r.entity_component(&OWNER, [0u8; 64], component_flags::SAVE);
     r.particle(&HEART)
-        .textures(&["chihuahua:heart"])
+        .textures(&["animals:heart"])
         .life(0.8, 1.2)
         .size(0.12, 0.16)
         .gravity(-0.4)
@@ -147,7 +152,7 @@ fn init(r: &mut Registry) {
             for pose in POSES {
                 let kind = Entity::generated(
                     look_name(coat, puppy, pose)
-                        .trim_start_matches("chihuahua:")
+                        .trim_start_matches("animals:")
                         .to_string(),
                 );
                 let model = if puppy { "chihuahua_pup" } else { "chihuahua" };

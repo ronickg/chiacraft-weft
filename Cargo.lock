@@ -139,6 +139,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "animals"
+version = "0.1.0"
+dependencies = [
+ "weft_sdk",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1356,13 +1363,6 @@ dependencies = [
  "unicode-segmentation",
  "wasm-bindgen",
  "yaml-rust2",
-]
-
-[[package]]
-name = "chihuahua"
-version = "0.1.0"
-dependencies = [
- "weft_sdk",
 ]
 
 [[package]]
