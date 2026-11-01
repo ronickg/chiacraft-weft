@@ -1,0 +1,6 @@
+# macOS: sign the game before `cargo run` starts it, so the Keychain remembers "Always Allow".
+[target.aarch64-apple-darwin]
+runner = "tools/macos-sign-run.sh"
+
+[target.x86_64-apple-darwin]
+runner = "tools/macos-sign-run.sh"
