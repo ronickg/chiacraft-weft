@@ -44,6 +44,23 @@ to it (it was refused); `chiacraft_*` crates log at info; bare `cargo run` start
 - `cargo run --release -- --test account` runs one testkit test against the real game; `--test
   list` names them. Line scripts (`--script`, see `mods/testkit/src/script.rs`) drive host/join.
 
+## Staying up to date with Weft
+
+`upstream` is VortexSo4/Weft. Merge `upstream/master` into a branch, build, check in the game
+(one world, and two copies hosting and joining), then fast-forward `main`. Last merge: 6e4e168
+(2026-11-01, 74 commits). Weft formats with `rustfmt.toml` and checks it on pull requests: run
+`cargo fmt --all` (and `--manifest-path examples/examplemod/Cargo.toml`) before committing, so
+merges stay small. What we keep apart on purpose: our networking in `net/p2p.rs` (world
+addresses, accounts, worlds hosted under their own keys; Weft's join by IP and port isn't wired
+in), and no texture pack built from a Minecraft copy (`minecraft.rs` and its lists stay deleted).
+Weft's new random grass (`tallgrass.ctm`) draws as white sticks in Weft itself too.
+
+On macOS, `cargo run` signs the game with the first Apple Development identity
+(`tools/macos-sign-run.sh`, `.cargo/config.toml`), so the Keychain's "Always Allow" for the
+account key survives rebuilds. Two copies on one Mac: `--run-dir run-alice` and `--run-dir
+run-bob`, each with `name = ...` in `config/core.txt` (their accounts live in the run dir's file
+store, no Keychain).
+
 ## Phase 2, packages
 
 Slice 1 (local packages) is done: `crates/packages` (format), `mods/packages` (registers them),
