@@ -1,12 +1,15 @@
-//! Chihuahuas: small dogs on grassland, each with its own coat (8 colors, 6 patterns, 2 marking
-//! layouts: 96 coats, painted by `tools/coats.py`). Tame one with bones (a third of the time it
+//! Chihuahuas: small long-haired dogs on grassland, each with its own coat (8 colors, 6 patterns,
+//! 2 marking layouts: 96 coats). Tame one with bones (a third of the time it
 //! takes), make it sit or follow by right clicking it, breed two tamed ones with meat: the puppy
 //! takes its color from one parent and its pattern from either, now and then something new, and
 //! grows up in twenty minutes (meat speeds it along).
 //!
-//! A coat is a look (`World::set_look`): one entity kind per coat, all on the same model, drawn
-//! in place of the dog. Puppies are the same model at half size on a half size layout, so the
-//! same pictures fit. The owner is kept by player key, which the engine's bridge gives
+//! The model, its animations and the coats are files `tools/chihuahua.py` writes: boxes for the
+//! body and flat fur panels, cut out where the coat is clear, for ears, ruff, tail and feathering.
+//! A coat is a look (`World::set_look`): one entity kind per coat, age and pose, drawn in place of
+//! the dog. Puppies have their own model file (half size, a bigger head) on the same layout, so
+//! the same pictures fit. A pose is the look's animation file, whose `idle` holds it (sitting,
+//! lying down), so every player sees it whenever they come by. The owner is kept by player key, which the engine's bridge gives
 //! (`player_key`), so a dog knows its owner after a restart.
 
 use std::sync::OnceLock;
@@ -29,9 +32,8 @@ const MARKS: u32 = 2;
 const COATS: u32 = COLORS * PATTERNS * MARKS;
 /// Twenty minutes to grow up.
 const GROW_TICKS: u32 = 24_000;
-/// Model scales: a grown dog stands about a third of a block at the shoulder.
-const ADULT_SCALE: f32 = 0.75;
-const PUPPY_SCALE: f32 = 0.375;
+/// Sitting this long (thirty seconds), a dog lies down.
+const LIE_TICKS: u32 = 600;
 /// Thirty seconds in love, five minutes before the next litter.
 const LOVE_TICKS: u32 = 600;
 const COOLDOWN_TICKS: u32 = 6_000;
@@ -55,10 +57,11 @@ value! {
 
 value! {
     #[derive(Default)]
-    /// What is not saved: whether its look is applied, and the owner's entity as last found.
+    /// What is not saved: the look applied, the owner's entity as last found, ticks sitting.
     pub struct Seen {
         pub look: u32,
         pub owner: u64,
+        pub sat: u32,
     }
 }
 
@@ -86,57 +89,30 @@ fn player_key(player: u64) -> String {
     BRIDGE.get().map(|f| unsafe { f(Str::new("player_key"), Str::new(&player.to_string())).as_str().to_string() }).unwrap_or_default()
 }
 
-// ------------------------------------------------------------------ the model
+// ------------------------------------------------------------------ looks
 
-/// The boxes, in model pixels, on a 64x32 skin (`tools/coats.py` paints the same layout):
-/// a big round head with wide ears and a short snout, a small low body on short legs, and a tail
-/// curled up over the back. `s` scales everything, layout included, so one skin fits both
-/// sizes; the sheet stays whole pixels at these scales. `sitting` folds the hind legs under a
-/// body tipped up at the front, the tail down on the ground.
-fn model(s: f32, sitting: bool) -> Model {
-    let p = |v: [f32; 3]| [v[0] * s, v[1] * s, v[2] * s];
-    let uv = |u: f32, v: f32| [u * s, v * s];
-    let leg = |name: &str, pivot: [f32; 3]| Part::new(name, p(pivot)).cube(p([-0.5, -3.0, -0.5]), p([1.0, 3.0, 1.0]), uv(24.0, 10.0));
-    let (body, head, tail) = if sitting {
-        (
-            Part::new("body", p([0.0, 0.8, 2.5])).cube(p([-2.0, 0.0, -6.0]), p([4.0, 3.0, 6.0]), uv(0.0, 10.0)).rotation(0.4, 0.0, 0.0),
-            [0.0, 6.5, -2.0],
-            Part::new("tail", p([0.0, 0.5, 2.5])).cube(p([-0.5, 0.0, 0.0]), p([1.0, 1.0, 4.0]), uv(30.0, 10.0)).rotation(-0.2, 0.6, 0.0),
-        )
-    } else {
-        (
-            Part::new("body", p([0.0, 3.0, 0.0])).cube(p([-2.0, 0.0, -3.0]), p([4.0, 3.0, 6.0]), uv(0.0, 10.0)),
-            [0.0, 6.5, -3.0],
-            Part::new("tail", p([0.0, 5.5, 2.5])).cube(p([-0.5, -0.5, 0.0]), p([1.0, 1.0, 4.0]), uv(30.0, 10.0)).rotation(-1.0, 0.0, 0.0),
-        )
-    };
-    let [hx, hy, hz] = head;
-    // The ears hang from the head and lean out, as a chihuahua's do.
-    let ear = |name: &str, x: f32, u: f32, lean: f32| {
-        Part::new(name, p([hx + x, hy + 2.5, hz - 1.0])).cube(p([-1.0, 0.0, -0.5]), p([2.0, 3.0, 1.0]), uv(u, 0.0)).rotation(0.0, 0.0, lean).child_of(1)
-    };
-    let hind = |name: &str, x: f32| {
-        if sitting { leg(name, [x * 1.4, 1.0, 1.5]).rotation(1.45, 0.0, 0.0) } else { leg(name, [x, 3.0, 2.0]) }
-    };
-    let parts = vec![
-        body,
-        Part::new("head", p(head))
-            .cube(p([-2.5, -1.0, -4.0]), p([5.0, 4.0, 4.0]), uv(0.0, 0.0))
-            .cube(p([-1.0, -1.0, -5.5]), p([2.0, 2.0, 2.0]), uv(18.0, 0.0)),
-        ear("ear_r", -2.0, 26.0, 0.35),
-        ear("ear_l", 2.0, 32.0, -0.35),
-        tail,
-        hind("leg0", -1.5),
-        hind("leg1", 1.5),
-        leg("leg2", [1.5, 3.0, -2.0]),
-        leg("leg3", [-1.5, 3.0, -2.0]),
-    ];
-    Model::from(parts).uv((64.0 * s) as u32, (32.0 * s) as u32)
+#[derive(Clone, Copy, PartialEq)]
+enum Pose {
+    Stand,
+    Sit,
+    Lie,
 }
 
-/// The kind a dog is drawn as: one per coat, grown or puppy, standing or sitting.
-fn look_name(coat: u32, puppy: bool, sitting: bool) -> String {
-    format!("chihuahua:{}{}_{coat}", if puppy { "pup" } else { "coat" }, if sitting { "_sit" } else { "" })
+const POSES: [Pose; 3] = [Pose::Stand, Pose::Sit, Pose::Lie];
+
+impl Pose {
+    fn suffix(self) -> &'static str {
+        match self {
+            Pose::Stand => "",
+            Pose::Sit => "_sit",
+            Pose::Lie => "_lie",
+        }
+    }
+}
+
+/// The kind a dog is drawn as: one per coat, grown or puppy, and pose.
+fn look_name(coat: u32, puppy: bool, pose: Pose) -> String {
+    format!("chihuahua:{}{}_{coat}", if puppy { "pup" } else { "coat" }, pose.suffix())
 }
 
 // ------------------------------------------------------------------ registration
@@ -148,10 +124,12 @@ fn init(r: &mut Registry) {
     r.particle(&HEART).textures(&["chihuahua:heart"]).life(0.8, 1.2).size(0.12, 0.16).gravity(-0.4).drag(0.9).fullbright();
     // The looks, drawn in place of a dog with that coat, age and pose.
     for coat in 0..COATS {
-        for (puppy, sitting) in [(false, false), (true, false), (false, true), (true, true)] {
-            let kind = Entity::generated(look_name(coat, puppy, sitting).trim_start_matches("chihuahua:").to_string());
-            let scale = if puppy { PUPPY_SCALE } else { ADULT_SCALE };
-            drop(r.entity(kind).size(0.35, 0.5).passive().model(model(scale, sitting)).texture(&format!("chihuahua/coat_{coat}")));
+        for puppy in [false, true] {
+            for pose in POSES {
+                let kind = Entity::generated(look_name(coat, puppy, pose).trim_start_matches("chihuahua:").to_string());
+                let model = if puppy { "chihuahua_pup" } else { "chihuahua" };
+                drop(r.entity(kind).size(0.35, 0.5).passive().model_file(model).animations(&format!("{model}{}", pose.suffix())).texture(&format!("chihuahua/coat_{coat}")));
+            }
         }
     }
     r.entity(&CHIHUAHUA)
@@ -159,7 +137,8 @@ fn init(r: &mut Registry) {
         .health(8.0)
         .speed(2.8)
         .passive()
-        .model(model(ADULT_SCALE, false))
+        .model_file("chihuahua")
+        .animations("chihuahua")
         .texture("chihuahua/coat_0")
         .attach(&DOG)
         .attach(&SEEN)
@@ -216,13 +195,18 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     d.panic = d.panic.saturating_sub(1);
     d.age = d.age.saturating_sub(1);
     let (coat, puppy, sitting) = (d.coat - 1, d.age > 0, d.tamed != 0 && d.sitting != 0);
-    // The look in use, as 1 + puppy + 2 * sitting (0: none yet).
-    let look = 1 + puppy as u32 + 2 * sitting as u32;
-    if let Some(s) = w.component_mut(id, &SEEN)
-        && s.look != look
-    {
+    let Some(s) = w.component_mut(id, &SEEN) else { return false };
+    s.sat = if sitting { s.sat.saturating_add(1) } else { 0 };
+    let pose = match (sitting, s.sat > LIE_TICKS) {
+        (false, _) => Pose::Stand,
+        (true, false) => Pose::Sit,
+        (true, true) => Pose::Lie,
+    };
+    // The look in use, as 1 + puppy + 2 * pose (0: none yet).
+    let look = 1 + puppy as u32 + 2 * pose as u32;
+    if s.look != look {
         s.look = look;
-        w.set_look(id, Some(&look_name(coat, puppy, sitting)));
+        w.set_look(id, Some(&look_name(coat, puppy, pose)));
         w.set_size(id, puppy.then_some([0.2, 0.25, 0.2]));
     }
     false

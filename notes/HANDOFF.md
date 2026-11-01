@@ -215,10 +215,16 @@ build scripts that contain addresses with Python, not sed (`&` in the replacemen
 
 ## Side mods
 
-`mods/chihuahua` (MIT): wild chihuahuas on grassland (spawn rule like pigs', rarer). 96 coats,
-8 colors x 6 patterns x 2 marking layouts, painted by `tools/coats.py` (deterministic; rerun after
-changing it and commit the pictures). Each dog draws as a generated look kind per coat, grown or
-puppy, standing or sitting (`set_look`), so no two dogs need to match. A bone tames (1 in 3); a
+`mods/chihuahua` (MIT): wild long-haired chihuahuas on grassland (spawn rule like pigs', rarer).
+`tools/chihuahua.py` writes the model (`models/chihuahua.geo.json` and a puppy one with a bigger
+head; Bedrock geometry, so Blockbench opens it), its animations (`animations/chihuahua[_pup][_sit|_lie]`:
+`idle` holds the pose with a little life, `walk` by distance) and 96 coats on a 128x128 sheet, 8
+colors x 6 patterns x 2 marking layouts. The body is boxes; the fur is flat panels (ears, face and
+neck ruff, chest, skirt, leg feathering, plume tail) whose clear texels the engine cuts out, locks
+along their edges. Deterministic: rerun it after changing it and commit what it writes.
+`tools/preview.py` draws the files from five sides without the game. Each dog draws as a generated
+look kind per coat, grown or puppy, and pose (stand, sit, lie down after 30 s sitting), so the pose
+reaches every player that comes by (a played animation is a one-off event). A bone tames (1 in 3); a
 tamed dog sits on the start, the owner's empty-handed or non-food right-click toggles sitting, it
 follows its owner (teleports when 24 blocks behind). Meat puts two tamed adults in love; they meet
 (a sitting one waits for the other) and have a puppy whose coat mixes theirs (color from one, pattern from either, now and then a
