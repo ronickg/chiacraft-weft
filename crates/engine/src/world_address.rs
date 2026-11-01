@@ -118,6 +118,12 @@ pub fn address(key: &str, name: &str, relay: Option<&str>, addrs: &[String]) -> 
     s
 }
 
+/// `address` with one more hint appended (`k=v`).
+pub fn with_hint(address: &str, k: &str, v: &str) -> String {
+    let sep = if address.contains('?') { '&' } else { '?' };
+    format!("{address}{sep}{k}={}", encode(v))
+}
+
 /// What an address says: the key, and the hints it carries (name, relay, direct addresses).
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Parsed {
@@ -127,6 +133,8 @@ pub struct Parsed {
     pub addrs: Vec<String>,
     /// A travel ticket (`travel`): the join came through a portal.
     pub ticket: String,
+    /// An invite to link with the world (`links::invite`).
+    pub invite: String,
 }
 
 /// Reads an address, or the older `<key>;<relay>;<ip:port,...>` ticket.
@@ -143,6 +151,7 @@ pub fn parse(text: &str) -> Option<Parsed> {
                 "r" => p.relay = v,
                 "a" => p.addrs = v.split(',').filter(|s| !s.is_empty()).map(str::to_string).collect(),
                 "t" => p.ticket = v,
+                "i" => p.invite = v,
                 _ => {}
             }
         }
@@ -152,7 +161,7 @@ pub fn parse(text: &str) -> Option<Parsed> {
     let key = parts.next()?.to_string();
     let relay = parts.next().unwrap_or("").to_string();
     let addrs = parts.next().unwrap_or("").split(',').filter(|s| !s.is_empty()).map(str::to_string).collect();
-    (!key.is_empty()).then_some(Parsed { key, name: String::new(), relay, addrs, ticket: String::new() })
+    (!key.is_empty()).then_some(Parsed { key, name: String::new(), relay, addrs, ticket: String::new(), invite: String::new() })
 }
 
 fn encode(v: &str) -> String {
@@ -199,7 +208,7 @@ mod tests {
         let a = address("abc123", "Ruby Hills & co", Some("https://relay.example/"), &["1.2.3.4:5".into(), "[::1]:6".into()]);
         assert!(a.starts_with("chiacraft://w/abc123?n=Ruby%20Hills%20%26%20co&r=https://relay.example/&a="));
         let p = parse(&a).unwrap();
-        assert_eq!(p, Parsed { key: "abc123".into(), name: "Ruby Hills & co".into(), relay: "https://relay.example/".into(), addrs: vec!["1.2.3.4:5".into(), "[::1]:6".into()], ticket: String::new() });
+        assert_eq!(p, Parsed { key: "abc123".into(), name: "Ruby Hills & co".into(), relay: "https://relay.example/".into(), addrs: vec!["1.2.3.4:5".into(), "[::1]:6".into()], ticket: String::new(), invite: String::new() });
         assert_eq!(parse("chiacraft://w/abc?t=chiacraft%20travel%201;player=p").unwrap().ticket, "chiacraft travel 1;player=p");
         assert_eq!(parse("chiacraft://w/abc123").unwrap().key, "abc123");
         let old = parse("abc123;https://relay.example/;1.2.3.4:5").unwrap();

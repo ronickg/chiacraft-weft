@@ -119,6 +119,9 @@ pub struct Request {
     /// for it (`<identity hex>:<signature hex>`).
     pub reply_to: String,
     pub reply_vouch: String,
+    /// An invite from the asked world's owner (`invite`): the request is accepted without asking.
+    #[serde(default)]
+    pub invite: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -179,6 +182,9 @@ pub struct Store {
     pub allow: Vec<String>,
     /// Owners and worlds whose requests are dropped without a word.
     pub blocked: Vec<String>,
+    /// Invites used (their nonces): each is good once.
+    #[serde(default)]
+    pub invites_used: Vec<String>,
 }
 
 struct State {
@@ -285,6 +291,7 @@ pub fn request(account_key: &iroh::SecretKey, from: &crate::world_address::World
         from_name: from_name.to_string(),
         reply_to,
         reply_vouch,
+        invite: target.invite.clone(),
     };
     with(|s| {
         if s.store.links.iter().any(|l| (l.body.from == request.body.from && l.body.to == request.body.to) || (l.body.from == request.body.to && l.body.to == request.body.from)) {
@@ -424,6 +431,17 @@ fn receive_request(s: &mut State, peer: &str, r: Request) -> Result<(), String> 
         log::info!("link request from '{}' for '{to_name}': accepted (its owner is always accepted)", r.from_name);
         return accept_request(s, &r, &owner);
     }
+    if !r.invite.is_empty() {
+        match check_invite(&r.invite, &r.body.to) {
+            Ok(nonce) if !s.store.invites_used.contains(&nonce) => {
+                log::info!("link request from '{}' for '{to_name}': accepted (it came with an invite)", r.from_name);
+                s.store.invites_used.push(nonce);
+                return accept_request(s, &r, &owner);
+            }
+            Ok(_) => log::info!("link request from '{}': its invite was used already", r.from_name),
+            Err(e) => log::info!("link request from '{}': {e}", r.from_name),
+        }
+    }
     // One waiting request per pair of worlds; the oldest go when there are too many.
     s.store.incoming.retain(|i| !(i.request.body.from == r.body.from && i.request.body.to == r.body.to));
     while s.store.incoming.len() >= MAX_INCOMING {
@@ -481,6 +499,46 @@ fn receive_revoke(s: &mut State, r: Revoke) -> Result<(), String> {
     Ok(())
 }
 
+const INVITE_HEADER: &str = "chiacraft-invite-1";
+const INVITE_LABEL: &str = "chiacraft link invite v1\n";
+/// How long an invite is good for.
+const INVITE_LIFETIME: u64 = 7 * 86_400;
+
+/// An invite to link with world `world` (its address, with the invite as a hint): whoever asks
+/// with it is linked without being asked about, once, within a week. Signed by the world's key.
+pub fn invite(world: &crate::world_address::WorldIdentity, name: &str) -> String {
+    let body = format!("{INVITE_HEADER};world={};expires={};nonce={}", world.key(), crate::saves::now_secs() + INVITE_LIFETIME, nonce());
+    let sig = hex(&world.secret.sign(format!("{INVITE_LABEL}{body}").as_bytes()).to_bytes());
+    let address = crate::world_address::address(&world.key(), name, None, &[]);
+    crate::world_address::with_hint(&address, "i", &format!("{body};sig={sig}"))
+}
+
+/// The invite's nonce if it is world `world`'s, signed by it, and not expired.
+fn check_invite(text: &str, world: &str) -> Result<String, String> {
+    let (body, sig) = text.rsplit_once(";sig=").ok_or("an invite this game can't read")?;
+    let mut f = body.split(';');
+    let field = |f: &mut std::str::Split<'_, char>, name: &str| f.next().and_then(|p| p.strip_prefix(name)).and_then(|p| p.strip_prefix('=')).map(str::to_string);
+    if f.next() != Some(INVITE_HEADER) {
+        return Err("an invite this game can't read".into());
+    }
+    let (Some(w), Some(expires), Some(nonce)) = (field(&mut f, "world"), field(&mut f, "expires"), field(&mut f, "nonce")) else {
+        return Err("an invite this game can't read".into());
+    };
+    if w != world {
+        return Err("an invite for another world".into());
+    }
+    if expires.parse::<u64>().unwrap_or(0) < crate::saves::now_secs() {
+        return Err("an expired invite".into());
+    }
+    if !verify(world, format!("{INVITE_LABEL}{body}").as_bytes(), sig) {
+        return Err("an invite its world didn't sign".into());
+    }
+    Ok(nonce)
+}
+
+/// The invite made last, for the Links screen to show.
+pub static LAST_INVITE: Mutex<String> = Mutex::new(String::new());
+
 /// Messages due for delivery now (a copy, with their place in the outbox).
 pub fn due() -> Vec<(usize, Queued)> {
     let now = crate::saves::now_secs();
@@ -531,6 +589,20 @@ mod tests {
         assert!(Body { note: "a\nb".into(), ..b.clone() }.check().is_err());
         assert!(Body { created: now - MAX_AGE - 1, ..b.clone() }.check().is_err());
         assert!(Body { to: "a".into(), ..b.clone() }.check().is_err());
+    }
+
+    #[test]
+    fn invites_are_checked() {
+        let k = iroh::SecretKey::from_bytes(&[3; 32]);
+        let world = k.public().to_string();
+        let body = format!("{INVITE_HEADER};world={world};expires={};nonce=abc", crate::saves::now_secs() + 60);
+        let sig = hex(&k.sign(format!("{INVITE_LABEL}{body}").as_bytes()).to_bytes());
+        assert_eq!(check_invite(&format!("{body};sig={sig}"), &world).unwrap(), "abc");
+        assert!(check_invite(&format!("{body};sig={sig}"), "another").is_err());
+        assert!(check_invite(&format!("{};sig={sig}", body.replace("nonce=abc", "nonce=abd")), &world).is_err());
+        let old = format!("{INVITE_HEADER};world={world};expires=1;nonce=abc");
+        let sig = hex(&k.sign(format!("{INVITE_LABEL}{old}").as_bytes()).to_bytes());
+        assert!(check_invite(&format!("{old};sig={sig}"), &world).is_err());
     }
 
     #[test]

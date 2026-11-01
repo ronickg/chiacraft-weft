@@ -118,6 +118,9 @@ pub const NEAR: i32 = 2;
 /// Saved cubes beyond what is loaded sent to a player per tick (each read from disk).
 const FAR_PER_TICK: usize = 256;
 
+/// Ticks a player arriving through a portal can't be hurt (chiacraft): five seconds.
+const ARRIVAL_PROTECTION: u32 = 100;
+
 /// State the client thread may read or poke while the server runs.
 #[derive(Default)]
 pub struct Shared {
@@ -1294,7 +1297,8 @@ impl Server {
             }
         };
         // Through a portal (chiacraft): beside this world's portal for that link.
-        if let Some(at) = self.storage.as_ref().map(|s| s.lock().meta.dir.clone()).and_then(|d| crate::travel::arrival(&d, &key)) {
+        let arrived = self.storage.as_ref().map(|s| s.lock().meta.dir.clone()).and_then(|d| crate::travel::arrival(&d, &key));
+        if let Some(at) = arrived {
             dim = c.spawn_dim;
             pos = glam::DVec3::from_array(at);
             log::info!("{name} arrives through a portal at {:.0} {:.0} {:.0}", pos.x, pos.y, pos.z);
@@ -1315,6 +1319,10 @@ impl Server {
             e.worn = worn;
             if e.health <= 0.0 {
                 e.health = max;
+            }
+            // Out of a portal: a few seconds before anything can hurt them, to find their feet.
+            if arrived.is_some() {
+                e.hurt_cooldown = e.hurt_cooldown.max(ARRIVAL_PROTECTION);
             }
         }
         r.emit_engine(c, abi::event::PLAYER_JOINED, &abi::PlayerEvent { player: id });

@@ -80,6 +80,8 @@ pub enum Request {
     ReturnHome,
     /// Asks the world at this address to link with the world in play, with a note (chiacraft).
     AskLink(String, String),
+    /// Makes an invite to link with the world in play (chiacraft, `links::invite`).
+    MakeInvite,
     /// Stops the join in progress (chiacraft).
     CancelJoin,
     /// The join sheet's answer: download the world's packages; true also trusts their creators.
@@ -1045,6 +1047,14 @@ impl Running {
                     }
                 }
                 Request::ReturnHome => self.return_home(),
+                Request::MakeInvite => {
+                    if let Some(Game { server: Some(_), identity: Some(id), world, .. }) = &self.game {
+                        let invite = crate::links::invite(id, world);
+                        log::info!("invite made for '{world}': {invite}");
+                        *crate::links::LAST_INVITE.lock() = invite;
+                    }
+                    self.rebuild_all();
+                }
                 Request::AskLink(address, note) => {
                     let result = match &self.game {
                         Some(Game { server: Some(_), identity: Some(id), world, .. }) => {

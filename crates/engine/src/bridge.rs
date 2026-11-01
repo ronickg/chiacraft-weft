@@ -11,6 +11,11 @@
 //! - `ticket <player entity> <link id>`: a travel ticket (`travel`) this world signs for that player
 //!   to go through the link, or empty;
 //! - `spot <link id> <x> <y> <z>`: arrivals through the link stand here; `unspot <link id>` forgets it.
+//!
+//! Asked anywhere (from a mod's client hooks too):
+//! - `warm <world key>`: asks that world for its status through the player's own endpoint, in the
+//!   background, so a trip there finds its way faster; `warmed <world key>` gives what it answered,
+//!   `<name>\t<players>`, empty while unknown or offline.
 
 use std::cell::RefCell;
 
@@ -39,6 +44,14 @@ pub unsafe extern "C" fn query(q: Str, arg: Str) -> Str {
 }
 
 fn answer(q: &str, arg: &str) -> String {
+    match q {
+        "warm" => {
+            crate::net::p2p::warm(arg);
+            return String::new();
+        }
+        "warmed" => return crate::net::p2p::warmed(arg).map(|s| format!("{}\t{}", s.name.replace(['\t', '\n'], " "), s.players)).unwrap_or_default(),
+        _ => {}
+    }
     let Some(info) = crate::server::current_info() else { return String::new() };
     match q {
         "owner" => {

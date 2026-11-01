@@ -204,96 +204,114 @@ impl Screen for Links {
         crate::links::UNSEEN.store(0, std::sync::atomic::Ordering::Relaxed);
         let store = crate::links::snapshot();
         frame(ui, cx, "links.title", |ui| {
-            // Asking: only from one of your own worlds, which is what gets linked.
-            if cx.in_game && !cx.remote {
-                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
-                    label(ui, cx, "links.ask", &[], "default");
-                    let input = ui.add(Kind::input("", 4096), Style::default().h(18.0).stretch());
-                    ui.set_id(input, "link_address");
-                    label(ui, cx, "links.note", &[], "dim");
-                    let note = ui.add(Kind::input("", 200), Style::default().h(18.0).stretch());
-                    ui.set_id(note, "link_note");
-                    let id = button(ui, cx, "links.send", &[], 120.0, |c| {
-                        let address = c.input_text("link_address").unwrap_or_default();
-                        let note = c.input_text("link_note").unwrap_or_default();
-                        c.requests.push(Request::AskLink(address, note));
+            // Everything but Back scrolls: requests and links can outgrow the window.
+            let list = ui.container(Style::default().gap(10.0).w(400.0).h(0.0).grow().min_h(60.0).scroll(), |ui| {
+                // Asking: only from one of your own worlds, which is what gets linked.
+                if cx.in_game && !cx.remote {
+                    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
+                        label(ui, cx, "links.ask", &[], "default");
+                        let input = ui.add(Kind::input("", 4096), Style::default().h(18.0).stretch());
+                        ui.set_id(input, "link_address");
+                        label(ui, cx, "links.note", &[], "dim");
+                        let note = ui.add(Kind::input("", 200), Style::default().h(18.0).stretch());
+                        ui.set_id(note, "link_note");
+                        let id = button(ui, cx, "links.send", &[], 120.0, |c| {
+                            let address = c.input_text("link_address").unwrap_or_default();
+                            let note = c.input_text("link_note").unwrap_or_default();
+                            c.requests.push(Request::AskLink(address, note));
+                        });
+                        ui.set_id(id, "ask");
+                        // An invite: whoever asks with it is linked without being asked about.
+                        let invite = crate::links::LAST_INVITE.lock().clone();
+                        if invite.is_empty() {
+                            let id = button(ui, cx, "links.make_invite", &[], 200.0, |c| c.requests.push(Request::MakeInvite));
+                            ui.set_id(id, "make_invite");
+                        } else {
+                            label(ui, cx, "links.invite", &[], "dim");
+                            let short = if invite.len() > 60 { format!("{}...{}", &invite[..34], &invite[invite.len() - 20..]) } else { invite.clone() };
+                            label(ui, cx, "links.invite_text", &[Arg::Text(short)], "default");
+                            let id = button(ui, cx, "multiplayer.copy", &[], 120.0, move |_| {
+                                crate::clipboard::set(&invite);
+                            });
+                            ui.set_id(id, "copy_invite");
+                        }
                     });
-                    ui.set_id(id, "ask");
-                });
-            }
-            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
-                label(ui, cx, "links.incoming", &[], "default");
-                if store.incoming.is_empty() {
-                    label(ui, cx, "links.none", &[], "dim");
                 }
-                for (i, inc) in store.incoming.iter().enumerate() {
-                    let r = &inc.request;
-                    label(ui, cx, "links.request", &[Arg::Text(r.from_name.clone()), Arg::Text(short(&inc.owner)), Arg::Text(inc.to_name.clone())], "default");
-                    if !r.body.note.is_empty() {
-                        label(ui, cx, "links.says", &[Arg::Text(r.body.note.clone())], "dim");
+                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
+                    label(ui, cx, "links.incoming", &[], "default");
+                    if store.incoming.is_empty() {
+                        label(ui, cx, "links.none", &[], "dim");
                     }
-                    ui.container(Style::row().gap(4.0), |ui| {
-                        let id = r.body.id();
-                        let (a, b, d) = (id.clone(), id.clone(), id);
-                        let n = button(ui, cx, "links.accept", &[], 80.0, move |c| {
-                            if let Err(e) = crate::links::accept(&a, false) {
-                                log::warn!("{e}");
-                            }
-                            c.requests.push(Request::Rebuild);
-                        });
-                        ui.set_id(n, &format!("accept{i}"));
-                        let n = button(ui, cx, "links.always", &[], 140.0, move |c| {
-                            if let Err(e) = crate::links::accept(&b, true) {
-                                log::warn!("{e}");
-                            }
-                            c.requests.push(Request::Rebuild);
-                        });
-                        ui.set_id(n, &format!("always{i}"));
-                        let n = button(ui, cx, "links.decline", &[], 80.0, move |c| {
-                            crate::links::decline(&d, false);
-                            c.requests.push(Request::Rebuild);
-                        });
-                        ui.set_id(n, &format!("decline{i}"));
-                    });
-                }
-            });
-            if !store.outgoing.is_empty() {
-                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
-                    label(ui, cx, "links.outgoing", &[], "default");
-                    for o in &store.outgoing {
-                        let r = &o.request;
-                        let to = if o.to_name.is_empty() { short(&r.body.to) } else { o.to_name.clone() };
-                        let queued = store.outbox.iter().any(|q| matches!(&q.message, crate::links::Message::Request(x) if x.body.id() == r.body.id()));
-                        ui.container(Style::row().gap(6.0).stretch(), |ui| {
-                            label(ui, cx, if queued { "links.sending" } else { "links.waiting" }, &[Arg::Text(r.from_name.clone()), Arg::Text(to)], "default");
+                    for (i, inc) in store.incoming.iter().enumerate() {
+                        let r = &inc.request;
+                        label(ui, cx, "links.request", &[Arg::Text(r.from_name.clone()), Arg::Text(short(&inc.owner)), Arg::Text(inc.to_name.clone())], "default");
+                        if !r.body.note.is_empty() {
+                            label(ui, cx, "links.says", &[Arg::Text(r.body.note.clone())], "dim");
+                        }
+                        ui.container(Style::row().gap(4.0), |ui| {
                             let id = r.body.id();
-                            button(ui, cx, "links.withdraw", &[], 80.0, move |c| {
-                                crate::links::withdraw(&id);
+                            let (a, b, d) = (id.clone(), id.clone(), id);
+                            let n = button(ui, cx, "links.accept", &[], 80.0, move |c| {
+                                if let Err(e) = crate::links::accept(&a, false) {
+                                    log::warn!("{e}");
+                                }
                                 c.requests.push(Request::Rebuild);
                             });
+                            ui.set_id(n, &format!("accept{i}"));
+                            let n = button(ui, cx, "links.always", &[], 140.0, move |c| {
+                                if let Err(e) = crate::links::accept(&b, true) {
+                                    log::warn!("{e}");
+                                }
+                                c.requests.push(Request::Rebuild);
+                            });
+                            ui.set_id(n, &format!("always{i}"));
+                            let n = button(ui, cx, "links.decline", &[], 80.0, move |c| {
+                                crate::links::decline(&d, false);
+                                c.requests.push(Request::Rebuild);
+                            });
+                            ui.set_id(n, &format!("decline{i}"));
                         });
                     }
                 });
-            }
-            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
-                label(ui, cx, "links.links", &[], "default");
-                if store.links.is_empty() {
-                    label(ui, cx, "links.no_links", &[], "dim");
-                }
-                for (i, l) in store.links.iter().enumerate() {
-                    ui.container(Style::row().gap(6.0).stretch(), |ui| {
-                        label(ui, cx, "links.link", &[Arg::Text(l.from_name.clone()), Arg::Text(l.to_name.clone())], "default");
-                        let id = l.id();
-                        let n = button(ui, cx, "links.end", &[], 80.0, move |c| {
-                            if let Err(e) = crate::links::revoke(&id) {
-                                log::warn!("{e}");
-                            }
-                            c.requests.push(Request::Rebuild);
-                        });
-                        ui.set_id(n, &format!("end{i}"));
+                if !store.outgoing.is_empty() {
+                    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
+                        label(ui, cx, "links.outgoing", &[], "default");
+                        for o in &store.outgoing {
+                            let r = &o.request;
+                            let to = if o.to_name.is_empty() { short(&r.body.to) } else { o.to_name.clone() };
+                            let queued = store.outbox.iter().any(|q| matches!(&q.message, crate::links::Message::Request(x) if x.body.id() == r.body.id()));
+                            ui.container(Style::row().gap(6.0).stretch(), |ui| {
+                                label(ui, cx, if queued { "links.sending" } else { "links.waiting" }, &[Arg::Text(r.from_name.clone()), Arg::Text(to)], "default");
+                                let id = r.body.id();
+                                button(ui, cx, "links.withdraw", &[], 80.0, move |c| {
+                                    crate::links::withdraw(&id);
+                                    c.requests.push(Request::Rebuild);
+                                });
+                            });
+                        }
                     });
                 }
+                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
+                    label(ui, cx, "links.links", &[], "default");
+                    if store.links.is_empty() {
+                        label(ui, cx, "links.no_links", &[], "dim");
+                    }
+                    for (i, l) in store.links.iter().enumerate() {
+                        ui.container(Style::row().gap(6.0).stretch(), |ui| {
+                            label(ui, cx, "links.link", &[Arg::Text(l.from_name.clone()), Arg::Text(l.to_name.clone())], "default");
+                            let id = l.id();
+                            let n = button(ui, cx, "links.end", &[], 80.0, move |c| {
+                                if let Err(e) = crate::links::revoke(&id) {
+                                    log::warn!("{e}");
+                                }
+                                c.requests.push(Request::Rebuild);
+                            });
+                            ui.set_id(n, &format!("end{i}"));
+                        });
+                    }
+                });
             });
+            ui.set_id(list, "links_list");
             button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }

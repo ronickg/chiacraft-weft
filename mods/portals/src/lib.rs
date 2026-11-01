@@ -30,6 +30,10 @@ static BIND: Channel<String> = Channel::named("bind");
 /// Server to a client: go to the world with this key, carrying the travel ticket this world signed
 /// (`key\tname\tticket`).
 static TRAVEL: Channel<String> = Channel::named("travel");
+/// Server to a client: a bound portal is near; warm up the way to the world with this key
+/// (`key\tname`).
+static NEAR: Channel<String> = Channel::named("near");
+
 /// Server to a client: a line to show the player, as a translation key and one argument
 /// (`key\targ`), so it reads in the player's own language.
 static SAY: Channel<String> = Channel::named("say");
@@ -94,6 +98,7 @@ fn init(r: &mut Registry) {
 
     r.packet(&BIND, |p, text| bind(p, &text));
     r.world_tick(walk_in);
+    r.world_tick(near_portals);
     client(r);
 }
 
@@ -235,6 +240,50 @@ fn walk_in(w: &World) {
     }
 }
 
+/// How far from a portal a player's game starts warming up the trip, in blocks.
+const NEAR_BLOCKS: i32 = 4;
+
+/// When each player was last looked at and last told about each link, so the search runs about
+/// twice a second and a player hears about a portal once every half minute.
+static NEARBY: Mutex<Option<std::collections::HashMap<u64, (std::time::Instant, Vec<(String, std::time::Instant)>)>>> = Mutex::new(None);
+
+/// Players walking up to a bound portal: their game warms up the trip (see `bridge`'s `warm`).
+fn near_portals(w: &World) {
+    for player in w.each_player() {
+        let Some(st) = w.entity(player) else { continue };
+        let mut nearby = NEARBY.lock().unwrap();
+        let entry = nearby.get_or_insert_with(Default::default).entry(player).or_insert_with(|| (std::time::Instant::now(), Vec::new()));
+        if entry.0.elapsed().as_millis() < 500 {
+            continue;
+        }
+        entry.0 = std::time::Instant::now();
+        entry.1.retain(|(_, t)| t.elapsed().as_secs() < 30);
+        let c = [st.pos[0].floor() as i32, st.pos[1].floor() as i32, st.pos[2].floor() as i32];
+        let mut found = None;
+        'search: for dy in -1..=2 {
+            for dx in -NEAR_BLOCKS..=NEAR_BLOCKS {
+                for dz in -NEAR_BLOCKS..=NEAR_BLOCKS {
+                    let p = [c[0] + dx, c[1] + dy, c[2] + dz];
+                    if PORTAL.is(w.get(p))
+                        && let Some(id) = link_at(w, p)
+                    {
+                        found = Some(id);
+                        break 'search;
+                    }
+                }
+            }
+        }
+        let Some(id) = found else { continue };
+        if entry.1.iter().any(|(l, _)| *l == id) {
+            continue;
+        }
+        entry.1.push((id.clone(), std::time::Instant::now()));
+        if let Some((name, key)) = link(&id) {
+            w.send(player, &NEAR, &format!("{key}\t{name}"));
+        }
+    }
+}
+
 // ------------------------------------------------------------------ the client half
 
 /// What the portal screen shows: owner or not, the portal's position, and the links to pick.
@@ -263,6 +312,11 @@ fn client(r: &mut Registry) {
     r.client_packet(&SAY, |c, text| {
         let (key, arg) = text.split_once('\t').unwrap_or((&text, ""));
         c.chat(&format!("/portal_note {key} {arg}"));
+    });
+    r.client_packet(&NEAR, |c, text| {
+        let (key, name) = text.split_once('\t').unwrap_or((&text, ""));
+        ask("warm", key);
+        c.chat(&format!("/portal_note portals.msg.near {name}"));
     });
     r.client_packet(&TRAVEL, |c, text| {
         let mut f = text.split('\t');

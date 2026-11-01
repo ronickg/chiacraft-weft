@@ -248,6 +248,35 @@ async fn account(settings: &Settings) -> Result<Endpoint, String> {
         .cloned()
 }
 
+/// Worlds asked about ahead of a trip (`warm`), and what they answered.
+static WARMED: Mutex<Option<std::collections::HashMap<String, (Status, std::time::Instant)>>> = Mutex::new(None);
+
+/// Asks the world with key `key` for its status through the player's own endpoint, in the
+/// background: the endpoint then knows the way there, and a trip that follows connects sooner.
+pub fn warm(key: &str) {
+    let (Some(ep), Ok(addr)) = (ACCOUNT.get().cloned(), parse_ticket(key)) else { return };
+    let key = key.to_string();
+    runtime().spawn(async move {
+        match status_on(&ep, addr, Duration::from_secs(8)).await {
+            Ok(st) => {
+                log::info!("a portal leads to '{}' ({} playing): on the way", st.name, st.players);
+                WARMED.lock().get_or_insert_with(Default::default).insert(key, (st, std::time::Instant::now()));
+            }
+            Err(e) => {
+                log::info!("a portal leads to a world that doesn't answer: {e}");
+                if let Some(w) = WARMED.lock().as_mut() {
+                    w.remove(&key);
+                }
+            }
+        }
+    });
+}
+
+/// What the world with key `key` answered when warmed in the last minute.
+pub fn warmed(key: &str) -> Option<Status> {
+    WARMED.lock().as_ref()?.get(key).filter(|(_, t)| t.elapsed().as_secs() < 60).map(|(s, _)| s.clone())
+}
+
 /// Opens the player's endpoint in the background: link requests can reach this game from now on.
 pub fn start_account(settings: &Settings) {
     let settings = settings.clone();
