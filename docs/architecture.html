@@ -1,0 +1,487 @@
+<title>chiacraft Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; diagrams run wider in their own scroll boxes, each with one claim. */
+:root {
+  --bg: #eef1f4;
+  --panel: #ffffff;
+  --ink: #1c2430;
+  --muted: #5b6676;
+  --line: #c6ced8;
+  --accent: #b4233a;
+  --accent-soft: #f7dfe3;
+  --net: #2a6a89;
+  --net-soft: #dcebf2;
+  --display: "Silkscreen", "Courier New", monospace;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151b; --panel: #19202a; --ink: #e2e7ee; --muted: #94a1b2; --line: #334152;
+    --accent: #e45a70; --accent-soft: #3b1f27; --net: #72b6d6; --net-soft: #17303d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151b; --panel: #19202a; --ink: #e2e7ee; --muted: #94a1b2; --line: #334152;
+  --accent: #e45a70; --accent-soft: #3b1f27; --net: #72b6d6; --net-soft: #17303d; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 72px; display: flex; flex-direction: column; gap: 56px; }
+header { display: flex; flex-direction: column; gap: 14px; max-width: 70ch; }
+h1 { font: 400 clamp(34px, 6vw, 56px)/1 var(--display); margin: 0; letter-spacing: 0.02em; }
+h1 span { color: var(--accent); }
+.lede { font-size: 18px; color: var(--muted); margin: 0; text-wrap: pretty; }
+nav { display: flex; flex-wrap: wrap; gap: 8px; }
+nav a { font: 500 13px var(--mono); color: var(--ink); text-decoration: none; border: 1px solid var(--line); background: var(--panel); padding: 4px 10px; border-radius: 4px; }
+nav a:hover, nav a:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+section { display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 16px; }
+.eyebrow { font: 400 12px var(--display); color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; }
+h2 { font: 600 26px/1.25 var(--body); margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 70ch; text-wrap: pretty; }
+code { font: 14px var(--mono); background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.scroll { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.scroll svg { display: block; width: 100%; min-width: 720px; height: auto; color: var(--ink); }
+figcaption { font-size: 14px; color: var(--muted); max-width: 80ch; }
+.points { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.points div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.points b { font-weight: 600; font-size: 15px; }
+.points span { font-size: 14px; color: var(--muted); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 12px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+td:first-child { font-family: var(--mono); white-space: nowrap; }
+.table-box { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.roadmap { display: flex; flex-direction: column; gap: 8px; }
+.step { display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; align-items: baseline; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; }
+.step .ph { font: 400 12px var(--display); color: var(--muted); letter-spacing: 0.05em; }
+.step .what { min-width: 0; }
+.chip { font: 500 12px var(--mono); padding: 2px 8px; border-radius: 3px; white-space: nowrap; }
+.chip.done { background: var(--net-soft); color: var(--net); }
+.chip.next { background: var(--accent-soft); color: var(--accent); }
+.chip.later { border: 1px solid var(--line); color: var(--muted); }
+@media (max-width: 560px) { .step { grid-template-columns: 1fr auto; } .step .ph { grid-column: 1 / -1; } }
+footer { font-size: 13px; color: var(--muted); }
+
+/* Diagram pieces */
+.box { fill: var(--panel); stroke: var(--ink); stroke-width: 1.2; }
+.frame { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.netbox { fill: var(--net-soft); stroke: var(--net); stroke-width: 1.2; }
+.hotbox { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+.dim { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; }
+.note { fill: var(--bg); stroke: var(--line); stroke-width: 1; }
+.t { font: 600 13px var(--body); fill: currentColor; }
+.s { font: 13px var(--body); fill: currentColor; }
+.m { font: 11.5px var(--mono); fill: var(--muted); }
+.mi { font: 11.5px var(--mono); fill: currentColor; }
+.ma { font: 500 11.5px var(--mono); fill: var(--accent); }
+.mn { font: 11.5px var(--mono); fill: var(--net); }
+.h { font: 400 12px var(--display); fill: var(--muted); letter-spacing: 0.04em; }
+.ln { stroke: currentColor; stroke-width: 1.3; fill: none; }
+.lna { stroke: var(--accent); stroke-width: 2; fill: none; }
+.lnn { stroke: var(--net); stroke-width: 1.3; fill: none; stroke-dasharray: 5 4; }
+.life { stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.dash { stroke: currentColor; stroke-width: 1.3; fill: none; stroke-dasharray: 5 4; }
+.head { fill: currentColor; }
+.heada { fill: var(--accent); }
+.headn { fill: var(--net); }
+@media (prefers-reduced-motion: no-preference) { nav a { transition: border-color .15s, color .15s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>chia<span>craft</span></h1>
+    <p class="lede">How players, worlds, packages and links fit together on the Weft engine, as built through Phase 3 slice 3 (31 October 2026). Every arrow below is something the code does today, unless it is marked as next.</p>
+    <nav aria-label="Sections">
+      <a href="#overview">Overview</a>
+      <a href="#keys">Keys</a>
+      <a href="#join">Joining</a>
+      <a href="#scope">World scope</a>
+      <a href="#links">Links</a>
+      <a href="#packages">Packages</a>
+      <a href="#code">Code map</a>
+      <a href="#roadmap">Roadmap</a>
+    </nav>
+  </header>
+
+  <section id="overview">
+    <div class="eyebrow">The whole picture</div>
+    <h2>Two games, two endpoints each, no server in the middle</h2>
+    <p>Every game runs its own world in the same process and talks to other games directly over iroh (QUIC). A game has two network endpoints: one under the player's account key, which joins other worlds and receives link requests, and one under the open world's own key, which other players join. The services in the middle only help peers find and reach each other; anyone can run them.</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 1000 500" role="img" aria-label="Player A's game joins player B's world through A's account endpoint and B's world endpoint; the two account endpoints exchange link messages; worlds publish their relay address to n0 DNS and the Mainline DHT, which players look keys up in.">
+          <defs>
+            <marker id="o-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+            <marker id="o-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="heada"/></marker>
+            <marker id="o-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="headn"/></marker>
+          </defs>
+          <!-- Player A -->
+          <rect class="frame" x="20" y="16" width="320" height="468" rx="10"/>
+          <text class="h" x="40" y="42">Player A's game</text>
+          <rect class="box" x="40" y="60" width="280" height="58" rx="5"/>
+          <text class="t" x="56" y="84">Game (what A sees)</text>
+          <text class="m" x="56" y="104">client · renderer · the game's content</text>
+          <rect class="box" x="40" y="146" width="280" height="72" rx="5"/>
+          <text class="t" x="56" y="170">A's world server</text>
+          <text class="m" x="56" y="190">own Scope: content + settings</text>
+          <text class="m" x="56" y="207">runs on while A visits B</text>
+          <rect class="netbox" x="40" y="246" width="280" height="58" rx="5"/>
+          <text class="t" x="56" y="270">World endpoint</text>
+          <text class="mn" x="56" y="290">world key · weft/1 · status/1</text>
+          <rect class="netbox" x="40" y="330" width="280" height="58" rx="5"/>
+          <text class="t" x="56" y="354">Account endpoint</text>
+          <text class="mn" x="56" y="374">account key · joins · links/1 inbox</text>
+          <rect class="dim" x="40" y="414" width="280" height="54" rx="5"/>
+          <text class="s" x="56" y="436">run/ folder</text>
+          <text class="m" x="56" y="456">saves/ cache/ links.json worlds.txt</text>
+          <line class="ln" x1="180" y1="120" x2="180" y2="144" marker-start="url(#o-a)" marker-end="url(#o-a)"/>
+          <text class="m" x="190" y="137">local channels</text>
+          <line class="ln" x1="180" y1="220" x2="180" y2="244" marker-end="url(#o-a)"/>
+          <text class="m" x="190" y="237">under the world key</text>
+
+          <!-- Player B -->
+          <rect class="frame" x="660" y="16" width="320" height="468" rx="10"/>
+          <text class="h" x="680" y="42">Player B's game</text>
+          <rect class="box" x="680" y="60" width="280" height="58" rx="5"/>
+          <text class="t" x="696" y="84">Game (what B sees)</text>
+          <text class="m" x="696" y="104">client · renderer · the game's content</text>
+          <rect class="box" x="680" y="146" width="280" height="72" rx="5"/>
+          <text class="t" x="696" y="170">B's world server</text>
+          <text class="m" x="696" y="190">own Scope: content + settings</text>
+          <text class="m" x="696" y="207">A plays here as a guest</text>
+          <rect class="netbox" x="680" y="246" width="280" height="58" rx="5"/>
+          <text class="t" x="696" y="270">World endpoint</text>
+          <text class="mn" x="696" y="290">world key · weft/1 · status/1</text>
+          <rect class="netbox" x="680" y="330" width="280" height="58" rx="5"/>
+          <text class="t" x="696" y="354">Account endpoint</text>
+          <text class="mn" x="696" y="374">account key · joins · links/1 inbox</text>
+          <rect class="dim" x="680" y="414" width="280" height="54" rx="5"/>
+          <text class="s" x="696" y="436">run/ folder</text>
+          <text class="m" x="696" y="456">saves/ cache/ links.json worlds.txt</text>
+          <line class="ln" x1="820" y1="120" x2="820" y2="144" marker-start="url(#o-a)" marker-end="url(#o-a)"/>
+          <line class="ln" x1="820" y1="220" x2="820" y2="244" marker-end="url(#o-a)"/>
+
+          <!-- Shared services -->
+          <text class="h" x="500" y="34" text-anchor="middle">shared, replaceable</text>
+          <rect class="netbox" x="390" y="46" width="220" height="44" rx="5"/>
+          <text class="t" x="500" y="66" text-anchor="middle">n0 relay</text>
+          <text class="mn" x="500" y="82" text-anchor="middle">path when direct fails</text>
+          <rect class="netbox" x="390" y="102" width="220" height="44" rx="5"/>
+          <text class="t" x="500" y="122" text-anchor="middle">n0 DNS (pkarr)</text>
+          <text class="mn" x="500" y="138" text-anchor="middle">key → relay URL</text>
+          <rect class="netbox" x="390" y="158" width="220" height="44" rx="5"/>
+          <text class="t" x="500" y="178" text-anchor="middle">Mainline DHT</text>
+          <text class="mn" x="500" y="194" text-anchor="middle">key → relay URL</text>
+          <line class="lnn" x1="680" y1="262" x2="612" y2="186" marker-end="url(#o-n)"/>
+          <line class="lnn" x1="680" y1="256" x2="612" y2="130" marker-end="url(#o-n)"/>
+          <line class="lnn" x1="320" y1="340" x2="388" y2="196" marker-end="url(#o-n)"/>
+          <text class="mn" x="500" y="226" text-anchor="middle">worlds publish where to reach them;</text>
+          <text class="mn" x="500" y="241" text-anchor="middle">players look a key up</text>
+
+          <!-- Between the games -->
+          <line class="lna" x1="322" y1="352" x2="676" y2="282" marker-end="url(#o-acc)"/>
+          <text class="ma" x="500" y="300" text-anchor="middle">join · weft/1 (A visits B)</text>
+          <line class="ln" x1="324" y1="374" x2="676" y2="374" marker-start="url(#o-a)" marker-end="url(#o-a)"/>
+          <text class="mi" x="500" y="396" text-anchor="middle">links/1 · request · accept · end</text>
+        </svg>
+      </div>
+      <figcaption>A visiting B: A's account endpoint dials B's world endpoint (the accent arrow). A's own world keeps serving its guests meanwhile. Status pings (online, players, owner) use a throwaway key, so asking tells a world nothing about who asks.</figcaption>
+    </figure>
+  </section>
+
+  <section id="keys">
+    <div class="eyebrow">Identity</div>
+    <h2>One set of 24 words, four kinds of key</h2>
+    <p>The words never leave the OS keychain. Everything else is derived one way from the identity key, each on its own label, so a leaked world or content key gives away nothing else. The identity key signs short statements that tie the other keys to it, which is how a world learns who owns a key it has never seen.</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 920 330" role="img" aria-label="The 24 words give the identity key; from it, one-way derivations on separate labels give the network key, the content key and a world key per world, each vouched for or certified by the identity key.">
+          <defs>
+            <marker id="k-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+          </defs>
+          <rect class="box" x="20" y="135" width="140" height="60" rx="5"/>
+          <text class="t" x="90" y="160" text-anchor="middle">24 words</text>
+          <text class="m" x="90" y="180" text-anchor="middle">OS keychain</text>
+          <line class="ln" x1="160" y1="165" x2="208" y2="165" marker-end="url(#k-a)"/>
+          <rect class="hotbox" x="210" y="122" width="200" height="86" rx="5"/>
+          <text class="t" x="310" y="148" text-anchor="middle">Identity key (BLS)</text>
+          <text class="mi" x="310" y="168" text-anchor="middle">you, on every world</text>
+          <text class="m" x="310" y="186" text-anchor="middle">a Chia DID later</text>
+
+          <path class="ln" d="M410 165 H450 V57 H638" marker-end="url(#k-a)"/>
+          <path class="ln" d="M410 165 H638" marker-end="url(#k-a)"/>
+          <path class="ln" d="M450 165 V273 H638" marker-end="url(#k-a)"/>
+          <text class="m" x="462" y="49">label "network key v1"</text>
+          <text class="m" x="462" y="157">label "content key v1"</text>
+          <text class="m" x="462" y="265">label + index + generation</text>
+
+          <rect class="netbox" x="640" y="20" width="260" height="74" rx="5"/>
+          <text class="t" x="656" y="44">Network key (Ed25519)</text>
+          <text class="mi" x="656" y="64">account endpoint · player key</text>
+          <text class="m" x="656" y="82">vouched for on every join</text>
+          <rect class="netbox" x="640" y="128" width="260" height="74" rx="5"/>
+          <text class="t" x="656" y="152">Content key</text>
+          <text class="mi" x="656" y="172">signs packages (package.sig)</text>
+          <text class="m" x="656" y="190">vouched for inside the envelope</text>
+          <rect class="netbox" x="640" y="236" width="260" height="74" rx="5"/>
+          <text class="t" x="656" y="260">World key, one per world</text>
+          <text class="mi" x="656" y="280">the address · hosting endpoint</text>
+          <text class="m" x="656" y="298">certified: world certificate</text>
+        </svg>
+      </div>
+      <figcaption>Each derived seed is SHA-256 of its label and the identity secret. A world key also takes a random index saved in <code>world.txt</code>, so worlds made on two computers never share a key, and a generation for replacing a leaked one.</figcaption>
+    </figure>
+    <div class="points">
+      <div><b>World address</b><span><code>chiacraft://w/&lt;world key&gt;?n=…&amp;r=…&amp;a=…</code>. The key alone is enough; name, relay and direct addresses are hints. Old tickets still parse.</span></div>
+      <div><b>World certificate</b><span>"chiacraft world v1": the world key, generation and creation time, signed by the owner's identity. Served in every status answer.</span></div>
+      <div><b>One world, one place</b><span>Before hosting, the game pings its own world key. If something answers, the world is open elsewhere and hosting is refused.</span></div>
+    </div>
+  </section>
+
+  <section id="join">
+    <div class="eyebrow">Protocol 4</div>
+    <h2>Joining a world downloads its packages first</h2>
+    <p>Code mods must match exactly. Data packages travel: the host offers what its world plays with, the guest downloads what it lacks (after the player agrees), loads exactly that set, and proves it by hash before it is let in.</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 820 590" role="img" aria-label="The joining game sends hello; the host offers packages; after consent the guest fetches manifests and files on extra streams, checking each hash; it builds content for exactly those packages and sends the content hash; the host admits it if the hash matches.">
+          <defs>
+            <marker id="j-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+            <marker id="j-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="heada"/></marker>
+          </defs>
+          <rect class="box" x="80" y="16" width="180" height="48" rx="5"/>
+          <text class="t" x="170" y="38" text-anchor="middle">Joining game</text>
+          <text class="m" x="170" y="55" text-anchor="middle">account endpoint</text>
+          <rect class="box" x="520" y="16" width="200" height="48" rx="5"/>
+          <text class="t" x="620" y="38" text-anchor="middle">Host</text>
+          <text class="m" x="620" y="55" text-anchor="middle">world endpoint + server</text>
+          <line class="life" x1="170" y1="64" x2="170" y2="575"/>
+          <line class="life" x1="620" y1="64" x2="620" y2="575"/>
+
+          <line class="ln" x1="172" y1="100" x2="616" y2="100" marker-end="url(#j-a)"/>
+          <text class="s" x="395" y="92" text-anchor="middle">hello</text>
+          <text class="m" x="395" y="116" text-anchor="middle">protocol 4 · hash of the code mods</text>
+          <line class="ln" x1="618" y1="152" x2="174" y2="152" marker-end="url(#j-a)"/>
+          <text class="s" x="395" y="144" text-anchor="middle">offers, or why not</text>
+          <text class="m" x="395" y="168" text-anchor="middle">id · version · hash · size · signature</text>
+
+          <rect class="note" x="40" y="186" width="260" height="40" rx="4"/>
+          <text class="mi" x="170" y="204" text-anchor="middle">join sheet: untrusted? ask the player</text>
+          <text class="m" x="170" y="219" text-anchor="middle">trust.txt remembers the answer</text>
+
+          <line class="ln" x1="172" y1="262" x2="616" y2="262" marker-end="url(#j-a)"/>
+          <text class="mi" x="395" y="254" text-anchor="middle">GET_MANIFEST hash (its own stream)</text>
+          <line class="ln" x1="618" y1="296" x2="174" y2="296" marker-end="url(#j-a)"/>
+          <text class="mi" x="395" y="288" text-anchor="middle">manifest, checked: BLAKE3 = hash</text>
+          <line class="ln" x1="172" y1="340" x2="616" y2="340" marker-end="url(#j-a)"/>
+          <text class="mi" x="395" y="332" text-anchor="middle">GET_FILE hash, for each missing file</text>
+          <line class="ln" x1="618" y1="374" x2="174" y2="374" marker-end="url(#j-a)"/>
+          <text class="mi" x="395" y="366" text-anchor="middle">bytes, checked: size and BLAKE3</text>
+
+          <rect class="note" x="634" y="244" width="176" height="122" rx="4"/>
+          <text class="h" x="646" y="264">host limits</text>
+          <text class="m" x="646" y="284">only offered hashes</text>
+          <text class="m" x="646" y="302">about 2× the offer per peer</text>
+          <text class="m" x="646" y="320">4 streams at once</text>
+          <text class="m" x="646" y="338">8 joins configuring</text>
+          <text class="m" x="646" y="356">15 minutes to finish</text>
+
+          <rect class="note" x="40" y="400" width="260" height="40" rx="4"/>
+          <text class="mi" x="170" y="418" text-anchor="middle">build content for exactly these</text>
+          <text class="m" x="170" y="433" text-anchor="middle">modloader::use_packages</text>
+
+          <line class="ln" x1="172" y1="476" x2="616" y2="476" marker-end="url(#j-a)"/>
+          <text class="mi" x="395" y="468" text-anchor="middle">ready: hash of the content loaded</text>
+          <line class="lna" x1="618" y1="516" x2="174" y2="516" marker-end="url(#j-acc)"/>
+          <text class="ma" x="395" y="508" text-anchor="middle">admitted (or: content doesn't match)</text>
+          <line class="ln" x1="174" y1="556" x2="616" y2="556" marker-start="url(#j-a)" marker-end="url(#j-a)"/>
+          <text class="mi" x="395" y="548" text-anchor="middle">play</text>
+        </svg>
+      </div>
+      <figcaption>Downloads ride extra streams of the same connection and every byte is checked against the hash the world pins. A signature on a package travels beside it and is kept only if it checks out.</figcaption>
+    </figure>
+  </section>
+
+  <section id="scope">
+    <div class="eyebrow">Phase 3 slice 1</div>
+    <h2>Your world keeps its own content while you visit</h2>
+    <p>The game and your world's server share one process. When you visit a world with other packages, the game switches to that world's content, but your server must not. So the engine asks one question every time code reads the content (or a synced setting such as a game rule): is this one of a server's threads?</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 900 270" role="img" aria-label="content::content() checks whether the calling thread belongs to a server; server threads, the server's own thread pool and its background jobs get their world's content; every other thread gets the game's content.">
+          <defs>
+            <marker id="s-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+            <marker id="s-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="heada"/></marker>
+          </defs>
+          <rect class="box" x="20" y="110" width="170" height="50" rx="25"/>
+          <text class="mi" x="105" y="140" text-anchor="middle">content::content()</text>
+          <line class="ln" x1="190" y1="135" x2="258" y2="135" marker-end="url(#s-a)"/>
+          <path class="box" d="M330 85 L400 135 L330 185 L260 135 Z"/>
+          <text class="s" x="330" y="131" text-anchor="middle">a server's</text>
+          <text class="s" x="330" y="147" text-anchor="middle">thread?</text>
+          <path class="lna" d="M366 110 L430 65 H498" marker-end="url(#s-acc)"/>
+          <text class="ma" x="440" y="56">yes</text>
+          <path class="ln" d="M366 160 L430 205 H498" marker-end="url(#s-a)"/>
+          <text class="mi" x="440" y="225">no</text>
+          <rect class="hotbox" x="500" y="30" width="380" height="72" rx="5"/>
+          <text class="t" x="516" y="54">The world's own Content</text>
+          <text class="mi" x="516" y="74">server thread · its rayon pool · its jobs</text>
+          <text class="m" x="516" y="92">content::for_thread, Scope::with</text>
+          <rect class="box" x="500" y="170" width="380" height="72" rx="5"/>
+          <text class="t" x="516" y="194">The game's Content</text>
+          <text class="mi" x="516" y="214">what you see; switches when you visit</text>
+          <text class="m" x="516" y="232">modloader::use_packages, use_built</text>
+        </svg>
+      </div>
+      <figcaption>Each frozen Content is built once per set of packages and kept for the life of the game, so switching back is instant. Code mods take the first ids in every build, so their ids never move.</figcaption>
+    </figure>
+    <div class="points">
+      <div><b>Leaving for another world</b><span>If your world is hosted, it keeps running for its guests and becomes "home". Otherwise it is saved and closed.</span></div>
+      <div><b>Coming back</b><span>"Back to &lt;world&gt;" in the pause menu, or automatically when the world you visit goes offline or the join fails.</span></div>
+      <div><b>Quitting</b><span>Save and Quit, or closing the game, stops home too.</span></div>
+    </div>
+  </section>
+
+  <section id="links">
+    <div class="eyebrow">Phase 3 slice 3</div>
+    <h2>A link is one record both worlds sign</h2>
+    <p>Worlds are offline most of the time, so requests go to the owner's game, which is the inbox for all of their worlds whenever it runs. Anything that can't be delivered waits in an outbox and is tried again for up to two weeks.</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 900 580" role="img" aria-label="A asks B's world for its owner's inbox, sends a request signed by world A to that inbox, B's game checks it, the owner accepts and world B signs the same bytes, the accept goes back to A's inbox, and both keep the twice-signed record; either side can end it with a signed tombstone.">
+          <defs>
+            <marker id="l-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+            <marker id="l-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="heada"/></marker>
+          </defs>
+          <rect class="box" x="40" y="16" width="180" height="48" rx="5"/>
+          <text class="t" x="130" y="38" text-anchor="middle">A's game</text>
+          <text class="m" x="130" y="55" text-anchor="middle">account endpoint</text>
+          <rect class="netbox" x="360" y="16" width="180" height="48" rx="5"/>
+          <text class="t" x="450" y="38" text-anchor="middle">B's world</text>
+          <text class="mn" x="450" y="55" text-anchor="middle">world endpoint</text>
+          <rect class="box" x="680" y="16" width="180" height="48" rx="5"/>
+          <text class="t" x="770" y="38" text-anchor="middle">B's game (inbox)</text>
+          <text class="m" x="770" y="55" text-anchor="middle">account endpoint</text>
+          <line class="life" x1="130" y1="64" x2="130" y2="565"/>
+          <line class="life" x1="450" y1="64" x2="450" y2="565"/>
+          <line class="life" x1="770" y1="64" x2="770" y2="565"/>
+
+          <rect class="note" x="20" y="84" width="300" height="36" rx="4"/>
+          <text class="mi" x="170" y="107" text-anchor="middle">ask: body signed by world A → outbox</text>
+
+          <line class="ln" x1="132" y1="156" x2="446" y2="156" marker-end="url(#l-a)"/>
+          <text class="mi" x="290" y="148" text-anchor="middle">status/1</text>
+          <line class="ln" x1="448" y1="190" x2="134" y2="190" marker-end="url(#l-a)"/>
+          <text class="mi" x="290" y="182" text-anchor="middle">owner's inbox + owner's vouch</text>
+
+          <line class="ln" x1="132" y1="246" x2="766" y2="246" marker-end="url(#l-a)"/>
+          <text class="mi" x="450" y="238" text-anchor="middle">Request: body · world A's signature · A's certificate · answer to</text>
+
+          <rect class="note" x="560" y="268" width="330" height="56" rx="4"/>
+          <text class="mi" x="725" y="290" text-anchor="middle">checks: world A signed it · certificate valid</text>
+          <text class="mi" x="725" y="308" text-anchor="middle">answer address is the owner's · sender is it</text>
+
+          <rect class="note" x="560" y="342" width="330" height="36" rx="4"/>
+          <text class="mi" x="725" y="365" text-anchor="middle">owner accepts: world B signs the same bytes</text>
+
+          <line class="lna" x1="768" y1="414" x2="134" y2="414" marker-end="url(#l-acc)"/>
+          <text class="ma" x="450" y="406" text-anchor="middle">Accept: world B's signature · B's certificate</text>
+
+          <rect class="hotbox" x="200" y="440" width="500" height="40" rx="4"/>
+          <text class="mi" x="450" y="465" text-anchor="middle">both keep { body, sig A, sig B }   id = BLAKE3(body)</text>
+
+          <line class="dash" x1="132" y1="528" x2="766" y2="528" marker-start="url(#l-a)" marker-end="url(#l-a)"/>
+          <text class="mi" x="450" y="520" text-anchor="middle">End: a signed tombstone to the other inbox; it can't be undone</text>
+          <text class="m" x="450" y="548" text-anchor="middle">either side, alone · declining is silent · "always from them" accepts without asking</text>
+        </svg>
+      </div>
+      <figcaption>The signed text starts with "chiacraft link v1", so a link signature can never pass for any other signature these keys make. Everything is kept in <code>links.json</code>: links, waiting requests, sent requests, the outbox, ended ids, always-accept and blocked owners.</figcaption>
+    </figure>
+  </section>
+
+  <section id="packages">
+    <div class="eyebrow">Phase 2</div>
+    <h2>A package is named by its exact files</h2>
+    <p>Blocks, items, recipes and tags are TOML files with their art, and no code. The package's identity is a hash of a canonical list of every file's path, size and hash, so the same files give the same name on every computer, and a world pins exactly the version it was played with.</p>
+    <figure>
+      <div class="scroll">
+        <svg viewBox="0 0 940 230" role="img" aria-label="A package folder is checked against an allow-list, listed in a manifest of per-file BLAKE3 hashes, hashed into the package id, stored by hash, and pinned by worlds.">
+          <defs>
+            <marker id="p-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+          </defs>
+          <rect class="box" x="20" y="40" width="180" height="62" rx="5"/>
+          <text class="t" x="36" y="64">Package folder</text>
+          <text class="m" x="36" y="84">package.toml defs/ assets/</text>
+          <line class="ln" x1="200" y1="71" x2="258" y2="71" marker-end="url(#p-a)"/>
+          <text class="m" x="229" y="62" text-anchor="middle">checked</text>
+          <rect class="box" x="260" y="40" width="210" height="62" rx="5"/>
+          <text class="t" x="276" y="64">Manifest</text>
+          <text class="m" x="276" y="84">path · size · BLAKE3, each file</text>
+          <line class="ln" x1="470" y1="71" x2="528" y2="71" marker-end="url(#p-a)"/>
+          <text class="m" x="499" y="62" text-anchor="middle">hash</text>
+          <rect class="hotbox" x="530" y="40" width="160" height="62" rx="5"/>
+          <text class="t" x="546" y="64">Package id</text>
+          <text class="mi" x="546" y="84">BLAKE3(manifest)</text>
+          <line class="ln" x1="690" y1="71" x2="748" y2="71" marker-end="url(#p-a)"/>
+          <text class="m" x="719" y="62" text-anchor="middle">stored</text>
+          <rect class="box" x="750" y="40" width="170" height="62" rx="5"/>
+          <text class="t" x="766" y="64">run/cache</text>
+          <text class="m" x="766" y="84">blobs/ packages/</text>
+          <line class="ln" x1="610" y1="102" x2="610" y2="146" marker-end="url(#p-a)"/>
+          <text class="m" x="620" y="128">pinned</text>
+          <rect class="box" x="530" y="148" width="200" height="62" rx="5"/>
+          <text class="t" x="546" y="172">world.txt</text>
+          <text class="mi" x="546" y="192">package.gems = 7a73bc…</text>
+          <rect class="dim" x="20" y="148" width="450" height="62" rx="5"/>
+          <text class="s" x="36" y="172">allow-list: toml · lang · png · anim · ctm · gui · json · ogg · wav</text>
+          <text class="m" x="36" y="192">size per kind · 4096 files · 256 MiB · PNG ≤ 4096 px</text>
+        </svg>
+      </div>
+      <figcaption>Paths come only from a checked manifest, never straight from an archive or a download. Old versions stay in the store for the worlds that pin them; the rest is tidied at start, keeping 512 MiB of recently used packages.</figcaption>
+    </figure>
+  </section>
+
+  <section id="code">
+    <div class="eyebrow">Where it lives</div>
+    <h2>Code map</h2>
+    <p>Our crates and mods are MIT; Weft's engine files stay MPL-2.0 and change only where the plan allows (identity, content switching, the server's scope, networking).</p>
+    <div class="table-box">
+      <table>
+        <thead><tr><th>Path</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>crates/wallet, crates/account</td><td>The words, the identity key, derived keys (network, content, world), vouching and certificates.</td></tr>
+          <tr><td>crates/packages</td><td>Package format and checks, manifest identity, allow-list, the store and its tidy, signature envelopes.</td></tr>
+          <tr><td>engine/src/modloader.rs</td><td>Installs packages; builds and keeps one Content per package set; use_packages, use_built.</td></tr>
+          <tr><td>engine/src/content.rs</td><td>content(): the thread's own (a server's) or the game's.</td></tr>
+          <tr><td>engine/src/server/mod.rs</td><td>Scope (content + synced settings), the server's own thread pool.</td></tr>
+          <tr><td>engine/src/net/p2p.rs</td><td>Endpoints, protocol 4 join and downloads, status/1, links/1 transport, the outbox loop.</td></tr>
+          <tr><td>engine/src/world_address.rs</td><td>World key, world certificate, the chiacraft:// address.</td></tr>
+          <tr><td>engine/src/links.rs</td><td>Link records and signatures, inbox checks, outbox, links.json.</td></tr>
+          <tr><td>engine/src/saved_worlds.rs</td><td>Worlds you've joined (worlds.txt) and their status.</td></tr>
+          <tr><td>engine/src/package_trust.rs</td><td>Signing packages, checking creators, trust.txt.</td></tr>
+          <tr><td>mods/packages</td><td>Registers data packages through the SDK; the unknown-block placeholder.</td></tr>
+          <tr><td>mods/testkit</td><td>In-game tests and line scripts (host, join, tap, shot) that check all of the above.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="eyebrow">Plan</div>
+    <h2>Roadmap</h2>
+    <div class="roadmap">
+      <div class="step"><span class="ph">Phase 1</span><span class="what">Account: 24 words, login key, identity on join</span><span class="chip done">done</span></div>
+      <div class="step"><span class="ph">Phase 2</span><span class="what">Data packages: format, identity and store, switching, downloads on join, signing and trust, hardening</span><span class="chip done">done</span></div>
+      <div class="step"><span class="ph">Phase 3 · 1–3</span><span class="what">Your world runs on, world addresses, link requests</span><span class="chip done">done</span></div>
+      <div class="step"><span class="ph">Phase 3 · 4</span><span class="what">Portal blocks: built into the game, holding a link id, bound only by the world's owner</span><span class="chip next">next</span></div>
+      <div class="step"><span class="ph">Phase 3 · 5</span><span class="what">Travel prepared as you approach: signed travel ticket, origin keeps you until arrival, safe return</span><span class="chip next">next</span></div>
+      <div class="step"><span class="ph">Phase 4–5</span><span class="what">DIDs and achievements on Chia; finding worlds through on-chain listings and DIG</span><span class="chip later">later</span></div>
+      <div class="step"><span class="ph">Phase 6–8</span><span class="what">Sandboxed code mods (WebAssembly), headless servers, wallet and items</span><span class="chip later">later</span></div>
+    </div>
+  </section>
+
+  <footer>Source: notes/PLAN.md, notes/HANDOFF.md and the code at commit 1acdfe6. Research behind the decisions: reports/.</footer>
+</div>
