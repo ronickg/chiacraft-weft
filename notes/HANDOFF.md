@@ -233,20 +233,16 @@ build scripts that contain addresses with Python, not sed (`&` in the replacemen
 ## Side mods
 
 `mods/chihuahua` (MIT): wild long-haired chihuahuas on grassland (spawn rule like pigs', rarer).
-`tools/chihuahua.py` writes the model (`models/chihuahua.geo.json` and a puppy one with a bigger
-head; Bedrock geometry, so Blockbench opens it), its animations (`animations/chihuahua[_pup][_sit|_lie]`:
-`idle` holds the pose with a little life, `walk` by distance) and 96 coats on a 256x256 sheet, 8
-colors x 6 patterns x 2 marking layouts. Made the way Hytale makes creatures: about 40 chunky boxes
-(tilted parts in their own bones) and textures painted like illustrations (soft light as if each
-box were round, baked shadow where parts meet, cool shadows, soft fur tufts, a light blur, painted
-eyes, toes and claws; ears and fluffy edges cut out of the texture). Every proportion is a named
-setting (`SHAPE`); `tools/shape.json`, when present, overrides them. The Chihuahua Shaper artifact
-(https://claude.ai/artifact/Syo5TJLDfLebf7u8BR5eY5) shows the same boxes with sliders and saves
-designs to its `designs` collection (read it with ArtifactData, write the `shape` field to
-`tools/shape.json`, rerun). Deterministic: rerun it after changing it and commit what it writes.
+The dog (2026-11-01) is a papillon-style chihuahua built in Blockbench the way Hytale makes
+creatures: 49 boxes and flat fur panels with a hand-painted 512x96 texture, big solid butterfly
+ears, a jaw and a tongue, eyelids that blink, toes; animations idle (panting, blinking), walk,
+run, sit, lie and lick. Its source project is `~/Coding/voxel-dog` (not in this repository); the
+files here are exported from it with the `blocky-model` skill's `to_bedrock.py`
+([docs/creatures.md](../docs/creatures.md) has the recipe and the commands). All coats draw with
+one texture for now (the coat is still chosen and inherited). The old generator
+(`tools/chihuahua.py`, 96 painted coats) and its preview were removed; they are in git history.
 The engine shares one copy of a model file between all kinds naming it (`client/models.rs`), so
-the 576 look kinds cost two models. Voxel models were tried and dropped (grainy).
-`tools/preview.py` draws the files from five sides without the game. Each dog draws as a generated
+the 576 look kinds cost two models. Each dog draws as a generated
 look kind per coat, grown or puppy, and pose (stand, sit, lie down after 30 s sitting), so the pose
 reaches every player that comes by (a played animation is a one-off event). A bone tames (1 in 3); a
 tamed dog sits on the start, the owner's empty-handed or non-food right-click toggles sitting, it

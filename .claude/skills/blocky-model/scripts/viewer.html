@@ -1,0 +1,123 @@
+<title>Model Viewer</title>
+<!-- Generic viewer for a box model: one live view, a button per animation in the GLB, and a
+     button per texture variant (eyes, coats...) from variants.json. Put next to it:
+       model.json     {"glb": "<base64 of the .glb>"}   (artifact hosts serve .json, not .glb)
+       variants.json  {"name": "data:image/png;base64,..."}   (scripts/variants.py; optional)
+     Set the page title, heading and blurb below. -->
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root {
+  --bg: #1b1d24; --panel: #23262f; --line: #343845; --fg: #ece6df; --muted: #a39b93;
+  --accent: #d98b52; --accent-ink: #1b1d24; --alt: #e1977d;
+  --mono: ui-monospace, Menlo, monospace; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 system-ui, sans-serif; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 18px; }
+h1 { font: 700 clamp(28px, 5vw, 42px)/1.05 system-ui, sans-serif; margin: 0; }
+.lede { color: var(--muted); margin: 0; max-width: 68ch; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg:empty { display: none; }
+.seg button { font: 500 13px var(--mono); color: var(--fg); background: transparent; border: 0; padding: 8px 13px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+#variants button[aria-pressed="true"] { background: var(--alt); }
+.seg button:focus-visible { outline: 2px solid var(--alt); outline-offset: 2px; }
+.toggle { display: inline-flex; gap: 8px; align-items: center; font: 13px var(--mono); color: var(--muted); cursor: pointer; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.view { position: relative; aspect-ratio: 16 / 9; max-height: 76vh; width: 100%; }
+@media (max-width: 760px) { .view { aspect-ratio: 4 / 5; } }
+.view canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; touch-action: none; }
+.status { position: absolute; inset: 0; display: grid; place-items: center; font: 13px var(--mono); color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <h1>Model</h1>
+  <p class="lede">Drag to orbit, scroll or pinch to zoom.</p>
+  <div class="bar">
+    <div class="seg" id="anims" role="group" aria-label="Animation"></div>
+    <div class="seg" id="variants" role="group" aria-label="Texture"></div>
+    <label class="toggle"><input type="checkbox" id="spin" checked> Turntable</label>
+  </div>
+  <div class="card"><div class="view" id="view"><div class="status">Loading model</div></div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const el = document.getElementById("view"), status = el.querySelector(".status"), spin = document.getElementById("spin");
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) spin.checked = false;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x23262f, 1);
+el.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 16 / 9, 0.01, 10);
+camera.position.set(0.42, 0.26, 0.62);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.15, 0); controls.enableDamping = true; controls.minDistance = 0.2; controls.maxDistance = 2;
+scene.add(new THREE.HemisphereLight(0xfff4e8, 0x3a3326, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(-0.6, 1.2, 0.9); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(0.36, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x2c3039).convertSRGBToLinear() }));
+ground.rotation.x = -Math.PI / 2; scene.add(ground);
+const pivot = new THREE.Group(); scene.add(pivot);
+
+let mixer = null, active = null, model = null;
+const actions = {}, textures = {};
+function buttons(box, names, onPick, label = n => n) {
+  box.innerHTML = "";
+  names.forEach((n, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = label(n, i); b.setAttribute("aria-pressed", String(i === 0));
+    b.onclick = () => { for (const x of box.children) x.setAttribute("aria-pressed", String(x === b)); onPick(n); };
+    box.appendChild(b);
+  });
+}
+function play(name, fade = 0.35) {
+  const next = actions[name]; if (!next) return;
+  next.reset().play();
+  if (active && active !== next) active.crossFadeTo(next, fade, false);
+  active = next;
+}
+const failed = err => { status.textContent = "The model did not load: " + (err && err.message || err); };
+fetch("model.json").then(r => r.json()).then(({ glb }) => {
+  const bytes = Uint8Array.from(atob(glb), c => c.charCodeAt(0));
+  new THREE.GLTFLoader().parse(bytes.buffer, "", gltf => {
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    gltf.scene.scale.setScalar(0.32 / Math.max(box.max.y - box.min.y, 1e-6));
+    gltf.scene.traverse(o => { if (o.material && o.material.map) { o.material.map.magFilter = o.material.map.minFilter = THREE.NearestFilter; o.material.map.needsUpdate = true; } });
+    pivot.add(gltf.scene); model = gltf.scene;
+    mixer = new THREE.AnimationMixer(gltf.scene);
+    for (const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip);
+    const names = Object.keys(actions);
+    buttons(document.getElementById("anims"), names, n => play(n));
+    status.remove(); if (names.length) play(names[0], 0);
+  }, failed);
+}).catch(failed);
+// Texture variants share the model's UV layout; they replace the material's map.
+fetch("variants.json").then(r => r.ok ? r.json() : {}).then(urls => {
+  const loader = new THREE.TextureLoader();
+  for (const [name, url] of Object.entries(urls)) loader.load(url, t => {
+    t.flipY = false; t.encoding = THREE.sRGBEncoding; t.magFilter = t.minFilter = THREE.NearestFilter; textures[name] = t;
+  });
+  buttons(document.getElementById("variants"), Object.keys(urls), name => {
+    const t = textures[name]; if (!model || !t) return;
+    model.traverse(o => { if (o.material && o.material.map) { o.material.map = t; o.material.needsUpdate = true; } });
+  }, (n, i) => `${i + 1} ${n}`);
+}).catch(() => {});
+new ResizeObserver(() => {
+  const r = el.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+}).observe(el);
+const clock = new THREE.Clock();
+(function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (mixer) mixer.update(dt);
+  if (spin.checked) pivot.rotation.y += dt * 0.45;
+  controls.update(); renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+})();
+</script>

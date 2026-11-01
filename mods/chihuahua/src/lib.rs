@@ -4,11 +4,14 @@
 //! takes its color from one parent and its pattern from either, now and then something new, and
 //! grows up in twenty minutes (meat speeds it along).
 //!
-//! The model, its animations and the coats are files `tools/chihuahua.py` writes: boxes for the
-//! body and flat fur panels, cut out where the coat is clear, for ears, ruff, tail and feathering.
-//! A coat is a look (`World::set_look`): one entity kind per coat, age and pose, drawn in place of
-//! the dog. Puppies have their own model file (half size, a bigger head) on the same layout, so
-//! the same pictures fit. A pose is the look's animation file, whose `idle` holds it (sitting,
+//! The model is a papillon-style long-haired chihuahua made of boxes and flat fur panels with a
+//! hand-painted texture (Hytale's style), built in Blockbench: `models/chihuahua.geo.json`,
+//! `animations/chihuahua[_pup][_sit|_lie].animation.json` and `textures/entity/chihuahua/chihuahua.png`
+//! are exported from its source project (see `docs/creatures.md`). All coats draw with that
+//! one texture for now; the coat is still chosen and inherited. A coat is a look
+//! (`World::set_look`): one entity kind per coat, age and pose, drawn in place of the dog. Puppies
+//! have their own model file (half size, a bigger head) on the same layout, so the same picture
+//! fits. A pose is the look's animation file, whose `idle` holds it (sitting,
 //! lying down), so every player sees it whenever they come by. The owner is kept by player key, which the engine's bridge gives
 //! (`player_key`), so a dog knows its owner after a restart.
 
@@ -31,6 +34,8 @@ const COLORS: u32 = 8;
 const PATTERNS: u32 = 6;
 const MARKS: u32 = 2;
 const COATS: u32 = COLORS * PATTERNS * MARKS;
+/// The dog's texture (every coat, for now).
+const TEXTURE: &str = "chihuahua/chihuahua";
 /// Twenty minutes to grow up.
 const GROW_TICKS: u32 = 24_000;
 /// Sitting this long (thirty seconds), a dog lies down.
@@ -152,7 +157,7 @@ fn init(r: &mut Registry) {
                         .passive()
                         .model_file(model)
                         .animations(&format!("{model}{}", pose.suffix()))
-                        .texture(&format!("chihuahua/coat_{coat}")),
+                        .texture(TEXTURE),
                 );
             }
         }
@@ -164,7 +169,7 @@ fn init(r: &mut Registry) {
         .passive()
         .model_file("chihuahua")
         .animations("chihuahua")
-        .texture("chihuahua/coat_0")
+        .texture(TEXTURE)
         .attach(&DOG)
         .attach(&SEEN)
         .attach(&OWNER)

@@ -68,6 +68,8 @@ The engine reads bones with their `pivot`, `parent` and resting `rotation`, boxe
 
 Two things trip people up. A rotated box is drawn unrotated (the log warns about it), so put it in its own bone and rotate the bone. And list parent bones before their children, as Blockbench does. Molang expressions aren't evaluated, only plain numbers.
 
+To make a whole creature this way (boxes, a painted texture, eyes that blink, poses), follow [creatures.md](creatures.md).
+
 ## Roles
 A role tells the engine what a bone should do on its own, without any keyframes: look where the entity looks, swing while it walks. It comes from the bone's name, in code and in Blockbench files alike (case and `_` don't matter), so the ready made models can be animated and worn on by the same names:
 
