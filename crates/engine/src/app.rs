@@ -78,6 +78,8 @@ pub enum Request {
     Join(String),
     /// Back to your own world from a visit (chiacraft).
     ReturnHome,
+    /// Asks the world at this address to link with the world in play, with a note (chiacraft).
+    AskLink(String, String),
     /// Stops the join in progress (chiacraft).
     CancelJoin,
     /// The join sheet's answer: download the world's packages; true also trusts their creators.
@@ -217,6 +219,8 @@ pub(crate) struct Running {
     home: Option<Home>,
     /// The address of the join in progress, saved once it lets the player in.
     join_address: Option<String>,
+    /// `links::GENERATION` last shown.
+    links_seen: u64,
     last: Instant,
     shot_pending: bool,
     fps: f32,
@@ -355,6 +359,11 @@ impl App {
             crate::config::override_for_run("core:view_distance", &v.to_string());
         }
         let mut settings = Settings::new(&self.opts.run_dir);
+        // Links between worlds, and the inbox for them, open while the game runs (chiacraft).
+        crate::links::init(&self.opts.run_dir, &settings.saves_dir());
+        if chiacraft_account::current().is_some() {
+            net::p2p::start_account(&settings);
+        }
         let icon = crate::assets::decode_png_file(&engine_assets(self.opts.dev).join("icon.png")).and_then(|(w, h, px)| winit::window::Icon::from_rgba(px, w, h).ok());
         let mut attrs = Window::default_attributes()
             .with_title("Weft")
@@ -433,6 +442,7 @@ impl App {
             join_offer: None,
             home: None,
             join_address: None,
+            links_seen: 0,
             last: Instant::now(),
             shot_pending: false,
             fps: 0.0,
@@ -981,6 +991,19 @@ impl Running {
                     }
                 }
                 Request::ReturnHome => self.return_home(),
+                Request::AskLink(address, note) => {
+                    let result = match &self.game {
+                        Some(Game { server: Some(_), identity: Some(id), world, .. }) => {
+                            net::p2p::account_key(&self.settings).and_then(|k| crate::links::request(&k, id, world, &address, &note))
+                        }
+                        _ => Err("open one of your worlds to link it".into()),
+                    };
+                    if let Err(e) = result {
+                        self.open(Box::new(screens::Message { title: "links.failed".into(), args: vec![Arg::Text(e)] }));
+                    } else {
+                        self.rebuild_all();
+                    }
+                }
                 Request::CancelJoin => {
                     self.join_offer = None;
                     if let Some(j) = self.joining.take() {
@@ -1634,6 +1657,14 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     let scale = r.gui_scale();
 
     r.frame_no += 1;
+    // Link requests and answers arrive in the background: the links screen shows them as they do.
+    let links_now = crate::links::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
+    if links_now != r.links_seen {
+        r.links_seen = links_now;
+        if r.screens.last().is_some_and(|(s, _)| s.name() == "core:links" || s.name() == "core:multiplayer") {
+            r.rebuild_all();
+        }
+    }
     if crate::config::generation() != r.config_seen {
         r.config_seen = crate::config::generation();
         r.apply_settings();

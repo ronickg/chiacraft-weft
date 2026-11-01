@@ -20,7 +20,8 @@
 //! join ticket.txt     # join with the ticket from that file (waits for it)
 //! open name           # leave this world and open (or make) the saved world called name
 //! leave               # leave the world for the title screen
-//! tap screen query    # once `screen` is open, clicks the element `query` (`id:x`, `text:x`) until it closes
+//! tap screen query    # once `screen` is open, clicks the element `query` (`id:x`, `text:x`) until it closes or the element goes
+//! tap_once screen query  # the same, one click (a text field, a button that stays)
 //! origin              # later via points are relative to where the player stands now
 //! where label        # logs the player's position
 //! rec start|stop     # logs a marker; tools/rec.ps1 presses the OBS hotkeys on it
@@ -115,15 +116,30 @@ pub async fn run(t: T, src: String) -> R {
                 t.loaded().await?;
             }
             "tap" => {
+                // Clicked again while a rebuilding screen may have lost the click; done once the
+                // screen changes or the element is gone (a button that did its job).
                 let (screen, query) = rest.split_once(' ').ok_or("tap: a screen and an element")?;
                 t.screen(screen).await?;
-                for _ in 0..10 {
-                    t.click_ui(query, 0);
+                if !t.click_ui(query, 0) {
+                    continue;
+                }
+                for _ in 0..9 {
                     t.frames(15).await?;
-                    if t.c().screen() != screen {
+                    if t.c().screen() != screen || !t.c().click_ui(query, 0) {
                         break;
                     }
                 }
+            }
+            // One click, for what stays on screen and must happen once (a text field, "Ask").
+            "tap_once" => {
+                // Only the screen's name: a focused text field keeps a screen from ever being
+                // "ready" (its caret redraws it).
+                let (screen, query) = rest.split_once(' ').ok_or("tap_once: a screen and an element")?;
+                let name = screen.to_string();
+                t.until(&format!("screen {screen}"), Duration::from_secs(60), move |t| t.c().screen() == name).await?;
+                t.frames(15).await?;
+                t.click_ui(query, 0);
+                t.frames(15).await?;
             }
             "leave" => {
                 t.c().leave_world();

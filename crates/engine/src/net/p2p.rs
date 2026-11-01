@@ -18,6 +18,8 @@ use crate::settings::Settings;
 const ALPN: &[u8] = b"weft/1";
 /// A world's status, for lists of worlds (chiacraft): answered without joining.
 const STATUS_ALPN: &[u8] = b"chiacraft/status/1";
+/// Link requests and answers between owners' account endpoints (chiacraft, `links`).
+const LINKS_ALPN: &[u8] = b"chiacraft/links/1";
 /// 3: `Join` carries the account's vouching (chiacraft). 4: the hello offers the world's data
 /// packages, which the joining game downloads and loads before it is let in (chiacraft).
 const PROTOCOL: u32 = 4;
@@ -149,7 +151,7 @@ async fn endpoint(settings: &Settings, who: Who) -> Result<Endpoint, String> {
     use iroh_mainline_address_lookup::DhtAddressLookup;
     let b = Endpoint::builder(presets::N0).relay_mode(relay_mode(settings));
     let b = match who {
-        Who::Player => b.secret_key(identity(&settings.run_dir)?).address_lookup(DhtAddressLookup::builder().no_publish()),
+        Who::Player => b.secret_key(identity(&settings.run_dir)?).alpns(vec![LINKS_ALPN.to_vec()]).address_lookup(DhtAddressLookup::builder()),
         Who::World(key) => b.secret_key(*key).alpns(vec![ALPN.to_vec(), STATUS_ALPN.to_vec()]).address_lookup(DhtAddressLookup::builder()),
         Who::Anonymous => b.secret_key(throwaway_key()),
     };
@@ -214,6 +216,110 @@ fn parse_ticket(t: &str) -> Result<EndpointAddr, String> {
     Ok(EndpointAddr::from_parts(id, addrs))
 }
 
+/// The player's own endpoint (the account's network key, chiacraft): open while the game runs. It
+/// joins other worlds and is the inbox for link requests to any of the player's worlds. One per
+/// key: two endpoints with one key take the relay from each other.
+static ACCOUNT: tokio::sync::OnceCell<Endpoint> = tokio::sync::OnceCell::const_new();
+static OUTBOX: tokio::sync::Notify = tokio::sync::Notify::const_new();
+
+async fn account(settings: &Settings) -> Result<Endpoint, String> {
+    ACCOUNT
+        .get_or_try_init(|| async {
+            let ep = endpoint(settings, Who::Player).await?;
+            let serving = ep.clone();
+            tokio::spawn(async move {
+                while let Some(incoming) = serving.accept().await {
+                    tokio::spawn(async move {
+                        let Ok(conn) = incoming.await else { return };
+                        if conn.alpn() == LINKS_ALPN
+                            && let Err(e) = serve_links(conn).await
+                        {
+                            log::warn!("link message: {e}");
+                        }
+                    });
+                }
+            });
+            let sending = ep.clone();
+            tokio::spawn(async move { outbox(sending).await });
+            Ok::<Endpoint, String>(ep)
+        })
+        .await
+        .cloned()
+}
+
+/// Opens the player's endpoint in the background: link requests can reach this game from now on.
+pub fn start_account(settings: &Settings) {
+    let settings = settings.clone();
+    runtime().spawn(async move {
+        match account(&settings).await {
+            Ok(ep) => log::info!("inbox open at {}", ep.id()),
+            Err(e) => log::warn!("no inbox: {e}"),
+        }
+    });
+}
+
+/// The account endpoint's id: where this player's link answers come.
+pub fn account_key(settings: &Settings) -> Result<iroh::SecretKey, String> {
+    identity(&settings.run_dir)
+}
+
+/// Delivers what waits in the outbox soon (something was queued, or answered).
+pub fn wake_outbox() {
+    OUTBOX.notify_one();
+}
+
+/// A link message from another owner's account endpoint: one frame, answered with an empty frame
+/// (taken) or an error.
+async fn serve_links(conn: iroh::endpoint::Connection) -> Result<(), String> {
+    let peer = conn.remote_id().to_string();
+    let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi()).await.map_err(|_| "nothing sent")?.map_err(|e| e.to_string())?;
+    let frame = tokio::time::timeout(Duration::from_secs(10), read_frame_max(&mut recv, 16 << 10)).await.map_err(|_| "nothing sent")??;
+    let message: crate::links::Message = serde_json::from_slice(&frame).map_err(|e| format!("a message this game can't read: {e}"))?;
+    let answer = crate::links::receive(&peer, message);
+    if let Err(e) = &answer {
+        log::info!("link message from {}: {e}", &peer[..12]);
+    }
+    write_frame(&mut send, answer.err().unwrap_or_default().as_bytes()).await?;
+    let _ = send.finish();
+    let _ = tokio::time::timeout(Duration::from_secs(5), conn.closed()).await;
+    Ok(())
+}
+
+/// Delivers queued link messages, again and again until they arrive (or give up after two weeks).
+async fn outbox(ep: Endpoint) {
+    loop {
+        for (_, q) in crate::links::due() {
+            let mut inbox = q.inbox.clone();
+            if inbox.is_empty() {
+                // Learn the owner's inbox from the world itself.
+                let addr = if q.address.is_empty() { q.world.clone() } else { q.address.clone() };
+                if let Ok(a) = parse_ticket(&addr)
+                    && let Ok(st) = status_on(&ep, a, Duration::from_secs(8)).await
+                {
+                    inbox = st.inbox;
+                }
+            }
+            let delivered = !inbox.is_empty() && deliver(&ep, &inbox, &q.message).await.inspect_err(|e| log::info!("link message not delivered yet: {e}")).is_ok();
+            crate::links::tried(&q, &inbox, delivered);
+        }
+        let _ = tokio::time::timeout(Duration::from_secs(20), OUTBOX.notified()).await;
+    }
+}
+
+async fn deliver(ep: &Endpoint, inbox: &str, message: &crate::links::Message) -> Result<(), String> {
+    let id: EndpointId = inbox.parse().map_err(|_| "a bad inbox")?;
+    tokio::time::timeout(Duration::from_secs(20), async {
+        let conn = ep.connect(EndpointAddr::from_parts(id, Vec::<TransportAddr>::new()), LINKS_ALPN).await.map_err(|e| e.to_string())?;
+        let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+        write_frame(&mut send, &serde_json::to_vec(message).map_err(|e| e.to_string())?).await?;
+        let answer = read_frame_max(&mut recv, 1024).await?;
+        conn.close(0u32.into(), b"thanks");
+        if answer.is_empty() { Ok(()) } else { Err(format!("refused: {}", String::from_utf8_lossy(&answer))) }
+    })
+    .await
+    .unwrap_or_else(|_| Err("no answer".into()))
+}
+
 pub struct Hosting {
     pub ticket: Option<String>,
     pub error: Option<String>,
@@ -234,6 +340,9 @@ pub struct HostWorld {
     pub identity: std::sync::Arc<crate::world_address::WorldIdentity>,
     pub name: String,
     pub shared: std::sync::Arc<crate::server::Shared>,
+    /// The owner's account endpoint (their inbox for link requests) and their identity's vouching
+    /// for it; empty without an account.
+    pub inbox: (String, String),
 }
 
 /// Starts hosting under the world's own key: its address appears in `HOSTING` once the endpoint
@@ -300,13 +409,15 @@ pub struct Status {
     pub players: u32,
     pub packages: u32,
     pub package_bytes: u64,
+    /// The owner's account endpoint, where link requests go: only if the owner vouches for it.
+    pub inbox: String,
 }
 
 async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::content::Content, hw: &HostWorld) {
     let Ok(Ok((mut send, _recv))) = tokio::time::timeout(Duration::from_secs(5), conn.accept_bi()).await else { return };
     let packages = crate::content::with(world, crate::modloader::current_packages);
     let players = hw.shared.views.read().len() as u32;
-    let answer = (PROTOCOL, hw.name.clone(), hw.identity.cert.text(), players, packages.len() as u32, packages.iter().map(|p| p.3).sum::<u64>());
+    let answer = ((PROTOCOL, hw.name.clone(), hw.identity.cert.text(), players, packages.len() as u32, packages.iter().map(|p| p.3).sum::<u64>()), hw.inbox.clone());
     let mut w = codec::W::default();
     codec::Wire::put(&answer, &mut w);
     if write_frame(&mut send, &w.0).await.is_ok() {
@@ -318,23 +429,28 @@ async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::c
 
 async fn status_of(settings: &Settings, addr: EndpointAddr, wait: Duration) -> Result<Status, String> {
     let ep = endpoint(settings, Who::Anonymous).await?;
-    let result = tokio::time::timeout(wait, async {
+    let result = status_on(&ep, addr, wait).await;
+    ep.close().await;
+    result
+}
+
+async fn status_on(ep: &Endpoint, addr: EndpointAddr, wait: Duration) -> Result<Status, String> {
+    tokio::time::timeout(wait, async {
         let conn = ep.connect(addr.clone(), STATUS_ALPN).await.map_err(|e| e.to_string())?;
         let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
         // A stream is only seen by the other side once something is written on it.
         write_frame(&mut send, &[]).await?;
         let frame = read_frame_max(&mut recv, 8 << 10).await?;
         conn.close(0u32.into(), b"thanks");
-        let (protocol, name, cert, players, packages, package_bytes) =
-            <(u32, String, String, u32, u32, u64) as codec::Wire>::get(&mut codec::R(&frame)).ok_or("a status this game can't read")?;
-        // The certificate must be for the key that answered.
+        let ((protocol, name, cert, players, packages, package_bytes), (inbox, vouch)) =
+            <((u32, String, String, u32, u32, u64), (String, String)) as codec::Wire>::get(&mut codec::R(&frame)).ok_or("a status this game can't read")?;
+        // The certificate must be for the key that answered, and the inbox the owner's.
         let owner = crate::world_address::WorldCert::parse(&cert).ok().filter(|c| c.world == addr.id.to_string()).and_then(|c| c.verify()).unwrap_or_default();
-        Ok::<Status, String>(Status { protocol, name: name.chars().take(64).collect(), owner, cert, players, packages, package_bytes })
+        let inbox = if !owner.is_empty() && chiacraft_account::check_vouch(&vouch, &inbox).as_deref() == Some(owner.as_str()) { inbox } else { String::new() };
+        Ok::<Status, String>(Status { protocol, name: name.chars().take(64).collect(), owner, cert, players, packages, package_bytes, inbox })
     })
     .await
-    .unwrap_or_else(|_| Err("no answer".into()));
-    ep.close().await;
-    result
+    .unwrap_or_else(|_| Err("no answer".into()))
 }
 
 /// Asks the world at `address` for its status, in the background: the answer arrives on the
@@ -671,22 +787,23 @@ async fn pump_out<T: Send + crate::net::Message + 'static>(rx: crossbeam_channel
 /// get back to, and the attempt hangs on it whatever else the client tries (about one in six
 /// on a machine with Radmin VPN and Hyper-V). The relay always gets through; iroh moves the
 /// connection to a direct path afterwards when one works.
-async fn connect(settings: &Settings, addr: EndpointAddr) -> Result<(Endpoint, iroh::endpoint::Connection), String> {
+///
+/// Both tries go out through the player's account endpoint (one endpoint per key).
+async fn connect(settings: &Settings, addr: EndpointAddr) -> Result<iroh::endpoint::Connection, String> {
     let relayed = EndpointAddr::from_parts(addr.id, addr.relay_urls().cloned().map(TransportAddr::Relay).collect::<Vec<_>>());
     // An address with no hints is looked up (the relay-only try would have nothing to go on).
     let attempts = if relayed.relay_urls().next().is_some() { vec![(addr, Duration::from_secs(3)), (relayed, Duration::from_secs(20))] } else { vec![(addr, Duration::from_secs(20))] };
     let mut last = String::new();
+    let ep = account(settings).await?;
     for (i, (addr, wait)) in attempts.into_iter().enumerate() {
-        let ep = endpoint(settings, Who::Player).await?;
         match tokio::time::timeout(wait, ep.connect(addr, ALPN)).await {
-            Ok(Ok(conn)) => return Ok((ep, conn)),
+            Ok(Ok(conn)) => return Ok(conn),
             Ok(Err(e)) => last = e.to_string(),
             Err(_) => last = "timed out".into(),
         }
         if i == 0 {
             log::info!("connecting directly failed ({last}), trying through the relay");
         }
-        ep.close().await;
     }
     Err(last)
 }
@@ -720,7 +837,7 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
     let (answers, mut answers_rx) = tokio::sync::mpsc::unbounded_channel::<JoinAnswer>();
     runtime().spawn(async move {
         let result = async {
-            let (ep, conn) = connect(&settings, addr).await?;
+            let conn = connect(&settings, addr).await?;
             let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
             let mut hello = codec::W::default();
             codec::Wire::put(&(PROTOCOL, native_hash()), &mut hello);
@@ -758,11 +875,11 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
             if !verdict.is_empty() {
                 return Err(String::from_utf8_lossy(&verdict).into_owned());
             }
-            Ok((ep, conn, send, recv))
+            Ok((conn, send, recv))
         }
         .await;
         match result {
-            Ok((ep, conn, send, mut recv)) => {
+            Ok((conn, send, mut recv)) => {
                 let (to_server_tx, to_server_rx) = unbounded::<ToServer>();
                 let (to_client_tx, to_client_rx) = unbounded::<ToClient>();
                 let _ = events.send(JoinEvent::Admitted(Conn::new(to_server_tx, to_client_rx)));
@@ -778,7 +895,6 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
                 pump_out(to_server_rx, send, codec::encode_server).await;
                 reader.abort();
                 conn.close(0u32.into(), b"bye");
-                ep.close().await;
             }
             Err(e) => {
                 let _ = events.send(JoinEvent::Failed(e));

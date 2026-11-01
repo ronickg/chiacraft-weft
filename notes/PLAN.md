@@ -183,7 +183,8 @@ The smallest version that works is phases 1-4.
       saved-worlds list (proposed name, owner, last seen, status). Not yet: petnames, the join
       policy in the status answer, rotating a key (the generation is kept; the "world moved"
       notice needs slice 3's account endpoint).
-   3. *Link requests*: the account endpoint runs while the game does and is the inbox for all
+   3. *Link requests* (done, apart from friends' worlds, "world moved", invite tokens and a block
+      list screen): the account endpoint runs while the game does and is the inbox for all
       the owner's worlds (worlds are offline most of the time); requesters keep an outbox and
       retry; friends' worlds and "world moved" notices are served there (`chiacraft/worlds/1`).
       A link is one labelled record both world keys sign over the same bytes (id: its BLAKE3);

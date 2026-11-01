@@ -147,10 +147,29 @@ saved list showed the world online, then offline after the host quit, with the o
 a second copy of the same account and world was refused hosting while the first ran; the
 world-swap test from slice 1 still passes with joins on the player's own key.
 
+Slice 3 (link requests) is done. `p2p::ACCOUNT`: the player's endpoint (login key), opened at start
+(`start_account`) and kept; joins go out through it (both tries), and it serves
+`chiacraft/links/1` (`serve_links`) and runs the outbox loop (`outbox`, woken by `wake_outbox`,
+otherwise every 20 s; backoff 60 s doubling to an hour; gives up after 14 days). The world status
+now carries the owner's inbox (account endpoint id) with the identity's vouching, checked against
+the certificate's owner. `crates/engine/src/links.rs`: `Body` (canonical text; id = BLAKE3; signed
+after `chiacraft link v1\n` by each world key), `Request`/`Accept`/`Revoke` messages (JSON on the
+wire), `Store` in `links.json` (links, incoming, outgoing, outbox, revoked, allow, blocked);
+`request`, `accept(id, always)`, `decline(id, block)`, `revoke`, `withdraw`, `receive` (checks: the
+request comes from the account it names for answers, the world signed it, its certificate checks,
+the owner vouches for that account; strangers' refusals are silent; 100 waiting at most; one per
+pair of worlds). The Links screen (`net::screens::Links`, from Multiplayer): ask from your open
+world (address and note), answer requests (Accept, Always from them, Decline), see what you sent,
+end links. testkit script: `tap_once` (one click; waits for the screen's name only, since a
+focused text field keeps a screen from ever being "ready"), and `tap` stops once its element is
+gone. Checked with two copies: a request by bare key reached the other owner's inbox (looked up
+through the world's status), was accepted, ended from the other side; "Always from them" accepted
+the next request without asking; an ending sent while the other game was closed waited in the
+outbox and arrived seconds after both games started again.
+
 ## Next steps
 
-1. Phase 3 slice 3 (link requests; the account endpoint as inbox, friends' worlds) per
-   `notes/PLAN.md`.
+1. Phase 3 slice 4 (portal blocks bound to a link) per `notes/PLAN.md`.
 2. Phase 2 "later" items: bao-tree verified streaming and resume, iroh-blobs for downloads from
    other players and mirrors, reviewer lists, key rotation; running the fuzz targets (nightly,
    perhaps a scheduled CI job).

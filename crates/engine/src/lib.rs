@@ -1,6 +1,7 @@
 pub mod gpu_layout;
 pub mod account_screen;
 pub mod kv;
+pub mod links;
 pub mod app;
 pub mod assets;
 pub mod audio;

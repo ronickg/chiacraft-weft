@@ -24,7 +24,13 @@ pub fn current_ticket() -> Option<String> {
 /// Hosts the world `server` runs, under the world's own key (`identity`, chiacraft).
 pub fn host(server: &crate::server::ServerHandle, identity: std::sync::Arc<crate::world_address::WorldIdentity>, name: &str, settings: &crate::settings::Settings) {
     server.shared.hosting.store(true, std::sync::atomic::Ordering::Relaxed);
-    let hw = p2p::HostWorld { identity, name: name.to_string(), shared: server.shared.clone() };
+    // Link requests for this world go to its owner's inbox, which the owner vouches for.
+    let inbox = p2p::account_key(settings)
+        .ok()
+        .map(|k| k.public().to_string())
+        .and_then(|me| chiacraft_account::current().and_then(|s| s.vouch_line(&me)).map(|v| (me, v)))
+        .unwrap_or_default();
+    let hw = p2p::HostWorld { identity, name: name.to_string(), shared: server.shared.clone(), inbox };
     p2p::host(server.connect.clone(), server.content, hw, settings);
 }
 

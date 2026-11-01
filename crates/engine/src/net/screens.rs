@@ -56,6 +56,9 @@ impl Screen for Multiplayer {
                 );
             });
             saved_worlds(ui, cx);
+            let waiting = crate::links::snapshot().incoming.len();
+            let id = button(ui, cx, "links.open", &[Arg::Text(waiting.to_string())], 200.0, |c| c.requests.push(Request::Open(Box::new(Links))));
+            ui.set_id(id, "links");
             button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
@@ -180,6 +183,118 @@ impl Screen for JoinSheet {
                 }
             });
             button(ui, cx, "menu.cancel", &[], 150.0, |c| c.requests.push(Request::CancelJoin));
+        });
+    }
+}
+
+/// Links between worlds (chiacraft): ask another world to link with yours, answer requests for
+/// your worlds, see and end links.
+pub struct Links;
+
+fn short(key: &str) -> String {
+    key.chars().take(12).collect()
+}
+
+impl Screen for Links {
+    fn name(&self) -> &str {
+        "core:links"
+    }
+
+    fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
+        crate::links::UNSEEN.store(0, std::sync::atomic::Ordering::Relaxed);
+        let store = crate::links::snapshot();
+        frame(ui, cx, "links.title", |ui| {
+            // Asking: only from one of your own worlds, which is what gets linked.
+            if cx.in_game && !cx.remote {
+                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
+                    label(ui, cx, "links.ask", &[], "default");
+                    let input = ui.add(Kind::input("", 4096), Style::default().h(18.0).stretch());
+                    ui.set_id(input, "link_address");
+                    label(ui, cx, "links.note", &[], "dim");
+                    let note = ui.add(Kind::input("", 200), Style::default().h(18.0).stretch());
+                    ui.set_id(note, "link_note");
+                    let id = button(ui, cx, "links.send", &[], 120.0, |c| {
+                        let address = c.input_text("link_address").unwrap_or_default();
+                        let note = c.input_text("link_note").unwrap_or_default();
+                        c.requests.push(Request::AskLink(address, note));
+                    });
+                    ui.set_id(id, "ask");
+                });
+            }
+            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
+                label(ui, cx, "links.incoming", &[], "default");
+                if store.incoming.is_empty() {
+                    label(ui, cx, "links.none", &[], "dim");
+                }
+                for (i, inc) in store.incoming.iter().enumerate() {
+                    let r = &inc.request;
+                    label(ui, cx, "links.request", &[Arg::Text(r.from_name.clone()), Arg::Text(short(&inc.owner)), Arg::Text(inc.to_name.clone())], "default");
+                    if !r.body.note.is_empty() {
+                        label(ui, cx, "links.says", &[Arg::Text(r.body.note.clone())], "dim");
+                    }
+                    ui.container(Style::row().gap(4.0), |ui| {
+                        let id = r.body.id();
+                        let (a, b, d) = (id.clone(), id.clone(), id);
+                        let n = button(ui, cx, "links.accept", &[], 80.0, move |c| {
+                            if let Err(e) = crate::links::accept(&a, false) {
+                                log::warn!("{e}");
+                            }
+                            c.requests.push(Request::Rebuild);
+                        });
+                        ui.set_id(n, &format!("accept{i}"));
+                        let n = button(ui, cx, "links.always", &[], 140.0, move |c| {
+                            if let Err(e) = crate::links::accept(&b, true) {
+                                log::warn!("{e}");
+                            }
+                            c.requests.push(Request::Rebuild);
+                        });
+                        ui.set_id(n, &format!("always{i}"));
+                        let n = button(ui, cx, "links.decline", &[], 80.0, move |c| {
+                            crate::links::decline(&d, false);
+                            c.requests.push(Request::Rebuild);
+                        });
+                        ui.set_id(n, &format!("decline{i}"));
+                    });
+                }
+            });
+            if !store.outgoing.is_empty() {
+                ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
+                    label(ui, cx, "links.outgoing", &[], "default");
+                    for o in &store.outgoing {
+                        let r = &o.request;
+                        let to = if o.to_name.is_empty() { short(&r.body.to) } else { o.to_name.clone() };
+                        let queued = store.outbox.iter().any(|q| matches!(&q.message, crate::links::Message::Request(x) if x.body.id() == r.body.id()));
+                        ui.container(Style::row().gap(6.0).stretch(), |ui| {
+                            label(ui, cx, if queued { "links.sending" } else { "links.waiting" }, &[Arg::Text(r.from_name.clone()), Arg::Text(to)], "default");
+                            let id = r.body.id();
+                            button(ui, cx, "links.withdraw", &[], 80.0, move |c| {
+                                crate::links::withdraw(&id);
+                                c.requests.push(Request::Rebuild);
+                            });
+                        });
+                    }
+                });
+            }
+            ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(380.0), |ui| {
+                label(ui, cx, "links.links", &[], "default");
+                if store.links.is_empty() {
+                    label(ui, cx, "links.no_links", &[], "dim");
+                }
+                for (i, l) in store.links.iter().enumerate() {
+                    ui.container(Style::row().gap(6.0).stretch(), |ui| {
+                        label(ui, cx, "links.link", &[Arg::Text(l.from_name.clone()), Arg::Text(l.to_name.clone())], "default");
+                        let id = l.id();
+                        let n = button(ui, cx, "links.end", &[], 80.0, move |c| {
+                            if let Err(e) = crate::links::revoke(&id) {
+                                log::warn!("{e}");
+                            }
+                            c.requests.push(Request::Rebuild);
+                        });
+                        ui.set_id(n, &format!("end{i}"));
+                    });
+                }
+            });
+            button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
 }
