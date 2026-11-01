@@ -21,6 +21,8 @@ pub struct BuildCx<'a> {
     pub in_game: bool,
     /// Joined someone else's world (their synced settings apply).
     pub remote: bool,
+    /// Your own world's name while it runs on during a visit elsewhere (chiacraft).
+    pub home: Option<&'a str>,
     pub mods: usize,
     pub client: Option<&'a crate::client::Client>,
     /// The window in GUI pixels.
@@ -457,6 +459,9 @@ impl Screen for Pause {
         desc::build(ui, cx, |d| {
             desc::frame(d, cx.in_game, "menu.paused", |d| {
                 d.button("menu.resume", &[], 200.0, false, |r| r.handle(vec![Request::Close]));
+                if let Some(home) = cx.home {
+                    d.button("menu.return_home", &[Arg::Text(home.to_string())], 200.0, false, |r| r.handle(vec![Request::ReturnHome]));
+                }
                 d.button("menu.multiplayer", &[], 200.0, false, |r| r.handle(vec![Request::Screen("core:multiplayer".into())]));
                 d.button("menu.settings", &[], 200.0, false, |r| r.handle(vec![Request::Screen("core:settings".into())]));
                 d.parts("core:pause", "buttons");

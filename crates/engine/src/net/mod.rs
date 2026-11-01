@@ -23,7 +23,7 @@ pub fn current_ticket() -> Option<String> {
 
 pub fn host(server: &crate::server::ServerHandle, settings: &crate::settings::Settings) {
     server.shared.hosting.store(true, std::sync::atomic::Ordering::Relaxed);
-    p2p::host(server.connect.clone(), settings);
+    p2p::host(server.connect.clone(), server.content, settings);
 }
 
 pub fn start_join(ticket: &str, settings: &crate::settings::Settings) -> Result<p2p::Joining, String> {

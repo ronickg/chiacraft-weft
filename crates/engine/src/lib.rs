@@ -51,7 +51,7 @@ pub fn init_workers() {
     set_priority(PRIORITY_ABOVE_NORMAL);
 }
 
-fn workers() -> usize {
+pub(crate) fn workers() -> usize {
     std::thread::available_parallelism().map_or(4, |n| n.get()).saturating_sub(2).max(1)
 }
 
@@ -86,11 +86,11 @@ pub fn lower_priority() {
 }
 
 const PRIORITY_BELOW_NORMAL: i32 = -1;
-const PRIORITY_ABOVE_NORMAL: i32 = 1;
+pub(crate) const PRIORITY_ABOVE_NORMAL: i32 = 1;
 
 /// The calling thread's scheduling priority (Windows values; Linux maps them onto nice;
 /// elsewhere nothing).
-fn set_priority(_priority: i32) {
+pub(crate) fn set_priority(_priority: i32) {
     #[cfg(windows)]
     {
         unsafe extern "system" {

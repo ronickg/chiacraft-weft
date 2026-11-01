@@ -113,12 +113,27 @@ to the guest; a package holding `run.sh` was left out; an 8192-pixel texture sho
 without a crash; the store tidy removed a half-done package and stray files and kept the pinned
 ones. The per-peer limits and the frame check weren't exercised by a hostile client.
 
+Phase 3 slice 1 (your world runs on) is done. `server::Scope` (`server/mod.rs`): the world's
+`Content` and `config::ServerValues` (its synced settings). The server thread enters it, runs its
+loop on its own rayon pool whose threads enter it too (`pool.install`), and wraps its two jobs on
+the shared background pool in `Scope::with`. `content::content()` reads the thread's content first,
+then the game's; `config::get`/`put` read and write the server's values for synced settings on a
+server's threads. `ServerHandle.content` is what hosting checks joins against (`p2p::host` takes
+it; `accept` computes hashes and decodes with it). In `app.rs`: `leave_for_another` keeps a hosted
+world as `Running.home`; `return_home` (`Request::ReturnHome`, pause menu "Back to <world>")
+switches back with `modloader::use_built` and `play_local`; a disconnect or failed join goes home;
+leaving to the title or quitting stops it (`close_home`). `p2p::HOST_ENDPOINT`: joining while
+hosting connects through the hosting endpoint, and `stop_hosting` now closes it. Checked with two
+copies swapping worlds (each hosting its own, with different packages, each visiting the other while
+the other was away): each guest saw the other world's blocks, both came back to their own through
+the pause menu, and a guest whose host quit was taken home.
+
 ## Next steps
 
-1. Phase 2 "later" items: bao-tree verified streaming and resume, iroh-blobs for downloads from
+1. Phase 3 slice 2 (world addresses) per `notes/PLAN.md`.
+2. Phase 2 "later" items: bao-tree verified streaming and resume, iroh-blobs for downloads from
    other players and mirrors, reviewer lists, key rotation; running the fuzz targets (nightly,
    perhaps a scheduled CI job).
-2. Phase 3 (portals) per `notes/PLAN.md`, starting with the per-world `Content` decision in Open.
 
 ## Notes
 

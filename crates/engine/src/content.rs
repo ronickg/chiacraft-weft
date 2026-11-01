@@ -491,18 +491,47 @@ pub struct Content {
 }
 
 /// The content in force. Each frozen `Content` lives as long as the game (kept once per set of
-/// data packages, see `modloader::use_packages`), so references to an earlier one stay valid; it
-/// is swapped only while no world is loaded.
+/// data packages, see `modloader::use_packages`), so references to an earlier one stay valid.
+/// This is the game's (what it shows and the world it plays in); a server keeps its world's own
+/// on its threads ([`for_thread`], chiacraft), so a world kept running while its player visits
+/// another plays on with its own packages.
 static CONTENT: std::sync::atomic::AtomicPtr<Content> = std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+
+thread_local! {
+    static THREAD: std::cell::Cell<*const Content> = const { std::cell::Cell::new(std::ptr::null()) };
+}
 
 pub fn content() -> &'static Content {
     try_content().expect("content not frozen yet")
 }
 
 pub fn try_content() -> Option<&'static Content> {
+    let t = THREAD.with(|t| t.get());
+    // SAFETY: only `for_thread` and `with` store there, a `&'static Content`.
+    if !t.is_null() {
+        return Some(unsafe { &*t });
+    }
     let p = CONTENT.load(std::sync::atomic::Ordering::Acquire);
     // SAFETY: only `set` stores here, a `&'static Content`.
     (!p.is_null()).then(|| unsafe { &*p })
+}
+
+/// The content this thread uses from now on, whatever the game's is (a server's threads).
+pub fn for_thread(c: &'static Content) {
+    THREAD.with(|t| t.set(c));
+}
+
+/// Runs `f` with `c` as this thread's content, then puts back what was there (a server's jobs
+/// on pools other work shares).
+pub fn with<R>(c: &'static Content, f: impl FnOnce() -> R) -> R {
+    struct Restore(*const Content);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            THREAD.with(|t| t.set(self.0));
+        }
+    }
+    let _restore = Restore(THREAD.with(|t| t.replace(c)));
+    f()
 }
 
 pub(crate) fn set(c: &'static Content) {

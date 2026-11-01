@@ -369,7 +369,8 @@ pub fn for_world(meta: &crate::saves::WorldMeta) -> (Vec<PackageRef>, Vec<String
 }
 
 /// Makes the content the code mods' plus exactly these packages, building it the first time this
-/// set is asked for. Only while no world is loaded. True if the content changed.
+/// set is asked for. True if the content changed. This is the game's content: a world still
+/// running keeps the content it was opened with (`server::Scope`).
 pub fn use_packages(set: &[PackageRef]) -> Result<bool, String> {
     let start = Instant::now();
     let mut guard = LOADER.lock();
@@ -412,6 +413,21 @@ pub fn use_packages(set: &[PackageRef]) -> Result<bool, String> {
         l.store.touch(&p.hash);
     }
     Ok(true)
+}
+
+/// Makes `c`, a content built earlier, the game's again (going back to a world kept running).
+/// True if the content changed.
+pub fn use_built(c: &'static content::Content) -> bool {
+    let mut guard = LOADER.lock();
+    let Some(l) = guard.as_mut() else { return false };
+    let Some((key, _)) = l.built.iter().find(|(_, b)| std::ptr::eq(*b, c)) else { return false };
+    if l.current.as_ref() == Some(key) {
+        return false;
+    }
+    l.current = Some(key.clone());
+    set_names(c.mods.iter().map(|m| m.id.clone()).collect());
+    content::set(c);
+    true
 }
 
 /// Packages no world here pins are kept up to this much, those used most recently first: the

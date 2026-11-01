@@ -76,6 +76,8 @@ pub enum Request {
     LeaveWorld,
     Host,
     Join(String),
+    /// Back to your own world from a visit (chiacraft).
+    ReturnHome,
     /// Stops the join in progress (chiacraft).
     CancelJoin,
     /// The join sheet's answer: download the world's packages; true also trusts their creators.
@@ -158,6 +160,15 @@ pub struct Stats {
 pub struct Game {
     pub client: Client,
     pub server: Option<ServerHandle>,
+    /// The world's name (empty for a world joined over the network).
+    pub world: String,
+}
+
+/// Your own world, kept running while you visit others because players are in it (it is
+/// hosted; chiacraft). It keeps its own content and settings (`server::Scope`).
+pub(crate) struct Home {
+    server: ServerHandle,
+    world: String,
 }
 
 /// Commands the engine runs on the client that types them: name, usage, handler. One table for
@@ -198,6 +209,8 @@ pub(crate) struct Running {
     joining: Option<net::p2p::Joining>,
     /// The packages the join sheet asks about.
     join_offer: Option<Vec<net::screens::OfferRow>>,
+    /// Your world, running on while you visit another.
+    home: Option<Home>,
     last: Instant,
     shot_pending: bool,
     fps: f32,
@@ -412,6 +425,7 @@ impl App {
             game: None,
             joining: None,
             join_offer: None,
+            home: None,
             last: Instant::now(),
             shot_pending: false,
             fps: 0.0,
@@ -501,6 +515,7 @@ impl Running {
             languages: &self.languages,
             in_game: self.game.is_some(),
             remote: self.game.as_ref().is_some_and(|g| g.server.is_none()),
+            home: self.home.as_ref().map(|h| h.world.as_str()),
             mods: self.mods.len(),
             client: self.game.as_ref().map(|g| &g.client),
             size: {
@@ -681,6 +696,7 @@ impl Running {
                     log::warn!("joining failed: {e}");
                     self.joining = None;
                     self.join_offer = None;
+                    self.return_home();
                     self.screens.clear();
                     self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] }));
                     return;
@@ -695,7 +711,7 @@ impl Running {
         match Client::new(&mut *self.gpu, &self.assets, &self.textures, conn, &self.settings.name(), &key, self.settings.view_distance(), std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok()) {
             Ok(mut client) => {
                 client.sent = load_chat_history(&self.settings.run_dir);
-                self.game = Some(Game { client, server: None });
+                self.game = Some(Game { client, server: None, world: String::new() });
                 self.screens.clear();
                 self.hud.invalidate();
                 self.set_capture(true);
@@ -732,13 +748,18 @@ impl Running {
             ServerConfig { seed: meta.seed, view_radius: self.settings.view_distance() },
             Some(storage),
         );
+        self.play_local(server, meta.name.clone());
+    }
+
+    /// Plays in the world `server` runs in this process.
+    fn play_local(&mut self, server: ServerHandle, world: String) {
         let (client_conn, server_conn) = net::local_pair();
         let _ = server.connect.send(server_conn);
         let key = net::p2p::player_key(&self.settings.run_dir);
         match Client::new(&mut *self.gpu, &self.assets, &self.textures, client_conn, &self.settings.name(), &key, self.settings.view_distance(), std::fs::read(self.settings.run_dir.join("skins").join("skin.png")).ok()) {
             Ok(mut client) => {
                 client.sent = load_chat_history(&self.settings.run_dir);
-                self.game = Some(Game { client, server: Some(server) });
+                self.game = Some(Game { client, server: Some(server), world });
                 self.screens.clear();
                 self.hud.invalidate();
                 self.quads_dirty = true;
@@ -753,8 +774,53 @@ impl Running {
         }
     }
 
+    /// Leaves the world in play to join another. Your own world runs on while others play in
+    /// it (it is hosted): it becomes `home`, to come back to. Otherwise it is saved and closed.
+    fn leave_for_another(&mut self) {
+        let hosted = matches!(&self.game, Some(Game { server: Some(s), .. }) if s.is_hosting());
+        if !hosted {
+            self.leave_world_silent();
+            return;
+        }
+        let Some(mut g) = self.game.take() else { return };
+        g.client.leave();
+        self.gpu.wait_idle();
+        g.client.destroy(&mut *self.gpu);
+        if let Some(server) = g.server.take() {
+            // It may have been paused by the menu this was chosen from.
+            server.set_paused(false);
+            log::info!("'{}' keeps running while you are away", g.world);
+            self.home = Some(Home { server, world: g.world });
+        }
+        self.set_capture(false);
+    }
+
+    /// Back to your own world, left running while you visited another.
+    fn return_home(&mut self) {
+        let Some(home) = self.home.take() else { return };
+        self.leave_world_silent();
+        if let Some(j) = self.joining.take() {
+            let _ = j.answers.send(net::p2p::JoinAnswer::Cancel("went home".into()));
+        }
+        self.join_offer = None;
+        log::info!("back to '{}'", home.world);
+        if modloader::use_built(home.server.content) {
+            self.content_changed();
+        }
+        self.play_local(home.server, home.world);
+    }
+
+    /// Stops your own world if it was left running.
+    fn close_home(&mut self) {
+        if let Some(mut h) = self.home.take() {
+            h.server.stop();
+            net::p2p::stop_hosting();
+        }
+    }
+
     fn leave_world(&mut self) {
         self.leave_world_silent();
+        self.close_home();
         // A finished play session: the title screen asks for the words after the first one.
         if !crate::config::automated() {
             if let Some(s) = chiacraft_account::current() {
@@ -861,8 +927,7 @@ impl Running {
                     }
                 }
                 Request::Join(ticket) => {
-                    // Content may be built again for the world's packages: no world may be loaded.
-                    self.leave_world_silent();
+                    self.leave_for_another();
                     self.joining = None;
                     match net::start_join(&ticket, &self.settings) {
                         Ok(j) => {
@@ -891,10 +956,15 @@ impl Running {
                         self.open(Box::new(net::screens::Joining));
                     }
                 }
+                Request::ReturnHome => self.return_home(),
                 Request::CancelJoin => {
                     self.join_offer = None;
                     if let Some(j) = self.joining.take() {
                         let _ = j.answers.send(net::p2p::JoinAnswer::Cancel("cancelled".into()));
+                    }
+                    if self.home.is_some() {
+                        self.return_home();
+                        continue;
                     }
                     self.screens.clear();
                     self.open(screens::engine("core:title"));
@@ -1508,6 +1578,7 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 if frame(r, &self.opts) || r.quit {
                     r.leave_world_silent();
+                    r.close_home();
                     el.exit();
                 }
             }
@@ -1525,6 +1596,7 @@ impl ApplicationHandler for App {
         if let Some(mut r) = self.run.take() {
             r.gpu.wait_idle();
             r.leave_world_silent();
+            r.close_home();
             drop(r.gpu);
         }
     }
@@ -1769,7 +1841,12 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
         log::info!("disconnected: {reason}");
         r.leave_world_silent();
         r.screens.clear();
-        r.open(screens::engine("core:title"));
+        if r.home.is_some() {
+            // The world you visited went away: back to your own, which kept running.
+            r.return_home();
+        } else {
+            r.open(screens::engine("core:title"));
+        }
         r.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(reason)] }));
     }
     r.input.sensitivity = r.settings.sensitivity();

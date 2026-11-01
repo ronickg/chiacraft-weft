@@ -105,11 +105,63 @@ fn values() -> &'static [AtomicU64] {
     VALUES.get_or_init(|| content().game.configs.iter().map(|d| AtomicU64::new(d.default.to_bits())).collect())
 }
 
+/// A server's own values of the settings it decides (chiacraft). The values above are the game's:
+/// its player's settings and, while playing, the server's synced ones. A world kept running while
+/// its player visits another must not take that world's rules, so each server keeps its synced
+/// values here, read and written on its threads ([`for_thread`]).
+pub struct ServerValues(Vec<AtomicU64>);
+
+thread_local! {
+    static SERVER: std::cell::RefCell<Option<std::sync::Arc<ServerValues>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The game's values as they are now, for a server to keep as its own.
+pub fn server_values() -> std::sync::Arc<ServerValues> {
+    std::sync::Arc::new(ServerValues(values().iter().map(|v| AtomicU64::new(v.load(Ordering::Relaxed))).collect()))
+}
+
+/// This thread reads and writes the synced settings in `v` from now on (`None`: the game's).
+pub fn for_thread(v: Option<std::sync::Arc<ServerValues>>) {
+    SERVER.with(|s| *s.borrow_mut() = v);
+}
+
+/// This thread's server values, if it is a server's.
+pub fn thread_values() -> Option<std::sync::Arc<ServerValues>> {
+    SERVER.with(|s| s.borrow().clone())
+}
+
+/// Runs `f` with `v` as this thread's server values, then puts back what was there.
+pub fn with<R>(v: std::sync::Arc<ServerValues>, f: impl FnOnce() -> R) -> R {
+    struct Restore(Option<std::sync::Arc<ServerValues>>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            SERVER.with(|s| *s.borrow_mut() = self.0.take());
+        }
+    }
+    let _restore = Restore(SERVER.with(|s| s.borrow_mut().replace(v)));
+    f()
+}
+
+/// The server's slot for setting `id` if this is a server's thread and the server decides it.
+fn server_slot<R>(id: u32, f: impl FnOnce(&AtomicU64) -> R) -> Option<R> {
+    SERVER.with(|s| {
+        let s = s.borrow();
+        let v = s.as_ref()?;
+        if !def(id)?.synced() {
+            return None;
+        }
+        v.0.get(id as usize).map(f)
+    })
+}
+
 fn def(id: u32) -> Option<&'static ConfigDef> {
     content().game.configs.get(id as usize)
 }
 
 pub fn get(id: u32) -> f64 {
+    if let Some(v) = server_slot(id, |s| f64::from_bits(s.load(Ordering::Relaxed))) {
+        return v;
+    }
     values().get(id as usize).map_or(0.0, |v| f64::from_bits(v.load(Ordering::Relaxed)))
 }
 
@@ -124,6 +176,11 @@ pub fn generation() -> u64 {
 
 /// Sets a value without saving (server values arriving, loading files).
 pub fn put(id: u32, v: f64) {
+    if let Some(d) = def(id)
+        && server_slot(id, |s| s.store(d.fit(v).to_bits(), Ordering::Relaxed)).is_some()
+    {
+        return;
+    }
     if let (Some(slot), Some(d)) = (values().get(id as usize), def(id)) {
         let bits = d.fit(v).to_bits();
         if slot.swap(bits, Ordering::Relaxed) != bits {

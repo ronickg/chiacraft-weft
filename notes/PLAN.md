@@ -159,7 +159,24 @@ The smallest version that works is phases 1-4.
    Later: iroh-blobs for downloads from other players and mirrors, reviewer lists, key rotation.
 3. **Portals.** World addresses (key, DID later); link requests inbox with pre-allow; links
    signed by both worlds, revocable; portal blocks; travel with the connection prepared ahead; a
-   safe return when a world goes offline; keep your own world open while you visit others.
+   safe return when a world goes offline; keep your own world open while you visit others. In
+   slices:
+   1. *Your world runs on* (done): decided 2026-10-31 that a server keeps its own world's state
+      instead of a second process or one shared package set. `server::Scope` holds its world's
+      `Content` and its own values of the synced settings; its thread, its own rayon pool and its
+      jobs on shared pools take them as theirs (`content::for_thread`/`with`,
+      `config::for_thread`/`with`), so the game can switch content for another world meanwhile.
+      Joining another world while yours is hosted keeps it running (`Running.home`); "Back to
+      <world>" in the pause menu; back home automatically when the visited world goes away or the
+      join fails. Joins go out through the hosting endpoint (two endpoints with one key took the
+      relay from each other).
+   2. *World addresses*: a key per world (not per player), joinable by address alone; saved
+      worlds and friends' worlds to join again.
+   3. *Link requests*: request, inbox, accept or pre-allow; a link signed by both worlds' keys,
+      kept by both, revocable.
+   4. *Portal blocks* bound to a link; walking in travels.
+   5. *Travel prepared ahead*: connect and download while the player nears the portal; arrive at
+      the linked portal; return through it, and to the origin world when the other goes offline.
 4. **DIDs and achievements.** Player and world DIDs through sponsors; world ownership both ways;
    achievements signed by the world DID, anchored in batches, opt-in; profile view; admission
    rules (allow lists, probation, DID age, achievements); shared ban lists.
@@ -182,5 +199,5 @@ is the content.
 - Verify Chia full nodes return hinted coins for an arbitrary hint fast enough for a world list.
 - Weft upstream: keep merging (proposed) or cut loose.
 - The Horizon-based project: frozen as it is, W7-W9 work left in its worktrees.
-- Phase 3, "keep your own world open while you visit others": `Content` is one per process, so
-  both worlds share a package set unless the server gets its own `Content`. Decide at Phase 3.
+- Settings in the game's own store that servers read without being synced (text settings,
+  client-scope ones) are still shared by a world kept running and the game; none matters yet.

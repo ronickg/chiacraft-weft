@@ -182,6 +182,8 @@ pub struct Server {
 pub struct ServerHandle {
     pub connect: Sender<ServerConn>,
     pub shared: Arc<Shared>,
+    /// The content the world plays with (chiacraft: the game's may change while it runs).
+    pub content: &'static Content,
     stop: Sender<()>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
@@ -235,45 +237,95 @@ impl Drop for ServerHandle {
     }
 }
 
+/// What a server's threads take as theirs (chiacraft): its world's content and its own values of
+/// the settings it decides, whatever the game in the same process plays meanwhile.
+#[derive(Clone)]
+pub struct Scope {
+    pub content: &'static Content,
+    configs: Arc<crate::config::ServerValues>,
+}
+
+impl Scope {
+    /// The game's content and settings as they are now: what a world opened now plays with.
+    pub fn now() -> Scope {
+        Scope { content: content(), configs: crate::config::server_values() }
+    }
+
+    /// This thread's own scope, if it is a server's.
+    fn current() -> Option<Scope> {
+        Some(Scope { content: content(), configs: crate::config::thread_values()? })
+    }
+
+    /// This thread is the server's from now on.
+    fn enter(&self) {
+        crate::content::for_thread(self.content);
+        crate::config::for_thread(Some(self.configs.clone()));
+    }
+
+    /// Runs `f` as the server's (its jobs on the pools the game shares).
+    pub fn with<R>(&self, f: impl FnOnce() -> R) -> R {
+        crate::content::with(self.content, || crate::config::with(self.configs.clone(), f))
+    }
+}
+
 pub fn spawn(cfg: ServerConfig, storage: Option<Storage>) -> ServerHandle {
     let (connect, incoming) = unbounded();
     let (stop, stop_rx) = unbounded::<()>();
     let shared = Arc::new(Shared::default());
     let sh = shared.clone();
+    let scope = Scope::now();
+    let world_content = scope.content;
     let thread = std::thread::Builder::new()
         .name("server".into())
         .spawn(move || {
-            let mut server = Server::new(cfg, incoming, storage, sh);
-            let mut next = Instant::now();
-            loop {
-                if stop_rx.try_recv().is_ok() {
-                    break;
-                }
-                if server.shared.paused.load(Ordering::Relaxed) {
-                    server.idle();
-                } else {
-                    server.tick();
-                }
-                if server.sprint.is_some() {
-                    next = Instant::now();
-                    continue;
-                }
-                let step = Duration::from_secs_f64(1.0 / server.tick_rate.max(1) as f64);
-                next += step;
-                // The rest of the tick goes to loading instead of sleeping.
-                server.load_until(next.checked_sub(Duration::from_millis(2)).unwrap_or(next));
-                let now = Instant::now();
-                if next > now {
-                    std::thread::sleep(next - now);
-                } else if now - next > step * 10 {
-                    // Far behind (debugger, huge load): skip instead of fast-forwarding.
-                    next = now;
-                }
-            }
-            server.shutdown();
+            // The server's parallel work (region ticks, entities) runs on a pool of its own whose
+            // threads are the server's, as the server thread is.
+            scope.enter();
+            let pool_scope = scope.clone();
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(crate::workers())
+                .thread_name(|i| format!("server {i}"))
+                .start_handler(move |_| {
+                    pool_scope.enter();
+                    crate::set_priority(crate::PRIORITY_ABOVE_NORMAL);
+                })
+                .build()
+                .expect("server pool");
+            pool.install(move || run(cfg, incoming, storage, sh, stop_rx));
         })
         .expect("spawning server thread");
-    ServerHandle { connect, shared, stop, thread: Some(thread) }
+    ServerHandle { connect, shared, content: world_content, stop, thread: Some(thread) }
+}
+
+fn run(cfg: ServerConfig, incoming: Receiver<ServerConn>, storage: Option<Storage>, sh: Arc<Shared>, stop_rx: Receiver<()>) {
+    let mut server = Server::new(cfg, incoming, storage, sh);
+    let mut next = Instant::now();
+    loop {
+        if stop_rx.try_recv().is_ok() {
+            break;
+        }
+        if server.shared.paused.load(Ordering::Relaxed) {
+            server.idle();
+        } else {
+            server.tick();
+        }
+        if server.sprint.is_some() {
+            next = Instant::now();
+            continue;
+        }
+        let step = Duration::from_secs_f64(1.0 / server.tick_rate.max(1) as f64);
+        next += step;
+        // The rest of the tick goes to loading instead of sleeping.
+        server.load_until(next.checked_sub(Duration::from_millis(2)).unwrap_or(next));
+        let now = Instant::now();
+        if next > now {
+            std::thread::sleep(next - now);
+        } else if now - next > step * 10 {
+            // Far behind (debugger, huge load): skip instead of fast-forwarding.
+            next = now;
+        }
+    }
+    server.shutdown();
 }
 
 /// The cubes in a player's view that differ from generation: told about first (the client
@@ -1630,7 +1682,8 @@ impl Server {
         let storage = self.storage.clone();
         let shared = self.shared.clone();
         let edits = self.dims[dim as usize].edits.clone();
-        crate::background().spawn(move || {
+        let scope = Scope::current().unwrap_or_else(Scope::now);
+        crate::background().spawn(move || scope.with(|| {
             // Columns go up to open sky, so nothing above the view's floor counts as left behind.
             let wanted = shared.views.read().iter().any(|&(d, v)| {
                 let v = v.grown(2);
@@ -1648,7 +1701,7 @@ impl Server {
             shared.gen_ns.fetch_add(t.elapsed().as_nanos() as u64, Ordering::Relaxed);
             shared.generated.fetch_add(1, Ordering::Relaxed);
             let _ = tx.send(Generated { dim, pos, cube: Some(cube), entities, conn });
-        });
+        }));
     }
 
     fn sync_players(&mut self, c: &'static Content) {
@@ -1965,7 +2018,8 @@ impl Server {
                     if let Some(s) = &storage {
                         // Written in the background; loads queue behind it there.
                         let (s, bytes, dim) = (s.clone(), serialize(c, r, &inside), r.id);
-                        crate::background().spawn(move || s.lock().save(c, dim, pos, &cube, &bytes));
+                        let scope = Scope::current().unwrap_or_else(Scope::now);
+                        crate::background().spawn(move || scope.with(|| s.lock().save(c, dim, pos, &cube, &bytes)));
                     }
                     for id in inside {
                         r.entities.remove(id);

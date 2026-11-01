@@ -6,6 +6,7 @@ menu.quit = Выйти из игры
 menu.back = Назад
 menu.done = Готово
 menu.resume = Вернуться в игру
+menu.return_home = Вернуться в {0}
 menu.save_quit = Сохранить и выйти в меню
 menu.paused = Игра приостановлена
 menu.version = Weft {0} | модов загружено: {1}

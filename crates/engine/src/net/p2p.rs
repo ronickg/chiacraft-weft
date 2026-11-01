@@ -202,9 +202,16 @@ pub struct Hosting {
 
 pub static HOSTING: Mutex<Option<Hosting>> = Mutex::new(None);
 
+/// The hosting endpoint (chiacraft). Joining another world while this game hosts its own goes out
+/// through it: a second endpoint with the same key would take the relay from the first, and the
+/// hosted world would stop hearing from its players.
+static HOST_ENDPOINT: Mutex<Option<Endpoint>> = Mutex::new(None);
+
 /// Starts accepting players for the running server. The ticket appears in `HOSTING` once the
 /// endpoint is online.
-pub fn host(connect: crossbeam_channel::Sender<ServerConn>, settings: &Settings) {
+/// `world` is the content the hosted world plays with: what joining games are checked against,
+/// whatever the host's game shows meanwhile (chiacraft: it may be visiting another world).
+pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crate::content::Content, settings: &Settings) {
     if HOSTING.lock().is_some() {
         return;
     }
@@ -219,6 +226,7 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, settings: &Settings)
                 return;
             }
         };
+        *HOST_ENDPOINT.lock() = Some(ep.clone());
         let _ = tokio::time::timeout(Duration::from_secs(8), ep.online()).await;
         let t = ticket(&ep.addr());
         log::info!("hosting, ticket: {t}");
@@ -228,7 +236,7 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, settings: &Settings)
         while let Some(incoming) = ep.accept().await {
             let connect = connect.clone();
             tokio::spawn(async move {
-                if let Err(e) = accept(incoming, connect).await {
+                if let Err(e) = accept(incoming, connect, world).await {
                     log::warn!("incoming player: {e}");
                 }
             });
@@ -238,23 +246,28 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, settings: &Settings)
 
 pub fn stop_hosting() {
     *HOSTING.lock() = None;
+    // Closing it ends its accept loop.
+    if let Some(ep) = HOST_ENDPOINT.lock().take() {
+        runtime().spawn(async move { ep.close().await });
+    }
 }
 
-async fn accept(incoming: iroh::endpoint::Incoming, connect: crossbeam_channel::Sender<ServerConn>) -> Result<(), String> {
+async fn accept(incoming: iroh::endpoint::Incoming, connect: crossbeam_channel::Sender<ServerConn>, world: &'static crate::content::Content) -> Result<(), String> {
+    use crate::content::with;
     let conn = incoming.await.map_err(|e| e.to_string())?;
     let peer = conn.remote_id();
     let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi()).await.map_err(|_| "no hello")?.map_err(|e| e.to_string())?;
     let hello = tokio::time::timeout(Duration::from_secs(10), read_frame_max(&mut recv, MAX_HELLO)).await.map_err(|_| "no hello")??;
     let (proto, native) = <(u32, u64) as codec::Wire>::get(&mut codec::R(&hello)).ok_or("bad hello")?;
-    let offers = crate::modloader::current_packages();
+    let offers = with(world, crate::modloader::current_packages);
     // Joins still configuring hold a place until this goes out of scope.
     let place = Configuring::take();
     let refusal = if place.is_none() {
         "the world is busy with other players joining; try again in a minute".to_string()
     } else if proto != PROTOCOL {
         format!("protocol mismatch: server {PROTOCOL}, client {proto}")
-    } else if native != native_hash() {
-        format!("different mods; server runs: {}", mod_list())
+    } else if native != with(world, native_hash) {
+        format!("different mods; server runs: {}", with(world, mod_list))
     } else {
         String::new()
     };
@@ -271,7 +284,7 @@ async fn accept(incoming: iroh::endpoint::Incoming, connect: crossbeam_channel::
     drop(place);
     let ready = ready.map_err(|_| "took too long to download and load the world's packages")?;
     let loaded = <u64 as codec::Wire>::get(&mut codec::R(&ready?)).ok_or("bad ready")?;
-    let refusal = if loaded != content_hash() { "the content does not match this world's after its packages".to_string() } else { String::new() };
+    let refusal = if loaded != with(world, content_hash) { "the content does not match this world's after its packages".to_string() } else { String::new() };
     write_frame(&mut send, refusal.as_bytes()).await?;
     if !refusal.is_empty() {
         return Err(refusal);
@@ -284,7 +297,7 @@ async fn accept(incoming: iroh::endpoint::Incoming, connect: crossbeam_channel::
     // Incoming: the authenticated key replaces whatever key the client claims.
     let reader = tokio::spawn(async move {
         while let Ok(frame) = read_frame(&mut recv).await {
-            let Some(mut msg) = codec::decode_server(&frame) else { break };
+            let Some(mut msg) = with(world, || codec::decode_server(&frame)) else { break };
             if let ToServer::Join { key, .. } = &mut msg {
                 *key = peer_key.clone();
             }
@@ -548,21 +561,31 @@ async fn pump_out<T: Send + crate::net::Message + 'static>(rx: crossbeam_channel
 /// get back to, and the attempt hangs on it whatever else the client tries (about one in six
 /// on a machine with Radmin VPN and Hyper-V). The relay always gets through; iroh moves the
 /// connection to a direct path afterwards when one works.
-async fn connect(settings: &Settings, addr: EndpointAddr) -> Result<(Endpoint, iroh::endpoint::Connection), String> {
+///
+/// While this game hosts, the hosting endpoint is used (both tries) and stays open: the endpoint
+/// given back is `None` then, and otherwise is the caller's to close.
+async fn connect(settings: &Settings, addr: EndpointAddr) -> Result<(Option<Endpoint>, iroh::endpoint::Connection), String> {
     let relayed = EndpointAddr::from_parts(addr.id, addr.relay_urls().cloned().map(TransportAddr::Relay).collect::<Vec<_>>());
     let attempts = [(addr, Duration::from_secs(3)), (relayed, Duration::from_secs(20))];
     let mut last = String::new();
     for (i, (addr, wait)) in attempts.into_iter().enumerate() {
-        let ep = endpoint(settings, false).await?;
+        let hosting = HOST_ENDPOINT.lock().clone();
+        let shared = hosting.is_some();
+        let ep = match hosting {
+            Some(ep) => ep,
+            None => endpoint(settings, false).await?,
+        };
         match tokio::time::timeout(wait, ep.connect(addr, ALPN)).await {
-            Ok(Ok(conn)) => return Ok((ep, conn)),
+            Ok(Ok(conn)) => return Ok(((!shared).then_some(ep), conn)),
             Ok(Err(e)) => last = e.to_string(),
             Err(_) => last = "timed out".into(),
         }
         if i == 0 {
             log::info!("connecting directly failed ({last}), trying through the relay");
         }
-        ep.close().await;
+        if !shared {
+            ep.close().await;
+        }
     }
     Err(last)
 }
@@ -654,7 +677,9 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
                 pump_out(to_server_rx, send, codec::encode_server).await;
                 reader.abort();
                 conn.close(0u32.into(), b"bye");
-                ep.close().await;
+                if let Some(ep) = ep {
+                    ep.close().await;
+                }
             }
             Err(e) => {
                 let _ = events.send(JoinEvent::Failed(e));
