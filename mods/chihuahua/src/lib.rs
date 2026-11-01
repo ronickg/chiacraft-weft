@@ -7,7 +7,7 @@
 //! The model is a papillon-style long-haired chihuahua made of boxes and flat fur panels with a
 //! hand-painted texture (Hytale's style), built in Blockbench: `models/chihuahua.geo.json`,
 //! `animations/chihuahua[_pup][_sit|_lie].animation.json` and `textures/entity/chihuahua/chihuahua.png`
-//! are exported from its source project (see `docs/creatures.md`). All coats draw with that
+//! are built from its source in `source/` (`source/build.py`; see `docs/creatures.md`). All coats draw with that
 //! one texture for now; the coat is still chosen and inherited. A coat is a look
 //! (`World::set_look`): one entity kind per coat, age and pose, drawn in place of the dog. Puppies
 //! have their own model file (half size, a bigger head) on the same layout, so the same picture

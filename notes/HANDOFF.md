@@ -236,8 +236,8 @@ build scripts that contain addresses with Python, not sed (`&` in the replacemen
 The dog (2026-11-01) is a papillon-style chihuahua built in Blockbench the way Hytale makes
 creatures: 49 boxes and flat fur panels with a hand-painted 512x96 texture, big solid butterfly
 ears, a jaw and a tongue, eyelids that blink, toes; animations idle (panting, blinking), walk,
-run, sit, lie and lick. Its source project is `~/Coding/voxel-dog` (not in this repository); the
-files here are exported from it with the `blocky-model` skill's `to_bedrock.py`
+run, sit, lie and lick. Its source is `mods/chihuahua/source` (rebuild with `source/build.py`); the
+files are exported with the `blocky-model` skill's `to_bedrock.py`
 ([docs/creatures.md](../docs/creatures.md) has the recipe and the commands). All coats draw with
 one texture for now (the coat is still chosen and inherited). The old generator
 (`tools/chihuahua.py`, 96 painted coats) and its preview were removed; they are in git history.

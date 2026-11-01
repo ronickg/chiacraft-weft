@@ -208,9 +208,11 @@ Engine limits that shape the model: bones rotate but single boxes don't; no per-
 `idle` and `walk` play by themselves (poses are look kinds with their own file); a played
 animation replaces idle while it plays; no Molang; cut-out alpha only (no blending).
 
-Worked example: the chiacraft chihuahua (a papillon), source in `~/Coding/voxel-dog` (`tools/blocky.py` builds 49 boxes/quads
-on 25 bones with all the defaults above; `tools/bb_build.py` builds it in Blockbench and exports
-.blockymodel/.blockyanim/.glb; `tools/ground.py` and the fitted `sit_*`/`lie_*` values; `NOTES.md`).
+Worked example: the chiacraft chihuahua (a papillon), source in the repo at
+`mods/chihuahua/source` (its README explains it): `tools/blocky.py` builds 51 boxes/quads on 27
+bones with all the defaults above (eyelids, jaw, tongue, solid ears, toes, a V bib),
+`tools/bb_build.py` builds it in Blockbench, `tools/ground.py` and the fitted `sit_*`/`lie_*`
+values, `build.py` exports it into the mod. Copy that folder to start a new animal.
 
 ## Sources
 

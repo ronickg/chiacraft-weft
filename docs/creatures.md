@@ -78,16 +78,16 @@ F3+T reloads models, animations and textures while the game runs.
 
 ## The chihuahua, as the worked example
 
-Its source project is `~/Coding/voxel-dog` (`NOTES.md` explains everything):
-`tools/blocky.py` lays out and paints the dog (49 boxes and quads, eyelids, jaw and tongue,
-`EYES`, `BLINKS`, `lick_keys`), `tools/bb_build.py` builds it in Blockbench and exports
-`.blockymodel`/`.blockyanim`/`.glb`/`.bbmodel`, `tools/voxdog.py` has the poses. To update the dog
-in the game after changing it:
+Its source is in the mod: [mods/chihuahua/source](../mods/chihuahua/source/README.md).
+`tools/blocky.py` lays out and paints the dog (51 boxes and quads with eyelids, jaw and tongue;
+`EYES`, `BLINKS`, `lick_keys`), `tools/voxdog.py` has the poses, `tools/bb_build.py` builds it in
+Blockbench. To update the dog in the game after changing it:
 
 ```
-cd ~/Coding/voxel-dog
-.venv/bin/python tools/blocky.py && .venv/bin/python tools/bb_build.py
-.venv/bin/python ~/Coding/chiacraft-weft/.claude/skills/blocky-model/scripts/to_bedrock.py \
-    out/d_blocky/spec.json out/d_blocky/texture.png ~/Coding/chiacraft-weft/mods/chihuahua/assets \
-    --name chihuahua --scale 0.17 --texture-name chihuahua/chihuahua --pup 0.5 --pup-head 1.3
+cd mods/chihuahua/source
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once
+.venv/bin/python build.py
 ```
+
+For a new animal, copy that folder next to the new mod's assets and change `blocky.py`'s
+elements, painting and poses; `build.py` names the files.
