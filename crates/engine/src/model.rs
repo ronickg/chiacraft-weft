@@ -632,7 +632,17 @@ mod tests {
         pose(
             &parts,
             Mat4::IDENTITY,
-            &Motion { pitch: 0.0, head_yaw: 0.0, swing: 0.0, swim: None, attack: 0.0, holding: false, anims: &[], crouch: false, sit: false },
+            &Motion {
+                pitch: 0.0,
+                head_yaw: 0.0,
+                swing: 0.0,
+                swim: None,
+                attack: 0.0,
+                holding: false,
+                anims: &[],
+                crouch: false,
+                sit: false,
+            },
             &mut mats,
         );
         let hand = mats[1].transform_point3(Vec3::new(-6.0, 12.0, 0.0));

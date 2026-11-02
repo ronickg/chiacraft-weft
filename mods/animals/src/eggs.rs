@@ -114,14 +114,22 @@ pub fn init(r: &mut Registry) {
     let mut items = Vec::new();
     for (i, s) in SPECIES.iter().enumerate().filter(|(_, s)| s.gestation == 0) {
         let item = Item::generated(format!("{}_egg", s.kind_name()));
-        r.item(item).max_stack(1).texture("raptor_egg").tab(&TOOLS).on_use(place);
+        r.item(item)
+            .max_stack(1)
+            .texture("raptor_egg")
+            .tab(&TOOLS)
+            .on_use(place);
         items.push((i, item));
     }
     let _ = ITEMS.set(items);
 }
 
 fn item_of(index: usize) -> Option<&'static Item> {
-    ITEMS.get()?.iter().find(|(i, _)| *i == index).map(|(_, it)| *it)
+    ITEMS
+        .get()?
+        .iter()
+        .find(|(i, _)| *i == index)
+        .map(|(_, it)| *it)
 }
 
 /// Where a nest's eggs stand: on the floor of its dish (the slabs round its middle are 1.5 to
@@ -190,7 +198,11 @@ fn in_nest(w: &World, at: [f64; 3]) -> bool {
 fn nest_clicked(w: &World, id: u64, player: u64) {
     let Some(st) = w.entity(id) else { return };
     let held = w.inventory(player).get(w.selected_slot(player));
-    if let Some(e) = EGG.on_stack(&held).filter(|_| ITEMS.get().is_some_and(|i| i.iter().any(|(_, it)| it.id() == held.item))) {
+    if let Some(e) = EGG.on_stack(&held).filter(|_| {
+        ITEMS
+            .get()
+            .is_some_and(|i| i.iter().any(|(_, it)| it.id() == held.item))
+    }) {
         spawn_egg(w, nest_spot(w, st.pos), &e, owner_of(player));
         let slot = w.selected_slot(player);
         w.inventory(player).set(slot, StackData::shrink(held, 1));
@@ -245,7 +257,10 @@ pub fn lay(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
 /// An egg put down at `at`: a quarter sunk into the ground, leaning (its model leans forward) with
 /// its top toward the nest's middle, or any way outside a nest.
 fn spawn_egg(w: &World, at: [f64; 3], egg: &Egg, owner: Option<[u8; 64]>) -> u64 {
-    let size = (egg.species as usize).checked_sub(1).filter(|&i| i < SPECIES.len()).map_or(1.0, egg_size);
+    let size = (egg.species as usize)
+        .checked_sub(1)
+        .filter(|&i| i < SPECIES.len())
+        .map_or(1.0, egg_size);
     let sink = if nest_near(w, at, 0.8).is_some() { 0.0 } else { SINK * size as f64 };
     let id = w.spawn(&EGG_ENTITY, [at[0], at[1] - sink, at[2]]);
     if id == 0 {
@@ -332,7 +347,12 @@ pub fn wild_clutch(w: &World, id: u64, index: usize, st: &EntityState) -> bool {
 /// hatching.
 fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(e) = w.component(id, &EGG).copied() else { return true };
-    let Some(index) = (e.species as usize).checked_sub(1).filter(|&i| i < SPECIES.len()) else { return true };
+    let Some(index) = (e.species as usize)
+        .checked_sub(1)
+        .filter(|&i| i < SPECIES.len())
+    else {
+        return true;
+    };
     let size = egg_size(index);
     if w.component(id, &EGG_SCALED).is_some_and(|&v| v != size) {
         w.set_scale(id, size);
@@ -346,7 +366,13 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
     let p = st.pos.map(|v| v.floor() as i32);
     let warm = in_nest(w, st.pos)
         || (-2..=2).any(|dx| {
-            (-1..=2).any(|dy| (-2..=2).any(|dz| WARMTH.iter().any(|t| t.on_block(w.get([p[0] + dx, p[1] + dy, p[2] + dz])))))
+            (-1..=2).any(|dy| {
+                (-2..=2).any(|dz| {
+                    WARMTH
+                        .iter()
+                        .any(|t| t.on_block(w.get([p[0] + dx, p[1] + dy, p[2] + dz])))
+                })
+            })
         });
     let cold = crate::evolution::Habitat::at(w, st.pos).cold() > 0.0;
     let step = match (warm, cold) {
@@ -442,7 +468,12 @@ pub fn hurry(w: &World, at: [f64; 3]) {
 pub fn nest_now(w: &World, player: u64) -> bool {
     let Some(p) = w.entity(player) else { return false };
     for id in w.near(p.pos, 16.0, None) {
-        let Some(index) = w.component(id, &ANIMAL).and_then(|a| (a.species as usize).checked_sub(1)) else { continue };
+        let Some(index) = w
+            .component(id, &ANIMAL)
+            .and_then(|a| (a.species as usize).checked_sub(1))
+        else {
+            continue;
+        };
         if SPECIES.get(index).is_some_and(|s| s.gestation == 0)
             && let Some(st) = w.entity(id)
             && wild_clutch(w, id, index, &st)

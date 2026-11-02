@@ -901,7 +901,8 @@ impl Client {
         // Limbs swing with horizontal speed in the air too, like vanilla.
         crate::model::walk_limbs(&mut self.self_walk, &mut self.self_swing, speed, dt as f32);
         // Vanilla's: swimming doesn't bob, even touching the bottom.
-        let walking = self.player.on_ground && !self.player.flying && self.player.pose != Pose::Swim && !self.dead && self.player.mount.is_none();
+        let walking =
+            self.player.on_ground && !self.player.flying && self.player.pose != Pose::Swim && !self.dead && self.player.mount.is_none();
         // Vanilla: amplitude follows the per-tick speed capped at 0.1, eased by 0.4 per tick.
         self.walk_dist += moved * 0.6;
         let target = if walking { (speed / 20.0).min(0.1) } else { 0.0 };
@@ -1106,7 +1107,10 @@ impl Client {
         ToServer::Move {
             // Seated, the server puts it on the seat of the mount as the server has it.
             frame: match self.player.mount {
-                Some((m, _)) if self.seat().is_some() => self.seat().zip(self.entities.get(&m)).map(|(s, e)| (m, s - e.pos)),
+                Some((m, _)) if self.seat().is_some() => self
+                    .seat()
+                    .zip(self.entities.get(&m))
+                    .map(|(s, e)| (m, s - e.pos)),
                 _ => self.player.riding.map(|(b, _, now)| (b, now)),
             },
             keys: self.player.keys,
@@ -1825,9 +1829,15 @@ impl Client {
         let c = content();
         let [health, burning, worn, shape, held, mount] = c.game.field_comps;
         let mounted = || {
-            let m = bytes.get(..8).map_or(0, |b| u64::from_le_bytes(b.try_into().unwrap()));
-            let seat = bytes.get(8..12).map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
-            let forward = bytes.get(12..16).map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
+            let m = bytes
+                .get(..8)
+                .map_or(0, |b| u64::from_le_bytes(b.try_into().unwrap()));
+            let seat = bytes
+                .get(8..12)
+                .map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
+            let forward = bytes
+                .get(12..16)
+                .map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
             (m != 0).then_some((m, seat, forward))
         };
         let f: Vec<f32> = words(bytes).map(f32::from_le_bytes).collect();
@@ -2346,7 +2356,9 @@ fn angle_diff(a: f32, b: f32) -> f32 {
 fn held_keys(input: &Input, p: &LocalPlayer) -> u8 {
     use weft_abi::held_keys as h;
     let mut keys = 0;
-    for (action, bit) in [("core:forward", h::FORWARD), ("core:back", h::BACK), ("core:left", h::LEFT), ("core:right", h::RIGHT), ("core:jump", h::JUMP)] {
+    for (action, bit) in
+        [("core:forward", h::FORWARD), ("core:back", h::BACK), ("core:left", h::LEFT), ("core:right", h::RIGHT), ("core:jump", h::JUMP)]
+    {
         if input.held(action) {
             keys |= bit;
         }

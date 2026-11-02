@@ -327,7 +327,9 @@ pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 
         crate::commands::set_command(w, id, crate::commands::WANDER, None);
         crate::dog::on_tamed(w, id);
     }
-    let coat = coats::phenotype(&y.genome).map(|l| l.name).unwrap_or_default();
+    let coat = coats::phenotype(&y.genome)
+        .map(|l| l.name)
+        .unwrap_or_default();
     let whose = if owner.is_some() { "tamed" } else { "wild" };
     weft_sdk::info!("{} {id} born to {} and {} ({whose}): {coat}", s.kind_name(), y.mother, y.father);
     id

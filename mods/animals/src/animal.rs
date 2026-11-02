@@ -50,7 +50,12 @@ impl Animal {
     }
     /// 1, plus a level for every point.
     pub fn level(&self) -> u32 {
-        1 + self.wild.iter().chain(&self.tamed).map(|&p| p as u32).sum::<u32>()
+        1 + self
+            .wild
+            .iter()
+            .chain(&self.tamed)
+            .map(|&p| p as u32)
+            .sum::<u32>()
     }
     pub fn tamed_points(&self) -> u32 {
         self.tamed.iter().map(|&p| p as u32).sum()
@@ -64,8 +69,7 @@ impl Animal {
     }
     /// The stat as a multiple of the species' base.
     pub fn factor(&self, i: usize) -> f32 {
-        self.species()
-            .map_or(1.0, |s| self.stat(i) / s.base[i])
+        self.species().map_or(1.0, |s| self.stat(i) / s.base[i])
     }
 }
 
@@ -104,7 +108,9 @@ pub fn tamed(w: &World, id: u64) -> bool {
 /// Whether `player` (by key) owns `id`.
 pub fn owns(w: &World, id: u64, player: u64) -> bool {
     let key = crate::player_key(player);
-    key.len() == 64 && w.component(id, &OWNER).is_some_and(|k| k[..] == *key.as_bytes())
+    key.len() == 64
+        && w.component(id, &OWNER)
+            .is_some_and(|k| k[..] == *key.as_bytes())
 }
 
 /// A goal that comes first for every animal of species `index`: a new one gets its wild level,
@@ -135,7 +141,9 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             hunger(w, id, &a);
         }
         let (health, speed) = (a.factor(species::HEALTH), a.factor(species::SPEED));
-        if w.component(id, &APPLIED).is_some_and(|&p| p != [health, speed]) {
+        if w.component(id, &APPLIED)
+            .is_some_and(|&p| p != [health, speed])
+        {
             apply(w, id, st, health, speed, if new { f32::MAX } else { 0.0 });
         }
         false
@@ -150,12 +158,7 @@ fn roll(w: &World, index: usize) -> Animal {
         60..90 => 31 + w.random_below(60),
         _ => 91 + w.random_below(MAX_WILD_LEVEL - 90),
     };
-    let mut a = Animal {
-        species: index as u8 + 1,
-        female: w.random_below(2) as u8,
-        stage: ADULT,
-        ..Animal::default()
-    };
+    let mut a = Animal { species: index as u8 + 1, female: w.random_below(2) as u8, stage: ADULT, ..Animal::default() };
     for _ in 1..level {
         a.wild[w.random_below(STATS as u32) as usize] += 1;
     }
@@ -171,7 +174,9 @@ fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f3
     if let Some(p) = w.component_mut(id, &APPLIED) {
         *p = [health, speed];
     }
-    if heal > 0.0 && let Some(a) = w.component(id, &ANIMAL) {
+    if heal > 0.0
+        && let Some(a) = w.component(id, &ANIMAL)
+    {
         let mut s = *st;
         s.max_health = a.stat(species::HEALTH);
         s.health = (st.health + heal).min(s.max_health);

@@ -154,7 +154,10 @@ pub fn owner(w: &World, id: u64) -> Option<u64> {
     if cached != 0 && w.entity(cached).is_some() && (w.time() + id) % 40 != 0 {
         return Some(cached);
     }
-    let found = w.players().into_iter().find(|&p| crate::player_key(p) == key);
+    let found = w
+        .players()
+        .into_iter()
+        .find(|&p| crate::player_key(p) == key);
     if let Some(o) = w.component_mut(id, &OWNER_ID) {
         *o = found.unwrap_or(0);
     }
@@ -167,7 +170,9 @@ pub fn can_command(w: &World, id: u64, player: u64) -> bool {
         return true;
     }
     let shared = w.component(id, &SHARED).copied().unwrap_or_default();
-    shared.is_some() && w.component(player, &TRIBE).is_some_and(|t| t.id == shared.id)
+    shared.is_some()
+        && w.component(player, &TRIBE)
+            .is_some_and(|t| t.id == shared.id)
 }
 
 /// Whether `other` is on `id`'s side: its owner, a player of its tribe, or a tame either has.
@@ -181,7 +186,9 @@ fn friend(w: &World, id: u64, other: u64) -> bool {
         return true;
     }
     let shared = w.component(id, &SHARED).copied().unwrap_or_default();
-    shared.is_some() && w.component(other, &SHARED).is_some_and(|s| s.id == shared.id)
+    shared.is_some()
+        && w.component(other, &SHARED)
+            .is_some_and(|s| s.id == shared.id)
 }
 
 pub fn command(w: &World, id: u64) -> u8 {
@@ -419,9 +426,7 @@ fn target(w: &World, id: u64, st: &EntityState, o: &Orders, index: usize) -> Opt
     let guarding = command(w, id) == GUARD;
     let worth = |t: u64| {
         w.entity(t).is_some_and(|e| {
-            e.health > 0.0
-                && dist2(e.pos, st.pos) < CHASE * CHASE
-                && (!guarding || dist2(e.pos, o.home) < (o.guard as f64 + 8.0).powi(2))
+            e.health > 0.0 && dist2(e.pos, st.pos) < CHASE * CHASE && (!guarding || dist2(e.pos, o.home) < (o.guard as f64 + 8.0).powi(2))
         }) && !friend(w, id, t)
     };
     if o.target != 0 && worth(o.target) {

@@ -129,7 +129,8 @@ pub fn init(r: &mut Registry) {
             .entry(gift("base:gold_ingot", 1))
             .entry(gift("base:apple", 2)),
     );
-    r.loot(&GIFTS[3]).pool(Pool::new().entry(gift("base:diamond", 1)));
+    r.loot(&GIFTS[3])
+        .pool(Pool::new().entry(gift("base:diamond", 1)));
     let mut tracked: Vec<(&'static str, &'static Entity)> = Vec::new();
     for (_, kind) in SCENTS {
         if !tracked.iter().any(|(k, _)| *k == kind) {
@@ -220,7 +221,10 @@ fn scent(item: u32) -> Option<(u32, &'static Entity)> {
 /// sniffs it and sets off).
 pub fn track(w: &World, id: u64, item: u32) -> bool {
     let Some((i, _)) = scent(item) else { return false };
-    if w.component(id, &ANIMAL).and_then(|a| a.species()).is_none_or(|s| s.name != "dog") {
+    if w.component(id, &ANIMAL)
+        .and_then(|a| a.species())
+        .is_none_or(|s| s.name != "dog")
+    {
         return false;
     }
     set(w, id, |s| {
@@ -245,7 +249,13 @@ pub fn tracking(w: &World, id: u64, st: &EntityState) -> bool {
     if (w.time() + id) % 10 != 0 {
         return true;
     }
-    let Some(kind) = TRACKED.get().and_then(|t| t.get(sig.track as usize - 1)).map(|t| t.1) else { return false };
+    let Some(kind) = TRACKED
+        .get()
+        .and_then(|t| t.get(sig.track as usize - 1))
+        .map(|t| t.1)
+    else {
+        return false;
+    };
     let found = w
         .near(st.pos, TRACK_RANGE, Some(kind))
         .into_iter()

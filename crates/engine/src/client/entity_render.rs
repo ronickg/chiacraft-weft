@@ -485,17 +485,15 @@ impl EntityRenderer {
             budget -= 1;
             let texture = &c.game.entities[e.kind as usize].texture;
             let base = self.skin_bases.entry(texture.clone()).or_insert_with(|| {
-                let img = assets.read(texture, "textures", "png").and_then(|b| decode_png(&b))?;
+                let img = assets
+                    .read(texture, "textures", "png")
+                    .and_then(|b| decode_png(&b))?;
                 Some((img.rgba, [img.width, img.height]))
             });
             let Some((rgba, size)) = base else { continue };
             let mut rgba = rgba.clone();
-            let mut args = weft_abi::SkinArgs {
-                data: weft_abi::Slice::new(from),
-                rgba: rgba.as_mut_ptr(),
-                width: size[0],
-                height: size[1],
-            };
+            let mut args =
+                weft_abi::SkinArgs { data: weft_abi::Slice::new(from), rgba: rgba.as_mut_ptr(), width: size[0], height: size[1] };
             if !crate::host::invoke(owner, cb, &mut args) {
                 continue;
             }
@@ -776,7 +774,17 @@ impl EntityRenderer {
         self.models.add(
             c.game.player_kind,
             root,
-            &crate::model::Motion { pitch, head_yaw: 0.0, swing: 0.0, swim: None, holding: false, attack: 0.0, anims: &[], crouch: false, sit: false },
+            &crate::model::Motion {
+                pitch,
+                head_yaw: 0.0,
+                swing: 0.0,
+                swim: None,
+                holding: false,
+                attack: 0.0,
+                anims: &[],
+                crouch: false,
+                sit: false,
+            },
             layers.0[..layers.1].iter().copied(),
         );
         let vb = self.preview[frame.slot];

@@ -17,8 +17,7 @@ pub const DAMAGE: usize = 3;
 pub const SPEED: usize = 4;
 pub const TORPOR: usize = 7;
 /// Their names in translations (`stat.animals.<name>`).
-pub const STAT_NAMES: [&str; STATS] =
-    ["health", "stamina", "food", "damage", "speed", "weight", "oxygen", "torpor", "fortitude"];
+pub const STAT_NAMES: [&str; STATS] = ["health", "stamina", "food", "damage", "speed", "weight", "oxygen", "torpor", "fortitude"];
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Size {
@@ -323,13 +322,7 @@ pub static SPECIES: [Species; 7] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 20.0,
-        foods: &[
-            eats("base:chicken", 10),
-            eats("base:mutton", 10),
-            eats("base:porkchop", 12),
-            favorite("base:beef", 15),
-            KIBBLE,
-        ],
+        foods: &[eats("base:chicken", 10), eats("base:mutton", 10), eats("base:porkchop", 12), favorite("base:beef", 15), KIBBLE],
         feedings: 10.0,
         shy: 8.0,
         fights: true,
@@ -365,13 +358,7 @@ pub static SPECIES: [Species; 7] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 12.0,
-        foods: &[
-            eats("base:chicken", 10),
-            eats("base:porkchop", 15),
-            favorite("base:beef", 20),
-            favorite("base:mutton", 15),
-            KIBBLE,
-        ],
+        foods: &[eats("base:chicken", 10), eats("base:porkchop", 15), favorite("base:beef", 20), favorite("base:mutton", 15), KIBBLE],
         feedings: 18.0,
         shy: 10.0,
         fights: true,
@@ -410,13 +397,7 @@ pub static SPECIES: [Species; 7] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 20.0,
-        foods: &[
-            eats("base:chicken", 10),
-            eats("base:mutton", 10),
-            eats("base:porkchop", 12),
-            favorite("base:beef", 15),
-            KIBBLE,
-        ],
+        foods: &[eats("base:chicken", 10), eats("base:mutton", 10), eats("base:porkchop", 12), favorite("base:beef", 15), KIBBLE],
         feedings: 10.0,
         shy: 8.0,
         fights: true,
@@ -498,10 +479,7 @@ impl Species {
     /// Its food `item` (an item id), if it eats it.
     pub fn food(&self, item: u32) -> Option<(usize, &'static Food)> {
         let name = weft_sdk::item_name(item);
-        self.foods
-            .iter()
-            .enumerate()
-            .find(|(_, f)| f.item == name)
+        self.foods.iter().enumerate().find(|(_, f)| f.item == name)
     }
 }
 

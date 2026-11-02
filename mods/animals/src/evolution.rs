@@ -226,7 +226,10 @@ fn generation(index: usize, pool: &Pool, h: Habitat, r: &mut impl coats::Rng) ->
         .map(|g| (g, fitness(index, &g, h)))
         .collect();
     let parent = |female: bool, r: &mut dyn FnMut() -> f32| {
-        let of: Vec<&(coats::Genome, f32)> = adults.iter().filter(|a| (a.0.female != 0) == female).collect();
+        let of: Vec<&(coats::Genome, f32)> = adults
+            .iter()
+            .filter(|a| (a.0.female != 0) == female)
+            .collect();
         let mut x = r() * of.iter().map(|a| a.1).sum::<f32>();
         for a in &of {
             x -= a.1;
@@ -261,7 +264,8 @@ fn mix_in(pool: &mut Pool, other: &Pool, share: f32) {
 fn evolved(p: &mut Pools, index: usize, cell: (i64, i64), h: Habitat, day: u64, r: &mut impl coats::Rng) -> Option<Pool> {
     let k = key(index, cell, h);
     if !p.all.contains_key(&k) {
-        p.all.insert(k.clone(), Local { day, pool: coats::wild_pool(index)? });
+        p.all
+            .insert(k.clone(), Local { day, pool: coats::wild_pool(index)? });
         p.dirty = true;
     }
     let from = p.all[&k].day;
@@ -311,7 +315,12 @@ pub fn count(w: &World, id: u64, sign: f32) {
 /// `count` for animal `id` at `pos` (one that just died is nowhere any more).
 fn count_at(w: &World, id: u64, pos: [f64; 3], sign: f32) {
     let Some(g) = w.component(id, &coats::GENOME).copied() else { return };
-    let Some(index) = (g.species as usize).checked_sub(1).filter(|&i| i < SPECIES.len()) else { return };
+    let Some(index) = (g.species as usize)
+        .checked_sub(1)
+        .filter(|&i| i < SPECIES.len())
+    else {
+        return;
+    };
     let (cell, h, day) = (cell_of(pos), Habitat::at(w, pos), w.time() / GENERATION);
     let mut r = coats::world_rng(w);
     with_pools(|p| {

@@ -77,7 +77,11 @@ pub fn init(r: &mut Registry) {
 /// Its species' saddle (an item id), if it can be ridden.
 fn saddle_of(w: &World, id: u64) -> Option<u32> {
     let s = w.component(id, &ANIMAL)?.species()?;
-    SADDLES.get()?.iter().find(|(n, _)| *n == s.kind_name()).map(|(_, i)| i.id())
+    SADDLES
+        .get()?
+        .iter()
+        .find(|(n, _)| *n == s.kind_name())
+        .map(|(_, i)| i.id())
 }
 
 /// Takes its saddle off and drops it beside it (it is let go).

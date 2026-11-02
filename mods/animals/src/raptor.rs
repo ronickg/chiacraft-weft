@@ -148,7 +148,9 @@ fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     let pose = resting as u32;
     if c.look != pose + 1 {
         c.look = pose + 1;
-        let look = kind_of(w, id).filter(|_| resting).map(|k| format!("animals:{}", rest_look(k)));
+        let look = kind_of(w, id)
+            .filter(|_| resting)
+            .map(|k| format!("animals:{}", rest_look(k)));
         w.set_look(id, look.as_deref());
     }
     if resting && w.navigating(id) {

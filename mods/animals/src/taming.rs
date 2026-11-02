@@ -184,12 +184,15 @@ fn dist2(a: &EntityState, b: &EntityState) -> f64 {
 /// A player walking upright within `shy` blocks, or running within twice that.
 fn frightened(w: &World, st: &EntityState, shy: f32) -> bool {
     let shy = shy as f64;
-    w.players().into_iter().filter_map(|p| w.entity(p)).any(|p| {
-        let d2 = dist2(&p, st);
-        let sneaking = p.pose == abi::pose::CROUCH;
-        let walking = p.moved > 0.01;
-        (p.sprinting != 0 && d2 < 4.0 * shy * shy) || (!sneaking && walking && d2 < shy * shy)
-    })
+    w.players()
+        .into_iter()
+        .filter_map(|p| w.entity(p))
+        .any(|p| {
+            let d2 = dist2(&p, st);
+            let sneaking = p.pose == abi::pose::CROUCH;
+            let walking = p.moved > 0.01;
+            (p.sprinting != 0 && d2 < 4.0 * shy * shy) || (!sneaking && walking && d2 < shy * shy)
+        })
 }
 
 /// Scared: stops asking and runs off for a while.

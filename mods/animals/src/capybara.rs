@@ -66,7 +66,7 @@ pub fn init(r: &mut Registry) {
                 .then(crate::breeding::behave(2))
                 .then(settle)
                 .then(crate::commands::hold)
-                .then(ai::wander(0.35, 6.0)),  // slow and calm
+                .then(ai::wander(0.35, 6.0)), // slow and calm
         )
         .on_hurt(|w, h| {
             crate::taming::hurt(w, h.entity);
@@ -103,7 +103,12 @@ fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     if c.look != pose + 1 {
         c.look = pose + 1;
         let kind = LOOKS[pose as usize].1;
-        w.set_look(id, (!kind.is_empty()).then(|| format!("animals:{kind}")).as_deref());
+        w.set_look(
+            id,
+            (!kind.is_empty())
+                .then(|| format!("animals:{kind}"))
+                .as_deref(),
+        );
     }
     if resting && w.navigating(id) {
         w.navigate(id, st.pos, 0.0);

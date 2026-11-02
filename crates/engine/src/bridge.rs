@@ -128,7 +128,11 @@ fn answer(q: &str, arg: &str) -> String {
         }
         "data_dir" => {
             let Some(dir) = &info.dir else { return String::new() };
-            if arg.is_empty() || !arg.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_') {
+            if arg.is_empty()
+                || !arg
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+            {
                 return String::new();
             }
             let d = dir.join("mods").join(arg);

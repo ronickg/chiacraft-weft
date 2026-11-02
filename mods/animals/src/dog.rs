@@ -226,4 +226,3 @@ pub(crate) fn on_tamed(w: &World, id: u64) {
         d.tamed = 1;
     }
 }
-

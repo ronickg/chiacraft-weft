@@ -1755,12 +1755,9 @@ unsafe extern "C" fn reg_entity_skin(r: *mut abi::Registrar, kind: Str, comp: St
     unsafe {
         let r = reg(r);
         let owner = r.owner;
-        r.game.skin_painters.push(registry::SkinPainter {
-            kind: kind.as_str().to_string(),
-            comp: comp.as_str().to_string(),
-            owner,
-            cb,
-        });
+        r.game
+            .skin_painters
+            .push(registry::SkinPainter { kind: kind.as_str().to_string(), comp: comp.as_str().to_string(), owner, cb });
     }
 }
 

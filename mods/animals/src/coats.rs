@@ -40,11 +40,7 @@ pub const MIXED: u8 = 255;
 const NONE: u8 = 255;
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(
-        &GENOME,
-        Genome::default(),
-        component_flags::SAVE | component_flags::SYNC_WATCHERS | component_flags::SYNC_MENU,
-    );
+    r.entity_component(&GENOME, Genome::default(), component_flags::SAVE | component_flags::SYNC_WATCHERS | component_flags::SYNC_MENU);
     for (i, s) in SPECIES.iter().enumerate() {
         r.attach(s.kind, &GENOME);
         r.entity_skin(s.kind, &GENOME, move |g, skin| paint(i, g, skin));
@@ -189,7 +185,12 @@ pub type Pool = Vec<Vec<f32>>;
 fn breed_of(index: usize, g: &GeneFile) -> (u8, Option<&Breed>) {
     SPECIES[index]
         .breed
-        .and_then(|n| g.breeds.iter().position(|(k, _)| k == n).map(|i| (i as u8 + 1, &g.breeds[n])))
+        .and_then(|n| {
+            g.breeds
+                .iter()
+                .position(|(k, _)| k == n)
+                .map(|i| (i as u8 + 1, &g.breeds[n]))
+        })
         .map_or((0, None), |(i, b)| (i, Some(b)))
 }
 
@@ -314,9 +315,18 @@ pub fn describe_pool(index: usize, pool: &Pool) -> String {
             if l.quantitative {
                 format!("{} {:.2}±{:.2}", l.id, p.first().unwrap_or(&0.0), p.get(1).unwrap_or(&0.0))
             } else {
-                let mut a: Vec<(&str, f32)> = l.alleles.iter().map(|a| a.a.as_str()).zip(p.iter().copied()).collect();
+                let mut a: Vec<(&str, f32)> = l
+                    .alleles
+                    .iter()
+                    .map(|a| a.a.as_str())
+                    .zip(p.iter().copied())
+                    .collect();
                 a.sort_by(|x, y| y.1.total_cmp(&x.1));
-                let shown: Vec<String> = a.iter().filter(|x| x.1 >= 0.01).map(|(n, f)| format!("{n} {f:.2}")).collect();
+                let shown: Vec<String> = a
+                    .iter()
+                    .filter(|x| x.1 >= 0.01)
+                    .map(|(n, f)| format!("{n} {f:.2}"))
+                    .collect();
                 format!("{} {}", l.id, shown.join(" "))
             }
         })
@@ -417,7 +427,10 @@ impl Look {
         if let Some(p) = &self.patches {
             c = mix(c, mix(p.base, p.under, 0.3), 0.4);
         }
-        for p in [self.pattern, self.pattern2, self.points_pattern].into_iter().flatten() {
+        for p in [self.pattern, self.pattern2, self.points_pattern]
+            .into_iter()
+            .flatten()
+        {
             c = mix(c, p.color, 0.25 * p.amount);
         }
         if let Some(p) = self.points {
@@ -509,7 +522,13 @@ fn dog(r: &Read) -> Look {
     if dil {
         pheo = mix(pheo, [198.0, 182.0, 166.0], 0.35);
     }
-    let pheo_name = if i < 0.3 { "Cream" } else if i < 0.7 { "Fawn" } else { "Red" };
+    let pheo_name = if i < 0.3 {
+        "Cream"
+    } else if i < 0.7 {
+        "Fawn"
+    } else {
+        "Red"
+    };
     let (e, k, a) = (r.shows("E"), r.shows("K"), r.shows("A"));
     let mut c = Look { base: eu, under: lighten(eu, 0.06), ..Look::default() };
     let mut eumelanic = false;
@@ -640,8 +659,20 @@ fn capybara(r: &Read) -> Look {
     }
     let mut base = mix([190.0, 142.0, 96.0], [84.0, 56.0, 40.0], dk);
     base = mix(base, if ru > 0.5 { [150.0, 80.0, 42.0] } else { [118.0, 108.0, 98.0] }, (ru - 0.5).abs() * 0.7);
-    let shade = if dk < 0.33 { "Light tan" } else if dk < 0.66 { "Brown" } else { "Dark brown" };
-    let tint = if ru > 0.62 { ", reddish" } else if ru < 0.38 { ", greyish" } else { "" };
+    let shade = if dk < 0.33 {
+        "Light tan"
+    } else if dk < 0.66 {
+        "Brown"
+    } else {
+        "Dark brown"
+    };
+    let tint = if ru > 0.62 {
+        ", reddish"
+    } else if ru < 0.38 {
+        ", greyish"
+    } else {
+        ""
+    };
     Look {
         name: format!("{shade}{tint}"),
         base,
@@ -717,7 +748,12 @@ fn wyvern(r: &Read) -> Look {
 /// What a wyvern with `genome` breathes ("fire", "frost", "lightning", "venom"; "" for other
 /// species).
 pub fn breath(genome: &Genome) -> &'static str {
-    let Some(s) = (genome.species as usize).checked_sub(1).and_then(|i| SPECIES.get(i)) else { return "" };
+    let Some(s) = (genome.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+    else {
+        return "";
+    };
     let Some(g) = gene_file(s.name) else { return "" };
     match (Read { g, genome }).shows("Br") {
         "frost" => "frost",
@@ -730,7 +766,12 @@ pub fn breath(genome: &Genome) -> &'static str {
 
 /// Gives a wyvern two copies of the breath allele `kind` (testing: `/animal fire`).
 pub fn set_breath(genome: &mut Genome, kind: &str) -> bool {
-    let Some(s) = (genome.species as usize).checked_sub(1).and_then(|i| SPECIES.get(i)) else { return false };
+    let Some(s) = (genome.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+    else {
+        return false;
+    };
     let Some(g) = gene_file(s.name) else { return false };
     let Some((i, l)) = g.loci.iter().enumerate().find(|(_, l)| l.id == "Br") else { return false };
     let Some(a) = l.alleles.iter().position(|a| a.a == kind) else { return false };
@@ -743,7 +784,12 @@ pub fn set_breath(genome: &mut Genome, kind: &str) -> bool {
 /// (`Sz`, spread by the species' `size_spread`) and its sex (`dimorphism`, males against
 /// females; the average stays the model's).
 pub fn size(genome: &Genome) -> f32 {
-    let Some(s) = (genome.species as usize).checked_sub(1).and_then(|i| SPECIES.get(i)) else { return 1.0 };
+    let Some(s) = (genome.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+    else {
+        return 1.0;
+    };
     let sz = size_gene(genome);
     let sex = if genome.female != 0 { s.dimorphism.sqrt().recip() } else { s.dimorphism.sqrt() };
     (1.0 + s.size_spread * (sz - 0.5) * 2.0) * sex
@@ -751,7 +797,12 @@ pub fn size(genome: &Genome) -> f32 {
 
 /// Its size gene (`Sz`), 0..1: small to big for its kind.
 pub fn size_gene(genome: &Genome) -> f32 {
-    let Some(s) = (genome.species as usize).checked_sub(1).and_then(|i| SPECIES.get(i)) else { return 0.5 };
+    let Some(s) = (genome.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+    else {
+        return 0.5;
+    };
     gene_file(s.name).map_or(0.5, |g| Read { g, genome }.qv("Sz"))
 }
 
@@ -791,11 +842,7 @@ fn noise3(x: f32, y: f32, z: f32, s: i32) -> f32 {
     let l = |a: f32, b: f32, t: f32| a + (b - a) * t;
     let (xi, yi, zi) = (xi as i32, yi as i32, zi as i32);
     let c = |dx, dy, dz| hash3(xi + dx, yi + dy, zi + dz, s);
-    l(
-        l(l(c(0, 0, 0), c(1, 0, 0), u), l(c(0, 1, 0), c(1, 1, 0), u), v),
-        l(l(c(0, 0, 1), c(1, 0, 1), u), l(c(0, 1, 1), c(1, 1, 1), u), v),
-        w,
-    )
+    l(l(l(c(0, 0, 0), c(1, 0, 0), u), l(c(0, 1, 0), c(1, 1, 0), u), v), l(l(c(0, 0, 1), c(1, 0, 1), u), l(c(0, 1, 1), c(1, 1, 1), u), v), w)
 }
 
 fn smooth(v: f32, a: f32, b: f32) -> f32 {

@@ -6,9 +6,9 @@
 use weft_sdk::*;
 
 use crate::animal::{self, ANIMAL, Animal, OWNER, STAGE_NAMES};
-use crate::species::{self, Diet, Liking, STAT_NAMES, STATS, Size, Taming};
 use crate::commands::{COMMAND_NAMES, ORDER, ORDERS, SHARED, STANCE_NAMES};
 use crate::knockout::KNOCKOUT;
+use crate::species::{self, Diet, Liking, STAT_NAMES, STATS, Size, Taming};
 use crate::taming::TAMING;
 
 static ANIMAL_MENU: Menu = Menu::named("animal");
@@ -26,16 +26,13 @@ pub fn init(r: &mut Registry) {
     r.menu(&ANIMAL_MENU).screen(animal_screen);
     r.menu(&SCOUT_MENU).screen(scout_screen);
     r.packet(&PLACE, |p, [id, stat]| animal::place_point(&p.world(), id, p.player(), stat as usize));
-    r.item(&SPYGLASS)
-        .max_stack(1)
-        .tab(&TOOLS)
-        .on_use(|u| {
-            let (w, player) = (u.world(), u.player());
-            match looked_at(&w, player, SPYGLASS_RANGE) {
-                Some(id) => open(&w, player, id),
-                None => false,
-            }
-        });
+    r.item(&SPYGLASS).max_stack(1).tab(&TOOLS).on_use(|u| {
+        let (w, player) = (u.world(), u.player());
+        match looked_at(&w, player, SPYGLASS_RANGE) {
+            Some(id) => open(&w, player, id),
+            None => false,
+        }
+    });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
     r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
@@ -56,7 +53,9 @@ pub fn open(w: &World, player: u64, id: u64) -> bool {
 /// of one they own. True if it opened (the click is used).
 pub fn interact(w: &World, id: u64, player: u64) -> bool {
     let held = w.inventory(player).get(w.selected_slot(player)).item;
-    let sneaking = w.entity(player).is_some_and(|p| p.pose == abi::pose::CROUCH);
+    let sneaking = w
+        .entity(player)
+        .is_some_and(|p| p.pose == abi::pose::CROUCH);
     if held == SPYGLASS.id() || (sneaking && (crate::commands::can_command(w, id, player) || w.creative(player))) {
         return open(w, player, id);
     }
@@ -178,7 +177,10 @@ fn heading(ui: &mut Ui) {
     // In love, expecting, growing up or resting (`breeding.rs`), when it is.
     ui.text_bind(|c, t| {
         let Some(b) = c.menu_component(&crate::breeding::BREEDING) else { return };
-        let laying = c.menu_component(&ANIMAL).and_then(|a| a.species()).is_some_and(|s| s.gestation == 0);
+        let laying = c
+            .menu_component(&ANIMAL)
+            .and_then(|a| a.species())
+            .is_some_and(|s| s.gestation == 0);
         let min = |ticks: u32| Arg::Int(ticks.div_ceil(1200) as i64);
         match () {
             _ if b.love > 0 => t.set("screen.animals.love", &[]),
@@ -200,15 +202,17 @@ fn heading(ui: &mut Ui) {
         if b.generation == 0 {
             t.set("screen.animals.wild_born", &[]);
         } else {
-            t.set(
-                "screen.animals.family",
-                &[Arg::Int(b.generation as i64), Arg::Text(&coat(&b.dam)), Arg::Text(&coat(&b.sire))],
-            );
+            t.set("screen.animals.family", &[Arg::Int(b.generation as i64), Arg::Text(&coat(&b.dam)), Arg::Text(&coat(&b.sire))]);
         }
     });
     // Its coat, read from its genes ("Fawn sable with white").
     ui.text_bind(|c, t| {
-        let Some(look) = c.menu_component(&crate::coats::GENOME).and_then(|g| crate::coats::phenotype(&g)) else { return };
+        let Some(look) = c
+            .menu_component(&crate::coats::GENOME)
+            .and_then(|g| crate::coats::phenotype(&g))
+        else {
+            return;
+        };
         t.set("screen.animals.coat", &[Arg::Text(&look.name)]);
     });
     ui.text_bind(|c, t| {
@@ -271,11 +275,17 @@ fn animal_screen(ui: &mut Ui) {
                     }
                 });
                 if i != species::TORPOR {
-                    ui.button("screen.animals.plus", S::default().size(14.0, 12.0).tooltip("screen.animals.place"), move |c| {
-                        if let Some(id) = c.menu_owner() {
-                            c.client().send(&PLACE, &[id, i as u64]);
-                        }
-                    });
+                    ui.button(
+                        "screen.animals.plus",
+                        S::default()
+                            .size(14.0, 12.0)
+                            .tooltip("screen.animals.place"),
+                        move |c| {
+                            if let Some(id) = c.menu_owner() {
+                                c.client().send(&PLACE, &[id, i as u64]);
+                            }
+                        },
+                    );
                 }
             });
         }
@@ -286,7 +296,11 @@ fn animal_screen(ui: &mut Ui) {
             let stance = format!("screen.animals.stance.{}", STANCE_NAMES[(o.stance as usize).min(3)]);
             let shared = c
                 .menu_component(&SHARED)
-                .map(|s| String::from_utf8_lossy(&s.name).trim_end_matches('\0').to_string())
+                .map(|s| {
+                    String::from_utf8_lossy(&s.name)
+                        .trim_end_matches('\0')
+                        .to_string()
+                })
                 .unwrap_or_default();
             if shared.is_empty() {
                 t.set("screen.animals.orders", &[Arg::Key(&command), Arg::Key(&stance)]);
@@ -367,24 +381,28 @@ fn scout_screen(ui: &mut Ui) {
             if k.count == 0 {
                 t.set("screen.animals.mouth_empty", &[]);
             } else {
-                t.set(
-                    "screen.animals.mouth",
-                    &[Arg::Item(k.food), Arg::Int(k.count as i64), Arg::Int((k.bite / 20) as i64)],
-                );
+                t.set("screen.animals.mouth", &[Arg::Item(k.food), Arg::Int(k.count as i64), Arg::Int((k.bite / 20) as i64)]);
             }
         });
         // A wild one's taming so far, and what it asks for now.
         ui.text_bind(|c, t| {
             t.text("");
-            let Some(g) = c.menu_component(&TAMING).filter(|g| g.feedings > 0 && !tamed(c)) else { return };
-            t.set(
-                "screen.animals.taming",
-                &[Arg::Int((g.progress * 100.0) as i64), Arg::Int((g.effectiveness * 100.0).round() as i64)],
-            );
+            let Some(g) = c
+                .menu_component(&TAMING)
+                .filter(|g| g.feedings > 0 && !tamed(c))
+            else {
+                return;
+            };
+            t.set("screen.animals.taming", &[Arg::Int((g.progress * 100.0) as i64), Arg::Int((g.effectiveness * 100.0).round() as i64)]);
         });
         ui.text_bind(|c, t| {
             t.text("");
-            let Some(g) = c.menu_component(&TAMING).filter(|g| g.asking > 0 && !tamed(c)) else { return };
+            let Some(g) = c
+                .menu_component(&TAMING)
+                .filter(|g| g.asking > 0 && !tamed(c))
+            else {
+                return;
+            };
             let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
             if let Some(f) = s.foods.get(g.want as usize - 1) {
                 t.set("screen.animals.wants", &[Arg::Name(&format!("item:{}", f.item))]);
@@ -398,7 +416,10 @@ fn scout_screen(ui: &mut Ui) {
 /// The animal nearest `player` within `range`.
 fn nearest(w: &World, player: u64, range: f64) -> Option<u64> {
     let p = w.entity(player)?.pos;
-    let d2 = |id: u64| w.entity(id).map_or(f64::MAX, |e| (0..3).map(|i| (e.pos[i] - p[i]).powi(2)).sum());
+    let d2 = |id: u64| {
+        w.entity(id)
+            .map_or(f64::MAX, |e| (0..3).map(|i| (e.pos[i] - p[i]).powi(2)).sum())
+    };
     w.near(p, range, None)
         .into_iter()
         .filter(|&id| id != player && w.component(id, &ANIMAL).is_some())
@@ -418,7 +439,9 @@ fn command(cmd: &mut ServerCommand) {
     let (w, player) = (cmd.world(), cmd.player());
     if cmd.text("action") == Some("evolve") {
         let count = cmd.int("count").unwrap_or(0).clamp(0, 1000) as u32;
-        let habitat = cmd.text("habitat").and_then(crate::evolution::Habitat::named);
+        let habitat = cmd
+            .text("habitat")
+            .and_then(crate::evolution::Habitat::named);
         for line in crate::evolution::evolve_here(&w, player, count, habitat) {
             weft_sdk::info!("{line}");
             cmd.reply("command.animals.pool", &[Arg::Text(&line)]);
