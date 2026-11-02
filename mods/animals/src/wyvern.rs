@@ -109,7 +109,9 @@ fn guard(w: &World, id: u64, st: &EntityState) -> bool {
     if !calm {
         return false;
     }
-    let nest = !w.near(st.pos, NEST_TERRITORY, Some(&crate::eggs::NEST)).is_empty();
+    let nest = !w
+        .near(st.pos, NEST_TERRITORY, Some(&crate::eggs::NEST))
+        .is_empty();
     if let Some((p, _)) = ai::nearest_player(w, st, if nest { NEST_TERRITORY } else { TERRITORY }) {
         weft_sdk::info!("wyvern {id} goes for player {p}");
         wake(w, id);
@@ -132,7 +134,12 @@ fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     if c.look != pose + 1 {
         c.look = pose + 1;
         let kind = LOOKS[pose as usize].1;
-        w.set_look(id, (!kind.is_empty()).then(|| format!("animals:{kind}")).as_deref());
+        w.set_look(
+            id,
+            (!kind.is_empty())
+                .then(|| format!("animals:{kind}"))
+                .as_deref(),
+        );
     }
     if resting && w.navigating(id) {
         w.navigate(id, st.pos, 0.0);
