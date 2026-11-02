@@ -63,10 +63,14 @@ it off anyway).
 
 Then give it stats: a row in `mods/animals/src/species.rs` (base values of the nine stats, its
 diet and favorite foods, how it is tamed; see `notes/ANIMALS.md`),
-`.then(crate::animal::upkeep(<its row>)).then(crate::taming::behave(<its row>))` first in its
-goals (its wild level and stats; asking for food and running off when scared), an
-`.on_interact` that calls `crate::screen::interact` and else `crate::taming::feed` (the
-spyglass, the animal screen, feeding to tame) and `crate::taming::hurt` in its `.on_hurt`. A
+`.then(crate::animal::upkeep(<its row>)).then(crate::taming::behave(<its row>))
+.then(crate::commands::act(<its row>))` first in its goals (its wild level and stats; asking
+for food and running off when scared; a tame's fighting, following and staying),
+`.then(crate::commands::hold)` just before wandering, an `.on_interact` that calls
+`crate::screen::interact`, else `crate::taming::feed`, else `crate::commands::interact` (the
+spyglass and animal screen, feeding to tame, a tame's food and follow/stay),
+`crate::taming::hurt` in its `.on_hurt`, an `.attack_damage(..)` if it fights, and a `wake` that
+gets it up from resting (see `cat.rs`), listed in `wake` in `lib.rs`. A
 new food needs its bubble: `textures/particle/want_<item>.png` (the bubble with the item's icon).
 
 To see it: build (`cargo build --release`), then run a script that spawns it and takes shots:

@@ -311,7 +311,8 @@ pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
         weft_sdk::info!("animal {id} tamed at {:.0}%: {bonus} bonus levels, now level {}", effectiveness * 100.0, a.level());
     }
     set(w, id, |t| *t = FRESH);
-    crate::on_tamed(w, id, player);
+    crate::commands::tamed(w, id);
+    crate::on_tamed(w, id);
     if let Some(st) = w.entity(id) {
         hearts(w, st.pos, 7);
     }

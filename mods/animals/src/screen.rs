@@ -7,6 +7,7 @@ use weft_sdk::*;
 
 use crate::animal::{self, ANIMAL, Animal, OWNER, STAGE_NAMES};
 use crate::species::{self, Diet, Liking, STAT_NAMES, STATS, Size, Taming};
+use crate::commands::{COMMAND_NAMES, ORDER, ORDERS, SHARED, STANCE_NAMES};
 use crate::taming::TAMING;
 
 static ANIMAL_MENU: Menu = Menu::named("animal");
@@ -45,7 +46,7 @@ pub fn open(w: &World, player: u64, id: u64) -> bool {
     if w.component(id, &ANIMAL).is_none() {
         return false;
     }
-    let full = animal::owns(w, id, player) || w.creative(player);
+    let full = crate::commands::can_command(w, id, player) || w.creative(player);
     w.open_menu(player, if full { &ANIMAL_MENU } else { &SCOUT_MENU }, id);
     true
 }
@@ -55,7 +56,7 @@ pub fn open(w: &World, player: u64, id: u64) -> bool {
 pub fn interact(w: &World, id: u64, player: u64) -> bool {
     let held = w.inventory(player).get(w.selected_slot(player)).item;
     let sneaking = w.entity(player).is_some_and(|p| p.pose == abi::pose::CROUCH);
-    if held == SPYGLASS.id() || (sneaking && (animal::owns(w, id, player) || w.creative(player))) {
+    if held == SPYGLASS.id() || (sneaking && (crate::commands::can_command(w, id, player) || w.creative(player))) {
         return open(w, player, id);
     }
     false
@@ -63,6 +64,12 @@ pub fn interact(w: &World, id: u64, player: u64) -> bool {
 
 /// The animal `player` looks at within `range`, in front of any block in the way.
 pub fn looked_at(w: &World, player: u64, range: f64) -> Option<u64> {
+    looked_at_any(w, player, range, |id| w.component(id, &ANIMAL).is_some())
+}
+
+/// The entity `player` looks at within `range` that passes `pick`, in front of any block in
+/// the way.
+pub fn looked_at_any(w: &World, player: u64, range: f64, pick: impl Fn(u64) -> bool) -> Option<u64> {
     let st = w.entity(player)?;
     let eye = [st.pos[0], st.pos[1] + st.size[2] as f64, st.pos[2]];
     let (sy, cy) = (st.yaw as f64).sin_cos();
@@ -74,7 +81,7 @@ pub fn looked_at(w: &World, player: u64, range: f64) -> Option<u64> {
     });
     w.near(eye, range, None)
         .into_iter()
-        .filter(|&id| id != player && w.component(id, &ANIMAL).is_some())
+        .filter(|&id| id != player && pick(id))
         .filter_map(|id| {
             let e = w.entity(id)?;
             let (hw, h) = (e.size[0] as f64 / 2.0 + 0.1, e.size[1] as f64 + 0.1);
@@ -199,6 +206,32 @@ fn animal_screen(ui: &mut Ui) {
                 }
             });
         }
+        // Orders: what it does and how it fights, and sharing with your tribe.
+        ui.text_bind(|c, t| {
+            let (Some(a), Some(o)) = (c.menu_component(&ANIMAL), c.menu_component(&ORDERS)) else { return };
+            let command = format!("screen.animals.command.{}", COMMAND_NAMES[(a.command as usize).min(3)]);
+            let stance = format!("screen.animals.stance.{}", STANCE_NAMES[(o.stance as usize).min(3)]);
+            let shared = c
+                .menu_component(&SHARED)
+                .map(|s| String::from_utf8_lossy(&s.name).trim_end_matches('\0').to_string())
+                .unwrap_or_default();
+            if shared.is_empty() {
+                t.set("screen.animals.orders", &[Arg::Key(&command), Arg::Key(&stance)]);
+            } else {
+                t.set("screen.animals.orders_shared", &[Arg::Key(&command), Arg::Key(&stance), Arg::Text(&shared)]);
+            }
+        });
+        ui.row(S::row().gap(3.0), |ui| {
+            for (i, name) in COMMAND_NAMES.iter().enumerate() {
+                order_button(ui, &format!("screen.animals.do.{name}"), i as u64);
+            }
+        });
+        ui.row(S::row().gap(3.0), |ui| {
+            for (i, name) in STANCE_NAMES.iter().enumerate() {
+                order_button(ui, &format!("screen.animals.stance.{name}"), 10 + i as u64);
+            }
+            order_button(ui, "screen.animals.share", 20);
+        });
         ui.text_bind(|c, t| {
             let Some(a) = c.menu_component(&ANIMAL) else { return };
             t.set(
@@ -206,6 +239,15 @@ fn animal_screen(ui: &mut Ui) {
                 &[Arg::Int(a.unspent as i64), Arg::Int(a.tamed_points() as i64), Arg::Int(animal::MAX_TAMED_POINTS as i64)],
             );
         });
+    });
+}
+
+/// A button that gives the animal whose screen is open `order` (`commands::ORDER`).
+fn order_button(ui: &mut Ui, key: &str, order: u64) {
+    ui.button(key, S::default().h(14.0).pad(2.0), move |c| {
+        if let Some(id) = c.menu_owner() {
+            c.client().send(&ORDER, &[id, order]);
+        }
     });
 }
 

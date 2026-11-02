@@ -30,6 +30,7 @@ declare_mod!(deps: ["base"], init: init);
 mod animal;
 mod capybara;
 mod cat;
+mod commands;
 mod raptor;
 mod screen;
 mod species;
@@ -63,7 +64,6 @@ value! {
         /// Coat + 1 (0: not chosen yet).
         pub coat: u32,
         pub tamed: u32,
-        pub sitting: u32,
         /// Ticks left in love, before breeding again, and before growing up (0: grown).
         pub love: u32,
         pub cooldown: u32,
@@ -75,10 +75,9 @@ value! {
 
 value! {
     #[derive(Default)]
-    /// What is not saved: the look applied, the owner's entity as last found, ticks sitting.
+    /// What is not saved: the look applied, ticks sitting.
     pub struct Seen {
         pub look: u32,
-        pub owner: u64,
         pub sat: u32,
     }
 }
@@ -147,6 +146,7 @@ fn init(r: &mut Registry) {
     animal::init(r);
     screen::init(r);
     taming::init(r);
+    commands::init(r);
     r.entity_component(&DOG, Dog::default(), component_flags::SAVE);
     r.entity_component(&SEEN, Seen::default(), 0);
     r.particle(&HEART)
@@ -181,6 +181,7 @@ fn init(r: &mut Registry) {
         .size(0.35, 0.5)
         .health(8.0)
         .speed(2.8)
+        .attack_damage(2.0)
         .passive()
         .model_file("chihuahua")
         .animations("chihuahua")
@@ -191,8 +192,9 @@ fn init(r: &mut Registry) {
         .on_interact(interact)
         .on_hurt(|w, h| {
             taming::hurt(w, h.entity);
-            if let Some(d) = w.component_mut(h.entity, &DOG) {
-                d.sitting = 0;
+            if let Some(d) = w.component_mut(h.entity, &DOG)
+                && d.tamed == 0
+            {
                 d.panic = 60;
             }
         });
@@ -210,8 +212,9 @@ fn init(r: &mut Registry) {
 fn goals() -> Goals {
     Goals::new()
         .then(animal::upkeep(0))
-        .then(taming::behave(0))
         .then(upkeep)
+        .then(taming::behave(0))
+        .then(commands::act(0))
         .then(|w: &World, id: u64, st: &EntityState| {
             // Hurt: runs about for three seconds.
             if w.component(id, &DOG).is_none_or(|d| d.panic == 0) {
@@ -224,17 +227,7 @@ fn goals() -> Goals {
             true
         })
         .then(breed)
-        .then(|w: &World, id: u64, st: &EntityState| {
-            // Sitting: stays put.
-            let sitting = w
-                .component(id, &DOG)
-                .is_some_and(|d| d.tamed != 0 && d.sitting != 0);
-            if sitting && w.navigating(id) {
-                w.navigate(id, st.pos, 0.0);
-            }
-            sitting
-        })
-        .then(follow_owner)
+        .then(commands::hold)
         .then(ai::wander(0.45, 6.0))
 }
 
@@ -248,7 +241,9 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     d.cooldown = d.cooldown.saturating_sub(1);
     d.panic = d.panic.saturating_sub(1);
     d.age = d.age.saturating_sub(1);
-    let (coat, puppy, sitting) = (d.coat - 1, d.age > 0, d.tamed != 0 && d.sitting != 0);
+    // A tame told to stay sits (once it is there).
+    let staying = d.tamed != 0 && commands::command(w, id) == commands::STAY && !w.navigating(id);
+    let (coat, puppy, sitting) = (d.coat - 1, d.age > 0, staying);
     let stage = match d.age * 3 / GROW_TICKS.max(1) {
         _ if d.age == 0 => animal::ADULT,
         2.. => animal::BABY,
@@ -275,45 +270,6 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     false
 }
 
-/// The owner's entity, if they are here (looked up by key now and then).
-fn owner_of(w: &World, id: u64) -> Option<u64> {
-    let key = w
-        .component(id, &OWNER)
-        .filter(|k| k[0] != 0)
-        .map(|k| String::from_utf8_lossy(k).into_owned())?;
-    let cached = w.component(id, &SEEN).map_or(0, |s| s.owner);
-    if cached != 0 && w.entity(cached).is_some() && (w.time() + id) % 40 != 0 {
-        return Some(cached);
-    }
-    let found = w.players().into_iter().find(|&p| player_key(p) == key);
-    if let Some(s) = w.component_mut(id, &SEEN) {
-        s.owner = found.unwrap_or(0);
-    }
-    found
-}
-
-/// Tamed and not sitting: keeps near its owner, catching up when left behind.
-fn follow_owner(w: &World, id: u64, st: &EntityState) -> bool {
-    if w.component(id, &DOG).is_none_or(|d| d.tamed == 0) {
-        return false;
-    }
-    let Some(owner) = owner_of(w, id) else { return false };
-    let Some(o) = w.entity(owner) else { return false };
-    let d2 = (o.pos[0] - st.pos[0]).powi(2) + (o.pos[2] - st.pos[2]).powi(2);
-    if d2 > 24.0 * 24.0 || (o.pos[1] - st.pos[1]).abs() > 12.0 {
-        // Far behind: there in a moment, beside the owner.
-        let mut s = *st;
-        s.pos = [o.pos[0] + 1.0, o.pos[1], o.pos[2] + 1.0];
-        w.set_entity(id, &s);
-        return true;
-    }
-    if d2 > 3.5 * 3.5 {
-        w.navigate(id, o.pos, 1.3);
-        return true;
-    }
-    false
-}
-
 /// In love: goes to another dog in love nearby (or waits for it, sitting); when they meet, a
 /// puppy.
 fn breed(w: &World, id: u64, st: &EntityState) -> bool {
@@ -330,7 +286,7 @@ fn breed(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(ps) = w.entity(partner) else { return false };
     let d2 = (ps.pos[0] - st.pos[0]).powi(2) + (ps.pos[2] - st.pos[2]).powi(2);
     if d2 > 1.2 * 1.2 {
-        if me.tamed != 0 && me.sitting != 0 {
+        if me.tamed != 0 && commands::command(w, id) == commands::STAY {
             return false;
         }
         w.navigate(id, ps.pos, 1.0);
@@ -385,8 +341,8 @@ fn hearts(w: &World, at: [f64; 3]) {
 }
 
 /// A player right clicks a dog: a wild one is fed toward taming (`taming.rs`), meat puts a
-/// grown tamed one in love (or helps a puppy grow), anything else makes its owner's dog sit or
-/// follow.
+/// grown tamed one in love (or helps a puppy grow), anything else is as for every tame
+/// (`commands::interact`: it eats, or sits or follows).
 fn interact(e: &mut EntityEvent) {
     let (w, id, player) = (e.world(), e.entity(), e.other());
     if screen::interact(&w, id, player) {
@@ -395,15 +351,11 @@ fn interact(e: &mut EntityEvent) {
     let Some(st) = w.entity(id) else { return };
     let held = w.inventory(player).get(w.selected_slot(player));
     let Some(d) = w.component(id, &DOG).copied() else { return };
-    let key = player_key(player);
-    let mine = w
-        .component(id, &OWNER)
-        .is_some_and(|k| k[0] != 0 && String::from_utf8_lossy(k) == key);
     if d.tamed == 0 {
         taming::feed(&w, id, player);
         return;
     }
-    if !mine {
+    if !commands::can_command(&w, id, player) {
         return;
     }
     if MEATS.iter().any(|m| m.id() == held.item) {
@@ -424,22 +376,22 @@ fn interact(e: &mut EntityEvent) {
         }
         return;
     }
+    commands::interact(&w, id, player);
+}
+
+/// `id` was just tamed: a dog keeps its own record of that too.
+fn on_tamed(w: &World, id: u64) {
     if let Some(d) = w.component_mut(id, &DOG) {
-        d.sitting = 1 - d.sitting;
-        weft_sdk::info!("chihuahua {id} {}", if d.sitting != 0 { "sits" } else { "stands" });
-    }
-    if w.navigating(id) {
-        w.navigate(id, st.pos, 0.0);
+        d.tamed = 1;
     }
 }
 
-/// `id` was just tamed by `player`: a dog keeps its own record of that too, and sits.
-fn on_tamed(w: &World, id: u64, player: u64) {
-    if let Some(d) = w.component_mut(id, &DOG) {
-        d.tamed = 1;
-        d.sitting = 1;
-    }
-    if let Some(s) = w.component_mut(id, &SEEN) {
-        s.owner = player;
+/// Up from resting, to follow or fight (`index` into `species::SPECIES`).
+fn wake(w: &World, id: u64, index: usize) {
+    match index {
+        1 => cat::wake(w, id),
+        2 => capybara::wake(w, id),
+        3 => raptor::wake(w, id),
+        _ => {}
     }
 }

@@ -53,11 +53,19 @@ pub fn init(r: &mut Registry) {
         .attach(&STATE)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
-            if !crate::screen::interact(&w, id, player) {
-                crate::taming::feed(&w, id, player);
+            if !crate::screen::interact(&w, id, player) && !crate::taming::feed(&w, id, player) {
+                crate::commands::interact(&w, id, player);
             }
         })
-        .goals(Goals::new().then(crate::animal::upkeep(2)).then(crate::taming::behave(2)).then(settle).then(ai::wander(0.35, 6.0)))  // slow and calm
+        .goals(
+            Goals::new()
+                .then(crate::animal::upkeep(2))
+                .then(crate::taming::behave(2))
+                .then(crate::commands::act(2))
+                .then(settle)
+                .then(crate::commands::hold)
+                .then(ai::wander(0.35, 6.0)),  // slow and calm
+        )
         .on_hurt(|w, h| {
             crate::taming::hurt(w, h.entity);
             if let Some(c) = w.component_mut(h.entity, &STATE) {
@@ -99,4 +107,15 @@ fn settle(w: &World, id: u64, st: &EntityState) -> bool {
         w.navigate(id, st.pos, 0.0);
     }
     resting
+}
+
+/// Up from resting, to follow or fight.
+pub fn wake(w: &World, id: u64) {
+    if let Some(c) = w.component_mut(id, &STATE)
+        && c.rest > 0
+    {
+        c.rest = 0;
+        c.look = 1;
+        w.set_look(id, None);
+    }
 }

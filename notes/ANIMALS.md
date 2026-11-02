@@ -1,7 +1,7 @@
 # Animals: taming, stats, breeding (design)
 
-Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Steps 1 and
-2 of the build order (the core, passive taming) are built; see "Built so far" at the end. "Proposed" marks numbers and
+Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Steps 1-3
+of the build order (the core, passive taming, commands) are built; see "Built so far" at the end. "Proposed" marks numbers and
 details that still need his yes. Reference: ARK, made to
 fit chiacraft (worlds owned by their players, linked by portals, the chain only where it adds
 trust; see `notes/PLAN.md`).
@@ -433,6 +433,30 @@ general features worth offering upstream):
   bucket make four; every species takes it. Tiers by egg and a cooking pot come later.
 - The scout screen shows the favorite food, the taming bar and effectiveness, and what it asks
   for. `/animal here` brings the animal in front of you (testing).
+
+**Step 3, commands and tribes** (2026-11-01, `commands.rs`):
+
+- Commands (`Animal::command`): **follow** (keeps 3 blocks away; catches up from far off),
+  **stay** (at a point, going back there), **wander** (within 12 blocks of where it was left),
+  **guard** (an area of 12 blocks around a point). A new tame stays where it was tamed.
+- Stances (`orders` component): **passive** (never fights, runs from harm), **neutral** (fights
+  back and defends its owner), **aggressive** (also attacks monsters within 10 blocks),
+  **assist** (also attacks what its owner hits). Guarding, a tame that fights attacks monsters in
+  the area. Fighting species: chihuahua (2 damage), cat (1), raptor (4); the capybara never
+  fights (always passive). Damage is the kind's times the damage stat; the engine paces bites.
+- On the animal screen: the orders line and buttons for every command and stance, and Tribe
+  (share it with your tribe, or stop). Plain right click: food it eats feeds a hungry tame (+2
+  bond), anything else switches follow and stay (the chihuahua sits when staying).
+- Whistles, to every tame in 32 blocks you may command: J all follow, K all stay, H all come here
+  (they gather around you and stay), G attack what you look at, B all passive.
+- Tribes (on players, saved): `/tribe create <name>` (a random id and the name), `/tribeinvite
+  <player>`, `/tribe join` (the invite), `/tribe leave`, `/tribe info`. Members command, whistle
+  to and open the screen of tames shared with the tribe; points are still the owner's.
+- Resting animals (cat, capybara, raptor) get up to follow or fight (`wake`).
+
+Checked in the game with the chihuahua: the buttons, following, an aggressive dog biting a
+zombie, the stay whistle. Not yet tried: tribes with two players, guarding, the other animals'
+commands.
 
 Not yet: XP and earning points (the command gives them), naming, the higher spyglass tier, tame
 caps and other world settings. Engine note: clients don't see other entities' attribute

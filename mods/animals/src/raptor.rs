@@ -44,6 +44,7 @@ pub fn init(r: &mut Registry) {
         .size(0.6, 0.9)
         .health(14.0)
         .speed(4.0)
+        .attack_damage(4.0)
         .passive()
         .model_file("raptor")
         .animations("raptor")
@@ -51,11 +52,19 @@ pub fn init(r: &mut Registry) {
         .attach(&STATE)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
-            if !crate::screen::interact(&w, id, player) {
-                crate::taming::feed(&w, id, player);
+            if !crate::screen::interact(&w, id, player) && !crate::taming::feed(&w, id, player) {
+                crate::commands::interact(&w, id, player);
             }
         })
-        .goals(Goals::new().then(crate::animal::upkeep(3)).then(crate::taming::behave(3)).then(settle).then(ai::wander(0.6, 9.0)))
+        .goals(
+            Goals::new()
+                .then(crate::animal::upkeep(3))
+                .then(crate::taming::behave(3))
+                .then(crate::commands::act(3))
+                .then(settle)
+                .then(crate::commands::hold)
+                .then(ai::wander(0.6, 9.0)),
+        )
         .on_hurt(|w, h| {
             crate::taming::hurt(w, h.entity);
             if let Some(c) = w.component_mut(h.entity, &STATE) {
@@ -93,4 +102,15 @@ fn settle(w: &World, id: u64, st: &EntityState) -> bool {
         w.navigate(id, st.pos, 0.0);
     }
     resting
+}
+
+/// Up from resting, to follow or fight.
+pub fn wake(w: &World, id: u64) {
+    if let Some(c) = w.component_mut(id, &STATE)
+        && c.rest > 0
+    {
+        c.rest = 0;
+        c.look = 1;
+        w.set_look(id, None);
+    }
 }

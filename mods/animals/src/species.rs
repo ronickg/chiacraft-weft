@@ -92,6 +92,8 @@ pub struct Species {
     /// Blocks within which a player walking upright (not sneaking) scares it; twice as far
     /// running. 0: nothing scares it.
     pub shy: f32,
+    /// Whether it fights (a tame's stance does nothing for one that doesn't).
+    pub fights: bool,
 }
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
@@ -124,6 +126,7 @@ pub static SPECIES: [Species; 4] = [
         ],
         feedings: 4.0,
         shy: 3.0,
+        fights: true,
     },
     Species {
         kind: &crate::cat::CAT,
@@ -148,6 +151,7 @@ pub static SPECIES: [Species; 4] = [
         ],
         feedings: 5.0,
         shy: 6.0,
+        fights: true,
     },
     Species {
         kind: &crate::capybara::CAPYBARA,
@@ -170,6 +174,7 @@ pub static SPECIES: [Species; 4] = [
         ],
         feedings: 3.0,
         shy: 0.0,
+        fights: false,
     },
     Species {
         kind: &crate::raptor::RAPTOR,
@@ -190,6 +195,7 @@ pub static SPECIES: [Species; 4] = [
         ],
         feedings: 10.0,
         shy: 8.0,
+        fights: true,
     },
 ];
 
