@@ -214,6 +214,8 @@ def pack(tiles, width=512):
         h, w = img.shape[:2]
         if x + w + 2 > width:
             x, y, row = 0, y + row, 0
+        img = img.copy()
+        img[..., 3][img[..., 3] == IRIS_ALPHA] = 255  # an iris mark no recorder read (a second coat)
         sheet[y:y + h + 2, x:x + w + 2] = np.pad(img, ((1, 1), (1, 1), (0, 0)), mode="edge")
         uv[key] = [x + 1, y + 1, x + 1 + w, y + 1 + h]
         x += w + 2
@@ -264,6 +266,36 @@ EYES = {
 }
 
 
+# While a build records coat layers (`layers.Recorder`), stamped eyes mark their iris texels with
+# alpha `IRIS_ALPHA` (the recorder reads and clears it): the game recolors the iris per animal.
+MARK_IRIS = False
+IRIS_ALPHA = 254
+
+
+def iris_keys(design):
+    """A design's iris keys: its own `iris`, or every saturated mid-light color (not the dark rim,
+    the pupil or the highlights)."""
+    import colorsys
+    if "iris" in design:
+        return set(design["iris"])
+    out = set()
+    for k, c in design["colors"].items():
+        _, sat, val = colorsys.rgb_to_hsv(*(v / 255 for v in c))
+        if sat > 0.25 and 0.3 < val < 0.95:
+            out.add(k)
+    return out
+
+
+def mark_iris(img, v0, u0, pattern, keys):
+    """Marks a stamped eye's iris texels for the layers (`MARK_IRIS`)."""
+    if not MARK_IRIS or img.shape[-1] < 4:
+        return
+    for r, row in enumerate(pattern):
+        for c, ch in enumerate(row):
+            if ch in keys:
+                img[v0 + r, u0 + c, 3] = IRIS_ALPHA
+
+
 def stamp_eyes(img, centers, design="hytale", colors=None):
     """Stamp a pair of designed eyes on a face image (h, w, 3|4) at texel centers [(u, v), (u, v)]
     (left one first, as seen from the front). A design may set mirror=True (an eyelid wing that
@@ -306,4 +338,5 @@ def stamp_eyes(img, centers, design="hytale", colors=None):
                 if ch != ".":
                     f[v0 + r, u0 + c] = cols[ch]
         img[..., :3] = np.clip(np.round(f), 0, 255).astype(img.dtype)
+        mark_iris(img, v0, u0, pat, iris_keys(d))
     return img

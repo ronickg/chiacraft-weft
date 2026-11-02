@@ -28,7 +28,7 @@ import voxdog as vd  # noqa: E402
 sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..", "..", ".claude",
                                                  "skills", "blocky-model", "scripts")))
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import pack as skill_pack  # noqa: E402
+from paint import iris_keys, mark_iris, pack as skill_pack  # noqa: E402
 
 # Coats painted on the fly (`layers.py`): the recorder while build() paints, the face's key, and
 # the last face's material weights and light from `smooth_colors`.
@@ -702,6 +702,7 @@ def stamp_eyes_smooth(img, e, face):
                 if ch != ".":
                     f[v0 + r, u0 + c] = d["colors"][ch]
         img[..., :3] = np.clip(np.round(f), 0, 255).astype(np.uint8)
+        mark_iris(img, v0, u0, pattern, iris_keys(d))
     return img
 
 

@@ -583,7 +583,8 @@ pub struct Look {
     points_reach: f32,
     /// How its marks are drawn (the core traits).
     marks: Marks,
-    /// Its eye color (the core trait `Ey` along its species' eyes), if its species lists them.
+    /// Its eye color: the core trait `Ey` along its species' eyes, unless its genes decide it
+    /// (a colorpoint's blue).
     eye: Option<Rgb>,
     /// Model units to a pattern's (`GeneFile::mark_scale`).
     scale: f32,
@@ -645,6 +646,8 @@ fn darken(c: Rgb, t: f32) -> Rgb {
     mix(c, [24.0, 18.0, 18.0], t)
 }
 const WHITE: Rgb = [242.0, 238.0, 230.0];
+/// Eyes without pigment: blue from the light the iris scatters.
+const BLUE_EYE: Rgb = [92.0, 150.0, 214.0];
 
 /// A genome read against its gene file.
 struct Read<'a> {
@@ -784,6 +787,10 @@ fn dog(r: &Read) -> Look {
     }
     if r.shows("M") == "M" && eumelanic {
         c.merle = Some(mix(eu, [184.0, 186.0, 194.0], 0.6));
+        // Merle dilutes the eyes' pigment too: some merles have blue eyes.
+        if r.qv("Ey") > 0.6 {
+            c.eye = Some(BLUE_EYE);
+        }
         name = name.replacen(eu_name, &format!("{eu_name} merle"), 1);
     }
     let sp = r.copies("S", "sp").min(2);
@@ -855,6 +862,8 @@ fn cat(r: &Read) -> Look {
         };
         let seal = if eu_name == "Black" { "Seal" } else { eu_name };
         name = format!("{seal} point{}", if red { " (flame)" } else { "" });
+        // The same gene keeps the eyes' pigment from forming: always blue.
+        c.eye = Some(BLUE_EYE);
     }
     let s = r.copies("S", "S").min(2);
     c.white = [0.03, 0.36, 0.7][s];
@@ -866,6 +875,10 @@ fn cat(r: &Read) -> Look {
     if r.shows("W") == "W" {
         c.white = 1.2;
         name = "White".into();
+        // White cats' eyes are often blue (no pigment cells reached them).
+        if r.qv("Ey") > 0.45 {
+            c.eye = Some(BLUE_EYE);
+        }
     }
     c.name = name;
     c
@@ -1094,7 +1107,7 @@ fn core(r: &Read, look: &mut Look) {
     }
     look.scale = g.mark_scale;
     look.marks = Marks { size: r.qv("Ms"), density: r.qv("Md"), contrast: r.qv("Ct"), edge: r.qv("Me"), stretch: r.qv("Mx") };
-    if !g.eyes.is_empty() {
+    if look.eye.is_none() && !g.eyes.is_empty() {
         let e = r.qv("Ey") * (g.eyes.len() - 1) as f32;
         let i = (e.floor() as usize).min(g.eyes.len() - 1);
         look.eye = Some(mix(g.eyes[i], g.eyes[(i + 1).min(g.eyes.len() - 1)], e - i as f32));
@@ -1336,10 +1349,30 @@ fn render(l: &Layers, skin: &mut Skin, look: &Look) {
     let [lo, hi] = l.bounds;
     let s = look.seed as i32;
     let (w, h) = (l.w.min(skin.width as usize), l.h.min(skin.height as usize));
+    let at = |x: usize, y: usize| ((y * l.w + x) * 4, (y * skin.width as usize + x) * 4);
+    let lum = |c: &[u8]| 0.3 * c[0] as f32 + 0.59 * c[1] as f32 + 0.11 * c[2] as f32;
+    // The eyes' iris in its color, keeping its painted light: the brightest iris texel gets the
+    // color, darker ones (the rim, the shade under the lid) darker shades of it.
+    let brightest = look.eye.map_or(0.0, |_| {
+        (0..h)
+            .flat_map(|y| (0..w).map(move |x| (x, y)))
+            .filter(|&(x, y)| l.props2[at(x, y).0 + 2] > 127)
+            .map(|(x, y)| lum(&skin.rgba[at(x, y).1..]))
+            .fold(0.0, f32::max)
+    });
     for y in 0..h {
         for x in 0..w {
-            let i = (y * l.w + x) * 4;
-            let o = (y * skin.width as usize + x) * 4;
+            let (i, o) = at(x, y);
+            if let Some(eye) = look.eye
+                && l.props2[i + 2] > 127
+                && brightest > 0.0
+            {
+                let k = lum(&skin.rgba[o..]) / brightest;
+                for c in 0..3 {
+                    skin.rgba[o + c] = (eye[c] * k).round().clamp(0.0, 255.0) as u8;
+                }
+                continue;
+            }
             if l.info[i] < 128 {
                 continue;
             }

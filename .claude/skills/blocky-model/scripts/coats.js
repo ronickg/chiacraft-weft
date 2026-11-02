@@ -120,6 +120,7 @@
   const lighten = (c, t) => mix(c, [246, 240, 230], t);
   const darken = (c, t) => mix(c, [24, 18, 18], t);
   const WHITE = [242, 238, 230];
+  const BLUE_EYE = [92, 150, 214];  // eyes without pigment
 
   // ---------------------------------------------------------------- phenotypes per species
 
@@ -151,7 +152,7 @@
         name += " brindle";
       }
       if (E === "Em") { c.mask = eu; name += ", masked"; }
-      if (shows(g, a, "M") === "M" && c.eu) { c.merle = mix(eu, [184, 186, 194], 0.6); name = name.replace(euName, euName + " merle"); }
+      if (shows(g, a, "M") === "M" && c.eu) { c.merle = mix(eu, [184, 186, 194], 0.6); name = name.replace(euName, euName + " merle"); if (qv(a, "Ey") > 0.6) c.eye = BLUE_EYE; }
       const sp = copies(a, "S", "sp");
       c.white = [0.08, 0.34, 0.66][sp];
       if (sp === 2) name += " parti"; else if (sp === 1) name += " with white";
@@ -185,10 +186,11 @@
         c = { base: mix(c.base, [238, 226, 206], 0.78), under: [242, 234, 220], ext: { color: point, amount: 1 },
               pattern: c.pattern ? Object.assign({}, c.pattern, { amount: 0.2 }) : null };
         name = `${{ Black: "Seal", Blue: "Blue", Chocolate: "Chocolate", Lilac: "Lilac", Cinnamon: "Cinnamon", Fawn: "Fawn" }[euName]} point${red ? " (flame)" : ""}`;
+        c.eye = BLUE_EYE;  // the same gene keeps the eyes' pigment from forming
       }
       c.white = [0.03, 0.36, 0.7][copies(a, "S", "S")];
       if (copies(a, "S", "S") === 2) name += ", van"; else if (copies(a, "S", "S") === 1) name += " with white";
-      if (shows(g, a, "W") === "W") { c.white = 1.2; name = "White"; }
+      if (shows(g, a, "W") === "W") { c.white = 1.2; name = "White"; if (qv(a, "Ey") > 0.45) c.eye = BLUE_EYE; }
       c.name = name;
       return c;
     },
@@ -266,7 +268,7 @@
     if (c.white > 0 && c.white < 1) c.white = Math.min(0.97, c.white * (0.6 + 0.8 * qv(a, "Wh")));
     c.marks = { size: qv(a, "Ms"), density: qv(a, "Md"), contrast: qv(a, "Ct"), edge: qv(a, "Me"), stretch: qv(a, "Mx") };
     c.scale = g.mark_scale || 1;
-    if (g.eyes && g.eyes.length) {
+    if (!c.eye && g.eyes && g.eyes.length) {
       const e = qv(a, "Ey") * (g.eyes.length - 1), i = Math.min(g.eyes.length - 1, Math.floor(e));
       c.eye = mix(g.eyes[i], g.eyes[Math.min(i + 1, g.eyes.length - 1)], e - i);
     }
@@ -380,11 +382,22 @@
     const { w, h, info, pos, props, props2, bounds } = layers;
     const out = new Uint8ClampedArray(base);
     const [lo, hi] = bounds, s = look.seed | 0;
+    // The eyes' iris in its color, keeping its painted light (the game's `render`).
+    const lum = o => 0.3 * base[o] + 0.59 * base[o + 1] + 0.11 * base[o + 2];
+    let brightest = 0;
+    if (look.eye) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (props2[(y * w + x) * 4 + 2] > 127) brightest = Math.max(brightest, lum((y * stride + x) * 4));
+    }
     paint = paint || {};
     const coatBase = paint.base || look.base, coatUnder = paint.under || look.under;
     const markColor = c => paint.markings || c;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4, o = (y * stride + x) * 4;
+      if (look.eye && props2[i + 2] > 127 && brightest > 0) {
+        const k = lum(o) / brightest;
+        out[o] = look.eye[0] * k; out[o + 1] = look.eye[1] * k; out[o + 2] = look.eye[2] * k;
+        continue;
+      }
       if (info[i] < 128) continue;
       const level = info[i + 1] / 10, u = info[i + 2] / 255;
       const p = [0, 1, 2].map(k => (lo[k] + pos[i + k] / 255 * (hi[k] - lo[k])) / Math.max(0.01, look.scale || 1));

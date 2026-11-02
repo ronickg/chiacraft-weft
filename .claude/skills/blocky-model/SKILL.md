@@ -408,7 +408,11 @@ draws its marks bigger). So a species needs only its big genes and its colors; n
 species' own locus an id the core uses (the cat's tabby `Mc` once hid the core's contrast). The
 viewer's **Roll 12** shows a dozen of one kind side by side: check that no two look alike.
 A creature whose `layer_props` leaves `pattern` at 0 shows no markings at all, whatever its
-genes: mark where they show (the back and flanks fully, the belly and thin skin faintly).
+genes: mark where they show (the back and flanks fully, the belly and thin skin faintly). Eyes
+vary too: while a recorder exists, `stamp_eyes` marks the iris (its saturated mid-light colors,
+or the design's own `iris` keys) and the layers keep it (`props2` blue); the game paints it in
+the animal's eye color, keeping its painted light. A design stamped by hand (outside
+`paint.stamp_eyes`) calls `paint.mark_iris` itself.
 
 ## Props (no skeleton)
 

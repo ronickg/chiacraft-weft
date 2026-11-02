@@ -680,9 +680,16 @@ youth; eye colors chosen, not painted yet), 8 (crag, frost, sand, wood and storm
 bands, blotches, mottling or stripes, an accent that reaches further or less; wyverns now live in
 the cold, the deserts and the forests too, rarer than in the mountains) and 10. Genomes grew
 from 40 to 84 bytes: one saved before gets its core traits from the wild when it loads, and the
-genes kept in breeding records and eggs keep their old place with the rest after. *Next*: the
-eyes painted (the layers mark the iris: every model rebuilt), build (the engine scales single
-bones), scars (their place in the genome is kept), then Dalmatian spotting.
+genes kept in breeding records and eggs keep their old place with the rest after.
+
+*Eyes* (2026-11-02): every animal's eyes in its own color along its species' range (dogs dark
+brown to amber, cats copper to green, raptors amber to yellow, wyverns gold to red), painted on
+the iris the layers mark, keeping its painted light. Genes decide it outright where they do in
+life: colorpoint cats always blue-eyed, white cats and some merle dogs blue. The capybara's eyes
+are plain dark, nothing to recolor.
+
+*Next*: build (the engine scales single bones), scars (their place in the genome is kept), then
+Dalmatian spotting.
 
 Sources: Lee, Cavener, Bond 2018 (PeerJ 6:e5690, giraffe spots); Kaelin et al. 2021 (Nature
 Communications, tabby genes); Manukyan et al. 2017 (Nature 544:173, lizard scales); Shin et al.

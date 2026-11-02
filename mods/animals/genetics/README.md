@@ -31,7 +31,8 @@ file may set for them:
 - `traits`: their mean and spread for this species (`{"Ms": {"mean": 0.55, "sd": 0.15}}`);
 - `sexes`: what being male or female shifts (`{"male": {"Ct": 0.12}}`: a male's starker display);
 - `young`: what a young one's look shifts, fading as it grows, and a `pattern` it is born with;
-- `eyes`: its eye colors, along the eye trait;
+- `eyes`: its eye colors, along the eye trait, painted on the iris its model's layers mark (a
+  species' genes may decide it instead: a colorpoint cat's blue);
 - `habitats`: per habitat (`grassland`, `forest`, `taiga`, `snow`, `desert`, `mountains`), the
   frequencies wild ones there start from, as a breed's: a species' kinds in different country;
 - `mark_scale`: model units to a pattern's (a big model's marks drawn bigger).

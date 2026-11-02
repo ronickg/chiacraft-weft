@@ -11,7 +11,8 @@ without repainting it. Next to its texture a creature gets, per texel:
   paws, chest and belly whiten first); G points (where tan points or a colorpoint's dark shows:
   brows, muzzle, chest, legs); B mask (a dark face mask: the muzzle).
 - `props2.png`: R extremity (colorpoint: ears, face, paws, tail tip); G where body patterns show
-  (back and sides yes, face and belly less).
+  (back and sides yes, face and belly less); B the eyes' iris (recolored per animal, keeping its
+  painted light: `paint.stamp_eyes` marks it while a recorder exists).
 
 All four use the creature's UV layout (packed in the same order and sizes as the texture). The
 viewer's coat renderer and the game read them with the species' gene file. Painters record each
@@ -41,6 +42,8 @@ class Recorder:
     def __init__(self, bounds):
         self.lo, self.hi = np.array(bounds[0], float), np.array(bounds[1], float)
         self.tiles = {}
+        import paint
+        paint.MARK_IRIS = True  # stamped eyes mark their iris (read and cleared in `face`)
 
     def face(self, key, weights, level, roles, smooth_rgb, final_rgb, p, props):
         """One face: `weights` (n, h, w) and `level` (h, w) from `paint_face_smooth(out=...)`;
@@ -70,11 +73,19 @@ class Recorder:
         dark = changed & (ratio.std(-1) < 0.06) & (ratio.mean(-1) < 1)
         lvl = np.where(dark, lvl + (ratio.mean(-1) - 1) / 0.15 / STEP, lvl)
         coat = coat & ~(changed & ~dark)
+        # The iris a stamped eye marked (`paint.mark_iris`): kept as painted, recolored per animal.
+        iris = np.zeros((h, w), bool)
+        fin = final_rgb if isinstance(final_rgb, np.ndarray) else None
+        if fin is not None and fin.ndim == 3 and fin.shape[-1] == 4:
+            from paint import IRIS_ALPHA
+            iris = fin[..., 3] == IRIS_ALPHA
+            fin[..., 3][iris] = 255
+            coat = coat & ~iris
         lvl = np.clip(lvl, 0, 24)
         q = (p - self.lo) / np.maximum(self.hi - self.lo, 1e-6) * 255
         g = lambda k, d=0.0: np.clip(props.get(k, np.full((h, w), d)), 0, 1) * 255  # noqa: E731
         self.tiles[key] = (_rgba(coat * 255, lvl * 10, u * 255), _rgba(q[..., 0], q[..., 1], q[..., 2]),
-                           _rgba(g("white"), g("points"), g("mask")), _rgba(g("extremity"), g("pattern", 1.0), np.zeros((h, w))))
+                           _rgba(g("white"), g("points"), g("mask")), _rgba(g("extremity"), g("pattern", 1.0), iris * 255.0))
 
     def save(self, out_dir, keys, pack, width=512, extra=None):
         """Packs the layers in `keys` order (the texture's tile order) with `pack` (the painter's
