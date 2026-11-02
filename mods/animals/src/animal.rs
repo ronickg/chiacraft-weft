@@ -113,7 +113,7 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         if new {
             *a = roll(w, index);
         }
-        crate::coats::upkeep(w, id, index, a);
+        crate::coats::upkeep(w, id, index, a, st.pos);
         let a = *a;
         if !new && tamed(w, id) && (w.time() + id) % 20 == 0 {
             hunger(w, id, &a);

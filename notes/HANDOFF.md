@@ -241,7 +241,9 @@ files are exported with the `blocky-model` skill's `to_bedrock.py`
 ([docs/creatures.md](../docs/creatures.md) has the recipe and the commands). Every animal's coat
 comes from its genes (`src/coats.rs`, component `animals:genome`): each client paints it over the
 kind's texture through the engine's skin hook (`Registry::entity_skin`), so only 40 bytes travel
-per animal. The old generator (`tools/chihuahua.py`, 96 painted coats) and the 96 coat looks are
+per animal. Wild animals spawn from local gene pools that evolve (`src/evolution.rs`: a pool per
+species, 256-block cell and habitat, a generation an in-game day, camouflage selection, drift,
+mutation, migration), saved in the world's `mods/animals/pools.json` (the bridge's `data_dir`). The old generator (`tools/chihuahua.py`, 96 painted coats) and the 96 coat looks are
 gone; they are in git history. Each dog draws as a generated look kind per age (grown or puppy)
 and pose (stand, sit, lie down after 30 s sitting), so the pose
 reaches every player that comes by (a played animation is a one-off event). A bone tames (1 in 3); a

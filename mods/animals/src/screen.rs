@@ -37,7 +37,7 @@ pub fn init(r: &mut Registry) {
             }
         });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love)] [count:int]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,evolve)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -367,9 +367,20 @@ fn nearest(w: &World, player: u64, range: f64) -> Option<u64> {
 /// `/animal` on the animal you look at (or the nearest): `show` its screen, `tame` it (yours), give it `points`
 /// to place, make it `wild` again with new levels, bring it `here` (two blocks ahead), have a
 /// cat bring its next `gift` now, knock one out (`ko`), an unconscious one take its next `bite`
-/// now, or every grown dog near you be yours and in `love`.
+/// now, or every grown dog near you be yours and in `love`. `evolve [count] [habitat]` runs
+/// `count` generations of every species' gene pool where you stand (`evolution.rs`) and says how
+/// common each variant is.
 fn command(cmd: &mut ServerCommand) {
     let (w, player) = (cmd.world(), cmd.player());
+    if cmd.text("action") == Some("evolve") {
+        let count = cmd.int("count").unwrap_or(0).clamp(0, 1000) as u32;
+        let habitat = cmd.text("habitat").and_then(crate::evolution::Habitat::named);
+        for line in crate::evolution::evolve_here(&w, player, count, habitat) {
+            weft_sdk::info!("{line}");
+            cmd.reply("command.animals.pool", &[Arg::Text(&line)]);
+        }
+        return;
+    }
     let Some(id) = looked_at(&w, player, 16.0).or_else(|| nearest(&w, player, 12.0)) else {
         cmd.reply("command.animals.none", &[]);
         return;

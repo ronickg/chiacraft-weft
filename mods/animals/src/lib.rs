@@ -3,8 +3,8 @@
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
 //! (`taming.rs`, `knockout.rs`), commands and tribes (`commands.rs`), signatures
-//! (`signatures.rs`), riding (`riding.rs`), coats from genes (`coats.rs`) and the screens and
-//! spyglass (`screen.rs`). The design
+//! (`signatures.rs`), riding (`riding.rs`), coats from genes (`coats.rs`) that evolve where the
+//! animals live (`evolution.rs`), and the screens and spyglass (`screen.rs`). The design
 //! is `notes/ANIMALS.md`. An owner is kept by player key, which the engine's bridge gives
 //! (`player_key`), so a tame knows its owner after a restart.
 
@@ -21,6 +21,7 @@ mod cat;
 mod coats;
 mod commands;
 mod dog;
+mod evolution;
 mod knockout;
 mod raptor;
 mod riding;
@@ -58,6 +59,19 @@ fn player_key(player: u64) -> String {
         .unwrap_or_default()
 }
 
+/// A folder in the world's save for this mod's own files (`evolution.rs`'s gene pools); empty
+/// without one.
+fn data_dir() -> String {
+    BRIDGE
+        .get()
+        .map(|f| unsafe {
+            f(Str::new("data_dir"), Str::new("animals"))
+                .as_str()
+                .to_string()
+        })
+        .unwrap_or_default()
+}
+
 // ------------------------------------------------------------------ registration
 
 fn init(r: &mut Registry) {
@@ -74,6 +88,7 @@ fn init(r: &mut Registry) {
     knockout::init(r);
     riding::init(r);
     coats::init(r);
+    evolution::init(r);
     r.particle(&HEART)
         .textures(&["animals:heart"])
         .life(0.8, 1.2)

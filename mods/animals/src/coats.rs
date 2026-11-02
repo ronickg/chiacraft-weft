@@ -155,49 +155,148 @@ fn unit(v: f32) -> u8 {
     (v.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
-/// An allele as common as it is in the wild, or in a breed (`freq`).
-fn wild_allele(l: &Locus, r: &mut impl Rng, freq: Option<&HashMap<String, f32>>) -> u8 {
-    let f = |a: &Allele| freq.and_then(|m| m.get(&a.a)).copied().unwrap_or(a.freq);
-    let mut x = r.next() * l.alleles.iter().map(f).sum::<f32>();
-    for (i, a) in l.alleles.iter().enumerate() {
-        x -= f(a);
+/// One of `shares.len()` alleles, each as likely as its share.
+fn pick(shares: &[f32], r: &mut impl Rng) -> u8 {
+    let mut x = r.next() * shares.iter().sum::<f32>();
+    for (i, s) in shares.iter().enumerate() {
+        x -= s;
         if x <= 0.0 {
             return i as u8;
         }
     }
-    l.alleles.len().saturating_sub(1) as u8
+    shares.len().saturating_sub(1) as u8
 }
 
-/// A new animal of species `index` (its breed's, if it is one): drawn from the wild.
-fn random(index: usize, female: bool, r: &mut impl Rng) -> Option<Genome> {
-    let s = &SPECIES[index];
-    let g = gene_file(s.name)?;
-    let (breed, b) = s
+/// An allele as common as it is in the gene file.
+fn wild_allele(l: &Locus, r: &mut impl Rng) -> u8 {
+    pick(&l.alleles.iter().map(|a| a.freq).collect::<Vec<_>>(), r)
+}
+
+/// A gene pool: per locus of a species' gene file, each allele's share, or a quantitative
+/// trait's mean and spread (`[mean, sd]`). How common each variant is in a population; what
+/// evolves (`evolution.rs`).
+pub type Pool = Vec<Vec<f32>>;
+
+/// The breed species `index` is (+ 1, as `Genome::breed`), and its frequencies.
+fn breed_of(index: usize, g: &GeneFile) -> (u8, Option<&Breed>) {
+    SPECIES[index]
         .breed
         .and_then(|n| g.breeds.iter().position(|(k, _)| k == n).map(|i| (i as u8 + 1, &g.breeds[n])))
-        .map_or((0, None), |(i, b)| (i, Some(b)));
+        .map_or((0, None), |(i, b)| (i, Some(b)))
+}
+
+/// Species `index`'s pool as its gene file has it (its breed's frequencies for a breed): where
+/// every local pool starts.
+pub fn wild_pool(index: usize) -> Option<Pool> {
+    let g = gene_file(SPECIES.get(index)?.name)?;
+    let (_, b) = breed_of(index, g);
+    Some(
+        g.loci
+            .iter()
+            .take(16)
+            .map(|l| {
+                if l.quantitative {
+                    let (mean, sd) = b
+                        .and_then(|b| b.quantitative.get(&l.id))
+                        .map_or((l.mean, l.sd), |q| (q.mean, q.sd));
+                    vec![mean, sd]
+                } else {
+                    let f = b.and_then(|b| b.freq.get(&l.id));
+                    l.alleles
+                        .iter()
+                        .map(|a| f.and_then(|m| m.get(&a.a)).copied().unwrap_or(a.freq))
+                        .collect()
+                }
+            })
+            .collect(),
+    )
+}
+
+/// A new animal of species `index` drawn from `pool` (one copy on the X for males).
+pub fn sample(index: usize, female: bool, pool: &Pool, r: &mut impl Rng) -> Option<Genome> {
+    let g = gene_file(SPECIES.get(index)?.name)?;
+    let (breed, _) = breed_of(index, g);
     let mut genes = [NONE; 32];
     for (i, l) in g.loci.iter().enumerate().take(16) {
+        let p = pool.get(i)?;
         if l.quantitative {
-            let (mean, sd) = b
-                .and_then(|b| b.quantitative.get(&l.id))
-                .map_or((l.mean, l.sd), |q| (q.mean, q.sd));
+            let (mean, sd) = (p.first().copied().unwrap_or(l.mean), p.get(1).copied().unwrap_or(l.sd));
             for k in 0..2 {
                 genes[2 * i + k] = unit(mean + sd * gauss(r));
             }
         } else {
             let copies = if l.xlinked && !female { 1 } else { 2 };
             for k in 0..copies {
-                genes[2 * i + k] = wild_allele(l, r, b.and_then(|b| b.freq.get(&l.id)));
+                genes[2 * i + k] = if p.len() == l.alleles.len() { pick(p, r) } else { wild_allele(l, r) };
             }
         }
     }
     Some(Genome { seed: (r.next() * 1e9) as u32, species: index as u8 + 1, breed, female: female as u8, genes })
 }
 
+/// The pool `genomes` (of one species) make: how common each allele is among them, each
+/// quantitative trait's mean and spread.
+pub fn pool_of(index: usize, genomes: &[Genome]) -> Option<Pool> {
+    let g = gene_file(SPECIES.get(index)?.name)?;
+    Some(
+        g.loci
+            .iter()
+            .enumerate()
+            .take(16)
+            .map(|(i, l)| {
+                let values = genomes
+                    .iter()
+                    .flat_map(|x| [x.genes[2 * i], x.genes[2 * i + 1]])
+                    .filter(|&a| l.quantitative || a != NONE);
+                if l.quantitative {
+                    let v: Vec<f32> = values.map(|a| a as f32 / 255.0).collect();
+                    let n = v.len().max(1) as f32;
+                    let mean = v.iter().sum::<f32>() / n;
+                    let sd = (v.iter().map(|x| (x - mean) * (x - mean)).sum::<f32>() / n).sqrt();
+                    vec![mean, sd]
+                } else {
+                    let mut count = vec![0.0; l.alleles.len()];
+                    for a in values {
+                        if let Some(c) = count.get_mut(a as usize) {
+                            *c += 1.0;
+                        }
+                    }
+                    let n = count.iter().sum::<f32>().max(1.0);
+                    count.iter().map(|c| c / n).collect()
+                }
+            })
+            .collect(),
+    )
+}
+
+/// A pool in words, a locus a part: `Pg sa 0.74 br 0.14 · Dk 0.31±0.12`.
+pub fn describe_pool(index: usize, pool: &Pool) -> String {
+    let Some(g) = SPECIES.get(index).and_then(|s| gene_file(s.name)) else { return String::new() };
+    g.loci
+        .iter()
+        .zip(pool)
+        .map(|(l, p)| {
+            if l.quantitative {
+                format!("{} {:.2}±{:.2}", l.id, p.first().unwrap_or(&0.0), p.get(1).unwrap_or(&0.0))
+            } else {
+                let mut a: Vec<(&str, f32)> = l.alleles.iter().map(|a| a.a.as_str()).zip(p.iter().copied()).collect();
+                a.sort_by(|x, y| y.1.total_cmp(&x.1));
+                let shown: Vec<String> = a.iter().filter(|x| x.1 >= 0.01).map(|(n, f)| format!("{n} {f:.2}")).collect();
+                format!("{} {}", l.id, shown.join(" "))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" · ")
+}
+
 /// A baby of `mother` and `father`: one allele of each locus from each (a son's only X from his
 /// mother), quantitative traits drifting a little, now and then (1%) an allele mutating.
 pub fn breed(mother: &Genome, father: &Genome, r: &mut impl Rng) -> Option<Genome> {
+    breed_with(mother, father, 0.01, r)
+}
+
+/// `breed` with a chance of `mutation` per locus that an allele mutates.
+pub fn breed_with(mother: &Genome, father: &Genome, mutation: f32, r: &mut impl Rng) -> Option<Genome> {
     let index = (mother.species as usize).checked_sub(1)?;
     let g = gene_file(SPECIES.get(index)?.name)?;
     let female = r.next() < 0.5;
@@ -219,22 +318,26 @@ pub fn breed(mother: &Genome, father: &Genome, r: &mut impl Rng) -> Option<Genom
         if !l.xlinked || female {
             genes[2 * i + 1] = one(f, &mut rnd);
         }
-        if rnd() < 0.01 {
+        if rnd() < mutation {
             let k = if genes[2 * i + 1] != NONE && rnd() < 0.5 { 1 } else { 0 };
-            genes[2 * i + k] = wild_allele(l, &mut rnd, None);
+            genes[2 * i + k] = wild_allele(l, &mut rnd);
         }
     }
     let breed = if mother.breed == father.breed { mother.breed } else { MIXED };
     Some(Genome { seed: (rnd() * 1e9) as u32, species: mother.species, breed, female: female as u8, genes })
 }
 
-/// Every tick, for an animal of species `index` (`animal::upkeep`): one without genes gets them
-/// from the wild, of its sex; one born with them takes its sex from them.
-pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
+/// Every tick, for an animal of species `index` at `pos` (`animal::upkeep`): one without genes
+/// gets them from the wild around it (`evolution::pool_at`: how its kind has evolved there), of
+/// its sex; one born with them takes its sex from them.
+pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
     let Some(g) = w.component_mut(id, &GENOME) else { return };
     if g.species as usize == index + 1 {
         a.female = g.female;
-    } else if let Some(new) = random(index, a.female != 0, &mut world_rng(w)) {
+        return;
+    }
+    let Some(pool) = crate::evolution::pool_at(w, index, pos) else { return };
+    if let Some(new) = sample(index, a.female != 0, &pool, &mut world_rng(w)) {
         *g = new;
     }
 }
@@ -269,6 +372,30 @@ pub struct Look {
     /// How far white spotting reaches (0: none; over 1: all white).
     white: f32,
     seed: u32,
+}
+
+impl Look {
+    /// The color it shows at a glance, all over: what camouflages it or gives it away
+    /// (`evolution.rs`).
+    pub fn average(&self) -> [f32; 3] {
+        let mut c = mix(self.base, self.under, 0.3);
+        if let Some(p) = &self.patches {
+            c = mix(c, mix(p.base, p.under, 0.3), 0.4);
+        }
+        for p in [self.pattern, self.pattern2, self.points_pattern].into_iter().flatten() {
+            c = mix(c, p.color, 0.25 * p.amount);
+        }
+        if let Some(p) = self.points {
+            c = mix(c, p, 0.12);
+        }
+        if let Some(m) = self.merle {
+            c = mix(c, m, 0.3);
+        }
+        if let Some((e, a)) = self.ext {
+            c = mix(c, e, 0.12 * a);
+        }
+        mix(c, WHITE, (self.white * 0.7).clamp(0.0, 1.0))
+    }
 }
 
 fn mix(a: Rgb, b: Rgb, t: f32) -> Rgb {

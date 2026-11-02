@@ -124,6 +124,10 @@ pub struct Species {
     pub signature: &'static str,
     /// Where a rider sits, in blocks above its feet; 0: it can't be ridden (`riding.rs`).
     pub seat: f32,
+    /// How much a coat that stands out from its surroundings costs it in the wild (0..1, natural
+    /// selection in `evolution.rs`): most for prey and ambush hunters, little for dogs, which
+    /// live off people.
+    pub camouflage: f32,
 }
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
@@ -164,6 +168,7 @@ pub static SPECIES: [Species; 6] = [
         fights: true,
         signature: "alarm",
         seat: 0.0,
+        camouflage: 0.3,
     },
     Species {
         kind: &crate::cat::CAT,
@@ -196,6 +201,7 @@ pub static SPECIES: [Species; 6] = [
         fights: true,
         signature: "gifts",
         seat: 0.0,
+        camouflage: 0.5,
     },
     Species {
         kind: &crate::capybara::CAPYBARA,
@@ -226,6 +232,7 @@ pub static SPECIES: [Species; 6] = [
         fights: false,
         signature: "calm",
         seat: 0.0,
+        camouflage: 0.8,
     },
     Species {
         kind: &crate::raptor::RAPTOR,
@@ -254,6 +261,7 @@ pub static SPECIES: [Species; 6] = [
         fights: true,
         signature: "pack",
         seat: 0.0,
+        camouflage: 1.0,
     },
     Species {
         kind: &crate::utahraptor::UTAHRAPTOR,
@@ -283,6 +291,7 @@ pub static SPECIES: [Species; 6] = [
         signature: "mount",
         // On its back, above the hips (1.69 blocks up, the rider's hips a little above).
         seat: 1.55,
+        camouflage: 0.8,
     },
     // Velociraptor's second species (named 2008, from Bayan Mandahu, Inner Mongolia; known from
     // skull bones only, so the same body and numbers, its own coat).
@@ -313,6 +322,7 @@ pub static SPECIES: [Species; 6] = [
         fights: true,
         signature: "pack",
         seat: 0.0,
+        camouflage: 1.0,
     },
 ];
 

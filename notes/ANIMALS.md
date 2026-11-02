@@ -273,10 +273,21 @@ points to a random stat and changes one color region to a new color. Each animal
 mutation count from its mother's line and its father's line. A parent whose line has 20 or more
 mutations can't pass on more (proposed, ARK's limit), so breeders manage lines.
 
-**Colors.** Each species has color regions (coat, markings, belly, eyes for some) and a palette
-per region. Babies take each region from either parent. Mutations bring colors outside the wild
-palette: rare and prized. Patterns (the chihuahua's 96 coats: solid, marked, piebald, tricolor,
-sable, patched) are inherited the same way.
+**Colors.** Coats come from real coat genetics (`genetics/`, `src/coats.rs`): loci with alleles
+in dominance order, X-linked and quantitative traits, one allele of each locus from each parent,
+mutations; see "Looks" under "Built so far".
+
+**Evolution.** How common each variant is changes where the animals live, as in real populations
+(small changes within a species, not new species; one in-game day a generation, so a habitat's
+animals change over weeks). Every species has a gene pool per place (a cell of 256 blocks and its
+habitat: grassland, forest, taiga, snow, desert, mountains); wild animals spawn from it. Each
+generation: natural selection (a coat that stands out from the habitat's ground leaves fewer
+young, by the species' `camouflage`: prey and ambush hunters most, dogs least), drift (a
+population of 200), mutation, and migration from the neighboring places. Proposed next: players'
+part (animals hunted or killed leave the pool, tamed ones released or escaped join it: feral
+dogs), founding breeds (a line that breeds true can be named a breed with its own frequencies),
+selection on inherited stats and climate (bigger bodies and thicker fur in the cold), and, much
+later, isolated pools drifting into subspecies.
 
 **Pedigree.** Every animal knows its mother, father, their parents and so on, its generation,
 its mutation counts, who tamed its wild ancestors and who bred it. **Inbreeding**: parents who
@@ -596,9 +607,22 @@ spyglass show the coat ("Coat: Red sable, masked parti"). The chihuahua's 96 han
 are gone (its looks are now age and pose only). `/animal love` (testing): every grown dog near you
 is yours, wanders and falls in love.
 
-Next: the paint screen in the game (paint as a second component the same painter reads), then
-sizes (real sizes, by sex and individual: the engine's per-entity scale), breeding for the other
-species (only dogs breed so far), coat names in translations.
+**Evolution, part 1: local gene pools and natural selection** (2026-11-01; `evolution.rs`). Each
+species' pool per place (256-block cell and habitat, from the biome's tags) starts as its gene
+file and evolves a generation an in-game day, when next needed (up to 60 at once), as numbers:
+200 animals drawn from it, parents chosen by fitness (1 − 0.6 × camouflage × how far the coat's
+overall color is from the habitat's ground), their young making the next pool (drift), 0.2%
+mutation per locus, 2% from the neighboring places' pools. Wild animals spawn from their place's
+pool. Saved in the world (`mods/animals/pools.json`, through the bridge's new `data_dir`).
+`/animal evolve [count] [habitat]` runs generations where you stand and prints each pool. Checked:
+after 100 generations raptors are all sandy in the desert, red cats rise from 25% to 73% there,
+white spotting near fixed in snow, brown raptors and dark dogs rise in forest; 200 animals keep
+variation (40 fixed nearly every locus by chance).
+
+Next: players' part in evolution (hunting, releasing), the paint screen in the game (paint as a
+second component the same painter reads), then sizes (real sizes, by sex and individual: the
+engine's per-entity scale), breeding for the other species (only dogs breed so far), coat names
+in translations.
 
 Not yet: XP and earning points (the command gives them), naming, the higher spyglass tier, tame
 caps and other world settings. Engine note: clients don't see other entities' attribute
