@@ -136,6 +136,19 @@ pub struct Species {
     /// A grown average one's height in meters (its model's), and where it is measured
     /// (`screen.animals.size.<at>`): the shoulder, or the hip of a two-legged one.
     pub height: (f32, &'static str),
+    /// Young born or hatched at once (`breeding.rs`), fewest and most.
+    pub litter: (u32, u32),
+    /// Ticks a mother carries her young (an in-game day is 24 000); 0: it lays eggs.
+    pub gestation: u32,
+    /// Ticks its eggs take to hatch, kept warm.
+    pub incubation: u32,
+    /// Ticks a mother rests after a birth before she can breed again.
+    pub recovery: u32,
+    /// Ticks its young take to grow up.
+    pub growth: u32,
+    /// A newborn's size against a grown one's (1: it has its own young model, the chihuahua's
+    /// puppy).
+    pub birth_size: f32,
 }
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
@@ -180,6 +193,12 @@ pub static SPECIES: [Species; 6] = [
         dimorphism: 1.04,
         size_spread: 0.2,
         height: (0.20, "shoulder"),
+        litter: (1, 4),
+        gestation: 24_000,
+        incubation: 0,
+        recovery: 48_000,
+        growth: 72_000,
+        birth_size: 1.0,
     },
     Species {
         kind: &crate::cat::CAT,
@@ -216,6 +235,12 @@ pub static SPECIES: [Species; 6] = [
         dimorphism: 1.08,
         size_spread: 0.08,
         height: (0.24, "shoulder"),
+        litter: (2, 5),
+        gestation: 24_000,
+        incubation: 0,
+        recovery: 48_000,
+        growth: 72_000,
+        birth_size: 0.35,
     },
     Species {
         kind: &crate::capybara::CAPYBARA,
@@ -250,6 +275,12 @@ pub static SPECIES: [Species; 6] = [
         dimorphism: 0.97,
         size_spread: 0.08,
         height: (0.56, "shoulder"),
+        litter: (2, 6),
+        gestation: 48_000,
+        incubation: 0,
+        recovery: 72_000,
+        growth: 96_000,
+        birth_size: 0.3,
     },
     Species {
         kind: &crate::raptor::RAPTOR,
@@ -282,6 +313,12 @@ pub static SPECIES: [Species; 6] = [
         dimorphism: 1.0,
         size_spread: 0.08,
         height: (0.50, "hip"),
+        litter: (2, 4),
+        gestation: 0,
+        incubation: 24_000,
+        recovery: 96_000,
+        growth: 96_000,
+        birth_size: 0.3,
     },
     Species {
         kind: &crate::utahraptor::UTAHRAPTOR,
@@ -315,6 +352,12 @@ pub static SPECIES: [Species; 6] = [
         dimorphism: 1.0,
         size_spread: 0.08,
         height: (1.50, "hip"),
+        litter: (2, 4),
+        gestation: 0,
+        incubation: 48_000,
+        recovery: 96_000,
+        growth: 288_000,
+        birth_size: 0.15,
     },
     // Velociraptor's second species (named 2008, from Bayan Mandahu, Inner Mongolia; known from
     // skull bones only, so the same body and numbers, its own coat).
@@ -349,6 +392,12 @@ pub static SPECIES: [Species; 6] = [
         dimorphism: 1.0,
         size_spread: 0.08,
         height: (0.50, "hip"),
+        litter: (2, 4),
+        gestation: 0,
+        incubation: 24_000,
+        recovery: 96_000,
+        growth: 96_000,
+        birth_size: 0.3,
     },
 ];
 

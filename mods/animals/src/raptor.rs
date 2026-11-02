@@ -108,6 +108,8 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
                 .then(crate::knockout::behave(index))
                 .then(hunt)
                 .then(crate::commands::act(index))
+                .then(crate::breeding::behave(index))
+                .then(crate::eggs::nest(index))
                 .then(settle)
                 .then(crate::commands::hold)
                 .then(ai::wander(0.6, 9.0)),

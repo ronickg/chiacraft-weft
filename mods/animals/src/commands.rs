@@ -230,6 +230,11 @@ pub fn interact(w: &World, id: u64, player: u64) -> bool {
     let held = w.inventory(player).get(w.selected_slot(player));
     let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
     if let Some((_, f)) = a.species().and_then(|s| s.food(held.item)) {
+        // A favorite: a grown one falls in love, a young one grows (`breeding.rs`).
+        if f.liking == species::Liking::Favorite && crate::breeding::fed(w, id, player) {
+            animal::feed(w, id, f.food);
+            return true;
+        }
         if (a.food as f32) < a.stat(species::FOOD).round() {
             crate::taming::take_one(w, player);
             animal::feed(w, id, f.food);

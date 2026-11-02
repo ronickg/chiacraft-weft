@@ -3,7 +3,7 @@
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
 //! (`taming.rs`, `knockout.rs`), commands and tribes (`commands.rs`), signatures
-//! (`signatures.rs`), riding (`riding.rs`), coats from genes (`coats.rs`) that evolve where the
+//! (`signatures.rs`), riding (`riding.rs`), breeding and growing up (`breeding.rs`), eggs and nests (`eggs.rs`), coats from genes (`coats.rs`) that evolve where the
 //! animals live (`evolution.rs`), and the screens and spyglass (`screen.rs`). The design
 //! is `notes/ANIMALS.md`. An owner is kept by player key, which the engine's bridge gives
 //! (`player_key`), so a tame knows its owner after a restart.
@@ -16,11 +16,13 @@ use weft_sdk::*;
 declare_mod!(deps: ["base"], init: init);
 
 mod animal;
+mod breeding;
 mod capybara;
 mod cat;
 mod coats;
 mod commands;
 mod dog;
+mod eggs;
 mod evolution;
 mod knockout;
 mod raptor;
@@ -88,6 +90,8 @@ fn init(r: &mut Registry) {
     knockout::init(r);
     riding::init(r);
     coats::init(r);
+    breeding::init(r);
+    eggs::init(r);
     evolution::init(r);
     r.particle(&HEART)
         .textures(&["animals:heart"])

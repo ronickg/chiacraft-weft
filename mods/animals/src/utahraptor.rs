@@ -70,6 +70,8 @@ pub fn init(r: &mut Registry) {
                 .then(crate::knockout::behave(4))
                 .then(hunt)
                 .then(crate::commands::act(4))
+                .then(crate::breeding::behave(4))
+                .then(crate::eggs::nest(4))
                 .then(settle)
                 .then(crate::commands::hold)
                 .then(ai::wander(0.5, 12.0)),

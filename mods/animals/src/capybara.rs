@@ -63,6 +63,7 @@ pub fn init(r: &mut Registry) {
                 .then(crate::taming::behave(2))
                 .then(crate::signatures::calm_aura)
                 .then(crate::commands::act(2))
+                .then(crate::breeding::behave(2))
                 .then(settle)
                 .then(crate::commands::hold)
                 .then(ai::wander(0.35, 6.0)),  // slow and calm

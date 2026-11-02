@@ -94,7 +94,7 @@ impl Habitat {
     }
 
     /// How cold it is: 1 in snow and taiga, -1 in the desert's heat.
-    fn cold(self) -> f32 {
+    pub fn cold(self) -> f32 {
         match self {
             Habitat::Snow | Habitat::Taiga => 1.0,
             Habitat::Mountains => 0.5,

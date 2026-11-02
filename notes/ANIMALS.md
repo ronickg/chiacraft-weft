@@ -640,7 +640,49 @@ to ..." for young ones). Size evolves: mammals have more young the bigger they a
 taiga and the smaller in the desert (Bergmann's rule, `evolution::fitness`). Genomes from before
 read the new gene as average.
 
-Next: the paint screen in the game (paint as a
+**Breeding, for every species** (2026-11-01; `breeding.rs`, replacing the dog's own). A grown
+tame with bond 50 or more fed a favorite food by someone who may command it is in love for 30
+seconds (hearts); two of one species and both sexes in love meet (one told to stay waits) and
+mate. Mammals carry the young (dog and cat a day, capybara two) and give birth to a litter
+(dog 1-4, cat 2-5, capybara 2-6); raptors lay a clutch of 2-4 eggs after five minutes
+(`animals:raptor_egg`, a code model), which hatch after a day (the Utahraptor's two), twice as
+fast within two blocks of a torch or furnace, not at all in snow or taiga without one. Each young
+gets genes from both (`coats::breed`: siblings differ) and each stat's wild points from one
+parent, the stronger 55% of the time; it is its mother's owner's, follows its mother, and grows
+from its birth size (a third or so; the chihuahua keeps its puppy model) over three days (dog,
+cat), four (capybara, Velociraptor) or twelve (Utahraptor), a favorite food speeding it. Mothers
+rest after a birth (two to four days), fathers five minutes. Every animal keeps its generation
+and parents' genes; the screens show "In love", "Expecting young in N min", "Grows up in N min",
+"Generation 2 · mother: ... · father: ...". Checked in the game: a capybara litter of 6, a cat
+litter of 4 from one pair (black torbie, brown tabby, red tabby, white), two raptor eggs that
+hatched (rufous barred, ash spotted). `/animal love` and `/animal hurry` (births, hatching and
+growing up within a second) for testing. Not yet: heat cycles, dens and nests, imprinting,
+inbreeding costs.
+
+**Eggs and nests** (2026-11-02; `eggs.rs`). Raptor eggs are items you can carry: right click one
+(or the nest it's in) to take it, use it on the ground or a nest to put it down; whoever puts it
+down owns the young that hatches (taming by raising). Taking an egg from the wild sets the wild
+ones of its kind within 24 blocks on the thief. Wild females now and then (about every two days,
+while their kind isn't crowded and no nest is near) build a nest and lay a clutch fathered by
+their place's gene pool; tamed mothers lay into a nest within eight blocks. Eggs hatch twice as
+fast in a nest or by a torch or furnace, not at all in snow or taiga without. The nest is a prop
+(an entity, placed with a nest item made from sticks and wheat): an earthen dish about a meter
+across in a sloped rim, as Troodon (the raptors' close relative) dug them; the egg is about 15 cm
+long, pointed below and blunt above, set a quarter into the ground (onto the dish's floor in a
+nest) leaning its top toward the nest's middle, as Troodon's were; colored and marked
+(Deinonychus's eggshell held both birds' pigments). Both built with the skill's full workflow
+(`source/nest`, `source/egg`); of the options in the viewer (the nest bare, lined with grass or
+grassy-rimmed; the egg blotched blue-green, speckled cream, rufous or plain green) Ronald chose
+the bare nest and blotched eggs (`CHOSEN` in each build). `/animal nest`: the nearest wild female nests
+now.
+
+**House style** (2026-11-02, decided with Ronald): every model is made with the blocky-model
+skill in one style so they match: 64 texels a block for every model (Hytale's density for
+characters), real sizes, the skill's light and materials (`scripts/house.py`), props as entities.
+The five animals predate it (19 to 131 texels a block) and are to be rebuilt to it.
+
+Next: rebuild the five animals to the house density; the wyvern (flying, ridden, fire, rare;
+needs flying mounts in the engine; eggs and nests already fit it); the paint screen in the game (paint as a
 second component the same painter reads), then sizes (real sizes, by sex and individual: the
 engine's per-entity scale), breeding for the other species (only dogs breed so far), coat names
 in translations.

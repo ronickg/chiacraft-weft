@@ -21,23 +21,15 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-use crate::animal::{self, OWNER};
-use crate::{coats, commands, screen, signatures, species, taming};
+use crate::animal;
+use crate::{commands, screen, signatures, species, taming};
 
 pub(crate) static CHIHUAHUA: Entity = Entity::named("chihuahua");
-static HEART: Particle = Particle::named("heart");
-static MEATS: [Item; 4] =
-    [Item::named("base:beef"), Item::named("base:cooked_beef"), Item::named("base:porkchop"), Item::named("base:cooked_porkchop")];
 
 /// The dog's texture, its coat painted over it (`coats.rs`).
 const TEXTURE: &str = "chihuahua/chihuahua";
-/// Twenty minutes to grow up.
-const GROW_TICKS: u32 = 24_000;
 /// Sitting this long (thirty seconds), a dog lies down.
 const LIE_TICKS: u32 = 600;
-/// Thirty seconds in love, five minutes before the next litter.
-const LOVE_TICKS: u32 = 600;
-const COOLDOWN_TICKS: u32 = 6_000;
 
 value! {
     #[derive(Default)]
@@ -46,7 +38,7 @@ value! {
         /// Unused: coats come from genes now (`coats.rs`); kept so saved dogs load.
         pub coat: u32,
         pub tamed: u32,
-        /// Ticks left in love, before breeding again, and before growing up (0: grown).
+        /// Unused: love, rest and growing up are `breeding.rs`'s now; kept so saved dogs load.
         pub love: u32,
         pub cooldown: u32,
         pub age: u32,
@@ -168,30 +160,18 @@ fn goals() -> Goals {
             }
             true
         })
-        .then(breed)
+        .then(crate::breeding::behave(0))
         .then(commands::hold)
         .then(ai::wander(0.45, 6.0))
 }
 
-/// Every tick, before anything else: its look applied, time passing.
+/// Every tick, after its level and growing up (`animal::upkeep`): its look applied, time passing.
 fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
+    let puppy = crate::breeding::young(w, id);
     let Some(d) = w.component_mut(id, &DOG) else { return false };
-    d.love = d.love.saturating_sub(1);
-    d.cooldown = d.cooldown.saturating_sub(1);
     d.panic = d.panic.saturating_sub(1);
-    d.age = d.age.saturating_sub(1);
     // A tame told to stay sits (once it is there).
-    let staying = d.tamed != 0 && commands::command(w, id) == commands::STAY && !w.navigating(id);
-    let (puppy, sitting) = (d.age > 0, staying);
-    let stage = match d.age * 3 / GROW_TICKS.max(1) {
-        _ if d.age == 0 => animal::ADULT,
-        2.. => animal::BABY,
-        1 => animal::JUVENILE,
-        _ => animal::ADOLESCENT,
-    };
-    if let Some(a) = w.component_mut(id, &animal::ANIMAL) {
-        a.stage = stage;
-    }
+    let sitting = d.tamed != 0 && commands::command(w, id) == commands::STAY && !w.navigating(id);
     let Some(s) = w.component_mut(id, &SEEN) else { return false };
     s.sat = if sitting { s.sat.saturating_add(1) } else { 0 };
     let pose = match (sitting, s.sat > LIE_TICKS) {
@@ -209,99 +189,6 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     false
 }
 
-/// In love: goes to a dog of the other sex in love nearby, of any breed (or waits for it,
-/// sitting); when they meet, a puppy of the lower id's breed, with genes from both.
-fn breed(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(me) = w.component(id, &DOG).copied().filter(|d| d.love > 0) else { return false };
-    let species = |o: u64| w.component(o, &animal::ANIMAL).and_then(|a| a.species());
-    let female = |o: u64| w.component(o, &animal::ANIMAL).map(|a| a.female);
-    let Some(mine) = species(id) else { return false };
-    let partner = w
-        .near(st.pos, 8.0, None)
-        .into_iter()
-        .find(|&o| {
-            o != id
-                && species(o).is_some_and(|s| species::same_species(s, mine))
-                && female(o) != female(id)
-                && w.component(o, &DOG)
-                    .is_some_and(|d| d.love > 0 && d.age == 0)
-        });
-    let Some(partner) = partner else { return false };
-    let Some(ps) = w.entity(partner) else { return false };
-    let d2 = (ps.pos[0] - st.pos[0]).powi(2) + (ps.pos[2] - st.pos[2]).powi(2);
-    if d2 > 1.2 * 1.2 {
-        if me.tamed != 0 && commands::command(w, id) == commands::STAY {
-            return false;
-        }
-        w.navigate(id, ps.pos, 1.0);
-        return true;
-    }
-    // The pair meets once: the lower id has the puppy.
-    if id > partner {
-        return true;
-    }
-    let (Some(a), Some(b)) = (w.component(id, &coats::GENOME).copied(), w.component(partner, &coats::GENOME).copied()) else { return true };
-    let (mother, father) = if a.female != 0 { (a, b) } else { (b, a) };
-    let genes = coats::breed(&mother, &father, &mut coats::world_rng(w));
-    let at = [(st.pos[0] + ps.pos[0]) / 2.0, st.pos[1], (st.pos[2] + ps.pos[2]) / 2.0];
-    let pup = w.spawn(mine.kind, at);
-    if pup != 0 {
-        let owner = w.component(id, &OWNER).copied().unwrap_or([0; 64]);
-        if let Some(d) = w.component_mut(pup, &DOG) {
-            *d = Dog { tamed: (owner[0] != 0) as u32, age: GROW_TICKS, ..Dog::default() };
-        }
-        if let (Some(g), Some(genes)) = (w.component_mut(pup, &coats::GENOME), genes) {
-            *g = genes;
-        }
-        if let Some(o) = w.component_mut(pup, &OWNER) {
-            *o = owner;
-        }
-        let coat = |g: Option<coats::Genome>| g.and_then(|g| coats::phenotype(&g)).map(|l| l.name).unwrap_or_default();
-        weft_sdk::info!(
-            "chihuahua {pup} born to {} and {}: {}",
-            coat(Some(mother)),
-            coat(Some(father)),
-            coat(genes)
-        );
-    }
-    for p in [id, partner] {
-        if let Some(d) = w.component_mut(p, &DOG) {
-            d.love = 0;
-            d.cooldown = COOLDOWN_TICKS;
-        }
-    }
-    hearts(w, at);
-    true
-}
-
-/// `/animal love` (for testing): every grown dog within 12 blocks of `player` becomes theirs,
-/// wanders and falls in love.
-pub fn love_near(w: &World, player: u64) {
-    let Some(p) = w.entity(player) else { return };
-    for id in w.near(p.pos, 12.0, Some(&CHIHUAHUA)) {
-        if w.component(id, &DOG).is_none_or(|d| d.age > 0) {
-            continue;
-        }
-        if !animal::tamed(w, id) {
-            taming::tame(w, id, player, 0.0);
-        }
-        // Free to go to each other (two told to stay would wait for each other).
-        commands::set_command(w, id, commands::WANDER, None);
-        if let Some(d) = w.component_mut(id, &DOG) {
-            (d.love, d.cooldown) = (LOVE_TICKS, 0);
-        }
-    }
-}
-
-fn hearts(w: &World, at: [f64; 3]) {
-    drop(
-        w.spawn_particles(&HEART, [at[0], at[1] + 0.6, at[2]])
-            .count(5)
-            .spread(0.3)
-            .velocity([0.0, 0.6, 0.0]),
-    );
-}
-
 /// A player right clicks a dog: a wild one is fed toward taming (`taming.rs`), meat puts a
 /// grown tamed one in love (or helps a puppy grow), anything else is as for every tame
 /// (`commands::interact`: it eats, or sits or follows).
@@ -310,7 +197,6 @@ fn interact(e: &mut EntityEvent) {
     if screen::interact(&w, id, player) {
         return;
     }
-    let Some(st) = w.entity(id) else { return };
     let held = w.inventory(player).get(w.selected_slot(player));
     let Some(d) = w.component(id, &DOG).copied() else { return };
     if d.tamed == 0 {
@@ -322,24 +208,6 @@ fn interact(e: &mut EntityEvent) {
     }
     // Something an animal drops (and the dog doesn't eat): it tracks that animal down.
     if species::SPECIES[0].food(held.item).is_none() && signatures::track(&w, id, held.item) {
-        return;
-    }
-    if MEATS.iter().any(|m| m.id() == held.item) {
-        animal::feed(&w, id, 20);
-        if d.age > 0 {
-            taming::take_one(&w, player);
-            if let Some(d) = w.component_mut(id, &DOG) {
-                d.age = d.age * 9 / 10;
-            }
-            hearts(&w, st.pos);
-        } else if d.love == 0 && d.cooldown == 0 {
-            taming::take_one(&w, player);
-            if let Some(d) = w.component_mut(id, &DOG) {
-                d.love = LOVE_TICKS;
-            }
-            weft_sdk::info!("chihuahua {id} in love");
-            hearts(&w, st.pos);
-        }
         return;
     }
     commands::interact(&w, id, player);

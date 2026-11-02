@@ -251,9 +251,10 @@ gone; they are in git history. Each dog draws as a generated look kind per age (
 and pose (stand, sit, lie down after 30 s sitting), so the pose
 reaches every player that comes by (a played animation is a one-off event). A bone tames (1 in 3); a
 tamed dog sits on the start, the owner's empty-handed or non-food right-click toggles sitting, it
-follows its owner (teleports when 24 blocks behind). Meat puts two tamed adults in love; a male and a female meet
-(a sitting one waits for the other) and have a puppy with one allele of each gene from each
-(`coats::breed`: it looks like them, hidden recessives surprise, 1% mutate), half the size, grown after a day (meat speeds it up). The owner is the player's key,
+follows its owner (teleports when 24 blocks behind). A favorite food puts a tamed adult with bond 50 in love (`src/breeding.rs`, every species:
+litters for mammals, eggs for raptors); a male and a female meet (a sitting one waits for the
+other) and have young with one allele of each gene from each (`coats::breed`: they look like
+them, hidden recessives surprise, 1% mutate), a puppy half the size, grown after three days (a favorite food speeds it up). The owner is the player's key,
 asked of the engine bridge (`player_key`, added to `bridge.rs`). Checked in the game: model, coats,
 poses, taming, sitting, love, and a puppy born to two dogs in love (with a local patch that started
 dogs in love: aiming `press core:use` at wandering dogs from a script is too hit and miss). If the

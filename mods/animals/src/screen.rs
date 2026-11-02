@@ -37,7 +37,7 @@ pub fn init(r: &mut Registry) {
             }
         });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,evolve)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -174,6 +174,37 @@ fn heading(ui: &mut Ui) {
         let shown = if m < 1.0 { format!("{:.0} cm", m * 100.0) } else { format!("{m:.2} m") };
         let key = if a.stage < animal::ADULT { "screen.animals.height_young" } else { "screen.animals.height" };
         t.set(key, &[Arg::Text(&shown), Arg::Key(&format!("screen.animals.height.{}", s.height.1))]);
+    });
+    // In love, expecting, growing up or resting (`breeding.rs`), when it is.
+    ui.text_bind(|c, t| {
+        let Some(b) = c.menu_component(&crate::breeding::BREEDING) else { return };
+        let laying = c.menu_component(&ANIMAL).and_then(|a| a.species()).is_some_and(|s| s.gestation == 0);
+        let min = |ticks: u32| Arg::Int(ticks.div_ceil(1200) as i64);
+        match () {
+            _ if b.love > 0 => t.set("screen.animals.love", &[]),
+            _ if b.carrying > 0 && laying => t.set("screen.animals.laying", &[min(b.carrying)]),
+            _ if b.carrying > 0 => t.set("screen.animals.expecting", &[min(b.carrying)]),
+            _ if b.growing > 0 => t.set("screen.animals.growing", &[min(b.growing)]),
+            _ if b.rest > 0 => t.set("screen.animals.resting", &[min(b.rest)]),
+            _ => t.set("", &[]),
+        }
+    });
+    // Its family: its generation and its parents' coats, or born in the wild.
+    ui.text_bind(|c, t| {
+        let Some(b) = c.menu_component(&crate::breeding::BREEDING) else { return };
+        let coat = |g: &[u32; 10]| {
+            crate::breeding::unpack(g)
+                .and_then(|g| crate::coats::phenotype(&g))
+                .map_or_else(|| "?".to_string(), |l| l.name)
+        };
+        if b.generation == 0 {
+            t.set("screen.animals.wild_born", &[]);
+        } else {
+            t.set(
+                "screen.animals.family",
+                &[Arg::Int(b.generation as i64), Arg::Text(&coat(&b.dam)), Arg::Text(&coat(&b.sire))],
+            );
+        }
     });
     // Its coat, read from its genes ("Fawn sable with white").
     ui.text_bind(|c, t| {
@@ -377,7 +408,9 @@ fn nearest(w: &World, player: u64, range: f64) -> Option<u64> {
 /// `/animal` on the animal you look at (or the nearest): `show` its screen, `tame` it (yours), give it `points`
 /// to place, make it `wild` again with new levels, bring it `here` (two blocks ahead), have a
 /// cat bring its next `gift` now, knock one out (`ko`), an unconscious one take its next `bite`
-/// now, or every grown dog near you be yours and in `love`. `evolve [count] [habitat]` runs
+/// now, every grown animal near you be yours and in `love`, or every mother, egg and young one
+/// near you `hurry` (birth, hatching, growing up within a second), or the nearest wild female of a
+/// laying kind build a `nest` and lay in it now. `evolve [count] [habitat]` runs
 /// `count` generations of every species' gene pool where you stand (`evolution.rs`) and says how
 /// common each variant is.
 fn command(cmd: &mut ServerCommand) {
@@ -419,7 +452,11 @@ fn command(cmd: &mut ServerCommand) {
         "gift" => crate::signatures::gift_now(&w, id),
         "bite" => crate::knockout::bite_now(&w, id),
         "ko" => crate::knockout::add_torpor(&w, id, 100_000.0),
-        "love" => crate::dog::love_near(&w, player),
+        "love" => crate::breeding::love_near(&w, player),
+        "hurry" => crate::breeding::hurry_near(&w, player),
+        "nest" => {
+            crate::eggs::nest_now(&w, player);
+        }
         "here" => {
             if let (Some(p), Some(mut e)) = (w.entity(player), w.entity(id)) {
                 let (sy, cy) = (p.yaw as f64).sin_cos();
