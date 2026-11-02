@@ -587,9 +587,13 @@ def area(e, face, p, uu, vv, h):
 
 
 def layer_props(e, face, a):
-    """The accent (wing skin, spike tips) as `points`; patterns nowhere (none in its genes)."""
+    """The accent (wing skin, spike tips) as `points`; where its markings show (`Mk`): fully on
+    the scales of the back and flanks, faintly on the belly plates and through the wing skin."""
     pts = np.isin(a, [MEMBRANE, MEM_VEIN, MEM_EDGE, SPIKE_TIP]).astype(float)
-    return {"points": pts, "pattern": np.zeros(a.shape)}
+    zone = np.select([np.isin(a, [BACK, BACK_EDGE, BACK_HI, FLANK, FLANK_EDGE, FLANK_HI]),
+                      np.isin(a, [SPIKE]), np.isin(a, [MEMBRANE, MEM_VEIN, MEM_EDGE]), np.isin(a, [BELLY, BELLY_EDGE])],
+                     [1.0, 0.6, 0.35, 0.25], 0.0)
+    return {"points": pts, "pattern": zone}
 
 
 # The eye: an amber reptile's, a slit pupil, under the brow on each side of the skull.

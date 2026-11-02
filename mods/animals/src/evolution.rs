@@ -265,7 +265,7 @@ fn evolved(p: &mut Pools, index: usize, cell: (i64, i64), h: Habitat, day: u64, 
     let k = key(index, cell, h);
     if !p.all.contains_key(&k) {
         p.all
-            .insert(k.clone(), Local { day, pool: coats::wild_pool(index)? });
+            .insert(k.clone(), Local { day, pool: coats::wild_pool(index, h.name())? });
         p.dirty = true;
     }
     let from = p.all[&k].day;

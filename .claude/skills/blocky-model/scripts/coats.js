@@ -12,6 +12,13 @@
 //
 // `paint`: a paint screen's choices, on top of the genes: {base, under, markings, points}
 // colors (any color) and a stencil {kind: "stripes" | "spots" | "patches", color}.
+//
+// The core every species shares (`mods/animals/genetics/core.json`): `Coats.withCore(genes,
+// core)` adds its traits after a species' own loci (size, shade, warmth, white, the marks' size,
+// density, contrast, edge and stretch, eyes, build), each showing partly by chance (its
+// heritability `h`), shifted by sex (`sexes`) and youth (`young`; `animal.stage` 0 a baby, 3
+// grown). A gene file's `habitats` are where wild ones start in each country:
+// `Coats.random(genes, rng, sex, breed, habitat)`.
 (function (root) {
   "use strict";
 
@@ -30,19 +37,35 @@
     for (const a of L.alleles) { x -= f(a); if (x <= 0) return a.a; }
     return L.alleles[L.alleles.length - 1].a;
   }
-  // A new animal (of `breed`, from the species' `breeds`): one copy on the X for males (an
-  // X-linked locus), two otherwise.
-  function random(genes, r, sex, breed) {
+  const OWN = 16;
+  // A species' gene file with the core traits after its own loci (each locus gets its `slot`),
+  // as the game reads it.
+  function withCore(genes, core) {
+    const g = Object.assign({}, genes, { loci: genes.loci.slice(0, OWN).map((L, i) => Object.assign({}, L, { slot: i })) });
+    (core.loci || []).forEach((C, i) => {
+      const own = g.loci.find(L => L.id === C.id);
+      if (own) { if (own.h === undefined) own.h = C.h; return; }
+      const t = (genes.traits || {})[C.id];
+      g.loci.push(Object.assign({}, C, { slot: OWN + i }, t ? { mean: t.mean, sd: t.sd } : {}));
+    });
+    return g;
+  }
+  // A new animal (of `breed`, from the species' `breeds`, or of `habitat`'s kind): one copy on
+  // the X for males (an X-linked locus), two otherwise.
+  function random(genes, r, sex, breed, habitat) {
     sex = sex || (r() < 0.5 ? "female" : "male");
-    const b = (breed && genes.breeds && genes.breeds[breed]) || {};
+    const over = [(breed && genes.breeds && genes.breeds[breed]) || {}, (habitat && genes.habitats && genes.habitats[habitat]) || {}];
     const genome = {};
     for (const L of genes.loci) {
       if (L.quantitative) {
-        const q = (b.quantitative || {})[L.id] || L;
+        const q = over.map(b => (b.quantitative || {})[L.id]).find(Boolean) || L;
         genome[L.id] = [0, 1].map(() => clamp01(q.mean + q.sd * gauss(r)));
-      } else genome[L.id] = (L.xlinked && sex === "male" ? [0] : [0, 1]).map(() => wildAllele(L, r, (b.freq || {})[L.id]));
+      } else {
+        const freq = Object.assign({}, ...over.slice().reverse().map(b => (b.freq || {})[L.id] || {}));
+        genome[L.id] = (L.xlinked && sex === "male" ? [0] : [0, 1]).map(() => wildAllele(L, r, freq));
+      }
     }
-    return { sex, genome, seed: Math.floor(r() * 1e9), breed: breed || null };
+    return { sex, genome, seed: Math.floor(r() * 1e9), breed: breed || null, habitat: habitat || null, stage: 3 };
   }
   // A baby: one allele of each locus from each parent (a son gets his X from his mother only),
   // quantitative traits drift a little, and now and then (1%) an allele mutates.
@@ -58,7 +81,7 @@
       genome[L.id] = g;
     }
     const breed = mother.breed === father.breed ? mother.breed : "mixed";
-    return { sex, genome, seed: Math.floor(r() * 1e9), breed };
+    return { sex, genome, seed: Math.floor(r() * 1e9), breed, stage: 0 };
   }
   // What shows at a locus: the most dominant allele present.
   function shows(genes, a, id) {
@@ -66,8 +89,27 @@
     for (const x of L.alleles) if (have.includes(x.a)) return x.a;
     return have[0];
   }
-  const copies = (a, id, x) => a.genome[id].filter(v => v === x).length;
-  const qv = (a, id) => a.genome[id].reduce((s, v) => s + v, 0) / a.genome[id].length;
+  const copies = (a, id, x) => (a.genome[id] || []).filter(v => v === x).length;
+  // A quantitative trait's genes: the mean of its two values (what it passes on).
+  const genetic = (a, id) => a.genome[id] ? a.genome[id].reduce((s, v) => s + v, 0) / a.genome[id].length : 0.5;
+  // How young it is: 1 a baby, 0 grown.
+  const youth = a => (3 - Math.min(3, a.stage ?? 3)) / 3;
+  // A quantitative trait as it shows: its genes, its own chance for the share genes don't decide
+  // (from its seed: not passed on), and what its sex and youth shift (the game's `Read::qv`).
+  let G = null;  // the gene file `phenotype` is reading against
+  function qv(a, id) {
+    const L = G && G.loci.find(l => l.id === id);
+    let v = genetic(a, id);
+    if (!L) return v;
+    const h = Math.max(0.05, Math.min(1, L.h ?? 1));
+    if (h < 1) {
+      const u1 = hash3(L.slot, 1, 7, a.seed | 0), u2 = hash3(L.slot, 2, 7, a.seed | 0);
+      v += L.sd * Math.sqrt((1 - h) / h) * Math.sqrt(-2 * Math.log(u1 + 1e-6)) * Math.cos(2 * Math.PI * u2);
+    }
+    v += ((G.sexes || {})[a.sex] || {})[id] || 0;
+    v += youth(a) * (((G.young || {}).traits || {})[id] || 0);
+    return clamp01(v);
+  }
   function genotype(genes, a) {
     return genes.loci.map(L => L.quantitative ? `${L.id} ${qv(a, L.id).toFixed(2)}` : `${L.id} ${a.genome[L.id].join("/")}`).join(" \u00b7 ");
   }
@@ -178,13 +220,58 @@
       return { name, base, under, pattern, pattern2: saddle, white: 0 };
     },
   };
+  PHENOTYPES.wyvern = function (g, a) {
+    // Scales and an accent (the wing skin, the spikes' tips), as the show's dragons wear them.
+    const SC = { bronze: [[132, 92, 52], [96, 54, 38], "Bronze"], green: [[58, 78, 52], [150, 104, 52], "Green"],
+                 black: [[40, 38, 42], [128, 36, 30], "Black"], red: [[118, 40, 34], [52, 26, 24], "Red"],
+                 white: [[222, 212, 190], [196, 150, 70], "Cream"], slate: [[92, 92, 98], [112, 70, 60], "Slate"] };
+    const sc = shows(g, a, "Sc"), [scales, accent, cname] = SC[sc] || SC.slate;
+    const Dk = qv(a, "Dk");
+    const base = Dk > 0.5 ? darken(scales, (Dk - 0.5) * 0.6) : lighten(scales, (0.5 - Dk) * 0.4);
+    const under = mix(lighten(base, 0.3), [170, 140, 110], 0.4);
+    const breath = shows(g, a, "Br") || "fire";
+    const ink = sc === "white" ? mix(accent, base, 0.3) : darken(base, 0.5);
+    const MK = { bands: ["bands", ", banded"], blotches: ["blotches", ", blotched"], mottle: ["mottle", ", mottled"], stripes: ["streaks", ", striped"] };
+    const mk = a.genome.Mk ? MK[shows(g, a, "Mk")] : null;
+    return { name: `${cname}${mk ? mk[1] : ""}, breathes ${breath}`, base, under, points: accent,
+             pointsReach: (qv(a, "Ac") - 0.5) * 2, pattern: mk ? { kind: mk[0], color: ink, amount: 0.85 } : null, white: 0 };
+  };
   PHENOTYPES.utahraptor = PHENOTYPES.raptor;
   PHENOTYPES.osmolskae = PHENOTYPES.raptor;  // Velociraptor's second species: the same loci
 
   function phenotype(genes, a) {
+    G = genes;
     const c = PHENOTYPES[genes.species](genes, a);
+    core(genes, a, c);
     c.seed = a.seed;
+    G = null;
     return c;
+  }
+
+  // The core traits on a species' look, the same for every species (the game's `core`).
+  function core(g, a, c) {
+    const own = id => g.loci.some(L => L.id === id && (L.slot ?? 0) < OWN);
+    const recolor = f => {
+      c.base = f(c.base); c.under = f(c.under); if (c.points) c.points = f(c.points);
+      if (c.patches) { c.patches = Object.assign({}, c.patches, { base: f(c.patches.base), under: f(c.patches.under) }); }
+    };
+    if (!own("Dk") && a.genome.Dk) {
+      const dk = qv(a, "Dk");
+      recolor(x => dk > 0.5 ? darken(x, (dk - 0.5) * 0.5) : lighten(x, (0.5 - dk) * 0.35));
+    }
+    const t = (qv(a, "Wm") - 0.5) * 2;
+    const warm = x => [x[0] * (1 + 0.07 * t), x[1] * (1 + 0.015 * t), x[2] * (1 - 0.09 * t)];
+    recolor(warm);
+    for (const k of ["pattern", "pattern2", "pointsPattern"]) if (c[k]) c[k] = Object.assign({}, c[k], { color: warm(c[k].color) });
+    if (c.white > 0 && c.white < 1) c.white = Math.min(0.97, c.white * (0.6 + 0.8 * qv(a, "Wh")));
+    c.marks = { size: qv(a, "Ms"), density: qv(a, "Md"), contrast: qv(a, "Ct"), edge: qv(a, "Me"), stretch: qv(a, "Mx") };
+    c.scale = g.mark_scale || 1;
+    if (g.eyes && g.eyes.length) {
+      const e = qv(a, "Ey") * (g.eyes.length - 1), i = Math.min(g.eyes.length - 1, Math.floor(e));
+      c.eye = mix(g.eyes[i], g.eyes[Math.min(i + 1, g.eyes.length - 1)], e - i);
+    }
+    const y = youth(a);
+    if (g.young && g.young.pattern && y > 0 && !c.pattern2) c.pattern2 = { kind: g.young.pattern, color: lighten(c.base, 0.5), amount: y };
   }
 
   // ---------------------------------------------------------------- patterns in 3D (model units)
@@ -206,29 +293,58 @@
   const smooth = (v, a, b) => { const t = clamp01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
   const band = (t, width) => { const f = frac(t); return smooth(f, 0, 0.08) * (1 - smooth(f, width - 0.08, width)); };
 
+  const DEFAULT_MARKS = { size: 0.5, density: 0.5, contrast: 0.5, edge: 0.5, stretch: 0.5 };
   // How much a pattern covers a texel (0..1): p in model units (x side to side, y up, z along the
-  // body), u how far toward the underside.
-  function pattern(kind, p, u, s) {
-    const [x, y, z] = p;
+  // body; divided by the species' `mark_scale`), u how far toward the underside, m how this
+  // individual's marks are drawn: bigger marks are the pattern drawn on a smaller body, stretched
+  // ones on a body shortened along its length, ragged ones on a warped body, denser ones with
+  // wider marks (the game's `pattern`).
+  function pattern(kind, p, u, s, m) {
+    m = m || DEFAULT_MARKS;
+    const k = Math.pow(2, (m.size - 0.5) * 1.6), st = Math.pow(2, (m.stretch - 0.5) * 1.2);
+    const q = [p[0] / k * Math.sqrt(st), p[1] / k * Math.sqrt(st), p[2] / (k * st)];
+    const warp = 0.5 + 3 * m.edge;
+    const n = o => (noise3(q[0] * 0.4, q[1] * 0.4, q[2] * 0.4, s + o) - 0.5) * warp;
+    const x = q[0] + n(11), y = q[1] + n(12), z = q[2] + n(13);
+    const d = m.density - 0.5, w = width => Math.max(0.1, Math.min(0.85, width * (1 + 1.1 * d)));
     switch (kind) {
-      case "mackerel": case "bars": return band((z + 1.6 * Math.sin(y * 0.45) + 0.5 * Math.abs(x)) / 5.5, 0.32);
-      case "classic": { const r = Math.hypot(z - 2, y - 14); return band(r / 6.5 + 0.15 * noise3(x * 0.3, y * 0.3, z * 0.3, s), 0.42); }
-      case "spotted": return band((z + 1.6 * Math.sin(y * 0.45)) / 5.5, 0.4) * smooth(noise3(x * 0.55, y * 0.55, z * 0.55, s), 0.45, 0.55);
-      case "ticked": return 0.35 * smooth(noise3(x * 1.4, y * 1.4, z * 1.4, s), 0.55, 0.7);
-      case "bands": return band((z + 0.4 * y) / 7, 0.38);
+      case "mackerel": case "bars": return band((z + 1.6 * Math.sin(y * 0.45) + 0.5 * Math.abs(x)) / 5.5, w(0.32));
+      case "classic": { const r = Math.hypot(z - 2, y - 14); return band(r / 6.5 + 0.15 * noise3(x * 0.3, y * 0.3, z * 0.3, s), w(0.42)); }
+      case "spotted": return band((z + 1.6 * Math.sin(y * 0.45)) / 5.5, w(0.4)) * smooth(noise3(x * 0.55, y * 0.55, z * 0.55, s), 0.45 - 0.3 * d, 0.55 - 0.3 * d);
+      case "ticked": return 0.35 * smooth(noise3(x * 1.4, y * 1.4, z * 1.4, s), 0.55 - 0.3 * d, 0.7 - 0.3 * d);
+      case "bands": return band((z + 0.4 * y) / 7, w(0.38));
+      case "streaks": return band((y + 1.5 * noise3(z * 0.08, x * 0.2, 0, s)) / 4.5, w(0.3));
       case "rosettes": {
         const cx = Math.floor(x / 4), cy = Math.floor(y / 4), cz = Math.floor(z / 4);
-        if (hash3(cx, cy, cz, s) > 0.55) return 0;
-        const d = Math.hypot(x - (cx + 0.5) * 4, z - (cz + 0.5) * 4, (y - (cy + 0.5) * 4) * 0.6);
-        return smooth(d, 0.6, 0.8) * (1 - smooth(d, 1.5, 1.7));
+        if (hash3(cx, cy, cz, s) > 0.55 + 0.6 * d) return 0;
+        const dist = Math.hypot(x - (cx + 0.5) * 4, z - (cz + 0.5) * 4, (y - (cy + 0.5) * 4) * 0.6);
+        return smooth(dist, 0.6, 0.8) * (1 - smooth(dist, 1.5, 1.7));
       }
-      case "speckle": return hash3(Math.floor(x), Math.floor(y), Math.floor(z), s) < 0.14 ? 1 : 0;
-      case "saddle": return smooth(0.55 - u, 0, 0.25);
-      case "sable": return smooth(0.75 - u, 0, 0.5) * (0.55 + 0.45 * noise3(x * 0.6, y * 0.6, z * 0.6, s));
-      case "brindle": return band((z + 2.5 * noise3(x * 0.25, y * 0.25, z * 0.25, s) * 3) / 2.2, 0.3);
+      case "blotches": {  // solid spots, one at a jittered place in each cell (a reptile's blotches)
+        const cx = Math.floor(x / 6), cy = Math.floor(y / 6), cz = Math.floor(z / 6);
+        let best = 0;
+        for (const [ox, oy, oz] of [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0]]) {
+          const i = cx + ox, j = cy + oy, l = cz + oz;
+          if (hash3(i, j, l, s + 21) > 0.5 + 0.6 * d) continue;
+          const at = (o, base) => (base + 0.2 + 0.6 * hash3(i, j, l, s + o)) * 6;
+          const dist = Math.hypot(x - at(22, i), (y - at(23, j)) * 0.8, z - at(24, l));
+          const r = 1.4 + 1.2 * hash3(i, j, l, s + 25);
+          best = Math.max(best, 1 - smooth(dist, r - 0.3, r + 0.3));
+        }
+        return best;
+      }
+      case "mottle": {
+        const v = noise3(x * 0.22, y * 0.22, z * 0.22, s + 31) * 0.65 + noise3(x * 0.6, y * 0.6, z * 0.6, s + 32) * 0.35;
+        return smooth(v, 0.55 - 0.25 * d, 0.62 - 0.25 * d);
+      }
+      case "speckle": return hash3(Math.floor(x), Math.floor(y), Math.floor(z), s) < 0.14 * Math.max(0.2, 1 + 2 * d) ? 1 : 0;
+      case "saddle": return smooth(0.55 + 0.3 * d - u, 0, 0.25);
+      case "sable": return smooth(0.75 + 0.3 * d - u, 0, 0.5) * (0.55 + 0.45 * noise3(x * 0.6, y * 0.6, z * 0.6, s));
+      case "brindle": return band((z + 2.5 * noise3(x * 0.25, y * 0.25, z * 0.25, s) * 3) / 2.2, w(0.3));
+      // The paint screen's stencils (not genes).
       case "stripes": return band(z / 4.5, 0.4);
       case "spots": return smooth(noise3(x * 0.4, y * 0.4, z * 0.4, s), 0.62, 0.68);
-      case "patches": return smooth(noise3(x * 0.15, y * 0.15, z * 0.15, s), 0.5, 0.56);
+      case "patches": return smooth(noise3(x * 0.15, y * 0.15, z * 0.15, s), 0.5 - 0.25 * d, 0.56 - 0.25 * d);
       default: return 0;
     }
   }
@@ -271,29 +387,33 @@
       const i = (y * w + x) * 4, o = (y * stride + x) * 4;
       if (info[i] < 128) continue;
       const level = info[i + 1] / 10, u = info[i + 2] / 255;
-      const p = [0, 1, 2].map(k => lo[k] + pos[i + k] / 255 * (hi[k] - lo[k]));
+      const p = [0, 1, 2].map(k => (lo[k] + pos[i + k] / 255 * (hi[k] - lo[k])) / Math.max(0.01, look.scale || 1));
       const white = props[i] / 255, points = props[i + 1] / 255, mask = props[i + 2] / 255;
       const ext = props2[i] / 255, zone = props2[i + 1] / 255;
+      const m = look.marks || DEFAULT_MARKS, contrast = 0.45 + 1.1 * m.contrast;  // stark marks show fully
       let b = coatBase, un = coatUnder, pat = look.pattern;
-      if (look.patches && !paint.base && pattern("patches", p, u, s + 7) > 0.5) {
+      if (look.patches && !paint.base && pattern("patches", p, u, s + 7, m) > 0.5) {
         b = look.patches.base; un = look.patches.under; pat = look.patches.pattern;
       }
       let c = mix(b, un, u);
-      if (look.merle && !paint.base) c = mix(c, look.merle, 0.8 * (1 - smooth(noise3(p[0] * 0.3, p[1] * 0.3, p[2] * 0.3, s + 3), 0.58, 0.64)));
+      if (look.merle && !paint.base) {
+        const k = 0.3 / Math.pow(2, (m.size - 0.5) * 1.6);
+        c = mix(c, look.merle, 0.8 * (1 - smooth(noise3(p[0] * k, p[1] * k, p[2] * k, s + 3), 0.58, 0.64)));
+      }
       for (const pt of [pat, look.pattern2]) {
-        if (pt) c = mix(c, markColor(pt.color), pattern(pt.kind, p, u, s) * zone * (pt.amount ?? 1));
+        if (pt) c = mix(c, markColor(pt.color), Math.min(1, pattern(pt.kind, p, u, s, m) * zone * (pt.amount ?? 1) * contrast));
       }
       if (look.points || paint.points) {
-        const t = smooth(points, 0.4, 0.62);
+        const at = 0.4 - 0.3 * (look.pointsReach || 0), t = smooth(points, at, at + 0.22);
         let pc = paint.points || look.points;
-        if (look.pointsPattern) pc = mix(pc, look.pointsPattern.color, pattern(look.pointsPattern.kind, p, u, s) * look.pointsPattern.amount);
+        if (look.pointsPattern) pc = mix(pc, look.pointsPattern.color, Math.min(1, pattern(look.pointsPattern.kind, p, u, s, m) * look.pointsPattern.amount * contrast));
         c = mix(c, pc, t);
       }
       if (look.mask) c = mix(c, look.mask, 0.9 * mask);
       if (look.ext) c = mix(c, look.ext.color, smooth(ext * look.ext.amount, 0.25, 0.9));
       if (paint.stencil && paint.stencil.color) c = mix(c, paint.stencil.color, pattern(paint.stencil.kind, p, u, s + 11) * zone);
-      if (look.white > 0) {
-        const wn = white + (noise3(p[0] * 0.22, p[1] * 0.22, p[2] * 0.22, s + 5) - 0.5) * 0.3, thr = 1 - look.white;
+      if (look.white > 0) {  // white's edges as ragged as the marks'
+        const wn = white + (noise3(p[0] * 0.22, p[1] * 0.22, p[2] * 0.22, s + 5) - 0.5) * (0.15 + 0.3 * m.edge), thr = 1 - look.white;
         c = mix(c, WHITE, smooth(wn, thr, thr + 0.05));
       }
       const t = tone(c, -3 + level * 0.25);
@@ -302,5 +422,5 @@
     return out;
   }
 
-  root.Coats = { rng, random, breed, phenotype, genotype, render, tone };
+  root.Coats = { rng, withCore, random, breed, phenotype, genotype, render, tone };
 })(typeof window !== "undefined" ? window : globalThis);

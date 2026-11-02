@@ -36,6 +36,10 @@ value! {
         pub dam: [u32; 10],
         pub sire: [u32; 10],
         pub wild: [u8; 9],
+        /// The rest of `genes`, `dam` and `sire` (`breeding::pack`).
+        pub genes_more: breeding::More,
+        pub dam_more: breeding::More,
+        pub sire_more: breeding::More,
     }
 }
 
@@ -239,16 +243,21 @@ pub fn lay(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
                 [at[0] + a.cos() * r, at[1], at[2] + a.sin() * r]
             }
         };
+        let ((genes, genes_more), (dam, dam_more), (sire, sire_more)) =
+            (breeding::pack(&y.genome), breeding::pack(&y.dam), breeding::pack(&y.sire));
         let egg = Egg {
             species: y.index as u32 + 1,
             left: SPECIES[y.index].incubation,
             generation: y.generation,
             mother: y.mother,
             father: y.father,
-            genes: breeding::pack(&y.genome),
-            dam: y.dam,
-            sire: y.sire,
+            genes,
+            dam,
+            sire,
             wild: y.wild,
+            genes_more,
+            dam_more,
+            sire_more,
         };
         spawn_egg(w, spot, &egg, owner);
     }
@@ -329,8 +338,8 @@ pub fn wild_clutch(w: &World, id: u64, index: usize, st: &EntityState) -> bool {
                 mother: id,
                 father: 0,
                 generation,
-                dam: breeding::pack(&mother),
-                sire: breeding::pack(&father),
+                dam: mother,
+                sire: father,
                 wild: a.wild,
             })
         })
@@ -397,12 +406,12 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
 fn young_of(e: &Egg, index: usize) -> Option<Young> {
     Some(Young {
         index,
-        genome: breeding::unpack(&e.genes)?,
+        genome: breeding::unpack(&e.genes, &e.genes_more)?,
         mother: e.mother,
         father: e.father,
         generation: e.generation,
-        dam: e.dam,
-        sire: e.sire,
+        dam: breeding::unpack(&e.dam, &e.dam_more).unwrap_or_default(),
+        sire: breeding::unpack(&e.sire, &e.sire_more).unwrap_or_default(),
         wild: e.wild,
     })
 }

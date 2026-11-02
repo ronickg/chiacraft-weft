@@ -1,0 +1,21 @@
+{
+ "about": "Traits every species carries (genes 16-31, after its own loci; a species' locus with the same id is used instead). Each is quantitative: two values, the mean shows. `h` is its heritability: the share of its spread that comes from genes; the rest is the animal's own chance (development, food), not passed on. A species' gene file sets each one's mean and spread under `traits`, a breed or habitat its own under `quantitative`.",
+ "loci": [
+  {"id": "Sz", "name": "Size", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.6, "about": "small to big for its kind and sex"},
+  {"id": "Dk", "name": "Shade", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.6, "about": "lighter to darker"},
+  {"id": "Wm", "name": "Warmth", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.5, "about": "cooler to warmer colors"},
+  {"id": "Wh", "name": "White extent", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.6, "about": "less to more white, where there is white (many genes besides the spotting ones)"},
+  {"id": "Ms", "name": "Mark size", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.7, "about": "fine to bold marks: stripes, spots, bands"},
+  {"id": "Md", "name": "Mark density", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.6, "about": "sparse to crowded: how much of the coat the marks cover"},
+  {"id": "Ct", "name": "Mark contrast", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.6, "about": "faint to stark marks"},
+  {"id": "Me", "name": "Mark edge", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.5, "about": "smooth to ragged edges (giraffe spots: inherited)"},
+  {"id": "Mx", "name": "Mark stretch", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.5, "about": "round to drawn out along the body"},
+  {"id": "Ey", "name": "Eye color", "quantitative": true, "mean": 0.5, "sd": 0.2, "h": 0.8, "about": "along the species' eye colors"},
+  {"id": "Hd", "name": "Head", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.5, "about": "smaller to bigger head"},
+  {"id": "Nk", "name": "Neck", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.5, "about": "shorter to longer neck"},
+  {"id": "Tl", "name": "Tail", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.5, "about": "shorter to longer tail"},
+  {"id": "Lg", "name": "Legs", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.5, "about": "shorter to longer legs"},
+  {"id": "Gt", "name": "Girth", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.4, "about": "slimmer to stockier body"},
+  {"id": "Ho", "name": "Horns", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.6, "about": "smaller to bigger horns, crests, frills"}
+ ]
+}

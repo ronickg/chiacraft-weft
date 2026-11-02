@@ -120,5 +120,35 @@
    "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
   }
  ],
- "species": "utahraptor"
+ "species": "utahraptor",
+ "eyes": [
+  [
+   206,
+   146,
+   40
+  ],
+  [
+   230,
+   188,
+   62
+  ],
+  [
+   196,
+   104,
+   38
+  ]
+ ],
+ "sexes": {
+  "male": {
+   "Dk": -0.04,
+   "Ct": 0.12
+  }
+ },
+ "young": {
+  "traits": {
+   "Ms": -0.12,
+   "Ct": 0.15
+  },
+  "pattern": "speckle"
+ }
 }

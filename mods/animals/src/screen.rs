@@ -194,15 +194,18 @@ fn heading(ui: &mut Ui) {
     // Its family: its generation and its parents' coats, or born in the wild.
     ui.text_bind(|c, t| {
         let Some(b) = c.menu_component(&crate::breeding::BREEDING) else { return };
-        let coat = |g: &[u32; 10]| {
-            crate::breeding::unpack(g)
+        let coat = |g: &[u32; 10], more: &crate::breeding::More| {
+            crate::breeding::unpack(g, more)
                 .and_then(|g| crate::coats::phenotype(&g))
                 .map_or_else(|| "?".to_string(), |l| l.name)
         };
         if b.generation == 0 {
             t.set("screen.animals.wild_born", &[]);
         } else {
-            t.set("screen.animals.family", &[Arg::Int(b.generation as i64), Arg::Text(&coat(&b.dam)), Arg::Text(&coat(&b.sire))]);
+            t.set(
+                "screen.animals.family",
+                &[Arg::Int(b.generation as i64), Arg::Text(&coat(&b.dam, &b.dam_more)), Arg::Text(&coat(&b.sire, &b.sire_more))],
+            );
         }
     });
     // Its coat, read from its genes ("Fawn sable with white").

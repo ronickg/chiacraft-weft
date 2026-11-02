@@ -609,6 +609,86 @@ spyglass show the coat ("Coat: Red sable, masked parti"). The chihuahua's 96 han
 are gone (its looks are now age and pose only). `/animal love` (testing): every grown dog near you
 is yours, wanders and falls in love.
 
+**Looks, part 3: every animal unique (plan, 2026-11-02; asked for by Ronald: "every animal is
+unique, that's super important").** What real animals show, and what follows for ours:
+
+- *Three things make a look.* The kind (species, subspecies, breed) decides which patterns turn
+  up and how often: leopards' rosettes are rounder in East Africa, squarer in the south, bigger in
+  Asia, and fur greyer in cold places. The genes decide the pattern and its character. Chance in
+  development decides where each mark lands.
+- *Patterns are a few major genes plus many small ones.* In dogs, a few genes switch white
+  spotting on or off (MITF), or decide stripes against swirls in cats (Taqpep, Dkk4). Many small
+  genes set how much: MITF variants explain whether a cow is spotted but not how much white each
+  one has (polygenic). Giraffe calves inherit their mothers' spot *shape* (round, jagged-edged;
+  Lee et al. 2018), not where the spots are.
+- *Placement is chance.* The marks are laid down in the embryo by a reaction-diffusion process
+  (Turing; Dkk4 is the cat's inhibitor) or by migrating pigment cells. A clone of a calico cat
+  (CC, 2001) looked nothing like its donor, so even identical genes don't give identical marks.
+  Marks are fixed for life (photo-ID of giraffes, leopards and tigers relies on it). A few change
+  with age: ocellated lizards go from spots to a labyrinth, each scale flipping by its neighbours.
+- *Dalmatians* are extreme white (MITF) with ticking (dark spots coming back into white, roan
+  locus at USH2A) and a modifier that makes the ticks big, round and solid (not yet found).
+- *Selection acts on it*: giraffe calves with bigger, irregular spots survived better.
+
+What we have: kinds (species, breeds, local gene pools that evolve), major genes, a few
+quantitative genes (shade, red intensity, sable, size), and a seed per animal that places every
+mark (siblings with the same genes still differ). Size is inherited and evolves (Bergmann). What's
+missing is the middle layer: every spotted cat's spots are the same size, every brindle the same
+stripes, and the wyvern has no markings at all.
+
+**The design: one core, every species speaking it** (Ronald: "this should be a core thing").
+Real species each have their own genes and their own interactions between them, but every
+animal is built the same way: a kind, genes with a big effect, many genes with a small one,
+chance, sex and age, and what life does to it. So:
+
+1. **Core traits** (`genetics/core.json`): quantitative traits every species carries, after its
+   own loci, inherited alike (one value from each parent, a little drift, evolving in local
+   pools): size, shade, warmth, underside lightness, how much white; the marks' size, density,
+   contrast, edge (smooth to ragged) and stretch (round to long); eye color; build (head, neck,
+   tail, limbs, girth, horns). A species' gene file sets each one's mean and spread, a breed or
+   lineage its own, so a cheetah-like cat has small dense spots and a leopard-like one big
+   rosettes; a locus of the species' own with the same id replaces the core one.
+2. **Chance**: each core trait has a heritability; the rest of its variation is the animal's own
+   (from its seed), not passed on, as nutrition and development give real animals. With the
+   seed placing every mark, two siblings with the same genes still differ in shade, size and
+   marks.
+3. **One vocabulary for the look** (`Look`: base and underside, patterns, points, mask,
+   extremities, merle, patches, accent, white, eyes), painted by one painter. Species with simple
+   genes say what each allele does in their gene file (a scale color, a pattern kind), read by
+   one generic reader; species whose genes interact (dogs, cats: one gene hiding another) keep
+   their rules in code, as their genetics is. A new species needs its gene file and its model's
+   layers, nothing else.
+4. **Sex and age**: a gene file's `sexes` (a male's offsets: brighter, more contrast) and `young`
+   (a juvenile's look: spots a hatchling or cub loses as it grows) shift the traits. Old age
+   (a greying muzzle) needs animals to age past adulthood: later.
+5. **Eyes**: the layers mark the iris (`props2` blue); the eye trait picks along the species' eye
+   colors, a species' genes may tie it (blue eyes with merle or much white).
+6. **Build**: the engine scales single bones of one animal (synced, like its size); a gene file
+   maps the build traits onto bones (neck: the neck bones' length).
+7. **Scars**: what life does, saved with the animal: a badly hurt animal may keep a scar (a pale
+   line through the coat, a torn wing, a notched ear, a chipped horn), painted where it fell.
+8. **Wyvern lineages**: wyverns of a few kinds, each its own breed (they interbreed, as
+   subspecies do), living in their own country, with their own colors, markings, breath and
+   build: every one still marked differently.
+9. **Dog spotting**: extreme white, ticking, the marks' size for Dalmatian spots; a Dalmatian
+   breed once a bigger dog body exists.
+10. **The viewer** (`coats.js`, the same rules) gets a "roll" that shows a dozen individuals of
+    one kind side by side.
+
+*Built* (2026-11-02): 1-4 (the core traits in every genome, chance by heritability, sex and
+youth; eye colors chosen, not painted yet), 8 (crag, frost, sand, wood and storm wyverns, with
+bands, blotches, mottling or stripes, an accent that reaches further or less; wyverns now live in
+the cold, the deserts and the forests too, rarer than in the mountains) and 10. Genomes grew
+from 40 to 84 bytes: one saved before gets its core traits from the wild when it loads, and the
+genes kept in breeding records and eggs keep their old place with the rest after. *Next*: the
+eyes painted (the layers mark the iris: every model rebuilt), build (the engine scales single
+bones), scars (their place in the genome is kept), then Dalmatian spotting.
+
+Sources: Lee, Cavener, Bond 2018 (PeerJ 6:e5690, giraffe spots); Kaelin et al. 2021 (Nature
+Communications, tabby genes); Manukyan et al. 2017 (Nature 544:173, lizard scales); Shin et al.
+2002 (cloned cat CC); Massey University 2025 (Science Advances, Holstein MITF and KIT); the USH2A
+roan studies (PMC7986734, PMC7987146) for roan and Dalmatian spots.
+
 **Evolution, part 1: local gene pools and natural selection** (2026-11-01; `evolution.rs`). Each
 species' pool per place (256-block cell and habitat, from the biome's tags) starts as its gene
 file and evolves a generation an in-game day, when next needed (up to 60 at once), as numbers:

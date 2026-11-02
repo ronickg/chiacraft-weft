@@ -17,8 +17,28 @@ game's `src/coats.rs` and, for trying coats out in the viewer, the skill's `coat
 (`.claude/skills/blocky-model/scripts/coats.js`): the same rules, change both together. They
 paint on the layers each creature's build writes (`layers.py`), copied here into
 `layers/<model>/` and embedded in the mod: what is coat and what is fixed, its light, its
-position, where white, points, a mask and patterns show. Every file ends with `Sz`, the size gene (quantitative: small to big for its kind, `coats::size`
-with the species' sex difference and spread in `src/species.rs`).
+position, where white, points, a mask and patterns show. Every file ends with `Sz`, the size
+gene (quantitative: small to big for its kind, `coats::size` with the species' sex difference
+and spread in `src/species.rs`).
+
+**The core** (`core.json`): traits every species carries after its own loci, in genes 16-31
+(`Genome::core`): size, shade, warmth, how far white reaches, the marks' size, density,
+contrast, edge and stretch, eye color, and build (head, neck, tail, legs, girth, horns). They
+decide how each individual wears its species' colors and patterns. Each has a heritability
+(`h`): the rest of its spread is the animal's own chance (from its seed), not passed on. A gene
+file may set for them:
+
+- `traits`: their mean and spread for this species (`{"Ms": {"mean": 0.55, "sd": 0.15}}`);
+- `sexes`: what being male or female shifts (`{"male": {"Ct": 0.12}}`: a male's starker display);
+- `young`: what a young one's look shifts, fading as it grows, and a `pattern` it is born with;
+- `eyes`: its eye colors, along the eye trait;
+- `habitats`: per habitat (`grassland`, `forest`, `taiga`, `snow`, `desert`, `mountains`), the
+  frequencies wild ones there start from, as a breed's: a species' kinds in different country;
+- `mark_scale`: model units to a pattern's (a big model's marks drawn bigger).
+
+A species' own locus with a core trait's id replaces it (its `Dk`, its `Sz`); never reuse a core
+id for a locus of alleles. Add a species' new loci after its old ones, or saved genomes read the
+wrong genes.
 
 These files are where every population starts: in the game each species has a gene pool per
 place that evolves from it (`src/evolution.rs`: natural selection by camouflage, drift,

@@ -49,5 +49,17 @@
    "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
   }
  ],
- "species": "capybara"
+ "species": "capybara",
+ "eyes": [
+  [
+   52,
+   34,
+   24
+  ],
+  [
+   78,
+   52,
+   32
+  ]
+ ]
 }

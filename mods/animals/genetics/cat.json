@@ -178,5 +178,33 @@
    "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
   }
  ],
- "species": "cat"
+ "species": "cat",
+ "eyes": [
+  [
+   196,
+   112,
+   38
+  ],
+  [
+   216,
+   164,
+   56
+  ],
+  [
+   176,
+   178,
+   70
+  ],
+  [
+   112,
+   162,
+   94
+  ]
+ ],
+ "young": {
+  "traits": {
+   "Ms": -0.1,
+   "Ct": -0.1
+  }
+ }
 }

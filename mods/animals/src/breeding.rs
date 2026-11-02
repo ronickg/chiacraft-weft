@@ -41,6 +41,11 @@ value! {
         pub mate: u64,
         pub mate_genes: [u32; 10],
         pub mate_wild: [u8; 9],
+        /// The rest of `dam`, `sire` and `mate_genes` (`pack`: genomes grew past 40 bytes; kept
+        /// after older saves' fields).
+        pub dam_more: More,
+        pub sire_more: More,
+        pub mate_more: More,
     }
 }
 
@@ -55,18 +60,27 @@ const BOND: u8 = 50;
 /// Five minutes after mating, a raptor lays.
 const LAYING: u32 = 6_000;
 
-const _: () = assert!(size_of::<Genome>() <= 40);
+/// A genome's words past its first ten (`pack`).
+pub type More = [u32; 11];
+const _: () = assert!(size_of::<Genome>() <= 84);
 
-/// A genome kept as words, as `Breeding` and `eggs::Egg` keep them.
-pub fn pack(g: &Genome) -> [u32; 10] {
-    let mut out = [0u32; 10];
+/// A genome kept as words, as `Breeding` and `eggs::Egg` keep them: its first 40 bytes (all a
+/// genome had before the core traits), and the rest.
+pub fn pack(g: &Genome) -> ([u32; 10], More) {
+    let mut out = [0u32; 21];
     unsafe { std::ptr::copy_nonoverlapping(g as *const Genome as *const u8, out.as_mut_ptr() as *mut u8, size_of::<Genome>()) };
-    out
+    let (a, b) = out.split_at(10);
+    (a.try_into().unwrap(), b.try_into().unwrap())
 }
 
-/// A genome kept as words (`pack`), if any.
-pub fn unpack(b: &[u32; 10]) -> Option<Genome> {
-    let g: Genome = unsafe { std::ptr::read_unaligned(b.as_ptr() as *const Genome) };
+/// A genome kept as words (`pack`), if any; one kept before the core traits has none of them
+/// (`coats::mend`).
+pub fn unpack(a: &[u32; 10], more: &More) -> Option<Genome> {
+    let mut all = [0u32; 21];
+    all[..10].copy_from_slice(a);
+    all[10..].copy_from_slice(more);
+    let mut g: Genome = unsafe { std::ptr::read_unaligned(all.as_ptr() as *const Genome) };
+    coats::mend(&mut g);
     (g.species != 0).then_some(g)
 }
 
@@ -201,7 +215,8 @@ fn mated(w: &World, id: u64, mate: u64, index: usize) {
         b.love = 0;
         b.carrying = if s.gestation > 0 { s.gestation } else { LAYING };
         b.rest = b.carrying + s.recovery;
-        (b.mate, b.mate_genes, b.mate_wild) = (mate, pack(&genes), wild);
+        (b.mate, b.mate_wild) = (mate, wild);
+        (b.mate_genes, b.mate_more) = pack(&genes);
     }
     if let Some(b) = w.component_mut(mate, &BREEDING) {
         (b.love, b.rest) = (0, MALE_REST);
@@ -236,8 +251,9 @@ pub struct Young {
     pub mother: u64,
     pub father: u64,
     pub generation: u32,
-    pub dam: [u32; 10],
-    pub sire: [u32; 10],
+    /// Its parents' genes (species 0: unknown).
+    pub dam: Genome,
+    pub sire: Genome,
     pub wild: [u8; STATS],
 }
 
@@ -245,7 +261,7 @@ pub struct Young {
 fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
     let s = &SPECIES[index];
     let (Some(mother), Some(father), Some(st), Some(a)) =
-        (w.component(id, &GENOME).copied(), unpack(&b.mate_genes), w.entity(id), w.component(id, &ANIMAL).copied())
+        (w.component(id, &GENOME).copied(), unpack(&b.mate_genes, &b.mate_more), w.entity(id), w.component(id, &ANIMAL).copied())
     else {
         return;
     };
@@ -267,8 +283,8 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
             mother: id,
             father: b.mate,
             generation: b.generation.max(father_gen) + 1,
-            dam: pack(&mother),
-            sire: b.mate_genes,
+            dam: mother,
+            sire: father,
             wild,
         };
         let angle = k as f64 / n as f64 * std::f64::consts::TAU;
@@ -309,15 +325,9 @@ pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 
         *a = new;
     }
     if let Some(b) = w.component_mut(id, &BREEDING) {
-        *b = Breeding {
-            growing: s.growth,
-            generation: y.generation,
-            mother: y.mother,
-            father: y.father,
-            dam: y.dam,
-            sire: y.sire,
-            ..Breeding::default()
-        };
+        *b = Breeding { growing: s.growth, generation: y.generation, mother: y.mother, father: y.father, ..Breeding::default() };
+        (b.dam, b.dam_more) = pack(&y.dam);
+        (b.sire, b.sire_more) = pack(&y.sire);
     }
     if let Some(o) = owner {
         if let Some(own) = w.component_mut(id, &OWNER) {

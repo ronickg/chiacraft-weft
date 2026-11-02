@@ -1,5 +1,5 @@
 //! Wyverns: a fantasy animal, dragons with two legs and bat wings for arms (as the dragons of
-//! Game of Thrones), about 3.9 m at the shoulder and 16 m long, rare in the mountains and alone.
+//! Game of Thrones), about 3.9 m at the shoulder and 16 m long, rare and alone, most in the mountains.
 //! On the ground they go on four, on their hind feet and the wrists of their folded wings. Wild
 //! ones are dangerous: one goes for any player who comes near (nearer its nest, sooner), and
 //! hurt, it fights back, breathing at its foe from a distance; now and then one hunts a sheep, pig
@@ -92,13 +92,16 @@ pub fn init(r: &mut Registry) {
                 c.rest = 0;
             }
         });
-    // Alone, rarely, in the mountains.
-    r.spawn(&WYVERN)
-        .biome("#mountain")
-        .ground("#animal_spawn")
-        .light(7, 15)
-        .group(1, 1)
-        .chance(0.0006);
+    // Alone, rarely: most in the mountains, fewer in the cold, the deserts and the forests,
+    // each country's kind of wyvern (`genetics/wyvern.json`'s `habitats`).
+    for (biome, chance) in [("#mountain", 0.0006), ("#cold", 0.0002), ("#dry", 0.0002), ("#forest", 0.0002)] {
+        r.spawn(&WYVERN)
+            .biome(biome)
+            .ground("#animal_spawn")
+            .light(7, 15)
+            .group(1, 1)
+            .chance(chance);
+    }
 }
 
 /// A goal for wild wyverns: a calm one goes for the nearest player within its territory (wider

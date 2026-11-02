@@ -395,6 +395,21 @@ plain coat: the genes draw patterns now. In the chiacraft game the build copies 
 `coats.js`, in Rust) paints every animal's coat from its genome on the client: keep the two in
 step.
 
+**Every animal unique: the core traits.** Real looks come in three layers: the kind (species,
+breed, the population of a country) decides which patterns turn up; genes decide the pattern
+(a few big ones) and its character (many small ones); chance in development decides where each
+mark lands, so even clones differ. The core every species shares (`genetics/core.json`, merged
+after a species' own loci by `Coats.withCore`) carries the small genes: size, shade, warmth, how
+far white reaches, the marks' size, density, contrast, edge and stretch, eye color, build. Each
+has a heritability: the rest of its spread is the animal's own chance from its seed. A gene file
+sets their means (`traits`), what sex and youth shift (`sexes`, `young` with a pattern a young
+one loses), its eye colors, its countries' kinds (`habitats`) and `mark_scale` (a big model
+draws its marks bigger). So a species needs only its big genes and its colors; never give a
+species' own locus an id the core uses (the cat's tabby `Mc` once hid the core's contrast). The
+viewer's **Roll 12** shows a dozen of one kind side by side: check that no two look alike.
+A creature whose `layer_props` leaves `pattern` at 0 shows no markings at all, whatever its
+genes: mark where they show (the back and flanks fully, the belly and thin skin faintly).
+
 ## Props (no skeleton)
 
 Nests, eggs, furniture, anything placed or lying about: `scripts/prop.py`.

@@ -6,6 +6,12 @@
 //! coat layers its model's build wrote (`genetics/layers/<model>`: what is coat, its light, where
 //! on the body, where white, points, a mask and patterns show). Only the genome travels.
 //!
+//! The core every species shares (`genetics/core.json`, "Looks, part 3" in the notes): traits
+//! after a species' own loci (size, shade, warmth, white, the marks' size, density, contrast,
+//! edge and stretch, eyes, build), inherited alike, each showing partly by chance (its
+//! heritability), shifted by sex and youth; scars from life. A species' own rules decide its
+//! colors and which patterns it has; the core decides how each individual wears them.
+//!
 //! These are the rules of the viewer's `coats.js` (`.claude/skills/blocky-model/scripts`), where
 //! coats are tried out: change both together.
 
@@ -29,15 +35,70 @@ value! {
         /// Its breed + 1, in its gene file's `breeds` (0: none; `MIXED`: parents of two breeds).
         pub breed: u8,
         pub female: u8,
-        /// Two per locus, in the gene file's order: an allele's index (`NONE`: a male's missing
-        /// second X), or a quantitative trait's value (0-255 for 0-1).
+        /// Two per locus of the species' own, in the gene file's order: an allele's index
+        /// (`NONE`: a male's missing second X, or a locus it doesn't have), or a quantitative
+        /// trait's value (0-254 for 0-1).
         pub genes: [u8; 32],
+        /// Two per core trait (`genetics/core.json`, in its order), as `genes`.
+        pub core: [u8; 32],
+        /// Its layout (`VERSION`; 0: saved before the core traits, given them at `upkeep`).
+        pub version: u8,
+        /// Its life stage (`animal::BABY`..), for a young one's look.
+        pub stage: u8,
+        /// Marks life left on it: up to four scars, each a kind (`SCARS`, 0: none) and where.
+        pub scars: [u8; 8],
     }
 }
 
 pub static GENOME: Component<Genome> = Component::named("genome");
 pub const MIXED: u8 = 255;
 const NONE: u8 = 255;
+/// Loci of a species' own (`Genome::genes`); the core traits' slots come after them.
+const OWN: usize = 16;
+/// Every slot: a species' own and the core.
+const SLOTS: usize = 32;
+/// The genome's layout now.
+const VERSION: u8 = 1;
+
+/// A genome kept before the core traits (version 0, zeros where they now are): none of them
+/// yet, so they read as the middle until `upkeep` draws them.
+pub fn mend(g: &mut Genome) {
+    if g.version == 0 {
+        g.core = [NONE; 32];
+        g.stage = crate::animal::ADULT;
+    }
+}
+
+impl Genome {
+    /// Gene `k` (0, 1) of slot `slot` (a species' own locus, or `OWN` + a core trait).
+    fn get(&self, slot: usize, k: usize) -> u8 {
+        if slot < OWN { self.genes[2 * slot + k] } else { self.core[2 * (slot - OWN) + k] }
+    }
+    fn set(&mut self, slot: usize, k: usize, v: u8) {
+        if slot < OWN {
+            self.genes[2 * slot + k] = v;
+        } else {
+            self.core[2 * (slot - OWN) + k] = v;
+        }
+    }
+    fn pair(&self, slot: usize) -> [u8; 2] {
+        [self.get(slot, 0), self.get(slot, 1)]
+    }
+    /// One with no genes in any slot yet.
+    fn empty(species: u8, breed: u8, female: bool, seed: u32) -> Genome {
+        Genome {
+            seed,
+            species,
+            breed,
+            female: female as u8,
+            genes: [NONE; 32],
+            core: [NONE; 32],
+            version: VERSION,
+            stage: crate::animal::ADULT,
+            ..Genome::default()
+        }
+    }
+}
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&GENOME, Genome::default(), component_flags::SAVE | component_flags::SYNC_WATCHERS | component_flags::SYNC_MENU);
@@ -51,13 +112,49 @@ pub fn init(r: &mut Registry) {
 
 #[derive(Deserialize)]
 struct GeneFile {
+    /// Its own loci (slots 0..), then the core traits it doesn't have of its own (`core.json`,
+    /// slots `OWN`..; added when it is read).
     loci: Vec<Locus>,
     /// By name, in name order (a genome keeps its breed as an index into these).
     #[serde(default)]
     breeds: BTreeMap<String, Breed>,
+    /// Where wild ones start from in each habitat (`evolution::Habitat::name`), as a breed's
+    /// frequencies: the kinds of a species living in different country (leopards' rosettes are
+    /// rounder in East Africa, squarer in the south).
+    #[serde(default)]
+    habitats: HashMap<String, Breed>,
+    /// The core traits' mean and spread for this species (`Ms`: its marks' size...).
+    #[serde(default)]
+    traits: HashMap<String, Spread>,
+    /// What being male or female shifts (`male`: `{"Ct": 0.15}`, starker displays).
+    #[serde(default)]
+    sexes: HashMap<String, HashMap<String, f32>>,
+    /// How a young one looks: shifts at birth, fading as it grows up.
+    #[serde(default)]
+    young: Young,
+    /// Its eye colors, along the eye trait (`Ey`) from 0 to 1.
+    #[serde(default)]
+    eyes: Vec<[f32; 3]>,
+    /// Model units to a pattern's (a big model's patterns drawn bigger to match: the wyvern's
+    /// model is at the house density, 64 texels a block).
+    #[serde(default = "one")]
+    mark_scale: f32,
 }
 
-#[derive(Deserialize)]
+fn one() -> f32 {
+    1.0
+}
+
+#[derive(Deserialize, Default)]
+struct Young {
+    #[serde(default)]
+    traits: HashMap<String, f32>,
+    /// A pattern it is born with and loses (a hatchling's speckles, a cub's spots).
+    #[serde(default)]
+    pattern: Option<String>,
+}
+
+#[derive(Deserialize, Clone)]
 struct Locus {
     id: String,
     #[serde(default)]
@@ -72,9 +169,16 @@ struct Locus {
     mean: f32,
     #[serde(default)]
     sd: f32,
+    /// Heritability: the share of its spread from genes, the rest its own chance (a core
+    /// trait's when a species has it as its own; 1 if neither says).
+    #[serde(default)]
+    h: Option<f32>,
+    /// Its slot in a genome (`Genome::get`).
+    #[serde(skip)]
+    slot: usize,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Allele {
     a: String,
     #[serde(default)]
@@ -89,11 +193,40 @@ struct Breed {
     quantitative: HashMap<String, Spread>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Copy)]
 struct Spread {
     mean: f32,
     sd: f32,
 }
+
+/// `species` with the core traits added after its own loci.
+fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
+    if g.loci.len() > OWN {
+        weft_sdk::error!("genetics/{name}.json: more than {OWN} loci; the rest are left out");
+        g.loci.truncate(OWN);
+    }
+    for (i, l) in g.loci.iter_mut().enumerate() {
+        l.slot = i;
+    }
+    for (i, c) in core.loci.iter().enumerate().take(SLOTS - OWN) {
+        if let Some(own) = g.loci.iter_mut().find(|l| l.id == c.id) {
+            if !own.quantitative {
+                weft_sdk::error!("genetics/{name}.json: locus {} is also a core trait's id", c.id);
+            }
+            own.h = own.h.or(c.h);
+            continue;
+        }
+        let mut l = c.clone();
+        l.slot = OWN + i;
+        if let Some(t) = g.traits.get(&c.id) {
+            (l.mean, l.sd) = (t.mean, t.sd);
+        }
+        g.loci.push(l);
+    }
+    g
+}
+
+const CORE: &str = include_str!("../genetics/core.json");
 
 const FILES: [(&str, &str); 7] = [
     ("dog", include_str!("../genetics/dog.json")),
@@ -110,10 +243,14 @@ fn gene_file(species: &str) -> Option<&'static GeneFile> {
     static PARSED: OnceLock<Vec<(&'static str, GeneFile)>> = OnceLock::new();
     PARSED
         .get_or_init(|| {
+            let core: GeneFile = serde_json::from_str(CORE).unwrap_or_else(|e| {
+                weft_sdk::error!("genetics/core.json: {e}");
+                serde_json::from_str("{\"loci\":[]}").unwrap()
+            });
             FILES
                 .iter()
                 .filter_map(|(n, json)| match serde_json::from_str(json) {
-                    Ok(f) => Some((*n, f)),
+                    Ok(f) => Some((*n, with_core(f, &core, n))),
                     Err(e) => {
                         weft_sdk::error!("genetics/{n}.json: {e}");
                         None
@@ -176,9 +313,9 @@ fn wild_allele(l: &Locus, r: &mut impl Rng) -> u8 {
     pick(&l.alleles.iter().map(|a| a.freq).collect::<Vec<_>>(), r)
 }
 
-/// A gene pool: per locus of a species' gene file, each allele's share, or a quantitative
-/// trait's mean and spread (`[mean, sd]`). How common each variant is in a population; what
-/// evolves (`evolution.rs`).
+/// A gene pool: per slot of a species' genome (its own loci, then the core traits), each
+/// allele's share, or a quantitative trait's mean and spread (`[mean, sd]`); empty for a slot it
+/// doesn't use. How common each variant is in a population; what evolves (`evolution.rs`).
 pub type Pool = Vec<Vec<f32>>;
 
 /// The breed species `index` is (+ 1, as `Genome::breed`), and its frequencies.
@@ -194,88 +331,95 @@ fn breed_of(index: usize, g: &GeneFile) -> (u8, Option<&Breed>) {
         .map_or((0, None), |(i, b)| (i, Some(b)))
 }
 
-/// Species `index`'s pool as its gene file has it (its breed's frequencies for a breed): where
-/// every local pool starts.
-pub fn wild_pool(index: usize) -> Option<Pool> {
-    let g = gene_file(SPECIES.get(index)?.name)?;
-    let (_, b) = breed_of(index, g);
-    Some(
-        g.loci
-            .iter()
-            .take(16)
-            .map(|l| {
-                if l.quantitative {
-                    let (mean, sd) = b
-                        .and_then(|b| b.quantitative.get(&l.id))
-                        .map_or((l.mean, l.sd), |q| (q.mean, q.sd));
-                    vec![mean, sd]
-                } else {
-                    let f = b.and_then(|b| b.freq.get(&l.id));
-                    l.alleles
-                        .iter()
-                        .map(|a| f.and_then(|m| m.get(&a.a)).copied().unwrap_or(a.freq))
-                        .collect()
-                }
-            })
-            .collect(),
-    )
+/// Locus `l` as the wild has it: a breed's frequencies over a habitat's over the gene file's.
+fn wild_of(l: &Locus, over: &[&Breed]) -> Vec<f32> {
+    if l.quantitative {
+        let q = over.iter().find_map(|b| b.quantitative.get(&l.id));
+        return q.map_or(vec![l.mean, l.sd], |q| vec![q.mean, q.sd]);
+    }
+    l.alleles
+        .iter()
+        .map(|a| {
+            over.iter()
+                .find_map(|b| b.freq.get(&l.id).and_then(|m| m.get(&a.a)))
+                .copied()
+                .unwrap_or(a.freq)
+        })
+        .collect()
 }
 
-/// A new animal of species `index` drawn from `pool` (one copy on the X for males).
+/// Species `index`'s pool in `habitat` as its gene file has it (its breed's frequencies for a
+/// breed, else the habitat's kind): where every local pool starts.
+pub fn wild_pool(index: usize, habitat: &str) -> Option<Pool> {
+    let g = gene_file(SPECIES.get(index)?.name)?;
+    let (_, b) = breed_of(index, g);
+    let over: Vec<&Breed> = b.into_iter().chain(g.habitats.get(habitat)).collect();
+    let mut pool = vec![Vec::new(); SLOTS];
+    for l in &g.loci {
+        pool[l.slot] = wild_of(l, &over);
+    }
+    Some(pool)
+}
+
+/// A new animal of species `index` drawn from `pool` (one copy on the X for males); a slot the
+/// pool doesn't have yet (saved before it was added) as the gene file has it.
 pub fn sample(index: usize, female: bool, pool: &Pool, r: &mut impl Rng) -> Option<Genome> {
     let g = gene_file(SPECIES.get(index)?.name)?;
     let (breed, _) = breed_of(index, g);
-    let mut genes = [NONE; 32];
-    for (i, l) in g.loci.iter().enumerate().take(16) {
-        let p = pool.get(i)?;
-        if l.quantitative {
-            let (mean, sd) = (p.first().copied().unwrap_or(l.mean), p.get(1).copied().unwrap_or(l.sd));
-            for k in 0..2 {
-                genes[2 * i + k] = unit(mean + sd * gauss(r));
-            }
-        } else {
-            let copies = if l.xlinked && !female { 1 } else { 2 };
-            for k in 0..copies {
-                genes[2 * i + k] = if p.len() == l.alleles.len() { pick(p, r) } else { wild_allele(l, r) };
-            }
+    let mut out = Genome::empty(index as u8 + 1, breed, female, (r.next() * 1e9) as u32);
+    for l in &g.loci {
+        draw(l, female, pool.get(l.slot).filter(|p| !p.is_empty()), &mut out, r);
+    }
+    Some(out)
+}
+
+/// Locus `l` of `out` drawn from the pool's `p` (or the gene file).
+fn draw(l: &Locus, female: bool, p: Option<&Vec<f32>>, out: &mut Genome, r: &mut impl Rng) {
+    if l.quantitative {
+        let (mean, sd) = p.map_or((l.mean, l.sd), |p| (p.first().copied().unwrap_or(l.mean), p.get(1).copied().unwrap_or(l.sd)));
+        for k in 0..2 {
+            out.set(l.slot, k, unit(mean + sd * gauss(r)));
+        }
+    } else {
+        let copies = if l.xlinked && !female { 1 } else { 2 };
+        for k in 0..copies {
+            let a = match p {
+                Some(p) if p.len() == l.alleles.len() => pick(p, r),
+                _ => wild_allele(l, r),
+            };
+            out.set(l.slot, k, a);
         }
     }
-    Some(Genome { seed: (r.next() * 1e9) as u32, species: index as u8 + 1, breed, female: female as u8, genes })
 }
 
 /// The pool `genomes` (of one species) make: how common each allele is among them, each
 /// quantitative trait's mean and spread.
 pub fn pool_of(index: usize, genomes: &[Genome]) -> Option<Pool> {
     let g = gene_file(SPECIES.get(index)?.name)?;
-    Some(
-        g.loci
+    let mut pool = vec![Vec::new(); SLOTS];
+    for l in &g.loci {
+        let values = genomes
             .iter()
-            .enumerate()
-            .take(16)
-            .map(|(i, l)| {
-                let values = genomes
-                    .iter()
-                    .flat_map(|x| [x.genes[2 * i], x.genes[2 * i + 1]])
-                    .filter(|&a| a != NONE);
-                if l.quantitative {
-                    let v: Vec<f32> = values.map(value).collect();
-                    let n = v.len().max(1) as f32;
-                    let mean = v.iter().sum::<f32>() / n;
-                    let sd = (v.iter().map(|x| (x - mean) * (x - mean)).sum::<f32>() / n).sqrt();
-                    vec![mean, sd]
-                } else {
-                    let mut count = vec![0.0; l.alleles.len()];
-                    for a in values {
-                        if let Some(c) = count.get_mut(a as usize) {
-                            *c += 1.0;
-                        }
-                    }
-                    let n = count.iter().sum::<f32>().max(1.0);
-                    count.iter().map(|c| c / n).collect()
+            .flat_map(|x| x.pair(l.slot))
+            .filter(|&a| a != NONE);
+        pool[l.slot] = if l.quantitative {
+            let v: Vec<f32> = values.map(value).collect();
+            let n = v.len().max(1) as f32;
+            let mean = v.iter().sum::<f32>() / n;
+            let sd = (v.iter().map(|x| (x - mean) * (x - mean)).sum::<f32>() / n).sqrt();
+            vec![mean, sd]
+        } else {
+            let mut count = vec![0.0; l.alleles.len()];
+            for a in values {
+                if let Some(c) = count.get_mut(a as usize) {
+                    *c += 1.0;
                 }
-            })
-            .collect(),
-    )
+            }
+            let n = count.iter().sum::<f32>().max(1.0);
+            count.iter().map(|c| c / n).collect()
+        };
+    }
+    Some(pool)
 }
 
 /// `pool` (of `n` animals) with genome `g`'s alleles taken out (`sign` -1: one of them died or
@@ -283,8 +427,9 @@ pub fn pool_of(index: usize, genomes: &[Genome]) -> Option<Pool> {
 pub fn count_in(index: usize, pool: &mut Pool, g: &Genome, sign: f32, n: f32) {
     let Some(file) = SPECIES.get(index).and_then(|s| gene_file(s.name)) else { return };
     let total = 2.0 * n;
-    for ((i, l), p) in file.loci.iter().enumerate().zip(pool.iter_mut()) {
-        let have = [g.genes[2 * i], g.genes[2 * i + 1]];
+    for l in &file.loci {
+        let Some(p) = pool.get_mut(l.slot) else { continue };
+        let have = g.pair(l.slot);
         if l.quantitative {
             if let Some(mean) = p.first_mut() {
                 let sum = value(have[0]) + value(have[1]);
@@ -310,7 +455,7 @@ pub fn describe_pool(index: usize, pool: &Pool) -> String {
     let Some(g) = SPECIES.get(index).and_then(|s| gene_file(s.name)) else { return String::new() };
     g.loci
         .iter()
-        .zip(pool)
+        .filter_map(|l| Some((l, pool.get(l.slot).filter(|p| !p.is_empty())?)))
         .map(|(l, p)| {
             if l.quantitative {
                 format!("{} {:.2}±{:.2}", l.id, p.first().unwrap_or(&0.0), p.get(1).unwrap_or(&0.0))
@@ -348,41 +493,58 @@ pub fn breed_with(mother: &Genome, father: &Genome, mutation: f32, r: &mut impl 
     let one = |pair: [u8; 2], r: &mut dyn FnMut() -> f32| {
         if pair[1] == NONE || r() < 0.5 { pair[0] } else { pair[1] }
     };
-    let mut genes = [NONE; 32];
+    let breed = if mother.breed == father.breed { mother.breed } else { MIXED };
     let mut rnd = || r.next();
-    for (i, l) in g.loci.iter().enumerate().take(16) {
-        let (m, f) = ([mother.genes[2 * i], mother.genes[2 * i + 1]], [father.genes[2 * i], father.genes[2 * i + 1]]);
+    let mut out = Genome::empty(mother.species, breed, female, (rnd() * 1e9) as u32);
+    for l in &g.loci {
+        let (m, f) = (mother.pair(l.slot), father.pair(l.slot));
         if l.quantitative {
             for (k, p) in [m, f].into_iter().enumerate() {
                 let v = value(one(p, &mut rnd));
-                genes[2 * i + k] = unit(v + 0.05 * gauss(&mut rnd));
+                out.set(l.slot, k, unit(v + 0.05 * gauss(&mut rnd)));
             }
             continue;
         }
-        genes[2 * i] = one(m, &mut rnd);
+        out.set(l.slot, 0, one(m, &mut rnd));
         if !l.xlinked || female {
-            genes[2 * i + 1] = one(f, &mut rnd);
+            out.set(l.slot, 1, one(f, &mut rnd));
         }
         if rnd() < mutation {
-            let k = if genes[2 * i + 1] != NONE && rnd() < 0.5 { 1 } else { 0 };
-            genes[2 * i + k] = wild_allele(l, &mut rnd);
+            let k = if out.get(l.slot, 1) != NONE && rnd() < 0.5 { 1 } else { 0 };
+            out.set(l.slot, k, wild_allele(l, &mut rnd));
         }
     }
-    let breed = if mother.breed == father.breed { mother.breed } else { MIXED };
-    Some(Genome { seed: (rnd() * 1e9) as u32, species: mother.species, breed, female: female as u8, genes })
+    Some(out)
 }
 
 /// Every tick, for an animal of species `index` at `pos` (`animal::upkeep`): one without genes
 /// gets them from the wild around it (`evolution::pool_at`: how its kind has evolved there), of
-/// its sex; one born with them takes its sex from them.
+/// its sex; one born with them takes its sex from them. One saved before the core traits (or a
+/// locus its species gained since) gets those from the wild too, and its genome keeps its life
+/// stage (a young one looks young).
 pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
     let Some(g) = w.component_mut(id, &GENOME) else { return };
     if g.species as usize == index + 1 {
         a.female = g.female;
+        if g.version < VERSION {
+            let (Some(file), Some(pool)) = (gene_file(SPECIES[index].name), crate::evolution::pool_at(w, index, pos)) else { return };
+            let mut r = world_rng(w);
+            for l in &file.loci {
+                let p = g.pair(l.slot);
+                if l.slot >= OWN || p == [NONE, NONE] {
+                    draw(l, g.female != 0, pool.get(l.slot).filter(|p| !p.is_empty()), g, &mut r);
+                }
+            }
+            g.version = VERSION;
+        }
+        if g.stage != a.stage {
+            g.stage = a.stage;
+        }
         return;
     }
     let Some(pool) = crate::evolution::pool_at(w, index, pos) else { return };
-    if let Some(new) = sample(index, a.female != 0, &pool, &mut world_rng(w)) {
+    if let Some(mut new) = sample(index, a.female != 0, &pool, &mut world_rng(w)) {
+        new.stage = a.stage;
         *g = new;
     }
 }
@@ -416,7 +578,34 @@ pub struct Look {
     patches: Option<Box<Look>>,
     /// How far white spotting reaches (0: none; over 1: all white).
     white: f32,
+    /// How far the points' color reaches past where it starts (-1..1, 0 as the layers have it):
+    /// a wyvern's accent spreading over more of its wings.
+    points_reach: f32,
+    /// How its marks are drawn (the core traits).
+    marks: Marks,
+    /// Its eye color (the core trait `Ey` along its species' eyes), if its species lists them.
+    eye: Option<Rgb>,
+    /// Model units to a pattern's (`GeneFile::mark_scale`).
+    scale: f32,
     seed: u32,
+}
+
+/// How an individual's marks are drawn, each 0..1 (0.5 as the pattern is designed): their size,
+/// how much they cover, how stark they are, how ragged their edges and how drawn out along the
+/// body (the core traits `Ms`, `Md`, `Ct`, `Me`, `Mx`).
+#[derive(Clone, Copy)]
+struct Marks {
+    size: f32,
+    density: f32,
+    contrast: f32,
+    edge: f32,
+    stretch: f32,
+}
+
+impl Default for Marks {
+    fn default() -> Marks {
+        Marks { size: 0.5, density: 0.5, contrast: 0.5, edge: 0.5, stretch: 0.5 }
+    }
 }
 
 impl Look {
@@ -459,23 +648,21 @@ const WHITE: Rgb = [242.0, 238.0, 230.0];
 
 /// A genome read against its gene file.
 struct Read<'a> {
-    g: &'a GeneFile,
+    g: &'static GeneFile,
     genome: &'a Genome,
 }
 
 impl Read<'_> {
-    fn locus(&self, id: &str) -> Option<(usize, &Locus)> {
-        self.g.loci.iter().enumerate().find(|(_, l)| l.id == id)
+    fn locus(&self, id: &str) -> Option<&Locus> {
+        self.g.loci.iter().find(|l| l.id == id)
     }
-    fn pair(&self, i: usize) -> impl Iterator<Item = u8> + '_ {
-        [self.genome.genes[2 * i], self.genome.genes[2 * i + 1]]
-            .into_iter()
-            .filter(|&a| a != NONE)
+    fn pair(&self, l: &Locus) -> impl Iterator<Item = u8> + '_ {
+        self.genome.pair(l.slot).into_iter().filter(|&a| a != NONE)
     }
     /// What shows at a locus: the most dominant allele present.
     fn shows(&self, id: &str) -> &str {
-        let Some((i, l)) = self.locus(id) else { return "" };
-        let have: Vec<u8> = self.pair(i).collect();
+        let Some(l) = self.locus(id) else { return "" };
+        let have: Vec<u8> = self.pair(l).collect();
         (0..l.alleles.len())
             .find(|a| have.contains(&(*a as u8)))
             .or(have.first().map(|&a| a as usize))
@@ -484,15 +671,47 @@ impl Read<'_> {
     }
     /// How many copies of `allele` it has.
     fn copies(&self, id: &str, allele: &str) -> usize {
-        let Some((i, l)) = self.locus(id) else { return 0 };
-        self.pair(i)
+        let Some(l) = self.locus(id) else { return 0 };
+        self.pair(l)
             .filter(|&a| l.alleles.get(a as usize).is_some_and(|x| x.a == allele))
             .count()
     }
-    /// A quantitative trait's value, 0..1.
-    fn qv(&self, id: &str) -> f32 {
+    /// A quantitative trait's genes: the mean of its two values, 0..1 (what it passes on).
+    fn genetic(&self, id: &str) -> f32 {
         self.locus(id)
-            .map_or(0.5, |(i, _)| (value(self.genome.genes[2 * i]) + value(self.genome.genes[2 * i + 1])) / 2.0)
+            .map_or(0.5, |l| (value(self.genome.get(l.slot, 0)) + value(self.genome.get(l.slot, 1))) / 2.0)
+    }
+    /// A quantitative trait as it shows, 0..1: its genes, the animal's own chance for the share
+    /// genes don't decide (from its seed: development, food; not passed on), and what its sex
+    /// and youth shift.
+    fn qv(&self, id: &str) -> f32 {
+        let Some(l) = self.locus(id) else { return 0.5 };
+        let mut v = self.genetic(id);
+        let h = l.h.unwrap_or(1.0).clamp(0.05, 1.0);
+        if h < 1.0 {
+            let (u1, u2) = (hash3(l.slot as i32, 1, 7, self.genome.seed as i32), hash3(l.slot as i32, 2, 7, self.genome.seed as i32));
+            let z = (-2.0 * (u1 + 1e-6).ln()).sqrt() * (std::f32::consts::TAU * u2).cos();
+            v += l.sd * ((1.0 - h) / h).sqrt() * z;
+        }
+        let sex = if self.female() { "female" } else { "male" };
+        v += self
+            .g
+            .sexes
+            .get(sex)
+            .and_then(|m| m.get(id))
+            .copied()
+            .unwrap_or(0.0);
+        v += self.youth() * self.g.young.traits.get(id).copied().unwrap_or(0.0);
+        v.clamp(0.0, 1.0)
+    }
+    /// How young it is: 1 a baby, 0 grown.
+    fn youth(&self) -> f32 {
+        let adult = crate::animal::ADULT;
+        (adult - self.genome.stage.min(adult)) as f32 / adult as f32
+    }
+    /// Whether the species has `id` as its own locus (not only as a core trait).
+    fn own(&self, id: &str) -> bool {
+        self.locus(id).is_some_and(|l| l.slot < OWN)
     }
     fn female(&self) -> bool {
         self.genome.female != 0
@@ -742,7 +961,24 @@ fn wyvern(r: &Read) -> Look {
         "" => "fire",
         b => b,
     };
-    Look { name: format!("{name}, breathes {breath}"), base, under, points: Some(accent), ..Look::default() }
+    // Dark markings over the scales (on cream scales, in the accent).
+    let ink = if r.shows("Sc") == "white" { mix(accent, base, 0.3) } else { darken(base, 0.5) };
+    let (kind, marked) = match r.shows("Mk") {
+        "bands" => (Some("bands"), ", banded"),
+        "blotches" => (Some("blotches"), ", blotched"),
+        "mottle" => (Some("mottle"), ", mottled"),
+        "stripes" => (Some("streaks"), ", striped"),
+        _ => (None, ""),
+    };
+    Look {
+        name: format!("{name}{marked}, breathes {breath}"),
+        base,
+        under,
+        points: Some(accent),
+        points_reach: (r.qv("Ac") - 0.5) * 2.0,
+        pattern: kind.map(|kind| Pattern { kind, color: ink, amount: 0.85 }),
+        ..Look::default()
+    }
 }
 
 /// What a wyvern with `genome` breathes ("fire", "frost", "lightning", "venom"; "" for other
@@ -773,10 +1009,10 @@ pub fn set_breath(genome: &mut Genome, kind: &str) -> bool {
         return false;
     };
     let Some(g) = gene_file(s.name) else { return false };
-    let Some((i, l)) = g.loci.iter().enumerate().find(|(_, l)| l.id == "Br") else { return false };
+    let Some(l) = g.loci.iter().find(|l| l.id == "Br") else { return false };
     let Some(a) = l.alleles.iter().position(|a| a.a == kind) else { return false };
-    genome.genes[2 * i] = a as u8;
-    genome.genes[2 * i + 1] = a as u8;
+    genome.set(l.slot, 0, a as u8);
+    genome.set(l.slot, 1, a as u8);
     true
 }
 
@@ -790,12 +1026,13 @@ pub fn size(genome: &Genome) -> f32 {
     else {
         return 1.0;
     };
-    let sz = size_gene(genome);
+    // As it shows: its genes and its own chance (how well it grew).
+    let sz = gene_file(s.name).map_or(0.5, |g| Read { g, genome }.qv("Sz"));
     let sex = if genome.female != 0 { s.dimorphism.sqrt().recip() } else { s.dimorphism.sqrt() };
     (1.0 + s.size_spread * (sz - 0.5) * 2.0) * sex
 }
 
-/// Its size gene (`Sz`), 0..1: small to big for its kind.
+/// Its size genes (`Sz`), 0..1: small to big for its kind (what it passes on).
 pub fn size_gene(genome: &Genome) -> f32 {
     let Some(s) = (genome.species as usize)
         .checked_sub(1)
@@ -803,7 +1040,7 @@ pub fn size_gene(genome: &Genome) -> f32 {
     else {
         return 0.5;
     };
-    gene_file(s.name).map_or(0.5, |g| Read { g, genome }.qv("Sz"))
+    gene_file(s.name).map_or(0.5, |g| Read { g, genome }.genetic("Sz"))
 }
 
 /// What `genome` looks like (none before it has genes).
@@ -817,11 +1054,58 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "wyvern" => wyvern(&r),
         _ => raptor(&r),
     };
+    core(&r, &mut look);
     look.seed = genome.seed;
     if let Some(p) = &mut look.patches {
         p.seed = genome.seed;
     }
     Some(look)
+}
+
+/// The core traits on a species' look, the same for every species: how light and warm this
+/// one's colors are, how far its white reaches, how its marks are drawn, its eyes, and the
+/// pattern a young one is born with.
+fn core(r: &Read, look: &mut Look) {
+    let g = r.g;
+    let recolor = |f: &dyn Fn(Rgb) -> Rgb, look: &mut Look| {
+        look.base = f(look.base);
+        look.under = f(look.under);
+        look.points = look.points.map(f);
+        if let Some(p) = look.patches.as_deref_mut() {
+            (p.base, p.under) = (f(p.base), f(p.under));
+        }
+    };
+    if !r.own("Dk") {
+        // A species without shade genes of its own still has lighter and darker ones.
+        let dk = r.qv("Dk");
+        recolor(&|c| if dk > 0.5 { darken(c, (dk - 0.5) * 0.5) } else { lighten(c, (0.5 - dk) * 0.35) }, look);
+    }
+    let t = (r.qv("Wm") - 0.5) * 2.0;
+    let warm = |c: Rgb| [c[0] * (1.0 + 0.07 * t), c[1] * (1.0 + 0.015 * t), c[2] * (1.0 - 0.09 * t)];
+    recolor(&warm, look);
+    for p in [&mut look.pattern, &mut look.pattern2, &mut look.points_pattern]
+        .into_iter()
+        .flatten()
+    {
+        p.color = warm(p.color);
+    }
+    if look.white > 0.0 && look.white < 1.0 {
+        look.white = (look.white * (0.6 + 0.8 * r.qv("Wh"))).min(0.97);
+    }
+    look.scale = g.mark_scale;
+    look.marks = Marks { size: r.qv("Ms"), density: r.qv("Md"), contrast: r.qv("Ct"), edge: r.qv("Me"), stretch: r.qv("Mx") };
+    if !g.eyes.is_empty() {
+        let e = r.qv("Ey") * (g.eyes.len() - 1) as f32;
+        let i = (e.floor() as usize).min(g.eyes.len() - 1);
+        look.eye = Some(mix(g.eyes[i], g.eyes[(i + 1).min(g.eyes.len() - 1)], e - i as f32));
+    }
+    let youth = r.youth();
+    if let Some(kind) = g.young.pattern.as_deref()
+        && youth > 0.0
+        && look.pattern2.is_none()
+    {
+        look.pattern2 = Some(Pattern { kind, color: lighten(look.base, 0.5), amount: youth });
+    }
 }
 
 // ------------------------------------------------------------------ patterns in 3D (model units)
@@ -856,29 +1140,64 @@ fn band(t: f32, width: f32) -> f32 {
 }
 
 /// How much a pattern covers a texel (0..1): `p` in model units (x side to side, y up, z along
-/// the body), `u` how far toward the underside.
-fn pattern(kind: &str, p: [f32; 3], u: f32, s: i32) -> f32 {
-    let [x, y, z] = p;
+/// the body; divided by the species' `mark_scale`), `u` how far toward the underside, `m` how
+/// this individual's marks are drawn: bigger marks are the pattern drawn on a smaller body,
+/// stretched ones on a body shortened along its length, ragged ones on a warped body, and
+/// denser ones with wider marks.
+fn pattern(kind: &str, p: [f32; 3], u: f32, s: i32, m: &Marks) -> f32 {
+    let k = 2f32.powf((m.size - 0.5) * 1.6);
+    let st = 2f32.powf((m.stretch - 0.5) * 1.2);
+    let q = [p[0] / k * st.sqrt(), p[1] / k * st.sqrt(), p[2] / (k * st)];
+    let warp = 0.5 + 3.0 * m.edge;
+    let n = |o: i32| (noise3(q[0] * 0.4, q[1] * 0.4, q[2] * 0.4, s + o) - 0.5) * warp;
+    let [x, y, z] = [q[0] + n(11), q[1] + n(12), q[2] + n(13)];
+    let d = m.density - 0.5;
+    let w = |width: f32| (width * (1.0 + 1.1 * d)).clamp(0.1, 0.85);
     match kind {
-        "mackerel" | "bars" => band((z + 1.6 * (y * 0.45).sin() + 0.5 * x.abs()) / 5.5, 0.32),
-        "classic" => band(((z - 2.0).hypot(y - 14.0)) / 6.5 + 0.15 * noise3(x * 0.3, y * 0.3, z * 0.3, s), 0.42),
-        "spotted" => band((z + 1.6 * (y * 0.45).sin()) / 5.5, 0.4) * smooth(noise3(x * 0.55, y * 0.55, z * 0.55, s), 0.45, 0.55),
-        "ticked" => 0.35 * smooth(noise3(x * 1.4, y * 1.4, z * 1.4, s), 0.55, 0.7),
-        "bands" => band((z + 0.4 * y) / 7.0, 0.38),
+        "mackerel" | "bars" => band((z + 1.6 * (y * 0.45).sin() + 0.5 * x.abs()) / 5.5, w(0.32)),
+        "classic" => band(((z - 2.0).hypot(y - 14.0)) / 6.5 + 0.15 * noise3(x * 0.3, y * 0.3, z * 0.3, s), w(0.42)),
+        "spotted" => {
+            band((z + 1.6 * (y * 0.45).sin()) / 5.5, w(0.4))
+                * smooth(noise3(x * 0.55, y * 0.55, z * 0.55, s), 0.45 - 0.3 * d, 0.55 - 0.3 * d)
+        }
+        "ticked" => 0.35 * smooth(noise3(x * 1.4, y * 1.4, z * 1.4, s), 0.55 - 0.3 * d, 0.7 - 0.3 * d),
+        "bands" => band((z + 0.4 * y) / 7.0, w(0.38)),
+        "streaks" => band((y + 1.5 * noise3(z * 0.08, x * 0.2, 0.0, s)) / 4.5, w(0.3)),
         "rosettes" => {
             let (cx, cy, cz) = ((x / 4.0).floor(), (y / 4.0).floor(), (z / 4.0).floor());
-            if hash3(cx as i32, cy as i32, cz as i32, s) > 0.55 {
+            if hash3(cx as i32, cy as i32, cz as i32, s) > 0.55 + 0.6 * d {
                 return 0.0;
             }
             let (dx, dz, dy) = (x - (cx + 0.5) * 4.0, z - (cz + 0.5) * 4.0, (y - (cy + 0.5) * 4.0) * 0.6);
-            let d = (dx * dx + dy * dy + dz * dz).sqrt();
-            smooth(d, 0.6, 0.8) * (1.0 - smooth(d, 1.5, 1.7))
+            let dist = (dx * dx + dy * dy + dz * dz).sqrt();
+            smooth(dist, 0.6, 0.8) * (1.0 - smooth(dist, 1.5, 1.7))
         }
-        "speckle" => (hash3(x.floor() as i32, y.floor() as i32, z.floor() as i32, s) < 0.14) as u8 as f32,
-        "saddle" => smooth(0.55 - u, 0.0, 0.25),
-        "sable" => smooth(0.75 - u, 0.0, 0.5) * (0.55 + 0.45 * noise3(x * 0.6, y * 0.6, z * 0.6, s)),
-        "brindle" => band((z + 2.5 * noise3(x * 0.25, y * 0.25, z * 0.25, s) * 3.0) / 2.2, 0.3),
-        "patches" => smooth(noise3(x * 0.15, y * 0.15, z * 0.15, s), 0.5, 0.56),
+        "blotches" => {
+            // Solid spots, one at a jittered place in each cell (a reptile's blotches).
+            let c = |v: f32| (v / 6.0).floor();
+            let (cx, cy, cz) = (c(x), c(y), c(z));
+            let mut best = 0.0f32;
+            for (ox, oy, oz) in [(0, 0, 0), (1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1), (0, 1, 0), (0, -1, 0)] {
+                let (i, j, l) = (cx as i32 + ox, cy as i32 + oy, cz as i32 + oz);
+                if hash3(i, j, l, s + 21) > 0.5 + 0.6 * d {
+                    continue;
+                }
+                let at = |o: i32, base: i32| (base as f32 + 0.2 + 0.6 * hash3(i, j, l, s + o)) * 6.0;
+                let dist = ((x - at(22, i)).powi(2) + ((y - at(23, j)) * 0.8).powi(2) + (z - at(24, l)).powi(2)).sqrt();
+                let r = 1.4 + 1.2 * hash3(i, j, l, s + 25);
+                best = best.max(1.0 - smooth(dist, r - 0.3, r + 0.3));
+            }
+            best
+        }
+        "mottle" => {
+            let v = noise3(x * 0.22, y * 0.22, z * 0.22, s + 31) * 0.65 + noise3(x * 0.6, y * 0.6, z * 0.6, s + 32) * 0.35;
+            smooth(v, 0.55 - 0.25 * d, 0.62 - 0.25 * d)
+        }
+        "speckle" => (hash3(x.floor() as i32, y.floor() as i32, z.floor() as i32, s) < 0.14 * (1.0 + 2.0 * d).max(0.2)) as u8 as f32,
+        "saddle" => smooth(0.55 + 0.3 * d - u, 0.0, 0.25),
+        "sable" => smooth(0.75 + 0.3 * d - u, 0.0, 0.5) * (0.55 + 0.45 * noise3(x * 0.6, y * 0.6, z * 0.6, s)),
+        "brindle" => band((z + 2.5 * noise3(x * 0.25, y * 0.25, z * 0.25, s) * 3.0) / 2.2, w(0.3)),
+        "patches" => smooth(noise3(x * 0.15, y * 0.15, z * 0.15, s), 0.5 - 0.25 * d, 0.56 - 0.25 * d),
         _ => 0.0,
     }
 }
@@ -1007,7 +1326,9 @@ fn paint(index: usize, genome: &Genome, skin: &mut Skin) {
     if genome.species as usize != index + 1 {
         return;
     }
-    let (Some(look), Some(l)) = (phenotype(genome), layers(SPECIES[index].model)) else { return };
+    let mut genome = *genome;
+    mend(&mut genome);
+    let (Some(look), Some(l)) = (phenotype(&genome), layers(SPECIES[index].model)) else { return };
     render(l, skin, &look);
 }
 
@@ -1024,36 +1345,42 @@ fn render(l: &Layers, skin: &mut Skin, look: &Look) {
             }
             let level = l.info[i + 1] as f32 / 10.0;
             let u = l.info[i + 2] as f32 / 255.0;
-            let p = [0, 1, 2].map(|k| lo[k] + l.pos[i + k] as f32 / 255.0 * (hi[k] - lo[k]));
+            let p = [0, 1, 2].map(|k| (lo[k] + l.pos[i + k] as f32 / 255.0 * (hi[k] - lo[k])) / look.scale.max(0.01));
             let (white, points, mask) = (l.props[i] as f32 / 255.0, l.props[i + 1] as f32 / 255.0, l.props[i + 2] as f32 / 255.0);
             let (ext, zone) = (l.props2[i] as f32 / 255.0, l.props2[i + 1] as f32 / 255.0);
+            let m = &look.marks;
+            // Stark marks show fully, faint ones blend into the coat.
+            let contrast = 0.45 + 1.1 * m.contrast;
             let (mut b, mut un, mut pat) = (look.base, look.under, look.pattern);
             if let Some(other) = look.patches.as_deref()
-                && pattern("patches", p, u, s + 7) > 0.5
+                && pattern("patches", p, u, s + 7, m) > 0.5
             {
                 (b, un, pat) = (other.base, other.under, other.pattern);
             }
             let mut c = mix(b, un, u);
-            if let Some(m) = look.merle {
-                c = mix(c, m, 0.8 * (1.0 - smooth(noise3(p[0] * 0.3, p[1] * 0.3, p[2] * 0.3, s + 3), 0.58, 0.64)));
+            if let Some(mc) = look.merle {
+                let k = 0.3 / 2f32.powf((m.size - 0.5) * 1.6);
+                c = mix(c, mc, 0.8 * (1.0 - smooth(noise3(p[0] * k, p[1] * k, p[2] * k, s + 3), 0.58, 0.64)));
             }
             for pt in [pat, look.pattern2].into_iter().flatten() {
-                c = mix(c, pt.color, pattern(pt.kind, p, u, s) * zone * pt.amount);
+                c = mix(c, pt.color, (pattern(pt.kind, p, u, s, m) * zone * pt.amount * contrast).min(1.0));
             }
             if let Some(mut pc) = look.points {
                 if let Some(pp) = look.points_pattern {
-                    pc = mix(pc, pp.color, pattern(pp.kind, p, u, s) * pp.amount);
+                    pc = mix(pc, pp.color, (pattern(pp.kind, p, u, s, m) * pp.amount * contrast).min(1.0));
                 }
-                c = mix(c, pc, smooth(points, 0.4, 0.62));
+                let at = 0.4 - 0.3 * look.points_reach;
+                c = mix(c, pc, smooth(points, at, at + 0.22));
             }
-            if let Some(m) = look.mask {
-                c = mix(c, m, 0.9 * mask);
+            if let Some(mk) = look.mask {
+                c = mix(c, mk, 0.9 * mask);
             }
             if let Some((color, amount)) = look.ext {
                 c = mix(c, color, smooth(ext * amount, 0.25, 0.9));
             }
             if look.white > 0.0 {
-                let wn = white + (noise3(p[0] * 0.22, p[1] * 0.22, p[2] * 0.22, s + 5) - 0.5) * 0.3;
+                // White's edges as ragged as the marks'.
+                let wn = white + (noise3(p[0] * 0.22, p[1] * 0.22, p[2] * 0.22, s + 5) - 0.5) * (0.15 + 0.3 * m.edge);
                 let thr = 1.0 - look.white;
                 c = mix(c, WHITE, smooth(wn, thr, thr + 0.05));
             }
