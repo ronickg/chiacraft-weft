@@ -135,9 +135,9 @@ pub fn sleep(w: &World, id: u64) {
     }
 }
 
-/// A goal for wild Utahraptors: now and then (about every ten minutes) one goes after a sheep,
-/// pig or cow nearby, and the others of its kind near it join in.
-fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
+/// A goal for wild Utahraptors (and wyverns): now and then (about every ten minutes) one goes
+/// after a sheep, pig or cow nearby, and the others of its kind near it join in.
+pub(crate) fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     if crate::animal::tamed(w, id) || w.random_below(12_000) != 0 {
         return false;
     }
@@ -152,7 +152,7 @@ fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
         .flat_map(|p| w.near(st.pos, 24.0, Some(p)))
         .next();
     if let Some(p) = prey {
-        weft_sdk::info!("utahraptor {id} hunts {p}");
+        weft_sdk::info!("{id} hunts {p}");
         crate::knockout::anger(w, id, p);
     }
     false

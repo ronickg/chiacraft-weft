@@ -88,7 +88,7 @@ pub fn init(r: &mut Registry) {
     // egg in hand.
     r.entity(&NEST)
         .no_egg()
-        .size(0.9, 0.15)
+        .size(NEST_WIDTH, 0.15)
         .health(6.0)
         .speed(0.0)
         .passive()
@@ -133,15 +133,16 @@ const SINK: f64 = 2.5 / 64.0;
 
 /// A free spot in the nest at `n`: the middle, else round it.
 fn nest_spot(w: &World, n: [f64; 3]) -> [f64; 3] {
-    let spots = std::iter::once((0.0, 0.0)).chain((0..7).map(|k| {
-        let a = k as f64 / 7.0 * std::f64::consts::TAU;
-        (a.cos() * 0.2, a.sin() * 0.2)
+    let k = nest_scale(w, n);
+    let spots = std::iter::once((0.0, 0.0)).chain((0..7).map(|i| {
+        let a = i as f64 / 7.0 * std::f64::consts::TAU;
+        (a.cos() * 0.2 * k, a.sin() * 0.2 * k)
     }));
     let mut first = None;
     for (dx, dz) in spots {
-        let at = [n[0] + dx, n[1] + NEST_FLOOR, n[2] + dz];
+        let at = [n[0] + dx, n[1] + NEST_FLOOR * k, n[2] + dz];
         first.get_or_insert(at);
-        if w.near(at, 0.1, Some(&EGG_ENTITY)).is_empty() {
+        if w.near(at, 0.1 * k, Some(&EGG_ENTITY)).is_empty() {
             return at;
         }
     }
@@ -154,6 +155,20 @@ fn egg_size(index: usize) -> f32 {
     (SPECIES[index].height.0 / SPECIES[3].height.0).powf(EGG_GROWTH)
 }
 
+/// A nest's width.
+const NEST_WIDTH: f32 = 0.9;
+/// A bigger species' nest is its eggs' size bigger (a wyvern's, about 3 m across).
+fn nest_size(index: usize) -> f32 {
+    egg_size(index).max(1.0)
+}
+
+/// How much bigger than the plain one the nest at `at` is (1 for none).
+fn nest_scale(w: &World, at: [f64; 3]) -> f64 {
+    nest_near(w, at, 0.1)
+        .and_then(|(n, _)| w.entity(n))
+        .map_or(1.0, |e| (e.size[0] / NEST_WIDTH) as f64)
+}
+
 /// The nest within `r` blocks of `at`, if any: its id and position.
 fn nest_near(w: &World, at: [f64; 3], r: f64) -> Option<(u64, [f64; 3])> {
     w.near(at, r, Some(&NEST))
@@ -163,7 +178,12 @@ fn nest_near(w: &World, at: [f64; 3], r: f64) -> Option<(u64, [f64; 3])> {
 
 /// Whether `at` is in a nest.
 fn in_nest(w: &World, at: [f64; 3]) -> bool {
-    nest_near(w, at, 0.6).is_some()
+    w.near(at, 2.5, Some(&NEST)).into_iter().any(|n| {
+        w.entity(n).is_some_and(|e| {
+            let r = 0.6 * (e.size[0] / NEST_WIDTH) as f64;
+            (e.pos[0] - at[0]).powi(2) + (e.pos[2] - at[2]).powi(2) < r * r
+        })
+    })
 }
 
 /// A player right clicks nest `id`: holding an egg, they put it in; else they take one out.
@@ -202,7 +222,10 @@ pub fn lay(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
         let a = k as f64 / n * std::f64::consts::TAU;
         let spot = match nest {
             Some(p) => nest_spot(w, p),
-            None => [at[0] + a.cos() * 0.25, at[1], at[2] + a.sin() * 0.25],
+            None => {
+                let r = 0.25 * egg_size(y.index) as f64;
+                [at[0] + a.cos() * r, at[1], at[2] + a.sin() * r]
+            }
         };
         let egg = Egg {
             species: y.index as u32 + 1,
@@ -274,7 +297,10 @@ pub fn wild_clutch(w: &World, id: u64, index: usize, st: &EntityState) -> bool {
         return false;
     }
     let at = [feet[0] as f64 + 0.5, feet[1] as f64, feet[2] as f64 + 0.5];
-    w.spawn(&NEST, at);
+    let nest = w.spawn(&NEST, at);
+    if nest_size(index) > 1.0 {
+        w.set_scale(nest, nest_size(index));
+    }
     let mut r = coats::world_rng(w);
     let Some(pool) = crate::evolution::pool_at(w, index, st.pos) else { return false };
     let Some(father) = coats::sample(index, false, &pool, &mut r) else { return false };

@@ -33,5 +33,31 @@
   ]
  },
  "wing_cost": 534.05,
- "note": "wing: the cape fold (the lower-cost fit flares the membranes out sideways)"
+ "note": "wing: the cape fold (the lower-cost fit flares the membranes out sideways)",
+ "rest": [
+  149.53,
+  -111.82,
+  139.93,
+  19.24,
+  15.46,
+  9.44,
+  0.59,
+  -8.99,
+  -15.72,
+  -7.36,
+  -12.11,
+  -3.74,
+  19.46,
+  -0.23,
+  -1.88,
+  -2.71,
+  15.67,
+  -29.92,
+  -0.01,
+  2.96,
+  -0.0,
+  -0.0,
+  52.91
+ ],
+ "rest_cost": 34.3
 }

@@ -35,7 +35,12 @@ pub fn init(r: &mut Registry) {
         let name = format!("{}_saddle", s.kind_name());
         let saddle = Item::generated(name.clone());
         r.item(saddle).max_stack(1).tab(&TOOLS);
-        r.shaped(&CRAFTING, &name, 1, &["lll", "s s"], &[('l', "base:leather"), ('s', "base:string")]);
+        if s.seat > 3.0 {
+            // A saddle for a dragon-sized back: more leather, an iron frame.
+            r.shaped(&CRAFTING, &name, 1, &["lll", "lil", "s s"], &[('l', "base:leather"), ('i', "base:iron_ingot"), ('s', "base:string")]);
+        } else {
+            r.shaped(&CRAFTING, &name, 1, &["lll", "s s"], &[('l', "base:leather"), ('s', "base:string")]);
+        }
         saddles.push((s.kind_name(), saddle));
     }
     let _ = SADDLES.set(saddles);

@@ -1,0 +1,86 @@
+{
+ "species": "wyvern",
+ "about": "A wyvern's genes (a fantasy animal: imagined, on the pattern of real reptiles): what it breathes, its scales' color, how dark, how big.",
+ "loci": [
+  {
+   "id": "Br",
+   "name": "Breath",
+   "about": "what it breathes; the commoner breaths dominant over the rarer",
+   "alleles": [
+    {
+     "a": "fire",
+     "freq": 0.55,
+     "about": "fire"
+    },
+    {
+     "a": "frost",
+     "freq": 0.25,
+     "about": "frost"
+    },
+    {
+     "a": "lightning",
+     "freq": 0.12,
+     "about": "lightning"
+    },
+    {
+     "a": "venom",
+     "freq": 0.08,
+     "about": "venom (a burning, poisonous spray)"
+    }
+   ]
+  },
+  {
+   "id": "Sc",
+   "name": "Scales",
+   "about": "the scales' color",
+   "alleles": [
+    {
+     "a": "slate",
+     "freq": 0.35,
+     "about": "slate grey"
+    },
+    {
+     "a": "bronze",
+     "freq": 0.25,
+     "about": "bronze"
+    },
+    {
+     "a": "green",
+     "freq": 0.15,
+     "about": "dark green"
+    },
+    {
+     "a": "black",
+     "freq": 0.13,
+     "about": "black"
+    },
+    {
+     "a": "red",
+     "freq": 0.09,
+     "about": "deep red"
+    },
+    {
+     "a": "white",
+     "freq": 0.03,
+     "about": "pale cream (recessive, rare)"
+    }
+   ]
+  },
+  {
+   "id": "Dk",
+   "name": "Darkness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.2,
+   "about": "light to dark"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ]
+}

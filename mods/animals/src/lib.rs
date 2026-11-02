@@ -1,5 +1,6 @@
 //! The animals mod: dogs by breed (`dog.rs`: the chihuahua), cats (`cat.rs`), capybaras
-//! (`capybara.rs`), velociraptors of two species (`raptor.rs`) and Utahraptors (`utahraptor.rs`),
+//! (`capybara.rs`), velociraptors of two species (`raptor.rs`), Utahraptors (`utahraptor.rs`) and
+//! wyverns (`wyvern.rs`, a fantasy animal),
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
 //! (`taming.rs`, `knockout.rs`), commands and tribes (`commands.rs`), signatures
@@ -32,6 +33,7 @@ mod signatures;
 mod species;
 mod taming;
 mod utahraptor;
+mod wyvern;
 
 static HEART: Particle = Particle::named("heart");
 
@@ -82,6 +84,7 @@ fn init(r: &mut Registry) {
     capybara::init(r);
     raptor::init(r);
     utahraptor::init(r);
+    wyvern::init(r);
     animal::init(r);
     screen::init(r);
     taming::init(r);
@@ -102,11 +105,12 @@ fn init(r: &mut Registry) {
         .fullbright();
 }
 
-/// Knocked out: lying down (`index` into `species::SPECIES`; the raptors).
+/// Knocked out: lying down (`index` into `species::SPECIES`; the raptors and the wyvern).
 fn sleep(w: &World, id: u64, index: usize) {
     match index {
         3 | 5 => raptor::sleep(w, id),
         4 => utahraptor::sleep(w, id),
+        6 => wyvern::sleep(w, id),
         _ => {}
     }
 }
@@ -118,6 +122,7 @@ fn wake(w: &World, id: u64, index: usize) {
         2 => capybara::wake(w, id),
         3 | 5 => raptor::wake(w, id),
         4 => utahraptor::wake(w, id),
+        6 => wyvern::wake(w, id),
         _ => {}
     }
 }

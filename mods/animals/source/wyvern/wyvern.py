@@ -25,28 +25,80 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
-from house import material  # noqa: E402
-from prop import FACES, el, paint, rotm  # noqa: E402
+from prop import FACES, el, rotm  # noqa: E402
 from rig import euler  # noqa: E402
 
 OUT = os.environ.get("WYVERN_OUT") or os.path.join(HERE, "out")
 
-# ------------------------------------------------------------------ materials
+# ------------------------------------------------------------------ materials and coats
+#
+# As the show's dragons: one main color with an accent (Drogon black with red, Rhaegal green
+# with bronze, Viserion cream with gold). A coat is three colors: the scales (back), the belly
+# plates (under) and the accent (the wing skin and the spikes' tips). The game repaints the scales
+# from the genes the same way (`coats.rs`, `wyvern`): back and flank from the scales toward the
+# belly color, the accent as "points" (`layers.py`), every texel keeping the light painted here.
 
-BACK, FLANK, BELLY, MEMBRANE, VEIN, HORN, CLAW, TEETH, MOUTH, EYE, SPIKE = range(11)
-MATERIALS = [
-    material("scale", (58, 54, 56)),      # back: dark slate scales
-    material("scale", (82, 74, 70)),      # flanks
-    material("scale", (148, 120, 92)),    # belly plates: warm tan
-    material("skin", (92, 62, 58)),       # wing membrane: dark leathery red-brown
-    material("skin", (64, 42, 40)),       # its veins
-    material("horn", (196, 182, 156)),
-    material("claw"),
-    material("horn", (226, 220, 200)),    # teeth
-    material("skin", (70, 32, 30)),       # inside the mouth
-    material("skin", (232, 150, 40)),     # eyes: amber
-    material("scale", (40, 36, 38)),      # spikes: darker than the back
-]
+(BACK, BACK_EDGE, BACK_HI, FLANK, FLANK_EDGE, FLANK_HI, BELLY, BELLY_EDGE, MEMBRANE, MEM_VEIN, MEM_EDGE,
+ HORN, HORN_RING, HORN_TIP, CLAW, CLAW_TIP, TEETH, MOUTH, SPIKE, SPIKE_TIP, DARK) = range(21)
+# Each material: (where its color comes from, light shift in ramp steps). "coat" materials are
+# repainted by genes: u toward the belly color, or the accent; the rest are fixed.
+SCALE_ROLES = {
+    BACK: ("coat", 0.0, 0.0), BACK_EDGE: ("coat", 0.0, -1.25), BACK_HI: ("coat", 0.0, 0.5),
+    FLANK: ("coat", 0.3, 0.0), FLANK_EDGE: ("coat", 0.3, -1.25), FLANK_HI: ("coat", 0.3, 0.5),
+    BELLY: ("coat", 1.0, 0.0), BELLY_EDGE: ("coat", 1.0, -1.0),
+    MEMBRANE: ("accent", 0.0, 0.0), MEM_VEIN: ("accent", 0.0, -1.25), MEM_EDGE: ("accent", 0.0, -0.75),
+    SPIKE: ("coat", 0.0, -1.5), SPIKE_TIP: ("accent", 0.0, -0.5),
+}
+FIXED = {HORN: ("horn", (200, 186, 158)), HORN_RING: ("horn", (150, 134, 112)), HORN_TIP: ("horn", (232, 224, 204)),
+         CLAW: ("claw", (44, 36, 36)), CLAW_TIP: ("horn", (150, 138, 118)), TEETH: ("horn", (234, 228, 210)),
+         MOUTH: ("skin", (104, 42, 40)), DARK: ("claw", (24, 18, 20))}
+STEP = 0.25  # paint.STEP: a light shift of k ramp steps is k / STEP indices
+
+# The genes' coats (`genetics/wyvern.json`, Sc): scales, belly, accent; as `coats.rs` makes them.
+COATS = {
+    "slate": ((92, 92, 98), (112, 70, 60)),
+    "bronze": ((132, 92, 52), (96, 54, 38)),
+    "green": ((58, 78, 52), (150, 104, 52)),
+    "black": ((40, 38, 42), (128, 36, 30)),
+    "red": ((118, 40, 34), (52, 26, 24)),
+    "cream": ((222, 212, 190), (196, 150, 70)),
+}
+COAT = os.environ.get("WYVERN_COAT", "black")
+
+
+def coat_colors(name):
+    """(scales, belly, accent) for a coat, as the game's `wyvern` look makes them (mid darkness)."""
+    scales, accent = COATS[name]
+    s = np.array(scales, float)
+    light = s + (np.array([246, 240, 230]) - s) * 0.3
+    under = light + (np.array([170, 140, 110]) - light) * 0.4
+    return s, under, np.array(accent, float)
+
+
+def materials(coat):
+    """Every material's tones for `coat`."""
+    from paint import tones
+    from house import MATERIALS as HM
+    scales, under, accent = coat_colors(coat)
+    out = []
+    for m in range(21):
+        if m in SCALE_ROLES:
+            src, u, shift = SCALE_ROLES[m]
+            c = accent if src == "accent" else scales + (under - scales) * u
+            t = tones(tuple(c), HM["scale"][1])
+            # Painted already shifted (the layers record the shift on the light level).
+            idx = np.clip(np.arange(len(t)) + int(round(shift / STEP)), 0, len(t) - 1)
+            out.append(t[idx])
+        else:
+            kind, rgb = FIXED[m]
+            out.append(tones(rgb, HM[kind][1]))
+    return out
+
+
+def roles():
+    """Each material's role in the coat layers (`layers.Recorder`)."""
+    return [("coat", r[1], r[2]) if m in SCALE_ROLES else "fixed" for m in range(21) for r in [SCALE_ROLES.get(m)]]
+
 
 # ------------------------------------------------------------------ the model (units: 64 a meter)
 
@@ -311,31 +363,268 @@ def cut(e, p):
     return keep
 
 
-def area(e, face, p, uu, vv, h):
-    part = e.get("part")
+# How the scales are drawn (options for Ronald to pick; the same layout): scale size on the body
+# in texels, and the kind.
+STYLES = {
+    "fine": dict(size=7, kind="scallop", hi=0.10),       # small overlapping scales, a dark rim each
+    "plated": dict(size=11, kind="scallop", hi=0.22),    # big armor-like scales, more catching the light
+    "pebbled": dict(size=6, kind="pebble", hi=0.15),     # rounded pebbly scales with dark gaps (a lizard's)
+    "banded": dict(size=7, kind="scallop", hi=0.10, bands=True),  # fine scales, darker bands down the back and tail
+}
+CHOSEN = "plated"  # chosen by Ronald, 2026-11-02
+STYLE = os.environ.get("WYVERN_STYLE", CHOSEN)
+
+# Each part's scale size against the body's: smaller on the head, feet and wings, down the tail.
+def part_scale(name):
+    if name in ("skull", "snout", "nose", "jaw") or name.startswith(("brow", "cheek")):
+        return 0.55
+    if name.startswith(("neck_",)):
+        return 0.85
+    if name.startswith("tail_"):
+        return 0.95 - 0.06 * int(name.split("_")[1])
+    if name.startswith(("foot", "toe", "hindtoe", "finger", "hand", "thumb")):
+        return 0.5
+    if name.startswith(("shin", "arm", "forearm")):
+        return 0.7
+    return 1.0
+
+
+def hashed(i, j, seed=0):
+    """A stable 0..1 number per scale."""
+    v = np.sin(i * 12.9898 + j * 78.233 + seed * 37.719) * 43758.5453
+    return v - np.floor(v)
+
+
+def scale_cells(a, b, size, kind):
+    """Scales on a face, from 2D coordinates on the body (`a` along a row, `b` up the rows, in
+    units): which scale each texel is in, whether it is on the scale's rim (dark), and the
+    scale's middle on `b`. Scallops overlap like roof tiles, each rim a U open toward the next
+    row (scales lie back and down over the ones below); pebbles are rounded, a dark gap round each."""
+    if kind == "pebble":
+        row = size * 0.87
+        j = np.floor(b / row)
+        a2 = a / size + 0.5 * (j % 2)
+        i = np.floor(a2)
+        fa, fb = a2 - i - 0.5, b / row - j - 0.5
+        rim = (fa * size) ** 2 + (fb * row) ** 2 > (0.5 * size - 0.9) ** 2
+        return i, j, rim, (j + 0.5) * row
+    row = size * 0.8
+    j = np.floor(b / row)
+    a2 = a / size + 0.5 * (j % 2)
+    i = np.floor(a2)
+    fa, fb = a2 - i, b / row - j
+    rim = fb * row < 1.0 + 0.55 * row * (2 * fa - 1) ** 2
+    return i, j, rim, (j + 0.5) * row
+
+
+def body_axis(name):
+    """Along which coordinate a part runs (its scales' rows run across it): z for the body, neck
+    and tail and the legs' sides, x for the wings' bones."""
+    return 0 if name.startswith(("arm", "forearm", "hand", "thumb", "finger")) else 2
+
+
+def scaled_area(e, face, p, regions):
+    """Scales over a face: `regions(center_height_fraction, face)` picks back, flank or belly per
+    scale, so the colors meet along whole scales; each region its base, rim and catching-light
+    materials."""
+    st = STYLES[STYLE]
+    size = st["size"] * part_scale(e["name"])
+    x, y, z = p[..., 0], p[..., 1], p[..., 2]
+    ax = body_axis(e["name"])
+    along = z if ax == 2 else x
+    if face in ("up", "down"):
+        a, b = (x, z) if ax == 2 else (z, x)
+        b = -b  # rows stacked from the front back: rims face the tail
+    elif face in ("east", "west"):
+        a, b = (-z, y) if ax == 2 else (x, y)
+    else:
+        a, b = (x, y) if ax == 2 else (z, y)
+    i, j, rim, mid_b = scale_cells(a, b, size, st["kind"])
+    lo, hi = e["lo"][1], e["hi"][1]
+    if face in ("east", "west", "north", "south"):
+        frac = (mid_b - lo) / max(hi - lo, 1e-3)
+    else:
+        frac = np.full(x.shape, 1.0 if face == "up" else 0.0)
+    region = regions(frac, face)  # 0 back, 1 flank, 2 belly
+    base = np.choose(region, [BACK, FLANK, BELLY])
+    edge = np.choose(region, [BACK_EDGE, FLANK_EDGE, BELLY_EDGE])
+    hi_m = np.choose(region, [BACK_HI, FLANK_HI, BELLY])
+    lit = hashed(i, j, sum(map(ord, e["name"])) % 13) < st["hi"]
+    out = np.where(rim, edge, np.where(lit, hi_m, base))
+    if st.get("bands") and e["name"].startswith(("tail_", "hips", "chest", "shoulders", "neck_")):
+        band = np.mod(along, 56.0) < 12
+        out = np.where(band & (region < 2) & ~rim, BACK_EDGE, out)
+    return out
+
+
+def belly_plates(e, p):
+    """Plates across the belly, throat and under the tail: bands across the body's axis, a dark
+    seam between each, the plates' sides running into the flank's scales."""
+    x, z = p[..., 0], p[..., 2]
+    width = 9 * part_scale(e["name"]) if not e["name"].startswith("neck") else 7
+    seam = np.mod(z, width) < 1.0
+    half = (e["hi"][0] - e["lo"][0]) / 2
+    side = np.abs(x - (e["hi"][0] + e["lo"][0]) / 2) > half * 0.78
+    return np.where(side, FLANK_EDGE, np.where(seam, BELLY_EDGE, BELLY))
+
+
+def unrotated(e, p):
+    """A tilted element's points back in its own (unturned) frame."""
+    if not e.get("rot"):
+        return p
+    o = np.array(e["origin"], float)
+    return (p - o) @ rotm(e["rot"]) + o
+
+
+def horn_area(e, p, pieces=3):
+    """A horn or spike piece: ringed toward the base, paling to the tip. `t` 0 at the horn's base,
+    1 at its tip, from which piece of the horn this is and where along it."""
+    q = unrotated(e, p)
+    z = q[..., 2]
+    lo, hi = e["lo"][2], e["hi"][2]
+    n = e["name"]
+    k = int(n[-1]) if n[-1].isdigit() else {"a": 0, "b": 1, "c": 2}.get(n[-1], 0)
+    t = (k + (hi - z) / max(hi - lo, 1e-3)) / pieces
+    if e["part"] == "spike":
+        return np.where(t > 0.72, SPIKE_TIP, SPIKE)
+    ring = (np.mod(z, 6.0) < 1.0) & (t < 0.62)
+    return np.where(t > 0.78, HORN_TIP, np.where(ring | (t < 0.08), HORN_RING, HORN))
+
+
+def teeth_rows(face, uu, vv, w, h, top, rows=4, period=6.0, phase=0.0, front=1.0):
+    """Teeth along an edge of a face: pointed, `rows` tall, every `period` texels; `top` the edge
+    they hang from is the face's top (the lower jaw's, pointing up) or its bottom (the upper's)."""
+    d = (vv if top else h - vv) - 0.5  # rows from the edge, 0 at it
+    c = np.mod(uu - 0.5 + phase, period) - period / 2  # across each tooth
+    tooth = np.abs(c) < (rows - d) * 0.55
+    along = (uu / w) if face == "east" else (1 - uu / w)
+    return tooth & (d < rows) & (along < front)
+
+
+def membrane_area(e, p):
+    """Wing skin: the accent color, veins fanning from where the panel grows (the wrist, or along
+    the body), and a darker trailing edge."""
+    from scipy import ndimage
     shape = p.shape[:-1]
-    x, y = p[..., 0], p[..., 1]
+    a = np.full(shape, MEMBRANE)
+    poly = [np.array(v) for v in e["poly"]]
+    if len(poly) == 3:      # between two fingers: from the wrist toward the edge between the tips
+        origins = [poly[0], poly[0]]
+        ends = [poly[1] + (poly[2] - poly[1]) * k for k in (1 / 3, 2 / 3)]
+    else:                   # the body panels: from their first edge toward the trailing edge
+        origins = [poly[0] + (poly[3] - poly[0]) * k for k in (1 / 3, 2 / 3)]
+        ends = [poly[1] + (poly[2] - poly[1]) * k for k in (1 / 3, 2 / 3)]
+    x, z = p[..., 0], p[..., 2]
+    for o, b in zip(origins, ends):
+        d = np.array([b[0] - o[0], b[2] - o[2]])
+        L = np.hypot(*d) + 1e-6
+        t = np.clip(((x - o[0]) * d[0] + (z - o[2]) * d[1]) / L ** 2, 0, 1)
+        dist = np.hypot(x - (o[0] + t * d[0]), z - (o[2] + t * d[1]))
+        a = np.where(dist < 1.1 - 0.5 * t, MEM_VEIN, a)  # thinner toward the edge
+    keep = cut(e, p)
+    inner = ndimage.binary_erosion(keep, iterations=3)
+    return np.where(keep & ~inner & (a == MEMBRANE), MEM_EDGE, a)
+
+
+def area(e, face, p, uu, vv, h):
+    part, n = e.get("part"), e["name"]
+    shape = p.shape[:-1]
+    w = shape[1]
     if part == "membrane":
-        return np.full(shape, MEMBRANE)
-    if part in ("horn",):
-        return np.full(shape, HORN)
+        return membrane_area(e, p)
+    if part in ("horn", "spike"):
+        return horn_area(e, p)
     if part == "claw":
-        return np.full(shape, CLAW)
-    if part == "spike":
-        return np.full(shape, SPIKE)
+        return np.full(shape, CLAW_TIP if n.startswith(("toetip", "hindclaw")) or n.startswith("thumbclaw") else CLAW)
     if part == "mouth":
         return np.full(shape, MOUTH)
-    if part == "finger":
-        return np.full(shape, BACK)
-    a = np.full(shape, FLANK)
-    if face == "up":
-        a[:] = BACK
-    elif face == "down":
-        a[:] = BELLY if part in ("body", "jaw") else FLANK
-    elif face in ("east", "west"):
-        top = p[..., 1].max()
-        a = np.where(y > top - 0.35 * (top - p[..., 1].min()), BACK, FLANK)
+    if n == "snout" and face == "down":  # the roof of the mouth, teeth round its edge
+        a = np.full(shape, MOUTH)
+        edge = (uu < 3) | (uu > w - 3) | (vv > h - 3)
+        return np.where(edge, TEETH, a)
+    if n in ("hips", "chest", "keel", "jaw") or n.startswith(("neck_", "tail_")):
+        if face == "down":
+            return belly_plates(e, p)
+        under = 0.22 if n != "jaw" else 0.4
+
+        def regions(frac, f):
+            return np.where(frac > 0.6, 0, np.where(frac < under, 2, 1))
+    else:
+        def regions(frac, f):
+            if f == "up":
+                return np.zeros(frac.shape, int)
+            if f == "down":
+                return np.ones(frac.shape, int)
+            return np.where(frac > 0.55, 0, 1)
+    a = scaled_area(e, face, p, regions)
+    if n.startswith("brow"):
+        a = np.where(a == BACK_HI, BACK, a)
+    if n == "snout" and face in ("east", "west"):
+        a = np.where(teeth_rows(face, uu, vv, w, h, top=False, rows=4, front=0.8), TEETH, a)
+        a[-5:][~np.isin(a[-5:], [TEETH])] = DARK  # the lip's shadow between the teeth
+    if n == "jaw" and face in ("east", "west"):
+        rows = (vv >= 2) & (vv < 7)  # (the top two rows are behind the snout)
+        a = np.where(rows & teeth_rows(face, uu, vv - 2, w, h, top=True, rows=4, phase=3, front=0.8), TEETH, a)
+    if n == "nose" and face == "up":  # nostrils: slits near the front (a pair on the front reads as eyes)
+        a[h - 4:h - 3, 3:7] = DARK
+        a[h - 4:h - 3, w - 7:w - 3] = DARK
     return a
+
+
+def layer_props(e, face, a):
+    """The accent (wing skin, spike tips) as `points`; patterns nowhere (none in its genes)."""
+    pts = np.isin(a, [MEMBRANE, MEM_VEIN, MEM_EDGE, SPIKE_TIP]).astype(float)
+    return {"points": pts, "pattern": np.zeros(a.shape)}
+
+
+# The eye: an amber reptile's, a slit pupil, under the brow on each side of the skull.
+EYE = ("reptile", 18.0)  # design, how far up from the skull's top (texels: under the brow)
+EYE_Z = 40.0  # from the skull's back face forward
+
+
+def paint_sheet(E, coat=None, style=None, rec=None):
+    """Paints every face (the house light, ambient occlusion), stamps the eyes, packs the sheet.
+    Returns (sheet, uv, keys); `rec` a `layers.Recorder` to record the coat layers into."""
+    global STYLE
+    from paint import occlusion, paint_face_smooth, pack, stamp_eyes
+    from prop import face_frame
+    old = STYLE
+    STYLE = style or STYLE
+    tone_sets = materials(coat or COAT)
+    boxes = [(e["name"], np.array(e["lo"]), np.array(e["hi"])) for e in E if not e["quad"] and not e["rot"]]
+    tiles = []
+    for i, e in enumerate(E):
+        for face in ([e["quad"]] if e["quad"] else list(FACES)):
+            corner, du, dv, w, h, nrm = face_frame(e["lo"], e["hi"], face)
+            if w == 0 or h == 0:
+                continue
+            uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
+            p = corner + uu[..., None] * du + vv[..., None] * dv
+            R = rotm(e["rot"])
+            if e["rot"]:
+                o = np.array(e["origin"], float)
+                p = (p - o) @ R.T + o
+            a = area(e, face, p, uu, vv, h)
+            occ = None if e["quad"] else occlusion(p, R @ nrm, R @ du, R @ dv, boxes, own=e["name"])
+            # Undersides seen only when a pose lifts or folds them, lit as backs (not black).
+            light = "north" if face == "down" and e["part"] in ("leg", "arm", "finger", "jaw", "claw") else face
+            cap = {}
+            col = paint_face_smooth(a, tone_sets, light, coat=(), y_world=p[..., 1], occ=occ, quad=bool(e["quad"]),
+                                    seed=(sum(map(ord, e["name"] + face)) + 5) % 97, out=cap)
+            img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
+            if e["cut"]:
+                img[..., 3] = np.where(cut(e, p), 255, 0)
+            if e["name"] == "skull" and face in ("east", "west"):
+                lo, hi = e["lo"], e["hi"]
+                u = (hi[2] - (lo[2] + EYE_Z)) if face == "east" else EYE_Z
+                stamp_eyes(img, [(u, EYE[1])], EYE[0])
+            if rec is not None:
+                rec.face((i, face), cap["weights"], cap["level"], roles(), np.clip(np.round(col), 0, 255), img, p,
+                         layer_props(e, face, a))
+            tiles.append(((i, face), img))
+    sheet, uv = pack(tiles, 1024)
+    STYLE = old
+    return sheet, uv, [k for k, _ in tiles]
 
 
 # ------------------------------------------------------------------ poses and animations
@@ -469,7 +758,7 @@ def pose_glide(t):
 
 GROUND_SPEED = 64 / 0.6
 SKELETON = []  # the spec's bones, for the solver (set by build)
-CLAW_TIP = np.array([310.0, 268.0, 188.0])  # the thumb claw's tip at rest: the wrist's foot
+THUMB_TIP = np.array([310.0, 268.0, 188.0])  # the thumb claw's tip at rest: the wrist's foot
 HAND_LOW = None  # the hand box's corners (set by build)
 GAITS = {
     # length (clip seconds: the stride over GROUND_SPEED), the part of the stride a foot is down,
@@ -542,7 +831,7 @@ def solve_limb(body, limb, target, swing, guess):
 
         def res(x):
             p = pose_of(x)
-            d = at(p, "thumb_L", CLAW_TIP) - target
+            d = at(p, "thumb_L", THUMB_TIP) - target
             low = min(at(p, "hand_L", c)[1] for c in HAND_LOW)  # the wrist's underside stays above ground
             return [*d, *(0.06 * np.asarray(x)), 3 * min(0.0, low - 1)]
         n = 6
@@ -599,7 +888,7 @@ def neutral_feet():
     W = world(SKELETON, rest)
     piv = {b["name"]: np.array(b["pivot"], float) for b in SKELETON}
     (Rl, tl), (Rw, tw) = W["toes_L"], W["thumb_L"]
-    return {"leg": Rl @ (np.array([LEG_X, 8.0, 0.0]) - piv["toes_L"]) + tl, "wing": Rw @ (CLAW_TIP - piv["thumb_L"]) + tw}
+    return {"leg": Rl @ (np.array([LEG_X, 8.0, 0.0]) - piv["toes_L"]) + tl, "wing": Rw @ (THUMB_TIP - piv["thumb_L"]) + tw}
 
 
 def flipped(body):
@@ -705,9 +994,21 @@ def pose_breathe(t):
     return p
 
 
+def pose_rest(t):
+    """Lying down (asleep, resting, knocked out): breathing slowly, the tail tip stirring."""
+    p = rest_pose(FIT["rest"])
+    br = math.sin(t / 5.0 * 2 * math.pi)
+    p["spine_1"] = (br * 0.8, 0, 0)
+    p["neck_0"] = (p["neck_0"][0] - br * 0.6, 0, 0)
+    for k in (6, 7):
+        p[f"tail_{k}"] = (p[f"tail_{k}"][0], p[f"tail_{k}"][1] + 4 * math.sin(t / 5.0 * 2 * math.pi * 2 - k), 0)
+    p["scale"] = fan_closed()["scale"] | {"memb_R": fan_closed()["scale"]["memb_L"]}
+    return p
+
+
 BLINKS = {}
 ANIMS = {"idle": (pose_idle, 4.0), "walk": (pose_gait("walk"), GAITS["walk"]["length"]),
-         "run": (pose_gait("run"), GAITS["run"]["length"]), "breathe": (pose_breathe, 3.0),
+         "run": (pose_gait("run"), GAITS["run"]["length"]), "breathe": (pose_breathe, 3.0), "rest": (pose_rest, 5.0),
          "fly": (pose_fly, 1.0), "glide": (pose_glide, 3.0)}
 
 
@@ -737,10 +1038,70 @@ def fit_poses(spec):
     `--refit` after moving the wing's or legs' bones."""
     if os.path.exists(FIT_FILE) and "--refit" not in sys.argv:
         FIT.update(json.load(open(FIT_FILE)))
-        return
-    fit_wing(spec)
+    else:
+        fit_wing(spec)
+    if "rest" not in FIT or "--refit" in sys.argv or "--refit-rest" in sys.argv:
+        fit_rest(spec)
     with open(FIT_FILE, "w") as f:
         json.dump(FIT, f, indent=1)
+
+
+REST_CURL = 9  # degrees each tail segment turns to the side lying down, curling it round
+REST_NAMES = ["thigh_L", "shin_L", "foot_L", "neck_0", "neck_1", "neck_2", "neck_3", "head"] + [f"tail_{k}" for k in range(len(TAIL))]
+
+
+def rest_pose(x, curl=REST_CURL):
+    """The lying pose from the fitted numbers: how far the body drops, the legs' and neck's and
+    tail's pitches (the toes flat, the tail curled to the side), the wings folded."""
+    p = {"root": (0, -x[0], 0)}
+    th, sh, ft = x[1:4]
+    p.update({"thigh_L": (th, 0, 0), "shin_L": (sh, 0, 0), "foot_L": (ft, 0, 0), "toes_L": (-(th + sh + ft), 0, 0)})
+    for i, n in enumerate(REST_NAMES[3:8]):
+        p[n] = (x[4 + i], 0, 0)
+    for k in range(len(TAIL)):
+        p[f"tail_{k}"] = (x[9 + k], curl if k else curl / 2, 0)
+    fold = {k: v for k, v in folded_wing().items() if k != "scale"}
+    # The folded wing raised and drawn in to the body as it lies down (the arm and forearm turned
+    # from the stand's fold).
+    fold["arm_L"] = tuple(np.array(fold["arm_L"]) + x[17:20])
+    fold["forearm_L"] = tuple(np.array(fold["forearm_L"]) + x[20:23])
+    p.update(fold)
+    return mirror(p)
+
+
+def fit_rest(spec):
+    """Lying down (resting, asleep, knocked out): the belly on the ground, the legs folded under
+    it with the toes flat, the neck lowered and the head resting level on the ground ahead, the
+    tail lying along the ground curled to one side, nothing below the ground."""
+    from scipy.optimize import minimize
+    from ground import lowest
+
+    def starts(n):
+        return lambda name: name.startswith(n)
+    groups = {"keel": starts("keel"), "toes": starts(("toe", "hind")), "jaw": starts("jaw"),
+              "solid": lambda n: not n.startswith("mem")}
+    groups.update({f"tail_{k}": (lambda k: lambda n: n == f"tail_{k}")(k) for k in range(len(TAIL))})
+
+    def cost(x):
+        lo = lowest(spec, rest_pose(x), groups)
+        e = 50 * min(0.0, lo["solid"] + 0.3) ** 2
+        e += (lo["keel"] - 1) ** 2 + (lo["toes"] - 0.5) ** 2 + 0.5 * (lo["jaw"] - 1) ** 2
+        e += sum(0.3 * (lo[f"tail_{k}"] - 1) ** 2 for k in range(2, len(TAIL)))
+        e += 0.02 * (sum(x[4:9])) ** 2  # the head level with the ground
+        # Joints in their natural range: the thighs forward as a resting bird folds them, the
+        # neck and tail bending gently, the wings turned no more than they must.
+        def beyond(v, lim):
+            return max(0.0, abs(v) - lim) ** 2
+        e += 0.5 * max(0.0, x[1] + 10) ** 2
+        e += 0.2 * sum(beyond(v, 40) for v in x[4:17]) + 0.2 * sum(beyond(v, 50) for v in x[17:23])
+        return e + 0.0005 * float(np.sum(np.asarray(x[1:]) ** 2)) + 0.002 * float(np.sum(np.asarray(x[17:]) ** 2))
+
+    x0 = [150, -60, 120, -50, 20, 10, 0, -10, -10, -10, -6, -4, 0, 0, 0, 0, 0] + [0, 0, 20, 0, 0, 0]
+    r = minimize(cost, x0, method="Powell", options={"maxiter": 60000, "xtol": 1e-2, "ftol": 1e-6})
+    FIT["rest"] = [round(float(v), 2) for v in r.x]
+    FIT["rest_cost"] = round(float(r.fun), 2)
+    lo = lowest(spec, rest_pose(r.x), groups)
+    print("rest:", {k: round(float(v), 1) for k, v in lo.items() if not k.startswith("tail_")})
 
 
 def fit_wing(spec):
@@ -813,7 +1174,11 @@ def spec_of(E, uv, sheet):
 
 def build():
     E = elements()
-    sheet, uv = paint(E, area, MATERIALS, cut=cut, width=1024, seed=5)
+    from layers import Recorder, bounds as layer_bounds
+    rec = Recorder(layer_bounds(E, 3.0))
+    sheet, uv, keys = paint_sheet(E, rec=rec)
+    from paint import pack
+    rec.save(OUT, keys, lambda tiles, width: pack(tiles, 1024))
     spec = spec_of(E, uv, sheet)
     fit_poses(spec)
     SKELETON[:] = spec["bones"]

@@ -253,6 +253,12 @@ EYES = {
     "glossy": dict(pattern=[".DDDD.", "DHHDDD", "DHHDDD", "DDDDDD", "DDDDHD", "DIIIID", ".IIII."],
                    colors={"D": _D, "H": _W, "I": (120, 70, 44)}, halo="below"),
     "button": dict(pattern=[".DD.", "DHDD", "DDDD", ".DD."], colors={"D": _D, "H": _W}, halo="below"),
+    # A reptile's (dragons, lizards, crocodiles): an amber iris, darker round its rim and lighter
+    # below, a slit pupil, a small highlight high up; on the head's side, under a heavy brow.
+    "reptile": dict(pattern=["...LLLLLLL...", ".LLAAAPPAALL.", "LAHHAAPPAAAAL", "LAHHAAPPAAAAL", "LAAAAAPPAAAaL",
+                             "LAaAAAPPAAaaL", ".LaaaaPPaaaL.", "..LLLLLLLLL.."],
+                    colors={"L": (52, 30, 20), "A": (196, 124, 34), "a": (232, 170, 64), "P": (14, 10, 10),
+                            "H": (246, 230, 190)}, halo="round"),
     "anime": dict(pattern=[".DD.", "DHHD", "DHDD", "DDDD", "DDSD", "DIID", ".II."],
                   colors={"D": _D, "H": _W, "S": (190, 196, 206), "I": (120, 70, 44)}, halo="below"),
 }

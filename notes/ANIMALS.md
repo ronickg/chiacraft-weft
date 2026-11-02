@@ -682,11 +682,37 @@ skill in one style so they match: 64 texels a block for every model (Hytale's de
 characters), real sizes, the skill's light and materials (`scripts/house.py`), props as entities.
 The five animals predate it (19 to 131 texels a block) and are to be rebuilt to it.
 
-Next: rebuild the five animals to the house density; the wyvern (flying, ridden, fire, rare;
-needs flying mounts in the engine; eggs and nests already fit it); the paint screen in the game (paint as a
-second component the same painter reads), then sizes (real sizes, by sex and individual: the
-engine's per-entity scale), breeding for the other species (only dogs breed so far), coat names
-in translations.
+**The wyvern** (2026-11-02; `wyvern.rs`, `source/wyvern`; asked for by Ronald: a wyvern that
+flies, can be ridden, breathes fire, rare and dangerous, huge, like Game of Thrones'). A
+fantasy animal, kept apart from the real ones: its family is placed under "Fantasy"
+(*Wyverna montana* · Fantasy › Draconia › Wyvernidae › Wyverninae). About 3.9 m at the shoulder,
+16 m long, 17 m across the wings: two heavy hind legs, bat wings for arms; on the ground it goes
+on four, on its feet and the wrists of its folded wings. Built with the skill at the house
+density (64 a block). Painted with plated scales (of four ways to draw them in the viewer, Ronald
+chose plated, 2026-11-02): big armor-like scales each with a dark rim, plates across the belly,
+throat and under the tail, veined wing skin with a darker trailing edge, ringed horns paling to
+the tip, amber slit-pupil eyes under the brow, teeth along both jaws. Animations: idle, walk and run
+(the wings step one after the other, as the show's dragons, animated from gorillas; the run a
+gallop), breathe (rears, lunges with the jaws wide, sweeps), fly, glide, and lying down (rest,
+knocked out). Its feet don't slide: each foot's path is set and the limb's angles solved to it
+every frame. Genes (`genetics/wyvern.json`): what it breathes (fire, frost, lightning, venom;
+the commoner dominant), its scales' color (slate, bronze, green, black, red, rare cream), how
+dark, how big; the coat line names them ("Slate, breathes fire"). Each scale color brings its
+accent, as the show's dragons wear them (black with red wings, green with bronze, cream with
+gold): the game repaints each wyvern from its genes on its coat layers, the accent on the wing
+skin and spike tips as the look's points. Rare and alone in the mountains (`#mountain`); a wild
+one goes for any player within 14 blocks (24 near a nest) and hunts sheep, pigs and cows as the
+Utahraptor does. Knocked out to tame; 400 health, 30 damage. Its eggs are about 3.4 times a
+raptor's and its nests as many times bigger (any species' nest is now scaled to its eggs).
+Rideable on the ground with its own saddle (more leather and an iron ingot). The engine now
+flies entities (`World::fly`) and plays a model's `run` by speed (the walk and run written as
+offsets from the idle).
+
+Next for the wyvern: riding in flight (take off, climb, dive, land), the breath attack on a key
+(fire, frost, lightning or venom from its genes), wild ones flying, its sounds, its own egg icon.
+
+Next otherwise: rebuild the five animals to the house density; the paint screen in the game
+(paint as a second component the same painter reads), coat names in translations.
 
 Not yet: XP and earning points (the command gives them), naming, the higher spyglass tier, tame
 caps and other world settings. Engine note: clients don't see other entities' attribute

@@ -57,10 +57,12 @@ and `textures/entity/<mod>/<animal>.png`. It takes care of what the engine needs
 - **Props** (nests, eggs, anything without a skeleton) are entities built with the skill's
   `prop.py`, not block models (block models here take only coarse texture coordinates).
 - **Fur panels**: both sides of a flat panel get the picture (mirrored to line up).
-- **Poses**: the engine plays `idle` and `walk` by itself. A pose (sit, lie) is its own file whose
-  `idle` holds it, used by its own look kind (`set_look`). `run` and actions like `lick` are in
-  the standing file for `World::play_animation`, which replaces idle while it plays (so an action
-  on a sitting dog stands it up for that time). Blinks are part of each idle.
+- **Poses**: the engine plays `idle`, `walk` and `run` by itself: walk and run by speed (run
+  takes over between 3 and 4.5 blocks a second), on top of the idle, so the exporter writes them
+  as offsets from the idle's first frame. A pose (sit, lie) is its own file whose `idle` holds
+  it, used by its own look kind (`set_look`). Actions like `lick` are in the standing file for
+  `World::play_animation`, which replaces idle while it plays (so an action on a sitting dog
+  stands it up for that time). Blinks are part of each idle.
 
 Register it like the cat (`mods/animals/src/cat.rs`, the simplest) or the chihuahua (`mods/animals/src/dog.rs`): `.model_file("<animal>")`,
 `.animations("<animal>[_sit|_lie]")`, `.texture("<mod>/<animal>")`, and a hitbox `.size(..)`

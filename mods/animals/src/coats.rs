@@ -99,13 +99,14 @@ struct Spread {
     sd: f32,
 }
 
-const FILES: [(&str, &str); 6] = [
+const FILES: [(&str, &str); 7] = [
     ("dog", include_str!("../genetics/dog.json")),
     ("cat", include_str!("../genetics/cat.json")),
     ("capybara", include_str!("../genetics/capybara.json")),
     ("raptor", include_str!("../genetics/raptor.json")),
     ("utahraptor", include_str!("../genetics/utahraptor.json")),
     ("osmolskae", include_str!("../genetics/osmolskae.json")),
+    ("wyvern", include_str!("../genetics/wyvern.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -690,6 +691,43 @@ fn raptor(r: &Read) -> Look {
     Look { name, base, under, pattern, pattern2: saddle, ..Look::default() }
 }
 
+/// Wyverns: scales of a big reptile's colors, and what it breathes (named with the coat).
+fn wyvern(r: &Read) -> Look {
+    // Scales and an accent (the wing skin, the spikes' tips), as the show's dragons wear them:
+    // black with red, green with bronze, cream with gold (`source/wyvern`'s `COATS`).
+    let (scales, accent, name): (Rgb, Rgb, &str) = match r.shows("Sc") {
+        "bronze" => ([132.0, 92.0, 52.0], [96.0, 54.0, 38.0], "Bronze"),
+        "green" => ([58.0, 78.0, 52.0], [150.0, 104.0, 52.0], "Green"),
+        "black" => ([40.0, 38.0, 42.0], [128.0, 36.0, 30.0], "Black"),
+        "red" => ([118.0, 40.0, 34.0], [52.0, 26.0, 24.0], "Red"),
+        "white" => ([222.0, 212.0, 190.0], [196.0, 150.0, 70.0], "Cream"),
+        _ => ([92.0, 92.0, 98.0], [112.0, 70.0, 60.0], "Slate"),
+    };
+    let dk = r.qv("Dk");
+    let base = if dk > 0.5 { darken(scales, (dk - 0.5) * 0.6) } else { lighten(scales, (0.5 - dk) * 0.4) };
+    // The belly plates a muted, lighter brown of the scales (a black one's dark, as Drogon's).
+    let under = mix(lighten(base, 0.3), [170.0, 140.0, 110.0], 0.4);
+    let breath = match breath(r.genome) {
+        "" => "fire",
+        b => b,
+    };
+    Look { name: format!("{name}, breathes {breath}"), base, under, points: Some(accent), ..Look::default() }
+}
+
+/// What a wyvern with `genome` breathes ("fire", "frost", "lightning", "venom"; "" for other
+/// species).
+pub fn breath(genome: &Genome) -> &'static str {
+    let Some(s) = (genome.species as usize).checked_sub(1).and_then(|i| SPECIES.get(i)) else { return "" };
+    let Some(g) = gene_file(s.name) else { return "" };
+    match (Read { g, genome }).shows("Br") {
+        "frost" => "frost",
+        "lightning" => "lightning",
+        "venom" => "venom",
+        "fire" => "fire",
+        _ => "",
+    }
+}
+
 /// How big an adult with `genome` is against its species' average (its model): its size gene
 /// (`Sz`, spread by the species' `size_spread`) and its sex (`dimorphism`, males against
 /// females; the average stays the model's).
@@ -714,6 +752,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "dog" => dog(&r),
         "cat" => cat(&r),
         "capybara" => capybara(&r),
+        "wyvern" => wyvern(&r),
         _ => raptor(&r),
     };
     look.seed = genome.seed;
@@ -862,7 +901,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 5] = model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor");
+const MODEL_LAYERS: [ModelLayers; 6] = model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern");
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
     let mut d = png::Decoder::new(std::io::Cursor::new(png_bytes));

@@ -69,6 +69,10 @@ pub static CANIDAE: Family = Family { name: "Canidae", above: &["Mammalia", "Car
 pub static FELIDAE: Family = Family { name: "Felidae", above: &["Mammalia", "Carnivora"] };
 pub static CAVIIDAE: Family = Family { name: "Caviidae", above: &["Mammalia", "Rodentia"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
+/// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
+/// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
+/// -inae).
+pub static WYVERNIDAE: Family = Family { name: "Wyvernidae", above: &["Fantasy", "Draconia"] };
 
 pub struct Food {
     /// The item's full name.
@@ -155,7 +159,7 @@ pub struct Species {
 const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 6] = [
+pub static SPECIES: [Species; 7] = [
     Species {
         kind: &crate::dog::CHIHUAHUA,
         model: "chihuahua",
@@ -398,6 +402,49 @@ pub static SPECIES: [Species; 6] = [
         recovery: 96_000,
         growth: 96_000,
         birth_size: 0.3,
+    },
+    // The wyvern, a fantasy animal (`wyvern.rs`): a dragon with two legs and bat wings, about
+    // 3.9 m at the shoulder and 16 m long, rare in the mountains.
+    Species {
+        kind: &crate::wyvern::WYVERN,
+        model: "wyvern",
+        name: "wyvern",
+        binomial: "Wyverna montana",
+        family: &WYVERNIDAE,
+        subfamily: "Wyverninae",
+        breed: None,
+        size: Size::Large,
+        diet: Diet::Carnivore,
+        taming: Taming::Knockout,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [400.0, 800.0, 2000.0, 30.0, 1.0, 1200.0, 400.0, 3000.0, 80.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 5.0,
+        foods: &[
+            eats("base:chicken", 10),
+            eats("base:porkchop", 15),
+            eats("base:beef", 20),
+            favorite("base:mutton", 20),
+            favorite("base:cooked_mutton", 30),
+            KIBBLE,
+        ],
+        feedings: 45.0,
+        shy: 0.0,
+        fights: true,
+        signature: "mount",
+        // Astride its back above the hips (3.55 blocks up), the rider's hips a little above.
+        seat: 3.6,
+        camouflage: 0.2,
+        dimorphism: 1.08,
+        size_spread: 0.12,
+        height: (3.9, "shoulder"),
+        litter: (1, 3),
+        gestation: 0,
+        incubation: 168_000,
+        recovery: 336_000,
+        growth: 960_000,
+        birth_size: 0.08,
     },
 ];
 
