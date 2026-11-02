@@ -737,6 +737,15 @@ face something faces it whole. Checked in the game: each breath ridden, and a wi
 fire at a player and killing them, and breathing in flight (the stream carries the wyvern's own
 speed, or it would outfly its fire).
 
+**Attacks** (2026-11-02; asked for by Ronald). Every animal that fights shows its hits: each
+species lists its attacks (`Species::attacks`), and `commands::fight` plays one at random when a
+hit lands (the engine paces hits by the kind's attack speed). The chihuahua bites (ears flat, a
+lunge and snap); the cat swipes (a forepaw raised to the face and raked down, a hiss) or bites;
+both raptors bite or kick with the sickle claw (rearing back on one leg, the other struck forward);
+the wyvern bites (the neck drawn back and lunging), claws (a wing-arm lifted 3 m and brought down
+on what's ahead) or lashes its tail. The capybara never fights. How far past its box a species
+strikes is `Species::reach` (the wyvern's head is 7 blocks ahead of its middle: 5 blocks).
+
 Next for the wyvern: wild ones flying, its sounds (a roar, wingbeats, the breath), its own egg
 icon.
 

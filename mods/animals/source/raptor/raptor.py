@@ -483,10 +483,43 @@ def pose_screech(t):
     return q
 
 
+def pose_bite(t):
+    """A bite: the head draws back, darts forward and down with the jaws opening, and snaps them
+    shut on what it strikes; then back."""
+    p = t / 0.7
+    q = stand()
+    d = float(np.interp(p, [0, .3, .45, .6, 1], [0, -1, 1, 1, 0]))  # -1 drawn back, 1 thrust out
+    q["spine_0"] = (5 * d, 0, 0)
+    q["neck"] = (NECK + 18 * d, 0, 0)
+    q["head"] = (-NECK - 8 * d, 0, 0)
+    q["jaw"] = (float(np.interp(p, [0, .25, .42, .5, 1], [0, 22, 34, 0, 0])), 0, 0)
+    q.update(tail_sway(p, 1, 3, lift=-4 * d))
+    return q
+
+
+def pose_kick(t):
+    """The sickle-claw kick: leaning back on one leg, the other draws up, strikes down and forward
+    with the claw, and is set down again; the arms out for balance."""
+    p = t / 0.8
+    q = stand()
+    lift = float(np.interp(p, [0, .3, .45, .6, 1], [0, 1, .5, 0, 0]))
+    swing = float(np.interp(p, [0, .3, .45, .6, 1], [0, -23, -47, -18, 0]))  # negative: forward
+    q.update(legs(L["thigh"], L["shin"], L["foot"], swing_l=swing, lift_l=55 * lift))
+    lean = float(np.interp(p, [0, .3, .5, 1], [0, 1, 1, 0]))
+    q["spine_0"] = (-8 * lean, 0, 0)
+    q["neck"] = (NECK - 6 * lean, 0, 0)
+    q["head"] = (-NECK + 6 * lean, 0, 0)
+    for n, s in (("L", 1), ("R", -1)):
+        q[f"arm_{n}"] = (35 - 30 * lean, 0, -s * (8 + 30 * lean))
+        q[f"forearm_{n}"] = (-80 + 30 * lean, 0, 0)
+    q.update(tail_sway(p, 1, 4, lift=-8 * lean))
+    return q
+
+
 BLINKS = {"idle": [1.5], "rest": [1.2, 3.0]}
 BLINK = 0.09
 ANIMS = {"idle": (pose_idle, 3.0), "walk": (pose_walk, 0.9), "run": (pose_run, 0.5), "rest": (pose_rest, 4.0),
-         "screech": (pose_screech, 1.6)}
+         "screech": (pose_screech, 1.6), "bite": (pose_bite, 0.7), "kick": (pose_kick, 0.8)}
 
 
 def eyelids(name, t):
@@ -495,7 +528,7 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = 30 if name in ("idle", "screech") else (12 if dur < 1 else 16)
+    n = 30 if name in ("idle", "screech", "bite", "kick") else (12 if dur < 1 else 16)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}

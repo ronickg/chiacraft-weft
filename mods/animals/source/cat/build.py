@@ -22,7 +22,7 @@ ASSETS = os.path.join(HERE, "..", "..", "assets")
 SCALE = 0.174  # model pixels per unit: a real house cat, about 24 cm at the shoulder (23-25 cm)
 # Which animations go in which file: the engine plays `idle` and `walk` by itself, a pose's
 # file holds it in `idle`; `run` and `meow` are there for code to play.
-POSES = {"": {"idle": "idle", "walk": "walk", "run": "run", "meow": "meow"},
+POSES = {"": {"idle": "idle", "walk": "walk", "run": "run", "meow": "meow", "swipe": "swipe", "bite": "bite"},
          "_sit": {"idle": "sit", "walk": "walk"},
          "_lie": {"idle": "lie", "walk": "walk"}}
 

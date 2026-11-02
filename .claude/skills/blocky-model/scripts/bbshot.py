@@ -60,7 +60,7 @@ return true;
 if __name__ == "__main__":
     if "--anim" in sys.argv:
         i = sys.argv.index("--anim")
-        t = float(sys.argv[i + 2]) if len(sys.argv) > i + 2 else 0.0
+        t = float(sys.argv[i + 2]) if len(sys.argv) > i + 2 and not sys.argv[i + 2].startswith("--") else 0.0
         run(POSE % (sys.argv[i + 1], t))
     bounds = run(BOUNDS)
     names = sys.argv[sys.argv.index("--angles") + 1].split(",") if "--angles" in sys.argv else list(ANGLES)

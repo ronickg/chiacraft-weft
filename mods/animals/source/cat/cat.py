@@ -481,10 +481,38 @@ def pose_meow(t):
     return q
 
 
+def pose_swipe(t):
+    """A paw swipe: the weight back, a forepaw drawn up and out, then raked down and across, claws
+    first; a hiss."""
+    p = t / 0.6
+    q = pose_idle(0)
+    up = float(np.interp(p, [0, .35, .5, .62, 1], [0, 1, .4, 0, 0]))
+    rake = float(np.interp(p, [0, .35, .5, .62, 1], [0, 0, 1, .6, 0]))
+    q["leg_FL_upper"] = (-105 * up - 40 * rake, 18 * up - 22 * rake, 0)  # -X reaches forward and up
+    q["leg_FL_lower"] = (15 * up + 10 * rake, 0, 0)  # nearly straight: the paw up by the face, then raked down
+    q["leg_FL_paw"] = (-45 * up, 0, 0)  # curled, claws out
+    q["spine_1"] = (-10 * up, 0, 0)  # rearing a little
+    q["head"] = (6 * rake, 0, 0)
+    q["jaw"] = (14 * up, 0, 0)
+    return q
+
+
+def pose_bite(t):
+    """A bite: drawn back, then a quick lunge with the jaws opening, snapping shut."""
+    p = t / 0.5
+    q = pose_idle(0)
+    d = float(np.interp(p, [0, .25, .45, .6, 1], [0, -1, 1, 1, 0]))  # -1 drawn back, 1 lunging
+    q["spine_1"] = (4 * d, 0, 0)
+    q["neck"] = (10 * d, 0, 0)
+    q["head"] = (4 * d, 0, 0)
+    q["jaw"] = (float(np.interp(p, [0, .2, .4, .48, 1], [0, 18, 26, 0, 0])), 0, 0)
+    return q
+
+
 BLINKS = {"idle": [1.2], "sit": [1.8], "lie": [1.0, 3.0], "meow": [0.4]}
 BLINK = 0.09
 ANIMS = {"idle": (pose_idle, 3.0), "walk": (pose_walk, 0.9), "run": (pose_run, 0.5), "sit": (pose_sit, 3.0),
-         "lie": (pose_lie, 4.0), "meow": (pose_meow, 1.6)}
+         "lie": (pose_lie, 4.0), "meow": (pose_meow, 1.6), "swipe": (pose_swipe, 0.6), "bite": (pose_bite, 0.5)}
 
 
 def eyelids(name, t):
@@ -493,7 +521,7 @@ def eyelids(name, t):
 
 
 def frame_times(name, dur):
-    n = 24 if name == "meow" else (12 if dur < 1 else 16)
+    n = 24 if name in ("meow", "swipe", "bite") else (12 if dur < 1 else 16)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}

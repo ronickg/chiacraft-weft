@@ -1007,6 +1007,8 @@ def mouth(name, t, dur):
     if name == "lick":
         k = lick_keys(p)
         return {"jaw": (k["jaw"], 0, 0), "tongue": (k["tongue"], 0, 0), "tongue_tip": (k["tip_x"], k["tip_y"], 0)}
+    if name == "bite":  # the tongue folded away under the muzzle
+        return {"jaw": (bite_keys(p)["jaw"], 0, 0), "tongue": (0, 0, 0), "tongue_tip": (180, 0, 0)}
     pant = {"idle": (20, 4, 8, 55, 6, 25), "sit": (20, 4, 8, 55, 6, 25), "walk": (18, 3, 2, 55, 8, 25),
             "run": (26, 4, 1, 40, 12, 15), "lie": (8, 2, 2, 70, 4, 15)}[name]
     jaw, jaw_amp, n, tongue, tongue_amp, tip = pant
@@ -1041,7 +1043,29 @@ def pose_lick(t, L):
     return pose
 
 
-ANIMS = dict(vd.ANIMS, lick=(pose_lick, 1.6))
+def bite_keys(p):
+    """The bite, as (phase, value) keys: drawn back with the ears flat, a quick lunge, the jaw
+    opening on the way and snapping shut."""
+    K = {"lunge": [(0, 0), (.25, -1), (.45, 1), (.6, 1), (1, 0)],
+         "jaw": [(0, 0), (.2, 22), (.4, 30), (.48, 0), (1, 0)],
+         "ears": [(0, 0), (.15, 1), (.75, 1), (1, 0)]}
+    return {k: float(np.interp(p, [a for a, _ in v], [b for _, b in v])) for k, v in K.items()}
+
+
+def pose_bite(t, L):
+    """Bite: standing, a quick lunge and snap (0.5 s)."""
+    pose = vd.pose_stand(0, L)
+    k = bite_keys(t / 0.5)
+    d, e = k["lunge"], k["ears"]
+    pose["spine_1"] = (4 * d, 0, 0)
+    pose["neck"] = (10 * d, 0, 0)
+    pose["head"] = (4 * d, 0, 0)
+    pose["ear_L"] = (-24 * e, 0, -10 * e)  # flat back
+    pose["ear_R"] = (-24 * e, 0, 10 * e)
+    return pose
+
+
+ANIMS = dict(vd.ANIMS, lick=(pose_lick, 1.6), bite=(pose_bite, 0.5))
 
 
 def eyelids(name, t, dur):
@@ -1056,7 +1080,7 @@ def eyelids(name, t, dur):
 def frame_times(name, dur):
     """Keyframe times: even steps, plus the edges and middle of every blink so they stay crisp;
     the lick, all quick moves, gets fine steps."""
-    n = 32 if name == "lick" else (12 if dur < 1 else 16)
+    n = 32 if name == "lick" else 24 if name == "bite" else (12 if dur < 1 else 16)
     ts = {round(dur * k / n, 4) for k in range(n + 1)}
     for b in BLINKS.get(name, []):
         ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}

@@ -264,6 +264,14 @@ Animation
 - **Animation set** for a creature: idle, walk, run, sit, lie as a base; then cheap, charming
   extras that reuse the same bones: blink, lick, head tilt, sniff, shake off, scratch, play bow,
   sleep, eat. Offer the list and let the user pick.
+- **Attacks** for anything that fights, one or more (the game plays one at random on each hit):
+  short (0.5-1 s), a wind-up, the strike and a recovery from (phase, value) keys, with fine
+  keyframes (24-30). A bite: drawn back, a lunge with the jaw opening on the way and snapping shut
+  at the strike, the body leaning in. A swipe: the weight back, a forepaw raised nearly straight
+  to the face with the paw curled, raked down and across. A kick (raptors): rearing back on one
+  leg, the other drawn up and struck forward. A limb that strikes the ground (a dragon's claw):
+  solve it to its targets like a gait's foot. Ears flat, a hiss, the head following the strike
+  sell it. Run `boxcheck` on them too: a raised limb sweeps through the body's planes.
 
 ## Workflow
 

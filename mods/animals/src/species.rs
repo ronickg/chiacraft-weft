@@ -124,6 +124,11 @@ pub struct Species {
     pub shy: f32,
     /// Whether it fights (a tame's stance does nothing for one that doesn't).
     pub fights: bool,
+    /// Its attacks: animations in its model's file, one played at random on each hit
+    /// (`commands::fight`).
+    pub attacks: &'static [&'static str],
+    /// How far past its box it strikes, in blocks (a long neck reaches further).
+    pub reach: f32,
     /// What it does best (`signatures.rs`; `screen.animals.signature.<it>`).
     pub signature: &'static str,
     /// Where a rider sits, in blocks above its feet; 0: it can't be ridden (`riding.rs`).
@@ -196,6 +201,8 @@ pub static SPECIES: [Species; 7] = [
         feedings: 4.0,
         shy: 3.0,
         fights: true,
+        attacks: &["bite"],
+        reach: 0.8,
         signature: "alarm",
         seat: 0.0,
         seat_forward: 0.0,
@@ -240,6 +247,8 @@ pub static SPECIES: [Species; 7] = [
         feedings: 5.0,
         shy: 6.0,
         fights: true,
+        attacks: &["swipe", "bite"],
+        reach: 0.8,
         signature: "gifts",
         seat: 0.0,
         seat_forward: 0.0,
@@ -282,6 +291,8 @@ pub static SPECIES: [Species; 7] = [
         feedings: 3.0,
         shy: 0.0,
         fights: false,
+        attacks: &[],
+        reach: 0.8,
         signature: "calm",
         seat: 0.0,
         seat_forward: 0.0,
@@ -322,6 +333,8 @@ pub static SPECIES: [Species; 7] = [
         feedings: 10.0,
         shy: 8.0,
         fights: true,
+        attacks: &["bite", "kick"],
+        reach: 0.8,
         signature: "pack",
         seat: 0.0,
         seat_forward: 0.0,
@@ -362,6 +375,8 @@ pub static SPECIES: [Species; 7] = [
         feedings: 18.0,
         shy: 10.0,
         fights: true,
+        attacks: &["bite", "kick"],
+        reach: 1.2,
         signature: "mount",
         // On its back, above the hips (1.69 blocks up, the rider's hips a little above).
         seat: 1.55,
@@ -405,6 +420,8 @@ pub static SPECIES: [Species; 7] = [
         feedings: 10.0,
         shy: 8.0,
         fights: true,
+        attacks: &["bite", "kick"],
+        reach: 0.8,
         signature: "pack",
         seat: 0.0,
         seat_forward: 0.0,
@@ -449,6 +466,9 @@ pub static SPECIES: [Species; 7] = [
         feedings: 45.0,
         shy: 0.0,
         fights: true,
+        attacks: &["bite", "claw", "tail"],
+        // Its head is 7 blocks ahead of its middle: a bite reaches well past its box.
+        reach: 5.0,
         signature: "mount",
         // At the base of the neck between the shoulder spikes, as the show's riders sit: its back
         // there 3.8 blocks up and 1.6 ahead of its middle, the rider's hips a little above.

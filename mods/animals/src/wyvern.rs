@@ -55,6 +55,7 @@ pub fn init(r: &mut Registry) {
         .health(400.0)
         .speed(5.0)
         .attack_damage(30.0)
+        .attack_speed(0.8)
         .passive()
         .model_file("wyvern")
         .animations("wyvern")

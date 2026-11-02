@@ -24,9 +24,11 @@ sys.path.insert(0, SKILL)
 from house import SCALE  # noqa: E402  (the house style: 64 texels a block)
 
 # Which animations go in which file: the engine plays `idle`, `walk` and `run` by itself (walk
-# and run by speed); `breathe`, `fly` and `glide` are there for code to play. Lying down (asleep,
+# and run by speed); `breathe`, `fly`, `glide` and the attacks (`bite`, `claw`, `tail`) are there
+# for code to play. Lying down (asleep,
 # knocked out) is its own look, whose file holds it in `idle`.
-POSES = {"": {"idle": "idle", "walk": "walk", "run": "run", "breathe": "breathe", "fly": "fly", "glide": "glide"},
+POSES = {"": {"idle": "idle", "walk": "walk", "run": "run", "breathe": "breathe", "fly": "fly", "glide": "glide",
+            "bite": "bite", "claw": "claw", "tail": "tail"},
          "_rest": {"idle": "rest"}}
 
 if __name__ == "__main__":

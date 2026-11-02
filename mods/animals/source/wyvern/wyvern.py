@@ -1035,9 +1035,67 @@ def pose_rest(t):
     return p
 
 
+# ------------------------------------------------------------------ attacks
+#
+# Played by the game when it strikes (`commands::fight`), one at random: a bite, a claw (a wing-arm
+# lifted and brought down on what's ahead, solved like the gaits so the claw lands on the ground
+# it strikes), a lash of the tail.
+
+def pose_bite(t):
+    """The neck draws back, then lunges forward and down with the jaws wide, snapping shut; the
+    body leans into it."""
+    p = t / 0.9
+    q = stand()
+    back = {"neck_0": -36, "neck_1": -20, "neck_2": 4, "neck_3": 14, "head": 14}
+    lunge = {"neck_0": -8, "neck_1": -2, "neck_2": 6, "neck_3": 8, "head": 6}
+    d = float(np.interp(p, [0, .3, .5, .65, 1], [0, -1, 1, 1, 0]))  # -1 drawn back, 1 lunging
+    for b, v in back.items() if d < 0 else lunge.items():
+        q[b] = (q[b][0] + (v - q[b][0]) * abs(d), 0, 0)
+    q["spine_1"] = (4 * d, 0, 0)
+    q["jaw"] = (float(np.interp(p, [0, .3, .48, .56, 1], [0, 20, 36, 0, 0])), 0, 0)
+    return q
+
+
+CLAW_KEYS = ([0, .35, .55, .7, 1], [(0, 0, 0), (25, 150, 40), (0, 3, 130), (0, 3, 130), (0, 0, 0)])  # out, up, ahead
+
+
+def pose_claw(t):
+    """A wing-arm's strike: the left wrist lifts high and comes down on what's ahead, the claw
+    hitting the ground there; the shoulders lean into it and the head follows."""
+    p = t / 1.0
+    q = stand()
+    keys, offs = CLAW_KEYS
+    off = np.array([float(np.interp(p, keys, [o[k] for o in offs])) for k in range(3)])
+    lean = float(np.interp(p, [0, .35, .55, 1], [0, -1, 1, 0]))
+    q["spine_1"] = (4 * lean, 0, -3 * max(lean, 0))
+    body = {k: v for k, v in q.items() if k != "scale"}
+    target = neutral_feet()["wing"] + off
+    wing, _ = solve_limb(body, "wing", target, 0.0, None)
+    q.update(wing)
+    q["head"] = (q["head"][0] + 6 * max(lean, 0), -8 * max(lean, 0), 0)
+    q["jaw"] = (12 * max(lean, 0), 0, 0)
+    return q
+
+
+def pose_tail(t):
+    """A lash of the tail: it swings out to one side, then whips across to the other in a wave
+    running down it, the hips turning against it; the head looks back."""
+    p = t / 1.0
+    q = stand()
+    swing = float(np.interp(p, [0, .3, .55, .75, 1], [0, 1, -1, -0.6, 0]))  # +: out to the left
+    for k in range(len(TAIL)):
+        lag = float(np.interp(p - 0.04 * k, [0, .3, .55, .75, 1], [0, 1, -1, -0.6, 0]))
+        q[f"tail_{k}"] = (q[f"tail_{k}"][0], 9 * lag, 0)
+    q["spine_0"] = (0, -6 * swing, 0)
+    q["neck_3"] = (q["neck_3"][0], -10 * swing, 0)
+    q["head"] = (q["head"][0], -12 * swing, 0)
+    return q
+
+
 BLINKS = {}
 ANIMS = {"idle": (pose_idle, 4.0), "walk": (pose_gait("walk"), GAITS["walk"]["length"]),
          "run": (pose_gait("run"), GAITS["run"]["length"]), "breathe": (pose_breathe, 3.0), "rest": (pose_rest, 5.0),
+         "bite": (pose_bite, 0.9), "claw": (pose_claw, 1.0), "tail": (pose_tail, 1.0),
          "fly": (pose_fly, 1.0), "glide": (pose_glide, 3.0)}
 
 
