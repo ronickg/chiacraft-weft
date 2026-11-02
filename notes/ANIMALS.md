@@ -470,10 +470,7 @@ on grass, snow or sand. The habitats, from where each lives or lived:
   the cold); cat: plains, forests, savanna, desert, a little taiga (the African wildcat of desert
   and savanna edges; feral nearly everywhere but the deep cold); capybara: swamp, savanna, a
   little forest (the llanos' savannas, flooded grasslands and swamps).
-- Until the dino dimension: Velociraptor in the desert (the Djadokhta Formation's dunes),
-  V. osmolskae only there (Bayan Mandahu), Utahraptor on savanna, plains and forest (the Cedar
-  Mountain Formation's semi-arid floodplain); wyverns in the mountains, and a third as often in
-  snow, taiga, desert and forest (each country's kind).
+- The dinosaurs and wyverns: in the Cretaceous since (below).
 
 Two new overworld biomes in base: **savanna** (warm and dry, between the desert and the forests;
 yellow grass, few trees; 6% of the land) and **swamp** (mild and wet lowland near sea level; dark
@@ -482,6 +479,28 @@ capybara, raptors and Utahraptor would have had nowhere. `/animal habitats [radi
 land round the player from the world's generator: each biome's share and nearest spot, and how
 much of the land each species lives on. Still to come: standing water in swamps (a terrain
 feature), and a capybara keeping near water.
+
+**2. The Cretaceous** (built 2026-11-02; Ronald: a built gateway, "The Cretaceous", mostly real
+plants). A dimension (`animals:cretaceous`, `src/cretaceous.rs`) warm everywhere, with five
+biomes of its own and the sea: **red dunes** (red sand over red sandstone, wind-blown dunes: the
+Djadokhta Formation's), **scrubland** (dry, open, a few conifers), **floodplain** (low and wet:
+ferns and horsetails; the Cedar Mountain Formation's floodplain, whose soils swelled and cracked
+with wet and dry seasons), **fern forest** (conifers over ferns) and **crags** (high rock). Of its
+land about a quarter scrubland, a sixth each dunes and fern forest, a tenth crags and floodplain.
+Mostly real: grass as in the overworld, ferns and horsetails over it, spruce for the conifers;
+no flowers (a fern where base would put one) and no cacti (red sand isn't `sand`). Who lives
+there: Velociraptor on the dunes and scrubland, V. osmolskae on the dunes, the Utahraptor on the
+floodplain, scrubland and in the forest, wyverns on the crags and a third as often elsewhere. In
+the game Utahraptors turned up on the floodplain within two minutes.
+
+**The gateway** (`src/gateway.rs`). Amber (fossil resin, from `amber_ore` in the rock: three
+small seams a cube below y 64 in the overworld, six in the Cretaceous) makes amber blocks (four
+each). An upright frame of them round an opening 2-21 wide and 3-21 tall, lit with a torch,
+fills with the gateway; two seconds in it and you are in the other world at the same x and z, on
+the ground, out of a gateway within 24 blocks there or a new one built in front of you (2 by 3,
+on an amber floor), so the way back is always there. Tested both ways from the overworld
+(`mods/animals/tests/gateway.txt`): lit, across, a gateway built there, back out beside the
+first. Not yet: tame animals coming along, a gateway going out when its frame breaks.
 
 Sources: [canid immobilization](https://pmc.ncbi.nlm.nih.gov/articles/PMC3141559),
 [muskoxen](https://openpolar.no/Record/ftpubmed:oai:pubmedcentral.nih.gov:5645868),

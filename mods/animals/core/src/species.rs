@@ -413,7 +413,7 @@ pub static SPECIES: [Species; 7] = [
         size_spread: 0.08,
         height: (0.50, "hip"),
         // The Djadokhta Formation, Mongolia: wind-blown dunes, warm and semi-arid.
-        habitats: &[("base:desert", 1.0), ("base:savanna", 0.3)],
+        habitats: &[("animals:red_dunes", 1.0), ("animals:scrubland", 0.4)],
         bio: Biology {
             mass: 15.0,
             gestation: 0.0,
@@ -457,8 +457,9 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.0,
         size_spread: 0.08,
         height: (1.50, "hip"),
-        // The Cedar Mountain Formation, Utah: a semi-arid floodplain with conifers and ferns.
-        habitats: &[("base:savanna", 1.0), ("base:plains", 0.5), ("base:forest", 0.3)],
+        // The Cedar Mountain Formation, Utah: a floodplain whose soils swelled and cracked with
+        // wet and dry seasons, conifers and ferns.
+        habitats: &[("animals:floodplain", 1.0), ("animals:scrubland", 0.5), ("animals:fern_forest", 0.3)],
         bio: Biology {
             mass: 300.0,
             gestation: 0.0,
@@ -504,7 +505,7 @@ pub static SPECIES: [Species; 7] = [
         size_spread: 0.08,
         height: (0.50, "hip"),
         // The Bayan Mandahu Formation, Inner Mongolia: dunes, drier than its cousin's.
-        habitats: &[("base:desert", 1.0)],
+        habitats: &[("animals:red_dunes", 1.0)],
         bio: Biology {
             mass: 15.0,
             gestation: 0.0,
@@ -562,13 +563,7 @@ pub static SPECIES: [Species; 7] = [
         size_spread: 0.12,
         height: (3.9, "shoulder"),
         // A fantasy animal of high crags, each country's kind (`genetics/wyvern.json`).
-        habitats: &[
-            ("base:mountains", 1.0),
-            ("base:snowy_plains", 0.33),
-            ("base:taiga", 0.33),
-            ("base:desert", 0.33),
-            ("base:forest", 0.33),
-        ],
+        habitats: &[("animals:crags", 1.0), ("animals:fern_forest", 0.33), ("animals:red_dunes", 0.33), ("animals:scrubland", 0.33)],
         bio: Biology {
             mass: 5000.0,
             gestation: 0.0,

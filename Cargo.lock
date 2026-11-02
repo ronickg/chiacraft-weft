@@ -143,6 +143,7 @@ name = "animals"
 version = "0.1.0"
 dependencies = [
  "animals_core",
+ "base_api",
  "serde",
  "serde_json",
  "weft_sdk",

@@ -23,9 +23,11 @@ mod capybara;
 mod cat;
 mod coats;
 mod commands;
+mod cretaceous;
 mod dog;
 mod eggs;
 mod evolution;
+mod gateway;
 mod habitats;
 mod knockout;
 mod raptor;
@@ -101,6 +103,8 @@ fn init(r: &mut Registry) {
     breeding::init(r);
     eggs::init(r);
     evolution::init(r);
+    cretaceous::init(r);
+    gateway::init(r);
     habitats::init(r);
     r.particle(&HEART)
         .textures(&["animals:heart"])

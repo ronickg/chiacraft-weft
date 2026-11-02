@@ -32,7 +32,15 @@ Two ways, the same rules (`mods/animals/core`):
 
       target/release/weft --world away-test --size 1600x900 --script mods/animals/tests/away.txt
 
+- **The gateway** (`gateway.txt`, about 30 seconds): builds an amber frame beside the player,
+  lights it with a torch, steps in (to the Cretaceous: a gateway is built in front of them
+  there), steps into that one and comes back out beside the first. The log says
+  `gateway: none near .., built one`, then `gateway: came out of the one at ..`.
+
+      target/release/weft --world gateway-test --size 1600x900 --script mods/animals/tests/gateway.txt
+
 In a world of your own: `/animal speed <n>`, `/animal census [radius]`, `/animal reset`,
 `/animal age <days>` (the animal you look at, older), `/animal away <days>` (the animals round
 you, as if that long had passed while away), `/animal scar`, `/animal habitats [radius]` (the
-land round you by biome, each one's nearest spot, and how much of it each species lives on).
+land round you by biome, each one's nearest spot, and how much of it each species lives on),
+`/dim animals:cretaceous` (straight to the Cretaceous).

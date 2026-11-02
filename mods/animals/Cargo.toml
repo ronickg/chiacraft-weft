@@ -12,5 +12,7 @@ crate-type = ["cdylib"]
 # Species, genes, coats and evolution, shared with the website (`core/`).
 animals_core = { path = "core", features = ["sdk"] }
 weft_sdk.workspace = true
+# The overworld, its sky objects (the Cretaceous has the same sun and moon).
+base_api.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json.workspace = true

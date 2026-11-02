@@ -8,7 +8,7 @@ use weft_sdk::*;
 
 use crate::species::SPECIES;
 
-/// The ground a wild animal may spawn on: grass, snowy grass, sand.
+/// The ground a wild animal may spawn on: grass, snowy grass, sand, red sand.
 const GROUND: &str = "habitat_ground";
 
 /// The tag a biome is given so rules can name it (spawn rules match biomes by tag).
@@ -17,7 +17,7 @@ fn tag(biome: &str) -> String {
 }
 
 pub fn init(r: &mut Registry) {
-    r.tag(GROUND, &["base:grass", "base:snowy_grass", "base:sand"]);
+    r.tag(GROUND, &["base:grass", "base:snowy_grass", "base:sand", "animals:red_sand"]);
     let mut tagged: Vec<&str> = Vec::new();
     for s in &SPECIES {
         for &(biome, share) in s.habitats {

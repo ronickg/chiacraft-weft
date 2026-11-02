@@ -208,8 +208,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 
 | Where it lives | how common there |
 |---|---|
-| `base:desert` | commonest |
-| `base:savanna` | 30% |
+| `animals:red_dunes` | commonest |
+| `animals:scrubland` | 40% |
 
 Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 
@@ -263,9 +263,9 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 
 | Where it lives | how common there |
 |---|---|
-| `base:savanna` | commonest |
-| `base:plains` | 50% |
-| `base:forest` | 30% |
+| `animals:floodplain` | commonest |
+| `animals:scrubland` | 50% |
+| `animals:fern_forest` | 30% |
 
 Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn attempts that pick it where commonest (rare).
 
@@ -319,7 +319,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 
 | Where it lives | how common there |
 |---|---|
-| `base:desert` | commonest |
+| `animals:red_dunes` | commonest |
 
 Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 
@@ -373,11 +373,10 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 
 | Where it lives | how common there |
 |---|---|
-| `base:mountains` | commonest |
-| `base:snowy_plains` | 33% |
-| `base:taiga` | 33% |
-| `base:desert` | 33% |
-| `base:forest` | 33% |
+| `animals:crags` | commonest |
+| `animals:fern_forest` | 33% |
+| `animals:red_dunes` | 33% |
+| `animals:scrubland` | 33% |
 
 Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spawn attempts that pick it where commonest (legendary).
 
