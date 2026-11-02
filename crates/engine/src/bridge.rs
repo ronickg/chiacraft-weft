@@ -11,7 +11,9 @@
 //! - `link <id>`: `<other world's name>\t<other world's key>` if the world has that link, else empty;
 //! - `ticket <player entity> <link id>`: a travel ticket (`travel`) this world signs for that player
 //!   to go through the link, or empty;
-//! - `spot <link id> <x> <y> <z>`: arrivals through the link stand here; `unspot <link id>` forgets it.
+//! - `spot <link id> <x> <y> <z>`: arrivals through the link stand here; `unspot <link id>` forgets it;
+//! - `data_dir <mod>`: a folder in the world's save for that mod's own files (made if missing),
+//!   or empty (no world open, or a name that isn't lowercase letters, digits and `_`).
 //!
 //! Asked anywhere (from a mod's client hooks too):
 //! - `warm <world key>`: asks that world for its status through the player's own endpoint, in the
@@ -123,6 +125,20 @@ fn answer(q: &str, arg: &str) -> String {
             };
             let to = if l.body.from == *world { &l.body.to } else { &l.body.from };
             crate::travel::issue(id, &player, link, to)
+        }
+        "data_dir" => {
+            let Some(dir) = &info.dir else { return String::new() };
+            if arg.is_empty() || !arg.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_') {
+                return String::new();
+            }
+            let d = dir.join("mods").join(arg);
+            match std::fs::create_dir_all(&d) {
+                Ok(()) => d.to_string_lossy().into_owned(),
+                Err(e) => {
+                    log::warn!("mod data folder {}: {e}", d.display());
+                    String::new()
+                }
+            }
         }
         "spot" | "unspot" => {
             let Some(dir) = &info.dir else { return String::new() };
