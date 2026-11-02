@@ -1,6 +1,6 @@
 ---
 name: blocky-model
-description: Build, texture, rig and animate every model in the game (creatures, props, eggs, nests, items) in one block-game house style (Minecraft, Hytale, Vintage Story look) as boxes and quads with a hand-painted pixel texture, from concept art, research or a description, so they all match. Use when asked to make any model, a mob, animal, creature, character or prop "like Minecraft/Hytale", to turn concept art into a Blockbench / .bbmodel / .blockymodel / Bedrock geo model, to paint or fix a pixel texture for a box model, to animate one, or when a box model looks rough, flickers, has wrong eyes, floats or sinks in a pose.
+description: Build, texture, rig and animate every model in the game (creatures, props, eggs, nests, items) in one block-game house style (Minecraft, Hytale, Vintage Story look) as boxes and quads with a hand-painted pixel texture, from concept art, research or a description, so they all match. Use when asked to make any model, a mob, animal, creature, character or prop "like Minecraft/Hytale", to turn concept art into a Blockbench / .bbmodel / .blockymodel / Bedrock geo model, to paint or fix a pixel texture for a box model, to animate one, or when a box model looks rough or somehow wrong next to its references, flickers, has wrong eyes, floats or sinks in a pose.
 ---
 
 # Block-game models: boxes + painted pixel texture
@@ -146,6 +146,37 @@ Appendages
 - No one-way cut-out quads where they're seen side-on (a face-on cheek-fluff quad reads as an
   extra ear from the side): put such fringe on parts that have width.
 
+Big bodies
+- **A torso reads as muscle, not one box**: a core, then the masses that carry the animal on
+  top of it (pectorals either side of the breastbone, shoulder or wing-root muscles widening the
+  top, the ribcage narrowing back to the hips, a keel under a flier's chest). Still few boxes, each
+  a few units out from its neighbors' planes. One big box for a 4 m chest looks like a crate.
+- **Stance width decides strength**: an animal standing on its forelimbs (a dragon on its
+  wrists, a gorilla on its knuckles) plants them wider than its shoulders, the limbs sloping out
+  from the elbows (an A from the front). Straight down from the shoulders they read as stilts.
+
+Wings (bats, dragons, pterosaurs: arms that are wings)
+- **Proportions from the animal, not from a guess**: a bat's or dragon's wing is a short, thick
+  upper arm, a long forearm, and fingers each about as long as the forearm or longer, the skin
+  reaching back to the hips; a dragon's span is 1.4-1.5 times its nose-to-tail length. The
+  forearm must be long enough to reach the ground from an elbow at the height of the back, or it
+  can't walk on its wrists with the wings folded; short fingers can't fold into anything but a
+  cape. Sweep the arms a little forward in flight: the leading edge angles forward.
+- **Skin as panels**: one cut-out quad per gap between fingers, riding the first of the two, and
+  one from the last finger back to the body; each in its own plane inside the fingers' thickness,
+  a unit apart (they never share a plane, even mid-beat).
+- **A rigid panel can't follow fingers closing**: turning it about the wrist moves its whole
+  edge off its own finger (by the angle it turned: on long fingers, metres). So close the fan
+  only partly (half the spread), turn each panel by half the closing so it sits centred in the
+  gap left (reaching a little past both fingers, over its neighbors, a unit apart), and draw in
+  (scale to a sliver toward a pivot inside the hand or body) the skin that can't fit: the panel
+  from the last finger to the body.
+- **Folded on the ground, a sail**: the wrist planted wide and ahead of the chest, the forearm
+  rising to the elbow by the chest's side, the fingers half closed and fanned up and back from
+  the wrist into a tall pleated sail beside the body (the show's dragons). Fit it (wrist, elbow,
+  first and last finger tips as targets) with every corner of the arm, hand and fingers above the
+  ground: pinning one point (the thumb claw's tip) lets the rest hang through it.
+
 Feet and fur
 - **Feet are designed**: toes as grooves on the front running a little over the top, pads
   underneath (hooves: a split line; birds: toes as thin boxes). Size the foot so toes split
@@ -194,6 +225,9 @@ Animation
   ground moving back at the ground speed, then lifted and swung forward) and solve the limb's
   angles to it every frame (least squares on the model's bones, warm-started from the last frame,
   with terms keeping heels, toe tips and wrists above the ground); the wyvern's `solve_gait`.
+  Solve the right limbs as left ones in the mirrored body (its turns' y and z, and its sideways
+  shift, negated), so the shoulders' roll and the weight shifting over a planted limb are in the
+  solve and nothing slides.
   Weft plays a walk 0.6 clip seconds per block walked, so a planted foot moves back DENSITY / 0.6
   units per clip second, and a gait's clip length is its stride over that. A `run` takes over from
   the walk by speed; both are exported as offsets from the idle (`to_bedrock.LAYERED`), which the
@@ -247,6 +281,13 @@ Animation
    - **What makes it recognizable**: ear shape, muzzle, markings (a tabby's M and stripes), eye
      color and pupil shape, tail carriage, typical poses (a cat sits upright with its tail around
      its paws, lies as a loaf).
+   - **For a fantasy creature, the best-known screen version is the real animal**: find its
+     orthographic sheets (ArtStation's "render view" turnarounds), sculpts and stills, and
+     measure from them as from a field guide: span against length, each limb segment against the
+     others, how it stands, how wide. Look at images with the built-in browser (an image search;
+     open a result's image address to see it large), and turn 3D models on Sketchfab in the
+     page's viewer to their front, side and top (downloading one needs the user's OK and a look
+     at its license). Write the ratios into the README; they decide bone lengths.
    - Then decide: real proportions for the body, cute exaggeration only on head, eyes and ears
      (Hytale's way), chunky limbs (not Minecraft's 2-texel sticks), and list the creature's
      signature animations.
@@ -312,8 +353,18 @@ Animation
          no part (tail, ears) folded into the body in any pose
    - [ ] swinging parts swing, not twist; walk and run go forward (`ground.gait` positive)
    - [ ] compare with a screenshot of the target game's own creature at the same angle
+   - [ ] held against the references in flat views (`bbshot.py --angles front_flat,side_flat,top`,
+         the same views as the reference sheet): the ratios match (span, limb lengths, stance
+         width, chest depth), standing and in flight
+   - [ ] quads (wing skin, fins) checked by their cut outline, not their box: a panel's bounding
+         box can dip below the ground while its shape doesn't (and the reverse)
 8. **Save a version before each big change** (`<out>_vN/` with the scripts that built it and a
-   README on restoring it): users often want to compare or revert.
+   README on restoring it): users often want to compare or revert. Show the new one next to the
+   old one in the viewer ("<name> (before)").
+9. **When the user says something looks wrong** (and can't say what): look up the references
+   again, shoot ours in the same flat views, and list the differences as numbers (a span 1.06 times
+   the length against 1.4, a forearm too short to reach the ground). Fix the cause (bone lengths,
+   part sizes) and refit the poses; adjusting a pose around a wrong skeleton never gets there.
 
 ## Coats on the fly (genes, breeding, paint)
 
@@ -388,7 +439,9 @@ on one layout).
   piece, `smooth` drops specks), `entity_spec` (see Props).
 
 - `scripts/bb.py` — run JS in a running Blockbench over CDP (`BB_PORT`, default 9333).
-- `scripts/bbshot.py out.png` — the open Blockbench project from four angles, side by side.
+- `scripts/bbshot.py out.png [--anim name t] [--angles a,b]` — the open Blockbench project from
+  four angles side by side (framed by its bounds), at an animation's frame; `--angles` picks others:
+  `front_flat`, `side_flat`, `top`, `back` (flat views to hold against a reference sheet).
 - `scripts/boxcheck.py spec.json` — coplanar overlapping faces (z-fighting) at rest and, with
   animations in the spec, in every keyframe (`check_posed`); exit 1 if any.
 - `scripts/paint.py` — `tones`, `occlusion`, `paint_face_smooth` (default look), `EYES` (ten eye
@@ -407,7 +460,8 @@ on one layout).
 - `scripts/coats.js` — genes (random, breed), phenotypes per species, the coat renderer.
 - `scripts/coatdata.py layers genes.json out.json` — a creature's layers and genes for the viewer.
 - `scripts/viewer.html` — the viewer page: a switcher between creatures (`animals.json`), a
-  button per animation and per texture variant, and the coat panel (three.js r147).
+  button per animation and per texture variant, and the coat panel (three.js r147); per entry a
+  person for scale, zoom, and playback rates for gaits (see its header). Turntable off by default.
 - `scripts/bb_build.py <dir>` — builds `<dir>/spec.json` + `texture.png` in a running Blockbench
   as a Hytale Character and saves `<name>.blockymodel`, `anims/*.blockyanim`, `<name>.glb`,
   `<name>.bbmodel`.
@@ -422,8 +476,9 @@ Follow `docs/creatures.md` in the chiacraft repository: export with `to_bedrock.
 entity (`.model_file`, `.animations` per pose, `.texture`, `.size`), and check it in the game
 with a `--script` that spawns it and takes shots (`look yaw pitch`: negative pitch looks down).
 Engine limits that shape the model: bones rotate but single boxes don't; a per-entity scale
-(`World::set_scale`) for individuals, none per kind (bake the size in); only `idle` and `walk`
-play by themselves (poses are look kinds with their own file); a played
+(`World::set_scale`) for individuals, none per kind (bake the size in); only `idle`, `walk` and
+`run` play by themselves (walk and run by speed, on top of the idle: `to_bedrock` writes them as
+offsets from it; poses are look kinds with their own file); scale keys play; a played
 animation replaces idle while it plays; no Molang; cut-out alpha only (no blending).
 
 Worked examples, in the chiacraft repo's `animals` mod (each README explains it):
@@ -435,6 +490,9 @@ Worked examples, in the chiacraft repo's `animals` mod (each README explains it)
   eyes on the sides, feather panels). Start birds and dinosaurs here.
 - `mods/animals/source/capybara`: a stocky grazer (no tail, side eyes, chewing, grazing fitted
   to the ground). Start heavy herbivores here.
+- `mods/animals/source/wyvern`: a huge winged dragon (the show's dragons): four-fingered bat
+  wings with skin panels, the folded sail, IK-solved gaits on feet and wrists, a fitted lying pose,
+  scale keys, genes with an accent color, a breath animation. Start winged creatures here.
 - `mods/animals/source/nest` and `mods/animals/source/egg`: props (see Props).
 - `mods/animals/source/dog/chihuahua`: built from a concept sheet (`tools/blocky.py`, colors read
   from the flat turnaround), with eyelids, jaw, tongue, solid ears, toes, a V bib.

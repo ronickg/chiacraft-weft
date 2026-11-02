@@ -7,6 +7,11 @@
        models/<x>.json     {"glb": "<base64 of the .glb>"}   (artifact hosts serve .json, not .glb)
        variants file       {"name": "data:image/png;base64,..."}   (scripts/variants.py; optional)
        fit                 optional: "size" scales a prop by its biggest side (default: height)
+       zoom                optional: times that (a winged creature framed by its span looks small)
+       person              optional: [x, z] meters: a 1.8 m person stands there for scale
+       unit                optional: the GLB's units a meter (default 1; 4 at the house density)
+       rates               optional: {"walk": 1.5, "run": 2.7}: playback rates (a game times gaits by
+                           distance, so a stride's clip plays at the rate a typical speed gives it)
        texture             optional: a PNG for the same model (another species that shares it)
        coat file           models/<x>_coat.json (scripts/coatdata.py; optional): its layers and gene
                            file, for the coat panel (coats.js: Random, Mother, Father, Breed, Paint)
@@ -62,7 +67,7 @@ h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01
     <div class="seg" id="anims" role="group" aria-label="Animation"></div>
     <span class="label" id="variant-label"></span>
     <div class="seg" id="variants" role="group" aria-label="Texture"></div>
-    <label class="toggle"><input type="checkbox" id="spin" checked> Turntable</label>
+    <label class="toggle"><input type="checkbox" id="spin"> Turntable</label>
   </div>
   <div class="bar" id="coatbar" hidden>
     <span class="label">Coat</span>
@@ -138,6 +143,20 @@ function setStatus(text) {
   if (!status) { status = document.createElement("div"); status.className = "status"; el.appendChild(status); }
   status.textContent = text;
 }
+// A 1.8 m person for scale, standing at [x, z] meters (`unit`: the model's units a meter).
+function person(unit, [x, z]) {
+  const g = new THREE.Group();
+  const box = (w, h, d, px, py, color) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w * unit, h * unit, d * unit), new THREE.MeshStandardMaterial({ color, roughness: 1 }));
+    m.position.set(px * unit, py * unit, 0); g.add(m);
+  };
+  box(0.22, 0.86, 0.24, -0.12, 0.43, 0x3a4660); box(0.22, 0.86, 0.24, 0.12, 0.43, 0x3a4660);  // legs
+  box(0.5, 0.64, 0.26, 0, 1.18, 0x7a8fa8);                                                      // body
+  box(0.18, 0.62, 0.22, -0.35, 1.18, 0x7a8fa8); box(0.18, 0.62, 0.22, 0.35, 1.18, 0x7a8fa8);  // arms
+  box(0.3, 0.3, 0.3, 0, 1.65, 0xd9b38c);                                                        // head
+  g.position.set(x * unit, 0, z * unit);
+  return g;
+}
 async function load(entry) {
   if (loaded[entry.name]) return loaded[entry.name];
   const { glb } = await (await fetch(entry.model)).json();
@@ -146,10 +165,13 @@ async function load(entry) {
   const box = new THREE.Box3().setFromObject(gltf.scene);
   // Creatures by height; props (`fit: "size"`, a flat nest) by their biggest side.
   const sz = box.getSize(new THREE.Vector3());
-  gltf.scene.scale.setScalar(entry.fit === "size" ? 0.5 / Math.max(sz.x, sz.y, sz.z, 1e-6) : 0.32 / Math.max(sz.y, 1e-6));
+  gltf.scene.scale.setScalar((entry.zoom || 1) * (entry.fit === "size" ? 0.5 / Math.max(sz.x, sz.y, sz.z, 1e-6) : 0.32 / Math.max(sz.y, 1e-6)));
+  if (entry.person) gltf.scene.add(person(entry.unit || 1, entry.person));
   gltf.scene.traverse(o => { if (o.material && o.material.map) { o.material.map.magFilter = o.material.map.minFilter = THREE.NearestFilter; o.material.map.needsUpdate = true; } });
   const a = { model: gltf.scene, mixer: new THREE.AnimationMixer(gltf.scene), actions: {}, textures: {}, variantNames: [] };
   for (const clip of gltf.animations) a.actions[clip.name] = a.mixer.clipAction(clip);
+  // Gaits the game times by distance walked play at the rate a typical speed gives them.
+  for (const [n, r] of Object.entries(entry.rates || {})) if (a.actions[n]) a.actions[n].timeScale = r;
   if (entry.texture) {  // another species on the same model: its own texture
     const t = await new Promise(done => new THREE.TextureLoader().load(entry.texture, done));
     t.flipY = false; t.encoding = THREE.sRGBEncoding; t.magFilter = t.minFilter = THREE.NearestFilter;

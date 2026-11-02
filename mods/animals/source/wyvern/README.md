@@ -25,7 +25,7 @@ folded wing, the lying pose; `--refit` or `--refit-rest` to redo them after movi
   closing all the way: the fan only half closes, each panel centred in the gap left, the skin
   from the last finger to the body drawn in to slivers.
 - **On the ground** it goes on four: the hind feet and the wrists of the folded wings, the wings
-  closed round it like a cape. The show's animators (Pixomondo) studied gorillas for the walk
+  standing beside it as sails. The show's animators (Pixomondo) studied gorillas for the walk
   (big shoulders and long arms, walking on the knuckles) and dropped a bat's hopping gait as odd
   on a dragon; the walk was sold by the arm and hip motion. So: the wings step one after the
   other (a primate's order: left leg, right wing, right leg, left wing), the shoulders roll onto
