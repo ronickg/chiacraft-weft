@@ -133,6 +133,8 @@ pub struct ClientEntity {
     /// Its own box (width, height, eye) and the kind it looks like, when a mod set them.
     pub size: Option<[f32; 3]>,
     pub look: Option<u32>,
+    /// How big it is against its kind (`Host::set_entity_scale`): model and box.
+    pub scale: f32,
     /// The solid body it stands on (0: the world), and its position relative to that body:
     /// shown and as the server last had it. Riders are drawn where the body is drawn.
     pub frame: u64,
@@ -185,7 +187,7 @@ impl ClientEntity {
         let [w, h, eye] = self
             .size
             .unwrap_or([k.width, k.height, k.eye])
-            .map(|v| v as f64);
+            .map(|v| (v * self.scale) as f64);
         let (h, eye) = physics::posed(self.pose, h, eye);
         (w / 2.0, h, eye)
     }
@@ -1814,12 +1816,13 @@ impl Client {
         };
         let f: Vec<f32> = words(bytes).map(f32::from_le_bytes).collect();
         let shaped = || {
-            let size = (f.len() == 4 && f[0] > 0.0).then(|| [f[0], f[1], f[2]]);
+            let size = (f.len() >= 4 && f[0] > 0.0).then(|| [f[0], f[1], f[2]]);
             let look = words(bytes)
                 .nth(3)
                 .map(u32::from_le_bytes)
                 .filter(|&l| l != u32::MAX);
-            (size, look)
+            let scale = f.get(4).copied().filter(|&s| s > 0.0).unwrap_or(1.0);
+            (size, look, scale)
         };
         if id == self.player_id {
             if comp == burning {
@@ -1837,9 +1840,11 @@ impl Client {
             } else if comp == mount {
                 self.player.mount = mounted().map(|(m, seat)| (m, seat as f64));
             } else if comp == shape {
-                let (size, look) = shaped();
+                let (size, look, scale) = shaped();
                 let k = &c.game.entities[c.game.player_kind as usize];
-                self.player.size = size.unwrap_or([k.width, k.height, k.eye]).map(|v| v as f64);
+                self.player.size = size
+                    .unwrap_or([k.width, k.height, k.eye])
+                    .map(|v| (v * scale) as f64);
                 self.self_look = look;
             }
             return;
@@ -1859,7 +1864,7 @@ impl Client {
         } else if comp == held {
             e.held = words(bytes).next().map_or(0, u32::from_le_bytes);
         } else if comp == shape {
-            (e.size, e.look) = shaped();
+            (e.size, e.look, e.scale) = shaped();
         }
     }
 
@@ -2048,6 +2053,7 @@ impl Client {
             pulled: None,
             size: None,
             look: self.self_look,
+            scale: 1.0,
             frame: 0,
             rel: DVec3::ZERO,
             rel_target: None,

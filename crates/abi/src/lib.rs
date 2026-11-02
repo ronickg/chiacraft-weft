@@ -2202,6 +2202,9 @@ pub struct Host {
     /// and in any look with the same texture. A changed component paints it again. For skins
     /// that follow from a few bytes (an animal's genes) instead of sending pictures.
     pub reg_entity_skin: unsafe extern "C" fn(reg: *mut Registrar, kind: Str, comp: Str, cb: Callback),
+    /// Draws an entity `scale` times as big as its kind (or its own `set_entity_size` box), its
+    /// box and eyes scaled alike: individuals of one kind that differ in size. 1 is its own size.
+    pub set_entity_scale: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, scale: f32),
     /// Writes a kind's box (width, height, eye height); 0 if there is no such kind.
     pub entity_kind_size: unsafe extern "C" fn(kind: Str, out: *mut [f32; 3]) -> u32,
     /// A block of moving structure `entity` (its own coordinates); `u32::MAX` if it is none.

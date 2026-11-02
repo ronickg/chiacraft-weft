@@ -603,11 +603,14 @@ impl Dim {
             put(comps, burning, &[(e.fire > 0) as u8]);
             let items: Vec<u8> = e.worn.iter().flat_map(|i| i.to_le_bytes()).collect();
             put(comps, worn, &items);
-            let mut sh = [0u8; 16];
+            let mut sh = [0u8; 20];
             for (i, v) in e.size.unwrap_or([0.0; 3]).iter().enumerate() {
                 sh[i * 4..i * 4 + 4].copy_from_slice(&v.to_le_bytes());
             }
-            sh[12..].copy_from_slice(&e.look.unwrap_or(u32::MAX).to_le_bytes());
+            sh[12..16].copy_from_slice(&e.look.unwrap_or(u32::MAX).to_le_bytes());
+            // 0 for its own size, so most entities send the field's default.
+            let scale = if e.scale == 1.0 { 0.0 } else { e.scale };
+            sh[16..].copy_from_slice(&scale.to_le_bytes());
             put(comps, shape, &sh);
             let mut on = [0u8; 12];
             if let Some((m, seat)) = e.mount {

@@ -272,7 +272,7 @@ Anywhere a block is named as text, `base:furnace[lit=true]` picks a state: in st
 - `on_interact`: a player right clicked one (after `question::INTERACT_ENTITY`)
 
 Moving platforms: `solid()`, `kinematic()`, `carry_height(..)`, and
-`blocks(&DECK)` with a template (`r.template(&DECK).fill("base:oak_planks", from, to)`) makes a flying structure players can build on; its box is what the blocks fill, no `size` needed. `EntityState.size` is an entity's box and eye height as they are now (crouching and `w.set_size` included), so `st.pos[1] + st.size[2]` is where its eyes are.
+`blocks(&DECK)` with a template (`r.template(&DECK).fill("base:oak_planks", from, to)`) makes a flying structure players can build on; its box is what the blocks fill, no `size` needed. `EntityState.size` is an entity's box and eye height as they are now (crouching and `w.set_size` included), so `st.pos[1] + st.size[2]` is where its eyes are. `w.set_scale(id, 1.2)` draws one entity a fifth bigger than its kind, its box and eyes alike (individuals that differ in size; not saved, so set it again when it loads).
 
 Riding: `w.mount(rider, mount, seat)` seats a player (or any entity) on another, `seat` blocks
 above its feet; `w.dismount(rider)` gets it off where it is (`w.teleport` it beside). A riding

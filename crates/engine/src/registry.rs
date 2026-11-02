@@ -1666,7 +1666,7 @@ pub fn freeze(
         (HEALTH, 8, own, vec![0; 8]),
         (BURNING, 1, shown, vec![0]),
         (WORN, 0, shown, Vec::new()),
-        (SHAPE, 16, own, shape),
+        (SHAPE, 20, own, shape),
         (HELD, 4, shown, vec![0; 4]),
         (MOUNT, 12, own, vec![0; 12]),
         (SIMULATED, 8, save, vec![0; 8]),

@@ -228,6 +228,7 @@ pub static HOST: Host = Host {
     entity_keys,
     reg_entity_skin,
     entity_kind_size,
+    set_entity_scale,
     structure_block,
     set_structure_block,
     lift_blocks,
@@ -2012,6 +2013,15 @@ unsafe extern "C" fn set_entity_size(w: *mut abi::WorldCtx, id: u64, width: f32,
         let d = dim(w);
         if let Some(e) = d.entities.get_mut(id) {
             e.size = (width > 0.0).then_some([width, height.max(0.0), eye.clamp(0.0, height.max(0.0))]);
+        }
+    }
+}
+
+unsafe extern "C" fn set_entity_scale(w: *mut abi::WorldCtx, id: u64, scale: f32) {
+    unsafe {
+        let d = dim(w);
+        if let Some(e) = d.entities.get_mut(id) {
+            e.scale = if scale.is_finite() { scale.clamp(0.05, 20.0) } else { 1.0 };
         }
     }
 }

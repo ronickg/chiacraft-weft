@@ -82,6 +82,12 @@ impl World {
         let [w, h, eye] = size.unwrap_or([0.0; 3]);
         unsafe { (host().set_entity_size)(self.raw(), id, w, h, eye) }
     }
+    /// Draws `id` `scale` times as big as its kind (or its own `set_size` box), its box and eyes
+    /// scaled alike, for every player: individuals of a kind that differ in size (1: its own).
+    /// Not saved: set it again when it loads.
+    pub fn set_scale(&self, id: u64, scale: f32) {
+        unsafe { (host().set_entity_scale)(self.raw(), id, scale) }
+    }
     /// `rider` (a player, or any entity) sits on `mount`, `seat` blocks above the mount's feet.
     /// A riding player stays on the seat and its movement keys are only read (`keys`): steer the
     /// mount with them (`walk`), and let it off (`dismount`) when it sneaks. False if either is

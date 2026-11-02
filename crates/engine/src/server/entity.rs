@@ -51,6 +51,8 @@ pub struct Entity {
     /// Its own box (width, height, eye) and another kind it looks like, set by mods.
     pub size: Option<[f32; 3]>,
     pub look: Option<u32>,
+    /// How big it is against its kind (or its own box): model and box alike (`Host::set_entity_scale`).
+    pub scale: f32,
     /// What it rides and its seat's height above the mount's feet (`Host::entity_mount`).
     pub mount: Option<(u64, f32)>,
     /// A player's movement keys as its client last said (`abi::held_keys`).
@@ -124,6 +126,7 @@ impl Entity {
             frame: None,
             motion: Motion::Free,
             size: None,
+            scale: 1.0,
             look: None,
             mount: None,
             keys: 0,
@@ -151,7 +154,7 @@ impl Entity {
         let [w, h, eye] = self
             .size
             .unwrap_or([k.width, k.height, k.eye])
-            .map(|v| v as f64);
+            .map(|v| (v * self.scale) as f64);
         let (h, eye) = physics::posed(self.pose, h, eye);
         (w / 2.0, h, eye)
     }

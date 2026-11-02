@@ -879,7 +879,8 @@ impl EntityRenderer {
                             add((i, m.anims[i].at(e.age, true), 1.0));
                         }
                         if let Some(i) = m.walk {
-                            add((i, m.anims[i].at(e.walk * 0.6, true), e.swing.min(1.0)));
+                            // Smaller steps, quicker: a small one's legs go round faster.
+                            add((i, m.anims[i].at(e.walk * 0.6 / e.scale, true), e.swing.min(1.0)));
                             swing = 0.0;
                         }
                     }
@@ -912,7 +913,7 @@ impl EntityRenderer {
                 * Mat4::from_rotation_y(body_yaw)
                 * Mat4::from_rotation_z(roll)
                 * swim
-                * Mat4::from_scale(Vec3::splat(1.0 / 16.0));
+                * Mat4::from_scale(Vec3::splat(e.scale / 16.0));
             // Its head up to look ahead, and limbs by the swimming stroke.
             let swim_limbs = lying.filter(|_| !sleeping).map(|_| e.walk * 4.0);
             let (pitch, head_yaw) = if sleeping {

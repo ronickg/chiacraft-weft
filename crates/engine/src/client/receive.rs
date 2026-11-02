@@ -299,6 +299,7 @@ impl Client {
                     track: Default::default(),
                     pulled: None,
                     size: None,
+                    scale: 1.0,
                     look: None,
                     frame: 0,
                     rel: DVec3::ZERO,
