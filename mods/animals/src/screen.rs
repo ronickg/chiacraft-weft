@@ -6,7 +6,8 @@
 use weft_sdk::*;
 
 use crate::animal::{self, ANIMAL, Animal, OWNER, STAGE_NAMES};
-use crate::species::{self, Diet, STAT_NAMES, STATS, Size, Taming};
+use crate::species::{self, Diet, Liking, STAT_NAMES, STATS, Size, Taming};
+use crate::taming::TAMING;
 
 static ANIMAL_MENU: Menu = Menu::named("animal");
 static SCOUT_MENU: Menu = Menu::named("scout");
@@ -34,7 +35,7 @@ pub fn init(r: &mut Registry) {
             }
         });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild)] [count:int]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here)] [count:int]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -227,6 +228,30 @@ fn scout_screen(ui: &mut Ui) {
             };
             t.set("screen.animals.kind", &[Arg::Key(size), Arg::Key(diet), Arg::Key(taming)]);
         });
+        ui.text_bind(|c, t| {
+            t.text("");
+            let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
+            if let Some(f) = s.foods.iter().find(|f| f.liking == Liking::Favorite) {
+                t.set("screen.animals.favorite", &[Arg::Name(&format!("item:{}", f.item))]);
+            }
+        });
+        // A wild one's taming so far, and what it asks for now.
+        ui.text_bind(|c, t| {
+            t.text("");
+            let Some(g) = c.menu_component(&TAMING).filter(|g| g.feedings > 0 && !tamed(c)) else { return };
+            t.set(
+                "screen.animals.taming",
+                &[Arg::Int((g.progress * 100.0) as i64), Arg::Int((g.effectiveness * 100.0).round() as i64)],
+            );
+        });
+        ui.text_bind(|c, t| {
+            t.text("");
+            let Some(g) = c.menu_component(&TAMING).filter(|g| g.asking > 0 && !tamed(c)) else { return };
+            let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
+            if let Some(f) = s.foods.get(g.want as usize - 1) {
+                t.set("screen.animals.wants", &[Arg::Name(&format!("item:{}", f.item))]);
+            }
+        });
     });
 }
 
@@ -243,7 +268,7 @@ fn nearest(w: &World, player: u64, range: f64) -> Option<u64> {
 }
 
 /// `/animal` on the animal you look at (or the nearest): `show` its screen, `tame` it (yours), give it `points`
-/// to place, or make it `wild` again with new levels.
+/// to place, make it `wild` again with new levels, or bring it `here` (two blocks ahead).
 fn command(cmd: &mut ServerCommand) {
     let (w, player) = (cmd.world(), cmd.player());
     let Some(id) = looked_at(&w, player, 16.0).or_else(|| nearest(&w, player, 12.0)) else {
@@ -252,16 +277,7 @@ fn command(cmd: &mut ServerCommand) {
     };
     match cmd.text("action").unwrap_or("show") {
         "tame" => {
-            let key = crate::player_key(player);
-            if let Some(o) = w.component_mut(id, &OWNER)
-                && key.len() == 64
-            {
-                o.copy_from_slice(key.as_bytes());
-            }
-            if let Some(a) = w.component_mut(id, &ANIMAL) {
-                a.bond = a.bond.max(50);
-            }
-            crate::tamed_by_command(&w, id, player);
+            crate::taming::tame(&w, id, player, 0.0);
             cmd.reply("command.animals.tamed", &[]);
         }
         "points" => {
@@ -279,6 +295,14 @@ fn command(cmd: &mut ServerCommand) {
                 a.species = 0;
             }
             cmd.reply("command.animals.wild", &[]);
+        }
+        "here" => {
+            if let (Some(p), Some(mut e)) = (w.entity(player), w.entity(id)) {
+                let (sy, cy) = (p.yaw as f64).sin_cos();
+                e.pos = [p.pos[0] - sy * 2.0, p.pos[1], p.pos[2] - cy * 2.0];
+                w.set_entity(id, &e);
+                w.navigate(id, e.pos, 0.0);
+            }
         }
         _ => {
             open(&w, player, id);

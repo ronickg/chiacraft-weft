@@ -34,6 +34,43 @@ pub enum Taming {
     Knockout,
 }
 
+/// How much an animal likes a food: taming progress per feeding, as a multiple of plain food.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Liking {
+    Eats,
+    Favorite,
+    Kibble,
+}
+
+impl Liking {
+    pub fn taming(self) -> f32 {
+        match self {
+            Liking::Eats => 1.0,
+            Liking::Favorite => 1.5,
+            Liking::Kibble => 2.0,
+        }
+    }
+}
+
+pub struct Food {
+    /// The item's full name.
+    pub item: &'static str,
+    /// Points of food it gives.
+    pub food: u16,
+    pub liking: Liking,
+}
+
+const fn eats(item: &'static str, food: u16) -> Food {
+    Food { item, food, liking: Liking::Eats }
+}
+
+const fn favorite(item: &'static str, food: u16) -> Food {
+    Food { item, food, liking: Liking::Favorite }
+}
+
+/// Every species takes kibble, best of all.
+const KIBBLE: Food = Food { item: "animals:kibble", food: 30, liking: Liking::Kibble };
+
 pub struct Species {
     pub kind: &'static Entity,
     /// `entity.animals.<name>`, `species.animals.<name>.*`.
@@ -48,6 +85,13 @@ pub struct Species {
     pub tamed_step: [f32; STATS],
     /// Seconds a tame takes to use one point of food.
     pub hunger: f32,
+    /// What it eats; anything else in another species' diet it dislikes.
+    pub foods: &'static [Food],
+    /// Feedings of plain food that tame one at level 1 (a level-150 one takes 2.5 times as many).
+    pub feedings: f32,
+    /// Blocks within which a player walking upright (not sneaking) scares it; twice as far
+    /// running. 0: nothing scares it.
+    pub shy: f32,
 }
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
@@ -66,6 +110,20 @@ pub static SPECIES: [Species; 4] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 30.0,
+        foods: &[
+            eats("base:beef", 10),
+            eats("base:porkchop", 10),
+            eats("base:chicken", 8),
+            eats("base:mutton", 8),
+            favorite("base:cooked_beef", 20),
+            favorite("base:cooked_porkchop", 20),
+            favorite("base:cooked_chicken", 16),
+            favorite("base:cooked_mutton", 16),
+            favorite("base:bone", 5),
+            KIBBLE,
+        ],
+        feedings: 4.0,
+        shy: 3.0,
     },
     Species {
         kind: &crate::cat::CAT,
@@ -77,6 +135,19 @@ pub static SPECIES: [Species; 4] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 40.0,
+        // No fish in the game yet: birds and eggs are what it likes best.
+        foods: &[
+            eats("base:beef", 8),
+            eats("base:mutton", 8),
+            eats("base:egg", 6),
+            eats("base:cooked_beef", 14),
+            eats("base:cooked_mutton", 14),
+            favorite("base:chicken", 10),
+            favorite("base:cooked_chicken", 16),
+            KIBBLE,
+        ],
+        feedings: 5.0,
+        shy: 6.0,
     },
     Species {
         kind: &crate::capybara::CAPYBARA,
@@ -89,6 +160,16 @@ pub static SPECIES: [Species; 4] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 25.0,
+        foods: &[
+            eats("base:wheat", 10),
+            eats("base:wheat_seeds", 3),
+            eats("base:bread", 15),
+            favorite("base:apple", 15),
+            favorite("base:sugar_cane", 12),
+            KIBBLE,
+        ],
+        feedings: 3.0,
+        shy: 0.0,
     },
     Species {
         kind: &crate::raptor::RAPTOR,
@@ -100,6 +181,30 @@ pub static SPECIES: [Species; 4] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 20.0,
+        foods: &[
+            eats("base:chicken", 10),
+            eats("base:mutton", 10),
+            eats("base:porkchop", 12),
+            favorite("base:beef", 15),
+            KIBBLE,
+        ],
+        feedings: 10.0,
+        shy: 8.0,
     },
 ];
 
+impl Species {
+    /// Its food `item` (an item id), if it eats it.
+    pub fn food(&self, item: u32) -> Option<(usize, &'static Food)> {
+        let name = weft_sdk::item_name(item);
+        self.foods
+            .iter()
+            .enumerate()
+            .find(|(_, f)| f.item == name)
+    }
+}
+
+/// Whether some species eats `item`: offered to one that doesn't, it is disliked.
+pub fn anyone_eats(item: u32) -> bool {
+    SPECIES.iter().any(|s| s.food(item).is_some())
+}

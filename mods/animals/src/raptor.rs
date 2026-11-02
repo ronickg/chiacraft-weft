@@ -50,10 +50,14 @@ pub fn init(r: &mut Registry) {
         .texture(TEXTURE)
         .attach(&STATE)
         .on_interact(|e| {
-            crate::screen::interact(&e.world(), e.entity(), e.other());
+            let (w, id, player) = (e.world(), e.entity(), e.other());
+            if !crate::screen::interact(&w, id, player) {
+                crate::taming::feed(&w, id, player);
+            }
         })
-        .goals(Goals::new().then(crate::animal::upkeep(3)).then(settle).then(ai::wander(0.6, 9.0)))
+        .goals(Goals::new().then(crate::animal::upkeep(3)).then(crate::taming::behave(3)).then(settle).then(ai::wander(0.6, 9.0)))
         .on_hurt(|w, h| {
+            crate::taming::hurt(w, h.entity);
             if let Some(c) = w.component_mut(h.entity, &STATE) {
                 c.rest = 0;
             }

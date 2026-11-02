@@ -1,7 +1,7 @@
 # Animals: taming, stats, breeding (design)
 
-Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Step 1 of
-the build order (the core) is built; see "Built so far" at the end. "Proposed" marks numbers and
+Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Steps 1 and
+2 of the build order (the core, passive taming) are built; see "Built so far" at the end. "Proposed" marks numbers and
 details that still need his yes. Reference: ARK, made to
 fit chiacraft (worlds owned by their players, linked by portals, the chain only where it adds
 trust; see `notes/PLAN.md`).
@@ -412,6 +412,27 @@ general features worth offering upstream):
   sex, stage, size, diet, how it is tamed) through the spyglass: use it on an animal up to 64
   blocks away (a ray against the animals' boxes, stopped by blocks), or right click one with it.
   `/animal [show|tame|points N|wild]` (game masters) for testing.
+
+**Step 2, passive taming** (2026-11-01, `taming.rs`, diets in `species.rs`):
+
+- Each species has a diet (what it eats, its favorites, food points per item) and how many
+  feedings of plain food tame one at level 1 (chihuahua 4, cat 5, capybara 3; a level-150 one
+  takes 2.5 times as many). Plain food counts 1, a favorite 1.5, kibble 2, and what it asked
+  for a quarter more. No fish or melons exist yet, so the cat's favorite is chicken and the
+  capybara's apples and sugar cane.
+- A wild one asks when a player is within 5 blocks: a speech bubble with the food above it
+  (`textures/particle/want_*.png`, made from base's item icons), for 20 seconds, standing
+  still; after each feeding it waits 10-30 seconds before asking again.
+- Mistakes: feeding it when it isn't asking (it eats, a third of the time it runs off) or
+  offering food it dislikes (another species' food) cost 10% effectiveness; hurting it 15% and
+  it runs off. Shyness: within `shy` blocks a player walking upright (not sneaking) scares it,
+  running twice as far (cat 6, chihuahua 3, capybara never).
+- Tamed: the player's, bond 25, `floor(level * effectiveness / 2)` bonus levels as wild points
+  on random stats (not torpor). The chihuahua's old bone taming is gone (bones are a favorite).
+- **Kibble** (`animals:kibble`): an egg, raw meat or an apple/sugar cane, wheat and a water
+  bucket make four; every species takes it. Tiers by egg and a cooking pot come later.
+- The scout screen shows the favorite food, the taming bar and effectiveness, and what it asks
+  for. `/animal here` brings the animal in front of you (testing).
 
 Not yet: XP and earning points (the command gives them), naming, the higher spyglass tier, tame
 caps and other world settings. Engine note: clients don't see other entities' attribute

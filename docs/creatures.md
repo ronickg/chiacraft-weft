@@ -62,10 +62,12 @@ bones `leg0`..`leg3` unless you want the engine's own leg swing (an animation wi
 it off anyway).
 
 Then give it stats: a row in `mods/animals/src/species.rs` (base values of the nine stats, its
-diet, how it is tamed; see `notes/ANIMALS.md`), `.then(crate::animal::upkeep(<its row>))` first in
-its goals (its wild level, sex, stats applied) and
-`.on_interact(|e| { crate::screen::interact(&e.world(), e.entity(), e.other()); })` so the
-spyglass and the animal screen work on it.
+diet and favorite foods, how it is tamed; see `notes/ANIMALS.md`),
+`.then(crate::animal::upkeep(<its row>)).then(crate::taming::behave(<its row>))` first in its
+goals (its wild level and stats; asking for food and running off when scared), an
+`.on_interact` that calls `crate::screen::interact` and else `crate::taming::feed` (the
+spyglass, the animal screen, feeding to tame) and `crate::taming::hurt` in its `.on_hurt`. A
+new food needs its bubble: `textures/particle/want_<item>.png` (the bubble with the item's icon).
 
 To see it: build (`cargo build --release`), then run a script that spawns it and takes shots:
 

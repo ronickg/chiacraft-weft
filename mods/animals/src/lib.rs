@@ -2,8 +2,9 @@
 //! capybaras (`capybara.rs`).
 //!
 //! Chihuahuas: small long-haired dogs on grassland, each with its own coat (8 colors, 6 patterns,
-//! 2 marking layouts: 96 coats). Tame one with bones (a third of the time it
-//! takes), make it sit or follow by right clicking it, breed two tamed ones with meat: the puppy
+//! 2 marking layouts: 96 coats). Tame one by feeding it when it asks (`taming.rs`; bones and cooked
+//! meat are its favorites), make it sit or follow by right clicking it, breed two tamed ones with
+//! meat: the puppy
 //! takes its color from one parent and its pattern from either, now and then something new, and
 //! grows up in twenty minutes (meat speeds it along).
 //!
@@ -20,7 +21,7 @@
 
 use std::sync::OnceLock;
 
-use weft_sdk::abi::{ItemStack, Str};
+use weft_sdk::abi::Str;
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
@@ -32,13 +33,12 @@ mod cat;
 mod raptor;
 mod screen;
 mod species;
+mod taming;
 
 use animal::OWNER;
 
 pub(crate) static CHIHUAHUA: Entity = Entity::named("chihuahua");
 static HEART: Particle = Particle::named("heart");
-static POOF: Particle = Particle::named("core:poof");
-static BONE: Item = Item::named("base:bone");
 static MEATS: [Item; 4] =
     [Item::named("base:beef"), Item::named("base:cooked_beef"), Item::named("base:porkchop"), Item::named("base:cooked_porkchop")];
 
@@ -146,6 +146,7 @@ fn init(r: &mut Registry) {
     raptor::init(r);
     animal::init(r);
     screen::init(r);
+    taming::init(r);
     r.entity_component(&DOG, Dog::default(), component_flags::SAVE);
     r.entity_component(&SEEN, Seen::default(), 0);
     r.particle(&HEART)
@@ -189,6 +190,7 @@ fn init(r: &mut Registry) {
         .goals(goals())
         .on_interact(interact)
         .on_hurt(|w, h| {
+            taming::hurt(w, h.entity);
             if let Some(d) = w.component_mut(h.entity, &DOG) {
                 d.sitting = 0;
                 d.panic = 60;
@@ -208,6 +210,7 @@ fn init(r: &mut Registry) {
 fn goals() -> Goals {
     Goals::new()
         .then(animal::upkeep(0))
+        .then(taming::behave(0))
         .then(upkeep)
         .then(|w: &World, id: u64, st: &EntityState| {
             // Hurt: runs about for three seconds.
@@ -381,19 +384,7 @@ fn hearts(w: &World, at: [f64; 3]) {
     );
 }
 
-/// A held item from the player's hand, used up (unless in creative).
-fn take_one(w: &World, player: u64) {
-    if w.creative(player) {
-        return;
-    }
-    let inv = w.inventory(player);
-    let slot = w.selected_slot(player);
-    let mut s = inv.get(slot);
-    s.count = s.count.saturating_sub(1);
-    inv.set(slot, if s.count == 0 { ItemStack::EMPTY } else { s });
-}
-
-/// A player right clicks a dog: a bone tames a wild one (a third of the time), meat puts a
+/// A player right clicks a dog: a wild one is fed toward taming (`taming.rs`), meat puts a
 /// grown tamed one in love (or helps a puppy grow), anything else makes its owner's dog sit or
 /// follow.
 fn interact(e: &mut EntityEvent) {
@@ -409,33 +400,7 @@ fn interact(e: &mut EntityEvent) {
         .component(id, &OWNER)
         .is_some_and(|k| k[0] != 0 && String::from_utf8_lossy(k) == key);
     if d.tamed == 0 {
-        if held.item != BONE.id() || key.len() != 64 {
-            return;
-        }
-        take_one(&w, player);
-        if w.random_below(3) == 0 {
-            if let Some(o) = w.component_mut(id, &OWNER) {
-                o.copy_from_slice(key.as_bytes());
-            }
-            if let Some(d) = w.component_mut(id, &DOG) {
-                d.tamed = 1;
-                d.sitting = 1;
-            }
-            if let Some(a) = w.component_mut(id, &animal::ANIMAL) {
-                a.bond = a.bond.max(25);
-            }
-            weft_sdk::info!("chihuahua {id} tamed");
-            if let Some(s) = w.component_mut(id, &SEEN) {
-                s.owner = player;
-            }
-            hearts(&w, st.pos);
-        } else {
-            drop(
-                w.spawn_particles(&POOF, [st.pos[0], st.pos[1] + 0.5, st.pos[2]])
-                    .count(4)
-                    .spread(0.2),
-            );
-        }
+        taming::feed(&w, id, player);
         return;
     }
     if !mine {
@@ -444,13 +409,13 @@ fn interact(e: &mut EntityEvent) {
     if MEATS.iter().any(|m| m.id() == held.item) {
         animal::feed(&w, id, 20);
         if d.age > 0 {
-            take_one(&w, player);
+            taming::take_one(&w, player);
             if let Some(d) = w.component_mut(id, &DOG) {
                 d.age = d.age * 9 / 10;
             }
             hearts(&w, st.pos);
         } else if d.love == 0 && d.cooldown == 0 {
-            take_one(&w, player);
+            taming::take_one(&w, player);
             if let Some(d) = w.component_mut(id, &DOG) {
                 d.love = LOVE_TICKS;
             }
@@ -468,10 +433,11 @@ fn interact(e: &mut EntityEvent) {
     }
 }
 
-/// `/animal tame` made `id` `player`'s: a dog keeps its own record of that too.
-fn tamed_by_command(w: &World, id: u64, player: u64) {
+/// `id` was just tamed by `player`: a dog keeps its own record of that too, and sits.
+fn on_tamed(w: &World, id: u64, player: u64) {
     if let Some(d) = w.component_mut(id, &DOG) {
         d.tamed = 1;
+        d.sitting = 1;
     }
     if let Some(s) = w.component_mut(id, &SEEN) {
         s.owner = player;

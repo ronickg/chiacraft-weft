@@ -46,3 +46,7 @@ command.animals.none = Look at an animal.
 command.animals.tamed = It is yours now.
 command.animals.points = {0} points to place.
 command.animals.wild = It is wild again, with new levels.
+item.animals.kibble = Kibble
+screen.animals.favorite = Favorite food: {0}
+screen.animals.taming = Taming {0}% · effectiveness {1}%
+screen.animals.wants = It asks for {0}
