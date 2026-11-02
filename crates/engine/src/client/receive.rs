@@ -305,6 +305,7 @@ impl Client {
                     rel: DVec3::ZERO,
                     rel_target: None,
                     mount: None,
+                    seat_forward: 0.0,
                     structure: None,
                     world_light: Default::default(),
                 },

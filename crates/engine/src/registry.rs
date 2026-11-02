@@ -1668,7 +1668,7 @@ pub fn freeze(
         (WORN, 0, shown, Vec::new()),
         (SHAPE, 20, own, shape),
         (HELD, 4, shown, vec![0; 4]),
-        (MOUNT, 12, own, vec![0; 12]),
+        (MOUNT, 16, own, vec![0; 16]),
         (SIMULATED, 8, save, vec![0; 8]),
     ] {
         components.push(RawComponent {

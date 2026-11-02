@@ -612,10 +612,11 @@ impl Dim {
             let scale = if e.scale == 1.0 { 0.0 } else { e.scale };
             sh[16..].copy_from_slice(&scale.to_le_bytes());
             put(comps, shape, &sh);
-            let mut on = [0u8; 12];
+            let mut on = [0u8; 16];
             if let Some((m, seat)) = e.mount {
                 on[..8].copy_from_slice(&m.to_le_bytes());
-                on[8..].copy_from_slice(&seat.to_le_bytes());
+                on[8..12].copy_from_slice(&seat.to_le_bytes());
+                on[12..].copy_from_slice(&e.seat_forward.to_le_bytes());
             }
             put(comps, mount, &on);
             if e.player {
@@ -1932,19 +1933,19 @@ impl Dim {
     /// Riders on their mounts' seats (a player's client puts itself there and says so); a
     /// mount that is gone or dead leaves its rider on foot.
     fn seat_riders(&mut self) {
-        let riders: Vec<(u64, u64, f32)> = self
+        let riders: Vec<(u64, u64, f32, f32)> = self
             .entities
             .list
             .iter()
             .filter(|e| !e.removed)
-            .filter_map(|e| e.mount.map(|(m, seat)| (e.id, m, seat)))
+            .filter_map(|e| e.mount.map(|(m, seat)| (e.id, m, seat, e.seat_forward)))
             .collect();
-        for (id, m, seat) in riders {
+        for (id, m, seat, forward) in riders {
             let at = self
                 .entities
                 .get(m)
                 .filter(|e| !e.removed && e.alive())
-                .map(|e| e.pos);
+                .map(|e| e.pos + seat_ahead(e.yaw, forward));
             let Some(r) = self.entities.get_mut(id) else { continue };
             match at {
                 None => r.mount = None,
@@ -2930,4 +2931,11 @@ impl Dim {
     pub fn set_rng(&mut self, seed: u64) {
         self.rng = Rng(seed);
     }
+}
+
+/// Where a seat `forward` blocks ahead of a mount's middle is, for a mount facing `yaw` (0 looks
+/// along -z).
+pub fn seat_ahead(yaw: f32, forward: f32) -> DVec3 {
+    let (s, c) = (yaw as f64).sin_cos();
+    DVec3::new(-s, 0.0, -c) * forward as f64
 }

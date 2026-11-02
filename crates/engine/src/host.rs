@@ -230,6 +230,7 @@ pub static HOST: Host = Host {
     entity_kind_size,
     set_entity_scale,
     entity_fly,
+    entity_mount_seat,
     structure_block,
     set_structure_block,
     lift_blocks,
@@ -703,6 +704,18 @@ unsafe extern "C" fn entity_fly(w: *mut abi::WorldCtx, id: u64, dir: *const [f32
         if let Some(e) = d.entities.get_mut(id) {
             e.fly = Some((*dir, speed * mul));
         }
+    }
+}
+
+unsafe extern "C" fn entity_mount_seat(w: *mut abi::WorldCtx, rider: u64, mount: u64, seat: f32, forward: f32) -> u32 {
+    unsafe {
+        let on = entity_mount(w, rider, mount, seat);
+        if on != 0
+            && let Some(r) = dim(w).entities.get_mut(rider)
+        {
+            r.seat_forward = if forward.is_finite() && mount != 0 { forward } else { 0.0 };
+        }
+        on
     }
 }
 
@@ -2055,6 +2068,7 @@ unsafe extern "C" fn entity_mount(w: *mut abi::WorldCtx, rider: u64, mount: u64,
         }
         let Some(r) = d.entities.get_mut(rider).filter(|e| !e.removed) else { return 0 };
         r.mount = (mount != 0).then_some((mount, if seat.is_finite() { seat } else { 0.0 }));
+        r.seat_forward = 0.0;
         if mount == 0 && r.pose == crate::world::Pose::Sit {
             r.pose = crate::world::Pose::Stand;
         }

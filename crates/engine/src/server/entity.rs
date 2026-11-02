@@ -58,6 +58,8 @@ pub struct Entity {
     pub scale: f32,
     /// What it rides and its seat's height above the mount's feet (`Host::entity_mount`).
     pub mount: Option<(u64, f32)>,
+    /// How far ahead of the mount's middle the seat is, along the way the mount faces.
+    pub seat_forward: f32,
     /// A player's movement keys as its client last said (`abi::held_keys`).
     pub keys: u8,
     /// Crouching players: a 1.5 high box with lower eyes.
@@ -133,6 +135,7 @@ impl Entity {
             scale: 1.0,
             look: None,
             mount: None,
+            seat_forward: 0.0,
             keys: 0,
             pose: Default::default(),
             sprinting: false,

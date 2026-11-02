@@ -2210,6 +2210,9 @@ pub struct Host {
     /// asked, its velocity turning toward that over about a second like a bird's, blocks still in
     /// the way. Ask every tick it should keep flying; left alone, it falls.
     pub entity_fly: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, dir: *const [f32; 3], speed: f32),
+    /// `entity_mount` with the seat also `forward` blocks ahead of the mount's middle, along the
+    /// way it faces (the base of a dragon's neck rather than its hips).
+    pub entity_mount_seat: unsafe extern "C" fn(world: *mut WorldCtx, rider: u64, mount: u64, seat: f32, forward: f32) -> u32,
     /// Writes a kind's box (width, height, eye height); 0 if there is no such kind.
     pub entity_kind_size: unsafe extern "C" fn(kind: Str, out: *mut [f32; 3]) -> u32,
     /// A block of moving structure `entity` (its own coordinates); `u32::MAX` if it is none.

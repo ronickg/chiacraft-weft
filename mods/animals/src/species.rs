@@ -128,6 +128,11 @@ pub struct Species {
     pub signature: &'static str,
     /// Where a rider sits, in blocks above its feet; 0: it can't be ridden (`riding.rs`).
     pub seat: f32,
+    /// How far ahead of its middle the seat is, in blocks (a dragon's rider sits at the base of
+    /// the neck).
+    pub seat_forward: f32,
+    /// How fast it flies ridden, against its walking speed (0: it doesn't fly).
+    pub flight: f32,
     /// How much a coat that stands out from its surroundings costs it in the wild (0..1, natural
     /// selection in `evolution.rs`): most for prey and ambush hunters, little for dogs, which
     /// live off people.
@@ -193,6 +198,8 @@ pub static SPECIES: [Species; 7] = [
         fights: true,
         signature: "alarm",
         seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
         camouflage: 0.3,
         dimorphism: 1.04,
         size_spread: 0.2,
@@ -235,6 +242,8 @@ pub static SPECIES: [Species; 7] = [
         fights: true,
         signature: "gifts",
         seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
         camouflage: 0.5,
         dimorphism: 1.08,
         size_spread: 0.08,
@@ -275,6 +284,8 @@ pub static SPECIES: [Species; 7] = [
         fights: false,
         signature: "calm",
         seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
         camouflage: 0.8,
         dimorphism: 0.97,
         size_spread: 0.08,
@@ -313,6 +324,8 @@ pub static SPECIES: [Species; 7] = [
         fights: true,
         signature: "pack",
         seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.0,
         size_spread: 0.08,
@@ -352,6 +365,8 @@ pub static SPECIES: [Species; 7] = [
         signature: "mount",
         // On its back, above the hips (1.69 blocks up, the rider's hips a little above).
         seat: 1.55,
+        seat_forward: 0.0,
+        flight: 0.0,
         camouflage: 0.8,
         dimorphism: 1.0,
         size_spread: 0.08,
@@ -392,6 +407,8 @@ pub static SPECIES: [Species; 7] = [
         fights: true,
         signature: "pack",
         seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.0,
         size_spread: 0.08,
@@ -433,8 +450,12 @@ pub static SPECIES: [Species; 7] = [
         shy: 0.0,
         fights: true,
         signature: "mount",
-        // Astride its back above the hips (3.55 blocks up), the rider's hips a little above.
-        seat: 3.6,
+        // At the base of the neck between the shoulder spikes, as the show's riders sit: its back
+        // there 3.8 blocks up and 1.6 ahead of its middle, the rider's hips a little above.
+        seat: 3.65,
+        seat_forward: 1.55,
+        // Flying about 18 blocks a second, 28 sprinting (the engine's movement speed included).
+        flight: 8.0,
         camouflage: 0.2,
         dimorphism: 1.08,
         size_spread: 0.12,

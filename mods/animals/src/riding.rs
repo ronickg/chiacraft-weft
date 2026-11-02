@@ -3,6 +3,12 @@
 //! tribe member: an empty hand gets on. The engine seats the rider (`World::mount`) and reads
 //! their movement keys; here they steer it: walking it faces where the rider looks, it runs while
 //! sprinting and jumps higher. Sneaking gets off beside it.
+//!
+//! One that flies (`Species::flight`, the wyvern) takes off when its rider jumps. In the air it
+//! flies where the rider looks while they go forward (look up to climb, down to dive), sideways
+//! with the side keys, climbs with jump and comes down with sneak, faster sprinting, and hovers
+//! when no key is held; it beats its wings, gliding as it dives. It lands when it touches the
+//! ground; a rider who came down holding sneak lets go of it before sneaking gets them off.
 
 use weft_sdk::*;
 
@@ -13,6 +19,24 @@ use crate::species::SPECIES;
 pub static SADDLED: Component<u32> = Component::named("saddled");
 /// Being ridden (1), to undo the ride's jump once the rider is gone (not saved).
 static RIDDEN: Component<u32> = Component::named("ridden");
+
+value! {
+    #[derive(Default)]
+    /// A flying mount in the air (not saved: after a restart it's on foot, and falls if it was up).
+    pub struct Flight {
+        /// Ticks since it took off + 1 (0: on the ground).
+        pub up: u32,
+        /// The animation playing: 0 none, 1 flying, 2 gliding.
+        pub anim: u32,
+        /// It landed with its rider holding sneak: sneak gets them off only once let go.
+        pub latch: u32,
+    }
+}
+
+static FLIGHT: Component<Flight> = Component::named("flight");
+/// Flying faster sprinting, and climbing or coming down at this share of the speed.
+const FLY_SPRINT: f32 = 1.5;
+const FLY_VERTICAL: f32 = 0.7;
 static TOOLS: CreativeTab = CreativeTab::named("base:tools");
 static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
 static POOF: Particle = Particle::named("core:poof");
@@ -28,10 +52,14 @@ const JUMP: f64 = 0.5;
 pub fn init(r: &mut Registry) {
     r.entity_component(&SADDLED, 0u32, component_flags::SAVE | component_flags::SYNC_MENU);
     r.entity_component(&RIDDEN, 0u32, 0);
+    r.entity_component(&FLIGHT, Flight::default(), 0);
     let mut saddles = Vec::new();
     for s in SPECIES.iter().filter(|s| s.seat > 0.0) {
         r.attach(s.kind, &SADDLED);
         r.attach(s.kind, &RIDDEN);
+        if s.flight > 0.0 {
+            r.attach(s.kind, &FLIGHT);
+        }
         let name = format!("{}_saddle", s.kind_name());
         let saddle = Item::generated(name.clone());
         r.item(saddle).max_stack(1).tab(&TOOLS);
@@ -100,9 +128,13 @@ pub fn interact(w: &World, id: u64, player: u64) -> bool {
         return true;
     }
     // As high as this one is big.
-    let size = w.component(id, &crate::coats::GENOME).map_or(1.0, crate::coats::size);
-    let seat = a.species().map_or(0.0, |s| s.seat) * size;
-    if w.mount(player, id, seat) {
+    let size = w
+        .component(id, &crate::coats::GENOME)
+        .map_or(1.0, crate::coats::size);
+    let (seat, forward) = a
+        .species()
+        .map_or((0.0, 0.0), |s| (s.seat * size, s.seat_forward * size));
+    if w.mount_at(player, id, seat, forward) {
         w.add_modifier(id, &attribute::JUMP_STRENGTH, "animals:ridden", attr_op::MUL_BASE, JUMP, 0);
         if let Some(r) = w.component_mut(id, &RIDDEN) {
             *r = 1;
@@ -123,11 +155,15 @@ pub fn ridden(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             return false;
         };
         let keys = w.keys(rider);
-        if keys & held_keys::SNEAK != 0 {
+        let Some(r) = w.entity(rider) else { return false };
+        if SPECIES[index].flight > 0.0 && fly(w, id, st, &r, keys, SPECIES[index].flight) {
+            return true;
+        }
+        let latched = w.component(id, &FLIGHT).is_some_and(|f| f.latch != 0);
+        if keys & held_keys::SNEAK != 0 && !latched {
             get_off(w, id, rider, st);
             return true;
         }
-        let Some(r) = w.entity(rider) else { return false };
         crate::wake(w, id, index);
         let held = |k: u32| (keys & k != 0) as i32 as f32;
         let (forward, side) = (held(held_keys::FORWARD) - held(held_keys::BACK), held(held_keys::RIGHT) - held(held_keys::LEFT));
@@ -155,6 +191,60 @@ pub fn ridden(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
     }
 }
 
+/// A flying mount's rider steers it in the air: true while it flies (or takes off), false on the
+/// ground (walking is ridden as any mount's).
+fn fly(w: &World, id: u64, st: &EntityState, r: &EntityState, keys: u32, flight: f32) -> bool {
+    let Some(f) = w.component_mut(id, &FLIGHT) else { return false };
+    let held = |k: u32| (keys & k != 0) as i32 as f32;
+    let (jump, sneak) = (keys & held_keys::JUMP != 0, keys & held_keys::SNEAK != 0);
+    if !sneak {
+        f.latch = 0;
+    }
+    if f.up == 0 {
+        if !jump {
+            return false;
+        }
+        f.up = 1; // takes off
+    }
+    f.up += 1;
+    // Down again: it lands (not in the moment it leaves the ground).
+    if st.on_ground != 0 && f.up > 12 && !jump {
+        *f = Flight { latch: sneak as u32, ..Flight::default() };
+        w.play_animation(id, "", false);
+        return false;
+    }
+    let (forward, side) = (held(held_keys::FORWARD) - held(held_keys::BACK), held(held_keys::RIGHT) - held(held_keys::LEFT));
+    // Where the rider looks (yaw 0 along -z, pitch up positive), and right of it.
+    let (sy, cy) = r.yaw.sin_cos();
+    let (sp, cp) = r.pitch.sin_cos();
+    let look = [-sy * cp, sp, -cy * cp];
+    let right = [cy, 0.0, -sy];
+    let mut dir = [0.0f32; 3];
+    for k in 0..3 {
+        dir[k] = look[k] * forward + right[k] * side;
+    }
+    dir[1] += (held(held_keys::JUMP) - held(held_keys::SNEAK)) * FLY_VERTICAL;
+    // Full speed going forward or sideways; climbing or coming down alone, slower.
+    let amount = dir.iter().map(|v| v * v).sum::<f32>().sqrt().min(1.0);
+    let fast = if keys & held_keys::SPRINT != 0 && forward > 0.0 { FLY_SPRINT } else { 1.0 };
+    w.fly(id, dir, flight * fast * amount);
+    if w.navigating(id) {
+        w.navigate(id, st.pos, 0.0);
+    }
+    if forward != 0.0 || side != 0.0 {
+        let mut s = *st;
+        s.yaw = r.yaw;
+        w.set_entity(id, &s);
+    }
+    // Wingbeats, or a glide diving forward.
+    let anim = if forward > 0.0 && dir[1] < -0.35 { 2 } else { 1 };
+    if f.anim != anim {
+        f.anim = anim;
+        w.play_animation(id, if anim == 2 { "glide" } else { "fly" }, true);
+    }
+    true
+}
+
 /// The rider gets off beside it.
 fn get_off(w: &World, id: u64, rider: u64, st: &EntityState) {
     w.dismount(rider);
@@ -166,6 +256,13 @@ fn get_off(w: &World, id: u64, rider: u64, st: &EntityState) {
 
 fn end_ride(w: &World, id: u64) {
     w.remove_modifier(id, &attribute::JUMP_STRENGTH, "animals:ridden");
+    // Left in the air without its rider, it stops flying (and comes down).
+    if let Some(f) = w.component_mut(id, &FLIGHT)
+        && f.up != 0
+    {
+        *f = Flight::default();
+        w.play_animation(id, "", false);
+    }
     if let Some(r) = w.component_mut(id, &RIDDEN) {
         *r = 0;
     }

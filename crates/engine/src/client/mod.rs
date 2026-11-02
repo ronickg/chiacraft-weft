@@ -85,9 +85,11 @@ pub struct LocalPlayer {
     /// Sneaking now and wanting to sprint now.
     pub sneak: bool,
     pub sprint: bool,
-    /// The mount it sits on and the seat's height (the server's `core:mount`): there it stays,
-    /// and its movement keys (`keys`, `abi::held_keys`) steer the mount on the server.
+    /// The mount it sits on, the seat's height and how far ahead of the mount's middle it is (the
+    /// server's `core:mount`): there it stays, and its movement keys (`keys`, `abi::held_keys`)
+    /// steer the mount on the server.
     pub mount: Option<(u64, f64)>,
+    pub seat_forward: f64,
     pub keys: u8,
 }
 
@@ -140,8 +142,9 @@ pub struct ClientEntity {
     pub frame: u64,
     pub rel: DVec3,
     pub rel_target: Option<DVec3>,
-    /// What it rides and the seat's height: drawn there.
+    /// What it rides, the seat's height and how far ahead: drawn there.
     pub mount: Option<(u64, f32)>,
+    pub seat_forward: f32,
     /// A moving structure's blocks, in its own coordinates (meshed like the world's).
     pub structure: Option<Box<ClientWorld>>,
     /// The world's light on a moving structure, by its cubes, as the server worked it out.
@@ -577,6 +580,7 @@ impl Client {
                 },
                 riding: None,
                 mount: None,
+                seat_forward: 0.0,
                 keys: 0,
                 flying: false,
                 noclip: false,
@@ -1102,7 +1106,7 @@ impl Client {
         ToServer::Move {
             // Seated, the server puts it on the seat of the mount as the server has it.
             frame: match self.player.mount {
-                Some((m, seat)) if self.seat().is_some() => Some((m, DVec3::Y * seat)),
+                Some((m, _)) if self.seat().is_some() => self.seat().zip(self.entities.get(&m)).map(|(s, e)| (m, s - e.pos)),
                 _ => self.player.riding.map(|(b, _, now)| (b, now)),
             },
             keys: self.player.keys,
@@ -1317,7 +1321,12 @@ impl Client {
             .iter()
             .filter_map(|(&id, e)| {
                 let (m, seat) = e.mount?;
-                let on = if m == self.player_id { self.smooth_pos() } else { self.entities.get(&m)?.pos };
+                let on = if m == self.player_id {
+                    self.smooth_pos() + crate::server::dim::seat_ahead(self.player.yaw, e.seat_forward)
+                } else {
+                    let mount = self.entities.get(&m)?;
+                    mount.pos + crate::server::dim::seat_ahead(mount.body_yaw, e.seat_forward)
+                };
                 Some((id, on + DVec3::Y * seat as f64))
             })
             .collect();
@@ -1812,7 +1821,8 @@ impl Client {
         let mounted = || {
             let m = bytes.get(..8).map_or(0, |b| u64::from_le_bytes(b.try_into().unwrap()));
             let seat = bytes.get(8..12).map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
-            (m != 0).then_some((m, seat))
+            let forward = bytes.get(12..16).map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
+            (m != 0).then_some((m, seat, forward))
         };
         let f: Vec<f32> = words(bytes).map(f32::from_le_bytes).collect();
         let shaped = || {
@@ -1838,7 +1848,8 @@ impl Client {
                     self.dead = false;
                 }
             } else if comp == mount {
-                self.player.mount = mounted().map(|(m, seat)| (m, seat as f64));
+                self.player.mount = mounted().map(|(m, seat, _)| (m, seat as f64));
+                self.player.seat_forward = mounted().map_or(0.0, |(_, _, f)| f as f64);
             } else if comp == shape {
                 let (size, look, scale) = shaped();
                 let k = &c.game.entities[c.game.player_kind as usize];
@@ -1860,7 +1871,8 @@ impl Client {
         } else if comp == worn {
             e.worn = words(bytes).map(u32::from_le_bytes).collect();
         } else if comp == mount {
-            e.mount = mounted();
+            e.mount = mounted().map(|(m, seat, _)| (m, seat));
+            e.seat_forward = mounted().map_or(0.0, |(_, _, f)| f);
         } else if comp == held {
             e.held = words(bytes).next().map_or(0, u32::from_le_bytes);
         } else if comp == shape {
@@ -1943,7 +1955,9 @@ impl Client {
     /// Where the player sits while riding: its mount's seat as the mount is drawn.
     fn seat(&self) -> Option<DVec3> {
         let (m, seat) = self.player.mount?;
-        self.entities.get(&m).map(|e| e.pos + DVec3::Y * seat)
+        self.entities
+            .get(&m)
+            .map(|e| e.pos + DVec3::Y * seat + crate::server::dim::seat_ahead(e.body_yaw, self.player.seat_forward as f32))
     }
 
     pub fn camera(&self) -> Camera {
@@ -1995,8 +2009,9 @@ impl Client {
         }
     }
 
-    /// The camera drawn from: the eye, or up to 4 blocks behind or in front of it in third person,
-    /// pulled in where a block is in the way.
+    /// The camera drawn from: the eye, or up to 4 blocks behind or in front of it in third person
+    /// (and twice its mount's height further riding, to clear a big one), pulled in where a block
+    /// is in the way.
     pub fn render_camera(&self) -> Camera {
         let eye = self.camera();
         if self.view == 0 {
@@ -2012,8 +2027,14 @@ impl Client {
         let c = content();
         let world = &self.world;
         let block = |p: IVec3| world.block_or_air(p);
-        let dist = physics::raycast(c, &block, eye.pos, back, 4.0, false)
-            .map_or(4.0, |h| ((h.block.as_dvec3() + DVec3::splat(0.5) - eye.pos).length() - 0.8).clamp(0.3, 4.0));
+        let far = 4.0
+            + self
+                .player
+                .mount
+                .and_then(|(m, _)| self.entities.get(&m))
+                .map_or(0.0, |m| 2.0 * m.dims().1);
+        let dist = physics::raycast(c, &block, eye.pos, back, far, false)
+            .map_or(far, |h| ((h.block.as_dvec3() + DVec3::splat(0.5) - eye.pos).length() - 0.8).clamp(0.3, far));
         cam.pos = eye.pos + back * dist;
         self.bobbed(cam)
     }
@@ -2058,6 +2079,7 @@ impl Client {
             rel: DVec3::ZERO,
             rel_target: None,
             mount: None,
+            seat_forward: 0.0,
             structure: None,
             world_light: Default::default(),
         }

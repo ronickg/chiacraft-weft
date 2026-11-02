@@ -708,7 +708,18 @@ Rideable on the ground with its own saddle (more leather and an iron ingot). The
 flies entities (`World::fly`) and plays a model's `run` by speed (the walk and run written as
 offsets from the idle).
 
-Next for the wyvern: riding in flight (take off, climb, dive, land), the breath attack on a key
+**Riding in flight** (2026-11-02; `riding.rs`, engine). A tamed, saddled wyvern's rider sits at
+the base of its neck between the shoulder spikes, as the show's riders do (the engine's seat can
+now be ahead of a mount's middle: `World::mount_at`). Jump takes off. In the air it flies where the
+rider looks while they go forward (look up to climb, down to dive), sideways with the side keys,
+climbs with jump and comes down with sneak, faster sprinting (about 18 blocks a second, 28
+sprinting), and hovers with no key held; it beats its wings, gliding as it dives. It lands when it
+touches the ground; a rider who came down holding sneak lets go before sneaking gets them off.
+Without its rider in the air it stops flying. Riding anything big, the third-person camera pulls
+back by twice the mount's height so it clears it. Checked in the game: take off, climb, fly, dive,
+land, get off; a wild one killed a player in survival who came near.
+
+Next for the wyvern: the breath attack on a key
 (fire, frost, lightning or venom from its genes), wild ones flying, its sounds, its own egg icon.
 
 Next otherwise: rebuild the five animals to the house density; the paint screen in the game

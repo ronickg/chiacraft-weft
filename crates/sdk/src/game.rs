@@ -95,6 +95,10 @@ impl World {
     pub fn mount(&self, rider: u64, mount: u64, seat: f32) -> bool {
         mount != 0 && unsafe { (host().entity_mount)(self.raw(), rider, mount, seat) != 0 }
     }
+    /// `mount`, the seat also `forward` blocks ahead of the mount's middle along the way it faces.
+    pub fn mount_at(&self, rider: u64, mount: u64, seat: f32, forward: f32) -> bool {
+        mount != 0 && unsafe { (host().entity_mount_seat)(self.raw(), rider, mount, seat, forward) != 0 }
+    }
     /// Gets off where it is (put it beside the mount with `teleport`).
     pub fn dismount(&self, rider: u64) {
         unsafe { (host().entity_mount)(self.raw(), rider, 0, 0.0) };
