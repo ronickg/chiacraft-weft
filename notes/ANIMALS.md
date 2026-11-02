@@ -705,6 +705,25 @@ its place falls (the back and flanks; a tear on the wing skin), sized to the bod
 paler and pinker than the coat, a burn dark with a pale rim. `/animal scar` gives the animal looked
 at one of each.
 
+*Crisp marks* (2026-11-02): looked up how games do coats (tint regions in ARK and Red Dead,
+grey-and-tint in Hytale, gene-driven overlay layers in horse games, Spore's procedural painting).
+Ours combines all of them; the one thing pixel art asks for that it lacked was clean clusters.
+Every mark is now snapped to three tones (none, an edge tone, full) and lone texels taken into
+their neighbours'. Still worth doing: designed markings for what noise can't place (a tabby's
+M, eye stripes, a blaze, socks, a wyvern's face mask), and cell-grown rosettes and spots.
+
+*One copy of the rules, on the website too* (2026-11-02; asked for by Ronald: "compile it to WASM
+so the website mimics the real logic, to test breeding, family trees, time"). The mod's pure
+logic is its own crate, `mods/animals/core` (`animals_core`: the species table, genes and
+breeding, coats, builds, scars, evolution's generations, growing up and litters), used by the mod
+in the game and, through `mods/animals/web` (a JSON API, `web/build.sh`), compiled to WASM for
+the viewer. The viewer's coat panel and How it works run on it, and its **Breeding lab** runs a
+population on the game's clock: wild animals from any habitat, matings the game would allow (it
+refuses the same pairs), carrying, litters and clutches, eggs hatching, growing up, families
+(grandparents to young), scars and deaths, breeding by themselves up to a cap, and old age (not in
+the game yet: a setting there), with a habitat's pool evolving beside it. The JS copy of the rules
+(`coats.js`) is now only the skill's standalone version.
+
 *Next*: Dalmatian spotting.
 
 Sources: Lee, Cavener, Bond 2018 (PeerJ 6:e5690, giraffe spots); Kaelin et al. 2021 (Nature

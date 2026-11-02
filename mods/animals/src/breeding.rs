@@ -10,6 +10,7 @@
 //! (their favorite food speeds it), and remember their parents and generation. Afterwards both
 //! parents rest, the mother for her recovery.
 
+use animals_core::life::{self, LOVE_TICKS, MALE_REST};
 use weft_sdk::*;
 
 use crate::animal::{self, ANIMAL, Animal, OWNER};
@@ -52,13 +53,8 @@ value! {
 pub static BREEDING: Component<Breeding> = Component::named("breeding");
 static HEART: Particle = Particle::named("heart");
 
-/// Thirty seconds in love; a male rests five minutes after mating.
-const LOVE_TICKS: u32 = 600;
-const MALE_REST: u32 = 6_000;
 /// The bond breeding needs.
 const BOND: u8 = 50;
-/// Five minutes after mating, a raptor lays.
-const LAYING: u32 = 6_000;
 
 /// A genome's words past its first ten (`pack`).
 pub type More = [u32; 11];
@@ -101,12 +97,7 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
     b.love = b.love.saturating_sub(1);
     b.rest = b.rest.saturating_sub(1);
     b.growing = b.growing.saturating_sub(1);
-    a.stage = match b.growing * 3 / s.growth.max(1) {
-        _ if b.growing == 0 => a.stage.max(animal::ADULT),
-        2.. => animal::BABY,
-        1 => animal::JUVENILE,
-        _ => animal::ADOLESCENT,
-    };
+    a.stage = life::stage(s, b.growing, a.stage);
     if b.love > 0 && (w.time() + id) % 20 == 0 {
         hearts(w, id, 1);
     }
@@ -122,9 +113,8 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
 /// How big it is against a grown one: from its birth size up, as it grows.
 pub fn growth(w: &World, id: u64, index: usize) -> f32 {
     let s = &SPECIES[index];
-    let Some(b) = w.component(id, &BREEDING).filter(|b| b.growing > 0) else { return 1.0 };
-    let grown = 1.0 - b.growing as f32 / s.growth.max(1) as f32;
-    s.birth_size + (1.0 - s.birth_size) * grown
+    w.component(id, &BREEDING)
+        .map_or(1.0, |b| life::size(s, b.growing))
 }
 
 /// Still growing up.
@@ -213,7 +203,7 @@ fn mated(w: &World, id: u64, mate: u64, index: usize) {
     };
     if let Some(b) = w.component_mut(id, &BREEDING) {
         b.love = 0;
-        b.carrying = if s.gestation > 0 { s.gestation } else { LAYING };
+        b.carrying = life::carrying(s);
         b.rest = b.carrying + s.recovery;
         (b.mate, b.mate_wild) = (mate, wild);
         (b.mate_genes, b.mate_more) = pack(&genes);
@@ -266,17 +256,13 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
         return;
     };
     let mut r = coats::world_rng(w);
-    let n = s.litter.0 + w.random_below(s.litter.1 - s.litter.0 + 1);
+    let n = life::litter(s, w.random_below(u32::MAX));
     let father_gen = w.component(b.mate, &BREEDING).map_or(0, |f| f.generation);
     let owner = w.component(id, &OWNER).copied().filter(|o| o[0] != 0);
     let mut clutch = Vec::new();
     for k in 0..n {
         let Some(genome) = coats::breed(&mother, &father, &mut r) else { continue };
-        // Each stat's wild points from one parent, the stronger 55% of the time.
-        let wild = std::array::from_fn(|i| {
-            let (hi, lo) = (a.wild[i].max(b.mate_wild[i]), a.wild[i].min(b.mate_wild[i]));
-            if w.random_below(100) < 55 { hi } else { lo }
-        });
+        let wild = life::wild_points(&a.wild, &b.mate_wild, |n| w.random_below(n));
         let y = Young {
             index,
             genome,

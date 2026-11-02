@@ -142,10 +142,29 @@ dependencies = [
 name = "animals"
 version = "0.1.0"
 dependencies = [
+ "animals_core",
+ "serde",
+ "serde_json",
+ "weft_sdk",
+]
+
+[[package]]
+name = "animals_core"
+version = "0.1.0"
+dependencies = [
  "png",
  "serde",
  "serde_json",
  "weft_sdk",
+]
+
+[[package]]
+name = "animals_web"
+version = "0.1.0"
+dependencies = [
+ "animals_core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

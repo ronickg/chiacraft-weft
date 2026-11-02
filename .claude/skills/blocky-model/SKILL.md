@@ -391,9 +391,12 @@ layers: map each material to a role (`("coat", toward the underside 0..1, light 
 does), and write its `layer_props` (where white starts: paws, chest, belly, muzzle; points;
 mask; extremities; where patterns show). A painted pattern (a tabby's stripes) maps to the
 plain coat: the genes draw patterns now. In the chiacraft game the build copies its layers to
-`mods/animals/genetics/layers/<model>` and `mods/animals/src/coats.rs` (the same rules as
-`coats.js`, in Rust) paints every animal's coat from its genome on the client: keep the two in
-step.
+`mods/animals/genetics/layers/<model>` and the mod's shared crate (`mods/animals/core`) paints
+every animal's coat from its genome on the client. That crate also compiles to WASM
+(`mods/animals/web/build.sh` writes `animals.wasm`); the viewer then runs the game's own rules
+through `scripts/animals.js` (coat panel, How it works) and `scripts/lab.js` (the breeding lab:
+matings, litters, eggs, growing up, families, old age if set, evolution). `coats.js` is the
+standalone version, for a creature with no game behind it.
 
 **Every animal unique: the core traits.** Real looks come in three layers: the kind (species,
 breed, the population of a country) decides which patterns turn up; genes decide the pattern
@@ -417,7 +420,11 @@ bones each build trait scales): name a model's bones so a trait can find them (o
 or tail segment, the jaw and eyelids under the head); in the viewer a bone whose rotated boxes
 became meshes (`_tilt` in the game) can't be scaled. Scars (what life left: claw lines, tooth
 marks, a blade's line, a burn, torn wing skin) are painted the same way, flat on the surface where
-they fall; the viewer's **Scar** button adds one.
+they fall; the viewer's **Scar** button adds one. Marks are drawn crisp, as pixel art draws
+them: each pattern's cover (and points, mask, extremities, scars) snapped to three tones (none,
+one edge tone, full), then lone texels unlike every neighbour taken into their neighbours'
+(`crisp_marks` / `crispMarks`). Soft blends read as mud and stray pixels as noise at 32-64
+texels a block; the viewer's **Crisp marks** switch shows the difference.
 
 ## Props (no skeleton)
 

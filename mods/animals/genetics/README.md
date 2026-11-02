@@ -13,8 +13,8 @@ babies take only their parents' alleles, so crossing breeds mixes them. Babies t
 recessives can surprise (two black chihuahuas with a chocolate puppy).
 
 The phenotype rules (which genotype is which colors and patterns) and the coat renderer are in the
-game's `src/coats.rs` and, for trying coats out in the viewer, the skill's `coats.js`
-(`.claude/skills/blocky-model/scripts/coats.js`): the same rules, change both together. They
+shared crate `core/src/coats.rs` (`animals_core`), which the game uses and the website runs as
+WASM (`web/`, `web/build.sh`): one copy of the rules. They
 paint on the layers each creature's build writes (`layers.py`), copied here into
 `layers/<model>/` and embedded in the mod: what is coat and what is fixed, its light, its
 position, where white, points, a mask and patterns show. Every file ends with `Sz`, the size

@@ -383,7 +383,7 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
                 })
             })
         });
-    let cold = crate::evolution::Habitat::at(w, st.pos).cold() > 0.0;
+    let cold = crate::evolution::habitat_at(w, st.pos).cold() > 0.0;
     let step = match (warm, cold) {
         (true, _) => 40,
         (false, false) => 20,

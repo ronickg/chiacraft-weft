@@ -8,10 +8,7 @@ use weft_sdk::*;
 use crate::species::{self, SPECIES, STATS};
 
 /// Life stages; only the chihuahua has young ones so far.
-pub const BABY: u8 = 0;
-pub const JUVENILE: u8 = 1;
-pub const ADOLESCENT: u8 = 2;
-pub const ADULT: u8 = 3;
+pub use animals_core::species::{ADULT, BABY};
 pub const STAGE_NAMES: [&str; 5] = ["baby", "juvenile", "adolescent", "adult", "elder"];
 
 /// Wild levels: most low, a few high (proposed in the design; a world setting later).

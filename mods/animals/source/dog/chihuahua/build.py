@@ -42,7 +42,7 @@ if __name__ == "__main__":
     poses = {**POSE_FILES, "": {**POSE_FILES[""], "bite": "bite"}}  # its bite, for code to play
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "chihuahua", SCALE, "chihuahua/chihuahua", PUP, PUP_HEAD,
                   pose_files=poses)
-    # Its coat layers, for coats painted from genes in the game (`src/coats.rs`).
+    # Its coat layers, for coats painted from genes in the game (`core/src/coats.rs`).
     import shutil  # noqa: E402
     shutil.copytree(os.path.join(OUT, "layers"), os.path.join(HERE, "..", "..", "..", "genetics", "layers", "chihuahua"), dirs_exist_ok=True)
     print("wrote", made, "into", os.path.normpath(ASSETS))

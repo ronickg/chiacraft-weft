@@ -40,7 +40,7 @@ if __name__ == "__main__":
         back = {f: v for f, v in gait(spec, anim, ["leg_FL_paw", "leg_FR_paw", "leg_BL_paw", "leg_BR_paw"]).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "capybara", SCALE, "capybara/capybara", pose_files=POSES)
-    # Its coat layers, for coats painted from genes in the game (`src/coats.rs`).
+    # Its coat layers, for coats painted from genes in the game (`core/src/coats.rs`).
     import shutil  # noqa: E402
     shutil.copytree(os.path.join(OUT, "layers"), os.path.join(HERE, "..", "..", "genetics", "layers", "capybara"), dirs_exist_ok=True)
     print("wrote", made, "into", os.path.normpath(ASSETS))

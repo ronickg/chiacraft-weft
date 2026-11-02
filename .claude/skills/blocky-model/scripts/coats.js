@@ -453,8 +453,46 @@
 
   // layers: {w, h, info, pos, props, props2 (RGBA Uint8 arrays, w*h), bounds: [lo, hi]};
   // base: the painted texture's RGBA at least w*h (it may be padded wider/taller: `stride`).
+  // Crisp marks, as pixel art draws them (the game's `crisp_marks`): each pattern's cover snapped
+  // to none, an edge tone or full (relative to its strongest: ticking is faint everywhere), then
+  // lone texels (unlike every neighbour) take their neighbours' step. `Coats.crisp = false`
+  // draws the soft marks instead, to compare.
+  const TONES = [0, 0.5, 1];
+  const toneStep = v => v < 0.35 ? 0 : v < 0.65 ? 1 : 2;
+  function crispMarks(layers, look) {
+    const { w, h, info, pos, bounds } = layers, [lo, hi] = bounds, s = look.seed | 0, m = look.marks || DEFAULT_MARKS;
+    const step = (pt, p, u) => pt ? toneStep(pattern(pt.kind, p, u, s, m) / (pt.kind === "ticked" ? 0.35 : 1)) : 0;
+    const marks = new Uint8Array(w * h * 4);
+    for (let i = 0; i < w * h; i++) {
+      if (info[i * 4] < 128) continue;
+      const u = info[i * 4 + 2] / 255;
+      const p = [0, 1, 2].map(k => (lo[k] + pos[i * 4 + k] / 255 * (hi[k] - lo[k])) / Math.max(0.01, look.scale || 1));
+      const other = look.patches && pattern("patches", p, u, s + 7, m) > 0.5 ? look.patches : null;
+      marks.set([step(other ? other.pattern : look.pattern, p, u), step(look.pattern2, p, u), step(look.pointsPattern, p, u), other ? 2 : 0], i * 4);
+    }
+    const read = marks.slice();
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (info[i * 4] < 128) continue;
+      const near = [i - 1, i + 1, i - w, i + w].filter(j => info[j * 4] >= 128);
+      if (near.length < 3) continue;
+      for (let k = 0; k < 4; k++) {
+        const mine = read[i * 4 + k];
+        if (near.some(j => read[j * 4 + k] === mine)) continue;
+        const count = [0, 0, 0];
+        for (const j of near) count[read[j * 4 + k]]++;
+        let best = 0;
+        for (let v = 1; v < 3; v++) if (count[v] > count[best]) best = v;
+        marks[i * 4 + k] = best;
+      }
+    }
+    return marks;
+  }
+
   function render(layers, base, stride, look, paint) {
     const { w, h, info, pos, props, props2, bounds } = layers;
+    const crisp = root.Coats.crisp !== false, marks = crisp ? crispMarks(layers, look) : null;
+    const t3 = v => crisp ? TONES[toneStep(v)] : v;
     const out = new Uint8ClampedArray(base);
     const [lo, hi] = bounds, s = look.seed | 0;
     // The eyes' iris in its color, keeping its painted light (the game's `render`).
@@ -481,7 +519,8 @@
       const ext = props2[i] / 255, zone = props2[i + 1] / 255;
       const m = look.marks || DEFAULT_MARKS, contrast = 0.45 + 1.1 * m.contrast;  // stark marks show fully
       let b = coatBase, un = coatUnder, pat = look.pattern;
-      if (look.patches && !paint.base && pattern("patches", p, u, s + 7, m) > 0.5) {
+      const cover = (k, pt) => crisp ? TONES[marks[i + k]] : pattern(pt.kind, p, u, s, m);
+      if (look.patches && !paint.base && (crisp ? marks[i + 3] === 2 : pattern("patches", p, u, s + 7, m) > 0.5)) {
         b = look.patches.base; un = look.patches.under; pat = look.patches.pattern;
       }
       let c = mix(b, un, u);
@@ -489,17 +528,17 @@
         const k = 0.3 / Math.pow(2, (m.size - 0.5) * 1.6);
         c = mix(c, look.merle, 0.8 * (1 - smooth(noise3(p[0] * k, p[1] * k, p[2] * k, s + 3), 0.58, 0.64)));
       }
-      for (const pt of [pat, look.pattern2]) {
-        if (pt) c = mix(c, markColor(pt.color), Math.min(1, pattern(pt.kind, p, u, s, m) * zone * (pt.amount ?? 1) * contrast));
-      }
+      [pat, look.pattern2].forEach((pt, k) => {
+        if (pt) c = mix(c, markColor(pt.color), Math.min(1, cover(k, pt) * zone * (pt.amount ?? 1) * contrast));
+      });
       if (look.points || paint.points) {
-        const at = 0.4 - 0.3 * (look.pointsReach || 0), t = smooth(points, at, at + 0.22);
+        const at = 0.4 - 0.3 * (look.pointsReach || 0), t = t3(smooth(points, at, at + 0.22));
         let pc = paint.points || look.points;
-        if (look.pointsPattern) pc = mix(pc, look.pointsPattern.color, Math.min(1, pattern(look.pointsPattern.kind, p, u, s, m) * look.pointsPattern.amount * contrast));
+        if (look.pointsPattern) pc = mix(pc, look.pointsPattern.color, Math.min(1, cover(2, look.pointsPattern) * look.pointsPattern.amount * contrast));
         c = mix(c, pc, t);
       }
-      if (look.mask) c = mix(c, look.mask, 0.9 * mask);
-      if (look.ext) c = mix(c, look.ext.color, smooth(ext * look.ext.amount, 0.25, 0.9));
+      if (look.mask) c = mix(c, look.mask, 0.9 * t3(mask));
+      if (look.ext) c = mix(c, look.ext.color, t3(smooth(ext * look.ext.amount, 0.25, 0.9)));
       if (paint.stencil && paint.stencil.color) c = mix(c, paint.stencil.color, pattern(paint.stencil.kind, p, u, s + 11) * zone);
       if (look.white > 0) {  // white's edges as ragged as the marks'
         const wn = white + (noise3(p[0] * 0.22, p[1] * 0.22, p[2] * 0.22, s + 5) - 0.5) * (0.15 + 0.3 * m.edge), thr = 1 - look.white;
@@ -508,7 +547,7 @@
       const at = [0, 1, 2].map(k => lo[k] + pos[i + k] / 255 * (hi[k] - lo[k]));
       let torn = false;
       for (const sc of scars) {
-        const a = scarCover(sc, at, s);
+        const a = t3(scarCover(sc, at, s));
         if (a <= 0) continue;
         if (sc.kind === SCAR.burn) c = mix(c, mix(mix(darken(c, 0.5), [124, 62, 52], 0.35), lighten(c, 0.3), (1 - a) * 0.8), Math.min(1, a));
         else if (sc.kind === SCAR.tear) { torn = torn || a > 0.5; c = mix(c, darken(c, 0.45), a); }
@@ -535,5 +574,17 @@
     return out;
   }
 
-  root.Coats = { rng, withCore, random, breed, phenotype, genotype, render, tone, build, scar, SCAR };
+  // Every locus of an animal, for explaining it: its alleles and the one that shows, or a
+  // trait's genes (what it passes on) and how it shows (with its own chance, sex and youth).
+  function explain(genes, a) {
+    G = genes;
+    const out = genes.loci.filter(L => a.genome[L.id]).map(L => L.quantitative
+      ? { id: L.id, name: L.name, about: L.about, core: (L.slot ?? 0) >= OWN, quantitative: true, genetic: genetic(a, L.id), shown: qv(a, L.id), h: L.h ?? 1 }
+      : { id: L.id, name: L.name, about: L.about, core: false, alleles: a.genome[L.id], shows: shows(genes, a, L.id),
+          meaning: (L.alleles.find(x => x.a === shows(genes, a, L.id)) || {}).about || "" });
+    G = null;
+    return out;
+  }
+
+  root.Coats = { rng, withCore, random, breed, phenotype, genotype, render, tone, build, scar, SCAR, explain };
 })(typeof window !== "undefined" ? window : globalThis);
