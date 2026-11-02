@@ -244,7 +244,9 @@ kind's texture through the engine's skin hook (`Registry::entity_skin`), so only
 per animal. Wild animals spawn from local gene pools that evolve (`src/evolution.rs`: a pool per
 species, 256-block cell and habitat, a generation an in-game day, camouflage selection, drift,
 mutation, migration; wild ones that die or are tamed leave it, tames released with the screen's
-Release join it), saved in the world's `mods/animals/pools.json` (the bridge's `data_dir`). The old generator (`tools/chihuahua.py`, 96 painted coats) and the 96 coat looks are
+Release join it), saved in the world's `mods/animals/pools.json` (the bridge's `data_dir`). Animals are at real
+size (a block a meter) and vary by a size gene and sex through the engine's per-entity scale
+(`World::set_scale`, synced in `core:shape`). The old generator (`tools/chihuahua.py`, 96 painted coats) and the 96 coat looks are
 gone; they are in git history. Each dog draws as a generated look kind per age (grown or puppy)
 and pose (stand, sit, lie down after 30 s sitting), so the pose
 reaches every player that comes by (a played animation is a one-off event). A bone tames (1 in 3); a

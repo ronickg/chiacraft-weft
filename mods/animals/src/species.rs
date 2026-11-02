@@ -128,6 +128,14 @@ pub struct Species {
     /// selection in `evolution.rs`): most for prey and ambush hunters, little for dogs, which
     /// live off people.
     pub camouflage: f32,
+    /// How much bigger males are than females, as heights (capybara females are the bigger;
+    /// unknown for dinosaurs, so 1); individuals' sizes in `coats::size`.
+    pub dimorphism: f32,
+    /// How far an individual's size goes either way from its sex's, at the size gene's ends.
+    pub size_spread: f32,
+    /// A grown average one's height in meters (its model's), and where it is measured
+    /// (`screen.animals.size.<at>`): the shoulder, or the hip of a two-legged one.
+    pub height: (f32, &'static str),
 }
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
@@ -169,6 +177,9 @@ pub static SPECIES: [Species; 6] = [
         signature: "alarm",
         seat: 0.0,
         camouflage: 0.3,
+        dimorphism: 1.04,
+        size_spread: 0.2,
+        height: (0.20, "shoulder"),
     },
     Species {
         kind: &crate::cat::CAT,
@@ -202,6 +213,9 @@ pub static SPECIES: [Species; 6] = [
         signature: "gifts",
         seat: 0.0,
         camouflage: 0.5,
+        dimorphism: 1.08,
+        size_spread: 0.08,
+        height: (0.24, "shoulder"),
     },
     Species {
         kind: &crate::capybara::CAPYBARA,
@@ -233,6 +247,9 @@ pub static SPECIES: [Species; 6] = [
         signature: "calm",
         seat: 0.0,
         camouflage: 0.8,
+        dimorphism: 0.97,
+        size_spread: 0.08,
+        height: (0.56, "shoulder"),
     },
     Species {
         kind: &crate::raptor::RAPTOR,
@@ -262,6 +279,9 @@ pub static SPECIES: [Species; 6] = [
         signature: "pack",
         seat: 0.0,
         camouflage: 1.0,
+        dimorphism: 1.0,
+        size_spread: 0.08,
+        height: (0.50, "hip"),
     },
     Species {
         kind: &crate::utahraptor::UTAHRAPTOR,
@@ -292,6 +312,9 @@ pub static SPECIES: [Species; 6] = [
         // On its back, above the hips (1.69 blocks up, the rider's hips a little above).
         seat: 1.55,
         camouflage: 0.8,
+        dimorphism: 1.0,
+        size_spread: 0.08,
+        height: (1.50, "hip"),
     },
     // Velociraptor's second species (named 2008, from Bayan Mandahu, Inner Mongolia; known from
     // skull bones only, so the same body and numbers, its own coat).
@@ -323,6 +346,9 @@ pub static SPECIES: [Species; 6] = [
         signature: "pack",
         seat: 0.0,
         camouflage: 1.0,
+        dimorphism: 1.0,
+        size_spread: 0.08,
+        height: (0.50, "hip"),
     },
 ];
 

@@ -166,6 +166,15 @@ fn heading(ui: &mut Ui) {
         let owner = if tamed(c) { "screen.animals.tamed" } else { "screen.animals.wild" };
         t.set("screen.animals.about", &[Arg::Key(sex_key(&a)), Arg::Key(&stage_key(&a)), Arg::Key(owner)]);
     });
+    // How big it is ("Size: 21 cm at the shoulder"; a young one, what it grows to).
+    ui.text_bind(|c, t| {
+        let (Some(a), Some(g)) = (c.menu_component(&ANIMAL), c.menu_component(&crate::coats::GENOME)) else { return };
+        let Some(s) = a.species() else { return };
+        let m = s.height.0 * crate::coats::size(&g);
+        let shown = if m < 1.0 { format!("{:.0} cm", m * 100.0) } else { format!("{m:.2} m") };
+        let key = if a.stage < animal::ADULT { "screen.animals.height_young" } else { "screen.animals.height" };
+        t.set(key, &[Arg::Text(&shown), Arg::Key(&format!("screen.animals.height.{}", s.height.1))]);
+    });
     // Its coat, read from its genes ("Fawn sable with white").
     ui.text_bind(|c, t| {
         let Some(look) = c.menu_component(&crate::coats::GENOME).and_then(|g| crate::coats::phenotype(&g)) else { return };

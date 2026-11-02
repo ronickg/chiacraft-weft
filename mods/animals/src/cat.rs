@@ -34,7 +34,7 @@ pub fn init(r: &mut Registry) {
     for (suffix, kind) in &LOOKS[1..] {
         drop(
             r.entity(Entity::generated(kind.to_string()))
-                .size(0.4, 0.5)
+                .size(0.35, 0.44)
                 .passive()
                 .model_file("cat")
                 .animations(&format!("cat{suffix}"))
@@ -42,7 +42,7 @@ pub fn init(r: &mut Registry) {
         );
     }
     r.entity(&CAT)
-        .size(0.4, 0.5)
+        .size(0.35, 0.44)
         .health(6.0)
         .speed(3.0)
         .attack_damage(1.0)

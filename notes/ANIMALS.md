@@ -627,6 +627,19 @@ owner only) lets a tame go: wild again with its levels, bond, orders and tribe s
 saddle dropped, taming starting over, and its genes join the pool where it is. Checked in the game:
 ten raptors killed and a chihuahua tamed each left their pool, the released one joined it.
 
+**Sizes** (2026-11-01). Every species at its real size, a block a meter: the chihuahua rebuilt
+to 20 cm at the shoulder (×0.72) and the cat to 24 cm (×0.87), so the chihuahua is now smaller
+than the cat; capybara (56 cm), Velociraptor (0.5 m at the hip) and Utahraptor (1.5 m) already
+were. Individuals differ around that (`coats::size`): a size gene `Sz` in every gene file
+(quantitative: a baby takes one value from each parent, so big parents have big young), spread
+±20% for chihuahuas (15-23 cm), ±8% for the rest, and sex: males 4% taller than females in dogs,
+8% in cats, capybara females 3% the bigger, none for the dinosaurs (unknown). The engine's new
+per-entity scale (`World::set_scale`: model, box and eyes; quicker steps for small ones) draws
+it, the riding seat follows it, and the screens show it ("Size: 21 cm at the shoulder", "Grows
+to ..." for young ones). Size evolves: mammals have more young the bigger they are in snow and
+taiga and the smaller in the desert (Bergmann's rule, `evolution::fitness`). Genomes from before
+read the new gene as average.
+
 Next: the paint screen in the game (paint as a
 second component the same painter reads), then sizes (real sizes, by sex and individual: the
 engine's per-entity scale), breeding for the other species (only dogs breed so far), coat names

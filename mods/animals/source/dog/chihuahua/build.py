@@ -21,7 +21,7 @@ EXPORT = os.path.join(REPO, ".claude", "skills", "blocky-model", "scripts")
 OUT = os.path.join(HERE, "out", "d_blocky")
 ASSETS = os.path.join(HERE, "..", "..", "..", "assets")
 
-SCALE = 0.17  # model pixels per unit: the size of the old dog, ~0.6 blocks
+SCALE = 0.122  # model pixels per unit: a real chihuahua, about 20 cm at the shoulder (15-23 cm)
 PUP, PUP_HEAD = 0.5, 1.3  # a puppy: half the size, a bigger head
 
 if __name__ == "__main__":

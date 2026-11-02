@@ -47,8 +47,11 @@ and `textures/entity/<mod>/<animal>.png`. It takes care of what the engine needs
 
 - **Facing**: Bedrock models look along -Z; Blockbench's Hytale format along +Z. Turned 180°.
 - **Tilted boxes**: the engine only rotates bones, so every tilted box gets its own `_tilt` bone.
-- **Size**: the engine has no per-kind scale; `--scale` is baked into every position (model
-  pixels per Blockbench unit; 0.17 makes the chihuahua the size of the old one, ~0.6 blocks).
+- **Size**: `--scale` is baked into every position (model pixels per Blockbench unit, a block
+  being a meter): build the model at its species' real average adult size (0.122 puts the
+  chihuahua at 20 cm at the shoulder, 0.174 the cat at 24 cm). Individuals then differ around it
+  with the engine's per-entity scale (`World::set_scale`), from their size gene and sex
+  (`coats::size`; the species' `dimorphism`, `size_spread` and `height` in `species.rs`).
 - **Fur panels**: both sides of a flat panel get the picture (mirrored to line up).
 - **Poses**: the engine plays `idle` and `walk` by itself. A pose (sit, lie) is its own file whose
   `idle` holds it, used by its own look kind (`set_look`). `run` and actions like `lick` are in

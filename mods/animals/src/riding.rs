@@ -94,7 +94,9 @@ pub fn interact(w: &World, id: u64, player: u64) -> bool {
         );
         return true;
     }
-    let seat = a.species().map_or(0.0, |s| s.seat);
+    // As high as this one is big.
+    let size = w.component(id, &crate::coats::GENOME).map_or(1.0, crate::coats::size);
+    let seat = a.species().map_or(0.0, |s| s.seat) * size;
     if w.mount(player, id, seat) {
         w.add_modifier(id, &attribute::JUMP_STRENGTH, "animals:ridden", attr_op::MUL_BASE, JUMP, 0);
         if let Some(r) = w.component_mut(id, &RIDDEN) {

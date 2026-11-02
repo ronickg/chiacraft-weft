@@ -5,7 +5,8 @@
 //! generation: a population of the pool lives, the ones whose coat stands out from the habitat
 //! (sandy raptors on grass, dark ones on snow) leave fewer young (natural selection, by the
 //! species' `camouflage`), chance decides much in a small population (drift), alleles now and
-//! then mutate, and a little of each neighboring place's pool mixes in (migration). So raptors in
+//! then mutate, and a little of each neighboring place's pool mixes in (migration). Mammals also
+//! grow bigger where it is cold and smaller where it is hot (Bergmann's rule). So raptors in
 //! deserts turn sandy over a few weeks, ones in forests dark, and neighbors stay alike.
 //!
 //! Players change them too: a wild animal that dies (hunted or otherwise) or is tamed takes its
@@ -36,6 +37,9 @@ const POPULATION: usize = 200;
 const SELECTION: f32 = 0.6;
 /// The chance per locus and young that an allele mutates.
 const MUTATION: f32 = 0.002;
+/// How much size matters to a mammal in the cold (or heat): at the size gene's ends, this much
+/// more (or fewer) young in snow.
+const BERGMANN: f32 = 0.15;
 /// The share of each generation from the neighboring places.
 const MIGRATION: f32 = 0.02;
 /// Generations a pool catches up at once when it is needed again after a long time.
@@ -86,6 +90,16 @@ impl Habitat {
             (false, true) => Habitat::Forest,
             _ if MOUNTAIN.on_biome(b) => Habitat::Mountains,
             _ => Habitat::Grassland,
+        }
+    }
+
+    /// How cold it is: 1 in snow and taiga, -1 in the desert's heat.
+    fn cold(self) -> f32 {
+        match self {
+            Habitat::Snow | Habitat::Taiga => 1.0,
+            Habitat::Mountains => 0.5,
+            Habitat::Desert => -1.0,
+            Habitat::Grassland | Habitat::Forest => 0.0,
         }
     }
 
@@ -189,21 +203,27 @@ pub fn init(r: &mut Registry) {
 
 // ------------------------------------------------------------------ generations
 
-/// How many young an animal leaves, relative: less the more its coat stands out.
-fn fitness(g: &coats::Genome, h: Habitat, camouflage: f32) -> f32 {
+/// How many young an animal of species `index` leaves, relative: less the more its coat stands
+/// out; and for mammals, more the bigger it is in the cold and the smaller in the heat (Bergmann's
+/// rule: a big body loses less heat).
+fn fitness(index: usize, g: &coats::Genome, h: Habitat) -> f32 {
+    let s = &SPECIES[index];
     let Some(look) = coats::phenotype(g) else { return 1.0 };
     let (c, bg) = (look.average(), h.background());
     let d = ((c[0] - bg[0]).powi(2) + (c[1] - bg[1]).powi(2) + (c[2] - bg[2]).powi(2)).sqrt() / 441.7;
-    (1.0 - SELECTION * camouflage * d).max(0.05)
+    let mut f = (1.0 - SELECTION * s.camouflage * d).max(0.05);
+    if s.family.above.contains(&"Mammalia") {
+        f *= 1.0 + BERGMANN * h.cold() * (coats::size_gene(g) - 0.5) * 2.0;
+    }
+    f
 }
 
 /// One generation of species `index`'s pool in habitat `h`: `POPULATION` animals drawn from it,
 /// parents chosen by fitness, their young making the next pool.
 fn generation(index: usize, pool: &Pool, h: Habitat, r: &mut impl coats::Rng) -> Option<Pool> {
-    let camouflage = SPECIES[index].camouflage;
     let adults: Vec<(coats::Genome, f32)> = (0..POPULATION)
         .filter_map(|i| coats::sample(index, i % 2 == 0, pool, r))
-        .map(|g| (g, fitness(&g, h, camouflage)))
+        .map(|g| (g, fitness(index, &g, h)))
         .collect();
     let parent = |female: bool, r: &mut dyn FnMut() -> f32| {
         let of: Vec<&(coats::Genome, f32)> = adults.iter().filter(|a| (a.0.female != 0) == female).collect();

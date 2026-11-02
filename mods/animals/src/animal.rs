@@ -72,16 +72,20 @@ impl Animal {
 pub static ANIMAL: Component<Animal> = Component::named("animal");
 /// The stats last applied to the entity (not saved: applied again after loading).
 static APPLIED: Component<[f32; 2]> = Component::named("animal_applied");
+/// The size it is drawn at (`World::set_scale`; 0: not yet since it loaded).
+static SCALED: Component<f32> = Component::named("animal_scaled");
 /// The owner's player key (64 hex digits), zeros while wild.
 pub static OWNER: Component<[u8; 64]> = Component::named("owner");
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&ANIMAL, Animal::default(), component_flags::SAVE | component_flags::SYNC_MENU);
     r.entity_component(&APPLIED, [0.0; 2], 0);
+    r.entity_component(&SCALED, 0.0f32, 0);
     r.entity_component(&OWNER, [0u8; 64], component_flags::SAVE | component_flags::SYNC_MENU);
     for s in &SPECIES {
         r.attach(s.kind, &ANIMAL);
         r.attach(s.kind, &APPLIED);
+        r.attach(s.kind, &SCALED);
         r.attach(s.kind, &OWNER);
     }
     // An animal hits as hard as its damage stat.
@@ -115,6 +119,16 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         }
         crate::coats::upkeep(w, id, index, a, st.pos);
         let a = *a;
+        // Its size, from its genes and sex (the engine forgets it on loading: set it again).
+        if let Some(g) = w.component(id, &crate::coats::GENOME) {
+            let size = crate::coats::size(g);
+            if w.component(id, &SCALED).is_some_and(|&s| s != size) {
+                w.set_scale(id, size);
+                if let Some(s) = w.component_mut(id, &SCALED) {
+                    *s = size;
+                }
+            }
+        }
         if !new && tamed(w, id) && (w.time() + id) % 20 == 0 {
             hunger(w, id, &a);
         }

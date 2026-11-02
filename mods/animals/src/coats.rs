@@ -151,8 +151,15 @@ fn gauss(r: &mut impl Rng) -> f32 {
     (-2.0 * (r.next() + 1e-9).ln()).sqrt() * (std::f32::consts::TAU * r.next()).cos()
 }
 
+/// A quantitative trait's value, 0..1, as a gene keeps it (0-254; `NONE` stays "missing").
 fn unit(v: f32) -> u8 {
-    (v.clamp(0.0, 1.0) * 255.0).round() as u8
+    (v.clamp(0.0, 1.0) * 254.0).round() as u8
+}
+
+/// A quantitative trait's value back, 0..1: the middle when missing (a genome from before the
+/// trait was added).
+fn value(a: u8) -> f32 {
+    if a == NONE { 0.5 } else { a as f32 / 254.0 }
 }
 
 /// One of `shares.len()` alleles, each as likely as its share.
@@ -247,9 +254,9 @@ pub fn pool_of(index: usize, genomes: &[Genome]) -> Option<Pool> {
                 let values = genomes
                     .iter()
                     .flat_map(|x| [x.genes[2 * i], x.genes[2 * i + 1]])
-                    .filter(|&a| l.quantitative || a != NONE);
+                    .filter(|&a| a != NONE);
                 if l.quantitative {
-                    let v: Vec<f32> = values.map(|a| a as f32 / 255.0).collect();
+                    let v: Vec<f32> = values.map(value).collect();
                     let n = v.len().max(1) as f32;
                     let mean = v.iter().sum::<f32>() / n;
                     let sd = (v.iter().map(|x| (x - mean) * (x - mean)).sum::<f32>() / n).sqrt();
@@ -278,7 +285,7 @@ pub fn count_in(index: usize, pool: &mut Pool, g: &Genome, sign: f32, n: f32) {
         let have = [g.genes[2 * i], g.genes[2 * i + 1]];
         if l.quantitative {
             if let Some(mean) = p.first_mut() {
-                let sum = (have[0] as f32 + have[1] as f32) / 255.0;
+                let sum = value(have[0]) + value(have[1]);
                 *mean = ((*mean * total + sign * sum) / (total + 2.0 * sign)).clamp(0.0, 1.0);
             }
             continue;
@@ -336,7 +343,7 @@ pub fn breed_with(mother: &Genome, father: &Genome, mutation: f32, r: &mut impl 
         let (m, f) = ([mother.genes[2 * i], mother.genes[2 * i + 1]], [father.genes[2 * i], father.genes[2 * i + 1]]);
         if l.quantitative {
             for (k, p) in [m, f].into_iter().enumerate() {
-                let v = one(p, &mut rnd) as f32 / 255.0;
+                let v = value(one(p, &mut rnd));
                 genes[2 * i + k] = unit(v + 0.05 * gauss(&mut rnd));
             }
             continue;
@@ -471,7 +478,7 @@ impl Read<'_> {
     /// A quantitative trait's value, 0..1.
     fn qv(&self, id: &str) -> f32 {
         self.locus(id)
-            .map_or(0.5, |(i, _)| (self.genome.genes[2 * i] as f32 + self.genome.genes[2 * i + 1] as f32) / 510.0)
+            .map_or(0.5, |(i, _)| (value(self.genome.genes[2 * i]) + value(self.genome.genes[2 * i + 1])) / 2.0)
     }
     fn female(&self) -> bool {
         self.genome.female != 0
@@ -681,6 +688,22 @@ fn raptor(r: &Read) -> Look {
         name = "Leucistic".into();
     }
     Look { name, base, under, pattern, pattern2: saddle, ..Look::default() }
+}
+
+/// How big an adult with `genome` is against its species' average (its model): its size gene
+/// (`Sz`, spread by the species' `size_spread`) and its sex (`dimorphism`, males against
+/// females; the average stays the model's).
+pub fn size(genome: &Genome) -> f32 {
+    let Some(s) = (genome.species as usize).checked_sub(1).and_then(|i| SPECIES.get(i)) else { return 1.0 };
+    let sz = size_gene(genome);
+    let sex = if genome.female != 0 { s.dimorphism.sqrt().recip() } else { s.dimorphism.sqrt() };
+    (1.0 + s.size_spread * (sz - 0.5) * 2.0) * sex
+}
+
+/// Its size gene (`Sz`), 0..1: small to big for its kind.
+pub fn size_gene(genome: &Genome) -> f32 {
+    let Some(s) = (genome.species as usize).checked_sub(1).and_then(|i| SPECIES.get(i)) else { return 0.5 };
+    gene_file(s.name).map_or(0.5, |g| Read { g, genome }.qv("Sz"))
 }
 
 /// What `genome` looks like (none before it has genes).

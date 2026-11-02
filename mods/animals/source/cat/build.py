@@ -19,7 +19,7 @@ SKILL = os.path.join(REPO, ".claude", "skills", "blocky-model", "scripts")
 OUT = os.path.join(HERE, "out")
 ASSETS = os.path.join(HERE, "..", "..", "assets")
 
-SCALE = 0.2  # model pixels per unit: about half a block long (a cat is a little bigger than the dog)
+SCALE = 0.174  # model pixels per unit: a real house cat, about 24 cm at the shoulder (23-25 cm)
 # Which animations go in which file: the engine plays `idle` and `walk` by itself, a pose's
 # file holds it in `idle`; `run` and `meow` are there for code to play.
 POSES = {"": {"idle": "idle", "walk": "walk", "run": "run", "meow": "meow"},

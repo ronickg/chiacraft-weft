@@ -140,6 +140,14 @@
    "mean": 0.35,
    "sd": 0.25,
    "about": "dark tips over the back on fawn"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
   }
  ],
  "species": "dog",
@@ -188,6 +196,10 @@
     "Sh": {
      "mean": 0.35,
      "sd": 0.25
+    },
+    "Sz": {
+     "mean": 0.5,
+     "sd": 0.2
     }
    }
   }

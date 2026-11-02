@@ -109,7 +109,7 @@ pub fn init(r: &mut Registry) {
             let model = if puppy { "chihuahua_pup" } else { "chihuahua" };
             drop(
                 r.entity(kind)
-                    .size(0.35, 0.5)
+                    .size(0.25, 0.36)
                     .passive()
                     .model_file(model)
                     .animations(&format!("{model}{}", pose.suffix()))
@@ -118,7 +118,7 @@ pub fn init(r: &mut Registry) {
         }
     }
     r.entity(&CHIHUAHUA)
-        .size(0.35, 0.5)
+        .size(0.25, 0.36)
         .health(8.0)
         .speed(2.8)
         .attack_damage(2.0)
@@ -204,7 +204,7 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     if s.look != look {
         s.look = look;
         w.set_look(id, Some(&look_name(puppy, pose)));
-        w.set_size(id, puppy.then_some([0.2, 0.25, 0.2]));
+        w.set_size(id, puppy.then_some([0.15, 0.18, 0.15]));
     }
     false
 }
