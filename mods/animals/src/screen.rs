@@ -34,7 +34,7 @@ pub fn init(r: &mut Registry) {
         }
     });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,away)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,away,habitats)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -464,6 +464,17 @@ fn command(cmd: &mut ServerCommand) {
             crate::breeding::set_speed(cmd.int("count").unwrap_or(1).max(1) as u32);
             let line = format!("animals live {} times faster", crate::breeding::speed());
             cmd.reply("command.animals.line", &[Arg::Text(&line)]);
+            return;
+        }
+        // The land round the player by biome, and how much of it each species lives on
+        // (`/animal habitats [radius]`), from the world's generator: generated or not.
+        Some("habitats") => {
+            let Some(p) = w.entity(player) else { return };
+            let radius = cmd.int("count").unwrap_or(2048).clamp(64, 16_384) as i32;
+            for line in crate::habitats::survey(&w, [p.pos[0] as i32, p.pos[2] as i32], radius) {
+                weft_sdk::info!("habitats: {line}");
+                cmd.reply("command.animals.line", &[Arg::Text(&line)]);
+            }
             return;
         }
         Some("census") => {

@@ -211,6 +211,9 @@ console.log("Balance");
 // and a wild group left to itself at its own room lasts, neither dying out nor flooding.
 for (const x of species) {
   for (const c of x.balance.checks) check(`${x.name}: ${c.name}`, c.ok, `${c.found}, want ${c.target}`);
+  const homes = x.bio.habitats;
+  check(`${x.name}: lives somewhere, commonest in one place`, homes.length > 0 && homes.every(([b, h]) => b.includes(":") && h > 0 && h <= 1) && homes.some(([, h]) => h === 1),
+    homes.map(([b, h]) => `${b} ${Math.round(h * 100)}%`).join(", "));
   // Alone (no newcomers, as in a pen; in the open the engine spawns more), over 150 days or a
   // life and a half: two runs of three last at least.
   const days = Math.max(150, Math.round(x.lifespan / DAY * 1.5));

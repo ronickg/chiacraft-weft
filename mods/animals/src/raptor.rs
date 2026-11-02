@@ -57,19 +57,6 @@ pub fn init(r: &mut Registry) {
     for (kind, index, texture) in KINDS {
         register(r, kind, index, texture);
     }
-    // Small packs now and then, rarer than cats: mongoliensis on grassland, osmolskae on sand.
-    r.spawn(&RAPTOR)
-        .biome("#animals")
-        .ground("#animal_spawn")
-        .light(7, 15)
-        .group(2, 3)
-        .chance(0.008);
-    r.spawn(&OSMOLSKAE)
-        .biome("#dry")
-        .ground("#sand")
-        .light(7, 15)
-        .group(2, 3)
-        .chance(0.008);
 }
 
 /// One species: the kind, and its resting pose (a look) drawn in place of it lying down.

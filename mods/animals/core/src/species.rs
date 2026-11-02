@@ -161,6 +161,10 @@ pub struct Species {
     /// A grown average one's height in meters (its model's), and where it is measured
     /// (`screen.animals.size.<at>`): the shoulder, or the hip of a two-legged one.
     pub height: (f32, &'static str),
+    /// Where it lives: biomes by full name, each with how common it is there against where it is
+    /// commonest (1). It spawns only there (`mods/animals/src/habitats.rs`), how often by its
+    /// rarity, in groups by its social life (`Rarity::spawn_chance`, `Social::group`).
+    pub habitats: &'static [(&'static str, f32)],
     /// It as life has it (mass, carrying, growing up, a life, litters; `biology`): its
     /// breeding numbers follow from these by one pacing for every species (`gestation()`..).
     pub bio: Biology,
@@ -250,6 +254,8 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.04,
         size_spread: 0.2,
         height: (0.20, "shoulder"),
+        // Chihuahua, Mexico: dry country, and wherever people are; never the cold.
+        habitats: &[("base:plains", 1.0), ("base:savanna", 0.6), ("base:desert", 0.4), ("base:forest", 0.3), ("base:birch_forest", 0.3)],
         bio: Biology {
             mass: 2.5,
             gestation: 63.0,
@@ -302,6 +308,16 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.08,
         size_spread: 0.08,
         height: (0.24, "shoulder"),
+        // From the African wildcat of desert and savanna edges; feral almost everywhere but the
+        // deep cold.
+        habitats: &[
+            ("base:plains", 1.0),
+            ("base:forest", 0.6),
+            ("base:birch_forest", 0.6),
+            ("base:savanna", 0.5),
+            ("base:desert", 0.4),
+            ("base:taiga", 0.2),
+        ],
         bio: Biology {
             mass: 4.5,
             gestation: 65.0,
@@ -352,6 +368,8 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 0.97,
         size_spread: 0.08,
         height: (0.56, "shoulder"),
+        // Savannas, flooded grasslands and swamps of South America, always near water.
+        habitats: &[("base:swamp", 1.0), ("base:savanna", 0.8), ("base:forest", 0.2)],
         bio: Biology {
             mass: 50.0,
             gestation: 140.0,
@@ -394,6 +412,8 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.0,
         size_spread: 0.08,
         height: (0.50, "hip"),
+        // The Djadokhta Formation, Mongolia: wind-blown dunes, warm and semi-arid.
+        habitats: &[("base:desert", 1.0), ("base:savanna", 0.3)],
         bio: Biology {
             mass: 15.0,
             gestation: 0.0,
@@ -437,6 +457,8 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.0,
         size_spread: 0.08,
         height: (1.50, "hip"),
+        // The Cedar Mountain Formation, Utah: a semi-arid floodplain with conifers and ferns.
+        habitats: &[("base:savanna", 1.0), ("base:plains", 0.5), ("base:forest", 0.3)],
         bio: Biology {
             mass: 300.0,
             gestation: 0.0,
@@ -481,6 +503,8 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.0,
         size_spread: 0.08,
         height: (0.50, "hip"),
+        // The Bayan Mandahu Formation, Inner Mongolia: dunes, drier than its cousin's.
+        habitats: &[("base:desert", 1.0)],
         bio: Biology {
             mass: 15.0,
             gestation: 0.0,
@@ -537,6 +561,14 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.08,
         size_spread: 0.12,
         height: (3.9, "shoulder"),
+        // A fantasy animal of high crags, each country's kind (`genetics/wyvern.json`).
+        habitats: &[
+            ("base:mountains", 1.0),
+            ("base:snowy_plains", 0.33),
+            ("base:taiga", 0.33),
+            ("base:desert", 0.33),
+            ("base:forest", 0.33),
+        ],
         bio: Biology {
             mass: 5000.0,
             gestation: 0.0,

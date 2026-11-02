@@ -34,4 +34,5 @@ Two ways, the same rules (`mods/animals/core`):
 
 In a world of your own: `/animal speed <n>`, `/animal census [radius]`, `/animal reset`,
 `/animal age <days>` (the animal you look at, older), `/animal away <days>` (the animals round
-you, as if that long had passed while away), `/animal scar`.
+you, as if that long had passed while away), `/animal scar`, `/animal habitats [radius]` (the
+land round you by biome, each one's nearest spot, and how much of it each species lives on).

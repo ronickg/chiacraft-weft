@@ -37,6 +37,8 @@ pub static BIRCH_FOREST: Biome = Biome::named("birch_forest");
 pub static TAIGA: Biome = Biome::named("taiga");
 pub static SNOWY: Biome = Biome::named("snowy_plains");
 pub static DESERT: Biome = Biome::named("desert");
+pub static SAVANNA: Biome = Biome::named("savanna");
+pub static SWAMP: Biome = Biome::named("swamp");
 pub static MOUNTAINS: Biome = Biome::named("mountains");
 pub static OCEAN: Biome = Biome::named("ocean");
 pub static BEACH: Biome = Biome::named("beach");
@@ -105,6 +107,29 @@ pub fn register(r: &mut Registry) {
         .tint(foliage, 0xaea42a)
         .tag("dry")
         .tag("hot");
+    // Hot grassland with few trees, between the desert and the forests (wet and dry seasons).
+    r.biome(&SAVANNA)
+        .temperature(0.2..)
+        .humidity(..0.2)
+        .surface("grass", "dirt", 3)
+        .tint(grass, 0xbfb755)
+        .tint(foliage, 0xaea42a)
+        .tag("hot")
+        .tag("animals")
+        .set(&TREES, 0.03)
+        .set(&GRASS_COVER, 0.35);
+    // Warm, wet lowland: still, dark water, low trees.
+    r.biome(&SWAMP)
+        .temperature(-0.05..)
+        .humidity(0.1..)
+        .surface("grass", "dirt", 3)
+        .tint(grass, 0x6a7039)
+        .tint(foliage, 0x6a7039)
+        .tint(water, 0x617b64)
+        .tag("wet")
+        .tag("animals")
+        .set(&TREES, 0.12)
+        .set(&GRASS_COVER, 0.2);
     r.biome(&MOUNTAINS)
         .surface("grass", "dirt", 3)
         .bare_above(130)
@@ -169,6 +194,9 @@ pub fn register(r: &mut Registry) {
         .biome(BiomeRule::new("snowy_plains"))
         .biome(BiomeRule::new("taiga"))
         .biome(BiomeRule::new("desert"))
+        .biome(BiomeRule::new("savanna"))
+        // Swamps only on low land, where water stands.
+        .biome(BiomeRule::new("swamp").height(..=SEA + 12).continent(0.1..))
         .biome(BiomeRule::new("forest"))
         .biome(BiomeRule::new("birch_forest"))
         .biome(BiomeRule::new("plains"))

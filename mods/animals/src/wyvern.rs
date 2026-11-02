@@ -92,16 +92,6 @@ pub fn init(r: &mut Registry) {
                 c.rest = 0;
             }
         });
-    // Alone, rarely: most in the mountains, fewer in the cold, the deserts and the forests,
-    // each country's kind of wyvern (`genetics/wyvern.json`'s `habitats`).
-    for (biome, chance) in [("#mountain", 0.0006), ("#cold", 0.0002), ("#dry", 0.0002), ("#forest", 0.0002)] {
-        r.spawn(&WYVERN)
-            .biome(biome)
-            .ground("#animal_spawn")
-            .light(7, 15)
-            .group(1, 1)
-            .chance(chance);
-    }
 }
 
 /// A goal for wild wyverns: a calm one goes for the nearest player within its territory (wider

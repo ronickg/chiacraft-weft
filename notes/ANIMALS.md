@@ -414,6 +414,81 @@ general features worth offering upstream):
 9. **Capsules**, portals, trading; achievements on chain.
 10. **Jobs**, the journal, the pedigree NFT.
 
+## Places, food and sedation (design, 2026-11-02)
+
+Ronald: "certain animals will only spawn in certain biomes; raptors in their own dino
+dimension; food sources tied to taming and to how animals' stats change; a realistic way to
+make narcotics. When does it get too complex?"
+
+**When it's too much.** A new idea stays only if the player can see it (the animal's screen, the
+spyglass, the world), can act on it (it changes where to hunt, what to feed, whom to breed), it
+feeds a system we have (habitat, genes and evolution, stats, food, the species' facts) instead of
+starting another, and it says itself in one sentence ("raptors from the red desert are paler and
+smaller"). Depth over complexity: few rules that combine. Out by this test: each food shifting
+particular stats (a food x stat x species table nobody can see or plan around).
+
+**One hub: the place.** A biome's climate (temperature, humidity, which the engine has) and what
+grows there; everything below reads from it.
+
+- **Where each lives**: a species' habitats are facts in its row (biome tags, and a dimension),
+  and spawning follows them (the engine spawns by biome tag already).
+- **The dino dimension** (decided: dinosaurs and wyverns; the overworld keeps today's animals):
+  its own biomes after the places these animals lived: arid dunes and red beds (Velociraptor:
+  the Djadokhta Formation, Mongolia), a semi-arid floodplain with conifers and ferns
+  (Utahraptor: the Cedar Mountain Formation, Utah), fern and conifer forests, and high crags for
+  wyverns. Same systems, its own data.
+- **Climate shapes them** (evolution, already: bigger in the cold, Bergmann; camouflage): add
+  shorter ears, tails and limbs in the cold (Allen's rule, on the build genes' bones) and darker
+  coats where it's humid (Gloger's rule).
+- **Food** (decided: wild animals eat in the world): a diet is food categories (grass, leaves,
+  fruit, seeds, insects, meat, fish, carrion), with its favorites; every food item and food
+  source belongs to one. Herbivores graze grass and browse leaves, carnivores hunt smaller
+  animals; a biome's food sets how many it holds and how well fed they are.
+- **Diet changes an animal through its condition** (decided: one number): well fed on its foods
+  it reaches the size and strength its genes allow and grows up on time; poorly fed it stays
+  smaller and weaker, growing slowly. Shown on its screen. Generations change through the local
+  gene pool, as now.
+- **Sedation by dose and weight** (decided): as wildlife capture does it, a dart's drug acts
+  after a delay and the dose needed scales with body mass (mg/kg), which every species has as a
+  fact; too much for a small one can kill it, an antidote wakes one. Made from real plants:
+  opium poppy (the strong one; etorphine is of its family), datura or henbane (strong, risky),
+  valerian root (mild, to keep one under). No sleeping berries.
+
+**Order**: 1. habitats as species facts and spawning by them; 2. the dino dimension and its
+biomes, with the dinosaurs and wyverns moved there; 3. food categories, plants and items, wild
+grazing and hunting, condition; 4. sedatives from plants by dose; 5. Allen's and Gloger's rules.
+
+**1. Habitats** (built 2026-11-02; Ronald: "some animals have multiple habitats, some many;
+following realism; we'll create the new biomes"). Each species' row lists its biomes, each with
+how common it is there against where it is commonest (`Species::habitats`), and spawning follows
+them (`src/habitats.rs`): a rule per species and biome, at its rarity's chance there
+(`Rarity::spawn_chance`: common 2%, uncommon 0.8%, rare 0.4%, legendary 0.06% of attempts that
+pick it), in groups by its social life (`Social::group`: alone 1, pack 2-3, herd 3-5), by day
+on grass, snow or sand. The habitats, from where each lives or lived:
+
+- chihuahua: plains, savanna, desert, forests (Chihuahua, Mexico: dry country and people; not
+  the cold); cat: plains, forests, savanna, desert, a little taiga (the African wildcat of desert
+  and savanna edges; feral nearly everywhere but the deep cold); capybara: swamp, savanna, a
+  little forest (the llanos' savannas, flooded grasslands and swamps).
+- Until the dino dimension: Velociraptor in the desert (the Djadokhta Formation's dunes),
+  V. osmolskae only there (Bayan Mandahu), Utahraptor on savanna, plains and forest (the Cedar
+  Mountain Formation's semi-arid floodplain); wyverns in the mountains, and a third as often in
+  snow, taiga, desert and forest (each country's kind).
+
+Two new overworld biomes in base: **savanna** (warm and dry, between the desert and the forests;
+yellow grass, few trees; 6% of the land) and **swamp** (mild and wet lowland near sea level; dark
+olive grass and water; 1.6%). Before them hot and wet land barely existed (desert 0.5%), so the
+capybara, raptors and Utahraptor would have had nowhere. `/animal habitats [radius]` surveys the
+land round the player from the world's generator: each biome's share and nearest spot, and how
+much of the land each species lives on. Still to come: standing water in swamps (a terrain
+feature), and a capybara keeping near water.
+
+Sources: [canid immobilization](https://pmc.ncbi.nlm.nih.gov/articles/PMC3141559),
+[muskoxen](https://openpolar.no/Record/ftpubmed:oai:pubmedcentral.nih.gov:5645868),
+[black rhinoceros darting](https://rhinoresourcecenter.com/wp-content/uploads/2006/12/1652709686.pdf),
+[diet and carotenoids in birds](https://cibnor.repositorioinstitucional.mx/jspui/handle/1001/2353),
+[depth and complexity](https://giantbrain.co.uk/2022/07/14/the-complexity-of-depth/).
+
 ## Open questions
 
 - Tribes: a world feature only, or tied to player DIDs across worlds?

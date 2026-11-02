@@ -74,13 +74,6 @@ pub fn init(r: &mut Registry) {
                 c.rest = 0;
             }
         });
-    // Small groups (they're social), about as often as cats.
-    r.spawn(&CAPYBARA)
-        .biome("#animals")
-        .ground("#animal_spawn")
-        .light(7, 15)
-        .group(2, 4)
-        .chance(0.015);
 }
 
 /// Every tick: now and then settle down for a while (sit, then lie), and show the pose.

@@ -32,6 +32,14 @@ pub enum Rarity {
 
 impl Social {
     /// How much more room its kind take near: a pack's and a herd's more.
+    /// How many are met together in the wild.
+    pub fn group(self) -> (u32, u32) {
+        match self {
+            Social::Solitary => (1, 1),
+            Social::Pack => (2, 3),
+            Social::Herd => (3, 5),
+        }
+    }
     pub fn room(self) -> f32 {
         match self {
             Social::Solitary => 1.0,
@@ -42,6 +50,15 @@ impl Social {
 }
 
 impl Rarity {
+    /// The chance a natural spawn attempt that picked it brings it, where it is commonest.
+    pub fn spawn_chance(self) -> f32 {
+        match self {
+            Rarity::Common => 0.02,
+            Rarity::Uncommon => 0.008,
+            Rarity::Rare => 0.004,
+            Rarity::Legendary => 0.0006,
+        }
+    }
     pub fn name(self) -> &'static str {
         match self {
             Rarity::Common => "common",

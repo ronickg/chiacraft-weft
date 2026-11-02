@@ -26,6 +26,7 @@ mod commands;
 mod dog;
 mod eggs;
 mod evolution;
+mod habitats;
 mod knockout;
 mod raptor;
 mod riding;
@@ -100,6 +101,7 @@ fn init(r: &mut Registry) {
     breeding::init(r);
     eggs::init(r);
     evolution::init(r);
+    habitats::init(r);
     r.particle(&HEART)
         .textures(&["animals:heart"])
         .life(0.8, 1.2)

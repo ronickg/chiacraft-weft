@@ -130,13 +130,6 @@ pub fn init(r: &mut Registry) {
                 d.panic = 60;
             }
         });
-    // Now and then a pair on grassland by day, rarer than pigs and cows.
-    r.spawn(&CHIHUAHUA)
-        .biome("#animals")
-        .ground("#animal_spawn")
-        .light(7, 15)
-        .group(1, 2)
-        .chance(0.02);
 }
 
 // ------------------------------------------------------------------ behavior

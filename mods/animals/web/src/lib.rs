@@ -209,6 +209,7 @@ fn bio(s: &Species) -> Value {
         "mass": b.mass, "gestation": b.gestation, "incubation": b.incubation, "maturity": b.maturity,
         "lifespan": b.lifespan, "interval": b.interval, "litter": b.litter,
         "social": format!("{:?}", b.social).to_lowercase(), "rarity": b.rarity.name(),
+        "habitats": s.habitats,
         "tuned": tuned,
     })
 }

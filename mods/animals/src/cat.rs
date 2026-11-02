@@ -74,12 +74,6 @@ pub fn init(r: &mut Registry) {
                 c.rest = 0;
             }
         });
-    r.spawn(&CAT)
-        .biome("#animals")
-        .ground("#animal_spawn")
-        .light(7, 15)
-        .group(1, 2)
-        .chance(0.02);
 }
 
 /// Every tick: now and then settle down for a while (sit, then lie), and show the pose.

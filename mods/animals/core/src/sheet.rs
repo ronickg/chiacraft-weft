@@ -129,6 +129,24 @@ fn species(w: &mut String, s: &Species) {
         .collect();
     let _ = writeln!(w, "*{}*, {}. Model `{}`, entity `animals:{}`.\n", s.binomial, tree.join(" › "), s.model, s.breed.unwrap_or(s.name));
 
+    let (few, most) = s.bio.social.group();
+    let group = if few == most { few.to_string() } else { format!("{few}-{most}") };
+    let _ = writeln!(w, "| Where it lives | how common there |\n|---|---|");
+    for &(biome, share) in s.habitats {
+        let _ = writeln!(
+            w,
+            "| `{biome}` | {} |",
+            if share >= 1.0 { "commonest".to_string() } else { format!("{}%", trim(share as f64 * 100.0, 0)) }
+        );
+    }
+    let _ = writeln!(
+        w,
+        "\nSpawns by day on grass, snow or sand, in groups of {group} ({}), at {}% of spawn attempts that pick it where commonest ({}).\n",
+        lower(s.bio.social),
+        trim(s.bio.rarity.spawn_chance() as f64 * 100.0, 2),
+        s.bio.rarity.name()
+    );
+
     let _ = writeln!(w, "| Body | |\n|---|---|");
     let _ = writeln!(w, "| size class | {} |", lower(s.size));
     let _ = writeln!(w, "| height (grown, average) | {} m at the {} |", s.height.0, s.height.1);
@@ -274,6 +292,16 @@ fn shared(w: &mut String) {
     let _ = writeln!(w, "| bigger in the cold (Bergmann) | {} |", evolution::BERGMANN);
     let _ =
         writeln!(w, "| a new place's history | {} generations (a revisited one catches up {}) |", evolution::HISTORY, evolution::CATCH_UP);
+    let _ = writeln!(w);
+
+    let _ = writeln!(w, "| Spawning (`habitats.rs`, `biology.rs`) | |\n|---|---|");
+    for r in [biology::Rarity::Common, biology::Rarity::Uncommon, biology::Rarity::Rare, biology::Rarity::Legendary] {
+        let _ = writeln!(w, "| {} | {}% of attempts that pick it, where commonest |", r.name(), trim(r.spawn_chance() as f64 * 100.0, 2));
+    }
+    for x in [biology::Social::Solitary, biology::Social::Pack, biology::Social::Herd] {
+        let (few, most) = x.group();
+        let _ = writeln!(w, "| {} | groups of {} |", lower(x), if few == most { few.to_string() } else { format!("{few}-{most}") });
+    }
     let _ = writeln!(w);
 
     let _ = writeln!(w, "| Balance targets (`balance.rs`): a line four generations deep | |\n|---|---|");

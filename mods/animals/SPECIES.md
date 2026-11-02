@@ -36,6 +36,16 @@ Damage and speed are each kind's own (1 = 100%).
 
 *Canis familiaris*, Mammalia › Carnivora › Canidae › Caninae. Model `chihuahua`, entity `animals:chihuahua`.
 
+| Where it lives | how common there |
+|---|---|
+| `base:plains` | commonest |
+| `base:savanna` | 60% |
+| `base:desert` | 40% |
+| `base:forest` | 30% |
+| `base:birch_forest` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn attempts that pick it where commonest (common).
+
 | Body | |
 |---|---|
 | size class | small |
@@ -82,6 +92,17 @@ Damage and speed are each kind's own (1 = 100%).
 ## cat
 
 *Felis catus*, Mammalia › Carnivora › Felidae › Felinae. Model `cat`, entity `animals:cat`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:plains` | commonest |
+| `base:forest` | 60% |
+| `base:birch_forest` | 60% |
+| `base:savanna` | 50% |
+| `base:desert` | 40% |
+| `base:taiga` | 20% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn attempts that pick it where commonest (common).
 
 | Body | |
 |---|---|
@@ -130,6 +151,14 @@ Damage and speed are each kind's own (1 = 100%).
 
 *Hydrochoerus hydrochaeris*, Mammalia › Rodentia › Caviidae › Hydrochoerinae. Model `capybara`, entity `animals:capybara`.
 
+| Where it lives | how common there |
+|---|---|
+| `base:swamp` | commonest |
+| `base:savanna` | 80% |
+| `base:forest` | 20% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
 | Body | |
 |---|---|
 | size class | medium |
@@ -176,6 +205,13 @@ Damage and speed are each kind's own (1 = 100%).
 ## raptor
 
 *Velociraptor mongoliensis*, Dinosauria › Theropoda › Dromaeosauridae › Velociraptorinae. Model `raptor`, entity `animals:raptor`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:desert` | commonest |
+| `base:savanna` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 
 | Body | |
 |---|---|
@@ -225,6 +261,14 @@ Damage and speed are each kind's own (1 = 100%).
 
 *Utahraptor ostrommaysi*, Dinosauria › Theropoda › Dromaeosauridae › Dromaeosaurinae. Model `utahraptor`, entity `animals:utahraptor`.
 
+| Where it lives | how common there |
+|---|---|
+| `base:savanna` | commonest |
+| `base:plains` | 50% |
+| `base:forest` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn attempts that pick it where commonest (rare).
+
 | Body | |
 |---|---|
 | size class | large |
@@ -273,6 +317,12 @@ Damage and speed are each kind's own (1 = 100%).
 
 *Velociraptor osmolskae*, Dinosauria › Theropoda › Dromaeosauridae › Velociraptorinae. Model `raptor`, entity `animals:osmolskae`.
 
+| Where it lives | how common there |
+|---|---|
+| `base:desert` | commonest |
+
+Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
 | Body | |
 |---|---|
 | size class | medium |
@@ -320,6 +370,16 @@ Damage and speed are each kind's own (1 = 100%).
 ## wyvern
 
 *Wyverna montana*, Fantasy › Draconia › Wyvernidae › Wyverninae. Model `wyvern`, entity `animals:wyvern`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:mountains` | commonest |
+| `base:snowy_plains` | 33% |
+| `base:taiga` | 33% |
+| `base:desert` | 33% |
+| `base:forest` | 33% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spawn attempts that pick it where commonest (legendary).
 
 | Body | |
 |---|---|
@@ -401,6 +461,16 @@ Damage and speed are each kind's own (1 = 100%).
 | migration from neighbors | 0.02 |
 | bigger in the cold (Bergmann) | 0.15 |
 | a new place's history | 300 generations (a revisited one catches up 120) |
+
+| Spawning (`habitats.rs`, `biology.rs`) | |
+|---|---|
+| common | 2% of attempts that pick it, where commonest |
+| uncommon | 0.8% of attempts that pick it, where commonest |
+| rare | 0.4% of attempts that pick it, where commonest |
+| legendary | 0.06% of attempts that pick it, where commonest |
+| solitary | groups of 1 |
+| pack | groups of 2-3 |
+| herd | groups of 3-5 |
 
 | Balance targets (`balance.rs`): a line four generations deep | |
 |---|---|
