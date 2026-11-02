@@ -226,6 +226,7 @@ pub static HOST: Host = Host {
     entity_mount_of,
     entity_rider,
     entity_keys,
+    reg_entity_skin,
     entity_kind_size,
     structure_block,
     set_structure_block,
@@ -1710,6 +1711,19 @@ unsafe extern "C" fn reg_hud_element(r: *mut abi::Registrar, name: Str, anchor: 
             title: crate::ui::text::dotted(name.as_str()),
             anchor: anchor.as_str().to_string(),
             order,
+            owner,
+            cb,
+        });
+    }
+}
+
+unsafe extern "C" fn reg_entity_skin(r: *mut abi::Registrar, kind: Str, comp: Str, cb: Callback) {
+    unsafe {
+        let r = reg(r);
+        let owner = r.owner;
+        r.game.skin_painters.push(registry::SkinPainter {
+            kind: kind.as_str().to_string(),
+            comp: comp.as_str().to_string(),
             owner,
             cb,
         });

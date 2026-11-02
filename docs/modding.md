@@ -403,6 +403,12 @@ Also:
 - messages both ways on a typed channel: `static BOOST: Channel<Boost> = Channel::named("boost")` with a `value!` struct (or `String`, `Vec<u8>`, `()`), `r.packet(&BOOST, |p, b| ..)` on the server (`p.reply(&OTHER, &v)` answers), `r.client_packet` on the client, `w.send` / `client.send`. Both ends must declare the same type, the engine checks it like event values
 - `client.run_command("/tp ~ ~5 ~")` runs a command as the player and `client.command_reply(id)` gives its answer to your code instead of the chat (testkit drives its server half like this)
 - frame hooks (`r.client_frame`)
+- skins painted from a few bytes: `r.entity_skin(&MOB, &GENES, |genes, skin| ..)` paints each
+  mob's own texture on every client from its component (registered with `SYNC_WATCHERS`): `skin`
+  is a copy of the kind's texture (`skin.rgba`, `width` x `height`) to paint over, drawn on the
+  mob in its own kind and every look with the same texture, painted again when the component
+  changes. Only the component travels. The animals mod paints every animal's coat from its genes
+  this way (`mods/animals/src/coats.rs`)
 - cosmetics of your mobs: `r.client_entity_tick(&MOB, |c, e| ..)` every frame, with its position, distance walked, age and death; it replaces the engine's steps, idle noises and death smoke unless you call `e.engine_effects()`
 - particles and screen effects from shader snippets in `assets/shaders`
 - sounds with `r.sound(..).category(..)` (every category gets its own volume slider), music

@@ -21,6 +21,15 @@ pub struct HudElement {
     pub owner: ModId,
     pub cb: Callback,
 }
+/// A mod painting a kind's skins from a component (`Host::reg_entity_skin`), by name.
+#[derive(Clone)]
+pub struct SkinPainter {
+    pub kind: String,
+    pub comp: String,
+    pub owner: ModId,
+    pub cb: Callback,
+}
+
 pub const ITEM: &str = "core:item";
 /// Holder of virtual inventories (`Host::inventory_create`).
 pub const VIRTUAL: &str = "core:virtual";
@@ -319,6 +328,7 @@ pub struct Game {
     /// Sound categories by `SoundDef::category`: the engine's six first.
     pub sound_categories: Vec<SoundCategory>,
     pub huds: Vec<HudElement>,
+    pub skin_painters: Vec<SkinPainter>,
     pub player_menu: Option<u32>,
     pub player_layout: PlayerLayout,
     /// Mods' screens; of two with one name the mod loaded last comes last.
@@ -661,6 +671,7 @@ pub struct RawGame {
     pub sound_categories: Vec<SoundCategory>,
     pub menus: Vec<(usize, MenuDef)>,
     pub huds: Vec<HudElement>,
+    pub skin_painters: Vec<SkinPainter>,
     /// (owner, name, usage, callback).
     pub commands: Vec<(ModId, String, String, Callback)>,
     /// Commands that run on the client: (owner, name, usage, callback).
@@ -1381,6 +1392,7 @@ pub fn freeze(
         sound_categories.extend(r.sound_categories);
         menus.extend(r.menus);
         g.huds.extend(r.huds);
+        g.skin_painters.extend(r.skin_painters);
         if let Some((owner, name)) = r.player_menu {
             if player_menu
                 .as_ref()

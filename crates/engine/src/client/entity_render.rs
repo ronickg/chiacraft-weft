@@ -18,6 +18,20 @@ use crate::content::content;
 use crate::gpu_layout::{GpuBox, Scene};
 use crate::physics::Hit;
 
+/// A skin a mod painted: the component it was painted from, the texture of the kind it was
+/// painted over (the looks drawn with it), and the GPU copy.
+struct Painted {
+    from: Vec<u8>,
+    texture: String,
+    tex: (TextureId, u32, [u32; 2]),
+}
+
+/// A kind's painter: its component, the mod and the mod's callback.
+type Painter = (u32, weft_abi::ModId, weft_abi::Callback);
+
+/// Skins painted a frame at most: many animals coming into view at once spread over frames.
+const PAINTS_PER_FRAME: usize = 8;
+
 /// What the first person view holds: the item (or the bare arm) and how it moves.
 pub struct Hand {
     pub stack: weft_abi::ItemStack,
@@ -64,6 +78,12 @@ pub struct EntityRenderer {
     player_skins: FxHashMap<u64, (TextureId, u32, [u32; 2])>,
     /// Skins received and not uploaded yet.
     pub skin_pending: Vec<(u64, Vec<u8>)>,
+    /// Skins mods painted (`Host::reg_entity_skin`), by entity.
+    painted: FxHashMap<u64, Painted>,
+    /// Each kind with a painter: its component, the mod and its callback (made on first use).
+    painters: Option<FxHashMap<u32, Painter>>,
+    /// Textures painted over, as read: RGBA and size, by name.
+    skin_bases: FxHashMap<String, Option<(Vec<u8>, [u32; 2])>>,
     /// The local player's entity.
     pub local: u64,
     glows: FxHashMap<String, (TextureId, u32)>,
@@ -148,6 +168,9 @@ impl EntityRenderer {
             skins: FxHashMap::default(),
             player_skins: FxHashMap::default(),
             skin_pending: Vec::new(),
+            painted: FxHashMap::default(),
+            painters: None,
+            skin_bases: FxHashMap::default(),
             local: 0,
             glows: FxHashMap::default(),
             kind_shaders,
@@ -272,6 +295,11 @@ impl EntityRenderer {
             Err(e) => log::error!("model shader: {e}"),
         }
         self.models.reload(gpu, assets);
+        // Painted skins are painted again over the textures as read now.
+        self.skin_bases.clear();
+        for (_, p) in self.painted.drain() {
+            gpu.destroy_texture(p.tex.0);
+        }
         // Skins and masks are read again the next time they are used.
         for t in self
             .skins
@@ -323,7 +351,12 @@ impl EntityRenderer {
     }
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
-        for (t, ..) in self.player_skins.drain().map(|(_, v)| v) {
+        for (t, ..) in self
+            .player_skins
+            .drain()
+            .map(|(_, v)| v)
+            .chain(self.painted.drain().map(|(_, p)| p.tex))
+        {
             gpu.destroy_texture(t);
         }
         for (b, _) in self.buffers.drain(..) {
@@ -361,8 +394,17 @@ impl EntityRenderer {
 
     /// Loads skins and worn textures the first time something visible uses them; `worn` is what
     /// the local player wears.
-    pub fn preload(&mut self, gpu: &mut dyn Backend, assets: &Assets, entities: &FxHashMap<u64, ClientEntity>, worn: &[u32], held: u32) {
+    pub fn preload(
+        &mut self,
+        gpu: &mut dyn Backend,
+        assets: &Assets,
+        entities: &FxHashMap<u64, ClientEntity>,
+        comps: &FxHashMap<(u64, u32), Vec<u8>>,
+        worn: &[u32],
+        held: u32,
+    ) {
         let c = content();
+        self.paint_skins(gpu, assets, entities, comps);
         self.load_sprite(assets, held);
         // Each kind and item looked at once per frame, without listing thousands of entities.
         let mut seen = std::mem::take(&mut self.seen_kinds);
@@ -396,6 +438,83 @@ impl EntityRenderer {
             if let Some((_, t)) = c.worn(i) {
                 self.load(gpu, assets, t);
             }
+        }
+    }
+
+    /// Paints the skins mods paint (`Host::reg_entity_skin`) of entities whose component is new
+    /// or changed, a few a frame, and forgets those of entities gone.
+    fn paint_skins(
+        &mut self,
+        gpu: &mut dyn Backend,
+        assets: &Assets,
+        entities: &FxHashMap<u64, ClientEntity>,
+        comps: &FxHashMap<(u64, u32), Vec<u8>>,
+    ) {
+        let c = content();
+        let painters = self.painters.get_or_insert_with(|| {
+            c.game
+                .skin_painters
+                .iter()
+                .filter_map(|p| {
+                    let kind = *c.game.entity_names.get(&p.kind)?;
+                    let comp = c.components.id(&p.comp)?;
+                    Some((kind, (comp, p.owner, p.cb)))
+                })
+                .collect()
+        });
+        if painters.is_empty() {
+            return;
+        }
+        self.painted.retain(|id, p| {
+            let keep = entities.contains_key(id);
+            if !keep {
+                gpu.destroy_texture(p.tex.0);
+            }
+            keep
+        });
+        let mut budget = PAINTS_PER_FRAME;
+        for (&id, e) in entities {
+            let Some(&(comp, owner, cb)) = painters.get(&e.kind) else { continue };
+            let Some(from) = comps.get(&(id, comp)) else { continue };
+            if budget == 0 {
+                break;
+            }
+            if self.painted.get(&id).is_some_and(|p| p.from == *from) {
+                continue;
+            }
+            budget -= 1;
+            let texture = &c.game.entities[e.kind as usize].texture;
+            let base = self.skin_bases.entry(texture.clone()).or_insert_with(|| {
+                let img = assets.read(texture, "textures", "png").and_then(|b| decode_png(&b))?;
+                Some((img.rgba, [img.width, img.height]))
+            });
+            let Some((rgba, size)) = base else { continue };
+            let mut rgba = rgba.clone();
+            let mut args = weft_abi::SkinArgs {
+                data: weft_abi::Slice::new(from),
+                rgba: rgba.as_mut_ptr(),
+                width: size[0],
+                height: size[1],
+            };
+            if !crate::host::invoke(owner, cb, &mut args) {
+                continue;
+            }
+            let tex = match self.painted.remove(&id) {
+                Some(p) if p.tex.2 == *size => p.tex,
+                old => {
+                    if let Some(p) = old {
+                        gpu.destroy_texture(p.tex.0);
+                    }
+                    let t = gpu.create_texture(
+                        &TextureDesc { width: size[0], height: size[1], mips: 1, format: Format::Rgba8Srgb, render_target: false },
+                        "painted skin",
+                    );
+                    (t, gpu.texture_index(t), *size)
+                }
+            };
+            gpu.write_texture(tex.0, 0, &rgba);
+            self.painted
+                .insert(id, Painted { from: from.clone(), texture: texture.clone(), tex });
         }
     }
 
@@ -567,10 +686,18 @@ impl EntityRenderer {
             .get(kind as usize)
             .and_then(|m| m.texture)
             .unwrap_or(k.texture_size);
+        // A player's own skin; a painted one on any look drawn with the texture it was painted
+        // over (an animal sitting, lying, a puppy).
         let own = self
             .player_skins
             .get(&entity)
-            .filter(|_| kind == c.game.player_kind);
+            .filter(|_| kind == c.game.player_kind)
+            .or_else(|| {
+                self.painted
+                    .get(&entity)
+                    .filter(|p| p.texture == k.texture)
+                    .map(|p| &p.tex)
+            });
         let (skin, size) = own.map_or((skin, size), |o| (&o.1, o.2));
         let base = Instance {
             color: [1.0; 3],

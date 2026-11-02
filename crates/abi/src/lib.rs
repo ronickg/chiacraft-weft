@@ -2196,6 +2196,12 @@ pub struct Host {
     pub entity_rider: unsafe extern "C" fn(world: *mut WorldCtx, mount: u64) -> u64,
     /// The movement keys player `entity` holds (`held_keys`); 0 for anything else.
     pub entity_keys: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64) -> u32,
+    /// Each client paints the skin of entities of `kind` from their component `comp` (one
+    /// synced to watchers): `cb` gets `SkinArgs` with the component's bytes and a copy of the
+    /// kind's texture to paint over, and the entity is drawn with the result, in its own kind
+    /// and in any look with the same texture. A changed component paints it again. For skins
+    /// that follow from a few bytes (an animal's genes) instead of sending pictures.
+    pub reg_entity_skin: unsafe extern "C" fn(reg: *mut Registrar, kind: Str, comp: Str, cb: Callback),
     /// Writes a kind's box (width, height, eye height); 0 if there is no such kind.
     pub entity_kind_size: unsafe extern "C" fn(kind: Str, out: *mut [f32; 3]) -> u32,
     /// A block of moving structure `entity` (its own coordinates); `u32::MAX` if it is none.
@@ -3107,6 +3113,17 @@ pub struct ClientEntityArgs {
 pub struct ClientScreenArgs {
     pub client: *mut ClientCtx,
     pub screen: Str,
+}
+
+/// A skin to paint (`Host::reg_entity_skin`), on the client.
+#[repr(C)]
+pub struct SkinArgs {
+    /// The entity's component, as synced.
+    pub data: Slice<u8>,
+    /// The kind's texture, RGBA rows of `width` pixels, `height` of them: painted over in place.
+    pub rgba: *mut u8,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[repr(C)]

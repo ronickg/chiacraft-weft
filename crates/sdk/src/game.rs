@@ -6,6 +6,14 @@ use crate::content::{
 use crate::ui::{Ui, ui_callback};
 use crate::{Registry, World, callback, host, qualify};
 
+/// A skin being painted (`Registry::entity_skin`): the kind's texture, to change in place.
+pub struct Skin<'a> {
+    pub width: u32,
+    pub height: u32,
+    /// RGBA rows of `width` pixels.
+    pub rgba: &'a mut [u8],
+}
+
 pub use abi::{Energy, EntityState, component_flags, damage, entity_flags, slot_flags};
 
 /// Eye height as a share of an entity's height, the engine's default too.
@@ -1418,6 +1426,24 @@ impl Registry {
             desc: abi::ScreenDesc { build: ui_callback(f), ..abi::ScreenDesc::DEFAULT },
             _p: std::marker::PhantomData,
         }
+    }
+
+    /// Each client paints the skin of `kind`'s entities from their `comp` (registered with
+    /// `SYNC_WATCHERS`): `f` gets the entity's value and a copy of the kind's texture to paint
+    /// over. It is drawn with the result in its own kind and any look with the same texture,
+    /// painted again when the value changes. For looks that follow from a few bytes, such as an
+    /// animal's genes: they travel instead of pictures.
+    pub fn entity_skin<T: Value>(&mut self, kind: &Entity, comp: &'static Component<T>, f: impl Fn(&T, &mut Skin) + Send + Sync + 'static) {
+        let cb = callback(move |a: &mut abi::SkinArgs| {
+            if a.data.len != size_of::<T>() || a.rgba.is_null() {
+                return;
+            }
+            let value = unsafe { std::ptr::read_unaligned(a.data.ptr as *const T) };
+            let len = a.width as usize * a.height as usize * 4;
+            let mut skin = Skin { width: a.width, height: a.height, rgba: unsafe { std::slice::from_raw_parts_mut(a.rgba, len) } };
+            f(&value, &mut skin);
+        });
+        unsafe { (host().reg_entity_skin)(self.raw, Str::new(kind.name()), Str::new(comp.name()), cb) }
     }
 
     /// HUD element at `anchor` (`hud_anchor::*`); `order` 0 sits nearest the anchor's edge.
