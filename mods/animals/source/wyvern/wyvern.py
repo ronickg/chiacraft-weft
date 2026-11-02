@@ -108,13 +108,20 @@ NECK_BASE = np.array([0.0, 262.0, 160.0])
 NECK = [(50, 70, 74), (50, 62, 66), (50, 55, 59), (50, 49, 53)]  # length, width, height
 TAIL = [(64, 82, 76), (62, 72, 66), (60, 62, 56), (58, 52, 47), (56, 43, 39), (52, 35, 31), (48, 27, 24), (48, 20, 17)]
 TAIL_BASE = np.array([0.0, 236.0, -50.0])
-SHOULDER = np.array([52.0, 270.0, 140.0])
-# Fingers: rest yaw (degrees, + toward the front), segment lengths, widths; leading edge first.
-FINGERS = [(12, (120, 104), (12, 9)), (-28, (110, 90), (10, 7)), (-62, (96, 76), (8, 5))]
-LEG_X = 62  # the hind legs' middle, out from the hips (52 a side)
-WRIST = np.array([306.0, 270.0, 140.0])  # where the hand's bone turns (inside the hand)
-MEM_Y = (268.5, 269.5, 270.5, 271.5)  # the membrane panels' heights: mem0, mem1, memb, memo
-BODY_EDGE = (np.array([56.0, 270.0, 130.0]), np.array([40.0, 270.0, -40.0]))  # where the membrane grows from the flank
+SHOULDER = np.array([60.0, 270.0, 140.0])
+# The wing as the show's dragons' (Drogon's span is about 1.5 times his length): a short thick
+# upper arm, a long forearm (long enough to reach the ground from an elbow at the height of the
+# back, folded), and four long fingers fanning to a broad, deep wing, the last pointing back to
+# the hips. Fingers: rest yaw (degrees, + toward the front), segment lengths, widths; leading edge
+# first. About 24 m across.
+ELBOW_X = 150.0
+FINGERS = [(10, (190, 170), (13, 10)), (-20, (175, 160), (11, 8)), (-50, (160, 140), (10, 7)), (-80, (135, 115), (8, 6))]
+LEG_X = 62  # the hind legs' middle, out from the hips (56 a side)
+WRIST = np.array([420.0, 270.0, 140.0])  # where the hand's bone turns (inside the hand)
+# The membrane panels' heights: between each pair of fingers, then the body panel, then the
+# outer one; inside the fingers' thickness, a unit apart (no two share a plane).
+MEM_Y = (268.0, 269.0, 270.0, 271.0, 272.0)
+BODY_EDGE = (np.array([64.0, 270.0, 130.0]), np.array([46.0, 270.0, -40.0]))  # where the membrane grows from the flank
 
 
 def neck_points():
@@ -163,9 +170,9 @@ def bones():
         B += [(f"thigh_{n}", "spine_0", (46 * s, 215, -5)), (f"shin_{n}", f"thigh_{n}", (x, 118, -4)),
               (f"foot_{n}", f"shin_{n}", (x, 46, -4)), (f"toes_{n}", f"foot_{n}", (x, 8, 0))]
         sh = SHOULDER * np.array([s, 1, 1])
-        B += [(f"arm_{n}", "spine_1", tuple(sh)), (f"forearm_{n}", f"arm_{n}", (134 * s, 270, 140)),
+        B += [(f"arm_{n}", "spine_1", tuple(sh)), (f"forearm_{n}", f"arm_{n}", (ELBOW_X * s, 270, 140)),
               (f"hand_{n}", f"forearm_{n}", tuple(WRIST * np.array([s, 1, 1]))),
-              (f"thumb_{n}", f"hand_{n}", (310 * s, 270, 148))]
+              (f"thumb_{n}", f"hand_{n}", ((WRIST[0] + 4) * s, 270, 148))]
         for k, (w, mid, _) in enumerate(finger_points(s)):
             B += [(f"finger{k}_{n}", f"hand_{n}", tuple(w)), (f"finger{k}b_{n}", f"finger{k}_{n}", tuple(mid))]
         # The panels between the fingers, each on its own bone at the wrist (a child of the finger
@@ -175,8 +182,9 @@ def bones():
         # The membrane from the last finger to the body, in two: the inner panel on the body
         # (turning about the shoulder-to-hip line, where it grows from the flank), the outer one on
         # the last finger (closing with the fan).
-        B += [(f"memb_{n}", "spine_1", tuple(BODY_EDGE[0] * np.array([s, 1, 1]) + np.array([0, MEM_Y[2] - 270, 0]))),
-              (f"memo_{n}", f"finger{len(FINGERS) - 1}_{n}", tuple(WRIST * np.array([s, 1, 1]) + np.array([0, MEM_Y[3] - 270, 0])))]
+        nf = len(FINGERS)
+        B += [(f"memb_{n}", "spine_1", tuple(BODY_EDGE[0] * np.array([s, 1, 1]) + np.array([0, MEM_Y[nf - 1] - 270, 0]))),
+              (f"memo_{n}", f"finger{nf - 1}_{n}", tuple(WRIST * np.array([s, 1, 1]) + np.array([0, MEM_Y[nf] - 270, 0])))]
     return B
 
 
@@ -195,11 +203,19 @@ def box_along(name, bone, a, b, w, h, part, extra=0.0, **kw):
 
 def elements():
     E = [
-        el("hips", (-52, 186, -56), (52, 284, 50), bone="spine_0", part="body"),
-        el("chest", (-64, 166, 38), (64, 294, 172), bone="spine_1", part="body"),
-        # The flight muscles' hump over the shoulders, and the keel under the chest.
-        el("shoulders", (-50, 288, 100), (50, 304, 168), bone="spine_1", part="body"),
-        el("keel", (-34, 152, 70), (34, 174, 160), bone="spine_1", part="body"),
+        el("hips", (-56, 186, -56), (56, 284, 50), bone="spine_0", part="body"),
+        # The chest shaped by the flight muscles, as a flier's: a core, the ribcage narrowing back
+        # to the hips, the hump over the shoulders, a pectoral either side of the breastbone
+        # bulging forward, a wing-root muscle on each shoulder widening the top where the wings
+        # grow, the keel under it all.
+        el("chest", (-66, 172, 44), (66, 290, 166), bone="spine_1", part="body"),
+        el("ribs", (-62, 176, 20), (62, 286, 60), bone="spine_1", part="body"),
+        el("shoulders", (-58, 286, 98), (58, 304, 168), bone="spine_1", part="body"),
+        el("pec_L", (4, 178, 150), (58, 252, 182), bone="spine_1", part="body"),
+        el("pec_R", (-58, 178, 150), (-4, 252, 182), bone="spine_1", part="body"),
+        el("delt_L", (52, 226, 102), (84, 298, 164), bone="spine_1", part="body"),
+        el("delt_R", (-84, 226, 102), (-52, 298, 164), bone="spine_1", part="body"),
+        el("keel", (-40, 150, 68), (40, 174, 158), bone="spine_1", part="body"),
     ]
     npts = neck_points()
     for k, (length, w, h) in enumerate(NECK):
@@ -280,11 +296,12 @@ def elements():
         # The wing: upper arm, forearm, wrist, thumb with its claw, fingers, membrane.
         S = np.array([s, 1, 1])
         E += [
-            el(f"arm_{n}", tuple(np.array([40, 252, 122]) * S), tuple(np.array([140, 288, 158]) * S), bone=f"arm_{n}", part="arm"),
-            el(f"forearm_{n}", tuple(np.array([130, 257, 127]) * S), tuple(np.array([310, 283, 153]) * S), bone=f"forearm_{n}", part="arm"),
-            el(f"hand_{n}", tuple(np.array([298, 262, 130]) * S), tuple(np.array([320, 278, 150]) * S), bone=f"hand_{n}", part="arm"),
-            el(f"thumb_{n}", tuple(np.array([304, 263, 144]) * S), tuple(np.array([316, 277, 176]) * S), bone=f"thumb_{n}", part="arm"),
-            el(f"thumbclaw_{n}", tuple(np.array([306.5, 264, 174]) * S), tuple(np.array([313.5, 273, 190]) * S), bone=f"thumb_{n}",
+            # A short, thick upper arm in the shoulder's muscle, a long forearm, the wrist.
+            el(f"arm_{n}", tuple(np.array([44, 248, 118]) * S), tuple(np.array([158, 292, 162]) * S), bone=f"arm_{n}", part="arm"),
+            el(f"forearm_{n}", tuple(np.array([146, 256, 126]) * S), tuple(np.array([424, 284, 154]) * S), bone=f"forearm_{n}", part="arm"),
+            el(f"hand_{n}", tuple(np.array([410, 261, 129]) * S), tuple(np.array([436, 279, 151]) * S), bone=f"hand_{n}", part="arm"),
+            el(f"thumb_{n}", tuple(np.array([418, 263, 144]) * S), tuple(np.array([430, 277, 176]) * S), bone=f"thumb_{n}", part="arm"),
+            el(f"thumbclaw_{n}", tuple(np.array([420.5, 264, 174]) * S), tuple(np.array([427.5, 273, 190]) * S), bone=f"thumb_{n}",
                part="claw"),
         ]
         for k, ((w, mid, tip), (_, _, (wa, wb))) in enumerate(zip(finger_points(s), FINGERS)):
@@ -306,11 +323,9 @@ def membranes(s, n):
     out = []
     S_, H_ = BODY_EDGE[0] * np.array([s, 1, 1]), BODY_EDGE[1] * np.array([s, 1, 1])
     M = (fp[0][0] + S_) / 2 + np.array([s * 30, 0, 4])  # on the forearm, halfway out
-    T = (fp[2][2] + H_) / 2  # halfway along the trailing edge from the last finger to the hip
-    shapes = [("mem0", f"mem0_{n}", [fp[0][0], fp[0][2], fp[1][2]]),
-              ("mem1", f"mem1_{n}", [fp[1][0], fp[1][2], fp[2][2]]),
-              ("memb", f"memb_{n}", [S_, M, T, H_]),
-              ("memo", f"memo_{n}", [M, fp[2][0], fp[2][2], T])]
+    T = (fp[-1][2] + H_) / 2  # halfway along the trailing edge from the last finger to the hip
+    shapes = [(f"mem{k}", f"mem{k}_{n}", [fp[k][0], fp[k][2], fp[k + 1][2]]) for k in range(len(fp) - 1)]
+    shapes += [("memb", f"memb_{n}", [S_, M, T, H_]), ("memo", f"memo_{n}", [M, fp[-1][0], fp[-1][2], T])]
     for k, (name, bone, poly) in enumerate(shapes):
         poly = [np.array(p, float) for p in poly]
         xs, zs = [p[0] for p in poly], [p[2] for p in poly]
@@ -542,7 +557,7 @@ def area(e, face, p, uu, vv, h):
         a = np.full(shape, MOUTH)
         edge = (uu < 3) | (uu > w - 3) | (vv > h - 3)
         return np.where(edge, TEETH, a)
-    if n in ("hips", "chest", "keel", "jaw") or n.startswith(("neck_", "tail_")):
+    if n in ("hips", "chest", "ribs", "keel", "jaw") or n.startswith(("neck_", "tail_", "pec_")):
         if face == "down":
             return belly_plates(e, p)
         under = 0.22 if n != "jaw" else 0.4
@@ -664,26 +679,37 @@ def tail_curve(droop=6.0, sway=0.0, t=0.0):
 
 
 def fan_closed():
-    """Each panel swung in against the finger it hangs from (by the angle to the next finger); the
-    outer body panel closed onto the last finger; the inner one turned down about the flank line
-    and drawn in to a sliver inside the flank, as a bat's skin contracts when the wing closes
-    (hanging at full size it would cut through the thighs)."""
-    out = {f"mem{k}_L": (0, -(FINGERS[k][0] - FINGERS[k + 1][0]) * 0.92, 0) for k in range(len(FINGERS) - 1)}
-    out["memo_L"] = (0, -100, 0)
+    """The fan half closed, turned up by the hand as a sail beside the body: each finger turned
+    toward the first (the spread halved), each panel between two fingers centred in the gap left
+    (a rigid panel can't shrink with it: it reaches a little past both fingers, over its
+    neighbours, a unit apart from them); the skin from the last finger back to the body drawn in,
+    as a bat's contracts when the wing closes: the outer panel to a sliver at the wrist, the inner
+    one turned down about the flank line to a sliver inside the flank (at full size they would
+    hang through the legs)."""
+    out = {}
+    first = FINGERS[0][0]
+    for k, (yaw, _, _) in enumerate(FINGERS):
+        # Toward the first finger (a smaller yaw angle is +Y here: Ry turns +x toward -z).
+        out[f"finger{k}_L"] = (0, (yaw - first) * (1 - FAN_CLOSED), 0)
+    for k in range(len(FINGERS) - 1):
+        gap = FINGERS[k][0] - FINGERS[k + 1][0]
+        out[f"mem{k}_L"] = (0, -gap * (1 - FAN_CLOSED) / 2, 0)
     S_, H_ = BODY_EDGE
     u = (H_ - S_) / np.linalg.norm(H_ - S_)
     a = math.radians(FOLD_FLANK) / 2
     out["memb_L"] = tuple(round(v, 2) for v in euler(np.array([*(u * math.sin(a)), math.cos(a)])))
-    out["scale"] = {"memb_L": (0.04, 1.0, 0.04)}  # toward its pivot at the shoulder, inside the chest
+    # Toward their pivots: the shoulder (inside the chest) and the wrist (inside the hand).
+    out["scale"] = {"memb_L": (0.04, 1.0, 0.04), "memo_L": (0.01, 1.0, 0.01)}
     return out
 
 
 FOLD_FLANK = 88  # degrees the inner panel turns about the flank line, folded
+FAN_CLOSED = 0.5  # how much of the fingers' spread is left, folded
 
 
 def folded_wing():
-    w = {k: tuple(v) for k, v in FIT.get("wing", {}).items()}
-    w.update(fan_closed())
+    w = fan_closed()
+    w.update({k: tuple(v) for k, v in FIT.get("wing", {}).items()})
     return w
 
 
@@ -715,6 +741,9 @@ def flying_body():
     return p
 
 
+SWEEP = -12  # degrees the arms reach forward in flight: the leading edge angled forward, as Drogon's
+
+
 def pose_fly(t):
     """A wingbeat (one a second): the downstroke strong and quick, the upstroke with the wing
     half folded, the fingers trailing behind the arm."""
@@ -722,7 +751,7 @@ def pose_fly(t):
     up = math.cos(ph)  # 1 at the top of the stroke
     fold = max(0.0, math.sin(ph)) * 0.5  # folding on the way up
     p = flying_body()
-    arm = (0, 16 * fold, 28 * up + 4)
+    arm = (0, SWEEP + 16 * fold, 28 * up + 4)
     p.update({
         "arm_L": arm,
         "memb_L": arm,  # the inner membrane follows the upper arm in flight
@@ -742,7 +771,7 @@ def pose_fly(t):
 def pose_glide(t):
     ph = t / 3.0 * 2 * math.pi
     p = flying_body()
-    arm = (0, -2, 8 + 2 * math.sin(ph))
+    arm = (0, SWEEP, 8 + 2 * math.sin(ph))
     p.update({"arm_L": arm, "memb_L": arm, "forearm_L": (0, 0, -4), "hand_L": (0, 0, -3 + 2 * math.sin(ph + 1))})
     p.update(tail_curve(droop=-2, sway=4, t=t / 3.0))
     return mirror(p)
@@ -758,7 +787,7 @@ def pose_glide(t):
 
 GROUND_SPEED = 64 / 0.6
 SKELETON = []  # the spec's bones, for the solver (set by build)
-THUMB_TIP = np.array([310.0, 268.0, 188.0])  # the thumb claw's tip at rest: the wrist's foot
+THUMB_TIP = np.array([424.0, 268.0, 188.0])  # the thumb claw's tip at rest: the wrist's foot
 HAND_LOW = None  # the hand box's corners (set by build)
 GAITS = {
     # length (clip seconds: the stride over GROUND_SPEED), the part of the stride a foot is down,
@@ -1002,7 +1031,7 @@ def pose_rest(t):
     p["neck_0"] = (p["neck_0"][0] - br * 0.6, 0, 0)
     for k in (6, 7):
         p[f"tail_{k}"] = (p[f"tail_{k}"][0], p[f"tail_{k}"][1] + 4 * math.sin(t / 5.0 * 2 * math.pi * 2 - k), 0)
-    p["scale"] = fan_closed()["scale"] | {"memb_R": fan_closed()["scale"]["memb_L"]}
+    p["scale"] = mirror({"scale": fan_closed()["scale"]})["scale"]
     return p
 
 
@@ -1105,11 +1134,13 @@ def fit_rest(spec):
 
 
 def fit_wing(spec):
-    """The folded wing (the wrist, where the thumb's claw is, on the ground ahead of the chest;
-    the fingers folded back up along the forearm, the membrane folded between them) and the
+    """The folded wing, as the show's dragons fold theirs (a tall pleated sail beside the body):
+    the wrist (where the thumb's claw is) on the ground ahead of the chest and out from it, the
+    forearm rising steeply to the elbow at the height of the back, the fingers fanned up and back
+    from the wrist over the flank toward the hips, the membrane pleated between them; and the
     stand's drop (toes on the ground)."""
     from scipy.optimize import minimize
-    from ground import lowest, world
+    from ground import corners, lowest, world
 
     bones_ = spec["bones"]
     piv = {b["name"]: np.array(b["pivot"], float) for b in bones_}
@@ -1119,33 +1150,45 @@ def fit_wing(spec):
     base.update(neck_s())
     base = mirror(base)
     FIT["drop"] = round(float(lowest(spec, base, groups)["toes"]), 2)
+    base.update(mirror({k: v for k, v in fan_closed().items() if k != "scale"}))  # the fingers half closed
 
     def at(pose, bone, local):
         R, t = world(bones_, pose)[bone]
         return R @ (np.array(local, float) - piv[bone]) + t
 
     elbow_rest = piv["forearm_L"]
-    claw_rest = np.array([310.0, 268.0, 188.0])  # the thumb claw's tip at rest
+    claw_rest = THUMB_TIP  # the thumb claw's tip at rest
     ground = FIT["drop"] + 6
-    # Where a bat's folded wing puts things: the wrist (the thumb's claw) on the ground ahead of
-    # the chest, the elbow high and back by the shoulder, the fingers folded up from the wrist
-    # along the forearm and past the elbow, the membrane tight between them.
-    wrist_t = np.array([120.0, ground + 4, 206.0])
-    elbow_t = np.array([110.0, 222.0, 118.0])
-    up = (elbow_t - wrist_t) / np.linalg.norm(elbow_t - wrist_t)
-    tips_t = [wrist_t + up * (sum(f[1]) - 10) + np.array([14 + 6 * k, -12 * k, -26 * k]) for k, f in enumerate(FINGERS)]
-    names = ["arm_L", "forearm_L", "hand_L", "finger0_L", "finger1_L", "finger2_L"]
+    # Planted wide, the forearm sloping out from the elbow to the ground (an A from the front,
+    # strong and broad), the elbow by the shoulder at the height of the back.
+    wrist_t = np.array([240.0, ground + 4, 215.0])
+    elbow_t = np.array([140.0, 292.0, 104.0])
+    # The open fan stood up beside the body: the first finger rising nearly straight up from the
+    # wrist (the sail's top about one and a half times the back's height, as the show's), the last
+    # running back toward the hips, the fan leaning a little out.
+    ups = {0: np.array([-0.12, 0.82, -0.57]), len(FINGERS) - 1: np.array([0.0, 0.17, -0.98])}
+    tips_t = {k: wrist_t + d / np.linalg.norm(d) * (sum(FINGERS[k][1]) - 10) for k, d in ups.items()}
+    names = ["arm_L", "forearm_L", "hand_L"]
 
     def wing(x):
         return {n: (x[3 * i], x[3 * i + 1], x[3 * i + 2]) for i, n in enumerate(names)}
 
+    # The arm's, hand's and fingers' corners: none below the ground (the claw's tip on it, the
+    # hand turned over above it).
+    solid = [(e["bone"], c) for e in spec["elements"] if e["bone"].endswith("_L")
+             and e["bone"].startswith(("forearm", "hand", "thumb", "finger")) for c in corners(e)]
+
     def cost(x):
         pose = dict(base)
         pose.update(wing(x))
-        e = np.sum((at(pose, "thumb_L", claw_rest) - wrist_t) ** 2)
+        W = world(bones_, pose)
+        low = min((W[b][0] @ (c - piv[b]) + W[b][1])[1] for b, c in solid)
+        e = 30 * min(0.0, low - FIT["drop"]) ** 2
+        e += np.sum((at(pose, "thumb_L", claw_rest) - wrist_t) ** 2)
         e += 0.6 * np.sum((at(pose, "forearm_L", elbow_rest) - elbow_t) ** 2)
-        for k, fp in enumerate(finger_points(1)):
-            e += 0.4 * np.sum((at(pose, f"finger{k}b_L", fp[2]) - tips_t[k]) ** 2)
+        fps = finger_points(1)
+        for k, t in tips_t.items():
+            e += 0.4 * np.sum((at(pose, f"finger{k}b_L", fps[k][2]) - t) ** 2)
         return e + 0.01 * np.sum(np.array(x) ** 2)
 
     best = None

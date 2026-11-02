@@ -686,8 +686,10 @@ The five animals predate it (19 to 131 texels a block) and are to be rebuilt to 
 flies, can be ridden, breathes fire, rare and dangerous, huge, like Game of Thrones'). A
 fantasy animal, kept apart from the real ones: its family is placed under "Fantasy"
 (*Wyverna montana* · Fantasy › Draconia › Wyvernidae › Wyverninae). About 3.9 m at the shoulder,
-16 m long, 17 m across the wings: two heavy hind legs, bat wings for arms; on the ground it goes
-on four, on its feet and the wrists of its folded wings. Built with the skill at the house
+16 m long, 24 m across the wings (reworked after Ronald found it looked wrong, from the show's
+Drogon: a long forearm and four long fingers, a muscled chest, standing broad on wrists planted
+wide, each folded wing a tall pleated sail; `source/wyvern/README.md`): two heavy hind legs, bat
+wings for arms; on the ground it goes on four, on its feet and the wrists of its folded wings. Built with the skill at the house
 density (64 a block). Painted with plated scales (of four ways to draw them in the viewer, Ronald
 chose plated, 2026-11-02): big armor-like scales each with a dark rim, plates across the belly,
 throat and under the tail, veined wing skin with a darker trailing edge, ringed horns paling to

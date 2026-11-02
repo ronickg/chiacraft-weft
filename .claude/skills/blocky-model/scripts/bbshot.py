@@ -2,7 +2,7 @@
 """Screenshots of the open Blockbench project from a few angles, side by side in one image, to
 check the texture on the model (flicker, eyes, edges) without touching the app.
 
-    .venv/bin/python tools/bbshot.py out/d_blocky/shots.png [--anim <name> [<seconds>]]
+    .venv/bin/python tools/bbshot.py out/d_blocky/shots.png [--anim <name> [<seconds>]] [--angles a,b]
 
 `--anim` shows that animation's frame at that time (default 0) instead of the rest pose.
 """
@@ -18,6 +18,8 @@ from bb import run
 # Camera directions (the model faces +z), each set back to frame the whole model: its bounds are
 # measured in Blockbench, so a 15 cm egg and a 16 m dragon fill the shot alike.
 ANGLES = {"front": (0, 0.36, 1.0), "3/4": (0.74, 0.53, 0.74), "side": (1.0, 0.3, 0.0), "back 3/4": (-0.74, 0.53, -0.74)}
+# Flat views to hold against a reference sheet (`--angles front_flat,side_flat,top`).
+MORE = {"front_flat": (0, 0.02, 1.0), "side_flat": (1.0, 0.02, 0.0), "top": (0.0, 1.0, 0.02), "back": (0, 0.36, -1.0)}
 
 BOUNDS = """
 const box = new THREE.Box3();
@@ -61,7 +63,8 @@ if __name__ == "__main__":
         t = float(sys.argv[i + 2]) if len(sys.argv) > i + 2 else 0.0
         run(POSE % (sys.argv[i + 1], t))
     bounds = run(BOUNDS)
-    imgs = [shot(d, bounds) for d in ANGLES.values()]
+    names = sys.argv[sys.argv.index("--angles") + 1].split(",") if "--angles" in sys.argv else list(ANGLES)
+    imgs = [shot({**ANGLES, **MORE}[n], bounds) for n in names]
     w, h = imgs[0].size
     sheet = Image.new("RGB", (w * len(imgs), h))
     for i, im in enumerate(imgs):
