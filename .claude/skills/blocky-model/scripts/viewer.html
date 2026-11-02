@@ -23,7 +23,7 @@
 <style>
 :root {
   --bg: #1b1d24; --panel: #23262f; --line: #343845; --fg: #ece6df; --muted: #a39b93;
-  --accent: #d98b52; --accent-ink: #1b1d24; --alt: #e1977d;
+  --accent: #d98b52; --accent-ink: #1b1d24; --alt: #e1977d; --good: #8fbf8a;
   --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --body: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
   color-scheme: dark;
@@ -138,10 +138,15 @@ h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01
 .fam.on { border-color: var(--accent) !important; }
 .fam.dead { opacity: 0.5; }
 .fam.unknown { border: 1px dashed var(--line); border-radius: 6px; font-size: 12px; }
-.lab-log { margin: 0; padding-left: 18px; font: 12px var(--mono); color: var(--muted); max-height: 180px; overflow: auto; }
+.lab-log { margin: 0; padding-left: 0; list-style: none; font: 12px var(--mono); color: var(--muted); max-height: 180px; overflow: auto; }
 .lab-msg { font-size: 14px; color: var(--fg); min-height: 1.4em; }
 .lab-msg.bad { color: var(--alt); }
 .evs { display: inline-flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); max-width: 120px; }
+.lab-live { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; background: var(--bg); display: block; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.charts figure { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.charts figcaption { font: 500 12px var(--mono); color: var(--muted); }
+.charts canvas { width: 100%; height: 180px; display: block; }
 .ev-bg { display: inline-block; width: 26px; height: 16px; border-radius: 4px; border: 1px solid var(--line); vertical-align: middle; }
 [hidden] { display: none !important; }
 </style>
@@ -204,10 +209,12 @@ h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01
   </section>
   <section class="how lab" id="lab" aria-labelledby="lab-title">
     <h2 id="lab-title">Breeding lab</h2>
-    <p class="lede">A population run by the game's own code (its Rust, compiled to WASM): matings, carrying, litters and clutches, eggs hatching, growing up and families, on the game's clock. Old age isn't in the game yet; set it here to see generations turn over.</p>
+    <p class="lede">A population run by the game's own code (its Rust, compiled to WASM): matings, carrying, litters and clutches, eggs hatching, growing up, old age and families, on the game's clock.</p>
     <div class="stage">
       <div class="lab-bar">
         <span class="lab-day" id="lab-day">Day 0</span><span class="muted" id="lab-count"></span>
+        <button type="button" class="go" id="lab-play">Play</button>
+        <label class="toggle">Speed <select id="lab-speed"><option value="0.25">6 hours a second</option><option value="1" selected>1 day a second</option><option value="5">5 days a second</option><option value="30">30 days a second</option></select></label>
         <button type="button" id="lab-hour">+1 hour</button><button type="button" id="lab-1d">+1 day</button><button type="button" id="lab-10d">+10 days</button><button type="button" id="lab-100d">+100 days</button>
       </div>
       <div class="lab-bar">
@@ -215,8 +222,9 @@ h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01
         <label class="toggle">From <select id="lab-habitat"></select></label>
         <button type="button" id="lab-add-pair">Add a wild pair</button><button type="button" id="lab-add-six">Add 6 wild</button>
         <label class="toggle"><input type="checkbox" id="lab-auto"> Breed by themselves</label>
-        <label class="toggle">Old age <input type="number" id="lab-life" min="0" value="0"> days</label>
-        <label class="toggle">At most <input type="number" id="lab-cap" min="2" value="150"> alive</label>
+        <label class="toggle">Old age <select id="lab-life-rule"><option value="game" selected>as in the game</option><option value="off">off</option><option value="days">lives about</option></select></label>
+        <label class="toggle" id="lab-life-wrap" hidden><input type="number" id="lab-life" min="1" value="20"> days</label>
+        <label class="toggle">Room for <input type="number" id="lab-cap" min="2" value="40"></label>
         <button type="button" id="lab-reset">Start over</button>
       </div>
       <div class="lab-bar"><span class="muted" id="lab-pair"></span><button type="button" class="go" id="lab-mate">Mate them</button><span class="lab-msg" id="lab-msg" role="status"></span></div>
@@ -228,9 +236,22 @@ h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01
       </div>
       <div class="stage">
         <header><h3>Chosen</h3></header>
+        <canvas class="lab-live" id="lab-live" aria-label="The chosen animal, live"></canvas>
         <div id="lab-chosen"></div>
         <div class="lab-tree" id="lab-tree"></div>
       </div>
+    </div>
+    <div class="stage">
+      <header><h3>Over time</h3><span class="muted" id="lab-chart-note"></span></header>
+      <div class="charts">
+        <figure><figcaption>Alive, by species</figcaption><canvas id="lab-chart-alive" height="180"></canvas><div class="legend" id="lab-chart-key"></div></figure>
+        <figure><figcaption>Born and died, per day</figcaption><canvas id="lab-chart-flow" height="180"></canvas><div class="legend"><span><span class="key" style="background:var(--good)"></span>born</span><span><span class="key" style="background:var(--alt)"></span>died</span></div></figure>
+      </div>
+    </div>
+    <div class="stage">
+      <header><h3>Balance</h3></header>
+      <p>Each species' breeding numbers as the game has them, and what they add up to. One in-game day is 20 minutes of play.</p>
+      <div class="tablewrap"><table class="genes" id="lab-balance"></table></div>
     </div>
     <div class="lab-grid">
       <div class="stage">
@@ -662,7 +683,7 @@ async function show(entry) {
 }
 let entries = [];
 // A lab animal in the 3D view: its species' model, painted from its genome.
-window.showAnimal = async (sp, genome) => {
+window.showAnimal = async (sp, genome, opts) => {
   const file = `models/${sp.breed || sp.name}_coat.json`;
   const entry = entries.find(e => e.coat === file);
   if (!entry) { setStatusBrief(`No model of ${sp.name} here`); return; }
@@ -672,7 +693,7 @@ window.showAnimal = async (sp, genome) => {
   if (about.error || !current.coat) return;
   current.coat.current = about;
   paintCoat(current); showCoat();
-  document.getElementById("view").scrollIntoView({ behavior: "smooth", block: "center" });
+  if (!opts || opts.scroll !== false) document.getElementById("view").scrollIntoView({ behavior: "smooth", block: "center" });
 };
 Animals.ready.then(() => fetch("animals.json")).then(r => r.json()).then(list => {
   entries = list;
@@ -690,6 +711,7 @@ const clock = new THREE.Clock();
   if (current) { unapplyBuild(current); current.mixer.update(dt); applyBuild(current); }
   if (spin.checked) pivot.rotation.y += dt * 0.45;
   controls.update(); renderer.render(scene, camera);
+  if (window.afterRender) window.afterRender(renderer.domElement);
   requestAnimationFrame(tick);
 })();
 </script>

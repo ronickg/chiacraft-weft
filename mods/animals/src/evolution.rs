@@ -132,13 +132,19 @@ pub fn init(r: &mut Registry) {
 /// Species `index`'s pool in a place, evolved to `day` (made from the gene file the first time).
 fn evolved(p: &mut Pools, index: usize, cell: (i64, i64), h: Habitat, day: u64, r: &mut impl coats::Rng) -> Option<Pool> {
     let k = key(index, cell, h);
-    if !p.all.contains_key(&k) {
+    let new = !p.all.contains_key(&k);
+    if new {
+        // As if it had evolved since the world began (up to `HISTORY` generations).
+        let start = day.saturating_sub(HISTORY);
         p.all
-            .insert(k.clone(), Local { day, pool: coats::wild_pool(index, h.name())? });
+            .insert(k.clone(), Local { day: start, pool: coats::wild_pool(index, h.name())? });
         p.dirty = true;
     }
     let from = p.all[&k].day;
-    for _ in 0..day.saturating_sub(from).min(CATCH_UP) {
+    for _ in 0..day
+        .saturating_sub(from)
+        .min(if new { HISTORY } else { CATCH_UP })
+    {
         step(p, &k, index, cell, h, r);
     }
     let local = p.all.get_mut(&k)?;

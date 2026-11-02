@@ -389,7 +389,7 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
         (false, false) => 20,
         (false, true) => 0,
     };
-    let left = e.left.saturating_sub(step);
+    let left = e.left.saturating_sub(step * breeding::speed());
     if let Some(e) = w.component_mut(id, &EGG) {
         e.left = left;
     }

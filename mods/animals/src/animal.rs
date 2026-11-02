@@ -7,6 +7,7 @@ use weft_sdk::*;
 
 use crate::species::{self, SPECIES, STATS};
 
+use animals_core::life;
 /// Life stages; only the chihuahua has young ones so far.
 pub use animals_core::species::{ADULT, BABY};
 pub const STAGE_NAMES: [&str; 5] = ["baby", "juvenile", "adolescent", "adult", "elder"];
@@ -38,6 +39,17 @@ value! {
         /// Food now (the food stat is how much it holds).
         pub food: u16,
         pub xp: u32,
+        /// When it was born (`life::birth`: a wild one met grown has an age); 0: not known yet
+        /// (saved before animals aged), given one at `upkeep`.
+        pub born: u64,
+        /// Its age in in-game days, as `upkeep` last saw it (for its screen).
+        pub age: u16,
+        /// How strong it is at its age, in percent of its prime (`life::vigor`; 0: not known
+        /// yet, as at its prime).
+        pub vigor: u8,
+        /// When it was last seen (its upkeep ran; `life::birth`'s count, from long before the
+        /// world began): the time away is caught up from it (`catch_up`); 0: not yet.
+        pub seen: u64,
     }
 }
 
@@ -62,13 +74,18 @@ impl Animal {
     pub fn stat(&self, i: usize) -> f32 {
         let Some(s) = self.species() else { return 0.0 };
         let bonus = self.imprint as f32 / 100.0 * 0.2 + self.bond as f32 / 100.0 * 0.05;
-        s.base[i] * (1.0 + self.wild[i] as f32 * s.wild_step[i]) * (1.0 + self.tamed[i] as f32 * s.tamed_step[i]) * (1.0 + bonus)
+        // The body's stats go with its age: growing up, its prime, old (`life::vigor`).
+        let age = if BODILY.contains(&i) && self.vigor > 0 { self.vigor as f32 / 100.0 } else { 1.0 };
+        s.base[i] * (1.0 + self.wild[i] as f32 * s.wild_step[i]) * (1.0 + self.tamed[i] as f32 * s.tamed_step[i]) * (1.0 + bonus) * age
     }
     /// The stat as a multiple of the species' base.
     pub fn factor(&self, i: usize) -> f32 {
         self.species().map_or(1.0, |s| self.stat(i) / s.base[i])
     }
 }
+
+/// The stats that go with its age: health, stamina, damage, speed and what it carries.
+const BODILY: [usize; 5] = [species::HEALTH, species::STAMINA, species::DAMAGE, species::SPEED, species::WEIGHT];
 
 pub static ANIMAL: Component<Animal> = Component::named("animal");
 /// The stats last applied to the entity (not saved: applied again after loading).
@@ -120,8 +137,16 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         if new {
             *a = roll(w, index);
         }
+        let away = if a.seen == 0 { 0 } else { life::age(w.time(), a.seen) };
+        a.seen = life::birth(w.time(), 0);
+        if !new && away > life::AWAY {
+            catch_up(w, id, index, a, away, st.pos);
+        }
         crate::coats::upkeep(w, id, index, a, st.pos);
         crate::breeding::upkeep(w, id, index, a);
+        if old_age(w, id, index, a) {
+            return false;
+        }
         let a = *a;
         // Its size, from its genes and sex, and how far it has grown (the engine forgets it on
         // loading: set it again).
@@ -156,11 +181,99 @@ fn roll(w: &World, index: usize) -> Animal {
         _ => 91 + w.random_below(MAX_WILD_LEVEL - 90),
     };
     let mut a = Animal { species: index as u8 + 1, female: w.random_below(2) as u8, stage: ADULT, ..Animal::default() };
+    a.born = born_wild(w, index);
     for _ in 1..level {
         a.wild[w.random_below(STATS as u32) as usize] += 1;
     }
     a.food = a.stat(species::FOOD).round() as u16;
     a
+}
+
+/// Its area was away (unloaded) for `away` ticks, and life went on there (`notes/ANIMALS.md`,
+/// "Time away"): its timers run out (a mother due gives birth now), it has aged (by the world's
+/// clock: a tame one whose time ran out dies as it loads, `old_age`), and a wild one that died
+/// meanwhile has a successor in its place, born while away, of its place's kind as it has evolved.
+fn catch_up(w: &World, id: u64, index: usize, a: &mut Animal, away: u64, pos: [f64; 3]) {
+    crate::breeding::catch_up(w, id, away);
+    let s = &SPECIES[index];
+    let Some(seed) = w.component(id, &crate::coats::GENOME).map(|g| g.seed) else { return };
+    if tamed(w, id) || life::age(w.time(), a.born) < life::lifespan(s, seed) {
+        return;
+    }
+    let Some(pool) = crate::evolution::pool_at(w, index, pos) else { return };
+    let mut r = crate::coats::world_rng(w);
+    let female = r() < 0.5;
+    let Some(mut g) = crate::coats::sample(index, female, &pool, &mut r) else { return };
+    let age = life::successor_age(s, away, r());
+    let growing = (s.growth as u64).saturating_sub(age) as u32;
+    *a = roll(w, index);
+    a.female = g.female;
+    a.born = life::birth(w.time(), age);
+    a.seen = life::birth(w.time(), 0);
+    a.stage = life::stage(s, growing, BABY);
+    g.stage = a.stage;
+    if let Some(old) = w.component_mut(id, &crate::coats::GENOME) {
+        *old = g;
+    }
+    if let Some(b) = w.component_mut(id, &crate::breeding::BREEDING) {
+        *b = crate::breeding::Breeding { growing, ..Default::default() };
+    }
+    crate::breeding::count(&crate::breeding::OLD, index);
+    crate::breeding::count(&crate::breeding::BORN, index);
+    weft_sdk::info!(
+        "wild {} {id} died while away ({} days); a successor {} days old took its place",
+        s.name,
+        away / life::DAY,
+        age / life::DAY
+    );
+}
+
+/// When a wild one met now was born: grown, and up to most of an average life ago.
+fn born_wild(w: &World, index: usize) -> u64 {
+    let age = life::wild_age(&SPECIES[index], w.random_below(10_000) as f32 / 10_000.0);
+    life::birth(w.time(), age)
+}
+
+/// Its age (`notes/ANIMALS.md`, "Old age"): one from before animals aged gets one; a grown one
+/// past most of its life is an elder (greying, past breeding); at the end of its own lifespan
+/// (its species', give or take a fifth) it dies. True if it died.
+fn old_age(w: &World, id: u64, index: usize, a: &mut Animal) -> bool {
+    let s = &SPECIES[index];
+    if a.born == 0 {
+        let growing = w
+            .component(id, &crate::breeding::BREEDING)
+            .map_or(0, |b| b.growing) as u64;
+        a.born = if growing > 0 { life::birth(w.time(), s.growth as u64 - growing) } else { born_wild(w, index) };
+    }
+    // Sped up for testing (`/animal speed`): older by the extra ticks too.
+    let n = crate::breeding::speed() as u64;
+    if n > 1 {
+        a.born = a.born.saturating_sub(n - 1).max(1);
+    }
+    let Some(seed) = w.component(id, &crate::coats::GENOME).map(|g| g.seed) else { return false };
+    let (age, span) = (life::age(w.time(), a.born), life::lifespan(s, seed));
+    a.stage = life::aged(a.stage, age, span);
+    a.age = (age / life::DAY).min(u16::MAX as u64) as u16;
+    let growing = w
+        .component(id, &crate::breeding::BREEDING)
+        .map_or(0, |b| b.growing);
+    a.vigor = (life::vigor(s, growing, age) * 100.0)
+        .round()
+        .clamp(1.0, 100.0) as u8;
+    if age < span {
+        return false;
+    }
+    crate::breeding::count(&crate::breeding::OLD, index);
+    weft_sdk::info!("animal {id} ({}) died of old age, {} days old", s.name, age / life::DAY);
+    // Bypassing armor and leaving no scar: nothing hit it.
+    w.damage(id, 1e9, 0, damage::VOID);
+    true
+}
+
+/// How old it is, in in-game days, and how long its kind lives (`old_age`).
+pub fn age_days(a: &Animal) -> Option<(f64, f64, u8)> {
+    let s = a.species().filter(|_| a.born != 0)?;
+    Some((a.age as f64, s.lifespan as f64 / life::DAY as f64, if a.vigor == 0 { 100 } else { a.vigor }))
 }
 
 /// Max health and speed as the stats say; `heal` adds that much health on top (a new animal

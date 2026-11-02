@@ -9,8 +9,11 @@
   const el = (tag, props, ...kids) => { const e = Object.assign(document.createElement(tag), props || {}); e.append(...kids.filter(k => k != null && k !== false)); return e; };
   const hex = c => "#" + c.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("");
   const DAY = 24000, HOUR = 1000;
-  const STAGES = ["baby", "juvenile", "adolescent", "adult"];
+  const STAGES = ["baby", "juvenile", "adolescent", "adult", "elder"];
   let species = [], state = null, chosen = null, mother = null, father = null, pool = null, poolKey = "";
+  // What happened over time: a point per step (day, alive per species, born and died since).
+  let history = [], lastTick = 0, playing = null, shownId = null;
+  const COLORS = ["#d98b52", "#8fbf8a", "#7fa7d6", "#e1977d", "#c9b26b", "#b48ad6", "#6fc2c0"];
 
   function chip(look) {
     if (!look) return el("span", { className: "chip" });
@@ -26,6 +29,7 @@
     if (a.egg) return `egg, hatches in ${(a.egg / DAY).toFixed(1)} d`;
     if (a.carrying) return `expecting, ${(a.carrying / DAY).toFixed(1)} d`;
     if (a.rest) return `resting ${Math.ceil(a.rest / 1200)} min`;
+    if (a.stage === 4) return "old, past breeding";
     return a.stage < 3 ? `growing, ${(a.growing / DAY).toFixed(1)} d` : "ready";
   }
   const ageDays = a => ((a.died || state.tick) - a.born) / DAY;
@@ -33,9 +37,24 @@
   function run(req) {
     const r = Animals.call(req);
     if (r.error) { say(r.error, true); return false; }
+    if (req.op === "sim_reset") { history = []; lastTick = 0; }
     state = r;
+    record();
     draw();
     return true;
+  }
+  // A point for the charts when time has moved on.
+  function record() {
+    if (state.tick === lastTick && history.length) return;
+    const from = lastTick, to = state.tick;
+    const alive = species.map(sp => state.animals.filter(a => !a.died && a.species === sp.index && !a.egg).length);
+    const born = state.animals.filter(a => a.mother && a.born > from && a.born <= to && !a.egg).length;
+    const died = state.animals.filter(a => a.died > from && a.died <= to).length;
+    const days = Math.max((to - from) / DAY, 1e-9);
+    history.push({ day: to / DAY, alive, born: born / days, died: died / days });
+    if (history.length > 600) history = history.filter((_, i) => i % 2 === 0);
+    lastTick = to;
+    drawCharts();
   }
   function say(text, bad) {
     const n = $("lab-msg");
@@ -59,7 +78,7 @@
         el("td", { className: "num", textContent: a.generation }),
         el("td", { className: "num", textContent: a.mother ? `#${a.mother} \u00d7 #${a.father}` : "wild" }),
         el("td", { className: "muted", textContent: status(a) }));
-      tr.onclick = tr.onkeydown = e => { if (e.type === "keydown" && e.key !== "Enter") return; chosen = a.id; draw(); };
+      tr.onclick = tr.onkeydown = e => { if (e.type === "keydown" && e.key !== "Enter") return; chosen = a.id; shownId = null; draw(); show3d(a); };
       return tr;
     }));
     $("lab-pair").textContent = `Mother ${mother ? who(byId(mother)) : "\u2014"} \u00b7 Father ${father ? who(byId(father)) : "\u2014"}`;
@@ -67,11 +86,100 @@
     $("lab-log").replaceChildren(...state.log.slice(-60).reverse().map(t => el("li", { textContent: t })));
   }
 
+  // ---------------------------------------------------------------- charts
+
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  // A round top for an axis: 1, 2 or 5 times a power of ten.
+  const niceMax = v => { if (v <= 0) return 1; const p = 10 ** Math.floor(Math.log10(v)); return [1, 2, 5, 10].map(k => k * p).find(k => k >= v); };
+  function chart(canvas, series, colors) {
+    const dpr = Math.min(devicePixelRatio || 1, 2), W = canvas.clientWidth, H = canvas.clientHeight;
+    if (!W) return;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    const g = canvas.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    const L = 34, R = 8, T = 8, B = 20, pw = W - L - R, ph = H - T - B;
+    const days = history.map(h => h.day), x0 = days[0] || 0, x1 = Math.max(days[days.length - 1] || 1, x0 + 1);
+    const top = niceMax(Math.max(1, ...series.flat()));
+    const X = d => L + (d - x0) / (x1 - x0) * pw, Y = v => T + ph - v / top * ph;
+    g.font = "11px " + css("--mono");
+    g.fillStyle = css("--muted"); g.strokeStyle = css("--line"); g.lineWidth = 1;
+    for (const v of [0, top / 2, top]) {
+      g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke();
+      g.fillText(String(+v.toFixed(2)), 2, Y(v) + 4);
+    }
+    g.fillText(`day ${x0.toFixed(0)}`, L, H - 4);
+    const end = `day ${x1.toFixed(0)}`;
+    g.fillText(end, W - R - g.measureText(end).width, H - 4);
+    series.forEach((ys, k) => {
+      if (!ys.some(v => v > 0)) return;
+      g.strokeStyle = colors[k]; g.lineWidth = 2; g.beginPath();
+      ys.forEach((v, i) => { const px = X(days[i]), py = Y(v); i ? g.lineTo(px, py) : g.moveTo(px, py); });
+      g.stroke();
+    });
+  }
+  function drawCharts() {
+    if (history.length < 2) return;
+    const used = species.map((_, k) => history.some(h => h.alive[k] > 0));
+    chart($("lab-chart-alive"), species.map((_, k) => used[k] ? history.map(h => h.alive[k]) : []), COLORS);
+    // Smoothed over a few steps: births come in litters.
+    const smooth = key => history.map((_, i) => { const w = history.slice(Math.max(0, i - 4), i + 1); return w.reduce((a, h) => a + h[key], 0) / w.length; });
+    chart($("lab-chart-flow"), [smooth("born"), smooth("died")], [css("--good"), css("--alt")]);
+    $("lab-chart-key").replaceChildren(...species.filter((_, k) => used[k]).map(sp => el("span", {},
+      el("span", { className: "key", style: `background:${COLORS[sp.index]}` }), sp.breed || sp.name)));
+  }
+
+  // ---------------------------------------------------------------- balance
+
+  // What each species' numbers add up to: how fast a breeder gets young, generations, a
+  // recessive coat (the 4th generation is when two carriers' young show one, 1 in 4).
+  function balance() {
+    const d = t => +(t / DAY).toFixed(2);
+    const rows = species.map(sp => {
+      const carry = sp.gestation || 6000 + sp.incubation;
+      const cycle = (sp.gestation || 6000) + sp.recovery;
+      const litter = (sp.litter[0] + sp.litter[1]) / 2;
+      const gen = sp.growth + carry;
+      return [sp.breed ? `${sp.name} (${sp.breed})` : sp.name, sp.gestation ? `${d(sp.gestation)} d` : `lays at once, hatch ${d(sp.incubation)} d`,
+        `${sp.litter[0]}\u2013${sp.litter[1]}`, `${d(sp.recovery)} d`, `${d(sp.growth)} d`, `${d(sp.lifespan)} d`, `${d(gen)} d`,
+        (litter * 10 * DAY / cycle).toFixed(1), `${d(3 * gen)} d`, `${(3 * gen / DAY / 3).toFixed(1)} h`];
+    });
+    const head = ["Species", "Carrying", "Litter", "Rest after", "Grows up in", "Lives about", "A generation", "Young per female per 10 d", "To the 4th generation", "That in play hours"];
+    $("lab-balance").replaceChildren(el("thead", {}, el("tr", {}, ...head.map(t => el("th", { textContent: t })))),
+      el("tbody", {}, ...rows.map(r => el("tr", {}, ...r.map((t, i) => el("td", { className: i ? "val" : "", textContent: t }))))));
+  }
+
+  // ---------------------------------------------------------------- playing and the live view
+
+  function play() {
+    if (playing) { clearInterval(playing); playing = null; $("lab-play").textContent = "Play"; return; }
+    $("lab-play").textContent = "Pause";
+    playing = setInterval(() => {
+      const perSecond = +$("lab-speed").value * DAY;
+      run({ op: "sim_advance", ticks: Math.round(perSecond / 5) });
+    }, 200);
+  }
+  // The chosen animal in the 3D view (its species' model, painted from its genes), and that view
+  // mirrored here while it is.
+  function show3d(a) {
+    if (!a || !window.showAnimal || shownId === a.id) return;
+    shownId = a.id;
+    window.showAnimal(species[a.species], a.genome, { scroll: false });
+  }
+  window.afterRender = src => {
+    const c = $("lab-live");
+    if (!c || !shownId || c.getBoundingClientRect().bottom < 0 || c.getBoundingClientRect().top > innerHeight) return;
+    if (c.width !== c.clientWidth) { c.width = c.clientWidth; c.height = c.clientWidth * 9 / 16; }
+    const g = c.getContext("2d"), r = Math.min(c.width / src.width, c.height / src.height);
+    g.fillStyle = css("--bg"); g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(src, (c.width - src.width * r) / 2, (c.height - src.height * r) / 2, src.width * r, src.height * r);
+  };
+
   function card(a, label) {
     if (!a) return el("div", { className: "fam unknown" }, el("span", { className: "muted", textContent: label || "wild" }));
     const b = el("button", { type: "button", className: "fam" + (a.died ? " dead" : "") + (a.id === chosen ? " on" : "") },
       chip(a.look), el("span", { textContent: `#${a.id} ${a.female ? "\u2640" : "\u2642"}` }));
-    b.onclick = () => { chosen = a.id; draw(); };
+    b.onclick = () => { chosen = a.id; shownId = null; draw(); show3d(a); };
     return b;
   }
   function drawChosen() {
@@ -91,11 +199,12 @@
         el("span", {}, `age `, el("b", { textContent: `${Math.max(0, ageDays(a)).toFixed(1)} d` })),
         el("span", {}, `generation `, el("b", { textContent: a.generation })),
         el("span", {}, `size `, el("b", { textContent: `${(a.size * 100).toFixed(0)}%` })),
+        el("span", {}, `strength `, el("b", { textContent: `${(a.vigor * 100).toFixed(0)}%` })),
         el("span", {}, status(a))),
       el("div", { className: "btns" },
         btn("As mother", () => { if (!a.female) return say(`#${a.id} is male`, true); mother = a.id; draw(); }, a.died),
         btn("As father", () => { if (a.female) return say(`#${a.id} is female`, true); father = a.id; draw(); }, a.died),
-        btn("Show in 3D", () => window.showAnimal && window.showAnimal(sp, a.genome)),
+        btn("Show in the big view", () => window.showAnimal && window.showAnimal(sp, a.genome)),
         btn("Scar", () => run({ op: "sim_scar", id: a.id, kind: 1 + Math.floor(Math.random() * 5) }), a.died),
         btn("Kill", () => run({ op: "sim_kill", id: a.id, cause: "killed" }), a.died)));
     // Its family: grandparents, parents, it, and its young.
@@ -137,13 +246,20 @@
     const wild = (count, female) => run({ op: "sim_wild", species: +$("lab-species").value, habitat: $("lab-habitat").value, count, female });
     $("lab-add-pair").onclick = () => { wild(1, true) && wild(1, false); };
     $("lab-add-six").onclick = () => wild(6);
+    $("lab-play").onclick = play;
+    balance();
+    addEventListener("resize", drawCharts);
     for (const [id, t] of [["lab-hour", HOUR], ["lab-1d", DAY], ["lab-10d", 10 * DAY], ["lab-100d", 100 * DAY]]) $(id).onclick = () => run({ op: "sim_advance", ticks: t });
     $("lab-mate").onclick = () => {
       if (!mother || !father) return say("Pick a mother and a father first (an animal, then As mother / As father).", true);
       if (run({ op: "sim_mate", mother, father })) say(`#${mother} and #${father} mated.`);
     };
-    const settings = () => run({ op: "sim_settings", auto: $("lab-auto").checked, lifespan: +$("lab-life").value || 0, cap: +$("lab-cap").value || 150 });
-    for (const id of ["lab-auto", "lab-life", "lab-cap"]) $(id).onchange = settings;
+    const settings = () => {
+      const rule = $("lab-life-rule").value;
+      $("lab-life-wrap").hidden = rule !== "days";
+      run({ op: "sim_settings", auto: $("lab-auto").checked, lifespan: rule === "days" ? Math.max(1, +$("lab-life").value || 1) : rule, cap: +$("lab-cap").value || 150 });
+    };
+    for (const id of ["lab-auto", "lab-life", "lab-life-rule", "lab-cap"]) $(id).onchange = settings;
     $("lab-dead").onchange = draw;
     $("lab-reset").onclick = () => { chosen = mother = father = null; run({ op: "sim_reset", seed: Animals.seed() }); settings(); say("A new world."); };
     $("lab-ev-10").onclick = () => evolve(10);

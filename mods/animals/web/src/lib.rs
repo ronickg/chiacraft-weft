@@ -4,15 +4,20 @@
 //! bytes, as the game saves it).
 //!
 //! The population simulator (`sim_*`) runs the game's breeding numbers over time: matings,
-//! carrying, litters and clutches, growing up, families, and (if asked) old age, which the game
-//! doesn't have yet.
+//! carrying, litters and clutches, growing up, families, and old age as the game has it (each its
+//! species' lifespan, give or take a fifth; elders past breeding), or none, or a span of the
+//! page's choosing. Left to breed by themselves, animals mate less the more crowded it is
+//! (logistic growth up to a cap).
+//!
+//! `test.mjs` checks the rules through this API (inheritance, the sexes, refusals, timings,
+//! caps, scars, evolution's direction, every animal unique): `build.sh && node test.mjs`.
 
 use std::cell::RefCell;
 
 use animals_core::coats::{self, Genome, Pool, Rng};
 use animals_core::evolution::{self, HABITATS, Habitat};
 use animals_core::life;
-use animals_core::species::{ADULT, BABY, SPECIES, STATS, same_species};
+use animals_core::species::{ADULT, BABY, ELDER, SPECIES, STATS, same_species};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -192,7 +197,7 @@ fn handle(req: &Value) -> Result<Value, String> {
                 "index": i, "name": s.name, "breed": s.breed, "model": s.model, "binomial": s.binomial,
                 "gestation": s.gestation, "incubation": s.incubation, "litter": s.litter, "growth": s.growth,
                 "recovery": s.recovery, "birth_size": s.birth_size, "dimorphism": s.dimorphism,
-                "height": s.height.0, "flight": s.flight, "camouflage": s.camouflage,
+                "height": s.height.0, "flight": s.flight, "camouflage": s.camouflage, "lifespan": s.lifespan,
             })).collect::<Vec<_>>(),
             "habitats": HABITATS.iter().map(|h| h.name()).collect::<Vec<_>>(),
             "day": life::DAY,
@@ -229,7 +234,7 @@ fn handle(req: &Value) -> Result<Value, String> {
         "edit" => {
             let mut g = genome_arg(req, "genome")?;
             if let Some(st) = req["stage"].as_u64() {
-                g.stage = st.min(ADULT as u64) as u8;
+                g.stage = st.min(ELDER as u64) as u8;
             }
             if let Some(k) = req["scar"].as_u64() {
                 coats::scar(&mut g, k as u8, req["place"].as_u64().unwrap_or(0) as u8);
@@ -289,8 +294,9 @@ struct Animal {
     genome: String,
     species: usize,
     female: bool,
-    /// Tick it was born (or hatched); wild ones start grown, born at 0 or when added.
-    born: u64,
+    /// Tick it was born (or hatched); a wild one met grown was born before (below 0 if met at
+    /// the start).
+    born: i64,
     mother: u32,
     father: u32,
     generation: u32,
@@ -319,8 +325,9 @@ struct Sim {
     rng: Option<Seeded>,
     /// Matings the simulator makes by itself (adults of a species, one a day each at most).
     auto: bool,
-    /// Old age (not in the game yet): days an adult lives, 0 for ever.
-    lifespan: u32,
+    /// Old age: `None` as the game has it (`life::lifespan`), `Some(0)` none, else an average
+    /// span in days.
+    lifespan: Option<u32>,
     /// Animals alive at most: no matings past it (as a pen or a habitat holds only so many).
     cap: u32,
     log: Vec<String>,
@@ -351,7 +358,7 @@ impl Sim {
             "tick": self.tick,
             "day": self.tick as f64 / life::DAY as f64,
             "auto": self.auto,
-            "lifespan": self.lifespan,
+            "lifespan": match self.lifespan { None => json!("game"), Some(0) => json!("off"), Some(d) => json!(d) },
             "cap": self.cap,
             "animals": self.animals.iter().map(|a| {
                 let mut v = serde_json::to_value(a).unwrap_or_default();
@@ -359,6 +366,8 @@ impl Sim {
                     let look = coats::describe(&g).map(|(_, l)| l);
                     v["look"] = json!(look);
                     v["size"] = json!(coats::size(&g) * life::size(&SPECIES[a.species], a.growing));
+                    let age = (self.tick as i64 - a.born).max(0) as u64;
+                    v["vigor"] = json!(life::vigor(&SPECIES[a.species], a.growing, age));
                 }
                 v
             }).collect::<Vec<_>>(),
@@ -373,7 +382,9 @@ fn wild(sim: &mut Sim, index: usize, female: Option<bool>, h: Habitat) -> Result
     let female = female.unwrap_or_else(|| r.next() < 0.5);
     let g = coats::sample(index, female, &pool, r).ok_or("no gene file")?;
     let points: [u8; STATS] = std::array::from_fn(|_| (r.below(8)) as u8);
-    let born = sim.tick;
+    // Met grown, at any age up to most of a life, as the game's wild ones are.
+    let age = life::wild_age(&SPECIES[index], r.next());
+    let born = sim.tick as i64 - age as i64;
     let id = sim.add(Animal {
         id: 0,
         genome: hex(&g),
@@ -406,7 +417,10 @@ fn mate(sim: &mut Sim, m: u32, f: u32) -> Result<(), String> {
         if a.died != 0 {
             return Err(format!("#{} is dead", a.id));
         }
-        if a.egg > 0 || a.stage != ADULT {
+        if a.stage == ELDER {
+            return Err(format!("#{} is too old", a.id));
+        }
+        if a.egg > 0 || !life::can_breed(a.stage) {
             return Err(format!("#{} isn't grown up", a.id));
         }
         if a.rest > 0 {
@@ -459,7 +473,7 @@ fn deliver(sim: &mut Sim, id: u32) {
             genome: hex(&g),
             species: m.species,
             female: g.female != 0,
-            born: tick,
+            born: tick as i64,
             mother: id,
             father: m.mate,
             generation,
@@ -496,12 +510,12 @@ fn advance(sim: &mut Sim, ticks: u64) {
         let mut due = Vec::new();
         let mut hatched = Vec::new();
         let mut died = Vec::new();
-        let (tick, lifespan) = (sim.tick, sim.lifespan as u64 * life::DAY);
+        let (tick, rule) = (sim.tick, sim.lifespan);
         for a in sim.animals.iter_mut().filter(|a| a.died == 0) {
             if a.egg > 0 {
                 a.egg = a.egg.saturating_sub(dt);
                 if a.egg == 0 {
-                    a.born = tick;
+                    a.born = tick as i64;
                     hatched.push(a.id);
                 }
                 continue;
@@ -516,7 +530,17 @@ fn advance(sim: &mut Sim, ticks: u64) {
                     due.push(a.id);
                 }
             }
-            if lifespan > 0 && tick.saturating_sub(a.born) > lifespan + s.growth as u64 {
+            // Its own span, as the game gives it (its species', give or take a fifth by its
+            // genes' seed), or the page's.
+            let seed = unhex(&a.genome).map_or(a.id, |g| g.seed);
+            let span = match rule {
+                None => life::lifespan(s, seed),
+                Some(0) => u64::MAX,
+                Some(d) => (d as u64 * life::DAY) * life::lifespan(s, seed) / s.lifespan.max(1) as u64,
+            };
+            let age = (tick as i64 - a.born).max(0) as u64;
+            a.stage = life::aged(a.stage, age, span);
+            if age >= span {
                 a.died = tick;
                 a.cause = "old age".into();
                 died.push(a.id);
@@ -528,23 +552,54 @@ fn advance(sim: &mut Sim, ticks: u64) {
         for id in died {
             sim.say(format!("#{id} died of old age"));
         }
+        if sim.auto {
+            want(sim, dt as f64 / life::DAY as f64);
+        }
         for id in due {
             deliver(sim, id);
         }
         if sim.auto {
-            auto_mate(sim);
+            auto_mate(sim, dt as f64 / life::DAY as f64);
         }
     }
 }
 
-/// Automatic matings: each grown, rested female finds a grown, rested male of her species now
-/// and then (about once a day each).
-fn auto_mate(sim: &mut Sim) {
-    let alive = sim.animals.iter().filter(|a| a.died == 0).count() as u32;
-    if alive >= sim.cap.max(2) {
-        return;
+/// Deaths of want, as crowded wild ones die in the game (`life::want_chance`): of each kind past
+/// the room, the old and the young first.
+fn want(sim: &mut Sim, days: f64) {
+    let near: Vec<f64> = (0..SPECIES.len())
+        .map(|i| {
+            sim.animals
+                .iter()
+                .filter(|a| a.died == 0 && a.egg == 0 && same_species(&SPECIES[a.species], &SPECIES[i]))
+                .map(|a| life::crowding(a.stage))
+                .sum()
+        })
+        .collect();
+    let (tick, cap) = (sim.tick, sim.cap);
+    let mut gone = Vec::new();
+    for k in 0..sim.animals.len() {
+        let a = &sim.animals[k];
+        if a.died != 0 || a.egg > 0 {
+            continue;
+        }
+        let chance = life::want_chance(days, near[a.species], cap, a.stage);
+        if chance > 0.0 && (sim.rng().next() as f64) < chance {
+            let a = &mut sim.animals[k];
+            (a.died, a.cause) = (tick, "want".into());
+            gone.push(a.id);
+        }
     }
-    let ready = |a: &Animal| a.died == 0 && a.egg == 0 && a.stage == ADULT && a.rest == 0 && a.carrying == 0;
+    for id in gone {
+        sim.say(format!("#{id} died of want"));
+    }
+}
+
+/// Matings by themselves, as wild ones breed in the game (`life::love_chance`): each grown,
+/// rested female, now and then, with a grown, rested male of her kind, the more readily the fewer
+/// of her kind there are (with the young on the way) against the room for `cap`.
+fn auto_mate(sim: &mut Sim, days: f64) {
+    let ready = |a: &Animal| a.died == 0 && a.egg == 0 && life::can_breed(a.stage) && a.rest == 0 && a.carrying == 0;
     let females: Vec<u32> = sim
         .animals
         .iter()
@@ -552,14 +607,30 @@ fn auto_mate(sim: &mut Sim) {
         .map(|a| a.id)
         .collect();
     for m in females {
-        if sim.rng().below(10) != 0 {
+        let Some(ma) = sim.get(m).cloned() else { continue };
+        let kin = |a: &Animal| a.died == 0 && same_species(&SPECIES[a.species], &SPECIES[ma.species]);
+        let s = &SPECIES[ma.species];
+        let coming: u32 = sim
+            .animals
+            .iter()
+            .filter(|a| kin(a) && a.carrying > 0)
+            .map(|_| (s.litter.0 + s.litter.1) / 2)
+            .sum();
+        let near = sim
+            .animals
+            .iter()
+            .filter(|a| kin(a))
+            .map(|a| life::crowding(a.stage))
+            .sum::<f64>()
+            + coming as f64;
+        let chance = life::love_chance(days, near, sim.cap);
+        if sim.rng().next() as f64 >= chance {
             continue;
         }
-        let Some(ma) = sim.get(m).cloned() else { continue };
         let males: Vec<u32> = sim
             .animals
             .iter()
-            .filter(|a| !a.female && ready(a) && same_species(&SPECIES[a.species], &SPECIES[ma.species]))
+            .filter(|a| !a.female && ready(a) && kin(a))
             .map(|a| a.id)
             .collect();
         if males.is_empty() {
@@ -618,8 +689,14 @@ fn sim(sim: &mut Sim, op: &str, req: &Value) -> Result<Value, String> {
             if let Some(b) = req["auto"].as_bool() {
                 sim.auto = b;
             }
-            if let Some(d) = req["lifespan"].as_u64() {
-                sim.lifespan = d.min(100_000) as u32;
+            match &req["lifespan"] {
+                Value::String(t) if t == "game" => sim.lifespan = None,
+                Value::String(t) if t == "off" => sim.lifespan = Some(0),
+                v => {
+                    if let Some(d) = v.as_u64() {
+                        sim.lifespan = Some(d.min(100_000) as u32);
+                    }
+                }
             }
             if let Some(n) = req["cap"].as_u64() {
                 sim.cap = n.clamp(2, 1000) as u32;

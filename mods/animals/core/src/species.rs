@@ -11,14 +11,18 @@ pub const BABY: u8 = 0;
 pub const JUVENILE: u8 = 1;
 pub const ADOLESCENT: u8 = 2;
 pub const ADULT: u8 = 3;
+/// Old: from `life::ELDERLY` of its lifespan on (greying, past breeding).
+pub const ELDER: u8 = 4;
 
 /// The nine stats, in the order of every `[_; STATS]` table (`STAT_NAMES`); those the core uses
 /// by name.
 pub const STATS: usize = 9;
 pub const HEALTH: usize = 0;
+pub const STAMINA: usize = 1;
 pub const FOOD: usize = 2;
 pub const DAMAGE: usize = 3;
 pub const SPEED: usize = 4;
+pub const WEIGHT: usize = 5;
 pub const TORPOR: usize = 7;
 /// Their names in translations (`stat.animals.<name>`).
 pub const STAT_NAMES: [&str; STATS] = ["health", "stamina", "food", "damage", "speed", "weight", "oxygen", "torpor", "fortitude"];
@@ -162,6 +166,14 @@ pub struct Species {
     pub recovery: u32,
     /// Ticks its young take to grow up.
     pub growth: u32,
+    /// How many of its kind may live within `life::CROWD_RADIUS` blocks before the wild ones
+    /// stop breeding (a pack, a herd, a pair of dragons).
+    pub crowd: u32,
+    /// Ticks an average one lives (each its own, give or take a fifth: `life::lifespan`); 0:
+    /// for ever. In the middle of what the balance research found (notes/ANIMALS.md, "Old
+    /// age"): pets 40-60 in-game days, capybaras 30-45, raptors 60-100, Utahraptors 120-200,
+    /// wyverns 400 or more.
+    pub lifespan: u32,
     /// A newborn's size against a grown one's (1: it has its own young model, the chihuahua's
     /// puppy).
     pub birth_size: f32,
@@ -217,6 +229,8 @@ pub static SPECIES: [Species; 7] = [
         incubation: 0,
         recovery: 48_000,
         growth: 72_000,
+        lifespan: 1_200_000, // 50 in-game days
+        crowd: 10,
         birth_size: 1.0,
     },
     Species {
@@ -262,6 +276,8 @@ pub static SPECIES: [Species; 7] = [
         incubation: 0,
         recovery: 48_000,
         growth: 72_000,
+        lifespan: 1_200_000, // 50 in-game days
+        crowd: 10,
         birth_size: 0.35,
     },
     Species {
@@ -305,6 +321,8 @@ pub static SPECIES: [Species; 7] = [
         incubation: 0,
         recovery: 72_000,
         growth: 96_000,
+        lifespan: 840_000, // 35 in-game days
+        crowd: 14,
         birth_size: 0.3,
     },
     Species {
@@ -340,6 +358,8 @@ pub static SPECIES: [Species; 7] = [
         incubation: 24_000,
         recovery: 96_000,
         growth: 96_000,
+        lifespan: 1_920_000, // 80 in-game days
+        crowd: 10,
         birth_size: 0.3,
     },
     Species {
@@ -376,6 +396,8 @@ pub static SPECIES: [Species; 7] = [
         incubation: 48_000,
         recovery: 96_000,
         growth: 288_000,
+        lifespan: 3_840_000, // 160 in-game days
+        crowd: 6,
         birth_size: 0.15,
     },
     // Velociraptor's second species (named 2008, from Bayan Mandahu, Inner Mongolia; known from
@@ -413,6 +435,8 @@ pub static SPECIES: [Species; 7] = [
         incubation: 24_000,
         recovery: 96_000,
         growth: 96_000,
+        lifespan: 1_920_000, // 80 in-game days
+        crowd: 10,
         birth_size: 0.3,
     },
     // The wyvern, a fantasy animal (`wyvern.rs`): a dragon with two legs and bat wings, about
@@ -462,6 +486,8 @@ pub static SPECIES: [Species; 7] = [
         incubation: 168_000,
         recovery: 336_000,
         growth: 960_000,
+        lifespan: 9_600_000, // 400 in-game days
+        crowd: 3,
         birth_size: 0.08,
     },
 ];

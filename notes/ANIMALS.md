@@ -724,7 +724,87 @@ refuses the same pairs), carrying, litters and clutches, eggs hatching, growing 
 the game yet: a setting there), with a habitat's pool evolving beside it. The JS copy of the rules
 (`coats.js`) is now only the skill's standalone version.
 
-*Next*: Dalmatian spotting.
+The lab plays time forward (6 hours to 30 days a second) with charts of who is alive and how
+many are born and die a day, shows the animal picked live, and has a balance table (each
+species' numbers and what they add up to: young per female per 10 days, days and play hours to a
+4th generation). `web/test.mjs` runs its checks on the rules through the WASM. What they found:
+the 1% mutation chance per gene in every young (about 1 young in 10 carries one somewhere) is far
+above life's and makes true-breeding lines leak; populations left alone overshot their cap and,
+with old age, died out together (a cohort aging as one), fixed in the simulator by logistic
+breeding and lifespans that vary.
+
+**Old age** (2026-11-02; Ronald: "animals should die"). Every animal ages on the game's tick clock
+(not the sky's: `/time` doesn't age them) from when it was born (`Animal::born`, counted from a
+start long before the world's, so a wild one met in a new world can be older than it; a wild one
+is met at a random grown age up to most of an average life). For the last fifth of its own
+lifespan (its species', give or take a fifth by its genes' seed, so siblings don't die together)
+it is an **elder**: a grizzled muzzle, the coat a little faded, past breeding. At the end it dies
+(`animal::old_age`). Its screen says how old it is and how long its kind lives; `/animal age
+<days>` makes one older (testing). Lifespans, in in-game days (20 minutes each): dogs and cats
+50, capybaras 35, raptors 80, Utahraptors 160, wyverns 400. The lab runs the same rule (or none,
+or a span of its own).
+
+**Balance research** (2026-11-02). How games and life pace breeding:
+- Minecraft (the same 20-minute day): parents wait 5 minutes (a quarter day), babies grow up in a
+  day. ARK at 1x: a raptor hatches in 2 hours and grows up in 37, a wyvern in about 4 days; most
+  servers breed 10-50 times faster. RimWorld cats: 10-day gestation, 1-3 kittens, adult at 24
+  days of a 60-day year. Sims 4 pets: about 25 adult days, then 6-11 elder days. Niche: 24 days.
+- Real ratios (dog gestation 1): cat 1.0, capybara 2.2, a troodontid's incubation about 1.2;
+  maturity: cat 0.8, capybara about 1.8, raptors 3 or more, a condor about 8. Ours keep that
+  order, compressed about 60-100 times.
+- Recommended (in-game days): dogs and cats carrying 1-1.5, litters of about 3, rest 2-3, grow up
+  in 2.5-4, live 40-60; capybaras 2-2.5, about 4, 4-6, 4-5, 30-45; raptors 1-1.5, 2-4 eggs, 4,
+  5-8, 60-100; Utahraptors 2-3, 1-3, 6-8, 10-15, 120-200; wyverns 5-7, 1, 14-20, 25-40, 400+.
+- Targets: a pet pair to the 4th generation in 12-16 days (now 12), 6-10 young per female per 10
+  days (cats 11.7, dogs 8.3), a recessive coat in two litters of carriers 80% of the time.
+- Evolution: at our selection strength 0.6 a whole region changes coat in about 12 in-game days
+  (4 hours of play); 0.25-0.3 makes it 25-40 days, over several sessions. The mutation rate
+  (0.002 a gene in the wild, 1% in every young bred) is 100-1000 times life's.
+
+Sources: [Minecraft breeding](https://minecraft.wiki/w/Breeding), [ARK breeding](https://ark.wiki.gg/wiki/Breeding),
+[RimWorld cat](https://rimworldwiki.com/wiki/Cat), [Sims 4 pet life stages](https://sims.fandom.com/wiki/Life_stages_(pet)),
+[Niche](https://niche.fandom.com/wiki/Nicheling), [dog litters (Borge 2011)](https://pubmed.ncbi.nlm.nih.gov/21196028/),
+[cat](https://en.wikipedia.org/wiki/Cat), [capybara](https://en.wikipedia.org/wiki/Capybara),
+[Troodon incubation (Varricchio 2018)](https://www.nature.com/articles/s41598-018-30085-6),
+[Deinonychus age (Erickson 2009)](https://pmc.ncbi.nlm.nih.gov/articles/PMC2756958),
+[peppered moth](https://www.wikiwand.com/en/Peppered_moth_evolution).
+
+**Wild breeding, crowding, strength by age** (2026-11-02; Ronald: "animals in the wild should
+mate, I don't want them to die out; age should be part of the stats"). Wild animals now breed on
+their own: a grown, rested wild one, now and then (about every other day with room), falls in love
+with a wild mate within 24 blocks, the more readily the fewer of its kind within 48 blocks against
+its species' crowd (dogs, cats, raptors 10, capybaras 14, Utahraptors 6, wyverns 3), a little even
+when full, never past three times it (`life::love_chance`; elders crowd half). When crowded, wild
+ones die of want, the old and the young first (`life::want_chance`). Without that last part a pen
+filled with one generation that aged together and died out (cats and chihuahuas in the first
+in-game test); with it, generations overlap and every species keeps going (four pens, 150 sped-up
+days, `mods/animals/tests`). Strength follows age (`life::vigor`): 40% at birth, growing up,
+young adults 90%, full in their prime, fading from the elder years to 60% at an average life's
+end; health, stamina, damage, speed and carrying go with it (shown on its screen). Testing:
+`/animal speed <n>`, `/animal census`, `/animal reset` (`mods/animals/tests/README.md`).
+
+**Time away** (2026-11-02; Ronald: "my animals should die even while I'm gone"). Animals only
+live where a player is: the engine spawns them 20-45 blocks from players (at most 6 passive ones
+within 64) and ticks only loaded areas. So what happens elsewhere is caught up when an area loads,
+as lazy simulations do (Vintage Story catches crops, births and spoilage up on load; Minecraft's
+Elapsed and KeepMeGrowing grow crops and young by the time since the chunk unloaded; Dwarf
+Fortress simulates a whole history when a world is made). Each animal keeps when it was last seen
+(`Animal::seen`); past half a minute away (`life::AWAY`), on its next tick its timers run on (a
+mother due gives birth), it has aged by the world's clock, a tame one whose time ran out dies of
+old age, and a wild one that died meanwhile has a successor in its place: born while away, of its
+place's kind as it has evolved since (`animal::catch_up`). A place's gene pool used for the first
+time starts as if it had evolved since the world began (up to 300 generations, `HISTORY`; a
+revisited one catches up to 120). Not caught up: births and deaths of want while away (a herd
+comes back the size it was). `/animal away <days>` makes the animals round the player as if that
+long had passed (`mods/animals/tests/away.txt`). Owners aren't told yet when a pet died away (the
+engine has no way to send a player a chat line).
+
+Sources: [Vintage Story forum](https://www.vintagestory.at/forums/topic/12926-how-close-do-i-need-for-things-to-keep-growingburningcooking-ect/),
+[Elapsed](https://www.modpackindex.com/mod/208669/elapsed), [KeepMeGrowing](https://modrinth.com/plugin/keep-me-growing),
+[Cattlestrophic!](https://modrinth.com/mod/cattlestrophic) (old age for Minecraft's animals).
+
+*Next*: the rest of the balance (raptors growing up in 5-8 days instead of 4, Utahraptors and
+wyverns slower to hatch, selection 0.25-0.3, fewer mutations), then Dalmatian spotting.
 
 Sources: Lee, Cavener, Bond 2018 (PeerJ 6:e5690, giraffe spots); Kaelin et al. 2021 (Nature
 Communications, tabby genes); Manukyan et al. 2017 (Nature 544:173, lizard scales); Shin et al.

@@ -10,6 +10,8 @@
 //! (their favorite food speeds it), and remember their parents and generation. Afterwards both
 //! parents rest, the mother for her recovery.
 
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use animals_core::life::{self, LOVE_TICKS, MALE_REST};
 use weft_sdk::*;
 
@@ -85,6 +87,41 @@ pub fn init(r: &mut Registry) {
     for s in &SPECIES {
         r.attach(s.kind, &BREEDING);
     }
+    // Counted for `/animal census`: deaths other than of old age (counted in `animal::old_age`).
+    // (By its kind: its components are gone by the time the event comes.)
+    r.on(&ENTITY_DIED, |b| {
+        for d in b.iter() {
+            if d.cause != damage::VOID
+                && let Some(i) = SPECIES.iter().position(|s| s.kind.id() == d.kind)
+            {
+                count(&DIED, i);
+            }
+        }
+    });
+}
+
+// ------------------------------------------------------------------ testing: speed and census
+
+/// How many times faster than the clock animals live (`/animal speed`, for testing: their
+/// timers, aging and wild breeding; not saved).
+static SPEED: AtomicU32 = AtomicU32::new(1);
+/// Per species since the census was last reset: born, died of old age, died otherwise.
+pub static BORN: [AtomicU32; 7] = [const { AtomicU32::new(0) }; 7];
+pub static OLD: [AtomicU32; 7] = [const { AtomicU32::new(0) }; 7];
+pub static DIED: [AtomicU32; 7] = [const { AtomicU32::new(0) }; 7];
+
+pub fn speed() -> u32 {
+    SPEED.load(Ordering::Relaxed).max(1)
+}
+
+pub fn set_speed(n: u32) {
+    SPEED.store(n.clamp(1, 10_000), Ordering::Relaxed);
+}
+
+pub fn count(what: &[AtomicU32; 7], index: usize) {
+    if let Some(c) = what.get(index) {
+        c.fetch_add(1, Ordering::Relaxed);
+    }
 }
 
 // ------------------------------------------------------------------ every tick
@@ -93,20 +130,108 @@ pub fn init(r: &mut Registry) {
 /// from how far it has grown, and a mother's young born (or eggs laid) when the time comes.
 pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
     let s = &SPECIES[index];
+    let n = speed();
     let Some(b) = w.component_mut(id, &BREEDING) else { return };
+    // Love isn't sped up: they still have to walk to each other.
     b.love = b.love.saturating_sub(1);
-    b.rest = b.rest.saturating_sub(1);
-    b.growing = b.growing.saturating_sub(1);
+    b.rest = b.rest.saturating_sub(n);
+    b.growing = b.growing.saturating_sub(n);
     a.stage = life::stage(s, b.growing, a.stage);
     if b.love > 0 && (w.time() + id) % 20 == 0 {
         hearts(w, id, 1);
     }
     if b.carrying > 0 {
-        b.carrying -= 1;
+        b.carrying = b.carrying.saturating_sub(n);
         if b.carrying == 0 {
             let b = *b;
             deliver(w, id, index, &b);
         }
+    }
+    let b = *b;
+    // Checked as often in game time at any speed (`/animal speed`), or a sped-up herd falls in
+    // love all at once.
+    let every = (WILD_LOVE_EVERY / n as u64).max(1);
+    if (w.time() + id) % every == 0 && !crate::animal::tamed(w, id) {
+        let days = (every * n as u64) as f64 / life::DAY as f64;
+        let (kin, near) = kin_near(w, id, index, a);
+        let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
+        if roll < life::want_chance(days, near, s.crowd, a.stage) {
+            weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {})", s.name, s.crowd);
+            w.damage(id, 1e9, 0, damage::STARVE);
+            return;
+        }
+        wild_love(w, id, index, a, &b, &kin, near, days);
+    }
+}
+
+/// Its kind within `life::CROWD_RADIUS` blocks of wild one `id` (itself among them), and how
+/// much they crowd it (`life::crowding`).
+fn kin_near(w: &World, id: u64, index: usize, a: &Animal) -> (Vec<u64>, f64) {
+    let Some(st) = w.entity(id) else { return (Vec::new(), 0.0) };
+    let kin: Vec<u64> = w
+        .near(st.pos, life::CROWD_RADIUS, Some(SPECIES[index].kind))
+        .into_iter()
+        .filter(|&o| {
+            w.component(o, &ANIMAL)
+                .is_some_and(|o| o.species == a.species)
+        })
+        .collect();
+    let near = kin
+        .iter()
+        .filter_map(|&o| w.component(o, &ANIMAL))
+        .map(|o| life::crowding(o.stage))
+        .sum();
+    (kin, near)
+}
+
+/// Ticks between a wild one's chances to fall in love (`wild_love`).
+const WILD_LOVE_EVERY: u64 = 200;
+
+/// A grown, rested wild one, now and then, falls in love with a wild mate near it, the more
+/// readily the fewer of its kind are around (`life::love_chance`): wild animals keep their kind
+/// going as old age takes them, and stop when it's crowded. They then meet and mate as tames in
+/// love do (`behave`).
+#[allow(clippy::too_many_arguments)]
+fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[u64], near: f64, days: f64) {
+    let ready = |a: &Animal, b: &Breeding| life::can_breed(a.stage) && b.growing == 0 && b.love == 0 && b.rest == 0 && b.carrying == 0;
+    if !ready(a, b) {
+        return;
+    }
+    let s = &SPECIES[index];
+    let Some(st) = w.entity(id) else { return };
+    let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
+    if roll >= life::love_chance(days, near, s.crowd) {
+        return;
+    }
+    let mate = kin.iter().copied().find(|&o| {
+        o != id
+            && !crate::animal::tamed(w, o)
+            && w.entity(o)
+                .is_some_and(|m| (m.pos[0] - st.pos[0]).powi(2) + (m.pos[2] - st.pos[2]).powi(2) < 24.0 * 24.0)
+            && match (w.component(o, &ANIMAL), w.component(o, &BREEDING)) {
+                (Some(oa), Some(ob)) => oa.female != a.female && ready(oa, ob),
+                _ => false,
+            }
+    });
+    let Some(mate) = mate else { return };
+    for o in [id, mate] {
+        if let Some(b) = w.component_mut(o, &BREEDING) {
+            b.love = LOVE_TICKS;
+        }
+    }
+    weft_sdk::info!("wild {} {id} and {mate} in love", s.name);
+}
+
+/// Its area was away (unloaded) for `away` ticks (`animal::catch_up`): its timers have run on (a
+/// mother due gives birth on its next tick), and love has passed.
+pub fn catch_up(w: &World, id: u64, away: u64) {
+    let Some(b) = w.component_mut(id, &BREEDING) else { return };
+    let away = away.min(u32::MAX as u64) as u32;
+    b.love = 0;
+    b.rest = b.rest.saturating_sub(away);
+    b.growing = b.growing.saturating_sub(away);
+    if b.carrying > 0 {
+        b.carrying = b.carrying.saturating_sub(away).max(1);
     }
 }
 
@@ -135,14 +260,14 @@ fn hearts(w: &World, id: u64, count: u32) {
 // ------------------------------------------------------------------ love and mating
 
 /// A player who may command `id` gives it one of its favorite foods (`commands::interact`): a
-/// grown one with bond enough, not resting or expecting, falls in love; a young one grows a
+/// grown one (not an elder) with bond enough, not resting or expecting, falls in love; a young one grows a
 /// tenth of what it has left. True if it took the food.
 pub fn fed(w: &World, id: u64, player: u64) -> bool {
     let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
     let Some(b) = w.component_mut(id, &BREEDING) else { return false };
     if b.growing > 0 {
         b.growing -= b.growing / 10;
-    } else if b.love == 0 && b.rest == 0 && b.carrying == 0 && a.bond >= BOND {
+    } else if b.love == 0 && b.rest == 0 && b.carrying == 0 && a.bond >= BOND && life::can_breed(a.stage) {
         b.love = LOVE_TICKS;
         weft_sdk::info!("animal {id} in love");
     } else {
@@ -166,7 +291,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         }
         let female = |o: u64| w.component(o, &ANIMAL).map(|a| a.female);
         let Some(mine) = w.component(id, &ANIMAL).and_then(|a| a.species()) else { return false };
-        let mate = w.near(st.pos, 8.0, None).into_iter().find(|&o| {
+        let mate = w.near(st.pos, 24.0, None).into_iter().find(|&o| {
             o != id
                 && female(o) != female(id)
                 && w.component(o, &ANIMAL)
@@ -295,6 +420,7 @@ pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 
     if id == 0 {
         return 0;
     }
+    count(&BORN, y.index);
     if let Some(g) = w.component_mut(id, &GENOME) {
         *g = y.genome;
     }
@@ -303,6 +429,7 @@ pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 
             species: y.index as u8 + 1,
             female: y.genome.female,
             stage: animal::BABY,
+            born: life::birth(w.time(), 0),
             bond: if owner.is_some() { 25 } else { 0 },
             wild: y.wild,
             ..Animal::default()

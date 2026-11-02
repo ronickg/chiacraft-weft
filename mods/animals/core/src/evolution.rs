@@ -37,7 +37,10 @@ pub const BERGMANN: f32 = 0.15;
 /// The share of each generation from the neighboring places.
 pub const MIGRATION: f32 = 0.02;
 /// Generations a pool catches up at once when it is needed again after a long time.
-pub const CATCH_UP: u64 = 60;
+pub const CATCH_UP: u64 = 120;
+/// Generations a place's pool has evolved when it is first needed (a place found late has a
+/// history: snow raptors already pale), at most.
+pub const HISTORY: u64 = 300;
 
 /// Where animals live, as their coats are seen against it.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

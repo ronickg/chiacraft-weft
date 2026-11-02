@@ -34,7 +34,7 @@ pub fn init(r: &mut Registry) {
         }
     });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,away)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -173,6 +173,12 @@ fn heading(ui: &mut Ui) {
         let shown = if m < 1.0 { format!("{:.0} cm", m * 100.0) } else { format!("{m:.2} m") };
         let key = if a.stage < animal::ADULT { "screen.animals.height_young" } else { "screen.animals.height" };
         t.set(key, &[Arg::Text(&shown), Arg::Key(&format!("screen.animals.height.{}", s.height.1))]);
+    });
+    // How old it is, and how long its kind lives (`animal::old_age`).
+    ui.text_bind(|c, t| {
+        let Some(a) = c.menu_component(&ANIMAL) else { return };
+        let Some((age, span, vigor)) = animal::age_days(&a) else { return t.text("") };
+        t.set("screen.animals.age", &[Arg::Int(age as i64), Arg::Int(span as i64), Arg::Int(vigor as i64)]);
     });
     // In love, expecting, growing up or resting (`breeding.rs`), when it is.
     ui.text_bind(|c, t| {
@@ -451,6 +457,52 @@ fn command(cmd: &mut ServerCommand) {
         }
         return;
     }
+    // Testing the animals' lives: faster (`/animal speed <n>`), and how they are doing round the
+    // player (`/animal census [radius]`; `/animal reset` zeroes its counts).
+    match cmd.text("action") {
+        Some("speed") => {
+            crate::breeding::set_speed(cmd.int("count").unwrap_or(1).max(1) as u32);
+            let line = format!("animals live {} times faster", crate::breeding::speed());
+            cmd.reply("command.animals.line", &[Arg::Text(&line)]);
+            return;
+        }
+        Some("census") => {
+            for line in census(&w, player, cmd.int("count").unwrap_or(256).clamp(8, 4096) as f64) {
+                weft_sdk::info!("census: {line}");
+                cmd.reply("command.animals.line", &[Arg::Text(&line)]);
+            }
+            return;
+        }
+        // Every animal round the player as if `count` days had passed while its area was away
+        // (testing `animal::catch_up`; the world's clock itself can't be turned on).
+        Some("away") => {
+            let days = cmd.int("count").unwrap_or(30).clamp(1, 10_000) as u64;
+            let Some(p) = w.entity(player) else { return };
+            let mut n = 0;
+            for id in w.near(p.pos, 256.0, None) {
+                if let Some(a) = w.component_mut(id, &ANIMAL).filter(|a| a.seen != 0) {
+                    a.seen = a.seen.saturating_sub(days * animals_core::life::DAY).max(1);
+                    a.born = a.born.saturating_sub(days * animals_core::life::DAY).max(1);
+                    n += 1;
+                }
+            }
+            let line = format!("{n} animals: {days} days passed while away");
+            cmd.reply("command.animals.line", &[Arg::Text(&line)]);
+            return;
+        }
+        Some("reset") => {
+            for c in crate::breeding::BORN
+                .iter()
+                .chain(&crate::breeding::OLD)
+                .chain(&crate::breeding::DIED)
+            {
+                c.store(0, std::sync::atomic::Ordering::Relaxed);
+            }
+            cmd.reply("command.animals.line", &[Arg::Text("census counts reset")]);
+            return;
+        }
+        _ => {}
+    }
     let Some(id) = looked_at(&w, player, 16.0).or_else(|| nearest(&w, player, 12.0)) else {
         cmd.reply("command.animals.none", &[]);
         return;
@@ -484,6 +536,13 @@ fn command(cmd: &mut ServerCommand) {
         "nest" => {
             crate::eggs::nest_now(&w, player);
         }
+        // Older by `count` in-game days (testing old age: `animal::old_age`).
+        "age" => {
+            let days = cmd.int("count").unwrap_or(10).clamp(0, 100_000) as u64;
+            if let Some(a) = w.component_mut(id, &ANIMAL) {
+                a.born = a.born.saturating_sub(days * animals_core::life::DAY).max(1);
+            }
+        }
         // A scar of each kind (testing scars: `scars.rs`).
         "scar" => {
             if let Some(g) = w.component_mut(id, &crate::coats::GENOME) {
@@ -509,4 +568,51 @@ fn command(cmd: &mut ServerCommand) {
             open(&w, player, id);
         }
     }
+}
+
+/// Every species' animals within `radius` of `player`, a line each: how many and at what age,
+/// expecting and in love, their mean strength, and since the counts were reset how many were
+/// born and died (of old age, or otherwise).
+fn census(w: &World, player: u64, radius: f64) -> Vec<String> {
+    use std::sync::atomic::Ordering::Relaxed;
+    let Some(p) = w.entity(player) else { return Vec::new() };
+    let mut lines = Vec::new();
+    let near = w.near(p.pos, radius, None);
+    for (i, s) in species::SPECIES.iter().enumerate() {
+        let mut n = [0u32; 5];
+        let (mut expecting, mut love, mut vigor, mut tame) = (0, 0, 0.0, 0);
+        for &id in &near {
+            let Some(a) = w
+                .component(id, &ANIMAL)
+                .filter(|a| a.species as usize == i + 1)
+            else {
+                continue;
+            };
+            n[(a.stage as usize).min(4)] += 1;
+            vigor += if a.vigor == 0 { 100.0 } else { a.vigor as f32 };
+            if let Some(b) = w.component(id, &crate::breeding::BREEDING) {
+                expecting += (b.carrying > 0) as u32;
+                love += (b.love > 0) as u32;
+            }
+            tame += animal::tamed(w, id) as u32;
+        }
+        let total: u32 = n.iter().sum();
+        let (born, old, died) =
+            (crate::breeding::BORN[i].load(Relaxed), crate::breeding::OLD[i].load(Relaxed), crate::breeding::DIED[i].load(Relaxed));
+        if total == 0 && born + old + died == 0 {
+            continue;
+        }
+        lines.push(format!(
+            "{}: {total} ({} young, {} grown, {} old; {tame} tame) - {expecting} expecting, {love} in love, strength {:.0}% - born {born}, died {old} of age + {died} otherwise",
+            s.breed.unwrap_or(s.name),
+            n[0] + n[1] + n[2],
+            n[3],
+            n[4],
+            if total > 0 { vigor / total as f32 } else { 0.0 },
+        ));
+    }
+    if lines.is_empty() {
+        lines.push("no animals near".into());
+    }
+    lines
 }

@@ -599,6 +599,8 @@ pub struct Look {
     scale: f32,
     /// Its scars: kind and place (`Genome::scars`).
     scars: [[u8; 2]; 4],
+    /// Old: a greying muzzle, the coat a little faded.
+    elder: bool,
     seed: u32,
 }
 
@@ -1127,6 +1129,7 @@ fn core(r: &Read, look: &mut Look) {
         let i = (e.floor() as usize).min(g.eyes.len() - 1);
         look.eye = Some(mix(g.eyes[i], g.eyes[(i + 1).min(g.eyes.len() - 1)], e - i as f32));
     }
+    look.elder = r.genome.stage >= crate::species::ELDER;
     let youth = r.youth();
     if let Some(kind) = g.young.pattern.as_deref()
         && youth > 0.0
@@ -1806,6 +1809,13 @@ fn render(l: &Layers, rgba: &mut [u8], width: usize, height: usize, look: &Look)
             }
             if let Some(mk) = look.mask {
                 c = mix(c, mk, 0.9 * tones3(mask));
+            }
+            if look.elder {
+                // Grey hairs on the muzzle, and the whole coat a little faded.
+                let grey = (c[0] + c[1] + c[2]) / 3.0;
+                c = mix(c, [grey, grey, grey], 0.2);
+                let hair = if hash3(x as i32, y as i32, 3, s + 61) > 0.45 { 1.0 } else { 0.4 };
+                c = mix(c, [214.0, 210.0, 204.0], 0.6 * hair * tones3(mask));
             }
             if let Some((color, amount)) = look.ext {
                 c = mix(c, color, tones3(smooth(ext * amount, 0.25, 0.9)));
