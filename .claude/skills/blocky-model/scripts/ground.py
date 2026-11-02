@@ -126,3 +126,71 @@ def joints(spec, tol=0.25, skip=("root",)):
         if par and not any(_inside(p, e, tol) for e in boxes[par]):
             bad.append((n, f"its pivot is outside its parent's ({par}) boxes"))
     return bad
+
+
+def _frames(spec):
+    """(label, pose) for the rest pose and every keyframe of every animation in the spec."""
+    out = [("rest pose", {})]
+    for name, a in spec.get("animations", {}).items():
+        for fr in a["frames"]:
+            out.append((f"{name}@{fr['t']}", dict(fr["rot"], root=fr.get("root", (0, 0, 0)))))
+    return out
+
+
+def _frame_of(e, W, piv):
+    """(R, t, o, lo, hi): world = R @ (box point - o) + t for the element's own unrotated box."""
+    R, t = W[e["bone"]]
+    E = rot(*e["rot"]) if e.get("rot") else np.eye(3)
+    o = np.array(e["origin"], float) if e.get("rot") else piv[e["bone"]]
+    # world = R @ (E @ (q - o) + o - pivot) + t
+    return R @ E, t + R @ (o - piv[e["bone"]]), o, np.array(e["lo"], float), np.array(e["hi"], float)
+
+
+def pokes(spec, parts=None, max_out=1.5, min_angle=5.0, tol=0.05):
+    """Tilted boxes poking through their neighbors: where two parts meet at a joint at an angle
+    (a neck rising into a level head, a tail segment swung against the one before, a thigh against
+    the hips), a corner of one sticking just out of the other (more than `tol`, less than
+    `max_out` units) cuts a sliver and slanted edges across the other's faces: it looks broken.
+    Parts that meet square-on (a jaw under a skull) make a clean step instead, and parts that really
+    extend beyond the other (a thigh beside the hips) stick out further; neither is reported. At rest
+    and in every keyframe. `parts`: element names or name prefixes to check among (the body's axis:
+    neck, head, chest, hips, tail; build scripts assert it's empty for these); None checks every
+    joined pair, where limb joints (knee, ankle, toes) and an opening jaw also show, as the usual
+    box-joint step. Returns {(poking element, element poked): (worst distance, [frames])}."""
+    keep = (lambda n: True) if parts is None else (lambda n: any(n == p or n.startswith(p) for p in parts))
+    piv = {b["name"]: np.array(b["pivot"], float) for b in spec["bones"]}
+    parent = {b["name"]: b.get("parent") for b in spec["bones"]}
+    boxes = [e for e in spec["elements"] if not e.get("quad") and keep(e["name"])]
+    pairs = [(a, b) for a in boxes for b in boxes
+             if a is not b and (parent.get(a["bone"]) == b["bone"] or parent.get(b["bone"]) == a["bone"])]
+    found = {}
+    for label, pose in _frames(spec):
+        W = world(spec["bones"], pose)
+        F = {id(e): _frame_of(e, W, piv) for e in boxes}
+        for a, b in pairs:
+            Ra, ta, oa, loa, hia = F[id(a)]
+            Rb, tb, ob, lob, hib = F[id(b)]
+            cos = (np.trace(Ra.T @ Rb) - 1) / 2
+            if np.degrees(np.arccos(np.clip(cos, -1, 1))) < min_angle:
+                continue
+            ca = np.array([[x, y, z] for x in (loa[0], hia[0]) for y in (loa[1], hia[1]) for z in (loa[2], hia[2])])
+            wa = (ca - oa) @ Ra.T + ta
+            qb = (wa - tb) @ Rb + ob  # into b's own unrotated box frame
+            out = np.max(np.maximum(lob - qb, qb - hib), axis=1)
+            if not np.any(out <= tol):  # no corner inside: they only touch, or one passes by
+                continue
+            worst = out[(out > tol) & (out < max_out)]
+            if len(worst):
+                key = (a["name"], b["name"])
+                d, where = found.get(key, (0.0, []))
+                found[key] = (max(d, float(worst.max())), where + [label])
+    return found
+
+
+if __name__ == "__main__":
+    import json
+    import sys
+
+    spec = json.load(open(sys.argv[1]))
+    for (a, b), (d, where) in sorted(pokes(spec, sys.argv[2:] or None).items()):
+        print(f"{a} pokes out of {b} by {d:.2f} in {len(where)} frames, e.g. {', '.join(where[:3])}")

@@ -122,14 +122,16 @@ def occlusion(p, n, du, dv, boxes, own=None):
 
 
 def paint_face_smooth(areas, tone_sets, face, coat=(), y_world=None, occ=None, quad=False, seed=0,
-                      tuft=True, occ_strength=2.2, down=None, merge=True):
+                      tuft=True, occ_strength=2.2, down=None, merge=True, out=None):
     """Paint one face the smooth way. `areas`: (h, w) ints into `tone_sets` (one `tones()` array
     per material). `coat`: material ids that are fur (simplified into big shapes, tufted and
     blended at their edges, streaked); others (eyes, nose, inner ear) stay crisp. `occ`: from
     `occlusion()`. `down`: (h, w) 0..1 from the top of the whole part, for boxes stacked into one
     part (an ear, a wing): it replaces each box's own top-to-bottom light and drops its edge
     highlights, so the stack is lit as one piece. `merge=False` keeps thin coat areas (stripes)
-    instead of merging them into big shapes. Returns (h, w, 3)."""
+    instead of merging them into big shapes. `out`: a dict that gets each texel's material weights
+    (`weights`, (n, h, w), summing to 1) and light level (`level`, index into the ramps), for
+    `layers.py` (coats painted on the fly). Returns (h, w, 3)."""
     h, w = areas.shape
     n = len(tone_sets)
     coat = list(coat)
@@ -165,10 +167,15 @@ def paint_face_smooth(areas, tone_sets, face, coat=(), y_world=None, occ=None, q
     crisp = ~np.isin(areas, coat)
     col = np.zeros((h, w, 3))
     total = np.zeros((h, w))
+    weights = []
     for m in range(n):
         wm = np.where(crisp, (areas == m).astype(float), blur[m] * (m in coat))
         col += wm[..., None] * tone_sets[m][ki]
         total += wm
+        weights.append(wm)
+    if out is not None:
+        out["weights"] = np.stack(weights) / np.maximum(total, 1e-6)
+        out["level"] = ki
     return col / np.maximum(total, 1e-6)[..., None]
 
 

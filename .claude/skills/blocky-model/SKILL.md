@@ -46,6 +46,16 @@ Geometry
   child's pivot at that end, inside the child. `ground.joints(spec)` lists every loose joint;
   build scripts assert none. (Hinges on a surface, like a tongue folding over a lip, still need
   the pivot within a quarter unit of both parts.)
+- **Nothing pokes through along the body's axis**: a part that meets its neighbor at an angle (a
+  neck rising into a level head, a neck into the chest, a tail segment into the one before) has
+  its end hidden inside the neighbor in every pose. A corner left just outside (a sliver up to
+  1.5 units) cuts slanted edges across the neighbor's faces, a lump that looks broken (both
+  raptors' necks did, through the back of the head). Make the entering part slimmer than the one
+  it enters and let it reach deep (a neck's end near the middle of the skull, not just past its
+  back face), so the head can turn and tilt. `ground.pokes(spec, ["neck", "skull", "chest",
+  "hips", "tail_"])` checks it at rest and in every keyframe; build scripts assert it's empty.
+  Without the list it also shows limb joints (knee, ankle, toes) and an opening jaw: there a
+  small step at the bend is the usual box joint and reads as one.
 
 Texture (paint it like an illustration; each face is a small pixel painting)
 - One light, from above and a bit front-left, baked in: tops lightest, sides mid, bottoms
@@ -245,7 +255,9 @@ Animation
          a blink frame closes the eyes completely
    - [ ] no part reads wrong side-on (stray flaps); thin parts solid, no gaps between layers;
          `ground.joints` empty: nothing comes apart at a joint (look at neck, shoulders, knees, tail
-         while the animations play)
+         while the animations play); `ground.pokes` empty along the axis: no neck corner through
+         the head or chest, no tail segment through the one before (look at the head from behind
+         and above while it turns)
    - [ ] colors: one coat hue across head, ears, body; no grey/dirty shading on light areas;
          no colors bleeding onto the wrong part
    - [ ] mouth: opens, no dark gaps at hinges, tongue bend hidden, tongue narrows
@@ -255,6 +267,24 @@ Animation
    - [ ] compare with a screenshot of the target game's own creature at the same angle
 8. **Save a version before each big change** (`<out>_vN/` with the scripts that built it and a
    README on restoring it): users often want to compare or revert.
+
+## Coats on the fly (genes, breeding, paint)
+
+A creature's look can vary per animal without repainting it: the painter records, per texel,
+whether it is coat or fixed (eyes, nose, teeth, claws), its light level, how far toward the
+underside it is, its position on the body, and where white spotting, points (tan points, a
+colorpoint's dark), a face mask and patterns show (`layers.py`: `paint_face_smooth(out=...)`, a
+`Recorder` per build, `layers/info|pos|props|props2.png` next to the texture). A gene file per
+species (loci, alleles in dominance order with wild frequencies, X-linked and codominant loci,
+quantitative traits) and `coats.js` (random animals, breeding with one allele from each parent,
+phenotype rules per species from real coat genetics, a renderer with 3D patterns and the same
+hue-shifted light ramps) paint any genotype on those layers; `coatdata.py` packs it for the
+viewer's coat panel (Natural, Random, Mother, Father, Breed, Paint). When a creature gets its
+layers: map each material to a role (`("coat", toward the underside 0..1, light shift)` or
+"fixed"), mark everything stamped after painting that isn't a darkening as fixed (the recorder
+does), and write its `layer_props` (where white starts: paws, chest, belly, muzzle; points;
+mask; extremities; where patterns show). A painted pattern (a tabby's stripes) maps to the
+plain coat: the genes draw patterns now.
 
 ## Scripts
 
@@ -269,11 +299,16 @@ Animation
   part), `fit` (grid search for pose parameters).
 - `scripts/ground.py` — `lowest(spec, pose, groups)`: each group's lowest world y in a pose;
   `joints(spec)`: joints whose pivot isn't inside both parts (parts that come apart);
+  `pokes(spec, parts)`: corners poking out of a neighbor at an angled joint, at rest and in every
+  keyframe (`python ground.py spec.json neck skull ...` prints them);
   `gait(spec, anim, feet)`: whether a walk or run moves forward (positive per foot).
 - `scripts/variants.py model.glb out.json name=tex.png ...` — texture variants padded to the
   GLB's texture size, as data URLs for the viewer.
+- `scripts/layers.py` — per-texel layers for coats painted on the fly (see above).
+- `scripts/coats.js` — genes (random, breed), phenotypes per species, the coat renderer.
+- `scripts/coatdata.py layers genes.json out.json` — a creature's layers and genes for the viewer.
 - `scripts/viewer.html` — the viewer page: a switcher between creatures (`animals.json`), a
-  button per animation and per texture variant (three.js r147).
+  button per animation and per texture variant, and the coat panel (three.js r147).
 - `scripts/bb_build.py <dir>` — builds `<dir>/spec.json` + `texture.png` in a running Blockbench
   as a Hytale Character and saves `<name>.blockymodel`, `anims/*.blockyanim`, `<name>.glb`,
   `<name>.bbmodel`.
@@ -300,7 +335,7 @@ Worked examples, in the chiacraft repo's `animals` mod (each README explains it)
   eyes on the sides, feather panels). Start birds and dinosaurs here.
 - `mods/animals/source/capybara`: a stocky grazer (no tail, side eyes, chewing, grazing fitted
   to the ground). Start heavy herbivores here.
-- `mods/animals/source/chihuahua`: built from a concept sheet (`tools/blocky.py`, colors read
+- `mods/animals/source/dog/chihuahua`: built from a concept sheet (`tools/blocky.py`, colors read
   from the flat turnaround), with eyelids, jaw, tongue, solid ears, toes, a V bib.
 
 ## Sources

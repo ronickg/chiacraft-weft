@@ -6,6 +6,9 @@
                              "variant_label": "Eyes", "about": "one line"}]
        models/<x>.json     {"glb": "<base64 of the .glb>"}   (artifact hosts serve .json, not .glb)
        variants file       {"name": "data:image/png;base64,..."}   (scripts/variants.py; optional)
+       texture             optional: a PNG for the same model (another species that shares it)
+       coat file           models/<x>_coat.json (scripts/coatdata.py; optional): its layers and gene
+                           file, for the coat panel (coats.js: Random, Mother, Father, Breed, Paint)
      Set the heading and blurb below. -->
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
@@ -39,6 +42,15 @@ h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01
 .view canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; touch-action: none; }
 .status { position: absolute; inset: 0; display: grid; place-items: center; font: 13px var(--mono); color: var(--muted); }
 .about { padding: 10px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.coat-name { font: 600 15px var(--display); color: var(--fg); }
+.genotype { font: 12px var(--mono); color: var(--muted); padding: 0 14px 12px; overflow-wrap: anywhere; }
+.genotype:empty { display: none; }
+.paint { display: inline-flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font: 13px var(--mono); color: var(--muted); }
+.paint label { display: inline-flex; gap: 6px; align-items: center; }
+.paint input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+.paint select { font: 13px var(--mono); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.paint button { font: 500 13px var(--mono); color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+[hidden] { display: none !important; }
 </style>
 
 <div class="wrap">
@@ -51,15 +63,37 @@ h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01
     <div class="seg" id="variants" role="group" aria-label="Texture"></div>
     <label class="toggle"><input type="checkbox" id="spin" checked> Turntable</label>
   </div>
+  <div class="bar" id="coatbar" hidden>
+    <span class="label">Coat</span>
+    <div class="seg" id="coatbtns" role="group" aria-label="Coat">
+      <button type="button" id="c-natural">Natural</button><button type="button" id="c-random">Random</button><button type="button" id="c-mother">Mother</button><button type="button" id="c-father">Father</button><button type="button" id="c-breed">Breed</button>
+    </div>
+    <span class="coat-name" id="coatname"></span>
+    <span class="label" id="parents"></span>
+  </div>
+  <div class="bar" id="paintbar" hidden>
+    <span class="label">Paint</span>
+    <div class="paint">
+      <label>Coat <input type="color" id="p-base" value="#c27a3e"></label>
+      <label>Underside <input type="color" id="p-under" value="#f2e6d0"></label>
+      <label>Markings <input type="color" id="p-markings" value="#2c2626"></label>
+      <label>Points <input type="color" id="p-points" value="#d8a060"></label>
+      <label>Stencil <select id="p-stencil"><option value="">none</option><option value="stripes">stripes</option><option value="spots">spots</option><option value="patches">patches</option></select>
+        <input type="color" id="p-stencil-color" value="#e06aa0"></label>
+      <button type="button" id="p-clear">Wash off</button>
+    </div>
+  </div>
   <div class="card">
     <div class="view" id="view"><div class="status">Loading</div></div>
     <div class="about" id="about"></div>
+    <div class="genotype" id="genotype"></div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="coats.js"></script>
 <script>
 const el = document.getElementById("view"), spin = document.getElementById("spin");
 let status = el.querySelector(".status");
@@ -113,6 +147,11 @@ async function load(entry) {
   gltf.scene.traverse(o => { if (o.material && o.material.map) { o.material.map.magFilter = o.material.map.minFilter = THREE.NearestFilter; o.material.map.needsUpdate = true; } });
   const a = { model: gltf.scene, mixer: new THREE.AnimationMixer(gltf.scene), actions: {}, textures: {}, variantNames: [] };
   for (const clip of gltf.animations) a.actions[clip.name] = a.mixer.clipAction(clip);
+  if (entry.texture) {  // another species on the same model: its own texture
+    const t = await new Promise(done => new THREE.TextureLoader().load(entry.texture, done));
+    t.flipY = false; t.encoding = THREE.sRGBEncoding; t.magFilter = t.minFilter = THREE.NearestFilter;
+    setMap(a, t);
+  }
   if (entry.variants) {
     const urls = await (await fetch(entry.variants)).json();
     a.variantNames = Object.keys(urls);
@@ -121,7 +160,101 @@ async function load(entry) {
       t.flipY = false; t.encoding = THREE.sRGBEncoding; t.magFilter = t.minFilter = THREE.NearestFilter; a.textures[n] = t; done();
     }))));
   }
+  if (entry.coat) a.coat = await loadCoat(entry.coat, a);
   return (loaded[entry.name] = a);
+}
+
+// ---------------------------------------------------------------- coats (genes, breeding, paint)
+
+const coatRng = Coats.rng(Date.now() & 0xffffffff);
+function pixels(img, w, h) {
+  const c = document.createElement("canvas"); c.width = w || img.width; c.height = h || img.height;
+  const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+  return x.getImageData(0, 0, c.width, c.height).data;
+}
+const loadImage = url => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = url; });
+async function loadCoat(url, a) {
+  const d = await (await fetch(url)).json();
+  const imgs = {};
+  for (const n of ["info", "pos", "props", "props2"]) imgs[n] = await loadImage(d.layers[n]);
+  const w = imgs.info.width, h = imgs.info.height;
+  let map = null;
+  a.model.traverse(o => { if (!map && o.material && o.material.map) map = o.material.map; });
+  const img = map.image, stride = img.width, mapH = img.height;
+  const canvas = document.createElement("canvas"); canvas.width = stride; canvas.height = mapH;
+  const coat = { genes: d.genes, breed: d.breed || null, original: map, canvas, ctx: canvas.getContext("2d"), stride, mapH,
+    base: pixels(img), layers: { w, h, bounds: d.bounds }, current: null, mother: null, father: null, paint: {} };
+  for (const n in imgs) coat.layers[n] = pixels(imgs[n]);
+  return coat;
+}
+function setMap(a, tex) {
+  a.model.traverse(o => { if (o.material && o.material.map) { o.material.map = tex; o.material.needsUpdate = true; } });
+}
+const sexMark = s => s === "female" ? "\u2640" : "\u2642";
+function describe(c, an) { return an ? `${Coats.phenotype(c.genes, an).name} ${sexMark(an.sex)}` : ""; }
+function paintCoat(a) {
+  const c = a.coat;
+  if (!c.current) { setMap(a, c.original); return; }
+  const look = Coats.phenotype(c.genes, c.current);
+  const px = Coats.render(c.layers, c.base, c.stride, look, c.paint);
+  c.ctx.putImageData(new ImageData(px, c.stride, c.mapH), 0, 0);
+  if (!c.tex) {
+    c.tex = new THREE.CanvasTexture(c.canvas);
+    c.tex.flipY = false; c.tex.encoding = THREE.sRGBEncoding; c.tex.magFilter = c.tex.minFilter = THREE.NearestFilter;
+  }
+  c.tex.needsUpdate = true;
+  setMap(a, c.tex);
+}
+function showCoat() {
+  const a = current, c = a && a.coat;
+  document.getElementById("coatbar").hidden = !c;
+  document.getElementById("paintbar").hidden = !c;
+  if (!c) { document.getElementById("genotype").textContent = ""; return; }
+  const painted = Object.keys(c.paint).length > 0;
+  document.getElementById("coatname").textContent = c.current
+    ? `${describe(c, c.current)}${c.current.baby ? " (baby)" : ""}${painted ? ", painted" : ""}` : "Natural (the painted model)";
+  document.getElementById("parents").textContent = [c.mother && `mother: ${describe(c, c.mother)}`, c.father && `father: ${describe(c, c.father)}`].filter(Boolean).join(" · ");
+  document.getElementById("genotype").textContent = c.current ? Coats.genotype(c.genes, c.current) : "";
+}
+function onCoat(fn) {
+  const a = current; if (!a || !a.coat) return;
+  fn(a.coat); paintCoat(a); showCoat();
+}
+document.getElementById("c-natural").onclick = () => onCoat(c => { c.current = null; c.paint = {}; });
+document.getElementById("c-random").onclick = () => onCoat(c => { c.current = Coats.random(c.genes, coatRng, null, c.breed); });
+document.getElementById("c-mother").onclick = () => onCoat(c => {
+  if (c.current && c.current.sex === "female") c.mother = c.current;
+  else setStatusBrief(c.current ? "That one is a male" : "Roll or breed an animal first");
+});
+document.getElementById("c-father").onclick = () => onCoat(c => {
+  if (c.current && c.current.sex === "male") c.father = c.current;
+  else setStatusBrief(c.current ? "That one is a female" : "Roll or breed an animal first");
+});
+document.getElementById("c-breed").onclick = () => onCoat(c => {
+  if (!c.mother || !c.father) { setStatusBrief("Pick a mother and a father first"); return; }
+  c.current = Object.assign(Coats.breed(c.genes, c.mother, c.father, coatRng), { baby: true });
+});
+const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+for (const k of ["base", "under", "markings", "points"]) {
+  document.getElementById("p-" + k).oninput = e => onCoat(c => {
+    if (!c.current) c.current = Coats.random(c.genes, coatRng, null, c.breed);
+    c.paint[k] = hexRgb(e.target.value);
+  });
+}
+const stencil = () => onCoat(c => {
+  if (!c.current) c.current = Coats.random(c.genes, coatRng, null, c.breed);
+  const kind = document.getElementById("p-stencil").value;
+  if (kind) c.paint.stencil = { kind, color: hexRgb(document.getElementById("p-stencil-color").value) };
+  else delete c.paint.stencil;
+});
+document.getElementById("p-stencil").onchange = stencil;
+document.getElementById("p-stencil-color").oninput = stencil;
+document.getElementById("p-clear").onclick = () => onCoat(c => { c.paint = {}; document.getElementById("p-stencil").value = ""; });
+let briefTimer = 0;
+function setStatusBrief(text) {
+  const n = document.getElementById("parents"), was = n.textContent;
+  n.textContent = text; clearTimeout(briefTimer);
+  briefTimer = setTimeout(showCoat, 1600);
 }
 async function show(entry) {
   setStatus("Loading " + entry.name);
@@ -140,9 +273,11 @@ async function show(entry) {
   buttons(document.getElementById("variants"), a.variantNames, n => {
     a.model.traverse(o => { if (o.material && o.material.map) { o.material.map = a.textures[n]; o.material.needsUpdate = true; } });
   }, (n, i) => `${i + 1} ${n}`);
+  showCoat();
 }
 fetch("animals.json").then(r => r.json()).then(list => {
-  buttons(document.getElementById("animals"), list.map(e => e.name), n => show(list.find(e => e.name === n)));
+  buttons(document.getElementById("animals"), list.map(e => e.name), n => show(list.find(e => e.name === n)),
+    n => { const e = list.find(x => x.name === n); return e.species ? `${n} (${e.species})` : n; });
   show(list[0]);
 }).catch(err => setStatus("animals.json did not load: " + err));
 new ResizeObserver(() => {
