@@ -229,6 +229,7 @@ pub static HOST: Host = Host {
     reg_entity_skin,
     entity_kind_size,
     set_entity_scale,
+    entity_fly,
     structure_block,
     set_structure_block,
     lift_blocks,
@@ -691,6 +692,16 @@ unsafe extern "C" fn entity_walk(w: *mut abi::WorldCtx, id: u64, dir: *const [f3
         if let Some(e) = d.entities.get_mut(id) {
             e.walk = Some((*dir, speed * mul, jump != 0));
             e.jump_mul = jump_mul;
+        }
+    }
+}
+
+unsafe extern "C" fn entity_fly(w: *mut abi::WorldCtx, id: u64, dir: *const [f32; 3], speed: f32) {
+    unsafe {
+        let d = dim(w);
+        let mul = d.attribute(content(), id, crate::server::MOVEMENT_SPEED, false) as f32;
+        if let Some(e) = d.entities.get_mut(id) {
+            e.fly = Some((*dir, speed * mul));
         }
     }
 }

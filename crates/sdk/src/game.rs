@@ -163,6 +163,13 @@ impl World {
     pub fn walk(&self, id: u64, dir: [f32; 2], speed: f32, jump: bool) {
         unsafe { (host().entity_walk)(self.raw(), id, &dir, speed, jump as u32) }
     }
+    /// Flies `id` this tick toward `dir` (any direction, up and down too) at `speed` times its
+    /// kind's speed: no gravity or fall damage while asked, turning and speeding up over about a
+    /// second like a bird, blocks still in the way. Ask every tick it should keep flying; left
+    /// alone it falls (ask with a down-and-forward `dir` to glide).
+    pub fn fly(&self, id: u64, dir: [f32; 3], speed: f32) {
+        unsafe { (host().entity_fly)(self.raw(), id, &dir, speed) }
+    }
     /// The block `id` looks at within `max` blocks (liquids count if `liquids`): position, face
     /// hit (-X, +X, -Y, +Y, -Z, +Z) and state.
     pub fn look_at(&self, id: u64, max: f64, liquids: bool) -> Option<LookAt> {

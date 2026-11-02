@@ -863,7 +863,7 @@ impl EntityRenderer {
             // Vanilla's limb swing: 0.6662 rad per tick of limbSwing, which grows 4 per block;
             // models with their own walk animation use that instead.
             let mut swing = (e.walk * 2.66).sin() * 1.2 * e.swing;
-            let (mut anims, mut anim_count) = ([(0, 0.0, 0.0); 2], 0);
+            let (mut anims, mut anim_count) = ([(0, 0.0, 0.0); crate::client::models::MAX_ANIMS], 0);
             let mut add = |a| {
                 anims[anim_count] = a;
                 anim_count += 1;
@@ -879,8 +879,18 @@ impl EntityRenderer {
                             add((i, m.anims[i].at(e.age, true), 1.0));
                         }
                         if let Some(i) = m.walk {
-                            // Smaller steps, quicker: a small one's legs go round faster.
-                            add((i, m.anims[i].at(e.walk * 0.6 / e.scale, true), e.swing.min(1.0)));
+                            // Smaller steps, quicker: a small one's legs go round faster. Both
+                            // gaits are timed by the distance moved, so their feet keep pace.
+                            let at = e.walk * 0.6 / e.scale;
+                            let moving = e.swing.min(1.0);
+                            // Running takes over between 3 and 4.5 blocks a second (`swing` is
+                            // the speed over 5, eased).
+                            let fast = ((e.swing - 0.6) / 0.3).clamp(0.0, 1.0);
+                            let run = if m.run.is_some() { fast } else { 0.0 };
+                            add((i, m.anims[i].at(at, true), moving * (1.0 - run)));
+                            if let Some(r) = m.run.filter(|_| run > 0.0) {
+                                add((r, m.anims[r].at(at, true), moving * run));
+                            }
                             swing = 0.0;
                         }
                     }

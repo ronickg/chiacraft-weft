@@ -390,7 +390,8 @@ general features worth offering upstream):
 1. **Riding**: mounts, passengers, rider input and camera. The biggest piece.
 2. **One-off animations over the pose**: bark, lick, mate, eat while sitting (see the earlier
    engine notes in `notes/HANDOFF.md`).
-3. **A run animation picked by speed**.
+3. **A run animation picked by speed** (done: a model's `run` takes over from `walk` between 3 and
+   4.5 blocks a second; both are written as offsets from the idle, which Weft plays under them).
 4. **A scale per kind**: babies grow smoothly instead of a model file per size.
 5. Projectiles for tranquilizer darts (if Weft's aren't enough).
 

@@ -36,7 +36,8 @@ import shutil
 import numpy as np
 
 # Pose files the engine picks by kind: suffix -> {animation name in the file: name in the spec}.
-# Weft plays `idle` (holding the pose) and `walk` by itself; others play when code asks for them.
+# Weft plays `idle` (holding the pose), `walk` and `run` (by speed) by itself; others play when
+# code asks for them.
 POSE_FILES = {"": {"idle": "idle", "walk": "walk", "run": "run", "lick": "lick"},
               "_sit": {"idle": "sit", "walk": "walk"},
               "_lie": {"idle": "lie", "walk": "walk"}}
@@ -121,7 +122,8 @@ def geometry(spec, ident, scale, head_scale=1.0, head="head"):
 
 
 def animation(spec_anim, scale):
-    """One animation: rotation keys per bone (all-zero bones left out), the root's position."""
+    """One animation: rotation keys per bone (all-zero bones left out), scale keys for the bones a
+    frame sizes, the root's position."""
     frames = spec_anim["frames"]
     bones = {}
     names = sorted({b for f in frames for b in f["rot"]})
@@ -129,10 +131,33 @@ def animation(spec_anim, scale):
         keys = {f"{f['t']:g}": r4(f["rot"][b]) for f in frames}
         if any(any(abs(x) > 1e-6 for x in v) for v in keys.values()):
             bones[b] = {"rotation": keys}
+    for b in sorted({b for f in frames for b in f.get("scale", {})}):  # a part drawn in (a folded wing's skin)
+        bones.setdefault(b, {})["scale"] = {f"{f['t']:g}": r4(f.get("scale", {}).get(b, [1, 1, 1])) for f in frames}
     root = {f"{f['t']:g}": r4(np.array([-f["root"][0], f["root"][1], -f["root"][2]]) * scale) for f in frames}
     if any(any(abs(x) > 1e-6 for x in v) for v in root.values()):
         bones.setdefault("root", {})["position"] = root
     return {"loop": True, "animation_length": spec_anim["length"], "bones": bones}
+
+
+# Weft (like Bedrock) adds a walk or run on top of the idle it plays all along, so in each pose file
+# these are written as offsets from the file's idle (its first frame): full poses added to a held
+# pose (a crouch, folded wings) would count it twice.
+LAYERED = ("walk", "run")
+
+
+def offset_from(spec_anim, base):
+    """The animation as offsets from the pose `base` (a frame): rotations and the root's position
+    less the base's, scales over the base's (kept where they differ from it)."""
+    frames = []
+    for f in spec_anim["frames"]:
+        rot = {b: (np.array(f["rot"].get(b, [0, 0, 0])) - np.array(base["rot"].get(b, [0, 0, 0]))).tolist()
+               for b in set(f["rot"]) | set(base["rot"])}
+        g = {"t": f["t"], "rot": rot, "root": (np.array(f["root"]) - np.array(base["root"])).tolist()}
+        fs, bs = f.get("scale", {}), base.get("scale", {})
+        sc = {b: (np.array(fs.get(b, [1, 1, 1])) / np.array(bs.get(b, [1, 1, 1]))).tolist() for b in set(fs) | set(bs)}
+        g["scale"] = {b: v for b, v in sc.items() if any(abs(x - 1) > 1e-6 for x in v)}
+        frames.append(g)
+    return {**spec_anim, "frames": frames}
 
 
 def write(path, value):
@@ -149,7 +174,9 @@ def export(spec, texture, out, name, scale, tex_name, pup=None, pup_head=1.3, po
     for model, s, hs in variants:
         write(os.path.join(out, "models", f"{model}.geo.json"), geometry(spec, f"geometry.{model}", s, hs))
         for suffix, names in pose_files.items():
-            anims = {f"animation.{model}{suffix}.{k}": animation(spec["animations"][v], s)
+            idle = spec["animations"].get(names.get("idle"))
+            anims = {f"animation.{model}{suffix}.{k}":
+                     animation(offset_from(spec["animations"][v], idle["frames"][0]) if k in LAYERED and idle else spec["animations"][v], s)
                      for k, v in names.items() if v in spec["animations"]}
             write(os.path.join(out, "animations", f"{model}{suffix}.animation.json"),
                   {"format_version": "1.8.0", "animations": anims})

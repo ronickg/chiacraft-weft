@@ -2205,6 +2205,11 @@ pub struct Host {
     /// Draws an entity `scale` times as big as its kind (or its own `set_entity_size` box), its
     /// box and eyes scaled alike: individuals of one kind that differ in size. 1 is its own size.
     pub set_entity_scale: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, scale: f32),
+    /// Flies `entity` this tick toward `dir` (any direction; its length doesn't matter) at `speed`
+    /// times its kind's speed (and movement speed attribute): no gravity and no fall damage while
+    /// asked, its velocity turning toward that over about a second like a bird's, blocks still in
+    /// the way. Ask every tick it should keep flying; left alone, it falls.
+    pub entity_fly: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, dir: *const [f32; 3], speed: f32),
     /// Writes a kind's box (width, height, eye height); 0 if there is no such kind.
     pub entity_kind_size: unsafe extern "C" fn(kind: Str, out: *mut [f32; 3]) -> u32,
     /// A block of moving structure `entity` (its own coordinates); `u32::MAX` if it is none.

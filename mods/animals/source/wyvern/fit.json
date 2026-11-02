@@ -1,0 +1,37 @@
+{
+ "drop": 57.26,
+ "wing": {
+  "arm_L": [
+   -12.78,
+   10.42,
+   -42.35
+  ],
+  "forearm_L": [
+   -19.33,
+   -29.02,
+   -36.46
+  ],
+  "hand_L": [
+   46.01,
+   -139.62,
+   22.21
+  ],
+  "finger0_L": [
+   -8.24,
+   9.96,
+   44.32
+  ],
+  "finger1_L": [
+   44.01,
+   -22.64,
+   35.56
+  ],
+  "finger2_L": [
+   37.56,
+   -58.08,
+   32.89
+  ]
+ },
+ "wing_cost": 534.05,
+ "note": "wing: the cape fold (the lower-cost fit flares the membranes out sideways)"
+}

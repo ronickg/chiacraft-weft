@@ -190,6 +190,14 @@ Animation
   foot, in walk and run; build scripts assert it. Short legs need a clear lift (a big knee
   bend, a small swing) and fine keyframes (20-24 a cycle), or the foot only shuffles and the
   check can't tell forward from back.
+- **Feet that don't slide** (big creatures, where sliding shows): give each foot a path (on the
+  ground moving back at the ground speed, then lifted and swung forward) and solve the limb's
+  angles to it every frame (least squares on the model's bones, warm-started from the last frame,
+  with terms keeping heels, toe tips and wrists above the ground); the wyvern's `solve_gait`.
+  Weft plays a walk 0.6 clip seconds per block walked, so a planted foot moves back DENSITY / 0.6
+  units per clip second, and a gait's clip length is its stride over that. A `run` takes over from
+  the walk by speed; both are exported as offsets from the idle (`to_bedrock.LAYERED`), which the
+  engine keeps playing under them.
 - **Grazing, drinking, sniffing the ground**: fit the neck and head angles that bring the mouth
   to the ground (about half a unit up) with forward kinematics, like the resting poses; then
   blend into it inside the idle (look about, head down, chew, head up) so the engine plays it
@@ -214,6 +222,11 @@ Animation
   keys with fine sampling (~0.05 s): jaw opens, tongue out level, tip curls up over the nose
   (-X), sweeps side to side (Y), folds back under the upper jaw (tip 180°) to hide; squint the
   eyes (lids closed) at the peak. Hide parts by folding them inside other boxes, not by scale.
+- **Skin that contracts** (a bat or dragon wing's inner membrane, between the arm and the body)
+  is the one part that scales: folded, it is too big to tuck anywhere (hanging down it cuts
+  through the thighs, folded in it pokes out under the belly), so in resting poses its bone
+  scales to a sliver toward a pivot inside the body (`"scale": {bone: (x, y, z)}` in a frame;
+  Bedrock and Blockbench play scale keys) and it opens to full size in flight.
 - **Animation set** for a creature: idle, walk, run, sit, lie as a base; then cheap, charming
   extras that reuse the same bones: blink, lick, head tilt, sniff, shake off, scratch, play bow,
   sleep, eat. Offer the list and let the user pick.

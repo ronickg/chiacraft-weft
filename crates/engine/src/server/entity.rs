@@ -29,6 +29,9 @@ pub struct Entity {
     pub attack_cooldown: u32,
     /// AI steering requested this tick: direction, speed factor, jump.
     pub walk: Option<([f32; 2], f32, bool)>,
+    /// Flight requested this tick (`Host::entity_fly`): direction (any, unnormalized), speed
+    /// factor. No gravity while it lasts.
+    pub fly: Option<([f32; 3], f32)>,
     /// Jump strength attribute when its walk was set (1 = vanilla's).
     pub jump_mul: f32,
     pub removed: bool,
@@ -112,6 +115,7 @@ impl Entity {
             hurt_cooldown: 0,
             attack_cooldown: 0,
             walk: None,
+            fly: None,
             jump_mul: 1.0,
             removed: false,
             item: ItemStack::EMPTY,
@@ -598,6 +602,16 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl Fn(IVec3) ->
     // The step players take, in blocks per tick: a mob walks at its target speed on plain
     // ground, faster on ice, slower in lava, and climbs ladders it walks into.
     let mut ctl = physics::Control { swim: k.is(ef::SWIMS), ..Default::default() };
+    // Flying, steered like a bird: its velocity turns toward `dir` at the asked speed over about
+    // a second, without gravity; blocks still stop it.
+    let fly = e.fly.take();
+    if let Some((dir, speed)) = fly {
+        let d = DVec3::new(dir[0] as f64, dir[1] as f64, dir[2] as f64);
+        let d = if d.length_squared() > 1e-9 { d.normalize() } else { DVec3::ZERO };
+        let target = d * (k.speed as f64 * speed as f64);
+        e.vel += (target - e.vel) * 0.08;
+        e.walk = None;
+    }
     if let Some((dir, speed, jump)) = e.walk.take() {
         let target = k.speed as f64 * speed as f64 * DT;
         ctl.wish = DVec3::new(dir[0] as f64, 0.0, dir[1] as f64);
@@ -613,7 +627,7 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl Fn(IVec3) ->
         half_width: hw,
         height: h,
         step: if e.item.is_empty() { 0.6 } else { 0.0 },
-        gravity: if k.is(ef::NO_GRAVITY) { 0.0 } else { gravity * DT * DT },
+        gravity: if k.is(ef::NO_GRAVITY) || fly.is_some() { 0.0 } else { gravity * DT * DT },
     };
     let mut v = e.vel * DT;
     let r = physics::walk(c, block, bodies, e.id, &mut e.pos, &mut v, e.on_ground, &ctl, &frame);
@@ -629,7 +643,7 @@ pub fn step(c: &Content, e: &mut Entity, gravity: f64, block: &impl Fn(IVec3) ->
     let dy = e.pos.y - start.y;
     e.moved = ((e.pos.x - start.x).powi(2) + (e.pos.z - start.z).powi(2)).sqrt() as f32;
     let climbing = block(e.pos.floor().as_ivec3()).is_some_and(|s| c.states[s as usize].flags & weft_abi::block_flags::CLIMBABLE != 0);
-    if let Some(land) = track_fall(&mut e.fall, dy, e.on_ground, e.in_liquid || climbing) {
+    if let Some(land) = track_fall(&mut e.fall, dy, e.on_ground, e.in_liquid || climbing || fly.is_some()) {
         out.land = Some(land);
     }
     out

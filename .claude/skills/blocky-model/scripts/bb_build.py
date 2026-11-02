@@ -63,13 +63,16 @@ Project.texture_width = SPEC.texture[0];
 Project.texture_height = SPEC.texture[1];
 Canvas.updateAll();
 
-// Animations: rotation keyframes on every bone, position on the root.
+// Animations: rotation keyframes on every bone, scale on the bones a frame sizes, position on the root.
 for (const [name, a] of Object.entries(SPEC.animations)) {
   const anim = new Animation({ name, length: a.length, loop: "loop", snapping: 60 }).add();
   for (const fr of a.frames) {
     for (const [bone, r] of Object.entries(fr.rot)) {
       if (!groups[bone]) continue;
       anim.getBoneAnimator(groups[bone]).addKeyframe({ channel: "rotation", time: fr.t, data_points: [{ x: r[0], y: r[1], z: r[2] }] });
+    }
+    for (const [bone, k] of Object.entries(fr.scale || {})) {
+      if (groups[bone]) anim.getBoneAnimator(groups[bone]).addKeyframe({ channel: "scale", time: fr.t, data_points: [{ x: k[0], y: k[1], z: k[2] }] });
     }
     anim.getBoneAnimator(groups.root).addKeyframe({ channel: "position", time: fr.t, data_points: [{ x: fr.root[0], y: fr.root[1], z: fr.root[2] }] });
   }

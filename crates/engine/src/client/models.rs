@@ -27,6 +27,8 @@ pub struct KindModel {
     pub anims: Vec<Bound>,
     pub idle: Option<usize>,
     pub walk: Option<usize>,
+    /// Played instead of `walk` when it moves fast.
+    pub run: Option<usize>,
     /// Texture size the model file was made for (it overrides the kind's).
     pub texture: Option<[u32; 2]>,
 }
@@ -49,8 +51,11 @@ impl KindModel {
 /// Layers one entity draws at most: its skin and what it wears.
 pub const MAX_LAYERS: usize = 8;
 
+/// Keyframe animations one entity plays at once: idle, walk and run.
+pub const MAX_ANIMS: usize = 3;
+
 /// One entity to pose this frame: kind, root transform, look pitch, limb swing, crouch, swim, up to
-/// two keyframe animations (index, time, weight) and its layers.
+/// `MAX_ANIMS` keyframe animations (index, time, weight) and its layers.
 #[derive(Clone, Copy)]
 pub struct Posed {
     pub kind: u32,
@@ -63,7 +68,7 @@ pub struct Posed {
     pub swim: Option<f32>,
     pub attack: f32,
     pub holding: bool,
-    pub anims: [(usize, f32, f32); 2],
+    pub anims: [(usize, f32, f32); MAX_ANIMS],
     pub anim_count: usize,
     pub layers: [Instance; MAX_LAYERS],
     pub layer_count: usize,
@@ -205,9 +210,9 @@ impl Models {
                 .clone();
             let anims: Vec<Bound> = anims.into_iter().map(|a| Bound::new(a, &parts)).collect();
             let find = |n: &str| anims.iter().position(|a| a.anim.name == n);
-            let (idle, walk) = (find("idle"), find("walk"));
+            let (idle, walk, run) = (find("idle"), find("walk"), find("run"));
             self.kinds
-                .push(KindModel { cuboids: cu, corners: co, parts, anims, idle, walk, texture });
+                .push(KindModel { cuboids: cu, corners: co, parts, anims, idle, walk, run, texture });
         }
         // Buffers may not be empty.
         cuboids.push(GpuCuboid::default());
@@ -292,22 +297,22 @@ impl Models {
             .with_min_len(64)
             .for_each_init(Vec::new, |scratch, (e, out)| {
                 let Some(m) = kinds.get(e.kind as usize) else { return };
-                let a = |i: usize| {
-                    e.anims[..e.anim_count]
-                        .get(i)
-                        .and_then(|&(a, t, w)| m.anims.get(a).map(|b| (b, t, w)))
-                };
-                let (single, both);
-                let anims: &[(&Bound, f32, f32)] = match (a(0), a(1)) {
-                    (Some(x), Some(y)) => {
-                        both = [x, y];
-                        &both
+                let found = e.anims[..e.anim_count]
+                    .iter()
+                    .filter_map(|&(a, t, w)| m.anims.get(a).map(|b| (b, t, w)));
+                let mut list = [None; MAX_ANIMS];
+                let mut n = 0;
+                for a in found {
+                    list[n] = Some(a);
+                    n += 1;
+                }
+                let filled;
+                let anims: &[(&Bound, f32, f32)] = match list[0] {
+                    Some(first) => {
+                        filled = list.map(|a| a.unwrap_or(first));
+                        &filled[..n]
                     }
-                    (Some(x), None) | (None, Some(x)) => {
-                        single = [x];
-                        &single
-                    }
-                    (None, None) => &[],
+                    None => &[],
                 };
                 model::pose(
                     &m.parts,
