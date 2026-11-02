@@ -7,7 +7,7 @@ from research alone. The recipe is [docs/creatures.md](../../../../docs/creature
 ## Rebuild
 
 ```
-../chihuahua/.venv/bin/python build.py      # any Python with ../chihuahua/requirements.txt
+../dog/chihuahua/.venv/bin/python build.py      # any Python with ../dog/chihuahua/requirements.txt
 ```
 
 `capybara.py` lays out, paints and animates it into `out/` (not committed) and fits its sit, lie

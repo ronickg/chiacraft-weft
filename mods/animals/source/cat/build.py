@@ -3,7 +3,7 @@
 files into the mod (`../../assets`): models/cat.geo.json, animations/cat[_sit|_lie].animation.json
 and textures/entity/cat/cat.png. Blockbench isn't needed for this.
 
-    ../chihuahua/.venv/bin/python build.py     (or any Python with requirements.txt installed)
+    ../dog/chihuahua/.venv/bin/python build.py     (or any Python with requirements.txt installed)
 
 Commit what it writes under `../../assets`.
 """

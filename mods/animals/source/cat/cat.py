@@ -3,7 +3,7 @@
 green eyes, made the way Hytale makes creatures (boxes and a few flat panels, a hand-painted
 texture) with the blocky-model skill. No concept sheet: its color areas are rules (see `area`).
 
-    ../chihuahua/.venv/bin/python cat.py      # writes out/spec.json, out/texture.png
+    ../dog/chihuahua/.venv/bin/python cat.py      # writes out/spec.json, out/texture.png
 
 Units are Blockbench's (1 texel each, 64 a block), y up, the cat faces +z.
 
@@ -24,6 +24,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
+from layers import Recorder, bounds as layer_bounds  # noqa: E402
 from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit, swing  # noqa: E402
 from ground import lowest  # noqa: E402
@@ -39,6 +40,7 @@ BASE = [(226, 138, 62), (240, 230, 214), (168, 78, 34), (228, 150, 150), (206, 1
 SHADOW = [0.02, 0.06, 0.0, 0.97, 0.97, 0.95]
 TONES = [tones(c, h) for c, h in zip(BASE, SHADOW)]
 FUR = (COAT, WHITE)  # stripes stay crisp: thin areas would be merged into the coat
+ROLES = [("coat", 0, 0), ("coat", 1, 0), ("coat", 0, 0), "fixed", "fixed", "fixed"]  # COAT WHITE STRIPE PINK NOSE DARK
 
 # Cat eyes: a green iris round a tall pupil, a catchlight up toward the light. Choose with
 # CAT_EYES=<name>; the others are there to compare in the viewer.
@@ -273,6 +275,47 @@ def cut_mask(e, p):
 EYE_DARK = (64, 34, 26)
 
 
+# ------------------------------------------------------------------ layers (coats painted on the fly)
+
+LAYERS = {"rec": None, "key": None}  # a layers.Recorder while build() paints, and the face's key
+
+
+def _ramp(v, a, b):
+    return np.clip((v - a) / (b - a), 0, 1)
+def layer_props(e, face, p, a):
+    """Where white, colorpoint and patterns show on a cat: white first where this tabby is white
+    (chest, belly, muzzle, paws), then up from below; colorpoint dark on ears, face, paws and
+    tail tip; tabby markings everywhere but the muzzle, paws and ears' insides."""
+    n, y = e["name"], p[..., 1]
+    lo, hi = e["lo"][1], e["hi"][1]
+    t = _ramp(y, lo, max(hi, lo + 1e-3))
+    low = 1 - t
+    if n.endswith("_paw"):
+        white = np.full(y.shape, 0.95)
+    elif n.startswith(("leg_", "thigh_")):
+        white = 0.45 + 0.4 * low
+    elif n in ("muzzle", "jaw", "nose"):
+        white = np.full(y.shape, 0.9)
+    elif n in ("chest", "hips", "neck"):
+        white = 0.75 * low + 0.2 * (face == "down") + 0.1 * (face == "south") * (n == "chest")
+    elif n.startswith("tail_"):
+        white = np.full(y.shape, 0.65 if n == "tail_3" else 0.2)
+    else:
+        white = 0.4 * low
+    white = np.maximum(white * 0.85, np.where(a == WHITE, 0.9, 0))
+    ext = np.zeros(y.shape)
+    if n.startswith(("ear_", "muzzle", "nose", "jaw")) or n.endswith("_paw"):
+        ext[:] = 1.0
+    elif n == "skull":
+        ext[:] = 0.75 if face == "south" else 0.35
+    elif n.startswith("leg_"):
+        ext = 0.5 + 0.4 * low
+    elif n.startswith("tail_"):
+        ext[:] = {"tail_0": 0.3, "tail_1": 0.55, "tail_2": 0.8}.get(n, 1.0)
+    pattern = np.full(y.shape, 0.2 if n in ("muzzle", "jaw", "nose") or n.endswith("_paw") else 1.0)
+    return {"white": white, "extremity": ext, "pattern": pattern}
+
+
 def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     if w == 0 or h == 0:
@@ -293,7 +336,8 @@ def paint_face(e, face, boxes):
     occ = None if e["quad"] else occlusion(p, R @ n, R @ du, R @ dv, boxes, own=e["name"])
     stacked = e["name"].startswith("ear_core")  # the ear's boxes, lit as one piece
     down = np.clip((41 - p[..., 1]) / 8, 0, 1) if stacked else None
-    col = paint_face_smooth(a, TONES, light_face, coat=FUR, y_world=p[..., 1], occ=occ, quad=bool(e["quad"]),
+    cap = {}
+    col = paint_face_smooth(a, TONES, light_face, out=cap, coat=FUR, y_world=p[..., 1], occ=occ, quad=bool(e["quad"]),
                             seed=sum(map(ord, e["name"] + face)) % 97, tuft=e["name"] not in ("skull",), down=down)
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["cut"] == "ear":
@@ -318,6 +362,9 @@ def paint_face(e, face, boxes):
     if e["name"].endswith("_paw") and face == "down":
         img[1, [0, 1, 3, 5, 6], :3] = (210, 130, 136)
         img[3:5, 2:5, :3] = (210, 130, 136)
+    if LAYERS["rec"] is not None:
+        LAYERS["rec"].face(LAYERS["key"], cap["weights"], cap["level"], ROLES, np.clip(np.round(col), 0, 255), img, p,
+                           layer_props(e, face, p, a))
     return img
 
 
@@ -549,13 +596,17 @@ def build():
     B = bones()
     E = elements()
     boxes = [(e["name"], np.array(e["lo"]), np.array(e["hi"])) for e in E if not e["quad"] and not e["rot"]]
+    LAYERS["rec"] = Recorder(layer_bounds(E, 3.0))
     tiles = []
     for i, e in enumerate(E):
         for f in ([e["quad"]] if e["quad"] else list(FACES)):
+            LAYERS["key"] = (i, f)
             img = paint_face(e, f, boxes)
             if img is not None:
                 tiles.append(((i, f), img))
     sheet, uv = pack(tiles, 512)
+    LAYERS["rec"].save(OUT, [k for k, _ in tiles], pack)
+    LAYERS["rec"] = None
     for i, e in enumerate(E):
         e["faces"] = {f: uv.get((i, f)) for f in ([e["quad"]] if e["quad"] else FACES)}
     spec = {"name": "cat", "texture": [sheet.shape[1], sheet.shape[0]],

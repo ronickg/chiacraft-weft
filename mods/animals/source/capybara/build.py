@@ -3,7 +3,7 @@
 files into the mod (`../../assets`): models/capybara.geo.json, animations/capybara[_sit|_lie].animation.json
 and textures/entity/capybara/capybara.png. Blockbench isn't needed for this.
 
-    ../chihuahua/.venv/bin/python build.py     (or any Python with requirements.txt installed)
+    ../dog/chihuahua/.venv/bin/python build.py     (or any Python with requirements.txt installed)
 
 Commit what it writes under `../../assets`.
 """

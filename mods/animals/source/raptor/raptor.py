@@ -4,7 +4,7 @@ feathers), made the way Hytale makes creatures (boxes and a few flat feather pan
 hand-painted texture) with the blocky-model skill. No concept sheet: its colors are rules
 (see `area`), its proportions come from the research in README.md.
 
-    ../chihuahua/.venv/bin/python raptor.py      # writes out/spec.json, out/texture.png
+    ../dog/chihuahua/.venv/bin/python raptor.py      # writes out/spec.json, out/texture.png
 
 Units are Blockbench's (1 texel each), y up, the raptor faces +z. A real Velociraptor is about
 50 cm at the hip and 1.8-2 m long, half of it tail; here the hip is about 29 units up after the
@@ -22,6 +22,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
+from layers import Recorder, bounds as layer_bounds  # noqa: E402
 from paint import EYES, pack, paint_face_smooth, occlusion, stamp_eyes, tones  # noqa: E402
 from rig import fit, swing  # noqa: E402
 from ground import lowest, world  # noqa: E402
@@ -37,7 +38,22 @@ BASE = [(150, 84, 48), (196, 150, 98), (228, 210, 174), (92, 50, 34), (214, 92, 
         (236, 232, 216), (70, 30, 34), (58, 46, 44), (60, 44, 40)]
 SHADOW = [0.02, 0.04, 0.06, 0.0, 0.0, 0.05, 0.1, 0.95, 0.7, 0.0]
 TONES = [tones(c, h) for c, h in zip(BASE, SHADOW)]
+# The second species, Velociraptor osmolskae, on the same model: it lived among the dunes of
+# Bayan Mandahu, so a paler sand coat with faint bars and a dull ochre crest (its colors, like
+# every raptor's, are a guess from living birds of open, dry country).
+OSMOLSKAE = [(196, 168, 120), (220, 198, 156), (240, 230, 204), (156, 124, 84), (176, 132, 82), (168, 150, 122),
+             (236, 232, 216), (70, 30, 34), (58, 46, 44), (140, 110, 76)]
+
+
+def set_palette(base):
+    """Paint with other colors (same pattern and layout)."""
+    global TONES
+    TONES = [tones(c, h) for c, h in zip(base, SHADOW)]
+
+
 FUR = (BACK, SIDE, BELLY)  # the soft feather coat; bars, crest, teeth, claws stay crisp
+ROLES = [("coat", 0, 0), ("coat", 0.5, 0), ("coat", 1, 0), ("coat", 0, 0), "fixed", "fixed",
+         "fixed", "fixed", "fixed", ("coat", 0, -1.5)]  # BACK SIDE BELLY BAR CREST SCALE TEETH DARK CLAW TIP
 
 # A hawk's eye: yellow round a black pupil, a catchlight; on the sides of the head.
 EYES.update({"raptor": dict(pattern=[".OOO.",
@@ -57,7 +73,7 @@ TAIL0 = np.array([0.0, 31.0, -5.5])
 
 
 NECK_BASE = np.array([0.0, 31.0, 14.0])  # inside the chest's front top
-NECK_ANGLE, NECK_LEN = 50.0, 9.5  # rising forward
+NECK_ANGLE, NECK_LEN = 50.0, 11.0  # rising forward, its end deep in the skull
 
 
 def neck_end():
@@ -111,8 +127,10 @@ def elements():
     E = [el("hips", "spine_0", (-5.5, 25, -6), (5.5, 35, 6)),
          el("chest", "spine_1", (-6, 24.5, 5.5), (6, 34.5, 17)),
          # The neck: a box from inside the chest out along the neck's angle to the head's joint,
-         # which sits inside the skull, so head and neck share a point and never come apart.
-         el("neck", "neck", NECK_BASE + np.array([-3.5, -3.5, -1.5]), NECK_BASE + np.array([3.5, 3.5, NECK_LEN + 1.5]),
+         # which sits inside the skull, so head and neck share a point and never come apart; slimmer
+         # than the skull and ending deep in it, so no corner of it pokes out of the head when the
+         # head turns (`ground.pokes`).
+         el("neck", "neck", NECK_BASE + np.array([-2.6, -2.6, -1.5]), NECK_BASE + np.array([2.6, 2.6, NECK_LEN + 1.5]),
             rot=(-NECK_ANGLE, 0, 0), origin=tuple(NECK_BASE)),
          el("skull", "head", *SKULL),
          el("snout", "head", (-3, 38, 28.5), (3, 42, 38), rot=(-6, 0, 0), origin=(0, 40, 28.5)),
@@ -286,6 +304,31 @@ def cut_mask(e, p):
 LASH = (54, 32, 26)
 
 
+# ------------------------------------------------------------------ layers (coats painted on the fly)
+
+LAYERS = {"rec": None, "key": None}  # a layers.Recorder while build() paints, and the face's key
+
+
+def _ramp(v, a, b):
+    return np.clip((v - a) / (b - a), 0, 1)
+def layer_props(e, face, p, a):
+    """Where white, patterns show on a raptor: white from the belly and throat up; patterns on the
+    body, neck, tail, thighs and feathers, less on the head, none on the scaly legs."""
+    n, y = e["name"], p[..., 1]
+    lo, hi = e["lo"][1], e["hi"][1]
+    t = _ramp(y, lo, max(hi, lo + 1e-3))  # 0 at the part's bottom
+    if n in ("hips", "chest", "neck") or n.startswith(("tail_", "thigh_", "shag_")):
+        white = 0.85 * (1 - t) + 0.15 * (face == "down")
+    elif n in ("skull", "snout", "jaw"):
+        white = 0.6 * (1 - t)
+    else:
+        white = np.full(y.shape, 0.2)
+    legs = n.startswith(("shin_", "foot_", "toe", "sickle_"))
+    face_part = n in ("snout", "jaw", "mouth")
+    pattern = np.full(y.shape, 0.0 if legs else 0.35 if face_part else 0.8 if n == "skull" else 1.0)
+    return {"white": white, "pattern": pattern}
+
+
 def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     if w == 0 or h == 0:
@@ -301,7 +344,8 @@ def paint_face(e, face, boxes):
         light_face = "north"  # seen when a pose lifts or folds it
     a = area(e, face, p, uu, vv, h)
     occ = None if e["quad"] else occlusion(p, R @ n, R @ du, R @ dv, boxes, own=e["name"])
-    col = paint_face_smooth(a, TONES, light_face, coat=FUR, y_world=p[..., 1], occ=occ, quad=bool(e["quad"]),
+    cap = {}
+    col = paint_face_smooth(a, TONES, light_face, out=cap, coat=FUR, y_world=p[..., 1], occ=occ, quad=bool(e["quad"]),
                             seed=sum(map(ord, e["name"] + face)) % 97)
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["cut"]:
@@ -321,6 +365,9 @@ def paint_face(e, face, boxes):
     if e["name"].startswith("eyelid"):  # a closed eye: the lash along the edge that ends up at the bottom
         col_idx = 0 if e["name"].endswith("L") else w - 1
         img[:, col_idx, :3] = LASH
+    if LAYERS["rec"] is not None:
+        LAYERS["rec"].face(LAYERS["key"], cap["weights"], cap["level"], ROLES, np.clip(np.round(col), 0, 255), img, p,
+                           layer_props(e, face, p, a))
     return img
 
 
@@ -503,13 +550,17 @@ def build():
     B = bones()
     E = elements()
     boxes = [(e["name"], np.array(e["lo"]), np.array(e["hi"])) for e in E if not e["quad"] and not e["rot"]]
+    LAYERS["rec"] = Recorder(layer_bounds(E, 3.0))
     tiles = []
     for i, e in enumerate(E):
         for f in ([e["quad"]] if e["quad"] else list(FACES)):
+            LAYERS["key"] = (i, f)
             img = paint_face(e, f, boxes)
             if img is not None:
                 tiles.append(((i, f), img))
     sheet, uv = pack(tiles, 512)
+    LAYERS["rec"].save(OUT, [k for k, _ in tiles], pack)
+    LAYERS["rec"] = None
     for i, e in enumerate(E):
         e["faces"] = {f: uv.get((i, f)) for f in ([e["quad"]] if e["quad"] else FACES)}
     spec = {"name": "raptor", "texture": [sheet.shape[1], sheet.shape[0]],
@@ -524,6 +575,16 @@ if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
     spec, sheet = build()
     Image.fromarray(sheet, "RGBA").save(os.path.join(OUT, "texture.png"))
+    # Velociraptor osmolskae: the same sheet in its colors.
+    set_palette(OSMOLSKAE)
+    E = elements()
+    boxes = [(e["name"], np.array(e["lo"]), np.array(e["hi"])) for e in E if not e["quad"] and not e["rot"]]
+    tiles = [((i, f), img) for i, e in enumerate(E) for f in ([e["quad"]] if e["quad"] else list(FACES))
+             if (img := paint_face(e, f, boxes)) is not None]
+    other, _ = pack(tiles, 512)
+    assert other.shape == sheet.shape
+    Image.fromarray(other, "RGBA").save(os.path.join(OUT, "osmolskae.png"))
+    set_palette(BASE)
     with open(os.path.join(OUT, "spec.json"), "w") as f:
         json.dump(spec, f)
     print(len(spec["elements"]), "elements;", len(spec["bones"]), "bones; texture", sheet.shape[1], "x", sheet.shape[0],

@@ -1,0 +1,116 @@
+{
+ "about": "Feather colors of a ground bird, imagined for a dromaeosaur: pigment, pattern, saddle, melanism, leucism.",
+ "loci": [
+  {
+   "id": "Pg",
+   "name": "Pigment",
+   "alleles": [
+    {
+     "a": "br",
+     "freq": 0.4,
+     "about": "umber brown"
+    },
+    {
+     "a": "ru",
+     "freq": 0.3,
+     "about": "rufous"
+    },
+    {
+     "a": "gr",
+     "freq": 0.2,
+     "about": "ash grey"
+    },
+    {
+     "a": "sa",
+     "freq": 0.1,
+     "about": "sandy"
+    }
+   ]
+  },
+  {
+   "id": "Pt",
+   "name": "Pattern",
+   "alleles": [
+    {
+     "a": "bars",
+     "freq": 0.45,
+     "about": "dark bars"
+    },
+    {
+     "a": "bands",
+     "freq": 0.15,
+     "about": "wide bands"
+    },
+    {
+     "a": "spots",
+     "freq": 0.15,
+     "about": "rosettes"
+    },
+    {
+     "a": "speckle",
+     "freq": 0.15,
+     "about": "speckles"
+    },
+    {
+     "a": "plain",
+     "freq": 0.1,
+     "about": "plain"
+    }
+   ]
+  },
+  {
+   "id": "Sd",
+   "name": "Saddle",
+   "alleles": [
+    {
+     "a": "Sd",
+     "freq": 0.85
+    },
+    {
+     "a": "sd",
+     "freq": 0.15,
+     "about": "a dark saddle over the back"
+    }
+   ]
+  },
+  {
+   "id": "Mel",
+   "name": "Melanism",
+   "alleles": [
+    {
+     "a": "Mel",
+     "freq": 0.96
+    },
+    {
+     "a": "mel",
+     "freq": 0.04,
+     "about": "melanistic: nearly black"
+    }
+   ]
+  },
+  {
+   "id": "Lc",
+   "name": "Leucism",
+   "alleles": [
+    {
+     "a": "Lc",
+     "freq": 0.97
+    },
+    {
+     "a": "lc",
+     "freq": 0.03,
+     "about": "leucistic: pale"
+    }
+   ]
+  },
+  {
+   "id": "Dk",
+   "name": "Darkness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.2,
+   "about": "light to dark"
+  }
+ ],
+ "species": "raptor"
+}

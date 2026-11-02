@@ -1,6 +1,10 @@
 //! Every species as data (`notes/ANIMALS.md`, "Species are data"): adding an animal is mostly a
-//! row here. Only what the core uses is filled in so far; taming, breeding and riding add their
-//! own fields when they are built.
+//! row here. Each row is placed in the tree of life as biology places it: its family (with the
+//! groups above it) and subfamily, its scientific name (genus and species). Animals breed only
+//! within a species (`same_species`): a house cat and a lion share a family, not a species. A
+//! domestic species with breeds (dogs) has a row per breed: the breed is its own entity kind
+//! with its own model and numbers, the species (genes, behavior, what it is) shared. A wild
+//! species is never a breed: Velociraptor's two species are two rows, two species.
 
 use weft_sdk::Entity;
 
@@ -20,6 +24,7 @@ pub const STAT_NAMES: [&str; STATS] =
 pub enum Size {
     Small,
     Medium,
+    Large,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -52,6 +57,19 @@ impl Liking {
     }
 }
 
+/// A family, and the groups above it, broadest first. Ranks are named where biology still uses
+/// them (a class, an order); dinosaurs are placed by clades instead.
+pub struct Family {
+    /// Its scientific name (`family.animals.<it, lowercase>` is what people call it).
+    pub name: &'static str,
+    pub above: &'static [&'static str],
+}
+
+pub static CANIDAE: Family = Family { name: "Canidae", above: &["Mammalia", "Carnivora"] };
+pub static FELIDAE: Family = Family { name: "Felidae", above: &["Mammalia", "Carnivora"] };
+pub static CAVIIDAE: Family = Family { name: "Caviidae", above: &["Mammalia", "Rodentia"] };
+pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
+
 pub struct Food {
     /// The item's full name.
     pub item: &'static str,
@@ -73,8 +91,14 @@ const KIBBLE: Food = Food { item: "animals:kibble", food: 30, liking: Liking::Ki
 
 pub struct Species {
     pub kind: &'static Entity,
-    /// `entity.animals.<name>`, `species.animals.<name>.*`.
+    /// The species (`species.animals.<name>`, its gene file `genetics/<name>.json`).
     pub name: &'static str,
+    /// Its scientific name: genus and species ("Canis familiaris").
+    pub binomial: &'static str,
+    pub family: &'static Family,
+    pub subfamily: &'static str,
+    /// The breed, for domestic species that have them (the gene file's breed).
+    pub breed: Option<&'static str>,
     pub size: Size,
     pub diet: Diet,
     pub taming: Taming,
@@ -96,16 +120,22 @@ pub struct Species {
     pub fights: bool,
     /// What it does best (`signatures.rs`; `screen.animals.signature.<it>`).
     pub signature: &'static str,
+    /// Where a rider sits, in blocks above its feet; 0: it can't be ridden (`riding.rs`).
+    pub seat: f32,
 }
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
 const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 4] = [
+pub static SPECIES: [Species; 6] = [
     Species {
-        kind: &crate::CHIHUAHUA,
-        name: "chihuahua",
+        kind: &crate::dog::CHIHUAHUA,
+        name: "dog",
+        binomial: "Canis familiaris",
+        family: &CANIDAE,
+        subfamily: "Caninae",
+        breed: Some("chihuahua"),
         size: Size::Small,
         diet: Diet::Carnivore,
         taming: Taming::Passive,
@@ -130,10 +160,15 @@ pub static SPECIES: [Species; 4] = [
         shy: 3.0,
         fights: true,
         signature: "alarm",
+        seat: 0.0,
     },
     Species {
         kind: &crate::cat::CAT,
         name: "cat",
+        binomial: "Felis catus",
+        family: &FELIDAE,
+        subfamily: "Felinae",
+        breed: None,
         size: Size::Small,
         diet: Diet::Carnivore,
         taming: Taming::Passive,
@@ -156,10 +191,15 @@ pub static SPECIES: [Species; 4] = [
         shy: 6.0,
         fights: true,
         signature: "gifts",
+        seat: 0.0,
     },
     Species {
         kind: &crate::capybara::CAPYBARA,
         name: "capybara",
+        binomial: "Hydrochoerus hydrochaeris",
+        family: &CAVIIDAE,
+        subfamily: "Hydrochoerinae",
+        breed: None,
         size: Size::Medium,
         diet: Diet::Herbivore,
         taming: Taming::Passive,
@@ -180,10 +220,15 @@ pub static SPECIES: [Species; 4] = [
         shy: 0.0,
         fights: false,
         signature: "calm",
+        seat: 0.0,
     },
     Species {
         kind: &crate::raptor::RAPTOR,
         name: "raptor",
+        binomial: "Velociraptor mongoliensis",
+        family: &DROMAEOSAURIDAE,
+        subfamily: "Velociraptorinae",
+        breed: None,
         size: Size::Medium,
         diet: Diet::Carnivore,
         taming: Taming::Knockout,
@@ -202,10 +247,73 @@ pub static SPECIES: [Species; 4] = [
         shy: 8.0,
         fights: true,
         signature: "pack",
+        seat: 0.0,
+    },
+    Species {
+        kind: &crate::utahraptor::UTAHRAPTOR,
+        name: "utahraptor",
+        binomial: "Utahraptor ostrommaysi",
+        family: &DROMAEOSAURIDAE,
+        subfamily: "Dromaeosaurinae",
+        breed: None,
+        size: Size::Large,
+        diet: Diet::Carnivore,
+        taming: Taming::Knockout,
+        base: [60.0, 300.0, 400.0, 10.0, 1.0, 400.0, 200.0, 700.0, 30.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 12.0,
+        foods: &[
+            eats("base:chicken", 10),
+            eats("base:porkchop", 15),
+            favorite("base:beef", 20),
+            favorite("base:mutton", 15),
+            KIBBLE,
+        ],
+        feedings: 18.0,
+        shy: 10.0,
+        fights: true,
+        signature: "mount",
+        // On its back, above the hips (1.69 blocks up, the rider's hips a little above).
+        seat: 1.55,
+    },
+    // Velociraptor's second species (named 2008, from Bayan Mandahu, Inner Mongolia; known from
+    // skull bones only, so the same body and numbers, its own coat).
+    Species {
+        kind: &crate::raptor::OSMOLSKAE,
+        name: "osmolskae",
+        binomial: "Velociraptor osmolskae",
+        family: &DROMAEOSAURIDAE,
+        subfamily: "Velociraptorinae",
+        breed: None,
+        size: Size::Medium,
+        diet: Diet::Carnivore,
+        taming: Taming::Knockout,
+        base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 20.0,
+        foods: &[
+            eats("base:chicken", 10),
+            eats("base:mutton", 10),
+            eats("base:porkchop", 12),
+            favorite("base:beef", 15),
+            KIBBLE,
+        ],
+        feedings: 10.0,
+        shy: 8.0,
+        fights: true,
+        signature: "pack",
+        seat: 0.0,
     },
 ];
 
 impl Species {
+    /// The name of its kind, without the namespace (`entity.animals.<it>`, its saddle).
+    pub fn kind_name(&self) -> &'static str {
+        self.kind.path()
+    }
+
     /// Its food `item` (an item id), if it eats it.
     pub fn food(&self, item: u32) -> Option<(usize, &'static Food)> {
         let name = weft_sdk::item_name(item);
@@ -214,6 +322,12 @@ impl Species {
             .enumerate()
             .find(|(_, f)| f.item == name)
     }
+}
+
+/// Whether two animals' species are one (and so can breed together): breeds of one species are,
+/// two species of one genus are not.
+pub fn same_species(a: &Species, b: &Species) -> bool {
+    a.binomial == b.binomial
 }
 
 /// Whether some species eats `item`: offered to one that doesn't, it is disliked.

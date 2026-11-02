@@ -1,15 +1,19 @@
 //! Velociraptors: feathered, turkey-sized hunters (the real animal, not the film's), in small
-//! groups on grassland, rarer than cats. They wander and now and then lie down to rest like
-//! birds, legs folded under; a pack now and then hunts a chicken, sheep or pig together, and
+//! groups on grassland, rarer than cats. Two species, as paleontologists name them: Velociraptor
+//! mongoliensis (`RAPTOR`) on grassland, and V. osmolskae (`OSMOLSKAE`), paler, on desert sand
+//! (it lived among dunes); the same body and behavior, two species that don't breed together.
+//! They wander and now and then lie down to rest like birds, legs folded under; a pack now and then hunts a chicken, sheep or pig together, and
 //! comes to the aid of any of them that is hurt. Tamed by knocking out (`knockout.rs`); tamed
-//! ones near each other fight better. A pose is a look (`World::set_look`), as the chihuahua's. The model, its animations and texture are built from `source/raptor` (see
+//! ones near each other fight better. Too small to ride (the Utahraptor is the mount). A pose is a look (`World::set_look`), as the chihuahua's. The model, its animations and texture are built from `source/raptor` (see
 //! `docs/creatures.md`).
 
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 pub(crate) static RAPTOR: Entity = Entity::named("raptor");
-const TEXTURE: &str = "raptor/raptor";
+pub(crate) static OSMOLSKAE: Entity = Entity::named("velociraptor_osmolskae");
+/// Each species: its kind, its row in `species::SPECIES`, its texture.
+static KINDS: [(&Entity, usize, &str); 2] = [(&RAPTOR, 3, "raptor/raptor"), (&OSMOLSKAE, 5, "raptor/osmolskae")];
 
 value! {
     #[derive(Default)]
@@ -26,7 +30,6 @@ value! {
 
 static STATE: Component<Raptor> = Component::named("raptor_state");
 
-const LOOKS: [(&str, &str); 2] = [("", ""), ("_rest", "raptor_rest")];
 /// How near a pack keeps together: helping, hunting, fighting better.
 const PACK_RANGE: f64 = 8.0;
 const AID_RANGE: f64 = 16.0;
@@ -35,8 +38,8 @@ static PREY: [Entity; 3] = [Entity::named("base:chicken"), Entity::named("base:s
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&STATE, Raptor::default(), 0);
-    // Tamed raptors fight better together: a tenth more damage for each other tame raptor
-    // within 8 blocks, up to three.
+    // Tamed raptors fight better together: a tenth more damage for each other tame raptor of
+    // its species within 8 blocks, up to three.
     r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
         let (w, id) = (m.world(), m.query().entity);
         if !is_tame_raptor(&w, id) {
@@ -44,25 +47,42 @@ pub fn init(r: &mut Registry) {
         }
         let Some(st) = w.entity(id) else { return };
         let pack = w
-            .near(st.pos, PACK_RANGE, Some(&RAPTOR))
+            .near(st.pos, PACK_RANGE, kind_of(&w, id))
             .into_iter()
             .filter(|&o| o != id && is_tame_raptor(&w, o))
             .count()
             .min(3);
         m.value *= 1.0 + 0.1 * pack as f64;
     });
-    // The resting pose, drawn in place of a raptor lying down.
-    for (suffix, kind) in &LOOKS[1..] {
-        drop(
-            r.entity(Entity::generated(kind.to_string()))
-                .size(0.6, 0.9)
-                .passive()
-                .model_file("raptor")
-                .animations(&format!("raptor{suffix}"))
-                .texture(TEXTURE),
-        );
+    for (kind, index, texture) in KINDS {
+        register(r, kind, index, texture);
     }
-    r.entity(&RAPTOR)
+    // Small packs now and then, rarer than cats: mongoliensis on grassland, osmolskae on sand.
+    r.spawn(&RAPTOR)
+        .biome("#animals")
+        .ground("#animal_spawn")
+        .light(7, 15)
+        .group(2, 3)
+        .chance(0.008);
+    r.spawn(&OSMOLSKAE)
+        .biome("#dry")
+        .ground("#sand")
+        .light(7, 15)
+        .group(2, 3)
+        .chance(0.008);
+}
+
+/// One species: the kind, and its resting pose (a look) drawn in place of it lying down.
+fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str) {
+    drop(
+        r.entity(Entity::generated(rest_look(kind)))
+            .size(0.6, 0.9)
+            .passive()
+            .model_file("raptor")
+            .animations("raptor_rest")
+            .texture(texture),
+    );
+    r.entity(kind)
         .size(0.6, 0.9)
         .health(14.0)
         .speed(4.0)
@@ -70,20 +90,24 @@ pub fn init(r: &mut Registry) {
         .passive()
         .model_file("raptor")
         .animations("raptor")
-        .texture(TEXTURE)
+        .texture(texture)
         .attach(&STATE)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
-            if !crate::screen::interact(&w, id, player) && !crate::knockout::feed(&w, id, player) {
+            if !crate::screen::interact(&w, id, player)
+                && !crate::knockout::feed(&w, id, player)
+                && !crate::riding::interact(&w, id, player)
+            {
                 crate::commands::interact(&w, id, player);
             }
         })
         .goals(
             Goals::new()
-                .then(crate::animal::upkeep(3))
-                .then(crate::knockout::behave(3))
+                .then(crate::animal::upkeep(index))
+                .then(crate::riding::ridden(index))
+                .then(crate::knockout::behave(index))
                 .then(hunt)
-                .then(crate::commands::act(3))
+                .then(crate::commands::act(index))
                 .then(settle)
                 .then(crate::commands::hold)
                 .then(ai::wander(0.6, 9.0)),
@@ -94,13 +118,17 @@ pub fn init(r: &mut Registry) {
                 c.rest = 0;
             }
         });
-    // A small pack now and then, rarer than cats.
-    r.spawn(&RAPTOR)
-        .biome("#animals")
-        .ground("#animal_spawn")
-        .light(7, 15)
-        .group(2, 3)
-        .chance(0.008);
+}
+
+/// A species' resting look (`raptor_rest`, `velociraptor_osmolskae_rest`).
+fn rest_look(kind: &Entity) -> String {
+    format!("{}_rest", kind.path())
+}
+
+/// The kind of raptor `id` is.
+fn kind_of(w: &World, id: u64) -> Option<&'static Entity> {
+    let k = w.entity(id)?.kind;
+    KINDS.iter().map(|(e, _, _)| *e).find(|e| e.id() == k)
 }
 
 /// Every tick: now and then lie down to rest for a while, and show the pose.
@@ -118,8 +146,8 @@ fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     let pose = resting as u32;
     if c.look != pose + 1 {
         c.look = pose + 1;
-        let kind = LOOKS[pose as usize].1;
-        w.set_look(id, (!kind.is_empty()).then(|| format!("animals:{kind}")).as_deref());
+        let look = kind_of(w, id).filter(|_| resting).map(|k| format!("animals:{}", rest_look(k)));
+        w.set_look(id, look.as_deref());
     }
     if resting && w.navigating(id) {
         w.navigate(id, st.pos, 0.0);
@@ -139,7 +167,7 @@ pub fn wake(w: &World, id: u64) {
 }
 
 fn is_tame_raptor(w: &World, id: u64) -> bool {
-    w.entity(id).is_some_and(|e| e.kind == RAPTOR.id()) && crate::animal::tamed(w, id)
+    kind_of(w, id).is_some() && crate::animal::tamed(w, id)
 }
 
 /// Knocked out: lying as it rests.
@@ -149,18 +177,20 @@ pub fn sleep(w: &World, id: u64) {
     {
         c.rest = 0;
         c.look = 2;
-        w.set_look(id, Some("animals:raptor_rest"));
+        let look = kind_of(w, id).map(|k| format!("animals:{}", rest_look(k)));
+        w.set_look(id, look.as_deref());
     }
 }
 
-/// `id` (wild) was hurt by `at`, or goes after it: the wild raptors near it join in.
+/// `id` (wild) was hurt by `at`, or goes after it: the wild ones of its kind near it join in
+/// (velociraptors and Utahraptors alike).
 pub fn aid(w: &World, id: u64, at: u64) {
     if crate::animal::tamed(w, id) {
         return;
     }
     let Some(st) = w.entity(id) else { return };
-    for other in w.near(st.pos, AID_RANGE, Some(&RAPTOR)) {
-        if other == id || crate::animal::tamed(w, other) {
+    for other in w.near(st.pos, AID_RANGE, None) {
+        if other == id || crate::animal::tamed(w, other) || w.entity(other).is_none_or(|e| e.kind != st.kind) {
             continue;
         }
         if let Some(k) = w.component_mut(other, &crate::knockout::KNOCKOUT)

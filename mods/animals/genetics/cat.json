@@ -1,0 +1,174 @@
+{
+ "about": "Cat coat genetics, simplified (O on the X, B, D, A, Mc, Ta, Sp, S, W, C and warmth). Alleles in dominance order.",
+ "loci": [
+  {
+   "id": "O",
+   "name": "Orange",
+   "alleles": [
+    {
+     "a": "O",
+     "freq": 0.25,
+     "about": "orange: red and cream"
+    },
+    {
+     "a": "o",
+     "freq": 0.75
+    }
+   ],
+   "xlinked": true,
+   "codominant": true
+  },
+  {
+   "id": "B",
+   "name": "Brown",
+   "alleles": [
+    {
+     "a": "B",
+     "freq": 0.85
+    },
+    {
+     "a": "b",
+     "freq": 0.1,
+     "about": "chocolate"
+    },
+    {
+     "a": "bl",
+     "freq": 0.05,
+     "about": "cinnamon"
+    }
+   ]
+  },
+  {
+   "id": "D",
+   "name": "Dilute",
+   "alleles": [
+    {
+     "a": "D",
+     "freq": 0.8
+    },
+    {
+     "a": "d",
+     "freq": 0.2,
+     "about": "dilute: blue, lilac, fawn, cream"
+    }
+   ]
+  },
+  {
+   "id": "A",
+   "name": "Agouti",
+   "alleles": [
+    {
+     "a": "A",
+     "freq": 0.6,
+     "about": "tabby shows"
+    },
+    {
+     "a": "a",
+     "freq": 0.4,
+     "about": "solid"
+    }
+   ]
+  },
+  {
+   "id": "Mc",
+   "name": "Tabby",
+   "alleles": [
+    {
+     "a": "Mc",
+     "freq": 0.6,
+     "about": "mackerel stripes"
+    },
+    {
+     "a": "mc",
+     "freq": 0.4,
+     "about": "classic swirls"
+    }
+   ]
+  },
+  {
+   "id": "Ta",
+   "name": "Ticked",
+   "alleles": [
+    {
+     "a": "Ta",
+     "freq": 0.1,
+     "about": "ticked, almost no stripes"
+    },
+    {
+     "a": "ta",
+     "freq": 0.9
+    }
+   ]
+  },
+  {
+   "id": "Sp",
+   "name": "Spotted",
+   "alleles": [
+    {
+     "a": "Sp",
+     "freq": 0.15,
+     "about": "stripes broken into spots"
+    },
+    {
+     "a": "sp",
+     "freq": 0.85
+    }
+   ]
+  },
+  {
+   "id": "S",
+   "name": "White spotting",
+   "alleles": [
+    {
+     "a": "S",
+     "freq": 0.35,
+     "about": "white patches"
+    },
+    {
+     "a": "s",
+     "freq": 0.65
+    }
+   ],
+   "codominant": true
+  },
+  {
+   "id": "W",
+   "name": "Dominant white",
+   "alleles": [
+    {
+     "a": "W",
+     "freq": 0.02,
+     "about": "all white"
+    },
+    {
+     "a": "w",
+     "freq": 0.98
+    }
+   ]
+  },
+  {
+   "id": "C",
+   "name": "Color",
+   "alleles": [
+    {
+     "a": "C",
+     "freq": 0.95
+    },
+    {
+     "a": "cs",
+     "freq": 0.05,
+     "about": "colorpoint: pale body, dark points"
+    }
+   ]
+  },
+  {
+   "id": "Ru",
+   "name": "Warmth",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.2,
+   "about": "cool to warm, golden ground"
+  }
+ ],
+ "species": "cat"
+}

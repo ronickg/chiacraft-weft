@@ -1,0 +1,195 @@
+{
+ "about": "Dog coat genetics, simplified (E, K, A, B, D, S, M loci and two polygenic traits). Alleles in dominance order; frequencies for dogs at large, a breed's own under `breeds`.",
+ "loci": [
+  {
+   "id": "E",
+   "name": "Extension",
+   "alleles": [
+    {
+     "a": "Em",
+     "freq": 0.2,
+     "about": "a dark mask on the muzzle"
+    },
+    {
+     "a": "E",
+     "freq": 0.6
+    },
+    {
+     "a": "e",
+     "freq": 0.2,
+     "about": "recessive red: no black in the coat"
+    }
+   ]
+  },
+  {
+   "id": "K",
+   "name": "Dominant black",
+   "alleles": [
+    {
+     "a": "KB",
+     "freq": 0.3,
+     "about": "solid black (or chocolate, blue)"
+    },
+    {
+     "a": "kbr",
+     "freq": 0.05,
+     "about": "brindle stripes on the tan"
+    },
+    {
+     "a": "ky",
+     "freq": 0.65,
+     "about": "lets the A locus show"
+    }
+   ]
+  },
+  {
+   "id": "A",
+   "name": "Agouti",
+   "alleles": [
+    {
+     "a": "ay",
+     "freq": 0.3,
+     "about": "fawn, sable"
+    },
+    {
+     "a": "at",
+     "freq": 0.55,
+     "about": "tan points"
+    },
+    {
+     "a": "a",
+     "freq": 0.15,
+     "about": "recessive black"
+    }
+   ]
+  },
+  {
+   "id": "B",
+   "name": "Brown",
+   "alleles": [
+    {
+     "a": "B",
+     "freq": 0.85
+    },
+    {
+     "a": "b",
+     "freq": 0.15,
+     "about": "chocolate"
+    }
+   ]
+  },
+  {
+   "id": "D",
+   "name": "Dilute",
+   "alleles": [
+    {
+     "a": "D",
+     "freq": 0.9
+    },
+    {
+     "a": "d",
+     "freq": 0.1,
+     "about": "dilute: blue, lilac, isabella"
+    }
+   ]
+  },
+  {
+   "id": "S",
+   "name": "White spotting",
+   "alleles": [
+    {
+     "a": "S",
+     "freq": 0.7,
+     "about": "solid"
+    },
+    {
+     "a": "sp",
+     "freq": 0.3,
+     "about": "piebald, parti"
+    }
+   ],
+   "codominant": true
+  },
+  {
+   "id": "M",
+   "name": "Merle",
+   "alleles": [
+    {
+     "a": "M",
+     "freq": 0.02,
+     "about": "merle: the dark coat mottled"
+    },
+    {
+     "a": "m",
+     "freq": 0.98
+    }
+   ]
+  },
+  {
+   "id": "I",
+   "name": "Red intensity",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.25,
+   "about": "cream to deep red"
+  },
+  {
+   "id": "Sh",
+   "name": "Sable shading",
+   "quantitative": true,
+   "mean": 0.35,
+   "sd": 0.25,
+   "about": "dark tips over the back on fawn"
+  }
+ ],
+ "species": "dog",
+ "breeds": {
+  "chihuahua": {
+   "name": "Chihuahua",
+   "about": "Every color and pattern dogs have, fawn and red sable the most common; merle rare.",
+   "freq": {
+    "E": {
+     "Em": 0.15,
+     "E": 0.6,
+     "e": 0.25
+    },
+    "K": {
+     "KB": 0.12,
+     "kbr": 0.08,
+     "ky": 0.8
+    },
+    "A": {
+     "ay": 0.55,
+     "at": 0.35,
+     "a": 0.1
+    },
+    "B": {
+     "B": 0.8,
+     "b": 0.2
+    },
+    "D": {
+     "D": 0.8,
+     "d": 0.2
+    },
+    "S": {
+     "S": 0.55,
+     "sp": 0.45
+    },
+    "M": {
+     "M": 0.03,
+     "m": 0.97
+    }
+   },
+   "quantitative": {
+    "I": {
+     "mean": 0.5,
+     "sd": 0.25
+    },
+    "Sh": {
+     "mean": 0.35,
+     "sd": 0.25
+    }
+   }
+  }
+ }
+}

@@ -116,7 +116,7 @@ fn ray_box(o: [f64; 3], d: [f64; 3], lo: [f64; 3], hi: [f64; 3]) -> Option<f64> 
 
 fn species_key(a: &Animal) -> String {
     a.species()
-        .map_or_else(String::new, |s| format!("entity.animals.{}", s.name))
+        .map_or_else(String::new, |s| format!("entity.animals.{}", s.kind_name()))
 }
 
 fn sex_key(a: &Animal) -> &'static str {
@@ -136,7 +136,30 @@ fn tamed(c: &ClientView) -> bool {
 fn heading(ui: &mut Ui) {
     ui.text_bind_styled(S::default().scale(1.5).no_wrap(), |c, t| {
         let Some(a) = c.menu_component(&ANIMAL) else { return };
-        t.set("screen.animals.heading", &[Arg::Key(&species_key(&a)), Arg::Int(a.level() as i64)]);
+        match a.species() {
+            // A breed with its species: "Chihuahua (dog)".
+            Some(s) if s.breed.is_some() => t.set(
+                "screen.animals.heading_breed",
+                &[Arg::Key(&species_key(&a)), Arg::Key(&format!("species.animals.{}", s.name)), Arg::Int(a.level() as i64)],
+            ),
+            _ => t.set("screen.animals.heading", &[Arg::Key(&species_key(&a)), Arg::Int(a.level() as i64)]),
+        }
+    });
+    // Where it sits in the tree of life: "Canis familiaris · Mammalia › Carnivora › Canidae
+    // (dog family) › Caninae".
+    ui.text_bind(|c, t| {
+        let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
+        let above = s.family.above.join(" › ");
+        t.set(
+            "screen.animals.taxon",
+            &[
+                Arg::Text(s.binomial),
+                Arg::Text(&above),
+                Arg::Text(s.family.name),
+                Arg::Key(&format!("family.animals.{}", s.family.name.to_lowercase())),
+                Arg::Text(s.subfamily),
+            ],
+        );
     });
     ui.text_bind(|c, t| {
         let Some(a) = c.menu_component(&ANIMAL) else { return };
@@ -265,6 +288,7 @@ fn scout_screen(ui: &mut Ui) {
             let size = match s.size {
                 Size::Small => "screen.animals.size.small",
                 Size::Medium => "screen.animals.size.medium",
+                Size::Large => "screen.animals.size.large",
             };
             let diet = match s.diet {
                 Diet::Carnivore => "screen.animals.diet.carnivore",

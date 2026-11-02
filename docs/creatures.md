@@ -55,14 +55,15 @@ and `textures/entity/<mod>/<animal>.png`. It takes care of what the engine needs
   the standing file for `World::play_animation`, which replaces idle while it plays (so an action
   on a sitting dog stands it up for that time). Blinks are part of each idle.
 
-Register it like the cat (`mods/animals/src/cat.rs`, the simplest) or the chihuahua (`mods/animals/src/lib.rs`): `.model_file("<animal>")`,
+Register it like the cat (`mods/animals/src/cat.rs`, the simplest) or the chihuahua (`mods/animals/src/dog.rs`): `.model_file("<animal>")`,
 `.animations("<animal>[_sit|_lie]")`, `.texture("<mod>/<animal>")`, and a hitbox `.size(..)`
 about the model's footprint. Bones named `head` follow where the creature looks; don't name
 bones `leg0`..`leg3` unless you want the engine's own leg swing (an animation with `walk` turns
 it off anyway).
 
-Then give it stats: a row in `mods/animals/src/species.rs` (base values of the nine stats, its
-diet and favorite foods, how it is tamed; see `notes/ANIMALS.md`),
+Then give it stats: a row in `mods/animals/src/species.rs` (its place in the tree of life: family,
+subfamily and scientific name, looked up, not guessed; base values of the nine stats, its diet and
+favorite foods, how it is tamed; see `notes/ANIMALS.md`),
 `.then(crate::animal::upkeep(<its row>)).then(crate::taming::behave(<its row>))
 .then(crate::commands::act(<its row>))` first in its goals (its wild level and stats; asking
 for food and running off when scared; a tame's fighting, following and staying),
@@ -94,7 +95,7 @@ F3+T reloads models, animations and textures while the game runs.
 
 Both live in the `animals` mod, each with its source next to the assets:
 
-- [mods/animals/source/chihuahua](../mods/animals/source/chihuahua/README.md): built from a
+- [mods/animals/source/dog/chihuahua](../mods/animals/source/dog/chihuahua/README.md): built from a
   concept sheet (colors read from the flat turnaround). `tools/blocky.py` lays out and paints the
   dog (eyelids, jaw and tongue, solid ears, a V bib, toes; `EYES`, `BLINKS`, `lick_keys`).
 - [mods/animals/source/cat](../mods/animals/source/cat/README.md): built from research alone (no
@@ -111,8 +112,8 @@ Both live in the `animals` mod, each with its source next to the assets:
 To update one in the game after changing it:
 
 ```
-cd mods/animals/source/chihuahua      # or cat, raptor, capybara
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once (the cat uses ../chihuahua/.venv)
+cd mods/animals/source/dog/chihuahua      # or cat, raptor, capybara, utahraptor
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once (the others use ../dog/chihuahua/.venv)
 .venv/bin/python build.py
 ```
 

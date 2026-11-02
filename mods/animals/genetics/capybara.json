@@ -1,0 +1,45 @@
+{
+ "about": "Capybaras vary little: shade, redness and how pale the belly is; leucism is very rare.",
+ "loci": [
+  {
+   "id": "Le",
+   "name": "Leucism",
+   "alleles": [
+    {
+     "a": "Le",
+     "freq": 0.97
+    },
+    {
+     "a": "le",
+     "freq": 0.03,
+     "about": "leucistic: pale cream"
+    }
+   ]
+  },
+  {
+   "id": "Dk",
+   "name": "Darkness",
+   "quantitative": true,
+   "mean": 0.45,
+   "sd": 0.18,
+   "about": "light tan to dark brown"
+  },
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.2,
+   "about": "grey-brown to red-brown"
+  },
+  {
+   "id": "Bl",
+   "name": "Pale belly",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.2,
+   "about": "how much lighter the belly is"
+  }
+ ],
+ "species": "capybara"
+}

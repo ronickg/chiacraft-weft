@@ -1,8 +1,8 @@
 # Animals: taming, stats, breeding (design)
 
-Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Steps 1-5
+Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Steps 1-6
 of the build order (the core, passive taming, commands, signatures, knock-out taming and the
-raptor) are built; see "Built so far" at the end. "Proposed" marks numbers and
+raptor, riding) are built; see "Built so far" at the end. "Proposed" marks numbers and
 details that still need his yes. Reference: ARK, made to
 fit chiacraft (worlds owned by their players, linked by portals, the chain only where it adds
 trust; see `notes/PLAN.md`).
@@ -63,6 +63,19 @@ trust; see `notes/PLAN.md`).
 Every species is a definition (a Rust table in the mod, or a JSON file per species: proposed),
 so adding an animal is mostly numbers:
 
+- **Its place in the tree of life**, as biology names it: family (with the groups above it:
+  a class and order for mammals, clades for dinosaurs), subfamily, and scientific name (genus and
+  species): the chihuahua is Canis familiaris, Mammalia › Carnivora › Canidae › Caninae. The
+  animal screen and the spyglass show it. **Only one species breeds together** (`same_species`):
+  a house cat (Felis catus) and a lion (Panthera leo) share a family, not a genus or species,
+  and would be two animals; Velociraptor mongoliensis and V. osmolskae share a genus and are two
+  species that don't interbreed. Below the species: breeds (domestic only, made by people) and,
+  for everything, the individual's genes (coat colors and patterns: a tabby is a pattern, not a
+  breed).
+- **Breeds**: a species can have breeds (the dog: the chihuahua so far). A breed is its own
+  entity kind (`animals:chihuahua`), model and saddle, with the species' rules, genes and
+  signature; its gene frequencies are its own (`genetics/dog.json`, `breeds`). Breeds of one
+  species breed together; their puppies are mixed unless both parents are the same breed.
 - **Body**: size class (small, medium, large, huge), model, sexes, life stages.
 - **Diet**: carnivore, herbivore, omnivore; the foods it eats with their food value and taming
   value; its favorite foods; its kibble tier.
@@ -280,7 +293,7 @@ share recent ancestors have lower fertility and a chance of a small stat penalty
 | Taming | Passive | Passive (shy) | Passive (easy) | Knock out |
 | Tame time (proposed) | 1-3 min | 2-4 min | 1-2 min | 5-15 min |
 | Signature | Alarm and tracker | Lucky finds | Calm aura | Mount, pack hunter |
-| Rideable | No | No | No (later?) | Yes, saddle |
+| Rideable | No | No | No (later?) | No (too small; the Utahraptor is the mount) |
 | Fights | Yes, quick bites | Small prey | No | Yes, leaps |
 | Breeding place | Den | Den (indoors, a bed) | Burrow near water | Nest, warm |
 | Birth | Litter 1-4 | Litter 2-5 | Litter 2-6 | Clutch 2-4 eggs |
@@ -508,6 +521,72 @@ Checked in the game: six darts knocking out a level-48 raptor, a level-30 one ta
 (15 bonus levels), three raptors attacking together when one was darted. Not yet: sedatives,
 waking up, hunting, the club, the pack bonus. A proper inventory for food (a menu) instead of
 the stack in its mouth could come with tame inventories.
+
+**Step 6, riding** (2026-11-01, engine and `riding.rs`):
+
+- **Engine** (general, worth offering to Weft upstream): `World::mount(rider, mount, seat)`,
+  `dismount`, `mount_of`, `rider_of`, `keys`; a `core:mount` field tells clients who rides what;
+  the move message carries the player's held keys (`abi::held_keys`); a seated pose
+  (`Pose::Sit`, `abi::pose::SIT`: legs forward, arms forward, the hips on the seat, eyes 0.97
+  above it). A riding client sits on its mount as drawn (no walking, no view bobbing) and the
+  server takes its seat on the mount as the server has it; riders and mounts don't push each
+  other; a dead or removed mount leaves its rider on foot; non-player riders are seated by the
+  server. Not saved: everyone is on foot after a restart.
+- **Mod**: a species with a `seat` (the Utahraptor, 1.55 blocks) can be saddled with its saddle
+  (`animals:utahraptor_saddle`: three leather and two string), and its owner or a tribe member gets
+  on with an empty hand once it is grown and its bond is 25 or more. Ridden it walks where the
+  rider steers (WASD), facing where they look while walking, runs 1.7 times as fast sprinting,
+  jumps half again as high; sneaking gets off beside it.
+
+Checked in the game: getting on, riding toward a landmark, the seated pose from the front and
+from the saddle, getting off. Not yet: other players seeing a rider (multiplayer), the saddle
+on the model, stamina while ridden, attacking from the saddle. A mount still turns its head and
+body to look at the rider standing still.
+
+**The Utahraptor** (2026-11-01, `utahraptor.rs`, `source/utahraptor`): the Velociraptor is too
+small to ride at its real size (turkey-sized), so the mount is a new species, the Utahraptor:
+1.5 m at the hip, about 4.7 m long, built with the skill from research (Carpenter's emu-coated,
+vulture-winged, alligator-eyed restoration) on the Velociraptor's skeleton: heavier everywhere,
+big slit-pupiled eyes, shaggy locks over the thighs, broad wing feathers, three-toed feet with
+the raised sickle claw, and six coats to choose from in the viewer (umber, emu, desert, forest,
+ash, rufous). Large, carnivore, tamed by knocking out (torpor 700: about a dozen darts; 18
+feedings at level 1), base health 60, damage 10; alone or in pairs, rarer than Velociraptors;
+hunts sheep, pigs and cows now and then, and the others of its kind join a fight. Checked in the
+game: standing beside a Velociraptor, resting, ridden (front view, from the saddle, moving).
+
+**Looks, part 1: coat genetics and painting, in the viewer** (2026-11-01; decided with Ronald:
+real coat genetics, a paint screen, paint is not inherited, the viewer first, then the game):
+
+- Every creature's build writes layers next to its texture (`layers/`, skill `layers.py`): coat
+  or fixed, light, underside, position, where white, points, a mask, extremities and patterns
+  show. Gene files per species in `mods/animals/genetics/` (see its README); phenotype rules and
+  the renderer in the skill's `coats.js`.
+- Dog (the chihuahua is a breed: `dog.json`, its frequencies under `breeds`): E (red, mask), K (solid black, brindle), A (fawn/sable, black and tan, recessive
+  black), B (chocolate), D (blue, lilac), S (white: a little, or parti), M (merle), red intensity
+  and sable shading. Cat: O on the X (red, cream; tortoiseshell only in females), B (chocolate,
+  cinnamon), D, A (tabby or solid), mackerel/classic/spotted/ticked, S (bicolor, van), W (all
+  white), colorpoint, warmth. Capybara: shade, redness, belly, rare leucism. Raptors: pigment,
+  pattern (bars, bands, rosettes, speckle, plain), saddle, melanism, leucism, darkness.
+- Babies get one allele of each locus from each parent (a son's X from his mother), quantitative
+  traits drift a little, 1% of alleles mutate: babies look like their parents, hidden recessives
+  surprise.
+- Paint (any color, pink included): coat, underside, markings and points colors, and a stencil
+  (stripes, spots, patches); "Wash off" removes it. Not inherited.
+- The viewer: Natural, Random, Mother, Father, Breed, the paint row, the genotype under the
+  description. The chihuahua's eye picker and the Utahraptor's fixed coats are gone (genes now).
+- The chihuahua is grouped under dog: species "dog", breed "chihuahua" (`species.rs` `breed`,
+  the code in `dog.rs`, the source in `source/dog/chihuahua`); its screen reads "Chihuahua (dog)".
+  The next dog breed is a new entity, model and row with `name: "dog"`.
+- Taxonomy (2026-11-01): every species row has its family (`species::Family`, with the groups
+  above it), subfamily and binomial; breeding is by species. A second Velociraptor species,
+  V. osmolskae (named 2008 from skull bones found at Bayan Mandahu, Inner Mongolia; a 2013 study
+  puts it nearer Linheraptor, so it may leave the genus): the raptor's body and behavior, a paler
+  sand coat (`source/raptor` paints both), its own gene file (`osmolskae.json`), spawning on
+  desert sand. Its own pack: the pack bonus and aid count only its species.
+
+Next: per-animal textures in the engine (a texture per entity from these layers), genes on every
+animal (spawn, breeding), the paint screen in the game, then sizes (real sizes, by sex and
+individual: the engine's per-entity scale).
 
 Not yet: XP and earning points (the command gives them), naming, the higher spyglass tier, tame
 caps and other world settings. Engine note: clients don't see other entities' attribute

@@ -9,7 +9,7 @@ animal; the recipe is [docs/creatures.md](../../../../docs/creatures.md).
 ## Rebuild
 
 ```
-../chihuahua/.venv/bin/python build.py      # any Python with ../chihuahua/requirements.txt
+../dog/chihuahua/.venv/bin/python build.py      # any Python with ../dog/chihuahua/requirements.txt
 ```
 
 `cat.py` lays out, paints and animates the cat into `out/` (spec.json, texture.png; not

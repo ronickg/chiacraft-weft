@@ -3,7 +3,7 @@
 creatures (boxes and a hand-painted texture) with the blocky-model skill, from research alone
 (README.md): its colors are rules (see `area`).
 
-    ../chihuahua/.venv/bin/python capybara.py      # writes out/spec.json, out/texture.png
+    ../dog/chihuahua/.venv/bin/python capybara.py      # writes out/spec.json, out/texture.png
 
 Units are Blockbench's (1 texel each), y up, the capybara faces +z. A real one is 50-62 cm at the
 shoulder and 100-130 cm long: here the back is 25.5 up, the whole animal 54 long; the head 1.15x
@@ -21,6 +21,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
+from layers import Recorder, bounds as layer_bounds  # noqa: E402
 from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit  # noqa: E402
 from ground import lowest  # noqa: E402
@@ -32,6 +33,7 @@ S = math.sin
 # ------------------------------------------------------------------ materials and eyes
 
 FUR, BACK, BELLY, DARK, SKIN, MOUTH, TEETH, EARIN = range(8)
+ROLES = [("coat", 0, 0), ("coat", 0, -1.0), ("coat", 1, 0), "fixed", "fixed", "fixed", "fixed", "fixed"]  # FUR BACK BELLY DARK SKIN MOUTH TEETH EARIN
 BASE = [(160, 104, 64), (124, 78, 48), (204, 162, 118), (54, 38, 32), (96, 72, 58), (84, 36, 40), (226, 212, 170),
         (150, 98, 84)]
 SHADOW = [0.02, 0.02, 0.05, 0.0, 0.03, 0.95, 0.1, 0.98]
@@ -182,6 +184,24 @@ def area(e, face, p, uu, vv, h):
 LASH = (40, 28, 24)
 
 
+# ------------------------------------------------------------------ layers (coats painted on the fly)
+
+LAYERS = {"rec": None, "key": None}  # a layers.Recorder while build() paints, and the face's key
+
+
+def _ramp(v, a, b):
+    return np.clip((v - a) / (b - a), 0, 1)
+def layer_props(e, face, p, a):
+    """A capybara's coat varies little: a slightly lighter belly, darker extremities (muzzle,
+    feet); white is very rare."""
+    n, y = e["name"], p[..., 1]
+    lo, hi = e["lo"][1], e["hi"][1]
+    low = 1 - _ramp(y, lo, max(hi, lo + 1e-3))
+    white = 0.7 * low if n in ("chest", "hips", "rump") else np.full(y.shape, 0.25)
+    ext = np.full(y.shape, 1.0 if n in ("muzzle", "jaw") or n.endswith("_paw") else 0.0)
+    return {"white": white, "extremity": ext, "pattern": np.ones(y.shape)}
+
+
 def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     if w == 0 or h == 0:
@@ -193,7 +213,8 @@ def paint_face(e, face, boxes):
         light_face = "north"  # seen when a pose lifts or folds it
     a = area(e, face, p, uu, vv, h)
     occ = None if e["quad"] else occlusion(p, n, du, dv, boxes, own=e["name"])
-    col = paint_face_smooth(a, TONES, light_face, coat=COAT, y_world=p[..., 1], occ=occ, quad=bool(e["quad"]),
+    cap = {}
+    col = paint_face_smooth(a, TONES, light_face, out=cap, coat=COAT, y_world=p[..., 1], occ=occ, quad=bool(e["quad"]),
                             seed=sum(map(ord, e["name"] + face)) % 97)
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["name"] == "skull" and face in ("east", "west"):
@@ -215,6 +236,9 @@ def paint_face(e, face, boxes):
             c = int(round(step * (k + 1))) - 1
             img[:, c, :3] = (img[:, c, :3] * 0.7).astype(np.uint8)
         img[h - 1, :, :3] = BASE[DARK]
+    if LAYERS["rec"] is not None:
+        LAYERS["rec"].face(LAYERS["key"], cap["weights"], cap["level"], ROLES, np.clip(np.round(col), 0, 255), img, p,
+                           layer_props(e, face, p, a))
     return img
 
 
@@ -395,13 +419,17 @@ def build():
     B = bones()
     E = elements()
     boxes = [(e["name"], np.array(e["lo"]), np.array(e["hi"])) for e in E if not e["quad"]]
+    LAYERS["rec"] = Recorder(layer_bounds(E, 3.0))
     tiles = []
     for i, e in enumerate(E):
         for f in ([e["quad"]] if e["quad"] else list(FACES)):
+            LAYERS["key"] = (i, f)
             img = paint_face(e, f, boxes)
             if img is not None:
                 tiles.append(((i, f), img))
     sheet, uv = pack(tiles, 512)
+    LAYERS["rec"].save(OUT, [k for k, _ in tiles], pack)
+    LAYERS["rec"] = None
     for i, e in enumerate(E):
         e["faces"] = {f: uv.get((i, f)) for f in ([e["quad"]] if e["quad"] else FACES)}
     spec = {"name": "capybara", "texture": [sheet.shape[1], sheet.shape[0]],

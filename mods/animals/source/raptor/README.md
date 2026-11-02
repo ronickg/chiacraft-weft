@@ -9,7 +9,7 @@ alone. The first two-legged animal: copy this folder for birds and other dinosau
 ## Rebuild
 
 ```
-../chihuahua/.venv/bin/python build.py      # any Python with ../chihuahua/requirements.txt
+../dog/chihuahua/.venv/bin/python build.py      # any Python with ../dog/chihuahua/requirements.txt
 ```
 
 `raptor.py` lays out, paints and animates it into `out/` (not committed) and fits its stance and
@@ -44,6 +44,13 @@ bird's), yellow round a black pupil, in a dark stripe; animations idle (a bird's
 then a snap to a new look), walk (head bobbing), run (leaning forward, tail straight out), rest
 (legs folded under like a resting bird), screech.
 
+Velociraptor has two named species, and both are built from here: V. mongoliensis (Osborn 1924,
+`textures/entity/raptor/raptor.png`) and V. osmolskae (Godefroit et al. 2008, from paired
+maxillae and a lacrimal found at Bayan Mandahu, Inner Mongolia: a long, low snout, a large
+promaxillary opening; nothing of its body or size is known, so it keeps this body). It lived among
+dunes, so its coat (`OSMOLSKAE` in `raptor.py`, written to `osmolskae.png`) is paler sand with
+faint bars and an ochre crest; like every raptor's colors, a guess from living birds.
+
 ## How it's made
 
 - **Stance**: bird legs (thigh, shin, foot, toes) in a crouch, knees forward, ankles back, toes
@@ -59,3 +66,6 @@ then a snap to a new look), walk (head bobbing), run (leaning forward, tail stra
   for the screech, teeth painted along both edges, a mouth box inside.
 - **Flicker**: 0 at rest and in every keyframe; each tail segment is 0.6 a side thinner than the
   one before, leg parts all differ in width.
+- **Neck into the head**: the neck (5.2 thick, 11 long) is slimmer than the skull and ends deep
+  in it, so no corner of it pokes out of the head when the head turns (it did, through the back
+  of the head, at 7 thick); `build.py` asserts `ground.pokes` is empty along the body's axis.

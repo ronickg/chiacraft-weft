@@ -1,6 +1,6 @@
 //! What each species does best (`notes/ANIMALS.md`, "The four animals"):
 //!
-//! - **Chihuahua, alarm and tracker**: a tame barks at the nearest monster that comes within
+//! - **Dog (the chihuahua so far), alarm and tracker**: a tame barks at the nearest monster that comes within
 //!   range (farther with level) and marks it for five seconds; given something an animal drops
 //!   (leather, a feather, wool...), or told to with the animal screen's Track and the drop in
 //!   hand, it leads its owner to the nearest such animal, waiting when they fall behind.
@@ -220,7 +220,7 @@ fn scent(item: u32) -> Option<(u32, &'static Entity)> {
 /// sniffs it and sets off).
 pub fn track(w: &World, id: u64, item: u32) -> bool {
     let Some((i, _)) = scent(item) else { return false };
-    if w.component(id, &ANIMAL).and_then(|a| a.species()).is_none_or(|s| s.name != "chihuahua") {
+    if w.component(id, &ANIMAL).and_then(|a| a.species()).is_none_or(|s| s.name != "dog") {
         return false;
     }
     set(w, id, |s| {
