@@ -70,6 +70,7 @@ key.animals.whistle_stay = Whistle: all stay
 key.animals.whistle_come = Whistle: all come here
 key.animals.whistle_attack = Whistle: attack my target
 key.animals.whistle_passive = Whistle: all passive
+key.animals.breathe = Ride: breathe (a wyvern)
 command.animals.tribe.none = You are in no tribe.
 command.animals.tribe.name = Give the tribe a name.
 command.animals.tribe.created = Tribe {0} founded.

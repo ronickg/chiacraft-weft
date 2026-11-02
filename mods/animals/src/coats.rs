@@ -728,6 +728,17 @@ pub fn breath(genome: &Genome) -> &'static str {
     }
 }
 
+/// Gives a wyvern two copies of the breath allele `kind` (testing: `/animal fire`).
+pub fn set_breath(genome: &mut Genome, kind: &str) -> bool {
+    let Some(s) = (genome.species as usize).checked_sub(1).and_then(|i| SPECIES.get(i)) else { return false };
+    let Some(g) = gene_file(s.name) else { return false };
+    let Some((i, l)) = g.loci.iter().enumerate().find(|(_, l)| l.id == "Br") else { return false };
+    let Some(a) = l.alleles.iter().position(|a| a.a == kind) else { return false };
+    genome.genes[2 * i] = a as u8;
+    genome.genes[2 * i + 1] = a as u8;
+    true
+}
+
 /// How big an adult with `genome` is against its species' average (its model): its size gene
 /// (`Sz`, spread by the species' `size_spread`) and its sex (`dimorphism`, males against
 /// females; the average stays the model's).

@@ -2213,6 +2213,8 @@ pub struct Host {
     /// `entity_mount` with the seat also `forward` blocks ahead of the mount's middle, along the
     /// way it faces (the base of a dragon's neck rather than its hips).
     pub entity_mount_seat: unsafe extern "C" fn(world: *mut WorldCtx, rider: u64, mount: u64, seat: f32, forward: f32) -> u32,
+    /// Sets `entity` on fire for at least `ticks` (burning hurts once a second; water puts it out).
+    pub entity_ignite: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, ticks: u32),
     /// Writes a kind's box (width, height, eye height); 0 if there is no such kind.
     pub entity_kind_size: unsafe extern "C" fn(kind: Str, out: *mut [f32; 3]) -> u32,
     /// A block of moving structure `entity` (its own coordinates); `u32::MAX` if it is none.

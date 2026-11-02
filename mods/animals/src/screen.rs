@@ -37,7 +37,7 @@ pub fn init(r: &mut Registry) {
             }
         });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -410,7 +410,8 @@ fn nearest(w: &World, player: u64, range: f64) -> Option<u64> {
 /// cat bring its next `gift` now, knock one out (`ko`), an unconscious one take its next `bite`
 /// now, every grown animal near you be yours and in `love`, or every mother, egg and young one
 /// near you `hurry` (birth, hatching, growing up within a second), or the nearest wild female of a
-/// laying kind build a `nest` and lay in it now. `evolve [count] [habitat]` runs
+/// laying kind build a `nest` and lay in it now; a wyvern breathe `fire`, `frost`, `lightning` or
+/// `venom` from now on. `evolve [count] [habitat]` runs
 /// `count` generations of every species' gene pool where you stand (`evolution.rs`) and says how
 /// common each variant is.
 fn command(cmd: &mut ServerCommand) {
@@ -456,6 +457,11 @@ fn command(cmd: &mut ServerCommand) {
         "hurry" => crate::breeding::hurry_near(&w, player),
         "nest" => {
             crate::eggs::nest_now(&w, player);
+        }
+        kind @ ("fire" | "frost" | "lightning" | "venom") => {
+            if let Some(g) = w.component_mut(id, &crate::coats::GENOME) {
+                crate::coats::set_breath(g, kind);
+            }
         }
         "here" => {
             if let (Some(p), Some(mut e)) = (w.entity(player), w.entity(id)) {

@@ -99,6 +99,10 @@ impl World {
     pub fn mount_at(&self, rider: u64, mount: u64, seat: f32, forward: f32) -> bool {
         mount != 0 && unsafe { (host().entity_mount_seat)(self.raw(), rider, mount, seat, forward) != 0 }
     }
+    /// Sets `id` on fire for at least `ticks` (it burns as in lava's heat; water puts it out).
+    pub fn ignite(&self, id: u64, ticks: u32) {
+        unsafe { (host().entity_ignite)(self.raw(), id, ticks) }
+    }
     /// Gets off where it is (put it beside the mount with `teleport`).
     pub fn dismount(&self, rider: u64) {
         unsafe { (host().entity_mount)(self.raw(), rider, 0, 0.0) };

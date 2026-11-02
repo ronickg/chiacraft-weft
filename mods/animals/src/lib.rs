@@ -1,6 +1,6 @@
 //! The animals mod: dogs by breed (`dog.rs`: the chihuahua), cats (`cat.rs`), capybaras
 //! (`capybara.rs`), velociraptors of two species (`raptor.rs`), Utahraptors (`utahraptor.rs`) and
-//! wyverns (`wyvern.rs`, a fantasy animal),
+//! wyverns (`wyvern.rs`, a fantasy animal, and their breath: `breath.rs`),
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
 //! (`taming.rs`, `knockout.rs`), commands and tribes (`commands.rs`), signatures
@@ -17,6 +17,7 @@ use weft_sdk::*;
 declare_mod!(deps: ["base"], init: init);
 
 mod animal;
+mod breath;
 mod breeding;
 mod capybara;
 mod cat;
@@ -85,6 +86,7 @@ fn init(r: &mut Registry) {
     raptor::init(r);
     utahraptor::init(r);
     wyvern::init(r);
+    breath::init(r);
     animal::init(r);
     screen::init(r);
     taming::init(r);

@@ -719,8 +719,24 @@ Without its rider in the air it stops flying. Riding anything big, the third-per
 back by twice the mount's height so it clears it. Checked in the game: take off, climb, fly, dive,
 land, get off; a wild one killed a player in survival who came near.
 
-Next for the wyvern: the breath attack on a key
-(fire, frost, lightning or venom from its genes), wild ones flying, its sounds, its own egg icon.
+**The breath** (2026-11-02; `breath.rs`). What a wyvern breathes is in its genes (fire, frost,
+lightning, venom). Its rider makes it breathe with a key (R) where they look; a wild one angry at
+something 5 to 16 blocks off breathes at it now and then. On the ground it rears, draws breath and
+lunges (`breathe`), the stream pouring from its mouth from 0.95 to 2.6 seconds; in the air it
+breathes as it flies, at once; then eight seconds before the next. The stream reaches 14 blocks in
+a cone: fire burns and sets alight, scorches grass to dirt, burns leaves, plants and snow away and
+melts ice; frost hurts less, slows (60% for four seconds) and puts fire out, freezes water and
+frosts grass; lightning strikes the nearest thing in it hard and arcs on to two more; venom hurts
+and poisons for five seconds, withering grass and leaves. Each its own particles (flame, frost
+mist, sparks in a jagged bolt, a green spray). `/animal fire|frost|lightning|venom` sets a
+wyvern's breath (testing). Engine: mods can set entities alight (`World::ignite`); a mob standing
+still now brings its body round to where it looks (vanilla's body rotation), so one that turned to
+face something faces it whole. Checked in the game: each breath ridden, and a wild one breathing
+fire at a player and killing them, and breathing in flight (the stream carries the wyvern's own
+speed, or it would outfly its fire).
+
+Next for the wyvern: wild ones flying, its sounds (a roar, wingbeats, the breath), its own egg
+icon.
 
 Next otherwise: rebuild the five animals to the house density; the paint screen in the game
 (paint as a second component the same painter reads), coat names in translations.

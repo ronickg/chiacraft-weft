@@ -33,7 +33,7 @@ value! {
     }
 }
 
-static FLIGHT: Component<Flight> = Component::named("flight");
+pub(crate) static FLIGHT: Component<Flight> = Component::named("flight");
 /// Flying faster sprinting, and climbing or coming down at this share of the speed.
 const FLY_SPRINT: f32 = 1.5;
 const FLY_VERTICAL: f32 = 0.7;

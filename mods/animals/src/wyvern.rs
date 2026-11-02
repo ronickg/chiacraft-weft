@@ -2,7 +2,8 @@
 //! Game of Thrones), about 3.9 m at the shoulder and 16 m long, rare in the mountains and alone.
 //! On the ground they go on four, on their hind feet and the wrists of their folded wings. Wild
 //! ones are dangerous: one goes for any player who comes near (nearer its nest, sooner), and
-//! hurt, it fights back; now and then one hunts a sheep, pig or cow. What one breathes (fire, frost, lightning or venom) is in its genes
+//! hurt, it fights back, breathing at its foe from a distance; now and then one hunts a sheep, pig
+//! or cow. What one breathes (fire, frost, lightning or venom) is in its genes
 //! (`coats::breath`), inherited like a coat. Tamed by knocking out (`knockout.rs`), and ridden
 //! saddled (`riding.rs`). Lying down (resting, asleep, knocked out) is a look
 //! (`World::set_look`), as the Utahraptor's. The model, its animations and texture are built from
@@ -71,7 +72,9 @@ pub fn init(r: &mut Registry) {
         .goals(
             Goals::new()
                 .then(crate::animal::upkeep(INDEX))
+                .then(crate::breath::behave)
                 .then(crate::riding::ridden(INDEX))
+                .then(breathe_at_foe)
                 .then(crate::knockout::behave(INDEX))
                 .then(guard)
                 .then(crate::utahraptor::hunt)
@@ -116,6 +119,27 @@ fn guard(w: &World, id: u64, st: &EntityState) -> bool {
         weft_sdk::info!("wyvern {id} goes for player {p}");
         wake(w, id);
         crate::knockout::anger(w, id, p);
+    }
+    false
+}
+
+/// A goal for wild wyverns: angry at something 5 to 16 blocks off, now and then it breathes at
+/// it (what its genes give it: `breath.rs`).
+fn breathe_at_foe(w: &World, id: u64, st: &EntityState) -> bool {
+    if crate::animal::tamed(w, id) || w.random_below(30) != 0 {
+        return false;
+    }
+    let Some(foe) = w
+        .component(id, &crate::knockout::KNOCKOUT)
+        .filter(|k| k.out == 0 && k.angry > 0)
+        .map(|k| k.angry_at)
+    else {
+        return false;
+    };
+    let Some(f) = w.entity(foe) else { return false };
+    let d2 = (f.pos[0] - st.pos[0]).powi(2) + (f.pos[2] - st.pos[2]).powi(2);
+    if (25.0..256.0).contains(&d2) {
+        crate::breath::start(w, id, foe);
     }
     false
 }

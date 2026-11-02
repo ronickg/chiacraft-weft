@@ -231,6 +231,7 @@ pub static HOST: Host = Host {
     set_entity_scale,
     entity_fly,
     entity_mount_seat,
+    entity_ignite,
     structure_block,
     set_structure_block,
     lift_blocks,
@@ -716,6 +717,14 @@ unsafe extern "C" fn entity_mount_seat(w: *mut abi::WorldCtx, rider: u64, mount:
             r.seat_forward = if forward.is_finite() && mount != 0 { forward } else { 0.0 };
         }
         on
+    }
+}
+
+unsafe extern "C" fn entity_ignite(w: *mut abi::WorldCtx, id: u64, ticks: u32) {
+    unsafe {
+        if let Some(e) = dim(w).entities.get_mut(id) {
+            e.fire = e.fire.max(ticks);
+        }
     }
 }
 

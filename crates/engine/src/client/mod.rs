@@ -1298,7 +1298,13 @@ impl Client {
             let mut dyaw = e.target_yaw - e.yaw;
             dyaw = (dyaw + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
             e.yaw += dyaw * k as f32;
-            e.body_yaw = turn_body(e.body_yaw, e.yaw, walked.unwrap_or(e.pos - before), dt as f32);
+            let moved = walked.unwrap_or(e.pos - before);
+            e.body_yaw = turn_body(e.body_yaw, e.yaw, moved, dt as f32);
+            // A mob standing still brings its body round to where it looks (vanilla's body
+            // rotation), so one that turned to face something faces it whole.
+            if e.kind != content().game.player_kind && moved.with_y(0.0).length_squared() < 1e-6 {
+                e.body_yaw += angle_diff(e.yaw, e.body_yaw) * (1.0 - 0.9f32.powf(dt as f32 * crate::world::TPS as f32));
+            }
             e.arm_swing = e
                 .arm_swing
                 .map(|p| p + dt as f32 / 0.3)
