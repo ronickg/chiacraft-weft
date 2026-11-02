@@ -131,22 +131,33 @@
 
   // ---------------------------------------------------------------- balance
 
-  // What each species' numbers add up to: how fast a breeder gets young, generations, a
-  // recessive coat (the 4th generation is when two carriers' young show one, 1 in 4).
+  // Each species' real facts, the numbers the game derives from them (core/src/biology.rs; a
+  // number it sets itself is marked "set"), what they add up to for a player, and the balance
+  // checks against its rarity's targets (core/src/balance.rs, the same that web/test.mjs runs).
   function balance() {
-    const d = t => +(t / DAY).toFixed(2);
+    const d = t => +(t / DAY).toFixed(1), b = sp => sp.bio, set = (sp, k) => b(sp).tuned.includes(k) ? " (set)" : "";
+    const real = x => x >= 365 ? `${+(x / 365).toFixed(1)} y` : `${Math.round(x)} d`;
     const rows = species.map(sp => {
-      const carry = sp.gestation || 6000 + sp.incubation;
-      const cycle = (sp.gestation || 6000) + sp.recovery;
-      const litter = (sp.litter[0] + sp.litter[1]) / 2;
-      const gen = sp.growth + carry;
-      return [sp.breed ? `${sp.name} (${sp.breed})` : sp.name, sp.gestation ? `${d(sp.gestation)} d` : `lays at once, hatch ${d(sp.incubation)} d`,
-        `${sp.litter[0]}\u2013${sp.litter[1]}`, `${d(sp.recovery)} d`, `${d(sp.growth)} d`, `${d(sp.lifespan)} d`, `${d(gen)} d`,
-        (litter * 10 * DAY / cycle).toFixed(1), `${d(3 * gen)} d`, `${(3 * gen / DAY / 3).toFixed(1)} h`];
+      const f = b(sp), r = sp.balance, bad = r.checks.filter(c => !c.ok);
+      const fourth = r.checks.find(c => c.name === "fourth generation");
+      return [
+        [sp.breed ? `${sp.name} (${sp.breed})` : sp.name], [f.rarity], [`${f.mass} kg, ${f.social}`],
+        [f.gestation ? `carries ${real(f.gestation)}` : `hatches ${real(f.incubation)}`],
+        [`grown ${real(f.maturity)}, lives ${real(f.lifespan)}`],
+        [sp.gestation ? `${d(sp.gestation)} d${set(sp, "gestation")}` : `hatch ${d(sp.incubation)} d${set(sp, "incubation")}`],
+        [`${sp.litter[0] === sp.litter[1] ? sp.litter[0] : `${sp.litter[0]}\u2013${sp.litter[1]}`}${set(sp, "litter")}`], [`${d(sp.recovery)} d${set(sp, "recovery")}`],
+        [`${d(sp.growth)} d${set(sp, "growth")}`], [`${d(sp.lifespan)} d${set(sp, "lifespan")}`], [`${sp.crowd}${set(sp, "crowd")}`],
+        [r.young_per_ten.toFixed(1)],
+        [`${r.fourth.toFixed(0)} d, ${(r.fourth / 3).toFixed(0)} h`, fourth && !fourth.ok],
+        [bad.length ? bad.map(c => `${c.name}: ${c.found} (want ${c.target})`).join("; ") : "all pass", bad.length > 0, !bad.length],
+      ];
     });
-    const head = ["Species", "Carrying", "Litter", "Rest after", "Grows up in", "Lives about", "A generation", "Young per female per 10 d", "To the 4th generation", "That in play hours"];
+    const head = ["Species", "Rarity", "Mass, lives in", "Real: young", "Real: life", "Carrying", "Litter", "Rest after", "Grows up in",
+      "Lives about", "Room near", "Young per female per 10 d", "To the 4th generation (play hours)", "Checks"];
     $("lab-balance").replaceChildren(el("thead", {}, el("tr", {}, ...head.map(t => el("th", { textContent: t })))),
-      el("tbody", {}, ...rows.map(r => el("tr", {}, ...r.map((t, i) => el("td", { className: i ? "val" : "", textContent: t }))))));
+      el("tbody", {}, ...rows.map(r => el("tr", {}, ...r.map(([t, bad, good], i) => el("td", {
+        className: [i > 4 && i < 13 ? "val" : "", bad ? "fail" : "", good ? "pass" : ""].join(" ").trim(), textContent: t,
+      }))))));
   }
 
   // ---------------------------------------------------------------- playing and the live view

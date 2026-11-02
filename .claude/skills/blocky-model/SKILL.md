@@ -395,7 +395,8 @@ plain coat: the genes draw patterns now. In the chiacraft game the build copies 
 every animal's coat from its genome on the client. That crate also compiles to WASM
 (`mods/animals/web/build.sh` writes `animals.wasm`); the viewer then runs the game's own rules
 through `scripts/animals.js` (coat panel, How it works) and `scripts/lab.js` (the breeding lab:
-matings, litters, eggs, growing up, families, old age if set, evolution). `coats.js` is the
+matings, litters, eggs, growing up, families, old age if set, evolution; a balance table of
+each species' real facts, the numbers the game derives from them and the balance checks). `coats.js` is the
 standalone version, for a creature with no game behind it.
 
 **Every animal unique: the core traits.** Real looks come in three layers: the kind (species,

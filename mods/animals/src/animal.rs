@@ -205,7 +205,7 @@ fn catch_up(w: &World, id: u64, index: usize, a: &mut Animal, away: u64, pos: [f
     let female = r() < 0.5;
     let Some(mut g) = crate::coats::sample(index, female, &pool, &mut r) else { return };
     let age = life::successor_age(s, away, r());
-    let growing = (s.growth as u64).saturating_sub(age) as u32;
+    let growing = (s.growth() as u64).saturating_sub(age) as u32;
     *a = roll(w, index);
     a.female = g.female;
     a.born = life::birth(w.time(), age);
@@ -243,7 +243,7 @@ fn old_age(w: &World, id: u64, index: usize, a: &mut Animal) -> bool {
         let growing = w
             .component(id, &crate::breeding::BREEDING)
             .map_or(0, |b| b.growing) as u64;
-        a.born = if growing > 0 { life::birth(w.time(), s.growth as u64 - growing) } else { born_wild(w, index) };
+        a.born = if growing > 0 { life::birth(w.time(), s.growth() as u64 - growing) } else { born_wild(w, index) };
     }
     // Sped up for testing (`/animal speed`): older by the extra ticks too.
     let n = crate::breeding::speed() as u64;
@@ -273,7 +273,7 @@ fn old_age(w: &World, id: u64, index: usize, a: &mut Animal) -> bool {
 /// How old it is, in in-game days, and how long its kind lives (`old_age`).
 pub fn age_days(a: &Animal) -> Option<(f64, f64, u8)> {
     let s = a.species().filter(|_| a.born != 0)?;
-    Some((a.age as f64, s.lifespan as f64 / life::DAY as f64, if a.vigor == 0 { 100 } else { a.vigor }))
+    Some((a.age as f64, s.lifespan() as f64 / life::DAY as f64, if a.vigor == 0 { 100 } else { a.vigor }))
 }
 
 /// Max health and speed as the stats say; `heal` adds that much health on top (a new animal

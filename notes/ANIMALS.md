@@ -84,9 +84,11 @@ so adding an animal is mostly numbers:
 - **Stats**: a base value and per-level increments (wild and tamed) for each of the nine stats.
 - **Abilities**: its signature ability (below) and its jobs.
 - **Riding**: rideable, saddle recipe, the level that unlocks the saddle.
-- **Breeding**: heat cycle (length, interval, season), courtship time, the place it needs (nest,
-  den, burrow; biome; temperature), gestation or incubation time and temperature range, litter
-  or clutch size, recovery time, growth time per stage.
+- **Breeding**: as real facts (`Biology`: its mass, gestation or incubation, time to grow up,
+  lifespan, time between litters, litter size, whether it lives alone, in a pack or a herd, and
+  its rarity); the game's numbers follow from them (Balance, under Built so far). Still to come:
+  heat cycle and season, courtship time, the place it needs (nest, den, burrow; biome;
+  temperature).
 - **Looks**: color regions and the colors each can take, patterns, rare colors.
 
 ## Stats and levels
@@ -741,7 +743,8 @@ lifespan (its species', give or take a fifth by its genes' seed, so siblings don
 it is an **elder**: a grizzled muzzle, the coat a little faded, past breeding. At the end it dies
 (`animal::old_age`). Its screen says how old it is and how long its kind lives; `/animal age
 <days>` makes one older (testing). Lifespans, in in-game days (20 minutes each): dogs and cats
-50, capybaras 35, raptors 80, Utahraptors 160, wyverns 400. The lab runs the same rule (or none,
+50, capybaras 31, raptors 77, Utahraptors 153, wyverns 422 (derived from real lifespans since:
+Balance, below). The lab runs the same rule (or none,
 or a span of its own).
 
 **Balance research** (2026-11-02). How games and life pace breeding:
@@ -773,7 +776,8 @@ Sources: [Minecraft breeding](https://minecraft.wiki/w/Breeding), [ARK breeding]
 mate, I don't want them to die out; age should be part of the stats"). Wild animals now breed on
 their own: a grown, rested wild one, now and then (about every other day with room), falls in love
 with a wild mate within 24 blocks, the more readily the fewer of its kind within 48 blocks against
-its species' crowd (dogs, cats, raptors 10, capybaras 14, Utahraptors 6, wyverns 3), a little even
+its species' crowd (now derived: dogs 17, cats 13, capybaras 16, raptors 12, Utahraptors 7,
+wyverns 3), a little even
 when full, never past three times it (`life::love_chance`; elders crowd half). When crowded, wild
 ones die of want, the old and the young first (`life::want_chance`). Without that last part a pen
 filled with one generation that aged together and died out (cats and chihuahuas in the first
@@ -803,8 +807,44 @@ Sources: [Vintage Story forum](https://www.vintagestory.at/forums/topic/12926-ho
 [Elapsed](https://www.modpackindex.com/mod/208669/elapsed), [KeepMeGrowing](https://modrinth.com/plugin/keep-me-growing),
 [Cattlestrophic!](https://modrinth.com/mod/cattlestrophic) (old age for Minecraft's animals).
 
-*Next*: the rest of the balance (raptors growing up in 5-8 days instead of 4, Utahraptors and
-wyverns slower to hatch, selection 0.25-0.3, fewer mutations), then Dalmatian spotting.
+**Balance: numbers from real facts** (2026-11-02; Ronald: "lots of animals, how do we keep it
+balanced? Is there a function one can run for everything?"). Games that stay balanced with many
+creatures don't tune each one by hand: they derive the numbers from a few inputs by one formula
+(ARK's per-species multipliers on a global rate, card games' cost curves, Magic's and
+Hearthstone's "vanilla test"), and check every one against targets. Life has such a formula:
+spans scale with body mass by quarter powers (lifespan and time to maturity ~ M^1/4, metabolism ~
+M^3/4: Kleiber's law; gestation weaker). So a species is now written as life has it
+(`core/src/biology.rs`, `Biology`): its mass, real days carried or incubated, to grow up, of life
+and between litters, its litter, its social life and its rarity. One pacing for every species
+turns real days into game days, compressing long spans more than short ones (game days = a ·
+real days^k: carrying 0.056·d^0.75, growing up 0.0645·d^0.7, a life 0.0105·d, rest 0.0139·d;
+fitted so the first seven land on the research's recommendations above). The room near (`crowd`)
+falls with mass (land per animal grows with it, ~M^-0.2) and rises for packs and herds. Any
+number can still be set by hand (`Tune`), and shows as set.
+
+Then the checks (`core/src/balance.rs`), on every species, a new one included: a line four
+generations deep in 10-25 in-game days for a common species, 20-40 uncommon, 35-70 rare, 80-160
+legendary; grown up in under a fifth of its life; 6-40 young in a mother's breeding life; a
+sensible litter and room; and in the simulator a wild group left alone at its room (no newcomers,
+as in a pen) lasts 150 days or a life and a half in two runs of three (`web/test.mjs`). The lab's
+balance table shows the facts, the numbers derived, what they come to for a player and the checks.
+
+| | real: mass, young, grown, life | game days: carrying, rest, grown, life | litter | room | 4th gen |
+|---|---|---|---|---|---|
+| dog (chihuahua), common | 2.5 kg, 63 d, 300 d, 13 y | 1.3, 2.5, 3.5, 50 | 1-4 | 17 | 14 d |
+| cat, common | 4.5 kg, 65 d, 240 d, 13 y | 1.3, 2.8, 3.0, 50 | 1-4 | 13 | 13 d |
+| capybara, common | 50 kg, 140 d, 1.5 y, 8 y | 2.3, 5.1, 5.3, 31 | 2-6 | 16 | 23 d |
+| raptors, uncommon | 15 kg, eggs 74 d, 2.5 y, 20 y | hatch 1.4, 5.1, 7.5, 77 | 1-4 | 12 | 28 d |
+| Utahraptor, rare | 300 kg, eggs 140 d, 4.9 y, 40 y | hatch 2.3, 7.6, 12.3, 153 | 1-3 | 7 | 44 d |
+| wyvern, legendary | 5 t, eggs 1.2 y, 20 y, 110 y | hatch 5.5, 15.2, 32.7, 422 | 1 | 3 | 115 d |
+
+What the simulator found: small rooms die out. Left alone, a cat group with room for 8 died out
+within 150 days in half the runs, with 12 in none; a Utahraptor group of 4 in half, of 6 in one in
+eight (a minimum viable population, as conservation biology calls it). So rooms start from 13
+cats' worth, not 8. In the open the engine keeps spawning newcomers, so only pens depend on it.
+
+*Next*: the rest of the balance (selection 0.25-0.3, fewer mutations; combat stats by a cost
+curve the same way), then Dalmatian spotting.
 
 Sources: Lee, Cavener, Bond 2018 (PeerJ 6:e5690, giraffe spots); Kaelin et al. 2021 (Nature
 Communications, tabby genes); Manukyan et al. 2017 (Nature 544:173, lizard scales); Shin et al.

@@ -155,8 +155,8 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
         let days = (every * n as u64) as f64 / life::DAY as f64;
         let (kin, near) = kin_near(w, id, index, a);
         let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
-        if roll < life::want_chance(days, near, s.crowd, a.stage) {
-            weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {})", s.name, s.crowd);
+        if roll < life::want_chance(days, near, s.crowd(), a.stage) {
+            weft_sdk::info!("wild {} {id} died of want ({near:.1} of its kind near, room for {})", s.name, s.crowd());
             w.damage(id, 1e9, 0, damage::STARVE);
             return;
         }
@@ -200,7 +200,7 @@ fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[
     let s = &SPECIES[index];
     let Some(st) = w.entity(id) else { return };
     let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
-    if roll >= life::love_chance(days, near, s.crowd) {
+    if roll >= life::love_chance(days, near, s.crowd()) {
         return;
     }
     let mate = kin.iter().copied().find(|&o| {
@@ -329,7 +329,7 @@ fn mated(w: &World, id: u64, mate: u64, index: usize) {
     if let Some(b) = w.component_mut(id, &BREEDING) {
         b.love = 0;
         b.carrying = life::carrying(s);
-        b.rest = b.carrying + s.recovery;
+        b.rest = b.carrying + s.recovery();
         (b.mate, b.mate_wild) = (mate, wild);
         (b.mate_genes, b.mate_more) = pack(&genes);
     }
@@ -400,7 +400,7 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
         };
         let angle = k as f64 / n as f64 * std::f64::consts::TAU;
         let at = [st.pos[0] + angle.cos() * 0.6, st.pos[1], st.pos[2] + angle.sin() * 0.6];
-        if s.gestation > 0 {
+        if s.gestation() > 0 {
             born(w, at, &y, owner);
         } else {
             clutch.push(y);
@@ -408,7 +408,7 @@ fn deliver(w: &World, id: u64, index: usize, b: &Breeding) {
     }
     crate::eggs::lay(w, st.pos, &clutch, owner);
     hearts(w, id, 9);
-    let what = if s.gestation > 0 { "young born" } else { "eggs laid" };
+    let what = if s.gestation() > 0 { "young born" } else { "eggs laid" };
     weft_sdk::info!("animal {id}: {n} {what}");
 }
 
@@ -438,7 +438,7 @@ pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 
         *a = new;
     }
     if let Some(b) = w.component_mut(id, &BREEDING) {
-        *b = Breeding { growing: s.growth, generation: y.generation, mother: y.mother, father: y.father, ..Breeding::default() };
+        *b = Breeding { growing: s.growth(), generation: y.generation, mother: y.mother, father: y.father, ..Breeding::default() };
         (b.dam, b.dam_more) = pack(&y.dam);
         (b.sire, b.sire_more) = pack(&y.sire);
     }

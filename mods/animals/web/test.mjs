@@ -206,6 +206,28 @@ for (const name of ["cat", "raptor", "wyvern"]) {
   check("strength grows up, peaks, and fades when old", newborn < half && half < prime && prime === 1 && (old === null || old < prime),
     `newborn ${(newborn * 100).toFixed(0)}%, half grown ${(half * 100).toFixed(0)}%, prime ${(prime * 100).toFixed(0)}%, old ${old === null ? "died" : (old * 100).toFixed(0) + "%"}`);
 }
+console.log("Balance");
+// Every species, a new one too: its numbers against its rarity's targets (`core/src/balance.rs`),
+// and a wild group left to itself at its own room lasts, neither dying out nor flooding.
+for (const x of species) {
+  for (const c of x.balance.checks) check(`${x.name}: ${c.name}`, c.ok, `${c.found}, want ${c.target}`);
+  // Alone (no newcomers, as in a pen; in the open the engine spawns more), over 150 days or a
+  // life and a half: two runs of three last at least.
+  const days = Math.max(150, Math.round(x.lifespan / DAY * 1.5));
+  const runs = [0, 1, 2].map(() => {
+    let st = sim(x.name, { auto: true, cap: x.crowd, lifespan: "game" }), peak = 0;
+    for (let i = 0; i < 2; i++) st = call({ op: "sim_wild", species: x.index, female: i === 0 });
+    for (let d = 0; d < days; d++) {
+      st = call({ op: "sim_advance", ticks: DAY });
+      peak = Math.max(peak, st.animals.filter(a => !a.died).length);
+    }
+    return { alive: st.animals.filter(a => !a.died).length, peak, gens: Math.max(...st.animals.map(a => a.generation)) };
+  });
+  const lasted = runs.filter(r => r.alive >= 2).length, peak = Math.max(...runs.map(r => r.peak));
+  check(`${x.name}: a wild group at its room lasts ${days} days`, lasted >= 2 && peak <= x.crowd * 3,
+    `${lasted} of 3 lasted, alive ${runs.map(r => r.alive).join("/")}, peak ${peak}, room ${x.crowd}, up to ${Math.max(...runs.map(r => r.gens))} generations`);
+}
+
 console.log("Evolution");
 for (const [name, h, want] of [["raptor", "snow", "lighter"], ["raptor", "forest", "darker"], ["raptor", "desert", "sandier"]]) {
   const avg = r => r.sample.map(a => a.look.average).reduce((a, b) => a.map((v, i) => v + b[i] / r.sample.length), [0, 0, 0]);

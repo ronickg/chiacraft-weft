@@ -116,7 +116,11 @@ pub fn init(r: &mut Registry) {
     });
     r.shaped(&CRAFTING, "nest", 1, &["s s", "sws"], &[('s', "base:stick"), ('w', "base:wheat")]);
     let mut items = Vec::new();
-    for (i, s) in SPECIES.iter().enumerate().filter(|(_, s)| s.gestation == 0) {
+    for (i, s) in SPECIES
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.gestation() == 0)
+    {
         let item = Item::generated(format!("{}_egg", s.kind_name()));
         r.item(item)
             .max_stack(1)
@@ -247,7 +251,7 @@ pub fn lay(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
             (breeding::pack(&y.genome), breeding::pack(&y.dam), breeding::pack(&y.sire));
         let egg = Egg {
             species: y.index as u32 + 1,
-            left: SPECIES[y.index].incubation,
+            left: SPECIES[y.index].incubation(),
             generation: y.generation,
             mother: y.mother,
             father: y.father,
@@ -329,7 +333,7 @@ pub fn wild_clutch(w: &World, id: u64, index: usize, st: &EntityState) -> bool {
     let Some(pool) = crate::evolution::pool_at(w, index, st.pos) else { return false };
     let Some(father) = coats::sample(index, false, &pool, &mut r) else { return false };
     let generation = w.component(id, &BREEDING).map_or(0, |b| b.generation) + 1;
-    let n = s.litter.0 + w.random_below(s.litter.1 - s.litter.0 + 1);
+    let n = s.litter().0 + w.random_below(s.litter().1 - s.litter().0 + 1);
     let young: Vec<Young> = (0..n)
         .filter_map(|_| {
             Some(Young {
@@ -483,7 +487,7 @@ pub fn nest_now(w: &World, player: u64) -> bool {
         else {
             continue;
         };
-        if SPECIES.get(index).is_some_and(|s| s.gestation == 0)
+        if SPECIES.get(index).is_some_and(|s| s.gestation() == 0)
             && let Some(st) = w.entity(id)
             && wild_clutch(w, id, index, &st)
         {

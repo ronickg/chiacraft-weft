@@ -16,7 +16,7 @@ pub const DAY: u64 = 24_000;
 
 /// A young one's life stage with `growing` ticks of growing up left (an adult stays one).
 pub fn stage(s: &Species, growing: u32, was: u8) -> u8 {
-    match growing * 3 / s.growth.max(1) {
+    match growing * 3 / s.growth().max(1) {
         _ if growing == 0 => was.max(ADULT),
         2.. => BABY,
         1 => JUVENILE,
@@ -29,18 +29,18 @@ pub fn size(s: &Species, growing: u32) -> f32 {
     if growing == 0 {
         return 1.0;
     }
-    let grown = 1.0 - growing as f32 / s.growth.max(1) as f32;
+    let grown = 1.0 - growing as f32 / s.growth().max(1) as f32;
     s.birth_size + (1.0 - s.birth_size) * grown
 }
 
 /// Ticks from mating to the young born, or the eggs laid.
 pub fn carrying(s: &Species) -> u32 {
-    if s.gestation > 0 { s.gestation } else { LAYING }
+    if s.gestation() > 0 { s.gestation() } else { LAYING }
 }
 
 /// How many young a litter or clutch has, `roll` any random number.
 pub fn litter(s: &Species, roll: u32) -> u32 {
-    s.litter.0 + roll % (s.litter.1 - s.litter.0 + 1)
+    s.litter().0 + roll % (s.litter().1 - s.litter().0 + 1)
 }
 
 /// A young one's wild points: each stat's from one parent, the stronger 55% of the time
@@ -72,12 +72,12 @@ pub const ELDERLY: f64 = 0.8;
 /// How long an animal lives, in ticks: its species' lifespan, give or take a fifth by its genes'
 /// seed (so siblings don't die together); `u64::MAX` for a species that doesn't age.
 pub fn lifespan(s: &Species, seed: u32) -> u64 {
-    if s.lifespan == 0 {
+    if s.lifespan() == 0 {
         return u64::MAX;
     }
     let h = seed.wrapping_mul(2_654_435_761) ^ seed.rotate_left(13);
     let share = 0.8 + 0.4 * (h % 10_000) as f64 / 10_000.0;
-    (s.lifespan as f64 * share) as u64
+    (s.lifespan() as f64 * share) as u64
 }
 
 /// Its life stage at `age` ticks old: a grown one past `ELDERLY` of its `lifespan` is an elder.
@@ -87,8 +87,8 @@ pub fn aged(stage: u8, age: u64, lifespan: u64) -> u8 {
 
 /// How old a wild one is when first met, `roll` 0..1: grown, and up to most of an average life.
 pub fn wild_age(s: &Species, roll: f32) -> u64 {
-    let grown = s.growth as u64;
-    let most = (s.lifespan as f64 * 0.7) as u64;
+    let grown = s.growth() as u64;
+    let most = (s.lifespan() as f64 * 0.7) as u64;
     grown + (most.saturating_sub(grown) as f64 * roll.clamp(0.0, 1.0) as f64) as u64
 }
 
@@ -102,13 +102,13 @@ pub fn can_breed(stage: u8) -> bool {
 /// 0.6 at an average life's end. Health, stamina, damage, speed and what it carries go with it.
 pub fn vigor(s: &Species, growing: u32, age: u64) -> f32 {
     if growing > 0 {
-        let grown = 1.0 - growing as f32 / s.growth.max(1) as f32;
+        let grown = 1.0 - growing as f32 / s.growth().max(1) as f32;
         return 0.4 + 0.5 * grown;
     }
-    if s.lifespan == 0 {
+    if s.lifespan() == 0 {
         return 1.0;
     }
-    let (t, grown) = (age as f32 / s.lifespan as f32, s.growth as f32 / s.lifespan as f32);
+    let (t, grown) = (age as f32 / s.lifespan() as f32, s.growth() as f32 / s.lifespan() as f32);
     let elderly = ELDERLY as f32;
     if t < grown * 2.0 {
         0.9 + 0.1 * ((t - grown) / grown).clamp(0.0, 1.0)
@@ -179,6 +179,6 @@ pub const AWAY: u64 = 600;
 /// How old a wild one's successor is (born while its area was away, `away` ticks), `roll` 0..1:
 /// any age up to the time away or most of a life.
 pub fn successor_age(s: &Species, away: u64, roll: f32) -> u64 {
-    let most = away.min((s.lifespan as f64 * 0.8) as u64);
+    let most = away.min((s.lifespan() as f64 * 0.8) as u64);
     (most as f64 * roll.clamp(0.0, 1.0) as f64) as u64
 }

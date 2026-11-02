@@ -19,7 +19,7 @@ Two ways, the same rules (`mods/animals/core`):
       grep census: <the log>
 
   What a healthy run looks like: every pen keeps going for the ~150 in-game days, at around its
-  species' crowd (`Species::crowd`) to twice it, with young, grown and old at once (generations
+  species' crowd (`Species::crowd()`, derived from its facts) to twice it, with young, grown and old at once (generations
   overlapping), born and died rising together.
 
 - **Time away** (`away.txt`, about 20 seconds): six wild cats and a tame one, then `/animal

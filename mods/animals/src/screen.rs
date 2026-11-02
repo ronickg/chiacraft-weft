@@ -186,7 +186,7 @@ fn heading(ui: &mut Ui) {
         let laying = c
             .menu_component(&ANIMAL)
             .and_then(|a| a.species())
-            .is_some_and(|s| s.gestation == 0);
+            .is_some_and(|s| s.gestation() == 0);
         let min = |ticks: u32| Arg::Int(ticks.div_ceil(1200) as i64);
         match () {
             _ if b.love > 0 => t.set("screen.animals.love", &[]),

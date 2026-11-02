@@ -141,6 +141,8 @@ h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01
 .lab-log { margin: 0; padding-left: 0; list-style: none; font: 12px var(--mono); color: var(--muted); max-height: 180px; overflow: auto; }
 .lab-msg { font-size: 14px; color: var(--fg); min-height: 1.4em; }
 .lab-msg.bad { color: var(--alt); }
+.genes td.fail { color: var(--alt); font-weight: 600; }
+.genes td.pass { color: var(--good); }
 .evs { display: inline-flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); max-width: 120px; }
 .lab-live { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; background: var(--bg); display: block; }
 .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
@@ -250,7 +252,7 @@ h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01
     </div>
     <div class="stage">
       <header><h3>Balance</h3></header>
-      <p>Each species' breeding numbers as the game has them, and what they add up to. One in-game day is 20 minutes of play.</p>
+      <p>Each species is a few real facts (its mass, how long it carries or hatches, grows up and lives, its litter, whether it lives alone, in a pack or a herd). The game's numbers follow from them by one pacing for all, so a new animal falls in line with the rest; a number a species sets itself shows &ldquo;set&rdquo;. The checks are the website tests&rsquo;, against each rarity&rsquo;s targets (a common pet&rsquo;s line four generations deep in 10&ndash;25 in-game days, a legendary&rsquo;s in 80&ndash;160). One in-game day is 20 minutes of play.</p>
       <div class="tablewrap"><table class="genes" id="lab-balance"></table></div>
     </div>
     <div class="lab-grid">

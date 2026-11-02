@@ -6,6 +6,8 @@
 //! with its own model and numbers, the species (genes, behavior, what it is) shared. A wild
 //! species is never a breed: Velociraptor's two species are two rows, two species.
 
+pub use crate::biology::{Biology, Rarity, Social, Tune};
+
 /// Life stages, from a newborn to grown (`animal::Animal::stage`).
 pub const BABY: u8 = 0;
 pub const JUVENILE: u8 = 1;
@@ -156,27 +158,48 @@ pub struct Species {
     /// A grown average one's height in meters (its model's), and where it is measured
     /// (`screen.animals.size.<at>`): the shoulder, or the hip of a two-legged one.
     pub height: (f32, &'static str),
-    /// Young born or hatched at once (`breeding.rs`), fewest and most.
-    pub litter: (u32, u32),
-    /// Ticks a mother carries her young (an in-game day is 24 000); 0: it lays eggs.
-    pub gestation: u32,
-    /// Ticks its eggs take to hatch, kept warm.
-    pub incubation: u32,
-    /// Ticks a mother rests after a birth before she can breed again.
-    pub recovery: u32,
-    /// Ticks its young take to grow up.
-    pub growth: u32,
-    /// How many of its kind may live within `life::CROWD_RADIUS` blocks before the wild ones
-    /// stop breeding (a pack, a herd, a pair of dragons).
-    pub crowd: u32,
-    /// Ticks an average one lives (each its own, give or take a fifth: `life::lifespan`); 0:
-    /// for ever. In the middle of what the balance research found (notes/ANIMALS.md, "Old
-    /// age"): pets 40-60 in-game days, capybaras 30-45, raptors 60-100, Utahraptors 120-200,
-    /// wyverns 400 or more.
-    pub lifespan: u32,
+    /// It as life has it (mass, carrying, growing up, a life, litters; `biology`): its
+    /// breeding numbers follow from these by one pacing for every species (`gestation()`..).
+    pub bio: Biology,
+    /// Numbers it sets itself instead (`Tune::NONE`: all derived).
+    pub tune: Tune,
     /// A newborn's size against a grown one's (1: it has its own young model, the chihuahua's
     /// puppy).
     pub birth_size: f32,
+}
+
+impl Species {
+    /// Ticks a mother carries her young (an in-game day is 24 000); 0: it lays eggs.
+    pub fn gestation(&self) -> u32 {
+        self.tune.gestation.unwrap_or_else(|| self.bio.gestation())
+    }
+    /// Ticks its eggs take to hatch, kept warm.
+    pub fn incubation(&self) -> u32 {
+        self.tune
+            .incubation
+            .unwrap_or_else(|| self.bio.incubation())
+    }
+    /// Ticks a mother rests after a birth before she can breed again.
+    pub fn recovery(&self) -> u32 {
+        self.tune.recovery.unwrap_or_else(|| self.bio.recovery())
+    }
+    /// Ticks its young take to grow up.
+    pub fn growth(&self) -> u32 {
+        self.tune.growth.unwrap_or_else(|| self.bio.growth())
+    }
+    /// Ticks an average one lives (each its own, give or take a fifth: `life::lifespan`).
+    pub fn lifespan(&self) -> u32 {
+        self.tune.lifespan.unwrap_or_else(|| self.bio.lifespan())
+    }
+    /// How many of its kind may live within `life::CROWD_RADIUS` blocks before the wild ones
+    /// breed less (a pack, a herd, a pair of dragons).
+    pub fn crowd(&self) -> u32 {
+        self.tune.crowd.unwrap_or_else(|| self.bio.crowd())
+    }
+    /// Young born or hatched at once (`breeding.rs`), fewest and most.
+    pub fn litter(&self) -> (u32, u32) {
+        self.tune.litter.unwrap_or_else(|| self.bio.litter())
+    }
 }
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
@@ -224,13 +247,18 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.04,
         size_spread: 0.2,
         height: (0.20, "shoulder"),
-        litter: (1, 4),
-        gestation: 24_000,
-        incubation: 0,
-        recovery: 48_000,
-        growth: 72_000,
-        lifespan: 1_200_000, // 50 in-game days
-        crowd: 10,
+        bio: Biology {
+            mass: 2.5,
+            gestation: 63.0,
+            incubation: 0.0,
+            maturity: 300.0,
+            lifespan: 4750.0,
+            interval: 180.0,
+            litter: 3.0,
+            social: Social::Pack,
+            rarity: Rarity::Common,
+        },
+        tune: Tune::NONE,
         birth_size: 1.0,
     },
     Species {
@@ -271,13 +299,18 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.08,
         size_spread: 0.08,
         height: (0.24, "shoulder"),
-        litter: (2, 5),
-        gestation: 24_000,
-        incubation: 0,
-        recovery: 48_000,
-        growth: 72_000,
-        lifespan: 1_200_000, // 50 in-game days
-        crowd: 10,
+        bio: Biology {
+            mass: 4.5,
+            gestation: 65.0,
+            incubation: 0.0,
+            maturity: 240.0,
+            lifespan: 4750.0,
+            interval: 200.0,
+            litter: 3.0,
+            social: Social::Solitary,
+            rarity: Rarity::Common,
+        },
+        tune: Tune::NONE,
         birth_size: 0.35,
     },
     Species {
@@ -316,13 +349,18 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 0.97,
         size_spread: 0.08,
         height: (0.56, "shoulder"),
-        litter: (2, 6),
-        gestation: 48_000,
-        incubation: 0,
-        recovery: 72_000,
-        growth: 96_000,
-        lifespan: 840_000, // 35 in-game days
-        crowd: 14,
+        bio: Biology {
+            mass: 50.0,
+            gestation: 140.0,
+            incubation: 0.0,
+            maturity: 550.0,
+            lifespan: 2920.0,
+            interval: 365.0,
+            litter: 4.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+        },
+        tune: Tune::NONE,
         birth_size: 0.3,
     },
     Species {
@@ -353,13 +391,18 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.0,
         size_spread: 0.08,
         height: (0.50, "hip"),
-        litter: (2, 4),
-        gestation: 0,
-        incubation: 24_000,
-        recovery: 96_000,
-        growth: 96_000,
-        lifespan: 1_920_000, // 80 in-game days
-        crowd: 10,
+        bio: Biology {
+            mass: 15.0,
+            gestation: 0.0,
+            incubation: 74.0,
+            maturity: 900.0,
+            lifespan: 7300.0,
+            interval: 365.0,
+            litter: 3.0,
+            social: Social::Pack,
+            rarity: Rarity::Uncommon,
+        },
+        tune: Tune::NONE,
         birth_size: 0.3,
     },
     Species {
@@ -391,13 +434,18 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.0,
         size_spread: 0.08,
         height: (1.50, "hip"),
-        litter: (2, 4),
-        gestation: 0,
-        incubation: 48_000,
-        recovery: 96_000,
-        growth: 288_000,
-        lifespan: 3_840_000, // 160 in-game days
-        crowd: 6,
+        bio: Biology {
+            mass: 300.0,
+            gestation: 0.0,
+            incubation: 140.0,
+            maturity: 1800.0,
+            lifespan: 14600.0,
+            interval: 548.0,
+            litter: 2.0,
+            social: Social::Pack,
+            rarity: Rarity::Rare,
+        },
+        tune: Tune::NONE,
         birth_size: 0.15,
     },
     // Velociraptor's second species (named 2008, from Bayan Mandahu, Inner Mongolia; known from
@@ -430,13 +478,18 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.0,
         size_spread: 0.08,
         height: (0.50, "hip"),
-        litter: (2, 4),
-        gestation: 0,
-        incubation: 24_000,
-        recovery: 96_000,
-        growth: 96_000,
-        lifespan: 1_920_000, // 80 in-game days
-        crowd: 10,
+        bio: Biology {
+            mass: 15.0,
+            gestation: 0.0,
+            incubation: 74.0,
+            maturity: 900.0,
+            lifespan: 7300.0,
+            interval: 365.0,
+            litter: 3.0,
+            social: Social::Pack,
+            rarity: Rarity::Uncommon,
+        },
+        tune: Tune::NONE,
         birth_size: 0.3,
     },
     // The wyvern, a fantasy animal (`wyvern.rs`): a dragon with two legs and bat wings, about
@@ -481,13 +534,18 @@ pub static SPECIES: [Species; 7] = [
         dimorphism: 1.08,
         size_spread: 0.12,
         height: (3.9, "shoulder"),
-        litter: (1, 3),
-        gestation: 0,
-        incubation: 168_000,
-        recovery: 336_000,
-        growth: 960_000,
-        lifespan: 9_600_000, // 400 in-game days
-        crowd: 3,
+        bio: Biology {
+            mass: 5000.0,
+            gestation: 0.0,
+            incubation: 450.0,
+            maturity: 7300.0,
+            lifespan: 40150.0,
+            interval: 1095.0,
+            litter: 1.0,
+            social: Social::Solitary,
+            rarity: Rarity::Legendary,
+        },
+        tune: Tune::NONE,
         birth_size: 0.08,
     },
 ];

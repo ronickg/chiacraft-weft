@@ -16,8 +16,8 @@ use std::cell::RefCell;
 
 use animals_core::coats::{self, Genome, Pool, Rng};
 use animals_core::evolution::{self, HABITATS, Habitat};
-use animals_core::life;
-use animals_core::species::{ADULT, BABY, ELDER, SPECIES, STATS, same_species};
+use animals_core::species::{ADULT, BABY, ELDER, SPECIES, STATS, Species, same_species};
+use animals_core::{balance, life};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -189,15 +189,52 @@ fn about(g: &Genome) -> Value {
     })
 }
 
+/// A species' real facts, and which of its numbers it sets itself (`Tune`) instead of deriving.
+fn bio(s: &Species) -> Value {
+    let (b, t) = (&s.bio, &s.tune);
+    let tuned: Vec<&str> = [
+        ("gestation", t.gestation.is_some()),
+        ("incubation", t.incubation.is_some()),
+        ("recovery", t.recovery.is_some()),
+        ("growth", t.growth.is_some()),
+        ("lifespan", t.lifespan.is_some()),
+        ("crowd", t.crowd.is_some()),
+        ("litter", t.litter.is_some()),
+    ]
+    .iter()
+    .filter(|(_, on)| *on)
+    .map(|(n, _)| *n)
+    .collect();
+    json!({
+        "mass": b.mass, "gestation": b.gestation, "incubation": b.incubation, "maturity": b.maturity,
+        "lifespan": b.lifespan, "interval": b.interval, "litter": b.litter,
+        "social": format!("{:?}", b.social).to_lowercase(), "rarity": b.rarity.name(),
+        "tuned": tuned,
+    })
+}
+
+/// What its numbers come to for a player, and the balance checks (`balance.rs`).
+fn balance(s: &Species) -> Value {
+    let r = balance::report(s);
+    json!({
+        "generation": r.generation, "fourth": r.fourth, "young_per_ten": r.young_per_ten,
+        "lifetime_young": r.lifetime_young,
+        "checks": balance::checks(s).iter().map(|c| json!({
+            "name": c.name, "ok": c.ok, "found": c.found, "target": c.target,
+        })).collect::<Vec<_>>(),
+    })
+}
+
 fn handle(req: &Value) -> Result<Value, String> {
     match req["op"].as_str().unwrap_or("") {
         // The species table and the habitats.
         "species" => Ok(json!({
             "species": SPECIES.iter().enumerate().map(|(i, s)| json!({
                 "index": i, "name": s.name, "breed": s.breed, "model": s.model, "binomial": s.binomial,
-                "gestation": s.gestation, "incubation": s.incubation, "litter": s.litter, "growth": s.growth,
-                "recovery": s.recovery, "birth_size": s.birth_size, "dimorphism": s.dimorphism,
-                "height": s.height.0, "flight": s.flight, "camouflage": s.camouflage, "lifespan": s.lifespan,
+                "gestation": s.gestation(), "incubation": s.incubation(), "litter": s.litter(), "growth": s.growth(),
+                "recovery": s.recovery(), "birth_size": s.birth_size, "dimorphism": s.dimorphism,
+                "height": s.height.0, "flight": s.flight, "camouflage": s.camouflage, "lifespan": s.lifespan(),
+                "crowd": s.crowd(), "bio": bio(s), "balance": balance(s),
             })).collect::<Vec<_>>(),
             "habitats": HABITATS.iter().map(|h| h.name()).collect::<Vec<_>>(),
             "day": life::DAY,
@@ -436,7 +473,7 @@ fn mate(sim: &mut Sim, m: u32, f: u32) -> Result<(), String> {
     }
     can_breed(&unhex(&ma.genome)?, &unhex(&fa.genome)?)?;
     let s = &SPECIES[ma.species];
-    let (carry, recovery) = (life::carrying(s), s.recovery);
+    let (carry, recovery) = (life::carrying(s), s.recovery());
     for a in sim.animals.iter_mut() {
         if a.id == m {
             (a.carrying, a.mate, a.mate_genome, a.rest) = (carry, f, fa.genome.clone(), carry + recovery);
@@ -459,7 +496,7 @@ fn deliver(sim: &mut Sim, id: u32) {
         .generation
         .max(father.as_ref().map_or(0, |f| f.generation))
         + 1;
-    let laying = s.gestation == 0;
+    let laying = s.gestation() == 0;
     let mut born = Vec::new();
     for _ in 0..n {
         let r = sim.rng();
@@ -477,7 +514,7 @@ fn deliver(sim: &mut Sim, id: u32) {
             mother: id,
             father: m.mate,
             generation,
-            growing: s.growth,
+            growing: s.growth(),
             stage: BABY,
             rest: 0,
             carrying: 0,
@@ -486,7 +523,7 @@ fn deliver(sim: &mut Sim, id: u32) {
             wild,
             died: 0,
             cause: String::new(),
-            egg: if laying { s.incubation } else { 0 },
+            egg: if laying { s.incubation() } else { 0 },
         });
         born.push(child);
     }
@@ -536,7 +573,7 @@ fn advance(sim: &mut Sim, ticks: u64) {
             let span = match rule {
                 None => life::lifespan(s, seed),
                 Some(0) => u64::MAX,
-                Some(d) => (d as u64 * life::DAY) * life::lifespan(s, seed) / s.lifespan.max(1) as u64,
+                Some(d) => (d as u64 * life::DAY) * life::lifespan(s, seed) / s.lifespan().max(1) as u64,
             };
             let age = (tick as i64 - a.born).max(0) as u64;
             a.stage = life::aged(a.stage, age, span);
@@ -614,7 +651,7 @@ fn auto_mate(sim: &mut Sim, days: f64) {
             .animals
             .iter()
             .filter(|a| kin(a) && a.carrying > 0)
-            .map(|_| (s.litter.0 + s.litter.1) / 2)
+            .map(|_| (s.litter().0 + s.litter().1) / 2)
             .sum();
         let near = sim
             .animals
