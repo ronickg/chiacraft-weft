@@ -42,6 +42,9 @@ file may set for them:
   size); a chain (a neck, a tail) scales every segment along it; a bone whose boxes sit in a
   `_tilt` child (rotated elements) is scaled through that child.
 
+Scars aren't genes: an animal keeps what life left on it in its genome's `scars` (`src/scars.rs`),
+painted on its coat's layers, never passed on.
+
 A species' own locus with a core trait's id replaces it (its `Dk`, its `Sz`); never reuse a core
 id for a locus of alleles. Add a species' new loci after its old ones, or saved genomes read the
 wrong genes.

@@ -415,7 +415,9 @@ the animal's eye color, keeping its painted light. A design stamped by hand (out
 `paint.stamp_eyes`) calls `paint.mark_iris` itself. Builds vary too (a gene file's `build`: the
 bones each build trait scales): name a model's bones so a trait can find them (one bone per neck
 or tail segment, the jaw and eyelids under the head); in the viewer a bone whose rotated boxes
-became meshes (`_tilt` in the game) can't be scaled.
+became meshes (`_tilt` in the game) can't be scaled. Scars (what life left: claw lines, tooth
+marks, a blade's line, a burn, torn wing skin) are painted the same way, flat on the surface where
+they fall; the viewer's **Scar** button adds one.
 
 ## Props (no skeleton)
 

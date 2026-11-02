@@ -60,6 +60,24 @@ const SLOTS: usize = 32;
 /// The genome's layout now.
 const VERSION: u8 = 1;
 
+/// Scar kinds (`Genome::scars`): three raked lines of claws, a ring of tooth marks, a blade's
+/// long line, a burn, torn wing skin.
+pub const CLAW: u8 = 1;
+pub const BITE: u8 = 2;
+pub const SLASH: u8 = 3;
+pub const BURN: u8 = 4;
+pub const TEAR: u8 = 5;
+
+/// `g` keeps a scar of `kind` at `place` (any byte: where on its body), the oldest of four going.
+pub fn scar(g: &mut Genome, kind: u8, place: u8) {
+    let free = (0..4).find(|&i| g.scars[2 * i] == 0).unwrap_or_else(|| {
+        g.scars.copy_within(2..8, 0);
+        3
+    });
+    g.scars[2 * free] = kind;
+    g.scars[2 * free + 1] = place;
+}
+
 /// A genome kept before the core traits (version 0, zeros where they now are): none of them
 /// yet, so they read as the middle until `upkeep` draws them.
 pub fn mend(g: &mut Genome) {
@@ -606,6 +624,8 @@ pub struct Look {
     eye: Option<Rgb>,
     /// Model units to a pattern's (`GeneFile::mark_scale`).
     scale: f32,
+    /// Its scars: kind and place (`Genome::scars`).
+    scars: [[u8; 2]; 4],
     seed: u32,
 }
 
@@ -1086,6 +1106,10 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         _ => raptor(&r),
     };
     core(&r, &mut look);
+    look.scars = std::array::from_fn(|i| [genome.scars[2 * i], genome.scars[2 * i + 1]]);
+    if look.scars.iter().any(|s| s[0] != 0) {
+        look.name += ", scarred";
+    }
     look.seed = genome.seed;
     if let Some(p) = &mut look.patches {
         p.seed = genome.seed;
@@ -1230,6 +1254,130 @@ fn pattern(kind: &str, p: [f32; 3], u: f32, s: i32, m: &Marks) -> f32 {
         "brindle" => band((z + 2.5 * noise3(x * 0.25, y * 0.25, z * 0.25, s) * 3.0) / 2.2, w(0.3)),
         "patches" => smooth(noise3(x * 0.15, y * 0.15, z * 0.15, s), 0.5 - 0.25 * d, 0.56 - 0.25 * d),
         _ => 0.0,
+    }
+}
+
+// ------------------------------------------------------------------ scars
+
+/// A scar placed on a model: its kind, its middle (on the body), the surface's normal there, the
+/// way it runs and across it (along the surface), its length (a bite's or burn's radius) and its
+/// width, in model units.
+struct ScarShape {
+    kind: u8,
+    c: [f32; 3],
+    n: [f32; 3],
+    d: [f32; 3],
+    across: [f32; 3],
+    len: f32,
+    w: f32,
+}
+
+fn sub3(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+fn dot3(a: [f32; 3], b: [f32; 3]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+fn len3(a: [f32; 3]) -> f32 {
+    dot3(a, a).sqrt()
+}
+fn norm3(a: [f32; 3]) -> [f32; 3] {
+    let l = len3(a).max(1e-6);
+    a.map(|v| v / l)
+}
+fn cross3(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+}
+
+/// Where `look`'s scars fall on a model's layers: each on a coat texel its place picks (a tear on
+/// the wing skin, the accent; the others where patterns show), running a way its place picks,
+/// sized to the body.
+fn scar_shapes(l: &Layers, look: &Look) -> Vec<ScarShape> {
+    let [lo, hi] = l.bounds;
+    let size = len3(sub3(hi, lo));
+    let seed = look.seed as i32;
+    let texels = l.w * l.h;
+    let mut out = Vec::new();
+    for [kind, place] in look.scars {
+        if kind == 0 {
+            continue;
+        }
+        let fits = |i: usize| {
+            l.info[i * 4] >= 128
+                && if kind == TEAR { l.props[i * 4 + 1] > 150 } else { l.props2[i * 4 + 1] > 80 && l.props[i * 4 + 1] < 100 }
+        };
+        let count = (0..texels).filter(|&i| fits(i)).count();
+        if count == 0 {
+            continue;
+        }
+        let h = |k: i32| hash3(place as i32, k, 99, seed);
+        let pick = ((h(1) * count as f32) as usize).min(count - 1);
+        let Some(i) = (0..texels).filter(|&i| fits(i)).nth(pick) else { continue };
+        let at = |i: usize| [0, 1, 2].map(|k| lo[k] + l.pos[i * 4 + k] as f32 / 255.0 * (hi[k] - lo[k]));
+        let c = at(i);
+        // The surface there: from the texels beside and below it on the same face.
+        let near = |j: usize| (j < texels && l.info[j * 4] >= 128 && len3(sub3(at(j), c)) < size * 0.02).then(|| sub3(at(j), c));
+        let (right, down) = (near(i + 1).or_else(|| near(i.wrapping_sub(1))), near(i + l.w).or_else(|| near(i.wrapping_sub(l.w))));
+        let n = match (right, down) {
+            (Some(a), Some(b)) if len3(cross3(a, b)) > 1e-6 => norm3(cross3(a, b)),
+            _ => norm3([h(5) - 0.5, h(6) - 0.5, h(7) - 0.5]),
+        };
+        let d = norm3(cross3(n, norm3([h(2) - 0.5, (h(3) - 0.5) * 1.4, h(4) - 0.5])));
+        let across = cross3(n, d);
+        let (len, w) = match kind {
+            CLAW => (0.11, 0.006),
+            BITE => (0.055, 0.011),
+            BURN => (0.07, 0.0),
+            TEAR => (0.08, 0.008),
+            _ => (0.15, 0.006),
+        };
+        out.push(ScarShape { kind, c, n, d, across, len: size * len * (0.8 + 0.4 * h(8)), w: (size * w).max(1.0) });
+    }
+    out
+}
+
+impl ScarShape {
+    /// How much of a texel at `p` (model units) it covers, 0..1.
+    fn cover(&self, p: [f32; 3], seed: i32) -> f32 {
+        // On the surface it lies on, and a little round its edges.
+        let depth = dot3(sub3(p, self.c), self.n);
+        if depth.abs() > self.len * 0.5 {
+            return 0.0;
+        }
+        let p = [0, 1, 2].map(|k| p[k] - self.n[k] * depth);
+        let line = |off: f32, len: f32, w: f32| {
+            let r = [0, 1, 2].map(|k| p[k] - self.c[k] - self.across[k] * off);
+            let t = dot3(r, self.d).clamp(-len / 2.0, len / 2.0);
+            let dist = len3([0, 1, 2].map(|k| r[k] - self.d[k] * t));
+            // Narrowing toward its ends.
+            let w = w * (1.0 - (2.0 * t / len).powi(2)).max(0.0).sqrt();
+            1.0 - smooth(dist, w * 0.5, w.max(0.01))
+        };
+        match self.kind {
+            CLAW => (-1..=1)
+                .map(|k| line(k as f32 * self.w * 3.0, self.len * (1.0 - 0.15 * (k as f32).abs()), self.w))
+                .fold(0.0, f32::max),
+            BITE => {
+                // Two arcs of tooth marks round where the jaws closed.
+                let r = sub3(p, self.c);
+                let (a, b) = (dot3(r, self.d), dot3(r, self.across));
+                let ring = (a.hypot(b) - self.len).abs();
+                let angle = b.atan2(a);
+                let tooth = ((angle * 9.0 / std::f32::consts::PI).rem_euclid(2.0) < 1.0) as u8 as f32;
+                tooth * (1.0 - smooth(ring, self.w * 0.6, self.w * 1.2))
+            }
+            BURN => {
+                let dist = len3(sub3(p, self.c));
+                let k = 3.0 / self.len.max(0.01);
+                let edge = self.len * (0.7 + 0.6 * noise3(p[0] * k, p[1] * k, p[2] * k, seed + 41));
+                1.0 - smooth(dist, edge * 0.85, edge)
+            }
+            TEAR => {
+                let k = 2.0 / self.w.max(0.01);
+                line((noise3(p[0] * k, p[1] * k, p[2] * k, seed + 43) - 0.5) * self.w * 2.0, self.len, self.w * 1.6)
+            }
+            _ => line(0.0, self.len, self.w * 1.3),
+        }
     }
 }
 
@@ -1409,6 +1557,7 @@ fn render(l: &Layers, skin: &mut Skin, look: &Look) {
             .map(|(x, y)| lum(&skin.rgba[at(x, y).1..]))
             .fold(0.0, f32::max)
     });
+    let scars = scar_shapes(l, look);
     for y in 0..h {
         for x in 0..w {
             let (i, o) = at(x, y);
@@ -1465,6 +1614,28 @@ fn render(l: &Layers, skin: &mut Skin, look: &Look) {
                 let wn = white + (noise3(p[0] * 0.22, p[1] * 0.22, p[2] * 0.22, s + 5) - 0.5) * (0.15 + 0.3 * m.edge);
                 let thr = 1.0 - look.white;
                 c = mix(c, WHITE, smooth(wn, thr, thr + 0.05));
+            }
+            let at_rest = [0, 1, 2].map(|k| lo[k] + l.pos[i + k] as f32 / 255.0 * (hi[k] - lo[k]));
+            let mut torn = false;
+            for sc in &scars {
+                let a = sc.cover(at_rest, s);
+                if a <= 0.0 {
+                    continue;
+                }
+                c = match sc.kind {
+                    // Scorched dark in the middle, its edge pale.
+                    BURN => mix(c, mix(mix(darken(c, 0.5), [124.0, 62.0, 52.0], 0.35), lighten(c, 0.3), (1.0 - a) * 0.8), a.min(1.0)),
+                    TEAR => {
+                        torn |= a > 0.5;
+                        mix(c, darken(c, 0.45), a)
+                    }
+                    // Healed skin, paler and pinker than the coat, where the hair grows back white.
+                    _ => mix(c, mix(lighten(c, 0.4), [214.0, 182.0, 172.0], 0.4), a * 0.85),
+                };
+            }
+            if torn {
+                skin.rgba[o + 3] = 0;
+                continue;
             }
             let t = tone(c, -3.0 + level * 0.25);
             for k in 0..3 {

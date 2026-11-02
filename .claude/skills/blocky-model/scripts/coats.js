@@ -245,6 +245,8 @@
     G = genes;
     const c = PHENOTYPES[genes.species](genes, a);
     core(genes, a, c);
+    c.scars = (a.scars || []).slice(0, 4);
+    if (c.scars.length) c.name += ", scarred";
     c.seed = a.seed;
     G = null;
     return c;
@@ -351,6 +353,79 @@
     }
   }
 
+  // ---------------------------------------------------------------- scars (the game's `scars.rs`)
+
+  // Scar kinds: three raked claw lines, a ring of tooth marks, a blade's line, a burn, torn wing
+  // skin. An animal keeps up to four ([kind, place]: place any byte), the oldest going.
+  const SCAR = { claw: 1, bite: 2, slash: 3, burn: 4, tear: 5 };
+  function scar(a, kind, place) {
+    a.scars = (a.scars || []).concat([[kind, place]]).slice(-4);
+  }
+  const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const len3 = a => Math.sqrt(dot3(a, a));
+  const norm3 = a => { const l = Math.max(len3(a), 1e-6); return a.map(v => v / l); };
+  const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  // Where the scars fall on a model's layers: each on a coat texel its place picks (a tear on the
+  // wing skin, the others where patterns show), sized to the body.
+  function scarShapes(layers, look) {
+    const { w, h, info, pos, props, props2, bounds } = layers, [lo, hi] = bounds;
+    const size = len3(sub3(hi, lo)), seed = look.seed | 0, n = w * h, out = [];
+    for (const [kind, place] of look.scars || []) {
+      if (!kind) continue;
+      const fits = i => info[i * 4] >= 128 && (kind === SCAR.tear ? props[i * 4 + 1] > 150 : props2[i * 4 + 1] > 80 && props[i * 4 + 1] < 100);
+      const hits = [];
+      for (let i = 0; i < n; i++) if (fits(i)) hits.push(i);
+      if (!hits.length) continue;
+      const H = k => hash3(place, k, 99, seed);
+      const i = hits[Math.min(hits.length - 1, Math.floor(H(1) * hits.length))];
+      const at = j => [0, 1, 2].map(k => lo[k] + pos[j * 4 + k] / 255 * (hi[k] - lo[k]));
+      const c = at(i);
+      // The surface there: from the texels beside and below it on the same face.
+      const near = j => (j >= 0 && j < n && info[j * 4] >= 128 && len3(sub3(at(j), c)) < size * 0.02) ? sub3(at(j), c) : null;
+      const right = near(i + 1) || near(i - 1), down = near(i + w) || near(i - w);
+      const nrm = right && down && len3(cross3(right, down)) > 1e-6 ? norm3(cross3(right, down)) : norm3([H(5) - 0.5, H(6) - 0.5, H(7) - 0.5]);
+      const d = norm3(cross3(nrm, norm3([H(2) - 0.5, (H(3) - 0.5) * 1.4, H(4) - 0.5])));
+      const across = cross3(nrm, d);
+      const [len, wd] = { 1: [0.11, 0.006], 2: [0.055, 0.011], 4: [0.07, 0], 5: [0.08, 0.008] }[kind] || [0.15, 0.006];
+      out.push({ kind, c, n: nrm, d, across, len: size * len * (0.8 + 0.4 * H(8)), w: Math.max(1, size * wd) });
+    }
+    return out;
+  }
+  // How much of a texel at p (model units) a scar covers, 0..1.
+  function scarCover(sc, p, seed) {
+    // On the surface it lies on, and a little round its edges.
+    const depth = dot3(sub3(p, sc.c), sc.n);
+    if (Math.abs(depth) > sc.len * 0.5) return 0;
+    p = [0, 1, 2].map(k => p[k] - sc.n[k] * depth);
+    const line = (off, len, w) => {
+      const r = [0, 1, 2].map(k => p[k] - sc.c[k] - sc.across[k] * off);
+      const t = Math.max(-len / 2, Math.min(len / 2, dot3(r, sc.d)));
+      const dist = len3([0, 1, 2].map(k => r[k] - sc.d[k] * t));
+      const ww = w * Math.sqrt(Math.max(0, 1 - (2 * t / len) ** 2));
+      return 1 - smooth(dist, ww * 0.5, Math.max(ww, 0.01));
+    };
+    switch (sc.kind) {
+      case SCAR.claw: return Math.max(...[-1, 0, 1].map(k => line(k * sc.w * 3, sc.len * (1 - 0.15 * Math.abs(k)), sc.w)));
+      case SCAR.bite: {
+        const r = sub3(p, sc.c), a = dot3(r, sc.d), b = dot3(r, sc.across);
+        const ring = Math.abs(Math.hypot(a, b) - sc.len), angle = Math.atan2(b, a);
+        const tooth = (((angle * 9 / Math.PI) % 2) + 2) % 2 < 1 ? 1 : 0;
+        return tooth * (1 - smooth(ring, sc.w * 0.6, sc.w * 1.2));
+      }
+      case SCAR.burn: {
+        const dist = len3(sub3(p, sc.c)), k = 3 / Math.max(sc.len, 0.01);
+        const edge = sc.len * (0.7 + 0.6 * noise3(p[0] * k, p[1] * k, p[2] * k, seed + 41));
+        return 1 - smooth(dist, edge * 0.85, edge);
+      }
+      case SCAR.tear: {
+        const k = 2 / Math.max(sc.w, 0.01);
+        return line((noise3(p[0] * k, p[1] * k, p[2] * k, seed + 43) - 0.5) * sc.w * 2, sc.len, sc.w * 1.6);
+      }
+      default: return line(0, sc.len, sc.w * 1.3);
+    }
+  }
+
   // ---------------------------------------------------------------- light (paint.tones)
 
   function rgb2hsv([r, g, b]) {
@@ -384,6 +459,7 @@
     const [lo, hi] = bounds, s = look.seed | 0;
     // The eyes' iris in its color, keeping its painted light (the game's `render`).
     const lum = o => 0.3 * base[o] + 0.59 * base[o + 1] + 0.11 * base[o + 2];
+    const scars = scarShapes(layers, look);
     let brightest = 0;
     if (look.eye) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       if (props2[(y * w + x) * 4 + 2] > 127) brightest = Math.max(brightest, lum((y * stride + x) * 4));
@@ -429,6 +505,16 @@
         const wn = white + (noise3(p[0] * 0.22, p[1] * 0.22, p[2] * 0.22, s + 5) - 0.5) * (0.15 + 0.3 * m.edge), thr = 1 - look.white;
         c = mix(c, WHITE, smooth(wn, thr, thr + 0.05));
       }
+      const at = [0, 1, 2].map(k => lo[k] + pos[i + k] / 255 * (hi[k] - lo[k]));
+      let torn = false;
+      for (const sc of scars) {
+        const a = scarCover(sc, at, s);
+        if (a <= 0) continue;
+        if (sc.kind === SCAR.burn) c = mix(c, mix(mix(darken(c, 0.5), [124, 62, 52], 0.35), lighten(c, 0.3), (1 - a) * 0.8), Math.min(1, a));
+        else if (sc.kind === SCAR.tear) { torn = torn || a > 0.5; c = mix(c, darken(c, 0.45), a); }
+        else c = mix(c, mix(lighten(c, 0.4), [214, 182, 172], 0.4), a * 0.85);  // healed, paler and pinker
+      }
+      if (torn) { out[o + 3] = 0; continue; }
       const t = tone(c, -3 + level * 0.25);
       out[o] = t[0]; out[o + 1] = t[1]; out[o + 2] = t[2];
     }
@@ -449,5 +535,5 @@
     return out;
   }
 
-  root.Coats = { rng, withCore, random, breed, phenotype, genotype, render, tone, build };
+  root.Coats = { rng, withCore, random, breed, phenotype, genotype, render, tone, build, scar, SCAR };
 })(typeof window !== "undefined" ? window : globalThis);

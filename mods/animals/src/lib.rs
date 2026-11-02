@@ -29,6 +29,7 @@ mod evolution;
 mod knockout;
 mod raptor;
 mod riding;
+mod scars;
 mod screen;
 mod signatures;
 mod species;
@@ -95,6 +96,7 @@ fn init(r: &mut Registry) {
     knockout::init(r);
     riding::init(r);
     coats::init(r);
+    scars::init(r);
     breeding::init(r);
     eggs::init(r);
     evolution::init(r);

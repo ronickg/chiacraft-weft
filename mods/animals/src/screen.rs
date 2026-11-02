@@ -188,7 +188,7 @@ fn heading(ui: &mut Ui) {
             _ if b.carrying > 0 => t.set("screen.animals.expecting", &[min(b.carrying)]),
             _ if b.growing > 0 => t.set("screen.animals.growing", &[min(b.growing)]),
             _ if b.rest > 0 => t.set("screen.animals.resting", &[min(b.rest)]),
-            _ => t.set("", &[]),
+            _ => t.text(""),
         }
     });
     // Its family: its generation and its parents' coats, or born in the wild.
@@ -483,6 +483,14 @@ fn command(cmd: &mut ServerCommand) {
         "hurry" => crate::breeding::hurry_near(&w, player),
         "nest" => {
             crate::eggs::nest_now(&w, player);
+        }
+        // A scar of each kind (testing scars: `scars.rs`).
+        "scar" => {
+            if let Some(g) = w.component_mut(id, &crate::coats::GENOME) {
+                for kind in [crate::coats::CLAW, crate::coats::BITE, crate::coats::SLASH, crate::coats::TEAR] {
+                    crate::coats::scar(g, kind, w.random_below(256) as u8);
+                }
+            }
         }
         kind @ ("fire" | "frost" | "lightning" | "venom") => {
             if let Some(g) = w.component_mut(id, &crate::coats::GENOME) {

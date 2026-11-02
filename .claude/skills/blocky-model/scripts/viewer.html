@@ -79,7 +79,7 @@ h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01
   <div class="bar" id="coatbar" hidden>
     <span class="label">Coat</span>
     <div class="seg" id="coatbtns" role="group" aria-label="Coat">
-      <button type="button" id="c-natural">Natural</button><button type="button" id="c-random">Random</button><button type="button" id="c-mother">Mother</button><button type="button" id="c-father">Father</button><button type="button" id="c-breed">Breed</button><button type="button" id="c-roll">Roll 12</button>
+      <button type="button" id="c-natural">Natural</button><button type="button" id="c-random">Random</button><button type="button" id="c-mother">Mother</button><button type="button" id="c-father">Father</button><button type="button" id="c-breed">Breed</button><button type="button" id="c-roll">Roll 12</button><button type="button" id="c-scar">Scar</button>
     </div>
     <label class="toggle coatopt" id="habitat-wrap" hidden>Country <select id="habitat"></select></label>
     <label class="toggle"><input type="checkbox" id="young"> Young</label>
@@ -223,7 +223,8 @@ async function loadCoat(url, a) {
   return coat;
 }
 function setMap(a, tex) {
-  a.model.traverse(o => { if (o.material && o.material.map) { o.material.map = tex; o.material.needsUpdate = true; } });
+  // Texels a coat leaves clear (torn wing skin) cut out, as the game's model shader does.
+  a.model.traverse(o => { if (o.material && o.material.map) { o.material.map = tex; o.material.alphaTest = 0.5; o.material.needsUpdate = true; } });
 }
 // A new wild one: of the chosen country's kind, young if "Young" is ticked.
 function rollOne(c) {
@@ -330,6 +331,13 @@ const stencil = () => onCoat(c => {
 document.getElementById("p-stencil").onchange = stencil;
 document.getElementById("p-stencil-color").oninput = stencil;
 document.getElementById("p-clear").onclick = () => onCoat(c => { c.paint = {}; document.getElementById("p-stencil").value = ""; });
+// A scar of a random kind at a random place, as a bad wound leaves one (`scars.rs`).
+document.getElementById("c-scar").onclick = () => onCoat(c => {
+  if (!c.current) c.current = rollOne(c);
+  const kinds = Object.values(Coats.SCAR);
+  c.current = Object.assign({}, c.current);
+  Coats.scar(c.current, kinds[Math.floor(coatRng() * kinds.length)], Math.floor(coatRng() * 256));
+});
 document.getElementById("young").onchange = e => onCoat(c => {
   if (!c.current) c.current = rollOne(c);
   c.current = Object.assign({}, c.current, { stage: e.target.checked ? 0 : 3 });

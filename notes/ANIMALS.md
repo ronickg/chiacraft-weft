@@ -695,7 +695,17 @@ client, so only the genes travel): a bone's own boxes about its pivot, its child
 size and moved with its ends, the animal raised or lowered by how far that moves its lowest
 point at rest. Each gene file's `build` names the bones.
 
-*Next*: scars (their place in the genome is kept), then Dalmatian spotting.
+*Scars* (2026-11-02; `scars.rs`): a blow that takes more than a twelfth of an animal's health
+may leave a scar (likelier the harder it was, at most six in ten), of what dealt it: an animal's
+claws (or a cat's swipe, a raptor's kick) three raked lines, its teeth a ring of tooth marks, a
+blade or a tail one long line, fire or a blast a burn; a winged one's wing skin tears instead a
+third of the time (holes in it). Up to four, the oldest going, kept in the genome (synced, saved,
+not inherited); its coat's name says "scarred". Each is painted flat on the body's surface where
+its place falls (the back and flanks; a tear on the wing skin), sized to the body: healed skin
+paler and pinker than the coat, a burn dark with a pale rim. `/animal scar` gives the animal looked
+at one of each.
+
+*Next*: Dalmatian spotting.
 
 Sources: Lee, Cavener, Bond 2018 (PeerJ 6:e5690, giraffe spots); Kaelin et al. 2021 (Nature
 Communications, tabby genes); Manukyan et al. 2017 (Nature 544:173, lizard scales); Shin et al.
