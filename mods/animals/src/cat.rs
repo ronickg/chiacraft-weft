@@ -61,6 +61,7 @@ pub fn init(r: &mut Registry) {
             Goals::new()
                 .then(crate::animal::upkeep(1))
                 .then(crate::taming::behave(1))
+                .then(crate::signatures::gifts)
                 .then(crate::commands::act(1))
                 .then(settle)
                 .then(crate::commands::hold)

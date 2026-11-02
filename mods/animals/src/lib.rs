@@ -33,6 +33,7 @@ mod cat;
 mod commands;
 mod raptor;
 mod screen;
+mod signatures;
 mod species;
 mod taming;
 
@@ -147,6 +148,7 @@ fn init(r: &mut Registry) {
     screen::init(r);
     taming::init(r);
     commands::init(r);
+    signatures::init(r);
     r.entity_component(&DOG, Dog::default(), component_flags::SAVE);
     r.entity_component(&SEEN, Seen::default(), 0);
     r.particle(&HEART)
@@ -214,6 +216,8 @@ fn goals() -> Goals {
         .then(animal::upkeep(0))
         .then(upkeep)
         .then(taming::behave(0))
+        .then(signatures::alarm)
+        .then(signatures::tracking)
         .then(commands::act(0))
         .then(|w: &World, id: u64, st: &EntityState| {
             // Hurt: runs about for three seconds.
@@ -356,6 +360,10 @@ fn interact(e: &mut EntityEvent) {
         return;
     }
     if !commands::can_command(&w, id, player) {
+        return;
+    }
+    // Something an animal drops (and the dog doesn't eat): it tracks that animal down.
+    if species::SPECIES[0].food(held.item).is_none() && signatures::track(&w, id, held.item) {
         return;
     }
     if MEATS.iter().any(|m| m.id() == held.item) {

@@ -94,6 +94,8 @@ pub struct Species {
     pub shy: f32,
     /// Whether it fights (a tame's stance does nothing for one that doesn't).
     pub fights: bool,
+    /// What it does best (`signatures.rs`; `screen.animals.signature.<it>`).
+    pub signature: &'static str,
 }
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
@@ -127,6 +129,7 @@ pub static SPECIES: [Species; 4] = [
         feedings: 4.0,
         shy: 3.0,
         fights: true,
+        signature: "alarm",
     },
     Species {
         kind: &crate::cat::CAT,
@@ -152,6 +155,7 @@ pub static SPECIES: [Species; 4] = [
         feedings: 5.0,
         shy: 6.0,
         fights: true,
+        signature: "gifts",
     },
     Species {
         kind: &crate::capybara::CAPYBARA,
@@ -175,6 +179,7 @@ pub static SPECIES: [Species; 4] = [
         feedings: 3.0,
         shy: 0.0,
         fights: false,
+        signature: "calm",
     },
     Species {
         kind: &crate::raptor::RAPTOR,
@@ -196,6 +201,7 @@ pub static SPECIES: [Species; 4] = [
         feedings: 10.0,
         shy: 8.0,
         fights: true,
+        signature: "pack",
     },
 ];
 

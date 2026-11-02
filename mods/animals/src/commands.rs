@@ -79,7 +79,8 @@ static OWNER_ID: Component<u64> = Component::named("owner_id");
 static HOSTILE: Tag = Tag::named("hostile");
 static NOTE: Particle = Particle::named("heart");
 /// Client to server: an order from the animal screen, as (animal, order): a command (0-3), a
-/// stance (10-13), or sharing with the tribe turned on or off (20).
+/// stance (10-13), sharing with the tribe turned on or off (20), or tracking what the player
+/// holds (30).
 pub static ORDER: Channel<[u64; 2]> = Channel::named("order");
 static WHISTLES: [(Key, &str); 5] = [
     (Key::named("whistle_follow"), "J"),
@@ -261,6 +262,10 @@ fn order_one(w: &World, id: u64, player: u64, order: u32) {
             if let Some(s) = w.component_mut(id, &SHARED) {
                 *s = if s.is_some() || !tribe.is_some() { Tribe::default() } else { tribe };
             }
+        }
+        30 => {
+            let held = w.inventory(player).get(w.selected_slot(player));
+            crate::signatures::track(w, id, held.item);
         }
         _ => {}
     }

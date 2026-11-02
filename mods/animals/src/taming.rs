@@ -105,7 +105,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             }
             return true;
         }
-        if (w.time() + id) % 10 == 0 && s.shy > 0.0 && frightened(w, st, s.shy) {
+        if (w.time() + id) % 10 == 0 && s.shy > 0.0 && frightened(w, st, s.shy) && !crate::signatures::calm(w, st.pos) {
             scare(w, id);
             return true;
         }
@@ -261,7 +261,9 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
     // What it asked for counts a quarter more (kibble is best anyway).
     let wanted = t.want as usize == index + 1;
     let needed = s.feedings * (1.0 + a.level() as f32 / 100.0);
-    let gain = food.liking.taming() * if wanted { 1.25 } else { 1.0 } / needed;
+    // Near a capybara it takes to you a quarter faster.
+    let calm = if crate::signatures::calm(w, st.pos) { 1.25 } else { 1.0 };
+    let gain = food.liking.taming() * if wanted { 1.25 } else { 1.0 } * calm / needed;
     let wait = WAIT_TICKS.0 + w.random_below(WAIT_TICKS.1 - WAIT_TICKS.0);
     set(w, id, |t| {
         t.progress = (t.progress + gain).min(1.0);

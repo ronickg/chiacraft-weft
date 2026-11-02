@@ -36,7 +36,7 @@ pub fn init(r: &mut Registry) {
             }
         });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here)] [count:int]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift)] [count:int]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -142,6 +142,10 @@ fn heading(ui: &mut Ui) {
         let owner = if tamed(c) { "screen.animals.tamed" } else { "screen.animals.wild" };
         t.set("screen.animals.about", &[Arg::Key(sex_key(&a)), Arg::Key(&stage_key(&a)), Arg::Key(owner)]);
     });
+    ui.text_bind(|c, t| {
+        let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
+        t.set("screen.animals.signature", &[Arg::Key(&format!("screen.animals.signature.{}", s.signature))]);
+    });
 }
 
 /// A stat's value as it is read: health with a decimal, damage and speed as a percentage of
@@ -231,6 +235,7 @@ fn animal_screen(ui: &mut Ui) {
                 order_button(ui, &format!("screen.animals.stance.{name}"), 10 + i as u64);
             }
             order_button(ui, "screen.animals.share", 20);
+            order_button(ui, "screen.animals.track", 30);
         });
         ui.text_bind(|c, t| {
             let Some(a) = c.menu_component(&ANIMAL) else { return };
@@ -310,7 +315,8 @@ fn nearest(w: &World, player: u64, range: f64) -> Option<u64> {
 }
 
 /// `/animal` on the animal you look at (or the nearest): `show` its screen, `tame` it (yours), give it `points`
-/// to place, make it `wild` again with new levels, or bring it `here` (two blocks ahead).
+/// to place, make it `wild` again with new levels, bring it `here` (two blocks ahead), or have a
+/// cat bring its next `gift` now.
 fn command(cmd: &mut ServerCommand) {
     let (w, player) = (cmd.world(), cmd.player());
     let Some(id) = looked_at(&w, player, 16.0).or_else(|| nearest(&w, player, 12.0)) else {
@@ -338,6 +344,7 @@ fn command(cmd: &mut ServerCommand) {
             }
             cmd.reply("command.animals.wild", &[]);
         }
+        "gift" => crate::signatures::gift_now(&w, id),
         "here" => {
             if let (Some(p), Some(mut e)) = (w.entity(player), w.entity(id)) {
                 let (sy, cy) = (p.yaw as f64).sin_cos();

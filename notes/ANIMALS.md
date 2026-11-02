@@ -1,7 +1,7 @@
 # Animals: taming, stats, breeding (design)
 
-Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Steps 1-3
-of the build order (the core, passive taming, commands) are built; see "Built so far" at the end. "Proposed" marks numbers and
+Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Steps 1-4
+of the build order (the core, passive taming, commands, signatures) are built; see "Built so far" at the end. "Proposed" marks numbers and
 details that still need his yes. Reference: ARK, made to
 fit chiacraft (worlds owned by their players, linked by portals, the chain only where it adds
 trust; see `notes/PLAN.md`).
@@ -457,6 +457,30 @@ general features worth offering upstream):
 Checked in the game with the chihuahua: the buttons, following, an aggressive dog biting a
 zombie, the stay whistle. Not yet tried: tribes with two players, guarding, the other animals'
 commands.
+
+**Step 4, signatures** (2026-11-01, `signatures.rs`):
+
+- **Chihuahua alarm**: a tame barks (`sounds/chihuahua/bark1-3.wav`, synthesized yips) at the
+  nearest monster within 12 blocks (up to 27 with level), at most every two seconds and once per
+  monster, and marks it with a red "!" for five seconds.
+- **Chihuahua tracking**: given something an animal drops (right click with leather, a feather,
+  wool, string, gunpowder...; or the animal screen's "Sniff out" with it in hand, for meat and
+  bones it would eat), it leads its owner to the nearest such animal within 96 blocks, waiting
+  when it is 8 blocks ahead, and barks and marks it when there. Two minutes at most; it gives up
+  (a puff) if there is none. Tracking players comes later.
+- **Cat lucky finds**: every 5-10 minutes (half that at full bond) a tame walks to its owner
+  (within 24 blocks) and drops a gift from loot tables `animals:cat_gift_common` (string,
+  feathers...), `_uncommon` (eggs, chicken, leather...), `_rare` (raw iron and gold, ingots,
+  apples) and `_precious` (diamonds): rare 4% rising to 16.5% with level and bond, precious 0.2%
+  to 0.7% with level. Other mods can add to the tables.
+- **Capybara calm aura**: 6 blocks, up to 20 with level and bond, from any capybara (wild ones
+  too): shy animals don't run from you, passive taming goes 25% faster, scared animals settle
+  (a tame's running off stops), tames staying there gain a point of bond about every minute.
+  Pale motes drift around it.
+- Every screen shows the species' signature; `/animal gift` makes a cat's next gift come now.
+
+Checked in the game: the mark over a zombie, a dog leading to a sheep and waiting, three gifts
+from a cat, a shy cat that stays beside a capybara (and runs without one).
 
 Not yet: XP and earning points (the command gives them), naming, the higher spyglass tier, tame
 caps and other world settings. Engine note: clients don't see other entities' attribute
