@@ -222,6 +222,10 @@ pub static HOST: Host = Host {
     reg_words,
     set_entity_size,
     set_entity_look,
+    entity_mount,
+    entity_mount_of,
+    entity_rider,
+    entity_keys,
     entity_kind_size,
     structure_block,
     set_structure_block,
@@ -1995,6 +1999,62 @@ unsafe extern "C" fn set_entity_size(w: *mut abi::WorldCtx, id: u64, width: f32,
         if let Some(e) = d.entities.get_mut(id) {
             e.size = (width > 0.0).then_some([width, height.max(0.0), eye.clamp(0.0, height.max(0.0))]);
         }
+    }
+}
+
+unsafe extern "C" fn entity_mount(w: *mut abi::WorldCtx, rider: u64, mount: u64, seat: f32) -> u32 {
+    unsafe {
+        let d = dim(w);
+        if mount != 0 {
+            // Not itself, nor something that (in a chain) rides it.
+            let mut on = Some(mount);
+            while let Some(m) = on {
+                if m == rider {
+                    return 0;
+                }
+                on = d.entities.get(m).and_then(|e| e.mount).map(|(n, _)| n);
+            }
+            if d.entities.get(mount).is_none_or(|e| e.removed) {
+                return 0;
+            }
+        }
+        let Some(r) = d.entities.get_mut(rider).filter(|e| !e.removed) else { return 0 };
+        r.mount = (mount != 0).then_some((mount, if seat.is_finite() { seat } else { 0.0 }));
+        if mount == 0 && r.pose == crate::world::Pose::Sit {
+            r.pose = crate::world::Pose::Stand;
+        }
+        1
+    }
+}
+
+unsafe extern "C" fn entity_mount_of(w: *mut abi::WorldCtx, id: u64, seat: *mut f32) -> u64 {
+    unsafe {
+        let Some((m, s)) = dim(w).entities.get(id).and_then(|e| e.mount) else { return 0 };
+        if !seat.is_null() {
+            *seat = s;
+        }
+        m
+    }
+}
+
+unsafe extern "C" fn entity_rider(w: *mut abi::WorldCtx, mount: u64) -> u64 {
+    unsafe {
+        dim(w)
+            .entities
+            .list
+            .iter()
+            .find(|e| !e.removed && e.mount.is_some_and(|(m, _)| m == mount))
+            .map_or(0, |e| e.id)
+    }
+}
+
+unsafe extern "C" fn entity_keys(w: *mut abi::WorldCtx, id: u64) -> u32 {
+    unsafe {
+        dim(w)
+            .entities
+            .get(id)
+            .filter(|e| e.player)
+            .map_or(0, |e| e.keys as u32)
     }
 }
 

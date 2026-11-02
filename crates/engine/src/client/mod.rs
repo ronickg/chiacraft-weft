@@ -85,6 +85,10 @@ pub struct LocalPlayer {
     /// Sneaking now and wanting to sprint now.
     pub sneak: bool,
     pub sprint: bool,
+    /// The mount it sits on and the seat's height (the server's `core:mount`): there it stays,
+    /// and its movement keys (`keys`, `abi::held_keys`) steer the mount on the server.
+    pub mount: Option<(u64, f64)>,
+    pub keys: u8,
 }
 
 pub struct ClientEntity {
@@ -134,6 +138,8 @@ pub struct ClientEntity {
     pub frame: u64,
     pub rel: DVec3,
     pub rel_target: Option<DVec3>,
+    /// What it rides and the seat's height: drawn there.
+    pub mount: Option<(u64, f32)>,
     /// A moving structure's blocks, in its own coordinates (meshed like the world's).
     pub structure: Option<Box<ClientWorld>>,
     /// The world's light on a moving structure, by its cubes, as the server worked it out.
@@ -568,6 +574,8 @@ impl Client {
                     [k.width, k.height, k.eye].map(|v| v as f64)
                 },
                 riding: None,
+                mount: None,
+                keys: 0,
                 flying: false,
                 noclip: false,
                 fly_speed: 1.0,
@@ -887,7 +895,7 @@ impl Client {
         // Limbs swing with horizontal speed in the air too, like vanilla.
         crate::model::walk_limbs(&mut self.self_walk, &mut self.self_swing, speed, dt as f32);
         // Vanilla's: swimming doesn't bob, even touching the bottom.
-        let walking = self.player.on_ground && !self.player.flying && self.player.pose != Pose::Swim && !self.dead;
+        let walking = self.player.on_ground && !self.player.flying && self.player.pose != Pose::Swim && !self.dead && self.player.mount.is_none();
         // Vanilla: amplitude follows the per-tick speed capped at 0.1, eased by 0.4 per tick.
         self.walk_dist += moved * 0.6;
         let target = if walking { (speed / 20.0).min(0.1) } else { 0.0 };
@@ -947,6 +955,7 @@ impl Client {
         let ready = self.joined && !self.dead && (flying || block(self.player.pos.floor().as_ivec3()).is_some());
         // The clock bodies are predicted by runs on while the player waits, or they would stop.
         let mut ambient_steps = 0;
+        self.player.keys = held_keys(input, &self.player);
         if self.joined {
             let air_if_missing = |p: IVec3| block(p).or(Some(crate::content::AIR));
             self.accum += dt.min(0.25);
@@ -998,6 +1007,13 @@ impl Client {
                     }
                 }
                 if !ready {
+                    continue;
+                }
+                // Riding: on the seat of the mount as it is drawn; the server moves the mount.
+                if let Some(at) = self.seat() {
+                    let p = &mut self.player;
+                    (p.pos, p.prev, p.vel, p.pose) = (at, at, DVec3::ZERO, Pose::Sit);
+                    (p.support, p.riding, p.on_ground) = (None, None, false);
                     continue;
                 }
                 if !flying {
@@ -1082,7 +1098,12 @@ impl Client {
 
     fn move_message(&self, landed: bool) -> ToServer {
         ToServer::Move {
-            frame: self.player.riding.map(|(b, _, now)| (b, now)),
+            // Seated, the server puts it on the seat of the mount as the server has it.
+            frame: match self.player.mount {
+                Some((m, seat)) if self.seat().is_some() => Some((m, DVec3::Y * seat)),
+                _ => self.player.riding.map(|(b, _, now)| (b, now)),
+            },
+            keys: self.player.keys,
             pos: self.player.pos,
             yaw: self.player.yaw,
             pitch: self.player.pitch,
@@ -1286,6 +1307,21 @@ impl Client {
                 *d += dt as f32;
                 e.hurt = 0.4;
                 e.burning = false;
+            }
+        }
+        // Riders on their mounts as drawn: the player's own mount too.
+        let seats: Vec<(u64, DVec3)> = self
+            .entities
+            .iter()
+            .filter_map(|(&id, e)| {
+                let (m, seat) = e.mount?;
+                let on = if m == self.player_id { self.smooth_pos() } else { self.entities.get(&m)?.pos };
+                Some((id, on + DVec3::Y * seat as f64))
+            })
+            .collect();
+        for (id, at) in seats {
+            if let Some(e) = self.entities.get_mut(&id) {
+                (e.pos, e.target) = (at, at);
             }
         }
         self.frames = frames;
@@ -1770,7 +1806,12 @@ impl Client {
     /// Copies an engine field component into the entity (or the own player) that shows it.
     fn engine_field(&mut self, id: u64, comp: u32, bytes: &[u8]) {
         let c = content();
-        let [health, burning, worn, shape, held] = c.game.field_comps;
+        let [health, burning, worn, shape, held, mount] = c.game.field_comps;
+        let mounted = || {
+            let m = bytes.get(..8).map_or(0, |b| u64::from_le_bytes(b.try_into().unwrap()));
+            let seat = bytes.get(8..12).map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
+            (m != 0).then_some((m, seat))
+        };
         let f: Vec<f32> = words(bytes).map(f32::from_le_bytes).collect();
         let shaped = || {
             let size = (f.len() == 4 && f[0] > 0.0).then(|| [f[0], f[1], f[2]]);
@@ -1793,6 +1834,8 @@ impl Client {
                 if f[0] > 0.0 {
                     self.dead = false;
                 }
+            } else if comp == mount {
+                self.player.mount = mounted().map(|(m, seat)| (m, seat as f64));
             } else if comp == shape {
                 let (size, look) = shaped();
                 let k = &c.game.entities[c.game.player_kind as usize];
@@ -1811,6 +1854,8 @@ impl Client {
             e.burning = bytes.first().is_some_and(|&b| b != 0);
         } else if comp == worn {
             e.worn = words(bytes).map(u32::from_le_bytes).collect();
+        } else if comp == mount {
+            e.mount = mounted();
         } else if comp == held {
             e.held = words(bytes).next().map_or(0, u32::from_le_bytes);
         } else if comp == shape {
@@ -1878,6 +1923,9 @@ impl Client {
     /// Position drawn this frame, between the last two physics ticks; on a body, on the body as
     /// it is shown now.
     pub fn smooth_pos(&self) -> DVec3 {
+        if let Some(at) = self.seat() {
+            return at;
+        }
         let t = (self.accum / STEP).clamp(0.0, 1.0);
         if let Some((b, before, now)) = self.player.riding {
             if let Some(e) = self.entities.get(&b) {
@@ -1885,6 +1933,12 @@ impl Client {
             }
         }
         self.player.prev.lerp(self.player.pos, t)
+    }
+
+    /// Where the player sits while riding: its mount's seat as the mount is drawn.
+    fn seat(&self) -> Option<DVec3> {
+        let (m, seat) = self.player.mount?;
+        self.entities.get(&m).map(|e| e.pos + DVec3::Y * seat)
     }
 
     pub fn camera(&self) -> Camera {
@@ -1997,6 +2051,7 @@ impl Client {
             frame: 0,
             rel: DVec3::ZERO,
             rel_target: None,
+            mount: None,
             structure: None,
             world_light: Default::default(),
         }
@@ -2251,6 +2306,24 @@ pub(crate) fn turn_body(body: f32, head: f32, moved: DVec3, dt: f32) -> f32 {
 /// `a - b` the short way around, radians.
 fn angle_diff(a: f32, b: f32) -> f32 {
     (a - b + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
+}
+
+/// The movement keys held, as `abi::held_keys` (a mount the player rides is steered by them).
+fn held_keys(input: &Input, p: &LocalPlayer) -> u8 {
+    use weft_abi::held_keys as h;
+    let mut keys = 0;
+    for (action, bit) in [("core:forward", h::FORWARD), ("core:back", h::BACK), ("core:left", h::LEFT), ("core:right", h::RIGHT), ("core:jump", h::JUMP)] {
+        if input.held(action) {
+            keys |= bit;
+        }
+    }
+    if p.sprint {
+        keys |= h::SPRINT;
+    }
+    if p.sneak {
+        keys |= h::SNEAK;
+    }
+    keys as u8
 }
 
 /// One 20 Hz tick of player movement with vanilla's numbers (blocks per tick): acceleration

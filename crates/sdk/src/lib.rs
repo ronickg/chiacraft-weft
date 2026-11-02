@@ -19,7 +19,7 @@ pub mod terrain;
 mod ui;
 mod world;
 
-pub use abi::{ItemStack, hud_anchor, tool_tier, worn_parts};
+pub use abi::{ItemStack, held_keys, hud_anchor, tool_tier, worn_parts};
 pub use cache::ColumnCache;
 pub use client::{Channel, Client, Packet, Payload, keys, launch_option, screens};
 pub use command::{ClientCommand, Command, CommandOptions, ServerCommand};

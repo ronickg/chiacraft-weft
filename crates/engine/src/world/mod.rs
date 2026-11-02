@@ -24,6 +24,8 @@ pub enum Pose {
     Crawl,
     /// In bed, on its back.
     Sleep,
+    /// Riding something, seated with its legs forward; its position is the seat.
+    Sit,
 }
 
 impl Pose {
@@ -33,6 +35,7 @@ impl Pose {
             2 => Pose::Swim,
             3 => Pose::Crawl,
             4 => Pose::Sleep,
+            5 => Pose::Sit,
             _ => Pose::Stand,
         }
     }

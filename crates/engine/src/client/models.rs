@@ -58,6 +58,7 @@ pub struct Posed {
     pub pitch: f32,
     pub swing: f32,
     pub crouch: bool,
+    pub sit: bool,
     pub head_yaw: f32,
     pub swim: Option<f32>,
     pub attack: f32,
@@ -320,6 +321,7 @@ impl Models {
                         holding: e.holding,
                         anims,
                         crouch: e.crouch,
+                        sit: e.sit,
                     },
                     scratch,
                 );

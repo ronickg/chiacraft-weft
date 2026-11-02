@@ -105,7 +105,7 @@ impl Server {
             }
             ToServer::StopBreak => self.players[pi].mining = None,
             ToServer::StopUsing => self.players[pi].using = None,
-            ToServer::Move { pos, yaw, pitch, on_ground, pose, sprint, flying, frame } => {
+            ToServer::Move { pos, yaw, pitch, on_ground, pose, sprint, flying, frame, keys } => {
                 if !pos.is_finite() {
                     return;
                 }
@@ -131,8 +131,10 @@ impl Server {
                 let state = r.get(pos.floor().as_ivec3());
                 let in_liquid = state.is_some_and(|s| c.states[s as usize].liquid.is_some());
                 let climbing = state.is_some_and(|s| c.states[s as usize].flags & abi::block_flags::CLIMBABLE != 0);
+                // A rider doesn't fall: its mount does.
+                let seated = r.entities.get(entity).is_some_and(|e| e.mount.is_some());
                 let mut fall = r.entities.get(entity).map_or(0.0, |e| e.fall);
-                let land = entity::track_fall(&mut fall, dy, on_ground, in_liquid || climbing)
+                let land = entity::track_fall(&mut fall, dy, on_ground || seated, in_liquid || climbing)
                     .and_then(|f| entity::fall_damage(&c.game.entities[c.game.player_kind as usize], f));
                 if let Some(e) = r.entities.get_mut(entity) {
                     e.fall = fall;
@@ -147,6 +149,7 @@ impl Server {
                     e.on_ground = on_ground;
                     e.in_liquid = in_liquid;
                     e.pose = pose;
+                    e.keys = keys;
                 }
                 if let Some(amount) = land {
                     r.damage(c, entity, amount, 0, damage::FALL);

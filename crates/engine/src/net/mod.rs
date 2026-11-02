@@ -282,8 +282,9 @@ messages! {
         /// `vouch_line`), or empty; the world checks it and learns the identity behind the key.
         Join { name: String, key: String, account: String },
         /// `frame`: the body it rides and its position relative to that body as the client shows it
-        /// (the client shows bodies behind the server; only the relative position agrees).
-        Move { pos: DVec3, yaw: f32, pitch: f32, on_ground: bool, pose: crate::world::Pose, sprint: bool, flying: bool, frame: Option<(u64, DVec3)> },
+        /// (the client shows bodies behind the server; only the relative position agrees), or the
+        /// mount it sits on and its seat. `keys`: the movement keys held (`abi::held_keys`).
+        Move { pos: DVec3, yaw: f32, pitch: f32, on_ground: bool, pose: crate::world::Pose, sprint: bool, flying: bool, frame: Option<(u64, DVec3)>, keys: u8 },
         /// Started mining this block (`frame` like `Break`'s).
         StartBreak { pos: IVec3, frame: u64 },
         /// Stopped mining without finishing.

@@ -8,8 +8,8 @@ use weft_abi::{Model, block_flags as bf};
 use crate::content::Content;
 
 /// A player's box and eyes in a pose (modern vanilla), on client and server alike: crouching
-/// lowers them like the player's 1.8 to 1.5 and 1.62 to 1.27, swimming to 0.6 and 0.4, whatever
-/// size it has.
+/// lowers them like the player's 1.8 to 1.5 and 1.62 to 1.27, swimming to 0.6 and 0.4, sitting
+/// to 1.15 and 0.97 above the seat, whatever size it has.
 pub fn posed(pose: crate::world::Pose, height: f64, eye: f64) -> (f64, f64) {
     use crate::world::Pose;
     let r = |v: f64| (v * 1e6).round() / 1e6;
@@ -18,6 +18,8 @@ pub fn posed(pose: crate::world::Pose, height: f64, eye: f64) -> (f64, f64) {
         Pose::Crouch => (r(height * 1.5 / 1.8), r(eye * 1.27 / 1.62)),
         Pose::Swim | Pose::Crawl => (r(height * 0.6 / 1.8), r(eye * 0.4 / 1.62)),
         Pose::Sleep => (r(height * 0.2 / 1.8), r(eye * 0.45 / 1.62)),
+        // Seated: the position is the seat, the hips a little above it.
+        Pose::Sit => (r(height * 1.15 / 1.8), r(eye * 0.97 / 1.62)),
     }
 }
 

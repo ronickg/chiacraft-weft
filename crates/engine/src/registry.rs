@@ -358,8 +358,8 @@ pub struct Game {
     pub world_ticks: Vec<(ModId, Callback)>,
     /// `abi::comp::NAME` as an entity component.
     pub name_comp: u32,
-    /// `HEALTH`, `BURNING`, `WORN`, `SHAPE`, `HELD`.
-    pub field_comps: [u32; 5],
+    /// `HEALTH`, `BURNING`, `WORN`, `SHAPE`, `HELD`, `MOUNT`.
+    pub field_comps: [u32; 6],
     /// `SIMULATED`.
     pub simulated_comp: u32,
     /// Entity components with `SYNC_WATCHERS` / `SYNC_MENU`.
@@ -1196,6 +1196,9 @@ pub const BURNING: &str = "core:burning";
 pub const WORN: &str = "core:worn";
 pub const SHAPE: &str = "core:shape";
 pub const HELD: &str = "core:held";
+/// What it rides (`u64`, 0 for nothing) and the seat's height (`f32`), so clients put riders on
+/// their mounts.
+pub const MOUNT: &str = "core:mount";
 /// Entity component (`u64`, saved): the world time a system last simulated it to, so it can
 /// catch up on what it missed (`Dim::run_systems`).
 pub const SIMULATED: &str = "core:simulated";
@@ -1653,6 +1656,7 @@ pub fn freeze(
         (WORN, 0, shown, Vec::new()),
         (SHAPE, 16, own, shape),
         (HELD, 4, shown, vec![0; 4]),
+        (MOUNT, 12, own, vec![0; 12]),
         (SIMULATED, 8, save, vec![0; 8]),
     ] {
         components.push(RawComponent {
@@ -1676,7 +1680,7 @@ pub fn freeze(
     g.modifiers_comp = g.component_names[MODIFIERS];
     g.timers_comp = g.component_names[TIMERS];
     g.name_comp = g.component_names[abi::comp::NAME];
-    g.field_comps = [HEALTH, BURNING, WORN, SHAPE, HELD].map(|n| g.component_names[n]);
+    g.field_comps = [HEALTH, BURNING, WORN, SHAPE, HELD, MOUNT].map(|n| g.component_names[n]);
     g.simulated_comp = g.component_names[SIMULATED];
     let with_flag = |f: u32| {
         g.components

@@ -2148,6 +2148,7 @@ fn declare_components(
         (crate::registry::WORN, "bytes"),
         (crate::registry::HELD, "u32"),
         (crate::registry::SHAPE, "bytes"),
+        (crate::registry::MOUNT, "bytes"),
         (crate::registry::SIMULATED, "u64"),
     ] {
         cb.declare(name, schema, None, &|| "the engine".into(), errors);

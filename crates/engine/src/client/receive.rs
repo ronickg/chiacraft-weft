@@ -303,6 +303,7 @@ impl Client {
                     frame: 0,
                     rel: DVec3::ZERO,
                     rel_target: None,
+                    mount: None,
                     structure: None,
                     world_light: Default::default(),
                 },

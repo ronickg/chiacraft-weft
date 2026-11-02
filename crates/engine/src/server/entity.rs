@@ -51,6 +51,10 @@ pub struct Entity {
     /// Its own box (width, height, eye) and another kind it looks like, set by mods.
     pub size: Option<[f32; 3]>,
     pub look: Option<u32>,
+    /// What it rides and its seat's height above the mount's feet (`Host::entity_mount`).
+    pub mount: Option<(u64, f32)>,
+    /// A player's movement keys as its client last said (`abi::held_keys`).
+    pub keys: u8,
     /// Crouching players: a 1.5 high box with lower eyes.
     pub pose: crate::world::Pose,
     /// Sprinting, as its client says (players).
@@ -121,6 +125,8 @@ impl Entity {
             motion: Motion::Free,
             size: None,
             look: None,
+            mount: None,
+            keys: 0,
             pose: Default::default(),
             sprinting: false,
             permission: 0,
@@ -664,7 +670,9 @@ pub fn soft_push(c: &Content, list: &[Entity]) -> Vec<(usize, DVec3)> {
                         let o = &list[j];
                         let reach = e.dims(c).0 + o.dims(c).0;
                         let d = e.pos - o.pos;
-                        if j == i || d.x.abs() >= reach || d.z.abs() >= reach || d.y >= o.height(c) || -d.y >= e.height(c) {
+                        // A rider and its mount don't push each other.
+                        let riding = e.mount.is_some_and(|m| m.0 == o.id) || o.mount.is_some_and(|m| m.0 == e.id);
+                        if j == i || riding || d.x.abs() >= reach || d.z.abs() >= reach || d.y >= o.height(c) || -d.y >= e.height(c) {
                             continue;
                         }
                         // Exactly on top of each other: split by id so they still drift apart.

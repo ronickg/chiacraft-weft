@@ -470,6 +470,8 @@ pub struct Motion<'a> {
     pub anims: &'a [(&'a Bound, f32, f32)],
     /// Vanilla's sneaking pose for bipeds (the bones Bedrock names `body`, arms, legs, head).
     pub crouch: bool,
+    /// Vanilla's riding pose for bipeds: legs forward and a little apart, arms forward.
+    pub sit: bool,
     /// Something in its hand: that arm hangs a little forward and swings less (`ArmPose.ITEM`).
     pub holding: bool,
 }
@@ -556,6 +558,17 @@ pub fn pose(parts: &[Part], root: Mat4, m: &Motion, out: &mut Vec<Mat4>) {
                 _ => {}
             }
         }
+        if m.sit {
+            // ModelBiped.riding: legs 0.45 turns forward (-1.41 about x there, which this
+            // model's x runs the other way of) and 0.1 out; arms 0.2 forward.
+            use std::f32::consts::PI;
+            match p.role {
+                role::LEG_RIGHT => rot = Vec3::new(PI * 0.45, PI * 0.1, 0.0),
+                role::LEG_LEFT => rot = Vec3::new(PI * 0.45, -PI * 0.1, 0.0),
+                role::ARM_LEFT | role::ARM_RIGHT if p.rest[0].abs() <= 1.0 => rot.x += PI * 0.2,
+                _ => {}
+            }
+        }
         for (bound, t, w) in m.anims {
             let ch = bound.bones[i];
             if let Some(c) = ch[0] {
@@ -619,7 +632,7 @@ mod tests {
         pose(
             &parts,
             Mat4::IDENTITY,
-            &Motion { pitch: 0.0, head_yaw: 0.0, swing: 0.0, swim: None, attack: 0.0, holding: false, anims: &[], crouch: false },
+            &Motion { pitch: 0.0, head_yaw: 0.0, swing: 0.0, swim: None, attack: 0.0, holding: false, anims: &[], crouch: false, sit: false },
             &mut mats,
         );
         let hand = mats[1].transform_point3(Vec3::new(-6.0, 12.0, 0.0));

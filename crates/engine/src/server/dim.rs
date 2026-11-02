@@ -571,7 +571,7 @@ impl Dim {
     /// Writes the fields clients show (`registry::HEALTH` ...) into their synced components when
     /// they differ, so they travel like mods' components. Absent ones stay absent while default.
     pub fn mirror_fields(&mut self, c: &Content) {
-        let [health, burning, worn, shape, held] = c.game.field_comps;
+        let [health, burning, worn, shape, held, mount] = c.game.field_comps;
         let maxes: Vec<(u64, f32)> = self
             .entities
             .list
@@ -609,6 +609,12 @@ impl Dim {
             }
             sh[12..].copy_from_slice(&e.look.unwrap_or(u32::MAX).to_le_bytes());
             put(comps, shape, &sh);
+            let mut on = [0u8; 12];
+            if let Some((m, seat)) = e.mount {
+                on[..8].copy_from_slice(&m.to_le_bytes());
+                on[8..].copy_from_slice(&seat.to_le_bytes());
+            }
+            put(comps, mount, &on);
             if e.player {
                 let item = inventories
                     .get(&e.id)
@@ -1902,6 +1908,7 @@ impl Dim {
         for (i, push) in super::entity::soft_push(c, &self.entities.list) {
             self.entities.list[i].vel += push;
         }
+        self.seat_riders();
         for &TickHit { id, land, burn, hot, crushed } in &hits {
             if let Some(amount) = land {
                 self.damage(c, id, amount, 0, damage::FALL);
@@ -1917,6 +1924,35 @@ impl Dim {
         }
         self.items(c);
         self.land_falling(c);
+    }
+
+    /// Riders on their mounts' seats (a player's client puts itself there and says so); a
+    /// mount that is gone or dead leaves its rider on foot.
+    fn seat_riders(&mut self) {
+        let riders: Vec<(u64, u64, f32)> = self
+            .entities
+            .list
+            .iter()
+            .filter(|e| !e.removed)
+            .filter_map(|e| e.mount.map(|(m, seat)| (e.id, m, seat)))
+            .collect();
+        for (id, m, seat) in riders {
+            let at = self
+                .entities
+                .get(m)
+                .filter(|e| !e.removed && e.alive())
+                .map(|e| e.pos);
+            let Some(r) = self.entities.get_mut(id) else { continue };
+            match at {
+                None => r.mount = None,
+                Some(pos) if !r.player => {
+                    r.pos = pos + DVec3::Y * seat as f64;
+                    r.vel = DVec3::ZERO;
+                    r.fall = 0.0;
+                }
+                Some(_) => r.fall = 0.0,
+            }
+        }
     }
 
     /// Systems over per-entity components: values copied into one aligned array, handed over

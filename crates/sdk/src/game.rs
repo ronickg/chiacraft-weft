@@ -74,6 +74,33 @@ impl World {
         let [w, h, eye] = size.unwrap_or([0.0; 3]);
         unsafe { (host().set_entity_size)(self.raw(), id, w, h, eye) }
     }
+    /// `rider` (a player, or any entity) sits on `mount`, `seat` blocks above the mount's feet.
+    /// A riding player stays on the seat and its movement keys are only read (`keys`): steer the
+    /// mount with them (`walk`), and let it off (`dismount`) when it sneaks. False if either is
+    /// gone, or the mount is the rider or rides it. Not saved.
+    pub fn mount(&self, rider: u64, mount: u64, seat: f32) -> bool {
+        mount != 0 && unsafe { (host().entity_mount)(self.raw(), rider, mount, seat) != 0 }
+    }
+    /// Gets off where it is (put it beside the mount with `teleport`).
+    pub fn dismount(&self, rider: u64) {
+        unsafe { (host().entity_mount)(self.raw(), rider, 0, 0.0) };
+    }
+    /// What `id` rides and its seat height.
+    pub fn mount_of(&self, id: u64) -> Option<(u64, f32)> {
+        let mut seat = 0.0;
+        let m = unsafe { (host().entity_mount_of)(self.raw(), id, &mut seat) };
+        (m != 0).then_some((m, seat))
+    }
+    /// Who rides `mount`.
+    pub fn rider_of(&self, mount: u64) -> Option<u64> {
+        let r = unsafe { (host().entity_rider)(self.raw(), mount) };
+        (r != 0).then_some(r)
+    }
+    /// The movement keys player `id` holds (`abi::held_keys`: forward, back, left, right, jump,
+    /// sprint, sneak); 0 for anything that isn't a player.
+    pub fn keys(&self, id: u64) -> u32 {
+        unsafe { (host().entity_keys)(self.raw(), id) }
+    }
     /// Draws the entity as another kind (model, texture, animations); `None` as itself. It stays
     /// the same entity with its own behavior.
     pub fn set_look(&self, id: u64, kind: Option<&str>) {

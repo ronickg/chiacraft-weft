@@ -649,7 +649,7 @@ impl EntityRenderer {
         self.models.add(
             c.game.player_kind,
             root,
-            &crate::model::Motion { pitch, head_yaw: 0.0, swing: 0.0, swim: None, holding: false, attack: 0.0, anims: &[], crouch: false },
+            &crate::model::Motion { pitch, head_yaw: 0.0, swing: 0.0, swim: None, holding: false, attack: 0.0, anims: &[], crouch: false, sit: false },
             layers.0[..layers.1].iter().copied(),
         );
         let vb = self.preview[frame.slot];
@@ -778,6 +778,9 @@ impl EntityRenderer {
                     * Mat4::from_rotation_x(a)
                     * Mat4::from_translation(Vec3::new(0.0, -0.9, 0.0))
             });
+            // Seated, its position is the seat: the hips rest a little above it.
+            let seated = e.pose == crate::world::Pose::Sit;
+            let base = if seated { base - Vec3::Y * 0.65 } else { base };
             let root = Mat4::from_translation(base)
                 * Mat4::from_rotation_y(body_yaw)
                 * Mat4::from_rotation_z(roll)
@@ -799,6 +802,7 @@ impl EntityRenderer {
                 head_yaw,
                 swing,
                 crouch: e.pose == crate::world::Pose::Crouch,
+                sit: seated,
                 swim: swim_limbs,
                 attack: e.arm_swing.unwrap_or(0.0),
                 holding: e.held != 0 && !sleeping,

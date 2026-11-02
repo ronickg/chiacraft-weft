@@ -1082,6 +1082,20 @@ pub mod pose {
     pub const SWIM: u32 = 2;
     pub const CRAWL: u32 = 3;
     pub const SLEEP: u32 = 4;
+    /// Riding: seated, legs forward (`Host::entity_mount`).
+    pub const SIT: u32 = 5;
+}
+
+/// The movement keys a player holds (`Host::entity_keys`), as their client last said: what a
+/// mount they ride is steered by.
+pub mod held_keys {
+    pub const FORWARD: u32 = 1;
+    pub const BACK: u32 = 2;
+    pub const LEFT: u32 = 4;
+    pub const RIGHT: u32 = 8;
+    pub const JUMP: u32 = 16;
+    pub const SPRINT: u32 = 32;
+    pub const SNEAK: u32 = 64;
 }
 
 #[repr(C)]
@@ -2170,6 +2184,18 @@ pub struct Host {
     /// Draws an entity with another kind's model, texture and animations (it stays what it is);
     /// empty goes back to its own.
     pub set_entity_look: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, kind: Str),
+    /// `rider` sits on `mount`, `seat` blocks above its feet (`mount` 0: gets off where it is);
+    /// 0 if either is gone, or `mount` is the rider or rides it. A riding player's client puts
+    /// them on the seat and stops walking; the mount moves however its mod steers it
+    /// (`entity_walk` with the rider's `entity_keys`). Not saved: everyone is on foot after a
+    /// restart.
+    pub entity_mount: unsafe extern "C" fn(world: *mut WorldCtx, rider: u64, mount: u64, seat: f32) -> u32,
+    /// What `entity` rides (0: nothing), and its seat height into `seat`.
+    pub entity_mount_of: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, seat: *mut f32) -> u64,
+    /// Who rides `mount` (0: nobody).
+    pub entity_rider: unsafe extern "C" fn(world: *mut WorldCtx, mount: u64) -> u64,
+    /// The movement keys player `entity` holds (`held_keys`); 0 for anything else.
+    pub entity_keys: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64) -> u32,
     /// Writes a kind's box (width, height, eye height); 0 if there is no such kind.
     pub entity_kind_size: unsafe extern "C" fn(kind: Str, out: *mut [f32; 3]) -> u32,
     /// A block of moving structure `entity` (its own coordinates); `u32::MAX` if it is none.

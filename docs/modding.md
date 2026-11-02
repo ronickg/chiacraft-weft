@@ -274,6 +274,16 @@ Anywhere a block is named as text, `base:furnace[lit=true]` picks a state: in st
 Moving platforms: `solid()`, `kinematic()`, `carry_height(..)`, and
 `blocks(&DECK)` with a template (`r.template(&DECK).fill("base:oak_planks", from, to)`) makes a flying structure players can build on; its box is what the blocks fill, no `size` needed. `EntityState.size` is an entity's box and eye height as they are now (crouching and `w.set_size` included), so `st.pos[1] + st.size[2]` is where its eyes are.
 
+Riding: `w.mount(rider, mount, seat)` seats a player (or any entity) on another, `seat` blocks
+above its feet; `w.dismount(rider)` gets it off where it is (`w.teleport` it beside). A riding
+player's client puts them on the seat in a sitting pose and stops walking them; their movement
+keys come to the server as `w.keys(player)` (`held_keys::FORWARD`, `BACK`, `LEFT`, `RIGHT`,
+`JUMP`, `SPRINT`, `SNEAK`), and the mount's mod steers it with them (`w.walk(..)` each tick,
+facing `w.entity(rider).yaw`), sneaking usually meaning "get off". `w.rider_of(mount)` and
+`w.mount_of(rider)` say who rides what. Riders aren't saved, and a mount that dies or is removed
+leaves its rider on foot. The animals mod's Utahraptor (`mods/animals/src/riding.rs`) is a worked
+example.
+
 ### Machines
 `r.machine(&BLOCK, &MENU)` is block + block entity + inventory + menu + screen in one go.\
 Look at testmod's generator for an example.
