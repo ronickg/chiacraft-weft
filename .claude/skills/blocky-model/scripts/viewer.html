@@ -6,6 +6,7 @@
                              "variant_label": "Eyes", "about": "one line"}]
        models/<x>.json     {"glb": "<base64 of the .glb>"}   (artifact hosts serve .json, not .glb)
        variants file       {"name": "data:image/png;base64,..."}   (scripts/variants.py; optional)
+       fit                 optional: "size" scales a prop by its biggest side (default: height)
        texture             optional: a PNG for the same model (another species that shares it)
        coat file           models/<x>_coat.json (scripts/coatdata.py; optional): its layers and gene
                            file, for the coat panel (coats.js: Random, Mother, Father, Breed, Paint)
@@ -143,7 +144,9 @@ async function load(entry) {
   const bytes = Uint8Array.from(atob(glb), c => c.charCodeAt(0));
   const gltf = await new Promise((ok, fail) => new THREE.GLTFLoader().parse(bytes.buffer, "", ok, fail));
   const box = new THREE.Box3().setFromObject(gltf.scene);
-  gltf.scene.scale.setScalar(0.32 / Math.max(box.max.y - box.min.y, 1e-6));
+  // Creatures by height; props (`fit: "size"`, a flat nest) by their biggest side.
+  const sz = box.getSize(new THREE.Vector3());
+  gltf.scene.scale.setScalar(entry.fit === "size" ? 0.5 / Math.max(sz.x, sz.y, sz.z, 1e-6) : 0.32 / Math.max(sz.y, 1e-6));
   gltf.scene.traverse(o => { if (o.material && o.material.map) { o.material.map.magFilter = o.material.map.minFilter = THREE.NearestFilter; o.material.map.needsUpdate = true; } });
   const a = { model: gltf.scene, mixer: new THREE.AnimationMixer(gltf.scene), actions: {}, textures: {}, variantNames: [] };
   for (const clip of gltf.animations) a.actions[clip.name] = a.mixer.clipAction(clip);

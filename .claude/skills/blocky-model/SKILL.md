@@ -1,6 +1,6 @@
 ---
 name: blocky-model
-description: Build, texture, rig and animate block-game style 3D creatures and props (Minecraft, Hytale, Vintage Story look) as boxes and quads with a hand-painted pixel texture, in Blockbench, from concept art or a description. Use when asked to make a mob, animal, creature, character or prop "like Minecraft/Hytale", to turn concept art into a Blockbench / .bbmodel / .blockymodel / Bedrock geo model, to paint or fix a pixel texture for a box model, to animate one, or when a box model looks rough, flickers, has wrong eyes, floats or sinks in a pose.
+description: Build, texture, rig and animate every model in the game (creatures, props, eggs, nests, items) in one block-game house style (Minecraft, Hytale, Vintage Story look) as boxes and quads with a hand-painted pixel texture, from concept art, research or a description, so they all match. Use when asked to make any model, a mob, animal, creature, character or prop "like Minecraft/Hytale", to turn concept art into a Blockbench / .bbmodel / .blockymodel / Bedrock geo model, to paint or fix a pixel texture for a box model, to animate one, or when a box model looks rough, flickers, has wrong eyes, floats or sinks in a pose.
 ---
 
 # Block-game models: boxes + painted pixel texture
@@ -8,10 +8,44 @@ description: Build, texture, rig and animate block-game style 3D creatures and p
 The look (Minecraft, Hytale, Vintage Story) is **few boxes, texture does the work**. Not voxels
 (thousands of small cubes look grainy and can't carry painted light), not smooth meshes.
 
-The aim is to get a creature right **the first time**: build in the defaults below from the
+The aim is to get a model right **the first time**: build in the defaults below from the
 start, run the review checklist before showing anything, and let the user choose between options
 instead of iterating by hand. Everything here is generic: a dog's ears, a bird's wings and a
 fish's fins follow the same rules.
+
+In chiacraft this skill is how **every** model is made, creature or prop, in one house style
+(next section): they must sit together seamlessly, a nest next to the raptor that laid it next to
+a chihuahua.
+
+## House style (chiacraft): every model matches
+
+The numbers are in `scripts/house.py`; build scripts import them instead of choosing their own.
+
+- **One texel density: 64 texels a block** (a block is a meter: a texel is 1.6 cm), for every
+  model: creatures, props, eggs. Lay a model out in units of one texel and export with
+  `house.SCALE` (0.25 model pixels a unit). Terrain blocks keep the base game's 16-pixel
+  textures; inventory icons are 16x16 (`house.ICON`).
+- **Real sizes**: research the real thing's measurements and build the average adult (a 20 cm
+  chihuahua is 13 units at the shoulder, a 1.5 m Utahraptor 96 at the hip). Individuals differ
+  by the engine's per-entity scale (sex, a size gene, growing up), never by another model.
+- **Light**: only `paint.py`'s (one light from above and a bit front-left, hue-shifted ramps in
+  quarter steps, ambient occlusion from the boxes, light lower near the ground). Never paint
+  light, outlines or shadows by hand; designed features (eyes, toes, blotches) are areas that the
+  same light then shades.
+- **Colors**: `house.MATERIALS`, natural and a little muted, the shadow hue by substance (warm for
+  anything alive or earthen, purple for stone and metal, cool for eggshell). No pure black or
+  white. An animal's coat comes from its genes on the client (see "Coats on the fly"); paint the
+  model in its species' most common coat.
+- **Shapes**: few chunky boxes (Hytale's way); cute exaggeration only on a creature's head, eyes
+  and ears; props keep real proportions.
+- **Props are entities** (`scripts/prop.py` + `to_bedrock.py`), placed by an item and broken back
+  into it, not blocks with their own model: block models here take only coarse texture
+  coordinates (a 128th of the texture), and a painted sheet on one came out a flat color.
+- **Built from source**: every model is `mods/<mod>/source/<thing>/build.py`, which writes its
+  assets and asserts the checks (`boxcheck`, `ground.joints`, `ground.pokes`, `ground.gait`).
+  Never edit an exported asset by hand.
+- **Models still off the density** (rebuild each to 64, with the review checklist): chihuahua
+  131 texels a block, cat 92, Velociraptor 58, capybara 47, Utahraptor 19.
 
 ## Rules that decide the look
 
@@ -19,8 +53,8 @@ Geometry
 - Only boxes (6 faces) and quads (one flat face, see-through pixels allowed). No spheres, wedges
   or triangles. Fewest boxes that give the silhouette; Hytale caps a model at 255 nodes; aim for
   20-60 parts on a creature.
-- Keep texel density the same everywhere: UV size = face size × density (Hytale 64 px a block
-  for characters/creatures, 32 for props; Minecraft 16). Stretch a box only 0.7-1.3× per axis.
+- Keep texel density the same everywhere: UV size = face size × density (chiacraft: 64 a block
+  for every model, see House style; Hytale 64 for characters and 32 for props; Minecraft 16). Stretch a box only 0.7-1.3× per axis.
   Texture sizes in multiples of 32 (Hytale) / powers of two (Minecraft).
 - **No two faces in the same plane where both can be seen** (z-fighting flickers as the camera
   moves): offset touching boxes ≥ 0.5 unit; never two quads in one plane. `scripts/boxcheck.py`
@@ -289,7 +323,56 @@ plain coat: the genes draw patterns now. In the chiacraft game the build copies 
 `coats.js`, in Rust) paints every animal's coat from its genome on the client: keep the two in
 step.
 
+## Props (no skeleton)
+
+Nests, eggs, furniture, anything placed or lying about: `scripts/prop.py`.
+
+1. **Research** the real thing, as for an animal (its size, shape, materials, colors), and write it
+   into the build's docstring or README.
+2. **Lay out** elements in texel units centered on the origin at the ground (`prop.el`: boxes,
+   quads with `cut`, tilts about one axis). Same rules: no coplanar faces (stagger even hidden
+   bottoms), neighbors differ in size, fewest boxes.
+3. **Areas**: `area(e, face, p, ...)` gives a material per texel from its position (`p`), e.g. a
+   darker scrape in a nest's middle, blotches from fixed 3D spots so they run over edges.
+4. **Paint** with `prop.paint(elements, area, [house.material(...)], coat=(soft materials,),
+   cut=...)`: the creatures' light, occlusion and smooth painting.
+5. **Export**: `prop.entity_spec` then `to_bedrock.export(..., house.SCALE, "<mod>/<thing>",
+   pose_files={"": {}})`; run `boxcheck` on the spec. Paint a 16x16 inventory icon in the same
+   colors.
+6. **Register** an entity (`.model_file`, `.texture`, `.size`, `.passive().unpushable()`, no
+   spawn egg), an item that places it, and drop the item when it is broken.
+
+**Props get the whole workflow**, not just the painter: research with reference pictures, a
+design, `boxcheck`, four-angle review shots after every change, and options for the user to pick
+(geometry options as separate entries, colorings as texture variants). The first nest skipped
+that and came out looking like a wooden crate with polka dots. What fixed it:
+
+- **Earth, stone, wood** need their own detail, quietly: soil in soft clumps two to four texels
+  across in shades just either side of the base, a lighter dry crust on top, a rare speck (a
+  tiny stone). Never a regular math pattern (sin grids read as dots), never big contrasty
+  blotches (camouflage), never a bare gradient (plastic). Run `smooth=1` (a `majority` pass) to
+  drop single-texel noise.
+- **Mounds and slopes**: three or four stacked boxes, each narrower and higher than the one
+  below, and light them as one piece (`paint(down=...)`), or every step gets its own bright edge
+  and it reads as stacked planks.
+- **Lay materials as the real thing has them**: stems running round a dish (as an animal turns
+  while lining it), an egg's marks gathered at its blunt end, darker marks over paler deeper
+  ones, bark along a twig; things kicked out of a scrape land outside its rim.
+- **Small props** (an egg is 10 texels at 64 a block): taper both ends a unit a layer so it reads
+  round, keep marks one or two texels (hairlines don't read at this size), and review it scaled
+  up six times in a copy of the spec (Blockbench frames tiny models too small to see).
+- **Show a prop as it is used** (a nest with eggs in it, half sunk and leaning as they are laid).
+
+Worked examples: `mods/animals/source/nest` (`build.py --variants`: a bare, lined and grassy
+scrape, each also with eggs) and `mods/animals/source/egg` (`build.py --variants`: four markings
+on one layout).
+
 ## Scripts
+
+- `scripts/house.py` — the house style's numbers: `DENSITY` (64), `SCALE`, `ICON`, `MATERIALS`
+  and `material(name)` (tones with the material's shadow hue).
+- `scripts/prop.py` — props without a skeleton: `el`, `paint` (`down` lights stacked boxes as one
+  piece, `smooth` drops specks), `entity_spec` (see Props).
 
 - `scripts/bb.py` — run JS in a running Blockbench over CDP (`BB_PORT`, default 9333).
 - `scripts/bbshot.py out.png` — the open Blockbench project from four angles, side by side.
@@ -325,8 +408,9 @@ step.
 Follow `docs/creatures.md` in the chiacraft repository: export with `to_bedrock.py`, register the
 entity (`.model_file`, `.animations` per pose, `.texture`, `.size`), and check it in the game
 with a `--script` that spawns it and takes shots (`look yaw pitch`: negative pitch looks down).
-Engine limits that shape the model: bones rotate but single boxes don't; no per-kind scale; only
-`idle` and `walk` play by themselves (poses are look kinds with their own file); a played
+Engine limits that shape the model: bones rotate but single boxes don't; a per-entity scale
+(`World::set_scale`) for individuals, none per kind (bake the size in); only `idle` and `walk`
+play by themselves (poses are look kinds with their own file); a played
 animation replaces idle while it plays; no Molang; cut-out alpha only (no blending).
 
 Worked examples, in the chiacraft repo's `animals` mod (each README explains it):
@@ -338,6 +422,7 @@ Worked examples, in the chiacraft repo's `animals` mod (each README explains it)
   eyes on the sides, feather panels). Start birds and dinosaurs here.
 - `mods/animals/source/capybara`: a stocky grazer (no tail, side eyes, chewing, grazing fitted
   to the ground). Start heavy herbivores here.
+- `mods/animals/source/nest` and `mods/animals/source/egg`: props (see Props).
 - `mods/animals/source/dog/chihuahua`: built from a concept sheet (`tools/blocky.py`, colors read
   from the flat turnaround), with eyelids, jaw, tongue, solid ears, toes, a V bib.
 
