@@ -228,6 +228,15 @@ for (const x of species) {
     `${lasted} of 3 lasted, alive ${runs.map(r => r.alive).join("/")}, peak ${peak}, room ${x.crowd}, up to ${Math.max(...runs.map(r => r.gens))} generations`);
 }
 
+{
+  // The settings page (mods/animals/SPECIES.md) is written from the species table: rewrite it
+  // after a change (web/sheet.mjs).
+  const page = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "SPECIES.md");
+  const now = fs.existsSync(page) ? fs.readFileSync(page, "utf8") : "";
+  const fresh = now === call({ op: "sheet" }).markdown;
+  check("SPECIES.md is up to date", fresh, fresh ? "" : now ? "rewrite it: node mods/animals/web/sheet.mjs" : "missing");
+}
+
 console.log("Evolution");
 for (const [name, h, want] of [["raptor", "snow", "lighter"], ["raptor", "forest", "darker"], ["raptor", "desert", "sandier"]]) {
   const avg = r => r.sample.map(a => a.look.average).reduce((a, b) => a.map((v, i) => v + b[i] / r.sample.length), [0, 0, 0]);

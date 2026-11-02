@@ -10,6 +10,7 @@ pub mod biology;
 pub mod coats;
 pub mod evolution;
 pub mod life;
+pub mod sheet;
 pub mod species;
 
 static PROBLEMS: Mutex<Vec<String>> = Mutex::new(Vec::new());

@@ -60,8 +60,10 @@ trust; see `notes/PLAN.md`).
 
 ## Species are data
 
-Every species is a definition (a Rust table in the mod, or a JSON file per species: proposed),
-so adding an animal is mostly numbers:
+Every species is a definition (a Rust table, `mods/animals/core/src/species.rs`), so adding an
+animal is mostly numbers. **Every species' settings are on one page, `mods/animals/SPECIES.md`**,
+written from that table (`node mods/animals/web/sheet.mjs`; the website tests fail while it is
+out of date), so a change shows there:
 
 - **Its place in the tree of life**, as biology names it: family (with the groups above it:
   a class and order for mammals, clades for dinosaurs), subfamily, and scientific name (genus and

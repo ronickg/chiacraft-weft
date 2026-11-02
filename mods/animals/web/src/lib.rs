@@ -239,6 +239,8 @@ fn handle(req: &Value) -> Result<Value, String> {
             "habitats": HABITATS.iter().map(|h| h.name()).collect::<Vec<_>>(),
             "day": life::DAY,
         })),
+        // Every species' settings as a page (`mods/animals/SPECIES.md`).
+        "sheet" => Ok(json!({ "markdown": animals_core::sheet::markdown() })),
         // A wild one from its habitat's kind (or the pool given), of the sex asked or either.
         "random" => {
             let index = species_arg(req)?;

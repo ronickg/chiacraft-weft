@@ -5,6 +5,9 @@
 //! domestic species with breeds (dogs) has a row per breed: the breed is its own entity kind
 //! with its own model and numbers, the species (genes, behavior, what it is) shared. A wild
 //! species is never a breed: Velociraptor's two species are two rows, two species.
+//!
+//! Every species' settings are on one page, `mods/animals/SPECIES.md` (`sheet.rs`): rewrite it
+//! after a change, `mods/animals/web/build.sh && node mods/animals/web/sheet.mjs`.
 
 pub use crate::biology::{Biology, Rarity, Social, Tune};
 
@@ -29,20 +32,20 @@ pub const TORPOR: usize = 7;
 /// Their names in translations (`stat.animals.<name>`).
 pub const STAT_NAMES: [&str; STATS] = ["health", "stamina", "food", "damage", "speed", "weight", "oxygen", "torpor", "fortitude"];
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Size {
     Small,
     Medium,
     Large,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Diet {
     Carnivore,
     Herbivore,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Taming {
     Passive,
     Knockout,

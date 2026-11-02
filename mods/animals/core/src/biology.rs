@@ -30,6 +30,17 @@ pub enum Rarity {
     Legendary,
 }
 
+impl Social {
+    /// How much more room its kind take near: a pack's and a herd's more.
+    pub fn room(self) -> f32 {
+        match self {
+            Social::Solitary => 1.0,
+            Social::Pack => 1.2,
+            Social::Herd => 2.0,
+        }
+    }
+}
+
 impl Rarity {
     pub fn name(self) -> &'static str {
         match self {
@@ -85,6 +96,10 @@ pub const GROWING: (f64, f64) = (0.0645, 0.7);
 pub const LIVING: (f64, f64) = (0.0105, 1.0);
 pub const RESTING: (f64, f64) = (0.0139, 1.0);
 
+/// The room near (`Biology::crowd`): for a 4 kg animal living alone, and how it goes with mass.
+pub const ROOM: f32 = 13.0;
+pub const ROOM_BY_MASS: f32 = -0.2;
+
 /// A real span of `days` as the game's ticks, by `pace`.
 pub fn span(pace: (f64, f64), days: f32) -> u32 {
     if days <= 0.0 {
@@ -122,12 +137,7 @@ impl Biology {
     /// group of 8 died out within 150 days in half the runs, of 12 in none; a Utahraptor's of 4
     /// in half, of 6 in one in eight).
     pub fn crowd(&self) -> u32 {
-        let social = match self.social {
-            Social::Solitary => 1.0,
-            Social::Pack => 1.2,
-            Social::Herd => 2.0,
-        };
-        (13.0 * (self.mass / 4.0).powf(-0.2) * social)
+        (ROOM * (self.mass / 4.0).powf(ROOM_BY_MASS) * self.social.room())
             .round()
             .max(3.0) as u32
     }

@@ -8,6 +8,9 @@ Two ways, the same rules (`mods/animals/core`):
 
       mods/animals/web/build.sh && node mods/animals/web/test.mjs
 
+  They also check that `mods/animals/SPECIES.md` (every species' settings) is up to date;
+  after changing a species, `node mods/animals/web/sheet.mjs` rewrites it.
+
 - **In the game** (about three minutes): four glass pens on flat land (cats, chihuahuas,
   capybaras, raptors, six each, wild), time 1000 times faster (`/animal speed 1000`: about 0.8
   in-game days a second), and a census every 15 seconds (`/animal census`): how many at each age,
