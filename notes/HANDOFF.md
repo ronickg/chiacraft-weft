@@ -238,17 +238,17 @@ creatures: 49 boxes and flat fur panels with a hand-painted 512x96 texture, big 
 ears, a jaw and a tongue, eyelids that blink, toes; animations idle (panting, blinking), walk,
 run, sit, lie and lick. Its source is `mods/animals/source/dog/chihuahua` (rebuild with its `build.py`); the
 files are exported with the `blocky-model` skill's `to_bedrock.py`
-([docs/creatures.md](../docs/creatures.md) has the recipe and the commands). All coats draw with
-one texture for now (the coat is still chosen and inherited). The old generator
-(`tools/chihuahua.py`, 96 painted coats) and its preview were removed; they are in git history.
-The engine shares one copy of a model file between all kinds naming it (`client/models.rs`), so
-the 576 look kinds cost two models. Each dog draws as a generated
-look kind per coat, grown or puppy, and pose (stand, sit, lie down after 30 s sitting), so the pose
+([docs/creatures.md](../docs/creatures.md) has the recipe and the commands). Every animal's coat
+comes from its genes (`src/coats.rs`, component `animals:genome`): each client paints it over the
+kind's texture through the engine's skin hook (`Registry::entity_skin`), so only 40 bytes travel
+per animal. The old generator (`tools/chihuahua.py`, 96 painted coats) and the 96 coat looks are
+gone; they are in git history. Each dog draws as a generated look kind per age (grown or puppy)
+and pose (stand, sit, lie down after 30 s sitting), so the pose
 reaches every player that comes by (a played animation is a one-off event). A bone tames (1 in 3); a
 tamed dog sits on the start, the owner's empty-handed or non-food right-click toggles sitting, it
-follows its owner (teleports when 24 blocks behind). Meat puts two tamed adults in love; they meet
-(a sitting one waits for the other) and have a puppy whose coat mixes theirs (color from one, pattern from either, now and then a
-mutation), half the size, grown after a day (meat speeds it up). The owner is the player's key,
+follows its owner (teleports when 24 blocks behind). Meat puts two tamed adults in love; a male and a female meet
+(a sitting one waits for the other) and have a puppy with one allele of each gene from each
+(`coats::breed`: it looks like them, hidden recessives surprise, 1% mutate), half the size, grown after a day (meat speeds it up). The owner is the player's key,
 asked of the engine bridge (`player_key`, added to `bridge.rs`). Checked in the game: model, coats,
 poses, taming, sitting, love, and a puppy born to two dogs in love (with a local patch that started
 dogs in love: aiming `press core:use` at wandering dogs from a script is too hit and miss). If the

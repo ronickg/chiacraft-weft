@@ -1,8 +1,8 @@
 // Coats painted on the fly from genes: the genome of an animal (random from the wild, or a baby
 // of two parents), what it looks like (phenotype rules per species, from real coat genetics,
 // simplified), and a renderer that paints that look on a creature's layers (`layers.py`: coat or
-// fixed, light, position on the body, where white, points, a mask and patterns show). The same
-// files drive the game (ported to Rust with per-animal textures).
+// fixed, light, position on the body, where white, points, a mask and patterns show). The game
+// paints its animals with the same rules in Rust (`mods/animals/src/coats.rs`): change both.
 //
 //   const genes = <species gene file (mods/animals/genetics/<species>.json)>;
 //   const animal = Coats.random(genes, rng, null, "chihuahua");  // {sex, genome, seed, breed}

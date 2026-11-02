@@ -37,7 +37,7 @@ pub fn init(r: &mut Registry) {
             }
         });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko)] [count:int]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love)] [count:int]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -165,6 +165,11 @@ fn heading(ui: &mut Ui) {
         let Some(a) = c.menu_component(&ANIMAL) else { return };
         let owner = if tamed(c) { "screen.animals.tamed" } else { "screen.animals.wild" };
         t.set("screen.animals.about", &[Arg::Key(sex_key(&a)), Arg::Key(&stage_key(&a)), Arg::Key(owner)]);
+    });
+    // Its coat, read from its genes ("Fawn sable with white").
+    ui.text_bind(|c, t| {
+        let Some(look) = c.menu_component(&crate::coats::GENOME).and_then(|g| crate::coats::phenotype(&g)) else { return };
+        t.set("screen.animals.coat", &[Arg::Text(&look.name)]);
     });
     ui.text_bind(|c, t| {
         let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
@@ -361,8 +366,8 @@ fn nearest(w: &World, player: u64, range: f64) -> Option<u64> {
 
 /// `/animal` on the animal you look at (or the nearest): `show` its screen, `tame` it (yours), give it `points`
 /// to place, make it `wild` again with new levels, bring it `here` (two blocks ahead), have a
-/// cat bring its next `gift` now, knock one out (`ko`), or an unconscious one take its next
-/// `bite` now.
+/// cat bring its next `gift` now, knock one out (`ko`), an unconscious one take its next `bite`
+/// now, or every grown dog near you be yours and in `love`.
 fn command(cmd: &mut ServerCommand) {
     let (w, player) = (cmd.world(), cmd.player());
     let Some(id) = looked_at(&w, player, 16.0).or_else(|| nearest(&w, player, 12.0)) else {
@@ -393,6 +398,7 @@ fn command(cmd: &mut ServerCommand) {
         "gift" => crate::signatures::gift_now(&w, id),
         "bite" => crate::knockout::bite_now(&w, id),
         "ko" => crate::knockout::add_torpor(&w, id, 100_000.0),
+        "love" => crate::dog::love_near(&w, player),
         "here" => {
             if let (Some(p), Some(mut e)) = (w.entity(player), w.entity(id)) {
                 let (sy, cy) = (p.yaw as f64).sin_cos();

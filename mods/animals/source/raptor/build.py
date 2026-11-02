@@ -43,7 +43,10 @@ if __name__ == "__main__":
         back = {f: v for f, v in gait(spec, anim, ["toes_L", "toes_R"]).items() if v is not None and v <= 0}
         assert not back, f"{anim} goes backwards: {back}"
     made = export(spec, os.path.join(OUT, "texture.png"), ASSETS, "raptor", SCALE, "raptor/raptor", pose_files=POSES)
-    # Velociraptor osmolskae wears the same model in its own colors.
     import shutil  # noqa: E402
+
+    # Its coat layers, for coats painted from genes in the game (`src/coats.rs`).
+    shutil.copytree(os.path.join(OUT, "layers"), os.path.join(HERE, "..", "..", "genetics", "layers", "raptor"), dirs_exist_ok=True)
+    # Velociraptor osmolskae wears the same model in its own colors.
     shutil.copy(os.path.join(OUT, "osmolskae.png"), os.path.join(ASSETS, "textures", "entity", "raptor", "osmolskae.png"))
     print("wrote", made, "and textures/entity/raptor/osmolskae.png into", os.path.normpath(ASSETS))

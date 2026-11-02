@@ -1,9 +1,9 @@
 //! Dogs (Canis familiaris), by breed; one so far, the chihuahua: small long-haired dogs on grassland,
-//! each with its own coat (8 colors, 6 patterns, 2 marking layouts: 96 coats, to be replaced by the
-//! dog coat genes of `genetics/dog.json`). Tame one by feeding it when it asks (`taming.rs`; bones
-//! and cooked meat are its favorites), make it sit or follow by right clicking it, breed two tamed
-//! ones with meat: the puppy takes its color from one parent and its pattern from either, now and
-//! then something new, and grows up in twenty minutes (meat speeds it along). Its signatures (an
+//! each with its own coat from its genes (`coats.rs`, dog coat genetics with the chihuahua's
+//! frequencies). Tame one by feeding it when it asks (`taming.rs`; bones and cooked meat are its
+//! favorites), make it sit or follow by right clicking it, breed a tamed male and female with
+//! meat: the puppy gets one allele of each gene from each parent, so it looks like them (hidden
+//! ones can surprise), and grows up in twenty minutes (meat speeds it along). Its signatures (an
 //! alarm, tracking) are in `signatures.rs`.
 //!
 //! A breed is its own entity kind with its own model (`animals:chihuahua`); the species' biology,
@@ -12,28 +12,24 @@
 //! texture (Hytale's style), built in Blockbench: `models/chihuahua.geo.json`,
 //! `animations/chihuahua[_pup][_sit|_lie].animation.json` and
 //! `textures/entity/chihuahua/chihuahua.png` are built from its source in `source/dog/chihuahua`
-//! (`build.py`; see `docs/creatures.md`). All coats draw with that one texture for now; the coat
-//! is still chosen and inherited. A coat is a look (`World::set_look`): one entity kind per coat,
-//! age and pose, drawn in place of the dog. Puppies have their own model file (half size, a bigger
-//! head) on the same layout, so the same picture fits. A pose is the look's animation file, whose
+//! (`build.py`; see `docs/creatures.md`); each dog's coat is painted over that texture. Age and
+//! pose are looks (`World::set_look`): one entity kind per age and pose, drawn in place of the dog
+//! with its own coat. Puppies have their own model file (half size, a bigger head) on the same
+//! layout, so the same picture fits. A pose is the look's animation file, whose
 //! `idle` holds it (sitting, lying down), so every player sees it whenever they come by.
 
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 use crate::animal::{self, OWNER};
-use crate::{commands, screen, signatures, species, taming};
+use crate::{coats, commands, screen, signatures, species, taming};
 
 pub(crate) static CHIHUAHUA: Entity = Entity::named("chihuahua");
 static HEART: Particle = Particle::named("heart");
 static MEATS: [Item; 4] =
     [Item::named("base:beef"), Item::named("base:cooked_beef"), Item::named("base:porkchop"), Item::named("base:cooked_porkchop")];
 
-const COLORS: u32 = 8;
-const PATTERNS: u32 = 6;
-const MARKS: u32 = 2;
-const COATS: u32 = COLORS * PATTERNS * MARKS;
-/// The dog's texture (every coat, for now).
+/// The dog's texture, its coat painted over it (`coats.rs`).
 const TEXTURE: &str = "chihuahua/chihuahua";
 /// Twenty minutes to grow up.
 const GROW_TICKS: u32 = 24_000;
@@ -47,7 +43,7 @@ value! {
     #[derive(Default)]
     /// A dog's own state, saved with it.
     pub struct Dog {
-        /// Coat + 1 (0: not chosen yet).
+        /// Unused: coats come from genes now (`coats.rs`); kept so saved dogs load.
         pub coat: u32,
         pub tamed: u32,
         /// Ticks left in love, before breeding again, and before growing up (0: grown).
@@ -92,9 +88,9 @@ impl Pose {
     }
 }
 
-/// The kind a dog is drawn as: one per coat, grown or puppy, and pose.
-fn look_name(coat: u32, puppy: bool, pose: Pose) -> String {
-    format!("animals:chihuahua_{}{}_{coat}", if puppy { "pup" } else { "coat" }, pose.suffix())
+/// The kind a dog is drawn as: grown or puppy, and pose.
+fn look_name(puppy: bool, pose: Pose) -> String {
+    format!("animals:chihuahua_{}{}", if puppy { "pup" } else { "adult" }, pose.suffix())
 }
 
 // ------------------------------------------------------------------ registration
@@ -102,25 +98,23 @@ fn look_name(coat: u32, puppy: bool, pose: Pose) -> String {
 pub fn init(r: &mut Registry) {
     r.entity_component(&DOG, Dog::default(), component_flags::SAVE);
     r.entity_component(&SEEN, Seen::default(), 0);
-    // The looks, drawn in place of a dog with that coat, age and pose.
-    for coat in 0..COATS {
-        for puppy in [false, true] {
-            for pose in POSES {
-                let kind = Entity::generated(
-                    look_name(coat, puppy, pose)
-                        .trim_start_matches("animals:")
-                        .to_string(),
-                );
-                let model = if puppy { "chihuahua_pup" } else { "chihuahua" };
-                drop(
-                    r.entity(kind)
-                        .size(0.35, 0.5)
-                        .passive()
-                        .model_file(model)
-                        .animations(&format!("{model}{}", pose.suffix()))
-                        .texture(TEXTURE),
-                );
-            }
+    // The looks, drawn in place of a dog of that age and pose.
+    for puppy in [false, true] {
+        for pose in POSES {
+            let kind = Entity::generated(
+                look_name(puppy, pose)
+                    .trim_start_matches("animals:")
+                    .to_string(),
+            );
+            let model = if puppy { "chihuahua_pup" } else { "chihuahua" };
+            drop(
+                r.entity(kind)
+                    .size(0.35, 0.5)
+                    .passive()
+                    .model_file(model)
+                    .animations(&format!("{model}{}", pose.suffix()))
+                    .texture(TEXTURE),
+            );
         }
     }
     r.entity(&CHIHUAHUA)
@@ -179,19 +173,16 @@ fn goals() -> Goals {
         .then(ai::wander(0.45, 6.0))
 }
 
-/// Every tick, before anything else: a coat for a new dog, its look applied, time passing.
+/// Every tick, before anything else: its look applied, time passing.
 fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     let Some(d) = w.component_mut(id, &DOG) else { return false };
-    if d.coat == 0 {
-        d.coat = 1 + w.random_below(COATS);
-    }
     d.love = d.love.saturating_sub(1);
     d.cooldown = d.cooldown.saturating_sub(1);
     d.panic = d.panic.saturating_sub(1);
     d.age = d.age.saturating_sub(1);
     // A tame told to stay sits (once it is there).
     let staying = d.tamed != 0 && commands::command(w, id) == commands::STAY && !w.navigating(id);
-    let (coat, puppy, sitting) = (d.coat - 1, d.age > 0, staying);
+    let (puppy, sitting) = (d.age > 0, staying);
     let stage = match d.age * 3 / GROW_TICKS.max(1) {
         _ if d.age == 0 => animal::ADULT,
         2.. => animal::BABY,
@@ -212,17 +203,18 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     let look = 1 + puppy as u32 + 2 * pose as u32;
     if s.look != look {
         s.look = look;
-        w.set_look(id, Some(&look_name(coat, puppy, pose)));
+        w.set_look(id, Some(&look_name(puppy, pose)));
         w.set_size(id, puppy.then_some([0.2, 0.25, 0.2]));
     }
     false
 }
 
-/// In love: goes to another dog in love nearby, of any breed (or waits for it, sitting); when
-/// they meet, a puppy of the lower id's breed.
+/// In love: goes to a dog of the other sex in love nearby, of any breed (or waits for it,
+/// sitting); when they meet, a puppy of the lower id's breed, with genes from both.
 fn breed(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(me) = w.component(id, &DOG).copied().filter(|d| d.love > 0) else { return false };
     let species = |o: u64| w.component(o, &animal::ANIMAL).and_then(|a| a.species());
+    let female = |o: u64| w.component(o, &animal::ANIMAL).map(|a| a.female);
     let Some(mine) = species(id) else { return false };
     let partner = w
         .near(st.pos, 8.0, None)
@@ -230,6 +222,7 @@ fn breed(w: &World, id: u64, st: &EntityState) -> bool {
         .find(|&o| {
             o != id
                 && species(o).is_some_and(|s| species::same_species(s, mine))
+                && female(o) != female(id)
                 && w.component(o, &DOG)
                     .is_some_and(|d| d.love > 0 && d.age == 0)
         });
@@ -247,19 +240,29 @@ fn breed(w: &World, id: u64, st: &EntityState) -> bool {
     if id > partner {
         return true;
     }
-    let (Some(a), Some(b)) = (w.component(id, &DOG).copied(), w.component(partner, &DOG).copied()) else { return true };
-    let coat = inherit(w, a.coat.max(1) - 1, b.coat.max(1) - 1);
+    let (Some(a), Some(b)) = (w.component(id, &coats::GENOME).copied(), w.component(partner, &coats::GENOME).copied()) else { return true };
+    let (mother, father) = if a.female != 0 { (a, b) } else { (b, a) };
+    let genes = coats::breed(&mother, &father, &mut coats::world_rng(w));
     let at = [(st.pos[0] + ps.pos[0]) / 2.0, st.pos[1], (st.pos[2] + ps.pos[2]) / 2.0];
     let pup = w.spawn(mine.kind, at);
     if pup != 0 {
         let owner = w.component(id, &OWNER).copied().unwrap_or([0; 64]);
         if let Some(d) = w.component_mut(pup, &DOG) {
-            *d = Dog { coat: coat + 1, tamed: (owner[0] != 0) as u32, age: GROW_TICKS, ..Dog::default() };
+            *d = Dog { tamed: (owner[0] != 0) as u32, age: GROW_TICKS, ..Dog::default() };
+        }
+        if let (Some(g), Some(genes)) = (w.component_mut(pup, &coats::GENOME), genes) {
+            *g = genes;
         }
         if let Some(o) = w.component_mut(pup, &OWNER) {
             *o = owner;
         }
-        weft_sdk::info!("chihuahua {pup} born to {id} and {partner}, coat {coat}");
+        let coat = |g: Option<coats::Genome>| g.and_then(|g| coats::phenotype(&g)).map(|l| l.name).unwrap_or_default();
+        weft_sdk::info!(
+            "chihuahua {pup} born to {} and {}: {}",
+            coat(Some(mother)),
+            coat(Some(father)),
+            coat(genes)
+        );
     }
     for p in [id, partner] {
         if let Some(d) = w.component_mut(p, &DOG) {
@@ -271,15 +274,23 @@ fn breed(w: &World, id: u64, st: &EntityState) -> bool {
     true
 }
 
-/// A puppy's coat: its color from one parent, its pattern from either, its markings at random,
-/// and now and then a color or pattern neither parent has.
-fn inherit(w: &World, a: u32, b: u32) -> u32 {
-    let split = |c: u32| (c / (PATTERNS * MARKS), (c / MARKS) % PATTERNS);
-    let ((ca, pa), (cb, pb)) = (split(a), split(b));
-    let pick = |x: u32, y: u32| if w.random_below(2) == 0 { x } else { y };
-    let color = if w.random_below(8) == 0 { w.random_below(COLORS) } else { pick(ca, cb) };
-    let pattern = if w.random_below(12) == 0 { w.random_below(PATTERNS) } else { pick(pa, pb) };
-    (color * PATTERNS + pattern) * MARKS + w.random_below(MARKS)
+/// `/animal love` (for testing): every grown dog within 12 blocks of `player` becomes theirs,
+/// wanders and falls in love.
+pub fn love_near(w: &World, player: u64) {
+    let Some(p) = w.entity(player) else { return };
+    for id in w.near(p.pos, 12.0, Some(&CHIHUAHUA)) {
+        if w.component(id, &DOG).is_none_or(|d| d.age > 0) {
+            continue;
+        }
+        if !animal::tamed(w, id) {
+            taming::tame(w, id, player, 0.0);
+        }
+        // Free to go to each other (two told to stay would wait for each other).
+        commands::set_command(w, id, commands::WANDER, None);
+        if let Some(d) = w.component_mut(id, &DOG) {
+            (d.love, d.cooldown) = (LOVE_TICKS, 0);
+        }
+    }
 }
 
 fn hearts(w: &World, at: [f64; 3]) {

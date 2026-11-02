@@ -105,3 +105,4 @@ family.animals.canidae = dog family
 family.animals.felidae = cat family
 family.animals.caviidae = cavy family
 family.animals.dromaeosauridae = raptor family
+screen.animals.coat = Coat: {0}

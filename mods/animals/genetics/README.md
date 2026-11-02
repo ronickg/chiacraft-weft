@@ -12,8 +12,10 @@ mostly fawn and sable, rarely merle): wild or newly met animals of a breed are d
 babies take only their parents' alleles, so crossing breeds mixes them. Babies take one allele of each locus from each parent, so they look like them, and hidden
 recessives can surprise (two black chihuahuas with a chocolate puppy).
 
-The phenotype rules (which genotype is which colors and patterns) and the coat renderer live in
-the viewer's `coats.js` for now (`.claude/skills/blocky-model/scripts/coats.js`), and come to the
-game in Rust with per-animal textures. They paint on the layers each creature's build writes
-(`layers.py`): what is coat and what is fixed, its light, its position, where white, points, a
-mask and patterns show.
+The phenotype rules (which genotype is which colors and patterns) and the coat renderer are in the
+game's `src/coats.rs` and, for trying coats out in the viewer, the skill's `coats.js`
+(`.claude/skills/blocky-model/scripts/coats.js`): the same rules, change both together. They
+paint on the layers each creature's build writes (`layers.py`), copied here into
+`layers/<model>/` and embedded in the mod: what is coat and what is fixed, its light, its
+position, where white, points, a mask and patterns show. A new species needs a gene file here
+(listed in `coats.rs`'s `FILES`), its model's layers (`MODEL_LAYERS`) and a phenotype rule.

@@ -284,7 +284,10 @@ layers: map each material to a role (`("coat", toward the underside 0..1, light 
 "fixed"), mark everything stamped after painting that isn't a darkening as fixed (the recorder
 does), and write its `layer_props` (where white starts: paws, chest, belly, muzzle; points;
 mask; extremities; where patterns show). A painted pattern (a tabby's stripes) maps to the
-plain coat: the genes draw patterns now.
+plain coat: the genes draw patterns now. In the chiacraft game the build copies its layers to
+`mods/animals/genetics/layers/<model>` and `mods/animals/src/coats.rs` (the same rules as
+`coats.js`, in Rust) paints every animal's coat from its genome on the client: keep the two in
+step.
 
 ## Scripts
 

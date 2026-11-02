@@ -91,6 +91,8 @@ const KIBBLE: Food = Food { item: "animals:kibble", food: 30, liking: Liking::Ki
 
 pub struct Species {
     pub kind: &'static Entity,
+    /// Its model: the coat layers its coat is painted on (`genetics/layers/<it>`).
+    pub model: &'static str,
     /// The species (`species.animals.<name>`, its gene file `genetics/<name>.json`).
     pub name: &'static str,
     /// Its scientific name: genus and species ("Canis familiaris").
@@ -131,6 +133,7 @@ const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.
 pub static SPECIES: [Species; 6] = [
     Species {
         kind: &crate::dog::CHIHUAHUA,
+        model: "chihuahua",
         name: "dog",
         binomial: "Canis familiaris",
         family: &CANIDAE,
@@ -164,6 +167,7 @@ pub static SPECIES: [Species; 6] = [
     },
     Species {
         kind: &crate::cat::CAT,
+        model: "cat",
         name: "cat",
         binomial: "Felis catus",
         family: &FELIDAE,
@@ -195,6 +199,7 @@ pub static SPECIES: [Species; 6] = [
     },
     Species {
         kind: &crate::capybara::CAPYBARA,
+        model: "capybara",
         name: "capybara",
         binomial: "Hydrochoerus hydrochaeris",
         family: &CAVIIDAE,
@@ -224,6 +229,7 @@ pub static SPECIES: [Species; 6] = [
     },
     Species {
         kind: &crate::raptor::RAPTOR,
+        model: "raptor",
         name: "raptor",
         binomial: "Velociraptor mongoliensis",
         family: &DROMAEOSAURIDAE,
@@ -251,6 +257,7 @@ pub static SPECIES: [Species; 6] = [
     },
     Species {
         kind: &crate::utahraptor::UTAHRAPTOR,
+        model: "utahraptor",
         name: "utahraptor",
         binomial: "Utahraptor ostrommaysi",
         family: &DROMAEOSAURIDAE,
@@ -281,6 +288,7 @@ pub static SPECIES: [Species; 6] = [
     // skull bones only, so the same body and numbers, its own coat).
     Species {
         kind: &crate::raptor::OSMOLSKAE,
+        model: "raptor",
         name: "osmolskae",
         binomial: "Velociraptor osmolskae",
         family: &DROMAEOSAURIDAE,

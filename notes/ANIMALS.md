@@ -584,9 +584,21 @@ real coat genetics, a paint screen, paint is not inherited, the viewer first, th
   sand coat (`source/raptor` paints both), its own gene file (`osmolskae.json`), spawning on
   desert sand. Its own pack: the pack bonus and aid count only its species.
 
-Next: per-animal textures in the engine (a texture per entity from these layers), genes on every
-animal (spawn, breeding), the paint screen in the game, then sizes (real sizes, by sex and
-individual: the engine's per-entity scale).
+**Looks, part 2: genes in the game** (2026-11-01). Every animal has a genome (`coats.rs`,
+component `animals:genome`, saved and synced to whoever sees it, 40 bytes): drawn from its
+species' gene file (its breed's frequencies for a breed) when it spawns, of its sex; one allele of
+each locus from each parent when it is born (dogs breed only male with female now). Each client
+paints the coat from the genome on the layers its model's build wrote (`genetics/layers/<model>`,
+embedded in the mod) through the engine's new skin hook (`Registry::entity_skin`: a mod paints an
+entity's own texture from a component, on the client; only the bytes travel). The phenotype rules
+and renderer are `coats.js`'s, ported to Rust: change both together. The animal screen and the
+spyglass show the coat ("Coat: Red sable, masked parti"). The chihuahua's 96 hand-made coat looks
+are gone (its looks are now age and pose only). `/animal love` (testing): every grown dog near you
+is yours, wanders and falls in love.
+
+Next: the paint screen in the game (paint as a second component the same painter reads), then
+sizes (real sizes, by sex and individual: the engine's per-entity scale), breeding for the other
+species (only dogs breed so far), coat names in translations.
 
 Not yet: XP and earning points (the command gives them), naming, the higher spyglass tier, tame
 caps and other world settings. Engine note: clients don't see other entities' attribute

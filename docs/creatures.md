@@ -61,6 +61,10 @@ about the model's footprint. Bones named `head` follow where the creature looks;
 bones `leg0`..`leg3` unless you want the engine's own leg swing (an animation with `walk` turns
 it off anyway).
 
+Its coat comes from genes: a gene file in `mods/animals/genetics/` and its build's layers copied
+to `genetics/layers/<model>` (the build scripts do it), both listed in `src/coats.rs`, with a
+phenotype rule there (and in the viewer's `coats.js`).
+
 Then give it stats: a row in `mods/animals/src/species.rs` (its place in the tree of life: family,
 subfamily and scientific name, looked up, not guessed; base values of the nine stats, its diet and
 favorite foods, how it is tamed; see `notes/ANIMALS.md`),
