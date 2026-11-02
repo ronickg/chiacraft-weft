@@ -113,7 +113,7 @@ fn settle(w: &World, id: u64, st: &EntityState) -> bool {
 /// Up from resting, to follow or fight.
 pub fn wake(w: &World, id: u64) {
     if let Some(c) = w.component_mut(id, &STATE)
-        && c.rest > 0
+        && (c.rest > 0 || c.look > 1)
     {
         c.rest = 0;
         c.look = 1;

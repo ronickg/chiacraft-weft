@@ -31,6 +31,7 @@ mod animal;
 mod capybara;
 mod cat;
 mod commands;
+mod knockout;
 mod raptor;
 mod screen;
 mod signatures;
@@ -149,6 +150,7 @@ fn init(r: &mut Registry) {
     taming::init(r);
     commands::init(r);
     signatures::init(r);
+    knockout::init(r);
     r.entity_component(&DOG, Dog::default(), component_flags::SAVE);
     r.entity_component(&SEEN, Seen::default(), 0);
     r.particle(&HEART)
@@ -391,6 +393,13 @@ fn interact(e: &mut EntityEvent) {
 fn on_tamed(w: &World, id: u64) {
     if let Some(d) = w.component_mut(id, &DOG) {
         d.tamed = 1;
+    }
+}
+
+/// Knocked out: lying down (`index` into `species::SPECIES`; only the raptor so far).
+fn sleep(w: &World, id: u64, index: usize) {
+    if index == 3 {
+        raptor::sleep(w, id);
     }
 }
 

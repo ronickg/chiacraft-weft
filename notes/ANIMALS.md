@@ -1,7 +1,8 @@
 # Animals: taming, stats, breeding (design)
 
-Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Steps 1-4
-of the build order (the core, passive taming, commands, signatures) are built; see "Built so far" at the end. "Proposed" marks numbers and
+Status: design draft, 2026-11-01, from Ronald's answers to a 48-question interview. Steps 1-5
+of the build order (the core, passive taming, commands, signatures, knock-out taming and the
+raptor) are built; see "Built so far" at the end. "Proposed" marks numbers and
 details that still need his yes. Reference: ARK, made to
 fit chiacraft (worlds owned by their players, linked by portals, the chain only where it adds
 trust; see `notes/PLAN.md`).
@@ -481,6 +482,32 @@ commands.
 
 Checked in the game: the mark over a zombie, a dog leading to a sheep and waiting, three gifts
 from a cat, a shy cat that stays beside a capybara (and runs without one).
+
+**Step 5, knock-out taming and the raptor** (2026-11-01, `knockout.rs`, `raptor.rs`):
+
+- **Torpor**: a player's hit adds 5 bare-handed, 20 with a **club** (`animals:club`, a log on a
+  stick); a **tranquilizer dart** (`animals:tranquilizer_dart`, an arrow and a spider eye make
+  four; thrown with use) stings for 1 and adds 60. Awake, torpor wears off in two minutes. Past
+  the torpor stat the animal falls unconscious (its resting pose, "z"s above it).
+- **Keeping it under**: out, torpor drains in four minutes; a **sedative** (`animals:sedative`,
+  a spider eye, sugar and seeds make two; right click it in) adds 40%. If torpor runs out it
+  wakes: the taming is lost, food left in its mouth falls out, and it attacks the nearest player.
+- **Feeding**: right click it with food it eats: the stack goes in its mouth (more of the same
+  can be added). A bite a minute; each fills the bar like a passive feeding (kibble 2, favorite
+  1.5, plain 1, over 10 feedings at level 1, 2.5 times at 150), and costs 2% effectiveness
+  plain, 1% favorite, none for kibble. A hit while it's out costs 5%. Tamed by the nearest
+  player, with bonus levels.
+- **Angry**: a wild raptor hurt while awake goes for whoever did it for 30 seconds, and every
+  wild raptor within 16 blocks joins in. Now and then (about every five minutes) a pack hunts a
+  chicken, sheep or pig nearby.
+- **Pack bonus**: a tamed raptor hits 10% harder for each other tamed raptor within 8 blocks, up
+  to three.
+- The scout screen shows torpor and what it is eating; `/animal ko` and `/animal bite` (testing).
+
+Checked in the game: six darts knocking out a level-48 raptor, a level-30 one tamed on kibble
+(15 bonus levels), three raptors attacking together when one was darted. Not yet: sedatives,
+waking up, hunting, the club, the pack bonus. A proper inventory for food (a menu) instead of
+the stack in its mouth could come with tame inventories.
 
 Not yet: XP and earning points (the command gives them), naming, the higher spyglass tier, tame
 caps and other world settings. Engine note: clients don't see other entities' attribute

@@ -432,7 +432,7 @@ fn set_target(w: &World, id: u64, t: u64) {
 }
 
 /// After `t`, biting when in reach (the engine keeps the pace of its attacks).
-fn fight(w: &World, id: u64, st: &EntityState, t: u64) {
+pub fn fight(w: &World, id: u64, st: &EntityState, t: u64) {
     let Some(e) = w.entity(t) else { return };
     let reach = (st.size[0] + e.size[0]) as f64 / 2.0 + 0.8;
     let flat = (e.pos[0] - st.pos[0]).powi(2) + (e.pos[2] - st.pos[2]).powi(2);

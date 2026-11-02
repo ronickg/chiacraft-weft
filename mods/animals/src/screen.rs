@@ -8,6 +8,7 @@ use weft_sdk::*;
 use crate::animal::{self, ANIMAL, Animal, OWNER, STAGE_NAMES};
 use crate::species::{self, Diet, Liking, STAT_NAMES, STATS, Size, Taming};
 use crate::commands::{COMMAND_NAMES, ORDER, ORDERS, SHARED, STANCE_NAMES};
+use crate::knockout::KNOCKOUT;
 use crate::taming::TAMING;
 
 static ANIMAL_MENU: Menu = Menu::named("animal");
@@ -36,7 +37,7 @@ pub fn init(r: &mut Registry) {
             }
         });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift)] [count:int]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko)] [count:int]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -282,6 +283,26 @@ fn scout_screen(ui: &mut Ui) {
                 t.set("screen.animals.favorite", &[Arg::Name(&format!("item:{}", f.item))]);
             }
         });
+        // Knocked out: its torpor, and what it has to eat.
+        ui.text_bind(|c, t| {
+            t.text("");
+            let Some(k) = c.menu_component(&KNOCKOUT).filter(|k| k.torpor > 0.0) else { return };
+            let Some(a) = c.menu_component(&ANIMAL) else { return };
+            let key = if k.out > 0 { "screen.animals.torpor_out" } else { "screen.animals.torpor" };
+            t.set(key, &[Arg::Int(k.torpor as i64), Arg::Int(a.stat(species::TORPOR) as i64)]);
+        });
+        ui.text_bind(|c, t| {
+            t.text("");
+            let Some(k) = c.menu_component(&KNOCKOUT).filter(|k| k.out > 0) else { return };
+            if k.count == 0 {
+                t.set("screen.animals.mouth_empty", &[]);
+            } else {
+                t.set(
+                    "screen.animals.mouth",
+                    &[Arg::Item(k.food), Arg::Int(k.count as i64), Arg::Int((k.bite / 20) as i64)],
+                );
+            }
+        });
         // A wild one's taming so far, and what it asks for now.
         ui.text_bind(|c, t| {
             t.text("");
@@ -315,8 +336,9 @@ fn nearest(w: &World, player: u64, range: f64) -> Option<u64> {
 }
 
 /// `/animal` on the animal you look at (or the nearest): `show` its screen, `tame` it (yours), give it `points`
-/// to place, make it `wild` again with new levels, bring it `here` (two blocks ahead), or have a
-/// cat bring its next `gift` now.
+/// to place, make it `wild` again with new levels, bring it `here` (two blocks ahead), have a
+/// cat bring its next `gift` now, knock one out (`ko`), or an unconscious one take its next
+/// `bite` now.
 fn command(cmd: &mut ServerCommand) {
     let (w, player) = (cmd.world(), cmd.player());
     let Some(id) = looked_at(&w, player, 16.0).or_else(|| nearest(&w, player, 12.0)) else {
@@ -345,6 +367,8 @@ fn command(cmd: &mut ServerCommand) {
             cmd.reply("command.animals.wild", &[]);
         }
         "gift" => crate::signatures::gift_now(&w, id),
+        "bite" => crate::knockout::bite_now(&w, id),
+        "ko" => crate::knockout::add_torpor(&w, id, 100_000.0),
         "here" => {
             if let (Some(p), Some(mut e)) = (w.entity(player), w.entity(id)) {
                 let (sy, cy) = (p.yaw as f64).sin_cos();
