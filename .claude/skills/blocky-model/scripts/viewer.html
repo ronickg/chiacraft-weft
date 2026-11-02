@@ -236,7 +236,7 @@ const sexMark = s => s === "female" ? "\u2640" : "\u2642";
 function describe(c, an) { return an ? `${Coats.phenotype(c.genes, an).name} ${sexMark(an.sex)}` : ""; }
 function paintCoat(a) {
   const c = a.coat;
-  if (!c.current) { setMap(a, c.original); return; }
+  if (!c.current) { setMap(a, c.original); setBuild(a); return; }
   const look = Coats.phenotype(c.genes, c.current);
   const px = Coats.render(c.layers, c.base, c.stride, look, c.paint);
   c.ctx.putImageData(new ImageData(px, c.stride, c.mapH), 0, 0);
@@ -246,6 +246,37 @@ function paintCoat(a) {
   }
   c.tex.needsUpdate = true;
   setMap(a, c.tex);
+  setBuild(a);
+}
+// The animal's build (`Coats.build`): each scaled bone's own boxes at its scale, its child bones
+// kept their size (moving with its ends), and the model lifted so its feet stay down; applied
+// after the animation each frame (`applyBuild`).
+function setBuild(a) {
+  const c = a.coat;
+  const scales = c && c.current ? Coats.build(c.genes, c.current) : {};
+  unapplyBuild(a);
+  a.build = [];
+  a.model.position.y = a.baseY ?? (a.baseY = a.model.position.y);
+  const own = {};
+  a.model.traverse(o => { if (!o.isMesh && scales[o.name]) own[o.uuid] = scales[o.name]; });
+  a.model.traverse(o => {
+    if (o.isMesh) return;
+    const mine = own[o.uuid] || [1, 1, 1], up = (o.parent && own[o.parent.uuid]) || [1, 1, 1];
+    const f = mine.map((v, k) => v / up[k]);
+    if (f.some(v => Math.abs(v - 1) > 1e-6)) a.build.push([o, f]);
+  });
+  if (!a.build.length) return;
+  const low = () => { a.model.updateMatrixWorld(true); return new THREE.Box3().setFromObject(a.model).min.y; };
+  const before = low();
+  applyBuild(a);
+  const after = low();
+  a.model.position.y += before - after;
+}
+function applyBuild(a) {
+  for (const [o, f] of a.build || []) o.scale.set(o.scale.x * f[0], o.scale.y * f[1], o.scale.z * f[2]);
+}
+function unapplyBuild(a) {
+  for (const [o, f] of a.build || []) o.scale.set(o.scale.x / f[0], o.scale.y / f[1], o.scale.z / f[2]);
 }
 function showCoat() {
   const a = current, c = a && a.coat;
@@ -365,7 +396,7 @@ new ResizeObserver(() => {
 const clock = new THREE.Clock();
 (function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
-  if (current) current.mixer.update(dt);
+  if (current) { unapplyBuild(current); current.mixer.update(dt); applyBuild(current); }
   if (spin.checked) pivot.rotation.y += dt * 0.45;
   controls.update(); renderer.render(scene, camera);
   requestAnimationFrame(tick);

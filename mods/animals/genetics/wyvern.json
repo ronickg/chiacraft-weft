@@ -375,5 +375,101 @@
     }
    }
   }
+ },
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw",
+    "cheek_L0_tilt",
+    "cheek_L1_tilt",
+    "cheek_L2_tilt",
+    "cheek_R0_tilt",
+    "cheek_R1_tilt",
+    "cheek_R2_tilt"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Nk": {
+   "bones": [
+    "neck_0",
+    "neck_1",
+    "neck_2",
+    "neck_3"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.12
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2",
+    "tail_3",
+    "tail_4",
+    "tail_5",
+    "tail_6",
+    "tail_7"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.12
+  },
+  "Lg": {
+   "bones": [
+    "thigh_L",
+    "thigh_R",
+    "shin_L",
+    "shin_R"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.05
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.08
+  },
+  "Ho": {
+   "bones": [
+    "horn_L0_tilt",
+    "horn_L1_tilt",
+    "horn_L2_tilt",
+    "horn_Llow_tilt",
+    "horn_R0_tilt",
+    "horn_R1_tilt",
+    "horn_R2_tilt",
+    "horn_Rlow_tilt"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.3
+  }
  }
 }

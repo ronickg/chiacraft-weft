@@ -139,6 +139,24 @@ struct GeneFile {
     /// model is at the house density, 64 texels a block).
     #[serde(default = "one")]
     mark_scale: f32,
+    /// Its build: per core build trait (`Nk`: neck...), the bones it scales and how far.
+    #[serde(default)]
+    build: HashMap<String, Stretch>,
+}
+
+/// How a build trait shows on a model: its bones drawn `1 + range` times as big at the trait's
+/// top and `1 - range` at its bottom, along the model's axes as much as `axes` says (a neck
+/// longer along y and z, hardly thicker across x).
+#[derive(Deserialize)]
+struct Stretch {
+    bones: Vec<String>,
+    #[serde(default = "ones")]
+    axes: [f32; 3],
+    range: f32,
+}
+
+fn ones() -> [f32; 3] {
+    [1.0; 3]
 }
 
 fn one() -> f32 {
@@ -1343,6 +1361,37 @@ fn paint(index: usize, genome: &Genome, skin: &mut Skin) {
     mend(&mut genome);
     let (Some(look), Some(l)) = (phenotype(&genome), layers(SPECIES[index].model)) else { return };
     render(l, skin, &look);
+    for (bone, scale) in build(&genome) {
+        skin.scale_bone(&bone, scale);
+    }
+}
+
+/// How `genome`'s body is built: each bone its build traits scale, and how much (the traits as
+/// they show, each through its species' `build`).
+pub fn build(genome: &Genome) -> Vec<(String, [f32; 3])> {
+    let Some(g) = (genome.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+        .and_then(|s| gene_file(s.name))
+    else {
+        return Vec::new();
+    };
+    let r = Read { g, genome };
+    let mut out: Vec<(String, [f32; 3])> = Vec::new();
+    let mut ids: Vec<&String> = g.build.keys().collect();
+    ids.sort();
+    for id in ids {
+        let st = &g.build[id];
+        let t = (r.qv(id) - 0.5) * 2.0 * st.range;
+        let scale = st.axes.map(|a| 1.0 + t * a);
+        for bone in &st.bones {
+            match out.iter_mut().find(|(b, _)| b == bone) {
+                Some((_, s)) => *s = [s[0] * scale[0], s[1] * scale[1], s[2] * scale[2]],
+                None => out.push((bone.clone(), scale)),
+            }
+        }
+    }
+    out
 }
 
 fn render(l: &Layers, skin: &mut Skin, look: &Look) {

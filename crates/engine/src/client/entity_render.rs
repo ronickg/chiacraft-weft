@@ -26,6 +26,17 @@ struct Painted {
     tex: (TextureId, u32, [u32; 2]),
 }
 
+/// An entity's build its painter set (`SkinArgs::bones`): bones by name and their scales, and
+/// for the kind it was last drawn as, the scale of each of its parts and how far that lifts the
+/// model (model pixels: longer legs stand taller).
+struct Build {
+    bones: Vec<(String, [f32; 3])>,
+    resolved: Option<(u32, Vec<[f32; 3]>, f32)>,
+}
+
+/// Bone scales a painter may set on one entity.
+const MAX_BUILD_BONES: usize = 64;
+
 /// A kind's painter: its component, the mod and the mod's callback.
 type Painter = (u32, weft_abi::ModId, weft_abi::Callback);
 
@@ -80,6 +91,9 @@ pub struct EntityRenderer {
     pub skin_pending: Vec<(u64, Vec<u8>)>,
     /// Skins mods painted (`Host::reg_entity_skin`), by entity.
     painted: FxHashMap<u64, Painted>,
+    /// Builds their painters set, by entity; and this frame's parts' scales (`Posed::build`).
+    builds: FxHashMap<u64, Build>,
+    frame_builds: Vec<[f32; 3]>,
     /// Each kind with a painter: its component, the mod and its callback (made on first use).
     painters: Option<FxHashMap<u32, Painter>>,
     /// Textures painted over, as read: RGBA and size, by name.
@@ -169,6 +183,8 @@ impl EntityRenderer {
             player_skins: FxHashMap::default(),
             skin_pending: Vec::new(),
             painted: FxHashMap::default(),
+            builds: FxHashMap::default(),
+            frame_builds: Vec::new(),
             painters: None,
             skin_bases: FxHashMap::default(),
             local: 0,
@@ -472,6 +488,7 @@ impl EntityRenderer {
             }
             keep
         });
+        self.builds.retain(|id, _| entities.contains_key(id));
         let mut budget = PAINTS_PER_FRAME;
         for (&id, e) in entities {
             let Some(&(comp, owner, cb)) = painters.get(&e.kind) else { continue };
@@ -492,10 +509,31 @@ impl EntityRenderer {
             });
             let Some((rgba, size)) = base else { continue };
             let mut rgba = rgba.clone();
-            let mut args =
-                weft_abi::SkinArgs { data: weft_abi::Slice::new(from), rgba: rgba.as_mut_ptr(), width: size[0], height: size[1] };
+            let mut bones = [weft_abi::BoneScale { name: [0; 32], scale: [1.0; 3] }; MAX_BUILD_BONES];
+            let mut args = weft_abi::SkinArgs {
+                data: weft_abi::Slice::new(from),
+                rgba: rgba.as_mut_ptr(),
+                width: size[0],
+                height: size[1],
+                bones: bones.as_mut_ptr(),
+                bone_cap: MAX_BUILD_BONES as u32,
+                bone_count: 0,
+            };
             if !crate::host::invoke(owner, cb, &mut args) {
                 continue;
+            }
+            let set: Vec<(String, [f32; 3])> = bones[..(args.bone_count as usize).min(MAX_BUILD_BONES)]
+                .iter()
+                .filter(|b| b.scale.iter().all(|v| v.is_finite()))
+                .map(|b| {
+                    let end = b.name.iter().position(|&c| c == 0).unwrap_or(b.name.len());
+                    (String::from_utf8_lossy(&b.name[..end]).into_owned(), b.scale.map(|v| v.clamp(0.2, 5.0)))
+                })
+                .collect();
+            if set.is_empty() {
+                self.builds.remove(&id);
+            } else {
+                self.builds.insert(id, Build { bones: set, resolved: None });
             }
             let tex = match self.painted.remove(&id) {
                 Some(p) if p.tex.2 == *size => p.tex,
@@ -784,6 +822,7 @@ impl EntityRenderer {
                 anims: &[],
                 crouch: false,
                 sit: false,
+                build: &[],
             },
             layers.0[..layers.1].iter().copied(),
         );
@@ -837,6 +876,8 @@ impl EntityRenderer {
         // Models: bones posed here (in parallel when many), drawn instanced per kind.
         let mut posed = std::mem::take(&mut self.posed);
         posed.clear();
+        let mut frame_builds = std::mem::take(&mut self.frame_builds);
+        frame_builds.clear();
         // Who holds something: its place in `posed`, the item and its light.
         let mut holders: Vec<(usize, u32, u32)> = Vec::new();
         for (id, e) in entities
@@ -927,11 +968,36 @@ impl EntityRenderer {
             // Seated, its position is the seat: the hips rest a little above it.
             let seated = e.pose == crate::world::Pose::Sit;
             let base = if seated { base - Vec3::Y * 0.65 } else { base };
+            // Its build (its painter's bone scales) for this kind's parts, and how far that lifts it.
+            let mut build = (0, 0);
+            let mut lift = 0.0;
+            if let (Some(b), Some(m)) = (self.builds.get_mut(&id), self.models.kinds.get(kind as usize)) {
+                if b.resolved.as_ref().is_none_or(|r| r.0 != kind) {
+                    let scales: Vec<[f32; 3]> = m
+                        .parts
+                        .iter()
+                        .map(|p| {
+                            b.bones
+                                .iter()
+                                .find(|(n, _)| n.eq_ignore_ascii_case(&p.name))
+                                .map_or([1.0; 3], |(_, s)| *s)
+                        })
+                        .collect();
+                    let lift = crate::model::lowest(&m.parts, &[]) - crate::model::lowest(&m.parts, &scales);
+                    b.resolved = Some((kind, scales, lift));
+                }
+                if let Some((_, scales, l)) = &b.resolved {
+                    build = (frame_builds.len() as u32, scales.len() as u32);
+                    frame_builds.extend_from_slice(scales);
+                    lift = *l;
+                }
+            }
             let root = Mat4::from_translation(base)
                 * Mat4::from_rotation_y(body_yaw)
                 * Mat4::from_rotation_z(roll)
                 * swim
-                * Mat4::from_scale(Vec3::splat(e.scale / 16.0));
+                * Mat4::from_scale(Vec3::splat(e.scale / 16.0))
+                * Mat4::from_translation(Vec3::Y * lift);
             // Its head up to look ahead, and limbs by the swimming stroke.
             let swim_limbs = lying.filter(|_| !sleeping).map(|_| e.walk * 4.0);
             let (pitch, head_yaw) = if sleeping {
@@ -956,6 +1022,7 @@ impl EntityRenderer {
                 anim_count,
                 layers,
                 layer_count,
+                build,
             });
             if e.held != 0 && !sleeping {
                 holders.push((posed.len() - 1, e.held, lit));
@@ -964,7 +1031,7 @@ impl EntityRenderer {
         let vb = scene_buf;
         self.models.begin();
         let first_bone = self.models.bones_so_far();
-        self.models.add_many(&posed);
+        self.models.add_many(&posed, &frame_builds);
         let (mut at, mut next) = (first_bone, 0);
         for (holder, item, lit) in holders {
             at += posed[next..holder]
@@ -991,6 +1058,7 @@ impl EntityRenderer {
             }
         }
         self.posed = posed;
+        self.frame_builds = frame_builds;
         self.models
             .draw(gpu, list, frame, super::models::Batch::World, self.model_pipe, vb);
 

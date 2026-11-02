@@ -412,7 +412,10 @@ genes: mark where they show (the back and flanks fully, the belly and thin skin 
 vary too: while a recorder exists, `stamp_eyes` marks the iris (its saturated mid-light colors,
 or the design's own `iris` keys) and the layers keep it (`props2` blue); the game paints it in
 the animal's eye color, keeping its painted light. A design stamped by hand (outside
-`paint.stamp_eyes`) calls `paint.mark_iris` itself.
+`paint.stamp_eyes`) calls `paint.mark_iris` itself. Builds vary too (a gene file's `build`: the
+bones each build trait scales): name a model's bones so a trait can find them (one bone per neck
+or tail segment, the jaw and eyelids under the head); in the viewer a bone whose rotated boxes
+became meshes (`_tilt` in the game) can't be scaled.
 
 ## Props (no skeleton)
 

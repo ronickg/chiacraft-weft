@@ -474,6 +474,9 @@ pub struct Motion<'a> {
     pub sit: bool,
     /// Something in its hand: that arm hangs a little forward and swings less (`ArmPose.ITEM`).
     pub holding: bool,
+    /// Per part, the scale of its own boxes about its pivot (an entity's build,
+    /// `SkinArgs::bones`); its children keep their size and move with its ends. Empty: none.
+    pub build: &'a [[f32; 3]],
 }
 
 /// (about x, about y) added to a part's rest (`rest_x` about x) by its role.
@@ -582,6 +585,13 @@ pub fn pose(parts: &[Part], root: Mat4, m: &Motion, out: &mut Vec<Mat4>) {
             }
         }
         let pivot = Vec3::from_array(p.pivot);
+        // A parent drawn bigger or smaller carries this joint along with its ends.
+        if let Some(q) = p.parent
+            && let Some(&s) = m.build.get(q as usize)
+            && let Some(pp) = parts.get(q as usize)
+        {
+            offset += (Vec3::from_array(s) - Vec3::ONE) * (pivot - Vec3::from_array(pp.pivot));
+        }
         let local = Mat4::from_translation(offset + pivot)
             * Mat4::from_quat(Quat::from_euler(EulerRot::ZYX, rot.z, rot.y, rot.x))
             * Mat4::from_scale(scale)
@@ -593,6 +603,44 @@ pub fn pose(parts: &[Part], root: Mat4, m: &Motion, out: &mut Vec<Mat4>) {
             .unwrap_or(root);
         out.push(parent * local);
     }
+    // Each part's own boxes at its build's scale (after the loop: children hang from the
+    // unscaled transforms).
+    for (i, (s, p)) in m.build.iter().zip(parts).enumerate() {
+        if *s != [1.0; 3] {
+            let pivot = Vec3::from_array(p.pivot);
+            out[i] = out[i] * Mat4::from_translation(pivot) * Mat4::from_scale(Vec3::from_array(*s)) * Mat4::from_translation(-pivot);
+        }
+    }
+}
+
+/// The lowest point of a model's boxes at rest (model pixels), drawn with `build`: how far a
+/// build lowers its feet.
+pub fn lowest(parts: &[Part], build: &[[f32; 3]]) -> f32 {
+    let mut mats = Vec::new();
+    let rest = Motion {
+        pitch: 0.0,
+        head_yaw: 0.0,
+        swim: None,
+        attack: 0.0,
+        swing: 0.0,
+        anims: &[],
+        crouch: false,
+        sit: false,
+        holding: false,
+        build,
+    };
+    pose(parts, Mat4::IDENTITY, &rest, &mut mats);
+    let mut low = f32::MAX;
+    for (p, m) in parts.iter().zip(&mats) {
+        for c in &p.cuboids {
+            let o = Vec3::from_array(p.pivot) + Vec3::from_array(c.origin);
+            for k in 0..8 {
+                let corner = o + Vec3::from_array(c.size) * Vec3::new((k & 1) as f32, (k >> 1 & 1) as f32, (k >> 2 & 1) as f32);
+                low = low.min(m.transform_point3(corner).y);
+            }
+        }
+    }
+    if low == f32::MAX { 0.0 } else { low }
 }
 
 #[cfg(test)]
@@ -642,6 +690,7 @@ mod tests {
                 anims: &[],
                 crouch: false,
                 sit: false,
+                build: &[],
             },
             &mut mats,
         );

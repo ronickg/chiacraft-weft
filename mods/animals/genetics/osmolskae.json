@@ -150,5 +150,77 @@
    "Ct": 0.15
   },
   "pattern": "speckle"
+ },
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw",
+    "eyelid_L",
+    "eyelid_R",
+    "snout_tilt"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.07
+  },
+  "Nk": {
+   "bones": [
+    "neck",
+    "neck_tilt"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.1
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2",
+    "tail_3",
+    "tail_4"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.1
+  },
+  "Lg": {
+   "bones": [
+    "leg_L_thigh",
+    "leg_L_shin",
+    "leg_L_foot",
+    "leg_R_thigh",
+    "leg_R_shin",
+    "leg_R_foot"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.07
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.1
+  }
  }
 }

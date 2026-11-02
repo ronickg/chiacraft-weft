@@ -6,12 +6,31 @@ use crate::content::{
 use crate::ui::{Ui, ui_callback};
 use crate::{Registry, World, callback, host, qualify};
 
-/// A skin being painted (`Registry::entity_skin`): the kind's texture, to change in place.
+/// A skin being painted (`Registry::entity_skin`): the kind's texture, to change in place, and
+/// the entity's build (`scale_bone`).
 pub struct Skin<'a> {
     pub width: u32,
     pub height: u32,
     /// RGBA rows of `width` pixels.
     pub rgba: &'a mut [u8],
+    bones: &'a mut [abi::BoneScale],
+    bone_count: &'a mut u32,
+}
+
+impl Skin<'_> {
+    /// Draws this entity's bone `name` scaled by `scale` about its pivot, along the model's axes
+    /// (x across, y up, z along): its own boxes only, its children keeping their size and moving
+    /// with its ends; the entity raised or lowered to keep its feet on the ground. For builds
+    /// that differ per animal (a longer neck, longer legs, bigger horns). False when full.
+    pub fn scale_bone(&mut self, name: &str, scale: [f32; 3]) -> bool {
+        let Some(slot) = self.bones.get_mut(*self.bone_count as usize) else { return false };
+        let mut n = [0u8; 32];
+        let len = name.len().min(31);
+        n[..len].copy_from_slice(&name.as_bytes()[..len]);
+        *slot = abi::BoneScale { name: n, scale };
+        *self.bone_count += 1;
+        true
+    }
 }
 
 pub use abi::{Energy, EntityState, component_flags, damage, entity_flags, slot_flags};
@@ -1453,7 +1472,8 @@ impl Registry {
     /// `SYNC_WATCHERS`): `f` gets the entity's value and a copy of the kind's texture to paint
     /// over. It is drawn with the result in its own kind and any look with the same texture,
     /// painted again when the value changes. For looks that follow from a few bytes, such as an
-    /// animal's genes: they travel instead of pictures.
+    /// animal's genes: they travel instead of pictures. `f` may also scale the entity's bones
+    /// (`Skin::scale_bone`): its build, drawn in every look of it.
     pub fn entity_skin<T: Value>(&mut self, kind: &Entity, comp: &'static Component<T>, f: impl Fn(&T, &mut Skin) + Send + Sync + 'static) {
         let cb = callback(move |a: &mut abi::SkinArgs| {
             if a.data.len != size_of::<T>() || a.rgba.is_null() {
@@ -1461,7 +1481,15 @@ impl Registry {
             }
             let value = unsafe { std::ptr::read_unaligned(a.data.ptr as *const T) };
             let len = a.width as usize * a.height as usize * 4;
-            let mut skin = Skin { width: a.width, height: a.height, rgba: unsafe { std::slice::from_raw_parts_mut(a.rgba, len) } };
+            let bones: &mut [abi::BoneScale] =
+                if a.bones.is_null() { &mut [] } else { unsafe { std::slice::from_raw_parts_mut(a.bones, a.bone_cap as usize) } };
+            let mut skin = Skin {
+                width: a.width,
+                height: a.height,
+                rgba: unsafe { std::slice::from_raw_parts_mut(a.rgba, len) },
+                bones,
+                bone_count: &mut a.bone_count,
+            };
             f(&value, &mut skin);
         });
         unsafe { (host().reg_entity_skin)(self.raw, Str::new(kind.name()), Str::new(comp.name()), cb) }

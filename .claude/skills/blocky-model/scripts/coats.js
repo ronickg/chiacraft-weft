@@ -435,5 +435,19 @@
     return out;
   }
 
-  root.Coats = { rng, withCore, random, breed, phenotype, genotype, render, tone };
+  // How an animal's body is built: each bone its build traits scale ({bone: [x, y, z]}), the
+  // traits as they show through the species' `build` (the game's `build`).
+  function build(genes, a) {
+    G = genes;
+    const out = {};
+    for (const id of Object.keys(genes.build || {}).sort()) {
+      const st = genes.build[id], t = (qv(a, id) - 0.5) * 2 * st.range;
+      const sc = (st.axes || [1, 1, 1]).map(x => 1 + t * x);
+      for (const b of st.bones) out[b] = out[b] ? out[b].map((v, k) => v * sc[k]) : sc;
+    }
+    G = null;
+    return out;
+  }
+
+  root.Coats = { rng, withCore, random, breed, phenotype, genotype, render, tone, build };
 })(typeof window !== "undefined" ? window : globalThis);

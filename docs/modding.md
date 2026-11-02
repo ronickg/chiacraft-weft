@@ -408,7 +408,10 @@ Also:
   is a copy of the kind's texture (`skin.rgba`, `width` x `height`) to paint over, drawn on the
   mob in its own kind and every look with the same texture, painted again when the component
   changes. Only the component travels. The animals mod paints every animal's coat from its genes
-  this way (`mods/animals/src/coats.rs`)
+  this way (`mods/animals/src/coats.rs`). The same callback may set the mob's build:
+  `skin.scale_bone("neck_0", [1.0, 1.1, 1.1])` draws that bone's own boxes scaled about its pivot
+  (along the model's axes) in every look of the mob, its child bones keeping their size and moving
+  with its ends, the mob raised or lowered so its feet stay on the ground (up to 64 bones)
 - cosmetics of your mobs: `r.client_entity_tick(&MOB, |c, e| ..)` every frame, with its position, distance walked, age and death; it replaces the engine's steps, idle noises and death smoke unless you call `e.engine_effects()`
 - particles and screen effects from shader snippets in `assets/shaders`
 - sounds with `r.sound(..).category(..)` (every category gets its own volume slider), music

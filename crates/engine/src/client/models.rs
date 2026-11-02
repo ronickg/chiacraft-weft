@@ -72,6 +72,8 @@ pub struct Posed {
     pub anim_count: usize,
     pub layers: [Instance; MAX_LAYERS],
     pub layer_count: usize,
+    /// Its build: where its parts' scales start in `add_many`'s `builds`, and how many (0: none).
+    pub build: (u32, u32),
 }
 
 #[derive(Clone, Copy)]
@@ -270,9 +272,9 @@ impl Models {
     }
 
     /// Poses many models at once, in parallel, straight into the bone table: per entity its kind,
-    /// root, pitch, swing, crouch, keyframes and layers. Nothing is allocated per entity (a
-    /// thousand mobs are a thousand of each every frame).
-    pub fn add_many(&mut self, entities: &[Posed]) {
+    /// root, pitch, swing, crouch, keyframes, build (its range of `builds`) and layers. Nothing is
+    /// allocated per entity (a thousand mobs are a thousand of each every frame).
+    pub fn add_many(&mut self, entities: &[Posed], builds: &[[f32; 3]]) {
         let kinds = &self.kinds;
         let base = self.rows.len();
         let mut counts = std::mem::take(&mut self.counts);
@@ -327,6 +329,9 @@ impl Models {
                         anims,
                         crouch: e.crouch,
                         sit: e.sit,
+                        build: builds
+                            .get(e.build.0 as usize..(e.build.0 + e.build.1) as usize)
+                            .unwrap_or(&[]),
                     },
                     scratch,
                 );

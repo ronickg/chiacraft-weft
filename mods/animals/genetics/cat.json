@@ -206,5 +206,80 @@
    "Ms": -0.1,
    "Ct": -0.1
   }
+ },
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw",
+    "eyelid_L",
+    "eyelid_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.07
+  },
+  "Nk": {
+   "bones": [
+    "neck"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.1
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2",
+    "tail_3",
+    "tail_0_tilt",
+    "tail_1_tilt",
+    "tail_2_tilt",
+    "tail_3_tilt"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.12
+  },
+  "Lg": {
+   "bones": [
+    "leg_FL_upper",
+    "leg_FL_lower",
+    "leg_FR_upper",
+    "leg_FR_lower",
+    "leg_BL_upper",
+    "leg_BL_lower",
+    "leg_BR_upper",
+    "leg_BR_lower"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.07
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.1
+  }
  }
 }

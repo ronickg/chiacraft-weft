@@ -3137,6 +3137,21 @@ pub struct SkinArgs {
     pub rgba: *mut u8,
     pub width: u32,
     pub height: u32,
+    /// Bones of this entity's models to draw scaled (its build: a longer neck, bigger horns),
+    /// room for `bone_cap`; the painter sets `bone_count`.
+    pub bones: *mut BoneScale,
+    pub bone_cap: u32,
+    pub bone_count: u32,
+}
+
+/// A bone drawn scaled on one entity (`SkinArgs::bones`): its name (UTF-8, zero padded) and the
+/// scale of its own boxes about its pivot, along the model's axes. Its children keep their size
+/// and move with its ends.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct BoneScale {
+    pub name: [u8; 32],
+    pub scale: [f32; 3],
 }
 
 #[repr(C)]

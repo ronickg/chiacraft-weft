@@ -688,8 +688,14 @@ the iris the layers mark, keeping its painted light. Genes decide it outright wh
 life: colorpoint cats always blue-eyed, white cats and some merle dogs blue. The capybara's eyes
 are plain dark, nothing to recolor.
 
-*Next*: build (the engine scales single bones), scars (their place in the genome is kept), then
-Dalmatian spotting.
+*Build* (2026-11-02): every animal's head, neck, tail, legs, girth and (wyverns) horns a little
+bigger or smaller by its genes and chance (a few percent; a wyvern's horns up to 30%). The engine
+draws single bones of one entity scaled (`Skin::scale_bone`, set by the coat painter on the
+client, so only the genes travel): a bone's own boxes about its pivot, its children kept their
+size and moved with its ends, the animal raised or lowered by how far that moves its lowest
+point at rest. Each gene file's `build` names the bones.
+
+*Next*: scars (their place in the genome is kept), then Dalmatian spotting.
 
 Sources: Lee, Cavener, Bond 2018 (PeerJ 6:e5690, giraffe spots); Kaelin et al. 2021 (Nature
 Communications, tabby genes); Manukyan et al. 2017 (Nature 544:173, lizard scales); Shin et al.

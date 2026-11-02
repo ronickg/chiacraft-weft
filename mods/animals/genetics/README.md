@@ -35,7 +35,12 @@ file may set for them:
   species' genes may decide it instead: a colorpoint cat's blue);
 - `habitats`: per habitat (`grassland`, `forest`, `taiga`, `snow`, `desert`, `mountains`), the
   frequencies wild ones there start from, as a breed's: a species' kinds in different country;
-- `mark_scale`: model units to a pattern's (a big model's marks drawn bigger).
+- `mark_scale`: model units to a pattern's (a big model's marks drawn bigger);
+- `build`: per build trait (`Hd`, `Nk`, `Tl`, `Lg`, `Gt`, `Ho`), the model's `bones` it scales,
+  along which `axes` and how far (`range`: a bone `1 + range` times as big at the trait's top,
+  `1 - range` at its bottom). A head's trait scales its jaw and eyelids too (child bones keep their
+  size); a chain (a neck, a tail) scales every segment along it; a bone whose boxes sit in a
+  `_tilt` child (rotated elements) is scaled through that child.
 
 A species' own locus with a core trait's id replaces it (its `Dk`, its `Sz`); never reuse a core
 id for a locus of alleles. Add a species' new loci after its old ones, or saved genomes read the
