@@ -269,6 +269,33 @@ pub fn pool_of(index: usize, genomes: &[Genome]) -> Option<Pool> {
     )
 }
 
+/// `pool` (of `n` animals) with genome `g`'s alleles taken out (`sign` -1: one of them died or
+/// was tamed) or added (+1: one joined): each allele's share, each trait's mean, as they then are.
+pub fn count_in(index: usize, pool: &mut Pool, g: &Genome, sign: f32, n: f32) {
+    let Some(file) = SPECIES.get(index).and_then(|s| gene_file(s.name)) else { return };
+    let total = 2.0 * n;
+    for ((i, l), p) in file.loci.iter().enumerate().zip(pool.iter_mut()) {
+        let have = [g.genes[2 * i], g.genes[2 * i + 1]];
+        if l.quantitative {
+            if let Some(mean) = p.first_mut() {
+                let sum = (have[0] as f32 + have[1] as f32) / 255.0;
+                *mean = ((*mean * total + sign * sum) / (total + 2.0 * sign)).clamp(0.0, 1.0);
+            }
+            continue;
+        }
+        let mut counts: Vec<f32> = p.iter().map(|s| s * total).collect();
+        for a in have.into_iter().filter(|&a| a != NONE) {
+            if let Some(c) = counts.get_mut(a as usize) {
+                *c = (*c + sign).max(0.0);
+            }
+        }
+        let sum = counts.iter().sum::<f32>();
+        if sum > 0.0 {
+            *p = counts.iter().map(|c| c / sum).collect();
+        }
+    }
+}
+
 /// A pool in words, a locus a part: `Pg sa 0.74 br 0.14 · Dk 0.31±0.12`.
 pub fn describe_pool(index: usize, pool: &Pool) -> String {
     let Some(g) = SPECIES.get(index).and_then(|s| gene_file(s.name)) else { return String::new() };

@@ -8,6 +8,9 @@
 //! then mutate, and a little of each neighboring place's pool mixes in (migration). So raptors in
 //! deserts turn sandy over a few weeks, ones in forests dark, and neighbors stay alike.
 //!
+//! Players change them too: a wild animal that dies (hunted or otherwise) or is tamed takes its
+//! genes out of its place's pool, and a tame its owner releases puts its genes in (`count`).
+//!
 //! Pools evolve when they are next needed (up to `CATCH_UP` generations at once), as numbers, not
 //! animals, so a pool far from everyone costs nothing. They are saved in the world
 //! (`mods/animals/pools.json`, through the engine's bridge).
@@ -168,6 +171,15 @@ fn save() {
 static TICKS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 pub fn init(r: &mut Registry) {
+    // A wild animal that dies (hunted, killed by another, starved...) is gone from its pool.
+    r.on(&ENTITY_DIED, |b| {
+        let w = b.world();
+        for d in b.iter() {
+            if !crate::animal::tamed(&w, d.entity) {
+                count_at(&w, d.entity, d.pos, -1.0);
+            }
+        }
+    });
     r.world_tick(|_| {
         if TICKS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 600 == 599 {
             save();
@@ -265,6 +277,31 @@ fn step(p: &mut Pools, k: &str, index: usize, cell: (i64, i64), h: Habitat, r: &
         l.day += 1;
         p.dirty = true;
     }
+}
+
+/// Animal `id` leaves the wild where it is (`sign` -1: it died, or was tamed) or joins it (+1:
+/// released): its genes out of or into its place's pool, as one animal of the population. So
+/// hunting the white ones makes white rarer there, and released tames spread their coats.
+pub fn count(w: &World, id: u64, sign: f32) {
+    if let Some(st) = w.entity(id) {
+        count_at(w, id, st.pos, sign);
+    }
+}
+
+/// `count` for animal `id` at `pos` (one that just died is nowhere any more).
+fn count_at(w: &World, id: u64, pos: [f64; 3], sign: f32) {
+    let Some(g) = w.component(id, &coats::GENOME).copied() else { return };
+    let Some(index) = (g.species as usize).checked_sub(1).filter(|&i| i < SPECIES.len()) else { return };
+    let (cell, h, day) = (cell_of(pos), Habitat::at(w, pos), w.time() / GENERATION);
+    let mut r = coats::world_rng(w);
+    with_pools(|p| {
+        evolved(p, index, cell, h, day, &mut r)?;
+        let l = p.all.get_mut(&key(index, cell, h))?;
+        coats::count_in(index, &mut l.pool, &g, sign, POPULATION as f32);
+        p.dirty = true;
+        weft_sdk::info!("animal {id} {} the wild pool {}", if sign < 0.0 { "left" } else { "joined" }, key(index, cell, h));
+        Some(())
+    });
 }
 
 /// The pool a wild animal of species `index` spawning at `pos` is drawn from: its kind's there,

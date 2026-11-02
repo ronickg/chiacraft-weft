@@ -265,6 +265,7 @@ fn animal_screen(ui: &mut Ui) {
             }
             order_button(ui, "screen.animals.share", 20);
             order_button(ui, "screen.animals.track", 30);
+            order_button(ui, "screen.animals.release", 40);
         });
         ui.text_bind(|c, t| {
             let Some(a) = c.menu_component(&ANIMAL) else { return };

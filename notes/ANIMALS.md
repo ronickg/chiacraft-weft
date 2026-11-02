@@ -283,9 +283,10 @@ animals change over weeks). Every species has a gene pool per place (a cell of 2
 habitat: grassland, forest, taiga, snow, desert, mountains); wild animals spawn from it. Each
 generation: natural selection (a coat that stands out from the habitat's ground leaves fewer
 young, by the species' `camouflage`: prey and ambush hunters most, dogs least), drift (a
-population of 200), mutation, and migration from the neighboring places. Proposed next: players'
-part (animals hunted or killed leave the pool, tamed ones released or escaped join it: feral
-dogs), founding breeds (a line that breeds true can be named a breed with its own frequencies),
+population of 200), mutation, and migration from the neighboring places. Players change it: a
+wild animal that dies (hunted or otherwise) or is tamed takes its genes out of its place's pool,
+a released tame puts its genes in (feral dogs). Proposed next: escaped tames (neglected ones going
+wild), founding breeds (a line that breeds true can be named a breed with its own frequencies),
 selection on inherited stats and climate (bigger bodies and thicker fur in the cold), and, much
 later, isolated pools drifting into subspecies.
 
@@ -619,7 +620,14 @@ after 100 generations raptors are all sandy in the desert, red cats rise from 25
 white spotting near fixed in snow, brown raptors and dark dogs rise in forest; 200 animals keep
 variation (40 fixed nearly every locus by chance).
 
-Next: players' part in evolution (hunting, releasing), the paint screen in the game (paint as a
+**Evolution, part 2: players' part** (2026-11-01). A wild animal that dies (any cause: the death
+event's position, as the dead one is nowhere any more) or is tamed leaves its place's pool, as one
+animal of its 200 (`evolution::count`, `coats::count_in`); the animal screen's new Release (the
+owner only) lets a tame go: wild again with its levels, bond, orders and tribe share gone, its
+saddle dropped, taming starting over, and its genes join the pool where it is. Checked in the game:
+ten raptors killed and a chihuahua tamed each left their pool, the released one joined it.
+
+Next: the paint screen in the game (paint as a
 second component the same painter reads), then sizes (real sizes, by sex and individual: the
 engine's per-entity scale), breeding for the other species (only dogs breed so far), coat names
 in translations.

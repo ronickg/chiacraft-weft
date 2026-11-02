@@ -156,6 +156,11 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
     }
 }
 
+/// `id` was let go: taming it starts again.
+pub fn released(w: &World, id: u64) {
+    set(w, id, |t| *t = FRESH);
+}
+
 fn set(w: &World, id: u64, f: impl FnOnce(&mut Taming)) {
     if let Some(t) = w.component_mut(id, &TAMING) {
         f(t);
@@ -294,6 +299,10 @@ fn mistake(w: &World, id: u64, st: &EntityState, scares: bool) {
 /// `id` becomes `player`'s, with `floor(level * effectiveness / 2)` bonus levels placed on
 /// random stats (never torpor).
 pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
+    // Out of the wild: its genes leave its place's pool.
+    if !crate::animal::tamed(w, id) {
+        crate::evolution::count(w, id, -1.0);
+    }
     let key = crate::player_key(player);
     if let Some(o) = w.component_mut(id, &OWNER)
         && key.len() == 64

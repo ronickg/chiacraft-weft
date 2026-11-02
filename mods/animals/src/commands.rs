@@ -267,8 +267,38 @@ fn order_one(w: &World, id: u64, player: u64, order: u32) {
             let held = w.inventory(player).get(w.selected_slot(player));
             crate::signatures::track(w, id, held.item);
         }
+        40 if animal::owns(w, id, player) => release(w, id),
         _ => {}
     }
+}
+
+/// Its owner lets it go: wild again, with its levels (its bond, orders and tribe's share gone,
+/// its saddle dropped beside it). Its genes join the wild ones where it is (`evolution.rs`).
+fn release(w: &World, id: u64) {
+    if w.rider_of(id).is_some() {
+        return;
+    }
+    if let Some(o) = w.component_mut(id, &OWNER) {
+        *o = [0; 64];
+    }
+    if let Some(o) = w.component_mut(id, &OWNER_ID) {
+        *o = 0;
+    }
+    if let Some(s) = w.component_mut(id, &SHARED) {
+        *s = Tribe::default();
+    }
+    if let Some(o) = w.component_mut(id, &ORDERS) {
+        *o = DEFAULT;
+    }
+    set_command(w, id, WANDER, None);
+    if let Some(a) = w.component_mut(id, &ANIMAL) {
+        a.bond = 0;
+    }
+    crate::riding::unsaddle(w, id);
+    crate::taming::released(w, id);
+    crate::dog::on_released(w, id);
+    crate::evolution::count(w, id, 1.0);
+    weft_sdk::info!("animal {id} released");
 }
 
 fn species_of(w: &World, id: u64) -> Option<&'static species::Species> {

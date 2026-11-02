@@ -47,6 +47,17 @@ fn saddle_of(w: &World, id: u64) -> Option<u32> {
     SADDLES.get()?.iter().find(|(n, _)| *n == s.kind_name()).map(|(_, i)| i.id())
 }
 
+/// Takes its saddle off and drops it beside it (it is let go).
+pub fn unsaddle(w: &World, id: u64) {
+    let (Some(saddle), Some(st)) = (saddle_of(w, id), w.entity(id)) else { return };
+    if let Some(s) = w.component_mut(id, &SADDLED)
+        && *s != 0
+    {
+        *s = 0;
+        w.spawn_item([st.pos[0], st.pos[1] + 0.5, st.pos[2]], ItemStack::new(saddle, 1));
+    }
+}
+
 /// A player right clicks a tame: its saddle saddles it; an empty hand on a saddled one gets on.
 /// True if the click was used.
 pub fn interact(w: &World, id: u64, player: u64) -> bool {

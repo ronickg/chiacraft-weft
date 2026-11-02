@@ -345,6 +345,13 @@ fn interact(e: &mut EntityEvent) {
     commands::interact(&w, id, player);
 }
 
+/// `id` was let go: a wild dog again.
+pub(crate) fn on_released(w: &World, id: u64) {
+    if let Some(d) = w.component_mut(id, &DOG) {
+        (d.tamed, d.love) = (0, 0);
+    }
+}
+
 /// `id` was just tamed: a dog keeps its own record of that too.
 pub(crate) fn on_tamed(w: &World, id: u64) {
     if let Some(d) = w.component_mut(id, &DOG) {
