@@ -172,3 +172,6 @@ entity.animals.wood_mouse = Wood Mouse
 species.animals.wood_mouse = wood mouse
 family.animals.muridae = mouse and rat family
 screen.animals.signature.dart = Darts for cover at the first shadow
+entity.animals.field_vole = Field Vole
+species.animals.field_vole = field vole
+family.animals.cricetidae = vole and hamster family

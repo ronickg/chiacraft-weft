@@ -90,6 +90,7 @@ pub static FELIDAE: Family = Family { name: "Felidae", above: &["Mammalia", "Car
 pub static CAVIIDAE: Family = Family { name: "Caviidae", above: &["Mammalia", "Rodentia"] };
 pub static LEPORIDAE: Family = Family { name: "Leporidae", above: &["Mammalia", "Lagomorpha"] };
 pub static MURIDAE: Family = Family { name: "Muridae", above: &["Mammalia", "Rodentia"] };
+pub static CRICETIDAE: Family = Family { name: "Cricetidae", above: &["Mammalia", "Rodentia"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -288,7 +289,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 10] = [
+pub static SPECIES: [Species; 11] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -889,6 +890,75 @@ pub static SPECIES: [Species; 10] = [
         // generations deep in five game days and crowd 36 near: its growing up, life and room are
         // set to the common animals' pace instead (`balance::checks`).
         tune: Tune { growth: Some(72_000), lifespan: Some(384_000), crowd: Some(24), ..Tune::NONE },
+        birth_size: 0.35,
+    },
+    // The field vole, the north's rodent (the lemming's, the snow vole's and the marsh rats' stand-in),
+    // a simple wild creature on its own model (`source/vole`): what the owls and foxes of the cold
+    // biomes live on.
+    Species {
+        model: "vole",
+        name: "field_vole",
+        binomial: "Microtus agrestis",
+        family: &CRICETIDAE,
+        subfamily: "Arvicolinae",
+        breed: None,
+        size: Size::Small,
+        // Grasses and herbs, root tubers and moss; bark in winter; a few insect larvae.
+        eats: &[(Grass, 0.6), (Leaves, 0.15), (Roots, 0.15), (Seeds, 0.05), (Insects, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [2.0, 60.0, 15.0, 0.2, 1.0, 3.0, 30.0, 5.0, 2.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:wheat", 6), eats("base:wheat_seeds", 3), favorite("base:apple", 6)],
+        feedings: 0.0,
+        shy: 5.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.5,
+        signature: "dart",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 1.0,
+        dimorphism: 1.0,
+        size_spread: 0.1,
+        // About 1.3 times life, as the wood mouse (its model's).
+        height: (0.05, "shoulder"),
+        // Moist grassland, woodland verges, marshes and moors to 1,700 m; the tundra's lemmings
+        // and the swamp's marsh rats share its row.
+        habitats: &[
+            ("base:taiga", 1.0),
+            ("base:birch_forest", 1.0),
+            ("base:snowy_plains", 0.8),
+            ("base:mountains", 0.8),
+            ("base:swamp", 0.6),
+        ],
+        bio: Biology {
+            mass: 0.035,
+            gestation: 21.0,
+            incubation: 0.0,
+            // Out of the nest at three weeks, mature soon after.
+            maturity: 35.0,
+            // About two years at most; spring-born ones die sooner.
+            lifespan: 730.0,
+            // Up to seven litters a year.
+            interval: 25.0,
+            litter: 4.5,
+            social: Social::Solitary,
+            rarity: Rarity::Common,
+            // All year, even under the snow, most in spring and summer.
+            breeds: seasons::ALL_YEAR,
+            peak: seasons::SPRING | seasons::SUMMER,
+            // Est.: snug in runs under the snow through the winter; it shelters from summer heat.
+            comfort: (-15.0, 28.0),
+            cold_blooded: false,
+        },
+        // A vole's real pace, as the mouse's, set to the common animals' (`balance::checks`);
+        // its life shorter still, as it breeds faster.
+        tune: Tune { growth: Some(72_000), lifespan: Some(336_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.35,
     },
 ];

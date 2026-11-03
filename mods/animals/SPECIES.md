@@ -20,6 +20,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | hare | *Lepus europaeus* | common | small | 0.3 m | 3.8 kg | solitary | herbivore | wild | 0.92 d | 2.81 d | 19.2 d | 1-4 | 13 |
 | mountain_hare | *Lepus timidus* | common | small | 0.3 m | 3 kg | solitary | herbivore | wild | 1.05 d | 3.5 d | 19.2 d | 1-4 | 14 |
 | wood_mouse | *Apodemus sylvaticus* | common | small | 0.05 m | 0.023 kg | solitary | herbivore | wild | 0.63 d | 3 d | 16 d | 2-6 | 24 |
+| field_vole | *Microtus agrestis* | common | small | 0.05 m | 0.035 kg | solitary | herbivore | wild | 0.55 d | 3 d | 14 d | 2-6 | 24 |
 
 ## Stats at level 1
 
@@ -37,6 +38,7 @@ Damage and speed are each kind's own (1 = 100%).
 | hare | 5 | 120 | 40 | 0.5 | 1 | 15 | 60 | 20 | 5 | 30 |
 | mountain_hare | 5 | 120 | 40 | 0.5 | 1 | 13 | 60 | 20 | 5 | 30 |
 | wood_mouse | 2 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
+| field_vole | 2 | 60 | 15 | 0.2 | 1 | 3 | 30 | 5 | 2 | 30 |
 
 ## dog (chihuahua)
 
@@ -85,7 +87,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | passive |
 | diet | carnivore |
 | eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
-| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, base:chicken |
+| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, base:chicken |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 8; `base:mutton` 8; `base:cooked_beef` 20, favorite; `base:cooked_porkchop` 20, favorite; `base:cooked_chicken` 16, favorite; `base:cooked_mutton` 16, favorite; `base:bone` 5, favorite; `animals:kibble` 30, kibble |
@@ -147,7 +149,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | passive |
 | diet | carnivore |
 | eats | meat 80%, insects 10%, carrion 5%, fish 5% |
-| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, base:chicken |
+| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, base:chicken |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:mutton` 8; `base:egg` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:chicken` 10, favorite; `base:cooked_chicken` 16, favorite; `animals:kibble` 30, kibble |
@@ -630,6 +632,67 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 4; `base:wheat` 6; `base:berries` 4, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.5 blocks |
+| signature | dart |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 1 |
+
+## field_vole
+
+*Microtus agrestis*, Mammalia › Rodentia › Cricetidae › Arvicolinae. Model `vole`, entity `animals:field_vole`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:taiga` | commonest |
+| `base:birch_forest` | commonest |
+| `base:snowy_plains` | 80% |
+| `base:mountains` | 80% |
+| `base:swamp` | 60% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.05 m at the shoulder |
+| males against females | 1x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 35% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 0.035 kg | |
+| carries her young | 21 d | 0.55 d |
+| litter or clutch | 4.5 on average | 2-6 |
+| between litters | 25 d | rests 0.35 d |
+| breeds in | all year, most in spring and summer |  |
+| comfortable in | -15 to 28 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 35 d | 3 d **set** |
+| lives | 2 y | 14 d **set**, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 24 **set** within 48 blocks |
+
+**Balance** (common): a generation 3.5 d; a line four deep in 11 d (4 h of play); 44.6 young per mother in 10 days, 37 in her life.
+
+- ✓ fourth generation: 10.6 days (want 10-25 days (common))
+- ✗ grown most of its life: grows 3.0 of 14 days (want under a fifth)
+- ✓ young in a life: 36.6 (want 6-40)
+- ✓ litter: 2-6 (want 1-12, fewest first)
+- ✓ room near: 24 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | grass 60%, leaves 15%, roots 15%, seeds 5%, insects 5% |
+| its food grows at home (spring/summer/autumn/winter) | taiga 40/62/40/40%, birch_forest 40/62/40/0%, snowy_plains 40/40/40/40%, mountains 40/70/40/40%, swamp 8/59/45/0% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 5 blocks (twice that running) |
+| eats (food points) | `base:wheat` 6; `base:wheat_seeds` 3; `base:apple` 6, favorite |
 
 | Fighting, riding, the wild | |
 |---|---|
