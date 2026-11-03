@@ -113,3 +113,15 @@ fn the_stats_are_the_same_nine() {
         "the animals' stats (species.rs STAT_NAMES) and the player's (vitals::stats::NAMES) must be the same, in the same order"
     );
 }
+
+/// Crops grow by the pace the species grow up by (`notes/ECOLOGY.md`, "The pacing"), so a field
+/// and a litter keep their real proportions.
+#[test]
+fn plants_and_animals_grow_at_one_pace() {
+    let (a, k) = animals_core::biology::GROWING;
+    assert_eq!(
+        (a as f32, k as f32),
+        vitals::plants::GROWING,
+        "vitals::plants::GROWING and animals_core::biology::GROWING must be the same pace"
+    );
+}

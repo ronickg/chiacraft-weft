@@ -177,6 +177,7 @@ recipe.base.crafting = Крафт
 recipe.base.smelting = Плавка
 command.base.season = сейчас день {1}: {0}
 command.base.rain.today = дождь здесь сегодня с {0}:00 до {1}:00; здесь дождь идёт в {2}% дней этого сезона
+command.base.growth = здесь сегодня в среднем {0} °C, почва влажная на {1}%: пшеница растёт на {2}% от лучшего
 command.base.rain.dry = сегодня здесь без дождя; здесь дождь идёт в {0}% дней этого сезона
 season.base.spring = весна
 season.base.summer = лето

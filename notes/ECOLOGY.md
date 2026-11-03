@@ -381,6 +381,12 @@ There are two clocks. Both already exist, so the loop only reuses them.
 
 ### 2. Soil water
 
+**Built (2026-11-03), simpler than planned:**
+- **Worked out, not stored:** `vitals::plants::soil_water` reads the last 8 days of the biome's
+  own rain schedule, each day's water drying faster in warmer air, so no number is kept per biome.
+- **By water:** ground within 4 blocks of water is soaked (`base_api::ground_at`).
+
+
 - **The rule:** each biome's `wet` goes up a step on a rainy day and down with heat on a dry one.
   From 0 to 1, it's kept per dimension and biome, and saved with the world's rules.
 - **Near water:** ground within 4 blocks of water counts as wet whatever the season. This is how
@@ -389,6 +395,26 @@ There are two clocks. Both already exist, so the loop only reuses them.
   season). That needs a per-biome tint that can change, an engine question for the look.
 
 ### 3. Plants grow by the place
+
+**Built (2026-11-03) for the game's growing plants: wheat, the berry bush, the sapling, sugar cane
+and cactus.**
+- **The table and rule:** `vitals::plants::PLANTS` holds their real warmth and water, and
+  `rate` = warmth × water. `mods/base/src/growth.rs` asks it at each growth step.
+- **Times:** wheat (7 stages) and berries (3) take their real days by the growing pace: 26 and
+  20 minutes at the best rate. Trees and columns keep the game's times, since a real oak's years
+  would be hours of play.
+- **Ripening:** berries ripen only in summer and autumn.
+- **`/growth`** says the day's air, the soil's water and wheat's rate where you stand.
+- **Checks:** every plant grows somewhere (`vitals/tests/places.rs`); the plants' pace is the
+  species' (`animals/core/tests/places.rs`).
+- **Seen in the game (plains):** wheat at 18% of its best in early spring, 64% in summer, 0 in a
+  dry autumn spell and in winter frost, and 76% beside water in summer.
+- **Not yet:**
+  - grass and tall grass regrowing (comes with grazing, part 5);
+  - frost killing tender crops;
+  - the new crops and wild plants from the research;
+  - unloaded plants catch up at today's season, not the season they missed.
+
 
 - **The plant table:** one row per plant:
   - the warmth it grows in (`min`, `best`, `max` °C);

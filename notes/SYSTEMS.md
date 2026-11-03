@@ -15,6 +15,8 @@ flowchart LR
   climate --> weather["Rain by season<br/>base weather.rs"]
   calendar --> weather
   weather --> air
+  weather --> plants["Plants grow<br/>base growth.rs"]
+  climate --> plants
   calendar["Calendar and seasons<br/>vitals::calendar"] --> air
   fires["Fires, roofs, water<br/>blocks in the world"] --> air
   air --> player["Player's body<br/>base survival/"]
@@ -40,8 +42,8 @@ flowchart LR
 
 ### Planned: the living world
 
-The loop that closes this map, designed in `notes/ECOLOGY.md`; its first part, rain by season, is
-built (the rows below). Rain by season
+The loop that closes this map, designed in `notes/ECOLOGY.md`; rain by season, soil water and
+plants by the place are built (the rows below). Rain by season
 comes from the climate table and falls through the air. It wets the soil, and plants grow by the
 place. Grazers eat the plants and hunters eat the grazers, all through one forage goal and food
 categories. A place's food sets how many animals it holds. What dies and rots becomes compost,
@@ -60,6 +62,7 @@ built, it gets its row below and its arrows above.
 | System | Code | Numbers | Reads | Read by |
 |---|---|---|---|---|
 | Climates | `vitals::climate::BIOMES`, each from a real place (`reports/ecology/Biome climates.md`) | same | the research | the air, the weather; biomes set it (`base_api::climate` in `worldgen.rs`, `cretaceous.rs`) |
+| Plants, soil water | `vitals::plants` (`PLANTS`, `rate`, `soil_water`), `base_api::ground_at`, `mods/base/src/growth.rs` | `PLANTS` rows, `GROWING` | climates, rain schedule, calendar, height, water within 4 blocks | the growing blocks' steps (wheat, berry bush, sapling, sugar cane, cactus) |
 | Rain by season | `mods/base/src/weather.rs`, `vitals::climate::{spell, rains, thunders}` | `rain` per season in `BIOMES` | climates, calendar, the world's seed | the engine (`set_rain`: rain drawn only where it falls), the air (`raining_at`) |
 | Calendar, seasons | `vitals::calendar` | `SEASON_DAYS`, `MIDSUMMER` | engine day time | the air, breeding seasons, day length (`.seasons(..)` on dimensions), the HUD clock |
 | The air | `base_api::air_at`, `vitals::temperature::air` | `temperature.rs` | climate, season, hour, height, sky light, rain here (`raining_at`), water, fires (`base_api::heat_of`) | player's body, animals' bodies, eggs |
@@ -94,6 +97,9 @@ built, it gets its row below and its arrows above.
 - **Temperature rules** (`temperature.rs`, `air_at`): players' effects, animals' comfort and
   eggs all move together; `places.rs` says if a species stops being at home or its eggs stop
   hatching.
+- **A growing plant, or a new one**: its row in `vitals::plants::PLANTS` from the research
+  (`reports/ecology/plants.json`), its block's `.growth(growth::step_secs(..))` and
+  `.on_grow(|e| growth::grow(..))` (`blocks.rs`); the sheet.
 - **The calendar** (season length, midsummer): breeding seasons, day length, the clock, the
   climates' seasons, eggs in each breeding season.
 - **An effect, or a new one**: `effects.rs` (`ALL`, `modifiers`, `icon`); its icon in
@@ -120,6 +126,8 @@ built, it gets its row below and its arrows above.
 | Check | Where | Catches |
 |---|---|---|
 | The climates are their real places | `vitals/tests/places.rs` | a biome's year mean, seasons or rainiest season drifting from its place's research |
+| Every plant grows somewhere | `vitals/tests/places.rs` | a plant whose warmth or water no biome gives |
+| One growing pace | `animals/core/tests/places.rs` | `vitals::plants::GROWING` and `animals_core::biology::GROWING` apart |
 | Rain follows the shares | `vitals/src/climate.rs` | the rain schedule raining more or less often than a season's share |
 | Every habitat has a climate | `animals/core/tests/places.rs` | a species living in a biome with no climate |
 | Each species is at home in its habitats | same | comfort ranges that don't fit the climates (cold or hot a quarter of the year at home, half elsewhere) |

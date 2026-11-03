@@ -24,7 +24,7 @@ pub fn register(r: &mut Registry) {
         let Some(c) = CLIMATE.on_biome(id) else { return };
         let (day, _, season) = now(&w);
         let share = Arg::Int((climate::rain_share(c.rain, season) * 100.0).round() as i64);
-        match climate::spell(c.rain, season, key(&w, id), day) {
+        match climate::spell(c.rain, season, base_api::rain_key(&w, id), day) {
             Some((from, to)) => cmd.reply("command.base.rain.today", &[Arg::Int(from as i64), Arg::Int(to.ceil() as i64), share]),
             None => cmd.reply("command.base.rain.dry", &[share]),
         }
@@ -38,11 +38,6 @@ fn now(w: &World) -> (u64, f32, Option<usize>) {
     let hour = ((time % calendar::DAY_TICKS) as f32 / 1000.0 + 6.0) % 24.0;
     let season = (SEASONS.on_dimension(w.dimension()).unwrap_or(0) > 0).then(|| calendar::date(time).season.index() as usize);
     (time / calendar::DAY_TICKS, hour, season)
-}
-
-/// The biome's own rain, in this world.
-fn key(w: &World, biome: u32) -> u64 {
-    w.seed() ^ (biome as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93)
 }
 
 /// Every biome with a climate (any mod's), by id, found once.
@@ -63,7 +58,7 @@ fn tick(w: &World) {
     let (day, hour, season) = now(w);
     let (mut wet, mut thunder) = (Vec::new(), false);
     for &(id, c) in biomes() {
-        let key = key(w, id);
+        let key = base_api::rain_key(w, id);
         if climate::rains(c.rain, season, key, day, hour) {
             wet.push(id);
             thunder |= climate::thunders(c.celsius, c.seasons, season, key, day);

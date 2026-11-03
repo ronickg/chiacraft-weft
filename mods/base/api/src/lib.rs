@@ -217,6 +217,44 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
     }
 }
 
+/// What the ground offers a plant at `pos` (`ground_at`): the day's mean air, how wet the soil
+/// is, and the season (in a dimension with a calendar).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Ground {
+    pub mean_air: f32,
+    /// 0 dry to 1 soaked: the biome's last days of rain (`vitals::plants::soil_water`), or soaked
+    /// by water within `WATER_REACH` blocks.
+    pub soil: f32,
+    pub season: Option<usize>,
+}
+
+/// Blocks from water within which the ground is wet whatever the weather (as farmland's).
+pub const WATER_REACH: i32 = 4;
+
+/// The ground at `pos` for a plant (`notes/ECOLOGY.md`, part 3): its biome's climate and season,
+/// the height, and the rain of the last days there.
+pub fn ground_at(w: &World, pos: [i32; 3]) -> Ground {
+    use vitals::{calendar, plants};
+    let biome = w.biome(pos);
+    let c = CLIMATE.on_biome(biome).unwrap_or(TEMPERATE);
+    let time = w.day_time();
+    let seasons = SEASONS.on_dimension(w.dimension()).unwrap_or(0) > 0;
+    let date = calendar::date(time);
+    let height = (pos[1] - SEA).max(0) as f32 * ALTITUDE;
+    let mean = if seasons { plants::mean_air(c.celsius, c.seasons, date.day as f32 + date.fraction) } else { c.celsius };
+    let by_water = (-WATER_REACH..=WATER_REACH).any(|dx| {
+        (-WATER_REACH..=WATER_REACH).any(|dz| (-1..=0).any(|dy| block_name(w.get([pos[0] + dx, pos[1] + dy, pos[2] + dz])).split('[').next() == Some("base:water")))
+    });
+    let soil = if by_water { 1.0 } else { plants::soil_water(c.rain, c.celsius, c.seasons, seasons, rain_key(w, biome), time / calendar::DAY_TICKS) };
+    Ground { mean_air: mean - 0.0065 * height, soil, season: seasons.then(|| date.season.index() as usize) }
+}
+
+/// A biome's own rain in this world (`vitals::climate::spell`): the weather and the ground read
+/// the same schedule.
+pub fn rain_key(w: &World, biome: u32) -> u64 {
+    w.seed() ^ (biome as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93)
+}
+
 /// How much a block heats the air near it (1 lava's).
 pub fn heat_of(state: u32) -> f32 {
     // The state's name without its properties (`base:lava[level=0]`).

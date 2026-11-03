@@ -89,6 +89,18 @@ Each biome's real place (`reports/ecology/Biome climates.md`), year mean, humidi
 | animals:fern_forest | the Yixian Formation, Liaoning | 10 | 0.8 | 10 | -4 | 27 | 25% | 45% | 30% | 15% |
 | animals:crags | the Sevier highlands, Utah | 15 | 0.6 | 8 | 2 | 31 | 25% | 40% | 25% | 15% |
 
+## Plants
+
+What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants and crops.md`): the air it grows in (from, best, to), its water, its real days to harvest and the game's minutes at the best rate, and where and in which seasons it grows at least a third of its best (sp, su, au, wi), with each biome's rain and warmth.
+
+| plant | real plant | °C | water | real days | minutes | grows |
+|---|---|---|---|---|---|---|
+| base:wheat | spring wheat | 0, 15-23, 34 | Moderate | 110 | 26 | plains (su au), forest (su au), birch_forest (su au), taiga (su), savanna (su au), swamp (au), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
+| base:berry_bush | blueberry | 7, 20-26, 32 | Moderate | 75 | 20 | plains (su), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
+| base:sugar_cane | sugar cane | 12, 22-30, 38 | Wet | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
+| base:cactus | saguaro | 10, 25-40, 50 | Dry | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
+| base:sapling | oak | 5, 18-28, 38 | Moderate | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
+
 ## Difficulty (the `base:difficulty` rule)
 
 | | digests | keeps | harm | can kill | XP lost on death | stamina costs |

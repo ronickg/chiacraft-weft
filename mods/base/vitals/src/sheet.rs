@@ -7,7 +7,7 @@ use std::fmt::Write;
 use crate::effects;
 use crate::food::{self, NUTRIENT_NAMES};
 use crate::stats::{self, Growth};
-use crate::{calendar, climate, difficulty, levels, temperature};
+use crate::{calendar, climate, difficulty, levels, plants, temperature};
 
 pub fn markdown() -> String {
     let mut w = String::new();
@@ -20,6 +20,7 @@ pub fn markdown() -> String {
     foods(&mut w);
     effects_table(&mut w);
     climates(&mut w);
+    plant_table(&mut w);
     difficulties(&mut w);
     level_table(&mut w);
     w
@@ -134,6 +135,42 @@ fn climates(w: &mut String) {
         let rain = c.rain.map(|r| format!("{:.0}%", r * 100.0)).join(" | ");
         let _ =
             writeln!(w, "| {} | {} | {} | {} | {} | {cold:.0} | {hot:.0} | {rain} |", c.biome, c.place, c.celsius, c.humidity, c.seasons);
+    }
+    let _ = writeln!(w);
+}
+
+fn plant_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Plants\n\nWhat each growing plant needs (`vitals::plants`, from `reports/ecology/Plants and crops.md`): the air it grows in (from, best, to), its water, its real days to harvest and the game's minutes at the best rate, and where and in which seasons it grows at least a third of its best (sp, su, au, wi), with each biome's rain and warmth.\n\n| plant | real plant | °C | water | real days | minutes | grows |\n|---|---|---|---|---|---|---|"
+    );
+    const SHORT: [&str; 4] = ["sp", "su", "au", "wi"];
+    for p in &plants::PLANTS {
+        let minutes = plants::step_secs(p, 1).map_or("the game's".into(), |s| format!("{:.0}", s / 60.0));
+        let grows = climate::BIOMES
+            .iter()
+            .filter(|c| !c.underground)
+            .filter_map(|c| {
+                let seasons: Vec<&str> = (0..4)
+                    .filter(|&s| plants::season_rate(p, c, s) >= 0.33)
+                    .map(|s| SHORT[s])
+                    .collect();
+                (!seasons.is_empty()).then(|| format!("{} ({})", c.biome.split(':').nth(1).unwrap_or(c.biome), seasons.join(" ")))
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let _ = writeln!(
+            w,
+            "| {} | {} | {}, {}-{}, {} | {:?} | {} | {minutes} | {grows} |",
+            p.block,
+            p.real,
+            p.base,
+            p.best.0,
+            p.best.1,
+            p.max,
+            p.water,
+            if p.days > 0.0 { format!("{}", p.days) } else { "-".into() }
+        );
     }
     let _ = writeln!(w);
 }

@@ -4,6 +4,7 @@
 mod advancements;
 mod beds;
 mod blocks;
+mod growth;
 mod hud;
 mod items;
 mod levels;
@@ -49,6 +50,7 @@ fn init(r: &mut Registry) {
     mobs::register(r);
     worldgen::register(r);
     weather::register(r);
+    growth::register(r);
     advancements::register(r);
     beds::register(r);
     hud::register(r);

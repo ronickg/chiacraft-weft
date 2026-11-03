@@ -15,6 +15,7 @@ pub mod difficulty;
 pub mod effects;
 pub mod food;
 pub mod levels;
+pub mod plants;
 pub mod sheet;
 pub mod stamina;
 pub mod stats;

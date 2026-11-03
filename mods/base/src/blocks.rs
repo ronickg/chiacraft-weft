@@ -344,8 +344,8 @@ pub fn register(r: &mut Registry) {
         .texture("sapling_oak")
         .plant()
         .needs_below("#plant_soil")
-        .growth(470.0, 9)
-        .on_grow(|e| worldgen::grow_tree(e.world(), e.pos()))
+        .growth(crate::growth::step_secs("base:sapling", 1, 470.0), 9)
+        .on_grow(|e| crate::growth::grow(e, "base:sapling", false, |e| worldgen::grow_tree(e.world(), e.pos())))
         .tab(&crate::tabs::NATURAL);
     r.block(&SUGAR_CANE)
         .sound_group("grass")
@@ -353,8 +353,8 @@ pub fn register(r: &mut Registry) {
         .plant()
         .needs_below("#sugar_cane_soil")
         .needs_near_support("#water")
-        .growth(270.0, 0)
-        .on_grow(|e| grow_column(e, &SUGAR_CANE))
+        .growth(crate::growth::step_secs("base:sugar_cane", 1, 270.0), 0)
+        .on_grow(|e| crate::growth::grow(e, "base:sugar_cane", false, |e| grow_column(e, &SUGAR_CANE)))
         .tab(&crate::tabs::NATURAL);
     r.block(&CACTUS)
         .sound_group("cloth")
@@ -362,8 +362,8 @@ pub fn register(r: &mut Registry) {
         .model_box([1.0, 0.0, 1.0], [15.0, 16.0, 15.0])
         .hardness(0.4)
         .needs_below("#cactus_soil")
-        .growth(270.0, 0)
-        .on_grow(|e| grow_column(e, &CACTUS))
+        .growth(crate::growth::step_secs("base:cactus", 1, 270.0), 0)
+        .on_grow(|e| crate::growth::grow(e, "base:cactus", false, |e| grow_column(e, &CACTUS)))
         .tab(&crate::tabs::NATURAL);
     r.block(&WHEAT)
         .sound_group("grass")
@@ -372,7 +372,9 @@ pub fn register(r: &mut Registry) {
         .plant()
         .needs_below("#crop_soil")
         .no_item()
-        .growth(205.0, 9);
+        // By warmth and rain (`growth.rs`): seven stages over its real 110 days' pace.
+        .growth(crate::growth::step_secs("base:wheat", 7, 205.0), 9)
+        .on_grow(|e| crate::growth::grow(e, "base:wheat", false, |e| crate::growth::next_age(e, 7)));
     // Modern's: unripe gives its seed back, ripe gives the wheat and up to 3 more seeds.
     r.loot(&WHEAT)
         .pool(Pool::new().when(Cond::BlockState("age=7")).item("wheat"))
@@ -541,7 +543,12 @@ pub fn register(r: &mut Registry) {
         .plant()
         .needs_below("#plant_soil")
         .no_item()
-        .growth(300.0, 9);
+        // Flowers to ripe berries by warmth and rain; ripe only in summer and autumn (`growth.rs`).
+        .growth(crate::growth::step_secs("base:berry_bush", 3, 300.0), 9)
+        .on_grow(|e| {
+            let last = crate::growth::age(e) == 2;
+            crate::growth::grow(e, "base:berry_bush", last, |e| crate::growth::next_age(e, 3))
+        });
     // Any age gives a berry back to plant again; ripe, two more.
     r.loot(&BERRY_BUSH)
         .pool(Pool::new().entry(Entry::item("berries")))

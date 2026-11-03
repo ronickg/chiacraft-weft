@@ -59,3 +59,22 @@ fn the_climates_are_their_real_places() {
     }
     assert!(problems.is_empty(), "\n{}\n(vitals::climate::BIOMES against the research)\n", problems.join("\n"));
 }
+
+/// Every growing plant grows somewhere, in some season, at least a third of its best: a plant
+/// with warmth or water no biome gives would never grow (`vitals::plants` against the climates).
+#[test]
+fn every_plant_grows_somewhere() {
+    use vitals::plants::{PLANTS, season_rate};
+    let mut problems = Vec::new();
+    for p in &PLANTS {
+        let best = BIOMES
+            .iter()
+            .filter(|c| !c.underground)
+            .flat_map(|c| (0..4).map(move |s| season_rate(p, c, s)))
+            .fold(0.0f32, f32::max);
+        if best < 0.33 {
+            problems.push(format!("{}: grows at most {:.0}% of its best in any biome and season", p.block, best * 100.0));
+        }
+    }
+    assert!(problems.is_empty(), "\n{}\n(vitals::plants against vitals::climate)\n", problems.join("\n"));
+}
