@@ -94,6 +94,7 @@ pub static CRICETIDAE: Family = Family { name: "Cricetidae", above: &["Mammalia"
 pub static CERVIDAE: Family = Family { name: "Cervidae", above: &["Mammalia", "Artiodactyla"] };
 pub static SALMONIDAE: Family = Family { name: "Salmonidae", above: &["Actinopterygii", "Salmoniformes"] };
 pub static SERRASALMIDAE: Family = Family { name: "Serrasalmidae", above: &["Actinopterygii", "Characiformes"] };
+pub static CORVIDAE: Family = Family { name: "Corvidae", above: &["Aves", "Passeriformes"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -297,7 +298,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 17] = [
+pub static SPECIES: [Species; 18] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1332,6 +1333,80 @@ pub static SPECIES: [Species; 17] = [
         },
         tune: Tune::NONE,
         birth_size: 0.25,
+    },
+    // The raven (`reports/ecology/Overworld food webs.md`: for the dead in the cold biomes, where
+    // there are no vultures): wild, on the ground and in the air (`source/raven`, `raven.rs`).
+    Species {
+        model: "raven",
+        name: "raven",
+        binomial: "Corvus corax",
+        family: &CORVIDAE,
+        subfamily: "Corvinae",
+        breed: None,
+        size: Size::Small,
+        // Carrion first (it follows wolves), eggs and small animals, insects, grain, berries and
+        // scraps.
+        eats: &[(Carrion, 0.4), (Meat, 0.2), (Insects, 0.15), (Seeds, 0.15), (Fruit, 0.1)],
+        // Mice and voles to a nestling or a young hare, a tenth of its own mass.
+        prey: (0.01, 0.1),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [6.0, 120.0, 40.0, 1.0, 1.0, 10.0, 60.0, 20.0, 5.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:beef", 10), eats("base:wheat_seeds", 2), favorite("base:rotten_flesh", 8)],
+        feedings: 0.0,
+        shy: 14.0,
+        fights: true,
+        attacks: &[],
+        reach: 0.4,
+        signature: "soar",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.2,
+        dimorphism: 1.08,
+        size_spread: 0.1,
+        // Standing, at the crown.
+        height: (0.34, "crown"),
+        // Woods, mountains, the tundra, the desert and the coast: about anywhere in the north, and
+        // the dry places to the south.
+        habitats: &[
+            ("base:taiga", 1.0),
+            ("base:mountains", 0.8),
+            ("base:forest", 0.6),
+            ("base:birch_forest", 0.6),
+            ("base:snowy_plains", 0.6),
+            ("base:desert", 0.4),
+            ("base:plains", 0.3),
+            ("base:beach", 0.3),
+        ],
+        bio: Biology {
+            mass: 1.2,
+            gestation: 0.0,
+            // 18-21 days, the female sitting; the young fly at five or six weeks.
+            incubation: 20.0,
+            // Grown at two; pairing and breeding from three or four.
+            maturity: 730.0,
+            // 10-15 years in the wild, up to 23.
+            lifespan: 4380.0,
+            interval: 365.0,
+            // 3-7 eggs.
+            litter: 4.5,
+            social: Social::Solitary,
+            rarity: Rarity::Uncommon,
+            // Laying from late winter to April.
+            breeds: seasons::SPRING,
+            peak: seasons::SPRING,
+            // From the Arctic's winters to the desert's heat (it pants and keeps to shade).
+            comfort: (-30.0, 32.0),
+            cold_blooded: false,
+        },
+        // No nests yet (Ronald, 2026-11-03): eggs laid on the ground would never hatch in the
+        // north's cold (`eggs.rs`), so its young come out as fledglings after the eggs' time.
+        tune: Tune { gestation: Some(12_700), ..Tune::NONE },
+        birth_size: 0.3,
     },
 ];
 

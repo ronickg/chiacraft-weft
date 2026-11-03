@@ -27,6 +27,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | pacu | *Piaractus mesopotamicus* | uncommon | small | 0.37 m | 4 kg | herd | omnivore | wild | eggs, hatch 0.06 d | 8.65 d | 57.5 d | 2-8 | 26 |
 | red_fox | *Vulpes vulpes* | common | small | 0.38 m | 5.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 2-7 | 15 |
 | arctic_fox | *Vulpes lagopus* | common | small | 0.38 m | 3.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 3-10 | 16 |
+| raven | *Corvus corax* | uncommon | small | 0.34 m | 1.2 kg | solitary | carnivore | wild | 0.53 d | 6.51 d | 46 d | 2-6 | 17 |
 
 ## Stats at level 1
 
@@ -51,6 +52,7 @@ Damage and speed are each kind's own (1 = 100%).
 | pacu | 6 | 80 | 40 | 0.5 | 1 | 20 | 400 | 15 | 4 | 25 |
 | red_fox | 10 | 120 | 60 | 2 | 1 | 30 | 80 | 40 | 10 | 30 |
 | arctic_fox | 8 | 120 | 60 | 1.6 | 1 | 22 | 80 | 35 | 12 | 30 |
+| raven | 6 | 120 | 40 | 1 | 1 | 10 | 60 | 20 | 5 | 30 |
 
 ## dog (chihuahua)
 
@@ -99,7 +101,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | passive |
 | diet | carnivore |
 | eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
-| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, base:chicken |
+| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, base:chicken |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 8; `base:mutton` 8; `base:cooked_beef` 20, favorite; `base:cooked_porkchop` 20, favorite; `base:cooked_chicken` 16, favorite; `base:cooked_mutton` 16, favorite; `base:bone` 5, favorite; `animals:kibble` 30, kibble |
@@ -161,7 +163,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | passive |
 | diet | carnivore |
 | eats | meat 80%, insects 10%, carrion 5%, fish 5% |
-| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, base:chicken |
+| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, base:chicken |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:mutton` 8; `base:egg` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:chicken` 10, favorite; `base:cooked_chicken` 16, favorite; `animals:kibble` 30, kibble |
@@ -1003,7 +1005,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | wild |
 | diet | carnivore |
 | eats | meat 50%, fruit 20%, insects 15%, carrion 15% |
-| hunts | 0.4%-80% of its mass alone (0.02-4 kg); at home: hare, mountain_hare, wood_mouse, field_vole, brown_trout, base:chicken |
+| hunts | 0.4%-80% of its mass alone (0.02-4 kg); at home: hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, base:chicken |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
@@ -1061,7 +1063,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | wild |
 | diet | carnivore |
 | eats | meat 55%, carrion 25%, fruit 10%, insects 5%, fish 5% |
-| hunts | 0.4%-100% of its mass alone (0.01-4 kg); at home: mountain_hare, field_vole, brown_trout, base:chicken |
+| hunts | 0.4%-100% of its mass alone (0.01-4 kg); at home: mountain_hare, field_vole, brown_trout, raven, base:chicken |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
@@ -1074,6 +1076,70 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.6 |
+
+## raven
+
+*Corvus corax*, Aves › Passeriformes › Corvidae › Corvinae. Model `raven`, entity `animals:raven`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:taiga` | commonest |
+| `base:mountains` | 80% |
+| `base:forest` | 60% |
+| `base:birch_forest` | 60% |
+| `base:snowy_plains` | 60% |
+| `base:desert` | 40% |
+| `base:plains` | 30% |
+| `base:beach` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.34 m at the crown |
+| males against females | 1.08x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 30% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 1.2 kg | |
+| carries her young | 0 d | 0.53 d **set** |
+| litter or clutch | 4.5 on average | 2-6 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | spring | out of it, only a tame well cared for |
+| comfortable in | -30 to 32 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 2 y | 6.51 d |
+| lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 17 within 48 blocks |
+
+**Balance** (uncommon): a generation 7.6 d; a line four deep in 23 d (8 h of play); 7.1 young per mother in 10 days, 22 in her life.
+
+- ✓ fourth generation: 22.7 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 6.5 of 46 days (want under a fifth)
+- ✓ young in a life: 21.6 (want 6-40)
+- ✓ litter: 2-6 (want 1-12, fewest first)
+- ✓ room near: 17 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | carrion 40%, meat 20%, insects 15%, seeds 15%, fruit 10% |
+| hunts | 1.0%-10% of its mass alone (0.01-0 kg); at home: wood_mouse, field_vole |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 14 blocks (twice that running) |
+| eats (food points) | `base:beef` 10; `base:wheat_seeds` 2; `base:rotten_flesh` 8, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes:  |
+| reach past its body | 0.4 blocks |
+| signature | soar |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.2 |
 
 ## Shared by every species
 

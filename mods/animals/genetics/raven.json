@@ -1,0 +1,74 @@
+{
+ "species": "raven",
+ "about": "The common raven (Corvus corax): black all over with a blue-purple gloss on the back, wings and crown, glossier in some than others. White ravens (leucistic: white with pale blue eyes) turn up very rarely.",
+ "loci": [
+  {
+   "id": "Le",
+   "name": "Leucism",
+   "alleles": [
+    {
+     "a": "Le",
+     "freq": 0.995
+    },
+    {
+     "a": "le",
+     "freq": 0.005,
+     "about": "white (very rare, recessive)"
+    }
+   ]
+  },
+  {
+   "id": "Gl",
+   "name": "Gloss",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "a dull black to a strong blue-purple sheen"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   44,
+   30,
+   24
+  ],
+  [
+   66,
+   46,
+   34
+  ]
+ ],
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  }
+ }
+}

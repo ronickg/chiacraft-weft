@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 17] = [
+const FILES: [(&str, &str); 18] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -276,6 +276,7 @@ const FILES: [(&str, &str); 17] = [
     ("pacu", include_str!("../../genetics/pacu.json")),
     ("red_fox", include_str!("../../genetics/red_fox.json")),
     ("arctic_fox", include_str!("../../genetics/arctic_fox.json")),
+    ("raven", include_str!("../../genetics/raven.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1108,6 +1109,27 @@ fn fox(r: &Read) -> Look {
     }
 }
 
+/// Ravens: black with a blue-purple gloss, strong in some and dull in others; white now and then
+/// (leucistic, recessive: white with pale blue eyes).
+fn raven(r: &Read) -> Look {
+    if r.copies("Le", "le") == 2 {
+        return Look {
+            name: "White".into(),
+            base: [228.0, 226.0, 218.0],
+            under: [234.0, 232.0, 226.0],
+            eye: Some([150.0, 176.0, 196.0]),
+            ..Look::default()
+        };
+    }
+    let gl = r.qv("Gl");
+    Look {
+        name: if gl > 0.62 { "Glossy black".into() } else { "Black".into() },
+        base: mix([34.0, 32.0, 36.0], [38.0, 40.0, 64.0], gl),
+        under: [28.0, 27.0, 32.0],
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1266,6 +1288,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "brown_trout" => trout(&r),
         "pacu" => pacu(&r),
         "red_fox" | "arctic_fox" => fox(&r),
+        "raven" => raven(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1847,8 +1870,21 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 12] =
-    model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern", "hare", "mouse", "vole", "deer", "fish", "fox");
+const MODEL_LAYERS: [ModelLayers; 13] = model_layers!(
+    "chihuahua",
+    "cat",
+    "capybara",
+    "raptor",
+    "utahraptor",
+    "wyvern",
+    "hare",
+    "mouse",
+    "vole",
+    "deer",
+    "fish",
+    "fox",
+    "raven"
+);
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
     let mut d = png::Decoder::new(std::io::Cursor::new(png_bytes));

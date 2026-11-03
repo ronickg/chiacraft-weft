@@ -3,7 +3,8 @@
 //! wyverns (`wyvern.rs`, a fantasy animal, and their breath: `breath.rs`), and the living world's
 //! simple wild creatures (`wild.rs`): hares of two species (`hare.rs`), wood mice (`mouse.rs`),
 //! field voles (`vole.rs`), deer of two species (`deer.rs`) and foxes of two species, hunters
-//! (`fox.rs`); and fish of two species, spawned into the water and swimming (`fish.rs`),
+//! (`fox.rs`), ravens on the ground and in the air (`raven.rs`); and fish of two species, spawned
+//! into the water and swimming (`fish.rs`),
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
 //! (`taming.rs`, `knockout.rs`), commands and tribes (`commands.rs`), signatures
@@ -33,8 +34,8 @@ mod dog;
 mod eggs;
 mod evolution;
 mod fish;
-mod fox;
 mod forage;
+mod fox;
 mod gateway;
 mod habitats;
 mod hare;
@@ -42,6 +43,7 @@ mod hunt;
 mod knockout;
 mod mouse;
 mod raptor;
+mod raven;
 mod riding;
 mod scars;
 mod screen;
@@ -111,6 +113,7 @@ fn init(r: &mut Registry) {
     deer::init(r);
     fish::init(r);
     fox::init(r);
+    raven::init(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
