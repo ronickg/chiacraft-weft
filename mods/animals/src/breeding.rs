@@ -12,6 +12,7 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use animals_core::biology::seasons;
 use animals_core::life::{self, LOVE_TICKS, MALE_REST};
 use weft_sdk::*;
 
@@ -57,6 +58,20 @@ static HEART: Particle = Particle::named("heart");
 
 /// The bond breeding needs.
 const BOND: u8 = 50;
+/// Out of its breeding season a tame still comes into heat if it's well cared for: this much
+/// bond, and its belly this full (a stand-in for comfort until camps have it).
+const OUT_OF_SEASON_BOND: u8 = 80;
+const OUT_OF_SEASON_FOOD: f32 = 0.75;
+
+/// The season it is in this dimension, as a breeding season's bit (`seasons::bit`); `None` where
+/// there are no seasons (all year is breeding season there). In a world with a wet and a dry
+/// season, its first half (spring and summer) is the wet one.
+pub fn season_bit(w: &World) -> Option<u8> {
+    base_api::SEASONS
+        .on_dimension(w.dimension())
+        .filter(|&k| k > 0)
+        .map(|_| seasons::bit(vitals::calendar::date(w.day_time()).season.index()))
+}
 
 /// A genome's words past its first ten (`pack`).
 pub type More = [u32; 11];
@@ -199,8 +214,9 @@ fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[
     }
     let s = &SPECIES[index];
     let Some(st) = w.entity(id) else { return };
+    // Only in its breeding season, twice as readily in its peak.
     let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
-    if roll >= life::love_chance(days, near, s.crowd()) {
+    if roll >= life::love_chance(days, near, s.crowd()) * s.bio.season_love(season_bit(w)) {
         return;
     }
     let mate = kin.iter().copied().find(|&o| {
@@ -260,14 +276,19 @@ fn hearts(w: &World, id: u64, count: u32) {
 // ------------------------------------------------------------------ love and mating
 
 /// A player who may command `id` gives it one of its favorite foods (`commands::interact`): a
-/// grown one (not an elder) with bond enough, not resting or expecting, falls in love; a young one grows a
-/// tenth of what it has left. True if it took the food.
+/// grown one (not an elder) with bond enough, not resting or expecting, falls in love in its
+/// breeding season, or out of it if well cared for (`OUT_OF_SEASON_BOND`, `OUT_OF_SEASON_FOOD`); a
+/// young one grows a tenth of what it has left. True if it took the food.
 pub fn fed(w: &World, id: u64, player: u64) -> bool {
     let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
+    let in_season = a
+        .species()
+        .is_none_or(|s| s.bio.season_love(season_bit(w)) > 0.0);
+    let cared = a.bond >= OUT_OF_SEASON_BOND && a.food as f32 >= a.stat(species::FOOD) * OUT_OF_SEASON_FOOD;
     let Some(b) = w.component_mut(id, &BREEDING) else { return false };
     if b.growing > 0 {
         b.growing -= b.growing / 10;
-    } else if b.love == 0 && b.rest == 0 && b.carrying == 0 && a.bond >= BOND && life::can_breed(a.stage) {
+    } else if b.love == 0 && b.rest == 0 && b.carrying == 0 && a.bond >= BOND && life::can_breed(a.stage) && (in_season || cared) {
         b.love = LOVE_TICKS;
         weft_sdk::info!("animal {id} in love");
     } else {
@@ -446,6 +467,7 @@ pub fn born(w: &World, at: [f64; 3], y: &Young, owner: Option<[u8; 64]>) -> u64 
         if let Some(own) = w.component_mut(id, &OWNER) {
             *own = o;
         }
+        crate::xp::raised(w, &o);
         crate::commands::tamed(w, id);
         crate::commands::set_command(w, id, crate::commands::WANDER, None);
         crate::dog::on_tamed(w, id);

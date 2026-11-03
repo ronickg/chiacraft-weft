@@ -180,6 +180,46 @@ fn heading(ui: &mut Ui) {
         let Some((age, span, vigor)) = animal::age_days(&a) else { return t.text("") };
         t.set("screen.animals.age", &[Arg::Int(age as i64), Arg::Int(span as i64), Arg::Int(vigor as i64)]);
     });
+    // When its kind breeds, and whether it's that season now where the player is ("Breeds in
+    // spring, summer and autumn · in season now"; the wet season in a world with a wet and a dry).
+    ui.text_bind(|c, t| {
+        use animals_core::biology::seasons;
+        let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return t.text("") };
+        let v = c.component(&base_api::VITALS).filter(|v| v.date > 0);
+        let wet_dry = v.is_some_and(|v| v.calendar == base_api::calendars::WET_AND_DRY);
+        let now = v.map(|v| seasons::bit((v.date as u32 - 1) / vitals::calendar::SEASON_DAYS));
+        let status = match now {
+            None => "",
+            Some(bit) if s.bio.breeds & bit != 0 => "screen.animals.in_season",
+            Some(_) => "screen.animals.out_of_season",
+        };
+        let status = if status.is_empty() { Arg::Text("") } else { Arg::Key(status) };
+        let mut names: Vec<String> = Vec::new();
+        if s.bio.breeds == seasons::ALL_YEAR {
+            return t.set("screen.animals.breeds_all", &[status]);
+        } else if wet_dry {
+            for (mask, name) in [(seasons::WET, "wet"), (seasons::ALL_YEAR & !seasons::WET, "dry")] {
+                if s.bio.breeds & mask != 0 {
+                    // Spring alone is the wet season's first half.
+                    let early = mask == seasons::WET && s.bio.breeds & mask == seasons::SPRING;
+                    names.push(format!("screen.animals.season.{}", if early { "early_wet" } else { name }));
+                }
+            }
+        } else {
+            for i in 0..4 {
+                if s.bio.breeds & seasons::bit(i) != 0 {
+                    names.push(format!("season.base.{}", seasons::NAMES[i as usize]));
+                }
+            }
+        }
+        let mut args: Vec<Arg> = names.iter().map(|n| Arg::Key(n)).collect();
+        let key = format!("screen.animals.breeds_{}", args.len().clamp(1, 3));
+        while args.len() < 3 {
+            args.push(Arg::Text(""));
+        }
+        args.push(status);
+        t.set(&key, &args);
+    });
     // In love, expecting, growing up or resting (`breeding.rs`), when it is.
     ui.text_bind(|c, t| {
         let Some(b) = c.menu_component(&crate::breeding::BREEDING) else { return };
@@ -252,10 +292,34 @@ fn animal_screen(ui: &mut Ui) {
                 "screen.animals.needs",
                 &[
                     Arg::Float(e.health as f64, 1),
-                    Arg::Float(a.stat(species::HEALTH) as f64, 1),
+                    Arg::Float((a.stat(species::HEALTH) * crate::comfort::condition(&a)) as f64, 1),
                     Arg::Int(a.food as i64),
                     Arg::Int(a.stat(species::FOOD).round() as i64),
                     Arg::Int(a.bond as i64),
+                ],
+            );
+        });
+        // Its body: how it feels in this air against its comfort, and its condition.
+        ui.text_bind(|c, t| {
+            let (Some(a), Some(b)) = (c.menu_component(&ANIMAL), c.menu_component(&crate::comfort::BODY)) else { return };
+            let Some(s) = a.species().filter(|_| b.core > 0.0) else { return };
+            let (lo, hi) = s.bio.comfort;
+            if s.bio.cold_blooded {
+                t.set(
+                    "screen.animals.body_cold",
+                    &[Arg::Int(b.air.round() as i64), Arg::Int(b.warmth as i64), Arg::Int(b.condition as i64)],
+                );
+                return;
+            }
+            let feel = crate::comfort::FEELING_NAMES[(b.feel as usize).min(6)];
+            t.set(
+                "screen.animals.body",
+                &[
+                    Arg::Key(&format!("screen.animals.feel.{feel}")),
+                    Arg::Int(b.air.round() as i64),
+                    Arg::Int(lo.round() as i64),
+                    Arg::Int(hi.round() as i64),
+                    Arg::Int(b.condition as i64),
                 ],
             );
         });

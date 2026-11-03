@@ -48,8 +48,22 @@ fn vs(@builtin(vertex_index) vi: u32) -> VOut {
     return out;
 }
 
+// Where to sample a picture so its pixels stay square and crisp at any GUI scale, their edges
+// blended over about one screen pixel (sharp bilinear); a picture drawn smaller than its pixels
+// (a high-resolution part, `size` in its `.gui`) is simply filtered. `step`: the uv's change per
+// screen pixel.
+fn sharp_uv(tex: u32, uv: vec2<f32>, step: vec2<f32>) -> vec2<f32> {
+    let dims = vec2<f32>(textureDimensions(textures[tex]));
+    let p = uv * dims;
+    let px = max(1.0 / max(step * dims, vec2(1e-5)), vec2(1.0));
+    let c = floor(p - 0.5) + 0.5;
+    let f = clamp((p - c - 0.5) * px + 0.5, vec2(0.0), vec2(1.0));
+    return (c + f) / dims;
+}
+
 @fragment
 fn fs(in: VOut) -> @location(0) vec4<f32> {
+    let step = fwidth(in.uv);
     if in.rect.z > in.rect.x && (in.clip.x < in.rect.x || in.clip.x > in.rect.z || in.clip.y < in.rect.y || in.clip.y > in.rect.w) {
         discard;
     }
@@ -60,15 +74,15 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         return gui_fill(in.fx, GuiPixel(in.uv, in.size, in.color, screen.size.z));
     }
     if in.mode == UI_MODE_ICON {
-        let t = textureSampleLevel(textures[in.tex], nearest_clamp, in.uv, 0.0);
+        let t = textureSampleLevel(textures[in.tex], linear_clamp, sharp_uv(in.tex, in.uv, step), 0.0);
         if t.a < 0.1 {
             discard;
         }
         return t * in.color;
     }
-    let t = textureSampleLevel(textures[in.tex], nearest_clamp, in.uv, 0.0);
     if in.mode == UI_MODE_FONT {
+        let t = textureSampleLevel(textures[in.tex], nearest_clamp, in.uv, 0.0);
         return vec4(in.color.rgb, in.color.a * t.r);
     }
-    return t * in.color;
+    return textureSampleLevel(textures[in.tex], linear_clamp, sharp_uv(in.tex, in.uv, step), 0.0) * in.color;
 }

@@ -118,6 +118,11 @@ fn max_torpor(w: &World, id: u64) -> f32 {
 
 /// `amount` more torpor; past the maximum, a wild one falls unconscious.
 pub fn add_torpor(w: &World, id: u64, amount: f32) {
+    // A player: their own torpor (base's survival), knocked out the same way.
+    if w.players().contains(&id) {
+        base_api::sedate(w, id, amount);
+        return;
+    }
     if animal::tamed(w, id) || w.component(id, &KNOCKOUT).is_none() {
         return;
     }

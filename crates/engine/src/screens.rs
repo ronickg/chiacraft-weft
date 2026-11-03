@@ -104,7 +104,7 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
         "core:controls" => Box::new(Controls::default()),
         "core:mod_settings" => Box::new(ModSettings),
         "core:worlds" => Box::new(crate::saves::WorldSelect::default()),
-        "core:create_world" => Box::new(crate::saves::CreateWorld),
+        "core:create_world" => Box::new(crate::saves::CreateWorld::default()),
         "core:chat" => Box::new(crate::game_screens::Chat::new("")),
         "core:death" => Box::new(crate::game_screens::Death),
         "core:multiplayer" => Box::new(crate::net::screens::Multiplayer::default()),
@@ -568,7 +568,7 @@ impl Screen for Pause {
 
 pub struct SettingsScreen;
 
-fn on_off(v: bool) -> Arg {
+pub(crate) fn on_off(v: bool) -> Arg {
     Arg::Key(if v { "settings.on".into() } else { "settings.off".into() })
 }
 

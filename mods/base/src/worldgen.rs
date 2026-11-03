@@ -1,6 +1,7 @@
 //! Base's worldgen as data: biomes, the overworld's terrain, ores, trees (a scatter the engine
 //! places in every dimension whose biomes ask for them) and plants (a decoration).
 
+use base_api::{CLIMATE, Climate};
 use weft_sdk::*;
 
 use crate::blocks::*;
@@ -8,7 +9,7 @@ use crate::blocks::*;
 use weft_sdk::noise::*;
 use weft_sdk::terrain::*;
 
-pub const SEA: i32 = 63;
+pub const SEA: i32 = base_api::SEA;
 
 static PLANT_SOIL: Tag = Tag::named("plant_soil");
 static CACTUS_SOIL: Tag = Tag::named("cactus_soil");
@@ -48,12 +49,14 @@ pub fn register(r: &mut Registry) {
     // Tags say what a biome is (spawning, decoration and mods ask these, not names).
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
     r.biome(&PLAINS)
+        .set(&CLIMATE, Climate { celsius: 12.0, humidity: 0.5, seasons: 12.0 })
         .surface("grass", "dirt", 3)
         .tag("animals")
         .tag("spawn_biome")
         .set(&TREES, 0.025)
         .set(&GRASS_COVER, 0.25);
     r.biome(&FOREST)
+        .set(&CLIMATE, Climate { celsius: 11.0, humidity: 0.65, seasons: 10.0 })
         .humidity(0.25..)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x79c05a)
@@ -64,6 +67,7 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, 0.12)
         .set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
     r.biome(&BIRCH_FOREST)
+        .set(&CLIMATE, Climate { celsius: 9.0, humidity: 0.6, seasons: 12.0 })
         .temperature(..0.1)
         .humidity(0.05..)
         .surface("grass", "dirt", 3)
@@ -75,6 +79,7 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, 0.12)
         .set_text(&TREE_KINDS, "base:birch_log");
     r.biome(&TAIGA)
+        .set(&CLIMATE, Climate { celsius: 0.0, humidity: 0.55, seasons: 18.0 })
         .temperature(..-0.15)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x86b783)
@@ -87,6 +92,7 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, 0.08)
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&SNOWY)
+        .set(&CLIMATE, Climate { celsius: -10.0, humidity: 0.4, seasons: 14.0 })
         .snows()
         .temperature(..-0.45)
         .surface("snowy_grass", "dirt", 3)
@@ -99,6 +105,7 @@ pub fn register(r: &mut Registry) {
         .set(&TREES, 0.03)
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&DESERT)
+        .set(&CLIMATE, Climate { celsius: 25.0, humidity: 0.1, seasons: 9.0 })
         .temperature(0.35..)
         .humidity(..0.0)
         .surface("sand", "sand", 3)
@@ -109,6 +116,7 @@ pub fn register(r: &mut Registry) {
         .tag("hot");
     // Hot grassland with few trees, between the desert and the forests (wet and dry seasons).
     r.biome(&SAVANNA)
+        .set(&CLIMATE, Climate { celsius: 26.0, humidity: 0.3, seasons: 4.0 })
         .temperature(0.2..)
         .humidity(..0.2)
         .surface("grass", "dirt", 3)
@@ -120,6 +128,7 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, 0.35);
     // Warm, wet lowland: still, dark water, low trees.
     r.biome(&SWAMP)
+        .set(&CLIMATE, Climate { celsius: 19.0, humidity: 0.9, seasons: 8.0 })
         .temperature(-0.05..)
         .humidity(0.1..)
         .surface("grass", "dirt", 3)
@@ -131,6 +140,7 @@ pub fn register(r: &mut Registry) {
         .set(&TREES, 0.12)
         .set(&GRASS_COVER, 0.2);
     r.biome(&MOUNTAINS)
+        .set(&CLIMATE, Climate { celsius: 6.0, humidity: 0.5, seasons: 12.0 })
         .surface("grass", "dirt", 3)
         .bare_above(130)
         .tint(grass, 0x8ab689)
@@ -141,12 +151,19 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, 0.05)
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&OCEAN)
+        .set(&CLIMATE, Climate { celsius: 14.0, humidity: 0.8, seasons: 6.0 })
         .surface("sand", "sand", 3)
         .deep_top("gravel", SEA - 8)
         .tag("ocean");
-    r.biome(&BEACH).surface("sand", "sand", 3).tag("beach");
+    r.biome(&BEACH)
+        .set(&CLIMATE, Climate { celsius: 17.0, humidity: 0.7, seasons: 8.0 })
+        .surface("sand", "sand", 3)
+        .tag("beach");
     // Underground (3D): whole cubes deep under the surface; spiders like it there.
-    r.biome(&DEEP_CAVES).tag("cave").tag("dark");
+    r.biome(&DEEP_CAVES)
+        .set(&CLIMATE, Climate { celsius: 12.0, humidity: 0.6, seasons: 0.0 })
+        .tag("cave")
+        .tag("dark");
 
     for (ore, max_y, veins, size) in [
         (&COAL_ORE, 128, 8, 12),

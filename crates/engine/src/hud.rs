@@ -768,6 +768,7 @@ pub fn draw_custom(
                 .copied()
                 .unwrap_or_default();
             stack_icon(ren, textures, r, stack, scale, text_unit);
+            ren.slot_number(r, data + 1, scale, text_unit);
         }
         TAG_ENTITY => {
             // Inset frame; the model itself is drawn in a later pass.

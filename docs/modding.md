@@ -387,7 +387,7 @@ Inside any callback you get a `World` (`w`):
 - components, energy, menus
 - particles (`w.spawn_particles(&SPARK, pos).count(20)`)
 - sounds (`w.play_sound(&S, pos, volume)`)
-- game rules: settings of the world, `r.config(&HARD_MODE).bool(false).world()`, read with `HARD_MODE.get()`, changed with `/rule hard_mode 1`
+- game rules: settings of the world, `r.config(&HARD_MODE).bool(false).world()`, read with `HARD_MODE.get()`, changed with `/rule hard_mode 1`; toggles and choices with a name in the language files (`config.<ns>.<key>`) are also offered on Create New World
 - gizmos for debugging (`w.draw_line/box/text/fill(&GROUP, ..)`)
 
 ## Client side

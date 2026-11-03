@@ -9,7 +9,7 @@ fn item(name: &str) -> u32 {
     Item::lookup(name).unwrap_or(u32::MAX)
 }
 
-use base_api::HUNGER;
+use base_api::VITALS;
 
 pub async fn sprint_and_sneak_modes(t: T) -> R {
     use weft_sdk::Config;
@@ -1184,9 +1184,33 @@ async fn creative_clicks_fast(t: &T) -> R {
         .await
 }
 
-/// Food: eating raises hunger, and another mod's component on the base game's food plus the
-/// engine's `item_used` event heals (the owner's example).
+/// Units of a food in the player's stomach (the vitals), as its client sees it.
+fn in_stomach(t: &T, food: &str) -> f32 {
+    let Some(i) = vitals::food::find(food) else { return 0.0 };
+    t.c().view().component(&VITALS).map_or(0.0, |v| {
+        (0..base_api::PORTIONS)
+            .filter(|&p| v.foods[p] as usize == i + 1)
+            .map(|p| v.units[p])
+            .sum()
+    })
+}
+
+/// Max health in the engine's points (20 the base game's), as the vitals have it now.
+fn max_health(t: &T) -> f32 {
+    t.c()
+        .view()
+        .component(&VITALS)
+        .map_or(0.0, |v| v.max_health / base_api::HEALTH_SCALE)
+}
+
+/// Food: eating puts it in the stomach (the vitals), and another mod's component on the base
+/// game's food plus the engine's `item_used` event heals (the owner's example).
 pub async fn food(t: T) -> R {
+    // Fed some first (an apple, a loaf and a steak): with protein in it, max health is over what a
+    // fall leaves, so the healing shows.
+    t.cmd("/feed 60").await?;
+    t.until("fed", Duration::from_secs(5), |t| in_stomach(t, "base:cooked_beef") > 0.0)
+        .await?;
     t.flat().await?;
     let s = t.state();
     t.c().teleport([s.pos[0], s.pos[1] + 8.0, s.pos[2]]);
@@ -1194,34 +1218,22 @@ pub async fn food(t: T) -> R {
         .await?;
     t.until("landed", Duration::from_secs(10), |t| t.flag(client::client_flags::ON_GROUND))
         .await?;
-    t.until("hurt", Duration::from_secs(3), |t| t.state().health < 20.0)
+    t.until("hurt", Duration::from_secs(3), |t| t.state().health < max_health(t) - 0.5)
         .await?;
     let before = t.state().health;
-    t.cmd("/feed 10").await?;
+    let beef = in_stomach(&t, "base:cooked_beef");
     t.op("put me 0 cooked_beef 3").await?;
     t.c().select(0);
-    t.until("hunger synced", Duration::from_secs(5), |t| {
-        t.c()
-            .view()
-            .component(&HUNGER)
-            .is_some_and(|h| h.food == 10.0)
-    })
-    .await?;
     t.secs(0.3).await?;
     t.hold("core:use", 2.0);
     t.until("ate", Duration::from_secs(5), |t| t.c().inventory_slot(0).count == 2)
         .await?;
-    t.until("food went up", Duration::from_secs(5), |t| {
-        t.c()
-            .view()
-            .component(&HUNGER)
-            .is_some_and(|h| h.food == 18.0)
-    })
-    .await?;
+    t.until("in the stomach", Duration::from_secs(5), |t| in_stomach(t, "base:cooked_beef") > beef + 10.0)
+        .await?;
     t.until("healed", Duration::from_secs(3), |t| t.state().health >= before + 2.0)
         .await?;
     let after = t.state().health;
-    t.check(after <= before + 3.0, format!("health {before} -> {after}: two from testmod's food_heal (plus maybe a regen tick)"));
+    t.check(after <= before + 3.0, format!("health {before} -> {after}: two from testmod's food_heal (plus a little regeneration)"));
     Ok(())
 }
 
@@ -1350,21 +1362,22 @@ pub async fn own_names(t: T) -> R {
     Ok(())
 }
 
-/// Respawning: every player has variable-sized components (hunger's timer), which once crashed
-/// the server on any death. What belongs to the body starts over (hunger, effects); mods' timers
-/// go on, or hunger's pulse, armed once on joining, would stop for good.
+/// Respawning: every player has variable-sized components, which once crashed the server on any
+/// death. What belongs to the body starts over (the stomach empties, effects go, max health is an
+/// empty stomach's); mods' timers and the vitals go on.
 pub async fn respawn(t: T) -> R {
+    fn used(t: &T) -> f32 {
+        t.c()
+            .view()
+            .component(&VITALS)
+            .map_or(0.0, |v| v.stomach().used())
+    }
     t.flat().await?;
     t.op("mode survival").await?;
     for with_effect in [false, true] {
-        t.cmd("/feed 5").await?;
-        t.until("food down", Duration::from_secs(5), |t| {
-            t.c()
-                .view()
-                .component(&HUNGER)
-                .is_some_and(|h| h.food <= 5.0)
-        })
-        .await?;
+        t.cmd("/feed 60").await?;
+        t.until("fed", Duration::from_secs(5), |t| used(t) > 0.0)
+            .await?;
         if with_effect {
             t.op("attr_mod me core:movement_speed testkit:fast 1 1 0")
                 .await?;
@@ -1373,23 +1386,19 @@ pub async fn respawn(t: T) -> R {
         t.screen("core:death").await?;
         t.c().respawn();
         t.no_screen().await?;
-        t.until("hunger starts over", Duration::from_secs(5), |t| {
-            t.c()
-                .view()
-                .component(&HUNGER)
-                .is_some_and(|h| h.food == 20.0)
-        })
-        .await?;
+        t.until("the stomach starts empty", Duration::from_secs(5), |t| used(t) == 0.0)
+            .await?;
         let speed = t.op("attr me core:movement_speed").await?;
         t.check(!speed.contains("testkit:fast"), format!("no effect after respawning: {speed}"));
-        t.check_eq(t.op("health").await?, "20".to_string(), "full health again");
+        // An empty stomach's max health: 40% of the 20.
+        t.until("weak after dying", Duration::from_secs(3), |t| (max_health(t) - 8.0).abs() < 0.01)
+            .await?;
+        t.check_eq(t.op("health").await?, "8".to_string(), "health at an empty stomach's max");
     }
-    // Starving takes health at hunger's next pulse (every 4 seconds).
-    t.cmd("/feed 0").await?;
-    t.secs(4.5).await?;
-    let health: f32 = t.op("health").await?.parse().unwrap_or(20.0);
-    t.check(health < 20.0, format!("hunger's pulse still runs: health {health}"));
-    Ok(())
+    // The vitals still run after respawning: eating raises max health again.
+    t.cmd("/feed 60").await?;
+    t.until("stronger once fed", Duration::from_secs(5), |t| max_health(t) > 8.5)
+        .await
 }
 
 /// Modern clicks: every press acts at once however fast it follows the last, and only holding the
@@ -1623,7 +1632,7 @@ pub async fn advancements_by_tags(t: T) -> R {
         t.check(Item::lookup(food).is_some_and(|i| Tag::named("cooked_meat").on_item(i)), format!("{food} is cooked meat"));
     }
     t.flat().await?;
-    t.cmd("/feed 5").await?;
+    t.cmd("/feed 0").await?;
     t.op("put me 0 cooked_mutton 1").await?;
     t.c().select(0);
     t.c().look(0.0, 60.0);
@@ -1697,8 +1706,8 @@ pub async fn air_in_creative(t: T) -> R {
     fn air(t: &T) -> f32 {
         t.c()
             .view()
-            .component(&base_api::HUNGER)
-            .map_or(0.0, |h| h.air)
+            .component(&base_api::VITALS)
+            .map_or(0.0, |v| v.air)
     }
     t.flat().await?;
     let f = t.feet();

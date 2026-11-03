@@ -681,10 +681,10 @@ impl UiRenderer {
         }
     }
 
-    /// Item icon: flat sprite, or an isometric cube for block items.
+    /// Item icon: its picture, else its model, or an isometric cube for block items.
     pub fn item_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, item: u32) {
         let looks = crate::client::looks::current();
-        match looks.item_draw(c, item) {
+        match looks.slot_draw(c, item) {
             crate::client::looks::ItemDraw::Model(model) => self.boxes_icon(tex, x, y, size, model, &c.states[0]),
             crate::client::looks::ItemDraw::Icon(icon) => self.quads.push(Quad {
                 p0: [x, y],
@@ -875,6 +875,14 @@ impl UiRenderer {
                 &mut none,
             );
         }
+    }
+
+    /// A slot's number in its top left corner (the hotbar's 1 to 9, the keys that pick them).
+    pub fn slot_number(&mut self, r: Rect, n: u64, scale: f32, text_unit: f32) {
+        let px = scale * text_unit;
+        let layout = super::text::layout(&super::text::plain(&n.to_string()), &self.font, None);
+        let mut none = Vec::new();
+        self.glyph_run(&layout.items, r.x + 2.0 * scale, r.y + scale, px, 0xF5E4BCD0, Some(0x2A1A0EFF), &mut none);
     }
 
     /// The hovered node's tooltip next to the mouse (physical pixels), drawn every frame on top:

@@ -88,6 +88,48 @@ pub struct Biology {
     pub litter: f32,
     pub social: Social,
     pub rarity: Rarity,
+    /// The seasons it comes into heat in (`seasons::*` together), and the one it's likeliest in
+    /// (0: none). In a world with a wet and a dry season, spring and summer are the wet one.
+    pub breeds: u8,
+    pub peak: u8,
+    /// The air it's comfortable in, °C, at its species' base fortitude (fortitude points widen
+    /// it, `vitals::temperature::Body`). Outside it seeks shade, water or warmth; a tame eats
+    /// faster, and far outside loses health.
+    pub comfort: (f32, f32),
+    /// Cold-blooded: no body heat of its own, slower in the cold below its comfort's middle
+    /// (`vitals::temperature::ectotherm_speed`), never freezing or overheating inside.
+    pub cold_blooded: bool,
+}
+
+/// Seasons, as a breeding season's bits (the calendar's order: `vitals::calendar::SEASONS`).
+pub mod seasons {
+    pub const SPRING: u8 = 1;
+    pub const SUMMER: u8 = 2;
+    pub const AUTUMN: u8 = 4;
+    pub const WINTER: u8 = 8;
+    pub const ALL_YEAR: u8 = 15;
+    /// The wet season of a world with a wet and a dry one.
+    pub const WET: u8 = SPRING | SUMMER;
+    pub const NAMES: [&str; 4] = ["spring", "summer", "autumn", "winter"];
+
+    /// The bit of season `index` (0 spring .. 3 winter).
+    pub fn bit(index: u32) -> u8 {
+        1 << (index % 4)
+    }
+}
+
+impl Biology {
+    /// How readily it comes into heat in the season of `bit` (`seasons::bit`): not at all out
+    /// of its breeding season, twice as readily in its peak; `None` (a world without seasons) as
+    /// any time in season.
+    pub fn season_love(&self, bit: Option<u8>) -> f64 {
+        match bit {
+            None => 1.0,
+            Some(b) if self.breeds & b == 0 => 0.0,
+            Some(b) if self.peak & b != 0 => 2.0,
+            Some(_) => 1.0,
+        }
+    }
 }
 
 /// Numbers a species sets itself instead of deriving them (`None`: derived).

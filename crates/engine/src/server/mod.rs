@@ -1414,6 +1414,10 @@ fn death_message(c: &Content, cause: u32, killer: Option<u32>, name: String) -> 
         (d::CRUSH, _) => "death.crush",
         (d::EXPLOSION, _) => "death.explosion",
         (d::SUFFOCATE, _) => "death.suffocate",
+        (d::FREEZE, _) => "death.freeze",
+        (d::HEAT, _) => "death.heat",
+        (d::POISON, _) => "death.poison",
+        (d::BLEED, _) => "death.bleed",
         _ => "death.generic",
     };
     let mut args = vec![Arg::Text(name)];

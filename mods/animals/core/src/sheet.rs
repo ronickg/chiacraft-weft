@@ -108,6 +108,38 @@ pub fn markdown() -> String {
     o
 }
 
+/// Its breeding season, in words ("spring, summer and autumn, most in spring"; for one of the
+/// Cretaceous, whose year is a wet and a dry season, "the wet season").
+fn breeding_season(s: &Species) -> String {
+    use crate::biology::seasons;
+    let b = &s.bio;
+    if s.habitats
+        .iter()
+        .any(|(biome, _)| biome.starts_with("animals:"))
+    {
+        let (wet, dry) = (b.breeds & seasons::WET, b.breeds & !seasons::WET);
+        return match (wet, dry) {
+            (seasons::SPRING, 0) => "early in the wet season".into(),
+            (_, 0) => "the wet season".into(),
+            (0, _) => "the dry season".into(),
+            _ => "all year".into(),
+        };
+    }
+    let names = |bits: u8| -> Vec<&str> {
+        (0..4)
+            .filter(|&i| bits & seasons::bit(i) != 0)
+            .map(|i| seasons::NAMES[i as usize])
+            .collect()
+    };
+    let list = |n: Vec<&str>| match n.len() {
+        0 => String::new(),
+        1 => n[0].to_string(),
+        _ => format!("{} and {}", n[..n.len() - 1].join(", "), n[n.len() - 1]),
+    };
+    let all = if b.breeds == seasons::ALL_YEAR { "all year".to_string() } else { list(names(b.breeds)) };
+    if b.peak != 0 && b.peak != b.breeds { format!("{all}, most in {}", list(names(b.peak))) } else { all }
+}
+
 fn litter(s: &Species) -> String {
     match s.litter() {
         (a, b) if a == b => a.to_string(),
@@ -170,6 +202,19 @@ fn species(w: &mut String, s: &Species) {
     }
     let _ = writeln!(w, "| litter or clutch | {} on average | {}{} |", b.litter, litter(s), set(t.litter.is_some()));
     let _ = writeln!(w, "| between litters | {} | rests {}{} |", real(b.interval), days(s.recovery()), set(t.recovery.is_some()));
+    let out_of_season = if b.breeds == crate::biology::seasons::ALL_YEAR { "" } else { "out of it, only a tame well cared for" };
+    let _ = writeln!(w, "| breeds in | {} | {out_of_season} |", breeding_season(s));
+    let _ = writeln!(
+        w,
+        "| comfortable in | {} to {} °C air | {} |",
+        b.comfort.0,
+        b.comfort.1,
+        if b.cold_blooded {
+            "cold-blooded: slower in the cold"
+        } else {
+            "seeks shade, water or warmth outside it; a tame eats faster, far outside loses health"
+        }
+    );
     let _ = writeln!(w, "| grows up in | {} | {}{} |", real(b.maturity), days(s.growth()), set(t.growth.is_some()));
     let _ = writeln!(
         w,

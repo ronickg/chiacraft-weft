@@ -1472,12 +1472,13 @@ fn item_instance(m: Mat4, first: u32, hurt: f32, light: u32) -> GpuBox {
     GpuBox { rows: rows(m), color: [1.0, 1.0, 1.0, hurt], ids: [0, 0, first, 0], ids2: [0, light, 0, 0], ..Default::default() }
 }
 
-/// Whether the item shows as its block's shape (else as a sprite).
+/// Whether the item is posed as a block (else as a sprite). A handheld item's model (a sword,
+/// a pickaxe) lies in its square as its sprite would, so it is held like the sprite.
 fn shows_block(item: u32) -> bool {
     let c = content();
     let looks = super::looks::current();
     match looks.item_draw(c, item) {
-        ItemDraw::Model(_) => true,
+        ItemDraw::Model(_) => !c.items.get(item as usize).is_some_and(|d| d.handheld),
         ItemDraw::Block(state) => looks
             .block_sprite(state, &c.states[state as usize])
             .is_none(),

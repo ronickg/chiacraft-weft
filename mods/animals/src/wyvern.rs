@@ -84,6 +84,7 @@ pub fn init(r: &mut Registry) {
                 .then(crate::eggs::nest(INDEX))
                 .then(settle)
                 .then(crate::commands::hold)
+                .then(crate::comfort::seek)
                 .then(ai::wander(0.4, 20.0)),
         )
         .on_hurt(|w, h| {

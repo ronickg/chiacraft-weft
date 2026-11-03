@@ -60,6 +60,8 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | carries her young | 63 d | 1.25 d |
 | litter or clutch | 3 on average | 1-4 |
 | between litters | 180 d | rests 2.5 d |
+| breeds in | all year |  |
+| comfortable in | 7 to 29 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 300 d | 3.5 d |
 | lives | 13 y | 49.9 d, give or take a fifth; an elder from 80% of it |
 | lives in | pack | room for 17 within 48 blocks |
@@ -118,6 +120,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | carries her young | 65 d | 1.28 d |
 | litter or clutch | 3 on average | 1-4 |
 | between litters | 200 d | rests 2.78 d |
+| breeds in | spring, summer and autumn, most in spring | out of it, only a tame well cared for |
+| comfortable in | 5 to 32 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 240 d | 2.99 d |
 | lives | 13 y | 49.9 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 13 within 48 blocks |
@@ -173,6 +177,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | carries her young | 140 d | 2.28 d |
 | litter or clutch | 4 on average | 2-6 |
 | between litters | 1 y | rests 5.07 d |
+| breeds in | all year, most in spring |  |
+| comfortable in | 12 to 32 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 1.5 y | 5.34 d |
 | lives | 8 y | 30.7 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 16 within 48 blocks |
@@ -228,6 +234,8 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 | eggs hatch in | 74 d | 1.41 d |
 | litter or clutch | 3 on average | 1-4 |
 | between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 12 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 2.5 y | 7.54 d |
 | lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
 | lives in | pack | room for 12 within 48 blocks |
@@ -284,6 +292,8 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | eggs hatch in | 140 d | 2.28 d |
 | litter or clutch | 2 on average | 1-3 |
 | between litters | 1.5 y | rests 7.62 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 6 to 36 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 4.9 y | 12.3 d |
 | lives | 40 y | 153.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | pack | room for 7 within 48 blocks |
@@ -338,6 +348,8 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 | eggs hatch in | 74 d | 1.41 d |
 | litter or clutch | 3 on average | 1-4 |
 | between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 12 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 2.5 y | 7.54 d |
 | lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
 | lives in | pack | room for 12 within 48 blocks |
@@ -395,6 +407,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | eggs hatch in | 1.2 y | 5.47 d |
 | litter or clutch | 1 on average | 1 |
 | between litters | 3 y | rests 15.2 d |
+| breeds in | early in the wet season | out of it, only a tame well cared for |
+| comfortable in | -10 to 30 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 20 y | 32.7 d |
 | lives | 110 y | 421.6 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 3 within 48 blocks |

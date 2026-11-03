@@ -24,7 +24,8 @@ The numbers are in `scripts/house.py`; build scripts import them instead of choo
 - **One texel density: 64 texels a block** (a block is a meter: a texel is 1.6 cm), for every
   model: creatures, props, eggs. Lay a model out in units of one texel and export with
   `house.SCALE` (0.25 model pixels a unit). Terrain blocks keep the base game's 16-pixel
-  textures; inventory icons are 16x16 (`house.ICON`).
+  textures; inventory icons come from the `game-art` skill (generated, cut to 24 GUI pixels), and
+  held items are box models made from them (see "Items from icons").
 - **Real sizes**: research the real thing's measurements and build the average adult (a 20 cm
   chihuahua is 13 units at the shoulder, a 1.5 m Utahraptor 96 at the hip). Individuals differ
   by the engine's per-entity scale (sex, a size gene, growing up), never by another model.
@@ -471,7 +472,67 @@ Worked examples: `mods/animals/source/nest` (`build.py --variants`: a bare, line
 scrape, each also with eggs) and `mods/animals/source/egg` (`build.py --variants`: four markings
 on one layout).
 
+## Items from icons (held models)
+
+Items (tools, weapons, food) are 3D box models drawn in the hand, made from their inventory icon
+(the `game-art` skill: Ronald generates the icons, Claude cuts them). The model doesn't copy the
+icon one to one, but must read as the same thing. Worked example:
+`mods/base/source/items/stone_sword/` (`build.py`, `viewer.html`, `shots.py`).
+
+What the guides say (Hytale's modeling guide, Blockbench's style guide, hand-painted weapon
+critiques): weapons and tools at 64 texels a block, textures in multiples of 32; few boxes,
+detail in the texture; a slant is a turned box, never stair steps; never stretch a texture;
+light painted into the texture face by face; no pure black or white, colored shadows; deliberate
+shades in a short ramp, not noise; a blade brightest toward its point; lit edges.
+
+1. **The icon upright**: cut the item from its sheet (`sheet.background`; diagonal items reach
+   into each other's columns, so take connected shapes), turn it so its axis is vertical (PIL
+   `rotate(+45)` for one lying handle bottom-left), and print each row's width and extent: the
+   parts (blade, guard, grip, pommel) show as steps in the width.
+2. **Sizes**: widths from the icon, scaled so the parts keep their ratios. **Lengths not**: icons
+   draw items short and stubby to fill a square (the first sword read as a dagger). Use real
+   proportions: a one-handed sword ~1.35 blocks (87 texels), the blade 70% of it (Hytale's own
+   are ~72 texels).
+3. **Boxes**: one per part, neighbors differing in size; a flat blade 3 thick with a ridge box 5
+   thick down its middle (the icon's light and dark halves are a bevel); a point from a square
+   turned 45 degrees (side = width / sqrt 2), half sunk in the blade and 0.5 thinner so no faces
+   share a plane. 7 boxes for the sword.
+4. **Texture: "refined"** (`refined_faces`), the one to use. Per texel, in ramp steps (`tones`,
+   0.25 a step), then snapped to the ramp:
+   - each material's ramp from the icon: the part's lit pixels (55th percentile up) as its base;
+     stone's shadow hue its own (0.07: toward purple a warm grey passes through red);
+   - the icon's own light and marks: (luminance / base - 1) / 0.15, clipped to 1.5, rounded to
+     half steps (clean clusters); skipped on small round parts (grip, pommel), whose icon light
+     belongs to a 3/4 view;
+   - face light from the icon's top left: up +0.5, south 0, north -0.25, west +0.25, east
+     -0.5, down -1;
+   - bevels: +0.5 along each side face's top row, -0.5 along its bottom, +-0.25 left and
+     right; a light falloff down each side (+-0.3); occlusion where parts meet (-1.25 x
+     `occlusion`);
+   - the blade: +0.75 from guard to point; cutting edges +0.75, with chips (-0.75) at fixed
+     heights so both faces agree; cord on a grip as rows (groove -1, lit top +0.5), never at a
+     slant (that turns into a checkerboard);
+   - total clipped to +-2: stronger pushes the ramp to cream and maroon.
+5. **Sampling the icon**: per part, its front face to that part's box in the icon, inside the
+   dark outline (erode the alpha ~19 px; drop the outline's red-purple and the magenta tint);
+   side faces take the color just inside that edge. Where the model is longer than the icon,
+   repeat the icon's middle back and forth (a mirror, never a jump: a jump leaves a seam).
+6. **Review**: `shots.py` renders the viewer from any cameras (3/4, the icon's angle, close-ups
+   of a face); compare side by side with the upright icon. Look for seams, outline colors on an
+   edge, a part copying the icon's 3/4 light, colors drifting from the icon.
+7. **Into the engine**: `build.py` writes `models/item/<name>.json` (Blockbench's Java Block/Item
+   format: 16 units a block, a texel 0.25, `rotation` for the turned boxes) and its texture
+   (`textures/item/<name>_model.png`). The engine reads face UVs to 1/128 of the texture, so
+   textures up to 128 texels a side map texel for texel. As in Hytale, the slot shows the item's
+   picture (`textures/item/<name>.png`, the icon) and the hand and ground the model
+   (`Looks::slot_draw`). A `handheld` item's model is held like its sprite, so the build lays it
+   in the 16x16 square as the sprite lies: the sword turned -45 degrees about its middle, handle
+   bottom left (the points, turned +45, come out straight); a long sword's diagonal just fits.
+
 ## Scripts
+
+Run them with `~/.venvs/blocky/bin/python` (Homebrew's Python 3.14 with scipy added; it sees the
+system numpy and Pillow). Homebrew's own `python3` has no scipy and refuses installs.
 
 - `scripts/house.py` — the house style's numbers: `DENSITY` (64), `SCALE`, `ICON`, `MATERIALS`
   and `material(name)` (tones with the material's shadow hue).

@@ -1,7 +1,8 @@
 //! Eggs and nests (`notes/ANIMALS.md`, "Birth"), for the species that lay (`Species::gestation`
 //! 0: the raptors). An egg holds its young from the moment it is laid (`Egg`: genes, family,
-//! wild points) and hatches after its species' incubation if kept warm: twice as fast in a nest
-//! or within two blocks of a torch or furnace, not at all in snow or taiga without one.
+//! wild points) and hatches after its species' incubation, as long as the air at it (the
+//! player's, with the heat of fires near by) is between 25 and 40 °C: a nest holds it closer to a
+//! brooding parent's 37 °C and makes it twice as fast.
 //!
 //! Wild females now and then build a nest (`NEST`, an earthen scrape like their relatives', a prop
 //! anyone can also make from sticks and wheat and place) and lay a clutch in it, fathered by a male of their place's gene pool. A player can
@@ -52,7 +53,11 @@ static NEST_ITEM: Item = Item::named("nest");
 static AIR: Block = Block::named("core:air");
 static TOOLS: CreativeTab = CreativeTab::named("base:tools");
 static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
-static WARMTH: [Tag; 2] = [Tag::named("torches"), Tag::named("furnaces")];
+/// The air an egg develops in, °C (eggs of birds and reptiles: about 26 to 38), and how far a
+/// nest takes it toward a brooding parent's warmth (37 °C), both ways.
+const EGG_AIR: (f32, f32) = (25.0, 40.0);
+const NEST_HOLDS: f32 = 0.6;
+const BROODING: f32 = 37.0;
 /// Each laying species' egg item, by its row in `SPECIES` (made once).
 static ITEMS: OnceLock<Vec<(usize, &'static Item)>> = OnceLock::new();
 
@@ -355,9 +360,8 @@ pub fn wild_clutch(w: &World, id: u64, index: usize, st: &EntityState) -> bool {
 
 // ------------------------------------------------------------------ incubating and hatching
 
-/// An egg's goal: drawn at its species' size; warming toward hatching (twice as fast in a nest
-/// or within two blocks of a torch or furnace; not at all where it's cold without that);
-/// hatching.
+/// An egg's goal: drawn at its species' size; developing while the air at it is right (twice as
+/// fast in a nest; not at all too cold or too hot); hatching.
 fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(e) = w.component(id, &EGG).copied() else { return true };
     let Some(index) = (e.species as usize)
@@ -376,22 +380,15 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
     if (w.time() + id) % 20 != 0 {
         return true;
     }
-    let p = st.pos.map(|v| v.floor() as i32);
-    let warm = in_nest(w, st.pos)
-        || (-2..=2).any(|dx| {
-            (-1..=2).any(|dy| {
-                (-2..=2).any(|dz| {
-                    WARMTH
-                        .iter()
-                        .any(|t| t.on_block(w.get([p[0] + dx, p[1] + dy, p[2] + dz])))
-                })
-            })
-        });
-    let cold = crate::evolution::habitat_at(w, st.pos).cold() > 0.0;
-    let step = match (warm, cold) {
-        (true, _) => 40,
-        (false, false) => 20,
-        (false, true) => 0,
+    let nest = in_nest(w, st.pos);
+    let mut air = base_api::air_at(w, st.pos, 0.3, st.in_liquid != 0, 3, |_| {}).celsius;
+    if nest {
+        air += (BROODING - air) * NEST_HOLDS;
+    }
+    let step = match (EGG_AIR.0..=EGG_AIR.1).contains(&air) {
+        false => 0,
+        true if nest => 40,
+        true => 20,
     };
     let left = e.left.saturating_sub(step * breeding::speed());
     if let Some(e) = w.component_mut(id, &EGG) {

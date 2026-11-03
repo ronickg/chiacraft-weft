@@ -36,7 +36,7 @@ The texture goes to `assets/textures/sky/planet.png` and can be any size, and ev
 | `additive()`, `covers()` | `additive()` adds the body's light to what is behind it instead of covering it, and `covers()` switches it back |
 | `order(n)` | sets the drawing order from low to high, and bodies with equal values are drawn in the order they were registered |
 
-Daylight and the light on blocks come from the day of the dimension (`day_length`, `fixed_time`) and not from any body, which means that if you remove the sun, the day will still happen, and if you give the sun a different orbit, it will no longer match the light.
+Daylight and the light on blocks come from the day of the dimension (`day_length`, `fixed_time`, and `seasons` for days that lengthen and shorten through the year) and not from any body, which means that if you remove the sun, the day will still happen, and if you give the sun a different orbit, it will no longer match the light.
 
 ## Changing what is there
 When you use an object from another mod, only the fields you set are changed and the object stays the same type, so this example makes the moon bigger, while its texture, phases and orbit stay the same:

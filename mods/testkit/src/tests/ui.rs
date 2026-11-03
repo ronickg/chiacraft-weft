@@ -499,7 +499,7 @@ pub async fn chat(t: T) -> R {
     // change. The engine's, a mod's and a parse error alike.
     let replies = [
         ("/time query", "time is", "время"),
-        ("/feed 5", "food set to 5", "сытость теперь 5"),
+        ("/feed 20", "stomach filled with 18 units", "желудок заполнен: 18 единиц"),
         ("/give @p base:nothing", "usage: /give", "использование: /give"),
     ];
     for (line, _, _) in replies {

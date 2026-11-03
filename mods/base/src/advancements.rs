@@ -91,9 +91,11 @@ static OPEN: Key = Key::named("advancements");
 
 const TOAST_SECS: f32 = 5.0;
 const SLIDE_SECS: f32 = 0.35;
-/// The toast's box (`gui/advancement_toast.png`) in GUI pixels, and its gap to the window's edge.
+/// The toast's box (`gui/advancement_toast.png`) in GUI pixels, and its gap to the window's right edge.
 const TOAST_W: f32 = 160.0;
 const TOAST_MARGIN: f32 = 4.0;
+/// Its top, under the clock and position in the top right (`hud.rs`).
+const TOAST_TOP: f32 = 40.0;
 /// Top of the icon in the box, centered in its slot (y 7 to 27).
 const ICON_Y: f32 = 9.0;
 
@@ -191,6 +193,7 @@ fn grant_where(w: &World, player: u64, met: impl Fn(&Rule) -> bool) {
         if a.done & bit == 0 && met(&adv.rule) {
             a.done |= bit;
             w.send(player, &MADE, &(i as u32));
+            base_api::give_xp(w, player, vitals::levels::xp::ADVANCEMENT);
         }
     }
 }
@@ -232,7 +235,7 @@ fn client(r: &mut Registry) {
         let (gw, gh) = (st.window[0] as f32 / scale, st.window[1] as f32 / scale);
         let left = gw - (TOAST_W + TOAST_MARGIN) * ease;
         let text = |x: f32, y: f32, key: &str, args: &[Arg], color: u32, size: f32| {
-            c.screen_text((left + x) / gw, (TOAST_MARGIN + y) / gh, key, args, color, size)
+            c.screen_text((left + x) / gw, (TOAST_TOP + y) / gh, key, args, color, size)
         };
         text(TOAST_W / 2.0, 0.0, "advancements.base.toast_box", &[], 0xffffffff, 1.0);
         // An icon in text is as tall as a line: twice the size fills the slot.

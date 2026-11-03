@@ -84,9 +84,19 @@ pub fn register(r: &mut Registry) {
         ("cooked_mutton", 6, 9.6, "cooked_meat/mutton"),
         ("spider_eye", 2, 3.2, ""),
     ] {
+        // What a portion holds and how fresh it is (stamped as it ages, `survival.rs`): shown in
+        // its tooltip.
+        let n = vitals::food::find(name).map_or([0.0; 6], |f| {
+            let f = &vitals::food::FOODS[f];
+            let g = f.portion();
+            [f.units(), g[0], g[1], g[2], g[3], g[4]]
+        });
+        let [units, protein, energy, fat, greens, water] = n.map(|v| v.round() as u16);
         let i = r
             .item(Item::generated(name.into()))
             .set(&FOOD, Food { hunger, saturation })
+            .set(&base_api::NUTRITION, base_api::Nutrition { units, protein, energy, fat, greens, water })
+            .set(&base_api::FRESHNESS, base_api::freshness::FRESH)
             .use_ticks(32)
             .on_use(base_api::eat)
             .tab(&crate::tabs::FOOD);

@@ -4,13 +4,16 @@
 mod advancements;
 mod beds;
 mod blocks;
+mod hud;
 mod items;
+mod levels;
 mod machines;
 mod mobs;
 mod player;
 mod recipes;
 mod redstone;
 mod sounds;
+mod survival;
 mod worldgen;
 
 use weft_sdk::*;
@@ -37,6 +40,8 @@ fn init(r: &mut Registry) {
     blocks::register(r);
     items::register(r);
     player::register(r);
+    survival::register(r);
+    levels::register(r);
     machines::register(r);
     recipes::register(r);
     sounds::register(r);
@@ -44,12 +49,17 @@ fn init(r: &mut Registry) {
     worldgen::register(r);
     advancements::register(r);
     beds::register(r);
+    hud::register(r);
     redstone::register(r);
     // Its terrain is described in `worldgen`.
+    // A year of four 14-day seasons (notes/SURVIVAL.md): sixteen hours of daylight at midsummer,
+    // eight at midwinter.
     r.dimension(&OVERWORLD)
         .player_spawn()
         .sky_above(16)
         .day_length(24000)
+        .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)
+        .set(&base_api::SEASONS, base_api::calendars::FOUR)
         .weather();
     // Second dimension on purpose: nothing in the engine may assume there is only one world.
     r.dimension(&FLATLANDS)

@@ -59,7 +59,8 @@ impl Drawn<'_> {
     }
 }
 
-/// What an item is drawn as, in a slot and in the hand alike.
+/// What an item is drawn as: in the hand and on the ground (`Looks::item_draw`), in a slot
+/// (`Looks::slot_draw`).
 pub enum ItemDraw<'a> {
     /// Its own boxes.
     Model(&'a [ModelBox]),
@@ -89,11 +90,23 @@ impl Looks {
     }
 
     pub fn item_draw<'a>(&'a self, c: &'a Content, item: u32) -> ItemDraw<'a> {
+        self.draw(c, item, false)
+    }
+
+    /// What a slot shows: like `item_draw`, except that an item with a model and an icon shows
+    /// its icon, as Hytale's inventory does (painted for the slot, it reads better small than
+    /// the model would); the model is for the hand and the ground.
+    pub fn slot_draw<'a>(&'a self, c: &'a Content, item: u32) -> ItemDraw<'a> {
+        self.draw(c, item, true)
+    }
+
+    fn draw<'a>(&'a self, c: &'a Content, item: u32, icon_first: bool) -> ItemDraw<'a> {
         let Some(def) = c.items.get(item as usize).filter(|_| item != 0) else { return ItemDraw::Nothing };
         let look = self.item(item);
         let model = look.and_then(|l| l.model.as_deref()).unwrap_or(&def.model);
         let icon = look.and_then(|l| l.icon).unwrap_or(def.icon);
         match def.block {
+            _ if icon_first && icon != u32::MAX => ItemDraw::Icon(icon),
             _ if !model.is_empty() => ItemDraw::Model(model),
             _ if icon != u32::MAX => ItemDraw::Icon(icon),
             Some(state) => ItemDraw::Block(state),

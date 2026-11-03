@@ -1093,3 +1093,24 @@ Next otherwise: rebuild the five animals to the house density; the paint screen 
 Not yet: XP and earning points (the command gives them), naming, the higher spyglass tier, tame
 caps and other world settings. Engine note: clients don't see other entities' attribute
 modifiers, so the screen takes max health from the stat.
+
+## Breeding seasons (2026-11-02)
+
+Ronald: seasons tied in with mating and breeding; each species breeds in its real season
+(`notes/SURVIVAL.md`, "Seasons").
+
+- A species' facts say the seasons it comes into heat in and its peak (`Biology::breeds`, `peak`):
+  dogs all year (unlike wolves, about twice a year whenever); cats spring to autumn, most in
+  spring (long-day breeders, anestrous in winter's short days); capybaras all year, most in spring
+  (most births as the rains begin, April and May in the llanos); the Velociraptors and
+  Utahraptor the wet season, most at its start (no record: their nesting colonies came back year
+  after year as birds' do, and their kin time hatching to the growing season); the wyvern early
+  in the wet season (as the great birds of prey, courting in late winter, laying in spring). In a
+  world with a wet and a dry season, spring and summer are the wet one.
+- Wild ones fall in love only in their season, twice as readily in its peak
+  (`Biology::season_love`). A tame fed its favorite food out of season comes into heat only if
+  well cared for: bond 80 and its belly three quarters full (a stand-in for comfort until camps
+  have it). Where there are no seasons (the flatlands) all year is breeding season.
+- The animal screen says when its kind breeds and whether it's that season now; SPECIES.md has a
+  "breeds in" row.
+- Not yet: the website's simulator (`web/`) breeds without seasons.

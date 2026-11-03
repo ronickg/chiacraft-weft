@@ -66,6 +66,8 @@ const MOUTH_GROUND: (f64, f64) = (7.2, 3.7);
 const MOUTH_AIR: (f64, f64) = (7.3, 4.2);
 
 /// Poisoned: victim -> (who poisoned it, ticks left).
+/// Seconds venom poisons a player.
+const VENOM_SECS: f32 = 10.0;
 static POISON: Mutex<Option<HashMap<u64, (u64, u32)>>> = Mutex::new(None);
 
 pub fn init(r: &mut Registry) {
@@ -255,7 +257,13 @@ fn stream(w: &World, id: u64, rider: Option<u64>, kind: &str, mouth: [f64; 3], d
             let poison = poison.get_or_insert_with(HashMap::new);
             for &(e, _) in &hit {
                 w.damage(e, 2.0, source, damage::GENERIC);
-                poison.insert(e, (source, 100));
+                // A player is poisoned by their body (base's survival: longer, less with
+                // fortitude, a death put down to the poison); an animal here.
+                if w.players().contains(&e) {
+                    base_api::poison(w, e, VENOM_SECS);
+                } else {
+                    poison.insert(e, (source, 100));
+                }
             }
         }
         _ => {

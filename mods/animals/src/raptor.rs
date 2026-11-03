@@ -99,6 +99,7 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
                 .then(crate::eggs::nest(index))
                 .then(settle)
                 .then(crate::commands::hold)
+                .then(crate::comfort::seek)
                 .then(ai::wander(0.6, 9.0)),
         )
         .on_hurt(|w, h| {

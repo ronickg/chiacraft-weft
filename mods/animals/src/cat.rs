@@ -66,6 +66,7 @@ pub fn init(r: &mut Registry) {
                 .then(crate::breeding::behave(1))
                 .then(settle)
                 .then(crate::commands::hold)
+                .then(crate::comfort::seek)
                 .then(ai::wander(0.5, 7.0)),
         )
         .on_hurt(|w, h| {

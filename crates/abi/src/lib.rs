@@ -749,6 +749,13 @@ pub struct DimensionDesc {
     /// Ticks per day, 0 = time does not advance.
     pub day_length: u32,
     pub fixed_time: u32,
+    /// Days in a year, 0 = no seasons. Days are longer in summer and shorter in winter by
+    /// `day_swing`, midsummer three eighths into the year (a 56-day year's day 21: the middle of
+    /// its summer, spring being its first quarter).
+    pub year_days: u32,
+    /// How much longer than half the day midsummer's daylight is, as a share of the whole day
+    /// (0.17: about sixteen hours of light against twelve); midwinter's as much shorter.
+    pub day_swing: f32,
     pub sky_color: u32,
     pub fog_color: u32,
     /// Light level everything gets at least, 0..15.
@@ -773,6 +780,8 @@ defaults!(DimensionDesc {
     gravity: 32.0,
     day_length: 24000,
     fixed_time: 6000,
+    year_days: 0,
+    day_swing: 0.0,
     sky_color: 0x78a7ff,
     fog_color: 0xc0d8ff,
     ambient: 0,
@@ -1073,6 +1082,14 @@ pub mod damage {
     pub const EXPLOSION: u32 = 10;
     /// Its head stuck in a block.
     pub const SUFFOCATE: u32 = 9 | BYPASSES_ARMOR;
+    /// Its body too cold (hypothermia).
+    pub const FREEZE: u32 = 11 | BYPASSES_ARMOR;
+    /// Its body too hot (heatstroke).
+    pub const HEAT: u32 = 12 | BYPASSES_ARMOR;
+    /// Poison in its blood.
+    pub const POISON: u32 = 13 | BYPASSES_ARMOR;
+    /// Its wounds bleeding.
+    pub const BLEED: u32 = 14 | BYPASSES_ARMOR;
 }
 
 /// What `EntityState::pose` says.

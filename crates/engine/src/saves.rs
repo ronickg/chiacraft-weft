@@ -849,7 +849,13 @@ fn format_age(s: u64) -> String {
     }
 }
 
-pub struct CreateWorld;
+/// A new world: its name, seed, and its game rules that are toggles or choices (a mod's
+/// difficulty, mobs spawning) and have a name in the language files (not test switches), each a
+/// button that steps through its values; the rest keep their defaults and change with `/rule`.
+#[derive(Default)]
+pub struct CreateWorld {
+    rules: Rc<std::cell::RefCell<Vec<(String, f64)>>>,
+}
 
 impl Screen for CreateWorld {
     fn name(&self) -> &str {
@@ -857,6 +863,22 @@ impl Screen for CreateWorld {
     }
 
     fn build(&mut self, ui: &mut Ui, cx: &BuildCx) {
+        use weft_abi::{config_kind as ck, config_scope};
+        let c = crate::content::content();
+        let defs: Vec<crate::config::ConfigDef> = c
+            .game
+            .configs
+            .iter()
+            .filter(|d| d.scope == config_scope::WORLD && matches!(d.kind, ck::BOOL | ck::CHOICE))
+            .filter(|d| cx.lang.has(&text::lang_key("config", &d.name)))
+            .cloned()
+            .collect();
+        {
+            let mut rules = self.rules.borrow_mut();
+            if rules.is_empty() {
+                *rules = defs.iter().map(|d| (d.name.clone(), d.default)).collect();
+            }
+        }
         frame(ui, cx, "world.create", |ui| {
             ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(260.0), |ui| {
                 label(ui, cx, "world.name", &[], "default");
@@ -865,15 +887,49 @@ impl Screen for CreateWorld {
                 label(ui, cx, "world.seed", &[], "default");
                 let seed = ui.add(Kind::input("", 32), Style::default().h(18.0).stretch());
                 ui.set_id(seed, "seed");
+                for (i, d) in defs.iter().enumerate() {
+                    let key = text::lang_key("config", &d.name);
+                    let (kind, choices) = (d.kind, d.choices.clone());
+                    let (rules, rules2) = (self.rules.clone(), self.rules.clone());
+                    let b = ui.button(
+                        "button",
+                        Style::default().min_h(20.0).pad_xy(6.0, 4.0).stretch(),
+                        Rc::new(move |_: &mut Ctx| {
+                            let mut r = rules.borrow_mut();
+                            let v = r[i].1;
+                            r[i].1 = if kind == ck::BOOL { 1.0 - v } else { (v + 1.0) % choices.len().max(1) as f64 };
+                        }),
+                        |ui| {
+                            let choices = d.choices.clone();
+                            ui.text_bound(
+                                "button",
+                                Box::new(move |_: &Ctx| {
+                                    let v = rules2.borrow()[i].1;
+                                    let shown = if kind == ck::BOOL {
+                                        crate::screens::on_off(v != 0.0)
+                                    } else {
+                                        Arg::Key(format!("{key}.{}", choices.get(v as usize).cloned().unwrap_or_default()))
+                                    };
+                                    ("settings.config_value".into(), vec![Arg::Key(key.clone()), shown])
+                                }),
+                            );
+                        },
+                    );
+                    ui.set_id(b, &format!("rule_{}", d.name));
+                }
             });
+            let rules = self.rules.clone();
             ui.container(Style::row().gap(6.0), |ui| {
-                button(ui, cx, "world.create", &[], 120.0, |c| {
+                let create_button = button(ui, cx, "world.create", &[], 120.0, move |c| {
                     let name = c.input_text("name").unwrap_or_default();
                     let seed = parse_seed(&c.input_text("seed").unwrap_or_default());
                     let name = if name.trim().is_empty() { "World".to_string() } else { name.trim().to_string() };
-                    c.requests
-                        .push(Request::StartWorldAnyway(create(&c.settings.saves_dir(), &name, seed)));
+                    let mut world = create(&c.settings.saves_dir(), &name, seed);
+                    world.configs = rules.borrow().clone();
+                    world.save();
+                    c.requests.push(Request::StartWorldAnyway(world));
                 });
+                ui.set_id(create_button, "create");
                 button(ui, cx, "menu.cancel", &[], 120.0, |c| c.requests.push(Request::Close));
             });
         });

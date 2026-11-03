@@ -110,6 +110,7 @@ All the settings:
 - `no_sky_light()`: no sky light at all, for caves and the like
 - `gravity(g)`: blocks per second squared, 32 by default
 - `day_length(ticks)` or `fixed_time(time)`: either a day of that length, or a time of day that never changes
+- `seasons(days, day_swing)`: a year of that many days, the days longer in summer and shorter in winter by `day_swing` (a share of the day: 0.17 is about sixteen hours of light at midsummer and eight at midwinter, midsummer three eighths into the year); the sun rises and sets by it, and so do daylight and the sky
 - `sky(sky, fog)`: the two colors
 - `ambient(level)`: the lowest light any block gets, 0 to 15
 - `no_block_updates()`: nothing grows, falls or flows here

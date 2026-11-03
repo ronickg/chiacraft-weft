@@ -1,1 +1,3 @@
-border = 2
+scaling = nine_slice
+border = 11.75
+size = 54 54

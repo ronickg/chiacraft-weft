@@ -235,7 +235,8 @@ pub struct ItemDef {
     pub max_stack: u32,
     pub durability: u32,
     pub attack: f32,
-    /// Item icon layer; `u32::MAX` when the icon is the 3D block.
+    /// Item icon layer; `u32::MAX` when the icon is the 3D block, or its model when it has no
+    /// picture of its own.
     pub icon: u32,
     pub block: Option<u32>,
     pub on_use: Option<Callback>,
@@ -328,6 +329,10 @@ pub struct DimensionDef {
     pub gravity: f32,
     pub day_length: u32,
     pub fixed_time: u32,
+    /// Days in a year (0: no seasons) and how much longer than half the day midsummer's daylight
+    /// is (`DimensionDesc::year_days`).
+    pub year_days: u32,
+    pub day_swing: f32,
     pub sky_color: u32,
     pub fog_color: u32,
     pub ambient: u8,
@@ -424,12 +429,29 @@ impl DimensionDef {
 
     /// How far the day has gone around the sky at world time `time`, in turns: 0 the sun rising,
     /// 0.25 noon, 0.75 midnight. Vanilla's easing: slower than the clock around noon and midnight.
+    /// With seasons the clock is stretched so the sun rises earlier and sets later in summer.
     pub fn day_turn(&self, time: f64) -> f64 {
         let (t, len) =
             if self.day_length == 0 { (self.fixed_time as f64, 24000.0) } else { (time % self.day_length as f64, self.day_length as f64) };
-        let from_noon = (t / len - 0.25).rem_euclid(1.0);
+        let from_noon = self.daylight_clock((t / len - 0.25).rem_euclid(1.0), time / len);
         let eased = 0.5 - (from_noon * std::f64::consts::PI).cos() / 2.0;
         (0.25 + (from_noon * 2.0 + eased) / 3.0).rem_euclid(1.0)
+    }
+
+    /// The clock's distance from noon (turns, 0 noon, 0.5 midnight) as the sun's, on day `days`
+    /// (with its fraction): a day of `daylight` turns of light maps its half to a quarter turn,
+    /// the night the rest.
+    fn daylight_clock(&self, from_noon: f64, days: f64) -> f64 {
+        if self.year_days == 0 || self.day_swing <= 0.0 || self.day_length == 0 {
+            return from_noon;
+        }
+        let year = self.year_days as f64;
+        let midsummer = year * 3.0 / 8.0;
+        let daylight = 0.5 + self.day_swing as f64 * (std::f64::consts::TAU * (days.rem_euclid(year) - midsummer) / year).cos();
+        let half = daylight / 2.0;
+        let a = from_noon.min(1.0 - from_noon);
+        let sun = if a < half { a * 0.25 / half } else { 0.25 + (a - half) * 0.25 / (0.5 - half) };
+        if from_noon < 0.5 { sun } else { 1.0 - sun }
     }
 
     /// Fraction of full daylight (0..1) at world time `time`, vanilla's curve.
@@ -1105,6 +1127,8 @@ pub(crate) unsafe fn copy_dimension(owner: ModId, d: &abi::DimensionDesc) -> (Di
                 gravity: d.gravity,
                 day_length: d.day_length,
                 fixed_time: d.fixed_time,
+                year_days: d.year_days,
+                day_swing: d.day_swing.clamp(0.0, 0.45),
                 sky_color: d.sky_color,
                 fog_color: d.fog_color,
                 ambient: d.ambient.min(15) as u8,
@@ -1147,6 +1171,8 @@ fn void_dimension() -> DimensionDef {
         gravity: 0.0,
         day_length: 0,
         fixed_time: 18000,
+        year_days: 0,
+        day_swing: 0.0,
         sky_color: 0x0a0a12,
         fog_color: 0x0a0a12,
         ambient: 15,
@@ -1181,6 +1207,8 @@ fn debug_dimension() -> DimensionDef {
         sky_light: true,
         day_length: 24000,
         fixed_time: 6000,
+        year_days: 0,
+        day_swing: 0.0,
         sky_color: 0x78a7ff,
         fog_color: 0xc0d8ff,
         ambient: 0,
@@ -1984,6 +2012,10 @@ fn number_items(
                 Ok(None) => {}
                 Err(e) => errors.push(e),
             }
+        }
+        // Boxes and no picture of its own: its slot shows the boxes too (`Looks::slot_draw`).
+        if !model.is_empty() && !picture_exists(mods, &it.texture) {
+            icon = u32::MAX;
         }
         item_values.push((owner, it.components));
         item_defs.push(ItemDef {

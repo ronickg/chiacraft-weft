@@ -115,8 +115,8 @@ The main menu's logo is the GUI texture `logo` (drawn across the menu bar in who
 
 | anchor (`hud_anchor::..`) | where |
 |---|---|
-| `TOP_LEFT`, `TOP_RIGHT`, `BOTTOM_LEFT`, `BOTTOM_RIGHT` | the corners of the window |
-| `HOTBAR`, `HOTBAR_LEFT`, `HOTBAR_RIGHT` | over the hotbar, on its left and right (health and hunger live there) |
+| `TOP_LEFT`, `TOP_RIGHT`, `BOTTOM_LEFT`, `BOTTOM_RIGHT` | the corners of the window (base puts health, food and the screens' keys top left, the clock and position top right) |
+| `HOTBAR`, `HOTBAR_LEFT`, `HOTBAR_RIGHT` | over the hotbar, on its left and right |
 | `ABOVE_HOTBAR` | centered above all of that (the held item's name) |
 | `UNDER_CROSSHAIR` | just under the crosshair, which stays where it is (the attack indicator) |
 | `DEBUG_LEFT`, `DEBUG_RIGHT` | a panel of the F3 overlay, titled by the element's name as a translation key |

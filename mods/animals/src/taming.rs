@@ -323,6 +323,8 @@ pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
         }
         a.bond = a.bond.max(25);
         weft_sdk::info!("animal {id} tamed at {:.0}%: {bonus} bonus levels, now level {}", effectiveness * 100.0, a.level());
+        let level = a.level();
+        crate::xp::tamed(w, player, level);
     }
     set(w, id, |t| *t = FRESH);
     crate::commands::tamed(w, id);

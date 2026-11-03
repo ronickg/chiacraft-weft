@@ -109,7 +109,7 @@ pub fn init(r: &mut Registry) {
     // An animal hits as hard as its damage stat.
     r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
         if let Some(a) = m.world().component(m.query().entity, &ANIMAL) {
-            m.value *= a.factor(species::DAMAGE) as f64;
+            m.value *= (a.factor(species::DAMAGE) * crate::comfort::condition(a)) as f64;
         }
     });
 }
@@ -159,10 +159,14 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                 }
             }
         }
-        if !new && tamed(w, id) && (w.time() + id) % 20 == 0 {
-            hunger(w, id, &a);
+        // Its body once a second (`comfort.rs`); a tame gets hungry, faster out of its comfort.
+        if !new && (w.time() + id) % 20 == 0 {
+            let rate = crate::comfort::upkeep(w, id, &a, st);
+            if tamed(w, id) {
+                hunger(w, id, &a, rate);
+            }
         }
-        let (health, speed) = (a.factor(species::HEALTH), a.factor(species::SPEED));
+        let (health, speed) = factors(w, id, &a);
         if w.component(id, &APPLIED)
             .is_some_and(|&p| p != [health, speed])
         {
@@ -276,6 +280,11 @@ pub fn age_days(a: &Animal) -> Option<(f64, f64, u8)> {
     Some((a.age as f64, s.lifespan() as f64 / life::DAY as f64, if a.vigor == 0 { 100 } else { a.vigor }))
 }
 
+/// Max health and speed as its stats, its condition and (cold-blooded) the air say.
+fn factors(w: &World, id: u64, a: &Animal) -> (f32, f32) {
+    (a.factor(species::HEALTH) * crate::comfort::condition(a), a.factor(species::SPEED) * crate::comfort::speed(w, id))
+}
+
 /// Max health and speed as the stats say; `heal` adds that much health on top (a new animal
 /// starts full).
 fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f32) {
@@ -288,17 +297,18 @@ fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f3
         && let Some(a) = w.component(id, &ANIMAL)
     {
         let mut s = *st;
-        s.max_health = a.stat(species::HEALTH);
+        s.max_health = a.stat(species::HEALTH) * crate::comfort::condition(&a);
         s.health = (st.health + heal).min(s.max_health);
         w.set_entity(id, &s);
     }
 }
 
-/// Once a second: a tame uses a point of food every so often (its species' `hunger`). Starving
-/// and eating from troughs come with commands and needs.
-fn hunger(w: &World, id: u64, a: &Animal) {
+/// Once a second: a tame uses a point of food every so often (its species' `hunger`, `rate`
+/// times as often out of its comfort). Starving and eating from troughs come with commands and
+/// needs.
+fn hunger(w: &World, id: u64, a: &Animal, rate: f32) {
     let Some(s) = a.species() else { return };
-    let every = (s.hunger.max(1.0) as u64).max(1);
+    let every = ((s.hunger / rate).max(1.0) as u64).max(1);
     if a.food > 0 && (w.time() / 20) % every == 0 {
         if let Some(a) = w.component_mut(id, &ANIMAL) {
             a.food -= 1;
@@ -328,7 +338,8 @@ pub fn place_point(w: &World, id: u64, player: u64, i: usize) {
     // More health heals that much.
     let a = *a;
     if let Some(st) = w.entity(id) {
-        let gained = a.stat(species::HEALTH) - st.max_health;
-        apply(w, id, &st, a.factor(species::HEALTH), a.factor(species::SPEED), gained);
+        let (health, speed) = factors(w, id, &a);
+        let gained = a.stat(species::HEALTH) * crate::comfort::condition(&a) - st.max_health;
+        apply(w, id, &st, health, speed, gained);
     }
 }

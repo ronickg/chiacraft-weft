@@ -9,7 +9,7 @@
 //! Every species' settings are on one page, `mods/animals/SPECIES.md` (`sheet.rs`): rewrite it
 //! after a change, `mods/animals/web/build.sh && node mods/animals/web/sheet.mjs`.
 
-pub use crate::biology::{Biology, Rarity, Social, Tune};
+pub use crate::biology::{Biology, Rarity, Social, Tune, seasons};
 
 /// Life stages, from a newborn to grown (`animal::Animal::stage`).
 pub const BABY: u8 = 0;
@@ -29,6 +29,7 @@ pub const DAMAGE: usize = 3;
 pub const SPEED: usize = 4;
 pub const WEIGHT: usize = 5;
 pub const TORPOR: usize = 7;
+pub const FORTITUDE: usize = 8;
 /// Their names in translations (`stat.animals.<name>`).
 pub const STAT_NAMES: [&str; STATS] = ["health", "stamina", "food", "damage", "speed", "weight", "oxygen", "torpor", "fortitude"];
 
@@ -266,6 +267,13 @@ pub static SPECIES: [Species; 7] = [
             litter: 3.0,
             social: Social::Pack,
             rarity: Rarity::Common,
+            // Dogs, unlike wolves, come into heat at any time of year, about twice a year.
+            breeds: seasons::ALL_YEAR,
+            peak: 0,
+            // Small short-coated dogs feel the cold below about 7 °C (vets' 45 °F) and risk heatstroke
+            // from about 29 °C.
+            comfort: (7.0, 29.0),
+            cold_blooded: false,
         },
         tune: Tune::NONE,
         birth_size: 1.0,
@@ -328,6 +336,12 @@ pub static SPECIES: [Species; 7] = [
             litter: 3.0,
             social: Social::Solitary,
             rarity: Rarity::Common,
+            // A long-day breeder: cycling from spring into autumn, not in winter's short days.
+            breeds: seasons::SPRING | seasons::SUMMER | seasons::AUTUMN,
+            peak: seasons::SPRING,
+            // Cats keep warmer than dogs in their coats: shelter wanted below about 5 °C, heat from 32.
+            comfort: (5.0, 32.0),
+            cold_blooded: false,
         },
         tune: Tune::NONE,
         birth_size: 0.35,
@@ -380,6 +394,12 @@ pub static SPECIES: [Species; 7] = [
             litter: 4.0,
             social: Social::Herd,
             rarity: Rarity::Common,
+            // Mates all year; most young come as the rains begin (April and May in the llanos).
+            breeds: seasons::ALL_YEAR,
+            peak: seasons::SPRING,
+            // Tropical: zoos keep them over 12 °C; in the midday heat over about 32 they lie in the water.
+            comfort: (12.0, 32.0),
+            cold_blooded: false,
         },
         tune: Tune::NONE,
         birth_size: 0.3,
@@ -424,6 +444,14 @@ pub static SPECIES: [Species; 7] = [
             litter: 3.0,
             social: Social::Pack,
             rarity: Rarity::Uncommon,
+            // No record; nesting colonies came back year after year as birds' do, and their kin
+            // nest so their young hatch into the growing season: the wet one.
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // No record: feathered and warm-blooded like birds of its size, at home in the Gobi's dunes
+            // (hot days, cold nights).
+            comfort: (12.0, 40.0),
+            cold_blooded: false,
         },
         tune: Tune::NONE,
         birth_size: 0.3,
@@ -470,6 +498,12 @@ pub static SPECIES: [Species; 7] = [
             litter: 2.0,
             social: Social::Pack,
             rarity: Rarity::Rare,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // No record: a 300 kg feathered body keeps its heat (Bergmann), the Cedar Mountain floodplain
+            // was warm and seasonal.
+            comfort: (6.0, 36.0),
+            cold_blooded: false,
         },
         tune: Tune::NONE,
         birth_size: 0.15,
@@ -516,6 +550,11 @@ pub static SPECIES: [Species; 7] = [
             litter: 3.0,
             social: Social::Pack,
             rarity: Rarity::Uncommon,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // As its cousin's.
+            comfort: (12.0, 40.0),
+            cold_blooded: false,
         },
         tune: Tune::NONE,
         birth_size: 0.3,
@@ -574,6 +613,13 @@ pub static SPECIES: [Species; 7] = [
             litter: 1.0,
             social: Social::Solitary,
             rarity: Rarity::Legendary,
+            // As the great birds of prey: courting in late winter, laying in spring.
+            breeds: seasons::SPRING,
+            peak: seasons::SPRING,
+            // A fantasy animal: a huge body in the cold crags, too big to lose heat fast, overheats
+            // easily.
+            comfort: (-10.0, 30.0),
+            cold_blooded: false,
         },
         tune: Tune::NONE,
         birth_size: 0.08,

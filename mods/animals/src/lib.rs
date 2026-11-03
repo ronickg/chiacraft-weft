@@ -22,6 +22,7 @@ mod breeding;
 mod capybara;
 mod cat;
 mod coats;
+mod comfort;
 mod commands;
 mod cretaceous;
 mod dog;
@@ -39,6 +40,7 @@ mod species;
 mod taming;
 mod utahraptor;
 mod wyvern;
+mod xp;
 
 static HEART: Particle = Particle::named("heart");
 
@@ -92,6 +94,7 @@ fn init(r: &mut Registry) {
     wyvern::init(r);
     breath::init(r);
     animal::init(r);
+    comfort::init(r);
     screen::init(r);
     taming::init(r);
     commands::init(r);
@@ -101,6 +104,7 @@ fn init(r: &mut Registry) {
     coats::init(r);
     scars::init(r);
     breeding::init(r);
+    xp::init(r);
     eggs::init(r);
     evolution::init(r);
     cretaceous::init(r);

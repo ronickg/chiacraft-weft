@@ -1868,6 +1868,15 @@ impl DimensionBuilder<'_> {
         self.desc.fixed_time = time;
         self
     }
+    /// A year of `days` days, with days longer in summer and shorter in winter by `day_swing`
+    /// (a share of the day: 0.17 is about sixteen hours of light at midsummer, eight at
+    /// midwinter). The sun rises and sets by it, for daylight, the sky and everything that reads
+    /// them.
+    pub fn seasons(mut self, days: u32, day_swing: f32) -> Self {
+        self.desc.year_days = days;
+        self.desc.day_swing = day_swing;
+        self
+    }
     pub fn sky(mut self, sky: u32, fog: u32) -> Self {
         self.desc.sky_color = sky;
         self.desc.fog_color = fog;

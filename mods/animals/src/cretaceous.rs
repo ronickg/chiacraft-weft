@@ -9,6 +9,7 @@
 //!
 //! Getting there: a gateway (`gateway.rs`).
 
+use base_api::{CLIMATE, Climate};
 use base_api::{CLOUDS, MOON, STARS, SUN};
 use weft_sdk::terrain::{BiomeRule, Mask, preset};
 use weft_sdk::*;
@@ -68,6 +69,7 @@ pub fn init(r: &mut Registry) {
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
     // Wind-blown red dunes: Velociraptor's, and osmolskae's.
     r.biome(&DUNES)
+        .set(&CLIMATE, Climate { celsius: 28.0, humidity: 0.1, seasons: 6.0 })
         .humidity(..-0.12)
         .surface("red_sand", "red_sand", 4)
         .under("red_sandstone", 2)
@@ -79,6 +81,7 @@ pub fn init(r: &mut Registry) {
         .set_text(&FLOWERS, "animals:fern");
     // Dry, open land with a few conifers and ferns: between the dunes and the wet.
     r.biome(&SCRUBLAND)
+        .set(&CLIMATE, Climate { celsius: 26.0, humidity: 0.25, seasons: 5.0 })
         .humidity(-0.12..0.05)
         .surface("base:grass", "base:dirt", 3)
         .tint(grass, 0xb5ad5a)
@@ -91,6 +94,7 @@ pub fn init(r: &mut Registry) {
         .set_text(&FLOWERS, "animals:fern");
     // Low, wet ground by the rivers: ferns and horsetails, scattered conifers (Utahraptor's).
     r.biome(&FLOODPLAIN)
+        .set(&CLIMATE, Climate { celsius: 24.0, humidity: 0.8, seasons: 4.0 })
         .humidity(0.05..)
         .surface("base:grass", "base:dirt", 3)
         .tint(grass, 0x7fa64a)
@@ -104,6 +108,7 @@ pub fn init(r: &mut Registry) {
         .set_text(&FLOWERS, "animals:fern");
     // Conifers over a floor of ferns.
     r.biome(&FERN_FOREST)
+        .set(&CLIMATE, Climate { celsius: 23.0, humidity: 0.85, seasons: 3.0 })
         .humidity(0.05..)
         .surface("base:grass", "base:dirt", 3)
         .tint(grass, 0x6f9c40)
@@ -116,6 +121,7 @@ pub fn init(r: &mut Registry) {
         .set_text(&FLOWERS, "animals:fern");
     // High rock: the wyverns'.
     r.biome(&CRAGS)
+        .set(&CLIMATE, Climate { celsius: 15.0, humidity: 0.5, seasons: 6.0 })
         .surface("base:grass", "base:dirt", 3)
         .bare_above(115)
         .tint(grass, 0x8aa864)
@@ -125,9 +131,13 @@ pub fn init(r: &mut Registry) {
         .set(&FERNS, 0.05)
         .set_text(&FLOWERS, "animals:fern");
 
+    // Warm all year, as the Cretaceous's greenhouse was, with a wet and a dry season instead of
+    // four; near the tropics, the days barely change.
     r.dimension(&CRETACEOUS)
         .sky_above(16)
         .day_length(24000)
+        .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::WET_AND_DRY_SWING)
+        .set(&base_api::SEASONS, base_api::calendars::WET_AND_DRY)
         .weather();
     r.sky_stars(&CRETACEOUS, &STARS).count(1500);
     r.sky_clouds(&CRETACEOUS, &CLOUDS).texture("base:clouds");
