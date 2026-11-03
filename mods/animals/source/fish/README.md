@@ -44,3 +44,8 @@ fins sculling), walk (swimming), run (darting) and flop (stranded, on its side, 
   height (about 1.3 times), the size gene the whole fish (about 1.35 times).
 - **Stranded on its side**, the tail bends about its own x axis (the body's roll turns it upward),
   so it slaps along the ground instead of into it.
+
+Painted finer (Ronald, 2026-11-03): its head is 2.8 units across and the eye filled most of its
+side, so it is painted `house.FINE` (4) texels a unit, 256 a block: a round eye in proportion (a
+gold ring, a black pupil, a catchlight), round spots, finer fin outlines. Boxes, export scale and
+size unchanged.

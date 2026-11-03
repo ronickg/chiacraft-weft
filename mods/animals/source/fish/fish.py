@@ -5,7 +5,7 @@ cut-out fins and a hand-painted texture) with the blocky-model skill, from resea
 
     ~/.venvs/blocky/bin/python fish.py      # writes out/spec.json, out/texture.png
 
-Units are texels at the house density (64 a block, 1.56 cm each), y up, the fish faces +z. A
+Units are the house's (64 a block, 1.56 cm each), painted `house.FINE` texels a unit; y up, the fish faces +z. A
 river brown trout is about 35 cm long: here 24 from the snout to the tail's tips, the head a little
 bigger than life. The pacu is the same model drawn deeper and bigger by its genes (`build` "Gt" and
 the size gene in `genetics/pacu.json`).
@@ -25,6 +25,7 @@ sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
 from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import FINE as K  # noqa: E402  texels a unit: its head is under 3 units across, so it paints finer
 
 OUT = os.environ.get("FISH_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -45,12 +46,16 @@ COAT = (FLANK, BACK, BELLY, FIN)
 ROLES = [("coat", 0, 0), ("coat", 0, -1.5), ("coat", 1, 0), ("coat", 0.2, -1.0), ("coat", 0, -3.0), ("coat", 0.5, 0), "fixed", ("coat", 0, -0.5)]
 SPOTS = os.environ.get("FISH_COAT") != "pacu"
 
-# A fish's round eye: a gold ring round a big black pupil, a catchlight.
+# A fish's round eye: a gold ring round a big black pupil, a catchlight toward the front and up
+# with a dimmer gloss by it; painted `house.FINE` texels a unit (no eyelids: fish have none).
 EYES.update({
-    "fish_gold": dict(pattern=["APHA",
-                               "APPA",
-                               ".aA."], colors={"P": (16, 12, 12), "H": (222, 226, 230), "A": (176, 140, 70),
-                                                "a": (206, 172, 96)}, halo="none"),
+    "fish_gold": dict(pattern=[".AAAA.",
+                               "AHhPPA",
+                               "AhPPPA",
+                               "APPPPA",
+                               "aPPPPa",
+                               ".aaaa."], colors={"P": (16, 12, 12), "H": (222, 226, 230), "h": (86, 88, 96), "A": (176, 140, 70),
+                                                  "a": (206, 172, 96)}, halo="none"),
 })
 EYE_STYLE = os.environ.get("FISH_EYES", "fish_gold")
 HEAD = ((-1.4, 2.4, 4.5), (1.4, 6.6, 9.5))
@@ -116,7 +121,7 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(abs(size @ du)))), max(1, int(round(abs(size @ dv)))), n
+    return np.array(corner, float), du, dv, max(1, int(round(K * abs(size @ du)))), max(1, int(round(K * abs(size @ dv)))), n
 
 
 def spots(p, density, size, seed):
@@ -213,8 +218,8 @@ def paint_face(e, face, boxes):
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
     if e["name"] == "head" and face in ("east", "west"):
         (x0, y0, z0), (x1, y1, z1) = HEAD
-        cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
-        stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
+        cu = K * ((z1 - EYE_Z) if face == "east" else (EYE_Z - z0))
+        stamp_eyes(img, [(cu, K * (y1 - EYE_Y))], EYE_STYLE)
     if e["name"] == "snout" and face in ("south", "east", "west"):  # the mouth: a dark line
         r = int(round((5.6 - 3.6) * h / 2.7))
         img[min(r, h - 1), :, :3] = BASE[MOUTH]
