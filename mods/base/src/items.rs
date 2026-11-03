@@ -86,6 +86,7 @@ pub fn register(r: &mut Registry) {
         ("spider_eye", 2, 3.2, ""),
         ("cooked_egg", 5, 6.0, ""),
         ("apple_pie", 8, 4.8, ""),
+        ("berries", 2, 1.2, ""),
     ] {
         // What a portion holds and how fresh it is (stamped as it ages, `survival/food.rs`): shown in
         // its tooltip.
@@ -104,6 +105,8 @@ pub fn register(r: &mut Registry) {
             .on_use(base_api::eat)
             .tab(&crate::tabs::FOOD);
         let i = if tag.starts_with("cooked_meat/") { i.tag("cooked_meat") } else { i };
+        // Berries are planted like seeds: a new bush.
+        let i = if name == "berries" { i.placed_block(&crate::blocks::BERRY_BUSH) } else { i };
         if !tag.is_empty() {
             i.tag(tag);
         }

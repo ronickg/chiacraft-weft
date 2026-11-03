@@ -31,6 +31,7 @@ pub static TREE_LEAVES: Component<BlockRef> = Component::named("tree_leaves");
 pub static CONE_TREE: Tag = Tag::named("cone_tree");
 static FROZEN: Tag = Tag::named("frozen");
 static DRY: Tag = Tag::named("dry");
+static FOREST_TAG: Tag = Tag::named("forest");
 
 pub static PLAINS: Biome = Biome::named("plains");
 pub static FOREST: Biome = Biome::named("forest");
@@ -357,6 +358,9 @@ fn decorate(g: &mut Gen) {
                     if flower != 0 {
                         g.set(x, y, z, flower);
                     }
+                } else if roll < 0.016 && FOREST_TAG.on_biome(b) {
+                    // Berry bushes in forests, unripe: found, then come back for.
+                    g.set(x, y, z, BERRY_BUSH.id());
                 } else if roll < grass_chance {
                     g.set(x, y, z, TALL_GRASS.id());
                 }

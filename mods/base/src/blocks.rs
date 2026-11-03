@@ -61,6 +61,8 @@ pub static HAY_BALE: Block = Block::named("hay_bale");
 pub static PODZOL: Block = Block::named("podzol");
 /// The desert's scrub: a few sticks where there is no wood.
 pub static DEAD_BUSH: Block = Block::named("dead_bush");
+/// Wild berries in forests: a food found, then come back for when it has ripened.
+pub static BERRY_BUSH: Block = Block::named("berry_bush");
 
 /// Log axis along the clicked face, like vanilla.
 fn axis_placement(p: &Place, props: &mut Props) {
@@ -522,6 +524,19 @@ pub fn register(r: &mut Registry) {
     r.loot(&DEAD_BUSH)
         .pool(Pool::new().when(Cond::Chance(0.7)).item("stick"))
         .pool(Pool::new().when(Cond::Chance(0.35)).item("stick"));
+    r.block(&BERRY_BUSH)
+        .sound_group("grass")
+        .prop("age", 0..=3)
+        .states(|p, s| s.texture(&format!("berry_bush_stage_{}", p.get("age"))))
+        .plant()
+        .needs_below("#plant_soil")
+        .no_item()
+        .growth(300.0, 9);
+    // Any age gives a berry back to plant again; ripe, two more.
+    r.loot(&BERRY_BUSH)
+        .pool(Pool::new().entry(Entry::item("berries")))
+        .pool(Pool::new().when(Cond::BlockState("age=3")).entry(Entry::item("berries")))
+        .pool(Pool::new().when(Cond::BlockState("age=3")).entry(Entry::item("berries")));
     r.block(&BOOKSHELF)
         .sound_group("wood")
         .textures("planks_oak", "bookshelf", "planks_oak")

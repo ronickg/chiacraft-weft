@@ -369,6 +369,7 @@ pub static SPECIES: [Species; 7] = [
             eats("base:hay_bale", 90),
             favorite("base:apple", 15),
             favorite("base:sugar_cane", 12),
+            favorite("base:berries", 8),
             KIBBLE,
         ],
         feedings: 3.0,

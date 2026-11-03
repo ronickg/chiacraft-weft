@@ -6,7 +6,7 @@ from PIL import Image
 
 TINTED = {"grass_top", "leaves_oak", "leaves_birch", "leaves_spruce", "grass_side_overlay", "tallgrass"}
 PLANTS = {"ladder", "tallgrass", "flower_dandelion", "flower_rose", "sapling_oak", "reeds", "fern", "horsetail", "deadbush"}
-PLANTS |= {f"wheat_stage_{i}" for i in range(8)}
+PLANTS |= {f"wheat_stage_{i}" for i in range(8)} | {f"berry_bush_stage_{i}" for i in range(4)}
 CUTOUT = {"leaves_oak", "leaves_birch", "leaves_spruce", "grass_side_overlay"} | PLANTS
 
 def tile(src, name, size=64):

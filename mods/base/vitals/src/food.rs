@@ -191,6 +191,16 @@ pub const FOODS: &[Food] = &[
         keeps: (4.0, 4.0),
         poison: 0.0,
     },
+    // A handful of wild berries (100 g), as blueberries: water, a little sugar, vitamin C.
+    Food {
+        name: "base:berries",
+        grams: 100.0,
+        per100: per(84.2, 0.7, 14.5, 0.3, 2.4, 9.7),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (6.0, 6.0),
+        poison: 0.0,
+    },
     // Dry pet food (the animals mod's), as dry dog food.
     Food {
         name: "animals:kibble",
