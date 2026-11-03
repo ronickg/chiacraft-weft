@@ -10,10 +10,12 @@
 
 pub mod balance;
 pub mod calendar;
+pub mod climate;
 pub mod difficulty;
 pub mod effects;
 pub mod food;
 pub mod levels;
+pub mod sheet;
 pub mod stamina;
 pub mod stats;
 pub mod stomach;

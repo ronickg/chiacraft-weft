@@ -20,6 +20,7 @@ use crate::animal::{ANIMAL, OWNER};
 use crate::breeding::{self, BREEDING, Young};
 use crate::coats::{self, GENOME};
 use crate::species::SPECIES;
+use animals_core::life;
 
 value! {
     #[derive(Default)]
@@ -53,11 +54,6 @@ static NEST_ITEM: Item = Item::named("nest");
 static AIR: Block = Block::named("core:air");
 static TOOLS: CreativeTab = CreativeTab::named("base:tools");
 static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
-/// The air an egg develops in, °C (eggs of birds and reptiles: about 26 to 38), and how far a
-/// nest takes it toward a brooding parent's warmth (37 °C), both ways.
-const EGG_AIR: (f32, f32) = (25.0, 40.0);
-const NEST_HOLDS: f32 = 0.6;
-const BROODING: f32 = 37.0;
 /// Each laying species' egg item, by its row in `SPECIES` (made once).
 static ITEMS: OnceLock<Vec<(usize, &'static Item)>> = OnceLock::new();
 
@@ -381,11 +377,8 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
         return true;
     }
     let nest = in_nest(w, st.pos);
-    let mut air = base_api::air_at(w, st.pos, 0.3, st.in_liquid != 0, 3, |_| {}).celsius;
-    if nest {
-        air += (BROODING - air) * NEST_HOLDS;
-    }
-    let step = match (EGG_AIR.0..=EGG_AIR.1).contains(&air) {
+    let air = base_api::air_at(w, st.pos, 0.3, st.in_liquid != 0, 3, |_| {}).celsius;
+    let step = match life::develops(life::egg_air(air, nest)) {
         false => 0,
         true if nest => 40,
         true => 20,

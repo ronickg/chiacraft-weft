@@ -157,6 +157,7 @@ dependencies = [
  "png",
  "serde",
  "serde_json",
+ "vitals",
  "weft_sdk",
 ]
 

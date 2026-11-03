@@ -14,3 +14,7 @@ weft_sdk = { workspace = true, optional = true }
 png.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json.workspace = true
+
+[dev-dependencies]
+# The checks across systems (tests/places.rs) read the climates and body rules.
+vitals.workspace = true

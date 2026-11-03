@@ -1,0 +1,165 @@
+//! The survival numbers as one page (`mods/base/vitals/SHEET.md`), written from this crate so it
+//! can't drift: `cargo run -p vitals --bin sheet > mods/base/vitals/SHEET.md`. A test fails while
+//! the page is out of date (`tests/sheet.rs`).
+
+use std::fmt::Write;
+
+use crate::effects;
+use crate::food::{self, NUTRIENT_NAMES};
+use crate::stats::{self, Growth};
+use crate::{calendar, climate, difficulty, levels, temperature};
+
+pub fn markdown() -> String {
+    let mut w = String::new();
+    let _ = writeln!(w, "# Survival numbers\n");
+    let _ = writeln!(
+        w,
+        "Written from `mods/base/vitals` (`cargo run -p vitals --bin sheet > mods/base/vitals/SHEET.md`); do not edit by hand. How the systems connect: `notes/SYSTEMS.md`; why: `notes/SURVIVAL.md`.\n"
+    );
+    stats_table(&mut w);
+    foods(&mut w);
+    effects_table(&mut w);
+    climates(&mut w);
+    difficulties(&mut w);
+    level_table(&mut w);
+    w
+}
+
+fn stats_table(w: &mut String) {
+    let _ = writeln!(w, "## A player's stats\n\n| stat | level 1 | a point |\n|---|---|---|");
+    for (i, name) in stats::NAMES.iter().enumerate() {
+        let point = match stats::PLAYER_GROWTH[i] {
+            Growth::Share(s) => format!("+{:.0}%", s * 100.0),
+            Growth::Add(a) => format!("+{a}"),
+        };
+        let _ = writeln!(w, "| {name} | {} | {point} |", stats::PLAYER_BASE[i]);
+    }
+    let _ = writeln!(w, "\nComfortable air for a person, unclothed: {:?} °C.\n", temperature::PERSON);
+}
+
+fn foods(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Foods\n\nA portion, what it holds of each nutrient, how long it digests, and game days fresh then stale.\n\n| food | g | units | {} | digests | keeps | |\n|---|---|---|---|---|---|---|---|---|---|---|",
+        NUTRIENT_NAMES.join(" | ")
+    );
+    for f in food::FOODS {
+        let p = f.portion();
+        let notes = [
+            (f.raw, "raw"),
+            (f.poison >= 1.0, "poisonous"),
+            (f.meal == food::Meal::Cooked, "hot when cooked"),
+            (f.meal == food::Meal::Cooling, "cooling"),
+        ]
+        .iter()
+        .filter(|(on, _)| *on)
+        .map(|(_, n)| *n)
+        .collect::<Vec<_>>()
+        .join(", ");
+        let _ = writeln!(
+            w,
+            "| {} | {} | {:.0} | {} | {:.0} min | {} + {} | {notes} |",
+            f.name,
+            f.grams,
+            f.units(),
+            p.iter()
+                .map(|v| format!("{v:.0}"))
+                .collect::<Vec<_>>()
+                .join(" | "),
+            f.digest_minutes(),
+            f.keeps.0,
+            f.keeps.1
+        );
+    }
+    let _ = writeln!(w);
+}
+
+fn effects_table(w: &mut String) {
+    let _ = writeln!(w, "## Effects\n\n| effect | group | changes |\n|---|---|---|");
+    for e in effects::ALL {
+        let m = e.modifiers();
+        let n = effects::NONE;
+        let mut parts = Vec::new();
+        let mul = |parts: &mut Vec<String>, name: &str, v: f32, base: f32| {
+            if v != base {
+                parts.push(format!("{name} x{v}"));
+            }
+        };
+        mul(&mut parts, "health regen", m.health_regen, n.health_regen);
+        mul(&mut parts, "stamina regen", m.stamina_regen, n.stamina_regen);
+        mul(&mut parts, "speed", m.speed, n.speed);
+        mul(&mut parts, "stamina costs", m.stamina_cost, n.stamina_cost);
+        mul(&mut parts, "XP", m.xp, n.xp);
+        mul(&mut parts, "water used", m.water_use, n.water_use);
+        if m.health_loss > 0.0 {
+            parts.push(format!("loses {}% of max health a second", m.health_loss * 100.0));
+        }
+        if m.stamina_loss > 0.0 {
+            parts.push(format!("loses {}% of max stamina a second", m.stamina_loss * 100.0));
+        }
+        if !m.can_sprint {
+            parts.push("no sprinting".into());
+        }
+        let _ = writeln!(w, "| {} | {:?} | {} |", e.name(), e.group(), parts.join(", "));
+    }
+    // How the core feels, read off `temperature::feeling` a tenth of a degree at a time.
+    let mut lines = Vec::new();
+    let mut last = temperature::feeling(30.0);
+    for tenth in 301..=430 {
+        let core = tenth as f32 / 10.0;
+        let f = temperature::feeling(core);
+        if f != last {
+            lines.push(format!("{f:?} from {core} °C"));
+            last = f;
+        }
+    }
+    let _ = writeln!(
+        w,
+        "\nRested lasts {:.0} s and a minute more a comfort level. The core temperature: {:?}, then {}.\n",
+        effects::rested_secs(0),
+        temperature::feeling(30.0),
+        lines.join(", ")
+    );
+}
+
+fn climates(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Climates\n\nEach biome's year mean, humidity and half its summer-to-winter range, and the air at sea level under an open sky: midwinter before dawn, midsummer mid afternoon.\n\n| biome | mean °C | humidity | seasons ± | coldest | hottest |\n|---|---|---|---|---|---|"
+    );
+    let midwinter = calendar::MIDSUMMER + calendar::YEAR_DAYS as f32 / 2.0;
+    for c in &climate::BIOMES {
+        let cold = climate::air(c, midwinter, 4.0);
+        let hot = climate::air(c, calendar::MIDSUMMER, 15.0);
+        let _ = writeln!(w, "| {} | {} | {} | {} | {cold:.0} | {hot:.0} |", c.biome, c.celsius, c.humidity, c.seasons);
+    }
+    let _ = writeln!(w);
+}
+
+fn difficulties(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Difficulty (the `base:difficulty` rule)\n\n| | digests | keeps | harm | can kill | XP lost on death | stamina costs |\n|---|---|---|---|---|---|---|"
+    );
+    for d in difficulty::ALL {
+        let _ = writeln!(
+            w,
+            "| {} | x{} | x{} | x{} | {} | {:.0}% | x{} |",
+            d.name,
+            d.digest,
+            d.keep,
+            d.harm,
+            if d.deadly { "yes" } else { "no, stops at a tenth" },
+            d.death_xp * 100.0,
+            d.stamina_cost
+        );
+    }
+    let _ = writeln!(w);
+}
+
+fn level_table(w: &mut String) {
+    let _ = writeln!(w, "## Levels\n\n| level | XP to the next | XP from level 1 |\n|---|---|---|");
+    for l in [1, 2, 5, 10, 25, 50, 75, 99, 100] {
+        let _ = writeln!(w, "| {l} | {} | {} |", levels::to_next(l), levels::total_to(l));
+    }
+}

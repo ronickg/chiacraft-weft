@@ -182,3 +182,19 @@ pub fn successor_age(s: &Species, away: u64, roll: f32) -> u64 {
     let most = away.min((s.lifespan() as f64 * 0.8) as u64);
     (most as f64 * roll.clamp(0.0, 1.0) as f64) as u64
 }
+
+/// The air an egg develops in, °C (eggs of birds and reptiles: about 26 to 38).
+pub const EGG_AIR: (f32, f32) = (25.0, 40.0);
+/// A brooding parent's warmth, °C, and how far a nest takes an egg toward it, both ways.
+pub const BROODING: f32 = 37.0;
+pub const NEST_HOLDS: f32 = 0.6;
+
+/// The air at an egg in `air`, in a nest or not.
+pub fn egg_air(air: f32, nest: bool) -> f32 {
+    if nest { air + (BROODING - air) * NEST_HOLDS } else { air }
+}
+
+/// Whether an egg develops in that air (`egg_air`).
+pub fn develops(egg_air: f32) -> bool {
+    (EGG_AIR.0..=EGG_AIR.1).contains(&egg_air)
+}

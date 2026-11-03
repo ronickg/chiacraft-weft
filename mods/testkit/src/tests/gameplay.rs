@@ -1203,6 +1203,19 @@ fn max_health(t: &T) -> f32 {
         .map_or(0.0, |v| v.max_health / base_api::HEALTH_SCALE)
 }
 
+/// Every item that can be eaten, any mod's, has a row in the food table (`vitals::food::FOODS`):
+/// without one it can't be eaten (`base_api::eat` refuses it). A check across systems
+/// (`notes/SYSTEMS.md`).
+pub async fn every_food_has_nutrition(t: T) -> R {
+    let missing: Vec<&str> = (0..u16::MAX as u32)
+        .filter(|&id| base_api::FOOD.on_item(id).is_some())
+        .map(item_name)
+        .filter(|name| !name.is_empty() && vitals::food::find(name).is_none())
+        .collect();
+    t.check(missing.is_empty(), format!("food without a row in vitals::food::FOODS (it can't be eaten): {missing:?}"));
+    Ok(())
+}
+
 /// Food: eating puts it in the stomach (the vitals), and another mod's component on the base
 /// game's food plus the engine's `item_used` event heals (the owner's example).
 pub async fn food(t: T) -> R {

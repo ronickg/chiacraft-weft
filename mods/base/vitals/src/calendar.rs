@@ -73,9 +73,14 @@ impl Date {
     /// How far the year has gone from midwinter, 0 to 1 (0.5 midsummer), for
     /// `temperature::season`.
     pub fn from_midwinter(&self) -> f32 {
-        let midwinter = MIDSUMMER + YEAR_DAYS as f32 / 2.0;
-        ((self.day as f32 + self.fraction - midwinter) / YEAR_DAYS as f32).rem_euclid(1.0)
+        from_midwinter(self.day as f32 + self.fraction)
     }
+}
+
+/// How far day `day` of the year (from 0, with its fraction) is from midwinter, 0 to 1.
+pub fn from_midwinter(day: f32) -> f32 {
+    let midwinter = MIDSUMMER + YEAR_DAYS as f32 / 2.0;
+    ((day - midwinter) / YEAR_DAYS as f32).rem_euclid(1.0)
 }
 
 /// Hours of daylight on day `day` of the year (with its fraction) where midsummer's daylight is

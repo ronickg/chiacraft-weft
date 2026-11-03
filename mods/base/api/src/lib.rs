@@ -114,6 +114,13 @@ pub mod calendars {
     }
 }
 
+/// A biome's climate from the table (`vitals::climate::BIOMES`), by its full name, for setting
+/// on it: every biome's numbers in one place, where the checks across systems read them.
+pub fn climate(biome: &str) -> Climate {
+    let c = vitals::climate::of(biome).unwrap_or_else(|| panic!("no climate for {biome} in vitals::climate::BIOMES"));
+    Climate { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons }
+}
+
 /// A biome without one: a mild, temperate place.
 pub const TEMPERATE: Climate = Climate { celsius: 12.0, humidity: 0.5, seasons: 10.0 };
 
