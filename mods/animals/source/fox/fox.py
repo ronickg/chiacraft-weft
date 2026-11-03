@@ -55,6 +55,18 @@ EYES.update({
 EYE_STYLE = os.environ.get("FOX_EYES", "fox_amber")
 SKULL = ((-4.0, 24.0, 12.0), (4.0, 31.0, 20.0))
 EYE_X, EYE_Y = 2.3, 29.0  # on the face, above the muzzle
+LID_Z = SKULL[1][2] + 0.35  # the eyelids' hinge line, 0.35 in front of the face: closed, they sit over the eyes
+LASH = (52, 30, 22)
+
+
+def eye_box(cx):
+    """(x0, x1, top, bottom) of the eye at `cx` on the face, rounded as `stamp_eyes` places it."""
+    pat = EYES[EYE_STYLE]["pattern"]
+    ph, pw = len(pat), len(pat[0])
+    u0, top = SKULL[0][0], SKULL[1][1]
+    a = int(round((cx - u0) - pw / 2))
+    v0 = int(round((top - EYE_Y) - ph / 2))
+    return u0 + a, u0 + a + pw, top - v0, top - v0 - ph
 
 # ------------------------------------------------------------------ the model
 
@@ -106,6 +118,8 @@ def bones():
          ("neck", "spine_1", tuple(NECK0)), ("head", "neck", tuple(HEAD)), ("jaw", "head", (0, 25.1, 19.8))]
     for s, n in ((1, "L"), (-1, "R")):
         B.append((f"ear_{n}", "head", (s * EAR_X, 30.8, sum(EAR_Z) / 2)))
+        x0, x1, top, _ = eye_box(s * EYE_X)
+        B.append((f"eyelid_{n}", "head", ((x0 + x1) / 2, top, LID_Z)))
     pts = tail_points()
     B += [(f"tail_{k}", "spine_0" if k == 0 else f"tail_{k - 1}", tuple(pts[k])) for k in range(len(TAIL))]
     for leg in LEGS:
@@ -137,6 +151,12 @@ def elements():
         for k, (y0, y1, hw) in enumerate(EAR):
             E.append(el(f"ear_core_{n.lower()}{k}", f"ear_{n}", (cx - hw, y0, EAR_Z[0]), (cx + hw, y1, EAR_Z[1]), rot=rot, origin=origin))
         zc = sum(EAR_Z) / 2
+        # The eyelid: a quad the eye's size lying flat inside the head, hinged at the eye's top; a
+        # blink swings it down over the eye (-90 about x). Tilted a few degrees into the head, so it
+        # is never in the skull's top plane.
+        x0, x1, top, bottom = eye_box(s * EYE_X)
+        E.append(el(f"eyelid_{n}", f"eyelid_{n}", (x0, top, LID_Z - (top - bottom)), (x1, top, LID_Z), quad="down", rot=(-4, 0, 0),
+                    origin=((x0 + x1) / 2, top, LID_Z)))
         E.append(el(f"fringe_ear_{n.lower()}", f"ear_{n}", (cx - 2.8, 30.4, zc), (cx + 2.8, 38.6, zc), quad="south", rot=rot,
                     origin=origin, cut="ear"))
     pts = tail_points()
@@ -291,6 +311,8 @@ def paint_face(e, face, boxes):
     if face == "down" and e["name"].startswith(("leg_", "thigh_", "jaw", "tail")):
         light_face = "north"
     a = area(e, face, p, uu, vv, h)
+    if e["name"].startswith("eyelid"):  # seen only closed, as the face round the eyes
+        a, light_face = np.full(a.shape, COAT), "south"
     occ = None if e["quad"] else occlusion(p, R @ n, R @ du, R @ dv, boxes, own=e["name"])
     stacked = e["name"].startswith("ear_core")
     down = np.clip((38.2 - p[..., 1]) / 7.6, 0, 1) if stacked else None
@@ -303,6 +325,8 @@ def paint_face(e, face, boxes):
     if e["name"] == "skull" and face == "south":
         u0, top = SKULL[0][0], SKULL[1][1]
         stamp_eyes(img, [(cx - u0, top - EYE_Y) for cx in (-EYE_X, EYE_X)], EYE_STYLE)
+    if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
+        img[h - 1, :, :3] = LASH
     if e["name"] == "muzzle" and face in ("east", "west"):  # the dark line of the mouth
         img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.6).astype(np.uint8)
     if e["name"].endswith("_paw") and face == "south":  # four toes
@@ -429,9 +453,21 @@ ANIMS = {"idle": (pose_idle, 4.0), "walk": (pose_walk, 0.6), "run": (pose_run, 0
          "pounce": (pose_pounce, 1.0), "bite": (pose_bite, 0.5)}
 
 
+BLINKS = {"idle": [1.3, 3.2], "lie": [2.1, 4.2]}
+BLINK = 0.09
+
+
+def eyelids(name, t):
+    a = 90 * max([0.0] + [1 - abs(t - b) / BLINK for b in BLINKS.get(name, [])])
+    return {"eyelid_L": (-a, 0, 0), "eyelid_R": (-a, 0, 0)}  # eyes on the face: the lids swing down about x
+
+
 def frame_times(name, dur):
     n = {"idle": 48, "lie": 40, "walk": 24, "run": 20, "pounce": 30, "bite": 24}.get(name, 16)
-    return sorted({round(dur * k / n, 4) for k in range(n + 1)})
+    ts = {round(dur * k / n, 4) for k in range(n + 1)}
+    for b in BLINKS.get(name, []):
+        ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
+    return sorted(ts)
 
 
 def animations(bone_names):
@@ -441,6 +477,7 @@ def animations(bone_names):
         for t in frame_times(name, dur):
             tt = t % dur if t < dur else 0.0
             pose = fn(tt)
+            pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
         out[name] = {"length": dur, "frames": frames}
