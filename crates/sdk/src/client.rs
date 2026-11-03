@@ -525,8 +525,21 @@ impl World {
         unsafe { (host().set_weather)(self.raw(), raining as u32, thunder as u32, ticks) }
     }
 
+    /// Raining somewhere in this dimension (`raining_at`: here).
     pub fn raining(&self) -> bool {
         unsafe { (host().raining)(self.raw()) != 0 }
+    }
+
+    /// Raining at `pos`: in this dimension, and in that biome when a mod says where it rains.
+    pub fn raining_at(&self, pos: [i32; 3]) -> bool {
+        unsafe { (host().raining_at)(self.raw(), &pos) != 0 }
+    }
+
+    /// Rain from now on only in `biomes` of this dimension (none: dry everywhere), with thunder if
+    /// `thunder`, until the next call: weather by place and season, instead of the dimension's own
+    /// timing. A `/weather` command still wins for its time.
+    pub fn set_rain(&self, biomes: &[u32], thunder: bool) {
+        unsafe { (host().set_rain)(self.raw(), biomes.as_ptr(), biomes.len() as u32, thunder as u32) }
     }
 
     pub fn thundering(&self) -> bool {

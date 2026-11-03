@@ -1,5 +1,7 @@
-//! Every biome's climate in one table, the world's and other mods' (the Cretaceous's), each as a
-//! real place of its kind has it. The mods set these on their biomes (`base_api::climate`); the
+//! Every biome's climate in one table, the world's and other mods' (the Cretaceous's), each from
+//! a real place of its kind (`reports/ecology/Biome climates.md`, its numbers in
+//! `biome_climates.json`): the year's mean, how much the seasons and the day swing it, and how
+//! often it rains in each season. The mods set these on their biomes (`base_api::climate`); the
 //! checks across systems read them here (`mods/animals/core/tests/places.rs`): whether each
 //! species is at home in its habitats and its eggs hatch there.
 
@@ -7,42 +9,55 @@ use crate::calendar;
 use crate::temperature::{self, Place};
 
 /// A biome's climate: the year's mean temperature in °C, humidity 0 dry to 1 wet (dry air swings
-/// more between day and night), and half the range between summer and winter.
+/// more between day and night, `temperature::air`), half the range between summer and winter, and
+/// the share of days with rain in each season of the calendar.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Climate {
     /// Its full name (`base:plains`).
     pub biome: &'static str,
+    /// The real place its numbers come from.
+    pub place: &'static str,
     pub celsius: f32,
     pub humidity: f32,
     pub seasons: f32,
+    /// Days with rain (1 mm or more) in spring, summer, autumn and winter, as shares of the
+    /// season's days (`rains`): the place's months three to a season, a southern place's six
+    /// months on so its summer is the calendar's.
+    pub rain: [f32; 4],
     /// Deep under ground: the year's mean, no day, sun or weather.
     pub underground: bool,
 }
 
-const fn c(biome: &'static str, celsius: f32, humidity: f32, seasons: f32) -> Climate {
-    Climate { biome, celsius, humidity, seasons, underground: false }
+const fn c(biome: &'static str, place: &'static str, celsius: f32, humidity: f32, seasons: f32, rain: [f32; 4]) -> Climate {
+    Climate { biome, place, celsius, humidity, seasons, rain, underground: false }
 }
 
+// Humidity is fitted to each place's day range (`temperature::air` swings 2.5 + 6.5 · (1 − humidity)
+// a side). Rain days counted from 0.25 mm (NOAA) count a fifth fewer from 1 mm, and from 0.1 mm
+// (Mexico, and Kassel's and Moscow's sources) three tenths fewer, the usual gap between the
+// thresholds. The mountains' and crags' means are at sea level: the air takes 6.5 °C a km off
+// with the height (`ALTITUDE` in `base_api`), so a mountain's slopes are Davos's.
 pub const BIOMES: [Climate; 17] = [
     // The overworld (`mods/base/src/worldgen.rs`).
-    c("base:plains", 12.0, 0.5, 12.0), // a prairie
-    c("base:forest", 11.0, 0.65, 10.0),
-    c("base:birch_forest", 9.0, 0.6, 12.0),
-    c("base:taiga", 0.0, 0.55, 18.0),
-    c("base:snowy_plains", -10.0, 0.4, 14.0), // tundra
-    c("base:desert", 25.0, 0.1, 9.0),
-    c("base:savanna", 26.0, 0.3, 4.0),
-    c("base:swamp", 19.0, 0.9, 8.0),
-    c("base:mountains", 6.0, 0.5, 12.0),
-    c("base:ocean", 14.0, 0.8, 6.0),
-    c("base:beach", 17.0, 0.7, 8.0),
-    Climate { underground: true, ..c("base:deep_caves", 12.0, 0.6, 0.0) }, // keeps the year's mean
-    // The Cretaceous (`mods/animals/src/cretaceous.rs`), a wet and a dry season.
-    c("animals:red_dunes", 28.0, 0.1, 6.0), // the Djadokhta Formation, Mongolia
-    c("animals:scrubland", 26.0, 0.25, 5.0),
-    c("animals:floodplain", 24.0, 0.8, 4.0), // the Cedar Mountain Formation, Utah
-    c("animals:fern_forest", 23.0, 0.85, 3.0),
-    c("animals:crags", 15.0, 0.5, 6.0),
+    c("base:plains", "Manhattan, Kansas (Konza Prairie)", 12.8, 0.42, 14.2, [0.27, 0.27, 0.2, 0.14]),
+    c("base:forest", "Kassel, Germany", 9.3, 0.77, 8.7, [0.34, 0.34, 0.37, 0.41]),
+    c("base:birch_forest", "Moscow", 6.3, 0.8, 12.9, [0.29, 0.3, 0.32, 0.47]),
+    c("base:taiga", "Fairbanks, Alaska", -2.1, 0.51, 19.8, [0.14, 0.32, 0.26, 0.22]),
+    c("base:snowy_plains", "Utqiaġvik, Alaska", -10.2, 0.92, 14.9, [0.14, 0.24, 0.32, 0.15]),
+    c("base:desert", "Hermosillo, Sonora", 25.7, 0.18, 8.1, [0.01, 0.13, 0.06, 0.05]),
+    c("base:savanna", "Arauca, the Colombian llanos", 27.0, 0.65, 1.6, [0.4, 0.7, 0.45, 0.11]),
+    c("base:swamp", "Nhumirim, the Pantanal", 25.1, 0.42, 3.4, [0.18, 0.33, 0.2, 0.07]),
+    c("base:mountains", "Davos, 1,594 m", 6.0, 0.63, 8.8, [0.32, 0.45, 0.31, 0.29]),
+    c("base:ocean", "Ponta Delgada, the Azores", 18.2, 0.97, 4.1, [0.33, 0.19, 0.38, 0.43]),
+    c("base:beach", "Faro, Portugal", 18.2, 0.74, 6.2, [0.16, 0.01, 0.16, 0.2]),
+    Climate { underground: true, ..c("base:deep_caves", "any cave: the surface's year mean", 12.0, 0.95, 0.0, [0.0; 4]) },
+    // The Cretaceous (`mods/animals/src/cretaceous.rs`), estimated from the formations' rocks
+    // (`reports/ecology/Cretaceous food webs.md`; Ronald's choices in `notes/ECOLOGY.md`).
+    c("animals:red_dunes", "the Djadokhta Formation, Mongolia", 17.0, 0.2, 12.0, [0.1, 0.02, 0.03, 0.12]),
+    c("animals:scrubland", "the Barun Goyot Formation, Mongolia", 17.0, 0.3, 11.0, [0.06, 0.25, 0.08, 0.04]),
+    c("animals:floodplain", "the Cedar Mountain Formation, Utah", 21.0, 0.5, 8.0, [0.08, 0.45, 0.25, 0.04]),
+    c("animals:fern_forest", "the Yixian Formation, Liaoning", 10.0, 0.8, 10.0, [0.25, 0.45, 0.3, 0.15]),
+    c("animals:crags", "the Sevier highlands, Utah", 15.0, 0.6, 8.0, [0.25, 0.4, 0.25, 0.15]),
 ];
 
 /// The climate of a biome by its full name.
@@ -66,4 +81,77 @@ pub fn air(c: &Climate, day: f32, hour: f32) -> f32 {
         season: temperature::season(c.seasons, calendar::from_midwinter(day)),
         underground: c.underground,
     })
+}
+
+/// The share of days with rain in season `season` (0 spring); a dimension without seasons has
+/// the year's.
+pub fn rain_share(rain: [f32; 4], season: Option<usize>) -> f32 {
+    match season {
+        Some(s) => rain[s % 4],
+        None => rain.iter().sum::<f32>() / 4.0,
+    }
+}
+
+/// A rain spell's hours: a rainy day's rain falls in one spell of 2 to 8 hours, as most of a real
+/// rainy day's does.
+pub const SPELL_HOURS: (f32, f32) = (2.0, 8.0);
+
+/// When it rains on `day` (days since the world began) in the biome `key` stands for (its id and
+/// the world's seed): `None` on a dry day; on a rainy day, the spell's start and end hour. A day
+/// is rainy with the season's share, the same on every machine.
+pub fn spell(rain: [f32; 4], season: Option<usize>, key: u64, day: u64) -> Option<(f32, f32)> {
+    let r = mix(key ^ day.wrapping_mul(0x9E37_79B9_7F4A_7C15));
+    if unit(r) >= rain_share(rain, season) {
+        return None;
+    }
+    let length = SPELL_HOURS.0 + (SPELL_HOURS.1 - SPELL_HOURS.0) * unit(r >> 20);
+    let start = (24.0 - length) * unit(r >> 40);
+    Some((start, start + length))
+}
+
+/// Whether it rains at `hour` of `day` there (`spell`).
+pub fn rains(rain: [f32; 4], season: Option<usize>, key: u64, day: u64, hour: f32) -> bool {
+    spell(rain, season, key, day).is_some_and(|(from, to)| (from..to).contains(&hour))
+}
+
+/// Whether a rain spell that day thunders, in a biome of that mean and seasons (`Climate`): a third
+/// of the spells where the season's mean air is warm (over 15 °C), as summer storms are.
+pub fn thunders(celsius: f32, seasons: f32, season: Option<usize>, key: u64, day: u64) -> bool {
+    // The season's middle day; without seasons, a spring day.
+    let middle = (season.unwrap_or(0) as u32 * calendar::SEASON_DAYS + calendar::SEASON_DAYS / 2) as f32;
+    let mean = celsius + temperature::season(seasons, calendar::from_midwinter(middle));
+    mean > 15.0 && mix(key ^ day ^ 0x7448_554E).is_multiple_of(3)
+}
+
+/// SplitMix64: a hash every machine agrees on.
+fn mix(mut z: u64) -> u64 {
+    z = z.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
+/// 0..1 from the low 20 bits.
+fn unit(r: u64) -> f32 {
+    (r & 0xF_FFFF) as f32 / 0x10_0000 as f32
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Over many years a biome rains on about its share of each season's days.
+    #[test]
+    fn rain_follows_the_shares() {
+        for c in &BIOMES {
+            for s in 0..4 {
+                let days = 20_000;
+                let wet = (0..days)
+                    .filter(|&d| spell(c.rain, Some(s), 12345, d).is_some())
+                    .count();
+                let share = wet as f32 / days as f32;
+                assert!((share - c.rain[s]).abs() < 0.02, "{} season {s}: {share} against {}", c.biome, c.rain[s]);
+            }
+        }
+    }
 }

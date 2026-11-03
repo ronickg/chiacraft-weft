@@ -2093,6 +2093,13 @@ pub struct Host {
     pub set_weather: unsafe extern "C" fn(world: *mut WorldCtx, raining: u32, thunder: u32, ticks: u32),
     pub raining: unsafe extern "C" fn(world: *mut WorldCtx) -> u32,
     pub thundering: unsafe extern "C" fn(world: *mut WorldCtx) -> u32,
+    /// Rain from now on only in these `len` biomes of this dimension (none: dry everywhere), with
+    /// thunder if `thunder`, until the next call: a mod's weather by place and season instead of
+    /// the dimension's own timing. A `/weather` command still rains everywhere for its time.
+    pub set_rain: unsafe extern "C" fn(world: *mut WorldCtx, biomes: *const u32, len: u32, thunder: u32),
+    /// Whether it rains at `pos` (in the open or not): in this dimension, and in that biome when a
+    /// mod says where (`set_rain`).
+    pub raining_at: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const [i32; 3]) -> u32,
     /// A white flash on an entity for everyone who sees it.
     pub entity_flash: unsafe extern "C" fn(world: *mut WorldCtx, id: u64),
     /// A player's `permission` level.

@@ -235,7 +235,8 @@ messages! {
         BreakRefused { frame: u64, pos: IVec3 },
         /// Holding the use button started on an item that takes this many ticks, or it ended.
         Using(Option<u32>),
-        Weather { raining: bool, thunder: bool },
+        /// `only`: the biomes it rains in (a mod's weather by place); `None`: everywhere.
+        Weather { raining: bool, thunder: bool, only: Option<Vec<u32>> },
         /// A white flash on an entity.
         Flash(u64),
         /// Someone else's arm swings: a hit, a use, mining.

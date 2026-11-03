@@ -2128,12 +2128,14 @@ impl Client {
 
     /// How much rain there is, and now and then a lightning's flash (`weather` draws it).
     fn weather_effects(&mut self, dt: f32) {
-        let target = if self.weather.0 { 1.0 } else { 0.0 };
+        // Where the player stands: rain only in some biomes, when a mod says where.
+        let here = self.weather.0 && self.world.rains_at(self.player.pos.floor().as_ivec3());
+        let target = if here { 1.0 } else { 0.0 };
         self.rain += (target - self.rain).clamp(-dt / 5.0, dt / 5.0);
-        let target = if self.weather.0 && self.weather.1 { 1.0 } else { 0.0 };
+        let target = if here && self.weather.1 { 1.0 } else { 0.0 };
         self.thunder += (target - self.thunder).clamp(-dt / 5.0, dt / 5.0);
         self.lightning = (self.lightning - dt).max(0.0);
-        if self.weather.1 && self.chance() < dt / 12.0 {
+        if here && self.weather.1 && self.chance() < dt / 12.0 {
             self.lightning = 0.15;
         }
     }

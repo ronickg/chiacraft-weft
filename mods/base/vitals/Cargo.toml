@@ -6,3 +6,6 @@ license = "MIT"
 description = "Survival rules shared by players and animals: stats and levels, the stomach and nutrients, body temperature, effects (notes/SURVIVAL.md)"
 
 [dependencies]
+
+[dev-dependencies]
+serde_json.workspace = true

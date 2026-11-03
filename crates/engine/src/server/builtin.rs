@@ -274,7 +274,7 @@ fn weather(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     }
     let (raining, thunder) = (x.a.get("rain").is_some() || x.a.get("thunder").is_some(), x.a.get("thunder").is_some());
     let ticks = x.a.int("ticks").map_or(12000, |t| t.max(1) as u64);
-    d.set_weather(raining, thunder, ticks);
+    d.set_manual_weather(raining, thunder, ticks);
     say("weather.done", Vec::new())
 }
 

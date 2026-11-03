@@ -12,6 +12,9 @@ when something changes. The numbers themselves: `mods/base/vitals/SHEET.md` (sur
 ```mermaid
 flowchart LR
   climate["Climates<br/>vitals::climate"] --> air["The air<br/>base_api::air_at"]
+  climate --> weather["Rain by season<br/>base weather.rs"]
+  calendar --> weather
+  weather --> air
   calendar["Calendar and seasons<br/>vitals::calendar"] --> air
   fires["Fires, roofs, water<br/>blocks in the world"] --> air
   air --> player["Player's body<br/>base survival/"]
@@ -37,7 +40,8 @@ flowchart LR
 
 ### Planned: the living world
 
-The loop that closes this map, designed in `notes/ECOLOGY.md` and not built yet. Rain by season
+The loop that closes this map, designed in `notes/ECOLOGY.md`; its first part, rain by season, is
+built (the rows below). Rain by season
 comes from the climate table and falls through the air. It wets the soil, and plants grow by the
 place. Grazers eat the plants and hunters eat the grazers, all through one forage goal and food
 categories. A place's food sets how many animals it holds. What dies and rots becomes compost,
@@ -55,9 +59,10 @@ built, it gets its row below and its arrows above.
 
 | System | Code | Numbers | Reads | Read by |
 |---|---|---|---|---|
-| Climates | `vitals::climate::BIOMES` | same | | the air; biomes set it (`base_api::climate` in `worldgen.rs`, `cretaceous.rs`) |
+| Climates | `vitals::climate::BIOMES`, each from a real place (`reports/ecology/Biome climates.md`) | same | the research | the air, the weather; biomes set it (`base_api::climate` in `worldgen.rs`, `cretaceous.rs`) |
+| Rain by season | `mods/base/src/weather.rs`, `vitals::climate::{spell, rains, thunders}` | `rain` per season in `BIOMES` | climates, calendar, the world's seed | the engine (`set_rain`: rain drawn only where it falls), the air (`raining_at`) |
 | Calendar, seasons | `vitals::calendar` | `SEASON_DAYS`, `MIDSUMMER` | engine day time | the air, breeding seasons, day length (`.seasons(..)` on dimensions), the HUD clock |
-| The air | `base_api::air_at`, `vitals::temperature::air` | `temperature.rs` | climate, season, hour, height, sky light, rain, water, fires (`base_api::heat_of`) | player's body, animals' bodies, eggs |
+| The air | `base_api::air_at`, `vitals::temperature::air` | `temperature.rs` | climate, season, hour, height, sky light, rain here (`raining_at`), water, fires (`base_api::heat_of`) | player's body, animals' bodies, eggs |
 | Player's body | `mods/base/src/survival/` (a file per part: breath, food, temperature, camp, stamina, body, load, health) | `vitals` | air, stomach, stats, effects, armor, difficulty | HUD, health and speed modifiers, death |
 | Stomach, food | `vitals::food`, `vitals::stomach`, `base_api::eat` | `FOODS` | food items (`NUTRITION`, `FRESHNESS`) | max health and stamina, regen, warmth, food poisoning |
 | Effects | `vitals::effects` | `modifiers()` | | player's body, animals (cold, heat), HUD icons (`install.py` `EFFECT_ICONS`) |
@@ -76,10 +81,11 @@ built, it gets its row below and its arrows above.
 
 ## When you change something, check
 
-- **A biome's climate, or a new biome**: its row in `vitals::climate::BIOMES`, set on the biome
-  with `base_api::climate("<name>")` (a name with no row panics at start; a biome that sets none
-  is a mild temperate place); the species living there (comfort, eggs: `places.rs` checks); the
-  sheet.
+- **A biome's climate, or a new biome**: its real place first (`reports/ecology/biome_climates.json`,
+  `vitals/tests/places.rs` holds the table to it), then its row in `vitals::climate::BIOMES`
+  with rain per season, set on the biome with `base_api::climate("<name>")` (a name with no row
+  panics at start; a biome that sets none is a mild temperate place raining a quarter of the
+  days); the species living there (comfort, eggs: `places.rs` checks); the sheet.
 - **A species, or a new one**: its row in `species.rs` with comfort, breeding seasons and
   habitats (each habitat needs a climate); the species sheet; `places.rs` checks it on its own.
 - **A food, or a new food item**: a row in `vitals::food::FOODS` (an item without one can't be
@@ -113,6 +119,8 @@ built, it gets its row below and its arrows above.
 
 | Check | Where | Catches |
 |---|---|---|
+| The climates are their real places | `vitals/tests/places.rs` | a biome's year mean, seasons or rainiest season drifting from its place's research |
+| Rain follows the shares | `vitals/src/climate.rs` | the rain schedule raining more or less often than a season's share |
 | Every habitat has a climate | `animals/core/tests/places.rs` | a species living in a biome with no climate |
 | Each species is at home in its habitats | same | comfort ranges that don't fit the climates (cold or hot a quarter of the year at home, half elsewhere) |
 | Eggs hatch where and when they're laid | same | eggs that can't develop in a nest in a habitat in the breeding season |

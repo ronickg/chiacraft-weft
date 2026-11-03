@@ -67,27 +67,27 @@ Rested lasts 480 s and a minute more a comfort level. The core temperature: Free
 
 ## Climates
 
-Each biome's year mean, humidity and half its summer-to-winter range, and the air at sea level under an open sky: midwinter before dawn, midsummer mid afternoon.
+Each biome's real place (`reports/ecology/Biome climates.md`), year mean, humidity and half its summer-to-winter range, the air at sea level under an open sky (midwinter before dawn, midsummer mid afternoon), and the share of days with rain in spring, summer, autumn and winter.
 
-| biome | mean °C | humidity | seasons ± | coldest | hottest |
-|---|---|---|---|---|---|
-| base:plains | 12 | 0.5 | 12 | -8 | 35 |
-| base:forest | 11 | 0.65 | 10 | -6 | 31 |
-| base:birch_forest | 9 | 0.6 | 12 | -10 | 31 |
-| base:taiga | 0 | 0.55 | 18 | -25 | 29 |
-| base:snowy_plains | -10 | 0.4 | 14 | -33 | 16 |
-| base:desert | 25 | 0.1 | 9 | 5 | 48 |
-| base:savanna | 26 | 0.3 | 4 | 13 | 43 |
-| base:swamp | 19 | 0.9 | 8 | 6 | 35 |
-| base:mountains | 6 | 0.5 | 12 | -14 | 29 |
-| base:ocean | 14 | 0.8 | 6 | 3 | 29 |
-| base:beach | 17 | 0.7 | 8 | 3 | 34 |
-| base:deep_caves | 12 | 0.6 | 0 | 12 | 12 |
-| animals:red_dunes | 28 | 0.1 | 6 | 11 | 48 |
-| animals:scrubland | 26 | 0.25 | 5 | 11 | 44 |
-| animals:floodplain | 24 | 0.8 | 4 | 15 | 37 |
-| animals:fern_forest | 23 | 0.85 | 3 | 15 | 34 |
-| animals:crags | 15 | 0.5 | 6 | 1 | 32 |
+| biome | place | mean °C | humidity | seasons ± | coldest | hottest | rain: spring | summer | autumn | winter |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base:plains | Manhattan, Kansas (Konza Prairie) | 12.8 | 0.42 | 14.2 | -7 | 36 | 27% | 27% | 20% | 14% |
+| base:forest | Kassel, Germany | 9.3 | 0.77 | 8.7 | -3 | 25 | 34% | 34% | 37% | 41% |
+| base:birch_forest | Moscow | 6.3 | 0.8 | 12.9 | -10 | 26 | 29% | 30% | 32% | 47% |
+| base:taiga | Fairbanks, Alaska | -2.1 | 0.51 | 19.8 | -27 | 26 | 14% | 32% | 26% | 22% |
+| base:snowy_plains | Utqiaġvik, Alaska | -10.2 | 0.92 | 14.9 | -28 | 11 | 14% | 24% | 32% | 15% |
+| base:desert | Hermosillo, Sonora | 25.7 | 0.18 | 8.1 | 10 | 45 | 1% | 13% | 6% | 5% |
+| base:savanna | Arauca, the Colombian llanos | 27 | 0.65 | 1.6 | 21 | 36 | 40% | 70% | 45% | 11% |
+| base:swamp | Nhumirim, the Pantanal | 25.1 | 0.42 | 3.4 | 16 | 38 | 18% | 33% | 20% | 7% |
+| base:mountains | Davos, 1,594 m | 6 | 0.63 | 8.8 | -8 | 23 | 32% | 45% | 31% | 29% |
+| base:ocean | Ponta Delgada, the Azores | 18.2 | 0.97 | 4.1 | 11 | 28 | 33% | 19% | 38% | 43% |
+| base:beach | Faro, Portugal | 18.2 | 0.74 | 6.2 | 8 | 32 | 16% | 1% | 16% | 20% |
+| base:deep_caves | any cave: the surface's year mean | 12 | 0.95 | 0 | 12 | 12 | 0% | 0% | 0% | 0% |
+| animals:red_dunes | the Djadokhta Formation, Mongolia | 17 | 0.2 | 12 | -2 | 40 | 10% | 2% | 3% | 12% |
+| animals:scrubland | the Barun Goyot Formation, Mongolia | 17 | 0.3 | 11 | -1 | 38 | 6% | 25% | 8% | 4% |
+| animals:floodplain | the Cedar Mountain Formation, Utah | 21 | 0.5 | 8 | 7 | 38 | 8% | 45% | 25% | 4% |
+| animals:fern_forest | the Yixian Formation, Liaoning | 10 | 0.8 | 10 | -4 | 27 | 25% | 45% | 30% | 15% |
+| animals:crags | the Sevier highlands, Utah | 15 | 0.6 | 8 | 2 | 31 | 25% | 40% | 25% | 15% |
 
 ## Difficulty (the `base:difficulty` rule)
 

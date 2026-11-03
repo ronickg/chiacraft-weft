@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 54 · ◧ partly built: 16 · □ not built yet: 25 · ◌ planned for later: 6
+■ built and seen working: 55 · ◧ partly built: 16 · □ not built yet: 24 · ◌ planned for later: 6
 
 ## Core next
 
@@ -16,8 +16,7 @@ What's missing that the rest leans on (marked `core` in the data).
 - **Running worlds safely: Sandboxed code mods**. Phase 6: wasmtime components, WIT shaped on Weft's SDK.
 - **Survival: Clothing**. Fur and cloth clothes without armor value (open question).
 - **Survival: Freshness and cooking**. Freshness and hot meals. Not yet: meals from several ingredients, salting and smoking.
-- **Living world: Real places and pacing**. Researched (2026-11-03): a real place and its monthly climate for every biome, 57 plants' agronomy, real diets and food webs, and the pacing (the calendar for weather, the species' growing pace for plants). Decided: the fern forest after the Yixian (cool), the dunes wet in winter and spring, Velociraptors alone, temperatures as the real places have them. Next: the tables from it.
-- **Living world: Rain by season**. Rain per season in the climate table (the savanna wet in summer, dry in winter); rain falls in a biome as often as its season says. Today rain is random and everywhere. Needs one engine flag: no rain drawn in a dry biome.
+- **Living world: Real places and pacing**. Researched (2026-11-03): a real place and its monthly climate for every biome, 57 plants' agronomy, real diets and food webs, and the pacing (the calendar for weather, the species' growing pace for plants). Decided: the fern forest after the Yixian (cool), the dunes wet in winter and spring, Velociraptors alone, temperatures as the real places have them. The climate table follows it (vitals/tests/places.rs holds it there). Next: the plant table and the species' diets.
 - **Living world: Plants by the place**. One plant table and one growth rule (warmth, water, light, fertility) for crops, wild plants and grass. Today wheat, berries and saplings grow on a timer, whatever the season.
 - **Living world: Food categories and diets**. Grass, leaves, fruit, seeds, roots, insects, meat, fish, carrion, water, on every food, plant and species. Today a species is carnivore or herbivore with a list of items.
 - **Living world: Wild hunger and foraging**. Wild animals get hungry like tames; one forage goal finds plants, food on the ground, water or prey. Condition (built) turns it into stats.
@@ -155,12 +154,12 @@ Code: `mods/animals`, `mods/animals/core`. Docs: `notes/ANIMALS.md`, `mods/anima
 
 ## Living world
 
-The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, grazers feed hunters, and what dies goes back to the soil. Each part reads five shared things (the place, the climate table, the plant table, food categories, the forage goal) instead of rules of its own. 0 of 16 parts built.
+The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, grazers feed hunters, and what dies goes back to the soil. Each part reads five shared things (the place, the climate table, the plant table, food categories, the forage goal) instead of rules of its own. 1 of 16 parts built.
 
 | | Part | Notes |
 |---|---|---|
-| ◧ | Real places and pacing (core) | Researched (2026-11-03): a real place and its monthly climate for every biome, 57 plants' agronomy, real diets and food webs, and the pacing (the calendar for weather, the species' growing pace for plants). Decided: the fern forest after the Yixian (cool), the dunes wet in winter and spring, Velociraptors alone, temperatures as the real places have them. Next: the tables from it. Code: `mods/base/vitals/src/climate.rs`, `mods/animals/core/src/biology.rs`. Docs: `notes/ECOLOGY.md`, `reports/ecology/Biome climates.md`, `reports/ecology/Plants and crops.md`, `reports/ecology/Overworld food webs.md`, `reports/ecology/Cretaceous food webs.md`. |
-| □ | Rain by season (core) | Rain per season in the climate table (the savanna wet in summer, dry in winter); rain falls in a biome as often as its season says. Today rain is random and everywhere. Needs one engine flag: no rain drawn in a dry biome. Code: `mods/base/vitals/src/climate.rs`, `crates/engine/src/client/weather.rs`. Docs: `notes/ECOLOGY.md`. |
+| ◧ | Real places and pacing (core) | Researched (2026-11-03): a real place and its monthly climate for every biome, 57 plants' agronomy, real diets and food webs, and the pacing (the calendar for weather, the species' growing pace for plants). Decided: the fern forest after the Yixian (cool), the dunes wet in winter and spring, Velociraptors alone, temperatures as the real places have them. The climate table follows it (vitals/tests/places.rs holds it there). Next: the plant table and the species' diets. Code: `mods/base/vitals/src/climate.rs`, `mods/animals/core/src/biology.rs`. Docs: `notes/ECOLOGY.md`, `reports/ecology/Biome climates.md`, `reports/ecology/Plants and crops.md`, `reports/ecology/Overworld food webs.md`, `reports/ecology/Cretaceous food webs.md`. |
+| ■ | Rain by season | Each biome rains on its real place's share of each season's days, in spells of a few hours (mods/base/src/weather.rs); the engine draws rain only there (set_rain, raining_at); /rain tells today's spell. Not yet: snow drawn by temperature (a taiga winter spell shows rain), the Cretaceous's wet-season label per biome. Code: `mods/base/vitals/src/climate.rs`, `mods/base/src/weather.rs`, `crates/engine/src/server/regions.rs`, `crates/engine/src/client/weather.rs`. Docs: `notes/ECOLOGY.md`. |
 | □ | Soil water | One number per biome from the last days' rain and heat; ground near water always wet. Docs: `notes/ECOLOGY.md`. |
 | ◧ | Plants by the place (core) | One plant table and one growth rule (warmth, water, light, fertility) for crops, wild plants and grass. Today wheat, berries and saplings grow on a timer, whatever the season. Code: `mods/base/src/blocks.rs`. Docs: `notes/ECOLOGY.md`. |
 | ◧ | Food categories and diets (core) | Grass, leaves, fruit, seeds, roots, insects, meat, fish, carrion, water, on every food, plant and species. Today a species is carnivore or herbivore with a list of items. Code: `mods/animals/core/src/species.rs`, `mods/base/vitals/src/food.rs`. Docs: `notes/ECOLOGY.md`. |

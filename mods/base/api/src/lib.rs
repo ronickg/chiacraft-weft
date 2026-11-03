@@ -87,10 +87,11 @@ pub static VITALS: Component<Vitals> = Component::named("base:vitals");
 
 value! {
     /// A biome's climate, as a real place of its kind has it: the year's mean temperature in °C,
-    /// humidity 0 dry to 1 wet (dry air swings more between day and night), and half the range
-    /// between summer and winter. Set on biomes (`r.biome(..).set(&CLIMATE, ..)`); body
-    /// temperature reads it (`notes/SURVIVAL.md`).
-    pub struct Climate { pub celsius: f32, pub humidity: f32, pub seasons: f32 }
+    /// humidity 0 dry to 1 wet (dry air swings more between day and night), half the range
+    /// between summer and winter, and the share of days with rain in each season (spring
+    /// first). Set on biomes (`r.biome(..).set(&CLIMATE, ..)`); body temperature and the weather
+    /// read it (`notes/SURVIVAL.md`, `notes/ECOLOGY.md`).
+    pub struct Climate { pub celsius: f32, pub humidity: f32, pub seasons: f32, pub rain: [f32; 4] }
 }
 pub static CLIMATE: Component<Climate> = Component::named("base:climate");
 /// The calendar a dimension has (`vitals::calendar`): spring, summer, autumn and winter, or a
@@ -118,11 +119,11 @@ pub mod calendars {
 /// on it: every biome's numbers in one place, where the checks across systems read them.
 pub fn climate(biome: &str) -> Climate {
     let c = vitals::climate::of(biome).unwrap_or_else(|| panic!("no climate for {biome} in vitals::climate::BIOMES"));
-    Climate { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons }
+    Climate { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons, rain: c.rain }
 }
 
-/// A biome without one: a mild, temperate place.
-pub const TEMPERATE: Climate = Climate { celsius: 12.0, humidity: 0.5, seasons: 10.0 };
+/// A biome without one: a mild, temperate place, raining a quarter of the days.
+pub const TEMPERATE: Climate = Climate { celsius: 12.0, humidity: 0.5, seasons: 10.0, rain: [0.25; 4] };
 
 /// How hard survival is in this world (`vitals::difficulty::ALL`: gentle, normal, harsh), a
 /// game rule picked when the world is made and changed with `/rule difficulty`.
@@ -192,7 +193,8 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
         altitude: (feet[1] - SEA) as f32 * ALTITUDE,
         hour,
         open_sky: sky >= 15,
-        raining: w.raining(),
+        // Rain by biome and season (`weather.rs`): here, not just somewhere in the dimension.
+        raining: w.raining_at(eye),
         snowing: false,
         in_water,
         fire,

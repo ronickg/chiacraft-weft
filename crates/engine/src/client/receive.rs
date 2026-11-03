@@ -175,7 +175,10 @@ impl Client {
             }
             ToClient::Permission(level) => self.permission = level,
             ToClient::Using(ticks) => self.using = ticks.map(|t| (t as f32, t as f32)),
-            ToClient::Weather { raining, thunder } => self.weather = (raining, thunder),
+            ToClient::Weather { raining, thunder, only } => {
+                self.weather = (raining, thunder);
+                self.world.rain_in = only;
+            }
             ToClient::Flash(id) => {
                 if let Some(e) = self.entities.get_mut(&id) {
                     e.flash = 0.1;

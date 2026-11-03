@@ -14,6 +14,7 @@ mod recipes;
 mod redstone;
 mod sounds;
 mod survival;
+mod weather;
 mod worldgen;
 
 use weft_sdk::*;
@@ -47,6 +48,7 @@ fn init(r: &mut Registry) {
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);
+    weather::register(r);
     advancements::register(r);
     beds::register(r);
     hud::register(r);

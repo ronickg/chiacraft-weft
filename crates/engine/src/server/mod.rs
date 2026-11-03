@@ -812,6 +812,12 @@ impl Server {
                         self.set_permission(pi, level);
                     }
                 }
+                DimEvent::SetRain { dim, biomes, thunder } => {
+                    // Only where it rains at all.
+                    if c.dims[dim as usize].weather {
+                        self.dims[dim as usize].set_rain(biomes, thunder)
+                    }
+                }
                 DimEvent::SetWeather { dim, raining, thunder, ticks } => {
                     self.dims[dim as usize].set_weather(raining, thunder, ticks as u64)
                 }
@@ -1083,8 +1089,11 @@ impl Server {
             .send(ToClient::Edits { dim: to, specs: dims[to as usize].edits.iter().map(|e| e.spec(c)).collect(), all: true });
         p.conn
             .send(ToClient::Time { dim: to, time: dims[to as usize].day_time() });
-        p.conn
-            .send(ToClient::Weather { raining: dims[to as usize].raining, thunder: dims[to as usize].thunder });
+        p.conn.send(ToClient::Weather {
+            raining: dims[to as usize].raining,
+            thunder: dims[to as usize].thunder,
+            only: dims[to as usize].rain_here().map(|o| o.to_vec()),
+        });
         if to == c.void_dim && from != to as usize {
             p.conn.send(ToClient::Chat(void_note(c)));
         }

@@ -214,7 +214,7 @@ fn send_mining(p: &mut Player, cracks: &[(u64, IVec3, f32)], tick: u64) {
 fn send_clock(p: &mut Player, dim: &DimSet, tick: u64) {
     if dim.weather_moved || p.first_sync {
         p.conn
-            .send(ToClient::Weather { raining: dim.raining, thunder: dim.thunder });
+            .send(ToClient::Weather { raining: dim.raining, thunder: dim.thunder, only: dim.rain_here().map(|o| o.to_vec()) });
     }
     if tick % TPS as u64 == 0 || dim.day_moved {
         p.conn

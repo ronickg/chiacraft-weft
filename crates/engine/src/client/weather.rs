@@ -140,6 +140,10 @@ impl Weather {
                     continue;
                 }
                 let cell = IVec3::new(x, bottom, z);
+                // Not this biome's weather (a mod's rain by place).
+                if !world.rains_at(cell) {
+                    continue;
+                }
                 let biome = world
                     .cube(cell >> 4i32)
                     .map_or(0, |cube| cube.biome((x & 15) as usize, (z & 15) as usize));

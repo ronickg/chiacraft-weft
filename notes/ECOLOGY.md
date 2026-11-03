@@ -344,6 +344,26 @@ There are two clocks. Both already exist, so the loop only reuses them.
 
 ### 1. Rain by season
 
+**Built (2026-11-03).**
+- **The table:** `vitals::climate::BIOMES` holds each real place's rain per season and its
+  temperatures, and `temperature::air`'s day swing is fitted to the real places.
+- **The driver:** `mods/base/src/weather.rs` works out where it rains a few times a minute and
+  tells the engine (`set_rain`).
+- **The engine:** it draws rain only in those biomes, and the sky greys only where you stand in
+  it. `/weather` still rains everywhere for its time, and `raining_at` tells mods whether it's
+  raining here.
+- **`/rain`** says today's spell where you stand.
+- **Checks:** `vitals/tests/places.rs` holds the table to the research, and a unit test checks
+  that spells follow the shares.
+- **Seen in the game:** the plains, summer day 2, rain from 17:00 to 22:00 (24 °C, wet) and dry
+  at noon (30 °C).
+- **Not yet:**
+  - rain falls as snow only where a biome is tagged snowy, so a taiga winter spell is drawn as
+    rain, though bodies feel snow (air under 1 °C);
+  - the Cretaceous's "wet season" label is still the calendar's, not each biome's;
+  - not yet seen at a border between a wet and a dry biome.
+
+
 - **Climate table:** each row gets `rain: [f32; 4]`, the share of days with rain in spring,
   summer, autumn and winter. These come from real places of the biome's kind, as the
   temperatures did (the savanna from the llanos; the floodplain from Utah's Cretaceous).

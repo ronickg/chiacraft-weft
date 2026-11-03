@@ -125,13 +125,15 @@ fn effects_table(w: &mut String) {
 fn climates(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Climates\n\nEach biome's year mean, humidity and half its summer-to-winter range, and the air at sea level under an open sky: midwinter before dawn, midsummer mid afternoon.\n\n| biome | mean °C | humidity | seasons ± | coldest | hottest |\n|---|---|---|---|---|---|"
+        "## Climates\n\nEach biome's real place (`reports/ecology/Biome climates.md`), year mean, humidity and half its summer-to-winter range, the air at sea level under an open sky (midwinter before dawn, midsummer mid afternoon), and the share of days with rain in spring, summer, autumn and winter.\n\n| biome | place | mean °C | humidity | seasons ± | coldest | hottest | rain: spring | summer | autumn | winter |\n|---|---|---|---|---|---|---|---|---|---|---|"
     );
     let midwinter = calendar::MIDSUMMER + calendar::YEAR_DAYS as f32 / 2.0;
     for c in &climate::BIOMES {
         let cold = climate::air(c, midwinter, 4.0);
         let hot = climate::air(c, calendar::MIDSUMMER, 15.0);
-        let _ = writeln!(w, "| {} | {} | {} | {} | {cold:.0} | {hot:.0} |", c.biome, c.celsius, c.humidity, c.seasons);
+        let rain = c.rain.map(|r| format!("{:.0}%", r * 100.0)).join(" | ");
+        let _ =
+            writeln!(w, "| {} | {} | {} | {} | {} | {cold:.0} | {hot:.0} | {rain} |", c.biome, c.place, c.celsius, c.humidity, c.seasons);
     }
     let _ = writeln!(w);
 }

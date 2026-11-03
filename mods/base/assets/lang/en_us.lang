@@ -206,6 +206,8 @@ mod.base.authors = vortex_so
 menu.news = {align:center}{img:base:icon_settings 16x16}{/align}
     {align:center}Weft is in development.{/align}
 command.base.season = it is now day {1} of {0}
+command.base.rain.today = rain here today from {0}:00 to {1}:00; it rains on {2}% of this season's days here
+command.base.rain.dry = no rain here today; it rains on {0}% of this season's days here
 season.base.spring = spring
 season.base.summer = summer
 season.base.autumn = autumn

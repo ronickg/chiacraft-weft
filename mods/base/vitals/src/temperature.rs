@@ -34,8 +34,10 @@ pub fn air(p: &Place) -> f32 {
     if p.underground {
         return p.biome_c + p.fire;
     }
-    // Coldest before dawn, warmest mid afternoon; deserts swing far more than jungles.
-    let swing = 4.0 + 8.0 * (1.0 - p.humidity.clamp(0.0, 1.0));
+    // Coldest before dawn, warmest mid afternoon; deserts swing far more than the sea: half a
+    // day's range from 2.5 °C (an island in the Atlantic) to 9 (fitted to the real places,
+    // `reports/ecology/Biome climates.md`).
+    let swing = 2.5 + 6.5 * (1.0 - p.humidity.clamp(0.0, 1.0));
     let day = (std::f32::consts::TAU * (p.hour - 15.0) / 24.0).cos();
     let mut t = p.biome_c + p.season + swing * day - 0.0065 * p.altitude.max(0.0);
     if p.open_sky && (7.0..19.0).contains(&p.hour) && !p.raining && !p.snowing {

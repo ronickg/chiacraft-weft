@@ -524,7 +524,7 @@ pub unsafe extern "C" fn client_day_time(c: *mut abi::ClientCtx) -> u64 {
 }
 
 pub unsafe extern "C" fn client_raining(c: *mut abi::ClientCtx) -> u32 {
-    unsafe { view(c).is_some_and(|cl| cl.weather.0) as u32 }
+    unsafe { view(c).is_some_and(|cl| cl.weather.0 && cl.world.rains_at(cl.player.pos.floor().as_ivec3())) as u32 }
 }
 
 pub unsafe extern "C" fn client_permission(c: *mut abi::ClientCtx) -> u32 {

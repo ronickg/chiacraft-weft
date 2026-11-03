@@ -28,6 +28,11 @@ pub struct DimSet {
     pub thunder: bool,
     /// When the weather changes by itself.
     pub weather_until: u64,
+    /// The biomes a mod rains in (`set_rain`): from then on the weather is the mod's, not the
+    /// dimension's own timing.
+    pub rain_in: Option<Arc<Vec<u32>>>,
+    /// Until when a `/weather` command rains (or doesn't) everywhere, over the mod's.
+    pub manual_until: u64,
     /// Changed: players hear at once.
     pub weather_moved: bool,
     seed: u64,
@@ -55,6 +60,8 @@ impl DimSet {
             raining: false,
             thunder: false,
             weather_until: 0,
+            rain_in: None,
+            manual_until: 0,
             weather_moved: false,
             seed,
             next_id,
@@ -71,6 +78,7 @@ impl DimSet {
         d.day_offset = self.day_offset;
         d.raining = self.raining;
         d.thunder = self.thunder;
+        d.rain_in = self.rain_here();
         self.regions.push(d);
         self.regions.len() - 1
     }
@@ -363,15 +371,52 @@ impl DimSet {
         (self.raining, self.thunder) = (raining, raining && thunder);
         self.weather_until = self.time + ticks;
         self.weather_moved = true;
+        let only = self.rain_here();
         for r in &mut self.regions {
             r.raining = raining;
             r.thunder = self.thunder;
+            r.rain_in = only.clone();
+        }
+    }
+
+    /// Where it rains when it rains: the mod's biomes, or everywhere (no mod saying, or a
+    /// `/weather` command's time).
+    pub fn rain_here(&self) -> Option<Arc<Vec<u32>>> {
+        if self.time < self.manual_until { None } else { self.rain_in.clone() }
+    }
+
+    /// `/weather`: everywhere for `ticks`, whatever a mod says, then the mod's again.
+    pub fn set_manual_weather(&mut self, raining: bool, thunder: bool, ticks: u64) {
+        self.manual_until = self.time + ticks;
+        self.set_weather(raining, thunder, ticks);
+    }
+
+    /// Rain from now on only in `biomes` (none: dry), thunder with it: a mod's weather by place
+    /// and season (`set_rain`). Players hear only of a change.
+    pub fn set_rain(&mut self, mut biomes: Vec<u32>, thunder: bool) {
+        biomes.sort_unstable();
+        biomes.dedup();
+        if self.rain_in.as_deref() == Some(&biomes) && self.thunder == (thunder && !biomes.is_empty()) {
+            return;
+        }
+        let raining = !biomes.is_empty();
+        self.rain_in = Some(Arc::new(biomes));
+        if self.time >= self.manual_until {
+            self.set_weather(raining, thunder, u32::MAX as u64);
         }
     }
 
     /// Vanilla's timing: clear for 10 minutes to 2.5 hours, rain for 10 to 20 minutes, a third of
     /// it with thunder.
     pub fn tick_weather(&mut self) {
+        if let Some(only) = self.rain_in.clone() {
+            // A mod's weather: back to it when a `/weather` command's time is up.
+            if self.manual_until != 0 && self.time >= self.manual_until {
+                self.manual_until = 0;
+                self.set_weather(!only.is_empty(), self.thunder, u32::MAX as u64);
+            }
+            return;
+        }
         if self.time < self.weather_until {
             return;
         }

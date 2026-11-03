@@ -56,6 +56,8 @@ pub struct ClientWorld {
     pub dim: u32,
     cubes: FxHashMap<IVec3, Slot>,
     pub time: u64,
+    /// The biomes it rains in when a mod says where (`ToClient::Weather`); `None`: everywhere.
+    pub rain_in: Option<Vec<u32>>,
     /// Dirty cubes whose six neighbors are all known: meshable now. Kept up to date as cubes
     /// come and go, so a frame never walks every dirty cube (tens of thousands while loading).
     ready: FxHashSet<IVec3>,
@@ -157,6 +159,7 @@ impl ClientWorld {
             dim,
             cubes: FxHashMap::default(),
             time: 0,
+            rain_in: None,
             ready: FxHashSet::default(),
             order: Vec::new(),
             order_center: IVec3::ZERO,
@@ -245,6 +248,15 @@ impl ClientWorld {
 
     pub fn len(&self) -> usize {
         self.cubes.len()
+    }
+
+    /// Whether rain, when it rains, falls in the column at `p`: in its biome, if a mod says where.
+    pub fn rains_at(&self, p: IVec3) -> bool {
+        let Some(only) = &self.rain_in else { return true };
+        let biome = self
+            .cube(p >> 4i32)
+            .map_or(0, |c| c.biome((p.x & 15) as usize, (p.z & 15) as usize));
+        only.contains(&(biome as u32))
     }
 
     pub fn cube(&self, p: IVec3) -> Option<&Arc<Cube>> {

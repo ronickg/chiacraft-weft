@@ -45,6 +45,12 @@ pub enum DimEvent {
         thunder: bool,
         ticks: u32,
     },
+    /// Rain only in these biomes from now on (`DimSet::set_rain`).
+    SetRain {
+        dim: u32,
+        biomes: Vec<u32>,
+        thunder: bool,
+    },
     /// A white flash on it for those who see it.
     Flash {
         id: u64,
@@ -124,6 +130,8 @@ pub struct Dim {
     pub day_offset: i64,
     pub raining: bool,
     pub thunder: bool,
+    /// The biomes it rains in when a mod says where (`DimSet::set_rain`); `None`: everywhere.
+    pub rain_in: Option<Arc<Vec<u32>>>,
     rng: Rng,
     /// Cubes whose copy on disk holds entities or ticks, written again even if nothing else
     /// changed: what left them must not come back from there.
@@ -642,6 +650,7 @@ impl Dim {
             day_offset: 0,
             raining: false,
             thunder: false,
+            rain_in: None,
             on_disk: Default::default(),
             rng: Rng(weft_noise::mix(seed ^ id as u64)),
             players: None,
