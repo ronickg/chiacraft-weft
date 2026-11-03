@@ -25,6 +25,9 @@ pub fn init(r: &mut Registry) {
                 r.tag_on(Target::Biome(biome), &tag(biome));
                 tagged.push(biome);
             }
+            if s.in_water() {
+                continue; // fish come by their own spawner, into water (`fish.rs`)
+            }
             let (few, most) = s.bio.social.group();
             r.spawn(s.kind)
                 .biome(&format!("#{}", tag(biome)))

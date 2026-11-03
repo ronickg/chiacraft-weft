@@ -217,6 +217,11 @@ impl Species {
             _ => Diet::Omnivore,
         }
     }
+    /// Whether it lives in the water (the ray-finned fishes): it never spawns on the ground, its
+    /// mod puts it in the water (`mods/animals/src/fish.rs`).
+    pub fn in_water(&self) -> bool {
+        self.family.above.first() == Some(&"Actinopterygii")
+    }
     /// Whether it eats this kind of food at all.
     pub fn eats(&self, c: Category) -> bool {
         self.eats.iter().any(|&(k, _)| k == c)
