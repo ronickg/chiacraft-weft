@@ -888,7 +888,8 @@ impl UiRenderer {
             self.rect(Rect { w: 13.0 * scale * f, h: scale, ..bar }, ((255 - g) << 24) | (g << 16) | 0xFF);
         }
         if stack.count > 1 {
-            let px = scale * text_unit;
+            // A smooth font's count a size up, to read at a glance; a bitmap's stays whole pixels.
+            let px = scale * text_unit * if self.font.smooth { 1.3 } else { 1.0 };
             let layout = super::text::layout(&super::text::plain(&stack.count.to_string()), &self.font, None);
             let mut none = Vec::new();
             self.glyph_run(

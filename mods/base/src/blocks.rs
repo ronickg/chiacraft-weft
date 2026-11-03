@@ -53,6 +53,10 @@ pub static GOLD_BLOCK: Block = Block::named("gold_block");
 pub static DIAMOND_BLOCK: Block = Block::named("diamond_block");
 pub static COAL_BLOCK: Block = Block::named("coal_block");
 pub static WOOL: Block = Block::named("wool");
+/// Camp comfort (books, `survival::camp`), built from planks and books.
+pub static BOOKSHELF: Block = Block::named("bookshelf");
+/// Nine wheat packed (and back), soft to rest by.
+pub static HAY_BALE: Block = Block::named("hay_bale");
 
 /// Log axis along the clicked face, like vanilla.
 fn axis_placement(p: &Place, props: &mut Props) {
@@ -498,10 +502,25 @@ pub fn register(r: &mut Registry) {
         .hardness(0.8)
         .set(&FLAMMABLE, 30)
         .tab(&crate::tabs::COLORED);
+    r.block(&BOOKSHELF)
+        .sound_group("wood")
+        .textures("planks_oak", "bookshelf", "planks_oak")
+        .hardness(1.5)
+        .mineable("axe")
+        .set(&FLAMMABLE, 30)
+        .tab(&crate::tabs::BUILDING);
+    r.block(&HAY_BALE)
+        .sound_group("grass")
+        .textures("hay_bale_top", "hay_bale_side", "hay_bale_top")
+        .hardness(0.5)
+        .set(&FLAMMABLE, 60)
+        .tab(&crate::tabs::BUILDING);
 
     // What may grow or stand where, from the common `dirt` and `sand` tags like modern vanilla:
     // a mod's sand tagged `sand` gets cactus and sugar cane, in the world and from players.
     r.tag("plant_soil", &["#dirt"]);
+    r.tag("sugar_cane", &["sugar_cane"]);
+    r.tag("hay_bale", &["hay_bale"]);
     r.tag("dyes/red", &["rose"]);
     r.tag("dyes/green", &["cactus"]);
     r.tag("torches", &["torch"]);

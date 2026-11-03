@@ -108,7 +108,8 @@ pub fn register(r: &mut Registry) {
     r.item(Item::generated("leather".into()))
         .tag("materials/leather")
         .tab(&crate::tabs::INGREDIENTS);
-    for name in ["bone", "string", "sugar", "gunpowder", "feather", "arrow", "egg"] {
+    // paper (from sugar cane) and books (paper and leather) make bookshelves
+    for name in ["bone", "string", "sugar", "gunpowder", "feather", "arrow", "egg", "paper", "book"] {
         r.item(Item::generated(name.into()))
             .tag(name)
             .tab(&crate::tabs::INGREDIENTS);

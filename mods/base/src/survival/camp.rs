@@ -1,6 +1,6 @@
 //! Camp (Valheim's): near a fire, under a roof, and rested. Resting under a roof by a fire for a
 //! while, or asleep in a bed, makes one rested for eight minutes and one more for each kind of
-//! comfort around (a fire, a bed, a table, storage, something soft, flowers, a lamp), kept full
+//! comfort around (a fire, a bed, a table, storage, something soft, flowers, a lamp, books), kept full
 //! while one rests on.
 
 use base_api::{Air, Vitals};
@@ -22,9 +22,10 @@ pub fn comfort_of(state: u32) -> u32 {
         "base:bed" => 2,
         "base:crafting_table" => 4,
         "base:chest" => 8,
-        "base:wool" => 16,
+        "base:wool" | "base:hay_bale" => 16,
         "base:dandelion" | "base:rose" => 32,
         "base:glowstone" | "base:redstone_lamp" | "base:copper_lamp" => 64,
+        "base:bookshelf" => 128,
         _ => 0,
     }
 }

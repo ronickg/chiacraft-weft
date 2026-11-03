@@ -19,6 +19,14 @@ pub fn register(r: &mut Registry) {
     r.shaped(C, "torch", 4, &["c", "s"], &[('c', "#gems/coal"), ('s', "#stick")]);
     r.shaped(C, "ladder", 3, &["s s", "sss", "s s"], &[('s', "#stick")]);
     r.shaped(C, "bread", 1, &["www"], &[('w', "#crops/wheat")]);
+    // Sugar cane's uses: sugar, and paper for books, which make bookshelves (camp comfort).
+    r.shapeless(C, "sugar", 1, &["#sugar_cane"], 0);
+    r.shaped(C, "paper", 3, &["###"], &[('#', "#sugar_cane")]);
+    r.shapeless(C, "book", 1, &["#paper", "#paper", "#paper", "#materials/leather"], 0);
+    r.shaped(C, "bookshelf", 1, &["###", "bbb", "###"], &[('#', "#planks"), ('b', "#book")]);
+    // Wheat packed nine to a bale and back.
+    r.shaped(C, "hay_bale", 1, &["www", "www", "www"], &[('w', "#crops/wheat")]);
+    r.shapeless(C, "wheat", 9, &["#hay_bale"], 0);
     r.shaped(C, "stone_bricks", 4, &["##", "##"], &[('#', "#smooth_stone")]);
     r.shaped(C, "wool", 1, &["ss", "ss"], &[('s', "#string")]);
     r.shaped(C, "bed", 1, &["www", "ppp"], &[('w', "wool"), ('p', "#planks")]);

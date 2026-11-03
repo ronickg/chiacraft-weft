@@ -106,8 +106,7 @@ EFFECT_ICONS = {
 
 # Still drawn in the old style: the kit has nothing for them yet (to generate).
 MISSING = {
-    "font": "the pixel font is still the old one: Alegreya and Alegreya Sans need the engine's smooth-font change (notes/STYLE.md, Type)",
-    "overlay, vignette, death": "the dimming behind menus, the vignette, the death screen",
+    "title font": "a second face (Alegreya Bold) for titles and bold buttons (notes/STYLE.md, Type)",
     "input_selection, caret, suggest": "text selection, the caret, chat suggestions (engine)",
 }
 
@@ -196,11 +195,51 @@ def half(full, empty):
     return Image.fromarray(a, "RGBA")
 
 
+# The item icons (`kit/items/`, cut by icons.py): each over the item texture of the same name in the
+# mod that has it; an icon for a new item goes to the base mod.
+ITEM_DIRS = [os.path.join(HERE, "..", "..", "..", m, "assets", "textures", "item") for m in ("base", "animals")]
+NEW_ITEMS = {"paper", "book"}
+
+
+def install_items():
+    folder = os.path.join(KIT, "items")
+    n = 0
+    for f in sorted(os.listdir(folder)):
+        if not f.endswith(".png"):
+            continue
+        name = f[:-4]
+        home = next((d for d in ITEM_DIRS if os.path.exists(os.path.join(d, f))), None)
+        if home is None and name in NEW_ITEMS:
+            home = ITEM_DIRS[0]
+        if home is None:
+            print(f"  item icon {name}: no item of that name")
+            continue
+        Image.open(os.path.join(folder, f)).convert("RGBA").save(os.path.join(home, f))
+        n += 1
+    print(f"{n} item icons")
+
+
 def main():
     os.makedirs(GUI, exist_ok=True)
+    install_items()
     for name, part in PARTS.items():
         im, spec = load(part)
         write(name, im, spec)
+    # drawn here, not generated: the dimming behind menus in a world (warm dark brown, not the
+    # engine's blue-black), and the death screen: a vignette darkening to deep red-brown at the
+    # edges over the world, not the engine's flat red
+    Image.new("RGBA", (1, 1), (26, 17, 12, 170)).save(os.path.join(GUI, "overlay.png"))
+    w, h = 320, 180
+    y, x = np.mgrid[0:h, 0:w]
+    d = np.sqrt(((x - w / 2) / (w / 2)) ** 2 + ((y - h / 2) / (h / 2)) ** 2) / np.sqrt(2)
+    t = np.clip((d - 0.15) / 0.85, 0, 1) ** 1.6
+    death = np.zeros((h, w, 4))
+    death[..., :3] = np.array([40, 12, 8.0]) * (1 - t[..., None]) + np.array([70, 10, 6.0]) * t[..., None]
+    death[..., 3] = 90 + 150 * t
+    Image.fromarray(death.round().astype(np.uint8), "RGBA").save(os.path.join(GUI, "death.png"))
+    # an empty stomach in the HUD: the food icon, faded
+    im, _ = load("status/food")
+    write("hud_stomach_empty", faded(im), {})
     # the menus' background: a tile at its own size (64 GUI px), not shrunk with the slots
     im, _ = load("background")
     im.save(os.path.join(GUI, "background.png"))
