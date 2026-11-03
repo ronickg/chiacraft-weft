@@ -1,7 +1,7 @@
 //! The animals mod: dogs by breed (`dog.rs`: the chihuahua), cats (`cat.rs`), capybaras
 //! (`capybara.rs`), velociraptors of two species (`raptor.rs`), Utahraptors (`utahraptor.rs`),
-//! wyverns (`wyvern.rs`, a fantasy animal, and their breath: `breath.rs`) and hares of two species
-//! (`hare.rs`, wild: the living world's prey),
+//! wyverns (`wyvern.rs`, a fantasy animal, and their breath: `breath.rs`), and the living world's
+//! simple wild creatures (`wild.rs`): hares of two species (`hare.rs`) and wood mice (`mouse.rs`),
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
 //! (`taming.rs`, `knockout.rs`), commands and tribes (`commands.rs`), signatures
@@ -35,6 +35,7 @@ mod habitats;
 mod hare;
 mod hunt;
 mod knockout;
+mod mouse;
 mod raptor;
 mod riding;
 mod scars;
@@ -43,6 +44,7 @@ mod signatures;
 mod species;
 mod taming;
 mod utahraptor;
+mod wild;
 mod wyvern;
 mod xp;
 
@@ -96,7 +98,9 @@ fn init(r: &mut Registry) {
     raptor::init(r);
     utahraptor::init(r);
     wyvern::init(r);
+    wild::init(r);
     hare::init(r);
+    mouse::init(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
@@ -144,7 +148,7 @@ fn wake(w: &World, id: u64, index: usize) {
         3 | 5 => raptor::wake(w, id),
         4 => utahraptor::wake(w, id),
         6 => wyvern::wake(w, id),
-        7 | 8 => hare::wake(w, id),
+        7..=9 => wild::wake(w, id),
         _ => {}
     }
 }

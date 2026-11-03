@@ -168,3 +168,7 @@ species.animals.mountain_hare = mountain hare
 family.animals.leporidae = hare and rabbit family
 screen.animals.taming.wild = never tamed
 screen.animals.signature.bolt = Bolts at the first sign of danger: one of the fastest runners
+entity.animals.wood_mouse = Wood Mouse
+species.animals.wood_mouse = wood mouse
+family.animals.muridae = mouse and rat family
+screen.animals.signature.dart = Darts for cover at the first shadow

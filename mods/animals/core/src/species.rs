@@ -89,6 +89,7 @@ pub static CANIDAE: Family = Family { name: "Canidae", above: &["Mammalia", "Car
 pub static FELIDAE: Family = Family { name: "Felidae", above: &["Mammalia", "Carnivora"] };
 pub static CAVIIDAE: Family = Family { name: "Caviidae", above: &["Mammalia", "Rodentia"] };
 pub static LEPORIDAE: Family = Family { name: "Leporidae", above: &["Mammalia", "Lagomorpha"] };
+pub static MURIDAE: Family = Family { name: "Muridae", above: &["Mammalia", "Rodentia"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -287,7 +288,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 9] = [
+pub static SPECIES: [Species; 10] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -297,7 +298,7 @@ pub static SPECIES: [Species; 9] = [
         breed: Some("chihuahua"),
         size: Size::Small,
         eats: &[(Meat, 0.4), (Carrion, 0.2), (Insects, 0.15), (Fruit, 0.15), (Seeds, 0.1)],
-        prey: (0.01, 0.8),
+        prey: (0.008, 0.8),
         taming: Taming::Passive,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [8.0, 100.0, 80.0, 2.0, 1.0, 40.0, 100.0, 60.0, 10.0],
@@ -824,6 +825,71 @@ pub static SPECIES: [Species; 9] = [
         },
         tune: Tune::NONE,
         birth_size: 0.3,
+    },
+    // The wood mouse (`reports/ecology/Overworld food webs.md`: the rodent, the small hunters' main
+    // food), a simple wild creature on its own model (`source/mouse`). It stands in for the deer
+    // mouse of the prairie, the kangaroo rat of the desert, the cane mice of the llanos and the
+    // dune mice; the field vole takes the north.
+    Species {
+        model: "mouse",
+        name: "wood_mouse",
+        binomial: "Apodemus sylvaticus",
+        family: &MURIDAE,
+        subfamily: "Murinae",
+        breed: None,
+        size: Size::Small,
+        // Seeds and mast most of the year, insects and snails in late spring, berries, fungi and
+        // roots later.
+        eats: &[(Seeds, 0.45), (Insects, 0.2), (Fruit, 0.15), (Grass, 0.1), (Fungi, 0.05), (Roots, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [2.0, 60.0, 15.0, 0.2, 1.0, 2.0, 30.0, 5.0, 2.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:wheat_seeds", 4), eats("base:wheat", 6), favorite("base:berries", 4)],
+        feedings: 0.0,
+        shy: 6.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.5,
+        signature: "dart",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 1.0,
+        dimorphism: 1.0,
+        size_spread: 0.1,
+        // About 1.3 times life (its model's), as a real one is six texels long.
+        height: (0.05, "shoulder"),
+        // Hedgerows, woods, fields and grassland; the desert's, the llanos' and the dunes' mice share
+        // its row.
+        habitats: &[("base:plains", 1.0), ("base:forest", 1.0), ("base:desert", 0.6), ("base:savanna", 0.6), ("base:beach", 0.5)],
+        bio: Biology {
+            mass: 0.023,
+            gestation: 25.0,
+            incubation: 0.0,
+            // Grown at about two months.
+            maturity: 60.0,
+            // Most live less than a year; up to two.
+            lifespan: 548.0,
+            // A litter every month or so, February to October.
+            interval: 30.0,
+            litter: 4.5,
+            social: Social::Solitary,
+            rarity: Rarity::Common,
+            breeds: seasons::SPRING | seasons::SUMMER | seasons::AUTUMN,
+            peak: seasons::SUMMER,
+            // Est.: it shelters in a nest underground, out in frost and in summer warmth alike.
+            comfort: (-5.0, 32.0),
+            cold_blooded: false,
+        },
+        // A mouse's real pace (grown in two months, gone within the year) would make a line four
+        // generations deep in five game days and crowd 36 near: its growing up, life and room are
+        // set to the common animals' pace instead (`balance::checks`).
+        tune: Tune { growth: Some(72_000), lifespan: Some(384_000), crowd: Some(24), ..Tune::NONE },
+        birth_size: 0.35,
     },
 ];
 
