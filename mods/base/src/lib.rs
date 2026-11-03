@@ -14,6 +14,7 @@ mod mobs;
 mod player;
 mod recipes;
 mod redstone;
+mod shaderpack;
 mod sounds;
 mod survival;
 mod weather;
@@ -57,6 +58,9 @@ fn init(r: &mut Registry) {
     beds::register(r);
     hud::register(r);
     redstone::register(r);
+    // The installer is off until the look is tuned and checked on a Mac (see `shaderpack.rs`).
+    // shaderpack::register(r);
+    shaderpack::register_for_scripts(r);
     // Its terrain is described in `worldgen`.
     // A year of four 14-day seasons (notes/SURVIVAL.md): sixteen hours of daylight at midsummer,
     // eight at midwinter.
