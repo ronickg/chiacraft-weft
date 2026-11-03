@@ -21,7 +21,7 @@ crates (Weft's own code has clippy findings, and one deny lint, `mut_from_ref` i
 upstream has them).
 
 What Phase 1 added is described in `notes/PLAN.md` (phase 1) and in the code: `crates/wallet`,
-`crates/account`, `crates/engine/src/account_screen.rs`, the `account` field of `ToServer::Join`.
+`crates/account`, `crates/engine/src/chiacraft/account_screen.rs`, the `account` field of `ToServer::Join`.
 
 Checked in the running game:
 - `weft --test account` (testkit, `mods/testkit/src/tests/account.rs`): Profile shows the key and
@@ -102,7 +102,7 @@ Slice 5 (signing and trust) is done. The content key: `IdentitySigner::content_s
 own label), vouched for by the identity key (`content_link_text`, `Session::content_vouch_line`,
 `check_content_vouch`). The envelope `package.sig` (`crates/packages/src/signature.rs`) sits beside
 the package, outside its hash, and is kept beside it in the store. Signing and checking are in
-`crates/engine/src/package_trust.rs` (Ed25519 via iroh's key types), with `weft --sign-package <dir>`.
+`crates/engine/src/chiacraft/package_trust.rs` (Ed25519 via iroh's key types), with `weft --sign-package <dir>`.
 Offers carry the envelope; a downloaded one is kept only if it checks out. Trust (`trust.txt`,
 `test-trust.txt` in automated runs) holds trusted package hashes and creators. When a join needs
 untrusted packages, the join sheet (`core:join_sheet`) asks: Download and Join, or also trust the
@@ -148,7 +148,7 @@ the pause menu, and a guest whose host quit was taken home.
 Phase 3 research (`reports/World addresses links and portals.md`) was adopted into the plan.
 Slice 2 (world addresses) is done. `IdentitySigner::world_seed(index, generation)` (wallet, label
 "chiacraft world key v1") and `world_cert_text`; `Session::world_seed`, `world_cert_line`,
-`check_world_cert` (account). `crates/engine/src/world_address.rs`: `WorldIdentity` (key and
+`check_world_cert` (account). `crates/engine/src/chiacraft/worlds/world_address.rs`: `WorldIdentity` (key and
 `WorldCert`), `for_world` (gives an old world a random index, saved), the `chiacraft://w/` address
 and its parser (old tickets still parse). `WorldMeta.key_index`, `key_generation`, `created`
 (`world.txt`). `Game`/`Home` carry the identity; `net::host` hosts under the world key
@@ -156,7 +156,7 @@ and its parser (old tickets still parse). `WorldMeta.key_index`, `key_generation
 ALPNs `weft/1` and `chiacraft/status/1`, publishes to n0 DNS and the Mainline DHT through
 `iroh-mainline-address-lookup`), or a throwaway key (status pings). `serve_status`/`status_of`/
 `ping`: name, certificate (checked against the key that answered), players, packages. Hosting
-first pings its own key and refuses if the world answers. `crates/engine/src/saved_worlds.rs`:
+first pings its own key and refuses if the world answers. `crates/engine/src/chiacraft/worlds/saved_worlds.rs`:
 `worlds.txt` in the run folder, remembered on a successful join, pinged while the Multiplayer
 screen shows it (online with players and packages, or offline with last seen; owner from the
 certificate). Checked with copies: a guest joined by the bare key (looked up, no hints); the
@@ -169,7 +169,7 @@ Slice 3 (link requests) is done. `p2p::ACCOUNT`: the player's endpoint (login ke
 `chiacraft/links/1` (`serve_links`) and runs the outbox loop (`outbox`, woken by `wake_outbox`,
 otherwise every 20 s; backoff 60 s doubling to an hour; gives up after 14 days). The world status
 now carries the owner's inbox (account endpoint id) with the identity's vouching, checked against
-the certificate's owner. `crates/engine/src/links.rs`: `Body` (canonical text; id = BLAKE3; signed
+the certificate's owner. `crates/engine/src/chiacraft/worlds/links.rs`: `Body` (canonical text; id = BLAKE3; signed
 after `chiacraft link v1\n` by each world key), `Request`/`Accept`/`Revoke` messages (JSON on the
 wire), `Store` in `links.json` (links, incoming, outgoing, outbox, revoked, allow, blocked);
 `request`, `accept(id, always)`, `decline(id, block)`, `revoke`, `withdraw`, `receive` (checks: the
@@ -191,7 +191,7 @@ translucent, light 11, animated texture) with a block entity holding the link id
 the owner again and binds every connected portal block (up to 64). `world_tick` sends a player who
 steps in (after a second outside every portal) `portals:travel`; the client joins the world's key
 next frame. Messages go through `/portal_note <key> <arg>` so they are translated. The engine side:
-`crates/engine/src/bridge.rs` (`chiacraft_bridge` handed to mods at load; `owner`, `links`,
+`crates/engine/src/chiacraft/bridge.rs` (`chiacraft_bridge` handed to mods at load; `owner`, `links`,
 `link`), `server::ServerInfo` (the server's players and world key, on its threads through the
 Scope), `Shared.players`, `ServerConfig.world_key`. Joining your own home world's address returns
 home. Checked with two copies (alice and bob; same names made `/tp` confusing): the owner's screen
@@ -199,7 +199,7 @@ listed the link and bound the portal; stepping in took alice to bob's world whil
 guest's right-click got "only the owner"; bob's portal took her home without bouncing back. Test
 scripts: player names via `config/core.txt` (`name = alice`).
 
-Slice 5 (travel) is done, and with it Phase 3's slices. `crates/engine/src/travel.rs`: `Ticket`
+Slice 5 (travel) is done, and with it Phase 3's slices. `crates/engine/src/chiacraft/worlds/travel.rs`: `Ticket`
 (one line, signed by the origin world after `chiacraft travel v1\n`), `issue`, `admit` (player =
 connection, to = this world, not expired, signed, a link this world has with the origin, nonce
 used once), `ARRIVING` (player key → link), `arrival(world dir, key)`, `set_spot`, `expect` (coming
@@ -220,7 +220,7 @@ Phase 3 extras are done. Invites: `links::invite` (world-signed token, `i=` in t
 `near_portals` (within 4 blocks, about twice a second, once per link per 30 s) sends
 `portals:near`; the client asks the bridge `warm <key>` (`p2p::warm`: status through the account
 endpoint, `warmed`). Arrival protection: `ARRIVAL_PROTECTION` (100 ticks of `hurt_cooldown`).
-Friends: `crates/engine/src/friends.rs` (`friends.json`: friends and this player's moves;
+Friends: `crates/engine/src/chiacraft/worlds/friends.rs` (`friends.json`: friends and this player's moves;
 `answer_for`, `new_address`, `follow`, the Friends and ConfirmNewAddress screens), `p2p::serve_worlds`
 / `ask_worlds` (`chiacraft/worlds/1`; worlds only to friends, certificates and moves checked
 against the friend's identity). Saved worlds keep the owner's inbox (sixth column), learn it right
@@ -255,7 +255,7 @@ follows its owner (teleports when 24 blocks behind). A favorite food puts a tame
 litters for mammals, eggs for raptors); a male and a female meet (a sitting one waits for the
 other) and have young with one allele of each gene from each (`coats::breed`: they look like
 them, hidden recessives surprise, 1% mutate), a puppy half the size, grown after three days (a favorite food speeds it up). The owner is the player's key,
-asked of the engine bridge (`player_key`, added to `bridge.rs`). Checked in the game: model, coats,
+asked of the engine bridge (`player_key`, added to `chiacraft/bridge.rs`). Checked in the game: model, coats,
 poses, taming, sitting, love, and a puppy born to two dogs in love (with a local patch that started
 dogs in love: aiming `press core:use` at wandering dogs from a script is too hit and miss). If the
 game aborts at start with "unable to open IOSurface kernel service", the Mac has run out of

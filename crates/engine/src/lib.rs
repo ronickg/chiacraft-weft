@@ -1,4 +1,3 @@
-pub mod account_screen;
 pub mod app;
 pub mod assets;
 pub mod audio;
@@ -7,7 +6,6 @@ pub mod kv;
 
 pub mod bench;
 pub mod block_model;
-pub mod bridge;
 pub mod client;
 pub mod clipboard;
 pub mod commands;
@@ -16,37 +14,36 @@ pub mod config;
 pub mod content;
 pub mod dedicated;
 pub mod diag;
-pub mod friends;
 pub mod game_screens;
 pub mod host;
 pub mod hud;
 pub mod hud_editor;
 pub mod input;
-pub mod links;
 pub mod log;
 pub mod loot;
 pub mod model;
 pub mod modloader;
 pub mod net;
-pub mod package_trust;
 pub mod packs;
 pub mod paths;
 pub mod physics;
 pub mod post;
 pub mod refs;
 pub mod registry;
-pub mod saved_worlds;
 pub mod saves;
 pub mod screens;
 pub mod server;
 pub mod settings;
 pub mod shaders;
 pub mod stack;
-pub mod travel;
 pub mod ui;
 pub mod wire;
 pub mod world;
-pub mod world_address;
+
+// chiacraft's own parts (`chiacraft/`), under their old names too.
+pub mod chiacraft;
+pub use chiacraft::worlds::{friends, links, saved_worlds, travel, world_address};
+pub use chiacraft::{account_screen, bridge, package_trust};
 
 pub use app::api::{exit_code, set_launch_options};
 pub use app::{BackendFactory, Options, run};

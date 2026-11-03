@@ -84,7 +84,7 @@ pub fn register(r: &mut Registry) {
         ("cooked_mutton", 6, 9.6, "cooked_meat/mutton"),
         ("spider_eye", 2, 3.2, ""),
     ] {
-        // What a portion holds and how fresh it is (stamped as it ages, `survival.rs`): shown in
+        // What a portion holds and how fresh it is (stamped as it ages, `survival/food.rs`): shown in
         // its tooltip.
         let n = vitals::food::find(name).map_or([0.0; 6], |f| {
             let f = &vitals::food::FOODS[f];

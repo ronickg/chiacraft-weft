@@ -1,5 +1,5 @@
 //! The HUD's information around the screen's edges, after Ronald's reference: health and stamina
-//! bars, the stomach and the effects in the top left (the vitals, `survival.rs`), armor and breath
+//! bars, the stomach and the effects in the top left (the vitals, `survival/`), armor and breath
 //! under them (`player.rs`), the keys of the main screens down the left, the time of day and where
 //! you are in the top right.
 

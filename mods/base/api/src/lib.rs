@@ -65,7 +65,7 @@ value! {
         pub sick: f32,
         /// Seconds left poisoned and bleeding; torpor (sedatives, blows), knocked out (1) once it
         /// passes the torpor stat until it falls under half; kilograms carried; the speed last set
-        /// on the body (`survival.rs`).
+        /// on the body (`survival/load.rs`).
         pub poison: f32,
         pub bleed: f32,
         pub torpor: f32,

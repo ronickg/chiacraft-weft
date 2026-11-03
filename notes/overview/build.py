@@ -58,7 +58,8 @@ def markdown(data):
         ]
         for p in piece["parts"]:
             docs = ", ".join(f"`{d}`" for d in p.get("docs", []))
-            note = p.get("note", "") + (f" Docs: {docs}." if docs else "")
+            code = ", ".join(f"`{c}`" for c in p.get("code", []))
+            note = p.get("note", "") + (f" Code: {code}." if code else "") + (f" Docs: {docs}." if docs else "")
             core = " (core)" if p.get("core") and p["status"] != "built" else ""
             out.append(f"| {MARK[p['status']]} | {p['name']}{core} | {note.strip()} |")
         out += [
@@ -73,7 +74,7 @@ def missing_paths(data):
     """Code and docs paths named in the data that aren't in the repo (moved or renamed)."""
     root = NOTES.parent
     named = [x for piece in data["pieces"] for x in piece["code"] + piece["docs"]]
-    named += [d for piece in data["pieces"] for p in piece["parts"] for d in p.get("docs", [])]
+    named += [d for piece in data["pieces"] for p in piece["parts"] for d in p.get("docs", []) + p.get("code", [])]
     return sorted({x for x in named if not (root / x).exists()})
 
 

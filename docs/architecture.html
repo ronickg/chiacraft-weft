@@ -505,13 +505,13 @@ footer { font-size: 13px; color: var(--muted); }
           <tr><td>engine/src/content.rs</td><td>content(): the thread's own (a server's) or the game's.</td></tr>
           <tr><td>engine/src/server/mod.rs</td><td>Scope (content + synced settings), the server's own thread pool.</td></tr>
           <tr><td>engine/src/net/p2p.rs</td><td>Endpoints, protocol 4 join and downloads, status/1, links/1 transport, the outbox loop.</td></tr>
-          <tr><td>engine/src/world_address.rs</td><td>World key, world certificate, the chiacraft:// address.</td></tr>
-          <tr><td>engine/src/links.rs</td><td>Link records and signatures, inbox checks, outbox, links.json.</td></tr>
-          <tr><td>engine/src/travel.rs</td><td>Travel tickets (issue, admit once), arrival spots per world (portals.txt).</td></tr>
-          <tr><td>engine/src/saved_worlds.rs</td><td>Worlds you've joined (worlds.txt) and their status; follows a world that moved.</td></tr>
-          <tr><td>engine/src/friends.rs</td><td>Friends (friends.json), worlds/1 answers, new addresses and their signed notices.</td></tr>
-          <tr><td>engine/src/package_trust.rs</td><td>Signing packages, checking creators, trust.txt.</td></tr>
-          <tr><td>engine/src/bridge.rs</td><td>Answers chiacraft's mods beyond Weft's interface: is this player the owner, which links the world has.</td></tr>
+          <tr><td>engine/src/chiacraft/worlds/world_address.rs</td><td>World key, world certificate, the chiacraft:// address.</td></tr>
+          <tr><td>engine/src/chiacraft/worlds/links.rs</td><td>Link records and signatures, inbox checks, outbox, links.json.</td></tr>
+          <tr><td>engine/src/chiacraft/worlds/travel.rs</td><td>Travel tickets (issue, admit once), arrival spots per world (portals.txt).</td></tr>
+          <tr><td>engine/src/chiacraft/worlds/saved_worlds.rs</td><td>Worlds you've joined (worlds.txt) and their status; follows a world that moved.</td></tr>
+          <tr><td>engine/src/chiacraft/worlds/friends.rs</td><td>Friends (friends.json), worlds/1 answers, new addresses and their signed notices.</td></tr>
+          <tr><td>engine/src/chiacraft/package_trust.rs</td><td>Signing packages, checking creators, trust.txt.</td></tr>
+          <tr><td>engine/src/chiacraft/bridge.rs</td><td>Answers chiacraft's mods beyond Weft's interface: is this player the owner, which links the world has.</td></tr>
           <tr><td>mods/portals</td><td>The portal block: holds a link id, bound by the owner, sends players who step in to the linked world.</td></tr>
           <tr><td>mods/packages</td><td>Registers data packages through the SDK; the unknown-block placeholder.</td></tr>
           <tr><td>mods/testkit</td><td>In-game tests and line scripts (host, join, tap, shot) that check all of the above.</td></tr>

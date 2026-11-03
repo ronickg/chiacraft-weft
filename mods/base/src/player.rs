@@ -1,5 +1,5 @@
 //! The player's armor, its HUD points and the inventory screen with its 2x2 crafting grid; eating,
-//! stamina, health and breath are the vitals' (`survival.rs`).
+//! stamina, health and breath are the vitals' (`survival/`).
 
 use weft_sdk::*;
 

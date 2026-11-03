@@ -204,7 +204,7 @@ temperature effects' strength (gentle never kills by cold), the XP lost at death
 **2. The player's vitals** (2026-11-02): base's hunger is gone (`Hunger` in `base_api` replaced by
 `Vitals`, kept through death).
 
-- `mods/base/src/survival.rs`: each tick the stomach digests; max health and stamina follow it
+- `mods/base/src/survival/` (one file per part since 2026-11-03): each tick the stomach digests; max health and stamina follow it
   (the engine keeps the base game's 20 health points, a point 5 of the vitals', so creatures' damage
   stays in balance; max health is a `base:fed` modifier on it); stamina pays for sprinting,
   jumping, swimming, blows that land (a weapon or tool 1.5 kg, a fist 0.5) and every block broken
@@ -232,7 +232,7 @@ the food table (refused for now).
   its summer-to-winter range, from a real place of its kind (plains 12 °C like a prairie, taiga 0,
   snowy plains -10 like tundra, desert 25, savanna 26, swamp 19, caves keep 12 all year; the
   Cretaceous's hot: dunes 28, fern forest 23). Other mods set it on theirs.
-- Once a second (`survival.rs`, `feel`): the air where one stands from the climate, the hour,
+- Once a second (`survival/temperature.rs`, `feel`): the air where one stands from the climate, the hour,
   height (a block stands for 6 m), sun, rain or snow (rain under 1 °C falls as snow), water, caves
   (no day or weather deep down), and heat from lava, lit furnaces and torches within 7 blocks;
   wet from rain on open sky or water, drying in two minutes (faster by a fire); armor's insulation
@@ -318,7 +318,7 @@ base's small kill reward. The level and kind are noted when a player's blow land
 animal is gone by the time its death is told. Seen in the game: a wild capybara killed with a
 sword, about 100 XP.
 
-**5. Rested and comfort** (2026-11-02, `survival.rs`):
+**5. Rested and comfort** (2026-11-02, `survival/camp.rs`):
 
 - Comfort: 1, and one more for each kind of furniture within 7 blocks, each kind once (Valheim's):
   a fire (lava, a lit furnace, a torch), a bed, a table (crafting table), storage (chest),
@@ -349,7 +349,7 @@ sword, about 100 XP.
   icons; salting, smoking and drying (keeping longer); food in chests ages only from when a player
   first held it.
 
-**7. Poison, bleeding, sedation, carried weight** (2026-11-02, `survival.rs`, `base_api`):
+**7. Poison, bleeding, sedation, carried weight** (2026-11-02, `survival/body.rs`, `survival/load.rs`, `base_api`):
 
 - `base_api::poison(w, player, secs)`, `bleed(..)` and `sedate(w, player, torpor)`, for any mod
   (fortitude shortens poison and softens sedation, 2% a point; nothing in creative).
@@ -362,7 +362,7 @@ sword, about 100 XP.
   torpor stat a second. Over a quarter: sedated (half speed, no sprinting); at the stat (200 for
   a new player, so four darts): out cold, no walking or jumping, until under half (about half a
   minute).
-- Carried weight (`survival::weight`): game weights, not real ones (a block of stone 0.1 kg, an
+- Carried weight (`survival/load.rs`, `weight`): game weights, not real ones (a block of stone 0.1 kg, an
   ingot 0.2, a log 0.15, a tool 1, armor by material and piece, food its portion's grams). Over the
   weight stat (100 kg): encumbered (75% speed, actions 1.5x stamina); past half again:
   overloaded (half speed, double stamina, no sprinting). The stats screen says "Carrying 22.4 of

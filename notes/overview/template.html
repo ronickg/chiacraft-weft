@@ -87,6 +87,8 @@ header { display: grid; gap: 14px; }
 .parts .pname { font-weight: 500; }
 .parts .tag { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--copper); border: 1px solid var(--copper); padding: 0 5px; margin-left: 6px; vertical-align: 2px; }
 .parts .note { grid-column: 2; font-size: 0.9rem; color: var(--dim); }
+.parts .where { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.parts .where code { font-family: var(--mono); font-size: 0.74rem; color: var(--copper); overflow-wrap: anywhere; }
 .files { padding: 10px 16px 14px; background: var(--well); border-top: 2px solid var(--line); display: grid; gap: 4px; font-size: 0.8rem; }
 .files div { display: flex; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
 .files b { font: 500 0.8rem var(--display); color: var(--dim); min-width: 3.5em; }
@@ -214,6 +216,12 @@ function render() {
       li.append(mark(p.status), name);
       const note = [p.note, p.docs && p.docs.length ? "Docs: " + p.docs.join(", ") : ""].filter(Boolean).join(" ");
       if (note) li.append(el("div", "note", note));
+      if (p.code && p.code.length) {
+        const where = el("div", "where");
+        p.code.forEach(c => where.append(el("code", null, c.split("/").slice(-2).join("/"))));
+        where.title = p.code.join("\n");
+        li.append(where);
+      }
       ul.append(li);
     });
     const f = el("div", "files");

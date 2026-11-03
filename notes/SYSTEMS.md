@@ -14,7 +14,7 @@ flowchart LR
   climate["Climates<br/>vitals::climate"] --> air["The air<br/>base_api::air_at"]
   calendar["Calendar and seasons<br/>vitals::calendar"] --> air
   fires["Fires, roofs, water<br/>blocks in the world"] --> air
-  air --> player["Player's body<br/>base survival.rs"]
+  air --> player["Player's body<br/>base survival/"]
   air --> animal["Animal's body<br/>animals comfort.rs"]
   air --> eggs["Eggs<br/>animals eggs.rs"]
   food["Food table<br/>vitals::food"] --> stomach["Stomach<br/>vitals::stomach"]
@@ -42,11 +42,11 @@ flowchart LR
 | Climates | `vitals::climate::BIOMES` | same | | the air; biomes set it (`base_api::climate` in `worldgen.rs`, `cretaceous.rs`) |
 | Calendar, seasons | `vitals::calendar` | `SEASON_DAYS`, `MIDSUMMER` | engine day time | the air, breeding seasons, day length (`.seasons(..)` on dimensions), the HUD clock |
 | The air | `base_api::air_at`, `vitals::temperature::air` | `temperature.rs` | climate, season, hour, height, sky light, rain, water, fires (`base_api::heat_of`) | player's body, animals' bodies, eggs |
-| Player's body | `mods/base/src/survival.rs` | `vitals` | air, stomach, stats, effects, armor, difficulty | HUD, health and speed modifiers, death |
+| Player's body | `mods/base/src/survival/` (a file per part: breath, food, temperature, camp, stamina, body, load, health) | `vitals` | air, stomach, stats, effects, armor, difficulty | HUD, health and speed modifiers, death |
 | Stomach, food | `vitals::food`, `vitals::stomach`, `base_api::eat` | `FOODS` | food items (`NUTRITION`, `FRESHNESS`) | max health and stamina, regen, warmth, food poisoning |
 | Effects | `vitals::effects` | `modifiers()` | | player's body, animals (cold, heat), HUD icons (`install.py` `EFFECT_ICONS`) |
-| Body effects | `base_api::{poison, bleed, sedate}` | `survival.rs` constants | animals' venom (`breath.rs`), darts (`knockout.rs`), spider eye, heavy blows | player's body |
-| Carried weight | `survival::weight` | same | inventory | effects (encumbered), stats screen |
+| Body effects | `base_api::{poison, bleed, sedate}`, `survival/body.rs` | `survival/body.rs` constants | animals' venom (`breath.rs`), darts (`knockout.rs`), spider eye, heavy blows | player's body |
+| Carried weight | `survival/load.rs` | `weight` there | inventory | effects (encumbered), stats screen |
 | Levels, XP | `vitals::levels`, `mods/base/src/levels.rs` | `levels.rs` | blocks, crafting, kills, advancements, taming (`animals xp.rs`), discoveries | stats screen, HUD |
 | Species facts | `animals_core::species`, `biology` | `species.rs` rows | | animals' bodies (comfort), breeding (seasons), habitats (spawning), the species sheet |
 | Animal's body | `mods/animals/src/comfort.rs` | `comfort.rs` constants | air, species comfort, food, difficulty | animal stats (condition, speed), comfort-seeking goal, tames' health and hunger, its screen |
