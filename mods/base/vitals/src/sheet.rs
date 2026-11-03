@@ -196,8 +196,16 @@ fn forage_table(w: &mut String) {
         let back = match f.renews {
             Some(p) => p.to_string(),
             None => {
-                let when = if f.seasons == 15 { "all year" } else { "spring to autumn" };
-                format!("browse in {} ({when}), worth {:.0}% of fresh growth", f.found.join(", "), forage::BROWSE * 100.0)
+                let when = if f.seasons == 15 {
+                    "all year".to_string()
+                } else {
+                    (0..4)
+                        .filter(|s| f.seasons >> s & 1 != 0)
+                        .map(|s| calendar::SEASONS[s].name())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                format!("always there in {} ({when}), worth {:.0}% of fresh growth", f.found.join(", "), forage::BROWSE * 100.0)
             }
         };
         let _ = writeln!(w, "| {block} | {} | {} | {eaten} | {back} |", f.category.name(), f.food);

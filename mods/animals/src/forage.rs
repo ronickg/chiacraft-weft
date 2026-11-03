@@ -89,22 +89,28 @@ pub fn busy(w: &World, id: u64) -> bool {
 }
 
 /// What it would eat of the block `state`, if anything.
-fn food(s: &Species, state: u32) -> Option<&'static Source> {
+fn food(s: &Species, state: u32, season: Option<usize>) -> Option<&'static Source> {
     let name = block_name(state).split('[').next()?;
     let age = state_prop(state, "age").and_then(|a| a.parse().ok());
-    vitals::forage::of(name, age).filter(|f| s.eats(f.category))
+    vitals::forage::of(name, age, |c| s.eats(c), season)
+}
+
+/// The season now (0 spring), where there are seasons.
+fn season(w: &World) -> Option<usize> {
+    crate::breeding::season_bit(w).map(|bit| bit.trailing_zeros() as usize)
 }
 
 /// The nearest food of its diet within `LOOK` blocks it can reach from the ground.
 fn nearest(w: &World, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]> {
     let p = pos.map(|v| v.floor() as i32);
+    let now = season(w);
     let mut best: Option<([i32; 3], i32)> = None;
     for dx in -LOOK..=LOOK {
         for dz in -LOOK..=LOOK {
             for dy in -2..=LOOK_UP {
                 let at = [p[0] + dx, p[1] + dy, p[2] + dz];
                 let d = dx * dx + dz * dz + dy * dy * 4;
-                if best.is_none_or(|(_, b)| d < b) && food(s, w.get(at)).is_some() {
+                if best.is_none_or(|(_, b)| d < b) && food(s, w.get(at), now).is_some() {
                     best = Some((at, d));
                 }
             }
@@ -140,7 +146,7 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
             return true; // chewing
         }
         let at = t.map(|v| v as i32);
-        if let Some(src) = food(s, w.get(at)) {
+        if let Some(src) = food(s, w.get(at), season(w)) {
             // Growing food feeds as well as it grows now: dry-season grass is poor fodder.
             let fodder = if src.renews.is_some() { 0.4 + 0.6 * lush(w, s, at) } else { 1.0 };
             animal::feed(w, id, (src.food as f32 * fodder).round().max(1.0) as u16);

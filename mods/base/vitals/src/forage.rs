@@ -49,9 +49,10 @@ const fn browse(block: &'static str, category: Category, food: u16, found: &'sta
 /// How much of a diet's food browse is worth where it's found, against fresh growth at its best.
 pub const BROWSE: f32 = 0.4;
 const GREEN: u8 = 1 | 2 | 4;
+const SUMMER_AUTUMN: u8 = 2 | 4;
 const ALL_YEAR: u8 = 15;
 
-pub const SOURCES: [Source; 7] = [
+pub const SOURCES: [Source; 10] = [
     s("base:tall_grass", None, Category::Grass, 10, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
     s("base:berry_bush", Some(3), Category::Fruit, 8, Eaten::Age(1), Some("base:berry_bush")),
     browse("base:oak_leaves", Category::Leaves, 4, &["base:forest"], GREEN),
@@ -61,13 +62,34 @@ pub const SOURCES: [Source; 7] = [
     browse("base:acacia_leaves", Category::Leaves, 4, &["base:savanna"], ALL_YEAR),
     // Cactus pads, the desert's browse (jackrabbits live on them in the dry months).
     browse("base:cactus", Category::Leaves, 3, &["base:desert"], ALL_YEAR),
+    // Seeds: tall grass seeding in summer and autumn (the plains' mice and birds live on them),
+    // and the desert's seed bank under its shrubs all year (the kangaroo rat's).
+    browse(
+        "base:tall_grass",
+        Category::Seeds,
+        3,
+        &["base:plains", "base:forest", "base:birch_forest", "base:taiga", "base:savanna", "base:swamp", "base:mountains", "base:beach"],
+        SUMMER_AUTUMN,
+    ),
+    browse("base:dead_bush", Category::Seeds, 2, &["base:desert"], ALL_YEAR),
+    // Prickly pear fruit, July to September.
+    browse("base:cactus", Category::Fruit, 3, &["base:desert"], SUMMER_AUTUMN),
 ];
 
-/// What a forager can eat of the block `block` at `age` (`None`: it has no age).
-pub fn of(block: &str, age: Option<u8>) -> Option<&'static Source> {
+/// What a forager of that diet can eat of the block `block` at `age` (`None`: it has no age) in
+/// `season` (0 spring; `None`: no seasons there). One block can feed several diets: tall grass
+/// is grass to a grazer, and seeds to a mouse in summer and autumn.
+pub fn of(block: &str, age: Option<u8>, eats: impl Fn(Category) -> bool, season: Option<usize>) -> Option<&'static Source> {
     SOURCES
         .iter()
-        .find(|s| s.block == block && (s.age.is_none() || s.age == age))
+        .find(|s| s.block == block && (s.age.is_none() || s.age == age) && eats(s.category) && s.in_season(season))
+}
+
+impl Source {
+    /// Whether it's there in `season` (food that grows back always is; browse in its seasons).
+    pub fn in_season(&self, season: Option<usize>) -> bool {
+        self.seasons == 0 || season.is_none_or(|s| self.seasons >> s & 1 != 0)
+    }
 }
 
 /// Whether the world has food of this kind for foragers.
