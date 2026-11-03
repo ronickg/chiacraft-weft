@@ -95,6 +95,7 @@ pub static CERVIDAE: Family = Family { name: "Cervidae", above: &["Mammalia", "A
 pub static SALMONIDAE: Family = Family { name: "Salmonidae", above: &["Actinopterygii", "Salmoniformes"] };
 pub static SERRASALMIDAE: Family = Family { name: "Serrasalmidae", above: &["Actinopterygii", "Characiformes"] };
 pub static CORVIDAE: Family = Family { name: "Corvidae", above: &["Aves", "Passeriformes"] };
+pub static DJADOCHTATHERIIDAE: Family = Family { name: "Djadochtatheriidae", above: &["Mammalia", "Multituberculata"] };
 pub static PROTOCERATOPSIDAE: Family = Family { name: "Protoceratopsidae", above: &["Dinosauria", "Ceratopsia"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
@@ -299,7 +300,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 19] = [
+pub static SPECIES: [Species; 20] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1474,6 +1475,69 @@ pub static SPECIES: [Species; 19] = [
         // lost to storms and egg eaters), so the wild keeps a line's young to a mother's life.
         tune: Tune { growth: Some(144_000), litter: Some((3, 8)), ..Tune::NONE },
         birth_size: 0.15,
+    },
+    // Kryptobaatar (`reports/ecology/Cretaceous food webs.md`: the commonest mammal of the
+    // Djadokhta, Kielan-Jaworowska et al. 2003): a multituberculate, wild, on the wood mouse's build
+    // (`source/kryptobaatar`); what the raptors take when there is no Protoceratops.
+    Species {
+        model: "kryptobaatar",
+        name: "kryptobaatar",
+        binomial: "Kryptobaatar dashzevegi",
+        family: &DJADOCHTATHERIIDAE,
+        subfamily: "Djadochtatheriinae",
+        breed: None,
+        size: Size::Small,
+        // An omnivore leaning to animal food (its teeth): insects and their grubs first, seeds,
+        // fruit and roots.
+        eats: &[(Insects, 0.6), (Seeds, 0.25), (Fruit, 0.1), (Roots, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [2.0, 60.0, 15.0, 0.2, 1.0, 2.0, 30.0, 5.0, 2.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:wheat_seeds", 4), eats("base:wheat", 6), favorite("base:berries", 4)],
+        feedings: 0.0,
+        shy: 6.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.5,
+        signature: "dart",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 1.0,
+        dimorphism: 1.0,
+        size_spread: 0.1,
+        // About 1.3 times life (its model's, the wood mouse's build).
+        height: (0.05, "shoulder"),
+        // The Djadokhta's dunes, and Bayan Mandahu's flats (its sister species, K. mandahuensis).
+        habitats: &[("animals:red_dunes", 1.0), ("animals:scrubland", 1.0)],
+        bio: Biology {
+            mass: 0.04,
+            // No record (est.: a small mammal's of its size).
+            gestation: 20.0,
+            incubation: 0.0,
+            maturity: 60.0,
+            lifespan: 730.0,
+            interval: 30.0,
+            // No record (est.: fewer than a mouse's, as for most small mammals of its build).
+            litter: 3.5,
+            social: Social::Solitary,
+            rarity: Rarity::Common,
+            // No record: young born into the wet season's plenty.
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // Est.: it burrowed (Kielan-Jaworowska & Gambaryan 1994), out of the dunes' midday heat
+            // and the night's cold.
+            comfort: (5.0, 40.0),
+            cold_blooded: false,
+        },
+        // As the wood mouse's: a small mammal's real pace would make a line four generations deep
+        // in a few game days; its growing up, life and room are set to the common animals' pace.
+        tune: Tune { growth: Some(72_000), lifespan: Some(384_000), crowd: Some(24), ..Tune::NONE },
+        birth_size: 0.35,
     },
 ];
 

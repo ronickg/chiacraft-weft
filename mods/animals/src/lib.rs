@@ -4,8 +4,8 @@
 //! simple wild creatures (`wild.rs`): hares of two species (`hare.rs`), wood mice (`mouse.rs`),
 //! field voles (`vole.rs`), deer of two species (`deer.rs`) and foxes of two species, hunters
 //! (`fox.rs`), ravens on the ground and in the air (`raven.rs`), Protoceratops in herds
-//! (`protoceratops.rs`); and fish of two species, spawned
-//! into the water and swimming (`fish.rs`),
+//! (`protoceratops.rs`), Kryptobaatar, the Cretaceous's small mammal (`kryptobaatar.rs`); and fish
+//! of two species, spawned into the water and swimming (`fish.rs`),
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
 //! (`taming.rs`, `knockout.rs`), commands and tribes (`commands.rs`), signatures
@@ -42,6 +42,7 @@ mod habitats;
 mod hare;
 mod hunt;
 mod knockout;
+mod kryptobaatar;
 mod mouse;
 mod protoceratops;
 mod raptor;
@@ -117,6 +118,7 @@ fn init(r: &mut Registry) {
     fox::init(r);
     raven::init(r);
     protoceratops::init(r);
+    kryptobaatar::init(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
@@ -164,7 +166,7 @@ fn wake(w: &World, id: u64, index: usize) {
         3 | 5 => raptor::wake(w, id),
         4 => utahraptor::wake(w, id),
         6 => wyvern::wake(w, id),
-        7..=12 | 15 | 16 | 18 => wild::wake(w, id),
+        7..=12 | 15 | 16 | 18 | 19 => wild::wake(w, id),
         _ => {}
     }
 }

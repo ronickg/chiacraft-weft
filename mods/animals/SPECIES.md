@@ -29,6 +29,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | arctic_fox | *Vulpes lagopus* | common | small | 0.38 m | 3.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 3-10 | 16 |
 | raven | *Corvus corax* | uncommon | small | 0.34 m | 1.2 kg | solitary | carnivore | wild | 0.53 d | 6.51 d | 46 d | 2-6 | 17 |
 | protoceratops | *Protoceratops andrewsi* | common | medium | 0.6 m | 83 kg | herd | herbivore | wild | eggs, hatch 1.54 d | 6 d | 53.7 d | 3-8 | 14 |
+| kryptobaatar | *Kryptobaatar dashzevegi* | common | small | 0.05 m | 0.04 kg | solitary | omnivore | wild | 0.53 d | 3 d | 16 d | 1-5 | 24 |
 
 ## Stats at level 1
 
@@ -55,6 +56,7 @@ Damage and speed are each kind's own (1 = 100%).
 | arctic_fox | 8 | 120 | 60 | 1.6 | 1 | 22 | 80 | 35 | 12 | 30 |
 | raven | 6 | 120 | 40 | 1 | 1 | 10 | 60 | 20 | 5 | 30 |
 | protoceratops | 35 | 200 | 120 | 2 | 1 | 90 | 80 | 70 | 18 | 15 |
+| kryptobaatar | 2 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
 
 ## dog (chihuahua)
 
@@ -283,7 +285,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | how | knockout |
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
-| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops |
+| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
@@ -401,7 +403,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | how | knockout |
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
-| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops |
+| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
@@ -1201,6 +1203,63 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.9 |
+
+## kryptobaatar
+
+*Kryptobaatar dashzevegi*, Mammalia › Multituberculata › Djadochtatheriidae › Djadochtatheriinae. Model `kryptobaatar`, entity `animals:kryptobaatar`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:red_dunes` | commonest |
+| `animals:scrubland` | commonest |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.05 m at the shoulder |
+| males against females | 1x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 35% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 0.04 kg | |
+| carries her young | 20 d | 0.53 d |
+| litter or clutch | 3.5 on average | 1-5 |
+| between litters | 30 d | rests 0.42 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 5 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 60 d | 3 d **set** |
+| lives | 2 y | 16 d **set**, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 24 **set** within 48 blocks |
+
+**Balance** (common): a generation 3.5 d; a line four deep in 11 d (4 h of play); 31.7 young per mother in 10 days, 31 in her life.
+
+- ✓ fourth generation: 10.6 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 3.0 of 16 days (want under a fifth)
+- ✓ young in a life: 31.1 (want 6-40)
+- ✓ litter: 1-5 (want 1-12, fewest first)
+- ✓ room near: 24 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | omnivore |
+| eats | insects 60%, seeds 25%, fruit 10%, roots 5% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 6 blocks (twice that running) |
+| eats (food points) | `base:wheat_seeds` 4; `base:wheat` 6; `base:berries` 4, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.5 blocks |
+| signature | dart |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 1 |
 
 ## Shared by every species
 

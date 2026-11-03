@@ -202,3 +202,6 @@ species.animals.protoceratops = Protoceratops
 family.animals.protoceratopsidae = protoceratopsid family
 item.animals.protoceratops_egg = Protoceratops Egg
 screen.animals.signature.herd = Lives in herds of mixed ages, cropping ferns with its beak
+entity.animals.kryptobaatar = Kryptobaatar
+species.animals.kryptobaatar = Kryptobaatar
+family.animals.djadochtatheriidae = multituberculate family
