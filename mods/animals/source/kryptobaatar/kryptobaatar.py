@@ -5,7 +5,7 @@ creatures (boxes and a hand-painted texture) with the blocky-model skill, from r
 
     ~/.venvs/blocky/bin/python kryptobaatar.py      # writes out/spec.json, out/texture.png
 
-Units are texels at the house density (64 a block, 1.56 cm each), y up, it faces +z. A real one was
+Units are the house's (64 a block, 1.56 cm each), y up, it faces +z. A real one was
 about 10 cm head and body, its skull some 2.5 cm: too small for a face at the house density, so the
 body is drawn about 1.3 times life and the head and eyes bigger still, as the mouse's: 9 units nose
 to rump, the tail 7 more. Not a rodent: a blunter, broader snout over its gnawing incisors, small
@@ -27,6 +27,7 @@ from layers import Recorder, bounds as layer_bounds  # noqa: E402
 from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit, swing  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import FINE as K  # noqa: E402  texels a unit: a small creature paints finer
 
 OUT = os.environ.get("KRYPTO_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -44,15 +45,34 @@ TONES = [tones(c, h) for c, h in zip(BASE, SHADOW)]
 COAT = (FUR, BACK, BELLY)
 ROLES = [("coat", 0, 0), ("coat", 0, -1.0), ("coat", 1, 0), "fixed", "fixed", "fixed", "fixed"]
 
-# Big, bulging, black eyes (a nocturnal seed eater's): glossy, a catchlight toward the front.
+# Big, black eyes (a night forager's): glossy, a catchlight toward the front and up with a dimmer
+# gloss round it, a grey-blue sparkle low behind, a warm glow along the bottom, darker fur round it.
+# Painted `house.FINE` texels a unit, as the mouse.
 EYES.update({
-    "mouse_black": dict(pattern=["PH",
-                                 "PP"], colors={"P": (20, 14, 16), "H": (222, 224, 230)}, halo="none"),
-    "mouse_bead": dict(pattern=["P"], colors={"P": (20, 14, 16)}, halo="none"),
+    "mouse_black": dict(pattern=[".PPP.",
+                                 "PHhPP",
+                                 "PhPPP",
+                                 "PPPsP",
+                                 ".III."], colors={"P": (22, 15, 17), "H": (226, 228, 234), "h": (98, 96, 108), "s": (88, 98, 122),
+                                                   "I": (64, 40, 32)}, halo="round"),
 })
 EYE_STYLE = os.environ.get("KRYPTO_EYES", "mouse_black")
 SKULL = ((-1.25, 1.7, 1.7), (1.25, 4.0, 4.7))
-EYE_Z, EYE_Y = 3.7, 3.0  # high on the side, toward the front
+EYE_Z, EYE_Y = 3.6, 3.1  # high on the side, toward the front
+LID_X = 1.6  # the eyelids' hinge plane, 0.35 outside the head's side: closed, they sit over the eye
+LASH = (40, 26, 22)
+
+
+def eye_box(side):
+    """(z0, z1, top, bottom) of the eye on one side in units, rounded as `stamp_eyes` places it."""
+    pat = EYES[EYE_STYLE]["pattern"]
+    ph, pw = len(pat), len(pat[0])
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    cu = K * ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0))
+    u0 = int(round(cu - pw / 2))
+    v0 = int(round(K * (y1 - EYE_Y) - ph / 2))
+    za, zb = (z1 - (u0 + pw) / K, z1 - u0 / K) if side > 0 else (z0 + u0 / K, z0 + (u0 + pw) / K)
+    return za, zb, y1 - v0 / K, y1 - (v0 + ph) / K
 
 # ------------------------------------------------------------------ the model
 
@@ -88,7 +108,8 @@ def bones():
     B = [("root", None, (0, 0, 0)), ("spine_0", "root", (0, 2.0, -1.6)), ("spine_1", "spine_0", (0, 2.0, -0.95)),
          ("head", "spine_1", (0, 2.6, 1.9))]
     for s, n in ((1, "L"), (-1, "R")):
-        B.append((f"ear_{n}", "head", (s * EAR_X, 3.85, sum(EAR_Z) / 2)))
+        za, zb, top, _ = eye_box(s)
+        B += [(f"ear_{n}", "head", (s * EAR_X, 3.85, sum(EAR_Z) / 2)), (f"eyelid_{n}", "head", (s * LID_X, top, (za + zb) / 2))]
     pts = tail_points()
     B += [(f"tail_{k}", "spine_0" if k == 0 else f"tail_{k - 1}", tuple(pts[k])) for k in range(len(TAIL))]
     for leg in LEGS:
@@ -121,6 +142,13 @@ def elements():
         zc = sum(EAR_Z) / 2
         E.append(el(f"fringe_ear_{n.lower()}", f"ear_{n}", (cx - 0.8, 3.7, zc), (cx + 0.8, 5.0, zc), quad="south", rot=rot,
                     origin=origin, cut="ear"))
+        # The eyelid: a quad the eye's size lying flat inside the head, hinged at the eye's top; a
+        # blink swings it down over the eye. Tilted a few degrees about its hinge, so it is never in
+        # a face's plane.
+        za, zb, top, bottom = eye_box(s)
+        lx0, lx1 = (LID_X - (top - bottom), LID_X) if s > 0 else (-LID_X, -LID_X + (top - bottom))
+        E.append(el(f"eyelid_{n}", f"eyelid_{n}", (lx0, top, za), (lx1, top, zb), quad="down", rot=(0, 0, s * 4),
+                    origin=(s * LID_X, top, (za + zb) / 2)))
     pts = tail_points()
     for k, (pitch, length, w) in enumerate(TAIL):
         p = pts[k]
@@ -156,7 +184,7 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(abs(size @ du)))), max(1, int(round(abs(size @ dv)))), n
+    return np.array(corner, float), du, dv, max(1, int(round(K * abs(size @ du)))), max(1, int(round(K * abs(size @ dv)))), n
 
 
 def rotm(rot):
@@ -244,6 +272,8 @@ def paint_face(e, face, boxes):
     light_face = face
     if face == "down" and e["name"].startswith(("leg_", "thigh_", "tail")):
         light_face = "north"  # seen when a pose lifts or folds it
+    if e["name"].startswith("eyelid"):
+        light_face = "east"  # seen only closed, as the side of the head
     a = area(e, face, p, uu, vv, h)
     occ = None if e["quad"] else occlusion(p, R @ n, R @ du, R @ dv, boxes, own=e["name"])
     stacked = e["name"].startswith("ear_core")  # the ear's boxes, lit as one piece
@@ -256,15 +286,22 @@ def paint_face(e, face, boxes):
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
     if e["name"] == "skull" and face in ("east", "west"):
         (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
-        stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
-    if e["name"] == "muzzle" and face == "south":  # the nose at the top, the gnawing incisors below
+        cu = K * ((z1 - EYE_Z) if face == "east" else (EYE_Z - z0))
+        stamp_eyes(img, [(cu, K * (y1 - EYE_Y))], EYE_STYLE)
+    if e["name"] == "muzzle" and face == "south":  # the pink nose at the tip, the split lip below it
         c = w // 2
-        img[0, max(0, c - 1):c + 1, :3] = BASE[NOSE]
-        img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.8).astype(np.uint8)
-        img[h - 1, max(0, c - 1):c + 1, :3] = (222, 206, 170)
+        img[0:2, max(0, c - 1):c + 1, :3] = BASE[NOSE]
+        img[1, max(0, c - 1):c + 1, :3] = (np.array(BASE[NOSE]) * 0.72).astype(np.uint8)  # the nostrils, a slit
+        img[2:h - 1, c - 1:c, :3] = (img[2:h - 1, c - 1:c, :3] * 0.8).astype(np.uint8)
+        img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.82).astype(np.uint8)
+        img[h - 1, max(0, c - 1):c + 1, :3] = (222, 206, 170)  # the gnawing incisors
+    if e["name"] == "muzzle" and face in ("east", "west"):  # the nose's pink carries round the tip
+        tip = 0 if face == "east" else w - 1
+        img[0:2, tip, :3] = BASE[NOSE]
+    if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
+        img[:, 0 if e["name"].endswith("L") else w - 1, :3] = LASH
     if e["name"].endswith("_paw") and face == "south":  # tiny dark claws
-        img[h - 1, :, :3] = BASE[CLAW]
+        img[h - 1, ::2, :3] = BASE[CLAW]
     if LAYERS["rec"] is not None:
         LAYERS["rec"].face(LAYERS["key"], cap["weights"], cap["level"], ROLES, np.clip(np.round(col), 0, 255), img, p,
                            layer_props(e, face, p, a))
@@ -351,11 +388,21 @@ def pose_sit(t, P=L):
 
 
 ANIMS = {"idle": (pose_idle, 3.0), "walk": (pose_walk, 0.4), "run": (pose_run, 0.24), "sit": (pose_sit, 3.0)}
+BLINKS = {"idle": [1.1], "sit": [2.2]}
+BLINK = 0.09
+
+
+def eyelids(name, t):
+    a = 90 * max([0.0] + [1 - abs(t - b) / BLINK for b in BLINKS.get(name, [])])
+    return {"eyelid_L": (0, 0, a), "eyelid_R": (0, 0, -a)}  # side eyes: the lids swing down about z
 
 
 def frame_times(name, dur):
     n = {"idle": 72, "sit": 60, "walk": 20, "run": 20}.get(name, 16)
-    return sorted({round(dur * k / n, 4) for k in range(n + 1)})
+    ts = {round(dur * k / n, 4) for k in range(n + 1)}
+    for b in BLINKS.get(name, []):
+        ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
+    return sorted(ts)
 
 
 def animations(bone_names):
@@ -365,6 +412,7 @@ def animations(bone_names):
         for t in frame_times(name, dur):
             tt = t % dur if t < dur else 0.0
             pose = fn(tt)
+            pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
         out[name] = {"length": dur, "frames": frames}

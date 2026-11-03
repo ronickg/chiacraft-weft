@@ -32,3 +32,8 @@ to the ground; `build.py` checks flicker, joints, pokes and gait and exports
 Decided: the mouse's build (a small mammal at 1.3 times life, the eyes bigger), with a blunter,
 broader snout over pale incisors, small round ears and a thicker tail; grey-brown, pale below;
 animations idle, walk, run, sit (up on its haunches).
+
+Painted finer (Ronald, 2026-11-03): at the house density its head was 2.5 units across, the eye
+a black side of the head and every face one flat color, so it is painted `house.FINE` (4) texels
+a unit, 256 a block, with a designed eye, eyelids that blink (idle and sit), a nose and a split lip.
+The boxes, the export scale and its size in the game are unchanged.

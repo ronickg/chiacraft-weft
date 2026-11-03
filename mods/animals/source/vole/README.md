@@ -34,3 +34,8 @@ the other eyes, to compare in the viewer.
 
 Decided: the mouse's 1.3 times life; a short tail, small furred ears, a blunt muzzle, a dark coat;
 small bead eyes (Ronald's pick); the mouse's animations (sniffing, scurrying, a dash, sitting up).
+
+Painted finer (Ronald, 2026-11-03): at the house density its head was 2.5 units across, the eye
+a black side of the head and every face one flat color, so it is painted `house.FINE` (4) texels
+a unit, 256 a block, with a designed eye, eyelids that blink (idle and sit), a nose and a split lip.
+The boxes, the export scale and its size in the game are unchanged.
