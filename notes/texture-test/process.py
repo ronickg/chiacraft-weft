@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 
 TINTED = {"grass_top", "leaves_oak", "leaves_birch", "leaves_spruce", "grass_side_overlay", "tallgrass"}
-PLANTS = {"tallgrass", "flower_dandelion", "flower_rose", "sapling_oak", "reeds", "fern", "horsetail", "deadbush"}
+PLANTS = {"ladder", "tallgrass", "flower_dandelion", "flower_rose", "sapling_oak", "reeds", "fern", "horsetail", "deadbush"}
 PLANTS |= {f"wheat_stage_{i}" for i in range(8)}
 CUTOUT = {"leaves_oak", "leaves_birch", "leaves_spruce", "grass_side_overlay"} | PLANTS
 
