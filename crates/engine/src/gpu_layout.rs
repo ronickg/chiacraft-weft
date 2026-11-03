@@ -659,7 +659,7 @@ gpu_struct! {
         pub color: u32,
         pub tex: u32,
         /// A texture animated as a strip of square frames: frame count | ticks per frame << 16
-        /// (0: still).
+        /// (0: still). For text (`FONT`): 1 if the font is smooth, sampled linearly.
         pub layer: u32,
         pub mode: u32,
         /// Visible rectangle in physical pixels; empty (all zero) means unclipped.

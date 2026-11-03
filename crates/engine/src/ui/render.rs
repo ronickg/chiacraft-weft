@@ -228,20 +228,44 @@ impl UiRenderer {
     }
 
     /// `core:fonts/default` (atlas and its `.font`) over `core:fonts/unifont`; packs can replace either.
+    /// A mod's own `fonts/default` comes first: a smooth font baked from a font file
+    /// (`format = coverage`, `Font::coverage`) or another bitmap.
     fn load_font(gpu: &mut dyn Backend, assets: &Assets) -> Option<(Font, TextureId, u32)> {
         // Built in too: text must show even without the engine's asset folder.
         let hex = assets
             .read("core:fonts/unifont", "", "hex")
             .unwrap_or_else(|| include_bytes!("../../assets/fonts/unifont.hex").to_vec());
-        let desc = assets
-            .read("core:fonts/default", "", "font")
-            .unwrap_or_else(|| include_bytes!("../../assets/fonts/default.font").to_vec());
-        let img = assets
-            .read("core:fonts/default", "", "png")
-            .unwrap_or_else(|| include_bytes!("../../assets/fonts/default.png").to_vec());
-        let (desc, img) = (Some(desc), crate::assets::decode_png(&img));
-        let desc = desc.map(|d| String::from_utf8_lossy(&d).into_owned());
-        let font = Font::new(&String::from_utf8_lossy(&hex), desc.as_deref().zip(img.as_ref()));
+        let hex = String::from_utf8_lossy(&hex);
+        let from_mod = assets
+            .list("fonts", "font")
+            .into_iter()
+            .filter_map(|(name, _)| {
+                name.strip_suffix(":default")
+                    .filter(|ns| *ns != "core")
+                    .map(str::to_string)
+            })
+            .next_back()
+            .and_then(|ns| {
+                let desc = assets.read(&format!("{ns}:default"), "fonts", "font")?;
+                let img = crate::assets::decode_png(&assets.read(&format!("{ns}:default"), "fonts", "png")?)?;
+                let desc = String::from_utf8_lossy(&desc).into_owned();
+                if desc.lines().any(|l| l.trim() == "format = coverage") {
+                    Font::coverage(&hex, &desc, &img)
+                } else {
+                    Some(Font::new(&hex, Some((&desc, &img))))
+                }
+            });
+        let font = from_mod.unwrap_or_else(|| {
+            let desc = assets
+                .read("core:fonts/default", "", "font")
+                .unwrap_or_else(|| include_bytes!("../../assets/fonts/default.font").to_vec());
+            let img = assets
+                .read("core:fonts/default", "", "png")
+                .unwrap_or_else(|| include_bytes!("../../assets/fonts/default.png").to_vec());
+            let (desc, img) = (Some(desc), crate::assets::decode_png(&img));
+            let desc = desc.map(|d| String::from_utf8_lossy(&d).into_owned());
+            Font::new(&hex, desc.as_deref().zip(img.as_ref()))
+        });
         let tex = gpu.create_texture(
             &TextureDesc { width: font.atlas_width, height: font.atlas_height, mips: 1, format: Format::R8Unorm, render_target: false },
             "font",
@@ -648,17 +672,19 @@ impl UiRenderer {
                         let fx = self.fx_slot(fx) | if pass && fx != 0 { 1 << 31 } else { 0 };
                         let g = self.font.glyph(ch);
                         let uv = self.font.uv(g);
-                        let w = (g.advance as f32 - 1.0) * px;
+                        let w = g.width * px;
                         let c = if pass { shadow.unwrap() } else { color.map_or(default_color, |c| c << 8 | (default_color & 0xFF)) };
                         // Whole physical pixels: centered text starts mid-pixel, and nearest sampling
                         // at texel borders would drop or double glyph columns.
                         self.quads.push(Quad {
-                            p0: [(x + gx * px + off).round(), (y + gy * px + off).round()],
+                            p0: [(x + (gx + g.bearing) * px + off).round(), (y + (gy + self.font.top) * px + off).round()],
                             u: [w, 0.0],
-                            v: [0.0, 16.0 * px],
+                            v: [0.0, self.font.height * px],
                             uv,
                             color: c,
                             tex: self.font_idx,
+                            // `layer` 1: a smooth font, sampled linearly (`ui.wgsl`)
+                            layer: self.font.smooth as u32,
                             mode: ui_mode::FONT,
                             fx,
                             index: index as f32,

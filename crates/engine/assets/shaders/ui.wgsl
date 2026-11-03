@@ -81,7 +81,11 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         return t * in.color;
     }
     if in.mode == UI_MODE_FONT {
-        let t = textureSampleLevel(textures[in.tex], nearest_clamp, in.uv, 0.0);
+        // `layer` 1: a smooth font's coverage (linear); else a bitmap's whole pixels.
+        var t = textureSampleLevel(textures[in.tex], nearest_clamp, in.uv, 0.0);
+        if in.layer == 1u {
+            t = textureSampleLevel(textures[in.tex], linear_clamp, in.uv, 0.0);
+        }
         return vec4(in.color.rgb, in.color.a * t.r);
     }
     return textureSampleLevel(textures[in.tex], linear_clamp, sharp_uv(in.tex, in.uv, step), 0.0) * in.color;

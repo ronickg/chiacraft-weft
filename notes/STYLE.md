@@ -62,10 +62,16 @@ dark brown outline. Smooth letters over pixel-art frames, as the sheets (and Hyt
 Cyrillic. Also tried: Pixelify Sans, Silkscreen, Almendra, Press Start 2P (Pixelify Sans is kept in
 `mods/base/source/ui/fonts/`, OFL).
 
-In the game this needs the engine's text to change (`crates/engine/src/ui/font.rs`): glyphs are
-1-bit (an atlas pixel is drawn or not; `alpha < 128` drops it) and at most 16 pixels (`CELL`,
-`[u16; 16]` rows), one font for all text. To do: an atlas of coverage (soft edges), bigger glyphs
-baked from the font files, and a second face for titles. Waiting until the UI assets are done.
+In the game (2026-11-03): **Alegreya Sans Medium** for all text, baked from the font file by
+`mods/base/source/ui/font_bake.py` (run with `~/.venvs/blocky/bin/python`, it needs fontTools) into
+`mods/base/assets/fonts/default.png` and `.font`: a smooth coverage atlas, 3 atlas pixels a font
+pixel, capitals 11.5 font pixels tall standing on the pixel font's baseline, the font's lining
+figures in place of its old-style ones, wider spaces. The engine (`crates/engine/src/ui/font.rs`,
+`Font::coverage`) takes a mod's `fonts/default` over its own pixel font, samples it smoothly, and
+fills characters the font lacks from Unifont. Rendering the font file at runtime instead (sharp at
+every GUI scale) was considered and left: ab_glyph is already in the build if it is wanted. Still
+to do: a second face (Alegreya Bold) for titles and bold buttons, and the fonts' files are in
+`mods/base/source/ui/fonts/` (OFL).
 
 ## The HUD: what images there are
 

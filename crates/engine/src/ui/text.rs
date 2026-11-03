@@ -788,7 +788,7 @@ pub fn layout_with(spans: &[Span], font: &Font, max_width: Option<f32>, line_hei
                         last_break = None;
                         continue;
                     }
-                    let adv = font.glyph(ch).advance as f32;
+                    let adv = font.glyph(ch).advance;
                     if x + adv > limit && x > 0.0 {
                         if ch == ' ' {
                             // Wrapping right at a space: the space just disappears.
