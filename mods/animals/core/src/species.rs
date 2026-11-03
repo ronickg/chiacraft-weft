@@ -292,7 +292,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 15] = [
+pub static SPECIES: [Species; 17] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1199,6 +1199,134 @@ pub static SPECIES: [Species; 15] = [
         },
         tune: Tune::NONE,
         birth_size: 0.05,
+    },
+    // The foxes (`reports/ecology/Overworld food webs.md`: the small hunter of ten biomes, the
+    // tundra's main one): two wild hunters on one model (`source/fox`), the dog's family (so they
+    // leave chihuahuas be), taking voles, mice, hares and birds by size (`hunt.rs`).
+    Species {
+        model: "fox",
+        name: "red_fox",
+        binomial: "Vulpes vulpes",
+        family: &CANIDAE,
+        subfamily: "Caninae",
+        breed: None,
+        size: Size::Small,
+        // Small rodents first, rabbits and hares, birds and eggs; insects, berries and other fruit,
+        // carrion.
+        eats: &[(Meat, 0.5), (Fruit, 0.2), (Insects, 0.15), (Carrion, 0.15)],
+        // Voles and mice from about 20 g to hares near its own size (most under a fifth of it).
+        prey: (0.004, 0.8),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [10.0, 120.0, 60.0, 2.0, 1.0, 30.0, 80.0, 40.0, 10.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:chicken", 10), eats("base:beef", 10), favorite("base:berries", 6)],
+        feedings: 0.0,
+        shy: 10.0,
+        fights: true,
+        attacks: &["pounce", "bite"],
+        reach: 0.6,
+        signature: "pounce",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.6,
+        dimorphism: 1.05,
+        size_spread: 0.12,
+        // The model's (the red fox's); a fox's size genes draw it bigger or smaller.
+        height: (0.38, "shoulder"),
+        // Woods' edges, farmland and moors across the north; the desert's kit fox and the beach's
+        // dune foxes share its row.
+        habitats: &[
+            ("base:forest", 1.0),
+            ("base:birch_forest", 1.0),
+            ("base:taiga", 0.8),
+            ("base:mountains", 0.8),
+            ("base:plains", 0.6),
+            ("base:desert", 0.4),
+            ("base:beach", 0.4),
+        ],
+        bio: Biology {
+            mass: 5.5,
+            gestation: 52.0,
+            incubation: 0.0,
+            // Breeding in its first winter, at about ten months.
+            maturity: 300.0,
+            // Few live past three or four in the wild; up to 10 or more.
+            lifespan: 1825.0,
+            interval: 365.0,
+            litter: 5.0,
+            social: Social::Pack,
+            rarity: Rarity::Common,
+            // Mating in midwinter (December to February), the cubs born in spring.
+            breeds: seasons::WINTER,
+            peak: seasons::WINTER,
+            // Est.: a thick winter coat for the northern cold; it lies up in shade in the heat.
+            comfort: (-20.0, 30.0),
+            cold_blooded: false,
+        },
+        tune: Tune::NONE,
+        birth_size: 0.25,
+    },
+    Species {
+        model: "fox",
+        name: "arctic_fox",
+        binomial: "Vulpes lagopus",
+        family: &CANIDAE,
+        subfamily: "Caninae",
+        breed: None,
+        size: Size::Small,
+        // Lemmings and voles first (a family eats dozens a day), birds and eggs, fish, carrion
+        // (following wolves), berries.
+        eats: &[(Meat, 0.55), (Carrion, 0.25), (Fruit, 0.1), (Insects, 0.05), (Fish, 0.05)],
+        // Lemmings to an Arctic hare about its own size.
+        prey: (0.004, 1.0),
+        taming: Taming::Wild,
+        base: [8.0, 120.0, 60.0, 1.6, 1.0, 22.0, 80.0, 35.0, 12.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:chicken", 10), eats("base:beef", 10), favorite("base:berries", 6)],
+        feedings: 0.0,
+        shy: 10.0,
+        fights: true,
+        attacks: &["pounce", "bite"],
+        reach: 0.6,
+        signature: "pounce",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.6,
+        dimorphism: 1.05,
+        size_spread: 0.35,
+        // The model's (the red fox's); a fox's size genes draw it bigger or smaller.
+        height: (0.38, "shoulder"),
+        // The tundra, into the taiga's northern edge.
+        habitats: &[("base:snowy_plains", 1.0), ("base:taiga", 0.3)],
+        bio: Biology {
+            mass: 3.5,
+            gestation: 52.0,
+            incubation: 0.0,
+            maturity: 300.0,
+            // 3-4 years on average after its first, up to 11.
+            lifespan: 1825.0,
+            interval: 365.0,
+            // 6-18 in a lemming year, few or none in a poor one.
+            litter: 7.0,
+            social: Social::Pack,
+            rarity: Rarity::Common,
+            // April and May.
+            breeds: seasons::SPRING,
+            peak: seasons::SPRING,
+            // Its winter coat keeps it at ease to -7 degrees before it works harder; it overheats
+            // easily.
+            comfort: (-35.0, 18.0),
+            cold_blooded: false,
+        },
+        tune: Tune::NONE,
+        birth_size: 0.25,
     },
 ];
 

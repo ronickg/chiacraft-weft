@@ -2,8 +2,8 @@
 //! (`capybara.rs`), velociraptors of two species (`raptor.rs`), Utahraptors (`utahraptor.rs`),
 //! wyverns (`wyvern.rs`, a fantasy animal, and their breath: `breath.rs`), and the living world's
 //! simple wild creatures (`wild.rs`): hares of two species (`hare.rs`), wood mice (`mouse.rs`),
-//! field voles (`vole.rs`) and deer of two species (`deer.rs`); and fish of two species, spawned into
-//! the water and swimming (`fish.rs`),
+//! field voles (`vole.rs`), deer of two species (`deer.rs`) and foxes of two species, hunters
+//! (`fox.rs`); and fish of two species, spawned into the water and swimming (`fish.rs`),
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
 //! (`taming.rs`, `knockout.rs`), commands and tribes (`commands.rs`), signatures
@@ -33,6 +33,7 @@ mod dog;
 mod eggs;
 mod evolution;
 mod fish;
+mod fox;
 mod forage;
 mod gateway;
 mod habitats;
@@ -109,6 +110,7 @@ fn init(r: &mut Registry) {
     vole::init(r);
     deer::init(r);
     fish::init(r);
+    fox::init(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
@@ -156,7 +158,7 @@ fn wake(w: &World, id: u64, index: usize) {
         3 | 5 => raptor::wake(w, id),
         4 => utahraptor::wake(w, id),
         6 => wyvern::wake(w, id),
-        7..=12 => wild::wake(w, id),
+        7..=12 | 15 | 16 => wild::wake(w, id),
         _ => {}
     }
 }

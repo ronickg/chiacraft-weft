@@ -18,6 +18,7 @@ static BODY: Body = Body {
     // Lolloping about slowly, flat out when it bolts: faster than a running player.
     speed: 4.0,
     wander: 0.3,
+    damage: 0.0,
     rest: ("hare_lie", (0.4, 0.3)),
 };
 

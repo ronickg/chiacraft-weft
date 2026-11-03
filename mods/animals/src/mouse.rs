@@ -17,6 +17,7 @@ static BODY: Body = Body {
     // Scurrying about, darting off at about 3 m/s.
     speed: 3.0,
     wander: 0.35,
+    damage: 0.0,
     rest: ("mouse_sit", (0.15, 0.2)),
 };
 

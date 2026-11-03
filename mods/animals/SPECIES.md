@@ -25,6 +25,8 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | red_deer | *Cervus elaphus* | uncommon | large | 0.95 m | 160 kg | herd | herbivore | wild | 3.52 d | 6.51 d | 57.5 d | 1 | 12 |
 | brown_trout | *Salmo trutta* | uncommon | small | 0.37 m | 0.5 kg | solitary | carnivore | wild | eggs, hatch 0.97 d | 8.65 d | 46 d | 3-11 | 20 |
 | pacu | *Piaractus mesopotamicus* | uncommon | small | 0.37 m | 4 kg | herd | omnivore | wild | eggs, hatch 0.06 d | 8.65 d | 57.5 d | 2-8 | 26 |
+| red_fox | *Vulpes vulpes* | common | small | 0.38 m | 5.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 2-7 | 15 |
+| arctic_fox | *Vulpes lagopus* | common | small | 0.38 m | 3.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 3-10 | 16 |
 
 ## Stats at level 1
 
@@ -47,6 +49,8 @@ Damage and speed are each kind's own (1 = 100%).
 | red_deer | 45 | 250 | 180 | 3 | 1 | 120 | 80 | 90 | 20 | 15 |
 | brown_trout | 3 | 60 | 20 | 0.3 | 1 | 5 | 400 | 10 | 3 | 30 |
 | pacu | 6 | 80 | 40 | 0.5 | 1 | 20 | 400 | 15 | 4 | 25 |
+| red_fox | 10 | 120 | 60 | 2 | 1 | 30 | 80 | 40 | 10 | 30 |
+| arctic_fox | 8 | 120 | 60 | 1.6 | 1 | 22 | 80 | 35 | 12 | 30 |
 
 ## dog (chihuahua)
 
@@ -949,6 +953,127 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.8 |
+
+## red_fox
+
+*Vulpes vulpes*, Mammalia › Carnivora › Canidae › Caninae. Model `fox`, entity `animals:red_fox`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:forest` | commonest |
+| `base:birch_forest` | commonest |
+| `base:taiga` | 80% |
+| `base:mountains` | 80% |
+| `base:plains` | 60% |
+| `base:desert` | 40% |
+| `base:beach` | 40% |
+
+Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.38 m at the shoulder |
+| males against females | 1.05x as tall |
+| size spread (an individual's, either way) | 12% |
+| newborn's size | 25% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 5.5 kg | |
+| carries her young | 52 d | 1.08 d |
+| litter or clutch | 5 on average | 2-7 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | winter | out of it, only a tame well cared for |
+| comfortable in | -20 to 30 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 300 d | 3.5 d |
+| lives | 5 y | 19.2 d, give or take a fifth; an elder from 80% of it |
+| lives in | pack | room for 15 within 48 blocks |
+
+**Balance** (common): a generation 4.6 d; a line four deep in 14 d (5 h of play); 7.3 young per mother in 10 days, 9 in her life.
+
+- ✓ fourth generation: 13.7 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 3.5 of 19 days (want under a fifth)
+- ✓ young in a life: 8.6 (want 6-40)
+- ✓ litter: 2-7 (want 1-12, fewest first)
+- ✓ room near: 15 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | meat 50%, fruit 20%, insects 15%, carrion 15% |
+| hunts | 0.4%-80% of its mass alone (0.02-4 kg); at home: hare, mountain_hare, wood_mouse, field_vole, brown_trout, base:chicken |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 10 blocks (twice that running) |
+| eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes: pounce, bite |
+| reach past its body | 0.6 blocks |
+| signature | pounce |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.6 |
+
+## arctic_fox
+
+*Vulpes lagopus*, Mammalia › Carnivora › Canidae › Caninae. Model `fox`, entity `animals:arctic_fox`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:snowy_plains` | commonest |
+| `base:taiga` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.38 m at the shoulder |
+| males against females | 1.05x as tall |
+| size spread (an individual's, either way) | 35% |
+| newborn's size | 25% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 3.5 kg | |
+| carries her young | 52 d | 1.08 d |
+| litter or clutch | 7 on average | 3-10 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | spring | out of it, only a tame well cared for |
+| comfortable in | -35 to 18 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 300 d | 3.5 d |
+| lives | 5 y | 19.2 d, give or take a fifth; an elder from 80% of it |
+| lives in | pack | room for 16 within 48 blocks |
+
+**Balance** (common): a generation 4.6 d; a line four deep in 14 d (5 h of play); 10.6 young per mother in 10 days, 12 in her life.
+
+- ✓ fourth generation: 13.7 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 3.5 of 19 days (want under a fifth)
+- ✓ young in a life: 12.5 (want 6-40)
+- ✓ litter: 3-10 (want 1-12, fewest first)
+- ✓ room near: 16 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | meat 55%, carrion 25%, fruit 10%, insects 5%, fish 5% |
+| hunts | 0.4%-100% of its mass alone (0.01-4 kg); at home: mountain_hare, field_vole, brown_trout, base:chicken |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 10 blocks (twice that running) |
+| eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes: pounce, bite |
+| reach past its body | 0.6 blocks |
+| signature | pounce |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.6 |
 
 ## Shared by every species
 

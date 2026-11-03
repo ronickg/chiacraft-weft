@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 15] = [
+const FILES: [(&str, &str); 17] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -274,6 +274,8 @@ const FILES: [(&str, &str); 15] = [
     ("red_deer", include_str!("../../genetics/red_deer.json")),
     ("brown_trout", include_str!("../../genetics/brown_trout.json")),
     ("pacu", include_str!("../../genetics/pacu.json")),
+    ("red_fox", include_str!("../../genetics/red_fox.json")),
+    ("arctic_fox", include_str!("../../genetics/arctic_fox.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1058,6 +1060,54 @@ fn pacu(r: &Read) -> Look {
     }
 }
 
+/// Foxes. The red fox: orange-red with black stockings and ear backs (its points); a cross fox (one
+/// copy of the silver allele) with a dark cross over the shoulders, a silver fox (two) black frosted
+/// with silver. The Arctic fox (it has the blue locus): white, or the blue morph's charcoal.
+fn fox(r: &Read) -> Look {
+    if r.locus("Bl").is_some() {
+        return if r.shows("Bl") == "Bl" {
+            Look {
+                name: "Blue".into(),
+                base: [92.0, 90.0, 96.0],
+                under: [118.0, 116.0, 120.0],
+                points: Some([70.0, 66.0, 70.0]),
+                ..Look::default()
+            }
+        } else {
+            Look {
+                name: "White (winter coat)".into(),
+                base: [234.0, 232.0, 226.0],
+                under: [240.0, 238.0, 232.0],
+                points: Some([226.0, 222.0, 214.0]),
+                ..Look::default()
+            }
+        };
+    }
+    let dark = [54.0, 40.0, 36.0];
+    match r.copies("Sv", "sv") {
+        2 => Look {
+            name: "Silver".into(),
+            base: [46.0, 42.0, 44.0],
+            under: [70.0, 66.0, 68.0],
+            points: Some([30.0, 26.0, 26.0]),
+            pattern: Some(Pattern { kind: "speckle", color: [200.0, 200.0, 204.0], amount: 0.8 }),
+            ..Look::default()
+        },
+        n => {
+            let base = mix([210.0, 140.0, 64.0], [204.0, 92.0, 42.0], r.qv("Ru"));
+            let cross = (n == 1).then_some(Pattern { kind: "saddle", color: darken(base, 0.6), amount: 0.8 });
+            Look {
+                name: if n == 1 { "Cross".into() } else { "Red".into() },
+                base,
+                under: [236.0, 228.0, 214.0],
+                points: Some(dark),
+                pattern: cross,
+                ..Look::default()
+            }
+        }
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1215,6 +1265,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "white_tailed_deer" | "red_deer" => deer(&r),
         "brown_trout" => trout(&r),
         "pacu" => pacu(&r),
+        "red_fox" | "arctic_fox" => fox(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1796,8 +1847,8 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 11] =
-    model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern", "hare", "mouse", "vole", "deer", "fish");
+const MODEL_LAYERS: [ModelLayers; 12] =
+    model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern", "hare", "mouse", "vole", "deer", "fish", "fox");
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
     let mut d = png::Decoder::new(std::io::Cursor::new(png_bytes));

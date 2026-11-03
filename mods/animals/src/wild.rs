@@ -1,8 +1,8 @@
 //! The living world's simple creatures (`notes/ECOLOGY.md`, "The food webs and the species to
 //! add"): wild, never tamed (`Taming::Wild`), one model and a few animations each. What they
 //! share is here, so each animal's own file is its kinds and its body: they forage, bolt from a
-//! walker (`taming::behave`) and from hunters that could take them (`hunt::wary`), breed in their
-//! season, and now and then settle into a resting pose (a hare in its form, a mouse sitting up to
+//! walker (`taming::behave`) and from hunters that could take them (`hunt::wary`), hunt if they're
+//! hunters (`hunt::hunt`: a fox), breed in their season, and now and then settle into a resting pose (a hare in its form, a mouse sitting up to
 //! nibble), a look of its own (`World::set_look`), as the capybara's poses.
 
 use weft_sdk::ai::Goals;
@@ -22,6 +22,8 @@ pub struct Body {
     /// Its resting pose: the look kind's name (`<model>_<pose>`, its own animation file) and its
     /// box.
     pub rest: (&'static str, (f32, f32)),
+    /// What its bite does (a hunter's; 0: it never fights).
+    pub damage: f32,
 }
 
 value! {
@@ -57,6 +59,7 @@ pub fn register(r: &mut Registry, kinds: &[(&'static Entity, usize)], body: &'st
             .size(body.size.0, body.size.1)
             .health(body.health)
             .speed(body.speed)
+            .attack_damage(body.damage)
             .passive()
             .model_file(body.model)
             .animations(body.model)
@@ -72,6 +75,7 @@ pub fn register(r: &mut Registry, kinds: &[(&'static Entity, usize)], body: &'st
                     .then(startle)
                     .then(crate::taming::behave(index))
                     .then(|w: &World, id: u64, st: &EntityState| crate::hunt::wary(w, id, st) && woken(w, id))
+                    .then(|w: &World, id: u64, st: &EntityState| crate::hunt::hunt(w, id, st) && woken(w, id))
                     .then(crate::breeding::behave(index))
                     .then(move |w: &World, id: u64, st: &EntityState| settle(w, id, st, look))
                     .then(crate::comfort::seek)

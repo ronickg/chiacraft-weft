@@ -17,6 +17,7 @@ static BODY: Body = Body {
     // Busier by day than a mouse, darting along its runs through the grass.
     speed: 2.8,
     wander: 0.3,
+    damage: 0.0,
     rest: ("vole_sit", (0.15, 0.2)),
 };
 

@@ -19,6 +19,7 @@ static BODY: Body = Body {
     // Ambling while it feeds, bounding off at up to 60 km/h.
     speed: 5.0,
     wander: 0.25,
+    damage: 0.0,
     rest: ("deer_lie", (0.9, 0.7)),
 };
 
