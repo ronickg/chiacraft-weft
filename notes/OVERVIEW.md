@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 57 · ◧ partly built: 17 · □ not built yet: 21 · ◌ planned for later: 6
+■ built and seen working: 58 · ◧ partly built: 17 · □ not built yet: 20 · ◌ planned for later: 6
 
 ## Core next
 
@@ -153,7 +153,7 @@ Code: `mods/animals`, `mods/animals/core`. Docs: `notes/ANIMALS.md`, `mods/anima
 
 ## Living world
 
-The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, grazers feed hunters, and what dies goes back to the soil. Each part reads five shared things (the place, the climate table, the plant table, food categories, the forage goal) instead of rules of its own. 3 of 16 parts built.
+The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, grazers feed hunters, and what dies goes back to the soil. Each part reads five shared things (the place, the climate table, the plant table, food categories, the forage goal) instead of rules of its own. 4 of 16 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -167,8 +167,8 @@ The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, g
 | □ | New species, wave one | The smallest set that makes hunting visible: hare, rodent, deer, fish, fox and raven; Protoceratops, a small mammal and a lizard. Simple creatures first (one model, few animations), the rest biome by biome. Docs: `notes/ECOLOGY.md`, `reports/ecology/Overworld food webs.md`, `reports/ecology/Cretaceous food webs.md`. |
 | ◧ | Hunters and prey | Wild hunters get hungry with prey at home and hunt by their researched prey sizes (never their own family or players), a kill feeds them, prey run from hunters that can take them (mods/animals/src/hunt.rs). Seen: a chihuahua took a chicken, a wyvern a raptor, a pig and a cat. Not yet: packs taking big prey together, scavenging, hunting players (a decision). Code: `mods/animals/src/hunt.rs`, `mods/animals/core/src/species.rs`. Docs: `notes/ECOLOGY.md`. |
 | ◧ | Capacity and populations | Plant eaters come by natural spawning as often as their food grows this season (never under a fifth; the engine's new natural-spawn question), arrive as fed as the place feeds them, a quarter young in their breeding season, and starve to death on an empty stomach in a game day (wild only). Dry-season grass is poor fodder. Not yet: hunters' capacity, standing water in swamps. Code: `mods/base/vitals/src/forage.rs`, `mods/animals/src/forage.rs`, `mods/animals/src/animal.rs`, `crates/engine/src/server/dim.rs`. Docs: `notes/ECOLOGY.md`. |
-| ◧ | Death, dung and rot | Carcasses and dropped food rot, grazers leave dung, a compost bin turns them into compost. Today food items go stale, but rot has no use. Code: `mods/base/src/survival/food.rs`. Docs: `notes/ECOLOGY.md`. |
-| □ | Fertile soil | Farmland fertility 0-3: crops tire it; compost, dung, beans or a fallow season restore it. Docs: `notes/ECOLOGY.md`. |
+| ◧ | Death, dung and rot | Grazers leave dung; a compost bin takes spoiled food, dung, rotten flesh and plant waste and rots it into compost (vitals::soil, farming.rs); kills' drops stay as carcasses. Not yet: food and carcasses rotting away on the ground, scavengers, the generated art. Code: `mods/base/vitals/src/soil.rs`, `mods/base/src/farming.rs`, `mods/animals/src/forage.rs`. Docs: `notes/ECOLOGY.md`. |
+| ■ | Fertile soil | Farmland's fertility 3 to 0 sets crops' growth 100% to 20%; a ripe wheat harvest wears a level, dung and compost give levels back, a season unplanted one; hoes till grass and dirt (new). Not yet: clover and beans. Code: `mods/base/vitals/src/soil.rs`, `mods/base/src/farming.rs`, `mods/base/src/growth.rs`. Docs: `notes/ECOLOGY.md`. |
 | □ | Loop balance checks (core) | Every species finds its food in each habitat every season; every plant grows somewhere; a year in each biome holds (no starving season, no eating it bare). Docs: `notes/ECOLOGY.md`. |
 | ◌ | Migration and waterholes | Herds move to wetter land in the dry season; waterholes shrink. Docs: `notes/ECOLOGY.md`. |
 | ◌ | The seasons' look | Grass colour by soil water, autumn leaves, winter snow. Docs: `notes/ECOLOGY.md`. |

@@ -44,6 +44,7 @@ pub static SUGAR_CANE: Block = Block::named("sugar_cane");
 pub static CACTUS: Block = Block::named("cactus");
 pub static WHEAT: Block = Block::named("wheat");
 pub static FARMLAND: Block = Block::named("farmland");
+pub static COMPOST_BIN: Block = Block::named("compost_bin");
 pub static GLASS: Block = Block::named("glass");
 pub static CRAFTING_TABLE: Block = Block::named("crafting_table");
 pub static FURNACE: Block = Block::named("furnace");
@@ -399,7 +400,11 @@ pub fn register(r: &mut Registry) {
         );
     r.block(&FARMLAND)
         .sound_group("gravel")
+        // How worn its fertility is (`farming.rs`): 0 fresh, 3 worn out.
+        .prop("worn", 0..=3)
         .textures("farmland", "dirt", "dirt")
+        .growth(vitals::soil::FALLOW_SECS, 0)
+        .on_grow(crate::farming::fallow)
         .model_box([0.0, 0.0, 0.0], [16.0, 15.0, 16.0])
         .flags(0, 0)
         .hardness(0.6)
@@ -567,6 +572,25 @@ pub fn register(r: &mut Registry) {
         .pool(Pool::new().entry(Entry::item("berries")))
         .pool(Pool::new().when(Cond::BlockState("age=3")).entry(Entry::item("berries")))
         .pool(Pool::new().when(Cond::BlockState("age=3")).entry(Entry::item("berries")));
+    // Spoiled food, dung and plant waste rot into compost (`farming.rs`): its level shows as it
+    // fills, the top dark and rich when it's ready (placeholder look, `notes/STYLE.md`).
+    r.block(&COMPOST_BIN)
+        .sound_group("wood")
+        .prop("level", 0..=8)
+        .states(|p, s| {
+            let top = match p.get("level") {
+                "0" => "planks_oak",
+                "8" => "podzol",
+                _ => "dirt",
+            };
+            s.textures(top, "planks_oak", "planks_oak")
+        })
+        .hardness(0.6)
+        .mineable("axe")
+        .growth(vitals::soil::compost_secs(), 0)
+        .on_grow(crate::farming::rot)
+        .on_use(crate::farming::bin)
+        .tab(&crate::tabs::FUNCTIONAL);
     r.block(&BOOKSHELF)
         .sound_group("wood")
         .textures("planks_oak", "bookshelf", "planks_oak")

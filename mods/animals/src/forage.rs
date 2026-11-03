@@ -22,6 +22,7 @@ use crate::species::{self, SPECIES, Species};
 /// and the time it looks again (0: not foraging).
 static FORAGE: Component<[f64; 4]> = Component::named("animal_forage");
 static GRAZED_GRASS: Block = Block::named("base:grazed_grass");
+static DUNG: Item = Item::named("base:dung");
 
 /// Blocks it looks round, and up and down.
 const LOOK: i32 = 8;
@@ -33,6 +34,9 @@ const FULL: f32 = 0.95;
 const CHEW: f64 = 30.0;
 const WALK: f64 = 160.0;
 const NOTHING: f64 = 300.0;
+/// A grazer leaves dung after about this many mouthfuls (`vitals::soil`: it feeds farmland and
+/// compost).
+const MOUTHFULS_A_DUNG: u32 = 6;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&FORAGE, [0.0; 4], 0);
@@ -157,6 +161,9 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
                     w.set_prop(at, "age", &age.to_string());
                 }
                 Eaten::Stays => {}
+            }
+            if w.random_below(MOUTHFULS_A_DUNG) == 0 {
+                w.spawn_item(st.pos, ItemStack::new(DUNG.id(), 1));
             }
             f[3] = now + CHEW;
             w.component_mut(id, &FORAGE).map(|c| *c = f);

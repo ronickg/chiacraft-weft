@@ -18,6 +18,7 @@ pub mod forage;
 pub mod levels;
 pub mod plants;
 pub mod sheet;
+pub mod soil;
 pub mod stamina;
 pub mod stats;
 pub mod stomach;

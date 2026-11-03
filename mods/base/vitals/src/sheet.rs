@@ -7,7 +7,7 @@ use std::fmt::Write;
 use crate::effects;
 use crate::food::{self, NUTRIENT_NAMES};
 use crate::stats::{self, Growth};
-use crate::{calendar, climate, difficulty, forage, levels, plants, temperature};
+use crate::{calendar, climate, difficulty, forage, levels, plants, soil, temperature};
 
 pub fn markdown() -> String {
     let mut w = String::new();
@@ -22,6 +22,7 @@ pub fn markdown() -> String {
     climates(&mut w);
     plant_table(&mut w);
     forage_table(&mut w);
+    soil_table(&mut w);
     difficulties(&mut w);
     level_table(&mut w);
     w
@@ -202,6 +203,35 @@ fn forage_table(w: &mut String) {
         let _ = writeln!(w, "| {block} | {} | {} | {eaten} | {back} |", f.category.name(), f.food);
     }
     let _ = writeln!(w);
+}
+
+fn soil_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Soil and compost\n\nFarmland's fertility (`vitals::soil`): how fast crops grow at each level, what wears it, what gives it back; and what a compost bin takes.\n\n| fertility | crops grow |\n|---|---|"
+    );
+    for f in (0..=soil::MAX).rev() {
+        let _ = writeln!(w, "| {f} | {:.0}% |", soil::growth(f) * 100.0);
+    }
+    let feeds = soil::FEEDS
+        .iter()
+        .map(|(n, v)| format!("{n} +{v}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let composts = soil::COMPOSTS
+        .iter()
+        .map(|(n, v)| format!("{n} {v}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let _ = writeln!(
+        w,
+        "\nA ripe harvest of {} takes a level; {feeds}; a season unplanted (about {:.0} game days, at grass's rate) gives one back. A compost bin fills in {} steps: spoiled food {}, {composts}; full, it rots into compost in about {:.0} minutes.\n",
+        soil::TIRES.join(", "),
+        soil::FALLOW_SECS / crate::DAY_SECS,
+        soil::BIN_FULL,
+        soil::SPOILED,
+        soil::compost_secs() / 60.0
+    );
 }
 
 fn difficulties(w: &mut String) {

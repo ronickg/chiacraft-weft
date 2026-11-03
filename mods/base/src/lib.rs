@@ -4,6 +4,7 @@
 mod advancements;
 mod beds;
 mod blocks;
+mod farming;
 mod growth;
 mod hud;
 mod items;
@@ -51,6 +52,7 @@ fn init(r: &mut Registry) {
     worldgen::register(r);
     weather::register(r);
     growth::register(r);
+    farming::register(r);
     advancements::register(r);
     beds::register(r);
     hud::register(r);

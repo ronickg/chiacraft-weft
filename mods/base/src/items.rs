@@ -138,6 +138,9 @@ pub fn register(r: &mut Registry) {
                 .tab(if kind == "sword" { &crate::tabs::COMBAT } else { &crate::tabs::TOOLS });
             if kind == "sword" {
                 b.sweeps().no_creative_break();
+            } else if kind == "hoe" {
+                // Tills grass and dirt into farmland (`farming.rs`).
+                b.on_use(crate::farming::till);
             }
         };
         tool(r, "pickaxe", 2.0 + m.damage, 1.2);

@@ -116,6 +116,19 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | base:acacia_leaves | leaves | 4 | stays | browse in base:savanna (all year), worth 40% of fresh growth |
 | base:cactus | leaves | 3 | stays | browse in base:desert (all year), worth 40% of fresh growth |
 
+## Soil and compost
+
+Farmland's fertility (`vitals::soil`): how fast crops grow at each level, what wears it, what gives it back; and what a compost bin takes.
+
+| fertility | crops grow |
+|---|---|
+| 3 | 100% |
+| 2 | 73% |
+| 1 | 47% |
+| 0 | 20% |
+
+A ripe harvest of base:wheat takes a level; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
+
 ## Difficulty (the `base:difficulty` rule)
 
 | | digests | keeps | harm | can kill | XP lost on death | stamina costs |

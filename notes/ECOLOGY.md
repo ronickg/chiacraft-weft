@@ -590,6 +590,19 @@ and cactus.**
 
 ### 8. Death, dung and rot
 
+**Built in part (2026-11-03).**
+- **Dung:** grazers leave dung about every sixth mouthful (`forage.rs`).
+- **The compost bin** (`base:compost_bin`, crafted from planks) takes spoiled food of any kind,
+  dung, rotten flesh, leaves, saplings, wheat and seeds (`vitals::soil::COMPOSTS`). Full, it
+  rots into compost in about 23 minutes, the weeks hot compost takes, at the growing pace.
+- **Carcasses:** a kill's drops stay where it fell.
+- **Seen in the game:** the bin filling, its top turning to dirt.
+- **Not yet:**
+  - food and carcasses on the ground rotting away;
+  - scavengers eating them (both need the engine to tell a mod what a dropped item is);
+  - the generated art for dung, compost and the bin (placeholders now, `notes/STYLE.md`).
+
+
 - **Carcasses:** a dead animal leaves meat and bones (as now). Food on the ground rots through
   its freshness (built for items), and at the end it becomes spoiled food.
 - **Dung:** grazers drop dung now and then, more after eating.
@@ -598,6 +611,24 @@ and cactus.**
 - **Nothing piles up:** items on the ground rot away, and what's eaten is gone.
 
 ### 9. Fertile soil
+
+**Built (2026-11-03).**
+- **Fertility:** farmland's levels from 3 (fresh) to 0 (worn out) set crops' growth from 100% to
+  20% (`vitals::soil`, `farming.rs`, `growth.rs`).
+- **Wearing it down:** a ripe wheat harvest takes a level.
+- **Giving levels back:**
+  - dung gives one, compost two (used on the farmland);
+  - a season unplanted gives one back, at grass's rate there.
+- **Tilling is new too:** hoes now till grass and dirt into farmland. Until now farmland was
+  only in the creative inventory.
+- **`/growth` on farmland** shows its fertility.
+- **The sheet** has a soil and compost table.
+- **Seen in the game:**
+  - a hoe tilled grass;
+  - worn-out farmland grew wheat at a fifth of the plain ground's rate, one level up with dung and
+    full with compost.
+- **Not yet:** clover and beans that feed the soil; harvest wear on crops other than wheat.
+
 
 - **Fertility:** farmland gets a property, fertility 0 to 3, starting at 2. At 0 it still grows a
   fifth as fast: the Rothamsted wheat plot, unfertilised since 1843, still gives about 1 t/ha

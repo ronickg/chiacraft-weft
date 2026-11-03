@@ -15,11 +15,19 @@ pub fn register(r: &mut Registry) {
         let Some(st) = w.entity(cmd.player()) else { return };
         let pos = st.pos.map(|v| v.floor() as i32);
         let g = base_api::ground_at(&w, pos);
-        let wheat = plants::rate(plant("base:wheat"), g.mean_air, g.soil);
-        cmd.reply(
-            "command.base.growth",
-            &[Arg::Float(g.mean_air as f64, 1), Arg::Int((g.soil * 100.0).round() as i64), Arg::Int((wheat * 100.0).round() as i64)],
-        );
+        // Standing on farmland (a little lower than a block: the feet are in its block), its
+        // fertility too (`farming.rs`).
+        let below = [pos[0], pos[1] - 1, pos[2]];
+        let fertility = crate::farming::fertility(&w, pos).or_else(|| crate::farming::fertility(&w, below));
+        let wheat = plants::rate(plant("base:wheat"), g.mean_air, g.soil) * fertility.map_or(1.0, vitals::soil::growth);
+        let (air, soil, rate) = (g.mean_air as f64, (g.soil * 100.0).round() as i64, (wheat * 100.0).round() as i64);
+        match fertility {
+            Some(f) => cmd.reply(
+                "command.base.growth_farmland",
+                &[Arg::Float(air, 1), Arg::Int(soil), Arg::Int(rate), Arg::Int(f as i64), Arg::Int(vitals::soil::MAX as i64)],
+            ),
+            None => cmd.reply("command.base.growth", &[Arg::Float(air, 1), Arg::Int(soil), Arg::Int(rate)]),
+        }
     });
 }
 
@@ -44,6 +52,9 @@ pub fn grow(e: &mut BlockEvent, block: &str, last: bool, step: impl FnOnce(&mut 
         return;
     }
     let rate = plants::rate(p, ground.mean_air, if p.water == plants::Water::Wet { 1.0 } else { ground.soil });
+    // On farmland, as fast as its fertility lets (`vitals::soil`).
+    let pos = e.pos();
+    let rate = rate * crate::farming::fertility(&w, [pos[0], pos[1] - 1, pos[2]]).map_or(1.0, vitals::soil::growth);
     if (w.random() >> 11) as f32 / (1u64 << 53) as f32 >= rate {
         return;
     }

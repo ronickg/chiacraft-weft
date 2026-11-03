@@ -171,6 +171,9 @@ Each with the UI master prompt (`game-art` skill), the approved slot attached:
 | Arrange HUD frames | `Next asset: HUD element frame, 32 x 32 pixels, states left to right: normal (thin dashed copper outline), hidden (the same in grey), selected (amber-gold). Transparent inside.` |
 | Death screen, vignette | later: dark red-brown overlay and vignette |
 | Bandage (item icon) | with the item master prompt: `One item: bandage (rolled off-white linen strip, a loose end trailing, a small red stain).` |
+| Dung (item icon) | with the item master prompt: `One item: dung (a small heap of dark brown droppings, a few fibres of chewed grass in it).` Placeholder: darkened dirt. |
+| Compost (item icon) | with the item master prompt: `One item: compost (a handful of dark crumbly earth with flecks of leaf and twig).` Placeholder: the podzol texture. |
+| Compost bin (block, textures) | a block texture batch: slatted wooden bin sides, and its top empty, filling (rotting greens and browns) and ready (dark crumbly compost). Placeholder: oak planks, a dirt or podzol top. |
 
 ### Engine work still open
 
