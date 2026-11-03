@@ -1,0 +1,14 @@
+Use your image generation tool to make ONE image, then save it as a PNG file named NAME.png in the current folder. Do not write any code or edit any other files.
+
+The attached images are references for my game's block textures: a colour palette, and approved textures (smooth stone, oak planks, dirt). Match their style exactly.
+
+The image: a square block texture for my game, 1024 x 1024.
+- A 64 x 64 pixel game texture, enlarged with square pixels: soft painterly clusters in big simple shapes of three sizes, smooth light in fine steps, like a small hand-painted illustration. Not a photo, not a 3D render.
+- Colours from the attached palette only: warm and earthy, shadows warmer and slightly purple, highlights toward yellow, never pure black or white.
+- Each small shape lit on its own from the top left, with a soft shadow at its bottom right; the whole tile evenly bright, no light-to-dark gradient across it.
+- Seen straight on, flat, filling the whole image edge to edge, repeating seamlessly on all four sides, no border or dark edges.
+
+The material:
+DESC
+
+When done, reply with the file name you saved.

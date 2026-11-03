@@ -1,0 +1,7 @@
+log_oak	Oak log bark (the side of a tree trunk): vertical bark ridges and grooves running top to bottom, chunky and soft, a few small knots, warm grey-brown from the "wood" row, darker than the planks.
+log_oak_top	Oak log top (a cut tree trunk seen from above): the whole square is the cut wood face with soft concentric growth rings around the centre, light honey colour like the planks, and a thin ring of the darker bark along all four edges.
+leaves_oak	Oak leaves: dense clumps of small rounded leaves in three sizes, with a few small gaps between clumps where flat solid magenta #FF00FF shows through (the game makes those see-through). Fresh green from the "leaf" row.
+sand	Sand: fine soft ripples and small grains, very calm and low contrast, pale warm gold from the "sand" row.
+bricks	Bricks: staggered rectangular bricks, four rows, each brick softly rounded with soft mortar lines between, warm red-brown from the "soil" and "copper" rows, mortar a light warm grey.
+coal_ore	Coal ore: the attached smooth stone texture exactly as the background, with five or six chunky dark coal lumps set into it, each lump softly lit from the top left with a small warm highlight. Coal is a deep warm charcoal brown, not pure black.
+grass_top	Grass seen from above: dense short grass blades in soft clumps of three sizes, calm, fresh green from the "grass" row, no flowers, no dirt showing.
