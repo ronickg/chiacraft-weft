@@ -42,14 +42,31 @@ TONES = [tones(c, h) for c, h in zip(BASE, SHADOW)]
 FEATHER = (BLACK, GLOSS, DULL)
 ROLES = [("coat", 0, 0), ("coat", 0, 1.0), ("coat", 0.4, -0.5), "fixed"]
 
-# A raven's eye: dark brown, a bright catchlight (an all-black bird needs one to have a face).
+# A raven's eye: round, dark brown-black, warmer along the bottom, a bright catchlight toward the
+# front (an all-black bird needs one to have a face).
 EYES.update({
-    "raven": dict(pattern=["IH",
-                           "II"], colors={"I": (58, 40, 30), "H": (232, 230, 224)}, halo="none"),
+    "raven": dict(pattern=[".PP.",
+                           "PHPP",
+                           "PPPP",
+                           ".II."], colors={"I": (86, 56, 38), "P": (30, 20, 18), "H": (234, 232, 226)}, halo="none"),
 })
 EYE_STYLE = os.environ.get("RAVEN_EYES", "raven")
 SKULL = ((-2.6, 15.5, 8.5), (2.6, 20.5, 14.0))
-EYE_Z, EYE_Y = 12.4, 18.6
+EYE_Z, EYE_Y = 12.4, 17.5
+LID_X = SKULL[1][0] + 0.35  # the eyelids' hinge plane, 0.35 outside the head's side: closed, they sit over the eye
+LASH = (12, 10, 14)  # darker than the feathers
+
+
+def eye_box(side):
+    """(z0, z1, top, bottom) of the eye on one side, rounded as `stamp_eyes` places it."""
+    pat = EYES[EYE_STYLE]["pattern"]
+    ph, pw = len(pat), len(pat[0])
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    cu = (z1 - EYE_Z) if side > 0 else (EYE_Z - z0)
+    u0 = int(round(cu - pw / 2))
+    v0 = int(round((y1 - EYE_Y) - ph / 2))
+    za, zb = (z1 - u0 - pw, z1 - u0) if side > 0 else (z0 + u0, z0 + u0 + pw)
+    return za, zb, y1 - v0, y1 - v0 - ph
 
 # ------------------------------------------------------------------ the model
 
@@ -81,6 +98,8 @@ def bones():
               (f"wing_{n}", "spine_1", (s * 3.6, 14.9, 5.0)), (f"hand_{n}", f"wing_{n}", (s * 17.8, 14.9, 5.0)),  # open
               (f"leg_{n}_thigh", "spine_0", (s * 1.9, 10.0, -0.6)), (f"leg_{n}_shin", f"leg_{n}_thigh", (s * 1.9, 6.4, -0.6)),
               (f"leg_{n}_toes", f"leg_{n}_shin", (s * 1.9, 1.0, -0.6))]
+        za, zb, top, _ = eye_box(s)
+        B.append((f"eyelid_{n}", "head", (s * LID_X, top, (za + zb) / 2)))
     return B
 
 
@@ -93,6 +112,14 @@ def elements():
          el("jaw", "jaw", (-0.8, 15.9, 13.2), (0.8, 16.9, 18.0)),  # shorter than the bill
          el("tail", "tail", (-2.2, 12.6, -19.6), (2.2, 13.8, -5.0)),
          el("tail_fan", "tail", (-3.6, 13.2, -21.0), (3.6, 13.2, -8.0), quad="up", cut="wedge")]
+    for s, n in ((1, "L"), (-1, "R")):
+        # The eyelid: a quad the eye's size lying flat inside the head, hinged at the eye's top; a
+        # blink swings it down over the eye. Tilted a few degrees about its hinge, so it is never
+        # in a face's plane.
+        za, zb, top, bottom = eye_box(s)
+        lx0, lx1 = (LID_X - (top - bottom), LID_X) if s > 0 else (-LID_X, -LID_X + (top - bottom))
+        E.append(el(f"eyelid_{n}", f"eyelid_{n}", (lx0, top, za), (lx1, top, zb), quad="down", rot=(0, 0, s * 4),
+                    origin=(s * LID_X, top, (za + zb) / 2)))
     for s, n in ((1, "L"), (-1, "R")):
         x0, x1 = sorted((s * 3.6, s * 4.9))
         # Folded along the side, the primaries crossing over the tail's base.
@@ -197,9 +224,12 @@ def paint_face(e, face, boxes):
         o = np.array(e["origin"])
         p = (p - o) @ R.T + o
     a = area(e, face, p, uu, vv, h)
+    light_face = face
+    if e["name"].startswith("eyelid"):  # seen only closed, as the side of the head
+        a, light_face = np.full(a.shape, BLACK), "east"
     occ = None if e["quad"] or OPEN(e["name"]) else occlusion(p, R @ n, R @ du, R @ dv, boxes, own=e["name"])
     cap = {}
-    col = paint_face_smooth(a, TONES, face, out=cap, coat=FEATHER, y_world=None, occ=occ, quad=bool(e["quad"]),
+    col = paint_face_smooth(a, TONES, light_face, out=cap, coat=FEATHER, y_world=None, occ=occ, quad=bool(e["quad"]),
                             seed=sum(map(ord, e["name"] + face)) % 97, tuft=False)
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["cut"]:
@@ -208,6 +238,8 @@ def paint_face(e, face, boxes):
         (x0, y0, z0), (x1, y1, z1) = SKULL
         cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
         stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
+    if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
+        img[:, 0 if e["name"].endswith("L") else w - 1, :3] = LASH
     if e["quad"] and e["cut"] in ("primaries", "secondaries", "folded", "wedge"):  # the feathers' shafts and edges
         along = np.abs(p[..., 0]) if e["cut"] in ("primaries", "secondaries") else p[..., 2]
         img[..., :3] = np.where((np.floor(along * 0.9) % 2 == 0)[..., None], (img[..., :3] * 0.86).astype(np.uint8), img[..., :3])
@@ -293,9 +325,21 @@ ANIMS = {"idle": (pose_idle, 3.0), "walk": (pose_walk, 0.7), "run": (pose_run, 0
 FLY_ANIMS = {"flap": (pose_fly, 0.5)}
 
 
+BLINKS = {"idle": [0.9, 2.3]}
+BLINK = 0.08
+
+
+def eyelids(name, t):
+    a = 90 * max([0.0] + [1 - abs(t - b) / BLINK for b in BLINKS.get(name, [])])
+    return {"eyelid_L": (0, 0, a), "eyelid_R": (0, 0, -a)}  # side eyes: the lids swing down about z
+
+
 def frame_times(name, dur):
     n = {"idle": 48, "walk": 20, "run": 16, "flap": 20}.get(name, 16)
-    return sorted({round(dur * k / n, 4) for k in range(n + 1)})
+    ts = {round(dur * k / n, 4) for k in range(n + 1)}
+    for b in BLINKS.get(name, []):
+        ts |= {round(b + d, 4) for d in (-BLINK, -BLINK / 2, 0, BLINK / 2, BLINK)}
+    return sorted(ts)
 
 
 def animations(anims, bone_names):
@@ -305,6 +349,7 @@ def animations(anims, bone_names):
         for t in frame_times(name, dur):
             tt = t % dur if t < dur else 0.0
             pose = fn(tt)
+            pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
         out[name] = {"length": dur, "frames": frames}
