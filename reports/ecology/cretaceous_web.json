@@ -1,0 +1,1915 @@
+{
+ "about": "Cretaceous food webs for chiacraft; see 'Cretaceous food webs.md' beside this file. Tiers: 1 full creature, 2 simple creature, 3 food source. diet shares sum to 1 over grass, leaves, fruit, seeds, roots, insects, meat, fish, carrion (grass is 0 everywhere: there was no grass). intake_pct_mass_day: wet mass of food for meat/insect/fish eaters, dry matter for plant eaters (intake_basis), from Nagy et al. 1999 FMR allometry between mesotherm and endotherm bounds (intake_range); estimates. water_pct_mass_day: drinking, estimate. prey_mass_ratio: prey mass over own mass. biomes: weight against where it is commonest, as Species::habitats. 'carcass' in webs is the carrion food source. in_game: in the game now.",
+ "categories": [
+  "grass",
+  "leaves",
+  "fruit",
+  "seeds",
+  "roots",
+  "insects",
+  "meat",
+  "fish",
+  "carrion"
+ ],
+ "species": [
+  {
+   "name": "raptor",
+   "binomial": "Velociraptor mongoliensis",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 15,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.0,
+    "fruit": 0.0,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 0.05,
+    "meat": 0.7,
+    "fish": 0.0,
+    "carrion": 0.25
+   },
+   "foods": [
+    "small mammals (kryptobaatar)",
+    "lizards",
+    "early birds",
+    "protoceratops (adults and young)",
+    "citipati eggs and young (inference)",
+    "carcasses (an azhdarchid bone in its gut: scavenged)"
+   ],
+   "intake_pct_mass_day": 5.0,
+   "intake_range": [
+    2.6,
+    7.2
+   ],
+   "water_pct_mass_day": 2.5,
+   "social": "solitary: many fossils, none found with another; pack hunting unsupported. Perhaps night- or twilight-active (scleral rings)",
+   "predators": [
+    "wyvern (game)"
+   ],
+   "predators_real": "none known for adults (no resident large predator in the Djadokhta); young: large lizards, adult Velociraptor, azhdarchids (inference)",
+   "prey_mass_ratio": {
+    "min": 0.002,
+    "max_alone": 6.0,
+    "max_group": null,
+    "note": "the Fighting Dinosaurs: alone against a Protoceratops of 62-104 kg"
+   },
+   "biomes": {
+    "animals:red_dunes": 1.0,
+    "animals:scrubland": 0.4
+   },
+   "formation": "Djadokhta Formation, Mongolia (Campanian, ~75-71 Ma)",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Fighting_Dinosaurs",
+    "https://doi.org/10.1016/j.palaeo.2012.02.021",
+    "https://www.livescience.com/11006-velociraptor-frozen-time-scavenging-larger-dinosaur.html",
+    "https://en.wikipedia.org/wiki/Velociraptor",
+    "https://doi.org/10.1371/journal.pone.0028964",
+    "https://doi.org/10.1126/science.1200043"
+   ]
+  },
+  {
+   "name": "osmolskae",
+   "binomial": "Velociraptor osmolskae",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 15,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.0,
+    "fruit": 0.0,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 0.05,
+    "meat": 0.7,
+    "fish": 0.0,
+    "carrion": 0.25
+   },
+   "foods": [
+    "as V. mongoliensis",
+    "Protoceratops hellenikorhinus (tooth-marked jaws at Bayan Mandahu, Velociraptor-like teeth)",
+    "pinacosaurus juveniles (inference)"
+   ],
+   "intake_pct_mass_day": 5.0,
+   "intake_range": [
+    2.6,
+    7.2
+   ],
+   "water_pct_mass_day": 2.5,
+   "social": "solitary (inference, as its cousin); known from skull bones only and perhaps not a Velociraptor",
+   "predators": [
+    "wyvern (game)"
+   ],
+   "predators_real": "none known",
+   "prey_mass_ratio": {
+    "min": 0.002,
+    "max_alone": 6.0,
+    "max_group": null,
+    "note": "as its cousin"
+   },
+   "biomes": {
+    "animals:red_dunes": 1.0,
+    "animals:scrubland": 0.6
+   },
+   "biomes_note": "game has red_dunes only; Bayan Mandahu, its home, is the scrubland's model: add scrubland",
+   "formation": "Bayan Mandahu Formation, Inner Mongolia (Campanian, ~75-71 Ma)",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Velociraptor",
+    "https://www.livescience.com/11006-velociraptor-frozen-time-scavenging-larger-dinosaur.html",
+    "https://en.wikipedia.org/wiki/Djadochta_Formation"
+   ]
+  },
+  {
+   "name": "utahraptor",
+   "binomial": "Utahraptor ostrommaysi",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 300,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.0,
+    "fruit": 0.0,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.8,
+    "fish": 0.05,
+    "carrion": 0.15
+   },
+   "foods": [
+    "iguanodonts (Stikes block)",
+    "gastonia young",
+    "sauropod young",
+    "psittacosaurus (game)",
+    "crocodyliforms and turtles at the water (inference)",
+    "carcasses"
+   ],
+   "intake_pct_mass_day": 2.5,
+   "intake_range": [
+    1.5,
+    3.0
+   ],
+   "water_pct_mass_day": 2.5,
+   "social": "groups of mixed ages, adult to hatchling (Stikes Quarry block): the best group evidence of any dromaeosaur; possibly a trap that gathered them over time",
+   "predators": [
+    "wyvern (game)",
+    "crocodyliform (young)"
+   ],
+   "predators_real": "a large allosauroid (~10 m, teeth and bones in the Yellow Cat), inference; young also crocodyliforms",
+   "prey_mass_ratio": {
+    "min": 0.01,
+    "max_alone": 3.0,
+    "max_group": 15.0,
+    "note": "Kirkland et al. 1993: a group could take 1-2 t prey"
+   },
+   "biomes": {
+    "animals:floodplain": 1.0,
+    "animals:scrubland": 0.5,
+    "animals:fern_forest": 0.3
+   },
+   "formation": "Cedar Mountain Formation, Yellow Cat Member, Utah (Berriasian-Valanginian, ~139-134 Ma)",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Utahraptor",
+    "https://geology.utah.gov/popular/dinosaurs-fossils/megablock",
+    "https://en.wikipedia.org/wiki/Gastonia_(dinosaur)",
+    "https://edition.cnn.com/2020/05/08/us/raptor-pack-hunting-questions-scn-trnd",
+    "https://doi.org/10.1007/s00114-007-0310-7"
+   ]
+  },
+  {
+   "name": "wyvern",
+   "binomial": "Wyverna montana",
+   "tier": 1,
+   "in_game": true,
+   "mass_kg": 5000,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.0,
+    "fruit": 0.0,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.8,
+    "fish": 0.1,
+    "carrion": 0.1
+   },
+   "foods": [
+    "protoceratops",
+    "iguanodont",
+    "pinacosaurus and gastonia young",
+    "sauropod young",
+    "psittacosaurus",
+    "citipati",
+    "utahraptor",
+    "raptors",
+    "crocodyliform",
+    "large fish"
+   ],
+   "intake_pct_mass_day": 1.5,
+   "intake_range": [
+    0.9,
+    1.3
+   ],
+   "water_pct_mass_day": 1.5,
+   "social": "solitary (as eagles and azhdarchids); nests on crag ledges",
+   "predators": [],
+   "predators_real": "fantasy: apex; eggs and young to utahraptor groups (game)",
+   "prey_mass_ratio": {
+    "min": 0.001,
+    "max_alone": 0.6,
+    "max_group": null,
+    "note": "model: azhdarchids as terrestrial stalkers of small animals and young dinosaurs; Hatzegopteryx as island apex predator; big eagles take prey up to about their own mass"
+   },
+   "biomes": {
+    "animals:crags": 1.0,
+    "animals:fern_forest": 0.33,
+    "animals:red_dunes": 0.33,
+    "animals:scrubland": 0.33
+   },
+   "formation": "fantasy; real models from the Javelina Formation (Quetzalcoatlus) and Hateg Basin (Hatzegopteryx)",
+   "intake_note": "1.5% is a little over the endotherm figure because flying costs more (estimate)",
+   "sources": [
+    "https://doi.org/10.1371/journal.pone.0002271",
+    "https://peerj.com/articles/2908/"
+   ]
+  },
+  {
+   "name": "protoceratops",
+   "binomial": "Protoceratops andrewsi",
+   "tier": 1,
+   "in_game": false,
+   "mass_kg": 85,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.85,
+    "fruit": 0.05,
+    "seeds": 0.1,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "low shrubs (inference)",
+    "horsetails and ferns at interdune ponds (inference)",
+    "cycadophytes and gnetaleans (inference)",
+    "tough fibrous plants: strong bite, shearing teeth"
+   ],
+   "intake_pct_mass_day": 1.5,
+   "intake_range": [
+    1.4,
+    3.2
+   ],
+   "intake_basis": "dry matter",
+   "water_pct_mass_day": 3.0,
+   "social": "herds of mixed ages; nests of buried soft-shelled eggs (>=12); a nest of 15 juveniles; cathemeral",
+   "predators": [
+    "raptor",
+    "osmolskae",
+    "wyvern"
+   ],
+   "predators_real": "Velociraptor (Fighting Dinosaurs; tooth marks); carcasses scavenged by mammals and insects",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:red_dunes": 1.0,
+    "animals:scrubland": 0.6
+   },
+   "formation": "Djadokhta Formation, Mongolia (Campanian, ~75-71 Ma); P. hellenikorhinus in the Bayan Mandahu",
+   "why": "the dunes' dominant herbivore and the raptors' prey",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Protoceratops",
+    "https://doi.org/10.1038/s41586-020-2412-8",
+    "https://en.wikipedia.org/wiki/Fighting_Dinosaurs",
+    "https://en.wikipedia.org/wiki/Djadochta_Formation",
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Djadokhta&show=size&rank=genus",
+    "https://www.nature.com/articles/s41586-022-04770-6"
+   ]
+  },
+  {
+   "name": "iguanodont",
+   "binomial": "Iguanacolossus fortis",
+   "tier": 1,
+   "in_game": false,
+   "mass_kg": 4000,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.85,
+    "fruit": 0.05,
+    "seeds": 0.1,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "ferns and horsetails",
+    "conifer browse up to ~4 m",
+    "cycadophytes",
+    "conifer cones (inference)"
+   ],
+   "intake_pct_mass_day": 0.9,
+   "intake_range": [
+    0.73,
+    1.13
+   ],
+   "intake_basis": "dry matter",
+   "water_pct_mass_day": 3.0,
+   "social": "herds (inference from relatives' bonebeds)",
+   "predators": [
+    "utahraptor",
+    "wyvern"
+   ],
+   "predators_real": "Utahraptor (Stikes block: an iguanodont with the pack); the allosauroid",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:floodplain": 1.0,
+    "animals:fern_forest": 0.6
+   },
+   "formation": "Cedar Mountain Formation, Yellow Cat Member, Utah (Berriasian-Valanginian, ~139-134 Ma); stands for Hippodraco, Cedrorestes, the sail-backed form, and the Yixian's Jinzhousaurus",
+   "mass_note": "~9 m; estimates 1-5 t (Paul: 5 t); Hippodraco >=4.5 m",
+   "why": "the floodplain's and forest's big herbivore: the Utahraptor's prey; could start as tier 2",
+   "sources": [
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC2989904",
+    "https://en.wikipedia.org/wiki/Cedar_Mountain_Formation",
+    "https://geology.utah.gov/popular/dinosaurs-fossils/megablock",
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Cedar%20Mountain&member=Yellow%20Cat&rank=genus"
+   ]
+  },
+  {
+   "name": "pinacosaurus",
+   "binomial": "Pinacosaurus grangeri",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 1900,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.8,
+    "fruit": 0.1,
+    "seeds": 0.0,
+    "roots": 0.05,
+    "insects": 0.05,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "low plants",
+    "pulpy fruit (suggested)",
+    "insects (speculative)"
+   ],
+   "intake_pct_mass_day": 0.8,
+   "intake_range": [
+    0.8,
+    1.3
+   ],
+   "intake_basis": "dry matter",
+   "water_pct_mass_day": 3.0,
+   "social": "juveniles in groups (Alag Teeg, Bayan Mandahu; killed together by sandstorms); adults alone",
+   "predators": [
+    "raptor",
+    "osmolskae",
+    "wyvern"
+   ],
+   "predators_real": "Velociraptor on juveniles (inference)",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:scrubland": 1.0,
+    "animals:red_dunes": 0.5
+   },
+   "formation": "Djadokhta Formation, Mongolia (Campanian, ~75-71 Ma); Bayan Mandahu; Alagteeg",
+   "why": "the scrubland's big herbivore; young are raptor-sized prey; shares the ankylosaur model with gastonia",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Pinacosaurus",
+    "https://app.pan.pl/article/item/app20100055.html",
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Djadokhta&show=size&rank=genus"
+   ]
+  },
+  {
+   "name": "gastonia",
+   "binomial": "Gastonia burgei",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 1900,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.9,
+    "fruit": 0.05,
+    "seeds": 0.05,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "low plants: ferns, horsetails, cycadophytes (inference)"
+   ],
+   "intake_pct_mass_day": 0.8,
+   "intake_range": [
+    0.8,
+    1.3
+   ],
+   "intake_basis": "dry matter",
+   "water_pct_mass_day": 3.0,
+   "social": "bonebeds suggest groups; one formed in a drought or flood",
+   "predators": [
+    "utahraptor",
+    "wyvern"
+   ],
+   "predators_real": "Utahraptor (found together); armour as defence (Kirkland)",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:floodplain": 1.0,
+    "animals:scrubland": 0.3,
+    "animals:fern_forest": 0.3
+   },
+   "formation": "Cedar Mountain Formation, Yellow Cat Member, Utah (Berriasian-Valanginian, ~139-134 Ma)",
+   "why": "the floodplain's commonest dinosaur; armoured adults are hard prey",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Gastonia_(dinosaur)",
+    "https://en.wikipedia.org/wiki/Cedar_Mountain_Formation",
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Cedar%20Mountain&member=Yellow%20Cat&rank=genus"
+   ]
+  },
+  {
+   "name": "sauropod",
+   "binomial": "Cedarosaurus weiskopfae",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 10000,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.95,
+    "fruit": 0.0,
+    "seeds": 0.05,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "Araucaria-type conifer browse",
+    "horsetails",
+    "ferns",
+    "Ginkgo (forest)"
+   ],
+   "intake_pct_mass_day": 0.7,
+   "intake_range": [
+    0.58,
+    0.8
+   ],
+   "intake_basis": "dry matter",
+   "water_pct_mass_day": 2.5,
+   "social": "herds (inference)",
+   "predators": [
+    "utahraptor",
+    "wyvern"
+   ],
+   "predators_real": "Utahraptor and the allosauroid on young (inference)",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:floodplain": 1.0,
+    "animals:fern_forest": 0.5
+   },
+   "formation": "Cedar Mountain Formation, Yellow Cat Member, Utah (Berriasian-Valanginian, ~139-134 Ma); stands for Moabosaurus and the Yixian's Dongbeititan",
+   "mass_note": "estimate, no published figure found",
+   "why": "the high browser; adult carcasses feed the dead for weeks",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Cedar_Mountain_Formation",
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911",
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Cedar%20Mountain&member=Yellow%20Cat&rank=genus"
+   ]
+  },
+  {
+   "name": "citipati",
+   "binomial": "Citipati osmolskae",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 90,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.4,
+    "fruit": 0.1,
+    "seeds": 0.25,
+    "roots": 0.0,
+    "insects": 0.1,
+    "meat": 0.15,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "plants",
+    "seeds (inference)",
+    "small vertebrates and eggs (inference: troodontid skulls in a nest)"
+   ],
+   "intake_pct_mass_day": 2.5,
+   "intake_range": [
+    1.6,
+    3.6
+   ],
+   "water_pct_mass_day": 3.0,
+   "social": "nests of up to 22 eggs in rings, brooded by a parent with arms round the nest",
+   "predators": [
+    "raptor",
+    "osmolskae",
+    "wyvern"
+   ],
+   "predators_real": "Velociraptor on young and eggs (inference)",
+   "prey_mass_ratio": {
+    "min": 0.0005,
+    "max_alone": 0.05,
+    "max_group": null,
+    "note": "inference"
+   },
+   "biomes": {
+    "animals:red_dunes": 1.0,
+    "animals:scrubland": 0.7
+   },
+   "formation": "Djadokhta Formation, Mongolia (Campanian, ~75-71 Ma) (Ukhaa Tolgod)",
+   "why": "the dunes' omnivore; brooding nests",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Citipati",
+    "https://en.wikipedia.org/wiki/Djadochta_Formation"
+   ]
+  },
+  {
+   "name": "psittacosaurus",
+   "binomial": "Psittacosaurus lujiatunensis",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 25,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.6,
+    "fruit": 0.1,
+    "seeds": 0.3,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "tough plants ground with gastroliths (even hatchlings)",
+    "seeds and nuts (proposed)"
+   ],
+   "intake_pct_mass_day": 2.0,
+   "intake_range": [
+    1.8,
+    4.6
+   ],
+   "intake_basis": "dry matter",
+   "water_pct_mass_day": 3.0,
+   "social": "juveniles in groups of one age, without adults",
+   "predators": [
+    "utahraptor",
+    "wyvern"
+   ],
+   "predators_real": "Repenomamus (a juvenile in its gut; one attacking an adult), Yutyrannus and compsognathids (inference)",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:fern_forest": 1.0,
+    "animals:floodplain": 0.3,
+    "animals:scrubland": 0.3
+   },
+   "formation": "Yixian Formation, Jehol Biota, Liaoning (Barremian, ~125 Ma)",
+   "why": "the forest's small common herbivore",
+   "sources": [
+    "https://www.doi.org/10.4202/APP.2012.0128",
+    "https://www.eurekalert.org/news-releases/1121542",
+    "https://en.wikipedia.org/wiki/Repenomamus",
+    "https://en.wikipedia.org/wiki/Yixian_Formation"
+   ]
+  },
+  {
+   "name": "kryptobaatar",
+   "binomial": "Kryptobaatar dashzevegi",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 0.04,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.0,
+    "fruit": 0.1,
+    "seeds": 0.3,
+    "roots": 0.0,
+    "insects": 0.45,
+    "meat": 0.15,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "insects",
+    "seeds",
+    "eggs (inference)",
+    "carcasses (mammal borings on Protoceratops bones)"
+   ],
+   "intake_pct_mass_day": 25.0,
+   "intake_range": [
+    20,
+    30
+   ],
+   "water_pct_mass_day": 5.0,
+   "social": "burrowing (inference); hopped like a jerboa",
+   "predators": [
+    "raptor",
+    "osmolskae",
+    "citipati"
+   ],
+   "predators_real": "Velociraptor, troodontids, oviraptorids, lizards (inference)",
+   "prey_mass_ratio": {
+    "min": 0.0001,
+    "max_alone": 0.1,
+    "max_group": null,
+    "note": "insects and eggs"
+   },
+   "biomes": {
+    "animals:red_dunes": 1.0,
+    "animals:scrubland": 1.0,
+    "animals:fern_forest": 0.5,
+    "animals:floodplain": 0.5,
+    "animals:crags": 0.3
+   },
+   "formation": "Djadokhta Formation, Mongolia (Campanian, ~75-71 Ma); multituberculates also lived in the Yixian and the Cedar Mountain (bend: one row everywhere)",
+   "mass_note": "estimate",
+   "why": "the small-animal level everywhere",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Kryptobaatar",
+    "https://en.wikipedia.org/wiki/Djadochta_Formation",
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Djadokhta&show=size&rank=genus",
+    "https://doi.org/10.1016/j.palaeo.2011.07.024"
+   ]
+  },
+  {
+   "name": "lizard",
+   "binomial": "Adamisaurus magnidentatus",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 0.05,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.05,
+    "fruit": 0.05,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 0.9,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "insects"
+   ],
+   "intake_pct_mass_day": 2.5,
+   "intake_range": [
+    1.9,
+    2.7
+   ],
+   "water_pct_mass_day": 1.0,
+   "social": "solitary",
+   "predators": [
+    "raptor",
+    "osmolskae",
+    "citipati",
+    "gobipteryx"
+   ],
+   "predators_real": "Velociraptor, troodontids, oviraptorids; in the Jehol, compsognathids and Microraptor (gut contents)",
+   "prey_mass_ratio": {
+    "min": 0.0001,
+    "max_alone": 0.05,
+    "max_group": null,
+    "note": "insects"
+   },
+   "biomes": {
+    "animals:red_dunes": 1.0,
+    "animals:scrubland": 1.0,
+    "animals:crags": 0.6,
+    "animals:floodplain": 0.5,
+    "animals:fern_forest": 0.5
+   },
+   "formation": "Djadokhta Formation, Mongolia (Campanian, ~75-71 Ma); lizards in all three formations (bend: one row everywhere)",
+   "mass_note": "estimate",
+   "why": "insect eaters in every biome",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Djadochta_Formation",
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Djadokhta&show=size&rank=genus",
+    "https://www.nationalgeographic.com/science/article/new-fossil-lizard-found-inside-microraptor-dinosaur"
+   ]
+  },
+  {
+   "name": "confuciusornis",
+   "binomial": "Confuciusornis sanctus",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 0.5,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.0,
+    "fruit": 0.0,
+    "seeds": 0.4,
+    "roots": 0.0,
+    "insects": 0.2,
+    "meat": 0.0,
+    "fish": 0.4,
+    "carrion": 0.0
+   },
+   "foods": [
+    "fish (remains in one specimen)",
+    "seeds or plants (proposed)",
+    "insects (inference)"
+   ],
+   "intake_pct_mass_day": 15.0,
+   "intake_range": [
+    4.5,
+    18
+   ],
+   "water_pct_mass_day": 5.0,
+   "social": "flocks; many killed together",
+   "predators": [
+    "utahraptor"
+   ],
+   "predators_real": "Sinocalliopteryx (two in its gut), Microraptor, pterosaurs",
+   "prey_mass_ratio": {
+    "min": 0.0005,
+    "max_alone": 0.05,
+    "max_group": null,
+    "note": "small fish and insects"
+   },
+   "biomes": {
+    "animals:fern_forest": 1.0,
+    "animals:floodplain": 0.6
+   },
+   "formation": "Yixian Formation, Jehol Biota, Liaoning (Barremian, ~125 Ma)",
+   "mass_note": "estimate",
+   "why": "small fliers of the forest and water; shares the early-bird model with gobipteryx",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Yixian_Formation",
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Yixian&rank=genus&show=class",
+    "https://www.smithsonianmag.com/science-nature/stomach-contents-preserve-sinocalliopteryx-snacks-23453368/"
+   ]
+  },
+  {
+   "name": "gobipteryx",
+   "binomial": "Gobipteryx minuta",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 0.3,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.0,
+    "fruit": 0.1,
+    "seeds": 0.3,
+    "roots": 0.0,
+    "insects": 0.6,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "insects",
+    "seeds (inference)"
+   ],
+   "intake_pct_mass_day": 15.0,
+   "intake_range": [
+    4.5,
+    18
+   ],
+   "water_pct_mass_day": 5.0,
+   "social": "cliff colonies (game); embryos in eggs known",
+   "predators": [
+    "raptor",
+    "osmolskae"
+   ],
+   "predators_real": "Velociraptor, troodontids (inference)",
+   "prey_mass_ratio": {
+    "min": 0.0005,
+    "max_alone": 0.05,
+    "max_group": null,
+    "note": "insects"
+   },
+   "biomes": {
+    "animals:crags": 1.0,
+    "animals:scrubland": 1.0,
+    "animals:red_dunes": 0.5
+   },
+   "formation": "Djadokhta Formation, Mongolia (Campanian, ~75-71 Ma)",
+   "mass_note": "estimate",
+   "why": "the crags' and dry biomes' small life",
+   "sources": [
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Djadokhta&show=size&rank=genus"
+   ]
+  },
+  {
+   "name": "crocodyliform",
+   "binomial": "Neosuchia indet. (Yellow Cat Member)",
+   "tier": 2,
+   "in_game": false,
+   "mass_kg": 150,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.0,
+    "fruit": 0.0,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.3,
+    "fish": 0.6,
+    "carrion": 0.1
+   },
+   "foods": [
+    "fish (lungfish, semionotids)",
+    "turtles",
+    "young dinosaurs at the water"
+   ],
+   "intake_pct_mass_day": 0.9,
+   "intake_range": [
+    0.87,
+    1.71
+   ],
+   "water_pct_mass_day": 0.0,
+   "social": "solitary; in water",
+   "predators": [
+    "utahraptor",
+    "wyvern"
+   ],
+   "predators_real": "Utahraptor on young (inference)",
+   "prey_mass_ratio": {
+    "min": 0.001,
+    "max_alone": 1.0,
+    "max_group": null,
+    "note": "as living crocodiles"
+   },
+   "biomes": {
+    "animals:floodplain": 1.0,
+    "animals:fern_forest": 0.4
+   },
+   "formation": "Cedar Mountain Formation, Yellow Cat Member, Utah (Berriasian-Valanginian, ~139-134 Ma)",
+   "mass_note": "estimate (2-3 m)",
+   "why": "the water's hunter, and a predator for young Utahraptors",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Cedar_Mountain_Formation",
+    "https://en.wikipedia.org/wiki/Utahraptor"
+   ]
+  },
+  {
+   "name": "wood_beetles",
+   "binomial": "Coleoptera (wood and dung beetles)",
+   "tier": 3,
+   "in_game": false,
+   "mass_kg": 0.001,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 1.0,
+    "fruit": 0.0,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "rotting wood, dung (as leaves/plant matter)"
+   ],
+   "intake_pct_mass_day": null,
+   "social": "-",
+   "predators": [
+    "lizard",
+    "kryptobaatar",
+    "gobipteryx",
+    "confuciusornis",
+    "citipati"
+   ],
+   "predators_real": "small vertebrates",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:floodplain": 1.0,
+    "animals:fern_forest": 1.0,
+    "animals:scrubland": 0.5,
+    "animals:crags": 0.5
+   },
+   "formation": "all; insects at their Mesozoic peak in the Yixian",
+   "why": "insects for the insect eaters (found under logs, in rotten wood)",
+   "sources": [
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Yixian&rank=genus&show=class"
+   ]
+  },
+  {
+   "name": "termites",
+   "binomial": "Isoptera and ants (nests)",
+   "tier": 3,
+   "in_game": false,
+   "mass_kg": 1e-05,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 1.0,
+    "fruit": 0.0,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "dead plant matter"
+   ],
+   "intake_pct_mass_day": null,
+   "social": "colonies",
+   "predators": [
+    "lizard",
+    "kryptobaatar"
+   ],
+   "predators_real": "alvarezsaurs (Shuvuuia, inference), lizards, mammals",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:red_dunes": 1.0,
+    "animals:scrubland": 1.0
+   },
+   "formation": "Djadokhta Formation, Mongolia (Campanian, ~75-71 Ma) (inference)",
+   "why": "the dry biomes' insects",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Djadochta_Formation"
+   ]
+  },
+  {
+   "name": "carrion_insects",
+   "binomial": "carcass beetles (dermestid-like)",
+   "tier": 3,
+   "in_game": false,
+   "mass_kg": 0.0001,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.0,
+    "fruit": 0.0,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 0.0,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 1.0
+   },
+   "foods": [
+    "carcasses: borings, pupal chambers, gnawed joints in Protoceratops and Velociraptor bones"
+   ],
+   "intake_pct_mass_day": null,
+   "social": "-",
+   "predators": [
+    "lizard",
+    "kryptobaatar"
+   ],
+   "predators_real": "small vertebrates",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:red_dunes": 1.0,
+    "animals:scrubland": 1.0,
+    "animals:floodplain": 1.0,
+    "animals:fern_forest": 1.0,
+    "animals:crags": 1.0
+   },
+   "formation": "Djadokhta Formation, Mongolia (Campanian, ~75-71 Ma)",
+   "why": "the dead: they speed rot",
+   "sources": [
+    "https://doi.org/10.1016/j.palaeo.2011.07.024",
+    "https://en.wikipedia.org/wiki/Djadochta_Formation"
+   ]
+  },
+  {
+   "name": "lungfish",
+   "binomial": "Ceratodus kempae / C. kirklandi (with Semionotus, Amia)",
+   "tier": 3,
+   "in_game": false,
+   "mass_kg": 3,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.2,
+    "fruit": 0.0,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 0.5,
+    "meat": 0.0,
+    "fish": 0.3,
+    "carrion": 0.0
+   },
+   "foods": [
+    "snails, insect larvae, plants, small fish (inference)"
+   ],
+   "intake_pct_mass_day": null,
+   "social": "-",
+   "predators": [
+    "crocodyliform",
+    "utahraptor",
+    "wyvern"
+   ],
+   "predators_real": "crocodyliforms, pterosaurs",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:floodplain": 1.0
+   },
+   "formation": "Cedar Mountain Formation, Yellow Cat Member, Utah (Berriasian-Valanginian, ~139-134 Ma)",
+   "why": "fish as a catch in the floodplain's water",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Cedar_Mountain_Formation",
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Cedar%20Mountain&member=Yellow%20Cat&rank=genus"
+   ]
+  },
+  {
+   "name": "lycoptera",
+   "binomial": "Lycoptera davidi",
+   "tier": 3,
+   "in_game": false,
+   "mass_kg": 0.02,
+   "diet": {
+    "grass": 0.0,
+    "leaves": 0.0,
+    "fruit": 0.0,
+    "seeds": 0.0,
+    "roots": 0.0,
+    "insects": 1.0,
+    "meat": 0.0,
+    "fish": 0.0,
+    "carrion": 0.0
+   },
+   "foods": [
+    "insect larvae, plankton"
+   ],
+   "intake_pct_mass_day": null,
+   "social": "shoals",
+   "predators": [
+    "confuciusornis",
+    "crocodyliform"
+   ],
+   "predators_real": "birds, choristoderes, Microraptor, pterosaurs",
+   "prey_mass_ratio": null,
+   "biomes": {
+    "animals:fern_forest": 1.0
+   },
+   "formation": "Yixian Formation, Jehol Biota, Liaoning (Barremian, ~125 Ma)",
+   "why": "fish as a catch in the forest's lakes",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Yixian_Formation"
+   ]
+  }
+ ],
+ "plants": [
+  {
+   "name": "horsetail",
+   "taxon": "Equisetum",
+   "gives": {
+    "leaves": 1.0
+   },
+   "value": "high",
+   "biomes": [
+    "red_dunes (pond edges)",
+    "floodplain",
+    "fern_forest",
+    "scrubland (hollows)"
+   ],
+   "seasons": "shoots in the wet season; persists on wet ground",
+   "sources": [
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911"
+   ]
+  },
+  {
+   "name": "ground_fern",
+   "taxon": "ferns (incl. marattialeans)",
+   "gives": {
+    "leaves": 0.9,
+    "roots": 0.1
+   },
+   "value": "medium",
+   "biomes": [
+    "floodplain",
+    "fern_forest",
+    "scrubland",
+    "crags"
+   ],
+   "seasons": "flush with rain, dies back in drought (inference)",
+   "sources": [
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911"
+   ]
+  },
+  {
+   "name": "tree_fern",
+   "taxon": "Tempskya",
+   "gives": {
+    "leaves": 1.0
+   },
+   "value": "poor",
+   "biomes": [
+    "floodplain"
+   ],
+   "seasons": "all year",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Cedar_Mountain_Formation",
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911"
+   ]
+  },
+  {
+   "name": "cycadophyte",
+   "taxon": "cycads and bennettitaleans",
+   "gives": {
+    "leaves": 0.7,
+    "seeds": 0.3
+   },
+   "value": "poor leaves; seeds",
+   "biomes": [
+    "red_dunes",
+    "scrubland",
+    "floodplain",
+    "fern_forest",
+    "crags"
+   ],
+   "seasons": "seeds after the rains (inference)",
+   "sources": [
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911",
+    "https://en.wikipedia.org/wiki/Yixian_Formation"
+   ]
+  },
+  {
+   "name": "araucaria",
+   "taxon": "Araucariaceae",
+   "gives": {
+    "leaves": 0.7,
+    "seeds": 0.3
+   },
+   "value": "high energy, slow to ferment (big guts)",
+   "biomes": [
+    "floodplain",
+    "fern_forest",
+    "crags"
+   ],
+   "seasons": "cones late in the wet season (inference)",
+   "sources": [
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911"
+   ]
+  },
+  {
+   "name": "scale_conifer",
+   "taxon": "Cheirolepidiaceae (Brachyphyllum, Frenelopsis)",
+   "gives": {
+    "leaves": 1.0
+   },
+   "value": "low (inference); drought-tolerant",
+   "biomes": [
+    "red_dunes",
+    "scrubland",
+    "crags"
+   ],
+   "seasons": "all year",
+   "sources": [
+    "inference"
+   ]
+  },
+  {
+   "name": "podocarp_pine",
+   "taxon": "Podocarpaceae, Pinaceae, Cupressaceae",
+   "gives": {
+    "leaves": 0.8,
+    "seeds": 0.2
+   },
+   "value": "podocarps poor",
+   "biomes": [
+    "fern_forest"
+   ],
+   "seasons": "cones in autumn (inference)",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Yixian_Formation",
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911"
+   ]
+  },
+  {
+   "name": "ginkgo",
+   "taxon": "Ginkgo apodes",
+   "gives": {
+    "leaves": 0.7,
+    "fruit": 0.3
+   },
+   "value": "leaves good; fleshy seeds",
+   "biomes": [
+    "fern_forest"
+   ],
+   "seasons": "leaves spring-summer, seeds autumn, deciduous (as the living one)",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Yixian_Formation",
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911"
+   ]
+  },
+  {
+   "name": "gnetalean",
+   "taxon": "Ephedra-like gnetaleans",
+   "gives": {
+    "fruit": 0.5,
+    "seeds": 0.3,
+    "leaves": 0.2
+   },
+   "value": "medium (inference)",
+   "biomes": [
+    "red_dunes",
+    "scrubland",
+    "fern_forest"
+   ],
+   "seasons": "fruit after the rains (inference)",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Yixian_Formation"
+   ]
+  },
+  {
+   "name": "early_angiosperm",
+   "taxon": "Archaefructus, Potamogeton (water plants)",
+   "gives": {
+    "leaves": 0.6,
+    "seeds": 0.4
+   },
+   "value": "medium (inference)",
+   "biomes": [
+    "fern_forest (lakes)"
+   ],
+   "seasons": "summer (inference)",
+   "sources": [
+    "https://en.wikipedia.org/wiki/Yixian_Formation",
+    "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Yixian&rank=genus&show=class"
+   ]
+  }
+ ],
+ "webs": [
+  {
+   "biome": "animals:red_dunes",
+   "formation": "Djadokhta Formation, Mongolia (Campanian, ~75-71 Ma)",
+   "plants": [
+    "scale_conifer",
+    "gnetalean",
+    "cycadophyte",
+    "horsetail",
+    "ground_fern"
+   ],
+   "eats": [
+    [
+     "protoceratops",
+     "scale_conifer"
+    ],
+    [
+     "protoceratops",
+     "gnetalean"
+    ],
+    [
+     "protoceratops",
+     "cycadophyte"
+    ],
+    [
+     "protoceratops",
+     "horsetail"
+    ],
+    [
+     "pinacosaurus",
+     "cycadophyte"
+    ],
+    [
+     "pinacosaurus",
+     "horsetail"
+    ],
+    [
+     "pinacosaurus",
+     "gnetalean"
+    ],
+    [
+     "citipati",
+     "gnetalean"
+    ],
+    [
+     "citipati",
+     "cycadophyte"
+    ],
+    [
+     "citipati",
+     "lizard"
+    ],
+    [
+     "citipati",
+     "kryptobaatar"
+    ],
+    [
+     "citipati",
+     "termites"
+    ],
+    [
+     "kryptobaatar",
+     "termites"
+    ],
+    [
+     "kryptobaatar",
+     "carrion_insects"
+    ],
+    [
+     "kryptobaatar",
+     "gnetalean"
+    ],
+    [
+     "lizard",
+     "termites"
+    ],
+    [
+     "lizard",
+     "carrion_insects"
+    ],
+    [
+     "gobipteryx",
+     "termites"
+    ],
+    [
+     "gobipteryx",
+     "gnetalean"
+    ],
+    [
+     "raptor",
+     "protoceratops"
+    ],
+    [
+     "raptor",
+     "kryptobaatar"
+    ],
+    [
+     "raptor",
+     "lizard"
+    ],
+    [
+     "raptor",
+     "gobipteryx"
+    ],
+    [
+     "raptor",
+     "citipati"
+    ],
+    [
+     "raptor",
+     "pinacosaurus"
+    ],
+    [
+     "osmolskae",
+     "protoceratops"
+    ],
+    [
+     "osmolskae",
+     "kryptobaatar"
+    ],
+    [
+     "osmolskae",
+     "lizard"
+    ],
+    [
+     "wyvern",
+     "protoceratops"
+    ],
+    [
+     "wyvern",
+     "citipati"
+    ],
+    [
+     "wyvern",
+     "pinacosaurus"
+    ],
+    [
+     "wyvern",
+     "raptor"
+    ],
+    [
+     "wyvern",
+     "osmolskae"
+    ],
+    [
+     "termites",
+     "scale_conifer"
+    ],
+    [
+     "termites",
+     "gnetalean"
+    ],
+    [
+     "raptor",
+     "carcass"
+    ],
+    [
+     "carrion_insects",
+     "carcass"
+    ],
+    [
+     "kryptobaatar",
+     "carcass"
+    ]
+   ],
+   "notes": "Protoceratops dominant (PBDB: 23 collections, Velociraptor 13, Pinacosaurus 12). Plants nearly unknown (only fossil roots): the plant list is inference. The dead: Velociraptor scavenging, mammal and insect borings, all fossil evidence. Water only in short-lived interdune ponds. Real extras not in the game: Zalambdalestes, Shuvuuia, troodontids, Gobiosuchus, Zangerlia, azhdarchids."
+  },
+  {
+   "biome": "animals:scrubland",
+   "formation": "Bayan Mandahu Formation, Inner Mongolia (Campanian, ~75-71 Ma); Barun Goyot for the drier edge",
+   "plants": [
+    "scale_conifer",
+    "gnetalean",
+    "cycadophyte",
+    "ground_fern",
+    "horsetail"
+   ],
+   "eats": [
+    [
+     "pinacosaurus",
+     "cycadophyte"
+    ],
+    [
+     "pinacosaurus",
+     "gnetalean"
+    ],
+    [
+     "pinacosaurus",
+     "ground_fern"
+    ],
+    [
+     "protoceratops",
+     "scale_conifer"
+    ],
+    [
+     "protoceratops",
+     "gnetalean"
+    ],
+    [
+     "gastonia",
+     "ground_fern"
+    ],
+    [
+     "psittacosaurus",
+     "cycadophyte"
+    ],
+    [
+     "citipati",
+     "gnetalean"
+    ],
+    [
+     "citipati",
+     "lizard"
+    ],
+    [
+     "kryptobaatar",
+     "termites"
+    ],
+    [
+     "lizard",
+     "termites"
+    ],
+    [
+     "gobipteryx",
+     "termites"
+    ],
+    [
+     "osmolskae",
+     "protoceratops"
+    ],
+    [
+     "osmolskae",
+     "pinacosaurus"
+    ],
+    [
+     "osmolskae",
+     "kryptobaatar"
+    ],
+    [
+     "raptor",
+     "protoceratops"
+    ],
+    [
+     "raptor",
+     "lizard"
+    ],
+    [
+     "utahraptor",
+     "pinacosaurus"
+    ],
+    [
+     "utahraptor",
+     "protoceratops"
+    ],
+    [
+     "utahraptor",
+     "raptor"
+    ],
+    [
+     "utahraptor",
+     "osmolskae"
+    ],
+    [
+     "termites",
+     "scale_conifer"
+    ],
+    [
+     "utahraptor",
+     "psittacosaurus"
+    ],
+    [
+     "wyvern",
+     "pinacosaurus"
+    ],
+    [
+     "wyvern",
+     "protoceratops"
+    ],
+    [
+     "wyvern",
+     "utahraptor"
+    ],
+    [
+     "carrion_insects",
+     "carcass"
+    ],
+    [
+     "raptor",
+     "carcass"
+    ]
+   ],
+   "notes": "Bayan Mandahu: Velociraptor osmolskae's home (add it here), Protoceratops hellenikorhinus, many juvenile Pinacosaurus, Linheraptor, oviraptorids. Utahraptor here is a game bend (Utah, ~60 Myr older): it gives the 'young raptor eaten by a Utahraptor' link."
+  },
+  {
+   "biome": "animals:floodplain",
+   "formation": "Cedar Mountain Formation, Yellow Cat Member, Utah (Berriasian-Valanginian, ~139-134 Ma)",
+   "plants": [
+    "horsetail",
+    "ground_fern",
+    "tree_fern",
+    "cycadophyte",
+    "araucaria",
+    "scale_conifer"
+   ],
+   "eats": [
+    [
+     "iguanodont",
+     "horsetail"
+    ],
+    [
+     "iguanodont",
+     "ground_fern"
+    ],
+    [
+     "iguanodont",
+     "cycadophyte"
+    ],
+    [
+     "iguanodont",
+     "araucaria"
+    ],
+    [
+     "gastonia",
+     "ground_fern"
+    ],
+    [
+     "gastonia",
+     "horsetail"
+    ],
+    [
+     "gastonia",
+     "cycadophyte"
+    ],
+    [
+     "sauropod",
+     "araucaria"
+    ],
+    [
+     "sauropod",
+     "horsetail"
+    ],
+    [
+     "sauropod",
+     "tree_fern"
+    ],
+    [
+     "psittacosaurus",
+     "ground_fern"
+    ],
+    [
+     "kryptobaatar",
+     "wood_beetles"
+    ],
+    [
+     "lizard",
+     "wood_beetles"
+    ],
+    [
+     "confuciusornis",
+     "lungfish"
+    ],
+    [
+     "confuciusornis",
+     "wood_beetles"
+    ],
+    [
+     "lungfish",
+     "wood_beetles"
+    ],
+    [
+     "wood_beetles",
+     "araucaria"
+    ],
+    [
+     "wood_beetles",
+     "tree_fern"
+    ],
+    [
+     "utahraptor",
+     "iguanodont"
+    ],
+    [
+     "utahraptor",
+     "gastonia"
+    ],
+    [
+     "utahraptor",
+     "sauropod"
+    ],
+    [
+     "utahraptor",
+     "psittacosaurus"
+    ],
+    [
+     "utahraptor",
+     "crocodyliform"
+    ],
+    [
+     "utahraptor",
+     "confuciusornis"
+    ],
+    [
+     "utahraptor",
+     "lungfish"
+    ],
+    [
+     "crocodyliform",
+     "lungfish"
+    ],
+    [
+     "crocodyliform",
+     "utahraptor"
+    ],
+    [
+     "crocodyliform",
+     "iguanodont"
+    ],
+    [
+     "wyvern",
+     "iguanodont"
+    ],
+    [
+     "wyvern",
+     "sauropod"
+    ],
+    [
+     "wyvern",
+     "utahraptor"
+    ],
+    [
+     "wyvern",
+     "crocodyliform"
+    ],
+    [
+     "wyvern",
+     "lungfish"
+    ],
+    [
+     "utahraptor",
+     "carcass"
+    ],
+    [
+     "crocodyliform",
+     "carcass"
+    ],
+    [
+     "carrion_insects",
+     "carcass"
+    ]
+   ],
+   "notes": "Gastonia the commonest dinosaur; Utahraptor 4 PBDB collections. Seasonal, possibly monsoonal rain on swelling, cracking clay soils (Vertisols); shallow lakes in the rains, cracks to 1.5 m in the dry; wildfires. No flowering plants at ~139-134 Ma (inference). Real extras: the large allosauroid (apex), Falcarius (lower member), Nedcolbertia, turtles, Cifelliodon. Crocodyliform eating utahraptor means young ones."
+  },
+  {
+   "biome": "animals:fern_forest",
+   "formation": "Yixian Formation, Jehol Biota, Liaoning (Barremian, ~125 Ma)",
+   "plants": [
+    "araucaria",
+    "podocarp_pine",
+    "ginkgo",
+    "cycadophyte",
+    "ground_fern",
+    "horsetail",
+    "gnetalean",
+    "early_angiosperm"
+   ],
+   "eats": [
+    [
+     "psittacosaurus",
+     "cycadophyte"
+    ],
+    [
+     "psittacosaurus",
+     "ground_fern"
+    ],
+    [
+     "psittacosaurus",
+     "gnetalean"
+    ],
+    [
+     "psittacosaurus",
+     "ginkgo"
+    ],
+    [
+     "iguanodont",
+     "ground_fern"
+    ],
+    [
+     "iguanodont",
+     "horsetail"
+    ],
+    [
+     "iguanodont",
+     "ginkgo"
+    ],
+    [
+     "iguanodont",
+     "podocarp_pine"
+    ],
+    [
+     "sauropod",
+     "araucaria"
+    ],
+    [
+     "sauropod",
+     "ginkgo"
+    ],
+    [
+     "gastonia",
+     "ground_fern"
+    ],
+    [
+     "confuciusornis",
+     "lycoptera"
+    ],
+    [
+     "confuciusornis",
+     "early_angiosperm"
+    ],
+    [
+     "confuciusornis",
+     "wood_beetles"
+    ],
+    [
+     "kryptobaatar",
+     "wood_beetles"
+    ],
+    [
+     "kryptobaatar",
+     "ginkgo"
+    ],
+    [
+     "lizard",
+     "wood_beetles"
+    ],
+    [
+     "lycoptera",
+     "wood_beetles"
+    ],
+    [
+     "wood_beetles",
+     "podocarp_pine"
+    ],
+    [
+     "utahraptor",
+     "psittacosaurus"
+    ],
+    [
+     "utahraptor",
+     "iguanodont"
+    ],
+    [
+     "utahraptor",
+     "confuciusornis"
+    ],
+    [
+     "crocodyliform",
+     "lycoptera"
+    ],
+    [
+     "wyvern",
+     "psittacosaurus"
+    ],
+    [
+     "wyvern",
+     "iguanodont"
+    ],
+    [
+     "wyvern",
+     "sauropod"
+    ],
+    [
+     "wyvern",
+     "utahraptor"
+    ],
+    [
+     "carrion_insects",
+     "carcass"
+    ],
+    [
+     "utahraptor",
+     "carcass"
+    ]
+   ],
+   "notes": "Psittacosaurus the commonest dinosaur; Confuciusornis the commonest vertebrate in PBDB; insects at their Mesozoic peak. Cool (MAT ~10 C, cold winters) and humid with dry spells: warmer in the game. Real apex Yutyrannus (~1.4 t) and the mammal Repenomamus (ate young Psittacosaurus) are stood in for by the wyvern and Utahraptor. Choristoderes and turtles in the lakes."
+  },
+  {
+   "biome": "animals:crags",
+   "formation": "none: uplands are not preserved; built from edge faunas and living mountain webs (inference)",
+   "plants": [
+    "araucaria",
+    "scale_conifer",
+    "cycadophyte",
+    "ground_fern"
+   ],
+   "eats": [
+    [
+     "kryptobaatar",
+     "wood_beetles"
+    ],
+    [
+     "kryptobaatar",
+     "cycadophyte"
+    ],
+    [
+     "wood_beetles",
+     "araucaria"
+    ],
+    [
+     "lizard",
+     "wood_beetles"
+    ],
+    [
+     "gobipteryx",
+     "wood_beetles"
+    ],
+    [
+     "gobipteryx",
+     "cycadophyte"
+    ],
+    [
+     "wyvern",
+     "carcass"
+    ],
+    [
+     "carrion_insects",
+     "carcass"
+    ],
+    [
+     "lizard",
+     "carrion_insects"
+    ]
+   ],
+   "notes": "The wyvern hunts out of the crags into every other biome; its prey there is in those webs. The crags hold its nests, small life, and the remains of its kills (carrion insects and rot). A web check must count the wyvern's range, not just the crags."
+  }
+ ],
+ "sources": {
+  "hone2012": "https://doi.org/10.1016/j.palaeo.2012.02.021",
+  "hone2010": "https://www.livescience.com/11006-velociraptor-frozen-time-scavenging-larger-dinosaur.html",
+  "fighting": "https://en.wikipedia.org/wiki/Fighting_Dinosaurs",
+  "velo": "https://en.wikipedia.org/wiki/Velociraptor",
+  "fowler2011": "https://doi.org/10.1371/journal.pone.0028964",
+  "schmitz2011": "https://doi.org/10.1126/science.1200043",
+  "fred2020": "https://edition.cnn.com/2020/05/08/us/raptor-pack-hunting-questions-scn-trnd",
+  "li2008": "https://doi.org/10.1007/s00114-007-0310-7",
+  "utah": "https://en.wikipedia.org/wiki/Utahraptor",
+  "ugs": "https://geology.utah.gov/popular/dinosaurs-fossils/megablock",
+  "djad": "https://en.wikipedia.org/wiki/Djadochta_Formation",
+  "naug2016": "https://doi.org/10.1134/S0031030116120133",
+  "saneyoshi2011": "https://doi.org/10.1016/j.palaeo.2011.07.024",
+  "proto": "https://en.wikipedia.org/wiki/Protoceratops",
+  "norell2020": "https://doi.org/10.1038/s41586-020-2412-8",
+  "pinaco": "https://en.wikipedia.org/wiki/Pinacosaurus",
+  "currie2011": "https://app.pan.pl/article/item/app20100055.html",
+  "citipati": "https://en.wikipedia.org/wiki/Citipati",
+  "krypto": "https://en.wikipedia.org/wiki/Kryptobaatar",
+  "cmf": "https://en.wikipedia.org/wiki/Cedar_Mountain_Formation",
+  "joeckel": "https://research.unl.edu/blog/soil-study-lends-clues-to-ancient-climate",
+  "kirkland1999": "https://www.miketaylor.org.uk/tmp/PDF/Kirkland%20et%20al%201999%20-%20distrib%20of%20Cedar%20Mtn%20Fm%20vert%20faunas.pdf",
+  "gastonia": "https://en.wikipedia.org/wiki/Gastonia_(dinosaur)",
+  "mcdonald2010": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2989904",
+  "yixian": "https://en.wikipedia.org/wiki/Yixian_Formation",
+  "amiot2011": "https://doi.org/10.1073/pnas.1011369108",
+  "repeno": "https://en.wikipedia.org/wiki/Repenomamus",
+  "zhao2014": "https://www.doi.org/10.4202/APP.2012.0128",
+  "psittaco_gastro": "https://www.eurekalert.org/news-releases/1121542",
+  "hummel2008": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911",
+  "witton2008": "https://doi.org/10.1371/journal.pone.0002271",
+  "naish2017": "https://peerj.com/articles/2908/",
+  "wiemann2022": "https://www.nature.com/articles/s41586-022-04770-6",
+  "grady2014": "https://experts.arizona.edu/en/publications/evidence-for-mesothermy-in-dinosaurs/",
+  "nagy1999": "https://doi.org/10.1146/annurev.nutr.19.1.247",
+  "pbdb_djad": "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Djadokhta&show=size&rank=genus",
+  "pbdb_yc": "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Cedar%20Mountain&member=Yellow%20Cat&rank=genus",
+  "pbdb_yix": "https://paleobiodb.org/data1.2/occs/taxa.txt?formation=Yixian&rank=genus&show=class",
+  "microraptor": "https://www.nationalgeographic.com/science/article/new-fossil-lizard-found-inside-microraptor-dinosaur",
+  "sinocalli": "https://www.smithsonianmag.com/science-nature/stomach-contents-preserve-sinocalliopteryx-snacks-23453368/"
+ }
+}

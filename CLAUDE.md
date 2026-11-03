@@ -14,7 +14,8 @@ game), `animals`, `portals`, `packages`, `testkit`.
   Research behind decisions: `reports/`.
 - **Before changing gameplay**: `notes/SYSTEMS.md`: how survival, temperature, seasons, food,
   levels, animals, eggs and the HUD connect, and what to check when one changes. Why they are as
-  they are: `notes/SURVIVAL.md`, `notes/ANIMALS.md`. The numbers: `mods/base/vitals/SHEET.md`,
+  they are: `notes/SURVIVAL.md`, `notes/ANIMALS.md`. The loop still to build (rain by season,
+  plants, grazers, hunters, rot, soil), with its numbers from real places: `notes/ECOLOGY.md`. The numbers: `mods/base/vitals/SHEET.md`,
   `mods/animals/SPECIES.md` (both generated).
 - **The look**: `notes/STYLE.md`, and the `game-art` (UI parts, item icons) and `blocky-model`
   (models) skills.

@@ -35,6 +35,22 @@ flowchart LR
   animal --> screen["Animal screen<br/>animals screen.rs"]
 ```
 
+### Planned: the living world
+
+The loop that closes this map, designed in `notes/ECOLOGY.md` and not built yet. Rain by season
+comes from the climate table and falls through the air. It wets the soil, and plants grow by the
+place. Grazers eat the plants and hunters eat the grazers, all through one forage goal and food
+categories. A place's food sets how many animals it holds. What dies and rots becomes compost,
+and compost makes farmland fertile. Every part reads the same few shared things:
+- the place (`air_at` grown into `place_at`);
+- the climate table;
+- a plant table;
+- food categories;
+- the forage goal.
+
+Their numbers come from real places, plants and animals through one pacing. As each part is
+built, it gets its row below and its arrows above.
+
 ## The systems
 
 | System | Code | Numbers | Reads | Read by |
