@@ -55,3 +55,33 @@ pub fn of(block: &str, age: Option<u8>) -> Option<&'static Source> {
 pub fn grows(c: Category) -> bool {
     SOURCES.iter().any(|s| s.category == c)
 }
+
+/// How much of a diet's food a place grows now, 0 to 1 (`notes/ECOLOGY.md`, part 7): the best
+/// rate (`plants::rate`) among the plants that bring back the foods it eats, in that day's mean
+/// air and soil water. `None`: it eats nothing that grows (a hunter, until it hunts).
+pub fn lushness(eats: impl Fn(Category) -> bool, air: f32, soil: f32) -> Option<f32> {
+    SOURCES
+        .iter()
+        .filter(|s| eats(s.category))
+        .filter_map(|s| s.renews.and_then(crate::plants::of))
+        .map(|p| crate::plants::rate(p, air, soil))
+        .reduce(f32::max)
+}
+
+/// How much of a diet's food a biome grows through a season, 0 to 1: `lushness` on average over
+/// the season (`plants::season_rate_in`), in a biome of that mean, seasons and rain; without
+/// seasons (`None`), the year's. What a place feeds, for how many come and how fed (part 7).
+pub fn season_lushness(eats: impl Fn(Category) -> bool, celsius: f32, seasons: f32, rain: [f32; 4], season: Option<usize>) -> Option<f32> {
+    let plants: Vec<&crate::plants::Plant> = SOURCES
+        .iter()
+        .filter(|s| eats(s.category))
+        .filter_map(|s| s.renews.and_then(crate::plants::of))
+        .collect();
+    let at = |season: usize| {
+        plants
+            .iter()
+            .map(|p| crate::plants::season_rate_in(p, celsius, seasons, rain, season))
+            .fold(0.0f32, f32::max)
+    };
+    (!plants.is_empty()).then(|| season.map_or_else(|| (0..4).map(at).sum::<f32>() / 4.0, at))
+}

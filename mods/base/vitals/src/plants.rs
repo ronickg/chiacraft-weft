@@ -142,12 +142,17 @@ pub fn soil_water(rain: [f32; 4], celsius: f32, seasons: f32, calendar: bool, ke
 /// A plant's rate there through season `season` (0 spring), on average: the middle day's air and
 /// the season's soil, for the sheet and the checks.
 pub fn season_rate(p: &Plant, c: &Climate, season: usize) -> f32 {
+    season_rate_in(p, c.celsius, c.seasons, c.rain, season)
+}
+
+/// `season_rate` in a climate of that mean, seasons and rain (a biome's `base_api::Climate`).
+pub fn season_rate_in(p: &Plant, celsius: f32, seasons: f32, rain: [f32; 4], season: usize) -> f32 {
     let first = season as u64 * calendar::SEASON_DAYS as u64;
     let days = first + calendar::YEAR_DAYS as u64..first + calendar::YEAR_DAYS as u64 + calendar::SEASON_DAYS as u64;
     let n = days.end - days.start;
     days.map(|d| {
-        let air = mean_air(c.celsius, c.seasons, (d % calendar::YEAR_DAYS as u64) as f32 + 0.5);
-        let soil = if p.water == Water::Wet { 1.0 } else { soil_water(c.rain, c.celsius, c.seasons, true, 7, d) };
+        let air = mean_air(celsius, seasons, (d % calendar::YEAR_DAYS as u64) as f32 + 0.5);
+        let soil = if p.water == Water::Wet { 1.0 } else { soil_water(rain, celsius, seasons, true, 7, d) };
         rate(p, air, soil)
     })
     .sum::<f32>()

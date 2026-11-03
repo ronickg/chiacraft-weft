@@ -5,6 +5,10 @@
 //! (`base:grazed_grass`), a berry bush starts its fruit again. So a lush place keeps its animals
 //! fed and a dry season thins them, through their condition (`comfort::condition`).
 //!
+//! Its place feeds as many as its food grows: plant eaters come by natural spawning as often as
+//! their food grows there this season (`season_lush`), and each mouthful feeds as well as the
+//! plant grows today (dry-season grass is poor fodder).
+//!
 //! Wild plant eaters get hungry (`Species::forages_wild`, `animal::upkeep`); tames forage when
 //! hungry and not told to stay (`commands::hold` comes first).
 
@@ -35,6 +39,41 @@ pub fn init(r: &mut Registry) {
     for s in &SPECIES {
         r.attach(s.kind, &FORAGE);
     }
+    // A place holds as many as it feeds (`notes/ECOLOGY.md`, part 7): plant eaters come as often
+    // as their food grows there now, so fewer in a drought or a winter.
+    r.intercept(&question::NATURAL_SPAWN, |q| {
+        let kind = q.query().other as u32;
+        let Some(s) = SPECIES
+            .iter()
+            .find(|s| s.kind.id() == kind && s.forages_wild())
+        else {
+            return Verdict::Abstain;
+        };
+        let w = q.world();
+        let come = SPAWN_FLOOR + (1.0 - SPAWN_FLOOR) * season_lush(&w, s, q.pos());
+        if (w.random_below(10_000) as f32) < come * 10_000.0 { Verdict::Abstain } else { Verdict::Deny }
+    });
+}
+
+/// The share of natural spawns that still come where nothing grows this season: animals live
+/// through a winter or a drought, fewer and thinner.
+const SPAWN_FLOOR: f32 = 0.2;
+
+/// How much of its food its biome grows through this season, 0 to 1
+/// (`vitals::forage::season_lushness`); 1 for one that doesn't forage.
+pub fn season_lush(w: &World, s: &Species, pos: [i32; 3]) -> f32 {
+    let c = base_api::CLIMATE
+        .on_biome(w.biome(pos))
+        .unwrap_or(base_api::TEMPERATE);
+    let season = crate::breeding::season_bit(w).map(|bit| bit.trailing_zeros() as usize);
+    vitals::forage::season_lushness(|k| s.eats(k), c.celsius, c.seasons, c.rain, season).unwrap_or(1.0)
+}
+
+/// How much of its food the place at `pos` grows now, 0 to 1 (`vitals::forage::lushness`); 1 for
+/// one that doesn't forage.
+pub fn lush(w: &World, s: &Species, pos: [i32; 3]) -> f32 {
+    let g = base_api::ground_at(w, pos);
+    vitals::forage::lushness(|c| s.eats(c), g.mean_air, g.soil).unwrap_or(1.0)
 }
 
 /// Whether it is foraging (a resting animal settles only when it isn't: hungry, it eats first).
@@ -96,8 +135,16 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
         }
         let at = t.map(|v| v as i32);
         if let Some(src) = food(s, w.get(at)) {
-            animal::feed(w, id, src.food);
-            weft_sdk::info!("animal {id} eats {} at {at:?} (food {} of {:.0})", src.block, a.food + src.food, a.stat(species::FOOD));
+            // Growing food feeds as well as it grows now: dry-season grass is poor fodder.
+            let fodder = if src.renews.is_some() { 0.4 + 0.6 * lush(w, s, at) } else { 1.0 };
+            animal::feed(w, id, (src.food as f32 * fodder).round().max(1.0) as u16);
+            weft_sdk::info!(
+                "animal {id} eats {} at {at:?} ({:.0}% as good as at its best; food {} of {:.0})",
+                src.block,
+                fodder * 100.0,
+                a.food,
+                a.stat(species::FOOD)
+            );
             match src.eaten {
                 Eaten::Becomes(name) => {
                     if let Some(b) = becomes(name) {

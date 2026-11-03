@@ -517,6 +517,31 @@ and cactus.**
 
 ### 7. Capacity and populations
 
+**Built for plant eaters (2026-11-03).**
+- **How lush a place is:** `vitals::forage::season_lushness` gives how much of a diet's food a
+  biome grows through a season, from its plants' rates.
+- **Spawning:** the engine asks before a natural spawn (`question::NATURAL_SPAWN`, new), and the
+  animals mod lets plant eaters come as often as their food grows this season, never under a
+  fifth (`forage.rs`).
+- **Arriving:** a wild plant eater arrives as fed as its place feeds it (from 30% where nothing
+  grows), and in its breeding season a quarter of the wild ones met are this year's young
+  (`animal::arrive`).
+- **Fodder:** each mouthful feeds as well as the plant grows that day, so dry-season grass is
+  poor fodder.
+- **Starving:** a wild animal with an empty stomach starves in a game day. A tame never does;
+  its condition falls instead.
+- **The sheet:** `SPECIES.md` shows each plant eater's food at home season by season (the
+  capybara: savanna 43/82/75/19%).
+- **Seen in the game (plains):** a capybara met in summer arrived 68% fed (53% lush); one met in
+  winter arrived 30% fed, and its winter grass fed 40%.
+- **Not seen:** a spawn turned down, or a wild animal starving to death.
+- **Not yet:**
+  - **Standing water:** capacity ignores it, so a swamp feeds more in its dry season than the
+    number says;
+  - **Hunters:** their capacity comes with their prey;
+  - **Young without mothers:** young aren't spawned with a mother; they come in their groups.
+
+
 - **Capacity:** a place's capacity for a species is how much of its food categories the
   biome's plants (or, for hunters, its grazers) give this season, against how much one animal
   eats.

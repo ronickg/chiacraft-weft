@@ -198,6 +198,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | how | passive |
 | diet | herbivore |
 | eats | grass 75%, water plants 20%, fruit 5% |
+| its food grows at home (spring/summer/autumn/winter) | swamp 8/59/45/0%, savanna 43/82/75/19%, forest 11/73/41/0% |
 | feedings to tame at level 1 | 3 (2.5x at level 150) |
 | scared by a walking player within | nothing |
 | eats (food points) | `base:wheat` 10; `base:wheat_seeds` 3; `base:bread` 15; `base:hay_bale` 90; `base:apple` 15, favorite; `base:sugar_cane` 12, favorite; `base:berries` 8, favorite; `animals:kibble` 30, kibble |

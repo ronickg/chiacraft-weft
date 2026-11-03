@@ -19,6 +19,8 @@ flowchart LR
   climate --> plants
   plants --> forage["Foraging<br/>animals forage.rs"]
   forage --> animal
+  plants --> capacity["Capacity<br/>spawning by food"]
+  capacity --> animal
   calendar["Calendar and seasons<br/>vitals::calendar"] --> air
   fires["Fires, roofs, water<br/>blocks in the world"] --> air
   air --> player["Player's body<br/>base survival/"]
@@ -45,7 +47,7 @@ flowchart LR
 ### Planned: the living world
 
 The loop that closes this map, designed in `notes/ECOLOGY.md`; rain by season, soil water,
-plants by the place, food kinds and plant eaters' foraging are built (the rows below). Rain by season
+plants by the place, food kinds, plant eaters' foraging and capacity are built (the rows below). Rain by season
 comes from the climate table and falls through the air. It wets the soil, and plants grow by the
 place. Grazers eat the plants and hunters eat the grazers, all through one forage goal and food
 categories. A place's food sets how many animals it holds. What dies and rots becomes compost,
@@ -66,6 +68,7 @@ built, it gets its row below and its arrows above.
 | Climates | `vitals::climate::BIOMES`, each from a real place (`reports/ecology/Biome climates.md`) | same | the research | the air, the weather; biomes set it (`base_api::climate` in `worldgen.rs`, `cretaceous.rs`) |
 | Food kinds, diets | `vitals::food::Category`, `Species::eats` | `FOODS` rows, species rows | the research | foraging, the sheets, the animal screen's kind |
 | Foraging | `vitals::forage::SOURCES`, `mods/animals/src/forage.rs` | `SOURCES` rows | diets, plants (grazed grass grows back), hunger | animals' food and condition |
+| Capacity | `vitals::forage::season_lushness`, `forage.rs` (`NATURAL_SPAWN`), `animal::arrive` | `SPAWN_FLOOR`, `ARRIVES_FED`, `YOUNG_PERCENT`, `STARVES_SECS` | plants, climates, calendar, breeding seasons | natural spawning, how fed wild ones arrive, young in season, starving |
 | Plants, soil water | `vitals::plants` (`PLANTS`, `rate`, `soil_water`), `base_api::ground_at`, `mods/base/src/growth.rs` | `PLANTS` rows, `GROWING` | climates, rain schedule, calendar, height, water within 4 blocks | the growing blocks' steps (wheat, berry bush, sapling, sugar cane, cactus) |
 | Rain by season | `mods/base/src/weather.rs`, `vitals::climate::{spell, rains, thunders}` | `rain` per season in `BIOMES` | climates, calendar, the world's seed | the engine (`set_rain`: rain drawn only where it falls), the air (`raining_at`) |
 | Calendar, seasons | `vitals::calendar` | `SEASON_DAYS`, `MIDSUMMER` | engine day time | the air, breeding seasons, day length (`.seasons(..)` on dimensions), the HUD clock |

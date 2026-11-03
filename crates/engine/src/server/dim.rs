@@ -1722,6 +1722,11 @@ impl Dim {
                     continue;
                 }
                 let n = rule.group[0] + (self.rng.next() % (rule.group[1] - rule.group[0] + 1) as u64) as u32;
+                // A mod may turn it down (`question::NATURAL_SPAWN`: no food there for them).
+                let mut q = abi::Query { pos: spot.to_array(), other: rule.entity as u64, amount: n as f64, ..abi::Query::DEFAULT };
+                if !self.ask(c, abi::question::NATURAL_SPAWN, &mut q) {
+                    continue;
+                }
                 for _ in 0..n {
                     self.spawn(c, rule.entity, DVec3::new(x as f64 + 0.5, y as f64, z as f64 + 0.5));
                 }

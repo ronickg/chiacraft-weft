@@ -37,6 +37,8 @@ pub mod question {
     pub static ENTER_DIMENSION: Question = Question::named(q::ENTER_DIMENSION);
     /// `entity` (a player) picking up `item` (count in `amount`), `other` the item entity.
     pub static PICKUP_ITEM: Question = Question::named(q::PICKUP_ITEM);
+    /// A natural spawn about to happen at `pos`: `other` the entity kind, `amount` how many.
+    pub static NATURAL_SPAWN: Question = Question::named(q::NATURAL_SPAWN);
     /// `entity` attacking `other` with `item`.
     pub static ATTACK: Question = Question::named(q::ATTACK);
     /// `entity` about to be hurt by `other` for `amount` of `cause`: deny to prevent it.

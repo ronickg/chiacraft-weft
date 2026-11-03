@@ -136,6 +136,7 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         let new = a.species == 0;
         if new {
             *a = roll(w, index);
+            arrive(w, id, index, a, st.pos);
         }
         let away = if a.seen == 0 { 0 } else { life::age(w.time(), a.seen) };
         a.seen = life::birth(w.time(), 0);
@@ -193,6 +194,40 @@ fn roll(w: &World, index: usize) -> Animal {
     a.food = a.stat(species::FOOD).round() as u16;
     a
 }
+
+/// A wild one just met (`notes/ECOLOGY.md`, part 7): a plant eater is as fed as its place feeds
+/// it now (thin in a drought); in its breeding season a share of them are this year's young.
+fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
+    let s = &SPECIES[index];
+    if s.forages_wild() {
+        let lush = crate::forage::season_lush(w, s, pos.map(|v| v.floor() as i32));
+        a.food = (a.stat(species::FOOD) * (ARRIVES_FED + (1.0 - ARRIVES_FED) * lush)).round() as u16;
+        weft_sdk::info!(
+            "wild {} {id} arrives {:.0}% fed (its food grows at {:.0}% here this season)",
+            s.name,
+            a.food as f32 / a.stat(species::FOOD) * 100.0,
+            lush * 100.0
+        );
+    }
+    let in_season = crate::breeding::season_bit(w).is_none_or(|bit| s.bio.breeds & bit != 0);
+    if in_season && w.random_below(100) < YOUNG_PERCENT {
+        // Born this season, up to most of the way grown.
+        let age = s.growth() as u64 * w.random_below(80) as u64 / 100;
+        let growing = (s.growth() as u64 - age) as u32;
+        a.born = life::birth(w.time(), age);
+        a.stage = life::stage(s, growing, BABY);
+        if let Some(b) = w.component_mut(id, &crate::breeding::BREEDING) {
+            b.growing = growing;
+        }
+    }
+}
+
+/// Share of its food a wild plant eater has where nothing grows, and the share of wild ones met
+/// in their breeding season that are young.
+const ARRIVES_FED: f32 = 0.3;
+const YOUNG_PERCENT: u32 = 25;
+/// Seconds a wild one lives on an empty stomach at full health before it starves.
+const STARVES_SECS: f32 = 1200.0;
 
 /// Its area was away (unloaded) for `away` ticks, and life went on there (`notes/ANIMALS.md`,
 /// "Time away"): its timers run out (a mother due gives birth now), it has aged (by the world's
@@ -305,9 +340,18 @@ fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f3
 }
 
 /// Once a second: a tame or a wild plant eater uses a point of food every so often (its species'
-/// `hunger`, `rate` times as often out of its comfort); it eats from the world (`forage.rs`).
+/// `hunger`, `rate` times as often out of its comfort); it eats from the world (`forage.rs`). A
+/// wild one with an empty stomach starves.
 fn hunger(w: &World, id: u64, a: &Animal, rate: f32) {
     let Some(s) = a.species() else { return };
+    // A wild one with nothing left starves to death in a game day (a tame suffers, never dies:
+    // its condition falls instead).
+    if a.food == 0 && !tamed(w, id) {
+        if let Some(st) = w.entity(id) {
+            w.damage(id, st.max_health / STARVES_SECS, 0, damage::STARVE);
+        }
+        return;
+    }
     let every = ((s.hunger / rate).max(1.0) as u64).max(1);
     if a.food > 0 && (w.time() / 20) % every == 0 {
         if let Some(a) = w.component_mut(id, &ANIMAL) {

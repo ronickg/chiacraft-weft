@@ -260,6 +260,25 @@ fn species(w: &mut String, s: &Species) {
         .collect::<Vec<_>>()
         .join(", ");
     let _ = writeln!(w, "| eats | {eats} |");
+    // How much of its food grows at home, season by season (`vitals::forage::season_lushness`):
+    // how many come there and how fed (`notes/ECOLOGY.md`, part 7).
+    if s.forages_wild() {
+        let homes = s
+            .habitats
+            .iter()
+            .filter_map(|&(biome, _)| {
+                let c = vitals::climate::of(biome)?;
+                let by = (0..4)
+                    .map(|season| vitals::forage::season_lushness(|k| s.eats(k), c.celsius, c.seasons, c.rain, Some(season)).unwrap_or(0.0))
+                    .map(|l| format!("{:.0}", l * 100.0))
+                    .collect::<Vec<_>>()
+                    .join("/");
+                Some(format!("{} {by}%", biome.split(':').nth(1).unwrap_or(biome)))
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let _ = writeln!(w, "| its food grows at home (spring/summer/autumn/winter) | {homes} |");
+    }
     let _ = writeln!(w, "| feedings to tame at level 1 | {} (2.5x at level 150) |", s.feedings);
     let _ = writeln!(
         w,

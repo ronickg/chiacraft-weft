@@ -2826,6 +2826,9 @@ pub mod question {
     pub const ENTER_DIMENSION: &str = "core:enter_dimension";
     /// `entity` (a player) picking up `item` (count in `amount`), `other` the item entity.
     pub const PICKUP_ITEM: &str = "core:pickup_item";
+    /// A natural spawn (`Host::reg_spawn`) about to happen at `pos`: `other` the entity kind,
+    /// `amount` how many together. Denied, none come this time (no food there for them).
+    pub const NATURAL_SPAWN: &str = "core:natural_spawn";
     /// `entity` attacking `other` with `item`.
     pub const ATTACK: &str = "core:attack";
     /// `entity` about to be hurt by `other` for `amount` of `cause`, before the damage chain.
