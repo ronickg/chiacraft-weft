@@ -180,13 +180,18 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     let p = palette();
     var color = s.color.rgb;
     if open_sky() && !in_liquid() {
+        // The engine dims their color with the day (`sky.rs`); the palette lights them instead.
+        let d = clamp(scene.sun.y * 2.0 + 0.5, 0.0, 1.0);
+        let dimmed = pow(vec3(d * 0.9 + 0.1, d * 0.9 + 0.1, d * 0.85 + 0.15), vec3(2.2));
+        let albedo = s.color.rgb / max(dimmed, vec3(0.005));
         let ndl = max(dot(n, light_dir()), 0.0);
         // Undersides take the horizon's color, so they go rose at sunset.
-        let below = mix(p.ambient * 1.6, p.horizon * 0.75 + p.ambient * 0.5, select(0.0, 1.0, n.y < 0.0));
+        let below = mix(p.ambient * 1.6, p.horizon * 0.9 + p.ambient * 0.6, select(0.0, 1.0, n.y < 0.0));
         var lit = below * (0.85 + 0.15 * n.y) + p.sun * light_strength() * ndl * 0.95;
-        // The rim facing the sun shines.
-        lit += p.glow * pow(max(dot(dir, scene.sun.xyz), 0.0), 8.0) * 0.6 * light_strength();
-        color = s.color.rgb * lit;
+        // Toward the sun they glow, and the rim facing it shines.
+        let mu = max(dot(dir, scene.sun.xyz), 0.0);
+        lit += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength();
+        color = albedo * lit;
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0), dir.z))), smoothstep(0.3, 1.0, dist));
         color = display(color);
     } else {
@@ -297,7 +302,8 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     var rgb = c.rgb;
     if open_sky() && !in_liquid() {
         // Bodies shine through the tone curve; stars dim in the haze low down.
-        if s.ids.y == SKY_BODY {
+        // The sun shines through the tone curve; the moon keeps its markings.
+        if s.ids.y == SKY_BODY && dot(dir, scene.sun.xyz) > 0.0 {
             rgb = rgb * 2.2;
         }
         a *= 1.0 - rain_amount() * 0.9;

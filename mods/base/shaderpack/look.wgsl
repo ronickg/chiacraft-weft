@@ -15,13 +15,9 @@ fn in_liquid() -> bool {
     return abs(scene.params.x - 0.6 * scene.params.y) > 0.5;
 }
 
-// Rain, read from the fog: rain turns it grey (`sky::rained`), which takes the blue out of it.
-// Clear daylight fog is about 0.25 more blue than red, full rain 0.16. The sunrise and sunset warm
-// the fog toward where the camera looks, so it is only read while the sun is up.
+// How hard it rains, 0..1 (the engine puts it beside the fog's color).
 fn rain_amount() -> f32 {
-    let f = scene.fog_color.rgb;
-    let blue = (f.b - f.r) / max(f.b, 1e-4);
-    return clamp((0.245 - blue) / 0.08, 0.0, 1.0) * smoothstep(0.12, 0.3, scene.sun.y);
+    return clamp(scene.fog_color.w, 0.0, 1.0);
 }
 
 fn luma(c: vec3<f32>) -> f32 {
@@ -53,20 +49,21 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 // sunset, dusk and night, blended between.
 fn palette() -> Palette {
     let e = scene.sun.y;
-    let day = key(vec3(0.13, 0.30, 0.80), vec3(0.52, 0.68, 0.95), vec3(1.0, 0.92, 0.78), vec3(1.25, 1.12, 0.96), vec3(0.30, 0.38, 0.56));
-    let golden = key(vec3(0.16, 0.26, 0.70), vec3(0.98, 0.70, 0.52), vec3(1.0, 0.72, 0.42), vec3(1.30, 0.92, 0.58), vec3(0.32, 0.32, 0.50));
-    let sunset = key(vec3(0.17, 0.15, 0.46), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.10, 0.52, 0.28), vec3(0.30, 0.22, 0.38));
-    let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.11, 0.10, 0.20));
-    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.10, 0.14, 0.24), vec3(0.045, 0.060, 0.11));
+    let day = key(vec3(0.09, 0.26, 0.85), vec3(0.42, 0.60, 0.95), vec3(1.0, 0.92, 0.78), vec3(0.84, 0.78, 0.68), vec3(0.20, 0.27, 0.42));
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.78, 0.66, 0.62), vec3(1.0, 0.72, 0.42), vec3(1.15, 0.80, 0.50), vec3(0.22, 0.24, 0.38));
+    let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
+    let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
+    // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
+    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.025, 0.04, 0.10), vec3(0.010, 0.017, 0.050));
     var p: Palette;
-    if e > 0.15 {
-        p = blend(golden, day, smoothstep(0.15, 0.5, e));
-    } else if e > 0.02 {
-        p = blend(sunset, golden, smoothstep(0.02, 0.15, e));
-    } else if e > -0.12 {
-        p = blend(dusk, sunset, smoothstep(-0.12, 0.02, e));
+    if e > 0.08 {
+        p = blend(golden, day, smoothstep(0.08, 0.28, e));
+    } else if e > -0.02 {
+        p = blend(sunset, golden, smoothstep(-0.02, 0.08, e));
+    } else if e > -0.14 {
+        p = blend(dusk, sunset, smoothstep(-0.14, -0.02, e));
     } else {
-        p = blend(night, dusk, smoothstep(-0.3, -0.12, e));
+        p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
     // Overcast: grey and dim, and the sun no more than a brighter part of the sky.
     let r = rain_amount();
@@ -106,9 +103,9 @@ fn sun_glow(dir: vec3<f32>, p: Palette) -> vec3<f32> {
 fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let p = palette();
     let h = clamp(dir.y, 0.0, 1.0);
-    var c = mix(p.horizon, p.zenith, pow(h, 0.48));
+    var c = mix(p.horizon, p.zenith, pow(h, 0.4));
     let mu = dot(dir, scene.sun.xyz);
-    let low = 1.0 - smoothstep(0.0, 0.35, abs(scene.sun.y));
+    let low = 1.0 - smoothstep(0.0, 0.2, abs(scene.sun.y));
     // Away from the sun the sunset sky goes rose and violet.
     let away = (0.5 - 0.5 * mu) * (1.0 - h) * low;
     c = mix(c, c * vec3(0.95, 0.72, 1.12) + vec3(0.04, 0.0, 0.05), away * 0.7);
@@ -144,6 +141,13 @@ fn block_light(b: vec3<f32>, pos: vec3<f32>) -> vec3<f32> {
     return curve * warm * 1.55 * flicker;
 }
 
+// How much a surface with normal `n` faces the sun. With the sun low its light wraps a little
+// over the tops, which are otherwise only grazed: the warm ground of the golden hour.
+fn sun_facing(n: vec3<f32>) -> f32 {
+    let wrap = 0.45 * (1.0 - smoothstep(0.05, 0.3, abs(scene.sun.y)));
+    return max((dot(n, light_dir()) + wrap) / (1.0 + wrap), 0.0);
+}
+
 // Light arriving at a surface with normal `n`. `light` is the world's (sky, red, green, blue, 0..1),
 // `shadow` 1 where the sun reaches it, `ao` the corner shading.
 fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>) -> vec3<f32> {
@@ -155,8 +159,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // Direct light only where the sky reaches (it keeps caves out of reach of the traced shadow's
     // gaps), and without corner shading: corners are dark where little sky gets in.
     let open = smoothstep(0.5, 0.95, light.x);
-    let ndl = max(dot(n, light_dir()), 0.0);
-    c += p.sun * light_strength() * ndl * shadow * open * mix(0.75, 1.0, ao);
+    c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
     c += block_light(light.yzw, pos) * mix(0.5, 1.0, ao);
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
@@ -199,13 +202,19 @@ fn haze(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
 
 // ---- to the screen ----
 
-// Filmic tone curve (Narkowicz's fit of ACES) on exposed light, a little more color, and a warm
-// lift in the shadows: linear light for the sRGB screen.
+// Light as it is up to `KNEE`, then a soft shoulder that never quite reaches white: the darks
+// stay as vanilla shows them and only what is brighter than the screen is folded back in.
+const KNEE: f32 = 0.6;
+
+fn shoulder(x: vec3<f32>) -> vec3<f32> {
+    let over = max(x - vec3(KNEE), vec3(0.0));
+    return min(x, vec3(KNEE)) + (1.0 - KNEE) * (vec3(1.0) - exp(-over / (1.0 - KNEE)));
+}
+
+// The tone curve and a little more color: linear light for the sRGB screen.
 fn display(c: vec3<f32>) -> vec3<f32> {
-    let x = max(c, vec3(0.0)) * 1.05;
-    var t = clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), vec3(0.0), vec3(1.0));
+    var t = shoulder(max(c, vec3(0.0)));
     let y = luma(t);
-    t = max(mix(vec3(y), t, 1.14), vec3(0.0));
-    t = t + vec3(0.010, 0.004, 0.0) * (1.0 - smoothstep(0.0, 0.2, y));
+    t = max(mix(vec3(y), t, 1.06), vec3(0.0));
     return clamp(t, vec3(0.0), vec3(1.0));
 }

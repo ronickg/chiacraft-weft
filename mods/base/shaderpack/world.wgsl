@@ -196,7 +196,8 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         out.color = vec3(1.0);
     } else {
         out.overlay = 0u;
-        out.color = tint;
+        // The tint is a gamma-space color; the pack lights in linear light.
+        out.color = pow(tint, vec3(2.2));
     }
     return out;
 }
@@ -258,7 +259,8 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
         out.color = vec3(1.0);
     } else {
         out.overlay = 0u;
-        out.color = tint;
+        // The tint is a gamma-space color; the pack lights in linear light.
+        out.color = pow(tint, vec3(2.2));
     }
     return out;
 }
@@ -292,7 +294,7 @@ fn shade(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     var light = surface_light(in, n);
     if in.glow != 0xffffffffu {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
-        light = max(light, select(in.tint, vec3(1.0), in.overlay != 0u) * e * 1.7);
+        light = max(light, select(pow(in.tint, vec3(2.2)), vec3(1.0), in.overlay != 0u) * e * 1.7);
     }
     var lit: vec4<f32>;
     if in.slot == 0u {
@@ -457,7 +459,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
         tint = unpack_rgb(biomes[(w1 >> FACE_BIOME_SHIFT) * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
-    out.color = tint;
+    out.color = pow(tint, vec3(2.2));
     return out;
 }
 

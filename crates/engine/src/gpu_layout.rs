@@ -436,6 +436,7 @@ gpu_struct! {
         /// Camera right and up in world space (particle billboards).
         pub right: [f32; 4],
         pub up: [f32; 4],
+        /// Linear rgb; w how hard it rains, 0..1 (shader packs).
         pub fog_color: [f32; 4],
         /// x fog start, y fog end, z daylight 0..1, w seconds (shader effects).
         pub params: [f32; 4],

@@ -2322,8 +2322,9 @@ impl Client {
         list.push(weft_render::Cmd::Mark);
     }
 
+    /// Linear rgb, and in w how hard it rains (0..1) for shader packs.
     pub fn fog_color(&self) -> [f32; 4] {
-        self.fog_linear().extend(1.0).to_array()
+        self.fog_linear().extend(self.rain.clamp(0.0, 1.0)).to_array()
     }
 }
 
