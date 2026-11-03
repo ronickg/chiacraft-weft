@@ -365,6 +365,8 @@ pub static SPECIES: [Species; 7] = [
             eats("base:wheat", 10),
             eats("base:wheat_seeds", 3),
             eats("base:bread", 15),
+            // A bale is nine wheat: a tame's food for a long while in one go.
+            eats("base:hay_bale", 90),
             favorite("base:apple", 15),
             favorite("base:sugar_cane", 12),
             KIBBLE,
