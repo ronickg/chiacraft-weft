@@ -53,6 +53,66 @@ pub struct Food {
     pub keeps: (f32, f32),
     /// The chance of food poisoning at any freshness (a poisonous food, already rotten meat).
     pub poison: f32,
+    /// What kind of food it is, for the animals' diets (`Category`).
+    pub category: Category,
+}
+
+/// The kinds of food a diet is made of (`notes/ECOLOGY.md`, part 4): every food item, every food
+/// in the world (`vitals::forage`) and every species' diet (`animals_core::species`) names them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Category {
+    Grass,
+    Leaves,
+    WaterPlants,
+    Fruit,
+    Seeds,
+    Roots,
+    Lichen,
+    Fungi,
+    Insects,
+    Meat,
+    Fish,
+    Carrion,
+}
+
+pub const CATEGORIES: [Category; 12] = [
+    Category::Grass,
+    Category::Leaves,
+    Category::WaterPlants,
+    Category::Fruit,
+    Category::Seeds,
+    Category::Roots,
+    Category::Lichen,
+    Category::Fungi,
+    Category::Insects,
+    Category::Meat,
+    Category::Fish,
+    Category::Carrion,
+];
+
+impl Category {
+    /// Its name in translations and sheets.
+    pub fn name(self) -> &'static str {
+        match self {
+            Category::Grass => "grass",
+            Category::Leaves => "leaves",
+            Category::WaterPlants => "water_plants",
+            Category::Fruit => "fruit",
+            Category::Seeds => "seeds",
+            Category::Roots => "roots",
+            Category::Lichen => "lichen",
+            Category::Fungi => "fungi",
+            Category::Insects => "insects",
+            Category::Meat => "meat",
+            Category::Fish => "fish",
+            Category::Carrion => "carrion",
+        }
+    }
+
+    /// Plants and fungi, not animals.
+    pub fn plant(self) -> bool {
+        !matches!(self, Category::Insects | Category::Meat | Category::Fish | Category::Carrion)
+    }
 }
 
 const fn per(water: f32, protein: f32, carbs: f32, fat: f32, fiber: f32, vitamin_c: f32) -> Per100 {
@@ -71,6 +131,7 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (20.0, 20.0),
         poison: 0.0,
+        category: Category::Fruit,
     },
     Food {
         name: "base:bread",
@@ -80,6 +141,7 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (5.0, 5.0),
         poison: 0.0,
+        category: Category::Seeds,
     },
     Food {
         name: "base:porkchop",
@@ -89,6 +151,7 @@ pub const FOODS: &[Food] = &[
         raw: true,
         keeps: (2.0, 2.0),
         poison: 0.0,
+        category: Category::Meat,
     },
     Food {
         name: "base:cooked_porkchop",
@@ -98,6 +161,7 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (4.0, 4.0),
         poison: 0.0,
+        category: Category::Meat,
     },
     Food {
         name: "base:beef",
@@ -107,6 +171,7 @@ pub const FOODS: &[Food] = &[
         raw: true,
         keeps: (2.0, 2.0),
         poison: 0.0,
+        category: Category::Meat,
     },
     Food {
         name: "base:cooked_beef",
@@ -116,6 +181,7 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (4.0, 4.0),
         poison: 0.0,
+        category: Category::Meat,
     },
     Food {
         name: "base:chicken",
@@ -125,6 +191,7 @@ pub const FOODS: &[Food] = &[
         raw: true,
         keeps: (2.0, 2.0),
         poison: 0.0,
+        category: Category::Meat,
     },
     Food {
         name: "base:cooked_chicken",
@@ -134,6 +201,7 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (4.0, 4.0),
         poison: 0.0,
+        category: Category::Meat,
     },
     Food {
         name: "base:mutton",
@@ -143,6 +211,7 @@ pub const FOODS: &[Food] = &[
         raw: true,
         keeps: (2.0, 2.0),
         poison: 0.0,
+        category: Category::Meat,
     },
     Food {
         name: "base:cooked_mutton",
@@ -152,6 +221,7 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (4.0, 4.0),
         poison: 0.0,
+        category: Category::Meat,
     },
     Food {
         name: "base:rotten_flesh",
@@ -161,6 +231,7 @@ pub const FOODS: &[Food] = &[
         raw: true,
         keeps: (0.0, 0.0),
         poison: 0.8,
+        category: Category::Carrion,
     },
     Food {
         name: "base:spider_eye",
@@ -170,6 +241,7 @@ pub const FOODS: &[Food] = &[
         raw: true,
         keeps: (3.0, 3.0),
         poison: 1.0,
+        category: Category::Insects,
     },
     // Two eggs fried (100 g): protein and fat without meat.
     Food {
@@ -180,6 +252,7 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (2.0, 2.0),
         poison: 0.0,
+        category: Category::Meat,
     },
     // A quarter of an apple pie (200 g): sweet and filling, a little fruit in it.
     Food {
@@ -190,6 +263,7 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (4.0, 4.0),
         poison: 0.0,
+        category: Category::Fruit,
     },
     // A handful of wild berries (100 g), as blueberries: water, a little sugar, vitamin C.
     Food {
@@ -200,6 +274,7 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (6.0, 6.0),
         poison: 0.0,
+        category: Category::Fruit,
     },
     // Dry pet food (the animals mod's), as dry dog food.
     Food {
@@ -210,6 +285,7 @@ pub const FOODS: &[Food] = &[
         raw: false,
         keeps: (90.0, 90.0),
         poison: 0.0,
+        category: Category::Meat,
     },
 ];
 

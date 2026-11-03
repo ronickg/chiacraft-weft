@@ -439,6 +439,15 @@ and cactus.**
 
 ### 4. Food categories and diets
 
+**Built (2026-11-03).**
+- **The categories:** `vitals::food::Category` has the twelve kinds, and every food item has
+  one (the sheet's foods table).
+- **Diets:** every species' row has its researched diet as shares (`Species::eats`). Its label
+  (carnivore, omnivore, herbivore) follows from the plant share.
+- **The sheets:** `SPECIES.md` lists each diet.
+- **Not yet:** taming foods still come from each species' item list; water as a need.
+
+
 - **The categories:** grass, leaves, water plants, fruit, seeds, roots, lichen, fungi, insects, meat, fish, carrion and water. Water plants, lichen and fungi came from the research: the capybara lives on water plants, reindeer on lichen in winter, and the taiga's fungi feed rodents and boar.
 - **Food rows:** each row in `vitals::food::FOODS` gets its category, and each plant gives one.
   That covers player foods, items and plants.
@@ -456,6 +465,26 @@ and cactus.**
   (mammals need about 0.099 · mass^0.9 litres a day), or desert animals would crowd the few pools.
 
 ### 5. Wild hunger and the forage goal
+
+**Built for plant eaters (2026-11-03).**
+- **Food in the world:** `vitals::forage::SOURCES` lists tall grass (grazed short, growing back
+  by warmth and rain as `base:grazed_grass`), ripe berries (the bush starts again) and leaves
+  (always there).
+- **Wild hunger:** wild plant eaters get hungry like tames (`Species::forages_wild`).
+- **The goal:** `mods/animals/src/forage.rs` looks round for the nearest food of the diet, walks
+  there and eats a mouthful at a time until full. Tames forage too, unless told to stay, and a
+  foraging animal doesn't settle down to rest.
+- **Testing:** `/animal hungry [percent]` empties an animal's food.
+- **The check:** each plant eater's food grows back in each of its habitats in two seasons or
+  more (`animals/core/tests/places.rs`).
+- **Seen in the game:** a hungry capybara in the plains grazed four tall grasses in 40 seconds,
+  leaving short tufts.
+- **Not yet:**
+  - **Hunters:** they get hungry in the wild with prey, part 6.
+  - **Eating food off the ground:** needs the engine to tell a mod what a dropped item is.
+  - **Drinking.**
+  - **Unloaded areas:** a wild animal's hunger doesn't run while its area is unloaded.
+
 
 - **Hunger:** wild animals get the food meter tames have, using it up at the species' rate.
   Out of comfort it goes faster, as for tames (`comfort::upkeep`).

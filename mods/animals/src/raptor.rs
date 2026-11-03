@@ -100,6 +100,7 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
                 .then(settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)
+                .then(crate::forage::forage)
                 .then(ai::wander(0.6, 9.0)),
         )
         .on_hurt(|w, h| {
@@ -124,7 +125,7 @@ fn kind_of(w: &World, id: u64) -> Option<&'static Entity> {
 /// Every tick: now and then lie down to rest for a while, and show the pose.
 fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(c) = w.component_mut(id, &STATE) else { return false };
-    if c.rest == 0 && !w.navigating(id) && w.random_below(300) == 0 {
+    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(300) == 0 {
         c.rest = 400 + w.random_below(1200);
         c.rested = 0;
     }

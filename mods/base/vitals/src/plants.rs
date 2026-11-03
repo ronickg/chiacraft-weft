@@ -46,12 +46,14 @@ const fn p(block: &'static str, real: &'static str, warmth: (f32, f32, f32, f32)
 const ANY: u8 = 15;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 5] = [
+pub const PLANTS: [Plant; 6] = [
     p("base:wheat", "spring wheat", (0.0, 15.0, 23.0, 34.0), Water::Moderate, 110.0, ANY),
     p("base:berry_bush", "blueberry", (7.0, 20.0, 26.0, 32.0), Water::Moderate, 75.0, SUMMER_AUTUMN),
     p("base:sugar_cane", "sugar cane", (12.0, 22.0, 30.0, 38.0), Water::Wet, 0.0, ANY),
     p("base:cactus", "saguaro", (10.0, 25.0, 40.0, 50.0), Water::Dry, 0.0, ANY),
     p("base:sapling", "oak", (5.0, 18.0, 28.0, 38.0), Water::Moderate, 0.0, ANY),
+    // Grazed grass growing back to tall grass: 15-21 days in spring (`vitals::forage`).
+    p("base:grazed_grass", "prairie grass", (5.0, 15.0, 30.0, 40.0), Water::Moderate, 18.0, ANY),
 ];
 
 /// The plant that grows as this block.

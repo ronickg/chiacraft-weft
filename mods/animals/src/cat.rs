@@ -67,6 +67,7 @@ pub fn init(r: &mut Registry) {
                 .then(settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)
+                .then(crate::forage::forage)
                 .then(ai::wander(0.5, 7.0)),
         )
         .on_hurt(|w, h| {
@@ -80,7 +81,7 @@ pub fn init(r: &mut Registry) {
 /// Every tick: now and then settle down for a while (sit, then lie), and show the pose.
 fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(c) = w.component_mut(id, &STATE) else { return false };
-    if c.rest == 0 && !w.navigating(id) && w.random_below(300) == 0 {
+    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(300) == 0 {
         c.rest = 400 + w.random_below(1200);
         c.rested = 0;
     }

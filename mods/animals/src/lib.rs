@@ -23,6 +23,7 @@ mod capybara;
 mod cat;
 mod coats;
 mod comfort;
+mod forage;
 mod commands;
 mod cretaceous;
 mod dog;
@@ -95,6 +96,7 @@ fn init(r: &mut Registry) {
     breath::init(r);
     animal::init(r);
     comfort::init(r);
+    forage::init(r);
     screen::init(r);
     taming::init(r);
     commands::init(r);

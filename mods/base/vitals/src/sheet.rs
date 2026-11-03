@@ -7,7 +7,7 @@ use std::fmt::Write;
 use crate::effects;
 use crate::food::{self, NUTRIENT_NAMES};
 use crate::stats::{self, Growth};
-use crate::{calendar, climate, difficulty, levels, plants, temperature};
+use crate::{calendar, climate, difficulty, forage, levels, plants, temperature};
 
 pub fn markdown() -> String {
     let mut w = String::new();
@@ -21,6 +21,7 @@ pub fn markdown() -> String {
     effects_table(&mut w);
     climates(&mut w);
     plant_table(&mut w);
+    forage_table(&mut w);
     difficulties(&mut w);
     level_table(&mut w);
     w
@@ -41,7 +42,7 @@ fn stats_table(w: &mut String) {
 fn foods(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Foods\n\nA portion, what it holds of each nutrient, how long it digests, and game days fresh then stale.\n\n| food | g | units | {} | digests | keeps | |\n|---|---|---|---|---|---|---|---|---|---|---|",
+        "## Foods\n\nA portion, its kind for the animals' diets, what it holds of each nutrient, how long it digests, and game days fresh then stale.\n\n| food | kind | g | units | {} | digests | keeps | |\n|---|---|---|---|---|---|---|---|---|---|---|---|",
         NUTRIENT_NAMES.join(" | ")
     );
     for f in food::FOODS {
@@ -59,8 +60,9 @@ fn foods(w: &mut String) {
         .join(", ");
         let _ = writeln!(
             w,
-            "| {} | {} | {:.0} | {} | {:.0} min | {} + {} | {notes} |",
+            "| {} | {} | {} | {:.0} | {} | {:.0} min | {} + {} | {notes} |",
             f.name,
+            f.category.name(),
             f.grams,
             f.units(),
             p.iter()
@@ -171,6 +173,26 @@ fn plant_table(w: &mut String) {
             p.water,
             if p.days > 0.0 { format!("{}", p.days) } else { "-".into() }
         );
+    }
+    let _ = writeln!(w);
+}
+
+fn forage_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Food in the world\n\nWhat foraging animals eat of the world's blocks (`vitals::forage`), how much a mouthful feeds (a capybara holds 200), what eating it leaves, and what brings it back.\n\n| block | kind | food | eaten | grows back as |\n|---|---|---|---|---|"
+    );
+    for f in &forage::SOURCES {
+        let block = match f.age {
+            Some(a) => format!("{} (age {a})", f.block),
+            None => f.block.to_string(),
+        };
+        let eaten = match f.eaten {
+            forage::Eaten::Becomes(b) => format!("becomes {b}"),
+            forage::Eaten::Age(a) => format!("back to age {a}"),
+            forage::Eaten::Stays => "stays".into(),
+        };
+        let _ = writeln!(w, "| {block} | {} | {} | {eaten} | {} |", f.category.name(), f.food, f.renews.unwrap_or("always there"));
     }
     let _ = writeln!(w);
 }

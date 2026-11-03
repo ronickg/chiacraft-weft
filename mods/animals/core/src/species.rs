@@ -10,6 +10,8 @@
 //! after a change, `mods/animals/web/build.sh && node mods/animals/web/sheet.mjs`.
 
 pub use crate::biology::{Biology, Rarity, Social, Tune, seasons};
+pub use vitals::food::Category;
+use vitals::food::Category::*;
 
 /// Life stages, from a newborn to grown (`animal::Animal::stage`).
 pub const BABY: u8 = 0;
@@ -40,9 +42,11 @@ pub enum Size {
     Large,
 }
 
+/// What kind of eater it is, from its diet's plant share (`Species::diet`).
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Diet {
     Carnivore,
+    Omnivore,
     Herbivore,
 }
 
@@ -118,7 +122,9 @@ pub struct Species {
     /// The breed, for domestic species that have them (the gene file's breed).
     pub breed: Option<&'static str>,
     pub size: Size,
-    pub diet: Diet,
+    /// What it really eats, as shares of its food by kind (`vitals::food::Category`), from its
+    /// research (`reports/ecology/*food webs.md`): the forage goal looks for these in the world.
+    pub eats: &'static [(Category, f32)],
     pub taming: Taming,
     /// Each stat's value at level 1 (damage and speed as the kind's own: 100%).
     pub base: [f32; STATS],
@@ -177,6 +183,32 @@ pub struct Species {
 }
 
 impl Species {
+    /// The share of its food that is plants.
+    pub fn plant_share(&self) -> f32 {
+        self.eats
+            .iter()
+            .filter(|(c, _)| c.plant())
+            .map(|(_, s)| s)
+            .sum()
+    }
+    /// A plant eater from three quarters plants, a meat eater up to a quarter.
+    pub fn diet(&self) -> Diet {
+        match self.plant_share() {
+            p if p >= 0.75 => Diet::Herbivore,
+            p if p <= 0.25 => Diet::Carnivore,
+            _ => Diet::Omnivore,
+        }
+    }
+    /// Whether it eats this kind of food at all.
+    pub fn eats(&self, c: Category) -> bool {
+        self.eats.iter().any(|&(k, _)| k == c)
+    }
+    /// Whether a wild one gets hungry and forages (`notes/ECOLOGY.md`, part 5): mostly a plant
+    /// eater, whose food the world grows. Hunters get hungry in the wild with prey to hunt
+    /// (part 6).
+    pub fn forages_wild(&self) -> bool {
+        self.plant_share() >= 0.5
+    }
     /// Ticks a mother carries her young (an in-game day is 24 000); 0: it lays eggs.
     pub fn gestation(&self) -> u32 {
         self.tune.gestation.unwrap_or_else(|| self.bio.gestation())
@@ -223,7 +255,7 @@ pub static SPECIES: [Species; 7] = [
         subfamily: "Caninae",
         breed: Some("chihuahua"),
         size: Size::Small,
-        diet: Diet::Carnivore,
+        eats: &[(Meat, 0.4), (Carrion, 0.2), (Insects, 0.15), (Fruit, 0.15), (Seeds, 0.1)],
         taming: Taming::Passive,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [8.0, 100.0, 80.0, 2.0, 1.0, 40.0, 100.0, 60.0, 10.0],
@@ -286,7 +318,7 @@ pub static SPECIES: [Species; 7] = [
         subfamily: "Felinae",
         breed: None,
         size: Size::Small,
-        diet: Diet::Carnivore,
+        eats: &[(Meat, 0.8), (Insects, 0.1), (Carrion, 0.05), (Fish, 0.05)],
         taming: Taming::Passive,
         base: [6.0, 80.0, 60.0, 1.0, 1.0, 30.0, 80.0, 40.0, 10.0],
         wild_step: WILD_STEP,
@@ -354,7 +386,7 @@ pub static SPECIES: [Species; 7] = [
         subfamily: "Hydrochoerinae",
         breed: None,
         size: Size::Medium,
-        diet: Diet::Herbivore,
+        eats: &[(Grass, 0.75), (WaterPlants, 0.2), (Fruit, 0.05)],
         taming: Taming::Passive,
         // It holds its breath for five minutes.
         base: [12.0, 150.0, 200.0, 1.0, 1.0, 150.0, 400.0, 150.0, 20.0],
@@ -415,7 +447,7 @@ pub static SPECIES: [Species; 7] = [
         subfamily: "Velociraptorinae",
         breed: None,
         size: Size::Medium,
-        diet: Diet::Carnivore,
+        eats: &[(Meat, 0.7), (Carrion, 0.25), (Insects, 0.05)],
         taming: Taming::Knockout,
         base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
         wild_step: WILD_STEP,
@@ -467,7 +499,7 @@ pub static SPECIES: [Species; 7] = [
         subfamily: "Dromaeosaurinae",
         breed: None,
         size: Size::Large,
-        diet: Diet::Carnivore,
+        eats: &[(Meat, 0.8), (Carrion, 0.15), (Fish, 0.05)],
         taming: Taming::Knockout,
         base: [60.0, 300.0, 400.0, 10.0, 1.0, 400.0, 200.0, 700.0, 30.0],
         wild_step: WILD_STEP,
@@ -521,7 +553,7 @@ pub static SPECIES: [Species; 7] = [
         subfamily: "Velociraptorinae",
         breed: None,
         size: Size::Medium,
-        diet: Diet::Carnivore,
+        eats: &[(Meat, 0.7), (Carrion, 0.25), (Insects, 0.05)],
         taming: Taming::Knockout,
         base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
         wild_step: WILD_STEP,
@@ -572,7 +604,7 @@ pub static SPECIES: [Species; 7] = [
         subfamily: "Wyverninae",
         breed: None,
         size: Size::Large,
-        diet: Diet::Carnivore,
+        eats: &[(Meat, 0.8), (Fish, 0.1), (Carrion, 0.1)],
         taming: Taming::Knockout,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [400.0, 800.0, 2000.0, 30.0, 1.0, 1200.0, 400.0, 3000.0, 80.0],

@@ -78,6 +78,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 |---|---|
 | how | passive |
 | diet | carnivore |
+| eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 8; `base:mutton` 8; `base:cooked_beef` 20, favorite; `base:cooked_porkchop` 20, favorite; `base:cooked_chicken` 16, favorite; `base:cooked_mutton` 16, favorite; `base:bone` 5, favorite; `animals:kibble` 30, kibble |
@@ -138,6 +139,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 |---|---|
 | how | passive |
 | diet | carnivore |
+| eats | meat 80%, insects 10%, carrion 5%, fish 5% |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:mutton` 8; `base:egg` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:chicken` 10, favorite; `base:cooked_chicken` 16, favorite; `animals:kibble` 30, kibble |
@@ -195,6 +197,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 |---|---|
 | how | passive |
 | diet | herbivore |
+| eats | grass 75%, water plants 20%, fruit 5% |
 | feedings to tame at level 1 | 3 (2.5x at level 150) |
 | scared by a walking player within | nothing |
 | eats (food points) | `base:wheat` 10; `base:wheat_seeds` 3; `base:bread` 15; `base:hay_bale` 90; `base:apple` 15, favorite; `base:sugar_cane` 12, favorite; `base:berries` 8, favorite; `animals:kibble` 30, kibble |
@@ -252,6 +255,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 |---|---|
 | how | knockout |
 | diet | carnivore |
+| eats | meat 70%, carrion 25%, insects 5% |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
@@ -310,6 +314,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 |---|---|
 | how | knockout |
 | diet | carnivore |
+| eats | meat 80%, carrion 15%, fish 5% |
 | feedings to tame at level 1 | 18 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:porkchop` 15; `base:beef` 20, favorite; `base:mutton` 15, favorite; `animals:kibble` 30, kibble |
@@ -366,6 +371,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 |---|---|
 | how | knockout |
 | diet | carnivore |
+| eats | meat 70%, carrion 25%, insects 5% |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
@@ -425,6 +431,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 |---|---|
 | how | knockout |
 | diet | carnivore |
+| eats | meat 80%, fish 10%, carrion 10% |
 | feedings to tame at level 1 | 45 (2.5x at level 150) |
 | scared by a walking player within | nothing |
 | eats (food points) | `base:chicken` 10; `base:porkchop` 15; `base:beef` 20; `base:mutton` 20, favorite; `base:cooked_mutton` 30, favorite; `animals:kibble` 30, kibble |

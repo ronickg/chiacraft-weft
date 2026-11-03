@@ -40,6 +40,7 @@ screen.animals.size.small = Small
 screen.animals.size.medium = Medium-sized
 screen.animals.diet.carnivore = carnivore
 screen.animals.diet.herbivore = herbivore
+screen.animals.diet.omnivore = omnivore
 screen.animals.taming.passive = tamed by feeding
 screen.animals.taming.knockout = tamed when knocked out
 stat.animals.health = Health

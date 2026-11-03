@@ -36,6 +36,7 @@ pub static SPRUCE_LEAVES: Block = Block::named("spruce_leaves");
 pub static WATER: Block = Block::named("water");
 pub static LAVA: Block = Block::named("lava");
 pub static TALL_GRASS: Block = Block::named("tall_grass");
+pub static GRAZED_GRASS: Block = Block::named("grazed_grass");
 pub static DANDELION: Block = Block::named("dandelion");
 pub static ROSE: Block = Block::named("rose");
 pub static SAPLING: Block = Block::named("sapling");
@@ -337,6 +338,18 @@ pub fn register(r: &mut Registry) {
         .no_item();
     r.loot(&TALL_GRASS)
         .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"));
+    // Tall grass an animal has grazed, growing back by warmth and rain (`growth.rs`).
+    r.block(&GRAZED_GRASS)
+        .sound_group("grass")
+        .texture("grazed_grass")
+        .plant()
+        .needs_below("#plant_soil")
+        .tint(&tints::GRASS)
+        .no_item()
+        .growth(crate::growth::step_secs("base:grazed_grass", 1, 600.0), 9)
+        .on_grow(|e| crate::growth::grow(e, "base:grazed_grass", false, |e| {
+            e.world().set(e.pos(), TALL_GRASS.id());
+        }));
     plant(r, &DANDELION, "flower_dandelion");
     plant(r, &ROSE, "flower_rose");
     r.block(&SAPLING)

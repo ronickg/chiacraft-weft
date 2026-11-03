@@ -125,3 +125,36 @@ fn plants_and_animals_grow_at_one_pace() {
         "vitals::plants::GROWING and animals_core::biology::GROWING must be the same pace"
     );
 }
+
+/// A plant eater that forages in the wild finds its food growing in each of its habitats for at
+/// least half the year: some food of its diet in the world (`vitals::forage`) grows back there at
+/// a third of its best or more (`vitals::plants`) in two seasons or more.
+#[test]
+fn plant_eaters_find_food_where_they_live() {
+    use vitals::{forage, plants};
+    let mut problems = Vec::new();
+    for s in SPECIES.iter().filter(|s| s.forages_wild()) {
+        let renew: Vec<&plants::Plant> = forage::SOURCES
+            .iter()
+            .filter(|f| s.eats(f.category))
+            .filter_map(|f| f.renews.and_then(plants::of))
+            .collect();
+        for &(biome, _) in s.habitats {
+            let Some(c) = climate::of(biome) else { continue };
+            let seasons = (0..4)
+                .filter(|&season| {
+                    renew
+                        .iter()
+                        .any(|p| plants::season_rate(p, c, season) >= 0.33)
+                })
+                .count();
+            if seasons < 2 {
+                problems.push(format!(
+                    "{}: its food grows in {biome} in only {seasons} season(s): its diet (species.rs eats) against vitals::forage and vitals::plants",
+                    s.name
+                ));
+            }
+        }
+    }
+    report(problems);
+}

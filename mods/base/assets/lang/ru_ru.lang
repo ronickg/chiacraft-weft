@@ -41,6 +41,7 @@ block.base.spruce_leaves = Еловая хвоя
 block.base.water = Вода
 block.base.lava = Лава
 block.base.tall_grass = Трава
+block.base.grazed_grass = Объеденная трава
 block.base.dandelion = Одуванчик
 block.base.rose = Роза
 block.base.sapling = Саженец дуба

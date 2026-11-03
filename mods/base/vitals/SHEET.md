@@ -20,26 +20,26 @@ Comfortable air for a person, unclothed: (15.0, 28.0) °C.
 
 ## Foods
 
-A portion, what it holds of each nutrient, how long it digests, and game days fresh then stale.
+A portion, its kind for the animals' diets, what it holds of each nutrient, how long it digests, and game days fresh then stale.
 
-| food | g | units | protein | energy | fat | greens | water | digests | keeps | |
-|---|---|---|---|---|---|---|---|---|---|---|
-| base:apple | 180 | 18 | 1 | 25 | 0 | 5 | 154 | 9 min | 20 + 20 | cooling |
-| base:bread | 250 | 25 | 22 | 122 | 8 | 7 | 90 | 26 min | 5 + 5 | hot when cooked |
-| base:porkchop | 150 | 15 | 31 | 0 | 9 | 0 | 108 | 22 min | 2 + 2 | raw |
-| base:cooked_porkchop | 110 | 11 | 30 | 0 | 10 | 0 | 67 | 19 min | 4 + 4 | hot when cooked |
-| base:beef | 200 | 20 | 42 | 0 | 16 | 0 | 140 | 31 min | 2 + 2 | raw |
-| base:cooked_beef | 150 | 15 | 42 | 0 | 16 | 0 | 88 | 28 min | 4 + 4 | hot when cooked |
-| base:chicken | 300 | 30 | 56 | 0 | 45 | 0 | 206 | 53 min | 2 + 2 | raw |
-| base:cooked_chicken | 220 | 22 | 60 | 0 | 30 | 0 | 131 | 43 min | 4 + 4 | hot when cooked |
-| base:mutton | 150 | 15 | 26 | 0 | 24 | 0 | 96 | 26 min | 2 + 2 | raw |
-| base:cooked_mutton | 110 | 11 | 28 | 0 | 18 | 0 | 63 | 22 min | 4 + 4 | hot when cooked |
-| base:rotten_flesh | 120 | 12 | 18 | 0 | 12 | 0 | 78 | 18 min | 0 + 0 | raw |
-| base:spider_eye | 30 | 3 | 4 | 1 | 1 | 0 | 22 | 4 min | 3 + 3 | raw, poisonous |
-| base:cooked_egg | 100 | 10 | 14 | 1 | 15 | 0 | 70 | 16 min | 2 + 2 | hot when cooked |
-| base:apple_pie | 200 | 20 | 5 | 74 | 25 | 4 | 104 | 25 min | 4 + 4 | hot when cooked |
-| base:berries | 100 | 10 | 1 | 14 | 0 | 3 | 84 | 5 min | 6 + 6 | cooling |
-| animals:kibble | 100 | 10 | 25 | 45 | 14 | 4 | 10 | 19 min | 90 + 90 |  |
+| food | kind | g | units | protein | energy | fat | greens | water | digests | keeps | |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| base:apple | fruit | 180 | 18 | 1 | 25 | 0 | 5 | 154 | 9 min | 20 + 20 | cooling |
+| base:bread | seeds | 250 | 25 | 22 | 122 | 8 | 7 | 90 | 26 min | 5 + 5 | hot when cooked |
+| base:porkchop | meat | 150 | 15 | 31 | 0 | 9 | 0 | 108 | 22 min | 2 + 2 | raw |
+| base:cooked_porkchop | meat | 110 | 11 | 30 | 0 | 10 | 0 | 67 | 19 min | 4 + 4 | hot when cooked |
+| base:beef | meat | 200 | 20 | 42 | 0 | 16 | 0 | 140 | 31 min | 2 + 2 | raw |
+| base:cooked_beef | meat | 150 | 15 | 42 | 0 | 16 | 0 | 88 | 28 min | 4 + 4 | hot when cooked |
+| base:chicken | meat | 300 | 30 | 56 | 0 | 45 | 0 | 206 | 53 min | 2 + 2 | raw |
+| base:cooked_chicken | meat | 220 | 22 | 60 | 0 | 30 | 0 | 131 | 43 min | 4 + 4 | hot when cooked |
+| base:mutton | meat | 150 | 15 | 26 | 0 | 24 | 0 | 96 | 26 min | 2 + 2 | raw |
+| base:cooked_mutton | meat | 110 | 11 | 28 | 0 | 18 | 0 | 63 | 22 min | 4 + 4 | hot when cooked |
+| base:rotten_flesh | carrion | 120 | 12 | 18 | 0 | 12 | 0 | 78 | 18 min | 0 + 0 | raw |
+| base:spider_eye | insects | 30 | 3 | 4 | 1 | 1 | 0 | 22 | 4 min | 3 + 3 | raw, poisonous |
+| base:cooked_egg | meat | 100 | 10 | 14 | 1 | 15 | 0 | 70 | 16 min | 2 + 2 | hot when cooked |
+| base:apple_pie | fruit | 200 | 20 | 5 | 74 | 25 | 4 | 104 | 25 min | 4 + 4 | hot when cooked |
+| base:berries | fruit | 100 | 10 | 1 | 14 | 0 | 3 | 84 | 5 min | 6 + 6 | cooling |
+| animals:kibble | meat | 100 | 10 | 25 | 45 | 14 | 4 | 10 | 19 min | 90 + 90 |  |
 
 ## Effects
 
@@ -100,6 +100,20 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:sugar_cane | sugar cane | 12, 22-30, 38 | Wet | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
 | base:cactus | saguaro | 10, 25-40, 50 | Dry | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:sapling | oak | 5, 18-28, 38 | Moderate | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
+| base:grazed_grass | prairie grass | 5, 15-30, 40 | Moderate | 18 | 7 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
+
+## Food in the world
+
+What foraging animals eat of the world's blocks (`vitals::forage`), how much a mouthful feeds (a capybara holds 200), what eating it leaves, and what brings it back.
+
+| block | kind | food | eaten | grows back as |
+|---|---|---|---|---|
+| base:tall_grass | grass | 10 | becomes base:grazed_grass | base:grazed_grass |
+| base:berry_bush (age 3) | fruit | 8 | back to age 1 | base:berry_bush |
+| base:oak_leaves | leaves | 4 | stays | always there |
+| base:birch_leaves | leaves | 4 | stays | always there |
+| base:spruce_leaves | leaves | 4 | stays | always there |
+| base:acacia_leaves | leaves | 4 | stays | always there |
 
 ## Difficulty (the `base:difficulty` rule)
 

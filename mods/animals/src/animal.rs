@@ -159,10 +159,11 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                 }
             }
         }
-        // Its body once a second (`comfort.rs`); a tame gets hungry, faster out of its comfort.
+        // Its body once a second (`comfort.rs`); a tame gets hungry, faster out of its comfort,
+        // and so does a wild plant eater, which grazes (`forage.rs`).
         if !new && (w.time() + id) % 20 == 0 {
             let rate = crate::comfort::upkeep(w, id, &a, st);
-            if tamed(w, id) {
+            if tamed(w, id) || a.species().is_some_and(|s| s.forages_wild()) {
                 hunger(w, id, &a, rate);
             }
         }
@@ -303,9 +304,8 @@ fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f3
     }
 }
 
-/// Once a second: a tame uses a point of food every so often (its species' `hunger`, `rate`
-/// times as often out of its comfort). Starving and eating from troughs come with commands and
-/// needs.
+/// Once a second: a tame or a wild plant eater uses a point of food every so often (its species'
+/// `hunger`, `rate` times as often out of its comfort); it eats from the world (`forage.rs`).
 fn hunger(w: &World, id: u64, a: &Animal, rate: f32) {
     let Some(s) = a.species() else { return };
     let every = ((s.hunger / rate).max(1.0) as u64).max(1);

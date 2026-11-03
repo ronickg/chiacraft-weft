@@ -156,6 +156,7 @@ fn goals() -> Goals {
         .then(crate::breeding::behave(0))
         .then(commands::hold)
         .then(crate::comfort::seek)
+        .then(crate::forage::forage)
         .then(ai::wander(0.45, 6.0))
 }
 

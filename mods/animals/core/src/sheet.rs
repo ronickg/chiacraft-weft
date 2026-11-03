@@ -73,7 +73,7 @@ pub fn markdown() -> String {
             s.height.0,
             s.bio.mass,
             lower(s.bio.social),
-            lower(s.diet),
+            lower(s.diet()),
             lower(s.taming),
             days(s.growth()),
             days(s.lifespan()),
@@ -252,7 +252,14 @@ fn species(w: &mut String, s: &Species) {
 
     let _ = writeln!(w, "| Taming and food | |\n|---|---|");
     let _ = writeln!(w, "| how | {} |", lower(s.taming));
-    let _ = writeln!(w, "| diet | {} |", lower(s.diet));
+    let _ = writeln!(w, "| diet | {} |", lower(s.diet()));
+    let eats = s
+        .eats
+        .iter()
+        .map(|(c, share)| format!("{} {:.0}%", c.name().replace('_', " "), share * 100.0))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let _ = writeln!(w, "| eats | {eats} |");
     let _ = writeln!(w, "| feedings to tame at level 1 | {} (2.5x at level 150) |", s.feedings);
     let _ = writeln!(
         w,

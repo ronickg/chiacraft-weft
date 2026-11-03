@@ -64,6 +64,7 @@ block.base.spruce_leaves = Spruce Leaves
 block.base.water = Water
 block.base.lava = Lava
 block.base.tall_grass = Grass
+block.base.grazed_grass = Grazed Grass
 block.base.dandelion = Dandelion
 block.base.rose = Rose
 block.base.sapling = Oak Sapling

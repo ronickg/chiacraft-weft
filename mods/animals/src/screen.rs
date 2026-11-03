@@ -34,7 +34,7 @@ pub fn init(r: &mut Registry) {
         }
     });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,away,habitats)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,away,habitats,hungry)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -423,8 +423,9 @@ fn scout_screen(ui: &mut Ui) {
                 Size::Medium => "screen.animals.size.medium",
                 Size::Large => "screen.animals.size.large",
             };
-            let diet = match s.diet {
+            let diet = match s.diet() {
                 Diet::Carnivore => "screen.animals.diet.carnivore",
+                Diet::Omnivore => "screen.animals.diet.omnivore",
                 Diet::Herbivore => "screen.animals.diet.herbivore",
             };
             let taming = match s.taming {
@@ -612,6 +613,13 @@ fn command(cmd: &mut ServerCommand) {
             crate::eggs::nest_now(&w, player);
         }
         // Older by `count` in-game days (testing old age: `animal::old_age`).
+        // Its food down to `count` percent (testing foraging: `forage.rs`).
+        "hungry" => {
+            let share = cmd.int("count").unwrap_or(20).clamp(0, 100) as f32 / 100.0;
+            if let Some(a) = w.component_mut(id, &ANIMAL) {
+                a.food = (a.stat(species::FOOD) * share).round() as u16;
+            }
+        }
         "age" => {
             let days = cmd.int("count").unwrap_or(10).clamp(0, 100_000) as u64;
             if let Some(a) = w.component_mut(id, &ANIMAL) {
