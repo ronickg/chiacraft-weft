@@ -52,7 +52,7 @@ const GREEN: u8 = 1 | 2 | 4;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 const ALL_YEAR: u8 = 15;
 
-pub const SOURCES: [Source; 10] = [
+pub const SOURCES: [Source; 11] = [
     s("base:tall_grass", None, Category::Grass, 10, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
     s("base:berry_bush", Some(3), Category::Fruit, 8, Eaten::Age(1), Some("base:berry_bush")),
     browse("base:oak_leaves", Category::Leaves, 4, &["base:forest"], GREEN),
@@ -74,6 +74,15 @@ pub const SOURCES: [Source; 10] = [
     browse("base:dead_bush", Category::Seeds, 2, &["base:desert"], ALL_YEAR),
     // Prickly pear fruit, July to September.
     browse("base:cactus", Category::Fruit, 3, &["base:desert"], SUMMER_AUTUMN),
+    // The Cretaceous's ferns (the animals mod's), browse all year where they grow: the low
+    // browse Protoceratops cropped.
+    browse(
+        "animals:fern",
+        Category::Leaves,
+        4,
+        &["animals:red_dunes", "animals:scrubland", "animals:floodplain", "animals:fern_forest", "animals:crags"],
+        ALL_YEAR,
+    ),
 ];
 
 /// What a forager of that diet can eat of the block `block` at `age` (`None`: it has no age) in

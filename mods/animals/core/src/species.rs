@@ -95,6 +95,7 @@ pub static CERVIDAE: Family = Family { name: "Cervidae", above: &["Mammalia", "A
 pub static SALMONIDAE: Family = Family { name: "Salmonidae", above: &["Actinopterygii", "Salmoniformes"] };
 pub static SERRASALMIDAE: Family = Family { name: "Serrasalmidae", above: &["Actinopterygii", "Characiformes"] };
 pub static CORVIDAE: Family = Family { name: "Corvidae", above: &["Aves", "Passeriformes"] };
+pub static PROTOCERATOPSIDAE: Family = Family { name: "Protoceratopsidae", above: &["Dinosauria", "Ceratopsia"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -298,7 +299,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 18] = [
+pub static SPECIES: [Species; 19] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1407,6 +1408,72 @@ pub static SPECIES: [Species; 18] = [
         // north's cold (`eggs.rs`), so its young come out as fledglings after the eggs' time.
         tune: Tune { gestation: Some(12_700), ..Tune::NONE },
         birth_size: 0.3,
+    },
+    // Protoceratops (`reports/ecology/Cretaceous food webs.md`: the Djadokhta's "extremely common"
+    // plant eater and the Velociraptors' prey, the Fighting Dinosaurs): wild, in herds of mixed
+    // ages (`source/protoceratops`).
+    Species {
+        model: "protoceratops",
+        name: "protoceratops",
+        binomial: "Protoceratops andrewsi",
+        family: &PROTOCERATOPSIDAE,
+        subfamily: "Protoceratopsinae",
+        breed: None,
+        size: Size::Medium,
+        // Low browse, chopped and sheared with a strong bite (Button & Zanno 2019; Tanoue et al.
+        // 2009): ferns, cycads and shrubs, their roots and seeds.
+        eats: &[(Leaves, 0.75), (Roots, 0.15), (Seeds, 0.1)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [35.0, 200.0, 120.0, 2.0, 1.0, 90.0, 80.0, 70.0, 18.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 15.0,
+        foods: &[eats("animals:fern", 8), eats("base:wheat", 8), favorite("base:berries", 10)],
+        feedings: 0.0,
+        shy: 12.0,
+        fights: false,
+        attacks: &[],
+        reach: 1.0,
+        signature: "herd",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.05,
+        size_spread: 0.1,
+        height: (0.6, "hip"),
+        // The Djadokhta's dunes first; the scrubland's flats less often.
+        habitats: &[("animals:red_dunes", 1.0), ("animals:scrubland", 0.6)],
+        bio: Biology {
+            mass: 83.0,
+            gestation: 0.0,
+            // About 83 days, from the growth lines in embryos' teeth (Erickson et al. 2017).
+            incubation: 83.0,
+            // Breeding at about three, before it is fully grown, as dinosaurs did (Erickson et al.
+            // 2007).
+            maturity: 1095.0,
+            // Est.: growth lines put the oldest at about 13.
+            lifespan: 5110.0,
+            interval: 365.0,
+            // A clutch of 12 or more soft-shelled eggs, buried (Norell et al. 2020).
+            litter: 12.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            // No record; its nests are buried in the dunes' sand, and its young hatch into the
+            // growing season, the wet one, as Velociraptor's.
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // No record: a warm-blooded dinosaur at home in the Gobi's dunes (hot days, cold nights).
+            comfort: (8.0, 40.0),
+            cold_blooded: false,
+        },
+        // The most common animal of its dunes and a raptor's food: it grows up at a common
+        // species' pace (six days), and its clutches are the eggs that hatch (most of a wild one is
+        // lost to storms and egg eaters), so the wild keeps a line's young to a mother's life.
+        tune: Tune { growth: Some(144_000), litter: Some((3, 8)), ..Tune::NONE },
+        birth_size: 0.15,
     },
 ];
 

@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 18] = [
+const FILES: [(&str, &str); 19] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -277,6 +277,7 @@ const FILES: [(&str, &str); 18] = [
     ("red_fox", include_str!("../../genetics/red_fox.json")),
     ("arctic_fox", include_str!("../../genetics/arctic_fox.json")),
     ("raven", include_str!("../../genetics/raven.json")),
+    ("protoceratops", include_str!("../../genetics/protoceratops.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1130,6 +1131,24 @@ fn raven(r: &Read) -> Look {
     }
 }
 
+/// Protoceratops: sandy to ochre, pale below, dark bands across the back (no record of its colors:
+/// a dune animal's, est.).
+fn protoceratops(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.62 {
+            "Ochre".into()
+        } else if ru < 0.38 {
+            "Pale sand".into()
+        } else {
+            "Sandy".into()
+        },
+        base: mix([194.0, 168.0, 122.0], [176.0, 120.0, 74.0], ru),
+        under: [220.0, 204.0, 168.0],
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1289,6 +1308,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "pacu" => pacu(&r),
         "red_fox" | "arctic_fox" => fox(&r),
         "raven" => raven(&r),
+        "protoceratops" => protoceratops(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1870,7 +1890,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 13] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 14] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -1883,7 +1903,8 @@ const MODEL_LAYERS: [ModelLayers; 13] = model_layers!(
     "deer",
     "fish",
     "fox",
-    "raven"
+    "raven",
+    "protoceratops"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {

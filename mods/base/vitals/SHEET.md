@@ -118,6 +118,7 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | base:tall_grass | seeds | 3 | stays | always there in base:plains, base:forest, base:birch_forest, base:taiga, base:savanna, base:swamp, base:mountains, base:beach (summer, autumn), worth 40% of fresh growth |
 | base:dead_bush | seeds | 2 | stays | always there in base:desert (all year), worth 40% of fresh growth |
 | base:cactus | fruit | 3 | stays | always there in base:desert (summer, autumn), worth 40% of fresh growth |
+| animals:fern | leaves | 4 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
 
 ## Soil and compost
 

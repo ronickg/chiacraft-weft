@@ -28,6 +28,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | red_fox | *Vulpes vulpes* | common | small | 0.38 m | 5.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 2-7 | 15 |
 | arctic_fox | *Vulpes lagopus* | common | small | 0.38 m | 3.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 3-10 | 16 |
 | raven | *Corvus corax* | uncommon | small | 0.34 m | 1.2 kg | solitary | carnivore | wild | 0.53 d | 6.51 d | 46 d | 2-6 | 17 |
+| protoceratops | *Protoceratops andrewsi* | common | medium | 0.6 m | 83 kg | herd | herbivore | wild | eggs, hatch 1.54 d | 6 d | 53.7 d | 3-8 | 14 |
 
 ## Stats at level 1
 
@@ -53,6 +54,7 @@ Damage and speed are each kind's own (1 = 100%).
 | red_fox | 10 | 120 | 60 | 2 | 1 | 30 | 80 | 40 | 10 | 30 |
 | arctic_fox | 8 | 120 | 60 | 1.6 | 1 | 22 | 80 | 35 | 12 | 30 |
 | raven | 6 | 120 | 40 | 1 | 1 | 10 | 60 | 20 | 5 | 30 |
+| protoceratops | 35 | 200 | 120 | 2 | 1 | 90 | 80 | 70 | 18 | 15 |
 
 ## dog (chihuahua)
 
@@ -281,7 +283,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | how | knockout |
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
-| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: none yet: it waits for its prey to come to the world |
+| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
@@ -341,7 +343,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | how | knockout |
 | diet | carnivore |
 | eats | meat 80%, carrion 15%, fish 5% |
-| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: none yet: it waits for its prey to come to the world |
+| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops |
 | feedings to tame at level 1 | 18 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:porkchop` 15; `base:beef` 20, favorite; `base:mutton` 15, favorite; `animals:kibble` 30, kibble |
@@ -399,7 +401,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | how | knockout |
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
-| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: none yet: it waits for its prey to come to the world |
+| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
@@ -460,7 +462,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | how | knockout |
 | diet | carnivore |
 | eats | meat 80%, fish 10%, carrion 10% |
-| hunts | 0.1%-60% of its mass alone (5.00-3000 kg); at home: raptor, utahraptor, osmolskae |
+| hunts | 0.1%-60% of its mass alone (5.00-3000 kg); at home: raptor, utahraptor, osmolskae, protoceratops |
 | feedings to tame at level 1 | 45 (2.5x at level 150) |
 | scared by a walking player within | nothing |
 | eats (food points) | `base:chicken` 10; `base:porkchop` 15; `base:beef` 20; `base:mutton` 20, favorite; `base:cooked_mutton` 30, favorite; `animals:kibble` 30, kibble |
@@ -1140,6 +1142,65 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.2 |
+
+## protoceratops
+
+*Protoceratops andrewsi*, Dinosauria › Ceratopsia › Protoceratopsidae › Protoceratopsinae. Model `protoceratops`, entity `animals:protoceratops`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:red_dunes` | commonest |
+| `animals:scrubland` | 60% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | medium |
+| height (grown, average) | 0.6 m at the hip |
+| males against females | 1.05x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 15% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 83 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 83 d | 1.54 d |
+| litter or clutch | 12 on average | 3-8 **set** |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 8 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 3 y | 6 d **set** |
+| lives | 14 y | 53.7 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 14 within 48 blocks |
+
+**Balance** (common): a generation 7.8 d; a line four deep in 23 d (8 h of play); 10.3 young per mother in 10 days, 38 in her life.
+
+- ✓ fourth generation: 23.4 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 6.0 of 54 days (want under a fifth)
+- ✓ young in a life: 38.1 (want 6-40)
+- ✓ litter: 3-8 (want 1-12, fewest first)
+- ✓ room near: 14 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | leaves 75%, roots 15%, seeds 10% |
+| its food grows at home (spring/summer/autumn/winter) | red_dunes 40/40/40/40%, scrubland 40/40/40/40% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 12 blocks (twice that running) |
+| eats (food points) | `animals:fern` 8; `base:wheat` 8; `base:berries` 10, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 1 blocks |
+| signature | herd |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.9 |
 
 ## Shared by every species
 
