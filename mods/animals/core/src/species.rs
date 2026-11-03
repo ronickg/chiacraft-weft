@@ -92,6 +92,8 @@ pub static LEPORIDAE: Family = Family { name: "Leporidae", above: &["Mammalia", 
 pub static MURIDAE: Family = Family { name: "Muridae", above: &["Mammalia", "Rodentia"] };
 pub static CRICETIDAE: Family = Family { name: "Cricetidae", above: &["Mammalia", "Rodentia"] };
 pub static CERVIDAE: Family = Family { name: "Cervidae", above: &["Mammalia", "Artiodactyla"] };
+pub static SALMONIDAE: Family = Family { name: "Salmonidae", above: &["Actinopterygii", "Salmoniformes"] };
+pub static SERRASALMIDAE: Family = Family { name: "Serrasalmidae", above: &["Actinopterygii", "Characiformes"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -290,7 +292,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 13] = [
+pub static SPECIES: [Species; 15] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1082,6 +1084,121 @@ pub static SPECIES: [Species; 13] = [
             ..Tune::NONE
         },
         birth_size: 0.4,
+    },
+    // The fish (`reports/ecology/Overworld food webs.md`: the middle of the water webs): two wild
+    // species on one model (`source/fish`), spawned into water by the mod (`fish.rs`). They don't
+    // breed in the game yet: no breeding season (their eggs would need water, not a nest), the
+    // spawner keeps them. Insects and small fish are their food; hunting them waits for those to be
+    // food in the world, so they hunt nothing yet.
+    Species {
+        model: "fish",
+        name: "brown_trout",
+        binomial: "Salmo trutta",
+        family: &SALMONIDAE,
+        subfamily: "Salmoninae",
+        breed: None,
+        size: Size::Small,
+        // Insects (larvae and those fallen on the water), crustaceans and snails, small fish.
+        eats: &[(Insects, 0.65), (Fish, 0.3), (Carrion, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [3.0, 60.0, 20.0, 0.3, 1.0, 5.0, 400.0, 10.0, 3.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[],
+        feedings: 0.0,
+        shy: 6.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.5,
+        signature: "dart",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 1.0,
+        dimorphism: 1.0,
+        size_spread: 0.2,
+        height: (0.37, "fork"),
+        // Cool, clear rivers, streams and lakes of the temperate and northern country.
+        habitats: &[("base:forest", 1.0), ("base:birch_forest", 1.0), ("base:mountains", 1.0), ("base:taiga", 0.8), ("base:plains", 0.6)],
+        bio: Biology {
+            mass: 0.5,
+            gestation: 0.0,
+            // The eggs lie in the gravel over winter.
+            incubation: 45.0,
+            maturity: 1095.0,
+            // A well-fed one lives 10-20 years.
+            lifespan: 4380.0,
+            interval: 365.0,
+            // Young that live, of the hundreds of eggs.
+            litter: 8.0,
+            social: Social::Solitary,
+            rarity: Rarity::Uncommon,
+            breeds: 0,
+            peak: 0,
+            // The water it does best in: 4-19 degrees; it suffers over 20.
+            comfort: (4.0, 20.0),
+            cold_blooded: true,
+        },
+        tune: Tune::NONE,
+        birth_size: 0.1,
+    },
+    Species {
+        model: "fish",
+        name: "pacu",
+        binomial: "Piaractus mesopotamicus",
+        family: &SERRASALMIDAE,
+        subfamily: "Colossomatinae",
+        breed: None,
+        size: Size::Small,
+        // Fruit and seeds fallen into the floods (it spreads the forest's seeds), insects, snails
+        // and small fish the rest of the year.
+        // (Under half plants: it doesn't forage on land, `Species::forages_wild`.)
+        eats: &[(Fruit, 0.3), (Seeds, 0.15), (Insects, 0.35), (Fish, 0.2)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        base: [6.0, 80.0, 40.0, 0.5, 1.0, 20.0, 400.0, 15.0, 4.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 25.0,
+        foods: &[],
+        feedings: 0.0,
+        shy: 5.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.5,
+        signature: "dart",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.8,
+        dimorphism: 1.0,
+        size_spread: 0.4,
+        // The model's (the trout's); its size genes draw it about 1.35 times as long: half a metre.
+        height: (0.37, "fork"),
+        // The Pantanal's rivers and flooded fields, and the llanos'.
+        habitats: &[("base:swamp", 1.0), ("base:savanna", 0.8)],
+        bio: Biology {
+            mass: 4.0,
+            gestation: 0.0,
+            // Spawned in the rivers at the start of the floods; the eggs hatch within a day.
+            incubation: 1.0,
+            maturity: 1095.0,
+            lifespan: 5475.0,
+            interval: 365.0,
+            litter: 6.0,
+            social: Social::Herd,
+            rarity: Rarity::Uncommon,
+            breeds: 0,
+            peak: 0,
+            // Warm water: 20-32 degrees.
+            comfort: (20.0, 32.0),
+            cold_blooded: true,
+        },
+        tune: Tune::NONE,
+        birth_size: 0.05,
     },
 ];
 

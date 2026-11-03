@@ -1,0 +1,70 @@
+{
+ "species": "brown_trout",
+ "about": "The brown trout (Salmo trutta): an olive-brown back, golden-bronze flanks, black spots and red ones ringed pale; how spotted and how golden varies from one to the next, and lake and river fish differ.",
+ "loci": [
+  {
+   "id": "Rs",
+   "name": "Red spots",
+   "quantitative": true,
+   "mean": 0.6,
+   "sd": 0.2,
+   "about": "few to many red spots"
+  },
+  {
+   "id": "Gd",
+   "name": "Gold",
+   "quantitative": true,
+   "mean": 0.55,
+   "sd": 0.15,
+   "about": "silvery to golden flanks"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   176,
+   140,
+   70
+  ],
+  [
+   206,
+   172,
+   96
+  ]
+ ],
+ "traits": {
+  "Gt": {
+   "mean": 0.35,
+   "sd": 0.08
+  },
+  "Ms": {
+   "mean": 0.35,
+   "sd": 0.1
+  },
+  "Md": {
+   "mean": 0.55,
+   "sd": 0.15
+  }
+ },
+ "build": {
+  "Gt": {
+   "bones": [
+    "body",
+    "tail_0"
+   ],
+   "axes": [
+    0.3,
+    1,
+    0
+   ],
+   "range": 0.3
+  }
+ }
+}

@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 13] = [
+const FILES: [(&str, &str); 15] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -272,6 +272,8 @@ const FILES: [(&str, &str); 13] = [
     ("field_vole", include_str!("../../genetics/field_vole.json")),
     ("white_tailed_deer", include_str!("../../genetics/white_tailed_deer.json")),
     ("red_deer", include_str!("../../genetics/red_deer.json")),
+    ("brown_trout", include_str!("../../genetics/brown_trout.json")),
+    ("pacu", include_str!("../../genetics/pacu.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1024,6 +1026,38 @@ fn deer(r: &Read) -> Look {
     look
 }
 
+/// Brown trout: olive back and silvery to golden flanks, black spots, and red ones (few to many)
+/// ringed pale.
+fn trout(r: &Read) -> Look {
+    let (gd, rs) = (r.qv("Gd"), r.qv("Rs"));
+    let base = mix([150.0, 150.0, 128.0], [186.0, 148.0, 80.0], gd);
+    Look {
+        name: if gd > 0.6 {
+            "Golden".into()
+        } else if gd < 0.4 {
+            "Silvery".into()
+        } else {
+            "Bronze".into()
+        },
+        base,
+        under: [228.0, 214.0, 170.0],
+        pattern: Some(Pattern { kind: "spotted", color: [44.0, 36.0, 32.0], amount: 1.0 }),
+        pattern2: Some(Pattern { kind: "speckle", color: [176.0, 64.0, 48.0], amount: rs }),
+        ..Look::default()
+    }
+}
+
+/// Pacu: dark grey above and silver, the throat and belly pale to deep orange.
+fn pacu(r: &Read) -> Look {
+    let or = r.qv("Or");
+    Look {
+        name: if or > 0.6 { "Red-bellied".into() } else { "Silver".into() },
+        base: [128.0, 130.0, 128.0],
+        under: mix([214.0, 206.0, 190.0], [214.0, 120.0, 60.0], or),
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1179,6 +1213,8 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "wood_mouse" => mouse(&r),
         "field_vole" => vole(&r),
         "white_tailed_deer" | "red_deer" => deer(&r),
+        "brown_trout" => trout(&r),
+        "pacu" => pacu(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1760,8 +1796,8 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 10] =
-    model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern", "hare", "mouse", "vole", "deer");
+const MODEL_LAYERS: [ModelLayers; 11] =
+    model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern", "hare", "mouse", "vole", "deer", "fish");
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
     let mut d = png::Decoder::new(std::io::Cursor::new(png_bytes));

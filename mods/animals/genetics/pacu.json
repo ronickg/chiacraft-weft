@@ -1,0 +1,54 @@
+{
+ "species": "pacu",
+ "about": "The pacu (Piaractus mesopotamicus): deep-bodied, dark grey above, silver below with an orange throat and belly; drawn deeper (girth) and bigger (size) than the trout on the same model.",
+ "loci": [
+  {
+   "id": "Or",
+   "name": "Orange",
+   "quantitative": true,
+   "mean": 0.6,
+   "sd": 0.15,
+   "about": "the belly pale to deep orange"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.92,
+   "sd": 0.05,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   150,
+   120,
+   60
+  ],
+  [
+   190,
+   150,
+   80
+  ]
+ ],
+ "traits": {
+  "Gt": {
+   "mean": 0.95,
+   "sd": 0.04
+  }
+ },
+ "build": {
+  "Gt": {
+   "bones": [
+    "body",
+    "tail_0"
+   ],
+   "axes": [
+    0.3,
+    1,
+    0
+   ],
+   "range": 0.3
+  }
+ }
+}

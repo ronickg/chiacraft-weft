@@ -23,6 +23,8 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | field_vole | *Microtus agrestis* | common | small | 0.05 m | 0.035 kg | solitary | herbivore | wild | 0.55 d | 3 d | 14 d | 2-6 | 24 |
 | white_tailed_deer | *Odocoileus virginianus* | common | large | 0.95 m | 70 kg | herd | herbivore | wild | 2.98 d | 5.28 d | 38.3 d | 1-3 | 15 |
 | red_deer | *Cervus elaphus* | uncommon | large | 0.95 m | 160 kg | herd | herbivore | wild | 3.52 d | 6.51 d | 57.5 d | 1 | 12 |
+| brown_trout | *Salmo trutta* | uncommon | small | 0.37 m | 0.5 kg | solitary | carnivore | wild | eggs, hatch 0.97 d | 8.65 d | 46 d | 3-11 | 20 |
+| pacu | *Piaractus mesopotamicus* | uncommon | small | 0.37 m | 4 kg | herd | omnivore | wild | eggs, hatch 0.06 d | 8.65 d | 57.5 d | 2-8 | 26 |
 
 ## Stats at level 1
 
@@ -43,6 +45,8 @@ Damage and speed are each kind's own (1 = 100%).
 | field_vole | 2 | 60 | 15 | 0.2 | 1 | 3 | 30 | 5 | 2 | 30 |
 | white_tailed_deer | 30 | 200 | 120 | 2 | 1 | 70 | 80 | 60 | 15 | 15 |
 | red_deer | 45 | 250 | 180 | 3 | 1 | 120 | 80 | 90 | 20 | 15 |
+| brown_trout | 3 | 60 | 20 | 0.3 | 1 | 5 | 400 | 10 | 3 | 30 |
+| pacu | 6 | 80 | 40 | 0.5 | 1 | 20 | 400 | 15 | 4 | 25 |
 
 ## dog (chihuahua)
 
@@ -91,7 +95,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | passive |
 | diet | carnivore |
 | eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
-| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, base:chicken |
+| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, base:chicken |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 8; `base:mutton` 8; `base:cooked_beef` 20, favorite; `base:cooked_porkchop` 20, favorite; `base:cooked_chicken` 16, favorite; `base:cooked_mutton` 16, favorite; `base:bone` 5, favorite; `animals:kibble` 30, kibble |
@@ -153,7 +157,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | passive |
 | diet | carnivore |
 | eats | meat 80%, insects 10%, carrion 5%, fish 5% |
-| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, base:chicken |
+| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, base:chicken |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:mutton` 8; `base:egg` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:chicken` 10, favorite; `base:cooked_chicken` 16, favorite; `animals:kibble` 30, kibble |
@@ -826,6 +830,125 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.9 |
+
+## brown_trout
+
+*Salmo trutta*, Actinopterygii › Salmoniformes › Salmonidae › Salmoninae. Model `fish`, entity `animals:brown_trout`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:forest` | commonest |
+| `base:birch_forest` | commonest |
+| `base:mountains` | commonest |
+| `base:taiga` | 80% |
+| `base:plains` | 60% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.37 m at the fork |
+| males against females | 1x as tall |
+| size spread (an individual's, either way) | 20% |
+| newborn's size | 10% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 0.5 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 45 d | 0.97 d |
+| litter or clutch | 8 on average | 3-11 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in |  | out of it, only a tame well cared for |
+| comfortable in | 4 to 20 °C air | cold-blooded: slower in the cold |
+| grows up in | 3 y | 8.65 d |
+| lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 20 within 48 blocks |
+
+**Balance** (uncommon): a generation 9.9 d; a line four deep in 30 d (10 h of play); 13.1 young per mother in 10 days, 37 in her life.
+
+- ✓ fourth generation: 29.6 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 8.7 of 46 days (want under a fifth)
+- ✓ young in a life: 37.0 (want 6-40)
+- ✓ litter: 3-11 (want 1-12, fewest first)
+- ✓ room near: 20 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | insects 65%, fish 30%, carrion 5% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 6 blocks (twice that running) |
+| eats (food points) |  |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.5 blocks |
+| signature | dart |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 1 |
+
+## pacu
+
+*Piaractus mesopotamicus*, Actinopterygii › Characiformes › Serrasalmidae › Colossomatinae. Model `fish`, entity `animals:pacu`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:swamp` | commonest |
+| `base:savanna` | 80% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.37 m at the fork |
+| males against females | 1x as tall |
+| size spread (an individual's, either way) | 40% |
+| newborn's size | 5% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 4 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 1 d | 0.06 d |
+| litter or clutch | 6 on average | 2-8 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in |  | out of it, only a tame well cared for |
+| comfortable in | 20 to 32 °C air | cold-blooded: slower in the cold |
+| grows up in | 3 y | 8.65 d |
+| lives | 15 y | 57.5 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 26 within 48 blocks |
+
+**Balance** (uncommon): a generation 9 d; a line four deep in 27 d (9 h of play); 9.4 young per mother in 10 days, 35 in her life.
+
+- ✓ fourth generation: 26.9 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 8.7 of 57 days (want under a fifth)
+- ✓ young in a life: 35.1 (want 6-40)
+- ✓ litter: 2-8 (want 1-12, fewest first)
+- ✓ room near: 26 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | omnivore |
+| eats | fruit 30%, seeds 15%, insects 35%, fish 20% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 5 blocks (twice that running) |
+| eats (food points) |  |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.5 blocks |
+| signature | dart |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.8 |
 
 ## Shared by every species
 
