@@ -91,6 +91,7 @@ pub static CAVIIDAE: Family = Family { name: "Caviidae", above: &["Mammalia", "R
 pub static LEPORIDAE: Family = Family { name: "Leporidae", above: &["Mammalia", "Lagomorpha"] };
 pub static MURIDAE: Family = Family { name: "Muridae", above: &["Mammalia", "Rodentia"] };
 pub static CRICETIDAE: Family = Family { name: "Cricetidae", above: &["Mammalia", "Rodentia"] };
+pub static CERVIDAE: Family = Family { name: "Cervidae", above: &["Mammalia", "Artiodactyla"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -289,7 +290,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 11] = [
+pub static SPECIES: [Species; 13] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -960,6 +961,127 @@ pub static SPECIES: [Species; 11] = [
         // its life shorter still, as it breeds faster.
         tune: Tune { growth: Some(72_000), lifespan: Some(336_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.35,
+    },
+    // The deer (`reports/ecology/Overworld food webs.md`: the big browser and grazer of seven biomes,
+    // the wolf's and jaguar's prey): two simple wild creatures on one model (`source/deer`), as the
+    // hares. A buck's (a stag's) antlers are a build gene its sex sets (`genetics/*deer.json`).
+    Species {
+        model: "deer",
+        name: "white_tailed_deer",
+        binomial: "Odocoileus virginianus",
+        family: &CERVIDAE,
+        subfamily: "Capreolinae",
+        breed: None,
+        size: Size::Large,
+        // A browser: leaves, twigs and buds first, grass and herbs, acorns and other mast, fruit, fungi.
+        eats: &[(Leaves, 0.5), (Grass, 0.2), (Fruit, 0.15), (Seeds, 0.1), (Fungi, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [30.0, 200.0, 120.0, 2.0, 1.0, 70.0, 80.0, 60.0, 15.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 15.0,
+        foods: &[eats("base:wheat", 8), favorite("base:apple", 12), favorite("base:berries", 6)],
+        feedings: 0.0,
+        shy: 16.0,
+        fights: false,
+        attacks: &[],
+        reach: 1.0,
+        signature: "bolt",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.08,
+        size_spread: 0.1,
+        height: (0.95, "shoulder"),
+        // The Americas' deer: prairie and woods' edges in Kansas, the llanos' savanna, the desert edge
+        // (Coues deer), the Pantanal's marshes (the marsh deer's place).
+        habitats: &[("base:plains", 1.0), ("base:savanna", 0.8), ("base:desert", 0.5), ("base:forest", 0.5), ("base:swamp", 0.4)],
+        bio: Biology {
+            mass: 70.0,
+            gestation: 200.0,
+            incubation: 0.0,
+            // Does breed at about 18 months.
+            maturity: 540.0,
+            // Few live past 10 in the wild.
+            lifespan: 3650.0,
+            interval: 365.0,
+            // Twins are usual for a grown doe, one or three less often.
+            litter: 1.8,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            // The rut in autumn (late October, November), the fawns born in May and June.
+            breeds: seasons::AUTUMN,
+            peak: seasons::AUTUMN,
+            // Est.: a winter coat for the prairie's frost, shade-seeking in the llanos' midday heat.
+            comfort: (-15.0, 30.0),
+            cold_blooded: false,
+        },
+        tune: Tune::NONE,
+        birth_size: 0.4,
+    },
+    Species {
+        model: "deer",
+        name: "red_deer",
+        binomial: "Cervus elaphus",
+        family: &CERVIDAE,
+        subfamily: "Cervinae",
+        breed: None,
+        size: Size::Large,
+        // A mixed feeder: grasses and sedges, browse of trees and shrubs, heather, mast and fruit.
+        eats: &[(Grass, 0.5), (Leaves, 0.4), (Fruit, 0.05), (Seeds, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        base: [45.0, 250.0, 180.0, 3.0, 1.0, 120.0, 80.0, 90.0, 20.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 15.0,
+        foods: &[eats("base:wheat", 10), favorite("base:apple", 12)],
+        feedings: 0.0,
+        shy: 20.0,
+        fights: false,
+        attacks: &[],
+        reach: 1.0,
+        signature: "bolt",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.1,
+        size_spread: 0.3,
+        // The model's (the white-tailed deer's); its size genes draw it about 1.25 times as big: 1.2 m.
+        height: (0.95, "shoulder"),
+        // Europe's deer of the forests (Białowieża), birch woods and the Alps, wintering lower in the
+        // woods, summering high.
+        habitats: &[("base:forest", 1.0), ("base:birch_forest", 0.8), ("base:mountains", 0.8)],
+        bio: Biology {
+            mass: 160.0,
+            gestation: 250.0,
+            incubation: 0.0,
+            // Hinds breed in their second or third autumn.
+            maturity: 730.0,
+            // 10-13 years in the wild, about 15 where predators are few.
+            lifespan: 5475.0,
+            interval: 365.0,
+            litter: 1.0,
+            social: Social::Herd,
+            rarity: Rarity::Uncommon,
+            // The rut from late August into early winter; calves born in late spring.
+            breeds: seasons::AUTUMN,
+            peak: seasons::AUTUMN,
+            // Est.: a cool-country deer, at home in snow, seeking shade and wallows in summer heat.
+            comfort: (-20.0, 25.0),
+            cold_blooded: false,
+        },
+        tune: Tune {
+            // A hind calves every year and raises few: her rest after a calf set shorter so the wild
+            // can replace its dead (`balance::checks`: six young in a life or more).
+            recovery: Some(72_000),
+            ..Tune::NONE
+        },
+        birth_size: 0.4,
     },
 ];
 

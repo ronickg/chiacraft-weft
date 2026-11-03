@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 11] = [
+const FILES: [(&str, &str); 13] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -270,6 +270,8 @@ const FILES: [(&str, &str); 11] = [
     ("mountain_hare", include_str!("../../genetics/mountain_hare.json")),
     ("wood_mouse", include_str!("../../genetics/wood_mouse.json")),
     ("field_vole", include_str!("../../genetics/field_vole.json")),
+    ("white_tailed_deer", include_str!("../../genetics/white_tailed_deer.json")),
+    ("red_deer", include_str!("../../genetics/red_deer.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1002,6 +1004,26 @@ fn vole(r: &Read) -> Look {
     Look { name: name.into(), base, under: [160.0, 156.0, 148.0], ..Look::default() }
 }
 
+/// Deer (the white-tailed and the red deer share these loci): grey-brown to red-brown, the
+/// underside and rump white to buff; piebald now and then (recessive, white patches).
+fn deer(r: &Read) -> Look {
+    let (ru, bu) = (r.qv("Ru"), r.qv("Bu"));
+    let base = mix([128.0, 106.0, 86.0], [164.0, 100.0, 58.0], ru);
+    let name = if ru > 0.62 {
+        "Red-brown"
+    } else if ru < 0.38 {
+        "Grey-brown"
+    } else {
+        "Brown"
+    };
+    let mut look = Look { name: name.into(), base, under: mix([234.0, 228.0, 216.0], [214.0, 186.0, 138.0], bu), ..Look::default() };
+    if r.copies("Pb", "pb") == 2 {
+        look.white = 0.6;
+        look.name += ", piebald";
+    }
+    look
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1156,6 +1178,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "hare" | "mountain_hare" => hare(&r),
         "wood_mouse" => mouse(&r),
         "field_vole" => vole(&r),
+        "white_tailed_deer" | "red_deer" => deer(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1737,8 +1760,8 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 9] =
-    model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern", "hare", "mouse", "vole");
+const MODEL_LAYERS: [ModelLayers; 10] =
+    model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern", "hare", "mouse", "vole", "deer");
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
     let mut d = png::Decoder::new(std::io::Cursor::new(png_bytes));

@@ -21,6 +21,8 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | mountain_hare | *Lepus timidus* | common | small | 0.3 m | 3 kg | solitary | herbivore | wild | 1.05 d | 3.5 d | 19.2 d | 1-4 | 14 |
 | wood_mouse | *Apodemus sylvaticus* | common | small | 0.05 m | 0.023 kg | solitary | herbivore | wild | 0.63 d | 3 d | 16 d | 2-6 | 24 |
 | field_vole | *Microtus agrestis* | common | small | 0.05 m | 0.035 kg | solitary | herbivore | wild | 0.55 d | 3 d | 14 d | 2-6 | 24 |
+| white_tailed_deer | *Odocoileus virginianus* | common | large | 0.95 m | 70 kg | herd | herbivore | wild | 2.98 d | 5.28 d | 38.3 d | 1-3 | 15 |
+| red_deer | *Cervus elaphus* | uncommon | large | 0.95 m | 160 kg | herd | herbivore | wild | 3.52 d | 6.51 d | 57.5 d | 1 | 12 |
 
 ## Stats at level 1
 
@@ -39,6 +41,8 @@ Damage and speed are each kind's own (1 = 100%).
 | mountain_hare | 5 | 120 | 40 | 0.5 | 1 | 13 | 60 | 20 | 5 | 30 |
 | wood_mouse | 2 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
 | field_vole | 2 | 60 | 15 | 0.2 | 1 | 3 | 30 | 5 | 2 | 30 |
+| white_tailed_deer | 30 | 200 | 120 | 2 | 1 | 70 | 80 | 60 | 15 | 15 |
+| red_deer | 45 | 250 | 180 | 3 | 1 | 120 | 80 | 90 | 20 | 15 |
 
 ## dog (chihuahua)
 
@@ -702,6 +706,126 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 1 |
+
+## white_tailed_deer
+
+*Odocoileus virginianus*, Mammalia › Artiodactyla › Cervidae › Capreolinae. Model `deer`, entity `animals:white_tailed_deer`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:plains` | commonest |
+| `base:savanna` | 80% |
+| `base:desert` | 50% |
+| `base:forest` | 50% |
+| `base:swamp` | 40% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | large |
+| height (grown, average) | 0.95 m at the shoulder |
+| males against females | 1.08x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 40% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 70 kg | |
+| carries her young | 200 d | 2.98 d |
+| litter or clutch | 1.8 on average | 1-3 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | autumn | out of it, only a tame well cared for |
+| comfortable in | -15 to 30 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 1.5 y | 5.28 d |
+| lives | 10 y | 38.3 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 15 within 48 blocks |
+
+**Balance** (common): a generation 8.3 d; a line four deep in 25 d (8 h of play); 2.5 young per mother in 10 days, 6 in her life.
+
+- ✓ fourth generation: 24.8 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 5.3 of 38 days (want under a fifth)
+- ✓ young in a life: 6.3 (want 6-40)
+- ✓ litter: 1-3 (want 1-12, fewest first)
+- ✓ room near: 15 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | leaves 50%, grass 20%, fruit 15%, seeds 10%, fungi 5% |
+| its food grows at home (spring/summer/autumn/winter) | plains 13/53/46/0%, savanna 43/82/75/40%, desert 40/40/40/40%, forest 40/73/41/0%, swamp 8/59/45/0% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 16 blocks (twice that running) |
+| eats (food points) | `base:wheat` 8; `base:apple` 12, favorite; `base:berries` 6, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 1 blocks |
+| signature | bolt |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.9 |
+
+## red_deer
+
+*Cervus elaphus*, Mammalia › Artiodactyla › Cervidae › Cervinae. Model `deer`, entity `animals:red_deer`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:forest` | commonest |
+| `base:birch_forest` | 80% |
+| `base:mountains` | 80% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | large |
+| height (grown, average) | 0.95 m at the shoulder |
+| males against females | 1.1x as tall |
+| size spread (an individual's, either way) | 30% |
+| newborn's size | 40% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 160 kg | |
+| carries her young | 250 d | 3.52 d |
+| litter or clutch | 1 on average | 1 |
+| between litters | 1 y | rests 3 d **set** |
+| breeds in | autumn | out of it, only a tame well cared for |
+| comfortable in | -20 to 25 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 2 y | 6.51 d |
+| lives | 15 y | 57.5 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 12 within 48 blocks |
+
+**Balance** (uncommon): a generation 10 d; a line four deep in 30 d (10 h of play); 1.5 young per mother in 10 days, 6 in her life.
+
+- ✓ fourth generation: 30.1 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 6.5 of 57 days (want under a fifth)
+- ✓ young in a life: 6.1 (want 6-40)
+- ✓ litter: 1-1 (want 1-12, fewest first)
+- ✓ room near: 12 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | grass 50%, leaves 40%, fruit 5%, seeds 5% |
+| its food grows at home (spring/summer/autumn/winter) | forest 40/73/41/0%, birch_forest 40/62/40/0%, mountains 40/70/40/40% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 20 blocks (twice that running) |
+| eats (food points) | `base:wheat` 10; `base:apple` 12, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 1 blocks |
+| signature | bolt |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.9 |
 
 ## Shared by every species
 
