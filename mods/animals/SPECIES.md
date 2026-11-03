@@ -30,6 +30,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | raven | *Corvus corax* | uncommon | small | 0.34 m | 1.2 kg | solitary | carnivore | wild | 0.53 d | 6.51 d | 46 d | 2-6 | 17 |
 | protoceratops | *Protoceratops andrewsi* | common | medium | 0.6 m | 83 kg | herd | herbivore | wild | eggs, hatch 1.54 d | 6 d | 53.7 d | 3-8 | 14 |
 | kryptobaatar | *Kryptobaatar dashzevegi* | common | small | 0.05 m | 0.04 kg | solitary | omnivore | wild | 0.53 d | 3 d | 16 d | 1-5 | 24 |
+| priscagama | *Priscagama gobiensis* | common | small | 0.04 m | 0.03 kg | solitary | carnivore | wild | eggs, hatch 1.21 d | 4.01 d | 23 d | 2-6 | 24 |
 
 ## Stats at level 1
 
@@ -57,6 +58,7 @@ Damage and speed are each kind's own (1 = 100%).
 | raven | 6 | 120 | 40 | 1 | 1 | 10 | 60 | 20 | 5 | 30 |
 | protoceratops | 35 | 200 | 120 | 2 | 1 | 90 | 80 | 70 | 18 | 15 |
 | kryptobaatar | 2 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
+| priscagama | 2 | 60 | 12 | 0.2 | 1 | 2 | 40 | 5 | 2 | 40 |
 
 ## dog (chihuahua)
 
@@ -1257,6 +1259,64 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | fights | no |
 | reach past its body | 0.5 blocks |
 | signature | dart |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 1 |
+
+## priscagama
+
+*Priscagama gobiensis*, Reptilia › Squamata › Priscagamidae › Priscagaminae. Model `lizard`, entity `animals:priscagama`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:red_dunes` | commonest |
+| `animals:scrubland` | commonest |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.04 m at the shoulder |
+| males against females | 1.05x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 20% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 0.03 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 60 d | 1.21 d |
+| litter or clutch | 4.5 on average | 2-6 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 12 to 42 °C air | cold-blooded: slower in the cold |
+| grows up in | 1 y | 4.01 d |
+| lives | 6 y | 23 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 24 **set** within 48 blocks |
+
+**Balance** (common): a generation 5.5 d; a line four deep in 16 d (5 h of play); 7.5 young per mother in 10 days, 11 in her life.
+
+- ✓ fourth generation: 16.4 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 4.0 of 23 days (want under a fifth)
+- ✓ young in a life: 10.8 (want 6-40)
+- ✓ litter: 2-6 (want 1-12, fewest first)
+- ✓ room near: 24 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | insects 90%, leaves 10% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 5 blocks (twice that running) |
+| eats (food points) | `base:wheat_seeds` 2; `base:berries` 4, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.4 blocks |
+| signature | bask |
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 1 |

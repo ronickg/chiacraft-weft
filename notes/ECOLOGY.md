@@ -470,7 +470,8 @@ and cactus.**
 - **Food in the world:** `vitals::forage::SOURCES` lists tall grass (grazed short, growing back
   by warmth and rain as `base:grazed_grass`), ripe berries (the bush starts again), and browse.
   Browse is leaves where their trees grow (deciduous ones from spring to autumn, spruce and
-  acacia all year) and cactus pads in the desert, worth 40% of fresh growth. Seeds and fruit
+  acacia all year), cactus pads in the desert, and the Cretaceous's ferns all year (Protoceratops's
+  low browse), worth 40% of fresh growth. Seeds and fruit
   that are always there count the same way:
   - tall grass seeding in summer and autumn;
   - the desert's seed bank under dead bushes all year;
