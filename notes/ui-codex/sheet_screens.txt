@@ -1,0 +1,5 @@
+One sheet of screen parts in four rows, landscape 1536 x 1024, copied from the attached screens mockup. Draw them all at one scale: one game pixel is 5 image pixels. Rows top to bottom, parts left to right, evenly spaced, plenty of magenta between them:
+Row 1: a dropdown box, 64 x 14 (dark inside, thin copper frame, a small ivory down arrow at the right end), its hover state (brighter copper frame), and its open list panel, 64 x 40 (dark with a thin copper frame).
+Row 2: a progress bar fill in purple, 64 x 6 (smooth purple-violet with a light top edge, like the mockup's taming bar), and three skill tree node frames, 20 x 20 each: locked (grey-brown, dim), unlocked (copper), selected (bright amber-gold glow edge), all empty inside.
+Row 3: a parchment map frame, 64 x 48 (a copper frame around an empty magenta middle, nine-slice friendly), a small round zoom-in button 12 x 12 (copper with an ivory plus), a zoom-out button 12 x 12 (ivory minus).
+Row 4: four map markers, 12 x 12 each, ivory and amber with a dark outline: a house, a paw print, a camp tent, a mountain peak; then a reward badge 16 x 16 (an amber-gold plate with "XP" in dark letters).

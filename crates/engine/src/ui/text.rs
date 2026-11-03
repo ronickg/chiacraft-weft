@@ -547,7 +547,12 @@ fn format_depth(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>, st:
                 .or(st.color);
         } else if tag == "/" {
             st.color = base;
-        } else if let Some(action) = tag.strip_prefix("key:") {
+        } else if let Some((action, bare)) = tag
+            .strip_prefix("key:")
+            .map(|a| (a, false))
+            .or_else(|| tag.strip_prefix("keyname:").map(|a| (a, true)))
+        {
+            // `key:` in brackets for sentences ("press [E]"), `keyname:` bare beside a picture.
             let name = cx
                 .input
                 .and_then(|i| i.key_of(action))
@@ -556,7 +561,8 @@ fn format_depth(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>, st:
             let color = st
                 .color
                 .or_else(|| cx.lang.color("color.key").map(|c| c >> 8));
-            out.push(st.span(Piece::Text(format!("[{name}]")), color));
+            let text = if bare { name } else { format!("[{name}]") };
+            out.push(st.span(Piece::Text(text), color));
         } else if let Some(item) = tag.strip_prefix("item:") {
             if let Some(id) = crate::content::try_content().and_then(|c| c.item_by_ref(item)) {
                 out.push(st.span(Piece::Icon(id), None));

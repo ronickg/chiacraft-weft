@@ -14,6 +14,34 @@ a new item, an ornate piece) goes back to ChatGPT. Block textures, creature skin
 are painted in code (`blocky-model`), not here; an item's icon is the reference for its model, so
 the model in the hand matches the icon in the slot.
 
+## Generating it here with Codex (no copying images by hand)
+
+The Codex app's command line makes the same pictures, on Ronald's ChatGPT Plus plan, from this
+shell: `/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex`. It must be signed in with
+ChatGPT (`codex login status` says "Logged in using ChatGPT"; an API key bills per image), and an
+old build refused every model for a ChatGPT sign-in until the app was updated.
+
+    notes/ui-codex/gen.sh NAME request.txt [more reference images]
+
+`gen.sh` fills `style.txt` with the request and runs `codex exec --skip-git-repo-check --sandbox
+workspace-write --ephemeral -i ... -o last.txt "<prompt>" < /dev/null`, always attaching
+`approved_parts.png` and Ronald's two mockups of the game laid out as it should look
+(`notes/ui-reference/hud-in-game-mockup.jpg`, the HUD; `screens-overview-mockup.jpg`, inventory,
+crafting, taming, a creature's page, build mode, skills, journal and map).
+
+- `< /dev/null` or it waits for terminal input. The prompt says to use the image tool, save ONE
+  PNG under a given name in the current folder and write no code; it takes a minute or two.
+- `notes/ui-codex/style.txt` is the master prompt for it (the UI one above, plus "NAME" and
+  "REQUEST" to fill in); `approved_parts.png` is the kit's approved parts on magenta, the style key,
+  remade from `kit/` when parts are approved. Ronald's reference sheets are in
+  `notes/ui-reference/` (his PNG originals are sharper).
+- Many parts a sheet: one image held 17 small parts in four rows (menu icons, moon, lamp, armor,
+  grip, four bars, three frames), all in style, cut in one go by `sheet.py` (`--names` by rows).
+  Say the scale ("one game pixel is 6 image pixels") and "plenty of magenta between parts". Give a
+  tile or a logo its own image. Several `codex exec` runs can go at once.
+- Glows come out as a pink ring on magenta: take those pixels out after cutting (the waiting
+  lamp: `r > 200, g < 160, b > 100`).
+
 The style and the reasons behind it are in `notes/STYLE.md`; the reference sheets in
 `notes/ui-reference/`.
 

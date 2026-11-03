@@ -25,7 +25,8 @@ They work in any translation, not only in tooltips:
 | `{icons:base:food_full value.hunger/2}` | a row of a picture, as many as the number says, see [icons and meters](#icons-and-meters) |
 | `{value}`, `{value.hunger}`, `{value/200}`, `{value:food.hunger}` | a number from the item the text is about, see [lines by tag](#lines-by-tag) |
 | `{align:center}text{/align}` | lays out the lines inside centered (`left`, `right`); a picture alone on such a line is a centered picture |
-| `{key:core:sneak}` | the key the player has bound to that action |
+| `{key:core:sneak}` | the key the player has bound to that action, in brackets (`[Shift]`) |
+| `{keyname:core:sneak}` | the same key without brackets, for a label beside a picture |
 | `{lang:some.key}` | inserts another translation, so a shared phrase is written once |
 | `{name:item:base:coal}` | the display name of something, colors and all: `item:`, `block:`, `liquid:`, `tab:`, `mod:`, `recipe:`, `config:`, `key:`. Without a translation it shows the raw name. From code it's `Arg::Name("item:base:coal")` |
 | `{on_key:core:sneak}text{/on_key}` | shown only while the key is held; `!` in front inverts it; raw keys work too, but it's recommended to not use them |

@@ -61,9 +61,27 @@ PARTS = {
     "slot_boots": "equipment/boots",
     "led_on": "radio_on",
     "led_off": "radio",
+    "led_wait": "led_wait",
+    "titlebar_grip": "titlebar_grip",
+    "attack_bar": "attack_bar",
+    "attack_bar_fill": "attack_bar_fill",
+    "advancement_line": "advancement_line",
+    "advancement_line_done": "advancement_line_done",
+    "armor_full": "armor_full",
+    "armor_half": "armor_half",
+    "armor_empty": "armor_empty",
+    "logo": "logo",
+    "menu_singleplayer": "menu_singleplayer",
+    "menu_multiplayer": "menu_multiplayer",
+    "menu_settings": "menu_settings",
+    "menu_mods": "menu_mods",
+    # Settings > Arrange HUD (`hud.rs`)
+    "hud_frame": "hud_frame",
+    "hud_frame_hidden": "hud_frame_hidden",
+    "hud_frame_selected": "hud_frame_selected",
     # the HUD's own: the clock's sun, the shortcuts' pictures (`hud.rs`)
     "hud_day": "temperature/warm",
-    "hud_night": "status/rested",
+    "hud_night": "hud_night",
     "hud_inventory": "categories/inventory",
     "hud_recipes": "categories/crafting",
     "hud_advancements": "categories/journal",
@@ -81,16 +99,7 @@ EFFECT_ICONS = {
 
 # Still drawn in the old style: the kit has nothing for them yet (to generate).
 MISSING = {
-    "hud_night": "a moon for the clock at night (the sleeper stands in), 16x16",
     "font": "the pixel font is still the old one: Alegreya and Alegreya Sans need the engine's smooth-font change (notes/STYLE.md, Type)",
-    "background": "the tiled background behind the title and option menus (a dark wood or stone tile)",
-    "advancement_line": "the line between advancements, and advancement_line_done",
-    "titlebar_grip": "the grip on a window's title bar (16x6)",
-    "attack_bar": "the attack charge under the crosshair, and attack_bar_fill (16x4)",
-    "armor": "armor points in the HUD: armor_full, armor_half, armor_empty (a chestplate icon)",
-    "led_wait": "the amber 'waiting' light next to servers",
-    "logo, menu icons": "the title screen logo and menu_singleplayer/multiplayer/settings/mods",
-    "hud_frame": "the frames of Settings > Arrange HUD (engine): hud_frame, _hidden, _selected",
     "overlay, vignette, death": "the dimming behind menus, the vignette, the death screen",
     "input_selection, caret, suggest": "text selection, the caret, chat suggestions (engine)",
 }
@@ -137,6 +146,20 @@ def hue(im, shift, sat=1.0):
     return Image.fromarray((out * 255).round().astype(np.uint8), "RGBA")
 
 
+def muted(im, sat=0.3, val=0.62):
+    """The same frame in weathered bronze: its copper less saturated and darker, as the HUD
+    mockup (`notes/ui-reference/hud-in-game-mockup.png`) has its slots, so only what is selected
+    stays bright amber. The dark insides are left as they are."""
+    a = np.array(im).astype(float) / 255
+    rgb = a[..., :3]
+    mx, mn = rgb.max(-1), rgb.min(-1)
+    frame = (mx > 0.25) & ((mx - mn) / np.maximum(mx, 1e-6) > 0.35)
+    grey = rgb.mean(-1, keepdims=True)
+    toned = (grey + (rgb - grey) * sat) * val
+    a[..., :3] = np.where(frame[..., None], toned, rgb)
+    return Image.fromarray((a.clip(0, 1) * 255).round().astype(np.uint8), "RGBA")
+
+
 def faded(im):
     """An emptied icon: its shape in dark brown, half seen."""
     a = np.array(im)
@@ -171,6 +194,10 @@ def main():
     for name, part in PARTS.items():
         im, spec = load(part)
         write(name, im, spec)
+    # the menus' background: a tile at its own size (64 GUI px), not shrunk with the slots
+    im, _ = load("background")
+    im.save(os.path.join(GUI, "background.png"))
+    open(os.path.join(GUI, "background.gui"), "w").write("scaling = tile\nsize = 64 64\n")
     # the red quit button: the buttons turned from amber to red
     for state in ("", "_hover", "_pressed"):
         im, spec = load("button" + state)
@@ -178,12 +205,17 @@ def main():
     # the advancement toast is drawn as a picture in text ({img:..}), a GUI pixel an image pixel:
     # the kit's toast laid out at its box's size, 160 x 32
     im, spec = load("toast")
-    write("advancement_toast", nine(im, 16, 320, 64).resize((160, 32), Image.LANCZOS), {})
+    write("advancement_toast", muted(nine(im, 16, 320, 64).resize((160, 32), Image.LANCZOS)), {})
+    # the HUD's own frames in weathered bronze (the hotbar, the shortcuts, the clock), as the
+    # mockup: bright amber only for the selected slot
+    for name, part in (("hotbar", "slot"), ("tooltip", "tooltip")):
+        im, spec = load(part)
+        write(name, muted(im), spec)
     # the vitals' bars (`hud.rs`): the kit's frame as a picture, and each fill laid on a canvas the
     # frame's size where it sits inside it, so both stretch alike over the bar
     frame, _ = load("bar")
     for bar, part in (("hud_health", "bar_health"), ("hud_stamina", "bar_stamina"), ("hud_xp", "bar_xp")):
-        write(bar, frame, {})
+        write(bar, muted(frame), {})
         fill, _ = load(part)
         canvas = Image.new("RGBA", frame.size)
         canvas.alpha_composite(fill, ((frame.width - fill.width) // 2, (frame.height - fill.height) // 2))
