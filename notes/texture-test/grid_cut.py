@@ -19,7 +19,8 @@ WHOLE = {
     "log_oak_top", "log_birch_top", "log_spruce_top", "crafting_table_top", "crafting_table_front", "crafting_table_side",
     "furnace_front", "furnace_front_lit", "furnace_side", "furnace_top", "chest_front", "chest_side", "chest_top",
     "bookshelf", "hay_bale_side", "hay_bale_top", "amber_block", "cactus_top", "smooth_stone",
-}
+    "copper_lamp", "copper_lamp_lit", "redstone_lamp_on",
+} | process.PLANTS
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tiles")
 
 
