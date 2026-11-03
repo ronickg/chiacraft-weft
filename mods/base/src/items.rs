@@ -69,6 +69,7 @@ pub fn register(r: &mut Registry) {
     r.set("lava_bucket", &FUEL, 20000);
     r.tag("buckets/lava", &["lava_bucket"]);
     r.tag("bread", &["bread"]);
+    r.tag("apple", &["apple"]);
 
     for (name, hunger, saturation, tag) in [
         ("apple", 4, 2.4, ""),
@@ -83,6 +84,8 @@ pub fn register(r: &mut Registry) {
         ("mutton", 2, 1.2, "raw_meat/mutton"),
         ("cooked_mutton", 6, 9.6, "cooked_meat/mutton"),
         ("spider_eye", 2, 3.2, ""),
+        ("cooked_egg", 5, 6.0, ""),
+        ("apple_pie", 8, 4.8, ""),
     ] {
         // What a portion holds and how fresh it is (stamped as it ages, `survival/food.rs`): shown in
         // its tooltip.

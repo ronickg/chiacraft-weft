@@ -171,6 +171,26 @@ pub const FOODS: &[Food] = &[
         keeps: (3.0, 3.0),
         poison: 1.0,
     },
+    // Two eggs fried (100 g): protein and fat without meat.
+    Food {
+        name: "base:cooked_egg",
+        grams: 100.0,
+        per100: per(69.5, 13.6, 0.8, 14.8, 0.0, 0.0),
+        meal: Meal::Cooked,
+        raw: false,
+        keeps: (2.0, 2.0),
+        poison: 0.0,
+    },
+    // A quarter of an apple pie (200 g): sweet and filling, a little fruit in it.
+    Food {
+        name: "base:apple_pie",
+        grams: 200.0,
+        per100: per(52.0, 2.4, 37.1, 12.5, 1.6, 1.7),
+        meal: Meal::Cooked,
+        raw: false,
+        keeps: (4.0, 4.0),
+        poison: 0.0,
+    },
     // Dry pet food (the animals mod's), as dry dog food.
     Food {
         name: "animals:kibble",

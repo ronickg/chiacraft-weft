@@ -24,6 +24,9 @@ pub fn register(r: &mut Registry) {
     r.shaped(C, "paper", 3, &["###"], &[('#', "#sugar_cane")]);
     r.shapeless(C, "book", 1, &["#paper", "#paper", "#paper", "#materials/leather"], 0);
     r.shaped(C, "bookshelf", 1, &["###", "bbb", "###"], &[('#', "#planks"), ('b', "#book")]);
+    // Eggs: fried in the furnace, or baked into a pie with an apple, sugar and wheat.
+    r.shapeless(S, "cooked_egg", 1, &["#egg"], 200);
+    r.shapeless(C, "apple_pie", 1, &["#apple", "#sugar", "#egg", "#crops/wheat"], 0);
     // Wheat packed nine to a bale and back.
     r.shaped(C, "hay_bale", 1, &["www", "www", "www"], &[('w', "#crops/wheat")]);
     r.shapeless(C, "wheat", 9, &["#hay_bale"], 0);

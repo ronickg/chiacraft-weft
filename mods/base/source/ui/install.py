@@ -198,7 +198,7 @@ def half(full, empty):
 # The item icons (`kit/items/`, cut by icons.py): each over the item texture of the same name in the
 # mod that has it; an icon for a new item goes to the base mod.
 ITEM_DIRS = [os.path.join(HERE, "..", "..", "..", m, "assets", "textures", "item") for m in ("base", "animals")]
-NEW_ITEMS = {"paper", "book"}
+NEW_ITEMS = {"paper", "book", "cooked_egg", "apple_pie"}
 
 
 def install_items():
