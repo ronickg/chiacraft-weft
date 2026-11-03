@@ -54,3 +54,18 @@ same materials. Compare which one keeps closer to the palette and drifts less in
 - The materials look like one family, and like the UI's warm mood.
 - Put a texture next to itself four times (2 x 2): no visible seam, no obvious repeating blotch.
 - Shrunk to a thumbnail it still reads as stone, dirt, planks.
+
+## Generating many at once (Codex, no copying)
+
+`codex/gen_grid.sh NAME "top left" "top right" "bottom left" "bottom right"` makes four block
+textures in one image with the palette and `codex/approved_blocks.png` attached (the prompt is
+`codex/grid_common.txt`); `codex/gen_sprites.sh` the same for plants and other see-through pictures
+on magenta. `codex/batches*.tsv` list what was made; `run_batches.sh` runs a list two at a time.
+Then:
+
+    python3 notes/texture-test/grid_cut.py codex/grid_x.png name1 name2 name3 name4   # into tiles/
+    python3 notes/texture-test/install_blocks.py                                       # into the game
+
+`process.py` knows which textures the game tints (grass, leaves: made grey) and which are
+see-through (leaves, plants, the ladder); `grid_cut.py` which are one picture rather than a
+surface that runs on (their edges are not evened out). Item icons: `notes/ui-codex/gen_items.sh`.

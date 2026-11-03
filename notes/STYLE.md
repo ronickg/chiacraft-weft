@@ -8,17 +8,22 @@ textures **painted by Claude** by rule; the HUD after designs Ronald sends.
 
 ## Where it stands
 
-- Blocks are 16 px a block (`mods/base/assets/textures/block`); dirt, grass, stone, the ores and
-  the crafting table were redrawn soft and painterly (Priklen, `6f407dc`), the rest are older and
-  sharper. To redraw: all at 64 px (the engine takes any power-of-two size and makes mipmaps).
+- Blocks (2026-11-03): 107 textures at 64 px, generated with Codex (ChatGPT's image model) from
+  one prompt, the palette (`notes/texture-test/palette.png`) and the approved tiles, four an image
+  (`notes/texture-test/codex/gen_grid.sh`, `gen_sprites.sh` for plants), cut by `grid_cut.py` and
+  put in the game by `install_blocks.py` (see `notes/texture-test/PROMPTS.md`). Still 16 px: the
+  model-mapped ones (torches, redstone dust, repeaters, comparators, levers, buttons, beds, the
+  piston's inside), glass, water and lava (animated), the anchor and floater.
 - Creatures are meant to be 64 px a block (the blocky-model skill, `.claude/skills/blocky-model`),
   but some are still off it (chihuahua 131, cat 92, Velociraptor 58, capybara 47, Utahraptor 19):
   to rebuild at 64.
-- Items are flat 16 px sprites: to remake as small box models at 64 px a block. To check first:
+- Items: the generated icons (the kit's `items/`, 48 px) are installed for tools, ingots, ores, gems
+  and the animals mod's; the rest are old 16 px sprites. To remake as small box models at 64 px a block. To check first:
   block and item models take texture coordinates only in 128ths of the texture (the skill's
   note), which may need an engine change for painted item models.
-- Plants (tall grass, ferns) show as flat cut-outs, no light inside them: to redraw with shading.
-- The HUD and screens are a plain Minecraft-like layout: grey slots, hearts, hunger, flat panels.
+- Plants (tall grass, flowers, ferns, wheat) are painted 64 px cut-outs.
+- The HUD and screens: the UI kit, weathered bronze frames in the HUD (amber only when selected),
+  Alegreya Sans text; the layout is still the engine's (see the mockups in `notes/ui-reference/`).
 
 ## The look
 
