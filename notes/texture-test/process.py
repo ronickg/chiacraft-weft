@@ -4,11 +4,11 @@ import sys
 import numpy as np
 from PIL import Image
 
-TINTED = {"grass_top", "leaves_oak"}
-CUTOUT = {"leaves_oak"}
+TINTED = {"grass_top", "leaves_oak", "leaves_birch", "leaves_spruce", "grass_side_overlay", "tallgrass"}
+CUTOUT = {"leaves_oak", "leaves_birch", "leaves_spruce", "grass_side_overlay"}
 
 def tile(src, name, size=64):
-    im = np.asarray(Image.open(src).convert("RGB")).astype(float)
+    im = np.asarray((src if isinstance(src, Image.Image) else Image.open(src)).convert("RGB")).astype(float)
     alpha = np.ones(im.shape[:2])
     if name in CUTOUT:
         r, g, b = im[..., 0], im[..., 1], im[..., 2]

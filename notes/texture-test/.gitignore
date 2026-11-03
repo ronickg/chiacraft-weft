@@ -8,3 +8,6 @@ chatgpt/tiled_raw.png
 chatgpt/*_64raw.png
 codex/*.png
 !codex/*_64.png
+tiles_contact*.png
+stonevar_check.png
+!codex/approved_blocks.png
