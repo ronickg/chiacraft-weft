@@ -81,7 +81,7 @@ pub fn register(r: &mut Registry) {
     r.biome(&TAIGA)
         .set(&CLIMATE, base_api::climate("base:taiga"))
         .temperature(..-0.15)
-        .surface("grass", "dirt", 3)
+        .surface("podzol", "dirt", 3)
         .tint(grass, 0x86b783)
         .tint(foliage, 0x68a464)
         .tint(water, 0x3d57d6)
@@ -365,6 +365,9 @@ fn decorate(g: &mut Gen) {
                 for k in 0..n as usize {
                     g.set(x, y + k, z, CACTUS.id());
                 }
+            } else if CACTUS_SOIL.on_block(below) && DRY.on_biome(b) && roll < 0.02 {
+                // Dead bushes: the desert's few sticks.
+                g.set(x, y, z, DEAD_BUSH.id());
             } else if SUGAR_CANE_SOIL.on_block(below)
                 && col.height == SEA
                 && roll < 0.08

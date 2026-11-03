@@ -57,6 +57,10 @@ pub static WOOL: Block = Block::named("wool");
 pub static BOOKSHELF: Block = Block::named("bookshelf");
 /// Nine wheat packed (and back), soft to rest by.
 pub static HAY_BALE: Block = Block::named("hay_bale");
+/// Spruce forests' ground (`worldgen`), soil like dirt.
+pub static PODZOL: Block = Block::named("podzol");
+/// The desert's scrub: a few sticks where there is no wood.
+pub static DEAD_BUSH: Block = Block::named("dead_bush");
 
 /// Log axis along the clicked face, like vanilla.
 fn axis_placement(p: &Place, props: &mut Props) {
@@ -502,6 +506,22 @@ pub fn register(r: &mut Registry) {
         .hardness(0.8)
         .set(&FLAMMABLE, 30)
         .tab(&crate::tabs::COLORED);
+    r.block(&PODZOL)
+        .sound_group("gravel")
+        .textures("podzol", "dirt", "dirt")
+        .hardness(0.5)
+        .mineable("shovel")
+        .tag("dirt")
+        .tab(&crate::tabs::NATURAL);
+    r.block(&DEAD_BUSH)
+        .sound_group("grass")
+        .texture("deadbush")
+        .plant()
+        .needs_below("#sand")
+        .tab(&crate::tabs::NATURAL);
+    r.loot(&DEAD_BUSH)
+        .pool(Pool::new().when(Cond::Chance(0.7)).item("stick"))
+        .pool(Pool::new().when(Cond::Chance(0.35)).item("stick"));
     r.block(&BOOKSHELF)
         .sound_group("wood")
         .textures("planks_oak", "bookshelf", "planks_oak")
