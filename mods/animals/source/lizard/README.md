@@ -33,3 +33,8 @@ Decided: *Priscagama* as the lizard; 1.3 times life, as the mouse, so the face h
 sandy grey with dark blotches, a pale stripe along each side of the back, banded tail, pale below;
 animations idle (head bobs and push-ups, a look round, a flick of the tail), walk and run (sprawling,
 the body curving side to side), bask (flat, the legs splayed).
+
+Painted finer (Ronald, 2026-11-03): at the house density its head was 2.4 units across and 1.5
+tall, the eye a black side of the head, so it is painted `house.FINE` (4) texels a unit, 256 a
+block: an agama's eye (a dark pupil in a gold-brown ring, a catchlight), eyelids that blink (a
+slow blink basking), faint nostrils and the lips' line. Boxes, export scale and size unchanged.

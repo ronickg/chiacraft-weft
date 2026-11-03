@@ -5,9 +5,10 @@ rules (see `area`).
 
     ~/.venvs/blocky/bin/python lizard.py      # writes out/spec.json, out/texture.png
 
-Units are texels at the house density (64 a block, 1.56 cm each), y up, it faces +z. A real one was
-about 20 cm long, the tail more than half of it: here about 1.3 times life, as the mouse, so the
-face has room for an eye: 9 units from the snout to the hips, the tail 10 more. Its legs sprawl out
+Units are the house's (64 a block, 1.56 cm each), y up, it faces +z. A real one was about 20 cm
+long, the tail more than half of it: here about 1.3 times life, as the mouse: 9 units from the
+snout to the hips, the tail 10 more. Its head is still only 2.4 units across and 1.5 tall, so it is
+painted `house.FINE` texels a unit (256 a block): a designed eye that blinks, nostrils and lips. Its legs sprawl out
 to the sides, the body carried low; it bobs its head and pushes up on its front legs, as agamas do.
 """
 
@@ -26,6 +27,7 @@ from layers import Recorder, bounds as layer_bounds  # noqa: E402
 from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import FINE as K  # noqa: E402  texels a unit: a small creature paints finer
 
 OUT = os.environ.get("LIZARD_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -43,14 +45,32 @@ TONES = [tones(c, h) for c, h in zip(BASE, SHADOW)]
 COAT = (SKIN, BACK, BELLY, PALE)
 ROLES = [("coat", 0, 0), ("coat", 0, -1.2), ("coat", 1, 0), ("coat", 0.6, 0.6), "fixed", "fixed"]
 
-# A small dark eye with a gold ring and a catchlight.
+# An agama's eye: a dark pupil in a gold-brown ring, a catchlight toward the front, darker scales
+# round it. Painted `house.FINE` texels a unit.
 EYES.update({
-    "lizard": dict(pattern=["PH",
-                            "PP"], colors={"P": (30, 24, 18), "H": (226, 214, 170)}, halo="none"),
+    "lizard": dict(pattern=[".GG.",
+                            "GHPG",
+                            "GPPG",
+                            ".gg."], colors={"P": (28, 22, 16), "H": (232, 224, 196), "G": (150, 112, 58), "g": (188, 146, 76)},
+                   halo="round"),
 })
 EYE_STYLE = os.environ.get("LIZARD_EYES", "lizard")
 SKULL = ((-1.2, 0.8, 2.8), (1.2, 2.3, 4.8))
-EYE_Z, EYE_Y = 4.0, 1.9
+EYE_Z, EYE_Y = 4.0, 1.6
+LID_X = 1.55  # the eyelids' hinge plane, 0.35 outside the head's side: closed, they sit over the eye
+LASH = (70, 54, 40)
+
+
+def eye_box(side):
+    """(z0, z1, top, bottom) of the eye on one side in units, rounded as `stamp_eyes` places it."""
+    pat = EYES[EYE_STYLE]["pattern"]
+    ph, pw = len(pat), len(pat[0])
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    cu = K * ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0))
+    u0 = int(round(cu - pw / 2))
+    v0 = int(round(K * (y1 - EYE_Y) - ph / 2))
+    za, zb = (z1 - (u0 + pw) / K, z1 - u0 / K) if side > 0 else (z0 + u0 / K, z0 + (u0 + pw) / K)
+    return za, zb, y1 - v0 / K, y1 - (v0 + ph) / K
 
 # ------------------------------------------------------------------ the model
 
@@ -76,6 +96,9 @@ TAIL = [((0, 1.35, -2.8), (0.9, 0.9, 1.8, -6.0, -2.6)), ((0, 1.3, -5.9), (0.55, 
 def bones():
     B = [("root", None, (0, 0, 0)), ("spine_0", "root", (0, 1.4, -1.0)), ("spine_1", "spine_0", (0, 1.4, -0.7)),
          ("neck", "spine_1", (0, 1.5, 2.0)), ("head", "neck", (0, 1.5, 3.0))]
+    for s, n in ((1, "L"), (-1, "R")):
+        za, zb, top, _ = eye_box(s)
+        B.append((f"eyelid_{n}", "head", (s * LID_X, top, (za + zb) / 2)))
     for k, (pv, _) in enumerate(TAIL):
         B.append((f"tail_{k}", "spine_0" if k == 0 else f"tail_{k - 1}", pv))
     for leg in LEGS:
@@ -94,6 +117,14 @@ def elements():
          el("neck", "neck", (-0.8, 1.2, 0.9), (0.8, 1.9, 4.2)),  # deep in the chest and the skull: it turns on them
          el("skull", "head", *SKULL),
          el("snout", "head", (-0.8, 1.2, 4.6), (0.8, 1.9, 6.0))]
+    for s, n in ((1, "L"), (-1, "R")):
+        # The eyelid: a quad the eye's size lying flat inside the head, hinged at the eye's top; a
+        # blink swings it down over the eye. Tilted a few degrees about its hinge, so it is never
+        # in a face's plane.
+        za, zb, top, bottom = eye_box(s)
+        lx0, lx1 = (LID_X - (top - bottom), LID_X) if s > 0 else (-LID_X, -LID_X + (top - bottom))
+        E.append(el(f"eyelid_{n}", f"eyelid_{n}", (lx0, top, za), (lx1, top, zb), quad="down", rot=(0, 0, s * 4),
+                    origin=(s * LID_X, top, (za + zb) / 2)))
     for k, (_, (hw, y0, y1, z0, z1)) in enumerate(TAIL):
         # Each segment a little more down than the one before: never parallel to its neighbors.
         E.append(el(f"tail_{k}", f"tail_{k}", (-hw, y0, z0), (hw, y1, z1), rot=(-2.0 * (k + 1), 0, 0), origin=TAIL[k][0]))
@@ -122,7 +153,7 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(abs(size @ du)))), max(1, int(round(abs(size @ dv)))), n
+    return np.array(corner, float), du, dv, max(1, int(round(K * abs(size @ du)))), max(1, int(round(K * abs(size @ dv)))), n
 
 
 def area(e, face, p, uu, vv, h):
@@ -151,6 +182,8 @@ def area(e, face, p, uu, vv, h):
             a[:] = SKIN
         elif side:
             a = np.where(y < 1.2, BELLY, SKIN)
+    elif name.startswith("eyelid"):
+        a[:] = SKIN
     elif name.startswith("leg_"):
         a = np.where(blotch & (face == "up"), BACK, SKIN)
         if face == "down":
@@ -189,18 +222,28 @@ def paint_face(e, face, boxes):
     light_face = face
     if face == "down" and e["name"].startswith(("leg_", "tail")):
         light_face = "north"
+    if e["name"].startswith("eyelid"):
+        light_face = "east"  # seen only closed, as the side of the head
     a = area(e, face, p, uu, vv, h)
-    occ = occlusion(p, n, du, dv, boxes, own=e["name"])
+    occ = None if e["quad"] else occlusion(p, n, du, dv, boxes, own=e["name"])
     cap = {}
-    col = paint_face_smooth(a, TONES, light_face, out=cap, coat=COAT, y_world=None, occ=occ, quad=False,
+    col = paint_face_smooth(a, TONES, light_face, out=cap, coat=COAT, y_world=None, occ=occ, quad=bool(e["quad"]),
                             seed=sum(map(ord, e["name"] + face)) % 97, tuft=False, merge=False)
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["name"] == "skull" and face in ("east", "west"):
         (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
-        stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
-    if e["name"] == "snout" and face in ("east", "west"):  # the lips' line
+        cu = K * ((z1 - EYE_Z) if face == "east" else (EYE_Z - z0))
+        stamp_eyes(img, [(cu, K * (y1 - EYE_Y))], EYE_STYLE)
+    if e["name"] == "snout" and face in ("east", "west"):  # the lips' line, rising a little at the back
         img[h - 1, :, :3] = BASE[MOUTH]
+        back = slice(w - 2, w) if face == "east" else slice(0, 2)
+        img[h - 2, back, :3] = BASE[MOUTH]
+    if e["name"] == "snout" and face == "south":  # the nostrils, two slits at the top corners
+        for c in (1, w - 2):  # faint: dark spots on a face read as eyes
+            img[0, c, :3] = (img[0, c, :3] * 0.8).astype(np.uint8)
+        img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.8).astype(np.uint8)
+    if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
+        img[:, 0 if e["name"].endswith("L") else w - 1, :3] = LASH
     if e["name"].endswith("_paw") and face == "south":  # the claws
         img[:, ::2, :3] = (img[:, ::2, :3] * 0.7).astype(np.uint8)
     if LAYERS["rec"] is not None:
@@ -286,11 +329,23 @@ def pose_bask(t, P=L):
 
 
 ANIMS = {"idle": (pose_idle, 4.0), "walk": (pose_walk, 0.5), "run": (pose_run, 0.3), "bask": (pose_bask, 4.0)}
+BLINKS = {"idle": [0.6, 3.3], "bask": [2.0]}  # basking, a slow blink
+BLINK = {"idle": 0.08, "bask": 0.3}
+
+
+def eyelids(name, t):
+    d = BLINK.get(name, 0.08)
+    a = 90 * max([0.0] + [1 - abs(t - b) / d for b in BLINKS.get(name, [])])
+    return {"eyelid_L": (0, 0, a), "eyelid_R": (0, 0, -a)}  # side eyes: the lids swing down about z
 
 
 def frame_times(name, dur):
     n = {"idle": 96, "bask": 48, "walk": 20, "run": 20}.get(name, 16)
-    return sorted({round(dur * k / n, 4) for k in range(n + 1)})
+    ts = {round(dur * k / n, 4) for k in range(n + 1)}
+    d = BLINK.get(name, 0.08)
+    for b in BLINKS.get(name, []):
+        ts |= {round(b + x, 4) for x in (-d, -d / 2, 0, d / 2, d)}
+    return sorted(ts)
 
 
 def animations(bone_names):
@@ -300,6 +355,7 @@ def animations(bone_names):
         for t in frame_times(name, dur):
             tt = t % dur if t < dur else 0.0
             pose = fn(tt)
+            pose.update(eyelids(name, tt))
             frames.append({"t": round(t, 4), "rot": {b: [round(float(v), 4) for v in pose.get(b, (0, 0, 0))] for b in bone_names if b != "root"},
                            "root": [round(float(v), 4) for v in pose.get("root", (0, 0, 0))]})
         out[name] = {"length": dur, "frames": frames}
@@ -329,18 +385,18 @@ def fit_poses(spec):
 def build():
     B = bones()
     E = elements()
-    boxes = [(e["name"], np.array(e["lo"]), np.array(e["hi"])) for e in E]
+    boxes = [(e["name"], np.array(e["lo"]), np.array(e["hi"])) for e in E if not e["quad"]]
     LAYERS["rec"] = Recorder(layer_bounds(E, 1.0))
     tiles = []
     for i, e in enumerate(E):
-        for f in FACES:
+        for f in ([e["quad"]] if e["quad"] else FACES):
             LAYERS["key"] = (i, f)
             tiles.append(((i, f), paint_face(e, f, boxes)))
     sheet, uv = pack(tiles, 512)  # the layers pack at the same width (`Recorder.save`)
     LAYERS["rec"].save(OUT, [k for k, _ in tiles], pack)
     LAYERS["rec"] = None
     for i, e in enumerate(E):
-        e["faces"] = {f: uv.get((i, f)) for f in FACES}
+        e["faces"] = {f: uv.get((i, f)) for f in ([e["quad"]] if e["quad"] else FACES)}
     spec = {"name": "lizard", "texture": [sheet.shape[1], sheet.shape[0]],
             "bones": [{"name": n, "parent": p, "pivot": [float(v) for v in pv]} for n, p, pv in B], "elements": E}
     fit_poses(spec)
