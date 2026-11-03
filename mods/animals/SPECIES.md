@@ -13,9 +13,9 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | dog (chihuahua) | *Canis familiaris* | common | small | 0.2 m | 2.5 kg | pack | carnivore | passive | 1.25 d | 3.5 d | 49.9 d | 1-4 | 17 |
 | cat | *Felis catus* | common | small | 0.24 m | 4.5 kg | solitary | carnivore | passive | 1.28 d | 2.99 d | 49.9 d | 1-4 | 13 |
 | capybara | *Hydrochoerus hydrochaeris* | common | medium | 0.56 m | 50 kg | herd | herbivore | passive | 2.28 d | 5.34 d | 30.7 d | 2-6 | 16 |
-| raptor | *Velociraptor mongoliensis* | uncommon | medium | 0.5 m | 15 kg | pack | carnivore | knockout | eggs, hatch 1.41 d | 7.54 d | 76.7 d | 1-4 | 12 |
+| raptor | *Velociraptor mongoliensis* | uncommon | medium | 0.5 m | 15 kg | solitary | carnivore | knockout | eggs, hatch 1.41 d | 7.54 d | 76.7 d | 1-4 | 10 |
 | utahraptor | *Utahraptor ostrommaysi* | rare | large | 1.5 m | 300 kg | pack | carnivore | knockout | eggs, hatch 2.28 d | 12.3 d | 153.3 d | 1-3 | 7 |
-| osmolskae | *Velociraptor osmolskae* | uncommon | medium | 0.5 m | 15 kg | pack | carnivore | knockout | eggs, hatch 1.41 d | 7.54 d | 76.7 d | 1-4 | 12 |
+| osmolskae | *Velociraptor osmolskae* | uncommon | medium | 0.5 m | 15 kg | solitary | carnivore | knockout | eggs, hatch 1.41 d | 7.54 d | 76.7 d | 1-4 | 10 |
 | wyvern | *Wyverna montana* | legendary | large | 3.9 m | 5000 kg | solitary | carnivore | knockout | eggs, hatch 5.47 d | 32.7 d | 421.6 d | 1 | 3 |
 
 ## Stats at level 1
@@ -79,6 +79,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | passive |
 | diet | carnivore |
 | eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
+| hunts | 1.0%-80% of its mass alone (0.02-2 kg); at home: base:chicken |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 8; `base:mutton` 8; `base:cooked_beef` 20, favorite; `base:cooked_porkchop` 20, favorite; `base:cooked_chicken` 16, favorite; `base:cooked_mutton` 16, favorite; `base:bone` 5, favorite; `animals:kibble` 30, kibble |
@@ -140,6 +141,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | passive |
 | diet | carnivore |
 | eats | meat 80%, insects 10%, carrion 5%, fish 5% |
+| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: base:chicken |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:mutton` 8; `base:egg` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:chicken` 10, favorite; `base:cooked_chicken` 16, favorite; `animals:kibble` 30, kibble |
@@ -221,7 +223,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | `animals:red_dunes` | commonest |
 | `animals:scrubland` | 40% |
 
-Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 
 | Body | |
 |---|---|
@@ -242,7 +244,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 | comfortable in | 12 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 2.5 y | 7.54 d |
 | lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
-| lives in | pack | room for 12 within 48 blocks |
+| lives in | solitary | room for 10 within 48 blocks |
 
 **Balance** (uncommon): a generation 9.2 d; a line four deep in 28 d (9 h of play); 4.7 young per mother in 10 days, 25 in her life.
 
@@ -250,13 +252,14 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 - ✓ grown most of its life: grows 7.5 of 77 days (want under a fifth)
 - ✓ young in a life: 25.3 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
-- ✓ room near: 12 (want 3-30)
+- ✓ room near: 10 (want 3-30)
 
 | Taming and food | |
 |---|---|
 | how | knockout |
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
+| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: none yet: it waits for its prey to come to the world |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
@@ -316,6 +319,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | how | knockout |
 | diet | carnivore |
 | eats | meat 80%, carrion 15%, fish 5% |
+| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: none yet: it waits for its prey to come to the world |
 | feedings to tame at level 1 | 18 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:porkchop` 15; `base:beef` 20, favorite; `base:mutton` 15, favorite; `animals:kibble` 30, kibble |
@@ -337,7 +341,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 |---|---|
 | `animals:red_dunes` | commonest |
 
-Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 
 | Body | |
 |---|---|
@@ -358,7 +362,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 | comfortable in | 12 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 2.5 y | 7.54 d |
 | lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
-| lives in | pack | room for 12 within 48 blocks |
+| lives in | solitary | room for 10 within 48 blocks |
 
 **Balance** (uncommon): a generation 9.2 d; a line four deep in 28 d (9 h of play); 4.7 young per mother in 10 days, 25 in her life.
 
@@ -366,13 +370,14 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 - ✓ grown most of its life: grows 7.5 of 77 days (want under a fifth)
 - ✓ young in a life: 25.3 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
-- ✓ room near: 12 (want 3-30)
+- ✓ room near: 10 (want 3-30)
 
 | Taming and food | |
 |---|---|
 | how | knockout |
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
+| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: none yet: it waits for its prey to come to the world |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
@@ -433,6 +438,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | how | knockout |
 | diet | carnivore |
 | eats | meat 80%, fish 10%, carrion 10% |
+| hunts | 0.1%-60% of its mass alone (5.00-3000 kg); at home: raptor, utahraptor, osmolskae |
 | feedings to tame at level 1 | 45 (2.5x at level 150) |
 | scared by a walking player within | nothing |
 | eats (food points) | `base:chicken` 10; `base:porkchop` 15; `base:beef` 20; `base:mutton` 20, favorite; `base:cooked_mutton` 30, favorite; `animals:kibble` 30, kibble |

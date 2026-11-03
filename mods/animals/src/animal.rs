@@ -161,10 +161,11 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             }
         }
         // Its body once a second (`comfort.rs`); a tame gets hungry, faster out of its comfort,
-        // and so does a wild plant eater, which grazes (`forage.rs`).
+        // and so does a wild one whose food the world has: a plant eater grazes (`forage.rs`), a
+        // hunter with prey at home hunts (`hunt.rs`).
         if !new && (w.time() + id) % 20 == 0 {
             let rate = crate::comfort::upkeep(w, id, &a, st);
-            if tamed(w, id) || a.species().is_some_and(|s| s.forages_wild()) {
+            if tamed(w, id) || a.species().is_some_and(|s| s.hungry_in_the_wild()) {
                 hunger(w, id, &a, rate);
             }
         }

@@ -192,7 +192,14 @@ fn forage_table(w: &mut String) {
             forage::Eaten::Age(a) => format!("back to age {a}"),
             forage::Eaten::Stays => "stays".into(),
         };
-        let _ = writeln!(w, "| {block} | {} | {} | {eaten} | {} |", f.category.name(), f.food, f.renews.unwrap_or("always there"));
+        let back = match f.renews {
+            Some(p) => p.to_string(),
+            None => {
+                let when = if f.seasons == 15 { "all year" } else { "spring to autumn" };
+                format!("browse in {} ({when}), worth {:.0}% of fresh growth", f.found.join(", "), forage::BROWSE * 100.0)
+            }
+        };
+        let _ = writeln!(w, "| {block} | {} | {} | {eaten} | {back} |", f.category.name(), f.food);
     }
     let _ = writeln!(w);
 }

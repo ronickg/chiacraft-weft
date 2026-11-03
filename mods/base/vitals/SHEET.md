@@ -110,10 +110,11 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 |---|---|---|---|---|
 | base:tall_grass | grass | 10 | becomes base:grazed_grass | base:grazed_grass |
 | base:berry_bush (age 3) | fruit | 8 | back to age 1 | base:berry_bush |
-| base:oak_leaves | leaves | 4 | stays | always there |
-| base:birch_leaves | leaves | 4 | stays | always there |
-| base:spruce_leaves | leaves | 4 | stays | always there |
-| base:acacia_leaves | leaves | 4 | stays | always there |
+| base:oak_leaves | leaves | 4 | stays | browse in base:forest (spring to autumn), worth 40% of fresh growth |
+| base:birch_leaves | leaves | 4 | stays | browse in base:forest, base:birch_forest (spring to autumn), worth 40% of fresh growth |
+| base:spruce_leaves | leaves | 4 | stays | browse in base:taiga, base:snowy_plains, base:mountains (all year), worth 40% of fresh growth |
+| base:acacia_leaves | leaves | 4 | stays | browse in base:savanna (all year), worth 40% of fresh growth |
+| base:cactus | leaves | 3 | stays | browse in base:desert (all year), worth 40% of fresh growth |
 
 ## Difficulty (the `base:difficulty` rule)
 

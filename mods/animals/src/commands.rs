@@ -471,12 +471,16 @@ fn set_target(w: &World, id: u64, t: u64) {
     }
 }
 
+/// Blocks any animal strikes from, whatever its size.
+const LUNGE: f64 = 1.6;
+
 /// After `t`, striking when in reach (the engine keeps the pace of its attacks), each hit shown
 /// by one of its species' attacks (a bite, a swipe...), at random.
 pub fn fight(w: &World, id: u64, st: &EntityState, t: u64) {
     let Some(e) = w.entity(t) else { return };
     let species = w.component(id, &ANIMAL).and_then(|a| a.species());
-    let reach = (st.size[0] + e.size[0]) as f64 / 2.0 + species.map_or(0.8, |s| s.reach) as f64;
+    // At least a lunge: the path ends a block and a half short of a target that stands still.
+    let reach = ((st.size[0] + e.size[0]) as f64 / 2.0 + species.map_or(0.8, |s| s.reach) as f64).max(LUNGE);
     let flat = (e.pos[0] - st.pos[0]).powi(2) + (e.pos[2] - st.pos[2]).powi(2);
     if flat < reach * reach && (e.pos[1] - st.pos[1]).abs() < 2.0 + st.size[1] as f64 / 2.0 && w.attack(id, t) {
         let attacks = species.map_or(&[][..], |s| s.attacks);

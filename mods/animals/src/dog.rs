@@ -139,6 +139,8 @@ fn goals() -> Goals {
         .then(animal::upkeep(0))
         .then(upkeep)
         .then(taming::behave(0))
+        .then(crate::hunt::wary)
+        .then(crate::hunt::hunt)
         .then(signatures::alarm)
         .then(signatures::tracking)
         .then(commands::act(0))

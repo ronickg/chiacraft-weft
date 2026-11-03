@@ -34,7 +34,6 @@ static STATE: Component<Raptor> = Component::named("raptor_state");
 const PACK_RANGE: f64 = 8.0;
 const AID_RANGE: f64 = 16.0;
 /// What a pack hunts.
-static PREY: [Entity; 3] = [Entity::named("base:chicken"), Entity::named("base:sheep"), Entity::named("base:pig")];
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&STATE, Raptor::default(), 0);
@@ -93,7 +92,8 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
                 .then(crate::animal::upkeep(index))
                 .then(crate::riding::ridden(index))
                 .then(crate::knockout::behave(index))
-                .then(hunt)
+                .then(crate::hunt::wary)
+                .then(crate::hunt::hunt)
                 .then(crate::commands::act(index))
                 .then(crate::breeding::behave(index))
                 .then(crate::eggs::nest(index))
@@ -178,7 +178,12 @@ pub fn sleep(w: &World, id: u64) {
 /// `id` (wild) was hurt by `at`, or goes after it: the wild ones of its kind near it join in
 /// (velociraptors and Utahraptors alike).
 pub fn aid(w: &World, id: u64, at: u64) {
-    if crate::animal::tamed(w, id) {
+    // Only a pack's kind (Utahraptors); a lone hunter's kin don't join in.
+    let pack = w
+        .component(id, &crate::animal::ANIMAL)
+        .and_then(|a| a.species())
+        .is_some_and(|s| s.bio.social == crate::species::Social::Pack);
+    if crate::animal::tamed(w, id) || !pack {
         return;
     }
     let Some(st) = w.entity(id) else { return };
@@ -194,27 +199,4 @@ pub fn aid(w: &World, id: u64, at: u64) {
             k.angry_at = at;
         }
     }
-}
-
-/// A goal for wild raptors: now and then (about every five minutes) a pack goes after a
-/// chicken, sheep or pig nearby.
-fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
-    if crate::animal::tamed(w, id) || w.random_below(6000) != 0 {
-        return false;
-    }
-    let calm = w
-        .component(id, &crate::knockout::KNOCKOUT)
-        .is_some_and(|k| k.out == 0 && k.angry == 0);
-    if !calm {
-        return false;
-    }
-    let prey = PREY
-        .iter()
-        .flat_map(|p| w.near(st.pos, AID_RANGE, Some(p)))
-        .next();
-    if let Some(p) = prey {
-        weft_sdk::info!("raptor {id} hunts {p}");
-        crate::knockout::anger(w, id, p);
-    }
-    false
 }

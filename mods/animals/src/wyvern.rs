@@ -78,7 +78,7 @@ pub fn init(r: &mut Registry) {
                 .then(breathe_at_foe)
                 .then(crate::knockout::behave(INDEX))
                 .then(guard)
-                .then(crate::utahraptor::hunt)
+                .then(crate::hunt::hunt)
                 .then(crate::commands::act(INDEX))
                 .then(crate::breeding::behave(INDEX))
                 .then(crate::eggs::nest(INDEX))

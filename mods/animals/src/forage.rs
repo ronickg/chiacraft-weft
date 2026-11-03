@@ -62,11 +62,13 @@ const SPAWN_FLOOR: f32 = 0.2;
 /// How much of its food its biome grows through this season, 0 to 1
 /// (`vitals::forage::season_lushness`); 1 for one that doesn't forage.
 pub fn season_lush(w: &World, s: &Species, pos: [i32; 3]) -> f32 {
+    let biome = w.biome(pos);
     let c = base_api::CLIMATE
-        .on_biome(w.biome(pos))
+        .on_biome(biome)
         .unwrap_or(base_api::TEMPERATE);
     let season = crate::breeding::season_bit(w).map(|bit| bit.trailing_zeros() as usize);
-    vitals::forage::season_lushness(|k| s.eats(k), c.celsius, c.seasons, c.rain, season).unwrap_or(1.0)
+    let name = name_of(abi::entry_kind::BIOME, biome);
+    vitals::forage::season_lushness(|k| s.eats(k), name, c.celsius, c.seasons, c.rain, season).unwrap_or(1.0)
 }
 
 /// How much of its food the place at `pos` grows now, 0 to 1 (`vitals::forage::lushness`); 1 for
@@ -115,7 +117,7 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(mut f) = w.component(id, &FORAGE).copied() else { return false };
     let full = a.food as f32 / a.stat(species::FOOD).max(1.0);
     // Only an animal that gets hungry, and whose food grows in the world.
-    let hungry = (s.forages_wild() || animal::tamed(w, id)) && s.eats.iter().any(|&(c, _)| vitals::forage::grows(c));
+    let hungry = (s.hungry_in_the_wild() || animal::tamed(w, id)) && s.eats.iter().any(|&(c, _)| vitals::forage::grows(c));
     if !hungry || full >= FULL || (f[3] == 0.0 && full >= HUNGRY) {
         if f[3] != 0.0 {
             w.component_mut(id, &FORAGE).map(|f| *f = [0.0; 4]);

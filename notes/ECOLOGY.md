@@ -468,8 +468,11 @@ and cactus.**
 
 **Built for plant eaters (2026-11-03).**
 - **Food in the world:** `vitals::forage::SOURCES` lists tall grass (grazed short, growing back
-  by warmth and rain as `base:grazed_grass`), ripe berries (the bush starts again) and leaves
-  (always there).
+  by warmth and rain as `base:grazed_grass`), ripe berries (the bush starts again), and browse.
+  Browse is leaves where their trees grow (deciduous ones from spring to autumn, spruce and
+  acacia all year) and cactus pads in the desert, worth 40% of fresh growth. It counts in
+  capacity and in the check, so a winter hare in the taiga lives on spruce twigs, as the real
+  ones do.
 - **Wild hunger:** wild plant eaters get hungry like tames (`Species::forages_wild`).
 - **The goal:** `mods/animals/src/forage.rs` looks round for the nearest food of the diet, walks
   there and eats a mouthful at a time until full. Tames forage too, unless told to stay, and a
@@ -499,6 +502,32 @@ and cactus.**
   care for tames.
 
 ### 6. Hunters and prey
+
+**Built (2026-11-03).**
+- **Prey sizes:** every species' row has its prey sizes as shares of its own mass
+  (`Species::prey`, from its research). The farm animals count as prey by their wild kinds'
+  masses (`OTHER_PREY`).
+- **Wild hunger:** a hunter gets hungry in the wild once it has prey at home
+  (`Species::hungry_in_the_wild`). The chihuahua and cat have chickens; the wyvern has the
+  raptors. The Velociraptors and Utahraptor wait for wave one's *Protoceratops*.
+- **The goal:** `mods/animals/src/hunt.rs` picks the nearest prey it can take, never of its own
+  family or a player, and chases it. A knock-out kind fights through its anger, so a pack's kin
+  join in. It gives up after 30 seconds, and a kill feeds it, a tenth of its own mass filling it.
+  What the kill drops stays as the carcass.
+- **Prey watch:** a wild animal that sees a hunter able to take it within 10 blocks runs.
+- **The old random hunts are gone:** the raptors' and Utahraptor's "now and then" hunts are
+  replaced.
+- **Velociraptors live alone,** as decided: no pack aid, met one at a time.
+- **Every animal strikes from at least 1.6 blocks:** the path ends that far short of a target
+  that stands still.
+- **Seen in the game:** a hungry chihuahua killed a chicken and ate its fill; a hungry wyvern
+  took a Velociraptor, a pig and a cat in turn.
+- **Not yet:**
+  - **Hunting players:** a decision for later. The research says a lone raptor would take a person.
+  - **Packs together:** they don't take bigger prey together yet.
+  - **Scavenging carcasses:** needs the engine to tell a mod what a dropped item is.
+  - **Not seen:** prey running from a hunter.
+
 
 - **What a hunter takes:** each species' own prey-size range, from its research. Hunters under
   about 21.5 kg (chihuahua, cat, fox) mostly take prey under half their mass and many insects;

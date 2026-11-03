@@ -107,6 +107,11 @@ const fn favorite(item: &'static str, food: u16) -> Food {
     Food { item, food, liking: Liking::Favorite }
 }
 
+/// The other animals hunters take, by entity and mass in kg (the overworld's farm animals as
+/// their wild kinds: junglefowl and grouse, boar, wild sheep, aurochs; `reports/ecology/Overworld
+/// food webs.md`). They live all over the overworld.
+pub const OTHER_PREY: [(&str, f32); 4] = [("base:chicken", 1.0), ("base:pig", 80.0), ("base:sheep", 70.0), ("base:cow", 600.0)];
+
 /// Every species takes kibble, best of all.
 const KIBBLE: Food = Food { item: "animals:kibble", food: 30, liking: Liking::Kibble };
 
@@ -125,6 +130,10 @@ pub struct Species {
     /// What it really eats, as shares of its food by kind (`vitals::food::Category`), from its
     /// research (`reports/ecology/*food webs.md`): the forage goal looks for these in the world.
     pub eats: &'static [(Category, f32)],
+    /// The prey it takes alone, as shares of its own mass, smallest and biggest (`(0, 0)`: it
+    /// hunts nothing), from its research: small hunters mostly under half their mass, a lone
+    /// Velociraptor up to six times its own (the Fighting Dinosaurs).
+    pub prey: (f32, f32),
     pub taming: Taming,
     /// Each stat's value at level 1 (damage and speed as the kind's own: 100%).
     pub base: [f32; STATS],
@@ -204,10 +213,38 @@ impl Species {
         self.eats.iter().any(|&(k, _)| k == c)
     }
     /// Whether a wild one gets hungry and forages (`notes/ECOLOGY.md`, part 5): mostly a plant
-    /// eater, whose food the world grows. Hunters get hungry in the wild with prey to hunt
-    /// (part 6).
+    /// eater, whose food the world grows.
     pub fn forages_wild(&self) -> bool {
         self.plant_share() >= 0.5
+    }
+    /// Whether it hunts at all.
+    pub fn hunts(&self) -> bool {
+        self.prey.1 > 0.0
+    }
+    /// Whether a hunter of `own` kg takes prey of `kg` alone.
+    pub fn takes(&self, own: f32, kg: f32) -> bool {
+        self.hunts() && kg >= own * self.prey.0 && kg <= own * self.prey.1
+    }
+    /// Its prey where it lives (part 6): the species of other families sharing one of its
+    /// habitats within its prey's sizes, and the farm animals' wild kinds in the overworld.
+    pub fn prey_at_home(&self) -> impl Iterator<Item = &'static str> + '_ {
+        let mine = |biome: &str| self.habitats.iter().any(|&(b, _)| b == biome);
+        let species = SPECIES
+            .iter()
+            .filter(move |o| o.family.name != self.family.name && self.takes(self.bio.mass, o.bio.mass))
+            .filter(move |o| o.habitats.iter().any(|&(b, _)| mine(b)))
+            .map(|o| o.name);
+        let overworld = self.habitats.iter().any(|&(b, _)| b.starts_with("base:"));
+        let mobs = OTHER_PREY
+            .iter()
+            .filter(move |&&(_, kg)| overworld && self.takes(self.bio.mass, kg))
+            .map(|&(name, _)| name);
+        species.chain(mobs)
+    }
+    /// Whether a wild one gets hungry: a plant eater, or a hunter with prey where it lives (a
+    /// hunter with none waits for its prey to come to the world).
+    pub fn hungry_in_the_wild(&self) -> bool {
+        self.forages_wild() || self.prey_at_home().next().is_some()
     }
     /// Ticks a mother carries her young (an in-game day is 24 000); 0: it lays eggs.
     pub fn gestation(&self) -> u32 {
@@ -256,6 +293,7 @@ pub static SPECIES: [Species; 7] = [
         breed: Some("chihuahua"),
         size: Size::Small,
         eats: &[(Meat, 0.4), (Carrion, 0.2), (Insects, 0.15), (Fruit, 0.15), (Seeds, 0.1)],
+        prey: (0.01, 0.8),
         taming: Taming::Passive,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [8.0, 100.0, 80.0, 2.0, 1.0, 40.0, 100.0, 60.0, 10.0],
@@ -319,6 +357,7 @@ pub static SPECIES: [Species; 7] = [
         breed: None,
         size: Size::Small,
         eats: &[(Meat, 0.8), (Insects, 0.1), (Carrion, 0.05), (Fish, 0.05)],
+        prey: (0.005, 0.4),
         taming: Taming::Passive,
         base: [6.0, 80.0, 60.0, 1.0, 1.0, 30.0, 80.0, 40.0, 10.0],
         wild_step: WILD_STEP,
@@ -387,6 +426,7 @@ pub static SPECIES: [Species; 7] = [
         breed: None,
         size: Size::Medium,
         eats: &[(Grass, 0.75), (WaterPlants, 0.2), (Fruit, 0.05)],
+        prey: (0.0, 0.0),
         taming: Taming::Passive,
         // It holds its breath for five minutes.
         base: [12.0, 150.0, 200.0, 1.0, 1.0, 150.0, 400.0, 150.0, 20.0],
@@ -448,6 +488,7 @@ pub static SPECIES: [Species; 7] = [
         breed: None,
         size: Size::Medium,
         eats: &[(Meat, 0.7), (Carrion, 0.25), (Insects, 0.05)],
+        prey: (0.002, 6.0),
         taming: Taming::Knockout,
         base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
         wild_step: WILD_STEP,
@@ -477,7 +518,7 @@ pub static SPECIES: [Species; 7] = [
             lifespan: 7300.0,
             interval: 365.0,
             litter: 3.0,
-            social: Social::Pack,
+            social: Social::Solitary, // no Velociraptor was ever found with another (Ronald, 2026-11-03)
             rarity: Rarity::Uncommon,
             // No record; nesting colonies came back year after year as birds' do, and their kin
             // nest so their young hatch into the growing season: the wet one.
@@ -500,6 +541,7 @@ pub static SPECIES: [Species; 7] = [
         breed: None,
         size: Size::Large,
         eats: &[(Meat, 0.8), (Carrion, 0.15), (Fish, 0.05)],
+        prey: (0.01, 3.0),
         taming: Taming::Knockout,
         base: [60.0, 300.0, 400.0, 10.0, 1.0, 400.0, 200.0, 700.0, 30.0],
         wild_step: WILD_STEP,
@@ -554,6 +596,7 @@ pub static SPECIES: [Species; 7] = [
         breed: None,
         size: Size::Medium,
         eats: &[(Meat, 0.7), (Carrion, 0.25), (Insects, 0.05)],
+        prey: (0.002, 6.0),
         taming: Taming::Knockout,
         base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
         wild_step: WILD_STEP,
@@ -583,7 +626,7 @@ pub static SPECIES: [Species; 7] = [
             lifespan: 7300.0,
             interval: 365.0,
             litter: 3.0,
-            social: Social::Pack,
+            social: Social::Solitary, // no Velociraptor was ever found with another (Ronald, 2026-11-03)
             rarity: Rarity::Uncommon,
             breeds: seasons::WET,
             peak: seasons::SPRING,
@@ -605,6 +648,7 @@ pub static SPECIES: [Species; 7] = [
         breed: None,
         size: Size::Large,
         eats: &[(Meat, 0.8), (Fish, 0.1), (Carrion, 0.1)],
+        prey: (0.001, 0.6),
         taming: Taming::Knockout,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [400.0, 800.0, 2000.0, 30.0, 1.0, 1200.0, 400.0, 3000.0, 80.0],

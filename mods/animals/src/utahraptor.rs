@@ -29,7 +29,6 @@ static STATE: Component<Utahraptor> = Component::named("utahraptor_state");
 
 const LOOKS: [(&str, &str); 2] = [("", ""), ("_rest", "utahraptor_rest")];
 /// What it hunts.
-static PREY: [Entity; 3] = [Entity::named("base:sheep"), Entity::named("base:pig"), Entity::named("base:cow")];
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&STATE, Utahraptor::default(), 0);
@@ -68,7 +67,8 @@ pub fn init(r: &mut Registry) {
                 .then(crate::animal::upkeep(4))
                 .then(crate::riding::ridden(4))
                 .then(crate::knockout::behave(4))
-                .then(hunt)
+                .then(crate::hunt::wary)
+                .then(crate::hunt::hunt)
                 .then(crate::commands::act(4))
                 .then(crate::breeding::behave(4))
                 .then(crate::eggs::nest(4))
@@ -133,27 +133,4 @@ pub fn sleep(w: &World, id: u64) {
         c.look = 2;
         w.set_look(id, Some("animals:utahraptor_rest"));
     }
-}
-
-/// A goal for wild Utahraptors (and wyverns): now and then (about every ten minutes) one goes
-/// after a sheep, pig or cow nearby, and the others of its kind near it join in.
-pub(crate) fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
-    if crate::animal::tamed(w, id) || w.random_below(12_000) != 0 {
-        return false;
-    }
-    let calm = w
-        .component(id, &crate::knockout::KNOCKOUT)
-        .is_some_and(|k| k.out == 0 && k.angry == 0);
-    if !calm {
-        return false;
-    }
-    let prey = PREY
-        .iter()
-        .flat_map(|p| w.near(st.pos, 24.0, Some(p)))
-        .next();
-    if let Some(p) = prey {
-        weft_sdk::info!("{id} hunts {p}");
-        crate::knockout::anger(w, id, p);
-    }
-    false
 }

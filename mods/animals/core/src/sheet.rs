@@ -260,6 +260,17 @@ fn species(w: &mut String, s: &Species) {
         .collect::<Vec<_>>()
         .join(", ");
     let _ = writeln!(w, "| eats | {eats} |");
+    if s.hunts() {
+        let (lo, hi) = (s.bio.mass * s.prey.0, s.bio.mass * s.prey.1);
+        let prey = s.prey_at_home().collect::<Vec<_>>().join(", ");
+        let prey = if prey.is_empty() { "none yet: it waits for its prey to come to the world".to_string() } else { prey };
+        let _ = writeln!(
+            w,
+            "| hunts | {:.1}%-{:.0}% of its mass alone ({lo:.2}-{hi:.0} kg); at home: {prey} |",
+            s.prey.0 * 100.0,
+            s.prey.1 * 100.0
+        );
+    }
     // How much of its food grows at home, season by season (`vitals::forage::season_lushness`):
     // how many come there and how fed (`notes/ECOLOGY.md`, part 7).
     if s.forages_wild() {
@@ -269,7 +280,9 @@ fn species(w: &mut String, s: &Species) {
             .filter_map(|&(biome, _)| {
                 let c = vitals::climate::of(biome)?;
                 let by = (0..4)
-                    .map(|season| vitals::forage::season_lushness(|k| s.eats(k), c.celsius, c.seasons, c.rain, Some(season)).unwrap_or(0.0))
+                    .map(|season| {
+                        vitals::forage::season_lushness(|k| s.eats(k), biome, c.celsius, c.seasons, c.rain, Some(season)).unwrap_or(0.0)
+                    })
                     .map(|l| format!("{:.0}", l * 100.0))
                     .collect::<Vec<_>>()
                     .join("/");
