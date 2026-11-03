@@ -16,7 +16,7 @@ INSET = 6
 # Faces drawn as one picture, not a surface that runs on: their edges are not averaged.
 WHOLE = {
     "grass_side_overlay", "grass_snow_side", "iron_block", "gold_block", "diamond_block", "redstone_block", "slime_block",
-    "log_oak_top", "log_birch_top", "log_spruce_top", "crafting_table_top", "crafting_table_front", "crafting_table_side",
+    "log_oak_top", "log_birch_top", "log_spruce_top", "log_acacia_top", "crafting_table_top", "crafting_table_front", "crafting_table_side",
     "furnace_front", "furnace_front_lit", "furnace_side", "furnace_top", "chest_front", "chest_side", "chest_top",
     "bookshelf", "hay_bale_side", "hay_bale_top", "amber_block", "cactus_top", "smooth_stone",
     "copper_lamp", "copper_lamp_lit", "redstone_lamp_on",

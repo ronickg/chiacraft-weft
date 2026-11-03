@@ -22,6 +22,10 @@ pub static GOLD_ORE: Block = Block::named("gold_ore");
 pub static DIAMOND_ORE: Block = Block::named("diamond_ore");
 pub static OAK_LOG: Block = Block::named("oak_log");
 pub static BIRCH_LOG: Block = Block::named("birch_log");
+/// The savanna's flat-topped tree.
+pub static ACACIA_LOG: Block = Block::named("acacia_log");
+pub static ACACIA_PLANKS: Block = Block::named("acacia_planks");
+pub static ACACIA_LEAVES: Block = Block::named("acacia_leaves");
 pub static SPRUCE_LOG: Block = Block::named("spruce_log");
 pub static OAK_PLANKS: Block = Block::named("oak_planks");
 pub static BIRCH_PLANKS: Block = Block::named("birch_planks");
@@ -77,13 +81,17 @@ fn axis_placement(p: &Place, props: &mut Props) {
 }
 
 /// A log that grows into a tree of `leaves` (a cone, like a spruce, when `cone`).
-fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, cone: bool) {
+/// `shape`: the tree's tag (`cone_tree`, `flat_tree`; none: round), `worldgen::tree_blocks`.
+fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape: Option<&str>) {
     let side = format!("log_{wood}");
     let top = format!("log_{wood}_top");
     let b = r
         .block(handle)
         .set_text(&crate::worldgen::TREE_LEAVES, leaves);
-    let b = if cone { b.tag("cone_tree") } else { b };
+    let b = match shape {
+        Some(tag) => b.tag(tag),
+        None => b,
+    };
     b.sound_group("wood")
         .hardness(2.0)
         .mineable("axe")
@@ -272,10 +280,11 @@ pub fn register(r: &mut Registry) {
         .tag("ores/diamond")
         .tab(&crate::tabs::NATURAL);
 
-    log(r, &OAK_LOG, "oak", "oak_leaves", false);
-    log(r, &BIRCH_LOG, "birch", "birch_leaves", false);
-    log(r, &SPRUCE_LOG, "spruce", "spruce_leaves", true);
-    for (h, wood) in [(&OAK_PLANKS, "oak"), (&BIRCH_PLANKS, "birch"), (&SPRUCE_PLANKS, "spruce")] {
+    log(r, &OAK_LOG, "oak", "oak_leaves", None);
+    log(r, &BIRCH_LOG, "birch", "birch_leaves", None);
+    log(r, &SPRUCE_LOG, "spruce", "spruce_leaves", Some("cone_tree"));
+    log(r, &ACACIA_LOG, "acacia", "acacia_leaves", Some("flat_tree"));
+    for (h, wood) in [(&OAK_PLANKS, "oak"), (&BIRCH_PLANKS, "birch"), (&SPRUCE_PLANKS, "spruce"), (&ACACIA_PLANKS, "acacia")] {
         r.block(h)
             .sound_group("wood")
             .texture(&format!("planks_{wood}"))
@@ -291,6 +300,7 @@ pub fn register(r: &mut Registry) {
     leaves(r, &OAK_LEAVES, "leaves_oak");
     leaves(r, &BIRCH_LEAVES, "leaves_birch");
     leaves(r, &SPRUCE_LEAVES, "leaves_spruce");
+    leaves(r, &ACACIA_LEAVES, "leaves_acacia");
 
     // Vanilla numbers: water steps every 5 ticks and reaches 7 blocks, lava every 30 and 3.
     r.liquid(&WATER)

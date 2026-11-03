@@ -29,6 +29,8 @@ pub static FLOWERS: Component<BlockList> = Component::named("flowers");
 pub static TREE_LEAVES: Component<BlockRef> = Component::named("tree_leaves");
 /// Logs with this tag grow into cones (spruces), the others round (oaks, birches).
 pub static CONE_TREE: Tag = Tag::named("cone_tree");
+/// A tall bare trunk under one wide, flat crown (the acacia).
+pub static FLAT_TREE: Tag = Tag::named("flat_tree");
 static FROZEN: Tag = Tag::named("frozen");
 static DRY: Tag = Tag::named("dry");
 static FOREST_TAG: Tag = Tag::named("forest");
@@ -125,8 +127,9 @@ pub fn register(r: &mut Registry) {
         .tint(foliage, 0xaea42a)
         .tag("hot")
         .tag("animals")
-        .set(&TREES, 0.03)
-        .set(&GRASS_COVER, 0.35);
+        .set(&TREES, 0.04)
+        .set(&GRASS_COVER, 0.35)
+        .set_text(&TREE_KINDS, "base:acacia_log");
     // Warm, wet lowland: still, dark water, low trees.
     r.biome(&SWAMP)
         .set(&CLIMATE, base_api::climate("base:swamp"))
@@ -247,6 +250,7 @@ struct TreeAt {
     log: u32,
     leaves: u32,
     cone: bool,
+    flat: bool,
     height: i32,
 }
 
@@ -254,8 +258,9 @@ struct TreeAt {
 fn tree_at(log: u32, x: i32, y: i32, z: i32, h: u64) -> Option<TreeAt> {
     let leaves = TREE_LEAVES.on_block(log)?.0;
     let cone = CONE_TREE.on_block(log);
-    let height = if cone { 6 + (h % 4) as i32 } else { 4 + (h % 3) as i32 };
-    Some(TreeAt { x, y, z, log, leaves, cone, height })
+    let flat = FLAT_TREE.on_block(log);
+    let height = if cone { 6 + (h % 4) as i32 } else if flat { 5 + (h % 2) as i32 } else { 4 + (h % 3) as i32 };
+    Some(TreeAt { x, y, z, log, leaves, cone, flat, height })
 }
 
 /// Calls `put(x, y, z, state, force)` for every block of the tree.
@@ -263,6 +268,19 @@ fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     let (log, leaves) = (t.log, t.leaves);
     let top = t.y + t.height;
     match t.cone {
+        _ if t.flat => {
+            // One wide flat layer on the trunk's top, a small one over its middle.
+            for (y, r2) in [(top, 10), (top + 1, 2)] {
+                for dz in -3i32..=3 {
+                    for dx in -3i32..=3 {
+                        let d = dx * dx + dz * dz;
+                        if d <= r2 && (d < r2 || hash(1, (t.x + dx) as i64, y as i64, (t.z + dz) as i64) & 1 == 0) {
+                            put(t.x + dx, y, t.z + dz, leaves, false);
+                        }
+                    }
+                }
+            }
+        }
         true => {
             for dy in 2..=t.height + 1 {
                 let y = t.y + dy;
