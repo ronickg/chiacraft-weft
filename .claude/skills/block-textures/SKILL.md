@@ -61,6 +61,7 @@ deep shade of the block's own colour (never black), restrained highlights, top-l
    | `plant` | flowers, saplings, mushrooms, bushes, cacti | cut out |
    | `tplant` | tall grass, ferns, grazed grass | cut out, greyed for tint |
    | `crop` | crop stages | cut out (drawn to read 4 times in a # shape) |
+   | `cutout` | ladder, glass frame: fills the square, open parts magenta | cut out |
    | `flat` | lily pads, water hyacinth (seen from above) | cut out |
 4. **Generate**: `python3 notes/blocks/blocks.py gen batches/<x>.tsv [image ...]` (4 Codex runs at
    once, a fresh `codex exec` each, so nothing drifts; an image that exists is skipped, delete it
@@ -78,6 +79,15 @@ deep shade of the block's own colour (never black), restrained highlights, top-l
    sand, gravel, three logs, an oak) and shoots it. Copy and change it for other blocks.
 9. **Approve**: add the approved tiles to `approved.txt`; they become part of the style key.
    Commit the tiles, the batch and the game textures together, one family a commit.
+
+## Made in code, not generated
+
+`notes/blocks/derive.py` makes what must keep its layout or is a recolour of an approved tile,
+then `blocks.py install batches/derived.tsv` puts it in: worn farmland (paler per level), stained
+glass (the glass recoloured, see-through inside), water and lava (16 looping frames; water light
+grey for its tint), and the small model textures (beds, torches, lever, button, repeater,
+comparator, anchor, floater, observer back, piston inner): the old 16 px picture doubled, each of
+its colours drawn with the matching approved material. Rerun it after a material it uses changes.
 
 ## Colour ramps (dark to light)
 

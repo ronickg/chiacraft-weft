@@ -45,6 +45,7 @@ KINDS = {
     "plant": (PLANT, False, True, False),
     "tplant": (PLANT + " Light green, it is tinted by the biome in the game.", False, True, True),
     "crop": ("A row of stalks rising from the bottom edge that reads well when the texture is placed 4 times in a # shape. " + PLANT, False, True, False),
+    "cutout": ("Fills the square as described, with flat solid magenta wherever it is open or see-through.", False, True, False),
     "flat": ("Seen from straight above, lying flat, centred, not touching the edges, on the magenta background, with a soft 1-px edge darker than the inside.", False, True, False),
 }
 # Biome tints in the game, for previews only (`mods/base/src/tints.rs` picks the real ones).
@@ -255,6 +256,12 @@ def install(rows):
                     for f in os.listdir(folder):
                         os.remove(os.path.join(folder, f))
                     os.rmdir(folder)
+                # A lit face keeps its glow mask (`<name>_e.png`): white where the fire is.
+                if os.path.exists(os.path.join(home, n + "_e.png")):
+                    a = np.asarray(Image.open(os.path.join(home, n + ".png")).convert("RGB")).astype(int)
+                    fire = (a[..., 0] > 190) & (a[..., 1] > 90) & (a[..., 0] - a[..., 2] > 90)
+                    m = np.where(fire, 255, 0).astype(np.uint8)
+                    Image.fromarray(np.dstack([m, m, m, np.full_like(m, 255)]), "RGBA").save(os.path.join(home, n + "_e.png"))
                 done.append(n)
     print(f"{len(done)} textures in the game: {' '.join(done)}")
 
