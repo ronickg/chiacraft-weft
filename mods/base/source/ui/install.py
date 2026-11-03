@@ -97,6 +97,13 @@ EFFECT_ICONS = {
     "sheltered": "status/wind", "rested": "status/rested", "well_fed": "status/food",
 }
 
+# In the kit for systems not built yet (`notes/ui-reference/*-mockup.jpg`), not installed: the
+# minimap (minimap_ring, map_arrow), compass (compass, compass_marker), quest tracker (quest_panel,
+# quest_badge), key prompts (key, key_pressed, key_wide, mouse), portrait_frame, dropdown
+# (dropdown, dropdown_hover, dropdown_list), skill tree (skill_node_locked, skill_node,
+# skill_node_selected), map (map_frame, map_zoom_in, map_zoom_out, marker_home, marker_paw,
+# marker_camp, marker_peak) and reward_xp.
+
 # Still drawn in the old style: the kit has nothing for them yet (to generate).
 MISSING = {
     "font": "the pixel font is still the old one: Alegreya and Alegreya Sans need the engine's smooth-font change (notes/STYLE.md, Type)",
