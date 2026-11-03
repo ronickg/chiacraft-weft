@@ -17,6 +17,8 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | utahraptor | *Utahraptor ostrommaysi* | rare | large | 1.5 m | 300 kg | pack | carnivore | knockout | eggs, hatch 2.28 d | 12.3 d | 153.3 d | 1-3 | 7 |
 | osmolskae | *Velociraptor osmolskae* | uncommon | medium | 0.5 m | 15 kg | solitary | carnivore | knockout | eggs, hatch 1.41 d | 7.54 d | 76.7 d | 1-4 | 10 |
 | wyvern | *Wyverna montana* | legendary | large | 3.9 m | 5000 kg | solitary | carnivore | knockout | eggs, hatch 5.47 d | 32.7 d | 421.6 d | 1 | 3 |
+| hare | *Lepus europaeus* | common | small | 0.3 m | 3.8 kg | solitary | herbivore | wild | 0.92 d | 2.81 d | 19.2 d | 1-4 | 13 |
+| mountain_hare | *Lepus timidus* | common | small | 0.3 m | 3 kg | solitary | herbivore | wild | 1.05 d | 3.5 d | 19.2 d | 1-4 | 14 |
 
 ## Stats at level 1
 
@@ -31,6 +33,8 @@ Damage and speed are each kind's own (1 = 100%).
 | utahraptor | 60 | 300 | 400 | 10 | 1 | 400 | 200 | 700 | 30 | 12 |
 | osmolskae | 14 | 150 | 150 | 4 | 1 | 140 | 150 | 200 | 15 | 20 |
 | wyvern | 400 | 800 | 2000 | 30 | 1 | 1200 | 400 | 3000 | 80 | 5 |
+| hare | 5 | 120 | 40 | 0.5 | 1 | 15 | 60 | 20 | 5 | 30 |
+| mountain_hare | 5 | 120 | 40 | 0.5 | 1 | 13 | 60 | 20 | 5 | 30 |
 
 ## dog (chihuahua)
 
@@ -451,6 +455,127 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | ridden | seat 3.65 up, 1.55 forward |
 | flies ridden | 8x its walking speed |
 | camouflage (cost of a coat that stands out) | 0.2 |
+
+## hare
+
+*Lepus europaeus*, Mammalia › Lagomorpha › Leporidae › Leporinae. Model `hare`, entity `animals:hare`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:plains` | commonest |
+| `base:desert` | commonest |
+| `base:forest` | 60% |
+| `base:savanna` | 40% |
+| `base:beach` | 40% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.3 m at the shoulder |
+| males against females | 0.98x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 30% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 3.8 kg | |
+| carries her young | 42 d | 0.92 d |
+| litter or clutch | 3 on average | 1-4 |
+| between litters | 60 d | rests 0.83 d |
+| breeds in | spring and summer, most in spring | out of it, only a tame well cared for |
+| comfortable in | -5 to 30 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 220 d | 2.81 d |
+| lives | 5 y | 19.2 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 13 within 48 blocks |
+
+**Balance** (common): a generation 3.7 d; a line four deep in 11 d (4 h of play); 14.2 young per mother in 10 days, 18 in her life.
+
+- ✓ fourth generation: 11.2 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 2.8 of 19 days (want under a fifth)
+- ✓ young in a life: 17.8 (want 6-40)
+- ✓ litter: 1-4 (want 1-12, fewest first)
+- ✓ room near: 13 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | grass 60%, leaves 30%, roots 10% |
+| its food grows at home (spring/summer/autumn/winter) | plains 13/53/46/0%, desert 40/40/40/40%, forest 40/73/41/0%, savanna 43/82/75/40%, beach 14/20/50/33% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 12 blocks (twice that running) |
+| eats (food points) | `base:wheat` 8; `base:wheat_seeds` 2; `base:apple` 10, favorite; `base:berries` 6, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.8 blocks |
+| signature | bolt |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 1 |
+
+## mountain_hare
+
+*Lepus timidus*, Mammalia › Lagomorpha › Leporidae › Leporinae. Model `hare`, entity `animals:mountain_hare`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:taiga` | commonest |
+| `base:birch_forest` | commonest |
+| `base:snowy_plains` | 75% |
+| `base:mountains` | 75% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.3 m at the shoulder |
+| males against females | 0.98x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 30% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 3 kg | |
+| carries her young | 50 d | 1.05 d |
+| litter or clutch | 2.5 on average | 1-4 |
+| between litters | 70 d | rests 0.97 d |
+| breeds in | spring and summer, most in spring | out of it, only a tame well cared for |
+| comfortable in | -15 to 24 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 300 d | 3.5 d |
+| lives | 5 y | 19.2 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 14 within 48 blocks |
+
+**Balance** (common): a generation 4.5 d; a line four deep in 14 d (5 h of play); 12.3 young per mother in 10 days, 15 in her life.
+
+- ✓ fourth generation: 13.6 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 3.5 of 19 days (want under a fifth)
+- ✓ young in a life: 14.6 (want 6-40)
+- ✓ litter: 1-4 (want 1-12, fewest first)
+- ✓ room near: 14 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | grass 40%, leaves 55%, lichen 5% |
+| its food grows at home (spring/summer/autumn/winter) | taiga 40/62/40/40%, birch_forest 40/62/40/0%, snowy_plains 40/40/40/40%, mountains 40/70/40/40% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 12 blocks (twice that running) |
+| eats (food points) | `base:wheat` 8; `base:wheat_seeds` 2; `base:apple` 10, favorite; `base:berries` 6, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.8 blocks |
+| signature | bolt |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 1 |
 
 ## Shared by every species
 

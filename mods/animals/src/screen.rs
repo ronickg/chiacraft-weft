@@ -431,6 +431,7 @@ fn scout_screen(ui: &mut Ui) {
             let taming = match s.taming {
                 Taming::Passive => "screen.animals.taming.passive",
                 Taming::Knockout => "screen.animals.taming.knockout",
+                Taming::Wild => "screen.animals.taming.wild",
             };
             t.set("screen.animals.kind", &[Arg::Key(size), Arg::Key(diet), Arg::Key(taming)]);
         });

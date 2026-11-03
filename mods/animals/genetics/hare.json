@@ -1,0 +1,155 @@
+{
+ "species": "hare",
+ "about": "The brown hare (Lepus europaeus): grizzled yellow-brown with a white belly, black ear tips and a tail black on top; it never turns white. Paler and sandier in the desert (the jackrabbit's country), as Gloger's rule has it; black ones are very rare.",
+ "loci": [
+  {
+   "id": "Wi",
+   "name": "Winter white",
+   "alleles": [
+    {
+     "a": "Wi",
+     "freq": 0.0,
+     "about": "white coat (the mountain hare's winter coat; dominant, as the snowshoe hare's winter-white Agouti allele)"
+    },
+    {
+     "a": "wi",
+     "freq": 1.0,
+     "about": "stays brown"
+    }
+   ]
+  },
+  {
+   "id": "Bt",
+   "name": "Black tail",
+   "alleles": [
+    {
+     "a": "Bt",
+     "freq": 0.99,
+     "about": "the tail black on top (the brown hare's)"
+    },
+    {
+     "a": "bt",
+     "freq": 0.01,
+     "about": "the tail white all over (the mountain hare's)"
+    }
+   ]
+  },
+  {
+   "id": "Mel",
+   "name": "Melanism",
+   "alleles": [
+    {
+     "a": "Mel",
+     "freq": 0.98
+    },
+    {
+     "a": "mel",
+     "freq": 0.02,
+     "about": "black (very rare, recessive)"
+    }
+   ]
+  },
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.55,
+   "sd": 0.15,
+   "about": "grey-brown to rufous"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   150,
+   96,
+   40
+  ],
+  [
+   186,
+   128,
+   56
+  ]
+ ],
+ "traits": {
+  "Md": {
+   "mean": 0.7,
+   "sd": 0.12
+  },
+  "Ms": {
+   "mean": 0.3,
+   "sd": 0.1
+  },
+  "Ct": {
+   "mean": 0.4,
+   "sd": 0.12
+  }
+ },
+ "habitats": {
+  "desert": {
+   "quantitative": {
+    "Dk": {
+     "mean": 0.32,
+     "sd": 0.12
+    },
+    "Ru": {
+     "mean": 0.45,
+     "sd": 0.12
+    }
+   }
+  }
+ },
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw",
+    "eyelid_L",
+    "eyelid_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Lg": {
+   "bones": [
+    "leg_FL_upper",
+    "leg_FL_lower",
+    "leg_FR_upper",
+    "leg_FR_lower",
+    "leg_BL_upper",
+    "leg_BL_lower",
+    "leg_BR_upper",
+    "leg_BR_lower"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.08
+  }
+ }
+}

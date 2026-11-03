@@ -54,6 +54,9 @@ pub enum Diet {
 pub enum Taming {
     Passive,
     Knockout,
+    /// Never tamed: a wild creature of the food web (a hare, a fox) that lives, flees, breeds and
+    /// is eaten (`notes/ECOLOGY.md`, the species to add).
+    Wild,
 }
 
 /// How much an animal likes a food: taming progress per feeding, as a multiple of plain food.
@@ -85,6 +88,7 @@ pub struct Family {
 pub static CANIDAE: Family = Family { name: "Canidae", above: &["Mammalia", "Carnivora"] };
 pub static FELIDAE: Family = Family { name: "Felidae", above: &["Mammalia", "Carnivora"] };
 pub static CAVIIDAE: Family = Family { name: "Caviidae", above: &["Mammalia", "Rodentia"] };
+pub static LEPORIDAE: Family = Family { name: "Leporidae", above: &["Mammalia", "Lagomorpha"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -283,7 +287,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 7] = [
+pub static SPECIES: [Species; 9] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -702,6 +706,124 @@ pub static SPECIES: [Species; 7] = [
         },
         tune: Tune::NONE,
         birth_size: 0.08,
+    },
+    // The hares (`reports/ecology/Overworld food webs.md`: the mid-sized prey everywhere, the fox's,
+    // coyote's, eagle's and lynx's main food): wild, never tamed (`Taming::Wild`). Two species on
+    // one model (`source/hare`), as the two Velociraptors: the brown hare of open country and the
+    // mountain hare of the north, white in the snow (their gene files).
+    Species {
+        model: "hare",
+        name: "hare",
+        binomial: "Lepus europaeus",
+        family: &LEPORIDAE,
+        subfamily: "Leporinae",
+        breed: None,
+        size: Size::Small,
+        // Grasses most of the year, herbs and crops, twigs and bark in winter.
+        eats: &[(Grass, 0.6), (Leaves, 0.3), (Roots, 0.1)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [5.0, 120.0, 40.0, 0.5, 1.0, 15.0, 60.0, 20.0, 5.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:wheat", 8), eats("base:wheat_seeds", 2), favorite("base:apple", 10), favorite("base:berries", 6)],
+        feedings: 0.0,
+        // It sits tight in its form, then bolts when a walker comes within about 12 m.
+        shy: 12.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.8,
+        signature: "bolt",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 1.0,
+        // Females a little bigger (by mass, about 5%).
+        dimorphism: 0.98,
+        size_spread: 0.1,
+        height: (0.30, "shoulder"),
+        // Open country: farmland and grassland first, woods' edges; the jackrabbit's desert, the
+        // cottontail's llanos and the rabbit's dunes by the sea in the research share its row.
+        habitats: &[("base:plains", 1.0), ("base:desert", 1.0), ("base:forest", 0.6), ("base:savanna", 0.4), ("base:beach", 0.4)],
+        bio: Biology {
+            mass: 3.8,
+            gestation: 42.0,
+            incubation: 0.0,
+            // First breeding at 7-8 months.
+            maturity: 220.0,
+            // Up to 12 years; few live past 5 in the wild.
+            lifespan: 1825.0,
+            // Three or four litters from January to August, the next conceived before the last is born.
+            interval: 60.0,
+            litter: 3.0,
+            social: Social::Solitary,
+            rarity: Rarity::Common,
+            breeds: seasons::SPRING | seasons::SUMMER,
+            peak: seasons::SPRING,
+            // Est.: a dense winter coat keeps it in the open through European frosts; in the heat it lies
+            // up in its form by day.
+            comfort: (-5.0, 30.0),
+            cold_blooded: false,
+        },
+        tune: Tune::NONE,
+        birth_size: 0.3,
+    },
+    Species {
+        model: "hare",
+        name: "mountain_hare",
+        binomial: "Lepus timidus",
+        family: &LEPORIDAE,
+        subfamily: "Leporinae",
+        breed: None,
+        size: Size::Small,
+        // Grasses and herbs in summer; in winter birch, willow and heather twigs and bark.
+        eats: &[(Grass, 0.4), (Leaves, 0.55), (Lichen, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        base: [5.0, 120.0, 40.0, 0.5, 1.0, 13.0, 60.0, 20.0, 5.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:wheat", 8), eats("base:wheat_seeds", 2), favorite("base:apple", 10), favorite("base:berries", 6)],
+        feedings: 0.0,
+        shy: 12.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.8,
+        signature: "bolt",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 1.0,
+        // Females slightly heavier.
+        dimorphism: 0.98,
+        size_spread: 0.1,
+        height: (0.30, "shoulder"),
+        // The boreal forest, birch woods, the tundra and the Alps (700-3,800 m).
+        habitats: &[("base:taiga", 1.0), ("base:birch_forest", 1.0), ("base:snowy_plains", 0.75), ("base:mountains", 0.75)],
+        bio: Biology {
+            mass: 3.0,
+            gestation: 50.0,
+            incubation: 0.0,
+            // First breeding the summer after its birth.
+            maturity: 300.0,
+            lifespan: 1825.0,
+            // One to three litters from February to August.
+            interval: 70.0,
+            litter: 2.5,
+            social: Social::Solitary,
+            rarity: Rarity::Common,
+            breeds: seasons::SPRING | seasons::SUMMER,
+            peak: seasons::SPRING,
+            // Est.: snowshoe and mountain hares keep warm in their winter coats to about -10 °C before
+            // working harder; in the Alps they shelter from summer heat.
+            comfort: (-15.0, 24.0),
+            cold_blooded: false,
+        },
+        tune: Tune::NONE,
+        birth_size: 0.3,
     },
 ];
 

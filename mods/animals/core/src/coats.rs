@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 7] = [
+const FILES: [(&str, &str); 9] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -266,6 +266,8 @@ const FILES: [(&str, &str); 7] = [
     ("utahraptor", include_str!("../../genetics/utahraptor.json")),
     ("osmolskae", include_str!("../../genetics/osmolskae.json")),
     ("wyvern", include_str!("../../genetics/wyvern.json")),
+    ("hare", include_str!("../../genetics/hare.json")),
+    ("mountain_hare", include_str!("../../genetics/mountain_hare.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -927,6 +929,42 @@ fn capybara(r: &Read) -> Look {
     }
 }
 
+/// Hares (the brown hare and the mountain hare share these loci): agouti fur grizzled with dark tips
+/// over a white belly, grey-brown to rufous; the mountain hare's white coat (dominant, as the
+/// snowshoe hare's winter-white allele), the brown hare's tail black on top; black very rarely.
+fn hare(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    let tail = (r.shows("Bt") == "Bt").then_some(([40.0, 34.0, 32.0], 1.0));
+    if r.copies("Mel", "mel") == 2 {
+        return Look { name: "Black".into(), base: [58.0, 50.0, 46.0], under: [84.0, 74.0, 66.0], ext: tail, ..Look::default() };
+    }
+    if r.shows("Wi") == "Wi" {
+        return Look {
+            name: "White (winter coat)".into(),
+            base: [234.0, 232.0, 226.0],
+            under: [242.0, 240.0, 234.0],
+            ext: tail,
+            ..Look::default()
+        };
+    }
+    let base = mix([150.0, 128.0, 98.0], [178.0, 116.0, 66.0], ru);
+    let name = if ru > 0.62 {
+        "Rufous brown"
+    } else if ru < 0.38 {
+        "Grey-brown"
+    } else {
+        "Brown"
+    };
+    Look {
+        name: name.into(),
+        base,
+        under: [236.0, 230.0, 216.0],
+        pattern: Some(Pattern { kind: "ticked", color: darken(base, 0.4), amount: 0.6 }),
+        ext: tail,
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1078,6 +1116,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "cat" => cat(&r),
         "capybara" => capybara(&r),
         "wyvern" => wyvern(&r),
+        "hare" | "mountain_hare" => hare(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1659,7 +1698,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 6] = model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern");
+const MODEL_LAYERS: [ModelLayers; 7] = model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern", "hare");
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
     let mut d = png::Decoder::new(std::io::Cursor::new(png_bytes));

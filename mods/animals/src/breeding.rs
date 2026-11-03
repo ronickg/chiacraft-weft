@@ -121,9 +121,9 @@ pub fn init(r: &mut Registry) {
 /// timers, aging and wild breeding; not saved).
 static SPEED: AtomicU32 = AtomicU32::new(1);
 /// Per species since the census was last reset: born, died of old age, died otherwise.
-pub static BORN: [AtomicU32; 7] = [const { AtomicU32::new(0) }; 7];
-pub static OLD: [AtomicU32; 7] = [const { AtomicU32::new(0) }; 7];
-pub static DIED: [AtomicU32; 7] = [const { AtomicU32::new(0) }; 7];
+pub static BORN: [AtomicU32; 9] = [const { AtomicU32::new(0) }; 9];
+pub static OLD: [AtomicU32; 9] = [const { AtomicU32::new(0) }; 9];
+pub static DIED: [AtomicU32; 9] = [const { AtomicU32::new(0) }; 9];
 
 pub fn speed() -> u32 {
     SPEED.load(Ordering::Relaxed).max(1)
@@ -133,7 +133,7 @@ pub fn set_speed(n: u32) {
     SPEED.store(n.clamp(1, 10_000), Ordering::Relaxed);
 }
 
-pub fn count(what: &[AtomicU32; 7], index: usize) {
+pub fn count(what: &[AtomicU32; 9], index: usize) {
     if let Some(c) = what.get(index) {
         c.fetch_add(1, Ordering::Relaxed);
     }
