@@ -23,6 +23,8 @@ mod load;
 mod stamina;
 mod temperature;
 
+use std::sync::Mutex;
+
 use base_api::{VITALS, Vitals};
 use vitals::effects::{self, Effect};
 use vitals::stats::Stat;
@@ -70,17 +72,29 @@ pub fn register(r: &mut Registry) {
 }
 
 fn tick(w: &World) {
-    // A brand-new world with seasons begins on spring's 8th day (`vitals::calendar::START_DAY`):
-    // its clock is moved there in its first second, so the engine's day length and every calendar
-    // agree.
-    if w.time() < 20 && w.day_time() == w.time() && base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0) == base_api::calendars::FOUR
+    // A new world with seasons begins on spring's 8th day (`vitals::calendar::START_DAY`): on
+    // this run's first tick of a dimension, a clock still in the first half of day 0 (only a new
+    // world's is) moves there, so the engine's day length and every calendar agree. (The world's
+    // own time is no test: the server may tick a while finding the spawn before anyone joins.)
     {
-        w.set_day_time(w.day_time() + vitals::calendar::START_DAY as u64 * vitals::calendar::DAY_TICKS);
+        static BEGUN: Mutex<Vec<u32>> = Mutex::new(Vec::new());
+        let mut begun = BEGUN.lock().unwrap();
+        if !begun.contains(&w.dimension()) {
+            begun.push(w.dimension());
+            let seasons = base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0) == base_api::calendars::FOUR;
+            if seasons && w.day_time() < vitals::calendar::DAY_TICKS / 2 {
+                w.set_day_time(w.day_time() + vitals::calendar::START_DAY as u64 * vitals::calendar::DAY_TICKS);
+            }
+        }
     }
     let d = base_api::difficulty();
     let pulse = w.time() % 20 == 0;
     for id in w.players() {
         let Some(mut st) = w.entity(id) else { continue };
+        // The dead have no body to keep: nothing ticks until they're back.
+        if st.health <= 0.0 {
+            continue;
+        }
         let underwater = breath::underwater(w, &st);
         let creative = w.creative(id);
         let Some(v) = w.component_mut(id, &VITALS) else { continue };

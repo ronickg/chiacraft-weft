@@ -508,7 +508,8 @@ sword, about 100 XP.
   (three logs, four sticks, no stone) heats like lava (+20 °C beside it), counts as a fire for rest,
   and smokes food on a rack above it; it burns without fuel and gives light. A new world with
   seasons begins on spring's 8th day (`vitals::calendar::START_DAY`, a quarter of the year from
-  midwinter): its clock moves there in its first second, so the engine's day length agrees.
+  midwinter): on a run's first tick a clock still in day 0's first half moves there (only a new
+  world's is), so the engine's day length agrees. The dead's vitals don't tick (Tester 11-04).
 - **D1, spoiled food never comes back.** The pot, the rack and the crafting grid refuse spoiled
   food. What is made of stale food starts as far through its own life as its stalest part was
   (`survival::made_for`): a half-gone beef makes a half-gone stew. Carrying the oldest age as it
