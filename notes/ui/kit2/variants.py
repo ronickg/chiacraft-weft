@@ -16,7 +16,8 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit2 as k  # noqa: E402
 
-SHOTS, OUT = sys.argv[1], sys.argv[2]
+# Read only when run; label_check imports this for tones A.
+SHOTS, OUT = (sys.argv[1], sys.argv[2]) if __name__ == "__main__" else (None, None)
 
 # Kit 2's colours with tones A (what the shots were taken with), frozen here so the sheet stays
 # reproducible after kit 2 takes a variant's palette.
