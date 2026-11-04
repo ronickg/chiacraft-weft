@@ -72,6 +72,11 @@ impl Settings {
         config::text(id("core:language"))
     }
     /// 0 = automatic.
+    /// Frames a second at most, 0 for no cap.
+    pub fn fps_cap(&self) -> u32 {
+        number("core:fps_cap") as u32
+    }
+
     pub fn gui_scale(&self) -> u32 {
         number("core:gui_scale") as u32
     }

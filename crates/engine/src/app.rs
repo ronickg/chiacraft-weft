@@ -2041,6 +2041,14 @@ struct UiCallbacks {
 /// One frame. Returns true when the app should quit.
 fn frame(r: &mut Running, opts: &Options) -> bool {
     r.retired = None;
+    // The fps cap: what is left of this frame's share of a second, slept away.
+    let cap = r.settings.fps_cap();
+    if cap > 0 {
+        let share = std::time::Duration::from_secs_f64(1.0 / cap as f64);
+        if let Some(rest) = share.checked_sub(r.last.elapsed()) {
+            std::thread::sleep(rest);
+        }
+    }
     let now = Instant::now();
     let dt = (now - r.last).as_secs_f64();
     r.last = now;
