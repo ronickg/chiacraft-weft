@@ -389,6 +389,7 @@ levels.base.after_legend = Green: what the points you place make, until you keep
 hud.element.base.xp = Experience
 hud.base.badge = {0}
 hud.base.level_points = {#e4dacf}+{0}{/}
+hud.base.points_chip = +{0}
 hud.base.shortcut.stats = {keyname:base:stats} {#c6a383}Stats{/}
 key.base.stats = Stats
 block.base.tombstone = Tombstone

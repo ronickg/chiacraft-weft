@@ -562,6 +562,7 @@ levels.base.after_legend = Зелёным: что дадут распредел�
 hud.element.base.xp = Опыт
 hud.base.level = Ур. {0}
 hud.base.level_points = Ур. {0} {#ffbe45}+{1}{/}
+hud.base.points_chip = +{0}
 hud.base.shortcut.stats = {keyname:base:stats} {#c6a383}Навыки{/}
 key.base.stats = Характеристики
 block.base.campfire = Костёр

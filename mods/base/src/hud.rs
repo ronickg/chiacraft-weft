@@ -12,6 +12,7 @@ static HUD_CLOCK: HudElement = HudElement::named("clock");
 static HUD_POSITION: HudElement = HudElement::named("position");
 static HUD_SHORTCUTS: HudElement = HudElement::named("shortcuts");
 static HUD_HEALTH: HudElement = HudElement::named("health");
+static HUD_LEVEL: HudElement = HudElement::named("level");
 static HUD_STOMACH: HudElement = HudElement::named("food");
 static HUD_EFFECTS: HudElement = HudElement::named("effects");
 static HUD_TEMPERATURE: HudElement = HudElement::named("temperature");
@@ -21,14 +22,37 @@ static HUD_TEMPERATURE: HudElement = HudElement::named("temperature");
 /// frame round a 13-row track, so the numbers in it have 2 rows above their capitals and 2 below
 /// the baseline. The XP bar is thinner, with a 1 px frame.
 const BAR: (f32, f32) = (96.0, 9.5);
-const BAR_XP: (f32, f32) = (96.0, 4.0);
 /// The bars' rims in texels (outline and frame), of their 192.
 const BAR_RIM: f32 = 3.0;
-const BAR_XP_RIM: f32 = 2.0;
 /// How far a bar's numbers end from its right end, GUI pixels: its rim (1.5) and 1.5 of padding.
 const BAR_TEXT_INSET: f32 = 3.0;
-/// The level badge beside the bars (`hud_badge`, 40 x 48 pixels).
-const BADGE: (f32, f32) = (20.0, 24.0);
+/// The level row above the hotbar (`HUD_LEVEL`), GUI px: as wide as the hotbar (9 slots of 20)
+/// and as tall as its chips; the XP bar in it (`hud_xpbar`, 360 x 8 texels, a 1 px frame: 2 texels
+/// of rim), centred on the row's 22 UI px (7 above, 7 below); the chips (`hud_level_chip`,
+/// `hud_points_chip`, 32 x 22 texels: built like kit 2's buttons, their face 17 rows, the number
+/// 4 above and 4 below); the gap before the points chip.
+const LEVEL_ROW: (f32, f32) = (180.0, 11.0);
+const XPBAR_H: f32 = 4.0;
+const XPBAR_RIM: f32 = 2.0;
+const XPBAR_TEXELS: f32 = 360.0;
+const CHIP: (f32, f32) = (16.0, 11.0);
+const LEVEL_GAP: f32 = 2.0;
+
+/// `v` rounded down to the UI pixel (half a GUI pixel).
+fn down_half(v: f32) -> f32 {
+    (v * 2.0).floor() / 2.0
+}
+
+/// A stretched bar's fill for `share` filled, its fill starting `rim` of its `texels` in.
+fn fill_of(share: f32, rim: f32, texels: f32) -> f32 {
+    (rim + share.clamp(0.0, 1.0) * (texels - 2.0 * rim)) / texels
+}
+
+/// The points chip's pulse: lit for half of every second.
+fn pulse_lit() -> bool {
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    START.get_or_init(std::time::Instant::now).elapsed().as_millis() % 1000 < 500
+}
 
 /// Where a bar's fill ends for a share filled: the kit's fill starts `rim` of the bar's 192 texels
 /// in and spans the rest but the rim at the other end.
@@ -148,71 +172,83 @@ pub fn register(r: &mut Registry) {
     // Health, stamina and experience as Ronald's sheet has them: the level on a badge, and beside
     // it the bars, each with its numbers in the vitals' units; the points waiting to be placed (P)
     // after the XP bar.
+    // Health and stamina as Ronald's sheet has them, each bar with its numbers in the vitals'
+    // units. The level, the XP and the points to place are above the hotbar (`HUD_LEVEL`; Ronald,
+    // 11-04: "1: above the hotbar").
     r.hud_element(&HUD_HEALTH, hud_anchor::TOP_LEFT, 0, |ui| {
-        ui.row(S::row().gap(3.0).center(), |ui| {
-            // The shield as a gauge, full or hidden, so it hides with the bars (in creative it
-            // stayed, empty, as a panel: PC shot, 11-04); the level centred on it.
-            ui.row(S::row().size(BADGE.0, BADGE.1), |ui| {
-                ui.progress_bind("hud_badge", S::default().size(BADGE.0, BADGE.1).at(0.0, 0.0), |c| {
-                    if vitals_of(c).is_some() { 1.0 } else { -1.0 }
+        ui.column(S::col().gap(1.0), |ui| {
+            // The numbers inside the bar's right end, as on Ronald's sheet.
+            ui.row(S::row().size(BAR.0, BAR.1), |ui| {
+                ui.progress_bind("hud_health", S::default().size(BAR.0, BAR.1), |c| {
+                    let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return -1.0 };
+                    bar_fill(me.health * HEALTH_SCALE / v.max_health.max(1.0), BAR_RIM)
                 });
-                ui.row(S::row().size(BADGE.0, BADGE.1).center().at(0.0, 0.0), |ui| {
-                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                ui.text_bind_styled(
+                    S::default()
+                        .no_wrap()
+                        .at_pivot(BAR.0 - BAR_TEXT_INSET, BAR.1 / 2.0, [1.0, 0.5]),
+                    |c, t| {
+                        let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return t.text("") };
+                        t.set(
+                            "hud.base.bar_value",
+                            &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)],
+                        );
+                    },
+                );
+            });
+            ui.row(S::row().size(BAR.0, BAR.1), |ui| {
+                ui.progress_bind("hud_stamina", S::default().size(BAR.0, BAR.1), |c| {
+                    let Some(v) = vitals_of(c) else { return -1.0 };
+                    bar_fill(v.stamina / v.max_stamina.max(1.0), BAR_RIM)
+                });
+                ui.text_bind_styled(
+                    S::default()
+                        .no_wrap()
+                        .at_pivot(BAR.0 - BAR_TEXT_INSET, BAR.1 / 2.0, [1.0, 0.5]),
+                    |c, t| {
                         let Some(v) = vitals_of(c) else { return t.text("") };
-                        t.set("hud.base.badge", &[Arg::Int(vitals::levels::level_of(v.xp).0 as i64)]);
-                    });
+                        t.set("hud.base.bar_value", &[Arg::Int(v.stamina.round() as i64), Arg::Int(v.max_stamina.round() as i64)]);
+                    },
+                );
+            });
+        });
+    });
+    // The level, the XP and the points to place, as Minecraft has them (Ronald picked it from the
+    // other games, 11-04): a slim framed XP bar as wide as the hotbar, just above it, the level on
+    // a chip in its middle, and while there are points to place an orange chip at its right end
+    // that pulses. Everything is a gauge, so it hides with the bars (creative, dead).
+    r.hud_element(&HUD_LEVEL, hud_anchor::HOTBAR, 1, |ui| {
+        ui.row(S::row().size(LEVEL_ROW.0, LEVEL_ROW.1), |ui| {
+            ui.progress_bind("hud_xpbar", S::default().size(LEVEL_ROW.0, XPBAR_H).at(0.0, (LEVEL_ROW.1 - XPBAR_H) / 2.0), |c| {
+                let Some(v) = vitals_of(c) else { return -1.0 };
+                let (level, into) = vitals::levels::level_of(v.xp);
+                fill_of(into as f32 / vitals::levels::to_next(level).max(1) as f32, XPBAR_RIM, XPBAR_TEXELS)
+            });
+            // the level's chip, centred on the bar
+            let chip_x = down_half((LEVEL_ROW.0 - CHIP.0) / 2.0);
+            ui.progress_bind("hud_level_chip", S::default().size(CHIP.0, CHIP.1).at(chip_x, 0.0), |c| {
+                if vitals_of(c).is_some() { 1.0 } else { -1.0 }
+            });
+            ui.row(S::row().size(CHIP.0, CHIP.1).center().at(chip_x, 0.0), |ui| {
+                ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                    let Some(v) = vitals_of(c) else { return t.text("") };
+                    t.set("hud.base.badge", &[Arg::Int(vitals::levels::level_of(v.xp).0 as i64)]);
                 });
             });
-            ui.column(S::col().gap(1.0), |ui| {
-                // The numbers inside the bar's right end, as on Ronald's sheet.
-                ui.row(S::row().size(BAR.0, BAR.1), |ui| {
-                    ui.progress_bind("hud_health", S::default().size(BAR.0, BAR.1), |c| {
-                        let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return -1.0 };
-                        bar_fill(me.health * HEALTH_SCALE / v.max_health.max(1.0), BAR_RIM)
-                    });
-                    ui.text_bind_styled(
-                        S::default()
-                            .no_wrap()
-                            .at_pivot(BAR.0 - BAR_TEXT_INSET, BAR.1 / 2.0, [1.0, 0.5]),
-                        |c, t| {
-                            let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return t.text("") };
-                            t.set(
-                                "hud.base.bar_value",
-                                &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)],
-                            );
-                        },
-                    );
+            // the points to place at the bar's right end, its outline lit every other half second
+            let px = LEVEL_ROW.0 + LEVEL_GAP;
+            for (texture, lit) in [("hud_points_chip", false), ("hud_points_chip_lit", true)] {
+                ui.progress_bind(texture, S::default().size(CHIP.0, CHIP.1).at(px, 0.0), move |c| {
+                    let points = vitals_of(c).map_or(0, |v| crate::levels::unspent(&v));
+                    if points > 0 && pulse_lit() == lit { 1.0 } else { -1.0 }
                 });
-                ui.row(S::row().size(BAR.0, BAR.1), |ui| {
-                    ui.progress_bind("hud_stamina", S::default().size(BAR.0, BAR.1), |c| {
-                        let Some(v) = vitals_of(c) else { return -1.0 };
-                        bar_fill(v.stamina / v.max_stamina.max(1.0), BAR_RIM)
-                    });
-                    ui.text_bind_styled(
-                        S::default()
-                            .no_wrap()
-                            .at_pivot(BAR.0 - BAR_TEXT_INSET, BAR.1 / 2.0, [1.0, 0.5]),
-                        |c, t| {
-                            let Some(v) = vitals_of(c) else { return t.text("") };
-                            t.set("hud.base.bar_value", &[Arg::Int(v.stamina.round() as i64), Arg::Int(v.max_stamina.round() as i64)]);
-                        },
-                    );
-                });
-                ui.row(S::row().gap(3.0).center(), |ui| {
-                    ui.progress_bind("hud_xp", S::default().size(BAR_XP.0, BAR_XP.1), |c| {
-                        let Some(v) = vitals_of(c) else { return -1.0 };
-                        let (level, into) = vitals::levels::level_of(v.xp);
-                        bar_fill(into as f32 / vitals::levels::to_next(level) as f32, BAR_XP_RIM)
-                    });
-                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
-                        let Some(v) = vitals_of(c) else { return t.text("") };
-                        let unspent = crate::levels::unspent(&v);
-                        if unspent > 0 {
-                            t.set("hud.base.level_points", &[Arg::Int(unspent as i64)]);
-                        } else {
-                            t.text("");
-                        }
-                    });
+            }
+            ui.row(S::row().size(CHIP.0, CHIP.1).center().at(px, 0.0), |ui| {
+                ui.text_bind_styled(S::default().no_wrap().class("chip_points"), |c, t| {
+                    match vitals_of(c).map(|v| crate::levels::unspent(&v)) {
+                        Some(n) if n > 0 => t.set("hud.base.points_chip", &[Arg::Int(n as i64)]),
+                        _ => t.text(""),
+                    }
                 });
             });
         });
