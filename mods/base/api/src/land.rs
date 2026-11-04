@@ -48,6 +48,7 @@ pub mod salt {
     pub const HIGHLANDS: u64 = 0x416A;
     pub const SNOW_DRIFT: u64 = 0x5A0D;
     pub const MOUNTAIN_AREA: u64 = 0x44;
+    pub const RANGE_GAPS: u64 = 0x45;
     pub const SEQUOIA: u64 = 0x5E0A;
     pub const COAST_CLIFFS: u64 = 0xC1F;
     pub const ISLANDS: u64 = 0x151A;
@@ -216,9 +217,10 @@ pub const SEQUOIA_RISE: (i32, i32) = (28, 85);
 pub const SEQUOIA_GROVE: f64 = 0.5;
 pub const SEQUOIA_AREA: Area = Area {
     all: &[
-        Ramp::Noise { salt: salt::SEQUOIA, scale: 260.0, from: 0.02, to: 0.15 },
-        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: -0.08, to: -0.03 },
-        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: 0.08, to: 0.05 },
+        Ramp::Noise { salt: salt::SEQUOIA, scale: 260.0, from: -0.06, to: 0.08 },
+        // A range's flank, on the one side: just outside its band.
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH * 0.5, to: RANGE_WIDTH * 0.8 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH * 3.2, to: RANGE_WIDTH * 2.2 },
         Ramp::Continent(0.15, 0.25),
     ],
     not: false,
@@ -294,11 +296,28 @@ pub const DUNES: (f64, f64) = (4.0, 26.0);
 pub const DUNES_AREA: Area =
     Area { all: &[Ramp::Temperature(0.12, 0.22), Ramp::Humidity(0.0, -0.08), Ramp::Continent(0.01, 0.07)], not: false };
 
-/// Mountain ranges (height, width between ridge lines), in patches inland; the mountains biome
-/// stands where this area is 0.45 or more (`MOUNTAIN_BIOME`).
+/// Mountains (height, width between ridge lines); the mountains biome stands where their area is
+/// 0.45 or more (`MOUNTAIN_BIOME`).
 pub const MOUNTAINS: (f64, f64) = (150.0, 260.0);
-pub const MOUNTAINS_AREA: Area =
-    Area { all: &[Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: -0.1, to: 0.3 }, Ramp::Continent(0.0, 0.2)], not: false };
+/// Mountain ranges (Ronald, 11-04: "all three", the fourth sheet; they were patches, ovals a few
+/// hundred blocks across): along the zero lines of a noise `RANGE_SCALE` blocks across, which wind
+/// and branch over the land, strongest on the line and gone `RANGE_WIDTH` either side of it, so a
+/// range rises to its spine; broken where a second noise is under `-RANGE_GAPS`. Inland only.
+/// About the same share of the land as the patches (17-18% at the biome's strength, against
+/// 15.5-17%). The engine's masks give it (both ramps of one noise make the band), no cost.
+/// Saved worlds made before get seams where new chunks meet saved ones (accepted for dev).
+pub const RANGE_SCALE: f64 = 1600.0;
+pub const RANGE_WIDTH: f64 = 0.11;
+pub const RANGE_GAPS: f64 = 0.15;
+pub const MOUNTAINS_AREA: Area = Area {
+    all: &[
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: -RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::RANGE_GAPS, scale: 2600.0, from: -RANGE_GAPS, to: -RANGE_GAPS + 0.15 },
+        Ramp::Continent(0.0, 0.2),
+    ],
+    not: false,
+};
 pub const MOUNTAIN_BIOME: f64 = 0.45;
 
 /// Mesas: flat-topped hills `MESA_HEIGHT` blocks high in `MESA_TIERS` tiers, patches about
@@ -426,6 +445,15 @@ pub const ARCH_DEPTH: (i32, i32) = (3, 5);
 pub const FALL_CELL: i32 = 256;
 pub const FALL_CHANCE: f64 = 0.3;
 pub const FALL_CLIFF: i32 = 8;
+
+/// Glaciers (Ronald, 11-04: "all three", the fourth sheet; Art's glacier ice): in the mountains'
+/// high valleys, `GLACIER_BELOW` blocks under the snow line or higher, on ground falling a block
+/// at most to its neighbours and lying `GLACIER_HOLLOW` blocks or more under the ground
+/// `GLACIER_REACH` round it (a valley's floor, not a ridge); its top `GLACIER_THICK` blocks ice.
+pub const GLACIER_BELOW: i32 = 10;
+pub const GLACIER_HOLLOW: i32 = 2;
+pub const GLACIER_REACH: i32 = 8;
+pub const GLACIER_THICK: i32 = 3;
 
 /// The tropical forest's water (Ronald, 11-04: "A + C's giants + some B"; Plants' sheet): still
 /// water at the sea's level, the level the rivers and the sea hold, so it stays put: the ground
@@ -1266,6 +1294,27 @@ pub fn fray(f: &Fields, x: i32, z: i32, height: i32) -> Option<(&'static str, &'
     }
     let n = ONE / 2 + f.fbm(salt::FRAY, x, z, q4(FRAY_SIZE), 2) * 2;
     (n < (q12(FRAY_SHARE) * e.near) >> 12).then_some(theirs)
+}
+
+/// Whether column (`x`, `z`) (blocks), `h` high, is a glacier's floor (`GLACIER_*`), `ground`
+/// giving the height of any column (the engine's, in a decoration).
+pub fn glacier(f: &Fields, x: i32, z: i32, h: i32, ground: &mut dyn FnMut(i32, i32) -> i32) -> bool {
+    let here = Here::new(f, x * 16, z * 16);
+    if MOUNTAINS_AREA.at(&here) <= q12(MOUNTAIN_BIOME) || h < snow_line(here.temperature()) - GLACIER_BELOW {
+        return false;
+    }
+    if [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        .iter()
+        .any(|&(dx, dz)| (h - ground(x + dx, z + dz)).abs() > 1)
+    {
+        return false;
+    }
+    let r = GLACIER_REACH;
+    let round: i32 = [(r, 0), (-r, 0), (0, r), (0, -r), (r, r), (-r, -r), (r, -r), (-r, r)]
+        .iter()
+        .map(|&(dx, dz)| ground(x + dx, z + dz))
+        .sum();
+    round >= 8 * (h + GLACIER_HOLLOW)
 }
 
 /// How deep under the sea's level the tropical forest's still water stands at column (`x`, `z`)

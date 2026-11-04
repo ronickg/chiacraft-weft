@@ -1,0 +1,4 @@
+# Glacier ice (Terrain, 11-04): three variants beside the plain top, picked at random, so a glacier floor does not show its tile repeating.
+method = random
+tiles = <default> glacier_ice_top/1-3
+symmetry = all

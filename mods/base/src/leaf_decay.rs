@@ -1,4 +1,4 @@
-//! Leaf decay, vanilla-like: a tree's leaves with no log within `REACH` fall over the next second
+//! Leaf decay, vanilla-like: a tree's leaves with no log within `REACH` (six) fall over the next second
 //! to a minute, dropping what their loot gives (saplings, sticks, their species' fruit). Leaves are
 //! looked at only round a log that went (chopped or felled, `felling`): nothing scans the world.
 //! Leaves a player placed (`placed`) keep, and so do the shrubs' leaves (no `leaves/tree` tag: a
@@ -12,10 +12,12 @@ use weft_sdk::*;
 static LOGS: Tag = Tag::named("logs");
 static TREE_LEAVES: Tag = Tag::named("leaves/tree");
 
-/// Leaves this far (each way) from a log that went are looked at.
-const NEAR: i32 = 5;
-/// A log this close (each way) keeps leaves on.
-const REACH: i32 = 4;
+/// A log this close (each way) keeps leaves on, and only leaves this close to a log that went
+/// are looked at (they may have been its): the farthest any species grows a leaf from its logs
+/// (`base_api::branchy::LEAF_REACH`, six; the palms reach five), so a living tree never drops
+/// its own crown when a log beside it is chopped.
+const REACH: i32 = base_api::branchy::LEAF_REACH;
+const NEAR: i32 = REACH;
 /// Ticks after the log went that a leaf may fall: a second to a minute.
 const SOONEST: u64 = 20;
 const LATEST: u64 = 1200;

@@ -30,6 +30,11 @@ pub enum Part {
 
 /// How far a tree reaches sideways from its base (the worldgen scatter's reach).
 pub const REACH: i32 = 7;
+/// The farthest (each way) any leaf of a grown tree lies from one of its logs, and so how far leaf
+/// decay looks for a log before a leaf falls (`mods/base/src/leaf_decay.rs`): vanilla's six. The
+/// palms reach five (`examples/leaf_reach.rs` measures every species); a recipe whose leaves
+/// reach past it would drop its own crown when a log near it is chopped.
+pub const LEAF_REACH: i32 = 6;
 /// How high a tree may grow above its base.
 pub const MAX_HEIGHT: i32 = 24;
 /// From this width a trunk is a round disc each step, not a 2 x 2.
@@ -480,6 +485,28 @@ pub fn grow(recipe: &Recipe, x: i32, y: i32, z: i32, seed: u64, mut put: impl Fn
 mod tests {
     use super::*;
     use crate::tree_recipes::RECIPES;
+
+    /// Leaf decay keeps a leaf with a log within `LEAF_REACH`: no species may grow one farther, the
+    /// giants and the young ones too, or its crown falls by itself near a chopped log.
+    #[test]
+    fn every_leaf_grows_within_leaf_reach_of_a_log() {
+        use crate::tree_recipes::{SEQUOIA, YOUNG};
+        for r in RECIPES.iter().chain([&SEQUOIA]).chain(YOUNG.iter()) {
+            for seed in 0..20 {
+                let t = blocks(r, seed);
+                let logs: std::collections::HashSet<_> = t
+                    .iter()
+                    .filter(|b| matches!(b.3, Part::Log { .. }))
+                    .map(|b| (b.0, b.1, b.2))
+                    .collect();
+                let d = LEAF_REACH;
+                for &(x, y, z, _) in t.iter().filter(|b| b.3 == Part::Leaves) {
+                    let near = (-d..=d).any(|dy| (-d..=d).any(|dz| (-d..=d).any(|dx| logs.contains(&(x + dx, y + dy, z + dz)))));
+                    assert!(near, "{} {seed}: a leaf at {x} {y} {z} is past LEAF_REACH of every log", r.log);
+                }
+            }
+        }
+    }
 
     #[test]
     fn every_species_grows_a_tree_within_its_reach() {
