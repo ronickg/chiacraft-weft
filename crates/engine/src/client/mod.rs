@@ -2376,10 +2376,8 @@ impl Client {
             self.shadow_size = size;
         }
         let sun = self.sun();
-        let dir = settled(
-            if sun[1] > -0.06 { Vec3::new(sun[0], sun[1], sun[2]) } else { -Vec3::new(sun[0], sun[1], sun[2]) },
-            self.sun_plane(),
-        );
+        let dir =
+            settled(if sun[1] > -0.06 { Vec3::new(sun[0], sun[1], sun[2]) } else { -Vec3::new(sun[0], sun[1], sun[2]) }, self.sun_plane());
         // So low the shadows would run off the map (the pack fades them out above this).
         if dir.y < 0.02 {
             return;
