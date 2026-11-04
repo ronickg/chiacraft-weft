@@ -25,17 +25,17 @@ chat /time set 10800
 wait 4
 look 90 -10
 wait 2
-shot depth_2_golden_away.png
+shot depth_2_golden_toward.png
 look 270 -10
 wait 2
-shot depth_2_golden_toward.png
+shot depth_2_golden_away.png
 look 0 -10
 wait 2
 shot depth_2_golden_side.png
 # 3. Morning: the sun low in the east, the slopes facing west in shade.
 chat /time set 1000
 wait 4
-look 270 -10
+look 90 -10
 wait 2
 shot depth_3_morning_away.png
 look 0 -10
