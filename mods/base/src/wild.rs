@@ -80,9 +80,8 @@ pub fn register(r: &mut Registry) {
                 .no_item(),
         };
         drop(b);
-        // Picking gives what plants it again: one at any stage, a bush or a seed head two more when
-        // ripe (nothing at all out of season waits for spring's other plant food, `notes/ECOLOGY.md`);
-        // a cordage plant fibre besides (`wild::FIBRE`).
+        // Picking gives what plants it again: a bush or a seed head three when ripe and nothing out
+        // of season, the others one; a cordage plant fibre besides (`wild::FIBRE`).
         let fibre = wild::FIBRE
             .iter()
             .find(|(b, _)| *b == p.block)
@@ -90,19 +89,17 @@ pub fn register(r: &mut Registry) {
         if p.gives.is_some() || fibre.is_some() {
             let mut table = r.loot(block);
             if let Some(gives) = p.gives.map(short) {
-                table = table.pool(Pool::new().entry(Entry::item(gives)));
                 let ripe = match p.form {
                     Form::Bush => Some("age=3"),
                     Form::Ripens => Some("age=1"),
                     _ => None,
                 };
-                if let Some(ripe) = ripe {
-                    table = table.pool(
-                        Pool::new()
-                            .when(Cond::BlockState(ripe))
-                            .entry(Entry::item(gives).count(2, 2)),
-                    );
-                }
+                table = table.pool(match ripe {
+                    Some(ripe) => Pool::new()
+                        .when(Cond::BlockState(ripe))
+                        .entry(Entry::item(gives).count(3, 3)),
+                    None => Pool::new().entry(Entry::item(gives)),
+                });
             }
             if let Some(chance) = fibre {
                 table.pool(Pool::new().when(Cond::Chance(chance)).item("plant_fibre"));
