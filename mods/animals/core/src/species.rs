@@ -101,6 +101,7 @@ pub static PROTOCERATOPSIDAE: Family = Family { name: "Protoceratopsidae", above
 pub static PASSERIDAE: Family = Family { name: "Passeridae", above: &["Aves", "Passeriformes"] };
 pub static CALCARIIDAE: Family = Family { name: "Calcariidae", above: &["Aves", "Passeriformes"] };
 pub static STRIGIDAE: Family = Family { name: "Strigidae", above: &["Aves", "Strigiformes"] };
+pub static ACCIPITRIDAE: Family = Family { name: "Accipitridae", above: &["Aves", "Accipitriformes"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -304,7 +305,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 27] = [
+pub static SPECIES: [Species; 29] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -2001,6 +2002,140 @@ pub static SPECIES: [Species; 27] = [
             cold_blooded: false,
         },
         tune: Tune { gestation: Some(18_083), ..Tune::NONE },
+        birth_size: 0.3,
+    },
+    // The eagles (`reports/ecology/Overworld food webs.md`: the day's big hunter of every land biome,
+    // the hare's, the marmot's, the fawn's and the small dog's): the golden eagle of the north's and
+    // the dry country's open land, and the savanna hawk of the llanos and the Pantanal, where there
+    // are no golden eagles: two wild species on one model (`source/eagle`), the hawk drawn smaller
+    // by its size genes; on the ground and in the air (`eagle.rs`). No nests yet (Ronald,
+    // 2026-11-03): their young come out as fledglings after the eggs' time.
+    Species {
+        model: "eagle",
+        name: "golden_eagle",
+        binomial: "Aquila chrysaetos",
+        family: &ACCIPITRIDAE,
+        subfamily: "Aquilinae",
+        breed: None,
+        size: Size::Medium,
+        // Hares, rabbits, marmots and ground squirrels first, grouse, foxes and young deer; carrion
+        // in winter.
+        eats: &[(Meat, 0.85), (Carrion, 0.15)],
+        // A vole to a fawn or a fox, up to about one and a half times its own mass.
+        prey: (0.01, 1.5),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [16.0, 150.0, 60.0, 4.0, 1.0, 30.0, 60.0, 40.0, 10.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:beef", 12), favorite("base:chicken", 10), eats("base:rotten_flesh", 4)],
+        feedings: 0.0,
+        shy: 24.0,
+        fights: true,
+        attacks: &[],
+        reach: 0.6,
+        signature: "stoop",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.4,
+        // Females are the bigger (a third heavier).
+        dimorphism: 0.92,
+        size_spread: 0.1,
+        // Perched, at the crown.
+        height: (0.6, "crown"),
+        // Mountains first, the prairie and the desert's canyons, the taiga and the tundra's edge.
+        habitats: &[
+            ("base:mountains", 1.0),
+            ("base:plains", 0.6),
+            ("base:desert", 0.6),
+            ("base:taiga", 0.5),
+            ("base:snowy_plains", 0.3),
+            ("base:forest", 0.3),
+            ("base:birch_forest", 0.3),
+        ],
+        bio: Biology {
+            mass: 4.5,
+            gestation: 0.0,
+            // 41-45 days, the female sitting; the young fly at ten or eleven weeks.
+            incubation: 43.0,
+            // In adult plumage and breeding at four or five.
+            maturity: 1500.0,
+            // About 20 years in the wild; up to 32.
+            lifespan: 7300.0,
+            interval: 365.0,
+            // 1-4 eggs, usually two (often one fledges).
+            litter: 2.0,
+            social: Social::Solitary,
+            rarity: Rarity::Uncommon,
+            // Laying in March and April.
+            breeds: seasons::SPRING,
+            peak: seasons::SPRING,
+            // From the Arctic's edge to the Sonoran canyons.
+            comfort: (-40.0, 38.0),
+            cold_blooded: false,
+        },
+        // No nests yet: the young come out as fledglings after the eggs' time. A young eagle flies in
+        // its first summer and looks grown in a year; it waits years to breed, which no line of
+        // breeding in the game could wait for (`balance::checks`: a fourth generation in 40 days).
+        tune: Tune { gestation: Some(22_568), growth: Some(200_000), ..Tune::NONE },
+        birth_size: 0.3,
+    },
+    Species {
+        model: "eagle",
+        name: "savanna_hawk",
+        binomial: "Buteogallus meridionalis",
+        family: &ACCIPITRIDAE,
+        subfamily: "Buteoninae",
+        breed: None,
+        size: Size::Small,
+        // Rodents, lizards, snakes, frogs and crabs, big insects; following fires and the plough.
+        eats: &[(Meat, 0.7), (Insects, 0.2), (Fish, 0.1)],
+        prey: (0.005, 0.6),
+        taming: Taming::Wild,
+        base: [8.0, 110.0, 40.0, 2.0, 1.0, 10.0, 60.0, 20.0, 6.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:beef", 8), favorite("base:chicken", 8)],
+        feedings: 0.0,
+        shy: 16.0,
+        fights: true,
+        attacks: &[],
+        reach: 0.5,
+        signature: "stoop",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.4,
+        dimorphism: 0.95,
+        // Its size genes draw the golden eagle's model about two thirds as big (55 cm).
+        size_spread: 0.4,
+        height: (0.6, "crown"),
+        // The llanos' and the Pantanal's open grassland and marsh edges.
+        habitats: &[("base:savanna", 1.0), ("base:swamp", 0.8)],
+        bio: Biology {
+            mass: 0.85,
+            gestation: 0.0,
+            // About 39 days, one egg.
+            incubation: 39.0,
+            maturity: 730.0,
+            lifespan: 4380.0,
+            interval: 365.0,
+            litter: 1.0,
+            social: Social::Solitary,
+            rarity: Rarity::Common,
+            // Nesting in the dry season (December to March in the llanos).
+            breeds: seasons::WINTER,
+            peak: seasons::WINTER,
+            // A tropical hawk: at ease in the heat, uneasy below about 5 degrees (est.).
+            comfort: (5.0, 42.0),
+            cold_blooded: false,
+        },
+        // No nests yet: fledglings after the eggs' time. One young a year: her rest set shorter so
+        // the wild replaces its dead (`balance::checks`: six young in a life).
+        tune: Tune { gestation: Some(20_975), recovery: Some(60_000), ..Tune::NONE },
         birth_size: 0.3,
     },
 ];

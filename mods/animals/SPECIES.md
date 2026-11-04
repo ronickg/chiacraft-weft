@@ -37,6 +37,8 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | snow_bunting | *Plectrophenax nivalis* | common | small | 0.1 m | 0.035 kg | herd | omnivore | wild | 0.37 d | 2.75 d | 14 d | 2-7 | 24 |
 | great_horned_owl | *Bubo virginianus* | uncommon | small | 0.45 m | 1.4 kg | solitary | carnivore | wild | 0.77 d | 6.51 d | 49.8 d | 1-3 | 16 |
 | snowy_owl | *Bubo scandiacus* | uncommon | small | 0.45 m | 2 kg | solitary | carnivore | wild | 0.75 d | 6.51 d | 38.3 d | 2-8 | 15 |
+| golden_eagle | *Aquila chrysaetos* | uncommon | medium | 0.6 m | 4.5 kg | solitary | carnivore | wild | 0.94 d | 8.33 d | 76.7 d | 1-3 | 13 |
+| savanna_hawk | *Buteogallus meridionalis* | common | small | 0.6 m | 0.85 kg | solitary | carnivore | wild | 0.87 d | 6.51 d | 46 d | 1 | 18 |
 
 ## Stats at level 1
 
@@ -71,6 +73,8 @@ Damage and speed are each kind's own (1 = 100%).
 | snow_bunting | 2 | 60 | 15 | 0.2 | 1 | 1.2 | 40 | 5 | 3 | 20 |
 | great_horned_owl | 8 | 100 | 40 | 2.5 | 1 | 14 | 60 | 20 | 6 | 30 |
 | snowy_owl | 10 | 110 | 45 | 3 | 1 | 20 | 60 | 24 | 8 | 30 |
+| golden_eagle | 16 | 150 | 60 | 4 | 1 | 30 | 60 | 40 | 10 | 30 |
+| savanna_hawk | 8 | 110 | 40 | 2 | 1 | 10 | 60 | 20 | 6 | 30 |
 
 ## dog (chihuahua)
 
@@ -119,7 +123,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | passive |
 | diet | carnivore |
 | eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
-| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, great_horned_owl, base:chicken |
+| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, great_horned_owl, savanna_hawk, base:chicken |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 8; `base:mutton` 8; `base:cooked_beef` 20, favorite; `base:cooked_porkchop` 20, favorite; `base:cooked_chicken` 16, favorite; `base:cooked_mutton` 16, favorite; `base:bone` 5, favorite; `animals:kibble` 30, kibble |
@@ -181,7 +185,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | passive |
 | diet | carnivore |
 | eats | meat 80%, insects 10%, carrion 5%, fish 5% |
-| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, base:chicken |
+| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, savanna_hawk, base:chicken |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:mutton` 8; `base:egg` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:chicken` 10, favorite; `base:cooked_chicken` 16, favorite; `animals:kibble` 30, kibble |
@@ -1438,7 +1442,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | wild |
 | diet | carnivore |
 | eats | meat 60%, fruit 15%, carrion 15%, insects 10% |
-| hunts | 0.1%-40% of its mass alone (0.01-5 kg); at home: cat, hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, snowy_owl, base:chicken |
+| hunts | 0.1%-40% of its mass alone (0.01-5 kg); at home: cat, hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, snowy_owl, golden_eagle, base:chicken |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
 | eats (food points) | `base:beef` 12; `base:chicken` 10, favorite; `base:berries` 4 |
@@ -1625,7 +1629,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | how | wild |
 | diet | carnivore |
 | eats | meat 90%, insects 5%, fish 5% |
-| hunts | 0.5%-180% of its mass alone (0.01-3 kg); at home: dog, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, base:chicken |
+| hunts | 0.5%-180% of its mass alone (0.01-3 kg); at home: dog, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, savanna_hawk, base:chicken |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:chicken` 10, favorite |
@@ -1697,6 +1701,127 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.7 |
+
+## golden_eagle
+
+*Aquila chrysaetos*, Aves › Accipitriformes › Accipitridae › Aquilinae. Model `eagle`, entity `animals:golden_eagle`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:mountains` | commonest |
+| `base:plains` | 60% |
+| `base:desert` | 60% |
+| `base:taiga` | 50% |
+| `base:snowy_plains` | 30% |
+| `base:forest` | 30% |
+| `base:birch_forest` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | medium |
+| height (grown, average) | 0.6 m at the crown |
+| males against females | 0.92x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 30% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 4.5 kg | |
+| carries her young | 0 d | 0.94 d **set** |
+| litter or clutch | 2 on average | 1-3 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | spring | out of it, only a tame well cared for |
+| comfortable in | -40 to 38 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 4.1 y | 8.33 d **set** |
+| lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 13 within 48 blocks |
+
+**Balance** (uncommon): a generation 10.2 d; a line four deep in 31 d (10 h of play); 3.3 young per mother in 10 days, 18 in her life.
+
+- ✓ fourth generation: 30.6 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 8.3 of 77 days (want under a fifth)
+- ✓ young in a life: 17.6 (want 6-40)
+- ✓ litter: 1-3 (want 1-12, fewest first)
+- ✓ room near: 13 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | meat 85%, carrion 15% |
+| hunts | 1.0%-150% of its mass alone (0.04-7 kg); at home: dog, cat, hare, mountain_hare, brown_trout, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, base:chicken |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 24 blocks (twice that running) |
+| eats (food points) | `base:beef` 12; `base:chicken` 10, favorite; `base:rotten_flesh` 4 |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes:  |
+| reach past its body | 0.6 blocks |
+| signature | stoop |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.4 |
+
+## savanna_hawk
+
+*Buteogallus meridionalis*, Aves › Accipitriformes › Accipitridae › Buteoninae. Model `eagle`, entity `animals:savanna_hawk`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:savanna` | commonest |
+| `base:swamp` | 80% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.6 m at the crown |
+| males against females | 0.95x as tall |
+| size spread (an individual's, either way) | 40% |
+| newborn's size | 30% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 0.85 kg | |
+| carries her young | 0 d | 0.87 d **set** |
+| litter or clutch | 1 on average | 1 |
+| between litters | 1 y | rests 2.5 d **set** |
+| breeds in | winter | out of it, only a tame well cared for |
+| comfortable in | 5 to 42 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 2 y | 6.51 d |
+| lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 18 within 48 blocks |
+
+**Balance** (common): a generation 8.3 d; a line four deep in 25 d (8 h of play); 3 young per mother in 10 days, 9 in her life.
+
+- ✓ fourth generation: 24.8 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 6.5 of 46 days (want under a fifth)
+- ✓ young in a life: 9.0 (want 6-40)
+- ✓ litter: 1-1 (want 1-12, fewest first)
+- ✓ room near: 18 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | meat 70%, insects 20%, fish 10% |
+| hunts | 0.5%-60% of its mass alone (0.00-1 kg); at home: wood_mouse, field_vole, house_sparrow |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 16 blocks (twice that running) |
+| eats (food points) | `base:beef` 8; `base:chicken` 8, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes:  |
+| reach past its body | 0.5 blocks |
+| signature | stoop |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.4 |
 
 ## Shared by every species
 

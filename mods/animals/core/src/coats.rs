@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 27] = [
+const FILES: [(&str, &str); 29] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -286,6 +286,8 @@ const FILES: [(&str, &str); 27] = [
     ("snow_bunting", include_str!("../../genetics/snow_bunting.json")),
     ("great_horned_owl", include_str!("../../genetics/great_horned_owl.json")),
     ("snowy_owl", include_str!("../../genetics/snowy_owl.json")),
+    ("golden_eagle", include_str!("../../genetics/golden_eagle.json")),
+    ("savanna_hawk", include_str!("../../genetics/savanna_hawk.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1298,6 +1300,31 @@ fn owl(r: &Read, snowy: bool) -> Look {
     }
 }
 
+/// The eagle's model: a golden eagle dark brown, its crown and nape gold (its points), paler or
+/// darker by its genes; a savanna hawk rufous-cinnamon, finely barred below, its crown greyer.
+fn eagle(r: &Read, hawk: bool) -> Look {
+    let tone = r.qv("Tn");
+    if hawk {
+        let base = mix([168.0, 92.0, 56.0], [196.0, 122.0, 74.0], tone);
+        return Look {
+            name: "Rufous".into(),
+            base,
+            under: mix([182.0, 104.0, 64.0], [204.0, 136.0, 88.0], tone),
+            points: Some([150.0, 120.0, 100.0]),
+            pattern: Some(Pattern { kind: "streaks", color: darken(base, 0.45), amount: 0.45 }),
+            ..Look::default()
+        };
+    }
+    let base = mix([70.0, 52.0, 40.0], [112.0, 82.0, 58.0], tone);
+    Look {
+        name: if tone < 0.35 { "Dark brown".into() } else { "Brown, golden nape".into() },
+        base,
+        under: mix([112.0, 86.0, 64.0], [150.0, 114.0, 80.0], tone),
+        points: Some(mix([180.0, 132.0, 72.0], [214.0, 172.0, 104.0], tone)),
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1466,6 +1493,8 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "snow_bunting" => small_bird(&r, true),
         "great_horned_owl" => owl(&r, false),
         "snowy_owl" => owl(&r, true),
+        "golden_eagle" => eagle(&r, false),
+        "savanna_hawk" => eagle(&r, true),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -2047,7 +2076,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 20] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 21] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2067,7 +2096,8 @@ const MODEL_LAYERS: [ModelLayers; 20] = model_layers!(
     "reindeer",
     "coyote",
     "small_bird",
-    "owl"
+    "owl",
+    "eagle"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {

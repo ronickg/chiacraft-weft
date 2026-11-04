@@ -1,0 +1,83 @@
+{
+ "species": "golden_eagle",
+ "about": "The golden eagle (Aquila chrysaetos): dark brown, the crown and nape golden, the trousers paler, a grey bill with a yellow cere, yellow feet, brown eyes. Young ones show white at the base of the tail and wings.",
+ "loci": [
+  {
+   "id": "Tn",
+   "name": "Tone",
+   "quantitative": true,
+   "mean": 0.45,
+   "sd": 0.15,
+   "about": "dark brown to warm brown"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.12,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   132,
+   84,
+   38
+  ],
+  [
+   164,
+   108,
+   48
+  ]
+ ],
+ "habitats": {
+  "desert": {
+   "quantitative": {
+    "Tn": {
+     "mean": 0.6,
+     "sd": 0.1
+    }
+   }
+  }
+ },
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  },
+  "Wg": {
+   "bones": [
+    "wing_L",
+    "wing_R",
+    "hand_L",
+    "hand_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.05
+  }
+ }
+}
