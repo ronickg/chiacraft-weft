@@ -152,6 +152,61 @@ pub fn flowers(biome: &str, ground: Ground) -> impl Iterator<Item = &'static Flo
         .filter(move |f| f.ground == ground && f.found.contains(&biome))
 }
 
+/// How a tree's leaves turn in autumn (world-looks #7, with the lighting session's seasonal tints):
+/// evergreens never, birch-like trees yellow, the rest orange to brown.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Turn {
+    Evergreen,
+    Yellow,
+    Orange,
+}
+
+impl Turn {
+    /// The leaves' tint kind (`base_api::trees`): `core:foliage` for the orange ones, as before.
+    pub fn tint(self) -> &'static str {
+        match self {
+            Turn::Evergreen => "base:evergreen",
+            Turn::Yellow => "base:yellow_leaves",
+            Turn::Orange => "core:foliage",
+        }
+    }
+    /// The colour at autumn's height, for the leaves' tint (`None`: it doesn't turn): a birch's or
+    /// a ginkgo's gold, an oak's russet.
+    pub fn autumn(self) -> Option<u32> {
+        match self {
+            Turn::Evergreen => None,
+            Turn::Yellow => Some(0xd9b23a),
+            Turn::Orange => Some(0xb8622a),
+        }
+    }
+}
+
+/// Every tree's leaves and how they turn: the conifers, palms and the tree fern stay green;
+/// birches and ginkgos go gold; oaks, acacias, mesquite and the swamp cypress (a deciduous conifer)
+/// go russet.
+pub const LEAVES: [(&str, Turn); 12] = [
+    ("base:oak_leaves", Turn::Orange),
+    ("base:birch_leaves", Turn::Yellow),
+    ("base:spruce_leaves", Turn::Evergreen),
+    ("base:acacia_leaves", Turn::Orange),
+    ("base:mesquite_leaves", Turn::Orange),
+    ("base:acuri_palm_leaves", Turn::Evergreen),
+    ("base:moriche_palm_leaves", Turn::Evergreen),
+    ("animals:araucaria_leaves", Turn::Evergreen),
+    ("animals:ginkgo_leaves", Turn::Yellow),
+    ("animals:swamp_cypress_leaves", Turn::Orange),
+    ("animals:scale_conifer_leaves", Turn::Evergreen),
+    ("animals:tempskya_leaves", Turn::Evergreen),
+];
+
+/// How `leaves` turn (`Turn::Orange` for leaves not listed).
+pub fn turn(leaves: &str) -> Turn {
+    LEAVES
+        .iter()
+        .find(|(l, _)| *l == leaves)
+        .map_or(Turn::Orange, |&(_, t)| t)
+}
+
 /// Where still ponds lie, and in what share of the ground's 8 x 8 cells: the Pantanal's and the
 /// Cedar Mountain floodplain's standing water, a block deep, for their floating plants and the
 /// wild rice and cattails on their shores (the world's other water is the sea's, with beaches).
