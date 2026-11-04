@@ -1412,6 +1412,32 @@ impl TextureList {
     }
 }
 
+/// Every block texture a mod names must be a file in that mod's assets (`textures/<path>.png`):
+/// a missing one would draw as the magenta checker, and quietly (a resource pack can only replace
+/// a texture, not add one). Item textures without a file are only warned about, since an icon
+/// can wait for its art. Mods whose assets folder isn't there (tests) aren't checked.
+fn check_texture_files(mods: &[ModMeta], textures: &TextureList, errors: &mut Vec<String>) {
+    for name in &textures.names {
+        let Some((ns, rel)) = name.split_once(':') else { continue };
+        let Some(m) = mods.iter().find(|m| m.id == ns) else { continue };
+        if ns == "core" || !m.assets.is_dir() {
+            continue;
+        }
+        if m.assets
+            .join("textures")
+            .join(format!("{rel}.png"))
+            .is_file()
+        {
+            continue;
+        }
+        if rel.starts_with("block/") {
+            errors.push(format!("texture {name}: no file textures/{rel}.png in {ns}'s assets (it would draw magenta)"));
+        } else {
+            log::warn!("texture {name}: no file textures/{rel}.png in {ns}'s assets");
+        }
+    }
+}
+
 type RawBiome = (BiomeDef, usize, Vec<RawValue>, crate::server::terrain::RawRule);
 type RawDim = (DimensionDef, usize, Vec<RawValue>);
 
@@ -1491,6 +1517,7 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
     let fire_texture = textures.intern("core:block/fire");
     let block_tables = number_blocks(&mods, blocks, &mut textures, &mut errors);
     let item_tables = number_items(&mods, items, &block_tables, &mut textures, &mut errors);
+    check_texture_files(&mods, &textures, &mut errors);
     let biome_tables = number_biomes(biomes);
     let dim_tables = number_dimensions(&mods, dims);
     let entities = crate::registry::freeze_entities(&mut games, &mut errors);
