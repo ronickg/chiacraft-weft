@@ -426,7 +426,9 @@ Also:
   mob's own texture on every client from its component (registered with `SYNC_WATCHERS`): `skin`
   is a copy of the kind's texture (`skin.rgba`, `width` x `height`) to paint over, drawn on the
   mob in its own kind and every look with the same texture, painted again when the component
-  changes. Only the component travels. The animals mod paints every animal's coat from its genes
+  changes. Only the component travels. The callback runs on a worker thread, not the frame's
+  (a big texture's coat took 40 ms), so it reads only what it is given; the mob shows its plain
+  texture until it is done. The animals mod paints every animal's coat from its genes
   this way (`mods/animals/src/coats.rs`). The same callback may set the mob's build:
   `skin.scale_bone("neck_0", [1.0, 1.1, 1.1])` draws that bone's own boxes scaled about its pivot
   (along the model's axes) in every look of the mob, its child bones keeping their size and moving
