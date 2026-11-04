@@ -729,3 +729,6 @@ gain = 0.906
 
 [tiles.planks_ipe]  # luma 0.32->0.31, sat 0.53->0.53; ~ dark_oak_planks (0.18-0.29, 0.31-0.70) half way
 gain = 0.965
+
+[items.flint]  # outline 0.51 -> 0.40 (the first hours: a pale chalky rind, the edge too light)
+outline = 0.79

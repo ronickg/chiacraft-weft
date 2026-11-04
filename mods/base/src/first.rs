@@ -42,7 +42,7 @@ pub fn register(r: &mut Registry) {
     let shapes = [("struck", f::FLAKES_PER_STONE - 1), ("shaped", f::HEAD_STRIKES - 1)];
     loose(r, &LOOSE_ROCK, &strikes, "stone", "cobblestone", &[([4.0, 0.0, 5.0], [10.0, 3.0, 11.0]), ([10.0, 0.0, 8.0], [13.0, 1.5, 11.0])]);
     loose(r, &LOOSE_FLINT, &shapes, "stone", "flint_nodule", &[([5.0, 0.0, 5.0], [10.0, 3.0, 10.0]), ([9.0, 0.0, 9.0], [12.0, 2.0, 12.0])]);
-    loose(r, &FALLEN_BRANCH, &[], "wood", "log_oak", &[([1.0, 0.0, 7.0], [15.0, 1.5, 8.5]), ([9.0, 0.0, 8.5], [12.0, 1.0, 12.0])]);
+    loose(r, &FALLEN_BRANCH, &[], "wood", "fallen_branch", &[([1.0, 0.0, 7.0], [15.0, 1.5, 8.5]), ([9.0, 0.0, 8.5], [12.0, 1.0, 12.0])]);
     r.loot(&LOOSE_ROCK).pool(Pool::new().item("rock"));
     r.loot(&LOOSE_FLINT).pool(Pool::new().item("flint"));
     r.loot(&FALLEN_BRANCH)
