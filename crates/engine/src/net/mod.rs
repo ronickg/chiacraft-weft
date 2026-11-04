@@ -287,6 +287,9 @@ messages! {
         /// An achievement credential the world signed for this player (chiacraft: JSON,
         /// `chiacraft_wallet::achievement::Credential`), to keep.
         Achievement(String),
+        /// A day's anchor for one of this player's achievements (chiacraft): the credential's
+        /// hash (hex) and its inclusion proof (JSON, `achievement::Anchor`).
+        AchievementAnchor { hash: String, anchor: String },
     }
 }
 

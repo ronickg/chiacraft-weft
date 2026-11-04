@@ -759,6 +759,9 @@ impl Server {
         }
         self.did_answers(c);
         self.sign_achievements();
+        if self.tick % (TPS as u64 * 60) == 0 {
+            self.anchor_achievements();
+        }
         lap(5, &self.shared);
         let us = start.elapsed().as_micros() as u64;
         self.shared.tick_us.store(us, Ordering::Relaxed);

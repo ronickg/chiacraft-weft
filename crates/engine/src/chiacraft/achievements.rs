@@ -101,6 +101,30 @@ pub fn keep(path: &Path, me: &str, json: &str) -> Result<bool, String> {
     Ok(true)
 }
 
+/// A day's anchor a world sent for one of this account's achievements: kept on that credential
+/// if its proof leads from the credential to the anchored root.
+pub fn anchored(hash: &str, anchor: &str) {
+    let Some(path) = path() else { return };
+    let Ok(a) = serde_json::from_str::<chiacraft_wallet::achievement::Anchor>(anchor) else { return };
+    let mut store = load_from(&path);
+    let Some(c) = store
+        .credentials
+        .iter_mut()
+        .find(|c| chiacraft_wallet::keys::hex(&c.hash()) == hash)
+    else {
+        return;
+    };
+    if c.anchor.as_ref() == Some(&a) || !a.check(c.hash()) {
+        return;
+    }
+    log::info!("achievement '{}' anchored on day {}", c.achievement.id, a.day);
+    c.anchor = Some(a);
+    if let Err(e) = save_to(&path, &store) {
+        log::warn!("{e}");
+    }
+    GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Whether the world that issued `c` is the owner's, on chain: its DID (the credential's issuer
 /// DID) and the owner's DID name each other, and the key that vouched for the issuer holds the
 /// owner's DID. None for a credential without an issuer DID. Blocks; never from an async task.
