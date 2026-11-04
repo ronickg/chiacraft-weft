@@ -68,7 +68,10 @@ const LEAF_LIGHT: vec3<f32> = vec3(0.6, 1.0, 0.5);
 
 fn under_leaves(sky_light: f32) -> f32 {
     // Not in deep cover (a cave in the forest): the leaves' light is from what the sky reaches.
-    return min(canopy(), 1.0) * (1.0 - smoothstep(0.8, 1.0, sky_light)) * smoothstep(0.35, 0.6, sky_light);
+    // Faint down to a sky light of 0.1: from 0.35 the foot of a rainforest giant, between its
+    // buttresses under its thick crown, went near black at noon (frame luma 0.03-0.06, the world
+    // playtester's GIANT_F); a cave, with no sky light at all, stays dark.
+    return min(canopy(), 1.0) * (1.0 - smoothstep(0.8, 1.0, sky_light)) * smoothstep(0.08, 0.4, sky_light);
 }
 
 // ---- the colors of the day ----
