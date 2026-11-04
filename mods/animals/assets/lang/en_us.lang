@@ -321,3 +321,7 @@ species.animals.iguanodont = iguanodont
 family.animals.styracosterna = iguanodonts
 item.animals.iguanodont_egg = Iguanodont Egg
 hint.animals.tamed = Yours now. Sneak and use it for its menu; whistle {key:animals:whistle_follow} to follow, {key:animals:whistle_stay} to stay, {key:animals:whistle_come} to come, {key:animals:whistle_attack} to attack, {key:animals:whistle_passive} to calm down.
+entity.animals.crocodyliform = Crocodyliform
+species.animals.crocodyliform = crocodyliform
+family.animals.neosuchia = neosuchian crocodyliforms
+item.animals.crocodyliform_egg = Crocodyliform Egg

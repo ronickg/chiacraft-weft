@@ -24,5 +24,5 @@ static BODY: Body = Body {
 };
 
 pub fn init(r: &mut Registry) {
-    wild::register(r, &[(&COYOTE, 22)], &BODY);
+    wild::register(r, &[&COYOTE], &BODY);
 }

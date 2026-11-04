@@ -99,7 +99,8 @@ pub(crate) fn mass(w: &World, id: u64) -> Option<f32> {
     let e = w.entity(id)?;
     let size = w.component(id, &ANIMAL).and_then(|a| {
         let index = (a.species as usize).checked_sub(1)?;
-        Some(crate::coats::size_of(w, id)? * crate::breeding::growth(w, id, index))
+        // Against its species' average size: its row's mass is an average grown one's.
+        Some(crate::coats::size_of(w, id)? / crate::coats::mean_size(index) * crate::breeding::growth(w, id, index))
     });
     kind_mass(e.kind, size)
 }
