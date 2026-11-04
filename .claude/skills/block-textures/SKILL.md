@@ -154,6 +154,19 @@ toward the UI's own colours (`notes/STYLE.md`).
   earlier floor (slate, termite mound, red sandstone, sequoia and spruce bark, podzol) stay until
   they're re-judged under Lighting's new grade; leaves and grass top wait for it too ("After the
   grade").
+- **Close to vanilla's colour, so packs and shaders fit** (Ronald, 11-04: "it doesn't have to be
+  one-to-one matching, but it has to be close, because when it's similar, then also the shaders or
+  other resource packs will just fit in seamlessly"). Check every new or changed tile against vanilla
+  1.21.4 and two vanilla-style packs (Faithful 32x, Pixel Perfection CE):
+  `notes/blocks/vanilla_compare.py <worktree> <packs dir> <out>` then `vanilla_sheet.py` for the sheet.
+  Fetch the packs' `assets/minecraft/textures/block/` with a sparse git checkout into the scratchpad
+  (InventivetalentDev/minecraft-assets branch 1.21.4, Faithful-Resource-Pack/Faithful-32x-Java
+  java-latest, Athemis/PixelPerfectionCE master), read them as images only, and never commit them.
+  A tile passes when its mean hue is within 15 deg (coloured tiles only), luma within 0.05 and
+  saturation within 0.10 of the packs' range, tinted tiles measured with vanilla's tints (grass
+  #91BD59, foliage #77AB2F, spruce #619961, birch #80A755, lily pad #208030). Ours without a vanilla
+  twin are compared with their nearest relative (sequoia with spruce, termite mound with terracotta,
+  canyon bands with sandstone and terracotta) and may keep their own identity.
 - **Streaks and stripes never repeat in step from block to block** (Ronald, 11-04, on the karst
   limestone: "Yes, loosen streaks"; the first version put rain streaks in the same columns in every
   variant, and a tall tower looked corrugated). Give each variant its own positions, gaps and
