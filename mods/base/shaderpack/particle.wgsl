@@ -48,7 +48,16 @@ fn shade(in: VOut) -> vec4<f32> {
         color = vec4(color.rgb * 1.5, color.a);
     }
     let sky = select(1.0, unpack_light(in.data.w).x, in.data.w != 0xffffffffu);
-    return vec4(display(haze_lit(color.rgb, in.rel, sky)), color.a);
+    var rgb = color.rgb;
+    // Under water (bubbles): a little lighter than the water's teal, not flat grey, and the ones
+    // right at the eye (a bubble rising past the lens filled the screen as a hard pixel ring,
+    // Tester 2's under-water shots) blend into the water.
+    if in_water() {
+        let teal = underwater_color();
+        rgb = mix(rgb, teal * 2.0 + vec3(0.02, 0.04, 0.04), 0.6);
+        rgb = mix(teal, rgb, smoothstep(0.8, 2.5, length(in.rel)));
+    }
+    return vec4(display(haze_lit(rgb, in.rel, sky)), color.a);
 }
 
 @fragment
