@@ -2262,11 +2262,11 @@ impl Client {
         self.shadow_index
     }
 
-    /// Sun shadows, before the world's pass (`sun_shadows` packs): the terrain drawn from the sun,
-    /// or the moon once it has set, into the shadow map, an orthographic box `SHADOW_REACH`
-    /// blocks to each side of the camera along the light, moved in whole texels so its edges do
-    /// not crawl as the camera moves.
-    pub fn render_shadows(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo) {
+    /// Sun shadows (`sun_shadows` packs), first their light, before the world is drawn (its scene
+    /// samples the map with it): from the sun, or the moon once it has set, an orthographic box
+    /// `SHADOW_REACH` blocks to each side of the camera along the light, moved in whole texels so
+    /// its edges do not crawl as the camera moves. `render_shadows` then draws the map.
+    pub fn prepare_shadows(&mut self, gpu: &mut dyn Backend) {
         self.shadow.1 = false;
         if !self.render.has_shadows() || !content().dims[self.world.dim as usize].sky_light {
             return;
@@ -2277,24 +2277,20 @@ impl Client {
         if dir.y < 0.02 {
             return;
         }
-        let map = match self.shadow_map {
-            Some(t) => t,
-            None => {
-                let t = gpu.create_texture(
-                    &weft_render::TextureDesc {
-                        width: SHADOW_SIZE,
-                        height: SHADOW_SIZE,
-                        mips: 1,
-                        format: weft_render::Format::Depth32,
-                        render_target: true,
-                    },
-                    "shadow map",
-                );
-                self.shadow_index = gpu.texture_index(t);
-                self.shadow_map = Some(t);
-                t
-            }
-        };
+        if self.shadow_map.is_none() {
+            let t = gpu.create_texture(
+                &weft_render::TextureDesc {
+                    width: SHADOW_SIZE,
+                    height: SHADOW_SIZE,
+                    mips: 1,
+                    format: weft_render::Format::Depth32,
+                    render_target: true,
+                },
+                "shadow map",
+            );
+            self.shadow_index = gpu.texture_index(t);
+            self.shadow_map = Some(t);
+        }
         let cam = self.render_camera();
         let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
         // Looking from the light's side of the camera toward it (right-handed, -z forward).
@@ -2324,7 +2320,15 @@ impl Client {
             glam::Vec4::new(0.0, 0.0, 1.0 / d, 0.0),
             glam::Vec4::new(off.x / r, off.y / r, 1.0, 1.0),
         );
-        let light = proj * view;
+        self.shadow = (proj * view, true);
+    }
+
+    /// The sun's shadow map, after `render` posed this frame's models (the pass is put before the
+    /// world's in the frame's list): the terrain and the models, the player's own body too.
+    pub fn render_shadows(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo) {
+        let (light, true) = self.shadow else { return };
+        let Some(map) = self.shadow_map else { return };
+        let cam = self.render_camera();
         while self.shadow_bufs.len() < gpu.frames_in_flight() {
             self.shadow_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,
@@ -2334,12 +2338,14 @@ impl Client {
         }
         let mut scene = self.scene(&cam, frame);
         scene.view_proj = light.to_cols_array_2d();
+        // The map is the pass's target: nothing in it may sample it.
+        scene.shadow = [0.0; 4];
         let buf = self.shadow_bufs[frame.slot];
         gpu.mapped(buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((map, Some(0.0))) });
         self.render.draw_shadow(gpu, list, frame, &cam, light, buf);
+        self.entity_render.draw_shadow(gpu, list, frame, buf);
         list.push(weft_render::Cmd::EndPass);
-        self.shadow = (light, true);
     }
 
     pub fn render(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, textures: &GameTextures) {
@@ -2410,6 +2416,8 @@ impl Client {
         );
         self.render.draw_translucent(&mut late);
         let me = (self.view != 0 && !self.dead && self.mode != GameMode::Spectator).then(|| self.self_entity());
+        // In first person the player's body is not drawn, but casts its shadow.
+        let shadow_me = (self.shadow.1 && self.view == 0 && !self.dead && self.mode != GameMode::Spectator).then(|| self.self_entity());
         let hand = (self.view == 0 && !self.dead && self.player.lying.is_none() && self.mode != GameMode::Spectator && !self.hide_gui)
             .then(|| entity_render::Hand {
                 stack: self.hand_stack,
@@ -2440,6 +2448,7 @@ impl Client {
             &cam,
             &self.entities,
             me.as_ref(),
+            shadow_me.as_ref(),
             hand,
             textures,
             &light,

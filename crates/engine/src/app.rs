@@ -210,6 +210,8 @@ pub(crate) struct Running {
     window: Arc<Window>,
     depth: (TextureId, u32, u32),
     list: CommandList,
+    /// The world's pass, recorded before the sun's shadow map that goes ahead of it in `list`.
+    world_list: CommandList,
     input: Input,
     pub(crate) settings: Settings,
     lang: Lang,
@@ -466,6 +468,7 @@ impl App {
             window,
             depth,
             list: CommandList::default(),
+            world_list: CommandList::default(),
             input,
             settings,
             lang,
@@ -2662,20 +2665,25 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             .particles
             .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
         g.client.update_wires(&mut *r.gpu, &r.textures);
-        // The sun's shadow map first, for packs that use it.
-        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
+        // The sun's light for shadow maps (packs that use them), which the world's scene samples.
+        g.client.prepare_shadows(&mut *r.gpu);
     }
-    r.list
-        .push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
+    let mut world = std::mem::take(&mut r.world_list);
+    world.clear();
+    world.push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
     if let Some(g) = &mut r.game {
         let worn = g.client.worn();
         let held = g.client.held().item;
         g.client
             .entity_render
             .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
-        g.client.render(&mut *r.gpu, &mut r.list, info, &r.textures);
+        g.client.render(&mut *r.gpu, &mut world, info, &r.textures);
+        // The shadow map once the models are posed, ahead of the world's pass that samples it.
+        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
     }
-    r.list.push(Cmd::EndPass);
+    world.push(Cmd::EndPass);
+    r.list.append(&mut world);
+    r.world_list = world;
     if post {
         let scene = r
             .game
