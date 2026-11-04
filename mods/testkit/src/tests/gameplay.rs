@@ -1862,18 +1862,28 @@ pub async fn spawn_eggs(t: T) -> R {
     Ok(())
 }
 
+/// The address a `weft --server` in `dir` hosts its world at, once it does: its log's "hosting
+/// '<world>' at chiacraft://w/..." line. Servers host over the p2p network (iroh), so there is
+/// no port to connect to (`--port` was Weft's TCP); a game joins by this address.
+fn hosting_address(dir: &str) -> Option<String> {
+    let log = std::fs::read_to_string(format!("{dir}/logs/latest.log")).ok()?;
+    log.lines()
+        .filter(|l| l.contains("hosting '"))
+        .find_map(|l| l.find("chiacraft://w/").map(|i| l[i..].split_whitespace().next().unwrap_or("").to_string()))
+        .filter(|a| a.len() > "chiacraft://w/".len())
+}
+
 /// With every other mod turned off the game still starts, whatever they brought (no mod but this
 /// one has settings of its own to lean on).
 pub async fn base_alone(t: T) -> R {
     use std::io::Write;
-    let port = 30000 + (std::process::id() % 20000) as u16 + 1;
     let dir = format!("{}/test-base-alone", t.c().run_dir());
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(format!("{dir}/config")).map_err(|e| e.to_string())?;
     std::fs::write(format!("{dir}/config/disabled_mods.txt"), "testkit\ntestmod").map_err(|e| e.to_string())?;
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut server = std::process::Command::new(exe)
-        .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
+        .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--run-dir", &dir])
         .args(crate::package_args())
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::null())
@@ -1881,7 +1891,7 @@ pub async fn base_alone(t: T) -> R {
         .spawn()
         .map_err(|e| e.to_string())?;
     let up = t
-        .until("the game up with only base", Duration::from_secs(30), |_| std::net::TcpStream::connect(("127.0.0.1", port)).is_ok())
+        .until("the game up with only base", Duration::from_secs(30), |_| hosting_address(&dir).is_some())
         .await;
     if up.is_err() {
         let _ = server.kill();
@@ -1911,7 +1921,6 @@ pub async fn dedicated_server(t: T) -> R {
             let _ = self.0.kill();
         }
     }
-    let port = 30000 + (std::process::id() % 20000) as u16;
     let dir = format!("{}/test-server", t.c().run_dir());
     let _ = std::fs::remove_dir_all(&dir);
     static SPARKS: Config<u32> = Config::named("testmod:wisp_sparks");
@@ -1919,11 +1928,15 @@ pub async fn dedicated_server(t: T) -> R {
     std::fs::create_dir_all(format!("{dir}/config")).map_err(|e| e.to_string())?;
     std::fs::write(format!("{dir}/config/testmod.txt"), format!("wisp_sparks = {}\n", own_sparks + 3)).map_err(|e| e.to_string())?;
     let start = || -> Result<Child, String> {
+        // A log from an earlier start would give its address before this one hosts.
+        let _ = std::fs::remove_file(format!("{dir}/logs/latest.log"));
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         std::process::Command::new(exe)
-            .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
+            .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--run-dir", &dir])
             .args(crate::package_args())
-            .args(crate::package_args())
+            // The test-only mods too (testmod, whose setting this checks): the server needs the
+            // joining game's code mods, and only `--test` games load them by themselves.
+            .args(["--mods", &format!("{dir}/test-mods")])
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -1931,14 +1944,11 @@ pub async fn dedicated_server(t: T) -> R {
             .map(Child)
             .map_err(|e| e.to_string())
     };
-    let listening = |t: &T| {
-        let _ = t;
-        std::net::TcpStream::connect(("127.0.0.1", port)).is_ok()
-    };
+    let hosting = |_: &T| hosting_address(&dir).is_some();
     let mut server = start()?;
-    t.until("the server listening", Duration::from_secs(30), listening)
+    t.until("the server hosting", Duration::from_secs(30), hosting)
         .await?;
-    t.c().join(&format!("127.0.0.1:{port}"));
+    t.c().join(&hosting_address(&dir).ok_or("no address")?);
     t.until("joined by address", Duration::from_secs(30), |t| t.flag(client::client_flags::JOINED))
         .await?;
     t.loaded().await?;
@@ -1952,6 +1962,13 @@ pub async fn dedicated_server(t: T) -> R {
     t.secs(0.5).await?;
     let allowed = t.cmd("/time query").await?;
     t.check(allowed.contains("time is"), format!("op from the console: {allowed}"));
+    // Operators always get in, past the allow list too (admission's `verdict`): `deop` makes
+    // the player an ordinary one again, whom the whitelist below keeps out.
+    writeln!(console, "deop {}", NAME.get()).map_err(|e| e.to_string())?;
+    let _ = console.flush();
+    t.secs(0.5).await?;
+    let refused_again = t.cmd("/time query").await?;
+    t.check(!refused_again.contains("time is"), format!("deop from the console: {refused_again}"));
     t.c().leave_world();
     t.screen("core:title").await?;
     t.check_eq(SPARKS.get(), own_sparks, "the player's own setting after leaving");
@@ -1965,9 +1982,9 @@ pub async fn dedicated_server(t: T) -> R {
     std::fs::write(format!("{dir}/config/whitelist.txt"), "somebody else\n").map_err(|e| e.to_string())?;
     std::fs::write(format!("{dir}/config/disabled_mods.txt"), "").map_err(|e| e.to_string())?;
     let _server = start()?;
-    t.until("the server listening again", Duration::from_secs(30), listening)
+    t.until("the server hosting again", Duration::from_secs(30), hosting)
         .await?;
-    t.c().join(&format!("127.0.0.1:{port}"));
+    t.c().join(&hosting_address(&dir).ok_or("no address")?);
     t.screen("core:message").await?;
     t.check(!t.flag(client::client_flags::IN_WORLD), "not on the whitelist, not in");
     t.c().close_screen();

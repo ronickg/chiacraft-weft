@@ -219,6 +219,17 @@ pub fn server_values() -> std::sync::Arc<ServerValues> {
     ))
 }
 
+/// The values of the server this game's player is playing in, when it runs in this process:
+/// the synced settings the game changes (a mod, the settings screen) go to it too, or the host's
+/// changes would never reach the world or its other players. None while on a remote server or
+/// visiting another world (a visited world's rules must not reach home).
+static PLAYING: Mutex<Option<std::sync::Arc<ServerValues>>> = Mutex::new(None);
+
+/// The player is now in the world whose server keeps `v` (None: no world run here).
+pub fn playing_in(v: Option<std::sync::Arc<ServerValues>>) {
+    *PLAYING.lock().unwrap() = v;
+}
+
 /// This thread reads and writes the synced settings in `v` from now on (`None`: the game's).
 pub fn for_thread(v: Option<std::sync::Arc<ServerValues>>) {
     SERVER.with(|s| *s.borrow_mut() = v);
@@ -291,6 +302,12 @@ pub fn put(id: u32, v: f64) {
         let bits = d.fit(v).to_bits();
         if slot.swap(bits, Ordering::Relaxed) != bits {
             GENERATION.fetch_add(1, Ordering::Relaxed);
+        }
+        if d.synced()
+            && let Some(server) = PLAYING.lock().unwrap().as_ref()
+            && let Some(s) = server.0.get(id as usize)
+        {
+            s.store(bits, Ordering::Relaxed);
         }
     }
 }
