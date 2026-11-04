@@ -47,7 +47,8 @@ fn shade(in: VOut) -> vec4<f32> {
         // Fullbright particles (sparks, flames) glow.
         color = vec4(color.rgb * 1.5, color.a);
     }
-    return vec4(display(haze(color.rgb, in.rel)), color.a);
+    let sky = select(1.0, unpack_light(in.data.w).x, in.data.w != 0xffffffffu);
+    return vec4(display(haze_lit(color.rgb, in.rel, sky)), color.a);
 }
 
 @fragment

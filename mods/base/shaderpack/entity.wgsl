@@ -15,6 +15,8 @@ struct VOut {
     @location(8) rel: vec3<f32>,
     // 1 where the world lights it (not on a screen, not a gizmo).
     @location(9) @interpolate(flat) graded: u32,
+    // Sky light where it is (0..1): fog gathers only out under the sky.
+    @location(10) @interpolate(flat) sky: f32,
 }
 
 var<private> NORMAL: array<vec3<f32>, 6> = array<vec3<f32>, 6>(
@@ -131,6 +133,7 @@ fn box_vertex(b: Box, v: u32) -> VOut {
     var lit = vec3(1.0);
     let world_lit = b.ids.y != BOX_MODE_SOLID && b.ids.y != BOX_MODE_FILLED && b.ids2.y != 0xffffffffu;
     out.graded = select(0u, 1u, world_lit);
+    out.sky = select(1.0, unpack_light(b.ids2.y).x, world_lit);
     if world_lit {
         lit = lightmap(unpack_light(b.ids2.y), scene.params.z, scene.light.x, scene.light.y);
     }
@@ -169,7 +172,7 @@ fn vs_hand_item(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32
 
 fn fog(in: VOut, rgb: vec3<f32>) -> vec3<f32> {
     if in.graded != 0u {
-        return display(haze(rgb, in.rel));
+        return display(haze_lit(rgb, in.rel, in.sky));
     }
     let f = fog_amount(in.dist, scene.params.x, scene.params.y);
     return mix(rgb, scene.fog_color.rgb, f);

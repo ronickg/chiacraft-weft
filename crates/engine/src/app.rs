@@ -2641,7 +2641,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
     }
     r.list.push(Cmd::EndPass);
     if post {
-        r.post.apply(&mut *r.gpu, &mut r.list, info);
+        let scene = r.game.as_ref().and_then(|g| g.client.scene_buffer(info.slot));
+        r.post.apply(&mut *r.gpu, &mut r.list, info, scene);
     } else {
         // The UI pipeline has no depth, so it cannot draw in a pass that has one.
         r.list

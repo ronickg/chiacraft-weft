@@ -796,6 +796,9 @@ bindings! {
     }
     post "post.wgsl" {
         PASSES "passes": "array<Pass>",
+        // The frame the world was drawn with (all zero without one): where the sun is on the
+        // screen, the weather, for effects such as light shafts.
+        SCENE "scene": "Scene",
     }
 }
 

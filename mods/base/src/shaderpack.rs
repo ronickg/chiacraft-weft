@@ -55,6 +55,25 @@ pub fn register_for_scripts(r: &mut Registry) {
     });
 }
 
+/// The pack's light shafts (`assets/shaders/post/shafts.wgsl`, a screen effect: packs cannot
+/// add passes): on while chiacraft's pack is the one chosen, off with any other or none.
+pub fn register_shafts(r: &mut Registry) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static ON: AtomicBool = AtomicBool::new(false);
+    r.client_frame(|c| {
+        // Out of a world: turned on again at the next join.
+        if c.state().flags & weft_sdk::client::client_flags::JOINED == 0 {
+            ON.store(false, Ordering::Relaxed);
+            return;
+        }
+        let want = SHADER_PACK.get() == ID;
+        if ON.swap(want, Ordering::Relaxed) != want {
+            let known = c.post_effect("shafts", if want { 1.0 } else { 0.0 });
+            weft_sdk::info!("light shafts {}{}", if want { "on" } else { "off" }, if known { "" } else { " (no such effect)" });
+        }
+    });
+}
+
 pub fn register(r: &mut Registry) {
     static ONCE: Once = Once::new();
     // After the join: a reload before it hung the GPU (the engine now holds one back itself).

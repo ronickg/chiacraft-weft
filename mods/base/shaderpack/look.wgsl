@@ -255,7 +255,7 @@ fn fog_light(dir: vec3<f32>) -> vec3<f32> {
     let mu = dot(dir, light_dir());
     let g = 0.6;
     let hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566;
-    let phase = hg * 6.0 + 0.25;
+    let phase = hg * 2.5 + 0.3;
     // Droplets are white, snow whiter, dust the color of sand.
     let tint = mix(mix(vec3(0.9), vec3(1.0, 1.0, 1.03), scene.ground.y), vec3(0.95, 0.68, 0.42), scene.ground.z);
     return ((p.ambient * 1.25 + p.horizon * 0.2) + p.sun * light_strength() * phase) * 0.9 * tint;

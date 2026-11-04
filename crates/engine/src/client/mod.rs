@@ -2351,6 +2351,11 @@ impl Client {
     }
 
     /// Linear rgb, and in w how hard it rains (0..1) for shader packs.
+    /// The buffer this frame's world was drawn with (`gpu_layout::Scene`), once it was.
+    pub fn scene_buffer(&self, slot: usize) -> Option<weft_render::BufferId> {
+        self.scene_bufs.get(slot).copied()
+    }
+
     pub fn fog_color(&self) -> [f32; 4] {
         self.fog_linear().extend(self.rain.clamp(0.0, 1.0)).to_array()
     }

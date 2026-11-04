@@ -140,6 +140,9 @@ A file replaces its shader completely and the ones a pack doesn't have stay as t
 ### What the frame knows
 Every shader's prelude has `scene`: `fog_color` (linear rgb, and in `w` how hard it rains, 0 to 1), `params` (x and y where the fog starts and ends, z the daylight from 0 to 1, w seconds), `light` (x the dimension's ambient light, y the Brightness setting, z game ticks), `sun` (below), `weather` (x and y the wind where the player is along the world's x and z, in m/s the way it blows, z how foggy it is there from 0 to 1, w how hard it thunders; still and clear unless a mod sets the air with `World::set_air`) `eye` (the camera in the world, x and z wrapped every 8192 blocks) and `ground` (x the snow lying where the player is from 0 to 1, y how much of what falls is snow, z how much dust blows).
 
+### Screen effects
+A screen effect (`shaders/post/<name>.wgsl`, `fn apply(p: PostPixel) -> vec4<f32>`, turned on by a mod with `Client::post_effect`) reads the picture so far through `p.scene` and also gets `scene`, the frame the world was drawn with: `scene.view_proj * vec4(scene.sun.xyz * 1000.0, 1.0)` puts the sun on the screen, as the base game's light shafts do (`mods/base/assets/shaders/post/shafts.wgsl`). Without a world it is all zeros.
+
 ### Sun shadows
 A pack that wants shadows gets the two things it needs from the world shader's prelude: `scene.sun` (xyz points toward the sun, w is how high it stands, 0 at night and in dimensions without sky) and `solid_at(p: vec3<i32>) -> bool`, which says whether the block at `p` casts a shadow (anything that dims sky light, liquids aside). It knows the blocks about 112 blocks around the camera and answers false beyond them, so march from the pixel toward `scene.sun.xyz` through block cells and stop at the first solid one. The engine only keeps these blocks on the GPU while the chosen pack's `world.wgsl` calls `solid_at`, so packs without shadows pay nothing.
 

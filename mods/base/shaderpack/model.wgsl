@@ -14,6 +14,8 @@ struct VOut {
     @location(6) rel: vec3<f32>,
     // 1 where the world lights it (not in a preview on a screen).
     @location(7) @interpolate(flat) graded: u32,
+    // Sky light where it stands (0..1): fog gathers only out under the sky.
+    @location(8) @interpolate(flat) sky: f32,
 }
 
 var<private> NORMAL: array<vec3<f32>, 6> = array<vec3<f32>, 6>(
@@ -92,6 +94,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     }
     let flash = select(mix(vec3(1.0), vec3(1.0, 0.4, 0.4), inst.hurt), vec3(2.0), inst.hurt < 0.0);
     out.graded = select(0u, 1u, inst.light != 0xffffffffu);
+    out.sky = select(1.0, unpack_light(inst.light).x, inst.light != 0xffffffffu);
     if inst.light != 0xffffffffu {
         // The pack's light; no traced shadow here, the sky light stands in for it.
         let l = unpack_light(inst.light);
@@ -118,7 +121,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     if in.graded != 0u {
-        return vec4(display(haze(c.rgb, in.rel)), 1.0);
+        return vec4(display(haze_lit(c.rgb, in.rel, in.sky)), 1.0);
     }
     let f = fog_amount(in.dist, scene.params.x, scene.params.y);
     return vec4(mix(c.rgb, scene.fog_color.rgb, f), 1.0);
