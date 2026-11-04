@@ -177,8 +177,108 @@ def sheet(names, scale=6, bg=(26, 19, 19)):
     return s
 
 
+# ---------------------------------------------------------------- the kit
+
+SRC = os.path.join(HERE, "px", "src")
+GUI = os.path.join(HERE, "..", "..", "assets", "textures", "gui")
+
+
+def src(name, i=0, toned=True):
+    a = load(os.path.join(SRC, name + ".png"))
+    ps = parts(a)
+    a = crop(a, ps[i])
+    return tone(a) if toned else a
+
+
+GOLD1 = ((255, 221, 32),)
+GOLD2 = ((255, 221, 32), (243, 171, 31))
+
+
+def ring(a, colors=GOLD2):
+    """Only the gold rim of `glow`, the inside transparent: an overlay for the hovered slot."""
+    g = glow(a, colors)
+    out = np.zeros_like(g)
+    m = a[..., 3] > 0
+    ring_m = m.copy()
+    for _ in colors:
+        pad = np.pad(ring_m, 1)
+        ring_m = ring_m & pad[2:, 1:-1] & pad[:-2, 1:-1] & pad[1:-1, 2:] & pad[1:-1, :-2]
+    edge = m & ~ring_m
+    out[edge] = g[edge]
+    return out
+
+
+def red(a):
+    """The quit button: the main button turned brick red."""
+    return hsv_map(a, lambda h, s, v: (0.01, min(1.0, s * 1.05), v * 0.9) if s > 0.25 else (h, s, v))
+
+
+def build():
+    """Every engine part (the names `docs/ui.md`, "Looks", gives) from the kit's sources, into
+    `px/` as NAME.png + NAME.gui at two image pixels a GUI pixel."""
+    out = {}
+
+    def put(name, a, border=None, scaling=None, extra=()):
+        save(name, a, border, scaling)
+        if extra:
+            with open(os.path.join(OUT, name + ".gui"), "a") as f:
+                f.write("\n".join(extra) + "\n")
+        out[name] = a
+
+    slot = fit9(src("c_slot"), 36, 36, 4)
+    put("slot", slot, 4, extra=["icon = 16"])
+    put("recipe_slot", disabled(slot), 4, extra=["icon = 16"])
+    put("slot_highlight", ring(slot), 4)
+    hot = fit9(src("c_hotbar", 0), 36, 36, 5)
+    put("hotbar", hot, 5, extra=["icon = 16"])
+    put("hotbar_selected", fit9(src("c_hotbar", 1, toned=False), 40, 40, 7), 7)
+    put("advancement_tile", slot, 4)
+    put("advancement_tile_done", glow(slot, GOLD1), 4)
+    panel = src("c_panel")
+    for n in ("panel", "sidebar", "news"):
+        put(n, panel, 9)
+    put("well", fit9(src("c_small", 2), 32, 24, 4), 4)
+    put("tooltip", fit9(src("c_small", 3), 32, 24, 3), 3)
+    btn = fit9(src("c_buttons", 0), 64, 20, 5)
+    put("button", btn, 5)
+    put("button_hover", glow(brighter(btn, 1.08), GOLD1), 5)
+    put("button_pressed", pressed(btn), 5)
+    put("button_disabled", disabled(btn), 5)
+    q = red(btn)
+    put("button_quit", q, 5)
+    put("button_quit_hover", glow(brighter(q, 1.1), GOLD1), 5)
+    put("button_quit_pressed", pressed(q), 5)
+    field = fit9(src("c_small", 3), 64, 18, 3)
+    put("input", field, 3)
+    put("input_focused", glow(field, GOLD1), 3)
+    put("scrollbar", fit9(src("c_small", 3), 12, 40, 3), 3)
+    handle = fit9(src("c_buttons", 1), 12, 28, 4)
+    put("scrollbar_handle", handle, 4)
+    put("scrollbar_handle_hover", glow(brighter(handle, 1.1), GOLD1), 4)
+    put("slider", fit9(src("c_controls", 4), 62, 9, 3), 3)
+    knob = src("c_knob")
+    put("slider_knob", knob, scaling="stretch")
+    put("slider_knob_hover", glow(brighter(knob, 1.1), GOLD1), scaling="stretch")
+    return out
+
+
+def install(names=None):
+    """Copies `px/` over `assets/textures/gui/` (the engine's names), PNG and .gui."""
+    import shutil
+    for f in sorted(os.listdir(OUT)):
+        stem, ext = os.path.splitext(f)
+        if ext in (".png", ".gui") and (names is None or stem in names):
+            shutil.copy(os.path.join(OUT, f), os.path.join(GUI, f))
+
+
 if __name__ == "__main__":
-    if sys.argv[1] == "parts":
+    if sys.argv[1] == "build":
+        made = build()
+        sheet(sorted(made)).save(os.path.join(OUT, "_sheet.png"))
+        print(len(made), "parts in", OUT)
+    elif sys.argv[1] == "install":
+        install()
+    elif sys.argv[1] == "parts":
         a = load(sys.argv[2])
         for i, b in enumerate(parts(a)):
             print(i, "box", b, "size", b[3] - b[1], "x", b[2] - b[0])
