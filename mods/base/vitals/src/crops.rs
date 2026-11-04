@@ -37,6 +37,10 @@ pub struct Crop {
     /// A stem's fruit (pumpkin, melon): ripe, it sets this block on soil beside it in its season,
     /// again and again, instead of being harvested itself.
     pub fruit: Option<&'static str>,
+    /// The first age it stands two blocks tall (maize, sorghum, millet: Ronald, 11-04, "Yes, two
+    /// blocks" for their last two stages): from then on its upper half is a block of its own,
+    /// `<block>_top`, that breaks with it.
+    pub tall: Option<u32>,
 }
 
 /// The chance broken tall grass gives a seed of one of its biome's crops (wheat's own is an
@@ -74,7 +78,7 @@ pub const CROPS: [Crop; 14] = [
     c("base:carrots", "base:carrot", "base:carrot", (1, 3), 3, Soil::Tires, COOL),
     c("base:potatoes", "base:potato", "base:potato", (1, 3), 3, Soil::Tires, COOL),
     c("base:beetroots", "base:beetroot", "base:beetroot", (1, 2), 3, Soil::Tires, COOL),
-    c("base:maize", "base:maize_seeds", "base:corn", (1, 2), 3, Soil::Tires, &["base:plains", "base:forest", "base:savanna"]),
+    c("base:maize", "base:maize_seeds", "base:corn", (1, 2), 3, Soil::Tires, &["base:plains", "base:forest", "base:savanna"]).tall(2),
     c("base:paddy_rice", "base:rice_seeds", "base:rice_seeds", (1, 3), 3, Soil::Tires, &["base:swamp", "base:savanna"]),
     c(
         "base:beans",
@@ -85,8 +89,8 @@ pub const CROPS: [Crop; 14] = [
         Soil::Feeds,
         &["base:plains", "base:forest", "base:savanna", "base:mountains"],
     ),
-    c("base:sorghum", "base:sorghum_seeds", "base:sorghum", (1, 1), 3, Soil::Tires, &["base:savanna", "base:plains", "base:desert"]),
-    c("base:millet", "base:millet_seeds", "base:millet", (1, 1), 3, Soil::Tires, &["base:savanna", "base:desert"]),
+    c("base:sorghum", "base:sorghum_seeds", "base:sorghum", (1, 1), 3, Soil::Tires, &["base:savanna", "base:plains", "base:desert"]).tall(2),
+    c("base:millet", "base:millet_seeds", "base:millet", (1, 1), 3, Soil::Tires, &["base:savanna", "base:desert"]).tall(2),
     c("base:cassava", "base:cassava", "base:cassava", (1, 3), 3, Soil::Tires, &["base:savanna", "base:swamp"]),
     // Stems that set their fruit beside them (ECOLOGY.md, the research's pumpkin and melon):
     // pumpkins in the prairie's, the forest's and the llanos' fields, melons where it's hot.
@@ -103,12 +107,24 @@ const fn c(
     soil: Soil,
     wild: &'static [&'static str],
 ) -> Crop {
-    Crop { block, seed, gives, count, ripe, soil, wild, fruit: None }
+    Crop { block, seed, gives, count, ripe, soil, wild, fruit: None, tall: None }
 }
 
 /// A stem: sown from its seed, picked it gives the seed back, ripe it sets `fruit` beside it.
 const fn stem(block: &'static str, seed: &'static str, fruit: &'static str, wild: &'static [&'static str]) -> Crop {
-    Crop { block, seed, gives: seed, count: (1, 1), ripe: 3, soil: Soil::Tires, wild, fruit: Some(fruit) }
+    Crop { block, seed, gives: seed, count: (1, 1), ripe: 3, soil: Soil::Tires, wild, fruit: Some(fruit), tall: None }
+}
+
+impl Crop {
+    /// Two blocks tall from age `from` on (`Crop::tall`).
+    const fn tall(self, from: u32) -> Crop {
+        Crop { tall: Some(from), ..self }
+    }
+
+    /// Two blocks tall at `age`.
+    pub fn tall_at(&self, age: u32) -> bool {
+        self.tall.is_some_and(|t| age >= t)
+    }
 }
 
 /// The crop that grows as this block.

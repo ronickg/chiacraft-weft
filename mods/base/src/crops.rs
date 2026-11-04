@@ -131,12 +131,15 @@ fn crop(r: &mut Registry, c: &'static Crop) {
             }
             // A stem grows in any season; the others' last step waits for their ripening one.
             let last = c.fruit.is_none() && age + 1 == ripe;
-            growth::grow(e, c.block, last, |e| growth::next_age(e, ripe))
+            growth::grow(e, c.block, last, |e| grow_up(e, c))
         });
     // Paddy rice stands by water.
     let b =
         if vitals::plants::of(c.block).is_some_and(|p| p.water == vitals::plants::Water::Wet) { b.needs_near_support("#water") } else { b };
     drop(b);
+    if let Some(from) = c.tall {
+        top(r, c, from);
+    }
     let ripe_state: &'static str = Box::leak(format!("age={ripe}").into_boxed_str());
     let loot = r
         .loot(block)
@@ -155,6 +158,57 @@ fn crop(r: &mut Registry, c: &'static Crop) {
             ),
         );
     }
+}
+
+/// A tall crop's upper half (`vitals::crops::Crop::tall`): its stages' tops, standing on the crop
+/// itself, so breaking the crop takes it (it loses its support, and drops nothing). Broken by a
+/// player, it breaks the crop below as that player did, so the harvest drops once, as from the
+/// crop.
+fn top(r: &mut Registry, c: &'static Crop, from: u32) {
+    let name = short(c.block);
+    let look = texture(name);
+    let stalk = format!("{name}_stalk");
+    r.tag(&stalk, &[name]);
+    drop(
+        r.block(Block::generated(format!("{name}_top")))
+            .sound_group("grass")
+            .prop("age", from..=c.ripe)
+            .states(move |p, s| s.texture(&format!("{look}_stage_{}_top", p.get("age"))))
+            .plant()
+            .needs_below(&format!("#{stalk}"))
+            .no_item()
+            .on_broken(|w, b| {
+                if b.player == 0 {
+                    return;
+                }
+                let below = [b.pos[0], b.pos[1] - 1, b.pos[2]];
+                let tool = if b.item == 0 { ItemStack::EMPTY } else { ItemStack::new(b.item, 1) };
+                w.break_block(below, tool, b.player, !w.creative(b.player));
+            }),
+    );
+}
+
+/// A crop's next stage. A tall crop (`Crop::tall`) growing into its two-block stages sets or
+/// turns its top first, and waits while something stands above it.
+fn grow_up(e: &mut BlockEvent, c: &Crop) {
+    let next = growth::age(e) + 1;
+    if next > c.ripe {
+        return;
+    }
+    if c.tall_at(next) {
+        let w = e.world();
+        let [x, y, z] = e.pos();
+        let above = [x, y + 1, z];
+        let Some(top) = Block::lookup(&format!("{}_top", c.block)) else { return };
+        let here = w.get(above);
+        if here == 0 {
+            w.set(above, top);
+        } else if block_name(here).split('[').next() != block_name(top).split('[').next() {
+            return;
+        }
+        w.set_prop(above, "age", &next.to_string());
+    }
+    growth::next_age(e, c.ripe)
 }
 
 /// A ripe stem's fruit, set on an empty block beside it that stands on soil, unless one already
