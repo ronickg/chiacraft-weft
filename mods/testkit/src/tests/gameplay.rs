@@ -1425,10 +1425,17 @@ pub async fn respawn(t: T) -> R {
         let health: f32 = t.op("health").await?.parse().unwrap_or(0.0);
         t.check((health - back).abs() < 0.2, format!("health at the arrival meal's max: {health}, want {back}"));
     }
-    // The vitals still run after respawning: eating raises max health again.
+    // The vitals still run after respawning: an empty stomach lowers max health and eating raises
+    // it again. (`/feed` sets the stomach to an apple, a loaf and a steak, whose max health is
+    // under the arrival meal's 90 since the meal grew (Ronald, "Bigger arrival meal"), so it
+    // empties it first.)
     let arrival = vitals::stomach::max_health_stamina(100.0, 100.0, &vitals::stomach::arrival(), 100.0).0 / base_api::HEALTH_SCALE;
+    t.cmd("/feed 0").await?;
+    t.until("weaker with an empty stomach", Duration::from_secs(5), |t| max_health(t) < arrival - 0.5)
+        .await?;
+    let empty = max_health(&t);
     t.cmd("/feed 60").await?;
-    t.until("stronger once fed", Duration::from_secs(5), |t| max_health(t) > arrival + 0.5)
+    t.until("stronger once fed", Duration::from_secs(5), move |t| max_health(t) > empty + 0.5)
         .await
 }
 
