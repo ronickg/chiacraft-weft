@@ -45,11 +45,14 @@ pub fn turned(foot: [i32; 3], logs: &[[i32; 3]], d: [i32; 2]) -> Vec<Option<([i3
         .max()
         .unwrap_or(0)
         .max(0);
+    // With other logs at the foot's height (a 2 x 2's, a disc) they lie first, past the edge;
+    // a trunk of one lies from the stump on, where its chopped foot was.
+    let first = if logs.iter().any(|p| p[1] == foot[1]) { far + 1 } else { 0 };
     logs.iter()
         .map(|&p| {
             let (a, h) = (along(p), p[1] - foot[1]);
             // Up becomes along the fall past the edge; along the fall becomes down from it.
-            let (a2, up) = (far + 1 + h, far - a);
+            let (a2, up) = (first + h, far - a);
             if up < 0 {
                 return None;
             }
@@ -169,11 +172,11 @@ mod tests {
 
     #[test]
     fn a_tree_turns_a_quarter_over_its_far_edge() {
-        // A trunk of 3 over a chopped foot, falling toward +x: it lies from x 1 on, at the
-        // foot's height, in the order it stood.
+        // A trunk of 3 over a chopped foot, falling toward +x: it lies from x 1 on (next to the
+        // stump), at the foot's height, in the order it stood.
         let trunk = [[0, 1, 0], [0, 2, 0], [0, 3, 0]];
         let lying = turned([0, 0, 0], &trunk, [1, 0]);
-        assert_eq!(lying, vec![Some(([2, 0, 0], 1)), Some(([3, 0, 0], 2)), Some(([4, 0, 0], 3))]);
+        assert_eq!(lying, vec![Some(([1, 0, 0], 1)), Some(([2, 0, 0], 2)), Some(([3, 0, 0], 3))]);
         // A 2 x 2 falling toward -z: its far edge is z -1, its near column lies a block up.
         let pair = [[0, 0, -1], [0, 1, 0], [0, 1, -1]];
         let lying = turned([0, 0, 0], &pair, [0, -1]);
@@ -183,7 +186,7 @@ mod tests {
         // A low branch on the far side would turn into the ground: it has no place.
         assert_eq!(turned([0, 0, 0], &[[2, 1, 0]], [1, 0]), vec![None]);
         // Across the fall stays.
-        assert_eq!(turned([0, 0, 0], &[[0, 2, 1]], [1, 0])[0], Some(([3, 0, 1], 2)));
+        assert_eq!(turned([0, 0, 0], &[[0, 2, 1]], [1, 0])[0], Some(([2, 0, 1], 2)));
     }
 
     #[test]
