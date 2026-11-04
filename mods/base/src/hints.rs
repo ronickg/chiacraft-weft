@@ -220,6 +220,11 @@ fn client(r: &mut Registry) {
     r.client_frame(|c| {
         let mut q = QUEUE.lock().unwrap();
         let Some((key, args, at)) = q.front_mut() else { return };
+        // Not over a screen (it ran across the inventory's grid): a hint not yet shown waits
+        // until the screen closes.
+        if !c.screen().is_empty() {
+            return;
+        }
         let since = at.get_or_insert_with(Instant::now).elapsed().as_secs_f32();
         if since > SHOW_SECS {
             q.pop_front();
