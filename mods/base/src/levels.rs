@@ -204,23 +204,58 @@ fn tombstone_block(r: &mut Registry) {
         });
 }
 
-/// A stat's value as the screen shows it.
-fn shown(stat: Stat, value: f32) -> String {
+/// A stat's value as a number alone, its unit in a column of its own (`unit_key`), so the
+/// numbers line up on their right edge.
+fn number(stat: Stat, value: f32) -> String {
     match stat {
-        Stat::Damage | Stat::Speed => format!("{:.0}%", value * 100.0),
-        Stat::Weight => format!("{value:.0} kg"),
-        Stat::Fortitude => format!("+{value:.0}"),
-        Stat::Food => format!("{value:.0} u"),
+        Stat::Damage | Stat::Speed => format!("{:.0}", value * 100.0),
         _ => format!("{value:.0}"),
     }
 }
+
+/// A stat's unit, a translation key (empty for none).
+fn unit_key(stat: Stat) -> &'static str {
+    match stat {
+        Stat::Damage | Stat::Speed => "levels.base.unit.percent",
+        Stat::Weight => "levels.base.unit.kg",
+        Stat::Food => "levels.base.unit.units",
+        _ => "",
+    }
+}
+
+/// Points placed on the stats screen and not kept yet (Ronald's round 2: "see a point before you
+/// keep it", as Elden Ring and Baldur's Gate 3 do). This client's only: Keep sends them, Undo
+/// drops them.
+static PENDING: Mutex<[u16; vitals::stats::STATS]> = Mutex::new([0; vitals::stats::STATS]);
+
+/// The points waiting, none if there are more than the points left to place (after a death).
+fn pending(v: &base_api::Vitals) -> [u16; vitals::stats::STATS] {
+    let p = *PENDING.lock().unwrap();
+    if p.iter().map(|&n| n as u32).sum::<u32>() > unspent(v) { [0; vitals::stats::STATS] } else { p }
+}
+
+/// The vitals as they would be with the waiting points placed.
+fn after(v: &base_api::Vitals) -> base_api::Vitals {
+    let mut a = *v;
+    for (i, n) in pending(v).into_iter().enumerate() {
+        a.points[i] += n;
+    }
+    a
+}
+
+/// The stats screen's columns after the bar (GUI pixels): the value now (right-aligned), its unit,
+/// the value after the waiting points (right-aligned), the points waiting (centred).
+const NOW_W: f32 = 18.0;
+const UNIT_W: f32 = 16.0;
+const AFTER_W: f32 = 18.0;
+const WAITING_W: f32 = 8.0;
 
 /// Level ups waiting to show, the first with the moment it appeared.
 static BANNERS: Mutex<Vec<(u32, Option<Instant>)>> = Mutex::new(Vec::new());
 
 /// The stats screen's bars (the kit's `stat_<name>`, 150 x 12 pixels) in GUI pixels, and the
 /// points that fill one: a bar shows the points placed in a stat.
-const STAT_BAR: (f32, f32) = (75.0, 6.0);
+const STAT_BAR: (f32, f32) = (60.0, 6.0);
 const POINTS_FULL: f32 = 20.0;
 /// A stat's bar with no points placed: a third full, so it reads as the stat, growing with points.
 const BAR_BASE: f32 = 0.3;
@@ -264,7 +299,8 @@ fn client(r: &mut Registry) {
                         ui.panel("chip_points", S::row().pad(2.0), |ui| {
                             ui.text_bind_styled(S::default().no_wrap(), |c, t| {
                                 let Some(v) = c.component(&VITALS) else { return };
-                                t.set("levels.base.points", &[Arg::Int(unspent(&v) as i64)]);
+                                let waiting: u32 = pending(&v).iter().map(|&n| n as u32).sum();
+                                t.set("levels.base.points", &[Arg::Int((unspent(&v) - waiting) as i64)]);
                             });
                         });
                     });
@@ -283,33 +319,68 @@ fn client(r: &mut Registry) {
                 });
             });
             ui.column(S::col().gap(2.0), |ui| {
+                // The header in the rows' columns: "now" over the values, "after" over what the
+                // waiting points make of them, each lined up as its values are (right).
+                ui.row(S::row().gap(4.0), |ui| {
+                    ui.row(S::row().w(8.0 + 4.0 + 40.0 + 4.0 + STAT_BAR.0), |_| {});
+                    ui.row(S::row().w(NOW_W).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "levels.base.now_head", &[]));
+                    ui.row(S::row().w(UNIT_W), |_| {});
+                    ui.row(S::row().w(AFTER_W).end(), |ui| {
+                        ui.text_styled(S::default().class("dim").no_wrap(), "levels.base.after_head", &[])
+                    });
+                });
                 for (i, stat) in stats::ALL.into_iter().enumerate() {
                     ui.row(S::row().gap(4.0).center(), |ui| {
                         ui.image(&format!("base:gui/stat_icon_{}", stat.name()), 8.0, 8.0);
                         ui.text_styled(S::default().w(40.0).no_wrap(), &format!("stat.base.{}", stat.name()), &[]);
-                        ui.row(S::row().size(STAT_BAR.0, STAT_BAR.1), |ui| {
-                            ui.progress_bind(
-                                Box::leak(format!("stat_{}", stat.name()).into_boxed_str()),
-                                S::default().size(STAT_BAR.0, STAT_BAR.1),
-                                move |c| {
-                                    let Some(v) = c.component(&VITALS) else { return -1.0 };
-                                    (2.0 + (BAR_BASE + (1.0 - BAR_BASE) * (v.points[i] as f32 / POINTS_FULL).min(1.0)) * 146.0) / 150.0
-                                },
-                            );
-                            ui.text_bind_styled(
-                                S::default()
-                                    .no_wrap()
-                                    .at_pivot(STAT_BAR.0 - 3.0, STAT_BAR.1 / 2.0, [1.0, 0.5]),
-                                move |c, t| {
-                                    let Some(v) = c.component(&VITALS) else { return };
-                                    t.text(&shown(stat, v.stats()[i]));
-                                },
-                            );
-                        });
-                        ui.row(S::row().w(12.0).end(), move |ui| {
+                        ui.progress_bind(
+                            Box::leak(format!("stat_{}", stat.name()).into_boxed_str()),
+                            S::default().size(STAT_BAR.0, STAT_BAR.1),
+                            move |c| {
+                                let Some(v) = c.component(&VITALS) else { return -1.0 };
+                                BAR_BASE + (1.0 - BAR_BASE) * (v.points[i] as f32 / POINTS_FULL).min(1.0)
+                            },
+                        );
+                        ui.row(S::row().w(NOW_W).end(), move |ui| {
                             ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
                                 let Some(v) = c.component(&VITALS) else { return };
-                                t.text(&v.points[i].to_string());
+                                t.text(&number(stat, v.stats()[i]));
+                            });
+                        });
+                        ui.row(S::row().w(UNIT_W), move |ui| {
+                            let unit = unit_key(stat);
+                            if !unit.is_empty() {
+                                ui.text_styled(S::default().no_wrap(), unit, &[]);
+                            }
+                        });
+                        ui.row(S::row().w(AFTER_W).end(), move |ui| {
+                            ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
+                                let Some(v) = c.component(&VITALS) else { return };
+                                if pending(&v)[i] == 0 {
+                                    return t.text("");
+                                }
+                                t.set("levels.base.after", &[Arg::Text(&number(stat, after(&v).stats()[i]))]);
+                            });
+                        });
+                        ui.button(
+                            "levels.base.minus",
+                            S::default()
+                                .class("button_secondary")
+                                .size(10.0, 9.0)
+                                .pad(0.5)
+                                .tooltip("levels.base.minus_tip"),
+                            move |_| {
+                                let mut p = PENDING.lock().unwrap();
+                                p[i] = p[i].saturating_sub(1);
+                            },
+                        );
+                        ui.row(S::row().w(WAITING_W).center(), move |ui| {
+                            ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
+                                let Some(v) = c.component(&VITALS) else { return };
+                                match pending(&v)[i] {
+                                    0 => t.set("levels.base.waiting_none", &[]),
+                                    n => t.set("levels.base.waiting", &[Arg::Int(n as i64)]),
+                                }
                             });
                         });
                         ui.button(
@@ -319,12 +390,33 @@ fn client(r: &mut Registry) {
                                 .pad(0.5)
                                 .tooltip(&format!("stat.base.{}.desc", stat.name())),
                             move |c| {
-                                c.client().send(&PLACE, &(i as u32));
+                                let Some(v) = c.component(&VITALS) else { return };
+                                let waiting: u32 = pending(&v).iter().map(|&n| n as u32).sum();
+                                if waiting < unspent(&v) {
+                                    PENDING.lock().unwrap()[i] += 1;
+                                }
                             },
                         );
                     });
                 }
             });
+            // Keep sends the waiting points (one place each, as the + used to); Undo drops them.
+            ui.row(S::row().gap(4.0), |ui| {
+                ui.button("levels.base.keep", S::default().min_w(60.0).h(11.0), |c| {
+                    let Some(v) = c.component(&VITALS) else { return };
+                    let p = pending(&v);
+                    *PENDING.lock().unwrap() = [0; vitals::stats::STATS];
+                    for (i, n) in p.into_iter().enumerate() {
+                        for _ in 0..n {
+                            c.client().send(&PLACE, &(i as u32));
+                        }
+                    }
+                });
+                ui.button("levels.base.undo", S::default().class("button_secondary").min_w(44.0).h(11.0), |_| {
+                    *PENDING.lock().unwrap() = [0; vitals::stats::STATS];
+                });
+            });
+            ui.text_styled(S::col().class("dim").max_w(170.0), "levels.base.after_legend", &[]);
             ui.text_bind_styled(S::col().class("dim").max_w(170.0), |c, t| {
                 let (Some(v), Some(me)) = (c.component(&VITALS), c.me()) else { return };
                 t.set("levels.base.now", &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)]);
