@@ -47,23 +47,23 @@ fn lasts(w: &World, id: u64, a: &Animal) -> Option<f32> {
 /// Once a second, from `animal::upkeep` (for those that get hungry): it gets thirstier, `rate`
 /// times as fast out of its comfort; rain on it or wading slakes it a little. Parched, a wild one
 /// loses health (dead in `PARCHED_SECS` at full health).
-pub fn thirst(w: &World, id: u64, a: &Animal, st: &EntityState, rate: f32) {
-    let Some(secs) = lasts(w, id, a) else { return };
+pub fn thirst(w: &World, id: u64, a: &Animal, st: &EntityState, rate: f32, secs: f32) {
+    let Some(lasts) = lasts(w, id, a) else { return };
     let eye = [st.pos[0], st.pos[1] + st.size[2] as f64, st.pos[2]].map(|v| v.floor() as i32);
     let rained = w.sky_light(eye) >= 15 && w.raining_at(eye);
-    let mut t = a.thirst + rate / secs;
+    let mut t = a.thirst + rate / lasts * secs;
     if rained {
-        t -= RAIN;
+        t -= RAIN * secs;
     }
     if st.in_liquid != 0 {
-        t -= WADING;
+        t -= WADING * secs;
     }
     let t = t.clamp(0.0, 1.0);
     if let Some(a) = w.component_mut(id, &ANIMAL) {
         a.thirst = t;
     }
     if t >= 1.0 && !animal::tamed(w, id) {
-        w.damage(id, st.max_health / PARCHED_SECS, 0, damage::STARVE);
+        w.damage(id, st.max_health / PARCHED_SECS * secs, 0, damage::STARVE);
     }
 }
 

@@ -178,11 +178,13 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         // Its body once a second (`comfort.rs`); a tame gets hungry and thirsty, faster out of
         // its comfort, and so does a wild one whose food the world has: a plant eater grazes
         // (`forage.rs`), a hunter with prey at home hunts (`hunt.rs`); both drink (`drink.rs`).
-        if !new && (w.time() + id) % 20 == 0 {
-            let rate = crate::comfort::upkeep(w, id, &a, st);
+        // Far from players it rests and ticks seldom, and catches up the seconds that passed
+        // (`life::seconds_due`).
+        if !new && let Some(secs) = life::seconds_due(w.time(), id, w.tick_elapsed(id)) {
+            let rate = crate::comfort::upkeep(w, id, &a, st, secs);
             if tamed(w, id) || a.species().is_some_and(|s| s.hungry_in_the_wild()) {
-                hunger(w, id, &a, rate);
-                crate::drink::thirst(w, id, &a, st, rate);
+                hunger(w, id, &a, rate, secs);
+                crate::drink::thirst(w, id, &a, st, rate, secs);
             }
         }
         let (health, speed) = factors(w, id, &a);
@@ -390,24 +392,26 @@ fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f3
     }
 }
 
-/// Once a second: a tame or a wild plant eater uses a point of food every so often (its species'
-/// `hunger`, `rate` times as often out of its comfort); it eats from the world (`forage.rs`). A
-/// wild one with an empty stomach starves.
-fn hunger(w: &World, id: u64, a: &Animal, rate: f32) {
+/// Once a second (`secs` of them, far from players): a tame or a wild plant eater uses a point of
+/// food every so often (its species' `hunger`, `rate` times as often out of its comfort); it eats
+/// from the world (`forage.rs`). A wild one with an empty stomach starves.
+fn hunger(w: &World, id: u64, a: &Animal, rate: f32, secs: f32) {
     let Some(s) = a.species() else { return };
     // A wild one with nothing left starves to death in a game day (a tame suffers, never dies:
     // its condition falls instead).
     if a.food == 0 && !tamed(w, id) {
         if let Some(st) = w.entity(id) {
-            w.damage(id, st.max_health / STARVES_SECS, 0, damage::STARVE);
+            w.damage(id, st.max_health / STARVES_SECS * secs, 0, damage::STARVE);
         }
         return;
     }
     let every = ((s.hunger / rate).max(1.0) as u64).max(1);
-    if a.food > 0 && (w.time() / 20) % every == 0 {
-        if let Some(a) = w.component_mut(id, &ANIMAL) {
-            a.food -= 1;
-        }
+    let used = life::steps_in(w.time(), secs, every).min(u16::MAX as u64) as u16;
+    if a.food > 0
+        && used > 0
+        && let Some(a) = w.component_mut(id, &ANIMAL)
+    {
+        a.food = a.food.saturating_sub(used);
     }
 }
 

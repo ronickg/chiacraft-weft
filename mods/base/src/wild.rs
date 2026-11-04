@@ -31,7 +31,8 @@ fn short(block: &'static str) -> &'static str {
 
 pub fn register(r: &mut Registry) {
     // What plants of the bed root in, and what kelp stands on: the bed or kelp under it.
-    r.tag("water_bed", &["#dirt", "#sand", "gravel", "clay"]);
+    // ... and on a reef, its coral (`blocks.rs`, Terrain's reef tops).
+    r.tag("water_bed", &["#dirt", "#sand", "gravel", "clay", "#coral", "coral_rubble"]);
     // What the shore's plants (reeds, cattails, wild rice) root in: soil or a sandy shore.
     r.tag("shore_soil", &["#plant_soil", "#sand"]);
     r.tag("kelp_soil", &["#water_bed", "kelp"]);

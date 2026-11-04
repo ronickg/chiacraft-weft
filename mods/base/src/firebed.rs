@@ -33,7 +33,7 @@ const REACH: f64 = 6.0;
 pub fn register(r: &mut Registry) {
     r.block(&FIRE_BED)
         .sound_group("wood")
-        .texture("fallen_branch")
+        .texture("fire_bed")
         .not_solid()
         .hardness(0.3)
         .needs(2, "")

@@ -373,6 +373,12 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:huckleberry_bush | Bush | Soil | base:huckleberries | 1.0% | mountains |
 | base:chia | Ripens | Sand | base:chia_seeds | 2.0% | desert |
 | base:dwarf_birch | Still | Soil | - | 2.0% | snowy_plains |
+| base:staghorn_coral | Still | Bed | - | 9.0% | coral_reef |
+| base:elkhorn_coral | Still | Bed | - | 6.0% | coral_reef |
+| base:sea_fan | Still | Bed | - | 5.0% | coral_reef |
+| base:finger_coral | Still | Bed | - | 5.0% | coral_reef, lagoon |
+| base:sea_rod | Still | Bed | - | 4.0% | coral_reef, lagoon |
+| base:turtle_grass | Still | Bed | - | 20.0% | lagoon |
 
 ## Food in the world
 
@@ -435,6 +441,7 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | animals:flowering_shrub | leaves | 4 | stays | always there in animals:floodplain, animals:scrubland (spring, summer, autumn), worth 40% of fresh growth |
 | animals:water_lily | water_plants | 5 | stays | always there in animals:floodplain, animals:red_dunes (all year), worth 40% of fresh growth |
 | base:kelp_wrack | water_plants | 4 | stays | always there in base:beach (all year), worth 40% of fresh growth |
+| base:turtle_grass | water_plants | 5 | stays | always there in base:lagoon (all year), worth 40% of fresh growth |
 | animals:rotten_log | insects | 3 | stays | always there in animals:floodplain, animals:fern_forest (all year), worth 40% of fresh growth |
 | base:dune_grass (age 1) | grass | 4 | back to age 0 | base:dune_grass |
 | base:beach_plum_bush (age 3) | fruit | 6 | back to age 1 | base:beach_plum_bush |
