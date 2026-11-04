@@ -62,6 +62,10 @@ pub struct ClientWorld {
     /// lying 0..1, `air_flags`) sorted by biome, and where the wind blows to, degrees clockwise
     /// from north.
     pub air: (Vec<(u32, f32, f32, f32, u32)>, f32),
+    /// Every biome's tint colors as a mod set them (`ToClient::Tints`), biome by biome, one per
+    /// tint kind; none: the content's. `tints_changed` until the renderer took them.
+    pub tints: Option<Vec<u32>>,
+    pub tints_changed: bool,
     /// Dirty cubes whose six neighbors are all known: meshable now. Kept up to date as cubes
     /// come and go, so a frame never walks every dirty cube (tens of thousands while loading).
     ready: FxHashSet<IVec3>,
@@ -165,6 +169,9 @@ impl ClientWorld {
             time: 0,
             rain_in: None,
             air: (Vec::new(), 0.0),
+            tints: None,
+            // A new world (another dimension) starts from the content's colors.
+            tints_changed: true,
             ready: FxHashSet::default(),
             order: Vec::new(),
             order_center: IVec3::ZERO,
@@ -605,6 +612,33 @@ impl ClientWorld {
         }
     }
 
+    /// Every biome's tint colors from now on (`tints`, empty or of the wrong length: the
+    /// content's); every column is blended again.
+    pub fn set_tints(&mut self, tints: Vec<u32>) {
+        let c = content();
+        let ok = !c.biomes.is_empty() && tints.len() == c.biomes.len() * c.tint_kinds.len();
+        let tints = ok.then_some(tints);
+        if tints != self.tints {
+            self.tints = tints;
+            self.tints_changed = true;
+            self.retint_all();
+        }
+    }
+
+    /// Every biome's tint colors, biome by biome: the mod's or the content's.
+    pub fn biome_tints(&self) -> Vec<u32> {
+        let c = content();
+        match &self.tints {
+            Some(t) => t.clone(),
+            None if c.biomes.is_empty() => c.tint_kinds.iter().map(|k| k.1).collect(),
+            None => c
+                .biomes
+                .iter()
+                .flat_map(|b| b.tints.iter().copied())
+                .collect(),
+        }
+    }
+
     pub fn retint_all(&mut self) {
         self.tints_dirty.extend(self.columns.keys().copied());
     }
@@ -653,11 +687,11 @@ impl ClientWorld {
         for gz in 0..W {
             for gx in 0..W {
                 let id = biome_at(gx as i32 - BLEND, gz as i32 - BLEND) as usize;
-                let tints = c
-                    .biomes
-                    .get(id)
-                    .or(c.biomes.first())
-                    .map_or(&defaults[..], |b| &b.tints[..]);
+                let id = if id < c.biomes.len() { id } else { 0 };
+                let tints = match &self.tints {
+                    Some(t) => &t[id * k..(id + 1) * k],
+                    None => c.biomes.get(id).map_or(&defaults[..], |b| &b.tints[..]),
+                };
                 for (t, rgb) in tints.iter().enumerate() {
                     line[gx * k + t] = [rgb >> 16 & 255, rgb >> 8 & 255, rgb & 255];
                 }

@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 68 · ◧ partly built: 19 · □ not built yet: 13 · ◌ planned for later: 6
+■ built and seen working: 68 · ◧ partly built: 20 · □ not built yet: 13 · ◌ planned for later: 6
 
 ## Core next
 
@@ -192,13 +192,14 @@ Code: `mods/base/src`, `mods/base/assets`. Docs: `docs/worldgen.md`, `notes/PLAN
 
 ## Look and feel
 
-One warm pixel style: a copper-bronze UI kit, generated icons, box models painted like illustrations. 5 of 10 parts built.
+One warm pixel style: a copper-bronze UI kit, generated icons, box models painted like illustrations. 5 of 11 parts built.
 
 | | Part | Notes |
 |---|---|---|
 | ■ | Style guide |  |
 | ■ | UI kit in the game | Code: `mods/base/source/ui`. |
 | ■ | Shader pack light: shadows, reflections, rays | In chiacraft's pack (mods/base/shaderpack, its screen effects in mods/base/assets/shaders/post): sun shadows from a 2048 shadow map 80 blocks around the player, cast by blocks (leaves and plants dappled), mobs and the player's own body (in first person too); water that is dark and clear looking down, shows the bottom in the shallows (turquoise there, deep blue further down, from the client's block map), mirrors the sky and the hills toward the horizon (Fresnel, reflect.wgsl), has crossed swells along the wind, a narrow sun path and foam at the shore (checks/water-look.txt); contact shadows in corners and under overhangs (contact.wgsl); light shafts round a low sun and in fog (shafts.wgsl). The engine gives packs the scene's depth and the shadow map (pack.cfg: translucent_depth, sun_shadows). Checked on an RTX 5090 (and an M3 Max for the pack before shadows) with the testkit scripts in checks/. Not yet: dropped and held items cast none, a comparison sampler for softer edges. Code: `mods/base/shaderpack`, `mods/base/assets/shaders/post`, `crates/engine/src/client/mod.rs`. Docs: `reports/Shadow maps.md`, `reports/Shader pack testing.md`, `mods/base/shaderpack/checks/README.md`. |
+| ◧ | Seasonal grass and leaves | Grass and foliage tints follow the calendar (vitals::foliage): fresh in spring, the biome's own in summer, gold and russet leaves and straw grass in autumn, dull in winter, as strongly as the place's year swings (the tropics stay green). The base mod sets them every quarter day (mods/base/src/seasons.rs) through an engine hook (World::set_biome_tints: sent to players, columns blended again, no seams at biome borders). Leaves turn by kind (Voxel dog's base_api::trees::leaf_tint): birches and ginkgos gold, oaks, acacias and mesquite russet, evergreens not at all. Not yet: falling leaves, bare winter trees, a red kind, the wet and dry calendar's dry season. Code: `mods/base/vitals/src/foliage.rs`, `mods/base/src/seasons.rs`, `crates/engine/src/client/world.rs`. Docs: `docs/worldgen.md`, `reports/world-looks.md`. |
 | ■ | HUD | Code: `mods/base/src/hud.rs`. |
 | ◧ | Remaining UI art | Menu background, logo, menu icons, armor points and more: the list is in STYLE.md. |
 | □ | Fonts | Alegreya needs the smooth-font change. |
