@@ -79,8 +79,30 @@ pub fn terrain(r: &mut Registry) {
 static WET: Tag = Tag::named("wet");
 static WOODS: Tag = Tag::named("forest");
 
+/// Whether ground that falls `fall` blocks to its lowest neighbour is a bare rock face (no soil:
+/// no plants, trees or boulders stand there).
+pub fn rock_face(fall: i32) -> bool {
+    fall >= l::ROCK_FALL
+}
+
+/// Whether a scatter's site (`Site::pos`, the block above the ground) in the overworld stands on a
+/// bare rock face, for trees and boulders to skip: a site can't see the cube, so this asks the
+/// terrain for the neighbouring columns.
+pub fn site_on_rock(seed: u64, dimension: u32, [x, _, z]: [i32; 3]) -> bool {
+    if dimension != crate::OVERWORLD.id() {
+        return false;
+    }
+    let h = crate::OVERWORLD.column(seed, x, z).height;
+    let fall = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        .iter()
+        .map(|&(dx, dz)| h - crate::OVERWORLD.column(seed, x + dx, z + dz).height)
+        .max()
+        .unwrap_or(0);
+    rock_face(fall)
+}
+
 /// How far the ground of column (`wx`, `wz`), `height` high, falls to its lowest neighbour.
-fn fall(g: &Gen, wx: i32, wz: i32, height: i32) -> i32 {
+pub fn fall(g: &Gen, wx: i32, wz: i32, height: i32) -> i32 {
     [(1, 0), (-1, 0), (0, 1), (0, -1)]
         .iter()
         .map(|&(dx, dz)| height - g.column(wx + dx, wz + dz).height)
