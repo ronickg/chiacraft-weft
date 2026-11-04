@@ -1191,6 +1191,19 @@ impl EntityRenderer {
         out
     }
 
+    /// The bones (the first 32) of kind `kind`'s model whose role is in `roles` (a mask of
+    /// `1 << role`): what a layer's `bone_mask` keeps when its `roles` are cut to these.
+    fn bones_with(&self, kind: u32, roles: u32) -> u32 {
+        self.models.kinds.get(kind as usize).map_or(0, |m| {
+            m.parts
+                .iter()
+                .take(32)
+                .enumerate()
+                .filter(|(_, p)| p.role < 32 && roles >> p.role & 1 != 0)
+                .fold(0u32, |mask, (b, _)| mask | 1 << b)
+        })
+    }
+
     /// The action entity `id` is playing now, and how long a clip of `name` is on it, if it has one.
     pub fn action_of<'a>(&self, id: u64, e: &'a ClientEntity) -> Option<&'a str> {
         let (name, start, looping) = e.action.as_ref()?;
@@ -1611,8 +1624,13 @@ impl EntityRenderer {
                     own_shadow = Some((posed.len(), layers, layer_count));
                 }
                 own_hand = in_view.then_some((posed.len(), layers, layer_count, arms_up));
+                // Cut by role and by named bone alike: a worn layer drawn by its bones' names
+                // (`bone_mask`, our clothes) kept its head and sleeves at the camera otherwise.
+                let cut = 1 << role::HEAD | 1 << role::ON_HEAD | arms_up;
+                let cut_bones = self.bones_with(kind, cut);
                 for l in &mut layers[..layer_count] {
-                    l.roles &= !(1 << role::HEAD | 1 << role::ON_HEAD | arms_up);
+                    l.roles &= !cut;
+                    l.bone_mask &= !cut_bones;
                 }
                 if !body {
                     layer_count = 0;
@@ -1831,8 +1849,12 @@ impl EntityRenderer {
         gpu.mapped(hb)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&hv));
         self.models.begin_batch();
         let kind = self.posed[i].kind;
+        // Only the arms, by role and by named bone: a shirt drawn by its bones' names
+        // (`bone_mask`) came along whole, a slab of cloth across the view.
+        let arm_bones = self.bones_with(kind, arms_up);
         let arms = own[..count].iter().copied().map(|mut l| {
             l.roles &= arms_up;
+            l.bone_mask &= arm_bones;
             l
         });
         self.models.queue(kind, own_first as u32, arms);
