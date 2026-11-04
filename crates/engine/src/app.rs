@@ -388,6 +388,7 @@ impl App {
             crate::config::override_for_run("core:view_distance", &v.to_string());
         }
         let mut settings = Settings::new(&self.opts.run_dir);
+        log::info!("player name '{}' (setting core:name)", settings.name());
         // Links between worlds, and the inbox for them, open while the game runs (chiacraft).
         crate::links::init(&self.opts.run_dir, &settings.saves_dir());
         crate::friends::init(&self.opts.run_dir, &settings.saves_dir());
