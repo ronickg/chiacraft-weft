@@ -2335,6 +2335,9 @@ impl Client {
     fn hand_light(&self, cam: &Camera) -> ([f32; 4], [f32; 4]) {
         let none = ([0.0; 4], [0.0; 4]);
         let stack = self.held();
+        // Logged when what is held changes, to check the held light from a run's log.
+        static LAST: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(u32::MAX);
+        let changed = LAST.swap(stack.item, std::sync::atomic::Ordering::Relaxed) != stack.item;
         if stack.is_empty() {
             return none;
         }
@@ -2348,6 +2351,9 @@ impl Client {
                     *l = (*l).max(e);
                 }
             }
+        }
+        if changed {
+            log::info!("held light: item {} block {} levels {:?}", stack.item, block, light);
         }
         if light == [0; 3] {
             return none;
