@@ -5,13 +5,13 @@
 //! loaded              # until the world around the player is meshed
 //! idle                # until nothing is left to generate, light, send or mesh
 //! press core:inventory
-//! hold core:forward 1.5
+//! hold core:forward 1.5  # held 1.5 s, the next line after it; `hold core:forward 1.5 nowait` goes on at once
 //! click 0             # mouse button
 //! cursor 0.5 0.4      # mouse at fractions of the window
 //! scroll -3
 //! type /give dia      # text into the focused field
 //! key Tab             # a key by its settings name
-//! look 90 -20         # yaw, pitch in degrees
+//! look 90 -20         # yaw, pitch in degrees: a negative pitch looks DOWN, a positive one up
 //! chat /give stone 10
 //! say_config testmod:x  # a config's value as this client has it, into the chat
 //! shot name.png       # into run/screenshots (or --shot-dir)
@@ -98,6 +98,39 @@ pub fn preflight(src: &str) -> Vec<String> {
         }
     }
     bad
+}
+
+/// Lines that run but probably don't do what was meant: a click or use while the last `look`
+/// pointed up (a positive pitch is up, so a script aiming at the ground clicks the sky).
+pub fn lint(src: &str) -> Vec<String> {
+    let mut warn = Vec::new();
+    let mut up: Option<(usize, f32)> = None;
+    for (n, raw) in src.lines().enumerate() {
+        let line = raw.split('#').next().unwrap_or("").trim();
+        let (cmd, rest) = line.split_once(' ').unwrap_or((line, ""));
+        match cmd {
+            "look" => {
+                let pitch = rest
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|p| p.parse::<f32>().ok())
+                    .unwrap_or(0.0);
+                up = (pitch > 0.0).then_some((n + 1, pitch));
+            }
+            "via" | "travel" | "glide" => up = None,
+            "click" | "press" | "hold" => {
+                let aims = cmd == "click" || rest.contains("core:attack") || rest.contains("core:use");
+                if let (true, Some((at, pitch))) = (aims, up) {
+                    warn.push(format!(
+                        "line {}: '{line}' while looking UP (pitch +{pitch} at line {at}); a negative pitch looks down",
+                        n + 1
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    warn
 }
 
 /// `cond within 12` → (`cond`, 12 s); 30 s without it.
@@ -286,6 +319,9 @@ pub async fn run(t: T, src: String) -> R {
     if !bad.is_empty() {
         return Err(format!("the script has {} bad line(s): {}", bad.len(), bad.join("; ")));
     }
+    for w in lint(&src) {
+        weft_sdk::warn!("script: {w}");
+    }
     // A step that stops the run names its line.
     run_lines(t, src)
         .await
@@ -333,9 +369,17 @@ async fn run_lines(t: T, src: String) -> R {
                 );
             }
             "press" => t.hold(rest, 0.0),
+            // Holds for its seconds before the next line, unless `nowait` (then the next lines run
+            // while it is held: steering while walking).
             "hold" => {
-                let (a, secs) = rest.rsplit_once(' ').unwrap_or((rest, "1"));
-                t.hold(a.trim(), secs.parse().unwrap_or(1.0));
+                let mut w = rest.split_whitespace();
+                let action = w.next().unwrap_or("");
+                let secs: f32 = w.next().and_then(|s| s.parse().ok()).unwrap_or(1.0);
+                let nowait = w.next() == Some("nowait");
+                t.hold(action, secs);
+                if !nowait {
+                    t.secs(secs).await?;
+                }
             }
             "click" => t.c().click(num(0, 0.0) as u32, 0.0),
             "cursor" => t.c().cursor(num(0, 0.5), num(1, 0.5)),
@@ -630,6 +674,14 @@ mod tests {
         assert!(Cond::parse("health about 8").is_err());
         assert_eq!(split_within("players 2 within 90"), ("players 2", 90.0));
         assert_eq!(split_within("on_ground"), ("on_ground", 30.0));
+    }
+
+    #[test]
+    fn lint_warns_on_clicking_upwards() {
+        let w = lint("look 0 85\nclick 0\nlook 0 -85\npress core:attack\nlook 10 20\nhold core:use 1\nhold core:forward 2\n");
+        assert_eq!(w.len(), 2, "{w:?}");
+        assert!(w[0].starts_with("line 2:"));
+        assert!(w[1].starts_with("line 6:"));
     }
 
     #[test]

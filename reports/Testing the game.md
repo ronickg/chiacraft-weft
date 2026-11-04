@@ -192,6 +192,34 @@ Every problem found today in other sessions' runs traces back to one of these ga
     - The report also comes out as JUnit XML, so CI can show it.
     - Fuzz the network packet decoder, alongside the package fuzzing that already exists.
 
+## CI's skip list
+
+CI draws with software Vulkan (llvmpipe, a few frames a second), so `mods/testkit/ci-skip.txt`
+lists what can't meet its timing there: a test, `test/scenario` or `test/scenario/check` per line,
+with why and since when.
+
+- testkit reads it only with `TESTKIT_CI=1`, which CI's testkit jobs set. It prints each skipped name
+  as `SKIP <name> on CI: <why>` in the log and report.txt, so nothing goes missing silently.
+- A check is guarded in code with `if !t.ci_skips("<check>")`; tests and scenarios need nothing.
+- Everything listed still runs on a real GPU: Tester 2 runs the list on the PC now and then
+  (`--test` with the names).
+- First list, 2026-11-04:
+  - scene/water_flow
+  - scene/sand_and_support/falling
+  - inventory_hotkeys
+  - debug_lines
+  - edit_while_loading
+  - sprint_and_sneak_modes
+  - presses_never_wait
+  - attack_charge
+  - persistence/speed
+
+Two script traps that tripped three sessions' scripts (2026-11-04), now handled in `script.rs`:
+- `hold <action> <secs>` waits out its seconds before the next line (`… nowait` for steering
+  while walking).
+- A `click` or a use/attack after a `look` with a positive pitch gets a warning before the run,
+  since a positive pitch looks up.
+
 ## Start with
 
 1, 2 and 6 are small, live entirely in testkit, and would have saved most of today's wasted runs.
