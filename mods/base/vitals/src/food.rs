@@ -470,6 +470,30 @@ pub const FOODS: &[Food] = &[
         poison: 0.0,
         category: Category::Seeds,
     },
+    // Brazil nuts (USDA, dried), a handful (30 g, about six): the richest in fat of the nuts, and
+    // in selenium; keeping for months in the shell.
+    Food {
+        name: "base:brazil_nut",
+        grams: 30.0,
+        per100: per(3.4, 14.3, 4.8, 67.1, 7.5, 0.7),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (180.0, 180.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    // A cacao pod's pulp (the sweet white flesh round the beans, eaten fresh where it grows;
+    // estimates near its kin cupuaçu's), a pod's worth (100 g), keeping a week.
+    Food {
+        name: "base:cacao_pod",
+        grams: 100.0,
+        per100: per(81.0, 1.0, 13.0, 0.5, 2.0, 10.0),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (7.0, 7.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
     Food {
         name: "base:sunflower_seeds",
         grams: 30.0,

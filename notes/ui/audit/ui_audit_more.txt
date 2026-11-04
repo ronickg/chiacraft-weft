@@ -47,6 +47,8 @@ key Escape
 wait 1
 key Escape
 wait 1
+# The title, its Profile button (the Singleplayer figure while there is no skin).
+shot 39_title.png
 tap core:title id:profile
 wait 1.5
 shot 46_profile.png

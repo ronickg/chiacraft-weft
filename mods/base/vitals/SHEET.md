@@ -58,6 +58,8 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:pine_nut | seeds | 30 | 3 | 4 | 3 | 21 | 1 | 1 | 11 min | 60 + 60 |  |
 | base:chia_seeds | seeds | 30 | 3 | 5 | 2 | 9 | 10 | 2 | 7 min | 365 + 365 |  |
 | base:tepary_beans | seeds | 50 | 5 | 12 | 22 | 1 | 8 | 5 | 7 min | 365 + 365 |  |
+| base:brazil_nut | seeds | 30 | 3 | 4 | 1 | 20 | 2 | 1 | 11 min | 180 + 180 |  |
+| base:cacao_pod | fruit | 100 | 10 | 1 | 13 | 0 | 3 | 81 | 6 min | 7 + 7 | cooling |
 | base:sunflower_seeds | seeds | 30 | 3 | 6 | 3 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
 | base:kelp | water_plants | 50 | 5 | 1 | 5 | 0 | 1 | 41 | 3 min | 3 + 3 |  |
 | base:cattail_root | roots | 100 | 10 | 1 | 17 | 0 | 3 | 78 | 6 min | 14 + 14 |  |
@@ -106,6 +108,7 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | base:huckleberries (10) | base:dried_berries | - | - | 112 |
 | base:beach_plums (10) | base:dried_berries | - | - | 112 |
 | base:prickly_pear_fruit (14) | base:dried_berries | - | - | 112 |
+| base:cacao_pod (14) | base:dried_berries | - | - | 112 |
 | animals:venison (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | animals:hare (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | animals:trout (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
@@ -225,7 +228,7 @@ Each biome's real place (`reports/ecology/Biome climates.md`), year mean, humidi
 
 ## Wind and fog
 
-Each place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from 45% to 155% of the mean, a quarter more mid afternoon than before dawn, 1.8 times under a thunderstorm; still fog clears from 3.5 to 7 m/s, sea fog from 9 to 14. Under 1 °C what falls is snow; a day of it lays 0.4 of a deep cover and each degree of a day's mean above freezing melts 0.05; near players it lies as snow layers (an eighth of a block each) from 0.2 of a cover, 4 of them when deep, burying plants from 2, a column looked at every 27 s and a layer melting in 45 s; falling snow in 6 to 12 m/s of wind is a blizzard; a place's air is its own and its neighbours' over a band 32 blocks wide, and deep in a closed forest (12 blocks in from the edge) the wind is 25% of the open's, with its chill and blizzard; dry ground (humidity under 0.35) lifts dust from 7 to 11 m/s. Out in the open the wind chills the cold (the wind chill index, 10 °C and under), and in thick fog animals see 35% as far.
+Each place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from 45% to 155% of the mean, a quarter more mid afternoon than before dawn, 1.8 times under a thunderstorm; still fog clears from 3.5 to 7 m/s, sea fog from 9 to 14. Under 1 °C what falls is snow; a day of it lays 0.4 of a deep cover and each degree of a day's mean above freezing melts 0.05; near players it lies as snow layers (an eighth of a block each) from 0.2 of a cover, 4 of them when deep, burying plants from 2, a column looked at every 27 s and a layer melting in 20 s in air of 8 °C or warmer (fewer the colder, none in a frost); falling snow in 6 to 12 m/s of wind is a blizzard; a place's air is its own and its neighbours' over a band 32 blocks wide, and deep in a closed forest (12 blocks in from the edge) the wind is 25% of the open's, with its chill and blizzard; dry ground (humidity under 0.35) lifts dust from 7 to 11 m/s. Out in the open the wind chills the cold (the wind chill index, 10 °C and under), and in thick fog animals see 35% as far.
 
 | biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |
 |---|---|---|---|---|---|---|---|---|---|
@@ -297,6 +300,11 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:mushroom_red | fly agaric | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:water_hyacinth | water hyacinth | 12, 25-30, 38 | Wet | -1 °C | 10 | 5 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), sequoia_grove (su), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:mesquite_sapling | mesquite | 12, 25-38, 48 | Dry | -15 °C | - | the game's | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
+| base:brazil_nut_sapling | Brazil nut (Bertholletia excelsa) | 18, 25-32, 38 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su), crags (su) |
+| base:cacao_sapling | cacao (Theobroma cacao) | 15, 22-30, 35 | Moderate | 0 °C | - | the game's | plains (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), ocean (su au), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
+| base:andiroba_sapling | andiroba (Carapa guianensis) | 18, 24-32, 38 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su), crags (su) |
+| base:matamata_sapling | matamatá (Eschweilera coriacea) | 18, 24-32, 38 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su), crags (su) |
+| base:ipe_sapling | golden ipê (Handroanthus serratifolius) | 15, 22-32, 40 | Dry | -1 °C | - | the game's | plains (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:acuri_palm_sapling | acuri palm (Attalea phalerata) | 15, 24-32, 40 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), ocean (su), coral_reef (su au), lagoon (su au), scrubland (su), floodplain (su au), crags (su) |
 | base:sequoia_sapling | giant sequoia (Sequoiadendron giganteum) | 5, 15-24, 35 | Moderate | -24 °C | - | the game's | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), coral_reef (au), lagoon (au), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:moriche_palm_sapling | moriche palm (Mauritia flexuosa) | 15, 24-32, 40 | Wet | 0 °C | - | the game's | plains (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (sp su au), coral_reef (sp su au wi), lagoon (sp su au wi), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
@@ -460,6 +468,10 @@ On the ground, animals eat dropped food of their diet one item a mouthful: every
 | base:mesquite_pod | seeds | 30 |
 | base:acuri_nut | seeds | 30 |
 | base:moriche_fruit | fruit | 50 |
+| base:brazil_nut | seeds | 30 |
+| base:cacao_pod | fruit | 40 |
+| base:andiroba_seed | seeds | 20 |
+| base:matamata_fruit | seeds | 20 |
 | animals:araucaria_cone | seeds | 50 |
 | animals:ginkgo_seed | fruit | 10 |
 

@@ -608,10 +608,15 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     if scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 {
         return c;
     }
-    let dist = min(length(rel), 220.0);
+    // The whole view: walked only to 220 blocks, the fog lying on the land ended 220 blocks out, a
+    // flat pale disc seen from high up (the world playtester, y 250 over snow, 11-04).
+    let dist = min(length(rel), 1500.0);
     let dir = rel / max(length(rel), 1e-4);
     let eye = scene.eye.xyz;
     let floor = fog_floor(rel);
+    // Looking down on the fog from well above it, the steps crowd toward the far end, where the
+    // layer lies; from in it or beside it, toward the eye.
+    let from_end = eye.y - floor > 24.0;
     let light = fog_light(dir);
     let leafy = min(canopy(), 1.0);
     // In the canopy's shade the mist is lit by what comes through the leaves, warm green, more than
@@ -626,7 +631,9 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     var last = 0.0;
     for (var i = 1u; i <= steps; i++) {
         let k = f32(i) / f32(steps);
-        let at = dist * (exp(2.2 * k) - 1.0) / (exp(2.2) - 1.0);
+        let near = (exp(2.2 * k) - 1.0) / (exp(2.2) - 1.0);
+        let far = 1.0 - (exp(2.2 * (1.0 - k)) - 1.0) / (exp(2.2) - 1.0);
+        let at = dist * select(near, far, from_end);
         let step = at - last;
         // Jittered by under half a step: at 0.8 of one the shafts showed a fixed grain.
         let mid = at - step * (0.5 + 0.35 * jitter);

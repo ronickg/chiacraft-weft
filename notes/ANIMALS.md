@@ -889,6 +889,26 @@ young adults 90%, full in their prime, fading from the elder years to 60% at an 
 end; health, stamina, damage, speed and carrying go with it (shown on its screen). Testing:
 `/animal speed <n>`, `/animal census`, `/animal reset` (`mods/animals/tests/README.md`).
 
+**Each species in its own world, and the Cretaceous as lively as the overworld** (2026-11-05,
+the creatures playtest cret2: hares, wood mice, red foxes, ravens, house sparrows and herring
+gulls had a share of the Cretaceous, and no utahraptor, wyvern, crocodyliform or fish came in 7
+minutes, the same on old dev). Spawn rules match biomes only, and the Cretaceous's beaches and
+seas are base's own `base:beach` and `base:ocean`: now a species spawns only in its own world
+(`Species::cretaceous`: its habitats are `animals:` biomes; fish too). And the engine picks a
+fitting rule at random, then rolls its chance: the overworld's biomes also hold base's farm
+animals at 5%, so their rules average about 0.025 a try, while the Cretaceous's, only its own and
+rarer, averaged 0.004 (crags) to 0.012 (red dunes): a group every minute or two near a player, a
+utahraptor about one floodplain group in twenty. Its biomes' chances are now raised together to
+average `CRETACEOUS_FLOW` (0.025), each species keeping its share by rarity (a floodplain group is
+a crocodyliform one time in ten, a utahraptor one in twenty; a crag group a wyvern one in twenty);
+the overworld's are unchanged. The engine's cap (6 passive within 64 blocks of a player) still
+holds a spot to two or three groups, so the rare ones show as a player moves on.
+PC runs aw_cr2 (seven stops of the new land, 75 s each, twice before and twice after): 11 groups
+and 27 animals before, a flock of house sparrows on the Cretaceous's beach among them; 16 groups
+and 39 animals after, no modern ones. Plant eaters still come only as often as their food grows
+(`NATURAL_SPAWN`, its wet and dry seasons), and the engine scans for a spot only 16 blocks above
+and below the player.
+
 **Natural spawning stops at the room** (2026-11-04, the 48-minute PC soak f706e44f: wild grey
 wolves at 21-52 near one spot with room for 16, dying of want again and again). That soak's
 overshoot was its own script: it `/tk spawn`ed 10 wolves at the same home spot in each of 12 loops

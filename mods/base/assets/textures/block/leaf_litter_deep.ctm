@@ -1,0 +1,4 @@
+# Tropical forest (11-04): three variants beside the plain tile, picked at random, so a forest floor does not show its tile repeating.
+method = random
+tiles = <default> leaf_litter_deep/1-3
+symmetry = all
