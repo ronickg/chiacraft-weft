@@ -22,6 +22,7 @@ block.base.bookshelf = Книжная полка
 block.base.hay_bale = Тюк сена
 block.base.podzol = Подзол
 block.base.dead_bush = Мёртвый куст
+block.base.fern = Папоротник
 block.base.berry_bush = Ягодный куст
 block.base.acacia_log = Акациевое бревно
 block.base.acacia_planks = Акациевые доски

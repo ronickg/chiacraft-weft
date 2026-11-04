@@ -74,6 +74,8 @@ pub static HAY_BALE: Block = Block::named("hay_bale");
 pub static PODZOL: Block = Block::named("podzol");
 /// The desert's scrub: a few sticks where there is no wood.
 pub static DEAD_BUSH: Block = Block::named("dead_bush");
+/// Bracken and the woods' ferns, under the trees (`vitals::layers`).
+pub static FERN: Block = Block::named("fern");
 
 /// Log axis along the clicked face, like vanilla.
 fn axis_placement(p: &Place, props: &mut Props) {
@@ -646,6 +648,18 @@ pub fn register(r: &mut Registry) {
         .mineable("shovel")
         .tag("dirt")
         .tab(&crate::tabs::NATURAL);
+    // Ferns on the forest floor (`vitals::layers`): the Cretaceous fern's look until bracken's own.
+    r.block(&FERN)
+        .sound_group("grass")
+        .texture("fern")
+        .plant()
+        .needs_below("#plant_soil")
+        .tab(&crate::tabs::NATURAL);
+    r.loot(&FERN).pool(
+        Pool::new()
+            .when(Cond::Chance(vitals::clothing::FIBRE_CHANCE))
+            .item("plant_fibre"),
+    );
     r.block(&DEAD_BUSH)
         .sound_group("grass")
         .texture("deadbush")

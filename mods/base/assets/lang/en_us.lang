@@ -45,6 +45,7 @@ block.base.bookshelf = Bookshelf
 block.base.hay_bale = Hay Bale
 block.base.podzol = Podzol
 block.base.dead_bush = Dead Bush
+block.base.fern = Fern
 block.base.berry_bush = Berry Bush
 block.base.acacia_log = Acacia Log
 block.base.acacia_planks = Acacia Planks
