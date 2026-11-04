@@ -169,6 +169,7 @@
         {"name": "Biomes with real climates", "status": "built"},
         {"name": "Mobs", "status": "built", "note": "Weft's."},
         {"name": "Advancements", "status": "built"},
+        {"name": "Crafting system", "status": "missing", "core": true, "note": "Proposed in notes/CRAFTING.md, waiting for Ronald's four choices: stations that grow with add-ons, a recipe list with a ghost grid, crafting from chests within 7 blocks, a queue, recipes found by touching materials, quality from the work, knapping and smithing by hand at first. Today's crafting is Weft's 2x2 and 3x3 grids.", "docs": ["notes/CRAFTING.md", "reports/crafting/Crafting in other games.md"]},
         {"name": "Our own content plan", "status": "missing", "core": true, "note": "The plan leaves game content out until the foundations stand; survival and animals now need it. For food, the living world's research is the plan: the species' diets and the biomes' plants and crops.", "docs": ["notes/ECOLOGY.md"]}
       ]
     },
