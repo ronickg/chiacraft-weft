@@ -601,14 +601,11 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.glow = 0xffffffffu;
     out.slot = 0u;
     out.overlay = 0u;
-    // The near blocks' shading on average (corners, creases, the sky a slope's side sees): without it
-    // distant land is a step lighter and flatter where the kept blocks end.
-    let top = NORMAL[dir].y > 0.5;
-    out.light = vec4(select(0.92, 1.0, top), 0.0, 0.0, 0.0);
+    out.light = vec4(1.0, 0.0, 0.0, 0.0);
     let o = origins[ii] + g.cam_cube;
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.normal = NORMAL[dir];
-    out.ao = select(0.8, 0.9, top);
+    out.ao = 1.0;
     // Not traced: it is past the blocks the client keeps. Its tint kind, so far water is drawn as
     // water (and far leaves as leaves).
     let kind = lod_tint(w0);
