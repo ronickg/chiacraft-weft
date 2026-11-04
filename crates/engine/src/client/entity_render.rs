@@ -40,8 +40,35 @@ const MAX_BUILD_BONES: usize = 64;
 /// A kind's painter: its component, the mod and the mod's callback.
 type Painter = (u32, weft_abi::ModId, weft_abi::Callback);
 
-/// Skins painted a frame at most: many animals coming into view at once spread over frames.
-const PAINTS_PER_FRAME: usize = 8;
+/// Skins being painted at once (`paint_skins`): many animals coming into view at once queue up
+/// behind them.
+const PAINTS_IN_FLIGHT: usize = 8;
+
+/// A texture painted over, as read: RGBA (shared with the painters) and size; none if unreadable.
+type SkinBase = Option<(std::sync::Arc<Vec<u8>>, [u32; 2])>;
+
+/// A skin a painter finished on `skin_painters()`: `bones` none if its callback failed.
+struct PaintDone {
+    id: u64,
+    generation: u32,
+    from: Vec<u8>,
+    rgba: Vec<u8>,
+    size: [u32; 2],
+    bones: Option<Vec<(String, [f32; 3])>>,
+}
+
+/// Where mods' skin painters run: two threads of normal priority (what comes into view), apart
+/// from the loading queues.
+fn skin_painters() -> &'static rayon::ThreadPool {
+    static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
+    POOL.get_or_init(|| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(2)
+            .thread_name(|i| format!("skin paint {i}"))
+            .build()
+            .expect("skin paint pool")
+    })
+}
 
 /// What the first person view holds: the item (or the bare arm) and how it moves.
 pub struct Hand {
@@ -100,7 +127,12 @@ pub struct EntityRenderer {
     /// Each kind with a painter: its component, the mod and its callback (made on first use).
     painters: Option<FxHashMap<u32, Painter>>,
     /// Textures painted over, as read: RGBA and size, by name.
-    skin_bases: FxHashMap<String, Option<(Vec<u8>, [u32; 2])>>,
+    skin_bases: FxHashMap<String, SkinBase>,
+    /// Entities whose skin is being painted, what finishes (`paint_skins`), and which reading of
+    /// the textures they were painted over (`reload` counts up; older ones are dropped).
+    painting: rustc_hash::FxHashSet<u64>,
+    paint_done: (std::sync::mpsc::Sender<PaintDone>, std::sync::mpsc::Receiver<PaintDone>),
+    paint_generation: u32,
     /// The local player's entity.
     pub local: u64,
     glows: FxHashMap<String, (TextureId, u32)>,
@@ -191,6 +223,9 @@ impl EntityRenderer {
             frame_builds: Vec::new(),
             painters: None,
             skin_bases: FxHashMap::default(),
+            painting: Default::default(),
+            paint_done: std::sync::mpsc::channel(),
+            paint_generation: 0,
             local: 0,
             glows: FxHashMap::default(),
             kind_shaders,
@@ -340,6 +375,8 @@ impl EntityRenderer {
         self.models.reload(gpu, assets);
         // Painted skins are painted again over the textures as read now.
         self.skin_bases.clear();
+        self.painting.clear();
+        self.paint_generation = self.paint_generation.wrapping_add(1);
         for (_, p) in self.painted.drain() {
             gpu.destroy_texture(p.tex.0);
         }
@@ -488,7 +525,11 @@ impl EntityRenderer {
     }
 
     /// Paints the skins mods paint (`Host::reg_entity_skin`) of entities whose component is new
-    /// or changed, a few a frame, and forgets those of entities gone.
+    /// or changed, and forgets those of entities gone. The painters run on `skin_painters()` (the
+    /// SDK has them `Send + Sync`): a coat took 0.3-2.5 ms, a big model's 18-42 ms (the animals'
+    /// wyvern, 1024 x 544), and eight a frame on this thread made 20-60 ms frames whenever animals
+    /// came into view (the Mac lag runs, 11-04). Each is shown when done, over the plain texture
+    /// until then.
     fn paint_skins(
         &mut self,
         gpu: &mut dyn Backend,
@@ -519,54 +560,23 @@ impl EntityRenderer {
             keep
         });
         self.builds.retain(|id, _| entities.contains_key(id));
-        let mut budget = PAINTS_PER_FRAME;
-        for (&id, e) in entities {
-            let Some(&(comp, owner, cb)) = painters.get(&e.kind) else { continue };
-            let Some(from) = comps.get(&(id, comp)) else { continue };
-            if budget == 0 {
-                break;
-            }
-            if self.painted.get(&id).is_some_and(|p| p.from == *from) {
+        // What the painters finished: shown if the entity is still here and the textures weren't
+        // read again since (`reload`).
+        while let Ok(done) = self.paint_done.1.try_recv() {
+            if done.generation != self.paint_generation {
                 continue;
             }
-            budget -= 1;
-            let texture = &c.game.entities[e.kind as usize].texture;
-            let base = self.skin_bases.entry(texture.clone()).or_insert_with(|| {
-                let img = assets
-                    .read(texture, "textures", "png")
-                    .and_then(|b| decode_png(&b))?;
-                Some((img.rgba, [img.width, img.height]))
-            });
-            let Some((rgba, size)) = base else { continue };
-            let mut rgba = rgba.clone();
-            let mut bones = [weft_abi::BoneScale { name: [0; 32], scale: [1.0; 3] }; MAX_BUILD_BONES];
-            let mut args = weft_abi::SkinArgs {
-                data: weft_abi::Slice::new(from),
-                rgba: rgba.as_mut_ptr(),
-                width: size[0],
-                height: size[1],
-                bones: bones.as_mut_ptr(),
-                bone_cap: MAX_BUILD_BONES as u32,
-                bone_count: 0,
-            };
-            if !crate::host::invoke(owner, cb, &mut args) {
-                continue;
-            }
-            let set: Vec<(String, [f32; 3])> = bones[..(args.bone_count as usize).min(MAX_BUILD_BONES)]
-                .iter()
-                .filter(|b| b.scale.iter().all(|v| v.is_finite()))
-                .map(|b| {
-                    let end = b.name.iter().position(|&c| c == 0).unwrap_or(b.name.len());
-                    (String::from_utf8_lossy(&b.name[..end]).into_owned(), b.scale.map(|v| v.clamp(0.2, 5.0)))
-                })
-                .collect();
+            self.painting.remove(&done.id);
+            let (Some(set), Some(e)) = (done.bones, entities.get(&done.id)) else { continue };
             if set.is_empty() {
-                self.builds.remove(&id);
+                self.builds.remove(&done.id);
             } else {
-                self.builds.insert(id, Build { bones: set, resolved: None });
+                self.builds
+                    .insert(done.id, Build { bones: set, resolved: None });
             }
-            let tex = match self.painted.remove(&id) {
-                Some(p) if p.tex.2 == *size => p.tex,
+            let size = done.size;
+            let tex = match self.painted.remove(&done.id) {
+                Some(p) if p.tex.2 == size => p.tex,
                 old => {
                     if let Some(p) = old {
                         gpu.destroy_texture(p.tex.0);
@@ -575,12 +585,60 @@ impl EntityRenderer {
                         &TextureDesc { width: size[0], height: size[1], mips: 1, format: Format::Rgba8Srgb, render_target: false },
                         "painted skin",
                     );
-                    (t, gpu.texture_index(t), *size)
+                    (t, gpu.texture_index(t), size)
                 }
             };
-            gpu.write_texture(tex.0, 0, &rgba);
+            gpu.write_texture(tex.0, 0, &done.rgba);
+            let texture = c.game.entities[e.kind as usize].texture.clone();
             self.painted
-                .insert(id, Painted { from: from.clone(), texture: texture.clone(), tex });
+                .insert(done.id, Painted { from: done.from, texture, tex });
+        }
+        for (&id, e) in entities {
+            if self.painting.len() >= PAINTS_IN_FLIGHT {
+                break;
+            }
+            let Some(&(comp, owner, cb)) = painters.get(&e.kind) else { continue };
+            let Some(from) = comps.get(&(id, comp)) else { continue };
+            // One at a time each: a value that changed while it was painted is painted again
+            // once that one is shown.
+            if self.painting.contains(&id) || self.painted.get(&id).is_some_and(|p| p.from == *from) {
+                continue;
+            }
+            let texture = &c.game.entities[e.kind as usize].texture;
+            let base = self.skin_bases.entry(texture.clone()).or_insert_with(|| {
+                let img = assets
+                    .read(texture, "textures", "png")
+                    .and_then(|b| decode_png(&b))?;
+                Some((std::sync::Arc::new(img.rgba), [img.width, img.height]))
+            });
+            let Some((rgba, size)) = base.clone() else { continue };
+            self.painting.insert(id);
+            let (from, tx, generation) = (from.clone(), self.paint_done.0.clone(), self.paint_generation);
+            skin_painters().spawn(move || {
+                let mut rgba = rgba.as_ref().clone();
+                let mut bones = [weft_abi::BoneScale { name: [0; 32], scale: [1.0; 3] }; MAX_BUILD_BONES];
+                let mut args = weft_abi::SkinArgs {
+                    data: weft_abi::Slice::new(&from),
+                    rgba: rgba.as_mut_ptr(),
+                    width: size[0],
+                    height: size[1],
+                    bones: bones.as_mut_ptr(),
+                    bone_cap: MAX_BUILD_BONES as u32,
+                    bone_count: 0,
+                };
+                let painted = crate::host::invoke(owner, cb, &mut args);
+                let set = painted.then(|| {
+                    bones[..(args.bone_count as usize).min(MAX_BUILD_BONES)]
+                        .iter()
+                        .filter(|b| b.scale.iter().all(|v| v.is_finite()))
+                        .map(|b| {
+                            let end = b.name.iter().position(|&c| c == 0).unwrap_or(b.name.len());
+                            (String::from_utf8_lossy(&b.name[..end]).into_owned(), b.scale.map(|v| v.clamp(0.2, 5.0)))
+                        })
+                        .collect()
+                });
+                let _ = tx.send(PaintDone { id, generation, from, rgba, size, bones: set });
+            });
         }
     }
 

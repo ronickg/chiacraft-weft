@@ -705,11 +705,13 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
         albedo = mix(albedo, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
     }
     // Far water is the same water as near: deep there (no blocks are kept that far), with its
-    // Fresnel, the sky, the sun's path, and the water mask that lets the screen's reflections in.
-    // Otherwise it would be a flat grey-blue lit like land, a seam at the edge of the render distance.
+    // Fresnel, the sky and the sun's path. Otherwise it would be a flat grey-blue lit like land, a
+    // seam at the edge of the render distance. It is left out of the screen's reflections (solid in
+    // the mask): looking out to sea, their march over every far-water pixel cost too much
+    // (reports/performance.md).
     if in.kind.x == TINT_WATER {
         let w = water(in, albedo, false);
-        return vec4(w.rgb, max(w.a, 0.5));
+        return vec4(w.rgb, SOLID_ALPHA);
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }

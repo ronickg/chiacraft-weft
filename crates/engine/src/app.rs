@@ -595,7 +595,8 @@ fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
 impl Running {
     fn gui_scale(&self) -> f32 {
         let max = crate::settings::max_gui_scale(self.gpu.surface_size());
-        let s = if self.settings.gui_scale() == 0 { max } else { self.settings.gui_scale().min(max) };
+        // A scale set before scales were kept even (3, 5...) is shown at the even one below it.
+        let s = if self.settings.gui_scale() == 0 { max } else { crate::settings::even_scale(self.settings.gui_scale()).min(max) };
         s as f32
     }
 
@@ -2060,6 +2061,14 @@ struct UiCallbacks {
 /// One frame. Returns true when the app should quit.
 fn frame(r: &mut Running, opts: &Options) -> bool {
     r.retired = None;
+    // The fps cap: what is left of this frame's share of a second, slept away.
+    let cap = r.settings.fps_cap();
+    if cap > 0 {
+        let share = std::time::Duration::from_secs_f64(1.0 / cap as f64);
+        if let Some(rest) = share.checked_sub(r.last.elapsed()) {
+            std::thread::sleep(rest);
+        }
+    }
     let now = Instant::now();
     let dt = (now - r.last).as_secs_f64();
     r.last = now;

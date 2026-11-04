@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 70 · ◧ partly built: 21 · □ not built yet: 12 · ◌ planned for later: 6
+■ built and seen working: 70 · ◧ partly built: 22 · □ not built yet: 12 · ◌ planned for later: 6
 
 ## Core next
 
@@ -177,13 +177,14 @@ Code: `mods/base/vitals/src/climate.rs`, `mods/base/api`, `mods/animals/src/comf
 
 ## World content
 
-What the world is made of: blocks, items, recipes, biomes, mobs. 4 of 6 parts built.
+What the world is made of: blocks, items, recipes, biomes, mobs. 4 of 7 parts built.
 
 | | Part | Notes |
 |---|---|---|
 | ■ | Blocks, items, crafting | Weft's base game. |
 | ■ | Biomes with real climates |  |
-| ◧ | The land's shape | Research round 7's change 5 (reports/world-looks.md): rivers that cut valleys down to the sea along a wandering noise, wider at the coast, rising in the mountains and rare in the dry; mesas on two or three tiers in the hot, dry land; highlands that lift the temperate lands up to some 30 blocks; snow above a snow line that falls with the cold, lower in drifts; steep faces bare rock in patches of stone and cobbles (sandstone on sand). Water inland is the land's biome, on gravel, sand or mud. The biomes' climate thresholds sat past the noise's 95th percentile (no desert in 18 km on seed 1, Tester 2); they're now in base_api::land, set inside its spread (±0.28 over nine tenths of the world): on seeds 1-3 every biome is 2-20% of the land and turns up within 700 blocks (tested). Numbers and math in base_api::land, a map preview in its examples. Rock faces show their column's own stones (Chiacraft's art, 11-04): banded ochre, red and plain sandstone strata in the hot, dry land, slate in the cold, granite high up and in the mountains, limestone on the low cliffs, each in patches with stone or cobbles (base_api::land::rock_set). Not yet seen in the game: the stones; not yet: water above the sea's level (springs, falls), 3D overhangs (Weft). Code: `mods/base/api/src/land.rs`, `mods/base/src/land.rs`. Docs: `docs/worldgen.md`, `reports/world-looks.md`. |
+| ◧ | Giant sequoia groves | Ronald, 11-04. base:sequoia_grove with Giant Forest's climate (1,721 m, Csb: cool snowy winters, dry summers), on the mountains' front slopes in grove patches, 0.6-0.7% of the land, the nearest some 600-800 blocks from spawn (base_api::land::SEQUOIA_*). Not yet: the sequoia tree (Voxel dog, Weft for its full height), the art (Chiacraft), its animals' habitats (the web check), seen in the game. Code: `mods/base/vitals/src/climate.rs`, `mods/base/api/src/land.rs`, `mods/base/src/land.rs`, `mods/base/src/worldgen.rs`. Docs: `reports/sequoia-grove/README.md`, `reports/ecology/Biome climates.md`. |
+| ◧ | The land's shape | Research round 7's change 5 (reports/world-looks.md): rivers that cut valleys down to the sea along a wandering noise, wider at the coast, rising in the mountains and rare in the dry; mesas on two or three tiers in the hot, dry land; highlands that lift the temperate lands up to some 30 blocks; snow above a snow line that falls with the cold, lower in drifts; steep faces bare rock in patches of stone and cobbles (sandstone on sand). Water inland is the land's biome, on gravel, sand or mud. The biomes' climate thresholds sat past the noise's 95th percentile (no desert in 18 km on seed 1, Tester 2); they're now in base_api::land, set inside its spread (±0.28 over nine tenths of the world): on seeds 1-3 every biome is 2-20% of the land and turns up within 700 blocks (tested). Numbers and math in base_api::land, a map preview in its examples. Rock faces show their column's own stones (Chiacraft's art, 11-04): banded ochre, red and plain sandstone strata in the hot, dry land, slate in the cold, granite high up and in the mountains, limestone on the low cliffs, each in patches with stone or cobbles (base_api::land::rock_set). Lakes in basins (11-04, reports/terrain-terralith-tectonic.md step 1): a site per 420-block cell by climate, long ragged bowls 36-130 blocks across carved under the sea's level so the sea fills them, small islands, about 1% of the land like the rivers. Not yet seen in the game: the stones, the lakes; not yet: mountain lakes and other water above the sea's level (springs, falls), 3D overhangs (Weft). Code: `mods/base/api/src/land.rs`, `mods/base/src/land.rs`. Docs: `docs/worldgen.md`, `reports/world-looks.md`. |
 | ■ | Mobs | Weft's. |
 | ■ | Advancements |  |
 | □ | Our own content plan (core) | The plan leaves game content out until the foundations stand; survival and animals now need it. For food, the living world's research is the plan: the species' diets and the biomes' plants and crops. Docs: `notes/ECOLOGY.md`. |

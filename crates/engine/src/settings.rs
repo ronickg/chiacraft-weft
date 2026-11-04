@@ -26,8 +26,61 @@ pub fn render_scale(density: f64) -> f32 {
 }
 
 /// The largest GUI scale a window shows whole (vanilla's 320x240 per step); auto uses it.
+/// The GUI pixels every screen needs to fit whole (chiacraft: the widest and tallest window, the
+/// animal screen at about 385 x 300 with its tab, and a margin round it). The automatic scale,
+/// and the most the setting goes to, keeps at least this much room, so nothing is cut off on a
+/// small or high-density screen (a 3456 x 2234 MacBook: 6, where 320 x 240 gave 9).
+pub const GUI_MIN: (u32, u32) = (400, 320);
+
+/// The largest GUI scale at which a window of `window` physical pixels still holds `GUI_MIN`:
+/// always 1 or an even number. A UI pixel (a frame's, an item's, a letter's) is half a GUI pixel,
+/// so only at 1 and the even scales does it land on whole screen pixels; at 3 a frame pixel is 1.5
+/// and the text, rounded on its own, no longer matches it (Researcher, round 13; Minecraft keeps
+/// to even scales for the same reason with its half-size font).
 pub fn max_gui_scale(window: (u32, u32)) -> u32 {
-    (window.0 / 320).min(window.1 / 240).max(1)
+    even_scale((window.0 / GUI_MIN.0).min(window.1 / GUI_MIN.1))
+}
+
+/// `s` rounded down to a scale the UI pixel sits whole on: 1, 2, 4, 6...
+pub fn even_scale(s: u32) -> u32 {
+    if s <= 1 { 1 } else { s - s % 2 }
+}
+
+/// The GUI scale setting's next step: auto (0), 1, then the even scales up to `max`, then auto.
+pub fn next_gui_scale(now: u32, max: u32) -> u32 {
+    let next = match now {
+        0 => 1,
+        1 => 2,
+        n => even_scale(n) + 2,
+    };
+    if next > max { 0 } else { next }
+}
+
+#[cfg(test)]
+mod gui_scale_tests {
+    use super::*;
+
+    #[test]
+    fn scales_are_one_or_even() {
+        assert_eq!(max_gui_scale((1280, 720)), 2);
+        assert_eq!(max_gui_scale((1920, 1080)), 2);
+        assert_eq!(max_gui_scale((2560, 1440)), 4);
+        assert_eq!(max_gui_scale((3456, 2234)), 6);
+        assert_eq!(max_gui_scale((640, 480)), 1);
+        assert_eq!(even_scale(3), 2);
+        assert_eq!(even_scale(7), 6);
+    }
+
+    #[test]
+    fn the_setting_steps_through_even_scales() {
+        let mut s = 0;
+        let mut seen = vec![];
+        for _ in 0..6 {
+            s = next_gui_scale(s, 6);
+            seen.push(s);
+        }
+        assert_eq!(seen, vec![1, 2, 4, 6, 0, 1]);
+    }
 }
 
 fn id(name: &str) -> u32 {
@@ -76,6 +129,11 @@ impl Settings {
         config::text(id("core:language"))
     }
     /// 0 = automatic.
+    /// Frames a second at most, 0 for no cap.
+    pub fn fps_cap(&self) -> u32 {
+        number("core:fps_cap") as u32
+    }
+
     pub fn gui_scale(&self) -> u32 {
         number("core:gui_scale") as u32
     }

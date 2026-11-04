@@ -60,8 +60,11 @@ fn apply(p: PostPixel) -> vec4<f32> {
     let radius = clamp(length(c.xy / c.w - c0.xy / c0.w) * 0.5, 2.0 / p.size.y, 0.12);
     let turn = contact_hash(p.uv * p.size) * 6.2831853;
     var closed = 0.0;
-    for (var i = 0; i < CONTACT_DIRS; i++) {
-        let a = turn + f32(i) * 6.2831853 / f32(CONTACT_DIRS);
+    // Strength under 0.75 (the Low setting): as dark, from half the directions.
+    let cheap = p.strength < 0.75;
+    let dirs = select(CONTACT_DIRS, CONTACT_DIRS / 2, cheap);
+    for (var i = 0; i < dirs; i++) {
+        let a = turn + f32(i) * 6.2831853 / f32(dirs);
         let dir = vec2(cos(a), sin(a) * p.size.x / p.size.y);
         // Two distances along each direction.
         for (var k = 1; k <= 2; k++) {
@@ -81,6 +84,7 @@ fn apply(p: PostPixel) -> vec4<f32> {
     }
     closed /= f32(CONTACT_DIRS) * 2.0;
     let fade = 1.0 - smoothstep(24.0, 64.0, dist);
-    let dark = 1.0 - clamp(closed * 2.8, 0.0, 0.5) * fade * min(p.strength, 1.0);
+    closed *= f32(CONTACT_DIRS) / f32(dirs);
+    let dark = 1.0 - clamp(closed * 2.8, 0.0, 0.5) * fade * select(min(p.strength, 1.0), 1.0, cheap);
     return vec4(p.color.rgb * dark, p.color.a);
 }

@@ -31,6 +31,7 @@ snow lying. The Cretaceous biomes get what the palaeoclimate literature supports
 | `base:savanna` | Arauca, Colombia (llanos) | Aw | 27 | 1.6 | 1,868 |
 | `base:swamp` | Nhecolândia, Pantanal, Brazil | Aw | 25.1 | 3.4 | 1,046 |
 | `base:mountains` | Davos, Switzerland (1,594 m) | Dfc | 3.9 | 8.8 | 1,046 |
+| `base:sequoia_grove` | Giant Forest, Sequoia National Park (1,721 m) | Csb | 10.4 | 8.4 | 1,047 |
 | `base:ocean` | Ponta Delgada, Azores | Csa (borderline Cfa/Csb) | 18.2 | 4.1 | 988 |
 | `base:beach` | Faro, Portugal | Csa | 18.2 | 6.2 | 455 |
 | `base:deep_caves` | any cave (rule) | — | surface year mean | 0 | — |
@@ -270,6 +271,31 @@ Year: 3.9 °C, half range 8.8 °C, 1045.9 mm on 125.3 days (threshold: 1.0 mm), 
 **Sources:**
 - https://www.meteoswiss.admin.ch/services-and-publications/applications/ext/climate-tables-normals.html (MeteoSwiss normals 1991-2020, Davos DAV)
 - https://en.wikipedia.org/wiki/Davos (climate box citing MeteoSwiss 1991-2020)
+
+## `base:sequoia_grove` — Giant sequoia grove: the Sierra Nevada's west slope (Giant Forest, 1,721 m)
+
+**Place:** Giant Forest, Sequoia National Park, California (giant sequoia grove, 1,721 m). 36.56° N, 118.77° W, 1721 m. Northern hemisphere. Köppen Csb.
+
+**Why it fits:** Giant Forest is one of the largest groves of giant sequoia, in the band where every grove grows (1,400–2,100 m on the west slope), among white fir, sugar pine, incense cedar and black oak. Its climate is the groves': cool, snowy winters and dry summers over deep soil (Ronald asked for the biome, 11-04).
+
+| | Jan | Feb | Mar | Apr | May | Jun | Jul | Aug | Sep | Oct | Nov | Dec | Year |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Mean °C | 3.3 | 3.4 | 4.8 | 7 | 11.4 | 15.9 | 20.2 | 19.8 | 16.8 | 11.9 | 6.6 | 3.3 | 10.4 |
+| Daily min °C | −1.7 | −1.8 | −0.6 | 1.3 | 5.2 | 9.3 | 13.7 | 12.9 | 10.1 | 5.9 | 1.4 | −1.2 | 4.5 |
+| Daily max °C | 8.4 | 8.7 | 10.3 | 12.8 | 17.7 | 22.4 | 26.7 | 26.8 | 23.6 | 17.9 | 11.7 | 7.7 | 16.2 |
+| Rain mm | 193 | 182 | 173 | 92 | 45 | 17 | 8 | 4 | 18 | 50 | 110 | 155 | 1047 |
+| Rain days | 7 | 8 | 7.6 | 6.2 | 4.6 | 1.9 | 1.7 | 1.2 | 1.8 | 3.1 | 4.5 | 6.6 | 54.2 |
+
+Year: 10.4 °C, half range 8.4 °C, 1047 mm on 54.2 days (threshold: 1.0 mm, from 0.25 mm counts × 0.8), mean daily range 11.7 °C.
+
+**Wet and dry:** Winter is the wet season: November to March bring over four fifths of the year's precipitation, much of it as snow (Lodgepole, 2,053 m: 5.6 m a year, 41.6 days with snow). June to September are dry, a Mediterranean mountain climate.
+
+**Caveats:** Temperatures and precipitation are PRISM's 30-year normals for the Giant Forest Visitor Center; rain days are Lodgepole's (5 km away, NOAA 1991–2020, days ≥ 0.01 in) times 0.8 for days ≥ 1.0 mm. No monthly snow-cover normal was found. Wind and fog in `vitals::climate` are estimates for a sheltered montane forest.
+
+**Sources:**
+- https://en.wikipedia.org/wiki/Sequoia_National_Park (climate boxes: Giant Forest Visitor Center from the PRISM Climate Group; Lodgepole, 2,053 m, NOAA 1991-2020 normals)
+- https://prism.oregonstate.edu/ (PRISM 30-year normals)
+- https://www.ncei.noaa.gov/products/land-based-station/us-climate-normals (Lodgepole, CA, 1991-2020)
 
 ## `base:ocean` — Ocean: the Azores (Ponta Delgada, São Miguel)
 

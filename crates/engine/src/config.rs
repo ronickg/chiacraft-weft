@@ -305,13 +305,31 @@ pub fn put_text(id: u32, v: &str) {
 
 /// Sets a value and saves it where its scope keeps it (a world's are saved with the world).
 pub fn set(id: u32, v: f64) {
+    if held_for_run(id) {
+        return;
+    }
     put(id, v);
     save_of(id);
 }
 
 pub fn set_text(id: u32, v: &str) {
+    if held_for_run(id) {
+        return;
+    }
     put_text(id, v);
     save_of(id);
+}
+
+/// Whether `id` was set for this run (`override_for_run`): it keeps that value however it is
+/// changed after. The test kit put back vsync, a view of 12 and no shader pack when each test
+/// began, so every lag bench (11-04) ran with vsync on, `--view 8` at 12 and without the pack,
+/// whatever its `--no-vsync`, `--view` or `--config` said.
+fn held_for_run(id: u32) -> bool {
+    let held = OVERRIDES.lock().unwrap().iter().any(|o| o.0 == id);
+    if held {
+        log::debug!("config {}: kept as set for this run", def(id).map_or("?", |d| d.name.as_str()));
+    }
+    held
 }
 
 fn save_of(id: u32) {
@@ -333,7 +351,8 @@ pub fn set_automated(on: bool) {
     AUTOMATED.store(on, Ordering::Relaxed);
 }
 
-/// A value for this run only (`--view`, `--no-vsync`), as the file writes it.
+/// A value for this run only (`--view`, `--no-vsync`, `--config`), as the file writes it; it
+/// holds for the run (`held_for_run`).
 pub fn override_for_run(name: &str, value: &str) {
     let Some(id) = by_name(name) else { return };
     let saved = shown(id);
@@ -523,12 +542,18 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:render_scale", ck::FLOAT, 0.0, 0.0, 1.0, 0.05),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
+        // Sun shadows, for shader packs that draw them: 0 off, 1 the near map only (80 blocks
+        // about the player), 2 near and far (400). The maps' size in texels: 1024, 2048 or 4096.
+        ConfigDef::number("core:shadows", ck::INT, 2.0, 0.0, 2.0, 1.0),
+        ConfigDef::number("core:shadow_size", ck::INT, 2048.0, 1024.0, 4096.0, 1024.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
         ConfigDef::number("core:chat_width", ck::INT, 320.0, 40.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_height", ck::INT, 180.0, 20.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_height_closed", ck::INT, 110.0, 20.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_opacity", ck::INT, 50.0, 0.0, 100.0, 5.0),
         ConfigDef::number("core:vsync", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // Frames a second at most (0: as many as it can draw): less heat and battery, steadier.
+        ConfigDef::number("core:fps_cap", ck::INT, 0.0, 0.0, 360.0, 10.0),
         ConfigDef::number("core:fullscreen", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:terrain_gpu", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:terrain_check", ck::BOOL, 0.0, 0.0, 1.0, 0.0),

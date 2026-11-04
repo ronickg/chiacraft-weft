@@ -20,6 +20,9 @@ const PAGE_BYTES: u64 = 64 << 20;
 /// How far from the camera, in blocks, translucent quads are kept sorted far to near. Past that
 /// overlaps are too small to tell.
 const SORT_REACH: f64 = 48.0;
+/// Translucent quads re-sorted in one go up to which the frame thread sorts them itself
+/// (`sort_translucent`), not the pool.
+const PARALLEL_SORT: usize = 16_384;
 /// A cube holds at most 6 * 4096 faces; plants and boxes add a few quads per block.
 const MAX_QUADS_PER_DRAW: u32 = 6 * 4096 * 2;
 
@@ -255,11 +258,16 @@ struct Solid {
     tags: Vec<[u32; 4]>,
     /// Per block state: casts a shadow.
     casts: Vec<bool>,
+    /// The center and the world's `revision` of the last pass that finished: while both stay,
+    /// nothing is looked at (the 15³ cubes' lookups were a cost every frame).
+    done: Option<(IVec3, u32)>,
 }
 
 const SOLID_SLOTS: usize = 4096;
-/// Cubes rebuilt per frame at most; the rest follow in the next frames.
-const SOLID_PER_FRAME: usize = 192;
+/// Cubes rebuilt per frame at most; the rest follow in the next frames, nearest first. At 192 a
+/// step into the next cube rebuilt up to 192 x 4096 blocks in one frame, a burst of 1-3 ms
+/// (reports/performance.md); 32 spreads a step's new shell over a few frames.
+const SOLID_PER_FRAME: usize = 32;
 
 impl Solid {
     fn new(gpu: &mut dyn Backend, c: &Content) -> Solid {
@@ -268,7 +276,8 @@ impl Solid {
             .iter()
             .map(|st| st.opacity > 0 && st.liquid.is_none())
             .collect();
-        let mut s = Solid { buf: gpu.create_buffer(4, usage::STORAGE, "solid"), on: false, held: Vec::new(), tags: Vec::new(), casts };
+        let mut s =
+            Solid { buf: gpu.create_buffer(4, usage::STORAGE, "solid"), on: false, held: Vec::new(), tags: Vec::new(), casts, done: None };
         s.set_on(gpu, crate::packs::pack_uses("world.wgsl", "solid_at"));
         s
     }
@@ -280,6 +289,7 @@ impl Solid {
         gpu.destroy_buffer(self.buf);
         self.on = on;
         self.held = vec![None; if on { SOLID_SLOTS } else { 0 }];
+        self.done = None;
         self.tags = vec![[0; 4]; if on { SOLID_SLOTS } else { 0 }];
         let words = if on { SOLID_SLOTS * (4 + 128) } else { 1 };
         self.buf = gpu.create_buffer(words as u64 * 4, usage::STORAGE, "solid");
@@ -288,8 +298,13 @@ impl Solid {
 }
 
 pub struct WorldRenderer {
-    /// Depth only, from the sun, for `sun_shadows` packs (their `fs_shadow`): faces, quads.
-    shadow_pipes: Option<[PipelineId; 2]>,
+    /// Depth only, from the sun, for `sun_shadows` packs: faces solid, faces cutout, quads solid,
+    /// quads cutout. Solid blocks have no fragment shader (nothing to leave out, and a pass without
+    /// `discard` keeps Apple GPUs' hidden-surface removal on); cutout ones the pack's `fs_shadow`.
+    shadow_pipes: Option<[PipelineId; 4]>,
+    /// Counts every change to the terrain drawn (cubes or distant tiles uploaded or removed): a
+    /// cached shadow map is drawn again when it moves (`Client::render_shadows`).
+    pub terrain_epoch: u64,
     /// The shadow pass's own per-frame draws (`draw_shadow`), apart from the camera's.
     /// Per shadow cascade (near, far): each pass writes its own draws.
     shadow_origins: [Vec<(BufferId, u32)>; 2],
@@ -436,6 +451,7 @@ impl WorldRenderer {
             .collect();
         Ok(WorldRenderer {
             shadow_pipes,
+            terrain_epoch: 0,
             shadow_origins: Default::default(),
             shadow_indirect: Default::default(),
             shadow_offsets: Default::default(),
@@ -535,32 +551,40 @@ impl WorldRenderer {
     /// The shadow pass's pipelines when the shader pack asks for sun shadows: depth only, the
     /// pack's `fs_shadow` leaving out the see-through texels of cutout blocks (leaves cast dappled
     /// shadows). Both sides drawn: what faces away from the sun casts as well.
-    fn shadow_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 2]> {
+    fn shadow_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 4]> {
         if !crate::packs::sun_shadows() {
             return None;
         }
         let depth = Some(DepthState { write: true, compare: Compare::GreaterEqual });
-        let mut make = |label: &str, vs: &str| {
-            gpu.create_pipeline(&PipelineDesc {
+        let mut made: Vec<PipelineId> = Vec::new();
+        for (label, vs, fs) in [
+            ("faces shadow", "vs_face", None),
+            ("faces shadow cutout", "vs_face", Some("fs_shadow")),
+            ("quads shadow", "vs_quad", None),
+            ("quads shadow cutout", "vs_quad", Some("fs_shadow")),
+        ] {
+            match gpu.create_pipeline(&PipelineDesc {
                 label,
                 shader,
                 vertex: vs,
-                fragment: Some("fs_shadow"),
+                fragment: fs,
                 color: None,
                 depth,
                 blend: Blend::None,
                 cull_back: false,
                 topology: Topology::Triangles,
-            })
-            .map_err(|e| log::error!("sun shadows: {}", e.0))
-            .ok()
-        };
-        let faces = make("faces shadow", "vs_face")?;
-        let Some(quads) = make("quads shadow", "vs_quad") else {
-            gpu.destroy_pipeline(faces);
-            return None;
-        };
-        Some([faces, quads])
+            }) {
+                Ok(p) => made.push(p),
+                Err(e) => {
+                    log::error!("sun shadows: {}", e.0);
+                    for p in made {
+                        gpu.destroy_pipeline(p);
+                    }
+                    return None;
+                }
+            }
+        }
+        Some([made[0], made[1], made[2], made[3]])
     }
 
     /// Whether the shader pack's sun shadows can be drawn (`draw_shadow`).
@@ -581,7 +605,7 @@ impl WorldRenderer {
         scene: BufferId,
         cascade: usize,
     ) {
-        let Some([face_pipe, quad_pipe]) = self.shadow_pipes else { return };
+        let Some(pipes) = self.shadow_pipes else { return };
         let cam_block = cam.pos.floor();
         let cam_cube: IVec3 = cam_block.as_ivec3() >> 4i32;
         let cam_frac = (cam.pos - (cam_cube * 16).as_dvec3()).as_vec3();
@@ -593,7 +617,9 @@ impl WorldRenderer {
         };
         let gbuf = self.globals[frame.slot];
         gpu.mapped(gbuf)[..size_of::<Globals>()].copy_from_slice(bytemuck::bytes_of(&globals));
-        let planes = frustum_planes(light);
+        // The light's box on all six sides: along the light too, so what lies beyond its depth (the
+        // ground far behind, caves deep under) is not drawn into the map for nothing.
+        let planes = box_planes(light);
         // The faces the light falls on: the same for every mesh (it comes from one direction), not
         // the ones the camera sees. Its depth row points toward it (reverse depth). Faces nearly
         // edge-on to it are kept either way.
@@ -625,7 +651,7 @@ impl WorldRenderer {
         }
         // Solid and cutout layers only, in runs of one pipeline and page.
         draws.retain(|d| d.1 < 2);
-        draws.sort_unstable_by_key(|d| (d.0, d.2));
+        draws.sort_unstable_by_key(|d| (d.0, d.1, d.2));
         let n = draws.len() as u32;
         if n == 0 {
             return;
@@ -654,13 +680,17 @@ impl WorldRenderer {
         list.push(Cmd::IndexBuffer(self.quad_index));
         let mut start = 0usize;
         while start < draws.len() {
-            let (kind, page) = (draws[start].0, draws[start].2);
+            let (kind, layer, page) = (draws[start].0, draws[start].1, draws[start].2);
             let mut end = start;
-            while end < draws.len() && draws[end].0 == kind && draws[end].2 == page {
+            while end < draws.len() && draws[end].0 == kind && draws[end].1 == layer && draws[end].2 == page {
                 end += 1;
             }
-            let (pipe, buf) =
-                if kind == 0 { (face_pipe, self.faces.pages[page as usize].0) } else { (quad_pipe, self.quads.pages[page as usize].0) };
+            let cutout = layer as usize;
+            let (pipe, buf) = if kind == 0 {
+                (pipes[cutout], self.faces.pages[page as usize].0)
+            } else {
+                (pipes[2 + cutout], self.quads.pages[page as usize].0)
+            };
             list.pipeline(pipe);
             use crate::gpu_layout::bind::world as b;
             list.bind(b::G, gbuf);
@@ -703,6 +733,7 @@ impl WorldRenderer {
                 }
                 if let Ok((s, _)) = world_shader(assets) {
                     self.shadow_pipes = Self::shadow_pipelines(gpu, &s);
+                    self.terrain_epoch += 1;
                 }
                 gpu.destroy_buffer(self.tex_shader);
                 self.tex_shader = shader_table(gpu, crate::content::content(), textures, &slots);
@@ -748,6 +779,7 @@ impl WorldRenderer {
 
     pub fn remove(&mut self, key: MeshKey) {
         let Some(i) = self.meshes.remove(&key) else { return };
+        self.terrain_epoch += 1;
         self.sorted.remove(&key);
         let r = region_of(key);
         let list = self.regions.get_mut(&r).unwrap();
@@ -812,6 +844,11 @@ impl WorldRenderer {
         if !s.on {
             return;
         }
+        let now_seen = (center, world.revision());
+        if s.done == Some(now_seen) {
+            return;
+        }
+        s.done = Some(now_seen);
         let mut rebuilt = 0;
         let mut bits = [0u32; 128];
         // Nearest first, so a frame out of budget has fixed what is close.
@@ -830,6 +867,8 @@ impl WorldRenderer {
                             continue;
                         }
                         if rebuilt >= SOLID_PER_FRAME {
+                            // More next frame.
+                            s.done = None;
                             break 'shells;
                         }
                         rebuilt += 1;
@@ -886,6 +925,7 @@ impl WorldRenderer {
         let a = self.faces.alloc(gpu, quads.len() as u32);
         gpu.write_buffer(self.faces.pages[a.page as usize].0, a.offset as u64 * 16, bytemuck::cast_slice(quads));
         self.lod.insert(key, (a, quads.len() as u32, y, skip));
+        self.terrain_epoch += 1;
     }
 
     /// The columns shown by cubes (`Lod::mask`).
@@ -905,6 +945,7 @@ impl WorldRenderer {
     pub fn remove_lod(&mut self, key: super::lod::TileKey) {
         if let Some((a, ..)) = self.lod.remove(&key) {
             self.faces.free(a);
+            self.terrain_epoch += 1;
         }
     }
 
@@ -930,9 +971,10 @@ impl WorldRenderer {
         }
         self.sorted_from = Some(at);
         let began = std::time::Instant::now();
-        let redone: Vec<MeshKey> = self
+        // Which cubes to redo, picked here (a distance each), then sorted.
+        let mut work: Vec<(MeshKey, &mut SortedQuads, IVec3)> = self
             .sorted
-            .par_iter_mut()
+            .iter_mut()
             .filter_map(|(key, s)| {
                 let origin = if key.0 == 0 { DVec3::ZERO } else { frames.iter().find(|f| f.0 == key.0)?.1 };
                 let here = cam - origin - (key.1 * 16).as_dvec3();
@@ -944,15 +986,26 @@ impl WorldRenderer {
                     return None;
                 }
                 s.seen_from = Some(block);
-                let eye = (here * 32.0).as_ivec3();
-                s.quads.sort_unstable_by_key(|q| {
-                    let m = crate::gpu_layout::quad_middle(q);
-                    let d = [m[0] - eye.x, m[1] - eye.y, m[2] - eye.z].map(|v| v as i64);
-                    std::cmp::Reverse(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])
-                });
-                Some(*key)
+                Some((*key, s, (here * 32.0).as_ivec3()))
             })
             .collect();
+        let sort = |(_, s, eye): &mut (MeshKey, &mut SortedQuads, IVec3)| {
+            let eye = *eye;
+            s.quads.sort_by_cached_key(|q| {
+                let m = crate::gpu_layout::quad_middle(q);
+                let d = [m[0] - eye.x, m[1] - eye.y, m[2] - eye.z].map(|v| v as i64);
+                std::cmp::Reverse(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])
+            });
+        };
+        // A few thousand quads (a lake, a window) sort here in a fraction of a millisecond; handed
+        // to the pool they waited for a worker to wake and get a core, up to 15 ms on a busy Mac
+        // (the lag runs, 11-04). Only a sea's worth goes to every core.
+        if work.iter().map(|w| w.1.quads.len()).sum::<usize>() < PARALLEL_SORT {
+            work.iter_mut().for_each(sort);
+        } else {
+            work.par_iter_mut().for_each(sort);
+        }
+        let redone: Vec<MeshKey> = work.into_iter().map(|w| w.0).collect();
         let mut quads = 0;
         for key in &redone {
             let s = &self.sorted[key];
@@ -969,6 +1022,7 @@ impl WorldRenderer {
         if mesh.is_empty() {
             return;
         }
+        self.terrain_epoch += 1;
         // The textures it shows are loaded before it is drawn.
         let mut used: Vec<u32> = mesh
             .faces
@@ -1311,4 +1365,13 @@ fn frustum_planes(m: Mat4) -> [Vec4; 4] {
     let r = |i: usize| m.row(i);
     let norm = |p: Vec4| p / p.truncate().length();
     [norm(r(3) + r(0)), norm(r(3) - r(0)), norm(r(3) + r(1)), norm(r(3) - r(1))]
+}
+
+/// `frustum_planes` and the depth range's two (reversed depth, 0 to 1): a closed box, for the
+/// shadow maps' orthographic light.
+fn box_planes(m: Mat4) -> [Vec4; 6] {
+    let r = |i: usize| m.row(i);
+    let norm = |p: Vec4| p / p.truncate().length();
+    let [a, b, c, d] = frustum_planes(m);
+    [a, b, c, d, norm(r(2)), norm(r(3) - r(2))]
 }

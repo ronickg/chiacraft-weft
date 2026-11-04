@@ -24,6 +24,7 @@ mod seasons;
 mod shaderpack;
 mod sounds;
 mod survival;
+mod video;
 mod weather;
 mod wild;
 mod window;
@@ -101,6 +102,7 @@ fn init(r: &mut Registry) {
     shaderpack::register(r);
     shaderpack::register_for_scripts(r);
     shaderpack::register_shafts(r);
+    video::register(r);
     // Its terrain is described in `worldgen`.
     // A year of four 14-day seasons (notes/SURVIVAL.md): sixteen hours of daylight at midsummer,
     // eight at midwinter.
