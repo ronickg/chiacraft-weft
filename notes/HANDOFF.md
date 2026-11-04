@@ -403,7 +403,13 @@ run's overrides and a remote server's values over to the new content's ids by na
 mods' setting handles (`Game::config_cells`) back to the new content's ids; `VALUES` is a table
 per content (the old ones kept, so held slices stay valid). Check
 `a_content_switch_keeps_values_by_name`. So packages may add settings, and client halves' keys
-are their own again (an interim fix had given them shared slots). Not covered: other kinds of
+are their own again (an interim fix had given them shared slots).
+Checked on the Mac (Tester, c4a527ea, two copies): bob joined with his name; the sheet listed
+the bell "(mod API 1.2)"; `/mods` answered ("bell (mod API 1.2): 1 calls, 121.0 µs each ...").
+Found and fixed after it: the input registered key bindings only at start, so a key a package
+brings on joining was unknown on the joining game (`content_changed` in `app.rs` now registers
+the new content's keys with the player's bindings); the badge's text wrapped a letter a line (it
+needs `no_wrap` in a HUD panel). Bob's HUD after alice's ring and his key: rerun pending. Not covered: other kinds of
 handle cells (blocks, items, sounds) when a content built earlier comes back.
 Slice 5, personal mods (built, and checked in one game on the PC: off by default with "Your
 personal mods are off in this world: clock.", on after `/rule personal_mods 1` with the clock
