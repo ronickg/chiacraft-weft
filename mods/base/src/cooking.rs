@@ -127,7 +127,7 @@ pub fn register(r: &mut Registry) {
                     ui.spacer();
                     ui.column(S::col().gap(2.0), |ui| {
                         ui.group("rack");
-                        ui.progress_bind("drying", S::default().size(72.0, 4.0), |c| {
+                        ui.progress_bind("attack_bar", S::default().size(72.0, 4.0), |c| {
                             c.menu_component(&DRYING).map_or(0.0, |s| *s.done.iter().max().unwrap_or(&0) as f32 / 1000.0)
                         });
                     });

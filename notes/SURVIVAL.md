@@ -370,6 +370,10 @@ sword, about 100 XP.
 - Food is stamped as the pot and the rack make it, and opening any block's inventory (a chest)
   brings its food's freshness up to date; food a player held was stamped then and ages wherever
   it is, since its day is fixed.
+- Seen in the game (11-04, Tester): a pot with coal made a stew of beef, an apple and bread in
+  ten seconds, using one coal; after half a day a rack over a lit furnace held smoked meat and a
+  dried apple, and one in the winter air still held its mutton. Not seen yet: eating a stew, its
+  tooltip.
 - Not yet: roasts and pies from several ingredients (the apple pie is still a fixed row), smoked
   fish (no fish item), food going stale on a rack left in the rain.
 
@@ -473,6 +477,10 @@ sword, about 100 XP.
 - Checks (`vitals::balance`): fur holds off the cold on a -5 °C night that freezes one unclothed,
   linen is cooler than bare skin in the desert sun and fur hotter, wet wool warmer than wet linen,
   fur keeps out the wind.
+- Seen in the game (11-04, Tester): fur in the four clothing slots and an iron chestplate came to
+  31.6 °C cold, 9.6 kept wet, -10.6 heat, 80% windproof, and the air felt -8.2 °C instead of
+  -11.8 unclothed; the inventory shows armor and clothes in two columns beside the model, the fur
+  coat under the chestplate. Not seen yet: pelts dropping, plant fibre from grass.
 - Not yet: clothes wearing out, dyes, flax for linen (the plants work), generated art.
 - From the Researcher's round 1 (F1, `reports/Research round 1.md` on `claude/researcher-c31668`):
   used per-item warmth, windproof and warm-when-wet (`MATERIALS`, the body's shares). Not yet:
