@@ -25,11 +25,9 @@ ORES = {
 FAINT = 0.12
 NONE = lambda r, g, b, a: np.zeros_like(a, bool)
 PLANTS = {
-    # Plants' names and shapes (notes/NIGHT_GLOW.md): only the threads, the caps, the gold flecks glow
-    "foxfire": (lambda r, g, b, a: (a > 0) & (g - r > 18) & (b - r > 4) & (g > 95), NONE, (0.30, 0.70)),
+    # Plants' names (notes/NIGHT_GLOW.md); the foxfire and goblins_gold mats make their own masks (mats_snap.py)
     "glow_mycena": (lambda r, g, b, a: (a > 0) & (g > 120) & (g >= r) & (g - b > 25),
                     lambda r, g, b, a: (a > 0) & (g > 120) & (abs(g - b) <= 25), (0.35, 0.80)),
-    "goblins_gold": (lambda r, g, b, a: (a > 0) & (g > 150) & (r > 120) & (g - b > 60), NONE, (0.35, 0.75)),
     # round 1, approved by Ronald (glow_mycena_small uses glow_mycena's rule)
     "glow_lichen": (lambda r, g, b, a: (a > 0) & (b > 110) & (g > 120) & (b - r > 25),
                     lambda r, g, b, a: (a > 0) & (g > 90) & (g - r > 5), (0.40, 0.80)),
