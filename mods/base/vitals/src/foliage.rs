@@ -55,6 +55,42 @@ pub fn tint(base: u32, part: Part, day: f32, strength: f32) -> u32 {
     pack(c)
 }
 
+/// How strongly a place's grass follows its rain, 0 to 1: where the year hardly swings in warmth
+/// (the tropics) but its seasons' rain does (the llanos: 0.11 to 0.7), the grass greens in the
+/// rains and goes to straw in the dry season. Places whose warmth turns them (`strength`) keep that.
+pub fn rain_strength(seasons: f32, rain: [f32; 4]) -> f32 {
+    let (lo, hi) = rain.iter().fold((f32::MAX, 0.0f32), |(l, h), &r| (l.min(r), h.max(r)));
+    if hi <= 0.0 {
+        return 0.0;
+    }
+    smoothstep(0.3, 0.8, (hi - lo) / hi) * (1.0 - strength(seasons))
+}
+
+/// The look grass pulls toward in the rains, and in the dry season (a pale straw, not the yellow
+/// of the dry biomes' base: the playtest read that as neon).
+const RAINY_GRASS: u32 = 0x86ad4e;
+const DRY_GRASS: u32 = 0xc4b680;
+const RAIN_AMOUNT: (f32, f32) = (0.6, 0.65);
+
+/// The grass color of `base` on `day` of the year where the rain (`rain`, a season's share, spring
+/// first) drives the year with `strength` (`rain_strength`): wetness eased between the seasons'
+/// middles, green the wetter, straw the drier.
+pub fn rain_tint(base: u32, day: f32, rain: [f32; 4], strength: f32) -> u32 {
+    let q = YEAR_DAYS as f32 / 4.0;
+    let d = day.rem_euclid(YEAR_DAYS as f32);
+    // Each season's rain stands at its middle; in between it eases from one to the next.
+    let pos = (d / q - 0.5).rem_euclid(4.0);
+    let (i, t) = (pos.floor() as usize % 4, pos.fract());
+    let t = t * t * (3.0 - 2.0 * t);
+    let now = rain[i] + (rain[(i + 1) % 4] - rain[i]) * t;
+    let (lo, hi) = rain.iter().fold((f32::MAX, 0.0f32), |(l, h), &r| (l.min(r), h.max(r)));
+    let wet = if hi > lo { (now - lo) / (hi - lo) } else { 0.5 };
+    let mut c = rgb(base);
+    c = mix(c, rgb(RAINY_GRASS), wet * RAIN_AMOUNT.0 * strength);
+    c = mix(c, rgb(DRY_GRASS), (1.0 - wet) * RAIN_AMOUNT.1 * strength);
+    pack(c)
+}
+
 fn bump(x: f32, from: f32, peak: f32, to: f32) -> f32 {
     smoothstep(from, peak, x) * (1.0 - smoothstep(peak, to, x))
 }
@@ -111,6 +147,19 @@ mod tests {
         // Green no stronger than its red, and darker than the autumn color.
         assert!(deep_winter[1] <= deep_winter[0] * 1.05, "{deep_winter:?}");
         assert!(deep_winter.iter().sum::<f32>() < late_autumn.iter().sum::<f32>(), "{deep_winter:?} {late_autumn:?}");
+    }
+
+    #[test]
+    fn the_llanos_green_in_the_rains_and_go_straw_when_dry() {
+        let llanos = [0.4, 0.7, 0.45, 0.11];
+        let s = rain_strength(1.6, llanos);
+        assert!(s > 0.8, "{s}");
+        let mid_summer = rgb(rain_tint(0xb0aa60, YEAR_DAYS as f32 * 3.0 / 8.0, llanos, s));
+        let mid_winter = rgb(rain_tint(0xb0aa60, YEAR_DAYS as f32 * 7.0 / 8.0, llanos, s));
+        assert!(mid_summer[1] > mid_summer[0], "the rains are green: {mid_summer:?}");
+        assert!(mid_winter[0] >= mid_winter[1] * 0.95, "the dry season is straw: {mid_winter:?}");
+        // Kassel's warmth turns it; its even rain doesn't.
+        assert!(rain_strength(8.7, [0.34, 0.34, 0.37, 0.41]) < 0.05);
     }
 
     #[test]
