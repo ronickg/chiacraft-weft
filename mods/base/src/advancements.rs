@@ -143,7 +143,7 @@ pub fn register(r: &mut Registry) {
     r.on(&BLOCK_PLACED, |b| {
         let w = b.world();
         for c in b.iter() {
-            grant_where(&w, c.player, |rule| matches!(rule, Rule::Place(t) if t.on_block(c.state)));
+            placed(&w, c.player, c.state);
         }
     });
     r.on(&ENTITY_DIED, |b| {
@@ -352,4 +352,9 @@ fn client(r: &mut Registry) {
             c.client().open_screen(&SCREEN);
         });
     });
+}
+
+/// `player` made a block be `state` where it stands (placed, or a fire lit by a drill: `firebed.rs`).
+pub fn placed(w: &World, player: u64, state: u32) {
+    grant_where(w, player, |rule| matches!(rule, Rule::Place(t) if t.on_block(state)));
 }

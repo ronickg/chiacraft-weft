@@ -150,7 +150,7 @@ pub fn look(kind: &str) -> Option<&'static KindLook> {
 /// The name a material's drawings go by: woods share the wooden head, wrought iron is "iron".
 pub fn art_name(material: &str) -> &str {
     match material {
-        "oak" | "birch" | "spruce" | "mesquite" => "wood",
+        "oak" | "birch" | "spruce" | "mesquite" | "branch" => "wood",
         "wrought_iron" => "iron",
         m => m,
     }

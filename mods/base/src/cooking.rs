@@ -81,7 +81,10 @@ pub fn register(r: &mut Registry) {
     r.shaped(&CRAFTING, "cooking_pot", 1, &["i i", "i i", "iii"], &[('i', "#ingots/iron")]);
     r.shaped(&CRAFTING, "drying_rack", 1, &["sss", "s s"], &[('s', "#stick")]);
     // In the inventory's own grid: a fire comes before a crafting table (Research round 4).
-    r.shaped(&CRAFTING, "campfire", 1, &["ss", "ll"], &[('s', "#stick"), ('l', "#logs")]);
+    // Laid unlit, and lit with a drill like a fire bed (`firebed.rs`; Planner, 11-05, from Ronald's
+    // "Fire bed + bow drill": one rule for fire). Broken, it gives the laid one back.
+    r.shaped(&CRAFTING, "campfire_laid", 1, &["ss", "ll"], &[('s', "#stick"), ('l', "#logs")]);
+    r.loot(&CAMPFIRE).pool(Pool::new().item("campfire_laid"));
     r.entity_component(&ROASTING, Roasting { cook: 0, cook_max: 0, item: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
     r.system(&ROASTING, tick_campfires);
     // It cooks what a furnace cooks of food, a little slower, with no fuel.

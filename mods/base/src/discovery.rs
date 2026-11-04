@@ -83,7 +83,16 @@ pub fn standing(r: &Recipe, items: &[u32]) -> (u32, u32, Option<u32>) {
 }
 
 /// Recipes everyone knows from the start, whatever they've held: what a first night needs.
-const STARTERS: &[&str] = &["base:stick", "base:crafting_table", "base:campfire", "base:torch", "base:string", "base:cloth"];
+const STARTERS: &[&str] = &[
+    "base:stick",
+    "base:crafting_table",
+    "base:campfire_laid",
+    "base:fire_bed",
+    "base:bow_drill",
+    "base:torch",
+    "base:string",
+    "base:cloth",
+];
 
 /// Whether `r` is known from the start: planks of any wood, and the `STARTERS`.
 pub fn starter(r: &Recipe) -> bool {
