@@ -565,6 +565,8 @@ pub fn mining_time(c: &Content, state: u32, tool: &ItemStack, head_wet: bool, on
 }
 
 pub fn break_time(c: &Content, state: u32, tool: &ItemStack) -> f32 {
+    // A broken tool kept in the hand mines like the hand.
+    let tool = if c.broken(tool) { &ItemStack::EMPTY } else { tool };
     let s = &c.states[state as usize];
     if s.hardness < 0.0 {
         return f32::INFINITY;
@@ -1154,7 +1156,7 @@ impl Dim {
         if !self.ask(c, abi::question::ATTACK, &mut q) {
             return false;
         }
-        let base = if held.item != 0 {
+        let base = if held.item != 0 && !c.broken(&held) {
             // The stack's own attack damage first (an item built from parts), else its item's.
             c.stack_value::<f32>(&held, c.ids.attack_damage)
                 .unwrap_or_else(|| c.items.get(held.item as usize).map_or(1.0, |i| i.attack))

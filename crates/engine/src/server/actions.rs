@@ -677,6 +677,13 @@ pub(super) fn wear(c: &Content, d: &mut Dim, player: u64, slot: u32, amount: u32
         return;
     }
     let damage = crate::stack::damage(&stack) + amount;
-    let next = if damage >= max { ItemStack::EMPTY } else { crate::stack::with_damage(stack, damage) };
+    let next = if damage < max {
+        crate::stack::with_damage(stack, damage)
+    } else if c.item_has(stack.item, c.ids.keep_broken) {
+        // Kept, broken, until it's repaired.
+        crate::stack::with_damage(stack, max)
+    } else {
+        ItemStack::EMPTY
+    };
     d.entities.set_slot(player, slot, next);
 }

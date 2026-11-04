@@ -521,6 +521,7 @@ pub struct Ids {
     pub attack_damage: Option<u32>,
     pub mining_speed: Option<u32>,
     pub tool_level: Option<u32>,
+    pub keep_broken: Option<u32>,
     pub harvest_level: Option<u32>,
     pub damage: Option<u32>,
     pub name: Option<u32>,
@@ -756,6 +757,12 @@ impl Content {
         self.item_value(stack.item, Some(comp))
     }
 
+    /// Worn out and kept (`keep_broken`): it works like an empty hand until it's repaired.
+    pub fn broken(&self, stack: &weft_abi::ItemStack) -> bool {
+        let max = self.max_durability(stack);
+        max > 0 && crate::stack::damage(stack) >= max
+    }
+
     /// Uses before the stack breaks, 0 for one that doesn't: its own `durability`, else its item's.
     pub fn max_durability(&self, stack: &weft_abi::ItemStack) -> u32 {
         match self.stack_value::<u32>(stack, self.ids.durability) {
@@ -822,6 +829,8 @@ impl Content {
     /// Mining the block with `tool` (empty = hand) harvests it: it needs no tool, or this one fits
     /// and is of a high enough level (the stack's own, for one built from parts).
     pub fn harvests(&self, state: u32, tool: &weft_abi::ItemStack) -> bool {
+        let empty = weft_abi::ItemStack::EMPTY;
+        let tool = if self.broken(tool) { &empty } else { tool };
         !self.needs_tool(state)
             || (self.tool_fits(state, tool.item)
                 && self
@@ -2412,6 +2421,7 @@ fn component_ids(components: &Components) -> Ids {
         attack_damage: id(abi::comp::ATTACK_DAMAGE),
         mining_speed: id(abi::comp::MINING_SPEED),
         tool_level: id(abi::comp::TOOL_LEVEL),
+        keep_broken: id(abi::comp::KEEP_BROKEN),
         harvest_level: id(abi::comp::HARVEST_LEVEL),
         damage: id(abi::comp::DAMAGE),
         name: id(abi::comp::NAME),

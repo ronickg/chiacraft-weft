@@ -252,6 +252,9 @@ pub mod comp {
     pub const SNOWY: &str = "snowy";
     pub const MINING_SPEED: &str = "mining_speed";
     pub const TOOL_LEVEL: &str = "tool_level";
+    /// On an item: worn out, it stays where it is, broken, instead of vanishing, and works like an
+    /// empty hand until it's repaired (its damage lowered).
+    pub const KEEP_BROKEN: &str = "keep_broken";
     /// The block drops its loot only to a fitting tool of at least this level (0 = any tier).
     pub const HARVEST_LEVEL: &str = "harvest_level";
     pub const DAMAGE: &str = "damage";

@@ -247,6 +247,7 @@ Anywhere a block is named as text, `base:furnace[lit=true]` picks a state: in st
 - `max_stack(N)`
 - `durability`
 - `tool("pickaxe")`, `tool_level(tier)`, `mining_speed(speed)`
+- `keeps_broken()`: worn out, it stays in its slot broken instead of vanishing, and works like an empty hand until its damage is lowered (a repair)
 - A stack can carry its own of those numbers, and they win over its item's: `stack.with(&DURABILITY, 412).with(&MINING_SPEED, 3.6).with(&TOOL_LEVEL, 100).with(&ATTACK_DAMAGE, 4.1)` is one axe built from parts (base's crafting), mined, worn and hit with by its own numbers on client and server alike
 - `attack_damage`, `attack_speed(per_second)` (hitting before it has recharged does less; a sword is 1.6, and without it an item swings at an empty hand's 4) and `sweeps()` (a full swing on the ground also does 1 damage to what stands next to the target)
 - Advancements read tags, so yours count by tagging them: `cooked_meat` on food, `hostile` and `livestock` on mobs, `logs`, `torches`, `furnaces`, etc etc

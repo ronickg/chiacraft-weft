@@ -103,6 +103,8 @@ pub fn register(r: &mut Registry) {
         let b = r
             .item(Item::generated(k.id.to_string()))
             .durability(1)
+            // Worn out, it stays: a part is repaired or replaced, not the tool lost.
+            .keeps_broken()
             .tab(if matches!(k.id, "sword" | "spear" | "knife") { &crate::tabs::COMBAT } else { &crate::tabs::TOOLS });
         let b = match tool {
             Some(t) => b.tool(t),
