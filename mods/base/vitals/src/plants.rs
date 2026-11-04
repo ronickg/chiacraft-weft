@@ -126,7 +126,15 @@ pub const PLANTS: [Plant; 48] = [
     // The mountains' black huckleberry (Rockies, 1,000-2,000 m) flowers in June and ripens in
     // August and September; the beach plum on Atlantic dunes flowers in May and ripens August to
     // September, its blossom killed by a late frost.
-    p("base:huckleberry_bush", "black huckleberry (Vaccinium membranaceum)", (3.0, 12.0, 22.0, 30.0), Water::Moderate, 70.0, SUMMER_AUTUMN, -2.0),
+    p(
+        "base:huckleberry_bush",
+        "black huckleberry (Vaccinium membranaceum)",
+        (3.0, 12.0, 22.0, 30.0),
+        Water::Moderate,
+        70.0,
+        SUMMER_AUTUMN,
+        -2.0,
+    ),
     p("base:beach_plum_bush", "beach plum (Prunus maritima)", (5.0, 16.0, 26.0, 34.0), Water::Dry, 100.0, SUMMER_AUTUMN, -2.0),
     p("base:bramble_bush", "raspberry and blackberry", (5.0, 16.0, 25.0, 32.0), Water::Moderate, 60.0, SUMMER_AUTUMN, -2.0),
     // Fruit and seed in their season: prickly pears flower in April and May and ripen July to
