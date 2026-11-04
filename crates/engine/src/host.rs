@@ -252,6 +252,7 @@ pub static HOST: Host = Host {
     lift_blocks,
     put_down_body,
     body_go,
+    body_turn,
     signal_read_changed,
     reg_terrain,
     reg_screen_part,
@@ -610,6 +611,21 @@ unsafe extern "C" fn body_go(w: *mut abi::WorldCtx, entity: u64, pos: *const [f6
         {
             e.motion = crate::server::entity::Motion::To { to, left: ticks.clamp(1, u16::MAX as u32) as u16 };
         }
+    }
+}
+
+/// chiacraft: a moving structure leans about `pivot` (world) by `rot`, reached in `ticks`.
+unsafe extern "C" fn body_turn(w: *mut abi::WorldCtx, entity: u64, pivot: *const [f64; 3], rot: *const [f32; 4], ticks: u32) {
+    unsafe {
+        let d = dim(w);
+        let pivot = d.place.to_world(DVec3::from_array(*pivot));
+        let Some(e) = d.entities.get(entity) else { return };
+        let local = crate::physics::Transform::of(e.pos).to_local(pivot);
+        let rot = *rot;
+        let Some(st) = d.bodies.get_mut(&entity) else { return };
+        let upright = rot[0] == 0.0 && rot[1] == 0.0 && rot[2] == 0.0;
+        st.lean = (!upright).then_some((local.as_vec3().to_array(), rot));
+        st.lean_moved = Some(ticks);
     }
 }
 

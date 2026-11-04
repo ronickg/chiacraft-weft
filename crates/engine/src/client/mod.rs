@@ -151,6 +151,27 @@ pub struct ClientEntity {
     pub structure: Option<Box<ClientWorld>>,
     /// The world's light on a moving structure, by its cubes, as the server worked it out.
     pub world_light: rustc_hash::FxHashMap<IVec3, u32>,
+    /// How a moving structure leans (chiacraft, `ToClient::BodyLean`): only drawn, never
+    /// collided with or picked, while it does.
+    pub lean: Option<Lean>,
+}
+
+/// A moving structure leaning (chiacraft, a falling tree): turned about `pivot` (its own
+/// coordinates) from `from` to `to` over `secs`, `t` of them gone.
+#[derive(Clone, Copy, Debug)]
+pub struct Lean {
+    pub pivot: Vec3,
+    pub from: glam::Quat,
+    pub to: glam::Quat,
+    pub secs: f32,
+    pub t: f32,
+}
+
+impl Lean {
+    /// The rotation shown now.
+    pub fn now(&self) -> glam::Quat {
+        if self.secs <= 0.0 { self.to } else { self.from.slerp(self.to, (self.t / self.secs).min(1.0)) }
+    }
 }
 
 /// A picked up item reaches the taker's feet in three ticks (vanilla's pickup animation).
@@ -1059,6 +1080,10 @@ impl Client {
                 let mut push = DVec3::ZERO;
                 for (&id, e) in &self.entities {
                     let k = &c.game.entities[e.kind as usize];
+                    // A leaning body (chiacraft) is only drawn.
+                    if k.is(weft_abi::entity_flags::SOLID) && e.lean.is_some() {
+                        continue;
+                    }
                     if k.is(weft_abi::entity_flags::SOLID) {
                         let (now, delta) = (e.known(at), e.known(at) - e.known(at - 1.0));
                         let aabb = physics::Aabb::around(now, k.width as f64 / 2.0, k.height as f64);
@@ -1368,6 +1393,9 @@ impl Client {
             } else {
                 e.pos.lerp(e.target, k)
             };
+            if let Some(l) = &mut e.lean {
+                l.t += dt as f32;
+            }
             let mut dyaw = e.target_yaw - e.yaw;
             dyaw = (dyaw + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
             e.yaw += dyaw * k as f32;
@@ -2016,6 +2044,7 @@ impl Client {
         let structures: Vec<(u64, physics::Transform, &dyn physics::Blocks)> = self
             .entities
             .iter()
+            .filter(|(_, e)| e.lean.is_none())
             .filter_map(|(&id, e)| {
                 e.structure
                     .as_deref()
@@ -2176,6 +2205,7 @@ impl Client {
             seat_forward: 0.0,
             structure: None,
             world_light: Default::default(),
+            lean: None,
         }
     }
 
@@ -2617,9 +2647,15 @@ impl Client {
             .iter()
             .flat_map(|(&id, e)| e.world_light.iter().map(move |(cp, l)| ((id, *cp), *l)))
             .collect();
+        // How each leans (chiacraft): its pivot and rotation now.
+        let leans: rustc_hash::FxHashMap<u64, (Vec3, glam::Quat)> = self
+            .entities
+            .iter()
+            .filter_map(|(&id, e)| e.lean.map(|l| (id, (l.pivot, l.now()))))
+            .collect();
         let s = crate::diag::span("render/world");
         self.render
-            .draw(gpu, list, frame, &cam, scene_buf, &frames, &lights);
+            .draw(gpu, list, frame, &cam, scene_buf, &frames, &lights, &leans);
         drop(s);
         let lit: Vec<u32> = frames
             .iter()

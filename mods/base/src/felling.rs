@@ -145,25 +145,31 @@ pub fn register(r: &mut Registry) {
             }
             let Some(logs) = foot_of_tree(&w, e.pos, e.state, e.item) else { continue };
             let felling = vitals::felling::felling(logs.len() as u32, TOOL_LEVEL.on_stack(&axe).unwrap_or(0));
-            FELLING
-                .lock()
-                .unwrap()
-                .get_or_insert_with(HashSet::new)
-                .extend(logs.iter().copied());
-            // In survival a tree within the axe's tier is laid down to be cut in pieces
-            // (`felled`); in creative, as there, it goes without drops, and past the axe's tier
-            // without wood. Taken out from the top down, so every log still has its own below
-            // while it breaks.
+            // It falls (`fall`): lifted out with its crown, it leans over away from the player and
+            // lies down to be cut in pieces (`felled`) in survival within the axe's tier; in
+            // creative and past the tier it shatters. If it can't be lifted it is taken down
+            // here, from the top down so every log still has its own below while it breaks.
             let lays = survival && felling.fruitful;
             let states: Vec<u32> = logs.iter().map(|&p| w.get(p)).collect();
-            for &p in &logs {
-                w.break_block(p, axe, e.player, false);
-            }
-            if lays {
-                let from = w
-                    .entity(e.player)
-                    .map_or([e.pos[0] as f64, 0.0, e.pos[2] as f64 - 1.0], |st| st.pos);
-                crate::felled::lay(&w, e.pos, &logs, &states, crate::felled::away(e.pos, from));
+            let from = w
+                .entity(e.player)
+                .map_or([e.pos[0] as f64, 0.0, e.pos[2] as f64 - 1.0], |st| st.pos);
+            let d = crate::felled::away(e.pos, from);
+            let leaves = crown(&w, &logs);
+            if crate::fall::start(&w, e.pos, logs.clone(), states.clone(), leaves, d, lays) {
+                crate::leaf_decay::logs_gone(&w, logs.iter().copied());
+            } else {
+                FELLING
+                    .lock()
+                    .unwrap()
+                    .get_or_insert_with(HashSet::new)
+                    .extend(logs.iter().copied());
+                for &p in &logs {
+                    w.break_block(p, axe, e.player, false);
+                }
+                if lays {
+                    crate::felled::lay(&w, e.pos, &logs, &states, d);
+                }
             }
             if survival {
                 let by = vitals::felling::wear(logs.len() as u32);
@@ -198,10 +204,19 @@ fn held(w: &World, player: u64) -> ItemStack {
 /// The logs of the tree above `pos` (now or just broken, `state` it), highest first, if it is a
 /// tree's foot mined with an axe (`item`).
 fn foot_of_tree(w: &World, pos: [i32; 3], state: u32, item: u32) -> Option<Vec<[i32; 3]>> {
+    if !AXES.on_item(item) {
+        return None;
+    }
+    tree_on(w, pos, state)
+}
+
+/// The logs of the tree whose foot is at `pos` (`state` it, there or just gone), highest first,
+/// with the foot itself left out (it stays as a stump when the tree is knocked down: `fall`).
+pub fn tree_on(w: &World, pos: [i32; 3], state: u32) -> Option<Vec<[i32; 3]>> {
     let [x, y, z] = pos;
     // Only from the foot: the block below is no log. A felled log is no tree's.
     let felled = |s: u32| crate::felled::piece_of(s).is_some();
-    if !AXES.on_item(item) || !LOGS.on_block(state) || felled(state) || LOGS.on_block(w.get([x, y - 1, z])) {
+    if !LOGS.on_block(state) || felled(state) || LOGS.on_block(w.get([x, y - 1, z])) {
         return None;
     }
     let kind = |p: [i32; 3]| {
@@ -222,6 +237,34 @@ fn foot_of_tree(w: &World, pos: [i32; 3], state: u32, item: u32) -> Option<Vec<[
         }
     };
     tree(kind, pos)
+}
+
+/// The most leaves a falling tree takes along (a sequoia's crown is a few thousand).
+const MAX_CROWN: usize = 8192;
+
+/// A tree's crown: the tree leaves (none a player placed) joined face to face to its `logs`
+/// within `base_api::branchy::LEAF_REACH` steps, as leaf decay counts them.
+pub fn crown(w: &World, logs: &[[i32; 3]]) -> Vec<([i32; 3], u32)> {
+    let mut seen: HashSet<[i32; 3]> = logs.iter().copied().collect();
+    let mut ring: Vec<[i32; 3]> = logs.to_vec();
+    let mut out = Vec::new();
+    for _ in 0..base_api::branchy::LEAF_REACH {
+        let mut next = Vec::new();
+        for [x, y, z] in ring {
+            for d in [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] {
+                let p = [x + d[0], y + d[1], z + d[2]];
+                if seen.insert(p) && crate::leaf_decay::decays(w, p) {
+                    out.push((p, w.get(p)));
+                    if out.len() >= MAX_CROWN {
+                        return out;
+                    }
+                    next.push(p);
+                }
+            }
+        }
+        ring = next;
+    }
+    out
 }
 
 /// `axe` worn by `by` more (its `max` durability, 0 for none): gone once used up.

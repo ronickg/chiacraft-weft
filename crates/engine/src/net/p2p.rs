@@ -33,8 +33,10 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// only whether it has code (empty: no code; chiacraft, phase 6). 9: worlds send players their
 /// signed achievements (`ToClient::Achievement`; chiacraft, phase 4). 10: a world asks a joining
 /// game for an achievement its rules need (`AskAchievement`, `Proofs`; chiacraft, phase 4). 11: a
-/// world sends its issuer's revocation list (`ToClient::Revocations`; chiacraft, phase 4).
-const PROTOCOL: u32 = 12;
+/// world sends its issuer's revocation list (`ToClient::Revocations`; chiacraft, phase 4). 12: a
+/// time-of-day rate per dimension (`ToClient::Time`). 13: a moving structure leans
+/// (`ToClient::BodyLean`; chiacraft, falling trees).
+const PROTOCOL: u32 = 13;
 const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its

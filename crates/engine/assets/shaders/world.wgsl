@@ -114,12 +114,26 @@ fn on_body(l: vec4<f32>, k: i32) -> vec4<f32> {
     if k == 0 {
         return l;
     }
-    let w = unpack_light(bitcast<u32>(offsets[k].w));
+    let w = unpack_light(bitcast<u32>(offsets[k * 3].w));
     return vec4(min(l.x, w.x), max(l.yzw, w.yzw));
 }
 
+// `v` turned by quaternion `q` (x, y, z, w).
+fn quat_turn(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
+    let t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
+
+// Each structure has three vec4 in `offsets`: its offset (and light), its rotation and its pivot
+// in its own coordinates (chiacraft: a leaning body, a falling tree; upright for the rest).
 fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
-    let pos = vec3<f32>(origin.xyz) * 16.0 + local - g.cam_frac.xyz + offsets[origin.w].xyz;
+    var at = vec3<f32>(origin.xyz) * 16.0 + local;
+    let k = origin.w;
+    if k != 0 {
+        let pivot = offsets[k * 3 + 2].xyz;
+        at = quat_turn(offsets[k * 3 + 1], at - pivot) + pivot;
+    }
+    let pos = at - g.cam_frac.xyz + offsets[k * 3].xyz;
     return vec4(pos, 1.0);
 }
 

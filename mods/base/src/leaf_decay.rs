@@ -34,27 +34,7 @@ static DUE: Mutex<Due> = Mutex::new(Due { list: Vec::new(), waiting: None });
 pub fn register(r: &mut Registry) {
     r.on(&BLOCK_BROKEN, |b| {
         let w = b.world();
-        let (dim, now) = (w.dimension(), w.time());
-        // A felled giant breaks a thousand logs at once, their boxes mostly the same places:
-        // each looked at once.
-        let mut looked = HashSet::new();
-        for e in b.iter().filter(|e| LOGS.on_block(e.state)) {
-            let mut due = DUE.lock().unwrap();
-            let Due { list, waiting } = &mut *due;
-            let waiting = waiting.get_or_insert_with(HashSet::new);
-            let [x, y, z] = e.pos;
-            for dy in -NEAR..=NEAR {
-                for dz in -NEAR..=NEAR {
-                    for dx in -NEAR..=NEAR {
-                        let p = [x + dx, y + dy, z + dz];
-                        if looked.insert(p) && decays(&w, p) && waiting.insert((dim, p)) {
-                            let wait = SOONEST + (w.random() % (LATEST - SOONEST));
-                            list.push((dim, now + wait, p));
-                        }
-                    }
-                }
-            }
-        }
+        logs_gone(&w, b.iter().filter(|e| LOGS.on_block(e.state)).map(|e| e.pos));
     });
     // A player's leaves are theirs to keep.
     r.on(&BLOCK_PLACED, |b| {
@@ -95,8 +75,33 @@ pub fn register(r: &mut Registry) {
     });
 }
 
+/// Logs at `gone` went (chopped, felled, or lifted away by a falling tree, which breaks
+/// nothing): the leaves round them that may have been theirs are looked at again in a while.
+pub fn logs_gone(w: &World, gone: impl Iterator<Item = [i32; 3]>) {
+    let (dim, now) = (w.dimension(), w.time());
+    // A felled giant takes a thousand logs at once, their boxes mostly the same places: each
+    // looked at once.
+    let mut looked = HashSet::new();
+    let mut due = DUE.lock().unwrap();
+    let Due { list, waiting } = &mut *due;
+    let waiting = waiting.get_or_insert_with(HashSet::new);
+    for [x, y, z] in gone {
+        for dy in -NEAR..=NEAR {
+            for dz in -NEAR..=NEAR {
+                for dx in -NEAR..=NEAR {
+                    let p = [x + dx, y + dy, z + dz];
+                    if looked.insert(p) && decays(w, p) && waiting.insert((dim, p)) {
+                        let wait = SOONEST + (w.random() % (LATEST - SOONEST));
+                        list.push((dim, now + wait, p));
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// A tree's leaves no player placed.
-fn decays(w: &World, p: [i32; 3]) -> bool {
+pub fn decays(w: &World, p: [i32; 3]) -> bool {
     TREE_LEAVES.on_block(w.get(p)) && w.prop(p, "placed") != Some("true")
 }
 

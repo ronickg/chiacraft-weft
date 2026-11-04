@@ -327,6 +327,8 @@ impl Dim {
         let structures: Vec<(u64, crate::physics::Transform, &dyn crate::physics::Blocks)> = self
             .bodies
             .iter()
+            // A leaning body (chiacraft) is only drawn.
+            .filter(|(_, s)| s.lean.is_none())
             .filter_map(|(&sid, s)| {
                 self.entities
                     .get(sid)

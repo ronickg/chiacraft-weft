@@ -173,6 +173,7 @@ impl Server {
                     st.signals.level_changes.clear();
                     st.edited.clear();
                     st.world_light_changed = false;
+                    st.lean_moved = None;
                 }
                 r.space.resend.clear();
                 r.space.changes.clear();
@@ -371,6 +372,9 @@ fn send_entities(
         for (&id, st) in &reg.bodies {
             if spawn.iter().any(|v| v.id == id) {
                 bodies.push(ToClient::BodyLight { frame: id, lights: st.world_light.iter().map(|(p, l)| (*p, *l)).collect() });
+                if let Some((pivot, rot)) = st.lean {
+                    bodies.push(ToClient::BodyLean { frame: id, pivot, rot, ticks: 0 });
+                }
                 for (pos, cube) in &st.cubes {
                     bodies.push(ToClient::Cube { dim: p.dim, frame: id, pos: *pos, cube: cube.clone(), edit: false });
                     let changes = st.signals.levels_in(c, *pos, cube);
@@ -388,6 +392,10 @@ fn send_entities(
                 }));
                 if st.world_light_changed {
                     bodies.push(ToClient::BodyLight { frame: id, lights: st.world_light.iter().map(|(p, l)| (*p, *l)).collect() });
+                }
+                if let Some(ticks) = st.lean_moved {
+                    let (pivot, rot) = st.lean.unwrap_or(([0.0; 3], [0.0, 0.0, 0.0, 1.0]));
+                    bodies.push(ToClient::BodyLean { frame: id, pivot, rot, ticks });
                 }
                 if !st.changes.is_empty() {
                     bodies.push(ToClient::Blocks { dim: p.dim, frame: id, changes: st.changes.clone() });

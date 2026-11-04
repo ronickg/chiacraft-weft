@@ -22,6 +22,40 @@ pub const PIECE: i32 = 4;
 /// it is.
 pub const LAND_DROP: i32 = 8;
 
+/// The fall (`mods/base/src/fall.rs`; Panda's Falling Trees' curve, Dynamic Trees' slower tall
+/// trees): a creak leaning `CREAK_DEGREES` over `CREAK_TICKS`, then an ease-in fall of
+/// `fall_ticks(height)`, then a bounce `BOUNCE_DEGREES` up and back over `BOUNCE_TICKS`.
+pub const CREAK_TICKS: u32 = 20;
+pub const CREAK_DEGREES: f32 = 3.0;
+pub const BOUNCE_TICKS: u32 = 12;
+pub const BOUNCE_DEGREES: f32 = 8.0;
+/// Seconds a tree 10 blocks high takes to fall; others by the square root of their height,
+/// from `FALL_SECS.1` to `FALL_SECS.2`.
+pub const FALL_SECS: (f32, f32, f32) = (2.5, 2.0, 5.0);
+/// The pose goes to clients every this many ticks, eased between.
+pub const POSE_EVERY: u32 = 2;
+/// Leaves start breaking off past this angle, and by the ground this share of them has.
+pub const SHED_FROM: f32 = 20.0;
+pub const SHED_SHARE: f32 = 0.7;
+/// Pieces a breaking leaf throws; one in this many drops its loot.
+pub const SHED_BITS: u32 = 4;
+pub const SHED_LOOT_ONE_IN: u32 = 3;
+/// What is left of the crown at the ground: one in this many bursts (the rest just goes).
+pub const SHED_BURST_ONE_IN: u32 = 2;
+
+/// Ticks a tree `height` blocks high takes to fall (after its creak).
+pub fn fall_ticks(height: f32) -> u32 {
+    let (ten, least, most) = FALL_SECS;
+    ((ten * (height.max(1.0) / 10.0).sqrt()).clamp(least, most) * crate::TICKS as f32).round() as u32
+}
+
+/// A falling tree strikes what is in its way from this angle on (near the stump it is its own
+/// stump's neighbours), testing at most this many of its logs a tick; another tree's trunk it
+/// strikes falls too if it has this many times that tree's logs.
+pub const KNOCK_FROM: f32 = 10.0;
+pub const KNOCK_SAMPLES: usize = 96;
+pub const KNOCK_FELLS: usize = 2;
+
 /// The longest a felling may take, in seconds, past tier or not: past an hour nobody is
 /// chopping, and the engine's mining speed has a floor.
 pub const LONGEST_SECS: f32 = 3600.0;
@@ -143,5 +177,8 @@ mod tests {
         assert!((piece(4).chops - 2.83).abs() < 0.01);
         assert_eq!(wear(20), 9);
         assert!(wear(1015) < 1015 / 4);
+        // A tall tree falls slower, within its bounds.
+        assert_eq!(fall_ticks(10.0), 50);
+        assert!(fall_ticks(40.0) > fall_ticks(10.0) && fall_ticks(400.0) == 100 && fall_ticks(1.0) == 40);
     }
 }

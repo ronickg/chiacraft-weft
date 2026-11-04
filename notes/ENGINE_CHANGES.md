@@ -59,6 +59,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 - **Items:** a stack's own tool numbers win over its item's (a9fcb688), items that keep when broken (4e03dc83), a stack's look from layers (988c4077). *Why:* tools built from parts (crafting).
 - **A player's break drops at their feet** (8cb72890, 6eaf25b5). *Why:* chopped logs landed out of reach (first-day test).
 - **A time-of-day rate per dimension, sent to clients** (1e138839, protocol 11 to 12). *Why:* Ronald's slow first day, starting at 10:00.
+- **A moving structure can lean** (tree-felling branch, protocol 12 to 13): `World::body_turn(entity, pivot, rot, ticks)` gives a body a pose, a pivot and a rotation the clients ease to (`ToClient::BodyLean`); `world.wgsl` (the engine's and the base pack's) turns its vertices and the pack its normals (`offsets` is three vec4 a structure: offset and light, rotation, pivot); a leaning body is only drawn: the server's physics and picking and the client's collision and raycast skip it. *Why:* Ronald, 11-05: trees "fall down sideways and like the leaves to sort of start breaking while it's falling": the tree's own blocks, lifted (`World::lift`), lean over the stump and shed leaves as they go (`mods/base/src/fall.rs`). Ronald chose this over a box-model tree ("Yes, the real tree falls").
 - **A world never takes a nameless player** (dc1d8b7b); **a headless server has its own identity** (432889c9). *Why:* bugs found in multiplayer checks.
 
 ## 5. UI the engine had to allow
