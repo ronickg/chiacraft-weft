@@ -1,0 +1,24 @@
+# Crafting slice 1, by hand: the recipe book beside the inventory's 2x2 crafts from the bag.
+# One copy, a fresh world. Look for "crafting: made" lines and the /tk inv replies.
+loaded
+idle
+chat /tk mode survival
+until mode survival within 10
+chat /tk give base:oak_log 1
+chat /tk inv me
+press core:inventory
+until screen core:menu within 10
+wait 1
+shot book_hands_open.png
+# The first recipe is the one you can make: oak planks from the log.
+tap_once core:menu class:slot
+wait 1
+shot book_hands_picked.png
+tap core:menu text:all (
+wait 1
+chat /tk inv me
+until chat base:oak_planks within 5
+shot book_hands_after.png
+key Escape
+until screen none within 10
+quit

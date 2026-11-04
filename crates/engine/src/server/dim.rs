@@ -574,16 +574,23 @@ pub fn see_through(c: &Content, cube: &Cube) -> u16 {
 /// a tool that harvests it.
 /// Seconds it takes a player to mine a block, as client and server agree: vanilla's five times as
 /// slow with the head in a liquid, and again off the ground.
-pub fn mining_time(c: &Content, state: u32, tool: u32, head_wet: bool, on_ground: bool, speed: f32) -> f32 {
+pub fn mining_time(c: &Content, state: u32, tool: &ItemStack, head_wet: bool, on_ground: bool, speed: f32) -> f32 {
     break_time(c, state, tool) * if head_wet { 5.0 } else { 1.0 } * if on_ground { 1.0 } else { 5.0 } / speed
 }
 
-pub fn break_time(c: &Content, state: u32, tool: u32) -> f32 {
+pub fn break_time(c: &Content, state: u32, tool: &ItemStack) -> f32 {
+    // A broken tool kept in the hand mines like the hand.
+    let tool = if c.broken(tool) { &ItemStack::EMPTY } else { tool };
     let s = &c.states[state as usize];
     if s.hardness < 0.0 {
         return f32::INFINITY;
     }
-    let speed = if c.tool_fits(state, tool) { c.item_value::<f32>(tool, c.ids.mining_speed).unwrap_or(1.0) } else { 1.0 };
+    let speed = if c.tool_fits(state, tool.item) {
+        c.stack_value::<f32>(tool, c.ids.mining_speed)
+            .unwrap_or(1.0)
+    } else {
+        1.0
+    };
     s.hardness * if c.harvests(state, tool) { 1.5 } else { 5.0 } / speed
 }
 
@@ -601,7 +608,7 @@ impl Dim {
     /// Writes the fields clients show (`registry::HEALTH` ...) into their synced components when
     /// they differ, so they travel like mods' components. Absent ones stay absent while default.
     pub fn mirror_fields(&mut self, c: &Content) {
-        let [health, burning, worn, shape, held, mount] = c.game.field_comps;
+        let [health, burning, worn, shape, held, mount, held_look] = c.game.field_comps;
         let maxes: Vec<(u64, f32)> = self
             .entities
             .list
@@ -650,12 +657,13 @@ impl Dim {
             }
             put(comps, mount, &on);
             if e.player {
-                let item = inventories
+                let stack = inventories
                     .get(&e.id)
                     .and_then(|i| i.get(e.selected as usize))
-                    .filter(|s| !s.is_empty())
-                    .map_or(0, |s| s.item);
-                put(comps, held, &item.to_le_bytes());
+                    .filter(|s| !s.is_empty());
+                put(comps, held, &stack.map_or(0, |s| s.item).to_le_bytes());
+                let look = stack.and_then(crate::stack::look).unwrap_or("");
+                put(comps, held_look, look.as_bytes());
             }
         }
     }
@@ -1166,8 +1174,10 @@ impl Dim {
         if !self.ask(c, abi::question::ATTACK, &mut q) {
             return false;
         }
-        let base = if held.item != 0 {
-            c.items.get(held.item as usize).map_or(1.0, |i| i.attack)
+        let base = if held.item != 0 && !c.broken(&held) {
+            // The stack's own attack damage first (an item built from parts), else its item's.
+            c.stack_value::<f32>(&held, c.ids.attack_damage)
+                .unwrap_or_else(|| c.items.get(held.item as usize).map_or(1.0, |i| i.attack))
         } else if player {
             1.0
         } else {

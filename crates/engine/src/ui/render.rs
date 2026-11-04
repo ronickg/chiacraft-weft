@@ -756,19 +756,32 @@ impl UiRenderer {
         let looks = crate::client::looks::current();
         match looks.slot_draw(c, item) {
             crate::client::looks::ItemDraw::Model(model) => self.boxes_icon(tex, x, y, size, model, &c.states[0]),
-            crate::client::looks::ItemDraw::Icon(icon) => self.quads.push(Quad {
-                p0: [x, y],
-                u: [size, 0.0],
-                v: [0.0, size],
-                uv: [0.0, 0.0, 1.0, 1.0],
-                color: 0xFFFFFFFF,
-                tex: tex.texture(icon),
-                mode: ui_mode::ICON,
-                ..Default::default()
-            }),
+            crate::client::looks::ItemDraw::Icon(icon) => self.icon(tex, x, y, size, icon),
             crate::client::looks::ItemDraw::Block(state) => self.state_icon(c, tex, x, y, size, state),
             crate::client::looks::ItemDraw::Nothing => {}
         }
+    }
+
+    /// A stack's icon: its own look (`abi::comp::LOOK`) if it has one, else its item's.
+    pub fn stack_item_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, stack: &weft_abi::ItemStack) {
+        match crate::stack::look(stack).and_then(|l| tex.look(l)) {
+            Some(t) => self.icon(tex, x, y, size, t),
+            None => self.item_icon(c, tex, x, y, size, stack.item),
+        }
+    }
+
+    /// Texture `t` as a flat icon.
+    fn icon(&mut self, tex: &GameTextures, x: f32, y: f32, size: f32, t: u32) {
+        self.quads.push(Quad {
+            p0: [x, y],
+            u: [size, 0.0],
+            v: [0.0, size],
+            uv: [0.0, 0.0, 1.0, 1.0],
+            color: 0xFFFFFFFF,
+            tex: tex.texture(t),
+            mode: ui_mode::ICON,
+            ..Default::default()
+        });
     }
 
     /// A block state the way block items show: a sprite for flat blocks, else an isometric model.
@@ -939,11 +952,11 @@ impl UiRenderer {
         let s = 16.0 * scale;
         let (x, y) = (r.x + (r.w - s) / 2.0, r.y + (r.h - s) / 2.0);
         let i = icon * scale;
-        self.item_icon(c, textures, r.x + (r.w - i) / 2.0, r.y + (r.h - i) / 2.0, i, stack.item);
-        let def = &c.items[stack.item as usize];
+        self.stack_item_icon(c, textures, r.x + (r.w - i) / 2.0, r.y + (r.h - i) / 2.0, i, &stack);
+        let max = c.max_durability(&stack);
         let damage = crate::stack::damage(&stack);
-        if def.durability > 0 && damage > 0 {
-            let f = 1.0 - damage as f32 / def.durability as f32;
+        if max > 0 && damage > 0 {
+            let f = 1.0 - damage as f32 / max as f32;
             let bar = Rect { x: x + scale, y: y + s - 2.0 * scale, w: 14.0 * scale, h: 2.0 * scale };
             self.rect(bar, 0x000000FF);
             let g = (f * 255.0) as u32;

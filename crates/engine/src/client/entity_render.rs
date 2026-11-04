@@ -145,16 +145,16 @@ pub struct EntityRenderer {
     seen_kinds: Vec<bool>,
     seen_items: Vec<bool>,
     /// Item models drawn instanced: pipelines for the world and the hand, each item's boxes
-    /// (first, count) in `item_boxes`, the GPU copy (buffer, capacity, boxes uploaded) and the
-    /// texture generation they were made with.
+    /// (first, count) in `item_boxes` by `model_key`, the GPU copy (buffer, capacity, boxes
+    /// uploaded) and the texture generation they were made with.
     item_pipe: PipelineId,
     hand_item_pipe: PipelineId,
-    item_models: FxHashMap<u32, (u32, u32)>,
+    item_models: FxHashMap<u64, (u32, u32)>,
     item_boxes: Vec<GpuBox>,
     item_buf: Option<(BufferId, u32, usize)>,
     item_generation: u64,
-    /// This frame's item instances: (item, instance).
-    instances: Vec<(u32, GpuBox)>,
+    /// This frame's item instances: (model key, instance).
+    instances: Vec<(u64, GpuBox)>,
 }
 
 fn shader(assets: &Assets) -> Result<Shader, ShaderError> {
@@ -653,47 +653,26 @@ impl EntityRenderer {
         let img = assets
             .read(&name, "textures", "png")
             .and_then(|b| decode_png(&b));
-        let sprite = img.map(|img| {
-            let size = img.width;
-            // Animated strips: the first frame.
-            let solid = |x: i64, y: i64| {
-                (0..size as i64).contains(&x)
-                    && (0..size as i64).contains(&y)
-                    && img
-                        .rgba
-                        .get((y as usize * size as usize + x as usize) * 4 + 3)
-                        .is_some_and(|&a| a >= 128)
-            };
-            let pixels = (0..size * size)
-                .map(|i| ((i % size) as i64, (i / size) as i64))
-                .filter(|&(x, y)| solid(x, y))
-                .map(|(x, y)| {
-                    (
-                        x as u8,
-                        y as u8,
-                        solid(x - 1, y) as u32
-                            | (solid(x + 1, y) as u32) << 1
-                            | (solid(x, y + 1) as u32) << 2
-                            | (solid(x, y - 1) as u32) << 3,
-                    )
-                })
-                .collect();
-            Sprite { size, pixels }
-        });
+        let sprite = img.map(|img| sprite_of(img.width, &img.rgba));
         self.sprites.insert(name, sprite);
     }
 
     /// An item's model as boxes in the unit cube, made once: a block item's shape, else its
-    /// sprite one texel thick (flat when the sprite could not be read). (first box, count).
-    fn item_model(&mut self, textures: &GameTextures, item: u32) -> Option<(u32, u32)> {
-        if let Some(&m) = self.item_models.get(&item) {
-            return Some(m);
+    /// sprite one texel thick (flat when the sprite could not be read); a stack with a look of
+    /// its own (`abi::comp::LOOK`) is that picture. (model key, (first box, count)).
+    fn item_model(&mut self, textures: &GameTextures, item: u32, look: Option<&str>) -> Option<(u64, (u32, u32))> {
+        let look = look.and_then(|l| textures.look(l));
+        let key = model_key(item, look);
+        if let Some(&m) = self.item_models.get(&key) {
+            return Some((key, m));
         }
         let c = content();
         let first = self.item_boxes.len();
         let white = Vec4::new(1.0, 1.0, 1.0, 0.0);
         let looks = super::looks::current();
         let sprite = match looks.item_draw(c, item) {
+            _ if c.items.get(item as usize).is_none() || item == 0 => return None,
+            _ if look.is_some() => look,
             ItemDraw::Model(model) => {
                 boxes_shape(&mut self.item_boxes, textures, Mat4::IDENTITY, model, &c.states[0], white);
                 None
@@ -711,10 +690,14 @@ impl EntityRenderer {
         };
         if let Some(t) = sprite {
             let l = textures.texture(t);
-            match sprite_name(item)
-                .and_then(|n| self.sprites.get(&n))
-                .and_then(|s| s.as_ref())
-            {
+            // A look's pixels come with its texture, once it has loaded (a load remakes models).
+            let own = look.and_then(|t| textures.look_pixels(t)).map(|(size, rgba)| sprite_of(size, &rgba));
+            let from_file = || {
+                sprite_name(item)
+                    .and_then(|n| self.sprites.get(&n))
+                    .and_then(|s| s.as_ref())
+            };
+            match own.as_ref().or_else(|| look.is_none().then(from_file).flatten()) {
                 Some(sp) => {
                     let n = sp.size as f32;
                     // Only the outline: a side face against a neighboring pixel would fight
@@ -744,8 +727,8 @@ impl EntityRenderer {
             }
         }
         let m = (first as u32, (self.item_boxes.len() - first) as u32);
-        self.item_models.insert(item, m);
-        Some(m)
+        self.item_models.insert(key, m);
+        Some((key, m))
     }
 
     /// Item models made since the last upload go to the GPU; a new texture generation remakes
@@ -984,8 +967,8 @@ impl EntityRenderer {
         posed.clear();
         let mut frame_builds = std::mem::take(&mut self.frame_builds);
         frame_builds.clear();
-        // Who holds something: its place in `posed`, the item and its light.
-        let mut holders: Vec<(usize, u32, u32)> = Vec::new();
+        // Who holds something: its place in `posed`, the item, its look and its light.
+        let mut holders: Vec<(usize, u32, Option<&str>, u32)> = Vec::new();
         // The player's own body in first person only casts its shadow (`shadow_me`).
         for (id, e, shadow_only) in entities
             .iter()
@@ -1005,8 +988,8 @@ impl EntityRenderer {
             // Below zero the model's shader flashes white instead of red.
             let hurt = if e.flash > 0.0 { -1.0 } else { (e.hurt / 0.5).clamp(0.0, 1.0) };
             if !e.item.is_empty() {
-                if let Some(m) = self.item_model(textures, e.item.item) {
-                    instances.push((e.item.item, item_instance(ground_transform(base, e.age, e.item.item), m.0, hurt, lit)));
+                if let Some((key, m)) = self.item_model(textures, e.item.item, crate::stack::look(&e.item)) {
+                    instances.push((key, item_instance(ground_transform(base, e.age, e.item.item), m.0, hurt, lit)));
                 }
                 continue;
             }
@@ -1138,7 +1121,7 @@ impl EntityRenderer {
                 shadow_only,
             });
             if e.held != 0 && !sleeping && !shadow_only {
-                holders.push((posed.len() - 1, e.held, lit));
+                holders.push((posed.len() - 1, e.held, e.held_look.as_deref(), lit));
             }
         }
         let vb = scene_buf;
@@ -1146,7 +1129,7 @@ impl EntityRenderer {
         let first_bone = self.models.bones_so_far();
         self.models.add_many(&posed, &frame_builds);
         let (mut at, mut next) = (first_bone, 0);
-        for (holder, item, lit) in holders {
+        for (holder, item, look, lit) in holders {
             at += posed[next..holder]
                 .iter()
                 .filter_map(|p| self.models.kinds.get(p.kind as usize))
@@ -1166,8 +1149,8 @@ impl EntityRenderer {
                 continue;
             };
             let arm = self.models.bone(at + i) * Mat4::from_translation(Vec3::from_array(parts[i].pivot));
-            if let Some(m) = self.item_model(textures, item) {
-                instances.push((item, item_instance(held_transform(arm, item), m.0, 0.0, lit)));
+            if let Some((key, m)) = self.item_model(textures, item, look) {
+                instances.push((key, item_instance(held_transform(arm, item), m.0, 0.0, lit)));
             }
         }
         self.posed = posed;
@@ -1297,8 +1280,8 @@ impl EntityRenderer {
             match hand_transform(cam, &h, pose.unwrap_or(Mat4::IDENTITY)) {
                 Some(m) => {
                     hand_item = self
-                        .item_model(textures, h.stack.item)
-                        .map(|(first, n)| (item_instance(m, first, 0.0, shade(cam.pos)), n))
+                        .item_model(textures, h.stack.item, crate::stack::look(&h.stack))
+                        .map(|(_, (first, n))| (item_instance(m, first, 0.0, shade(cam.pos)), n))
                 }
                 None => {
                     // The arm is the player model's own right arm bone.
@@ -1351,9 +1334,9 @@ impl EntityRenderer {
             list.bind(crate::gpu_layout::bind::entity::ITEM_BOXES, ib);
             let mut i = 0;
             while i < instances.len() {
-                let item = instances[i].0;
-                let run = instances[i..].iter().take_while(|x| x.0 == item).count();
-                let boxes_per = self.item_models.get(&item).map_or(0, |m| m.1);
+                let key = instances[i].0;
+                let run = instances[i..].iter().take_while(|x| x.0 == key).count();
+                let boxes_per = self.item_models.get(&key).map_or(0, |m| m.1);
                 list.push(Cmd::Draw {
                     vertices: boxes_per * 36,
                     instances: run as u32,
@@ -1435,6 +1418,35 @@ fn fire_boxes(out: &mut Vec<GpuBox>, textures: &GameTextures, base: Vec3, width:
             ..Default::default()
         });
     }
+}
+
+/// Opaque pixels of a picture (a strip's first frame) and their neighbors.
+fn sprite_of(size: u32, rgba: &[u8]) -> Sprite {
+    let solid = |x: i64, y: i64| {
+        (0..size as i64).contains(&x)
+            && (0..size as i64).contains(&y)
+            && rgba
+                .get((y as usize * size as usize + x as usize) * 4 + 3)
+                .is_some_and(|&a| a >= 128)
+    };
+    let pixels = (0..size * size)
+        .map(|i| ((i % size) as i64, (i / size) as i64))
+        .filter(|&(x, y)| solid(x, y))
+        .map(|(x, y)| {
+            (
+                x as u8,
+                y as u8,
+                solid(x - 1, y) as u32 | (solid(x + 1, y) as u32) << 1 | (solid(x, y + 1) as u32) << 2 | (solid(x, y - 1) as u32) << 3,
+            )
+        })
+        .collect();
+    Sprite { size, pixels }
+}
+
+/// Item models by item and, for a stack with a look of its own, that look's texture id: one
+/// item drawn from many looks has a model per look.
+fn model_key(item: u32, look: Option<u32>) -> u64 {
+    item as u64 | look.map_or(0, |t| t as u64 + 1) << 32
 }
 
 /// Texture a held item is drawn from as a solid sprite: its icon, or the texture of a plant block.
