@@ -31,6 +31,7 @@ mod canyons;
 pub mod caves;
 mod craters;
 mod karst;
+pub mod landmarks;
 mod net;
 
 /// Salts of our own noises (the engine's are in `weft_noise::fixed::salt`).
@@ -55,6 +56,8 @@ pub mod salt {
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
     pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const ARCHES: u64 = 0xA2C;
+    pub const FALLS: u64 = 0xFA11;
     pub const SINKS: u64 = 0x4A9;
     pub const CRATERS: u64 = 0xC4A7;
     pub const FACE_COAL: u64 = 0x0C0A;
@@ -404,6 +407,22 @@ pub const CRATER_RADIUS: (i32, i32) = (20, 30);
 pub const CRATER_DEPTH: f64 = 0.65;
 pub const CRATER_RIM: (i32, i32) = (5, 8);
 pub const CRATER_RIM_OUT: f64 = 1.8;
+
+/// Natural arches (Ronald, 11-04: "all four"; `land::landmarks`): at most one per `ARCH_CELL`
+/// square, kept with `ARCH_CHANCE` where it fits: in the strata land on level ground, or in the
+/// shallow sea off a cliff coast (a sea arch, of the cliffs' rock). A half ring `ARCH_INNER` blocks
+/// inside, `ARCH_THICK` thick and `ARCH_DEPTH` deep, its legs down to the ground.
+pub const ARCH_CELL: i32 = 512;
+pub const ARCH_CHANCE: f64 = 0.6;
+pub const ARCH_INNER: (i32, i32) = (5, 9);
+pub const ARCH_THICK: (i32, i32) = (3, 4);
+pub const ARCH_DEPTH: (i32, i32) = (3, 5);
+/// Sea-cliff waterfalls (`land::landmarks`): in one `FALL_CELL` square in `1 / FALL_CHANCE`, the
+/// first sea cliff `FALL_CLIFF` or more over the sea in it gets a spring two under its top,
+/// falling into the sea.
+pub const FALL_CELL: i32 = 256;
+pub const FALL_CHANCE: f64 = 0.3;
+pub const FALL_CLIFF: i32 = 8;
 
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
@@ -1652,6 +1671,33 @@ mod tests {
         assert!(!sinks.is_empty(), "no sinkhole in 6 km");
         for &(x, z, _) in &sinks {
             assert!(land_height(&f, x * 16, z * 16) <= q4((SEA - SINK_FLOOR) as f64), "sinkhole at {x} {z} holds no water");
+        }
+    }
+
+    #[test]
+    fn arches_stand_and_waterfalls_fall_into_the_sea() {
+        let f = fields(7);
+        let arches = landmarks::arches_near(&f, 0, 0, 3000);
+        assert!(!arches.is_empty(), "no arch within 3 km");
+        for a in &arches {
+            // The ring's top and both legs' feet.
+            let leg = (a.inner + a.outer) / 2;
+            let (lx, lz) = if a.along_x { (leg, 0) } else { (0, leg) };
+            assert!(a.holds(a.x, a.base + (a.inner + a.outer) / 2, a.z, i32::MIN), "arch at {} {}: no top", a.x, a.z);
+            assert!(
+                a.holds(a.x + lx, a.base - 1, a.z + lz, a.base - 2) && a.holds(a.x - lx, a.base - 1, a.z - lz, a.base - 2),
+                "arch at {} {}: no legs",
+                a.x,
+                a.z
+            );
+            assert!(!a.holds(a.x, a.base, a.z, i32::MIN), "arch at {} {}: filled under", a.x, a.z);
+        }
+        let falls = landmarks::waterfalls_near(&f, 0, 0, 3000);
+        assert!(!falls.is_empty(), "no waterfall within 3 km");
+        for w in &falls {
+            let [x, y, z] = w.spring;
+            assert!(height(&f, x * 16, z * 16) >> 4 > y, "a spring at {x} {z} over its ground");
+            assert!(height(&f, w.front[0] * 16, w.front[1] * 16) >> 4 < SEA, "a waterfall at {x} {z} not over the sea");
         }
     }
 
