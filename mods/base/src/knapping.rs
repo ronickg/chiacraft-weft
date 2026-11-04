@@ -179,7 +179,8 @@ fn screen(ui: &mut Ui) {
                         let class = if head.keeps(i) { "slot_highlight" } else { "slot" };
                         let s = S::default().size(18.0, 18.0).class(class);
                         if k.removed & (1 << i) != 0 {
-                            ui.button_with(s.disabled(true), |_| {}, |_| {});
+                            // Struck away: an empty space.
+                            ui.column(S::col().size(18.0, 18.0), |_| {});
                         } else {
                             ui.button_with(
                                 s,

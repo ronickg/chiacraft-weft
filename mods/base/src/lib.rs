@@ -15,6 +15,7 @@ mod fall;
 mod farming;
 mod felled;
 mod felling;
+mod firebed;
 mod first;
 mod growth;
 mod hints;
@@ -105,6 +106,7 @@ fn init(r: &mut Registry) {
     parts::register(r);
     first::register(r);
     knapping::register(r);
+    firebed::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);

@@ -212,6 +212,30 @@ pub const HAND_PART_GRADE: u32 = 3;
 /// knapping skill, as from the book), no station.
 pub const HEAD_MATERIAL_POINTS: u32 = 24;
 
+/// The first fire (Ronald, 11-05: "Fire bed + bow drill"): a fire bed of sticks and tinder (fibre)
+/// put on the ground, lit by holding a drill on it. Friction fire, for real: a bow drill gives an
+/// ember in under a minute with good wood, a hand drill took 3-4 minutes over 370 wood pairs and
+/// often failed (`reports/The first hours.md`).
+pub const FIRE_BED_STICKS: u32 = 3;
+/// A drill: (seconds held, the chance it gives an ember, uses before it's worn out).
+#[derive(Clone, Copy, Debug)]
+pub struct Drill {
+    pub item: &'static str,
+    pub secs: f32,
+    pub chance: f32,
+    pub uses: u32,
+}
+pub const BOW_DRILL: Drill = Drill { item: "bow_drill", secs: 6.0, chance: 0.7, uses: 12 };
+pub const HAND_DRILL: Drill = Drill { item: "hand_drill", secs: 10.0, chance: 0.35, uses: 6 };
+pub const DRILLS: [Drill; 2] = [BOW_DRILL, HAND_DRILL];
+/// Blocks over a fire bed that keep the rain off it.
+pub const ROOF_REACH: i32 = 24;
+
+/// Seconds to an ember, on average, with a drill: its holds until one takes.
+pub fn ember_secs(d: Drill) -> f32 {
+    d.secs / d.chance
+}
+
 /// What the first stone axe takes, start to finish, for a player who knows the way, in seconds:
 /// the sum of the steps' own times (walking left out). The timing table in `notes/FIRST_HOURS.md`.
 pub fn axe_hands_secs() -> f32 {
@@ -278,6 +302,12 @@ mod tests {
         // More than a minute of the hands' own work for one who knows the way, less than three.
         let s = axe_hands_secs();
         assert!((15.0..180.0).contains(&s), "{s} s");
+    }
+
+    #[test]
+    fn the_bow_drill_beats_the_hand_drill() {
+        assert!(ember_secs(BOW_DRILL) < 15.0 && ember_secs(HAND_DRILL) > 2.0 * ember_secs(BOW_DRILL));
+        assert!(BOW_DRILL.uses > HAND_DRILL.uses);
     }
 
     #[test]
