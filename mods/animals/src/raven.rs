@@ -27,5 +27,5 @@ static WINGS: Wings = Wings {
 };
 
 pub fn init(r: &mut Registry) {
-    birds::register(r, &[(&RAVEN, 17)], &WINGS);
+    birds::register(r, &[&RAVEN], &WINGS);
 }

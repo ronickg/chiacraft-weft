@@ -127,6 +127,9 @@ fn data_dir() -> String {
 
 fn init(r: &mut Registry) {
     dog::init(r);
+    for p in species::problems() {
+        weft_sdk::error!("{p}");
+    }
     // The full creatures' resting state, before they attach it.
     rest::init(r);
     cat::init(r);
@@ -209,17 +212,14 @@ pub(crate) fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
     (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)
 }
 
-/// Knocked out: lying down (`index` into `species::SPECIES`; the raptors, the wyvern and the jaguar
-/// as they rest, `rest.rs`).
+/// Knocked out: lying down (the raptors, the wyvern and the jaguar as they rest, `rest.rs`).
 fn sleep(w: &World, id: u64, _index: usize) {
     rest::sleep(w, id);
 }
 
-/// Up from resting, to follow or fight (`index` into `species::SPECIES`).
-fn wake(w: &World, id: u64, index: usize) {
-    match index {
-        1..=6 | 33 | 34 => rest::wake(w, id),
-        7..=12 | 15 | 16 | 18..=22 | 31 | 32 => wild::wake(w, id),
-        _ => {}
-    }
+/// Up from resting, to follow or fight: whichever resting state its kind has (`rest.rs` for the
+/// full creatures, `wild.rs` for the simple ones; the others have none).
+fn wake(w: &World, id: u64, _index: usize) {
+    rest::wake(w, id);
+    wild::wake(w, id);
 }

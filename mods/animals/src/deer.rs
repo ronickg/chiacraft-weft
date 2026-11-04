@@ -24,5 +24,5 @@ static BODY: Body = Body {
 };
 
 pub fn init(r: &mut Registry) {
-    wild::register(r, &[(&WHITE_TAILED_DEER, 11), (&RED_DEER, 12)], &BODY);
+    wild::register(r, &[&WHITE_TAILED_DEER, &RED_DEER], &BODY);
 }

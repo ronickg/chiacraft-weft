@@ -169,7 +169,7 @@ fn nest_spot(w: &World, n: [f64; 3]) -> [f64; 3] {
 /// An egg of species `index`'s size against the Velociraptor's (eggs grow more slowly than
 /// bodies).
 fn egg_size(index: usize) -> f32 {
-    (SPECIES[index].height.0 / SPECIES[3].height.0).powf(EGG_GROWTH)
+    (SPECIES[index].height.0 / SPECIES[crate::species::of(&crate::raptor::RAPTOR)].height.0).powf(EGG_GROWTH)
 }
 
 /// A nest's width.

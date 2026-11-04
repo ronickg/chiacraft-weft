@@ -228,7 +228,7 @@ fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
     };
     if let Some(lush) = lush {
         a.food = (a.stat(species::FOOD) * (ARRIVES_FED + (1.0 - ARRIVES_FED) * lush)).round() as u16;
-        weft_sdk::info!(
+        weft_sdk::debug!(
             "wild {} {id} arrives {:.0}% fed (its {} at {:.0}% here this season)",
             s.name,
             a.food as f32 / a.stat(species::FOOD) * 100.0,
@@ -284,7 +284,7 @@ fn catch_up(w: &World, id: u64, index: usize, a: &mut Animal, away: u64, pos: [f
     }
     crate::breeding::count(&crate::breeding::OLD, index);
     crate::breeding::count(&crate::breeding::BORN, index);
-    weft_sdk::info!(
+    weft_sdk::debug!(
         "wild {} {id} died while away ({} days); a successor {} days old took its place",
         s.name,
         away / life::DAY,

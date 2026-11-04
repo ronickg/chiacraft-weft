@@ -135,15 +135,16 @@ pub fn init(r: &mut Registry) {
 // ------------------------------------------------------------------ behavior
 
 fn goals() -> Goals {
+    let index = species::of(&CHIHUAHUA);
     Goals::new()
-        .then(animal::upkeep(0))
+        .then(animal::upkeep(index))
         .then(upkeep)
-        .then(taming::behave(0))
+        .then(taming::behave(index))
         .then(crate::hunt::wary)
         .then(crate::hunt::hunt)
         .then(signatures::alarm)
         .then(signatures::tracking)
-        .then(commands::act(0))
+        .then(commands::act(index))
         .then(|w: &World, id: u64, st: &EntityState| {
             // Hurt: runs about for three seconds.
             if w.component(id, &DOG).is_none_or(|d| d.panic == 0) {
@@ -155,7 +156,7 @@ fn goals() -> Goals {
             }
             true
         })
-        .then(crate::breeding::behave(0))
+        .then(crate::breeding::behave(index))
         .then(commands::hold)
         .then(crate::comfort::seek)
         .then(crate::forage::forage)
@@ -204,7 +205,11 @@ fn interact(e: &mut EntityEvent) {
         return;
     }
     // Something an animal drops (and the dog doesn't eat): it tracks that animal down.
-    if species::SPECIES[0].food(held.item).is_none() && signatures::track(&w, id, held.item) {
+    if species::SPECIES[species::of(&CHIHUAHUA)]
+        .food(held.item)
+        .is_none()
+        && signatures::track(&w, id, held.item)
+    {
         return;
     }
     commands::interact(&w, id, player);

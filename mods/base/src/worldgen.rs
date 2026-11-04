@@ -20,6 +20,12 @@ static SAND_TAG: Tag = Tag::named("sand");
 /// grass on plantable soil, which trees and flowers (block lists the engine checks), and tags `frozen` (nothing grows, set by
 /// `.frozen(..)`), `dry` (cacti).
 pub static TREES: Component<f32> = Component::named("trees");
+/// Boulders: the chance of a heap of stone per 12 x 12 cell (`boulder`).
+pub static BOULDERS: Component<f32> = Component::named("boulders");
+/// Where a forest stands thick: the chance of a tree per 3 x 3 cell in its stands, on top of
+/// `TREES`, with clearings left open between them. Mature stands hold 170-244 trees a hectare
+/// (Research round 7): a 5 x 5 site at 0.4 is 160, a 3 x 3 one at 0.2 adds 220 in the stands.
+pub static STAND_TREES: Component<f32> = Component::named("stand_trees");
 pub static GRASS_COVER: Component<f32> = Component::named("grass");
 /// The logs of the trees a biome grows, with weights: `"base:birch_log:1 base:oak_log:4"`
 /// (oaks where unset).
@@ -28,7 +34,7 @@ pub static TREE_KINDS: Component<BlockList> = Component::named("tree_kinds");
 pub static FLOWERS: Component<BlockList> = Component::named("flowers");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
 pub use base_api::trees::{TREE_LEAVES, grow_tree};
-use base_api::trees::{tree_at, tree_blocks};
+use base_api::trees::{tree_blocks, wild_tree_at};
 static FROZEN: Tag = Tag::named("frozen");
 static DRY: Tag = Tag::named("dry");
 
@@ -50,6 +56,7 @@ pub fn register(r: &mut Registry) {
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
     r.biome(&PLAINS)
         .set(&CLIMATE, base_api::climate("base:plains"))
+        .set(&BOULDERS, 0.05)
         .surface("grass", "dirt", 3)
         .tag("animals")
         .tag("spawn_biome")
@@ -57,6 +64,7 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:plains").unwrap_or(vitals::forage::GRASS_COVER_ELSE));
     r.biome(&FOREST)
         .set(&CLIMATE, base_api::climate("base:forest"))
+        .set(&BOULDERS, 0.12)
         .humidity(0.25..)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x79c05a)
@@ -64,10 +72,12 @@ pub fn register(r: &mut Registry) {
         .tag("forest")
         .tag("animals")
         .set(&TREES, 0.4)
+        .set(&STAND_TREES, 0.2)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
     r.biome(&BIRCH_FOREST)
         .set(&CLIMATE, base_api::climate("base:birch_forest"))
+        .set(&BOULDERS, 0.1)
         .temperature(..0.1)
         .humidity(0.05..)
         .surface("grass", "dirt", 3)
@@ -77,9 +87,11 @@ pub fn register(r: &mut Registry) {
         .tag("animals")
         .set(&TREES, 0.45)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:birch_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set(&STAND_TREES, 0.2)
         .set_text(&TREE_KINDS, "base:birch_log");
     r.biome(&TAIGA)
         .set(&CLIMATE, base_api::climate("base:taiga"))
+        .set(&BOULDERS, 0.25)
         .temperature(..-0.15)
         .surface("podzol", "dirt", 3)
         .tint(grass, 0x86b783)
@@ -90,9 +102,11 @@ pub fn register(r: &mut Registry) {
         .tag("animals")
         .set(&TREES, 0.45)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:taiga").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set(&STAND_TREES, 0.25)
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&SNOWY)
         .set(&CLIMATE, base_api::climate("base:snowy_plains"))
+        .set(&BOULDERS, 0.2)
         .snows()
         .temperature(..-0.45)
         .surface("snowy_grass", "dirt", 3)
@@ -106,6 +120,7 @@ pub fn register(r: &mut Registry) {
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&DESERT)
         .set(&CLIMATE, base_api::climate("base:desert"))
+        .set(&BOULDERS, 0.04)
         .temperature(0.35..)
         .humidity(..0.0)
         .surface("sand", "sand", 3)
@@ -120,6 +135,7 @@ pub fn register(r: &mut Registry) {
     // Hot grassland with few trees, between the desert and the forests (wet and dry seasons).
     r.biome(&SAVANNA)
         .set(&CLIMATE, base_api::climate("base:savanna"))
+        .set(&BOULDERS, 0.04)
         .temperature(0.2..)
         .humidity(..0.2)
         .surface("grass", "dirt", 3)
@@ -143,11 +159,14 @@ pub fn register(r: &mut Registry) {
         .tag("wet")
         .tag("animals")
         .set(&TREES, 0.12)
+        // Palm groves on the higher ground (the Pantanal's capões).
+        .set(&STAND_TREES, 0.1)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:swamp").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         // The Pantanal's acuri palms on the ground above the flood, a few moriches and oaks.
         .set_text(&TREE_KINDS, "base:acuri_palm_log:3 base:moriche_palm_log:1 base:oak_log:1");
     r.biome(&MOUNTAINS)
         .set(&CLIMATE, base_api::climate("base:mountains"))
+        .set(&BOULDERS, 0.4)
         .surface("grass", "dirt", 3)
         .bare_above(130)
         .tint(grass, 0x8ab689)
@@ -155,6 +174,7 @@ pub fn register(r: &mut Registry) {
         .tag("mountain")
         .tag("animals")
         .set(&TREES, 0.06)
+        .set(&STAND_TREES, 0.08)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:mountains").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&OCEAN)
@@ -228,23 +248,96 @@ pub fn register(r: &mut Registry) {
         .caves(Caves::new("lava", i32::MIN, 11));
 
     // Trees wherever a biome asks for them, in any dimension.
+    // Trees wherever a biome asks for them, in any dimension: a site per 5 x 5 cell, left open in
+    // a forest's clearings; and where a forest stands thick (`STAND_TREES`), more in its stands, a
+    // site per 3 x 3 cell. Stands and clearings follow one smooth noise (`stand`), so woods have
+    // groves and glades instead of trees spread evenly.
     r.scatter(&TREE_SITES)
         .cell(5)
-        .reach(3)
+        .reach(8)
         .density(&TREES)
         .shape(|s| {
-            let [x, y, z] = s.pos();
-            let log = TREE_KINDS
-                .on_biome(s.biome())
-                .and_then(|l| l.pick(s.random() >> 40))
-                .unwrap_or(OAK_LOG.id());
-            let Some(t) = tree_at(log, x, y, z, s.random() >> 32) else { return };
-            tree_blocks(&t, |x, y, z, state, force| if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) });
+            if STAND_TREES.on_biome(s.biome()).is_some() && stand(s.seed(), s.pos()) < -CLEARING && s.random() % 4 != 0 {
+                return;
+            }
+            tree(s);
         });
+    r.scatter(&STAND_SITES)
+        .cell(3)
+        .reach(8)
+        .density(&STAND_TREES)
+        .shape(|s| {
+            if stand(s.seed(), s.pos()) > STAND {
+                tree(s);
+            }
+        });
+    // Boulders where a biome has them (`BOULDERS`): a heap of stone two to five blocks across, half
+    // sunk in the ground, mossy in the woods and the wet.
+    r.scatter(&BOULDER_SITES)
+        .cell(12)
+        .reach(3)
+        .density(&BOULDERS)
+        .shape(boulder);
     r.decorate(decorate);
 }
 
+/// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet.
+fn boulder(s: &mut Site) {
+    let [x, y, z] = s.pos();
+    let h = s.random();
+    let mossy = WET.on_biome(s.biome()) || WOODS.on_biome(s.biome());
+    let r = 1 + (h % 3) as i32;
+    for dy in -1..=r {
+        for dz in -r..=r {
+            for dx in -r..=r {
+                let bump = (hash(h, (x + dx) as i64, (y + dy) as i64, (z + dz) as i64) % 3) as i32;
+                if dx * dx + 2 * dy * dy + dz * dz > r * r + bump {
+                    continue;
+                }
+                let pick = hash(h ^ 0xB0, (x + dx) as i64, (y + dy) as i64, (z + dz) as i64) % 4;
+                let block = match pick {
+                    0 if mossy => MOSSY_COBBLESTONE.id(),
+                    0 | 1 => COBBLESTONE.id(),
+                    _ => STONE.id(),
+                };
+                s.force([x + dx, y + dy, z + dz], block);
+            }
+        }
+    }
+}
+
 static TREE_SITES: Scatter = Scatter::named("trees");
+static STAND_SITES: Scatter = Scatter::named("stand_trees");
+static BOULDER_SITES: Scatter = Scatter::named("boulders");
+static WET: Tag = Tag::named("wet");
+static WOODS: Tag = Tag::named("forest");
+
+/// The stand noise over the ground, about -4096 to 4096: a forest's stands where it's over
+/// `STAND`, its clearings where it's under `-CLEARING`; one patch is some 40 blocks across.
+fn stand(seed: u64, [x, _, z]: [i32; 3]) -> i32 {
+    fixed::perlin2(fixed::seed32(seed, 0x57A4D), x * 16, z * 16, 40 * 16)
+}
+const STAND: i32 = 600;
+/// Which flower a column of a flower patch grows: one kind to a patch (its 16 x 16 cell), a few
+/// strays of the others.
+fn flower_kind(seed: u64, wx: i32, wz: i32, h: u64) -> u64 {
+    if h >> 60 == 0 { h >> 32 } else { hash(seed ^ 0xF70, (wx >> 4) as i64, 0, (wz >> 4) as i64) }
+}
+
+/// Where the meadow noise is over this, flowers grow thick (a sixth of the ground or so).
+const FLOWER_MEADOW: f64 = 0.72;
+const CLEARING: i32 = 1600;
+
+/// A tree of the biome's kinds (`TREE_KINDS`) at a scatter's site.
+fn tree(s: &mut Site) {
+    let [x, y, z] = s.pos();
+    let log = TREE_KINDS
+        .on_biome(s.biome())
+        .and_then(|l| l.pick(s.random() >> 40))
+        .unwrap_or(OAK_LOG.id());
+    let Some(t) = wild_tree_at(log, x, y, z, s.random() >> 32) else { return };
+    tree_blocks(&t, |x, y, z, state, force| if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) });
+}
 
 /// Plants, after the terrain and trees filled the cube.
 fn decorate(g: &mut Gen) {
@@ -268,15 +361,8 @@ fn decorate(g: &mut Gen) {
             if col.height < SEA {
                 let shore = shore_biome(g, wx, wz, col.biome);
                 let floor = col.height - oy;
-                if col.height >= SEA - CLAY_DEPTH && (0..16).contains(&floor) {
-                    let share = match name_of(abi::entry_kind::BIOME, shore) {
-                        "base:swamp" => 0.5,
-                        "base:ocean" | "base:beach" => 0.0,
-                        _ => 0.2,
-                    };
-                    if unit(hash(seed ^ 0xC1A, (wx >> 2) as i64, 0, (wz >> 2) as i64)) < share {
-                        g.set(x, floor as usize, z, CLAY.id());
-                    }
+                if col.height >= SEA - CLAY_DEPTH && (0..16).contains(&floor) && clay(seed, wx, wz, shore) {
+                    g.set(x, floor as usize, z, CLAY.id());
                 }
                 if col.height >= SEA - WILD_WATER_DEPTH {
                     for top in [SEA, SEA - 1] {
@@ -303,23 +389,44 @@ fn decorate(g: &mut Gen) {
             let roll = unit(h);
             // Plants go where they could be planted (soil tags); the biome decides how many.
             let b = col.biome;
-            let grass_chance = GRASS_COVER
+            // Grass and flowers in patches, not spread evenly: a meadow noise (0 to 1, patches some
+            // 14 blocks across) thickens the grass where it's high and thins it where it's low, the
+            // biome's cover on average; flowers come in patches of one kind where it's highest.
+            let meadow = ((fixed::perlin2(fixed::seed32(seed, 0x3EAD), wx * 16, wz * 16, 14 * 16) + 4096) as f64 / 8192.0).clamp(0.0, 1.0);
+            let grass_chance = (GRASS_COVER
                 .on_biome(b)
-                .unwrap_or(vitals::forage::GRASS_COVER_ELSE) as f64;
+                .unwrap_or(vitals::forage::GRASS_COVER_ELSE) as f64
+                * (0.35 + 1.3 * meadow))
+                .min(0.9);
+            let flower_chance = if meadow > FLOWER_MEADOW { 0.06 } else { 0.004 };
             // What is under the lowest layer takes a look at the terrain: only if anything would grow.
-            if y == 0 && roll >= grass_chance.max(0.08) && wild_roll(seed, wx, wz) >= wild::MOST {
+            if y == 0 && roll >= (flower_chance + grass_chance) && wild_roll(seed, wx, wz) >= wild::MOST {
                 continue;
             }
             let below = if y == 0 { g.surface_block(wx, wz) } else { g.get(x, y - 1, z) };
             // Ponds in swamps and floodplains (`vitals::wild::POND_LANDS`): still water a block deep
             // where the ground is level, its floating plants on it.
             let near = [(1, 0), (-1, 0), (0, 1), (0, -1)].map(|(dx, dz)| (wx + dx, wz + dz, g.column(wx + dx, wz + dz)));
+            // Steep ground goes bare: gravel where it falls three blocks to a neighbour, stone
+            // where it falls five (sand and the frozen north keep their own ground).
+            let fall = near
+                .iter()
+                .map(|(_, _, c)| col.height - c.height)
+                .max()
+                .unwrap_or(0);
+            if y >= 1 && fall >= 3 && PLANT_SOIL.on_block(below) && !FROZEN.on_biome(b) {
+                g.set(x, y - 1, z, if fall >= 5 { STONE.id() } else { GRAVEL.id() });
+                continue;
+            }
             if y >= 1
                 && pond(seed, wx, wz, col.height, b)
                 && PLANT_SOIL.on_block(below)
                 && near.iter().all(|(_, _, c)| c.height >= col.height)
             {
                 g.set(x, y - 1, z, WATER.id());
+                if y >= 2 && clay(seed, wx, wz, b) {
+                    g.set(x, y - 2, z, CLAY.id());
+                }
                 if let Some(s) = wild_at(seed, wx, wz, b, wild::Ground::Water) {
                     g.set(x, y, z, s);
                 }
@@ -346,16 +453,28 @@ fn decorate(g: &mut Gen) {
                 continue;
             }
             if PLANT_SOIL.on_block(below) {
-                if roll < 0.012 {
-                    let flower = FLOWERS
-                        .on_biome(b)
-                        .map_or_else(|| [DANDELION.id(), ROSE.id()][(h >> 32) as usize % 2], |l| l.pick(h >> 32).unwrap_or(0));
+                if roll < flower_chance {
+                    // The biome's own flowers (`vitals::wild::FLOWERS`), else its `FLOWERS` (another
+                    // mod's biome), else dandelions and roses.
+                    let kind = flower_kind(seed, wx, wz, h);
+                    let flower = crate::wild::flower(name_of(abi::entry_kind::BIOME, b), wild::Ground::Soil, kind).unwrap_or_else(|| {
+                        FLOWERS
+                            .on_biome(b)
+                            .map_or_else(|| [DANDELION.id(), ROSE.id()][kind as usize % 2], |l| l.pick(kind).unwrap_or(0))
+                    });
                     if flower != 0 {
                         g.set(x, y, z, flower);
                     }
-                } else if roll < grass_chance {
+                } else if roll < flower_chance + grass_chance {
                     g.set(x, y, z, TALL_GRASS.id());
                 }
+            } else if SAND_TAG.on_block(below)
+                && roll < flower_chance
+                && let Some(flower) =
+                    crate::wild::flower(name_of(abi::entry_kind::BIOME, b), wild::Ground::Sand, flower_kind(seed, wx, wz, h))
+            {
+                // The desert's and the beach's flowers, on their sand.
+                g.set(x, y, z, flower);
             } else if CACTUS_SOIL.on_block(below) && DRY.on_biome(b) && roll < 0.006 && y + 2 < 16 {
                 let n = 1 + (h >> 40) % 3;
                 for k in 0..n as usize {
@@ -379,6 +498,17 @@ fn decorate(g: &mut Gen) {
             }
         }
     }
+}
+
+/// Whether clay lies under still water at this column of `biome`'s: in 4 x 4 patches, half the
+/// swamp's floor, a fifth of other inland water's, none under the sea (sand there).
+fn clay(seed: u64, wx: i32, wz: i32, biome: u32) -> bool {
+    let share = match name_of(abi::entry_kind::BIOME, biome) {
+        "base:swamp" => 0.5,
+        "base:ocean" | "base:beach" => 0.0,
+        _ => 0.2,
+    };
+    unit(hash(seed ^ 0xC1A, (wx >> 2) as i64, 0, (wz >> 2) as i64)) < share
 }
 
 /// Water clay lies under is this deep at most.
