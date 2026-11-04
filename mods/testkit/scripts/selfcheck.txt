@@ -18,7 +18,7 @@ expect players 1
 chat hello from the selfcheck
 until chat hello from the selfcheck within 10
 press core:inventory
-until screen core:inventory within 10
+until screen core:menu within 10
 key Escape
 until screen none within 10
 # On purpose: these two must fail, and the report must name lines 25 and 26.

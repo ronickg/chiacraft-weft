@@ -315,12 +315,13 @@ fn block_matches(got: &str, want: &str) -> bool {
 }
 
 pub async fn run(t: T, src: String) -> R {
+    // Warnings first: they matter most when the script also has errors to fix.
+    for w in lint(&src) {
+        weft_sdk::warn!("script: {w}");
+    }
     let bad = preflight(&src);
     if !bad.is_empty() {
         return Err(format!("the script has {} bad line(s): {}", bad.len(), bad.join("; ")));
-    }
-    for w in lint(&src) {
-        weft_sdk::warn!("script: {w}");
     }
     // A step that stops the run names its line.
     run_lines(t, src)
