@@ -17,3 +17,10 @@ Ronald. Items other sessions handed over, to do in the batch named:
 ## Not this job (on Ronald's sheet, later features)
 Character creation, compass and minimap, map, journal, skills, build menu, whistle radial,
 creature quick HUD, taming screen, creature management.
+
+## Decided (Planner, 2026-11-04)
+- R stays the recipe key; the animals session moves wyvern breath to V (F is `core:fly`).
+- Numbers inside the HUD bars (Ronald's sheet) need an `at` placement in the mod UI ABI: folded
+  into the next ABI change with Phase 6's API 1.2, so mods break once. Until then the numbers
+  sit beside the bars, in cream.
+- Food: Survival's 12-portion stomach stays (not the sheet's 3 buff tiles), toned.
