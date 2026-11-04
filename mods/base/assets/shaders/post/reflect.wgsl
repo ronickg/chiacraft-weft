@@ -159,13 +159,29 @@ fn apply(p: PostPixel) -> vec4<f32> {
         // Nothing in the way: the sky that way, from the screen where it shows there (its clouds,
         // the sun), so the water is not a flat painted blue.
         let far = reflect_project(r * 4096.0);
-        if far.w < 0.0 || far.x < 0.0 || far.x > 1.0 || far.y < 0.0 || far.y > 1.0 || post_depth(p, far.xy) > 0.0 {
+        if far.w < 0.0 || far.x < 0.0 || far.x > 1.0 || far.y < 0.0 || far.y > 1.0 {
             return p.color;
         }
-        let sky = textureSampleLevel(textures[p.scene], linear_clamp, far.xy, 0.0).rgb;
-        let edge = smoothstep(0.0, 0.1, min(min(far.x, 1.0 - far.x), min(far.y, 1.0 - far.y)));
+        // Where something is drawn at that spot (land at the horizon, a trunk), look a little
+        // higher up the screen for the sky, and give it less the further up it was: switching
+        // straight from the screen's sky to the pack's own at that spot drew hard straight lines
+        // in the water, level along the horizon and upright along trunks (Ronald's lake, the LOD
+        // worker's sea views, 11-05).
+        var at = far.xy;
+        var found = post_depth(p, at) <= 0.0;
+        var reach = 0.0;
+        for (var k = 1; k <= 6 && !found; k++) {
+            reach = f32(k) / 6.0;
+            at = vec2(far.x, far.y - reach * 0.06);
+            found = at.y > 0.0 && post_depth(p, at) <= 0.0;
+        }
+        if !found {
+            return p.color;
+        }
+        let sky = textureSampleLevel(textures[p.scene], linear_clamp, at, 0.0).rgb;
+        let edge = smoothstep(0.0, 0.1, min(min(at.x, 1.0 - at.x), min(at.y, 1.0 - at.y)));
         // The pack's own sky is already in the water at this share; this only replaces it.
-        let amount = clamp(fresnel, 0.0, 0.97) * mask * edge;
+        let amount = clamp(fresnel, 0.0, 0.97) * mask * edge * (1.0 - reach);
         return vec4(mix(p.color.rgb, sky, amount), p.color.a);
     }
     // Blurred more the farther the ray went before it hit (a reflection in rippled water softens
