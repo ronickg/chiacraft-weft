@@ -34,8 +34,9 @@ const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze an
 /// default, counted from the join; the engine holds back reloads before it anyway): no files
 /// written, nothing turned on for players.
 pub fn register_for_scripts(r: &mut Registry) {
+    use std::sync::atomic::{AtomicU32, Ordering};
     static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
-    static DONE: Once = Once::new();
+    static TIMES: AtomicU32 = AtomicU32::new(0);
     r.client_frame(|c| {
         let Some(pack) = weft_sdk::client::launch_option("shader-pack") else { return };
         let after: f32 = weft_sdk::client::launch_option("shader-pack-after").and_then(|s| s.parse().ok()).unwrap_or(0.0);
@@ -45,11 +46,13 @@ pub fn register_for_scripts(r: &mut Registry) {
         if STARTED.get_or_init(std::time::Instant::now).elapsed().as_secs_f32() < after {
             return;
         }
-        DONE.call_once(|| {
+        // The testkit turns packs off when a test begins, which on a slow start comes after the
+        // join: it is turned on again then, a few times at most.
+        if SHADER_PACK.get() != pack && TIMES.fetch_add(1, Ordering::Relaxed) < 3 {
             weft_sdk::info!("shader pack {pack} on");
             SHADER_PACK.set(&pack);
             c.reload_assets();
-        });
+        }
     });
 }
 
