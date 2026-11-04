@@ -75,6 +75,12 @@ before the next one starts.
   2. Distant terrain: keep our LOD tiles.
   3. Waterlogging: take upstream's, and move base's water-holding blocks onto it.
   4. Weather: take upstream's weather by id, with ours registered on it in base.
+- **The two calls from the refresh:** "Yes, take Weft's both":
+  5. Riding: take upstream's seats, chains and steering presets. Animals moves our wyvern flight
+     and the rider's sit pose onto them.
+  6. Camera: take upstream's camera modes and `camera_flags`. Our crosshair, the sun shadow of
+     one's own body and the first-person hand read `HAND`/`BODY` instead of the old `view`.
+- **Start:** when Planner says dev is frozen, not before.
 
 ## The decisions as they were put (with the reasons)
 
