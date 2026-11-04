@@ -13,9 +13,10 @@ use std::collections::HashMap;
 use weft_sdk::noise::fixed::{self, div_floor, q4, q12};
 
 use super::{
-    Here, MOUNTAIN_BIOME, MOUNTAINS_AREA, TARN_BAND, TARN_CARVE, TARN_CELL, TARN_CHANCE, TARN_DEPTH, TARN_RADIUS, TARN_TRIES, salt,
-    snow_line,
+    Here, MOUNTAIN_BIOME, MOUNTAINS_AREA, STREAM_MAX, STREAM_MIN, TARN_BAND, TARN_CARVE, TARN_CELL, TARN_CHANCE, TARN_DEPTH, TARN_RADIUS,
+    TARN_TRIES, salt, snow_line,
 };
+use crate::SEA;
 use weft_sdk::noise::fixed::Fields;
 
 /// A tarn: its middle and radius (blocks), its water's level (the top water block, y) and its
@@ -146,4 +147,111 @@ pub(super) fn near(f: &Fields, x: i32, z: i32, r: i32, ground: &dyn Fn(i32, i32)
         .filter_map(|(cx, cz)| tarn(f, cx, cz, ground))
         .filter(|t| (t.x - x).abs() <= r && (t.z - z).abs() <= r)
         .collect()
+}
+
+// ---- the tarns' streams ----
+
+/// A tarn's stream (Planner, 11-04: springs on the range flanks): from the lowest column of its
+/// ring (the outlet, cut to the water's level) down the steepest way, a channel whose bed never
+/// rises and lies a block under the ground and under the ground on both sides (so the water stays
+/// in it on a slope: no sheets over the terraces), still water a block deep in it, falling where
+/// the bed drops. Kept only if it ends in a hollow or at the sea's level within `STREAM_MAX`
+/// columns: never running out onto open ground.
+#[derive(Default)]
+pub(super) struct Stream {
+    /// Each column of it: its bed's top (blocks).
+    beds: HashMap<(i32, i32), i32>,
+    /// Its columns in order from the outlet, with their beds.
+    pub path: Vec<(i32, i32, i32)>,
+}
+
+thread_local! {
+    static STREAMS: RefCell<HashMap<(u64, i32, i32), std::rc::Rc<Stream>>> = RefCell::new(HashMap::new());
+}
+
+/// Cell (`cx`, `cz`)'s tarn's stream (empty: none). `ground(x, z)`: the ground (blocks) with the
+/// tarns, before the streams.
+fn stream(f: &Fields, cx: i32, cz: i32, before: &dyn Fn(i32, i32) -> i32, ground: &dyn Fn(i32, i32) -> i32) -> std::rc::Rc<Stream> {
+    let key = (f.seed, cx, cz);
+    if let Some(hit) = STREAMS.with(|c| c.borrow().get(&key).cloned()) {
+        return hit;
+    }
+    let made = std::rc::Rc::new(
+        tarn(f, cx, cz, before)
+            .and_then(|t| trace(&t, ground))
+            .unwrap_or_default(),
+    );
+    STREAMS.with(|c| {
+        let mut c = c.borrow_mut();
+        if c.len() > 4096 {
+            c.clear();
+        }
+        c.insert(key, made.clone());
+    });
+    made
+}
+
+/// The way down from tarn `t`'s outlet, if it ends well.
+fn trace(t: &Tarn, ground: &dyn Fn(i32, i32) -> i32) -> Option<Stream> {
+    let r2 = t.radius * t.radius;
+    let inside = |x: i32, z: i32| (x - t.x) * (x - t.x) + (z - t.z) * (z - t.z) <= r2;
+    // The outlet: the ring's lowest column, the nearest to the middle of those.
+    let (ox, oz) = ring(t.x, t.z, t.radius).min_by_key(|&(x, z)| (ground(x, z), (x - t.x).pow(2) + (z - t.z).pow(2)))?;
+    let mut path = vec![(ox, oz, t.level - 1)];
+    let mut seen: std::collections::HashSet<(i32, i32)> = [(ox, oz)].into();
+    let (mut x, mut z, mut bed) = (ox, oz, t.level - 1);
+    let mut here = ground(x, z);
+    let ended = loop {
+        if path.len() > STREAM_MAX as usize {
+            break false;
+        }
+        let next = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            .iter()
+            .map(|&(dx, dz)| (x + dx, z + dz))
+            .filter(|&(nx, nz)| !inside(nx, nz) && !seen.contains(&(nx, nz)))
+            .map(|(nx, nz)| (ground(nx, nz), nx, nz))
+            .min();
+        let Some((g, nx, nz)) = next else { break true };
+        // A hollow: nothing lower round it (the water gathers there), or the sea's level.
+        if g > here {
+            break true;
+        }
+        if g <= SEA + 1 {
+            path.push((nx, nz, (g - 1).min(bed)));
+            break true;
+        }
+        // Under the ground and under its sides (the columns beside it that aren't the way).
+        let sides = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            .iter()
+            .map(|&(dx, dz)| (nx + dx, nz + dz))
+            .filter(|&(sx, sz)| (sx, sz) != (x, z) && !seen.contains(&(sx, sz)) && !inside(sx, sz))
+            .map(|(sx, sz)| ground(sx, sz))
+            .min()
+            .unwrap_or(g);
+        bed = bed.min(g - 1).min(sides - 1);
+        path.push((nx, nz, bed));
+        seen.insert((nx, nz));
+        (x, z, here) = (nx, nz, g);
+    };
+    (ended && path.len() >= STREAM_MIN as usize).then(|| Stream { beds: path.iter().map(|&(x, z, b)| ((x, z), b)).collect(), path })
+}
+
+/// The bed (blocks) of a tarn's stream at column (`x`, `z`) (blocks), if one runs there.
+pub(super) fn stream_bed(f: &Fields, x: i32, z: i32, before: &dyn Fn(i32, i32) -> i32, ground: &dyn Fn(i32, i32) -> i32) -> Option<i32> {
+    let (cx, cz) = (div_floor(x, TARN_CELL).0, div_floor(z, TARN_CELL).0);
+    (cz - 1..=cz + 1)
+        .flat_map(|cz| (cx - 1..=cx + 1).map(move |cx| (cx, cz)))
+        .filter_map(|(cx, cz)| stream(f, cx, cz, before, ground).beds.get(&(x, z)).copied())
+        .min()
+}
+
+/// Cell (`cx`, `cz`)'s stream's path (x, z, bed; blocks), empty if none.
+pub(super) fn stream_path(
+    f: &Fields,
+    cx: i32,
+    cz: i32,
+    before: &dyn Fn(i32, i32) -> i32,
+    ground: &dyn Fn(i32, i32) -> i32,
+) -> Vec<(i32, i32, i32)> {
+    stream(f, cx, cz, before, ground).path.clone()
 }

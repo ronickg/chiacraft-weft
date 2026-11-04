@@ -462,6 +462,10 @@ pub const TARN_TRIES: u32 = 24;
 pub const TARN_RADIUS: (i32, i32) = (5, 10);
 pub const TARN_DEPTH: (i32, i32) = (2, 5);
 pub const TARN_CARVE: i32 = 10;
+/// Each tarn's stream (`tarns`' streams): from its outlet down the steepest way, kept if it ends in
+/// a hollow or at the sea's level within `STREAM_MAX` columns and runs `STREAM_MIN` at least.
+pub const STREAM_MAX: i32 = 96;
+pub const STREAM_MIN: i32 = 6;
 
 /// Natural arches (Ronald, 11-04: "all four"; `land::landmarks`): at most one per `ARCH_CELL`
 /// square, kept with `ARCH_CHANCE` where it fits: in the strata land on level ground, or in the
@@ -733,6 +737,8 @@ pub fn features() -> Vec<Feature> {
         Feature::new(craters).named("craters"),
         // After the craters: a tarn is measured from the ground they leave (none meet).
         Feature::new(tarns).named("tarns"),
+        // After the tarns: their streams' channels, down from them.
+        Feature::new(tarn_streams).named("tarn_streams"),
         // No height: their masks say where the snow drifts and where the sequoias stand (rules
         // ask for them).
         preset::hills(0.0, 64.0)
@@ -788,8 +794,38 @@ fn base_ground(h: &Here) -> i32 {
 
 /// The ground's height (Q4) with the rivers: what the engine makes of `features`.
 pub fn height(f: &Fields, x: i32, z: i32) -> i32 {
+    let ground = with_tarns(f, x, z);
+    ground + stream_cut(f, x, z, ground)
+}
+
+/// The ground (Q4) with the tarns, before their streams.
+fn with_tarns(f: &Fields, x: i32, z: i32) -> i32 {
     let ground = before_tarns(f, x, z);
     ground + tarns::cut(f, x, z, ground, &|x, z| before_tarns(f, x * 16, z * 16) >> 4)
+}
+
+/// What a tarn's stream takes off ground `ground` (Q4) at (`x`, `z`) (Q4): down to its bed.
+fn stream_cut(f: &Fields, x: i32, z: i32, ground: i32) -> i32 {
+    stream_bed(f, x >> 4, z >> 4).map_or(0, |bed| (q4(bed as f64) + 8 - ground).min(0))
+}
+
+/// The bed (blocks) of a tarn's stream at column (`x`, `z`) (blocks), if one runs there: still
+/// water stands on it, a block deep (`tarn_streams`).
+pub fn stream_bed(f: &Fields, x: i32, z: i32) -> Option<i32> {
+    tarns::stream_bed(f, x, z, &|x, z| before_tarns(f, x * 16, z * 16) >> 4, &|x, z| with_tarns(f, x * 16, z * 16) >> 4)
+}
+
+/// What the tarns' streams take off the ground (Q4, zero or less) at (`x`, `z`) (Q4), as the
+/// engine adds it.
+pub fn tarn_streams(f: &Fields, x: i32, z: i32) -> i32 {
+    stream_cut(f, x, z, with_tarns(f, x, z))
+}
+
+/// The stream of the tarn in the cell holding (`x`, `z`) (blocks): its columns from the outlet
+/// (x, z, bed; blocks), empty if it has none.
+pub fn tarn_stream(f: &Fields, x: i32, z: i32) -> Vec<(i32, i32, i32)> {
+    let (cx, cz) = (x.div_euclid(TARN_CELL), z.div_euclid(TARN_CELL));
+    tarns::stream_path(f, cx, cz, &|x, z| before_tarns(f, x * 16, z * 16) >> 4, &|x, z| with_tarns(f, x * 16, z * 16) >> 4)
 }
 
 /// The ground (Q4) before the tarns: the rest of `height`.
@@ -1952,19 +1988,54 @@ mod tests {
             assert!(tarns.len() >= 5, "seed {seed}: {} tarns", tarns.len());
             for (x, z, r, level) in tarns {
                 assert!(level > SEA, "seed {seed}: tarn at {x} {z} at {level}");
+                // Its stream's channel, if it has one, leaves through the ring.
+                let channel: std::collections::HashSet<(i32, i32)> = tarn_stream(&f, x, z).iter().map(|p| (p.0, p.1)).collect();
                 for dz in -r - 2..=r + 2 {
                     for dx in -r - 2..=r + 2 {
                         let d2 = dx * dx + dz * dz;
                         let g = h(x + dx, z + dz);
                         if d2 <= r * r {
                             assert!(g < level, "seed {seed}: tarn at {x} {z}: bed {g} at {dx} {dz}, water {level}");
-                        } else if d2 <= (2 * r + 3) * (2 * r + 3) / 4 {
+                        } else if d2 <= (2 * r + 3) * (2 * r + 3) / 4 && !channel.contains(&(x + dx, z + dz)) {
                             assert!(g > level, "seed {seed}: tarn at {x} {z}: rim {g} at {dx} {dz}, water {level}");
                         }
                     }
                 }
             }
         }
+    }
+
+    /// A tarn's stream runs down from its outlet at the tarn's level: its bed never rises, a
+    /// block under the ground; the columns beside it hold its water (no sheets over the slope).
+    #[test]
+    fn tarn_streams_stay_in_their_channels() {
+        let mut streams = 0;
+        for seed in [1, 2, 3] {
+            let f = fields(seed);
+            let h = |x: i32, z: i32| height(&f, x * 16, z * 16) >> 4;
+            for (x, z, _, level) in tarns_near(&f, 0, 0, 3000) {
+                let path = tarn_stream(&f, x, z);
+                if path.is_empty() {
+                    continue;
+                }
+                streams += 1;
+                assert_eq!(path[0].2, level - 1, "seed {seed}: tarn {x} {z}: outlet bed");
+                let on: std::collections::HashSet<(i32, i32)> = path.iter().map(|p| (p.0, p.1)).collect();
+                let mut last = i32::MAX;
+                for &(px, pz, bed) in &path {
+                    assert!(bed <= last, "seed {seed}: tarn {x} {z}: the bed rises at {px} {pz}");
+                    last = bed;
+                    assert_eq!(h(px, pz), bed, "seed {seed}: tarn {x} {z}: channel at {px} {pz}");
+                    for (sx, sz) in [(px + 1, pz), (px - 1, pz), (px, pz + 1), (px, pz - 1)] {
+                        let inside = (sx - x).pow(2) + (sz - z).pow(2) <= tarns_near(&f, x, z, 0).first().map_or(0, |t| t.2 * t.2);
+                        if !on.contains(&(sx, sz)) && !inside {
+                            assert!(h(sx, sz) > bed, "seed {seed}: tarn {x} {z}: water leaves the channel at {px} {pz} to {sx} {sz}");
+                        }
+                    }
+                }
+            }
+        }
+        assert!(streams >= 5, "{streams} streams");
     }
 
     #[test]
