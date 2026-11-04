@@ -28,6 +28,9 @@ use crate::SEA;
 /// Salts of our own noises (the engine's are in `weft_noise::fixed::salt`).
 pub mod salt {
     pub const RIVERS: u64 = 0x21FE5;
+    pub const LAKES: u64 = 0x1A4E;
+    pub const LAKE_SHORE: u64 = 0x1A4F;
+    pub const LAKE_ISLANDS: u64 = 0x1A50;
     pub const RIVER_WARP_X: u64 = 0x21FE6;
     pub const RIVER_WARP_Z: u64 = 0x21FE7;
     pub const MESAS: u64 = 0x3E5A;
@@ -239,6 +242,42 @@ pub const RIVER_FLOODPLAIN: f64 = 0.006;
 pub const RIVER_VALLEY_PER_BLOCK: i32 = 6;
 pub const RIVER_VALLEY_RISE: i32 = 80;
 
+/// Lakes in basins (Lithosphere's "big lakes anywhere, with islands"): a site per `LAKE_CELL`
+/// blocks square, kept with `LAKE_CHANCE` times its climate's share (`LAKE_WET`: the dry land a
+/// quarter of it, the wet all; `LAKE_COLD` more in the cold, as glacial country is full of lakes).
+/// Only on low land, its middle at most `LAKE_MAX_RISE` blocks over the sea, inland, and out of
+/// the mountains. Their bed is under the sea's level, so the sea's water fills them.
+pub const LAKE_CELL: i32 = 420;
+pub const LAKE_CHANCE: f64 = 0.8;
+pub const LAKE_WET: (f64, f64) = (-0.2, 0.1);
+pub const LAKE_COLD: (f64, f64) = (-0.05, -0.2);
+pub const LAKE_COLD_MORE: f64 = 0.35;
+pub const LAKE_MAX_RISE: i32 = 40;
+/// A lake's radius in blocks (the smallest, the largest), its shore wobbled by up to
+/// `LAKE_WOBBLE` of it (a noise `LAKE_WOBBLE_SIZE` times the radius across), and its depth under the sea's
+/// level in the middle (blocks, the shallowest, the deepest).
+pub const LAKE_RADIUS: (i32, i32) = (36, 130);
+pub const LAKE_WOBBLE: f64 = 1.0;
+pub const LAKE_WOBBLE_SIZE: f64 = 0.7;
+/// Lakes run long: across their own direction (one of 8) they are this many sixteenths as wide
+/// as along it at most (16: round).
+pub const LAKE_STRETCH: (i32, i32) = (16, 34);
+/// The 8 directions a lake can lie in, as (x, z) in 1/64.
+const LAKE_AXES: [(i32, i32); 8] = [(64, 0), (59, 24), (45, 45), (24, 59), (0, 64), (-24, 59), (-45, 45), (-59, 24)];
+pub const LAKE_DEPTH: (i32, i32) = (3, 9);
+/// The shore rises from the water to the land over `LAKE_SHORE` blocks, plus `LAKE_SHORE_PER_BLOCK`
+/// (in sixteenths) for each block the land stands over the sea, counted up to `LAKE_SHORE_RISE`.
+pub const LAKE_SHORE: i32 = 10;
+pub const LAKE_SHORE_PER_BLOCK: i32 = 24;
+pub const LAKE_SHORE_RISE: i32 = 40;
+/// Islands: where the island noise (patches about `LAKE_ISLAND_SIZE` blocks across) is over
+/// `LAKE_ISLANDS`, the bed rises back over the water, up to `LAKE_ISLAND_HEIGHT` blocks; not in
+/// the outer `LAKE_ISLAND_SHORE` of the lake, so islands stand clear of the shore.
+pub const LAKE_ISLANDS: f64 = 0.16;
+pub const LAKE_ISLAND_SIZE: f64 = 44.0;
+pub const LAKE_ISLAND_HEIGHT: i32 = 5;
+pub const LAKE_ISLAND_SHORE: f64 = 0.25;
+
 /// Water deeper than a block is the ocean's where continentalness is under this, out to the
 /// coast; inland, a river's or a lake's water belongs to the land around it (its climate).
 pub const OCEAN_CONTINENT: f64 = 0.1;
@@ -304,6 +343,7 @@ pub fn features() -> Vec<Feature> {
             .mask(MOUNTAINS_AREA.mask())
             .named("mountains"),
         Feature::new(mesa).named("mesas"),
+        Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
         // No height: its mask is where snow drifts (the snow rules ask for it).
         preset::hills(0.0, 64.0)
@@ -319,12 +359,18 @@ fn masked(h: &Here, area: &Area, height: impl FnOnce() -> i32) -> i32 {
 }
 
 /// The ground's height (Q4) at (`x`, `z`) (Q4) before the rivers: the sea level and every feature
-/// in `features` before `rivers`, the same integers the engine sums.
+/// in `features` before `rivers` (the lakes included), the same integers the engine sums.
 pub fn land_height(f: &Fields, x: i32, z: i32) -> i32 {
     land_height_at(&Here::new(f, x, z))
 }
 
 fn land_height_at(h: &Here) -> i32 {
+    let ground = ground_at(h);
+    ground + lakes_on(h, ground)
+}
+
+/// The ground before the lakes and the rivers.
+fn ground_at(h: &Here) -> i32 {
     let (f, x, z) = (h.f, h.x, h.z);
     q4(SEA as f64)
         + shape::continents(f, x, z, q4(CONTINENTS))
@@ -359,6 +405,160 @@ fn mesa_at(h: &Here) -> i32 {
     let step = (q4(MESA_HEIGHT) / MESA_TIERS).max(1);
     let (tier, climb) = div_floor(v, step);
     tier * step + (climb * ONE / q12(MESA_CLIFF).max(1)).min(step)
+}
+
+/// A lake's site: its middle (blocks), radius and depth (blocks).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Lake {
+    pub x: i32,
+    pub z: i32,
+    pub radius: i32,
+    pub depth: i32,
+    /// Its direction (`LAKE_AXES`) and how much narrower it is across (`LAKE_STRETCH`).
+    pub axis: u8,
+    pub stretch: i32,
+}
+
+thread_local! {
+    /// Lake sites already worked out, by seed and cell: the climate and the ground at a site's
+    /// middle cost as much as a column, and every column near it asks.
+    static LAKE_SITES: std::cell::RefCell<std::collections::HashMap<(u64, i32, i32), Option<Lake>>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Cell (`cx`, `cz`)'s two hashes and the middle (blocks) its lake would have: cheap, so a column
+/// far from every middle skips the lakes without asking for their climate.
+fn lake_middle(seed: u64, cx: i32, cz: i32) -> (u32, u32, [i32; 2]) {
+    let h = fixed::hash(fixed::seed32(seed, salt::LAKES), cx, 0, cz);
+    let h2 = fixed::fmix(h);
+    let span = LAKE_CELL - 2 * LAKE_RADIUS.1 / 3;
+    let at = |c: i32, v: u32| c * LAKE_CELL + LAKE_CELL / 2 - span / 2 + (v % span as u32) as i32;
+    (h, h2, [at(cx, h2), at(cz, h2 >> 16)])
+}
+
+/// The lake of cell (`cx`, `cz`), if it has one (`LAKE_CELL`).
+pub fn lake_site(f: &Fields, cx: i32, cz: i32) -> Option<Lake> {
+    if let Some(hit) = LAKE_SITES.with(|c| c.borrow().get(&(f.seed, cx, cz)).copied()) {
+        return hit;
+    }
+    let site = (|| {
+        let (h, h2, [x, z]) = lake_middle(f.seed, cx, cz);
+        let here = Here::new(f, x * 16, z * 16);
+        let wet = q12(0.25) + ((q12(0.75) * ramp(here.humidity(), q12(LAKE_WET.0), q12(LAKE_WET.1))) >> 12);
+        let cold = ONE + ((q12(LAKE_COLD_MORE) * ramp(here.temperature(), q12(LAKE_COLD.0), q12(LAKE_COLD.1))) >> 12);
+        let chance = (((q12(LAKE_CHANCE) * wet) >> 12) * cold) >> 12;
+        if (h & 4095) as i32 >= chance {
+            return None;
+        }
+        if here.continent() < q12(OCEAN_CONTINENT + 0.08) || MOUNTAINS_AREA.at(&here) > q12(0.3) {
+            return None;
+        }
+        let rise = (ground_at(&here) >> 4) - SEA;
+        if !(1..=LAKE_MAX_RISE).contains(&rise) {
+            return None;
+        }
+        let pick = |v: u32, (lo, hi): (i32, i32)| lo + (v % (hi - lo + 1) as u32) as i32;
+        let h3 = fixed::fmix(h2);
+        Some(Lake {
+            x,
+            z,
+            radius: pick(h2 >> 4, LAKE_RADIUS),
+            depth: pick(h >> 12, LAKE_DEPTH),
+            axis: (h3 % 8) as u8,
+            stretch: pick(h3 >> 3, LAKE_STRETCH),
+        })
+    })();
+    LAKE_SITES.with(|c| {
+        let mut c = c.borrow_mut();
+        if c.len() > 4096 {
+            c.clear();
+        }
+        c.insert((f.seed, cx, cz), site);
+    });
+    site
+}
+
+/// What the lakes take off the ground (Q4, zero or less) at (`x`, `z`) (Q4).
+pub fn lakes(f: &Fields, x: i32, z: i32) -> i32 {
+    let here = Here::new(f, x, z);
+    lakes_on(&here, i32::MIN)
+}
+
+/// The lakes' cut at a column whose ground before them is `ground` (Q4; `i32::MIN`: not yet
+/// known, worked out only if a lake is near).
+fn lakes_on(h: &Here, ground: i32) -> i32 {
+    let (bx, bz) = (h.x >> 4, h.z >> 4);
+    let (cx, cz) = (div_floor(bx, LAKE_CELL).0, div_floor(bz, LAKE_CELL).0);
+    let reach = LAKE_RADIUS.1 + ((LAKE_RADIUS.1 * q12(LAKE_WOBBLE)) >> 12) + LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4);
+    let mut cut = 0;
+    let mut ground = ground;
+    for dz in -1..=1 {
+        for dx in -1..=1 {
+            let (_, _, [mx, mz]) = lake_middle(h.f.seed, cx + dx, cz + dz);
+            if (bx - mx).abs() > reach || (bz - mz).abs() > reach {
+                continue;
+            }
+            let Some(lake) = lake_site(h.f, cx + dx, cz + dz) else { continue };
+            cut = cut.min(lake_cut(h, lake, &mut ground));
+        }
+    }
+    cut
+}
+
+/// One lake's cut at a column near it; `ground` (Q4) is worked out only where the lake reaches
+/// (`i32::MIN` until then).
+fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
+    let sea = q4(SEA as f64);
+    // Stretched along the lake's own direction (`LAKE_STRETCH`), so lakes run long and lie every
+    // way; then its distance from the middle in Q4, as if round.
+    let (bx, bz) = (h.x >> 4, h.z >> 4);
+    let (ux, uz) = LAKE_AXES[lake.axis as usize];
+    let (dx, dz) = ((bx - lake.x) as i64, (bz - lake.z) as i64);
+    let along = (dx * ux as i64 + dz * uz as i64) / 64;
+    let across = (dz * ux as i64 - dx * uz as i64) / 64;
+    let across = across * lake.stretch as i64 / 16;
+    let d = ((along * along + across * across) as u64).isqrt() as i32 * 16;
+    let shore_most = q4((LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4)) as f64);
+    let widest = q4(lake.radius as f64) + ((q4(lake.radius as f64) * q12(LAKE_WOBBLE)) >> 12);
+    if d >= widest + shore_most {
+        return 0;
+    }
+    // The shore wobbles by a noise as coarse as the lake is big.
+    let size = q4(lake.radius as f64 * LAKE_WOBBLE_SIZE);
+    let wobble = h.f.fbm(salt::LAKE_SHORE, h.x, h.z, size, 4);
+    let r = q4(lake.radius as f64) + ((((q4(lake.radius as f64) * wobble) >> 12) * q12(LAKE_WOBBLE)) >> 12);
+    let r = r.max(16 * 8);
+    if d >= r + shore_most {
+        return 0;
+    }
+    if *ground == i32::MIN {
+        *ground = ground_at(h);
+    }
+    let ground = *ground;
+    let target = if d < r {
+        // The bowl: a block under the sea at the shore, `depth` in the middle.
+        let t = d * ONE / r;
+        let bowl = ONE - ((t * t) >> 12);
+        let bed = sea - 16 - (((q4(lake.depth as f64) - 16) * bowl) >> 12);
+        // Islands, clear of the shore.
+        let inner = ramp(t, ONE, q12(1.0 - LAKE_ISLAND_SHORE));
+        let n =
+            h.f.fbm(salt::LAKE_ISLANDS, h.x, h.z, q4(LAKE_ISLAND_SIZE), 3);
+        let lift = (ramp(n, q12(LAKE_ISLANDS), q12(LAKE_ISLANDS + 0.2)) * inner) >> 12;
+        let island = sea - 16 + ((q4((LAKE_ISLAND_HEIGHT + 1) as f64) * lift) >> 12);
+        if lift > 0 { bed.max(island) } else { bed }
+    } else {
+        // The shore: level with the water at its edge, rising smoothly to the land.
+        let rise = ((ground - sea) >> 4).clamp(0, LAKE_SHORE_RISE);
+        let width = q4((LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * rise) >> 4)) as f64);
+        if d >= r + width {
+            return 0;
+        }
+        let t = (d - r) * ONE / width;
+        let smooth = (((t * t) >> 12) * (3 * ONE - 2 * t)) >> 12;
+        sea + (((ground - sea) * smooth) >> 12)
+    };
+    (target - ground).min(0)
 }
 
 /// Where a river runs: the line noise's distance from its zero line (Q12), at the wandered point.
@@ -575,6 +775,24 @@ mod tests {
             }
         }
         assert!(wet > 0, "no river reached under the sea in 20 000 columns");
+    }
+
+    #[test]
+    fn lakes_only_cut_and_hold_water() {
+        let f = Fields { seed: 1 };
+        let (mut wet, mut lakes_seen) = (0, 0);
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 12 * 16, (i / 200) * 12 * 16);
+            let cut = lakes(&f, x, z);
+            assert!(cut <= 0);
+            if cut < 0 {
+                lakes_seen += 1;
+                if land_height(&f, x, z) >> 4 < SEA {
+                    wet += 1;
+                }
+            }
+        }
+        assert!(lakes_seen > 0 && wet > 0, "no lake in 2.4 km by 2.4 km ({lakes_seen} cut, {wet} wet)");
     }
 
     #[test]

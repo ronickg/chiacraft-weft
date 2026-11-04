@@ -54,6 +54,17 @@ Worldgen, 2026-11-04, for Ronald via Planner ("lakes, rivers etc.", and "Still L
 - Oases are the wet corner of the hot band.
 - Steep slopes go bare, snow lies by biome, and badlands are banded by height.
 
+## Other mods (Ronald: "have a look at other mods maybe too"; our scale, not Terralith's)
+
+Licences are as each page states; ideas only, from the pages' own descriptions.
+
+| mod | licence | what's worth taking |
+|---|---|---|
+| [William Wythers' Overhauled Overworld](https://modrinth.com/datapack/wwoo) | CC BY-NC-ND 4.0 (no derivatives) | sub-biomes inside every biome and transition biomes "to eliminate jarring shifts"; add-ons for navigable rivers and coves on cliff coasts |
+| [Regions Unexplored](https://modrinth.com/mod/regions-unexplored) | MIT, source public | 64 biomes with many plants and blocks; more than we want (Ronald: not that massive) |
+| [Geophilic](https://modrinth.com/datapack/geophilic) | All Rights Reserved (source viewable) | the closest to our scale: no new biomes, only better ones. Fallen trees, clearings, boulders, stumps, bushes and moss, and trees kept low enough to walk under. Most of it Voxel dog has, or is doing |
+| Vintage Story's river mods: [Rivers](https://mods.vintagestory.at/rivers), [Watersheds](https://mods.vintagestory.at/show/mod/42299) | per mod, not checked | **rivers as a network of nodes**: segments with set sizes, linked to the sea, lakes fading into rivers. Watersheds paths streams uphill from lakes and seas over eroded ground. Our zero lines can't make tributaries meet; a node network could (step 2) |
+
 ## What we have (dev, seed 1, 8 km around spawn)
 
 | | ours |
@@ -78,7 +89,7 @@ Each step is ours, in `base_api::land` (numbers, shapes) and `mods/base/src/land
 | # | step | the idea from | effort | engine? |
 |---|---|---|---|---|
 | **1** | **Lakes in basins, with islands.** One lake site per 480-block cell, its chance set by the climate (many in the wet and the cold, few in the dry, oases rare). Its shoreline is a noise-wobbled blob 40-140 blocks across. The bed is carved below the sea's level and the banks rise smoothly to the land, so the water is the sea's own fill and costs nothing on the GPU or in distant terrain. Islands come where an island noise lifts the bed back above the water, and rivers passing near join them (both lie at the sea's level). **1b, mountain lakes** above the sea's level: the same basin with its water level set by the lowest point of its rim, filled by a decoration. | Lithosphere (big lakes with islands, anywhere); Tectonic's weakness | M (1), M (1b) | 1: no. 1b: distant terrain shows the basin dry until the engine has water levels per area (the LOD session could add a hook like `faces`) |
-| **2** | **A river network that shapes its valleys.** Rivers rarer and longer (a coarser line), with tributaries from a finer line that only exists near a main river. Mountains leave room for them (the mountains' height falls toward the river line), so rivers run through valleys between ranges instead of ending at their feet. The same river distance shapes terraces and plateaus beside the river. | Tectonic (one river distance shapes banks and tiers); Lithosphere (rivers through mountains, never cut off) | M | no |
+| **2** | **A river network that shapes its valleys.** Rivers rarer and longer, and tributaries that meet them: either a finer line that only exists near a main river (cheap), or Vintage Story's way, a network of nodes per large region linked down to the sea (truer, more work). Mountains leave room for them (the mountains' height falls toward the river line), so rivers run through valleys between ranges instead of ending at their feet. The same river distance shapes terraces and plateaus beside the river. | Tectonic (one river distance shapes banks and tiers); Lithosphere (rivers through mountains, never cut off) | M | no |
 | **3** | **Coasts: wide gentle beaches, sea cliffs, islands.** A wider shelf, so beaches slope into the sea. Where an erosion field is low the coast is a cliff into the water (rock faces do the rest). Archipelagos in the seas where the continent noise dips to islands. | Tectonic (coasts by erosion), Lithosphere (beaches, archipelagos), Terralith (cliffs as a capped cut) | S-M | no |
 | **4** | **An erosion field and continental ranges.** One large noise that says flat or rugged; it scales the hills, the mountains and the valley widths instead of today's separate patch masks. Mountains rise further from the coast, so ranges form a continent's spine rather than scattered patches. | Tectonic (erosion × inland-ness), Lithosphere ("cinematic" ranges) | M | no |
 | **5** | **Shapes by climate band.** Tiered plateaus along rivers in the dry and temperate lands, badland canyons in the hottest, dunes with a steep lee side, karst towers in the warm and wet. | Tectonic (temperature band picks the shape), Lithosphere (karst) | M | no |
@@ -89,6 +100,13 @@ Each step is ours, in `base_api::land` (numbers, shapes) and `mods/base/src/land
 **Order.** Do 1 and 2 first: they are what Ronald named, and they work together (lakes along rivers). Then 3 and 4 for the land's big shape. Then 5 and 6, which need art and climates. 7 and 8 last.
 
 ## Step 1 in more detail (lakes)
+
+**Built** (claude/terrain-lakes, not yet seen in the game). Lakes are about 1% of the area on seeds 1-3 (1.15, 0.97, 1.13%), about as much as the rivers (1.25-1.3%). They are long and ragged, lie every way, and carry small islands. On the CPU they cost 0.3-0.4 µs a column (about 0.1 ms a chunk column), on top of about 0.5 ms for the other mods' features; timed on a loaded Mac, so roughly. Maps (left as before, right with lakes):
+- `terrain-terralith-tectonic/lakes_seed1_4096.jpg`: 4 km around spawn
+- `terrain-terralith-tectonic/lake_seed1_zoom.jpg`: one lake, a block a pixel
+
+The numbers as built: a site per 420-block cell, kept with 0.8 times its climate's share; radius 36-130 blocks; the shore wobbled by up to the radius; 1-2.1 times longer than wide; 3-9 blocks deep. These differ from the plan below, which was the first guess.
+
 
 - **Where:**
   - A site per `LAKE_CELL` cell (480 blocks), jittered.
