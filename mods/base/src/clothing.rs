@@ -183,7 +183,8 @@ pub fn register(r: &mut Registry) {
                 cold: (m.cold() * share).round() as u32,
                 heat: (m.heat * share).round() as i32,
                 wet: (m.wet_keeps * 100.0).round() as u32,
-                wind: (m.windproof * 100.0).round() as u32,
+                // The piece's share of the wind it stops (a fur hat 12%, not the suit's 80%).
+                wind: (m.windproof * share * 100.0).round() as u32,
             };
             // Trousers are the inner layer of the skin's layout, like leggings.
             let layer = if piece == 2 { 2 } else { 1 };
