@@ -130,10 +130,10 @@ pub fn fall(g: &Gen, wx: i32, wz: i32, height: i32) -> i32 {
 /// rocks (`rocks`, `base_api::land::rock_set`): strata, slate, granite or limestone in patches.
 fn bare(seed: u64, pos: [i32; 3], block: u32, fall: i32, biome: u32, rocks: l::RockSet) -> Option<u32> {
     let face = |pos| rock(rocks.block(seed, pos, WET.on_biome(biome) || WOODS.on_biome(biome)));
-    if fall >= l::SNOW_FALL && SNOW.is(block) && fall < l::ROCK_FALL {
+    if fall >= l::SNOW_FALL && SNOW.is(block) && fall < rocks.bare_from() {
         return Some(face(pos));
     }
-    if fall < l::ROCK_FALL {
+    if fall < rocks.bare_from() {
         return None;
     }
     let soil = [GRASS.id(), SNOWY_GRASS.id(), DIRT.id(), PODZOL.id(), SNOW.id(), GRAVEL.id(), SAND.id(), SANDSTONE.id(), STONE.id()];

@@ -459,6 +459,17 @@ pub const SNOW_DEPTH: i32 = 2;
 /// `ROCK_MAX_DEPTH` blocks; on sand the whole face is sandstone (the mesas). Snow slides off at
 /// `SNOW_FALL`.
 pub const ROCK_FALL: i32 = 4;
+/// In the hot, dry land's strata (mesas, canyons) a face goes bare from this fall: steps of three
+/// would otherwise take the planting's gravel for steep ground, which read as dark bands in the
+/// canyon walls (canblack, 11-04).
+pub const ROCK_FALL_STRATA: i32 = 3;
+
+impl RockSet {
+    /// The fall from which a face of these rocks goes bare.
+    pub fn bare_from(self) -> i32 {
+        if self == RockSet::Strata { ROCK_FALL_STRATA } else { ROCK_FALL }
+    }
+}
 pub const SNOW_FALL: i32 = 3;
 pub const ROCK_DEPTH: i32 = 5;
 pub const ROCK_MAX_DEPTH: i32 = 16;
