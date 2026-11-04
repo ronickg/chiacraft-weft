@@ -2,6 +2,38 @@
 
 use super::*;
 
+/// Entities' moves go to a player every tick within a third of `core:entity_send_distance`,
+/// every 2nd tick within two thirds, every `FAR_EVERY`th beyond. (At its largest, 1024, all
+/// within the simulation distance go every tick, as before it was there.)
+const FAR_EVERY: u64 = 4;
+
+/// An entity that moved in the last `FAR_EVERY` ticks, where it is now.
+pub(super) struct Moved {
+    mv: crate::net::Move,
+    /// The tick it last moved.
+    at: u64,
+    /// Sent every tick it moves, however far.
+    exact: bool,
+}
+
+/// How often moves go to a player this far away (squared), out of `send2`, the send
+/// distance's square.
+fn move_every(dist2: f64, send2: f64) -> u64 {
+    if dist2 <= send2 / 9.0 {
+        1
+    } else if dist2 <= send2 * 4.0 / 9.0 {
+        2
+    } else {
+        FAR_EVERY
+    }
+}
+
+/// Whether a move goes now to a player hearing it every `every` ticks, on its own `phase`
+/// (`tick` shifted by something of the player's): on its ticks, if it moved since the last one.
+fn move_due(phase: u64, every: u64, moved_at: u64, tick: u64) -> bool {
+    phase % every == 0 && moved_at + every > tick
+}
+
 impl Server {
     pub(super) fn sync_players(&mut self, c: &'static Content) {
         let mining_now = self.mining_now(c);
@@ -26,7 +58,8 @@ impl Server {
             let viewer = dim
                 .entity(p.entity)
                 .map_or((DVec3::ZERO, GameMode::Survival), |e| (e.pos, e.mode));
-            send_entities(c, p, dim, &moved[d], *tick, view.radius, viewer);
+            let send = crate::config::get(c.game.entity_send_distance);
+            send_entities(c, p, dim, &moved[d], *tick, (send, view.radius as f64 * 16.0), viewer);
             send_own_state(c, p, dim);
             if !p.gizmos.is_empty() {
                 let shapes = gizmos_for(p, dim, *tick, viewer.0);
@@ -71,9 +104,11 @@ impl Server {
         mining_now
     }
 
-    /// Entities that moved since last tick, per dimension (all regions).
-    fn collect_moves(&mut self, c: &'static Content) -> Vec<Vec<crate::net::Move>> {
-        let mut moved: Vec<Vec<crate::net::Move>> = Vec::with_capacity(self.dims.len());
+    /// Entities that moved in the last `FAR_EVERY` ticks, per dimension (all regions), where
+    /// they are now.
+    fn collect_moves(&mut self, c: &'static Content) -> Vec<Vec<Moved>> {
+        let tick = self.tick;
+        let mut moved: Vec<Vec<Moved>> = Vec::with_capacity(self.dims.len());
         for d in &mut self.dims {
             let mut m = Vec::new();
             for r in &mut d.regions {
@@ -105,9 +140,16 @@ impl Server {
                         })
                     {
                         if e.sent.is_some() {
-                            m.push((e.id, e.pos, e.yaw, e.pitch, e.pose, e.frame.unwrap_or(0)));
+                            e.moved_at = tick;
                         }
                         e.sent = Some(now);
+                    }
+                    if e.moved_at + FAR_EVERY > tick && e.sent.is_some() {
+                        // Bodies and what rides them go every tick: clients time bodies by the
+                        // tick and place riders on them.
+                        let exact = solid || e.frame.is_some();
+                        let mv = (e.id, e.pos, e.yaw, e.pitch, e.pose, e.frame.unwrap_or(0));
+                        m.push(Moved { mv, at: e.moved_at, exact });
                     }
                 }
             }
@@ -227,17 +269,18 @@ fn send_clock(p: &mut Player, dim: &DimSet, tick: u64) {
     }
 }
 
-/// Entities in range: spawn new ones, despawn gone ones, stream movement.
+/// Entities within the send distance (and the simulated blocks): spawn new ones, despawn gone
+/// ones, stream movement.
 fn send_entities(
     c: &'static Content,
     p: &mut Player,
     dim: &DimSet,
-    moved: &[crate::net::Move],
+    moved: &[Moved],
     tick: u64,
-    radius: i32,
+    (send, simulated): (f64, f64),
     (me, me_mode): (DVec3, GameMode),
 ) {
-    let range2 = ((radius * 16) as f64).powi(2);
+    let range2 = send.min(simulated).powi(2);
     let mut spawn = Vec::new();
     let mut visible = FxHashSet::default();
     for reg in &dim.regions {
@@ -359,10 +402,16 @@ fn send_entities(
     if !shared.is_empty() {
         p.conn.send(ToClient::EntityComponents(shared));
     }
+    // Far ones every few ticks, where they are now if they moved since the last time (each
+    // player on its own ticks, so not all at once).
+    let due = |m: &Moved| {
+        let every = if m.exact { 1 } else { move_every((m.mv.1 - me).length_squared(), send * send) };
+        move_due(tick + p.entity, every, m.at, tick)
+    };
     let moves: Vec<crate::net::Move> = moved
         .iter()
-        .filter(|m| p.known.contains(&m.0) && visible.contains(&m.0))
-        .copied()
+        .filter(|m| p.known.contains(&m.mv.0) && visible.contains(&m.mv.0) && due(m))
+        .map(|m| m.mv)
         .collect();
     if !moves.is_empty() {
         p.conn.send(ToClient::Moves { tick, moves });
@@ -586,6 +635,47 @@ impl Player {
                 self.conn
                     .send(ToClient::Signals { dim: self.dim, frame: 0, changes });
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn moves_go_less_often_farther_away() {
+        let send2 = 96.0f64 * 96.0;
+        let every = |d: f64| move_every(d * d, send2);
+        assert_eq!((every(0.0), every(32.0), every(33.0), every(64.0), every(65.0), every(500.0)), (1, 1, 2, 2, FAR_EVERY, FAR_EVERY));
+        // At the largest send distance everything simulated goes every tick, as before.
+        assert_eq!(move_every(128.0 * 128.0, 1024.0 * 1024.0), 1);
+    }
+
+    /// An entity moving on some ticks, its player now near, now far: every move reaches it
+    /// within the tier's interval, and the last one always does.
+    #[test]
+    fn a_skipped_tick_loses_no_move() {
+        let moves_at = [3u64, 4, 9, 10, 11, 17, 30, 31, 32, 33, 34, 50];
+        for phase in 0..FAR_EVERY {
+            let mut moved_at = 0;
+            let mut heard_at = 0;
+            for tick in 1..80u64 {
+                if moves_at.contains(&tick) {
+                    moved_at = tick;
+                }
+                let every = [1, 2, FAR_EVERY][(tick / 7 % 3) as usize];
+                // `collect_moves` lists it while it moved within the longest interval.
+                if moved_at + FAR_EVERY > tick && move_due(tick + phase, every, moved_at, tick) {
+                    heard_at = tick;
+                }
+                // Heard since it last moved, or its tick to hear isn't here yet.
+                assert!(
+                    heard_at >= moved_at || tick < moved_at + FAR_EVERY,
+                    "phase {phase}: moved at {moved_at}, heard at {heard_at}, tick {tick}"
+                );
+            }
+            assert!(heard_at >= 50, "phase {phase}: the last move is heard");
         }
     }
 }

@@ -381,6 +381,11 @@ pub struct Game {
     pub mob_spawning: u32,
     /// Config id of `core:simulation_distance`.
     pub simulation_distance: u32,
+    /// Config ids of `core:entity_send_distance`, `core:entity_activation_distance` and
+    /// `core:inactive_entity_interval`.
+    pub entity_send_distance: u32,
+    pub entity_activation_distance: u32,
+    pub inactive_entity_interval: u32,
     /// (owner, component, system) in mod order.
     pub systems: Vec<(ModId, u32, Callback)>,
     /// `{if:name}` conditions mods answer.
@@ -1498,6 +1503,9 @@ pub fn freeze(
     }
     g.mob_spawning = g.config_names["core:mob_spawning"];
     g.simulation_distance = g.config_names["core:simulation_distance"];
+    g.entity_send_distance = g.config_names["core:entity_send_distance"];
+    g.entity_activation_distance = g.config_names["core:entity_activation_distance"];
+    g.inactive_entity_interval = g.config_names["core:inactive_entity_interval"];
     for d in &categories {
         if categories.iter().filter(|o| o.name == d.name).count() > 1 && !errors.iter().any(|e| e.contains(&d.name)) {
             errors.push(format!("entity category {} registered twice", d.name));

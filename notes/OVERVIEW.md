@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 62 · ◧ partly built: 18 · □ not built yet: 17 · ◌ planned for later: 6
+■ built and seen working: 62 · ◧ partly built: 19 · □ not built yet: 17 · ◌ planned for later: 6
 
 ## Core next
 
@@ -12,6 +12,7 @@ What's missing that the rest leans on (marked `core` in the data).
 
 - **Account and identity: Player and world DIDs**. Phase 4: through sponsors; world ownership both ways.
 - **Linked worlds: Admission rules and bans**. Phase 4: allow lists, probation, DID age, shared ban lists.
+- **Running worlds safely: Entity send and activation ranges**. Research round 2, E1, in Weft's engine (to offer upstream): entities go to players within 96 blocks, far ones' moves every 2nd or 4th tick, and those no player is within 48 blocks of tick their goals and paths once a second. Built; Tester's measurement with a 200-animal pen and two players pending. The animals mod's per-tick countdowns (breeding, cat gifts, knockout anger) still to switch to `tick_elapsed`.
 - **Running worlds safely: Permissions**. Operator levels exist, but any player can still /give.
 - **Running worlds safely: Sandboxed code mods**. Phase 6 slice 1 built: a package's code/server.wasm (a wasmtime component, API chiacraft:mods@1.0.0 shaped on Weft's SDK) downloads with it on join and runs on the world's host under fuel, time and memory limits, per world, with storage in the save; sample clans (the animals mod's tribes). Slice 2: the join sheet marks packages that carry code (protocol 6), and a package's clashing command is left out. Left: more of the SDK (components, channels), client halves, personal mods.
 - **Survival: Clothing**. Fur and cloth clothes without armor value (open question).
@@ -91,11 +92,12 @@ Code: `crates/engine/src/chiacraft/worlds`, `mods/portals`, `crates/engine/src/c
 
 ## Running worlds safely
 
-Always-on servers and code mods that can't hurt the player. 0 of 6 parts built.
+Always-on servers and code mods that can't hurt the player. 0 of 7 parts built.
 
 | | Part | Notes |
 |---|---|---|
 | ◧ | Headless server | A dedicated mode exists; no server.toml, console or load tests (phase 7). |
+| ◧ | Entity send and activation ranges (core) | Research round 2, E1, in Weft's engine (to offer upstream): entities go to players within 96 blocks, far ones' moves every 2nd or 4th tick, and those no player is within 48 blocks of tick their goals and paths once a second. Built; Tester's measurement with a 200-animal pen and two players pending. The animals mod's per-tick countdowns (breeding, cat gifts, knockout anger) still to switch to `tick_elapsed`. Docs: `docs/modding.md`. |
 | ◧ | Permissions (core) | Operator levels exist, but any player can still /give. |
 | □ | Movement checks | Phase 7. |
 | ◧ | Sandboxed code mods (core) | Phase 6 slice 1 built: a package's code/server.wasm (a wasmtime component, API chiacraft:mods@1.0.0 shaped on Weft's SDK) downloads with it on join and runs on the world's host under fuel, time and memory limits, per world, with storage in the save; sample clans (the animals mod's tribes). Slice 2: the join sheet marks packages that carry code (protocol 6), and a package's clashing command is left out. Left: more of the SDK (components, channels), client halves, personal mods. Code: `crates/sandbox`, `crates/mod-sdk`, `mods/packages/src/sandboxed.rs`, `examples/wasm/clans`. Docs: `docs/sandboxed-mods.md`, `reports/Sandboxed code mods.md`. |

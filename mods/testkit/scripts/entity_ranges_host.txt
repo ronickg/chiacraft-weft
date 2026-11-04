@@ -1,0 +1,244 @@
+# Entity ranges (core:entity_send_distance, core:entity_activation_distance): what a pen of 200
+# animals 70 blocks away costs, before (1024 / 0: every entity every tick, as the engine was)
+# and after (the defaults, 96 / 48). Run with `--log net=debug` beside
+# entity_ranges_join.txt (a second game process, from the same folder): the host logs
+# "to clients per 1.0 s: ... Moves N (size)" for the joined player, and two BENCH lines with the
+# server tick time ("server avg") and "mods per tick". Compare the Moves bytes between the REC
+# markers.
+loaded
+idle
+chat /tk mode creative
+# A floor, room above it and glass walls, 56..84 blocks east of the host.
+chat /tk fill ~56 ~-1 ~-14 ~84 ~-1 ~14 base:stone
+chat /tk fill ~56 ~ ~-14 ~84 ~8 ~14 core:air
+chat /tk fill ~56 ~ ~-14 ~84 ~2 ~-14 base:glass
+chat /tk fill ~56 ~ ~14 ~84 ~2 ~14 base:glass
+chat /tk fill ~56 ~ ~-14 ~56 ~2 ~14 base:glass
+chat /tk fill ~84 ~ ~-14 ~84 ~2 ~14 base:glass
+chat /tk spawn base:sheep ~59 ~ ~-12
+chat /tk spawn base:sheep ~59 ~ ~-11
+chat /tk spawn base:sheep ~59 ~ ~-10
+chat /tk spawn base:sheep ~59 ~ ~-9
+chat /tk spawn base:sheep ~59 ~ ~-8
+chat /tk spawn base:sheep ~59 ~ ~-7
+chat /tk spawn base:sheep ~59 ~ ~-6
+chat /tk spawn base:sheep ~59 ~ ~-5
+chat /tk spawn base:sheep ~59 ~ ~-4
+chat /tk spawn base:sheep ~59 ~ ~-3
+chat /tk spawn base:sheep ~59 ~ ~-2
+chat /tk spawn base:sheep ~59 ~ ~-1
+chat /tk spawn base:sheep ~59 ~ ~0
+chat /tk spawn base:sheep ~59 ~ ~1
+chat /tk spawn base:sheep ~59 ~ ~2
+chat /tk spawn base:sheep ~59 ~ ~3
+chat /tk spawn base:sheep ~59 ~ ~4
+chat /tk spawn base:sheep ~59 ~ ~5
+chat /tk spawn base:sheep ~59 ~ ~6
+chat /tk spawn base:sheep ~59 ~ ~7
+chat /tk spawn base:sheep ~59 ~ ~8
+chat /tk spawn base:sheep ~59 ~ ~9
+chat /tk spawn base:sheep ~59 ~ ~10
+chat /tk spawn base:sheep ~59 ~ ~11
+chat /tk spawn base:sheep ~59 ~ ~12
+chat /tk spawn base:sheep ~61 ~ ~-12
+chat /tk spawn base:sheep ~61 ~ ~-11
+chat /tk spawn base:sheep ~61 ~ ~-10
+chat /tk spawn base:sheep ~61 ~ ~-9
+chat /tk spawn base:sheep ~61 ~ ~-8
+chat /tk spawn base:sheep ~61 ~ ~-7
+chat /tk spawn base:sheep ~61 ~ ~-6
+chat /tk spawn base:sheep ~61 ~ ~-5
+chat /tk spawn base:sheep ~61 ~ ~-4
+chat /tk spawn base:sheep ~61 ~ ~-3
+chat /tk spawn base:sheep ~61 ~ ~-2
+chat /tk spawn base:sheep ~61 ~ ~-1
+chat /tk spawn base:sheep ~61 ~ ~0
+chat /tk spawn base:sheep ~61 ~ ~1
+chat /tk spawn base:sheep ~61 ~ ~2
+chat /tk spawn base:sheep ~61 ~ ~3
+chat /tk spawn base:sheep ~61 ~ ~4
+chat /tk spawn base:sheep ~61 ~ ~5
+chat /tk spawn base:sheep ~61 ~ ~6
+chat /tk spawn base:sheep ~61 ~ ~7
+chat /tk spawn base:sheep ~61 ~ ~8
+chat /tk spawn base:sheep ~61 ~ ~9
+chat /tk spawn base:sheep ~61 ~ ~10
+chat /tk spawn base:sheep ~61 ~ ~11
+chat /tk spawn base:sheep ~61 ~ ~12
+chat /tk spawn base:sheep ~63 ~ ~-12
+chat /tk spawn base:sheep ~63 ~ ~-11
+chat /tk spawn base:sheep ~63 ~ ~-10
+chat /tk spawn base:sheep ~63 ~ ~-9
+chat /tk spawn base:sheep ~63 ~ ~-8
+chat /tk spawn base:sheep ~63 ~ ~-7
+chat /tk spawn base:sheep ~63 ~ ~-6
+chat /tk spawn base:sheep ~63 ~ ~-5
+chat /tk spawn base:sheep ~63 ~ ~-4
+chat /tk spawn base:sheep ~63 ~ ~-3
+chat /tk spawn base:sheep ~63 ~ ~-2
+chat /tk spawn base:sheep ~63 ~ ~-1
+chat /tk spawn base:sheep ~63 ~ ~0
+chat /tk spawn base:sheep ~63 ~ ~1
+chat /tk spawn base:sheep ~63 ~ ~2
+chat /tk spawn base:sheep ~63 ~ ~3
+chat /tk spawn base:sheep ~63 ~ ~4
+chat /tk spawn base:sheep ~63 ~ ~5
+chat /tk spawn base:sheep ~63 ~ ~6
+chat /tk spawn base:sheep ~63 ~ ~7
+chat /tk spawn base:sheep ~63 ~ ~8
+chat /tk spawn base:sheep ~63 ~ ~9
+chat /tk spawn base:sheep ~63 ~ ~10
+chat /tk spawn base:sheep ~63 ~ ~11
+chat /tk spawn base:sheep ~63 ~ ~12
+chat /tk spawn base:sheep ~65 ~ ~-12
+chat /tk spawn base:sheep ~65 ~ ~-11
+chat /tk spawn base:sheep ~65 ~ ~-10
+chat /tk spawn base:sheep ~65 ~ ~-9
+chat /tk spawn base:sheep ~65 ~ ~-8
+chat /tk spawn base:sheep ~65 ~ ~-7
+chat /tk spawn base:sheep ~65 ~ ~-6
+chat /tk spawn base:sheep ~65 ~ ~-5
+chat /tk spawn base:sheep ~65 ~ ~-4
+chat /tk spawn base:sheep ~65 ~ ~-3
+chat /tk spawn base:sheep ~65 ~ ~-2
+chat /tk spawn base:sheep ~65 ~ ~-1
+chat /tk spawn base:sheep ~65 ~ ~0
+chat /tk spawn base:sheep ~65 ~ ~1
+chat /tk spawn base:sheep ~65 ~ ~2
+chat /tk spawn base:sheep ~65 ~ ~3
+chat /tk spawn base:sheep ~65 ~ ~4
+chat /tk spawn base:sheep ~65 ~ ~5
+chat /tk spawn base:sheep ~65 ~ ~6
+chat /tk spawn base:sheep ~65 ~ ~7
+chat /tk spawn base:sheep ~65 ~ ~8
+chat /tk spawn base:sheep ~65 ~ ~9
+chat /tk spawn base:sheep ~65 ~ ~10
+chat /tk spawn base:sheep ~65 ~ ~11
+chat /tk spawn base:sheep ~65 ~ ~12
+chat /tk spawn base:cow ~67 ~ ~-12
+chat /tk spawn base:cow ~67 ~ ~-11
+chat /tk spawn base:cow ~67 ~ ~-10
+chat /tk spawn base:cow ~67 ~ ~-9
+chat /tk spawn base:cow ~67 ~ ~-8
+chat /tk spawn base:cow ~67 ~ ~-7
+chat /tk spawn base:cow ~67 ~ ~-6
+chat /tk spawn base:cow ~67 ~ ~-5
+chat /tk spawn base:cow ~67 ~ ~-4
+chat /tk spawn base:cow ~67 ~ ~-3
+chat /tk spawn base:cow ~67 ~ ~-2
+chat /tk spawn base:cow ~67 ~ ~-1
+chat /tk spawn base:cow ~67 ~ ~0
+chat /tk spawn base:cow ~67 ~ ~1
+chat /tk spawn base:cow ~67 ~ ~2
+chat /tk spawn base:cow ~67 ~ ~3
+chat /tk spawn base:cow ~67 ~ ~4
+chat /tk spawn base:cow ~67 ~ ~5
+chat /tk spawn base:cow ~67 ~ ~6
+chat /tk spawn base:cow ~67 ~ ~7
+chat /tk spawn base:cow ~67 ~ ~8
+chat /tk spawn base:cow ~67 ~ ~9
+chat /tk spawn base:cow ~67 ~ ~10
+chat /tk spawn base:cow ~67 ~ ~11
+chat /tk spawn base:cow ~67 ~ ~12
+chat /tk spawn base:cow ~69 ~ ~-12
+chat /tk spawn base:cow ~69 ~ ~-11
+chat /tk spawn base:cow ~69 ~ ~-10
+chat /tk spawn base:cow ~69 ~ ~-9
+chat /tk spawn base:cow ~69 ~ ~-8
+chat /tk spawn base:cow ~69 ~ ~-7
+chat /tk spawn base:cow ~69 ~ ~-6
+chat /tk spawn base:cow ~69 ~ ~-5
+chat /tk spawn base:cow ~69 ~ ~-4
+chat /tk spawn base:cow ~69 ~ ~-3
+chat /tk spawn base:cow ~69 ~ ~-2
+chat /tk spawn base:cow ~69 ~ ~-1
+chat /tk spawn base:cow ~69 ~ ~0
+chat /tk spawn base:cow ~69 ~ ~1
+chat /tk spawn base:cow ~69 ~ ~2
+chat /tk spawn base:cow ~69 ~ ~3
+chat /tk spawn base:cow ~69 ~ ~4
+chat /tk spawn base:cow ~69 ~ ~5
+chat /tk spawn base:cow ~69 ~ ~6
+chat /tk spawn base:cow ~69 ~ ~7
+chat /tk spawn base:cow ~69 ~ ~8
+chat /tk spawn base:cow ~69 ~ ~9
+chat /tk spawn base:cow ~69 ~ ~10
+chat /tk spawn base:cow ~69 ~ ~11
+chat /tk spawn base:cow ~69 ~ ~12
+chat /tk spawn animals:red_deer ~71 ~ ~-12
+chat /tk spawn animals:red_deer ~71 ~ ~-11
+chat /tk spawn animals:red_deer ~71 ~ ~-10
+chat /tk spawn animals:red_deer ~71 ~ ~-9
+chat /tk spawn animals:red_deer ~71 ~ ~-8
+chat /tk spawn animals:red_deer ~71 ~ ~-7
+chat /tk spawn animals:red_deer ~71 ~ ~-6
+chat /tk spawn animals:red_deer ~71 ~ ~-5
+chat /tk spawn animals:red_deer ~71 ~ ~-4
+chat /tk spawn animals:red_deer ~71 ~ ~-3
+chat /tk spawn animals:red_deer ~71 ~ ~-2
+chat /tk spawn animals:red_deer ~71 ~ ~-1
+chat /tk spawn animals:red_deer ~71 ~ ~0
+chat /tk spawn animals:red_deer ~71 ~ ~1
+chat /tk spawn animals:red_deer ~71 ~ ~2
+chat /tk spawn animals:red_deer ~71 ~ ~3
+chat /tk spawn animals:red_deer ~71 ~ ~4
+chat /tk spawn animals:red_deer ~71 ~ ~5
+chat /tk spawn animals:red_deer ~71 ~ ~6
+chat /tk spawn animals:red_deer ~71 ~ ~7
+chat /tk spawn animals:red_deer ~71 ~ ~8
+chat /tk spawn animals:red_deer ~71 ~ ~9
+chat /tk spawn animals:red_deer ~71 ~ ~10
+chat /tk spawn animals:red_deer ~71 ~ ~11
+chat /tk spawn animals:red_deer ~71 ~ ~12
+chat /tk spawn animals:red_deer ~73 ~ ~-12
+chat /tk spawn animals:red_deer ~73 ~ ~-11
+chat /tk spawn animals:red_deer ~73 ~ ~-10
+chat /tk spawn animals:red_deer ~73 ~ ~-9
+chat /tk spawn animals:red_deer ~73 ~ ~-8
+chat /tk spawn animals:red_deer ~73 ~ ~-7
+chat /tk spawn animals:red_deer ~73 ~ ~-6
+chat /tk spawn animals:red_deer ~73 ~ ~-5
+chat /tk spawn animals:red_deer ~73 ~ ~-4
+chat /tk spawn animals:red_deer ~73 ~ ~-3
+chat /tk spawn animals:red_deer ~73 ~ ~-2
+chat /tk spawn animals:red_deer ~73 ~ ~-1
+chat /tk spawn animals:red_deer ~73 ~ ~0
+chat /tk spawn animals:red_deer ~73 ~ ~1
+chat /tk spawn animals:red_deer ~73 ~ ~2
+chat /tk spawn animals:red_deer ~73 ~ ~3
+chat /tk spawn animals:red_deer ~73 ~ ~4
+chat /tk spawn animals:red_deer ~73 ~ ~5
+chat /tk spawn animals:red_deer ~73 ~ ~6
+chat /tk spawn animals:red_deer ~73 ~ ~7
+chat /tk spawn animals:red_deer ~73 ~ ~8
+chat /tk spawn animals:red_deer ~73 ~ ~9
+chat /tk spawn animals:red_deer ~73 ~ ~10
+chat /tk spawn animals:red_deer ~73 ~ ~11
+chat /tk spawn animals:red_deer ~73 ~ ~12
+# Before: every entity sent every tick within the simulation distance, all ticking.
+chat /rule entity_send_distance 1024
+chat /rule entity_activation_distance 0
+host run/entity_ranges_ticket.txt
+# The second player joins and loads (its script waits for the ticket file).
+wait 45
+look 90 -10
+shot entity_ranges_pen.png
+rec before start
+bench 30 before
+rec before end
+# After: the defaults.
+chat /rule entity_send_distance 96
+chat /rule entity_activation_distance 48
+wait 3
+rec after start
+bench 30 after
+rec after end
+shot entity_ranges_after.png
+# Near the pen: they all wake up and move every tick again.
+chat /tp ~60 ~ ~
+wait 3
+rec near start
+bench 15 near
+rec near end
+shot entity_ranges_near.png
+quit
