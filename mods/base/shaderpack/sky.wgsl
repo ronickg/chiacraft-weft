@@ -234,7 +234,11 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     if lit_sky {
         let d = clamp(scene.sun.y * 2.0 + 0.5, 0.0, 1.0);
         let dimmed = pow(vec3(d * 0.9 + 0.1, d * 0.9 + 0.1, d * 0.85 + 0.15), vec3(2.2));
-        let albedo = s.color.rgb / max(dimmed, vec3(0.005));
+        // A thunderstorm's deck floored at a mid grey: the engine darkens its colour to a fifth, and
+        // the deck went near black over pale mist with a bright band of sky at the horizon between.
+        // None of the packs lets a storm sky go that dark (Complementary floors it at about 0.65;
+        // the Researcher's weather findings, 11-05); the bellies still darken (`dark`).
+        let albedo = max(s.color.rgb / max(dimmed, vec3(0.005)), vec3(0.55, 0.58, 0.64) * scene.weather.w);
         color = albedo * light / alpha_cloud;
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.3, 1.0, dist));
         color = display(fog_through(color, dir * 220.0, 1.0));

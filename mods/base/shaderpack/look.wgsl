@@ -147,13 +147,17 @@ fn palette() -> Palette {
     // grass about luma 77 in the grade model; a new moon still a quarter, near black, a torch needed.
     // Its light less blue than it was, 0.17 0.21 0.30: blue 3.4x red turned stone a saturated blue.)
     p.ambient *= mix(1.0, mix(0.25, 6.0, scene.moon.w), smoothstep(-0.14, -0.3, e));
-    // Overcast: grey and dim, and the sun no more than a brighter part of the sky.
+    // Overcast: grey and dim, and the sun no more than a brighter part of the sky. A thunderstorm
+    // darker again, its sky a moody slate (Bliss's rain: the land darker but in its colours, the
+    // sky dark blue-grey). With the sky's light 0.4 of the sun's the land went a bright flat grey
+    // (Ronald, 11-05: "looks very grey weird").
     let r = rain_amount();
-    let grey = vec3(luma(p.horizon)) * vec3(0.92, 0.95, 1.0);
-    p.zenith = mix(p.zenith, grey * 0.75, r * 0.85);
-    p.horizon = mix(p.horizon, grey, r * 0.85);
+    let storm = scene.weather.w;
+    let grey = vec3(luma(p.horizon)) * vec3(0.9, 0.94, 1.0);
+    p.zenith = mix(p.zenith, grey * (0.72 - 0.32 * storm), r * 0.85);
+    p.horizon = mix(p.horizon, grey * (1.0 - 0.45 * storm), r * 0.85);
     p.glow = p.glow * (1.0 - r * 0.8);
-    p.ambient = mix(p.ambient, vec3(luma(p.ambient + p.sun * 0.4)) * vec3(0.95, 0.97, 1.0), r * 0.85);
+    p.ambient = mix(p.ambient, vec3(luma(p.ambient + p.sun * 0.25)) * vec3(0.93, 0.97, 1.02) * (1.0 - 0.35 * storm), r * 0.85);
     p.sun = p.sun * (1.0 - r * 0.9);
     // At night rain and its clouds darken the sky's light too (by day overcast only greys it).
     p.ambient *= mix(1.0, 1.0 - 0.6 * r, smoothstep(-0.14, -0.3, e));
@@ -758,8 +762,11 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Rain's own mist starts at the eye (Ronald, 11-05: "when raining shouldn't it be more
     // misty??"): rain alone a soft veil (a third gone at 100 blocks), a thunderstorm down to about
     // 150 (at twice that, a thunderstorm went white).
-    let downpour = rain * (0.004 + 0.016 * scene.weather.w);
-    let veil = vec3(1.0) - exp(-((rayleigh + vec3(mie)) * far + vec3(downpour) * dist));
+    // Its mist mainly in the distance, as Bliss's: next to none within about 20 blocks, so the near
+    // land keeps its colour (it began at the eye and the whole land went grey).
+    let downpour = rain * (0.0035 + 0.0055 * scene.weather.w);
+    let wet_far = max(dist - 20.0, 0.0) * smoothstep(10.0, 60.0, dist);
+    let veil = vec3(1.0) - exp(-((rayleigh + vec3(mie)) * far + vec3(downpour) * wet_far));
     // Only the last sixth of the view hands over to the sky's colour where the terrain ends.
     let edge = smoothstep(end * 0.84, end, dist);
     // Valheim's air: lit from behind by the sun, so the haze toward it glows warm (a forward
@@ -774,11 +781,13 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
     // Rain's mist is as dark as the rain's sky, darker in a thunderstorm: lit as a clear day's
     // air, a storm's mist was pale under a dark sky.
-    lit *= mix(1.0, 0.75 - 0.35 * scene.weather.w, rain);
+    // (The sky's colour it starts from is already the rain's; darker than it, the land under a
+    // storm's horizon met a bright band of sky.)
+    lit *= mix(1.0, 0.82 - 0.1 * scene.weather.w, rain);
     // Far ridges still lose a little colour (as before, but only where the veil has begun), then
     // the veil per channel (its blue thicker than its red), then the handover at the end.
     // In rain everything takes a little grey-blue wash, near too.
-    let pale = mix(mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3)), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.25);
+    let pale = mix(mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3)), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.08);
     let seen = mix(pale, lit, veil);
     return mix(seen, lit, edge);
 }
