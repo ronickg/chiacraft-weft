@@ -2066,12 +2066,15 @@ impl Genome {
         unsafe { std::ptr::copy_nonoverlapping(self as *const Genome as *const u8, out.as_mut_ptr(), out.len()) };
         out
     }
-    /// A genome from its bytes (`to_bytes`); one too short is padded with zeros.
+    /// A genome from its bytes (`to_bytes`); one too short is padded with zeros, and one of an
+    /// older layout mended (`mend`: no temperament yet, rather than the calmest).
     pub fn from_bytes(b: &[u8]) -> Genome {
         let mut all = vec![0u8; size_of::<Genome>()];
         let n = b.len().min(all.len());
         all[..n].copy_from_slice(&b[..n]);
-        unsafe { std::ptr::read_unaligned(all.as_ptr() as *const Genome) }
+        let mut g: Genome = unsafe { std::ptr::read_unaligned(all.as_ptr() as *const Genome) };
+        mend(&mut g);
+        g
     }
 }
 
