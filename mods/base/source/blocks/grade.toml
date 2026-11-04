@@ -484,3 +484,9 @@ gain = 0.84
 
 [tiles.log_cacao_top]  # luma 0.52 -> 0.47
 gain = 0.9
+
+[tiles.planks_andiroba]  # sat 0.68 -> 0.60, into jungle planks' band (0.49-0.52 +0.10)
+saturation = 0.88
+
+[items.ipe_seed]  # outline 0.64 -> 0.40 (new, the tropical forest: pale papery wings, the edge too light)
+outline = 0.62
