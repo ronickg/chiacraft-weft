@@ -109,8 +109,13 @@ fn main() {
                     stream.iter().any(|p| (p.0, p.1) == (sx, sz)) || (sx - x).pow(2) + (sz - z).pow(2) <= r * r || h(sx, sz) > bed
                 })
             });
+            // How often it turns: a canal never does.
+            let turns = stream
+                .windows(3)
+                .filter(|w| (w[1].0 - w[0].0, w[1].1 - w[0].1) != (w[2].0 - w[1].0, w[2].1 - w[1].1))
+                .count();
             println!(
-                "# tarn at x {x} z {z}, radius {r}, water at {level}: bed up to {high_bed}, rim from {low_rim} ({}); stream {} long{}",
+                "# tarn at x {x} z {z}, radius {r}, water at {level}: bed up to {high_bed}, rim from {low_rim} ({}); stream {} long, {turns} turns{}",
                 if low_rim > level && high_bed < level { "holds" } else { "LEAKS" },
                 stream.len(),
                 match (stream.first(), stream.last()) {

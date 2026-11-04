@@ -68,6 +68,7 @@ pub mod salt {
     pub const SINKS: u64 = 0x4A9;
     pub const CRATERS: u64 = 0xC4A7;
     pub const TARNS: u64 = 0x7A27;
+    pub const STREAMS: u64 = 0x57EA;
     pub const FACE_COAL: u64 = 0x0C0A;
     pub const FACE_IRONSTONE: u64 = 0x0F3A;
     pub const FACE_MAGNETITE: u64 = 0x0F3B;
@@ -463,9 +464,15 @@ pub const TARN_RADIUS: (i32, i32) = (5, 10);
 pub const TARN_DEPTH: (i32, i32) = (2, 5);
 pub const TARN_CARVE: i32 = 10;
 /// Each tarn's stream (`tarns`' streams): from its outlet down the steepest way, kept if it ends in
-/// a hollow or at the sea's level within `STREAM_MAX` columns and runs `STREAM_MIN` at least.
-pub const STREAM_MAX: i32 = 96;
+/// a hollow or at the sea's level within `STREAM_MAX` columns and runs `STREAM_MIN` at least (128: winding, the longest
+/// run a third longer than straight down).
+pub const STREAM_MAX: i32 = 128;
 pub const STREAM_MIN: i32 = 6;
+/// A stream winds (Planner, 11-04: straight down the grid they read like canals): each step any
+/// way at most `STREAM_WANDER` blocks over the lowest round it (and not uphill) may be taken, a
+/// noise `STREAM_BEND` blocks across choosing.
+pub const STREAM_WANDER: i32 = 1;
+pub const STREAM_BEND: f64 = 14.0;
 
 /// Natural arches (Ronald, 11-04: "all four"; `land::landmarks`): at most one per `ARCH_CELL`
 /// square, kept with `ARCH_CHANCE` where it fits: in the strata land on level ground, or in the
