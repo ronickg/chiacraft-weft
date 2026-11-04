@@ -4,15 +4,18 @@ use std::time::{Duration, Instant};
 
 /// CPU parts of a frame, in the order `Running::prof` records them.
 pub const CPU_PARTS: [&str; 5] = ["update", "ui", "acquire", "record", "submit"];
-/// GPU parts, split by the marks the renderer places.
-pub const GPU_PARTS: [&str; 5] = ["upload", "world", "entities", "ui", "rest"];
+/// GPU parts, split by the marks the renderer places: uploads; terrain made on the GPU and
+/// particles simulated; the sun's shadow map; the opaque world with entities; sky, weather and
+/// what is seen through; the screen effects (shader packs'); the UI; the rest of the frame.
+pub const GPU_PARTS: [&str; GPU_N] = ["upload", "compute", "shadows", "world", "translucent", "effects", "ui", "rest"];
+pub const GPU_N: usize = 8;
 
 pub struct Bench {
     label: String,
     until: Instant,
     frames: Vec<f32>,
     cpu: [f64; 5],
-    gpu: [f64; 5],
+    gpu: [f64; GPU_N],
     gpu_frames: u32,
     server: Vec<f32>,
     phases: [f64; 6],
@@ -33,7 +36,7 @@ impl Bench {
             until: Instant::now() + Duration::from_secs_f32(secs),
             frames: Vec::new(),
             cpu: [0.0; 5],
-            gpu: [0.0; 5],
+            gpu: [0.0; GPU_N],
             gpu_frames: 0,
             server: Vec::new(),
             phases: [0.0; 6],
@@ -71,7 +74,7 @@ impl Bench {
         for (s, v) in self.cpu.iter_mut().zip(cpu) {
             *s += *v as f64;
         }
-        if gpu.len() >= 5 {
+        if gpu.len() >= GPU_N {
             for (s, v) in self.gpu.iter_mut().zip(gpu) {
                 *s += *v as f64;
             }

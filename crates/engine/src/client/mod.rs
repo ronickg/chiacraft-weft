@@ -2286,7 +2286,11 @@ impl Client {
     /// its edges do not crawl as the camera moves. `render_shadows` then draws the map.
     pub fn prepare_shadows(&mut self, gpu: &mut dyn Backend) {
         self.shadow.1 = false;
-        if !self.render.has_shadows() || !content().dims[self.world.dim as usize].sky_light {
+        // `--no-shadows`: a benchmark leaving the shadow map out.
+        if !self.render.has_shadows()
+            || !content().dims[self.world.dim as usize].sky_light
+            || crate::app::api::launch_options().contains_key("no-shadows")
+        {
             return;
         }
         let sun = self.sun();
