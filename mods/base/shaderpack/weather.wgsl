@@ -45,6 +45,10 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     let light = light_round(unpack_light(in.data.y), vec3(0.0), vec3(1e4));
-    // A little darker and stronger than the texture, so drops show against the pale rainy sky.
-    return vec4(display(haze(color.rgb * light * 0.75, in.rel)), min(color.a * in.alpha * 1.4, 1.0));
+    // Thin grey streaks rather than vanilla's pale-blue drops: half grey, fainter, and fading out
+    // right by the eye, where a drop's texel is as big as a fingernail. Drawn as they were (the
+    // texture's blue at 1.4x its alpha) they read as big pale-blue rectangles (Ronald, 11-05).
+    let tint = mix(color.rgb, vec3(luma(color.rgb)) * vec3(0.95, 0.98, 1.02), 0.5);
+    let near = smoothstep(1.5, 6.0, length(in.rel));
+    return vec4(display(haze(tint * light * 0.8, in.rel)), min(color.a * in.alpha * 0.85 * near, 1.0));
 }
