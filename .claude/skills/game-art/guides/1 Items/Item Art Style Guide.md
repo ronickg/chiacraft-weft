@@ -168,6 +168,19 @@ Two files don't match the rest of the set and should not be used as reference: `
 
 **Background:** flat `#FF00FF` magenta everywhere outside the item (flat `#00FF00` green when the item itself is purple, pink or magenta). It becomes transparent; every pixel of the item is fully opaque.
 
+**Learned from Ronald's answers** (the item icon redo, 2026-11-04; each line is something he approved or sent back):
+- Metal is warm silver with a near-white bevel; handles are red-brown leather with gold bands and a round gold pommel; fittings are gold (approved across every tool and armour piece).
+- A hoe is a long plain handle with one flat blade like a garden hoe, about 10 px wide and 4-5 px tall, set at a right angle across the top of the handle and pointing down-left: never a block-shaped hammer head (too big) nor a thin hook (too small). Tool heads must read at slot size.
+- A leather helmet is a soft cap with stitched panels, a short brim and ear flaps, open face; metal helmets have the visor.
+- Boots are a pair seen a little from the side, so each foot and toe shows at the bottom; never shin guards alone.
+- Sticks, shafts and handles are a full 3 px thick from end to end.
+- Coal is a deep, glossy black-brown with bright blue-grey glints on its facets; dark powders (gunpowder) keep strong contrast between their light and dark sides. Never dull or muddy grey.
+- Meat keeps its outline like everything else; cooked meat is a warm brown with darker grill or char marks, never grey.
+- An item named for a body part shows that part (a spider eye is an eye, with an iris and a glint, not a plain ball); a food in a container reads as the container (kibble is a small tied sack, not a heap).
+- A whole animal (a raw hare) reads as that animal at slot size: its outline and one or two telltale parts (long ears, long hind legs).
+- Seeds, grains and small berries need contrast and size: a few big clear grains or berries with a light top-left and a dark outline, never a pale washed-out heap or a tiny dark speck. Grain ears (barley, rye) are full and golden with clear bearded ears, not wispy.
+- Beans are clearly beans (kidney-shaped, glossy, with a speckle or a pale eye), never a pink lump that reads as meat; small round berries (crowberries) are glossy and big enough to see one by one.
+
 How to prompt, check and cut it: `0 Making it.md`.
 
 ### Reference images to attach

@@ -953,6 +953,9 @@ pub mod entity_flags {
     pub const KINEMATIC: u32 = 128;
     /// A solid body hurts what it squeezes against blocks instead of only pushing.
     pub const CRUSHES: u32 = 256;
+    /// Its mod tick and navigation run every tick even with no player near
+    /// (`core:entity_activation_distance`): projectiles, anything a mod needs exact.
+    pub const ALWAYS_ACTIVE: u32 = 512;
     /// Not a kind flag: set in `EntityState::flags` when its last move ran into a wall.
     pub const BLOCKED: u32 = 1 << 31;
 }
@@ -2303,6 +2306,10 @@ pub struct Host {
     /// The state the terrain leaves at the top of column (`x`, `z`): 0 where caves took it or the
     /// dimension has no terrain.
     pub dim_surface: unsafe extern "C" fn(dim: u32, seed: u64, x: i32, z: i32) -> u32,
+    /// Ticks since `entity`'s kind last ticked it (`EntityDesc::on_tick`), at least 1: 1 every tick
+    /// while a player is near, more for one ticked only now and then
+    /// (`core:entity_activation_distance`). What counts down per tick counts down by this.
+    pub entity_tick_elapsed: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64) -> u32,
 }
 
 /// Natural spawning around players (`Host::reg_spawn`). Every two seconds the engine tries a few

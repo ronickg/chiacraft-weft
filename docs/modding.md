@@ -267,9 +267,28 @@ Anywhere a block is named as text, `base:furnace[lit=true]` picks a state: in st
 - `animations(..)`
 - `goals(..)` for AI (see `weft_sdk::ai`); `ai::melee(reach)` with `.attack_damage(3.0)` makes it hit like a player does, so `question::ATTACK` and `chain::ATTACK_DAMAGE` (a strength effect, a peaceful zone) work on mobs too
 - `neutral(|w, mob, player| ..)`: leaves a player alone while that holds, unless they hit it in the last 20 seconds. A spider is calm in daylight, and a mob that only minds you up close is `|_, m, p| dist(m, p) > 16.0`. `ai::melee` and `ai::follow_player` go by it, `ai::target` is the same for goals of your own
-- `on_tick`: every entity of the kind at once, once per tick
+- `on_tick`: every entity of the kind at once, once per tick (but see "Far from players" below)
 - `on_hurt(|w, hurt| ..)`, `on_death(|w, death| ..)`: the `ENTITY_HURT` and `ENTITY_DIED` events for this kind. The damage itself is the `chain::DAMAGE` chain and `question::HURT` can stop it, for any kind, yours or not
 - `on_interact`: a player right clicked one (after `question::INTERACT_ENTITY`)
+
+Far from players, entities cost less, by three world settings (`/rule <name> <value>`):
+- `core:entity_send_distance` (blocks, 96): entities farther from a player than this (or than
+  the simulation distance) aren't sent to them. Their moves go every tick within a third of it,
+  every 2nd tick within two thirds, every 4th beyond; clients ease far ones between, and a
+  skipped tick loses nothing (the next one sends where it is now). Solid bodies and what rides
+  them go every tick. At 1024 every entity simulated goes every tick.
+- `core:entity_activation_distance` (blocks, 48; 0 off): an entity with no player this near
+  *rests*: its kind's `on_tick` (goals) and its path finding run only once in
+  `core:inactive_entity_interval` ticks (20), on the ticks where `(time + id) % interval == 0`.
+  Physics still runs every tick, and the `walk` or `fly` its last tick asked for goes on in
+  between, so it keeps walking or flying; a path it follows is still steered every tick.
+  Players, riders and what they ride, block entities, burning entities and those hurt in the
+  last 5 seconds never rest.
+- What counts down per tick should count down by `w.tick_elapsed(id)` (ticks since its last
+  tick, 1 when a player is near): `fuse = fuse.saturating_sub(w.tick_elapsed(id))`. Checks on
+  `(time + id) % n == 0` with `n` dividing the interval still land; `time % n == 0` doesn't.
+- `always_active()` on the kind opts out of resting: projectiles (a resting arrow would fly
+  through what it should hit) and anything a mod needs exact every tick.
 
 Moving platforms: `solid()`, `kinematic()`, `carry_height(..)`, and
 `blocks(&DECK)` with a template (`r.template(&DECK).fill("base:oak_planks", from, to)`) makes a flying structure players can build on; its box is what the blocks fill, no `size` needed. `EntityState.size` is an entity's box and eye height as they are now (crouching and `w.set_size` included), so `st.pos[1] + st.size[2]` is where its eyes are. `w.set_scale(id, 1.2)` draws one entity a fifth bigger than its kind, its box and eyes alike (individuals that differ in size; not saved, so set it again when it loads).

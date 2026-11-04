@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a few sunflower seeds: teardrop seeds striped black and grey-white, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.578,
+   "outline": 0.88,
+   "red_line": 0.0,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

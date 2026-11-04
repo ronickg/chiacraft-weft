@@ -6,8 +6,8 @@
 //! season.
 
 use base_api::{Air, Vitals};
-use vitals::effects::{self, Effect, Group};
 use vitals::clothing::{self, Worn};
+use vitals::effects::{self, Effect, Group};
 use vitals::temperature::{self, Body};
 use vitals::{calendar, stomach};
 use weft_sdk::*;
@@ -113,7 +113,12 @@ fn worn(w: &World, id: u64) -> Worn {
         if let Some((m, piece)) = clothing::piece_of(name) {
             worn.clothes(m, piece);
         } else if i < 4 {
-            let material = name.split_once(':').map_or(name, |(_, n)| n).split('_').next().unwrap_or("");
+            let material = name
+                .split_once(':')
+                .map_or(name, |(_, n)| n)
+                .split('_')
+                .next()
+                .unwrap_or("");
             worn.armor(material, i as usize);
         }
     }

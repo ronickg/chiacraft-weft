@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a wooden bowl of cooked rice seen from the front and slightly above: a heap of white grains with a soft shine, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.289,
+   "outline": 0.46,
+   "red_line": 0.0,
+   "fill": 0.52,
+   "passed": true
+  }
+ ]
+}

@@ -8,6 +8,8 @@ description = "Sandboxed code mods (chiacraft plan, phase 6): runs a package's W
 
 [dependencies]
 blake3 = "1.8"
+# The API version this game runs, and reading a component's (`chiacraft_packages::code`).
+chiacraft-packages = { path = "../packages" }
 wasmtime = { version = "36.0.18", default-features = false, features = ["runtime", "cranelift", "component-model", "std"] }
 # Turns a mod's `wasm32-unknown-unknown` module into the component the game loads (`componentize`).
 wit-component = { version = "0.239", optional = true }
@@ -17,6 +19,12 @@ pack = ["dep:wit-component"]
 
 [[bin]]
 name = "componentize"
+required-features = ["pack"]
+
+# `callcost <component or module.wasm> [calls]`: what one call into a mod costs, by kind, against
+# a game with nothing in it (the sandbox's own cost; a real world call adds the engine's).
+[[bin]]
+name = "callcost"
 required-features = ["pack"]
 
 # Runs the test mod (tests/guest, built here for wasm32-unknown-unknown) against the limits:

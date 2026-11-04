@@ -187,6 +187,12 @@ impl World {
     pub fn navigating(&self, id: u64) -> bool {
         unsafe { (host().navigating)(self.raw(), id) != 0 }
     }
+    /// Ticks since `id`'s kind last ticked it, at least 1. Entities with no player near tick
+    /// only now and then (`core:entity_activation_distance`): what counts down per tick should
+    /// count down by this.
+    pub fn tick_elapsed(&self, id: u64) -> u32 {
+        unsafe { (host().entity_tick_elapsed)(self.raw(), id) }
+    }
     pub fn walk(&self, id: u64, dir: [f32; 2], speed: f32, jump: bool) {
         unsafe { (host().entity_walk)(self.raw(), id, &dir, speed, jump as u32) }
     }
@@ -732,6 +738,14 @@ impl EntityBuilder<'_> {
     /// A solid body that hurts what it squeezes into blocks instead of only pushing it.
     pub fn crushing(mut self) -> Self {
         self.flags |= entity_flags::CRUSHES;
+        self
+    }
+    /// Ticks (`on_tick`, `goals`) and walks its path every tick even with no player near.
+    /// Without it, an entity no player is within `core:entity_activation_distance` of ticks
+    /// once in `core:inactive_entity_interval` ticks (physics still runs every tick). For
+    /// projectiles and anything a mod needs exact.
+    pub fn always_active(mut self) -> Self {
+        self.flags |= entity_flags::ALWAYS_ACTIVE;
         self
     }
     /// Riders up to `blocks` above the body (jumping, flying around inside it) keep moving with

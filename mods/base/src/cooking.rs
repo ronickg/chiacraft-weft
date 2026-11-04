@@ -52,7 +52,10 @@ const CATCH_UP: u32 = 24000;
 pub fn register(r: &mut Registry) {
     r.stack_component(&MEAL, 0);
     r.stack_component(&MEAL_NUTRITION, 0);
-    r.item(&BOWL).tag("bowl").max_stack(16).tab(&crate::tabs::FOOD);
+    r.item(&BOWL)
+        .tag("bowl")
+        .max_stack(16)
+        .tab(&crate::tabs::FOOD);
     r.item(&STEW)
         .max_stack(1)
         .set_text(&REMAINDER, "base:bowl")
@@ -69,14 +72,25 @@ pub fn register(r: &mut Registry) {
     r.shaped(&CRAFTING, "drying_rack", 1, &["sss", "s s"], &[('s', "#stick")]);
 
     r.entity_component(&COOKING, Cooking { burn: 0, burn_max: 0, cook: 0, cooking: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
-    r.entity_component(&DRYING, Drying { done: [0; 4], items: [0; 4], wait: 0, smoking: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
+    r.entity_component(
+        &DRYING,
+        Drying { done: [0; 4], items: [0; 4], wait: 0, smoking: 0 },
+        component_flags::SAVE | component_flags::SYNC_MENU,
+    );
     r.system(&COOKING, tick_pots);
     r.system(&DRYING, tick_racks);
 
     r.machine(&COOKING_POT, &POT_MENU)
         .block(|b| {
             b.sound_group("stone")
-                .faces(["cooking_pot_side", "cooking_pot_side", "cooking_pot_top", "cooking_pot_side", "cooking_pot_side", "cooking_pot_side"])
+                .faces([
+                    "cooking_pot_side",
+                    "cooking_pot_side",
+                    "cooking_pot_top",
+                    "cooking_pot_side",
+                    "cooking_pot_side",
+                    "cooking_pot_side",
+                ])
                 .model_box([2.0, 0.0, 2.0], [14.0, 10.0, 14.0])
                 .hardness(3.0)
                 .mineable("pickaxe")
@@ -96,11 +110,15 @@ pub fn register(r: &mut Registry) {
                     ui.column(S::col().gap(2.0), |ui| {
                         ui.group("bowl");
                         ui.progress_bind_dir("flame", S::default().size(14.0, 14.0), abi::ui_dir::UP, |c| {
-                            c.menu_component(&COOKING).map_or(0.0, |s| ratio(s.burn, s.burn_max))
+                            c.menu_component(&COOKING)
+                                .map_or(0.0, |s| ratio(s.burn, s.burn_max))
                         });
                         ui.group("fuel");
                     });
-                    ui.recipe_arrow_bind(|c| c.menu_component(&COOKING).map_or(0.0, |s| ratio(s.cook, meals::COOK_TICKS)));
+                    ui.recipe_arrow_bind(|c| {
+                        c.menu_component(&COOKING)
+                            .map_or(0.0, |s| ratio(s.cook, meals::COOK_TICKS))
+                    });
                     ui.group("output");
                     ui.spacer();
                 });
@@ -128,7 +146,8 @@ pub fn register(r: &mut Registry) {
                     ui.column(S::col().gap(2.0), |ui| {
                         ui.group("rack");
                         ui.progress_bind("attack_bar", S::default().size(72.0, 4.0), |c| {
-                            c.menu_component(&DRYING).map_or(0.0, |s| *s.done.iter().max().unwrap_or(&0) as f32 / 1000.0)
+                            c.menu_component(&DRYING)
+                                .map_or(0.0, |s| *s.done.iter().max().unwrap_or(&0) as f32 / 1000.0)
                         });
                     });
                     ui.spacer();
@@ -188,7 +207,9 @@ fn tick_pots(b: &mut SystemBatch<Cooking>) {
 fn pot_step(w: &World, id: u64, s: &mut Cooking) -> bool {
     let inv = w.inventory(id);
     let (ings, bowl, fuel, output) = (inv.group("ingredients"), inv.group("bowl"), inv.group("fuel"), inv.group("output"));
-    let foods: Vec<usize> = (0..ings.len()).filter_map(|i| food_of(ings.get(i).item)).collect();
+    let foods: Vec<usize> = (0..ings.len())
+        .filter_map(|i| food_of(ings.get(i).item))
+        .collect();
     let can = foods.len() >= meals::MIN && !bowl.get(0).is_empty() && output.get(0).is_empty();
     let key = meals::pack(&foods) as u32 ^ (meals::pack(&foods) >> 32) as u32;
     if key != s.cooking {
@@ -258,7 +279,9 @@ fn tick_racks(b: &mut SystemBatch<Drying>) {
             s.done[i] = (s.done[i] as f32 + rate * secs * 1000.0).round() as u32;
             if s.done[i] >= 1000 {
                 let Some(item) = PRODUCTS.iter().find(|p| item_name(p.id()) == product) else { continue };
-                let made = ItemStack::new(item.id(), stack.count).with(&MADE, today(&w)).with(&FRESHNESS, freshness::FRESH);
+                let made = ItemStack::new(item.id(), stack.count)
+                    .with(&MADE, today(&w))
+                    .with(&FRESHNESS, freshness::FRESH);
                 rack.set(i as u32, made);
                 (s.items[i], s.done[i]) = (made.item, 0);
             }

@@ -1,6 +1,8 @@
 //! Fish (`notes/ECOLOGY.md`, wave one: the middle of the water webs): the brown trout (`BROWN_TROUT`)
-//! of cool rivers and lakes and the pacu (`PACU`) of the swamp's and the llanos' waters, two species
-//! on one model (`source/fish`), the pacu drawn deeper and bigger by its genes. Wild, never tamed.
+//! of cool rivers and lakes and the pacu (`PACU`) of the swamp's and the llanos' waters, and the
+//! Cretaceous's lungfish (`LUNGFISH`) of the floodplain and Lycoptera (`LYCOPTERA`) of the fern
+//! forest's lakes, four species on one model (`source/fish`), drawn deeper, bigger or smaller by
+//! their genes. Wild, never tamed.
 //!
 //! The engine's natural spawning puts animals on the ground, never in water, so fish come by their
 //! own spawner (`spawn`): every two seconds near each player, into water two blocks deep or more in
@@ -17,8 +19,10 @@ use crate::species::SPECIES;
 
 pub(crate) static BROWN_TROUT: Entity = Entity::named("brown_trout");
 pub(crate) static PACU: Entity = Entity::named("pacu");
+pub(crate) static LUNGFISH: Entity = Entity::named("lungfish");
+pub(crate) static LYCOPTERA: Entity = Entity::named("lycoptera");
 /// Each kind and its row in `species::SPECIES`.
-static KINDS: [(&Entity, usize); 2] = [(&BROWN_TROUT, 13), (&PACU, 14)];
+static KINDS: [(&Entity, usize); 4] = [(&BROWN_TROUT, 13), (&PACU, 14), (&LUNGFISH, 35), (&LYCOPTERA, 36)];
 const FLOP: &str = "fish_flop";
 /// How many of a kind may swim within `ROOM_RADIUS` blocks before no more come.
 const ROOM: usize = 6;
@@ -140,8 +144,8 @@ fn swim(w: &World, id: u64, st: &EntityState, index: usize) -> bool {
         set(w, id, s);
         return true;
     }
-    s.left -= 1;
-    s.flee = s.flee.saturating_sub(1);
+    s.left = s.left.saturating_sub(w.tick_elapsed(id) as _);
+    s.flee = s.flee.saturating_sub(w.tick_elapsed(id) as _);
     let speed = if s.flee > 0 { 1.0 } else { 0.3 };
     w.fly(id, [(d[0] / dist) as f32, (d[1] / dist) as f32, (d[2] / dist) as f32], speed);
     set(w, id, s);

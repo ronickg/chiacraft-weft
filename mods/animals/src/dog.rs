@@ -166,7 +166,7 @@ fn goals() -> Goals {
 fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     let puppy = crate::breeding::young(w, id);
     let Some(d) = w.component_mut(id, &DOG) else { return false };
-    d.panic = d.panic.saturating_sub(1);
+    d.panic = d.panic.saturating_sub(w.tick_elapsed(id) as _);
     // A tame told to stay sits (once it is there).
     let sitting = d.tamed != 0 && commands::command(w, id) == commands::STAY && !w.navigating(id);
     let Some(s) = w.component_mut(id, &SEEN) else { return false };

@@ -234,6 +234,7 @@ pub fn register(r: &mut Registry) {
         .speed(0.0)
         .model(arrow_model())
         .attach(&SHOOTER)
+        .always_active()
         .goals(ai::Goals::new().then(arrow_flies));
     r.entity(&SHEEP)
         .tag("livestock")
@@ -468,7 +469,8 @@ fn passive_chicken() -> ai::Goals {
             if *next == 0 {
                 *next = 6000 + w.random_below(6000) as u32;
             } else {
-                *next -= 1;
+                // Far from players it ticks only now and then.
+                *next = next.saturating_sub(w.tick_elapsed(id));
                 if *next == 0 {
                     w.spawn_item(st.pos, ItemStack::new(EGG.id(), 1));
                 }

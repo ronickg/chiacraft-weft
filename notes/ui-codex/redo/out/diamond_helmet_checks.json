@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a cyan diamond plates with white facet tips over dark leather helmet, front view: a rounded dome narrowing to the chin, a horizontal eye slit, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.41,
+   "outline": 0.69,
+   "red_line": 0.18,
+   "fill": 0.56,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "raw venison: a lean deep dark-red steak with a clear darker red-brown outline, a thin cream fat edge and soft marbling, glossy highlight on the upper left, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.273,
+   "outline": 0.83,
+   "red_line": 0.0,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

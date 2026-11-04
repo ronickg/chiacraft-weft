@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a wooden pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of warm orange-brown wood with clear grain, crudely carved, lashed with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.543,
+   "outline": 0.52,
+   "red_line": 0.05,
+   "fill": 0.33,
+   "passed": true
+  }
+ ]
+}

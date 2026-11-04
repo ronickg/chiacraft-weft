@@ -18,6 +18,10 @@ from another texture pack, for reading only.
 
     art.py batch jobs.json            # many at once, four at a time: a list of {kind, name, what, ref, ...}
 
+Every image is also kept for good in the archive (ART_ARCHIVE, default
+/Users/ronald/Coding/chiacraft-archive/images/chiacraft-art/<date>/): each try, each cut sprite, each
+game texture an install replaces. Nothing is ever deleted from it.
+
 Options: --dir (default run/art/, kept out of git), --green (purple or pink things, so the background
 can be keyed), --pale (pale things whose outline may be light), --tries N (default 3). Output in --dir: NAME.png (as generated), NAME_px.png (the exact sprite),
 NAME_checks.json (every try's numbers), failed tries as NAME__tryK.png.
@@ -37,6 +41,28 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
 UI_DIR = os.path.join(ROOT, "mods", "base", "source", "ui")
 CODEX = "/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex"
 SCRATCH = os.environ.get("ART_DIR", os.path.join(ROOT, "run", "art"))
+# Every image ever generated is kept here, outside the repo, and nothing is deleted from it (Ronald,
+# 2026-11-04: "never throw away generated images pls so I can also check back"): each try as made, the
+# cut sprite, and every game texture an install replaces.
+ARCHIVE = os.environ.get("ART_ARCHIVE", "/Users/ronald/Coding/chiacraft-archive/images/chiacraft-art")
+
+
+def archive(path, label, sub=""):
+    """Copy `path` into today's archive folder as <time>__<label><ext>; never overwrites, never deletes."""
+    import datetime
+    if not os.path.exists(path):
+        return None
+    now = datetime.datetime.now()
+    folder = os.path.join(ARCHIVE, now.strftime("%Y-%m-%d"), sub)
+    os.makedirs(folder, exist_ok=True)
+    ext = os.path.splitext(path)[1]
+    dst = os.path.join(folder, f"{now.strftime('%H%M%S')}__{label}{ext}")
+    k = 1
+    while os.path.exists(dst):
+        dst = os.path.join(folder, f"{now.strftime('%H%M%S')}__{label}_{k}{ext}")
+        k += 1
+    shutil.copy2(path, dst)
+    return dst
 
 KINDS = {
     "item": ("1 Items/Item Art Style Guide.md", "1 Items/Item Prompt References"),
@@ -328,7 +354,8 @@ def make(a):
     text, refs, (w, h), full = build(a)
     tries = []
     for k in range(a.tries):
-        if os.path.exists(out):
+        if os.path.exists(out):  # an earlier image under this name: keep it in the archive, then make room
+            archive(out, f"{a.name}__earlier", "generated")
             os.remove(out)
         args = [CODEX, "exec", "--skip-git-repo-check", "--sandbox", "workspace-write", "--ephemeral"]
         for r in refs:
@@ -339,6 +366,7 @@ def make(a):
         if not os.path.exists(out):
             tries.append({"made": False})
             continue
+        archive(out, f"{a.name}__try{k + 1}", "generated")  # every try, passed or not
         ok, res = check(out, w, h, full, a.green, a.pale, a.kind)
         tries.append(dict(res, passed=ok))
         if ok:
@@ -352,7 +380,9 @@ def make(a):
             return f"{a.name}: nothing made ({len(tries)} tries)"
         shutil.copy(os.path.join(a.dir, f"{a.name}__try{made[0]}.png"), out)
     from PIL import Image
-    Image.fromarray(snap(out, w, h, full, a.green)).save(os.path.join(a.dir, a.name + "_px.png"))
+    pxp = os.path.join(a.dir, a.name + "_px.png")
+    Image.fromarray(snap(out, w, h, full, a.green)).save(pxp)
+    archive(pxp, f"{a.name}__px", "cut")
     passed = tries and tries[-1].get("passed")
     return f"{a.name}: {'passed' if passed else 'FAILED the checks'} after {len(tries)} tr{'y' if len(tries) == 1 else 'ies'} {tries[-1] if tries else ''}"
 
@@ -365,6 +395,7 @@ def install(a):
     dst = os.path.join(ROOT, "mods", a.mod, "assets", "textures", folder, a.name + ".png")
     if os.path.exists(dst):
         shutil.copy(dst, os.path.join(a.dir, a.name + "_was.png"))
+        archive(dst, f"{a.name}__replaced_{a.mod}", "replaced")  # the old game texture, kept for good
     shutil.copy(src, dst)
     print(f"{src} -> {dst}")
 

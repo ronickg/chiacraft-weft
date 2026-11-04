@@ -33,8 +33,13 @@ const INFLATE: [f32; 4] = [0.45, 0.3, 0.25, 0.35];
 
 pub fn register(r: &mut Registry) {
     r.item(&FUR).tag("pelts").tab(&crate::tabs::INGREDIENTS);
-    r.item(&PLANT_FIBRE).tag("plant_fibre").tab(&crate::tabs::INGREDIENTS);
-    r.item(&CLOTH).tag("cloth").set(&base_api::FLAMMABLE, 30).tab(&crate::tabs::INGREDIENTS);
+    r.item(&PLANT_FIBRE)
+        .tag("plant_fibre")
+        .tab(&crate::tabs::INGREDIENTS);
+    r.item(&CLOTH)
+        .tag("cloth")
+        .set(&base_api::FLAMMABLE, 30)
+        .tab(&crate::tabs::INGREDIENTS);
     // Fibre spun into string (three to one), string woven into linen (three to a cloth).
     r.shapeless(&CRAFTING, "string", 1, &["#plant_fibre", "#plant_fibre", "#plant_fibre"], 0);
     r.shaped(&CRAFTING, "cloth", 1, &["sss"], &[('s', "#string")]);

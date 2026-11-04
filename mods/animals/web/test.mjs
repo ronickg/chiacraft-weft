@@ -114,7 +114,9 @@ console.log("Genomes, scars, looks");
   for (const x of species) {
     const an = call({ op: "random", species: x.index, seed: s() });
     const builds = an.build.flatMap(b => b[1]);
-    check(`${x.name}${x.breed ? "/" + x.breed : ""}: build within its ranges, size sane`, builds.every(v => v > 0.6 && v < 1.6) && an.size > 0.5 && an.size < 1.6, `size ${an.size.toFixed(2)}`);
+    // A part may be drawn down to nothing (a doe's antlers, a snowy owl's ear tufts: a build trait
+    // whose sex or kind turns it off), never past 1.6 or inside out.
+    check(`${x.name}${x.breed ? "/" + x.breed : ""}: build within its ranges, size sane`, builds.every(v => v > 0 && v < 1.6) && an.size > 0.5 && an.size < 1.6, `size ${an.size.toFixed(2)}`);
   }
 }
 console.log("Over time");
@@ -182,10 +184,16 @@ for (const name of ["cat", "raptor", "wyvern"]) {
   for (const a of st.animals) wildAges.push((st.tick - a.born) / DAY);
   check("wild ones met at different ages, all grown", wildAges.every(d => d >= sp("cat").growth / DAY) && Math.max(...wildAges) - Math.min(...wildAges) > 5,
     `${Math.min(...wildAges).toFixed(1)}-${Math.max(...wildAges).toFixed(1)} days`);
-  for (let d = 0; d < span; d++) st = call({ op: "sim_advance", ticks: DAY });
-  const elder = st.animals.find(a => !a.died && a.stage === 4);
-  const mateOf = elder && st.animals.find(a => !a.died && a.female !== elder.female && a.stage === 3);
-  check("an elder can't mate", elder && (!mateOf || !!call({ op: "sim_mate", mother: elder.female ? elder.id : mateOf.id, father: elder.female ? mateOf.id : elder.id }).error));
+  // Until an elder and a grown one of the other sex are alive together (a fixed number of days
+  // found none when every elder had already died, by the seed).
+  let elder, mateOf;
+  for (let d = 0; d < span * 2 && !(elder && mateOf); d++) {
+    st = call({ op: "sim_advance", ticks: DAY });
+    elder = st.animals.find(a => !a.died && a.stage === 4);
+    mateOf = elder && st.animals.find(a => !a.died && a.female !== elder.female && a.stage === 3);
+  }
+  check("an elder can't mate", elder && mateOf && !!call({ op: "sim_mate", mother: elder.female ? elder.id : mateOf.id, father: elder.female ? mateOf.id : elder.id }).error,
+    elder && mateOf ? "" : "no elder and grown mate alive together");
   st = sim("cat", { lifespan: "off" });
   st = call({ op: "sim_advance", ticks: span * 3 * DAY });
   check("old age off: nobody dies", st.animals.every(a => !a.died));
@@ -215,11 +223,16 @@ for (const x of species) {
   check(`${x.name}: lives somewhere, commonest in one place`, homes.length > 0 && homes.every(([b, h]) => b.includes(":") && h > 0 && h <= 1) && homes.some(([, h]) => h === 1),
     homes.map(([b, h]) => `${b} ${Math.round(h * 100)}%`).join(", "));
   // Alone (no newcomers, as in a pen; in the open the engine spawns more), over 150 days or a
-  // life and a half: two runs of three last at least.
+  // life and a half: two runs of three last at least. A small wild group as the game meets them
+  // (two pairs, of any age), its runs seeded by its name, so a species added elsewhere doesn't
+  // shuffle another's luck.
   const days = Math.max(150, Math.round(x.lifespan / DAY * 1.5));
-  const runs = [0, 1, 2].map(() => {
-    let st = sim(x.name, { auto: true, cap: x.crowd, lifespan: "game" }), peak = 0;
-    for (let i = 0; i < 2; i++) st = call({ op: "sim_wild", species: x.index, female: i === 0 });
+  const own = [...x.name].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  const runs = [0, 1, 2].map(r => {
+    call({ op: "sim_reset", seed: (own + r) * 2 });  // the simulator's seeds 2k and 2k + 1 are one run
+    call({ op: "sim_settings", auto: true, cap: x.crowd, lifespan: "game" });
+    let st, peak = 0;
+    for (let i = 0; i < 4; i++) st = call({ op: "sim_wild", species: x.index, female: i % 2 === 0 });
     for (let d = 0; d < days; d++) {
       st = call({ op: "sim_advance", ticks: DAY });
       peak = Math.max(peak, st.animals.filter(a => !a.died).length);

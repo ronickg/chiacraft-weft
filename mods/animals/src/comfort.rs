@@ -96,9 +96,7 @@ pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState) -> f32 {
     let Some(s) = a.species() else { return 1.0 };
     let Some(body) = comfort(a) else { return 1.0 };
     let air = base_api::air_at(w, st.pos, st.size[1], st.in_liquid != 0, REACH, |_| {}).celsius;
-    let size = w
-        .component(id, &crate::coats::GENOME)
-        .map_or(1.0, |g| crate::coats::size(g) * crate::breeding::growth(w, id, (a.species - 1) as usize));
+    let size = crate::coats::size_of(w, id).map_or(1.0, |g| g * crate::breeding::growth(w, id, (a.species - 1) as usize));
     let mass = s.bio.mass * size.powi(3);
     let old = w.component(id, &BODY).copied().unwrap_or_default();
     let (core, feeling, warmth) = if s.bio.cold_blooded {

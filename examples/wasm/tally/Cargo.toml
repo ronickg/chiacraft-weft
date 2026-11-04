@@ -1,0 +1,24 @@
+[package]
+# A sandboxed mod: the server half of the `tally` package (examples/packages/tally). Build it with
+# `./build.sh`, which writes the package's code/server.wasm.
+name = "tally"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# The sandboxed SDK (API 1.1) under the name of Weft's, so the code reads like a Weft mod's
+# (`use weft_sdk::*;`).
+weft_sdk = { package = "chiacraft-mod-sdk", path = "../../../crates/mod-sdk" }
+
+# Its own cargo root, outside the game's build (it is built for wasm32-unknown-unknown).
+[workspace]
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+codegen-units = 1

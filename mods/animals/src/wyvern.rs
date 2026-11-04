@@ -148,7 +148,7 @@ fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let resting = c.rest > 0;
     if resting {
-        c.rest -= 1;
+        c.rest = c.rest.saturating_sub(w.tick_elapsed(id) as _);
     }
     let pose = resting as u32;
     if c.look != pose + 1 {

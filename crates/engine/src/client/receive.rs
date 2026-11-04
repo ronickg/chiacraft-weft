@@ -214,6 +214,10 @@ impl Client {
                 self.command_replies.insert(id, lines);
             }
             ToClient::Disconnect(reason) => self.disconnected = Some(reason),
+            ToClient::Refused(why) => {
+                self.disconnected = Some(why.key.clone());
+                self.refused = Some(why);
+            }
             ToClient::Gizmos(shapes) => self.gizmos.receive(shapes),
             ToClient::Packet { channel, data } => self.packets.push((channel, data)),
             ToClient::EntityComponents(list) => {

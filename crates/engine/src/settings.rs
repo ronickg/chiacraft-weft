@@ -110,6 +110,18 @@ impl Settings {
     pub fn relays(&self) -> Vec<String> {
         list("core:relays")
     }
+    /// The Chia network for DIDs (chiacraft): `off`, `testnet11` or `mainnet`.
+    pub fn chain(&self) -> String {
+        config::text(id("core:chain")).trim().to_lowercase()
+    }
+    /// Own full nodes (`host:port`) instead of the DNS introducers.
+    pub fn chain_peers(&self) -> Vec<String> {
+        list("core:chain_peers")
+    }
+    /// DID sponsors' addresses (iroh endpoint ids), tried in order.
+    pub fn sponsors(&self) -> Vec<String> {
+        list("core:sponsors")
+    }
     /// Enabled resource packs, highest priority first.
     pub fn resource_packs(&self) -> Vec<String> {
         list("core:resource_packs")

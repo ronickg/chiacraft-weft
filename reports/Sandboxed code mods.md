@@ -86,9 +86,12 @@ nested callback skips the mod (it is busy) rather than re-entering the store.
 2. *Consent says it is code* (built): the join sheet's note says code runs sandboxed; offers carry
    "has code" (protocol 6) and the sheet marks those packages; a host that hides code is refused
    when the manifest arrives. Later, perhaps: a trust setting that refuses code alone.
-3. *More of the SDK*: components (per-entity values with flags, the biggest gap for porting),
-   channels to a mod's client half, block and item callbacks (`on_use`, `on_neighbor`), gizmos,
-   sounds and particles. Each is a new frozen API version (1.1, ...) beside 1.0.
+3. *More of the SDK*, as API 1.1 (built): per-entity components (declared and attached in
+   `init`, values by bytes of at most 256 in buckets of the SDK's `[u8; N]`, the mod's own
+   only), `set-blocks`, sounds and particles; a component's imports are checked at load (this API
+   only, no newer 1.x than the game's). One set of host bindings serves every 1.x, since 1.x only
+   adds and wasmtime matches 1.x by semver. Sample `tally`. Next, as 1.2: block and item
+   callbacks (`on_use`, `on_neighbor`), channels (with client halves), gizmos.
 4. *Client halves*: `code/client.wasm` in the same package, run in the player's game with
    client calls only (HUD lines, screens built from the SDK's UI parts, keys, channels to its
    server half), the same limits plus a frame budget. Downloaded on join like the rest.
@@ -116,6 +119,17 @@ Ronald took the recommendations ("Take its recommendations", through Planner):
 7. One consent sheet for data and code, marking "runs sandboxed code" on the packages that carry
    it. Built in slice 2: offers say whether a package carries code (protocol 6) and the joining
    game refuses a package whose manifest says otherwise.
+
+## Decided after round 1 (2026-11-04, Planner for Ronald)
+
+- a) A mod's API version is read from its own imports (`chiacraft_packages::code::api_of`, by
+  `wasmparser`, so the engine needs no wasmtime). A too-new one is refused when it loads, and the
+  host's offer carries it (protocol 8), so the join sheet refuses before downloading. Built.
+- b) A `required` flag per package at the next `package.toml` change, optional by default: a
+  stopped required mod closes its world to joins and sends its players home, naming the mod. Not
+  built yet.
+- c) `set-blocks` in 1.1 (built), and a call-cost benchmark before anything freezes 1.0
+  (`callcost`, built; numbers below once taken).
 
 ## Checked against the Researcher's round 1 (W1-W4)
 

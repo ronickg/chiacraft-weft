@@ -2893,12 +2893,16 @@ fn freeze_commands(mods: &[ModMeta], games: &mut [crate::registry::RawGame], err
             None => commands.push(def),
         }
     }
-    for (name, level) in games
+    // A mod sets the level of its own commands only. A package's command left out above for a
+    // clashing name leaves its level here too: it must not open (or close) the command that kept
+    // the name, another mod's (chiacraft, phase 6; Research round 4, S8).
+    for (owner, name, level) in games
         .iter_mut()
         .flat_map(|g| std::mem::take(&mut g.command_permissions))
     {
         match commands.iter_mut().find(|d| d.name == name) {
-            Some(d) => d.level = level.min(abi::permission::OWNER),
+            Some(d) if d.handler.is_some_and(|(o, _)| o == owner) => d.level = level.min(abi::permission::OWNER),
+            Some(_) => log::warn!("{}: the permission of /{name}, another's command, is left as it is", mod_name(owner)),
             None => errors.push(format!("permission of unknown command /{name}")),
         }
     }
@@ -3338,6 +3342,33 @@ mod tests {
             assets: Default::default(),
             package: None,
         }
+    }
+
+    /// A package whose command clashes with a code mod's is left out, and so is the permission it
+    /// set: the code mod's command keeps its own level (Research round 4, S8).
+    #[test]
+    fn a_left_out_command_leaves_its_permission_too() {
+        let mut package = meta("pkg", &[]);
+        package.package = Some("00".repeat(32));
+        let mods = [meta("tk", &[]), package];
+        let mut games = vec![crate::registry::RawGame::default(), crate::registry::RawGame::default()];
+        for (i, g) in games.iter_mut().enumerate() {
+            let owner = ModId(i as u32);
+            g.commands
+                .push((owner, "give_more".into(), "<n:int>".into(), abi::Callback::NONE));
+        }
+        games[0]
+            .command_permissions
+            .push((ModId(0), "give_more".into(), abi::permission::GAME_MASTER));
+        games[1]
+            .command_permissions
+            .push((ModId(1), "give_more".into(), abi::permission::EVERYONE));
+        let mut errors = Vec::new();
+        let commands = freeze_commands(&mods, &mut games, &mut errors);
+        let d = commands.iter().find(|d| d.name == "give_more").unwrap();
+        assert!(errors.is_empty(), "{errors:?}");
+        assert_eq!(d.handler.map(|(o, _)| o), Some(ModId(0)));
+        assert_eq!(d.level, abi::permission::GAME_MASTER);
     }
 
     #[test]

@@ -84,6 +84,8 @@ again (once or twice) rather than fixed by hand:
 - **Outline**: the edge is darker than the inside, and not the red-brown line (under 45% of the
   edge). A thing that is red-brown itself (a spider, a brown hide) has its own outline flagged
   as that line: look, and keep it if the outline is its own darker shade.
+  A dark, glossy thing (coal) has bright glints on its edges, so its edge measures lighter than
+  its inside and fails the outline rule too: look, and keep it if it reads right.
 - **Full faces** (a chest front, a workstation face, a cloud or star tile) fill their canvas: make
   them as tiles (`--tile`, blocks without `--cutout`), or the fill check fails them.
 - **Background**: flat magenta (or green) all round, nothing stray on it.
@@ -101,6 +103,12 @@ again (once or twice) rather than fixed by hand:
 - Magenta (or green) cells become transparent; every other pixel is fully opaque.
 - Glows (the sun, fire, magic) blend into magenta as a pink ring: ask for glows on green, or take
   the pink pixels out after cutting (`r > 200, g < 160, b > 100`).
+
+## Keeping it
+
+Nothing generated is ever thrown away: each try, cut sprite, review sheet and replaced texture goes
+to `/Users/ronald/Coding/chiacraft-archive/images/chiacraft-art/<date>/`, outside the repo, and is
+never deleted (Ronald's rule, 2026-11-04). `art.py` does it on its own.
 
 ## Showing it
 
