@@ -687,8 +687,8 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     return shade(in, albedo);
 }
 
-// Distant terrain (`client::lod`): faces of boxes in the average color of their texture, under
-// open sky.
+// Distant terrain (`client::lod`): faces of boxes with their blocks' textures, laid over the
+// world block by block (`lod_albedo`), under open sky.
 @vertex
 fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
@@ -761,17 +761,43 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     if lod_hidden(in) {
         discard;
     }
-    var albedo = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
-    if in.blend > 0.0 {
-        albedo = mix(albedo, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    // A texture per block, laid from the world position on the face's plane (top
+    // faces and gentle slopes by x and z, walls by their side and height, up the right way), its
+    // gradients from that unbroken position so block borders don't jump to a coarse mip. Far off
+    // the mips make it the average color it was drawn in before (Distant Horizons 3.2 textures
+    // its near levels the same way).
+    let top = in.pos.xz;
+    let east = vec2(in.pos.z, -in.pos.y);
+    let south = vec2(in.pos.x, -in.pos.y);
+    let dt = vec4(dpdx(top), dpdy(top));
+    let de = vec4(dpdx(east), dpdy(east));
+    let ds = vec4(dpdx(south), dpdy(south));
+    let n = abs(in.normal);
+    var at = top;
+    var d = dt;
+    if n.y < 0.5 {
+        if n.x > n.z {
+            at = east;
+            d = de;
+        } else {
+            at = south;
+            d = ds;
+        }
     }
+    var avg = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
+    if in.blend > 0.0 {
+        avg = mix(avg, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    }
+    let t = sample(in, fract(at), d.xy, d.zw);
+    // A cutout's clear texels (leaves' gaps) show the average, not their unset color.
+    var albedo = vec4(mix(avg.rgb, t.rgb, t.a), avg.a);
     // Far water is the same water as near: deep there (no blocks are kept that far), with its
     // Fresnel, the sky and the sun's path. Otherwise it would be a flat grey-blue lit like land, a
     // seam at the edge of the render distance. It is left out of the screen's reflections (solid in
     // the mask): looking out to sea, their march over every far-water pixel cost too much
     // (reports/performance.md).
     if in.kind.x == TINT_WATER {
-        let w = water(in, albedo, false);
+        let w = water(in, avg, false);
         return vec4(w.rgb, SOLID_ALPHA);
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
