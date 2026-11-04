@@ -6,7 +6,10 @@
 // of the sky is on the screen, and else keeps the sky the pack already put in it. It must run
 // before other effects: only the first sees the alpha.
 
-const REFLECT_STEPS: i32 = 40;
+// 28 steps growing 1.245 a step reach as far as 40 growing 1.15 did (about 860 blocks); a hit is
+// still narrowed down between the last two. Fewer steps: the march over water was most of the
+// Mac's effects time after a flight over the sea.
+const REFLECT_STEPS: i32 = 28;
 
 fn reflect_hash(p: vec2<f32>) -> f32 {
     let q = vec2<u32>(p);
@@ -118,7 +121,7 @@ fn apply(p: PostPixel) -> vec4<f32> {
     // Walk out along it, the steps growing, from a random start against banding. Past something
     // thin without a clean hit it keeps going; a hit is narrowed down between the last two steps.
     let steps = select(REFLECT_STEPS, 16, cheap);
-    let grow = select(1.15, 1.5, cheap);
+    let grow = select(1.245, 1.5, cheap);
     var step = 0.5;
     var dist = step * (0.5 + reflect_hash(p.uv * p.size));
     var before = 0.0;
