@@ -7,7 +7,7 @@ painted in a grizzled grey-buff coyote's.
 
     ~/.venvs/blocky/bin/python coyote.py      # writes out/spec.json, out/texture.png
 
-Units are texels at the house density (64 a block, 1.56 cm each), y up, it faces +z. A coyote stands
+Units are the house's (64 a block, 1.56 cm each; painted at 32 texels a block, `TX`), y up, it faces +z. A coyote stands
 about 61 cm at the shoulder and is 90 cm long with a 35 cm tail: here the withers are 39 up, the
 body 60 from the nose to the rump, the tail 26, hanging low; the head, eyes and ears a little
 bigger than life.
@@ -25,9 +25,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit, swing  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import TX  # noqa: E402  texels a unit: 32 a block (the face is 5 by 5 texels, over house.MIN_FACE)
 
 OUT = os.environ.get("COYOTE_OUT") or os.path.join(HERE, "out")
 
@@ -72,23 +73,42 @@ EYES.update({
                                    "APPA",
                                    ".aa."], colors={"O": (66, 48, 34), "A": (206, 156, 52), "a": (228, 186, 82), "P": (18, 12, 12),
                                                     "H": (240, 236, 220)}, halo="round"),
+    # At 32 a block the face is 5 texels by 5: an eye is 2 by 2 at each edge, one texel between, a
+    # pale catchlight up and out, the yellow iris below (recolored per coyote), mirrored to match.
+    "coyote_px_lit": dict(pattern=["aP", "AA"], colors={"P": (18, 12, 12), "a": (236, 200, 104), "A": (212, 162, 56)},
+                          halo="none", iris="Aa", mirror=True),
+    "coyote_px": dict(pattern=["HP", "AA"], colors={"P": (18, 12, 12), "H": (240, 236, 220), "A": (212, 162, 56)},
+                      halo="none", iris="A", mirror=True),
 })
-EYE_STYLE = os.environ.get("COYOTE_EYES", "coyote_yellow")
+EYE_STYLE = os.environ.get("COYOTE_EYES", "coyote_px_lit")
 SKULL0 = ((-4.0, 24.0, 12.0), (4.0, 31.0, 20.0))  # the fox's space
 SKULL = tuple(tuple(float(v) for v in warp(c)) for c in SKULL0)
-EYE_X, EYE_Y = 2.4 * K, (29.0 + D) * K  # on the face, above the muzzle (warped)
+EYE_X, EYE_Y = 2.4 * K, (29.0 + D) * K  # on the face, above the muzzle (warped): texels 0-1 and 3-4, rows 0-1
 LID_Z = SKULL[1][2] + 0.15  # the eyelids' hinge line, just in front of the face: closed, they sit over the eyes
 LASH = (52, 30, 22)
+
+
+def skull_grid():
+    """The skull front's texels: (width, height) and the size of one texel in units (u, v)."""
+    sx, sy = SKULL[1][0] - SKULL[0][0], SKULL[1][1] - SKULL[0][1]
+    w, h = max(1, round(TX * sx)), max(1, round(TX * sy))
+    return w, h, sx / w, sy / h
+
+
+def eye_center(cx):
+    """The eye centered at x = cx on the skull's front, in its texels."""
+    w, h, su, sv = skull_grid()
+    return (cx - SKULL[0][0]) / su, (SKULL[1][1] - EYE_Y) / sv
 
 
 def eye_box(cx):
     """(x0, x1, top, bottom) of the eye at `cx` on the face, rounded as `stamp_eyes` places it."""
     pat = EYES[EYE_STYLE]["pattern"]
     ph, pw = len(pat), len(pat[0])
-    u0, top = SKULL[0][0], SKULL[1][1]
-    a = int(round((cx - u0) - pw / 2))
-    v0 = int(round((top - EYE_Y) - ph / 2))
-    return u0 + a, u0 + a + pw, top - v0, top - v0 - ph
+    w, h, su, sv = skull_grid()
+    u0, v0 = eye_corner(*eye_center(cx), pat, w)
+    x0, top = SKULL[0][0] + u0 * su, SKULL[1][1] - v0 * sv
+    return x0, x0 + pw * su, top, top - ph * sv
 
 # ------------------------------------------------------------------ the model
 
@@ -227,7 +247,10 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(abs(size @ du)))), max(1, int(round(abs(size @ dv)))), n
+    w, h = int(round(TX * abs(size @ du))), int(round(TX * abs(size @ dv)))  # texels, at 32 a block
+    if abs(size @ du) > 0 and abs(size @ dv) > 0:  # a small face is still a texel
+        w, h = max(1, w), max(1, h)
+    return np.array(corner, float), du, dv, w, h, n
 
 
 def area(e, face, p, uu, vv, h):
@@ -301,7 +324,9 @@ def area(e, face, p, uu, vv, h):
         if name.endswith("_upper") and face == "south":
             a = np.where(y < 13.0, TAWNY, COAT)
         if name.startswith("leg_F") and name.endswith("_lower") and face == "south":
-            a = np.where(np.abs(x - x.mean()) < 0.5, BLACK, a)  # the dark line down a coyote's foreleg
+            # The dark line down a coyote's foreleg: at 32 a block the front is 1 texel, all line, so
+            # the back's dark buff there (black would read as a fox's stocking).
+            a = np.where(np.abs(x - x.mean()) < 0.5, BLACK if x.shape[1] >= 3 else BACK, a)
     return a
 
 
@@ -339,8 +364,9 @@ def layer_props(e, face, p, a):
 def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     size = np.array(e["hi"]) - np.array(e["lo"])
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du * (abs(size @ du) / w) + vv[..., None] * dv * (abs(size @ dv) / h)
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel centers, in texels
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
     R = rotm(e["rot"])
     if e["rot"]:
         o = np.array(e["origin"])
@@ -361,15 +387,15 @@ def paint_face(e, face, boxes):
     if e["cut"] == "ear":
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
     if e["name"] == "skull" and face == "south":
-        u0, top = SKULL[0][0], SKULL[1][1]
-        stamp_eyes(img, [(cx - u0, top - EYE_Y) for cx in (-EYE_X, EYE_X)], EYE_STYLE)
+        stamp_eyes(img, [eye_center(cx) for cx in (-EYE_X, EYE_X)], EYE_STYLE)
     if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
         img[h - 1, :, :3] = LASH
-    if e["name"] == "muzzle" and face in ("east", "west"):  # the dark line of the mouth
+    if e["name"] == "muzzle" and face in ("east", "west") and h >= 3:  # the dark line of the mouth (1-2 texels tall at 32:
+        # a darkened row is half the muzzle or all of it; the mouth box under it draws the line)
         img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.6).astype(np.uint8)
-    if e["name"] == "nose" and face == "south":  # nostrils as slits
+    if e["name"] == "nose" and face == "south" and w >= 4:  # nostrils as slits (the nose is 1 texel at 32)
         img[h // 2, [0, w - 1], :3] = (24, 18, 18)
-    if e["name"].endswith("_paw") and face == "south":  # four toes
+    if e["name"].endswith("_paw") and face == "south" and w >= 5:  # four toes (a paw is 2 texels at 32)
         for c in range(1, w - 1, 2):
             img[:, c, :3] = (img[:, c, :3] * 0.75).astype(np.uint8)
     if LAYERS["rec"] is not None:

@@ -8,7 +8,8 @@ grey wolf's grizzled grey.
 
     ~/.venvs/blocky/bin/python wolf.py      # writes out/spec.json, out/texture.png
 
-Units are texels at the house density (64 a block, 1.56 cm each), y up, it faces +z. A grey wolf
+Units are the house's (64 a block, 1.56 cm each), y up, it faces +z; painted at 32 texels a block
+(`TX`, half a texel a unit), as the blocks and items are. A grey wolf
 stands about 80 cm at the shoulder and is 1.2 m long with a 45 cm tail: here the withers are 51 up,
 the body 79 from the nose to the rump, the tail 33, carried low; a broad head, shorter ears than a
 coyote's, big paws.
@@ -26,9 +27,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit, swing  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import TX  # noqa: E402  texels a unit: 32 a block (the face is 7 by 6 texels, over house.MIN_FACE)
 
 OUT = os.environ.get("WOLF_OUT") or os.path.join(HERE, "out")
 
@@ -73,23 +75,46 @@ EYES.update({
                                    "APPA",
                                    ".aa."], colors={"O": (58, 44, 32), "A": (200, 146, 44), "a": (224, 178, 72), "P": (18, 12, 12),
                                                     "H": (240, 236, 220)}, halo="round"),
+    # At 32 a block the face is 7 texels by 6, 3 rows of it above the muzzle: an eye is 2 by 2, a
+    # catchlight up and out, the amber iris below (recolored per wolf), mirrored so the two match.
+    "wolf_px": dict(pattern=["HP", "AA"], colors={"P": (18, 12, 12), "H": (240, 236, 220), "A": (206, 150, 44)}, halo="none",
+                    iris="A", mirror=True),
+    "wolf_px_in": dict(pattern=["HP", "PA"], colors={"P": (18, 12, 12), "H": (240, 236, 220), "A": (206, 150, 44)},
+                       halo="none", iris="A", mirror=True),
+    "wolf_px_lit": dict(pattern=["aP", "AA"], colors={"P": (18, 12, 12), "a": (236, 192, 92), "A": (206, 150, 44)},
+                        halo="none", iris="Aa", mirror=True),
 })
-EYE_STYLE = os.environ.get("WOLF_EYES", "wolf_amber")
+EYE_STYLE = os.environ.get("WOLF_EYES", "wolf_px_lit")  # reads amber from across a clearing
 SKULL0 = ((-4.0, 24.0, 12.0), (4.0, 31.0, 20.0))  # the fox's space
 SKULL = tuple(tuple(float(v) for v in warp(c)) for c in SKULL0)
-EYE_X, EYE_Y = 2.4 * K, (29.0 + D) * K  # on the face, above the muzzle (warped)
+# On the face, above the muzzle (warped): at 7 texels across, 2-texel eyes with one of fur outside
+# each and one between.
+EYE_X, EYE_Y = 1.71 * K, (29.0 + D) * K
 LID_Z = SKULL[1][2] + 0.15  # the eyelids' hinge line, just in front of the face: closed, they sit over the eyes
 LASH = (52, 30, 22)
+
+
+def skull_grid():
+    """The skull front's texels: (width, height) and the size of one texel in units (u, v)."""
+    sx, sy = SKULL[1][0] - SKULL[0][0], SKULL[1][1] - SKULL[0][1]
+    w, h = max(1, round(TX * sx)), max(1, round(TX * sy))
+    return w, h, sx / w, sy / h
+
+
+def eye_center(cx):
+    """The eye centered at x = cx on the skull's front, in its texels."""
+    w, h, su, sv = skull_grid()
+    return (cx - SKULL[0][0]) / su, (SKULL[1][1] - EYE_Y) / sv
 
 
 def eye_box(cx):
     """(x0, x1, top, bottom) of the eye at `cx` on the face, rounded as `stamp_eyes` places it."""
     pat = EYES[EYE_STYLE]["pattern"]
     ph, pw = len(pat), len(pat[0])
-    u0, top = SKULL[0][0], SKULL[1][1]
-    a = int(round((cx - u0) - pw / 2))
-    v0 = int(round((top - EYE_Y) - ph / 2))
-    return u0 + a, u0 + a + pw, top - v0, top - v0 - ph
+    w, h, su, sv = skull_grid()
+    u0, v0 = eye_corner(*eye_center(cx), pat, w)
+    x0, top = SKULL[0][0] + u0 * su, SKULL[1][1] - v0 * sv
+    return x0, x0 + pw * su, top, top - ph * sv
 
 # ------------------------------------------------------------------ the model
 
@@ -228,7 +253,10 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(abs(size @ du)))), max(1, int(round(abs(size @ dv)))), n
+    w, h = int(round(TX * abs(size @ du))), int(round(TX * abs(size @ dv)))  # texels, at 32 a block
+    if abs(size @ du) > 0 and abs(size @ dv) > 0:  # a small face is still a texel
+        w, h = max(1, w), max(1, h)
+    return np.array(corner, float), du, dv, w, h, n
 
 
 def area(e, face, p, uu, vv, h):
@@ -301,8 +329,7 @@ def area(e, face, p, uu, vv, h):
         a[:] = TAWNY
         if name.endswith("_upper") and face == "south":
             a = np.where(y < 13.0, TAWNY, COAT)
-        if name.startswith("leg_F") and name.endswith("_lower") and face == "south":
-            a = np.where(np.abs(x - x.mean()) < 0.4, BACK, a)  # a darker line down the foreleg
+        # (The darker line down the foreleg's front is dropped at 32 a block: the front is 2 texels.)
     return a
 
 
@@ -341,8 +368,9 @@ def layer_props(e, face, p, a):
 def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     size = np.array(e["hi"]) - np.array(e["lo"])
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du * (abs(size @ du) / w) + vv[..., None] * dv * (abs(size @ dv) / h)
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel centers, in texels
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
     R = rotm(e["rot"])
     if e["rot"]:
         o = np.array(e["origin"])
@@ -363,15 +391,15 @@ def paint_face(e, face, boxes):
     if e["cut"] == "ear":
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
     if e["name"] == "skull" and face == "south":
-        u0, top = SKULL[0][0], SKULL[1][1]
-        stamp_eyes(img, [(cx - u0, top - EYE_Y) for cx in (-EYE_X, EYE_X)], EYE_STYLE)
+        stamp_eyes(img, [eye_center(cx) for cx in (-EYE_X, EYE_X)], EYE_STYLE)
     if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
         img[h - 1, :, :3] = LASH
-    if e["name"] == "muzzle" and face in ("east", "west"):  # the dark line of the mouth
+    if e["name"] == "muzzle" and face in ("east", "west") and h >= 3:  # the dark line of the mouth (2 texels tall at 32:
+        # a darkened row is half the muzzle; the mouth box under it draws the line)
         img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.6).astype(np.uint8)
-    if e["name"] == "nose" and face == "south":  # nostrils as slits
+    if e["name"] == "nose" and face == "south" and w >= 4:  # nostrils as slits (the nose is 2 texels at 32)
         img[h // 2, [0, w - 1], :3] = (24, 18, 18)
-    if e["name"].endswith("_paw") and face == "south":  # four toes
+    if e["name"].endswith("_paw") and face == "south" and w >= 5:  # four toes (a paw is 3 texels at 32)
         for c in range(1, w - 1, 2):
             img[:, c, :3] = (img[:, c, :3] * 0.75).astype(np.uint8)
     if LAYERS["rec"] is not None:
