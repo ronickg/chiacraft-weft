@@ -28,6 +28,8 @@ pub struct Material {
     pub windproof: f32,
     /// What it's made of (`materials/<name>`... in the recipes), for the sheet.
     pub from: &'static str,
+    /// Pieces of its material each piece takes, head to feet (string to sew it: `STRING`).
+    pub makes: [u32; 4],
 }
 
 impl Material {
@@ -42,10 +44,26 @@ impl Material {
 /// (1.2); hide: buckskin (0.8); linen: cap, shirt and trousers (0.5), loose enough with its hat to
 /// shade one in the sun (between the research's linen, 0, and its desert robe, +6).
 pub const MATERIALS: [Material; 4] = [
-    Material { name: "fur", clo: 2.5, heat: -9.0, wet_keeps: 0.3, windproof: 0.8, from: "pelts of furred wild animals" },
-    Material { name: "wool", clo: 1.2, heat: -2.0, wet_keeps: 0.6, windproof: 0.3, from: "sheep's wool" },
-    Material { name: "hide", clo: 0.8, heat: -1.0, wet_keeps: 0.3, windproof: 0.7, from: "leather" },
-    Material { name: "linen", clo: 0.5, heat: 4.0, wet_keeps: 0.2, windproof: 0.1, from: "plant fibre spun and woven" },
+    Material {
+        name: "fur",
+        clo: 2.5,
+        heat: -9.0,
+        wet_keeps: 0.3,
+        windproof: 0.8,
+        from: "pelts of furred wild animals",
+        makes: [2, 4, 3, 2],
+    },
+    Material { name: "wool", clo: 1.2, heat: -2.0, wet_keeps: 0.6, windproof: 0.3, from: "sheep's wool", makes: [1, 2, 1, 1] },
+    Material { name: "hide", clo: 0.8, heat: -1.0, wet_keeps: 0.3, windproof: 0.7, from: "leather", makes: [1, 2, 1, 1] },
+    Material {
+        name: "linen",
+        clo: 0.5,
+        heat: 4.0,
+        wet_keeps: 0.2,
+        windproof: 0.1,
+        from: "plant fibre spun and woven",
+        makes: [2, 4, 3, 2],
+    },
 ];
 
 /// The four pieces, head to feet, as items are named (`<material>_<piece>`).
@@ -54,8 +72,26 @@ pub const PIECES: [&str; 4] = ["hat", "coat", "trousers", "boots"];
 /// The chance cutting tall grass gives plant fibre, for string and linen.
 pub const FIBRE_CHANCE: f32 = 0.125;
 
-/// What each piece takes to make: pieces of its material, and string to sew it.
-pub const MAKES: [(u32, u32); 4] = [(2, 1), (4, 2), (3, 1), (2, 1)];
+/// String each piece takes to sew, head to feet. Its material: `Material::makes` (hide and wool to
+/// real hide counts, Research round 3 B3: a buckskin suit is three or four deer hides, a fleece
+/// knits more than a sweater; fur stays near a caribou suit's, about four reindeer).
+pub const STRING: [u32; 4] = [1, 2, 1, 1];
+/// Plant fibre a string takes.
+pub const FIBRE_PER_STRING: u32 = 2;
+
+/// What a new player arrives in (Research round 3, B1): a linen hood, a wool sweater, buckskin
+/// trousers and moccasins, about 0.9 clo, ordinary clothing's 0.8 to 1.2 (ISO 9920). With the year
+/// starting in spring it makes the temperate biomes' first week cold rather than deadly.
+pub const ARRIVAL: [(&str, usize); 4] = [("linen", 0), ("wool", 1), ("hide", 2), ("hide", 3)];
+
+/// The clothing material an armor material is the same stuff as: leather armor is hide (Research
+/// round 3, C1: it was warm two ways with two sets of numbers).
+pub fn armor_cloth(material: &str) -> Option<&'static Material> {
+    match material {
+        "leather" => find("hide"),
+        _ => None,
+    }
+}
 
 pub fn find(name: &str) -> Option<&'static Material> {
     MATERIALS.iter().find(|m| m.name == name)
@@ -80,8 +116,13 @@ pub struct Worn {
 }
 
 impl Worn {
-    /// Puts on a piece of armor of that material in slot `piece` (0 head to 3 feet).
+    /// Puts on a piece of armor of that material in slot `piece` (0 head to 3 feet). Armor and
+    /// clothes stack: leather armor over a hide coat is two layers of hide.
     pub fn armor(&mut self, material: &str, piece: usize) {
+        if let Some(m) = armor_cloth(material) {
+            self.clothes(m, piece);
+            return;
+        }
         let (c, h) = temperature::set_insulation(material);
         let share = PIECE_SHARE[piece.min(3)];
         self.cold += c * share;

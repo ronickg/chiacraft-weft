@@ -148,6 +148,9 @@ pub struct S {
     /// Translation shown while the mouse is over the part, empty for none.
     pub tooltip: String,
     tooltip_args: Vec<ArgBuf>,
+    /// Placed at a point of its parent instead of in its flow (`S::at`): x, y, and which point
+    /// of the part goes there.
+    pub at: Option<[f32; 4]>,
 }
 
 /// An argument kept until the node is sent.
@@ -178,6 +181,7 @@ impl Default for S {
             class: "",
             tooltip: String::new(),
             tooltip_args: Vec::new(),
+            at: None,
         }
     }
 }
@@ -308,6 +312,18 @@ impl S {
         self.justify = abi::ui_justify::END;
         self
     }
+    /// Placed with its top left corner at (x, y) GUI pixels from its parent's inner corner, over
+    /// the parent's other parts instead of after them: a number inside a bar, a badge on an icon.
+    /// It takes no room in the parent's flow.
+    pub fn at(self, x: f32, y: f32) -> S {
+        self.at_pivot(x, y, [0.0, 0.0])
+    }
+    /// `at`, with the part's `pivot` on (x, y): [0.5, 0.5] centers it there, [1.0, 0.0] puts its
+    /// top right corner there.
+    pub fn at_pivot(mut self, x: f32, y: f32, pivot: [f32; 2]) -> S {
+        self.at = Some([x, y, pivot[0], pivot[1]]);
+        self
+    }
 }
 
 pub struct Ui {
@@ -378,6 +394,7 @@ fn node(kind: u32, s: S) -> Node {
         data: 0,
         tooltip: Str::new(&s.tooltip),
         tooltip_args: Slice::new(&tip),
+        at: s.at.unwrap_or([f32::NAN, 0.0, 0.0, 0.0]),
         ..abi::UiNode::DEFAULT
     };
     Node { raw, _s: s, _tip: tip }

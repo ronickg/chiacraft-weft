@@ -1,0 +1,26 @@
+{
+ "kind": "block",
+ "what": "a drying rack frame seen from the side, a see-through cutout: two upright oak sticks 2-3 px thick at the left and right edges, two horizontal poles across (one along row 6, one along row 18), and three or four strips of dark red-brown drying meat hanging from the top pole, with clear see-through gaps everywhere else; nothing above row 4. (The game shows only part of this texture on its box: everything below the top 4 px (rows 4 to 32), on all six sides of a box 14 px tall. Draw the whole 32 x 32 so that part reads right; what lies outside it is the same material, unimportant.)",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.379,
+   "outline": 0.91,
+   "red_line": 0.15,
+   "fill": 0.38,
+   "passed": false
+  },
+  {
+   "grid": 0.554,
+   "outline": 0.65,
+   "red_line": 0.39,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

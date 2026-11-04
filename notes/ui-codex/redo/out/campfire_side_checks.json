@@ -1,0 +1,24 @@
+{
+ "kind": "block",
+ "what": "the side of a low campfire: a row of grey stones along the very bottom (rows 26 to 32), two crossed split oak log ends with bark and pale cut rings above them (rows 19 to 26), and small orange-yellow flame tips along rows 18 to 20; above row 18, dark smoky air. (The game shows only part of this texture on its box: only the bottom 14 px (rows 18 to 32) across the full width, so stones, logs and flame tips must all fit in those rows. Draw the whole 32 x 32 so that part reads right; what lies outside it is the same material, unimportant.)",
+ "size": [
+  32,
+  32
+ ],
+ "full": true,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.393,
+   "empty": 0,
+   "seam": 2.69,
+   "passed": false
+  },
+  {
+   "grid": 0.483,
+   "empty": 0,
+   "seam": 1.48,
+   "passed": true
+  }
+ ]
+}

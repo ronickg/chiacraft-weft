@@ -718,8 +718,8 @@ pub struct RawGame {
     pub liquids: Vec<(String, String, weft_abi::LiquidDesc)>,
     /// (liquid, overlay, change), in mod order.
     pub liquid_changes: Vec<(String, String, weft_abi::LiquidChange)>,
-    /// (command, level), mods' say on what their commands ask for.
-    pub command_permissions: Vec<(String, u32)>,
+    /// (owner, command, level), mods' say on what their commands ask for: their own only.
+    pub command_permissions: Vec<(ModId, String, u32)>,
     /// liquid, touching, source result, flowing result, falls-into result.
     pub reactions: Vec<[String; 5]>,
     /// (owner, event, schema, handler).

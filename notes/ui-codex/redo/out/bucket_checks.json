@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a metal bucket seen from the front and slightly above, slightly tapered, thick bright warm-silver rim, vertical highlight just left of centre, a dark rope band around the middle, small round handle lugs on both sides, the oval opening showing the dark inside, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.488,
+   "outline": 0.74,
+   "red_line": 0.02,
+   "fill": 0.56,
+   "passed": true
+  }
+ ]
+}

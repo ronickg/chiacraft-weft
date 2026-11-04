@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a soft tan buckskin leather with fringed seams hat, front view, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.572,
+   "outline": 0.64,
+   "red_line": 0.0,
+   "fill": 0.4,
+   "passed": true
+  }
+ ]
+}

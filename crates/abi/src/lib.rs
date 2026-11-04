@@ -1596,6 +1596,11 @@ pub struct UiNode {
     pub tooltip: Str,
     /// `ui_dir` for progress bars.
     pub dir: u32,
+    /// Placed at a point of its parent instead of in the parent's flow, over whatever is there
+    /// (a number inside a bar): x and y in GUI pixels from the parent's inner corner, then which
+    /// point of the node goes there, 0..1 of its width and height ([0.5, 0.5] its middle). NaN x:
+    /// in the flow, as usual.
+    pub at: [f32; 4],
 }
 defaults!(UiNode {
     kind: 0,
@@ -1626,6 +1631,7 @@ defaults!(UiNode {
     on_click: Callback::NONE,
     tooltip: Str::EMPTY,
     dir: 0,
+    at: [f32::NAN, 0.0, 0.0, 0.0],
 });
 
 #[repr(C)]

@@ -754,7 +754,7 @@ impl Running {
                                 creator,
                                 problem,
                                 trusted,
-                                code: o.5,
+                                api: o.5.clone(),
                             }
                         })
                         .collect();

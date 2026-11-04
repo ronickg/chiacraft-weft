@@ -1600,7 +1600,11 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | seeds 60%, insects 30%, fruit 10% |
 | a meal that fills it | 0.003 kg |
 | drinks | 100% of its 0.004 L a day; a drink lasts 11 min, thirsty after 5 |
+<<<<<<< HEAD
 | its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, desert 40/78/55/40%, beach 40/40/43/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
+=======
+| its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, savanna 40/100/100/0%, desert 40/78/55/40%, beach 40/40/40/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
+>>>>>>> chihuahua-papillon-model
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 2; `base:berries` 3, favorite |

@@ -17,7 +17,8 @@ icons, box models), and items stay flat pictures (the `game-art` skill's guides,
 - Blocks (2026-11-03): 107 textures at 64 px, generated with Codex (ChatGPT's image model) from
   one prompt, the palette (`notes/texture-test/palette.png`) and the approved tiles, four an image
   (`notes/texture-test/codex/gen_grid.sh`, `gen_sprites.sh` for plants), cut by `grid_cut.py` and
-  put in the game by `install_blocks.py` (see `notes/texture-test/PROMPTS.md`). Still 16 px: the
+  put in the game by `install_blocks.py` (see `notes/texture-test/PROMPTS.md`; those scripts and tiles
+  left the repo 2026-11-04 and are in git history and `/Users/ronald/Coding/chiacraft-archive/images/repo-cleanup/2026-11-04/texture-test/`). Still 16 px: the
   model-mapped ones (torches, redstone dust, repeaters, comparators, levers, buttons, beds, the
   piston's inside), glass, water and lava (animated), the anchor and floater.
 - Creatures and props (2026-11-04): every box model repainted at **32 texels a block**, like the
@@ -190,7 +191,7 @@ Each with the UI master prompt (`game-art` skill), the approved slot attached:
 - **Health and stamina bars** instead of hearts and food (the kit's `bar`, `bar_health`,
   `bar_stamina`, `bar_xp`, food buffs with timers, temperature): a HUD change in the base mod.
 - **Creative tabs** as tabs (`tab`, `tab_active`, `tab_hover`).
-- **Item icons** in slots: the generated icons (`kit/items` when added; `notes/ui-reference/items`)
+- **Item icons** in slots: the generated icons (redone from the style guides with the game-art skill, 2026-11-04)
   replace `textures/item/*.png`, which the hand also shows until each item has its model.
 - **Bigger slots**: the kit is drawn for 32-pixel slots at GUI scale 2; the screens lay out 18.
 

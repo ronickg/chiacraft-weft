@@ -479,6 +479,34 @@ and cactus.**
   Spruce stays in the fern forest as its pines and podocarps. Each tree's leaves are browse where
   it grows, its fruit in season (`forage::SOURCES`), and the fallen fruit lies on the ground for
   animals (`forage::DROPPED`).
+- **Water plants take the shore's biome** (2026-11-04): water deeper than a block is the ocean to
+  the world, so hyacinth, wild rice's neighbours and the Cretaceous's water lilies found almost
+  no swamp or floodplain water (Tester's run: none at any stop). Shallow water now counts as the
+  biome of the land beside it (`worldgen.rs`, `shore_biome`).
+- **One growth rule for every mod** (2026-11-04): the growth step (`base_api::grow`: rest,
+  frost or grow, by the place and the season) and the tree builder (`base_api::trees`: the
+  shapes, `grow_tree`) moved from base into `base_api`, so the animals mod's blocks grow by the
+  same rule. The Cretaceous's araucaria, ginkgo, swamp cypress and scale-leaved conifer now have
+  saplings, dropped by their leaves, that grow their trees (Tempskya spread by its roots: none).
+- **Research round 3's fixes** (2026-11-04):
+  - **B4, spring's real food:** lingonberries and crowberries, which hold their fruit over
+    winter, are made ripe; wild rice's grain cooks into a bowl of wild rice (`base:cooked_wild_rice`,
+    USDA cooked wild rice; `cooked_rice`, white, waits for the paddy crop). An unripe bush dropping nothing waits for the cattail's root and fibre, so
+    the spring plains keep a plant food (Research round 4: land them together).
+  - **U1, clay:** clay lies in patches under shallow inland water, half the swamp's floor, none
+    under the sea.
+  - **The berry bush** is a row of `vitals::wild` like the other bushes: one rule for its growth,
+    frost, drops and placement.
+  - **Art wired in:** the compost bin's own sides and tops, and farmland paler as it wears.
+  - **Kelp washed up** (wrack) lies on the beaches as a flat mat, a food for people and animals;
+    kelp under the sea waits for the engine's blocks that hold water (another session).
+  - **Not yet:** B3 (fibre from sedge, cottongrass and cattail) and B5 (plant frost by the still
+    air) need the Survival work (fibre, `Air::still`) in this branch; the cattail's root needs its
+    icon.
+- **Ponds** (2026-11-04): swamps had no still water (their water is the sea's, with beaches), so
+  their water plants had nowhere to grow. Round ponds a block deep now lie on their low, level
+  ground (`vitals::wild::POND_LANDS`: 35% of the swamp's 8 x 8 cells, 20% of the floodplain's),
+  with hyacinth or water lilies on them and wild rice and cattails on their shores.
 - **Looks:** a grazed tuft shows bitten down (`<plant>_grazed`), a ripe seed head its fruit or
   seed (`<plant>_ripe`).
 - **Grown plants rest:** a plant at its last age returns from its growth step before reading the
@@ -486,8 +514,6 @@ and cactus.**
   keeps its fruit through a frost now (lingonberries and crowberries really do).
 - **Not yet:**
   - kelp, since the engine has no block standing in water;
-  - saplings for the Cretaceous's trees: they grow by base's plant rule, which the animals mod
-    can't call;
   - the crops (barley, rye, potato, maize, rice, beans and the rest);
   - none of it seen in the game yet;
   - unloaded plants catch up at today's season, not the season they missed.

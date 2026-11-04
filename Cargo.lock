@@ -1336,8 +1336,9 @@ dependencies = [
 
 [[package]]
 name = "chiacraft-mod-sdk"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
+ "weft_abi",
  "wit-bindgen",
 ]
 
@@ -1348,6 +1349,7 @@ dependencies = [
  "blake3",
  "serde",
  "toml 1.1.8+spec-1.1.0",
+ "wasmparser 0.236.1",
 ]
 
 [[package]]
@@ -1355,6 +1357,7 @@ name = "chiacraft-sandbox"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "chiacraft-packages",
  "wasmtime",
  "wit-component 0.239.0",
 ]

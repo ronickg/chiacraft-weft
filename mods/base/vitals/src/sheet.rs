@@ -46,10 +46,11 @@ fn stats_table(w: &mut String) {
     let (health, stamina) = crate::stomach::max_health_stamina(100.0, 100.0, &arrival, cap);
     let _ = writeln!(
         w,
-        "A new player arrives with {} in the stomach ({:.0} units): max health {health:.0} and stamina {stamina:.0} of 100, wearing off as it digests (an empty stomach: {:.0}).\n",
+        "A new player arrives with {} in the stomach ({:.0} units): max health {health:.0} and stamina {stamina:.0} of 100, wearing off as it digests (an empty stomach: {:.0}). A new world begins on spring's day {}, a quarter of the year from midwinter.\n",
         crate::stomach::ARRIVAL.join(" and "),
         arrival.used(),
-        crate::stomach::FLOOR * 100.0
+        crate::stomach::FLOOR * 100.0,
+        calendar::START_DAY + 1
     );
 }
 
@@ -94,11 +95,12 @@ fn foods(w: &mut String) {
 fn cooking(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Meals and preserving\n\nA stew (`vitals::meals`) cooks {}-{} foods in {} s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x{} (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient.\n",
+        "## Meals and preserving\n\nA stew (`vitals::meals`) cooks {}-{} foods in {} s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x{} (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient. A campfire cooks what a furnace cooks of food, x{} the time, with no fuel. Nothing is made of spoiled food, and what is made of stale food starts as far through its own life as its stalest part.\n",
         meals::MIN,
         meals::MAX,
         meals::COOK_TICKS / crate::TICKS,
-        meals::BONUS
+        meals::BONUS,
+        meals::CAMPFIRE_PACE
     );
     let _ = writeln!(
         w,
@@ -129,29 +131,31 @@ fn cooking(w: &mut String) {
 fn clothes(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Clothing\n\nWorn in four slots of their own under armor ({}), no armor value. A full set's real insulation in clo at {} °C of comfort each; a piece gives its share ({:?}, head to feet). Wet, armor keeps {:.0}% of its warmth; being wet itself feels {} °C colder. What each piece takes: {}.\n\n| material | clo | cold °C | heat °C | kept wet | windproof | from |\n|---|---|---|---|---|---|---|",
+        "## Clothing\n\nWorn in four slots of their own under armor ({}), no armor value; armor and clothes stack, and leather armor is hide. A full set's real insulation in clo at {} °C of comfort each; a piece gives its share ({:?}, head to feet). Wet, armor keeps {:.0}% of its warmth; being wet itself feels {} °C colder. Each piece is sewn with {:?} string, a string is {} plant fibre. A new player arrives in {}.\n\n| material | clo | cold °C | heat °C | kept wet | windproof | pieces to make | from |\n|---|---|---|---|---|---|---|---|",
         clothing::PIECES.join(", "),
         clothing::PER_CLO,
         temperature::PIECE_SHARE,
         temperature::ARMOR_WET_KEEPS * 100.0,
         temperature::WET_CHILL,
-        clothing::PIECES
+        clothing::STRING,
+        clothing::FIBRE_PER_STRING,
+        clothing::ARRIVAL
             .iter()
-            .zip(clothing::MAKES)
-            .map(|(p, (m, s))| format!("{p} {m} + {s} string"))
+            .map(|(m, p)| format!("{m} {}", clothing::PIECES[*p]))
             .collect::<Vec<_>>()
             .join(", ")
     );
     for m in clothing::MATERIALS {
         let _ = writeln!(
             w,
-            "| {} | {} | {:.0} | {} | {:.0}% | {:.0}% | {} |",
+            "| {} | {} | {:.0} | {} | {:.0}% | {:.0}% | {:?} | {} |",
             m.name,
             m.clo,
             m.cold(),
             m.heat,
             m.wet_keeps * 100.0,
             m.windproof * 100.0,
+            m.makes,
             m.from
         );
     }

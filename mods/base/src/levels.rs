@@ -137,6 +137,9 @@ fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
         return;
     };
     w.set(at, TOMBSTONE.id());
+    if let Some(g) = w.component_mut(player, &base_api::GRAVE) {
+        *g = base_api::Grave { x: at[0], y: at[1], z: at[2], set: 1 };
+    }
     let grave = w.block_entity(at);
     if grave == 0 {
         return;

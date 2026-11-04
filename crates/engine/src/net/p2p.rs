@@ -29,14 +29,16 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// hello may carry a travel ticket from a linked world's portal (chiacraft, `travel`). 6: an offer
 /// says whether the package carries sandboxed code (chiacraft, phase 6). 7: a world refuses with a
 /// reason in the player's language (`ToClient::Refused`), and its status says what its admission
-/// rules ask (chiacraft, `admission`).
-const PROTOCOL: u32 = 7;
+/// rules ask (chiacraft, `admission`). 8: an offer says which mod API its code needs instead of
+/// only whether it has code (empty: no code; chiacraft, phase 6).
+const PROTOCOL: u32 = 8;
 const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its
-/// signature envelope (empty if unsigned), and whether it carries sandboxed code
-/// (`code/server.wasm`; the joining game checks this against the manifest it downloads).
-pub type Offer = (String, String, String, u64, String, bool);
+/// signature envelope (empty if unsigned), and the mod API its sandboxed code
+/// (`code/server.wasm`) needs, as `1.1` (empty: no code). The joining game refuses an API it
+/// doesn't run before downloading, and checks there is code exactly when the manifest says so.
+pub type Offer = (String, String, String, u64, String, String);
 
 /// Requests on the extra streams a joining game opens to download packages.
 const GET_MANIFEST: u8 = 0;
@@ -1129,7 +1131,7 @@ async fn download(
             .files
             .iter()
             .any(|f| f.path == chiacraft_packages::identity::SERVER_CODE)
-            != *code
+            != !code.is_empty()
         {
             return Err(format!("package {id}: the host didn't say truly whether it carries code"));
         }
@@ -1226,7 +1228,7 @@ fn check_offers(offers: &[Offer]) -> Result<(), String> {
     if offers.len() > MAX_OFFERS {
         return Err(format!("the world plays with {} packages: more than this game takes", offers.len()));
     }
-    for (id, version, hash, _, sig, _) in offers {
+    for (id, version, hash, _, sig, api) in offers {
         let fine = (1..=64).contains(&id.len())
             && id
                 .chars()
@@ -1239,6 +1241,15 @@ fn check_offers(offers: &[Offer]) -> Result<(), String> {
             && sig.len() <= 4096;
         if !fine {
             return Err("the host offered a package this game can't read".into());
+        }
+        // Code built for an API this game doesn't run would only fail once it loads.
+        match chiacraft_packages::code::parse(api) {
+            None => return Err("the host offered a package this game can't read".into()),
+            Some(Some(v)) if !chiacraft_packages::code::runs(v) => {
+                let (a, b) = chiacraft_packages::code::API;
+                return Err(format!("package {id} runs code for mod API {api}; this game runs {a}.{b}: a newer game can join"));
+            }
+            _ => {}
         }
     }
     Ok(())

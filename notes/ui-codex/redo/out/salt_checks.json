@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a small heap of coarse salt: white-grey crystals with tiny sparkles, a soft blue-grey shadow, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.221,
+   "outline": 0.88,
+   "red_line": 0.0,
+   "fill": 0.27,
+   "passed": true
+  }
+ ]
+}
