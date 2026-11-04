@@ -44,10 +44,30 @@ const OPT_HAZE: u32 = 8u;
 const OPT_FOG: u32 = 9u;
 const OPT_NIGHT_LIGHT: u32 = 10u;
 const OPT_NIGHT_MOON: u32 = 11u;
+const OPT_CANOPY: u32 = 12u;
+const OPT_SHAFTS: u32 = 13u;
 
 fn look_opt(i: u32, missing: f32) -> f32 {
     let v = scene.options[i / 4u][i % 4u];
     return select(v, missing, v == 0.0);
+}
+
+// ---- under the leaves ----
+
+// How closed the forest's canopy is where the player is (`scene.canopy`, from the biome's air:
+// `vitals::air::CANOPY`, 1 a rainforest's), times its knob.
+fn canopy() -> f32 {
+    return clamp(scene.canopy.x * look_opt(OPT_CANOPY, 1.0), 0.0, 2.0);
+}
+
+// The light that comes down through leaves is green (they pass green and swallow red and blue):
+// the sky's light on a forest floor, by how much of the sky the leaves cut (`sky_light` the sky
+// light level, 0..1) and how closed the canopy is. Other cover (rock, a roof) cuts the sky too, but
+// only in a forest is it leaves; the canopy number tells which.
+const LEAF_LIGHT: vec3<f32> = vec3(0.6, 1.0, 0.5);
+
+fn under_leaves(sky_light: f32) -> f32 {
+    return min(canopy(), 1.0) * (1.0 - smoothstep(0.8, 1.0, sky_light));
 }
 
 // ---- the colors of the day ----
@@ -390,22 +410,27 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // The sky's light falls off steeply under cover (Bliss's lightmap, (L^15 x 2 + L^2.5) / 3: 1 in the
     // open, 0.39 a step under, 0.21 two): a forest floor sits a few times below open shade, the open
     // stays as it was.
-    let steep = look_opt(OPT_SHADE, 1.0);
+    // Under a closed canopy steeper still: a rainforest floor gets 1-2 % of the sun.
+    let steep = look_opt(OPT_SHADE, 1.0) * (1.0 + 0.4 * canopy());
     let sky = (pow(light.x, 15.0 * steep) * 2.0 + pow(light.x, 2.5 * steep)) / 3.0;
+    let leaves = mix(vec3(1.0), LEAF_LIGHT, under_leaves(light.x) * 0.8);
     // More of the sky's light comes from above than from the sides, and less from below: tops 1,
     // sides 0.75, bottoms 0.5 (Complementary's), so shade still shows form.
     let hemi = 0.75 + 0.25 * n.y;
-    var c = p.ambient * sky * hemi * ao;
+    var c = p.ambient * sky * hemi * ao * leaves;
     // At golden hour the sky round the low sun glows: a warm fill from its side of the sky, on
     // the faces turned that way; those turned away keep the sky's cool light (Valheim's warm light,
     // blue shade).
     let l = light_dir();
     let side = normalize(vec3(l.x, 0.0, l.z) + vec3(1e-4, 0.0, 0.0));
     let toward = clamp(dot(n, side) * 0.5 + 0.5, 0.0, 1.0);
-    c += p.glow * golden() * 0.35 * mix(0.3, 1.1, toward) * sky * hemi * ao;
+    c += p.glow * golden() * 0.35 * mix(0.3, 1.1, toward) * sky * hemi * ao * leaves;
     // Direct light only where the sky reaches (it keeps caves out of reach of the traced shadow's
     // gaps), and without corner shading: corners are dark where little sky gets in.
-    let open = smoothstep(0.5, 0.95, light.x);
+    // Under a forest's canopy the sun comes through the gaps the shadow map shows at nearly its
+    // full strength (sunflecks), though the leaves cut the sky light there to 0.6-0.8.
+    let c_open = min(canopy(), 1.0);
+    let open = smoothstep(mix(0.5, 0.25, c_open), mix(0.95, 0.55, c_open), light.x);
     c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
     // A held torch's light where it is brighter than the placed lights there (no doubling).
     c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao);
@@ -487,7 +512,9 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     let f = scene.weather.z;
     let s = storm();
     let h = p.y - floor;
-    let low = exp(-max(h - 3.0, 0.0) / mix(7.0, 40.0, s));
+    // In a forest the morning mist rises into the crowns (a rainforest's lies on its canopy at
+    // dawn, 25-35 blocks up).
+    let low = exp(-max(h - 3.0, 0.0) / mix(7.0 + 12.0 * min(canopy(), 1.0), 40.0, s));
     let high = exp(-max(h, 0.0) / 45.0);
     let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
     let q = p - drift;

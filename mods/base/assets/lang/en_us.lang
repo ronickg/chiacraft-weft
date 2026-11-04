@@ -852,6 +852,10 @@ config.base.night_light = Night sky light
 config.base.night_light.tooltip = The night's light (nights are dark by design)
 config.base.night_moon = Moonlight
 config.base.night_moon.tooltip = The moon's light at night
+config.base.look_canopy = Forest shade
+config.base.look_canopy.tooltip = How dim and green the light under a forest's leaves is, with its sunflecks
+config.base.look_shafts = Light shafts
+config.base.look_shafts.tooltip = How strong the sunbeams through a forest's crowns are
 # The recipe book beside the crafting grids (book.rs)
 crafting.book.title = Recipes
 crafting.book.all = All

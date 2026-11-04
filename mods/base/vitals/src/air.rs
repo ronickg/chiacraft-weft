@@ -296,3 +296,18 @@ mod tests {
 /// best aurora places on Earth; the snowy plains, Utqiaġvik at 71.3°), the birch forest (Moscow,
 /// 55.8°) a rare faint one. How strong, 0..1 (`reports/sky-weather-life.md`).
 pub const AURORA: [(&str, f32); 3] = [("base:taiga", 1.0), ("base:snowy_plains", 1.0), ("base:birch_forest", 0.2)];
+
+/// How closed each forest's canopy is, 0..1, for the light under the leaves (the shader pack's
+/// green shade and sunflecks): a rainforest's lets about 1-2 % of the sun reach the floor, much of
+/// it as brief sunflecks (the central Amazon, `images/vegetation/2026-11-04/tropical_refs/real/NOTES.md`);
+/// a temperate broadleaf wood in leaf 3-10 %, a conifer or birch wood more, and an open grove or a
+/// swamp's scattered trees more again (Lighting's estimates from those shares). Biomes not listed
+/// have open sky.
+pub const CANOPY: [(&str, f32); 6] = [
+    ("base:tropical_forest", 1.0),
+    ("base:sequoia_grove", 0.6),
+    ("base:forest", 0.5),
+    ("base:taiga", 0.4),
+    ("base:birch_forest", 0.35),
+    ("base:swamp", 0.3),
+];

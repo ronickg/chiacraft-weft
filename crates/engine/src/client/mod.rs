@@ -455,6 +455,8 @@ pub struct Client {
     dust: f32,
     /// How strong an aurora is where the player is (a mod's air, `air_flags::AURORA_SHIFT`).
     aurora: f32,
+    /// How closed the canopy is where the player is (a mod's air, `air_flags::CANOPY_SHIFT`).
+    canopy: f32,
     frame_dt: f32,
     /// Seconds left of a lightning's flash.
     lightning: f32,
@@ -746,6 +748,7 @@ impl Client {
             snowing: 0.0,
             dust: 0.0,
             aurora: 0.0,
+            canopy: 0.0,
             lightning: 0.0,
             lightnings: 0,
             using: None,
@@ -2233,6 +2236,8 @@ impl Client {
         self.dust += (on(weft_abi::air_flags::DUST) - self.dust).clamp(-dt / 5.0, dt / 5.0);
         let aurora = ((flags >> weft_abi::air_flags::AURORA_SHIFT) & 255) as f32 / 255.0;
         self.aurora += (aurora - self.aurora).clamp(-dt / 20.0, dt / 20.0);
+        let canopy = ((flags >> weft_abi::air_flags::CANOPY_SHIFT) & 255) as f32 / 255.0;
+        self.canopy += (canopy - self.canopy).clamp(-dt / 10.0, dt / 10.0);
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
@@ -2304,6 +2309,7 @@ impl Client {
             options: pack_options(),
             hand: hand.0,
             hand_light: hand.1,
+            canopy: [self.canopy, 0.0, 0.0, 0.0],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {

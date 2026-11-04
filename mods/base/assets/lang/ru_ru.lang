@@ -853,6 +853,10 @@ config.base.night_light = Свет ночи
 config.base.night_light.tooltip = Свет ночного неба (ночи тёмные по задумке)
 config.base.night_moon = Лунный свет
 config.base.night_moon.tooltip = Свет луны ночью
+config.base.look_canopy = Лесная тень
+config.base.look_canopy.tooltip = Насколько тусклый и зелёный свет под листвой леса, с солнечными бликами
+config.base.look_shafts = Солнечные лучи
+config.base.look_shafts.tooltip = Насколько сильны лучи солнца сквозь кроны леса
 # Книга рецептов рядом с сеткой крафта (book.rs)
 crafting.book.title = Рецепты
 crafting.book.all = Все
