@@ -70,7 +70,12 @@ Researcher, 2026-11-04, round 10, for Planner and Ronald ("LODs etc seem broken.
    - Work already in flight is never cancelled.
    - A child tile shows over its parent before its three siblings are ready (`lod.rs:292-311`).
    - Simulated: about 11 new tiles per 16 blocks walked, and 6–10 regenerated pacing over a threshold.
-7. **Light:** full sky light, no AO, no shadows. Valleys and forest floors never darken. Distant Horizons and Voxy keep sky and block light per voxel and add SSAO.
+7. **Light, and the brightness step at the edge.**
+   - `vs_lod` gives every far face full sky light and no AO: `out.light = vec4(1.0, 0.0, 0.0, 0.0)` and `out.ao = 1.0` (`mods/base/shaderpack/world.wgsl:604, 608`).
+   - Near cubes at the same distance keep their real sky light and corner AO. Shadows end at 80 blocks for both, so that part isn't the difference.
+   - So the far land reads lighter and flatter than the cubes beside it, as Tester 2 saw: a brightness step at the edge.
+   - Valleys and forest floors never darken.
+   - Distant Horizons and Voxy keep sky and block light per voxel and add SSAO. The quick fix is in our pack: give far faces the average AO and side-face darkening near terrain has at that distance.
 8. **Cost at default settings** (`lod_distance` 256 cubes, view 12):
    - **Tiles:** 801, about 830k cells, about 1.2–4 M quads before culling.
    - **The level-4 ring** is mostly drawn and then nearly covered by haze (full haze from about 2,950 blocks).
