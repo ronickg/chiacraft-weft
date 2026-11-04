@@ -237,8 +237,16 @@ def build():
     put("advancement_tile", slot, 4)
     put("advancement_tile_done", glow(slot, GOLD1), 4)
     panel = src("c_panel")
-    for n in ("panel", "sidebar", "news"):
+    for n in ("panel", "news"):
         put(n, panel, 9)
+    # The title's menu bar over the painting (engine `screens.rs`, Title): a dark band, no frame,
+    # fading a little to the right, with a thin bronze line on its right edge.
+    band = np.zeros((8, 64, 4), np.uint8)
+    band[..., :3] = (22, 16, 15)
+    band[..., 3] = np.linspace(215, 165, 64).astype(np.uint8)[None, :]
+    band[:, -2, :3], band[:, -2, 3] = (120, 72, 40), 230
+    band[:, -1, :3], band[:, -1, 3] = (40, 24, 16), 200
+    put("sidebar", band, scaling="stretch")
     put("well", fit9(src("c_small", 2), 32, 24, 4), 4)
     put("tooltip", fit9(src("c_small", 3), 32, 24, 3), 3)
     btn = fit9(src("c_buttons", 0), 64, 20, 5)
@@ -255,6 +263,18 @@ def build():
     portrait[4:60, 4:60, :3] = inner.astype(np.uint8)
     portrait[4:60, 4:60, 3] = 255
     put("portrait", portrait, 4)
+    # The menus' background outside the game (the title, worlds, settings): a painted landscape
+    # (`px/title/`, three made 2026-11-04; title_1, golden hour, chosen overnight), cut to 16:9
+    # and stretched to the window.
+    from PIL import Image as _I
+    scene = _I.open(os.path.join(HERE, "px", "title", "title_1.png")).convert("RGBA")
+    h = scene.width * 9 // 16
+    top = (scene.height - h) // 3
+    scene = np.array(scene.crop((0, top, scene.width, top + h)))
+    save("background", scene, scaling="stretch")
+    with open(os.path.join(OUT, "background.gui"), "w") as f:
+        f.write("scaling = stretch\n")
+    out["background"] = scene
     # the secondary button (dark brown): `S::default().class("button_secondary")`
     b2 = fit9(src("c_buttons", 1), 64, 20, 5)
     put("button_secondary", b2, 5)
