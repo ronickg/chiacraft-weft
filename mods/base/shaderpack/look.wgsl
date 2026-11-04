@@ -545,9 +545,9 @@ fn fog_light(dir: vec3<f32>) -> vec3<f32> {
     // At dawn and dusk the mist is lit gold toward the low sun and dims away from it (the
     // Amazon's dawn fog, the canopy refs' 07): less of the sky's cool light, the sun's glow warmer.
     // Before, a misty morning read milky white everywhere (the world playtester, Plants, 11-04).
-    let g = golden();
-    let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.6, g);
-    let sun_part = mix(p.sun, p.sun * 0.6 + p.glow * 0.8, g) * light_strength() * phase;
+    let gold = golden();
+    let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.6, gold);
+    let sun_part = mix(p.sun, p.sun * 0.6 + p.glow * 0.8, gold) * light_strength() * phase;
     return (sky_part + sun_part) * 0.75 * tint * look_opt(OPT_FOG, 1.0);
 }
 
