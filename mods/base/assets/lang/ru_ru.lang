@@ -524,3 +524,4 @@ block.base.wool.tooltip = С овец или из четырёх нитей.
 block.base.kelp = Ламинария
 item.base.kelp = Ламинария
 item.base.cooked_wild_rice = Варёный дикий рис
+item.base.cattail_root = Корень рогоза

@@ -81,21 +81,31 @@ pub fn register(r: &mut Registry) {
         };
         drop(b);
         // Picking gives what plants it again: one at any stage, a bush or a seed head two more when
-        // ripe. (Nothing at all out of season waits for spring's other plant food: the cattail's
-        // root and fibre, `notes/ECOLOGY.md`.)
-        if let Some(gives) = p.gives.map(short) {
-            let ripe = match p.form {
-                Form::Bush => Some("age=3"),
-                Form::Ripens => Some("age=1"),
-                _ => None,
-            };
-            let table = r.loot(block).pool(Pool::new().entry(Entry::item(gives)));
-            if let Some(ripe) = ripe {
-                table.pool(
-                    Pool::new()
-                        .when(Cond::BlockState(ripe))
-                        .entry(Entry::item(gives).count(2, 2)),
-                );
+        // ripe (nothing at all out of season waits for spring's other plant food, `notes/ECOLOGY.md`);
+        // a cordage plant fibre besides (`wild::FIBRE`).
+        let fibre = wild::FIBRE
+            .iter()
+            .find(|(b, _)| *b == p.block)
+            .map(|&(_, chance)| chance);
+        if p.gives.is_some() || fibre.is_some() {
+            let mut table = r.loot(block);
+            if let Some(gives) = p.gives.map(short) {
+                table = table.pool(Pool::new().entry(Entry::item(gives)));
+                let ripe = match p.form {
+                    Form::Bush => Some("age=3"),
+                    Form::Ripens => Some("age=1"),
+                    _ => None,
+                };
+                if let Some(ripe) = ripe {
+                    table = table.pool(
+                        Pool::new()
+                            .when(Cond::BlockState(ripe))
+                            .entry(Entry::item(gives).count(2, 2)),
+                    );
+                }
+            }
+            if let Some(chance) = fibre {
+                table.pool(Pool::new().when(Cond::Chance(chance)).item("plant_fibre"));
             }
         }
     }

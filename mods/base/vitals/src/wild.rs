@@ -63,6 +63,11 @@ pub const HOLDS_FRUIT: [&str; 2] = ["base:lingonberry_bush", "base:crowberry_bus
 /// wild rice and cattails on their shores (the world's other water is the sea's, with beaches).
 pub const POND_LANDS: [(&str, f32); 2] = [("base:swamp", 0.35), ("animals:floodplain", 0.2)];
 
+/// Cordage plants: the chance cutting one gives plant fibre (`clothing`; tall grass gives it a time
+/// in eight). Sedges, cottongrass and cattail leaves were twisted into cord wherever they grow, so
+/// the tundra and the marshes have fibre too (Research round 3, B3).
+pub const FIBRE: [(&str, f32); 3] = [("base:sedge", 0.5), ("base:cottongrass", 0.5), ("base:cattail", 1.0)];
+
 /// The most of one ground all its wild plants cover in a biome (the world rolls for them first).
 pub const MOST: f32 = 0.3;
 
@@ -124,7 +129,7 @@ pub const WILD: [Wild; 22] = [
     w("base:mushroom_brown", Form::Spreads, Ground::Soil, Some("base:mushroom_brown"), FOREST_FLOOR, 0.006),
     w("base:mushroom_red", Form::Spreads, Ground::Soil, Some("base:mushroom_red"), AGARICS, 0.003),
     w("base:water_hyacinth", Form::Spreads, Ground::Water, None, WETLANDS, 0.08),
-    w("base:cattail", Form::Still, Ground::Shore, None, MARSHES, 0.1),
+    w("base:cattail", Form::Still, Ground::Shore, Some("base:cattail_root"), MARSHES, 0.1),
     w("animals:cycad", Form::Still, Ground::Soil, Some("animals:cycad_seed"), CYCAD_LANDS, 0.01),
     w("animals:flowering_shrub", Form::Still, Ground::Soil, None, FLOWERING, 0.02),
     w("animals:water_lily", Form::Still, Ground::Water, None, PONDS, 0.06),

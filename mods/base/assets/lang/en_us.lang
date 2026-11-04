@@ -523,3 +523,4 @@ block.base.wool.tooltip = From sheep, or made of four string.
 block.base.kelp = Kelp
 item.base.kelp = Kelp
 item.base.cooked_wild_rice = Cooked Wild Rice
+item.base.cattail_root = Cattail Root
