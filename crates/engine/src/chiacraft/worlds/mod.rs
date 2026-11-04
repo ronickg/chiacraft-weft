@@ -9,3 +9,4 @@ pub mod links;
 pub mod saved_worlds;
 pub mod travel;
 pub mod world_address;
+pub mod world_did;

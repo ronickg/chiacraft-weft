@@ -9,7 +9,10 @@
 //!    `status` is the code the HTTP API gave (200 a DID launched or the status; 400 malformed, a
 //!    bad signature or time; 403 already sponsored, with its `did` and `launcher`, or another
 //!    network; 429 busy or the budget spent; 503 not synced, no free coin, the chain refused), and
-//!    `body` the body it gave (`{"error": "…"}` for a refusal).
+//!    `body` the body it gave (`{"error": "…"}` for a refusal). A world DID's request (a `Request`
+//!    with `world`, [`chiacraft_wallet::sponsor::Request::sign_world`]) is answered the same way:
+//!    403 also when the owner's DID isn't held by the address, and 403 naming the world's DID when
+//!    its key already has one; 429 also past the identity's world DIDs for the day.
 //! 3. The asker closes the connection.
 //!
 //! The game then reads a DID answer with [`chiacraft_wallet::sponsor::read_answer`]`(status,

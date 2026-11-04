@@ -19,6 +19,14 @@
 //! identity key as a Chia signed message (CHIP-0002, [`crate::sign`]). The identity key names who
 //! asked (a sponsor's daily budget per identity); the address is where the DID goes. Nothing in a
 //! request is secret.
+//!
+//! **World DIDs** (plan phase 4, slice 7): a request may carry `world` ([`WorldAsk`]: the owner's
+//! DID, the world's key and its generation). The sponsor then launches a world DID to the address
+//! (the owner's), its metadata naming the owner's DID and the world's key and generation, after
+//! checking on chain that the owner's DID is held by that address. The identity key then signs
+//! [`world_text`], `chiacraft sponsor world v1 <address> <time> <owner_did> <key> <generation>`,
+//! instead of [`text`]; the proof of work is the same. A request without `world` is a player's,
+//! exactly as before.
 use crate::{Error, Result, keys::IdentityKey, sign::Signer};
 use serde::{Deserialize, Serialize};
 
@@ -30,6 +38,12 @@ pub const MAX_SKEW: u64 = 300;
 /// The text the identity key signs.
 pub fn text(address: &str, time: u64) -> String {
     format!("chiacraft sponsor v1 {address} {time}")
+}
+
+/// The text the identity key signs for a world DID: the player's text's fields, then the world's
+/// (each exactly as sent).
+pub fn world_text(address: &str, time: u64, world: &WorldAsk) -> String {
+    format!("chiacraft sponsor world v1 {address} {time} {} {} {}", world.owner_did, world.key, world.generation)
 }
 
 /// What the proof of work hashes: the request's address, time and identity, and the nonce.
@@ -50,6 +64,17 @@ fn zero_bits(hash: &[u8]) -> u32 {
     n
 }
 
+/// What a world DID's request asks for: the metadata the sponsor launches it with.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorldAsk {
+    /// The owner's DID: its launcher id, 64 hex digits. It must be held by the request's address.
+    pub owner_did: String,
+    /// The world's Ed25519 public key as iroh writes it: its 32 bytes in hex (64 digits).
+    pub key: String,
+    /// The key's generation (0 for a world's first key, one more per rotation).
+    pub generation: u32,
+}
+
 /// The request's JSON body.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Request {
@@ -61,6 +86,9 @@ pub struct Request {
     /// The proof of work's nonce ([`work_text`]).
     #[serde(default)]
     pub work: u64,
+    /// A world DID's ask; None (left out of the JSON): a player's DID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub world: Option<WorldAsk>,
 }
 
 impl Request {
@@ -74,7 +102,29 @@ impl Request {
             signature: crate::keys::hex(&signature),
             time,
             work: 0,
+            world: None,
         })
+    }
+    /// A request for a world DID at `address` (the owner's) on `network`, signed by the account's
+    /// identity key over [`world_text`].
+    pub fn sign_world(signer: &dyn Signer, network: &str, address: &str, time: u64, world: WorldAsk) -> Result<Self> {
+        let signature = signer.sign(&world_text(address, time, &world))?;
+        Ok(Self {
+            network: network.to_owned(),
+            address: address.to_owned(),
+            identity: signer.identity().hex(),
+            signature: crate::keys::hex(&signature),
+            time,
+            work: 0,
+            world: Some(world),
+        })
+    }
+    /// The text the identity key signed: [`world_text`] for a world DID, else [`text`].
+    pub fn signed_text(&self) -> String {
+        match &self.world {
+            Some(world) => world_text(&self.address, self.time, world),
+            None => text(&self.address, self.time),
+        }
     }
     /// The zero bits this request's proof of work reaches.
     pub fn work_bits(&self) -> u32 {
@@ -93,7 +143,8 @@ impl Request {
         }
         Ok(())
     }
-    /// Whether the signature is the identity key's over the text (the sponsor's first check).
+    /// Whether the signature is the identity key's over the text ([`Self::signed_text`]; the
+    /// sponsor's first check).
     pub fn verify(&self) -> bool {
         let Some(key) = IdentityKey::from_hex(&self.identity) else {
             return false;
@@ -101,7 +152,7 @@ impl Request {
         let Some(signature) = crate::keys::from_hex(&self.signature) else {
             return false;
         };
-        crate::sign::verify(&key, text(&self.address, self.time).as_bytes(), &signature)
+        crate::sign::verify(&key, self.signed_text().as_bytes(), &signature)
     }
     /// Whether `time` is within [`MAX_SKEW`] of `now`.
     pub fn fresh(&self, now: u64) -> bool {
@@ -212,6 +263,49 @@ mod tests {
         assert!(json.contains("\"network\":\"testnet11\""), "{json}");
         let back: Request = serde_json::from_str(&json).unwrap();
         assert_eq!(back, r);
+    }
+
+    #[test]
+    fn world_requests_sign_and_verify() {
+        let s = IdentitySigner::from_mnemonic(&Mnemonic::generate().unwrap(), 0);
+        let world = WorldAsk { owner_did: "ab".repeat(32), key: "cd".repeat(32), generation: 3 };
+        let r = Request::sign_world(&s, "testnet11", "txch1abc", 1_700_000_000, world.clone()).unwrap();
+        assert!(r.verify());
+        assert_eq!(
+            world_text("txch1abc", 1_700_000_000, &world),
+            format!("chiacraft sponsor world v1 txch1abc 1700000000 {} {} 3", "ab".repeat(32), "cd".repeat(32))
+        );
+        assert_eq!(r.signed_text(), world_text("txch1abc", 1_700_000_000, &world));
+        // Tampering with any field of the world (or the rest) breaks it.
+        let tampered = |f: &dyn Fn(&mut Request)| {
+            let mut t = r.clone();
+            f(&mut t);
+            t.verify()
+        };
+        assert!(!tampered(&|t| t.world.as_mut().unwrap().owner_did = "ac".repeat(32)));
+        assert!(!tampered(&|t| t.world.as_mut().unwrap().key = "ce".repeat(32)));
+        assert!(!tampered(&|t| t.world.as_mut().unwrap().generation = 4));
+        assert!(!tampered(&|t| t.address = "txch1other".into()));
+        assert!(!tampered(&|t| t.time += 1));
+        // Not a player's request: dropping the world, or signing the player's text, fails.
+        assert!(!tampered(&|t| t.world = None));
+        let player = Request::sign(&s, "testnet11", "txch1abc", 1_700_000_000).unwrap();
+        let mut grafted = player.clone();
+        grafted.world = Some(world.clone());
+        assert!(!grafted.verify());
+        assert_ne!(player.signature, r.signature);
+        // The proof of work is the same text and covers it.
+        let mut worked = r.clone();
+        worked.do_work(8).unwrap();
+        assert!(worked.work_bits() >= 8 && worked.verify());
+        // The JSON carries the world; a player's leaves it out, and JSON without it still parses.
+        let json = r.to_json();
+        assert!(json.contains("\"world\":{\"owner_did\""), "{json}");
+        assert_eq!(serde_json::from_str::<Request>(&json).unwrap(), r);
+        assert!(!player.to_json().contains("world"));
+        let old = r#"{"network":"testnet11","address":"txch1abc","identity":"00","signature":"00","time":5}"#;
+        let back: Request = serde_json::from_str(old).unwrap();
+        assert_eq!((back.world, back.work), (None, 0));
     }
 
     #[test]

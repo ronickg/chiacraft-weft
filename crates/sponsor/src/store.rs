@@ -5,6 +5,10 @@
 //! start, so a restart forgets nothing. Each line is flushed and synced before the request is
 //! answered.
 //!
+//! A launch is a player's DID (one per identity) or a world's (`kind: "world"`, with the world's
+//! key, its owner's DID and the key's generation: at most one per world key, and a daily count per
+//! identity). Lines written before world DIDs have no `kind` and replay as players'.
+//!
 //! The askers' endpoint ids are not kept: only a hash of the day and the id, enough to count an
 //! endpoint's launches that day.
 use serde::{Deserialize, Serialize};
@@ -15,6 +19,27 @@ use std::path::{Path, PathBuf};
 
 /// Seconds in a day: budgets and endpoint limits count per UTC day (`unix seconds / 86400`).
 pub const DAY: u64 = 86_400;
+
+/// What a launch was for.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Kind {
+    /// A player's DID (one per identity).
+    #[default]
+    Player,
+    /// A world's DID (plan phase 4, slice 7), launched to its owner's address.
+    World,
+}
+
+/// A world DID's launch: what its metadata was set to.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorldRecord {
+    /// The world's Ed25519 key, 64 hex digits (lower case).
+    pub key: String,
+    /// The owner's DID launcher id, 64 hex digits (lower case).
+    pub owner_did: String,
+    pub generation: u32,
+}
 
 /// One line of the log.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,6 +57,12 @@ pub enum Event {
         #[serde(alias = "ip")]
         client: String,
         txid: String,
+        /// A player's or a world's DID (left out in older logs: a player's).
+        #[serde(default)]
+        kind: Kind,
+        /// A world DID's metadata (None for a player's).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        world: Option<WorldRecord>,
     },
     /// A bundle pushed.
     Bundle { time: u64, txid: String, dids: usize, fee: u64, change: u64, spent: Vec<String> },
@@ -62,6 +93,8 @@ pub struct Launch {
     pub txid: String,
     pub time: u64,
     pub status: Status,
+    pub kind: Kind,
+    pub world: Option<WorldRecord>,
 }
 
 /// The log and the state it adds up to.
@@ -69,8 +102,12 @@ pub struct Store {
     path: Option<PathBuf>,
     file: Option<std::fs::File>,
     launches: BTreeMap<String, Launch>,
-    /// Identity → its launch that isn't dropped.
+    /// Identity → its player launch that isn't dropped.
     by_identity: HashMap<String, String>,
+    /// World key → its world launch that isn't dropped.
+    by_world_key: HashMap<String, String>,
+    /// (day, identity) → world launches (not dropped).
+    worlds_per_identity: HashMap<(u64, String), u32>,
     /// Day → mojos spent (dropped launches refunded).
     spent: BTreeMap<u64, u64>,
     /// (day, asker hash) → launches.
@@ -86,6 +123,8 @@ impl Store {
             file: None,
             launches: BTreeMap::new(),
             by_identity: HashMap::new(),
+            by_world_key: HashMap::new(),
+            worlds_per_identity: HashMap::new(),
             spent: BTreeMap::new(),
             per_client: HashMap::new(),
             bundles: 0,
@@ -146,11 +185,24 @@ impl Store {
 
     fn apply(&mut self, event: &Event) {
         match event {
-            Event::Sponsored { time, identity, address, launcher, coin, cost, client, txid } => {
+            Event::Sponsored { time, identity, address, launcher, coin, cost, client, txid, kind, world } => {
                 let day = time / DAY;
                 *self.spent.entry(day).or_default() += cost;
                 *self.per_client.entry((day, client.clone())).or_default() += 1;
-                self.by_identity.insert(identity.clone(), launcher.clone());
+                match (kind, world) {
+                    (Kind::World, Some(w)) => {
+                        self.by_world_key.insert(w.key.clone(), launcher.clone());
+                        *self
+                            .worlds_per_identity
+                            .entry((day, identity.clone()))
+                            .or_default() += 1;
+                    }
+                    // A world line without its world can't be told apart: kept, counted as spent.
+                    (Kind::World, None) => {}
+                    (Kind::Player, _) => {
+                        self.by_identity.insert(identity.clone(), launcher.clone());
+                    }
+                }
                 self.launches.insert(
                     launcher.clone(),
                     Launch {
@@ -163,6 +215,8 @@ impl Store {
                         txid: txid.clone(),
                         time: *time,
                         status: Status::Pending,
+                        kind: *kind,
+                        world: world.clone(),
                     },
                 );
             }
@@ -187,12 +241,35 @@ impl Store {
                     if self.by_identity.get(&l.identity) == Some(launcher) {
                         self.by_identity.remove(&l.identity);
                     }
+                    if let Some(w) = &l.world {
+                        if self.by_world_key.get(&w.key) == Some(launcher) {
+                            self.by_world_key.remove(&w.key);
+                        }
+                        if let Some(n) = self.worlds_per_identity.get_mut(&(day, l.identity.clone())) {
+                            *n = n.saturating_sub(1);
+                        }
+                    }
                 }
             }
         }
     }
 
-    /// The identity's launch, unless it was dropped.
+    /// The world DID launched for a world key (64 hex, lower case), unless it was dropped.
+    pub fn by_world_key(&self, key: &str) -> Option<&Launch> {
+        self.by_world_key
+            .get(key)
+            .and_then(|l| self.launches.get(l))
+    }
+
+    /// World DIDs launched for an identity on `day` (not dropped).
+    pub fn worlds_on(&self, day: u64, identity: &str) -> u32 {
+        self.worlds_per_identity
+            .get(&(day, identity.to_owned()))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    /// The identity's player DID launch, unless it was dropped.
     pub fn by_identity(&self, identity: &str) -> Option<&Launch> {
         self.by_identity
             .get(identity)
@@ -263,6 +340,27 @@ mod tests {
             cost: 10,
             client: "ip".into(),
             txid: "t".into(),
+            kind: Kind::Player,
+            world: None,
+        }
+    }
+
+    fn world(time: u64, identity: &str, launcher: &str, key: &str) -> Event {
+        let Event::Sponsored { time, identity, address, launcher, coin, cost, client, txid, .. } = sponsored(time, identity, launcher)
+        else {
+            unreachable!()
+        };
+        Event::Sponsored {
+            time,
+            identity,
+            address,
+            launcher,
+            coin,
+            cost,
+            client,
+            txid,
+            kind: Kind::World,
+            world: Some(WorldRecord { key: key.into(), owner_did: "o".into(), generation: 0 }),
         }
     }
 
@@ -303,6 +401,46 @@ mod tests {
         assert_eq!(s.by_identity("c").unwrap().launcher, "L3");
         assert_eq!(s.pending().len(), 1);
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn world_launches_replay_apart_from_the_players() {
+        let dir = std::env::temp_dir().join(format!("chiacraft-sponsor-store-worlds-{}", std::process::id()));
+        let path = dir.join("sponsor-log.jsonl");
+        let _ = std::fs::remove_dir_all(&dir);
+        let day = 20_000;
+        {
+            let mut s = Store::open(&path).unwrap();
+            s.record(sponsored(day * DAY + 1, "a", "P")).unwrap();
+            s.record(world(day * DAY + 2, "a", "W1", "k1")).unwrap();
+            s.record(world(day * DAY + 3, "a", "W2", "k2")).unwrap();
+            s.record(Event::Dropped { time: 0, launcher: "W2".into(), reason: "x".into() })
+                .unwrap();
+        }
+        let log = std::fs::read_to_string(&path).unwrap();
+        assert!(log.contains(r#""kind":"world","world":{"key":"k1""#), "{log}");
+        assert!(log.contains(r#""kind":"player""#), "{log}");
+        let s = Store::open(&path).unwrap();
+        // The player DID is the identity's; the worlds are by key, counted per day.
+        assert_eq!(s.by_identity("a").unwrap().launcher, "P");
+        assert_eq!(s.by_world_key("k1").unwrap().kind, Kind::World);
+        assert_eq!(s.by_world_key("k1").unwrap().world.as_ref().unwrap().key, "k1");
+        assert!(s.by_world_key("k2").is_none());
+        assert_eq!(s.worlds_on(day, "a"), 1);
+        assert_eq!(s.worlds_on(day + 1, "a"), 0);
+        assert_eq!(s.spent_on(day), 20);
+        assert_eq!(s.launched_on(day), 2);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn lines_without_a_kind_are_players() {
+        let line = r#"{"event":"sponsored","time":5,"identity":"a","address":"txch1x","launcher":"L","coin":"c","cost":3,"client":"h","txid":"t"}"#;
+        let e: Event = serde_json::from_str(line).unwrap();
+        assert!(matches!(e, Event::Sponsored { kind: Kind::Player, world: None, .. }), "{e:?}");
+        let mut s = Store::memory();
+        s.record(e).unwrap();
+        assert_eq!(s.by_identity("a").unwrap().kind, Kind::Player);
     }
 
     #[test]

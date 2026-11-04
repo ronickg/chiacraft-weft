@@ -21,6 +21,13 @@ max_skew_seconds = 300           # a request's time vs the sponsor's clock
 work_bits = 22                   # proof of work per request: about 2^22 hashes (a second or two)
 hourly_release = true            # the day's budget opens 1/24 per UTC hour: no draining it at midnight
 
+# World DIDs (a request with "world"): launched to the owner's address, the metadata naming the
+# owner's DID and the world's key and generation. gift_mojos defaults to 2 x fee_per_did on
+# testnet11 and 0 on mainnet; gifts count against the daily budget and stay within max-send.
+worlds_per_identity_per_day = 8  # world DIDs per identity a UTC day (player DID not counted)
+gift_mojos = 10000000            # mojos sent with each world DID to the owner (a fee for listing it)
+player_gift_mojos = 0            # mojos sent with each player DID
+
 batch_window_ms = 2000           # requests within 2 s of the first go in one bundle
 max_batch = 25
 max_queue = 200

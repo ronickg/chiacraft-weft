@@ -5,10 +5,13 @@
 //! - A DID request (the JSON of [`chiacraft_wallet::sponsor::Request`], at most
 //!   [`MAX_REQUEST`] bytes) → `{"status": 200, "body": `[`DidReply`](crate::DidReply)`}`;
 //!   refusals `400` (not a request, too large, malformed, bad signature, time more than
-//!   `max_skew_seconds` off), `403` (identity already sponsored: the body also names its `did` and
-//!   `launcher`; network not served), `429` (a request for the identity in progress, the asking
-//!   endpoint's daily limit, the daily budget, a full queue), `503` (not synced, no free coin in
-//!   time, the chain refused the spend), each with the body `{"error": "…"}`.
+//!   `max_skew_seconds` off, a world's `owner_did` or `key` not 64 hex digits), `403` (identity
+//!   already sponsored, or a world key already sponsored: the body also names its `did` and
+//!   `launcher`; network not served; a world's owner DID not held by the address), `429` (a
+//!   request for the identity or the world in progress, the identity's world DIDs for the day,
+//!   the asking endpoint's daily limit, the daily budget, a full queue), `503` (not synced, the
+//!   chain didn't answer the owner check, no free coin in time, the chain refused the spend),
+//!   each with the body `{"error": "…"}`.
 //! - `status` → `{"status": 200, "body": `[`StatusReply`](crate::StatusReply)`}`.
 //!
 //! Every read has a time limit ([`READ_WAIT`]); the service's blocking calls run on tokio's

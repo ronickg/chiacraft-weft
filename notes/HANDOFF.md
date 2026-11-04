@@ -267,6 +267,19 @@ the server checks the proof, then the chain on a thread (`server/admission.rs` `
 `did_answers`), waits up to 25 s only when the rules ask for a DID (`Rules::needs_did`), and keeps
 `did` in the player file. `/didrule required on|off`, `/didrule age <days>`, and the screen.
 
+Slices 5 and 7 (2026-11-04, built, not yet seen on testnet11). `crates/sponsor`
+(`chiacraft-sponsor`): Horizon's sponsor on iroh (`chiacraft/sponsor/1`, JSON request and answer,
+key in `<data_dir>/sponsor.key`), feature `service` for the binary; a proof of work per request and
+the budget released by the hour; world requests (`Request::sign_world`, `WorldAsk`: a world DID
+launched to the owner's address with `WorldMeta` and a gift for the listing fee). The wallet:
+`chain/world.rs` (`WorldMeta`, `OwnerMeta`, `DidMetadata`, `world_link_expecting`),
+`build_eve_dids_with`, `set_did_metadata` (an update carries the new metadata as a memo, since
+chia-sdk-driver's `parse_child` assumes it unchanged). The game: `chiacraft/did.rs` (the Account
+screen's Get a DID / Link a DID, asking `core:sponsors` through `p2p::ask_sponsor`), and
+`worlds/world_did.rs` (`did.json` in the world folder; Get a DID for This World on the Who May
+Come In screen, then the owner's DID lists it; the status answer carries both DIDs and the saved
+worlds list checks them both ways). Our sponsor: see "Our DID sponsor" below.
+
 ## Phase 6, sandboxed code mods
 
 Slice 1 (server halves) is built; the design for Ronald to agree is `reports/Sandboxed code

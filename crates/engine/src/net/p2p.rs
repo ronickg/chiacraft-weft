@@ -631,6 +631,9 @@ pub struct Status {
     /// What its admission rules ask, as lang keys with a number (`admission::summary`); empty:
     /// open to all, or a world from before protocol 6.
     pub admission: Vec<(String, i64)>,
+    /// Its DID and the owner's DID it names (launcher ids, hex), as the world says: a visitor
+    /// checks both ways on chain (`world_did::check`).
+    pub did: Option<(String, String)>,
 }
 
 async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::content::Content, hw: &HostWorld) {
@@ -646,10 +649,18 @@ async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::c
         .as_deref()
         .map(|d| crate::admission::summary(&crate::admission::load_rules(d)))
         .unwrap_or_default();
+    // Its DID and the owner's it names (phase 4), when it has one.
+    let did = hw
+        .dir
+        .as_deref()
+        .and_then(crate::chiacraft::worlds::world_did::load)
+        .map(|d| (d.launcher, d.owner))
+        .unwrap_or_default();
     let mut w = codec::W::default();
     codec::Wire::put(&answer, &mut w);
     // After the rest, so a game from before protocol 6 still reads the start.
     codec::Wire::put(&admission, &mut w);
+    codec::Wire::put(&did, &mut w);
     if write_frame(&mut send, &w.0).await.is_ok() {
         let _ = send.finish();
         // Wait for the asker to read it and close.
@@ -683,6 +694,9 @@ async fn status_on(ep: &Endpoint, addr: EndpointAddr, wait: Duration) -> Result<
         // Only keys this game knows, so a world can't make a list say anything.
         admission.retain(|(k, _)| k.starts_with("admission.summary."));
         admission.truncate(8);
+        let (did, owner_did) = <(String, String) as codec::Wire>::get(&mut r).unwrap_or_default();
+        let hex64 = |s: &str| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit());
+        let did = (hex64(&did) && hex64(&owner_did)).then_some((did, owner_did));
         // The certificate must be for the key that answered, and the inbox the owner's.
         let owner = crate::world_address::WorldCert::parse(&cert)
             .ok()
@@ -704,6 +718,7 @@ async fn status_on(ep: &Endpoint, addr: EndpointAddr, wait: Duration) -> Result<
             package_bytes,
             inbox,
             admission,
+            did,
         })
     })
     .await

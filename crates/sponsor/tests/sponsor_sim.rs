@@ -267,7 +267,7 @@ fn over_iroh_the_protocol_answers_as_the_contract_says() {
     let fields: serde_json::Value = serde_json::from_str(&body).unwrap();
     let mut keys: Vec<_> = fields.as_object().unwrap().keys().cloned().collect();
     keys.sort();
-    assert_eq!(keys, ["address", "identity", "network", "signature", "time"]);
+    assert_eq!(keys, ["address", "identity", "network", "signature", "time", "work"]);
 
     let (status, reply) = served.ask(&ep, &player.request());
     assert_eq!(status, 200, "{reply}");

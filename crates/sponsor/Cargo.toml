@@ -36,6 +36,10 @@ name = "sponsor_sim"
 required-features = ["service"]
 
 [[test]]
+name = "world_sim"
+required-features = ["service"]
+
+[[test]]
 name = "mainnet_sim"
 required-features = ["service"]
 

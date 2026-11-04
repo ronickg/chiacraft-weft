@@ -67,7 +67,8 @@ pub struct Config {
     /// The fee paid per DID, in mojos (a batch of n pays n times this). testnet11's mempool is
     /// busy with dust, and a spend with no fee can wait most of an hour.
     pub fee_per_did: u64,
-    /// The most the sponsor spends in one UTC day, in mojos: a mojo per DID plus its fee.
+    /// The most the sponsor spends in one UTC day, in mojos: a mojo per DID plus its fee (and a
+    /// world DID's gift).
     pub daily_budget_mojos: u64,
     /// DIDs per asking endpoint (iroh endpoint id) per UTC day. Endpoint ids cost nothing to
     /// make, so this only slows a careless client: the identity limit and the daily budget are
@@ -96,6 +97,15 @@ pub struct Config {
     /// The most `fee_per_did` may be (a hard cap: a higher fee refuses to start, and the chain
     /// reader refuses a bundle paying more per DID). Unlimited on testnet11 by default.
     pub max_fee_per_did: u64,
+    /// World DIDs (plan phase 4, slice 7) one identity may have launched per UTC day. They don't
+    /// use up the identity's one player DID; the endpoint limit and the budget count them too.
+    pub worlds_per_identity_per_day: u32,
+    /// Mojos sent with each world DID to the owner's address (a coin hinted to it), so the owner
+    /// can pay a fee for the owner DID's spend that lists the world. It counts against the day's
+    /// budget like the fee. Default: twice `fee_per_did` on testnet11, 0 on mainnet.
+    pub gift_mojos: u64,
+    /// The same for each player DID. Default 0: a player DID comes alone.
+    pub player_gift_mojos: u64,
 }
 
 /// The file as written: the budget fields left out take their network's defaults.
@@ -122,6 +132,9 @@ struct Raw {
     max_fee_per_did: Option<u64>,
     work_bits: u32,
     hourly_release: bool,
+    worlds_per_identity_per_day: u32,
+    gift_mojos: Option<u64>,
+    player_gift_mojos: u64,
 }
 
 impl Default for Raw {
@@ -145,6 +158,9 @@ impl Default for Raw {
             hourly_release: true,
             drop_after_seconds: 3_600,
             max_fee_per_did: None,
+            worlds_per_identity_per_day: 8,
+            gift_mojos: None,
+            player_gift_mojos: 0,
         }
     }
 }
@@ -152,10 +168,9 @@ impl Default for Raw {
 impl TryFrom<Raw> for Config {
     type Error = String;
     fn try_from(r: Raw) -> Result<Self, String> {
-        let d = match ChainNetwork::parse(&r.network) {
-            Some(ChainNetwork::Mainnet) => MAINNET_DEFAULTS,
-            _ => TESTNET11_DEFAULTS,
-        };
+        let mainnet = ChainNetwork::parse(&r.network) == Some(ChainNetwork::Mainnet);
+        let d = if mainnet { MAINNET_DEFAULTS } else { TESTNET11_DEFAULTS };
+        let fee_per_did = r.fee_per_did.unwrap_or(d.fee_per_did);
         let config = Self {
             network: r.network,
             allow_mainnet: r.allow_mainnet,
@@ -163,7 +178,7 @@ impl TryFrom<Raw> for Config {
             words_file: r.words_file,
             addresses: r.addresses,
             peers: r.peers,
-            fee_per_did: r.fee_per_did.unwrap_or(d.fee_per_did),
+            fee_per_did,
             daily_budget_mojos: r.daily_budget_mojos.unwrap_or(d.daily_budget_mojos),
             per_endpoint_per_day: r.per_endpoint_per_day.unwrap_or(d.per_endpoint_per_day),
             max_skew_seconds: r.max_skew_seconds,
@@ -175,6 +190,11 @@ impl TryFrom<Raw> for Config {
             max_fee_per_did: r.max_fee_per_did.unwrap_or(d.max_fee_per_did),
             work_bits: r.work_bits.min(32),
             hourly_release: r.hourly_release,
+            worlds_per_identity_per_day: r.worlds_per_identity_per_day,
+            gift_mojos: r
+                .gift_mojos
+                .unwrap_or(if mainnet { 0 } else { fee_per_did.saturating_mul(2) }),
+            player_gift_mojos: r.player_gift_mojos,
         };
         config.check()?;
         Ok(config)
@@ -200,7 +220,7 @@ impl Config {
     }
 
     /// Everything that refuses to start: the network and its confirmation, the fee within its
-    /// cap, the batch size, the addresses.
+    /// cap, the gifts within the network's `max-send`, the batch size, the addresses.
     pub fn check(&self) -> Result<(), String> {
         let network = self.chain_network()?;
         if self.max_batch == 0 || self.max_batch > chiacraft_wallet::chain::sponsor::MAX_BATCH {
@@ -215,6 +235,16 @@ impl Config {
                 spending::mojos_and_amount(self.fee_per_did, network.address_network()),
                 spending::mojos_and_amount(self.max_fee_per_did, network.address_network())
             ));
+        }
+        let max_send = self.caps()?.max_send;
+        for (name, gift) in [("gift_mojos", self.gift_mojos), ("player_gift_mojos", self.player_gift_mojos)] {
+            if gift > max_send {
+                return Err(format!(
+                    "{name} = {} is above the cap max-send = {} on {network}: refused",
+                    spending::mojos_and_amount(gift, network.address_network()),
+                    spending::mojos_and_amount(max_send, network.address_network())
+                ));
+            }
         }
         Ok(())
     }
@@ -247,9 +277,18 @@ impl Config {
         Ok(caps)
     }
 
-    /// The cost of one DID to the budget: a mojo plus its fee.
+    /// The cost of one player DID to the budget: a mojo plus its fee (and `player_gift_mojos`).
     pub fn cost_per_did(&self) -> u64 {
-        self.fee_per_did.saturating_add(1)
+        self.fee_per_did
+            .saturating_add(1)
+            .saturating_add(self.player_gift_mojos)
+    }
+
+    /// The cost of one world DID to the budget: a mojo, its fee and `gift_mojos`.
+    pub fn cost_per_world(&self) -> u64 {
+        self.fee_per_did
+            .saturating_add(1)
+            .saturating_add(self.gift_mojos)
     }
 
     /// The peers to dial: the config's, then `CHIACRAFT_CHAIN_PEERS`' (else `HORIZON_CHAIN_PEERS`').
@@ -317,6 +356,13 @@ mod tests {
         assert!(Config::parse("nonsense = 1").is_err());
         let c = Config::parse("fee_per_did = 0\nper_ip_per_day = 9").unwrap();
         assert_eq!((c.cost_per_did(), c.per_endpoint_per_day), (1, 9));
+        // World DIDs: 8 per identity a day, a gift of twice the fee (whichever fee is set).
+        let c = Config::parse("").unwrap();
+        assert_eq!((c.worlds_per_identity_per_day, c.gift_mojos, c.player_gift_mojos), (8, 10_000_000, 0));
+        assert_eq!(c.cost_per_world(), 15_000_001);
+        let c = Config::parse("fee_per_did = 7\nplayer_gift_mojos = 3").unwrap();
+        assert_eq!((c.gift_mojos, c.cost_per_did(), c.cost_per_world()), (14, 11, 22));
+        assert_eq!(Config::parse("gift_mojos = 0").unwrap().cost_per_world(), 5_000_001);
         // Horizon's HTTP settings are gone.
         assert!(Config::parse("listen = \"127.0.0.1:8080\"").is_err());
     }
@@ -331,6 +377,13 @@ mod tests {
             (1_000_000, 50_000_000, 1, 5, 100_000_000)
         );
         assert_eq!(c.caps().unwrap().max_did_fee, 100_000_000);
+        // No gift with a world DID on mainnet unless set, and never above max-send.
+        assert_eq!((c.gift_mojos, c.player_gift_mojos, c.worlds_per_identity_per_day), (0, 0, 8));
+        let max_send = c.caps().unwrap().max_send;
+        if max_send < u64::MAX {
+            let e = Config::parse(&format!("network = \"mainnet\"\nallow_mainnet = true\ngift_mojos = {}", max_send + 1)).unwrap_err();
+            assert!(e.contains("max-send"), "{e}");
+        }
         // Set explicitly, a field keeps its value; a fee above its cap refuses to start.
         let c = Config::parse("network = \"mainnet\"\nallow_mainnet = true\ndaily_budget_mojos = 7").unwrap();
         assert_eq!(c.daily_budget_mojos, 7);

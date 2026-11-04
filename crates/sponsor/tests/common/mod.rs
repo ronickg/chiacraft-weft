@@ -29,6 +29,8 @@ pub fn config(dir: &std::path::Path) -> Config {
     let mut c = Config::parse("").unwrap();
     c.data_dir = dir.to_owned();
     c.fee_per_did = 1_000;
+    // A world DID's gift: twice the fee, as the default is (it was computed from the parsed fee).
+    c.gift_mojos = 2 * c.fee_per_did;
     c.batch_window_ms = 200;
     c.max_wait_seconds = 2;
     c.per_endpoint_per_day = 100;

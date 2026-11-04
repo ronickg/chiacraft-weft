@@ -24,15 +24,22 @@ use crate::ui::text::{Arg, Msg};
 /// Raised whenever a world's rules, bans or lists are saved: the Admission screen shows them anew.
 pub static GENERATION: AtomicU64 = AtomicU64::new(0);
 
-/// The world this game runs (its folder), for the Admission screen.
-static LOCAL_WORLD: parking_lot::Mutex<Option<PathBuf>> = parking_lot::Mutex::new(None);
+type LocalWorld = (Option<PathBuf>, Option<std::sync::Arc<crate::world_address::WorldIdentity>>);
 
-pub fn set_local_world(dir: Option<PathBuf>) {
-    *LOCAL_WORLD.lock() = dir;
+/// The world this game runs (its folder and key), for the Admission screen.
+static LOCAL_WORLD: parking_lot::Mutex<LocalWorld> = parking_lot::Mutex::new((None, None));
+
+pub fn set_local_world(dir: Option<PathBuf>, identity: Option<std::sync::Arc<crate::world_address::WorldIdentity>>) {
+    *LOCAL_WORLD.lock() = (dir, identity);
 }
 
 pub fn local_world() -> Option<PathBuf> {
-    LOCAL_WORLD.lock().clone()
+    LOCAL_WORLD.lock().0.clone()
+}
+
+/// The key of the world this game runs.
+pub fn local_identity() -> Option<std::sync::Arc<crate::world_address::WorldIdentity>> {
+    LOCAL_WORLD.lock().1.clone()
 }
 
 pub const RULES_FILE: &str = "admission.json";

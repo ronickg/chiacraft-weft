@@ -38,7 +38,8 @@ answer comes once its bundle is pushed: usually in a few seconds, at most `max_w
 | Request | Answer |
 | --- | --- |
 | `{ "network": "testnet11", "address": "txch1…", "identity": "<96 hex>", "signature": "<192 hex>", "time": <unix seconds> }` | `200 { "did": "did:chia:1…", "launcher": "<64 hex>", "coin": "<64 hex>", "status": "pending" }` |
-| `status` | `200 { network, phase, height, address, balance, spendable, budget_left_today, sponsored_today, pending, queued, fee_per_did, per_endpoint_per_day, work_bits }` |
+| The same with `"world": { "owner_did": "<64 hex>", "key": "<64 hex>", "generation": <n> }` | the same `200`, for the world's DID (below) |
+| `status` | `200 { network, phase, height, address, balance, spendable, budget_left_today, sponsored_today, pending, queued, fee_per_did, per_endpoint_per_day, work_bits, worlds_per_identity_per_day, gift_mojos }` |
 
 **The signature.** The identity key (the game's `chiacraft_wallet::Signer`, identity key 0 by default) signs the
 text
@@ -51,13 +52,33 @@ with the address exactly as sent and `time` in decimal, as every identity text i
 `address` is the player's standard address on the network (`txch1…`, lower case): its puzzle hash becomes the
 DID's owner. `launcher` is the DID's id; `coin` is its eve coin (the DID's coin until the player first spends it).
 
+**World DIDs** (plan phase 4, slice 7). A world can get a DID too, launched to its owner's address, so the DID
+stays in the owner's wallet and the world holds only its key. The request is a player's with `world`:
+`owner_did` (the owner's DID launcher id, 64 hex), `key` (the world's Ed25519 key as iroh writes it: its 32 bytes
+in hex) and `generation` (the key's, 0 for a world's first). The identity key then signs
+
+    chiacraft sponsor world v1 <address> <time> <owner_did> <key> <generation>
+
+(each field exactly as sent; `chiacraft_wallet::sponsor::Request::sign_world` makes it) instead of the player's
+text; the proof of work is the same. Besides a player request's checks, the sponsor resolves the owner's DID on
+chain and needs it held by `address` (`403` if not, `503` if the chain can't answer). The world DID's metadata,
+set at launch (so its eve puzzle hash commits to it), is chiacraft's world metadata: the owner's DID, the key and
+the generation (`chiacraft_wallet::chain::world::WorldMeta`). With it the sponsor sends `gift_mojos` (by default
+twice `fee_per_did` on testnet11, nothing on mainnet) to the owner's address, a coin hinted to it, so the owner
+can pay the fee of the one spend of their own DID that lists the world in its metadata (`player_gift_mojos`, 0 by
+default, would do the same for player DIDs; both are held to the network's `max-send` cap). Limits: one world DID per
+world key, ever (a second request for the key answers `403` naming that DID, as a player's second request does),
+and `worlds_per_identity_per_day` (8) per identity per UTC day. A world DID doesn't use up the identity's player
+DID; the endpoint limit and the budget count it like any other (its cost is a mojo, the fee and the gift). World
+DIDs go in the same bundles as player DIDs.
+
 **Refusals**, each with the body `{ "error": "<why>" }`:
 
 | Status | When |
 | --- | --- |
-| `400` | Not JSON or a field missing; larger than 4 KiB; `address` not a testnet11 address; `identity` not a public key; `time` more than `max_skew_seconds` (300) from the sponsor's clock; `signature` not the identity key's signature of the text; `work` short of `work_bits` zero bits (below) |
-| `403` | The identity already has a sponsored DID (the body also carries its `did` and `launcher`); `network` isn't the one served |
-| `429` | A request for this identity is already in progress; the asking endpoint's DIDs for today (`per_endpoint_per_day`); today's budget (`daily_budget_mojos`, UTC day) is spent, or this hour's share of it (`hourly_release`); too many requests waiting |
+| `400` | Not JSON or a field missing; larger than 4 KiB; `address` not a testnet11 address; `identity` not a public key; `time` more than `max_skew_seconds` (300) from the sponsor's clock; `signature` not the identity key's signature of the text; `work` short of `work_bits` zero bits (below); a world's `owner_did` or `key` not 64 hex digits |
+| `403` | The identity already has a sponsored DID, or the world's key already has one (the body also carries its `did` and `launcher`); `network` isn't the one served; a world's owner DID doesn't exist or isn't held by `address` |
+| `429` | A request for this identity (or this world's key) is already in progress; the identity's world DIDs for today (`worlds_per_identity_per_day`); the asking endpoint's DIDs for today (`per_endpoint_per_day`); today's budget (`daily_budget_mojos`, UTC day) is spent, or this hour's share of it (`hourly_release`); too many requests waiting |
 
 **What makes a flood cost something.** Identities and endpoint ids cost nothing to make, so the
 per-identity and per-endpoint limits alone let a script take the day's whole budget the moment the
@@ -66,7 +87,7 @@ UTC day turns. So each request carries a proof of work (`work`: a nonce making t
 22 by default, a second or two of one CPU core; the game reads `work_bits` from `status` first),
 and the day's budget opens an hour's share at a time (`hourly_release`). The daily budget stays
 the cap on everything.
-| `503` | The sponsor isn't synced with the chain; none of its coins was free within `max_wait_seconds` (all in unconfirmed spends, or it is out of funds); the chain refused the bundle |
+| `503` | The sponsor isn't synced with the chain; the chain didn't answer a world's owner check, or the owner's DID is one this sponsor launched that isn't confirmed yet; none of its coins was free within `max_wait_seconds` (all in unconfirmed spends, or it is out of funds); the chain refused the bundle |
 
 A DID whose launch isn't confirmed within `drop_after_seconds` is **dropped**: its identity may ask again and its
 cost goes back to the day's budget.
@@ -119,7 +140,8 @@ CHIACRAFT_SPONSOR_WORDS_FILE=/path/to/words ./target/release/chiacraft-sponsor -
 - **The network**: iroh with n0's preset (its relays and address lookup), outgoing UDP (and HTTPS to the relays).
   Nothing to open or forward.
 - **Its data** (`data_dir`): `sponsor-log.jsonl`, one JSON line per event (a DID launched: identity, address,
-  launcher, coin, cost, a daily hash of the asking endpoint's id, transaction; a bundle: its coins, fee and change;
+  launcher, coin, cost, a daily hash of the asking endpoint's id, transaction, `kind` (`player` or `world`; older
+  lines without it are players') and a world's `world` (key, owner DID, generation); a bundle: its coins, fee and change;
   confirmations; drops), replayed at start (Horizon's logs replay too); `chain-cache.json`, the reader's cache; and
   `sponsor.key`. Back up the log: it is what remembers who was served. No endpoint id is stored, only a hash of
   the day and the id.
@@ -149,6 +171,8 @@ iroh endpoints on loopback with no relay): a request launches a DID owned by the
 player can spend and the sponsor can't; a second request for the same identity is refused; bad signatures, stale
 times, other networks and bad addresses are refused; the budget and the per-endpoint limit answer 429; requests
 arriving together share one bundle; a restart keeps identities, budget and pending launches; no free coin answers
-503; the protocol over iroh matches this page; the address survives a restart; mainnet only opted in and within
+503; world DIDs: launched with their metadata and the owner's gift, refused for a DID held elsewhere, the day's
+limit, the same key twice naming its DID, a player request still served after them; the protocol over iroh matches
+this page; the address survives a restart; mainnet only opted in and within
 its caps; no secret in logs or files. A live testnet11 run needs a funded throwaway testnet wallet and is not
 automated.
