@@ -78,6 +78,9 @@ pub fn register(r: &mut Registry) {
             v.wet = 0.0;
             v.core = vitals::temperature::CORE;
             (v.poison, v.bleed, v.torpor, v.out) = (0.0, 0.0, 0.0, 0);
+            // Nor food poisoning or rest (integration review: 3 minutes without healing after a
+            // respawn).
+            (v.sick, v.rested, v.resting) = (0.0, 0.0, 0.0);
             // Respawning drops the body's modifiers: the next tick sets max health and speed again.
             v.max_health = -1.0;
             v.speed = -1.0;

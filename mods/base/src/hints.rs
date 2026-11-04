@@ -52,9 +52,9 @@ static RAW_MEAT_TAG: Tag = Tag::named("raw_meat");
 static CAMPFIRE_TAG: Tag = Tag::named("campfires");
 /// The evening the night hint was last shown (the day count; not saved).
 static NIGHT_SHOWN: Component<u32> = Component::named("hints_night_shown");
-/// The hours the night hint shows in: from two game hours before dark (sunset is 18:00 in spring,
-/// monsters need the dark after it), so a fresh player has time to build a fire.
-const DUSK: std::ops::Range<f32> = 16.0..18.0;
+/// Game hours before sunset the night hint comes (the sunset by the calendar's daylight: 18:00 at
+/// the equinoxes, later in summer, earlier in winter), so a fresh player has time to build a fire.
+const DUSK_BEFORE: f32 = 2.0;
 
 pub fn register(r: &mut Registry) {
     r.config(&SHOW).bool(true);
@@ -138,14 +138,22 @@ fn watch(w: &World) {
         if logs && !table {
             once(w, id, TABLE);
         }
-        // Each evening at dusk until a campfire is built.
-        if DUSK.contains(&hour) && !seen(w, id, NIGHT) {
+        // Each evening at dusk until a campfire is built, by the season's sunset (as the HUD clock
+        // and beds have it; integration review: fixed at 16-18 it came after dark in winter).
+        let sunset = w
+            .component(id, &VITALS)
+            .filter(|v| v.date > 0)
+            .map_or(18.0, |v| {
+                let light = vitals::calendar::daylight_hours((v.date - 1) as f32, base_api::calendars::swing(v.calendar));
+                12.0 + light / 2.0
+            });
+        if (sunset - DUSK_BEFORE..sunset).contains(&hour) && !seen(w, id, NIGHT) {
             let day = (w.day_time() / 24000) as u32;
             if let Some(shown) = w.component_mut(id, &NIGHT_SHOWN)
                 && *shown != day
             {
                 *shown = day;
-                w.send(id, &HINT, &Hint { hint: NIGHT, a: 0, b: 0 });
+                w.send(id, &HINT, &Hint { hint: NIGHT, a: sunset.round() as i32, b: 0 });
             }
         }
         if has(&RAW_MEAT_TAG) {

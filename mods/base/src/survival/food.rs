@@ -82,8 +82,8 @@ pub fn effects(v: &mut Vitals, s: &stomach::Stomach, capacity: f32) {
     set(v, Effect::FoodPoisoning, v.sick > 0.0);
 }
 
-/// Stamps the food one carries with the day it was made (cooked food fresh off the fire as hot,
-/// with the second) and moves its freshness on as it ages: stale, then spoiled (`food::freshness`;
+/// Stamps the food one carries with the day it was made (what was cooked came hot off the fire,
+/// stamped there) and moves its freshness on as it ages: stale, then spoiled (`food::freshness`;
 /// a stew by its shortest-keeping ingredient, `meals::keeps`); hot food cools after a while and
 /// then stacks with the day's.
 pub fn age(w: &World, player: u64) {
