@@ -468,7 +468,7 @@ impl GpuTerrain {
         for (i, j) in batch.iter().enumerate() {
             let r = i * stride;
             let o = j.key.origin();
-            jobs[r..r + 3].copy_from_slice(&[o.x, o.y, j.key.level as i32]);
+            jobs[r..r + 4].copy_from_slice(&[o.x, o.y, j.key.level as i32, j.key.smooth() as i32]);
             if j.custom.len() == custom * SAMPLES {
                 jobs[r + 4..r + stride].copy_from_slice(&j.custom);
             }

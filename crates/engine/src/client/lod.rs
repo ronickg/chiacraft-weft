@@ -27,6 +27,9 @@ const SIDE: i32 = crate::gpu_layout::terrain::lod::SIDE as i32;
 /// Words per tile coming back from the GPU.
 pub const LOD_WORDS_PER_TILE: usize = SAMPLES * 2;
 pub const MAX_LEVEL: u32 = 5;
+/// From this level on tiles are smooth ground, morphing into the next level with distance: at
+/// 8-block cells and more (from about 1000 blocks away), boxes only drew stairs.
+pub const SMOOTH_LEVEL: u32 = 3;
 /// A tile splits into the level below while nearer than this many of its widths: a cell stays
 /// about the same size on screen (a 32-block cell at 4096 blocks).
 const SPLIT: f64 = 4.0;
@@ -52,6 +55,11 @@ impl TileKey {
     /// Width in blocks.
     pub fn size(self) -> i32 {
         CELLS << self.level
+    }
+
+    /// Whether it is drawn as smooth ground (`mesh_smooth`) rather than boxes.
+    pub fn smooth(self) -> bool {
+        self.level >= SMOOTH_LEVEL
     }
 
     /// Lowest block corner (x, z).
@@ -108,12 +116,14 @@ pub fn pool() -> &'static rayon::ThreadPool {
     })
 }
 
-/// A made tile's quads (`mesh`) and the heights they span.
+/// A made tile's quads (`mesh`), how many records come before them (`mesh_smooth`'s
+/// corners) and the heights they span.
 pub struct LodMesh {
     pub dim: u32,
     pub seed: u64,
     pub key: TileKey,
     pub quads: Vec<[u32; 4]>,
+    pub skip: u32,
     pub y: (i32, i32),
 }
 
@@ -126,10 +136,15 @@ pub fn made(job: LodJob, words: Vec<u32>) {
         if !job.live() {
             return;
         }
-        let (quads, y) = mesh(content(), job.dim, job.seed, job.key, &words);
+        let (quads, skip, y) = if job.key.smooth() {
+            mesh_smooth(content(), job.dim, job.seed, job.key, &words)
+        } else {
+            let (quads, y) = mesh(content(), job.dim, job.seed, job.key, &words);
+            (quads, 0, y)
+        };
         let _ = job
             .done
-            .send(LodMesh { dim: job.dim, seed: job.seed, key: job.key, quads, y });
+            .send(LodMesh { dim: job.dim, seed: job.seed, key: job.key, quads, skip, y });
     });
 }
 
@@ -280,6 +295,77 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
     (out, (lo, hi))
 }
 
+/// A smooth tile (`TileKey::smooth`): its corners' heights and biomes first (`gpu_layout::lod_grid`,
+/// `SIDE` x `SIDE` from one before its first corner, not drawn), then a cell per 32 x 32
+/// (`lod_grid_cell`) in the block most of its corners have on top (bare rock where the ground
+/// falls steeply, `Terrain::faces`), and short skirts under its edges against cracks where a tile
+/// of another level is beside it. The shader morphs its corners into the next level's.
+pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, u32, (i32, i32)) {
+    use crate::gpu_layout::{lod_face, lod_grid, lod_grid_cell};
+    let s = 1 << key.level;
+    // Corner (i, j), from -1 to 32.
+    let at = |i: i32, j: i32| {
+        let k = ((j + 1) * SIDE + i + 1) as usize * 2;
+        let (a, b) = (words[k], words[k + 1]);
+        ((a & 0xFFFF) as u16 as i16 as i32, a >> 16, b & 0xFFFF, b >> 16)
+    };
+    let looks = super::looks::current();
+    let face_of = |state: u32, dir: usize| {
+        let info = &c.states[state as usize];
+        let tint = if info.tint_faces & (1 << dir) != 0 { info.tint as u32 } else { 0 };
+        (looks.drawn(state, info).textures[dir] & face::TEX_MASK, tint)
+    };
+    let faces = c
+        .dims
+        .get(dim as usize)
+        .and_then(|d| d.terrain.as_ref())
+        .and_then(|t| t.faces);
+    let grid: Vec<u32> = (0..SAMPLES as i32)
+        .map(|k| {
+            let (y, _, biome, _) = at(k % SIDE - 1, k / SIDE - 1);
+            lod_grid(y, biome)
+        })
+        .collect();
+    debug_assert_eq!(grid.len(), lod_face::GRID_WORDS as usize);
+    let mut out: Vec<[u32; 4]> = grid.chunks(4).map(|w| [w[0], w[1], w[2], w[3]]).collect();
+    let skip = out.len() as u32;
+    let o = key.origin();
+    let (mut lo, mut hi) = (i32::MAX, i32::MIN);
+    for j in 0..CELLS {
+        for i in 0..CELLS {
+            let corners = [at(i, j), at(i + 1, j), at(i, j + 1), at(i + 1, j + 1)];
+            // The top most of its corners have (the first of them on a tie).
+            let pick = (0..4)
+                .max_by_key(|&a| (corners.iter().filter(|c| c.1 == corners[a].1).count(), std::cmp::Reverse(a)))
+                .unwrap_or(0);
+            let (_, mut top, biome, under) = corners[pick];
+            let low = corners.iter().map(|c| c.0).min().unwrap_or(0);
+            let high = corners.iter().map(|c| c.0).max().unwrap_or(0);
+            (lo, hi) = (lo.min(low + 1 - 2 * s), hi.max(high + 1));
+            if let Some(f) = faces.filter(|_| top != under) {
+                let fall = fall(high - low, s);
+                if fall >= f.fall {
+                    let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
+                    top = f.block(seed, dim, [x, high, z], high, biome, fall, top);
+                }
+            }
+            let (tex, tint) = face_of(top, 3);
+            let k = out.len() as u32;
+            out.push(lod_grid_cell(i as u32, j as u32, key.level, k, tex, tint, biome));
+            // Skirts: down from the lower corner of the edge, as deep as two cells.
+            for (dir, edge, a, b) in [(0u32, i == 0, 0, 2), (1, i == CELLS - 1, 1, 3), (4, j == 0, 0, 1), (5, j == CELLS - 1, 2, 3)] {
+                if !edge {
+                    continue;
+                }
+                let y = corners[a].0.min(corners[b].0) + 1 - 2 * s;
+                let (tex, tint) = face_of(top, dir as usize);
+                out.push(quad(dir, i * s, y, j * s, (s, 2 * s, s), tex, tint, biome));
+            }
+        }
+    }
+    (out, skip, (lo, hi))
+}
+
 /// The client's distant terrain: which tiles to show, asking for missing ones, taking made ones.
 pub struct Lod {
     /// The land's height at the camera's column, kept while it stays in it.
@@ -400,7 +486,7 @@ impl Lod {
             if (m.dim, m.seed) != (self.dim, self.seed) || self.pending.remove(&m.key).is_none() {
                 continue;
             }
-            render.upload_lod(gpu, textures, m.key, &m.quads, m.y);
+            render.upload_lod(gpu, textures, m.key, &m.quads, m.skip, m.y);
             self.ready.insert(m.key);
             crate::diag::LOD_MADE.add(1);
         }
@@ -635,10 +721,12 @@ fn custom_heights(c: &Content, dim: u32, seed: u64, key: TileKey, custom: &[usiz
     let Some(t) = c.dims[dim as usize].terrain.as_ref() else { return Vec::new() };
     let f = weft_noise::fixed::Fields { seed };
     let (o, s) = (key.origin(), 1 << key.level);
+    // At the cells' middles, or a smooth tile's corners (as `terrain.wgsl` samples them).
+    let mid = if key.smooth() { 0 } else { s / 2 };
     let mut out = Vec::with_capacity(custom.len() * SAMPLES);
     for &i in custom {
         for k in 0..SAMPLES as i32 {
-            let (x, z) = (o.x + (k % SIDE - 1) * s + s / 2, o.y + (k / SIDE - 1) * s + s / 2);
+            let (x, z) = (o.x + (k % SIDE - 1) * s + mid, o.y + (k / SIDE - 1) * s + mid);
             out.push(t.features[i].height_at(&f, x * 16, z * 16));
         }
     }

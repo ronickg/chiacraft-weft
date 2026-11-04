@@ -60,6 +60,11 @@ erase what they earned.
        four children are made (no child over its parent); 192 dropped tiles cached; jobs no
        longer wanted are called off; LOD's mods' heights, meshing and description run on their
        own low-priority pool, not the one finishing near cubes.
+     - **Smooth far ground.** Tiles from level 3 (8-block cells, about 1 km on) are a heightmap
+       sampled at cell corners, not boxes: a corner grid at the start of the tile's records, a
+       record per cell, skirts at the edges. A prelude helper (`lod_corner`, used by `vs_lod`)
+       morphs odd corners into the next level's shape between 6 and 8 tile widths (CDLOD), so
+       levels meet without seams and swap without a jump; normals from the grid, tints per corner.
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 

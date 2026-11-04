@@ -600,7 +600,8 @@ fn mod64(a: vec2<u32>, m: u32) -> u32 {
 
 // Distant terrain (`client::lod`): a tile of 32x32 cells of 2^level blocks and a cell around it,
 // each its column at the cell's middle: the block on top (water above the ground under the sea),
-// the one under it, the biome. Caves are left out.
+// the one under it, the biome. Caves are left out. A smooth tile (the job's fourth word set)
+// takes the columns at the cells' corners instead, from one before its first to its last.
 const LOD_LAST: i32 = i32(LOD_SIDE) - 1;
 // Per sample: ground height (low half) and biome; and what scattered things put on it: the
 // highest canopy top + 32768 and its block, and how many of its blocks they cover.
@@ -631,11 +632,13 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
     let ox = jobs[job];
     let oz = jobs[job + 1u];
     let s = 1 << u32(jobs[job + 2u]);
+    // Corners: the samples sit half a cell lower than the middles, `off` from where cells start.
+    let off = select(0, s / 2, jobs[job + 3u] != 0);
     let nr = u32(desc[D_RULES]);
     let stone = desc[D_STONE];
     for (var k = t; k < LOD_SAMPLES; k += 256u) {
-        let bx = ox + (i32(k % LOD_SIDE) - 1) * s + s / 2;
-        let bz = oz + (i32(k / LOD_SIDE) - 1) * s + s / 2;
+        let bx = ox + (i32(k % LOD_SIDE) - 1) * s + s / 2 - off;
+        let bz = oz + (i32(k / LOD_SIDE) - 1) * s + s / 2 - off;
         let c = column(job, bx, bz, k, LOD_SAMPLES);
         var top = stone;
         var under = stone;
@@ -695,9 +698,9 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
         let keep = u32(desc[at + 7u]);
         let table = at + WORDS_SCATTER + thin_len * WORDS_MASK;
         at = table + nb * WORDS_SCATTER_BIOME;
-        let c0 = div_floor(ox - s - reach, cell).x;
+        let c0 = div_floor(ox - s - off - reach, cell).x;
         let c1 = div_floor(ox + LOD_LAST * s + reach, cell).x;
-        let d0 = div_floor(oz - s - reach, cell).x;
+        let d0 = div_floor(oz - s - off - reach, cell).x;
         let d1 = div_floor(oz + LOD_LAST * s + reach, cell).x;
         let wide = u32(c1 - c0 + 1);
         let cells = wide * u32(d1 - d0 + 1);
@@ -707,8 +710,8 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             let h = hash64(key, cx, cz);
             let px = cx * cell + i32(mod64(h, u32(cell)));
             let pz = cz * cell + i32(mod64(shr64(h, 8u), u32(cell)));
-            let si = clamp(div_floor(px - ox, s).x + 1, 0, LOD_LAST);
-            let sj = clamp(div_floor(pz - oz, s).x + 1, 0, LOD_LAST);
+            let si = clamp(div_floor(px - ox + off, s).x + 1, 0, LOD_LAST);
+            let sj = clamp(div_floor(pz - oz + off, s).x + 1, 0, LOD_LAST);
             let g = lod_ground[u32(sj) * LOD_SIDE + u32(si)];
             let gh = bitcast<i32>(g << 16u) >> 16u;
             let biome = g >> 16u;
@@ -733,14 +736,14 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             let r = desc[b + 2u];
             let top = u32(gh + 1 + desc[b + 3u] + 32768);
             let packed = (top << 16u) | u32(desc[b + 4u]);
-            let a0 = clamp(div_floor(px - r - ox, s).x + 1, 0, LOD_LAST);
-            let a1 = clamp(div_floor(px + r - ox, s).x + 1, 0, LOD_LAST);
-            let e0 = clamp(div_floor(pz - r - oz, s).x + 1, 0, LOD_LAST);
-            let e1 = clamp(div_floor(pz + r - oz, s).x + 1, 0, LOD_LAST);
+            let a0 = clamp(div_floor(px - r - ox + off, s).x + 1, 0, LOD_LAST);
+            let a1 = clamp(div_floor(px + r - ox + off, s).x + 1, 0, LOD_LAST);
+            let e0 = clamp(div_floor(pz - r - oz + off, s).x + 1, 0, LOD_LAST);
+            let e1 = clamp(div_floor(pz + r - oz + off, s).x + 1, 0, LOD_LAST);
             for (var j = e0; j <= e1; j++) {
                 for (var i = a0; i <= a1; i++) {
-                    let x0 = ox + (i - 1) * s;
-                    let z0 = oz + (j - 1) * s;
+                    let x0 = ox + (i - 1) * s - off;
+                    let z0 = oz + (j - 1) * s - off;
                     let wx = min(px + r + 1, x0 + s) - max(px - r, x0);
                     let wz = min(pz + r + 1, z0 + s) - max(pz - r, z0);
                     if (wx > 0 && wz > 0) {
