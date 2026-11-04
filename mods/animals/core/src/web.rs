@@ -29,6 +29,9 @@ pub struct Gap {
 pub const WAITING: &[(&str, &str)] = &[
     // The overworld: what wave two (`notes/ECOLOGY.md`) left.
     ("herring_gull: no prey in base:ocean", "the open sea's web: its fish (later; the gull hunts on the beach meanwhile)"),
+    // The tropical forest (Terrain's, 11-04): its climate is in, its animals come with its trees.
+    ("base:tropical_forest: no hunters", "the tropical forest's animals (jaguar, ocelot, harpy eagle)"),
+    ("base:tropical_forest: no a carrion eater", "the tropical forest's animals (king vulture)"),
     // The Cretaceous's tier 2 and 3.
 ];
 
