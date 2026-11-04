@@ -69,7 +69,7 @@ fn palette() -> Palette {
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
     // Valheim's, mixed with the orange of a fire into olive on the ground: Tester 2's campfire.)
-    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.025, 0.04, 0.10), vec3(0.010, 0.017, 0.050));
+    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.045, 0.07, 0.15), vec3(0.010, 0.017, 0.050));
     var p: Palette;
     if e > 0.08 {
         p = blend(golden, day, smoothstep(0.08, 0.28, e));
@@ -81,7 +81,10 @@ fn palette() -> Palette {
         p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
     // A new moon's night is darker than a full moon's.
-    p.ambient *= mix(1.0, mix(0.55, 1.0, moon_light()), smoothstep(-0.14, -0.3, e));
+    // The night follows the moon (Ronald, 11-04: "if the moon is light, then it can be lighter, and
+    // if there's no moon, it should be darker"): under a full moon high up a dim cool light to
+    // walk by, darker as it sets or wanes, near black with no moon up (a torch needed).
+    p.ambient *= mix(1.0, mix(0.25, 1.8, scene.moon.w), smoothstep(-0.14, -0.3, e));
     // Overcast: grey and dim, and the sun no more than a brighter part of the sky.
     let r = rain_amount();
     let grey = vec3(luma(p.horizon)) * vec3(0.92, 0.95, 1.0);
@@ -107,14 +110,18 @@ fn moon_light() -> f32 {
 
 // Where direct light comes from: the sun while it is up, then the moon opposite it.
 fn light_dir() -> vec3<f32> {
-    return select(-scene.sun.xyz, scene.sun.xyz, scene.sun.y > -0.06);
+    // At night the moon where it stands (`scene.moon`: it lags the day by its phase), not simply
+    // opposite the sun.
+    return select(scene.moon.xyz, scene.sun.xyz, scene.sun.y > -0.06);
 }
 
 // How much of the palette's direct light there is: it fades out as the sun sets and the moon comes
 // up a little after.
 fn light_strength() -> f32 {
     let e = scene.sun.y;
-    return select(smoothstep(0.06, 0.2, -e) * mix(0.2, 1.0, moon_light()), smoothstep(-0.04, 0.05, e), e > -0.06);
+    // At night the moon's light: its phase times how high it stands (`scene.moon.w`), none when it
+    // is down or new.
+    return select(smoothstep(0.06, 0.2, -e) * scene.moon.w, smoothstep(-0.04, 0.05, e), e > -0.06);
 }
 
 // ---- the sky ----
@@ -144,9 +151,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
     c += vec3(0.55, 0.22, 0.05) * toward;
     c += sun_glow(dir, p);
-    // The glow about the moon as bright as its phase (`moon_light`): on a new moon there is no moon
-    // in the sky, and its glow alone read as a dark-blue ring (the world playtester's nights).
-    let moon = pow(max(-mu, 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * moon_light();
+    // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
+    // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
+    let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
     c += vec3(0.05, 0.07, 0.12) * moon;
     if dir.y < 0.0 {
         // Below the horizon it darkens a little toward the ground the haze stands on.

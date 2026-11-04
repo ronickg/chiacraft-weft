@@ -600,6 +600,10 @@ gpu_struct! {
         /// Where the camera is under it: x and z (in `xy`) its place in its cell, 0..1, and the
         /// cell in the picture (`zw`), as the sky's cloud pass reads them.
         pub cloud_cells: [f32; 4],
+        /// xyz toward the moon where the sky draws it (it lags the day by its phase: up all night
+        /// when full, only by day when new), w the light it gives: its phase times how high it
+        /// stands, 0 below the horizon. For packs' night light and moon shadows.
+        pub moon: [f32; 4],
         /// The light the player holds (a torch, a lantern), for packs' dynamic light: xyz where it
         /// is (camera relative, by the hand), w unused.
         pub hand: [f32; 4],

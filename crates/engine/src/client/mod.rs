@@ -2289,6 +2289,7 @@ impl Client {
             behind: self.behind,
             clouds: self.sky.cloud_shade[0],
             cloud_cells: self.sky.cloud_shade[1],
+            moon: self.moon(),
             hand: hand.0,
             hand_light: hand.1,
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
@@ -2366,6 +2367,43 @@ impl Client {
             .find(|s| s.kind == weft_abi::sky_kind::BODY && s.glow != 0 && s.orbit.is_infinite())
     }
 
+    /// The sky's moon (`moon`): the first other body (the base game's sun, then its moon).
+    fn moon_body(&self) -> Option<&'static crate::registry::SkyDef> {
+        let sun = self.sun_body();
+        content()
+            .game
+            .sky
+            .get(self.world.dim as usize)?
+            .iter()
+            .find(|s| s.kind == weft_abi::sky_kind::BODY && !sun.is_some_and(|x| std::ptr::eq(x, *s)))
+    }
+
+    /// Toward the moon where the sky draws it, and in w how much light it gives: its phase
+    /// (`moon_light`, 1 full, 0 new) times how high it stands (none below the horizon). A moon that
+    /// lags the day by its phase is up all night when full, half the night at a half moon and only
+    /// by day when new (`Scene::moon`). Without a moon body, opposite the sun.
+    fn moon(&self) -> [f32; 4] {
+        let d = &content().dims[self.world.dim as usize];
+        if !d.sky_light {
+            return [0.0, -1.0, 0.0, 0.0];
+        }
+        let v = match self.moon_body() {
+            Some(s) => sky::frame_of(s, sky::turn_of(s, d, self.world.time as f64)).x_axis,
+            None => {
+                let s = self.sun();
+                -Vec3::new(s[0], s[1], s[2])
+            }
+        };
+        let up = ((v.y + 0.02) / 0.14).clamp(0.0, 1.0);
+        let up = up * up * (3.0 - 2.0 * up);
+        [v.x, v.y, v.z, self.moon_light() * up]
+    }
+
+    /// The plane the moon turns in (`settled`).
+    fn moon_plane(&self) -> glam::Mat3 {
+        self.moon_body().map_or(SUN_LEAN, |s| sky::frame_of(s, 0.0))
+    }
+
     /// The plane the sun turns in (its x and y axes; `settled`).
     fn sun_plane(&self) -> glam::Mat3 {
         self.sun_body().map_or(SUN_LEAN, |s| sky::frame_of(s, 0.0))
@@ -2416,9 +2454,14 @@ impl Client {
             }
             self.shadow_size = size;
         }
+        // By day the sun's shadows, by night the moon's where it stands (none when it is down).
         let sun = self.sun();
-        let dir =
-            settled(if sun[1] > -0.06 { Vec3::new(sun[0], sun[1], sun[2]) } else { -Vec3::new(sun[0], sun[1], sun[2]) }, self.sun_plane());
+        let moon = self.moon();
+        let dir = if sun[1] > -0.06 {
+            settled(Vec3::new(sun[0], sun[1], sun[2]), self.sun_plane())
+        } else {
+            settled(Vec3::new(moon[0], moon[1], moon[2]), self.moon_plane())
+        };
         // So low the shadows would run off the map (the pack fades them out above this).
         if dir.y < 0.02 {
             return;
