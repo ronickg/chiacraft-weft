@@ -744,6 +744,29 @@ impl Content {
         self.components.get(comps::ITEM, item, comp?)
     }
 
+    /// A number of a stack: the stack's own value of `comp` when it carries one (an item built
+    /// from parts carries its tool numbers), else its item's.
+    pub fn stack_value<T: Copy>(&self, stack: &weft_abi::ItemStack, comp: Option<u32>) -> Option<T> {
+        let comp = comp?;
+        if let Some(b) = crate::stack::value(stack.data, comp)
+            && b.len() == std::mem::size_of::<T>()
+        {
+            return Some(unsafe { std::ptr::read_unaligned(b.as_ptr() as *const T) });
+        }
+        self.item_value(stack.item, Some(comp))
+    }
+
+    /// Uses before the stack breaks, 0 for one that doesn't: its own `durability`, else its item's.
+    pub fn max_durability(&self, stack: &weft_abi::ItemStack) -> u32 {
+        match self.stack_value::<u32>(stack, self.ids.durability) {
+            Some(d) => d,
+            None => self
+                .items
+                .get(stack.item as usize)
+                .map_or(0, |d| d.durability),
+        }
+    }
+
     pub fn block_value<T: Copy>(&self, state: u32, comp: Option<u32>) -> Option<T> {
         self.components.get(comps::BLOCK, state, comp?)
     }
@@ -796,13 +819,13 @@ impl Content {
                 .any(|&(mineable, tools)| self.components.has(comps::BLOCK, state, mineable) && self.item_has(tool, tools))
     }
 
-    /// Mining the block with `tool` (0 = hand) harvests it: it needs no tool, or this one fits
-    /// and is of a high enough level.
-    pub fn harvests(&self, state: u32, tool: u32) -> bool {
+    /// Mining the block with `tool` (empty = hand) harvests it: it needs no tool, or this one fits
+    /// and is of a high enough level (the stack's own, for one built from parts).
+    pub fn harvests(&self, state: u32, tool: &weft_abi::ItemStack) -> bool {
         !self.needs_tool(state)
-            || (self.tool_fits(state, tool)
+            || (self.tool_fits(state, tool.item)
                 && self
-                    .item_value::<u32>(tool, self.ids.tool_level)
+                    .stack_value::<u32>(tool, self.ids.tool_level)
                     .unwrap_or(0)
                     >= self.harvest_level(state))
     }

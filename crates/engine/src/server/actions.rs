@@ -206,7 +206,7 @@ impl Server {
                         .map_or(now, |m| m.2);
                     let need = d
                         .get(pos)
-                        .map_or(0.0, |s| dim::mining_time(c, s, held.item, head_wet, on_ground, speed))
+                        .map_or(0.0, |s| dim::mining_time(c, s, &held, head_wet, on_ground, speed))
                         * crate::world::TPS as f32;
                     let too_soon = !creative && ((now - started) as f32 + 2.0) < need * 0.7;
                     let keeps = creative && c.no_creative_break(held.item);
@@ -672,11 +672,11 @@ pub(super) fn wear(c: &Content, d: &mut Dim, player: u64, slot: u32, amount: u32
     else {
         return;
     };
-    let Some(def) = c.items.get(stack.item as usize) else { return };
-    if def.durability == 0 || stack.is_empty() {
+    let max = c.max_durability(&stack);
+    if max == 0 || stack.is_empty() {
         return;
     }
     let damage = crate::stack::damage(&stack) + amount;
-    let next = if damage >= def.durability { ItemStack::EMPTY } else { crate::stack::with_damage(stack, damage) };
+    let next = if damage >= max { ItemStack::EMPTY } else { crate::stack::with_damage(stack, damage) };
     d.entities.set_slot(player, slot, next);
 }

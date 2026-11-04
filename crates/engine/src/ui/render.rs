@@ -896,10 +896,10 @@ impl UiRenderer {
         let (x, y) = (r.x + (r.w - s) / 2.0, r.y + (r.h - s) / 2.0);
         let i = icon * scale;
         self.item_icon(c, textures, r.x + (r.w - i) / 2.0, r.y + (r.h - i) / 2.0, i, stack.item);
-        let def = &c.items[stack.item as usize];
+        let max = c.max_durability(&stack);
         let damage = crate::stack::damage(&stack);
-        if def.durability > 0 && damage > 0 {
-            let f = 1.0 - damage as f32 / def.durability as f32;
+        if max > 0 && damage > 0 {
+            let f = 1.0 - damage as f32 / max as f32;
             let bar = Rect { x: x + scale, y: y + s - 2.0 * scale, w: 14.0 * scale, h: 2.0 * scale };
             self.rect(bar, 0x000000FF);
             let g = (f * 255.0) as u32;

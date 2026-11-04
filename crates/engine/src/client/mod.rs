@@ -1190,11 +1190,11 @@ impl Client {
             } else if refused {
                 self.breaking = None;
             } else if let Some(hit) = self.target {
-                let held = self.held().item;
+                let held = self.held();
                 let time = crate::server::mining_time(
                     c,
                     hit.state,
-                    held,
+                    &held,
                     self.eye_liquid().is_some(),
                     self.player.on_ground,
                     self.attribute(crate::server::extend::MINING_SPEED),

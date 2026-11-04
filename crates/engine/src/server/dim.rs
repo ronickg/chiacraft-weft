@@ -560,16 +560,21 @@ pub fn see_through(c: &Content, cube: &Cube) -> u16 {
 /// a tool that harvests it.
 /// Seconds it takes a player to mine a block, as client and server agree: vanilla's five times as
 /// slow with the head in a liquid, and again off the ground.
-pub fn mining_time(c: &Content, state: u32, tool: u32, head_wet: bool, on_ground: bool, speed: f32) -> f32 {
+pub fn mining_time(c: &Content, state: u32, tool: &ItemStack, head_wet: bool, on_ground: bool, speed: f32) -> f32 {
     break_time(c, state, tool) * if head_wet { 5.0 } else { 1.0 } * if on_ground { 1.0 } else { 5.0 } / speed
 }
 
-pub fn break_time(c: &Content, state: u32, tool: u32) -> f32 {
+pub fn break_time(c: &Content, state: u32, tool: &ItemStack) -> f32 {
     let s = &c.states[state as usize];
     if s.hardness < 0.0 {
         return f32::INFINITY;
     }
-    let speed = if c.tool_fits(state, tool) { c.item_value::<f32>(tool, c.ids.mining_speed).unwrap_or(1.0) } else { 1.0 };
+    let speed = if c.tool_fits(state, tool.item) {
+        c.stack_value::<f32>(tool, c.ids.mining_speed)
+            .unwrap_or(1.0)
+    } else {
+        1.0
+    };
     s.hardness * if c.harvests(state, tool) { 1.5 } else { 5.0 } / speed
 }
 
@@ -1150,7 +1155,9 @@ impl Dim {
             return false;
         }
         let base = if held.item != 0 {
-            c.items.get(held.item as usize).map_or(1.0, |i| i.attack)
+            // The stack's own attack damage first (an item built from parts), else its item's.
+            c.stack_value::<f32>(&held, c.ids.attack_damage)
+                .unwrap_or_else(|| c.items.get(held.item as usize).map_or(1.0, |i| i.attack))
         } else if player {
             1.0
         } else {
