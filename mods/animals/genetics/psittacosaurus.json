@@ -1,0 +1,61 @@
+{
+ "species": "psittacosaurus",
+ "about": "Psittacosaurus lujiatunensis: its colors are known from its skin (Vinther et al. 2016): dark brown above, pale below (countershaded for a shaded forest floor), darker flecks on the back, dark cheek horns.",
+ "loci": [
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "dark brown to a redder brown"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   104,
+   70,
+   40
+  ],
+  [
+   84,
+   56,
+   34
+  ]
+ ],
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  }
+ }
+}

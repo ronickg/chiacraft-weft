@@ -14,6 +14,8 @@
 use weft_sdk::abi::ItemStack;
 use weft_sdk::*;
 
+use crate::dist2;
+
 use crate::animal::{self, ANIMAL};
 use crate::commands::{self, ORDERS};
 use crate::species::SPECIES;
@@ -144,10 +146,6 @@ fn set(w: &World, id: u64, f: impl FnOnce(&mut Signature)) {
     if let Some(s) = w.component_mut(id, &SIGNATURE) {
         f(s);
     }
-}
-
-fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (0..3).map(|i| (a[i] - b[i]).powi(2)).sum()
 }
 
 // ------------------------------------------------------------------ chihuahua

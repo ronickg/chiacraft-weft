@@ -21,6 +21,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts")))
+from house import SCALE, texels  # noqa: E402
 from paint import EYES  # noqa: E402
 
 BROWN, DARK, BUFF, RUFOUS, WHITE, BILL = range(6)
@@ -39,16 +40,29 @@ EYES.update({
                          "APPA",
                          ".aa."], colors={"A": (226, 168, 40), "a": (240, 190, 70), "P": (16, 12, 12), "H": (240, 238, 228)},
                 halo="round"),
+    # At 32 a block the face is 4 texels by 4: each eye a texel wide and two tall at the face's
+    # edges, the pupil over the yellow iris (the house's px2 order), the rufous disc and the bill
+    # between them. Two 2x2 eyes would fill the middle rows edge to edge and read as one band.
+    "owl_px": dict(pattern=["P",
+                            "A"], colors={"A": (226, 168, 40), "P": (16, 12, 12)}, halo="none", iris="A"),
 })
 
 HS, HY = 1.75, 1.5  # the head's size against the raven's, and how much higher it sits
 CY = 18.0 + HY
 EYE_X, EYE_Y = 2.2, 18.0 + 0.55 * HS  # on the face (EYE_Y without the head's lift)
+K = 0.95
+# Painted at 64 a block (1 texel a unit), an exception to the house's 32: an owl's face is its two
+# big ringed eyes, and at 32 the face is 4 by 4 texels, where they shrink to a texel each and the
+# owl stops reading as one (tried: `owl_px`). At 64 the face is 8 by 8 and keeps the 4x4 design.
+TX = texels(SCALE, 2)
+TEX = 1 / (TX * K)  # a texel, in the raven's units
+EYE_PX_X = EYE_X  # the painted eyes' centers (at 32: 3.4, the face's outer texel columns)
 
 
 def mottle(x, y, z, s=0):
     """Fixed dark flecks: a hash of where the texel is."""
-    h = np.sin(np.floor(x * 1.3) * 12.9898 + np.floor(y * 1.3) * 78.233 + np.floor(z * 1.3) * 37.719 + s) * 43758.5453
+    f = min(1.3, 1 / TEX)  # a fleck at least a texel
+    h = np.sin(np.floor(x * f) * 12.9898 + np.floor(y * f) * 78.233 + np.floor(z * f) * 37.719 + s) * 43758.5453
     return (h - np.floor(h)) > 0.72
 
 
@@ -68,7 +82,7 @@ def area(e, face, p, uu, vv, h):
     if n == "skull":
         if face == "south":
             d = np.minimum(np.hypot(x - EYE_X, y - (EYE_Y + HY)), np.hypot(x + EYE_X, y - (EYE_Y + HY)))
-            a = np.where(d < 2.9, RUFOUS, np.where(d < 3.6, DARK, BROWN))
+            a = np.where(d < 2.9, RUFOUS, np.where(d < 2.9 + max(0.7, TEX), DARK, BROWN))  # the rim at least a texel
             a = np.where((np.abs(x) < 1.0) & (y > EYE_Y + HY - 0.6) & (y < EYE_Y + HY + 2.4), WHITE, a)  # the pale brows meeting over the bill
             a = np.where((y < CY - 2.6) & (np.abs(x) < 3.0), WHITE, a)  # the white throat
         elif face == "down":
@@ -84,7 +98,7 @@ def area(e, face, p, uu, vv, h):
         if face == "up" or (face == "north" and n == "hips"):
             return np.where(mottle(x, y, z, 1), DARK, BROWN)
         a = np.where(vv < h * (0.25 if face in ("east", "west") else 0.0), BROWN, BUFF)
-        bars = (np.floor(y * 1.1) % 3 == 0) & (face != "down")
+        bars = (np.floor(y / max(1 / 1.1, TEX)) % 3 == 0) & (face != "down")  # a bar a texel, two between
         a = np.where((a == BUFF) & bars, DARK, a)  # the barred breast and belly
         if n == "chest" and face == "south":
             a = np.where(y > 14.6, WHITE, a)  # the white bib under the face
@@ -96,9 +110,9 @@ def area(e, face, p, uu, vv, h):
         return np.where(mottle(x, y, z, 2), DARK, np.where(mottle(x, y, z, 5), BUFF, BROWN))
     if n.startswith(("primaries", "flight", "primariesf")):
         along = np.abs(x) if not n.startswith("primariesf") else -z
-        return np.where(np.floor(along * 0.8) % 2 == 0, DARK, BROWN)  # the barred flight feathers
+        return np.where(np.floor(along / max(1 / 0.8, 1.5 * TEX)) % 2 == 0, DARK, BROWN)  # the barred flight feathers, 1.5+ texels a bar
     if n.startswith("tail"):
-        return np.where(np.floor(-z * 0.8) % 2 == 0, DARK, BROWN)
+        return np.where(np.floor(-z / max(1 / 0.8, 1.5 * TEX)) % 2 == 0, DARK, BROWN)
     if n.startswith(("thigh_", "shin_", "toes_")):
         a[:] = BUFF
         return a
@@ -117,7 +131,8 @@ def props(e, face, p, a):
 
 CFG = dict(
     name="owl",
-    K=0.95,
+    K=K,
+    TX=TX,
     D=-1.2,
     head=HS,
     head_y=HY,
@@ -131,7 +146,7 @@ CFG = dict(
     tilt=-50,
     neck_share=0.0,
     neck_hidden=True,  # the head sits on the shoulders: the neck is a hidden link
-    eyes=dict(kind="front", pattern="owl", x=EYE_X, y=EYE_Y, lash=(52, 34, 26)),
+    eyes=dict(kind="front", pattern="owl", x=EYE_PX_X, y=EYE_Y, lash=(52, 34, 26)),
     materials=MATERIALS,
     feather=(BROWN, DARK, BUFF, RUFOUS, WHITE),
     area=area,

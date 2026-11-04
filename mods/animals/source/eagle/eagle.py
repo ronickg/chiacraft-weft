@@ -20,6 +20,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts")))
+from house import TX  # noqa: E402
 from paint import EYES  # noqa: E402
 
 BROWN, DARK, GOLD, PALE, BILL, CERE, FOOT = range(7)
@@ -39,9 +40,18 @@ EYES.update({
                            "APPA",
                            ".aa."], colors={"A": (132, 84, 38), "a": (164, 108, 48), "P": (18, 12, 12), "H": (238, 236, 228)},
                   halo="round"),
+    # At 32 a block the head's side is 4 texels by 4: the eye 2 by 2 at its front, under the
+    # golden crown: a highlight and the pupil over the amber iris.
+    "eagle_px": dict(pattern=["HP",
+                              "Aa"], colors={"A": (176, 112, 44), "a": (204, 146, 62), "P": (18, 12, 12), "H": (238, 236, 228)},
+                     halo="none", iris="Aa"),
 })
 
 HS = 1.15
+K = 1.35
+# Painted at 32 a block (house.TX, 0.5 texels a unit): the eye-bearing side of the head is 8.5 by
+# 7.8 units, 4 by 4 texels at 32 (3+, so no finer).
+TEX = 1 / (TX * K)  # a texel, in the raven's units
 
 
 def area(e, face, p, uu, vv, h):
@@ -80,7 +90,7 @@ def area(e, face, p, uu, vv, h):
     if n.startswith(("primaries", "flight", "primariesf")):
         a[:] = DARK
         if n.startswith(("primaries_", "flight_")):
-            a = np.where((z < -2.0) & (np.floor(np.abs(x) * 0.7) % 2 == 0), BROWN, a)  # faint barring at the base
+            a = np.where((z < -2.0) & (np.floor(np.abs(x) / max(1 / 0.7, 2 * TEX)) % 2 == 0), BROWN, a)  # faint barring at the base, 2+ texels a bar
         return a
     if n.startswith("tail"):
         a[:] = BROWN
@@ -103,7 +113,8 @@ def props(e, face, p, a):
 
 CFG = dict(
     name="eagle",
-    K=1.35,
+    K=K,
+    TX=TX,
     D=0.0,
     head=HS,
     bill=dict(w=1.9, h=2.3, len=3.6, rot=10, hook=True, y=0.7),
@@ -113,7 +124,7 @@ CFG = dict(
     shin=0.95,
     toes=1.25,
     tilt=-30,
-    eyes=dict(kind="side", pattern="eagle", z=11.25 + 2.75 * HS * 0.42, y=18.0 + 0.25 * HS, lash=(40, 30, 24)),
+    eyes=dict(kind="side", pattern="eagle_px", z=11.25 + 2.75 * HS * 0.42, y=18.0 + 0.25 * HS, lash=(40, 30, 24)),
     materials=MATERIALS,
     feather=(BROWN, DARK, GOLD, PALE),
     area=area,

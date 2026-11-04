@@ -610,7 +610,7 @@ from a cat, a shy cat that stays beside a capybara (and runs without one).
 **Step 5, knock-out taming and the raptor** (2026-11-01, `knockout.rs`, `raptor.rs`):
 
 - **Torpor**: a player's hit adds 5 bare-handed, 20 with a **club** (`animals:club`, a log on a
-  stick); a **tranquilizer dart** (`animals:tranquilizer_dart`, an arrow and a spider eye make
+  stick); a **tranquilizer dart** (`animals:tranquilizer_dart`, a stick, a feather and a spider eye make
   four; thrown with use) stings for 1 and adds 60. Awake, torpor wears off in two minutes. Past
   the torpor stat the animal falls unconscious (its resting pose, "z"s above it).
 - **Keeping it under**: out, torpor drains in four minutes; a **sedative** (`animals:sedative`,
@@ -1060,7 +1060,7 @@ back by twice the mount's height so it clears it. Checked in the game: take off,
 land, get off; a wild one killed a player in survival who came near.
 
 **The breath** (2026-11-02; `breath.rs`). What a wyvern breathes is in its genes (fire, frost,
-lightning, venom). Its rider makes it breathe with a key (R) where they look; a wild one angry at
+lightning, venom). Its rider makes it breathe with a key (V, rebindable) where they look; a wild one angry at
 something 5 to 16 blocks off breathes at it now and then. On the ground it rears, draws breath and
 lunges (`breathe`), the stream pouring from its mouth from 0.95 to 2.6 seconds; in the air it
 breathes as it flies, at once; then eight seconds before the next. The stream reaches 14 blocks in

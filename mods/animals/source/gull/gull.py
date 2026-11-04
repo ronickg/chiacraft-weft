@@ -18,6 +18,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts")))
+from house import texels  # noqa: E402
 from paint import EYES  # noqa: E402
 
 GREY, WHITE, BLACK, BILL, SPOT, LEG = range(6)
@@ -34,7 +35,15 @@ EYES.update({
     "gull": dict(pattern=["YYY",
                           "YPH",
                           "YYY"], colors={"Y": (226, 208, 136), "P": (22, 18, 16), "H": (244, 242, 236)}, halo="none"),
+    # At 64 a block the head's side is 5 texels by 5: the pale eye 2 by 2, the pupil over the
+    # pale yellow iris (a shade darker below).
+    "gull_px": dict(pattern=["YP",
+                             "Yy"], colors={"Y": (226, 208, 136), "y": (198, 176, 112), "P": (22, 18, 16)}, halo="none", iris="Yy"),
 })
+
+# Painted at 64 a block (texels(k=2), 1 texel a unit): the eye-bearing side of the head is 5.5 by
+# 5.0 units, 2.7 by 2.5 texels at 32 (under 3), 5 by 5 at 64.
+TX = texels(k=2)
 
 HS = 1.05
 FRONT = 11.25 + 2.75 * HS
@@ -52,7 +61,7 @@ def area(e, face, p, uu, vv, h):
         return a
     if n == "jaw":
         a[:] = BILL
-        return np.where(z > FRONT + 2.3, SPOT, a)  # the red gonys spot
+        return np.where(z > FRONT + 2.0, SPOT, a)  # the red gonys spot (a texel long at 64)
     if n.startswith(("shin_", "toes_")):
         a[:] = LEG
         return a
@@ -103,6 +112,7 @@ def props(e, face, p, a):
 CFG = dict(
     name="gull",
     K=0.95,
+    TX=TX,
     D=0.7,
     head=HS,
     bill=dict(w=1.3, h=1.9, len=4.8, rot=5, hook=False, y=0.6),
@@ -112,7 +122,7 @@ CFG = dict(
     shin=0.45,
     toes=1.15,
     tilt=-12,
-    eyes=dict(kind="side", pattern="gull", z=11.6, y=18.0 + 0.3 * HS, lash=(150, 150, 156)),
+    eyes=dict(kind="side", pattern="gull_px", z=11.6, y=18.0 + 0.3 * HS, lash=(150, 150, 156)),
     materials=MATERIALS,
     feather=(GREY, WHITE, BLACK),
     area=area,

@@ -5,7 +5,7 @@ cut-out fins and a hand-painted texture) with the blocky-model skill, from resea
 
     ~/.venvs/blocky/bin/python fish.py      # writes out/spec.json, out/texture.png
 
-Units are the house's (64 a block, 1.56 cm each), painted `house.FINE` texels a unit; y up, the fish faces +z. A
+Units are the house's (64 a block, 1.56 cm each), painted `TX` texels a unit (64 a block); y up, the fish faces +z. A
 river brown trout is about 35 cm long: here 24 from the snout to the tail's tips, the head a little
 bigger than life. The pacu is the same model drawn deeper and bigger by its genes (`build` "Gt" and
 the size gene in `genetics/pacu.json`).
@@ -23,9 +23,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from ground import lowest  # noqa: E402
-from house import FINE as K  # noqa: E402  texels a unit: its head is under 3 units across, so it paints finer
+from house import SCALE, fine, texels  # noqa: E402
+
+# Texels a unit. The eye sits on the head's side, 5 units by 4.2: at the house's 32 a block that is
+# 2.5 by 2.1 texels, under `house.MIN_FACE` (3), so it paints at twice that (k = 2, 64 a block): 5 by 4.
+# (It was `house.FINE`, 4 a unit, 256 a block.)
+TX = texels(SCALE, fine(4.2))
 
 OUT = os.environ.get("FISH_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -45,9 +50,10 @@ TONES = [tones(c, h) for c, h in zip(BASE, SHADOW)]
 COAT = (FLANK, BACK, BELLY, FIN)
 ROLES = [("coat", 0, 0), ("coat", 0, -1.5), ("coat", 1, 0), ("coat", 0.2, -1.0), ("coat", 0, -3.0), ("coat", 0.5, 0), "fixed", ("coat", 0, -0.5)]
 SPOTS = os.environ.get("FISH_COAT") != "pacu"
+MOUTH_LINE = (96, 60, 58)
 
 # A fish's round eye: a gold ring round a big black pupil, a catchlight toward the front and up
-# with a dimmer gloss by it; painted `house.FINE` texels a unit (no eyelids: fish have none).
+# with a dimmer gloss by it (no eyelids: fish have none). `fish_gold` is the old one, at 256 a block.
 EYES.update({
     "fish_gold": dict(pattern=[".AAAA.",
                                "AHhPPA",
@@ -57,9 +63,45 @@ EYES.update({
                                ".aaaa."], colors={"P": (16, 12, 12), "H": (222, 226, 230), "h": (86, 88, 96), "A": (176, 140, 70),
                                                   "a": (206, 172, 96)}, halo="none"),
 })
-EYE_STYLE = os.environ.get("FISH_EYES", "fish_gold")
+# At 64 a block the head's side is 5 texels by 4: the eye is 2 by 2, written for the east side
+# (the snout to the left): a catchlight up and forward, the black pupil, the gold iris below and
+# behind it (recolored per fish). The west side gets it mirrored (`eye_pattern`).
+_GOLD, _gold, _PUP, _HI = (176, 140, 70), (206, 172, 96), (16, 12, 12), (222, 226, 230)
+EYES.update({
+    "fish_px": dict(pattern=["HP", "Pa"], colors={"P": _PUP, "H": _HI, "a": _gold}, halo="none", iris="a"),
+    "fish_px_gold": dict(pattern=["HP", "aA"], colors={"P": _PUP, "H": _HI, "A": _GOLD, "a": _gold}, halo="none",
+                         iris="Aa"),
+    "fish_px_ring": dict(pattern=["PA", "Aa"], colors={"P": _PUP, "A": _GOLD, "a": _gold}, halo="none", iris="Aa"),
+    "fish_px_lit": dict(pattern=["HA", "Pa"], colors={"P": _PUP, "H": _HI, "A": _GOLD, "a": _gold}, halo="none",
+                        iris="Aa"),
+})
+EYE_STYLE = os.environ.get("FISH_EYES", "fish_px")
 HEAD = ((-1.4, 2.4, 4.5), (1.4, 6.6, 9.5))
-EYE_Z, EYE_Y = 7.4, 5.1
+# The eye in the side's middle rows (5.1 at 256 a block): at 4 rows high it would touch the back's edge.
+EYE_Z, EYE_Y = 7.4, 4.6
+
+
+def side_grid():
+    """The head side's texels: (width, height) and one texel's size in units (u, v)."""
+    (x0, y0, z0), (x1, y1, z1) = HEAD
+    w, h = max(1, round(TX * (z1 - z0))), max(1, round(TX * (y1 - y0)))
+    return w, h, (z1 - z0) / w, (y1 - y0) / h
+
+
+def eye_center(side):
+    """The eye's center on the head's east (side > 0) or west side, in that face's texels."""
+    (x0, y0, z0), (x1, y1, z1) = HEAD
+    w, h, su, sv = side_grid()
+    return ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0)) / su, (y1 - EYE_Y) / sv
+
+
+def eye_pattern(side):
+    """The design for one side: as drawn on the east side, mirrored on the west (its u runs tail
+    to snout), so the catchlight is toward the snout on both."""
+    d = dict(EYES[EYE_STYLE])
+    if side < 0:
+        d["pattern"] = [row[::-1] for row in d["pattern"]]
+    return d
 
 # ------------------------------------------------------------------ the model
 
@@ -121,7 +163,13 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(K * abs(size @ du)))), max(1, int(round(K * abs(size @ dv)))), n
+    w, h = int(round(TX * abs(size @ du))), int(round(TX * abs(size @ dv)))
+    if abs(size @ du) > 0 and abs(size @ dv) > 0:  # a small face is still a texel
+        w, h = max(1, w), max(1, h)
+    return np.array(corner, float), du, dv, w, h, n
+
+
+SPOT_R = 0.55  # texels: a spot's least radius (0.42 units at 256 a block)
 
 
 def spots(p, density, size, seed):
@@ -129,7 +177,7 @@ def spots(p, density, size, seed):
     rng = np.random.default_rng(seed)
     pts = np.c_[rng.uniform(-2, 2, 60), rng.uniform(2, 7.5, 60), rng.uniform(-11, 10, 60)][: int(60 * density)]
     d = np.min(np.linalg.norm(p[..., None, :] - pts[None, None], axis=-1), axis=-1)
-    return d < size
+    return d < max(size, SPOT_R / TX)  # at least a texel, or most spots fall between texel centers
 
 
 def area(e, face, p, uu, vv, h):
@@ -154,8 +202,8 @@ def area(e, face, p, uu, vv, h):
     if SPOTS and name in ("body", "tail_0", "head") and face != "down":
         a = np.where(spots(p, 1.0, 0.42, 1) & (y > 3.6), SPOT, a)
         a = np.where(spots(p, 0.5, 0.5, 2) & (y > 3.4) & (y < 5.4) & (face in ("east", "west")), RED, a)
-    if name == "head" and face in ("east", "west"):  # the gill cover's back edge
-        a = np.where((np.abs(z - 5.2) < 0.45) & (y < 6.0), GILL, a)
+    if name == "head" and face in ("east", "west"):  # the gill cover's back edge, a texel wide
+        a = np.where((np.abs(z - 5.2) < max(0.45, 0.5 / TX)) & (y < 6.0), GILL, a)
     return a
 
 
@@ -202,8 +250,9 @@ def layer_props(e, face, p, a):
 def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     size = np.array(e["hi"]) - np.array(e["lo"])
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du * (abs(size @ du) / w) + vv[..., None] * dv * (abs(size @ dv) / h)
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel indices (+0.5)
+    p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
     R = rotm(e["rot"])
     if e["rot"]:
         o = np.array(e["origin"])
@@ -217,15 +266,19 @@ def paint_face(e, face, boxes):
     if e["cut"]:
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
     if e["name"] == "head" and face in ("east", "west"):
-        (x0, y0, z0), (x1, y1, z1) = HEAD
-        cu = K * ((z1 - EYE_Z) if face == "east" else (EYE_Z - z0))
-        stamp_eyes(img, [(cu, K * (y1 - EYE_Y))], EYE_STYLE)
-    if e["name"] == "snout" and face in ("south", "east", "west"):  # the mouth: a dark line
-        r = int(round((5.6 - 3.6) * h / 2.7))
-        img[min(r, h - 1), :, :3] = BASE[MOUTH]
+        side = 1 if face == "east" else -1
+        EYES["_fish_side"] = eye_pattern(side)
+        stamp_eyes(img, [eye_center(side)], "_fish_side")
+    if e["name"] == "snout" and face in ("south", "east", "west"):  # the mouth: a dark line, 2 units down
+        r = int(round(2.0 / sv))  # its row, a texel index
+        img[min(r, h - 1), :, :3] = BASE[MOUTH] if h >= 6 else MOUTH_LINE  # a texel-high line: the dark gap
     if e["quad"] and e["cut"] in ("caudal", "dorsal", "anal", "pectoral"):  # rays along the fin
-        along = p[..., 1] if e["cut"] in ("caudal",) else p[..., 2]
-        img[..., :3] = np.where((np.floor(along * 1.4) % 2 == 0)[..., None], (img[..., :3] * 0.9).astype(np.uint8), img[..., :3])
+        # A dark ray every third texel (texel indices: across the caudal's rows, along the others'
+        # columns); a fin under 4 texels that way is too small for them.
+        idx = vv if e["cut"] == "caudal" else uu
+        if idx.max() >= 3.5:
+            ray = (np.floor(idx) % 3 == 1)[..., None]
+            img[..., :3] = np.where(ray, (img[..., :3] * 0.86).astype(np.uint8), img[..., :3])
     if LAYERS["rec"] is not None:
         LAYERS["rec"].face(LAYERS["key"], cap["weights"], cap["level"], ROLES, np.clip(np.round(col), 0, 255), img, p,
                            layer_props(e, face, p, a))

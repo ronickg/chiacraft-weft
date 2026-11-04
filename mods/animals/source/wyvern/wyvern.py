@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The wyvern: a huge winged dragon in the style of the show dragons (Game of Thrones), our own
-design, built with the blocky-model skill in the house style (64 units a meter; see README.md for
-the research and the decisions).
+design, built with the blocky-model skill in the house style (64 units a meter, painted at 32
+texels a meter, `TX`; see README.md for the research and the decisions).
 
 Two hind legs and two wings that are its arms, as a bat's: an upper arm, a forearm, a clawed thumb
 it walks on, and three long fingers carrying the membrane (two panels between the fingers, one
@@ -25,8 +25,13 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
+from paint import EYES  # noqa: E402
 from prop import FACES, el, rotm  # noqa: E402
 from rig import euler  # noqa: E402
+from house import TX  # noqa: E402
+
+# Painted at the house density, 32 texels a block (TX = 0.5 texels a unit): the face that carries
+# the eye (the skull's side) is 35 by 24 texels there, far above house.MIN_FACE, so no finer.
 
 OUT = os.environ.get("WYVERN_OUT") or os.path.join(HERE, "out")
 
@@ -379,7 +384,7 @@ def cut(e, p):
 
 
 # How the scales are drawn (options for Ronald to pick; the same layout): scale size on the body
-# in texels, and the kind.
+# in units (the old texels, at 64 a block), and the kind.
 STYLES = {
     "fine": dict(size=7, kind="scallop", hi=0.10),       # small overlapping scales, a dark rim each
     "plated": dict(size=11, kind="scallop", hi=0.22),    # big armor-like scales, more catching the light
@@ -387,6 +392,7 @@ STYLES = {
     "banded": dict(size=7, kind="scallop", hi=0.10, bands=True),  # fine scales, darker bands down the back and tail
 }
 CHOSEN = "plated"  # chosen by Ronald, 2026-11-02
+MIN_SCALE = 4  # the smallest scale, in texels (at 32 a block)
 STYLE = os.environ.get("WYVERN_STYLE", CHOSEN)
 
 # Each part's scale size against the body's: smaller on the head, feet and wings, down the tail.
@@ -414,21 +420,24 @@ def scale_cells(a, b, size, kind):
     """Scales on a face, from 2D coordinates on the body (`a` along a row, `b` up the rows, in
     units): which scale each texel is in, whether it is on the scale's rim (dark), and the
     scale's middle on `b`. Scallops overlap like roof tiles, each rim a U open toward the next
-    row (scales lie back and down over the ones below); pebbles are rounded, a dark gap round each."""
+    row (scales lie back and down over the ones below); pebbles are rounded, a dark gap round each.
+    At 32 a block a rim is a texel (1 / TX units) and a scale at least MIN_SCALE texels across, so
+    the smallest (head, feet) still read as scales, not speckle."""
+    size = max(size, MIN_SCALE / TX)
     if kind == "pebble":
         row = size * 0.87
         j = np.floor(b / row)
         a2 = a / size + 0.5 * (j % 2)
         i = np.floor(a2)
         fa, fb = a2 - i - 0.5, b / row - j - 0.5
-        rim = (fa * size) ** 2 + (fb * row) ** 2 > (0.5 * size - 0.9) ** 2
+        rim = (fa * size) ** 2 + (fb * row) ** 2 > (0.5 * size - 0.9 / TX) ** 2
         return i, j, rim, (j + 0.5) * row
     row = size * 0.8
     j = np.floor(b / row)
     a2 = a / size + 0.5 * (j % 2)
     i = np.floor(a2)
     fa, fb = a2 - i, b / row - j
-    rim = fb * row < 1.0 + 0.55 * row * (2 * fa - 1) ** 2
+    rim = fb * row < 1.0 / TX + 0.55 * row * (2 * fa - 1) ** 2
     return i, j, rim, (j + 0.5) * row
 
 
@@ -477,7 +486,8 @@ def belly_plates(e, p):
     seam between each, the plates' sides running into the flank's scales."""
     x, z = p[..., 0], p[..., 2]
     width = 9 * part_scale(e["name"]) if not e["name"].startswith("neck") else 7
-    seam = np.mod(z, width) < 1.0
+    width = max(width, 3 / TX)  # at least 3 texels a plate, at 32 a block
+    seam = np.mod(z, width) < 1 / TX  # a seam a texel wide
     half = (e["hi"][0] - e["lo"][0]) / 2
     side = np.abs(x - (e["hi"][0] + e["lo"][0]) / 2) > half * 0.78
     return np.where(side, FLANK_EDGE, np.where(seam, BELLY_EDGE, BELLY))
@@ -502,13 +512,14 @@ def horn_area(e, p, pieces=3):
     t = (k + (hi - z) / max(hi - lo, 1e-3)) / pieces
     if e["part"] == "spike":
         return np.where(t > 0.72, SPIKE_TIP, SPIKE)
-    ring = (np.mod(z, 6.0) < 1.0) & (t < 0.62)
+    ring = (np.mod(z, 8.0) < 1 / TX) & (t < 0.62)  # a ring a texel wide, 4 texels apart (32 a block)
     return np.where(t > 0.78, HORN_TIP, np.where(ring | (t < 0.08), HORN_RING, HORN))
 
 
-def teeth_rows(face, uu, vv, w, h, top, rows=4, period=6.0, phase=0.0, front=1.0):
-    """Teeth along an edge of a face: pointed, `rows` tall, every `period` texels; `top` the edge
-    they hang from is the face's top (the lower jaw's, pointing up) or its bottom (the upper's)."""
+def teeth_rows(face, uu, vv, w, h, top, rows=2, period=4.0, phase=0.0, front=1.0):
+    """Teeth along an edge of a face: pointed, `rows` tall, every `period` texels (`uu`, `vv` the
+    texel centers, in texels: a design, 3 wide and 2 tall at 32 a block); `top` the edge they hang
+    from is the face's top (the lower jaw's, pointing up) or its bottom (the upper's)."""
     d = (vv if top else h - vv) - 0.5  # rows from the edge, 0 at it
     c = np.mod(uu - 0.5 + phase, period) - period / 2  # across each tooth
     tooth = np.abs(c) < (rows - d) * 0.55
@@ -535,13 +546,14 @@ def membrane_area(e, p):
         L = np.hypot(*d) + 1e-6
         t = np.clip(((x - o[0]) * d[0] + (z - o[2]) * d[1]) / L ** 2, 0, 1)
         dist = np.hypot(x - (o[0] + t * d[0]), z - (o[2] + t * d[1]))
-        a = np.where(dist < 1.1 - 0.5 * t, MEM_VEIN, a)  # thinner toward the edge
+        a = np.where(dist < (0.75 - 0.25 * t) / TX, MEM_VEIN, a)  # a texel and a half, a texel toward the edge
     keep = cut(e, p)
-    inner = ndimage.binary_erosion(keep, iterations=3)
+    inner = ndimage.binary_erosion(keep, iterations=2)  # the trailing edge: 2 texels (4 units)
     return np.where(keep & ~inner & (a == MEMBRANE), MEM_EDGE, a)
 
 
 def area(e, face, p, uu, vv, h):
+    """`uu`, `vv`: texel centers, in texels (for the stamps: teeth, the lip, nostrils)."""
     part, n = e.get("part"), e["name"]
     shape = p.shape[:-1]
     w = shape[1]
@@ -555,7 +567,7 @@ def area(e, face, p, uu, vv, h):
         return np.full(shape, MOUTH)
     if n == "snout" and face == "down":  # the roof of the mouth, teeth round its edge
         a = np.full(shape, MOUTH)
-        edge = (uu < 3) | (uu > w - 3) | (vv > h - 3)
+        edge = (uu < 1) | (uu > w - 1) | (vv > h - 1)  # a texel round its edge
         return np.where(edge, TEETH, a)
     if n in ("hips", "chest", "ribs", "keel", "jaw") or n.startswith(("neck_", "tail_", "pec_")):
         if face == "down":
@@ -575,14 +587,14 @@ def area(e, face, p, uu, vv, h):
     if n.startswith("brow"):
         a = np.where(a == BACK_HI, BACK, a)
     if n == "snout" and face in ("east", "west"):
-        a = np.where(teeth_rows(face, uu, vv, w, h, top=False, rows=4, front=0.8), TEETH, a)
-        a[-5:][~np.isin(a[-5:], [TEETH])] = DARK  # the lip's shadow between the teeth
+        a = np.where(teeth_rows(face, uu, vv, w, h, top=False, front=0.8), TEETH, a)
+        a[-3:][~np.isin(a[-3:], [TEETH])] = DARK  # the lip's shadow between the teeth, a texel above them
     if n == "jaw" and face in ("east", "west"):
-        rows = (vv >= 2) & (vv < 7)  # (the top two rows are behind the snout)
-        a = np.where(rows & teeth_rows(face, uu, vv - 2, w, h, top=True, rows=4, phase=3, front=0.8), TEETH, a)
-    if n == "nose" and face == "up":  # nostrils: slits near the front (a pair on the front reads as eyes)
-        a[h - 4:h - 3, 3:7] = DARK
-        a[h - 4:h - 3, w - 7:w - 3] = DARK
+        rows = (vv >= 1) & (vv < 3)  # (the top row, 2 units, is behind the snout)
+        a = np.where(rows & teeth_rows(face, uu, vv - 1, w, h, top=True, phase=2, front=0.8), TEETH, a)
+    if n == "nose" and face == "up" and w >= 8 and h >= 4:  # nostrils: slits near the front (a pair on the front reads as eyes)
+        a[h - 2:h - 1, 1:3] = DARK  # (14 by 8 texels at 32 a block: 2-texel slits a texel in)
+        a[h - 2:h - 1, w - 3:w - 1] = DARK
     return a
 
 
@@ -596,9 +608,37 @@ def layer_props(e, face, a):
     return {"points": pts, "pattern": zone}
 
 
-# The eye: an amber reptile's, a slit pupil, under the brow on each side of the skull.
-EYE = ("reptile", 18.0)  # design, how far up from the skull's top (texels: under the brow)
+# The eye: an amber reptile's, a slit pupil, under the brow on each side of the skull. At 32 a
+# block the skull's side is 35 by 24 texels: the old 13 by 8 design ("reptile", at 64) halved, a
+# dark rim, the amber iris (lighter low), a slit pupil two texels tall, a catchlight up and toward
+# the snout (mirrored on the right side, where the snout is the other way). The halo's dark ring
+# sits under the brow.
+EYES.update({
+    "wyvern_px": dict(pattern=[".LLLLL.",
+                               "LHAPAAL",
+                               "LAaPaaL",
+                               ".LLLLL."],
+                      colors={"L": (52, 30, 20), "A": (196, 124, 34), "a": (232, 170, 64), "P": (14, 10, 10),
+                              "H": (246, 230, 190)}, halo="round", iris="Aa"),
+})
+EYE = ("wyvern_px", 18.0)  # design, how far down from the skull's top (units: under the brow)
 EYE_Z = 40.0  # from the skull's back face forward
+
+
+EYES[EYE[0] + "_w"] = dict(EYES[EYE[0]], pattern=[row[::-1] for row in EYES[EYE[0]]["pattern"]])
+
+
+def face_frame(lo, hi, face):
+    """`prop.face_frame` with the face's size in texels at TX (32 a block), at least a texel for
+    any face with an area (painting only: the geometry stays in units)."""
+    from prop import face_frame as unit_frame
+    corner, du, dv, _, _, n = unit_frame(lo, hi, face)
+    size = np.array(hi, float) - np.array(lo, float)
+    fu, fv = abs(size @ du), abs(size @ dv)
+    w, h = int(round(TX * fu)), int(round(TX * fv))
+    if fu > 0 and fv > 0:
+        w, h = max(1, w), max(1, h)
+    return corner, du, dv, w, h, n
 
 
 def paint_sheet(E, coat=None, style=None, rec=None):
@@ -606,7 +646,6 @@ def paint_sheet(E, coat=None, style=None, rec=None):
     Returns (sheet, uv, keys); `rec` a `layers.Recorder` to record the coat layers into."""
     global STYLE
     from paint import occlusion, paint_face_smooth, pack, stamp_eyes
-    from prop import face_frame
     old = STYLE
     STYLE = style or STYLE
     tone_sets = materials(coat or COAT)
@@ -617,8 +656,10 @@ def paint_sheet(E, coat=None, style=None, rec=None):
             corner, du, dv, w, h, nrm = face_frame(e["lo"], e["hi"], face)
             if w == 0 or h == 0:
                 continue
-            uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-            p = corner + uu[..., None] * du + vv[..., None] * dv
+            uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel centers, in texels
+            size = np.array(e["hi"]) - np.array(e["lo"])
+            su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+            p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
             R = rotm(e["rot"])
             if e["rot"]:
                 o = np.array(e["origin"], float)
@@ -636,7 +677,8 @@ def paint_sheet(E, coat=None, style=None, rec=None):
             if e["name"] == "skull" and face in ("east", "west"):
                 lo, hi = e["lo"], e["hi"]
                 u = (hi[2] - (lo[2] + EYE_Z)) if face == "east" else EYE_Z
-                stamp_eyes(img, [(u, EYE[1])], EYE[0])
+                design = EYE[0] if face == "east" else EYE[0] + "_w"  # the catchlight toward the snout
+                stamp_eyes(img, [(u / su, EYE[1] / sv)], design)
             if rec is not None:
                 rec.face((i, face), cap["weights"], cap["level"], roles(), np.clip(np.round(col), 0, 255), img, p,
                          layer_props(e, face, a))

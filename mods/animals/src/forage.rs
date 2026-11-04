@@ -22,6 +22,8 @@
 use vitals::forage::{Eaten, Source};
 use weft_sdk::*;
 
+use crate::dist2;
+
 use crate::animal::{self, ANIMAL};
 use crate::species::{self, SPECIES, Species};
 
@@ -67,14 +69,11 @@ pub fn init(r: &mut Registry) {
             return Verdict::Abstain;
         };
         let w = q.world();
-        let come = SPAWN_FLOOR + (1.0 - SPAWN_FLOOR) * season_lush(&w, s, q.pos());
+        let floor = animals_core::needs::SPAWN_FLOOR;
+        let come = floor + (1.0 - floor) * season_lush(&w, s, q.pos());
         if (w.random_below(10_000) as f32) < come * 10_000.0 { Verdict::Abstain } else { Verdict::Deny }
     });
 }
-
-/// The share of natural spawns that still come where nothing grows this season: animals live
-/// through a winter or a drought, fewer and thinner.
-const SPAWN_FLOOR: f32 = 0.2;
 
 /// How much of its food its biome grows through this season, 0 to 1
 /// (`vitals::forage::season_lushness`); 1 for one that doesn't forage.
@@ -104,11 +103,41 @@ pub fn busy(w: &World, id: u64) -> bool {
             .is_some_and(|f| f[3] != 0.0 && !f[0].is_nan())
 }
 
-/// What it would eat of the block `state`, if anything.
+/// What it would eat of the block `state`, if anything: the first of the state's food rows
+/// (`rows`) its diet and the season allow, as `vitals::forage::of` picks.
 fn food(s: &Species, state: u32, season: Option<usize>) -> Option<&'static Source> {
-    let name = block_name(state).split('[').next()?;
-    let age = state_prop(state, "age").and_then(|a| a.parse().ok());
-    vitals::forage::of(name, age, |c| s.eats(c), season)
+    rows(state, |r| {
+        r.iter()
+            .map(|&i| &vitals::forage::SOURCES[i as usize])
+            .find(|src| s.eats(src.category) && src.in_season(season))
+    })
+}
+
+/// The food rows (`vitals::forage::SOURCES`) that block state `state` is, by its block and age:
+/// read from its name once a state, not compared by name for every block a forager looks over
+/// (C7).
+fn rows<R>(state: u32, f: impl FnOnce(&[u8]) -> R) -> R {
+    thread_local! {
+        static ROWS: std::cell::RefCell<std::collections::HashMap<u32, Vec<u8>>> = Default::default();
+    }
+    ROWS.with(|m| {
+        let mut m = m.borrow_mut();
+        let r = m.entry(state).or_insert_with(|| {
+            let name = block_name(state)
+                .split('[')
+                .next()
+                .unwrap_or("")
+                .to_string();
+            let age: Option<u8> = state_prop(state, "age").and_then(|a| a.parse().ok());
+            vitals::forage::SOURCES
+                .iter()
+                .enumerate()
+                .filter(|(_, src)| src.block == name && (src.age.is_none() || src.age == age))
+                .map(|(i, _)| i as u8)
+                .collect()
+        });
+        f(r)
+    })
 }
 
 /// The season now (0 spring), where there are seasons.
@@ -146,15 +175,19 @@ fn nearest(w: &World, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]> {
 fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32> {
     let stack = w.dropped_item(id)?;
     let name = name_of(abi::entry_kind::ITEM, stack.item);
-    let spoiled = vitals::food::FOODS
-        .iter()
-        .find(|f| f.name == name)
-        .is_some_and(|f| {
-            let (age, _) = base_api::food_age(&stack, w.day_time());
-            vitals::food::freshness(f, age, base_api::difficulty().keep) == vitals::food::Freshness::Spoiled
-        });
+    let food = vitals::food::FOODS.iter().find(|f| f.name == name);
+    // A poisonous one (a fly agaric, a spider's eye) it leaves where it lies, and salted meat,
+    // too salty for an animal; dried and smoked meat a meat eater takes as it raids a camp (C6).
+    if food.is_some_and(|f| f.poison > 0.0) || name == "base:salted_meat" {
+        return None;
+    }
+    let spoiled = food.is_some_and(|f| {
+        let (age, _) = base_api::food_age(&stack, w.day_time());
+        vitals::food::freshness(f, age, base_api::difficulty().keep) == vitals::food::Freshness::Spoiled
+    });
     let (c, grams) = vitals::forage::dropped(name, spoiled)?;
-    s.eats(c).then_some(grams)
+    // Kibble is every species' (`taming.rs`), though the food table files it as meat (C6).
+    (s.eats(c) || name == "animals:kibble").then_some(grams)
 }
 
 /// The nearest dropped food of its diet within `radius` blocks of `pos`: the item, where it is.
@@ -164,10 +197,6 @@ pub fn ground_food(w: &World, s: &animals_core::species::Species, pos: [f64; 3],
         .filter(|&t| edible(w, s, t).is_some())
         .filter_map(|t| Some((t, w.entity(t)?.pos)))
         .min_by(|a, b| dist2(a.1, pos).total_cmp(&dist2(b.1, pos)))
-}
-
-fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)
 }
 
 /// Within reach of its mouth: two blocks for even a small one standing beside it.
