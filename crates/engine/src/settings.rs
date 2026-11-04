@@ -33,25 +33,35 @@ pub fn render_scale(density: f64) -> f32 {
 pub const GUI_MIN: (u32, u32) = (400, 320);
 
 /// The largest GUI scale at which a window of `window` physical pixels still holds `GUI_MIN`:
-/// always 1 or an even number. A UI pixel (a frame's, an item's, a letter's) is half a GUI pixel,
-/// so only at 1 and the even scales does it land on whole screen pixels; at 3 a frame pixel is 1.5
-/// and the text, rounded on its own, no longer matches it (Researcher, round 13; Minecraft keeps
-/// to even scales for the same reason with its half-size font).
+/// an even number, or 1 only for a window too small for 2. A UI pixel (a frame's, an item's, a
+/// letter's) is half a GUI pixel, so only at the even scales does it land on whole screen pixels:
+/// at 3 a frame pixel is 1.5, and at 1 it is half a screen pixel, so the text, which is never drawn
+/// smaller than a screen pixel a font pixel, came out twice the size its boxes were laid out for
+/// (Playtest B9: the animal screen at GUI scale 1, its buttons' labels over each other; Researcher,
+/// round 13; Minecraft keeps to even scales for the same reason with its half-size font).
 pub fn max_gui_scale(window: (u32, u32)) -> u32 {
     even_scale((window.0 / GUI_MIN.0).min(window.1 / GUI_MIN.1))
 }
 
-/// `s` rounded down to a scale the UI pixel sits whole on: 1, 2, 4, 6...
+/// `s` rounded down to a scale the UI pixel sits whole on: 2, 4, 6... (1 below 2).
 pub fn even_scale(s: u32) -> u32 {
     if s <= 1 { 1 } else { s - s % 2 }
 }
 
-/// The GUI scale setting's next step: auto (0), 1, then the even scales up to `max`, then auto.
+/// The scale the GUI is drawn at for the setting `setting` (0: auto) in a window that allows up to
+/// `max`: auto is `max`; a setting is kept even, at least 2 (a 1 or a 3 saved before scales were
+/// kept even shows at 2), and no more than `max` (1 only where the window allows no more).
+pub fn applied_gui_scale(setting: u32, max: u32) -> u32 {
+    if setting == 0 { max } else { even_scale(setting.max(2)).min(max) }
+}
+
+/// The GUI scale setting's next step: auto (0), then the even scales up to `max`, then auto (1
+/// only for a window too small for 2).
 pub fn next_gui_scale(now: u32, max: u32) -> u32 {
     let next = match now {
-        0 => 1,
-        1 => 2,
-        n => even_scale(n) + 2,
+        0 if max < 2 => 1,
+        0 => 2,
+        n => even_scale(n.max(2)) + 2,
     };
     if next > max { 0 } else { next }
 }
@@ -61,7 +71,7 @@ mod gui_scale_tests {
     use super::*;
 
     #[test]
-    fn scales_are_one_or_even() {
+    fn scales_are_even() {
         assert_eq!(max_gui_scale((1280, 720)), 2);
         assert_eq!(max_gui_scale((1920, 1080)), 2);
         assert_eq!(max_gui_scale((2560, 1440)), 4);
@@ -72,14 +82,27 @@ mod gui_scale_tests {
     }
 
     #[test]
+    fn a_setting_of_one_shows_at_two() {
+        assert_eq!(applied_gui_scale(1, 2), 2);
+        assert_eq!(applied_gui_scale(3, 6), 2);
+        assert_eq!(applied_gui_scale(0, 6), 6);
+        assert_eq!(applied_gui_scale(8, 6), 6);
+        // a window too small for 2
+        assert_eq!(applied_gui_scale(1, 1), 1);
+        assert_eq!(applied_gui_scale(0, 1), 1);
+    }
+
+    #[test]
     fn the_setting_steps_through_even_scales() {
         let mut s = 0;
         let mut seen = vec![];
-        for _ in 0..6 {
+        for _ in 0..5 {
             s = next_gui_scale(s, 6);
             seen.push(s);
         }
-        assert_eq!(seen, vec![1, 2, 4, 6, 0, 1]);
+        assert_eq!(seen, vec![2, 4, 6, 0, 2]);
+        assert_eq!(next_gui_scale(0, 1), 1);
+        assert_eq!(next_gui_scale(1, 1), 0);
     }
 }
 
