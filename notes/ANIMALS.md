@@ -889,6 +889,19 @@ young adults 90%, full in their prime, fading from the elder years to 60% at an 
 end; health, stamina, damage, speed and carrying go with it (shown on its screen). Testing:
 `/animal speed <n>`, `/animal census`, `/animal reset` (`mods/animals/tests/README.md`).
 
+**Natural spawning stops at the room** (2026-11-04, the 48-minute PC soak f706e44f: wild grey
+wolves at 21-52 near one spot with room for 16, dying of want again and again). That soak's
+overshoot was its own script: it `/tk spawn`ed 10 wolves at the same home spot in each of 12 loops
+(120 in all); the log has no births, no nests and no natural spawns (mob spawning was off), and
+the 9 deaths of want in 48 minutes are `want_chance` at work (10% a day at twice the crowd).
+`/tk spawn` ignores the room on purpose. But looking for it found a real gap: the engine's spawner
+caps only all passive creatures together (6 within 64 blocks of a player), and our natural-spawn
+answer asked only about food, so a group could come where its kind already filled the place (two
+players a little apart, a big species whose group is larger than its crowd). Now a group comes
+only while it fits its room (`life::room_for`: its kind within `CROWD_RADIUS`, counted by
+`crowding`, plus the group, at most its crowd; a group bigger than the room still comes to an
+empty place), checked for every species, hunters too, before the food roll (`forage.rs`).
+
 **Time away** (2026-11-02; Ronald: "my animals should die even while I'm gone"). Animals only
 live where a player is: the engine spawns them 20-45 blocks from players (at most 6 passive ones
 within 64) and ticks only loaded areas. So what happens elsewhere is caught up when an area loads,

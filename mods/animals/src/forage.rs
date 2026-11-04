@@ -59,15 +59,29 @@ pub fn init(r: &mut Registry) {
     }
     // A place holds as many as it feeds (`notes/ECOLOGY.md`, part 7): plant eaters come as often
     // as their food grows there now, so fewer in a drought or a winter.
+    // And none come past its room (`life::room_for`): the engine's spawner caps only all creatures
+    // together, so packs were added where their kind already filled the place.
     r.intercept(&question::NATURAL_SPAWN, |q| {
         let kind = q.query().other as u32;
-        let Some(s) = SPECIES
-            .iter()
-            .find(|s| s.kind.id() == kind && s.forages_wild())
-        else {
+        let Some(s) = SPECIES.iter().find(|s| s.kind.id() == kind) else {
             return Verdict::Abstain;
         };
         let w = q.world();
+        let at = q.pos().map(|v| v as f64 + 0.5);
+        let near: f64 = w
+            .near(at, animals_core::life::CROWD_RADIUS, Some(s.kind))
+            .into_iter()
+            .filter_map(|o| w.component(o, &ANIMAL))
+            .map(|o| animals_core::life::crowding(o.stage))
+            .sum();
+        let coming = q.query().amount.max(1.0) as u32;
+        if !animals_core::life::room_for(near, coming, s.crowd()) {
+            weft_sdk::debug!("no room for {coming} {} at {:?}: {near:.1} near, room for {}", s.name, q.pos(), s.crowd());
+            return Verdict::Deny;
+        }
+        if !s.forages_wild() {
+            return Verdict::Abstain;
+        }
         let floor = animals_core::needs::SPAWN_FLOOR;
         let come = floor + (1.0 - floor) * season_lush(&w, s, q.pos());
         if (w.random_below(10_000) as f32) < come * 10_000.0 { Verdict::Abstain } else { Verdict::Deny }
