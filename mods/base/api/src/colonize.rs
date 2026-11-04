@@ -89,6 +89,21 @@ pub struct Colonize {
     /// Stems the trunk divides into at its top before the crown grows (an acacia's 3 or 4 fanning
     /// out like a vase); 0 none.
     pub fork: u32,
+    /// Its own reach sideways and height (0: `branchy::REACH`, `MAX_HEIGHT`), for the canopy trees
+    /// and the giants; their scatter must reach as far.
+    pub reach: i32,
+    pub max_height: i32,
+    /// A trunk grown by this `branchy` recipe (its foot, flare and buttresses), the crown grown by
+    /// colonization from its top (the Brazil nut's: Plants keeps its trunk); its height is the
+    /// trunk recipe's own, cut where the crown starts (`trunk` as a share of it).
+    pub trunk_from: Option<&'static crate::branchy::Recipe>,
+}
+
+impl Colonize {
+    /// How far it reaches sideways and up.
+    pub fn limits(&self) -> (i32, i32) {
+        (if self.reach > 0 { self.reach } else { REACH }, if self.max_height > 0 { self.max_height } else { MAX_HEIGHT })
+    }
 }
 
 pub const OAK: Colonize = Colonize {
@@ -112,6 +127,9 @@ pub const OAK: Colonize = Colonize {
     twig: 0.32,
     leader: false,
     fork: 0,
+    reach: 0,
+    max_height: 0,
+    trunk_from: None,
 };
 
 pub const SPRUCE: Colonize = Colonize {
@@ -135,6 +153,9 @@ pub const SPRUCE: Colonize = Colonize {
     twig: 0.3,
     leader: false,
     fork: 0,
+    reach: 0,
+    max_height: 0,
+    trunk_from: None,
 };
 
 pub const BIRCH: Colonize = Colonize {
@@ -158,6 +179,9 @@ pub const BIRCH: Colonize = Colonize {
     twig: 0.16,
     leader: true,
     fork: 0,
+    reach: 0,
+    max_height: 0,
+    trunk_from: None,
 };
 
 /// An umbrella thorn (Vachellia tortilis): a short trunk dividing low into stems that fan out to a
@@ -183,6 +207,9 @@ pub const ACACIA: Colonize = Colonize {
     twig: 0.32,
     leader: false,
     fork: 3,
+    reach: 0,
+    max_height: 0,
+    trunk_from: None,
 };
 
 /// A Pacific dogwood (Cornus nuttallii): a small understory tree, a short trunk under a rounded,
@@ -209,9 +236,126 @@ pub const DOGWOOD: Colonize = Colonize {
     twig: 0.3,
     leader: false,
     fork: 0,
+    reach: 0,
+    max_height: 0,
+    trunk_from: None,
 };
 
-pub const ALL: &[Colonize] = &[OAK, SPRUCE, BIRCH, ACACIA, DOGWOOD];
+/// The golden ipê (Plants' recipe, `tree_recipes::IPE`, its numbers kept): a straight trunk to
+/// about 21, a high, open, spreading crown topping out at 28-32 (it may poke a little above the
+/// canopy); its clumps within the bloom's reach of each other (`BLOOM_REACH`, 4).
+pub const IPE: Colonize = Colonize {
+    log: "base:ipe_log",
+    trunk: 22.0,
+    crown_h: 7.5,
+    crown_r: 6.6,
+    size_var: 0.12,
+    shape: Shape::Dome,
+    points: 170,
+    influence: 5.0,
+    kill: 2.2,
+    step: 1.0,
+    tropism: 0.05,
+    twig_r: 0.14,
+    min_trunk: 1.55,
+    leaf_r: 2.3,
+    leaf_ry: 1.4,
+    ragged: 0.4,
+    leaf_along: false,
+    twig: 0.32,
+    leader: false,
+    fork: 0,
+    reach: 8,
+    max_height: 42,
+    trunk_from: None,
+};
+
+/// Andiroba (Carapa guianensis): a straight 2 x 2 trunk under a dense, round crown level with
+/// the canopy (28-32).
+pub const ANDIROBA: Colonize = Colonize {
+    log: "base:andiroba_log",
+    trunk: 20.5,
+    crown_h: 8.0,
+    crown_r: 6.6,
+    size_var: 0.12,
+    shape: Shape::Dome,
+    points: 240,
+    influence: 5.0,
+    kill: 2.0,
+    step: 1.0,
+    tropism: 0.05,
+    twig_r: 0.14,
+    min_trunk: 1.6,
+    leaf_r: 2.4,
+    leaf_ry: 1.8,
+    ragged: 0.3,
+    leaf_along: false,
+    twig: 0.32,
+    leader: false,
+    fork: 0,
+    reach: 8,
+    max_height: 40,
+    trunk_from: None,
+};
+
+/// Matamatá (Eschweilera): Manaus's commonest canopy tree, a slimmer trunk under a narrower,
+/// rounder crown level with the canopy.
+pub const MATAMATA: Colonize = Colonize {
+    log: "base:matamata_log",
+    trunk: 19.5,
+    crown_h: 10.0,
+    crown_r: 5.0,
+    size_var: 0.12,
+    shape: Shape::Oval,
+    points: 180,
+    influence: 5.0,
+    kill: 1.9,
+    step: 1.0,
+    tropism: 0.05,
+    twig_r: 0.14,
+    min_trunk: 1.45,
+    leaf_r: 2.0,
+    leaf_ry: 1.8,
+    ragged: 0.35,
+    leaf_along: false,
+    twig: 0.32,
+    leader: false,
+    fork: 0,
+    reach: 8,
+    max_height: 38,
+    trunk_from: None,
+};
+
+/// The Brazil nut, the emergent: its own trunk (`tree_recipes::BRAZIL_NUT`: round, flared,
+/// buttressed, as Plants made it) to about four fifths of its height, then a broad dome of a
+/// crown 15-20 over the canopy (about 45-55), at least 2 wide where it starts.
+pub const BRAZIL_NUT: Colonize = Colonize {
+    log: "base:brazil_nut_log",
+    trunk: 0.76,
+    crown_h: 9.0,
+    crown_r: 10.0,
+    size_var: 0.1,
+    shape: Shape::Dome,
+    points: 320,
+    influence: 6.0,
+    kill: 2.6,
+    step: 1.0,
+    tropism: 0.05,
+    twig_r: 0.16,
+    min_trunk: 2.0,
+    leaf_r: 2.6,
+    leaf_ry: 1.4,
+    ragged: 0.3,
+    leaf_along: false,
+    twig: 0.34,
+    leader: false,
+    fork: 0,
+    reach: 12,
+    max_height: 80,
+    trunk_from: Some(&crate::tree_recipes::BRAZIL_NUT),
+};
+
+pub const ALL: &[Colonize] = &[OAK, SPRUCE, BIRCH, ACACIA, DOGWOOD, IPE, ANDIROBA, MATAMATA, BRAZIL_NUT];
 
 struct Rng(u64);
 impl Rng {
@@ -256,13 +400,12 @@ struct Node {
 }
 
 /// The nodes of the grown skeleton and each one's radius.
-fn skeleton(c: &Colonize, seed: u64) -> (Vec<Node>, Vec<f32>) {
+fn skeleton(c: &Colonize, seed: u64, foot: V, trunk_len: Option<f32>) -> (Vec<Node>, Vec<f32>) {
     let mut rng = Rng(seed.wrapping_mul(0x2545_F491_4F6C_DD1D) ^ 0xC0105);
     let size = 1.0 + c.size_var * rng.s();
-    let (trunk, ch, cr) = (c.trunk * size, c.crown_h * size, c.crown_r * size);
+    let (trunk, ch, cr) = (trunk_len.unwrap_or(c.trunk * size), c.crown_h * size, c.crown_r * size);
     // The crown leans a little off the foot, as a tree's does toward its light.
     let lean = [rng.s() * cr * 0.08, 0.0, rng.s() * cr * 0.08];
-    let foot = [0.5, 0.0, 0.5];
     let base = add(foot, add(lean, [0.0, trunk, 0.0]));
     // The points, uniform in the crown (rejection from its box).
     let mut pts: Vec<V> = Vec::with_capacity(c.points as usize);
@@ -402,8 +545,41 @@ fn skeleton(c: &Colonize, seed: u64) -> (Vec<Node>, Vec<f32>) {
 /// The blocks of one tree of `c` from `seed` with each wood block's width (blocks), in a fixed
 /// order: wood joined face to face, 2 x 2 from 1.5 wide; leaves at the twigs.
 pub fn blocks(c: &Colonize, seed: u64) -> Vec<(i32, i32, i32, Part, f32)> {
-    let (nodes, r) = skeleton(c, seed);
     let mut wood: HashMap<(i32, i32, i32), (u8, f32)> = HashMap::new();
+    // A trunk from its `branchy` recipe (the Brazil nut's), cut where the crown starts; the crown
+    // grows from the middle of its top.
+    let (foot, trunk_len) = match c.trunk_from {
+        Some(t) => {
+            let trunk_only = crate::branchy::Recipe { orders: 0, fronds: 0, leaf_r: 0.0, leaf_ry: 0.0, ..*t };
+            let stem = crate::branchy::wood_widths(&trunk_only, seed);
+            let top = (stem.iter().map(|b| b.1).max().unwrap_or(0) as f32 * c.trunk) as i32;
+            let mut sum = ([0.0f32; 3], 0.0f32);
+            let mut per_layer: HashMap<i32, u32> = HashMap::new();
+            for &(_, y, _, _) in &stem {
+                *per_layer.entry(y).or_insert(0) += 1;
+            }
+            for &(x, y, z, w) in &stem {
+                if y > top {
+                    continue;
+                }
+                wood.insert((x, y, z), (1, w));
+                // At least 2 x 2 up its top quarter, so it reaches the crown at least 2 wide (a
+                // thinner one's crown had leaves with no wood near enough, Plants' leaf reach).
+                if per_layer[&y] < 4 && y * 4 > top * 3 {
+                    for k in [(x + 1, y, z), (x, y, z + 1), (x + 1, y, z + 1)] {
+                        wood.entry(k).or_insert((1, 1.5));
+                    }
+                }
+                if y == top {
+                    sum.0 = add(sum.0, [x as f32 + 0.5, y as f32 + 0.5, z as f32 + 0.5]);
+                    sum.1 += 1.0;
+                }
+            }
+            (mul(sum.0, 1.0 / sum.1.max(1.0)), Some(0.5))
+        }
+        None => ([0.5, 0.0, 0.5], None),
+    };
+    let (nodes, r) = skeleton(c, seed, foot, trunk_len);
     let mut leaves: HashMap<(i32, i32, i32), ()> = HashMap::new();
     let mut has_child = vec![false; nodes.len()];
     for n in &nodes {
@@ -470,16 +646,52 @@ pub fn blocks(c: &Colonize, seed: u64) -> Vec<(i32, i32, i32, Part, f32)> {
         }
     }
     // Within the scatter's reach and height (`branchy::REACH`, `MAX_HEIGHT`), as every tree.
-    let inside = |&(x, y, z): &(i32, i32, i32)| x.abs() <= REACH && z.abs() <= REACH && (0..MAX_HEIGHT).contains(&y);
+    let (reach, max_height) = c.limits();
+    let inside = |&(x, y, z): &(i32, i32, i32)| x.abs() <= reach && z.abs() <= reach && (0..max_height).contains(&y);
     let mut out: Vec<_> = wood
         .iter()
         .filter(|(k, _)| inside(k))
         .map(|(&(x, y, z), &(axis, w))| (x, y, z, Part::Log { axis }, w))
         .collect();
+    // No leaf past `LEAF_REACH` of the wood (leaf decay would drop it): a long chain of twigs,
+    // leaves without wood, can carry one that far (one Brazil nut in thirty did). A summed
+    // volume table of the wood over the tree's box answers "any wood within d" per leaf at once.
+    let d = crate::branchy::LEAF_REACH;
+    let (nx, ny) = ((2 * reach + 1) as usize, max_height as usize);
+    let idx = |x: i32, y: i32, z: i32| -> usize { ((y as usize) * nx + (z + reach) as usize) * nx + (x + reach) as usize };
+    // sums[(y+1, z+1, x+1)] = wood blocks in [0..=y] x [-reach..=z] x [-reach..=x]
+    let (sx, sz) = (nx + 1, nx + 1);
+    let mut sums = vec![0u32; (ny + 1) * sz * sx];
+    let at = |y: usize, z: usize, x: usize| (y * sz + z) * sx + x;
+    let mut grid = vec![false; ny * nx * nx];
+    for b in &out {
+        grid[idx(b.0, b.1, b.2)] = true;
+    }
+    for y in 0..ny {
+        for z in 0..nx {
+            for x in 0..nx {
+                let v = grid[(y * nx + z) * nx + x] as u32;
+                // The added terms first, so the sum never dips under 0 on the way.
+                sums[at(y + 1, z + 1, x + 1)] =
+                    v + sums[at(y, z + 1, x + 1)] + sums[at(y + 1, z, x + 1)] + sums[at(y + 1, z + 1, x)] + sums[at(y, z, x)]
+                        - sums[at(y, z, x + 1)]
+                        - sums[at(y, z + 1, x)]
+                        - sums[at(y + 1, z, x)];
+            }
+        }
+    }
+    let near = |&(x, y, z): &(i32, i32, i32)| -> bool {
+        let c = |v: i32, hi: usize| v.clamp(0, hi as i32) as usize;
+        let (x0, x1) = (c(x + reach - d, nx), c(x + reach + d + 1, nx));
+        let (z0, z1) = (c(z + reach - d, nx), c(z + reach + d + 1, nx));
+        let (y0, y1) = (c(y - d, ny), c(y + d + 1, ny));
+        sums[at(y1, z1, x1)] + sums[at(y0, z0, x1)] + sums[at(y0, z1, x0)] + sums[at(y1, z0, x0)]
+            >= sums[at(y0, z1, x1)] + sums[at(y1, z0, x1)] + sums[at(y1, z1, x0)] + sums[at(y0, z0, x0)] + 1
+    };
     out.extend(
         leaves
             .keys()
-            .filter(|k| !wood.contains_key(k) && inside(k))
+            .filter(|k| !wood.contains_key(k) && inside(k) && near(k))
             .map(|&(x, y, z)| (x, y, z, Part::Leaves, 0.0)),
     );
     out.sort_unstable_by_key(|b| (b.0, b.1, b.2));
@@ -536,7 +748,7 @@ mod tests {
                 assert!(t.len() <= 4096, "{name} {seed}: {} blocks", t.len());
                 assert!(
                     t.iter()
-                        .all(|b| b.0.abs() <= REACH && b.2.abs() <= REACH && (0..MAX_HEIGHT).contains(&b.1)),
+                        .all(|b| b.0.abs() <= c.limits().0 && b.2.abs() <= c.limits().0 && (0..c.limits().1).contains(&b.1)),
                     "{name} {seed}: out of reach"
                 );
                 let d = LEAF_REACH;
@@ -556,7 +768,7 @@ mod tests {
                 }
                 let loose: Vec<_> = logs
                     .iter()
-                    .filter(|k| !seen.contains(k) && k.0.abs() < REACH && k.2.abs() < REACH)
+                    .filter(|k| !seen.contains(k) && k.0.abs() < c.limits().0 && k.2.abs() < c.limits().0)
                     .collect();
                 assert!(loose.is_empty(), "{name} {seed}: loose wood {loose:?}");
             }

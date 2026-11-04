@@ -555,7 +555,14 @@ pub fn understory(r: &Recipe) -> Recipe {
 /// The species grown by space colonization (`colonize`), not from their `RECIPES` row: the broad
 /// crowns (Ronald, 11-05: "Hybrid, as recommended"). Their row stays for their understory young
 /// (`understory`). The cone and column trees and the palms keep `branchy`.
-pub const COLONIZED: &[crate::colonize::Colonize] = &[crate::colonize::OAK, crate::colonize::ACACIA];
+pub const COLONIZED: &[crate::colonize::Colonize] = &[
+    crate::colonize::OAK,
+    crate::colonize::ACACIA,
+    crate::colonize::IPE,
+    crate::colonize::ANDIROBA,
+    crate::colonize::MATAMATA,
+    crate::colonize::BRAZIL_NUT,
+];
 
 /// The colonization recipe for a log, if its species grows so.
 pub fn colonized(log: &str) -> Option<&'static crate::colonize::Colonize> {
