@@ -120,6 +120,11 @@ Ronald found the smooth Alegreya "off and not well positioned". The text is now 
 - **Baking:** `font_bake.py --pixel FONT.ttf --also CYRILLIC.ttf` finds the design size (the smallest size with no grey pixels), keeps glyphs black-and-white, puts the second font's glyphs on the first one's baseline, and writes `pixel = 1`, `line`, `sharp = true` into `default.font`.
 - **The line:** capitals plus the same room above them as below the baseline (descender + 1 pixel). PixelOperator: capitals 9, line 17. Text then sits centred in a button or tab with even padding.
 - **Placement:** text starts on whole UI pixels; centre by whole pixels (round the leftover down); buttons and tabs at least 4 UI pixels of padding left and right of the text, title tabs 6 plus the icon; a one-pixel shadow down-right in `#28180c`.
+- **Items in slots:** the 32 px icon 2 UI pixels inside the 36 px slot on every side (`icon = 16` in `slot.gui`), the same in the hotbar, inventory, chests, the pot and the rack. Every laid-out box's edges are rounded to the UI pixel (`Rect::snapped`, the font pixel), so centring never leaves half pixels.
+- **Stack counts:** bottom right of the icon, the digits' ink 2 UI pixels inside the icon's right and bottom edges, the shadow 1; cream `#f4ead8`, shadow `#28180c`. Hotbar numbers: capitals' top 3 pixels inside the slot's top-left corner, 3 from its left.
+- **Labels in buttons and tabs:** centred by whole pixels, equal margins (one pixel more below or right where the leftover is odd), at least 4 UI pixels between the ink and the button's outer edge. Labels in panels left-aligned, 6 UI pixels (3 GUI) from the frame's inside.
+- **Grids:** slots touch (36 px apart, the slot's dark groove is the gap); panels and their groups spaced in whole GUI pixels.
+- **Measured, not eyeballed:** `mods/base/source/ui/placement_check.py SHOT.png --out marked.png` finds every slot and button in a shot at an even GUI scale and reports each item's offset (0,0 is right), each count's gap (2, 2) and each label's margins.
 - **Colors:** titles and labels on orange `#fff4dc`, body cream `#e4dacf`, names and headings gold `#f2da9a`, dim `#c6a383`.
 - **Never** draw letters in a generated part: the game writes all text.
 

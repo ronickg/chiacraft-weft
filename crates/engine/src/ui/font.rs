@@ -42,6 +42,9 @@ pub struct Font {
     pub atlas_height: u32,
     pub atlas: Vec<u8>,
     pub line_height: f32,
+    /// Capitals' height in font pixels, standing on the baseline (font pixel 14 of the line):
+    /// for placing text by its top, as the hotbar's numbers are.
+    pub caps: f32,
     /// Font pixels per pixel of the font's design (2 for the 8 pixel atlas): shadows and text
     /// placement step by this so glyph pixels stay whole.
     pub pixel: f32,
@@ -162,6 +165,7 @@ impl Font {
             atlas_height,
             atlas,
             line_height,
+            caps: 7.0 * pixel,
             pixel,
             mono,
             cell_w: CELL,
@@ -180,10 +184,10 @@ impl Font {
     /// rest. Its baseline sits where the bitmap font's does (font pixel 14 of the line).
     /// A pixel font baked one design pixel a font pixel says so: `pixel = 1` (font pixels a design
     /// pixel, 2 by default), `line = n` (the line's height in font pixels, 18 by default) and
-    /// `sharp = true` (sampled nearest, not smoothly).
+    /// `sharp = true` (sampled nearest, not smoothly), and `caps = n` (capitals' height, font pixels).
     pub fn coverage(hex: &str, desc: &str, img: &crate::assets::Image) -> Option<Font> {
         let (mut size, mut cell_h, mut baseline, mut unit) = (0u32, 0u32, 0.0f32, 0u32);
-        let (mut pixel, mut line_height, mut smooth) = (2.0f32, 18.0f32, true);
+        let (mut pixel, mut line_height, mut smooth, mut caps) = (2.0f32, 18.0f32, true, 11.5f32);
         let mut baked: Vec<(char, u32, u32, f32, f32, f32, f32)> = Vec::new();
         for line in desc.lines() {
             if let Some(v) = line.strip_prefix("cell = ") {
@@ -202,6 +206,8 @@ impl Font {
                 pixel = v.trim().parse().ok()?;
             } else if let Some(v) = line.strip_prefix("line = ") {
                 line_height = v.trim().parse().ok()?;
+            } else if let Some(v) = line.strip_prefix("caps = ") {
+                caps = v.trim().parse().ok()?;
             } else if let Some(v) = line.strip_prefix("sharp = ") {
                 smooth = v.trim() != "true";
             } else if let Some(v) = line.strip_prefix("g ") {
@@ -285,6 +291,7 @@ impl Font {
             atlas_height,
             atlas,
             line_height,
+            caps,
             pixel,
             mono,
             cell_w: size,

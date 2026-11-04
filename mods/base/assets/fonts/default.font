@@ -5,6 +5,7 @@ scale = 1
 baseline = 16
 pixel = 1
 line = 17
+caps = 9
 sharp = true
 g 0020 0 0 6 0 0 4
 g 0021 1 0 8 2 2 6

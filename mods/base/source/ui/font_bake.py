@@ -174,6 +174,7 @@ def pixel_main(path, also=None):
         f"baseline = {baseline}",
         "pixel = 1",
         f"line = {line}",
+        f"caps = {cap_h}",
         "sharp = true",
     ]
     for n, (c, img, left, width, bearing, advance) in enumerate(glyphs):
