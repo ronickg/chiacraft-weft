@@ -117,7 +117,7 @@ def geometry(c):
                 side=side, hand_x=hand_x, arm_end=side - 0.8 + 15.2 * w["arm"], hand_end=hand_x - 0.4 + 20.6 * w["hand"],
                 prim_end=hand_x - 0.2 + 21.4 * w["hand"], flight_z0=2.4 - 9.9 * w["chord"], prim_z0=2.8 - 9.3 * w["chord"],
                 tail_end=-5.0 - 14.6 * t["len"], fan_end=-8.0 - 13.0 * t["len"], tail_w=2.2 * t["w"], fan_w=3.6 * t["w"],
-                leg_x=min(1.9 * bw, 3.4 * bw - 1.1 - 0.4 / c["K"]), fold_end=-4.0 - 11.0 * w["folded"], eye=eye,
+                leg_x=min(1.9 * bw, 3.4 * bw - max(1.1, c["shin"] + 0.6) - 0.4 / c["K"]), fold_end=-4.0 - 11.0 * w["folded"], eye=eye,
                 fan_z1=-8.0, fold_z1=-4.0, prim_x0=hand_x - 0.2, prim_z1=2.8, fold_y=12.0, fold_h=2.0, u=1.0)  # u: the feathers' wiggles, in raven units
 
 
@@ -215,7 +215,8 @@ def raven_elements(c):
         E.append(el(f"primaries_{n.lower()}", f"hand_{n}", (gx0, 14.9, g["prim_z0"]), (gx1, 14.9, 2.8), quad="down", cut="primaries"))
         x = s * g["leg_x"]
         sh, tf = c["shin"], c["toes"]
-        E.append(el(f"thigh_{n.lower()}", f"leg_{n}_thigh", (x - 1.1, 5.9, -2.0), (x + 1.1, 11.0, 0.8)))  # feathered
+        th = max(1.1, sh + 0.6)  # the thigh a size bigger than the shin
+        E.append(el(f"thigh_{n.lower()}", f"leg_{n}_thigh", (x - th, 5.9, -2.0 - 2 * (th - 1.1)), (x + th, 11.0, 0.8)))  # feathered
         E.append(el(f"shin_{n.lower()}", f"leg_{n}_shin", (x - sh, 0.8, -0.6 - sh * 1.0), (x + sh, 6.6, -0.6 + sh * 1.0)))
         E.append(el(f"toes_{n.lower()}", f"leg_{n}_toes", (x - 1.1 * tf, 0.0, -0.6 - 2.0 * tf), (x + 1.1 * tf, 1.2, -0.6 + 3.2 * tf)))
         if c["tufts"]:

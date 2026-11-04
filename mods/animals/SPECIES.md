@@ -35,6 +35,8 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | coyote | *Canis latrans* | common | medium | 0.61 m | 13 kg | pack | carnivore | wild | 1.25 d | 3.5 d | 23 d | 2-8 | 12 |
 | house_sparrow | *Passer domesticus* | common | small | 0.1 m | 0.03 kg | herd | omnivore | wild | 0.36 d | 2.75 d | 14 d | 2-6 | 24 |
 | snow_bunting | *Plectrophenax nivalis* | common | small | 0.1 m | 0.035 kg | herd | omnivore | wild | 0.37 d | 2.75 d | 14 d | 2-7 | 24 |
+| great_horned_owl | *Bubo virginianus* | uncommon | small | 0.45 m | 1.4 kg | solitary | carnivore | wild | 0.77 d | 6.51 d | 49.8 d | 1-3 | 16 |
+| snowy_owl | *Bubo scandiacus* | uncommon | small | 0.45 m | 2 kg | solitary | carnivore | wild | 0.75 d | 6.51 d | 38.3 d | 2-8 | 15 |
 
 ## Stats at level 1
 
@@ -67,6 +69,8 @@ Damage and speed are each kind's own (1 = 100%).
 | coyote | 18 | 150 | 80 | 3.5 | 1 | 45 | 80 | 60 | 12 | 30 |
 | house_sparrow | 2 | 60 | 15 | 0.2 | 1 | 1 | 40 | 5 | 2 | 20 |
 | snow_bunting | 2 | 60 | 15 | 0.2 | 1 | 1.2 | 40 | 5 | 3 | 20 |
+| great_horned_owl | 8 | 100 | 40 | 2.5 | 1 | 14 | 60 | 20 | 6 | 30 |
+| snowy_owl | 10 | 110 | 45 | 3 | 1 | 20 | 60 | 24 | 8 | 30 |
 
 ## dog (chihuahua)
 
@@ -115,7 +119,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | passive |
 | diet | carnivore |
 | eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
-| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, base:chicken |
+| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, great_horned_owl, base:chicken |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 8; `base:mutton` 8; `base:cooked_beef` 20, favorite; `base:cooked_porkchop` 20, favorite; `base:cooked_chicken` 16, favorite; `base:cooked_mutton` 16, favorite; `base:bone` 5, favorite; `animals:kibble` 30, kibble |
@@ -177,7 +181,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | passive |
 | diet | carnivore |
 | eats | meat 80%, insects 10%, carrion 5%, fish 5% |
-| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, base:chicken |
+| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, base:chicken |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:mutton` 8; `base:egg` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:chicken` 10, favorite; `base:cooked_chicken` 16, favorite; `animals:kibble` 30, kibble |
@@ -1019,7 +1023,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | wild |
 | diet | carnivore |
 | eats | meat 50%, fruit 20%, insects 15%, carrion 15% |
-| hunts | 0.4%-80% of its mass alone (0.02-4 kg); at home: hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, base:chicken |
+| hunts | 0.4%-80% of its mass alone (0.02-4 kg); at home: hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, snowy_owl, base:chicken |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
@@ -1077,7 +1081,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | wild |
 | diet | carnivore |
 | eats | meat 55%, carrion 25%, fruit 10%, insects 5%, fish 5% |
-| hunts | 0.4%-100% of its mass alone (0.01-4 kg); at home: mountain_hare, field_vole, brown_trout, raven, snow_bunting, base:chicken |
+| hunts | 0.4%-100% of its mass alone (0.01-4 kg); at home: mountain_hare, field_vole, brown_trout, raven, snow_bunting, great_horned_owl, snowy_owl, base:chicken |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
@@ -1434,7 +1438,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | wild |
 | diet | carnivore |
 | eats | meat 60%, fruit 15%, carrion 15%, insects 10% |
-| hunts | 0.1%-40% of its mass alone (0.01-5 kg); at home: cat, hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, base:chicken |
+| hunts | 0.1%-40% of its mass alone (0.01-5 kg); at home: cat, hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, great_horned_owl, snowy_owl, base:chicken |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
 | eats (food points) | `base:beef` 12; `base:chicken` 10, favorite; `base:berries` 4 |
@@ -1570,6 +1574,129 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.6 |
+
+## great_horned_owl
+
+*Bubo virginianus*, Aves › Strigiformes › Strigidae › Striginae. Model `owl`, entity `animals:great_horned_owl`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:forest` | commonest |
+| `base:birch_forest` | 80% |
+| `base:taiga` | 80% |
+| `base:plains` | 80% |
+| `base:mountains` | 60% |
+| `base:desert` | 60% |
+| `base:swamp` | 60% |
+| `base:savanna` | 40% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.45 m at the crown |
+| males against females | 0.95x as tall |
+| size spread (an individual's, either way) | 15% |
+| newborn's size | 30% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 1.4 kg | |
+| carries her young | 0 d | 0.77 d **set** |
+| litter or clutch | 2 on average | 1-3 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | winter | out of it, only a tame well cared for |
+| comfortable in | -35 to 38 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 2 y | 6.51 d |
+| lives | 13 y | 49.8 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 16 within 48 blocks |
+
+**Balance** (uncommon): a generation 8.1 d; a line four deep in 24 d (8 h of play); 3.4 young per mother in 10 days, 11 in her life.
+
+- ✓ fourth generation: 24.2 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 6.5 of 50 days (want under a fifth)
+- ✓ young in a life: 11.4 (want 6-40)
+- ✓ litter: 1-3 (want 1-12, fewest first)
+- ✓ room near: 16 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | meat 90%, insects 5%, fish 5% |
+| hunts | 0.5%-180% of its mass alone (0.01-3 kg); at home: dog, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, base:chicken |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 14 blocks (twice that running) |
+| eats (food points) | `base:beef` 10; `base:chicken` 10, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes:  |
+| reach past its body | 0.5 blocks |
+| signature | silent |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.7 |
+
+## snowy_owl
+
+*Bubo scandiacus*, Aves › Strigiformes › Strigidae › Striginae. Model `owl`, entity `animals:snowy_owl`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:snowy_plains` | commonest |
+| `base:taiga` | 30% |
+| `base:mountains` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.45 m at the crown |
+| males against females | 0.95x as tall |
+| size spread (an individual's, either way) | 12% |
+| newborn's size | 30% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 2 kg | |
+| carries her young | 0 d | 0.75 d **set** |
+| litter or clutch | 6 on average | 2-8 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | spring | out of it, only a tame well cared for |
+| comfortable in | -50 to 16 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 2 y | 6.51 d |
+| lives | 10 y | 38.3 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 15 within 48 blocks |
+
+**Balance** (uncommon): a generation 8 d; a line four deep in 24 d (8 h of play); 8.6 young per mother in 10 days, 21 in her life.
+
+- ✓ fourth generation: 24.1 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 6.5 of 38 days (want under a fifth)
+- ✓ young in a life: 20.7 (want 6-40)
+- ✓ litter: 2-8 (want 1-12, fewest first)
+- ✓ room near: 15 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | meat 100% |
+| hunts | 0.5%-120% of its mass alone (0.01-2 kg); at home: field_vole, brown_trout, raven, house_sparrow, snow_bunting, base:chicken |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 16 blocks (twice that running) |
+| eats (food points) | `base:beef` 10; `base:chicken` 10, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes:  |
+| reach past its body | 0.5 blocks |
+| signature | silent |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.7 |
 
 ## Shared by every species
 

@@ -5,7 +5,7 @@
 //! field voles (`vole.rs`), deer of two species (`deer.rs`) and foxes of two species, hunters
 //! (`fox.rs`), ravens (`raven.rs`), Protoceratops in herds
 //! (`protoceratops.rs`), Kryptobaatar, the Cretaceous's small mammal (`kryptobaatar.rs`), and its lizard,
-//! Priscagama (`lizard.rs`); reindeer in herds (`reindeer.rs`), coyotes, hunters (`coyote.rs`); birds on the ground and in the air (`birds.rs`): small birds of two species (`small_bird.rs`); and fish
+//! Priscagama (`lizard.rs`); reindeer in herds (`reindeer.rs`), coyotes, hunters (`coyote.rs`); birds on the ground and in the air (`birds.rs`): small birds of two species (`small_bird.rs`), owls of two species (`owl.rs`); and fish
 //! of two species, spawned into the water and swimming (`fish.rs`),
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
@@ -48,6 +48,7 @@ mod knockout;
 mod kryptobaatar;
 mod lizard;
 mod mouse;
+mod owl;
 mod protoceratops;
 mod raptor;
 mod raven;
@@ -130,6 +131,7 @@ fn init(r: &mut Registry) {
     coyote::init(r);
     birds::init(r);
     small_bird::init(r);
+    owl::init(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);

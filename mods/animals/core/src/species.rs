@@ -100,6 +100,7 @@ pub static PRISCAGAMIDAE: Family = Family { name: "Priscagamidae", above: &["Rep
 pub static PROTOCERATOPSIDAE: Family = Family { name: "Protoceratopsidae", above: &["Dinosauria", "Ceratopsia"] };
 pub static PASSERIDAE: Family = Family { name: "Passeridae", above: &["Aves", "Passeriformes"] };
 pub static CALCARIIDAE: Family = Family { name: "Calcariidae", above: &["Aves", "Passeriformes"] };
+pub static STRIGIDAE: Family = Family { name: "Strigidae", above: &["Aves", "Strigiformes"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -303,7 +304,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 25] = [
+pub static SPECIES: [Species; 27] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1869,6 +1870,138 @@ pub static SPECIES: [Species; 25] = [
         // a second brood in a long summer, flocks close together (`balance::checks`).
         tune: Tune { gestation: Some(8_935), growth: Some(66_000), lifespan: Some(336_000), recovery: Some(60_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.6,
+    },
+    // The owls (`reports/ecology/Overworld food webs.md`: the night's hunter of every land biome, the
+    // rodent's and the hare's): two wild species on one model (`source/owl`), on the ground and in
+    // the air (`owl.rs`). No nests yet (Ronald, 2026-11-03): as the raven's, their young come out as
+    // fledglings after the eggs' time.
+    Species {
+        model: "owl",
+        name: "great_horned_owl",
+        binomial: "Bubo virginianus",
+        family: &STRIGIDAE,
+        subfamily: "Striginae",
+        breed: None,
+        size: Size::Small,
+        // Rodents and rabbits first, birds up to geese, skunks, frogs, fish, big insects.
+        eats: &[(Meat, 0.9), (Insects, 0.05), (Fish, 0.05)],
+        // A deer mouse of 20 g to a hare or a skunk near twice its own mass.
+        prey: (0.005, 1.8),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [8.0, 100.0, 40.0, 2.5, 1.0, 14.0, 60.0, 20.0, 6.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:beef", 10), favorite("base:chicken", 10)],
+        feedings: 0.0,
+        shy: 14.0,
+        fights: true,
+        attacks: &[],
+        reach: 0.5,
+        signature: "silent",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.7,
+        // Females are the bigger.
+        dimorphism: 0.95,
+        size_spread: 0.15,
+        // Perched upright, at the crown (the tufts above it).
+        height: (0.45, "crown"),
+        // The Americas' owl of every land but the high Arctic: woods' edges first, the prairie, the
+        // desert's canyons, the swamps.
+        habitats: &[
+            ("base:forest", 1.0),
+            ("base:birch_forest", 0.8),
+            ("base:taiga", 0.8),
+            ("base:plains", 0.8),
+            ("base:mountains", 0.6),
+            ("base:desert", 0.6),
+            ("base:swamp", 0.6),
+            ("base:savanna", 0.4),
+        ],
+        bio: Biology {
+            mass: 1.4,
+            gestation: 0.0,
+            // 30-37 days, the female sitting; the young climb out at six weeks, fly at nine or ten.
+            incubation: 33.0,
+            // Breeding at two.
+            maturity: 730.0,
+            // About 13 years in the wild; up to 28.
+            lifespan: 4745.0,
+            interval: 365.0,
+            // 1-4 eggs, usually two.
+            litter: 2.0,
+            social: Social::Solitary,
+            rarity: Rarity::Uncommon,
+            // The earliest nester: laying in January and February, hooting through the winter.
+            breeds: seasons::WINTER,
+            peak: seasons::WINTER,
+            // From the taiga's winter to the Sonoran heat.
+            comfort: (-35.0, 38.0),
+            cold_blooded: false,
+        },
+        tune: Tune { gestation: Some(18_505), ..Tune::NONE },
+        birth_size: 0.3,
+    },
+    Species {
+        model: "owl",
+        name: "snowy_owl",
+        binomial: "Bubo scandiacus",
+        family: &STRIGIDAE,
+        subfamily: "Striginae",
+        breed: None,
+        size: Size::Small,
+        // Lemmings and voles above all (3-5 a day), ptarmigan, Arctic hares, seabirds.
+        eats: &[(Meat, 1.0)],
+        // A lemming of 50 g to a hare about its own mass.
+        prey: (0.005, 1.2),
+        taming: Taming::Wild,
+        base: [10.0, 110.0, 45.0, 3.0, 1.0, 20.0, 60.0, 24.0, 8.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:beef", 10), favorite("base:chicken", 10)],
+        feedings: 0.0,
+        shy: 16.0,
+        fights: true,
+        attacks: &[],
+        reach: 0.5,
+        signature: "silent",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.7,
+        dimorphism: 0.95,
+        size_spread: 0.12,
+        // The model's (the great horned owl's); a snowy owl's size genes draw it bigger.
+        height: (0.45, "crown"),
+        // The open tundra, hunting by day in the Arctic summer; south into the taiga and the fells in
+        // a hard winter.
+        habitats: &[("base:snowy_plains", 1.0), ("base:taiga", 0.3), ("base:mountains", 0.3)],
+        bio: Biology {
+            mass: 2.0,
+            gestation: 0.0,
+            // 31-33 days.
+            incubation: 32.0,
+            maturity: 730.0,
+            // About ten years in the wild.
+            lifespan: 3650.0,
+            interval: 365.0,
+            // 3-11 eggs by the lemmings, none in a poor year.
+            litter: 6.0,
+            social: Social::Solitary,
+            rarity: Rarity::Uncommon,
+            // Laying in May on the tundra.
+            breeds: seasons::SPRING,
+            peak: seasons::SPRING,
+            // Feathered to the toes: at ease far below -40, panting in the Arctic summer's sun.
+            comfort: (-50.0, 16.0),
+            cold_blooded: false,
+        },
+        tune: Tune { gestation: Some(18_083), ..Tune::NONE },
+        birth_size: 0.3,
     },
 ];
 

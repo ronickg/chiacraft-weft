@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 25] = [
+const FILES: [(&str, &str); 27] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -284,6 +284,8 @@ const FILES: [(&str, &str); 25] = [
     ("coyote", include_str!("../../genetics/coyote.json")),
     ("house_sparrow", include_str!("../../genetics/house_sparrow.json")),
     ("snow_bunting", include_str!("../../genetics/snow_bunting.json")),
+    ("great_horned_owl", include_str!("../../genetics/great_horned_owl.json")),
+    ("snowy_owl", include_str!("../../genetics/snowy_owl.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1263,6 +1265,39 @@ fn small_bird(r: &Read, bunting: bool) -> Look {
     }
 }
 
+/// The owls: a great horned owl mottled grey-brown to rusty or pale, its facial disc rufous (its
+/// points) to grey; a snowy owl white, barred dark on the body and wings, a female heavily, a male
+/// lightly or not at all, its disc white.
+fn owl(r: &Read, snowy: bool) -> Look {
+    let tone = r.qv("Tn");
+    if snowy {
+        let bars = if r.female() { 0.85 } else { 0.25 + 0.3 * tone };
+        return Look {
+            name: if r.female() { "White, barred".into() } else { "White".into() },
+            base: [236.0, 234.0, 228.0],
+            under: [242.0, 240.0, 236.0],
+            points: Some([236.0, 234.0, 228.0]),
+            pattern: Some(Pattern { kind: "streaks", color: [70.0, 60.0, 54.0], amount: bars }),
+            ..Look::default()
+        };
+    }
+    let base = mix([108.0, 98.0, 90.0], [150.0, 112.0, 74.0], tone);
+    Look {
+        name: if tone > 0.62 {
+            "Rusty brown".into()
+        } else if tone < 0.38 {
+            "Grey-brown".into()
+        } else {
+            "Brown".into()
+        },
+        base,
+        under: mix([200.0, 192.0, 178.0], [204.0, 168.0, 124.0], tone),
+        points: Some(mix([150.0, 122.0, 100.0], [184.0, 114.0, 62.0], tone)),
+        pattern: Some(Pattern { kind: "streaks", color: darken(base, 0.55), amount: 0.5 }),
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1429,6 +1464,8 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "coyote" => coyote(&r),
         "house_sparrow" => small_bird(&r, false),
         "snow_bunting" => small_bird(&r, true),
+        "great_horned_owl" => owl(&r, false),
+        "snowy_owl" => owl(&r, true),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -2010,7 +2047,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 19] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 20] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2029,7 +2066,8 @@ const MODEL_LAYERS: [ModelLayers; 19] = model_layers!(
     "lizard",
     "reindeer",
     "coyote",
-    "small_bird"
+    "small_bird",
+    "owl"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {

@@ -1,0 +1,103 @@
+{
+ "species": "great_horned_owl",
+ "about": "The great horned owl (Bubo virginianus): mottled grey-brown above, buff below barred dark, a rufous facial disc rimmed black, white brows and throat, long ear tufts, yellow eyes. Paler and greyer in the desert and the north, darker and rustier in the wet woods.",
+ "loci": [
+  {
+   "id": "Tn",
+   "name": "Tone",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "grey-brown to rusty"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.12,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   226,
+   168,
+   40
+  ],
+  [
+   240,
+   190,
+   70
+  ]
+ ],
+ "traits": {
+  "Ho": {
+   "mean": 0.5,
+   "sd": 0.06
+  }
+ },
+ "habitats": {
+  "desert": {
+   "quantitative": {
+    "Tn": {
+     "mean": 0.35,
+     "sd": 0.1
+    }
+   }
+  },
+  "taiga": {
+   "quantitative": {
+    "Tn": {
+     "mean": 0.3,
+     "sd": 0.1
+    }
+   }
+  },
+  "swamp": {
+   "quantitative": {
+    "Tn": {
+     "mean": 0.7,
+     "sd": 0.1
+    }
+   }
+  }
+ },
+ "build": {
+  "Ho": {
+   "bones": [
+    "tuft_L",
+    "tuft_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.98
+  },
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  }
+ }
+}
