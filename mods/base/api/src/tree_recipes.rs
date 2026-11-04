@@ -20,9 +20,9 @@ pub const RECIPES: &[Recipe] = &[
     // The acuri palm (Attalea phalerata): a short stout trunk, a little bent, a big crown of long
     // fronds sweeping out and down.
     Recipe { log: "base:acuri_palm_log", height: 6.0, width_loss: 0.06, drift: 3.0, lean: 4.0, rise: 0.9, orders: 0, fronds: 10, frond_len: 5.0, frond_droop: 0.38, leaf_r: 1.0, leaf_ry: 0.8, ..Recipe::BASE },
-    // The moriche palm (Mauritia flexuosa): tall and straight, a round crown of fan leaves held
+    // The moriche palm (Mauritia flexuosa): tall and dead straight (a slight lean shows as one jog), a round crown of fan leaves held
     // out and only a little drooping.
-    Recipe { log: "base:moriche_palm_log", height: 14.0, width_loss: 0.05, drift: 1.5, lean: 1.5, rise: 1.0, orders: 0, fronds: 12, frond_len: 3.5, frond_droop: 0.25, leaf_r: 1.2, leaf_ry: 1.0, ..Recipe::BASE },
+    Recipe { log: "base:moriche_palm_log", height: 14.0, width_loss: 0.05, drift: 0.0, lean: 0.0, rise: 1.0, orders: 0, fronds: 12, frond_len: 3.5, frond_droop: 0.25, leaf_r: 1.2, leaf_ry: 1.0, ..Recipe::BASE },
     // An araucaria: a tall straight bare trunk (2 x 2 at its foot), whorls of four near the top
     // held flat and turning up at their tips, tufts only at the tips: flat layered plates.
     Recipe { log: "animals:araucaria_log", height: 14.0, width: 1.6, width_loss: 0.08, drift: 1.5, droop: -0.12, branch_start: 0.62, branch_every: 2.2, branch_count: 4, branch_angle: 86.0, branch_width: 0.22, branch_len: 0.42, orders: 1, taper: 0.6, leaf_r: 2.1, leaf_ry: 0.8, ragged: 0.3, ..Recipe::BASE },
