@@ -74,7 +74,10 @@ fn init(r: &mut Registry) {
         static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
         watchdog::beat();
         if !STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
-            if let Some(secs) = launch_option("watchdog").and_then(|s| s.parse::<f32>().ok()).filter(|s| *s > 0.0) {
+            if let Some(secs) = launch_option("watchdog")
+                .and_then(|s| s.parse::<f32>().ok())
+                .filter(|s| *s > 0.0)
+            {
                 watchdog::start(secs, format!("{}/test-reports", c.run_dir()));
             }
             start(c);

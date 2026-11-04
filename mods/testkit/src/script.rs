@@ -68,13 +68,62 @@ pub static STEP: Mutex<String> = Mutex::new(String::new());
 /// reads this file). Some come from branches not merged yet (`await_ui` to `await_file` from
 /// Phase 3's portal checks, `chatf` from Phase 4's), so the check doesn't reject their scripts.
 const COMMANDS: &[&str] = &[
-    "wait", "loaded", "idle", "press", "hold", "click", "cursor", "scroll", "type", "key", "look", "chat", "say_config", "shot", "bench", "host",
-    "join", "open", "leave", "tap", "tap_once", "origin", "where", "rec", "via", "travel", "glide", "expect", "until", "quit", "await_ui", "screen",
-    "type_file", "close", "mark", "await_file", "chatf",
+    "wait",
+    "loaded",
+    "idle",
+    "press",
+    "hold",
+    "click",
+    "cursor",
+    "scroll",
+    "type",
+    "key",
+    "look",
+    "chat",
+    "say_config",
+    "shot",
+    "bench",
+    "host",
+    "join",
+    "open",
+    "leave",
+    "tap",
+    "tap_once",
+    "origin",
+    "where",
+    "rec",
+    "via",
+    "travel",
+    "glide",
+    "expect",
+    "until",
+    "quit",
+    "await_ui",
+    "screen",
+    "type_file",
+    "close",
+    "mark",
+    "await_file",
+    "chatf",
 ];
 /// Commands that mean nothing without an argument.
 const NEED_ARGS: &[&str] = &[
-    "wait", "press", "hold", "type", "key", "look", "chat", "say_config", "shot", "host", "join", "open", "tap", "tap_once", "via", "expect",
+    "wait",
+    "press",
+    "hold",
+    "type",
+    "key",
+    "look",
+    "chat",
+    "say_config",
+    "shot",
+    "host",
+    "join",
+    "open",
+    "tap",
+    "tap_once",
+    "via",
+    "expect",
     "until",
 ];
 
@@ -242,8 +291,12 @@ impl Cond {
                 Some("spectator") => Cond::Mode(2),
                 _ => return Err(bad("mode survival|creative|spectator")),
             },
-            "health" => cmp().map(|(c, v)| Cond::Health(c, v)).ok_or_else(|| bad("health <op> n"))?,
-            "fps" => cmp().map(|(c, v)| Cond::Fps(c, v)).ok_or_else(|| bad("fps <op> n"))?,
+            "health" => cmp()
+                .map(|(c, v)| Cond::Health(c, v))
+                .ok_or_else(|| bad("health <op> n"))?,
+            "fps" => cmp()
+                .map(|(c, v)| Cond::Fps(c, v))
+                .ok_or_else(|| bad("fps <op> n"))?,
             "chat" if w.len() > 1 => Cond::Chat(text["chat".len()..].trim().to_lowercase()),
             "screen" if w.len() == 2 => Cond::Screen(w[1].to_string()),
             "players" => match w.get(1).and_then(|n| n.parse().ok()) {
@@ -680,7 +733,11 @@ mod tests {
         let body = src.split("async fn run_lines").nth(1).unwrap();
         for line in body.lines() {
             let l = line.trim();
-            if let Some(name) = l.strip_prefix('"').and_then(|r| r.split_once("\" =>")).map(|(n, _)| n) {
+            if let Some(name) = l
+                .strip_prefix('"')
+                .and_then(|r| r.split_once("\" =>"))
+                .map(|(n, _)| n)
+            {
                 assert!(COMMANDS.contains(&name), "script command '{name}' is missing from COMMANDS");
             }
         }
@@ -697,7 +754,10 @@ mod tests {
 
     #[test]
     fn conditions_read() {
-        assert_eq!(Cond::parse("block ~ ~-1 ~2 stone"), Ok(Cond::Block([Coord::Off(0.0), Coord::Off(-1.0), Coord::Off(2.0)], "stone".into())));
+        assert_eq!(
+            Cond::parse("block ~ ~-1 ~2 stone"),
+            Ok(Cond::Block([Coord::Off(0.0), Coord::Off(-1.0), Coord::Off(2.0)], "stone".into()))
+        );
         assert_eq!(Cond::parse("health <= 8"), Ok(Cond::Health(Cmp::Le, 8.0)));
         assert_eq!(Cond::parse("chat You Joined"), Ok(Cond::Chat("you joined".into())));
         assert!(Cond::parse("health about 8").is_err());
