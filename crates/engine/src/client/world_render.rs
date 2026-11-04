@@ -255,11 +255,16 @@ struct Solid {
     tags: Vec<[u32; 4]>,
     /// Per block state: casts a shadow.
     casts: Vec<bool>,
+    /// The center and the world's `revision` of the last pass that finished: while both stay,
+    /// nothing is looked at (the 15³ cubes' lookups were a cost every frame).
+    done: Option<(IVec3, u32)>,
 }
 
 const SOLID_SLOTS: usize = 4096;
-/// Cubes rebuilt per frame at most; the rest follow in the next frames.
-const SOLID_PER_FRAME: usize = 192;
+/// Cubes rebuilt per frame at most; the rest follow in the next frames, nearest first. At 192 a
+/// step into the next cube rebuilt up to 192 x 4096 blocks in one frame, a burst of 1-3 ms
+/// (reports/performance.md); 32 spreads a step's new shell over a few frames.
+const SOLID_PER_FRAME: usize = 32;
 
 impl Solid {
     fn new(gpu: &mut dyn Backend, c: &Content) -> Solid {
@@ -268,7 +273,8 @@ impl Solid {
             .iter()
             .map(|st| st.opacity > 0 && st.liquid.is_none())
             .collect();
-        let mut s = Solid { buf: gpu.create_buffer(4, usage::STORAGE, "solid"), on: false, held: Vec::new(), tags: Vec::new(), casts };
+        let mut s =
+            Solid { buf: gpu.create_buffer(4, usage::STORAGE, "solid"), on: false, held: Vec::new(), tags: Vec::new(), casts, done: None };
         s.set_on(gpu, crate::packs::pack_uses("world.wgsl", "solid_at"));
         s
     }
@@ -280,6 +286,7 @@ impl Solid {
         gpu.destroy_buffer(self.buf);
         self.on = on;
         self.held = vec![None; if on { SOLID_SLOTS } else { 0 }];
+        self.done = None;
         self.tags = vec![[0; 4]; if on { SOLID_SLOTS } else { 0 }];
         let words = if on { SOLID_SLOTS * (4 + 128) } else { 1 };
         self.buf = gpu.create_buffer(words as u64 * 4, usage::STORAGE, "solid");
@@ -834,6 +841,11 @@ impl WorldRenderer {
         if !s.on {
             return;
         }
+        let now_seen = (center, world.revision());
+        if s.done == Some(now_seen) {
+            return;
+        }
+        s.done = Some(now_seen);
         let mut rebuilt = 0;
         let mut bits = [0u32; 128];
         // Nearest first, so a frame out of budget has fixed what is close.
@@ -852,6 +864,8 @@ impl WorldRenderer {
                             continue;
                         }
                         if rebuilt >= SOLID_PER_FRAME {
+                            // More next frame.
+                            s.done = None;
                             break 'shells;
                         }
                         rebuilt += 1;
