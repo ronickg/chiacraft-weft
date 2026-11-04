@@ -424,15 +424,50 @@ fn in_water() -> bool {
 
 fn underwater_color() -> vec3<f32> {
     let p = palette();
-    let light = p.ambient * 1.4 + p.sun * light_strength() * 0.35;
-    return vec3(0.05, 0.2, 0.2) * light * 2.0;
+    let light = p.ambient * 1.4 + p.sun * light_strength() * 0.5;
+    return vec3(0.06, 0.27, 0.25) * light * 2.2;
+}
+
+// Where the water's surface is above the eye under water: the sea's, or just over the eye in a
+// lake higher up.
+fn water_surface() -> f32 {
+    return max(SEA_LEVEL, scene.eye.y + 0.5);
+}
+
+// The water between the eye and a point `rel` away, from inside it: bright teal near the surface,
+// darker as it goes down, clear for about 20 blocks (the engine's water fog is a few), and beams of
+// sunlight slanting down through it, broken up by the waves above. Six steps along the way.
+fn under_water(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let dist = length(rel);
+    let surface = water_surface();
+    let y = scene.eye.y + rel.y;
+    let down = exp(-max(surface - y, 0.0) / 28.0);
+    let fog = underwater_color() * mix(0.35, 1.0, down);
+    var out = mix(c * mix(0.6, 1.0, down), fog, 1.0 - exp(-dist / 18.0));
+    let l = light_dir();
+    if l.y > 0.05 && light_strength() > 0.0 {
+        let reach = min(dist, 32.0);
+        let t = scene.params.w;
+        var beams = 0.0;
+        for (var i = 0; i < 6; i++) {
+            let at = rel * ((f32(i) + 0.5) / 6.0) * (reach / max(dist, 1e-4));
+            let wy = scene.eye.y + at.y;
+            // Straight up the light to the surface: where it came through.
+            let q = (at.xz + scene.eye.xz) + l.xz / l.y * (surface - wy);
+            let n = noise3(vec3(q.x * 0.18, t * 0.06, q.y * 0.18));
+            beams += pow(1.0 - abs(n * 2.0 - 1.0), 6.0) * exp(-max(surface - wy, 0.0) / 20.0);
+        }
+        let p = palette();
+        out += p.sun * light_strength() * vec3(0.55, 0.95, 0.85) * beams * (reach / 6.0) * 0.012;
+    }
+    return out;
 }
 
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     let dist = length(rel);
     if in_water() {
-        return mix(c, underwater_color(), fog_amount(dist, scene.params.x, scene.params.y));
+        return under_water(c, rel);
     }
     if in_liquid() || !open_sky() {
         return mix(c, scene.fog_color.rgb, fog_amount(dist, scene.params.x, scene.params.y));
