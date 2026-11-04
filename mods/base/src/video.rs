@@ -158,6 +158,13 @@ pub fn register(r: &mut Registry) {
         if QUALITY.get() >= 0 {
             return;
         }
+        // Scripts, tests and benchmarks keep their own settings (`--config` sets them per run).
+        if ["script", "test", "config"]
+            .iter()
+            .any(|o| weft_sdk::client::launch_option(o).is_some())
+        {
+            return;
+        }
         let [w, h] = c.state().window;
         if w == 0 || h == 0 {
             return;
