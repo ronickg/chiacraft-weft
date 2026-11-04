@@ -44,9 +44,12 @@ fn init(r: &mut Registry) {
             true
         })
         .on_scheduled(|e| {
+            // Above the bell, so the puff isn't inside the block.
+            let at = e.pos().map(|v| v as f64 + 0.5);
             e.world()
-                .spawn_particles(&POOF, e.pos().map(|v| v as f64 + 0.5))
+                .spawn_particles(&POOF, [at[0], at[1] + 0.8, at[2]])
                 .count(12);
+            info!("a puff above the bell at {:?}", e.pos());
         })
         .on_neighbor(|e| info!("beside the bell at {:?}, {:?} changed", e.pos(), e.other()));
     r.item(&STRIKER).on_use(|u| {
