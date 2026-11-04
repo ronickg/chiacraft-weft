@@ -78,7 +78,8 @@ pub fn strip(u: &mut Use) -> bool {
     if !AXES.on_item(axe.item) {
         return false;
     }
-    let name = name_of(abi::entry_kind::BLOCK, block_of(state));
+    // A state's name carries its props (`base:oak_log[axis=y,..]`): the block's is before them.
+    let name = name_of(abi::entry_kind::BLOCK, block_of(state)).split('[').next().unwrap_or("");
     let Some(wood) = name
         .strip_prefix("base:")
         .and_then(|n| n.strip_suffix("_log"))
