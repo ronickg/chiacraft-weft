@@ -7,6 +7,7 @@ mod blocks;
 mod book;
 mod clothing;
 mod cooking;
+mod crops;
 mod crafts;
 mod death;
 mod discovery;
@@ -82,6 +83,7 @@ fn init(r: &mut Registry) {
     }
     blocks::register(r);
     wild::register(r);
+    crops::register(r);
     items::register(r);
     player::register(r);
     survival::register(r);

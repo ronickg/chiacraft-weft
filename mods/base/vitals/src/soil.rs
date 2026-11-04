@@ -20,9 +20,8 @@ pub fn growth(fertility: u8) -> f32 {
     WORN_OUT + (1.0 - WORN_OUT) * fertility.min(MAX) as f32 / MAX as f32
 }
 
-/// The crops whose harvest (ripe) takes a level from the farmland under them: wheat takes about
-/// 23 kg of nitrogen a tonne of grain.
-pub const TIRES: [&str; 1] = ["base:wheat"];
+// Which crops' ripe harvest takes a level from the farmland under them and which give one back
+// (beans): `crops::Crop::soil`.
 
 /// What gives farmland levels back, used on it: a load of compost or of dung (about 6 kg of
 /// nitrogen a tonne, a fifth of it there the first year).
