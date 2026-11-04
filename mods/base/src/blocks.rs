@@ -132,10 +132,12 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
         .tag(&format!("logs/{wood}"))
         .set(&FLAMMABLE, 5)
         .set(&FUEL, 300)
-        .prop("axis", ["y", "x", "z"])
+        // `bark`: bark on every face, for a trunk whose top shows (a giant's flared foot).
+        .prop("axis", ["y", "x", "z", "bark"])
         .states(move |p, s| match p.get("axis") {
             "y" => s.textures(&top, &side, &top),
             "x" => s.faces([&top, &top, &side, &side, &side, &side]),
+            "bark" => s.texture(&side),
             _ => s.faces([&side, &side, &side, &side, &top, &top]),
         })
         .placement(axis_placement)
