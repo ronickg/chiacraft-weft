@@ -267,6 +267,9 @@ impl World {
         (!p.is_null()).then(|| unsafe { &*(p as *const T) })
     }
     /// The component to write; changes are saved and synced like any other.
+    // The bytes live in the host, not in `World` (a handle to it), as every `&self` call that
+    // changes the world.
+    #[allow(clippy::mut_from_ref)]
     pub fn component_mut<T: Value>(&self, id: u64, c: &Component<T>) -> Option<&mut T> {
         let p = unsafe { (host().component)(self.raw(), id, c.id()) };
         (!p.is_null()).then(|| unsafe { &mut *(p as *mut T) })

@@ -226,7 +226,7 @@ def main():
                                (r"allow\(dead_code\)", "allow(dead_code)"), (r"\b(FIXME|XXX|HACK)\b", "FIXME/XXX/HACK"),
                                (r"^\s*println!\(", "println! (outside a bin)")):
                 if re.search(pat, s):
-                    if label.startswith("println") and ("/bin/" in f or f.endswith("main.rs") or is_test_path(f) or "/build.rs" in f):
+                    if label.startswith("println") and ("/bin/" in f or "/examples/" in f or f.endswith("main.rs") or is_test_path(f) or "/build.rs" in f):
                         continue
                     leftovers[label].append(f"{f}:{i}")
 

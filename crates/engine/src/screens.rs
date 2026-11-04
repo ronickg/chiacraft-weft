@@ -487,16 +487,27 @@ impl Screen for Title {
                     ui.add(Kind::Image { texture: logo, color: 0xFFFFFFFF }, Style::default().w(size[0] * k).h(size[1] * k));
                 }
                 ui.spacer();
+                // The first way in is the main button, the rest `button_secondary` (the engine's own
+                // is a copy of its button; base's is the dark one).
                 icon_button(ui, cx, "button", "menu_singleplayer", "menu.singleplayer", &[], 156.0, |c| open(c, "core:worlds"));
                 // The profile is a square beside Multiplayer: the face of the player's skin.
                 ui.container(Style::row().gap(4.0).stretch(), |ui| {
-                    let mp =
-                        icon_button(ui, cx, "button", "menu_multiplayer", "menu.multiplayer", &[], 132.0, |c| open(c, "core:multiplayer"));
+                    let mp = icon_button(ui, cx, "button_secondary", "menu_multiplayer", "menu.multiplayer", &[], 132.0, |c| {
+                        open(c, "core:multiplayer")
+                    });
                     ui.nodes[mp].style.grow = 1.0;
                     let face = face_texture(cx);
-                    let p = ui.button("button", Style::default().w(20.0).h(20.0), Rc::new(|c: &mut Ctx| open(c, "core:profile")), |ui| {
-                        ui.add(Kind::Image { texture: face, color: 0xFFFFFFFF }, Style::default().w(8.0).h(8.0).at(6.0, 6.0, [0.0, 0.0]));
-                    });
+                    let p = ui.button(
+                        "button_secondary",
+                        Style::default().w(20.0).h(20.0),
+                        Rc::new(|c: &mut Ctx| open(c, "core:profile")),
+                        |ui| {
+                            ui.add(
+                                Kind::Image { texture: face, color: 0xFFFFFFFF },
+                                Style::default().w(8.0).h(8.0).at(6.0, 6.0, [0.0, 0.0]),
+                            );
+                        },
+                    );
                     ui.nodes[p].tooltip = Some(cx.t("menu.profile", &[]));
                     ui.set_id(p, "profile");
                 });
@@ -504,8 +515,10 @@ impl Screen for Title {
                 if chiacraft_account::current().is_some_and(|s| s.wants_backup()) {
                     button(ui, cx, "menu.write_words", &[], 156.0, |c| open(c, "core:account"));
                 }
-                icon_button(ui, cx, "button", "menu_mods", "menu.mods", &[Arg::Int(cx.mods as i64)], 156.0, |c| open(c, "core:mods"));
-                icon_button(ui, cx, "button", "menu_settings", "menu.settings", &[], 156.0, |c| open(c, "core:settings"));
+                icon_button(ui, cx, "button_secondary", "menu_mods", "menu.mods", &[Arg::Int(cx.mods as i64)], 156.0, |c| {
+                    open(c, "core:mods")
+                });
+                icon_button(ui, cx, "button_secondary", "menu_settings", "menu.settings", &[], 156.0, |c| open(c, "core:settings"));
                 parts(ui, cx, "core:title", "buttons");
                 ui.add(Kind::Container { class: None }, Style::default().h(6.0));
                 let quit = button(ui, cx, "menu.quit", &[], 156.0, |c| c.requests.push(Request::Quit));

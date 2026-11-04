@@ -98,9 +98,15 @@ pub fn lush(w: &World, s: &Species, pos: [i32; 3]) -> f32 {
 /// Whether it is foraging or drinking (a resting animal settles only when it isn't: hungry or
 /// thirsty, it eats and drinks first).
 pub fn busy(w: &World, id: u64) -> bool {
+    // A search left from before it was fed (a tame held by its orders, whose forage goal doesn't
+    // run to clear it) isn't one: only a hungry one forages.
+    let hungry = w
+        .component(id, &ANIMAL)
+        .is_some_and(|a| (a.food as f32) < a.stat(species::FOOD) * FULL);
     crate::drink::busy(w, id)
-        || w.component(id, &FORAGE)
-            .is_some_and(|f| f[3] != 0.0 && !f[0].is_nan())
+        || (hungry
+            && w.component(id, &FORAGE)
+                .is_some_and(|f| f[3] != 0.0 && !f[0].is_nan()))
 }
 
 /// What it would eat of the block `state`, if anything: the first of the state's food rows

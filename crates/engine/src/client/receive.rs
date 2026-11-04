@@ -176,6 +176,7 @@ impl Client {
             ToClient::Permission(level) => self.permission = level,
             ToClient::Using(ticks) => self.using = ticks.map(|t| (t as f32, t as f32)),
             ToClient::Air { air, heading } => self.world.air = (air, heading),
+            ToClient::Tints { tints } => self.world.set_tints(tints),
             ToClient::Weather { raining, thunder, only } => {
                 self.weather = (raining, thunder);
                 self.world.rain_in = only;
