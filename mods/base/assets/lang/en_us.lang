@@ -98,6 +98,7 @@ block.base.weathered_limestone = Weathered Limestone
 block.base.red_sandstone = Red Sandstone
 block.base.snow = Snow
 block.base.ice = Ice
+block.base.glacier_ice = Glacier Ice
 block.base.obsidian = Obsidian
 block.base.coal_ore = Coal Ore
 block.base.iron_ore = Iron Ore

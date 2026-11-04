@@ -90,6 +90,7 @@ pub fn terrain(r: &mut Registry) {
 
     r.decorate(rock_faces).dimension(&crate::OVERWORLD);
     r.decorate(cave_mouths).dimension(&crate::OVERWORLD);
+    r.decorate(glaciers).dimension(&crate::OVERWORLD);
     r.decorate(fray_borders).dimension(&crate::OVERWORLD);
     r.decorate(landmarks).dimension(&crate::OVERWORLD);
 }
@@ -420,6 +421,50 @@ fn landmarks(g: &mut Gen) {
                 // The front: flowing, amount 7; under it falling.
                 let state = if wy == sy { water + 1 } else { water + 8 };
                 g.set((fx - ox) as usize, (wy - oy) as usize, (fz - oz) as usize, state);
+            }
+        }
+    }
+}
+
+/// Glaciers in the mountains' high valleys (`base_api::land::glacier`): the top
+/// `GLACIER_THICK` blocks of a valley's floor glacier ice, under the snow. After the rock faces.
+fn glaciers(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let [ox, oy, oz] = g.origin();
+    let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
+    let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
+    // High ground only: the lowest snow line less the glaciers' reach under it.
+    let lowest = SNOW_LINES.iter().map(|&(_, line)| line).min().unwrap_or(0) - l::GLACIER_BELOW;
+    if max_h < lowest || oy > max_h || oy + 15 < min_h - l::GLACIER_THICK {
+        return;
+    }
+    let f = l::fields(g.seed());
+    // Which columns are a glacier's floor, from the heights alone; then the ice.
+    let mut floors = Vec::new();
+    {
+        let mut heights = std::collections::HashMap::new();
+        let mut ground = |x: i32, z: i32| {
+            *heights
+                .entry((x, z))
+                .or_insert_with(|| g.column(x, z).height)
+        };
+        for z in 0..16i32 {
+            for x in 0..16i32 {
+                let h = cols[(z * 16 + x) as usize].height;
+                if h < lowest || h < oy || h - l::GLACIER_THICK >= oy + 16 {
+                    continue;
+                }
+                if l::glacier(&f, ox + x, oz + z, h, &mut ground) {
+                    floors.push((x as usize, z as usize, h));
+                }
+            }
+        }
+    }
+    for (x, z, h) in floors {
+        for wy in (h - l::GLACIER_THICK + 1).max(oy)..=h.min(oy + 15) {
+            let y = (wy - oy) as usize;
+            if g.get(x, y, z) != 0 {
+                g.set(x, y, z, GLACIER_ICE.id());
             }
         }
     }

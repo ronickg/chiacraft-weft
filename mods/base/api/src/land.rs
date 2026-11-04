@@ -443,6 +443,15 @@ pub const FALL_CELL: i32 = 256;
 pub const FALL_CHANCE: f64 = 0.3;
 pub const FALL_CLIFF: i32 = 8;
 
+/// Glaciers (Ronald, 11-04: "all three", the fourth sheet; Art's glacier ice): in the mountains'
+/// high valleys, `GLACIER_BELOW` blocks under the snow line or higher, on ground falling a block
+/// at most to its neighbours and lying `GLACIER_HOLLOW` blocks or more under the ground
+/// `GLACIER_REACH` round it (a valley's floor, not a ridge); its top `GLACIER_THICK` blocks ice.
+pub const GLACIER_BELOW: i32 = 10;
+pub const GLACIER_HOLLOW: i32 = 2;
+pub const GLACIER_REACH: i32 = 8;
+pub const GLACIER_THICK: i32 = 3;
+
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
 /// the rain of the nodes upstream within `RIVER_REACH` steps (about 2 km of river).
@@ -1267,6 +1276,27 @@ pub fn fray(f: &Fields, x: i32, z: i32, height: i32) -> Option<(&'static str, &'
     }
     let n = ONE / 2 + f.fbm(salt::FRAY, x, z, q4(FRAY_SIZE), 2) * 2;
     (n < (q12(FRAY_SHARE) * e.near) >> 12).then_some(theirs)
+}
+
+/// Whether column (`x`, `z`) (blocks), `h` high, is a glacier's floor (`GLACIER_*`), `ground`
+/// giving the height of any column (the engine's, in a decoration).
+pub fn glacier(f: &Fields, x: i32, z: i32, h: i32, ground: &mut dyn FnMut(i32, i32) -> i32) -> bool {
+    let here = Here::new(f, x * 16, z * 16);
+    if MOUNTAINS_AREA.at(&here) <= q12(MOUNTAIN_BIOME) || h < snow_line(here.temperature()) - GLACIER_BELOW {
+        return false;
+    }
+    if [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        .iter()
+        .any(|&(dx, dz)| (h - ground(x + dx, z + dz)).abs() > 1)
+    {
+        return false;
+    }
+    let r = GLACIER_REACH;
+    let round: i32 = [(r, 0), (-r, 0), (0, r), (0, -r), (r, r), (-r, -r), (r, -r), (-r, r)]
+        .iter()
+        .map(|&(dx, dz)| ground(x + dx, z + dz))
+        .sum();
+    round >= 8 * (h + GLACIER_HOLLOW)
 }
 
 /// The snow line (blocks) at temperature `t` (Q12): the band's height from `SNOW_LINES`.
