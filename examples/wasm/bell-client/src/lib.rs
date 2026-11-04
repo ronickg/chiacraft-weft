@@ -25,7 +25,7 @@ fn init(r: &mut Registry) {
     r.hud_element(&HUD, hud_anchor::TOP_RIGHT, 0, |ui| {
         // `hud_badge` once the UI redo is in; `tooltip` is in every game now.
         ui.panel("tooltip", S::col().pad(3.0).gap(2.0), |ui| {
-            ui.text_bind(|_, out| match COUNT.with(Cell::get) {
+            ui.text_bind_styled(S::default().no_wrap(), |_, out| match COUNT.with(Cell::get) {
                 Some(n) => out.set("bell.hud", &[Arg::Int(n as i64)]),
                 None => out.set("bell.hud_none", &[]),
             });

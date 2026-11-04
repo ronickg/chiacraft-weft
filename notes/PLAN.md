@@ -37,6 +37,12 @@ erase what they earned.
      128 x 64 armour or clothes layer on a 64 x 32 skin then maps over all of it, as Minecraft's
      armour does in 32x packs; one at the layout's width reads as before. One general line and a
      test (branch `claude/clothes-worn`).
+   - To offer: settings carried over by name on a content switch (`config::content_switched`,
+     phase 6). Weft numbers settings by name within each content but keeps their values in one
+     table by id, so switching to a content with one more setting (a mod's key) moved the values
+     after it: a joining player read an empty name. Now the values follow their names into the new
+     content's ids, and mods' setting handles get the new content's ids back. Small, general,
+     with a check (`a_content_switch_keeps_values_by_name`).
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 
@@ -350,8 +356,9 @@ The smallest version that works is phases 1-4.
       halves in `<run dir>/personal/<name>`, run only where the world rule Personal Mods allows
       (off by default, on Create World); joining says which are off. They run through shared
       slots (a HUD element per anchor, a screen, eight keys) so the content stays the same.
-   6. *Operations*: `/mods` (cost, strikes, resume), cached compiled components, a per-tick budget
-      across mods.
+   6. *Operations* (`/mods` built): calls, time, strikes and why one stopped, per mod in this
+      world; `/mods resume <package>` for admins. Later: cached compiled components, a per-tick
+      budget across mods.
 7. **Headless server and administration.** No window or GPU (Weft's CPU terrain path),
    `server.toml`, console, operators and command permissions (today any player can `/give`),
    movement checks, our own relay, load tests (`horizon-bots`).
