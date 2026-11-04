@@ -40,7 +40,7 @@ SPECIES = {
     "animals:scale_conifer_log": ("scale_conifer", "scale_conifer", ANIMALS, (84, 120, 70), "cone", "scale conifer (Cretaceous)"),
     "animals:tempskya_log": ("tempskya", "tempskya", ANIMALS, (100, 150, 70), None, "tempskya tree fern (Cretaceous)"),
     "base:sequoia_log": ("sequoia", "sequoia", BASE, (77, 138, 60), "cone", "giant sequoia"),
-    "base:dogwood_log": ("dogwood", "dogwood_green", BASE, None, "ball", "Pacific dogwood (no recipe: trees.rs round crown)"),
+    "base:dogwood_log": ("dogwood", "dogwood_green", BASE, None, "ball", "Pacific dogwood (Cornus nuttallii)"),
 }
 # The tropical trees (Plants' branch until it lands): textures from `AUDIT_TEXTURES` (that tree's
 # block folder) when they aren't here yet.
@@ -220,7 +220,8 @@ def main(src, outdir, refs=None):
     trees = json.load(open(src))
     os.makedirs(outdir, exist_ok=True)
     # dogwood has no recipe: three of its plain crowns
-    trees["base:dogwood_log"] = [round_crown(h, f) for h, f in ((0, "standing"), (1, "standing"), (2, "big"))]
+    if "base:dogwood_log" not in trees:
+        trees["base:dogwood_log"] = [round_crown(h, f) for h, f in ((0, "standing"), (1, "standing"), (2, "big"))]
     for sp in SPECIES:
         if sp in trees:
             p = sheet(sp, trees, refs, os.path.join(outdir, sp.split(":")[1] + ".png"))

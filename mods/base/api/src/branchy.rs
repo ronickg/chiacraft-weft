@@ -86,6 +86,10 @@ pub struct Recipe {
     pub leaf_ry: f32,
     pub ragged: f32,
     pub leaf_along: bool,
+    /// A branch thinner than this is a leafy spray, not wood: small clusters along it instead of
+    /// logs (0: off, wood down to a twig's width). Keeps a small tree's crown from showing bare
+    /// log arms (the dogwood's, the tree-look audit).
+    pub twig: f32,
     /// Fronds at the top (palms, tree ferns): how many, how long, and how hard they droop.
     pub fronds: u32,
     pub frond_len: f32,
@@ -132,6 +136,7 @@ impl Recipe {
         leaf_ry: 1.6,
         ragged: 0.35,
         leaf_along: false,
+        twig: 0.0,
         fronds: 0,
         frond_len: 0.0,
         frond_droop: 0.42,
@@ -361,7 +366,14 @@ impl Grow<'_> {
         // A branch thins to nothing over its own length; the trunk by the recipe's loss.
         let loss = if order == 0 { r.width_loss / self.size } else { width / len.max(STEP) };
         // Under needles (a conifer) the twigs and the trunk's top are all needles, no bare wood.
-        let min_wood = if r.leaf_along { 0.25 } else { MIN_WOOD };
+        let min_wood = if r.leaf_along {
+            0.25
+        } else if order > 0 {
+            MIN_WOOD.max(r.twig)
+        } else {
+            MIN_WOOD
+        };
+        let spray = !r.leaf_along && order > 0 && r.twig > 0.0;
         // A trunk with a 2 x 2 foot stays 2 x 2 up to its first branch: narrowing on the bare
         // trunk steps it to one side, as if broken (the tree-look audit: araucaria, spruce).
         let first = r.branch_start * len;
@@ -379,6 +391,11 @@ impl Grow<'_> {
                 } else {
                     self.out.wood(p, d, shown >= 1.5, last)
                 });
+            }
+            if spray && width < r.twig && needled != Some(block(p)) {
+                needled = Some(block(p));
+                self.out
+                    .cluster(p, r.leaf_r * 0.6, r.leaf_ry * 0.8, r.ragged, self.seed); // a leafy spray
             }
             if r.leaf_along && (order > 0 || grown > len * 0.3) && needled != Some(block(p)) {
                 needled = Some(block(p));

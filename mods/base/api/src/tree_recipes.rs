@@ -255,6 +255,29 @@ pub const RECIPES: &[Recipe] = &[
         frond_spread: 12.0,
         ..Recipe::BASE
     },
+    // A Pacific dogwood (Cornus nuttallii), the giant groves' small tree: a short trunk, its
+    // branches in opposite pairs held out level, tips turning up, in flat layered sprays: an open
+    // rounded crown about as wide as it is tall (it was a box of leaves, the tree-look audit).
+    Recipe {
+        log: "base:dogwood_log",
+        height: 6.0,
+        size_var: 0.25,
+        width_loss: 0.1,
+        drift: 6.0,
+        droop: -0.08,
+        branch_start: 0.3,
+        branch_every: 1.1,
+        branch_count: 2,
+        branch_angle: 68.0,
+        branch_width: 0.55,
+        branch_len: 0.6,
+        taper: 0.4,
+        leaf_r: 2.0,
+        leaf_ry: 1.0,
+        ragged: 0.4,
+        twig: 0.32,
+        ..Recipe::BASE
+    },
     // A giant sequoia (Sequoiadendron giganteum, `vitals::wild` for where): the real ones 80-95 m
     // tall on trunks 6-11 m across, here about 60 blocks on a round trunk 4 to 7 wide, flaring
     // into buttresses at the foot; bare for its lower half, then short branches all round,
