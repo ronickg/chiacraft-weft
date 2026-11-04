@@ -904,6 +904,13 @@ pub const SPAWN_WOODS: i32 = 64;
 /// or, failing that within `SPAWN_REACH`, the first level plains, then the first land above the
 /// sea, on the same rings.
 pub fn spawn(seed: u64) -> [i32; 3] {
+    spawn_where(seed, &|_, _| true)
+}
+
+/// `spawn`, only where `open` (blocks) also holds: what the terrain here can't see, as the
+/// engine's caves (seed 42's first fair place stood over a cave's mouth, PC look fv_new_42: the
+/// player fell 15 blocks).
+pub fn spawn_where(seed: u64, open: &dyn Fn(i32, i32) -> bool) -> [i32; 3] {
     let f = fields(seed);
     let h = |x: i32, z: i32| height(&f, x * 16, z * 16) >> 4;
     let biome = |x: i32, z: i32| overworld_biome(&f, x * 16, z * 16);
@@ -941,7 +948,7 @@ pub fn spawn(seed: u64) -> [i32; 3] {
                 let a = k as f64 / n as f64 * std::f64::consts::TAU;
                 let (x, z) = ((r * SPAWN_STEP) as f64 * a.cos(), (r * SPAWN_STEP) as f64 * a.sin());
                 let (x, z) = (x.round() as i32, z.round() as i32);
-                if test(x, z) {
+                if test(x, z) && open(x, z) {
                     return [x, h(x, z), z];
                 }
             }
