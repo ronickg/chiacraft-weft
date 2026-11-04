@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "ginkgo seeds: two round wrinkled pale yellow-orange fleshy seeds, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.384,
+   "outline": 0.84,
+   "red_line": 0.0,
+   "fill": 0.3,
+   "passed": true
+  }
+ ]
+}

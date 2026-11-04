@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "an araucaria cone: a large round green-brown cone covered in pointed overlapping scales, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.569,
+   "outline": 0.86,
+   "red_line": 0.13,
+   "fill": 0.51,
+   "passed": true
+  }
+ ]
+}

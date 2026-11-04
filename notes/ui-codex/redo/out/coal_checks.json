@@ -1,6 +1,6 @@
 {
  "kind": "item",
- "what": "a lump of coal: a chunky faceted black-brown lump, never pure black, soft grey-blue glints on its upper-left facets, centred with 3-5 px of padding",
+ "what": "a lump of coal: a chunky faceted lump of deep glossy black-brown (the darkest shade of its own brown, never pure black) with bright blue-grey glints along its upper-left facet edges, strong contrast, centred with 3-5 px of padding",
  "size": [
   32,
   32
@@ -9,25 +9,25 @@
  "green": false,
  "tries": [
   {
-   "grid": 0.555,
-   "outline": 1.22,
-   "red_line": 0.0,
-   "fill": 0.45,
+   "grid": 0.559,
+   "outline": 1.37,
+   "red_line": 0.9,
+   "fill": 0.48,
    "passed": false
   },
   {
-   "grid": 0.294,
-   "outline": 1.25,
-   "red_line": 0.0,
-   "fill": 0.43,
+   "grid": 0.485,
+   "outline": 1.45,
+   "red_line": 0.33,
+   "fill": 0.39,
    "passed": false
   },
   {
-   "grid": 0.468,
-   "outline": 0.77,
-   "red_line": 0.01,
-   "fill": 0.4,
-   "passed": true
+   "grid": 0.395,
+   "outline": 1.93,
+   "red_line": 0.53,
+   "fill": 0.44,
+   "passed": false
   }
  ]
 }

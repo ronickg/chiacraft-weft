@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a cattail root: a pale cream-tan starchy rhizome lying diagonally, segmented with faint rings, a few thin brown root hairs, one cut end showing white starchy flesh",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.555,
+   "outline": 0.58,
+   "red_line": 0.0,
+   "fill": 0.27,
+   "passed": true
+  }
+ ]
+}

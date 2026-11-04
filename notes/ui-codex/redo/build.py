@@ -19,7 +19,10 @@ TITLES = {"1_tools": "Tools and weapons", "2_armour": "Armour", "3_materials": "
           "4_food": "Food", "5_plants": "Plants, nuts, berries and seeds", "6_misc": "Containers, tools, creatures, eggs",
           "7_survival": "Survival's new items (for its branch)",
           "2b_redo": "Redos: hoes, leather cap, boots",
-          "3b_redo": "Redos: coal, gunpowder, stick, three hoes, five foods"}
+          "3b_redo": "Redos: coal, gunpowder, stick, three hoes, five foods",
+          "5b_hoes": "Hoes, third try",
+          "5c_wild": "New wild foods (for the Voxel dog handoff)",
+          "5d_redo": "Redos: crowberries, beans, barley, rye, melon seeds, diamond hoe"}
 
 
 def uri(im, scale=1):
@@ -124,7 +127,7 @@ def main():
         print("sheet:", sheet(b, jobs))
         for j in made:
             t = json.load(open(os.path.join(OUT, j["name"] + "_checks.json")))["tries"]
-            if not (t and t[-1].get("passed")):
+            if not (t and t[-1].get("passed")) and j["name"] not in failed:
                 failed.append(j["name"])
         hot_new = "".join(f'<span class="slot"><img src="{uri(Image.open(os.path.join(OUT, j["name"] + "_px.png")), 2)}" width="32" height="32" alt="{j["name"]}" title="{j["name"]}"></span>' for j in made)
         hot_old = "".join(f'<span class="slot"><img src="{uri(o.resize((32, 32), Image.NEAREST))}" width="32" height="32" alt="{j["name"]}" title="{j["name"]}"></span>'
