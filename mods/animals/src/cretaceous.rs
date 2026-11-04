@@ -11,7 +11,7 @@
 
 use base_api::CLIMATE;
 use base_api::{CLOUDS, MOON, STARS, SUN};
-use weft_sdk::terrain::{BiomeRule, Mask, preset};
+use weft_sdk::terrain::BiomeRule;
 use weft_sdk::*;
 
 pub static CRETACEOUS: Dimension = Dimension::named("cretaceous");
@@ -47,6 +47,8 @@ static BUILDING: CreativeTab = CreativeTab::named("base:building");
 
 /// Sea level, as the overworld's.
 const SEA: i32 = 63;
+/// The floodplain: the low ground by the rivers, lakes and coasts, this high over the sea at most.
+const FLOODPLAIN_RISE: i32 = 6;
 
 pub fn init(r: &mut Registry) {
     r.block(&RED_SAND)
@@ -231,34 +233,39 @@ pub fn init(r: &mut Registry) {
         .size(23.0)
         .phase(0.5);
 
-    r.terrain(&CRETACEOUS)
+    // The overworld's land (Ronald, 11-04: "all three", Terrain's fourth sheet): its continents,
+    // hills, mountain ranges, rivers by flow, lakes and coasts (`base_api::land`), the same seed,
+    // so a gateway opens onto the same land a hundred million years earlier: the rivers and lakes
+    // a player knows, the Cretaceous's own biomes on them. Crags on the ranges, floodplain on the
+    // low ground by the water, red dunes and scrub where it's dry, fern forest where it's wet.
+    let mut t = r
+        .terrain(&CRETACEOUS)
         .stone("base:stone")
         .base_height(SEA as f64)
-        .sea(SEA, "base:water")
-        .feature(preset::continents(18.0))
-        .feature(preset::hills(14.0, 120.0))
-        // The dunes where it is dry.
-        .feature(preset::dunes(5.0, 24.0).mask(Mask::Humidity(-0.08, -0.16)))
-        .feature(
-            preset::mountains(140.0, 240.0)
-                .mask(
-                    Mask::noise(650.0, -0.05, 0.3)
-                        .salt(0x5c)
-                        .and(Mask::Continent(0.0, 0.2)),
-                )
-                .named("crags"),
-        )
-        .biome(BiomeRule::new("base:ocean").height(..=SEA - 2))
-        .biome(
-            BiomeRule::new("base:beach")
-                .height(..=SEA + 1)
-                .continent(..0.1),
-        )
-        .biome(BiomeRule::new("crags").feature("crags", 0.45..))
-        .biome(BiomeRule::new("red_dunes"))
-        .biome(BiomeRule::new("scrubland"))
-        .biome(BiomeRule::new("floodplain").height(..=SEA + 10))
-        .biome(BiomeRule::new("fern_forest"));
+        .continent_scale(base_api::land::CONTINENT_SCALE)
+        .sea(SEA, "base:water");
+    for f in base_api::land::features() {
+        t = t.feature(f);
+    }
+    t.biome(
+        BiomeRule::new("base:ocean")
+            .height(..=SEA - 2)
+            .continent(..base_api::land::OCEAN_CONTINENT),
+    )
+    .biome(
+        BiomeRule::new("base:beach")
+            .height(..=SEA + 1)
+            .continent(..0.1),
+    )
+    .biome(BiomeRule::new("crags").feature("mountains", base_api::land::MOUNTAIN_BIOME..))
+    .biome(
+        BiomeRule::new("floodplain")
+            .height(..=SEA + FLOODPLAIN_RISE)
+            .humidity(-0.12..),
+    )
+    .biome(BiomeRule::new("red_dunes"))
+    .biome(BiomeRule::new("scrubland"))
+    .biome(BiomeRule::new("fern_forest"));
 
     r.decorate(ferns).dimension(&CRETACEOUS);
 }
