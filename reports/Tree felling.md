@@ -10,6 +10,17 @@ or partially".
 The research behind the pick (Valheim, the Minecraft mods, Vintage Story, how a falling tree is drawn,
 game feel) is below it, with a source for every number.
 
+## Where it stands (11-05)
+
+Built on `claude/tree-felling-df4d15`, each seen on the PC (`~/Coding/chiacraft-archive/images/tree-felling/2026-11-05/`):
+chop time and axe tiers (`fell_chop_v6`), the fall as the real tree with Ronald's yes to the engine
+change ("Yes, the real tree falls"; `fell_fall4`, sheets `fall_sheet_v1..v3.jpg`), the trunk on the
+ground in pieces (`fell_land2`), knock-on, no floating trees (Planner: any lost foot or trunk log
+fells what it held; bare hands slow and fruitless; `fell_nofloat`), and stripping (one log makes
+planks; an axe strips a log, oak gives bark; `fell_strip3`). Not yet: a tree hanging up on a trunk
+it can't fell, damage to what it sweeps, the fall's sounds, a falling tree's shadow (the engine's
+shadow pass skips structures), bark chips and a stump top (Art, later).
+
 ## The pick
 
 **1. Chopping (built, slice 1, `70177b92`).** The foot takes `logs^0.75` times one log's time, with the
