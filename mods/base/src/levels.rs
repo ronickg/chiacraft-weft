@@ -200,6 +200,8 @@ static BANNERS: Mutex<Vec<(u32, Option<Instant>)>> = Mutex::new(Vec::new());
 /// points that fill one: a bar shows the points placed in a stat.
 const STAT_BAR: (f32, f32) = (75.0, 6.0);
 const POINTS_FULL: f32 = 20.0;
+/// A stat's bar with no points placed: a third full, so it reads as the stat, growing with points.
+const BAR_BASE: f32 = 0.3;
 
 fn client(r: &mut Registry) {
     r.client_packet(&LEVEL_UP, |_, level| BANNERS.lock().unwrap().push((level, None)));
@@ -266,7 +268,7 @@ fn client(r: &mut Registry) {
                         ui.row(S::row().size(STAT_BAR.0, STAT_BAR.1), |ui| {
                             ui.progress_bind(Box::leak(format!("stat_{}", stat.name()).into_boxed_str()), S::default().size(STAT_BAR.0, STAT_BAR.1), move |c| {
                                 let Some(v) = c.component(&VITALS) else { return -1.0 };
-                                (2.0 + (v.points[i] as f32 / POINTS_FULL).clamp(0.02, 1.0) * 146.0) / 150.0
+                                (2.0 + (BAR_BASE + (1.0 - BAR_BASE) * (v.points[i] as f32 / POINTS_FULL).min(1.0)) * 146.0) / 150.0
                             });
                             ui.text_bind_styled(S::default().no_wrap().at_pivot(STAT_BAR.0 - 3.0, STAT_BAR.1 / 2.0, [1.0, 0.5]), move |c, t| {
                                 let Some(v) = c.component(&VITALS) else { return };

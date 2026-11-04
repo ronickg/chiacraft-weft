@@ -336,9 +336,10 @@ fn quality(points: u8) -> usize {
     QUALITY.iter().filter(|&&q| points >= q).count()
 }
 
-/// A stat bar's share: its points (wild and tamed) against 40, a strong one.
+/// A stat bar's share: a sixth at no points, then its points (wild and tamed) against 40, a
+/// strong one.
 fn points_share(a: &Animal, i: usize) -> f32 {
-    ((a.wild[i] as f32 + a.tamed[i] as f32) / 40.0).clamp(0.02, 1.0)
+    0.15 + 0.85 * ((a.wild[i] as f32 + a.tamed[i] as f32) / 40.0).min(1.0)
 }
 
 /// A bar of the kit (`class`, drawn at its own size) with its value written inside its right end.
