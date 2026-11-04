@@ -200,7 +200,8 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
     use vitals::{calendar, temperature};
     let feet = pos.map(|v| v.floor() as i32);
     let eye = [feet[0], (pos[1] + height as f64).floor() as i32, feet[2]];
-    let climate = CLIMATE.on_biome(w.biome(feet)).unwrap_or(TEMPERATE);
+    let around = around(w, feet);
+    let climate = around.climate;
     let sky = w.sky_light(eye);
     let underground = sky == 0 && feet[1] < SEA - 6;
     let mut fire = 0.0f32;
@@ -226,7 +227,10 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
     let kind = SEASONS.on_dimension(w.dimension()).unwrap_or(0);
     let date = calendar::date(w.day_time());
     let year = if kind > 0 { date.from_midwinter() } else { 0.25 };
-    let weather = w.air_at(eye);
+    // In a forest the wind drops, and a blizzard with it (`vitals::air::shelter`).
+    let calm = vitals::air::sheltered_wind(around.wind, vitals::air::shelter(around.canopy, cover(w, eye)));
+    let snowing_here = around.flags & air_flags::SNOWING != 0;
+    let fog = vitals::air::sheltered_fog(around.fog, around.wind, calm, snowing_here);
     let mut place = temperature::Place {
         biome_c: climate.celsius,
         humidity: climate.humidity,
@@ -240,7 +244,7 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
         fire,
         season: temperature::season(climate.seasons, year),
         underground,
-        wind: weather.wind,
+        wind: calm,
     };
     if place.raining && temperature::air(&place) < 1.0 {
         (place.raining, place.snowing) = (false, true);
@@ -257,18 +261,88 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
         open_sky: place.open_sky,
         raining: place.raining,
         snowing: place.snowing,
-        wind: weather.wind,
-        fog: weather.fog,
-        snow: weather.snow,
+        wind: calm,
+        fog,
+        snow: around.snow,
         day: if kind > 0 { date.day as u16 + 1 } else { 0 },
         calendar: kind,
     }
 }
 
 /// How far an animal sees at `pos` against clear air, 1 to `vitals::air::FOG_SIGHT`: fog, a
-/// blizzard or a dust storm (`World::air_at`) close it in.
+/// blizzard or a dust storm (`World::air_at`) close it in; a blizzard less inside a forest.
 pub fn sight(w: &World, pos: [f64; 3]) -> f32 {
-    vitals::air::sight(w.air_at(pos.map(|v| v.floor() as i32)).fog)
+    let p = pos.map(|v| v.floor() as i32);
+    let a = w.air_at(p);
+    if a.flags & air_flags::SNOWING == 0 {
+        return vitals::air::sight(a.fog);
+    }
+    let calm = vitals::air::sheltered_wind(a.wind, vitals::air::shelter(canopy(w.biome(p)), cover(w, p)));
+    vitals::air::sight(vitals::air::sheltered_fog(a.fog, a.wind, calm, true))
+}
+
+/// The air round a place, blended over its neighbours (`vitals::air::AIR_BLEND`): the climate's
+/// temperature, humidity and seasons, the weather's wind, fog and snow lying, and how closed the
+/// canopy is. Rain and the rest of the climate are the middle's.
+pub struct Around {
+    pub climate: Climate,
+    pub wind: f32,
+    pub fog: f32,
+    pub snow: f32,
+    /// The middle's `air_flags` (snowing, dust).
+    pub flags: u32,
+    pub canopy: f32,
+}
+
+/// The air round `pos` (`Around`): 9 biome and weather looks, so a body crossing a border feels
+/// the air turn over `vitals::air::AIR_BLEND` blocks instead of at the line.
+pub fn around(w: &World, pos: [i32; 3]) -> Around {
+    use vitals::air::{AIR_BLEND, blend, ring};
+    let points = ring(pos[0], pos[2], AIR_BLEND / 2).map(|(x, z)| {
+        let p = [x, pos[1], z];
+        let id = w.biome(p);
+        (id, CLIMATE.on_biome(id).unwrap_or(TEMPERATE), w.air_at(p))
+    });
+    let mid = points[0];
+    Around {
+        climate: Climate {
+            celsius: blend(points.map(|p| p.1.celsius)),
+            humidity: blend(points.map(|p| p.1.humidity)),
+            seasons: blend(points.map(|p| p.1.seasons)),
+            ..mid.1
+        },
+        wind: blend(points.map(|p| p.2.wind)),
+        fog: blend(points.map(|p| p.2.fog)),
+        snow: blend(points.map(|p| p.2.snow)),
+        flags: mid.2.flags,
+        canopy: blend(points.map(|p| canopy(p.0))),
+    }
+}
+
+/// How closed biome `id`'s canopy is (`vitals::air::CANOPY`), 0 for open country.
+pub fn canopy(id: u32) -> f32 {
+    use std::sync::OnceLock;
+    static IDS: OnceLock<Vec<(u32, f32)>> = OnceLock::new();
+    IDS.get_or_init(|| {
+        vitals::air::CANOPY
+            .iter()
+            .map(|&(name, s)| (Biome::generated(name.to_string()).id(), s))
+            .collect()
+    })
+    .iter()
+    .find(|c| c.0 == id)
+    .map_or(0.0, |c| c.1)
+}
+
+/// How much of the ground `vitals::air::FOREST_EDGE` blocks round `eye` is under leaves or a roof
+/// at that height (sky light under 15), 0 open to 1: deep in a forest all of it, at its edge half.
+pub fn cover(w: &World, eye: [i32; 3]) -> f32 {
+    let ring = vitals::air::ring(eye[0], eye[2], vitals::air::FOREST_EDGE);
+    ring[1..]
+        .iter()
+        .filter(|&&(x, z)| w.sky_light([x, eye[1], z]) < 15)
+        .count() as f32
+        / 8.0
 }
 
 /// What the ground offers a plant at `pos` (`ground_at`): the day's mean air, how wet the soil

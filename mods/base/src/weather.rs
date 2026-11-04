@@ -47,11 +47,19 @@ pub fn register(r: &mut Registry) {
         let Some(st) = w.entity(cmd.player()) else { return };
         let id = w.biome(st.pos.map(|v| v.floor() as i32));
         let Some(c) = CLIMATE.on_biome(id) else { return };
-        let BiomeAir { fog, wind, .. } = air_of(&w, id, &c);
+        // Where the player stands: blended over the biomes round, calmer in a forest
+        // (`base_api::air_at`).
+        let here = base_api::air_at(&w, st.pos, 1.8, false, 0, |_| {});
         let share = Arg::Int((air::fog_share(c.fog, now(&w).2) * 100.0).round() as i64);
         cmd.reply(
             "command.base.air.now",
-            &[Arg::Int((fog * 100.0).round() as i64), Arg::Int(wind.round() as i64), Arg::Int(now_heading(&w).round() as i64), share],
+            &[
+                Arg::Int((here.fog * 100.0).round() as i64),
+                Arg::Int(here.wind.round() as i64),
+                Arg::Int(now_heading(&w).round() as i64),
+                share,
+                Arg::Int(here.celsius.round() as i64),
+            ],
         );
     });
     // Today's rain where the player stands, and how often it rains there this season.
@@ -136,7 +144,7 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
     let mut flags = 0;
     if raining && place.air(day, hour, true) < air::SNOWS_BELOW {
         flags |= air_flags::SNOWING;
-        fog = fog.max(air::blizzard(wind) * 0.9);
+        fog = fog.max(air::blizzard(wind) * air::BLIZZARD_FOG);
     }
     let dust = air::dust(c.humidity, wind, raining);
     if dust > 0.0 {

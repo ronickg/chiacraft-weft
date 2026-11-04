@@ -208,6 +208,67 @@ impl Place {
     }
 }
 
+/// A blizzard as fog: how much of the land it hides at its thickest.
+pub const BLIZZARD_FOG: f32 = 0.9;
+
+// ---- the air across borders, and in the forest ----
+
+/// A place's air is its own and its neighbours' (Planner, 11-04: crossing a border shouldn't snap
+/// the weather or the snow): the climate and the weather at a body's feet, counted twice, and at
+/// the 8 points of `AIR_RING` `AIR_BLEND / 2` blocks round it, averaged, so the air turns from
+/// one biome's to the next over a band `AIR_BLEND` blocks wide.
+pub const AIR_BLEND: i32 = 32;
+pub const AIR_RING: [(f32, f32); 8] =
+    [(1.0, 0.0), (0.707, 0.707), (0.0, 1.0), (-0.707, 0.707), (-1.0, 0.0), (-0.707, -0.707), (0.0, -1.0), (0.707, -0.707)];
+
+/// The 9 points of a place's air round (`x`, `z`) `radius` blocks out: the middle first.
+pub fn ring(x: i32, z: i32, radius: i32) -> [(i32, i32); 9] {
+    let mut out = [(x, z); 9];
+    for (o, (dx, dz)) in out[1..].iter_mut().zip(AIR_RING) {
+        *o = (x + (dx * radius as f32).round() as i32, z + (dz * radius as f32).round() as i32);
+    }
+    out
+}
+
+/// The average of `values` at the points of `ring` (the middle counted twice).
+pub fn blend(values: [f32; 9]) -> f32 {
+    (values[0] * 2.0 + values[1..].iter().sum::<f32>()) / 10.0
+}
+
+/// Inside a forest the wind drops: under a closed canopy, a tree height or two in from the edge,
+/// to about a quarter of the open wind at a body's height (`FOREST_CALM` of it taken; forest
+/// interiors keep some 10-40 % of the open wind near the ground, Raupach and Finnigan's canopy
+/// flows), and with it the wind chill and the blizzard. How closed the canopy is comes from the
+/// biome (`CANOPY`, full shelter from `CANOPY_SHELTERS`), how far in from how many of the 8
+/// points `FOREST_EDGE` blocks round have leaves over them (`cover` 0..1): from `EDGE_COVER.0`
+/// some shelter, all of it from `EDGE_COVER.1`. At the edge half the ring is open: no shelter.
+pub const FOREST_CALM: f32 = 0.75;
+pub const CANOPY_SHELTERS: f32 = 0.4;
+pub const FOREST_EDGE: i32 = 12;
+pub const EDGE_COVER: (f32, f32) = (0.5, 0.9);
+
+/// How sheltered from the wind a place is, 0 open to 1 deep in a closed forest: its canopy
+/// (`CANOPY`'s share, blended) and how much of the ring round it is under leaves.
+pub fn shelter(canopy: f32, cover: f32) -> f32 {
+    let closed = (canopy / CANOPY_SHELTERS).clamp(0.0, 1.0);
+    let inside = ((cover - EDGE_COVER.0) / (EDGE_COVER.1 - EDGE_COVER.0)).clamp(0.0, 1.0);
+    closed * inside
+}
+
+/// The wind `wind` m/s at a place that `shelter` (0..1) shelters.
+pub fn sheltered_wind(wind: f32, shelter: f32) -> f32 {
+    wind * (1.0 - FOREST_CALM * shelter.clamp(0.0, 1.0))
+}
+
+/// The fog `fog` (0..1, the weather's) where the wind drops from `wind` to `calm` m/s: in falling
+/// snow the blizzard's part of it drops with the wind.
+pub fn sheltered_fog(fog: f32, wind: f32, calm: f32, snowing: bool) -> f32 {
+    if !snowing {
+        return fog;
+    }
+    (fog - (blizzard(wind) - blizzard(calm)) * BLIZZARD_FOG).max(0.0)
+}
+
 /// How thick a blizzard is in falling snow with the wind at `wind` m/s, 0 to 1.
 pub fn blizzard(wind: f32) -> f32 {
     ((wind - BLIZZARD.0) / (BLIZZARD.1 - BLIZZARD.0)).clamp(0.0, 1.0)
@@ -339,6 +400,39 @@ mod tests {
         // The scan reaches the ground below a player on a hill and above one in a valley; plants
         // are buried by a cover that has layers.
         const { assert!(SNOW_SCAN >= 32 && SNOW_BURIES >= 1 && SNOW_BURIES <= 8) };
+    }
+
+    /// Crossing a border the air turns over the band: a place half in each biome gets half of
+    /// each. Deep in a closed forest the wind is a quarter of the open's and a blizzard thins;
+    /// at the edge (half the ring open) and in open country nothing changes.
+    #[test]
+    fn air_blends_and_forests_calm_the_wind() {
+        let r = ring(0, 0, AIR_BLEND / 2);
+        assert_eq!(r[0], (0, 0));
+        assert!(
+            r[1..]
+                .iter()
+                .all(|&(x, z)| ((x * x + z * z) as f32).sqrt().round() as i32 == AIR_BLEND / 2)
+        );
+        // East of the border (x > 0) 10 °C, west 0: on the border, about half.
+        let half: [f32; 9] = r.map(|(x, _)| if x >= 0 { 10.0 } else { 0.0 });
+        assert!((4.0..=7.0).contains(&blend(half)), "{}", blend(half));
+        assert_eq!(blend([3.0; 9]), 3.0);
+        // The forest.
+        assert_eq!(shelter(1.0, 0.5), 0.0, "the edge is open");
+        assert_eq!(shelter(0.0, 1.0), 0.0, "no canopy, no shelter");
+        assert_eq!(shelter(1.0, 1.0), 1.0);
+        assert!((sheltered_wind(8.0, 1.0) - 2.0).abs() < 1e-4);
+        assert_eq!(sheltered_wind(8.0, 0.0), 8.0);
+        for &(name, share) in &CANOPY {
+            let deep = sheltered_wind(10.0, shelter(share, 1.0));
+            assert!((2.5..=5.0).contains(&deep), "{name}: {deep} m/s of 10 deep inside");
+        }
+        // A blizzard in 12 m/s, deep in a forest: the fog thins with the wind; no snow, no change.
+        let fog = blizzard(12.0) * BLIZZARD_FOG;
+        let calm = sheltered_wind(12.0, 1.0);
+        assert!(sheltered_fog(fog, 12.0, calm, true) < 0.2, "{}", sheltered_fog(fog, 12.0, calm, true));
+        assert_eq!(sheltered_fog(0.4, 12.0, calm, false), 0.4);
     }
 
     /// Dawn fog is gone by noon and the wind clears it.
