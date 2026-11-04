@@ -454,13 +454,14 @@ fn animal_screen(ui: &mut Ui) {
             });
             // The header in the rows' own columns: name, bar, wild, tamed, +.
             ui.row(S::row().gap(3.0), |ui| {
-                ui.row(S::row().w(34.0 + 3.0 + STAT_BAR.0), |_| {});
+                ui.row(S::row().w(8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0), |_| {});
                 ui.row(S::row().w(14.0).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.wild_points", &[]));
                 ui.row(S::row().w(18.0).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.tamed_points", &[]));
                 ui.row(S::row().w(10.0), |_| {});
             });
             for (i, name) in STAT_NAMES.iter().enumerate() {
                 ui.row(S::row().gap(3.0).center(), |ui| {
+                    ui.image(&format!("base:gui/stat_icon_{name}"), 8.0, 8.0);
                     ui.text_styled(S::default().w(34.0).no_wrap(), &format!("stat.animals.{name}"), &[]);
                     ui.row(S::row().size(STAT_BAR.0, STAT_BAR.1), move |ui| {
                         // One bar per quality on the same place: the one matching its wild points shows.

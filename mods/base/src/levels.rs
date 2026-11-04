@@ -258,6 +258,7 @@ fn client(r: &mut Registry) {
             ui.column(S::col().gap(2.0), |ui| {
                 for (i, stat) in stats::ALL.into_iter().enumerate() {
                     ui.row(S::row().gap(4.0).center(), |ui| {
+                        ui.image(&format!("base:gui/stat_icon_{}", stat.name()), 8.0, 8.0);
                         ui.text_styled(S::default().w(40.0).no_wrap(), &format!("stat.base.{}", stat.name()), &[]);
                         ui.row(S::row().size(STAT_BAR.0, STAT_BAR.1), |ui| {
                             ui.progress_bind(Box::leak(format!("stat_{}", stat.name()).into_boxed_str()), S::default().size(STAT_BAR.0, STAT_BAR.1), move |c| {
