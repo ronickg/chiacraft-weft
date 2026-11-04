@@ -231,7 +231,8 @@ pub fn init(r: &mut Registry) {
 /// foliage and big cones; ginkgos, round, deciduous, with fleshy seeds; the floodplain's swamp
 /// cypresses and the dry land's scale-leaved conifers (Cheirolepidiaceae), both cones; and the tree
 /// fern Tempskya, a trunk of roots under a crown of fronds. Wood, shape, what the leaves drop.
-/// No saplings yet: they grow by base's plant rule, which this mod can't call.
+/// Their saplings grow by the place (`base_api::grow`, `vitals::plants`); Tempskya, which spread by
+/// its roots, has none.
 const WOODS: [(&str, Option<&str>, Option<&str>); 5] = [
     ("araucaria", Some("flat_tree"), Some("araucaria_cone")),
     ("ginkgo", None, Some("ginkgo_seed")),
@@ -284,10 +285,38 @@ fn woods(r: &mut Registry) {
             .tag("leaves")
             .mineable("shears")
             .tab(&NATURAL);
+        let plant: &'static str = Box::leak(format!("animals:{wood}_sapling").into_boxed_str());
+        let has_sapling = vitals::plants::of(plant).is_some();
+        let table = r.loot(leaves);
+        let table = if has_sapling { table.pool(Pool::new().when(Cond::Chance(0.05)).item(plant)) } else { table };
+        drop(match fruit {
+            Some(fruit) => table.pool(Pool::new().when(Cond::Chance(0.05)).item(fruit)),
+            None => table,
+        });
         if let Some(fruit) = fruit {
-            r.loot(leaves)
-                .pool(Pool::new().when(Cond::Chance(0.05)).item(fruit));
             r.item(Item::generated(fruit.into())).tab(&NATURAL);
+        }
+        if has_sapling {
+            let log: &'static str = Box::leak(format!("animals:{wood}_log").into_boxed_str());
+            r.block(Block::generated(plant.into()))
+                .sound_group("base:block.grass")
+                .texture(&format!("sapling_{wood}"))
+                .plant()
+                .needs_below("#plant_soil")
+                .growth(base_api::grow::step_secs(plant, 1, 470.0), 9)
+                .on_grow(move |e| match base_api::grow::step(e, plant, false) {
+                    base_api::grow::Step::Grow => {
+                        if let Some(id) = Block::lookup(log) {
+                            base_api::trees::grow_tree(e.world(), e.pos(), id);
+                        }
+                    }
+                    // A frost kills a sapling of the warm Cretaceous.
+                    base_api::grow::Step::Frost => {
+                        e.world().set(e.pos(), 0);
+                    }
+                    base_api::grow::Step::Rest => {}
+                })
+                .tab(&NATURAL);
         }
     }
 }

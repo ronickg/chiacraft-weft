@@ -435,3 +435,6 @@ block.base.moriche_palm_sapling = Moriche Palm Sapling
 item.base.mesquite_pod = Mesquite Pods
 item.base.acuri_nut = Acuri Nut
 item.base.moriche_fruit = Moriche Fruit
+block.base.kelp = Kelp
+item.base.kelp = Kelp
+item.base.cooked_wild_rice = Cooked Wild Rice

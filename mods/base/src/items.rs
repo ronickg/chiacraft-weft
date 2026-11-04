@@ -100,6 +100,8 @@ pub fn register(r: &mut Registry) {
         ("sunflower_seeds", 2, 2.4, ""),
         ("mushroom_brown", 1, 0.6, ""),
         ("mushroom_red", 1, 0.6, ""),
+        ("cooked_wild_rice", 5, 6.0, ""),
+        ("kelp", 1, 0.6, ""),
     ] {
         // What a portion holds and how fresh it is (stamped as it ages, `survival/food.rs`): shown in
         // its tooltip.
@@ -119,7 +121,6 @@ pub fn register(r: &mut Registry) {
             .tab(&crate::tabs::FOOD);
         let i = if tag.starts_with("cooked_meat/") { i.tag("cooked_meat") } else { i };
         // Berries are planted like seeds: a new bush; so are the wild plants' fruit and seeds.
-        let i = if name == "berries" { i.placed_block(&crate::blocks::BERRY_BUSH) } else { i };
         let i = match crate::wild::planted_by(name) {
             Some(b) => i.placed_block(b),
             None => i,
@@ -135,6 +136,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     let rice = r
         .item(Item::generated("rice".into()))
+        .tag("rice")
         .tab(&crate::tabs::NATURAL);
     match crate::wild::planted_by("rice") {
         Some(b) => drop(rice.placed_block(b)),
