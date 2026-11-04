@@ -111,8 +111,26 @@ fn tick(w: &World) {
         }
     }
     w.set_rain(&wet, thunder);
+    // `/weather rain` rains everywhere for its time, whatever the biomes' spells: seen as a player
+    // rained on where their biome has no spell today. Then every biome's air counts as raining, so
+    // the cold ones snow (a taiga winter drew rain under it).
+    // Only a region with players tells (the others would say no, every region ticking this).
+    let players = w.players();
+    if !players.is_empty() {
+        let manual = w.raining()
+            && players.into_iter().any(|p| {
+                w.entity(p).is_some_and(|st| {
+                    let at = st.pos.map(|v| v.floor() as i32);
+                    w.raining_at(at) && !wet.contains(&w.biome(at))
+                })
+            });
+        MANUAL_RAIN.store(manual, std::sync::atomic::Ordering::Relaxed);
+    }
     send(w);
 }
+
+/// A `/weather rain` is on: it rains in every biome (`tick`).
+static MANUAL_RAIN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Where the wind blows to now, degrees clockwise from north.
 fn now_heading(w: &World) -> f32 {
@@ -134,7 +152,7 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
             return BiomeAir { biome: id, fog, wind, snow, flags: flags | aurora };
         }
     }
-    let raining = climate::rains(c.rain, season, key, day, hour);
+    let raining = climate::rains(c.rain, season, key, day, hour) || MANUAL_RAIN.load(std::sync::atomic::Ordering::Relaxed);
     // A thunderstorm's wind, and in dry country the hour before it: its gust front.
     let storm = climate::spell(c.rain, season, key, day)
         .is_some_and(|(from, to)| ((from - if c.humidity < air::DRY { 1.0 } else { 0.0 })..to).contains(&hour))
