@@ -1,6 +1,6 @@
 {
  "kind": "item",
- "what": "an earthworm: a pink-brown segmented worm curled in an S shape, faint ring segments and a slightly paler band, centred with 3-5 px of padding",
+ "what": "an earthworm: a pink-brown segmented worm curled in an S shape, faint ring segments and a slightly paler band, plump enough to read at 1x, drawn small: its longest side only about 20 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
  "size": [
   32,
   32
@@ -9,10 +9,10 @@
  "green": true,
  "tries": [
   {
-   "grid": 0.483,
-   "outline": 0.66,
+   "grid": 0.488,
+   "outline": 0.81,
    "red_line": 0.0,
-   "fill": 0.2,
+   "fill": 0.14,
    "passed": true
   }
  ]
