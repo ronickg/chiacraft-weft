@@ -278,8 +278,19 @@ Slice 2 (consent marks code), after Ronald agreed the report's decisions: protoc
 join sheet marks it (`join_sheet.code`, `OfferRow.code`). In `content::freeze_commands` a
 package's command whose name is taken is left out with a warning instead of failing the content
 build (code mods keep the old error).
-Left: components and channels in the API (slice 3), client halves (slice 4), personal mods per
-world (slice 5), `/mods` (slice 6).
+Slice 3, API 1.1 (built; not yet seen in the game): `crates/sandbox/wit/v1.1/mod.wit` is 1.0
+plus `registry.component`/`attach` (declarations, `Decl`, compared on restart like hooks),
+`world.get-component`/`set-component`, `set-blocks`, `play-sound`, `spawn-particles`. The host
+binds 1.1 only: a 1.0 component links by wasmtime's semver matching (checked with clans, and a
+test loads its committed wasm). `check_imports` refuses imports outside `chiacraft:mods/*` and
+newer 1.x at load. `crates/mod-sdk` is 1.1.0 (`value!`, `Component`, `entity_component`,
+`attach`, `w.component`/`set_component`/`update_component`, `Sound`, `Particle`, `Burst`,
+`set_blocks`). In `mods/packages`, components register as `Component<[u8; N]>` in buckets of 8
+to 256 (`Comp`); sounds and particles are checked by `find` and made into handles once per name.
+Sample `examples/wasm/tally` (a per-player count of blocks broken, a chime and particles every
+tenth, `/tally pillar` with `set_blocks`), packaged as `examples/packages/tally`.
+Left: 1.2 (block and item callbacks, channels), client halves (slice 4), personal mods per world
+(slice 5), `/mods` (slice 6).
 
 ## Side mods
 

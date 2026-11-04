@@ -21,8 +21,13 @@
 //!
 //! What differs from Weft's SDK: only server code (no content builders, screens or client hooks
 //! yet: content comes from the package's definitions); a handle's id is looked up by name in the
-//! world the mod runs in; per-entity components become [`storage`]; and a few calls of our own
-//! ([`World::tell`], [`World::player_key`], [`World::teleport`]).
+//! world the mod runs in; a component's value is read and set by value
+//! ([`World::component`], [`World::set_component`], [`World::update_component`]) rather than by
+//! reference; and a few calls of our own ([`World::tell`], [`World::player_key`],
+//! [`World::teleport`], [`storage`]).
+//!
+//! API 1.1 (this SDK): components, `set_blocks`, sounds and particles. A mod built with it needs
+//! a game that runs 1.1; one built with the 1.0 SDK runs in every 1.x game.
 //!
 //! Build with `cargo build --release --target wasm32-unknown-unknown`, then
 //! `cargo run -p chiacraft-sandbox --features pack --bin componentize -- <module.wasm>
@@ -35,7 +40,7 @@ use std::rc::Rc;
 #[doc(hidden)]
 pub mod bindings {
     wit_bindgen::generate!({
-        path: "../sandbox/wit/v1.0",
+        path: "../sandbox/wit/v1.1",
         world: "server-mod",
         pub_export_macro: true,
         export_macro_name: "__export",
@@ -51,7 +56,7 @@ pub use bindings::exports::chiacraft::mods::hooks::{
 };
 
 /// The API version this SDK builds for.
-pub const API: &str = "1.0.0";
+pub const API: &str = "1.1.0";
 
 // ------------------------------------------------------------------ entry point
 
@@ -628,6 +633,32 @@ impl Registry {
         let id = registry::world_tick();
         push(id, Callback::Tick(Rc::new(f)));
     }
+
+    /// A per-entity value of this mod's (Weft's `entity_component`, 1.1): at most 256 bytes,
+    /// `flags` from [`component_flags`]. Entities get it through [`Registry::attach`].
+    pub fn entity_component<T: Value>(&mut self, c: &Component<T>, default: T, flags: u32) {
+        let mut f = registry::ComponentFlags::empty();
+        for (bit, flag) in [
+            (component_flags::SAVE, registry::ComponentFlags::SAVE),
+            (component_flags::SYNC_OWNER, registry::ComponentFlags::SYNC_OWNER),
+            (component_flags::SYNC_WATCHERS, registry::ComponentFlags::SYNC_WATCHERS),
+            (component_flags::KEEP, registry::ComponentFlags::KEEP),
+        ] {
+            if flags & bit != 0 {
+                f = f | flag;
+            }
+        }
+        if let Err(e) = registry::component(c.name, std::mem::size_of::<T>() as u32, f, &value_bytes(&default)) {
+            self.errors.push(e);
+        }
+    }
+
+    /// Every entity of `kind` carries component `c` (Weft's `attach`, 1.1).
+    pub fn attach<T: Value>(&mut self, kind: &Entity, c: &Component<T>) {
+        if let Err(e) = registry::attach(kind.name(), c.name) {
+            self.errors.push(e);
+        }
+    }
 }
 
 /// A command being registered: it is registered when this is dropped.
@@ -923,6 +954,37 @@ impl World {
     pub fn player_key(&self, player: u64) -> String {
         wworld::player_key(player)
     }
+    /// Many blocks at once (1.1): how many changed.
+    pub fn set_blocks(&self, changes: &[([i32; 3], u32)]) -> u32 {
+        let list: Vec<((i32, i32, i32), u32)> = changes
+            .iter()
+            .map(|(p, s)| ((p[0], p[1], p[2]), *s))
+            .collect();
+        wworld::set_blocks(&list)
+    }
+    /// An entity's value of one of this mod's components (Weft's `component`, by value; 1.1).
+    pub fn component<T: Value>(&self, id: u64, c: &Component<T>) -> Option<T> {
+        wworld::get_component(id, c.name).and_then(|b| value_from(&b))
+    }
+    /// Sets it (1.1); false if the entity doesn't carry it.
+    pub fn set_component<T: Value>(&self, id: u64, c: &Component<T>, value: T) -> bool {
+        wworld::set_component(id, c.name, &value_bytes(&value))
+    }
+    /// Changes it in place, the way Weft's `component_mut` is used (1.1); false if the entity
+    /// doesn't carry it.
+    pub fn update_component<T: Value>(&self, id: u64, c: &Component<T>, f: impl FnOnce(&mut T)) -> bool {
+        let Some(mut v) = self.component(id, c) else { return false };
+        f(&mut v);
+        self.set_component(id, c, v)
+    }
+    /// A sound at `pos` (Weft's `play_sound`, 1.1).
+    pub fn play_sound(&self, sound: &Sound, pos: [f64; 3], volume: f32) {
+        wworld::play_sound(sound.0, (pos[0], pos[1], pos[2]), volume);
+    }
+    /// Particles at `pos` (Weft's `spawn_particles`, 1.1): `.count(n)`, sent when dropped.
+    pub fn spawn_particles(&self, kind: &Particle, pos: [f64; 3]) -> Burst {
+        Burst { kind: kind.0, pos, count: 1 }
+    }
     /// The value of property `name` of the block at `pos`.
     pub fn prop(&self, pos: [i32; 3], name: &str) -> Option<String> {
         state_prop(self.get(pos), name)
@@ -936,6 +998,118 @@ impl World {
             }
             None => false,
         }
+    }
+}
+
+// ------------------------------------------------------------------ components, sounds, particles (1.1)
+
+/// Plain data a component holds (Weft's `Value`): `repr(C)`, `Copy`, no pointers. Primitives and
+/// arrays of them are; structs with [`value!`].
+///
+/// # Safety
+/// Every byte pattern of its size must be a valid value (no `bool`, `char` or enums inside), and
+/// it has no padding the game might keep.
+pub unsafe trait Value: Copy + 'static {}
+
+macro_rules! primitive {
+    ($($t:ty),*) => { $(unsafe impl Value for $t {})* };
+}
+primitive!(u8, i8, u16, i16, u32, i32, u64, i64, f32, f64);
+unsafe impl<T: Value, const N: usize> Value for [T; N] {}
+
+/// A component's struct, as Weft's `value!` writes it: `repr(C)`, `Copy`.
+///
+/// ```ignore
+/// value! {
+///     #[derive(Default)]
+///     pub struct Tribe { pub id: [u8; 16], pub name: [u8; 24] }
+/// }
+/// ```
+#[macro_export]
+macro_rules! value {
+    ($(#[$m:meta])* $vis:vis struct $name:ident { $($(#[$fm:meta])* $fvis:vis $field:ident : $ty:ty),* $(,)? }) => {
+        $(#[$m])*
+        #[repr(C)]
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        $vis struct $name { $($(#[$fm])* $fvis $field: $ty),* }
+        unsafe impl $crate::Value for $name {}
+    };
+}
+
+fn value_bytes<T: Value>(v: &T) -> Vec<u8> {
+    // SAFETY: `Value` is plain data without padding.
+    unsafe { std::slice::from_raw_parts(v as *const T as *const u8, std::mem::size_of::<T>()) }.to_vec()
+}
+
+fn value_from<T: Value>(b: &[u8]) -> Option<T> {
+    // SAFETY: any bytes of the size are a valid `Value`.
+    (b.len() >= std::mem::size_of::<T>()).then(|| unsafe { std::ptr::read_unaligned(b.as_ptr() as *const T) })
+}
+
+/// A per-entity value of this mod's, by its own name (Weft's `Component`); `size_of::<T>()` at
+/// most 256 bytes.
+pub struct Component<T: Value> {
+    name: &'static str,
+    _t: PhantomData<fn() -> T>,
+}
+
+impl<T: Value> Component<T> {
+    pub const fn named(name: &'static str) -> Self {
+        Component { name, _t: PhantomData }
+    }
+    pub fn name(&self) -> &str {
+        self.name
+    }
+}
+
+/// Weft's `component_flags`.
+pub mod component_flags {
+    /// Kept in the save.
+    pub const SAVE: u32 = 1;
+    /// Sent to the entity's own player.
+    pub const SYNC_OWNER: u32 = 2;
+    /// Sent to every player who sees it.
+    pub const SYNC_WATCHERS: u32 = 4;
+    /// Kept when a player respawns.
+    pub const KEEP: u32 = 16;
+}
+
+/// A sound, by full name (`Sound::named("base:block.stone.break")`).
+pub struct Sound(&'static str);
+
+impl Sound {
+    pub const fn named(name: &'static str) -> Sound {
+        Sound(name)
+    }
+}
+
+/// A particle kind, by full name.
+pub struct Particle(&'static str);
+
+impl Particle {
+    pub const fn named(name: &'static str) -> Particle {
+        Particle(name)
+    }
+}
+
+/// Particles being made (Weft's `Burst`): sent when dropped.
+pub struct Burst {
+    kind: &'static str,
+    pos: [f64; 3],
+    count: u32,
+}
+
+impl Burst {
+    /// How many (1 to 256).
+    pub fn count(mut self, n: u32) -> Self {
+        self.count = n;
+        self
+    }
+}
+
+impl Drop for Burst {
+    fn drop(&mut self) {
+        wworld::spawn_particles(self.kind, (self.pos[0], self.pos[1], self.pos[2]), self.count);
     }
 }
 
