@@ -1,6 +1,6 @@
 //! The nearest spots to spawn of a kind, with a camera for a look script: for testers, so a shot
 //! of a lake or a river shows one. Kinds: `lake`, `river` (water at least two blocks deep in the
-//! channel), `coast` (land with the sea beside it), `karst` (a tower), `canyon` (cut 24 or more), `crater`, `sinkhole` (karst), `arch`, `waterfall`, `glacier`, `flooded` (the tropical forest's still water), `spawn` (the fair first place) or any overworld biome by name (`desert`,
+//! channel), `coast` (land with the sea beside it), `karst` (a tower), `canyon` (cut 24 or more), `crater`, `sinkhole` (karst), `arch`, `waterfall`, `glacier`, `tarn`, `flooded` (the tropical forest's still water), `spawn` (the fair first place) or any overworld biome by name (`desert`,
 //! `sequoia_grove`, ...). Searched in rings outward from the middle every `step` blocks, the
 //! world as the engine builds it (the overworld's fields, its continent scale).
 //!
@@ -66,6 +66,32 @@ fn main() {
             let dist = ((x as f64).powi(2) + (z as f64).powi(2)).sqrt().round();
             println!("# {kind} at x {x} z {z}: {what}, ground {}, {dist} blocks from spawn", h(x, z));
             println!("chat /tp {x} {} {}\nidle\nlook 180 -30\nwait 2\nwhere\nshot {kind}_{x}_{z}.png", h(x, z).max(SEA) + 20, z - 30);
+        }
+        return;
+    }
+    if kind == "tarn" {
+        // Sites, by their cells: each with its water and whether its ring holds it all round.
+        let mut sites = l::tarns_near(&f, 0, 0, 6_000);
+        sites.sort_by_key(|&(x, z, _, _)| x as i64 * x as i64 + z as i64 * z as i64);
+        println!("# {} tarns within 6000 of the middle on seed {seed}", sites.len());
+        for (x, z, r, level) in sites.into_iter().take(count) {
+            let mut low_rim = i32::MAX;
+            let mut high_bed = i32::MIN;
+            for dz in -r - 2..=r + 2 {
+                for dx in -r - 2..=r + 2 {
+                    let d2 = dx * dx + dz * dz;
+                    if d2 <= r * r {
+                        high_bed = high_bed.max(h(x + dx, z + dz));
+                    } else if d2 <= (2 * r + 3) * (2 * r + 3) / 4 {
+                        low_rim = low_rim.min(h(x + dx, z + dz));
+                    }
+                }
+            }
+            println!(
+                "# tarn at x {x} z {z}, radius {r}, water at {level}: bed up to {high_bed}, rim from {low_rim} ({})",
+                if low_rim > level && high_bed < level { "holds" } else { "LEAKS" }
+            );
+            println!("chat /tp {x}.5 {} {}.5\nidle\nlook 180 -40\nwait 2\nwhere", level + 14, z - 18);
         }
         return;
     }

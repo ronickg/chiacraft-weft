@@ -144,9 +144,10 @@ pub fn felling(logs: u32, harvest: u32) -> Felling {
 
 /// STOPGAP until first-hours (Planner, 11-05): a fresh survival world had no way to a first tool
 /// (bare hands chopped fruitlessly, and planks, the table and every tool need logs). Bare hands
-/// keep the wood of a tree this small (a bush, a young tree) at the hand's own pace, a log's
-/// time the hand's. The First hours worker replaces it with stones, knapping and a hand-made axe.
-pub const HAND_STOPGAP_LOGS: u32 = 8;
+/// keep the wood of a tree this small (a bush, a young tree: the understory's young oaks have a
+/// median of 9 logs, Tree looks 11-05) at the hand's own pace, a log's time the hand's. The First
+/// hours worker replaces it with stones, knapping and a hand-made axe.
+pub const HAND_STOPGAP_LOGS: u32 = 10;
 
 /// Chopping a tree's foot with bare hands or any tool but an axe: as slow as an axe past its tier
 /// and as fruitless (Planner, 11-05), with one log's time the hand's; but a tree of up to

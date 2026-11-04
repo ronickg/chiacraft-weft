@@ -181,6 +181,30 @@ pub fn room_for(near: f64, coming: u32, crowd: u32) -> bool {
     near + coming as f64 <= crowd.max(coming) as f64
 }
 
+/// Ticks in a second.
+pub const SECOND: u64 = 20;
+
+/// Whether an animal's once-a-second upkeep (its body, hunger and thirst) runs this tick, and
+/// how many seconds it covers: `time` is the world's tick, `elapsed` the ticks since the animal
+/// last ticked (`World::tick_elapsed`). It runs on the tick a second turns over for it
+/// (`(time + id) % SECOND < elapsed`) and covers what passed (`elapsed / SECOND`, at least one).
+/// One no player is near rests and ticks only every `core:inactive_entity_interval` ticks: run on
+/// `(time + id) % 20 == 0` alone, it lived a second for every wake whatever the interval (half as
+/// fast at 40, a third at 60; at 30 two wakes in three were missed).
+pub fn seconds_due(time: u64, id: u64, elapsed: u32) -> Option<f32> {
+    let e = elapsed.max(1) as u64;
+    ((time + id) % SECOND < e).then(|| (e as f32 / SECOND as f32).max(1.0))
+}
+
+/// How many of its every-`every`-seconds steps fall in the `secs` seconds (`seconds_due`) up to
+/// tick `time` (a point of food used every so many seconds, `animal::hunger`): the windows of
+/// successive upkeeps meet, so none is missed or counted twice.
+pub fn steps_in(time: u64, secs: f32, every: u64) -> u64 {
+    let period = every.max(1) * SECOND;
+    let window = (secs * SECOND as f32).round() as u64;
+    time / period - time.saturating_sub(window) / period
+}
+
 /// Ticks since an animal was last seen (its area loaded) past which its time away is caught up
 /// on load, as lazy simulations do (Vintage Story's crops, Minecraft's Elapsed): timers run out,
 /// young are born, it ages, and a wild one that died meanwhile has a successor.
@@ -212,6 +236,43 @@ pub fn develops(egg_air: f32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A far animal lives as fast as a near one (`seconds_due`, `steps_in`): ticking only every
+    /// 20, 30, 40, 60 or 200 ticks (`core:inactive_entity_interval`), or every tick, its upkeep
+    /// covers a minute in a minute, its points of food are used on time, and a countdown run
+    /// down by the ticks elapsed (taming's fright and wait, a dog's sitting, breeding) ends
+    /// within one wake of when it is due.
+    #[test]
+    fn a_far_animal_keeps_time() {
+        for interval in [1u64, 7, 20, 30, 40, 60, 200] {
+            for id in [0u64, 3, 17, 1234] {
+                let (mut secs, mut food, mut last, mut left, mut ended) = (0.0f32, 0u64, 0u64, 600u32, None);
+                // Ticks as the engine wakes a resting entity: when (time + id) % interval == 0.
+                for time in 1..=1200u64 {
+                    if (time + id) % interval != 0 {
+                        continue;
+                    }
+                    let elapsed = if last == 0 { 1 } else { (time - last) as u32 };
+                    last = time;
+                    left = left.saturating_sub(elapsed);
+                    if left == 0 && ended.is_none() {
+                        ended = Some(time);
+                    }
+                    if let Some(s) = seconds_due(time, id, elapsed) {
+                        secs += s;
+                        food += steps_in(time, s, 5);
+                    }
+                }
+                assert!(
+                    (secs - 60.0).abs() <= interval as f32 / SECOND as f32 + 1.0,
+                    "interval {interval}, id {id}: {secs} s of upkeep in 60"
+                );
+                assert!(food.abs_diff(12) <= 1 + interval / 100, "interval {interval}, id {id}: {food} points of food in a minute, not 12");
+                let ended = ended.expect("the countdown ended");
+                assert!(ended >= 600 && ended < 600 + 2 * interval, "interval {interval}, id {id}: a 600-tick countdown ended at {ended}");
+            }
+        }
+    }
 
     /// Natural spawning fills a place to its crowd and no further (the 48-minute PC soak: wolves
     /// at 21-52 where there is room for 16, dying of want): a grey wolf's pack comes while it
