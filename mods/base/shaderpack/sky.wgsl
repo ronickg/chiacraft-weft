@@ -384,6 +384,7 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
     }
     if open_sky() && !in_liquid() {
         var c = sky_color(dir) + milky_way(dir) + aurora(dir);
+        c = cirrus(c, dir);
         if dir.y < 0.0 {
             // From below sea level, vanilla's dark of the void.
             c *= 1.0 - s.uv.x * smoothstep(0.0, 0.08, -dir.y);
@@ -398,6 +399,26 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
         return vec4(scene.fog_color.rgb * (1.0 - dark), 1.0);
     }
     return vec4(mix(s.color.rgb, scene.fog_color.rgb, clamp(0.0625 / dir.y, 0.0, 1.0)), 1.0);
+}
+
+// A soft high layer of thin cloud, far above the blocky ones (Research round 15, rec. 2 slice 4:
+// Bliss's altostratus plane at y 2000): wisps on a plane, drifting slowly with the wind, lit by the
+// sky and taking the sunset's colours and the moon's light, thicker under rain. Behind the blocky
+// clouds it gives the sky depth.
+fn cirrus(c: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
+    if dir.y <= 0.02 {
+        return c;
+    }
+    let p = palette();
+    let t = scene.params.w;
+    let at = dir.xz / dir.y * 2000.0 + scene.eye.xz + wind_now() * t * 6.0;
+    let q = at / vec2(900.0, 260.0);
+    let n = noise3(vec3(q, t * 0.002)) * 0.6 + noise3(vec3(q * 2.7 + 13.0, t * 0.003)) * 0.3 + noise3(vec3(q * 7.1 + 41.0, 0.0)) * 0.1;
+    let rain = rain_amount();
+    let cover = smoothstep(0.55 - 0.25 * rain, 0.85, n) * smoothstep(0.02, 0.2, dir.y);
+    let mu = max(dot(dir, light_dir()), 0.0);
+    let lit = p.horizon * 0.6 + p.ambient * 0.8 + p.sun * light_strength() * 0.35 + p.glow * pow(mu, 4.0) * light_strength() * 0.8;
+    return mix(c, lit, cover * 0.55);
 }
 
 // Vanilla's sunset fan: an oval lying on the horizon on the side of the body.
