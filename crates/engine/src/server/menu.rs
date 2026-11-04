@@ -51,10 +51,13 @@ pub struct MenuCall {
 }
 
 impl MenuCall {
+    // These hand out what the raw pointers point at, which `MenuCall` doesn't own.
+    #[allow(clippy::mut_from_ref)]
     fn m(&self) -> &mut OpenMenu {
         unsafe { &mut *self.menu }
     }
 
+    #[allow(clippy::mut_from_ref)]
     fn d(&self) -> &mut Dim {
         unsafe { &mut *self.dim }
     }
