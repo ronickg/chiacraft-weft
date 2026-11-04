@@ -259,7 +259,13 @@ fn screen(ui: &mut Ui) {
                         } else if k.removed & (1 << i) != 0 || (k.done != 0 && !keeps) {
                             ui.panel("knap_gone", square, |_| {});
                         } else if ended {
-                            ui.panel(if k.done != 0 { "knap_free" } else { "knap_head" }, square, |_| {});
+                            // Shown, no longer struck: the freed head lit, or a broken nodule as it lay.
+                            let class = match (k.done != 0, keeps) {
+                                (true, _) => "knap_free",
+                                (false, true) => "knap_head",
+                                (false, false) => "knap_stone",
+                            };
+                            ui.panel(class, square, |_| {});
                         } else if keeps {
                             let s = square.class("knap_head").tooltip("knapping.base.keep_tip");
                             ui.button_with(s, move |c| c.client().send(&HIT, &(i as u32)), |_| {});
