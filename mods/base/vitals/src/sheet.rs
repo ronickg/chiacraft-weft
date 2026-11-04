@@ -138,7 +138,7 @@ fn felling_table(w: &mut String) {
     use crate::felling::{self, LONGEST_SECS, PAST_TIER, SHEET_TREES, TIERS};
     let _ = write!(
         w,
-        "## Felling\n\nAn axe at a tree's foot fells it in one chop that takes logs^{} times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, {} times slower, and gives nothing. A tree that loses its foot, or a log of its trunk, by any means falls (none stands in the air); bare hands and other tools chop the foot as slowly as an axe past its tier, and as fruitlessly. Never more than {} min. Felled, a tree within its tier lies on the ground in pieces of {} logs, each cut as long as felling a tree of its logs takes; the axe wears by logs^{} for a felling or a piece. A tree falls as itself: a {} s creak, then {:.1} s for one 10 high ({}-{} s, by the square root of its height), its leaves breaking off past {}° until {:.0}% have, the rest bursting on the ground; on the way leaves and branches in its path break, and a trunk it strikes falls too if the falling tree has {}x its logs. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:\n\n| tier | harvest | takes up to | speed |",
+        "## Felling\n\nAn axe at a tree's foot fells it in one chop that takes logs^{} times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, {} times slower, and gives nothing. A tree that loses its foot, or a log of its trunk, by any means falls (none stands in the air); bare hands and other tools chop the foot as slowly as an axe past its tier, and as fruitlessly. Never more than {} min. Felled, a tree within its tier lies on the ground in pieces of {} logs, each cut as long as felling a tree of its logs takes; the axe wears by logs^{} for a felling or a piece. A tree falls as itself: a {} s creak, then {:.1} s for one 10 high ({}-{} s, by the square root of its height), its leaves breaking off past {}° until {:.0}% have, the rest bursting on the ground; on the way leaves and branches in its path break, and a trunk it strikes falls too if the falling tree has {}x its logs, or else it catches there and settles as blocks; a creature it hits takes 2 + a tenth of its logs, up to {}. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:\n\n| tier | harvest | takes up to | speed |",
         felling::GROWTH,
         PAST_TIER,
         LONGEST_SECS / 60.0,
@@ -150,7 +150,8 @@ fn felling_table(w: &mut String) {
         felling::FALL_SECS.2,
         felling::SHED_FROM,
         felling::SHED_SHARE * 100.0,
-        felling::KNOCK_FELLS
+        felling::KNOCK_FELLS,
+        felling::HURT_MOST
     );
     for (name, logs) in SHEET_TREES {
         let _ = write!(w, " {name} ({logs}) |");
