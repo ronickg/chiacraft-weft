@@ -22,6 +22,8 @@ pub enum Shape {
     Cone,
     /// A birch's: an upright ellipse.
     Oval,
+    /// An umbrella thorn's: a wide flat disc on top, nothing under it (the stems fan out to it).
+    Umbrella,
 }
 
 impl Shape {
@@ -35,6 +37,14 @@ impl Shape {
                 (1.0 - t * t).max(0.0).sqrt()
             }
             Shape::Cone => 1.0 - 0.92 * v,
+            Shape::Umbrella => {
+                if v < 0.55 {
+                    0.0
+                } else {
+                    let t = (v - 0.8) / 0.25;
+                    (1.0 - t * t).max(0.0).sqrt()
+                }
+            }
             Shape::Oval => {
                 let t = 2.0 * v - 1.0;
                 (1.0 - t * t).max(0.0).sqrt()
@@ -76,6 +86,9 @@ pub struct Colonize {
     /// The trunk goes on to the crown's top as a leader the branches grow from (a birch's), not
     /// only to the crown's foot (an oak's, which divides into its limbs).
     pub leader: bool,
+    /// Stems the trunk divides into at its top before the crown grows (an acacia's 3 or 4 fanning
+    /// out like a vase); 0 none.
+    pub fork: u32,
 }
 
 pub const OAK: Colonize = Colonize {
@@ -98,6 +111,7 @@ pub const OAK: Colonize = Colonize {
     leaf_along: false,
     twig: 0.32,
     leader: false,
+    fork: 0,
 };
 
 pub const SPRUCE: Colonize = Colonize {
@@ -120,6 +134,7 @@ pub const SPRUCE: Colonize = Colonize {
     leaf_along: true,
     twig: 0.3,
     leader: false,
+    fork: 0,
 };
 
 pub const BIRCH: Colonize = Colonize {
@@ -142,9 +157,61 @@ pub const BIRCH: Colonize = Colonize {
     leaf_along: true,
     twig: 0.16,
     leader: true,
+    fork: 0,
 };
 
-pub const ALL: &[Colonize] = &[OAK, SPRUCE, BIRCH];
+/// An umbrella thorn (Vachellia tortilis): a short trunk dividing low into stems that fan out to a
+/// wide flat crown, far wider than it is tall (`reports/Tree looks.md`, section 12).
+pub const ACACIA: Colonize = Colonize {
+    log: "base:acacia_log",
+    trunk: 2.2,
+    crown_h: 7.5,
+    crown_r: 6.4,
+    size_var: 0.15,
+    shape: Shape::Umbrella,
+    points: 220,
+    influence: 4.0,
+    kill: 2.0,
+    step: 1.0,
+    tropism: 0.05,
+    twig_r: 0.13,
+    min_trunk: 1.0,
+    leaf_r: 2.0,
+    leaf_ry: 0.8,
+    ragged: 0.3,
+    leaf_along: false,
+    twig: 0.32,
+    leader: false,
+    fork: 3,
+};
+
+/// A Pacific dogwood (Cornus nuttallii): a small understory tree, a short trunk under a rounded,
+/// open crown of level sprays. Tried and not used: colonization gives a ball, `branchy`'s
+/// opposite level sprays read better (its `RECIPES` row).
+pub const DOGWOOD: Colonize = Colonize {
+    log: "base:dogwood_log",
+    trunk: 1.5,
+    crown_h: 5.0,
+    crown_r: 3.8,
+    size_var: 0.2,
+    shape: Shape::Dome,
+    points: 110,
+    influence: 3.5,
+    kill: 1.8,
+    step: 1.0,
+    tropism: -0.05,
+    twig_r: 0.1,
+    min_trunk: 0.9,
+    leaf_r: 1.7,
+    leaf_ry: 0.9,
+    ragged: 0.4,
+    leaf_along: false,
+    twig: 0.3,
+    leader: false,
+    fork: 0,
+};
+
+pub const ALL: &[Colonize] = &[OAK, SPRUCE, BIRCH, ACACIA, DOGWOOD];
 
 struct Rng(u64);
 impl Rng {
@@ -210,6 +277,28 @@ fn skeleton(c: &Colonize, seed: u64) -> (Vec<Node>, Vec<f32>) {
         }
     }
     let mut nodes = vec![Node { p: foot, parent: None }];
+    if c.fork > 0 {
+        // The trunk straight up, then its stems out at about 40 degrees, evenly round with a
+        // random turn (directions by rotating one unit vector: arithmetic only).
+        while nodes[nodes.len() - 1].p[1] < trunk {
+            let last = nodes.len() - 1;
+            nodes.push(Node { p: add(nodes[last].p, [0.0, c.step, 0.0]), parent: Some(last) });
+        }
+        let top = nodes.len() - 1;
+        let n = c.fork.clamp(2, 4) as usize;
+        let (cs, sn) = [(-1.0f32, 0.0f32), (-0.5, 0.866_025_4), (0.0, 1.0)][n - 2];
+        let mut h = norm([rng.s(), 0.0, rng.s() + 0.001]);
+        for _ in 0..n {
+            let mut q = top;
+            let d = norm(add(h, [0.0, 1.2, 0.0]));
+            for _ in 0..2 {
+                let p = add(nodes[q].p, mul(d, c.step));
+                nodes.push(Node { p, parent: Some(q) });
+                q = nodes.len() - 1;
+            }
+            h = [h[0] * cs - h[2] * sn, 0.0, h[0] * sn + h[2] * cs];
+        }
+    }
     if c.leader {
         // The leader straight up through the crown to near its top, swaying a little.
         let top = base[1] + ch * 0.92;
