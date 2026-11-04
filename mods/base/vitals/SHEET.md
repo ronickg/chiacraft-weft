@@ -78,6 +78,8 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:beans | seeds | 100 | 10 | 2 | 4 | 0 | 4 | 90 | 5 min | 5 + 5 |  |
 | base:cooked_rice | seeds | 150 | 15 | 4 | 42 | 0 | 1 | 103 | 11 min | 3 + 3 | hot when cooked |
 | base:cassava | roots | 100 | 10 | 1 | 36 | 0 | 4 | 60 | 7 min | 2 + 2 |  |
+| base:pumpkin_slice | fruit | 200 | 20 | 2 | 12 | 0 | 3 | 183 | 9 min | 4 + 4 |  |
+| base:melon_slice | fruit | 150 | 15 | 1 | 11 | 0 | 2 | 137 | 7 min | 2 + 2 | cooling |
 
 ## Meals and preserving
 
@@ -102,6 +104,8 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | animals:hare (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | animals:trout (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | animals:pacu (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| base:pumpkin_slice (8) | base:dried_berries | - | - | 112 |
+| base:melon_slice (4) | base:dried_berries | - | - | 112 |
 
 ## Clothing
 
@@ -237,6 +241,8 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:sorghum | sorghum | 8, 27-34, 42 | Dry | 0 °C | 125 | 28 | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), sequoia_grove (su), ocean (sp su au wi), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su au) |
 | base:millet | pearl millet | 10, 30-34, 45 | Dry | 0 °C | 105 | 25 | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au), ocean (su au), beach (su au), red_dunes (su), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
 | base:cassava | cassava | 12, 25-29, 37 | Moderate | 0 °C | 390 | 63 | plains (su), savanna (sp su au), swamp (su au), ocean (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
+| base:pumpkin_stem | pumpkin, squash | 10, 20-30, 35 | Moderate | 0 °C | 110 | 26 | plains (su), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), ocean (su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
+| base:melon_stem | melon | 12, 25-30, 38 | Moderate | 0 °C | 140 | 31 | plains (su), savanna (sp su au), swamp (su au), ocean (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
 | base:berry_bush | blueberry | 7, 20-26, 32 | Moderate | -2 °C | 75 | 20 | plains (su), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
 | base:sugar_cane | sugar cane | 12, 22-30, 38 | Wet | -1 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), sequoia_grove (su), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
 | base:kelp | kelp (Laminaria) | 0, 5-15, 22 | Wet | hardy | - | the game's | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (sp su au), snowy_plains (su), desert (wi), mountains (sp su au), sequoia_grove (sp su au wi), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (wi), fern_forest (sp su au), crags (sp au wi) |
@@ -285,6 +291,8 @@ What each crop is sown from and gives ripe (`vitals::crops`; how it grows is its
 | base:sorghum | base:sorghum_seeds | base:sorghum 1-1 | 4 | Tires | base:savanna, base:plains, base:desert |
 | base:millet | base:millet_seeds | base:millet 1-1 | 4 | Tires | base:savanna, base:desert |
 | base:cassava | base:cassava | base:cassava 1-3 | 4 | Tires | base:savanna, base:swamp |
+| base:pumpkin_stem | base:pumpkin_seeds | base:pumpkin_seeds 1-1 | 4 | Tires | base:plains, base:forest, base:savanna |
+| base:melon_stem | base:melon_seeds | base:melon_seeds 1-1 | 4 | Tires | base:savanna, base:plains |
 
 ## Wild plants
 
@@ -422,7 +430,7 @@ Farmland's fertility (`vitals::soil`): how fast crops grow at each level, what w
 | 1 | 47% |
 | 0 | 20% |
 
-A ripe harvest of base:wheat, base:barley, base:rye, base:carrots, base:potatoes, base:beetroots, base:maize, base:paddy_rice, base:sorghum, base:millet, base:cassava takes a level, of base:beans gives one back; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
+A ripe harvest of base:wheat, base:barley, base:rye, base:carrots, base:potatoes, base:beetroots, base:maize, base:paddy_rice, base:sorghum, base:millet, base:cassava, base:pumpkin_stem, base:melon_stem takes a level, of base:beans gives one back; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
 
 ## Difficulty (the `base:difficulty` rule)
 

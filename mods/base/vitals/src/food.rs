@@ -685,6 +685,28 @@ pub const FOODS: &[Food] = &[
         poison: 0.2,
         category: Category::Roots,
     },
+    // The stems' fruit (`crops::CROPS`, USDA, raw; carbs without the fiber): a slice of pumpkin,
+    // a fifth of a small one, and a slice of watermelon, cooling.
+    Food {
+        name: "base:pumpkin_slice",
+        grams: 200.0,
+        per100: per(91.6, 1.0, 6.0, 0.1, 0.5, 9.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (4.0, 4.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    Food {
+        name: "base:melon_slice",
+        grams: 150.0,
+        per100: per(91.5, 0.6, 7.2, 0.2, 0.4, 8.1),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (2.0, 2.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
 ];
 
 /// A food by its item's name (`base:apple`), or the name without its mod (`apple`).

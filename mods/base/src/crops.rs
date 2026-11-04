@@ -13,6 +13,12 @@ use weft_sdk::*;
 use crate::blocks::TALL_GRASS;
 use crate::growth;
 
+/// The stems' fruit (`vitals::crops::Crop::fruit`): full blocks set beside a ripe stem, broken
+/// into slices.
+static PUMPKIN: Block = Block::named("pumpkin");
+static MELON: Block = Block::named("melon");
+static PLANT_SOIL: Tag = Tag::named("plant_soil");
+
 fn short(name: &'static str) -> &'static str {
     name.split_once(':').map_or(name, |n| n.1)
 }
@@ -58,6 +64,21 @@ pub fn register(r: &mut Registry) {
     r.shapeless(s, "roasted_corn", 1, &["#crops/corn"], 200);
     r.shapeless(s, "cooked_rice", 1, &["#crops/rice_seeds"], 200);
 
+    // The stems' fruit: a pumpkin breaks into three to five slices, a melon three to seven; a
+    // slice gives its seeds.
+    for (b, top, side, slice, (lo, hi)) in [(&PUMPKIN, "pumpkin_top", "pumpkin_side", "pumpkin_slice", (3, 5)), (&MELON, "melon_top", "melon_side", "melon_slice", (3, 7))] {
+        r.block(b)
+            .sound_group("wood")
+            .textures(top, side, top)
+            .hardness(1.0)
+            .mineable("axe")
+            .tab(&crate::tabs::NATURAL);
+        r.loot(b).pool(Pool::new().entry(Entry::item(slice).count(lo, hi)));
+    }
+    let c = &base_api::CRAFTING;
+    r.shapeless(c, "pumpkin_seeds", 2, &["pumpkin_slice"], 0);
+    r.shapeless(c, "melon_seeds", 2, &["melon_slice"], 0);
+
     // Tall grass broken by a player gives now and then a seed of one of its biome's crops.
     r.on(&BLOCK_BROKEN, |b| {
         let w = b.world();
@@ -102,7 +123,14 @@ fn crop(r: &mut Registry, c: &'static Crop) {
         // waits for the season it ripens in (winter rye's summer).
         .growth(growth::step_secs(c.block, ripe, 205.0), 9)
         .on_grow(move |e| {
-            let last = growth::age(e) + 1 == ripe;
+            let age = growth::age(e);
+            // A ripe stem sets its fruit beside it in its season (`set_fruit`), again and again.
+            if let Some(fruit) = c.fruit.filter(|_| age >= ripe) {
+                growth::grow(e, c.block, true, |e| set_fruit(e, fruit));
+                return;
+            }
+            // A stem grows in any season; the others' last step waits for their ripening one.
+            let last = c.fruit.is_none() && age + 1 == ripe;
             growth::grow(e, c.block, last, |e| growth::next_age(e, ripe))
         });
     // Paddy rice stands by water.
@@ -126,6 +154,27 @@ fn crop(r: &mut Registry, c: &'static Crop) {
                     .entry(Entry::item(short(c.seed)).count(0, crops::EXTRA_SEEDS)),
             ),
         );
+    }
+}
+
+/// A ripe stem's fruit, set on an empty block beside it that stands on soil, unless one already
+/// lies beside it (a vine bears one at a time where it lies).
+fn set_fruit(e: &mut BlockEvent, fruit: &str) {
+    let w = e.world();
+    let [x, y, z] = e.pos();
+    let Some(id) = Block::lookup(fruit) else { return };
+    const SIDES: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+    if SIDES.iter().any(|&(dx, dz)| w.get([x + dx, y, z + dz]) == id) {
+        return;
+    }
+    let start = (w.random() % 4) as usize;
+    for k in 0..4 {
+        let (dx, dz) = SIDES[(start + k) % 4];
+        let at = [x + dx, y, z + dz];
+        if w.get(at) == 0 && PLANT_SOIL.on_block(w.get([x + dx, y - 1, z + dz])) {
+            w.set(at, id);
+            return;
+        }
     }
 }
 

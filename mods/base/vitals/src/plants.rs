@@ -61,7 +61,7 @@ const ANY: u8 = 15;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 41] = [
+pub const PLANTS: [Plant; 43] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -84,6 +84,10 @@ pub const PLANTS: [Plant; 41] = [
     p("base:sorghum", "sorghum", (8.0, 27.0, 34.0, 42.0), Water::Dry, 125.0, ANY, 0.0),
     p("base:millet", "pearl millet", (10.0, 30.0, 34.0, 45.0), Water::Dry, 105.0, ANY, 0.0),
     p("base:cassava", "cassava", (12.0, 25.0, 29.0, 37.0), Water::Moderate, 390.0, ANY, 0.0),
+    // Pumpkin and melon stems (the research's rows): warm-season, killed by frost; the fruit sets
+    // in summer and autumn (`SUMMER_AUTUMN`, the stem's last step).
+    p("base:pumpkin_stem", "pumpkin, squash", (10.0, 20.0, 30.0, 35.0), Water::Moderate, 110.0, SUMMER_AUTUMN, 0.0),
+    p("base:melon_stem", "melon", (12.0, 25.0, 30.0, 38.0), Water::Moderate, 140.0, SUMMER_AUTUMN, 0.0),
     p("base:berry_bush", "blueberry", (7.0, 20.0, 26.0, 32.0), Water::Moderate, 75.0, SUMMER_AUTUMN, -2.0),
     p("base:sugar_cane", "sugar cane", (12.0, 22.0, 30.0, 38.0), Water::Wet, 0.0, ANY, -1.0),
     // Kelp (Laminaria, Saccharina): cold-water seaweed, growing best at 5-15 °C and failing

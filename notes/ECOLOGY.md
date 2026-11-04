@@ -556,7 +556,6 @@ and cactus.**
 - **Not yet:**
   - the water plants as food: reeds, lily pads, eelgrass and the kelp standing in the sea
     (2026-11-04) have no `forage::SOURCES` rows yet (the wrack washed up on beaches has);
-  - pumpkins and melons (their art is in: stems that set a fruit block beside them);
   - animals eating the crops and their grain;
   - beetroot's own seed and cooked cassava, waiting for icons;
   - none of it seen in the game yet;

@@ -34,6 +34,9 @@ pub struct Crop {
     /// research grows it without watering (so not maize in the desert, nor cassava on the beach).
     /// Wheat's seed comes from tall grass everywhere instead.
     pub wild: &'static [&'static str],
+    /// A stem's fruit (pumpkin, melon): ripe, it sets this block on soil beside it in its season,
+    /// again and again, instead of being harvested itself.
+    pub fruit: Option<&'static str>,
 }
 
 /// The chance broken tall grass gives a seed of one of its biome's crops (wheat's own is an
@@ -48,7 +51,7 @@ const COOL: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base
 /// The crops. The grains are sown from their seed and give their grain; carrots, potatoes,
 /// beetroot and cassava from the root itself (cassava really from stem cuttings, beetroot from
 /// seed: a seed of its own waits for an icon); paddy rice's grain is its seed.
-pub const CROPS: [Crop; 12] = [
+pub const CROPS: [Crop; 14] = [
     c("base:wheat", "base:wheat_seeds", "base:wheat", (1, 1), 7, Soil::Tires, &[]),
     c(
         "base:barley",
@@ -85,6 +88,10 @@ pub const CROPS: [Crop; 12] = [
     c("base:sorghum", "base:sorghum_seeds", "base:sorghum", (1, 1), 3, Soil::Tires, &["base:savanna", "base:plains", "base:desert"]),
     c("base:millet", "base:millet_seeds", "base:millet", (1, 1), 3, Soil::Tires, &["base:savanna", "base:desert"]),
     c("base:cassava", "base:cassava", "base:cassava", (1, 3), 3, Soil::Tires, &["base:savanna", "base:swamp"]),
+    // Stems that set their fruit beside them (ECOLOGY.md, the research's pumpkin and melon):
+    // pumpkins in the prairie's, the forest's and the llanos' fields, melons where it's hot.
+    stem("base:pumpkin_stem", "base:pumpkin_seeds", "base:pumpkin", &["base:plains", "base:forest", "base:savanna"]),
+    stem("base:melon_stem", "base:melon_seeds", "base:melon", &["base:savanna", "base:plains"]),
 ];
 
 const fn c(
@@ -96,7 +103,12 @@ const fn c(
     soil: Soil,
     wild: &'static [&'static str],
 ) -> Crop {
-    Crop { block, seed, gives, count, ripe, soil, wild }
+    Crop { block, seed, gives, count, ripe, soil, wild, fruit: None }
+}
+
+/// A stem: sown from its seed, picked it gives the seed back, ripe it sets `fruit` beside it.
+const fn stem(block: &'static str, seed: &'static str, fruit: &'static str, wild: &'static [&'static str]) -> Crop {
+    Crop { block, seed, gives: seed, count: (1, 1), ripe: 3, soil: Soil::Tires, wild, fruit: Some(fruit) }
 }
 
 /// The crop that grows as this block.
