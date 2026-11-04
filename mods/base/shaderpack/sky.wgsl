@@ -128,6 +128,21 @@ fn cloud_cell(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> f32 {
     return cloud_cell_of(s.ids.x, cell, s.uv.zw, dims, s.axes[0].x * 0.6 + s.axes[0].z * 0.35);
 }
 
+// A storm deck's lumpiness at `cellp`, 0..1: a hash per cell, blended smoothly between the four
+// cells about the point.
+fn cloud_lumps(s: Sky, cellp: vec2<f32>) -> f32 {
+    let q = cellp - vec2(0.5);
+    let base = floor(q);
+    let f = q - base;
+    let u = f * f * (3.0 - 2.0 * f);
+    let c = vec2<i32>(base + s.uv.zw);
+    let a = hash3(vec3(c.x, 91, c.y));
+    let b = hash3(vec3(c.x + 1, 91, c.y));
+    let d = hash3(vec3(c.x, 91, c.y + 1));
+    let e = hash3(vec3(c.x + 1, 91, c.y + 1));
+    return mix(mix(a, b, u.x), mix(d, e, u.x), u.y);
+}
+
 // Henyey-Greenstein's phase for the clouds' light, `g` forward (> 0) or back (< 0).
 fn cloud_hg(mu: f32, g: f32) -> f32 {
     return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566;
@@ -235,9 +250,9 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         if density <= 0.0 {
             continue;
         }
-        // A storm's deck is lumpy, its density varying cell by cell.
-        let cell = vec2<i32>(floor(cellp - vec2(0.5)) + s.uv.zw);
-        density *= mix(1.0, 0.55 + 0.9 * hash3(vec3(cell.x, 91, cell.y)), storm * 0.8);
+        // A storm's deck is lumpy, its density varying from cell to cell, blended between them as
+        // the density is (a step at each cell's edge showed as a seam running off to the horizon).
+        density *= mix(1.0, 0.55 + 0.9 * cloud_lumps(s, cellp), storm * 0.8);
         let a = 1.0 - exp(-density * step * 0.18);
         var c = vec3(1.0);
         if lit_sky {
