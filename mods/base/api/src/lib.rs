@@ -24,6 +24,9 @@ pub const PORTIONS: usize = vitals::stomach::PORTIONS;
 /// The engine counts health as the base game's 20 points, which keeps every creature's damage
 /// in balance; the vitals count 100 (`notes/SURVIVAL.md`). A health point is this many.
 pub const HEALTH_SCALE: f32 = 5.0;
+/// A new player's stamina before the first tick sets its max (`survival/stamina.rs` clamps it):
+/// over any max, so one starts full. Dying still leaves one at 0.
+pub const NEW_STAMINA: f32 = 1.0e6;
 
 value! {
     #[derive(Default)]
@@ -293,9 +296,10 @@ pub fn heat_of(state: u32) -> f32 {
 }
 
 impl Vitals {
-    /// A new player: breath full, the body at 37 °C, an empty stomach.
+    /// A new player: breath full, stamina full (the first tick brings it down to what the stomach
+    /// allows), the body at 37 °C, an empty stomach.
     pub fn new(air: f32) -> Vitals {
-        Vitals { core: vitals::temperature::CORE, air, ..Vitals::default() }
+        Vitals { core: vitals::temperature::CORE, air, stamina: NEW_STAMINA, ..Vitals::default() }
     }
 
     pub fn stomach(&self) -> vitals::stomach::Stomach {
@@ -569,4 +573,17 @@ pub mod tabs {
     pub static FOOD: CreativeTab = CreativeTab::named("base:food");
     pub static INGREDIENTS: CreativeTab = CreativeTab::named("base:ingredients");
     pub static REDSTONE: CreativeTab = CreativeTab::named("base:redstone");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A new player starts with full stamina (Tester, 2026-11-03: it started at 0 and took 14 s to
+    /// fill), however many points are placed in it.
+    #[test]
+    fn a_new_player_starts_with_full_stamina() {
+        let most = vitals::stats::player(&[u32::from(u16::MAX); vitals::stats::STATS])[vitals::stats::Stat::Stamina.index()];
+        assert!(Vitals::new(10.0).stamina >= most, "a new player's stamina {} under a max of {most}", Vitals::new(10.0).stamina);
+    }
 }
