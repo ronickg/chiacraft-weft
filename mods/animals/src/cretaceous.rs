@@ -294,6 +294,8 @@ fn woods(r: &mut Registry) {
             .texture(&format!("leaves_{wood}"))
             .hardness(0.2)
             .cutout()
+            // Faces between two leaves of one kind aren't drawn, as base's (`blocks.rs`).
+            .cull_same()
             .opacity(1)
             .tint(base_api::trees::leaf_tint(vitals::wild::turn(&format!("animals:{wood}_leaves"))))
             .tag("leaves")
