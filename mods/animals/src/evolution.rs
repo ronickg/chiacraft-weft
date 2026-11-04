@@ -335,20 +335,54 @@ fn evolved(p: &mut Pools, index: usize, cell: (i64, i64), h: Habitat, day: u64, 
     p.today = p.today.max(day);
     let new = p.get(&k, cell).is_none();
     if new {
-        // As if it had evolved since the world began (up to `HISTORY` generations).
-        let start = day.saturating_sub(HISTORY);
-        p.insert(k.clone(), cell, Local { day: start, pool: coats::wild_pool(index, h.name())? });
+        // As if it had evolved since the world began (up to `HISTORY` generations): the species'
+        // history in this habitat (`history`, once for every place found that day), then its
+        // last `OWN` generations here, its neighbors mixing in.
+        let gens = day.min(HISTORY);
+        let own = gens.min(OWN);
+        let pool = history(index, h, gens - own, r)?;
+        p.insert(k.clone(), cell, Local { day: day - own, pool });
     }
     let from = p.get(&k, cell)?.day;
-    for _ in 0..day
-        .saturating_sub(from)
-        .min(if new { HISTORY } else { CATCH_UP })
-    {
+    for _ in 0..day.saturating_sub(from).min(CATCH_UP) {
         step(p, &k, index, cell, h, r);
     }
     let local = p.get_mut(&k, cell)?;
     local.day = local.day.max(day);
     Some(local.pool.clone())
+}
+
+/// Generations a new place evolves itself (with its neighbors) after its habitat's history.
+const OWN: u64 = 10;
+
+/// Species `index`'s pool in habitat `h` after `gens` generations from its gene file, alone: the
+/// start of every new place of that habitat. Kept, so new places share it and the next day's
+/// takes it up a generation on: 300 generations of 200 animals each was a hitch on the game thread for every
+/// species in every new place (P4).
+fn history(index: usize, h: Habitat, gens: u64, r: &mut impl coats::Rng) -> Option<Pool> {
+    static KEPT: Mutex<Option<HashMap<(usize, &'static str), (u64, Pool)>>> = Mutex::new(None);
+    let key = (index, h.name());
+    // Taken up where it was kept (a young world's history grows a generation a day).
+    let kept = KEPT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .and_then(|m| m.get(&key))
+        .filter(|(g, _)| *g <= gens)
+        .cloned();
+    let (from, mut pool) = match kept {
+        Some((g, pool)) if g == gens => return Some(pool),
+        Some(k) => k,
+        None => (0, coats::wild_pool(index, h.name())?),
+    };
+    for _ in from..gens {
+        pool = generation(index, &pool, h, r)?;
+    }
+    KEPT.lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get_or_insert_with(HashMap::new)
+        .insert(key, (gens, pool.clone()));
+    Some(pool)
 }
 
 /// One generation of the pool at `k`, with the neighbors' pools (the places around, any habitat)
