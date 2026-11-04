@@ -168,7 +168,11 @@ fn strike(u: &mut ItemUse) -> bool {
     let flint = LOOSE_FLINT.is(state);
     let player = u.player();
     let at = [p[0] as f64 + 0.5, p[1] as f64 + 0.2, p[2] as f64 + 0.5];
-    let sneaking = w.keys(player) & abi::held_keys::SNEAK != 0;
+    // Sneaking: the key held, or crouched (the server has both).
+    let sneaking = w.keys(player) & abi::held_keys::SNEAK != 0
+        || w.entity(player)
+            .is_some_and(|e| e.pose == abi::pose::CROUCH);
+    weft_sdk::info!("first: strike at {p:?}, flint {flint}, sneaking {sneaking}");
     if sneaking && flint {
         crate::knapping::open(&w, player, p);
         return true;

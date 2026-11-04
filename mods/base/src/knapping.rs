@@ -44,7 +44,8 @@ pub fn register(r: &mut Registry) {
     r.packet(&HIT, |p, v| hit(&p.world(), p.player(), v));
     r.client_packet(&OPEN, |c, v| {
         *VIEW.lock().unwrap() = Some(v);
-        c.open_screen(&SCREEN);
+        let opened = c.open_screen(&SCREEN);
+        weft_sdk::info!("knapping: screen opened {opened}");
     });
     r.client_packet(&UPDATE, |c, v| {
         *VIEW.lock().unwrap() = Some(v);
@@ -66,6 +67,7 @@ pub fn open(w: &World, player: u64, pos: [i32; 3]) {
     };
     nodules.retain(|(p, _)| *p != player);
     nodules.push((player, knap));
+    weft_sdk::info!("knapping: {player} opens the nodule at {pos:?}, head {}", knap.shape);
     w.send(player, &OPEN, &knap);
 }
 
