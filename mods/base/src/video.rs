@@ -47,8 +47,8 @@ struct Row {
 const PRESETS: [[f64; 12]; 4] = [
     // scale shadows size  reflect contact volume shafts bloom view lod   vsync cap
     [0.5, 0.0, 1024.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 64.0, 1.0, 60.0],
-    [0.67, 1.0, 1024.0, 1.0, 1.0, 0.0, 1.0, 0.0, 8.0, 128.0, 1.0, 60.0],
-    [0.0, 2.0, 2048.0, 2.0, 2.0, 1.0, 2.0, 1.0, 12.0, 192.0, 1.0, 0.0],
+    [0.67, 1.0, 1024.0, 1.0, 1.0, 1.0, 1.0, 0.0, 8.0, 128.0, 1.0, 60.0],
+    [0.0, 2.0, 2048.0, 2.0, 2.0, 2.0, 2.0, 1.0, 12.0, 192.0, 1.0, 0.0],
     [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 2.0, 1.0, 16.0, 256.0, 1.0, 0.0],
 ];
 const PRESET_NAMES: [&str; 4] = ["low", "medium", "high", "ultra"];
@@ -160,7 +160,8 @@ pub fn register(r: &mut Registry) {
     r.config(&QUALITY).int(-1, -1, 4);
     r.config(&FX_REFLECT).int(2, 0, 2);
     r.config(&FX_CONTACT).int(2, 0, 2);
-    // 2-3 ms at Retina size on the Mac (Lighting's estimate): low until a preset says otherwise.
+    // Cheap (Tester 2's PC bench, 11-04: +0.04 ms of effects at 1280x720): low until a preset
+    // says otherwise; off on the Low preset until the Mac's Retina numbers are in.
     r.config(&FX_VOLUME).int(1, 0, 2);
     r.config(&FX_SHAFTS).int(2, 0, 2);
     r.config(&FX_BLOOM).int(1, 0, 1);
