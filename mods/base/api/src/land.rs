@@ -1160,7 +1160,7 @@ mod tests {
 
     #[test]
     fn sequoia_groves_are_rare_and_found() {
-        for seed in [1, 2, 3] {
+        for seed in [1, 2, 3, 7, 42, 1234] {
             let shares = biome_shares(seed, 8000, 32);
             let (share, near) = shares
                 .iter()
@@ -1250,8 +1250,12 @@ mod tests {
 
     #[test]
     fn every_biome_turns_up_near_the_middle() {
-        for seed in [1, 2, 3] {
+        // The playtesters' seeds too (7, 42, 1234), at the continent scale of 1800.
+        for seed in [1, 2, 3, 7, 42, 1234] {
             let shares = biome_shares(seed, 6000, 48);
+            for (b, s, _) in &shares {
+                assert!(*s < 0.25, "seed {seed}: {b} is {:.1}% of the land", s * 100.0);
+            }
             for biome in ["plains", "forest", "birch_forest", "taiga", "snowy_plains", "desert", "savanna", "swamp", "mountains", "beach"] {
                 let (share, near) = shares
                     .iter()
