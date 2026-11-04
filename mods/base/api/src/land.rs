@@ -186,6 +186,11 @@ pub const DESERT: (f64, f64) = (0.14, 0.0);
 pub const SAVANNA: (f64, f64) = (0.1, 0.1);
 /// Swamp from this temperature and this humidity, on low land.
 pub const SWAMP: (f64, f64) = (0.0, 0.04);
+/// Tropical forest (Ronald, 11-04: "all four"; the third proposal sheet) from this temperature
+/// and this humidity: the hot, wet corner, where the rules fell through to oak "forest" at the
+/// llanos' heat (3.5-5.6% of the land on seeds 1, 7, 42, 1234). The savanna's heat, the forest's
+/// rain; the swamp keeps the low wet land.
+pub const TROPICAL: (f64, f64) = (0.1, 0.07);
 /// Forest from this humidity; birch forest under this temperature and from this humidity.
 pub const FOREST_HUMIDITY: f64 = 0.07;
 pub const BIRCH: (f64, f64) = (0.05, 0.0);
@@ -487,12 +492,13 @@ pub const OCEAN_CONTINENT: f64 = 0.1;
 /// The land's biome rules in the order they're tried, after the coasts and the mountains, with
 /// the bed under their water: gravel in the north and the birch woods, sand in the warm lands,
 /// mud (dirt) in the swamp.
-pub const RIVER_BEDS: [(&str, &str); 8] = [
+pub const RIVER_BEDS: [(&str, &str); 9] = [
     ("snowy_plains", "gravel"),
     ("taiga", "gravel"),
     ("desert", "sand"),
     ("savanna", "sand"),
     ("swamp", "dirt"),
+    ("tropical_forest", "dirt"),
     ("forest", "sand"),
     ("birch_forest", "gravel"),
     ("plains", "sand"),
@@ -991,7 +997,9 @@ pub fn spawn_where(seed: u64, open: &dyn Fn(i32, i32) -> bool) -> [i32; 3] {
             && level(x, z, hh)
             && MOUNTAINS_AREA.value(&f, x * 16, z * 16) < q12(0.2)
             && near(x, z, SPAWN_WATER, 4, &|px, pz| h(px, pz) < SEA && biome(px, pz) != "ocean")
-            && near(x, z, SPAWN_WOODS, 8, &|px, pz| matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove"))
+            && near(x, z, SPAWN_WOODS, 8, &|px, pz| {
+                matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove" | "tropical_forest")
+            })
     };
     let plains = |x: i32, z: i32| biome(x, z) == "plains" && h(x, z) > SEA + 1 && level(x, z, h(x, z));
     let land = |x: i32, z: i32| h(x, z) > SEA + 1;
@@ -1124,6 +1132,8 @@ fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool) -
         "savanna"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
+    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
+        "tropical_forest"
     } else if hu >= at(FOREST_HUMIDITY) {
         "forest"
     } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {
@@ -1394,6 +1404,8 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
         "savanna"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
+    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
+        "tropical_forest"
     } else if hu >= at(FOREST_HUMIDITY) {
         "forest"
     } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {
@@ -1747,7 +1759,19 @@ mod tests {
             for (b, s, _) in &shares {
                 assert!(*s < 0.25, "seed {seed}: {b} is {:.1}% of the land", s * 100.0);
             }
-            for biome in ["plains", "forest", "birch_forest", "taiga", "snowy_plains", "desert", "savanna", "swamp", "mountains", "beach"] {
+            for biome in [
+                "plains",
+                "forest",
+                "tropical_forest",
+                "birch_forest",
+                "taiga",
+                "snowy_plains",
+                "desert",
+                "savanna",
+                "swamp",
+                "mountains",
+                "beach",
+            ] {
                 let (share, near) = shares
                     .iter()
                     .find(|e| e.0 == biome)
