@@ -43,9 +43,15 @@ shot clouds_4_storm_n.png
 look 0 40
 wait 2
 shot clouds_4b_storm_up.png
+look 0 15
+wait 1
+bench 4 clouds_storm
 chat /tp 149.5 75 -166.5
 wait 6
 look 0 5
 wait 3
 shot clouds_5_storm_ground.png
+look 180 20
+wait 2
+shot clouds_5b_storm_ground_s.png
 quit

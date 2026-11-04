@@ -128,19 +128,25 @@ fn cloud_cell(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> f32 {
     return cloud_cell_of(s.ids.x, cell, s.uv.zw, dims, s.axes[0].x * 0.6 + s.axes[0].z * 0.35);
 }
 
-// A storm deck's lumpiness at `cellp`, 0..1: a hash per cell, blended smoothly between the four
-// cells about the point.
-fn cloud_lumps(s: Sky, cellp: vec2<f32>) -> f32 {
-    let q = cellp - vec2(0.5);
-    let base = floor(q);
-    let f = q - base;
-    let u = f * f * (3.0 - 2.0 * f);
-    let c = vec2<i32>(base + s.uv.zw);
-    let a = hash3(vec3(c.x, 91, c.y));
-    let b = hash3(vec3(c.x + 1, 91, c.y));
-    let d = hash3(vec3(c.x, 91, c.y + 1));
-    let e = hash3(vec3(c.x + 1, 91, c.y + 1));
-    return mix(mix(a, b, u.x), mix(d, e, u.x), u.y);
+// A storm deck's structure at `cellp`, 0..1: one smooth field about three and a half cells across
+// (the picture's cells, as the wind carries them). Where it is high the deck stands up in towers,
+// where it is lowest it opens into lighter breaks. Picked cell by cell (a hash), the towers' dark
+// bottoms read from below as a checkered ceiling (Ronald: "Merge, then refine storm", 11-05).
+fn storm_field(s: Sky, cellp: vec2<f32>) -> f32 {
+    let at = cellp + s.uv.zw;
+    return noise3(vec3(at.x / 3.5, 5.5, at.y / 3.5));
+}
+
+// How much a storm deck stands up in a tower at a field value `n`.
+fn storm_tower(n: f32) -> f32 {
+    return smoothstep(0.55, 0.8, n);
+}
+
+// The deck's lumps, 0..1, varying with the height in it too, so its belly darkens by depth and not
+// by cell.
+fn cloud_lumps(s: Sky, cellp: vec2<f32>, along: f32) -> f32 {
+    let at = cellp + s.uv.zw;
+    return noise3(vec3(at.x / 1.6, along * 2.5, at.y / 1.6));
 }
 
 // Henyey-Greenstein's phase for the clouds' light, `g` forward (> 0) or back (< 0).
@@ -149,15 +155,13 @@ fn cloud_hg(mu: f32, g: f32) -> f32 {
 }
 
 // Where `along` (0 at the slab's bottom, 1 at its top as tall as a storm makes it) is within the
-// cloud at `cellp`: its own height 0..1, over 1 above it. A storm's towers (a cell in five) take
-// the whole height; the rest the bottom third.
+// cloud at `cellp`: its own height 0..1, over 1 above it. A storm's towers (`storm_field`) rise
+// smoothly to the whole height; the rest of the deck fills the bottom third.
 fn cloud_height(s: Sky, cellp: vec2<f32>, along: f32, storm: f32) -> f32 {
     if storm <= 0.0 {
         return along;
     }
-    let cell = vec2<i32>(floor(cellp) + s.uv.zw);
-    let tower = select(0.0, 1.0, hash3(vec3(cell.x, 53, cell.y)) < 0.2);
-    let span = mix(1.0 / mix(1.0, 3.0, storm), 1.0, tower);
+    let span = mix(1.0 / mix(1.0, 3.0, storm), 1.0, storm_tower(storm_field(s, cellp)));
     return along / span;
 }
 
@@ -177,7 +181,11 @@ fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
     let middle = 1.0 - pow(abs(h * 2.0 - 1.0), 2.0);
     // A storm's deck is one sheet: rounded puffs would leave lens-shaped gaps where four meet, the
     // bright sky showing through them.
-    let deck = s.axes[0].z * smoothstep(0.0, 0.4, middle);
+    // Where the storm's field is lowest the deck breaks open a little.
+    var deck = s.axes[0].z * smoothstep(0.0, 0.4, middle);
+    if scene.weather.w > 0.0 {
+        deck *= mix(1.0, smoothstep(0.12, 0.3, storm_field(s, cellp)), scene.weather.w);
+    }
     return max(smoothstep(0.35, 0.6, cover - (1.0 - middle) * 0.5), deck);
 }
 
@@ -242,7 +250,8 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         let t = near + (f32(i) + jitter) * step;
         let rel = dir * t;
         let cellp = s.uv.xy + rel.xz / size;
-        let h = cloud_height(s, cellp, (rel.y - low) / tall, storm);
+        let along = (rel.y - low) / tall;
+        let h = cloud_height(s, cellp, along, storm);
         if h > 1.0 {
             continue;
         }
@@ -252,7 +261,9 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         }
         // A storm's deck is lumpy, its density varying from cell to cell, blended between them as
         // the density is (a step at each cell's edge showed as a seam running off to the horizon).
-        density *= mix(1.0, 0.55 + 0.9 * cloud_lumps(s, cellp), storm * 0.8);
+        if storm > 0.0 {
+            density *= mix(1.0, 0.45 + 1.1 * cloud_lumps(s, cellp, along), storm * 0.8);
+        }
         let a = 1.0 - exp(-density * step * 0.18);
         var c = vec3(1.0);
         if lit_sky {
@@ -273,7 +284,13 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
             }
             let powder = 1.0 - exp(-2.0 * (od + density * 0.5));
             // Undersides darker by their albedo in a storm, not blackened.
-            let albedo = mix(1.0, mix(0.45, 1.0, h), storm);
+            // By the height in the deck (the same at the same height everywhere), and darker under a
+            // tower's whole column, smoothly, as the towers rise.
+            var albedo = 1.0;
+            if storm > 0.0 {
+                let deep = mix(0.45, 1.0, smoothstep(0.0, 0.5, along)) * mix(1.0, 0.75, storm_tower(storm_field(s, cellp)));
+                albedo = mix(1.0, deep, storm);
+            }
             let below = mix(p.horizon * 0.9 + p.ambient * 0.6, p.ambient * 1.6, h) * mix(1.0, 0.4, dark * (1.0 - h)) * albedo;
             c = below + p.sun * light_strength() * scatter * mix(0.6, 1.0, powder) * 0.55 * (1.0 - dark * 0.6) * albedo;
             c += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength() * (0.4 + 0.6 * h);
