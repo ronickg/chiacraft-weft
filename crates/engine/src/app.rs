@@ -388,6 +388,13 @@ impl App {
         if let Some(v) = self.opts.view {
             crate::config::override_for_run("core:view_distance", &v.to_string());
         }
+        // `--config "core:lod_distance=0,core:shader_pack="`: settings for this run only, as the
+        // file writes them (benchmarks varying one thing at a time).
+        if let Some(list) = api::launch_options().get("config") {
+            for (name, value) in list.split(',').filter_map(|kv| kv.split_once('=')) {
+                crate::config::override_for_run(name.trim(), value.trim());
+            }
+        }
         let mut settings = Settings::new(&self.opts.run_dir);
         log::info!("player name '{}' (setting core:name)", settings.name());
         // Links between worlds, and the inbox for them, open while the game runs (chiacraft).
@@ -2709,7 +2716,17 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
         g.client.update_wires(&mut *r.gpu, &r.textures);
         // The sun's light for shadow maps (packs that use them), which the world's scene samples.
         g.client.prepare_shadows(&mut *r.gpu);
+        // A copy of the world for what is seen through it (`water_behind` packs, with post on).
+        g.client.behind = [0.0; 4];
+        if post && crate::packs::water_behind() {
+            if let Some([c, d]) = r.post.behind_targets(&mut *r.gpu, info.width, info.height) {
+                g.client.behind = [c as f32, d as f32, 1.0, 0.0];
+            }
+        }
     }
+    // GPU time parts (`bench::GPU_PARTS`): terrain made and particles simulated so far, then the
+    // shadow map.
+    r.list.push(Cmd::Mark);
     let mut world = std::mem::take(&mut r.world_list);
     world.clear();
     world.push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
@@ -2722,7 +2739,19 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
         g.client.render(&mut *r.gpu, &mut world, info, &r.textures);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
         g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
+        // The opaque world copied, then what is seen through it drawn over it, reading the copy.
+        if g.client.behind[2] > 0.5 {
+            world.push(Cmd::EndPass);
+            if let Some(scene) = g.client.scene_buffer(info.slot) {
+                let depth = r.gpu.texture_index(r.depth.0);
+                r.post
+                    .copy_behind(&mut *r.gpu, &mut world, info, scene, depth);
+            }
+            world.push(Cmd::BeginPass { color: Some((world_target, None)), depth: Some((r.depth.0, None)) });
+            world.append(&mut g.client.late_out);
+        }
     }
+    r.list.push(Cmd::Mark);
     world.push(Cmd::EndPass);
     r.list.append(&mut world);
     r.world_list = world;
@@ -2733,7 +2762,9 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
         r.post.apply(&mut *r.gpu, &mut r.list, info, scene, depth);
+        r.list.push(Cmd::Mark);
     } else {
+        r.list.push(Cmd::Mark);
         // The UI pipeline has no depth, so it cannot draw in a pass that has one.
         r.list
             .push(Cmd::BeginPass { color: Some((Target::Surface, None)), depth: None });

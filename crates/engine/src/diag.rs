@@ -47,6 +47,9 @@ pub static TERRAIN_FINISHED: Counter = Counter::new();
 pub static TERRAIN_FINISH_NS: Counter = Counter::new();
 pub static TERRAIN_JOINED: Counter = Counter::new();
 pub static TERRAIN_BUSY_NS: Counter = Counter::new();
+/// Distant terrain: tiles made (shown or cached) and asked for then called off.
+pub static LOD_MADE: Counter = Counter::new();
+pub static LOD_CALLED_OFF: Counter = Counter::new();
 
 /// Messages and bytes per message kind: `[0]` to clients, `[1]` to the server.
 static NET: [[(AtomicU64, AtomicU64); 64]; 2] = [const { [const { (AtomicU64::new(0), AtomicU64::new(0)) }; 64] }; 2];
@@ -296,7 +299,7 @@ pub struct Reporter {
     frame_sum: f64,
     frame_max: f32,
     cpu: [f64; 5],
-    gpu: [f64; 5],
+    gpu: [f64; crate::bench::GPU_N],
     gpu_frames: u32,
     mods: ModWindow,
 }
@@ -316,7 +319,7 @@ impl Reporter {
         for (a, v) in self.cpu.iter_mut().zip(s.cpu) {
             *a += *v as f64;
         }
-        if s.gpu.len() >= 5 {
+        if s.gpu.len() >= crate::bench::GPU_N {
             for (a, v) in self.gpu.iter_mut().zip(s.gpu) {
                 *a += *v as f64;
             }
@@ -393,6 +396,10 @@ impl Reporter {
                     busy as f64 / secs / 1e7
                 );
             }
+            let (made, off) = (LOD_MADE.take(), LOD_CALLED_OFF.take());
+            if made + off > 0 {
+                log::debug!(target: "load", "distant terrain per {secs:.1} s: {made} tiles made, {off} called off");
+            }
         }
         if on(Channel::Mesh, Level::Debug) {
             let (meshed, ns) = (MESHED.take(), MESH_NS.take());
@@ -408,7 +415,7 @@ impl Reporter {
         self.frame_sum = 0.0;
         self.frame_max = 0.0;
         self.cpu = [0.0; 5];
-        self.gpu = [0.0; 5];
+        self.gpu = [0.0; crate::bench::GPU_N];
         self.gpu_frames = 0;
     }
 

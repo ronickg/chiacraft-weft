@@ -291,16 +291,17 @@ pub struct WorldRenderer {
     /// Depth only, from the sun, for `sun_shadows` packs (their `fs_shadow`): faces, quads.
     shadow_pipes: Option<[PipelineId; 2]>,
     /// The shadow pass's own per-frame draws (`draw_shadow`), apart from the camera's.
-    shadow_origins: Vec<(BufferId, u32)>,
-    shadow_indirect: Vec<(BufferId, u32)>,
-    shadow_offsets: Vec<(BufferId, u32)>,
+    /// Per shadow cascade (near, far): each pass writes its own draws.
+    shadow_origins: [Vec<(BufferId, u32)>; 2],
+    shadow_indirect: [Vec<(BufferId, u32)>; 2],
+    shadow_offsets: [Vec<(BufferId, u32)>; 2],
     face_pipes: [PipelineId; 3],
     quad_pipes: [PipelineId; 3],
     lod_pipe: PipelineId,
-    /// Distant terrain tiles (`lod`): their quads (in `faces`, four words like a face), count
-    /// and the heights they span; the ones to draw this frame; and the columns whose cubes show
+    /// Distant terrain tiles (`lod`): their quads (in `faces`, four words like a face), count,
+    /// the heights they span and the records before its faces; the ones to draw this frame; and the columns whose cubes show
     /// their ground (`Lod::mask`, half its width), where their pixels are left to the cubes.
-    lod: FxHashMap<super::lod::TileKey, (Alloc, u32, (i32, i32))>,
+    lod: FxHashMap<super::lod::TileKey, (Alloc, u32, (i32, i32), u32)>,
     pub lod_draw: Vec<super::lod::TileKey>,
     pub lod_half: u32,
     lod_mask: (BufferId, usize),
@@ -435,9 +436,9 @@ impl WorldRenderer {
             .collect();
         Ok(WorldRenderer {
             shadow_pipes,
-            shadow_origins: Vec::new(),
-            shadow_indirect: Vec::new(),
-            shadow_offsets: Vec::new(),
+            shadow_origins: Default::default(),
+            shadow_indirect: Default::default(),
+            shadow_offsets: Default::default(),
             face_pipes,
             quad_pipes,
             lod_pipe,
@@ -578,6 +579,7 @@ impl WorldRenderer {
         cam: &Camera,
         light: Mat4,
         scene: BufferId,
+        cascade: usize,
     ) {
         let Some([face_pipe, quad_pipe]) = self.shadow_pipes else { return };
         let cam_block = cam.pos.floor();
@@ -628,9 +630,12 @@ impl WorldRenderer {
         if n == 0 {
             return;
         }
-        let obuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_origins, frame.slot, n, 16, usage::STORAGE, "shadow origins");
-        let ibuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_indirect, frame.slot, n, 20, usage::INDIRECT, "shadow indirect");
-        let fbuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_offsets, frame.slot, 1, 16, usage::STORAGE, "shadow offsets");
+        let obuf =
+            crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_origins[cascade], frame.slot, n, 16, usage::STORAGE, "shadow origins");
+        let ibuf =
+            crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_indirect[cascade], frame.slot, n, 20, usage::INDIRECT, "shadow indirect");
+        let fbuf =
+            crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_offsets[cascade], frame.slot, 1, 16, usage::STORAGE, "shadow offsets");
         gpu.mapped(fbuf)[..16].fill(0);
         {
             let origins = gpu.mapped(obuf);
@@ -784,9 +789,9 @@ impl WorldRenderer {
             .drain(..)
             .chain(self.indirect.drain(..))
             .chain(self.offsets.drain(..))
-            .chain(self.shadow_origins.drain(..))
-            .chain(self.shadow_indirect.drain(..))
-            .chain(self.shadow_offsets.drain(..))
+            .chain(self.shadow_origins.iter_mut().flat_map(|v| v.drain(..)))
+            .chain(self.shadow_indirect.iter_mut().flat_map(|v| v.drain(..)))
+            .chain(self.shadow_offsets.iter_mut().flat_map(|v| v.drain(..)))
         {
             gpu.destroy_buffer(b);
         }
@@ -856,20 +861,22 @@ impl WorldRenderer {
         }
     }
 
-    /// A distant terrain tile's quads (`lod::mesh`), spanning heights `y`.
+    /// A distant terrain tile's quads (`lod::mesh`), spanning heights `y`; the first `skip`
+    /// records aren't drawn (a smooth tile's corners, which its cells read).
     pub fn upload_lod(
         &mut self,
         gpu: &mut dyn Backend,
         textures: &GameTextures,
         key: super::lod::TileKey,
         quads: &[[u32; 4]],
+        skip: u32,
         y: (i32, i32),
     ) {
         self.remove_lod(key);
-        if quads.is_empty() {
+        if quads.len() <= skip as usize {
             return;
         }
-        let mut used: Vec<u32> = quads
+        let mut used: Vec<u32> = quads[skip as usize..]
             .iter()
             .map(|q| q[1] & crate::gpu_layout::face::TEX_MASK)
             .collect();
@@ -878,7 +885,7 @@ impl WorldRenderer {
         textures.ensure_blocks(gpu, used);
         let a = self.faces.alloc(gpu, quads.len() as u32);
         gpu.write_buffer(self.faces.pages[a.page as usize].0, a.offset as u64 * 16, bytemuck::cast_slice(quads));
-        self.lod.insert(key, (a, quads.len() as u32, y));
+        self.lod.insert(key, (a, quads.len() as u32, y, skip));
     }
 
     /// The columns shown by cubes (`Lod::mask`).
@@ -892,11 +899,11 @@ impl WorldRenderer {
 
     /// Distant terrain tiles held and their quads.
     pub fn lod_counts(&self) -> (usize, usize) {
-        (self.lod.len(), self.lod.values().map(|t| t.1 as usize).sum())
+        (self.lod.len(), self.lod.values().map(|t| (t.1 - t.3) as usize).sum())
     }
 
     pub fn remove_lod(&mut self, key: super::lod::TileKey) {
-        if let Some((a, _, _)) = self.lod.remove(&key) {
+        if let Some((a, ..)) = self.lod.remove(&key) {
             self.faces.free(a);
         }
     }
@@ -1156,7 +1163,7 @@ impl WorldRenderer {
             .lod_draw
             .iter()
             .filter_map(|key| {
-                let &(a, count, (y0, y1)) = self.lod.get(key)?;
+                let &(a, count, (y0, y1), skip) = self.lod.get(key)?;
                 let o = key.origin();
                 let half = Vec3::new(key.size() as f32, (y1 - y0) as f32, key.size() as f32) / 2.0;
                 let center = Vec3::new(o.x as f32, y0 as f32, o.y as f32) + half - (cam_cube * 16).as_vec3() - cam_frac;
@@ -1167,10 +1174,10 @@ impl WorldRenderer {
                     return None;
                 }
                 let args = DrawIndexedArgs {
-                    indices: count * 6,
+                    indices: (count - skip) * 6,
                     instances: 1,
                     first_index: 0,
-                    vertex_offset: (a.offset * 4) as i32,
+                    vertex_offset: ((a.offset + skip) * 4) as i32,
                     first_instance: 0,
                 };
                 Some((3, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center))

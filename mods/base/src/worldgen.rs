@@ -2,6 +2,7 @@
 //! places in every dimension whose biomes ask for them) and plants (a decoration).
 
 use base_api::CLIMATE;
+use base_api::land;
 use vitals::wild;
 use weft_sdk::*;
 
@@ -66,7 +67,7 @@ pub fn register(r: &mut Registry) {
     r.biome(&FOREST)
         .set(&CLIMATE, base_api::climate("base:forest"))
         .set(&BOULDERS, 0.12)
-        .humidity(0.25..)
+        .humidity(land::FOREST_HUMIDITY..)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x79c05a)
         .tint(foliage, 0x59ae30)
@@ -81,8 +82,8 @@ pub fn register(r: &mut Registry) {
     r.biome(&BIRCH_FOREST)
         .set(&CLIMATE, base_api::climate("base:birch_forest"))
         .set(&BOULDERS, 0.1)
-        .temperature(..0.1)
-        .humidity(0.05..)
+        .temperature(..land::BIRCH.0)
+        .humidity(land::BIRCH.1..)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x88bb67)
         .tint(foliage, 0x6ba941)
@@ -97,7 +98,7 @@ pub fn register(r: &mut Registry) {
     r.biome(&TAIGA)
         .set(&CLIMATE, base_api::climate("base:taiga"))
         .set(&BOULDERS, 0.25)
-        .temperature(..-0.15)
+        .temperature(..land::TAIGA_BELOW)
         .surface("podzol", "dirt", 3)
         .tint(grass, 0x86b783)
         .tint(foliage, 0x68a464)
@@ -115,7 +116,7 @@ pub fn register(r: &mut Registry) {
         .set(&CLIMATE, base_api::climate("base:snowy_plains"))
         .set(&BOULDERS, 0.2)
         .snows()
-        .temperature(..-0.45)
+        .temperature(..land::SNOWY_BELOW)
         .surface("snowy_grass", "dirt", 3)
         .frozen("ice")
         .tint(grass, 0x80b497)
@@ -130,8 +131,8 @@ pub fn register(r: &mut Registry) {
     r.biome(&DESERT)
         .set(&CLIMATE, base_api::climate("base:desert"))
         .set(&BOULDERS, 0.04)
-        .temperature(0.35..)
-        .humidity(..0.0)
+        .temperature(land::DESERT.0..)
+        .humidity(..land::DESERT.1)
         .surface("sand", "sand", 3)
         .under("sandstone", 1)
         .tint(grass, 0xbfb755)
@@ -147,8 +148,8 @@ pub fn register(r: &mut Registry) {
     r.biome(&SAVANNA)
         .set(&CLIMATE, base_api::climate("base:savanna"))
         .set(&BOULDERS, 0.04)
-        .temperature(0.2..)
-        .humidity(..0.2)
+        .temperature(land::SAVANNA.0..)
+        .humidity(..land::SAVANNA.1)
         .surface("grass", "dirt", 3)
         .tint(grass, 0xbfb755)
         .tint(foliage, 0xaea42a)
@@ -163,8 +164,8 @@ pub fn register(r: &mut Registry) {
     // Warm, wet lowland: still, dark water, low trees.
     r.biome(&SWAMP)
         .set(&CLIMATE, base_api::climate("base:swamp"))
-        .temperature(-0.05..)
-        .humidity(0.1..)
+        .temperature(land::SWAMP.0..)
+        .humidity(land::SWAMP.1..)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x6a7039)
         .tint(foliage, 0x6a7039)
@@ -235,21 +236,15 @@ pub fn register(r: &mut Registry) {
         .cell(5)
         .reach(8)
         .density(&TREES)
-        .shape(|s| {
-            if STAND_TREES.on_biome(s.biome()).is_some() && stand(s.seed(), s.pos()) < -CLEARING && s.random() % 4 != 0 {
-                return;
-            }
-            tree(s);
-        });
+        // A forest's clearings keep one tree in four.
+        .thin_in(&STAND_TREES, stand_over(-CLEARING).not(), 4)
+        .shape(tree);
     r.scatter(&STAND_SITES)
         .cell(3)
         .reach(8)
         .density(&STAND_TREES)
-        .shape(|s| {
-            if stand(s.seed(), s.pos()) > STAND {
-                tree(s);
-            }
-        });
+        .thin(stand_over(STAND + 1).not(), 0)
+        .shape(tree);
     // Boulders where a biome has them (`BOULDERS`): a heap of stone two to five blocks across, half
     // sunk in the ground, mossy in the woods and the wet.
     r.scatter(&BOULDER_SITES)
@@ -296,9 +291,12 @@ static WET: Tag = Tag::named("wet");
 static WOODS: Tag = Tag::named("forest");
 
 /// The stand noise over the ground, about -4096 to 4096: a forest's stands where it's over
-/// `STAND`, its clearings where it's under `-CLEARING`; one patch is some 40 blocks across.
-fn stand(seed: u64, [x, _, z]: [i32; 3]) -> i32 {
-    fixed::perlin2(fixed::seed32(seed, 0x57A4D), x * 16, z * 16, 40 * 16)
+/// `STAND`, its clearings where it's under `-CLEARING`; one patch is some 40 blocks across. As a
+/// mask that is on where the noise is `edge` or more (one octave of `fbm` is `perlin2` exactly),
+/// so the engine thins sites by it near and in distant terrain alike.
+fn stand_over(edge: i32) -> Mask {
+    let e = edge as f64 / fixed::ONE as f64;
+    Mask::Noise { salt: 0x57A4D, scale: 40.0, octaves: 1, from: e, to: e }
 }
 const STAND: i32 = 600;
 /// Which flower a column of a flower patch grows: one kind to a patch (its 16 x 16 cell), a few
