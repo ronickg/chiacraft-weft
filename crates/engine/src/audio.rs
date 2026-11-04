@@ -200,6 +200,8 @@ pub struct Audio {
     pub muted: bool,
     /// Each category's volume setting id, then the master volume's, looked up once.
     volume_ids: Option<Vec<Option<u32>>>,
+    /// Every event's files were looked for (`check_files`).
+    checked: bool,
 }
 
 fn sound_path(assets: &Assets, name: &str) -> Option<PathBuf> {
@@ -317,6 +319,7 @@ impl Audio {
                 dropped: 0,
                 muted: false,
                 volume_ids: None,
+                checked: false,
             })
         })();
         match made {
@@ -559,6 +562,35 @@ impl Audio {
         &self.files[name]
     }
 
+    /// Logs, once, the sound events with a file that isn't there (`sound files:` in the log).
+    fn check_files(&mut self, assets: &Assets) {
+        self.checked = true;
+        let c = content();
+        let mut missing: Vec<String> = Vec::new();
+        // The folders are walked once, not once a pattern.
+        let listed: Vec<String> = ["ogg", "wav"]
+            .iter()
+            .flat_map(|e| assets.list("sounds", e))
+            .map(|f| f.0)
+            .collect();
+        for d in &c.game.sounds {
+            for f in &d.files {
+                let found = match f.strip_suffix('*') {
+                    Some(prefix) => listed.iter().any(|n| n.starts_with(prefix)),
+                    None => sound_path(assets, f).is_some(),
+                };
+                if !found {
+                    missing.push(format!("{} ({f})", d.name));
+                }
+            }
+        }
+        if missing.is_empty() {
+            log::info!("sound files: all {} events have their files", c.game.sounds.len());
+        } else {
+            log::warn!("sound files: {} of {} events miss files: {}", missing.len(), c.game.sounds.len(), missing.join(", "));
+        }
+    }
+
     /// Settings, listener, environment, music, files read and sounds asked for, once a frame.
     pub fn update(&mut self, assets: &Assets, l: Option<&Listener>) {
         let ids = self.volume_ids.get_or_insert_with(|| {
@@ -587,6 +619,9 @@ impl Audio {
                 .main_track()
                 .set_volume(db(*volumes.last().unwrap()), Tween::default());
             self.volumes = volumes;
+        }
+        if !self.checked {
+            self.check_files(assets);
         }
         self.read_done();
         // Ended sounds give back their room and their handles.
