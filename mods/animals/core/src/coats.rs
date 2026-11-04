@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 38] = [
+const FILES: [(&str, &str); 40] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -297,6 +297,8 @@ const FILES: [(&str, &str); 38] = [
     ("lungfish", include_str!("../../genetics/lungfish.json")),
     ("lycoptera", include_str!("../../genetics/lycoptera.json")),
     ("psittacosaurus", include_str!("../../genetics/psittacosaurus.json")),
+    ("gastonia", include_str!("../../genetics/gastonia.json")),
+    ("pinacosaurus", include_str!("../../genetics/pinacosaurus.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1486,6 +1488,24 @@ fn psittacosaurus(r: &Read) -> Look {
     }
 }
 
+/// The ankylosaurs: Gastonia olive-brown to dun, Pinacosaurus a paler sand to ochre, both paler
+/// below (no record of their colors: est.).
+fn ankylosaur(r: &Read, gobi: bool) -> Look {
+    let ru = r.qv("Ru");
+    let (dull, warm) = if gobi { ([176.0, 154.0, 110.0], [180.0, 132.0, 82.0]) } else { ([116.0, 104.0, 70.0], [140.0, 112.0, 72.0]) };
+    Look {
+        name: match (gobi, ru > 0.6) {
+            (false, false) => "Olive-brown".into(),
+            (false, true) => "Dun".into(),
+            (true, false) => "Sandy".into(),
+            (true, true) => "Ochre".into(),
+        },
+        base: mix(dull, warm, ru),
+        under: [198.0, 184.0, 146.0],
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1665,6 +1685,8 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "lungfish" => cretaceous_fish(&r, true),
         "lycoptera" => cretaceous_fish(&r, false),
         "psittacosaurus" => psittacosaurus(&r),
+        "gastonia" => ankylosaur(&r, false),
+        "pinacosaurus" => ankylosaur(&r, true),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -2248,7 +2270,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 27] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 28] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2275,7 +2297,8 @@ const MODEL_LAYERS: [ModelLayers; 27] = model_layers!(
     "caiman",
     "wolf",
     "jaguar",
-    "psittacosaurus"
+    "psittacosaurus",
+    "ankylosaur"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {

@@ -26,6 +26,7 @@ use weft_sdk::*;
 declare_mod!(deps: ["base"], init: init);
 
 mod animal;
+mod ankylosaur;
 mod birds;
 mod breath;
 mod breeding;
@@ -142,6 +143,7 @@ fn init(r: &mut Registry) {
     raven::init(r);
     protoceratops::init(r);
     psittacosaurus::init(r);
+    ankylosaur::init(r);
     kryptobaatar::init(r);
     lizard::init(r);
     reindeer::init(r);

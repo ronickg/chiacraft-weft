@@ -30,8 +30,6 @@ pub const WAITING: &[(&str, &str)] = &[
     // The overworld: what wave two (`notes/ECOLOGY.md`) left.
     ("herring_gull: no prey in base:ocean", "the open sea's web: its fish (later; the gull hunts on the beach meanwhile)"),
     // The Cretaceous's tier 2 and 3.
-    ("animals:crags: no plant eaters", "the ankylosaur (the Cretaceous's tier 2)"),
-    ("wyvern: no prey in animals:crags", "the ankylosaur (the Cretaceous's tier 2)"),
 ];
 
 /// The biomes the webs are for: every climate but the caves (no web of their own) and the open

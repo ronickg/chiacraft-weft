@@ -108,6 +108,8 @@ pub static ALLIGATORIDAE: Family = Family { name: "Alligatoridae", above: &["Rep
 pub static CERATODONTIDAE: Family = Family { name: "Ceratodontidae", above: &["Sarcopterygii", "Dipnoi"] };
 pub static LYCOPTERIDAE: Family = Family { name: "Lycopteridae", above: &["Actinopterygii", "Osteoglossomorpha"] };
 pub static PSITTACOSAURIDAE: Family = Family { name: "Psittacosauridae", above: &["Dinosauria", "Ceratopsia"] };
+pub static POLACANTHIDAE: Family = Family { name: "Polacanthidae", above: &["Dinosauria", "Ankylosauria"] };
+pub static ANKYLOSAURIDAE: Family = Family { name: "Ankylosauridae", above: &["Dinosauria", "Ankylosauria"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -355,7 +357,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 38] = [
+pub static SPECIES: [Species; 40] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -2858,6 +2860,132 @@ pub static SPECIES: [Species; 38] = [
         // (`web/test.mjs`).
         tune: Tune { growth: Some(144_000), litter: Some((3, 8)), crowd: Some(20), ..Tune::NONE },
         birth_size: 0.15,
+    },
+    // Gastonia (`reports/ecology/Cretaceous food webs.md`: "among the most common dinosaur fossils
+    // in the Cedar Mountain Formation", found with the Utahraptor): a polacanthid ankylosaur,
+    // armoured, so the Utahraptor takes its young (`source/ankylosaur`, its own colors).
+    Species {
+        model: "ankylosaur",
+        name: "gastonia",
+        binomial: "Gastonia burgei",
+        family: &POLACANTHIDAE,
+        subfamily: "",
+        breed: None,
+        size: Size::Large,
+        // Low plants: ferns, horsetails, cycads' fronds, a little fruit and seed.
+        eats: &[(Leaves, 0.9), (Fruit, 0.05), (Seeds, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [120.0, 300.0, 400.0, 6.0, 0.8, 600.0, 200.0, 400.0, 60.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 12.0,
+        foods: &[eats("animals:fern", 10), favorite("animals:cycad_seed", 12)],
+        feedings: 0.0,
+        shy: 8.0,
+        fights: false,
+        attacks: &[],
+        reach: 1.5,
+        signature: "herd",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.03,
+        size_spread: 0.1,
+        height: (1.25, "hip"),
+        // The Yellow Cat floodplain first; its bonebeds suggest groups (one formed in a drought or
+        // a flood).
+        habitats: &[("animals:floodplain", 1.0), ("animals:scrubland", 0.3), ("animals:fern_forest", 0.3)],
+        bio: Biology {
+            mass: 1900.0,
+            gestation: 0.0,
+            // No record; a big ornithischian's egg, longer than Protoceratops's 83 days (est.).
+            incubation: 100.0,
+            // No record of its growth lines; breeding at about six, before it is fully grown, as
+            // dinosaurs did (est.), and living about 25 years.
+            maturity: 2190.0,
+            lifespan: 9125.0,
+            interval: 365.0,
+            // No record of a clutch (est., as Protoceratops's).
+            litter: 10.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The floodplain's monsoon heat and its dry spells.
+            comfort: (8.0, 38.0),
+            cold_blooded: false,
+        },
+        // A big plant eater at a common species' pace, its young what the hunters take, a wild
+        // clutch kept to what a mother raises, and a room that lets a small group last
+        // (`web/test.mjs`).
+        tune: Tune { growth: Some(144_000), litter: Some((1, 4)), crowd: Some(12), ..Tune::NONE },
+        birth_size: 0.1,
+    },
+    // Pinacosaurus (`reports/ecology/Cretaceous food webs.md`: the scrubland's big plant eater,
+    // "dominant" at Bayan Mandahu, mostly juveniles in groups killed together by sandstorms:
+    // Currie et al. 2011): an ankylosaurid with a tail club, on the same model in its own colors.
+    Species {
+        model: "ankylosaur",
+        name: "pinacosaurus",
+        binomial: "Pinacosaurus grangeri",
+        family: &ANKYLOSAURIDAE,
+        subfamily: "",
+        breed: None,
+        size: Size::Large,
+        // Low plants, perhaps pulpy fruit, roots and a few insects (speculative).
+        eats: &[(Leaves, 0.8), (Fruit, 0.1), (Roots, 0.05), (Insects, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [120.0, 300.0, 400.0, 6.0, 0.8, 600.0, 200.0, 400.0, 60.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 12.0,
+        foods: &[eats("animals:fern", 10), favorite("base:berries", 12)],
+        feedings: 0.0,
+        shy: 8.0,
+        fights: false,
+        attacks: &[],
+        reach: 1.5,
+        signature: "herd",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.03,
+        size_spread: 0.1,
+        height: (1.25, "hip"),
+        // The Gobi's scrub first, the dunes less often, and now and then the rocky crags' foot
+        // (the only plant eater there big enough for the wyvern).
+        habitats: &[("animals:scrubland", 1.0), ("animals:red_dunes", 0.5), ("animals:crags", 0.2)],
+        bio: Biology {
+            mass: 1900.0,
+            gestation: 0.0,
+            // No record; a big ornithischian's egg, longer than Protoceratops's 83 days (est.).
+            incubation: 100.0,
+            // No record of its growth lines; breeding at about six, before it is fully grown, as
+            // dinosaurs did (est.), and living about 25 years.
+            maturity: 2190.0,
+            lifespan: 9125.0,
+            interval: 365.0,
+            // No record of a clutch (est., as Protoceratops's).
+            litter: 10.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The Djadokhta's semi-arid seasons: hot days, cold nights.
+            comfort: (0.0, 40.0),
+            cold_blooded: false,
+        },
+        // A big plant eater at a common species' pace, its young what the hunters take, a wild
+        // clutch kept to what a mother raises, and a room that lets a small group last
+        // (`web/test.mjs`).
+        tune: Tune { growth: Some(144_000), litter: Some((1, 4)), crowd: Some(12), ..Tune::NONE },
+        birth_size: 0.1,
     },
 ];
 
