@@ -1600,11 +1600,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | seeds 60%, insects 30%, fruit 10% |
 | a meal that fills it | 0.003 kg |
 | drinks | 100% of its 0.004 L a day; a drink lasts 11 min, thirsty after 5 |
-<<<<<<< HEAD
-| its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, desert 40/78/55/40%, beach 40/40/43/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
-=======
-| its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, savanna 40/100/100/0%, desert 40/78/55/40%, beach 40/40/40/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
->>>>>>> chihuahua-papillon-model
+| its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, desert 40/78/55/40%, beach 40/40/40/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 2; `base:berries` 3, favorite |
@@ -2469,7 +2465,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | leaves 60%, seeds 30%, fruit 10% |
 | a meal that fills it | 2.5 kg |
 | drinks | 100% of its 1.794 L a day; a drink lasts 21 min, thirsty after 10 |
-| its food grows at home (spring/summer/autumn/winter) | fern_forest 40/65/40/40%, floodplain 40/40/59/40%, scrubland 40/40/40/40% |
+| its food grows at home (spring/summer/autumn/winter) | fern_forest 40/40/40/40%, floodplain 40/40/40/40%, scrubland 40/40/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `animals:fern` 8; `animals:ginkgo_seed` 8; `base:berries` 10, favorite |
@@ -2531,7 +2527,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | leaves 90%, fruit 5%, seeds 5% |
 | a meal that fills it | 190 kg |
 | drinks | 100% of its 88.412 L a day; a drink lasts 32 min, thirsty after 16 |
-| its food grows at home (spring/summer/autumn/winter) | floodplain 40/40/59/40%, scrubland 40/40/40/40%, fern_forest 40/65/40/40% |
+| its food grows at home (spring/summer/autumn/winter) | floodplain 40/40/40/40%, scrubland 40/40/40/40%, fern_forest 40/40/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `animals:fern` 10; `animals:cycad_seed` 12, favorite |
@@ -2593,7 +2589,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | leaves 80%, fruit 10%, roots 5%, insects 5% |
 | a meal that fills it | 190 kg |
 | drinks | 100% of its 88.412 L a day; a drink lasts 32 min, thirsty after 16 |
-| its food grows at home (spring/summer/autumn/winter) | scrubland 40/40/40/40%, red_dunes 40/40/40/40%, crags 40/66/45/40% |
+| its food grows at home (spring/summer/autumn/winter) | scrubland 40/40/40/40%, red_dunes 40/40/40/40%, crags 40/40/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `animals:fern` 10; `base:berries` 12, favorite |
