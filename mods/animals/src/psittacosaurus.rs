@@ -12,7 +12,6 @@ pub(crate) static PSITTACOSAURUS: Entity = Entity::named("psittacosaurus");
 static BODY: Body = Body {
     model: "psittacosaurus",
     texture: "psittacosaurus/psittacosaurus",
-    size: (0.6, 0.8),
     health: 22.0,
     // A quick runner on its hind legs, about 5 m/s at its fastest (est., from its long shins).
     speed: 5.0,

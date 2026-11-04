@@ -13,7 +13,6 @@ pub(crate) static REINDEER: Entity = Entity::named("reindeer");
 static BODY: Body = Body {
     model: "reindeer",
     texture: "reindeer/reindeer",
-    size: (1.0, 1.4),
     health: 40.0,
     // Walking far while it feeds, galloping off at up to 60-80 km/h.
     speed: 5.0,

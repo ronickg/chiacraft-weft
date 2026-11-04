@@ -14,8 +14,6 @@ use weft_sdk::*;
 
 pub(crate) static WYVERN: Entity = Entity::named("wyvern");
 const TEXTURE: &str = "wyvern/wyvern";
-/// Its box: about its body (the neck and tail reach well out of it), as tall as its shoulders.
-const SIZE: (f32, f32) = (3.4, 4.0);
 /// Its row in `species::SPECIES`.
 
 /// How near a player can come before a wild one goes for them, in blocks; near its nest, further.
@@ -31,11 +29,11 @@ pub fn init(r: &mut Registry) {
         crate::rest::Settle { chance: 500, ticks: (800, 2400), lie_after: 0 },
         "wyvern",
         TEXTURE,
-        (SIZE.0, SIZE.1 * 0.5),
+        (animals_core::bodies::of("wyvern").0, animals_core::bodies::of("wyvern").1 * 0.5),
         &[("_rest", "wyvern_rest")],
     );
     r.entity(&WYVERN)
-        .size(SIZE.0, SIZE.1)
+        .size(animals_core::bodies::of("wyvern").0, animals_core::bodies::of("wyvern").1)
         .health(400.0)
         .speed(5.0)
         .attack_damage(30.0)

@@ -14,7 +14,6 @@ pub(crate) static SNOW_BUNTING: Entity = Entity::named("snow_bunting");
 static WINGS: Wings = Wings {
     model: "small_bird",
     texture: "small_bird/small_bird",
-    size: (0.2, 0.15),
     fly_size: (0.25, 0.12),
     health: 2.0,
     // Hopping at about 1.5 m/s; it flies at about 10.

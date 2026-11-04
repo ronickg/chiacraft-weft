@@ -12,7 +12,6 @@ pub(crate) static FIELD_VOLE: Entity = Entity::named("field_vole");
 static BODY: Body = Body {
     model: "vole",
     texture: "vole/vole",
-    size: (0.2, 0.15),
     health: 2.0,
     // Busier by day than a mouse, darting along its runs through the grass.
     speed: 2.8,

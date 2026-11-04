@@ -12,7 +12,6 @@ pub(crate) static TURKEY_VULTURE: Entity = Entity::named("turkey_vulture");
 static WINGS: Wings = Wings {
     model: "vulture",
     texture: "vulture/vulture",
-    size: (0.45, 0.55),
     fly_size: (1.1, 0.35),
     health: 10.0,
     // It walks little; it soars at about 12 m/s.

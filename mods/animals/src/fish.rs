@@ -57,7 +57,7 @@ pub fn init(r: &mut Registry) {
     for kind in KINDS {
         let index = crate::species::of(kind);
         r.entity(kind)
-            .size(0.35, 0.2)
+            .size(animals_core::bodies::of("fish").0, animals_core::bodies::of("fish").1)
             .health(3.0)
             // Cruising slowly, darting off at a few metres a second.
             .speed(3.0)

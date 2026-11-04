@@ -13,7 +13,6 @@ pub(crate) static PROTOCERATOPS: Entity = Entity::named("protoceratops");
 static BODY: Body = Body {
     model: "protoceratops",
     texture: "protoceratops/protoceratops",
-    size: (0.7, 0.75),
     health: 35.0,
     // A heavy trot, about 4 m/s at its fastest (est., from its build).
     speed: 4.0,

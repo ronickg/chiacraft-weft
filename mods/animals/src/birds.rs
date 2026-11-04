@@ -20,8 +20,8 @@ pub struct Wings {
     /// its texture.
     pub model: &'static str,
     pub texture: &'static str,
-    /// Its box on the ground and in the air, width and height in blocks.
-    pub size: (f32, f32),
+    /// Its box in the air, width and height in blocks (on the ground its model's:
+    /// `animals_core::bodies`).
     pub fly_size: (f32, f32),
     pub health: f32,
     /// Its speed on the ground, and in the air as a multiple of it.
@@ -76,10 +76,11 @@ pub fn register(r: &mut Registry, kinds: &[&'static Entity], wings: &'static Win
             .animations(&look)
             .texture(wings.texture),
     );
+    let (bw, bh) = animals_core::bodies::of(wings.model);
     for &kind in kinds {
         let index = crate::species::of(kind);
         r.entity(kind)
-            .size(wings.size.0, wings.size.1)
+            .size(bw, bh)
             .health(wings.health)
             .speed(wings.speed)
             .attack_damage(wings.damage)
