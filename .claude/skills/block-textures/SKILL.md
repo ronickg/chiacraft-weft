@@ -187,6 +187,12 @@ toward the UI's own colours (`notes/STYLE.md`).
   - in-tile contrast as the p10-p90 spread in codes: **quiet ground 20-30** (grass top, stone, sand,
     podzol), **busy blocks 45-80** (cobble, dirt, logs, planks, ores). Ronald, 11-04: "Yes, stone,
     gravel, planks": stone calmed to 30, gravel to 42, planks given grain at 48.
+  - **walked-on ground's saturation** (Ronald, 11-04: "Yes, apply"; the red sand floor read neon orange
+    in the PC's light, since Lighting's look adds saturation): keep it in the middle of vanilla, Faithful
+    32x and Pixel Perfection, not at their top. Measured bands: red sand about 0.63 (vanilla 0.83, Pixel
+    Perfection 0.50), level with our red sandstone (0.62); dirt and coarse dirt 0.48 (vanilla 0.50, PP
+    0.35); leaf litter 0.55; sand 0.38, grass top 0.53 (tinted), podzol 0.42, gravel 0.25 already fine.
+    A Cretaceous copy of a tile (animals) gets the same row as base's.
   Fix a tile's level, contrast or colour in the grade table, not in its pixels (see "The grade"). The six tiles lifted for the
   earlier floor (slate, termite mound, red sandstone, sequoia and spruce bark, podzol) stay until
   they're re-judged under Lighting's new grade; leaves and grass top wait for it too ("After the

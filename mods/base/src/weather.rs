@@ -174,5 +174,15 @@ fn send(w: &World) {
         _ => now_heading(w),
     };
     let list: Vec<BiomeAir> = biomes().iter().map(|&(id, c)| air_of(w, id, &c)).collect();
+    *SNOW.lock().unwrap() = list.iter().map(|a| (a.biome, a.snow)).collect();
     w.set_air(&list, heading);
+}
+
+/// The snow lying in each biome as last told to the engine (`send`), 0 bare to 1 deep.
+static SNOW: Mutex<Vec<(u32, f32)>> = Mutex::new(Vec::new());
+
+/// The snow lying in biome `id` now (`vitals::air::Place::snow_lying`, or `/air`'s), 0 to 1;
+/// `None` before the weather's first look or for a biome without a climate.
+pub fn snow_in(id: u32) -> Option<f32> {
+    SNOW.lock().unwrap().iter().find(|a| a.0 == id).map(|a| a.1)
 }

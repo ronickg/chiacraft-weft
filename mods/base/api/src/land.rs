@@ -322,6 +322,21 @@ pub const MOUNTAINS_AREA: Area = Area {
     not: false,
 };
 pub const MOUNTAIN_BIOME: f64 = 0.45;
+/// How the ranges rise (Planner, 11-04: the foothill a new player sees from the spawn should be
+/// walkable, mostly steps of one): by their area's band squared, so a range's foot climbs gently
+/// (half the slope a quarter of the way in) and its spine is steeper. Only the height: where the
+/// mountains' biome, the rivers and the spawn stand still go by `MOUNTAINS_AREA`.
+pub const MOUNTAINS_RISE: Area = Area {
+    all: &[
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: -RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: -RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::RANGE_GAPS, scale: 2600.0, from: -RANGE_GAPS, to: -RANGE_GAPS + 0.15 },
+        Ramp::Continent(0.0, 0.2),
+    ],
+    not: false,
+};
 
 /// Mesas: flat-topped hills `MESA_HEIGHT` blocks high in `MESA_TIERS` tiers, patches about
 /// `MESA_SIZE` blocks across where the mesa noise runs from `MESA_FROM` to `MESA_TO`; in each
@@ -679,8 +694,8 @@ pub fn features() -> Vec<Feature> {
             .named("highlands"),
         preset::dunes(DUNES.0, DUNES.1).mask(DUNES_AREA.mask()),
         preset::mountains(MOUNTAINS.0, MOUNTAINS.1)
-            .mask(MOUNTAINS_AREA.mask())
-            .named("mountains"),
+            .mask(MOUNTAINS_RISE.mask())
+            .named("mountain_rise"),
         Feature::new(mesa).named("mesas"),
         Feature::new(canyons).named("canyons"),
         Feature::new(karst).named("karst"),
@@ -694,6 +709,9 @@ pub fn features() -> Vec<Feature> {
         preset::hills(0.0, 64.0)
             .mask(SEQUOIA_AREA.mask())
             .named("sequoia_groves"),
+        preset::hills(0.0, 64.0)
+            .mask(MOUNTAINS_AREA.mask())
+            .named("mountains"),
         preset::hills(0.0, 64.0)
             .mask(Mask::noise(SNOW_DRIFT_SIZE, -0.2, 0.2).salt(salt::SNOW_DRIFT))
             .named("snow_drift"),
@@ -735,7 +753,7 @@ fn base_ground(h: &Here) -> i32 {
         + masked(h, &ISLANDS_AREA, || q4(ISLAND_HEIGHT))
         + masked(h, &HIGHLANDS_AREA, || q4(HIGHLANDS))
         + masked(h, &DUNES_AREA, || shape::dunes(f, x, z, q4(DUNES.0), q4(DUNES.1)))
-        + masked(h, &MOUNTAINS_AREA, || shape::mountains(f, x, z, q4(MOUNTAINS.0), q4(MOUNTAINS.1)))
+        + masked(h, &MOUNTAINS_RISE, || shape::mountains(f, x, z, q4(MOUNTAINS.0), q4(MOUNTAINS.1)))
         + mesa_at(h)
 }
 
@@ -978,8 +996,11 @@ pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
         }
         let deep = sh.strength;
         let flat = sh.half + ((sh.floodplain * deep) >> 12);
-        // The sides widen with the land's height, up to the stretch's bound (`net::Seg::rise`).
-        let banks = ((q4(RIVER_BANKS as f64) + RIVER_VALLEY_PER_BLOCK * rise.min(s.rise)) * deep) >> 12;
+        // The sides widen with the land's height, up to the stretch's bound (`net::Seg::rise`);
+        // as wide where the mountains fade the river out (`RIVER_MOUNTAINS`): narrowed with it, a
+        // valley's end climbed into the foothills in faces of two (Planner, 11-04, the climb from
+        // seed 1's spawn).
+        let banks = ((q4(RIVER_BANKS as f64) + RIVER_VALLEY_PER_BLOCK * rise.min(s.rise)) * net::shape(flow, ONE).strength) >> 12;
         if d >= flat + banks {
             continue;
         }
@@ -1721,7 +1742,10 @@ mod tests {
         for i in 0..40_000 {
             let (x, z) = ((i % 200) * 12 * 16 - 1200 * 16, (i / 200) * 12 * 16 - 1200 * 16);
             let add = karst(&f, x, z);
-            assert!((0..=q4(KARST_WIDE_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
+            // Down only into a sinkhole: to `SINK_FLOOR` under the sea from ground at most
+            // `SINK_LAND.1` over it (Tester 2, 11-04: the sinkholes made this fail at -410).
+            let deepest = -q4((SINK_LAND.1 + SINK_FLOOR + 1) as f64);
+            assert!((deepest..=q4(KARST_WIDE_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
             if add > q4(8.0) {
                 towers += 1;
                 if KARST_AREA.value(&f, x, z) == 0 {
@@ -1785,6 +1809,48 @@ mod tests {
             let t = f.temperature(x * 16, z * 16);
             assert!((q12(SPAWN_TEMPERATURE.0)..q12(SPAWN_TEMPERATURE.1)).contains(&t), "seed {seed}: too cold or hot");
             assert!(x.abs().max(z.abs()) <= SPAWN_REACH, "seed {seed}: spawn {x} {z} far out");
+        }
+    }
+
+    /// A range's foothills and lower flanks walk up in steps of one, mostly: few columns there
+    /// have a face of two or more to a neighbour (dev before 11-04: 10-13%, and 22% where a river
+    /// valley ends in them), while the spines stay steep.
+    #[test]
+    fn foothills_are_walkable() {
+        for seed in [1, 2, 3] {
+            let f = fields(seed);
+            let h = |x: i32, z: i32| height(&f, x * 16, z * 16) >> 4;
+            // Columns, and those with a face of 2+: on the flanks (0.1..0.45), on the spines (0.7+).
+            let (mut flank, mut spine) = ([0u32; 2], [0u32; 2]);
+            for z in (-2000..=2000).step_by(9) {
+                for x in (-2000..=2000).step_by(9) {
+                    let m = MOUNTAINS_AREA.value(&f, x * 16, z * 16);
+                    let c = if (q12(0.1)..q12(0.45)).contains(&m) {
+                        &mut flank
+                    } else if m >= q12(0.7) {
+                        &mut spine
+                    } else {
+                        continue;
+                    };
+                    let here = h(x, z);
+                    if here <= SEA + 1 || here >= snow_line(f.temperature(x * 16, z * 16)) - 20 {
+                        continue;
+                    }
+                    let face = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                        .iter()
+                        .any(|&(dx, dz)| (h(x + dx, z + dz) - here).abs() >= 2);
+                    c[0] += 1;
+                    c[1] += face as u32;
+                }
+            }
+            let share = |c: [u32; 2]| c[1] as f64 / c[0].max(1) as f64;
+            assert!(
+                flank[0] > 1000 && share(flank) < 0.09,
+                "seed {seed}: {:.1}% of {} flank columns have faces",
+                share(flank) * 100.0,
+                flank[0]
+            );
+            assert!(spine[0] < 200 || share(spine) > 0.15, "seed {seed}: the spines are {:.1}% faces", share(spine) * 100.0);
         }
     }
 

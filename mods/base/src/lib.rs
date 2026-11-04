@@ -31,6 +31,7 @@ mod recipes;
 mod redstone;
 mod seasons;
 mod shaderpack;
+mod snow;
 mod sounds;
 mod survival;
 mod video;
@@ -104,6 +105,7 @@ fn init(r: &mut Registry) {
     mobs::register(r);
     worldgen::register(r);
     weather::register(r);
+    snow::register(r);
     weather_sound::register(r);
     seasons::register(r);
     growth::register(r);

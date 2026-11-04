@@ -171,6 +171,16 @@ pub fn want_chance(days: f64, near: f64, crowd: u32, stage: u8) -> f64 {
 /// Of a crowd twice its size, the share of grown ones dying of want a day.
 pub const DEATHS_WHEN_CROWDED: f64 = 0.1;
 
+/// Whether a group of `coming` finds room where `near` of its kind already live (counted by
+/// `crowding`, within `CROWD_RADIUS`) with room for `crowd`: natural spawning brings none past the
+/// room, so a place fills to its crowd and no further. Without it the engine's spawner, which caps
+/// only all creatures together, added packs to a place already full, and they died of want
+/// (`want_chance`) as fast as they came. A group bigger than the room still comes to an empty
+/// place.
+pub fn room_for(near: f64, coming: u32, crowd: u32) -> bool {
+    near + coming as f64 <= crowd.max(coming) as f64
+}
+
 /// Ticks since an animal was last seen (its area loaded) past which its time away is caught up
 /// on load, as lazy simulations do (Vintage Story's crops, Minecraft's Elapsed): timers run out,
 /// young are born, it ages, and a wild one that died meanwhile has a successor.
@@ -197,4 +207,34 @@ pub fn egg_air(air: f32, nest: bool) -> f32 {
 /// Whether an egg develops in that air (`egg_air`).
 pub fn develops(egg_air: f32) -> bool {
     (EGG_AIR.0..=EGG_AIR.1).contains(&egg_air)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Natural spawning fills a place to its crowd and no further (the 48-minute PC soak: wolves
+    /// at 21-52 where there is room for 16, dying of want): a grey wolf's pack comes while it
+    /// fits, not into a place already full, and a pack bigger than the room still comes to an
+    /// empty one.
+    #[test]
+    fn natural_spawns_stop_at_the_room() {
+        let wolf = crate::species::SPECIES
+            .iter()
+            .find(|s| s.name == "grey_wolf")
+            .expect("the grey wolf's row");
+        let (crowd, (few, most)) = (wolf.crowd(), wolf.bio.social.group());
+        assert!(room_for(0.0, most, crowd), "a pack of {most} doesn't fit an empty place with room for {crowd}");
+        assert!(room_for((crowd - few) as f64, few, crowd), "the last {few} of the room were turned away");
+        assert!(!room_for(crowd as f64, few, crowd), "a pack of {few} came to a full place ({crowd})");
+        assert!(!room_for((crowd - few) as f64 + 0.5, few, crowd), "a pack came past the room");
+        // Every species: a place at its crowd takes no more, and one where none live takes a group.
+        for s in &crate::species::SPECIES {
+            let (few, most) = s.bio.social.group();
+            assert!(room_for(0.0, most, s.crowd()), "{}: no room for its group in an empty place", s.name);
+            assert!(!room_for(s.crowd() as f64, few.max(1), s.crowd()), "{}: room past its crowd", s.name);
+            // Nothing that comes is past what dies of want (`want_chance` is 0 up to the crowd).
+            assert_eq!(want_chance(1.0, s.crowd() as f64, s.crowd(), ADULT), 0.0);
+        }
+    }
 }
