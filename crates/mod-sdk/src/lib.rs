@@ -548,8 +548,6 @@ pub mod chain {
     pub static ATTACK_DAMAGE: Chain = Chain(C::AttackDamage);
 }
 
-
-
 /// A named thing of the game's content, looked up in the world the mod runs in. Each world has
 /// its own ids, but a mod runs anew in each world, so a looked-up id is kept.
 struct Lookup {
@@ -1386,7 +1384,6 @@ impl<T: Value> Component<T> {
         self.name
     }
 }
-
 
 /// A sound, by full name (`Sound::named("base:block.stone.break")`).
 pub struct Sound(&'static str);
