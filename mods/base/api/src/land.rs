@@ -275,11 +275,20 @@ pub const ROCK_FALL: i32 = 4;
 pub const SNOW_FALL: i32 = 3;
 pub const ROCK_DEPTH: i32 = 5;
 pub const ROCK_MAX_DEPTH: i32 = 16;
-/// Rock faces in patches about `ROCK_PATCH` blocks across: cobbles where the patch noise is over
-/// `ROCK_COBBLES`, mossy cobbles under `-ROCK_MOSS` in the woods and the wet, stone between.
+/// What rock a face shows, by its column's climate and height (`rock_set`): the hot, dry land's
+/// strata (`STRATA`), slate in the cold (under `TAIGA_BELOW`), granite on ground this high over
+/// the sea or in the mountains, limestone on the lower cliffs and river banks.
+pub const GRANITE_ABOVE: i32 = 40;
+/// In patches about `ROCK_PATCH` blocks across: where the patch noise is over `ROCK_PATCHES` the
+/// face shows its second rock (stone in slate and limestone, cobbles in granite), under
+/// `-ROCK_MOSS` mossy cobbles in the woods and the wet (limestone) or stone (granite).
 pub const ROCK_PATCH: f64 = 9.0;
-pub const ROCK_COBBLES: f64 = 0.22;
+pub const ROCK_PATCHES: f64 = 0.22;
 pub const ROCK_MOSS: f64 = 0.25;
+/// The mesas' strata from the bottom up, repeating: each layer's rock, 1 to 3 blocks thick by the
+/// world's seed; the layers tilt gently, up to `STRATA_TILT` blocks over some 300.
+pub const STRATA: [&str; 6] = ["sandstone", "ochre_sandstone", "sandstone", "red_sandstone", "ochre_sandstone", "red_sandstone"];
+pub const STRATA_TILT: i32 = 3;
 
 /// The engine's features of the land, in the order they're added; `mesas` and `rivers` go after
 /// them (`land_height`, `rivers`).
@@ -425,18 +434,69 @@ pub fn snowy(f: &Fields, x: i32, z: i32, height: i32) -> bool {
     height >= line || (height >= line - SNOW_DRIFT && drift > q12(SNOW_DRIFT_FROM))
 }
 
-/// Which rock a rock face shows at a block (world blocks): 0 stone, 1 cobbles, 2 mossy cobbles
-/// (only where `mossy`), in patches.
-pub fn rock_kind(seed: u64, [x, y, z]: [i32; 3], mossy: bool) -> u8 {
-    let s = q4(ROCK_PATCH);
-    let v = fixed::perlin3(fixed::seed32(seed, 0x50C4), x * 16, y * 16, z * 16, s, s / 2, s);
-    if v > q12(ROCK_COBBLES) {
-        1
-    } else if mossy && v < -q12(ROCK_MOSS) {
-        2
+/// The rocks a column's face shows (`rock_set`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RockSet {
+    Strata,
+    Slate,
+    Granite,
+    Limestone,
+}
+
+/// The rocks of the face of column (`x`, `z`) (Q4), its ground `height` (blocks) high; `sandy`
+/// faces (sand on top) are strata wherever they are.
+pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet {
+    let here = Here::new(f, x, z);
+    let (t, hu) = (here.temperature(), here.humidity());
+    if sandy || t >= q12(SAVANNA.0) && hu < q12(SAVANNA.1) {
+        RockSet::Strata
+    } else if t < q12(TAIGA_BELOW) {
+        RockSet::Slate
+    } else if height >= SEA + GRANITE_ABOVE || MOUNTAINS_AREA.at(&here) > q12(MOUNTAIN_BIOME) {
+        RockSet::Granite
     } else {
-        0
+        RockSet::Limestone
     }
+}
+
+impl RockSet {
+    /// The block (its name in base) at `pos` (world blocks) of a face of these rocks; mossy cobbles
+    /// only where `mossy`.
+    pub fn block(self, seed: u64, [x, y, z]: [i32; 3], mossy: bool) -> &'static str {
+        if self == RockSet::Strata {
+            return strata(seed, [x, y, z]);
+        }
+        let s = q4(ROCK_PATCH);
+        let v = fixed::perlin3(fixed::seed32(seed, 0x50C4), x * 16, y * 16, z * 16, s, s / 2, s);
+        let (patch, low) = (v > q12(ROCK_PATCHES), v < -q12(ROCK_MOSS));
+        match self {
+            RockSet::Slate if patch => "stone",
+            RockSet::Slate => "slate",
+            RockSet::Granite if patch => "cobblestone",
+            RockSet::Granite if low => "stone",
+            RockSet::Granite => "granite",
+            RockSet::Limestone if patch => "stone",
+            RockSet::Limestone if low && mossy => "mossy_cobblestone",
+            _ => "limestone",
+        }
+    }
+}
+
+/// The mesas' layer at `pos` (world blocks): `STRATA` repeating up the height, each layer 1 to 3
+/// blocks thick by the seed, the whole gently tilted.
+pub fn strata(seed: u64, [x, y, z]: [i32; 3]) -> &'static str {
+    let s = fixed::seed32(seed, 0x57A7);
+    let thick = |i: usize| 1 + (fixed::hash(s, i as i32, 0, 0) % 3) as i32;
+    let period: i32 = (0..STRATA.len()).map(thick).sum();
+    let tilt = (fixed::perlin2(s ^ 1, x * 16, z * 16, 300 * 16) * STRATA_TILT) >> 12;
+    let mut at = (y + tilt).rem_euclid(period);
+    for (i, rock) in STRATA.iter().enumerate() {
+        at -= thick(i);
+        if at < 0 {
+            return rock;
+        }
+    }
+    STRATA[0]
 }
 
 /// The overworld biome the rules in `mods/base/src/land.rs` pick at (`x`, `z`) (Q4), by name, in
@@ -525,6 +585,13 @@ mod tests {
             let m = mesa(&f, x, z);
             assert!((0..=q4(MESA_HEIGHT)).contains(&m));
         }
+    }
+
+    #[test]
+    fn strata_are_layers_of_their_rocks() {
+        let rocks: Vec<&str> = (0..40).map(|y| strata(5, [0, y, 0])).collect();
+        assert!(rocks.iter().all(|r| STRATA.contains(r)));
+        assert!(STRATA.iter().all(|r| rocks.contains(r)), "{rocks:?}");
     }
 
     #[test]
