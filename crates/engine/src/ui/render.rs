@@ -432,6 +432,12 @@ impl UiRenderer {
         loaded
     }
 
+    /// Whether GUI texture `name` declares a nine-slice in its `.gui`.
+    fn sliced(&mut self, gpu: &mut dyn Backend, assets: &Assets, name: &str) -> bool {
+        let Some(t) = self.texture(gpu, assets, name) else { return false };
+        matches!(self.declared_slicing(assets, name, [t.1 as f32, t.2 as f32]), Some(Slicing::Nine { .. }))
+    }
+
     fn declared_slicing(&mut self, assets: &Assets, name: &str, pixels: [f32; 2]) -> Option<Slicing> {
         if let Some(s) = self.slicing.get(name) {
             return *s;
@@ -1124,6 +1130,20 @@ impl UiRenderer {
                 background(self, class, "");
                 let v = value.clamp(0.0, 1.0);
                 match look.texture(class, "fill") {
+                    // A fill that slices (its `.gui` says nine_slice) is laid over the whole bar
+                    // like its frame and cut to the share, so its rounded ends keep their pixels
+                    // at any width; a plain one is stretched and cropped as before.
+                    Some(fill) if self.sliced(gpu, assets, &fill) => {
+                        if v > 0.0 {
+                            let start = self.quads.len();
+                            self.draw_gui(gpu, assets, &fill, r, scale, 0xFFFFFFFF, Slicing::Stretch);
+                            let c = cropped(r, super::meter::crop(v, *dir));
+                            let cut = [c.x.round(), c.y.round(), (c.x + c.w).round(), (c.y + c.h).round()];
+                            for q in &mut self.quads[start..] {
+                                q.clip = cut;
+                            }
+                        }
+                    }
                     Some(fill) => self.meter_picture(gpu, assets, &fill, v, *dir, r, scale),
                     None => self.checker(cropped(r, super::meter::crop(v, *dir)), scale),
                 }
