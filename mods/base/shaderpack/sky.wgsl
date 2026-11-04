@@ -182,7 +182,13 @@ fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
     let b = cloud_cell(s, base + vec2(1.0, 0.0), dims);
     let c = cloud_cell(s, base + vec2(0.0, 1.0), dims);
     let d = cloud_cell(s, base + vec2(1.0, 1.0), dims);
-    let cover = mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    var cover = mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    // In rain the cells give way to the deck's large forms: with the cell picture alone a rainy sky
+    // stayed a blocky patchwork (the storm-light check, 11-05).
+    let rainy = s.axes[0].x;
+    if rainy > 0.0 {
+        cover = mix(cover, smoothstep(0.25, 0.6, storm_field(s, cellp)) * 0.4 + 0.5, rainy * 0.85);
+    }
     let middle = 1.0 - pow(abs(h * 2.0 - 1.0), 2.0);
     // A storm's deck is one sheet: rounded puffs would leave lens-shaped gaps where four meet, the
     // bright sky showing through them.
@@ -306,8 +312,8 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
                 let deep = mix(0.45, 1.0, smoothstep(0.0, 0.5, along)) * mix(1.0, 0.7, storm_tower(n));
                 // Dark masses away from the sun, a brighter side toward it, and the thin deck about
                 // the breaks there lit through (Bliss's storm: dark to bright across the sky).
-                let thin = 1.0 - smoothstep(0.24, 0.6, n);
-                let sweep = mix(0.6, 1.3, SUN_SIDE) * (1.0 + 1.4 * thin * SUN_SIDE);
+                let thin = 1.0 - smoothstep(0.3, 0.6, n);
+                let sweep = mix(0.6, 1.3, SUN_SIDE) * (1.0 + 0.8 * thin * SUN_SIDE);
                 albedo = mix(1.0, deep, storm) * mix(1.0, sweep, wet);
             }
             let below = mix(p.horizon * 0.9 + p.ambient * 0.6, p.ambient * 1.6, h) * mix(1.0, 0.4, dark * (1.0 - h)) * albedo;

@@ -62,7 +62,7 @@ fn vol_deck_open(rel: vec3<f32>) -> f32 {
     let t = max(c.z - rel.y, 0.0) / l.y;
     let cell = scene.cloud_cells.xy + scene.cloud_cells.zw + (rel.xz + l.xz * t) / c.y;
     let n = vol_noise(vec3(cell.x / 9.0, 5.5, cell.y / 9.0)) * 0.7 + vol_noise(vec3(cell.x / 3.5, 9.5, cell.y / 3.5)) * 0.3;
-    return 1.0 - smoothstep(0.24, 0.4, n);
+    return 1.0 - smoothstep(0.32, 0.46, n);
 }
 
 fn apply(p: PostPixel) -> vec4<f32> {

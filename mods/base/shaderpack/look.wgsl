@@ -379,7 +379,8 @@ fn deck_field(cell: vec2<f32>) -> f32 {
 // How open the deck is at a field value `n`, 0 closed to 1 a clear break; `wide` (0..1) opens the
 // breaks further (toward the sun, where light breaks through).
 fn deck_open(n: f32, wide: f32) -> f32 {
-    return 1.0 - smoothstep(0.24 + 0.1 * wide, 0.4 + 0.1 * wide, n);
+    // At 0.24-0.4 a break opened in about one place in twenty and no beams showed (c2f2eb1c).
+    return 1.0 - smoothstep(0.32 + 0.08 * wide, 0.46 + 0.08 * wide, n);
 }
 
 // ---- light on things ----
