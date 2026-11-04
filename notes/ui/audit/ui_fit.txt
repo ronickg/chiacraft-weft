@@ -43,4 +43,11 @@ wait 1
 tap core:title text:Settings
 wait 1.5
 shot fit_settings.png
+# Video and Quality, at the bottom of the settings.
+cursor 0.5 0.5
+scroll -40
+wait 1
+tap_once core:settings text:Video and Quality
+wait 1.5
+shot fit_video.png
 quit
