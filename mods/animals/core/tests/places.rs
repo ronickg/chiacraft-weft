@@ -276,3 +276,110 @@ fn every_taming_food_has_its_bubble() {
     }
     report(problems);
 }
+
+/// Each species lives in one world (`Species::cretaceous`): its habitats are all the
+/// Cretaceous's own biomes (`animals:`) or all the overworld's (`base:`), and it spawns only in
+/// that dimension. A Cretaceous species on a `base:` biome would spawn nowhere there but the
+/// shared beaches and seas; a modern one on an `animals:` biome nowhere at all.
+#[test]
+fn each_species_lives_in_one_world() {
+    let mut problems = Vec::new();
+    for s in &SPECIES {
+        let (old, new): (Vec<&str>, Vec<&str>) = s
+            .habitats
+            .iter()
+            .map(|(b, _)| *b)
+            .partition(|b| b.starts_with("animals:"));
+        if !old.is_empty() && !new.is_empty() {
+            problems.push(format!("{}: Cretaceous habitats {old:?} and overworld ones {new:?}", s.name));
+        }
+        if s.habitats.is_empty() && !s.name.is_empty() && s.cretaceous() {
+            problems.push(format!("{}: no habitats", s.name));
+        }
+    }
+    for name in ["hare", "wood_mouse", "red_fox", "raven", "house_sparrow", "herring_gull"] {
+        let s = SPECIES
+            .iter()
+            .find(|s| s.name == name)
+            .expect("a modern species");
+        if s.cretaceous() {
+            problems.push(format!("{name} counts as a Cretaceous species"));
+        }
+    }
+    for name in ["utahraptor", "wyvern", "crocodyliform", "lungfish", "lycoptera", "pinacosaurus"] {
+        let s = SPECIES
+            .iter()
+            .find(|s| s.name == name)
+            .expect("a Cretaceous species");
+        if !s.cretaceous() {
+            problems.push(format!("{name} doesn't count as a Cretaceous species"));
+        }
+    }
+    report(problems);
+}
+
+/// Natural spawning brings the Cretaceous's animals as often as the overworld's
+/// (`Species::spawn_chance`, `CRETACEOUS_FLOW`): each of its biomes' land rules average the
+/// flow, each species keeps its share there by rarity (a wyvern stays the rarest), and the
+/// overworld's chances are their rarity's, as before.
+#[test]
+fn the_cretaceous_spawns_as_often_as_the_overworld() {
+    use animals_core::species::CRETACEOUS_FLOW;
+    let mut problems = Vec::new();
+    let mut biomes: Vec<&str> = SPECIES
+        .iter()
+        .flat_map(|s| s.habitats.iter().map(|(b, _)| *b))
+        .collect();
+    biomes.sort();
+    biomes.dedup();
+    for biome in biomes {
+        for water in [false, true] {
+            let here: Vec<&Species> = SPECIES
+                .iter()
+                .filter(|s| s.in_water() == water && s.habitats.iter().any(|(b, _)| *b == biome))
+                .collect();
+            if here.is_empty() {
+                continue;
+            }
+            let raw = |s: &Species| s.bio.rarity.spawn_chance() * s.habitats.iter().find(|(b, _)| *b == biome).unwrap().1;
+            if !here[0].cretaceous() {
+                for s in &here {
+                    if (s.spawn_chance(biome) - raw(s)).abs() > 1e-6 {
+                        problems.push(format!("{} in {biome}: {} where its rarity gives {}", s.name, s.spawn_chance(biome), raw(s)));
+                    }
+                }
+                continue;
+            }
+            let mean = here.iter().map(|s| s.spawn_chance(biome)).sum::<f32>() / here.len() as f32;
+            if mean < CRETACEOUS_FLOW * 0.999 {
+                problems.push(format!(
+                    "{biome} ({}): its rules average {mean:.4}, under the flow {CRETACEOUS_FLOW}",
+                    if water { "fish" } else { "land" }
+                ));
+            }
+            for a in &here {
+                for b in &here {
+                    let (ra, rb) = (a.spawn_chance(biome) / b.spawn_chance(biome), raw(a) / raw(b));
+                    if (ra / rb - 1.0).abs() > 1e-3 {
+                        problems.push(format!("{biome}: {} against {} is {ra:.3}, its rarity says {rb:.3}", a.name, b.name));
+                    }
+                }
+            }
+        }
+    }
+    let wyvern = SPECIES
+        .iter()
+        .find(|s| s.name == "wyvern")
+        .expect("the wyvern");
+    for &(biome, _) in wyvern.habitats {
+        for s in SPECIES
+            .iter()
+            .filter(|s| s.name != "wyvern" && !s.in_water() && s.habitats.iter().any(|(b, _)| *b == biome))
+        {
+            if s.spawn_chance(biome) <= wyvern.spawn_chance(biome) {
+                problems.push(format!("{} comes no more often than the wyvern in {biome}", s.name));
+            }
+        }
+    }
+    report(problems);
+}

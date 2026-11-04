@@ -1,8 +1,9 @@
 //! Where each species lives (`notes/ANIMALS.md`, "Places, food and sedation"): its habitats are
 //! facts in its row (`Species::habitats`, biomes with how common it is in each), and natural
 //! spawning follows them: a rule per species and biome, as often as its rarity has it there
-//! (`Rarity::spawn_chance`), in groups as its social life has them (`Social::group`), on the
-//! ground animals stand on, by day.
+//! (`Species::spawn_chance`: in the Cretaceous raised to the overworld's flow), in groups as its
+//! social life has them (`Social::group`), on the ground animals stand on, by day, and only in
+//! its own world (`world`: the Cretaceous's species there, the rest in the overworld).
 
 use weft_sdk::*;
 
@@ -16,11 +17,17 @@ fn tag(biome: &str) -> String {
     format!("habitat/{}", biome.replace(':', "/"))
 }
 
+/// The dimension species `s` lives in (`Species::cretaceous`): its spawn rules hold only there,
+/// though the overworld and the Cretaceous share their beaches and seas.
+pub fn world(s: &animals_core::species::Species) -> &'static str {
+    if s.cretaceous() { crate::cretaceous::CRETACEOUS.name() } else { base_api::OVERWORLD.name() }
+}
+
 pub fn init(r: &mut Registry) {
     r.tag(GROUND, &["base:grass", "base:snowy_grass", "base:sand", "animals:red_sand"]);
     let mut tagged: Vec<&str> = Vec::new();
     for s in &SPECIES {
-        for &(biome, share) in s.habitats {
+        for &(biome, _) in s.habitats {
             if !tagged.contains(&biome) {
                 r.tag_on(Target::Biome(biome), &tag(biome));
                 tagged.push(biome);
@@ -30,11 +37,12 @@ pub fn init(r: &mut Registry) {
             }
             let (few, most) = s.bio.social.group();
             r.spawn(s.kind)
+                .dimension(world(s))
                 .biome(&format!("#{}", tag(biome)))
                 .ground(&format!("#{GROUND}"))
                 .light(7, 15)
                 .group(few, most)
-                .chance(s.bio.rarity.spawn_chance() * share);
+                .chance(s.spawn_chance(biome));
         }
     }
 }
@@ -68,7 +76,9 @@ pub fn survey(w: &World, at: [i32; 2], radius: i32) -> Vec<String> {
             .collect::<Vec<_>>()
             .join(", "),
     ];
-    for s in &SPECIES {
+    // This dimension's species only (`world`).
+    let here = name_of(abi::entry_kind::DIMENSION, w.dimension());
+    for s in SPECIES.iter().filter(|s| world(s) == here) {
         // Land weighted by how common it is in each biome.
         let land: f32 = s
             .habitats

@@ -142,7 +142,7 @@ Real species (and a wyvern) to tame, command, ride, breed and raise, with genes,
 | ■ | Riding | Utahraptor. Code: `mods/animals/src/riding.rs`. |
 | ■ | Breeding, eggs, seasons | Code: `mods/animals/src/breeding.rs`, `mods/animals/src/eggs.rs`, `mods/animals/core/src/life.rs`. |
 | ■ | Genetics, coats, evolution | Code: `mods/animals/src/coats.rs`, `mods/animals/core/src/coats.rs`, `mods/animals/src/evolution.rs`. |
-| ■ | Habitats and the Cretaceous | Code: `mods/animals/src/habitats.rs`, `mods/animals/src/cretaceous.rs`, `mods/animals/src/gateway.rs`. |
+| ■ | Habitats and the Cretaceous | Each species spawns only in its own world (Species::cretaceous; the Cretaceous shares base:beach and base:ocean), and the Cretaceous's biomes spawn as often as the overworld's (Species::spawn_chance, CRETACEOUS_FLOW 0.025 a try, each species keeping its share by rarity; 11-05, after the creatures playtest saw hares and gulls there and no utahraptor, wyvern, crocodyliform or fish in 7 minutes). Code: `mods/animals/src/habitats.rs`, `mods/animals/src/fish.rs`, `mods/animals/src/cretaceous.rs`, `mods/animals/src/gateway.rs`, `mods/animals/core/src/species.rs`. |
 | ■ | Bodies | Comfort ranges, seeking warmth or shade, condition from food. Code: `mods/animals/src/comfort.rs`. |
 | □ | Imprinting babies | The value exists; nothing raises it yet. |
 | □ | Care for tames | Barns, coats, troughs (shelter and fires work already). |
