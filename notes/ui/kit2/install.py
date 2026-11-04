@@ -382,9 +382,10 @@ save("hud_badge_fill", badge, [("scaling", "stretch")])
 
 # The hotbar's slots (and the shortcuts' frames, the same part): kit 2's slot with a wood rim, and
 # the chosen one glowing orange, 2 GUI px bigger, as before.
-def hotbar_slot(size, rims, inner=k.SLOT):
-    a = k.canvas(size, size)
-    m = k.shape(size, size, k.R)
+def hotbar_slot(size, rims, inner=k.SLOT, h=None):
+    h = h or size
+    a = k.canvas(size, h)
+    m = k.shape(size, h, k.R)
     for colour in rims:
         r = k.edge(m)
         k.paint(a, r, colour)
@@ -402,10 +403,11 @@ save("hotbar", hotbar_slot(40, [k.OUTLINE, k.BRONZE, k.OUTLINE]), [NINE, border(
 save("hotbar_selected", hotbar_slot(44, [k.OUTLINE, k.GLOW, k.GLOW_D, k.OUTLINE]), [NINE, border(7)])
 # The HUD's food tiles (`hud.rs`, `food_tile`): the hotbar's slot, drawn as a gauge (full, or
 # hidden when there is no food for it), and the bar under each: outline round a green 4-row track.
-tile = hotbar_slot(40, [k.OUTLINE, k.BRONZE, k.OUTLINE])
+# 44 x 52: the picture (32) and the minutes' line under it inside the rim (`hud.rs`, FOOD_TILE).
+tile = hotbar_slot(44, [k.OUTLINE, k.BRONZE, k.OUTLINE], h=52)
 save("hud_food", tile, [("scaling", "stretch")])
 save("hud_food_fill", tile, [("scaling", "stretch")])
-hud_bar_pair("hud_food_bar", 40, 6, "q1", frame_px=0)
+hud_bar_pair("hud_food_bar", 44, 6, "q1", frame_px=0)
 
 for name, w, h, gui in WRITTEN:
     print(f"{name:28s} {w}x{h}  {gui}")
