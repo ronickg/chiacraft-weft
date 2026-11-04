@@ -5,6 +5,9 @@ idle
 chat /tk mode survival
 chat /tk time 6000
 wait 2
+# Clear ground: /knap puts the nodule at the feet only where there's room (tall grass took it).
+chat /tk fill ~-2 ~ ~-2 ~2 ~2 ~2 core:air
+wait 0.5
 look 0 -40
 wait 0.5
 chat /knap axe
@@ -29,6 +32,7 @@ tap_once base:knapping class:knap_stone
 wait 0.15
 shot kn_03_freed.png
 wait 1.5
+chat /tk fill ~-2 ~ ~-2 ~2 ~2 ~2 core:air
 chat /knap pick
 wait 1.5
 shot kn_04_pick.png
@@ -36,6 +40,7 @@ tap_once base:knapping class:knap_head
 wait 0.15
 shot kn_05_broken.png
 wait 1.5
+chat /tk fill ~-2 ~ ~-2 ~2 ~2 ~2 core:air
 chat /knap shovel
 wait 1.5
 shot kn_06_shovel.png
