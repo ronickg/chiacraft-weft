@@ -359,7 +359,10 @@ impl VulkanBackend {
             instance.get_physical_device_properties2(pdev, &mut props2);
             // Which driver too: on a Mac MoltenVK or Mesa's KosmicKrisp can stand behind the
             // same GPU, and runs comparing them must say which they had.
-            let text = |s: Result<&std::ffi::CStr, _>| s.map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            let text = |s: Result<&std::ffi::CStr, _>| {
+                s.map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_default()
+            };
             log::info!(
                 "GPU: {device_name}, driver {} {} ({:?})",
                 text(driver.driver_name_as_c_str()),
