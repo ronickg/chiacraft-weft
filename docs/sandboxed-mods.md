@@ -73,9 +73,9 @@ clans/
 Start a game with `--packages examples/packages` and a new world plays with it; players who join
 download it.
 
-## What a mod can do (API 1.2)
+## What a mod can do (API 1.3)
 
-The contract is `crates/sandbox/wit/v1.2/mod.wit` (1.0 and the calls 1.1 and 1.2 added). The
+The contract is `crates/sandbox/wit/v1.3/mod.wit` (1.0 and the calls 1.1, 1.2 and 1.3 added). The
 SDK gives it Weft's names:
 
 | Weft's SDK | Sandboxed SDK |
@@ -97,11 +97,75 @@ SDK gives it Weft's names:
 | content builders, screens, HUD, keys, client hooks | not yet: content comes from the package's definitions; client halves come later |
 
 Ours, beyond Weft's: `w.tell(player, key, args)` (a line in a player's chat, in their language),
-`w.player_key(player)` (who they are, the same in every world), `w.teleport(id, pos)`, and
-`storage::{get, get_text, set, remove, keys}` (the mod's own data in this world's save).
+`w.player_key(player)` (who they are, the same in every world), `w.teleport(id, pos)`,
+`storage::{get, get_text, set, remove, keys}` (the mod's own data in this world's save), and
+`w.grant_achievement(player, id, title, description, icon)` (1.3, below).
+
+### Achievements (1.3)
+
+`w.grant_achievement(player, "first_ring", "bell.achievement.first_ring",
+"bell.achievement.first_ring.desc", Some("bell:bell"))` tells the world the player earned it: the
+world signs an achievement credential for them, as it does for the base game's advancements
+(`notes/PLAN.md`, phase 4, slice 8), and their game keeps it in their account, on the Profile's
+Achievements screen, in every world they go to. The id gets the package's namespace
+(`bell:first_ring`), so a mod can't grant another's; title and description are the package's lang
+keys (or text), at most 64 and 256 characters; the icon is an item's full name. Granting the same
+id again signs it again, so a mod keeps who has what itself (`storage`). A player without an
+account gets none, and a world whose rule `sign_achievements` is off signs none. A world's owner
+can ask for one at the door (`/achievementrule bell:first_ring`).
 
 Every line a mod shows players is a translation key and arguments, worded by each player's game
 from the package's `assets/lang` files, like Weft's command replies.
+
+## Client halves
+
+A package may also carry `code/client.wasm`, a client half (API 1.2): a component for the world
+`chiacraft:mods/client-mod`, built against `crates/mod-sdk-client`, that runs in each player's
+own game (the host's too). It reads what that game shows the player (`c.me()`, `day_time`,
+`raining`, `creative`, the package's components synced to them, `inventory_slot`, `screen`) and
+adds, with Weft's client names:
+
+- HUD elements and screens: `r.hud_element(&H, hud_anchor::TOP_RIGHT, 0, |ui| ..)`,
+  `r.screen(&S, |ui| ..).pauses()`, built from `ui.panel`, `row`, `column`, `text`, `text_bind`,
+  `progress_bind`, `icons`, `image`, `item`, `spacer`, `button` with `S` styles, `at` included;
+- keys: `r.key(&K, "N").on_press(|c| ..)`, rebindable in Controls (named by
+  `key.<package>.<name>` in the package's language file);
+- packets from its server half: `r.client_packet(&CH, |c, v| ..)`, and `c.send(&CH, &v)` back;
+- `r.client_frame(|c, seconds| ..)`, every frame (off unless needed).
+
+A HUD element or screen is built as a list of parts the game replays into its own UI, so a
+client half draws with the game's kit: use its classes (`panel`, `tooltip`, `button`, `slot`,
+`hud_frame`, the `hud_health`, `hud_stamina`, `hud_xp` and `hud_temperature` bars; with the UI
+redo also `hud_badge`, `tab` and `category`; text classes `title`, `dim`, `button`, `chat`) and
+it looks like the game. A class the game has no texture for draws as the missing texture. A
+binding (`text_bind`, `progress_bind`, `icons`) may only read; keys, buttons, packets and frames
+may also send, open screens and show lines. It never reaches the account, files or network, and
+the same limits and strikes hold (a failing client half stops in the player's game). Lines it
+shows are translation keys from the package's `assets/lang`; key names too (`key.<package>.<name>`).
+
+`examples/wasm/bell-client` is the bell's client half: a `hud_badge` with the ring count and an
+`hud_xp` bar with the count inside it, fed by the server half on `bell:rings`, and the key N
+asking for it on `bell:ping`. Build it like a server half; `componentize` treats an output named
+`client.wasm` as a client half.
+
+## Personal mods
+
+A player's own client halves, never downloaded and never shared: a minimap, a clock, a tweak.
+Each is a folder like a package's with `package.toml` and `code/client.wasm` (and its
+`assets/lang`), in `<run dir>/personal/<name>/`. `examples/personal/clock` is one.
+
+Each world's owner decides whether they run there: the world rule **Personal Mods** (Off or
+Client Halves; off by default), on Create World and in the world's settings, or `/rule
+personal_mods 1`. Where it is off they don't run, and on joining the player is told which of
+theirs are off ("Your personal mods are off in this world: clock").
+
+A personal mod is written like any client half, with these differences, because it must not
+change what the world and the player's game agree on (the join checks the content's hash):
+- its HUD elements show through shared slots, one per anchor, in their order;
+- its screens open in one shared screen;
+- its keys take the slots Personal Key 1 to 8 in the order they are registered (Shift+Alt+1 to
+  8 unless rebound in Controls), not their own default bindings;
+- it has no server half, channels or components; its lines come from its own `assets/lang`.
 
 ## Limits
 
@@ -111,7 +175,7 @@ from the package's `assets/lang` files, like Weft's command replies.
 | Wall time per call | 500 ms (a backstop; fuel ends calls long before) |
 | Memory | 64 MiB |
 | Component size | 16 MiB (`code/server.wasm`) |
-| Per call | 64 log lines, 32 tells, 32 replies, 4096 block changes (`set_blocks` included), 64 spawns, 64 sounds, 64 particle bursts of at most 256, 256 scheduled ticks (up to an hour ahead), 32 sends of 16 KiB; `near` within 64 blocks, 256 entities |
+| Per call | 64 log lines, 32 tells, 8 achievements, 32 replies, 4096 block changes (`set_blocks` included), 64 spawns, 64 sounds, 64 particle bursts of at most 256, 256 scheduled ticks (up to an hour ahead), 32 sends of 16 KiB; `near` within 64 blocks, 256 entities |
 | Storage | 1024 keys, 4 MiB in all, 1 MiB written per call, keys of `a-z 0-9 _ - .` |
 | Registrations | 256 hooks, 64 components, 256 attaches; commands of `a-z 0-9 _`, not the engine's (`/op`, `/give`, `/tp`, ...); a name another mod or package already has is left out (a warning in the log) and the world still opens |
 
@@ -136,6 +200,13 @@ Floats are deterministic (NaNs canonicalized, no relaxed SIMD) and there are no 
 - A mod's own call into the world can ask a question or run a chain the mod itself hooks; that
   nested call skips the mod instead of re-entering it.
 
+## Seeing what runs: `/mods`
+
+`/mods` lists the sandboxed server halves running in the world you are in: each one's API
+version, its calls so far, their average and slowest time, and its strikes in the last ten
+minutes, and why one has stopped. An admin starts a stopped one again with `/mods resume
+<package>` (its strikes forgotten, its memory new, its storage kept).
+
 ## Versions
 
 API versions are frozen once released. `crates/sandbox/wit/v1.0/` and `v1.1/` never change
@@ -147,7 +218,9 @@ code needs, so a game too old for it refuses on joining, before downloading anyt
 sheet shows the version ("runs sandboxed code (mod API 1.1)"). A change that removes or alters a call would
 be 2.0, which nothing plans.
 
-The SDK builds for the newest version (1.2): a mod built with it needs a game that runs 1.2.
+The SDK builds for the newest version (1.3): a mod built with it needs a game that runs 1.3.
+1.3 added one call, `world.grant-achievement` (phase 4); the client SDK stays on 1.2, whose
+client world 1.3 didn't change.
 `examples/packages/clans` is built for 1.0, `tally` for 1.1, `bell` for 1.2. The callbacks 1.2
 added are a second export of the component, `content-hooks`, which the game looks for at run
 time, so a component built for 1.0 or 1.1, which lacks it, still runs.

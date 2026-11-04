@@ -13,6 +13,7 @@
 //!   strike: the instance is dropped and started again on the next call. Three strikes within
 //!   [`STRIKE_WINDOW`] stop it in that world.
 
+pub mod client;
 pub mod engine;
 pub mod storage;
 
@@ -28,7 +29,7 @@ pub use storage::Storage;
 
 mod bindings {
     wasmtime::component::bindgen!({
-        path: "wit/v1.2",
+        path: "wit/v1.3",
         world: "host",
     });
 }
@@ -43,7 +44,7 @@ pub use bindings::exports::chiacraft::mods::hooks::{BlockChange, Death, EventVal
 
 /// The API version this game serves.
 /// Its version is `chiacraft_packages::code::API`; a test checks the two agree.
-pub const API: &str = "1.2.0";
+pub const API: &str = "1.3.0";
 /// Strikes within this long stop a mod in a world.
 pub const STRIKE_WINDOW: Duration = Duration::from_secs(600);
 pub const STRIKES: usize = 3;
@@ -52,6 +53,8 @@ pub const STRIKES: usize = 3;
 const LOG_LINES: u32 = 64;
 const LOG_CHARS: usize = 512;
 const TELLS: u32 = 32;
+/// Achievements a call may grant (1.3).
+const ACHIEVEMENTS: u32 = 8;
 const REPLIES: u32 = 32;
 const BLOCK_SETS: u32 = 4096;
 const SPAWNS: u32 = 64;
@@ -100,6 +103,9 @@ pub trait Game: Send {
     fn give(&mut self, owner: u64, stack: ItemStack) -> ItemStack;
     fn spawn_item(&mut self, pos: [f64; 3], stack: ItemStack);
     fn tell(&mut self, player: u64, key: &str, args: &[Arg]);
+    /// The player earned achievement `id` (a full name, `<package>:<name>`) here: the world signs
+    /// it for them (1.3).
+    fn grant_achievement(&mut self, _player: u64, _id: &str, _title: &str, _description: &str, _icon: Option<&str>) {}
     fn player_key(&mut self, player: u64) -> String;
     /// A command's answer to whoever ran it; nothing outside a command.
     fn reply(&mut self, key: &str, args: &[Arg]);
@@ -340,6 +346,7 @@ struct Counts {
     stored: u64,
     schedules: u32,
     sends: u32,
+    achievements: u32,
 }
 
 impl State {
@@ -694,6 +701,21 @@ impl world::Host for State {
     fn player_key(&mut self, player: u64) -> String {
         self.game().map_or(String::new(), |g| g.player_key(player))
     }
+    fn grant_achievement(&mut self, player: u64, id: String, title: String, description: String, icon: Option<String>) {
+        self.counts.achievements += 1;
+        if self.counts.achievements > ACHIEVEMENTS || id.is_empty() || id.len() > 64 {
+            return;
+        }
+        // The package's own namespace in front, as for every name it registers.
+        let name = id.rsplit(':').next().unwrap_or(&id);
+        let full = format!("{}:{name}", self.package);
+        let cut = |s: &str, n: usize| s.chars().take(n).collect::<String>();
+        let (title, description) = (cut(&title, 64), cut(&description, 256));
+        let icon = icon.map(|i| cut(&i, 128));
+        if let Some(g) = self.game() {
+            g.grant_achievement(player, &full, &title, &description, icon.as_deref())
+        }
+    }
 
     fn get_component(&mut self, id: u64, component: String) -> Option<Vec<u8>> {
         let (full, size) = State::component(self, &component)?;
@@ -1041,17 +1063,59 @@ pub struct Instance {
     live: Option<Live>,
     strikes: VecDeque<Instant>,
     stopped: Option<String>,
+    stats: Stats,
+}
+
+/// What a mod has cost in one world (`/mods`): calls made, their time, the slowest, and strikes.
+#[derive(Clone, Debug, Default)]
+pub struct Stats {
+    pub calls: u64,
+    pub total: Duration,
+    pub slowest: Duration,
+    /// Strikes in the last [`STRIKE_WINDOW`].
+    pub strikes: usize,
+    /// Why it no longer runs here, if it doesn't.
+    pub stopped: Option<String>,
+}
+
+impl Stats {
+    /// Microseconds per call, on average.
+    pub fn average_us(&self) -> f64 {
+        if self.calls == 0 { 0.0 } else { self.total.as_secs_f64() * 1e6 / self.calls as f64 }
+    }
 }
 
 impl Instance {
     /// The mod `m` in a world whose save keeps its storage in `storage_dir` (none: in memory).
     pub fn new(m: Arc<Mod>, storage_dir: Option<PathBuf>) -> Instance {
-        Instance { m, storage_dir, live: None, strikes: VecDeque::new(), stopped: None }
+        Instance { m, storage_dir, live: None, strikes: VecDeque::new(), stopped: None, stats: Stats::default() }
     }
 
     /// Why the mod no longer runs in this world, if it doesn't.
     pub fn stopped(&self) -> Option<&str> {
         self.stopped.as_deref()
+    }
+
+    /// What it has cost here.
+    pub fn stats(&self) -> Stats {
+        let cut = Instant::now().checked_sub(STRIKE_WINDOW);
+        Stats {
+            strikes: self
+                .strikes
+                .iter()
+                .filter(|t| cut.is_none_or(|c| **t > c))
+                .count(),
+            stopped: self.stopped.clone(),
+            ..self.stats.clone()
+        }
+    }
+
+    /// Lets a stopped mod run again here (an operator's `/mods resume`): its strikes are
+    /// forgotten and it starts over on its next call.
+    pub fn resume(&mut self) {
+        self.stopped = None;
+        self.strikes.clear();
+        self.live = None;
     }
 
     fn strike(&mut self, why: String) {
@@ -1089,8 +1153,13 @@ impl Instance {
         if store.set_fuel(fuel).is_err() {
             return None;
         }
+        let started = Instant::now();
         let r = f(&live.bindings, store);
         store.data_mut().game = None;
+        let took = started.elapsed();
+        self.stats.calls += 1;
+        self.stats.total += took;
+        self.stats.slowest = self.stats.slowest.max(took);
         match r {
             Ok(v) => Some(v),
             Err(e) => {

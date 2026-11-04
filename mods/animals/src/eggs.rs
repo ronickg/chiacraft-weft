@@ -45,7 +45,7 @@ value! {
     }
 }
 
-static EGG: Component<Egg> = Component::named("egg_young");
+pub(crate) static EGG: Component<Egg> = Component::named("egg_young");
 /// The size an egg is drawn at (0: not since it loaded).
 static EGG_SCALED: Component<f32> = Component::named("egg_scaled");
 pub static EGG_ENTITY: Entity = Entity::named("egg");
@@ -168,8 +168,8 @@ fn nest_spot(w: &World, n: [f64; 3]) -> [f64; 3] {
 
 /// An egg of species `index`'s size against the Velociraptor's (eggs grow more slowly than
 /// bodies).
-fn egg_size(index: usize) -> f32 {
-    (SPECIES[index].height.0 / SPECIES[3].height.0).powf(EGG_GROWTH)
+pub(crate) fn egg_size(index: usize) -> f32 {
+    (SPECIES[index].height.0 / SPECIES[crate::species::of(&crate::raptor::RAPTOR)].height.0).powf(EGG_GROWTH)
 }
 
 /// A nest's width.
@@ -378,7 +378,7 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let nest = in_nest(w, st.pos);
     // The air itself: wind chill is what a body loses, and an egg never falls below the air (B5).
-    let air = base_api::air_at(w, st.pos, 0.3, st.in_liquid != 0, 3, |_| {}).still;
+    let air = base_api::air_at(w, st.pos, 0.3, st.in_liquid != 0, vitals::temperature::FIRE_REACH, |_| {}).still;
     let step = match life::develops(life::egg_air(air, nest)) {
         false => 0,
         true if nest => 40,

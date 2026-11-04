@@ -5,6 +5,7 @@ use super::*;
 impl Server {
     pub(super) fn join(&mut self, c: &'static Content, pi: usize, name: String, key: String) {
         let key = if key.is_empty() { name.clone() } else { key };
+        let name = self.name_for(&name, &key);
         if self.players.iter().any(|p| p.joined && p.key == key) {
             self.players[pi]
                 .conn
@@ -21,6 +22,7 @@ impl Server {
             identity: p.identity.clone(),
             did: p.did.clone(),
             did_days: p.did_days,
+            achievements: p.achievements.clone(),
         };
         if let crate::admission::Verdict::Refuse(why) = self.gate.verdict(&who, trusted) {
             log::info!("{name} ({key}) is not let in: {}", why.key);
@@ -160,6 +162,8 @@ impl Server {
         if dim == c.void_dim {
             p.conn.send(ToClient::Chat(void_note(c)));
         }
+        // The anchors of their achievements from this world (chiacraft), since they were here.
+        self.send_anchor_proofs(pi);
         // The skins of who is here already.
         let skins: Vec<(u64, Arc<Vec<u8>>)> = self
             .players
@@ -239,6 +243,37 @@ pub(super) type PlayerData = (Option<u32>, DVec3, f32, Option<Vec<ItemStack>>, V
 
 /// A saved player. Content that no longer exists is dropped with a log line; a file that cannot
 /// be read is kept as `.bak` before it gets overwritten by a fresh player.
+impl Server {
+    /// The name a joining player goes by here (chiacraft): the one their game sent, without
+    /// control characters, trimmed, at most 32 characters; an empty one (a game that sent none)
+    /// becomes the name they had here last time, else `player-` and the start of their key, so
+    /// nobody is ever nameless in the chat, the player list or the bans.
+    fn name_for(&self, given: &str, key: &str) -> String {
+        let clean = |s: &str| -> String {
+            s.chars()
+                .filter(|c| !c.is_control())
+                .collect::<String>()
+                .trim()
+                .chars()
+                .take(32)
+                .collect()
+        };
+        let name = clean(given);
+        if !name.is_empty() {
+            return name;
+        }
+        let before = self
+            .storage
+            .as_ref()
+            .and_then(|s| std::fs::read_to_string(s.lock().player_path(key)).ok())
+            .and_then(|f| crate::kv::get(&f, "name").map(clean))
+            .filter(|n| !n.is_empty());
+        let name = before.unwrap_or_else(|| format!("player-{}", key.chars().take(6).collect::<String>()));
+        log::warn!("a player ({key}) joined with no name: called {name}");
+        name
+    }
+}
+
 pub(super) fn load_player(c: &Content, s: &Storage, key: &str) -> Option<PlayerData> {
     let path = s.player_path(key);
     let src = match std::fs::read_to_string(&path) {

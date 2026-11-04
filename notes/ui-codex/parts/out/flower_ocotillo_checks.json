@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "ocotillo: a few long thin spiny grey-brown canes rising and spreading from one base, small green leaves along them and clusters of scarlet flowers at the tips, 28-30 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.507,
+   "outline": 1.26,
+   "red_line": 0.0,
+   "fill": 0.16,
+   "passed": false
+  },
+  {
+   "grid": 0.178,
+   "outline": 1.36,
+   "red_line": 0.0,
+   "fill": 0.12,
+   "passed": false
+  },
+  {
+   "grid": 0.302,
+   "outline": 1.35,
+   "red_line": 0.04,
+   "fill": 0.16,
+   "passed": false
+  }
+ ]
+}

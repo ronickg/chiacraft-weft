@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a loden wool cloak hanging open from its shoulders: muted loden green wool (#586848 to #687858) falling in soft folds, a lighter woven border along its edges, a small brass clasp at the collar, seen from the front, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.566,
+   "outline": 0.75,
+   "red_line": 0.0,
+   "fill": 0.51,
+   "passed": true
+  }
+ ]
+}

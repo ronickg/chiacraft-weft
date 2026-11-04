@@ -54,8 +54,8 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 // sunset, dusk and night, blended between.
 fn palette() -> Palette {
     let e = scene.sun.y;
-    let day = key(vec3(0.09, 0.26, 0.85), vec3(0.42, 0.60, 0.95), vec3(1.0, 0.92, 0.78), vec3(0.84, 0.78, 0.68), vec3(0.20, 0.27, 0.42));
-    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.78, 0.66, 0.62), vec3(1.0, 0.72, 0.42), vec3(1.15, 0.80, 0.50), vec3(0.22, 0.24, 0.38));
+    let day = key(vec3(0.09, 0.26, 0.85), vec3(0.42, 0.60, 0.95), vec3(1.0, 0.92, 0.78), vec3(1.15, 0.98, 0.76), vec3(0.20, 0.27, 0.42));
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.78, 0.66, 0.62), vec3(1.0, 0.72, 0.42), vec3(1.45, 0.95, 0.52), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
@@ -70,6 +70,8 @@ fn palette() -> Palette {
     } else {
         p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
+    // A new moon's night is darker than a full moon's.
+    p.ambient *= mix(1.0, mix(0.55, 1.0, moon_light()), smoothstep(-0.14, -0.3, e));
     // Overcast: grey and dim, and the sun no more than a brighter part of the sky.
     let r = rain_amount();
     let grey = vec3(luma(p.horizon)) * vec3(0.92, 0.95, 1.0);
@@ -81,6 +83,18 @@ fn palette() -> Palette {
     return p;
 }
 
+// How much of golden hour and sunset there is: 0 by day and at night, 1 with the sun just above the
+// horizon. The grade warms with it, and the glowing sky lights the ground.
+fn golden() -> f32 {
+    let e = scene.sun.y;
+    return (1.0 - smoothstep(0.08, 0.35, e)) * smoothstep(-0.06, 0.03, e);
+}
+
+// The moon's light by its phase: 1 full, 0 new (`scene.eye.w`, the engine's).
+fn moon_light() -> f32 {
+    return clamp(scene.eye.w, 0.0, 1.0);
+}
+
 // Where direct light comes from: the sun while it is up, then the moon opposite it.
 fn light_dir() -> vec3<f32> {
     return select(-scene.sun.xyz, scene.sun.xyz, scene.sun.y > -0.06);
@@ -90,7 +104,7 @@ fn light_dir() -> vec3<f32> {
 // up a little after.
 fn light_strength() -> f32 {
     let e = scene.sun.y;
-    return select(smoothstep(0.06, 0.2, -e), smoothstep(-0.04, 0.05, e), e > -0.06);
+    return select(smoothstep(0.06, 0.2, -e) * mix(0.2, 1.0, moon_light()), smoothstep(-0.04, 0.05, e), e > -0.06);
 }
 
 // ---- the sky ----
@@ -98,8 +112,8 @@ fn light_strength() -> f32 {
 fn sun_glow(dir: vec3<f32>, p: Palette) -> vec3<f32> {
     let mu = max(dot(dir, scene.sun.xyz), 0.0);
     let horizon = 1.0 - clamp(dir.y, 0.0, 1.0);
-    let wide = pow(mu, 5.0) * (0.28 + 0.4 * horizon);
-    let near = pow(mu, 60.0) * 0.9;
+    let wide = pow(mu, 5.0) * (0.2 + 0.28 * horizon);
+    let near = pow(mu, 60.0) * 0.75;
     return p.glow * (wide + near);
 }
 
@@ -113,7 +127,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let low = 1.0 - smoothstep(0.0, 0.2, abs(scene.sun.y));
     // Away from the sun the sunset sky goes rose and violet.
     let away = (0.5 - 0.5 * mu) * (1.0 - h) * low;
-    c = mix(c, c * vec3(0.95, 0.72, 1.12) + vec3(0.04, 0.0, 0.05), away * 0.7);
+    c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
     // Toward it, a warmer band low on the horizon.
     let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
     c += vec3(0.55, 0.22, 0.05) * toward;
@@ -133,28 +147,34 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
 // map: x 1 lit to 0 in shadow (a 3x3 of texels softens the edge), y how far to trust it, 1 well
 // inside the map and fading to 0 at its edge and where it holds nothing this frame (the caller
 // then guesses as it would without one).
-fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
-    if scene.shadow.z < 0.5 {
+// One cascade of the sun's shadows: its matrix `m`, `info` (bindless index, size, 1 when it holds
+// this frame's, the blocks a texel covers), its round reach and depth (blocks).
+fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
+    if info.z < 0.5 {
         return vec2(1.0, 0.0);
     }
-    let texel = scene.shadow.w;
+    let texel = info.w;
     // Off the surface along its normal so it does not shade itself, twice as far where the light
     // grazes it (Complementary's and Photon's normal offset), and a hair along the light.
     let ndl = clamp(dot(n, light_dir()), 0.0, 1.0);
-    let c = scene.shadow_view_proj * vec4(rel + n * texel * 1.2 * (2.0 - ndl), 1.0);
+    let c = m * vec4(rel + n * texel * 1.2 * (2.0 - ndl), 1.0);
     let ndc = c.xyz / c.w;
-    // The nearer of the box's edge and its round reach (80 blocks), so the corners fade too.
-    let reach = max(max(abs(ndc.x), abs(ndc.y)), length(rel.xz) / 80.0);
+    // The nearer of the box's edge and its round reach, so the corners fade too.
+    let reach = max(max(abs(ndc.x), abs(ndc.y)), length(rel.xz) / round);
     if reach > 0.97 || ndc.z <= 0.0 || ndc.z >= 1.0 {
         return vec2(1.0, 0.0);
     }
-    let size = i32(scene.shadow.y);
-    let at = vec2<i32>((ndc.xy * 0.5 + 0.5) * f32(size));
-    let index = u32(scene.shadow.x);
+    let size = i32(info.y);
+    // Rows run down the map as y runs up the light's view: the engine's shaders draw with y up, the
+    // way the screen effects read the screen (`0.5 - ndc.y * 0.5`). Read the other way up, every
+    // shadow was mirrored across the camera's row of the map, and one side of open ground lay in
+    // the mirror image of the ground itself.
+    let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * f32(size));
+    let index = u32(info.x);
     // A few hundredths of a block along the light, more on surfaces the light grazes, in the map's
-    // depth (it spans 400 blocks): no floating shadows at the foot of things.
+    // depth: no floating shadows at the foot of things.
     let slope = min(sqrt(max(1.0 - ndl * ndl, 0.0)) / max(ndl, 0.05), 4.0);
-    let bias = (0.03 + texel * 0.5 * slope) / 400.0;
+    let bias = (0.03 + texel * 0.5 * slope) / depth;
     // A 4x4 of the map about the point; each of the 3x3 taps takes the nearest to the light of its
     // texel and the ones right and below. That closes the one-texel cracks between neighbouring
     // meshes, through which sunlight would draw thin dotted lines across a shadow.
@@ -179,6 +199,22 @@ fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
     // horizon (long smeared shadows, then the swap from the sun to the moon).
     let low = smoothstep(0.02, 0.06, light_dir().y);
     return vec2(lit, (1.0 - smoothstep(0.85, 0.97, reach)) * low);
+}
+
+// How much of the sun reaches `rel` (camera relative) facing `n`: the near cascade's map (80 blocks
+// about the player, fine) where it holds, the far one's (400 blocks, coarser) beyond, handing over
+// smoothly; x 1 lit to 0 in shadow, y how far to trust it.
+fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
+    let near = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n);
+    if near.y >= 0.999 {
+        return near;
+    }
+    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, 400.0, 1200.0, rel, n);
+    let trust = max(near.y, far.y);
+    if trust <= 0.0 {
+        return vec2(1.0, 0.0);
+    }
+    return vec2(mix(far.x, near.x, near.y / trust), trust);
 }
 
 // The sun on a mob or a model at `rel` facing `n` with sky light `sky`: the shadow map where it
@@ -223,6 +259,9 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // More of the sky's light comes from above than from the sides, and little from below.
     let hemi = 0.62 + 0.38 * n.y;
     var c = p.ambient * sky * hemi * ao;
+    // At golden hour the sky round the low sun glows: a warm fill on everything under it, in the
+    // shade too, so the hour reaches the ground and not only the sky.
+    c += p.glow * golden() * 0.35 * sky * hemi * ao;
     // Direct light only where the sky reaches (it keeps caves out of reach of the traced shadow's
     // gaps), and without corner shading: corners are dark where little sky gets in.
     let open = smoothstep(0.5, 0.95, light.x);
@@ -409,9 +448,37 @@ fn shoulder(x: vec3<f32>) -> vec3<f32> {
 }
 
 // The tone curve and a little more color: linear light for the sRGB screen.
+// The grade on top: the darks a little cool and the lights warmer as the sun goes down (warm
+// light, blue shade), colour held back a little (vanilla's, not a saturated look), and a cool
+// floor so nothing is ever pure black.
+// Jim Hejl's 2015 filmic curve (his published formula): a toe that deepens the darks and a long
+// shoulder that keeps bright skies and sunlit faces from flattening; its output is display-coded,
+// so it is brought back to linear for the sRGB screen.
+fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
+    let v = vec4(c, white);
+    let a = 1.425 * v + vec4(0.05);
+    let f = (v * a + vec4(0.004)) / (v * (a + vec4(0.55)) + vec4(0.0491)) - vec4(0.0821);
+    return pow(max(f.rgb / f.w, vec3(0.0)), vec3(2.2));
+}
+
+// How bright the picture is taken: the filmic curve deepens the mid-tones, so by day it is opened
+// up to keep them where they were, and more as night falls and under water, the eye adjusting.
+fn exposure() -> f32 {
+    if in_liquid() {
+        return 3.0;
+    }
+    return mix(1.7, 4.0, smoothstep(0.0, -0.2, scene.sun.y));
+}
+
 fn display(c: vec3<f32>) -> vec3<f32> {
-    var t = shoulder(max(c, vec3(0.0)));
+    var t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
+    // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
+    let lights = smoothstep(0.02, 0.22, luma(t));
+    t *= mix(vec3(0.975, 0.99, 1.03), mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
+    // Colour held back in the mid-tones and darks (the land), not in what glows bright (lava, fire,
+    // lamps keep their fire).
     let y = luma(t);
-    t = max(mix(vec3(y), t, 1.06), vec3(0.0));
+    t = max(mix(vec3(y), t, mix(1.08, 1.25, smoothstep(0.05, 0.35, y))), vec3(0.0));
+    t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034);
     return clamp(t, vec3(0.0), vec3(1.0));
 }

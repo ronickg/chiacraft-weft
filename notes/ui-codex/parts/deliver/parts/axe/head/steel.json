@@ -1,0 +1,15 @@
+{
+ "kind": "base:axe",
+ "layer": "head",
+ "material": "steel",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 8,
+ "anchor": [
+  12.1,
+  21.5
+ ]
+}

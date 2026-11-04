@@ -42,7 +42,7 @@ pub fn compose(look: &str, read: impl Fn(&str) -> Option<(u32, Vec<u8>)>) -> Opt
             ((0..w as i32).contains(&x) && (0..w as i32).contains(&y)).then(|| (y as u32 * w + x as u32) as usize * 4)
         };
         let Some(ramps) = ramps else {
-            for (i, p) in px.chunks_exact(4).enumerate() {
+            for (i, p) in px.as_chunks::<4>().0.iter().enumerate() {
                 if let (true, Some(o)) = (p[3] > 0, at(i)) {
                     canvas[o..o + 4].copy_from_slice(p);
                 }
@@ -60,7 +60,7 @@ pub fn compose(look: &str, read: impl Fn(&str) -> Option<(u32, Vec<u8>)>) -> Opt
                 ramp
             })
             .collect();
-        for (i, p) in px.chunks_exact(4).enumerate() {
+        for (i, p) in px.as_chunks::<4>().0.iter().enumerate() {
             let Some(o) = at(i).filter(|_| p[3] != 0) else { continue };
             // A region without a ramp leaves what is below.
             let Some(Some((rw, rp))) = ramps.get(p[1] as usize) else { continue };

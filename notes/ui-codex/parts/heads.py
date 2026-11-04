@@ -41,7 +41,11 @@ def cut(a, wide=4.0):
     c, d = line(handle)
     t, dist = frame(a, c, d)
     lo = t[m].min() + (t[m].max() - t[m].min()) * 0.3  # past the pommel and bands
-    t_head = t[m & (dist > wide) & (t > lo)].min()
+    for w in (wide, 3.0, 2.2):  # a slim tool (a steel sword's small guard) stands out less
+        sel = m & (dist > w) & (t > lo)
+        if sel.any():
+            break
+    t_head = t[sel].min() if sel.any() else t[m].min() + (t[m].max() - t[m].min()) * 0.5
     head = m & ((t >= t_head) | ((t >= t_head - 3) & (dist <= 2.6)))  # head, and its collar or lashing below
     base = c + d * (t_head - 3)
     return head, base, (c, d)

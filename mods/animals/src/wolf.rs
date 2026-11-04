@@ -10,10 +10,10 @@ use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
 pub(crate) static WOLF: Entity = Entity::named("grey_wolf");
-const INDEX: usize = 33;
 const TEXTURE: &str = "wolf/wolf";
 
 pub fn init(r: &mut Registry) {
+    let index = crate::species::of(&WOLF);
     // Settling down: its poses, drawn in place of it (`rest.rs`).
     crate::rest::register(
         r,
@@ -41,12 +41,12 @@ pub fn init(r: &mut Registry) {
         })
         .goals(
             Goals::new()
-                .then(crate::animal::upkeep(INDEX))
-                .then(crate::taming::behave(INDEX))
+                .then(crate::animal::upkeep(index))
+                .then(crate::taming::behave(index))
                 .then(crate::hunt::wary)
                 .then(crate::hunt::hunt)
-                .then(crate::commands::act(INDEX))
-                .then(crate::breeding::behave(INDEX))
+                .then(crate::commands::act(index))
+                .then(crate::breeding::behave(index))
                 .then(crate::rest::settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)

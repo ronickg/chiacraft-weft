@@ -13,6 +13,13 @@ pub static SAND: Block = Block::named("sand");
 pub static GRAVEL: Block = Block::named("gravel");
 pub static CLAY: Block = Block::named("clay");
 pub static SANDSTONE: Block = Block::named("sandstone");
+// The rock faces' stones (`land.rs`): granite on warm mountains, slate in the cold, limestone on
+// temperate cliffs, ochre and red sandstone in the mesas' strata.
+pub static GRANITE: Block = Block::named("granite");
+pub static SLATE: Block = Block::named("slate");
+pub static LIMESTONE: Block = Block::named("limestone");
+pub static OCHRE_SANDSTONE: Block = Block::named("ochre_sandstone");
+pub static RED_SANDSTONE: Block = Block::named("red_sandstone");
 pub static SNOW: Block = Block::named("snow");
 pub static ICE: Block = Block::named("ice");
 pub static OBSIDIAN: Block = Block::named("obsidian");
@@ -168,7 +175,8 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fr
         .hardness(0.2)
         .cutout()
         .opacity(1)
-        .tint(&tints::FOLIAGE)
+        // Its tint by how it turns in autumn (`vitals::wild::LEAVES`).
+        .tint(base_api::trees::leaf_tint(vitals::wild::turn(handle.name())))
         .tag("leaves")
         .redstone_blocker()
         .mineable("shears")
@@ -203,6 +211,9 @@ fn plant(r: &mut Registry, handle: &'static Block, tex: &str) {
 
 /// Sand and gravel: with nothing under them they fall as an entity and land as a block.
 pub fn register(r: &mut Registry) {
+    // The leaves' tint kinds besides foliage (`base_api::trees`), as green as foliage by default.
+    r.tint_kind(&base_api::trees::EVERGREEN, 0x48b518);
+    r.tint_kind(&base_api::trees::YELLOW_LEAVES, 0x48b518);
     r.block(&STONE)
         .sound_group("stone")
         .hardness(1.5)
@@ -280,6 +291,25 @@ pub fn register(r: &mut Registry) {
         .mineable("pickaxe")
         .needs_tool(0)
         .tab(&crate::tabs::BUILDING);
+    for (block, textures) in [
+        (&GRANITE, None),
+        (&SLATE, Some(("slate_top", "slate_side", "slate_top"))),
+        (&LIMESTONE, Some(("limestone_top", "limestone_side", "limestone_top"))),
+        (&OCHRE_SANDSTONE, Some(("ochre_sandstone_top", "ochre_sandstone_side", "ochre_sandstone_bottom"))),
+        (&RED_SANDSTONE, Some(("red_sandstone_top", "red_sandstone_side", "red_sandstone_bottom"))),
+    ] {
+        let b = r
+            .block(block)
+            .sound_group("stone")
+            .hardness(1.2)
+            .mineable("pickaxe")
+            .needs_tool(0);
+        match textures {
+            Some((top, side, bottom)) => b.textures(top, side, bottom),
+            None => b,
+        }
+        .tab(&crate::tabs::BUILDING);
+    }
     r.block(&SNOW)
         .sound_group("sand")
         .hardness(0.2)
@@ -344,7 +374,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
 
     log(r, &OAK_LOG, "oak", "oak_leaves", None);
-    log(r, &BIRCH_LOG, "birch", "birch_leaves", None);
+    log(r, &BIRCH_LOG, "birch", "birch_leaves", Some("slim_tree"));
     log(r, &SPRUCE_LOG, "spruce", "spruce_leaves", Some("cone_tree"));
     log(r, &ACACIA_LOG, "acacia", "acacia_leaves", Some("flat_tree"));
     for (h, wood) in [(&OAK_PLANKS, "oak"), (&BIRCH_PLANKS, "birch"), (&SPRUCE_PLANKS, "spruce"), (&ACACIA_PLANKS, "acacia")] {

@@ -1,0 +1,9 @@
+[package]
+name = "chiacraft-mod-common"
+version = "1.2.0"
+edition.workspace = true
+license = "MIT"
+rust-version.workspace = true
+description = "What chiacraft's two sandboxed-mod SDKs (chiacraft-mod-sdk, chiacraft-mod-sdk-client) share: values, line arguments, item stacks, callback numbering, logging"
+
+[dependencies]

@@ -1,0 +1,19 @@
+{
+ "kind": "block",
+ "what": "a clump with a few seed heads on thin stems among the blades, rising 20-26 px; in the same style, colours and blade width as the attached tall grass from my game; centred, see-through around it",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.523,
+   "outline": 0.79,
+   "red_line": 0.0,
+   "fill": 0.51,
+   "passed": true
+  }
+ ]
+}

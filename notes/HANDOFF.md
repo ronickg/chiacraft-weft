@@ -268,7 +268,13 @@ the server checks the proof, then the chain on a thread (`server/admission.rs` `
 `did_answers`), waits up to 25 s only when the rules ask for a DID (`Rules::needs_did`), and keeps
 `did` in the player file. `/didrule required on|off`, `/didrule age <days>`, and the screen.
 
-Slices 5 and 7 (2026-11-04, built, not yet seen on testnet11). `crates/sponsor`
+Slices 4-7 passed the two-copy check on testnet11 on the Mac (2026-11-04, Tester, fd673712,
+`tools/checks/did`, about 20 minutes): alice's DID from our sponsor reached the chain in about 70 s,
+her world's DID in about 3 minutes and her DID's listing of it 3 minutes later; bob was refused for
+having no DID, got one, was let in once the world checked it on chain, and his saved worlds list
+showed alice's world "DID required, a DID its owner's DID confirms".
+
+Slices 5 and 7 (2026-11-04). `crates/sponsor`
 (`chiacraft-sponsor`): Horizon's sponsor on iroh (`chiacraft/sponsor/1`, JSON request and answer,
 key in `<data_dir>/sponsor.key`), feature `service` for the binary; a proof of work per request and
 the budget released by the hour; world requests (`Request::sign_world`, `WorldAsk`: a world DID
@@ -389,8 +395,78 @@ component as the package it goes into. Sample `examples/wasm/bell` (a bell block
 striker item that wears down, a channel), built as a size-optimised dev build since the Mac does
 no release builds now. With it, the mod UI ABI got `at` (b2877719: `UiNode::at`, `S::at`,
 `S::at_pivot`, onto the engine's `Style::at`), for the UI redo's numbers inside bars.
+Slice 4, client halves (built; not yet seen in the game): `code/client.wasm` (allowed beside
+`code/server.wasm`, `identity::is_code`), a component for the world `client-mod` in
+`crates/sandbox/wit/v1.2` (`client`, `client-registry`, `ui` parts, exported `client-hooks`).
+`crates/sandbox/src/client.rs`: `ClientMod`, `ClientInstance` (strikes as server halves;
+`well_formed` checks a build's parts), `ClientGame` (the player's game; `can_act` false in
+bindings). `crates/mod-sdk-client` (Weft's client names: `hud_element`, `screen`, `key`,
+`client_packet`, `client_frame`, `Ui` parts, `S` with `at`, `ClientView`/`Client`).
+`mods/packages/src/client_half.rs` registers its hooks through Weft's SDK in every game and
+replays its parts into `Ui` (classes interned; flags limited); a client reads a sandboxed
+component through the same byte buckets (`sandboxed::client_component`). The offer's API is the
+newer half's; "has code" means either half. Sample: `examples/wasm/bell-client` (a `hud_badge`
+with the ring count, an `hud_xp` bar with the count inside it through `at`, the key N), with the
+bell's server half now sending `bell:rings`. Tests `crates/sandbox/tests/client.rs`.
+Checked on the Linux PC (Tester 2, aa03294f): alice's side of the client-half pair ran: the
+bell rang and the puff showed above it ("a puff above the bell", seen in the shot; it had been
+inside the block), the join sheet listed the bell "(mod API 1.2)"; but the badge drew as the
+missing texture: `hud_badge` comes with the UI redo, not in `dev` yet, so the sample now uses
+`tooltip`. Bob's side is untested: his game ran out of GPU memory both times on the PC, next to
+vLLM ("allocating 67108864 bytes for quad page: Out of memory", a panic in the Vulkan backend).
+Bob also joined with an empty name although his `core.txt` says `name = bob`. That was this
+work's: the bell's client half registered a key, a key's binding is a setting, and the engine
+numbers settings by name per content while their values sit in one table by id, so the content
+switch on joining shifted `core:name` onto an empty slot. Fixed in the engine, generally (Planner's call):
+`content::set` calls `config::content_switched`, which carries the game's setting values, the
+run's overrides and a remote server's values over to the new content's ids by name, and writes
+mods' setting handles (`Game::config_cells`) back to the new content's ids; `VALUES` is a table
+per content (the old ones kept, so held slices stay valid). Check
+`a_content_switch_keeps_values_by_name`. So packages may add settings, and client halves' keys
+are their own again (an interim fix had given them shared slots).
+Checked on the Mac (Tester, c4a527ea, two copies): bob joined with his name; the sheet listed
+the bell "(mod API 1.2)"; `/mods` answered ("bell (mod API 1.2): 1 calls, 121.0 µs each ...").
+Found and fixed after it: the input registered key bindings only at start, so a key a package
+brings on joining was unknown on the joining game (`content_changed` in `app.rs` now registers
+the new content's keys with the player's bindings); the badge's text wrapped a letter a line (it
+needs `no_wrap` in a HUD panel). Checked on the PC (Tester 2, 47a8be49, two copies at 480x270 beside vLLM): the whole pair. Bob joined as "bob" and downloaded bell, clans, gems and tally; alice's use rang the bell and the puff showed above it; the badge "Bell: 2 rings" on one line over the bar "2/10", in both games; bob's key: "You listen for the bell." in his chat and "player 2 pinged: ping" in alice's log; `/mods` gave the bell's and clans' calls with 0 strikes. Two rings from one use: the script held use 0.3 s and the engine repeats use every 0.2 s while it is held (the script now holds 0.15 s). Not covered: other kinds of
+handle cells (blocks, items, sounds) when a content built earlier comes back.
+Slice 5, personal mods (built, and checked in one game on the PC: off by default with "Your
+personal mods are off in this world: clock.", on after `/rule personal_mods 1` with the clock
+showing 07:07 top left, its key in slot 1 hid it, off again; Create World's choice not looked at): `mods/packages/src/personal.rs`. The
+world rule `packages:personal_mods` (choice off/client, off by default, a world rule so it is on
+Create World and synced to players); the player's own client halves from `<run dir>/personal/`
+(up to 16, loaded on the first client frame); slots registered the same in every game so the
+content hash is unchanged: a HUD element per anchor (`personal_<anchor>`, order 1000), the
+screen `packages:personal`, keys `packages:personal_1..8` (Shift+Alt+1..8), and a client frame
+that runs their frames and tells the player once per world which are off or on. A personal mod's
+`Half` has its own `Words` (from its `assets/lang`, the player's language over English), and no
+channels or components. Sample `examples/personal/clock` (from `examples/wasm/clock`).
+Slice 6 (built; not yet seen in the game): `/mods` (`sandboxed::register_command`, in this
+mod's init): each server half running in this world (by the bridge's run) with its API, calls,
+average and slowest time and strikes in ten minutes (`Instance::stats`), and why one stopped;
+`/mods resume <package>` for admins (`Instance::resume`). Every `Runs` is kept in `ALL` (weak).
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
-and chain steps, client halves (slice 4), personal mods per world (slice 5), `/mods` (slice 6).
+and chain steps, cached compiled components and a per-tick budget across mods, `/mods` for
+client halves, the engine's settings hazard on a content switch (Planner).
+
+## Phase 4: achievements (2026-11-04 overnight, built, not yet seen in a game)
+
+Slices 8-10. `crates/engine/src/chiacraft/achievements.rs` (the player's store, `achievements.json`
+in the account home; `received`, `anchored`; `check_issuer`, the world DID confirmed both ways),
+`server/achievements.rs` (the server signs what mods grant through the bridge's `achievement`
+question, `Shared.grants`, with the owner's account as issuer and the world DID's proof kept in
+`did.json`; `achievements/issued.jsonl`; the daily anchor behind the world rule
+`anchor_achievements`, `achievements/anchors.json`, proofs sent on join), `achievements_screen.rs`
+(Profile > Achievements). The base mod asks the bridge in `advancements.rs` `grant_where`.
+World rules `sign_achievements` (on) and `anchor_achievements` (off). Protocol 9. Slices 8-9 and
+the join-name fix passed on the Mac (Tester, c030a1d1). Then, on claude/phase4-achievement-rule:
+`/achievementrule <id> [issuers]` (`Rules.achievement`; the world asks the joining game for that
+achievement only, `AskAchievement` / `Proofs`, the join waiting as for a DID; protocol 10) and
+`/revoke <player> <id | *>` (the issuer account's `revoked.json` in its home, sent to players on
+joining and on change, `ToClient::Revocations`, protocol 11; marked on the profile; no longer
+counts at the door). Plural forms for screen text: `chiacraft::plural`. The check:
+`tools/checks/achievements` (two copies, no chain): signing, the profile, the rule, revoking.
 
 ## Our DID sponsor (testnet11, since 2026-11-04)
 
@@ -440,6 +516,12 @@ poses, taming, sitting, love, and a puppy born to two dogs in love (with a local
 dogs in love: aiming `press core:use` at wandering dogs from a script is too hit and miss). If the
 game aborts at start with "unable to open IOSurface kernel service", the Mac has run out of
 IOSurface clients (leaked by hung `simctl` runs); only a reboot clears it.
+
+Server identity (2026-11-04, branch `claude/server-identity-519f6e`, off `dev`): `weft --server`
+exited with "has no address of its own: no account is open". `chiacraft_account::open_server`
+opens (making it once) an account called "Server" in `<run dir>/server-account` (file store),
+and `dedicated.rs` opens it before the world's key; the world's keys and certificate derive from it
+as from a player's account. Phase 7's part (an owner certifying their server) is in the plan.
 
 ## Next steps
 

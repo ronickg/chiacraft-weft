@@ -1,0 +1,35 @@
+{
+ "species": "cedarosaurus",
+ "about": "Cedarosaurus weiskopfae: no record of its colors; here grey-brown to olive, darker along the top, pale buff below, faint darker bands.",
+ "loci": [
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "grey-brown to olive"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   150,
+   110,
+   50
+  ],
+  [
+   120,
+   84,
+   40
+  ]
+ ],
+ "build": {}
+}

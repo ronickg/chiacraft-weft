@@ -10,10 +10,12 @@
 //! A package may also carry a sandboxed server half, `code/server.wasm` (phase 6): see
 //! `sandboxed`.
 
+mod client_half;
+mod personal;
 mod sandboxed;
 
 use std::collections::VecDeque;
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 
 use chiacraft_packages::{BlockDef, Drops, ItemDef, Package, RecipeDef, Render};
 use weft_sdk::abi::{Host, ModId, Registrar, Str};
@@ -31,43 +33,35 @@ fn init(r: &mut Registry) {
     chiacraft_sandbox::set_logger(sandboxed::logger);
     // A sandboxed mod's line for this player goes through a command of this mod's own, whose
     // reply the client shows in its own language.
-    r.client_packet(&sandboxed::SAY, |c, text| {
-        {
-            let mut lines = LINES.lock().unwrap_or_else(|e| e.into_inner());
-            if lines.len() >= 64 {
-                return;
-            }
-            lines.push_back(text);
-        }
-        // The lock is let go first: the command may run right here, and it takes the lock.
-        c.chat("/packages_say");
-    });
+    r.client_packet(&sandboxed::SAY, show_line);
+    // Personal mods (slice 5): the world rule and the shared slots their parts and keys use.
+    personal::register(r);
+    // `/mods` (slice 6).
+    sandboxed::register_command(r);
     r.client_command("packages_say", "", |cmd| {
         let Some(text) = LINES.lock().unwrap_or_else(|e| e.into_inner()).pop_front() else { return };
         sandboxed::with_line(&text, |key, args| cmd.reply(key, args));
     });
 }
 
+/// Shows a line (`sandboxed::line_text`) in the player's chat, in their language: through
+/// `/packages_say`, whose reply the client words.
+fn show_line(c: &Client, text: String) {
+    {
+        let mut lines = LINES.lock().unwrap_or_else(|e| e.into_inner());
+        if lines.len() >= 64 {
+            return;
+        }
+        lines.push_back(text);
+    }
+    // The lock is let go first: the command may run right here, and it takes the lock.
+    c.chat("/packages_say");
+}
+
 // ------------------------------------------------------------------ the engine's bridge
 
-type Query = unsafe extern "C" fn(query: Str, arg: Str) -> Str;
-static BRIDGE: OnceLock<Query> = OnceLock::new();
-
-/// The engine hands the mod its bridge when the mod loads (`crates/engine/src/chiacraft/bridge.rs`).
-///
-/// # Safety
-/// `q` must be the engine's `bridge::query`.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn chiacraft_bridge(q: Query) {
-    let _ = BRIDGE.set(q);
-}
-
-fn ask(q: &str, arg: &str) -> String {
-    BRIDGE
-        .get()
-        .map(|f| unsafe { f(Str::new(q), Str::new(arg)).as_str().to_string() })
-        .unwrap_or_default()
-}
+chiacraft_bridge::install!();
+use chiacraft_bridge::ask;
 
 /// What registering the current package's sandboxed half found wrong, for the engine as load errors.
 static CODE_ERROR: Mutex<Option<String>> = Mutex::new(None);
@@ -139,6 +133,12 @@ fn register_current(r: &mut Registry) {
         if let Err(e) = registered {
             *CODE_ERROR.lock().unwrap() = Some(e);
         }
+    }
+    // The client half (slice 4), in every game: the host's and each joining player's.
+    let client = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| client_half::load(r, p.id(), &p.dir)))
+        .unwrap_or_else(|_| Err("loading code/client.wasm failed".into()));
+    if let Err(e) = client {
+        *CODE_ERROR.lock().unwrap() = Some(e);
     }
 }
 

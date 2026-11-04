@@ -108,7 +108,7 @@ static ALL: [Advancement; 27] = [
 /// Server to the player who made it: the index into `ALL`.
 static MADE: Channel<u32> = Channel::named("advancement_made");
 static CHIME: Sound = Sound::named("ui.advancement");
-static SCREEN: Screen = Screen::named("advancements");
+pub static SCREEN: Screen = Screen::named("advancements");
 static OPEN: Key = Key::named("advancements");
 
 const TOAST_SECS: f32 = 5.0;
@@ -229,6 +229,13 @@ fn grant_where(w: &World, player: u64, met: impl Fn(&Rule) -> bool) {
         if a.done & bit == 0 && met(&adv.rule) {
             a.done |= bit;
             w.send(player, &MADE, &(i as u32));
+            // chiacraft: the world signs it for the player, a credential that outlives the world.
+            let arg = format!(
+                "{player}\tbase:{id}\tadvancement.base.{id}\tadvancement.base.{id}.desc\t{icon}",
+                id = adv.id,
+                icon = adv.icon.name()
+            );
+            crate::bridge("achievement", &arg);
             base_api::give_xp(w, player, vitals::levels::xp::ADVANCEMENT);
         }
     }
@@ -286,9 +293,11 @@ fn client(r: &mut Registry) {
     // Built when the screen opens, from what the player has made by then.
     r.screen(&SCREEN, |ui| {
         let done = ui.client().component(&ADVANCEMENTS).map_or(0, |a| a.done);
-        ui.panel("panel", S::col().pad(8.0).gap(6.0), |ui| {
+        let tabs: [crate::window::Tab; 1] = [("window.base.tab.stats", |c| {
+            c.client().open_screen(&crate::levels::SCREEN);
+        })];
+        crate::window::window_titled(ui, S::col().pad(8.0).gap(6.0), "advancements.base.title", &tabs, |ui| {
             ui.row(S::row().gap(8.0), |ui| {
-                ui.text_styled(S::col().class("title").scale(1.5).no_wrap(), "advancements.base.title", &[]);
                 ui.spacer();
                 ui.text_bind_styled(S::col().class("dim").no_wrap(), |v, out| {
                     let done = v

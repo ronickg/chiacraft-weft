@@ -453,7 +453,10 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
             uk::IMAGE => {
                 b.ui.open(Kind::Image { texture: n.text.as_str().to_string(), color: 0xFFFFFFFF }, style)
             }
-            uk::ENTITY => b.ui.open(Kind::Custom { tag: TAG_ENTITY, data: 0 }, style),
+            // The player (data 0), or with the text "menu" the menu's own entity (data 1).
+            uk::ENTITY => {
+                b.ui.open(Kind::Custom { tag: TAG_ENTITY, data: (n.text.as_str() == "menu") as u64 }, style)
+            }
             uk::SPACER => {
                 b.ui.open(Kind::Container { class: None }, Style { grow: n.grow.max(1.0), ..style })
             }

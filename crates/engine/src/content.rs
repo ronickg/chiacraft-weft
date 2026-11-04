@@ -379,6 +379,34 @@ pub struct ScatterDef {
     pub density: Option<u32>,
     pub salt: u64,
     pub shape: Callback,
+    /// Sites thinned by where they stand (`abi::ScatterDesc::thin`), before `shape`.
+    pub thin: Option<ScatterThin>,
+}
+
+/// Where `mask` is over 0, one site in `keep` stays (0: none), in biomes with component
+/// `biomes` (all when `None`).
+#[derive(Clone)]
+pub struct ScatterThin {
+    pub mask: crate::server::terrain::Mask,
+    pub keep: u32,
+    pub biomes: Option<u32>,
+}
+
+impl ScatterThin {
+    /// Whether it takes away the site at (`x`, `z`) in `biome` with random bits `random`.
+    pub fn removes(&self, c: &Content, seed: u64, x: i32, z: i32, biome: u32, random: u64) -> bool {
+        if self
+            .biomes
+            .is_some_and(|b| !c.components.has(crate::components::BIOME, biome, b))
+        {
+            return false;
+        }
+        (self.keep == 0 || random % self.keep as u64 != 0)
+            && self
+                .mask
+                .value(&weft_noise::fixed::Fields { seed }, x * 16, z * 16)
+                > 0
+    }
 }
 
 impl DimensionDef {
@@ -652,7 +680,12 @@ pub fn with<R>(c: &'static Content, f: impl FnOnce() -> R) -> R {
 }
 
 pub(crate) fn set(c: &'static Content) {
-    CONTENT.store(c as *const Content as *mut Content, std::sync::atomic::Ordering::Release);
+    let old = CONTENT.swap(c as *const Content as *mut Content, std::sync::atomic::Ordering::AcqRel);
+    // The game's setting values follow their names into the new content's ids (chiacraft).
+    // SAFETY: only `set` stores here, a `&'static Content`.
+    if !old.is_null() && !std::ptr::eq(old, c) {
+        crate::config::content_switched(unsafe { &*old }, c);
+    }
 }
 
 /// Color (0xRRGGBB) of a tint kind on items, which have no biome: the kind's default.
@@ -1643,7 +1676,11 @@ fn merge_registrars(mods: &[ModMeta], regs: Vec<RawRegistrar>, errors: &mut Vec<
     let mut biome_tints = Vec::new();
     let mut games = Vec::new();
     for r in regs {
-        games.push(r.game);
+        let mut game = r.game;
+        game.package = mods
+            .get(r.owner.0 as usize)
+            .is_some_and(|m| m.package.is_some());
+        games.push(game);
         tint_kinds.extend(r.tint_kinds);
         biome_tints.extend(
             r.biome_tints
@@ -2594,6 +2631,20 @@ fn place_features(games: &mut [crate::registry::RawGame], dim_defs: &mut [Dimens
             errors.push(format!("{what}: cell {} and reach {} (cell at least 1)", s.cell, s.reach));
             continue;
         }
+        let thin = crate::server::terrain::Mask::from_steps(&s.thin).map(|mask| ScatterThin {
+            mask,
+            keep: s.thin_keep,
+            biomes: (!s.thin_biomes.is_empty()).then(|| {
+                let id = components.id(&s.thin_biomes);
+                if id.is_none() {
+                    errors.push(format!("{what}: thinning component {:?} is not set on any biome", s.thin_biomes));
+                }
+                id.unwrap_or(u32::MAX)
+            }),
+        });
+        if !s.thin.is_empty() && thin.is_none() {
+            errors.push(format!("{what}: malformed thinning mask"));
+        }
         for d in targets(&what, &s.dimensions, errors) {
             dim_defs[d].scatters.push(ScatterDef {
                 owner: s.owner,
@@ -2602,6 +2653,7 @@ fn place_features(games: &mut [crate::registry::RawGame], dim_defs: &mut [Dimens
                 density,
                 salt: crate::registry::name_hash(&s.name),
                 shape: s.shape,
+                thin: thin.clone(),
             });
         }
     }

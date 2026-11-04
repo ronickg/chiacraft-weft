@@ -37,13 +37,21 @@ const THERMOMETER: (f32, f32) = (64.0, 5.0);
 const COLDEST: f32 = 31.0;
 const HOTTEST: f32 = 43.0;
 
-/// The player's vitals, none in creative (the bars hide).
+/// The player's vitals, none in creative or while dead (the bars hide: a dead player's are
+/// placeholders, health "0 / -1" over the death screen).
 fn vitals_of(c: &ClientView) -> Option<Vitals> {
-    if c.creative() { None } else { c.component(&VITALS) }
+    if c.creative() || c.me().is_none_or(|m| m.health <= 0.0) {
+        return None;
+    }
+    c.component(&VITALS)
+        .filter(|v| v.max_health > 0.0 && v.max_stamina > 0.0)
 }
 
 /// The screens a key opens, each with its picture (`gui/hud_<name>.png`) and its key
 /// (`hud.base.shortcut.<name>`, as the player has bound it).
+/// The effects the HUD names at once (the rest wait their turn).
+const EFFECTS_SHOWN: usize = 6;
+
 const SHORTCUTS: [&str; 4] = ["inventory", "recipes", "stats", "advancements"];
 
 pub fn register(r: &mut Registry) {
@@ -172,21 +180,28 @@ pub fn register(r: &mut Registry) {
             });
         });
     });
-    // An icon for each effect on.
+    // An icon and a name for each effect on, on one line (two spaces apart); rested with its
+    // minutes after them.
     r.hud_element(&HUD_EFFECTS, hud_anchor::TOP_LEFT, 5, |ui| {
-        ui.row(S::row().gap(2.0), |ui| {
-            for e in effects::ALL {
-                ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
-                    match vitals_of(c).filter(|v| v.has(e)) {
-                        // Rested says the minutes it has left.
-                        Some(v) if e == effects::Effect::Rested => {
-                            t.set("hud.base.effect.rested", &[Arg::Int((v.rested / 60.0).ceil() as i64)])
-                        }
-                        Some(_) => t.set(&format!("hud.base.effect.{}", e.name()), &[]),
-                        None => t.text(""),
-                    }
-                });
-            }
+        ui.row(S::row().gap(4.0), |ui| {
+            ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                let Some(v) = vitals_of(c) else { return t.text("") };
+                let on: Vec<String> = effects::ALL
+                    .iter()
+                    .filter(|&&e| e != effects::Effect::Rested && v.has(e))
+                    .take(EFFECTS_SHOWN)
+                    .map(|e| format!("hud.base.effect.{}", e.name()))
+                    .collect();
+                if on.is_empty() {
+                    return t.text("");
+                }
+                let args: Vec<Arg> = on.iter().map(|k| Arg::Key(k)).collect();
+                t.set(&format!("hud.base.effects_{}", args.len()), &args);
+            });
+            ui.text_bind_styled(S::default().no_wrap(), |c, t| match vitals_of(c).filter(|v| v.has(effects::Effect::Rested)) {
+                Some(v) => t.set("hud.base.effect.rested", &[Arg::Int((v.rested / 60.0).ceil() as i64)]),
+                None => t.text(""),
+            });
             // Resting by a fire: the seconds until rested; rested: the comfort that sets how long.
             ui.text_bind_styled(S::default().no_wrap(), |c, t| {
                 let Some(v) = vitals_of(c) else { return t.text("") };
@@ -235,7 +250,7 @@ pub fn register(r: &mut Registry) {
         });
     });
     // A framed picture per screen, its key beside it.
-    r.hud_element(&HUD_SHORTCUTS, hud_anchor::TOP_LEFT, 8, |ui| {
+    r.hud_element(&HUD_SHORTCUTS, hud_anchor::TOP_LEFT, 10, |ui| {
         ui.column(S::col().gap(2.0), |ui| {
             for name in SHORTCUTS {
                 ui.row(S::row().gap(3.0).center(), |ui| {

@@ -24,6 +24,19 @@ shot 01b_third_person.png
 press core:perspective
 press core:perspective
 wait 0.5
+# First, before any other animal: a raptor (tamed by knocking out) ahead, knocked out, and the
+# taming plate under the crosshair; then away from it (40 blocks), out of the plate's reach.
+chat /tk spawn animals:raptor ~ ~ ~-3
+wait 2
+look 0 -20
+wait 1
+chat /animal ko
+wait 2
+shot 16a_taming_plate.png
+chat /tp ~40 ~ ~
+wait 4
+loaded
+look 0 5
 # Inventory with clothing and armor slots, some items.
 chat /tk put me 41 base:fur_coat
 chat /tk put me 37 base:iron_chestplate
@@ -168,4 +181,8 @@ shot 02_hud_hurt_cold_night.png
 chat /tk hurt_me 100
 wait 2
 shot 18_death.png
+# Respawned: the way to the tombstone over the hotbar.
+tap core:death text:Respawn
+wait 3
+shot 19_grave_hud.png
 quit

@@ -1,0 +1,18 @@
+{
+ "kind": "block",
+ "what": "large sage-grey stone slabs. A new variant of the attached stone texture (the last image before the grid, from my game): exactly the same colours, the same SIZE of slabs (about 6-9 rounded sage-grey slabs per tile, as large as in the attached one), the same soft rounded shapes, light and crevice darkness; only their arrangement differs. Not flatter, not more cartoony, no smaller stones. Seamless on all four edges, every cell filled.",
+ "size": [
+  32,
+  32
+ ],
+ "full": true,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.603,
+   "empty": 0,
+   "seam": 1.66,
+   "passed": true
+  }
+ ]
+}

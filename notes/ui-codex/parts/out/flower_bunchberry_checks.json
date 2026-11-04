@@ -1,0 +1,19 @@
+{
+ "kind": "block",
+ "what": "bunchberry: a low plant with a whorl of four to six oval veined green leaves holding one white four-bracted flower in the middle, two plants side by side, 8-12 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.534,
+   "outline": 0.8,
+   "red_line": 0.0,
+   "fill": 0.26,
+   "passed": true
+  }
+ ]
+}

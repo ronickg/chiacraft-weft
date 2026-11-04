@@ -59,6 +59,8 @@ pub struct Material {
 
 use Role::{Fitting as F, Holding as H, Working as W};
 
+// A table row: one argument a column reads better here than a builder.
+#[allow(clippy::too_many_arguments)]
 const fn m(
     id: &'static str,
     key: &'static str,

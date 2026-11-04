@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "a full clump of long thin grass blades, most of them leaning a little to the right, rising 22-26 px from the bottom edge; in the same style, colours and blade width as the attached tall grass from my game; centred, see-through around it",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.567,
+   "outline": 1.01,
+   "red_line": 0.0,
+   "fill": 0.49,
+   "passed": false
+  },
+  {
+   "grid": 0.205,
+   "outline": 1.0,
+   "red_line": 0.0,
+   "fill": 0.39,
+   "passed": false
+  },
+  {
+   "grid": 0.506,
+   "outline": 1.04,
+   "red_line": 0.0,
+   "fill": 0.44,
+   "passed": false
+  }
+ ]
+}

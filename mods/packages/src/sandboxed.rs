@@ -74,7 +74,12 @@ pub struct Runs {
     channels: Vec<ModChannel>,
     /// The block and item callbacks the package's builders took (by callback number).
     attached: Mutex<Vec<u32>>,
+    /// The API its code was built for (`1.2`).
+    api: String,
 }
+
+/// Every package's mod in every content built, for `/mods`.
+static ALL: Mutex<Vec<std::sync::Weak<Runs>>> = Mutex::new(Vec::new());
 
 /// A sandboxed mod's component as the SDK holds it: bytes in a size of the next bucket up.
 #[derive(Clone, Copy)]
@@ -120,6 +125,29 @@ fn register_component(r: &mut Registry, name: &str, size: u32, default: &[u8], f
         33..=64 => Comp::B64(one(r, name, default, flags)),
         65..=128 => Comp::B128(one(r, name, default, flags)),
         _ => Comp::B256(one(r, name, default, flags)),
+    }
+}
+
+/// Every sandboxed component registered in this game, newest first: a client half reads the
+/// player's own value through them (its bucket is known only here).
+static COMPONENTS: Mutex<Vec<(String, Comp)>> = Mutex::new(Vec::new());
+
+/// The player's own value of the sandboxed component `name` on the client, its bucket's bytes.
+pub fn client_component(c: Client, name: &str) -> Option<Vec<u8>> {
+    let comp = COMPONENTS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .find(|(n, _)| n == name)
+        .map(|(_, c)| *c)?;
+    let v = c.view();
+    match comp {
+        Comp::B8(c) => v.component(c).map(|b| b.to_vec()),
+        Comp::B16(c) => v.component(c).map(|b| b.to_vec()),
+        Comp::B32(c) => v.component(c).map(|b| b.to_vec()),
+        Comp::B64(c) => v.component(c).map(|b| b.to_vec()),
+        Comp::B128(c) => v.component(c).map(|b| b.to_vec()),
+        Comp::B256(c) => v.component(c).map(|b| b.to_vec()),
     }
 }
 
@@ -281,6 +309,10 @@ pub fn load(r: &mut Registry, package: &str, dir: &Path) -> Result<Option<Arc<Ru
             Decl::Component { name, size, flags, default } => {
                 let c = register_component(r, name, *size, default, flag_bits(*flags));
                 comps.push((name.clone(), c));
+                COMPONENTS
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(0, (name.clone(), c));
             }
             Decl::Attach { kind, component } => {
                 if let Some((_, c)) = comps.iter().find(|(n, _)| n == component) {
@@ -300,7 +332,11 @@ pub fn load(r: &mut Registry, package: &str, dir: &Path) -> Result<Option<Arc<Ru
             _ => None,
         })
         .collect();
-    Ok(Some(Arc::new(Runs {
+    let api = chiacraft_packages::code::api_of(&wasm)
+        .ok()
+        .flatten()
+        .map_or_else(|| "1.0".into(), |v| chiacraft_packages::code::text(Some(v)));
+    let runs = Arc::new(Runs {
         m: Arc::new(m),
         package: package.to_string(),
         runs: Mutex::new(Vec::new()),
@@ -308,7 +344,70 @@ pub fn load(r: &mut Registry, package: &str, dir: &Path) -> Result<Option<Arc<Ru
         effects: Mutex::new(Vec::new()),
         channels,
         attached: Mutex::new(Vec::new()),
-    })))
+        api,
+    });
+    let mut all = ALL.lock().unwrap_or_else(|e| e.into_inner());
+    all.retain(|w| w.strong_count() > 0);
+    all.push(Arc::downgrade(&runs));
+    Ok(Some(runs))
+}
+
+/// `/mods [resume <package>]` (slice 6): the sandboxed server halves running in this world, what
+/// they cost and their strikes; an admin resumes one that stopped. Registered in this mod's own
+/// `init`, the same in every game.
+pub fn register_command(r: &mut Registry) {
+    r.command("mods", "[action:word(resume)] [package:word]", |cmd| {
+        let Some((run, _)) = world() else { return };
+        let all: Vec<Arc<Runs>> = ALL
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .filter_map(|w| w.upgrade())
+            .collect();
+        if cmd.text("action") == Some("resume") {
+            if cmd.world().permission(cmd.player()) < permission::ADMIN {
+                cmd.reply("packages.mods.admin", &[]);
+                return;
+            }
+            let wanted = cmd.text("package").unwrap_or("").to_string();
+            let mut done = false;
+            for runs in all.iter().filter(|r| r.package == wanted) {
+                let mut list = runs.runs.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some((_, inst)) = list.iter_mut().find(|(r, _)| *r == run) {
+                    inst.resume();
+                    done = true;
+                }
+            }
+            let key = if done { "packages.mods.resumed" } else { "packages.mods.unknown" };
+            cmd.reply(key, &[Arg::Text(&wanted)]);
+            return;
+        }
+        let mut any = false;
+        for runs in &all {
+            let list = runs.runs.lock().unwrap_or_else(|e| e.into_inner());
+            let Some((_, inst)) = list.iter().find(|(r, _)| *r == run) else { continue };
+            any = true;
+            let st = inst.stats();
+            cmd.reply(
+                "packages.mods.line",
+                &[
+                    Arg::Text(&runs.package),
+                    Arg::Text(&runs.api),
+                    Arg::Int(st.calls as i64),
+                    Arg::Float(st.average_us(), 1),
+                    Arg::Int(st.slowest.as_micros() as i64),
+                    Arg::Int(st.strikes as i64),
+                ],
+            );
+            if let Some(why) = &st.stopped {
+                cmd.reply("packages.mods.stopped", &[Arg::Text(&runs.package), Arg::Text(why)]);
+            }
+        }
+        if !any {
+            cmd.reply("packages.mods.none", &[]);
+        }
+    })
+    .permission(permission::EVERYONE);
 }
 
 /// The package's own block `id` takes the mod's callbacks for it (1.2).
@@ -661,7 +760,7 @@ fn real_stack(s: sandbox::ItemStack) -> Option<ItemStack> {
 }
 
 /// A mod's line arguments as the SDK's: its texts are kept here while the line is sent.
-fn args_text(key: &str, args: &[WArg]) -> String {
+pub fn line_text(key: &str, args: &[WArg]) -> String {
     let mut out = key.replace('\n', " ");
     for a in args {
         out.push('\n');
@@ -791,11 +890,18 @@ impl Game for WorldGame {
     }
     fn tell(&mut self, player: u64, key: &str, args: &[WArg]) {
         if self.w.players().contains(&player) {
-            self.w.send(player, &SAY, &args_text(key, args));
+            self.w.send(player, &SAY, &line_text(key, args));
         }
     }
     fn player_key(&mut self, player: u64) -> String {
         crate::ask("player_key", &player.to_string())
+    }
+    fn grant_achievement(&mut self, player: u64, id: &str, title: &str, description: &str, icon: Option<&str>) {
+        // The engine's bridge signs it (chiacraft, phase 4: `achievements`); tabs and lines would
+        // split the question.
+        let clean = |s: &str| s.replace(['\t', '\n', '\r'], " ");
+        let arg = format!("{player}\t{}\t{}\t{}\t{}", clean(id), clean(title), clean(description), icon.map(clean).unwrap_or_default());
+        crate::ask("achievement", &arg);
     }
     fn reply(&mut self, key: &str, args: &[WArg]) {
         if self.cmd == 0 {
@@ -803,7 +909,7 @@ impl Game for WorldGame {
         }
         // SAFETY: `cmd` is the command this callback runs, alive until it returns (see the type).
         let cmd = unsafe { &mut *(self.cmd as *mut ServerCommand) };
-        with_line(&args_text(key, args), |key, args| cmd.reply(key, args));
+        with_line(&line_text(key, args), |key, args| cmd.reply(key, args));
     }
 
     fn get_component(&mut self, id: u64, name: &str) -> Option<Vec<u8>> {
@@ -890,7 +996,7 @@ mod tests {
 
     #[test]
     fn lines_survive_the_trip() {
-        let text = args_text(
+        let text = line_text(
             "clans.invite",
             &[WArg::Text("a\nb".into()), WArg::Int(-3), WArg::Float((1.5, 2)), WArg::Key("k".into()), WArg::Item(7)],
         );

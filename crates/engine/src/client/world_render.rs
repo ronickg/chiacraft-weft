@@ -173,7 +173,13 @@ fn region_of(key: MeshKey) -> (u64, IVec3) {
 /// The draws of one visible mesh (its corner `lo` relative to the camera, `k` its structure or
 /// 0), returning the faces drawn. A face direction can be seen only from the side its normal
 /// points to; contiguous visible runs become one draw.
-fn mesh_draws(m: &GpuMesh, key: MeshKey, lo: Vec3, k: i32, cam_cube: IVec3, out: &mut Vec<DrawRecord>) -> u64 {
+/// Which way faces a mesh at `lo` (camera relative) shows the camera: by rank +X +Y +Z -X -Y -Z.
+fn camera_sides(lo: Vec3) -> [bool; 6] {
+    [lo.x < 0.0, lo.y < 0.0, lo.z < 0.0, lo.x > -16.0, lo.y > -16.0, lo.z > -16.0]
+}
+
+/// A mesh's draws, with only the faces whose direction `seen` keeps (by rank, see `camera_sides`).
+fn mesh_draws(m: &GpuMesh, key: MeshKey, lo: Vec3, k: i32, cam_cube: IVec3, seen: [bool; 6], out: &mut Vec<DrawRecord>) -> u64 {
     let rel = if k == 0 { key.1 - cam_cube } else { key.1 };
     let origin = [rel.x, rel.y, rel.z, k];
     let center = lo + Vec3::splat(8.0);
@@ -186,8 +192,6 @@ fn mesh_draws(m: &GpuMesh, key: MeshKey, lo: Vec3, k: i32, cam_cube: IVec3, out:
         first_instance: 0,
     };
     if let Some(a) = m.faces {
-        // Directions by rank: +X +Y +Z -X -Y -Z.
-        let seen = [lo.x < 0.0, lo.y < 0.0, lo.z < 0.0, lo.x > -16.0, lo.y > -16.0, lo.z > -16.0];
         let mut off = a.offset;
         for layer in 0..3 {
             let counts = m.face_counts[layer];
@@ -287,16 +291,17 @@ pub struct WorldRenderer {
     /// Depth only, from the sun, for `sun_shadows` packs (their `fs_shadow`): faces, quads.
     shadow_pipes: Option<[PipelineId; 2]>,
     /// The shadow pass's own per-frame draws (`draw_shadow`), apart from the camera's.
-    shadow_origins: Vec<(BufferId, u32)>,
-    shadow_indirect: Vec<(BufferId, u32)>,
-    shadow_offsets: Vec<(BufferId, u32)>,
+    /// Per shadow cascade (near, far): each pass writes its own draws.
+    shadow_origins: [Vec<(BufferId, u32)>; 2],
+    shadow_indirect: [Vec<(BufferId, u32)>; 2],
+    shadow_offsets: [Vec<(BufferId, u32)>; 2],
     face_pipes: [PipelineId; 3],
     quad_pipes: [PipelineId; 3],
     lod_pipe: PipelineId,
-    /// Distant terrain tiles (`lod`): their quads (in `faces`, four words like a face), count
-    /// and the heights they span; the ones to draw this frame; and the columns whose cubes show
+    /// Distant terrain tiles (`lod`): their quads (in `faces`, four words like a face), count,
+    /// the heights they span and the records before its faces; the ones to draw this frame; and the columns whose cubes show
     /// their ground (`Lod::mask`, half its width), where their pixels are left to the cubes.
-    lod: FxHashMap<super::lod::TileKey, (Alloc, u32, (i32, i32))>,
+    lod: FxHashMap<super::lod::TileKey, (Alloc, u32, (i32, i32), u32)>,
     pub lod_draw: Vec<super::lod::TileKey>,
     pub lod_half: u32,
     lod_mask: (BufferId, usize),
@@ -431,9 +436,9 @@ impl WorldRenderer {
             .collect();
         Ok(WorldRenderer {
             shadow_pipes,
-            shadow_origins: Vec::new(),
-            shadow_indirect: Vec::new(),
-            shadow_offsets: Vec::new(),
+            shadow_origins: Default::default(),
+            shadow_indirect: Default::default(),
+            shadow_offsets: Default::default(),
             face_pipes,
             quad_pipes,
             lod_pipe,
@@ -574,6 +579,7 @@ impl WorldRenderer {
         cam: &Camera,
         light: Mat4,
         scene: BufferId,
+        cascade: usize,
     ) {
         let Some([face_pipe, quad_pipe]) = self.shadow_pipes else { return };
         let cam_block = cam.pos.floor();
@@ -588,6 +594,11 @@ impl WorldRenderer {
         let gbuf = self.globals[frame.slot];
         gpu.mapped(gbuf)[..size_of::<Globals>()].copy_from_slice(bytemuck::bytes_of(&globals));
         let planes = frustum_planes(light);
+        // The faces the light falls on: the same for every mesh (it comes from one direction), not
+        // the ones the camera sees. Its depth row points toward it (reverse depth). Faces nearly
+        // edge-on to it are kept either way.
+        let to_light = light.row(2).truncate().normalize_or_zero();
+        let sides = [to_light.x > -0.05, to_light.y > -0.05, to_light.z > -0.05, to_light.x < 0.05, to_light.y < 0.05, to_light.z < 0.05];
         let side = (16 << REGION) as f32;
         let mut draws: Vec<DrawRecord> = Vec::new();
         for (&(f, r), meshes) in &self.regions {
@@ -608,7 +619,7 @@ impl WorldRenderer {
                 let lo = (key.1 - cam_cube).as_vec3() * 16.0 - cam_frac;
                 let c = lo + Vec3::splat(8.0);
                 if planes.iter().all(|pl| pl.dot(c.extend(1.0)) > -13.86) {
-                    mesh_draws(&m, key, lo, 0, cam_cube, &mut draws);
+                    mesh_draws(&m, key, lo, 0, cam_cube, sides, &mut draws);
                 }
             }
         }
@@ -619,9 +630,12 @@ impl WorldRenderer {
         if n == 0 {
             return;
         }
-        let obuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_origins, frame.slot, n, 16, usage::STORAGE, "shadow origins");
-        let ibuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_indirect, frame.slot, n, 20, usage::INDIRECT, "shadow indirect");
-        let fbuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_offsets, frame.slot, 1, 16, usage::STORAGE, "shadow offsets");
+        let obuf =
+            crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_origins[cascade], frame.slot, n, 16, usage::STORAGE, "shadow origins");
+        let ibuf =
+            crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_indirect[cascade], frame.slot, n, 20, usage::INDIRECT, "shadow indirect");
+        let fbuf =
+            crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_offsets[cascade], frame.slot, 1, 16, usage::STORAGE, "shadow offsets");
         gpu.mapped(fbuf)[..16].fill(0);
         {
             let origins = gpu.mapped(obuf);
@@ -716,6 +730,16 @@ impl WorldRenderer {
         true
     }
 
+    /// Every biome's tint colors from now on (`ClientWorld::biome_tints`), for blocks whose
+    /// column has no blended colors yet and for distant terrain.
+    pub fn set_biome_table(&mut self, gpu: &mut dyn Backend, table: Vec<u32>) {
+        if table.len() != self.biome_table.len() || table == self.biome_table {
+            return;
+        }
+        gpu.write_buffer(self.biomes, 0, bytemuck::cast_slice(&table));
+        self.biome_table = table;
+    }
+
     pub fn upload_tints(&mut self, gpu: &mut dyn Backend, col: glam::IVec2, tints: &super::world::ColumnTints) {
         let t = self.tint_tiles as i32;
         let slot = (col.x.rem_euclid(t) + col.y.rem_euclid(t) * t) as usize;
@@ -765,9 +789,9 @@ impl WorldRenderer {
             .drain(..)
             .chain(self.indirect.drain(..))
             .chain(self.offsets.drain(..))
-            .chain(self.shadow_origins.drain(..))
-            .chain(self.shadow_indirect.drain(..))
-            .chain(self.shadow_offsets.drain(..))
+            .chain(self.shadow_origins.iter_mut().flat_map(|v| v.drain(..)))
+            .chain(self.shadow_indirect.iter_mut().flat_map(|v| v.drain(..)))
+            .chain(self.shadow_offsets.iter_mut().flat_map(|v| v.drain(..)))
         {
             gpu.destroy_buffer(b);
         }
@@ -837,20 +861,22 @@ impl WorldRenderer {
         }
     }
 
-    /// A distant terrain tile's quads (`lod::mesh`), spanning heights `y`.
+    /// A distant terrain tile's quads (`lod::mesh`), spanning heights `y`; the first `skip`
+    /// records aren't drawn (a smooth tile's corners, which its cells read).
     pub fn upload_lod(
         &mut self,
         gpu: &mut dyn Backend,
         textures: &GameTextures,
         key: super::lod::TileKey,
         quads: &[[u32; 4]],
+        skip: u32,
         y: (i32, i32),
     ) {
         self.remove_lod(key);
-        if quads.is_empty() {
+        if quads.len() <= skip as usize {
             return;
         }
-        let mut used: Vec<u32> = quads
+        let mut used: Vec<u32> = quads[skip as usize..]
             .iter()
             .map(|q| q[1] & crate::gpu_layout::face::TEX_MASK)
             .collect();
@@ -859,7 +885,7 @@ impl WorldRenderer {
         textures.ensure_blocks(gpu, used);
         let a = self.faces.alloc(gpu, quads.len() as u32);
         gpu.write_buffer(self.faces.pages[a.page as usize].0, a.offset as u64 * 16, bytemuck::cast_slice(quads));
-        self.lod.insert(key, (a, quads.len() as u32, y));
+        self.lod.insert(key, (a, quads.len() as u32, y, skip));
     }
 
     /// The columns shown by cubes (`Lod::mask`).
@@ -873,11 +899,11 @@ impl WorldRenderer {
 
     /// Distant terrain tiles held and their quads.
     pub fn lod_counts(&self) -> (usize, usize) {
-        (self.lod.len(), self.lod.values().map(|t| t.1 as usize).sum())
+        (self.lod.len(), self.lod.values().map(|t| (t.1 - t.3) as usize).sum())
     }
 
     pub fn remove_lod(&mut self, key: super::lod::TileKey) {
-        if let Some((a, _, _)) = self.lod.remove(&key) {
+        if let Some((a, ..)) = self.lod.remove(&key) {
             self.faces.free(a);
         }
     }
@@ -1080,7 +1106,7 @@ impl WorldRenderer {
                     };
                     let center = lo + Vec3::splat(8.0);
                     if planes.iter().all(|pl| pl.dot(center.extend(1.0)) > -13.86) {
-                        faces += mesh_draws(&m, key, lo, k, cam_cube, out);
+                        faces += mesh_draws(&m, key, lo, k, cam_cube, camera_sides(lo), out);
                     }
                 }
                 faces
@@ -1137,7 +1163,7 @@ impl WorldRenderer {
             .lod_draw
             .iter()
             .filter_map(|key| {
-                let &(a, count, (y0, y1)) = self.lod.get(key)?;
+                let &(a, count, (y0, y1), skip) = self.lod.get(key)?;
                 let o = key.origin();
                 let half = Vec3::new(key.size() as f32, (y1 - y0) as f32, key.size() as f32) / 2.0;
                 let center = Vec3::new(o.x as f32, y0 as f32, o.y as f32) + half - (cam_cube * 16).as_vec3() - cam_frac;
@@ -1148,10 +1174,10 @@ impl WorldRenderer {
                     return None;
                 }
                 let args = DrawIndexedArgs {
-                    indices: count * 6,
+                    indices: (count - skip) * 6,
                     instances: 1,
                     first_index: 0,
-                    vertex_offset: (a.offset * 4) as i32,
+                    vertex_offset: ((a.offset + skip) * 4) as i32,
                     first_instance: 0,
                 };
                 Some((3, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center))

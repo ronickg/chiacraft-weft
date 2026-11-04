@@ -26,6 +26,7 @@ pub struct RawTerrain {
     pub size: f64,
     pub feature: RawFeature,
     pub rule: RawRule,
+    pub face: Callback,
 }
 
 #[derive(Clone)]
@@ -147,6 +148,7 @@ pub unsafe fn copy(owner: ModId, d: &abi::TerrainDesc) -> RawTerrain {
                 mask: f.mask.as_slice().to_vec(),
             },
             rule: copy_rule(&d.rule),
+            face: d.face,
         }
     }
 }
@@ -164,7 +166,7 @@ pub enum Mask {
 
 impl Mask {
     /// From postfix steps; `None` for an empty or malformed list.
-    fn from_steps(steps: &[abi::MaskStep]) -> Option<Mask> {
+    pub fn from_steps(steps: &[abi::MaskStep]) -> Option<Mask> {
         use abi::terrain_mask as k;
         let mut stack: Vec<Mask> = Vec::new();
         for s in steps {
@@ -295,6 +297,8 @@ pub struct Terrain {
     pub caves: Option<Caves>,
     /// Biomes of cubes deep underground.
     pub cave_biomes: Vec<CaveBiome>,
+    /// What steep faces show (`abi::terrain_op::FACES`): from what fall, whose callback.
+    pub faces: Option<Faces>,
     cache: ColumnCache<Columns>,
     /// Column heights every 4 blocks over a cube's columns and its +X/+Z edge (5 x 5): caves
     /// measure depth from this smoothed surface, so steep slopes do not leave single-column
@@ -311,6 +315,26 @@ struct Draft {
     features: Vec<RawFeature>,
     rules: Vec<RawRule>,
     cave_biomes: Vec<(String, i32, f64, f64)>,
+    faces: Option<Faces>,
+}
+
+/// Steep faces as the generator's own passes make them (`abi::terrain_op::FACES`), for distant
+/// terrain: ground falling `fall` blocks or more shows what `face` says.
+#[derive(Clone, Copy)]
+pub struct Faces {
+    pub fall: i32,
+    pub owner: ModId,
+    pub face: Callback,
+}
+
+impl Faces {
+    /// What the face at `pos` (its column `height` high) shows instead of `block`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn block(&self, seed: u64, dim: u32, pos: [i32; 3], height: i32, biome: u32, fall: i32, block: u32) -> u32 {
+        let mut a = abi::FaceArgs { seed, dim, pos, height, biome, fall, block };
+        crate::host::invoke(self.owner, self.face, &mut a);
+        a.block
+    }
 }
 
 /// Looks up content by full name while terrains are built.
@@ -331,7 +355,16 @@ pub fn build(
     names: &Names,
     errors: &mut Vec<String>,
 ) -> Terrain {
-    let mut d = Draft { stone: None, base: 64.0, sea: None, caves: None, features: Vec::new(), rules: Vec::new(), cave_biomes: Vec::new() };
+    let mut d = Draft {
+        stone: None,
+        base: 64.0,
+        sea: None,
+        caves: None,
+        features: Vec::new(),
+        rules: Vec::new(),
+        cave_biomes: Vec::new(),
+        faces: None,
+    };
     let rule_name = |r: &RawRule| if r.name.is_empty() { r.biome.clone() } else { r.name.clone() };
     for o in ops {
         let who = owner_name(o.owner);
@@ -408,6 +441,7 @@ pub fn build(
                 Some(i) => drop(d.cave_biomes.remove(i)),
                 None => missing("cave biome"),
             },
+            op::FACES => d.faces = Some(Faces { fall: o.level, owner: o.owner, face: o.face }),
 
             n => errors.push(format!("{who}: unknown terrain edit {n} for {dimension}")),
         }
@@ -507,7 +541,9 @@ pub fn build(
             threshold: q12(*threshold),
         })
         .collect();
-    Terrain::new(stone, q4(d.base), sea, features, rules, caves, cave_biomes)
+    let mut t = Terrain::new(stone, q4(d.base), sea, features, rules, caves, cave_biomes);
+    t.faces = d.faces;
+    t
 }
 
 impl Terrain {
@@ -520,7 +556,18 @@ impl Terrain {
         caves: Option<Caves>,
         cave_biomes: Vec<CaveBiome>,
     ) -> Terrain {
-        Terrain { stone, base, sea, features, rules, caves, cave_biomes, cache: ColumnCache::new(32768), corners: ColumnCache::new(32768) }
+        Terrain {
+            stone,
+            base,
+            sea,
+            features,
+            rules,
+            caves,
+            cave_biomes,
+            faces: None,
+            cache: ColumnCache::new(32768),
+            corners: ColumnCache::new(32768),
+        }
     }
 
     pub fn sea_level(&self) -> Option<i32> {
@@ -1092,6 +1139,7 @@ mod tests {
                 bare_above: i32::MAX,
                 ice: String::new(),
             },
+            face: Callback::NONE,
         }
     }
 

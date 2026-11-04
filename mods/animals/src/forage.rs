@@ -40,9 +40,8 @@ const LOOK: i32 = 8;
 const LOOK_UP: i32 = 3;
 /// Blocks it sees (and smells) food on the ground from.
 pub const ITEM_LOOK: f64 = 12.0;
-/// It starts foraging under this share of its food, and stops when this full.
-const HUNGRY: f32 = 0.6;
-const FULL: f32 = 0.95;
+/// It starts foraging under this share of its food, and stops when this full (`needs`).
+use animals_core::needs::{FULL, HUNGRY};
 /// Ticks: chewing a mouthful, walking before it looks again, wandering when nothing is near.
 const CHEW: f64 = 30.0;
 const WALK: f64 = 160.0;
@@ -98,9 +97,15 @@ pub fn lush(w: &World, s: &Species, pos: [i32; 3]) -> f32 {
 /// Whether it is foraging or drinking (a resting animal settles only when it isn't: hungry or
 /// thirsty, it eats and drinks first).
 pub fn busy(w: &World, id: u64) -> bool {
+    // A search left from before it was fed (a tame held by its orders, whose forage goal doesn't
+    // run to clear it) isn't one: only a hungry one forages.
+    let hungry = w
+        .component(id, &ANIMAL)
+        .is_some_and(|a| (a.food as f32) < a.stat(species::FOOD) * FULL);
     crate::drink::busy(w, id)
-        || w.component(id, &FORAGE)
-            .is_some_and(|f| f[3] != 0.0 && !f[0].is_nan())
+        || (hungry
+            && w.component(id, &FORAGE)
+                .is_some_and(|f| f[3] != 0.0 && !f[0].is_nan()))
 }
 
 /// What it would eat of the block `state`, if anything: the first of the state's food rows
@@ -171,6 +176,9 @@ fn nearest(w: &World, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]> {
     best.or(ground).map(|(at, _)| at)
 }
 
+/// The share of a spoiled carcass's weight an insect eater gets from it (its insects).
+const CARRION_INSECTS: f32 = 0.1;
+
 /// Grams of the dropped item `id` that `s` eats: food of its diet (spoiled food as carrion).
 fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32> {
     let stack = w.dropped_item(id)?;
@@ -186,7 +194,13 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
         vitals::food::freshness(f, age, base_api::difficulty().keep) == vitals::food::Freshness::Spoiled
     });
     let (c, grams) = vitals::forage::dropped(name, spoiled)?;
-    // Kibble is every species' (`taming.rs`), though the food table files it as meat (C6).
+    // Kibble is every species' (`taming.rs`), though the food table files it as meat (C6); a
+    // carcass gone off is the insects' as well, its beetles and grubs an insect eater's (the
+    // Djadokhta's bones are bored by them), a share of it.
+    let insects = c == vitals::food::Category::Carrion && s.eats(vitals::food::Category::Insects);
+    if insects && !s.eats(c) {
+        return Some(grams * CARRION_INSECTS);
+    }
     (s.eats(c) || name == "animals:kibble").then_some(grams)
 }
 
@@ -217,7 +231,7 @@ fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
     animal::feed(w, id, points);
     stack.count -= 1;
     w.set_dropped_item(item, stack);
-    weft_sdk::info!(
+    weft_sdk::debug!(
         "animal {id} eats {} off the ground ({grams} g, it {own:.3} kg): food {} of {max:.0}",
         name_of(abi::entry_kind::ITEM, stack.item),
         a.food.saturating_add(points).min(max as u16)
@@ -284,7 +298,7 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
             // Growing food feeds as well as it grows now: dry-season grass is poor fodder.
             let fodder = if src.renews.is_some() { 0.4 + 0.6 * lush(w, s, at) } else { 1.0 };
             animal::feed(w, id, (src.food as f32 * fodder).round().max(1.0) as u16);
-            weft_sdk::info!(
+            weft_sdk::debug!(
                 "animal {id} eats {} at {at:?} ({:.0}% as good as at its best; food {} of {:.0})",
                 src.block,
                 fodder * 100.0,

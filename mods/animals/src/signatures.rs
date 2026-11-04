@@ -53,7 +53,7 @@ static GIFTS: [LootTable; 4] = [
 ];
 /// What an animal drops, and the animal a chihuahua finds by it.
 const SCENTS: [(&str, &str); 17] = [
-    ("base:leather", "base:cow"),
+    ("base:hide", "base:cow"),
     ("base:beef", "base:cow"),
     ("base:cooked_beef", "base:cow"),
     ("base:porkchop", "base:pig"),

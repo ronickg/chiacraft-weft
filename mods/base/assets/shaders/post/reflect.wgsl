@@ -15,6 +15,21 @@ fn reflect_hash(p: vec2<f32>) -> f32 {
     return f32((h ^ (h >> 15u)) & 1023u) / 1024.0;
 }
 
+// The water's swells as the pack's water draws them (`wave_height` in its `world.wgsl`, without the
+// chop): the slope at `p` (world xz), flatter far off. The mirror wobbles with the surface.
+fn reflect_swell(p: vec2<f32>, t: f32, dist: f32) -> vec3<f32> {
+    let w = scene.weather.xy;
+    let speed = length(w);
+    let dir = select(vec2(0.8, 0.6), w / max(speed, 1e-4), speed > 0.3);
+    let side = vec2(-dir.y, dir.x);
+    let d1 = normalize(dir + side * 0.35);
+    let d2 = normalize(dir - side * 0.85);
+    let calm = 0.6 + 0.4 * smoothstep(1.0, 8.0, speed);
+    let g = d1 * cos(dot(p, d1) * 0.9 - t * 0.85) * 0.054 + d2 * cos(dot(p, d2) * 1.37 - t * 1.1 + 1.7) * 0.055;
+    let k = calm * mix(1.0, 0.25, smoothstep(24.0, 140.0, dist));
+    return normalize(vec3(-g.x * k, 1.0, -g.y * k));
+}
+
 // Where `rel` (camera relative) lands on the screen, and its depth there.
 fn reflect_project(rel: vec3<f32>) -> vec4<f32> {
     let c = scene.view_proj * vec4(rel, 1.0);
@@ -46,11 +61,7 @@ fn apply(p: PostPixel) -> vec4<f32> {
     if n.y < 0.9 || pos.y > -0.3 {
         return p.color;
     }
-    // A slight ripple, so the mirror is water.
-    let world = pos.xz + scene.eye.xz;
-    let t = p.time;
-    let ripple = vec2(sin(world.x * 1.7 + t * 1.3) + sin(world.y * 2.3 - t * 1.1), sin(world.y * 1.9 + t * 1.5) + sin(world.x * 2.9 + t * 0.9));
-    n = normalize(vec3(ripple.x * 0.012, 1.0, ripple.y * 0.012));
+    n = reflect_swell(pos.xz + scene.eye.xz, scene.params.w, length(pos));
     let v = normalize(pos);
     let r = reflect(v, n);
     if r.y <= 0.0 {
@@ -95,11 +106,14 @@ fn apply(p: PostPixel) -> vec4<f32> {
         return p.color;
     }
     let mirrored = textureSampleLevel(textures[p.scene], linear_clamp, hit, 0.0).rgb;
-    // Less toward the screen's edges and far along the ray; more at a glancing look (Fresnel).
+    // Less toward the screen's edges and far along the ray; as much as the water mirrors at that
+    // angle (Fresnel: little looking down, nearly all at a glancing look), the sky's share of
+    // which the water already shows.
     let edge = smoothstep(0.0, 0.12, min(min(hit.x, 1.0 - hit.x), min(hit.y, 1.0 - hit.y)));
     // Hills across a lake are hundreds of blocks off: only the very far fades.
     let near = 1.0 - smoothstep(300.0, 700.0, travelled);
-    let fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(-v, n), 0.0), 5.0);
-    let amount = clamp(fresnel * 0.9 + 0.1, 0.0, 0.85) * clamp(water, 0.0, 1.0) * edge * near * min(p.strength, 1.0);
+    let fresnel = 0.04 + 0.96 * pow(1.0 - max(dot(-v, n), 0.0), 4.0);
+    // The mask is the water's own opacity: low only in clear shallows seen from above.
+    let amount = clamp(fresnel * 0.95 + 0.08, 0.0, 0.97) * smoothstep(0.02, 0.3, water) * edge * near * min(p.strength, 1.0);
     return vec4(mix(p.color.rgb, mirrored, amount), p.color.a);
 }

@@ -23,5 +23,5 @@ static BODY: Body = Body {
 };
 
 pub fn init(r: &mut Registry) {
-    wild::register(r, &[(&HARE, 7), (&MOUNTAIN_HARE, 8)], &BODY);
+    wild::register(r, &[&HARE, &MOUNTAIN_HARE], &BODY);
 }

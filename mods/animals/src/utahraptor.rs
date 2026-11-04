@@ -17,6 +17,7 @@ const SIZE: (f32, f32) = (1.2, 2.4);
 /// What it hunts.
 
 pub fn init(r: &mut Registry) {
+    let index = crate::species::of(&UTAHRAPTOR);
     // Settling down: its poses, drawn in place of it (`rest.rs`).
     crate::rest::register(
         r,
@@ -47,14 +48,14 @@ pub fn init(r: &mut Registry) {
         })
         .goals(
             Goals::new()
-                .then(crate::animal::upkeep(4))
-                .then(crate::riding::ridden(4))
-                .then(crate::knockout::behave(4))
+                .then(crate::animal::upkeep(index))
+                .then(crate::riding::ridden(index))
+                .then(crate::knockout::behave(index))
                 .then(crate::hunt::wary)
                 .then(crate::hunt::hunt)
-                .then(crate::commands::act(4))
-                .then(crate::breeding::behave(4))
-                .then(crate::eggs::nest(4))
+                .then(crate::commands::act(index))
+                .then(crate::breeding::behave(index))
+                .then(crate::eggs::nest(index))
                 .then(crate::rest::settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)

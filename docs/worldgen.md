@@ -8,6 +8,7 @@ Examples to copy from:
 - `mods/testmod/src/lib.rs`: Mars, a planet made only from terrain presets, `void`, an island written by hand, and a biome, a rock needle and boulders added to base's overworld
 - `mods/testmod/src/looks.rs`: an obelisk structure standing in another mod's desert
 - `mods/base/src/worldgen.rs`: the overworld, with biomes, caves, trees and flowers
+- `mods/base/src/land.rs` and `mods/base/api/src/land.rs`: the overworld's shape: rivers and mesas as `Feature::new` (a river rebuilds the other features' height to know how deep to cut), snow by rules on height and temperature, bare rock on steep faces as a decoration
 
 ## Quick links
 [how generation works](#how-generation-works) | [ores](#ores) | [structures](#structures) | [spawns](#spawns) | [biomes](#biomes) | [dimensions](#dimensions) | [terrain](#terrain) | [trees](#trees-and-other-scattered-things) | [decorations](#decorations) | [changing another mod's terrain](#changing-another-mods-terrain) | [writing a generator](#writing-a-generator)
@@ -72,13 +73,13 @@ A biome says once what it is: the climate it likes, its ground, its colors, plus
 static DESERT: Biome = Biome::named("desert");
 r.biome(&DESERT).temperature(0.35..).humidity(..0.0).surface("sand", "sand", 3).under("sandstone", 1).tint(&tints::GRASS, 0xbfb755).tag("dry");
 ```
-- `temperature(..)`, `humidity(..)`: where the climate fits it, as ranges like `0.35..` or `..-0.45` (the fields run about -1.4 to 1.4). Without them it fits anywhere.
+- `temperature(..)`, `humidity(..)`: where the climate fits it, as ranges like `0.35..` or `..-0.45` (the fields could run about -1.4 to 1.4, but nine tenths of a world lies within ±0.28, so a range past ±0.3 is rare: base's are in `base_api::land`). Without them it fits anywhere.
 - `surface(top, filler, depth)`: a top block, `depth` blocks of filler, then the terrain's stone
 - `under(block, layers)`: the lowest layers of filler become another block (sandstone under sand)
 - `deep_top(block, below)`: a different top block where the ground is lower than `below` (gravel on a sea floor)
 - `bare_above(y)`: plain stone above this height
 - `frozen(block)`: the water surface turns into this block, and the biome gets the tag `frozen` (base grows no flowers there)
-- `tint(&kind, color)`: what blocks tinted with that kind take here, `tints::GRASS`, `FOLIAGE`, `WATER` or a mod's own kind. Kinds you don't give keep their default. To color another mod's biome with your kind, `r.biome_tint(&biome, &kind, color)`.
+- `tint(&kind, color)`: what blocks tinted with that kind take here, `tints::GRASS`, `FOLIAGE`, `WATER` or a mod's own kind. Kinds you don't give keep their default. To color another mod's biome with your kind, `r.biome_tint(&biome, &kind, color)`. While the world runs a mod can change them (seasons, say): `w.set_biome_tints(&[(biome_id, &kind, color)])` replaces what it set before (the rest keep the content's color, an empty list puts all back), and players' clients blend the new colors across biome borders as before; `w.content_tint(biome_id, &kind)` gives the content's color to start from.
 - `snows()`: rain falls as snow here
 
 Tags (`tag("animals")`) are how everything else asks what a biome is, since spawns, ores and structures look at tags and never at names. `set(&COMPONENT, value)` attaches data, like how many trees base grows there.

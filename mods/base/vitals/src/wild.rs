@@ -58,10 +58,164 @@ pub struct Wild {
 /// crowberries for geese and ptarmigan in spring): the world makes them ripe.
 pub const HOLDS_FRUIT: [&str; 2] = ["base:lingonberry_bush", "base:crowberry_bush"];
 
+/// A wild flower (Research round 7, `reports/world-looks.md`, "Flowers per biome"): each biome's
+/// flowers from the real place its climate comes from, in patches of one kind (`worldgen.rs`).
+#[derive(Clone, Copy, Debug)]
+pub struct Flower {
+    /// The block's full name.
+    pub block: &'static str,
+    pub found: &'static [&'static str],
+    pub ground: Ground,
+    /// The seasons it blooms in, as bits spring first (for a bloom look to come).
+    pub blooms: u8,
+}
+
+const SP: u8 = 1;
+const SU: u8 = 2;
+const AU: u8 = 4;
+const WI: u8 = 8;
+const fn f(block: &'static str, found: &'static [&'static str], ground: Ground, blooms: u8) -> Flower {
+    Flower { block, found, ground, blooms }
+}
+const PLAINS: &[&str] = &["base:plains"];
+const FOREST: &[&str] = &["base:forest"];
+const BIRCH: &[&str] = &["base:birch_forest"];
+const TAIGA: &[&str] = &["base:taiga"];
+const SNOWY: &[&str] = &["base:snowy_plains"];
+const SAVANNA: &[&str] = &["base:savanna"];
+const SWAMP: &[&str] = &["base:swamp"];
+const MOUNTAINS: &[&str] = &["base:mountains"];
+const BEACH: &[&str] = &["base:beach"];
+
+pub const FLOWERS: [Flower; 45] = [
+    // The Konza Prairie's tallgrass.
+    f("base:purple_coneflower", PLAINS, Ground::Soil, SU),
+    f("base:black_eyed_susan", PLAINS, Ground::Soil, SU),
+    f("base:butterfly_milkweed", PLAINS, Ground::Soil, SU),
+    f("base:leadplant", PLAINS, Ground::Soil, SU),
+    f("base:blazing_star", PLAINS, Ground::Soil, SU | AU),
+    // Hessian beech-oak woods: spring's carpets before the leaves, foxglove in the clearings.
+    f("base:wood_anemone", FOREST, Ground::Soil, SP),
+    f("base:lesser_celandine", FOREST, Ground::Soil, SP),
+    f("base:lungwort", FOREST, Ground::Soil, SP),
+    f("base:sweet_woodruff", FOREST, Ground::Soil, SP),
+    f("base:foxglove", FOREST, Ground::Soil, SU),
+    // Moscow's mixed birch forest.
+    f("base:lily_of_the_valley", BIRCH, Ground::Soil, SP),
+    f("base:wood_cranesbill", BIRCH, Ground::Soil, SU),
+    f("base:may_lily", BIRCH, Ground::Soil, SP),
+    f("base:bellflower", BIRCH, Ground::Soil, SU),
+    f("base:fireweed", &["base:birch_forest", "base:taiga"], Ground::Soil, SU),
+    // Interior Alaska's taiga.
+    f("base:twinflower", TAIGA, Ground::Soil, SU),
+    f("base:bunchberry", TAIGA, Ground::Soil, SU),
+    f("base:prickly_rose", TAIGA, Ground::Soil, SU),
+    f("base:labrador_tea", TAIGA, Ground::Soil, SU),
+    // Utqiaġvik's coastal tundra: coltsfoot first as the snow goes.
+    f("base:arctic_poppy", SNOWY, Ground::Soil, SU),
+    f("base:lousewort", SNOWY, Ground::Soil, SU),
+    f("base:saxifrage", SNOWY, Ground::Soil, SU),
+    f("base:arctic_coltsfoot", SNOWY, Ground::Soil, SP | SU),
+    f("base:pygmy_buttercup", SNOWY, Ground::Soil, SU),
+    // The Sonoran desert, on its sand, after the winter rains.
+    f("base:brittlebush", DESERT, Ground::Sand, WI | SP),
+    f("base:globemallow", DESERT, Ground::Sand, SP),
+    f("base:gold_poppy", DESERT, Ground::Sand, WI | SP),
+    f("base:desert_marigold", DESERT, Ground::Sand, SP | SU | AU),
+    f("base:ocotillo", DESERT, Ground::Sand, SP),
+    // The llanos in the wet season.
+    f("base:sensitive_plant", SAVANNA, Ground::Soil, SU),
+    f("base:senna", SAVANNA, Ground::Soil, SU),
+    f("base:pencil_flower", SAVANNA, Ground::Soil, SU),
+    f("base:morning_glory", &["base:savanna", "base:swamp"], Ground::Soil, SP | SU | AU),
+    // The Pantanal (and its water hyacinth, a wild plant).
+    f("base:water_primrose", SWAMP, Ground::Soil, SU),
+    f("base:alligator_flag", SWAMP, Ground::Soil, SU),
+    // Davos's subalpine meadows.
+    f("base:alpenrose", MOUNTAINS, Ground::Soil, SU),
+    f("base:gentian", MOUNTAINS, Ground::Soil, SP | SU),
+    f("base:edelweiss", MOUNTAINS, Ground::Soil, SU),
+    f("base:globeflower", MOUNTAINS, Ground::Soil, SU),
+    f("base:alpine_aster", MOUNTAINS, Ground::Soil, SU),
+    // The Ria Formosa's dunes at Faro.
+    f("base:sea_daffodil", BEACH, Ground::Sand, SU),
+    f("base:sea_holly", BEACH, Ground::Sand, SU),
+    f("base:horned_poppy", BEACH, Ground::Sand, SU),
+    f("base:sea_rocket", BEACH, Ground::Sand, SP | SU),
+    f("base:hottentot_fig", BEACH, Ground::Sand, SP),
+];
+
+/// The flowers of a biome on that ground.
+pub fn flowers(biome: &str, ground: Ground) -> impl Iterator<Item = &'static Flower> + '_ {
+    FLOWERS
+        .iter()
+        .filter(move |f| f.ground == ground && f.found.contains(&biome))
+}
+
+/// How a tree's leaves turn in autumn (world-looks #7, with the lighting session's seasonal tints):
+/// evergreens never, birch-like trees yellow, the rest orange to brown.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Turn {
+    Evergreen,
+    Yellow,
+    Orange,
+}
+
+impl Turn {
+    /// The leaves' tint kind (`base_api::trees`): `core:foliage` for the orange ones, as before.
+    pub fn tint(self) -> &'static str {
+        match self {
+            Turn::Evergreen => "base:evergreen",
+            Turn::Yellow => "base:yellow_leaves",
+            Turn::Orange => "core:foliage",
+        }
+    }
+    /// The colour at autumn's height, for the leaves' tint (`None`: it doesn't turn): a birch's or
+    /// a ginkgo's gold, an oak's russet.
+    pub fn autumn(self) -> Option<u32> {
+        match self {
+            Turn::Evergreen => None,
+            Turn::Yellow => Some(0xd9b23a),
+            Turn::Orange => Some(0xb8622a),
+        }
+    }
+}
+
+/// Every tree's leaves and how they turn: the conifers, palms and the tree fern stay green;
+/// birches and ginkgos go gold; oaks, acacias, mesquite and the swamp cypress (a deciduous conifer)
+/// go russet.
+pub const LEAVES: [(&str, Turn); 12] = [
+    ("base:oak_leaves", Turn::Orange),
+    ("base:birch_leaves", Turn::Yellow),
+    ("base:spruce_leaves", Turn::Evergreen),
+    ("base:acacia_leaves", Turn::Orange),
+    ("base:mesquite_leaves", Turn::Orange),
+    ("base:acuri_palm_leaves", Turn::Evergreen),
+    ("base:moriche_palm_leaves", Turn::Evergreen),
+    ("animals:araucaria_leaves", Turn::Evergreen),
+    ("animals:ginkgo_leaves", Turn::Yellow),
+    ("animals:swamp_cypress_leaves", Turn::Orange),
+    ("animals:scale_conifer_leaves", Turn::Evergreen),
+    ("animals:tempskya_leaves", Turn::Evergreen),
+];
+
+/// How `leaves` turn (`Turn::Orange` for leaves not listed).
+pub fn turn(leaves: &str) -> Turn {
+    LEAVES
+        .iter()
+        .find(|(l, _)| *l == leaves)
+        .map_or(Turn::Orange, |&(_, t)| t)
+}
+
 /// Where still ponds lie, and in what share of the ground's 8 x 8 cells: the Pantanal's and the
 /// Cedar Mountain floodplain's standing water, a block deep, for their floating plants and the
 /// wild rice and cattails on their shores (the world's other water is the sea's, with beaches).
 pub const POND_LANDS: [(&str, f32); 2] = [("base:swamp", 0.35), ("animals:floodplain", 0.2)];
+
+/// Cordage plants: the chance cutting one gives plant fibre (`clothing`; tall grass gives it a time
+/// in eight). Sedges, cottongrass and cattail leaves were twisted into cord wherever they grow, so
+/// the tundra and the marshes have fibre too (Research round 3, B3).
+pub const FIBRE: [(&str, f32); 3] = [("base:sedge", 0.5), ("base:cottongrass", 0.5), ("base:cattail", 1.0)];
 
 /// The most of one ground all its wild plants cover in a biome (the world rolls for them first).
 pub const MOST: f32 = 0.3;
@@ -124,7 +278,7 @@ pub const WILD: [Wild; 22] = [
     w("base:mushroom_brown", Form::Spreads, Ground::Soil, Some("base:mushroom_brown"), FOREST_FLOOR, 0.006),
     w("base:mushroom_red", Form::Spreads, Ground::Soil, Some("base:mushroom_red"), AGARICS, 0.003),
     w("base:water_hyacinth", Form::Spreads, Ground::Water, None, WETLANDS, 0.08),
-    w("base:cattail", Form::Still, Ground::Shore, None, MARSHES, 0.1),
+    w("base:cattail", Form::Still, Ground::Shore, Some("base:cattail_root"), MARSHES, 0.1),
     w("animals:cycad", Form::Still, Ground::Soil, Some("animals:cycad_seed"), CYCAD_LANDS, 0.01),
     w("animals:flowering_shrub", Form::Still, Ground::Soil, None, FLOWERING, 0.02),
     w("animals:water_lily", Form::Still, Ground::Water, None, PONDS, 0.06),

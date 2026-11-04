@@ -91,6 +91,9 @@ fn saved_worlds(ui: &mut Ui, cx: &BuildCx) {
                     ui.text_bound("default", Box::new(move |_: &Ctx| crate::saved_worlds::title_line(&saved)));
                     let (dir, key) = (run_dir.clone(), w.key.clone());
                     ui.text_bound("dim", Box::new(move |_: &Ctx| crate::saved_worlds::status_line(&dir, &key)));
+                    // What it asks of visitors and its DID (chiacraft, phase 4), on a line of its own.
+                    let key = w.key.clone();
+                    ui.text_bound("dim", Box::new(move |_: &Ctx| crate::saved_worlds::notes_line(&key)));
                 });
                 let address = w.address.clone();
                 let id = button(ui, cx, "multiplayer.join", &[], 60.0, move |c| c.requests.push(Request::Join(address.clone())));

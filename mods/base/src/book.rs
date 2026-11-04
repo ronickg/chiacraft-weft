@@ -79,6 +79,10 @@ struct Book {
     ask: Option<Station>,
 }
 
+/// One recipe in the book: how many can be made now, and for a near miss (ingredients held,
+/// ingredients, an item still to find).
+type Entry = (Recipe, u32, Option<(u32, u32, u32)>);
+
 /// The bag as the open book last saw it (`client_frame` above).
 static BAG_SIG: Mutex<u64> = Mutex::new(0);
 
@@ -223,7 +227,9 @@ fn encode(pool: &[(u32, u32)]) -> Vec<u8> {
 
 fn decode(bytes: &[u8]) -> Vec<(u32, u32)> {
     bytes
-        .chunks_exact(8)
+        .as_chunks::<8>()
+        .0
+        .iter()
         .map(|c| (u32::from_le_bytes([c[0], c[1], c[2], c[3]]), u32::from_le_bytes([c[4], c[5], c[6], c[7]])))
         .collect()
 }
@@ -448,7 +454,7 @@ pub fn book(ui: &mut Ui, station: Station) {
             touched.push(item);
         }
     }
-    let mut list: Vec<(Recipe, u32, Option<(u32, u32, u32)>)> = shown(station)
+    let mut list: Vec<Entry> = shown(station)
         .into_iter()
         .filter(|r| match TABS[tab] {
             "" => true,

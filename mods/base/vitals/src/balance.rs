@@ -214,6 +214,52 @@ pub fn problems() -> Vec<String> {
         out.push("leather armor isn't as warm as hide clothes".into());
     }
 
+    // Rooms (`shelter`): a fire in a log cabin keeps a player in arrival clothes comfortable on a
+    // -20 °C night; logs keep heat better than stone, stone and plank better than hide; an earthen
+    // room is cooler than a desert afternoon.
+    {
+        use crate::shelter::{Room, WALLS, Wall};
+        let room_of = |w: Wall| {
+            let mut r = Room { volume: 40, ..Room::default() };
+            r.faces[WALLS.iter().position(|&x| x == w).unwrap_or(0)] = 80;
+            r
+        };
+        let cold = Place { hour: 3.0, ..noon(-15.0) };
+        let (mean, still) = (temperature::day_mean(&cold), temperature::air(&cold));
+        let warm = |w: Wall| room_of(w).air(mean, still, temperature::fire_heat(4.0));
+        if feels(&dressed, &Place { fire: 0.0, ..cold }) == Feeling::Comfortable {
+            out.push("arrival clothes are comfortable on a -20 °C night outside: a cabin would matter little".into());
+        }
+        if dressed.target(warm(Wall::Log)) < temperature::CORE {
+            out.push(format!(
+                "a fire in a log cabin on a -20 °C night leaves a player in arrival clothes cold (air {:.0} °C)",
+                warm(Wall::Log)
+            ));
+        }
+        if !(warm(Wall::Log) > warm(Wall::Stone) && warm(Wall::Stone) > warm(Wall::Hide)) {
+            out.push("logs don't keep a fire's heat better than stone, and stone than hide".into());
+        }
+        let desert = Place { humidity: 0.18, season: 8.1, ..noon(25.7) };
+        let (dm, ds) = (temperature::day_mean(&desert), temperature::air(&desert));
+        if room_of(Wall::Earth).air(dm, ds, 0.0) > ds - 5.0 {
+            out.push("an earthen room isn't cooler than a desert afternoon".into());
+        }
+    }
+
+    // Crafts that wait (`crafts`): a buckskin while one eats (2 to 4 minutes), a charcoal clamp a
+    // few minutes (4 to 6), sole leather most of a game week (3 to 5 game days), as CONTENT.md has
+    // them.
+    for (station, lo, hi) in [
+        (crate::crafts::Station::TanningFrame, 120.0, 240.0),
+        (crate::crafts::Station::CharcoalClamp, 240.0, 360.0),
+        (crate::crafts::Station::TanningPit, 3.0 * crate::DAY_SECS, 5.0 * crate::DAY_SECS),
+    ] {
+        let secs = crate::crafts::craft(station).secs();
+        if !(lo..=hi).contains(&secs) {
+            out.push(format!("{} takes {secs:.0} s ({lo:.0} to {hi:.0} wanted)", station.name()));
+        }
+    }
+
     // Freezing takes a full new player in two to five minutes at normal difficulty.
     let freeze = 1.0 / Effect::Freezing.modifiers().health_loss;
     if !(120.0..=300.0).contains(&freeze) {

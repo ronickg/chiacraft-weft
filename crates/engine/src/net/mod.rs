@@ -246,6 +246,9 @@ messages! {
         /// snow lying 0..1, `air_flags`), and where the wind blows to, degrees clockwise from
         /// north (-z).
         Air { air: Vec<(u32, f32, f32, f32, u32)>, heading: f32 },
+        /// Every biome's tint colors (a mod's, `set_biome_tints`): biome by biome, one 0xRRGGBB
+        /// per tint kind; empty for the content's.
+        Tints { tints: Vec<u32> },
         /// A white flash on an entity.
         Flash(u64),
         /// Someone else's arm swings: a hit, a use, mining.
@@ -284,6 +287,18 @@ messages! {
         /// Not let in, or sent away, with the reason in the player's own language (chiacraft:
         /// admission rules and bans). The connection ends after it.
         Refused(crate::ui::text::Msg),
+        /// An achievement credential the world signed for this player (chiacraft: JSON,
+        /// `chiacraft_wallet::achievement::Credential`), to keep.
+        Achievement(String),
+        /// A day's anchor for one of this player's achievements (chiacraft): the credential's
+        /// hash (hex) and its inclusion proof (JSON, `achievement::Anchor`).
+        AchievementAnchor { hash: String, anchor: String },
+        /// The world's rules ask for this achievement (chiacraft): the joining game answers with
+        /// its credentials for it (`ToServer::Proofs`), and only those.
+        AskAchievement { id: String },
+        /// The signed list of achievements the world's issuer withdrew (chiacraft: JSON,
+        /// `achievement::Revocations`), sent on joining and whenever it changes.
+        Revocations(String),
     }
 }
 
@@ -341,6 +356,9 @@ messages! {
         Skin(Vec<u8>),
         /// The client's view distance in cubes: what the server announces edited cubes in.
         View(u32),
+        /// The player's credentials for the achievement the world asked about
+        /// (`ToClient::AskAchievement`; chiacraft): JSON, at most a few.
+        Proofs(Vec<String>),
     }
 }
 

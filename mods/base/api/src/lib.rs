@@ -7,7 +7,10 @@
 
 use weft_sdk::*;
 
+pub mod branchy;
 pub mod grow;
+pub mod land;
+pub mod tree_recipes;
 pub mod trees;
 
 value! {
@@ -167,8 +170,12 @@ pub struct Air {
     pub still: f32,
     /// The biome's humidity, 0 dry to 1 wet (drying racks).
     pub humidity: f32,
-    /// Degrees from the nearest fire (lava, a lit furnace, torches).
+    /// The day's mean air here (`temperature::day_mean`): what a room's walls hold to.
+    pub mean: f32,
+    /// Degrees from the nearest fire (lava, a lit furnace, torches), and from the nearest one hot
+    /// enough to rest by (`temperature::REST_HEAT`: not a torch).
     pub fire: f32,
+    pub hearth: f32,
     /// Sky light at the eyes: under 13 a roof, 0 deep inside.
     pub sky: u32,
     pub underground: bool,
@@ -197,6 +204,7 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
     let sky = w.sky_light(eye);
     let underground = sky == 0 && feet[1] < SEA - 6;
     let mut fire = 0.0f32;
+    let mut hearth = 0.0f32;
     for dx in -reach..=reach {
         for dy in -reach..=reach {
             for dz in -reach..=reach {
@@ -206,6 +214,9 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
                 if h > 0.0 {
                     let d = ((dx * dx + dy * dy + dz * dz) as f32).sqrt();
                     fire = fire.max(temperature::fire_heat(d) * h);
+                    if h >= temperature::REST_HEAT {
+                        hearth = hearth.max(temperature::fire_heat(d) * h);
+                    }
                 }
             }
         }
@@ -238,7 +249,9 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
         celsius: temperature::air(&place),
         still: temperature::air(&temperature::Place { wind: 0.0, ..place }),
         humidity: climate.humidity,
+        mean: temperature::day_mean(&place),
         fire,
+        hearth,
         sky,
         underground,
         open_sky: place.open_sky,
@@ -333,9 +346,9 @@ const HEAT_STATES: usize = 1 << 20;
 fn heat_by_name(state: u32) -> f32 {
     // The state's name without its properties (`base:lava[level=0]`).
     match block_name(state).split('[').next().unwrap_or("") {
-        "base:lava" | "base:campfire" => 1.0,
-        "base:furnace" if state_prop(state, "lit") == Some("true") => 0.7,
-        "base:torch" | "base:wall_torch" => 0.25,
+        "base:lava" | "base:campfire" => vitals::temperature::LAVA_HEAT,
+        "base:furnace" if state_prop(state, "lit") == Some("true") => vitals::temperature::FURNACE_HEAT,
+        "base:torch" | "base:wall_torch" => vitals::temperature::TORCH_HEAT,
         _ => 0.0,
     }
 }
@@ -552,6 +565,23 @@ fn with_body(w: &World, player: u64, f: impl FnOnce(&mut Vitals, f32)) {
     f(v, resist);
 }
 
+/// Server to client: a hint from any mod (`hint`), as its lang key and number arguments, tab
+/// separated.
+pub static HINT_TEXT: weft_sdk::Channel<String> = weft_sdk::Channel::named("base:hint_text");
+
+/// Shows `player` a hint: the line under the crosshair the base game's hints use (`hints.rs`), a
+/// few seconds, one at a time, off when the player's `base:hints` setting is. `key` is a lang key
+/// of any mod (`hint.animals.tamed`), `args` fill its `{0}`, `{1}`... The caller decides how often
+/// (the base game's own show once per player).
+pub fn hint(w: &World, player: u64, key: &str, args: &[i64]) {
+    let mut text = key.to_string();
+    for a in args {
+        text.push('\t');
+        text.push_str(&a.to_string());
+    }
+    w.send(player, &HINT_TEXT, &text);
+}
+
 /// Things a player has done that other mods know of and the base game's advancements read
 /// (`advancements.rs`, the "Surviving" group): a bit each (`milestones`), kept through death.
 pub static MILESTONES: Component<u32> = Component::named("base:milestones");
@@ -622,6 +652,8 @@ pub static COAT: EquipmentSlot = EquipmentSlot::named("base:coat");
 pub static TROUSERS: EquipmentSlot = EquipmentSlot::named("base:trousers");
 pub static SHOES: EquipmentSlot = EquipmentSlot::named("base:shoes");
 pub const CLOTHES: [&EquipmentSlot; 4] = [&HAT, &COAT, &TROUSERS, &SHOES];
+/// A cloak, over clothes and armor (`vitals::clothing::CLOAKS`).
+pub static CLOAK: EquipmentSlot = EquipmentSlot::named("base:cloak");
 
 pub static OVERWORLD: Dimension = Dimension::named("base:overworld");
 pub static FLATLANDS: Dimension = Dimension::named("base:flatlands");

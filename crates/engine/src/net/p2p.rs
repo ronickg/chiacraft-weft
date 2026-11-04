@@ -30,13 +30,16 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// says whether the package carries sandboxed code (chiacraft, phase 6). 7: a world refuses with a
 /// reason in the player's language (`ToClient::Refused`), and its status says what its admission
 /// rules ask (chiacraft, `admission`). 8: an offer says which mod API its code needs instead of
-/// only whether it has code (empty: no code; chiacraft, phase 6).
-const PROTOCOL: u32 = 8;
+/// only whether it has code (empty: no code; chiacraft, phase 6). 9: worlds send players their
+/// signed achievements (`ToClient::Achievement`; chiacraft, phase 4). 10: a world asks a joining
+/// game for an achievement its rules need (`AskAchievement`, `Proofs`; chiacraft, phase 4). 11: a
+/// world sends its issuer's revocation list (`ToClient::Revocations`; chiacraft, phase 4).
+const PROTOCOL: u32 = 11;
 const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its
 /// signature envelope (empty if unsigned), and the mod API its sandboxed code
-/// (`code/server.wasm`) needs, as `1.1` (empty: no code). The joining game refuses an API it
+/// (`code/server.wasm`, `code/client.wasm`) needs, as `1.1` (empty: no code). The joining game refuses an API it
 /// doesn't run before downloading, and checks there is code exactly when the manifest says so.
 pub type Offer = (String, String, String, u64, String, String);
 
@@ -1190,7 +1193,7 @@ async fn download(
         if manifest
             .files
             .iter()
-            .any(|f| f.path == chiacraft_packages::identity::SERVER_CODE)
+            .any(|f| chiacraft_packages::identity::is_code(&f.path))
             != !code.is_empty()
         {
             return Err(format!("package {id}: the host didn't say truly whether it carries code"));

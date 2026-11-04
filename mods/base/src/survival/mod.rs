@@ -20,6 +20,7 @@ mod camp;
 mod food;
 mod health;
 mod load;
+mod shelter;
 mod stamina;
 mod temperature;
 
@@ -43,6 +44,19 @@ pub fn register(r: &mut Registry) {
     r.config(&base_api::DIFFICULTY)
         .choice(1, &difficulty::ALL.map(|d| d.name))
         .world();
+    // Gentle's grace: no monsters appear by themselves in a new world's first nights
+    // (`Difficulty::grace_nights`, counted from the world's first day, `calendar::START_DAY`).
+    r.intercept(&question::NATURAL_SPAWN, |q| {
+        static HOSTILE: Tag = Tag::named("hostile");
+        let w = q.world();
+        let nights = base_api::difficulty().grace_nights;
+        let day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
+        if nights > 0 && day < vitals::calendar::START_DAY + nights && HOSTILE.on_entity(q.query().other as u32) {
+            Verdict::Deny
+        } else {
+            Verdict::Abstain
+        }
+    });
     r.entity_component(&VITALS, Vitals::new(MAX_AIR), component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP);
     r.attach(&PLAYER, &VITALS);
     r.world_tick(tick);
@@ -64,6 +78,9 @@ pub fn register(r: &mut Registry) {
             v.wet = 0.0;
             v.core = vitals::temperature::CORE;
             (v.poison, v.bleed, v.torpor, v.out) = (0.0, 0.0, 0.0, 0);
+            // Nor food poisoning or rest (integration review: 3 minutes without healing after a
+            // respawn).
+            (v.sick, v.rested, v.resting) = (0.0, 0.0, 0.0);
             // Respawning drops the body's modifiers: the next tick sets max health and speed again.
             v.max_health = -1.0;
             v.speed = -1.0;
@@ -89,7 +106,20 @@ fn tick(w: &World) {
     }
     let d = base_api::difficulty();
     let pulse = w.time() % 20 == 0;
+    // Today's date for the HUD and everything reading it (seasonal tints), for every player,
+    // creative and dead too: it was set only with the body's warmth, so after `/time set` in
+    // creative the clock stayed on its old day (Tester 2, 11-04).
+    let today = pulse.then(|| {
+        let kind = base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0);
+        let date = vitals::calendar::date(w.day_time());
+        (if kind > 0 { date.day as u16 + 1 } else { 0 }, kind)
+    });
     for id in w.players() {
+        if let Some((day, kind)) = today
+            && let Some(v) = w.component_mut(id, &VITALS)
+        {
+            (v.date, v.calendar) = (day, kind);
+        }
         let Some(mut st) = w.entity(id) else { continue };
         // The dead have no body to keep: nothing ticks until they're back.
         if st.health <= 0.0 {

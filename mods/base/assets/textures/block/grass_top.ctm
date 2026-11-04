@@ -1,0 +1,4 @@
+# The grass top: Chiacraft's three variants beside the plain one, picked at random and turned four ways, so a field doesn't show its tile repeating.
+method = random
+tiles = <default> grass_top/1-3
+symmetry = all

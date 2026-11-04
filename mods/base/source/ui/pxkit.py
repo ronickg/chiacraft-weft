@@ -116,8 +116,9 @@ def tone(a, to=0.072, pull=0.55, sat=0.78, val=0.84, lo=0.068, hi=0.19, min_s=0.
 
 
 def disabled(a):
-    """Grey-brown and flat: most of the color out, darker, the light kept."""
-    return hsv_map(a, lambda h, s, v: (0.07, s * 0.25, v * 0.72))
+    """Grey-brown, flat and dim: most of the color out and much darker, so it reads as off (a
+    lighter one looked washed out over the title's painting)."""
+    return hsv_map(a, lambda h, s, v: (0.07, s * 0.2, v * 0.5))
 
 
 def pressed(a):
@@ -229,14 +230,24 @@ def build():
     put("slot", slot, 4, extra=["icon = 16"])
     put("recipe_slot", disabled(slot), 4, extra=["icon = 16"])
     put("slot_highlight", ring(slot), 4)
-    hot = fit9(src("c_hotbar", 0), 36, 36, 5)
+    # The HUD's hotbar slots are 20 GUI pixels (engine `hud.rs`), the selected frame one GUI
+    # pixel bigger all round: drawn at those sizes so nothing stretches.
+    hot = fit9(src("c_hotbar", 0), 40, 40, 5)
     put("hotbar", hot, 5, extra=["icon = 16"])
-    put("hotbar_selected", fit9(src("c_hotbar", 1, toned=False), 40, 40, 7), 7)
+    put("hotbar_selected", fit9(src("c_hotbar", 1, toned=False), 44, 44, 7), 7)
     put("advancement_tile", slot, 4)
     put("advancement_tile_done", glow(slot, GOLD1), 4)
     panel = src("c_panel")
-    for n in ("panel", "sidebar", "news"):
+    for n in ("panel", "news"):
         put(n, panel, 9)
+    # The title's menu bar over the painting (engine `screens.rs`, Title): a dark band, no frame,
+    # fading a little to the right, with a thin bronze line on its right edge.
+    band = np.zeros((8, 64, 4), np.uint8)
+    band[..., :3] = (22, 16, 15)
+    band[..., 3] = np.linspace(215, 165, 64).astype(np.uint8)[None, :]
+    band[:, -2, :3], band[:, -2, 3] = (120, 72, 40), 230
+    band[:, -1, :3], band[:, -1, 3] = (40, 24, 16), 200
+    put("sidebar", band, scaling="stretch")
     put("well", fit9(src("c_small", 2), 32, 24, 4), 4)
     put("tooltip", fit9(src("c_small", 3), 32, 24, 3), 3)
     btn = fit9(src("c_buttons", 0), 64, 20, 5)
@@ -244,6 +255,47 @@ def build():
     put("button_hover", glow(brighter(btn, 1.08), GOLD1), 5)
     put("button_pressed", pressed(btn), 5)
     put("button_disabled", disabled(btn), 5)
+    # Behind a 3D portrait (the animal screen): the well's frame round a lighter warm backdrop,
+    # brightest in the middle, so dark coats (a black wolf) read.
+    portrait = fit9(src("c_small", 2), 64, 64, 4).copy()
+    yy, xx = np.mgrid[0:56, 0:56]
+    r = np.sqrt(((xx - 27.5) / 28) ** 2 + ((yy - 27.5) / 28) ** 2).clip(0, 1)
+    inner = np.stack([118 - 40 * r, 102 - 36 * r, 88 - 32 * r], -1)
+    portrait[4:60, 4:60, :3] = inner.astype(np.uint8)
+    portrait[4:60, 4:60, 3] = 255
+    put("portrait", portrait, 4)
+    # The menus' background outside the game (the title, worlds, settings): a painted landscape
+    # (`px/title/`, three made 2026-11-04; title_1, golden hour, chosen overnight), cut to 16:9
+    # and stretched to the window.
+    from PIL import Image as _I
+    scene = _I.open(os.path.join(HERE, "px", "title", "title_1.png")).convert("RGBA")
+    h = scene.width * 9 // 16
+    top = (scene.height - h) // 3
+    scene = np.array(scene.crop((0, top, scene.width, top + h)))
+    save("background", scene, scaling="stretch")
+    with open(os.path.join(OUT, "background.gui"), "w") as f:
+        f.write("scaling = stretch\n")
+    out["background"] = scene
+    # A row of a list (the worlds): `list_row`, a dark plate with a bronze rim, lighter on hover,
+    # a gold rim when selected (a selected button is drawn with `_pressed`).
+    row = fit9(src("c_small", 2), 64, 24, 4)
+    put("list_row", row, 4)
+    put("list_row_hover", brighter(row, 1.3), 4)
+    put("list_row_pressed", glow(brighter(row, 1.2), GOLD1), 4)
+    put("list_row_disabled", disabled(row), 4)
+    # the secondary button (dark brown): `S::default().class("button_secondary")`
+    b2 = fit9(src("c_buttons", 1), 64, 20, 5)
+    put("button_secondary", b2, 5)
+    put("button_secondary_hover", glow(brighter(b2, 1.15), GOLD1), 5)
+    put("button_secondary_pressed", pressed(b2), 5)
+    put("button_secondary_disabled", disabled(b2), 5)
+    # behind the death screen: dark red-brown, darker at the edges
+    yy, xx = np.mgrid[0:64, 0:64]
+    r = np.sqrt(((xx - 31.5) / 32) ** 2 + ((yy - 31.5) / 32) ** 2)
+    death = np.zeros((64, 64, 4), np.uint8)
+    death[..., 0], death[..., 1], death[..., 2] = 52, 14, 10
+    death[..., 3] = np.clip(150 + 90 * r, 0, 235).astype(np.uint8)
+    put("death", death, scaling="stretch")
     q = red(btn)
     put("button_quit", q, 5)
     put("button_quit_hover", glow(brighter(q, 1.1), GOLD1), 5)
@@ -272,6 +324,57 @@ def build():
     put("category_hover", box, 4)
     put("category_pressed", glow(box, GOLD1), 4)
     put("category_disabled", np.zeros_like(box), 4)
+    # Chips: a small dark plate with a bronze edge, for traits and genes (`ui.panel("chip", ..)`);
+    # `chip_new` dashed, for something not built yet.
+    chip = np.zeros((16, 16, 4), np.uint8)
+    chip[..., :3] = (42, 32, 27)
+    chip[..., 3] = 255
+    chip[[0, -1], :, :3] = (120, 78, 48)
+    chip[:, [0, -1], :3] = (120, 78, 48)
+    for y, x in ((0, 0), (0, -1), (-1, 0), (-1, -1)):
+        chip[y, x, 3] = 0
+    put("chip", chip, 2)
+    chip_points = chip.copy()
+    chip_points[1:-1, 1:-1, :3] = (120, 64, 24)
+    put("chip_points", chip_points, 2)
+
+    # Bars of the animal and stats screens: a frame (the HUD bar's) and a fill on a canvas its
+    # size, each colour its own class (`progress_bind` draws a class at its own size).
+    def stat_bar(name, w, h, color):
+        fr = fit9(src("c_bars", 0), w, h, 3)
+        put(name, fr, scaling="stretch")
+        c = np.array(color, float)
+        fill = np.zeros_like(fr)
+        fill[2:h - 2, 2:w - 2, :3] = c
+        fill[2, 2:w - 2, :3] = np.minimum(255, c * 1.25 + 20)
+        fill[h - 3, 2:w - 2, :3] = c * 0.65
+        fill[2:h - 2, 2:w - 2, 3] = 255
+        put(name + "_fill", fill, scaling="stretch")
+
+    # wild points' quality, few to many (`mods/animals/src/screen.rs`, QUALITY)
+    for i, col in enumerate(((150, 140, 130), (138, 200, 15), (47, 141, 228), (155, 79, 224), (240, 170, 40))):
+        stat_bar(f"stat_q{i}", 108, 12, col)
+    life = {"health": (224, 48, 42), "food": (196, 120, 40), "water": (70, 150, 220), "bond": (200, 110, 150),
+            "taming": (240, 170, 40), "torpor": (155, 79, 224)}
+    for n, col in life.items():
+        stat_bar(f"life_{n}", 126, 12, col)
+    # the player's stats screen (`mods/base/src/levels.rs`), a colour per stat
+    stats = {"health": (224, 48, 42), "stamina": (196, 130, 50), "food": (180, 120, 60), "damage": (180, 70, 50),
+             "speed": (110, 170, 80), "weight": (150, 110, 80), "oxygen": (70, 150, 220), "torpor": (155, 79, 224),
+             "fortitude": (140, 150, 170)}
+    for n, col in stats.items():
+        stat_bar(f"stat_{n}", 150, 12, col)
+    stat_bar("stat_xp", 220, 8, (155, 79, 224))
+    # The close button at a window's top right (`mods/base/src/window.rs`): the generated one,
+    # its hover and pressed states in code.
+    close = src("c_small", 0, toned=False)
+    put("close", close, scaling="stretch")
+    put("close_hover", glow(brighter(close, 1.15), GOLD1), scaling="stretch")
+    put("close_pressed", pressed(close), scaling="stretch")
+    # A plate behind a HUD element that only shows sometimes (the taming plate): a "bar" whose
+    # background is the tooltip's frame and whose fill is nothing; hidden while its value is < 0.
+    put("hud_plate", fit9(src("c_small", 3), 32, 24, 3), 3)
+    put("hud_plate_fill", np.zeros((2, 2, 4), np.uint8), scaling="stretch")
     # The HUD (`mods/base/src/hud.rs`): each bar a frame and a fill on a canvas the frame's size,
     # which the engine crops to the value (`BAR_*` and `bar_fill` there follow these sizes).
     def bar(name, fill, w, h):

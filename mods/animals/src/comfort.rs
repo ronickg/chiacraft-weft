@@ -45,8 +45,9 @@ pub const FEELING_NAMES: [&str; 7] = ["comfortable", "chilly", "cold", "freezing
 /// Strength on an empty stomach, the player's (`vitals::stomach::FLOOR`): the rest comes back as
 /// it is fed, all of it from half full.
 const FLOOR: f32 = vitals::stomach::FLOOR;
-/// Blocks searched for a fire around it, and for a better place.
-const REACH: i32 = 3;
+/// Blocks searched for a fire around it (the animals' reach, `vitals::temperature::FIRE_REACH`),
+/// and for a better place.
+const REACH: i32 = vitals::temperature::FIRE_REACH;
 const LOOK: f64 = 10.0;
 /// Blocks a cold one notices a fire from (its light and smell carry further).
 const FIRE_LOOK: i32 = 16;
@@ -96,7 +97,8 @@ pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState) -> f32 {
     let Some(s) = a.species() else { return 1.0 };
     let Some(body) = comfort(a) else { return 1.0 };
     let air = base_api::air_at(w, st.pos, st.size[1], st.in_liquid != 0, REACH, |_| {}).celsius;
-    let size = crate::coats::size_of(w, id).map_or(1.0, |g| g * crate::breeding::growth(w, id, (a.species - 1) as usize));
+    let index = (a.species - 1) as usize;
+    let size = crate::coats::size_of(w, id).map_or(1.0, |g| g / crate::coats::mean_size(index) * crate::breeding::growth(w, id, index));
     let mass = s.bio.mass * size.powi(3);
     let old = w.component(id, &BODY).copied().unwrap_or_default();
     let (core, feeling, warmth) = if s.bio.cold_blooded {
@@ -198,7 +200,7 @@ pub fn seek(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let target = best.map_or(st.pos, |(p, _)| p);
     if let Some((p, t)) = best {
-        weft_sdk::info!("animal {id} seeks comfort at {p:?}: {t:.1} °C off its comfort, {here:.1} here");
+        weft_sdk::debug!("animal {id} seeks comfort at {p:?}: {t:.1} °C off its comfort, {here:.1} here");
         w.navigate(id, target, 1.0);
     }
     if let Some(s) = w.component_mut(id, &SEEK) {

@@ -165,6 +165,7 @@ impl Server {
             d.day_moved = false;
             d.weather_moved = false;
             d.air_moved = false;
+            d.tints_moved = false;
             for r in &mut d.regions {
                 for st in r.bodies.values_mut() {
                     st.resend.clear();
@@ -263,6 +264,9 @@ fn send_clock(p: &mut Player, dim: &DimSet, tick: u64) {
     if dim.air_moved || p.first_sync {
         p.conn
             .send(ToClient::Air { air: dim.air.0.clone(), heading: dim.air.1 });
+    }
+    if dim.tints_moved || (p.first_sync && !dim.tints.is_empty()) {
+        p.conn.send(ToClient::Tints { tints: dim.tints.to_vec() });
     }
     if tick % TPS as u64 == 0 || dim.day_moved {
         p.conn

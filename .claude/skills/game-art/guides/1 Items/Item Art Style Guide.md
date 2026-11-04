@@ -170,6 +170,7 @@ Two files don't match the rest of the set and should not be used as reference: `
 
 **Learned from Ronald's answers** (the item icon redo, 2026-11-04; each line is something he approved or sent back):
 - Metal is warm silver with a near-white bevel; handles are red-brown leather with gold bands and a round gold pommel; fittings are gold (approved across every tool and armour piece).
+- The working part follows the tool's diagonal, never upright (Ronald, 11-04: "its not allowed to be vertical like that the front part"). An axe is built like a real one and like Minecraft's: the head sits crosswise at the top of the handle, the blade sticks out to the upper left with its cutting edge parallel to the handle (along the corner-to-corner diagonal), and a short blunt poll sticks out to the lower right; never a vertical edge down the canvas side, and never the edge turned across the handle. Every handle lies on the same corner-to-corner diagonal, so any head fits without turning.
 - A hoe is a long plain handle with one flat blade like a garden hoe, about 10 px wide and 4-5 px tall, set at a right angle across the top of the handle and pointing down-left: never a block-shaped hammer head (too big) nor a thin hook (too small). Tool heads must read at slot size.
 - A leather helmet is a soft cap with stitched panels, a short brim and ear flaps, open face; metal helmets have the visor.
 - Boots are a pair seen a little from the side, so each foot and toe shows at the bottom; never shin guards alone.
