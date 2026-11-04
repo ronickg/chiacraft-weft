@@ -203,6 +203,30 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
         }
         None => vec![Msg::new("command.music.no_device", Vec::new())],
     }),
+    // What this client hears now, most important first (also in the log, for scripts).
+    ("sounds", "", |r, _| match &r.audio {
+        Some(a) => {
+            let (playing, held) = a.counts();
+            log::info!("sounds: {playing} playing, {held} held, {} played, {} dropped", a.played, a.dropped);
+            let mut out =
+                vec![Msg::new("command.sounds.count", vec![Arg::Int(playing as i64), Arg::Int(held as i64), Arg::Int(a.dropped as i64)])];
+            for (name, volume, looped, waiting) in a.describe() {
+                log::info!(
+                    "sound: {name} volume {volume:.2}{}{}",
+                    if looped { " loop" } else { "" },
+                    if waiting { " reading" } else { "" }
+                );
+                let key = match (looped, waiting) {
+                    (_, true) => "command.sounds.reading",
+                    (true, _) => "command.sounds.loop",
+                    _ => "command.sounds.one",
+                };
+                out.push(Msg::new(key, vec![Arg::Text(name), Arg::Float(volume as f64, 2)]));
+            }
+            out
+        }
+        None => vec![Msg::new("command.music.no_device", Vec::new())],
+    }),
 ];
 
 pub(crate) struct Running {

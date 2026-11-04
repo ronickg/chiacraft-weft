@@ -26,6 +26,7 @@ mod sounds;
 mod survival;
 mod video;
 mod weather;
+mod weather_sound;
 mod wild;
 mod window;
 mod worldgen;
@@ -90,6 +91,7 @@ fn init(r: &mut Registry) {
     mobs::register(r);
     worldgen::register(r);
     weather::register(r);
+    weather_sound::register(r);
     seasons::register(r);
     growth::register(r);
     farming::register(r);

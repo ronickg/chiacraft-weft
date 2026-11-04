@@ -3,6 +3,10 @@ Usage: python3 sfx.py plan.tsv out_root
 plan.tsv rows: out_rel_path <TAB> source_file <TAB> mode (copy|hit:N) <TAB> max_seconds <TAB> peak_dbfs
   copy  : the whole source (trimmed of leading silence, cut to max_seconds)
   hit:N : the N-th strongest separate hit in a long recording (0-based), max_seconds long
+  at:S  : from S seconds in, max_seconds long (fades in over 20 ms)
+  loop:S: a seamless loop of max_seconds from S seconds in: its tail is crossfaded into its head
+          (equal power, LOOP_FADE seconds), levelled by loudness (peak_dbfs is then the RMS
+          level, peaks held below -1 dBFS)
 """
 import sys, os, subprocess, numpy as np
 SR = 44100
@@ -53,6 +57,23 @@ def finish(x, max_s, peak_db):
         x = x * (10 ** (peak_db / 20) / pk)
     return x.astype(np.float32)
 
+LOOP_FADE = 1.5
+
+def make_loop(x, start, length, rms_db):
+    a, n, f = int(start * SR), int(length * SR), int(LOOP_FADE * SR)
+    seg = x[a:a + n + f].copy()
+    if len(seg) < n + f:
+        raise SystemExit(f"source too short for a {length}s loop from {start}s")
+    t = np.linspace(0, np.pi / 2, f)
+    y = seg[:n].copy()
+    y[:f] = seg[:f] * np.sin(t) + seg[n:n + f] * np.cos(t)
+    rms = np.sqrt(np.mean(y * y)) + 1e-12
+    y = y * (10 ** (rms_db / 20) / rms)
+    pk = np.abs(y).max()
+    if pk > 10 ** (-1 / 20):
+        y = y * (10 ** (-1 / 20) / pk)
+    return y.astype(np.float32)
+
 def encode(x, out):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", str(SR), "-ac", "1", "-i", "-",
@@ -64,8 +85,18 @@ for line in open(plan):
         continue
     rel, src, mode, max_s, peak = line.rstrip("\n").split("\t")
     x = decode(os.path.expanduser(src))
+    if mode.startswith("loop:"):
+        y = make_loop(x, float(mode.split(":")[1]), float(max_s), float(peak))
+        out = os.path.join(root, rel)
+        encode(y, out)
+        print(f"{rel}\t{len(y)/SR:.2f}s loop\t{os.path.getsize(out)} B")
+        continue
     if mode == "copy":
         y = trim_lead(x)
+    elif mode.startswith("at:"):
+        y = x[int(float(mode.split(":")[1]) * SR):].copy()
+        k = min(len(y), int(0.02 * SR))
+        y[:k] *= np.linspace(0, 1, k)
     else:
         n = int(mode.split(":")[1])
         starts = hits(x, float(max_s))

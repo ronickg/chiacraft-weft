@@ -454,6 +454,8 @@ pub struct Client {
     frame_dt: f32,
     /// Seconds left of a lightning's flash.
     lightning: f32,
+    /// Lightning flashes seen so far: mods hear a new one as thunder.
+    lightnings: u32,
     /// Holding the use button on an item that takes time: ticks left, ticks in all.
     using: Option<(f32, f32)>,
     /// On fire, as the server says.
@@ -740,6 +742,7 @@ impl Client {
             dust: 0.0,
             aurora: 0.0,
             lightning: 0.0,
+            lightnings: 0,
             using: None,
             burning: false,
             others_mining: Vec::new(),
@@ -2224,7 +2227,13 @@ impl Client {
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
         if here && self.weather.1 && self.chance() < dt / 12.0 {
             self.lightning = 0.15;
+            self.lightnings = self.lightnings.wrapping_add(1);
         }
+    }
+
+    /// The weather where the player is, as drawn (`ClientState::rain` and on, for mods' sound).
+    pub fn weather_now(&self) -> (f32, f32, [f32; 2], f32, u32) {
+        (self.rain, self.thunder, self.wind.to_array(), self.snowing, self.lightnings)
     }
 
     /// Game ticks now, with the fraction of the current one.

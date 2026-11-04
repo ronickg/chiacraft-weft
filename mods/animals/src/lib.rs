@@ -76,6 +76,7 @@ mod store;
 mod taming;
 mod utahraptor;
 mod vole;
+mod voices;
 mod vulture;
 mod wild;
 mod wolf;
@@ -141,6 +142,7 @@ fn init(r: &mut Registry) {
     caiman::init(r);
     wolf::init(r);
     jaguar::init(r);
+    voices::init(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
