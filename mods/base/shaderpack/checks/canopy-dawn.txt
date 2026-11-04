@@ -3,6 +3,7 @@
 # flooded forest's water (igapó, Terrain's banks). Seed 1, --view 12, 1280x720, --shader-pack
 # chiacraft, a fresh world. Spectator, absolute /tp, mobs off. Yaw 0 faces -z, 90 -x (west), 180 +z,
 # 270 +x (east, the morning sun); a negative pitch looks down. /air 0.6 0 is a thick fog morning.
+# No `idle` after the first /tp: on tropical-trees 1662f8db the world round spot 1 never went idle.
 loaded
 idle
 chat /rule core:mob_spawning 0
@@ -11,8 +12,7 @@ chat /weather clear 99999
 chat /time set 1000
 chat /tp 148.5 93 523.5
 loaded
-idle
-wait 12
+wait 30
 # 1. Inside the forest (Terrain's spot 1), toward the sun: 07:00, 07:30, 08:30, in the forest's own air.
 look 270 12
 wait 3
