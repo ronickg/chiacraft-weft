@@ -78,7 +78,7 @@ impl Climate {
 // Wind and fog (`air`): each place's seasonal mean wind at 10 m and its days with fog, from airport
 // records, the weather services and the Cretaceous places' modern stand-ins
 // (`reports/ecology/Wind and fog.md`, with which are estimates).
-pub const BIOMES: [Climate; 18] = [
+pub const BIOMES: [Climate; 19] = [
     // The overworld (`mods/base/src/worldgen.rs`).
     c("base:plains", "Manhattan, Kansas (Konza Prairie)", 12.8, 0.42, 14.2, [0.27, 0.27, 0.2, 0.14]).air(
         [3.8, 3.0, 3.0, 3.1],
@@ -114,6 +114,16 @@ pub const BIOMES: [Climate; 18] = [
     c("base:swamp", "Nhumirim, the Pantanal", 25.1, 0.42, 3.4, [0.18, 0.33, 0.2, 0.07]).air(
         [3.5, 2.9, 2.9, 3.6],
         [3.0, 3.5, 5.5, 5.0],
+        Fog::Dawn,
+    ),
+    // The tropical forest (Terrain's, for the hot, wet corner; Ronald 11-04): Manaus, the central
+    // Amazon (INMET 1991-2020), hot and wet all year, the rains December to May and easing July to
+    // October. Southern, so its months are shifted six: its autumn (March-May, 52 rain days) just
+    // out-rains its summer (December-February, 51.6). Wind and fog are estimates for the forest's
+    // still air: a light wind, dawn mist in the drier months.
+    c("base:tropical_forest", "Manaus, the central Amazon", 27.4, 0.75, 1.0, [0.27, 0.56, 0.57, 0.25]).air(
+        [1.8, 1.5, 1.4, 1.7],
+        [3.0, 1.5, 1.5, 4.0],
         Fog::Dawn,
     ),
     c("base:mountains", "Davos, 1,594 m", 6.0, 0.63, 8.8, [0.32, 0.45, 0.31, 0.29]).air(

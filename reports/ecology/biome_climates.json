@@ -1193,6 +1193,157 @@
   }
  },
  {
+  "biome": "base:tropical_forest",
+  "place": "Manaus, Amazonas, Brazil (the central Amazon rainforest)",
+  "lat": -3.1,
+  "lon": -60.02,
+  "elevation_m": 67,
+  "hemisphere": "south",
+  "koppen": "Am",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 26.6,
+    "t_min": 23.6,
+    "t_max": 31.3,
+    "precip_mm": 305.6,
+    "rain_days": 18.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Feb",
+    "t_mean": 26.6,
+    "t_min": 23.6,
+    "t_max": 31.1,
+    "precip_mm": 296.8,
+    "rain_days": 17.6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Mar",
+    "t_mean": 26.6,
+    "t_min": 23.7,
+    "t_max": 31.2,
+    "precip_mm": 320.9,
+    "rain_days": 19,
+    "snow_cover": 0
+   },
+   {
+    "month": "Apr",
+    "t_mean": 26.7,
+    "t_min": 23.7,
+    "t_max": 31.3,
+    "precip_mm": 331.0,
+    "rain_days": 17.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "May",
+    "t_mean": 27.0,
+    "t_min": 23.9,
+    "t_max": 31.5,
+    "precip_mm": 233.3,
+    "rain_days": 15.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 27.3,
+    "t_min": 23.8,
+    "t_max": 31.9,
+    "precip_mm": 117.2,
+    "rain_days": 10.4,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 27.5,
+    "t_min": 23.7,
+    "t_max": 32.5,
+    "precip_mm": 67.1,
+    "rain_days": 6.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 28.2,
+    "t_min": 24.1,
+    "t_max": 33.6,
+    "precip_mm": 56.1,
+    "rain_days": 5.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 28.6,
+    "t_min": 24.5,
+    "t_max": 34.1,
+    "precip_mm": 79.0,
+    "rain_days": 6.1,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 28.5,
+    "t_min": 24.6,
+    "t_max": 34.0,
+    "precip_mm": 113.9,
+    "rain_days": 8.3,
+    "snow_cover": 0
+   },
+   {
+    "month": "Nov",
+    "t_mean": 28.0,
+    "t_min": 24.4,
+    "t_max": 33.0,
+    "precip_mm": 188.0,
+    "rain_days": 10.3,
+    "snow_cover": 0
+   },
+   {
+    "month": "Dec",
+    "t_mean": 27.2,
+    "t_min": 24.0,
+    "t_max": 32.0,
+    "precip_mm": 253.5,
+    "rain_days": 15.3,
+    "snow_cover": 0
+   }
+  ],
+  "wet_months": [
+   "Jan",
+   "Feb",
+   "Mar",
+   "Apr",
+   "May",
+   "Jun",
+   "Oct",
+   "Nov",
+   "Dec"
+  ],
+  "dry_months": [
+   "Aug"
+  ],
+  "sources": [
+   "https://portal.inmet.gov.br/normais (INMET Normais Climatologicas do Brasil 1991-2020)",
+   "https://en.wikipedia.org/wiki/Manaus (climate box citing INMET 1991-2020)"
+  ],
+  "estimate": false,
+  "notes": "INMET 1991-2020 normals for Manaus, rain_days >=1.0 mm. SOUTHERN HEMISPHERE (3 S): months here are the place's own; shift by six months for the game's calendar. Hot and wet all year: the months' means span 26.6-28.6 C; the rains run December-May (300+ mm a month January-April) and ease July-October (August the driest, 56 mm). Relative humidity 75-86% by month. Added 2026-11-04 for Terrain's tropical forest (Ronald approved it for the hot, wet corner).",
+  "rain_days_threshold": "1.0 mm",
+  "snow_cover_unit": "days in the month with snow lying on the ground (none here)",
+  "summary": {
+   "year_mean_c": 27.4,
+   "half_range_c": 1.0,
+   "precip_year_mm": 2362.4,
+   "rain_days_year": 151.2,
+   "mean_daily_range_c": 8.3,
+   "mean_rh_pct": 81.0,
+   "humidity_implied_by_daily_range": 0.75,
+   "wet_dry_rule": "tropical: wet = month >= 100 mm; dry = P < 2T (Walter-Lieth)"
+  }
+ },
+ {
   "biome": "base:mountains",
   "place": "Davos, Graubuenden, Switzerland (subalpine valley, 1,594 m)",
   "lat": 46.81,
