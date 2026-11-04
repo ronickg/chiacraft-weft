@@ -9,8 +9,8 @@ use weft_sdk::*;
 
 use crate::wild::{self, Body};
 
-pub(crate) static GASTONIA: Entity = Entity::named("gastonia");
-pub(crate) static PINACOSAURUS: Entity = Entity::named("pinacosaurus");
+pub(crate) static GASTONIA: EntityKind = EntityKind::named("gastonia");
+pub(crate) static PINACOSAURUS: EntityKind = EntityKind::named("pinacosaurus");
 
 static BODY: Body = Body {
     model: "ankylosaur",

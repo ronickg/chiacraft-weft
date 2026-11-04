@@ -98,8 +98,8 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&ORDERS, DEFAULT, component_flags::SAVE | component_flags::SYNC_MENU);
     r.entity_component(&SHARED, Tribe::default(), component_flags::SAVE | component_flags::SYNC_MENU);
     r.entity_component(&OWNER_ID, 0u64, 0);
-    r.entity_component(&TRIBE, Tribe::default(), component_flags::SAVE | component_flags::KEEP);
-    r.entity_component(&INVITE, Tribe::default(), component_flags::SAVE | component_flags::KEEP);
+    r.entity_component(&TRIBE, Tribe::default(), component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
+    r.entity_component(&INVITE, Tribe::default(), component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
     r.entity_component(&FIGHT, [0u64; 4], 0);
     for s in &SPECIES {
         r.attach(s.kind, &ORDERS);
@@ -110,7 +110,7 @@ pub fn init(r: &mut Registry) {
         r.attach(&PLAYER, c);
     }
     r.attach(&PLAYER, &FIGHT);
-    r.on(&ENTITY_HURT, |b| {
+    r.on(&actions::HURT, |b| {
         let w = b.world();
         for h in b.iter() {
             hurt(&w, h);
@@ -130,7 +130,7 @@ pub fn init(r: &mut Registry) {
         .permission(permission::EVERYONE);
     r.command("tribeinvite", "<player:targets>", |cmd| {
         let (w, player) = (cmd.world(), cmd.player());
-        let Some(t) = w.component(player, &TRIBE).copied().filter(Tribe::is_some) else {
+        let Some(t) = w.component(player, &TRIBE).filter(Tribe::is_some) else {
             cmd.reply("command.animals.tribe.none", &[]);
             return;
         };
@@ -151,9 +151,9 @@ pub fn owner(w: &World, id: u64) -> Option<u64> {
     let key = w
         .component(id, &OWNER)
         .filter(|k| k[0] != 0)
-        .map(|k| String::from_utf8_lossy(k).into_owned())?;
-    let cached = w.component(id, &OWNER_ID).copied().unwrap_or(0);
-    if cached != 0 && w.entity(cached).is_some() && (w.time() + id) % 40 != 0 {
+        .map(|k| String::from_utf8_lossy(&k).into_owned())?;
+    let cached = w.component(id, &OWNER_ID).unwrap_or(0);
+    if cached != 0 && w.entity(cached).is_some() && (w.game_time() + id) % 40 != 0 {
         return Some(cached);
     }
     let found = w
@@ -171,7 +171,7 @@ pub fn can_command(w: &World, id: u64, player: u64) -> bool {
     if animal::owns(w, id, player) {
         return true;
     }
-    let shared = w.component(id, &SHARED).copied().unwrap_or_default();
+    let shared = w.component(id, &SHARED).unwrap_or_default();
     shared.is_some()
         && w.component(player, &TRIBE)
             .is_some_and(|t| t.id == shared.id)
@@ -182,12 +182,12 @@ fn friend(w: &World, id: u64, other: u64) -> bool {
     if other == id || can_command(w, id, other) {
         return true;
     }
-    let mine = w.component(id, &OWNER).copied().unwrap_or([0; 64]);
-    let theirs = w.component(other, &OWNER).copied().unwrap_or([0; 64]);
+    let mine = w.component(id, &OWNER).unwrap_or([0; 64]);
+    let theirs = w.component(other, &OWNER).unwrap_or([0; 64]);
     if mine[0] != 0 && mine == theirs {
         return true;
     }
-    let shared = w.component(id, &SHARED).copied().unwrap_or_default();
+    let shared = w.component(id, &SHARED).unwrap_or_default();
     shared.is_some()
         && w.component(other, &SHARED)
             .is_some_and(|s| s.id == shared.id)
@@ -204,7 +204,7 @@ pub fn set_command(w: &World, id: u64, c: u8, at: Option<[f64; 3]>) {
         a.command = c;
     }
     if let Some(o) = w.component_mut(id, &ORDERS) {
-        o.home = at.unwrap_or(st.pos);
+        o.home = at.unwrap_or(st.pos.to_array());
         o.target = 0;
     }
 }
@@ -225,7 +225,7 @@ pub fn toggle(w: &World, id: u64, player: u64) -> bool {
     let c = if command(w, id) == FOLLOW { STAY } else { FOLLOW };
     set_command(w, id, c, None);
     if let Some(st) = w.entity(id) {
-        notes(w, st.pos);
+        notes(w, st.pos.to_array());
     }
     true
 }
@@ -237,7 +237,7 @@ pub fn interact(w: &World, id: u64, player: u64) -> bool {
         return false;
     }
     let held = w.inventory(player).get(w.selected_slot(player));
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
     if let Some((_, f)) = a.species().and_then(|s| s.food(held.item)) {
         // A favorite: a grown one falls in love, a young one grows (`breeding.rs`).
         if f.liking == species::Liking::Favorite && crate::breeding::fed(w, id, player) {
@@ -251,7 +251,7 @@ pub fn interact(w: &World, id: u64, player: u64) -> bool {
                 a.bond = a.bond.saturating_add(2).min(100);
             }
             if let Some(st) = w.entity(id) {
-                notes(w, st.pos);
+                notes(w, st.pos.to_array());
             }
         }
         return true;
@@ -272,7 +272,7 @@ fn order_one(w: &World, id: u64, player: u64, order: u32) {
             }
         }
         20 => {
-            let tribe = w.component(player, &TRIBE).copied().unwrap_or_default();
+            let tribe = w.component(player, &TRIBE).unwrap_or_default();
             if let Some(s) = w.component_mut(id, &SHARED) {
                 *s = if s.is_some() || !tribe.is_some() { Tribe::default() } else { tribe };
             }
@@ -289,7 +289,7 @@ fn order_one(w: &World, id: u64, player: u64, order: u32) {
 /// Its owner lets it go: wild again, with its levels (its bond, orders and tribe's share gone,
 /// its saddle dropped beside it). Its genes join the wild ones where it is (`evolution.rs`).
 fn release(w: &World, id: u64) {
-    if w.rider_of(id).is_some() {
+    if crate::riding::rider_of(w, id).is_some() {
         return;
     }
     if let Some(o) = w.component_mut(id, &OWNER) {
@@ -328,22 +328,22 @@ pub fn act(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send + 
         if !animal::tamed(w, id) {
             return false;
         }
-        let Some(mut o) = w.component(id, &ORDERS).copied() else { return false };
+        let Some(mut o) = w.component(id, &ORDERS) else { return false };
         if o.home == [0.0; 3] {
             // Not set yet (a puppy born tame): where it is.
-            o.home = st.pos;
+            o.home = st.pos.to_array();
             if let Some(h) = w.component_mut(id, &ORDERS) {
-                h.home = st.pos;
+                h.home = st.pos.to_array();
             }
         }
         if o.flee > 0 {
             if let Some(o) = w.component_mut(id, &ORDERS) {
                 o.flee = o.flee.saturating_sub(w.tick_elapsed(id) as _);
             }
-            if (w.time() + id) % 20 == 0 {
+            if (w.game_time() + id) % 20 == 0 {
                 let a = w.random_below(628) as f64 / 100.0;
                 crate::wake(w, id, index);
-                w.navigate(id, [st.pos[0] + a.cos() * 8.0, st.pos[1], st.pos[2] + a.sin() * 8.0], 1.6);
+                w.navigate(id, [st.pos.x + a.cos() * 8.0, st.pos.y, st.pos.z + a.sin() * 8.0], 1.6);
             }
             return true;
         }
@@ -356,11 +356,10 @@ pub fn act(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send + 
             FOLLOW => {
                 let Some(p) = owner(w, id).and_then(|p| w.entity(p)) else { return false };
                 let d2 = dist2(p.pos, st.pos);
-                if d2 > 24.0 * 24.0 || (p.pos[1] - st.pos[1]).abs() > 12.0 {
+                if d2 > 24.0 * 24.0 || (p.pos.y - st.pos.y).abs() > 12.0 {
                     // Far behind: there in a moment, beside the owner.
-                    let mut s = *st;
-                    s.pos = [p.pos[0] + 1.0, p.pos[1], p.pos[2] + 1.0];
-                    w.set_entity(id, &s);
+                    w.entity_edit(id)
+                        .pos([p.pos.x + 1.0, p.pos.y, p.pos.z + 1.0]);
                     return true;
                 }
                 let near = o.follow as f64 + 0.5;
@@ -374,7 +373,7 @@ pub fn act(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send + 
             STAY | GUARD => {
                 let leash = if command(w, id) == STAY { 1.5 } else { 4.0 };
                 if dist2(o.home, st.pos) > leash * leash {
-                    if (w.time() + id) % 10 == 0 || !w.navigating(id) {
+                    if (w.game_time() + id) % 10 == 0 || !w.navigating(id) {
                         crate::wake(w, id, index);
                         w.navigate(id, o.home, 1.1);
                     }
@@ -401,7 +400,9 @@ pub fn hold(w: &World, id: u64, st: &EntityState) -> bool {
             true
         }
         _ => {
-            let home = w.component(id, &ORDERS).map_or(st.pos, |o| o.home);
+            let home = w
+                .component(id, &ORDERS)
+                .map_or(st.pos.to_array(), |o| o.home);
             if dist2(home, st.pos) > ROAM * ROAM {
                 w.navigate(id, home, 1.0);
                 return true;
@@ -433,11 +434,11 @@ fn target(w: &World, id: u64, st: &EntityState, o: &Orders, index: usize) -> Opt
     if o.target != 0 {
         set_target(w, id, 0);
     }
-    if (w.time() + id) % 10 != 0 {
+    if (w.game_time() + id) % 10 != 0 {
         return None;
     }
-    let now = w.time();
-    let fight = owner(w, id).and_then(|p| w.component(p, &FIGHT).copied());
+    let now = w.game_time();
+    let fight = owner(w, id).and_then(|p| w.component(p, &FIGHT));
     let mut found = None;
     if let Some([hit, hit_at, by, by_at]) = fight {
         if by != 0 && now.saturating_sub(by_at) < FIGHT_TICKS && worth(by) {
@@ -447,9 +448,9 @@ fn target(w: &World, id: u64, st: &EntityState, o: &Orders, index: usize) -> Opt
         }
     }
     if found.is_none() && (o.stance == AGGRESSIVE || guarding) {
-        let (center, radius) = if guarding { (o.home, o.guard as f64) } else { (st.pos, AGGRO) };
+        let (center, radius) = if guarding { (o.home, o.guard as f64) } else { (st.pos.to_array(), AGGRO) };
         found = w
-            .near(center, radius, None)
+            .entities_near(center, radius, None)
             .into_iter()
             .filter(|&t| w.entity(t).is_some_and(|e| HOSTILE.on_entity(e.kind)) && worth(t))
             .min_by(|&a, &b| {
@@ -483,17 +484,17 @@ pub fn fight_at(w: &World, id: u64, st: &EntityState, t: u64, speed: f32) {
     let Some(e) = w.entity(t) else { return };
     let species = w.component(id, &ANIMAL).and_then(|a| a.species());
     // At least a lunge: the path ends a block and a half short of a target that stands still.
-    let reach = ((st.size[0] + e.size[0]) as f64 / 2.0 + species.map_or(0.8, |s| s.reach) as f64).max(LUNGE);
+    let reach = ((st.size.width + e.size.width) as f64 / 2.0 + species.map_or(0.8, |s| s.reach) as f64).max(LUNGE);
     // Running prey down, a pack bites at its flanks and hindquarters as it runs: a block further.
     let reach = if speed > 1.4 { reach + 1.0 } else { reach };
-    let flat = (e.pos[0] - st.pos[0]).powi(2) + (e.pos[2] - st.pos[2]).powi(2);
-    if flat < reach * reach && (e.pos[1] - st.pos[1]).abs() < 2.0 + st.size[1] as f64 / 2.0 && w.attack(id, t) {
+    let flat = (e.pos.x - st.pos.x).powi(2) + (e.pos.z - st.pos.z).powi(2);
+    if flat < reach * reach && (e.pos.y - st.pos.y).abs() < 2.0 + st.size.height as f64 / 2.0 && w.attack(id, t) {
         let attacks = species.map_or(&[][..], |s| s.attacks);
         if !attacks.is_empty() {
-            w.play_animation(id, attacks[w.random_below(attacks.len() as u32) as usize], false);
+            w.action_play(id, attacks[w.random_below(attacks.len() as u32) as usize], false);
         }
     }
-    if (w.time() + id) % 5 == 0 || !w.navigating(id) {
+    if (w.game_time() + id) % 5 == 0 || !w.navigating(id) {
         w.navigate(id, e.pos, speed);
     }
 }
@@ -501,7 +502,7 @@ pub fn fight_at(w: &World, id: u64, st: &EntityState, t: u64, speed: f32) {
 /// Every hurt: who a player hit and who hit a player (for their tames); a tame hurt runs off
 /// (passive) or fights back.
 fn hurt(w: &World, h: &abi::Hurt) {
-    let now = w.time();
+    let now = w.game_time();
     if h.source != 0
         && let Some(f) = w.component_mut(h.source, &FIGHT)
     {
@@ -537,7 +538,7 @@ fn whistle(w: &World, player: u64, which: usize) {
         .then(|| crate::screen::looked_at_any(w, player, CHASE, |t| !w.component(t, &OWNER).is_some_and(|k| k[0] != 0)))
         .flatten();
     let tames: Vec<u64> = w
-        .near(p.pos, WHISTLE_RANGE, None)
+        .entities_near(p.pos, WHISTLE_RANGE, None)
         .into_iter()
         .filter(|&id| w.component(id, &ANIMAL).is_some() && animal::tamed(w, id) && can_command(w, id, player))
         .collect();
@@ -548,7 +549,7 @@ fn whistle(w: &World, player: u64, which: usize) {
             2 => {
                 // Around the player, not all on one spot.
                 let a = n as f64 * 2.4;
-                set_command(w, id, STAY, Some([p.pos[0] + a.cos() * 1.5, p.pos[1], p.pos[2] + a.sin() * 1.5]));
+                set_command(w, id, STAY, Some([p.pos.x + a.cos() * 1.5, p.pos.y, p.pos.z + a.sin() * 1.5]));
             }
             3 => {
                 let fights = species_of(w, id).is_some_and(|s| s.fights);
@@ -567,7 +568,7 @@ fn whistle(w: &World, player: u64, which: usize) {
             }
         }
         if let Some(st) = w.entity(id) {
-            notes(w, st.pos);
+            notes(w, st.pos.to_array());
         }
     }
 }
@@ -587,7 +588,7 @@ fn notes(w: &World, at: [f64; 3]) {
 /// `/tribe create <name>`, `join` (the one you were invited to), `leave`, `info`.
 fn tribe_command(cmd: &mut ServerCommand) {
     let (w, player) = (cmd.world(), cmd.player());
-    let mine = w.component(player, &TRIBE).copied().unwrap_or_default();
+    let mine = w.component(player, &TRIBE).unwrap_or_default();
     match cmd.text("action").unwrap_or("info") {
         "create" => {
             let name = cmd.text("name").unwrap_or("").trim().to_string();
@@ -609,7 +610,7 @@ fn tribe_command(cmd: &mut ServerCommand) {
             cmd.reply("command.animals.tribe.created", &[Arg::Text(&t.name())]);
         }
         "join" => {
-            let invite = w.component(player, &INVITE).copied().unwrap_or_default();
+            let invite = w.component(player, &INVITE).unwrap_or_default();
             if !invite.is_some() {
                 cmd.reply("command.animals.tribe.no_invite", &[]);
                 return;

@@ -20,11 +20,12 @@ pub fn turned(v: DVec3, yaw: f32) -> DVec3 {
 }
 
 impl Dim {
-    /// Where a rider's feet go in seat `seat` of `mount`, if it has that seat.
+    /// Where a rider's feet go in seat `seat` of `mount`, if it has that seat: scaled with the
+    /// mount (chiacraft, `set_entity_scale`: animals differ in size).
     pub fn seat_pos(&self, c: &Content, mount: u64, seat: u8) -> Option<DVec3> {
         let m = self.entities.get(mount)?;
         let s = c.game.entities[m.kind as usize].seats.get(seat as usize)?;
-        Some(m.pos + turned(s.pos, m.yaw))
+        Some(m.pos + turned(s.pos * m.scale as f64, m.yaw))
     }
 
     /// Who sits in `seat` of `mount`.

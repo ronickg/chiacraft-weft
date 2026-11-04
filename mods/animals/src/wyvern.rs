@@ -12,10 +12,10 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
-pub(crate) static WYVERN: Entity = Entity::named("wyvern");
-const TEXTURE: &str = "wyvern/wyvern";
-/// Its row in `species::SPECIES`.
+use crate::ModelFile;
 
+pub(crate) static WYVERN: EntityKind = EntityKind::named("wyvern");
+const TEXTURE: &str = "wyvern/wyvern";
 /// How near a player can come before a wild one goes for them, in blocks; near its nest, further.
 const TERRITORY: f64 = 14.0;
 const NEST_TERRITORY: f64 = 24.0;
@@ -32,10 +32,10 @@ pub fn init(r: &mut Registry) {
         (animals_core::bodies::of("wyvern").0, animals_core::bodies::of("wyvern").1 * 0.5),
         &[("_rest", "wyvern_rest")],
     );
-    r.entity(&WYVERN)
+    crate::riding::rideable(r.entity(&WYVERN), index, 5.0)
         .size(animals_core::bodies::of("wyvern").0, animals_core::bodies::of("wyvern").1)
-        .health(400.0)
-        .speed(5.0)
+        .max_health(400.0)
+        .walk_speed(5.0)
         .attack_damage(30.0)
         .attack_speed(0.8)
         .passive()
@@ -50,6 +50,7 @@ pub fn init(r: &mut Registry) {
             {
                 crate::commands::interact(&w, id, player);
             }
+            false
         })
         .goals(
             Goals::new()
@@ -88,7 +89,7 @@ fn guard(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     let nest = !w
-        .near(st.pos, NEST_TERRITORY, Some(&crate::eggs::NEST))
+        .entities_near(st.pos, NEST_TERRITORY, Some(&crate::eggs::NEST))
         .is_empty();
     if let Some((p, _)) = ai::nearest_player(w, st, if nest { NEST_TERRITORY } else { TERRITORY }) {
         weft_sdk::info!("wyvern {id} goes for player {p}");
@@ -112,7 +113,7 @@ fn breathe_at_foe(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     };
     let Some(f) = w.entity(foe) else { return false };
-    let d2 = (f.pos[0] - st.pos[0]).powi(2) + (f.pos[2] - st.pos[2]).powi(2);
+    let d2 = (f.pos.x - st.pos.x).powi(2) + (f.pos.z - st.pos.z).powi(2);
     if (25.0..256.0).contains(&d2) {
         crate::breath::start(w, id, foe);
     }

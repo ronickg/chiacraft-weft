@@ -278,7 +278,7 @@ fn ride_step(
         moved = Some((pos, yaw));
     }
     let (pos, yaw) = moved.unwrap_or((m.pos, m.yaw));
-    if let Some(at) = seat_at(c, m.kind, pos, yaw, seat) {
+    if let Some(at) = seat_at(c, m.kind, pos, yaw, m.scale, seat) {
         (player.pos, player.vel, player.on_ground) = (at, DVec3::ZERO, false);
     }
     moved
@@ -293,10 +293,11 @@ struct Drive {
     jump_held: u32,
 }
 
-/// Where a rider's feet go in seat `seat` of a mount of `kind` at `pos` facing `yaw`.
-fn seat_at(c: &crate::content::Content, kind: u32, pos: DVec3, yaw: f32, seat: u8) -> Option<DVec3> {
+/// Where a rider's feet go in seat `seat` of a mount of `kind` at `pos` facing `yaw`, `scale`
+/// times its kind's size (chiacraft).
+fn seat_at(c: &crate::content::Content, kind: u32, pos: DVec3, yaw: f32, scale: f32, seat: u8) -> Option<DVec3> {
     let s = c.game.entities[kind as usize].seats.get(seat as usize)?;
-    Some(pos + crate::server::riding::turned(s.pos, yaw))
+    Some(pos + crate::server::riding::turned(s.pos * scale as f64, yaw))
 }
 
 /// `u32` and `f32` values of an engine field component (`registry::HEALTH` ...).
@@ -1734,7 +1735,7 @@ impl Client {
                 let Some(at) = self
                     .entities
                     .get(&mount)
-                    .and_then(|m| seat_at(c, m.kind, m.pos, m.yaw, seat))
+                    .and_then(|m| seat_at(c, m.kind, m.pos, m.yaw, m.scale, seat))
                 else {
                     continue;
                 };

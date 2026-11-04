@@ -45,28 +45,28 @@ pub fn init(r: &mut Registry) {
         r.attach(s.kind, &WARY);
     }
     // A kill feeds the hunter that made it, by the prey's mass against its own.
-    r.on(&ENTITY_DIED, |b| {
+    r.on(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
-            let Some(a) = w.component(d.killer, &ANIMAL).copied() else { continue };
+            let Some(a) = w.component(d.source, &ANIMAL) else { continue };
             let Some(s) = a.species().filter(|s| s.hunts()) else { continue };
             // The prey's own mass if it can still be read (its genes and growth), its kind's if not.
             let prey = mass(&w, d.entity).or_else(|| kind_mass(d.kind, None));
-            let (Some(own), Some(prey)) = (mass(&w, d.killer), prey) else { continue };
+            let (Some(own), Some(prey)) = (mass(&w, d.source), prey) else { continue };
             let max = a.stat(species::FOOD);
             let meal = (max * animals_core::needs::fills(own, prey))
                 .round()
                 .max(1.0) as u16;
-            animal::feed(&w, d.killer, meal);
+            animal::feed(&w, d.source, meal);
             weft_sdk::info!(
                 "{} {} eats its kill ({:.1} kg of {}): food {} of {max:.0}",
                 s.name,
-                d.killer,
+                d.source,
                 prey,
                 name_of(abi::entry_kind::ENTITY, d.kind),
                 a.food.saturating_add(meal).min(max as u16)
             );
-            w.component_mut(d.killer, &HUNT).map(|h| *h = [0; 4]);
+            w.component_mut(d.source, &HUNT).map(|h| *h = [0; 4]);
         }
     });
 }
@@ -150,9 +150,9 @@ fn family(w: &World, id: u64) -> Option<&'static str> {
 /// A goal for wild hunters: hungry, it goes after the nearest prey it can take; it takes the turn
 /// while it chases (a knock-out kind fights through its anger, `knockout::behave`).
 pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
+    let Some(a) = w.component(id, &ANIMAL) else { return false };
     let Some(s) = a.species().filter(|s| s.hunts()) else { return false };
-    let Some(mut h) = w.component(id, &HUNT).copied() else { return false };
+    let Some(mut h) = w.component(id, &HUNT) else { return false };
     let full = a.food as f32 / a.stat(species::FOOD).max(1.0);
     if animal::tamed(w, id) || full >= FULL || (h[0] == 0 && full >= HUNGRY) {
         if h[0] != 0 {
@@ -160,7 +160,7 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
         }
         return false;
     }
-    let now = w.time();
+    let now = w.game_time();
     let knockout = w.component(id, &crate::knockout::KNOCKOUT).is_some();
     if h[0] != 0 {
         let alive = w
@@ -192,7 +192,7 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     h[2] = now + LOOK_EVERY;
     // Food lying near (a carcass, dropped meat) is a meal without a chase: it eats that first
     // (`forage.rs`).
-    if crate::forage::ground_food(w, s, st.pos, crate::forage::ITEM_LOOK).is_some() {
+    if crate::forage::ground_food(w, s, st.pos.to_array(), crate::forage::ITEM_LOOK).is_some() {
         w.component_mut(id, &HUNT).map(|c| *c = h);
         return false;
     }
@@ -200,7 +200,7 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     // A pack's kind with others of it near hunts together: bigger prey (`Species::takes_with`).
     let pack = if s.pack_prey().is_some() { pack_near(w, id, st) } else { 1 };
     let prey = w
-        .near_bodies(st.pos, LOOK * base_api::sight(w, st.pos) as f64)
+        .targets_near(st.pos, LOOK * base_api::sight(w, st.pos.to_array()) as f64, None)
         .into_iter()
         .filter(|&t| t != id && family(w, t) != Some(s.family.name) && !owned_egg(w, t))
         .filter_map(|t| Some((t, w.entity(t)?, mass(w, t)?)))
@@ -234,7 +234,7 @@ const PACK_RANGE: f64 = 16.0;
 /// How many wild ones of `id`'s kind are near it, itself among them.
 fn pack_near(w: &World, id: u64, st: &EntityState) -> u32 {
     let kind = w.entity(id).map(|e| e.kind);
-    w.near(st.pos, PACK_RANGE, None)
+    w.entities_near(st.pos, PACK_RANGE, None)
         .into_iter()
         .filter(|&o| o == id || (w.entity(o).map(|e| e.kind) == kind && !animal::tamed(w, o)))
         .count() as u32
@@ -244,7 +244,7 @@ fn pack_near(w: &World, id: u64, st: &EntityState) -> u32 {
 /// too, so it isn't one wolf against a red deer.
 fn rally(w: &World, id: u64, st: &EntityState, target: u64, now: u64) {
     let kind = w.entity(id).map(|e| e.kind);
-    for o in w.near(st.pos, PACK_RANGE, None) {
+    for o in w.entities_near(st.pos, PACK_RANGE, None) {
         if o == id || w.entity(o).map(|e| e.kind) != kind || animal::tamed(w, o) {
             continue;
         }
@@ -262,8 +262,8 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     if animal::tamed(w, id) {
         return false;
     }
-    let now = w.time();
-    if w.component(id, &WARY).is_some_and(|&until| now < until) {
+    let now = w.game_time();
+    if w.component(id, &WARY).is_some_and(|until| now < until) {
         return true;
     }
     if (now + id) % 10 != 0 {
@@ -272,7 +272,7 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(me) = mass(w, id) else { return false };
     let mine = family(w, id);
     let hunter = w
-        .near_bodies(st.pos, WATCH * base_api::sight(w, st.pos) as f64)
+        .targets_near(st.pos, WATCH * base_api::sight(w, st.pos.to_array()) as f64, None)
         .into_iter()
         .filter(|&t| t != id && family(w, t) != mine && !animal::tamed(w, t))
         .filter_map(|t| {
@@ -282,9 +282,9 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
         })
         .min_by(|a, b| dist2(a.pos, st.pos).total_cmp(&dist2(b.pos, st.pos)));
     let Some(h) = hunter else { return false };
-    let (x, z) = (st.pos[0] - h.pos[0], st.pos[2] - h.pos[2]);
+    let (x, z) = (st.pos.x - h.pos.x, st.pos.z - h.pos.z);
     let n = (x * x + z * z).sqrt().max(0.01);
-    w.navigate(id, [st.pos[0] + x / n * 10.0, st.pos[1], st.pos[2] + z / n * 10.0], 1.6);
+    w.navigate(id, [st.pos.x + x / n * 10.0, st.pos.y, st.pos.z + z / n * 10.0], 1.6);
     w.component_mut(id, &WARY).map(|u| *u = now + RUN);
     true
 }

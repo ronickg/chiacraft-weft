@@ -14,11 +14,11 @@ use std::ops::Deref;
 
 use animals_core::species as data;
 pub use animals_core::species::*;
-use weft_sdk::Entity;
+use weft_sdk::EntityKind;
 
 /// A species' row (`animals_core::species::Species`, through `Deref`) with its entity kind.
 pub struct Species {
-    pub kind: &'static Entity,
+    pub kind: &'static EntityKind,
     data: &'static data::Species,
 }
 
@@ -93,7 +93,7 @@ impl Species {
 
 /// The row in `SPECIES` of the species whose entity kind is `kind` (each creature's code finds its
 /// own by its kind, never by a number kept by hand: Research round 5, item 7).
-pub fn of(kind: &Entity) -> usize {
+pub fn of(kind: &EntityKind) -> usize {
     SPECIES
         .iter()
         .position(|s| std::ptr::eq(s.kind, kind))

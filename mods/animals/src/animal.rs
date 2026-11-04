@@ -125,7 +125,7 @@ pub fn init(r: &mut Registry) {
     // An animal hits as hard as its damage stat.
     r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
         if let Some(a) = m.world().component(m.query().entity, &ANIMAL) {
-            m.value *= (a.factor(species::DAMAGE) * crate::comfort::condition(a)) as f64;
+            m.value *= (a.factor(species::DAMAGE) * crate::comfort::condition(&a)) as f64;
         }
     });
 }
@@ -151,14 +151,14 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         let Some(a) = w.component_mut(id, &ANIMAL) else { return false };
         let new = a.species == 0;
         if new {
-            first_roll(w, id, index, a, st.pos);
+            first_roll(w, id, index, a, st.pos.to_array());
         }
-        let away = if a.seen == 0 { 0 } else { life::age(w.time(), a.seen) };
-        a.seen = life::birth(w.time(), 0);
+        let away = if a.seen == 0 { 0 } else { life::age(w.game_time(), a.seen) };
+        a.seen = life::birth(w.game_time(), 0);
         if !new && away > life::AWAY {
-            catch_up(w, id, index, a, away, st.pos);
+            catch_up(w, id, index, a, away, st.pos.to_array());
         }
-        crate::coats::upkeep(w, id, index, a, st.pos);
+        crate::coats::upkeep(w, id, index, a, st.pos.to_array());
         crate::breeding::upkeep(w, id, index, a);
         if old_age(w, id, index, a) {
             return false;
@@ -168,7 +168,7 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         // loading: set it again).
         if let Some(g) = crate::coats::size_of(w, id) {
             let size = g * crate::breeding::growth(w, id, index);
-            if w.component(id, &SCALED).is_some_and(|&s| s != size) {
+            if w.component(id, &SCALED).is_some_and(|s| s != size) {
                 w.set_scale(id, size);
                 if let Some(s) = w.component_mut(id, &SCALED) {
                     *s = size;
@@ -180,7 +180,7 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         // (`forage.rs`), a hunter with prey at home hunts (`hunt.rs`); both drink (`drink.rs`).
         // Far from players it rests and ticks seldom, and catches up the seconds that passed
         // (`life::seconds_due`).
-        if !new && let Some(secs) = life::seconds_due(w.time(), id, w.tick_elapsed(id)) {
+        if !new && let Some(secs) = life::seconds_due(w.game_time(), id, w.tick_elapsed(id)) {
             let rate = crate::comfort::upkeep(w, id, &a, st, secs);
             if tamed(w, id) || a.species().is_some_and(|s| s.hungry_in_the_wild()) {
                 hunger(w, id, &a, rate, secs);
@@ -189,7 +189,7 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         }
         let (health, speed) = factors(w, id, &a);
         if w.component(id, &APPLIED)
-            .is_some_and(|&p| p != [health, speed])
+            .is_some_and(|p| p != [health, speed])
         {
             apply(w, id, st, health, speed, if new { f32::MAX } else { 0.0 });
         }
@@ -213,9 +213,9 @@ pub fn ensure_rolled(w: &World, id: u64) -> bool {
     let Some(a) = w.component_mut(id, &ANIMAL) else { return false };
     if a.species == 0 {
         weft_sdk::warn!("animal {id} ({}) reached before its first upkeep: rolled now", SPECIES[index].name);
-        first_roll(w, id, index, a, st.pos);
-        a.seen = life::birth(w.time(), 0);
-        crate::coats::upkeep(w, id, index, a, st.pos);
+        first_roll(w, id, index, a, st.pos.to_array());
+        a.seen = life::birth(w.game_time(), 0);
+        crate::coats::upkeep(w, id, index, a, st.pos.to_array());
         // Its stats on the entity at once, and full, as a new one in `upkeep` (shown at once, it
         // read "8 / 15": the kind's base health under its rolled maximum, PC run b2_roll).
         let a = *a;
@@ -270,7 +270,7 @@ fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
         // Born this season, up to most of the way grown.
         let age = s.growth() as u64 * w.random_below(80) as u64 / 100;
         let growing = (s.growth() as u64 - age) as u32;
-        a.born = life::birth(w.time(), age);
+        a.born = life::birth(w.game_time(), age);
         a.stage = life::stage(s, growing, BABY);
         if let Some(b) = w.component_mut(id, &crate::breeding::BREEDING) {
             b.growing = growing;
@@ -290,7 +290,7 @@ fn catch_up(w: &World, id: u64, index: usize, a: &mut Animal, away: u64, pos: [f
     crate::breeding::catch_up(w, id, away);
     let s = &SPECIES[index];
     let Some(seed) = w.component(id, &crate::coats::GENOME).map(|g| g.seed) else { return };
-    if tamed(w, id) || life::age(w.time(), a.born) < life::lifespan(s, seed) {
+    if tamed(w, id) || life::age(w.game_time(), a.born) < life::lifespan(s, seed) {
         return;
     }
     let Some(pool) = crate::evolution::pool_at(w, index, pos) else { return };
@@ -301,8 +301,8 @@ fn catch_up(w: &World, id: u64, index: usize, a: &mut Animal, away: u64, pos: [f
     let growing = (s.growth() as u64).saturating_sub(age) as u32;
     *a = roll(w, index);
     a.female = g.female;
-    a.born = life::birth(w.time(), age);
-    a.seen = life::birth(w.time(), 0);
+    a.born = life::birth(w.game_time(), age);
+    a.seen = life::birth(w.game_time(), 0);
     a.stage = life::stage(s, growing, BABY);
     g.stage = a.stage;
     if let Some(old) = w.component_mut(id, &crate::coats::GENOME) {
@@ -324,7 +324,7 @@ fn catch_up(w: &World, id: u64, index: usize, a: &mut Animal, away: u64, pos: [f
 /// When a wild one met now was born: grown, and up to most of an average life ago.
 fn born_wild(w: &World, index: usize) -> u64 {
     let age = life::wild_age(&SPECIES[index], w.random_below(10_000) as f32 / 10_000.0);
-    life::birth(w.time(), age)
+    life::birth(w.game_time(), age)
 }
 
 /// Its age (`notes/ANIMALS.md`, "Old age"): one from before animals aged gets one; a grown one
@@ -336,7 +336,7 @@ fn old_age(w: &World, id: u64, index: usize, a: &mut Animal) -> bool {
         let growing = w
             .component(id, &crate::breeding::BREEDING)
             .map_or(0, |b| b.growing) as u64;
-        a.born = if growing > 0 { life::birth(w.time(), s.growth() as u64 - growing) } else { born_wild(w, index) };
+        a.born = if growing > 0 { life::birth(w.game_time(), s.growth() as u64 - growing) } else { born_wild(w, index) };
     }
     // Sped up for testing (`/animal speed`): older by the extra ticks too.
     let n = crate::breeding::speed() as u64;
@@ -344,7 +344,7 @@ fn old_age(w: &World, id: u64, index: usize, a: &mut Animal) -> bool {
         a.born = a.born.saturating_sub(n - 1).max(1);
     }
     let Some(seed) = w.component(id, &crate::coats::GENOME).map(|g| g.seed) else { return false };
-    let (age, span) = (life::age(w.time(), a.born), life::lifespan(s, seed));
+    let (age, span) = (life::age(w.game_time(), a.born), life::lifespan(s, seed));
     a.stage = life::aged(a.stage, age, span);
     a.age = (age / life::DAY).min(u16::MAX as u64) as u16;
     let growing = w
@@ -359,7 +359,7 @@ fn old_age(w: &World, id: u64, index: usize, a: &mut Animal) -> bool {
     crate::breeding::count(&crate::breeding::OLD, index);
     weft_sdk::info!("animal {id} ({}) died of old age, {} days old", s.name, age / life::DAY);
     // Bypassing armor and leaving no scar: nothing hit it.
-    w.damage(id, 1e9, 0, damage::VOID);
+    w.damage(id, 1e9, 0, damage_cause::VOID);
     true
 }
 
@@ -377,18 +377,16 @@ fn factors(w: &World, id: u64, a: &Animal) -> (f32, f32) {
 /// Max health and speed as the stats say; `heal` adds that much health on top (a new animal
 /// starts full).
 fn apply(w: &World, id: u64, st: &EntityState, health: f32, speed: f32, heal: f32) {
-    w.add_modifier(id, &attribute::MAX_HEALTH, "animals:stats", attr_op::MUL_BASE, health as f64 - 1.0, 0);
-    w.add_modifier(id, &attribute::MOVEMENT_SPEED, "animals:stats", attr_op::MUL_BASE, speed as f64 - 1.0, 0);
+    w.attribute_add_modifier(id, &attribute::MAX_HEALTH, "animals:stats", attr_op::MULTIPLY_BASE, health as f64 - 1.0, 0);
+    w.attribute_add_modifier(id, &attribute::MOVEMENT_SPEED, "animals:stats", attr_op::MULTIPLY_BASE, speed as f64 - 1.0, 0);
     if let Some(p) = w.component_mut(id, &APPLIED) {
         *p = [health, speed];
     }
     if heal > 0.0
         && let Some(a) = w.component(id, &ANIMAL)
     {
-        let mut s = *st;
-        s.max_health = a.stat(species::HEALTH) * crate::comfort::condition(&a);
-        s.health = (st.health + heal).min(s.max_health);
-        w.set_entity(id, &s);
+        let max = a.stat(species::HEALTH) * crate::comfort::condition(&a);
+        w.entity_edit(id).health((st.health + heal).min(max));
     }
 }
 
@@ -401,12 +399,12 @@ fn hunger(w: &World, id: u64, a: &Animal, rate: f32, secs: f32) {
     // its condition falls instead).
     if a.food == 0 && !tamed(w, id) {
         if let Some(st) = w.entity(id) {
-            w.damage(id, st.max_health / STARVES_SECS * secs, 0, damage::STARVE);
+            w.damage(id, st.max_health / STARVES_SECS * secs, 0, damage_cause::STARVE);
         }
         return;
     }
     let every = ((s.hunger / rate).max(1.0) as u64).max(1);
-    let used = life::steps_in(w.time(), secs, every).min(u16::MAX as u64) as u16;
+    let used = life::steps_in(w.game_time(), secs, every).min(u16::MAX as u64) as u16;
     if a.food > 0
         && used > 0
         && let Some(a) = w.component_mut(id, &ANIMAL)

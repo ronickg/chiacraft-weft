@@ -64,7 +64,7 @@ pub fn init(r: &mut Registry) {
         .textures("red_sandstone_top", "red_sandstone_side", "red_sandstone_bottom")
         .hardness(0.8)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tab(&BUILDING);
     for plant in [&FERN, &HORSETAIL] {
         r.block(plant)
@@ -120,7 +120,7 @@ pub fn init(r: &mut Registry) {
                 .pool(Pool::new().entry(Entry::item(p.block)))
                 .pool(Pool::new().when(Cond::Chance(0.5)).item(seed));
             r.item(Item::generated(seed.into()))
-                .placed_block(block)
+                .places(block)
                 .tab(&NATURAL);
         }
     }
@@ -218,17 +218,17 @@ pub fn init(r: &mut Registry) {
         .day_length(24000)
         .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::WET_AND_DRY_SWING)
         .set(&base_api::SEASONS, base_api::calendars::WET_AND_DRY)
-        .weather();
+        .weathers(&[&weathers::RAIN, &weathers::THUNDER]);
     r.sky_stars(&CRETACEOUS, &STARS).count(1500);
     r.sky_clouds(&CRETACEOUS, &CLOUDS).texture("base:clouds");
     r.sky_body(&CRETACEOUS, &SUN)
         .texture("base:sun")
-        .additive()
+        .blend_add()
         .size(33.0)
         .glow(0xFFE633);
     r.sky_body(&CRETACEOUS, &MOON)
         .texture("base:moon_phases")
-        .additive()
+        .blend_add()
         .frames(4, 2)
         .size(23.0)
         .phase(0.5);
@@ -285,7 +285,7 @@ pub fn init(r: &mut Registry) {
     .biome(BiomeRule::new("scrubland"))
     .biome(BiomeRule::new("fern_forest"));
 
-    r.decorate(ferns).dimension(&CRETACEOUS);
+    r.decoration(ferns).dimension(&CRETACEOUS);
 }
 
 /// The Cretaceous's trees (`reports/ecology/Cretaceous food webs.md`), which base's worldgen grows
@@ -330,7 +330,7 @@ fn woods(r: &mut Registry) {
             .placement(|p, props| {
                 props.set(
                     "axis",
-                    match p.face() {
+                    match p.face().face() {
                         0 | 1 => "x",
                         4 | 5 => "z",
                         _ => "y",
@@ -346,7 +346,7 @@ fn woods(r: &mut Registry) {
             .cutout()
             // Faces between two leaves of one kind aren't drawn, as base's (`blocks.rs`).
             .cull_same()
-            .opacity(1)
+            .light_opacity(1)
             .tint(base_api::trees::leaf_tint(vitals::wild::turn(&format!("animals:{wood}_leaves"))))
             .tag("leaves")
             .mineable("shears")
@@ -369,16 +369,16 @@ fn woods(r: &mut Registry) {
                 .texture(&format!("sapling_{wood}"))
                 .plant()
                 .needs_below("#plant_soil")
-                .growth(base_api::grow::step_secs(plant, 1, 470.0), 9)
+                .grows(base_api::grow::step_secs(plant, 1, 470.0), 9)
                 .on_grow(move |e| match base_api::grow::step(e, plant, false) {
                     base_api::grow::Step::Grow => {
                         if let Some(id) = Block::lookup(log) {
-                            base_api::trees::grow_tree(e.world(), e.pos(), id);
+                            base_api::trees::grow_tree(e.world(), e.pos().to_array(), id);
                         }
                     }
                     // A frost kills a sapling of the warm Cretaceous.
                     base_api::grow::Step::Frost => {
-                        e.world().set(e.pos(), 0);
+                        e.world().set_block(e.pos(), 0);
                     }
                     base_api::grow::Step::Rest => {}
                 })
@@ -392,7 +392,7 @@ fn woods(r: &mut Registry) {
 fn ferns(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
     let seed = g.seed();
-    let [ox, oy, oz] = g.origin();
+    let [ox, oy, oz] = g.origin().to_array();
     for z in 0..16usize {
         for x in 0..16usize {
             let col = &cols[z * 16 + x];
