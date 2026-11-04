@@ -39,6 +39,17 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:cooked_egg | meat | 100 | 10 | 14 | 1 | 15 | 0 | 70 | 16 min | 2 + 2 | hot when cooked |
 | base:apple_pie | fruit | 200 | 20 | 5 | 74 | 25 | 4 | 104 | 25 min | 4 + 4 | hot when cooked |
 | base:berries | fruit | 100 | 10 | 1 | 14 | 0 | 3 | 84 | 5 min | 6 + 6 | cooling |
+| base:lingonberries | fruit | 100 | 10 | 0 | 12 | 0 | 5 | 87 | 5 min | 20 + 20 | cooling |
+| base:cloudberries | fruit | 100 | 10 | 2 | 9 | 1 | 16 | 85 | 6 min | 3 + 3 | cooling |
+| base:crowberries | fruit | 100 | 10 | 1 | 7 | 1 | 5 | 85 | 6 min | 10 + 10 | cooling |
+| base:raspberries | fruit | 100 | 10 | 1 | 12 | 1 | 9 | 86 | 5 min | 2 + 2 | cooling |
+| base:prickly_pear_fruit | fruit | 100 | 10 | 1 | 10 | 0 | 5 | 88 | 5 min | 7 + 7 | cooling |
+| base:rose_hip | fruit | 30 | 3 | 0 | 11 | 0 | 20 | 18 | 2 min | 30 + 30 | cooling |
+| base:hazelnut | seeds | 30 | 3 | 4 | 5 | 18 | 3 | 2 | 10 min | 60 + 60 |  |
+| base:pine_nut | seeds | 30 | 3 | 4 | 4 | 21 | 1 | 1 | 11 min | 60 + 60 |  |
+| base:sunflower_seeds | seeds | 30 | 3 | 6 | 6 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
+| base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
+| base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
 | animals:kibble | meat | 100 | 10 | 25 | 45 | 14 | 4 | 10 | 19 min | 90 + 90 |  |
 
 ## Effects
@@ -124,6 +135,47 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:cactus | saguaro | 10, 25-40, 50 | Dry | -7 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:sapling | oak | 5, 18-28, 38 | Moderate | hardy | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:grazed_grass | prairie grass | 5, 15-30, 40 | Moderate | hardy | 18 | 7 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
+| base:sedge | sedges | -1, 8-22, 32 | Moderate | hardy | 18 | 7 | plains (sp su au), forest (sp su au), birch_forest (su au), taiga (su), snowy_plains (su), savanna (au), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au wi) |
+| base:cottongrass | cottongrass (Eriophorum) | -2, 6-16, 25 | Moderate | hardy | 18 | 7 | plains (sp au), forest (sp su au wi), birch_forest (su au), taiga (su), snowy_plains (su), mountains (sp su au), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
+| base:reindeer_lichen | reindeer lichen (Cladonia) | 0, 5-15, 25 | Dry | hardy | 3650 | 301 | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (su au), snowy_plains (su), mountains (sp su au), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (au wi), fern_forest (sp su au), crags (sp au wi) |
+| base:clover | white clover | 5, 18-25, 32 | Moderate | hardy | 30 | 10 | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (au), fern_forest (su au), crags (su au) |
+| base:lingonberry_bush | lingonberry | 5, 12-20, 28 | Moderate | -3 °C | 75 | 20 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
+| base:cloudberry_bush | cloudberry | 0, 8-16, 25 | Wet | -2 °C | 45 | 14 | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (su), snowy_plains (su), desert (wi), mountains (sp su au), ocean (sp su au wi), beach (sp au wi), red_dunes (sp au wi*), scrubland (sp au wi), floodplain (sp au wi), fern_forest (sp su au), crags (sp au wi) |
+| base:crowberry_bush | crowberry | -1, 6-15, 25 | Moderate | hardy | 60 | 17 | plains (sp au), forest (sp su au wi), birch_forest (su au), taiga (su), snowy_plains (su), mountains (su au), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
+| base:hazel_bush | hazel | 5, 16-24, 32 | Moderate | hardy | 180 | 37 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (su au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), floodplain (au), fern_forest (su au), crags (su au) |
+| base:bramble_bush | raspberry and blackberry | 5, 16-25, 32 | Moderate | -2 °C | 60 | 17 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (au), fern_forest (su au), crags (su au) |
+| base:prickly_pear | prickly pear (Opuntia) | 10, 20-35, 45 | Dry | -10 °C | 90 | 23 | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), ocean (sp su au wi), beach (sp su au), red_dunes (sp su), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su au) |
+| base:wild_sunflower | wild sunflower | 6, 20-28, 38 | Dry | -2 °C | 125 | 28 | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
+| base:wild_rice | wild rice (Oryza latifolia) | 12, 25-32, 38 | Wet | 0 °C | 150 | 32 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
+| base:mushroom_brown | forest mushrooms | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
+| base:mushroom_red | fly agaric | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
+| base:water_hyacinth | water hyacinth | 12, 25-30, 38 | Wet | -1 °C | 10 | 5 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
+
+## Wild plants
+
+What the world grows besides grass and trees (`vitals::wild`): how each grows, the ground it stands on, what picking it gives, and the biomes it covers that share of its ground in.
+
+| block | grows | ground | gives | cover | found in |
+|---|---|---|---|---|---|
+| base:sedge | Tuft | Soil | - | 12.0% | snowy_plains, taiga, swamp |
+| base:cottongrass | Tuft | Soil | - | 8.0% | snowy_plains, taiga |
+| base:reindeer_lichen | Tuft | Soil | - | 5.0% | snowy_plains, taiga, mountains |
+| base:clover | Tuft | Soil | - | 3.0% | plains, forest, birch_forest, mountains |
+| base:lingonberry_bush | Bush | Soil | base:lingonberries | 1.0% | taiga, birch_forest, mountains |
+| base:cloudberry_bush | Bush | Soil | base:cloudberries | 0.6% | snowy_plains, taiga |
+| base:crowberry_bush | Bush | Soil | base:crowberries | 1.2% | snowy_plains, taiga, mountains |
+| base:hazel_bush | Bush | Soil | base:hazelnut | 0.6% | forest, birch_forest, plains |
+| base:bramble_bush | Bush | Soil | base:raspberries | 0.6% | forest, birch_forest, plains, taiga, mountains |
+| base:prickly_pear | Ripens | Sand | base:prickly_pear_fruit | 1.0% | desert |
+| base:wild_sunflower | Ripens | Soil | base:sunflower_seeds | 1.0% | plains |
+| base:wild_rice | Ripens | Shore | base:rice | 10.0% | swamp, savanna |
+| base:mushroom_brown | Spreads | Soil | base:mushroom_brown | 0.6% | forest, birch_forest, taiga, mountains |
+| base:mushroom_red | Spreads | Soil | base:mushroom_red | 0.3% | forest, birch_forest, taiga |
+| base:water_hyacinth | Spreads | Water | - | 8.0% | swamp, savanna |
+| base:cattail | Still | Shore | - | 10.0% | swamp, plains, forest, taiga, savanna |
+| animals:cycad | Still | Soil | animals:cycad_seed | 1.0% | red_dunes, scrubland, floodplain, fern_forest, crags |
+| animals:flowering_shrub | Still | Soil | - | 2.0% | floodplain, scrubland |
+| animals:water_lily | Still | Water | - | 6.0% | floodplain, red_dunes |
 
 ## Food in the world
 
@@ -162,6 +214,29 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | base:snowy_grass | insects | 2 | stays | always there in base:snowy_plains (summer), worth 40% of fresh growth |
 | base:sugar_cane | water_plants | 4 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:beach (all year), worth 40% of fresh growth |
 | animals:horsetail | water_plants | 4 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
+| base:sedge (age 1) | grass | 8 | back to age 0 | base:sedge |
+| base:cottongrass (age 1) | grass | 6 | back to age 0 | base:cottongrass |
+| base:reindeer_lichen (age 1) | lichen | 6 | back to age 0 | base:reindeer_lichen |
+| base:clover (age 1) | leaves | 8 | back to age 0 | base:clover |
+| base:lingonberry_bush (age 3) | fruit | 6 | back to age 1 | base:lingonberry_bush |
+| base:cloudberry_bush (age 3) | fruit | 6 | back to age 1 | base:cloudberry_bush |
+| base:crowberry_bush (age 3) | fruit | 6 | back to age 1 | base:crowberry_bush |
+| base:hazel_bush (age 3) | seeds | 8 | back to age 1 | base:hazel_bush |
+| base:bramble_bush (age 3) | fruit | 8 | back to age 1 | base:bramble_bush |
+| base:prickly_pear (age 1) | fruit | 6 | back to age 0 | base:prickly_pear |
+| base:wild_sunflower (age 1) | seeds | 6 | back to age 0 | base:wild_sunflower |
+| base:wild_rice (age 1) | seeds | 6 | back to age 0 | base:wild_rice |
+| base:prickly_pear | leaves | 4 | stays | always there in base:desert (all year), worth 40% of fresh growth |
+| base:wild_rice | grass | 4 | stays | always there in base:swamp, base:savanna (spring, summer, autumn), worth 40% of fresh growth |
+| base:crowberry_bush | fruit | 2 | stays | always there in base:snowy_plains, base:taiga, base:mountains (winter), worth 40% of fresh growth |
+| base:lingonberry_bush | fruit | 2 | stays | always there in base:taiga, base:birch_forest, base:mountains (winter), worth 40% of fresh growth |
+| base:mushroom_brown | fungi | 5 | stays | always there in base:forest, base:birch_forest, base:taiga, base:mountains (summer, autumn), worth 40% of fresh growth |
+| base:water_hyacinth | water_plants | 6 | stays | always there in base:swamp, base:savanna (all year), worth 40% of fresh growth |
+| base:cattail | water_plants | 5 | stays | always there in base:swamp, base:plains, base:forest, base:taiga, base:savanna (spring, summer, autumn), worth 40% of fresh growth |
+| animals:cycad | leaves | 3 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
+| animals:cycad | seeds | 3 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (summer, autumn), worth 40% of fresh growth |
+| animals:flowering_shrub | leaves | 4 | stays | always there in animals:floodplain, animals:scrubland (spring, summer, autumn), worth 40% of fresh growth |
+| animals:water_lily | water_plants | 5 | stays | always there in animals:floodplain, animals:red_dunes (all year), worth 40% of fresh growth |
 
 On the ground, animals eat dropped food of their diet one item a mouthful: every food (the foods table, by its kind and portion) and these seeds; spoiled food only carrion eaters. An item fills an animal by its weight against a meal of a tenth of the animal's mass (`animals_core::needs`).
 
@@ -169,6 +244,9 @@ On the ground, animals eat dropped food of their diet one item a mouthful: every
 |---|---|---|
 | base:wheat_seeds | seeds | 10 |
 | base:wheat | seeds | 50 |
+| base:acorn | seeds | 20 |
+| base:rice | seeds | 30 |
+| animals:cycad_seed | seeds | 20 |
 
 ## Soil and compost
 

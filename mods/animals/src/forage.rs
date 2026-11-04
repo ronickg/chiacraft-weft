@@ -92,7 +92,8 @@ pub fn season_lush(w: &World, s: &animals_core::species::Species, pos: [i32; 3])
 /// one that doesn't forage.
 pub fn lush(w: &World, s: &Species, pos: [i32; 3]) -> f32 {
     let g = base_api::ground_at(w, pos);
-    vitals::forage::lushness(|c| s.eats(c), g.mean_air, g.soil).unwrap_or(1.0)
+    let biome = name_of(abi::entry_kind::BIOME, w.biome(pos));
+    vitals::forage::lushness(|c| s.eats(c), biome, g.mean_air, g.soil).unwrap_or(1.0)
 }
 
 /// Whether it is foraging or drinking (a resting animal settles only when it isn't: hungry or
