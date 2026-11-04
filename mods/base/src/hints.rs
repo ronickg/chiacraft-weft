@@ -15,7 +15,8 @@ use vitals::effects::Effect;
 use weft_sdk::*;
 
 /// The hints, by their bit in `SEEN`: `hint.base.<name>` in the lang files.
-const HINTS: [&str; 11] = ["logs", "table", "night", "cold", "freezing", "wet", "empty", "raw_meat", "grave", "hot", "rest"];
+const HINTS: [&str; 14] =
+    ["logs", "table", "night", "cold", "freezing", "wet", "empty", "raw_meat", "grave", "hot", "rest", "knap", "flake", "lash"];
 const LOGS: u32 = 0;
 const TABLE: u32 = 1;
 const NIGHT: u32 = 2;
@@ -27,9 +28,13 @@ const RAW_MEAT: u32 = 7;
 const GRAVE_AT: u32 = 8;
 const HOT: u32 = 9;
 const REST: u32 = 10;
+/// The first hours (`first.rs`): a rock and flint in the bag, a sharp flake, an axe head.
+const KNAP: u32 = 11;
+const FLAKE: u32 = 12;
+const LASH: u32 = 13;
 
-/// Seconds played before the first hint about logs.
-const LOGS_AFTER: u64 = 60;
+/// Seconds played before the first hint, that bare hands can't fell a tree (`first.rs`).
+const LOGS_AFTER: u64 = 20;
 /// The felt air under which being wet is worth a word, °C.
 const WET_BELOW: f32 = 15.0;
 
@@ -50,6 +55,8 @@ static TABLE_TAG: Tag = Tag::named("crafting_tables");
 static FURNACE_TAG: Tag = Tag::named("furnaces");
 static RAW_MEAT_TAG: Tag = Tag::named("raw_meat");
 static CAMPFIRE_TAG: Tag = Tag::named("campfires");
+static ROCKS_TAG: Tag = Tag::named("rocks");
+static FLINT_TAG: Tag = Tag::named("flint");
 /// The evening the night hint was last shown (the day count; not saved).
 static NIGHT_SHOWN: Component<u32> = Component::named("hints_night_shown");
 /// Game hours before sunset the night hint comes (the sunset by the calendar's daylight: 18:00 at
@@ -138,6 +145,20 @@ fn watch(w: &World) {
         if logs && !table {
             once(w, id, TABLE);
         }
+        // The way to the first axe, a step at a time.
+        let flake = has(&crate::first::CUTTERS);
+        let head = items
+            .iter()
+            .any(|&i| item_name(i) == "base:part_felling_axe_head");
+        if has(&ROCKS_TAG) && has(&FLINT_TAG) && !flake {
+            once(w, id, KNAP);
+        }
+        if flake && !logs {
+            once(w, id, FLAKE);
+        }
+        if head && !logs {
+            once(w, id, LASH);
+        }
         // Each evening at dusk until a campfire is built, by the season's sunset (as the HUD clock
         // and beds have it; integration review: fixed at 16-18 it came after dark in winter).
         let sunset = w
@@ -194,6 +215,12 @@ fn watch(w: &World) {
 /// Where the hint line sits, a share of the window's height down: over the crosshair's lower
 /// half and clear of the chat in the bottom left (at 0.78 the two overlapped, Tester 2 11-04).
 const HINT_Y: f32 = 0.64;
+/// The widest a hint is (GUI px), and the room kept on each side for the HUD's top-left column
+/// (the shortcuts, about 100 wide): a long hint wraps rather than running over it in a narrow
+/// window (760 x 600, the audit, 11-04). It wraps no narrower than `HINT_MIN_W`.
+const HINT_MAX_W: f32 = 360.0;
+const HINT_SIDES: f32 = 108.0;
+const HINT_MIN_W: f32 = 140.0;
 /// Seconds a hint stays, and fades at the end.
 const SHOW_SECS: f32 = 6.0;
 const FADE_SECS: f32 = 0.6;
@@ -252,6 +279,14 @@ fn client(r: &mut Registry) {
         }
         let alpha = ((SHOW_SECS - since) / FADE_SECS).clamp(0.0, 1.0);
         let args: Vec<Arg> = args.iter().map(|&a| Arg::Int(a)).collect();
-        c.screen_text(0.5, HINT_Y, key, &args, 0xe4dacf00 | (alpha * 255.0) as u32, 1.0);
+        let st = c.state();
+        let gw = st.window[0] as f32 / st.gui_scale.max(1.0);
+        let width = (gw - 2.0 * HINT_SIDES).clamp(HINT_MIN_W, HINT_MAX_W);
+        c.screen_text_wrapped(0.5, HINT_Y, key, &args, 0xe4dacf00 | (alpha * 255.0) as u32, 1.0, width);
     });
+}
+
+/// A fire lit by `player` (`firebed.rs`): the night hint has done its work, as for one placed.
+pub fn fire_lit(w: &World, player: u64) {
+    mark(w, player, NIGHT);
 }

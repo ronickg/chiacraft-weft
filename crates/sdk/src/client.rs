@@ -349,6 +349,12 @@ impl Client {
         self.draw(None, gk::SCREEN_LABEL, [x as f64, y as f64, 0.0], [size as f64, 0.0, 0.0], color, key, args);
     }
 
+    /// `screen_text` wrapped to at most `width` GUI pixels, its lines centered (0: one line).
+    #[allow(clippy::too_many_arguments)]
+    pub fn screen_text_wrapped(&self, x: f32, y: f32, key: &str, args: &[crate::Arg], color: u32, size: f32, width: f32) {
+        self.draw(None, gk::SCREEN_LABEL, [x as f64, y as f64, 0.0], [size as f64, width.max(0.0) as f64, 0.0], color, key, args);
+    }
+
     /// Sends `value` on `channel` to the server.
     pub fn send<T: Payload>(&self, channel: &Channel<T>, value: &T) {
         let data = value.encode();

@@ -552,6 +552,37 @@ pub fn understory(r: &Recipe) -> Recipe {
     }
 }
 
+/// The species grown by space colonization (`colonize`), not from their `RECIPES` row: the broad
+/// crowns (Ronald, 11-05: "Hybrid, as recommended"). Their row stays for their understory young
+/// (`understory`). The cone and column trees and the palms keep `branchy`.
+pub const COLONIZED: &[crate::colonize::Colonize] = &[
+    crate::colonize::OAK,
+    crate::colonize::ACACIA,
+    crate::colonize::IPE,
+    crate::colonize::ANDIROBA,
+    crate::colonize::MATAMATA,
+    crate::colonize::BRAZIL_NUT,
+];
+
+/// The colonization recipe for a log, if its species grows so.
+pub fn colonized(log: &str) -> Option<&'static crate::colonize::Colonize> {
+    COLONIZED.iter().find(|c| c.log == log)
+}
+
+/// A grown tree of `log` from `seed`, whichever way its species grows (`colonized` or its
+/// `RECIPES` row): for the dumps, sheets and log counts.
+pub fn grown(log: &str, seed: u64) -> Option<Vec<(i32, i32, i32, crate::branchy::Part)>> {
+    if let Some(c) = colonized(log) {
+        return Some(
+            crate::colonize::blocks(c, seed)
+                .into_iter()
+                .map(|(x, y, z, p, _)| (x, y, z, p))
+                .collect(),
+        );
+    }
+    of(log).map(|r| crate::branchy::blocks(r, seed))
+}
+
 /// The recipe a sapling of this log grows by: its young one's, if it has one, else its own.
 pub fn sapling_of(log: &str) -> Option<&'static Recipe> {
     YOUNG.iter().find(|r| r.log == log).or_else(|| of(log))

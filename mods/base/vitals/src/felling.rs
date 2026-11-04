@@ -89,12 +89,15 @@ pub const LONGEST_SECS: f32 = 3600.0;
 /// Axe tiers by harvest level (`abi::tool_tier`, the crafting materials' `harvest`): the most
 /// logs a tree may have for an axe of that level to fell it for its wood. The highest row at or
 /// under the axe's level counts. Sized on the species (`cargo run -p base_api --example
-/// tree_logs`, 11-05): the ordinary trees grow 5 to 72 logs (a stone axe takes them all; a
-/// wooden one the first day's common trees, the oak's, birch's and spruce's medians, 16 to 34:
-/// Planner, 11-05), a young sequoia 76 to 231 (copper), a grown one 444 to 1421 (steel).
+/// tree_logs`, 11-05, after the trees by space colonization): the ordinary trees grow 4 to 87
+/// logs (a stone axe takes them all); a wooden one the first day's common trees, the medians of
+/// the oak (43), birch (9) and spruce (21) and most oaks (Planner, 11-05: raised from 40 when the
+/// colonized oak's median passed it); bone a little more (most araucarias); a young sequoia 76 to
+/// 231 and the tropical canopy trees up to 181 (copper), the Brazil nut up to 432 (bronze), a
+/// grown sequoia 444 to 1421 (steel).
 pub const TIERS: &[Tier] = &[
-    Tier { harvest: 0, name: "wood, gold", logs: 40, speed: 2.0 },
-    Tier { harvest: 50, name: "bone, antler", logs: 64, speed: 2.5 },
+    Tier { harvest: 0, name: "wood, gold", logs: 56, speed: 2.0 },
+    Tier { harvest: 50, name: "bone, antler", logs: 72, speed: 2.5 },
     Tier { harvest: 100, name: "flint, chert, obsidian, stone", logs: 96, speed: 2.91 },
     Tier { harvest: 150, name: "copper", logs: 192, speed: 4.85 },
     Tier { harvest: 200, name: "bronze, iron, wrought iron", logs: 512, speed: 6.79 },
@@ -115,7 +118,7 @@ pub struct Tier {
 
 /// Trees the sheet times (logs, from `tree_logs`): a median oak, birch and araucaria, a young
 /// sequoia and a grown one.
-pub const SHEET_TREES: &[(&str, u32)] = &[("oak", 20), ("birch", 34), ("araucaria", 72), ("young sequoia", 165), ("sequoia", 1015)];
+pub const SHEET_TREES: &[(&str, u32)] = &[("oak", 43), ("birch", 9), ("araucaria", 64), ("young sequoia", 165), ("sequoia", 1015)];
 
 /// The tier of an axe of `harvest` level.
 pub fn tier(harvest: u32) -> &'static Tier {
@@ -142,20 +145,11 @@ pub fn felling(logs: u32, harvest: u32) -> Felling {
     Felling { chops, fruitful }
 }
 
-/// STOPGAP until first-hours (Planner, 11-05): a fresh survival world had no way to a first tool
-/// (bare hands chopped fruitlessly, and planks, the table and every tool need logs). Bare hands
-/// keep the wood of a tree this small (a bush, a young tree: the understory's young oaks have a
-/// median of 9 logs, Tree looks 11-05) at the hand's own pace, a log's time the hand's. The First
-/// hours worker replaces it with stones, knapping and a hand-made axe.
-pub const HAND_STOPGAP_LOGS: u32 = 10;
-
 /// Chopping a tree's foot with bare hands or any tool but an axe: as slow as an axe past its tier
-/// and as fruitless (Planner, 11-05), with one log's time the hand's; but a tree of up to
-/// `HAND_STOPGAP_LOGS` gives its wood at the hand's pace (STOPGAP until first-hours).
+/// and as fruitless (Planner, 11-05), with one log's time the hand's. The first axe is made off the
+/// ground by hand (`first`: rocks, flint, a lashed stone axe; Ronald, 11-05: "you can't just punch
+/// down a tree").
 pub fn by_hand(logs: u32) -> Felling {
-    if logs <= HAND_STOPGAP_LOGS {
-        return Felling { chops: (logs.max(1) as f32).powf(GROWTH), fruitful: true };
-    }
     fruitless(logs)
 }
 
@@ -207,6 +201,9 @@ mod tests {
         // More logs, more chops; a tree past the tier is slower still and gives nothing.
         assert!(felling(30, 100).chops > felling(6, 100).chops);
         assert!(felling(30, 100).fruitful);
+        // The first day's trees (`tree_logs`, 11-05): a wooden axe fells the median oak (43 logs)
+        // for its wood, the first stone axe (flint, harvest 100) the biggest (87).
+        assert!(felling(43, 0).fruitful && felling(87, 100).fruitful);
         let giant = felling(1350, 100);
         assert!(!giant.fruitful && giant.chops > felling(1350, 300).chops);
         assert!(felling(1350, 300).fruitful, "steel fells a sequoia for its wood");
@@ -225,8 +222,7 @@ mod tests {
         // Bare hands are as slow and fruitless as an axe past its tier.
         assert_eq!(by_hand(60), felling(60, 0));
         assert!(!fruitless(5).fruitful && fruitless(5).chops > felling(5, 0).chops);
-        // STOPGAP until first-hours: bare hands keep a small tree's wood, not a bigger one's.
-        assert!(by_hand(HAND_STOPGAP_LOGS).fruitful && !by_hand(HAND_STOPGAP_LOGS + 1).fruitful);
+        assert!(!by_hand(1).fruitful);
         // A piece of four logs is 2.8 logs' time; the axe wears by chops, not by logs.
         assert!((piece(4).chops - 2.83).abs() < 0.01);
         assert_eq!(wear(20), 9);

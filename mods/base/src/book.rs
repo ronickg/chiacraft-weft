@@ -376,7 +376,7 @@ fn chest_totals(w: &World, player: u64, station: Station) -> Vec<(u32, u32)> {
 /// Makes `r` up to `count` times at `station` from the player's bag (and the chests by the
 /// table), giving each result to the bag or dropping it at the player's feet.
 fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u32 {
-    if station == Station::Hands && !fits_hands(r) {
+    if station == Station::Hands && !fits_hands(r) || crate::first::locked_for(w, player, r) {
         return 0;
     }
     let Some(src) = sources(w, player, station) else { return 0 };
@@ -408,6 +408,11 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
         if !found {
             break;
         }
+        // What it's made of, as it was (an axe lashed by hand takes its head's parts: `first.rs`).
+        let used: Vec<ItemStack> = take
+            .iter()
+            .map(|&(i, _)| w.inventory(src[i].owner).get(src[i].slot))
+            .collect();
         for &(i, n) in &take {
             if src[i].owner != player {
                 from_chests += n;
@@ -427,8 +432,11 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
             let out = if r.kind() == crate::parts::PART_RECIPES.name() {
                 crate::parts::finish(w, player, r, out, (w.random() >> 40) as f32 / (1u64 << 24) as f32)
             } else {
-                out
+                crate::first::finish(w, player, &used, out, Some((w.random() >> 40) as f32 / (1u64 << 24) as f32))
             };
+            if out.is_empty() {
+                continue;
+            }
             let left = w.inventory(player).insert(out);
             if !left.is_empty() {
                 w.spawn_item(pos, left);
@@ -523,6 +531,8 @@ pub fn book(ui: &mut Ui, station: Station) {
                 .first()
                 .is_some_and(|(o, _)| item_has_tag(o.item, &format!("tab/{t}"))),
         })
+        // A knapped head from memory waits for one made by hand (`first.rs`).
+        .filter(|r| creative || !crate::first::locked(r, &touched))
         .filter_map(|r| {
             let n = if table_only(station, &r) { 0 } else { times(&r, &have, MAX_BATCH) };
             if creative || n > 0 || crate::discovery::starter(&r) {

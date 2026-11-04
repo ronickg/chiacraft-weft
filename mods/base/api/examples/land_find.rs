@@ -87,9 +87,42 @@ fn main() {
                     }
                 }
             }
+            let stream = l::tarn_stream(&f, x, z);
+            let low_rim = if !stream.is_empty() {
+                // The ring but the stream's channel through it.
+                let mut m = i32::MAX;
+                for dz in -r - 2..=r + 2 {
+                    for dx in -r - 2..=r + 2 {
+                        let d2 = dx * dx + dz * dz;
+                        if d2 > r * r && d2 <= (2 * r + 3) * (2 * r + 3) / 4 && !stream.iter().any(|p| (p.0, p.1) == (x + dx, z + dz)) {
+                            m = m.min(h(x + dx, z + dz));
+                        }
+                    }
+                }
+                m
+            } else {
+                low_rim
+            };
+            let walled = stream.iter().all(|&(px, pz, bed)| {
+                [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().all(|&(dx, dz)| {
+                    let (sx, sz) = (px + dx, pz + dz);
+                    stream.iter().any(|p| (p.0, p.1) == (sx, sz)) || (sx - x).pow(2) + (sz - z).pow(2) <= r * r || h(sx, sz) > bed
+                })
+            });
+            // How often it turns: a canal never does.
+            let turns = stream
+                .windows(3)
+                .filter(|w| (w[1].0 - w[0].0, w[1].1 - w[0].1) != (w[2].0 - w[1].0, w[2].1 - w[1].1))
+                .count();
             println!(
-                "# tarn at x {x} z {z}, radius {r}, water at {level}: bed up to {high_bed}, rim from {low_rim} ({})",
-                if low_rim > level && high_bed < level { "holds" } else { "LEAKS" }
+                "# tarn at x {x} z {z}, radius {r}, water at {level}: bed up to {high_bed}, rim from {low_rim} ({}); stream {} long, {turns} turns{}",
+                if low_rim > level && high_bed < level { "holds" } else { "LEAKS" },
+                stream.len(),
+                match (stream.first(), stream.last()) {
+                    (Some(a), Some(b)) =>
+                        format!(" from {} {} to {} {} (bed {} to {}){}", a.0, a.1, b.0, b.1, a.2, b.2, if walled { "" } else { " SPILLS" }),
+                    _ => String::new(),
+                }
             );
             println!("chat /tp {x}.5 {} {}.5\nidle\nlook 180 -40\nwait 2\nwhere", level + 14, z - 18);
         }

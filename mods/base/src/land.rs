@@ -554,7 +554,8 @@ fn tropical_water(g: &mut Gen) {
 }
 
 /// The tarns' water (`base_api::land::tarn_level`, `TARN_*`): from the bowl's bed up to its level,
-/// still; the ring round it holds it. A cave under the bed is closed with stone so the water can't
+/// still; the ring round it holds it. Their streams (`stream_bed`): a block of still water on the
+/// channel's bed, falling where it drops. A cave under the bed is closed with stone so the water can't
 /// run out. After the glaciers, before the plants.
 fn tarn_water(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
@@ -571,7 +572,14 @@ fn tarn_water(g: &mut Gen) {
             if h - 1 > oy + 15 {
                 continue;
             }
-            let Some(level) = l::tarn_level(&f, ox + x, oz + z) else { continue };
+            // A tarn's stream: a block of still water on its bed.
+            let level = match l::tarn_level(&f, ox + x, oz + z) {
+                Some(level) => level,
+                None => match l::stream_bed(&f, ox + x, oz + z) {
+                    Some(bed) => bed + 1,
+                    None => continue,
+                },
+            };
             let (xu, zu) = (x as usize, z as usize);
             for wy in (h - 1)..=level {
                 if !(oy..oy + 16).contains(&wy) {

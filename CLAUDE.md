@@ -49,7 +49,7 @@ in our crates and mods.
 `chat`, `wait`, `key`, `hold <action> <secs>`, `cursor`, `click`, `tap <screen> <query>`, `shot`,
 `where`, `leave`, `quit`; `/tk give|fill|spawn|mode|hurt_me|attr`). Worlds are saved under
 `run/saves/<name>`, and a reused name keeps its inventory: use a fresh name per check.
-Two traps that broke several scripts: `hold` doesn't block (follow it with a `wait` of its length),
+Two traps that broke several scripts: `hold` waits until it releases unless given `nowait` (with `nowait`, follow it with a `wait` of its length),
 and in `look <yaw> <pitch>` a positive pitch looks up (look down to aim at the ground).
 Never launch the game yourself: the testers ("Tester", "Tester 2") run every script
 (`.claude/skills/session-crew/SKILL.md`).

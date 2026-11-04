@@ -68,7 +68,10 @@ const LEAF_LIGHT: vec3<f32> = vec3(0.6, 1.0, 0.5);
 
 fn under_leaves(sky_light: f32) -> f32 {
     // Not in deep cover (a cave in the forest): the leaves' light is from what the sky reaches.
-    return min(canopy(), 1.0) * (1.0 - smoothstep(0.8, 1.0, sky_light)) * smoothstep(0.35, 0.6, sky_light);
+    // Faint down to a sky light of about 0.05: from 0.35 the foot of a rainforest giant, between
+    // its buttresses under its thick crown, went near black at noon (frame luma 0.03-0.06, the
+    // world playtester's GIANT_F); a cave, with no sky light at all, stays dark.
+    return min(canopy(), 1.0) * (1.0 - smoothstep(0.8, 1.0, sky_light)) * smoothstep(0.03, 0.3, sky_light);
 }
 
 // ---- the colors of the day ----
@@ -423,7 +426,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // green and soft (a rainforest's floor gets 1-2 % of the sun, more of it this way than from the
     // sky). Without it the floor of Plants' rainforest sat at luma 12-17 at noon, under the daytime
     // targets' 15-60 for deep forest shade (Lighting's canopy check, 11-04).
-    c += p.sun * light_strength() * 0.035 * LEAF_LIGHT * under * hemi * ao;
+    c += p.sun * light_strength() * 0.045 * LEAF_LIGHT * under * hemi * ao;
     // At golden hour the sky round the low sun glows: a warm fill from its side of the sky, on
     // the faces turned that way; those turned away keep the sky's cool light (Valheim's warm light,
     // blue shade).
@@ -741,12 +744,24 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let rain = rain_amount();
     // The air's own depth, whatever the view distance: with distant terrain the fog's end lies
     // thousands of blocks off, and the haze would barely start where the kept blocks give way to it.
-    let reach = min(end, 2500.0);
-    // A little hazier than it was (0.9): Bliss's air veils the middle distance more, lighter.
-    // (Half as thick as it was: with it off a forest frame's darkest twentieth went 35 -> 25 and its
-    // saturation 0.41 -> 0.57; the haze was the grey veil over the middle distance, Colour 9.)
-    let amount = 1.0 - exp(-dist / (reach * mix(0.75, 0.4, rain)) * mix(0.45, 1.0, thin) * 0.5 * look_opt(OPT_HAZE, 1.0));
-    let edge = smoothstep(end * 0.72, end, dist);
+    // Clear air veils by wavelength, as Bliss's and Photon's atmospheres do: the sky's blue
+    // (Rayleigh) goes first, red hardly at all, so far land goes a little blue and keeps its
+    // contrast. And it starts further out (Ronald, 11-05: "it should be a bit hazy ... that's in
+    // real life the same ... but in the close proximity it can be a bit more clear"): next to
+    // nothing within about 150 blocks, rising steeply past it to the far haze as it was (in the
+    // blue, about a fifth of the way to the sky's colour at 1000 blocks). Grey haze (Mie) comes
+    // with the conditions: rain, the weather's fog, a forest's damp air, and a little always.
+    let k = look_opt(OPT_HAZE, 1.6) * mix(0.45, 1.0, thin);
+    let rayleigh = vec3(0.35, 0.6, 1.0) * 2.6e-4 * k;
+    let mie = (0.4e-4 + 2.0e-4 * scene.weather.z + 0.8e-4 * min(canopy(), 1.0)) * k;
+    let far = dist * smoothstep(90.0, 450.0, dist);
+    // Rain's own mist starts at the eye (Ronald, 11-05: "when raining shouldn't it be more
+    // misty??"): rain alone a soft veil (a third gone at 100 blocks), a thunderstorm down to about
+    // 150 (at twice that, a thunderstorm went white).
+    let downpour = rain * (0.004 + 0.016 * scene.weather.w);
+    let veil = vec3(1.0) - exp(-((rayleigh + vec3(mie)) * far + vec3(downpour) * dist));
+    // Only the last sixth of the view hands over to the sky's colour where the terrain ends.
+    let edge = smoothstep(end * 0.84, end, dist);
     // Valheim's air: lit from behind by the sun, so the haze toward it glows warm (a forward
     // scattering lobe, Henyey-Greenstein) and the side away goes a cool blue-teal, most at a low
     // sun. Toward the far end it hands back to the sky's own color, which the terrain fades into.
@@ -757,10 +772,15 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let near_end = 1.0 - edge;
     var lit = color + p.glow * light_strength() * lobe * mix(0.25, 0.7, golden()) * (1.0 - rain) * near_end;
     lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
-    // The far loses its colour before the haze covers it: far ridges go pale and grey-blue while the
-    // near stays rich.
-    let pale = mix(c, vec3(luma(c)), clamp(amount * 0.6, 0.0, 0.35));
-    return mix(pale, lit, clamp(max(amount * 0.9, edge), 0.0, 1.0));
+    // Rain's mist is as dark as the rain's sky, darker in a thunderstorm: lit as a clear day's
+    // air, a storm's mist was pale under a dark sky.
+    lit *= mix(1.0, 0.75 - 0.35 * scene.weather.w, rain);
+    // Far ridges still lose a little colour (as before, but only where the veil has begun), then
+    // the veil per channel (its blue thicker than its red), then the handover at the end.
+    // In rain everything takes a little grey-blue wash, near too.
+    let pale = mix(mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3)), vec3(luma(c)) * vec3(0.92, 0.97, 1.05), rain * 0.25);
+    let seen = mix(pale, lit, veil);
+    return mix(seen, lit, edge);
 }
 
 // ---- to the screen ----
