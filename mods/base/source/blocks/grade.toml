@@ -456,3 +456,6 @@ outline = 0.883
 [tiles.gold_ore]
 base = "stone"
 overlay = "ore_gold_b"
+
+[items.tepary_beans]  # outline 0.60 -> 0.40 (new, Plants' batch 3: pale beans, the edge too light)
+outline = 0.67
