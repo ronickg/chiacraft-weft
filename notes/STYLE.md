@@ -186,7 +186,7 @@ Each with the UI master prompt (`game-art` skill), the approved slot attached:
 - **Health and stamina bars** instead of hearts and food (the kit's `bar`, `bar_health`,
   `bar_stamina`, `bar_xp`, food buffs with timers, temperature): a HUD change in the base mod.
 - **Creative tabs** as tabs (`tab`, `tab_active`, `tab_hover`).
-- **Item icons** in slots: the generated icons (`kit/items` when added; `notes/ui-reference/items`)
+- **Item icons** in slots: the generated icons (redone from the style guides with the game-art skill, 2026-11-04)
   replace `textures/item/*.png`, which the hand also shows until each item has its model.
 - **Bigger slots**: the kit is drawn for 32-pixel slots at GUI scale 2; the screens lay out 18.
 
