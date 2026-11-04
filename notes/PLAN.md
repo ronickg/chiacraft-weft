@@ -231,7 +231,7 @@ The smallest version that works is phases 1-4.
    batches, daily budget, per-IP limit, a log replayed at start, no secret in its output) ran live
    on testnet11 on 2026-10-30 from throwaway wallets kept in `~/chiacraft-testnet/`. Bans and
    admission don't need the chain and come first, so they can be tried while the DID slices land.
-   1. *Admission rules per world* (built 2026-11-03, the two-game check pending): `admission.json` in the world folder, read at every
+   1. *Admission rules per world* (built, seen working between two games 2026-11-04): `admission.json` in the world folder, read at every
       join (no restart), set by the owner from the pause menu's "Who May Come In" screen and by
       commands (`/allow`, `/probation`). Rules,
       all of which must pass: open, or only the allow list (by login key, identity or DID);
@@ -244,13 +244,13 @@ The smallest version that works is phases 1-4.
       **Probation:** a player new to the world can't break or place blocks or open containers
       (proposed default) until they have played there for N hours (owner's number, 0 = off) or the
       owner lifts it (`/probation end <player>`); the owner picks which of the three apply.
-   2. *Bans* (built, check pending): `bans.json` in the world: entries by login key, identity or DID, each
+   2. *Bans* (built, seen working): `bans.json` in the world: entries by login key, identity or DID, each
       with a reason, who banned, when and an optional end. `/ban <player|key|did:chia:1…>
       [duration] [reason]`, `/unban`, `/bans`; banning someone online bans their login key,
       identity and proven DID together and disconnects them; a banned DID refuses every identity
       that proves it. The same screen lists and lifts them. Probation and DID age are what
       make a ban stick: a new identity has no old DID and starts on probation.
-   3. *Shared ban lists* (built, check pending): a list is a JSON document signed by its
+   3. *Shared ban lists* (built, seen working): a list is a JSON document signed by its
       maintainer's identity key (a sequence number, entries with reasons). Any world that holds
       it serves it over iroh (`chiacraft/bans/1` on the world's own key; signed, so any copy is as
       good as the original). A world follows a list by a world's address (`/banlist follow

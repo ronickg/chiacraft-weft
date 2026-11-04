@@ -25,8 +25,8 @@ join adm-ticket.txt
 loaded
 wait 2
 look 0 -85
-hold core:attack 3       # still on probation: refused
-wait 1
+hold core:attack 3       # still on probation: refused (hold doesn't block: wait it out)
+wait 4
 mark adm-mark-bob-in-again
 await_file adm-mark-free 300
 wait 2

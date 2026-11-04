@@ -230,7 +230,7 @@ the trip ("on the way"); both added each other from the link; alice joined bob's
 Friends screen; bob gave his world a new address; alice's saved entry followed it. Test scripts:
 build scripts that contain addresses with Python, not sed (`&` in the replacement).
 
-## Phase 4: admission rules, bans and ban lists (2026-11-03, built, the two-game check pending)
+## Phase 4: admission rules, bans and ban lists (built 2026-11-03, seen working 2026-11-04)
 
 Slices 1-3 of phase 4 (`notes/PLAN.md`). `crates/engine/src/chiacraft/worlds/admission.rs`: the
 world's `admission.json` (`Rules`: `only_listed`, `allow`, `probation`, `lists`) and `bans.json`
@@ -251,7 +251,10 @@ worlds list), and worlds serve ban lists on `chiacraft/bans/1` and fetch the one
 hosting starts and daily (`p2p::fetch_lists`). The owner's screen: pause menu, "Who May Come In"
 (`admission_screen.rs`), which acts through the same commands. Unit tests in `admission.rs` (not run
 here). testkit's new script line `chatf <file> <text with {}>`. The check: `tools/checks/admission`
-(two copies, alice and bob), to run through the Tester.
+(two copies, alice and bob, stepping together through `mark`/`await_file`): passed on the PC
+(Tester 2, 20e4522): probation refused bob's digging, the ban sent him away and refused him, the
+allow list refused then admitted him, the owner lifted his probation, and his own world fetched
+alice's published list from hers.
 
 Slices 4 and 6 (2026-11-04, built, not yet seen on testnet11): the engine links the wallet with
 `chain`; `crates/engine/src/chiacraft/chain.rs` holds one `ChainReader` per process, configured at
