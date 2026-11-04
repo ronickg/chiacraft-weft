@@ -108,3 +108,14 @@ steps as the first groups). Kenney files are from Impact Sounds (CC0): `step/sno
 | `step/mud1` (hit:0), `step/mud2` (hit:1), `step/mud3` (hit:2) | "MUDDY AND WET FOOTSTEPS.wav" ([freesound 376809](https://freesound.org/people/Alex_hears_things/sounds/376809/)) | Alex_hears_things | CC0 |
 | `dig/leaves1` (at:2.6), `dig/leaves2` (at:3.3), `dig/leaves3` (at:5.4) | "Rustling leaves" ([freesound 437356](https://freesound.org/people/giddster/sounds/437356/)) | giddster | CC0 |
 | `step/leaves1` (at:1.2), `step/leaves2` (at:2.5), `step/leaves3` (at:4.0) | "Leaves_Rustling_Edited.wav" ([freesound 443065](https://freesound.org/people/AmberdeMeillon/sounds/443065/)) | AmberdeMeillon | CC0 |
+
+## A falling tree (`tree/`)
+
+Made 2026-11-05 by the Tree felling session with `reports/sound-files/fall_sounds.py` (numpy and
+ffmpeg), from nothing but synthesis and CC0 files already here:
+
+| files | made from | licence |
+|---|---|---|
+| `tree/creak1-2` | synthesized stick-slip creak through wood resonances; the crack at its end is Kenney's Impact Sounds `impactWood_light_001-002` | ours + CC0 |
+| `tree/fall1-2` | swept noise (synthesized) with base's own `dig/leaves1-3` (Kenney, Impact Sounds) scattered through | ours + CC0 |
+| `tree/thud1-2` | Kenney's Impact Sounds `impactWood_heavy_001-002` an octave down, a synthesized low thump, `dig/leaves1-3` | CC0 + ours |

@@ -283,7 +283,175 @@ pub const RECIPES: &[Recipe] = &[
     // into buttresses at the foot; bare for its lower half, then short branches all round,
     // shorter up the tree, in rounded clumps: a narrow, rounded spire.
     SEQUOIA,
+    // The tropical forest's emergent, the Brazil nut (Bertholletia excelsa, Manaus's terra
+    // firme): 30-50 m on a dead-straight trunk bare for two thirds, buttressed at the foot, its
+    // umbrella crown above the canopy.
+    BRAZIL_NUT,
+    ANDIROBA,
+    MATAMATA,
+    IPE,
+    // Cacao (Theobroma cacao), the Amazon's understorey tree: 4-8 m, slender, branching low
+    // into a few limbs held out under a crown of big drooping leaves.
+    Recipe {
+        log: "base:cacao_log",
+        height: 5.0,
+        width: 0.9,
+        width_loss: 0.1,
+        drift: 4.0,
+        droop: 0.3,
+        branch_start: 0.3,
+        branch_every: 0.6,
+        branch_count: 3,
+        branch_angle: 50.0,
+        branch_width: 0.6,
+        orders: 1,
+        leaf_r: 1.8,
+        leaf_ry: 1.2,
+        ragged: 0.4,
+        ..Recipe::BASE
+    },
 ];
+
+/// The tropical canopy (about 26-29 blocks, under its emergents): andiroba's broad dark crown on a tall clean trunk.
+pub const ANDIROBA: Recipe = Recipe {
+    log: "base:andiroba_log",
+    height: 25.0,
+    size_var: 0.12,
+    width: 1.3,
+    // Wood to its crown: width / loss (here 32 blocks at size 1) must cover its height, or its
+    // limbs grow leaves with no wood (leaf reach); at 0.03 the world never settled round them.
+    width_loss: 0.04,
+    drift: 2.0,
+    branch_start: 0.62,
+    branch_every: 0.7,
+    branch_count: 2,
+    branch_angle: 55.0,
+    branch_width: 0.6,
+    orders: 2,
+    branch_len: 0.3,
+    leaf_r: 3.2,
+    leaf_ry: 1.8,
+    ragged: 0.3,
+    reach: 8,
+    max_height: 40,
+    flare: 0.2,
+    flare_up: 1.5,
+    ..Recipe::BASE
+};
+
+/// Matamatá: Manaus's commonest canopy tree, a slimmer trunk and a narrower, rounder crown.
+pub const MATAMATA: Recipe = Recipe {
+    log: "base:matamata_log",
+    height: 23.0,
+    size_var: 0.15,
+    width: 1.2,
+    width_loss: 0.04,
+    drift: 3.0,
+    branch_start: 0.66,
+    branch_every: 0.6,
+    branch_count: 2,
+    branch_angle: 45.0,
+    branch_width: 0.55,
+    orders: 2,
+    branch_len: 0.25,
+    leaf_r: 2.6,
+    leaf_ry: 2.0,
+    ragged: 0.35,
+    reach: 8,
+    max_height: 38,
+    ..Recipe::BASE
+};
+
+/// The golden ipê: a tall straight trunk and a high, open, spreading crown.
+pub const IPE: Recipe = Recipe {
+    log: "base:ipe_log",
+    height: 27.0,
+    size_var: 0.12,
+    width: 1.3,
+    width_loss: 0.04,
+    drift: 2.0,
+    branch_start: 0.7,
+    branch_every: 0.55,
+    branch_count: 3,
+    branch_angle: 50.0,
+    // Limbs thick enough to stay wood to their tips (thin, their last third was leaves alone).
+    branch_width: 0.8,
+    orders: 2,
+    branch_len: 0.3,
+    leaf_r: 2.5,
+    leaf_ry: 1.4,
+    ragged: 0.45,
+    reach: 8,
+    max_height: 42,
+    ..Recipe::BASE
+};
+
+/// A grown Brazil nut (`RECIPES`' own row), the world's (the giant scatter, `GIANT_KINDS`).
+pub const BRAZIL_NUT: Recipe = Recipe {
+    log: "base:brazil_nut_log",
+    // Its crown clears the canopy (26-29) by 15-20 blocks, as a real emergent rises 10-20 m over a
+    // 30-40 m canopy (Ronald, 11-04: "C's giants"; Planner: "well above the canopy").
+    height: 58.0,
+    size_var: 0.15,
+    width: 3.0,
+    // Thinning slowly enough to stay wood to its top: at 0.06 a smaller one's trunk ran out
+    // under its crown, and its limbs grew leaves with no wood (the PC's measure: wood 2 out,
+    // leaves 10).
+    width_loss: 0.035,
+    leaf_width: 0.7,
+    drift: 1.0,
+    rise: 1.0,
+    droop: 0.1,
+    // An umbrella of a few big limbs, not many small ones: a scatter's shape keeps 4,096 blocks
+    // (the first try's limbs every 0.6 overran it, and the crown was dropped).
+    branch_start: 0.75,
+    branch_every: 1.6,
+    branch_count: 3,
+    branch_angle: 62.0,
+    branch_width: 0.6,
+    orders: 2,
+    // Limbs scale with the height: short, so the umbrella stays inside the giant scatter's reach
+    // and every leaf within LEAF_REACH of a log (at 0.3 and 0.22 a 58-high crown's limbs ran past
+    // the reach, which cut their wood and left leaves with no log).
+    branch_len: 0.18,
+    taper: 0.4,
+    leaf_r: 2.6,
+    leaf_ry: 1.2,
+    ragged: 0.3,
+    // The giant scatter's reach (`worldgen.rs`, 12; at 14 the world never finished generating
+    // round a giant). Its wood stays within 8 (the PC's measure), so the reach trims only leaves.
+    reach: 12,
+    // 58 high, a sixth more at most, and its crown over that; the scatter reaches 96 up.
+    max_height: 80,
+    flare: 0.55,
+    flare_up: 3.0,
+    lobes: 0.35,
+    ..Recipe::BASE
+};
+
+/// A young Brazil nut, grown from a planted nut: a pole of a tree with a small crown, under the
+/// canopy, waiting for a gap (`BRAZIL_NUT` is the grown one).
+pub const YOUNG_BRAZIL_NUT: Recipe = Recipe {
+    log: "base:brazil_nut_log",
+    height: 14.0,
+    width: 1.2,
+    width_loss: 0.07,
+    drift: 2.0,
+    branch_start: 0.55,
+    branch_every: 0.6,
+    branch_count: 2,
+    branch_angle: 60.0,
+    branch_width: 0.55,
+    orders: 1,
+    branch_len: 0.3,
+    leaf_r: 2.0,
+    leaf_ry: 1.2,
+    reach: 8,
+    max_height: 22,
+    flare: 0.2,
+    flare_up: 1.5,
+    ..Recipe::BASE
+};
 
 /// A grown giant sequoia (`RECIPES`' own row).
 pub const SEQUOIA: Recipe = Recipe {
@@ -346,7 +514,7 @@ pub const YOUNG_SEQUOIA: Recipe = Recipe {
 
 /// The young of the trees that grow too big to come from a sapling at once: a planted sequoia
 /// grows into a young one (`YOUNG_SEQUOIA`), not a giant.
-pub const YOUNG: &[Recipe] = &[YOUNG_SEQUOIA];
+pub const YOUNG: &[Recipe] = &[YOUNG_SEQUOIA, YOUNG_BRAZIL_NUT];
 
 /// How far a young tree of the understory reaches sideways (its scatter's reach in `worldgen.rs`).
 pub const UNDERSTORY_REACH: i32 = 3;

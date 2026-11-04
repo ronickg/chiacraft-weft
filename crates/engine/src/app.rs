@@ -2653,6 +2653,7 @@ fn end_input(r: &mut Running) {
 fn refresh_hud(r: &mut Running) {
     if let Some(g) = &r.game {
         let chat_open = r.screens.last().is_some_and(|(s, _)| s.shows_chat());
+        let menu_open = !r.screens.is_empty() && !chat_open;
         if r.hud.editing()
             && !r
                 .screens
@@ -2662,7 +2663,7 @@ fn refresh_hud(r: &mut Running) {
             r.hud.set_edit(None);
         }
         if r.hud
-            .update(&g.client, r.debug, r.settings.debug_groups(), chat_open, &r.lang, &r.input)
+            .update(&g.client, r.debug, r.settings.debug_groups(), chat_open, menu_open, &r.lang, &r.input)
         {
             r.quads_dirty = true;
         }
