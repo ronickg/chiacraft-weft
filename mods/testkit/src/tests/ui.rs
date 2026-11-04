@@ -297,8 +297,8 @@ pub async fn inventory_crafting(t: T) -> R {
     t.op("put me 0 oak_log 16").await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    // Menu slots: 0-3 grid, 4 result, 5-12 armor and clothes, 13-39 main, 40-48 the hotbar
-    // (`t.hotbar`, which finds it).
+    // Menu slots: 0-3 grid, 4 result, 5-13 equipment (armor, clothes, cloak), 14-40 main, 41-49 the
+    // hotbar (`t.hotbar`, which finds it).
     let (log, planks) = (id("base:oak_log"), id("base:oak_planks"));
     t.click_ui(&t.hotbar(0), 0);
     t.until("logs on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == log)

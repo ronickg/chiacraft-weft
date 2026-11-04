@@ -187,6 +187,12 @@ impl Client {
         self.command(abi::client_op::CLOSE_SCREEN, "", 0.0);
     }
 
+    /// Builds the top screen again, for a screen whose parts follow state of its own (a page, a
+    /// selection): its builder runs anew.
+    pub fn rebuild_screen(&self) {
+        self.command(abi::client_op::REBUILD_SCREEN, "", 0.0);
+    }
+
     pub fn reload_assets(&self) {
         self.command(abi::client_op::RELOAD_ASSETS, "", 0.0);
     }

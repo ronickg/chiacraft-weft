@@ -522,6 +522,9 @@ pub async fn multiplayer(t: T) -> R {
     let mut child = std::process::Command::new(exe)
         .args(["--run-dir", &dir, "--script", &script, "--size", "640x360"])
         .args(crate::package_args())
+        // The host runs the test-only mods (testmod), which a `--script` game leaves out: the
+        // joining game needs the same code mods.
+        .args(["--mods", &format!("{dir}/test-mods")])
         .spawn()
         .map_err(|e| format!("cannot start the second client: {e}"))?;
     let heard = t

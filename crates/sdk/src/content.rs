@@ -1656,6 +1656,11 @@ impl ItemBuilder<'_> {
     pub fn no_creative_break(self) -> Self {
         self.tag(abi::comp::NO_CREATIVE_BREAK)
     }
+    /// Worn out, it stays in its slot broken instead of vanishing, and works like an empty hand
+    /// until it's repaired (its `DAMAGE` lowered): tools built from parts.
+    pub fn keeps_broken(self) -> Self {
+        self.tag(abi::comp::KEEP_BROKEN)
+    }
     /// Takes effect after holding the use button this long (food 32 ticks), slowing the player down.
     pub fn use_ticks(self, ticks: u32) -> Self {
         self.set(&c::USE_TICKS, ticks)

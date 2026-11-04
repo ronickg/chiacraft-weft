@@ -70,8 +70,10 @@ fn apply(p: PostPixel) -> vec4<f32> {
     lit /= f32(steps) * 0.45;
     // Brighter the nearer the sun, wide around it.
     let near = exp(-length(to_sun * vec2(p.size.x / p.size.y, 1.0)) * mix(2.4, 1.3, low));
-    let tint = mix(vec3(1.0, 0.72, 0.42), vec3(1.0, 0.95, 0.85), smoothstep(0.1, 0.6, sun.y));
-    let shafts = tint * lit * near * amount * mix(0.16, 0.55, low);
+    // Warm and gentle: with the filmic grade a strong white wash would bleach a low sun's half of
+    // the sky (Tester 2's golden-hour shots).
+    let tint = mix(vec3(1.0, 0.6, 0.3), vec3(1.0, 0.92, 0.8), smoothstep(0.1, 0.6, sun.y));
+    let shafts = tint * lit * near * amount * mix(0.12, 0.3, low);
     // Strength 2 (`--shafts-debug`): how it sees the frame, amount in red, the sky it gathered in
     // green, how near the sun in blue.
     if p.strength > 1.5 {
