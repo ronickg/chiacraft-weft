@@ -40,9 +40,8 @@ const LOOK: i32 = 8;
 const LOOK_UP: i32 = 3;
 /// Blocks it sees (and smells) food on the ground from.
 pub const ITEM_LOOK: f64 = 12.0;
-/// It starts foraging under this share of its food, and stops when this full.
-const HUNGRY: f32 = 0.6;
-const FULL: f32 = 0.95;
+/// It starts foraging under this share of its food, and stops when this full (`needs`).
+use animals_core::needs::{FULL, HUNGRY};
 /// Ticks: chewing a mouthful, walking before it looks again, wandering when nothing is near.
 const CHEW: f64 = 30.0;
 const WALK: f64 = 160.0;
