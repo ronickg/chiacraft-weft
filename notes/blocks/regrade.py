@@ -195,6 +195,8 @@ def build(table_paths, dry=False):
             if n.endswith("_e"):
                 continue
             key = n if mod == "base" else f"{mod}:{n}"
+            if "base" in t["tiles"].get(key, {}):  # built from its host by overlays()
+                continue
             if not neutral(knobs(t, key)) or os.path.exists(os.path.join(src_dir(mod), n + ".png")):
                 keys.add((mod, n, key))
     done = []
@@ -230,8 +232,60 @@ def build(table_paths, dry=False):
                 save(out, g, os.path.join(sd, rel))
                 lock[f"{mod}/{rel}"] = sha(g)
         done.append((mod, n, key, kn, main, grade(main, kn, k)))
+    done += overlays(t, lock, dry)
     if not dry:
         json.dump(dict(sorted(lock.items())), open(LOCK, "w"), indent=1)
+    return done
+
+
+OVERLAYS = os.path.join(ROOT, "mods", "base", "source", "blocks", "overlays")
+def inside_shifts(ov):
+    """Where each variant's marks sit: moved within the overlay's own margins, so no mark wraps round the
+    tile's edge and shows cut in half at a block border (a seam sets its own sideways `shifts`)."""
+    ys, xs = np.nonzero(ov[..., 3] > 0.5)
+    n = ov.shape[0]
+    left, right, top, bottom = int(xs.min()), int(n - 1 - xs.max()), int(ys.min()), int(n - 1 - ys.max())
+    return [[0, 0], [right, -top], [-left, bottom], [(right - left) // 2, (bottom - top) // 2]]
+
+
+def overlays(t, lock, dry):
+    """Rows with `base` and `overlay` (ores in a rock face): the host's own graded tile and variants with
+    the overlay's marks laid on, so the rock under them is exactly the wall's and follows its tuning.
+    `shifts` sets where the marks sit per variant; a seam keeps dy 0 so it stays level and tiles."""
+    done = []
+    for key, row in sorted(t["tiles"].items()):
+        if "base" not in row or "overlay" not in row:
+            continue
+        mod, n = key.split(":", 1) if ":" in key else ("base", key)
+        hkey = row["base"]
+        hmod, hn = hkey.split(":", 1) if ":" in hkey else ("base", hkey)
+        hkn = knobs(t, hkey)
+        sd = src_dir(hmod) if os.path.exists(os.path.join(src_dir(hmod), hn + ".png")) else game_dir(hmod)
+        rels = files_of(hmod, hn, sd)
+        main = load(os.path.join(sd, rels[0]))
+        k = contrast_k(grade(main, hkn), hkn["spread"]) if hkn["spread"] is not None else (hkn["contrast"] if hkn["contrast"] != 1.0 else None)
+        ov = load(os.path.join(OVERLAYS, row["overlay"] + ".png"))
+        shifts = row.get("shifts") or inside_shifts(ov)
+        outs = []
+        for i, rel in enumerate(rels):
+            host = grade(load(os.path.join(sd, rel)), hkn, k)
+            dx, dy = shifts[i % len(shifts)]
+            o = np.roll(ov, (dy, dx), (0, 1))
+            m = o[..., 3:] > 0.5
+            out = np.where(m, o, host)
+            out[..., 3] = 1.0
+            outs.append(out)
+            dst = rel.replace(hn, n, 1)
+            g = os.path.join(game_dir(mod), dst)
+            if not dry:
+                os.makedirs(os.path.dirname(g), exist_ok=True)
+                save(out, g, os.path.join(sd, rel))
+                lock[f"{mod}/{dst}"] = sha(g)
+        ctm = os.path.join(game_dir(hmod), hn + ".ctm")
+        if not dry and len(rels) > 1 and os.path.exists(ctm):
+            text = open(ctm).read().replace(hn, n)
+            open(os.path.join(game_dir(mod), n + ".ctm"), "w").write(text)
+        done.append((mod, n, key, hkn, grade(main, hkn, k), outs[0]))
     return done
 
 

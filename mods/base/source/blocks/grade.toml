@@ -202,3 +202,24 @@ saturation = 0.794
 
 [tiles.planks_mesquite]  # luma 0.26->0.33, sat 0.72->0.72, hue 14->14; ~ acacia_planks (half way)
 gain = 1.302
+
+# Ores in the rock faces (Terrain, 11-04; Ronald: "All 3: 1, 2, 3"): the host rock's own graded tile and
+# variants with an ore overlay (mods/base/source/blocks/overlays/) laid on, so the rock reads as the
+# wall's and follows its tuning. `shifts`: where the marks sit per variant; a seam keeps dy 0 so it
+# stays level and runs on into the next block.
+[tiles.banded_clay_coal_ore]
+base = "banded_clay_side"
+overlay = "ore_coal_seam"
+shifts = [[0, 0], [9, 0], [17, 0], [25, 0]]
+
+[tiles.red_sandstone_iron_ore]
+base = "red_sandstone_side"
+overlay = "ore_ironstone"
+
+[tiles.granite_gold_ore]
+base = "granite"
+overlay = "ore_gold_quartz"
+
+[tiles.granite_iron_ore]
+base = "granite"
+overlay = "ore_magnetite"
