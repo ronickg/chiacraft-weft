@@ -539,7 +539,10 @@ fn soil_table(w: &mut String) {
         soil::PAT_GROWTH,
         crate::DAY_SECS / 60.0
     );
-    for c in crate::climate::BIOMES.iter().filter(|c| !c.underground && crate::forage::grass_grows(c.biome) > 0.0) {
+    for c in crate::climate::BIOMES
+        .iter()
+        .filter(|c| !c.underground && crate::forage::grass_grows(c.biome) > 0.0)
+    {
         let lies = (0..4)
             .map(|s| format!("{:.0}", soil::pat_season_secs(c.celsius, c.seasons, c.rain, s) / 60.0))
             .collect::<Vec<_>>()

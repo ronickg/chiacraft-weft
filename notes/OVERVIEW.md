@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 70 · ◧ partly built: 34 · □ not built yet: 11 · ◌ planned for later: 6
+■ built and seen working: 70 · ◧ partly built: 34 · □ not built yet: 13 · ◌ planned for later: 6
 
 ## Core next
 
@@ -155,7 +155,7 @@ Code: `mods/animals`, `mods/animals/core`. Docs: `notes/ANIMALS.md`, `mods/anima
 
 ## Living world
 
-The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, grazers feed hunters, and what dies goes back to the soil. Each part reads five shared things (the place, the climate table, the plant table, food categories, the forage goal) instead of rules of its own. 8 of 22 parts built.
+The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, grazers feed hunters, and what dies goes back to the soil. Each part reads five shared things (the place, the climate table, the plant table, food categories, the forage goal) instead of rules of its own. 8 of 24 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -179,6 +179,8 @@ The loop: seasons bring heat and rain, rain grows plants, plants feed grazers, g
 | ■ | Fertile soil | Farmland's fertility 3 to 0 sets crops' growth 100% to 20%; a ripe crop's harvest wears a level (beans give one back), dung and compost give levels back, a season unplanted one; hoes till grass and dirt (new). Not yet: clover. Code: `mods/base/vitals/src/soil.rs`, `mods/base/src/farming.rs`, `mods/base/src/growth.rs`. Docs: `notes/ECOLOGY.md`. |
 | ■ | Loop balance checks | Built: animals_core::web checks every food in a diet is in the world, every plant eater eats in each habitat every season, every hunter has prey where it lives, every biome has plants, plant eaters, hunters and a carrion eater, and everything but the top hunters is prey; the species sheet shows each biome's web and the gaps the plan fills (web::WAITING, 14 now: wave two and the Cretaceous tier 2). It found winter bare, so the world gained winter hay, twigs and mast, lichen, fungi, roots, insects and water plants (vitals::forage). Every plant grows somewhere (vitals/tests/places.rs). A year holds (web::grazing): in each biome's best season its grazers' full crowds eat at most 18% of what its tall grass grows back (far under real grazers' quarter to half: a choice for later); the grass cover moved to vitals::forage::GRASS_COVER, which worldgen reads. Code: `mods/animals/core/src/web.rs`, `mods/base/vitals/src/forage.rs`, `mods/animals/core/tests/places.rs`. Docs: `notes/ECOLOGY.md`. |
 | ◌ | Migration and waterholes | Herds move to wetter land in the dry season; waterholes shrink. Docs: `notes/ECOLOGY.md`. |
+| □ | Fireflies | Planned (2026-11-05, Ronald's fantasy pick, Research round 17): fireflies on warm nights, by each biome's real fireflies (swamp 1.0, plains and tropical forest 0.8, savanna and forest 0.6, birch 0.3, none elsewhere), flying from 12 °C in seasons with a mean of 16 °C, more on wet ground, none in rain, from sunset to 02:00. The server counts them per player (vitals::fireflies, built); a client frame puts them about as particles, 24 or 60 within 24 blocks by base:fx_fireflies (off, few, many), in clusters away from torches. Blinking is Lighting's, the look Art's. To build after the Weft sync. Code: `mods/base/vitals/src/fireflies.rs`. Docs: `notes/NIGHT_GLOW.md`. |
+| □ | Glowing plants | Planned (2026-11-05, Research round 17): foxfire (Armillaria and Panellus mycelium, a mat on damp forest floors, light 2) and glow mycena (Mycena chlorophos, tropical forest and swamp, light 3), perhaps goblin's gold moss in cave mouths (light 2, if Terrain can find the spots). Wild rows growing and spreading like the mushrooms; their light in vitals::wild::GLOW (built, checked dim: 1-4). Art's _e masks; base:fx_glow and the night scaling are Lighting's. To build after the Weft sync. Code: `mods/base/vitals/src/wild.rs`. Docs: `notes/NIGHT_GLOW.md`. |
 | ◌ | The seasons' look | Grass colour by soil water, autumn leaves, winter snow. Docs: `notes/ECOLOGY.md`. |
 | ◌ | Wildfire | Dry grass burns in the dry season and grows back greener. Docs: `notes/ECOLOGY.md`. |
 

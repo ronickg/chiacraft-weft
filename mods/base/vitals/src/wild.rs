@@ -278,6 +278,19 @@ pub const FIBRE: [(&str, f32); 4] = [("base:sedge", 0.5), ("base:cottongrass", 0
 /// and dies back, so at any time about one plant in three of a stand carries a bunch.
 pub const BANANA_FRUIT: f32 = 0.3;
 
+/// Plants that glow in the dark, and their block light (`notes/NIGHT_GLOW.md`; Research round 17,
+/// recommendation 4): foxfire (Armillaria and Panellus mycelium in rotting twigs), glow mycena
+/// (Mycena chlorophos) and goblin's gold moss (Schistostega pennata). Dim, under Vintage Story's
+/// glow worms (7): the sun washes them out by day, and the pack's `base:fx_glow` scales their glow.
+pub const GLOW: [(&str, u8); 3] = [("base:foxfire", 2), ("base:glow_mycena", 3), ("base:goblins_gold", 2)];
+
+/// A plant's own light (0: it gives none).
+pub fn glow(block: &str) -> u8 {
+    GLOW.iter()
+        .find(|(b, _)| *b == block)
+        .map_or(0, |&(_, l)| l)
+}
+
 /// The most of one ground all its wild plants cover in a biome (the world rolls for them first).
 pub const MOST: f32 = 0.3;
 
@@ -442,6 +455,16 @@ pub fn pick(biome: &str, ground: Ground, roll: f32) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Glowing plants stay dim: light 1-4, nothing like a torch (`notes/NIGHT_GLOW.md`).
+    #[test]
+    fn glow_is_dim() {
+        for (block, light) in GLOW {
+            assert!((1..=4).contains(&light), "{block}: light {light}");
+            assert_eq!(glow(block), light);
+        }
+        assert_eq!(glow("base:mushroom_brown"), 0);
+    }
 
     #[test]
     fn every_wild_plant_has_its_numbers() {

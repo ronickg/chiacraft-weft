@@ -73,7 +73,9 @@ pub fn pat_break_chance() -> f32 {
 
 /// Game seconds a pat lies, on average, at a rot rate `rate` (`plants::rate`).
 fn pat_lies(rate: f32) -> f32 {
-    let step = crate::plants::of("base:dung_pat").and_then(|p| crate::plants::step_secs(p, 1)).unwrap_or(0.0);
+    let step = crate::plants::of("base:dung_pat")
+        .and_then(|p| crate::plants::step_secs(p, 1))
+        .unwrap_or(0.0);
     step / (rate + pat_break_chance() * (1.0 - rate)).max(1e-6)
 }
 
@@ -126,7 +128,10 @@ mod tests {
     #[test]
     fn pats_rot_by_warmth_and_rain() {
         let lies = |c: &crate::climate::Climate, s: usize| pat_season_secs(c.celsius, c.seasons, c.rain, s);
-        for c in crate::climate::BIOMES.iter().filter(|c| !c.underground && crate::forage::grass_grows(c.biome) > 0.0) {
+        for c in crate::climate::BIOMES
+            .iter()
+            .filter(|c| !c.underground && crate::forage::grass_grows(c.biome) > 0.0)
+        {
             let best = (0..4).map(|s| lies(c, s)).fold(f32::MAX, f32::min);
             assert!(best <= 2.0 * DAY_SECS, "{}: a pat lies {:.1} game days in its best season", c.biome, best / DAY_SECS);
             for s in 0..4 {
