@@ -120,6 +120,20 @@ impl T {
         ok
     }
 
+    /// Whether CI leaves this check out (`ci-skip.txt`, as `test/check` or `test/scenario/check`);
+    /// says so in the report.
+    pub fn ci_skips(&self, check: &str) -> bool {
+        let name = match &self.1 {
+            Some(l) => format!("{}/{l}/{check}", self.name()),
+            None => format!("{}/{check}", self.name()),
+        };
+        let why = crate::ci_skip(&name);
+        if let Some(why) = why {
+            skip(&name, why);
+        }
+        why.is_some()
+    }
+
     pub fn check_eq<V: PartialEq + std::fmt::Debug>(&self, got: V, want: V, what: &str) -> bool {
         self.check(got == want, format!("{what}: got {got:?}, want {want:?}"))
     }
@@ -579,6 +593,9 @@ impl Future for All {
 
 /// One scenario of a scene: labeled failures, its error reported as a failure, its time noted.
 pub fn scenario<F: Future<Output = R> + 'static>(t: &T, name: &str, f: impl FnOnce(T) -> F) -> BoxTest {
+    if t.ci_skips(name) {
+        return Box::pin(async { Ok(()) });
+    }
     let t = t.scoped(name);
     let fut = f(t.clone());
     Box::pin(async move {
@@ -638,6 +655,16 @@ thread_local! {
     pub static PROBES: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
     static RUNNER: RefCell<Option<Runner>> = const { RefCell::new(None) };
     static ACTIVE: RefCell<Option<T>> = const { RefCell::new(None) };
+}
+
+thread_local! {
+    static SKIPPED: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Left out on CI (`crate::ci_skip`): in the log now and in the report, never silently.
+pub fn skip(name: &str, why: &str) {
+    weft_sdk::info!("testkit: SKIP {name} on CI: {why}");
+    SKIPPED.with(|s| s.borrow_mut().push(format!("SKIP {name} on CI: {why}")));
 }
 
 pub fn start(queue: Vec<TestDef>) {
@@ -729,6 +756,11 @@ fn finish(c: &Client, run: &mut Runner) {
     let failed = run.done.iter().filter(|o| !o.ok).count();
     let mut report =
         format!("testkit report: {} passed, {failed} failed, {:.1} s\n", run.done.len() - failed, run.started.elapsed().as_secs_f32());
+    SKIPPED.with(|s| {
+        for l in s.borrow().iter() {
+            report.push_str(&format!("\n{l}\n"));
+        }
+    });
     for o in &run.done {
         report.push_str(&format!("\n{} {} ({:.1} s)\n", if o.ok { "PASS" } else { "FAIL" }, o.name, o.secs));
         for l in &o.lines {

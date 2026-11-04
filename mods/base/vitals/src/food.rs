@@ -276,6 +276,62 @@ pub const FOODS: &[Food] = &[
         poison: 0.0,
         category: Category::Fruit,
     },
+    // Preserved (`preserve`): the water gone, so lighter to carry, and keeping for weeks.
+    // Dried meat as plain jerky (a 200 g cut dries to 75 g); real jerky keeps one to two months.
+    Food {
+        name: "base:dried_meat",
+        grams: 75.0,
+        per100: per(20.0, 55.0, 2.0, 15.0, 0.0, 0.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (30.0, 30.0),
+        poison: 0.0,
+        category: Category::Meat,
+    },
+    // Hot-smoked meat (smoked over a fire, partly dried): keeps weeks.
+    Food {
+        name: "base:smoked_meat",
+        grams: 120.0,
+        per100: per(50.0, 30.0, 0.0, 14.0, 0.0, 0.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (14.0, 14.0),
+        poison: 0.0,
+        category: Category::Meat,
+    },
+    // Salt-cured meat (as corned beef or barrel pork): months to a year in salt, a game year here.
+    Food {
+        name: "base:salted_meat",
+        grams: 160.0,
+        per100: per(55.0, 22.0, 0.0, 14.0, 0.0, 0.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (45.0, 45.0),
+        poison: 0.0,
+        category: Category::Meat,
+    },
+    // Dried apple rings (an apple's 180 g dry to 40 g): six months to a year.
+    Food {
+        name: "base:dried_apple",
+        grams: 40.0,
+        per100: per(31.8, 0.9, 65.9, 0.3, 8.7, 3.9),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (56.0, 56.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    // Dried berries, as dried blueberries (a handful's 100 g dry to 30 g).
+    Food {
+        name: "base:dried_berries",
+        grams: 30.0,
+        per100: per(15.0, 2.5, 80.0, 2.5, 7.5, 2.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (56.0, 56.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
     // The wild foods (`vitals::wild`): the north's berries, a handful (100 g) each. Lingonberries
     // as cranberries (USDA), keeping long on their own acid; cloudberries from Fineli (Finland's
     // food table), rich in vitamin C, soft; crowberries, which hold on the plant over winter, as
@@ -471,12 +527,17 @@ impl Freshness {
 }
 
 /// A food's freshness at `age_secs` since it was made; `keep` stretches or shortens how long
-/// food keeps (the world's difficulty, salting and smoking later).
+/// food keeps (the world's difficulty). Preserved foods are foods of their own (`preserve`).
 pub fn freshness(food: &Food, age_secs: f32, keep: f32) -> Freshness {
+    freshness_of(food.keeps, age_secs, keep)
+}
+
+/// Freshness for food that keeps `keeps` game days fresh, then stale (a meal's, `meals::keeps`).
+pub fn freshness_of(keeps: (f32, f32), age_secs: f32, keep: f32) -> Freshness {
     let days = age_secs / DAY_SECS / keep.max(0.01);
-    if days < food.keeps.0 {
+    if days < keeps.0 {
         Freshness::Fresh
-    } else if days < food.keeps.0 + food.keeps.1 {
+    } else if days < keeps.0 + keeps.1 {
         Freshness::Stale
     } else {
         Freshness::Spoiled
@@ -502,11 +563,14 @@ pub const POISON_SECS: f32 = 15.0;
 /// Seconds a cooked food stays hot after it is made.
 pub const HOT_FOR: f32 = 300.0;
 
+/// Degrees a hot meal warms and for how many seconds.
+pub const HOT_MEAL: (f32, f32) = (4.0, 240.0);
+
 /// What a meal does to how warm its eater feels: degrees and for how many seconds (hot food
 /// warms 4 °C for four minutes, cooling food cools 2 °C for three; proposed).
 pub fn meal_warmth(food: &Food, age_secs: f32) -> Option<(f32, f32)> {
     match food.meal {
-        Meal::Cooked if age_secs < HOT_FOR => Some((4.0, 240.0)),
+        Meal::Cooked if age_secs < HOT_FOR => Some(HOT_MEAL),
         Meal::Cooling => Some((-2.0, 180.0)),
         _ => None,
     }

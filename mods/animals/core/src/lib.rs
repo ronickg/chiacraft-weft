@@ -9,6 +9,7 @@ pub mod balance;
 pub mod biology;
 pub mod coats;
 pub mod evolution;
+pub mod hides;
 pub mod life;
 pub mod needs;
 pub mod sheet;

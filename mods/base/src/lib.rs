@@ -4,6 +4,8 @@
 mod advancements;
 mod beds;
 mod blocks;
+mod clothing;
+mod cooking;
 mod farming;
 mod growth;
 mod hud;
@@ -49,6 +51,8 @@ fn init(r: &mut Registry) {
     survival::register(r);
     levels::register(r);
     machines::register(r);
+    clothing::register(r);
+    cooking::register(r);
     recipes::register(r);
     sounds::register(r);
     mobs::register(r);

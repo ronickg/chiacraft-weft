@@ -230,6 +230,43 @@ the trip ("on the way"); both added each other from the link; alice joined bob's
 Friends screen; bob gave his world a new address; alice's saved entry followed it. Test scripts:
 build scripts that contain addresses with Python, not sed (`&` in the replacement).
 
+## Phase 4: admission rules, bans and ban lists (built 2026-11-03, seen working 2026-11-04)
+
+Slices 1-3 of phase 4 (`notes/PLAN.md`). `crates/engine/src/chiacraft/worlds/admission.rs`: the
+world's `admission.json` (`Rules`: `only_listed`, `allow`, `probation`, `lists`) and `bans.json`
+(`Bans`), the verdict on a join (`verdict`: bans, then the allow list, then followed lists, then
+"allow list only"; the owner and operators always in), probation (`probation_for`), signed ban lists
+(`BanList`, text `chiacraft ban list v1`, the account's `sign_text`/`check_text`), copies kept in the
+world's `banlists/` (newer `seq` wins; `owners.json` maps a followed world's key to its certified
+owner), and `Gate`, the server's view of all of it, read again when the files change.
+`crates/engine/src/server/admission.rs`: `trusted` (the world certificate's owner, ops; connection
+order only for a world without a certificate), `may`/`barred` (probation on breaking, placing, and
+containers a block keeps, checked in `actions.rs` and `open_menu`), `send_banned_away` (every 5 s
+when the files changed, and on `/ban`), and the commands `/ban`, `/tempban`, `/unban`, `/bans`,
+`/allow`, `/probation`, `/banlist` (ADMIN). The join (`player_file.rs`) asks the gate instead of
+`whitelist.txt` (a dedicated server's whitelist becomes the allow list once); player files keep
+`identity`, `played` (seconds) and `probation = lifted`. Protocol 7: `ToClient::Refused(Msg)` (the
+reason in the player's language), the status answer carries the rules' summary (shown in the saved
+worlds list), and worlds serve ban lists on `chiacraft/bans/1` and fetch the ones they follow when
+hosting starts and daily (`p2p::fetch_lists`). The owner's screen: pause menu, "Who May Come In"
+(`admission_screen.rs`), which acts through the same commands. Unit tests in `admission.rs` (not run
+here). testkit's new script line `chatf <file> <text with {}>`. The check: `tools/checks/admission`
+(two copies, alice and bob, stepping together through `mark`/`await_file`): passed on the PC
+(Tester 2, 20e4522): probation refused bob's digging, the ban sent him away and refused him, the
+allow list refused then admitted him, the owner lifted his probation, and his own world fetched
+alice's published list from hers.
+
+Slices 4 and 6 (2026-11-04, built, not yet seen on testnet11): the engine links the wallet with
+`chain`; `crates/engine/src/chiacraft/chain.rs` holds one `ChainReader` per process, configured at
+start (`chain::configure`, settings `core:chain` = `testnet11` by default, `off`; `mainnet` refused
+in this build; `core:chain_peers`), started by the first `chain::get()`, never from an async task
+(the reader runs its own runtime and `block_on`s), cache `<run dir>/chain/<network>.json`. The
+account keeps its DID's owner key (`Session::link_did`, `did_proof`, `check_did_proof`; text
+`chiacraft did v1`, `sign::did_link_text`). The join carries `did` (protocol 7 also covers it);
+the server checks the proof, then the chain on a thread (`server/admission.rs` `check_did`,
+`did_answers`), waits up to 25 s only when the rules ask for a DID (`Rules::needs_did`), and keeps
+`did` in the player file. `/didrule required on|off`, `/didrule age <days>`, and the screen.
+
 ## Phase 6, sandboxed code mods
 
 Slice 1 (server halves) is built; the design for Ronald to agree is `reports/Sandboxed code
@@ -289,7 +326,7 @@ newer 1.x at load. `crates/mod-sdk` is 1.1.0 (`value!`, `Component`, `entity_com
 to 256 (`Comp`); sounds and particles are checked by `find` and made into handles once per name.
 Sample `examples/wasm/tally` (a per-player count of blocks broken, a chime and particles every
 tenth, `/tally pillar` with `set_blocks`), packaged as `examples/packages/tally`. Checked in one game on the Linux PC (Tester 2, with
-the protocol 7 work below in the build): `/tally` 0, `/tally pillar` built 5 glass blocks with
+the API-in-offer work below in the build): `/tally` 0, `/tally pillar` built 5 glass blocks with
 one `set_blocks`, digging logged "has broken 10 blocks" up to 90 and told the player every tenth,
 `/tally` 94, and after leaving and opening the world again still 94 (the component saved, `KEEP`);
 no strikes or load errors. The particles weren't visible in the shots (a dark shaft), the chime
@@ -297,7 +334,7 @@ isn't in the log: neither is confirmed. Script `tally.txt` in the shared notes' 
 (testkit: negative pitch looks down, `hold` doesn't wait).
 After slice 3, decided by Planner for Ronald: the API version a mod needs is read from its
 imports (`chiacraft_packages::code`, with `wasmparser`; also the one place the game's API, 1.1,
-is written) and travels in the offer (protocol 7: the sixth field is `1.1`, or empty for no
+is written) and travels in the offer (protocol 8, after Phase 4's 7: the sixth field is `1.1`, or empty for no
 code), so `check_offers` refuses a too-new mod before downloading and the sheet shows "mod API
 1.1"; the sandbox checks imports with the same rule before compiling. Storage now holds the WIT's
 1 MiB written per call. `callcost` (feature `pack`) times each kind of call against a `NullGame`;
@@ -308,7 +345,7 @@ by name to whatever command had that name, so a package whose clashing command w
 open another mod's (`/tk give` to everyone); a permission now carries its mod and applies to that
 mod's own command only (`content::freeze_commands`, test
 `a_left_out_command_leaves_its_permission_too`).
-Not yet seen in the game: protocol 7 (a pair run is to come).
+Not yet seen in the game: protocol 8 (a pair run is to come).
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost numbers, 1.2
 (block and item callbacks, channels), client halves (slice 4), personal mods per world (slice
 5), `/mods` (slice 6).

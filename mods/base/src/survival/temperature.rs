@@ -1,11 +1,12 @@
 //! Body temperature (`vitals::temperature`): once a second the air where one stands
 //! (`base_api::air_at`: the biome's climate, the season, the hour, height, sun, rain or snow,
 //! water, caves, fires near by), wet from rain and water and drying (faster by a fire), armor's
-//! insulation, and the core temperature moving toward what that leaves it at. Sets the weather's
+//! and clothes' insulation (`vitals::clothing`: warmth, what of it stays wet, the wind they stop), and the core temperature moving toward what that leaves it at. Sets the weather's
 //! effects, chilly to freezing and warm to heatstroke. Also `/season`, which jumps to a day of a
 //! season.
 
 use base_api::{Air, Vitals};
+use vitals::clothing::{self, Worn};
 use vitals::effects::{self, Effect, Group};
 use vitals::temperature::{self, Body};
 use vitals::{calendar, stomach};
@@ -35,6 +36,24 @@ pub fn register(r: &mut Registry) {
         w.set_day_time(calendar::on_day(w.day_time(), season as u32 * calendar::SEASON_DAYS + day - 1));
         cmd.reply("command.base.season", &[Arg::Key(&format!("season.base.{}", calendar::SEASONS[season].name())), Arg::Int(day as i64)]);
     });
+    // What one wears comes to, the air as felt and the core: for checking clothes.
+    r.command("warmth", "", |cmd| {
+        let w = cmd.world();
+        let worn = worn(&w, cmd.player());
+        let Some(v) = w.component(cmd.player(), &base_api::VITALS) else { return };
+        cmd.reply(
+            "command.base.warmth",
+            &[
+                Arg::Float(worn.cold as f64, 1),
+                Arg::Float(worn.cold_wet as f64, 1),
+                Arg::Float(worn.heat as f64, 1),
+                Arg::Int((worn.windproof * 100.0).round() as i64),
+                Arg::Float(v.outside as f64, 1),
+                Arg::Float(v.core as f64, 2),
+            ],
+        );
+    })
+    .permission(permission::EVERYONE);
 }
 
 /// This second's air and core temperature. Returns the air where one stands and the kinds of
@@ -48,11 +67,12 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
     } else {
         v.wet = (v.wet - 1.0 - here.fire / 3.0).max(0.0);
     }
-    let (cold, heat) = armor(w, id);
+    let worn = worn(w, id);
     let body = Body {
         comfort: temperature::PERSON,
-        cold_insulation: cold,
-        heat_insulation: heat,
+        cold_insulation: worn.cold,
+        heat_insulation: worn.heat,
+        wet_cold_insulation: worn.cold_wet,
         fortitude,
         fat,
         meal: s.meal_warmth(),
@@ -61,8 +81,10 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
     if v.core < 20.0 {
         v.core = temperature::CORE; // saved before the body had a temperature
     }
-    v.core = temperature::step_core(v.core, body.target(here.celsius), 1.0, 70.0);
-    v.outside = here.celsius;
+    // Through windproof clothes, only part of the wind chills.
+    let felt = temperature::through_clothes(here.still, here.celsius, worn.windproof);
+    v.core = temperature::step_core(v.core, body.target(felt), 1.0, 70.0);
+    v.outside = felt;
 
     let mut on = Vec::new();
     on.extend(effects::from_feeling(temperature::feeling(v.core)));
@@ -77,26 +99,28 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
     (here, comfort)
 }
 
-/// The cold and heat insulation of the armor one wears, a share a piece (head to feet).
-fn armor(w: &World, id: u64) -> (f32, f32) {
-    let (mut cold, mut heat) = (0.0, 0.0);
-    if let Some(worn) = w.inventory(id).find_group(EQUIPMENT_GROUP) {
-        for i in 0..worn.len().min(4) {
-            let stack = worn.get(i);
-            if stack.is_empty() {
-                continue;
-            }
-            let name = item_name(stack.item);
+/// What one wears: armor by its material, a share a piece (head to feet), and clothes by theirs
+/// (`vitals::clothing`, named `<material>_<piece>`).
+fn worn(w: &World, id: u64) -> Worn {
+    let mut worn = Worn::default();
+    let Some(slots) = w.inventory(id).find_group(EQUIPMENT_GROUP) else { return worn };
+    for i in 0..slots.len() {
+        let stack = slots.get(i);
+        if stack.is_empty() {
+            continue;
+        }
+        let name = item_name(stack.item);
+        if let Some((m, piece)) = clothing::piece_of(name) {
+            worn.clothes(m, piece);
+        } else if i < 4 {
             let material = name
                 .split_once(':')
                 .map_or(name, |(_, n)| n)
                 .split('_')
                 .next()
                 .unwrap_or("");
-            let (c, h) = temperature::set_insulation(material);
-            cold += c * temperature::PIECE_SHARE[i as usize];
-            heat += h * temperature::PIECE_SHARE[i as usize];
+            worn.armor(material, i as usize);
         }
     }
-    (cold, heat)
+    worn
 }

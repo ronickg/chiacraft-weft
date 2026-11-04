@@ -1,0 +1,266 @@
+[
+ {
+  "kind": "item",
+  "name": "apple",
+  "what": "a red apple: round glossy vivid red with a pale streak on the upper left, a short stem and one green leaf, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "apple_pie",
+  "what": "an apple pie in three-quarter top view: a round golden lattice crust over red-brown apple filling, a crimped rim, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "bread",
+  "what": "a loaf of bread in three-quarter view: a golden-brown crust with slashes on top and a cut end showing pale speckled crumb, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "carrot",
+  "what": "a carrot: a bright orange tapering root with faint rings, lying diagonally, a green leaf tuft at the top right",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "potato",
+  "what": "a raw potato: a lumpy oval tuber, pale tan-brown skin with small dark eyes, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "baked_potato",
+  "what": "a baked potato: a golden-brown roasted potato split open on top showing fluffy pale yellow inside, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "beetroot",
+  "what": "a beetroot: a round deep crimson-purple root with a thin tail at the bottom and short green-red stalks on top, centred with 3-5 px of padding",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "corn",
+  "what": "an ear of maize: golden-yellow kernels in rows, pale green husk leaves peeled back at the bottom, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "roasted_corn",
+  "what": "a roasted ear of maize: golden kernels with dark brown char spots, husk leaves peeled back, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cassava",
+  "what": "a cassava root: a long tapering tuber with rough dark brown bark-like skin, one cut end showing white flesh, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "melon_slice",
+  "what": "a slice of melon: a crescent wedge with a green rind, a pale band and juicy pink-red flesh with a few dark seeds, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "beef",
+  "what": "a raw steak: a glossy red cut of meat with a cream fat edge and marbling, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_beef",
+  "what": "a cooked steak: a muted brown seared steak with darker grill stripes, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "porkchop",
+  "what": "a raw pork chop: pale pink meat with a cream fat rim and a small bone, centred with 3-5 px of padding",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_porkchop",
+  "what": "a cooked pork chop: golden-brown seared meat with a crisp fat rim and grill stripes, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "mutton",
+  "what": "raw mutton: a red-pink leg cut with cream fat and a short bone end, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_mutton",
+  "what": "cooked mutton: a browned roast leg cut with crisp fat and a short bone end, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "chicken",
+  "what": "a raw chicken leg: pale pink skin with goosebump texture and a pale bone end, centred with 3-5 px of padding",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_chicken",
+  "what": "a roast chicken leg: golden-brown crisp skin and a pale bone end, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "hare",
+  "what": "a raw hare: a skinned dark-red game carcass, long hind legs, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_hare",
+  "what": "a roast hare: a golden-brown roasted game carcass with long hind legs, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "venison",
+  "what": "raw venison: a deep dark-red lean steak with very little fat, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_venison",
+  "what": "cooked venison: a dark brown seared lean steak with grill marks, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "trout",
+  "what": "a raw trout: a whole fish lying diagonally, head at the bottom left, olive-green speckled back, a pink stripe along the side, silver belly",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_trout",
+  "what": "a cooked trout: a whole fish lying diagonally, head at the bottom left, golden-brown roasted skin with darker char marks, a fin on top",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "pacu",
+  "what": "a raw pacu: a deep-bodied round Amazon fish lying diagonally, silver-grey with an orange-red chest and belly",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_pacu",
+  "what": "a cooked pacu: a deep-bodied round fish lying diagonally, golden-brown roasted skin with char marks",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "egg",
+  "what": "an egg: an upright oval, slightly narrower at the top, warm cream shell with a soft highlight on the upper left, an outline no darker than mid brown, centred with 3-5 px of padding",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_egg",
+  "what": "a fried egg seen from above: a white with a frilled golden-brown edge and a round yellow yolk with a glint, centred with 3-5 px of padding",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cooked_rice",
+  "what": "a wooden bowl of cooked rice seen from the front and slightly above: a heap of white grains with a soft shine, centred with 3-5 px of padding",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "rotten_flesh",
+  "what": "rotten flesh: a lump of grey-green spoiled meat with sickly olive patches and a dark red edge, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "spider_eye",
+  "what": "a spider eye: a glossy dark red eyeball with a bright highlight and a few thin veins, centred with 3-5 px of padding",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "kibble",
+  "what": "a small pile of kibble: chunky round brown pet-food pellets, a few lighter crumbs, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ }
+]

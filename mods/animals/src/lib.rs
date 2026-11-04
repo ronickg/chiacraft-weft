@@ -160,6 +160,11 @@ fn init(r: &mut Registry) {
     signatures::init(r);
     knockout::init(r);
     riding::init(r);
+    // Pelts and hides for clothes (`animals_core::hides`).
+    for &(species, item, lo, hi) in animals_core::hides::HIDES {
+        r.loot(&Entity::named(species))
+            .pool(Pool::new().items(item, lo, hi));
+    }
     coats::init(r);
     scars::init(r);
     breeding::init(r);

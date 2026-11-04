@@ -118,6 +118,7 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
         "core:mods" => Box::new(ModList::default()),
         "core:profile" => Box::new(Profile::default()),
         "core:account" => Box::new(crate::account_screen::Account::default()),
+        "core:admission" => Box::new(crate::chiacraft::worlds::admission_screen::Admission),
         _ => return None,
     })
 }
@@ -556,6 +557,10 @@ impl Screen for Pause {
                     d.button("menu.return_home", &[Arg::Text(home.to_string())], 200.0, false, |r| r.handle(vec![Request::ReturnHome]));
                 }
                 d.button("menu.multiplayer", &[], 200.0, false, |r| r.handle(vec![Request::Screen("core:multiplayer".into())]));
+                // Who may come into your world (chiacraft): only in a world this game runs.
+                if cx.in_game && !cx.remote {
+                    d.button("menu.admission", &[], 200.0, false, |r| r.handle(vec![Request::Screen("core:admission".into())]));
+                }
                 d.button("menu.settings", &[], 200.0, false, |r| r.handle(vec![Request::Screen("core:settings".into())]));
                 d.parts("core:pause", "buttons");
                 d.button("menu.save_quit", &[], 200.0, false, |r| r.handle(vec![Request::LeaveWorld]));

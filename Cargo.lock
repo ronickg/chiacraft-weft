@@ -1331,6 +1331,7 @@ version = "0.1.0"
 dependencies = [
  "chiacraft-wallet",
  "log",
+ "parking_lot 0.13.0",
 ]
 
 [[package]]
@@ -8353,6 +8354,7 @@ dependencies = [
  "bytemuck",
  "chiacraft-account",
  "chiacraft-packages",
+ "chiacraft-wallet",
  "crossbeam-channel",
  "glam 0.34.1",
  "iroh",

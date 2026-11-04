@@ -124,7 +124,7 @@ Ronald took the recommendations ("Take its recommendations", through Planner):
 
 - a) A mod's API version is read from its own imports (`chiacraft_packages::code::api_of`, by
   `wasmparser`, so the engine needs no wasmtime). A too-new one is refused when it loads, and the
-  host's offer carries it (protocol 7), so the join sheet refuses before downloading. Built.
+  host's offer carries it (protocol 8), so the join sheet refuses before downloading. Built.
 - b) A `required` flag per package at the next `package.toml` change, optional by default: a
   stopped required mod closes its world to joins and sends its players home, naming the mod. Not
   built yet.

@@ -112,6 +112,7 @@ pub fn all() -> Vec<TestDef> {
         gameplay::own_names,
         gameplay::food,
         gameplay::every_food_has_nutrition,
+        gameplay::clothes_and_stew,
         gameplay::drop_and_pickup,
         gameplay::sounds,
         extend::events_batched,

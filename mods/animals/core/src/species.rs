@@ -439,7 +439,9 @@ pub static SPECIES: [Species; 35] = [
             comfort: (5.0, 32.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { crowd: Some(20), ..Tune::NONE },
         birth_size: 0.35,
     },
     Species {
@@ -501,7 +503,9 @@ pub static SPECIES: [Species; 35] = [
             comfort: (12.0, 32.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
     },
     Species {
@@ -725,7 +729,9 @@ pub static SPECIES: [Species; 35] = [
             comfort: (-10.0, 30.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { crowd: Some(8), ..Tune::NONE },
         birth_size: 0.08,
     },
     // The hares (`reports/ecology/Overworld food webs.md`: the mid-sized prey everywhere, the fox's,
@@ -788,7 +794,9 @@ pub static SPECIES: [Species; 35] = [
             comfort: (-5.0, 30.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { crowd: Some(26), ..Tune::NONE },
         birth_size: 0.3,
     },
     Species {
@@ -843,7 +851,9 @@ pub static SPECIES: [Species; 35] = [
             comfort: (-15.0, 24.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { crowd: Some(26), ..Tune::NONE },
         birth_size: 0.3,
     },
     // The wood mouse (`reports/ecology/Overworld food webs.md`: the rodent, the small hunters' main
@@ -908,7 +918,9 @@ pub static SPECIES: [Species; 35] = [
         // A mouse's real pace (grown in two months, gone within the year) would make a line four
         // generations deep in five game days and crowd 36 near: its growing up, life and room are
         // set to the common animals' pace instead (`balance::checks`).
-        tune: Tune { growth: Some(72_000), lifespan: Some(384_000), crowd: Some(24), ..Tune::NONE },
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { growth: Some(72_000), lifespan: Some(384_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.35,
     },
     // The field vole, the north's rodent (the lemming's, the snow vole's and the marsh rats' stand-in),
@@ -977,7 +989,11 @@ pub static SPECIES: [Species; 35] = [
         },
         // A vole's real pace, as the mouse's, set to the common animals' (`balance::checks`);
         // its life shorter still, as it breeds faster.
-        tune: Tune { growth: Some(72_000), lifespan: Some(336_000), crowd: Some(24), ..Tune::NONE },
+        // A life paced as the wood mouse's, so it is grown most of it, and litters of 2-5 (4-6 in a good
+        // year, fewer in most), so it doesn't raise more than 40 young in it (`balance::checks`).
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { growth: Some(72_000), lifespan: Some(384_000), litter: Some((2, 5)), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.35,
     },
     // The deer (`reports/ecology/Overworld food webs.md`: the big browser and grazer of seven biomes,
@@ -1158,7 +1174,11 @@ pub static SPECIES: [Species; 35] = [
             comfort: (4.0, 20.0),
             cold_blooded: true,
         },
-        tune: Tune::NONE,
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        // Of a redd's hundreds of eggs, the fry that grow up: 3-8 here, or a group overshoots its room
+        // threefold (`web/test.mjs`).
+        tune: Tune { litter: Some((3, 8)), crowd: Some(26), ..Tune::NONE },
         birth_size: 0.1,
     },
     Species {
@@ -1283,7 +1303,11 @@ pub static SPECIES: [Species; 35] = [
             comfort: (-20.0, 30.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
+        // A vixen's rest after her cubs set shorter: with its short wild life she raised two litters,
+        // too few for a group to last (`web/test.mjs`).
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { recovery: Some(60_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.25,
     },
     Species {
@@ -1341,7 +1365,9 @@ pub static SPECIES: [Species; 35] = [
             comfort: (-35.0, 18.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { crowd: Some(24), ..Tune::NONE },
         birth_size: 0.25,
     },
     // The raven (`reports/ecology/Overworld food webs.md`: for the dead in the cold biomes, where
@@ -1481,7 +1507,9 @@ pub static SPECIES: [Species; 35] = [
         // The most common animal of its dunes and a raptor's food: it grows up at a common
         // species' pace (six days), and its clutches are the eggs that hatch (most of a wild one is
         // lost to storms and egg eaters), so the wild keeps a line's young to a mother's life.
-        tune: Tune { growth: Some(144_000), litter: Some((3, 8)), ..Tune::NONE },
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { growth: Some(144_000), litter: Some((3, 8)), crowd: Some(20), ..Tune::NONE },
         birth_size: 0.15,
     },
     // Kryptobaatar (`reports/ecology/Cretaceous food webs.md`: the commonest mammal of the
@@ -1544,7 +1572,9 @@ pub static SPECIES: [Species; 35] = [
         },
         // As the wood mouse's: a small mammal's real pace would make a line four generations deep
         // in a few game days; its growing up, life and room are set to the common animals' pace.
-        tune: Tune { growth: Some(72_000), lifespan: Some(384_000), crowd: Some(24), ..Tune::NONE },
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { growth: Some(72_000), lifespan: Some(384_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.35,
     },
     // Priscagama (`reports/ecology/Cretaceous food webs.md`: the Djadokhta's lizards, "rather
@@ -1666,6 +1696,8 @@ pub static SPECIES: [Species; 35] = [
             comfort: (-45.0, 18.0),
             cold_blooded: false,
         },
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune {
             // A calf runs with the herd within a day and doubles its weight in two weeks, and a cow
             // calves nearly every year: growing up and her rest set shorter, so a herd keeps up
@@ -1673,6 +1705,7 @@ pub static SPECIES: [Species; 35] = [
             // life).
             growth: Some(110_000),
             recovery: Some(40_000),
+            crowd: Some(20),
             ..Tune::NONE
         },
         birth_size: 0.35,
@@ -1738,7 +1771,9 @@ pub static SPECIES: [Species; 35] = [
             comfort: (-30.0, 36.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { crowd: Some(22), ..Tune::NONE },
         birth_size: 0.25,
     },
     // The small birds (`reports/ecology/Overworld food webs.md`: the songbirds of every land biome, the
@@ -1812,7 +1847,9 @@ pub static SPECIES: [Species; 35] = [
         // No nests yet: the young come out as fledglings after the eggs' time. Its life paced as the
         // mouse's (a small animal's derived span is too short for a line to be bred), growing up a
         // fifth of it; many live close together, at feeders and in hedges (`balance::checks`).
-        tune: Tune { gestation: Some(8_665), growth: Some(66_000), lifespan: Some(336_000), crowd: Some(24), ..Tune::NONE },
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { gestation: Some(8_665), growth: Some(66_000), lifespan: Some(336_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.6,
     },
     Species {
@@ -1871,12 +1908,14 @@ pub static SPECIES: [Species; 35] = [
         },
         // No nests yet: the young come out as fledglings after the eggs' time; paced as the sparrow,
         // a second brood in a long summer, flocks close together (`balance::checks`).
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune {
             gestation: Some(8_935),
             growth: Some(66_000),
             lifespan: Some(336_000),
             recovery: Some(60_000),
-            crowd: Some(24),
+            crowd: Some(30),
             ..Tune::NONE
         },
         birth_size: 0.6,
@@ -2218,7 +2257,8 @@ pub static SPECIES: [Species; 35] = [
         // No nests yet: fledglings after the eggs' time. A young vulture is grown in its first year
         // and breeds at three, which no line in the game could wait for (`balance::checks`).
         // Roosts of dozens, but spread over a big range by day: room near as a herd's at most.
-        tune: Tune { gestation: Some(21_377), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
+        // Her rest after a brood set shorter, so a roost of a few lasts on its own (`web/test.mjs`).
+        tune: Tune { gestation: Some(21_377), growth: Some(110_000), recovery: Some(80_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
     },
     // The herring gull (`reports/ecology/Overworld food webs.md`: the coast's hunter and its eater of
@@ -2354,7 +2394,17 @@ pub static SPECIES: [Species; 35] = [
         // most, so a pen doesn't flood. Growing up and a life paced so a line can be bred, and a
         // female's rest after a clutch long, as she guards the mound and the young for months
         // (`balance::checks`: a fourth generation in 25 days, at most 40 young in a life).
-        tune: Tune { litter: Some((6, 12)), growth: Some(150_000), lifespan: Some(1_800_000), recovery: Some(400_000), ..Tune::NONE },
+        // Clutches of 4-8 here: a dozen made a group overshoot its room threefold (`web/test.mjs`).
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune {
+            litter: Some((4, 8)),
+            growth: Some(150_000),
+            lifespan: Some(1_800_000),
+            recovery: Some(400_000),
+            crowd: Some(26),
+            ..Tune::NONE
+        },
         birth_size: 0.15,
     },
     Species {
@@ -2418,7 +2468,17 @@ pub static SPECIES: [Species; 35] = [
         // most, so a pen doesn't flood. Growing up and a life paced so a line can be bred, and a
         // female's rest after a clutch long, as she guards the mound and the young for months
         // (`balance::checks`: a fourth generation in 25 days, at most 40 young in a life).
-        tune: Tune { litter: Some((6, 12)), growth: Some(150_000), lifespan: Some(1_800_000), recovery: Some(400_000), ..Tune::NONE },
+        // Clutches of 4-8 here: a dozen made a group overshoot its room threefold (`web/test.mjs`).
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune {
+            litter: Some((4, 8)),
+            growth: Some(150_000),
+            lifespan: Some(1_800_000),
+            recovery: Some(400_000),
+            crowd: Some(26),
+            ..Tune::NONE
+        },
         birth_size: 0.15,
     },
     // The grey wolf (`reports/ecology/Overworld food webs.md`: the top hunter of the forests, the
@@ -2500,7 +2560,9 @@ pub static SPECIES: [Species; 35] = [
             comfort: (-40.0, 28.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { crowd: Some(16), ..Tune::NONE },
         birth_size: 0.2,
     },
     // The jaguar (`reports/ecology/Overworld food webs.md`: the top hunter of the swamp and the savanna,
@@ -2571,7 +2633,9 @@ pub static SPECIES: [Species; 35] = [
         },
         // A mother's rest after a litter set shorter than her two years with the cubs, so the wild
         // replaces its dead (`balance::checks`: six young in a life).
-        tune: Tune { recovery: Some(150_000), ..Tune::NONE },
+        // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
+        // left alone at their room neither die out nor flood); the food web's grazing still holds.
+        tune: Tune { recovery: Some(150_000), crowd: Some(12), ..Tune::NONE },
         birth_size: 0.12,
     },
 ];

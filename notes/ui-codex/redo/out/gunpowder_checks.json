@@ -1,0 +1,26 @@
+{
+ "kind": "item",
+ "what": "a small heap of gunpowder: dark grey-black grains with a few lighter grey specks, a soft pile, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.535,
+   "outline": 1.24,
+   "red_line": 0.0,
+   "fill": 0.27,
+   "passed": false
+  },
+  {
+   "grid": 0.541,
+   "outline": 0.86,
+   "red_line": 0.0,
+   "fill": 0.19,
+   "passed": true
+  }
+ ]
+}

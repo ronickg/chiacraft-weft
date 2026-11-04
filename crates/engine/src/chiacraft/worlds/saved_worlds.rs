@@ -241,7 +241,17 @@ pub fn status_line(run_dir: &Path, key: &str) -> (String, Vec<crate::ui::text::A
     }
     match pings.get(key) {
         Some(Ping::Online(st, _)) => {
-            ("multiplayer.status.online".into(), vec![Arg::Text(st.players.to_string()), Arg::Text(st.packages.to_string())])
+            let online = vec![Arg::Text(st.players.to_string()), Arg::Text(st.packages.to_string())];
+            // What its admission rules ask (chiacraft, `admission`), before joining.
+            let rules = st
+                .admission
+                .iter()
+                .map(|(k, n)| crate::ui::text::Msg::new(k, vec![Arg::Int(*n)]))
+                .reduce(|a, b| crate::ui::text::Msg::new("admission.summary.both", vec![Arg::Msg(a), Arg::Msg(b)]));
+            match rules {
+                Some(r) => ("multiplayer.status.online_rules".into(), [online, vec![Arg::Msg(r)]].concat()),
+                None => ("multiplayer.status.online".into(), online),
+            }
         }
         Some(Ping::Offline(_)) => {
             let seen = load(run_dir)

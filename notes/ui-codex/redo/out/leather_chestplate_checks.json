@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a soft warm-brown leather with stitching chestpanel, front view: a breastpanel with rounded shoulder panels, a collar at the neck, a brown leather belt at the waist, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.571,
+   "outline": 0.53,
+   "red_line": 0.44,
+   "fill": 0.51,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a wooden stick: a slightly crooked warm-brown twig 3 px wide with grain and a small knot, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.313,
+   "outline": 0.63,
+   "red_line": 0.15,
+   "fill": 0.09,
+   "passed": true
+  }
+ ]
+}

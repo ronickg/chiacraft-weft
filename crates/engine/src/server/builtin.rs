@@ -74,6 +74,25 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
     ("op", "<who:targets> [level:int]", op, p::ADMIN),
     ("deop", "<who:targets>", deop, p::ADMIN),
     ("rule", "[name:word(#core:rules)] [value:int]", rule, p::ADMIN),
+    // chiacraft: admission rules and bans (`server::admission`).
+    ("ban", "<who:word> [reason:text]", super::admission::ban, p::ADMIN),
+    ("tempban", "<who:word> <time:word> [reason:text]", super::admission::tempban, p::ADMIN),
+    ("unban", "<who:word>", super::admission::unban, p::ADMIN),
+    ("bans", "", super::admission::bans, p::ADMIN),
+    ("allow", "add <who:word> | remove <who:word> | list | only | everyone", super::admission::allow, p::ADMIN),
+    (
+        "probation",
+        "show | hours <hours:int> | build <on:word(on,off)> | containers <on:word(on,off)> | end <who:word>",
+        super::admission::probation,
+        p::ADMIN,
+    ),
+    ("didrule", "show | required <on:word(on,off)> | age <days:int>", super::admission::didrule, p::ADMIN),
+    (
+        "banlist",
+        "list | follow <from:word> [maintainer:word] | unfollow <what:word> | publish [name:text]",
+        super::admission::banlist,
+        p::ADMIN,
+    ),
 ];
 
 fn help(s: &mut Server, x: &Ctx) -> Vec<Msg> {

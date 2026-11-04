@@ -30,6 +30,9 @@ serde = { version = "1", features = ["derive"] }
 mimalloc.workspace = true
 # The player's account (MIT, ours): the network key follows the account's 24 words.
 chiacraft-account = { path = "../account" }
+# The chain (phase 4): reading DIDs (the player's, the world's, a joining player's) through Chia
+# full nodes. Started only when something asks (`chiacraft::chain`), never in the game loop.
+chiacraft-wallet = { path = "../wallet", features = ["chain"] }
 iroh-mainline-address-lookup = "0.6.1"
 
 [dev-dependencies]

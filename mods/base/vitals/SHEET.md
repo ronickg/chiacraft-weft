@@ -18,6 +18,8 @@ Written from `mods/base/vitals` (`cargo run -p vitals --bin sheet > mods/base/vi
 
 Comfortable air for a person, unclothed: (15.0, 28.0) °C.
 
+A new player arrives with base:bread and base:apple in the stomach (43 units): max health 54 and stamina 75 of 100, wearing off as it digests (an empty stomach: 40).
+
 ## Foods
 
 A portion, its kind for the animals' diets, what it holds of each nutrient, how long it digests, and game days fresh then stale.
@@ -39,6 +41,11 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:cooked_egg | meat | 100 | 10 | 14 | 1 | 15 | 0 | 70 | 16 min | 2 + 2 | hot when cooked |
 | base:apple_pie | fruit | 200 | 20 | 5 | 74 | 25 | 4 | 104 | 25 min | 4 + 4 | hot when cooked |
 | base:berries | fruit | 100 | 10 | 1 | 14 | 0 | 3 | 84 | 5 min | 6 + 6 | cooling |
+| base:dried_meat | meat | 75 | 8 | 41 | 2 | 11 | 0 | 15 | 20 min | 30 + 30 |  |
+| base:smoked_meat | meat | 120 | 12 | 36 | 0 | 17 | 0 | 60 | 24 min | 14 + 14 |  |
+| base:salted_meat | meat | 160 | 16 | 35 | 0 | 22 | 0 | 88 | 29 min | 45 + 45 |  |
+| base:dried_apple | fruit | 40 | 4 | 0 | 26 | 0 | 4 | 13 | 3 min | 56 + 56 |  |
+| base:dried_berries | fruit | 30 | 3 | 1 | 24 | 1 | 2 | 4 | 2 min | 56 + 56 |  |
 | base:lingonberries | fruit | 100 | 10 | 0 | 12 | 0 | 5 | 87 | 5 min | 20 + 20 | cooling |
 | base:cloudberries | fruit | 100 | 10 | 2 | 9 | 1 | 16 | 85 | 6 min | 3 + 3 | cooling |
 | base:crowberries | fruit | 100 | 10 | 1 | 7 | 1 | 5 | 85 | 6 min | 10 + 10 | cooling |
@@ -51,6 +58,32 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
 | animals:kibble | meat | 100 | 10 | 25 | 45 | 14 | 4 | 10 | 19 min | 90 + 90 |  |
+
+## Meals and preserving
+
+A stew (`vitals::meals`) cooks 2-4 foods in 10 s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x1.25 (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient.
+
+Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (25 °C, humidity 0.3, a breeze; nothing below 5 °C or above humidity 0.85, nor in the rain), and smokes in 10 min over a fire (lava, a lit furnace) within 2 blocks below, in any weather; salting is crafted with salt, boiled out of a water bucket in a furnace in 20 s.
+
+| from | dried | smoked | salted | keeps (days) |
+|---|---|---|---|---|
+| base:apple (40) | base:dried_apple | - | - | 112 |
+| base:porkchop (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| base:beef (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| base:chicken (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| base:mutton (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| base:berries (12) | base:dried_berries | - | - | 112 |
+
+## Clothing
+
+Worn in four slots of their own under armor (hat, coat, trousers, boots), no armor value. A full set's real insulation in clo at 12 °C of comfort each; a piece gives its share ([0.15, 0.4, 0.3, 0.15], head to feet). Wet, armor keeps 35% of its warmth; being wet itself feels 6 °C colder. What each piece takes: hat 2 + 1 string, coat 4 + 2 string, trousers 3 + 1 string, boots 2 + 1 string.
+
+| material | clo | cold °C | heat °C | kept wet | windproof | from |
+|---|---|---|---|---|---|---|
+| fur | 2.5 | 30 | -9 | 30% | 80% | pelts of furred wild animals |
+| wool | 1.2 | 14 | -2 | 60% | 30% | sheep's wool |
+| hide | 0.8 | 10 | -1 | 30% | 70% | leather |
+| linen | 0.5 | 6 | 4 | 20% | 10% | plant fibre spun and woven |
 
 ## Effects
 

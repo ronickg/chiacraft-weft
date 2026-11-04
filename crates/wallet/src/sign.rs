@@ -147,6 +147,14 @@ pub fn network_link_text(endpoint: &str) -> String {
     format!("{PREFIX}network key v1\nendpoint: {endpoint}")
 }
 
+/// What a DID's owner key signs to say the DID is this identity's (phase 4: the join's DID
+/// proof). It names no session: the identity is bound to the connection by its vouching for the
+/// network key, so a replay only proves the same link again. Whether the key still owns the DID
+/// is a chain lookup.
+pub fn did_link_text(launcher_hex: &str, identity_hex: &str) -> String {
+    format!("{PREFIX}did v1\ndid: {launcher_hex}\nidentity: {identity_hex}")
+}
+
 /// Whether `signature` is `identity` vouching for the network key `endpoint`.
 pub fn verify_network_link(identity: &IdentityKey, endpoint: &str, signature: &[u8]) -> bool {
     verify(identity, network_link_text(endpoint).as_bytes(), signature)

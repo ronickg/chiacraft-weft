@@ -36,6 +36,15 @@ pub fn register(r: &mut Registry) {
     ] {
         r.equipment_slot(slot, parts, &format!("slot_{piece}"));
     }
+    // Clothes under the armor (`vitals::clothing`): warmth, no protection.
+    for (slot, parts, piece) in [
+        (&base_api::HAT, worn_parts::HEAD, "hat"),
+        (&base_api::COAT, worn_parts::BODY | worn_parts::ARMS, "coat"),
+        (&base_api::TROUSERS, worn_parts::BODY | worn_parts::LEGS, "trousers"),
+        (&base_api::SHOES, worn_parts::LEGS, "shoes"),
+    ] {
+        r.equipment_slot(slot, parts, &format!("slot_{piece}"));
+    }
     // Armor is a step of the damage chain (modern's CombatRules: big hits go through more of it,
     // unless it is tough), and wears when the hit actually lands, a quarter of the damage per
     // piece (at least 1) like vanilla.
@@ -121,7 +130,14 @@ pub fn register(r: &mut Registry) {
         .screen(|ui| {
             ui.panel("panel", S::col().pad(7.0).gap(5.0), |ui| {
                 ui.row(S::row().gap(1.0), |ui| {
-                    ui.equipment();
+                    // Armor, and the clothes worn under it beside.
+                    for slots in [&EQUIPMENT, &base_api::CLOTHES] {
+                        ui.column(S::col(), |ui| {
+                            for slot in slots.iter() {
+                                ui.group(slot.name());
+                            }
+                        });
+                    }
                     ui.player_model(51.0, 72.0);
                     ui.spacer();
                     ui.column(S::col().gap(2.0), |ui| {

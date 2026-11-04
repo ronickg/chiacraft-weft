@@ -284,6 +284,12 @@ impl Solid {
 }
 
 pub struct WorldRenderer {
+    /// Depth only, from the sun, for `sun_shadows` packs (their `fs_shadow`): faces, quads.
+    shadow_pipes: Option<[PipelineId; 2]>,
+    /// The shadow pass's own per-frame draws (`draw_shadow`), apart from the camera's.
+    shadow_origins: Vec<(BufferId, u32)>,
+    shadow_indirect: Vec<(BufferId, u32)>,
+    shadow_offsets: Vec<(BufferId, u32)>,
     face_pipes: [PipelineId; 3],
     quad_pipes: [PipelineId; 3],
     lod_pipe: PipelineId,
@@ -396,6 +402,7 @@ impl WorldRenderer {
     ) -> Result<WorldRenderer, String> {
         let (shader, slots) = world_shader(assets).map_err(|e| e.0)?;
         let (face_pipes, quad_pipes, lod_pipe) = Self::pipelines(gpu, &shader)?;
+        let shadow_pipes = Self::shadow_pipelines(gpu, &shader);
         let tex_shader = shader_table(gpu, c, textures, &slots);
 
         let (tex_info, anim, overlays) = Self::texture_info(gpu, textures);
@@ -423,6 +430,10 @@ impl WorldRenderer {
             .map(|_| gpu.create_buffer(size_of::<Globals>() as u64, usage::STORAGE | usage::HOST, "globals"))
             .collect();
         Ok(WorldRenderer {
+            shadow_pipes,
+            shadow_origins: Vec::new(),
+            shadow_indirect: Vec::new(),
+            shadow_offsets: Vec::new(),
             face_pipes,
             quad_pipes,
             lod_pipe,
@@ -516,6 +527,137 @@ impl WorldRenderer {
         Ok((faces, quads, lod))
     }
 
+    /// The shadow pass's pipelines when the shader pack asks for sun shadows: depth only, the
+    /// pack's `fs_shadow` leaving out the see-through texels of cutout blocks (leaves cast dappled
+    /// shadows). Both sides drawn: what faces away from the sun casts as well.
+    fn shadow_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 2]> {
+        if !crate::packs::sun_shadows() {
+            return None;
+        }
+        let depth = Some(DepthState { write: true, compare: Compare::GreaterEqual });
+        let mut make = |label: &str, vs: &str| {
+            gpu.create_pipeline(&PipelineDesc {
+                label,
+                shader,
+                vertex: vs,
+                fragment: Some("fs_shadow"),
+                color: None,
+                depth,
+                blend: Blend::None,
+                cull_back: false,
+                topology: Topology::Triangles,
+            })
+            .map_err(|e| log::error!("sun shadows: {}", e.0))
+            .ok()
+        };
+        let faces = make("faces shadow", "vs_face")?;
+        let Some(quads) = make("quads shadow", "vs_quad") else {
+            gpu.destroy_pipeline(faces);
+            return None;
+        };
+        Some([faces, quads])
+    }
+
+    /// Whether the shader pack's sun shadows can be drawn (`draw_shadow`).
+    pub fn has_shadows(&self) -> bool {
+        self.shadow_pipes.is_some()
+    }
+
+    /// The terrain's solid and cutout blocks within the shadow box `light` (camera-relative to its
+    /// clip space, an orthographic box along the light) into the bound depth target: the world's
+    /// cubes only (structures and distant terrain cast none), with `scene` the shadow pass's.
+    pub fn draw_shadow(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, cam: &Camera, light: Mat4, scene: BufferId) {
+        let Some([face_pipe, quad_pipe]) = self.shadow_pipes else { return };
+        let cam_block = cam.pos.floor();
+        let cam_cube: IVec3 = cam_block.as_ivec3() >> 4i32;
+        let cam_frac = (cam.pos - (cam_cube * 16).as_dvec3()).as_vec3();
+        let globals = Globals {
+            cam_frac: [cam_frac.x, cam_frac.y, cam_frac.z, 0.0],
+            ids: [0, 0, (self.biome_table.len() / crate::content::content().tint_kinds.len()) as u32, self.tint_tiles],
+            cam_cube: cam_cube.extend(0).to_array(),
+            extra: [self.overlays, 0, crate::content::content().tint_kinds.len() as u32, self.lod_half],
+        };
+        let gbuf = self.globals[frame.slot];
+        gpu.mapped(gbuf)[..size_of::<Globals>()].copy_from_slice(bytemuck::bytes_of(&globals));
+        let planes = frustum_planes(light);
+        let side = (16 << REGION) as f32;
+        let mut draws: Vec<DrawRecord> = Vec::new();
+        for (&(f, r), meshes) in &self.regions {
+            if f != 0 {
+                continue;
+            }
+            let center = ((r << REGION) - cam_cube).as_vec3() * 16.0 - cam_frac + Vec3::splat(side / 2.0);
+            if !planes.iter().all(|pl| pl.dot(center.extend(1.0)) > -side * 0.8661) {
+                continue;
+            }
+            for &(key, m) in meshes {
+                if key.0 != 0 {
+                    continue;
+                }
+                let lo = (key.1 - cam_cube).as_vec3() * 16.0 - cam_frac;
+                let c = lo + Vec3::splat(8.0);
+                if planes.iter().all(|pl| pl.dot(c.extend(1.0)) > -13.86) {
+                    mesh_draws(&m, key, lo, 0, cam_cube, &mut draws);
+                }
+            }
+        }
+        // Solid and cutout layers only, in runs of one pipeline and page.
+        draws.retain(|d| d.1 < 2);
+        draws.sort_unstable_by_key(|d| (d.0, d.2));
+        let n = draws.len() as u32;
+        if n == 0 {
+            return;
+        }
+        let obuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_origins, frame.slot, n, 16, usage::STORAGE, "shadow origins");
+        let ibuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_indirect, frame.slot, n, 20, usage::INDIRECT, "shadow indirect");
+        let fbuf = crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_offsets, frame.slot, 1, 16, usage::STORAGE, "shadow offsets");
+        gpu.mapped(fbuf)[..16].fill(0);
+        {
+            let origins = gpu.mapped(obuf);
+            for (k, d) in draws.iter().enumerate() {
+                origins[k * 16..k * 16 + 16].copy_from_slice(bytemuck::bytes_of(&d.4));
+            }
+        }
+        {
+            let indirect = gpu.mapped(ibuf);
+            for (k, d) in draws.iter().enumerate() {
+                let mut a = d.3;
+                a.first_instance = k as u32;
+                indirect[k * 20..k * 20 + 20].copy_from_slice(bytemuck::bytes_of(&a));
+            }
+        }
+        list.push(Cmd::IndexBuffer(self.quad_index));
+        let mut start = 0usize;
+        while start < draws.len() {
+            let (kind, page) = (draws[start].0, draws[start].2);
+            let mut end = start;
+            while end < draws.len() && draws[end].0 == kind && draws[end].2 == page {
+                end += 1;
+            }
+            let (pipe, buf) = if kind == 0 {
+                (face_pipe, self.faces.pages[page as usize].0)
+            } else {
+                (quad_pipe, self.quads.pages[page as usize].0)
+            };
+            list.pipeline(pipe);
+            use crate::gpu_layout::bind::world as b;
+            list.bind(b::G, gbuf);
+            list.bind(b::ORIGINS, obuf);
+            list.bind(b::RECORDS, buf);
+            list.bind(b::BIOMES, self.biomes);
+            list.bind(b::TEX_INFO, self.tex_info);
+            list.bind(b::FRAMES, self.anim);
+            list.bind(b::OFFSETS, fbuf);
+            list.bind(b::GLOW_MAP, self.glow);
+            list.bind(b::TEX_SHADER, self.tex_shader);
+            list.bind(b::SCENE, scene);
+            list.bind(b::LOD_MASK, self.lod_mask.0);
+            list.bind(b::SOLID, self.solid.buf);
+            list.push(Cmd::DrawIndexedIndirect { buffer: ibuf, offset: start as u64 * 20, count: (end - start) as u32 });
+            start = end;
+        }
+    }
+
     /// Recompiles the world shader; keeps the old pipelines when the new source has errors.
     pub fn reload_shaders(&mut self, gpu: &mut dyn Backend, textures: &GameTextures, assets: &crate::assets::Assets) {
         match world_shader(assets)
@@ -534,6 +676,12 @@ impl WorldRenderer {
                 self.face_pipes = f;
                 self.quad_pipes = q;
                 self.lod_pipe = l;
+                for p in self.shadow_pipes.take().into_iter().flatten() {
+                    gpu.destroy_pipeline(p);
+                }
+                if let Ok((s, _)) = world_shader(assets) {
+                    self.shadow_pipes = Self::shadow_pipelines(gpu, &s);
+                }
                 gpu.destroy_buffer(self.tex_shader);
                 self.tex_shader = shader_table(gpu, crate::content::content(), textures, &slots);
                 self.solid
@@ -609,6 +757,9 @@ impl WorldRenderer {
             .drain(..)
             .chain(self.indirect.drain(..))
             .chain(self.offsets.drain(..))
+            .chain(self.shadow_origins.drain(..))
+            .chain(self.shadow_indirect.drain(..))
+            .chain(self.shadow_offsets.drain(..))
         {
             gpu.destroy_buffer(b);
         }
@@ -617,6 +768,7 @@ impl WorldRenderer {
             .into_iter()
             .chain(self.quad_pipes)
             .chain([self.lod_pipe])
+            .chain(self.shadow_pipes.take().into_iter().flatten())
         {
             gpu.destroy_pipeline(p);
         }

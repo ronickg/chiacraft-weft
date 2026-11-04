@@ -42,7 +42,7 @@ pub mod world;
 
 // chiacraft's own parts (`chiacraft/`), under their old names too.
 pub mod chiacraft;
-pub use chiacraft::worlds::{friends, links, saved_worlds, travel, world_address};
+pub use chiacraft::worlds::{admission, friends, links, saved_worlds, travel, world_address};
 pub use chiacraft::{account_screen, bridge, package_trust};
 
 pub use app::api::{exit_code, set_launch_options};

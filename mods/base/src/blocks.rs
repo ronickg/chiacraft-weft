@@ -391,7 +391,13 @@ pub fn register(r: &mut Registry) {
         .tint(&tints::GRASS)
         .no_item();
     r.loot(&TALL_GRASS)
-        .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"));
+        .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
+        // Fibre for string and linen (`clothing.rs`).
+        .pool(
+            Pool::new()
+                .when(Cond::Chance(vitals::clothing::FIBRE_CHANCE))
+                .item("plant_fibre"),
+        );
     // Tall grass an animal has grazed, growing back by warmth and rain (`growth.rs`).
     r.block(&GRAZED_GRASS)
         .sound_group("grass")
