@@ -50,7 +50,7 @@ wait 1
 tap core:title id:profile
 wait 1.5
 shot 46_profile.png
-tap core:profile text:Account
+tap core:profile text:Account and Words
 wait 1.5
 shot 47_account.png
 key Escape
