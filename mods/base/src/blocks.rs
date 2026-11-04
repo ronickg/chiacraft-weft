@@ -33,6 +33,7 @@ pub static GOLD_ORE: Block = Block::named("gold_ore");
 pub static BRAIN_CORAL_BLOCK: Block = Block::named("brain_coral_block");
 pub static STAGHORN_CORAL_BLOCK: Block = Block::named("staghorn_coral_block");
 pub static PORITES_CORAL_BLOCK: Block = Block::named("porites_coral_block");
+pub static CORAL_RUBBLE: Block = Block::named("coral_rubble");
 /// The floor of glaciers in the high valleys (`land.rs`, `base_api::land::glacier`; Art's tiles).
 pub static GLACIER_ICE: Block = Block::named("glacier_ice");
 // Ores in the rock faces (`base_api::land::face_ore`; Art's textures, Ronald: "Yes, all four").
@@ -497,6 +498,14 @@ pub fn register(r: &mut Registry) {
             .tag("coral")
             .tab(&crate::tabs::NATURAL);
     }
+    // Broken coral and sand: loose, a shovel's.
+    r.block(&CORAL_RUBBLE)
+        .sound_group("gravel")
+        .texture("coral_rubble")
+        .hardness(0.6)
+        .mineable("shovel")
+        .tag("coral")
+        .tab(&crate::tabs::NATURAL);
     r.block(&OBSIDIAN)
         .immovable()
         .sound_group("stone")

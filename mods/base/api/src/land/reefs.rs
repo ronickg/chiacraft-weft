@@ -10,8 +10,8 @@ use std::sync::Arc;
 use weft_sdk::noise::fixed::{div_floor, q4, q12, ramp};
 
 use super::{
-    Here, REEF_COAST, REEF_LAGOON, REEF_OUT, REEF_PATCH_SIZE, REEF_PATCHES, REEF_REGION, REEF_SHORE, REEF_SLOPE, REEF_STEP, REEF_WARM,
-    REEF_WARM_RULE, base_ground, salt,
+    Here, REEF_COAST, REEF_LAGOON, REEF_OUT, REEF_PATCH_SIZE, REEF_PATCHES, REEF_REGION, REEF_RUBBLE, REEF_SHORE, REEF_SLOPE, REEF_STEP,
+    REEF_WARM, REEF_WARM_RULE, base_ground, salt,
 };
 use crate::SEA;
 
@@ -139,4 +139,16 @@ pub(super) fn top(h: &Here) -> bool {
     }
     shore_distance(h).is_some_and(|d| (REEF_OUT.0..=REEF_OUT.1).contains(&d))
         && h.f.fbm(salt::REEFS, h.x, h.z, q4(REEF_PATCH_SIZE), 3) > q12(REEF_PATCHES)
+}
+
+/// Whether a column is the reef's rubble (broken coral on its sand): in the reef's gaps, and in a
+/// band `REEF_RUBBLE` blocks wide on its landward side.
+pub(super) fn rubble(h: &Here) -> bool {
+    if warm(h) < q12(0.5) || base_ground(h) >= q4(SEA as f64) {
+        return false;
+    }
+    shore_distance(h).is_some_and(|d| {
+        (REEF_OUT.0 - REEF_RUBBLE..REEF_OUT.0).contains(&d)
+            || ((REEF_OUT.0..=REEF_OUT.1).contains(&d) && h.f.fbm(salt::REEFS, h.x, h.z, q4(REEF_PATCH_SIZE), 3) <= q12(REEF_PATCHES))
+    })
 }

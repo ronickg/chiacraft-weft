@@ -528,7 +528,7 @@ fn tropical_water(g: &mut Gen) {
 /// Coral (`base_api::land::REEF_*`; Art's blocks): the reef's top and the block under it coral, in
 /// patches of brain, staghorn and porites coral, where the reef itself stands (`reef_top`; natural
 /// shallows at its depth share its biome's name, not its coral); single coral heads on the
-/// lagoon's floor.
+/// lagoon's floor; coral rubble in the reef's gaps and on its landward edge.
 fn coral(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
     let (reef, lagoon) = (crate::worldgen::CORAL_REEF.id(), crate::worldgen::LAGOON.id());
@@ -560,6 +560,10 @@ fn coral(g: &mut Gen) {
             if col.biome == reef && l::reef_top(&f, wx * 16, wz * 16) {
                 put(h, kind);
                 put(h - 1, kind);
+            } else if (col.biome == reef || col.biome == lagoon || col.biome == crate::worldgen::OCEAN.id())
+                && l::reef_rubble(&f, wx * 16, wz * 16)
+            {
+                put(h, CORAL_RUBBLE.id());
             } else if col.biome == lagoon && noise::fixed::hash(noise::fixed::seed32(seed, 0xC07B), wx, 0, wz) % 1000 < 25 {
                 // A head on the sand, in the water.
                 put(h + 1, kind);

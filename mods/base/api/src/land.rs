@@ -490,6 +490,8 @@ pub const REEF_OUT: (i32, i32) = (28, 40);
 pub const REEF_PATCH_SIZE: f64 = 20.0;
 pub const REEF_PATCHES: f64 = -0.02;
 pub const REEF_SLOPE: i32 = 48;
+/// Coral rubble (Art's): in the reef's gaps and a band this wide on its landward side.
+pub const REEF_RUBBLE: i32 = 4;
 pub const REEF_REGION: i32 = 128;
 pub const REEF_STEP: i32 = 4;
 
@@ -1050,6 +1052,11 @@ pub fn reef_part(f: &Fields, x: i32, z: i32, height: i32) -> Option<bool> {
 /// shallows that only share its depth (and its biome's name).
 pub fn reef_top(f: &Fields, x: i32, z: i32) -> bool {
     reefs::top(&Here::new(f, x, z))
+}
+
+/// Whether column (`x`, `z`) (Q4) is the reef's rubble: its gaps and its landward edge.
+pub fn reef_rubble(f: &Fields, x: i32, z: i32) -> bool {
+    reefs::rubble(&Here::new(f, x, z))
 }
 
 /// What the meteor craters add at (`x`, `z`) (Q4), as the engine adds it.
