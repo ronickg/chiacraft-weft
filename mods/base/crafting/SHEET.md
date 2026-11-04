@@ -29,7 +29,7 @@ Points: material up to 40, work up to 40 (from memory up to 30, a machine 22), s
 | bone | working, holding | 1.9 | 1.5 | 50 | 90 | 2.5 | 0.5 | uses +5%, speed +0% | - | tough |
 | antler | working, holding | 1.9 | 1.5 | 50 | 90 | 2.5 | 0.5 | uses +8%, speed +0% | - | tough |
 | stone (provisional) | working | 2.7 | 1.8 | 100 | 70 | 3 | 1 | - | - | common |
-| diamond (provisional) | working | 3.5 | 1 | 300 | 1500 | 8 | 3 | - | - | - |
+| diamond | working | 3.5 | 1 | 400 | 1500 | 8 | 3 | - | - | - |
 | copper | working, fitting | 8.96 | 1 | 150 | 150 | 5 | 1.5 | - | 120 uses | soft |
 | bronze | working, fitting | 8.8 | 1 | 200 | 250 | 7 | 2 | - | 220 uses | recastable |
 | wrought_iron | working, fitting | 7.7 | 1 | 220 | 275 | 7 | 2 | - | 260 uses | weldable |
@@ -45,7 +45,7 @@ Points: material up to 40, work up to 40 (from memory up to 30, a machine 22), s
 | birch_tar | fitting | 1 | 1 | 0 | 0 | 0 | 0 | - | 70 uses | glued |
 | leather | fitting, holding | 0.9 | 1 | 0 | 0 | 0 | 0 | uses +2%, speed +0% | 90 uses | - |
 
-Provisional rows stand in for today's tools until Content plan's decisions 1 and 2 (the ladder replacing Weft's tiers, and what diamond becomes).
+Provisional rows stand in for today's tools until Content plan's flint and chert. Diamond is a tier above steel, and the ladder stays open at the top: a new tier is a row.
 
 ## Traits
 

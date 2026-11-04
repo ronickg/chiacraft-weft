@@ -56,6 +56,18 @@ His words along the way:
 - **Slow crafts happen in the world:** tanning takes days, drying follows the weather, the forge
   needs fuel, and metal cools in the cold.
 
+## Content's decisions, as they touch crafting (11-04)
+
+- **The ladder stays open at the top.** Ronald: "we will probably have more ores / items with
+  higher tiers". Wood and bone, stone, copper, bronze, iron, steel, then diamond as a real tier
+  above steel, and more later.
+  - A new tier is a material row (a package's too).
+  - Grades and stats scale past steel by the same rule, with no code change.
+  - Diamond's harvest level is 400, above steel's 300.
+- **Taken as agreed unless he objects** (Planner): gold for ornaments, two clothing layers plus
+  a cloak, biomes gating materials, stations with add-ons, crafts that take real time, and the
+  room check.
+
 ## What we have
 
 - **The engine (Weft):**

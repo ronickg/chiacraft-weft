@@ -102,11 +102,10 @@ pub const MATERIALS: &[Material] = &[
     m("obsidian", "material.base.obsidian", &[W], 2.4, 1.8, 100, 40.0, 3.2, 1.5, (0.0, 0.0), 0.0, "razor", Making::Knap),
     m("bone", "material.base.bone", &[W, H], 1.9, 1.5, 50, 90.0, 2.5, 0.5, (0.05, 0.0), 0.0, "tough", Making::Carve),
     m("antler", "material.base.antler", &[W, H], 1.9, 1.5, 50, 90.0, 2.5, 0.5, (0.08, 0.0), 0.0, "tough", Making::Carve),
-    // Today's stone and diamond tools, provisional until Content plan's decisions 1 and 2 (the
-    // ladder replacing Weft's tiers, and what diamond becomes): plain stone like knapped chert,
-    // diamond above steel.
+    // Today's plain stone tools (provisional until flint and chert), and diamond, a tier above
+    // steel; more above it later.
     m("stone", "material.base.stone", &[W], 2.7, 1.8, 100, 70.0, 3.0, 1.0, (0.0, 0.0), 0.0, "common", Making::Knap),
-    m("diamond", "material.base.diamond", &[W], 3.5, 1.0, 300, 1500.0, 8.0, 3.0, (0.0, 0.0), 0.0, "", Making::Cast),
+    m("diamond", "material.base.diamond", &[W], 3.5, 1.0, 400, 1500.0, 8.0, 3.0, (0.0, 0.0), 0.0, "", Making::Carve),
     // Metals (tiers 3-6).
     m("copper", "material.base.copper", &[W, F], 8.96, 1.0, 150, 150.0, 5.0, 1.5, (0.0, 0.0), 120.0, "soft", Making::Forge),
     m("bronze", "material.base.bronze", &[W, F], 8.8, 1.0, 200, 250.0, 7.0, 2.0, (0.0, 0.0), 220.0, "recastable", Making::Cast),
@@ -126,9 +125,11 @@ pub const MATERIALS: &[Material] = &[
     m("leather", "material.base.leather", &[F, H], 0.9, 1.0, 0, 0.0, 0.0, 0.0, (0.02, 0.0), 90.0, "", Making::Sew),
 ];
 
-/// Rows kept only until Content plan's decisions 1 and 2 (the ladder replacing Weft's tiers, and
-/// what diamond becomes): today's stone and diamond tools.
-pub const PROVISIONAL: &[&str] = &["stone", "diamond"];
+/// Rows kept only until Content plan's flint, chert and obsidian replace them: today's plain
+/// stone tools. Diamond is a real tier above steel (Ronald, 2026-11-04: "we will probably have
+/// more ores / items with higher tiers"), and the ladder stays open at the top: a new tier is a
+/// row (a package's too), and grades and stats scale past steel by the same rule.
+pub const PROVISIONAL: &[&str] = &["stone"];
 
 /// Material `id`.
 pub fn material(id: &str) -> Option<&'static Material> {
@@ -160,8 +161,8 @@ mod tests {
         assert!(
             MATERIALS
                 .iter()
-                // Steel is the best of the ladder; diamond is today's, outside it until Content decides.
-                .filter(|m| m.id != "diamond")
+                // Steel is the best of the metals; diamond and what comes later sit above it.
+                .filter(|m| m.harvest <= material("steel").unwrap().harvest)
                 .all(|m| m.uses <= material("steel").unwrap().uses)
         );
     }

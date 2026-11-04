@@ -71,7 +71,7 @@ pub fn markdown() -> String {
 
     let _ = writeln!(
         w,
-        "\nProvisional rows stand in for today's tools until Content plan's decisions 1 and 2 (the ladder replacing Weft's tiers, and what diamond becomes).\n"
+        "\nProvisional rows stand in for today's tools until Content plan's flint and chert. Diamond is a tier above steel, and the ladder stays open at the top: a new tier is a row.\n"
     );
     let _ = writeln!(w, "## Traits\n");
     let _ = writeln!(w, "| Trait | Effect | When |\n|---|---|---|");
