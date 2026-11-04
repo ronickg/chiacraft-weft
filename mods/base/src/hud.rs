@@ -57,6 +57,72 @@ fn vitals_of(c: &ClientView) -> Option<Vitals> {
 /// The effects the HUD names at once (the rest wait their turn).
 const EFFECTS_SHOWN: usize = 6;
 
+/// The food tiles (`food_tile`): how many show, their size and the gap between them (GUI px), and
+/// the bar under each (`hud_food_bar`, 40 x 6 texels).
+const FOOD_TILES: usize = 6;
+const FOOD_TILE: f32 = 20.0;
+const FOOD_GAP: f32 = 2.0;
+const FOOD_BAR: (f32, f32) = (20.0, 3.0);
+
+/// The stomach's foods, each once in the order first eaten: the food, how many portions of it, and
+/// its longest-lasting portion's units left.
+fn foods_held(v: &base_api::Vitals) -> Vec<(&'static vitals::food::Food, u32, f32)> {
+    let mut out: Vec<(&'static vitals::food::Food, u32, f32)> = Vec::new();
+    for i in 0..base_api::PORTIONS {
+        let Some(f) = (v.foods[i] as usize).checked_sub(1).and_then(|f| FOODS.get(f)) else { continue };
+        if v.units[i] <= 0.0 {
+            continue;
+        }
+        match out.iter_mut().find(|(g, _, _)| std::ptr::eq(*g, f)) {
+            Some(e) => {
+                e.1 += 1;
+                e.2 = e.2.max(v.units[i]);
+            }
+            None => out.push((f, 1, v.units[i])),
+        }
+    }
+    out
+}
+
+/// Food tile `k`: a slot (a gauge, so it hides when there is no `k`th food), the food's picture at
+/// twice the text's size (16 GUI px, its pixels whole), the minutes in the bottom right and the
+/// count in the top left as a stack's, and the bar under it.
+fn food_tile(ui: &mut Ui, k: usize) {
+    let held = move |c: &ClientView| vitals_of(c).and_then(|v| foods_held(&v).get(k).copied());
+    ui.column(S::col().gap(1.0), move |ui| {
+        ui.row(S::row().size(FOOD_TILE, FOOD_TILE), move |ui| {
+            ui.progress_bind("hud_food", S::default().size(FOOD_TILE, FOOD_TILE).at(0.0, 0.0), move |c| {
+                if held(c).is_some() { 1.0 } else { -1.0 }
+            });
+            ui.row(S::row().size(FOOD_TILE, FOOD_TILE).center().at(0.0, 0.0), move |ui| {
+                ui.text_bind_styled(S::default().no_wrap().scale(2.0), move |c, t| {
+                    match held(c).and_then(|(f, _, _)| Item::lookup(f.name)) {
+                        Some(item) => t.set("", &[Arg::Item(item)]),
+                        None => t.text(""),
+                    }
+                });
+            });
+            // The minutes, right-aligned 2 GUI px in, their baseline 2 above the tile's bottom (its
+            // rim is 1.5; the line's 2 below the baseline reach the bottom), as a stack's count.
+            ui.text_bind_styled(S::default().no_wrap().at_pivot(FOOD_TILE - 2.0, FOOD_TILE, [1.0, 1.0]), move |c, t| {
+                match held(c) {
+                    Some((f, _, units)) => t.set("hud.base.food_minutes", &[Arg::Int((units / f.digest_rate()).ceil() as i64)]),
+                    None => t.text(""),
+                }
+            });
+            ui.text_bind_styled(S::default().no_wrap().at(2.0, 0.0), move |c, t| match held(c) {
+                Some((_, n, _)) if n > 1 => t.set("hud.base.food_count", &[Arg::Int(n as i64)]),
+                _ => t.text(""),
+            });
+        });
+        ui.progress_bind("hud_food_bar", S::default().size(FOOD_BAR.0, FOOD_BAR.1), move |c| match held(c) {
+            // the bar's rim is 1 of its 40 texels at each end
+            Some((f, _, units)) => (1.0 + (units / f.units()).clamp(0.0, 1.0) * 38.0) / 40.0,
+            None => -1.0,
+        });
+    });
+}
+
 const SHORTCUTS: [&str; 4] = ["inventory", "recipes", "stats", "advancements"];
 
 pub fn register(r: &mut Registry) {
@@ -135,20 +201,13 @@ pub fn register(r: &mut Registry) {
     // What's in the stomach: each food with the minutes it has left, and how full of each nutrient.
     r.hud_element(&HUD_STOMACH, hud_anchor::TOP_LEFT, 3, |ui| {
         ui.column(S::col().gap(1.0), |ui| {
-            ui.row(S::row().gap(2.0).center(), |ui| {
-                for i in 0..base_api::PORTIONS {
-                    ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
-                        let Some(v) = vitals_of(c) else { return t.text("") };
-                        let Some(f) = (v.foods[i] as usize)
-                            .checked_sub(1)
-                            .and_then(|f| FOODS.get(f))
-                        else {
-                            return t.text("");
-                        };
-                        let Some(item) = Item::lookup(f.name) else { return t.text("") };
-                        let minutes = (v.units[i] / f.digest_rate()).ceil() as i64;
-                        t.set("hud.base.portion", &[Arg::Item(item), Arg::Int(minutes)]);
-                    });
+            // A tile per food as on Ronald's sheet ("Yes, tiles", 11-04): its picture, the minutes
+            // until the last of it is digested, how many portions if more than one, and under it a
+            // bar of how much of that portion is left. The places are fixed, so the HUD doesn't
+            // move as food comes and goes.
+            ui.row(S::row().gap(FOOD_GAP), |ui| {
+                for k in 0..FOOD_TILES {
+                    food_tile(ui, k);
                 }
             });
             ui.text_bind_styled(S::default().no_wrap(), |c, t| {

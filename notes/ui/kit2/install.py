@@ -400,6 +400,12 @@ def hotbar_slot(size, rims, inner=k.SLOT):
 
 save("hotbar", hotbar_slot(40, [k.OUTLINE, k.BRONZE, k.OUTLINE]), [NINE, border(5), ("icon", "16")])
 save("hotbar_selected", hotbar_slot(44, [k.OUTLINE, k.GLOW, k.GLOW_D, k.OUTLINE]), [NINE, border(7)])
+# The HUD's food tiles (`hud.rs`, `food_tile`): the hotbar's slot, drawn as a gauge (full, or
+# hidden when there is no food for it), and the bar under each: outline round a green 4-row track.
+tile = hotbar_slot(40, [k.OUTLINE, k.BRONZE, k.OUTLINE])
+save("hud_food", tile, [("scaling", "stretch")])
+save("hud_food_fill", tile, [("scaling", "stretch")])
+hud_bar_pair("hud_food_bar", 40, 6, "q1", frame_px=0)
 
 for name, w, h, gui in WRITTEN:
     print(f"{name:28s} {w}x{h}  {gui}")
