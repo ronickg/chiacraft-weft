@@ -129,7 +129,7 @@ fn ridge(s: u32, x: i32, z: i32, scale: i32) -> i32 {
 }
 
 fn continent(x: i32, z: i32) -> i32 {
-    return ((fbm(seed(S_CONT), x, z, 900 * 16, 4u) * 6554) >> 12u) + 614;
+    return ((fbm(seed(S_CONT), x, z, desc[D_CONT_SCALE], 4u) * 6554) >> 12u) + 614;
 }
 
 fn temperature(x: i32, z: i32) -> i32 {
@@ -607,6 +607,8 @@ const LOD_LAST: i32 = i32(LOD_SIDE) - 1;
 // highest canopy top + 32768 and its block, and how many of its blocks they cover.
 var<workgroup> lod_ground: array<u32, LOD_SAMPLES>;
 var<workgroup> canopy: array<atomic<u32>, LOD_SAMPLES>;
+// Crowns this many blocks above their site or more (the giants') taper from afar.
+const TALL_CROWN: i32 = 24;
 var<workgroup> cover: array<atomic<u32>, LOD_SAMPLES>;
 
 // The ground height of sample (`i`, `j`), clamped to the tile's samples.
@@ -734,8 +736,8 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
                 continue;
             }
             let r = desc[b + 2u];
-            let top = u32(gh + 1 + desc[b + 3u] + 32768);
-            let packed = (top << 16u) | u32(desc[b + 4u]);
+            let tall = desc[b + 3u];
+            let leaves = u32(desc[b + 4u]);
             let a0 = clamp(div_floor(px - r - ox + off, s).x + 1, 0, LOD_LAST);
             let a1 = clamp(div_floor(px + r - ox + off, s).x + 1, 0, LOD_LAST);
             let e0 = clamp(div_floor(pz - r - oz + off, s).x + 1, 0, LOD_LAST);
@@ -747,6 +749,15 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
                     let wx = min(px + r + 1, x0 + s) - max(px - r, x0);
                     let wz = min(pz + r + 1, z0 + s) - max(pz - r, z0);
                     if (wx > 0 && wz > 0) {
+                        // A crown far taller than the rest (a giant sequoia's) narrows toward its
+                        // top from afar instead of standing as a flat-topped box: a sample is lower
+                        // the further its middle is from the trunk, half the height at the edge.
+                        var above = tall;
+                        if (tall >= TALL_CROWN) {
+                            let d = min(max(abs(x0 + s / 2 - px), abs(z0 + s / 2 - pz)), r);
+                            above = tall - (d * tall) / (2 * max(r, 1));
+                        }
+                        let packed = (u32(gh + 1 + above + 32768) << 16u) | leaves;
                         let q = u32(j) * LOD_SIDE + u32(i);
                         atomicAdd(&cover[q], u32(wx * wz));
                         atomicMax(&canopy[q], packed);

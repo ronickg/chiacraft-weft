@@ -279,6 +279,11 @@ pub mod comp {
     /// Block: the tag one of the supporting block's horizontal neighbors needs (`tag`, sugar
     /// cane: `#water`), unless the support is the same block.
     pub const SUPPORT_NEAR: &str = "support_near";
+    /// Block: the liquid it stands in (`block`, the liquid's name): the cell is a still source of
+    /// it as well, which flows, is swum in and stays when the block goes (kelp, a waterlogged
+    /// slab). A state of the same block one property apart without it is its dry twin, which
+    /// placing into the liquid fills and a bucket drains.
+    pub const HOLDS_LIQUID: &str = "holds_liquid";
     /// The own name of one stack or block entity (UTF-8), as a player gave it: shown instead of
     /// the item's or block's, and carried from the stack to the placed block and back.
     pub const NAME: &str = "core:name";
@@ -2339,6 +2344,17 @@ pub struct Host {
     /// The content's color (0xRRGGBB) of tint kind `kind` in biome `biome` (id): the biome's own,
     /// else the kind's default; 0 for an unknown kind.
     pub content_tint: unsafe extern "C" fn(biome: u32, kind: Str) -> u32,
+    /// Client: starts a sound only this client hears and returns its handle, for
+    /// `client_sound_set` and `client_sound_stop`; 0 if there is no sound device or no such
+    /// event. A `sound_start::LOOP` one plays until stopped; others end by themselves.
+    pub client_sound_start: unsafe extern "C" fn(client: *mut ClientCtx, start: *const SoundStart) -> u64,
+    /// Eases its volume, pitch, place or muffle (`SoundChange`); nothing for a handle that ended.
+    pub client_sound_set: unsafe extern "C" fn(client: *mut ClientCtx, handle: u64, change: *const SoundChange),
+    /// Fades it out over `fade` seconds, then it ends.
+    pub client_sound_stop: unsafe extern "C" fn(client: *mut ClientCtx, handle: u64, fade: f32),
+    /// 1 while it plays (or its file is still being read); 0 once it ended, was stopped, or
+    /// gave way to a sound that matters more (`SoundDesc::priority`).
+    pub client_sound_playing: unsafe extern "C" fn(client: *mut ClientCtx, handle: u64) -> u32,
 }
 
 /// Natural spawning around players (`Host::reg_spawn`). Every two seconds the engine tries a few
@@ -2467,6 +2483,13 @@ pub struct SoundDesc {
     /// `core:creatures`, `core:players`, `core:ambient`, `core:music`, `core:ui`, or one from
     /// `Host::reg_sound_category`.
     pub category_name: Str,
+    /// Which sounds keep playing when too many play at once: higher first, then the louder
+    /// where the listener is. A new sound that matters less than every playing one is not
+    /// played; else it replaces the one that matters least.
+    pub priority: i32,
+    /// At most this many of this event at once (0: no cap of its own); one more replaces the
+    /// quietest of them, or is not played if it would be the quietest.
+    pub voices: u32,
 }
 defaults!(SoundDesc {
     name: Str::EMPTY,
@@ -2475,8 +2498,61 @@ defaults!(SoundDesc {
     volume: 1.0,
     pitch: [1.0, 1.0],
     range: 16.0,
-    category_name: Str::EMPTY
+    category_name: Str::EMPTY,
+    priority: 0,
+    voices: 0
 });
+
+/// A sound a client starts with a handle (`Host::client_sound_start`).
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SoundStart {
+    /// The event (`find` with `entry_kind::SOUND`).
+    pub sound: u32,
+    /// Where it is, with `sound_start::POSITIONED`; else it is heard as if in the head (UI,
+    /// weather beds).
+    pub pos: [f64; 3],
+    /// Times the event's volume.
+    pub volume: f32,
+    /// Playback speed; 0 picks one from the event's range.
+    pub pitch: f32,
+    /// Seconds it fades in from silence.
+    pub fade: f32,
+    pub flags: u32,
+}
+defaults!(SoundStart { sound: 0, pos: [0.0; 3], volume: 1.0, pitch: 0.0, fade: 0.0, flags: 0 });
+
+pub mod sound_start {
+    /// At `SoundStart::pos`.
+    pub const POSITIONED: u32 = 1;
+    /// Starts again from the beginning when it ends, until stopped.
+    pub const LOOP: u32 = 2;
+}
+
+/// What `Host::client_sound_set` changes of a playing sound: the parts named in `what`
+/// (`sound_change`), each eased over `secs`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SoundChange {
+    pub what: u32,
+    /// Times the event's volume, like `SoundStart::volume`.
+    pub volume: f32,
+    /// Playback speed, 1 = as recorded.
+    pub pitch: f32,
+    /// Where it is now (positioned sounds only).
+    pub pos: [f64; 3],
+    /// Low-pass cutoff in Hz: muffled through walls or indoors; 20000 and above is clear.
+    pub lowpass: f32,
+    pub secs: f32,
+}
+defaults!(SoundChange { what: 0, volume: 1.0, pitch: 1.0, pos: [0.0; 3], lowpass: 20_000.0, secs: 0.0 });
+
+pub mod sound_change {
+    pub const VOLUME: u32 = 1;
+    pub const PITCH: u32 = 2;
+    pub const POS: u32 = 4;
+    pub const LOWPASS: u32 = 8;
+}
 
 /// When background music may play; 0 = always.
 pub mod music_when {
@@ -3357,6 +3433,17 @@ pub struct ClientState {
     /// Distant terrain tiles made and shown, and asked for and not back yet.
     pub lod_tiles: u32,
     pub lod_pending: u32,
+    /// The weather where the player is, eased as it is drawn: rain and thunder 0..1, the wind
+    /// (m/s, x and z: where it blows to), snow falling 0..1, and lightning flashes seen so far
+    /// (a new one is a flash this frame).
+    pub rain: f32,
+    pub thunder: f32,
+    pub wind: [f32; 2],
+    pub snowing: f32,
+    pub lightnings: u32,
+    /// Sounds playing now, and of them those started with a handle (`client_sound_start`).
+    pub voices: u32,
+    pub handles: u32,
 }
 defaults!(ClientState {
     flags: 0,
@@ -3402,6 +3489,13 @@ defaults!(ClientState {
     gpu_mismatches: 0,
     lod_tiles: 0,
     lod_pending: 0,
+    rain: 0.0,
+    thunder: 0.0,
+    wind: [0.0; 2],
+    snowing: 0.0,
+    lightnings: 0,
+    voices: 0,
+    handles: 0,
 });
 
 /// `Host::client_input` operations. Keys and buttons are held for `x` seconds (0 = one tap).
@@ -3612,6 +3706,8 @@ defaults!(FeatureDesc { name: Str::EMPTY, preset: 0, params: [0.0; 4], height: C
 #[repr(C)]
 pub struct FeatureArgs {
     pub seed: u64,
+    /// The dimension's continent scale (Q4, `terrain_op::CONTINENT_SCALE`), for the fields.
+    pub continent_scale: i32,
     pub x: i32,
     pub z: i32,
     /// Output: the height added at (x, z) at full strength.
@@ -3721,6 +3817,10 @@ pub mod terrain_op {
     /// (`FaceArgs`) for ground falling `level` blocks or more to a neighbour. Distant terrain,
     /// which runs no decorations, asks it, and puts no scattered things there.
     pub const FACES: u32 = 15;
+    /// `value`: how many blocks across the continent noise's land and sea are (900 when not
+    /// given). Larger makes bigger land masses and seas; every mask and rule on continentalness
+    /// follows it.
+    pub const CONTINENT_SCALE: u32 = 16;
 }
 
 /// A steep column's top as distant terrain sees it (`terrain_op::FACES`).

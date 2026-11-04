@@ -86,6 +86,14 @@ pub fn water_behind() -> bool {
     pack_flag("water_behind")
 }
 
+/// The chosen pack's `pack.cfg` says `merge_effects = true`: the screen effects run in one pass,
+/// each on the color the one before it left at its own pixel; what one reads elsewhere on the
+/// screen (`scene_at`) is the image before them all. On tile-based GPUs that saves storing and
+/// loading the whole image between effects (`Post::apply`).
+pub fn merge_effects() -> bool {
+    pack_flag("merge_effects")
+}
+
 /// `name = true` in the chosen shader pack's `pack.cfg`.
 fn pack_flag(name: &str) -> bool {
     let Some(dir) = SHADER_PACK.read().unwrap().clone() else { return false };

@@ -494,6 +494,19 @@ impl Registry {
         self.send_set(target, &Pending::text_as(comp.name(), &T::schema(), text), false);
     }
 
+    /// Gives blocks of any mod (a name, or `#tag` for all tagged so) sound group `group`, as
+    /// `.sound_group` does where a block is made: for a table of what sounds like what.
+    pub fn sound_group_on(&mut self, block: &str, group: &str) {
+        let prefix = if group.contains(':') { group.to_string() } else { format!("{}:block.{group}", self.ns) };
+        self.sounds_on(Target::Name(block), &prefix);
+    }
+
+    /// Gives blocks or entity kinds of any mod the sound events `<prefix>.<event>`: blocks
+    /// `break`, `place`, `step`, `hit`; kinds `hurt`, `death`, `ambient`, `step`.
+    pub fn sounds_on(&mut self, target: Target, prefix: &str) {
+        self.send_set(target, &Pending::text(abi::comp::SOUND, prefix), false);
+    }
+
     /// Takes a component or tag away from entries of any mod.
     pub fn remove(&mut self, target: Target, component: &str) {
         self.send_set(target, &Pending::tag(component), true);
@@ -704,6 +717,17 @@ macro_rules! state_setters {
         }
         pub fn not_solid(mut self) -> Self {
             self.each(|s, _| s.flags &= !bf::SOLID);
+            self
+        }
+        /// Stands in still `liquid` (`&WATER`): the cell is a source of it too, which flows,
+        /// is swum and drowned in, and stays when the block is broken or moved (kelp, seagrass).
+        /// On some states only, the others make its dry twin, which placing into the liquid fills
+        /// and a bucket drains: `.prop("waterlogged", ["false", "true"]).states(|p, s| if
+        /// p.is("waterlogged", "true") { s.holds_liquid(&WATER) } else { s })`. Without a dry
+        /// twin it is placed only into a source of the liquid.
+        pub fn holds_liquid(mut self, liquid: &Block) -> Self {
+            let name = liquid.name().to_string();
+            self.each(|s, _| s.put_text(abi::comp::HOLDS_LIQUID, "block", &name));
             self
         }
         pub fn replaceable(mut self) -> Self {
@@ -2629,7 +2653,18 @@ impl Registry {
     }
 }
 
-/// Liquid id of a block state (`None` for other blocks).
+/// The source state of the liquid a block in `state` stands in (`Block::holds_liquid`), `None`
+/// for one that stands in none (a liquid block too).
+pub fn held_liquid(state: u32) -> Option<u32> {
+    c::HOLDS_LIQUID.on_block(state).map(|b| b.0)
+}
+
+/// The liquid's block state in a cell: the liquid a block there stands in, else `state` itself.
+pub fn liquid_block(state: u32) -> u32 {
+    held_liquid(state).unwrap_or(state)
+}
+
+/// Liquid id of a block state, or of the liquid it stands in (`None` for other blocks).
 pub fn liquid_of(state: u32) -> Option<u32> {
     let l = unsafe { (host().liquid_of)(state) };
     (l != u32::MAX).then_some(l)

@@ -402,15 +402,17 @@ pub fn scatter_site(
     let random = hash(h, 1, 2, 3);
     if s.thin
         .as_ref()
-        .is_some_and(|t| t.removes(c, seed, x, z, col.biome, random))
+        .is_some_and(|t| t.removes(c, &def.fields(seed), x, z, col.biome, random))
     {
         return None;
     }
     Some((IVec3::new(x, col.height + 1, z), col.biome, random))
 }
 
-/// How far above and below its site a scattered thing may put blocks.
-const SCATTER_UP: i32 = 32;
+/// How far above and below its site a scattered thing may put blocks: up to a giant sequoia's
+/// 60-80 blocks (base's `tree_recipes::SEQUOIA`). The box of each thing is its own blocks', so a
+/// small tree costs no more for it.
+const SCATTER_UP: i32 = 96;
 const SCATTER_DOWN: i32 = 16;
 
 /// A scattered thing: where it stands and its blocks (the shape callback's, made once and
@@ -890,7 +892,8 @@ impl Dim {
     }
 
     /// Writes a block, relights, records the change for clients, queues neighbor updates and keeps
-    /// block entities in sync with their block.
+    /// block entities in sync with their block. Air over a block standing in a liquid leaves the
+    /// liquid (`Content::left`): breaking, pistons, fills and mods all go through here.
     pub fn set(&mut self, c: &'static Content, p: IVec3, state: u32) -> Option<u32> {
         self.write_block(c, p, state, false)
     }
@@ -906,6 +909,8 @@ impl Dim {
             self.space.structure_cube(c, cp);
         }
         let cube = Arc::make_mut(self.space.cubes.get_mut(&cp)?);
+        // In the world, not in a moving body, which has no water of its own.
+        let state = if state == AIR && self.frame == 0 { c.left(cube.get(local_index(p))) } else { state };
         let old = cube.set(local_index(p), state);
         if old == state {
             return Some(old);
@@ -1476,9 +1481,17 @@ impl Dim {
             }
             let p = IVec3::new(x, y, z);
             if let Some(state) = self.get(p) {
-                if c.states[state as usize].liquid.is_some() {
+                let info = &c.states[state as usize];
+                if info.liquid.is_some() {
                     self.liquid_tick(c, p, state);
                 } else {
+                    // A block standing in a liquid flows as its source, and has its own tick too.
+                    if info.holds.is_some() {
+                        self.liquid_tick(c, p, state);
+                        if self.get(p) != Some(state) {
+                            continue;
+                        }
+                    }
                     self.call_block(
                         c,
                         state,
@@ -1700,7 +1713,7 @@ impl Dim {
                 let top = p.y.floor() as i32 + 16;
                 let Some(y) = (top - 32..top)
                     .rev()
-                    .find(|&y| solid(y - 1) && !solid(y) && state(y).is_some_and(|s| s.liquid.is_none()) && !solid(y + 1))
+                    .find(|&y| solid(y - 1) && !solid(y) && state(y).is_some_and(|s| s.liquid_in().is_none()) && !solid(y + 1))
                 else {
                     continue;
                 };
@@ -1943,7 +1956,7 @@ impl Dim {
                 // Liquid temperatures where the entity is now (`in_liquid` is from before the move).
                 let temps = [e.pos, e.pos + DVec3::Y * (k.height as f64 * 0.5)].map(|p| {
                     block(p.floor().as_ivec3())
-                        .and_then(|s| c.states[s as usize].liquid)
+                        .and_then(|s| c.states[s as usize].liquid_in())
                         .map(|l| c.liquids[l as usize].temperature)
                 });
                 // Like vanilla lava: 15 seconds of fire and 4 damage while inside.
@@ -2303,6 +2316,12 @@ impl Dim {
                 self.liquid_neighbor(c, p, state);
                 continue;
             }
+            if c.states[state as usize].holds.is_some() {
+                self.liquid_neighbor(c, p, state);
+                if self.get(p) != Some(state) {
+                    continue;
+                }
+            }
             self.call_block(
                 c,
                 state,
@@ -2325,7 +2344,7 @@ impl Dim {
         match c.states[state as usize].support_near {
             Some(t) if c.states[n as usize].block != c.states[state as usize].block => [IVec3::X, -IVec3::X, IVec3::Z, -IVec3::Z]
                 .iter()
-                .any(|d| self.get(at + *d).is_none_or(|s| c.block_has(s, Some(t)))),
+                .any(|d| self.get(at + *d).is_none_or(|s| c.cell_has(s, Some(t)))),
             _ => true,
         }
     }
@@ -2505,6 +2524,9 @@ impl Dim {
                 host::misuse("placement", || format!("{} chose state {}, not one of its own", def.name, args.state));
             }
         }
+        // Standing in the still liquid there, if it can; one that only stands in a liquid goes
+        // only into it.
+        let Some(chosen) = c.placed_into(chosen, cur) else { return false };
         if !self.supported(c, p, chosen) {
             return false;
         }

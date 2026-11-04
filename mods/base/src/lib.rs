@@ -24,7 +24,9 @@ mod seasons;
 mod shaderpack;
 mod sounds;
 mod survival;
+mod video;
 mod weather;
+mod weather_sound;
 mod wild;
 mod window;
 mod worldgen;
@@ -89,6 +91,7 @@ fn init(r: &mut Registry) {
     mobs::register(r);
     worldgen::register(r);
     weather::register(r);
+    weather_sound::register(r);
     seasons::register(r);
     growth::register(r);
     farming::register(r);
@@ -101,6 +104,7 @@ fn init(r: &mut Registry) {
     shaderpack::register(r);
     shaderpack::register_for_scripts(r);
     shaderpack::register_shafts(r);
+    video::register(r);
     // Its terrain is described in `worldgen`.
     // A year of four 14-day seasons (notes/SURVIVAL.md): sixteen hours of daylight at midsummer,
     // eight at midwinter.
@@ -128,12 +132,19 @@ fn init(r: &mut Registry) {
             .texture("sun")
             .additive()
             .size(33.0)
-            .glow(0xFFE633);
+            .glow(0xFFE633)
+            // Its path leaned 35° to the south (Bliss's and Complementary's sun paths lean about
+            // 40°): noon stands 55° up, so shadows stay long all day and slopes and walls keep a
+            // lit and a shaded side (Ronald, 11-04: "it all seems so flat"). The engine's sun
+            // light and shadows follow this body.
+            .tilt(35.0);
+        // The moon on the same leaned path, opposite the sun: the night's shadows come from it.
         r.sky_body(dim, &MOON)
             .texture("moon_phases")
             .additive()
             .frames(4, 2)
             .size(23.0)
-            .phase(0.5);
+            .phase(0.5)
+            .tilt(35.0);
     }
 }

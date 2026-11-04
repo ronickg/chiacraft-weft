@@ -188,7 +188,7 @@ impl Server {
                 p.last_y = pos.y;
                 let Some((r, entity)) = self.region(pi) else { return };
                 let state = r.get(pos.floor().as_ivec3());
-                let in_liquid = state.is_some_and(|s| c.states[s as usize].liquid.is_some());
+                let in_liquid = state.is_some_and(|s| c.states[s as usize].liquid_in().is_some());
                 let climbing = state.is_some_and(|s| c.states[s as usize].flags & abi::block_flags::CLIMBABLE != 0);
                 // A rider doesn't fall: its mount does.
                 let seated = r.entities.get(entity).is_some_and(|e| e.mount.is_some());

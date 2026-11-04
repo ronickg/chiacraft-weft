@@ -75,6 +75,9 @@ pub struct StateInfo {
     pub conductor: bool,
     /// Liquid id (`Content::liquids`) for liquid blocks.
     pub liquid: Option<u16>,
+    /// The liquid this block stands in (`abi::comp::HOLDS_LIQUID`): the cell is that liquid's
+    /// still source as well as this block (kelp in water, a waterlogged slab).
+    pub holds: Option<u16>,
     /// Face whose neighbor must hold it up, and the tag that neighbor needs (`None`: solid).
     pub support: Option<(u8, Option<u32>)>,
     /// Tag a horizontal neighbor of the support needs (unless the support is the same block).
@@ -89,6 +92,14 @@ pub struct StateInfo {
 }
 
 impl StateInfo {
+    /// The liquid in a cell of this state: a liquid block's own, or the one a block stands in.
+    /// What touches, swims, drowns and draws water asks this; flow and buckets also tell the two
+    /// apart with `liquid` and `holds`.
+    #[inline]
+    pub fn liquid_in(&self) -> Option<u16> {
+        self.liquid.or(self.holds)
+    }
+
     /// The block texture an item of this block shows as a flat sprite (vanilla's generated item
     /// models): plants and liquids. Other shapes are drawn as their model.
     pub fn item_sprite(&self) -> Option<u32> {
@@ -394,22 +405,25 @@ pub struct ScatterThin {
 
 impl ScatterThin {
     /// Whether it takes away the site at (`x`, `z`) in `biome` with random bits `random`.
-    pub fn removes(&self, c: &Content, seed: u64, x: i32, z: i32, biome: u32, random: u64) -> bool {
+    pub fn removes(&self, c: &Content, f: &weft_noise::fixed::Fields, x: i32, z: i32, biome: u32, random: u64) -> bool {
         if self
             .biomes
             .is_some_and(|b| !c.components.has(crate::components::BIOME, biome, b))
         {
             return false;
         }
-        (self.keep == 0 || random % self.keep as u64 != 0)
-            && self
-                .mask
-                .value(&weft_noise::fixed::Fields { seed }, x * 16, z * 16)
-                > 0
+        (self.keep == 0 || random % self.keep as u64 != 0) && self.mask.value(f, x * 16, z * 16) > 0
     }
 }
 
 impl DimensionDef {
+    /// The noise fields of world `seed` here: its terrain's continent scale, else the default.
+    pub fn fields(&self, seed: u64) -> weft_noise::fixed::Fields {
+        self.terrain
+            .as_ref()
+            .map_or(weft_noise::fixed::Fields::new(seed), |t| t.fields(seed))
+    }
+
     /// The 256 columns of cube column (`cx`, `cz`), index z * 16 + x: its terrain's or its
     /// `column` callback's. None for a dimension with neither.
     pub fn columns(&self, seed: u64, cx: i32, cz: i32) -> Option<std::sync::Arc<[abi::TerrainColumn; 256]>> {
@@ -626,6 +640,11 @@ pub struct Content {
     pub item_liquid: FxHashMap<u32, (u16, u32)>,
     /// (empty container, liquid) -> filled item.
     pub containers: FxHashMap<(u32, u16), u32>,
+    /// (state, liquid) -> the same block's state standing in that liquid, one property apart
+    /// (`waterlogged=false` -> `true`).
+    pub filled: FxHashMap<(u32, u16), u32>,
+    /// A state standing in a liquid -> the same block's dry state one property apart.
+    pub drained: FxHashMap<u32, u32>,
     pub loot: FxHashMap<String, crate::loot::Table>,
     /// `abi::stack_flags` of stack components by component id.
     pub stack_flags: FxHashMap<u32, u32>,
@@ -785,7 +804,7 @@ impl Content {
     pub fn supports(&self, state: u32, neighbor: u32) -> bool {
         match &self.states[state as usize].support {
             None => true,
-            Some((_, Some(tag))) => self.block_has(neighbor, Some(*tag)),
+            Some((_, Some(tag))) => self.cell_has(neighbor, Some(*tag)),
             Some((_, None)) => self.states[neighbor as usize].flags & abi::block_flags::SOLID != 0,
         }
     }
@@ -885,6 +904,59 @@ impl Content {
         let pi = b.props.iter().position(|p| p.name == name)?;
         let v = b.props[pi].values.iter().position(|x| x == value)?;
         Some(b.with_value(state, pi, v as u32))
+    }
+
+    /// The still source of liquid `l`.
+    #[inline]
+    pub fn source_of(&self, l: u16) -> u32 {
+        self.liquids[l as usize].first_state
+    }
+
+    /// What is left of a cell when its block in `state` goes: the liquid it stood in, else air.
+    #[inline]
+    pub fn left(&self, state: u32) -> u32 {
+        self.states[state as usize]
+            .holds
+            .map_or(AIR, |l| self.source_of(l))
+    }
+
+    /// The still liquid a cell in `state` is a source of: a source block, or a block standing in it.
+    pub fn still_liquid(&self, state: u32) -> Option<u16> {
+        let s = &self.states[state as usize];
+        s.holds.or(s.liquid.filter(|&l| self.source_of(l) == state))
+    }
+
+    /// The state to put where `old` is for a block placed or landing as `state`: in a still liquid
+    /// it can stand in, its state standing in it; one that stands in a liquid elsewhere, its dry
+    /// state. `None`: it can't be there (it has no dry state and no such liquid is there).
+    pub fn placed_into(&self, state: u32, old: u32) -> Option<u32> {
+        let here = self.still_liquid(old);
+        match self.states[state as usize].holds {
+            Some(l) if here == Some(l) => Some(state),
+            Some(_) => self.drained.get(&state).copied(),
+            None => Some(
+                here.and_then(|l| self.filled.get(&(state, l)).copied())
+                    .unwrap_or(state),
+            ),
+        }
+    }
+
+    /// Whether a cell in `state` has the tag `comp`, on its block or on the liquid it stands in
+    /// (a kelp cell is `#water` to sugar cane and lily pads).
+    pub fn cell_has(&self, state: u32, comp: Option<u32>) -> bool {
+        self.block_has(state, comp)
+            || self.states[state as usize]
+                .holds
+                .is_some_and(|l| self.block_has(self.source_of(l), comp))
+    }
+
+    /// Whether a reaction side names what is in a cell in `state`, its block or the liquid it
+    /// stands in.
+    pub fn cell_matches(&self, m: &Match, state: u32) -> bool {
+        self.matches(m, state)
+            || self.states[state as usize]
+                .holds
+                .is_some_and(|l| self.matches(m, self.source_of(l)))
     }
 }
 
@@ -1579,6 +1651,7 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
     let commands = freeze_commands(&mods, &mut games, &mut errors);
     let mut word_sets = collect_word_sets(&mut games);
     let (liquids, reactions) = freeze_liquids(&mut games, &mut states, &block_defs, &block_names, &components, &mut errors);
+    let (filled, drained) = freeze_held_liquids(&mut states, &block_defs, &liquids, &components, &mut errors);
     let (item_liquid, containers) = item_containers(&item_defs, &liquids, &components, &mut errors);
     let creative_tabs = creative_tabs(&mods, &games, &item_defs, &item_names, &components, &mut errors);
     let mut ordered_items: Vec<u32> = (1..item_defs.len() as u32).collect();
@@ -1672,6 +1745,8 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
         reactions,
         item_liquid,
         containers,
+        filled,
+        drained,
         loot,
         stack_flags,
     })
@@ -1865,6 +1940,7 @@ fn number_blocks(mods: &[ModMeta], blocks: Vec<(ModId, RawBlock)>, textures: &mu
         drag: 1.0,
         conductor: false,
         liquid: None,
+        holds: None,
         support: None,
         support_near: None,
         spread: None,
@@ -1966,6 +2042,7 @@ fn number_blocks(mods: &[ModMeta], blocks: Vec<(ModId, RawBlock)>, textures: &mu
                 drag: 1.0,
                 conductor: false,
                 liquid: None,
+                holds: None,
                 support: None,
                 support_near: None,
                 spread: None,
@@ -3183,6 +3260,21 @@ fn resolve_sounds(
         for (prefix, what) in unknown {
             errors.push(format!("{what}: no sound events named {prefix}.*"));
         }
+        // Blocks nobody gave a sound (liquids and air have none on purpose), for whoever adds
+        // the missing groups.
+        let mut silent: Vec<&str> = Vec::new();
+        for s in states.iter() {
+            let name = block_defs[s.block as usize].name.as_str();
+            if s.block != 0 && s.liquid.is_none() && s.sounds.iter().all(|&x| x == u32::MAX) && silent.last() != Some(&name) {
+                silent.push(name);
+            }
+        }
+        silent.dedup();
+        if silent.is_empty() {
+            log::info!("block sounds: every block has some");
+        } else {
+            log::info!("block sounds: {} blocks have none: {}", silent.len(), silent.join(", "));
+        }
     }
 }
 
@@ -3301,6 +3393,54 @@ fn freeze_liquids(
         }
     }
     (liquids, reactions)
+}
+
+/// Blocks standing in a liquid (`abi::comp::HOLDS_LIQUID`): `holds` on their states, which
+/// absorb light at least as their liquid does, and the pairs of states one property apart where
+/// one stands in it and the other is dry, for placing into it and draining it.
+fn freeze_held_liquids(
+    states: &mut [StateInfo],
+    blocks: &[BlockDef],
+    liquids: &[LiquidDef],
+    components: &Components,
+    errors: &mut Vec<String>,
+) -> (FxHashMap<(u32, u16), u32>, FxHashMap<u32, u32>) {
+    let (mut filled, mut drained) = (FxHashMap::default(), FxHashMap::default());
+    let Some(comp) = components.id(abi::comp::HOLDS_LIQUID) else { return (filled, drained) };
+    for b in blocks {
+        for st in b.first_state..b.first_state + b.states {
+            let Some(bytes) = components.bytes(comps::BLOCK, st, comp) else { continue };
+            let named = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+            let Some(l) = liquids.iter().position(|d| d.first_state == named) else {
+                errors.push(format!("{}: holds_liquid names a block that is no liquid", b.state_name(st)));
+                continue;
+            };
+            if states[st as usize].liquid.is_some() {
+                errors.push(format!("{}: a liquid can't stand in a liquid", b.name));
+                continue;
+            }
+            let source = &states[named as usize];
+            let (absorb, opacity) = (source.absorb, source.opacity);
+            let s = &mut states[st as usize];
+            s.holds = Some(l as u16);
+            s.absorb = std::array::from_fn(|i| s.absorb[i].max(absorb[i]));
+            s.opacity = s.opacity.max(opacity);
+        }
+        // Each wet state's dry twin: the same but for one property.
+        for wet in b.first_state..b.first_state + b.states {
+            let Some(l) = states[wet as usize].holds else { continue };
+            for (pi, p) in b.props.iter().enumerate() {
+                let dry = (0..p.values.len() as u32)
+                    .map(|v| b.with_value(wet, pi, v))
+                    .find(|&d| states[d as usize].holds.is_none());
+                if let Some(dry) = dry {
+                    drained.entry(wet).or_insert(dry);
+                    filled.entry((dry, l)).or_insert(wet);
+                }
+            }
+        }
+    }
+    (filled, drained)
 }
 
 #[cfg(test)]

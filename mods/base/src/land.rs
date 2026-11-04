@@ -4,7 +4,6 @@
 //! `base:mountains`, `base:snow_1`, the features `mountains`, `mesas`, `rivers`).
 
 use base_api::land::{self as l, SNOW_LINES};
-use weft_sdk::noise::fixed::Fields;
 use weft_sdk::terrain::*;
 use weft_sdk::*;
 
@@ -17,6 +16,7 @@ pub fn terrain(r: &mut Registry) {
         .terrain(&crate::OVERWORLD)
         .stone("stone")
         .base_height(SEA as f64)
+        .continent_scale(l::CONTINENT_SCALE)
         .sea(SEA, "water");
     // Biomes shape the land through their climate, not their borders, so nothing seams: the cold
     // flattens hills into tundra, deserts get dunes and mesas, rivers run where it's wet enough.
@@ -63,6 +63,12 @@ pub fn terrain(r: &mut Registry) {
             .feature("mountains", l::MOUNTAIN_BIOME..)
             .deep_top("gravel", SEA),
     );
+    // Giant sequoia groves, on the mountains' front slopes (`base_api::land::SEQUOIA_AREA`).
+    t = t.biome(
+        BiomeRule::new("sequoia_grove")
+            .height(SEA + l::SEQUOIA_RISE.0..=SEA + l::SEQUOIA_RISE.1)
+            .feature("sequoia_groves", l::SEQUOIA_GROVE..),
+    );
     for (biome, bed) in l::RIVER_BEDS {
         let mut rule = BiomeRule::new(biome).deep_top(bed, SEA);
         // Swamps only on low land, where water stands.
@@ -76,7 +82,7 @@ pub fn terrain(r: &mut Registry) {
         // Distant terrain runs no decorations: it asks this what its steep faces show.
         .faces(l::SNOW_FALL, |f| {
             let [x, _, z] = f.pos();
-            let rocks = l::rock_set(&Fields { seed: f.seed() }, x * 16, z * 16, f.height(), SAND.is(f.surface_block()));
+            let rocks = l::rock_set(&l::fields(f.seed()), x * 16, z * 16, f.height(), SAND.is(f.surface_block()));
             if let Some(rock) = bare(f.seed(), f.pos(), f.block(), f.fall(), f.biome(), rocks) {
                 f.set(rock);
             }
@@ -151,7 +157,7 @@ fn rock(name: &str) -> u32 {
 
 /// The rocks of column (`wx`, `wz`)'s face, its top being `top`.
 fn rocks(g: &Gen, wx: i32, wz: i32, height: i32, top: u32) -> l::RockSet {
-    l::rock_set(&Fields { seed: g.seed() }, wx * 16, wz * 16, height, SAND.is(top))
+    l::rock_set(&l::fields(g.seed()), wx * 16, wz * 16, height, SAND.is(top))
 }
 
 /// The block at the top of column (`wx`, `wz`) once its face went bare: what a decoration in the

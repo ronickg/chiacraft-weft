@@ -535,7 +535,8 @@ and cactus.**
   air and ground, so a ripe field or bush costs nothing until it's picked or eaten. A ripe one
   keeps its fruit through a frost now (lingonberries and crowberries really do).
 - **Not yet:**
-  - kelp, since the engine has no block standing in water;
+  - the water plants as food: reeds, lily pads, eelgrass and the kelp standing in the sea
+    (2026-11-04) have no `forage::SOURCES` rows yet (the wrack washed up on beaches has);
   - the crops (barley, rye, potato, maize, rice, beans and the rest);
   - none of it seen in the game yet;
   - unloaded plants catch up at today's season, not the season they missed.

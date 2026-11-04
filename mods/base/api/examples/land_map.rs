@@ -17,7 +17,7 @@ fn main() {
     let across = arg(4, 4096) as i32;
     let step = arg(5, 4).max(1) as i32;
     let out = a.get(6).cloned().unwrap_or_else(|| "land_map.png".into());
-    let f = Fields { seed };
+    let f = l::fields(seed);
     let n = (across / step) as usize;
     let (x0, z0) = (cx - across / 2, cz - across / 2);
     // Heights before and after, a pixel's column each (with one more row and column for shading).
@@ -142,6 +142,8 @@ fn colour(f: &Fields, x: i32, z: i32, h: i32, rock: bool, after: bool) -> ([u8; 
         "mountains" => [105, 140, 100],
         "snowy_plains" => [215, 225, 225],
         "taiga" => [60, 100, 70],
+        // Giant sequoia groves: rust-red, to find them.
+        "sequoia_grove" => [175, 70, 45],
         "desert" => [220, 200, 130],
         "savanna" => [170, 165, 80],
         "swamp" => [90, 105, 60],

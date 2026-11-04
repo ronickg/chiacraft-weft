@@ -408,6 +408,12 @@ impl Tag {
     pub fn on_block(&self, state: u32) -> bool {
         self.lookup.has(ek::BLOCK, state, self.name, &no_schema)
     }
+    /// On a cell in `state`: on its block, or on the liquid that block stands in (kelp is in
+    /// `#water`). Ask this for what a place is, `on_block` for what a block is.
+    #[inline]
+    pub fn in_cell(&self, state: u32) -> bool {
+        self.on_block(state) || crate::content::held_liquid(state).is_some_and(|l| self.on_block(l))
+    }
     #[inline]
     pub fn on_item(&self, item: u32) -> bool {
         self.lookup.has(ek::ITEM, item, self.name, &no_schema)
@@ -517,6 +523,7 @@ pub static TINT_FACES: Component<u8> = Component::named(abi::comp::TINT_FACES);
 pub static SUPPORT_FACE: Component<u8> = Component::named(abi::comp::SUPPORT_FACE);
 pub static SUPPORT: Component<TagRef> = Component::named(abi::comp::SUPPORT);
 pub static SUPPORT_NEAR: Component<TagRef> = Component::named(abi::comp::SUPPORT_NEAR);
+pub static HOLDS_LIQUID: Component<BlockRef> = Component::named(abi::comp::HOLDS_LIQUID);
 pub static SPREADS_TO: Component<TagRef> = Component::named(abi::comp::SPREADS_TO);
 pub static SPREAD_TIME: Component<f32> = Component::named(abi::comp::SPREAD_TIME);
 pub static SPREAD_LIGHT: Component<u32> = Component::named(abi::comp::SPREAD_LIGHT);

@@ -34,6 +34,30 @@ pub static GRASS_COVER: Component<f32> = Component::named("grass");
 pub static TREE_KINDS: Component<BlockList> = Component::named("tree_kinds");
 /// Flowers a biome grows, picked evenly (`"base:dandelion base:rose"` where unset).
 pub static FLOWERS: Component<BlockList> = Component::named("flowers");
+/// Giant trees (a sequoia grove's): the chance of one per 24 x 24 cell, and which (logs with a
+/// recipe, `tree_recipes`), in a scatter of their own so distant terrain draws them at their own
+/// height, not averaged with the small trees.
+pub static GIANT_TREES: Component<f32> = Component::named("giant_trees");
+pub static GIANT_KINDS: Component<BlockList> = Component::named("giant_kinds");
+/// The layers under the trees (`vitals::layers`, `notes/VEGETATION.md`), as data on the biome:
+/// floor blocks swapped in for the top block in patches, by weight, and the share they cover;
+/// ferns on the bare soil; shrub clumps per 4 x 4 cell in thickets, made of these leaves.
+pub static FLOOR: Component<BlockList> = Component::named("floor");
+pub static FLOOR_COVER: Component<f32> = Component::named("floor_cover");
+pub static FERNS: Component<f32> = Component::named("ferns");
+pub static SHRUBS: Component<f32> = Component::named("shrubs");
+pub static SHRUB_KINDS: Component<BlockList> = Component::named("shrub_kinds");
+/// Young trees of the biome's `YOUNG_KINDS` (else its `TREE_KINDS`), the chance per 5 x 5 cell,
+/// out of the thick stands.
+pub static YOUNG_TREES: Component<f32> = Component::named("young_trees");
+pub static YOUNG_KINDS: Component<BlockList> = Component::named("young_kinds");
+/// The biome's fern (`FERN`, bracken, where unset).
+pub static FERN_KINDS: Component<BlockList> = Component::named("fern_kinds");
+/// Mushrooms at the foot of trunks: which, and their share of the bare soil beside a trunk.
+pub static MUSHROOMS: Component<BlockList> = Component::named("mushrooms");
+pub static MUSHROOM_COVER: Component<f32> = Component::named("mushroom_cover");
+/// The share of a biome's tall grass that grows two blocks tall (`TALL_GRASS_DOUBLE`).
+pub static TALL_GRASS_SHARE: Component<f32> = Component::named("tall_grass_share");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
 pub use base_api::trees::{TREE_LEAVES, grow_tree};
 use base_api::trees::{tree_blocks, wild_tree_at};
@@ -49,6 +73,7 @@ pub static DESERT: Biome = Biome::named("desert");
 pub static SAVANNA: Biome = Biome::named("savanna");
 pub static SWAMP: Biome = Biome::named("swamp");
 pub static MOUNTAINS: Biome = Biome::named("mountains");
+pub static SEQUOIA_GROVE: Biome = Biome::named("sequoia_grove");
 pub static OCEAN: Biome = Biome::named("ocean");
 pub static BEACH: Biome = Biome::named("beach");
 pub static DEEP_CAVES: Biome = Biome::named("deep_caves");
@@ -195,6 +220,32 @@ pub fn register(r: &mut Registry) {
         .set(&STAND_TREES, 0.08)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:mountains").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:spruce_log");
+    // Giant sequoia groves on the mountains' front slopes (`base_api::land::SEQUOIA_AREA`, Giant
+    // Forest's climate): the giants scattered among mixed conifers and black oaks over deep soil,
+    // with clearings. Spruce and oak stand in for the mixed conifers and the sequoia until their
+    // trees come (Voxel dog).
+    r.biome(&SEQUOIA_GROVE)
+        .set(&CLIMATE, base_api::climate("base:sequoia_grove"))
+        .temperature(land::SEQUOIA_TEMPERATURE.0..land::SEQUOIA_TEMPERATURE.1)
+        .humidity(land::SEQUOIA_HUMIDITY..)
+        .set(&BOULDERS, 0.08)
+        .surface("grass", "dirt", 5)
+        .tint(grass, 0x7fa95a)
+        .tint(foliage, 0x4d8a3c)
+        .tint(&base_api::trees::EVERGREEN, 0x4d8a3c)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x6d9a3c)
+        .tag("forest")
+        .tag("animals")
+        .set(&TREES, 0.12)
+        .set(&STAND_TREES, 0.1)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:sequoia_grove").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set_text(&TREE_KINDS, "base:spruce_log:3 base:oak_log:1")
+        // The giants among them (Plants): Giant Forest holds some 4-12 big sequoias a hectare;
+        // a grove patch about 260 across at 0.45 per 24 x 24 cell is some 50, about 7 a hectare.
+        .set(&GIANT_TREES, 0.45)
+        .set_text(&GIANT_KINDS, "base:sequoia_log")
+        // Lupine in its sunny gaps and meadows.
+        .set_text(&FLOWERS, "base:lupine");
     r.biome(&OCEAN)
         .set(&CLIMATE, base_api::climate("base:ocean"))
         .surface("sand", "sand", 3)
@@ -224,6 +275,36 @@ pub fn register(r: &mut Registry) {
             .replace("#stone_ore_replaceables");
     }
 
+    // The layers under the trees, each biome's (`vitals::layers`).
+    for l in &vitals::layers::LAYERS {
+        let b = || Target::Biome(l.biome);
+        if !l.floor.is_empty() {
+            r.set_text_on(b(), &FLOOR, l.floor);
+            r.set_on(b(), &FLOOR_COVER, l.floor_cover);
+        }
+        r.set_on(b(), &FERNS, l.ferns);
+        if l.young > 0.0 {
+            r.set_on(b(), &YOUNG_TREES, l.young);
+        }
+        if !l.young_kinds.is_empty() {
+            r.set_text_on(b(), &YOUNG_KINDS, l.young_kinds);
+        }
+        if !l.fern.is_empty() {
+            r.set_text_on(b(), &FERN_KINDS, l.fern);
+        }
+        if l.mushroom_cover > 0.0 {
+            r.set_text_on(b(), &MUSHROOMS, l.mushrooms);
+            r.set_on(b(), &MUSHROOM_COVER, l.mushroom_cover);
+        }
+        if l.tall_grass > 0.0 {
+            r.set_on(b(), &TALL_GRASS_SHARE, l.tall_grass);
+        }
+        if l.shrubs > 0.0 {
+            r.set_on(b(), &SHRUBS, l.shrubs);
+            r.set_text_on(b(), &SHRUB_KINDS, l.shrub_kinds);
+        }
+    }
+
     // The overworld's shape, its snow and its bare rock (`land.rs`), before the plants below.
     crate::land::terrain(r);
 
@@ -239,6 +320,11 @@ pub fn register(r: &mut Registry) {
         // A forest's clearings keep one tree in four.
         .thin_in(&STAND_TREES, stand_over(-CLEARING).not(), 4)
         .shape(tree);
+    r.scatter(&GIANT_SITES)
+        .cell(24)
+        .reach(12)
+        .density(&GIANT_TREES)
+        .shape(giant);
     r.scatter(&STAND_SITES)
         .cell(3)
         .reach(8)
@@ -252,7 +338,84 @@ pub fn register(r: &mut Registry) {
         .reach(3)
         .density(&BOULDERS)
         .shape(boulder);
+    // Shrubs where a biome has them (`SHRUBS`): a low clump of leaves per 4 x 4 cell, only in
+    // thickets (a noise some 24 blocks across), so they stand in groups with open ground between.
+    r.scatter(&SHRUB_SITES)
+        .cell(4)
+        .reach(1)
+        .density(&SHRUBS)
+        .thin(Mask::Noise { salt: 0x5B2B, scale: 24.0, octaves: 1, from: 0.0, to: 0.0 }.not(), 0)
+        .shape(shrub);
+    // Young trees where light comes in: in clearings and at the stands' edges, none deep in a
+    // stand (`stand_over`).
+    r.scatter(&YOUNG_SITES)
+        .cell(5)
+        .reach(2)
+        .density(&YOUNG_TREES)
+        .thin(stand_over(STAND), 0)
+        .shape(young_tree);
     r.decorate(decorate);
+}
+
+/// A young tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face.
+fn young_tree(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
+    let [x, y, z] = s.pos();
+    let h = s.random();
+    let log = YOUNG_KINDS
+        .on_biome(s.biome())
+        .or_else(|| TREE_KINDS.on_biome(s.biome()))
+        .and_then(|l| l.pick(h >> 40))
+        .unwrap_or(OAK_LOG.id());
+    base_api::trees::young_tree_blocks(
+        log,
+        x,
+        y,
+        z,
+        h >> 8,
+        |x, y, z, state, force| {
+            if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+        },
+    );
+}
+
+/// A shrub at a scatter's site: a clump of the biome's shrub leaves (`SHRUB_KINDS`), one or two
+/// high (`vitals::layers::shrub_height`) and one to three across; none on a bare rock face.
+fn shrub(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
+    let h = s.random();
+    let Some(leaves) = SHRUB_KINDS
+        .on_biome(s.biome())
+        .and_then(|l| l.pick(h >> 40))
+    else {
+        return;
+    };
+    let tall = vitals::layers::shrub_height(name_of(abi::entry_kind::BIOME, s.biome()));
+    let [x, y, z] = s.pos();
+    for dy in 0..tall {
+        for dz in -1..=1i32 {
+            for dx in -1..=1i32 {
+                let side = dx.abs() + dz.abs();
+                // The middle always; its sides most of the time low down, less above; corners
+                // seldom, and only low.
+                let bit = hash(h, dx as i64, dy as i64, dz as i64) & 15;
+                let keep = match (dy, side) {
+                    (_, 0) => true,
+                    (0, 1) => bit < 11,
+                    (0, _) => bit < 4,
+                    (_, 1) => bit < 5,
+                    _ => false,
+                };
+                if keep {
+                    s.put([x + dx, y + dy, z + dz], leaves);
+                }
+            }
+        }
+    }
 }
 
 /// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet; none
@@ -286,7 +449,67 @@ fn boulder(s: &mut Site) {
 
 static TREE_SITES: Scatter = Scatter::named("trees");
 static STAND_SITES: Scatter = Scatter::named("stand_trees");
+static GIANT_SITES: Scatter = Scatter::named("giant_trees");
+
+/// A giant of the biome's `GIANT_KINDS` at a scatter's site; none on a bare rock face.
+fn giant(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
+    let h = s.random();
+    let Some(log) = GIANT_KINDS
+        .on_biome(s.biome())
+        .and_then(|l| l.pick(h >> 40))
+    else {
+        return;
+    };
+    let [x, y, z] = s.pos();
+    // One in twelve lies fallen, mossy, along the ground (the overworld's: its height is known).
+    if (h >> 4).is_multiple_of(12) && s.dimension() == crate::OVERWORLD.id() {
+        fallen_giant(s, h);
+        return;
+    }
+    base_api::trees::giant_tree_blocks(
+        log,
+        x,
+        y,
+        z,
+        h >> 8,
+        |x, y, z, state, force| {
+            if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+        },
+    );
+}
+
+/// A fallen giant: a mossy trunk three wide lying 14 to 22 long through its site, following the
+/// ground under it (half sunk in it, only filling air), its root end a little wider.
+fn fallen_giant(s: &mut Site, h: u64) {
+    let [x, _, z] = s.pos();
+    let (ax, az, axis) = if h >> 12 & 1 == 0 { (1, 0, "x") } else { (0, 1, "z") };
+    let log = state_with(MOSSY_SEQUOIA_LOG.id(), "axis", axis).unwrap_or(MOSSY_SEQUOIA_LOG.id());
+    let half = 7 + ((h >> 16) % 5) as i32;
+    let seed = s.seed();
+    for k in -half..=half {
+        let (cx, cz) = (x + ax * k, z + az * k);
+        let ground = crate::OVERWORLD.column(seed, cx, cz).height;
+        let r2 = if k <= -half + 2 { 5 } else { 2 };
+        for dy in -2i32..=2 {
+            for d in -2i32..=2 {
+                if d * d + dy * dy > r2 {
+                    continue;
+                }
+                // Across the trunk: the other axis.
+                let (px, pz) = (cx + az * d, cz + ax * d);
+                s.put([px, ground + 1 + dy, pz], log);
+            }
+        }
+    }
+}
 static BOULDER_SITES: Scatter = Scatter::named("boulders");
+static SHRUB_SITES: Scatter = Scatter::named("shrubs");
+static YOUNG_SITES: Scatter = Scatter::named("young_trees");
+static LOGS: Tag = Tag::named("logs");
+static LEAVES: Tag = Tag::named("leaves");
 static WET: Tag = Tag::named("wet");
 static WOODS: Tag = Tag::named("forest");
 
@@ -332,8 +555,9 @@ fn decorate(g: &mut Gen) {
     let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
     let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
 
-    // Surface decoration only near the surface.
-    if oy > max_h + 16 || oy + 15 < min_h - 1 {
+    // Surface decoration only near the surface, which under the sea is its water's (kelp).
+    let top = if min_h < SEA { max_h.max(SEA) } else { max_h };
+    if oy > top + 16 || oy + 15 < min_h - 1 {
         return;
     }
     for z in 0..16usize {
@@ -349,10 +573,19 @@ fn decorate(g: &mut Gen) {
                 if col.height >= SEA - CLAY_DEPTH && (0..16).contains(&floor) && clay(seed, wx, wz, shore) {
                     g.set(x, floor as usize, z, CLAY.id());
                 }
+                // Under it, plants of the bed standing in the water (eelgrass, kelp).
+                bed(g, seed, [x, z], [wx, wz], col.height, col.biome);
                 if col.height >= SEA - WILD_WATER_DEPTH {
                     for top in [SEA, SEA - 1] {
                         let y = top + 1 - oy;
-                        if (1..16).contains(&y) && g.get(x, y as usize, z) == 0 && WATER.is(g.get(x, y as usize - 1, z)) {
+                        if !(0..16).contains(&y) || g.get(x, y as usize, z) != 0 {
+                            continue;
+                        }
+                        // The water it floats on: in this cube, or, on the cube's floor, the sea's
+                        // surface (y 63 tops a cube, so a plant on it is always the next cube's),
+                        // water unless the biome freezes it.
+                        let water = if y >= 1 { WATER.is(g.get(x, y as usize - 1, z)) } else { top == SEA && !FROZEN.on_biome(col.biome) };
+                        if water {
                             if let Some(s) = wild_at(seed, wx, wz, shore, wild::Ground::Water) {
                                 g.set(x, y as usize, z, s);
                             }
@@ -424,6 +657,24 @@ fn decorate(g: &mut Gen) {
                 || near
                     .iter()
                     .any(|&(nx, nz, c)| c.height == col.height && pond(seed, nx, nz, c.height, c.biome));
+            // Floor patches (`FLOOR`): a forest's leaf litter and bare dirt, the dry lands' gravel,
+            // in clumps (a noise some 6 blocks across holds them, with holes), twice as thick under
+            // the crowns and half in the open.
+            let below = match FLOOR.on_biome(b) {
+                Some(floor) if y >= 1 && !shore && (PLANT_SOIL.on_block(below) || SAND_TAG.on_block(below)) => {
+                    let cover = FLOOR_COVER.on_biome(b).unwrap_or(0.0) as f64 * if under_crown(g, x, y, z) { 2.0 } else { 0.5 };
+                    let patch = fixed::perlin2(fixed::seed32(seed, 0xF1C0), wx * 16, wz * 16, 6 * 16) > 0;
+                    let fh = hash(seed ^ 0xF1C, wx as i64, 0, wz as i64);
+                    match floor.pick(fh >> 32) {
+                        Some(f) if patch && unit(fh) < 2.0 * cover && f != below => {
+                            g.set(x, y - 1, z, f);
+                            f
+                        }
+                        _ => below,
+                    }
+                }
+                _ => below,
+            };
             let ground = if PLANT_SOIL.on_block(below) {
                 Some(if shore { wild::Ground::Shore } else { wild::Ground::Soil })
             } else if SAND_TAG.on_block(below) {
@@ -431,7 +682,11 @@ fn decorate(g: &mut Gen) {
             } else {
                 None
             };
-            if let Some(s) = ground.and_then(|gr| wild_at(seed, wx, wz, b, gr)) {
+            // A sandy lake or river shore grows the shore's reeds too, else its sand's own plants
+            // (a beach's washed-up kelp).
+            let sandy_shore = shore && ground == Some(wild::Ground::Sand);
+            let pick = if sandy_shore { wild_at(seed, wx, wz, b, wild::Ground::Shore) } else { None };
+            if let Some(s) = pick.or_else(|| ground.and_then(|gr| wild_at(seed, wx, wz, b, gr))) {
                 g.set(x, y, z, s);
                 continue;
             }
@@ -452,7 +707,32 @@ fn decorate(g: &mut Gen) {
                         g.set(x, y, z, flower);
                     }
                 } else if roll < flower_chance + grass_chance {
-                    g.set(x, y, z, TALL_GRASS.id());
+                    // Part of it two blocks tall where the biome grows it (`TALL_GRASS_SHARE`).
+                    let double = TALL_GRASS_SHARE.on_biome(b).unwrap_or(0.0) as f64;
+                    if y + 1 < 16 && g.get(x, y + 1, z) == 0 && unit(hash(seed ^ 0x2A55, wx as i64, 0, wz as i64)) < double {
+                        g.set(x, y, z, state_with(TALL_GRASS_DOUBLE.id(), "half", "lower").unwrap_or(TALL_GRASS_DOUBLE.id()));
+                        g.set(x, y + 1, z, state_with(TALL_GRASS_DOUBLE.id(), "half", "upper").unwrap_or(TALL_GRASS_DOUBLE.id()));
+                    } else {
+                        g.set(x, y, z, TALL_GRASS.id());
+                    }
+                } else {
+                    // The bare soil: mushrooms at the foot of a trunk (`MUSHROOMS`), then ferns
+                    // (`FERNS`), three times as thick round a trunk.
+                    let trunk = beside_log(g, x, y, z);
+                    let near = unit(hash(seed ^ 0xFE4, wx as i64, 0, wz as i64));
+                    let mushroom = MUSHROOM_COVER.on_biome(b).filter(|_| trunk).unwrap_or(0.0) as f64;
+                    let ferns = FERNS.on_biome(b).unwrap_or(0.0) as f64 * if trunk { 3.0 } else { 1.0 };
+                    if near < mushroom {
+                        if let Some(m) = MUSHROOMS.on_biome(b).and_then(|l| l.pick(h >> 20)) {
+                            g.set(x, y, z, m);
+                        }
+                    } else if near < mushroom + ferns {
+                        let fern = FERN_KINDS
+                            .on_biome(b)
+                            .and_then(|l| l.pick(h >> 20))
+                            .unwrap_or(FERN.id());
+                        g.set(x, y, z, fern);
+                    }
                 }
             } else if SAND_TAG.on_block(below)
                 && roll < flower_chance
@@ -484,6 +764,53 @@ fn decorate(g: &mut Gen) {
             }
         }
     }
+}
+
+/// The plant of the bed (eelgrass, kelp; `vitals::wild::Ground::Bed`) on a column whose floor is
+/// at `floor` under the sea, in this cube's part of it: in the water just over the floor, kelp on
+/// up to its height, a block below the surface at most.
+fn bed(g: &mut Gen, seed: u64, [x, z]: [usize; 2], [wx, wz]: [i32; 2], floor: i32, biome: u32) {
+    let roll = wild_roll(seed, wx, wz);
+    if roll >= wild::MOST {
+        return;
+    }
+    let Some(i) = wild::pick(name_of(abi::entry_kind::BIOME, biome), wild::Ground::Bed, roll) else { return };
+    let plant = &wild::WILD[i];
+    let depth = SEA - floor;
+    if !wild::depths(plant.block).contains(&depth) {
+        return;
+    }
+    let s = crate::wild::state(i);
+    if s == u32::MAX {
+        return;
+    }
+    let tall =
+        if plant.form == wild::Form::Column { 1 + (hash(seed ^ 0xCE1, wx as i64, 0, wz as i64) % (depth - 1) as u64) as i32 } else { 1 };
+    let oy = g.origin()[1];
+    for y in floor + 1..=floor + tall {
+        let ly = y - oy;
+        if (0..16).contains(&ly) && WATER.is(g.get(x, ly as usize, z)) {
+            // A kelp column's top shows its tip (`wild.rs`, `top`); the blocks under it the stalk.
+            let here = if plant.form == wild::Form::Column && y < floor + tall { state_with(s, "top", "false").unwrap_or(s) } else { s };
+            g.set(x, ly as usize, z, here);
+        }
+    }
+}
+
+/// Whether leaves hang over this spot of the cube (a tree's crown, a shrub), looking up to the
+/// cube's top.
+fn under_crown(g: &mut Gen, x: usize, y: usize, z: usize) -> bool {
+    (y + 1..16).any(|k| LEAVES.on_block(g.get(x, k, z)))
+}
+
+/// Whether a trunk stands beside this spot of the cube (the four sides and the corners).
+fn beside_log(g: &mut Gen, x: usize, y: usize, z: usize) -> bool {
+    (-1..=1i32).any(|dz| {
+        (-1..=1i32).any(|dx| {
+            let (nx, nz) = (x as i32 + dx, z as i32 + dz);
+            (0..16).contains(&nx) && (0..16).contains(&nz) && LOGS.on_block(g.get(nx as usize, y, nz as usize))
+        })
+    })
 }
 
 /// Whether clay lies under still water at this column of `biome`'s: in 4 x 4 patches, half the

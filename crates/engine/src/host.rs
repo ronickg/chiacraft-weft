@@ -206,6 +206,10 @@ pub static HOST: Host = Host {
     play_animation,
     play_sound,
     client_play_sound: crate::app::api::client_play_sound,
+    client_sound_start: crate::app::api::client_sound_start,
+    client_sound_set: crate::app::api::client_sound_set,
+    client_sound_stop: crate::app::api::client_sound_stop,
+    client_sound_playing: crate::app::api::client_sound_playing,
     reg_spawn,
     biome_at,
     navigate,
@@ -403,6 +407,8 @@ unsafe extern "C" fn reg_sound(r: *mut abi::Registrar, d: *const abi::SoundDesc)
             volume: d.volume,
             pitch: [d.pitch[0].min(d.pitch[1]).max(0.01), d.pitch[0].max(d.pitch[1]).max(0.01)],
             range: d.range.max(1.0),
+            priority: d.priority,
+            voices: d.voices,
         };
         reg(r).game.sounds.push((d.cell as usize, def));
     }
@@ -1916,7 +1922,7 @@ unsafe extern "C" fn reg_liquid_reaction(r: *mut abi::Registrar, d: *const abi::
 unsafe extern "C" fn liquid_of(state: u32) -> u32 {
     try_content()
         .and_then(|c| c.states.get(state as usize))
-        .and_then(|s| s.liquid)
+        .and_then(|s| s.liquid_in())
         .map_or(u32::MAX, |l| l as u32)
 }
 

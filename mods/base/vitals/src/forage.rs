@@ -72,6 +72,7 @@ const TURF: &[&str] = &[
     "base:savanna",
     "base:swamp",
     "base:mountains",
+    "base:sequoia_grove",
     "animals:scrubland",
     "animals:floodplain",
     "animals:fern_forest",
@@ -90,7 +91,13 @@ pub const SOURCES: [Source; 67] = [
     browse("base:oak_leaves", Category::Leaves, 4, OAKS, GREEN),
     browse("base:birch_leaves", Category::Leaves, 4, &["base:forest", "base:birch_forest"], GREEN),
     // Evergreen: a winter's browse (and the tundra's few trees).
-    browse("base:spruce_leaves", Category::Leaves, 4, &["base:taiga", "base:snowy_plains", "base:mountains"], ALL_YEAR),
+    browse(
+        "base:spruce_leaves",
+        Category::Leaves,
+        4,
+        &["base:taiga", "base:snowy_plains", "base:mountains", "base:sequoia_grove"],
+        ALL_YEAR,
+    ),
     browse("base:acacia_leaves", Category::Leaves, 4, &["base:savanna"], ALL_YEAR),
     // Cactus pads, the desert's browse (jackrabbits live on them in the dry months).
     browse("base:cactus", Category::Leaves, 3, &["base:desert"], ALL_YEAR),
@@ -100,7 +107,17 @@ pub const SOURCES: [Source; 67] = [
         "base:tall_grass",
         Category::Seeds,
         3,
-        &["base:plains", "base:forest", "base:birch_forest", "base:taiga", "base:savanna", "base:swamp", "base:mountains", "base:beach"],
+        &[
+            "base:plains",
+            "base:forest",
+            "base:birch_forest",
+            "base:taiga",
+            "base:savanna",
+            "base:swamp",
+            "base:mountains",
+            "base:sequoia_grove",
+            "base:beach",
+        ],
         SUMMER_AUTUMN,
     ),
     browse("base:dead_bush", Category::Seeds, 2, &["base:desert"], ALL_YEAR),
@@ -193,7 +210,7 @@ pub const SOURCES: [Source; 67] = [
     browse("animals:flowering_shrub", Category::Leaves, 4, wild::FLOWERING, GREEN),
     browse("animals:water_lily", Category::WaterPlants, 5, wild::PONDS, ALL_YEAR),
     // Kelp washed up on the beach, all year.
-    browse("base:kelp", Category::WaterPlants, 4, &["base:beach"], ALL_YEAR),
+    browse("base:kelp_wrack", Category::WaterPlants, 4, &["base:beach"], ALL_YEAR),
     // Grubs and beetles in the rotten logs, all year.
     browse("animals:rotten_log", Category::Insects, 3, wild::DEADWOOD, ALL_YEAR),
     // Our trees (`worldgen.rs`, `cretaceous.rs`), as browse where they grow: mesquite's leaves
@@ -270,7 +287,7 @@ pub fn of(block: &str, age: Option<u8>, eats: impl Fn(Category) -> bool, season:
 /// `cretaceous.rs` read it): the grass that grazers eat and that grows back. A biome not listed
 /// gets the world's default (`GRASS_COVER_ELSE`) wherever its ground takes plants; frozen ground
 /// and sand take none (`grass_grows`).
-pub const GRASS_COVER: [(&str, f32); 11] = [
+pub const GRASS_COVER: [(&str, f32); 12] = [
     ("base:plains", 0.25),
     ("base:forest", 0.12),
     ("base:birch_forest", 0.12),
@@ -278,6 +295,8 @@ pub const GRASS_COVER: [(&str, f32); 11] = [
     ("base:savanna", 0.35),
     ("base:swamp", 0.2),
     ("base:mountains", 0.05),
+    // The groves' floor is duff and ferns; the grass is in the clearings and the meadows.
+    ("base:sequoia_grove", 0.06),
     ("animals:red_dunes", 0.0),
     ("animals:scrubland", 0.1),
     ("animals:floodplain", 0.05),

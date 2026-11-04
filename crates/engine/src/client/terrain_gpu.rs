@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use crossbeam_channel::{Receiver, Sender};
 use glam::IVec3;
 use weft_abi::TerrainColumn;
-use weft_noise::fixed::{Fields, seed32};
+use weft_noise::fixed::seed32;
 use weft_render::{Backend, BufferId, Cmd, CommandList, ComputeDesc, PipelineId, usage};
 
 use crate::content::{Content, content};
@@ -54,6 +54,7 @@ pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize
     let mut put = |at: u32, v: i32| w[at as usize] = v;
     put(d::STONE, t.stone as i32);
     put(d::BASE, t.base);
+    put(d::CONT_SCALE, t.continent_scale);
     if let Some((level, water)) = t.sea {
         put(d::HAS_SEA, 1);
         put(d::SEA, level);
@@ -181,6 +182,8 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
                 .unwrap_or(0.0);
             let threshold = (density as f64 * (1u64 << 53) as f64).ceil() as u64;
             let (mut tops, mut radii, mut states) = (Vec::new(), Vec::new(), rustc_hash::FxHashMap::<u32, u32>::default());
+            // What it is made of where it puts nothing only into air (a boulder forces every block).
+            let mut forced = rustc_hash::FxHashMap::<u32, u32>::default();
             for (k, &pos) in spots.iter().enumerate() {
                 if threshold == 0 || tops.len() >= RUNS {
                     break;
@@ -209,8 +212,10 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
                         .max()
                         .unwrap_or(0),
                 );
-                for b in blocks.iter().filter(|b| b.force == 0) {
-                    *states.entry(b.state).or_default() += 1;
+                for b in blocks {
+                    *(if b.force == 0 { &mut states } else { &mut forced })
+                        .entry(b.state)
+                        .or_default() += 1;
                 }
             }
             if tops.is_empty() {
@@ -219,7 +224,14 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
             }
             tops.sort_unstable();
             radii.sort_unstable();
-            let state = states.into_iter().max_by_key(|e| e.1).map_or(0, |e| e.0);
+            // Its canopy's block: the commonest it puts into air (a tree's leaves), else the commonest
+            // it forces (a boulder's stone). None at all was state 0, air, which far terrain drew
+            // as a violet block over the snowy lands' boulders.
+            let state = states
+                .into_iter()
+                .max_by_key(|e| (e.1, e.0))
+                .or_else(|| forced.into_iter().max_by_key(|e| (e.1, e.0)))
+                .map_or(0, |e| e.0);
             let thinned = sc.thin.as_ref().is_some_and(|t| {
                 t.biomes
                     .is_none_or(|comp| c.components.has(crate::components::BIOME, b, comp))
@@ -283,7 +295,7 @@ pub fn custom_heights(c: &Content, dim: u32, seed: u64, x: i32, z: i32, custom: 
     let def = &c.dims[dim as usize];
     def.custom_cache.get(seed, x, z, || {
         let Some(t) = def.terrain.as_ref() else { return Vec::new() };
-        let f = Fields { seed };
+        let f = t.fields(seed);
         let (ox, oz) = (x * 16, z * 16);
         let mut out = Vec::with_capacity(custom.len() * CUSTOM_WORDS);
         for &i in custom {

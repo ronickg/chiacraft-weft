@@ -73,6 +73,7 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
         screens,
         personal: None,
     });
+    track(&half);
     for (i, hook) in m.hooks().iter().enumerate() {
         let cb = i as u32;
         let h = half.clone();
@@ -126,6 +127,89 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
         }
     }
     Ok(())
+}
+
+/// Every client half loaded in this game, packages' and personal ones: each frame ends for all
+/// of them, and `/client_mods` says what they cost. A content built again loads its halves
+/// again; the earlier ones stay here, idle (a content is kept), and are left out while idle.
+static HALVES: Mutex<Vec<std::sync::Weak<Half>>> = Mutex::new(Vec::new());
+
+pub(crate) fn track(h: &Arc<Half>) {
+    let mut all = HALVES.lock().unwrap_or_else(|e| e.into_inner());
+    all.retain(|w| w.strong_count() > 0);
+    all.push(Arc::downgrade(h));
+}
+
+fn halves() -> Vec<Arc<Half>> {
+    HALVES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .filter_map(|w| w.upgrade())
+        .collect()
+}
+
+/// The per-frame meter and `/client_mods` (in this mod's own `init`).
+pub fn register(r: &mut Registry) {
+    // Each frame ends here for every half: a frame's figure is what it ran since the last end.
+    r.client_frame(|_| {
+        for h in halves() {
+            lock(&h).end_frame();
+        }
+    });
+    r.client_command("client_mods", "", |cmd| {
+        let mut total: Vec<std::time::Duration> = Vec::new();
+        let mut any = false;
+        for h in halves() {
+            let inst = lock(&h);
+            let cost = inst.cost();
+            let times = inst.frame_times();
+            let package = inst.package().to_string();
+            drop(inst);
+            if let Some(why) = &cost.stopped {
+                any = true;
+                cmd.reply("packages.client_mods.stopped", &[Arg::Text(&package), Arg::Text(why)]);
+                continue;
+            }
+            // An earlier content's half, idle now (or one with nothing to do).
+            if cost.calls_per_frame == 0.0 {
+                continue;
+            }
+            any = true;
+            // Frames line up from the newest: every half's frame ends together.
+            if total.len() < times.len() {
+                total.splice(0..0, std::iter::repeat_n(std::time::Duration::ZERO, times.len() - total.len()));
+            }
+            let off = total.len() - times.len();
+            for (i, t) in times.iter().enumerate() {
+                total[off + i] += *t;
+            }
+            let key = if h.personal.is_some() { "packages.client_mods.line_personal" } else { "packages.client_mods.line" };
+            cmd.reply(
+                key,
+                &[
+                    Arg::Text(&package),
+                    Arg::Float(cost.per_frame.as_secs_f64() * 1e6, 1),
+                    Arg::Int(cost.worst_frame.as_micros() as i64),
+                    Arg::Float(cost.calls_per_frame, 1),
+                    Arg::Int(cost.frames as i64),
+                    Arg::Int(cost.slowest.as_micros() as i64),
+                    Arg::Int(cost.strikes as i64),
+                ],
+            );
+        }
+        if !any {
+            cmd.reply("packages.client_mods.none", &[]);
+            return;
+        }
+        let frames = total.len().max(1);
+        let average: std::time::Duration = total.iter().sum::<std::time::Duration>() / frames as u32;
+        let worst = total.iter().max().copied().unwrap_or_default();
+        cmd.reply(
+            "packages.client_mods.total",
+            &[Arg::Float(average.as_secs_f64() * 1e6, 1), Arg::Int(worst.as_micros() as i64), Arg::Int(total.len() as i64)],
+        );
+    });
 }
 
 pub(crate) fn lock(h: &Half) -> std::sync::MutexGuard<'_, ClientInstance> {

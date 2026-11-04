@@ -37,7 +37,7 @@ pub fn rgb(c: u32) -> Vec3 {
 }
 
 /// Where on its orbit it is, in turns.
-fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
+pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
     let moved = if s.orbit.is_infinite() {
         d.day_turn(time)
     } else if s.orbit == 0.0 {
@@ -49,7 +49,7 @@ fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
 }
 
 /// Its frame in the world at `turn`: x toward it, y along its way, z out of the orbit's plane.
-fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
+pub(super) fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
     Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(s.tilt) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
 }
 
@@ -126,6 +126,9 @@ pub struct Sky {
     overlay: Option<(BufferId, u32, u32)>,
     /// How far the wind has carried the clouds (blocks along x and z), on top of their own drift.
     cloud_drift: glam::DVec2,
+    /// The cloud layer as the last frame drew it, for shader packs' cloud shadows
+    /// (`Scene::clouds`, `Scene::cloud_cells`); zeros without one.
+    pub cloud_shade: [[f32; 4]; 2],
 }
 
 /// A picture over the whole screen, drawn last: from inside a liquid, a block or a fire.
@@ -179,6 +182,7 @@ impl Sky {
             liquid_colors: Vec::new(),
             overlay: None,
             cloud_drift: glam::DVec2::ZERO,
+            cloud_shade: [[0.0; 4]; 2],
         };
         s.reload(gpu, assets);
         s
@@ -365,6 +369,7 @@ impl Sky {
         overlays: &[Overlay],
     ) {
         self.overlay = None;
+        self.cloud_shade = [[0.0; 4]; 2];
         // Clouds ride the wind where the player is (m/s, the way it blows), at a game's pace.
         self.cloud_drift += wind.as_dvec2() * CLOUD_WIND * dt.clamp(0.0, 0.25) as f64;
         let Some(pipe) = self.pipe else { return };
@@ -441,14 +446,18 @@ impl Sky {
                 // The weather for packs: x how much more of the sky they cover as rain comes, y how
                 // dark their undersides go, z an overcast deck in a storm.
                 let cover = (rain * 0.75 + thunder * 0.25).min(1.0);
+                let cells = [
+                    x.rem_euclid(1.0) as f32,
+                    z.rem_euclid(1.0) as f32,
+                    x.floor().rem_euclid(4096.0) as f32,
+                    z.floor().rem_euclid(4096.0) as f32,
+                ];
+                // The bindless index + 1 (0: none), the cell size, its height over the camera
+                // (its underside) and how much of the gaps the weather fills (`fs_clouds`' `cloud_cell`).
+                self.cloud_shade = [[index as f32 + 1.0, CELL as f32, (lifted - cam.pos.y) as f32, cover * 0.6 + thunder * 0.35], cells];
                 self.list.push(GpuSky {
                     axes: [[cover, (rain * 0.6 + thunder * 0.4).min(1.0), thunder, 0.0], [0.0; 4], [0.0; 4]],
-                    uv: [
-                        x.rem_euclid(1.0) as f32,
-                        z.rem_euclid(1.0) as f32,
-                        x.floor().rem_euclid(4096.0) as f32,
-                        z.floor().rem_euclid(4096.0) as f32,
-                    ],
+                    uv: cells,
                     color: color.powf(2.2).extend(0.8 + 0.15 * cover).to_array(),
                     ids: [index, kind::CLOUDS, w, h],
                     extra: [CELL as f32, 4.0, (lifted - cam.pos.y) as f32, reach as f32],

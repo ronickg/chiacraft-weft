@@ -206,6 +206,8 @@ pub fn register(r: &mut Registry) {
     r.entity_component(&FUSE, 0u32, 0);
     r.entity_component(&SHOOTER, 0u64, 0);
     r.entity(&CREEPER)
+        .sound("hurt")
+        .sound("death")
         .tag("hostile")
         .size(0.6, 1.7)
         .health(20.0)
@@ -216,6 +218,9 @@ pub fn register(r: &mut Registry) {
         .attach(&FUSE)
         .goals(creeper());
     r.entity(&SKELETON)
+        .sound("ambient")
+        .sound("hurt")
+        .sound("death")
         .tag("hostile")
         .size(0.6, 1.99)
         .health(20.0)
@@ -237,6 +242,9 @@ pub fn register(r: &mut Registry) {
         .always_active()
         .goals(ai::Goals::new().then(arrow_flies));
     r.entity(&SHEEP)
+        .sound("ambient")
+        .sound("hurt")
+        .sound("death")
         .tag("livestock")
         .size(0.9, 1.3)
         .health(8.0)
@@ -247,6 +255,9 @@ pub fn register(r: &mut Registry) {
         .goals(passive())
         .on_hurt(panic);
     r.entity(&CHICKEN)
+        .sound("ambient")
+        .sound("hurt")
+        .sound("death")
         .tag("livestock")
         .size(0.4, 0.7)
         .health(4.0)
@@ -394,7 +405,7 @@ fn blast(w: &World, id: u64, at: [f64; 3], radius: f64) {
     }
     // Vanilla's: one going off in a liquid breaks nothing, and liquids don't break at all.
     let p = [at[0].floor() as i32, at[1].floor() as i32, at[2].floor() as i32];
-    if w.flags(p) & abi::block_flags::LIQUID == 0 {
+    if w.flags(p) & abi::block_flags::LIQUID == 0 && held_liquid(w.get(p)).is_none() {
         w.fill_sphere_keeping(at, radius, 0, abi::area_flags::KEEP_UNBREAKABLE | abi::area_flags::KEEP_LIQUIDS);
     }
     w.spawn_particles(&Particle::named("core:poof"), at)
