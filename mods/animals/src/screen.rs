@@ -471,8 +471,8 @@ fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Opt
 const LIFE_BAR: (f32, f32) = (56.0, 6.0);
 const LIFE_VALUE_W: f32 = 34.0;
 /// The Overview's left column (the portrait, name, chips and life), and the window's padding and
-/// the gap between its three columns, GUI px: the whole window is 6 + 104 + 6 + 148 (`STAT_ROW_W`) + 6
-/// + 100 + 6 = 376, inside the 380 a 760 px wide window has at GUI scale 2 (Playtest B9c: at 396 it lost 8 px
+/// the gap between its three columns, GUI px: the whole window is 6 + 104 + 6 + 150 (`STAT_ROW_W`) + 6
+/// + 100 + 6 = 378, inside the 380 a 760 px wide window has at GUI scale 2 (Playtest B9c: at 396 it lost 8 px
 /// each side).
 const LEFT_W: f32 = 104.0;
 const OVERVIEW_PAD: f32 = 6.0;
@@ -486,7 +486,8 @@ const STAT_BAR: (f32, f32) = (32.0, 6.0);
 /// (centred), then the + (GUI pixels).
 const STAT_VALUE_W: f32 = 18.0;
 const STAT_WILD_W: f32 = 12.0;
-const STAT_TAMED_W: f32 = 16.0;
+/// ("Tamed" is 17 GUI px: at 16 the row shrank it, PC run fit760.)
+const STAT_TAMED_W: f32 = 18.0;
 /// A stat row's whole width, for the divider over torpor.
 const STAT_ROW_W: f32 = 8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0 + STAT_WILD_W + 3.0 + STAT_TAMED_W + 3.0 + 10.0;
 
