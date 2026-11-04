@@ -289,3 +289,6 @@ item.animals.trout = Raw Trout
 item.animals.cooked_trout = Cooked Trout
 item.animals.pacu = Raw Pacu
 item.animals.cooked_pacu = Cooked Pacu
+entity.animals.psittacosaurus = Psittacosaurus
+species.animals.psittacosaurus = Psittacosaurus
+family.animals.psittacosauridae = parrot-lizard family

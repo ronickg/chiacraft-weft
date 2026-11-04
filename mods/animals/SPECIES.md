@@ -47,6 +47,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | jaguar | *Panthera onca* | uncommon | large | 0.7 m | 85 kg | solitary | carnivore | knockout | 1.77 d | 7.54 d | 65.1 d | 1-2 | 12 |
 | lungfish | *Ceratodus kempae* | uncommon | small | 0.37 m | 3 kg | solitary | carnivore | wild | eggs, hatch 0.72 d | 10 d | 76.7 d | 1-4 | 14 |
 | lycoptera | *Lycoptera davidi* | common | small | 0.37 m | 0.02 kg | herd | carnivore | wild | eggs, hatch 0.19 d | 2.92 d | 15.3 d | 3-11 | 30 |
+| psittacosaurus | *Psittacosaurus lujiatunensis* | common | medium | 0.5 m | 25 kg | herd | herbivore | wild | eggs, hatch 1.43 d | 6 d | 42.2 d | 3-8 | 20 |
 
 ## Stats at level 1
 
@@ -91,6 +92,7 @@ Damage and speed are each kind's own (1 = 100%).
 | jaguar | 45 | 260 | 200 | 9 | 1 | 120 | 160 | 300 | 25 | 20 |
 | lungfish | 8 | 90 | 40 | 0.6 | 1 | 12 | 600 | 20 | 6 | 30 |
 | lycoptera | 1 | 40 | 8 | 0.1 | 1 | 1 | 300 | 4 | 1 | 30 |
+| psittacosaurus | 22 | 160 | 80 | 1.5 | 1.1 | 45 | 70 | 45 | 14 | 15 |
 
 ## The food web
 
@@ -109,20 +111,17 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 | base:mountains | 60%, 95%, 76%, 40% | summer: eaten 27% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:beach | 40%, 40%, 50%, 40% | - | hare, wood_mouse, house_sparrow | red_fox, raven, herring_gull | red_fox, raven, herring_gull |
 | animals:red_dunes | 40%, 40%, 40%, 40% | - | protoceratops | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
-| animals:scrubland | 40%, 43%, 40%, 40% | - | protoceratops | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
-| animals:floodplain | 40%, 59%, 63%, 40% | - | **none** | utahraptor | utahraptor |
-| animals:fern_forest | 40%, 70%, 45%, 40% | - | **none** | utahraptor, wyvern | utahraptor, wyvern |
+| animals:scrubland | 40%, 43%, 40%, 40% | - | protoceratops, psittacosaurus | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
+| animals:floodplain | 40%, 59%, 63%, 40% | - | psittacosaurus | utahraptor | utahraptor |
+| animals:fern_forest | 40%, 70%, 45%, 40% | - | psittacosaurus | utahraptor, wyvern | utahraptor, wyvern |
 | animals:crags | 40%, 66%, 65%, 40% | - | **none** | wyvern | wyvern |
 
 ### Gaps in the web
 
 What the webs still lack, and what the plan fills it with (`web::WAITING`):
 
-- utahraptor: no prey in animals:fern_forest: Psittacosaurus and the iguanodont (the Cretaceous's tier 2)
 - wyvern: no prey in animals:crags: the ankylosaur (the Cretaceous's tier 2)
 - herring_gull: no prey in base:ocean: the open sea's web: its fish (later; the gull hunts on the beach meanwhile)
-- animals:floodplain: no plant eaters: the iguanodont, the ankylosaur and the sauropod (the Cretaceous's tier 2)
-- animals:fern_forest: no plant eaters: Psittacosaurus and the iguanodont (the Cretaceous's tier 2)
 - animals:crags: no plant eaters: the ankylosaur (the Cretaceous's tier 2)
 
 ## dog (chihuahua)
@@ -358,7 +357,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | how | knockout |
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
-| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar |
+| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar, psittacosaurus |
 | a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
 | drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
@@ -420,7 +419,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | how | knockout |
 | diet | carnivore |
 | eats | meat 80%, carrion 15%, fish 5% |
-| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops, lungfish |
+| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops, lungfish, psittacosaurus |
 | a meal that fills it | 30 kg; its biggest prey at home fills it in one kill |
 | drinks | 80% of its 16.79 L a day; a drink lasts 34 min, thirsty after 17 |
 | feedings to tame at level 1 | 18 (2.5x at level 150) |
@@ -543,7 +542,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | how | knockout |
 | diet | carnivore |
 | eats | meat 80%, fish 10%, carrion 10% |
-| hunts | 0.1%-60% of its mass alone (5.00-3000 kg); at home: raptor, utahraptor, osmolskae, protoceratops |
+| hunts | 0.1%-60% of its mass alone (5.00-3000 kg); at home: raptor, utahraptor, osmolskae, protoceratops, psittacosaurus |
 | a meal that fills it | 500 kg; its biggest prey at home in 1.7 kills |
 | drinks | 100% of its 211.207 L a day; a drink lasts 36 min, thirsty after 18 |
 | feedings to tame at level 1 | 45 (2.5x at level 150) |
@@ -2416,6 +2415,68 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 1 |
+
+## psittacosaurus
+
+*Psittacosaurus lujiatunensis*, Dinosauria › Ceratopsia › Psittacosauridae › . Model `psittacosaurus`, entity `animals:psittacosaurus`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:fern_forest` | commonest |
+| `animals:floodplain` | 30% |
+| `animals:scrubland` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | medium |
+| height (grown, average) | 0.5 m at the hip |
+| males against females | 1.05x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 15% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 25 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 75 d | 1.43 d |
+| litter or clutch | 12 on average | 3-8 **set** |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 0 to 32 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 4 y | 6 d **set** |
+| lives | 11 y | 42.2 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 20 **set** within 48 blocks |
+
+**Balance** (common): a generation 7.7 d; a line four deep in 23 d (8 h of play); 10.3 young per mother in 10 days, 29 in her life.
+
+- ✓ fourth generation: 23.0 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 6.0 of 42 days (want under a fifth)
+- ✓ young in a life: 28.6 (want 6-40)
+- ✓ litter: 3-8 (want 1-12, fewest first)
+- ✓ room near: 20 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | leaves 60%, seeds 30%, fruit 10% |
+| a meal that fills it | 2.5 kg |
+| drinks | 100% of its 1.794 L a day; a drink lasts 21 min, thirsty after 10 |
+| its food grows at home (spring/summer/autumn/winter) | fern_forest 40/65/40/40%, floodplain 40/40/59/40%, scrubland 40/40/40/40% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 12 blocks (twice that running) |
+| eats (food points) | `animals:fern` 8; `animals:ginkgo_seed` 8; `base:berries` 10, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 1 blocks |
+| signature | herd |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.9 |
 
 ## Shared by every species
 

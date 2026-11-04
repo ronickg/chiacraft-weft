@@ -30,10 +30,7 @@ pub const WAITING: &[(&str, &str)] = &[
     // The overworld: what wave two (`notes/ECOLOGY.md`) left.
     ("herring_gull: no prey in base:ocean", "the open sea's web: its fish (later; the gull hunts on the beach meanwhile)"),
     // The Cretaceous's tier 2 and 3.
-    ("animals:floodplain: no plant eaters", "the iguanodont, the ankylosaur and the sauropod (the Cretaceous's tier 2)"),
-    ("animals:fern_forest: no plant eaters", "Psittacosaurus and the iguanodont (the Cretaceous's tier 2)"),
     ("animals:crags: no plant eaters", "the ankylosaur (the Cretaceous's tier 2)"),
-    ("utahraptor: no prey in animals:fern_forest", "Psittacosaurus and the iguanodont (the Cretaceous's tier 2)"),
     ("wyvern: no prey in animals:crags", "the ankylosaur (the Cretaceous's tier 2)"),
 ];
 

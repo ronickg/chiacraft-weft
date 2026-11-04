@@ -29,7 +29,7 @@ impl Deref for Species {
     }
 }
 
-pub static SPECIES: [Species; 37] = [
+pub static SPECIES: [Species; 38] = [
     Species { kind: &crate::dog::CHIHUAHUA, data: &data::SPECIES[0] },
     Species { kind: &crate::cat::CAT, data: &data::SPECIES[1] },
     Species { kind: &crate::capybara::CAPYBARA, data: &data::SPECIES[2] },
@@ -67,6 +67,7 @@ pub static SPECIES: [Species; 37] = [
     Species { kind: &crate::jaguar::JAGUAR, data: &data::SPECIES[34] },
     Species { kind: &crate::fish::LUNGFISH, data: &data::SPECIES[35] },
     Species { kind: &crate::fish::LYCOPTERA, data: &data::SPECIES[36] },
+    Species { kind: &crate::psittacosaurus::PSITTACOSAURUS, data: &data::SPECIES[37] },
 ];
 
 impl Species {

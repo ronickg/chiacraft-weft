@@ -59,6 +59,7 @@ mod meat;
 mod mouse;
 mod owl;
 mod protoceratops;
+mod psittacosaurus;
 mod raptor;
 mod raven;
 mod reindeer;
@@ -137,6 +138,7 @@ fn init(r: &mut Registry) {
     fox::init(r);
     raven::init(r);
     protoceratops::init(r);
+    psittacosaurus::init(r);
     kryptobaatar::init(r);
     lizard::init(r);
     reindeer::init(r);

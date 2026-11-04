@@ -107,6 +107,7 @@ pub static LARIDAE: Family = Family { name: "Laridae", above: &["Aves", "Charadr
 pub static ALLIGATORIDAE: Family = Family { name: "Alligatoridae", above: &["Reptilia", "Crocodylia"] };
 pub static CERATODONTIDAE: Family = Family { name: "Ceratodontidae", above: &["Sarcopterygii", "Dipnoi"] };
 pub static LYCOPTERIDAE: Family = Family { name: "Lycopteridae", above: &["Actinopterygii", "Osteoglossomorpha"] };
+pub static PSITTACOSAURIDAE: Family = Family { name: "Psittacosauridae", above: &["Dinosauria", "Ceratopsia"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -337,7 +338,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 37] = [
+pub static SPECIES: [Species; 38] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1844,13 +1845,7 @@ pub static SPECIES: [Species; 37] = [
         // Wherever people farm and build, from the prairie to the desert's towns and the coast; few in
         // the deep woods. Not in the birch woods', the Alps' or the llanos' dry-season winters, where
         // it lives only on what people leave (`web`: nothing of its diet there then).
-        habitats: &[
-            ("base:plains", 1.0),
-            ("base:desert", 0.5),
-            ("base:beach", 0.5),
-            ("base:forest", 0.4),
-            ("base:swamp", 0.3),
-        ],
+        habitats: &[("base:plains", 1.0), ("base:desert", 0.5), ("base:beach", 0.5), ("base:forest", 0.4), ("base:swamp", 0.3)],
         bio: Biology {
             mass: 0.03,
             gestation: 0.0,
@@ -2781,6 +2776,70 @@ pub static SPECIES: [Species; 37] = [
         // room a pond holds (the balance checks' growth and room).
         tune: Tune { growth: Some(70_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.1,
+    },
+    // Psittacosaurus (`reports/ecology/Cretaceous food webs.md`: the Jehol's "dominant" plant eater,
+    // the commonest dinosaur of the Yixian, and the Utahraptor's prey where it is rare): wild, the
+    // young in groups of one age (Zhao et al. 2014), on its hind legs (`source/psittacosaurus`).
+    Species {
+        model: "psittacosaurus",
+        name: "psittacosaurus",
+        binomial: "Psittacosaurus lujiatunensis",
+        family: &PSITTACOSAURIDAE,
+        subfamily: "",
+        breed: None,
+        size: Size::Medium,
+        // Tough plants ground with stomach stones, even as hatchlings (Wang et al. 2025): leaves and
+        // fronds first, seeds and nuts, some fruit.
+        eats: &[(Leaves, 0.6), (Seeds, 0.3), (Fruit, 0.1)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [22.0, 160.0, 80.0, 1.5, 1.1, 45.0, 70.0, 45.0, 14.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 15.0,
+        foods: &[eats("animals:fern", 8), eats("animals:ginkgo_seed", 8), favorite("base:berries", 10)],
+        feedings: 0.0,
+        shy: 12.0,
+        fights: false,
+        attacks: &[],
+        reach: 1.0,
+        signature: "herd",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.05,
+        size_spread: 0.1,
+        height: (0.5, "hip"),
+        // The Yixian's forests and lake shores first; the floodplain and the scrub less often.
+        habitats: &[("animals:fern_forest", 1.0), ("animals:floodplain", 0.3), ("animals:scrubland", 0.3)],
+        bio: Biology {
+            mass: 25.0,
+            gestation: 0.0,
+            // No record; Protoceratops's 83 days (Erickson et al. 2017), for a smaller egg.
+            incubation: 75.0,
+            // Growth lines: grown at about 9 to 11 (Erickson et al. 2009); breeding before that, as
+            // dinosaurs did, at about four (est.).
+            maturity: 1460.0,
+            lifespan: 4015.0,
+            interval: 365.0,
+            // Clutches are big: a nest of 24 young with an adult (Meng et al. 2004).
+            litter: 12.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            // The Jehol's seasons: its young hatch into the wet summer (est.).
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The Jehol's cool, seasonal forests (a mean year near 10 °C: Amiot et al. 2011).
+            comfort: (0.0, 32.0),
+            cold_blooded: false,
+        },
+        // The commonest animal of its forest and the hunters' food: a common species' pace, a wild
+        // clutch's young kept to what a mother raises, and a room that lets a small group last
+        // (`web/test.mjs`).
+        tune: Tune { growth: Some(144_000), litter: Some((3, 8)), crowd: Some(20), ..Tune::NONE },
+        birth_size: 0.15,
     },
 ];
 
