@@ -83,15 +83,17 @@ fn apply(p: PostPixel) -> vec4<f32> {
     let canopy = min(scene.canopy.x, 1.0) * select(k, 1.0, k == 0.0);
     // At 0.004 + 0.02 x fog the beams under Plants' rainforest were faint (Lighting's dawn checks,
     // 11-04); Planner: make the shafts the canopy's signature.
-    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.012 + 0.04 * scene.weather.z)) * (1.0 - scene.fog_color.w);
+    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.018 + 0.04 * scene.weather.z)) * (1.0 - scene.fog_color.w);
     let air = 1.0 - exp(-density * end);
     // Gold while the sun is under about 30° (the fog's MIST_GOLD in look.wgsl), white toward noon.
     let color = mix(vec3(1.0, 0.62, 0.3), vec3(1.0, 0.95, 0.85), smoothstep(0.1, 0.65, sun.y));
     // Lit air against shade: what shows is the difference the shadow maps make, so a view where all
     // of the air is lit (looking at the sun over open land) gets little of it, beams through gaps
     // the most.
-    // Under a canopy nearly all the air is in shade, so what the sun reaches is all beam.
-    let beams = max(lit * (1.0 - lit) * 4.0, leafy);
-    let glow = color * mix(lit * 0.35, lit, beams) * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * mix(0.6, 1.2, canopy);
+    // Under a canopy nearly all the air is in shade, so what the sun reaches is all beam; where
+    // most of the view's air is lit (the open water by a forest's edge) it is not: at `leafy` alone
+    // the flooded forest's misty river went a white glare (luma p50 185 -> 201).
+    let beams = max(lit * (1.0 - lit) * 4.0, leafy * (1.0 - lit));
+    let glow = color * mix(lit * 0.35, lit, beams) * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * mix(0.6, 1.6, canopy * (1.0 - lit));
     return vec4(p.color.rgb + glow * (vec3(1.0) - p.color.rgb * 0.7), p.color.a);
 }
