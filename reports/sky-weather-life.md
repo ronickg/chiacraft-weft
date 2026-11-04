@@ -10,7 +10,7 @@ Researcher, 2026-11-04, round 8, for Planner and Ronald. It follows `reports/wor
   - The auroral oval sits at about 60–75° north, so biomes whose place is at 60° or more (`lat` in `reports/ecology/biome_climates.json`) get aurorae on clear nights. That is the taiga (Fairbanks, 64.8°, one of the best aurora places on Earth) and the snowy plains (Utqiaġvik, 71.3°).
   - The temperature rule would have left out Fairbanks, whose yearly mean is −2.1 °C.
   - The birch forest (Moscow, 55.8°) could have a rare faint one.
-- **Pictures:** no new ones downloaded. This round reuses round 7's thumbnails and lists the new ones as links with their sizes. Ronald says yes or no to downloading them when he wakes.
+- **Pictures:** none downloaded at first. Ronald said yes in the morning, and the ten are now in `sky-weather-life/refs/` (below).
 - **Code:** ideas only, never code, from Photon and Complementary: their licences don't allow copying. Particle Rain, Falling Leaves, Cosy Critters and Ambient Birds are MIT. AmbientSounds is LGPL.
 
 ## Where we are
@@ -91,22 +91,24 @@ The gaps, worst first:
 - `complementary_old_growth.jpg`: a sunset through spruces, light rays, reflections;
 - `complementary_style_comparison.jpg`: stylised against realistic clouds and grading.
 
-**Not downloaded, awaiting Ronald's yes** (about 12 MB; for internal reference only, since screenshots belong to their authors):
+**Downloaded with Ronald's yes (2026-11-04), internal reference only** (the screenshots belong to their authors).
+- Thumbnails are in `sky-weather-life/refs/`; the originals (13.7 MB) are in `~/Coding/chiacraft-archive/sky-weather-life/refs/`.
+- GIF thumbnails show the first frame.
 
-| picture | shows | size | link |
+| thumbnail | shows | for change | source |
 |---|---|---|---|
-| Bliss, "Overcast day" | volumetric clouds by weather | 2.3 MB | [image](https://cdn.modrinth.com/data/ZvMtQlho/images/5551fc80b83c97dab65e45231ac7060f26dbbfa8.png), [gallery](https://modrinth.com/shader/bliss-shader/gallery) |
-| Bliss, "Rainy weather" | storm sky and wet ground | 1.9 MB | [image](https://cdn.modrinth.com/data/ZvMtQlho/images/8eae19cb16db51436e3f027a22f2309bf043900e.png) |
-| Photon, "New rainbows" | rainbow after rain | 0.5 MB | [image](https://cdn.modrinth.com/data/lLqFfGNs/images/a7eb9caed8a932e51631ca269c93d5792c11863d.jpeg), [gallery](https://modrinth.com/shader/photon-shader/gallery) |
-| Vintage Story, aurora | the aurora | 0.6 MB | [image](https://wiki.vintagestory.at/images/c/c6/Aurora.PNG), [page](https://wiki.vintagestory.at/index.php/Glow_worm) |
-| Vintage Story, fireflies | fireflies at night | 0.4 MB | [image](https://wiki.vintagestory.at/images/1/13/Fireflies.png) |
-| Puddles & Floods | puddles with shaders | 4.2 MB | [image](https://cdn.modrinth.com/data/xeRVd78z/images/3d4b5deeb0c50c9f501c3b0c3423e8b94d92f4c8.png), [page](https://modrinth.com/mod/puddles-floods) |
-| Vintage Story, snow (GIF) | snow building and melting | 1.4 MB | [image](https://media.vintagestory.at/monthly_2020_07/snowaccum.gif.57fb27cfb081bf3c5236cb34ed081463.gif) |
-| Falling Leaves (GIF) | falling leaves | 1.9 MB | [image](https://i.imgur.com/Y6zGq33.gif), [repo](https://github.com/RandomMcSomethin/fallingleaves) |
-| Particle Rain | fog after rain | 0.04 MB | [image](https://cdn.modrinth.com/data/nrikgvxm/images/4a4426059ebe345fb204a4915cdcf3743c8cd110.webp), [page](https://modrinth.com/mod/particle-rain) |
-| Vintage Story, clouds | stylised cumulonimbus | 0.5 MB | [image](https://media.vintagestory.at/monthly_2019_12/2019-11-25_14-19-58.jpg.80f0483e100d16b6bff462f76129b466.jpg) |
+| `bliss_overcast_day.jpg` | a layered overcast sky over a forest | 1 | [Bliss gallery](https://modrinth.com/shader/bliss-shader/gallery) |
+| `vintage_story_clouds.jpg` | stylised cumulonimbus | 1 | [VS 1.12 blog](https://www.vintagestory.at/blog.html/news/the-stormy-weathers-update-v112-pre1-r230/) |
+| `puddles_floods_puddles.jpg` | puddles mirroring trees in rain, fog | 2 | [Puddles & Floods](https://modrinth.com/mod/puddles-floods) |
+| `bliss_rainy_weather.jpg` | storm sky and wet ground | 2 | Bliss gallery |
+| `particle_rain_fog_after_rain.jpg` | fog after rain | 2, 6 | [Particle Rain](https://modrinth.com/mod/particle-rain) |
+| `vintage_story_fireflies.jpg` | fireflies over grass at dusk | 4 | [VS wiki](https://wiki.vintagestory.at/index.php/Glow_worm) |
+| `falling_leaves.jpg` | falling leaves (GIF, first frame) | 4 | [Falling Leaves](https://github.com/RandomMcSomethin/fallingleaves) |
+| `vintage_story_aurora.jpg` | a faint aurora, stars in colours | 5 | VS wiki |
+| `photon_rainbows.jpg` | a rainbow after rain | 6 | [Photon gallery](https://modrinth.com/shader/photon-shader/gallery) |
+| `vintage_story_snow_accumulation.jpg` | snow building on the ground (GIF, first frame) | 8 | [VS 1.13 blog](https://www.vintagestory.at/blog.html/news/the-seasons-update-v113-pre1-r251/) |
 
-**Ours:** Tester 2's fixed-spot shots at noon and sunset (round 7's request, not yet taken) give the "before" for changes 1, 5 and 6. Change 2 needs a rain run, and 4 a summer-night run, from the same spots.
+**Ours:** Tester 2's fixed-spot shots (`reports/world-looks/ours/2026-11-04_*`, noon and late afternoon; real sunset, night and rain retakes asked for) give the "before" for changes 1, 5 and 6. Change 2 needs a rain run, and 4 a summer-night run, from the same spots.
 
 ## Sources
 

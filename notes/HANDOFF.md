@@ -429,7 +429,7 @@ the bell "(mod API 1.2)"; `/mods` answered ("bell (mod API 1.2): 1 calls, 121.0 
 Found and fixed after it: the input registered key bindings only at start, so a key a package
 brings on joining was unknown on the joining game (`content_changed` in `app.rs` now registers
 the new content's keys with the player's bindings); the badge's text wrapped a letter a line (it
-needs `no_wrap` in a HUD panel). Bob's HUD after alice's ring and his key: rerun pending. Not covered: other kinds of
+needs `no_wrap` in a HUD panel). Checked on the PC (Tester 2, 47a8be49, two copies at 480x270 beside vLLM): the whole pair. Bob joined as "bob" and downloaded bell, clans, gems and tally; alice's use rang the bell and the puff showed above it; the badge "Bell: 2 rings" on one line over the bar "2/10", in both games; bob's key: "You listen for the bell." in his chat and "player 2 pinged: ping" in alice's log; `/mods` gave the bell's and clans' calls with 0 strikes. Two rings from one use: the script held use 0.3 s and the engine repeats use every 0.2 s while it is held (the script now holds 0.15 s). Not covered: other kinds of
 handle cells (blocks, items, sounds) when a content built earlier comes back.
 Slice 5, personal mods (built, and checked in one game on the PC: off by default with "Your
 personal mods are off in this world: clock.", on after `/rule personal_mods 1` with the clock
@@ -449,6 +449,18 @@ average and slowest time and strikes in ten minutes (`Instance::stats`), and why
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
 and chain steps, cached compiled components and a per-tick budget across mods, `/mods` for
 client halves, the engine's settings hazard on a content switch (Planner).
+
+## Phase 4: achievements (2026-11-04 overnight, built, not yet seen in a game)
+
+Slices 8-10. `crates/engine/src/chiacraft/achievements.rs` (the player's store, `achievements.json`
+in the account home; `received`, `anchored`; `check_issuer`, the world DID confirmed both ways),
+`server/achievements.rs` (the server signs what mods grant through the bridge's `achievement`
+question, `Shared.grants`, with the owner's account as issuer and the world DID's proof kept in
+`did.json`; `achievements/issued.jsonl`; the daily anchor behind the world rule
+`anchor_achievements`, `achievements/anchors.json`, proofs sent on join), `achievements_screen.rs`
+(Profile > Achievements). The base mod asks the bridge in `advancements.rs` `grant_where`.
+World rules `sign_achievements` (on) and `anchor_achievements` (off). Protocol 9. The check:
+`tools/checks/achievements` (two copies, no chain).
 
 ## Our DID sponsor (testnet11, since 2026-11-04)
 

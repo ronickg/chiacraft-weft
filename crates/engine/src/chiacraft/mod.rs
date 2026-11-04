@@ -5,6 +5,8 @@
 //! they were.
 
 pub mod account_screen;
+pub mod achievements;
+pub mod achievements_screen;
 pub mod bridge;
 pub mod chain;
 pub mod did;

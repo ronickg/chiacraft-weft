@@ -229,6 +229,13 @@ fn grant_where(w: &World, player: u64, met: impl Fn(&Rule) -> bool) {
         if a.done & bit == 0 && met(&adv.rule) {
             a.done |= bit;
             w.send(player, &MADE, &(i as u32));
+            // chiacraft: the world signs it for the player, a credential that outlives the world.
+            let arg = format!(
+                "{player}\tbase:{id}\tadvancement.base.{id}\tadvancement.base.{id}.desc\t{icon}",
+                id = adv.id,
+                icon = adv.icon.name()
+            );
+            crate::bridge("achievement", &arg);
             base_api::give_xp(w, player, vitals::levels::xp::ADVANCEMENT);
         }
     }

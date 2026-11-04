@@ -215,6 +215,8 @@ impl Client {
                 self.command_replies.insert(id, lines);
             }
             ToClient::Disconnect(reason) => self.disconnected = Some(reason),
+            ToClient::Achievement(json) => crate::chiacraft::achievements::received(&json),
+            ToClient::AchievementAnchor { hash, anchor } => crate::chiacraft::achievements::anchored(&hash, &anchor),
             ToClient::Refused(why) => {
                 self.disconnected = Some(why.key.clone());
                 self.refused = Some(why);

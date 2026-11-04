@@ -9,9 +9,8 @@
 //! does this world have) the mod asks through the engine's bridge (`chiacraft_bridge`).
 
 use std::collections::HashSet;
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 
-use weft_sdk::abi::Str;
 use weft_sdk::*;
 
 declare_mod!(deps: [], init: init);
@@ -46,24 +45,8 @@ static SCREEN: Screen = Screen::named("portal");
 
 // ------------------------------------------------------------------ the engine's bridge
 
-type Query = unsafe extern "C" fn(query: Str, arg: Str) -> Str;
-static BRIDGE: OnceLock<Query> = OnceLock::new();
-
-/// The engine hands the mod its bridge when the mod loads.
-///
-/// # Safety
-/// `q` must be the engine's `bridge::query`.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn chiacraft_bridge(q: Query) {
-    let _ = BRIDGE.set(q);
-}
-
-fn ask(q: &str, arg: &str) -> String {
-    BRIDGE
-        .get()
-        .map(|f| unsafe { f(Str::new(q), Str::new(arg)).as_str().to_string() })
-        .unwrap_or_default()
-}
+chiacraft_bridge::install!();
+use chiacraft_bridge::ask;
 
 fn is_owner(player: u64) -> bool {
     ask("owner", &player.to_string()) == "1"
