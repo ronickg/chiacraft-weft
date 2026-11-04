@@ -1,0 +1,160 @@
+//! The overworld's land (`reports/world-looks.md`, change 5): its shape, where each biome stands,
+//! snow on the heights, and bare rock on steep faces. The numbers and the shapes are in
+//! `base_api::land`; other mods edit the terrain by the names here (`base:desert`,
+//! `base:mountains`, `base:snow_1`, the features `mountains`, `mesas`, `rivers`).
+
+use base_api::land::{self as l, SNOW_LINES};
+use weft_sdk::terrain::*;
+use weft_sdk::*;
+
+use crate::blocks::*;
+use crate::worldgen::SEA;
+
+/// The overworld's terrain.
+pub fn terrain(r: &mut Registry) {
+    let mut t = r
+        .terrain(&crate::OVERWORLD)
+        .stone("stone")
+        .base_height(SEA as f64)
+        .sea(SEA, "water");
+    // Biomes shape the land through their climate, not their borders, so nothing seams: the cold
+    // flattens hills into tundra, deserts get dunes and mesas, rivers run where it's wet enough.
+    for f in l::features() {
+        t = t.feature(f);
+    }
+    // Biomes bring their climate and surface; rules only add where else they must hold. The sea
+    // is the ocean's out to the coast; water inland (rivers, lakes) belongs to the land around it
+    // and lies on its own bed (`RIVER_BEDS`).
+    t = t
+        .biome(
+            BiomeRule::new("ocean")
+                .height(..=SEA - 2)
+                .continent(..l::OCEAN_CONTINENT),
+        )
+        .biome(
+            BiomeRule::new("snowy_plains")
+                .named("snowy_coast")
+                .height(..=SEA + 1)
+                .continent(..0.1),
+        )
+        .biome(BiomeRule::new("beach").height(..=SEA + 1).continent(..0.1));
+    // Snow on the heights, the line lower in the cold and in drifts (`base_api::land::snowy`); the
+    // ground is the mountains' (their climate), only its surface is snow.
+    let mut low = f64::NEG_INFINITY;
+    for (i, &(below, line)) in SNOW_LINES.iter().enumerate() {
+        let snow = |name: String| {
+            BiomeRule::new("mountains")
+                .named(&name)
+                .temperature(low..below)
+                .surface("snow", "snow", l::SNOW_DEPTH - 1)
+                .bare_above(i32::MAX)
+        };
+        t = t.biome(snow(format!("snow_{i}")).height(line..)).biome(
+            snow(format!("snow_{i}_drift"))
+                .height(line - l::SNOW_DRIFT..)
+                .feature("snow_drift", l::SNOW_DRIFT_FROM..),
+        );
+        low = below;
+    }
+    // A creek in the mountains lies on gravel.
+    t = t.biome(
+        BiomeRule::new("mountains")
+            .feature("mountains", l::MOUNTAIN_BIOME..)
+            .deep_top("gravel", SEA),
+    );
+    for (biome, bed) in l::RIVER_BEDS {
+        let mut rule = BiomeRule::new(biome).deep_top(bed, SEA);
+        // Swamps only on low land, where water stands.
+        if biome == "swamp" {
+            rule = rule.height(..=SEA + 12).continent(0.1..);
+        }
+        t = t.biome(rule);
+    }
+    t.cave_biome("deep_caves", 24, 96.0, 0.25)
+        .caves(Caves::new("lava", i32::MIN, 11));
+
+    r.decorate(rock_faces).dimension(&crate::OVERWORLD);
+}
+
+static WET: Tag = Tag::named("wet");
+static WOODS: Tag = Tag::named("forest");
+
+/// How far the ground of column (`wx`, `wz`), `height` high, falls to its lowest neighbour.
+fn fall(g: &Gen, wx: i32, wz: i32, height: i32) -> i32 {
+    [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        .iter()
+        .map(|&(dx, dz)| height - g.column(wx + dx, wz + dz).height)
+        .max()
+        .unwrap_or(0)
+}
+
+/// What a rock face makes of `block` at `pos` in `biome`, if it's soil that goes bare there
+/// (`fall` blocks to the lowest neighbour); `None` keeps it. On a sandy face (`sandy`: the
+/// column's top is sand) stone and sand alike are sandstone.
+fn bare(seed: u64, pos: [i32; 3], block: u32, fall: i32, biome: u32, sandy: bool) -> Option<u32> {
+    if fall >= l::SNOW_FALL && SNOW.is(block) && fall < l::ROCK_FALL {
+        return Some(STONE.id());
+    }
+    if fall < l::ROCK_FALL || SANDSTONE.is(block) {
+        return None;
+    }
+    if SAND.is(block) || sandy && STONE.is(block) {
+        return Some(SANDSTONE.id());
+    }
+    if ![GRASS.id(), SNOWY_GRASS.id(), DIRT.id(), PODZOL.id(), SNOW.id(), GRAVEL.id()].contains(&block) {
+        return None;
+    }
+    Some(match l::rock_kind(seed, pos, WET.on_biome(biome) || WOODS.on_biome(biome)) {
+        1 => COBBLESTONE.id(),
+        2 => MOSSY_COBBLESTONE.id(),
+        _ => STONE.id(),
+    })
+}
+
+/// The block at the top of column (`wx`, `wz`) once its face went bare: what a decoration in the
+/// cube above reads instead of the terrain's (`Gen::surface_block`).
+pub fn surface_block(g: &Gen, wx: i32, wz: i32) -> u32 {
+    let top = g.surface_block(wx, wz);
+    if g.dimension() != crate::OVERWORLD.id() {
+        return top;
+    }
+    let c = g.column(wx, wz);
+    bare(g.seed(), [wx, c.height, wz], top, fall(g, wx, wz, c.height), c.biome, SAND.is(top)).unwrap_or(top)
+}
+
+/// Steep faces go bare: where the ground falls `ROCK_FALL` blocks or more to a neighbour, its soil
+/// is rock in patches as far down as the face shows (sand and the stone under it are sandstone),
+/// so cliffs and mesas show rock, not grass over a band of dirt; snow slides off from
+/// `SNOW_FALL`. Before the plants (`worldgen::decorate`), which then find no soil there.
+fn rock_faces(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let seed = g.seed();
+    let [ox, oy, oz] = g.origin();
+    let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
+    let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
+    if oy > max_h || oy + 15 < min_h - l::ROCK_MAX_DEPTH {
+        return;
+    }
+    for z in 0..16usize {
+        for x in 0..16usize {
+            let col = cols[z * 16 + x];
+            let (wx, wz) = (ox + x as i32, oz + z as i32);
+            let h = col.height;
+            if h < SEA || h < oy || h - l::ROCK_MAX_DEPTH > oy + 15 {
+                continue;
+            }
+            let fall = fall(g, wx, wz, h);
+            if fall < l::SNOW_FALL {
+                continue;
+            }
+            let sandy = SAND.is(g.surface_block(wx, wz));
+            let depth = fall.clamp(l::ROCK_DEPTH, l::ROCK_MAX_DEPTH);
+            for wy in (h - depth).max(oy)..=h.min(oy + 15) {
+                let y = (wy - oy) as usize;
+                if let Some(rock) = bare(seed, [wx, wy, wz], g.get(x, y, z), fall, col.biome, sandy) {
+                    g.set(x, y, z, rock);
+                }
+            }
+        }
+    }
+}

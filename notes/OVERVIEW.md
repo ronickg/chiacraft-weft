@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 67 · ◧ partly built: 18 · □ not built yet: 14 · ◌ planned for later: 6
+■ built and seen working: 67 · ◧ partly built: 19 · □ not built yet: 14 · ◌ planned for later: 6
 
 ## Core next
 
@@ -177,12 +177,13 @@ Code: `mods/base/vitals/src/climate.rs`, `mods/base/api`, `mods/animals/src/comf
 
 ## World content
 
-What the world is made of: blocks, items, recipes, biomes, mobs. 4 of 5 parts built.
+What the world is made of: blocks, items, recipes, biomes, mobs. 4 of 6 parts built.
 
 | | Part | Notes |
 |---|---|---|
 | ■ | Blocks, items, crafting | Weft's base game. |
 | ■ | Biomes with real climates |  |
+| ◧ | The land's shape | Research round 7's change 5 (reports/world-looks.md): rivers that cut valleys down to the sea along a wandering noise, wider at the coast, rising in the mountains and rare in the dry; mesas on two or three tiers in the hot, dry land; highlands that lift the temperate lands up to some 30 blocks; snow above a snow line that falls with the cold, lower in drifts; steep faces bare rock in patches of stone and cobbles (sandstone on sand). Water inland is the land's biome, on gravel, sand or mud. Numbers and math in base_api::land, a map preview in its examples. Not yet seen in the game; not yet: more kinds of stone (needs art), water above the sea's level (springs, falls), 3D overhangs (Weft). Code: `mods/base/api/src/land.rs`, `mods/base/src/land.rs`. Docs: `docs/worldgen.md`, `reports/world-looks.md`. |
 | ■ | Mobs | Weft's. |
 | ■ | Advancements |  |
 | □ | Our own content plan (core) | The plan leaves game content out until the foundations stand; survival and animals now need it. For food, the living world's research is the plan: the species' diets and the biomes' plants and crops. Docs: `notes/ECOLOGY.md`. |

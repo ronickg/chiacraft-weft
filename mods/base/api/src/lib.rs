@@ -8,6 +8,7 @@
 use weft_sdk::*;
 
 pub mod grow;
+pub mod land;
 pub mod trees;
 
 value! {
