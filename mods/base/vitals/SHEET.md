@@ -50,10 +50,14 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:cloudberries | fruit | 100 | 10 | 2 | 2 | 1 | 16 | 85 | 6 min | 3 + 3 | cooling |
 | base:crowberries | fruit | 100 | 10 | 1 | 7 | 1 | 5 | 85 | 6 min | 10 + 10 | cooling |
 | base:raspberries | fruit | 100 | 10 | 1 | 5 | 1 | 9 | 86 | 5 min | 2 + 2 | cooling |
+| base:huckleberries | fruit | 100 | 10 | 1 | 12 | 0 | 3 | 84 | 5 min | 5 + 5 | cooling |
+| base:beach_plums | fruit | 100 | 10 | 1 | 10 | 0 | 2 | 87 | 5 min | 5 + 5 | cooling |
 | base:prickly_pear_fruit | fruit | 100 | 10 | 1 | 6 | 0 | 5 | 88 | 5 min | 7 + 7 | cooling |
 | base:rose_hip | fruit | 30 | 3 | 0 | 4 | 0 | 20 | 18 | 2 min | 30 + 30 | cooling |
 | base:hazelnut | seeds | 30 | 3 | 4 | 2 | 18 | 3 | 2 | 10 min | 60 + 60 |  |
 | base:pine_nut | seeds | 30 | 3 | 4 | 3 | 21 | 1 | 1 | 11 min | 60 + 60 |  |
+| base:chia_seeds | seeds | 30 | 3 | 5 | 2 | 9 | 10 | 2 | 7 min | 365 + 365 |  |
+| base:tepary_beans | seeds | 50 | 5 | 12 | 22 | 1 | 8 | 5 | 7 min | 365 + 365 |  |
 | base:sunflower_seeds | seeds | 30 | 3 | 6 | 3 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
 | base:kelp | water_plants | 50 | 5 | 1 | 5 | 0 | 1 | 41 | 3 min | 3 + 3 |  |
 | base:cattail_root | roots | 100 | 10 | 1 | 17 | 0 | 3 | 78 | 6 min | 14 + 14 |  |
@@ -99,6 +103,8 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | base:cloudberries (6) | base:dried_berries | - | - | 112 |
 | base:crowberries (20) | base:dried_berries | - | - | 112 |
 | base:raspberries (4) | base:dried_berries | - | - | 112 |
+| base:huckleberries (10) | base:dried_berries | - | - | 112 |
+| base:beach_plums (10) | base:dried_berries | - | - | 112 |
 | base:prickly_pear_fruit (14) | base:dried_berries | - | - | 112 |
 | animals:venison (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | animals:hare (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
@@ -240,6 +246,7 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:beans | common bean | 10, 18-25, 30 | Moderate | 0 °C | 100 | 24 | plains (su), forest (su), birch_forest (su), taiga (su), savanna (au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), floodplain (au), fern_forest (su), crags (su au) |
 | base:sorghum | sorghum | 8, 27-34, 42 | Dry | 0 °C | 125 | 28 | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), sequoia_grove (su), ocean (sp su au wi), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su au) |
 | base:millet | pearl millet | 10, 30-34, 45 | Dry | 0 °C | 105 | 25 | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au), ocean (su au), beach (su au), red_dunes (su), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
+| base:tepary_beans | tepary bean (Phaseolus acutifolius) | 12, 25-32, 42 | Dry | 0 °C | 75 | 20 | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:cassava | cassava | 12, 25-29, 37 | Moderate | 0 °C | 390 | 63 | plains (su), savanna (sp su au), swamp (su au), ocean (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
 | base:pumpkin_stem | pumpkin, squash | 10, 20-30, 35 | Moderate | 0 °C | 110 | 26 | plains (su), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), ocean (su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
 | base:melon_stem | melon | 12, 25-30, 38 | Moderate | 0 °C | 140 | 31 | plains (su), savanna (sp su au), swamp (su au), ocean (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
@@ -252,13 +259,17 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:sedge | sedges | -1, 8-22, 32 | Moderate | hardy | 18 | 7 | plains (sp su au), forest (sp su au), birch_forest (su au), taiga (su), snowy_plains (su), savanna (au), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au wi) |
 | base:cottongrass | cottongrass (Eriophorum) | -2, 6-16, 25 | Moderate | hardy | 18 | 7 | plains (sp au), forest (sp su au wi), birch_forest (su au), taiga (su), snowy_plains (su), mountains (sp su au), sequoia_grove (wi), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
 | base:reindeer_lichen | reindeer lichen (Cladonia) | 0, 5-15, 25 | Dry | hardy | 3650 | 301 | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (su au), snowy_plains (su), mountains (sp su au), sequoia_grove (sp su au wi), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (au wi), fern_forest (sp su au), crags (sp au wi) |
+| base:dune_grass | American beachgrass (Ammophila breviligulata) | 5, 18-26, 35 | Dry | hardy | 30 | 10 | plains (sp su au), forest (su au), birch_forest (su), taiga (su), desert (sp au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au wi), fern_forest (su au), crags (sp su au) |
 | base:clover | white clover | 5, 18-25, 32 | Moderate | hardy | 30 | 10 | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (au), fern_forest (su au), crags (su au) |
 | base:lingonberry_bush | lingonberry | 5, 12-20, 28 | Moderate | -3 °C | 75 | 20 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:cloudberry_bush | cloudberry | 0, 8-16, 25 | Wet | -2 °C | 45 | 14 | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (su), snowy_plains (su), desert (wi), mountains (sp su au), sequoia_grove (sp su au wi*), ocean (sp su au wi), beach (sp au wi), red_dunes (sp au wi*), scrubland (sp au wi), floodplain (sp au wi), fern_forest (sp su au), crags (sp au wi) |
 | base:crowberry_bush | crowberry | -1, 6-15, 25 | Moderate | hardy | 60 | 17 | plains (sp au), forest (sp su au wi), birch_forest (su au), taiga (su), snowy_plains (su), mountains (su au), sequoia_grove (wi), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
 | base:hazel_bush | hazel | 5, 16-24, 32 | Moderate | hardy | 180 | 37 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (su au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), floodplain (au), fern_forest (su au), crags (su au) |
+| base:huckleberry_bush | black huckleberry (Vaccinium membranaceum) | 3, 12-22, 30 | Moderate | -2 °C | 70 | 19 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
+| base:beach_plum_bush | beach plum (Prunus maritima) | 5, 16-26, 34 | Dry | -2 °C | 100 | 24 | plains (sp su au), forest (su au), birch_forest (su), taiga (su), desert (sp au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au wi), fern_forest (su au), crags (sp su au) |
 | base:bramble_bush | raspberry and blackberry | 5, 16-25, 32 | Moderate | -2 °C | 60 | 17 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (au), fern_forest (su au), crags (su au) |
 | base:prickly_pear | prickly pear (Opuntia) | 10, 20-35, 45 | Dry | -10 °C | 90 | 23 | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), beach (sp su au), red_dunes (sp su), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su au) |
+| base:chia | desert chia (Salvia columbariae) | 5, 15-28, 38 | Dry | -3 °C | 90 | 23 | plains (sp su au), forest (su au), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), sequoia_grove (sp su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au wi), fern_forest (su au), crags (sp su au) |
 | base:wild_sunflower | wild sunflower | 6, 20-28, 38 | Dry | -2 °C | 125 | 28 | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
 | base:wild_rice | wild rice (Oryza latifolia) | 12, 25-32, 38 | Wet | 0 °C | 150 | 32 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), sequoia_grove (su), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:mushroom_brown | forest mushrooms | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
@@ -288,6 +299,7 @@ What each crop is sown from and gives ripe (`vitals::crops`; how it grows is its
 | base:maize | base:maize_seeds | base:corn 1-2 | 4 | Tires | base:plains, base:forest, base:savanna |
 | base:paddy_rice | base:rice_seeds | base:rice_seeds 1-3 | 4 | Tires | base:swamp, base:savanna |
 | base:beans | base:bean_seeds | base:beans 1-2 | 4 | Feeds | base:plains, base:forest, base:savanna, base:mountains |
+| base:tepary_beans | base:tepary_beans | base:tepary_beans 1-3 | 4 | Feeds | base:desert |
 | base:sorghum | base:sorghum_seeds | base:sorghum 1-1 | 4 | Tires | base:savanna, base:plains, base:desert |
 | base:millet | base:millet_seeds | base:millet 1-1 | 4 | Tires | base:savanna, base:desert |
 | base:cassava | base:cassava | base:cassava 1-3 | 4 | Tires | base:savanna, base:swamp |
@@ -327,6 +339,12 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | animals:rotten_log | Log | Soil | - | 0.4% | floodplain, fern_forest |
 | animals:termite_mound | Mound | Soil | - | 0.3% | red_dunes, scrubland |
 | base:kelp_wrack | Mat | Sand | base:kelp | 3.0% | beach |
+| base:dune_grass | Tuft | Sand | - | 10.0% | beach |
+| base:beach_plum_bush | Bush | Sand | base:beach_plums | 0.6% | beach |
+| base:huckleberry_bush | Bush | Soil | base:huckleberries | 1.0% | mountains |
+| base:chia | Ripens | Sand | base:chia_seeds | 2.0% | desert |
+| base:dwarf_birch | Still | Soil | - | 2.0% | snowy_plains |
+| animals:horsetail | Still | Soil | - | 6.0% | floodplain, fern_forest |
 
 ## Food in the world
 
@@ -390,6 +408,13 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | animals:water_lily | water_plants | 5 | stays | always there in animals:floodplain, animals:red_dunes (all year), worth 40% of fresh growth |
 | base:kelp_wrack | water_plants | 4 | stays | always there in base:beach (all year), worth 40% of fresh growth |
 | animals:rotten_log | insects | 3 | stays | always there in animals:floodplain, animals:fern_forest (all year), worth 40% of fresh growth |
+| base:dune_grass (age 1) | grass | 4 | back to age 0 | base:dune_grass |
+| base:beach_plum_bush (age 3) | fruit | 6 | back to age 1 | base:beach_plum_bush |
+| base:huckleberry_bush (age 3) | fruit | 8 | back to age 1 | base:huckleberry_bush |
+| base:chia (age 1) | seeds | 6 | back to age 0 | base:chia |
+| base:dwarf_birch | leaves | 4 | stays | always there in base:snowy_plains (spring, summer, autumn), worth 40% of fresh growth |
+| base:dwarf_birch | leaves | 2 | stays | always there in base:snowy_plains (winter), worth 40% of fresh growth |
+| animals:horsetail | grass | 6 | stays | always there in animals:floodplain, animals:fern_forest (spring, summer, autumn), worth 40% of fresh growth |
 | animals:termite_mound | insects | 3 | stays | always there in animals:red_dunes, animals:scrubland (all year), worth 40% of fresh growth |
 | animals:termite_mound_upper | insects | 3 | stays | always there in animals:red_dunes, animals:scrubland (all year), worth 40% of fresh growth |
 | base:mesquite_leaves | leaves | 4 | stays | always there in base:desert, base:savanna (spring, summer, autumn), worth 40% of fresh growth |
@@ -430,7 +455,7 @@ Farmland's fertility (`vitals::soil`): how fast crops grow at each level, what w
 | 1 | 47% |
 | 0 | 20% |
 
-A ripe harvest of base:wheat, base:barley, base:rye, base:carrots, base:potatoes, base:beetroots, base:maize, base:paddy_rice, base:sorghum, base:millet, base:cassava, base:pumpkin_stem, base:melon_stem takes a level, of base:beans gives one back; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
+A ripe harvest of base:wheat, base:barley, base:rye, base:carrots, base:potatoes, base:beetroots, base:maize, base:paddy_rice, base:sorghum, base:millet, base:cassava, base:pumpkin_stem, base:melon_stem takes a level, of base:beans, base:tepary_beans gives one back; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
 
 ## Difficulty (the `base:difficulty` rule)
 

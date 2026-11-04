@@ -159,6 +159,7 @@ block.animals.red_sandstone = Red Sandstone
 block.animals.fern = Fern
 block.animals.horsetail = Horsetail
 block.animals.cycad = Cycad
+block.animals.horsetail = Horsetail
 block.animals.flowering_shrub = Flowering Shrub
 block.animals.water_lily = Water Lily
 item.animals.cycad_seed = Cycad Seed

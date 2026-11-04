@@ -256,7 +256,7 @@ pub const POND_LANDS: [(&str, f32); 2] = [("base:swamp", 0.35), ("animals:floodp
 /// Cordage plants: the chance cutting one gives plant fibre (`clothing`; tall grass gives it a time
 /// in eight). Sedges, cottongrass and cattail leaves were twisted into cord wherever they grow, so
 /// the tundra and the marshes have fibre too (Research round 3, B3).
-pub const FIBRE: [(&str, f32); 3] = [("base:sedge", 0.5), ("base:cottongrass", 0.5), ("base:cattail", 1.0)];
+pub const FIBRE: [(&str, f32); 4] = [("base:sedge", 0.5), ("base:cottongrass", 0.5), ("base:cattail", 1.0), ("base:dune_grass", 0.3)];
 
 /// The most of one ground all its wild plants cover in a biome (the world rolls for them first).
 pub const MOST: f32 = 0.3;
@@ -297,6 +297,9 @@ pub const SEA_MEADOWS: &[&str] = &["base:ocean", "base:beach"];
 /// Kelp forests: the open sea's rocky and sandy floor.
 pub const KELP_FORESTS: &[&str] = &["base:ocean"];
 /// Where the Cretaceous's trees fall and rot: its forests and the wooded floodplain.
+/// Horsetails in the Cretaceous's wet ground: the floodplain's and the fern forest's (the
+/// research's D3: the sauropods' best food, highly digestible, eaten as grass).
+pub const HORSETAIL_LANDS: &[&str] = &["animals:floodplain", "animals:fern_forest"];
 pub const DEADWOOD: &[&str] = &["animals:floodplain", "animals:fern_forest"];
 /// The Djadokhta's dry lands, where termites built (the report's "termite and ant nests: red
 /// dunes, scrubland").
@@ -316,7 +319,7 @@ const fn w(
 /// Covers are shares of the cells of that ground (tall grass covers 5-35% of the turf, berry bushes
 /// 0.4% of the forest's; `forage::GRASS_COVER`): the tundra's sedges and cottongrass are its grass,
 /// the bushes and mushrooms are found, not walked through.
-pub const WILD: [Wild; 27] = [
+pub const WILD: [Wild; 33] = [
     w("base:sedge", Form::Tuft, Ground::Soil, None, SEDGE_LANDS, 0.12),
     w("base:cottongrass", Form::Tuft, Ground::Soil, None, TUNDRA, 0.08),
     w("base:reindeer_lichen", Form::Tuft, Ground::Soil, None, NORTH, 0.05),
@@ -348,6 +351,16 @@ pub const WILD: [Wild; 27] = [
     // Kelp washed up on the beach (wrack, the beach's food: sand fleas and flies on it feed the
     // shorebirds); the kelp standing in the sea is `base:kelp` above.
     w("base:kelp_wrack", Form::Mat, Ground::Sand, Some("base:kelp"), &["base:beach"], 0.03),
+    // The next batch from the research's gaps (part E): the beach's American beachgrass (dunes'
+    // grass, grazed and growing back; cordage) and beach plums; the mountains' black
+    // huckleberries; the desert's chia, a spring seed; dwarf birch in the tundra (hares and
+    // ptarmigan: its leaves in summer, buds and catkins in winter); the Cretaceous's horsetails.
+    w("base:dune_grass", Form::Tuft, Ground::Sand, None, &["base:beach"], 0.1),
+    w("base:beach_plum_bush", Form::Bush, Ground::Sand, Some("base:beach_plums"), &["base:beach"], 0.006),
+    w("base:huckleberry_bush", Form::Bush, Ground::Soil, Some("base:huckleberries"), &["base:mountains"], 0.01),
+    w("base:chia", Form::Ripens, Ground::Sand, Some("base:chia_seeds"), DESERT, 0.02),
+    w("base:dwarf_birch", Form::Still, Ground::Soil, None, &["base:snowy_plains"], 0.02),
+    w("animals:horsetail", Form::Still, Ground::Soil, None, HORSETAIL_LANDS, 0.06),
 ];
 
 /// How deep the water over a plant rooted on the bed is, from its floor to the surface, in

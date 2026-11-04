@@ -58,10 +58,11 @@ const fn p(
 }
 
 const ANY: u8 = 15;
+const SPRING: u8 = 1;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 43] = [
+pub const PLANTS: [Plant; 48] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -83,6 +84,9 @@ pub const PLANTS: [Plant; 43] = [
     p("base:beans", "common bean", (10.0, 18.0, 25.0, 30.0), Water::Moderate, 100.0, ANY, 0.0),
     p("base:sorghum", "sorghum", (8.0, 27.0, 34.0, 42.0), Water::Dry, 125.0, ANY, 0.0),
     p("base:millet", "pearl millet", (10.0, 30.0, 34.0, 45.0), Water::Dry, 105.0, ANY, 0.0),
+    // Tepary bean (the research's A1): base about 12, best 25-32, up past 40, no frost, 60-120
+    // days; it yields on 200-350 mm, the driest bean.
+    p("base:tepary_beans", "tepary bean (Phaseolus acutifolius)", (12.0, 25.0, 32.0, 42.0), Water::Dry, 75.0, SUMMER_AUTUMN, 0.0),
     p("base:cassava", "cassava", (12.0, 25.0, 29.0, 37.0), Water::Moderate, 390.0, ANY, 0.0),
     // Pumpkin and melon stems (the research's rows): warm-season, killed by frost; the fruit sets
     // in summer and autumn (`SUMMER_AUTUMN`, the stem's last step).
@@ -107,6 +111,9 @@ pub const PLANTS: [Plant; 43] = [
     p("base:sedge", "sedges", (-1.0, 8.0, 22.0, 32.0), Water::Moderate, 18.0, ANY, HARDY),
     p("base:cottongrass", "cottongrass (Eriophorum)", (-2.0, 6.0, 16.0, 25.0), Water::Moderate, 18.0, ANY, HARDY),
     p("base:reindeer_lichen", "reindeer lichen (Cladonia)", (0.0, 5.0, 15.0, 25.0), Water::Dry, 3650.0, ANY, HARDY),
+    // American beachgrass, the dunes' builder, grazed down grows back in about a month, from
+    // early spring to autumn (estimates).
+    p("base:dune_grass", "American beachgrass (Ammophila breviligulata)", (5.0, 18.0, 26.0, 35.0), Water::Dry, 30.0, ANY, HARDY),
     p("base:clover", "white clover", (5.0, 18.0, 25.0, 32.0), Water::Moderate, 30.0, ANY, HARDY),
     // Bushes, flower to ripe fruit: lingonberries flower in June and ripen August to October;
     // cloudberries, bog plants, June to July and August, their flowers killed by a June frost;
@@ -116,11 +123,19 @@ pub const PLANTS: [Plant; 43] = [
     p("base:cloudberry_bush", "cloudberry", (0.0, 8.0, 16.0, 25.0), Water::Wet, 45.0, SUMMER, -2.0),
     p("base:crowberry_bush", "crowberry", (-1.0, 6.0, 15.0, 25.0), Water::Moderate, 60.0, SUMMER_AUTUMN, HARDY),
     p("base:hazel_bush", "hazel", (5.0, 16.0, 24.0, 32.0), Water::Moderate, 180.0, SUMMER_AUTUMN, HARDY),
+    // The mountains' black huckleberry (Rockies, 1,000-2,000 m) flowers in June and ripens in
+    // August and September; the beach plum on Atlantic dunes flowers in May and ripens August to
+    // September, its blossom killed by a late frost.
+    p("base:huckleberry_bush", "black huckleberry (Vaccinium membranaceum)", (3.0, 12.0, 22.0, 30.0), Water::Moderate, 70.0, SUMMER_AUTUMN, -2.0),
+    p("base:beach_plum_bush", "beach plum (Prunus maritima)", (5.0, 16.0, 26.0, 34.0), Water::Dry, 100.0, SUMMER_AUTUMN, -2.0),
     p("base:bramble_bush", "raspberry and blackberry", (5.0, 16.0, 25.0, 32.0), Water::Moderate, 60.0, SUMMER_AUTUMN, -2.0),
     // Fruit and seed in their season: prickly pears flower in April and May and ripen July to
     // September, and frost below about -10 kills the pads; wild sunflowers take 125-130 days and
     // die at a light frost; the Pantanal's wild rices seed in 120-180 days as the flood peaks.
     p("base:prickly_pear", "prickly pear (Opuntia)", (10.0, 20.0, 35.0, 45.0), Water::Dry, 90.0, SUMMER_AUTUMN, -10.0),
+    // Desert chia, a winter annual: it comes up after the winter rains and sets its seed March to
+    // June, in about three months, then dries (the Sonoran's and Mojave's seed staple).
+    p("base:chia", "desert chia (Salvia columbariae)", (5.0, 15.0, 28.0, 38.0), Water::Dry, 90.0, SPRING, -3.0),
     p("base:wild_sunflower", "wild sunflower", (6.0, 20.0, 28.0, 38.0), Water::Dry, 125.0, SUMMER_AUTUMN, -2.0),
     p("base:wild_rice", "wild rice (Oryza latifolia)", (12.0, 25.0, 32.0, 38.0), Water::Wet, 150.0, SUMMER_AUTUMN, 0.0),
     // Spreading: mushrooms come up after late-summer rain and last days (3-14 to fruit); water
