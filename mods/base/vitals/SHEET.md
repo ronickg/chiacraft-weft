@@ -50,7 +50,7 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 
 A stew (`vitals::meals`) cooks 2-4 foods in 10 s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x1.25 (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient.
 
-Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (25 °C, humidity 0.3, a breeze; nothing below 5 °C or above humidity 0.85, nor in the rain), and smokes in 10 min over a fire within 2 blocks below, in any weather; salting is crafted with salt, boiled out of a water bucket in a furnace in 20 s.
+Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (25 °C, humidity 0.3, a breeze; nothing below 5 °C or above humidity 0.85, nor in the rain), and smokes in 10 min over a fire (lava, a lit furnace) within 2 blocks below, in any weather; salting is crafted with salt, boiled out of a water bucket in a furnace in 20 s.
 
 | from | dried | smoked | salted | keeps (days) |
 |---|---|---|---|---|

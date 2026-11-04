@@ -222,6 +222,7 @@ season.base.autumn = autumn
 season.base.winter = winter
 command.base.xp = level {0}, {1} of {2} XP to the next
 command.base.feed = stomach filled with {0} units
+command.base.warmth = worn: {0} °C cold ({1} wet), {2} °C heat, {3}% windproof; the air feels {4} °C, core {5} °C
 bed.base.sleeping = Sleeping…
 bed.base.leave = Leave Bed
 bed.base.spawn_set = Respawn point set

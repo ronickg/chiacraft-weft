@@ -236,7 +236,7 @@ fn tick_racks(b: &mut SystemBatch<Drying>) {
         s.wait = 0;
         let Some(st) = w.entity(id) else { continue };
         let pos = st.block_pos();
-        let smoking = (1..=preserve::SMOKE_REACH).any(|dy| base_api::heat_of(w.get([pos[0], pos[1] - dy, pos[2]])) > 0.0);
+        let smoking = (1..=preserve::SMOKE_REACH).any(|dy| base_api::heat_of(w.get([pos[0], pos[1] - dy, pos[2]])) >= preserve::SMOKE_HEAT);
         s.smoking = smoking as u32;
         let rate = if smoking {
             preserve::smoke_rate()

@@ -91,7 +91,7 @@ fn cooking(w: &mut String) {
     );
     let _ = writeln!(
         w,
-        "Preserving (`vitals::preserve`): a drying rack dries in {:.0} min in the best air (25 °C, humidity 0.3, a breeze; nothing below 5 °C or above humidity 0.85, nor in the rain), and smokes in {:.0} min over a fire within {} blocks below, in any weather; salting is crafted with salt, boiled out of a water bucket in a furnace in {} s.\n\n| from | dried | smoked | salted | keeps (days) |\n|---|---|---|---|---|",
+        "Preserving (`vitals::preserve`): a drying rack dries in {:.0} min in the best air (25 °C, humidity 0.3, a breeze; nothing below 5 °C or above humidity 0.85, nor in the rain), and smokes in {:.0} min over a fire (lava, a lit furnace) within {} blocks below, in any weather; salting is crafted with salt, boiled out of a water bucket in a furnace in {} s.\n\n| from | dried | smoked | salted | keeps (days) |\n|---|---|---|---|---|",
         preserve::DRY_SECS / 60.0,
         preserve::SMOKE_SECS / 60.0,
         preserve::SMOKE_REACH,

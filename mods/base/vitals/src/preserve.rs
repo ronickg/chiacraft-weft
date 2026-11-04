@@ -51,6 +51,9 @@ pub const DRY_SECS: f32 = DAY_SECS;
 pub const SMOKE_SECS: f32 = DAY_SECS / 2.0;
 /// Blocks below a rack a fire smokes it from.
 pub const SMOKE_REACH: i32 = 2;
+/// The heat a fire needs to smoke (`base_api::heat_of`: lava 1, a lit furnace 0.7; a torch's 0.25
+/// isn't a fire to smoke over).
+pub const SMOKE_HEAT: f32 = 0.5;
 /// Ticks a furnace boils a bucket of water down to salt.
 pub const SALT_TICKS: u32 = 400;
 

@@ -36,6 +36,24 @@ pub fn register(r: &mut Registry) {
         w.set_day_time(calendar::on_day(w.day_time(), season as u32 * calendar::SEASON_DAYS + day - 1));
         cmd.reply("command.base.season", &[Arg::Key(&format!("season.base.{}", calendar::SEASONS[season].name())), Arg::Int(day as i64)]);
     });
+    // What one wears comes to, the air as felt and the core: for checking clothes.
+    r.command("warmth", "", |cmd| {
+        let w = cmd.world();
+        let worn = worn(&w, cmd.player());
+        let Some(v) = w.component(cmd.player(), &base_api::VITALS) else { return };
+        cmd.reply(
+            "command.base.warmth",
+            &[
+                Arg::Float(worn.cold as f64, 1),
+                Arg::Float(worn.cold_wet as f64, 1),
+                Arg::Float(worn.heat as f64, 1),
+                Arg::Int((worn.windproof * 100.0).round() as i64),
+                Arg::Float(v.outside as f64, 1),
+                Arg::Float(v.core as f64, 2),
+            ],
+        );
+    })
+    .permission(permission::EVERYONE);
 }
 
 /// This second's air and core temperature. Returns the air where one stands and the kinds of

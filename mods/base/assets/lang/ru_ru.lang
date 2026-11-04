@@ -192,6 +192,7 @@ season.base.autumn = осень
 season.base.winter = зима
 command.base.xp = уровень {0}, {1} из {2} опыта до следующего
 command.base.feed = желудок заполнен: {0} единиц
+command.base.warmth = надето: {0} °C от холода ({1} мокрым), {2} °C от жары, {3}% от ветра; воздух ощущается как {4} °C, тело {5} °C
 bed.base.sleeping = Сон…
 bed.base.leave = Встать с кровати
 bed.base.spawn_set = Точка возрождения установлена
