@@ -511,7 +511,8 @@ const STAT_VALUE_W: f32 = 17.0;
 const STAT_WILD_W: f32 = 16.0;
 const STAT_TAMED_W: f32 = 20.0;
 /// A stat row's whole width, for the divider over torpor.
-const STAT_ROW_W: f32 = 8.0 + 3.0 + STAT_NAME_W + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0 + STAT_WILD_W + 3.0 + STAT_TAMED_W + 3.0 + 10.0;
+const STAT_ROW_W: f32 =
+    8.0 + 3.0 + STAT_NAME_W + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0 + STAT_WILD_W + 3.0 + STAT_TAMED_W + 3.0 + 10.0;
 
 /// The screen of a tame animal (`notes/ui/BATCHES.md`, the taming and stats upgrade): who it is
 /// and how it is on the left, its stats as bars in the middle, its coat and orders on the right.
@@ -675,8 +676,16 @@ fn animal_screen(ui: &mut Ui) {
             ui.row(S::row().size(STAT_ROW_W, 8.5), |ui| {
                 let wild = 8.0 + 3.0 + STAT_NAME_W + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0;
                 let tamed = wild + STAT_WILD_W + 3.0;
-                for (x, w, key) in [(wild, STAT_WILD_W, "screen.animals.wild_points"), (tamed, STAT_TAMED_W, "screen.animals.tamed_points")] {
-                    ui.text_styled(S::default().class("dim").no_wrap().at_pivot(x + w / 2.0, 0.0, [0.5, 0.0]), key, &[]);
+                for (x, w, key) in [(wild, STAT_WILD_W, "screen.animals.wild_points"), (tamed, STAT_TAMED_W, "screen.animals.tamed_points")]
+                {
+                    ui.text_styled(
+                        S::default()
+                            .class("dim")
+                            .no_wrap()
+                            .at_pivot(x + w / 2.0, 0.0, [0.5, 0.0]),
+                        key,
+                        &[],
+                    );
                 }
             });
             for (i, name) in STAT_NAMES.iter().enumerate() {
