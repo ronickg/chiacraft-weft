@@ -299,6 +299,23 @@ fn shown(a: &Animal, i: usize) -> String {
     }
 }
 
+/// A window as base's (`mods/base/src/window.rs`, the UI redo): the menu's title on an orange tab
+/// on the frame, a close button at the top right, `body` in the panel.
+fn window(ui: &mut Ui, s: S, body: impl FnOnce(&mut Ui)) {
+    ui.column(S::col().stretch(), |ui| {
+        ui.row(S::row().gap(2.0), |ui| {
+            ui.row(S::row().w(6.0), |_| {});
+            ui.panel("tab_pressed", S::row().pad(2.0).h(13.0).center(), |ui| ui.title());
+            ui.spacer();
+            ui.button("window.base.close", S::default().class("close").size(7.0, 7.0).pad(0.5).tooltip("window.base.close_tip"), |c| {
+                c.client().close_screen()
+            });
+            ui.row(S::row().w(4.0), |_| {});
+        });
+        ui.panel("panel", s, body);
+    });
+}
+
 /// Wild points' quality, by a stat's wild points: the bar's colour (`stat_q0`..`stat_q4`, grey few,
 /// then green, blue, purple, gold). A wild one's level is spread over nine stats, so 20 in one
 /// is rare.
@@ -334,7 +351,7 @@ const STAT_BAR: (f32, f32) = (54.0, 6.0);
 /// The screen of a tame animal (`notes/ui/BATCHES.md`, the taming and stats upgrade): who it is
 /// and how it is on the left, its stats as bars in the middle, its coat and orders on the right.
 fn animal_screen(ui: &mut Ui) {
-    ui.panel("panel", S::row().pad(8.0).gap(10.0), |ui| {
+    window(ui, S::row().pad(8.0).gap(10.0), |ui| {
         // Left: the level on a badge, the name, life, how it feels, and the facts.
         ui.column(S::col().gap(3.0).w(108.0), |ui| {
             ui.row(S::row().gap(4.0).center(), |ui| {
@@ -538,7 +555,7 @@ fn order_button_w(ui: &mut Ui, key: &str, order: u64, w: f32) {
 }
 
 fn scout_screen(ui: &mut Ui) {
-    ui.panel("panel", S::col().pad(8.0).gap(3.0).min_w(180.0), |ui| {
+    window(ui, S::col().pad(8.0).gap(3.0).min_w(180.0), |ui| {
         heading(ui);
         ui.text_bind(|c, t| {
             let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };

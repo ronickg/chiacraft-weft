@@ -108,7 +108,7 @@ static ALL: [Advancement; 27] = [
 /// Server to the player who made it: the index into `ALL`.
 static MADE: Channel<u32> = Channel::named("advancement_made");
 static CHIME: Sound = Sound::named("ui.advancement");
-static SCREEN: Screen = Screen::named("advancements");
+pub static SCREEN: Screen = Screen::named("advancements");
 static OPEN: Key = Key::named("advancements");
 
 const TOAST_SECS: f32 = 5.0;

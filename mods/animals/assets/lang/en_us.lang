@@ -351,3 +351,5 @@ screen.animals.wild_q1 = {#8ac80f}{0}{/}
 screen.animals.wild_q2 = {#2f8de4}{0}{/}
 screen.animals.wild_q3 = {#9b4fe0}{0}{/}
 screen.animals.wild_q4 = {#f0aa28}{0}{/}
+menu.animals.animal = Your animal
+menu.animals.scout = Through the spyglass

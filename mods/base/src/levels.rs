@@ -13,7 +13,7 @@ use weft_sdk::*;
 
 static LEVEL_UP: Channel<u32> = Channel::named("level_up");
 static PLACE: Channel<u32> = Channel::named("place_stat");
-static SCREEN: Screen = Screen::named("stats");
+pub static SCREEN: Screen = Screen::named("stats");
 static OPEN: Key = Key::named("stats");
 static FANFARE: Sound = Sound::named("level_up");
 pub static TOMBSTONE: Block = Block::named("tombstone");
@@ -175,8 +175,7 @@ fn tombstone_block(r: &mut Registry) {
         })
         .group("grave", Slots::chest(5))
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0), &[], |ui| {
                 ui.group("grave");
                 ui.player_inventory(true);
             });

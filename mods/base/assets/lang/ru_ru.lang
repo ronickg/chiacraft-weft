@@ -1,5 +1,10 @@
 language.name = Русский
-menu.base.inventory = Создание
+menu.base.inventory = Инвентарь
+window.base.crafting = Создание
+window.base.tab.stats = Навыки
+window.base.tab.advancements = Достижения
+window.base.close = 
+window.base.close_tip = Закрыть
 menu.base.chest = Сундук
 menu.base.tombstone = Надгробие
 menu.base.furnace = Печь
