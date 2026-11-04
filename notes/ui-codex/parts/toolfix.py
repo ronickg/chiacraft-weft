@@ -52,6 +52,30 @@ def regions(a, kind):
     return lab, base
 
 
+def sword_regions(a):
+    """(label map, base point) for a sword, by its width along the line: the guard is the widest band
+    in the lower 60% (with its neighbours at >= 60% of that width), the blade everything beyond it,
+    the grip and pommel everything before. The base is where the blade leaves the guard. (regions()'
+    "first wide part" put steel's guard up on the blade.)"""
+    m = a[..., 3] > 0
+    _, _, (c, d) = heads.cut(a)
+    t, dist = heads.frame(a, c, d)
+    tb = np.round(t).astype(int)
+    lo, hi = tb[m].min(), tb[m].max()
+    w = np.array([dist[m & (tb == k)].max() if (m & (tb == k)).any() else 0 for k in range(lo, hi + 1)])
+    g = int(np.argmax(w[: int(len(w) * 0.6)]))
+    a0, b0 = g, g
+    while a0 > 0 and w[a0 - 1] >= w[g] * 0.6:
+        a0 -= 1
+    while b0 < len(w) - 1 and w[b0 + 1] >= w[g] * 0.6:
+        b0 += 1
+    lab = np.zeros(m.shape, int)
+    lab[m] = HANDLE
+    lab[m & (tb >= lo + a0) & (tb <= lo + b0)] = JOINT
+    lab[m & (tb > lo + b0)] = WORK
+    return lab, np.array(c) + np.array(d) * (lo + b0 + 0.5)
+
+
 def shift(arr, dy, dx):
     return heads.shift(arr, dy, dx)
 
