@@ -246,6 +246,15 @@ def build():
     put("button_hover", glow(brighter(btn, 1.08), GOLD1), 5)
     put("button_pressed", pressed(btn), 5)
     put("button_disabled", disabled(btn), 5)
+    # Behind a 3D portrait (the animal screen): the well's frame round a lighter warm backdrop,
+    # brightest in the middle, so dark coats (a black wolf) read.
+    portrait = fit9(src("c_small", 2), 64, 64, 4).copy()
+    yy, xx = np.mgrid[0:56, 0:56]
+    r = np.sqrt(((xx - 27.5) / 28) ** 2 + ((yy - 27.5) / 28) ** 2).clip(0, 1)
+    inner = np.stack([118 - 40 * r, 102 - 36 * r, 88 - 32 * r], -1)
+    portrait[4:60, 4:60, :3] = inner.astype(np.uint8)
+    portrait[4:60, 4:60, 3] = 255
+    put("portrait", portrait, 4)
     # the secondary button (dark brown): `S::default().class("button_secondary")`
     b2 = fit9(src("c_buttons", 1), 64, 20, 5)
     put("button_secondary", b2, 5)
