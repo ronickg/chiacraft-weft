@@ -1,0 +1,20 @@
+{
+ "kind": "item",
+ "what": "a wood hoe: the blade of carved warm orange-brown wood with clear grain, crude and chunky, a plain wooden handle, the head lashed on with tan cord. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.281,
+   "outline": 0.47,
+   "red_line": 0.13,
+   "fill": 0.2,
+   "vertical": 0,
+   "passed": true
+  }
+ ]
+}

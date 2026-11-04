@@ -61,7 +61,7 @@ const ANY: u8 = 15;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 25] = [
+pub const PLANTS: [Plant; 29] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -112,6 +112,13 @@ pub const PLANTS: [Plant; 25] = [
     p("base:mesquite_sapling", "mesquite", (12.0, 25.0, 38.0, 48.0), Water::Dry, 0.0, ANY, -15.0),
     p("base:acuri_palm_sapling", "acuri palm (Attalea phalerata)", (15.0, 24.0, 32.0, 40.0), Water::Moderate, 0.0, ANY, 0.0),
     p("base:moriche_palm_sapling", "moriche palm (Mauritia flexuosa)", (15.0, 24.0, 32.0, 40.0), Water::Wet, 0.0, ANY, 0.0),
+    // The Cretaceous's saplings (the animals mod's), at the game's time: its greenhouse warmth
+    // suits them all; living kin give the frost they take (Araucaria about -5, ginkgo hardy, the
+    // bald cypress about -15, the scale-leaved conifers estimated as araucarias, drought-hardy).
+    p("animals:araucaria_sapling", "araucarian conifer", (5.0, 18.0, 28.0, 38.0), Water::Moderate, 0.0, ANY, -5.0),
+    p("animals:ginkgo_sapling", "ginkgo", (5.0, 15.0, 26.0, 36.0), Water::Moderate, 0.0, ANY, HARDY),
+    p("animals:swamp_cypress_sapling", "swamp cypress (Taxodioxylon)", (8.0, 20.0, 30.0, 40.0), Water::Wet, 0.0, ANY, -15.0),
+    p("animals:scale_conifer_sapling", "scale-leaved conifer (Cheirolepidiaceae)", (8.0, 20.0, 32.0, 42.0), Water::Dry, 0.0, ANY, -5.0),
 ];
 
 /// Whether air at `air` °C (a night's frost where it stands) hurts it (`Plant::frost`).

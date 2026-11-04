@@ -26,7 +26,18 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # The build, clippy's and the tests' builds of the whole workspace filled the runner's disk.
+    # Debug info is most of it, and nothing here reads it.
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
+      # The runner's own tools that nothing here uses (.NET, Android, Haskell, CodeQL): about 30 GB.
+      - name: Disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - uses: actions/checkout@v7
 
       # wasm32: the sandbox's tests build a mod for it.
@@ -87,6 +98,29 @@ jobs:
 
       - name: Tests (base, its API, packages mod)
         run: cargo nextest run --profile ci -p base -p base_api -p packages
+
+  # Is the code getting bloated (reports/code-health/README.md): the report goes into the run's
+  # summary and an artifact. It fails nothing yet. Runs wherever CI runs: dev lives on the Mac, so
+  # pull requests are where it is seen.
+  code-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the growth table needs the fork point and upstream's history
+      - name: Upstream refs
+        run: git fetch --no-tags https://github.com/VortexSo4/Weft master:refs/remotes/upstream/master || true
+      - name: Report
+        run: |
+          python3 -I reports/code-health/health.py --json health.json > health.md
+          cat health.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: code-health
+          path: |
+            health.md
+            health.json
 
   animals-web:
     runs-on: ubuntu-latest

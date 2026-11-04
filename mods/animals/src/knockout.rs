@@ -8,6 +8,8 @@
 use weft_sdk::abi::ItemStack;
 use weft_sdk::*;
 
+use crate::dist2;
+
 use crate::animal::{self, ANIMAL};
 use crate::species::{self, Liking, SPECIES, Taming as Method};
 use crate::taming::{self, TAMING};
@@ -61,7 +63,7 @@ const FAVORITE_BITE: f32 = 0.01;
 const DART_SPEED: f64 = 30.0;
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(&KNOCKOUT, Knockout::default(), component_flags::SAVE | component_flags::SYNC_MENU);
+    r.entity_component(&KNOCKOUT, Knockout::default(), component_flags::SAVE | component_flags::SYNC_MENU | component_flags::SYNC_WATCHERS);
     for s in SPECIES.iter().filter(|s| s.taming == Method::Knockout) {
         r.attach(s.kind, &KNOCKOUT);
     }
@@ -77,7 +79,9 @@ pub fn init(r: &mut Registry) {
         }
         true
     });
-    r.shapeless(&CRAFTING, "tranquilizer_dart", 4, &["base:arrow", "base:spider_eye"], 0);
+    // A stick, a feather for its flight and a spider's eye for the poison (U1: arrows come only
+    // from skeletons, so a dart made from one waited on the night).
+    r.shapeless(&CRAFTING, "tranquilizer_dart", 4, &["base:stick", "base:feather", "base:spider_eye"], 0);
     r.entity_component(&SHOOTER, 0u64, 0);
     r.entity(&DART_SHOT)
         .no_egg()
@@ -348,10 +352,6 @@ pub fn bite_now(w: &World, id: u64) {
 }
 
 // ------------------------------------------------------------------ darts
-
-fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (0..3).map(|i| (a[i] - b[i]).powi(2)).sum()
-}
 
 /// A dart from `player`'s eyes where they look.
 fn throw_dart(w: &World, player: u64) {

@@ -10,6 +10,8 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
+use crate::dist2;
+
 use crate::taming::TAMING;
 
 /// One bird's body, for every species on its model.
@@ -62,8 +64,8 @@ fn fly_look(wings: &Wings) -> String {
     format!("{}_fly", wings.model)
 }
 
-/// Registers `kinds` (each an entity and its row in `species::SPECIES`) on one body.
-pub fn register(r: &mut Registry, kinds: &[(&'static Entity, usize)], wings: &'static Wings) {
+/// Registers `kinds` (each a species' entity kind) on one body.
+pub fn register(r: &mut Registry, kinds: &[&'static Entity], wings: &'static Wings) {
     // In the air: the wings open and beating.
     let look = fly_look(wings);
     drop(
@@ -74,7 +76,8 @@ pub fn register(r: &mut Registry, kinds: &[(&'static Entity, usize)], wings: &'s
             .animations(&look)
             .texture(wings.texture),
     );
-    for &(kind, index) in kinds {
+    for &kind in kinds {
+        let index = crate::species::of(kind);
         r.entity(kind)
             .size(wings.size.0, wings.size.1)
             .health(wings.health)
@@ -189,8 +192,4 @@ fn set(w: &World, id: u64, f: Flight) {
     if let Some(c) = w.component_mut(id, &STATE) {
         *c = f;
     }
-}
-
-fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)
 }

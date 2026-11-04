@@ -5,6 +5,10 @@
 /// Days in a season and in a year (Ronald: fourteen days a season, a 56-day year).
 pub const SEASON_DAYS: u32 = 14;
 pub const YEAR_DAYS: u32 = SEASON_DAYS * 4;
+/// The day a new world begins on: spring's 8th, from midwinter a quarter of the year (Research
+/// round 3, B1: starting a week after midwinter froze new players in six biomes of ten). The world
+/// simply begins later (`survival` moves a new world's clock there), so every calendar agrees.
+pub const START_DAY: u32 = 7;
 /// Ticks in a day, the game's.
 pub const DAY_TICKS: u64 = 24000;
 /// Midsummer, three eighths into the year (the middle of summer), as the engine's day length has

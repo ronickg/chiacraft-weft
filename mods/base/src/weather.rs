@@ -115,6 +115,7 @@ fn now_heading(w: &World) -> f32 {
 /// The air in biome `id` now: fog (blizzards and dust storms count as fog), wind, snow lying,
 /// and whether it snows or dust blows.
 fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
+    let aurora = aurora_of(id) << air_flags::AURORA_SHIFT;
     let (day, hour, season) = now(w);
     let key = base_api::rain_key(w, id);
     let place = air::Place { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons, rain: c.rain, calendar: season.is_some() };
@@ -122,7 +123,7 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
     if let Some((fog, wind, _, flags, until)) = *SET.lock().unwrap() {
         if w.time() < until {
             let snow = if flags & air_flags::SNOWING != 0 { snow.max(0.8) } else { snow };
-            return BiomeAir { biome: id, fog, wind, snow, flags };
+            return BiomeAir { biome: id, fog, wind, snow, flags: flags | aurora };
         }
     }
     let raining = climate::rains(c.rain, season, key, day, hour);
@@ -142,7 +143,21 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
         flags |= air_flags::DUST;
         fog = fog.max(dust * 0.95);
     }
-    BiomeAir { biome: id, fog, wind, snow, flags }
+    BiomeAir { biome: id, fog, wind, snow, flags: flags | aurora }
+}
+
+/// How strong an aurora is in biome `id` on clear nights, 0 to 255 (`air::AURORA`, by latitude).
+fn aurora_of(id: u32) -> u32 {
+    static IDS: OnceLock<Vec<(u32, u32)>> = OnceLock::new();
+    IDS.get_or_init(|| {
+        air::AURORA
+            .iter()
+            .map(|&(name, s)| (Biome::generated(name.to_string()).id(), (s.clamp(0.0, 1.0) * 255.0) as u32))
+            .collect()
+    })
+    .iter()
+    .find(|a| a.0 == id)
+    .map_or(0, |a| a.1)
 }
 
 /// Tells the engine the air in every biome.

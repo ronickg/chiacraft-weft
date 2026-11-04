@@ -210,6 +210,8 @@ pub(crate) struct Running {
     window: Arc<Window>,
     depth: (TextureId, u32, u32),
     list: CommandList,
+    /// The world's pass, recorded before the sun's shadow map that goes ahead of it in `list`.
+    world_list: CommandList,
     input: Input,
     pub(crate) settings: Settings,
     lang: Lang,
@@ -278,7 +280,8 @@ pub(crate) struct Running {
     ui_cached: Vec<crate::ui::render::Quad>,
     ui_animated: Vec<crate::ui::render::Animated>,
     /// Where UI asked for the player model, physical pixels.
-    previews: Vec<[f32; 4]>,
+    /// Where 3D previews go, and whose: the player (0) or the open menu's own entity (1).
+    previews: Vec<([f32; 4], u64)>,
     /// Texture holding the rendered inventory figure, drawn by the UI.
     preview_tex: Option<u32>,
     shot_path: Option<PathBuf>,
@@ -385,7 +388,15 @@ impl App {
         if let Some(v) = self.opts.view {
             crate::config::override_for_run("core:view_distance", &v.to_string());
         }
+        // `--config "core:lod_distance=0,core:shader_pack="`: settings for this run only, as the
+        // file writes them (benchmarks varying one thing at a time).
+        if let Some(list) = api::launch_options().get("config") {
+            for (name, value) in list.split(',').filter_map(|kv| kv.split_once('=')) {
+                crate::config::override_for_run(name.trim(), value.trim());
+            }
+        }
         let mut settings = Settings::new(&self.opts.run_dir);
+        log::info!("player name '{}' (setting core:name)", settings.name());
         // Links between worlds, and the inbox for them, open while the game runs (chiacraft).
         crate::links::init(&self.opts.run_dir, &settings.saves_dir());
         crate::friends::init(&self.opts.run_dir, &settings.saves_dir());
@@ -466,6 +477,7 @@ impl App {
             window,
             depth,
             list: CommandList::default(),
+            world_list: CommandList::default(),
             input,
             settings,
             lang,
@@ -721,6 +733,19 @@ impl Running {
         );
         self.assets.set_mods(roots);
         self.reload_assets();
+        // Keys the new content brings (a package's client half, chiacraft phase 6): known to the
+        // input as the start's are, with the player's binding if they set one.
+        for (action, key) in &content().game.keys {
+            if let Some(k) = crate::settings::parse_chord(key) {
+                self.input.register(action, k);
+            }
+            let bound = crate::config::by_name(&format!("core:key.{action}"))
+                .map(crate::config::text)
+                .and_then(|t| crate::settings::parse_chord(&t));
+            if let Some(k) = bound {
+                self.input.rebind(action, k);
+            }
+        }
     }
 
     /// The join in progress: answers what it reports, until the game is let in or it fails.
@@ -846,7 +871,9 @@ impl Running {
                     }
                     self.return_home();
                     self.screens.clear();
-                    self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] }));
+                    // A world's refusal at the door (chiacraft, `admission`) in this player's language.
+                    let why = crate::admission::refusal_from_text(&e).map_or(Arg::Text(e), Arg::Msg);
+                    self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![why] }));
                     return;
                 }
             }
@@ -925,7 +952,7 @@ impl Running {
 
     /// Plays in the world `server` runs in this process.
     fn play_local(&mut self, server: ServerHandle, world: String, identity: Option<Arc<crate::world_address::WorldIdentity>>) {
-        crate::admission::set_local_world(server.dir.clone());
+        crate::admission::set_local_world(server.dir.clone(), identity.clone());
         let (client_conn, server_conn) = net::local_pair();
         let _ = server.connect.send(server_conn);
         let key = net::p2p::player_key(&self.settings.run_dir);
@@ -1523,14 +1550,24 @@ impl Running {
 
     /// Recipes of (or uses for) the item under the cursor, in any screen.
     fn recipe_keys(&mut self, requests: &mut Vec<Request>) {
+        let menu = self.game.is_some() && ui_shows_menu(&self.screens);
         let Some((_, ui)) = self.screens.last_mut() else { return };
         let typing = ui
             .focused
             .is_some_and(|f| matches!(ui.nodes[f].kind, Kind::Input { .. }));
         for (action, uses) in [("core:recipes", false), ("core:uses", true)] {
             if !typing && self.input.pressed(action) {
-                if let Some(item) = crate::game_screens::hovered_item(ui, self.game.as_ref().map(|g| &g.client)) {
-                    requests.push(Request::Open(Box::new(crate::game_screens::RecipeView::item(item, uses))));
+                match crate::game_screens::hovered_item(ui, self.game.as_ref().map(|g| &g.client)) {
+                    Some(item) => requests.push(Request::Open(Box::new(crate::game_screens::RecipeView::item(item, uses)))),
+                    // Nothing under the mouse in a menu: every recipe, by kind (the HUD shows R).
+                    None if menu => {
+                        let mut kinds: Vec<String> = content().game.recipe_kinds.iter().cloned().collect();
+                        kinds.sort();
+                        requests.push(Request::Open(Box::new(crate::game_screens::RecipeView::new(
+                            crate::game_screens::RecipeQuery::Kinds(kinds),
+                        ))));
+                    }
+                    None => {}
                 }
             }
         }
@@ -2096,13 +2133,13 @@ fn start_frame(r: &mut Running, opts: &Options, dt: f64) {
     // Link requests and answers arrive in the background: the links screen shows them as they do.
     let links_now = crate::links::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
         + crate::friends::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
-        + crate::admission::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
+        + crate::admission::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
+        + crate::chiacraft::achievements::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
     if links_now != r.links_seen {
         r.links_seen = links_now;
-        if r.screens
-            .last()
-            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission"].contains(&s.name()))
-        {
+        if r.screens.last().is_some_and(|(s, _)| {
+            ["core:links", "core:multiplayer", "core:friends", "core:admission", "core:account", "core:achievements"].contains(&s.name())
+        }) {
             r.rebuild_all();
         }
     }
@@ -2255,6 +2292,10 @@ fn toggle_keys(r: &mut Running) {
         r.hud_off = !r.hud_off;
         r.quads_dirty = true;
     }
+    // The crosshair shows only in first person (`hud::draw_custom`): redraw when the view turns.
+    if r.input.pressed("core:perspective") {
+        r.quads_dirty = true;
+    }
     if let Some(g) = &mut r.game {
         g.client.hide_gui = r.hud_off;
     }
@@ -2343,6 +2384,12 @@ fn client_events(r: &mut Running) {
     }
 }
 
+/// Whether the top screen is a menu (inventory, a machine): where R with nothing hovered opens
+/// the whole recipe list. Not the recipe view itself, or chat and the like, where R is typed.
+fn ui_shows_menu(screens: &[(Box<dyn Screen>, Ui)]) -> bool {
+    screens.last().is_some_and(|(s, _)| s.shows_menu())
+}
+
 /// Chat and inventory keys, which open and close screens around the game.
 fn world_keys(r: &mut Running) {
     if r.game.is_some() && r.screens.is_empty() {
@@ -2354,6 +2401,23 @@ fn world_keys(r: &mut Running) {
         if command || (r.input.pressed("core:chat") && !f3_held) {
             r.open(Box::new(crate::game_screens::Chat::new(if command { "/" } else { "" })));
             r.input.typed.clear();
+        }
+        // The recipe keys in the game itself: what the held item is made from (or used in), or
+        // with an empty hand every recipe, by kind.
+        else if let Some(uses) = [("core:recipes", false), ("core:uses", true)]
+            .into_iter()
+            .find(|(a, _)| r.input.pressed(a))
+            .map(|(_, u)| u)
+        {
+            let held = r.game.as_ref().map(|g| g.client.held()).unwrap_or_default();
+            let view = if held.item != 0 {
+                crate::game_screens::RecipeView::item(held.item, uses)
+            } else {
+                let mut kinds: Vec<String> = content().game.recipe_kinds.iter().cloned().collect();
+                kinds.sort();
+                crate::game_screens::RecipeView::new(crate::game_screens::RecipeQuery::Kinds(kinds))
+            };
+            r.open(Box::new(view));
         }
     }
     let (top_chat, top_menu) = r
@@ -2522,7 +2586,7 @@ fn build_ui_quads(r: &mut Running, scale: f32) {
             crate::hud::draw_custom(ren, look, textures, client, tag, data, rect, hovered, icon, scale, unit);
             if tag == crate::client::modui::TAG_ENTITY {
                 let inner = crate::ui::Rect { x: rect.x + scale, y: rect.y + scale, w: rect.w - 2.0 * scale, h: rect.h - 2.0 * scale };
-                previews.push([inner.x, inner.y, inner.w, inner.h]);
+                previews.push(([inner.x, inner.y, inner.w, inner.h], data));
                 if let Some(t) = preview_tex {
                     ren.image(inner, t, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
                 }
@@ -2612,13 +2676,22 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
 fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
     r.list.clear();
     if let Some(g) = r.game.as_mut().filter(|_| !r.screens.is_empty()) {
-        if let Some(&[x, y, w, h]) = r.previews.first() {
+        if let Some(&([x, y, w, h], whose)) = r.previews.first() {
             let worn = g.client.worn();
             let look = r.input.cursor - Vec2::new(x, y);
-            let tex =
-                g.client
-                    .entity_render
-                    .draw_preview(&mut *r.gpu, &mut r.list, info, [w.round() as u32, h.round() as u32], look, &worn);
+            let subject = (whose == 1)
+                .then(|| g.client.menu.as_ref().map(|m| m.owner))
+                .flatten()
+                .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind)));
+            let tex = g.client.entity_render.draw_preview(
+                &mut *r.gpu,
+                &mut r.list,
+                info,
+                [w.round() as u32, h.round() as u32],
+                look,
+                &worn,
+                subject,
+            );
             if tex != r.preview_tex {
                 r.preview_tex = tex;
                 r.quads_dirty = true;
@@ -2641,20 +2714,47 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             .particles
             .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
         g.client.update_wires(&mut *r.gpu, &r.textures);
-        // The sun's shadow map first, for packs that use it.
-        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
+        // The sun's light for shadow maps (packs that use them), which the world's scene samples.
+        g.client.prepare_shadows(&mut *r.gpu);
+        // A copy of the world for what is seen through it (`water_behind` packs, with post on).
+        g.client.behind = [0.0; 4];
+        if post && crate::packs::water_behind() {
+            if let Some([c, d]) = r.post.behind_targets(&mut *r.gpu, info.width, info.height) {
+                g.client.behind = [c as f32, d as f32, 1.0, 0.0];
+            }
+        }
     }
-    r.list
-        .push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
+    // GPU time parts (`bench::GPU_PARTS`): terrain made and particles simulated so far, then the
+    // shadow map.
+    r.list.push(Cmd::Mark);
+    let mut world = std::mem::take(&mut r.world_list);
+    world.clear();
+    world.push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
     if let Some(g) = &mut r.game {
         let worn = g.client.worn();
         let held = g.client.held().item;
         g.client
             .entity_render
             .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
-        g.client.render(&mut *r.gpu, &mut r.list, info, &r.textures);
+        g.client.render(&mut *r.gpu, &mut world, info, &r.textures);
+        // The shadow map once the models are posed, ahead of the world's pass that samples it.
+        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
+        // The opaque world copied, then what is seen through it drawn over it, reading the copy.
+        if g.client.behind[2] > 0.5 {
+            world.push(Cmd::EndPass);
+            if let Some(scene) = g.client.scene_buffer(info.slot) {
+                let depth = r.gpu.texture_index(r.depth.0);
+                r.post
+                    .copy_behind(&mut *r.gpu, &mut world, info, scene, depth);
+            }
+            world.push(Cmd::BeginPass { color: Some((world_target, None)), depth: Some((r.depth.0, None)) });
+            world.append(&mut g.client.late_out);
+        }
     }
-    r.list.push(Cmd::EndPass);
+    r.list.push(Cmd::Mark);
+    world.push(Cmd::EndPass);
+    r.list.append(&mut world);
+    r.world_list = world;
     if post {
         let scene = r
             .game
@@ -2662,7 +2762,9 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
         r.post.apply(&mut *r.gpu, &mut r.list, info, scene, depth);
+        r.list.push(Cmd::Mark);
     } else {
+        r.list.push(Cmd::Mark);
         // The UI pipeline has no depth, so it cannot draw in a pass that has one.
         r.list
             .push(Cmd::BeginPass { color: Some((Target::Surface, None)), depth: None });

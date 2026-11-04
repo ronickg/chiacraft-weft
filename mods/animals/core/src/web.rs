@@ -30,11 +30,6 @@ pub const WAITING: &[(&str, &str)] = &[
     // The overworld: what wave two (`notes/ECOLOGY.md`) left.
     ("herring_gull: no prey in base:ocean", "the open sea's web: its fish (later; the gull hunts on the beach meanwhile)"),
     // The Cretaceous's tier 2 and 3.
-    ("animals:floodplain: no plant eaters", "the iguanodont, the ankylosaur and the sauropod (the Cretaceous's tier 2)"),
-    ("animals:fern_forest: no plant eaters", "Psittacosaurus and the iguanodont (the Cretaceous's tier 2)"),
-    ("animals:crags: no plant eaters", "the ankylosaur (the Cretaceous's tier 2)"),
-    ("utahraptor: no prey in animals:fern_forest", "Psittacosaurus and the iguanodont (the Cretaceous's tier 2)"),
-    ("wyvern: no prey in animals:crags", "the ankylosaur (the Cretaceous's tier 2)"),
 ];
 
 /// The biomes the webs are for: every climate but the caves (no web of their own) and the open
@@ -79,11 +74,18 @@ pub fn prey_in(s: &Species, biome: &str) -> Vec<&'static str> {
     out
 }
 
-/// Who takes this species where it lives.
+/// A young one's mass against a grown one's, as hunters meet them: half grown, an eighth of the
+/// mass. Hunters weigh prey by its own mass (`hunt.rs`), so the young of animals too big to take
+/// grown (a sauropod, an iguanodont) are what keeps them in check, as they were in life.
+pub const YOUNG: f32 = 0.125;
+
+/// Who takes this species where it lives, grown or young.
 pub fn predators_of(s: &Species) -> Vec<&'static str> {
     SPECIES
         .iter()
-        .filter(|h| h.family.name != s.family.name && h.takes_at_most(h.bio.mass, s.bio.mass))
+        .filter(|h| {
+            h.family.name != s.family.name && (h.takes_at_most(h.bio.mass, s.bio.mass) || h.takes_at_most(h.bio.mass, s.bio.mass * YOUNG))
+        })
         .filter(|h| s.habitats.iter().any(|&(b, _)| lives(h, b)))
         .map(|h| h.name)
         .collect()

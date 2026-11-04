@@ -13,6 +13,13 @@ pub static SAND: Block = Block::named("sand");
 pub static GRAVEL: Block = Block::named("gravel");
 pub static CLAY: Block = Block::named("clay");
 pub static SANDSTONE: Block = Block::named("sandstone");
+// The rock faces' stones (`land.rs`): granite on warm mountains, slate in the cold, limestone on
+// temperate cliffs, ochre and red sandstone in the mesas' strata.
+pub static GRANITE: Block = Block::named("granite");
+pub static SLATE: Block = Block::named("slate");
+pub static LIMESTONE: Block = Block::named("limestone");
+pub static OCHRE_SANDSTONE: Block = Block::named("ochre_sandstone");
+pub static RED_SANDSTONE: Block = Block::named("red_sandstone");
 pub static SNOW: Block = Block::named("snow");
 pub static ICE: Block = Block::named("ice");
 pub static OBSIDIAN: Block = Block::named("obsidian");
@@ -67,8 +74,6 @@ pub static HAY_BALE: Block = Block::named("hay_bale");
 pub static PODZOL: Block = Block::named("podzol");
 /// The desert's scrub: a few sticks where there is no wood.
 pub static DEAD_BUSH: Block = Block::named("dead_bush");
-/// Wild berries in forests: a food found, then come back for when it has ripened.
-pub static BERRY_BUSH: Block = Block::named("berry_bush");
 
 /// Log axis along the clicked face, like vanilla.
 fn axis_placement(p: &Place, props: &mut Props) {
@@ -170,7 +175,8 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fr
         .hardness(0.2)
         .cutout()
         .opacity(1)
-        .tint(&tints::FOLIAGE)
+        // Its tint by how it turns in autumn (`vitals::wild::LEAVES`).
+        .tint(base_api::trees::leaf_tint(vitals::wild::turn(handle.name())))
         .tag("leaves")
         .redstone_blocker()
         .mineable("shears")
@@ -205,6 +211,9 @@ fn plant(r: &mut Registry, handle: &'static Block, tex: &str) {
 
 /// Sand and gravel: with nothing under them they fall as an entity and land as a block.
 pub fn register(r: &mut Registry) {
+    // The leaves' tint kinds besides foliage (`base_api::trees`), as green as foliage by default.
+    r.tint_kind(&base_api::trees::EVERGREEN, 0x48b518);
+    r.tint_kind(&base_api::trees::YELLOW_LEAVES, 0x48b518);
     r.block(&STONE)
         .sound_group("stone")
         .hardness(1.5)
@@ -282,6 +291,25 @@ pub fn register(r: &mut Registry) {
         .mineable("pickaxe")
         .needs_tool(0)
         .tab(&crate::tabs::BUILDING);
+    for (block, textures) in [
+        (&GRANITE, None),
+        (&SLATE, Some(("slate_top", "slate_side", "slate_top"))),
+        (&LIMESTONE, Some(("limestone_top", "limestone_side", "limestone_top"))),
+        (&OCHRE_SANDSTONE, Some(("ochre_sandstone_top", "ochre_sandstone_side", "ochre_sandstone_bottom"))),
+        (&RED_SANDSTONE, Some(("red_sandstone_top", "red_sandstone_side", "red_sandstone_bottom"))),
+    ] {
+        let b = r
+            .block(block)
+            .sound_group("stone")
+            .hardness(1.2)
+            .mineable("pickaxe")
+            .needs_tool(0);
+        match textures {
+            Some((top, side, bottom)) => b.textures(top, side, bottom),
+            None => b,
+        }
+        .tab(&crate::tabs::BUILDING);
+    }
     r.block(&SNOW)
         .sound_group("sand")
         .hardness(0.2)
@@ -298,7 +326,8 @@ pub fn register(r: &mut Registry) {
         .opacity(2)
         .friction(0.98)
         .mineable("pickaxe")
-        .drops_nothing()
+        // Itself with a pickaxe (Research round 3, U1: it's the only blue dye).
+        .needs_tool(0)
         .tab(&crate::tabs::NATURAL);
     r.block(&OBSIDIAN)
         .immovable()
@@ -345,7 +374,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
 
     log(r, &OAK_LOG, "oak", "oak_leaves", None);
-    log(r, &BIRCH_LOG, "birch", "birch_leaves", None);
+    log(r, &BIRCH_LOG, "birch", "birch_leaves", Some("slim_tree"));
     log(r, &SPRUCE_LOG, "spruce", "spruce_leaves", Some("cone_tree"));
     log(r, &ACACIA_LOG, "acacia", "acacia_leaves", Some("flat_tree"));
     for (h, wood) in [(&OAK_PLANKS, "oak"), (&BIRCH_PLANKS, "birch"), (&SPRUCE_PLANKS, "spruce"), (&ACACIA_PLANKS, "acacia")] {
@@ -467,7 +496,14 @@ pub fn register(r: &mut Registry) {
         .sound_group("gravel")
         // How worn its fertility is (`farming.rs`): 0 fresh, 3 worn out.
         .prop("worn", 0..=3)
-        .textures("farmland", "dirt", "dirt")
+        // Paler and cracked as it wears.
+        .states(|p, s| {
+            let top = match p.get("worn") {
+                "0" => "farmland".to_string(),
+                n => format!("farmland_worn_{n}"),
+            };
+            s.textures(&top, "dirt", "dirt")
+        })
         .growth(vitals::soil::FALLOW_SECS, 0)
         .on_grow(crate::farming::fallow)
         .model_box([0.0, 0.0, 0.0], [16.0, 15.0, 16.0])
@@ -619,44 +655,19 @@ pub fn register(r: &mut Registry) {
     r.loot(&DEAD_BUSH)
         .pool(Pool::new().when(Cond::Chance(0.7)).item("stick"))
         .pool(Pool::new().when(Cond::Chance(0.35)).item("stick"));
-    r.block(&BERRY_BUSH)
-        .sound_group("grass")
-        .prop("age", 0..=3)
-        .states(|p, s| s.texture(&format!("berry_bush_stage_{}", p.get("age"))))
-        .plant()
-        .needs_below("#plant_soil")
-        .no_item()
-        // Flowers to ripe berries by warmth and rain; ripe only in summer and autumn (`growth.rs`).
-        .growth(crate::growth::step_secs("base:berry_bush", 3, 300.0), 9)
-        .on_grow(|e| {
-            let last = crate::growth::age(e) == 2;
-            crate::growth::grow(e, "base:berry_bush", last, |e| crate::growth::next_age(e, 3))
-        });
-    // Any age gives a berry back to plant again; ripe, two more.
-    r.loot(&BERRY_BUSH)
-        .pool(Pool::new().entry(Entry::item("berries")))
-        .pool(
-            Pool::new()
-                .when(Cond::BlockState("age=3"))
-                .entry(Entry::item("berries")),
-        )
-        .pool(
-            Pool::new()
-                .when(Cond::BlockState("age=3"))
-                .entry(Entry::item("berries")),
-        );
     // Spoiled food, dung and plant waste rot into compost (`farming.rs`): its level shows as it
-    // fills, the top dark and rich when it's ready (placeholder look, `notes/STYLE.md`).
+    // fills, the top dark and rich when it's ready.
     r.block(&COMPOST_BIN)
         .sound_group("wood")
         .prop("level", 0..=8)
         .states(|p, s| {
+            // Empty, filling, then full while it rots and when it's compost.
             let top = match p.get("level") {
-                "0" => "planks_oak",
-                "8" => "podzol",
-                _ => "dirt",
+                "0" => "compost_bin_top_empty",
+                "7" | "8" => "compost_bin_top_full",
+                _ => "compost_bin_top_filling",
             };
-            s.textures(top, "planks_oak", "planks_oak")
+            s.textures(top, "compost_bin_side", "compost_bin_side")
         })
         .hardness(0.6)
         .mineable("axe")

@@ -161,7 +161,7 @@ def paint_face_smooth(areas, tone_sets, face, coat=(), y_world=None, occ=None, q
     if occ is not None:
         L -= occ_strength * occ
     g = ndimage.gaussian_filter(np.random.default_rng(seed).standard_normal((h, w)), (1.6, 0.45))
-    L += 0.22 * g / (g.std() + 1e-6) * is_coat  # strands
+    L += 0.22 * g / max(g.std(), 0.2) * is_coat  # strands (a face of a texel or two has next to no spread: not blown up)
     ki = np.round((np.clip(np.round(L / STEP) * STEP, KS[0], KS[-1]) - KS[0]) / STEP).astype(int)
     blur = np.stack([ndimage.gaussian_filter((areas == m).astype(float), 0.6) for m in range(n)])
     crisp = ~np.isin(areas, coat)
@@ -263,6 +263,15 @@ EYES = {
                             "H": (246, 230, 190)}, halo="round"),
     "anime": dict(pattern=[".DD.", "DHHD", "DHDD", "DDDD", "DDSD", "DIID", ".II."],
                   colors={"D": _D, "H": _W, "S": (190, 196, 206), "I": (120, 70, 44)}, halo="below"),
+    # Eyes for faces at the house density (32 a block): a wolf's face is 6 texels, a cat's 5. The
+    # same parts in 1-3 texels: a cool highlight up toward the light, a near-black pupil, the iris
+    # (recolored per animal) below or beside it. No halo: a darkened ring would cover the face.
+    "px2": dict(pattern=["HP", "II"], colors={"P": _P, "H": _H, "I": _I}, halo="none", iris="I"),
+    "px2_dark": dict(pattern=["HP", "PI"], colors={"P": _P, "H": _H, "I": _I}, halo="none", iris="I"),
+    "px2_wide": dict(pattern=["HP"], colors={"P": _P, "H": _H}, halo="none", iris=""),
+    "px3": dict(pattern=["HPI", "IPI"], colors={"P": _P, "H": _H, "I": _I}, halo="none", iris="I"),
+    "px3_round": dict(pattern=[".P.", "HPI", ".I."], colors={"P": _P, "H": _H, "I": _I}, halo="none", iris="I"),
+    "px1": dict(pattern=["P"], colors={"P": (40, 26, 26)}, halo="none", iris=""),
 }
 
 
@@ -296,6 +305,17 @@ def mark_iris(img, v0, u0, pattern, keys):
                 img[v0 + r, u0 + c, 3] = IRIS_ALPHA
 
 
+def eye_corner(cu, cv, pattern, w=None):
+    """Where `stamp_eyes` puts a design centered at texel (cu, cv): its top-left texel (u0, v0).
+    Halves round toward the face's middle (`w` its width), so two eyes placed mirror-symmetric
+    land mirror-symmetric (a 6-wide face with eyes at 1.5 and 4.5 gets texels 1 and 4)."""
+    ph, pw = len(pattern), len(pattern[0])
+    x, y = cu - pw / 2, cv - ph / 2
+    if w is not None and abs(x - round(x)) == 0.5:
+        x = math.floor(x) if cu > w / 2 else math.ceil(x)
+    return int(round(x)), int(round(y))
+
+
 def stamp_eyes(img, centers, design="hytale", colors=None):
     """Stamp a pair of designed eyes on a face image (h, w, 3|4) at texel centers [(u, v), (u, v)]
     (left one first, as seen from the front). A design may set mirror=True (an eyelid wing that
@@ -307,7 +327,7 @@ def stamp_eyes(img, centers, design="hytale", colors=None):
     for i, (cu, cv) in enumerate(centers):
         pat = [row[::-1] for row in d["pattern"]] if (d.get("mirror") and i == 1) else d["pattern"]
         ph, pw = len(pat), len(pat[0])
-        u0, v0 = int(round(cu - pw / 2)), int(round(cv - ph / 2))
+        u0, v0 = eye_corner(cu, cv, pat, img.shape[1])
         m = np.zeros(img.shape[:2], bool)
         for r, row in enumerate(pat):
             for c, ch in enumerate(row):
@@ -326,6 +346,8 @@ def stamp_eyes(img, centers, design="hytale", colors=None):
             f[ring & ~above] *= 0.8
             f[ring & above] *= 0.9
             f[ring2] *= 0.94
+        elif halo == "none":
+            pass
         elif halo == "mask":
             f[ring] *= 0.7
             f[ring2 & ~above] *= 0.8

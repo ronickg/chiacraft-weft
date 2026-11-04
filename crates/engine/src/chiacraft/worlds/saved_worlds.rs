@@ -242,16 +242,8 @@ pub fn status_line(run_dir: &Path, key: &str) -> (String, Vec<crate::ui::text::A
     match pings.get(key) {
         Some(Ping::Online(st, _)) => {
             let online = vec![Arg::Text(st.players.to_string()), Arg::Text(st.packages.to_string())];
-            // What its admission rules ask (chiacraft, `admission`), before joining.
-            let rules = st
-                .admission
-                .iter()
-                .map(|(k, n)| crate::ui::text::Msg::new(k, vec![Arg::Int(*n)]))
-                .reduce(|a, b| crate::ui::text::Msg::new("admission.summary.both", vec![Arg::Msg(a), Arg::Msg(b)]));
-            match rules {
-                Some(r) => ("multiplayer.status.online_rules".into(), [online, vec![Arg::Msg(r)]].concat()),
-                None => ("multiplayer.status.online".into(), online),
-            }
+            // What it asks of visitors and its DID: `notes_line`, a line of its own.
+            ("multiplayer.status.online".into(), online)
         }
         Some(Ping::Offline(_)) => {
             let seen = load(run_dir)
@@ -268,6 +260,75 @@ pub fn status_line(run_dir: &Path, key: &str) -> (String, Vec<crate::ui::text::A
         _ => ("multiplayer.status.asking".into(), Vec::new()),
     }
 }
+
+/// What an online world asks of visitors (its admission rules) and its DID, checked both ways on
+/// chain once per game (phase 4): a line under its status, empty for a world that asks nothing
+/// and has no DID, or isn't online.
+pub fn notes_line(key: &str) -> (String, Vec<crate::ui::text::Arg>) {
+    use crate::ui::text::{Arg, Msg};
+    let pings = PINGS.lock();
+    let Some(Ping::Online(st, _)) = pings.get(key) else { return (String::new(), Vec::new()) };
+    let rules = st
+        .admission
+        .iter()
+        .map(|(k, n)| Msg::new(k, vec![Arg::Int(*n)]))
+        .reduce(|a, b| Msg::new("admission.summary.both", vec![Arg::Msg(a), Arg::Msg(b)]));
+    let st = st.clone();
+    drop(pings);
+    let note = match (rules, did_note(key, &st)) {
+        (Some(r), Some(d)) => Msg::new("admission.summary.both", vec![Arg::Msg(r), Arg::Msg(d)]),
+        (Some(r), None) => r,
+        (None, Some(d)) => d,
+        (None, None) => return (String::new(), Vec::new()),
+    };
+    ("multiplayer.status.notes".into(), vec![Arg::Msg(note)])
+}
+
+/// What a world's DID check says, if the world has a DID: checking, owned both ways, or not.
+fn did_note(key: &str, st: &crate::net::p2p::Status) -> Option<crate::ui::text::Msg> {
+    use crate::ui::text::Msg;
+    let (did, owner) = st.did.clone()?;
+    let generation = crate::world_address::WorldCert::parse(&st.cert)
+        .map(|c| c.generation)
+        .unwrap_or(0);
+    let mut checks = DID_CHECKS.lock();
+    let checks = checks.get_or_insert_with(Default::default);
+    let state = checks.entry(key.to_string()).or_insert_with(|| {
+        let slot = std::sync::Arc::new(parking_lot::Mutex::new(None));
+        let (out, world_key) = (slot.clone(), key.to_string());
+        let enc = |h: &str| {
+            chiacraft_wallet::keys::from_hex(h)
+                .and_then(|b| <[u8; 32]>::try_from(b.as_slice()).ok())
+                .and_then(|b| chiacraft_wallet::keys::encode_did(&b))
+                .unwrap_or_default()
+        };
+        let (did, owner) = (enc(&did), enc(&owner));
+        let _ = std::thread::Builder::new()
+            .name("world did check".into())
+            .spawn(move || {
+                let key_hex = world_key
+                    .parse::<iroh::PublicKey>()
+                    .map(|k| chiacraft_wallet::keys::hex(k.as_bytes()))
+                    .unwrap_or_default();
+                let r = crate::chiacraft::worlds::world_did::check(&did, &owner, &key_hex, generation);
+                if let Err(e) = &r {
+                    log::info!("world {}'s DID: {e}", &world_key[..world_key.len().min(12)]);
+                }
+                *out.lock() = Some(r.unwrap_or(false));
+            });
+        slot
+    });
+    let key = match *state.lock() {
+        None => "multiplayer.status.did_checking",
+        Some(true) => "multiplayer.status.did_owned",
+        Some(false) => "multiplayer.status.did_unproven",
+    };
+    Some(Msg::new(key, Vec::new()))
+}
+
+type DidCheck = std::sync::Arc<parking_lot::Mutex<Option<bool>>>;
+/// Worlds' DID checks this game ran (by world key).
+static DID_CHECKS: parking_lot::Mutex<Option<std::collections::HashMap<String, DidCheck>>> = parking_lot::Mutex::new(None);
 
 fn ago(secs: u64) -> String {
     match secs {

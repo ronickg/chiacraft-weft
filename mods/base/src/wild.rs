@@ -104,28 +104,94 @@ pub fn register(r: &mut Registry) {
                 })
                 .growth(growth::step_secs(full, 1, 270.0), light)
                 .on_grow(move |e| growth::grow(e, full, false, grow_up))
-                .tab(&crate::tabs::NATURAL),
+                // Picked, it gives a handful of kelp, the food (`items.rs` registers its item).
+                .no_item(),
+            // A flat mat on the ground, a sixteenth high; picked, it gives its plant. Wrack is
+            // kelp washed up, drawn as kelp.
+            Form::Mat => b
+                .texture(if name == "kelp_wrack" { "kelp" } else { name })
+                .model_box([0.0, 0.0, 0.0], [16.0, 1.0, 16.0])
+                .no_item(),
         };
         drop(b);
-        // Picking gives what plants it again: one at any stage, two more when ripe.
-        if let Some(gives) = p.gives.map(short) {
-            let table = r.loot(block).pool(Pool::new().entry(Entry::item(gives)));
-            if matches!(p.form, Form::Bush | Form::Ripens) {
-                let ripe = if p.form == Form::Bush { "age=3" } else { "age=1" };
-                table
-                    .pool(
-                        Pool::new()
-                            .when(Cond::BlockState(ripe))
-                            .entry(Entry::item(gives)),
-                    )
-                    .pool(
-                        Pool::new()
-                            .when(Cond::BlockState(ripe))
-                            .entry(Entry::item(gives)),
-                    );
+        // Picking gives what plants it again: a bush or a seed head three when ripe and nothing out
+        // of season, the others one; a cordage plant fibre besides (`wild::FIBRE`).
+        let fibre = wild::FIBRE
+            .iter()
+            .find(|(b, _)| *b == p.block)
+            .map(|&(_, chance)| chance);
+        if p.gives.is_some() || fibre.is_some() {
+            let mut table = r.loot(block);
+            if let Some(gives) = p.gives.map(short) {
+                let ripe = match p.form {
+                    Form::Bush => Some("age=3"),
+                    Form::Ripens => Some("age=1"),
+                    _ => None,
+                };
+                table = table.pool(match ripe {
+                    Some(ripe) => Pool::new()
+                        .when(Cond::BlockState(ripe))
+                        .entry(Entry::item(gives).count(3, 3)),
+                    None => Pool::new().entry(Entry::item(gives)),
+                });
+            }
+            if let Some(chance) = fibre {
+                table.pool(Pool::new().when(Cond::Chance(chance)).item("plant_fibre"));
             }
         }
     }
+    flowers(r);
+}
+
+/// Each biome's wild flowers (`vitals::wild::FLOWERS`): plants that stand and give themselves,
+/// in bloom (`bloom` 1) only in their own seasons and green the rest of the year, a growth step
+/// every few minutes opening or closing them as the seasons turn.
+fn flowers(r: &mut Registry) {
+    for f in &wild::FLOWERS {
+        let name = short(f.block);
+        let blooms = f.blooms;
+        r.block(Block::generated(name.into()))
+            .sound_group("grass")
+            .plant()
+            .needs_below(if f.ground == Ground::Sand { "#sand" } else { "#plant_soil" })
+            .prop("bloom", 0..=1)
+            .states(move |p, s| s.texture(&if p.get("bloom") == "1" { name.to_string() } else { format!("{name}_green") }))
+            .growth(BLOOM_SECS, 0)
+            .on_grow(move |e| {
+                let season = base_api::ground_at(&e.world(), e.pos()).season;
+                let open = season.is_none_or(|s| blooms >> s & 1 != 0);
+                let want = if open { "1" } else { "0" };
+                if state_prop(e.state(), "bloom") != Some(want) {
+                    e.world().set_prop(e.pos(), "bloom", want);
+                }
+            })
+            .tab(&crate::tabs::NATURAL);
+    }
+}
+
+/// Game seconds between a flower's looks at the season, on average.
+const BLOOM_SECS: f32 = 300.0;
+
+/// A flower of `biome` on `ground` for the world to put (`worldgen.rs`), `kind` choosing among
+/// them; `None`: the biome has none of its own there.
+pub fn flower(biome: &str, ground: Ground, kind: u64) -> Option<u32> {
+    // A world starts in spring: the spring bloomers come open, the others green.
+    static IDS: OnceLock<Vec<u32>> = OnceLock::new();
+    let ids = IDS.get_or_init(|| {
+        wild::FLOWERS
+            .iter()
+            .map(|f| {
+                let Some(id) = Block::lookup(f.block) else { return u32::MAX };
+                let open = if f.blooms & 1 != 0 { "1" } else { "0" };
+                state_with(id, "bloom", open).unwrap_or(id)
+            })
+            .collect()
+    });
+    let here: Vec<usize> = (0..wild::FLOWERS.len())
+        .filter(|&i| wild::FLOWERS[i].ground == ground && wild::FLOWERS[i].found.contains(&biome))
+        .collect();
+    let i = *here.get(kind as usize % here.len().max(1))?;
+    (ids[i] != u32::MAX).then_some(ids[i])
 }
 
 /// The block a picked item of that name plants again, if any (`items.rs`): a wild plant that
@@ -137,7 +203,8 @@ pub fn planted_by(item: &str) -> Option<&'static Block> {
 }
 
 /// The state the world makes each wild plant in (`worldgen.rs`, any mod's: the Cretaceous's are
-/// the animals mod's), by its index in `WILD`: tufts grown, bushes and seed heads unripe;
+/// the animals mod's), by its index in `WILD`: tufts grown, bushes and seed heads unripe but for
+/// fruit that holds over winter (`wild::HOLDS_FRUIT`);
 /// `u32::MAX` for one not registered.
 pub fn state(i: usize) -> u32 {
     static STATES: OnceLock<Vec<u32>> = OnceLock::new();
@@ -146,7 +213,12 @@ pub fn state(i: usize) -> u32 {
             .iter()
             .map(|p| {
                 let Some(id) = Block::lookup(p.block) else { return u32::MAX };
-                if p.form == Form::Tuft { state_with(id, "age", "1").unwrap_or(id) } else { id }
+                match p.form {
+                    Form::Tuft => state_with(id, "age", "1").unwrap_or(id),
+                    // Fruit that holds on the plant over winter is there whenever you come.
+                    Form::Bush if wild::HOLDS_FRUIT.contains(&p.block) => state_with(id, "age", "3").unwrap_or(id),
+                    _ => id,
+                }
             })
             .collect()
     })[i]

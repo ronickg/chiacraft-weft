@@ -1,0 +1,14 @@
+{
+ "kind": "base:axe",
+ "layer": "head",
+ "material": "iron",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "socket": [
+  14.9,
+  14.8
+ ]
+}

@@ -48,10 +48,10 @@ const ASK_RANGE: f64 = 5.0;
 const MISTAKE: f32 = 0.1;
 const HURT: f32 = 0.15;
 
-const FRESH: Taming = Taming { progress: 0.0, effectiveness: 1.0, feedings: 0, wait: 0, asking: 0, scared: 0, want: 0 };
+pub const FRESH: Taming = Taming { progress: 0.0, effectiveness: 1.0, feedings: 0, wait: 0, asking: 0, scared: 0, want: 0 };
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(&TAMING, FRESH, component_flags::SAVE | component_flags::SYNC_MENU);
+    r.entity_component(&TAMING, FRESH, component_flags::SAVE | component_flags::SYNC_MENU | component_flags::SYNC_WATCHERS);
     for s in &SPECIES {
         r.attach(s.kind, &TAMING);
     }
@@ -107,7 +107,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             }
             return true;
         }
-        if (w.time() + id) % 10 == 0 && s.shy > 0.0 && frightened(w, st, s.shy) && !crate::signatures::calm(w, st.pos) {
+        if (w.time() + id) % 10 == 0 && s.shy > 0.0 && frightened(w, st, s.shy * shyness(w, id)) && !crate::signatures::calm(w, st.pos) {
             scare(w, id);
             return true;
         }
@@ -183,7 +183,14 @@ fn near_player(w: &World, st: &EntityState) -> Option<u64> {
 }
 
 fn dist2(a: &EntityState, b: &EntityState) -> f64 {
-    (0..3).map(|i| (a.pos[i] - b.pos[i]).powi(2)).sum()
+    crate::dist2(a.pos, b.pos)
+}
+
+/// How far its temperament (`coats::temperament`) moves its kind's shy distance: a calm one (0)
+/// lets a walker come to 0.6 of it, a skittish one (1) runs at 1.4 times it.
+fn shyness(w: &World, id: u64) -> f32 {
+    w.component(id, &crate::coats::GENOME)
+        .map_or(1.0, |g| 0.6 + 0.8 * crate::coats::temperament(g))
 }
 
 /// A player walking upright within `shy` blocks, or running within twice that.
@@ -330,6 +337,16 @@ pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
         weft_sdk::info!("animal {id} tamed at {:.0}%: {bonus} bonus levels, now level {}", effectiveness * 100.0, a.level());
         let level = a.level();
         crate::xp::tamed(w, player, level);
+        // The first time this player tames one: how to give it orders (a line under the
+        // crosshair, `base_api::hint`), then Survival's "A Friend" advancement
+        // (`base_api::milestones`), which also marks that they have.
+        let first = w
+            .component(player, &base_api::MILESTONES)
+            .is_some_and(|m| m & base_api::milestones::TAME == 0);
+        if first {
+            base_api::hint(w, player, "hint.animals.tamed", &[]);
+        }
+        base_api::milestone(w, player, base_api::milestones::TAME);
     }
     set(w, id, |t| *t = FRESH);
     crate::commands::tamed(w, id);

@@ -187,7 +187,10 @@ pub async fn armor(t: T) -> R {
     }
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    for i in 36..40 {
+    // The inventory menu: the 2x2 grid (0-3), its result (4), the nine equipment slots (armor's
+    // four, the clothes' four and the cloak, 5-13), the main inventory (14-40), then the hotbar
+    // (41-49).
+    for i in 41..45 {
         t.c().key("ShiftLeft", 0.3);
         t.frames(1).await?;
         t.click_ui(&format!("slot:{i}"), 0);
@@ -196,16 +199,19 @@ pub async fn armor(t: T) -> R {
     t.until("armor worn", Duration::from_secs(5), |t| (36..40).all(|s| !t.c().inventory_slot(s).is_empty()))
         .await?;
     // The player's inventory by group name: four equipment slots, all filled; the hotbar empty.
-    t.check_eq(t.op("group me core:equipment").await?, "4 4".to_string(), "equipment group (slots, filled)");
+    // Armor's four, the clothes' four and the cloak; the arrival clothes on, no cloak.
+    t.check_eq(t.op("group me core:equipment").await?, "9 8".to_string(), "equipment group (slots, filled)");
     t.check_eq(t.op("group me base:head").await?, "1 1".to_string(), "the head slot");
     t.check_eq(t.op("group me hotbar").await?, "9 0".to_string(), "hotbar group");
     t.shot("worn").await?;
     t.c().close_screen();
     t.no_screen().await?;
     let f = t.feet();
-    t.op(&format!("spawn zombie {}", at(add(f, [1, 0, 1]))))
+    let zombie = t
+        .op(&format!("spawn zombie {}", at(add(f, [1, 0, 1]))))
         .await?;
-    t.until("hit by the zombie", Duration::from_secs(15), |t| t.state().health < 20.0)
+    let full = super::max_health(&t);
+    t.until("hit by the zombie", Duration::from_secs(15), |t| t.state().health < full - 0.5)
         .await?;
     t.secs(0.5).await?;
     let mut worn = 0;
@@ -214,7 +220,9 @@ pub async fn armor(t: T) -> R {
     }
     t.check(worn > 0, "armor took no damage from a zombie hit");
     let hp = t.state().health;
-    t.check(hp > 17.0, format!("armor did not reduce the hit: health {hp}"));
+    t.check(hp > full - 3.0, format!("armor did not reduce the hit: health {hp} of {full}"));
+    // Gone before the next test: at the survival vitals' health it would kill the player there.
+    t.op(&format!("remove {zombie}")).await?;
     Ok(())
 }
 
@@ -778,8 +786,10 @@ pub async fn explosions_and_water(t: T) -> R {
 /// 12 blocks down costs 9 health like vanilla.
 pub async fn fall_damage(t: T) -> R {
     t.flat().await?;
-    t.until("full health", Duration::from_secs(5), |t| t.state().health >= 20.0)
+    t.op("heal").await?;
+    t.until("full health", Duration::from_secs(5), |t| super::full(t, t.state().health))
         .await?;
+    let full = super::max_health(&t);
     let s = t.state();
     t.c().teleport([s.pos[0], s.pos[1] + 12.0, s.pos[2]]);
     t.until("falling", Duration::from_secs(5), |t| !t.flag(client::client_flags::ON_GROUND))
@@ -793,7 +803,9 @@ pub async fn fall_damage(t: T) -> R {
         hp = hp.min(t.state().health);
         t.frames(1).await?;
     }
-    t.check((10.0..=13.0).contains(&hp), format!("health after a 12 block fall: {hp}, vanilla 11"));
+    // Vanilla takes 9 for 12 blocks (11 of its 20 left); the survival vitals' max is lower.
+    let lost = full - hp;
+    t.check((7.0..=10.0).contains(&lost), format!("health lost in a 12 block fall: {lost} (from {full} to {hp}), vanilla 9"));
     Ok(())
 }
 
@@ -1399,18 +1411,24 @@ pub async fn respawn(t: T) -> R {
         t.screen("core:death").await?;
         t.c().respawn();
         t.no_screen().await?;
-        t.until("the stomach starts empty", Duration::from_secs(5), |t| used(t) == 0.0)
+        // Back with the light meal a new player has (`vitals::stomach::arrival`), not more.
+        let arrival = vitals::stomach::arrival();
+        t.until("the stomach starts with the arrival meal", Duration::from_secs(5), |t| (used(t) - arrival.used()).abs() < 1.0)
             .await?;
         let speed = t.op("attr me core:movement_speed").await?;
         t.check(!speed.contains("testkit:fast"), format!("no effect after respawning: {speed}"));
-        // An empty stomach's max health: 40% of the 20.
-        t.until("weak after dying", Duration::from_secs(3), |t| (max_health(t) - 8.0).abs() < 0.01)
+        let stat = vitals::stats::PLAYER_BASE[vitals::stats::Stat::Health.index()];
+        let cap = vitals::stats::PLAYER_BASE[vitals::stats::Stat::Food.index()];
+        let back = vitals::stomach::max_health_stamina(stat, stat, &arrival, cap).0 / base_api::HEALTH_SCALE;
+        t.until("the arrival meal's max health after dying", Duration::from_secs(3), |t| (max_health(t) - back).abs() < 0.2)
             .await?;
-        t.check_eq(t.op("health").await?, "8".to_string(), "health at an empty stomach's max");
+        let health: f32 = t.op("health").await?.parse().unwrap_or(0.0);
+        t.check((health - back).abs() < 0.2, format!("health at the arrival meal's max: {health}, want {back}"));
     }
     // The vitals still run after respawning: eating raises max health again.
+    let arrival = vitals::stomach::max_health_stamina(100.0, 100.0, &vitals::stomach::arrival(), 100.0).0 / base_api::HEALTH_SCALE;
     t.cmd("/feed 60").await?;
-    t.until("stronger once fed", Duration::from_secs(5), |t| max_health(t) > 8.5)
+    t.until("stronger once fed", Duration::from_secs(5), |t| max_health(t) > arrival + 0.5)
         .await
 }
 
@@ -1848,6 +1866,7 @@ pub async fn base_alone(t: T) -> R {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut server = std::process::Command::new(exe)
         .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
+        .args(crate::package_args())
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -1895,6 +1914,8 @@ pub async fn dedicated_server(t: T) -> R {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         std::process::Command::new(exe)
             .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
+            .args(crate::package_args())
+            .args(crate::package_args())
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -1981,4 +2002,30 @@ pub async fn clothes_and_stew(t: T) -> R {
     let left = t.op(&format!("slot {} 0", at(pot))).await?;
     t.check(left.starts_with('-'), format!("the beef went into the stew: {left}"));
     Ok(())
+}
+
+/// The calendar follows the world's day, after a time jump and in creative too: the date the HUD and
+/// the seasonal tints read (`Vitals::date`) is day 49 of the year, winter by the calendar's
+/// seasons (Tester 2 11-04: after `/time set` in creative it stayed on its old day).
+pub async fn calendar_follows_time(t: T) -> R {
+    let mode = |t: T, m: &'static str| async move { t.op(&format!("mode {m}")).await };
+    mode(t.clone(), "creative").await?;
+    let day: u64 = 48;
+    let at = day * vitals::calendar::DAY_TICKS + 6000;
+    t.op(&format!("time {at}")).await?;
+    let moved = t
+        .until("the date follows the jump", Duration::from_secs(3), |t| {
+            t.c()
+                .view()
+                .component(&VITALS)
+                .is_some_and(|v| v.date as u64 == day + 1)
+        })
+        .await;
+    let season = vitals::calendar::date(at).season;
+    t.check(season == vitals::calendar::Season::Winter, format!("day 49 is {season:?} by the calendar, winter wanted"));
+    // Back to the world's first day (spring's 8th) and survival, for the tests after.
+    t.op(&format!("time {}", vitals::calendar::START_DAY as u64 * vitals::calendar::DAY_TICKS + 6000))
+        .await?;
+    mode(t.clone(), "survival").await?;
+    moved
 }

@@ -1,0 +1,3 @@
+# pxkit.py build output; installed into assets/textures/gui by `pxkit.py install`
+/*.png
+/*.gui

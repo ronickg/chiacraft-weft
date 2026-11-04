@@ -29,13 +29,28 @@ pub struct Post {
     params: Vec<BufferId>,
     /// A scene of zeros, bound when there is no world's (`apply`).
     no_scene: Option<BufferId>,
+    /// The world before what is seen through it is drawn (`copy_behind`): the copy pipeline, the
+    /// color and depth images with their bindless indices and size, and the copy's pass entries.
+    copy_pipe: Option<PipelineId>,
+    behind: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
+    copy_params: Vec<BufferId>,
 }
 
 const MAX_PASSES: usize = 16;
 
 impl Post {
     pub fn new(gpu: &mut dyn Backend, assets: &Assets) -> Post {
-        let mut p = Post { pipeline: None, slots: Slots::default(), active: Vec::new(), targets: None, params: Vec::new(), no_scene: None };
+        let mut p = Post {
+            pipeline: None,
+            slots: Slots::default(),
+            active: Vec::new(),
+            targets: None,
+            params: Vec::new(),
+            no_scene: None,
+            copy_pipe: None,
+            behind: None,
+            copy_params: Vec::new(),
+        };
         p.reload(gpu, assets);
         p
     }
@@ -58,11 +73,29 @@ impl Post {
                         topology: Topology::Triangles,
                     })
                     .map_err(|e| e.0)?;
-                Ok((p, slots.pop().unwrap_or_default()))
+                // The copy for `copy_behind`; a pack's own post.wgsl may lack it.
+                let copy = gpu
+                    .create_pipeline(&PipelineDesc {
+                        label: "post copy behind",
+                        shader: &s,
+                        vertex: "vs",
+                        fragment: Some("fs_copy_behind"),
+                        color: Some(Format::Surface),
+                        depth: Some(DepthState { write: true, compare: Compare::Always }),
+                        blend: Blend::None,
+                        cull_back: false,
+                        topology: Topology::Triangles,
+                    })
+                    .map_err(|e| log::warn!("post: no copy of the world for water: {}", e.0))
+                    .ok();
+                Ok((p, copy, slots.pop().unwrap_or_default()))
             });
         match made {
-            Ok((p, slots)) => {
+            Ok((p, copy, slots)) => {
                 if let Some(old) = self.pipeline.replace(p) {
+                    gpu.destroy_pipeline(old);
+                }
+                if let Some(old) = std::mem::replace(&mut self.copy_pipe, copy) {
                     gpu.destroy_pipeline(old);
                 }
                 self.slots = slots;
@@ -97,6 +130,56 @@ impl Post {
             self.targets = Some((t, t.map(|t| gpu.texture_index(t)), (w, h)));
         }
         self.targets.unwrap().0[0]
+    }
+
+    /// The images `copy_behind` copies the world into, sized to the frame: their bindless indices
+    /// (color, depth); none without the copy pipeline.
+    pub fn behind_targets(&mut self, gpu: &mut dyn Backend, w: u32, h: u32) -> Option<[u32; 2]> {
+        self.copy_pipe?;
+        if self.behind.is_none_or(|b| b.2 != (w, h)) {
+            if let Some((old, ..)) = self.behind.take() {
+                old.into_iter().for_each(|t| gpu.destroy_texture(t));
+            }
+            let (w, h) = (w.max(1), h.max(1));
+            let color = gpu.create_texture(
+                &TextureDesc { width: w, height: h, mips: 1, format: Format::Surface, render_target: true },
+                "behind color",
+            );
+            let depth = gpu.create_texture(
+                &TextureDesc { width: w, height: h, mips: 1, format: Format::Depth32, render_target: true },
+                "behind depth",
+            );
+            self.behind = Some(([color, depth], [gpu.texture_index(color), gpu.texture_index(depth)], (w, h)));
+        }
+        self.behind.map(|b| b.1)
+    }
+
+    /// Copies the world drawn so far (the scene image and `depth`, its depth's bindless index) into
+    /// the `behind_targets`, in a pass of its own: what is seen through (water) is drawn after, and
+    /// reads them (`scene.behind`). The world's pass must be ended before and begun again after.
+    pub fn copy_behind(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, scene: BufferId, depth: u32) {
+        let (Some(pipe), Some((_, idx, _)), Some((behind, ..))) = (self.copy_pipe, self.targets, self.behind) else { return };
+        while self.copy_params.len() < gpu.frames_in_flight() {
+            self.copy_params
+                .push(gpu.create_buffer(size_of::<Pass>() as u64, usage::STORAGE | usage::HOST, "post copy pass"));
+        }
+        let pass = Pass {
+            scene: idx[0],
+            slot: 0,
+            strength: 1.0,
+            time: crate::shaders::time(),
+            size: [frame.width as f32, frame.height as f32],
+            depth,
+            pad: 0,
+        };
+        let buf = self.copy_params[frame.slot];
+        gpu.mapped(buf)[..size_of::<Pass>()].copy_from_slice(bytemuck::bytes_of(&pass));
+        list.push(Cmd::BeginPass { color: Some((Target::Texture(behind[0]), Some([0.0; 4]))), depth: Some((behind[1], Some(0.0))) });
+        list.pipeline(pipe);
+        list.bind(crate::gpu_layout::bind::post::PASSES, buf);
+        list.bind(crate::gpu_layout::bind::post::SCENE, scene);
+        list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: 0 });
+        list.push(Cmd::EndPass);
     }
 
     /// Runs the effects over the scene; the last one draws onto the screen and leaves that pass

@@ -1,0 +1,26 @@
+{
+ "kind": "block",
+ "what": "sea holly: a stiff spiny plant with leathery blue-grey holly-like leaves and two or three round spiky pale blue flower heads, 14-18 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.318,
+   "outline": 0.95,
+   "red_line": 0.0,
+   "fill": 0.09,
+   "passed": false
+  },
+  {
+   "grid": 0.495,
+   "outline": 0.86,
+   "red_line": 0.0,
+   "fill": 0.12,
+   "passed": true
+  }
+ ]
+}

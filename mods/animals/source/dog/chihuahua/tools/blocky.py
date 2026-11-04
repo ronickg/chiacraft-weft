@@ -28,7 +28,12 @@ import voxdog as vd  # noqa: E402
 sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..", "..", ".claude",
                                                  "skills", "blocky-model", "scripts")))
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import iris_keys, mark_iris, pack as skill_pack  # noqa: E402
+from paint import eye_corner, iris_keys, mark_iris, pack as skill_pack  # noqa: E402
+from house import texels  # noqa: E402
+
+# Texels a unit: the house's 32 a block at the dog's export scale (build.SCALE, 0.122 model pixels a
+# unit), as the blocks and items are. The layout stays in units (56 from paw to ear tip).
+TX = texels(0.122)
 
 # Coats painted on the fly (`layers.py`): the recorder while build() paints, the face's key, and
 # the last face's material weights and light from `smooth_colors`.
@@ -63,11 +68,12 @@ class View:
         self.s = Image.open(os.path.join(V, "f_front.png")).height / H  # sheet px per unit
         self.name = name
 
-    def sample(self, u, v):
+    def sample(self, u, v, units=1.0):
         """Colors and mask at sheet pixel coords (u to the right, v down), median over each
-        texel's footprint."""
-        k = max(1, int(self.s * 0.6))
-        offs = np.linspace(-self.s * 0.35, self.s * 0.35, k)
+        texel's footprint (`units` units across: 1 for the layout's grid, 1 / TX painting)."""
+        foot = self.s * units  # sheet pixels a texel spans
+        k = max(1, int(foot * 0.6))
+        offs = np.linspace(-foot * 0.35, foot * 0.35, k)
         cols, masks = [], []
         for du in offs:
             for dv in offs:
@@ -91,7 +97,7 @@ SIDE_L = View("f_side_l", flip=True)  # flipped so the head is right too: seen f
 TOP = View("f_top")  # head down, image right = +x
 
 
-def project(p, n):
+def project(p, n, units=1.0):
     """Color and silhouette for world points p (..., 3) on faces with normal n (3,), from the
     view facing that way."""
     x, y, z = p[..., 0], p[..., 1], p[..., 2]
@@ -111,15 +117,15 @@ def project(p, n):
             nose = np.nonzero(vw.mask.any(0))[0].max()
             u = nose - (NOSE_Z - z) * vw.s
             v = np.full(x.shape, vw.h - 1 - 1.5 * vw.s)
-            return vw.sample(u, v)
+            return vw.sample(u, v, units)
         vw = TOP
         mid = np.nonzero(TOP.mask[TOP.h // 3: 2 * TOP.h // 3].any(0))[0]
         u = (mid.min() + mid.max()) / 2 + x * TOP.s
         nose_row = np.nonzero(TOP.mask.any(1))[0].max()
         v = nose_row - (NOSE_Z - z) * TOP.s
-        return vw.sample(u, v)
+        return vw.sample(u, v, units)
     v = vw.h - 1 - y * vw.s
-    return vw.sample(u, v)
+    return vw.sample(u, v, units)
 
 
 # ------------------------------------------------------------------ the model
@@ -253,9 +259,10 @@ def ear_parts(side, bone):
 # ------------------------------------------------------------------ geometry and painting
 
 
-def face_frame(lo, hi, face):
+def face_frame(lo, hi, face, tx=1.0):
     """A face's corner, its u and v directions (u right, v down when seen from outside, as
-    Blockbench lays face UVs out) and its size in texels."""
+    Blockbench lays face UVs out) and its size in texels at `tx` texels a unit (1: the layout's
+    unit grid, which the ear's bands are cut on; TX: the painted texture)."""
     lo, hi = np.array(lo), np.array(hi)
     ax, sgn = FACES[face]
     X, Y, Z = np.eye(3)
@@ -276,7 +283,10 @@ def face_frame(lo, hi, face):
     h = abs(size @ dv)
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, int(round(w)), int(round(h)), n
+    tw, th = int(round(tx * w)), int(round(tx * h))
+    if w > 0 and h > 0:  # a small face is still a texel
+        tw, th = max(1, tw), max(1, th)
+    return np.array(corner, float), du, dv, tw, th, n
 
 
 def rotm(rot):
@@ -493,14 +503,17 @@ def smooth_colors(idx, e, face, uu, vv, w, h, p, n, du, dv, seed, quad=False):
     if e["name"].endswith("_paw"):
         reg[:] = wh  # white feet; the top view only sees the body above them
     coat = np.isin(reg, [br, orng, wh])
-    # Big simple shapes: blur each coat area and take the strongest, then drop tiny islands.
-    if min(h, w) >= 3:
+    # Big simple shapes: blur each coat area and take the strongest, then drop tiny islands (not at
+    # 32 a block, where a mark one texel wide is the design).
+    if min(h, w) >= 3 and TX >= 0.75:
         score = np.stack([ndimage.gaussian_filter((reg == r).astype(float), 1.1) for r in range(len(REGIONS))])
         reg = np.where(coat, score.argmax(0), reg)
         reg = majority(reg, [REGIONS.index(r) for r in ("highlight", "nose", "pink")], passes=2)
     # Tufts: on side faces the coat above hangs into the color below in short points.
     if face not in ("up", "down") and h >= 4:
         off = np.array([0, 1, 2, 1, 0, 1, 2, 2, 1])[(np.arange(w) + seed) % 9]
+        if TX < 0.75:  # a point a texel long at most, at 32 a block
+            off = np.minimum(off, 1)
         src = np.clip(np.arange(h)[:, None] - off[None, :], 0, h - 1)
         hang = reg[src, np.arange(w)[None, :]]
         reg = np.where(coat & np.isin(hang, [br, orng, wh]), hang, reg)
@@ -526,7 +539,7 @@ def smooth_colors(idx, e, face, uu, vv, w, h, p, n, du, dv, seed, quad=False):
     # Strands: soft streaks along the fur (down on the sides, back on top), subtle.
     rng = np.random.default_rng(seed)
     g = ndimage.gaussian_filter(rng.standard_normal((h, w)), (1.6, 0.45))
-    L += (0.1 if e["name"] == "bib_locks" else 0.22) * g / (g.std() + 1e-6) * coat
+    L += (0.1 if e["name"] == "bib_locks" else 0.22) * g / max(g.std(), 0.2) * coat  # a texel or two: not blown up
     k = np.clip(np.round(L / STEP) * STEP, KS[0], KS[-1])
     ki = np.round((k - KS[0]) / STEP).astype(int)
     # Soft edges: each texel mixes the areas around it (about one texel of blend).
@@ -656,7 +669,17 @@ EYES.update({
                            ".II."], colors={"D": (36, 25, 31), "H": (240, 242, 244), "S": (190, 196, 206), "I": (120, 70, 44)},
                   halo="below"),
 })
-EYE_STYLE = os.environ.get("BLOCKY_EYES", "between")
+# At 32 a block the face is 5 texels by 4: an eye is 2 by 2, a catchlight up and out, the warm iris
+# (recolored per dog) low and in, mirrored so the two match.
+EYES.update({
+    "px": dict(pattern=["HP", "PI"], colors={"P": _P, "H": _H, "I": (120, 70, 44)}, halo="none", iris="I", mirror=True),
+    "px_round": dict(pattern=["HP", "IP"], colors={"P": _P, "H": _H, "I": (120, 70, 44)}, halo="none", iris="I", mirror=True),
+    "px_soft": dict(pattern=["HP", "PI"], colors={"P": _P, "H": (170, 180, 196), "I": (120, 70, 44)}, halo="none", iris="I",
+                    mirror=True),
+    "px_in": dict(pattern=["PH", "IP"], colors={"P": _P, "H": _H, "I": (120, 70, 44)}, halo="none", iris="I", mirror=True),
+    "px_dark": dict(pattern=["HP", "PP"], colors={"P": (30, 20, 22), "H": _H}, halo="none", iris="", mirror=True),
+})
+EYE_STYLE = os.environ.get("BLOCKY_EYES", "px_soft")
 EYE_Y = 38.5  # the eyes' middle, where the sheet has them
 
 
@@ -670,8 +693,7 @@ def stamp_eyes_smooth(img, e, face):
     for cx in (-6.5, 6.5):
         pattern = [row[::-1] for row in d["pattern"]] if (d.get("mirror") and cx > 0) else d["pattern"]
         ph, pw = len(pattern), len(pattern[0])
-        u0 = int(round(cx - pw / 2 - e["lo"][0]))
-        v0 = int(round(e["hi"][1] - d.get("y", EYE_Y) - ph / 2))
+        u0, v0 = eye_texel(cx, d)
         m = np.zeros(img.shape[:2], bool)
         for r, row in enumerate(pattern):
             for c, ch in enumerate(row):
@@ -690,6 +712,8 @@ def stamp_eyes_smooth(img, e, face):
             f[ring & ~above] *= 0.8
             f[ring & above] *= 0.9
             f[ring2] *= 0.94
+        elif halo == "none":
+            pass
         elif halo == "mask":
             f[ring] *= 0.7
             f[ring2 & ~above] *= 0.8
@@ -718,6 +742,8 @@ def stamp_paw(img, e, face):
         return img
     f = img[..., :3].astype(float)
     h, w = f.shape[:2]
+    if w < 8 or h < 6 and face == "down":  # at 32 a block a paw is 2 texels: no room for toes
+        return img
     if face == "south":
         for u in TOE_GROOVES:
             f[:, u] = f[:, u] * 0.5 + GROOVE * 0.5
@@ -771,16 +797,16 @@ def paint_mouth(img, e, face):
     elif name == "muzzle" and face == "down":  # the roof of the mouth, front row at v = 0
         f = shade("palate", -0.6 - 0.5 * (vv % 2 == 1) - 0.08 * vv)
         f[0] = LIP
-    elif name == "muzzle" and face == "south":  # upper lip, and a line from the nose down to it
+    elif name == "muzzle" and face == "south" and h >= 4:  # upper lip, and a line from the nose down to it
         f[h - 1] = LIP
         mid = [w // 2 - 1, w // 2]
         f[3:h - 1, mid] = f[3:h - 1, mid] * 0.45 + LIP * 0.55
-    elif name == "jaw" and face == "up":  # the floor of the mouth, front row at v = h - 1
+    elif name == "jaw" and face == "up" and w >= 5:  # the floor of the mouth, front row at v = h - 1
         f = shade("palate", -0.9 - 0.06 * (h - 1 - vv))
         f[h - 1] = LIP
         f[h - 2:, [1, w - 2]] = TOOTH
         f[h - 2:, 2:w - 2] = shade("tongue", -0.5)  # under the tongue, where it goes over the lip
-    elif name == "jaw" and face == "south":  # lower lip and the fangs' tips
+    elif name == "jaw" and face == "south" and w >= 5:  # lower lip and the fangs' tips
         f[0] = LIP
         f[0, [1, w - 2]] = TOOTH
     img[..., :3] = np.clip(np.round(f), 0, 255).astype(np.uint8)
@@ -880,11 +906,13 @@ def layer_props(e, face, p, white_w):
 
 
 def paint_face(e, face):
-    corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
+    corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face, TX)
     if w == 0 or h == 0:
         return None
     uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du + vv[..., None] * dv
+    size = np.array(e["hi"]) - np.array(e["lo"])
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
     R = rotm(e["rot"])
     if e["rot"]:
         o = np.array(e["origin"])
@@ -892,7 +920,7 @@ def paint_face(e, face):
     nn = R @ n
     lid = e["name"].startswith("eyelid")
     if lid:  # painted as it looks closed: on the face, hinge at the top
-        p = np.stack([p[..., 0], e["hi"][1] - vv, np.full(vv.shape, LID_Z)], -1)
+        p = np.stack([p[..., 0], e["hi"][1] - vv * sv, np.full(vv.shape, LID_Z)], -1)
         nn, du, dv, face = np.array([0, 0, 1.0]), np.array([1.0, 0, 0]), np.array([0, -1.0, 0]), "south"
     if e.get("src"):
         o, k = np.array(e["src"][0]), e["src"][1]
@@ -901,10 +929,12 @@ def paint_face(e, face):
         nn = np.array([0, 0, 1.0])
     elif e["view"] == "back":
         nn = np.array([0, 0, -1.0])
-    rgb, inside = project(p, nn)
+    rgb, inside = project(p, nn, max(1.0, 1 / TX))
     if e["name"] == "bib_locks":
         inside = bib_outline(p, inside)
-    idx = clean(vd.snap(rgb, palette_for(e)))
+    idx = vd.snap(rgb, palette_for(e))
+    if TX >= 0.75:  # at 32 a block each texel is already its footprint's median: a 3x3 vote would erase the blaze
+        idx = clean(idx)
     seed = sum(map(ord, e["name"] + face)) % 97
     if STYLE == "projected":
         col = projected_colors(idx, face, vv, h, p)
@@ -985,12 +1015,27 @@ def eyelid_boxes():
     sizes them for another eye type, so textures painted with other eyes keep this layout."""
     d = EYES[os.environ.get("BLOCKY_LID", EYE_STYLE)]
     ph, pw = len(d["pattern"]), len(d["pattern"][0])
+    _, _, su, sv = skull_grid()
     out = []
     for name, cx in (("eyelid_R", -6.5), ("eyelid_L", 6.5)):
-        x0 = SKULL_X0 + int(round(cx - pw / 2 - SKULL_X0))
-        top = SKULL_TOP - int(round(SKULL_TOP - d.get("y", EYE_Y) - ph / 2))
-        out.append((name, float(x0), float(x0 + pw), float(top), float(top - ph)))
+        u0, v0 = eye_texel(cx, d)
+        x0, top = SKULL_X0 + u0 * su, SKULL_TOP - v0 * sv
+        out.append((name, float(x0), float(x0 + pw * su), float(top), float(top - ph * sv)))
     return out
+
+
+def skull_grid():
+    """The skull front's texels: (width, height) and the units a texel spans (u, v)."""
+    sx, sy = 22, 18  # the skull's front: x -11..11, y 28..46
+    w, h = max(1, round(TX * sx)), max(1, round(TX * sy))
+    return w, h, sx / w, sy / h
+
+
+def eye_texel(cx, d):
+    """The top-left texel of the eye centered at x = cx on the skull's front (as `paint.eye_corner`
+    places it: two eyes land mirror-symmetric)."""
+    w, h, su, sv = skull_grid()
+    return eye_corner((cx - SKULL_X0) / su, (SKULL_TOP - d.get("y", EYE_Y)) / sv, d["pattern"], w)
 
 
 def skeleton(L=L):

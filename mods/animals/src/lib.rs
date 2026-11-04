@@ -18,20 +18,19 @@
 //! is `notes/ANIMALS.md`. An owner is kept by player key, which the engine's bridge gives
 //! (`player_key`), so a tame knows its owner after a restart.
 
-use std::sync::OnceLock;
-
-use weft_sdk::abi::Str;
 use weft_sdk::*;
 
 declare_mod!(deps: ["base"], init: init);
 
 mod animal;
+mod ankylosaur;
 mod birds;
 mod breath;
 mod breeding;
 mod caiman;
 mod capybara;
 mod cat;
+mod citipati;
 mod coats;
 mod comfort;
 mod commands;
@@ -41,6 +40,7 @@ mod deer;
 mod dog;
 mod drink;
 mod eagle;
+mod early_bird;
 mod eggs;
 mod evolution;
 mod fish;
@@ -51,6 +51,7 @@ mod gull;
 mod habitats;
 mod hare;
 mod hunt;
+mod iguanodont;
 mod jaguar;
 mod knockout;
 mod kryptobaatar;
@@ -59,10 +60,13 @@ mod meat;
 mod mouse;
 mod owl;
 mod protoceratops;
+mod psittacosaurus;
 mod raptor;
 mod raven;
 mod reindeer;
+mod rest;
 mod riding;
+mod sauropod;
 mod scars;
 mod screen;
 mod signatures;
@@ -82,47 +86,28 @@ static HEART: Particle = Particle::named("heart");
 
 // ------------------------------------------------------------------ the engine's bridge
 
-type Query = unsafe extern "C" fn(query: Str, arg: Str) -> Str;
-static BRIDGE: OnceLock<Query> = OnceLock::new();
-
-/// The engine hands the mod its bridge when the mod loads.
-///
-/// # Safety
-/// `q` must be the engine's `bridge::query`.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn chiacraft_bridge(q: Query) {
-    let _ = BRIDGE.set(q);
-}
+chiacraft_bridge::install!();
 
 /// A player's key: what their saves are keyed by, the same after a restart.
 fn player_key(player: u64) -> String {
-    BRIDGE
-        .get()
-        .map(|f| unsafe {
-            f(Str::new("player_key"), Str::new(&player.to_string()))
-                .as_str()
-                .to_string()
-        })
-        .unwrap_or_default()
+    chiacraft_bridge::ask("player_key", &player.to_string())
 }
 
 /// A folder in the world's save for this mod's own files (`evolution.rs`'s gene pools); empty
 /// without one.
 fn data_dir() -> String {
-    BRIDGE
-        .get()
-        .map(|f| unsafe {
-            f(Str::new("data_dir"), Str::new("animals"))
-                .as_str()
-                .to_string()
-        })
-        .unwrap_or_default()
+    chiacraft_bridge::ask("data_dir", "animals")
 }
 
 // ------------------------------------------------------------------ registration
 
 fn init(r: &mut Registry) {
     dog::init(r);
+    for p in species::problems() {
+        weft_sdk::error!("{p}");
+    }
+    // The full creatures' resting state, before they attach it.
+    rest::init(r);
     cat::init(r);
     capybara::init(r);
     raptor::init(r);
@@ -137,6 +122,12 @@ fn init(r: &mut Registry) {
     fox::init(r);
     raven::init(r);
     protoceratops::init(r);
+    psittacosaurus::init(r);
+    ankylosaur::init(r);
+    iguanodont::init(r);
+    citipati::init(r);
+    early_bird::init(r);
+    sauropod::init(r);
     kryptobaatar::init(r);
     lizard::init(r);
     reindeer::init(r);
@@ -195,28 +186,19 @@ fn init(r: &mut Registry) {
         .fullbright();
 }
 
-/// Knocked out: lying down (`index` into `species::SPECIES`; the raptors, the wyvern and the jaguar).
-fn sleep(w: &World, id: u64, index: usize) {
-    match index {
-        3 | 5 => raptor::sleep(w, id),
-        4 => utahraptor::sleep(w, id),
-        6 => wyvern::sleep(w, id),
-        34 => jaguar::sleep(w, id),
-        _ => {}
-    }
+/// The squared distance between two points (blocks²).
+pub(crate) fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
+    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)
 }
 
-/// Up from resting, to follow or fight (`index` into `species::SPECIES`).
-fn wake(w: &World, id: u64, index: usize) {
-    match index {
-        1 => cat::wake(w, id),
-        2 => capybara::wake(w, id),
-        3 | 5 => raptor::wake(w, id),
-        4 => utahraptor::wake(w, id),
-        6 => wyvern::wake(w, id),
-        33 => wolf::wake(w, id),
-        34 => jaguar::wake(w, id),
-        7..=12 | 15 | 16 | 18..=22 | 31 | 32 => wild::wake(w, id),
-        _ => {}
-    }
+/// Knocked out: lying down (the raptors, the wyvern and the jaguar as they rest, `rest.rs`).
+fn sleep(w: &World, id: u64, _index: usize) {
+    rest::sleep(w, id);
+}
+
+/// Up from resting, to follow or fight: whichever resting state its kind has (`rest.rs` for the
+/// full creatures, `wild.rs` for the simple ones; the others have none).
+fn wake(w: &World, id: u64, _index: usize) {
+    rest::wake(w, id);
+    wild::wake(w, id);
 }

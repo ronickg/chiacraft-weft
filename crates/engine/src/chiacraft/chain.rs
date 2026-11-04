@@ -48,6 +48,16 @@ pub fn network(choice: &str) -> Result<ChainNetwork, String> {
     }
 }
 
+/// Whether the game may spend coins on `network` (the daily anchor, a world DID's listing):
+/// testnet11 only. Real XCH needs Ronald's own yes; until then this refuses mainnet even if a
+/// reader were somehow on it (the setting and the wallet's own mainnet gate refuse first).
+pub fn may_spend(network: ChainNetwork) -> Result<(), String> {
+    match network {
+        ChainNetwork::Testnet11 => Ok(()),
+        other => Err(format!("this build spends coins only on testnet11, not {other}")),
+    }
+}
+
 /// The game's reader, started now if it isn't running (or runs on another network). Blocks
 /// briefly; never call it from an async task (the reader runs its own runtime).
 pub fn reader(settings: &crate::settings::Settings) -> Result<Arc<ChainReader>, String> {
@@ -121,5 +131,7 @@ mod tests {
         assert!(network("").is_err());
         assert!(network("mainnet").unwrap_err().contains("mainnet is off"));
         assert!(network("devnet").is_err());
+        assert!(may_spend(ChainNetwork::Testnet11).is_ok());
+        assert!(may_spend(ChainNetwork::Mainnet).is_err());
     }
 }

@@ -1,0 +1,616 @@
+// chiacraft's sandboxed mod API, version 1.2 (chiacraft plan, phase 6; `docs/sandboxed-mods.md`).
+//
+// 1.2 is 1.1 (`../v1.1/mod.wit`) with calls added and none changed: callbacks for the package's
+// own blocks and items, channels, and `schedule`. A 1.x version only ever adds, so the game binds
+// the newest and a component built against an older 1.x still links (wasmtime matches 1.x
+// imports and exports by semver). The callbacks new in 1.2 are a second export,
+// `content-hooks`, which the game looks for at run time: a 1.0 or 1.1 component, which has none,
+// still instantiates (the game's own world, `host`, exports `hooks` only). Frozen once released.
+//
+// The shape follows Weft's mod SDK (`crates/sdk`, `docs/modding.md`) on purpose: a mod registers
+// commands, event handlers, question interceptors, value-chain steps and world ticks during
+// `init`, and the game calls them back with the world they run in. The guest SDK
+// (`crates/mod-sdk`) gives these the SDK's own names (`r.command`, `r.on(&BLOCK_BROKEN, ..)`,
+// `r.intercept(&question::BREAK_BLOCK, ..)`, `w.get(pos)`, `cmd.reply(key, args)`), so a Weft
+// mod's server code recompiles to WebAssembly with few changes.
+//
+// What a mod never sees: the player's account, words or keys; files, the network, the clock of
+// the computer, other packages' storage, the engine's memory. Every call has a fuel budget, the
+// mod's memory is capped, and a call that runs away is stopped (`docs/sandboxed-mods.md`, "Limits").
+package chiacraft:mods@1.2.0;
+
+/// Types the other interfaces share.
+interface types {
+    /// An entity in the world the call runs in. Players are entities. 0 is nothing.
+    type entity = u64;
+    /// A block state: what `world.get-block` gives. Its name with `names.block`.
+    type state = u32;
+    /// A block's position.
+    type block-pos = tuple<s32, s32, s32>;
+    /// A point, in blocks.
+    type vec3 = tuple<f64, f64, f64>;
+
+    /// One argument of a line players read. Lines travel as a translation key and its arguments,
+    /// and each player's game words them in its own language (the package's `assets/lang`).
+    variant arg {
+        /// Shown as it is.
+        text(string),
+        /// Another translation key, worded too.
+        key(string),
+        int(s64),
+        /// A number with this many decimals.
+        float(tuple<f64, u32>),
+        /// An item, by id.
+        item(u32),
+        /// A display name, as `{name:..}` writes it: `item:base:coal`, `block:base:furnace`.
+        name(string),
+    }
+
+    record item-stack {
+        item: u32,
+        count: u32,
+        data: u32,
+    }
+
+    /// An entity as the world has it now.
+    record entity-state {
+        /// Its kind's id (`names.entity-kind`).
+        kind: u32,
+        /// Feet.
+        pos: vec3,
+        vel: vec3,
+        yaw: f32,
+        pitch: f32,
+        on-ground: bool,
+        in-liquid: bool,
+        health: f32,
+        max-health: f32,
+        /// Ticks it has lived.
+        age: u64,
+    }
+
+    /// A player using one of the package's blocks (1.2): `face` is the face they clicked
+    /// (Weft's `Use`).
+    record block-use-event {
+        player: entity,
+        pos: block-pos,
+        state: state,
+        face: u32,
+    }
+
+    /// A block of the package's told something happened (1.2): a neighbour at `other` changed
+    /// (`registry.on-block-neighbor`) or its scheduled tick came (`on-block-scheduled`, `other` is
+    /// `pos`). `entity` is its block entity, 0 if none.
+    record block-update-event {
+        pos: block-pos,
+        state: state,
+        other: block-pos,
+        entity: entity,
+    }
+
+    /// A player using one of the package's items (1.2; Weft's `ItemUse`). `slot` is where the
+    /// stack is in the player's inventory, so later API versions can read and change what the
+    /// stack itself carries; `target` is the block it was used on and the face, if any.
+    record item-use-event {
+        player: entity,
+        stack: item-stack,
+        slot: u32,
+        target: option<tuple<block-pos, u32>>,
+    }
+
+    /// What an item's use did (1.2): whether it was used (the hand swings and nothing else
+    /// happens), and the stack to leave in the hand, if it changed (its item and count; what the
+    /// stack carries stays).
+    record item-use-result {
+        handled: bool,
+        stack: option<item-stack>,
+    }
+
+    /// What a question or a value chain is about. Which fields mean something depends on the
+    /// question (Weft's `abi::Query`).
+    record query {
+        entity: entity,
+        other: entity,
+        pos: block-pos,
+        state: state,
+        item: u32,
+        dim: u32,
+        cause: u32,
+        amount: f64,
+    }
+}
+
+/// The mod's log: lines in the game's log as `mod:<package>`. At most 64 lines a call, each
+/// clipped to 512 characters.
+interface log {
+    enum level {
+        error,
+        warn,
+        info,
+        debug,
+    }
+    write: func(level: level, message: string);
+}
+
+/// What the mod adds to the game. Only while `init` runs: a call at any other time is refused.
+/// Each call returns the callback's number, counted from 0 in the order of registration; the
+/// game calls the mod's `hooks` with it.
+interface registry {
+    /// Events the engine sends, batched once per tick (Weft's `BLOCK_BROKEN`, ...).
+    enum event {
+        block-broken,
+        block-placed,
+        entity-died,
+        entity-hurt,
+        player-joined,
+        player-respawned,
+        item-used,
+        item-picked-up,
+    }
+
+    /// Questions anyone may answer no to (Weft's `question::*`).
+    enum question {
+        break-block,
+        place-block,
+        use-block,
+        use-item,
+        interact-entity,
+        attack,
+        hurt,
+        pickup-item,
+        enter-dimension,
+        natural-spawn,
+    }
+
+    /// Value chains (Weft's `chain::*`).
+    enum chain {
+        damage,
+        attack-damage,
+    }
+
+    /// A server command, `/name`. `usage` is Weft's: `[action:word(create,join)] <who:targets>`
+    /// (kinds `int`, `float`, `word`, `word(..)`, `text`, `item`, `block`, `entity`, `dim`,
+    /// `player`, `pos`, `targets`, `time`). `permission`: 0 every player, 1 moderators, 2 game
+    /// masters, 3 admins, 4 the host. A name the game or another mod already has is refused.
+    command: func(name: string, usage: string, permission: u32) -> result<u32, string>;
+    /// Called with every batch of `event`.
+    on: func(event: event) -> u32;
+    /// Asked `question`; any deny wins.
+    intercept: func(question: question) -> u32;
+    /// A step of `chain` at `stage` (100 add, 200 multiply, 300 final; between them is fine).
+    modify: func(chain: chain, stage: u32) -> u32;
+    /// Once per tick in every region of the world, for logic that is nobody's own.
+    world-tick: func() -> u32;
+
+    /// What happens to a component's value (Weft's `component_flags`, 1.1).
+    flags component-flags {
+        /// Kept in the save.
+        save,
+        /// Sent to the entity's own player.
+        sync-owner,
+        /// Sent to every player who sees the entity.
+        sync-watchers,
+        /// Kept when a player respawns.
+        keep,
+    }
+
+    /// A per-entity value of the mod's own (1.1; Weft's `entity_component`): `<package>:<name>`,
+    /// `size` bytes (1 to 256), starting as `default` (at most `size` bytes, the rest zeros).
+    /// Not numbered: it calls nothing back.
+    component: func(name: string, size: u32, %flags: component-flags, default: list<u8>) -> result<_, string>;
+    /// Every entity of kind `kind` (a full name: `core:player`, `base:pig`) carries the mod's
+    /// component `component` (1.1; Weft's `attach`).
+    attach: func(kind: string, component: string) -> result<_, string>;
+
+    /// Called when a player uses (right-clicks) `block`, one of the package's own
+    /// (`<package>:<name>`, from its `defs/blocks`), through `content-hooks.block-use` (1.2;
+    /// Weft's `on_use`).
+    on-block-use: func(block: string) -> result<u32, string>;
+    /// Called when a neighbour of one of `block`'s changes, through `content-hooks.block-update`
+    /// (1.2; Weft's `on_neighbor`).
+    on-block-neighbor: func(block: string) -> result<u32, string>;
+    /// Called when a tick scheduled with `world.schedule` comes for one of `block`'s, through
+    /// `content-hooks.block-update` (1.2; Weft's `on_scheduled`).
+    on-block-scheduled: func(block: string) -> result<u32, string>;
+    /// Called when a player uses `item`, one of the package's own items (from its `defs/items`),
+    /// through `content-hooks.item-use` (1.2; Weft's item `on_use`).
+    on-item-use: func(item: string) -> result<u32, string>;
+    /// A channel `<package>:<name>` (1.2; Weft's `Channel`, bytes): what players' games send on
+    /// it comes through `content-hooks.packet`, and `world.send` sends on it. At most 64 packets
+    /// a tick are handed to the mod; more are dropped.
+    channel: func(name: string) -> result<u32, string>;
+}
+
+/// The world a callback runs in. Only during a callback; outside one each call does nothing and
+/// gives nothing (0, empty, none, false).
+interface %world {
+    use types.{entity, state, block-pos, vec3, arg, item-stack, entity-state};
+
+    /// Ticks since the world began.
+    time: func() -> u64;
+    /// The world's seed.
+    seed: func() -> u64;
+    /// 64 random bits from the world's own random source.
+    random: func() -> u64;
+    /// The id of the dimension the call runs in.
+    dimension: func() -> u32;
+
+    /// The block at `pos`: 0 (air) where nothing is loaded.
+    get-block: func(pos: block-pos) -> state;
+    /// False if `pos` is not loaded. At most 4096 changes a call.
+    set-block: func(pos: block-pos, state: state) -> bool;
+    /// Many `set-block`s in one call (1.1): how many changed. They count toward the same 4096.
+    set-blocks: func(changes: list<tuple<block-pos, state>>) -> u32;
+    /// Light at `pos`, 0 to 15.
+    light: func(pos: block-pos) -> u32;
+    /// The biome's id at `pos`.
+    biome: func(pos: block-pos) -> u32;
+
+    /// The players in this region.
+    players: func() -> list<entity>;
+    get-entity: func(id: entity) -> option<entity-state>;
+    /// Entities whose feet are within `radius` (at most 64 blocks) of `pos`, at most 256.
+    near: func(pos: vec3, radius: f64) -> list<entity>;
+    /// Moves an entity, a player too.
+    teleport: func(id: entity, pos: vec3);
+    /// Adds to its velocity.
+    push: func(id: entity, velocity: vec3);
+    /// Hurts it as `source` (0: nothing) with the engine's damage `cause`; false if it took none.
+    damage: func(id: entity, amount: f32, source: entity, cause: u32) -> bool;
+    /// A new entity of kind `kind` (`base:pig`), 0 if there is no such kind. At most 64 a call.
+    spawn: func(kind: string, pos: vec3) -> entity;
+    /// Takes a non-player entity out of the world.
+    remove: func(id: entity);
+    creative: func(player: entity) -> bool;
+
+    /// Puts a stack into a player's (or a block entity's) inventory: what didn't fit comes back.
+    give: func(owner: entity, stack: item-stack) -> item-stack;
+    /// A dropped item at `pos`.
+    spawn-item: func(pos: vec3, stack: item-stack);
+
+    /// A line in a player's chat: the translation `key` with `args`, worded by their own game.
+    /// At most 32 lines a call.
+    tell: func(player: entity, key: string, args: list<arg>);
+    /// The player's key: who they are, the same in every world and every visit (what saves are
+    /// kept by). Empty for an entity that isn't a player.
+    player-key: func(player: entity) -> string;
+
+    /// An entity's value of one of the mod's components (1.1): its bytes, none if the entity
+    /// doesn't carry it.
+    get-component: func(id: entity, component: string) -> option<list<u8>>;
+    /// Sets it (1.1): at most its size, the rest zeros. False if the entity doesn't carry it.
+    set-component: func(id: entity, component: string, value: list<u8>) -> bool;
+    /// A sound (`base:block.stone.break`) at `pos`, volume 0 to 4 (1.1). At most 64 a call.
+    play-sound: func(sound: string, pos: vec3, volume: f32);
+    /// `count` particles (1 to 256) of kind `particle` (`base:flame`) at `pos` (1.1). At most 64
+    /// bursts a call.
+    spawn-particles: func(particle: string, pos: vec3, count: u32);
+
+    /// A tick for the block at `pos` in `ticks` (1 to 72000) ticks, which its
+    /// `on-block-scheduled` callback gets (1.2; Weft's `schedule`). At most 256 a call.
+    schedule: func(pos: block-pos, ticks: u32);
+    /// Bytes to a player's game on one of the mod's channels (1.2; Weft's `send`): at most 16 KiB
+    /// each, 32 a call. Nothing if the player isn't here or the channel isn't the mod's.
+    send: func(player: entity, channel: string, data: list<u8>);
+}
+
+/// Names and ids of the game's content, which differ from world to world: look them up by name.
+interface names {
+    use types.{state};
+
+    /// A block state's full name: `base:furnace[facing=north,lit=false]`. Empty if unknown.
+    block: func(state: state) -> string;
+    /// The first state of the block named `name` (`base:stone`), or a state written with its
+    /// properties (`base:furnace[lit=true]`).
+    block-state: func(name: string) -> option<state>;
+    /// The value of property `prop` in `state`, if its block has that property.
+    prop: func(state: state, prop: string) -> option<string>;
+    /// `state` with property `prop` set to `value`, its others kept.
+    with-prop: func(state: state, prop: string, value: string) -> option<state>;
+    item: func(id: u32) -> string;
+    item-id: func(name: string) -> option<u32>;
+    entity-kind: func(id: u32) -> string;
+    entity-kind-id: func(name: string) -> option<u32>;
+}
+
+/// The mod's own data in this world, kept in the world's save. A key is 1 to 64 lowercase
+/// letters, digits, `_`, `-` and `.`; values are bytes. At most 1024 keys and 4 MiB in all, and
+/// 1 MiB written per call. Other packages' data and other worlds' are out of reach.
+interface storage {
+    get: func(key: string) -> option<list<u8>>;
+    set: func(key: string, value: list<u8>) -> result<_, string>;
+    remove: func(key: string);
+    /// Every key, sorted.
+    keys: func() -> list<string>;
+}
+
+/// While a command runs: answers to whoever ran it.
+interface command {
+    use types.{arg};
+
+    /// A line for whoever ran the command: the translation `key` with `args`. At most 32 a call.
+    reply: func(key: string, args: list<arg>);
+}
+
+/// What the game calls. Each call has a fuel budget; one that runs out, traps or grows memory
+/// past the cap is a strike: the mod's memory is dropped and it starts over (`init` again, its
+/// storage kept). Three strikes within ten minutes stop it in this world until the world is
+/// opened again.
+interface hooks {
+    use types.{entity, state, block-pos, vec3, item-stack, query};
+
+    /// A command argument's value, parsed and checked by the game.
+    variant value {
+        int(s64),
+        float(f64),
+        /// Words, text, player names; item, block, entity and dimension names.
+        text(string),
+        /// Items, blocks, entity kinds, dimensions: the id and the name.
+        id(tuple<u32, string>),
+        /// What a `targets` argument picked.
+        targets(list<entity>),
+        pos(vec3),
+    }
+
+    record invocation {
+        /// Who ran it.
+        player: entity,
+        /// The arguments given, by name; ones left out are absent.
+        args: list<tuple<string, value>>,
+    }
+
+    record block-change {
+        player: entity,
+        pos: block-pos,
+        state: state,
+        item: u32,
+    }
+
+    record death {
+        entity: entity,
+        killer: entity,
+        kind: u32,
+        cause: u32,
+        pos: vec3,
+    }
+
+    record hurt {
+        entity: entity,
+        source: entity,
+        amount: f32,
+        cause: u32,
+    }
+
+    record item-used {
+        player: entity,
+        stack: item-stack,
+        pos: block-pos,
+        on-block: bool,
+    }
+
+    record pickup {
+        player: entity,
+        stack: item-stack,
+    }
+
+    variant event-value {
+        block-change(block-change),
+        death(death),
+        hurt(hurt),
+        player(entity),
+        item-used(item-used),
+        pickup(pickup),
+    }
+
+    enum verdict {
+        abstain,
+        allow,
+        deny,
+    }
+
+    /// Once when the mod starts in a world (and again after a strike): register everything here.
+    /// An error keeps the mod off in that world, with the reason in the log.
+    init: func() -> result<_, string>;
+    /// One of the mod's commands (`registry.command`).
+    command: func(callback: u32, call: invocation);
+    /// A batch of an event the mod listens to (`registry.on`).
+    event: func(callback: u32, batch: list<event-value>);
+    /// A question the mod intercepts (`registry.intercept`).
+    question: func(callback: u32, question: query) -> verdict;
+    /// A step of a value chain (`registry.modify`): the new value from the chain's base and its
+    /// value so far.
+    modify: func(callback: u32, query: query, base: f64, value: f64) -> f64;
+    /// A world tick (`registry.world-tick`).
+    world-tick: func(callback: u32);
+}
+
+/// What the game calls for the callbacks API 1.2 added: an export of its own, so components
+/// built for 1.0 and 1.1, which lack it, still instantiate. Same budgets and strikes as `hooks`.
+interface content-hooks {
+    use types.{entity, block-use-event, block-update-event, item-use-event, item-use-result};
+
+    /// A player used one of the package's blocks: true if the use did something (nothing else
+    /// happens then, like placing a held block).
+    block-use: func(callback: u32, used: block-use-event) -> bool;
+    /// A neighbour changed, or a scheduled tick came.
+    block-update: func(callback: u32, update: block-update-event);
+    /// A player used one of the package's items.
+    item-use: func(callback: u32, used: item-use-event) -> item-use-result;
+    /// Bytes a player's game sent on one of the mod's channels.
+    packet: func(callback: u32, player: entity, data: list<u8>);
+}
+
+// ------------------------------------------------------------------ client halves (1.2)
+
+/// What a client half reads and does in the player's own game (1.2). Only what that game shows
+/// the player anyway; never the account, files or network.
+interface client {
+    use types.{arg, item-stack, vec3};
+
+    /// The player: feet position, health and max health; none until the world is in.
+    me: func() -> option<tuple<vec3, f32, f32>>;
+    /// Ticks into the day, 0 to 24000.
+    day-time: func() -> u64;
+    raining: func() -> bool;
+    creative: func() -> bool;
+    /// The player's own value of one of the package's components (one synced to its owner or
+    /// watchers), its bytes.
+    component: func(name: string) -> option<list<u8>>;
+    /// A slot of the player's inventory.
+    inventory-slot: func(slot: u32) -> item-stack;
+    /// The id of the screen showing, empty for none.
+    screen: func() -> string;
+
+    // Only from keys, buttons, packets and frames, never from a binding (which only shows).
+    /// Bytes to the package's server half on one of its channels: at most 16 KiB, 32 a call.
+    send: func(channel: string, data: list<u8>);
+    /// Opens one of the mod's screens.
+    open-screen: func(name: string);
+    close-screen: func();
+    /// A line in the player's chat: the translation `key` with `args`. At most 8 a call.
+    show: func(key: string, args: list<arg>);
+}
+
+/// What a client half adds to the player's game. Only while `init` runs; each returns the
+/// callback's number, as `registry` does.
+interface client-registry {
+    /// A HUD element `<package>:<name>`, at `anchor` (Weft's `hud_anchor`: `top_left`,
+    /// `top_right`, `bottom_left`, `bottom_right`, `hotbar`, `hotbar_left`, `hotbar_right`,
+    /// `above_hotbar`, `under_crosshair`), `order` within it. Its parts come from `client-hooks.build`.
+    hud-element: func(name: string, anchor: string, order: s32) -> result<u32, string>;
+    /// A screen `<package>:<name>`, its parts from `client-hooks.build`; `pauses` stops a world
+    /// played alone while it shows.
+    screen: func(name: string, pauses: bool) -> result<u32, string>;
+    /// A key `<package>:<name>` with its default binding (`J`, `ctrl+R`), which the player can
+    /// change in Controls: `client-hooks.key` on each press.
+    key: func(name: string, default: string) -> result<u32, string>;
+    /// What the server half sends on its channel `<package>:<name>`: `client-hooks.packet`.
+    packet: func(channel: string) -> result<u32, string>;
+    /// Every frame: `client-hooks.frame`. Off unless needed; keys and bindings are cheaper.
+    frame: func() -> u32;
+}
+
+/// The parts a HUD element or screen is built from: Weft's UI parts, as data. Classes are the
+/// game's kit (`panel`, `tooltip`, `button`, `slot`, `hotbar`, `hud_badge`, the `hud_health`,
+/// `hud_stamina`, `hud_xp` and `hud_temperature` bars, `tab`, `category`; text classes `title`,
+/// `dim`, `button`, `chat`), so a mod looks like the game; or the package's own `gui/` textures.
+interface ui {
+    use types.{arg};
+
+    /// Weft's `S`: sizes in GUI pixels, none = fit the content.
+    record style {
+        row: bool,
+        width: option<f32>,
+        height: option<f32>,
+        gap: f32,
+        pad: f32,
+        grow: f32,
+        /// `ui_align`: 0 start, 1 center, 2 end, 3 stretch.
+        align: u32,
+        /// `ui_justify`: 0 start, 1 center, 2 end, 3 space between.
+        justify: u32,
+        /// Placed at a point of the parent, over its other parts: x, y, and which point of the
+        /// part goes there (Weft's `S::at_pivot`).
+        at: option<tuple<f32, f32, f32, f32>>,
+        /// Text size, 1 = normal.
+        scale: f32,
+        /// Weft's `ui_flags`: 2 one line, 4 digit-wide cells, 8 disabled, 16 selected.
+        %flags: u32,
+        /// A style class, empty for the part's own.
+        class: string,
+    }
+
+    enum part-kind {
+        /// Children in a column or row (`style.row`).
+        container,
+        /// A container drawn with class `class`.
+        panel,
+        /// The translation `text` with `args`.
+        text,
+        /// Text worded every frame from `client-hooks.text(bind)`.
+        text-bind,
+        /// A bar of class `class`, filled from `client-hooks.value(bind)` (0 to 1, hidden while
+        /// below 0); `count` is Weft's `ui_dir`.
+        progress,
+        /// `count` icons of class `class`, as many lit as `client-hooks.value(bind)`.
+        icons,
+        /// The texture `class` (`gui/` of this package or `mod:name`), `size` big.
+        image,
+        /// Item `item`, `count` of it.
+        item,
+        /// Takes the free space.
+        spacer,
+        /// A button showing `text` with `args`: `client-hooks.click(bind)` when pressed.
+        button,
+    }
+
+    /// One part. A build is a list of parts in order, each followed by its `children` parts.
+    record part {
+        kind: part-kind,
+        style: style,
+        class: string,
+        text: string,
+        args: list<arg>,
+        children: u32,
+        bind: u32,
+        count: u32,
+        item: u32,
+        size: tuple<f32, f32>,
+    }
+}
+
+/// What the game calls of a client half. Fuel budgets as for a server half's hooks; a failing
+/// client half is stopped in the player's game until the world is joined again.
+interface client-hooks {
+    use types.{arg};
+    use ui.{part};
+
+    init: func() -> result<_, string>;
+    /// The parts of the HUD element or screen `callback` (at most 512).
+    build: func(callback: u32) -> list<part>;
+    /// A bar's or icons' value.
+    value: func(bind: u32) -> f32;
+    /// A text binding's line.
+    text: func(bind: u32) -> tuple<string, list<arg>>;
+    /// A button was pressed.
+    click: func(bind: u32);
+    /// A key was pressed.
+    key: func(callback: u32);
+    /// Bytes from the server half.
+    packet: func(callback: u32, data: list<u8>);
+    /// A frame, `seconds` after the last.
+    frame: func(callback: u32, seconds: f32);
+}
+
+/// A package's client half: `code/client.wasm`, run in each player's own game (1.2).
+world client-mod {
+    import log;
+    import names;
+    import client;
+    import client-registry;
+    export client-hooks;
+}
+
+/// A package's server half: `code/server.wasm`, run where the world is simulated.
+world server-mod {
+    import log;
+    import registry;
+    import %world;
+    import names;
+    import storage;
+    import command;
+    export hooks;
+    export content-hooks;
+}
+
+/// The game's side of `server-mod`: the same imports, and `hooks` only. The game finds
+/// `content-hooks` at run time, so a component of any 1.x instantiates.
+world host {
+    import log;
+    import registry;
+    import %world;
+    import names;
+    import storage;
+    import command;
+    export hooks;
+}

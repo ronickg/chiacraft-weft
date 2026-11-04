@@ -25,6 +25,46 @@ erase what they earned.
    engine changes only for identity, the mod sandbox, content switching, the confirm dialog and
    the server mode. Weft is tracked as `upstream` and merged regularly. Weft files stay MPL-2.0,
    ours are MIT. The name players see is chiacraft.
+
+   **Engine changes we offer back to Weft** (only with Ronald's yes for each):
+   - Sent: the GPU fix, https://github.com/Weft-Rust/Weft/pull/83.
+   - To offer later: entity send and activation ranges (E1, `reports/Research round 2.md`).
+     These are the rules `core:entity_send_distance`, `core:entity_activation_distance` and
+     `core:inactive_entity_interval`, the `ALWAYS_ACTIVE` flag and `tick_elapsed`. Ronald's
+     yes, 11-04: "Yes, later". Offer it once it has run in `dev` a while.
+   - To offer: worn layers mapped by the skin's layout (`client/entity_render.rs`,
+     `worn_tex_size`), in use since Ronald's "all 32" for the player and clothes (11-04). A
+     128 x 64 armour or clothes layer on a 64 x 32 skin then maps over all of it, as Minecraft's
+     armour does in 32x packs; one at the layout's width reads as before. One general line and a
+     test (branch `claude/clothes-worn`).
+   - To offer: settings carried over by name on a content switch (`config::content_switched`,
+     phase 6). Weft numbers settings by name within each content but keeps their values in one
+     table by id, so switching to a content with one more setting (a mod's key) moved the values
+     after it: a joining player read an empty name. Now the values follow their names into the new
+     content's ids, and mods' setting handles get the new content's ids back. Small, general,
+     with a check (`a_content_switch_keeps_values_by_name`).
+   - To offer: room for more worn layers (`client/models.rs`, `MAX_LAYERS` 8 to 12). Armour's
+     four, clothes' four and a cloak are nine over the skin, and past 8 the rest were dropped
+     silently (the cloak never drew). One constant (branch `claude/cloaks`).
+   - To offer: distant terrain (LOD) fixes, Weft's own LOD (`reports/lod.md`; branch
+     `claude/lod-fixes`):
+     - **Trees per site.** `describe_lod` ran each scatter shape 8 times at the world origin, so
+       far forests were all or nothing by seed. Scatters can now declare a thinning rule
+       (`ScatterBuilder::thin` / `thin_in`: a terrain mask, keep one in N, optionally per biome
+       component) that the engine applies near (`dim::scatter_site`) and on the GPU per real site
+       alike; the canopy sample runs stand on real ground spread over the world.
+     - **Steep faces.** A terrain op `FACES` (`TerrainBuilder::faces(fall, f)`): what bare faces
+       show from a given fall. Distant terrain asks it for steep cells' tops and wall bands, and
+       puts no scattered things there.
+     - **Stable levels.** Split at 4 tile widths, join only past 4.5; a parent stays until all
+       four children are made (no child over its parent); 192 dropped tiles cached; jobs no
+       longer wanted are called off; LOD's mods' heights, meshing and description run on their
+       own low-priority pool, not the one finishing near cubes.
+     - **Smooth far ground.** Tiles from level 3 (8-block cells, about 1 km on) are a heightmap
+       sampled at cell corners, not boxes: a corner grid at the start of the tile's records, a
+       record per cell, skirts at the edges. A prelude helper (`lod_corner`, used by `vs_lod`)
+       morphs odd corners into the next level's shape between 6 and 8 tile widths (CDLOD), so
+       levels meet without seams and swap without a jump; normals from the grid, tints per corner.
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 
@@ -258,12 +298,12 @@ The smallest version that works is phases 1-4.
       maintainer key, fetches it then and daily while open, and applies its entries as bans, its
       own allow list winning. `/banlist publish` signs the world's bans for good as the owner's
       list. Never on by default. Not yet: lists from a URL.
-   4. *The chain in the game* (built 2026-11-04, `chiacraft/chain.rs`): the engine links the
+   4. *The chain in the game* (built, seen working on testnet11 2026-11-04, `chiacraft/chain.rs`): the engine links the
       wallet with `chain`. One chain reader per game or server, started only when something needs
       it (getting, linking or checking a DID), on the network the setting `core:chain` names: `off`, `testnet11` (the default while we test)
       or `mainnet` (only after Ronald's yes, and a confirmation in the game); peers from the DNS
       introducers or the setting's own nodes; its cache in the run folder. Never in the game loop.
-   5. *The sponsor and the account's DID*: `horizon-sponsor` ported as `crates/sponsor`
+   5. *The sponsor and the account's DID* (built, seen working on testnet11): `horizon-sponsor` ported as `crates/sponsor`
       (`chiacraft-sponsor`, not a default member), speaking **iroh** instead of HTTP: ALPN
       `chiacraft/sponsor/1` on its own key, the same JSON and the same signed request (the
       wallet's `sponsor.rs`), so anyone can run one at home with no domain, TLS certificate or open
@@ -273,8 +313,11 @@ The smallest version that works is phases 1-4.
       wallet address (so Sage shows it after importing the words), shows it pending until the
       chain has it (about a minute; the launcher id is saved, so a restart keeps waiting), then
       links it (`DidLink`); "Link a DID I have" finds one these words hold (`OwnerSigner::find`).
-      A sponsor gives each identity one player DID and up to 8 world DIDs a day.
-   6. *The join proves the DID* (built 2026-11-04, not yet seen on testnet11): beside the identity's vouching for the login key, the join
+      A sponsor gives each identity one player DID and up to 8 world DIDs a day. Identities and
+      endpoints cost nothing, so each request carries a proof of work (22 zero bits by default,
+      a second or two of CPU) and the day's budget opens an hour's share at a time (research
+      round 4, P7).
+   6. *The join proves the DID* (built, seen working on testnet11): beside the identity's vouching for the login key, the join
       carries the DID's launcher id, its owner key and that key's signature of `chiacraft did v1
       <launcher> <identity>`. It needn't name the session: the identity is already bound to the
       login key the connection proved, so a replay only proves the same link again. The world
@@ -284,7 +327,7 @@ The smallest version that works is phases 1-4.
       join waits for it (25 s at most) only when the world's rules ask for a DID. A DID's age is
       the chain's height since its launch (4,608 blocks a day). The DID rules of slice 1 start
       counting, and a ban by DID refuses whoever proves it.
-   7. *World DIDs, ownership both ways*: a world can get a DID from a sponsor, launched to the
+   7. *World DIDs, ownership both ways* (built, seen working on testnet11): a world can get a DID from a sponsor, launched to the
       owner's address, so the DID stays in the owner's wallet and the world holds only its key.
       Its metadata names the owner's DID and the world's current key and generation, set at
       launch (the player spends nothing). The owner's DID lists its worlds in its metadata (one
@@ -294,8 +337,38 @@ The smallest version that works is phases 1-4.
       updates its DID (one spend). The account's certificate of the world key stays as it is.
    Done when: a player has a DID made through our sponsor, their world and their DID point at
    each other, and a world owner sets admission rules and bans players, seen between two games
-   or a game and a headless server, on testnet11. Then achievements (signed by the world DID) and
-   the profile view; the admission rule "has achievement X" comes with them.
+   or a game and a headless server, on testnet11 (done 2026-11-04). Then achievements, decided
+   2026-11-04 overnight by Phase 4 under Ronald's "decide alone" (`notes/crew/OVERNIGHT.md`), on
+   the wallet's credential (`achievement.rs`: a record naming player, issuer and achievement,
+   signed by the issuer's identity key, an optional issuer DID with its owner key's proof,
+   revocation lists, a daily Merkle anchor):
+   8. *Worlds sign achievements* (built 2026-11-04, not yet seen in a game): when a world grants an advancement (the base mod's, or any mod
+      through the bridge's `achievement` question), the world signs a credential for the player:
+      the issuer is the owner's identity key (the world runs in the owner's game or a headless
+      server with the owner's account), named after the world, with the world's DID and its
+      owner key's proof when the world has one, and the world's address as where to ask about it.
+      Players without an account identity get none. The player's game checks it and keeps it in
+      the account home (`achievements.json`), so it follows the words to any computer. Free and
+      off chain; on in every world (an owner can turn it off).
+   9. *The profile view* (built): the Profile screen gains the player's achievements, by world: title,
+      when, and how sure it is (signature; the issuing world's DID confirmed both ways on chain;
+      anchored). Self-signed ones (earned in your own world) say so.
+   10. *The daily anchor* (opt-in, the owner's; built, not yet run on chain): once a day the owner's game commits one Merkle
+      root of the day's credentials on chain (the wallet's `anchor`, a spend from the owner's
+      wallet; testnet11 for now) and gives each player the inclusion proof for theirs when they
+      next join.
+   11. *Has achievement X* (built 2026-11-04, not yet seen in a game): an admission rule
+      (`/achievementrule <id> [issuer keys]`): only players who earned it, as a credential signed by
+      this world's owner or an issuer the owner names. The world asks the joining game for that
+      achievement only (`AskAchievement`), the game shows its credentials for it and nothing else
+      (`Proofs`), and the join waits for them as it waits for a DID check.
+   12. *Withdrawn achievements* (built 2026-11-04, not yet seen in a game): `/revoke <player>
+      <id | *>` adds what this world signed for them to its issuer's revocation list (the wallet's
+      `Revocations`, one per issuer account, kept in its home, signed again one `seq` higher);
+      every player here gets the list on joining and on each change, their profile marks what
+      it withdrew, and it no longer counts at the door.
+   Later: achievements a sandboxed mod grants; other worlds fetching an issuer's list (each
+   world sends its own today).
 5. **Finding worlds.** On-chain listing by hint; DIG listings and curated lists; spam ranking.
 6. **Sandboxed code mods.** wasmtime with components (from `horizon-mods`), WIT v1.0 shaped on
    Weft's SDK, server halves then client halves, frozen API versions; personal mods per world.
@@ -324,17 +397,30 @@ The smallest version that works is phases 1-4.
       the offer (protocol 8), so the join sheet refuses a too-new mod before downloading (built);
       a `required` flag per package at the next `package.toml` change, optional by default (a
       stopped required mod closes its world to joins and sends its players home); a call-cost
-      benchmark (`callcost`) before a release freezes 1.0. Next, 1.2: block and item callbacks,
-      channels, gizmos.
-   4. *Client halves*: `code/client.wasm`, client calls only (HUD, screens, keys, channels to its
-      server half), a frame budget.
-   5. *Personal mods per world*: the player's own client halves, allowed or not by each world's
-      owner.
-   6. *Operations*: `/mods` (cost, strikes, resume), cached compiled components, a per-tick budget
-      across mods.
+      benchmark (`callcost`) before a release freezes 1.0. API 1.2 (built): callbacks on the
+      package's own blocks and items, `schedule`, channels; a second export (`content-hooks`)
+      found at run time so older components still run. Sample `bell`. The mod UI ABI's `at`
+      came with it (Weft mods rebuild once).
+   4. *Client halves* (built): `code/client.wasm`, a component for the world `client-mod`: HUD
+      elements, screens, keys, packets from its server half and frame hooks, its UI built as parts
+      the game replays with its own kit (`crates/mod-sdk-client`). Sample: the bell's.
+   5. *Personal mods per world* (built; Ronald: "Yes, as planned"): the player's own client
+      halves in `<run dir>/personal/<name>`, run only where the world rule Personal Mods allows
+      (off by default, on Create World); joining says which are off. They run through shared
+      slots (a HUD element per anchor, a screen, eight keys) so the content stays the same.
+   6. *Operations* (`/mods` built): calls, time, strikes and why one stopped, per mod in this
+      world; `/mods resume <package>` for admins. Later: cached compiled components, a per-tick
+      budget across mods.
 7. **Headless server and administration.** No window or GPU (Weft's CPU terrain path),
    `server.toml`, console, operators and command permissions (today any player can `/give`),
    movement checks, our own relay, load tests (`horizon-bots`).
+   Built ahead (2026-11-04, decided by Planner): a server's own identity. A headless server runs
+   without anyone's account: `chiacraft_account::open_server` makes an account named "Server"
+   once, in the server's folder (`server-account`, encrypted file store), and its worlds' keys
+   and certificates come from it as a player's do, so addresses, status, links and admission work
+   unchanged; nobody who connects owns the world. Left for this phase: an owner certifying a
+   server they run (the server's identity vouched for by the owner's, so links and admission see
+   the owner), moving a world between a game and a server, and the server's DID.
 8. **Later.** Wallet view and spending with the confirm dialog, items on chain, offers, passes,
    paid links, portal-rights NFTs; launcher and signed updates.
 

@@ -155,13 +155,23 @@ impl Stomach {
                 >= WELL_FED_NUTRIENTS
     }
 
-    /// Degrees warmer (colder, negative) its meals make its eater feel now.
-    pub fn meal_warmth(&self) -> f32 {
+    /// Degrees warmer its warmest hot meal makes its eater feel now: the strongest dish, not the
+    /// sum (Research round 3, B6: four hot steaks aren't +16 °C).
+    pub fn meal_warming(&self) -> f32 {
         self.portions
             .iter()
             .filter(|p| p.warm_secs > 0.0)
             .map(|p| p.warmth)
-            .sum()
+            .fold(0.0, f32::max)
+    }
+
+    /// Degrees cooler (0 or less) its coolest cooling food makes it feel now.
+    pub fn meal_cooling(&self) -> f32 {
+        self.portions
+            .iter()
+            .filter(|p| p.warm_secs > 0.0)
+            .map(|p| p.warmth)
+            .fold(0.0, f32::min)
     }
 }
 

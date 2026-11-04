@@ -1,0 +1,11 @@
+{
+ "kind": "base:axe",
+ "layer": "haft",
+ "style": "plain",
+ "override": true,
+ "socket": [
+  11.8,
+  22.2
+ ],
+ "note": "moved so this socket meets the head's anchor"
+}

@@ -48,8 +48,9 @@ impl KindModel {
     }
 }
 
-/// Layers one entity draws at most: its skin and what it wears.
-pub const MAX_LAYERS: usize = 8;
+/// Layers one entity draws at most: its skin and what it wears (a game's armour, clothes and
+/// cloak are nine; past this the rest are dropped without a word, so leave room).
+pub const MAX_LAYERS: usize = 12;
 
 /// Keyframe animations one entity plays at once: idle, walk and run.
 pub const MAX_ANIMS: usize = 3;
@@ -74,12 +75,16 @@ pub struct Posed {
     pub layer_count: usize,
     /// Its build: where its parts' scales start in `add_many`'s `builds`, and how many (0: none).
     pub build: (u32, u32),
+    /// Drawn only into the sun's shadow map (the player's own body in first person).
+    pub shadow_only: bool,
 }
 
 #[derive(Clone, Copy)]
 pub enum Batch {
     World,
     Preview,
+    /// The sun's shadow map: the world's models and the shadow-only ones.
+    Shadow,
 }
 
 pub struct Models {
@@ -88,10 +93,13 @@ pub struct Models {
     corners: BufferId,
     /// Per frame slot, one set per [`Batch`]: the GPU reads them only when the frame's list
     /// runs, so two batches drawn in one frame can't share them.
-    instances: [Vec<(BufferId, u32)>; 2],
-    bones: [Vec<(BufferId, u32)>; 2],
+    instances: [Vec<(BufferId, u32)>; 3],
+    bones: [Vec<(BufferId, u32)>; 3],
     /// This frame: (kind, instance) and bone rows.
     queued: Vec<(u32, Instance)>,
+    /// This frame's instances for the shadow map only, and the shadow batch's list (scratch).
+    shadow_only: Vec<(u32, Instance)>,
+    shadow_list: Vec<(u32, Instance)>,
     rows: Vec<[[f32; 4]; 3]>,
     scratch: Vec<Mat4>,
     /// Bones per entity in `add_many`.
@@ -138,6 +146,8 @@ impl Models {
             instances: Default::default(),
             bones: Default::default(),
             queued: Vec::new(),
+            shadow_only: Vec::new(),
+            shadow_list: Vec::new(),
             rows: Vec::new(),
             scratch: Vec::new(),
             counts: Vec::new(),
@@ -241,6 +251,7 @@ impl Models {
 
     pub fn begin(&mut self) {
         self.queued.clear();
+        self.shadow_only.clear();
         self.rows.clear();
     }
 
@@ -344,7 +355,11 @@ impl Models {
             if let Some(m) = self.kinds.get(e.kind as usize) {
                 for mut inst in e.layers[..e.layer_count].iter().copied() {
                     (inst.bones, inst.cuboids, inst.cuboid_count, inst.vertices) = (first, m.cuboids.0, m.cuboids.1, m.corners.0);
-                    self.queued.push((e.kind, inst));
+                    if e.shadow_only {
+                        self.shadow_only.push((e.kind, inst));
+                    } else {
+                        self.queued.push((e.kind, inst));
+                    }
                 }
             }
             first += n as u32;
@@ -363,22 +378,48 @@ impl Models {
         pipe: PipelineId,
         view: BufferId,
     ) {
-        if self.queued.is_empty() {
+        // The shadow map draws the shadow-only instances too.
+        let mut queued = std::mem::take(&mut self.queued);
+        let shadow = matches!(batch, Batch::Shadow);
+        if shadow {
+            self.shadow_list.clear();
+            self.shadow_list.extend_from_slice(&queued);
+            self.shadow_list.extend_from_slice(&self.shadow_only);
+            std::mem::swap(&mut queued, &mut self.shadow_list);
+        }
+        self.draw_list(gpu, list, frame, batch, pipe, view, &mut queued);
+        if shadow {
+            std::mem::swap(&mut queued, &mut self.shadow_list);
+        }
+        self.queued = queued;
+    }
+
+    fn draw_list(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        batch: Batch,
+        pipe: PipelineId,
+        view: BufferId,
+        queued: &mut [(u32, Instance)],
+    ) {
+        if queued.is_empty() {
             return;
         }
-        self.queued.sort_by_key(|q| q.0);
+        queued.sort_by_key(|q| q.0);
         let grow = crate::gpu_layout::frame_buffer;
         let ib = grow(
             gpu,
             &mut self.instances[batch as usize],
             frame.slot,
-            self.queued.len() as u32,
+            queued.len() as u32,
             size_of::<Instance>() as u64,
             usage::STORAGE,
             "model instances",
         );
         let bb = grow(gpu, &mut self.bones[batch as usize], frame.slot, self.rows.len().max(1) as u32, 48, usage::STORAGE, "model bones");
-        let insts: Vec<Instance> = self.queued.iter().map(|q| q.1).collect();
+        let insts: Vec<Instance> = queued.iter().map(|q| q.1).collect();
         gpu.mapped(ib)[..insts.len() * size_of::<Instance>()].copy_from_slice(bytemuck::cast_slice(&insts));
         gpu.mapped(bb)[..self.rows.len() * 48].copy_from_slice(bytemuck::cast_slice(&self.rows));
         list.pipeline(pipe);
@@ -388,9 +429,9 @@ impl Models {
         list.bind(crate::gpu_layout::bind::model::CORNERS, self.corners);
         list.bind(crate::gpu_layout::bind::model::BONES, bb);
         let mut i = 0;
-        while i < self.queued.len() {
-            let kind = self.queued[i].0;
-            let end = i + self.queued[i..].iter().take_while(|q| q.0 == kind).count();
+        while i < queued.len() {
+            let kind = queued[i].0;
+            let end = i + queued[i..].iter().take_while(|q| q.0 == kind).count();
             let m = &self.kinds[kind as usize];
             let vertices = m.cuboids.1 * 36 + m.corners.1;
             list.push(Cmd::Draw { vertices, instances: (end - i) as u32, first_vertex: 0, first_instance: i as u32 });

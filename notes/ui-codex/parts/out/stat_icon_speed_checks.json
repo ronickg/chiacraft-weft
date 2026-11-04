@@ -1,0 +1,19 @@
+{
+ "kind": "ui",
+ "what": "a 16 x 16 stat icon of a running paw print with motion lines, its main colour #6eaa50 with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel",
+ "size": [
+  16,
+  16
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.368,
+   "outline": 0.26,
+   "red_line": 0.0,
+   "fill": 0.5,
+   "passed": true
+  }
+ ]
+}

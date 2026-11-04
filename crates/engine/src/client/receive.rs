@@ -176,6 +176,7 @@ impl Client {
             ToClient::Permission(level) => self.permission = level,
             ToClient::Using(ticks) => self.using = ticks.map(|t| (t as f32, t as f32)),
             ToClient::Air { air, heading } => self.world.air = (air, heading),
+            ToClient::Tints { tints } => self.world.set_tints(tints),
             ToClient::Weather { raining, thunder, only } => {
                 self.weather = (raining, thunder);
                 self.world.rain_in = only;
@@ -214,6 +215,10 @@ impl Client {
                 self.command_replies.insert(id, lines);
             }
             ToClient::Disconnect(reason) => self.disconnected = Some(reason),
+            ToClient::Achievement(json) => crate::chiacraft::achievements::received(&json),
+            ToClient::AchievementAnchor { hash, anchor } => crate::chiacraft::achievements::anchored(&hash, &anchor),
+            ToClient::Revocations(json) => crate::chiacraft::achievements::revocations_received(&json),
+            ToClient::AskAchievement { id } => self.send(crate::net::ToServer::Proofs(crate::chiacraft::achievements::proofs(&id))),
             ToClient::Refused(why) => {
                 self.disconnected = Some(why.key.clone());
                 self.refused = Some(why);

@@ -12,6 +12,15 @@ use crate::species::{SPECIES, Species};
 /// of fresh grass is its 2-3% of dry matter.
 pub const MEAL: f32 = 0.1;
 
+/// A wild one goes after food (grazing, `forage.rs`; hunting, `hunt.rs`) under this share of its
+/// food, and stops when this full.
+pub const HUNGRY: f32 = 0.6;
+pub const FULL: f32 = 0.95;
+
+/// The share of natural spawns that still come where nothing grows this season (`forage.rs`):
+/// animals live through a winter or a drought, fewer and thinner.
+pub const SPAWN_FLOOR: f32 = 0.2;
+
 /// The share of its food stat that `kg` of food fills in an eater of `own` kg (at most all of it).
 pub fn fills(own: f32, kg: f32) -> f32 {
     if own <= 0.0 {
@@ -66,7 +75,7 @@ pub const COLD_BLOODED_WATER: f32 = 0.2;
 pub const SPARE: f32 = 0.15;
 /// Seconds of play a real day of drinking takes: the hunger meter's clock (a deer's food stat, a
 /// meal of a tenth of its mass, is three days of its grazing and lasts it 30 minutes).
-pub const DAY_SECS: f32 = 600.0;
+pub const DRINK_DAY_SECS: f32 = 600.0;
 /// It goes to drink under this share of its water, and drinks until this full.
 pub const THIRSTY: f32 = 0.5;
 pub const SLAKED: f32 = 0.95;
@@ -116,9 +125,9 @@ pub fn litres_a_day(s: &Species, kg: f32) -> f32 {
 }
 
 /// Seconds a full drink lasts an animal of `s` weighing `kg`, from slaked to parched: the water it
-/// can spare (`SPARE`) over what it must drink a day, on the hunger meter's clock (`DAY_SECS`).
+/// can spare (`SPARE`) over what it must drink a day, on the hunger meter's clock (`DRINK_DAY_SECS`; not the calendar's day, `vitals::DAY_SECS`).
 /// `None`: it never needs to drink.
 pub fn drink_lasts(s: &Species, kg: f32) -> Option<f32> {
     let drunk = litres_a_day(s, kg) * drinks(s);
-    (drunk > 0.0).then(|| SPARE * kg / drunk * DAY_SECS)
+    (drunk > 0.0).then(|| SPARE * kg / drunk * DRINK_DAY_SECS)
 }

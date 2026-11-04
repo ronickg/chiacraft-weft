@@ -7,7 +7,9 @@ use std::fmt::Write;
 use crate::effects;
 use crate::food::{self, NUTRIENT_NAMES};
 use crate::stats::{self, Growth};
-use crate::{air, calendar, climate, clothing, difficulty, forage, levels, meals, plants, preserve, soil, temperature, wild};
+use crate::{
+    air, calendar, climate, clothing, crafts, difficulty, forage, levels, meals, plants, preserve, shelter, soil, temperature, wild,
+};
 
 pub fn markdown() -> String {
     let mut w = String::new();
@@ -20,6 +22,8 @@ pub fn markdown() -> String {
     foods(&mut w);
     cooking(&mut w);
     clothes(&mut w);
+    rooms(&mut w);
+    waiting(&mut w);
     effects_table(&mut w);
     climates(&mut w);
     plant_table(&mut w);
@@ -46,10 +50,11 @@ fn stats_table(w: &mut String) {
     let (health, stamina) = crate::stomach::max_health_stamina(100.0, 100.0, &arrival, cap);
     let _ = writeln!(
         w,
-        "A new player arrives with {} in the stomach ({:.0} units): max health {health:.0} and stamina {stamina:.0} of 100, wearing off as it digests (an empty stomach: {:.0}).\n",
+        "A new player arrives with {} in the stomach ({:.0} units): max health {health:.0} and stamina {stamina:.0} of 100, wearing off as it digests (an empty stomach: {:.0}). A new world begins on spring's day {}, a quarter of the year from midwinter.\n",
         crate::stomach::ARRIVAL.join(" and "),
         arrival.used(),
-        crate::stomach::FLOOR * 100.0
+        crate::stomach::FLOOR * 100.0,
+        calendar::START_DAY + 1
     );
 }
 
@@ -94,11 +99,12 @@ fn foods(w: &mut String) {
 fn cooking(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Meals and preserving\n\nA stew (`vitals::meals`) cooks {}-{} foods in {} s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x{} (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient.\n",
+        "## Meals and preserving\n\nA stew (`vitals::meals`) cooks {}-{} foods in {} s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x{} (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient. A campfire cooks what a furnace cooks of food, x{} the time, with no fuel. Nothing is made of spoiled food, and what is made of stale food starts as far through its own life as its stalest part.\n",
         meals::MIN,
         meals::MAX,
         meals::COOK_TICKS / crate::TICKS,
-        meals::BONUS
+        meals::BONUS,
+        meals::CAMPFIRE_PACE
     );
     let _ = writeln!(
         w,
@@ -126,33 +132,93 @@ fn cooking(w: &mut String) {
     let _ = writeln!(w);
 }
 
+fn waiting(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Crafts that wait\n\nWhat takes days in real life takes its time on the growing pace (`vitals::crafts`; game days = {} · real days^{}), at a station that keeps working unwatched.\n\n| station | in | with | out | real days | in the game | holds |\n|---|---|---|---|---|---|---|",
+        crate::plants::GROWING.0,
+        crate::plants::GROWING.1
+    );
+    for c in crafts::CRAFTS {
+        let secs = c.secs();
+        let time =
+            if secs < crate::DAY_SECS { format!("{:.1} min", secs / 60.0) } else { format!("{:.1} game days", secs / crate::DAY_SECS) };
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {} | {} | {time} | {} |",
+            c.station.name(),
+            c.input,
+            c.with.unwrap_or("-"),
+            c.output,
+            c.real_days,
+            c.station.holds()
+        );
+    }
+    let _ = writeln!(w);
+}
+
+fn rooms(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Rooms\n\nAn enclosed space (`vitals::shelter`; up to {} blocks of air, none open to the sky) shuts out the wind, lets in its walls' share of the day's swing, and keeps {} °C over the air outside empty, or a fire's gain by its walls with a fire in it (full up to {} blocks of air, at least {:.0}% in a bigger room; never less than the fire gives beside it).\n\n| wall | a fire in the room | the day's swing let in |\n|---|---|---|",
+        shelter::ROOM_MAX,
+        shelter::EMPTY_ROOM,
+        shelter::ROOM_FULL,
+        shelter::BIG_ROOM_SHARE * 100.0
+    );
+    for wall in shelter::WALLS {
+        let _ = writeln!(w, "| {} | +{} °C | {:.0}% |", wall.name(), wall.fire_gain(), wall.swing() * 100.0);
+    }
+    let _ = writeln!(w);
+}
+
 fn clothes(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Clothing\n\nWorn in four slots of their own under armor ({}), no armor value. A full set's real insulation in clo at {} °C of comfort each; a piece gives its share ({:?}, head to feet). Wet, armor keeps {:.0}% of its warmth; being wet itself feels {} °C colder. What each piece takes: {}.\n\n| material | clo | cold °C | heat °C | kept wet | windproof | from |\n|---|---|---|---|---|---|---|",
+        "## Clothing\n\nWorn in four slots of their own under armor ({}), no armor value; armor and clothes stack, and leather armor is hide. A full set's real insulation in clo at {} °C of comfort each; a piece gives its share ({:?}, head to feet). Wet, armor keeps {:.0}% of its warmth; being wet itself feels {} °C colder. Each piece is sewn with {:?} string, a string is {} plant fibre. A new player arrives in {}.\n\n| material | clo | cold °C | heat °C | kept wet | windproof | pieces to make | from |\n|---|---|---|---|---|---|---|---|",
         clothing::PIECES.join(", "),
         clothing::PER_CLO,
         temperature::PIECE_SHARE,
         temperature::ARMOR_WET_KEEPS * 100.0,
         temperature::WET_CHILL,
-        clothing::PIECES
+        clothing::STRING,
+        clothing::FIBRE_PER_STRING,
+        clothing::ARRIVAL
             .iter()
-            .zip(clothing::MAKES)
-            .map(|(p, (m, s))| format!("{p} {m} + {s} string"))
+            .map(|(m, p)| format!("{m} {}", clothing::PIECES[*p]))
             .collect::<Vec<_>>()
             .join(", ")
     );
     for m in clothing::MATERIALS {
         let _ = writeln!(
             w,
-            "| {} | {} | {:.0} | {} | {:.0}% | {:.0}% | {} |",
+            "| {} | {} | {:.0} | {} | {:.0}% | {:.0}% | {:?} | {} |",
             m.name,
             m.clo,
             m.cold(),
             m.heat,
             m.wet_keeps * 100.0,
             m.windproof * 100.0,
+            m.makes,
             m.from
+        );
+    }
+    let _ = writeln!(
+        w,
+        "\nCloaks, in a slot of their own over clothes and armor (covering {:.0}% of the body against the wind):\n\n| cloak | cold °C | heat °C | kept wet | windproof | keeps the rain off | from |\n|---|---|---|---|---|---|---|",
+        clothing::CLOAK_COVERS * 100.0
+    );
+    for c in clothing::CLOAKS {
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {:.0}% | {:.0}% | {} | {} |",
+            c.name,
+            c.cold,
+            c.heat,
+            c.wet_keeps * 100.0,
+            c.windproof * 100.0,
+            if c.keeps_dry { "yes" } else { "no" },
+            c.from
         );
     }
     let _ = writeln!(w);
@@ -389,19 +455,20 @@ fn soil_table(w: &mut String) {
 fn difficulties(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Difficulty (the `base:difficulty` rule)\n\n| | digests | keeps | harm | can kill | XP lost on death | stamina costs |\n|---|---|---|---|---|---|---|"
+        "## Difficulty (the `base:difficulty` rule)\n\n| | digests | keeps | harm | can kill | XP lost on death | stamina costs | first nights without monsters |\n|---|---|---|---|---|---|---|---|"
     );
     for d in difficulty::ALL {
         let _ = writeln!(
             w,
-            "| {} | x{} | x{} | x{} | {} | {:.0}% | x{} |",
+            "| {} | x{} | x{} | x{} | {} | {:.0}% | x{} | {} |",
             d.name,
             d.digest,
             d.keep,
             d.harm,
             if d.deadly { "yes" } else { "no, stops at a tenth" },
             d.death_xp * 100.0,
-            d.stamina_cost
+            d.stamina_cost,
+            d.grace_nights
         );
     }
     let _ = writeln!(w);

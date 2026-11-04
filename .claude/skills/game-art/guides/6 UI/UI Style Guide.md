@@ -78,6 +78,8 @@ Add **one** of these lines:
 | **Bar** | "A [health / stamina / XP / progress] bar, [W] px wide, dark track, bronze rim, [colour] fill with a lighter top line, cream value text, shown full, half and nearly empty." |
 | **HUD icon** | "A [9×9 / 16×16] HUD icon of a [heart / drumstick / shield / bubble / snowflake] in full, half and empty states, one clear shape with a single highlight pixel." |
 | **Status-effect tile** | "A 24×24 square tile with a bronze frame and a dark centre holding one bright [symbol], for a [buff / debuff]." |
+| **Slot** | "One empty item slot, [W×H], dark brown (#352015) and slightly sunken: a 1-px dark outline, a thin bronze rim lit top-left and shaded bottom-right, nothing inside." |
+| **Frame piece** | "One empty [title tab / section box / well / tooltip box] of [W×H] for nine-slice stretching: bevelled corners, plain even straight edges, nothing written on it." |
 | **Tabs** | "A row of [N] tabs with icons and labels: active (bright orange, joined to the panel), inactive (dark bronze), hover, disabled." |
 | **Small controls** | "[Checkbox / toggle / radio / slider / dropdown / text input], all states, bronze rim, orange or green when on." |
 | **Tooltip** | "A tooltip box: dark panel, thin bronze rim, gold item name, cream description, a coloured stat line (green for good, red for bad)." |
@@ -93,7 +95,38 @@ Add **one** of these lines:
 | Menus, navigation | `Pixel Art UI Navigation Reference.png` |
 | Creature or taming screens | `Creature Taming UI Asset Reference.png` |
 | Overall style | `Fantasy Pixel UI Reference Poster.png` |
+| Every UI part (attached first) | `Voxel Fantasy Survival UI Suite.png`: Ronald's whole-game UI target (main menu, HUD, inventory, crafting, chests, taming, creatures, components) |
 | Tiny HUD icons at low resolution | `01 Reference UI pieces.png` (for icon construction only, not colours) |
+
+Decided by Ronald (2026-11-04): **always attach `Voxel Fantasy Survival UI Suite.png`** (`art.py ui` does). An A/B round with and without it came out the same for simple parts ("dont see any diff"); the sheet costs nothing and carries what words don't (corner bevels and rivets, the double line, tab icons, the hover glow). `--guide-only` (without it) is kept only for such comparisons.
+
+What a first round missed against his sheet, so say it in every frame prompt: thick bronze frames with a double line (an outer and an inner bronze line with a dark groove between), bevelled corner blocks with a rivet; slots lighter and warmer than the panel; title tabs in orange with an icon; a soft gold glow around the hovered part.
+
+### Yellow and gold only for state, never at rest (Ronald, 2026-11-04)
+
+Round 2 of the parts was "too yellow everywhere". The rule:
+- **At rest:** frames, slots, tabs and secondary buttons in the bronze and brown of the palette (`#89451e`–`#b35a26`, slots `#3b2e27`). Main buttons and the active title tab in the orange (`#e47c02`), a little desaturated and darker, never gold.
+- **Gold (`#ffdd20`–`#f3ab1f`) only for state:** hover, selected, the active toggle or tick.
+- **Bars:** red health, a muted orange stamina; no gold fills.
+- **Text:** cream (`#e4dacf`); gold text only for a name or heading, sparingly.
+- In prompts, ask for bronze and brown frames and say "no gold except where I name it". After cutting, `pxkit.tone()` pulls any leftover orange-yellow toward bronze (hue about 25 degrees, saturation x0.78, value x0.84); the states (`glow`) add the gold back where it belongs.
+
+### Text (decided 2026-11-04)
+
+Ronald found the smooth Alegreya "off and not well positioned". The text is now a **pixel font on the UI's own grid**:
+
+- **Faces (Ronald picked "A bold"):** PixelOperator Bold (CC0, his sheet's pick) for Latin, with Pixeloid Sans Bold (OFL; Reserved Font Name, so never call our bake "Pixeloid") for Cyrillic, in the same weight. Both are in `mods/base/source/ui/fonts/` with their licences. Minecraftia (paid for commercial use) and VCR OSD Mono (private use only) can't ship.
+- **One pixel:** one design pixel of the font is one font pixel, which is half a GUI pixel: the same pixel as the frames and the 32 px items. The engine already rounds text so a font pixel covers whole screen pixels. At GUI scale 2 and 4 everything lines up; at odd scales (3) a UI pixel is 1.5 screen pixels and text and frames can't both be exact.
+- **Baking:** `font_bake.py --pixel FONT.ttf --also CYRILLIC.ttf` finds the design size (the smallest size with no grey pixels), keeps glyphs black-and-white, puts the second font's glyphs on the first one's baseline, and writes `pixel = 1`, `line`, `sharp = true` into `default.font`.
+- **The line:** capitals plus the same room above them as below the baseline (descender + 1 pixel). PixelOperator: capitals 9, line 17. Text then sits centred in a button or tab with even padding.
+- **Placement:** text starts on whole UI pixels; centre by whole pixels (round the leftover down); buttons and tabs at least 4 UI pixels of padding left and right of the text, title tabs 6 plus the icon; a one-pixel shadow down-right in `#28180c`.
+- **Items in slots:** the 32 px icon centred in the slot on the pixel grid: 2 UI pixels inside the 36 px menu slot, 4 inside the HUD's 40 px hotbar slot (20 GUI px in the engine; its texture is made at 40, the selected frame at 44) (`icon = 16` in `slot.gui`), the same in the hotbar, inventory, chests, the pot and the rack. Every laid-out box's edges are rounded to the UI pixel (`Rect::snapped`, the font pixel), so centring never leaves half pixels.
+- **Stack counts:** bottom right of the icon, the digits' ink 2 UI pixels inside the icon's right and bottom edges, the shadow 1; cream `#f4ead8`, shadow `#28180c`. Hotbar numbers: capitals' top 3 pixels inside the slot's top-left corner, 3 from its left.
+- **Labels in buttons and tabs:** a one-line text's box is its ink (no lead-in, no spacing after the last letter, engine `text.rs`), centred by whole pixels, equal margins (one pixel more below or right where the leftover is odd), at least 4 UI pixels between the ink and the button's outer edge. Labels in panels left-aligned, 6 UI pixels (3 GUI) from the frame's inside.
+- **Grids:** slots touch (36 px apart, the slot's dark groove is the gap); panels and their groups spaced in whole GUI pixels.
+- **Measured, not eyeballed:** `mods/base/source/ui/placement_check.py SHOT.png --out marked.png` finds every slot and button in a shot at an even GUI scale and reports each item's offset (0,0 is right), each count's gap (2, 2) and each label's margins.
+- **Colors:** titles and labels on orange `#fff4dc`, body cream `#e4dacf`, names and headings gold `#f2da9a`, dim `#c6a383`.
+- **Never** draw letters in a generated part: the game writes all text.
 
 ### C) Checklist
 

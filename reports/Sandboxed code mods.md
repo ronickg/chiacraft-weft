@@ -90,16 +90,30 @@ nested callback skips the mod (it is busy) rather than re-entering the store.
    `init`, values by bytes of at most 256 in buckets of the SDK's `[u8; N]`, the mod's own
    only), `set-blocks`, sounds and particles; a component's imports are checked at load (this API
    only, no newer 1.x than the game's). One set of host bindings serves every 1.x, since 1.x only
-   adds and wasmtime matches 1.x by semver. Sample `tally`. Next, as 1.2: block and item
-   callbacks (`on_use`, `on_neighbor`), channels (with client halves), gizmos.
-4. *Client halves*: `code/client.wasm` in the same package, run in the player's game with
-   client calls only (HUD lines, screens built from the SDK's UI parts, keys, channels to its
-   server half), the same limits plus a frame budget. Downloaded on join like the rest.
-5. *Personal mods per world*: a player's own client-half packages (minimap, tweaks), installed by
-   them, never downloaded; each world's owner allows them or not (`world.txt`), and the join tells
-   the player which of theirs are off there.
-6. *Operations*: `/mods` (which run, their cost per tick, strikes, resume a stopped one),
-   ahead-of-time compiled components cached in the store, per-tick budgets across all mods.
+   adds and wasmtime matches 1.x by semver. Sample `tally`. API 1.2 (built): callbacks on
+   the package's own blocks (`on_use`, `on_neighbor`, `on_scheduled`, with `schedule`) and items
+   (`on_use`, with the slot so a later version can reach what the stack carries, for parts-based
+   items), and channels (`packet`, `send`). They are a second export, `content-hooks`, looked up
+   at run time: the game's own world (`host`) exports `hooks` only, so 1.0 and 1.1 components
+   still instantiate (checked with clans and tally). Sample `bell`. With 1.2 the mod UI ABI got
+   `at` (a part placed at a point of its parent), so Weft mods rebuilt once for both.
+4. *Client halves* (built): `code/client.wasm` in the same package, a component for the world
+   `client-mod` (in 1.2), run in each player's game: it reads what that game shows the player and
+   adds HUD elements, screens, keys, packets from its server half and frame hooks
+   (`crates/mod-sdk-client`, Weft's client names). A HUD element or screen is a list of parts
+   (Weft's UI parts as data) the game replays into its own UI, so mods draw with the UI redo's
+   kit; bindings may only read. Downloaded on join like the rest; the offer's API is the newer
+   half's. Sample: the bell's client half.
+5. *Personal mods per world* (built; Ronald: "Yes, as planned"): a player's own client halves
+   in `<run dir>/personal/<name>`, never downloaded; the world rule `packages:personal_mods` (off
+   by default, on Create World) allows them, and joining tells the player which are off. As they
+   must not change the content the join checks, they run through slots the `packages` mod
+   registers the same in every game: a HUD element per anchor, one screen, eight keys; their
+   lines are worded from their own `assets/lang`. Sample `examples/personal/clock`.
+6. *Operations* (`/mods` built): `/mods` lists the server halves in this world with their API,
+   calls, average and slowest time and strikes, and why one stopped; `/mods resume <package>`
+   (admins) starts it again. Not built: ahead-of-time compiled components cached in the store,
+   a per-tick budget across all mods, the same view for client halves.
 
 ## Decisions (agreed 2026-11-03)
 
@@ -129,7 +143,11 @@ Ronald took the recommendations ("Take its recommendations", through Planner):
   stopped required mod closes its world to joins and sends its players home, naming the mod. Not
   built yet.
 - c) `set-blocks` in 1.1 (built), and a call-cost benchmark before anything freezes 1.0
-  (`callcost`, built; numbers below once taken).
+  (`callcost`, built). First numbers (Ryzen 7 9800X3D, release): a command 0.6 to 0.9 µs, an
+  empty event batch 0.2 to 0.3 µs, 64 block changes to a mod that makes a component call for
+  each 14 µs: about 0.2 µs per crossing. Cheap enough for events and commands; a question asked
+  for every block of a big change would add up, which is why events come in batches and
+  `set-blocks` exists. Questions, chain steps and ticks still to measure.
 
 ## Checked against the Researcher's round 1 (W1-W4)
 

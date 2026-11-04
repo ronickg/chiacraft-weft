@@ -30,13 +30,16 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// says whether the package carries sandboxed code (chiacraft, phase 6). 7: a world refuses with a
 /// reason in the player's language (`ToClient::Refused`), and its status says what its admission
 /// rules ask (chiacraft, `admission`). 8: an offer says which mod API its code needs instead of
-/// only whether it has code (empty: no code; chiacraft, phase 6).
-const PROTOCOL: u32 = 8;
+/// only whether it has code (empty: no code; chiacraft, phase 6). 9: worlds send players their
+/// signed achievements (`ToClient::Achievement`; chiacraft, phase 4). 10: a world asks a joining
+/// game for an achievement its rules need (`AskAchievement`, `Proofs`; chiacraft, phase 4). 11: a
+/// world sends its issuer's revocation list (`ToClient::Revocations`; chiacraft, phase 4).
+const PROTOCOL: u32 = 11;
 const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its
 /// signature envelope (empty if unsigned), and the mod API its sandboxed code
-/// (`code/server.wasm`) needs, as `1.1` (empty: no code). The joining game refuses an API it
+/// (`code/server.wasm`, `code/client.wasm`) needs, as `1.1` (empty: no code). The joining game refuses an API it
 /// doesn't run before downloading, and checks there is code exactly when the manifest says so.
 pub type Offer = (String, String, String, u64, String, String);
 
@@ -346,6 +349,29 @@ pub fn warmed(key: &str) -> Option<Status> {
         .map(|(s, _)| s.clone())
 }
 
+/// Asks the DID sponsor `sponsor` (its endpoint id) through the player's own endpoint: `request`
+/// as given, or its status when `None`. Blocks (call it from a thread of its own): the answer's
+/// status and body, or why nobody answered.
+pub fn ask_sponsor(
+    settings: &Settings,
+    sponsor: &str,
+    request: Option<&chiacraft_wallet::sponsor::Request>,
+) -> Result<(u16, String), String> {
+    let id: EndpointId = sponsor
+        .trim()
+        .parse()
+        .map_err(|_| format!("'{sponsor}' isn't a sponsor's address"))?;
+    let settings = settings.clone();
+    let request = request.cloned();
+    runtime().block_on(async move {
+        let ep = account(&settings).await?;
+        match &request {
+            Some(r) => chiacraft_sponsor::client::ask(&ep, id, r).await,
+            None => chiacraft_sponsor::client::status(&ep, id).await,
+        }
+    })
+}
+
 /// Opens the player's endpoint in the background: link requests can reach this game from now on.
 pub fn start_account(settings: &Settings) {
     let settings = settings.clone();
@@ -585,7 +611,7 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
                     serve_status(conn, world, &hw).await;
                 } else if conn.alpn() == BANS_ALPN {
                     serve_bans(conn, hw.dir.clone()).await;
-                } else if let Err(e) = accept(conn, connect, world, &key).await {
+                } else if let Err(e) = accept(conn, connect, world, &key, hw.dir.clone()).await {
                     log::warn!("incoming player: {e}");
                 }
             });
@@ -610,6 +636,9 @@ pub struct Status {
     /// What its admission rules ask, as lang keys with a number (`admission::summary`); empty:
     /// open to all, or a world from before protocol 6.
     pub admission: Vec<(String, i64)>,
+    /// Its DID and the owner's DID it names (launcher ids, hex), as the world says: a visitor
+    /// checks both ways on chain (`world_did::check`).
+    pub did: Option<(String, String)>,
 }
 
 async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::content::Content, hw: &HostWorld) {
@@ -625,10 +654,18 @@ async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::c
         .as_deref()
         .map(|d| crate::admission::summary(&crate::admission::load_rules(d)))
         .unwrap_or_default();
+    // Its DID and the owner's it names (phase 4), when it has one.
+    let did = hw
+        .dir
+        .as_deref()
+        .and_then(crate::chiacraft::worlds::world_did::load)
+        .map(|d| (d.launcher, d.owner))
+        .unwrap_or_default();
     let mut w = codec::W::default();
     codec::Wire::put(&answer, &mut w);
     // After the rest, so a game from before protocol 6 still reads the start.
     codec::Wire::put(&admission, &mut w);
+    codec::Wire::put(&did, &mut w);
     if write_frame(&mut send, &w.0).await.is_ok() {
         let _ = send.finish();
         // Wait for the asker to read it and close.
@@ -662,6 +699,9 @@ async fn status_on(ep: &Endpoint, addr: EndpointAddr, wait: Duration) -> Result<
         // Only keys this game knows, so a world can't make a list say anything.
         admission.retain(|(k, _)| k.starts_with("admission.summary."));
         admission.truncate(8);
+        let (did, owner_did) = <(String, String) as codec::Wire>::get(&mut r).unwrap_or_default();
+        let hex64 = |s: &str| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit());
+        let did = (hex64(&did) && hex64(&owner_did)).then_some((did, owner_did));
         // The certificate must be for the key that answered, and the inbox the owner's.
         let owner = crate::world_address::WorldCert::parse(&cert)
             .ok()
@@ -683,6 +723,7 @@ async fn status_on(ep: &Endpoint, addr: EndpointAddr, wait: Duration) -> Result<
             package_bytes,
             inbox,
             admission,
+            did,
         })
     })
     .await
@@ -776,11 +817,14 @@ async fn fetch_lists(dir: &std::path::Path) {
                         st.owner
                     }
                     Ok(_) => {
-                        log::info!("ban list from {}: that world's certificate doesn't check out", &key[..12.min(key.len())]);
+                        log::info!(
+                            "ban list from {}: that world's certificate doesn't check out",
+                            key.chars().take(12).collect::<String>()
+                        );
                         continue;
                     }
                     Err(e) => {
-                        log::info!("ban list from {}: {e}", &key[..12.min(key.len())]);
+                        log::info!("ban list from {}: {e}", key.chars().take(12).collect::<String>());
                         continue;
                     }
                 }
@@ -798,7 +842,11 @@ async fn fetch_lists(dir: &std::path::Path) {
                     }
                     break;
                 }
-                Err(e) => log::info!("ban list of {} from {}: {e}", &maintainer[..12.min(maintainer.len())], &key[..12.min(key.len())]),
+                Err(e) => log::info!(
+                    "ban list of {} from {}: {e}",
+                    maintainer.chars().take(12).collect::<String>(),
+                    key.chars().take(12).collect::<String>()
+                ),
             }
         }
     }
@@ -823,9 +871,21 @@ async fn accept(
     connect: crossbeam_channel::Sender<ServerConn>,
     world: &'static crate::content::Content,
     me: &str,
+    dir: Option<std::path::PathBuf>,
 ) -> Result<(), String> {
     use crate::content::with;
     let peer = conn.remote_id();
+    // Banned (chiacraft, `admission`): turned away at the door, before anything is served.
+    let banned = match dir {
+        Some(d) => {
+            let key = peer.to_string();
+            tokio::task::spawn_blocking(move || crate::admission::at_the_door(&d, &key))
+                .await
+                .ok()
+                .flatten()
+        }
+        None => None,
+    };
     let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi())
         .await
         .map_err(|_| "no hello")?
@@ -846,7 +906,10 @@ async fn accept(
     let offers = with(world, crate::modloader::current_packages);
     // Joins still configuring hold a place until this goes out of scope.
     let place = Configuring::take();
-    let refusal = if place.is_none() {
+    let refusal = if let Some(why) = &banned {
+        log::info!("{peer} is not let in at the door: {}", why.key);
+        crate::admission::refusal_text(why)
+    } else if place.is_none() {
         "the world is busy with other players joining; try again in a minute".to_string()
     } else if proto != PROTOCOL {
         format!("protocol mismatch: server {PROTOCOL}, client {proto}")
@@ -1130,7 +1193,7 @@ async fn download(
         if manifest
             .files
             .iter()
-            .any(|f| f.path == chiacraft_packages::identity::SERVER_CODE)
+            .any(|f| chiacraft_packages::identity::is_code(&f.path))
             != !code.is_empty()
         {
             return Err(format!("package {id}: the host didn't say truly whether it carries code"));

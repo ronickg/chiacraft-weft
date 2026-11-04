@@ -43,8 +43,7 @@ pub fn register(r: &mut Registry) {
         .recipes(&crate::recipes::SMELTING)
         .attach(&SMELTING)
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0).stretch(), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.column(S::col().gap(2.0), |ui| {
@@ -84,8 +83,7 @@ pub fn register(r: &mut Registry) {
         })
         .group("chest", Slots::chest(3))
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0), &[], |ui| {
                 ui.group("chest");
                 ui.player_inventory(true);
             });
@@ -96,11 +94,26 @@ fn ratio(a: u32, b: u32) -> f32 {
     if b == 0 { 0.0 } else { a as f32 / b as f32 }
 }
 
-/// Items the output slot still takes of `out`, as whole results.
+/// A furnace's result, stamped as food fresh off the fire: made today and hot (`survival/food.rs`
+/// ages it from there); anything else as it is.
+fn cooked(w: &World, out: ItemStack) -> ItemStack {
+    let Some(f) = vitals::food::find(item_name(out.item)).map(|f| &vitals::food::FOODS[f]) else { return out };
+    let now = w.day_time();
+    let made = out.with(&base_api::MADE, (now / vitals::calendar::DAY_TICKS) as u32 + 1);
+    if f.meal == vitals::food::Meal::Cooked {
+        made.with(&base_api::HOT, (now / 20) as u32)
+            .with(&base_api::FRESHNESS, base_api::freshness::HOT)
+    } else {
+        made
+    }
+}
+
+/// Items the output slot still takes of `out`, as whole results (by item: what's there keeps its
+/// stamps).
 fn room_for(output: ItemStack, out: ItemStack) -> u32 {
     let room = if output.is_empty() {
         max_stack(out.item)
-    } else if output.stacks_with(&out) {
+    } else if output.item == out.item {
         max_stack(out.item).saturating_sub(output.count)
     } else {
         0
@@ -145,8 +158,10 @@ fn catch_up(w: &World, id: u64, s: &mut Smelting, ticks: u32) {
         s.cook = (total % s.cook_max as u64) as u32;
         if done > 0 {
             input_slot.set(0, input.shrink(done));
-            output_slot
-                .set(0, if output.is_empty() { ItemStack { count: out.count * done, ..out } } else { output.grow(out.count * done) });
+            output_slot.set(
+                0,
+                if output.is_empty() { cooked(w, ItemStack { count: out.count * done, ..out }) } else { output.grow(out.count * done) },
+            );
             for _ in 0..done {
                 w.emit(&SMELTED, Smelted { furnace: id, input: input.item, output: out });
             }
@@ -188,7 +203,7 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
             .then(|| recipe_process(&crate::recipes::SMELTING, input.item))
             .flatten();
         let fits = recipe
-            .is_some_and(|(out, _)| output.is_empty() || (output.stacks_with(&out) && output.count + out.count <= max_stack(out.item)));
+            .is_some_and(|(out, _)| output.is_empty() || (output.item == out.item && output.count + out.count <= max_stack(out.item)));
         if s.burn == 0 && fits {
             if let Some(ticks) = FUEL.on_item(fuel.item).filter(|_| !fuel.is_empty()) {
                 s.burn = ticks;
@@ -205,7 +220,8 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
                 s.cook = 0;
                 // The last one leaves its remainder: a water bucket boiled to salt, the bucket.
                 input_slot.set(0, use_one(input));
-                let merged = if output.is_empty() { out } else { output.grow(out.count) };
+                // Into a slot already holding some, it takes the stamps there (`cooked`).
+                let merged = if output.is_empty() { cooked(&w, out) } else { output.grow(out.count) };
                 output_slot.set(0, merged);
                 w.emit(&SMELTED, Smelted { furnace: id, input: input.item, output: out });
             }

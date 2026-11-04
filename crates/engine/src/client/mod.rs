@@ -305,6 +305,11 @@ pub struct Client {
     shadow_bufs: Vec<BufferId>,
     shadow: (glam::Mat4, bool),
     shadow_index: u32,
+    /// The far cascade: map, light, scene buffers and bindless index, as the near one's.
+    shadow_far_map: Option<weft_render::TextureId>,
+    shadow_far: (glam::Mat4, bool),
+    shadow_far_bufs: Vec<BufferId>,
+    shadow_far_index: u32,
     pub target: Option<Hit>,
     pub target_entity: Option<u64>,
     pub selected: usize,
@@ -411,6 +416,11 @@ pub struct Client {
     /// particles, then cracks, gizmo fills and the hand.
     late: CommandList,
     hand_late: CommandList,
+    /// The world's copy for what is seen through (`gpu_layout::Scene::behind`), set by the app each
+    /// frame; and with it on, what is drawn after the opaque world goes into `late_out` for the app
+    /// to put after the copy instead of into the frame's list.
+    pub behind: [f32; 4],
+    pub late_out: CommandList,
     /// Seconds until the next dust piece from the block being hit, and until its next knock.
     hit_dust: f32,
     hit_sound: f32,
@@ -434,6 +444,8 @@ pub struct Client {
     snow_cover: f32,
     snowing: f32,
     dust: f32,
+    /// How strong an aurora is where the player is (a mod's air, `air_flags::AURORA_SHIFT`).
+    aurora: f32,
     frame_dt: f32,
     /// Seconds left of a lightning's flash.
     lightning: f32,
@@ -562,6 +574,7 @@ impl Client {
         let did = chiacraft_account::current()
             .and_then(|s| s.did_proof())
             .unwrap_or_default();
+        log::info!("joining as '{name}'");
         conn.send(ToServer::Join { name: name.to_string(), key: key.to_string(), account, did });
         conn.send(ToServer::View(view_radius as u32));
         if let Some(png) = skin {
@@ -629,6 +642,10 @@ impl Client {
             shadow_bufs: Vec::new(),
             shadow: (glam::Mat4::IDENTITY, false),
             shadow_index: 0,
+            shadow_far_map: None,
+            shadow_far: (glam::Mat4::IDENTITY, false),
+            shadow_far_bufs: Vec::new(),
+            shadow_far_index: 0,
             target: None,
             target_entity: None,
             selected: 0,
@@ -663,6 +680,8 @@ impl Client {
             self_look: None,
             late: CommandList::default(),
             hand_late: CommandList::default(),
+            behind: [0.0; 4],
+            late_out: CommandList::default(),
             hit_dust: 0.0,
             hit_sound: 0.0,
             sounds: Vec::new(),
@@ -712,6 +731,7 @@ impl Client {
             snow_cover: 0.0,
             snowing: 0.0,
             dust: 0.0,
+            aurora: 0.0,
             lightning: 0.0,
             using: None,
             burning: false,
@@ -1417,6 +1437,9 @@ impl Client {
         let reach = self.view_radius + 3;
         if self.render.set_tint_tiles(gpu, (reach * 2 + 1) as u32) {
             self.world.retint_all();
+        }
+        if std::mem::take(&mut self.world.tints_changed) {
+            self.render.set_biome_table(gpu, self.world.biome_tints());
         }
         for (col, tints) in self
             .world
@@ -2141,6 +2164,12 @@ impl Client {
         if let Some(t) = self.shadow_map.take() {
             gpu.destroy_texture(t);
         }
+        if let Some(t) = self.shadow_far_map.take() {
+            gpu.destroy_texture(t);
+        }
+        for b in self.shadow_far_bufs.drain(..) {
+            gpu.destroy_buffer(b);
+        }
         for b in self.shadow_bufs.drain(..) {
             gpu.destroy_buffer(b);
         }
@@ -2180,6 +2209,8 @@ impl Client {
         let on = |f: u32| if flags & f != 0 { 1.0 } else { 0.0 };
         self.snowing += (on(weft_abi::air_flags::SNOWING) - self.snowing).clamp(-dt / 5.0, dt / 5.0);
         self.dust += (on(weft_abi::air_flags::DUST) - self.dust).clamp(-dt / 5.0, dt / 5.0);
+        let aurora = ((flags >> weft_abi::air_flags::AURORA_SHIFT) & 255) as f32 / 255.0;
+        self.aurora += (aurora - self.aurora).clamp(-dt / 20.0, dt / 20.0);
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
@@ -2235,9 +2266,17 @@ impl Client {
             light: [content().dims[self.world.dim as usize].ambient as f32 / 15.0, self.brightness, ticks, 0.0],
             sun: self.sun(),
             weather: [self.wind.x, self.wind.y, self.fog, self.thunder],
-            eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, 0.0],
-            ground: [self.snow_cover, self.snowing, self.dust, 0.0],
+            eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, self.moon_light()],
+            ground: [self.snow_cover, self.snowing, self.dust, self.aurora],
+            behind: self.behind,
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
+            shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
+            shadow_far: match self.shadow_far_map {
+                Some(_) if self.shadow_far.1 => {
+                    [self.shadow_far_index as f32, SHADOW_SIZE as f32, 1.0, 2.0 * FAR_REACH / SHADOW_SIZE as f32]
+                }
+                _ => [0.0; 4],
+            },
             shadow: match self.shadow_map {
                 Some(t) if self.shadow.1 => [self.shadow_index(t) as f32, SHADOW_SIZE as f32, 1.0, 2.0 * SHADOW_REACH / SHADOW_SIZE as f32],
                 _ => [0.0; 4],
@@ -2257,18 +2296,32 @@ impl Client {
         [v.x, v.y, v.z, v.y.max(0.0)]
     }
 
+    /// The moon's light by its phase, 1 full to 0 new: vanilla's eight phases, one a day, the one
+    /// the sky's moon picture shows (`sky.rs`).
+    fn moon_light(&self) -> f32 {
+        let d = &content().dims[self.world.dim as usize];
+        let day = if d.day_length != 0 { d.day_length as f64 } else { 24000.0 };
+        let phase = (self.smooth_time() / day).floor().rem_euclid(8.0);
+        (0.5 + 0.5 * (phase * std::f64::consts::TAU / 8.0).cos()) as f32
+    }
+
     /// The shadow map's bindless index (set when it was made).
     fn shadow_index(&self, _t: weft_render::TextureId) -> u32 {
         self.shadow_index
     }
 
-    /// Sun shadows, before the world's pass (`sun_shadows` packs): the terrain drawn from the sun,
-    /// or the moon once it has set, into the shadow map, an orthographic box `SHADOW_REACH`
-    /// blocks to each side of the camera along the light, moved in whole texels so its edges do
-    /// not crawl as the camera moves.
-    pub fn render_shadows(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo) {
+    /// Sun shadows (`sun_shadows` packs), first their light, before the world is drawn (its scene
+    /// samples the map with it): from the sun, or the moon once it has set, an orthographic box
+    /// `SHADOW_REACH` blocks to each side of the camera along the light, moved in whole texels so
+    /// its edges do not crawl as the camera moves. `render_shadows` then draws the map.
+    pub fn prepare_shadows(&mut self, gpu: &mut dyn Backend) {
         self.shadow.1 = false;
-        if !self.render.has_shadows() || !content().dims[self.world.dim as usize].sky_light {
+        self.shadow_far.1 = false;
+        // `--no-shadows`: a benchmark leaving the shadow map out.
+        if !self.render.has_shadows()
+            || !content().dims[self.world.dim as usize].sky_light
+            || crate::app::api::launch_options().contains_key("no-shadows")
+        {
             return;
         }
         let sun = self.sun();
@@ -2277,54 +2330,39 @@ impl Client {
         if dir.y < 0.02 {
             return;
         }
-        let map = match self.shadow_map {
-            Some(t) => t,
-            None => {
-                let t = gpu.create_texture(
-                    &weft_render::TextureDesc {
-                        width: SHADOW_SIZE,
-                        height: SHADOW_SIZE,
-                        mips: 1,
-                        format: weft_render::Format::Depth32,
-                        render_target: true,
-                    },
-                    "shadow map",
-                );
-                self.shadow_index = gpu.texture_index(t);
-                self.shadow_map = Some(t);
-                t
-            }
+        let map = |gpu: &mut dyn Backend, label: &str| {
+            gpu.create_texture(
+                &weft_render::TextureDesc {
+                    width: SHADOW_SIZE,
+                    height: SHADOW_SIZE,
+                    mips: 1,
+                    format: weft_render::Format::Depth32,
+                    render_target: true,
+                },
+                label,
+            )
         };
+        if self.shadow_map.is_none() {
+            let t = map(gpu, "shadow map");
+            self.shadow_index = gpu.texture_index(t);
+            self.shadow_map = Some(t);
+        }
+        if self.shadow_far_map.is_none() {
+            let t = map(gpu, "far shadow map");
+            self.shadow_far_index = gpu.texture_index(t);
+            self.shadow_far_map = Some(t);
+        }
         let cam = self.render_camera();
-        let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
-        // Looking from the light's side of the camera toward it (right-handed, -z forward).
-        let eye = dir * SHADOW_DEPTH * 0.5;
-        let f = -dir;
-        let s = f.cross(up).normalize();
-        let u = s.cross(f);
-        let view = glam::Mat4::from_cols(
-            glam::Vec4::new(s.x, u.x, -f.x, 0.0),
-            glam::Vec4::new(s.y, u.y, -f.y, 0.0),
-            glam::Vec4::new(s.z, u.z, -f.z, 0.0),
-            glam::Vec4::new(-s.dot(eye), -u.dot(eye), f.dot(eye), 1.0),
-        );
-        // The camera's place across the light, in whole texels of the world (doubles: far from
-        // the world's origin a float would lose them).
-        let texel = 2.0 * SHADOW_REACH as f64 / SHADOW_SIZE as f64;
-        let right = view.row(0).truncate().as_dvec3();
-        let upward = view.row(1).truncate().as_dvec3();
-        let across = glam::DVec2::new(cam.pos.dot(right), cam.pos.dot(upward));
-        let off = (across - (across / texel).floor() * texel).as_vec2();
-        // x and y over the box (moved back by the camera's part of a texel), z reverse depth:
-        // 1 nearest the light, 0 `SHADOW_DEPTH` along it.
-        let (r, d) = (SHADOW_REACH, SHADOW_DEPTH);
-        let proj = glam::Mat4::from_cols(
-            glam::Vec4::new(1.0 / r, 0.0, 0.0, 0.0),
-            glam::Vec4::new(0.0, 1.0 / r, 0.0, 0.0),
-            glam::Vec4::new(0.0, 0.0, 1.0 / d, 0.0),
-            glam::Vec4::new(off.x / r, off.y / r, 1.0, 1.0),
-        );
-        let light = proj * view;
+        self.shadow = (light_box(dir, cam.pos, SHADOW_REACH, SHADOW_DEPTH), true);
+        self.shadow_far = (light_box(dir, cam.pos, FAR_REACH, FAR_DEPTH), true);
+    }
+
+    /// The sun's shadow map, after `render` posed this frame's models (the pass is put before the
+    /// world's in the frame's list): the terrain and the models, the player's own body too.
+    pub fn render_shadows(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo) {
+        let (light, true) = self.shadow else { return };
+        let Some(map) = self.shadow_map else { return };
+        let cam = self.render_camera();
         while self.shadow_bufs.len() < gpu.frames_in_flight() {
             self.shadow_bufs.push(gpu.create_buffer(
                 size_of::<Scene>() as u64,
@@ -2334,12 +2372,32 @@ impl Client {
         }
         let mut scene = self.scene(&cam, frame);
         scene.view_proj = light.to_cols_array_2d();
+        // The map is the pass's target: nothing in it may sample it.
+        scene.shadow = [0.0; 4];
         let buf = self.shadow_bufs[frame.slot];
         gpu.mapped(buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((map, Some(0.0))) });
-        self.render.draw_shadow(gpu, list, frame, &cam, light, buf);
+        self.render
+            .draw_shadow(gpu, list, frame, &cam, light, buf, 0);
+        self.entity_render.draw_shadow(gpu, list, frame, buf);
         list.push(weft_render::Cmd::EndPass);
-        self.shadow = (light, true);
+        // The far cascade: the terrain alone, coarser, to where hills stand far off.
+        let (Some(far_map), (far, true)) = (self.shadow_far_map, self.shadow_far) else { return };
+        while self.shadow_far_bufs.len() < gpu.frames_in_flight() {
+            self.shadow_far_bufs.push(gpu.create_buffer(
+                size_of::<Scene>() as u64,
+                weft_render::usage::STORAGE | weft_render::usage::HOST,
+                "far shadow scene",
+            ));
+        }
+        scene.view_proj = far.to_cols_array_2d();
+        scene.shadow_far = [0.0; 4];
+        let far_buf = self.shadow_far_bufs[frame.slot];
+        gpu.mapped(far_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
+        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((far_map, Some(0.0))) });
+        self.render
+            .draw_shadow(gpu, list, frame, &cam, far, far_buf, 1);
+        list.push(weft_render::Cmd::EndPass);
     }
 
     pub fn render(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, textures: &GameTextures) {
@@ -2406,10 +2464,14 @@ impl Client {
             self.eye_liquid().is_some(),
             self.rain,
             self.thunder,
+            self.wind,
+            self.frame_dt,
             &overlays,
         );
         self.render.draw_translucent(&mut late);
         let me = (self.view != 0 && !self.dead && self.mode != GameMode::Spectator).then(|| self.self_entity());
+        // In first person the player's body is not drawn, but casts its shadow.
+        let shadow_me = (self.shadow.1 && self.view == 0 && !self.dead && self.mode != GameMode::Spectator).then(|| self.self_entity());
         let hand = (self.view == 0 && !self.dead && self.player.lying.is_none() && self.mode != GameMode::Spectator && !self.hide_gui)
             .then(|| entity_render::Hand {
                 stack: self.hand_stack,
@@ -2440,6 +2502,7 @@ impl Client {
             &cam,
             &self.entities,
             me.as_ref(),
+            shadow_me.as_ref(),
             hand,
             textures,
             &light,
@@ -2458,8 +2521,15 @@ impl Client {
         self.weather_render
             .draw(gpu, &mut late, frame, &cam, scene_buf, &self.world, self.rain, ticks, self.frame_dt);
         self.sky.draw_overlay(&mut hand_late, scene_buf);
-        list.append(&mut late);
-        list.append(&mut hand_late);
+        if self.behind[2] > 0.5 {
+            // After the copy of the world (the app puts it there).
+            self.late_out.clear();
+            self.late_out.append(&mut late);
+            self.late_out.append(&mut hand_late);
+        } else {
+            list.append(&mut late);
+            list.append(&mut hand_late);
+        }
         (self.late, self.hand_late) = (late, hand_late);
         list.push(weft_render::Cmd::Mark);
     }
@@ -2480,6 +2550,41 @@ impl Client {
 /// The sun's shadow map: texels a side, blocks it reaches to each side of the camera, and the
 /// depth of its box along the light (half of it on the sun's side of the camera).
 const SHADOW_SIZE: u32 = 2048;
+/// The far cascade's reach and depth (blocks): hills a few hundred blocks off have shadows too.
+const FAR_REACH: f32 = 400.0;
+const FAR_DEPTH: f32 = 1200.0;
+
+/// From camera-relative positions to an orthographic box along the light `dir` (toward it), `reach`
+/// blocks to each side of the camera and `depth` deep (reverse depth: 1 nearest the light), moved in
+/// whole texels of the world so its edges do not crawl as the camera moves.
+fn light_box(dir: Vec3, cam: glam::DVec3, reach: f32, depth: f32) -> glam::Mat4 {
+    let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+    // Looking from the light's side of the camera toward it (right-handed, -z forward).
+    let eye = dir * depth * 0.5;
+    let f = -dir;
+    let s = f.cross(up).normalize();
+    let u = s.cross(f);
+    let view = glam::Mat4::from_cols(
+        glam::Vec4::new(s.x, u.x, -f.x, 0.0),
+        glam::Vec4::new(s.y, u.y, -f.y, 0.0),
+        glam::Vec4::new(s.z, u.z, -f.z, 0.0),
+        glam::Vec4::new(-s.dot(eye), -u.dot(eye), f.dot(eye), 1.0),
+    );
+    // The camera's place across the light, in whole texels of the world (doubles: far from the
+    // world's origin a float would lose them).
+    let texel = 2.0 * reach as f64 / SHADOW_SIZE as f64;
+    let right = view.row(0).truncate().as_dvec3();
+    let upward = view.row(1).truncate().as_dvec3();
+    let across = glam::DVec2::new(cam.dot(right), cam.dot(upward));
+    let off = (across - (across / texel).floor() * texel).as_vec2();
+    let proj = glam::Mat4::from_cols(
+        glam::Vec4::new(1.0 / reach, 0.0, 0.0, 0.0),
+        glam::Vec4::new(0.0, 1.0 / reach, 0.0, 0.0),
+        glam::Vec4::new(0.0, 0.0, 1.0 / depth, 0.0),
+        glam::Vec4::new(off.x / reach, off.y / reach, 1.0, 1.0),
+    );
+    proj * view
+}
 const SHADOW_REACH: f32 = 80.0;
 const SHADOW_DEPTH: f32 = 400.0;
 

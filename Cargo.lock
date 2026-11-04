@@ -159,6 +159,7 @@ version = "0.1.0"
 dependencies = [
  "animals_core",
  "base_api",
+ "chiacraft-bridge",
  "serde",
  "serde_json",
  "vitals",
@@ -1335,9 +1336,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "chiacraft-mod-sdk"
-version = "1.1.0"
+name = "chiacraft-bridge"
+version = "26.10.4"
 dependencies = [
+ "weft_abi",
+]
+
+[[package]]
+name = "chiacraft-mod-common"
+version = "1.2.0"
+
+[[package]]
+name = "chiacraft-mod-sdk"
+version = "1.3.0"
+dependencies = [
+ "chiacraft-mod-common",
+ "weft_abi",
+ "wit-bindgen",
+]
+
+[[package]]
+name = "chiacraft-mod-sdk-client"
+version = "1.2.0"
+dependencies = [
+ "chiacraft-mod-common",
+ "weft_abi",
  "wit-bindgen",
 ]
 
@@ -1348,7 +1371,7 @@ dependencies = [
  "blake3",
  "serde",
  "toml 1.1.8+spec-1.1.0",
- "wasmparser 0.239.0",
+ "wasmparser 0.236.1",
 ]
 
 [[package]]
@@ -1359,6 +1382,24 @@ dependencies = [
  "chiacraft-packages",
  "wasmtime",
  "wit-component 0.239.0",
+]
+
+[[package]]
+name = "chiacraft-sponsor"
+version = "0.1.0"
+dependencies = [
+ "chia-protocol",
+ "chia-puzzle-types",
+ "chia-sdk-driver",
+ "chia-sdk-types",
+ "chiacraft-wallet",
+ "iroh",
+ "log",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tokio",
+ "toml 1.1.8+spec-1.1.0",
 ]
 
 [[package]]
@@ -5200,6 +5241,7 @@ dependencies = [
 name = "packages"
 version = "0.1.0"
 dependencies = [
+ "chiacraft-bridge",
  "chiacraft-packages",
  "chiacraft-sandbox",
  "weft_sdk",
@@ -5468,6 +5510,7 @@ dependencies = [
 name = "portals"
 version = "0.1.0"
 dependencies = [
+ "chiacraft-bridge",
  "weft_sdk",
 ]
 
@@ -8354,6 +8397,7 @@ dependencies = [
  "bytemuck",
  "chiacraft-account",
  "chiacraft-packages",
+ "chiacraft-sponsor",
  "chiacraft-wallet",
  "crossbeam-channel",
  "glam 0.34.1",

@@ -18,7 +18,7 @@ Written from `mods/base/vitals` (`cargo run -p vitals --bin sheet > mods/base/vi
 
 Comfortable air for a person, unclothed: (15.0, 28.0) °C.
 
-A new player arrives with base:bread and base:apple in the stomach (43 units): max health 54 and stamina 75 of 100, wearing off as it digests (an empty stomach: 40).
+A new player arrives with base:bread and base:apple in the stomach (43 units): max health 54 and stamina 75 of 100, wearing off as it digests (an empty stomach: 40). A new world begins on spring's day 8, a quarter of the year from midwinter.
 
 ## Foods
 
@@ -55,6 +55,9 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:hazelnut | seeds | 30 | 3 | 4 | 5 | 18 | 3 | 2 | 10 min | 60 + 60 |  |
 | base:pine_nut | seeds | 30 | 3 | 4 | 4 | 21 | 1 | 1 | 11 min | 60 + 60 |  |
 | base:sunflower_seeds | seeds | 30 | 3 | 6 | 6 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
+| base:kelp | water_plants | 50 | 5 | 1 | 5 | 0 | 1 | 41 | 3 min | 3 + 3 |  |
+| base:cattail_root | roots | 100 | 10 | 1 | 17 | 0 | 3 | 78 | 6 min | 14 + 14 |  |
+| base:cooked_wild_rice | seeds | 150 | 15 | 6 | 32 | 0 | 3 | 111 | 12 min | 3 + 3 | hot when cooked |
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
 | animals:venison | meat | 200 | 20 | 44 | 0 | 5 | 0 | 147 | 27 min | 2 + 2 | raw |
@@ -69,7 +72,7 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 
 ## Meals and preserving
 
-A stew (`vitals::meals`) cooks 2-4 foods in 10 s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x1.25 (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient.
+A stew (`vitals::meals`) cooks 2-4 foods in 10 s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x1.25 (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient. A campfire cooks what a furnace cooks of food, x1.5 the time, with no fuel. Nothing is made of spoiled food, and what is made of stale food starts as far through its own life as its stalest part.
 
 Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (25 °C, humidity 0.3, a breeze; nothing below 5 °C or above humidity 0.85, nor in the rain), and smokes in 10 min over a fire (lava, a lit furnace) within 2 blocks below, in any weather; salting is crafted with salt, boiled out of a water bucket in a furnace in 20 s.
 
@@ -81,19 +84,58 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | base:chicken (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | base:mutton (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | base:berries (12) | base:dried_berries | - | - | 112 |
+| base:lingonberries (40) | base:dried_berries | - | - | 112 |
+| base:cloudberries (6) | base:dried_berries | - | - | 112 |
+| base:crowberries (20) | base:dried_berries | - | - | 112 |
+| base:raspberries (4) | base:dried_berries | - | - | 112 |
+| base:prickly_pear_fruit (14) | base:dried_berries | - | - | 112 |
 | animals:venison (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | animals:hare (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| animals:trout (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| animals:pacu (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 
 ## Clothing
 
-Worn in four slots of their own under armor (hat, coat, trousers, boots), no armor value. A full set's real insulation in clo at 12 °C of comfort each; a piece gives its share ([0.15, 0.4, 0.3, 0.15], head to feet). Wet, armor keeps 35% of its warmth; being wet itself feels 6 °C colder. What each piece takes: hat 2 + 1 string, coat 4 + 2 string, trousers 3 + 1 string, boots 2 + 1 string.
+Worn in four slots of their own under armor (hat, coat, trousers, boots), no armor value; armor and clothes stack, and leather armor is hide. A full set's real insulation in clo at 12 °C of comfort each; a piece gives its share ([0.15, 0.4, 0.3, 0.15], head to feet). Wet, armor keeps 35% of its warmth; being wet itself feels 6 °C colder. Each piece is sewn with [1, 2, 1, 1] string, a string is 2 plant fibre. A new player arrives in linen hat, wool coat, hide trousers, hide boots.
 
-| material | clo | cold °C | heat °C | kept wet | windproof | from |
+| material | clo | cold °C | heat °C | kept wet | windproof | pieces to make | from |
+|---|---|---|---|---|---|---|---|
+| fur | 2.5 | 30 | -9 | 30% | 80% | [2, 4, 3, 2] | pelts of furred wild animals |
+| wool | 1.2 | 14 | -2 | 60% | 30% | [1, 2, 1, 1] | sheep's wool |
+| hide | 0.8 | 10 | -1 | 30% | 70% | [1, 2, 1, 1] | leather |
+| linen | 0.5 | 6 | 4 | 20% | 10% | [2, 4, 3, 2] | plant fibre spun and woven |
+
+Cloaks, in a slot of their own over clothes and armor (covering 60% of the body against the wind):
+
+| cloak | cold °C | heat °C | kept wet | windproof | keeps the rain off | from |
 |---|---|---|---|---|---|---|
-| fur | 2.5 | 30 | -9 | 30% | 80% | pelts of furred wild animals |
-| wool | 1.2 | 14 | -2 | 60% | 30% | sheep's wool |
-| hide | 0.8 | 10 | -1 | 30% | 70% | leather |
-| linen | 0.5 | 6 | 4 | 20% | 10% | plant fibre spun and woven |
+| wool_cloak | 4 | -1 | 60% | 30% | no | sheep's wool |
+| fur_robe | 8 | -3 | 30% | 60% | no | pelts |
+| rain_cape | 1 | 0 | 100% | 50% | yes | leather |
+
+## Rooms
+
+An enclosed space (`vitals::shelter`; up to 400 blocks of air, none open to the sky) shuts out the wind, lets in its walls' share of the day's swing, and keeps 2 °C over the air outside empty, or a fire's gain by its walls with a fire in it (full up to 60 blocks of air, at least 40% in a bigger room; never less than the fire gives beside it).
+
+| wall | a fire in the room | the day's swing let in |
+|---|---|---|
+| log | +25 °C | 40% |
+| earth | +25 °C | 15% |
+| snow | +25 °C | 90% |
+| plank | +16 °C | 60% |
+| stone | +16 °C | 15% |
+| hide | +12 °C | 90% |
+| glass | +12 °C | 90% |
+
+## Crafts that wait
+
+What takes days in real life takes its time on the growing pace (`vitals::crafts`; game days = 0.0645 · real days^0.7), at a station that keeps working unwatched.
+
+| station | in | with | out | real days | in the game | holds |
+|---|---|---|---|---|---|---|
+| tanning_frame | #hides | - | base:leather | 3 | 2.8 min | 1 |
+| tanning_pit | #hides | #bark_tannin | base:sole_leather | 365 | 4.0 game days | 8 |
+| charcoal_clamp | #logs | - | base:coal | 7 | 5.0 min | 16 |
 
 ## Effects
 
@@ -197,6 +239,10 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:mesquite_sapling | mesquite | 12, 25-38, 48 | Dry | -15 °C | - | the game's | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:acuri_palm_sapling | acuri palm (Attalea phalerata) | 15, 24-32, 40 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), ocean (su), scrubland (su), floodplain (su au), crags (su) |
 | base:moriche_palm_sapling | moriche palm (Mauritia flexuosa) | 15, 24-32, 40 | Wet | 0 °C | - | the game's | plains (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
+| animals:araucaria_sapling | araucarian conifer | 5, 18-28, 38 | Moderate | -5 °C | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
+| animals:ginkgo_sapling | ginkgo | 5, 15-26, 36 | Moderate | hardy | - | the game's | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
+| animals:swamp_cypress_sapling | swamp cypress (Taxodioxylon) | 8, 20-30, 40 | Wet | -15 °C | - | the game's | plains (sp su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au wi), fern_forest (su), crags (sp su au) |
+| animals:scale_conifer_sapling | scale-leaved conifer (Cheirolepidiaceae) | 8, 20-32, 42 | Dry | -5 °C | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), ocean (sp su au wi), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
 
 ## Wild plants
 
@@ -208,6 +254,7 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:cottongrass | Tuft | Soil | - | 8.0% | snowy_plains, taiga |
 | base:reindeer_lichen | Tuft | Soil | - | 5.0% | snowy_plains, taiga, mountains |
 | base:clover | Tuft | Soil | - | 3.0% | plains, forest, birch_forest, mountains |
+| base:berry_bush | Bush | Soil | base:berries | 0.4% | forest, birch_forest, taiga |
 | base:lingonberry_bush | Bush | Soil | base:lingonberries | 1.0% | taiga, birch_forest, mountains |
 | base:cloudberry_bush | Bush | Soil | base:cloudberries | 0.6% | snowy_plains, taiga |
 | base:crowberry_bush | Bush | Soil | base:crowberries | 1.2% | snowy_plains, taiga, mountains |
@@ -219,15 +266,16 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:mushroom_brown | Spreads | Soil | base:mushroom_brown | 0.6% | forest, birch_forest, taiga, mountains |
 | base:mushroom_red | Spreads | Soil | base:mushroom_red | 0.3% | forest, birch_forest, taiga |
 | base:water_hyacinth | Spreads | Water | - | 8.0% | swamp, savanna |
-| base:cattail | Still | Shore | - | 15.0% | swamp, plains, forest, taiga, savanna |
+| base:cattail | Still | Shore | base:cattail_root | 15.0% | swamp, plains, forest, taiga, savanna |
 | base:reed | Still | Shore | - | 12.0% | plains, forest, birch_forest, taiga, swamp (4.0%) |
 | base:lily_pad | Still | Water | - | 12.0% | plains, forest, birch_forest, swamp, taiga, savanna |
 | base:seagrass | Still | Bed | - | 20.0% | ocean, beach |
-| base:kelp | Column | Bed | - | 8.0% | ocean |
+| base:kelp | Column | Bed | base:kelp | 8.0% | ocean |
 | animals:cycad | Still | Soil | animals:cycad_seed | 1.0% | red_dunes, scrubland, floodplain, fern_forest, crags |
 | animals:flowering_shrub | Still | Soil | - | 2.0% | floodplain, scrubland |
 | animals:water_lily | Still | Water | - | 6.0% | floodplain, red_dunes |
 | animals:rotten_log | Log | Soil | - | 0.4% | floodplain, fern_forest |
+| base:kelp_wrack | Mat | Sand | base:kelp | 3.0% | beach |
 
 ## Food in the world
 
@@ -289,6 +337,7 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | animals:cycad | seeds | 3 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (summer, autumn), worth 40% of fresh growth |
 | animals:flowering_shrub | leaves | 4 | stays | always there in animals:floodplain, animals:scrubland (spring, summer, autumn), worth 40% of fresh growth |
 | animals:water_lily | water_plants | 5 | stays | always there in animals:floodplain, animals:red_dunes (all year), worth 40% of fresh growth |
+| base:kelp_wrack | water_plants | 4 | stays | always there in base:beach (all year), worth 40% of fresh growth |
 | animals:rotten_log | insects | 3 | stays | always there in animals:floodplain, animals:fern_forest (all year), worth 40% of fresh growth |
 | base:mesquite_leaves | leaves | 4 | stays | always there in base:desert, base:savanna (spring, summer, autumn), worth 40% of fresh growth |
 | base:mesquite_leaves | seeds | 4 | stays | always there in base:desert, base:savanna (summer, autumn), worth 40% of fresh growth |
@@ -332,11 +381,11 @@ A ripe harvest of base:wheat takes a level; base:compost +2, base:dung +1; a sea
 
 ## Difficulty (the `base:difficulty` rule)
 
-| | digests | keeps | harm | can kill | XP lost on death | stamina costs |
-|---|---|---|---|---|---|---|
-| gentle | x0.75 | x1.5 | x0.5 | no, stops at a tenth | 10% | x0.8 |
-| normal | x1 | x1 | x1 | yes | 25% | x1 |
-| harsh | x1.25 | x0.6 | x1.5 | yes | 50% | x1.15 |
+| | digests | keeps | harm | can kill | XP lost on death | stamina costs | first nights without monsters |
+|---|---|---|---|---|---|---|---|
+| gentle | x0.75 | x1.5 | x0.5 | no, stops at a tenth | 10% | x0.8 | 3 |
+| normal | x1 | x1 | x1 | yes | 25% | x1 | 0 |
+| harsh | x1.25 | x0.6 | x1.5 | yes | 50% | x1.15 | 0 |
 
 ## Levels
 

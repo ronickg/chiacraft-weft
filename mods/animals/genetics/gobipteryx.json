@@ -1,0 +1,35 @@
+{
+ "species": "gobipteryx",
+ "about": "Gobipteryx minuta: no record of its colors; here a Gobi bird's, sandy brown, pale below; drawn a little smaller than Confuciusornis.",
+ "loci": [
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "sandy to buff"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.25,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   90,
+   62,
+   40
+  ],
+  [
+   70,
+   48,
+   32
+  ]
+ ],
+ "build": {}
+}

@@ -1,0 +1,19 @@
+{
+ "kind": "block",
+ "what": "prickly wild rose: a small bristly shrub with toothed leaves and three or four open pink five-petalled roses with yellow centres, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.35,
+   "outline": 0.6,
+   "red_line": 0.0,
+   "fill": 0.22,
+   "passed": true
+  }
+ ]
+}

@@ -102,6 +102,20 @@ pub fn init(r: &mut Registry) {
     r.entity_component(&APPLIED, [0.0; 2], 0);
     r.entity_component(&SCALED, 0.0f32, 0);
     r.entity_component(&OWNER, [0u8; 64], component_flags::SAVE | component_flags::SYNC_MENU);
+    // A young one bites as hard as its size: by the area of its jaws, the square of how far it has
+    // grown (a hatchling raptor a fortieth of a grown one's mass killed a cat in a PC run).
+    r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
+        let (w, id) = (m.world(), m.query().entity);
+        let Some(index) = w
+            .component(id, &ANIMAL)
+            .and_then(|a| (a.species as usize).checked_sub(1))
+            .filter(|&i| i < SPECIES.len())
+        else {
+            return;
+        };
+        let g = crate::breeding::growth(&w, id, index) as f64;
+        m.value *= (g * g).clamp(0.05, 1.0);
+    });
     for s in &SPECIES {
         r.attach(s.kind, &ANIMAL);
         r.attach(s.kind, &APPLIED);
@@ -214,7 +228,7 @@ fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
     };
     if let Some(lush) = lush {
         a.food = (a.stat(species::FOOD) * (ARRIVES_FED + (1.0 - ARRIVES_FED) * lush)).round() as u16;
-        weft_sdk::info!(
+        weft_sdk::debug!(
             "wild {} {id} arrives {:.0}% fed (its {} at {:.0}% here this season)",
             s.name,
             a.food as f32 / a.stat(species::FOOD) * 100.0,
@@ -270,7 +284,7 @@ fn catch_up(w: &World, id: u64, index: usize, a: &mut Animal, away: u64, pos: [f
     }
     crate::breeding::count(&crate::breeding::OLD, index);
     crate::breeding::count(&crate::breeding::BORN, index);
-    weft_sdk::info!(
+    weft_sdk::debug!(
         "wild {} {id} died while away ({} days); a successor {} days old took its place",
         s.name,
         away / life::DAY,

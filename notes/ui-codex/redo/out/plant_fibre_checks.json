@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a bundle of plant fibre: pale green-tan long fibres twisted together and tied in the middle, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.552,
+   "outline": 0.85,
+   "red_line": 0.0,
+   "fill": 0.24,
+   "passed": true
+  }
+ ]
+}

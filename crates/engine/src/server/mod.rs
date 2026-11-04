@@ -1,6 +1,7 @@
 //! Authoritative simulation. Runs on its own thread; single player talks to it through the
 //! in-process transport. Each dimension is a set of regions ticked in parallel.
 
+mod achievements;
 mod actions;
 mod admission;
 pub mod area;
@@ -133,6 +134,11 @@ pub struct Player {
     did: Option<String>,
     did_days: Option<u32>,
     waiting: Option<(String, String, Instant)>,
+    /// The join waits for the DID check, and for the achievements the rules asked about.
+    did_pending: bool,
+    proofs_pending: bool,
+    /// Achievements shown when the world asked: (id, issuer identity hex), checked.
+    achievements: Vec<(String, String)>,
 }
 
 pub struct Generated {
@@ -181,6 +187,8 @@ pub struct Shared {
     /// Where players load cubes (dim, center, radius, up, down), for generation jobs to skip
     /// cubes a fast player already left behind.
     pub views: parking_lot::RwLock<Vec<(u32, View)>>,
+    /// Achievements mods granted this tick (chiacraft, `achievements`): the server signs them.
+    pub grants: parking_lot::Mutex<Vec<crate::chiacraft::achievements::Grant>>,
 }
 
 pub const PHASES: [&str; 6] = ["insert", "messages", "regions", "request", "sync", "rest"];
@@ -617,6 +625,9 @@ impl Server {
                 did: None,
                 did_days: None,
                 waiting: None,
+                did_pending: false,
+                proofs_pending: false,
+                achievements: Vec::new(),
             });
         }
     }
@@ -755,6 +766,10 @@ impl Server {
             self.send_banned_away(c);
         }
         self.did_answers(c);
+        self.sign_achievements();
+        if self.tick % (TPS as u64 * 60) == 0 {
+            self.anchor_achievements();
+        }
         lap(5, &self.shared);
         let us = start.elapsed().as_micros() as u64;
         self.shared.tick_us.store(us, Ordering::Relaxed);
@@ -855,6 +870,7 @@ impl Server {
                     }
                 }
                 DimEvent::SetAir { dim, air, heading } => self.dims[dim as usize].set_air(air, heading),
+                DimEvent::SetTints { dim, tints } => self.dims[dim as usize].set_tints(tints),
                 DimEvent::SetRain { dim, biomes, thunder } => {
                     // Only where it rains at all.
                     if c.dims[dim as usize].weather {

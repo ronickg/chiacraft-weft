@@ -1,0 +1,38 @@
+loaded
+idle
+chat /tk mode creative
+chat /weather clear
+chat /air 0 0 90 mist
+chat /dim base:flatlands
+wait 5
+# One side of the open flatland looks shaded from the player's feet to the horizon, with full sky
+# light. From above: the shape of the shaded part, and whether it stays put in the world or moves
+# with the player.
+chat /gamemode spectator
+chat /tp 0 40 0
+wait 3
+look 0 -90
+wait 2
+shot 1_above_0_0.png
+chat /tp 0 90 0
+wait 3
+shot 2_high_0_0.png
+chat /tp 48 40 0
+wait 3
+shot 3_above_48_0.png
+chat /tp 0 40 48
+wait 3
+shot 4_above_0_48.png
+chat /tp 48 40 48
+wait 3
+shot 5_above_48_48.png
+# Standing again, after the moves: the same view as before at the origin and 48 blocks along x.
+chat /tp 0 4 0
+wait 2
+look 90 -8
+wait 2
+shot 6_ground_0_0_90.png
+chat /tp 48 4 0
+wait 3
+shot 7_ground_48_0_90.png
+quit

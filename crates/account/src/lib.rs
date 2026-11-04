@@ -12,7 +12,7 @@
 //!   `<run dir>/test-account`, beside the player's), or `CHIACRAFT_ACCOUNT_HOME`;
 //! - the secret in the OS keystore (macOS Keychain, Windows Credential Manager, Linux Secret
 //!   Service), or in the account home's encrypted file store for automated runs and machines
-//!   without a keystore ([`use_file_store`], or `HORIZON_WALLET_STORE=file`).
+//!   without a keystore ([`use_file_store`], or `CHIACRAFT_WALLET_STORE=file`).
 //!
 //! Nothing here touches the network or the chain.
 
@@ -178,6 +178,20 @@ impl Session {
         *self.owner.lock() = Some(Arc::new(signer));
         log::info!("DID {} linked to account {}", short_hex(&link.launcher), self.info.fingerprint);
         Ok(link)
+    }
+
+    /// The account's first wallet address's key signing `text` (one of chiacraft's own texts):
+    /// its public key and the signature, hex. What holds a sponsored DID (the player's or a
+    /// world's) signs this way, e.g. an achievement issuer's DID proof. The words are read for it
+    /// and not kept.
+    pub fn first_owner_sign(&self, text: &str) -> Result<(String, String), String> {
+        let mnemonic = self
+            .accounts()?
+            .reveal(self.info.fingerprint, env_passphrase())
+            .map_err(|e| format!("reading the words: {e}"))?;
+        let signer = OwnerSigner::from_mnemonic(&mnemonic, 0, false);
+        let sig = signer.sign(text).map_err(|e| e.to_string())?;
+        Ok((chiacraft_wallet::keys::hex(&signer.public()), chiacraft_wallet::keys::hex(&sig)))
     }
 
     /// Forget the linked DID (it stays on chain, held by the same address).
@@ -362,19 +376,43 @@ pub fn open(run_dir: &Path) -> Result<&'static Session, String> {
         .map_err(Clone::clone)
 }
 
+/// A headless server's own identity, the way a player has an account: an account named
+/// "Server", made once and kept in the server's folder (`<run dir>/server-account`, or
+/// `CHIACRAFT_ACCOUNT_HOME`), always in the encrypted file store (a server has no keystore to
+/// ask; `CHIACRAFT_WALLET_PASSPHRASE` locks it). Its worlds' keys and certificates come from it
+/// as a player's do, so a server needs nobody's account. Opened once per process, like [`open`];
+/// a game process opens one or the other.
+pub fn open_server(run_dir: &Path) -> Result<&'static Session, String> {
+    use_file_store();
+    let home = std::env::var_os("CHIACRAFT_ACCOUNT_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| run_dir.join("server-account"));
+    SESSION
+        .get_or_init(|| start_at(home, SERVER_NAME))
+        .as_ref()
+        .map_err(Clone::clone)
+}
+
+/// The name a server's own account is made with.
+pub const SERVER_NAME: &str = "Server";
+
 /// The open account, if [`open`] succeeded.
 pub fn current() -> Option<&'static Session> {
     SESSION.get().and_then(|s| s.as_ref().ok())
 }
 
 fn start(run_dir: &Path) -> Result<Session, String> {
-    let home = home(run_dir);
+    start_at(home(run_dir), DEFAULT_NAME)
+}
+
+/// Opens the account in `home`, making one called `name` the first time.
+fn start_at(home: PathBuf, name: &str) -> Result<Session, String> {
     let file_only = !OS_KEYSTORE.load(Ordering::Relaxed);
     let choice = StoreChoice::for_home(&home, SERVICE, file_only);
     let mut accounts = Accounts::load(&home, choice.clone()).map_err(|e| format!("opening the account in {}: {e}", home.display()))?;
     let made = accounts.current().is_none();
     let info = accounts
-        .ensure_default(DEFAULT_NAME)
+        .ensure_default(name)
         .map_err(|e| format!("making an account: {e}"))?;
     if made {
         log::info!("made a new account ({}), kept in the {} store", info.fingerprint, info.store);
@@ -383,7 +421,7 @@ fn start(run_dir: &Path) -> Result<Session, String> {
         .unlock(info.fingerprint, env_passphrase())
         .map_err(|e| {
             if e.is_wrong_passphrase() {
-                "the account's file needs its passphrase (HORIZON_WALLET_PASSPHRASE)".to_string()
+                "the account's file needs its passphrase (CHIACRAFT_WALLET_PASSPHRASE)".to_string()
             } else {
                 format!("unlocking the account: {e}")
             }

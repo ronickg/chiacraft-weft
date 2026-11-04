@@ -6,21 +6,27 @@ mod beds;
 mod blocks;
 mod clothing;
 mod cooking;
+mod crafts;
+mod death;
 mod farming;
 mod growth;
+mod hints;
 mod hud;
 mod items;
+mod land;
 mod levels;
 mod machines;
 mod mobs;
 mod player;
 mod recipes;
 mod redstone;
+mod seasons;
 mod shaderpack;
 mod sounds;
 mod survival;
 mod weather;
 mod wild;
+mod window;
 mod worldgen;
 
 use weft_sdk::*;
@@ -28,6 +34,30 @@ use weft_sdk::*;
 pub use base_api::{CLOUDS, FLATLANDS, MOON, OVERWORLD, STARS, SUN, tabs};
 
 declare_mod!(deps: [], init: init);
+
+// ------------------------------------------------------------------ the engine's bridge
+
+type Query = unsafe extern "C" fn(query: weft_sdk::abi::Str, arg: weft_sdk::abi::Str) -> weft_sdk::abi::Str;
+static BRIDGE: std::sync::OnceLock<Query> = std::sync::OnceLock::new();
+
+/// The engine hands the mod its bridge when the mod loads (chiacraft): what Weft's interface
+/// doesn't carry, such as asking the world to sign an achievement.
+///
+/// # Safety
+/// `q` must be the engine's `bridge::query`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn chiacraft_bridge(q: Query) {
+    let _ = BRIDGE.set(q);
+}
+
+/// Asks the engine's bridge `q` with `arg` (empty without a bridge: plain Weft).
+pub(crate) fn bridge(q: &str, arg: &str) -> String {
+    use weft_sdk::abi::Str;
+    BRIDGE
+        .get()
+        .map(|f| unsafe { f(Str::new(q), Str::new(arg)).as_str().to_string() })
+        .unwrap_or_default()
+}
 
 fn init(r: &mut Registry) {
     // Vanilla's creative tabs; blocks and items join them with `.tab(..)`.
@@ -53,14 +83,18 @@ fn init(r: &mut Registry) {
     machines::register(r);
     clothing::register(r);
     cooking::register(r);
+    crafts::register(r);
     recipes::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);
     weather::register(r);
+    seasons::register(r);
     growth::register(r);
     farming::register(r);
     advancements::register(r);
+    hints::register(r);
+    death::register(r);
     beds::register(r);
     hud::register(r);
     redstone::register(r);

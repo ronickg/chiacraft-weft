@@ -351,6 +351,8 @@ pub mod air_flags {
     pub const SNOWING: u32 = 1;
     /// Dust or sand blows (the fog is dust).
     pub const DUST: u32 = 2;
+    /// Bits 8 to 15: how strong an aurora is on clear nights there, 0 to 255.
+    pub const AURORA_SHIFT: u32 = 8;
 }
 
 pub mod block_flags {
@@ -706,8 +708,26 @@ pub struct ScatterDesc {
     pub density: Str,
     /// `ScatterArgs`. Pure: called once for each cube the site reaches.
     pub shape: Callback,
+    /// Sites thinned by where they stand, before `shape` runs: where this mask (postfix steps,
+    /// as a terrain feature's) is over 0, only one site in `thin_keep` stays (by its random bits;
+    /// 0: none). The engine applies it near and in distant terrain alike, which can't run `shape`
+    /// at every site. Empty: no thinning.
+    pub thin: Slice<MaskStep>,
+    pub thin_keep: u32,
+    /// A biome component: thinning only in biomes that have it. Empty: in all.
+    pub thin_biomes: Str,
 }
-defaults!(ScatterDesc { name: Str::EMPTY, dimensions: Str::EMPTY, cell: 8, reach: 0, density: Str::EMPTY, shape: Callback::NONE });
+defaults!(ScatterDesc {
+    name: Str::EMPTY,
+    dimensions: Str::EMPTY,
+    cell: 8,
+    reach: 0,
+    density: Str::EMPTY,
+    shape: Callback::NONE,
+    thin: Slice::EMPTY,
+    thin_keep: 0,
+    thin_biomes: Str::EMPTY
+});
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -1601,6 +1621,11 @@ pub struct UiNode {
     pub tooltip: Str,
     /// `ui_dir` for progress bars.
     pub dir: u32,
+    /// Placed at a point of its parent instead of in the parent's flow, over whatever is there
+    /// (a number inside a bar): x and y in GUI pixels from the parent's inner corner, then which
+    /// point of the node goes there, 0..1 of its width and height ([0.5, 0.5] its middle). NaN x:
+    /// in the flow, as usual.
+    pub at: [f32; 4],
 }
 defaults!(UiNode {
     kind: 0,
@@ -1631,6 +1656,7 @@ defaults!(UiNode {
     on_click: Callback::NONE,
     tooltip: Str::EMPTY,
     dir: 0,
+    at: [f32::NAN, 0.0, 0.0, 0.0],
 });
 
 #[repr(C)]
@@ -2310,6 +2336,14 @@ pub struct Host {
     /// while a player is near, more for one ticked only now and then
     /// (`core:entity_activation_distance`). What counts down per tick counts down by this.
     pub entity_tick_elapsed: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64) -> u32,
+    /// Tint colors from now on, over the content's while the world runs (a mod's seasons): for
+    /// each of `len` entries a biome (id), a tint kind (name, either may be another mod's) and its
+    /// 0xRRGGBB. What is not named keeps the content's color; 0 entries: all the content's again.
+    /// Replaces what an earlier call set. Players see it.
+    pub set_biome_tints: unsafe extern "C" fn(world: *mut WorldCtx, biomes: *const u32, kinds: *const Str, colors: *const u32, len: u32),
+    /// The content's color (0xRRGGBB) of tint kind `kind` in biome `biome` (id): the biome's own,
+    /// else the kind's default; 0 for an unknown kind.
+    pub content_tint: unsafe extern "C" fn(biome: u32, kind: Str) -> u32,
 }
 
 /// Natural spawning around players (`Host::reg_spawn`). Every two seconds the engine tries a few
@@ -3688,6 +3722,26 @@ pub mod terrain_op {
     pub const CAVE_BIOME: u32 = 13;
     /// The cave biome `anchor` goes away.
     pub const REMOVE_CAVE_BIOME: u32 = 14;
+    /// What steep faces show where the generator's own passes make them bare (rock): `face`
+    /// (`FaceArgs`) for ground falling `level` blocks or more to a neighbour. Distant terrain,
+    /// which runs no decorations, asks it, and puts no scattered things there.
+    pub const FACES: u32 = 15;
+}
+
+/// A steep column's top as distant terrain sees it (`terrain_op::FACES`).
+#[repr(C)]
+pub struct FaceArgs {
+    pub seed: u64,
+    pub dim: u32,
+    /// The block at the face: its column's top, or lower down the face.
+    pub pos: [i32; 3],
+    /// The column's ground height (its top block's y).
+    pub height: i32,
+    pub biome: u32,
+    /// How far the ground falls to its lowest neighbour (estimated from a coarse grid).
+    pub fall: i32,
+    /// The block there before (the surface rules'); output: what the face shows.
+    pub block: u32,
 }
 
 /// One part of a dimension's terrain (`Host::reg_terrain`). The mod that owns the dimension
@@ -3708,6 +3762,8 @@ pub struct TerrainDesc {
     pub size: f64,
     pub feature: FeatureDesc,
     pub rule: BiomeRuleDesc,
+    /// `FACES`: `FaceArgs`.
+    pub face: Callback,
 }
 defaults!(TerrainDesc {
     dimension: Str::EMPTY,
@@ -3719,7 +3775,8 @@ defaults!(TerrainDesc {
     value: 0.0,
     size: 0.0,
     feature: FeatureDesc::DEFAULT,
-    rule: BiomeRuleDesc::DEFAULT
+    rule: BiomeRuleDesc::DEFAULT,
+    face: Callback::NONE
 });
 
 /// One command argument; kinds in `command_value`.

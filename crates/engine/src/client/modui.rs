@@ -202,7 +202,8 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
             scroll: flag(abi::ui_flags::SCROLL),
             fill: None,
             max_h: f32::INFINITY,
-            at: None,
+            // Placed at a point of the parent (`UiNode::at`); a point that isn't finite is none.
+            at: n.at.iter().all(|v| v.is_finite()).then_some(n.at),
         };
         let (lang, input) = (b.lang, b.input);
         let spans = |key: Str, a: abi::Slice<abi::UiArg>| {
@@ -452,7 +453,10 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
             uk::IMAGE => {
                 b.ui.open(Kind::Image { texture: n.text.as_str().to_string(), color: 0xFFFFFFFF }, style)
             }
-            uk::ENTITY => b.ui.open(Kind::Custom { tag: TAG_ENTITY, data: 0 }, style),
+            // The player (data 0), or with the text "menu" the menu's own entity (data 1).
+            uk::ENTITY => {
+                b.ui.open(Kind::Custom { tag: TAG_ENTITY, data: (n.text.as_str() == "menu") as u64 }, style)
+            }
             uk::SPACER => {
                 b.ui.open(Kind::Container { class: None }, Style { grow: n.grow.max(1.0), ..style })
             }

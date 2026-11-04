@@ -14,35 +14,20 @@ const TEXTURE: &str = "utahraptor/utahraptor";
 /// Its box: wide and tall enough for the body and the raised head.
 const SIZE: (f32, f32) = (1.2, 2.4);
 
-value! {
-    #[derive(Default)]
-    /// What a Utahraptor is doing (not saved: it just settles down again).
-    pub struct Utahraptor {
-        /// Ticks left resting (0: up and about).
-        pub rest: u32,
-        /// The look applied, 1 + pose (0: none yet).
-        pub look: u32,
-    }
-}
-
-static STATE: Component<Utahraptor> = Component::named("utahraptor_state");
-
-const LOOKS: [(&str, &str); 2] = [("", ""), ("_rest", "utahraptor_rest")];
 /// What it hunts.
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(&STATE, Utahraptor::default(), 0);
-    // The resting pose, drawn in place of one lying down.
-    for (suffix, kind) in &LOOKS[1..] {
-        drop(
-            r.entity(Entity::generated(kind.to_string()))
-                .size(SIZE.0, SIZE.1)
-                .passive()
-                .model_file("utahraptor")
-                .animations(&format!("utahraptor{suffix}"))
-                .texture(TEXTURE),
-        );
-    }
+    let index = crate::species::of(&UTAHRAPTOR);
+    // Settling down: its poses, drawn in place of it (`rest.rs`).
+    crate::rest::register(
+        r,
+        &UTAHRAPTOR,
+        crate::rest::Settle { chance: 400, ticks: (600, 1600), lie_after: 0 },
+        "utahraptor",
+        TEXTURE,
+        (SIZE.0, SIZE.1),
+        &[("_rest", "utahraptor_rest")],
+    );
     r.entity(&UTAHRAPTOR)
         .size(SIZE.0, SIZE.1)
         .health(60.0)
@@ -52,7 +37,6 @@ pub fn init(r: &mut Registry) {
         .model_file("utahraptor")
         .animations("utahraptor")
         .texture(TEXTURE)
-        .attach(&STATE)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
             if !crate::screen::interact(&w, id, player)
@@ -64,15 +48,15 @@ pub fn init(r: &mut Registry) {
         })
         .goals(
             Goals::new()
-                .then(crate::animal::upkeep(4))
-                .then(crate::riding::ridden(4))
-                .then(crate::knockout::behave(4))
+                .then(crate::animal::upkeep(index))
+                .then(crate::riding::ridden(index))
+                .then(crate::knockout::behave(index))
                 .then(crate::hunt::wary)
                 .then(crate::hunt::hunt)
-                .then(crate::commands::act(4))
-                .then(crate::breeding::behave(4))
-                .then(crate::eggs::nest(4))
-                .then(settle)
+                .then(crate::commands::act(index))
+                .then(crate::breeding::behave(index))
+                .then(crate::eggs::nest(index))
+                .then(crate::rest::settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)
                 .then(crate::forage::forage)
@@ -80,57 +64,6 @@ pub fn init(r: &mut Registry) {
         )
         .on_hurt(|w, h| {
             crate::taming::hurt(w, h.entity);
-            if let Some(c) = w.component_mut(h.entity, &STATE) {
-                c.rest = 0;
-            }
+            crate::rest::stop(w, h.entity);
         });
-}
-
-/// Every tick: now and then lie down to rest for a while, and show the pose.
-fn settle(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(c) = w.component_mut(id, &STATE) else { return false };
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(400) == 0 {
-        c.rest = 600 + w.random_below(1600);
-    }
-    let resting = c.rest > 0;
-    if resting {
-        c.rest = c.rest.saturating_sub(w.tick_elapsed(id) as _);
-    }
-    let pose = resting as u32;
-    if c.look != pose + 1 {
-        c.look = pose + 1;
-        let kind = LOOKS[pose as usize].1;
-        w.set_look(
-            id,
-            (!kind.is_empty())
-                .then(|| format!("animals:{kind}"))
-                .as_deref(),
-        );
-    }
-    if resting && w.navigating(id) {
-        w.navigate(id, st.pos, 0.0);
-    }
-    resting
-}
-
-/// Up from resting, to follow, fight or carry a rider.
-pub fn wake(w: &World, id: u64) {
-    if let Some(c) = w.component_mut(id, &STATE)
-        && (c.rest > 0 || c.look > 1)
-    {
-        c.rest = 0;
-        c.look = 1;
-        w.set_look(id, None);
-    }
-}
-
-/// Knocked out: lying as it rests.
-pub fn sleep(w: &World, id: u64) {
-    if let Some(c) = w.component_mut(id, &STATE)
-        && c.look != 2
-    {
-        c.rest = 0;
-        c.look = 2;
-        w.set_look(id, Some("animals:utahraptor_rest"));
-    }
 }

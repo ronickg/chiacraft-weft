@@ -183,6 +183,8 @@ pub static HOST: Host = Host {
     raining_at,
     set_air,
     air_at,
+    set_biome_tints,
+    content_tint,
     entity_flash,
     reg_command_permission,
     player_permission,
@@ -1673,6 +1675,9 @@ unsafe extern "C" fn reg_scatter(r: *mut abi::Registrar, d: *const abi::ScatterD
             reach: d.reach,
             density: d.density.as_str().to_string(),
             shape: d.shape,
+            thin: d.thin.as_slice().to_vec(),
+            thin_keep: d.thin_keep,
+            thin_biomes: d.thin_biomes.as_str().to_string(),
         });
     }
 }
@@ -2252,6 +2257,48 @@ unsafe extern "C" fn set_air(
         };
         d.events
             .push(crate::server::DimEvent::SetAir { dim: d.id, air, heading });
+    }
+}
+
+unsafe extern "C" fn content_tint(biome: u32, kind: Str) -> u32 {
+    let c = content();
+    let kn = unsafe { kind.as_str() };
+    let Some(ki) = c.tint_kinds.iter().position(|x| x.0 == kn) else { return 0 };
+    c.biomes
+        .get(biome as usize)
+        .and_then(|b| b.tints.get(ki).copied())
+        .unwrap_or(c.tint_kinds[ki].1)
+}
+
+unsafe extern "C" fn set_biome_tints(w: *mut abi::WorldCtx, biomes: *const u32, kinds: *const Str, colors: *const u32, len: u32) {
+    unsafe {
+        let d = dim(w);
+        let c = content();
+        let k = c.tint_kinds.len();
+        // The whole table, biome by biome (the content's colors where not named): small, and the
+        // client blends from it as it does from the content's.
+        let tints = if len == 0 || c.biomes.is_empty() {
+            Vec::new()
+        } else {
+            let mut table: Vec<u32> = c
+                .biomes
+                .iter()
+                .flat_map(|b| b.tints.iter().copied())
+                .collect();
+            let n = len as usize;
+            let (b, kd, col) =
+                (std::slice::from_raw_parts(biomes, n), std::slice::from_raw_parts(kinds, n), std::slice::from_raw_parts(colors, n));
+            for i in 0..n {
+                let (bi, kn) = (b[i] as usize, kd[i].as_str());
+                match (bi < c.biomes.len(), c.tint_kinds.iter().position(|x| x.0 == kn)) {
+                    (true, Some(ki)) => table[bi * k + ki] = col[i] & 0xff_ffff,
+                    _ => misuse("set_biome_tints", || format!("no biome {bi} or tint kind {kn}")),
+                }
+            }
+            table
+        };
+        d.events
+            .push(crate::server::DimEvent::SetTints { dim: d.id, tints });
     }
 }
 

@@ -1,0 +1,30 @@
+{
+ "kind": "block",
+ "what": "the side wall of a round black-iron cooking pot, filling the face: dark iron (the darkest shade of its own grey, never pure black) with a soft vertical highlight left of centre, a thick bright rolled rim as a 2 px band across row 12 to 14, a small iron handle ring on each side just below the rim near columns 6 and 25, a few rivets, the bottom rows a little darker. (The game shows only part of this texture on its box: the middle 24 px wide (columns 4 to 28) and the bottom 20 px (rows 12 to 32), so the rim must sit along row 12. Draw the whole 32 x 32 so that part reads right; what lies outside it is the same material, unimportant.)",
+ "size": [
+  32,
+  32
+ ],
+ "full": true,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.52,
+   "empty": 0,
+   "seam": 2.78,
+   "passed": false
+  },
+  {
+   "grid": 0.433,
+   "empty": 0,
+   "seam": 3.11,
+   "passed": false
+  },
+  {
+   "grid": 0.552,
+   "empty": 0,
+   "seam": 1.77,
+   "passed": true
+  }
+ ]
+}

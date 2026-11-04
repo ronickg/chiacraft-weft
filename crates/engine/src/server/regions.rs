@@ -40,6 +40,10 @@ pub struct DimSet {
     pub air: Arc<(Vec<(u32, f32, f32, f32, u32)>, f32)>,
     /// Changed: players hear at once.
     pub air_moved: bool,
+    /// Every biome's tint colors as a mod set them (`set_biome_tints`), empty for the content's.
+    pub tints: Arc<Vec<u32>>,
+    /// Changed: players hear at once.
+    pub tints_moved: bool,
     seed: u64,
     next_id: Arc<AtomicU64>,
     owner: FxHashMap<IVec3, usize>,
@@ -70,6 +74,8 @@ impl DimSet {
             weather_moved: false,
             air: Arc::default(),
             air_moved: false,
+            tints: Arc::default(),
+            tints_moved: false,
             seed,
             next_id,
             owner: FxHashMap::default(),
@@ -402,6 +408,16 @@ impl DimSet {
         for r in &mut self.regions {
             r.air = self.air.clone();
         }
+    }
+
+    /// Every biome's tint colors from now on (`tints`, see `Host::set_biome_tints`); players hear
+    /// only of a change.
+    pub fn set_tints(&mut self, tints: Vec<u32>) {
+        if *self.tints == tints {
+            return;
+        }
+        self.tints = Arc::new(tints);
+        self.tints_moved = true;
     }
 
     pub fn rain_here(&self) -> Option<Arc<Vec<u32>>> {

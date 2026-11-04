@@ -60,11 +60,30 @@ pub fn air(p: &Place) -> f32 {
     t + p.fire
 }
 
+/// The day's mean air where one stands: the biome's mean, the season, the height (what a room's
+/// heavy walls hold to, `shelter::Room::air`).
+pub fn day_mean(p: &Place) -> f32 {
+    if p.underground { p.biome_c } else { p.biome_c + p.season - 0.0065 * p.altitude.max(0.0) }
+}
+
 /// Degrees the season adds to a biome's mean: `swing` its half range between summer and winter
 /// (a taiga's 18, a jungle's 2), `year` 0 to 1 from midwinter (coldest at 0, warmest at 0.5).
 pub fn season(swing: f32, year: f32) -> f32 {
     -swing * (std::f32::consts::TAU * year).cos()
 }
+
+/// How much each kind of fire heats the air near it, a share of lava's (`base_api::heat_of` names
+/// the blocks): lava and a campfire 1, a lit furnace 0.7, a torch 0.25.
+pub const LAVA_HEAT: f32 = 1.0;
+pub const FURNACE_HEAT: f32 = 0.7;
+pub const TORCH_HEAT: f32 = 0.25;
+/// The heat a fire needs to rest by (camp's "near a fire", being rested): a torch's isn't a fire
+/// (integration review: a torch-lit room gave rest).
+pub const REST_HEAT: f32 = 0.7;
+/// Blocks around a player searched for fires and comfort, once a second; animals, eggs and plants
+/// search fewer (`FIRE_REACH`), as there are many more of them. A fire warms nothing past 8.
+pub const PLAYER_FIRE_REACH: i32 = 7;
+pub const FIRE_REACH: i32 = 3;
 
 /// Degrees a fire adds `distance` blocks away: 20 °C beside it, nothing past 8 blocks (proposed).
 pub fn fire_heat(distance: f32) -> f32 {
@@ -86,8 +105,11 @@ pub struct Body {
     pub fortitude: f32,
     /// Fat's fullness in the stomach, 0 to 1: up to 4 °C warmer in the cold.
     pub fat: f32,
-    /// Degrees a meal warms (cools) one (`Stomach::meal_warmth`).
+    /// Degrees the warmest meal warms one (`Stomach::meal_warming`), and the coolest cools one
+    /// (`meal_cooling`, 0 or less): cooling only widens the hot side, it doesn't chill one in the
+    /// cold.
     pub meal: f32,
+    pub meal_cool: f32,
     /// Wet: insulation is mostly lost.
     pub wet: bool,
 }
@@ -104,7 +126,7 @@ impl Body {
         let wide = stats::fortitude_degrees(self.fortitude);
         let cold = if self.wet { self.wet_cold_insulation.min(self.cold_insulation) } else { self.cold_insulation };
         let lo = self.comfort.0 - wide - cold - 4.0 * self.fat.clamp(0.0, 1.0) - self.meal + if self.wet { WET_CHILL } else { 0.0 };
-        let hi = self.comfort.1 + wide + self.heat_insulation - self.meal;
+        let hi = self.comfort.1 + wide + self.heat_insulation - self.meal - self.meal_cool.min(0.0);
         (lo, hi)
     }
 
@@ -154,13 +176,12 @@ pub fn feeling(core: f32) -> Feeling {
     }
 }
 
-/// Cold and heat insulation of a full set of armor of that material (proposed): leather warm and a
-/// little hot (heat -3: the sign was wrong, the content plan's research), metal cold to wear in
-/// snow and hot in the sun. A piece gives its share (`PIECE_SHARE`). Fur,
+/// Cold and heat insulation of a full set of armor of that material (proposed): leather is hide
+/// (`clothing::armor_cloth`), metal cold to wear in snow and hot in the sun. A piece gives its share (`PIECE_SHARE`). Fur,
 /// wool, hide and linen are clothes (`clothing`), worn under armor.
 pub fn set_insulation(material: &str) -> (f32, f32) {
     match material {
-        "leather" => (8.0, -3.0),
+        "leather" => crate::clothing::armor_cloth(material).map_or((0.0, 0.0), |m| (m.cold(), m.heat)),
         "iron" | "chainmail" => (4.0, -4.0),
         "gold" => (3.0, -5.0),
         "diamond" => (5.0, -2.0),

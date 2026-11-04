@@ -45,6 +45,9 @@ pub struct Genome {
     pub stage: u8,
     /// Marks life left on it: up to four scars, each a kind (`SCARS`, 0: none) and where.
     pub scars: [u8; 8],
+    /// Two for its temperament, the 17th core trait (`Tp` in `genetics/core.json`, its slot
+    /// `OWN + 16`), as `core` (version 2; `NONE` before).
+    pub temper: [u8; 2],
 }
 
 pub const MIXED: u8 = 255;
@@ -52,9 +55,9 @@ pub const NONE: u8 = 255;
 /// Loci of a species' own (`Genome::genes`); the core traits' slots come after them.
 pub const OWN: usize = 16;
 /// Every slot: a species' own and the core.
-pub const SLOTS: usize = 32;
-/// The genome's layout now.
-pub const VERSION: u8 = 1;
+pub const SLOTS: usize = 33;
+/// The genome's layout now: 1 the core traits, 2 temperament.
+pub const VERSION: u8 = 2;
 
 /// Scar kinds (`Genome::scars`): three raked lines of claws, a ring of tooth marks, a blade's
 /// long line, a burn, torn wing skin.
@@ -81,18 +84,25 @@ pub fn mend(g: &mut Genome) {
         g.core = [NONE; 32];
         g.stage = crate::species::ADULT;
     }
+    if g.version < 2 {
+        g.temper = [NONE; 2];
+    }
 }
 
 impl Genome {
     /// Gene `k` (0, 1) of slot `slot` (a species' own locus, or `OWN` + a core trait).
     fn get(&self, slot: usize, k: usize) -> u8 {
-        if slot < OWN { self.genes[2 * slot + k] } else { self.core[2 * (slot - OWN) + k] }
+        match slot {
+            s if s < OWN => self.genes[2 * s + k],
+            s if s < OWN + 16 => self.core[2 * (s - OWN) + k],
+            _ => self.temper[k],
+        }
     }
     fn set(&mut self, slot: usize, k: usize, v: u8) {
-        if slot < OWN {
-            self.genes[2 * slot + k] = v;
-        } else {
-            self.core[2 * (slot - OWN) + k] = v;
+        match slot {
+            s if s < OWN => self.genes[2 * s + k] = v,
+            s if s < OWN + 16 => self.core[2 * (s - OWN) + k] = v,
+            _ => self.temper[k] = v,
         }
     }
     fn pair(&self, slot: usize) -> [u8; 2] {
@@ -107,6 +117,7 @@ impl Genome {
             female: female as u8,
             genes: [NONE; 32],
             core: [NONE; 32],
+            temper: [NONE; 2],
             version: VERSION,
             stage: crate::species::ADULT,
             ..Genome::default()
@@ -258,7 +269,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 37] = [
+const FILES: [(&str, &str); 46] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -296,6 +307,15 @@ const FILES: [(&str, &str); 37] = [
     ("jaguar", include_str!("../../genetics/jaguar.json")),
     ("lungfish", include_str!("../../genetics/lungfish.json")),
     ("lycoptera", include_str!("../../genetics/lycoptera.json")),
+    ("psittacosaurus", include_str!("../../genetics/psittacosaurus.json")),
+    ("gastonia", include_str!("../../genetics/gastonia.json")),
+    ("pinacosaurus", include_str!("../../genetics/pinacosaurus.json")),
+    ("iguanodont", include_str!("../../genetics/iguanodont.json")),
+    ("crocodyliform", include_str!("../../genetics/crocodyliform.json")),
+    ("citipati", include_str!("../../genetics/citipati.json")),
+    ("confuciusornis", include_str!("../../genetics/confuciusornis.json")),
+    ("gobipteryx", include_str!("../../genetics/gobipteryx.json")),
+    ("cedarosaurus", include_str!("../../genetics/cedarosaurus.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -579,9 +599,14 @@ pub fn upgrade(index: usize, g: &mut Genome, pool: &Pool, r: &mut impl Rng) {
         return;
     }
     let Some(file) = SPECIES.get(index).and_then(|s| gene_file(s.name)) else { return };
+    if g.version < 2 {
+        g.temper = [NONE; 2];
+    }
     for l in &file.loci {
         let p = g.pair(l.slot);
-        if l.slot >= OWN || p == [NONE, NONE] {
+        // A genome before the core traits draws them all; one after, only what it lacks (a
+        // version 1 genome its temperament), so its coat stays as it was.
+        if (g.version == 0 && l.slot >= OWN) || p == [NONE, NONE] {
             draw(l, g.female != 0, pool.get(l.slot).filter(|p| !p.is_empty()), g, r);
         }
     }
@@ -1467,6 +1492,112 @@ fn cretaceous_fish(r: &Read, lungfish: bool) -> Look {
     }
 }
 
+/// Psittacosaurus: dark brown above to a warmer, redder brown, pale below (countershaded, as its
+/// skin shows: Vinther et al. 2016).
+fn psittacosaurus(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.62 {
+            "Red-brown".into()
+        } else if ru < 0.38 {
+            "Dark brown".into()
+        } else {
+            "Brown".into()
+        },
+        base: mix([118.0, 88.0, 62.0], [150.0, 96.0, 58.0], ru),
+        under: [214.0, 194.0, 156.0],
+        ..Look::default()
+    }
+}
+
+/// The ankylosaurs: Gastonia olive-brown to dun, Pinacosaurus a paler sand to ochre, both paler
+/// below (no record of their colors: est.).
+fn ankylosaur(r: &Read, gobi: bool) -> Look {
+    let ru = r.qv("Ru");
+    let (dull, warm) = if gobi { ([176.0, 154.0, 110.0], [180.0, 132.0, 82.0]) } else { ([116.0, 104.0, 70.0], [140.0, 112.0, 72.0]) };
+    Look {
+        name: match (gobi, ru > 0.6) {
+            (false, false) => "Olive-brown".into(),
+            (false, true) => "Dun".into(),
+            (true, false) => "Sandy".into(),
+            (true, true) => "Ochre".into(),
+        },
+        base: mix(dull, warm, ru),
+        under: [198.0, 184.0, 146.0],
+        ..Look::default()
+    }
+}
+
+/// The iguanodont: olive-dun to a warmer buff, darker along the top, pale below (no record of its
+/// colors: est.).
+fn iguanodont(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.6 { "Buff".into() } else { "Olive-dun".into() },
+        base: mix([150.0, 142.0, 104.0], [168.0, 140.0, 96.0], ru),
+        under: [214.0, 202.0, 166.0],
+        ..Look::default()
+    }
+}
+
+/// The crocodyliform: dark olive-brown, darker bands, pale below (no record of its colors: a
+/// river crocodile's, est.).
+fn crocodyliform(r: &Read) -> Look {
+    let ol = r.qv("Ol");
+    let base = mix([72.0, 70.0, 54.0], [100.0, 92.0, 66.0], ol);
+    Look {
+        name: if ol > 0.6 { "Olive-brown".into() } else { "Dark olive".into() },
+        base,
+        under: [206.0, 198.0, 156.0],
+        points: Some(darken(base, 0.5)),
+        ..Look::default()
+    }
+}
+
+/// Citipati: sandy-buff to rufous feathers, darker barred wings and tail fan, pale below, a red
+/// crest (no record of its colors: a dune bird's, est.).
+fn citipati(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.6 { "Rufous".into() } else { "Sandy".into() },
+        base: mix([196.0, 158.0, 112.0], [178.0, 112.0, 70.0], ru),
+        under: [226.0, 212.0, 182.0],
+        ..Look::default()
+    }
+}
+
+/// The early birds: Confuciusornis mottled grey-black and brown with pale-spotted wings (Li et
+/// al. 2018, from its color cells), Gobipteryx a paler sandy brown (no record: a Gobi bird's,
+/// est.); both pale below.
+fn early_bird(r: &Read, gobi: bool) -> Look {
+    let tone = r.qv("Ru");
+    let base =
+        if gobi { mix([170.0, 140.0, 104.0], [186.0, 150.0, 106.0], tone) } else { mix([110.0, 92.0, 74.0], [134.0, 100.0, 72.0], tone) };
+    Look {
+        name: match (gobi, tone > 0.6) {
+            (false, false) => "Grey-brown".into(),
+            (false, true) => "Brown".into(),
+            (true, false) => "Sandy".into(),
+            (true, true) => "Buff".into(),
+        },
+        base,
+        under: [204.0, 194.0, 174.0],
+        ..Look::default()
+    }
+}
+
+/// The sauropod: grey-brown to olive, darker along the top, pale buff below (no record of its
+/// colors: est.).
+fn sauropod(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.6 { "Olive".into() } else { "Grey-brown".into() },
+        base: mix([142.0, 134.0, 110.0], [150.0, 142.0, 98.0], ru),
+        under: [210.0, 200.0, 170.0],
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1598,6 +1729,87 @@ pub fn size(genome: &Genome) -> f32 {
     (1.0 + s.size_spread * (sz - 0.5) * 2.0) * sex
 }
 
+/// How big an average one of species `index` is drawn against its model (its gene file's `Sz`
+/// mean, spread by `size_spread`): a species drawn bigger or smaller than its model (the lungfish
+/// on the trout's, the spectacled caiman on the yacare's) has its row's mass at this size, not at 1.
+pub fn mean_size(index: usize) -> f32 {
+    let Some(s) = SPECIES.get(index) else { return 1.0 };
+    let mean = gene_file(s.name)
+        .and_then(|g| g.loci.iter().find(|l| l.id == "Sz"))
+        .map_or(0.5, |l| l.mean);
+    1.0 + s.size_spread * (mean - 0.5) * 2.0
+}
+
+/// One gene of an animal, for its screen (`genes_of`).
+#[derive(Clone, Debug)]
+pub struct GeneLine {
+    /// The locus's id and name (`Ol`, "Olive"), and what it does (`about`).
+    pub id: String,
+    pub name: String,
+    pub about: String,
+    /// A core trait every species has (size, shade, marks, build, temperament), or its own.
+    pub core: bool,
+    /// A quantitative trait: as it shows, 0..1 (its genes and its own chance), and its genes'
+    /// mean (what it passes on). `None` for an allelic locus.
+    pub value: Option<f32>,
+    pub genetic: Option<f32>,
+    /// An allelic locus: its two alleles' names (one for a male's X-linked locus), and the one that
+    /// shows; empty for a quantitative trait.
+    pub alleles: Vec<String>,
+    pub shows: String,
+}
+
+/// Every gene of `genome`, its species' own loci first, then the core traits (`GeneLine`); empty
+/// before it has genes.
+pub fn genes_of(genome: &Genome) -> Vec<GeneLine> {
+    let Some(g) = (genome.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+        .and_then(|s| gene_file(s.name))
+    else {
+        return Vec::new();
+    };
+    let r = Read { g, genome };
+    g.loci
+        .iter()
+        .map(|l| {
+            let mut line = GeneLine {
+                id: l.id.clone(),
+                name: l.name.clone(),
+                about: l.about.clone(),
+                core: l.slot >= OWN,
+                value: None,
+                genetic: None,
+                alleles: Vec::new(),
+                shows: String::new(),
+            };
+            if l.quantitative {
+                line.value = Some(r.qv(&l.id));
+                line.genetic = Some(r.genetic(&l.id));
+            } else {
+                line.alleles = r
+                    .pair(l)
+                    .filter_map(|a| l.alleles.get(a as usize).map(|x| x.a.clone()))
+                    .collect();
+                line.shows = r.shows(&l.id).to_string();
+            }
+            line
+        })
+        .collect()
+}
+
+/// Its temperament as it shows (`Tp`), 0 calm to 1 skittish: how near a walker may come before it
+/// runs (`taming.rs`). 0.5 for a genome without one.
+pub fn temperament(genome: &Genome) -> f32 {
+    let Some(s) = (genome.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+    else {
+        return 0.5;
+    };
+    gene_file(s.name).map_or(0.5, |g| Read { g, genome }.qv("Tp"))
+}
+
 /// Its size genes (`Sz`), 0..1: small to big for its kind (what it passes on).
 pub fn size_gene(genome: &Genome) -> f32 {
     let Some(s) = (genome.species as usize)
@@ -1645,6 +1857,15 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "jaguar" => jaguar(&r),
         "lungfish" => cretaceous_fish(&r, true),
         "lycoptera" => cretaceous_fish(&r, false),
+        "psittacosaurus" => psittacosaurus(&r),
+        "gastonia" => ankylosaur(&r, false),
+        "pinacosaurus" => ankylosaur(&r, true),
+        "iguanodont" => iguanodont(&r),
+        "crocodyliform" => crocodyliform(&r),
+        "citipati" => citipati(&r),
+        "confuciusornis" => early_bird(&r, false),
+        "gobipteryx" => early_bird(&r, true),
+        "cedarosaurus" => sauropod(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1845,12 +2066,15 @@ impl Genome {
         unsafe { std::ptr::copy_nonoverlapping(self as *const Genome as *const u8, out.as_mut_ptr(), out.len()) };
         out
     }
-    /// A genome from its bytes (`to_bytes`); one too short is padded with zeros.
+    /// A genome from its bytes (`to_bytes`); one too short is padded with zeros, and one of an
+    /// older layout mended (`mend`: no temperament yet, rather than the calmest).
     pub fn from_bytes(b: &[u8]) -> Genome {
         let mut all = vec![0u8; size_of::<Genome>()];
         let n = b.len().min(all.len());
         all[..n].copy_from_slice(&b[..n]);
-        unsafe { std::ptr::read_unaligned(all.as_ptr() as *const Genome) }
+        let mut g: Genome = unsafe { std::ptr::read_unaligned(all.as_ptr() as *const Genome) };
+        mend(&mut g);
+        g
     }
 }
 
@@ -1911,10 +2135,12 @@ fn pattern(kind: &str, p: [f32; 3], u: f32, s: i32, m: &Marks) -> f32 {
         "streaks" => band((y + 1.5 * noise3(z * 0.08, x * 0.2, 0.0, s)) / 4.5, w(0.3)),
         "rosettes" => {
             let (cx, cy, cz) = ((x / 4.0).floor(), (y / 4.0).floor(), (z / 4.0).floor());
-            if hash3(cx as i32, cy as i32, cz as i32, s) > 0.55 + 0.6 * d {
+            if hash3(cx as i32, cy as i32, cz as i32, s) > 0.7 + 0.6 * d {
                 return 0.0;
             }
-            let (dx, dz, dy) = (x - (cx + 0.5) * 4.0, z - (cz + 0.5) * 4.0, (y - (cy + 0.5) * 4.0) * 0.6);
+            // A ring a little longer along the body than tall, inside its cell: squeezing the height
+            // (as it was) drew rings taller than the cell, cut by it into vertical streaks.
+            let (dx, dz, dy) = (x - (cx + 0.5) * 4.0, (z - (cz + 0.5) * 4.0) * 0.85, y - (cy + 0.5) * 4.0);
             let dist = (dx * dx + dy * dy + dz * dz).sqrt();
             smooth(dist, 0.6, 0.8) * (1.0 - smooth(dist, 1.5, 1.7))
         }
@@ -2226,7 +2452,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 26] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 32] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2252,7 +2478,13 @@ const MODEL_LAYERS: [ModelLayers; 26] = model_layers!(
     "gull",
     "caiman",
     "wolf",
-    "jaguar"
+    "jaguar",
+    "psittacosaurus",
+    "ankylosaur",
+    "iguanodont",
+    "citipati",
+    "early_bird",
+    "sauropod"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {

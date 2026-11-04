@@ -432,6 +432,41 @@ pub const FOODS: &[Food] = &[
         poison: 0.0,
         category: Category::Seeds,
     },
+    // A handful (50 g) of kelp (USDA, raw kelp): salty, a little starch, a sea vegetable.
+    Food {
+        name: "base:kelp",
+        grams: 50.0,
+        per100: per(81.6, 1.7, 9.6, 0.6, 1.3, 3.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (3.0, 3.0),
+        poison: 0.0,
+        category: Category::WaterPlants,
+    },
+    // A cattail's rhizome (100 g), spring's classic survival starch, roasted or raw: about 17 g of
+    // starch in 100 g fresh (an estimate, Research round 3), the rest mostly water and fibre.
+    Food {
+        name: "base:cattail_root",
+        grams: 100.0,
+        per100: per(78.0, 1.2, 17.0, 0.2, 3.0, 2.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (14.0, 14.0),
+        poison: 0.0,
+        category: Category::Roots,
+    },
+    // A bowl (150 g) of wild rice cooked from its grain (USDA, cooked wild rice): spring's real
+    // grain in the swamp and the llanos.
+    Food {
+        name: "base:cooked_wild_rice",
+        grams: 150.0,
+        per100: per(73.9, 4.0, 21.3, 0.3, 1.8, 0.0),
+        meal: Meal::Cooked,
+        raw: false,
+        keeps: (3.0, 3.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
     // Mushrooms (50 g), as white mushrooms (USDA); the red one is the fly agaric, poisonous.
     Food {
         name: "base:mushroom_brown",

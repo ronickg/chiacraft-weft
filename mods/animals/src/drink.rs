@@ -105,8 +105,13 @@ fn nearest_water(w: &World, pos: [f64; 3]) -> Option<[f64; 3]> {
 
 /// Whether it is drinking or on its way to water (a resting animal settles only when it isn't).
 pub fn busy(w: &World, id: u64) -> bool {
-    w.component(id, &DRINK)
-        .is_some_and(|d| d[3] != 0.0 && !d[0].is_nan())
+    // As foraging (`forage::busy`): a trip left from before it was slaked isn't one.
+    let thirsty = w
+        .component(id, &ANIMAL)
+        .is_some_and(|a| a.thirst > 1.0 - animals_core::needs::SLAKED);
+    thirsty
+        && w.component(id, &DRINK)
+            .is_some_and(|d| d[3] != 0.0 && !d[0].is_nan())
 }
 
 /// A goal (run first by the forage goal, `forage::forage`): thirsty, it goes to the nearest water
@@ -142,7 +147,7 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
         if w.navigating(id) {
             w.navigate(id, st.pos, 0.0);
         }
-        weft_sdk::info!("{} {id} drinks: water {:.0}%", s.name, (water + GULP).min(1.0) * 100.0);
+        weft_sdk::debug!("{} {id} drinks: water {:.0}%", s.name, (water + GULP).min(1.0) * 100.0);
         let p = spot.unwrap_or(st.pos);
         d = [p[0], p[1], p[2], now + GULP_TICKS as f64];
         w.component_mut(id, &DRINK).map(|c| *c = d);
@@ -154,7 +159,7 @@ pub fn drink(w: &World, id: u64, st: &EntityState) -> bool {
     }
     match nearest_water(w, st.pos) {
         Some(p) => {
-            weft_sdk::info!("{} {id} is thirsty (water {:.0}%): to water at {p:?}", s.name, water * 100.0);
+            weft_sdk::debug!("{} {id} is thirsty (water {:.0}%): to water at {p:?}", s.name, water * 100.0);
             w.navigate(id, p, 1.0);
             d = [p[0], p[1], p[2], now + WALK];
         }

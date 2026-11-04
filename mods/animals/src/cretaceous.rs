@@ -31,6 +31,10 @@ pub static CRAGS: Biome = Biome::named("crags");
 static TREES: Component<f32> = Component::named("trees");
 static GRASS_COVER: Component<f32> = Component::named("grass");
 static TREE_KINDS: Component<BlockList> = Component::named("tree_kinds");
+/// Extra trees where a forest stands thick, in stands with clearings between (base's worldgen).
+static STAND_TREES: Component<f32> = Component::named("stand_trees");
+/// Boulders, a heap of stone per 12 x 12 cell (base's worldgen).
+static BOULDERS: Component<f32> = Component::named("boulders");
 static FLOWERS: Component<BlockList> = Component::named("flowers");
 /// On a log, the leaves of the tree base's worldgen grows from it; tags `cone_tree`, `flat_tree`,
 /// `palm_tree` give its shape.
@@ -123,10 +127,13 @@ pub fn init(r: &mut Registry) {
     // Dry, open land with a few conifers and ferns: between the dunes and the wet.
     r.biome(&SCRUBLAND)
         .set(&CLIMATE, base_api::climate("animals:scrubland"))
+        .set(&BOULDERS, 0.08)
         .humidity(-0.12..0.05)
         .surface("base:grass", "base:dirt", 3)
         .tint(grass, 0xb5ad5a)
         .tint(foliage, 0x8f9a3c)
+        .tint(&base_api::trees::EVERGREEN, 0x8f9a3c)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x8f9a3c)
         .tag("hot")
         .set(&TREES, 0.02)
         .set(&GRASS_COVER, vitals::forage::grass_cover("animals:scrubland").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
@@ -140,9 +147,12 @@ pub fn init(r: &mut Registry) {
         .surface("base:grass", "base:dirt", 3)
         .tint(grass, 0x7fa64a)
         .tint(foliage, 0x5d8f35)
+        .tint(&base_api::trees::EVERGREEN, 0x5d8f35)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x5d8f35)
         .tint(water, 0x4a6e5a)
         .tag("wet")
         .set(&TREES, 0.04)
+        .set(&STAND_TREES, 0.1)
         .set(&GRASS_COVER, vitals::forage::grass_cover("animals:floodplain").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "animals:swamp_cypress_log:3 animals:araucaria_log:2 animals:tempskya_log:2")
         .set(&FERNS, 0.35)
@@ -154,8 +164,11 @@ pub fn init(r: &mut Registry) {
         .surface("base:grass", "base:dirt", 3)
         .tint(grass, 0x6f9c40)
         .tint(foliage, 0x4f8a2c)
+        .tint(&base_api::trees::EVERGREEN, 0x4f8a2c)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x4f8a2c)
         .tag("forest")
         .set(&TREES, 0.35)
+        .set(&STAND_TREES, 0.18)
         .set(&GRASS_COVER, vitals::forage::grass_cover("animals:fern_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "animals:araucaria_log:3 animals:ginkgo_log:2 base:spruce_log:2 animals:tempskya_log:1")
         .set(&FERNS, 0.3)
@@ -163,6 +176,7 @@ pub fn init(r: &mut Registry) {
     // High rock: the wyverns'.
     r.biome(&CRAGS)
         .set(&CLIMATE, base_api::climate("animals:crags"))
+        .set(&BOULDERS, 0.3)
         .surface("base:grass", "base:dirt", 3)
         .bare_above(115)
         .tint(grass, 0x8aa864)
@@ -231,7 +245,8 @@ pub fn init(r: &mut Registry) {
 /// foliage and big cones; ginkgos, round, deciduous, with fleshy seeds; the floodplain's swamp
 /// cypresses and the dry land's scale-leaved conifers (Cheirolepidiaceae), both cones; and the tree
 /// fern Tempskya, a trunk of roots under a crown of fronds. Wood, shape, what the leaves drop.
-/// No saplings yet: they grow by base's plant rule, which this mod can't call.
+/// Their saplings grow by the place (`base_api::grow`, `vitals::plants`); Tempskya, which spread by
+/// its roots, has none.
 const WOODS: [(&str, Option<&str>, Option<&str>); 5] = [
     ("araucaria", Some("flat_tree"), Some("araucaria_cone")),
     ("ginkgo", None, Some("ginkgo_seed")),
@@ -280,14 +295,42 @@ fn woods(r: &mut Registry) {
             .hardness(0.2)
             .cutout()
             .opacity(1)
-            .tint(&tints::FOLIAGE)
+            .tint(base_api::trees::leaf_tint(vitals::wild::turn(&format!("animals:{wood}_leaves"))))
             .tag("leaves")
             .mineable("shears")
             .tab(&NATURAL);
+        let plant: &'static str = Box::leak(format!("animals:{wood}_sapling").into_boxed_str());
+        let has_sapling = vitals::plants::of(plant).is_some();
+        let table = r.loot(leaves);
+        let table = if has_sapling { table.pool(Pool::new().when(Cond::Chance(0.05)).item(plant)) } else { table };
+        drop(match fruit {
+            Some(fruit) => table.pool(Pool::new().when(Cond::Chance(0.05)).item(fruit)),
+            None => table,
+        });
         if let Some(fruit) = fruit {
-            r.loot(leaves)
-                .pool(Pool::new().when(Cond::Chance(0.05)).item(fruit));
             r.item(Item::generated(fruit.into())).tab(&NATURAL);
+        }
+        if has_sapling {
+            let log: &'static str = Box::leak(format!("animals:{wood}_log").into_boxed_str());
+            r.block(Block::generated(plant.into()))
+                .sound_group("base:block.grass")
+                .texture(&format!("sapling_{wood}"))
+                .plant()
+                .needs_below("#plant_soil")
+                .growth(base_api::grow::step_secs(plant, 1, 470.0), 9)
+                .on_grow(move |e| match base_api::grow::step(e, plant, false) {
+                    base_api::grow::Step::Grow => {
+                        if let Some(id) = Block::lookup(log) {
+                            base_api::trees::grow_tree(e.world(), e.pos(), id);
+                        }
+                    }
+                    // A frost kills a sapling of the warm Cretaceous.
+                    base_api::grow::Step::Frost => {
+                        e.world().set(e.pos(), 0);
+                    }
+                    base_api::grow::Step::Rest => {}
+                })
+                .tab(&NATURAL);
         }
     }
 }

@@ -20,8 +20,11 @@ mod camp;
 mod food;
 mod health;
 mod load;
+mod shelter;
 mod stamina;
 mod temperature;
+
+use std::sync::Mutex;
 
 use base_api::{VITALS, Vitals};
 use vitals::effects::{self, Effect};
@@ -31,6 +34,7 @@ use weft_sdk::*;
 
 pub use breath::MAX_AIR;
 pub use camp::REST_SECS;
+pub(crate) use food::{crafted, life_used, made_for, spoiled};
 
 /// A tick, in seconds.
 const DT: f32 = 1.0 / 20.0;
@@ -40,6 +44,19 @@ pub fn register(r: &mut Registry) {
     r.config(&base_api::DIFFICULTY)
         .choice(1, &difficulty::ALL.map(|d| d.name))
         .world();
+    // Gentle's grace: no monsters appear by themselves in a new world's first nights
+    // (`Difficulty::grace_nights`, counted from the world's first day, `calendar::START_DAY`).
+    r.intercept(&question::NATURAL_SPAWN, |q| {
+        static HOSTILE: Tag = Tag::named("hostile");
+        let w = q.world();
+        let nights = base_api::difficulty().grace_nights;
+        let day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
+        if nights > 0 && day < vitals::calendar::START_DAY + nights && HOSTILE.on_entity(q.query().other as u32) {
+            Verdict::Deny
+        } else {
+            Verdict::Abstain
+        }
+    });
     r.entity_component(&VITALS, Vitals::new(MAX_AIR), component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP);
     r.attach(&PLAYER, &VITALS);
     r.world_tick(tick);
@@ -47,18 +64,23 @@ pub fn register(r: &mut Registry) {
     temperature::register(r);
     stamina::register(r);
     body::register(r);
-    // Dying empties the stomach and costs part of the XP into the level.
+    // Dying empties the stomach but for a light meal (the one a new player arrives with: Research
+    // round 4, H1, so the first death isn't a spiral), and costs part of the XP into the level.
     r.on(&ENTITY_DIED, |b| {
         let w = b.world();
         for d in b.iter() {
             let Some(v) = w.component_mut(d.entity, &VITALS) else { continue };
-            v.set_stomach(&stomach::Stomach::default());
-            v.stamina = 0.0;
+            v.set_stomach(&stomach::arrival());
+            // Back with breath to run (the first tick clamps it to what the stomach allows).
+            v.stamina = base_api::NEW_STAMINA;
             v.xp = levels::after_death(v.xp, base_api::difficulty().death_xp);
             v.air = MAX_AIR;
             v.wet = 0.0;
             v.core = vitals::temperature::CORE;
             (v.poison, v.bleed, v.torpor, v.out) = (0.0, 0.0, 0.0, 0);
+            // Nor food poisoning or rest (integration review: 3 minutes without healing after a
+            // respawn).
+            (v.sick, v.rested, v.resting) = (0.0, 0.0, 0.0);
             // Respawning drops the body's modifiers: the next tick sets max health and speed again.
             v.max_health = -1.0;
             v.speed = -1.0;
@@ -67,10 +89,42 @@ pub fn register(r: &mut Registry) {
 }
 
 fn tick(w: &World) {
+    // A new world with seasons begins on spring's 8th day (`vitals::calendar::START_DAY`): on
+    // this run's first tick of a dimension, a clock still in the first half of day 0 (only a new
+    // world's is) moves there, so the engine's day length and every calendar agree. (The world's
+    // own time is no test: the server may tick a while finding the spawn before anyone joins.)
+    {
+        static BEGUN: Mutex<Vec<u32>> = Mutex::new(Vec::new());
+        let mut begun = BEGUN.lock().unwrap();
+        if !begun.contains(&w.dimension()) {
+            begun.push(w.dimension());
+            let seasons = base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0) == base_api::calendars::FOUR;
+            if seasons && w.day_time() < vitals::calendar::DAY_TICKS / 2 {
+                w.set_day_time(w.day_time() + vitals::calendar::START_DAY as u64 * vitals::calendar::DAY_TICKS);
+            }
+        }
+    }
     let d = base_api::difficulty();
     let pulse = w.time() % 20 == 0;
+    // Today's date for the HUD and everything reading it (seasonal tints), for every player,
+    // creative and dead too: it was set only with the body's warmth, so after `/time set` in
+    // creative the clock stayed on its old day (Tester 2, 11-04).
+    let today = pulse.then(|| {
+        let kind = base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0);
+        let date = vitals::calendar::date(w.day_time());
+        (if kind > 0 { date.day as u16 + 1 } else { 0 }, kind)
+    });
     for id in w.players() {
+        if let Some((day, kind)) = today
+            && let Some(v) = w.component_mut(id, &VITALS)
+        {
+            (v.date, v.calendar) = (day, kind);
+        }
         let Some(mut st) = w.entity(id) else { continue };
+        // The dead have no body to keep: nothing ticks until they're back.
+        if st.health <= 0.0 {
+            continue;
+        }
         let underwater = breath::underwater(w, &st);
         let creative = w.creative(id);
         let Some(v) = w.component_mut(id, &VITALS) else { continue };

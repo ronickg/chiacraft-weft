@@ -23,10 +23,12 @@
 //! leave               # leave the world for the title screen
 //! tap screen query    # once `screen` is open, clicks the element `query` (`id:x`, `text:x`) until it closes or the element goes
 //! tap_once screen query  # the same, one click (a text field, a button that stays)
+//! screen core:multiplayer  # opens a screen by name (an engine screen or a mod's)
 //! mark path           # writes the file (a signal to another copy's await_file)
 //! await_file path 120 # until the file exists, at most 120 s
 //! origin              # later via points are relative to where the player stands now
 //! where label        # logs the player's position
+//! entities 16        # logs every entity within 16 blocks as the server and this client have it
 //! rec start|stop     # logs a marker; tools/rec.ps1 presses the OBS hotkeys on it
 //! via x y z yaw pitch # a camera waypoint (eye position), or: via x y z @ tx ty tz (look at a point)
 //! travel 8            # fly through the waypoints in 8 s: spline, eased, a little hand shake
@@ -49,6 +51,9 @@
 //! screen name         # the top screen (`none` in the world)
 //! players 2           # at least 2 players in the world (the host's view)
 //! ```
+//!
+//! `/tk time <ticks>` sets the world's whole clock (day 0 + ticks), so it also undoes a `/season`
+//! before it: set the time first, then the season (or use `/time set`, which keeps the day).
 //!
 //! Before the first step the whole script is read: an unknown command or a condition that can't
 //! be read fails the run at once, with every bad line, instead of minutes in.
@@ -91,6 +96,7 @@ const COMMANDS: &[&str] = &[
     "tap_once",
     "origin",
     "where",
+    "entities",
     "rec",
     "via",
     "travel",
@@ -520,6 +526,13 @@ async fn run_lines(t: T, src: String) -> R {
                 t.click_ui(query, 0);
                 t.frames(15).await?;
             }
+            "screen" => {
+                let screen = weft_sdk::Screen::generated(rest.to_string());
+                if !t.c().open_screen(screen) {
+                    t.fail(format!("no screen {rest}"));
+                }
+                t.screen(rest).await?;
+            }
             "mark" => {
                 if let Err(e) = std::fs::write(rest, "1") {
                     t.fail(format!("mark {rest}: {e}"));
@@ -553,6 +566,7 @@ async fn run_lines(t: T, src: String) -> R {
                 let s = t.state();
                 weft_sdk::info!("script: where {:.3} {:.3} {:.3} {rest}", s.pos[0], s.pos[1], s.pos[2]);
             }
+            "entities" => entities(&t, num(0, 16.0)).await?,
             "rec" => weft_sdk::info!("REC {rest}"),
             "via" => match waypoint(origin, rest) {
                 Some(mut w) => {
@@ -590,11 +604,17 @@ async fn run_lines(t: T, src: String) -> R {
             "until" => {
                 let (text, secs) = split_within(rest);
                 let cond = Cond::parse(text)?;
-                let deadline = Instant::now() + Duration::from_secs_f32(secs);
+                let waited = Instant::now();
+                let deadline = waited + Duration::from_secs_f32(secs);
                 loop {
                     let (ok, seen) = cond.check(&t).await?;
                     if ok {
-                        weft_sdk::info!("script: line {} until {text}: after {:.1} s", n + 1, started.elapsed().as_secs_f32());
+                        weft_sdk::info!(
+                            "script: line {} until {text}: met after {:.1} s ({:.1} s into the script)",
+                            n + 1,
+                            waited.elapsed().as_secs_f32(),
+                            started.elapsed().as_secs_f32()
+                        );
                         break;
                     }
                     if Instant::now() > deadline {
@@ -608,6 +628,82 @@ async fn run_lines(t: T, src: String) -> R {
         }
         // One step per frame.
         t.frames(1).await?;
+    }
+    Ok(())
+}
+
+/// Every entity within `r` blocks, one line each: where the server has it and where this client
+/// does (or that it doesn't), the client's block under its feet and light there. For "the server
+/// has it, the client draws nothing".
+async fn entities(t: &T, r: f32) -> R {
+    let me = t.state().pos;
+    let near = t
+        .op(&format!("near {:.0} {:.0} {:.0} {r}", me[0].floor(), me[1].floor(), me[2].floor()))
+        .await?;
+    let mut ids: Vec<u64> = near
+        .split_whitespace()
+        .filter_map(|p| p.split(':').next()?.parse().ok())
+        .collect();
+    let c = t.c();
+    let mine = c.entities();
+    let close = |p: [f64; 3]| (0..3).map(|i| (p[i] - me[i]).powi(2)).sum::<f64>() <= (r as f64).powi(2);
+    let only_mine: Vec<u64> = mine
+        .iter()
+        .copied()
+        .filter(|id| !ids.contains(id) && c.entity(*id).is_some_and(|e| close(e.pos)))
+        .collect();
+    ids.extend(only_mine);
+    weft_sdk::info!(
+        "entities: me at {:.2} {:.2} {:.2}, server {} within {r}, client knows {} in all",
+        me[0],
+        me[1],
+        me[2],
+        near.split_whitespace().count(),
+        mine.len()
+    );
+    for id in ids {
+        let server = t
+            .op(&format!("entity {id}"))
+            .await
+            .unwrap_or_else(|e| format!("none ({e})"));
+        // Under it as the server has it.
+        let under = match server
+            .split_whitespace()
+            .skip(1)
+            .take(3)
+            .map(|v| v.parse::<f64>())
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(p) if p.len() == 3 => {
+                let at = format!("{:.0} {:.0} {:.0}", p[0].floor(), p[1].floor() - 1.0, p[2].floor());
+                let block = t.op(&format!("get {at}")).await.unwrap_or_default();
+                let light = t
+                    .op(&format!("light {:.0} {:.0} {:.0}", p[0].floor(), p[1].floor(), p[2].floor()))
+                    .await
+                    .unwrap_or_default();
+                format!(", under {block}, light {light}")
+            }
+            _ => String::new(),
+        };
+        let client = match c.entity(id) {
+            Some(e) => {
+                let feet = [e.pos[0].floor() as i32, e.pos[1].floor() as i32, e.pos[2].floor() as i32];
+                let below = [feet[0], feet[1] - 1, feet[2]];
+                format!(
+                    "at {:.2} {:.2} {:.2}, health {}, size {:?}, block under {:?}, light {:?}, cube shown {}",
+                    e.pos[0],
+                    e.pos[1],
+                    e.pos[2],
+                    e.health,
+                    e.size,
+                    c.block(below).map(weft_sdk::block_name),
+                    c.light(feet),
+                    c.cube_shown(feet)
+                )
+            }
+            None => "MISSING".into(),
+        };
+        weft_sdk::info!("entities: {id} server [{server}{under}] client [{client}]");
     }
     Ok(())
 }

@@ -8,7 +8,7 @@ rules (see `area`).
 Units are the house's (64 a block, 1.56 cm each), y up, it faces +z. A real one was about 20 cm
 long, the tail more than half of it: here about 1.3 times life, as the mouse: 9 units from the
 snout to the hips, the tail 10 more. Its head is still only 2.4 units across and 1.5 tall, so it is
-painted `house.FINE` texels a unit (256 a block): a designed eye that blinks, nostrils and lips. Its legs sprawl out
+painted 4 times the house density (`TX`, 128 a block): a designed eye that blinks, nostrils and lips. Its legs sprawl out
 to the sides, the body carried low; it bobs its head and pushes up on its front legs, as agamas do.
 """
 
@@ -24,10 +24,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit  # noqa: E402
 from ground import lowest  # noqa: E402
-from house import FINE as K  # noqa: E402  texels a unit: a small creature paints finer
+from house import texels  # noqa: E402
+
+# Texels a unit: 128 a block (k = 4, `house.fine`). The eye sits on the head's side, 2 units by 1.5:
+# at the house's 32 a block that is 1 texel by 0.75, at 64 still 1.5 tall; at 128 it is 4 by 3.
+TX = texels(0.25, 4)
 
 OUT = os.environ.get("LIZARD_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -46,31 +50,58 @@ COAT = (SKIN, BACK, BELLY, PALE)
 ROLES = [("coat", 0, 0), ("coat", 0, -1.2), ("coat", 1, 0), ("coat", 0.6, 0.6), "fixed", "fixed"]
 
 # An agama's eye: a dark pupil in a gold-brown ring, a catchlight toward the front, darker scales
-# round it. Painted `house.FINE` texels a unit.
+# round it. "lizard" is the old one at 256 a block (for comparison); at 128 the head's side is 4
+# texels by 3 and the eye 2 by 2: the catchlight in front of the pupil, the gold ring under them.
 EYES.update({
     "lizard": dict(pattern=[".GG.",
                             "GHPG",
                             "GPPG",
                             ".gg."], colors={"P": (28, 22, 16), "H": (232, 224, 196), "G": (150, 112, 58), "g": (188, 146, 76)},
-                   halo="round"),
+                   halo="round", iris="Gg"),
+    "lizard_px": dict(pattern=["HP", "Gg"], colors={"P": (28, 22, 16), "H": (232, 224, 196), "G": (150, 112, 58),
+                                                    "g": (188, 146, 76)}, halo="none", iris="Gg"),
+    "lizard_px_ring": dict(pattern=["GP", "gG"], colors={"P": (28, 22, 16), "G": (150, 112, 58), "g": (188, 146, 76)},
+                           halo="none", iris="Gg"),
+    "lizard_px_dark": dict(pattern=["HP", "PG"], colors={"P": (28, 22, 16), "H": (232, 224, 196), "G": (150, 112, 58)},
+                           halo="none", iris="G"),
 })
-EYE_STYLE = os.environ.get("LIZARD_EYES", "lizard")
+EYE_STYLE = os.environ.get("LIZARD_EYES", "lizard_px")
 SKULL = ((-1.2, 0.8, 2.8), (1.2, 2.3, 4.8))
 EYE_Z, EYE_Y = 4.0, 1.6
 LID_X = 1.55  # the eyelids' hinge plane, 0.35 outside the head's side: closed, they sit over the eye
 LASH = (70, 54, 40)
 
 
+def skull_side():
+    """The skull side's texels: (width, height) and one texel's size in units (u along z, v along y)."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h = max(1, round(TX * (z1 - z0))), max(1, round(TX * (y1 - y0)))
+    return w, h, (z1 - z0) / w, (y1 - y0) / h
+
+
+def eye_pattern(side):
+    """The eye's design on one side: mirrored on the west face (its texels run back to front), so
+    the catchlight is toward the snout on both."""
+    pat = EYES[EYE_STYLE]["pattern"]
+    return pat if side > 0 else [row[::-1] for row in pat]
+
+
+def eye_center(side):
+    """The eye's center on the skull's east (side > 0) or west face, in that face's texels."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h, su, sv = skull_side()
+    return ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0)) / su, (y1 - EYE_Y) / sv
+
+
 def eye_box(side):
     """(z0, z1, top, bottom) of the eye on one side in units, rounded as `stamp_eyes` places it."""
-    pat = EYES[EYE_STYLE]["pattern"]
+    pat = eye_pattern(side)
     ph, pw = len(pat), len(pat[0])
     (x0, y0, z0), (x1, y1, z1) = SKULL
-    cu = K * ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0))
-    u0 = int(round(cu - pw / 2))
-    v0 = int(round(K * (y1 - EYE_Y) - ph / 2))
-    za, zb = (z1 - (u0 + pw) / K, z1 - u0 / K) if side > 0 else (z0 + u0 / K, z0 + (u0 + pw) / K)
-    return za, zb, y1 - v0 / K, y1 - (v0 + ph) / K
+    w, h, su, sv = skull_side()
+    u0, v0 = eye_corner(*eye_center(side), pat, w)
+    za, zb = (z1 - (u0 + pw) * su, z1 - u0 * su) if side > 0 else (z0 + u0 * su, z0 + (u0 + pw) * su)
+    return za, zb, y1 - v0 * sv, y1 - (v0 + ph) * sv
 
 # ------------------------------------------------------------------ the model
 
@@ -153,7 +184,7 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(K * abs(size @ du)))), max(1, int(round(K * abs(size @ dv)))), n
+    return np.array(corner, float), du, dv, max(1, int(round(TX * abs(size @ du)))), max(1, int(round(TX * abs(size @ dv)))), n
 
 
 def area(e, face, p, uu, vv, h):
@@ -217,8 +248,8 @@ def rotm(rot):
 def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     size = np.array(e["hi"]) - np.array(e["lo"])
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du * (abs(size @ du) / w) + vv[..., None] * dv * (abs(size @ dv) / h)
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel centers, in texels
+    p = corner + uu[..., None] * du * (abs(size @ du) / w) + vv[..., None] * dv * (abs(size @ dv) / h)  # ... in units
     light_face = face
     if face == "down" and e["name"].startswith(("leg_", "tail")):
         light_face = "north"
@@ -231,19 +262,30 @@ def paint_face(e, face, boxes):
                             seed=sum(map(ord, e["name"] + face)) % 97, tuft=False, merge=False)
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["name"] == "skull" and face in ("east", "west"):
-        (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = K * ((z1 - EYE_Z) if face == "east" else (EYE_Z - z0))
-        stamp_eyes(img, [(cu, K * (y1 - EYE_Y))], EYE_STYLE)
+        side = 1 if face == "east" else -1
+        EYES["_lizard_side"] = dict(EYES[EYE_STYLE], pattern=eye_pattern(side))
+        stamp_eyes(img, [eye_center(side)], "_lizard_side")
     if e["name"] == "snout" and face in ("east", "west"):  # the lips' line, rising a little at the back
-        img[h - 1, :, :3] = BASE[MOUTH]
-        back = slice(w - 2, w) if face == "east" else slice(0, 2)
-        img[h - 2, back, :3] = BASE[MOUTH]
+        if h >= 3:
+            img[h - 1, :, :3] = BASE[MOUTH]
+            back = slice(w - 2, w) if face == "east" else slice(0, 2)
+            img[h - 2, back, :3] = BASE[MOUTH]
+        else:  # at 128 a block the snout's side is one texel tall: the lips a darker side, not a line
+            img[..., :3] = (img[..., :3] * 0.55 + np.array(BASE[MOUTH]) * 0.45).astype(np.uint8)
     if e["name"] == "snout" and face == "south":  # the nostrils, two slits at the top corners
-        for c in (1, w - 2):  # faint: dark spots on a face read as eyes
-            img[0, c, :3] = (img[0, c, :3] * 0.8).astype(np.uint8)
-        img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.8).astype(np.uint8)
+        if h >= 3:
+            for c in (1, w - 2):  # faint: dark spots on a face read as eyes
+                img[0, c, :3] = (img[0, c, :3] * 0.8).astype(np.uint8)
+            img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.8).astype(np.uint8)
+        else:  # 3 texels by 1: the outer two a little darker
+            for c in (0, w - 1):
+                img[0, c, :3] = (img[0, c, :3] * 0.82).astype(np.uint8)
     if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
-        img[:, 0 if e["name"].endswith("L") else w - 1, :3] = LASH
+        c = 0 if e["name"].endswith("L") else w - 1
+        if w >= 3:
+            img[:, c, :3] = LASH
+        else:  # a 2-texel lid: a full dark lash would cover half the eye
+            img[:, c, :3] = (img[:, c, :3] * 0.5 + np.array(LASH) * 0.5).astype(np.uint8)
     if e["name"].endswith("_paw") and face == "south":  # the claws
         img[:, ::2, :3] = (img[:, ::2, :3] * 0.7).astype(np.uint8)
     if LAYERS["rec"] is not None:

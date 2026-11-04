@@ -8,39 +8,19 @@ use weft_sdk::*;
 
 pub(crate) static CAT: Entity = Entity::named("cat");
 const TEXTURE: &str = "cat/cat";
-/// Resting this long (thirty seconds), a sitting cat lies down.
-const LIE_TICKS: u32 = 600;
-
-value! {
-    #[derive(Default)]
-    /// What a cat is doing (not saved: it just settles down again).
-    pub struct Cat {
-        /// Ticks left resting (0: up and about).
-        pub rest: u32,
-        /// Ticks rested so far.
-        pub rested: u32,
-        /// The look applied, 1 + pose (0: none yet).
-        pub look: u32,
-    }
-}
-
-static STATE: Component<Cat> = Component::named("cat_state");
-
-const LOOKS: [(&str, &str); 3] = [("", ""), ("_sit", "cat_sit"), ("_lie", "cat_lie")];
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(&STATE, Cat::default(), 0);
-    // The poses, drawn in place of a cat sitting or lying down.
-    for (suffix, kind) in &LOOKS[1..] {
-        drop(
-            r.entity(Entity::generated(kind.to_string()))
-                .size(0.35, 0.44)
-                .passive()
-                .model_file("cat")
-                .animations(&format!("cat{suffix}"))
-                .texture(TEXTURE),
-        );
-    }
+    let index = crate::species::of(&CAT);
+    // Settling down: its poses, drawn in place of it (`rest.rs`).
+    crate::rest::register(
+        r,
+        &CAT,
+        crate::rest::Settle { chance: 300, ticks: (400, 1200), lie_after: 600 },
+        "cat",
+        TEXTURE,
+        (0.35, 0.44),
+        &[("_sit", "cat_sit"), ("_lie", "cat_lie")],
+    );
     r.entity(&CAT)
         .size(0.35, 0.44)
         .health(6.0)
@@ -50,7 +30,6 @@ pub fn init(r: &mut Registry) {
         .model_file("cat")
         .animations("cat")
         .texture(TEXTURE)
-        .attach(&STATE)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
             if !crate::screen::interact(&w, id, player) && !crate::taming::feed(&w, id, player) {
@@ -59,14 +38,14 @@ pub fn init(r: &mut Registry) {
         })
         .goals(
             Goals::new()
-                .then(crate::animal::upkeep(1))
-                .then(crate::taming::behave(1))
+                .then(crate::animal::upkeep(index))
+                .then(crate::taming::behave(index))
                 .then(crate::hunt::wary)
                 .then(crate::hunt::hunt)
                 .then(crate::signatures::gifts)
-                .then(crate::commands::act(1))
-                .then(crate::breeding::behave(1))
-                .then(settle)
+                .then(crate::commands::act(index))
+                .then(crate::breeding::behave(index))
+                .then(crate::rest::settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)
                 .then(crate::forage::forage)
@@ -74,52 +53,6 @@ pub fn init(r: &mut Registry) {
         )
         .on_hurt(|w, h| {
             crate::taming::hurt(w, h.entity);
-            if let Some(c) = w.component_mut(h.entity, &STATE) {
-                c.rest = 0;
-            }
+            crate::rest::stop(w, h.entity);
         });
-}
-
-/// Every tick: now and then settle down for a while (sit, then lie), and show the pose.
-fn settle(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(c) = w.component_mut(id, &STATE) else { return false };
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(300) == 0 {
-        c.rest = 400 + w.random_below(1200);
-        c.rested = 0;
-    }
-    let resting = c.rest > 0;
-    if resting {
-        c.rest = c.rest.saturating_sub(w.tick_elapsed(id) as _);
-        c.rested = c.rested.saturating_add(w.tick_elapsed(id) as _);
-    }
-    let pose = match (resting, c.rested > LIE_TICKS) {
-        (false, _) => 0,
-        (true, false) => 1,
-        (true, true) => 2,
-    };
-    if c.look != pose + 1 {
-        c.look = pose + 1;
-        let kind = LOOKS[pose as usize].1;
-        w.set_look(
-            id,
-            (!kind.is_empty())
-                .then(|| format!("animals:{kind}"))
-                .as_deref(),
-        );
-    }
-    if resting && w.navigating(id) {
-        w.navigate(id, st.pos, 0.0);
-    }
-    resting
-}
-
-/// Up from resting, to follow or fight.
-pub fn wake(w: &World, id: u64) {
-    if let Some(c) = w.component_mut(id, &STATE)
-        && (c.rest > 0 || c.look > 1)
-    {
-        c.rest = 0;
-        c.look = 1;
-        w.set_look(id, None);
-    }
 }

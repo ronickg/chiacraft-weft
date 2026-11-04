@@ -1,0 +1,10 @@
+[
+ {
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "name": "rock_granite_b",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/stone.png",
+  "what": "warm-grey granite in large rounded slabs: the same SIZE and soft rounded shapes of slabs as the attached stone (about 6-9 per tile, deep crevices between them in a dark warm grey), but each slab is warm grey (#8c8682 to #b4aca6) speckled with small 1-2 px flecks of soft pink feldspar (#c99a8e), pale quartz (#d2ccc6) and dark mica (#4c4644). Not green or sage: warm grey with a faint pink cast. Seamless on all four edges, every cell filled, no border."
+ }
+]

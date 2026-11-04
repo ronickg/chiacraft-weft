@@ -1,0 +1,62 @@
+{
+ "species": "pinacosaurus",
+ "about": "Pinacosaurus grangeri: no record of its colors; here a Gobi animal's, pale sand to ochre, paler below.",
+ "loci": [
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "pale sand to ochre"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   150,
+   104,
+   48
+  ],
+  [
+   120,
+   80,
+   40
+  ]
+ ],
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2",
+    "tail_3"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  }
+ }
+}

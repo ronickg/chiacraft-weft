@@ -33,6 +33,8 @@ struct Seen {
     sets: u32,
     sounds: u32,
     particles: Vec<u32>,
+    scheduled: Vec<u32>,
+    sent: Vec<(String, Vec<u8>)>,
 }
 
 fn text(key: &str, args: &[Arg]) -> String {
@@ -157,6 +159,16 @@ impl Game for Fake {
     fn spawn_particles(&mut self, _: &str, _: [f64; 3], count: u32) {
         self.0.lock().unwrap().particles.push(count);
     }
+    fn schedule(&mut self, _: [i32; 3], ticks: u32) {
+        self.0.lock().unwrap().scheduled.push(ticks);
+    }
+    fn send(&mut self, _: u64, channel: &str, data: &[u8]) {
+        self.0
+            .lock()
+            .unwrap()
+            .sent
+            .push((channel.to_string(), data.to_vec()));
+    }
 }
 
 struct World {
@@ -249,6 +261,55 @@ fn batched_blocks_and_effects_keep_their_allowances() {
 }
 
 #[test]
+fn registers_its_blocks_items_and_channels() {
+    let m = Mod::load("probe", guest()).unwrap();
+    let tail: Vec<&Hook> = m.hooks().iter().skip(5).collect();
+    assert_eq!(
+        tail,
+        [
+            &Hook::BlockUse("probe:bell".into()),
+            &Hook::BlockScheduled("probe:bell".into()),
+            &Hook::ItemUse("probe:wand".into()),
+            &Hook::Channel("probe:pings".into()),
+        ]
+    );
+}
+
+#[test]
+fn block_item_and_packet_calls() {
+    let mut w = World::new(None);
+    let used = |y| BlockUseEvent { player: 7, pos: (0, y, 0), state: 1, face: 1 };
+    assert!(w.inst.block_use(w.game(), 5, used(3)));
+    assert!(!w.inst.block_use(w.game(), 5, used(-3)));
+    let ev = BlockUpdateEvent { pos: (0, 3, 0), state: 1, other: (0, 3, 0), entity: 0 };
+    w.inst.block_update(w.game(), 6, ev);
+    {
+        let seen = w.seen.lock().unwrap();
+        assert_eq!(seen.tells, ["probe.rang 3", "probe.rang -3", "probe.scheduled 3"]);
+        // A tick at least 1 away.
+        assert_eq!(seen.scheduled, [1, 1]);
+    }
+    let stack = ItemStack { item: 9, count: 5, data: 0 };
+    let r = w
+        .inst
+        .item_use(w.game(), 7, ItemUseEvent { player: 7, stack, slot: 0, target: None });
+    assert!(r.handled);
+    assert_eq!(r.stack.map(|s| s.count), Some(4));
+    w.inst.packet(w.game(), 8, 7, b"hi");
+    let seen = w.seen.lock().unwrap();
+    assert_eq!(seen.sent.len(), 32, "32 sends a call");
+    assert_eq!(seen.sent[0], ("probe:pings".to_string(), b"pong hi".to_vec()));
+}
+
+#[test]
+fn a_component_built_for_1_1_still_loads() {
+    let wasm = std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/packages/tally/code/server.wasm")).unwrap();
+    let m = Mod::load("tally", &wasm).unwrap();
+    assert_eq!(m.hooks().len(), 2);
+    assert_eq!(m.decls().len(), 2);
+}
+
+#[test]
 fn a_component_built_for_1_0_still_loads() {
     // The clans package's server half, built with the 1.0 SDK and committed.
     let wasm = std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/packages/clans/code/server.wasm")).unwrap();
@@ -307,6 +368,26 @@ fn three_strikes_stop_it() {
 }
 
 #[test]
+fn stats_count_and_a_stopped_mod_resumes() {
+    let mut w = World::new(None);
+    w.probe("count", None);
+    w.probe("count", None);
+    let st = w.inst.stats();
+    assert_eq!((st.calls, st.strikes), (2, 0));
+    assert!(st.slowest > std::time::Duration::ZERO && st.average_us() > 0.0);
+    for _ in 0..STRIKES {
+        w.probe("panic", None);
+    }
+    let st = w.inst.stats();
+    assert_eq!(st.strikes, STRIKES);
+    assert!(st.stopped.is_some());
+    // An operator's `/mods resume`: it runs again, its memory new.
+    w.inst.resume();
+    assert_eq!(w.probe("count", None), ["probe.count 1"]);
+    assert_eq!(w.inst.stats().strikes, 0);
+}
+
+#[test]
 fn per_call_allowances_hold() {
     let mut w = World::new(None);
     w.probe("flood", None);
@@ -354,7 +435,7 @@ fn registering_after_init_is_refused() {
 fn one_api_version() {
     let (major, minor) = chiacraft_packages::code::API;
     assert_eq!(API, format!("{major}.{minor}.0"));
-    assert!(include_str!("../wit/v1.1/mod.wit").contains(&format!("package chiacraft:mods@{API};")));
+    assert!(include_str!("../wit/v1.3/mod.wit").contains(&format!("package chiacraft:mods@{API};")));
 }
 
 #[test]

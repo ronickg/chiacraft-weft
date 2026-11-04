@@ -3,7 +3,8 @@
 The common raven (*Corvus corax*), the living world's carrion bird of the cold biomes, where there
 are no vultures (`notes/ECOLOGY.md`, "The food webs and the species to add"), made with the
 `blocky-model` skill ([.claude/skills/blocky-model](../../../../.claude/skills/blocky-model/SKILL.md))
-from research alone, at the house density (64 texels a block). How it lives and flies is
+from research alone, laid out in house units (64 a block) and painted at 64 texels a block: twice the
+house's 32, as its head's side (the eye's face) would be 2.5 texels at 32 (`house.MIN_FACE`). How it lives and flies is
 `src/raven.rs`.
 
 ## Rebuild
