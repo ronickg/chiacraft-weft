@@ -111,6 +111,7 @@ pub static PSITTACOSAURIDAE: Family = Family { name: "Psittacosauridae", above: 
 pub static POLACANTHIDAE: Family = Family { name: "Polacanthidae", above: &["Dinosauria", "Ankylosauria"] };
 pub static ANKYLOSAURIDAE: Family = Family { name: "Ankylosauridae", above: &["Dinosauria", "Ankylosauria"] };
 pub static STYRACOSTERNA: Family = Family { name: "Styracosterna", above: &["Dinosauria", "Ornithopoda"] };
+pub static NEOSUCHIA: Family = Family { name: "Neosuchia", above: &["Crocodylomorpha", "Crocodyliformes"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -418,7 +419,7 @@ const BASE: Species = Species {
 /// `BASE`'s family, a placeholder every row replaces.
 static NO_FAMILY: Family = Family { name: "", above: &[] };
 
-pub static SPECIES: [Species; 41] = [
+pub static SPECIES: [Species; 42] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -2767,6 +2768,69 @@ pub static SPECIES: [Species; 41] = [
         // (`web/test.mjs`).
         tune: Tune { growth: Some(144_000), litter: Some((1, 3)), crowd: Some(12), ..Tune::NONE },
         birth_size: 0.1,
+        ..BASE
+    },
+    // The crocodyliform (`reports/ecology/Cretaceous food webs.md`: the water's hunter, a predator
+    // for young Utahraptors as caimans are for capybaras): a neosuchian of the Yellow Cat's rivers
+    // (its remains are fragments, no named species), on the caiman's model drawn about 1.6 times
+    // as long by its genes (`source/caiman`, `caiman.rs`).
+    Species {
+        model: "caiman",
+        name: "crocodyliform",
+        binomial: "Neosuchia indet.",
+        family: &NEOSUCHIA,
+        subfamily: "",
+        size: Size::Large,
+        // Fish first, then what comes to the water to drink, and carrion.
+        eats: &[(Fish, 0.6), (Meat, 0.3), (Carrion, 0.1)],
+        // A fish to a young dinosaur near its own mass.
+        prey: (0.005, 1.0),
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [45.0, 180.0, 160.0, 7.0, 1.0, 120.0, 400.0, 90.0, 40.0],
+        hunger: 60.0,
+        foods: &[eats("animals:trout", 10), favorite("animals:venison", 14)],
+        shy: 6.0,
+        fights: true,
+        attacks: &["bite"],
+        reach: 1.2,
+        signature: "ambush",
+        camouflage: 0.8,
+        dimorphism: 1.2,
+        // Its size genes draw it 1.6 times the caiman's model: about 3.5 m (`genetics`, Sz).
+        size_spread: 0.67,
+        // The model's length (the yacare's); its size genes draw it longer.
+        height: (2.2, "length"),
+        // The floodplain's rivers and oxbow ponds, the fern forest's lakes less often.
+        habitats: &[("animals:floodplain", 1.0), ("animals:fern_forest", 0.4)],
+        bio: Biology {
+            // About 150 kg (est., the report's).
+            mass: 150.0,
+            gestation: 0.0,
+            // As a living crocodile's, about 80 days in a mound (est.).
+            incubation: 80.0,
+            maturity: 3650.0,
+            lifespan: 18250.0,
+            interval: 365.0,
+            litter: 25.0,
+            social: Social::Solitary,
+            rarity: Rarity::Uncommon,
+            breeds: seasons::WET,
+            peak: seasons::SUMMER,
+            // Cold-blooded: at ease in the floodplain's heat, sluggish below 20 degrees.
+            comfort: (20.0, 36.0),
+            cold_blooded: true,
+        },
+        // As the caimans': clutches mostly lost to egg eaters, a long life, a long rest after a
+        // clutch, and a room that lets a small group last (`web/test.mjs`).
+        tune: Tune {
+            litter: Some((4, 8)),
+            growth: Some(150_000),
+            lifespan: Some(1_800_000),
+            recovery: Some(400_000),
+            crowd: Some(20),
+            ..Tune::NONE
+        },
+        birth_size: 0.15,
         ..BASE
     },
 ];

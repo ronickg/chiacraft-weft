@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 41] = [
+const FILES: [(&str, &str); 42] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -300,6 +300,7 @@ const FILES: [(&str, &str); 41] = [
     ("gastonia", include_str!("../../genetics/gastonia.json")),
     ("pinacosaurus", include_str!("../../genetics/pinacosaurus.json")),
     ("iguanodont", include_str!("../../genetics/iguanodont.json")),
+    ("crocodyliform", include_str!("../../genetics/crocodyliform.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1519,6 +1520,20 @@ fn iguanodont(r: &Read) -> Look {
     }
 }
 
+/// The crocodyliform: dark olive-brown, darker bands, pale below (no record of its colors: a
+/// river crocodile's, est.).
+fn crocodyliform(r: &Read) -> Look {
+    let ol = r.qv("Ol");
+    let base = mix([72.0, 70.0, 54.0], [100.0, 92.0, 66.0], ol);
+    Look {
+        name: if ol > 0.6 { "Olive-brown".into() } else { "Dark olive".into() },
+        base,
+        under: [206.0, 198.0, 156.0],
+        points: Some(darken(base, 0.5)),
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1712,6 +1727,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "gastonia" => ankylosaur(&r, false),
         "pinacosaurus" => ankylosaur(&r, true),
         "iguanodont" => iguanodont(&r),
+        "crocodyliform" => crocodyliform(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
