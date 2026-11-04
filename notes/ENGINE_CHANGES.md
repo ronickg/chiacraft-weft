@@ -72,6 +72,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 - **Text shrunk to fit says so in the log** (4765e3b2), **a missing block texture stops the game at startup** (e2d63707, 3ff06554). *Why:* catch squeezed Russian text and silent magenta early.
 - **Russian:** the Cyrillic glyphs lifted, then drawn for our main font (a5351840, cyrillic branch), 100 engine strings translated (c902d251), plural forms (bb4de9b4). *Why:* Russian is our second language.
 - **Smooth text: Alegreya Sans** (0e1ba79e); **slots with frames** (06bd9414); **the title screen in our theme** (e0edc189); **Select World as a list** (bf9427c5). *Why:* the UI redo.
+- **Chat fits small windows; no crosshair over a screen** (claude/audit-rest, merged a0fc9a41; `hud.rs`, `game_screens.rs`). *Why:* at 760x600 the chat covered the Inventory/Recipes/Stats buttons (B9c), and the crosshair stood over the sleeping screen.
 
 ## 6. Sound
 
