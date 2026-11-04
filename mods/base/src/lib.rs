@@ -21,6 +21,7 @@ mod player;
 mod recipes;
 mod redstone;
 mod seasons;
+mod look;
 mod shaderpack;
 mod sounds;
 mod survival;
@@ -101,6 +102,7 @@ fn init(r: &mut Registry) {
     beds::register(r);
     hud::register(r);
     redstone::register(r);
+    look::register(r);
     shaderpack::register(r);
     shaderpack::register_for_scripts(r);
     shaderpack::register_shafts(r);

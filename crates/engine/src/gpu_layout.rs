@@ -604,6 +604,9 @@ gpu_struct! {
         /// when full, only by day when new), w the light it gives: its phase times how high it
         /// stands, 0 below the horizon. For packs' night light and moon shadows.
         pub moon: [f32; 4],
+        /// The values of the settings the pack names in its `pack.cfg` (`options = a, b, ...`), 16
+        /// at most, four to a row in that order (`packs::pack_options`); 0 for one not found.
+        pub options: [[f32; 4]; 4],
         /// The light the player holds (a torch, a lantern), for packs' dynamic light: xyz where it
         /// is (camera relative, by the hand), w unused.
         pub hand: [f32; 4],

@@ -2290,6 +2290,7 @@ impl Client {
             clouds: self.sky.cloud_shade[0],
             cloud_cells: self.sky.cloud_shade[1],
             moon: self.moon(),
+            options: pack_options(),
             hand: hand.0,
             hand_light: hand.1,
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
@@ -2733,6 +2734,18 @@ fn shadow_setting(name: &str, default: f64) -> f64 {
 /// The far cascade's reach and depth (blocks): hills a few hundred blocks off have shadows too.
 const FAR_REACH: f32 = 400.0;
 const FAR_DEPTH: f32 = 1200.0;
+
+/// The values of the settings the shader pack reads (`Scene::options`).
+fn pack_options() -> [[f32; 4]; 4] {
+    let mut out = [[0.0; 4]; 4];
+    let names = &content().game.config_names;
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(16) {
+        if let Some(&id) = names.get(name.as_str()) {
+            out[i / 4][i % 4] = crate::config::get(id) as f32;
+        }
+    }
+    out
+}
 
 /// The sun's path leaned south when the sky has no sun to follow (`Client::sun`).
 const SUN_LEAN: glam::Mat3 = glam::Mat3::from_cols(Vec3::X, Vec3::new(0.0, 0.944, 0.33), Vec3::new(0.0, -0.33, 0.944));
