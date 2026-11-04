@@ -10,6 +10,7 @@
 pub mod combine;
 pub mod grades;
 pub mod kinds;
+pub mod looks;
 pub mod materials;
 pub mod sheet;
 pub mod traits;
