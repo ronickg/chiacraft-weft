@@ -94,6 +94,41 @@ pub fn merge_effects() -> bool {
     pack_flag("merge_effects")
 }
 
+/// The `pack.cfg` the options were read from, when it was written, and the names in it.
+type OptionsRead = Option<(PathBuf, Option<std::time::SystemTime>, Vec<String>)>;
+
+/// The settings the chosen pack reads (`options = a, b, ...` in its `pack.cfg`, at most 16):
+/// their values reach every pack shader as `scene.options` (`Client::scene`), in that order, so a
+/// pack's look can be tuned in the game's settings and swept with `--config` without editing
+/// shaders. Read again when the file changes.
+pub fn pack_options() -> Vec<String> {
+    static CACHE: RwLock<OptionsRead> = RwLock::new(None);
+    let Some(dir) = SHADER_PACK.read().unwrap().clone() else { return Vec::new() };
+    let path = dir.join("pack.cfg");
+    let stamp = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+    if let Some((d, t, names)) = &*CACHE.read().unwrap()
+        && *d == dir
+        && *t == stamp
+    {
+        return names.clone();
+    }
+    let names: Vec<String> = std::fs::read_to_string(&path)
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| l.split_once('='))
+        .filter(|(k, _)| k.trim() == "options")
+        .flat_map(|(_, v)| {
+            v.split(',')
+                .map(|n| n.trim().to_string())
+                .collect::<Vec<_>>()
+        })
+        .filter(|n| !n.is_empty())
+        .take(16)
+        .collect();
+    *CACHE.write().unwrap() = Some((dir, stamp, names.clone()));
+    names
+}
+
 /// `name = true` in the chosen shader pack's `pack.cfg`.
 fn pack_flag(name: &str) -> bool {
     let Some(dir) = SHADER_PACK.read().unwrap().clone() else { return false };

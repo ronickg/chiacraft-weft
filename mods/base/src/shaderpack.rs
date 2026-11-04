@@ -27,7 +27,13 @@ const FILES: [(&str, &str); 6] = [
 ];
 
 // Water writes depth, so the reflections effect finds its surface.
-const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\ntranslucent_depth = true\nsun_shadows = true\nwater_behind = true\nmerge_effects = true\n";
+// The settings the pack reads (`look.rs`), in its order: `scene.options` in the shaders.
+fn cfg() -> String {
+    format!(
+        "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\ntranslucent_depth = true\nsun_shadows = true\nwater_behind = true\nmerge_effects = true\noptions = {}\n",
+        crate::look::OPTIONS
+    )
+}
 
 /// Only `--shader-pack <id>` (a script checking a look; tests reset packs when they start, so
 /// it is turned on after that), `--shader-pack-after <secs>` seconds into the run (0 by
@@ -132,7 +138,7 @@ fn install(c: &Client) {
     let files = FILES
         .iter()
         .map(|(name, src)| (*name, format!("{LOOK}\n{src}")))
-        .chain(std::iter::once(("pack.cfg", CFG.to_string())));
+        .chain(std::iter::once(("pack.cfg", cfg())));
     for (name, text) in files {
         let path = dir.join(name);
         if std::fs::read_to_string(&path).ok().as_deref() != Some(text.as_str()) {

@@ -89,6 +89,7 @@ pub fn terrain(r: &mut Registry) {
         });
 
     r.decorate(rock_faces).dimension(&crate::OVERWORLD);
+    r.decorate(fray_borders).dimension(&crate::OVERWORLD);
 }
 
 static WET: Tag = Tag::named("wet");
@@ -176,6 +177,12 @@ fn rock(name: &str) -> u32 {
         "weathered_limestone" => WEATHERED_LIMESTONE.id(),
         "cobblestone" => COBBLESTONE.id(),
         "mossy_cobblestone" => MOSSY_COBBLESTONE.id(),
+        // The ground the borders fray into (`fray_borders`).
+        "sand" => SAND.id(),
+        "dirt" => DIRT.id(),
+        "grass" => GRASS.id(),
+        "podzol" => PODZOL.id(),
+        "snowy_grass" => SNOWY_GRASS.id(),
         _ => STONE.id(),
     }
 }
@@ -194,11 +201,22 @@ pub fn surface_block(g: &Gen, wx: i32, wz: i32) -> u32 {
     }
     let c = g.column(wx, wz);
     let fall = fall(g, wx, wz, c.height);
-    if fall < l::SNOW_FALL {
-        return top;
+    if fall >= l::SNOW_FALL
+        && let Some(face) = bare(g.seed(), [wx, c.height, wz], top, fall, c.biome, rocks(g, wx, wz, c.height, top))
+    {
+        return face;
     }
-    bare(g.seed(), [wx, c.height, wz], top, fall, c.biome, rocks(g, wx, wz, c.height, top)).unwrap_or(top)
+    // Then the border's fray (`fray_borders`), on soil.
+    if SOIL.contains(&top)
+        && let Some((frayed, _)) = l::fray(&l::fields(g.seed()), wx * 16, wz * 16, c.height)
+    {
+        return rock(frayed);
+    }
+    top
 }
+
+/// The ground a border's fray may change (`fray_borders`).
+static SOIL: std::sync::LazyLock<[u32; 5]> = std::sync::LazyLock::new(|| [GRASS.id(), SNOWY_GRASS.id(), PODZOL.id(), SAND.id(), DIRT.id()]);
 
 /// Steep faces go bare: where the ground falls `ROCK_FALL` blocks or more to a neighbour, its soil
 /// and stone are rock as far down as the face shows, the column's own (`rock_set`): the mesas'
@@ -231,6 +249,31 @@ fn rock_faces(g: &mut Gen) {
                 let y = (wy - oy) as usize;
                 if let Some(rock) = bare(seed, [wx, wy, wz], g.get(x, y, z), fall, col.biome, set) {
                     g.set(x, y, z, rock);
+                }
+            }
+        }
+    }
+}
+
+/// Biome borders fray (`base_api::land::fray`): near a border that changes the ground, the
+/// neighbour's top and under block in patches, on soil only (rock faces, water and what stands
+/// on the ground stay). After the rock faces, before the plants, which then grow on what it left.
+fn fray_borders(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let [ox, oy, oz] = g.origin();
+    let f = l::fields(g.seed());
+    for z in 0..16usize {
+        for x in 0..16usize {
+            let h = cols[z * 16 + x].height;
+            if h < SEA || h < oy || h - 2 > oy + 15 {
+                continue;
+            }
+            let (wx, wz) = (ox + x as i32, oz + z as i32);
+            let Some((top, under)) = l::fray(&f, wx * 16, wz * 16, h) else { continue };
+            for wy in (h - 2).max(oy)..=h.min(oy + 15) {
+                let y = (wy - oy) as usize;
+                if SOIL.contains(&g.get(x, y, z)) {
+                    g.set(x, y, z, rock(if wy == h { top } else { under }));
                 }
             }
         }

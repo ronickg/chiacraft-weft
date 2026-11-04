@@ -659,12 +659,17 @@ fn save_pipeline_cache(gpu: &dyn Backend) {
     }
 }
 
+/// A screen taller than the window scrolls (its root, with the wheel and a bar), as in a small
+/// window at GUI scale 2 (Playtest B9: at 640 x 360 the animal screen's tabs and bottom were cut
+/// off); it stays centred while it fits.
+fn scroll_when_taller(ui: &mut Ui) {
+    ui.nodes[0].style.scroll = true;
+}
+
 impl Running {
     fn gui_scale(&self) -> f32 {
         let max = crate::settings::max_gui_scale(self.gpu.surface_size());
-        // A scale set before scales were kept even (3, 5...) is shown at the even one below it.
-        let s = if self.settings.gui_scale() == 0 { max } else { crate::settings::even_scale(self.settings.gui_scale()).min(max) };
-        s as f32
+        crate::settings::applied_gui_scale(self.settings.gui_scale(), max) as f32
     }
 
     fn build_cx(&self) -> BuildCx<'_> {
@@ -693,6 +698,7 @@ impl Running {
         }
         let mut ui = Ui::new();
         s.build(&mut ui, &self.build_cx());
+        scroll_when_taller(&mut ui);
         self.screens.push((s, ui));
         self.quads_dirty = true;
         self.set_capture(false);
@@ -715,6 +721,7 @@ impl Running {
                 .collect();
             ui.clear();
             s.build(ui, &self.build_cx());
+            scroll_when_taller(ui);
             // Typed text survives rebuilds (language switch, resize).
             for (id, v, c) in inputs {
                 if let Some(n) = ui.find(&id) {
