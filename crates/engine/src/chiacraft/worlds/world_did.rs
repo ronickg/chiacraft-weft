@@ -12,7 +12,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chiacraft_wallet::chain::{self, Bytes32, ChainNetwork, DidMetadata, OwnerMeta, WalletKeys, WorldMeta};
+use chiacraft_wallet::chain::{self, Bytes32, ChainNetwork, DidMetadata, WalletKeys, WorldMeta};
 use serde::{Deserialize, Serialize};
 
 pub const FILE: &str = "did.json";

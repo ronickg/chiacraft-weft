@@ -242,21 +242,8 @@ pub fn status_line(run_dir: &Path, key: &str) -> (String, Vec<crate::ui::text::A
     match pings.get(key) {
         Some(Ping::Online(st, _)) => {
             let online = vec![Arg::Text(st.players.to_string()), Arg::Text(st.packages.to_string())];
-            // What its admission rules ask (chiacraft, `admission`), before joining.
-            let rules = st
-                .admission
-                .iter()
-                .map(|(k, n)| crate::ui::text::Msg::new(k, vec![Arg::Int(*n)]))
-                .reduce(|a, b| crate::ui::text::Msg::new("admission.summary.both", vec![Arg::Msg(a), Arg::Msg(b)]));
-            // Its DID, checked both ways on chain (phase 4) once per game.
-            let rules = match (rules, did_note(key, st)) {
-                (Some(r), Some(d)) => Some(crate::ui::text::Msg::new("admission.summary.both", vec![Arg::Msg(r), Arg::Msg(d)])),
-                (r, d) => r.or(d),
-            };
-            match rules {
-                Some(r) => ("multiplayer.status.online_rules".into(), [online, vec![Arg::Msg(r)]].concat()),
-                None => ("multiplayer.status.online".into(), online),
-            }
+            // What it asks of visitors and its DID: `notes_line`, a line of its own.
+            ("multiplayer.status.online".into(), online)
         }
         Some(Ping::Offline(_)) => {
             let seen = load(run_dir)
@@ -272,6 +259,29 @@ pub fn status_line(run_dir: &Path, key: &str) -> (String, Vec<crate::ui::text::A
         Some(Ping::Following(..)) => ("multiplayer.status.following".into(), Vec::new()),
         _ => ("multiplayer.status.asking".into(), Vec::new()),
     }
+}
+
+/// What an online world asks of visitors (its admission rules) and its DID, checked both ways on
+/// chain once per game (phase 4): a line under its status, empty for a world that asks nothing
+/// and has no DID, or isn't online.
+pub fn notes_line(key: &str) -> (String, Vec<crate::ui::text::Arg>) {
+    use crate::ui::text::{Arg, Msg};
+    let pings = PINGS.lock();
+    let Some(Ping::Online(st, _)) = pings.get(key) else { return (String::new(), Vec::new()) };
+    let rules = st
+        .admission
+        .iter()
+        .map(|(k, n)| Msg::new(k, vec![Arg::Int(*n)]))
+        .reduce(|a, b| Msg::new("admission.summary.both", vec![Arg::Msg(a), Arg::Msg(b)]));
+    let st = st.clone();
+    drop(pings);
+    let note = match (rules, did_note(key, &st)) {
+        (Some(r), Some(d)) => Msg::new("admission.summary.both", vec![Arg::Msg(r), Arg::Msg(d)]),
+        (Some(r), None) => r,
+        (None, Some(d)) => d,
+        (None, None) => return (String::new(), Vec::new()),
+    };
+    ("multiplayer.status.notes".into(), vec![Arg::Msg(note)])
 }
 
 /// What a world's DID check says, if the world has a DID: checking, owned both ways, or not.

@@ -268,7 +268,13 @@ the server checks the proof, then the chain on a thread (`server/admission.rs` `
 `did_answers`), waits up to 25 s only when the rules ask for a DID (`Rules::needs_did`), and keeps
 `did` in the player file. `/didrule required on|off`, `/didrule age <days>`, and the screen.
 
-Slices 5 and 7 (2026-11-04, built, not yet seen on testnet11). `crates/sponsor`
+Slices 4-7 passed the two-copy check on testnet11 on the Mac (2026-11-04, Tester, fd673712,
+`tools/checks/did`, about 20 minutes): alice's DID from our sponsor reached the chain in about 70 s,
+her world's DID in about 3 minutes and her DID's listing of it 3 minutes later; bob was refused for
+having no DID, got one, was let in once the world checked it on chain, and his saved worlds list
+showed alice's world "DID required, a DID its owner's DID confirms".
+
+Slices 5 and 7 (2026-11-04). `crates/sponsor`
 (`chiacraft-sponsor`): Horizon's sponsor on iroh (`chiacraft/sponsor/1`, JSON request and answer,
 key in `<data_dir>/sponsor.key`), feature `service` for the binary; a proof of work per request and
 the budget released by the hour; world requests (`Request::sign_world`, `WorldAsk`: a world DID
