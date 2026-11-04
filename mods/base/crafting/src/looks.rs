@@ -19,6 +19,9 @@ pub struct Layer {
     pub area: [u8; 4],
     /// Moved so the kind's `socket` meets the working part's anchor (the handle).
     pub moves: bool,
+    /// Painted per material (a head), else a shade map painted with ramps (a haft, a wooden
+    /// stave).
+    pub painted: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -48,8 +51,8 @@ pub const LOOKS: &[KindLook] = &[
             ("diamond", [11.5, 22.0]),
         ],
         layers: &[
-            Layer { name: "haft", regions: &["haft"], area: [0, 0, 31, 31], moves: true },
-            Layer { name: "head", regions: &["head", "fitting"], area: [7, 0, 28, 23], moves: false },
+            Layer { name: "haft", regions: &["haft"], area: [0, 0, 31, 31], moves: true, painted: false },
+            Layer { name: "head", regions: &["head", "fitting"], area: [7, 0, 28, 23], moves: false, painted: true },
         ],
     },
     KindLook {
@@ -67,8 +70,8 @@ pub const LOOKS: &[KindLook] = &[
             ("diamond", [13.0, 16.0]),
         ],
         layers: &[
-            Layer { name: "haft", regions: &["haft"], area: [0, 0, 31, 31], moves: true },
-            Layer { name: "head", regions: &["head", "fitting"], area: [5, 1, 30, 20], moves: false },
+            Layer { name: "haft", regions: &["haft"], area: [0, 0, 31, 31], moves: true, painted: false },
+            Layer { name: "head", regions: &["head", "fitting"], area: [5, 1, 30, 20], moves: false, painted: true },
         ],
     },
     KindLook {
@@ -86,8 +89,8 @@ pub const LOOKS: &[KindLook] = &[
             ("diamond", [19.7, 11.9]),
         ],
         layers: &[
-            Layer { name: "haft", regions: &["haft"], area: [0, 0, 31, 31], moves: true },
-            Layer { name: "head", regions: &["head", "fitting"], area: [16, 1, 30, 16], moves: false },
+            Layer { name: "haft", regions: &["haft"], area: [0, 0, 31, 31], moves: true, painted: false },
+            Layer { name: "head", regions: &["head", "fitting"], area: [16, 1, 30, 16], moves: false, painted: true },
         ],
     },
     KindLook {
@@ -105,8 +108,8 @@ pub const LOOKS: &[KindLook] = &[
             ("diamond", [14.7, 19.8]),
         ],
         layers: &[
-            Layer { name: "haft", regions: &["haft"], area: [0, 0, 31, 31], moves: true },
-            Layer { name: "head", regions: &["head", "fitting"], area: [10, 1, 27, 21], moves: false },
+            Layer { name: "haft", regions: &["haft"], area: [0, 0, 31, 31], moves: true, painted: false },
+            Layer { name: "head", regions: &["head", "fitting"], area: [10, 1, 27, 21], moves: false, painted: true },
         ],
     },
     KindLook {
@@ -114,8 +117,19 @@ pub const LOOKS: &[KindLook] = &[
         socket: [8.1, 23.4],
         anchors: &[],
         layers: &[
-            Layer { name: "blade", regions: &["blade"], area: [6, 0, 31, 26], moves: false },
-            Layer { name: "hilt", regions: &["grip", "guard", "pommel"], area: [0, 17, 15, 31], moves: true },
+            Layer { name: "blade", regions: &["blade"], area: [6, 0, 31, 26], moves: false, painted: true },
+            Layer { name: "hilt", regions: &["grip", "guard", "pommel"], area: [0, 17, 15, 31], moves: true, painted: false },
+        ],
+    },
+    // A bow drawn from corner to corner, the string behind the stave and the grip a region of it.
+    // Nothing moves: one stave drawing per shape, its wood a ramp.
+    KindLook {
+        kind: "bow",
+        socket: [16.0, 16.0],
+        anchors: &[],
+        layers: &[
+            Layer { name: "string", regions: &["string"], area: [0, 0, 31, 31], moves: false, painted: false },
+            Layer { name: "stave", regions: &["stave", "grip"], area: [0, 0, 31, 31], moves: false, painted: false },
         ],
     },
 ];
@@ -144,14 +158,15 @@ pub fn shift(kind: &str, material: &str) -> [i32; 2] {
     }
 }
 
-/// A layer's textures: a painted one for a material (`base:parts/<kind>/<layer>/<art name>`, used
-/// as it is) or the shade map (`base:parts/<kind>/<layer>`) painted with ramps.
-pub fn painted(kind: &str, layer: &str, material: &str) -> String {
-    format!("base:parts/{kind}/{layer}/{}", art_name(material))
+/// A layer's textures, named by the shape of the part in its region 0 (so a bearded axe head
+/// and a felling one each have their own): painted, `base:parts/<kind>/<shape>/<art name>`, used
+/// as it is; or a shade map, `base:parts/<kind>/<shape>`, painted with ramps.
+pub fn painted(kind: &str, shape: &str, material: &str) -> String {
+    format!("base:parts/{kind}/{shape}/{}", art_name(material))
 }
 
-pub fn map(kind: &str, layer: &str) -> String {
-    format!("base:parts/{kind}/{layer}")
+pub fn map(kind: &str, shape: &str) -> String {
+    format!("base:parts/{kind}/{shape}")
 }
 
 pub fn ramp(material: &str) -> String {
@@ -192,6 +207,6 @@ mod tests {
                 assert!(s[0].abs() <= 3 && s[1].abs() <= 3, "{} {m}: {s:?}", l.kind);
             }
         }
-        assert_eq!(painted("axe", "head", "oak"), "base:parts/axe/head/wood");
+        assert_eq!(painted("axe", "felling_axe_head", "oak"), "base:parts/axe/felling_axe_head/wood");
     }
 }

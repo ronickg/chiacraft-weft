@@ -24,6 +24,8 @@ pub enum Use {
     Till,
     Cut,
     Thrust,
+    /// A bow: its power is its stave's spring.
+    Shoot,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -73,6 +75,13 @@ pub const KINDS: &[Kind] = &[
         use_: Use::Cut,
         slots: &[s("blade", Role::Working), s("guard", Role::Extra), s("grip", Role::Holding), s("pommel", Role::Extra)],
         damage: 4.0,
+    },
+    Kind {
+        id: "bow",
+        key: "kind.base.bow",
+        use_: Use::Shoot,
+        slots: &[s("stave", Role::Working), s("grip", Role::Holding), s("string", Role::Fitting)],
+        damage: 6.0,
     },
 ];
 
@@ -125,6 +134,11 @@ pub const SHAPES: &[Shape] = &[
     sh("grip", "knife", "grip", 60.0, (1.0, 1.0, 1.0, 0.0)),
     sh("grip", "sword", "grip", 80.0, (1.0, 1.0, 1.0, 0.0)),
     sh("shaft", "spear", "shaft", 700.0, (1.0, 1.0, 1.0, 1.0)),
+    // Bows: a long self stave draws heavy; a short one is quick and light.
+    sh("self_stave", "bow", "stave", 400.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("short_stave", "bow", "stave", 280.0, (1.0, 1.15, 0.85, 0.0)),
+    sh("grip", "bow", "grip", 40.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("bowstring", "bow", "string", 2.0, (1.0, 1.0, 1.0, 0.0)),
     // Fittings and extras.
     sh("lashing", "axe", "fitting", 5.0, (1.0, 1.0, 1.0, 0.0)),
     sh("lashing", "pickaxe", "fitting", 5.0, (1.0, 1.0, 1.0, 0.0)),

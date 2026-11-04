@@ -63,14 +63,14 @@ const SOURCES: &[(&str, &str)] = &[
 
 /// A holding part of wood is split from a log of it.
 fn holding_source(material: &str) -> Option<String> {
-    matches!(material, "oak" | "birch" | "spruce" | "mesquite").then(|| format!("#logs/{material}"))
+    matches!(material, "oak" | "birch" | "spruce" | "mesquite" | "yew" | "elm" | "osage_orange").then(|| format!("#logs/{material}"))
 }
 
 /// How many of its material a shape takes.
 fn units(shape: &str) -> u32 {
     match shape {
         "felling_axe_head" | "bearded_axe_head" | "pick_head" => 3,
-        "hoe_blade" | "straight_blade" | "long_blade" | "long_haft" | "shaft" => 2,
+        "hoe_blade" | "straight_blade" | "long_blade" | "long_haft" | "shaft" | "self_stave" => 2,
         _ => 1,
     }
 }
@@ -105,7 +105,7 @@ pub fn register(r: &mut Registry) {
             .durability(1)
             // Worn out, it stays: a part is repaired or replaced, not the tool lost.
             .keeps_broken()
-            .tab(if matches!(k.id, "sword" | "spear" | "knife") { &crate::tabs::COMBAT } else { &crate::tabs::TOOLS });
+            .tab(if matches!(k.id, "sword" | "spear" | "knife" | "bow") { &crate::tabs::COMBAT } else { &crate::tabs::TOOLS });
         let b = match tool {
             Some(t) => b.tool(t),
             None => b,
@@ -140,7 +140,8 @@ pub fn register(r: &mut Registry) {
             if !can {
                 continue;
             }
-            let log = if role == Role::Holding { holding_source(m.id) } else { None };
+            // Hafts, grips, shafts and bow staves are split from a log.
+            let log = if role == Role::Holding || s.id.ends_with("_stave") { holding_source(m.id) } else { None };
             let from = log.as_deref().unwrap_or(from);
             let inputs: Vec<&str> = (0..units(s.id)).map(|_| from).collect();
             r.shapeless(&PART_RECIPES, &format!("part_{}", s.id), 1, &inputs, 0)
@@ -285,15 +286,18 @@ pub fn look_text(kind: &str, parts: &[Part]) -> String {
         .iter()
         .filter_map(|layer| {
             let at = if layer.moves && shift != [0, 0] { format!("+{},{}", shift[0], shift[1]) } else { String::new() };
-            if let Some(w) = working.filter(|w| layer.regions.contains(w)) {
-                return Some(crafting::looks::painted(kind, layer.name, material(w)?) + &at);
+            // The layer's drawing is named by the shape of its region-0 part.
+            let region0 = *layer.regions.first()?;
+            let first = parts.iter().find(|p| p.slot == region0)?;
+            if layer.painted {
+                return Some(crafting::looks::painted(kind, first.shape, first.material) + &at);
             }
             let ramps: Vec<String> = layer
                 .regions
                 .iter()
                 .map(|r| material(r).map(crafting::looks::ramp))
                 .collect::<Option<_>>()?;
-            Some(format!("{}@{}{at}", crafting::looks::map(kind, layer.name), ramps.join(",")))
+            Some(format!("{}@{}{at}", crafting::looks::map(kind, first.shape), ramps.join(",")))
         })
         .collect::<Vec<_>>()
         .join(";")

@@ -38,6 +38,9 @@ Points: material up to 40, work up to 40 (from memory up to 30, a machine 22), s
 | oak | working, holding | 0.75 | 1.6 | 0 | 60 | 2 | 0 | uses +10%, speed -3% | - | tough |
 | mesquite | working, holding | 0.88 | 1.6 | 0 | 70 | 2 | 0 | uses +15%, speed -5% | - | tough |
 | birch | working, holding | 0.65 | 1.6 | 0 | 55 | 2 | 0 | uses +0%, speed +5% | - | light |
+| yew (provisional) | working, holding | 0.67 | 1.6 | 0 | 60 | 2 | 0 | uses +5%, speed +0% | - | - |
+| elm (provisional) | working, holding | 0.56 | 1.6 | 0 | 55 | 2 | 0 | uses +5%, speed +0% | - | - |
+| osage_orange (provisional) | working, holding | 0.86 | 1.6 | 0 | 65 | 2 | 0 | uses +8%, speed +0% | - | - |
 | spruce | working, holding | 0.45 | 1.6 | 0 | 45 | 2 | 0 | uses -5%, speed +5% | - | light |
 | plant_cordage | fitting | 1.3 | 1 | 0 | 0 | 0 | 0 | - | 30 uses | cheap |
 | sinew | fitting | 1.3 | 1 | 0 | 0 | 0 | 0 | - | 60 uses | shrinks_tight |
@@ -101,6 +104,11 @@ Provisional rows stand in for today's tools until Content plan's flint and chert
   - grip `grip`: 80 cm³, stat ×1, speed ×1, damage ×1, reach +0
   - guard `bar_guard`: 20 cm³, stat ×1, speed ×1, damage ×1, reach +0
   - pommel `round_pommel`: 15 cm³, stat ×1, speed ×1.02, damage ×1, reach +0
+- **bow** (Shoot, damage 6): stave (Working), grip (Holding), string (Fitting)
+  - stave `self_stave`: 400 cm³, stat ×1, speed ×1, damage ×1, reach +0
+  - stave `short_stave`: 280 cm³, stat ×1, speed ×1.15, damage ×0.85, reach +0
+  - grip `grip`: 40 cm³, stat ×1, speed ×1, damage ×1, reach +0
+  - string `bowstring`: 2 cm³, stat ×1, speed ×1, damage ×1, reach +0
 
 ## Example axes (felling head, oak haft, Sound parts)
 

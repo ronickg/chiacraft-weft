@@ -116,6 +116,11 @@ pub const MATERIALS: &[Material] = &[
     m("oak", "material.base.oak", &[W, H], 0.75, 1.6, 0, 60.0, 2.0, 0.0, (0.10, -0.03), 0.0, "tough", Making::Carve),
     m("mesquite", "material.base.mesquite", &[W, H], 0.88, 1.6, 0, 70.0, 2.0, 0.0, (0.15, -0.05), 0.0, "tough", Making::Carve),
     m("birch", "material.base.birch", &[W, H], 0.65, 1.6, 0, 55.0, 2.0, 0.0, (0.0, 0.05), 0.0, "light", Making::Carve),
+    // Bow woods (Content: yew and elm in the forest, Osage orange on the plains), provisional until
+    // their trees grow in the world.
+    m("yew", "material.base.yew", &[W, H], 0.67, 1.6, 0, 60.0, 2.0, 0.0, (0.05, 0.0), 0.0, "", Making::Carve),
+    m("elm", "material.base.elm", &[W, H], 0.56, 1.6, 0, 55.0, 2.0, 0.0, (0.05, 0.0), 0.0, "", Making::Carve),
+    m("osage_orange", "material.base.osage_orange", &[W, H], 0.86, 1.6, 0, 65.0, 2.0, 0.0, (0.08, 0.0), 0.0, "", Making::Carve),
     m("spruce", "material.base.spruce", &[W, H], 0.45, 1.6, 0, 45.0, 2.0, 0.0, (-0.05, 0.05), 0.0, "light", Making::Carve),
     // Fittings: what holds a head on.
     m("plant_cordage", "material.base.plant_cordage", &[F], 1.3, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 30.0, "cheap", Making::Hands),
@@ -129,7 +134,17 @@ pub const MATERIALS: &[Material] = &[
 /// stone tools. Diamond is a real tier above steel (Ronald, 2026-11-04: "we will probably have
 /// more ores / items with higher tiers"), and the ladder stays open at the top: a new tier is a
 /// row (a package's too), and grades and stats scale past steel by the same rule.
-pub const PROVISIONAL: &[&str] = &["stone"];
+pub const PROVISIONAL: &[&str] = &["stone", "yew", "elm", "osage_orange"];
+
+/// How well a wood stores a bow's draw (yew 1): a stave's power. Proposed from bowyers' rankings;
+/// what isn't listed makes no bow.
+pub const SPRING: &[(&str, f32)] =
+    &[("yew", 1.0), ("osage_orange", 1.0), ("elm", 0.85), ("oak", 0.7), ("mesquite", 0.65), ("birch", 0.6), ("spruce", 0.5)];
+
+/// A material's `SPRING`, 0 if it makes no bow.
+pub fn spring(id: &str) -> f32 {
+    SPRING.iter().find(|(m, _)| *m == id).map_or(0.0, |s| s.1)
+}
 
 /// Material `id`.
 pub fn material(id: &str) -> Option<&'static Material> {

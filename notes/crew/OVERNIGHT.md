@@ -68,3 +68,15 @@ change any of them in the morning.
       named "iron".
     - Alternative: a painted head per wood species, and a socket point stored with each handle
       drawing.
+15. **A bow kind built from parts:** a stave (self, or short: quicker, lighter), a grip and a
+    string. Its power is its stave wood's spring: yew and Osage orange 1, elm 0.85, oak 0.7, birch
+    0.6, spruce 0.5.
+    - Yew, elm and Osage orange are provisional rows until their trees grow.
+    - Staves are split from a log.
+    - Shooting itself waits for Content's tier 1b (the bow); this is the parts and the art.
+    - The composite bow (horn and sinew) comes later.
+    - Alternative: no bow until tier 1b.
+16. **Layer art is named by the shape it draws:** `parts/<kind>/<shape>/<art>.png` painted,
+    `parts/<kind>/<shape>.png` maps. Then a felling and a bearded axe head each have their own
+    drawing.
+    - Alternative: by layer only (`parts/axe/head/...`), which can't tell two head shapes apart.

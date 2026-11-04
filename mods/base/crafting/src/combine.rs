@@ -169,9 +169,11 @@ pub fn combine(kind_id: &str, parts: &[Part]) -> Result<ToolStats, Missing> {
         .map(|t| if let Effect::Damage(f) = t.effect { f } else { 1.0 })
         .product();
     // A blade's or point's main stat is its damage: the grade goes there, a tool's goes to speed.
-    let weapon = matches!(k.use_, Use::Cut | Use::Thrust);
+    // A bow's power is its stave's spring.
+    let weapon = matches!(k.use_, Use::Cut | Use::Thrust | Use::Shoot);
+    let base_damage = if k.use_ == Use::Shoot { k.damage * crate::materials::spring(m.id) } else { k.damage + m.damage };
     let stat = m.speed * s.stat * stat_mul * if weapon { 1.0 } else { g.mult } * (1.0 + hold_speed) * hold_mul_speed * s.speed;
-    let damage = (k.damage + m.damage) * s.damage * dmg_mul * if weapon { g.mult } else { 1.0 } * hold_mul_damage;
+    let damage = base_damage * s.damage * dmg_mul * if weapon { g.mult } else { 1.0 } * hold_mul_damage;
     let head = Life { slot: p.slot, uses: m.uses * g.mult * (1.0 + hold_uses) / always_wear(&own) };
     life.insert(0, head);
     Ok(ToolStats { kind: k.id, harvest: m.harvest, grade: g.n, modifier_slots: g.slots, stat, damage, reach, mass_kg: mass, life, traits })
@@ -254,6 +256,22 @@ mod tests {
         assert_eq!(repair_share("copper"), 1.0, "hammered back for free");
         assert!(life_of(Role::Holding, "oak", 4) > life_of(Role::Working, "oak", 4), "hafts outlast heads");
         assert_eq!(life_of(Role::Extra, "gold", 4), 0.0);
+    }
+
+    #[test]
+    fn yew_draws_hardest() {
+        let bow = |wood| {
+            combine(
+                "bow",
+                &[
+                    Part { slot: "stave", shape: "self_stave", material: wood, grade: 4 },
+                    Part { slot: "grip", shape: "grip", material: "leather", grade: 4 },
+                    Part { slot: "string", shape: "bowstring", material: "sinew", grade: 4 },
+                ],
+            )
+            .unwrap()
+        };
+        assert!(bow("yew").damage > bow("oak").damage && bow("oak").damage > bow("spruce").damage);
     }
 
     #[test]
