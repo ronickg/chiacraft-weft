@@ -16,7 +16,7 @@ use crate::{Arg, ItemStack, Level, STRIKE_WINDOW, STRIKES, clip, clip_args, engi
 
 mod bindings {
     wasmtime::component::bindgen!({
-        path: "wit/v1.2",
+        path: "wit/v1.3",
         world: "client-mod",
         with: {
             "chiacraft:mods/types": crate::bindings::chiacraft::mods::types,

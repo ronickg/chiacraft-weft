@@ -1,10 +1,10 @@
 [package]
 name = "chiacraft-mod-sdk"
-version = "1.2.0"
+version = "1.3.0"
 edition.workspace = true
 license = "MIT"
 rust-version.workspace = true
-description = "Write sandboxed chiacraft mods in Rust: Weft's SDK names over the chiacraft:mods@1.2.0 WIT world, built for wasm32-unknown-unknown (docs/sandboxed-mods.md)"
+description = "Write sandboxed chiacraft mods in Rust: Weft's SDK names over the chiacraft:mods@1.3.0 WIT world, built for wasm32-unknown-unknown (docs/sandboxed-mods.md)"
 
 [dependencies]
 # What both SDKs share: values, line arguments, item stacks, logging.
