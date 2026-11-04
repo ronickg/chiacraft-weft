@@ -25,7 +25,12 @@ Then in alice's log: `only players with the achievement base:timber get in now (
 `bob (…) is not let in: admission.achievement_required`, `… showed 0 achievement(s)` then `… showed 1
 achievement(s)`, `bob joined` a second time; in bob's: `disconnected: admission.achievement_required`.
 
-Shots: `ach-bob-refused.png` "This world lets in only players who earned "Timber!" in a world it trusts";
+Last, alice withdraws it (`/revoke bob base:workbench`): her log `1 achievement(s) withdrawn
+(revocation list version 1)`, bob's `1 of your achievements were withdrawn by their issuer`; his
+next join is refused (`admission.achievement_required`) and `… showed 0 achievement(s)`.
+
+Shots: `ach-bob-withdrawn.png` his A Place to Work marked "(withdrawn by the world)";
+`ach-bob-refused2.png` the refusal again. `ach-bob-refused.png` "This world lets in only players who earned "Timber!" in a world it trusts";
 `ach-bob-back.png` bob back in alice's world. `ach-alice.png` "ach-alice-1: your own world" with "A Place to Work"; `ach-bob.png` "ach-alice-1:
 signed by its owner, no world DID" with "A Place to Work" and today's date.
 

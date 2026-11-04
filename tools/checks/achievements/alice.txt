@@ -17,4 +17,7 @@ await_file ach-mark-bob-refused 300
 chat /achievementrule base:workbench   # the one her world signed him
 mark ach-mark-rule2
 await_file ach-mark-bob-back 300
+chat /revoke bob base:workbench    # withdrawn: his game marks it, the door no longer takes it
+mark ach-mark-revoked
+await_file ach-mark-bob-done2 300
 quit

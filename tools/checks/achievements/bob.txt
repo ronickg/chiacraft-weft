@@ -21,4 +21,14 @@ loaded
 wait 3
 shot ach-bob-back.png
 mark ach-mark-bob-back
+await_file ach-mark-revoked 300
+wait 2
+screen core:achievements
+wait 2
+shot ach-bob-withdrawn.png
+leave
+join ach-ticket.txt      # refused again: what he shows was withdrawn
+wait 8
+shot ach-bob-refused2.png
+mark ach-mark-bob-done2
 quit
