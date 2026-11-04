@@ -149,8 +149,9 @@ pub mod terrain {
             /// Per scatter: cell, reach, hash seed (two words), biomes, thinning mask's place and
             /// steps, keep.
             SCATTER = 8,
-            /// Per scatter and biome: threshold (two words), canopy radius, top, block, thinned.
-            SCATTER_BIOME = 6,
+            /// Per scatter and biome: threshold (two words), thinned, then `lod::SHAPES` crowns
+            /// its shape callback made there, two words each (`crown`).
+            SCATTER_BIOME = 3 + 2 * 8,
             /// Per mod feature and cube: heights at the 256 columns and the 25 corners caves
             /// measure from.
             CUSTOM = 281,
@@ -173,6 +174,44 @@ pub mod terrain {
         lod {
             SIDE = 34,
             SAMPLES = 34 * 34,
+            /// Words per sample coming back: the ground (height and top, biome and under) and
+            /// the crown over it (`lod_out`).
+            WORDS = 4,
+            /// Crowns sampled per scatter and biome; each site takes one by its hash.
+            SHAPES = 8,
+        }
+        /// A sampled crown (`terrain_gpu::describe_lod`), first word: radius, top above the site,
+        /// its lowest leaves, the widest layer (fifteenths of the way from the lowest to the top),
+        /// how round its top is (its width halfway from the widest layer to the top, fifteenths
+        /// of the radius), the trunk's width. Second word: its leaves, its trunk's block. A first
+        /// word of 0: nothing there.
+        crown {
+            RADIUS_MASK = 63,
+            TOP_SHIFT = 6,
+            TOP_MASK = 255,
+            BOTTOM_SHIFT = 14,
+            BOTTOM_MASK = 127,
+            WIDEST_SHIFT = 21,
+            ROUND_SHIFT = 25,
+            FIFTEENTHS = 15,
+            TRUNK_SHIFT = 29,
+            TRUNK_MASK = 7,
+            BLOCK_MASK = 0xFFFF,
+            TRUNK_BLOCK_SHIFT = 16,
+        }
+        /// A sample's crown, words 2 and 3 of it: the crown's top block (signed 16 bits) and its
+        /// leaves (none: no crown); how many blocks it reaches down under its top, the trunk
+        /// standing in its cell (its place in the cell, two bits each, and width; 0: none) and
+        /// the trunk's block.
+        lod_out {
+            HALF_SHIFT = 16,
+            HALF_MASK = 0xFFFF,
+            DEPTH_MASK = 255,
+            TRUNK_DZ_SHIFT = 8,
+            TRUNK_DX_SHIFT = 10,
+            TRUNK_W_SHIFT = 12,
+            PLACE_MASK = 3,
+            TRUNK_W_MASK = 15,
         }
         /// Mask step kinds.
         mask {
@@ -648,7 +687,8 @@ gpu_struct! {
         /// Origins are relative to this cube.
         pub cam_cube: [i32; 4],
         /// x start of the overlay table in `frames` (per texture: overlay texture + 1, or 0),
-        /// z tint kinds, w half the width of `lod_mask`.
+        /// y how far across from the camera the cubes end, fading into distant terrain before it
+        /// (`WorldRenderer::lod_fade`, 0: no fade), z tint kinds, w half the width of `lod_mask`.
         pub extra: [u32; 4],
     }
 }

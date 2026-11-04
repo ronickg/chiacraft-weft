@@ -643,8 +643,7 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
     return vec4(mix(albedo.rgb, ov.rgb * pow(in.tint, vec3(2.2)), ov.a), albedo.a);
 }
 
-@fragment
-fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
+fn opaque(in: VOut) -> vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
@@ -664,7 +663,55 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
 }
 
 @fragment
+fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
+    return opaque(in);
+}
+
+@fragment
 fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    if albedo.a <= 0.1 {
+        discard;
+    }
+    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+}
+
+// Where the cubes end, they fade into distant terrain over this many blocks (as the engine's
+// `FADE_BAND`), so the edge isn't a line (Distant Horizons' fade).
+const FADE_BAND: f32 = 24.0;
+
+// Whether this pixel, near where the cubes end (`g.extra.y` blocks across from the camera), is
+// left to distant terrain: more of them the nearer the end, in a fine noise over the screen
+// (interleaved gradient noise). A cube's pixel and the distant terrain's at the same place agree,
+// so one of the two always draws it.
+fn faded(in: VOut) -> bool {
+    let end = f32(g.extra.y);
+    if end <= 0.0 {
+        return false;
+    }
+    let f = clamp((length(in.rel.xz) - (end - FADE_BAND)) / FADE_BAND, 0.0, 1.0);
+    let p = floor(in.clip.xy);
+    return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
+}
+
+// The cubes near where they end (the engine draws only those meshes with these, so the rest keep
+// early depth).
+@fragment
+fn fs_opaque_fade(in: VOut) -> @location(0) vec4<f32> {
+    if faded(in) {
+        discard;
+    }
+    return opaque(in);
+}
+
+@fragment
+fn fs_cutout_fade(in: VOut) -> @location(0) vec4<f32> {
+    if faded(in) {
+        discard;
+    }
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
@@ -687,8 +734,8 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     return shade(in, albedo);
 }
 
-// Distant terrain (`client::lod`): faces of boxes in the average color of their texture, under
-// open sky.
+// Distant terrain (`client::lod`): faces of boxes with their blocks' textures, laid over the
+// world block by block (`lod_albedo`), under open sky.
 @vertex
 fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
@@ -758,20 +805,47 @@ fn fs_lod_shadow(in: VOut) {
 
 @fragment
 fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
-    if lod_hidden(in) {
+    // Where cubes show the ground they stand there, except for the pixels they leave as they fade.
+    if lod_hidden(in) && !faded(in) {
         discard;
     }
-    var albedo = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
-    if in.blend > 0.0 {
-        albedo = mix(albedo, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    // A texture per block, laid from the world position on the face's plane (top
+    // faces and gentle slopes by x and z, walls by their side and height, up the right way), its
+    // gradients from that unbroken position so block borders don't jump to a coarse mip. Far off
+    // the mips make it the average color it was drawn in before (Distant Horizons 3.2 textures
+    // its near levels the same way).
+    let top = in.pos.xz;
+    let east = vec2(in.pos.z, -in.pos.y);
+    let south = vec2(in.pos.x, -in.pos.y);
+    let dt = vec4(dpdx(top), dpdy(top));
+    let de = vec4(dpdx(east), dpdy(east));
+    let ds = vec4(dpdx(south), dpdy(south));
+    let n = abs(in.normal);
+    var at = top;
+    var d = dt;
+    if n.y < 0.5 {
+        if n.x > n.z {
+            at = east;
+            d = de;
+        } else {
+            at = south;
+            d = ds;
+        }
     }
+    var avg = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
+    if in.blend > 0.0 {
+        avg = mix(avg, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    }
+    let t = sample(in, fract(at), d.xy, d.zw);
+    // A cutout's clear texels (leaves' gaps) show the average, not their unset color.
+    var albedo = vec4(mix(avg.rgb, t.rgb, t.a), avg.a);
     // Far water is the same water as near: deep there (no blocks are kept that far), with its
     // Fresnel, the sky and the sun's path. Otherwise it would be a flat grey-blue lit like land, a
     // seam at the edge of the render distance. It is left out of the screen's reflections (solid in
     // the mask): looking out to sea, their march over every far-water pixel cost too much
     // (reports/performance.md).
     if in.kind.x == TINT_WATER {
-        let w = water(in, albedo, false);
+        let w = water(in, avg, false);
         return vec4(w.rgb, SOLID_ALPHA);
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
