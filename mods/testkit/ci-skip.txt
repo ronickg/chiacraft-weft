@@ -26,3 +26,5 @@ ride_frames                            no tick-sized jumps, frame by frame (2026
 body_chest                             a chest kept at its block on a moving structure, frame by frame (2026-11-05)
 body_sneak_edge                        sneaking at a moving structure's edge, frame by frame (2026-11-05)
 recipe_viewer                          opens its screen a few frames at a time; passes on the Mac's GPU at c1afd614 (2026-11-05)
+redstone_clock                         flips counted over 4 s of frames; passes on the Mac's GPU at c1afd614 (the PC failed it at af753f03) (2026-11-05)
+redstone_on_a_structure                wire on a moving structure seen frame by frame; passes on the Mac's GPU at c1afd614 (the PC failed it at af753f03) (2026-11-05)
