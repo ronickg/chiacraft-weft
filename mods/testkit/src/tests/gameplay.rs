@@ -1138,7 +1138,7 @@ pub async fn creative_middle_click(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(2).await?;
-    t.click_ui("slot:36", 2);
+    t.click_ui("slot:41", 2);
     t.until("a whole stack on the cursor", Duration::from_secs(2), |t| t.c().cursor_stack().count == 64)
         .await?;
     t.check_eq(t.c().inventory_slot(0).count, 3, "and the slot keeps what it had");
@@ -1151,7 +1151,7 @@ pub async fn creative_middle_click(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(2).await?;
-    t.click_ui("slot:36", 2);
+    t.click_ui("slot:41", 2);
     t.secs(0.3).await?;
     t.check(t.c().cursor_stack().is_empty(), "nothing out of creative");
     t.c().close_screen();
