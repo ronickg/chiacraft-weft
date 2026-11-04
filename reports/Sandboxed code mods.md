@@ -117,6 +117,30 @@ Ronald took the recommendations ("Take its recommendations", through Planner):
    it. Built in slice 2: offers say whether a package carries code (protocol 6) and the joining
    game refuses a package whose manifest says otherwise.
 
+## Checked against the Researcher's round 1 (W1-W4)
+
+`reports/Research round 1.md` (Researcher's branch), "Mod sandboxing with wasmtime components":
+
+- **W1, freeze the Zed way.** Built that way already: one folder per version
+  (`crates/sandbox/wit/v1.0`), one `bindgen!` module; a host enum over the modules comes with the
+  second version. Missing: a version range. Proposed: read the version a component needs from its
+  own imports (`chiacraft:mods/...@1.x`, which it can't misstate), refuse a too-new one when the
+  package loads, and carry it in the offer so the join sheet refuses before downloading. Built with
+  1.1, since today there is one version.
+- **W2, limits and failures.** Memory: `StoreLimits` at 64 MiB, built. CPU: we meter fuel per call
+  (deterministic, the same cut-off on every machine, costlier than epochs) and keep a 500 ms epoch
+  watchdog only as a backstop; epochs alone would let a slow machine cut calls a fast one finishes.
+  Kept as built; measure the cost before the API is released. Failures: a strike drops the
+  instance and starts it over, three in ten minutes stop the mod in that world (the "optional"
+  policy). Proposed for later: a `required` flag in `package.toml` (the next format change), where
+  a stopped required mod closes the world to joins and sends its players home with the mod named.
+- **W3, coarse calls.** Events already come in batches. Block edits are one call each (at most
+  4096 a call). Proposed: a `set-blocks` list call in 1.1 and a call-cost benchmark (wasmtime's
+  `benches/call.rs` shape) before 1.0 is frozen by a release.
+- **W4, WASI 0.3.** Not taken: a mod imports no WASI at all (that is the sandbox), host calls
+  answer synchronously inside the callback, and the agreed wasmtime 36 LTS has no 0.3. Client
+  halves rare and opt-in, as Hytale does: agreed, they stay slice 4.
+
 ## Not done or not checked
 
 - The tests (`crates/sandbox/tests/sandbox.rs`) and fuzz targets (`crates/sandbox/fuzz`) are
