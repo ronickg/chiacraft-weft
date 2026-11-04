@@ -1,0 +1,39 @@
+loaded
+idle
+chat /tk mode creative
+chat /weather clear
+chat /air 0 0 90 mist
+chat /dim base:flatlands
+wait 5
+chat /summon base:cow ~3 ~ ~-2
+chat /summon base:sheep ~3 ~ ~2
+chat /summon base:chicken ~2 ~ ~0
+chat /summon base:pig ~5 ~ ~0
+chat /time set 6000
+look 300 -45
+wait 3
+shot 1_noon_mobs.png
+chat /time set 9000
+look 270 -30
+wait 2
+shot 2_afternoon_mobs.png
+look 90 -30
+wait 2
+shot 3_afternoon_other_side.png
+chat /time set 10300
+look 270 -20
+wait 2
+shot 4_golden_mobs.png
+look 90 -55
+wait 2
+shot 5_golden_own_shadow_east.png
+look 270 -55
+wait 2
+shot 6_golden_own_shadow_west.png
+look 0 -55
+wait 1
+shot 7_own_shadow_north.png
+look 180 -55
+wait 1
+shot 8_own_shadow_south.png
+quit
