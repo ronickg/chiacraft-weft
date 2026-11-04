@@ -5,7 +5,7 @@
 
 fn bloom_bright(c: vec3<f32>) -> vec3<f32> {
     let y = dot(c, vec3(0.2126, 0.7152, 0.0722));
-    return c * smoothstep(0.7, 1.0, y);
+    return c * smoothstep(0.85, 1.0, y);
 }
 
 fn apply(p: PostPixel) -> vec4<f32> {
@@ -23,5 +23,5 @@ fn apply(p: PostPixel) -> vec4<f32> {
         }
     }
     glow /= weight;
-    return vec4(p.color.rgb + glow * 0.55 * min(p.strength, 1.0), p.color.a);
+    return vec4(p.color.rgb + glow * 0.4 * min(p.strength, 1.0), p.color.a);
 }

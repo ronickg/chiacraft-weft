@@ -4,6 +4,14 @@ Lighting, 2026-11-04, for Planner and Ronald ("the game should look like a good 
 default"; his Bliss v2.1.1 settings in `chiacraft-archive/references/shaders/`). Ideas only: Bliss
 and Complementary may not be copied.
 
+## Ronald's decision (2026-11-04)
+
+From the four-way sheet (`chiacraft-archive/images/lighting/2026-11-04/fourway_sheet.jpg`): "Yes,
+make it default". The Bliss direction (step 1's filmic curve, richer color, a warmer and stronger
+sun, step 2's bloom, the brighter water mirror, with the brightness fixes) becomes the pack's
+default once Tester 2's reshoot confirms day, night and under water. Round 7's calmer Complementary
+grade is set aside.
+
 ## What chiacraft's pack already has
 
 - **Sun shadows:** a 2048 map, 80 blocks around the player, from blocks, mobs and the player.

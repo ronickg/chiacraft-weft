@@ -112,8 +112,8 @@ fn light_strength() -> f32 {
 fn sun_glow(dir: vec3<f32>, p: Palette) -> vec3<f32> {
     let mu = max(dot(dir, scene.sun.xyz), 0.0);
     let horizon = 1.0 - clamp(dir.y, 0.0, 1.0);
-    let wide = pow(mu, 5.0) * (0.28 + 0.4 * horizon);
-    let near = pow(mu, 60.0) * 0.9;
+    let wide = pow(mu, 5.0) * (0.2 + 0.28 * horizon);
+    let near = pow(mu, 60.0) * 0.75;
     return p.glow * (wide + near);
 }
 
@@ -465,9 +465,9 @@ fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
 // up to keep them where they were, and more as night falls and under water, the eye adjusting.
 fn exposure() -> f32 {
     if in_liquid() {
-        return 2.2;
+        return 3.0;
     }
-    return mix(1.7, 2.6, smoothstep(0.0, -0.2, scene.sun.y));
+    return mix(1.7, 4.0, smoothstep(0.0, -0.2, scene.sun.y));
 }
 
 fn display(c: vec3<f32>) -> vec3<f32> {
