@@ -1,0 +1,12 @@
+[
+ {
+  "kind": "item",
+  "name": "diag_gold_axe",
+  "what": "a gold axe: a broad wedge-shaped head of shiny lemon-gold with orange-brown shadows and small white glints, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle. The handle runs along the canvas diagonal from the bottom-left corner to the top-right; the axe head sits at the handle's top end and follows that diagonal: its cutting edge is a straight or gently curved line running perpendicular to the handle, from the upper left down to the lower right (along the canvas's other diagonal), never a vertical edge and never parallel to the canvas sides. Filling the canvas corner to corner Keep 2 px of empty margin between the head and the right and top sides of the canvas, so the cutting edge never touches a canvas side and is never cut flat into a vertical line."
+ },
+ {
+  "kind": "item",
+  "name": "diag_diamond_axe",
+  "what": "a diamond axe: a broad wedge-shaped head of faceted cyan diamond with teal shadows, white facet tips and one small sparkle, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar where head meets handle. The handle runs along the canvas diagonal from the bottom-left corner to the top-right; the axe head sits at the handle's top end and follows that diagonal: its cutting edge is a straight or gently curved line running perpendicular to the handle, from the upper left down to the lower right (along the canvas's other diagonal), never a vertical edge and never parallel to the canvas sides. Filling the canvas corner to corner The head is a broad, heavy wedge of faceted diamond, as wide as an iron axe's, flaring from the collar to a wide cutting edge; not a thin blade, not a hoe or a pickaxe. Keep 2 px of empty margin between the head and the right and top sides of the canvas, so the cutting edge never touches a canvas side and is never cut flat into a vertical line."
+ }
+]
