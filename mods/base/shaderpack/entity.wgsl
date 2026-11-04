@@ -203,7 +203,8 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
         light = max(light, in.tint * pow(e, 2.2));
     }
-    return vec4(fog(in, albedo.rgb * light), 1.0);
+    // In the world, solid (the reflections' mask); on a screen, opaque.
+    return vec4(fog(in, albedo.rgb * light), select(1.0, SOLID_ALPHA, in.graded != 0u));
 }
 
 @fragment

@@ -63,7 +63,7 @@ struct Texture {
     alloc: Allocation,
     desc: TextureDesc,
     layout: vk::ImageLayout,
-    /// Index into the matching bindless array, `u32::MAX` for depth.
+    /// Index into the matching bindless array (depth too: screen effects read it).
     index: u32,
 }
 
@@ -978,7 +978,7 @@ impl VulkanBackend {
                         if t.layout != vk::ImageLayout::UNDEFINED {
                             continue;
                         }
-                        let depth = t.index == u32::MAX;
+                        let depth = t.desc.format == Format::Depth32;
                         let (range, new) = if depth {
                             (depth_range(), vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
                         } else {
@@ -1211,8 +1211,10 @@ impl Backend for VulkanBackend {
     fn create_texture(&mut self, desc: &TextureDesc, label: &str) -> TextureId {
         let format = self.vk_format(desc.format);
         let depth = desc.format == Format::Depth32;
+        // Depth is also sampled: screen effects read how far each pixel is (it stays bindless,
+        // read in SHADER_READ_ONLY_OPTIMAL between the passes that draw into it).
         let usage = if depth {
-            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED
         } else {
             let mut u = vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST;
             if desc.render_target {
@@ -1263,9 +1265,7 @@ impl Backend for VulkanBackend {
                 )
                 .expect("vkCreateImageView");
 
-            let index = if depth {
-                u32::MAX
-            } else {
+            let index = {
                 let index = self.free_tex.pop().unwrap_or_else(|| {
                     self.next_tex += 1;
                     self.next_tex - 1
@@ -1505,6 +1505,7 @@ impl Backend for VulkanBackend {
             let sets = [self.global_set];
             let mut current: Option<u32> = None;
             let mut in_pass_targets: Vec<u32> = Vec::new();
+            let mut in_pass_depth: Option<u32> = None;
             let (sc_image, sc_view, sc_extent) = {
                 let sc = self.swapchain.as_ref().unwrap();
                 (sc.images[image_index as usize], sc.views[image_index as usize], sc.extent)
@@ -1549,6 +1550,17 @@ impl Backend for VulkanBackend {
                                     .clear_value(vk::ClearValue { color: vk::ClearColorValue { float32: clear.unwrap_or_default() } }),
                             );
                         }
+                        // Depth back to an attachment if a screen effect read it since (`EndPass`).
+                        if let Some((t, clear)) = depth {
+                            let tex = self.textures.get_mut(t.0);
+                            let old = if clear.is_some() { vk::ImageLayout::UNDEFINED } else { tex.layout };
+                            tex.layout = vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL;
+                            let image = tex.image;
+                            if old != vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL {
+                                self.barrier_image(cmd, image, depth_range(), old, vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL);
+                            }
+                            in_pass_depth = Some(t.0);
+                        }
                         let depth_att = depth.map(|(t, clear)| {
                             let tex = self.textures.get(t.0);
                             extent = vk::Extent2D { width: tex.desc.width, height: tex.desc.height };
@@ -1587,6 +1599,18 @@ impl Backend for VulkanBackend {
                     }
                     Cmd::EndPass => {
                         self.device.cmd_end_rendering(cmd);
+                        // What the pass drew its depth into can be read now.
+                        if let Some(t) = in_pass_depth.take() {
+                            let image = self.textures.get(t).image;
+                            self.barrier_image(
+                                cmd,
+                                image,
+                                depth_range(),
+                                vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
+                                vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                            );
+                            self.textures.get_mut(t).layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+                        }
                         for t in in_pass_targets.drain(..) {
                             let image = self.textures.get(t).image;
                             self.barrier_image(
