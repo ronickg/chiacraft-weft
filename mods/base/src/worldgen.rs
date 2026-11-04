@@ -452,6 +452,7 @@ fn young_tree(s: &mut Site) {
         z,
         h >> 8,
         |x, y, z, state, force| {
+            let state = made_leaves(state);
             if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
         },
     );
@@ -467,6 +468,7 @@ fn shrub(s: &mut Site) {
     let Some(leaves) = SHRUB_KINDS
         .on_biome(s.biome())
         .and_then(|l| l.pick(h >> 40))
+        .map(made_leaves)
     else {
         return;
     };
@@ -574,6 +576,7 @@ fn giant(s: &mut Site) {
             if brazil && matches!(state_prop(state, "axis"), Some("x" | "z")) {
                 limbs.push([x, y, z]);
             }
+            let state = made_leaves(state);
             if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
         },
     );
@@ -732,6 +735,7 @@ fn tree(s: &mut Site) {
         if climbers && LEAVES.on_block(state) {
             crown.push([x, y, z]);
         }
+        let state = made_leaves(state);
         if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
     });
     lianas(s, &crown, y, h);

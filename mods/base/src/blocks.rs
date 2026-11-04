@@ -356,10 +356,48 @@ fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'stat
         .on_grow(move |e| {
             let open = vitals::wild::in_bloom(seasons, base_api::ground_at(&e.world(), e.pos()).season);
             let want = if open { "1" } else { "0" };
-            if state_prop(e.state(), "bloom") != Some(want) {
-                e.world().set_prop(e.pos(), "bloom", want);
+            if state_prop(e.state(), "bloom") == Some(want) {
+                return;
+            }
+            // The whole crown round it turns with it, in one go: leaf by leaf, each on its own
+            // step a few minutes apart, a forest's thousands of leaves changed for a quarter of an
+            // hour after a season turned, and the world round them never settled (the tropical
+            // forest's stall, found on the PC).
+            let w = e.world();
+            let [x, y, z] = e.pos();
+            let kind = block_name(e.state()).split('[').next().unwrap_or("");
+            for dy in -BLOOM_REACH..=BLOOM_REACH {
+                for dz in -BLOOM_REACH..=BLOOM_REACH {
+                    for dx in -BLOOM_REACH..=BLOOM_REACH {
+                        let p = [x + dx, y + dy, z + dz];
+                        let st = w.get(p);
+                        if block_name(st).split('[').next() == Some(kind) && state_prop(st, "bloom") != Some(want) {
+                            w.set_prop(p, "bloom", want);
+                        }
+                    }
+                }
             }
         })
+}
+
+/// How far round a blooming leaf its crown turns with it (`bloom`): a crown's reach.
+const BLOOM_REACH: i32 = 4;
+
+/// The state a tree's leaves are made in: in flower for the spring bloomers
+/// (`vitals::wild::BLOOMS`), since every world starts in spring; others as they are.
+pub fn made_leaves(state: u32) -> u32 {
+    static OPEN: std::sync::OnceLock<Vec<(u32, u32)>> = std::sync::OnceLock::new();
+    let open = OPEN.get_or_init(|| {
+        vitals::wild::BLOOMS
+            .iter()
+            .filter(|(_, seasons)| vitals::wild::in_bloom(*seasons, Some(0)))
+            .filter_map(|(name, _)| {
+                let id = Block::lookup(name)?;
+                Some((id, state_with(id, "bloom", "1")?))
+            })
+            .collect()
+    });
+    open.iter().find(|(shut, _)| *shut == state).map_or(state, |&(_, open)| open)
 }
 
 /// A tree's leaves: they decay once no log is near (`leaf_decay`), unless a player placed them
