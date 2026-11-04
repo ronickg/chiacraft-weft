@@ -258,3 +258,21 @@ fn desert_animals_barely_drink() {
 fn taming_foods_are_in_the_diet() {
     report(animals_core::species::foods_off_diet());
 }
+
+/// Every taming food has its bubble, shown above an animal asking for it (`taming.rs`:
+/// `textures/particle/want_<food>.png`; make one with `source/bubbles/bubbles.py`), or the log
+/// fills with missing textures.
+#[test]
+fn every_taming_food_has_its_bubble() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/textures/particle");
+    let mut problems = Vec::new();
+    for s in &SPECIES {
+        for f in s.foods {
+            let name = f.item.split_once(':').map_or(f.item, |(_, n)| n);
+            if !dir.join(format!("want_{name}.png")).exists() {
+                problems.push(format!("{}: no bubble for {} (want_{name}.png; source/bubbles/bubbles.py)", s.name, f.item));
+            }
+        }
+    }
+    report(problems);
+}

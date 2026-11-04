@@ -85,7 +85,7 @@ const ARAUCARIAS: &[&str] = &["animals:scrubland", "animals:floodplain", "animal
 const SCALE_CONIFERS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:crags"];
 const BIRCHES: &[&str] = &["base:forest", "base:birch_forest"];
 
-pub const SOURCES: [Source; 67] = [
+pub const SOURCES: [Source; 69] = [
     s("base:tall_grass", None, Category::Grass, 10, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
     wild("base:berry_bush", 3, Category::Fruit, 8, Eaten::Age(1), wild::FORESTS),
     browse("base:oak_leaves", Category::Leaves, 4, OAKS, GREEN),
@@ -213,6 +213,10 @@ pub const SOURCES: [Source; 67] = [
     browse("base:kelp_wrack", Category::WaterPlants, 4, &["base:beach"], ALL_YEAR),
     // Grubs and beetles in the rotten logs, all year.
     browse("animals:rotten_log", Category::Insects, 3, wild::DEADWOOD, ALL_YEAR),
+    // Termites in their mounds on the dry lands, all year (the lizards', the small mammals', the
+    // birds'), the crown as the mound.
+    browse("animals:termite_mound", Category::Insects, 3, wild::TERMITE_LANDS, ALL_YEAR),
+    browse("animals:termite_mound_upper", Category::Insects, 3, wild::TERMITE_LANDS, ALL_YEAR),
     // Our trees (`worldgen.rs`, `cretaceous.rs`), as browse where they grow: mesquite's leaves
     // and, June to October, its pods (the desert's biggest single food); the acuri palm's nuts
     // in the Pantanal's dry season and the moriche's fruit from the llanos' late dry season

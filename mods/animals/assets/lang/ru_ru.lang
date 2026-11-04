@@ -337,6 +337,8 @@ species.animals.cedarosaurus = цедарозавр
 family.animals.brachiosauridae = семейство брахиозаврид
 item.animals.cedarosaurus_egg = Яйцо цедарозавра
 hint.animals.tamed = Теперь оно ваше. Присядьте и используйте его, чтобы открыть меню; свист {key:animals:whistle_follow} — за мной, {key:animals:whistle_stay} — стоять, {key:animals:whistle_come} — ко мне, {key:animals:whistle_attack} — в атаку, {key:animals:whistle_passive} — успокоиться.
+block.animals.termite_mound = Термитник
+block.animals.termite_mound_upper = Термитник
 # The UI redo's animal screen, taming HUD and menus.
 hud.animals.taming.asks = Эффективность {0}% · просит {1}
 hud.animals.taming.asleep = Эффективность {0}% · спит, оцепенение {1}
