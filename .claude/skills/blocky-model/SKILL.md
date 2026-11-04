@@ -33,8 +33,9 @@ The numbers are in `scripts/house.py`; build scripts import them instead of choo
   the face that carries the eyes is under `house.MIN_FACE` (3) texels at 32, paint the least
   power-of-two multiple of 32 that gives it 3 (`house.fine(face_units)`; `texels(scale, k)`).
   Today: raven, gull, vulture and fish at 64; mouse, vole, kryptobaatar, small bird and lizard at
-  128. Everything else, the chihuahua and cat included, at 32. Boxes, export scale and in-game
-  size stay the same.
+  128; the owl at 64 too (its face is its two big eyes, 4 by 4 texels at 32). Everything else at
+  32, the chihuahua and cat included: Ronald, 2026-11-04, shown both at 32 and finer, "32, one
+  look". A new animal follows the same rule. Boxes, export scale and in-game size stay the same.
 - **Faces at 32 are small** (a wolf's 7 by 6 texels, a cat's 6 by 5, a chihuahua's 5 by 4): eyes
   are 2-3 texel designs with no halo (`paint.EYES` `px2`, `px3`..., or the animal's own; two front
   eyes placed with `paint.eye_corner` so they land mirror-symmetric), a mark is a texel or more
