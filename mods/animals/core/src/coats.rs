@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 35] = [
+const FILES: [(&str, &str); 37] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -294,6 +294,8 @@ const FILES: [(&str, &str); 35] = [
     ("spectacled_caiman", include_str!("../../genetics/spectacled_caiman.json")),
     ("grey_wolf", include_str!("../../genetics/grey_wolf.json")),
     ("jaguar", include_str!("../../genetics/jaguar.json")),
+    ("lungfish", include_str!("../../genetics/lungfish.json")),
+    ("lycoptera", include_str!("../../genetics/lycoptera.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1443,6 +1445,28 @@ fn jaguar(r: &Read) -> Look {
     }
 }
 
+/// The Cretaceous's fish: a lungfish olive to brown, mottled darker, pale below; Lycoptera silvery
+/// with a dark back, as a herring is.
+fn cretaceous_fish(r: &Read, lungfish: bool) -> Look {
+    let t = r.qv("Tn");
+    if lungfish {
+        let base = mix([96.0, 98.0, 70.0], [118.0, 92.0, 62.0], t);
+        return Look {
+            name: if t > 0.6 { "Brown".into() } else { "Olive".into() },
+            base,
+            under: [206.0, 196.0, 160.0],
+            pattern: Some(Pattern { kind: "blotches", color: darken(base, 0.4), amount: 0.6 }),
+            ..Look::default()
+        };
+    }
+    Look {
+        name: "Silver".into(),
+        base: mix([110.0, 124.0, 130.0], [140.0, 150.0, 150.0], t),
+        under: [214.0, 218.0, 214.0],
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1619,6 +1643,8 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "spectacled_caiman" => caiman(&r, true),
         "grey_wolf" => wolf(&r),
         "jaguar" => jaguar(&r),
+        "lungfish" => cretaceous_fish(&r, true),
+        "lycoptera" => cretaceous_fish(&r, false),
         _ => raptor(&r),
     };
     core(&r, &mut look);

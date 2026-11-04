@@ -105,6 +105,8 @@ pub static ACCIPITRIDAE: Family = Family { name: "Accipitridae", above: &["Aves"
 pub static CATHARTIDAE: Family = Family { name: "Cathartidae", above: &["Aves", "Accipitriformes"] };
 pub static LARIDAE: Family = Family { name: "Laridae", above: &["Aves", "Charadriiformes"] };
 pub static ALLIGATORIDAE: Family = Family { name: "Alligatoridae", above: &["Reptilia", "Crocodylia"] };
+pub static CERATODONTIDAE: Family = Family { name: "Ceratodontidae", above: &["Sarcopterygii", "Dipnoi"] };
+pub static LYCOPTERIDAE: Family = Family { name: "Lycopteridae", above: &["Actinopterygii", "Osteoglossomorpha"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -131,6 +133,13 @@ const fn favorite(item: &'static str, food: u16) -> Food {
 /// their wild kinds: junglefowl and grouse, boar, wild sheep, aurochs; `reports/ecology/Overworld
 /// food webs.md`). They live all over the overworld.
 pub const OTHER_PREY: [(&str, f32); 4] = [("base:chicken", 1.0), ("base:pig", 80.0), ("base:sheep", 70.0), ("base:cow", 600.0)];
+
+/// The hunters that take bigger prey together than alone, and how big, as shares of one's mass:
+/// grey wolves kill moose, elk and bison, ten times a wolf (`reports/ecology/Overworld food webs.md`:
+/// "packs take moose and elk"; the hunting is `hunt.rs`).
+pub const PACK_PREY: &[(&str, f32)] = &[("grey_wolf", 10.0)];
+/// How many of its kind hunt together as a pack (itself among them).
+pub const PACK: u32 = 3;
 
 /// Every species takes kibble, best of all.
 const KIBBLE: Food = Food { item: "animals:kibble", food: 30, liking: Liking::Kibble };
@@ -228,10 +237,10 @@ impl Species {
             _ => Diet::Omnivore,
         }
     }
-    /// Whether it lives in the water (the ray-finned fishes): it never spawns on the ground, its
-    /// mod puts it in the water (`mods/animals/src/fish.rs`).
+    /// Whether it lives in the water (the ray-finned fishes and the lungfishes): it never spawns on
+    /// the ground, its mod puts it in the water (`mods/animals/src/fish.rs`).
     pub fn in_water(&self) -> bool {
-        self.family.above.first() == Some(&"Actinopterygii")
+        matches!(self.family.above.first(), Some(&"Actinopterygii") | Some(&"Sarcopterygii"))
     }
     /// Whether it eats this kind of food at all.
     pub fn eats(&self, c: Category) -> bool {
@@ -250,19 +259,39 @@ impl Species {
     pub fn takes(&self, own: f32, kg: f32) -> bool {
         self.hunts() && kg >= own * self.prey.0 && kg <= own * self.prey.1
     }
+    /// The biggest prey a pack of its kind takes together, as a share of one's mass (`PACK_PREY`;
+    /// `None`: it hunts alone, or its pack takes nothing bigger).
+    pub fn pack_prey(&self) -> Option<f32> {
+        PACK_PREY
+            .iter()
+            .find(|&&(n, _)| n == self.name)
+            .map(|&(_, m)| m)
+    }
+    /// Whether a hunter of `own` kg takes prey of `kg` with `pack` of its kind hunting with it (itself
+    /// among them): a pack of `PACK` or more takes up to `pack_prey`.
+    pub fn takes_with(&self, own: f32, kg: f32, pack: u32) -> bool {
+        match self.pack_prey() {
+            Some(most) if pack >= PACK => self.hunts() && kg >= own * self.prey.0 && kg <= own * most,
+            _ => self.takes(own, kg),
+        }
+    }
+    /// Whether it takes prey of `kg` at all, alone or with its pack (the food web, prey's watch).
+    pub fn takes_at_most(&self, own: f32, kg: f32) -> bool {
+        self.takes_with(own, kg, PACK)
+    }
     /// Its prey where it lives (part 6): the species of other families sharing one of its
     /// habitats within its prey's sizes, and the farm animals' wild kinds in the overworld.
     pub fn prey_at_home(&self) -> impl Iterator<Item = &'static str> + '_ {
         let mine = |biome: &str| self.habitats.iter().any(|&(b, _)| b == biome);
         let species = SPECIES
             .iter()
-            .filter(move |o| o.family.name != self.family.name && self.takes(self.bio.mass, o.bio.mass))
+            .filter(move |o| o.family.name != self.family.name && self.takes_at_most(self.bio.mass, o.bio.mass))
             .filter(move |o| o.habitats.iter().any(|&(b, _)| mine(b)))
             .map(|o| o.name);
         let overworld = self.habitats.iter().any(|&(b, _)| b.starts_with("base:"));
         let mobs = OTHER_PREY
             .iter()
-            .filter(move |&&(_, kg)| overworld && self.takes(self.bio.mass, kg))
+            .filter(move |&&(_, kg)| overworld && self.takes_at_most(self.bio.mass, kg))
             .map(|&(name, _)| name);
         species.chain(mobs)
     }
@@ -308,7 +337,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 35] = [
+pub static SPECIES: [Species; 37] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1813,11 +1842,10 @@ pub static SPECIES: [Species; 35] = [
         // Standing, at the crown.
         height: (0.1, "crown"),
         // Wherever people farm and build, from the prairie to the desert's towns and the coast; few in
-        // the deep woods. Not in the birch woods' and the Alps' winters, where it lives only on what
-        // people leave (`web`: nothing of its diet there then).
+        // the deep woods. Not in the birch woods', the Alps' or the llanos' dry-season winters, where
+        // it lives only on what people leave (`web`: nothing of its diet there then).
         habitats: &[
             ("base:plains", 1.0),
-            ("base:savanna", 0.6),
             ("base:desert", 0.5),
             ("base:beach", 0.5),
             ("base:forest", 0.4),
@@ -2637,6 +2665,122 @@ pub static SPECIES: [Species; 35] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { recovery: Some(150_000), crowd: Some(12), ..Tune::NONE },
         birth_size: 0.12,
+    },
+    // The Cretaceous's fish (`reports/ecology/Cretaceous food webs.md`, tier 3: fish as a catch in its
+    // waters), two wild species on the fish model, spawned into water as the overworld's are
+    // (`fish.rs`): the Cedar Mountain floodplain's lungfish and the Yixian lakes' Lycoptera, what the
+    // Utahraptor, the crocodyliform and the early birds take from the water.
+    Species {
+        model: "fish",
+        name: "lungfish",
+        binomial: "Ceratodus kempae",
+        family: &CERATODONTIDAE,
+        subfamily: "",
+        breed: None,
+        size: Size::Small,
+        // Snails, insect larvae and crayfish, water plants, small fish.
+        eats: &[(Insects, 0.5), (WaterPlants, 0.2), (Fish, 0.3)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [8.0, 90.0, 40.0, 0.6, 1.0, 12.0, 600.0, 20.0, 6.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[],
+        feedings: 0.0,
+        shy: 6.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.5,
+        signature: "dart",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 1.0,
+        dimorphism: 1.0,
+        size_spread: 0.6,
+        // The model's (the trout's); its size genes draw it about 1.55 times as long: 57 cm (Ceratodus
+        // reached about a metre).
+        height: (0.37, "fork"),
+        // The Cedar Mountain Formation's rivers and oxbow ponds (Ceratodus teeth are common there).
+        habitats: &[("animals:floodplain", 1.0)],
+        bio: Biology {
+            mass: 3.0,
+            gestation: 0.0,
+            incubation: 30.0,
+            maturity: 1825.0,
+            lifespan: 7300.0,
+            interval: 365.0,
+            litter: 6.0,
+            social: Social::Solitary,
+            rarity: Rarity::Uncommon,
+            breeds: 0,
+            peak: 0,
+            // A warm floodplain's rivers and ponds; it breathes air through the dry season.
+            comfort: (14.0, 32.0),
+            cold_blooded: true,
+        },
+        // Slow and long-lived, so fewer young a spawning season than the trout and growing a
+        // little sooner, or a cell fills with lungfish (the balance checks' generation and young).
+        tune: Tune { growth: Some(240_000), litter: Some((1, 4)), ..Tune::NONE },
+        birth_size: 0.1,
+    },
+    Species {
+        model: "fish",
+        name: "lycoptera",
+        binomial: "Lycoptera davidi",
+        family: &LYCOPTERIDAE,
+        subfamily: "",
+        breed: None,
+        size: Size::Small,
+        // Insect larvae and plankton.
+        eats: &[(Insects, 1.0)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [1.0, 40.0, 8.0, 0.1, 1.0, 1.0, 300.0, 4.0, 1.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[],
+        feedings: 0.0,
+        shy: 6.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.5,
+        signature: "dart",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 1.0,
+        dimorphism: 1.0,
+        size_spread: 0.5,
+        // The model's (the trout's); its size genes draw it about 0.55 times as long: 20 cm, about twice
+        // life (a 6-12 cm fish would be a speck).
+        height: (0.37, "fork"),
+        // The Yixian Formation's lakes (whole schools in its shales).
+        habitats: &[("animals:fern_forest", 1.0)],
+        bio: Biology {
+            mass: 0.02,
+            gestation: 0.0,
+            incubation: 5.0,
+            maturity: 365.0,
+            lifespan: 1460.0,
+            interval: 365.0,
+            litter: 8.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            breeds: 0,
+            peak: 0,
+            // The Yixian's cool lakes.
+            comfort: (4.0, 24.0),
+            cold_blooded: true,
+        },
+        // A small fish of a short life: grown in its first season, and schools that keep to a
+        // room a pond holds (the balance checks' growth and room).
+        tune: Tune { growth: Some(70_000), crowd: Some(30), ..Tune::NONE },
+        birth_size: 0.1,
     },
 ];
 

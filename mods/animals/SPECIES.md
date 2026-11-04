@@ -45,6 +45,8 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | spectacled_caiman | *Caiman crocodilus* | common | large | 2.2 m | 25 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 4-8 | 26 |
 | grey_wolf | *Canis lupus* | uncommon | medium | 0.8 m | 42 kg | pack | carnivore | passive | 1.25 d | 6.07 d | 46 d | 2-8 | 16 |
 | jaguar | *Panthera onca* | uncommon | large | 0.7 m | 85 kg | solitary | carnivore | knockout | 1.77 d | 7.54 d | 65.1 d | 1-2 | 12 |
+| lungfish | *Ceratodus kempae* | uncommon | small | 0.37 m | 3 kg | solitary | carnivore | wild | eggs, hatch 0.72 d | 10 d | 76.7 d | 1-4 | 14 |
+| lycoptera | *Lycoptera davidi* | common | small | 0.37 m | 0.02 kg | herd | carnivore | wild | eggs, hatch 0.19 d | 2.92 d | 15.3 d | 3-11 | 30 |
 
 ## Stats at level 1
 
@@ -87,6 +89,8 @@ Damage and speed are each kind's own (1 = 100%).
 | spectacled_caiman | 26 | 150 | 100 | 4.5 | 1 | 60 | 300 | 50 | 26 | 60 |
 | grey_wolf | 30 | 220 | 120 | 6 | 1 | 60 | 80 | 90 | 20 | 40 |
 | jaguar | 45 | 260 | 200 | 9 | 1 | 120 | 160 | 300 | 25 | 20 |
+| lungfish | 8 | 90 | 40 | 0.6 | 1 | 12 | 600 | 20 | 6 | 30 |
+| lycoptera | 1 | 40 | 8 | 0.1 | 1 | 1 | 300 | 4 | 1 | 30 |
 
 ## The food web
 
@@ -100,7 +104,7 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 | base:taiga | 40%, 93%, 40%, 40% | summer: eaten 20% of the regrowth | mountain_hare, field_vole, reindeer, snow_bunting | cat, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | cat, brown_trout, red_fox, arctic_fox, raven, golden_eagle, grey_wolf |
 | base:snowy_plains | 40%, 62%, 40%, 40% | - | mountain_hare, field_vole, reindeer, snow_bunting | arctic_fox, raven, snowy_owl, golden_eagle, grey_wolf | arctic_fox, raven, golden_eagle, grey_wolf |
 | base:desert | 40%, 78%, 55%, 40% | - | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, jaguar | dog (chihuahua), cat, red_fox, raven, coyote, golden_eagle, turkey_vulture |
-| base:savanna | 43%, 100%, 100%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman, jaguar | dog (chihuahua), cat, turkey_vulture |
+| base:savanna | 43%, 100%, 100%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman, jaguar | dog (chihuahua), cat, turkey_vulture |
 | base:swamp | 40%, 100%, 96%, 40% | summer: eaten 8% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
 | base:mountains | 60%, 95%, 76%, 40% | summer: eaten 27% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:beach | 40%, 40%, 50%, 40% | - | hare, wood_mouse, house_sparrow | red_fox, raven, herring_gull | red_fox, raven, herring_gull |
@@ -114,13 +118,8 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 
 What the webs still lack, and what the plan fills it with (`web::WAITING`):
 
-- utahraptor: no Fish: the Cretaceous's fish, lungfish and Lycoptera (tier 3)
-- utahraptor: no prey in animals:floodplain: the iguanodont and its herbivores (the Cretaceous's tier 2)
 - utahraptor: no prey in animals:fern_forest: Psittacosaurus and the iguanodont (the Cretaceous's tier 2)
-- wyvern: no Fish: the Cretaceous's fish, lungfish and Lycoptera (tier 3)
 - wyvern: no prey in animals:crags: the ankylosaur (the Cretaceous's tier 2)
-- red_deer: no predator: a wolf pack taking big prey together (`hunt.rs`): a lone wolf takes up to three times its mass
-- house_sparrow: nothing to eat in base:savanna in winter: **not planned**
 - herring_gull: no prey in base:ocean: the open sea's web: its fish (later; the gull hunts on the beach meanwhile)
 - animals:floodplain: no plant eaters: the iguanodont, the ankylosaur and the sauropod (the Cretaceous's tier 2)
 - animals:fern_forest: no plant eaters: Psittacosaurus and the iguanodont (the Cretaceous's tier 2)
@@ -421,7 +420,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | how | knockout |
 | diet | carnivore |
 | eats | meat 80%, carrion 15%, fish 5% |
-| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops |
+| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops, lungfish |
 | a meal that fills it | 30 kg; its biggest prey at home fills it in one kill |
 | drinks | 80% of its 16.79 L a day; a drink lasts 34 min, thirsty after 17 |
 | feedings to tame at level 1 | 18 (2.5x at level 150) |
@@ -1559,7 +1558,6 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | Where it lives | how common there |
 |---|---|
 | `base:plains` | commonest |
-| `base:savanna` | 60% |
 | `base:desert` | 50% |
 | `base:beach` | 50% |
 | `base:forest` | 40% |
@@ -1602,7 +1600,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | seeds 60%, insects 30%, fruit 10% |
 | a meal that fills it | 0.003 kg |
 | drinks | 100% of its 0.004 L a day; a drink lasts 11 min, thirsty after 5 |
-| its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, savanna 40/100/100/0%, desert 40/78/55/40%, beach 40/40/43/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
+| its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, desert 40/78/55/40%, beach 40/40/43/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 2; `base:berries` 3, favorite |
@@ -2224,7 +2222,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 | how | passive |
 | diet | carnivore |
 | eats | meat 85%, carrion 15% |
-| hunts | 2.0%-300% of its mass alone (0.84-126 kg); at home: cat, capybara, hare, mountain_hare, white_tailed_deer, raven, reindeer, great_horned_owl, snowy_owl, golden_eagle, turkey_vulture, herring_gull, base:chicken, base:pig, base:sheep |
+| hunts | 2.0%-300% of its mass alone (0.84-126 kg); at home: cat, capybara, hare, mountain_hare, white_tailed_deer, red_deer, raven, reindeer, great_horned_owl, snowy_owl, golden_eagle, turkey_vulture, herring_gull, base:chicken, base:pig, base:sheep |
 | a meal that fills it | 4.2 kg; its biggest prey at home fills it in one kill |
 | drinks | 100% of its 2.861 L a day; a drink lasts 22 min, thirsty after 11 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
@@ -2300,6 +2298,124 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.8 |
+
+## lungfish
+
+*Ceratodus kempae*, Sarcopterygii › Dipnoi › Ceratodontidae › . Model `fish`, entity `animals:lungfish`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:floodplain` | commonest |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.37 m at the fork |
+| males against females | 1x as tall |
+| size spread (an individual's, either way) | 60% |
+| newborn's size | 10% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 3 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 30 d | 0.72 d |
+| litter or clutch | 6 on average | 1-4 **set** |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 14 to 32 °C air | cold-blooded: slower in the cold |
+| grows up in | 5 y | 10 d **set** |
+| lives | 20 y | 76.7 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 14 within 48 blocks |
+
+**Balance** (uncommon): a generation 11 d; a line four deep in 33 d (11 h of play); 4.7 young per mother in 10 days, 24 in her life.
+
+- ✓ fourth generation: 32.9 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 10.0 of 77 days (want under a fifth)
+- ✓ young in a life: 24.1 (want 6-40)
+- ✓ litter: 1-4 (want 1-12, fewest first)
+- ✓ room near: 14 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | insects 50%, water plants 20%, fish 30% |
+| a meal that fills it | 0.3 kg |
+| drinks | never: it lives in the water |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 6 blocks (twice that running) |
+| eats (food points) |  |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.5 blocks |
+| signature | dart |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 1 |
+
+## lycoptera
+
+*Lycoptera davidi*, Actinopterygii › Osteoglossomorpha › Lycopteridae › . Model `fish`, entity `animals:lycoptera`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:fern_forest` | commonest |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.37 m at the fork |
+| males against females | 1x as tall |
+| size spread (an individual's, either way) | 50% |
+| newborn's size | 10% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 0.02 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 5 d | 0.19 d |
+| litter or clutch | 8 on average | 3-11 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 4 to 24 °C air | cold-blooded: slower in the cold |
+| grows up in | 1 y | 2.92 d **set** |
+| lives | 4 y | 15.3 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 30 **set** within 48 blocks |
+
+**Balance** (common): a generation 3.4 d; a line four deep in 10 d (3 h of play); 13.1 young per mother in 10 days, 12 in her life.
+
+- ✓ fourth generation: 10.1 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 2.9 of 15 days (want under a fifth)
+- ✓ young in a life: 12.3 (want 6-40)
+- ✓ litter: 3-11 (want 1-12, fewest first)
+- ✓ room near: 30 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | insects 100% |
+| a meal that fills it | 0.002 kg |
+| drinks | never: it lives in the water |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 6 blocks (twice that running) |
+| eats (food points) |  |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.5 blocks |
+| signature | dart |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 1 |
 
 ## Shared by every species
 

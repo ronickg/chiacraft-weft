@@ -1,0 +1,62 @@
+{
+ "species": "lungfish",
+ "about": "Ceratodus kempae, a lungfish of the Cedar Mountain floodplain: olive to brown, mottled darker, pale below, heavy and long (no record of its colors: a living lungfish's).",
+ "loci": [
+  {
+   "id": "Tn",
+   "name": "Tone",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "olive to brown (Lycoptera: grey to silver)"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.95,
+   "sd": 0.03,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   120,
+   100,
+   50
+  ],
+  [
+   150,
+   126,
+   66
+  ]
+ ],
+ "traits": {
+  "Gt": {
+   "mean": 0.35,
+   "sd": 0.08
+  },
+  "Ms": {
+   "mean": 0.35,
+   "sd": 0.1
+  },
+  "Md": {
+   "mean": 0.55,
+   "sd": 0.15
+  }
+ },
+ "build": {
+  "Gt": {
+   "bones": [
+    "body",
+    "tail_0"
+   ],
+   "axes": [
+    0.3,
+    1,
+    0
+   ],
+   "range": 0.3
+  }
+ }
+}
