@@ -129,7 +129,11 @@ Ronald took the recommendations ("Take its recommendations", through Planner):
   stopped required mod closes its world to joins and sends its players home, naming the mod. Not
   built yet.
 - c) `set-blocks` in 1.1 (built), and a call-cost benchmark before anything freezes 1.0
-  (`callcost`, built; numbers below once taken).
+  (`callcost`, built). First numbers (Ryzen 7 9800X3D, release): a command 0.6 to 0.9 µs, an
+  empty event batch 0.2 to 0.3 µs, 64 block changes to a mod that makes a component call for
+  each 14 µs: about 0.2 µs per crossing. Cheap enough for events and commands; a question asked
+  for every block of a big change would add up, which is why events come in batches and
+  `set-blocks` exists. Questions, chain steps and ticks still to measure.
 
 ## Checked against the Researcher's round 1 (W1-W4)
 
