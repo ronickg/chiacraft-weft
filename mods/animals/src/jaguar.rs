@@ -24,7 +24,7 @@ pub fn init(r: &mut Registry) {
         &[("_sit", "jaguar_sit"), ("_lie", "jaguar_lie")],
     );
     r.entity(&JAGUAR)
-        .size(0.8, 0.85)
+        .size(animals_core::bodies::of("jaguar").0, animals_core::bodies::of("jaguar").1)
         .health(45.0)
         .speed(5.0)
         .attack_damage(9.0)

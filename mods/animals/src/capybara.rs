@@ -23,7 +23,7 @@ pub fn init(r: &mut Registry) {
         &[("_sit", "capybara_sit"), ("_lie", "capybara_lie")],
     );
     r.entity(&CAPYBARA)
-        .size(0.7, 0.6)
+        .size(animals_core::bodies::of("capybara").0, animals_core::bodies::of("capybara").1)
         .health(12.0)
         .speed(2.5)
         .passive()

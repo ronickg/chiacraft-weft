@@ -14,7 +14,6 @@ pub(crate) static SNOWY_OWL: Entity = Entity::named("snowy_owl");
 static WINGS: Wings = Wings {
     model: "owl",
     texture: "owl/owl",
-    size: (0.4, 0.5),
     fly_size: (0.6, 0.35),
     health: 8.0,
     // It walks little; it flies at about 10 m/s.
