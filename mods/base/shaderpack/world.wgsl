@@ -309,13 +309,14 @@ fn fs_shadow(in: VOut) {
 
 // ---- shading ----
 
-fn surface_light(in: VOut, n: vec3<f32>) -> vec3<f32> {
+// `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
+fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
-    var light = in.color * light_on(n, in.light, shadow, in.ao, in.pos, in.rel);
+    var light = paint * light_on(n, in.light, shadow, in.ao, in.pos, in.rel);
     // Leaves and plants let some sun through when it is behind them.
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
         let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
-        light += in.color * palette().sun * light_strength() * pow(back, 3.0) * 0.35 * shadow * smoothstep(0.5, 0.95, in.light.x);
+        light += paint * palette().sun * light_strength() * pow(back, 3.0) * 0.35 * shadow * smoothstep(0.5, 0.95, in.light.x);
     }
     return light;
 }
@@ -323,12 +324,16 @@ fn surface_light(in: VOut, n: vec3<f32>) -> vec3<f32> {
 fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
     let n = normalize(in.normal);
     var albedo = albedo_in;
-    // Snow lying on the tops of blocks and leaves (not on plants, which it buries).
+    // Snow lying on the tops of blocks and leaves (not on plants, which it buries). The biome's
+    // tint goes onto the light (`in.color`), so the snow takes it off there too: tinted with the
+    // grass colour, snow on grass tops and leaves came out green, and past the snow layers the
+    // land stayed green at any cover (Terrain's edge look, 11-04).
+    var snow = 0.0;
     if in.kind.z == 0u {
-        let snow = snow_on(n, in.pos, in.light.x);
+        snow = snow_on(n, in.pos, in.light.x);
         albedo = vec4(mix(albedo.rgb, vec3(0.86, 0.9, 0.95), snow), albedo.a);
     }
-    var light = surface_light(in, n);
+    var light = surface_light(in, n, mix(in.color, vec3(1.0), snow));
     if in.glow != 0xffffffffu {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
         light = max(light, select(pow(in.tint, vec3(2.2)), vec3(1.0), in.overlay != 0u) * e * 1.7);
