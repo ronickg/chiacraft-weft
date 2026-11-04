@@ -71,6 +71,10 @@ fn skin_painters() -> &'static rayon::ThreadPool {
 }
 
 /// What the first person view holds: the item (or the bare arm) and how it moves.
+/// The block outline's width on the screen (pixels) and how dark it is (its black's alpha).
+const OUTLINE_PX: f32 = 1.25;
+const OUTLINE_DARK: f32 = 0.4;
+
 pub struct Hand {
     pub stack: weft_abi::ItemStack,
     pub swing: Option<f32>,
@@ -1163,33 +1167,6 @@ impl EntityRenderer {
         self.models
             .draw(gpu, list, frame, super::models::Batch::World, self.model_pipe, vb);
 
-        // Selection outline: twelve thin dark boxes along the edges of each selection box.
-        let outlined = target.map(|(hit, at)| (&c.states[hit.state as usize].selection, rel(hit.block.as_dvec3() + at)));
-        for (sel, o) in outlined
-            .iter()
-            .flat_map(|(sel, o)| sel.iter().map(move |s| (s, *o)))
-        {
-            let (mn, mx) = (Vec3::new(sel[0], sel[1], sel[2]), Vec3::new(sel[3], sel[4], sel[5]));
-            let t = 0.006;
-            let (a, b) = (o + mn - Vec3::splat(t), o + mx + Vec3::splat(t));
-            for axis in 0..3 {
-                for corner in 0..4 {
-                    let mut lo = a;
-                    let mut size = Vec3::splat(t * 2.0);
-                    size[axis] = b[axis] - a[axis];
-                    let (u, v) = ((axis + 1) % 3, (axis + 2) % 3);
-                    lo[u] = if corner & 1 == 0 { a[u] } else { b[u] - t * 2.0 };
-                    lo[v] = if corner & 2 == 0 { a[v] } else { b[v] - t * 2.0 };
-                    let m = Mat4::from_translation(lo) * Mat4::from_scale(size);
-                    boxes.push(GpuBox {
-                        rows: rows(m),
-                        color: [0.02, 0.02, 0.02, 0.0],
-                        ids: [0, box_mode::SOLID, 0, 0],
-                        ..Default::default()
-                    });
-                }
-            }
-        }
         // Gizmo lines: thin boxes like the outline, a little thicker so they read from afar.
         for &(a, b, color) in gizmo_lines {
             let (a, b) = (rel(a), rel(b));
@@ -1213,6 +1190,39 @@ impl EntityRenderer {
         }
 
         let overlay_start = boxes.len();
+        // Selection outline: twelve thin boxes along the edges of each selection box, see-through
+        // and about a pixel wide wherever the edge is (vanilla's faint thin lines). Ronald: our
+        // solid black ones, a fixed 0.012 blocks thick, were 3 px up close and too heavy; he picked
+        // "thin and faint like vanilla", about 1 px at about 40 % dark.
+        let px_at_1 = 2.0 * (cam.fov.to_radians() * 0.5).tan() / frame.height.max(1) as f32;
+        let outlined = target.map(|(hit, at)| (&c.states[hit.state as usize].selection, rel(hit.block.as_dvec3() + at)));
+        for (sel, o) in outlined
+            .iter()
+            .flat_map(|(sel, o)| sel.iter().map(move |s| (s, *o)))
+        {
+            let (mn, mx) = (Vec3::new(sel[0], sel[1], sel[2]), Vec3::new(sel[3], sel[4], sel[5]));
+            for axis in 0..3 {
+                for corner in 0..4 {
+                    let (u, v) = ((axis + 1) % 3, (axis + 2) % 3);
+                    // The edge's middle, and its half width there: OUTLINE_PX pixels across.
+                    let mut mid = (o + mn + o + mx) * 0.5;
+                    mid[u] = if corner & 1 == 0 { o[u] + mn[u] } else { o[u] + mx[u] };
+                    mid[v] = if corner & 2 == 0 { o[v] + mn[v] } else { o[v] + mx[v] };
+                    let t = (mid.length() * px_at_1 * OUTLINE_PX * 0.5).max(0.0015);
+                    let mut lo = mid - Vec3::splat(t);
+                    let mut size = Vec3::splat(t * 2.0);
+                    lo[axis] = o[axis] + mn[axis] - t;
+                    size[axis] = mx[axis] - mn[axis] + t * 2.0;
+                    let m = Mat4::from_translation(lo) * Mat4::from_scale(size);
+                    boxes.push(GpuBox {
+                        rows: rows(m),
+                        color: [0.0, 0.0, 0.0, 0.0],
+                        ids: [0, box_mode::FILLED, OUTLINE_DARK.to_bits(), 0],
+                        ..Default::default()
+                    });
+                }
+            }
+        }
         // Filled gizmo boxes: see-through by their own alpha (mode 5), slightly grown so they do
         // not fight with the faces of the blocks they cover.
         for &(a, b, color) in gizmo_fills {
