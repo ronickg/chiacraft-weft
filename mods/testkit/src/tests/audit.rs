@@ -386,3 +386,25 @@ pub async fn reach_and_mining_attributes(t: T) -> R {
     t.check_eq(t.block(near).await?, "core:air".to_string(), "not refused as too soon");
     Ok(())
 }
+
+// Restored from dev b5815f09 (Weft v26.11.2 removed them): see notes/crew/upstream/lost-tests.md
+
+/// The surface counts: above a source's top is not in it, and mods can ask.
+pub async fn liquid_surface(t: T) -> R {
+    t.flat().await?;
+    let p = add(t.feet(), [3, 2, 0]);
+    t.set(p, "water").await?;
+    t.check_eq(
+        t.op(&format!("in_liquid {} {} {}", p[0] as f64 + 0.5, p[1] as f64 + 0.5, p[2] as f64 + 0.5))
+            .await?,
+        "1".to_string(),
+        "inside",
+    );
+    t.check_eq(
+        t.op(&format!("in_liquid {} {} {}", p[0] as f64 + 0.5, p[1] as f64 + 0.95, p[2] as f64 + 0.5))
+            .await?,
+        "0".to_string(),
+        "above its surface, in its block",
+    );
+    Ok(())
+}

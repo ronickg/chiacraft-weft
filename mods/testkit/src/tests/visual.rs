@@ -8,6 +8,10 @@ use weft_sdk::*;
 use super::{add, probe};
 use crate::runner::{R, Shot, T};
 
+fn item(name: &str) -> u32 {
+    Item::lookup(name).unwrap_or(u32::MAX)
+}
+
 /// Share of the box around where `p` is drawn (half size `r`) for which `f` holds.
 fn around(t: &T, shot: &Shot, p: [f64; 3], r: f32, f: impl FnMut([u8; 3]) -> bool) -> f32 {
     let Some((x, y)) = t.on_screen(p) else { return 0.0 };
@@ -449,4 +453,172 @@ pub async fn client_hooks(t: T) -> R {
     let diamond = rich.share(0.35, 0.65, 0.65, 0.8, probe::cyan);
     t.probe("a block icon in screen text", diamond, diamond > 0.002);
     Ok(())
+}
+
+// Restored from dev b5815f09 (Weft v26.11.2 removed them): see notes/crew/upstream/lost-tests.md
+
+pub async fn pick_block(t: T) -> R {
+    t.flat().await?;
+    t.op("mode creative").await?;
+    t.until("creative", Duration::from_secs(5), |t| t.state().mode == 1)
+        .await?;
+    let f = t.feet();
+    let b = add(f, [0, -1, -1]);
+    t.set(b, "bricks").await?;
+    t.look_at(b);
+    t.frames(3).await?;
+    t.c().input_click(2, 0.0);
+    t.until("bricks picked", Duration::from_secs(5), |t| t.c().inventory_slot(t.state().selected).item == item("base:bricks"))
+        .await
+}
+
+/// A torch put against a wall hangs on it, and drops when the wall goes.
+pub async fn wall_torch(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let wall = add(f, [0, 0, -2]);
+    t.fill(wall, add(wall, [0, 1, 0]), "cobblestone").await?;
+    t.op("put me 0 torch 8").await?;
+    t.c().select_slot(0);
+    t.look_at(wall);
+    t.frames(3).await?;
+    t.press("core:use");
+    let at = add(wall, [0, 0, 1]);
+    t.until("torch placed", Duration::from_secs(5), |t| t.c().inventory_slot(0).count == 7)
+        .await?;
+    // West, east, up (the floor), north, south: on a wall to its north it faces south.
+    t.check_eq(t.block(at).await?, "base:torch[facing=south]".into(), "torch on the north wall");
+    t.frames(5).await?;
+    t.shot("wall_torch").await?;
+    t.set(wall, "air").await?;
+    t.secs(0.3).await?;
+    t.check_eq(t.block(at).await?, "core:air".into(), "the torch fell with its wall");
+    Ok(())
+}
+
+/// A ladder takes the facing of the wall it was put on.
+pub async fn ladder_placement(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let wall = add(f, [0, 0, -2]);
+    t.fill(wall, add(wall, [0, 1, 0]), "cobblestone").await?;
+    t.op("put me 0 ladder 8").await?;
+    t.c().select_slot(0);
+    t.look_at(wall);
+    t.frames(3).await?;
+    t.press("core:use");
+    let at = add(wall, [0, 0, 1]);
+    t.until("ladder placed", Duration::from_secs(5), |t| t.c().inventory_slot(0).count == 7)
+        .await?;
+    // States face away from the wall, in face order (west, east, north, south): on a wall to
+    // its north it faces south.
+    t.check_eq(t.block(at).await?, "base:ladder[facing=south]".into(), "ladder on the north wall");
+    Ok(())
+}
+
+/// Third person shows the player's model from behind and from the front.
+pub async fn third_person(t: T) -> R {
+    t.flat().await?;
+    t.op("put me 0 iron_sword 1").await?;
+    t.c().select_slot(0);
+    t.press("core:perspective");
+    t.c().set_look(30.0, -15.0);
+    t.secs(0.5).await?;
+    for name in ["behind", "front"] {
+        let shot = t.shot(name).await?;
+        let (shirt, skin) = (shot.share(0.42, 0.35, 0.58, 0.8, probe::cyan), shot.share(0.42, 0.35, 0.58, 0.8, probe::skin));
+        t.probe(&format!("{name}: shirt"), shirt, shirt > 0.05);
+        t.probe(&format!("{name}: skin"), skin, skin > 0.05);
+        t.press("core:perspective");
+        t.secs(0.3).await?;
+    }
+    Ok(())
+}
+
+/// Crouching shows in third person: the model is lower (vanilla's pose).
+pub async fn crouch_pose(t: T) -> R {
+    t.flat().await?;
+    t.press("core:perspective");
+    t.c().set_look(30.0, -15.0);
+    t.secs(0.3).await?;
+    t.press("core:perspective");
+    t.secs(0.3).await?;
+    let standing = t.shot("standing").await?;
+    t.hold("core:sneak", 2.0);
+    t.secs(1.0).await?;
+    let crouching = t.shot("crouching").await?;
+    // The camera goes down with the eyes, so the model is not lower on the picture but shorter:
+    // from the top of its hair (below the sky) to the bottom of its trousers in the middle column.
+    let height = |s: &Shot| {
+        let rows: Vec<f32> = (0..s.h).map(|y| y as f32 / s.h as f32).collect();
+        let top = rows
+            .iter()
+            .copied()
+            .find(|&y| !probe::light(s.at(0.5, y)))
+            .unwrap_or(1.0);
+        let bottom = rows
+            .iter()
+            .copied()
+            .filter(|&y| probe::blue(s.at(0.5, y)))
+            .last()
+            .unwrap_or(top);
+        bottom - top
+    };
+    let ratio = height(&crouching) / height(&standing).max(1e-3);
+    t.probe("crouching model height / standing", ratio, ratio < 0.92 && ratio > 0.6);
+    t.secs(1.2).await?;
+    t.press("core:perspective");
+    Ok(())
+}
+
+/// The player figure in the inventory stays while mobs are drawn in the world behind it (both
+/// once shared the model buffers of a frame).
+pub async fn inventory_figure(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    for dz in -2..=2 {
+        t.op(&format!("spawn testmod:idol {} {} {}", f[0] + 4, f[1], f[2] + dz))
+            .await?;
+    }
+    t.look_at(add(f, [4, 1, 0]));
+    t.secs(0.5).await?;
+    t.press("core:inventory");
+    t.screen("core:menu").await?;
+    t.frames(4).await?;
+    let Some(Rect { x, y, w, h }) = t.c().ui_rect("entity") else { return Err("no player figure in the inventory".into()) };
+    let shot = t.shot("figure").await?;
+    let v = shot.share(x, y, x + w, y + h, probe::skin);
+    t.probe("skin in the figure's box", v, v > 0.03);
+    t.press("core:inventory");
+    Ok(())
+}
+
+/// A skin of the player's own (`skins/skin.png`) goes to the server with the join and the model
+/// wears it: an all red one turns the figure red instead of its shirt and skin.
+pub async fn player_skin(t: T) -> R {
+    let path = format!("{}/skins/skin.png", t.c().run_dir());
+    std::fs::create_dir_all(format!("{}/skins", t.c().run_dir())).map_err(|e| e.to_string())?;
+    let file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
+    let mut enc = png::Encoder::new(std::io::BufWriter::new(file), 64, 64);
+    enc.set_color(png::ColorType::Rgba);
+    let px: Vec<u8> = (0..64 * 64).flat_map(|_| [220u8, 30, 30, 255]).collect();
+    enc.write_header()
+        .and_then(|mut w| w.write_image_data(&px))
+        .map_err(|e| e.to_string())?;
+    let result = async {
+        t.flat().await?;
+        t.press("core:perspective");
+        t.c().set_look(30.0, -15.0);
+        t.secs(0.8).await?;
+        let shot = t.shot("red").await?;
+        let (red, shirt) = (shot.share(0.42, 0.35, 0.58, 0.8, probe::red), shot.share(0.42, 0.35, 0.58, 0.8, probe::cyan));
+        t.probe("the model in the player's red skin", red, red > 0.05);
+        t.probe("and not in the default shirt", shirt, shirt < 0.01);
+        t.press("core:perspective");
+        t.press("core:perspective");
+        Ok::<(), String>(())
+    }
+    .await;
+    drop(std::fs::remove_file(&path));
+    result
 }

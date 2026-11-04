@@ -762,3 +762,180 @@ pub async fn ctm_any_model(t: T) -> R {
     t.frames(2).await?;
     out
 }
+
+// Restored from dev b5815f09 (Weft v26.11.2 removed them): see notes/crew/upstream/lost-tests.md
+
+/// Texture edges at a distance, where mip levels mix texels: no light line along the edge of a
+/// snowy grass block over dirt; a 64x64 texture shows its own colors among 16x16 ones.
+pub async fn texture_seams(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    t.fill(add(f, [-8, 0, -12]), add(f, [8, 0, -12]), "dirt")
+        .await?;
+    t.fill(add(f, [-8, 1, -12]), add(f, [8, 1, -12]), "snowy_grass")
+        .await?;
+    t.fill(add(f, [-8, 2, -12]), add(f, [8, 2, -12]), "dirt")
+        .await?;
+    t.fill(add(f, [-8, 3, -12]), add(f, [8, 3, -12]), "grass")
+        .await?;
+    t.fill(add(f, [-8, 0, -9]), add(f, [8, 0, -9]), "tall_grass")
+        .await?;
+    // 64x64 next to 16x16 textures.
+    let mosaic = add(f, [1, 0, -5]);
+    t.fill(mosaic, add(mosaic, [1, 1, 0]), "testmod:mosaic")
+        .await?;
+    t.c().set_look(35.0, 8.0);
+    t.settled().await?;
+    let shot = t.shot("seams").await?;
+    // Just below and above the edge between the dirt and the snowy grass on top of it, on the
+    // face the camera sees.
+    let mut light = 0;
+    let mut seen = 0;
+    for x in -7..=7 {
+        for dy in [0.96, 1.04] {
+            if let Some((sx, sy)) = t.on_screen([(f[0] + x) as f64 + 0.5, f[1] as f64 + dy, (f[2] - 11) as f64 + 0.01]) {
+                if (0.0..1.0).contains(&sx) && (0.0..1.0).contains(&sy) {
+                    seen += 1;
+                    light += (probe::lum(shot.at(sx, sy)) > 170.0) as u32;
+                }
+            }
+        }
+    }
+    t.check(seen > 6, format!("the wall's edge is in view ({seen} points)"));
+    t.probe("light points along the snowy grass edge", light as f32, light == 0);
+    // The middle of the 2x2 mosaic face the camera sees.
+    let p = t
+        .on_screen([(mosaic[0] + 1) as f64, (mosaic[1] + 1) as f64, mosaic[2] as f64 + 1.01])
+        .unwrap_or((0.5, 0.5));
+    let colors = shot.share(p.0 - 0.03, p.1 - 0.05, p.0 + 0.03, p.1 + 0.05, |c| {
+        let (hi, lo) = (*c.iter().max().unwrap() as i32, *c.iter().min().unwrap() as i32);
+        hi - lo > 80
+    });
+    t.probe("the mosaic's saturated colors", colors, colors > 0.3);
+    Ok(())
+}
+
+/// A random `.ctm` varies plants and box models too: red and blue tiles of a green texture, each
+/// row in front of a white wall.
+pub async fn ctm_off_the_cube(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    t.fill(add(f, [-9, 0, -7]), add(f, [9, 5, -7]), "snow")
+        .await?;
+    for x in -5..=5 {
+        t.set(add(f, [x, 0, -5]), "testkit:varied_plant").await?;
+        t.set(add(f, [x, 3, -5]), "testkit:varied_box").await?;
+    }
+    t.look_at(add(f, [0, 1, -5]));
+    t.secs(0.5).await?;
+    let s = t.shot("rows").await?;
+    let row = |p: [f64; 3]| t.on_screen(p).map_or(0.5, |at| at.1);
+    let (plants, boxes) =
+        (row([f[0] as f64, f[1] as f64 + 0.5, f[2] as f64 - 4.5]), row([f[0] as f64, f[1] as f64 + 3.5, f[2] as f64 - 4.5]));
+    let colors = |y: f32| [s.share(0.1, y - 0.03, 0.9, y + 0.03, probe::red), s.share(0.1, y - 0.03, 0.9, y + 0.03, probe::blue)];
+    let (p, b) = (colors(plants), colors(boxes));
+    t.note(format!("red and blue, plants {p:?}, boxes {b:?}"));
+    t.check(p[0] > 0.01 && p[1] > 0.01, format!("plants of both tiles: {p:?}"));
+    t.check(b[0] > 0.01 && b[1] > 0.01, format!("boxes of both tiles: {b:?}"));
+    Ok(())
+}
+
+/// An item shaped by a model file (the test mod's totem: a stone base, a crystal on it) shows its
+/// boxes in the hand and in the hotbar slot.
+pub async fn item_model_file(t: T) -> R {
+    t.flat().await?;
+    t.op("put me 0 testmod:totem 1").await?;
+    t.c().select_slot(0);
+    t.c().set_look(0.0, 20.0);
+    t.settled().await?;
+    // The hand comes up with it.
+    t.secs(0.8).await?;
+    let shot = t.shot("totem").await?;
+    let crystal = |c: probe::C| probe::cyan(c) || (c[2] > 120 && c[0] < 90);
+    let hand = shot.share(0.55, 0.55, 1.0, 0.94, crystal);
+    t.probe("the crystal in the hand", hand, hand > 0.01);
+    // The first hotbar slot of the HUD, at the bottom middle (gui scale 2, 1600x900).
+    let slot = shot.share(0.388, 0.95, 0.412, 0.995, crystal);
+    t.probe("the crystal in the hotbar slot", slot, slot > 0.015);
+    Ok(())
+}
+
+/// A block shaped by a Blockbench Java model file: the test mod's pedestal is a plate, a crystal
+/// column and a top, so against the sky the sides of the column show sky, the column itself not.
+pub async fn block_model_file(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let p = add(f, [0, 2, -3]);
+    t.set(p, "testmod:pedestal").await?;
+    t.op("put me 0 testmod:pedestal 1").await?;
+    t.c().set_look(0.0, 15.0);
+    t.settled().await?;
+    let shot = t.shot("pedestal").await?;
+    let at = |x: f64| {
+        t.on_screen([p[0] as f64 + x, p[1] as f64 + 0.35, p[2] as f64 + 0.5])
+            .map(|(sx, sy)| crate::runner::lum(shot.avg(sx - 0.003, sy - 0.003, sx + 0.003, sy + 0.003)))
+    };
+    let (gap, column) = (at(0.18).unwrap_or(0.0), at(0.5).unwrap_or(255.0));
+    t.probe("sky beside the column (the file's shape, not a cube)", gap, gap > 180.0);
+    t.probe("the crystal column itself", column, column < 150.0);
+    // A resource pack's model of the same block redraws it, here as a whole cube.
+    let pack = format!("{}/resourcepacks/testkit_shapes", t.c().run_dir());
+    let file = format!("{pack}/testmod/models/block/pedestal.json");
+    std::fs::create_dir_all(std::path::Path::new(&file).parent().unwrap()).map_err(|e| e.to_string())?;
+    std::fs::write(
+        &file,
+        r#"{"elements":[{"from":[0,0,0],"to":[16,16,16],"faces":{"north":{},"south":{},"east":{},"west":{},"up":{},"down":{}}}]}"#,
+    )
+    .map_err(|e| e.to_string())?;
+    weft_sdk::settings::RESOURCE_PACKS.set("testkit_shapes");
+    t.c().reload_assets();
+    t.frames(5).await?;
+    t.settled().await?;
+    let cube = t.shot("pedestal_pack").await?;
+    weft_sdk::settings::RESOURCE_PACKS.set("");
+    let _ = std::fs::remove_dir_all(&pack);
+    t.c().reload_assets();
+    t.frames(2).await?;
+    let filled = t
+        .on_screen([p[0] as f64 + 0.18, p[1] as f64 + 0.35, p[2] as f64 + 0.5])
+        .map(|(sx, sy)| crate::runner::lum(cube.avg(sx - 0.003, sy - 0.003, sx + 0.003, sy + 0.003)))
+        .unwrap_or(255.0);
+    t.probe("a pack's model draws a cube there", filled, filled < 150.0);
+    // Its item with it: in the hotbar's first slot the cube covers more than the pedestal did.
+    let covered =
+        |s: &crate::runner::Shot| s.share(0.392, 0.955, 0.408, 0.99, |c| c[0].abs_diff(c[1]) > 12 || c[1].abs_diff(c[2]) > 12 || c[0] < 90);
+    let (before, after) = (covered(&shot), covered(&cube));
+    t.probe("the item takes the pack's model, how much more of its slot is covered", after - before, after > before + 0.02);
+    Ok(())
+}
+
+/// From high above, where the view's cubes don't reach the ground, it is land all the way under
+/// the camera, not a hole of sky.
+pub async fn distant_terrain_from_above(t: T) -> R {
+    static VIEW: Config<i32> = Config::named("core:view_distance");
+    static LOD: Config<i32> = Config::named("core:lod_distance");
+    let before = (VIEW.get(), LOD.get());
+    VIEW.set(8);
+    LOD.set(256);
+    let out = async {
+        t.world(5).await?;
+        t.idle().await?;
+        t.op("mode spectator").await?;
+        let s = t.state().pos;
+        t.c().teleport([s.x, 1024.0, s.z]);
+        t.c().set_look(0.0, -89.0);
+        t.until("distant terrain made", Duration::from_secs(20), |t| t.state().lod_tiles > 50 && t.state().lod_pending == 0)
+            .await?;
+        t.secs(0.5).await?;
+        let shot = t.shot("down").await?;
+        // The sky's pale blue; a cloud may be in the way, which is white.
+        let sky = shot.share(0.44, 0.42, 0.56, 0.58, |c| c[2] > 200 && c[0] > 120 && c[0] < 215);
+        t.note(format!("sky under the camera: {sky:.3}"));
+        t.check(sky < 0.05, format!("a hole in the land: {sky:.3}"));
+        Ok(())
+    }
+    .await;
+    VIEW.set(before.0);
+    LOD.set(before.1);
+    out
+}

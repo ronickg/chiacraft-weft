@@ -1347,3 +1347,132 @@ pub async fn gpu_terrain(t: T) -> R {
     CHECK.set(before);
     out
 }
+
+// Restored from dev b5815f09 (Weft v26.11.2 removed them): see notes/crew/upstream/lost-tests.md
+
+async fn sky_column(t: &T) -> R {
+    t.world(5).await?;
+    t.idle().await?;
+    let f = t.feet();
+    // Two cubes over the view's top (6 over the player's cube), under open sky (cube 16).
+    let cube = (f[1] >> 4) + 8;
+    if cube >= 16 {
+        t.fail(format!("the player stands too high ({}) for a sky column", f[1]));
+        return Ok(());
+    }
+    let p = [f[0], cube * 16 + 5, f[2]];
+    t.set(p, "gold_block").await?;
+    t.until("the client has the block", Duration::from_secs(5), |t| t.c().block(p).is_some_and(|b| b != 0))
+        .await?;
+    Ok(())
+}
+
+async fn distant_terrain_at(t: &T) -> R {
+    static LOD: Config<i32> = Config::named("core:lod_distance");
+    t.world(5).await?;
+    t.idle().await?;
+    t.op("mode spectator").await?;
+    t.cmd("/tp ~ ~100 ~").await?;
+    t.c().set_look(0.0, -8.0);
+    t.until("distant terrain made", Duration::from_secs(20), |t| t.state().lod_tiles > 50 && t.state().lod_pending == 0)
+        .await?;
+    t.frames(5).await?;
+    let tiles = t.state().lod_tiles;
+    t.note(format!("{tiles} distant terrain tiles shown"));
+    let with = t.grab().await?;
+    LOD.set(0);
+    t.frames(10).await?;
+    let without = t.grab().await?;
+    let changed = T::differ(&with, &without);
+    t.note(format!("share of the picture that is distant terrain: {changed:.2}"));
+    t.check(changed > 0.1, format!("the horizon has land on it ({changed:.2} of the picture changes without it)"));
+    t.check_eq(t.state().lod_tiles, 0, "no tiles shown with it off");
+    Ok(())
+}
+
+/// Past the view, distant terrain is made and drawn: tiles come, and the horizon seen from up
+/// high is land, not the sky it is with distant terrain off.
+pub async fn distant_terrain(t: T) -> R {
+    static VIEW: Config<i32> = Config::named("core:view_distance");
+    static LOD: Config<i32> = Config::named("core:lod_distance");
+    let before = (VIEW.get(), LOD.get());
+    VIEW.set(8);
+    LOD.set(256);
+    let out = distant_terrain_at(&t).await;
+    VIEW.set(before.0);
+    LOD.set(before.1);
+    out
+}
+
+/// Distant terrain has no underside: from deep below the land it isn't drawn, and it is back on
+/// coming up.
+pub async fn distant_terrain_underground(t: T) -> R {
+    static VIEW: Config<i32> = Config::named("core:view_distance");
+    static LOD: Config<i32> = Config::named("core:lod_distance");
+    let before = (VIEW.get(), LOD.get());
+    VIEW.set(8);
+    LOD.set(256);
+    let out = async {
+        t.world(5).await?;
+        t.idle().await?;
+        t.op("mode spectator").await?;
+        let s = t.state().pos;
+        t.until("distant terrain made", Duration::from_secs(20), |t| t.state().lod_tiles > 50)
+            .await?;
+        t.c().teleport([s.x, -300.0, s.z]);
+        t.until("none deep under the land", Duration::from_secs(5), |t| t.state().lod_tiles == 0)
+            .await?;
+        t.c().set_look(0.0, 30.0);
+        t.secs(0.3).await?;
+        t.shot("below").await?;
+        t.c().teleport(s);
+        t.until("back over the land", Duration::from_secs(5), |t| t.state().lod_tiles > 50)
+            .await
+    }
+    .await;
+    VIEW.set(before.0);
+    LOD.set(before.1);
+    out
+}
+
+/// The view reaches as far down as sideways: standing beyond a deep crater's rim, its bottom
+/// stays loaded and lit (it used to reach six cubes down plus the air under the player, so the
+/// bottom unloaded the moment the player stepped off the rim).
+pub async fn crater_view(t: T) -> R {
+    t.world(5).await?;
+    t.idle().await?;
+    t.op("mode creative").await?;
+    let f = t.feet();
+    t.op("crater_fast 150").await?;
+    t.op("look").await?;
+    // The wall's cubes, cut through, reach the client at once with the rest (they used to wait
+    // for their light to be redone, a share per tick: pillars of old blocks for seconds).
+    t.secs(0.2).await?;
+    t.sync_blocks(add(f, [144, -6, -2]), add(f, [152, -1, 2]))
+        .await?;
+    let rim = [f[0], OVERWORLD.column(5, f[0], f[2] + 170).height.max(f[1]) + 1, f[2] + 170];
+    t.cmd(&format!("/tp {} {} {}", rim[0], rim[1], rim[2]))
+        .await?;
+    t.secs(1.0).await?;
+    t.loaded().await?;
+    t.idle().await?;
+    // Beyond what the server simulates: the client made the crater on its own terrain and lit it.
+    let bottom = add(f, [0, -140, 0]);
+    let light = t.c().light(bottom).unwrap_or(0);
+    t.check_eq(light & 255, 15, "the crater's bottom, seen from beyond the rim, is loaded and lit");
+    t.check_eq(t.c().block(bottom), Some(0), "the crater's bottom is air on the client");
+    t.c().set_look(0.0, -30.0);
+    t.frames(20).await?;
+    t.shot("from_rim").await?;
+    Ok(())
+}
+
+/// An edited cube in the sky column over the view (generated so sky light comes down right,
+/// never drawn) is announced like any other: the client keeps the edit, not generation. It
+/// used to be announced only up to the view's top.
+pub async fn sky_column_edit(t: T) -> R {
+    weft_sdk::settings::VIEW_DISTANCE.set(6);
+    let r = sky_column(&t).await;
+    weft_sdk::settings::VIEW_DISTANCE.set(12);
+    r
+}

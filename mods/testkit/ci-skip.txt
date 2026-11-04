@@ -8,12 +8,10 @@ inventory_hotkeys                      a double click is two clicks 4 frames apa
 debug_lines                            2 s waits on screens that lay out slowly (2026-11-04)
 edit_while_loading                     measures how quick the game is (2026-11-04)
 sprint_and_sneak_modes                 speed ratios over wall-clock holds (2026-11-04)
-presses_never_wait                     frame latency (2026-11-04)
 attack_charge                          the charge grows over the slow gaps between frames (2026-11-04)
 persistence/speed                      the 40 tick modifier runs out before the slow read (2026-11-04)
 # Passed on a real GPU (Tester 2's PC, RTX 5090, dev af753f03), failed on llvmpipe (CI run 41776351324):
 f3                                     a 1600x900 text check; passes at the default window size on a GPU (2026-11-05)
-dust_rests_on_the_floor                pixel shares of the dust; borderline on a GPU too at 1280x720 (2026-11-05)
 third_person_shakes                    a hit's jolt measured over frames; borderline on a GPU too at 1280x720 (2026-11-05)
 client_hooks                           a probe key seen within a few frames (2026-11-05)
 redstone_piston_moves                  a shove seen frame by frame (2026-11-05)

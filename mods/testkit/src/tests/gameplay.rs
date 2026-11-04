@@ -2375,3 +2375,143 @@ pub async fn calendar_follows_time(t: T) -> R {
     mode(t.clone(), "survival").await?;
     moved
 }
+
+// Restored from dev b5815f09 (Weft v26.11.2 removed them): see notes/crew/upstream/lost-tests.md
+
+/// Every creative click breaks a block, also at over 1000 frames a second (instant breaks once
+/// needed a frame longer than 1 ms), and a held button keeps breaking.
+/// One coal is eight items whatever else happens, none of its ticks lost to starting on an item.
+pub async fn furnace_one_coal(t: T) -> R {
+    t.flat().await?;
+    let furnace = add(t.feet(), [-3, 0, 0]);
+    t.set(furnace, "furnace").await?;
+    t.frames(4).await?;
+    // The coal first: it lights on the tick the first item goes in.
+    t.op(&format!("put {} 1 base:coal 1", at(furnace))).await?;
+    t.frames(4).await?;
+    t.op(&format!("put {} 0 base:raw_iron 10", at(furnace)))
+        .await?;
+    t.cmd("/tick sprint 1700").await?;
+    t.secs(2.0).await?;
+    t.check_eq(t.slot(&at(furnace), 2).await?, ("base:iron_ingot".into(), 8, 0), "what its coal allows");
+    t.check_eq(t.slot(&at(furnace), 0).await?, ("base:raw_iron".into(), 2, 0), "and the rest stays");
+    Ok(())
+}
+
+pub async fn crafting_table_tags(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let table = add(f, [2, 0, 0]);
+    t.set(table, "crafting_table").await?;
+    t.op("put me 0 birch_planks 8").await?;
+    t.look_at(table);
+    t.frames(2).await?;
+    t.press("core:use");
+    t.screen("core:menu").await?;
+    // Crafting table menu: 0-8 grid, 9 result, 10-36 main, 37-45 hotbar.
+    let planks = item("base:birch_planks");
+    t.click_ui("slot:37", 0);
+    t.until("planks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == planks)
+        .await?;
+    t.click_ui("slot:0", 1);
+    t.frames(3).await?;
+    t.click_ui("slot:3", 1);
+    let stick = item("base:stick");
+    let made = t
+        .until("sticks in the result", Duration::from_secs(5), |t| t.c().menu_slot(9).item == stick)
+        .await;
+    t.check(made.is_ok(), "two planks in a column give no sticks (tag ingredient #planks)");
+    t.c().screen_close();
+    t.no_screen().await
+}
+
+/// In creative the middle button picks a mob's egg, and in the inventory a stack of what is in a
+/// slot; out of creative neither.
+pub async fn creative_middle_click(t: T) -> R {
+    t.flat().await?;
+    t.op("mode creative").await?;
+    t.until("creative", Duration::from_secs(5), |t| t.state().mode == 1)
+        .await?;
+    let f = t.feet();
+    t.op(&format!("spawn base:pig {} {} {}", f[0], f[1], f[2] - 2))
+        .await?;
+    t.secs(0.3).await?;
+    t.look_at(add(f, [0, 0, -2]));
+    t.frames(3).await?;
+    t.press("core:pick");
+    t.secs(0.3).await?;
+    let held = t.op("inv me").await?;
+    t.check(held.contains("pig"), format!("the pig's egg: {held}"));
+
+    t.op("put me 0 base:stone 3").await?;
+    t.press("core:inventory");
+    t.screen("core:menu").await?;
+    t.frames(2).await?;
+    t.click_ui(&t.hotbar(0), 2);
+    t.until("a whole stack on the cursor", Duration::from_secs(2), |t| t.c().cursor_stack().count == 64)
+        .await?;
+    t.check_eq(t.c().inventory_slot(0).count, 3, "and the slot keeps what it had");
+    t.c().screen_close();
+    t.no_screen().await?;
+
+    t.op("mode survival").await?;
+    t.until("survival", Duration::from_secs(5), |t| t.state().mode == 0)
+        .await?;
+    t.press("core:inventory");
+    t.screen("core:menu").await?;
+    t.frames(2).await?;
+    t.click_ui(&t.hotbar(0), 2);
+    t.secs(0.3).await?;
+    t.check(t.c().cursor_stack().is_empty(), "nothing out of creative");
+    t.c().screen_close();
+    t.no_screen().await
+}
+
+/// A mob in the way is all that is aimed at: nothing happens to the block behind it.
+pub async fn mob_in_the_way(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let wall = add(f, [0, 0, -4]);
+    t.fill(wall, add(wall, [0, 1, 0]), "stone").await?;
+    t.op("put me 0 dirt 4").await?;
+    t.c().select_slot(0);
+    t.look_at(wall);
+    t.frames(2).await?;
+    let pig = t
+        .op(&format!("spawn pig {}", at(add(f, [0, 0, -3]))))
+        .await?;
+    t.until("the pig on the client", Duration::from_secs(3), |t| {
+        pig.trim()
+            .parse()
+            .is_ok_and(|id| t.c().entity(id).is_some())
+    })
+    .await?;
+    t.frames(3).await?;
+    t.press("core:use");
+    t.secs(0.4).await?;
+    t.check_eq(t.block(add(wall, [0, 0, 1])).await?, "core:air".into(), "no block placed on the wall through the pig");
+    t.op(&format!("remove {}", pig.trim())).await?;
+    t.frames(5).await?;
+    t.press("core:use");
+    t.until("placed with the pig gone", Duration::from_secs(2), |t| t.c().block(add(wall, [0, 0, 1])).is_some_and(|s| s != 0))
+        .await
+}
+
+/// Breaking and placing play the block's sounds (from the server), walking plays steps, and
+/// `/music` starts a track. Only checks that sounds start; without a sound device it is skipped.
+pub async fn sounds(t: T) -> R {
+    t.flat().await?;
+    let before = t.state().sounds;
+    t.op("play testmod:boom").await?;
+    if t.until("a sound", std::time::Duration::from_secs(2), |t| t.state().sounds > before)
+        .await
+        .is_err()
+    {
+        t.note("no sound device here, sound checks skipped");
+        return Ok(());
+    }
+    t.cmd("/music").await?;
+    t.until("music", std::time::Duration::from_secs(3), |t| t.flag(weft_sdk::client::client_flags::MUSIC))
+        .await?;
+    Ok(())
+}

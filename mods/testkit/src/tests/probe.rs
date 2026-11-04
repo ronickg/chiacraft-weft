@@ -62,3 +62,9 @@ pub fn under_water(c: C) -> bool {
     let [r, g, b] = i(c);
     r + 12 > g && b > r + 40
 }
+
+/// Skin of the default player model.
+pub fn skin(c: C) -> bool {
+    let [r, g, b] = i(c);
+    r > 140 && r > g + 25 && g > b + 10
+}

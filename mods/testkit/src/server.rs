@@ -306,6 +306,26 @@ const OPS: &[(&str, &str, Run)] = &[
         }
         Ok(w.body_from_blocks(p, &cells).to_string())
     }),
+    // Restored with `redstone_lift_api` (Weft's `put_down` / `body_go` are now `body_to_blocks` / `body_move_to`).
+    ("putdown", "<id:int>", |w, cmd, _, _| {
+        w.body_to_blocks(int(cmd, "id")?);
+        Ok(String::new())
+    }),
+    ("bodygo", "<id:int> <x:float> <y:float> <z:float> <ticks:int>", |w, cmd, _, _| {
+        w.body_move_to(
+            int(cmd, "id")?,
+            [cmd.float("x").ok_or("x")? as f64, cmd.float("y").ok_or("y")? as f64, cmd.float("z").ok_or("z")? as f64],
+            int(cmd, "ticks")?,
+        );
+        Ok(String::new())
+    }),
+    // A sound event at the player, by name (restored with `gameplay::sounds`).
+    ("play", "<sound:word>", |w, cmd, _, me| {
+        static BOOM: Sound = Sound::named("testmod:boom");
+        let _ = word(cmd, "sound")?;
+        w.play_sound(&BOOM, [me[0] as f64, me[1] as f64, me[2] as f64], 1.0);
+        Ok(String::new())
+    }),
     ("bodyfall", "<id:int>", |w, cmd, _, _| {
         w.body_fall(int(cmd, "id")?);
         Ok(String::new())

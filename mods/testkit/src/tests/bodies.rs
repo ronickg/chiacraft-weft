@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use weft_sdk::*;
 
-use super::add;
+use super::{add, probe};
 use crate::runner::{R, T};
 
 async fn spawn(t: &T, kind: &str, p: [i32; 3]) -> Result<u64, String> {
@@ -494,5 +494,89 @@ pub async fn skiff_blocks(t: T) -> R {
     t.hold("core:attack", 0.1);
     t.secs(0.5).await?;
     t.check_eq(t.op(&sb([0, 1, -1])).await?, "core:air".to_string(), "the stone broken off the flying deck");
+    Ok(())
+}
+
+// Restored from dev b5815f09 (Weft v26.11.2 removed them): see notes/crew/upstream/lost-tests.md
+
+/// Natural spawning runs from rules: at night monsters appear around the player (in the
+/// overworld; the flatlands stay at noon), and the rule switch stops it.
+pub async fn natural_spawning(t: T) -> R {
+    t.world(5).await?;
+    t.idle().await?;
+    t.op("time 18000").await?;
+    t.cmd("/rule core:mob_spawning 1").await?;
+    t.secs(8.0).await?;
+    let near = t.op("near ~ ~ ~ 64").await?;
+    let monsters = near
+        .split_whitespace()
+        .filter(|e| e.ends_with(":base:zombie") || e.ends_with(":base:spider"))
+        .count();
+    t.check(monsters > 0, format!("monsters spawned at night ({near})"));
+    t.check(!near.contains("base:pig") && !near.contains("base:cow"), "no animals at night or outside `animals` biomes");
+    t.cmd("/rule core:mob_spawning 0").await?;
+    Ok(())
+}
+
+/// Pausing on a flying skiff and going on: a paused server keeps sending the skiff at the same
+/// tick, which once made it (and its rider) fly off at an endless speed on resuming.
+pub async fn skiff_pause(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let id = spawn(&t, "testmod:skiff", add(f, [0, 3, 0])).await?;
+    t.op(&format!("onto {id} 1.0")).await?;
+    t.secs(0.5).await?;
+    for _ in 0..3 {
+        t.c().input_key("Escape", 0.0);
+        t.screen("core:pause").await?;
+        t.secs(2.0).await?;
+        t.c().input_key("Escape", 0.0);
+        t.no_screen().await?;
+        t.secs(1.0).await?;
+    }
+    let (me, skiff) = (t.state().pos, pos_of(&t, &format!("{id}")).await?);
+    t.check(
+        (me.x - skiff[0]).abs() < 3.0 && (me.z - skiff[2]).abs() < 3.0,
+        format!("the player stays on the skiff (x {:.2}, skiff {:.2})", me.x, skiff[0]),
+    );
+    Ok(())
+}
+
+/// A body is lit from the moment it is there, and a block broken shows its light at once.
+pub async fn body_lit_at_once(t: T) -> R {
+    t.flat().await?;
+    t.op("mode creative").await?;
+    let f = t.feet();
+    let at = add(f, [0, 2, -5]);
+    t.set(at, "base:stone").await?;
+    t.look_at(at);
+    t.secs(0.8).await?;
+    let Some((x, y)) = t.on_screen([at[0] as f64 + 0.5, at[1] as f64 + 0.9, at[2] as f64 + 1.02]) else {
+        return Err("it isn't in view".into());
+    };
+    let shade = |c: probe::C| c[0] as i32 + c[1] as i32 + c[2] as i32;
+    let before = shade(t.pixel(x + 0.01, y + 0.012).await?);
+    let id = t
+        .op(&format!("lift {} {} {} 0", at[0], at[1], at[2]))
+        .await?;
+    t.check(id != "0", "it lifted");
+    let mut darkest = before;
+    for _ in 0..30 {
+        t.frames(1).await?;
+        darkest = darkest.min(shade(t.pixel(x + 0.01, y + 0.012).await?));
+    }
+    t.check(darkest * 10 >= before * 7, format!("not dark for a moment: {darkest} of {before}"));
+    t.op(&format!("remove {id}")).await?;
+
+    // Broken by hand: what was inside a block has the light of the air now, in the same frame.
+    let b = add(f, [1, 0, -4]);
+    t.set(b, "base:stone").await?;
+    t.look_at(b);
+    t.secs(0.5).await?;
+    t.press("core:attack");
+    t.until("gone on the client", Duration::from_secs(2), |t| t.c().block(b) == Some(0))
+        .await?;
+    let sky = t.c().light(b).unwrap_or(0) & 255;
+    t.check(sky > 0, format!("a broken block's place is lit in the frame it goes: {sky}"));
     Ok(())
 }
