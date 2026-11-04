@@ -224,17 +224,23 @@ pub fn register(r: &mut Registry) {
                 let ticks = c.day_time() % 24000;
                 let minutes = (ticks * 60 / 1000 + 6 * 60) % (24 * 60);
                 let clock = format!("{:02}:{:02}", minutes / 60, minutes % 60);
+                // The date from the world's own clock, which every client has (the server writes
+                // it into the vitals only for players mods see, and spectators aren't: their clock
+                // stayed on its old day after `/season`, 11-04); the calendar's kind from the vitals.
                 let light = c
                     .component(&VITALS)
-                    .filter(|v| v.date > 0)
-                    .map_or(12.0, |v| vitals::calendar::daylight_hours((v.date - 1) as f32, base_api::calendars::swing(v.calendar)));
+                    .filter(|v| v.calendar > 0)
+                    .map_or(12.0, |v| {
+                        let day = vitals::calendar::date(c.day_time()).day as f32;
+                        vitals::calendar::daylight_hours(day, base_api::calendars::swing(v.calendar))
+                    });
                 let up = (12.0 - light / 2.0) * 60.0..(12.0 + light / 2.0) * 60.0;
                 let key = if up.contains(&(minutes as f32)) { "hud.base.clock_day" } else { "hud.base.clock_night" };
                 t.set(key, &[Arg::Text(&clock)]);
             });
             ui.text_bind_styled(S::default().no_wrap(), |c, t| {
-                let Some(v) = c.component(&VITALS).filter(|v| v.date > 0) else { return t.text("") };
-                let day = (v.date - 1) as u32;
+                let Some(v) = c.component(&VITALS).filter(|v| v.calendar > 0) else { return t.text("") };
+                let day = vitals::calendar::date(c.day_time()).day as u32;
                 let season = vitals::calendar::SEASONS[(day / vitals::calendar::SEASON_DAYS) as usize % 4];
                 let name =
                     if v.calendar == base_api::calendars::WET_AND_DRY { if season.wet() { "wet" } else { "dry" } } else { season.name() };
