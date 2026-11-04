@@ -1374,7 +1374,11 @@ pub fn freeze(
     for r in raws {
         if r.package {
             from_packages.extend(r.configs.iter().map(|(_, d)| d.name.clone()));
-            from_packages.extend(r.keys.iter().map(|(action, _)| format!("core:key.{action}")));
+            from_packages.extend(
+                r.keys
+                    .iter()
+                    .map(|(action, _)| format!("core:key.{action}")),
+            );
         }
         entity_ticks.extend(r.client_entity_ticks);
         sounds.extend(r.sounds);
@@ -1508,9 +1512,7 @@ pub fn freeze(
     // Switching content re-keys the game's values by name, but a mod's handle it only named
     // (`weft_sdk::settings::VIEW_DISTANCE`, `Config::named("core:...")`) keeps the id it first
     // resolved: a package's setting sorting among the engine's would move those.
-    configs.sort_by(|a, b| {
-        (from_packages.contains(&a.1.name), &a.1.name).cmp(&(from_packages.contains(&b.1.name), &b.1.name))
-    });
+    configs.sort_by(|a, b| (from_packages.contains(&a.1.name), &a.1.name).cmp(&(from_packages.contains(&b.1.name), &b.1.name)));
     for (cell, d) in configs {
         if g.config_names.contains_key(&d.name) {
             errors.push(format!("setting {} registered twice", d.name));
