@@ -17,7 +17,9 @@
 set -euo pipefail
 
 platform="${1:?usage: tools/release/package.sh <platform> [label]}"
-label="${2:-$(git rev-parse --short=8 HEAD)}"
+# The commit: GitHub's, git's, or none (a tree without .git, as on the test PC).
+commit="${GITHUB_SHA:-$(git rev-parse HEAD 2> /dev/null || echo unknown)}"
+label="${2:-${commit:0:8}}"
 out_dir="${OUT_DIR:-dist}"
 name="chiacraft-$label-$platform"
 folder="$out_dir/chiacraft"
@@ -57,7 +59,7 @@ cp LICENSE "$folder/LICENSE"
 cp tools/release/README.txt "$folder/README.txt"
 {
 	echo "chiacraft $label ($platform)"
-	echo "commit $(git rev-parse HEAD)"
+	echo "commit $commit"
 	echo "built $(date -u +%Y-%m-%dT%H:%MZ)"
 } > "$folder/BUILD.txt"
 
