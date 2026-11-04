@@ -217,7 +217,7 @@ fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
     animal::feed(w, id, points);
     stack.count -= 1;
     w.set_dropped_item(item, stack);
-    weft_sdk::info!(
+    weft_sdk::debug!(
         "animal {id} eats {} off the ground ({grams} g, it {own:.3} kg): food {} of {max:.0}",
         name_of(abi::entry_kind::ITEM, stack.item),
         a.food.saturating_add(points).min(max as u16)
@@ -284,7 +284,7 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
             // Growing food feeds as well as it grows now: dry-season grass is poor fodder.
             let fodder = if src.renews.is_some() { 0.4 + 0.6 * lush(w, s, at) } else { 1.0 };
             animal::feed(w, id, (src.food as f32 * fodder).round().max(1.0) as u16);
-            weft_sdk::info!(
+            weft_sdk::debug!(
                 "animal {id} eats {} at {at:?} ({:.0}% as good as at its best; food {} of {:.0})",
                 src.block,
                 fodder * 100.0,

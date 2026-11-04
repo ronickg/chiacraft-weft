@@ -198,7 +198,7 @@ pub fn seek(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let target = best.map_or(st.pos, |(p, _)| p);
     if let Some((p, t)) = best {
-        weft_sdk::info!("animal {id} seeks comfort at {p:?}: {t:.1} °C off its comfort, {here:.1} here");
+        weft_sdk::debug!("animal {id} seeks comfort at {p:?}: {t:.1} °C off its comfort, {here:.1} here");
         w.navigate(id, target, 1.0);
     }
     if let Some(s) = w.component_mut(id, &SEEK) {
