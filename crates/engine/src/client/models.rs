@@ -48,8 +48,9 @@ impl KindModel {
     }
 }
 
-/// Layers one entity draws at most: its skin and what it wears.
-pub const MAX_LAYERS: usize = 8;
+/// Layers one entity draws at most: its skin and what it wears (a game's armour, clothes and
+/// cloak are nine; past this the rest are dropped without a word, so leave room).
+pub const MAX_LAYERS: usize = 12;
 
 /// Keyframe animations one entity plays at once: idle, walk and run.
 pub const MAX_ANIMS: usize = 3;
