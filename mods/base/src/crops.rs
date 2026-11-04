@@ -66,14 +66,17 @@ pub fn register(r: &mut Registry) {
 
     // The stems' fruit: a pumpkin breaks into three to five slices, a melon three to seven; a
     // slice gives its seeds.
-    for (b, top, side, slice, (lo, hi)) in [(&PUMPKIN, "pumpkin_top", "pumpkin_side", "pumpkin_slice", (3, 5)), (&MELON, "melon_top", "melon_side", "melon_slice", (3, 7))] {
+    for (b, top, side, slice, (lo, hi)) in
+        [(&PUMPKIN, "pumpkin_top", "pumpkin_side", "pumpkin_slice", (3, 5)), (&MELON, "melon_top", "melon_side", "melon_slice", (3, 7))]
+    {
         r.block(b)
             .sound_group("wood")
             .textures(top, side, top)
             .hardness(1.0)
             .mineable("axe")
             .tab(&crate::tabs::NATURAL);
-        r.loot(b).pool(Pool::new().entry(Entry::item(slice).count(lo, hi)));
+        r.loot(b)
+            .pool(Pool::new().entry(Entry::item(slice).count(lo, hi)));
     }
     let c = &base_api::CRAFTING;
     r.shapeless(c, "pumpkin_seeds", 2, &["pumpkin_slice"], 0);
@@ -218,7 +221,10 @@ fn set_fruit(e: &mut BlockEvent, fruit: &str) {
     let [x, y, z] = e.pos();
     let Some(id) = Block::lookup(fruit) else { return };
     const SIDES: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-    if SIDES.iter().any(|&(dx, dz)| w.get([x + dx, y, z + dz]) == id) {
+    if SIDES
+        .iter()
+        .any(|&(dx, dz)| w.get([x + dx, y, z + dz]) == id)
+    {
         return;
     }
     let start = (w.random() % 4) as usize;

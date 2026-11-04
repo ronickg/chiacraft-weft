@@ -89,7 +89,8 @@ pub const CROPS: [Crop; 14] = [
         Soil::Feeds,
         &["base:plains", "base:forest", "base:savanna", "base:mountains"],
     ),
-    c("base:sorghum", "base:sorghum_seeds", "base:sorghum", (1, 1), 3, Soil::Tires, &["base:savanna", "base:plains", "base:desert"]).tall(2),
+    c("base:sorghum", "base:sorghum_seeds", "base:sorghum", (1, 1), 3, Soil::Tires, &["base:savanna", "base:plains", "base:desert"])
+        .tall(2),
     c("base:millet", "base:millet_seeds", "base:millet", (1, 1), 3, Soil::Tires, &["base:savanna", "base:desert"]).tall(2),
     c("base:cassava", "base:cassava", "base:cassava", (1, 3), 3, Soil::Tires, &["base:savanna", "base:swamp"]),
     // Stems that set their fruit beside them (ECOLOGY.md, the research's pumpkin and melon):
