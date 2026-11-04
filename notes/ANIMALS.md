@@ -1060,7 +1060,7 @@ back by twice the mount's height so it clears it. Checked in the game: take off,
 land, get off; a wild one killed a player in survival who came near.
 
 **The breath** (2026-11-02; `breath.rs`). What a wyvern breathes is in its genes (fire, frost,
-lightning, venom). Its rider makes it breathe with a key (R) where they look; a wild one angry at
+lightning, venom). Its rider makes it breathe with a key (V, rebindable) where they look; a wild one angry at
 something 5 to 16 blocks off breathes at it now and then. On the ground it rears, draws breath and
 lunges (`breathe`), the stream pouring from its mouth from 0.95 to 2.6 seconds; in the air it
 breathes as it flies, at once; then eight seconds before the next. The stream reaches 14 blocks in
