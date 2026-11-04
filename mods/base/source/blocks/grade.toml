@@ -68,6 +68,10 @@ match = ["glacier_ice_*"]
 saturation = 1.35
 gain = 0.95
 
+[tiles.glacier_ice_side]  # flattened for irregular layers (glacier_bands.py): grain back to quiet ground's 20,
+spread = 20               # and a little less blue than the group, to sit with the top
+saturation = 1.2
+
 [groups.liquids]
 match = ["water_*", "lava_*"]
 
