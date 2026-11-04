@@ -27,6 +27,7 @@
 //! await_file path 120 # until the file exists, at most 120 s
 //! origin              # later via points are relative to where the player stands now
 //! where label        # logs the player's position
+//! entities 16        # logs every entity within 16 blocks as the server and this client have it
 //! rec start|stop     # logs a marker; tools/rec.ps1 presses the OBS hotkeys on it
 //! via x y z yaw pitch # a camera waypoint (eye position), or: via x y z @ tx ty tz (look at a point)
 //! travel 8            # fly through the waypoints in 8 s: spline, eased, a little hand shake
@@ -556,6 +557,7 @@ async fn run_lines(t: T, src: String) -> R {
                 let s = t.state();
                 weft_sdk::info!("script: where {:.3} {:.3} {:.3} {rest}", s.pos[0], s.pos[1], s.pos[2]);
             }
+            "entities" => entities(&t, num(0, 16.0)).await?,
             "rec" => weft_sdk::info!("REC {rest}"),
             "via" => match waypoint(origin, rest) {
                 Some(mut w) => {
@@ -617,6 +619,82 @@ async fn run_lines(t: T, src: String) -> R {
         }
         // One step per frame.
         t.frames(1).await?;
+    }
+    Ok(())
+}
+
+/// Every entity within `r` blocks, one line each: where the server has it and where this client
+/// does (or that it doesn't), the client's block under its feet and light there. For "the server
+/// has it, the client draws nothing".
+async fn entities(t: &T, r: f32) -> R {
+    let me = t.state().pos;
+    let near = t
+        .op(&format!("near {:.0} {:.0} {:.0} {r}", me[0].floor(), me[1].floor(), me[2].floor()))
+        .await?;
+    let mut ids: Vec<u64> = near
+        .split_whitespace()
+        .filter_map(|p| p.split(':').next()?.parse().ok())
+        .collect();
+    let c = t.c();
+    let mine = c.entities();
+    let close = |p: [f64; 3]| (0..3).map(|i| (p[i] - me[i]).powi(2)).sum::<f64>() <= (r as f64).powi(2);
+    let only_mine: Vec<u64> = mine
+        .iter()
+        .copied()
+        .filter(|id| !ids.contains(id) && c.entity(*id).is_some_and(|e| close(e.pos)))
+        .collect();
+    ids.extend(only_mine);
+    weft_sdk::info!(
+        "entities: me at {:.2} {:.2} {:.2}, server {} within {r}, client knows {} in all",
+        me[0],
+        me[1],
+        me[2],
+        near.split_whitespace().count(),
+        mine.len()
+    );
+    for id in ids {
+        let server = t
+            .op(&format!("entity {id}"))
+            .await
+            .unwrap_or_else(|e| format!("none ({e})"));
+        // Under it as the server has it.
+        let under = match server
+            .split_whitespace()
+            .skip(1)
+            .take(3)
+            .map(|v| v.parse::<f64>())
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(p) if p.len() == 3 => {
+                let at = format!("{:.0} {:.0} {:.0}", p[0].floor(), p[1].floor() - 1.0, p[2].floor());
+                let block = t.op(&format!("get {at}")).await.unwrap_or_default();
+                let light = t
+                    .op(&format!("light {:.0} {:.0} {:.0}", p[0].floor(), p[1].floor(), p[2].floor()))
+                    .await
+                    .unwrap_or_default();
+                format!(", under {block}, light {light}")
+            }
+            _ => String::new(),
+        };
+        let client = match c.entity(id) {
+            Some(e) => {
+                let feet = [e.pos[0].floor() as i32, e.pos[1].floor() as i32, e.pos[2].floor() as i32];
+                let below = [feet[0], feet[1] - 1, feet[2]];
+                format!(
+                    "at {:.2} {:.2} {:.2}, health {}, size {:?}, block under {:?}, light {:?}, cube shown {}",
+                    e.pos[0],
+                    e.pos[1],
+                    e.pos[2],
+                    e.health,
+                    e.size,
+                    c.block(below).map(weft_sdk::block_name),
+                    c.light(feet),
+                    c.cube_shown(feet)
+                )
+            }
+            None => "MISSING".into(),
+        };
+        weft_sdk::info!("entities: {id} server [{server}{under}] client [{client}]");
     }
     Ok(())
 }
