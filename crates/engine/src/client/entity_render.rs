@@ -487,7 +487,9 @@ impl EntityRenderer {
         held: u32,
     ) {
         let c = content();
+        let s = crate::diag::span("preload/skins");
         self.paint_skins(gpu, assets, entities, comps);
+        drop(s);
         self.load_sprite(assets, held);
         // Each kind and item looked at once per frame, without listing thousands of entities.
         let mut seen = std::mem::take(&mut self.seen_kinds);

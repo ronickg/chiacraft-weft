@@ -109,7 +109,8 @@ impl Feature {
     /// machine and the GPU agree. It runs for every column, on many threads at once, and like a
     /// generator it must be a pure function of its input.
     pub fn new(height: impl Fn(&Fields, i32, i32) -> i32 + Send + Sync + 'static) -> Feature {
-        let height = callback(move |a: &mut abi::FeatureArgs| a.height = height(&Fields { seed: a.seed }, a.x, a.z));
+        let height =
+            callback(move |a: &mut abi::FeatureArgs| a.height = height(&Fields::with_continent_scale(a.seed, a.continent_scale), a.x, a.z));
         Feature { name: String::new(), preset: abi::terrain_preset::CUSTOM, params: [0.0; 4], height, mask: None }
     }
 
@@ -450,6 +451,11 @@ impl TerrainBuilder<'_> {
     pub fn base_height(self, y: f64) -> Self {
         self.send(Op { value: y, ..Op::new(op::BASE_HEIGHT) })
     }
+    /// How many blocks across land masses and seas are (the continent noise's scale; 900 when
+    /// not given). Masks and rules on continentalness follow it.
+    pub fn continent_scale(self, blocks: f64) -> Self {
+        self.send(Op { value: blocks, ..Op::new(op::CONTINENT_SCALE) })
+    }
     /// Everything up to `level` that isn't ground is `water`.
     pub fn sea(self, level: i32, water: &str) -> Self {
         self.send(Op { level, block: water.to_string(), ..Op::new(op::SEA) })
@@ -581,7 +587,7 @@ impl ScatterBuilder<'_> {
         self.desc.cell = blocks;
         self
     }
-    /// How far the shape puts blocks sideways from its site. Up and down it may go 32 and 16.
+    /// How far the shape puts blocks sideways from its site. Up and down it may go 96 and 16.
     pub fn reach(mut self, blocks: i32) -> Self {
         self.desc.reach = blocks;
         self

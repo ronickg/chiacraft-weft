@@ -233,7 +233,80 @@ pub const RECIPES: &[Recipe] = &[
         leaf_ry: 0.9,
         ..Recipe::BASE
     },
+    // A giant sequoia (Sequoiadendron giganteum, `vitals::wild` for where): the real ones 80-95 m
+    // tall on trunks 6-11 m across, here about 60 blocks on a round trunk 4 to 7 wide, flaring
+    // into buttresses at the foot; bare for its lower half, then short branches all round,
+    // shorter up the tree, in rounded clumps: a narrow, rounded spire.
+    SEQUOIA,
 ];
+
+/// A grown giant sequoia (`RECIPES`' own row).
+pub const SEQUOIA: Recipe = Recipe {
+    log: "base:sequoia_log",
+    height: 60.0,
+    size_var: 0.18,
+    width: 5.5,
+    width_loss: 0.075,
+    leaf_width: 0.9,
+    drift: 1.2,
+    rise: 1.0,
+    droop: 0.25,
+    branch_start: 0.5,
+    branch_every: 0.5,
+    branch_count: 1,
+    branch_angle: 72.0,
+    branch_width: 0.5,
+    orders: 2,
+    branch_len: 0.13,
+    taper: 0.6,
+    leaf_r: 2.4,
+    leaf_ry: 1.7,
+    ragged: 0.25,
+    reach: 10,
+    max_height: 80,
+    flare: 0.45,
+    flare_up: 6.0,
+    lobes: 0.22,
+    ..Recipe::BASE
+};
+
+/// A young giant sequoia, a few centuries old: conical, branched nearly to the ground, its trunk
+/// 2 to 3 wide (for the sheet and a grove's young; `SEQUOIA` is the grown one).
+pub const YOUNG_SEQUOIA: Recipe = Recipe {
+    log: "base:sequoia_log",
+    height: 26.0,
+    size_var: 0.2,
+    width: 2.6,
+    width_loss: 0.085,
+    leaf_width: 0.9,
+    drift: 1.5,
+    droop: 0.2,
+    branch_start: 0.15,
+    branch_every: 0.5,
+    branch_angle: 70.0,
+    branch_width: 0.5,
+    orders: 2,
+    branch_len: 0.2,
+    taper: 0.9,
+    leaf_r: 2.0,
+    leaf_ry: 1.3,
+    ragged: 0.22,
+    reach: 8,
+    max_height: 40,
+    flare: 0.3,
+    flare_up: 3.0,
+    lobes: 0.1,
+    ..Recipe::BASE
+};
+
+/// The young of the trees that grow too big to come from a sapling at once: a planted sequoia
+/// grows into a young one (`YOUNG_SEQUOIA`), not a giant.
+pub const YOUNG: &[Recipe] = &[YOUNG_SEQUOIA];
+
+/// The recipe a sapling of this log grows by: its young one's, if it has one, else its own.
+pub fn sapling_of(log: &str) -> Option<&'static Recipe> {
+    YOUNG.iter().find(|r| r.log == log).or_else(|| of(log))
+}
 
 /// The recipe for a log, by its block name (`base:oak_log`).
 pub fn of(log: &str) -> Option<&'static Recipe> {

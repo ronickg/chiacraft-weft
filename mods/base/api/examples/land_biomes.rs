@@ -4,7 +4,6 @@
 //!     cargo run -p base_api --example land_biomes -- <seed> <radius> <step>
 
 use base_api::land as l;
-use weft_sdk::noise::fixed::Fields;
 
 fn main() {
     let a: Vec<i64> = std::env::args()
@@ -14,7 +13,7 @@ fn main() {
     let seed = a.first().copied().unwrap_or(1) as u64;
     let radius = a.get(1).copied().unwrap_or(16000) as i32;
     let step = a.get(2).copied().unwrap_or(64) as usize;
-    let f = Fields { seed };
+    let f = l::fields(seed);
     let (mut ts, mut hs) = (Vec::new(), Vec::new());
     for z in (-radius..=radius).step_by(step * 2) {
         for x in (-radius..=radius).step_by(step * 2) {
