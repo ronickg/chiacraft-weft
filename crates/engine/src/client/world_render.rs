@@ -1364,7 +1364,9 @@ impl WorldRenderer {
             offs[at + 12..at + 16].copy_from_slice(&light.to_le_bytes());
             offs[at + 16..at + 32].copy_from_slice(bytemuck::cast_slice(&rot.to_array()));
             offs[at + 32..at + 44].copy_from_slice(bytemuck::cast_slice(&pivot.to_array()));
-            offs[at + 44..at + 48].fill(0);
+            // 1 for a leaning one: lit as in the open (`on_body`).
+            let leaning: f32 = if lean.is_some() { 1.0 } else { 0.0 };
+            offs[at + 44..at + 48].copy_from_slice(&leaning.to_le_bytes());
         };
         put(offs, 0, Vec3::ZERO, 0, None);
         for (k, &(o, light, lean)) in picks.iter().enumerate() {

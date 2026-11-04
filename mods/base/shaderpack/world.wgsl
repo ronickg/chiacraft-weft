@@ -124,6 +124,11 @@ fn on_body(l: vec4<f32>, k: i32) -> vec4<f32> {
         return l;
     }
     let w = unpack_light(bitcast<u32>(offsets[k * 3].w));
+    // A leaning one (a falling tree) lit its own blocks as if nothing stood beside them, so a
+    // trunk under its crown came out dark: lit as in the open.
+    if offsets[k * 3 + 2].w > 0.5 {
+        return max(l, w);
+    }
     return vec4(min(l.x, w.x), max(l.yzw, w.yzw));
 }
 
@@ -217,6 +222,10 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.light = on_body(corner_light(w2, w3, c), origins[ii].w);
     out.slot = shader_of(tex_id);
     out.pos = world;
+    // A structure's blocks: where they are in the world (its own coordinates, turned and moved).
+    if origins[ii].w != 0 {
+        out.pos = pos.xyz + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
+    }
     out.normal = body_normal(NORMAL[dir], origins[ii].w);
     out.ao = AO[a[c]];
     out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), 0u, 0u);
@@ -280,6 +289,10 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.light = on_body(corner_light(records[base + 6u], records[base + 7u], c), origins[ii].w);
     out.slot = shader_of(tex_id);
     out.pos = world;
+    // A structure's blocks: where they are in the world (its own coordinates, turned and moved).
+    if origins[ii].w != 0 {
+        out.pos = pos.xyz + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
+    }
     // Crossed plants are lit as if they faced up, like the ground they grow from.
     out.normal = body_normal(select(n, vec3(0.0, 1.0, 0.0), flat_), origins[ii].w);
     out.ao = 1.0;

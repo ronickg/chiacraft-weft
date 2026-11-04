@@ -115,6 +115,11 @@ fn on_body(l: vec4<f32>, k: i32) -> vec4<f32> {
         return l;
     }
     let w = unpack_light(bitcast<u32>(offsets[k * 3].w));
+    // A leaning one (a falling tree) lit its own blocks as if nothing stood beside them, so a
+    // trunk under its crown came out dark: lit as in the open.
+    if offsets[k * 3 + 2].w > 0.5 {
+        return max(l, w);
+    }
     return vec4(min(l.x, w.x), max(l.yzw, w.yzw));
 }
 
