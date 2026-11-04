@@ -214,6 +214,11 @@ pub fn ensure_rolled(w: &World, id: u64) -> bool {
         first_roll(w, id, index, a, st.pos);
         a.seen = life::birth(w.time(), 0);
         crate::coats::upkeep(w, id, index, a, st.pos);
+        // Its stats on the entity at once, and full, as a new one in `upkeep` (shown at once, it
+        // read "8 / 15": the kind's base health under its rolled maximum, PC run b2_roll).
+        let a = *a;
+        let (health, speed) = factors(w, id, &a);
+        apply(w, id, &st, health, speed, f32::MAX);
     }
     true
 }
