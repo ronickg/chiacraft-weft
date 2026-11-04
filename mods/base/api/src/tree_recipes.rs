@@ -7,16 +7,16 @@ use crate::branchy::Recipe;
 
 pub const RECIPES: &[Recipe] = &[
     // An oak: a short trunk, a few big limbs out and up, lumpy round clusters, a broad crown.
-    Recipe { log: "base:oak_log", height: 7.0, width: 1.1, width_loss: 0.1, branch_start: 0.4, branch_every: 1.1, branch_angle: 55.0, branch_width: 0.75, leaf_r: 2.3, leaf_ry: 1.8, ..Recipe::BASE },
+    Recipe { log: "base:oak_log", height: 7.0, width: 1.1, width_loss: 0.1, branch_start: 0.4, branch_every: 1.1, branch_angle: 55.0, branch_width: 0.75, leaf_r: 2.3, leaf_ry: 1.8, ragged: 0.5, ..Recipe::BASE },
     // A birch: tall and slim, a pale trunk, short branches steep up, small clusters, narrow.
     Recipe { log: "base:birch_log", height: 9.0, width_loss: 0.085, branch_start: 0.3, branch_every: 0.7, branch_angle: 35.0, branch_width: 0.55, orders: 1, taper: 0.4, leaf_r: 1.5, leaf_ry: 1.5, ..Recipe::BASE },
     // A spruce: a straight trunk to the tip, whorls of branches nearly flat and drooping, shorter
     // up the tree, needles along their whole length: a ragged cone. Big ones have a 2 x 2 foot.
-    Recipe { log: "base:spruce_log", height: 11.0, size_var: 0.3, width: 1.25, width_loss: 0.075, leaf_width: 2.0, drift: 2.0, droop: 0.4, branch_start: 0.22, branch_every: 0.9, branch_count: 3, branch_angle: 80.0, branch_width: 0.32, orders: 1, branch_len: 0.36, taper: 1.0, leaf_r: 1.1, leaf_ry: 0.9, ragged: 0.25, leaf_along: true, ..Recipe::BASE },
+    Recipe { log: "base:spruce_log", height: 11.0, size_var: 0.3, width: 1.25, width_loss: 0.075, leaf_width: 2.0, drift: 2.0, droop: 0.4, branch_start: 0.22, branch_every: 0.9, branch_count: 3, branch_angle: 80.0, branch_width: 0.32, orders: 1, branch_len: 0.36, taper: 1.0, leaf_r: 1.1, leaf_ry: 0.9, ragged: 0.45, leaf_along: true, ..Recipe::BASE },
     // An acacia: a trunk leaning a little, forking low into leaders, under one wide flat parasol.
     Recipe { log: "base:acacia_log", height: 7.0, width_loss: 0.1, drift: 8.0, lean: 4.0, branch_start: 0.4, branch_every: 0.6, branch_count: 3, branch_angle: 38.0, branch_width: 0.85, fork: true, leaf_r: 2.6, leaf_ry: 0.9, ragged: 0.3, ..Recipe::BASE },
-    // A mesquite: low, wide and crooked, forking near the ground, a thin open flat crown.
-    Recipe { log: "base:mesquite_log", height: 6.0, width_loss: 0.1, drift: 18.0, lean: 8.0, branch_start: 0.35, branch_every: 0.5, branch_count: 3, branch_angle: 55.0, branch_width: 0.85, fork: true, leaf_r: 1.9, leaf_ry: 0.8, ragged: 0.5, ..Recipe::BASE },
+    // A mesquite: low, wide and crooked, forking at about three blocks (lower read as a bush), a thin open flat crown.
+    Recipe { log: "base:mesquite_log", height: 6.0, width_loss: 0.1, drift: 18.0, lean: 8.0, branch_start: 0.5, branch_every: 0.5, branch_count: 3, branch_angle: 55.0, branch_width: 0.85, fork: true, leaf_r: 1.9, leaf_ry: 0.8, ragged: 0.5, ..Recipe::BASE },
     // The acuri palm (Attalea phalerata): a short stout trunk, a little bent, a big crown of long
     // fronds sweeping out and down.
     Recipe { log: "base:acuri_palm_log", height: 6.0, width_loss: 0.06, drift: 3.0, lean: 4.0, rise: 0.9, orders: 0, fronds: 10, frond_len: 5.0, frond_droop: 0.38, leaf_r: 1.0, leaf_ry: 0.8, ..Recipe::BASE },
