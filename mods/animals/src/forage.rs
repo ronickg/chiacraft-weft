@@ -176,8 +176,9 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
     let stack = w.dropped_item(id)?;
     let name = name_of(abi::entry_kind::ITEM, stack.item);
     let food = vitals::food::FOODS.iter().find(|f| f.name == name);
-    // A poisonous one (a fly agaric, a spider's eye) it leaves where it lies (C6).
-    if food.is_some_and(|f| f.poison > 0.0) {
+    // A poisonous one (a fly agaric, a spider's eye) it leaves where it lies, and salted meat,
+    // too salty for an animal; dried and smoked meat a meat eater takes as it raids a camp (C6).
+    if food.is_some_and(|f| f.poison > 0.0) || name == "base:salted_meat" {
         return None;
     }
     let spoiled = food.is_some_and(|f| {
