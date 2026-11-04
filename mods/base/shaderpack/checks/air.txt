@@ -7,7 +7,7 @@
 # 270 +x (east).
 loaded
 idle
-chat /rule core:mob_spawning false
+chat /rule core:mob_spawning 0
 chat /tk mode spectator
 chat /weather clear 99999
 # 1. High over hills: noon, then golden hour toward and away from the sun, then dusk.

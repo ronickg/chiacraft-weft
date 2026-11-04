@@ -5,7 +5,7 @@
 # mobs off. Yaw 0 faces -z.
 loaded
 idle
-chat /rule core:mob_spawning false
+chat /rule core:mob_spawning 0
 chat /weather clear 99999
 chat /tk mode creative
 chat /time set 6000

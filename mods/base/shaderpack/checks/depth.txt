@@ -5,7 +5,7 @@
 # A fresh world name per run. Spectator, absolute /tp, mobs off (nothing walks into a shot).
 loaded
 idle
-chat /rule core:mob_spawning false
+chat /rule core:mob_spawning 0
 chat /tk mode spectator
 chat /weather clear 99999
 # 1. High over hills, noon: cloud shadows on the land out to the horizon.
