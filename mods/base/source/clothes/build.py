@@ -12,9 +12,9 @@ what is worn matches what is held.
 Writes `mods/base/assets/textures/entity/clothes/<material>_{1,2}.png`; `--sheet` also draws the
 player wearing each piece (front and back) and each whole outfit.
 
-`K` is texels a skin pixel: 1 for the 64 x 32 layout (16 a block, as the player's own skin).
-The engine maps a worn texture's pixels by its own size, so a finer one (K = 2, 128 x 64, 32 a
-block) needs the engine to map worn layers by the skin's layout instead, and a 32 skin to match.
+`K` is texels a skin pixel: 2, 128 x 64, 32 texels a block like everything else (Ronald 11-04,
+"C now: all 32"), on the 32 default skin (`../player/build.py`). The engine maps worn layers by
+the skin's 64 x 32 layout (`worn_tex_size`), so any K works; K = 1 is the old 16-a-block look.
 """
 
 import argparse
@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.join(REPO, ".claude", "skills", "blocky-model", "scri
 from paint import occlusion, paint_face_smooth, tones  # noqa: E402
 from render import face_quad  # noqa: E402
 
-K = 1
+K = 2
 OUT = os.path.join(REPO, "mods", "base", "assets", "textures", "entity", "clothes")
 SKIN = os.path.join(REPO, "crates", "engine", "assets", "textures", "entity", "player.png")
 U = 4  # house units (1/64 block) a skin pixel: the painter's light and occlusion work in them
