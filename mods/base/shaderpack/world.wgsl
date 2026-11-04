@@ -348,20 +348,38 @@ fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
 
 // ---- water ----
 
-// Ripples as sums of waves, sampled on the texture's pixel grid so they stay blocky.
-fn ripple_normal(p: vec2<f32>) -> vec3<f32> {
-    let q = floor(p * 16.0) / 16.0;
+// The surface as heights (blocks): two crossed swells along the wind, 7 and 4.6 blocks long and
+// a little higher in a strong wind, and a chop of noise drifting with it. `detail` scales the chop,
+// which fades out with distance (far off fine waves only make moiré).
+fn wave_height(p: vec2<f32>, t: f32, detail: f32) -> f32 {
+    let w = wind_now();
+    let speed = length(w);
+    let dir = select(vec2(0.8, 0.6), w / max(speed, 1e-4), speed > 0.3);
+    let side = vec2(-dir.y, dir.x);
+    let d1 = normalize(dir + side * 0.35);
+    let d2 = normalize(dir - side * 0.85);
+    var h = sin(dot(p, d1) * 0.9 - t * 0.85) * 0.06;
+    h += sin(dot(p, d2) * 1.37 - t * 1.1 + 1.7) * 0.04;
+    let q = p * 0.65 - dir * t * 0.35;
+    h += (noise3(vec3(q.x, t * 0.25, q.y)) - 0.5) * 0.07 * detail;
+    let q2 = p * 1.4 + side * t * 0.3;
+    h += (noise3(vec3(q2.x, t * 0.4 + 7.0, q2.y)) - 0.5) * 0.03 * detail;
+    return h * (0.6 + 0.4 * smoothstep(1.0, 8.0, speed));
+}
+
+// The surface's normal at `pos` (world) seen from `dist` blocks: up close on the texture's pixel
+// grid, so it stays blocky; flatter far off and at a glancing look.
+fn wave_normal(pos: vec3<f32>, dist: f32, glance: f32) -> vec3<f32> {
     let t = scene.params.w;
-    var d = vec2(0.0);
-    let dirs = array<vec2<f32>, 4>(vec2(0.8, 0.6), vec2(-0.5, 0.86), vec2(0.97, -0.24), vec2(-0.3, -0.95));
-    let freq = array<f32, 4>(1.3, 2.1, 3.7, 5.3);
-    let speed = array<f32, 4>(1.1, 1.5, 2.3, 2.9);
-    let amp = array<f32, 4>(0.09, 0.05, 0.025, 0.015);
-    for (var i = 0u; i < 4u; i++) {
-        let k = dot(q, dirs[i]) * freq[i] + t * speed[i];
-        d += dirs[i] * cos(k) * freq[i] * amp[i];
-    }
-    return normalize(vec3(-d.x, 1.0, -d.y));
+    let grid = 1.0 - smoothstep(10.0, 20.0, dist);
+    let p = mix(pos.xz, floor(pos.xz * 16.0) / 16.0 + 1.0 / 32.0, grid);
+    let detail = 1.0 - smoothstep(16.0, 56.0, dist);
+    let e = 0.06;
+    let h = wave_height(p, t, detail);
+    let hx = wave_height(p + vec2(e, 0.0), t, detail);
+    let hz = wave_height(p + vec2(0.0, e), t, detail);
+    let k = mix(1.0, 0.25, smoothstep(24.0, 140.0, dist)) * mix(0.35, 1.0, smoothstep(0.05, 0.35, glance));
+    return normalize(vec3(-(hx - h) / e * k, 1.0, -(hz - h) / e * k));
 }
 
 // Rain on water: each drop's ring spreads and fades in its own cell, at its own time. The slope
@@ -386,31 +404,95 @@ fn rain_rings(p: vec2<f32>) -> vec2<f32> {
     return slope * 0.3;
 }
 
+// How deep the water is under the surface at `pos` (world): blocks straight down to the first solid
+// one, at most `WATER_PROBE` looked at (a few lookups per water pixel, nothing like a traced
+// shadow). Deeper, or out where the client keeps no blocks (`solid_at` is false): deep.
+const WATER_PROBE: i32 = 8;
+
+fn water_depth(pos: vec3<f32>) -> f32 {
+    let c = vec3<i32>(floor(pos - vec3(0.0, 0.05, 0.0)));
+    for (var i = 0; i < WATER_PROBE; i++) {
+        let b = c - vec3(0, i, 0);
+        if solid_at(b) {
+            return max(pos.y - f32(b.y + 1), 0.0);
+        }
+    }
+    return f32(WATER_PROBE) + 2.0;
+}
+
+// How far `pos` on the surface is from land beside its block (blocks; 1 with none).
+fn shore_distance(pos: vec3<f32>) -> f32 {
+    let c = vec3<i32>(floor(pos - vec3(0.0, 0.05, 0.0)));
+    let f = pos.xz - floor(pos.xz);
+    var d = 1.0;
+    if solid_at(c + vec3(-1, 0, 0)) {
+        d = min(d, f.x);
+    }
+    if solid_at(c + vec3(1, 0, 0)) {
+        d = min(d, 1.0 - f.x);
+    }
+    if solid_at(c + vec3(0, 0, -1)) {
+        d = min(d, f.y);
+    }
+    if solid_at(c + vec3(0, 0, 1)) {
+        d = min(d, 1.0 - f.y);
+    }
+    return d;
+}
+
+// Water seen from above: dark and clear looking down close by, the bottom showing through the
+// shallows (lighter and greener there), blue and opaque where deep, a mirror of the sky toward the
+// horizon (Fresnel), a path of sun glitter toward a low sun and a soft line of foam at the shore.
+// The screen's reflections (`post/reflect.wgsl`) then mirror the hills into it.
 fn water(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     let v = -normalize(in.rel);
+    let top = in.normal.y > 0.5;
+    if (top && v.y <= 0.0) || in_liquid() {
+        return shade(in, albedo);
+    }
     var n = normalize(in.normal);
-    if n.y > 0.5 {
-        n = ripple_normal(in.pos.xz);
+    var depth = 3.0;
+    var shore = 1.0;
+    if top {
+        n = wave_normal(in.pos, in.dist, v.y);
         let rain = rain_amount() * smoothstep(0.85, 1.0, in.light.x);
         if rain > 0.0 {
             let s = rain_rings(in.pos.xz) * rain;
             n = normalize(n + vec3(-s.x, 0.0, -s.y));
         }
+        depth = water_depth(in.pos);
+        shore = shore_distance(in.pos);
     }
-    let ndv = dot(n, v);
-    if ndv <= 0.0 || in_liquid() {
-        return shade(in, albedo);
-    }
-    let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
-    let body = albedo.rgb * in.color * light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos);
+    let ndv = max(dot(n, v), 0.02);
     let fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+    let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
+    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos);
+    // What the light in the water sends back up: turquoise in the shallows, deep blue further down,
+    // in the biome's own tint (a swamp's brown-green), with a little of the texture's pattern near.
+    let tint = in.color / max(max(in.color.r, max(in.color.g, in.color.b)), 1e-3);
+    let pattern = mix(1.0, clamp(luma(albedo.rgb) / 0.55, 0.8, 1.2), 1.0 - smoothstep(8.0, 24.0, in.dist));
+    let shallow = vec3(0.08, 0.26, 0.24);
+    let deep = vec3(0.012, 0.05, 0.085);
+    let scatter = mix(shallow, deep, 1.0 - exp(-0.35 * depth)) * mix(vec3(1.0), tint, 0.6) * pattern * lit;
+    // How much of the bottom shows: the way through the water to it, longer at a slant.
+    let through = exp(-0.28 * depth / max(v.y, 0.2));
     let r = reflect(-v, n);
-    // The sky it shows, darker where little sky reaches it.
     let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
-    let glint = palette().sun * light_strength() * pow(max(dot(r, light_dir()), 0.0), 350.0) * 14.0 * shadow;
-    let f = clamp(fresnel * 0.9 + 0.08, 0.0, 1.0);
-    let c = mix(body, refl, f) + glint;
-    let a = clamp(mix(albedo.a, 1.0, f) + luma(glint), 0.0, 1.0);
+    // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
+    let l = light_dir();
+    let hv = normalize(l + v);
+    let nh = max(dot(n, hv), 0.0);
+    let a2 = 0.0016;
+    let dd = nh * nh * (a2 - 1.0) + 1.0;
+    let spec = a2 / (3.14159 * dd * dd) * (0.02 + 0.98 * pow(1.0 - max(dot(v, hv), 0.0), 5.0)) * 0.25;
+    let glint = palette().sun * light_strength() * min(spec, 40.0) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
+    // Foam where it laps the land, in a wobbling line on the pixel grid.
+    let px = floor(in.pos.xz * 16.0) / 16.0;
+    let wobble = noise3(vec3(px.x * 2.0, scene.params.w * 0.6, px.y * 2.0));
+    let foam = (1.0 - smoothstep(0.04, 0.16 + 0.14 * wobble, shore)) * 0.55;
+    let lost = (1.0 - fresnel) * through;
+    let a = clamp(max(1.0 - lost, max(luma(glint), foam)), 0.02, 1.0);
+    let c = (refl * fresnel + scatter * (1.0 - fresnel) * (1.0 - through) + glint + lit * 0.8 * foam) / a;
     return vec4(display(haze_lit(c, in.rel, in.light.x)), a);
 }
 
