@@ -172,8 +172,10 @@ pub struct Air {
     pub humidity: f32,
     /// The day's mean air here (`temperature::day_mean`): what a room's walls hold to.
     pub mean: f32,
-    /// Degrees from the nearest fire (lava, a lit furnace, torches).
+    /// Degrees from the nearest fire (lava, a lit furnace, torches), and from the nearest one hot
+    /// enough to rest by (`temperature::REST_HEAT`: not a torch).
     pub fire: f32,
+    pub hearth: f32,
     /// Sky light at the eyes: under 13 a roof, 0 deep inside.
     pub sky: u32,
     pub underground: bool,
@@ -202,6 +204,7 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
     let sky = w.sky_light(eye);
     let underground = sky == 0 && feet[1] < SEA - 6;
     let mut fire = 0.0f32;
+    let mut hearth = 0.0f32;
     for dx in -reach..=reach {
         for dy in -reach..=reach {
             for dz in -reach..=reach {
@@ -211,6 +214,9 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
                 if h > 0.0 {
                     let d = ((dx * dx + dy * dy + dz * dz) as f32).sqrt();
                     fire = fire.max(temperature::fire_heat(d) * h);
+                    if h >= temperature::REST_HEAT {
+                        hearth = hearth.max(temperature::fire_heat(d) * h);
+                    }
                 }
             }
         }
@@ -245,6 +251,7 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
         humidity: climate.humidity,
         mean: temperature::day_mean(&place),
         fire,
+        hearth,
         sky,
         underground,
         open_sky: place.open_sky,
@@ -339,9 +346,9 @@ const HEAT_STATES: usize = 1 << 20;
 fn heat_by_name(state: u32) -> f32 {
     // The state's name without its properties (`base:lava[level=0]`).
     match block_name(state).split('[').next().unwrap_or("") {
-        "base:lava" | "base:campfire" => 1.0,
-        "base:furnace" if state_prop(state, "lit") == Some("true") => 0.7,
-        "base:torch" | "base:wall_torch" => 0.25,
+        "base:lava" | "base:campfire" => vitals::temperature::LAVA_HEAT,
+        "base:furnace" if state_prop(state, "lit") == Some("true") => vitals::temperature::FURNACE_HEAT,
+        "base:torch" | "base:wall_torch" => vitals::temperature::TORCH_HEAT,
         _ => 0.0,
     }
 }

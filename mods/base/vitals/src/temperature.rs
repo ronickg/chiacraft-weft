@@ -72,6 +72,19 @@ pub fn season(swing: f32, year: f32) -> f32 {
     -swing * (std::f32::consts::TAU * year).cos()
 }
 
+/// How much each kind of fire heats the air near it, a share of lava's (`base_api::heat_of` names
+/// the blocks): lava and a campfire 1, a lit furnace 0.7, a torch 0.25.
+pub const LAVA_HEAT: f32 = 1.0;
+pub const FURNACE_HEAT: f32 = 0.7;
+pub const TORCH_HEAT: f32 = 0.25;
+/// The heat a fire needs to rest by (camp's "near a fire", being rested): a torch's isn't a fire
+/// (integration review: a torch-lit room gave rest).
+pub const REST_HEAT: f32 = 0.7;
+/// Blocks around a player searched for fires and comfort, once a second; animals, eggs and plants
+/// search fewer (`FIRE_REACH`), as there are many more of them. A fire warms nothing past 8.
+pub const PLAYER_FIRE_REACH: i32 = 7;
+pub const FIRE_REACH: i32 = 3;
+
 /// Degrees a fire adds `distance` blocks away: 20 °C beside it, nothing past 8 blocks (proposed).
 pub fn fire_heat(distance: f32) -> f32 {
     20.0 * (1.0 - (distance - 1.0).max(0.0) / 7.0).clamp(0.0, 1.0)

@@ -18,7 +18,7 @@ use super::set_group;
 /// Seconds one stays wet after the rain or the water.
 const WET_SECS: f32 = 120.0;
 /// Blocks around one searched for heat and comfort.
-const HEAT_REACH: i32 = 7;
+const HEAT_REACH: i32 = temperature::PLAYER_FIRE_REACH;
 
 value! {
     /// The room a player is in (`shelter.rs`), for the HUD: its main wall class (`WALLS` index + 1, 0
