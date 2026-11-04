@@ -424,3 +424,10 @@ outline = 0.875
 
 [items."animals:trout"]  # outline 0.45 -> 0.40
 outline = 0.883
+
+# Gold ore with more gold (11-04, the vanilla comparison: whole-tile saturation 0.09 vs vanilla's 0.27): gold veins
+# laid on stone's own graded tile and variants, so it matches stone and follows its tuning. Option A, chunky
+# nuggets, is overlay "ore_gold" (saturation 0.24, hue 50); B, the veins, lands nearer vanilla (0.31, hue 44 vs 0.27, 42).
+[tiles.gold_ore]
+base = "stone"
+overlay = "ore_gold_b"
