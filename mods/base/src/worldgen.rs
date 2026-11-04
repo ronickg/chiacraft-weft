@@ -80,6 +80,8 @@ pub static SNOWY: Biome = Biome::named("snowy_plains");
 pub static DESERT: Biome = Biome::named("desert");
 pub static SAVANNA: Biome = Biome::named("savanna");
 pub static SWAMP: Biome = Biome::named("swamp");
+/// The hot, wet corner (`base_api::land::TROPICAL`): rainforest.
+pub static TROPICAL_FOREST: Biome = Biome::named("tropical_forest");
 pub static MOUNTAINS: Biome = Biome::named("mountains");
 pub static SEQUOIA_GROVE: Biome = Biome::named("sequoia_grove");
 pub static OCEAN: Biome = Biome::named("ocean");
@@ -224,6 +226,26 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:swamp").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         // The Pantanal's acuri palms on the ground above the flood, a few moriches and oaks.
         .set_text(&TREE_KINDS, "base:acuri_palm_log:3 base:moriche_palm_log:1 base:oak_log:1");
+    // Rainforest (Ronald, 11-04: "all four"): a dense canopy over palms; its trees, undergrowth,
+    // lianas and Manaus's climate are Plants' (`vitals`), these are a start.
+    r.biome(&TROPICAL_FOREST)
+        .tint(water, 0x5d7f6a)
+        .set(&CLIMATE, base_api::climate("base:tropical_forest"))
+        .set(&BOULDERS, 0.04)
+        .temperature(land::TROPICAL.0..)
+        .humidity(land::TROPICAL.1..)
+        .surface("grass", "dirt", 3)
+        .tint(grass, muted(0x4f9e35))
+        .tint(foliage, muted(0x3d8f28))
+        .tint(&base_api::trees::EVERGREEN, muted(0x3d8f28))
+        .tint(&base_api::trees::YELLOW_LEAVES, muted(0x3d8f28))
+        .tag("forest")
+        .tag("wet")
+        .tag("animals")
+        .set(&TREES, 0.6)
+        .set(&STAND_TREES, 0.15)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:tropical_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set_text(&TREE_KINDS, "base:acuri_palm_log:2 base:moriche_palm_log:2 base:oak_log:3");
     r.biome(&MOUNTAINS)
         .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:mountains"))
