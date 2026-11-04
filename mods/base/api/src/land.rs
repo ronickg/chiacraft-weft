@@ -377,10 +377,11 @@ pub const SINK_CLEAR: i32 = 4;
 /// kept with `CRATER_CHANCE` where the land at the middle is open and dry (not the cold, the
 /// woods' wet, the mountains or the karst) and over the sea: `CRATER_RADIUS` blocks from the
 /// middle to the rim's crest, `CRATER_DEPTH` radii deep, the rim `CRATER_RIM` blocks high and
-/// falling away to nothing at `CRATER_RIM_OUT` radii. Where the floor dips under the sea's level
+/// blending back into the land by `CRATER_RIM_OUT` radii; all measured from the ground at the
+/// middle, and only where the land round it is level. Where the floor dips under the sea's level
 /// water stands in it.
-pub const CRATER_CELL: i32 = 1536;
-pub const CRATER_CHANCE: f64 = 0.9;
+pub const CRATER_CELL: i32 = 1280;
+pub const CRATER_CHANCE: f64 = 1.0;
 pub const CRATER_RADIUS: (i32, i32) = (20, 30);
 pub const CRATER_DEPTH: f64 = 0.65;
 pub const CRATER_RIM: (i32, i32) = (5, 8);
@@ -608,7 +609,7 @@ fn land_height_at(h: &Here) -> i32 {
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
     let base = base_ground(h);
-    base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base) + craters::add(h)
+    base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base) + craters::add(h, || base)
 }
 
 /// The ground before the karst towers (which stand on it, or rise out of the water over it).
@@ -922,7 +923,8 @@ pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
 
 /// What the meteor craters add at (`x`, `z`) (Q4), as the engine adds it.
 pub fn craters(f: &Fields, x: i32, z: i32) -> i32 {
-    craters::add(&Here::new(f, x, z))
+    let h = Here::new(f, x, z);
+    craters::add(&h, || base_ground(&h))
 }
 
 /// The meteor craters (middle x, z and radius, blocks) within `r` blocks of (`x`, `z`) (blocks).
@@ -1611,9 +1613,12 @@ mod tests {
         let sites = craters_near(&f, 0, 0, 8000);
         assert!(sites.len() >= 4, "{} craters in 16 km", sites.len());
         for &(x, z, r) in &sites {
-            // A bowl at the middle, the rim's crest over the ground round it.
-            assert!(craters(&f, x * 16, z * 16) < -q4((r as f64 * CRATER_DEPTH) * 0.9), "crater at {x} {z}: shallow");
-            assert!(craters(&f, (x + r) * 16, z * 16) >= q4(CRATER_RIM.0 as f64) - 16, "crater at {x} {z}: no rim");
+            // A bowl at the middle under its rim's crest, nothing past the rim's foot.
+            let deep = land_height(&f, x * 16, z * 16);
+            for (dx, dz) in [(r, 0), (-r, 0), (0, r), (0, -r)] {
+                let crest = land_height(&f, (x + dx) * 16, (z + dz) * 16);
+                assert!(crest - deep >= q4(r as f64 * CRATER_DEPTH * 0.8), "crater at {x} {z}: shallow");
+            }
             assert_eq!(craters(&f, (x + r * 2) * 16, z * 16), 0, "crater at {x} {z}: reaches too far");
         }
         let f = fields(1);
