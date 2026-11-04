@@ -332,6 +332,127 @@ pub const FOODS: &[Food] = &[
         poison: 0.0,
         category: Category::Fruit,
     },
+    // The wild foods (`vitals::wild`): the north's berries, a handful (100 g) each. Lingonberries
+    // as cranberries (USDA), keeping long on their own acid; cloudberries from Fineli (Finland's
+    // food table), rich in vitamin C, soft; crowberries, which hold on the plant over winter, as
+    // estimates near Fineli's.
+    Food {
+        name: "base:lingonberries",
+        grams: 100.0,
+        per100: per(87.3, 0.5, 12.0, 0.1, 3.6, 14.0),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (20.0, 20.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    Food {
+        name: "base:cloudberries",
+        grams: 100.0,
+        per100: per(85.0, 2.4, 8.6, 0.8, 6.3, 100.0),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (3.0, 3.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    Food {
+        name: "base:crowberries",
+        grams: 100.0,
+        per100: per(85.0, 0.6, 7.0, 1.0, 4.5, 6.0),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (10.0, 10.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    // Brambles' raspberries (USDA), soft: two days fresh.
+    Food {
+        name: "base:raspberries",
+        grams: 100.0,
+        per100: per(85.8, 1.2, 11.9, 0.7, 6.5, 26.2),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (2.0, 2.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    // Prickly pear fruit (tunas, USDA), a large one.
+    Food {
+        name: "base:prickly_pear_fruit",
+        grams: 100.0,
+        per100: per(87.6, 0.7, 9.6, 0.5, 3.6, 14.0),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (7.0, 7.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    // Rose hips (USDA), a handful (30 g): sugar, fiber and a great deal of vitamin C, a winter
+    // fruit.
+    Food {
+        name: "base:rose_hip",
+        grams: 30.0,
+        per100: per(58.7, 1.6, 38.2, 0.3, 24.1, 426.0),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (30.0, 30.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    // Nuts and seeds, a handful (30 g), keeping for months: hazelnuts, pine nuts and sunflower
+    // kernels (USDA), fat and protein.
+    Food {
+        name: "base:hazelnut",
+        grams: 30.0,
+        per100: per(5.3, 15.0, 16.7, 60.8, 9.7, 6.3),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (60.0, 60.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    Food {
+        name: "base:pine_nut",
+        grams: 30.0,
+        per100: per(2.3, 13.7, 13.1, 68.4, 3.7, 0.8),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (60.0, 60.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    Food {
+        name: "base:sunflower_seeds",
+        grams: 30.0,
+        per100: per(4.7, 20.8, 20.0, 51.5, 8.6, 1.4),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (90.0, 90.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    // Mushrooms (50 g), as white mushrooms (USDA); the red one is the fly agaric, poisonous.
+    Food {
+        name: "base:mushroom_brown",
+        grams: 50.0,
+        per100: per(92.4, 3.1, 3.3, 0.3, 1.0, 2.1),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (3.0, 3.0),
+        poison: 0.0,
+        category: Category::Fungi,
+    },
+    Food {
+        name: "base:mushroom_red",
+        grams: 50.0,
+        per100: per(92.4, 3.1, 3.3, 0.3, 1.0, 2.1),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (3.0, 3.0),
+        poison: 1.0,
+        category: Category::Fungi,
+    },
     // Dry pet food (the animals mod's), as dry dog food.
     Food {
         name: "animals:kibble",

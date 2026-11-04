@@ -58,9 +58,10 @@ const fn p(
 }
 
 const ANY: u8 = 15;
+const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 6] = [
+pub const PLANTS: [Plant; 21] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -72,6 +73,37 @@ pub const PLANTS: [Plant; 6] = [
     p("base:sapling", "oak", (5.0, 18.0, 28.0, 38.0), Water::Moderate, 0.0, ANY, HARDY),
     // Grazed grass growing back to tall grass: 15-21 days in spring (`vitals::forage`).
     p("base:grazed_grass", "prairie grass", (5.0, 15.0, 30.0, 40.0), Water::Moderate, 18.0, ANY, HARDY),
+    // The wild plants (`vitals::wild`; the research's estimates where it has no source). A tuft
+    // or a mat grazed down grows back in `days`: sedges and cottongrass as grass, white clover in
+    // 20-40 days, reindeer lichen in about ten years (it grows millimetres a year and takes
+    // decades to recover). The research's warmths are estimates; the tundra's own plants are
+    // set to grow from about freezing, as arctic plants do, so its five-degree summer grows them.
+    // Sedges are wetland plants, but they stand on the open ground here, not at the water's edge:
+    // rain waters them, so a dry season rests them as it does grass.
+    p("base:sedge", "sedges", (-1.0, 8.0, 22.0, 32.0), Water::Moderate, 18.0, ANY, HARDY),
+    p("base:cottongrass", "cottongrass (Eriophorum)", (-2.0, 6.0, 16.0, 25.0), Water::Moderate, 18.0, ANY, HARDY),
+    p("base:reindeer_lichen", "reindeer lichen (Cladonia)", (0.0, 5.0, 15.0, 25.0), Water::Dry, 3650.0, ANY, HARDY),
+    p("base:clover", "white clover", (5.0, 18.0, 25.0, 32.0), Water::Moderate, 30.0, ANY, HARDY),
+    // Bushes, flower to ripe fruit: lingonberries flower in June and ripen August to October;
+    // cloudberries, bog plants, June to July and August, their flowers killed by a June frost;
+    // crowberries, whose fruit holds over winter; hazelnuts from catkins in February and March to
+    // nuts in August to October; brambles' raspberries and blackberries July to September.
+    p("base:lingonberry_bush", "lingonberry", (5.0, 12.0, 20.0, 28.0), Water::Moderate, 75.0, SUMMER_AUTUMN, -3.0),
+    p("base:cloudberry_bush", "cloudberry", (0.0, 8.0, 16.0, 25.0), Water::Wet, 45.0, SUMMER, -2.0),
+    p("base:crowberry_bush", "crowberry", (-1.0, 6.0, 15.0, 25.0), Water::Moderate, 60.0, SUMMER_AUTUMN, HARDY),
+    p("base:hazel_bush", "hazel", (5.0, 16.0, 24.0, 32.0), Water::Moderate, 180.0, SUMMER_AUTUMN, HARDY),
+    p("base:bramble_bush", "raspberry and blackberry", (5.0, 16.0, 25.0, 32.0), Water::Moderate, 60.0, SUMMER_AUTUMN, -2.0),
+    // Fruit and seed in their season: prickly pears flower in April and May and ripen July to
+    // September, and frost below about -10 kills the pads; wild sunflowers take 125-130 days and
+    // die at a light frost; the Pantanal's wild rices seed in 120-180 days as the flood peaks.
+    p("base:prickly_pear", "prickly pear (Opuntia)", (10.0, 20.0, 35.0, 45.0), Water::Dry, 90.0, SUMMER_AUTUMN, -10.0),
+    p("base:wild_sunflower", "wild sunflower", (6.0, 20.0, 28.0, 38.0), Water::Dry, 125.0, SUMMER_AUTUMN, -2.0),
+    p("base:wild_rice", "wild rice (Oryza latifolia)", (12.0, 25.0, 32.0, 38.0), Water::Wet, 150.0, SUMMER_AUTUMN, 0.0),
+    // Spreading: mushrooms come up after late-summer rain and last days (3-14 to fruit); water
+    // hyacinth doubles in one to two weeks in warm water and dies at a frost.
+    p("base:mushroom_brown", "forest mushrooms", (5.0, 10.0, 20.0, 30.0), Water::Moderate, 8.0, SUMMER_AUTUMN, -2.0),
+    p("base:mushroom_red", "fly agaric", (5.0, 10.0, 20.0, 30.0), Water::Moderate, 8.0, SUMMER_AUTUMN, -2.0),
+    p("base:water_hyacinth", "water hyacinth", (12.0, 25.0, 30.0, 38.0), Water::Wet, 10.0, ANY, -1.0),
 ];
 
 /// Whether air at `air` °C (a night's frost where it stands) hurts it (`Plant::frost`).

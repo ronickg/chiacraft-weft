@@ -417,8 +417,52 @@ and cactus.**
   (`vitals/tests/places.rs`); the sheet marks the seasons whose nights freeze it. Not yet seen in
   the game: a 90-second midwinter night didn't kill a fresh wheat field (likely no growth step came
   in that time).
+- **Wild plants** (2026-11-04): the food the webs were missing, each where its real place grows
+  it (`vitals::wild::WILD`, the research's "Gaps that matter for food chains"):
+  - **The tundra and taiga:** sedges and cottongrass are their grass, reindeer lichen their winter
+    food, and lingonberries, cloudberries and crowberries their fruit. The research's warmths
+    were estimates; arctic plants grow from about freezing, so they're set to, and Utqiaġvik's
+    five-degree summer grows them.
+  - **The desert:** prickly pear, its pads eaten all year and its fruit ripening July to
+    September.
+  - **The swamp and the llanos:** water hyacinth floating on shallow water, and wild rice and
+    cattails at the water's edge.
+  - **The forest:** brown mushrooms and fly agarics, hazel and brambles. Oak leaves drop acorns
+    (which plant an oak), spruce leaves pine nuts, and wild roses their hips.
+  - **The meadows and plains:** clover and wild sunflowers.
+  - **The Cretaceous** (the animals mod's blocks, placed by base's decoration): cycads, early
+    flowering shrubs and water lilies' kin.
+
+  Each grows by its form (`mods/base/src/wild.rs`):
+  - tufts and mats grazed down grow back (lichen over about ten real years);
+  - bushes ripen their fruit through four stages, as the berry bush;
+  - fruit and seed heads ripen in their season;
+  - mushrooms and water hyacinth spread near the old ones, up to five within four blocks;
+  - the rest stand.
+
+  Picking one gives what plants it again. Frost takes a bush's fruit and kills seed heads,
+  mushrooms and hyacinth. The world places them on their own roll, before the grass and flowers
+  and in the frozen north too, at the covers in `WILD`, 0.3% to 12% of their ground. Their fruit,
+  nuts and mushrooms are foods (`food::FOODS`, USDA and Fineli), and acorns, wild rice and cycad
+  seeds lie on the ground for animals (`forage::DROPPED`). The block textures are the
+  block-textures session's 32 px set (090ac91), and the item icons are the A2 set.
+- **What they changed:**
+  - **Fruit and seed feed only in the seasons they ripen** (`forage::season_lushness`), and a wild
+    plant's food counts only where the world puts it (`Source::found`).
+  - **Sedges and cottongrass are watered by rain**, so a dry season rests them as it does grass:
+    the llanos' and the Pantanal's dry winters stay lean.
+  - **The tundra feeds its plant eaters in summer:** 62% of a summer's best, from the 40%
+    browse floor.
+  - **The savanna:** 43/100/100/40% from spring to winter.
+- **Checks:** every wild plant grows where it's found, a third of its best in some season, and
+  the covers of one ground leave room for the grass (`vitals/src/wild.rs`).
 - **Not yet:**
-  - the new crops and wild plants from the research (winter wheat and rye, hardy);
+  - kelp, since the engine has no block standing in water;
+  - the trees (mesquite and pods, palms, the Cretaceous's ginkgo, araucaria, swamp cypress and
+    tree fern) and the rotten log for grubs;
+  - the crops (barley, rye, potato, maize, rice, beans and the rest);
+  - grazed and ripe looks for the tufts and seed heads (one texture for both states for now);
+  - none of it seen in the game yet;
   - unloaded plants catch up at today's season, not the season they missed.
 
 

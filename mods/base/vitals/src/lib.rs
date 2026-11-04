@@ -27,6 +27,7 @@ pub mod stamina;
 pub mod stats;
 pub mod stomach;
 pub mod temperature;
+pub mod wild;
 
 /// Ticks a second, as the game's.
 pub const TICKS: u32 = 20;

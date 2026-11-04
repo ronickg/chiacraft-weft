@@ -2,6 +2,7 @@
 //! places in every dimension whose biomes ask for them) and plants (a decoration).
 
 use base_api::CLIMATE;
+use vitals::wild;
 use weft_sdk::*;
 
 use crate::blocks::*;
@@ -14,6 +15,7 @@ pub const SEA: i32 = base_api::SEA;
 static PLANT_SOIL: Tag = Tag::named("plant_soil");
 static CACTUS_SOIL: Tag = Tag::named("cactus_soil");
 static SUGAR_CANE_SOIL: Tag = Tag::named("sugar_cane_soil");
+static SAND_TAG: Tag = Tag::named("sand");
 /// What a biome grows, as data any mod can set on any biome: trees per 5x5 cell (0..1), share of
 /// grass on plantable soil, which trees and flowers (block lists the engine checks), and tags `frozen` (nothing grows, set by
 /// `.frozen(..)`), `dry` (cacti).
@@ -352,30 +354,61 @@ fn decorate(g: &mut Gen) {
     for z in 0..16usize {
         for x in 0..16usize {
             let col = &cols[z * 16 + x];
+            let (wx, wz) = (ox + x as i32, oz + z as i32);
+            // Floating plants on still, shallow water (`wild.rs`); frozen water is ice.
+            if col.height < SEA {
+                if col.height >= SEA - WILD_WATER_DEPTH {
+                    for top in [SEA, SEA - 1] {
+                        let y = top + 1 - oy;
+                        if (1..16).contains(&y) && g.get(x, y as usize, z) == 0 && WATER.is(g.get(x, y as usize - 1, z)) {
+                            if let Some(s) = wild_at(seed, wx, wz, col.biome, wild::Ground::Water) {
+                                g.set(x, y as usize, z, s);
+                            }
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
             let y = col.height + 1 - oy;
-            if !(0..16).contains(&y) || col.height < SEA {
+            if !(0..16).contains(&y) {
                 continue;
             }
             let y = y as usize;
             if g.get(x, y, z) != 0 {
                 continue;
             }
-            let (wx, wz) = (ox + x as i32, oz + z as i32);
             let h = hash(seed ^ 0xF10, wx as i64, 0, wz as i64);
             let roll = unit(h);
             // Plants go where they could be planted (soil tags); the biome decides how many.
             let b = col.biome;
-            if FROZEN.on_biome(b) {
-                continue;
-            }
             let grass_chance = GRASS_COVER
                 .on_biome(b)
                 .unwrap_or(vitals::forage::GRASS_COVER_ELSE) as f64;
             // What is under the lowest layer takes a look at the terrain: only if anything would grow.
-            if y == 0 && roll >= grass_chance.max(0.08) {
+            if y == 0 && roll >= grass_chance.max(0.08) && wild_roll(seed, wx, wz) >= wild::MOST {
                 continue;
             }
             let below = if y == 0 { g.surface_block(wx, wz) } else { g.get(x, y - 1, z) };
+            // The wild plants first, on their own roll (`wild.rs`), in the frozen north too.
+            let shore = col.height == SEA
+                && [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                    .iter()
+                    .any(|&(dx, dz)| g.column(wx + dx, wz + dz).height < SEA);
+            let ground = if PLANT_SOIL.on_block(below) {
+                Some(if shore { wild::Ground::Shore } else { wild::Ground::Soil })
+            } else if SAND_TAG.on_block(below) {
+                Some(wild::Ground::Sand)
+            } else {
+                None
+            };
+            if let Some(s) = ground.and_then(|gr| wild_at(seed, wx, wz, b, gr)) {
+                g.set(x, y, z, s);
+                continue;
+            }
+            if FROZEN.on_biome(b) {
+                continue;
+            }
             if PLANT_SOIL.on_block(below) {
                 if roll < 0.012 {
                     let flower = FLOWERS
@@ -413,6 +446,26 @@ fn decorate(g: &mut Gen) {
             }
         }
     }
+}
+
+/// Water a floating wild plant grows on is this deep at most.
+const WILD_WATER_DEPTH: i32 = 3;
+
+/// A column's roll for the wild plants, 0 to 1.
+fn wild_roll(seed: u64, wx: i32, wz: i32) -> f32 {
+    unit(hash(seed ^ 0x3D1, wx as i64, 0, wz as i64)) as f32
+}
+
+/// The wild plant (its state) that grows on this column's `ground` in `biome`, if any
+/// (`vitals::wild::pick`).
+fn wild_at(seed: u64, wx: i32, wz: i32, biome: u32, ground: wild::Ground) -> Option<u32> {
+    let roll = wild_roll(seed, wx, wz);
+    if roll >= wild::MOST {
+        return None;
+    }
+    let i = wild::pick(name_of(abi::entry_kind::BIOME, biome), ground, roll)?;
+    let s = crate::wild::state(i);
+    (s != u32::MAX).then_some(s)
 }
 
 /// The test dimension: flat, bounded in height, nothing else.

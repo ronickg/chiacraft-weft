@@ -41,7 +41,9 @@ pub extern "C" fn alloc(len: usize) -> *mut u8 {
 ///
 /// # Safety
 /// `ptr` and `len` as `alloc` gave and was asked.
-#[unsafe(no_mangle)]
+// Exported only to the page: in a native build `free` is the C library's, which Rust refuses to
+// redefine.
+#[cfg_attr(target_arch = "wasm32", unsafe(no_mangle))]
 pub unsafe extern "C" fn free(ptr: *mut u8, len: usize) {
     unsafe { drop(Vec::from_raw_parts(ptr, len.max(1), len.max(1))) };
 }

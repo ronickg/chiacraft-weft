@@ -1,0 +1,26 @@
+[package]
+name = "chiacraft-sandbox"
+version = "0.1.0"
+edition.workspace = true
+license = "MIT"
+rust-version.workspace = true
+description = "Sandboxed code mods (chiacraft plan, phase 6): runs a package's WebAssembly component under fuel, time and memory limits, with only the calls its WIT world gives it"
+
+[dependencies]
+blake3 = "1.8"
+wasmtime = { version = "36.0.18", default-features = false, features = ["runtime", "cranelift", "component-model", "std"] }
+# Turns a mod's `wasm32-unknown-unknown` module into the component the game loads (`componentize`).
+wit-component = { version = "0.239", optional = true }
+
+[features]
+pack = ["dep:wit-component"]
+
+[[bin]]
+name = "componentize"
+required-features = ["pack"]
+
+# Runs the test mod (tests/guest, built here for wasm32-unknown-unknown) against the limits:
+# `cargo test -p chiacraft-sandbox --features pack` (needs `rustup target add wasm32-unknown-unknown`).
+[[test]]
+name = "sandbox"
+required-features = ["pack"]

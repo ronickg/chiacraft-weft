@@ -230,6 +230,53 @@ the trip ("on the way"); both added each other from the link; alice joined bob's
 Friends screen; bob gave his world a new address; alice's saved entry followed it. Test scripts:
 build scripts that contain addresses with Python, not sed (`&` in the replacement).
 
+## Phase 6, sandboxed code mods
+
+Slice 1 (server halves) is built; the design for Ronald to agree is `reports/Sandboxed code
+mods.md` (its "Decisions to agree"), the author guide `docs/sandboxed-mods.md`.
+- `crates/sandbox` (`chiacraft-sandbox`, MIT): wasmtime 36 LTS with components. `engine.rs` (the
+  engine, fuel per call kind, the 500 ms epoch watchdog, 64 MiB memory and store limits; from
+  Horizon's `horizon-mods`), `wit/v1.0/mod.wit` (API `chiacraft:mods@1.0.0`: `registry`, `world`,
+  `names`, `storage`, `command`, exported `hooks`), `lib.rs` (`Game`, the game's side of one
+  callback; `Mod::load` compiles and runs `init` once to learn the `Hook`s; `Instance`, the mod in
+  one world: started on first call, strikes, stopped after three in ten minutes; per-call counts),
+  `storage.rs` (keys checked, quotas, written beside and moved over). `componentize` (feature
+  `pack`) turns a wasm32 module into a component and loads it to check.
+- `crates/mod-sdk` (`chiacraft-mod-sdk`): the guest SDK with Weft's names (`declare_mod!`,
+  `Registry::command/on/intercept/modify/world_tick`, `ServerCommand`, `World`, `Block/Item/Entity`
+  handles looked up by name, `storage`). Depend on it as `weft_sdk = { package = "chiacraft-mod-sdk" }`.
+- Packages: `code/server.wasm` is the one code file the allow-list takes (`identity::SERVER_CODE`,
+  16 MiB). `mods/packages/src/sandboxed.rs` loads it when the package registers and turns each hook
+  into a Weft SDK registration; each callback finds the instance for its server run (the bridge's
+  new `world` question: `ServerInfo.run` and the folder) with storage in
+  `<world>/mods/packages/<id>/`. A mod's nested callbacks skip it. The engine's commands are
+  reserved. `w.tell` goes to the client as `packages:say` and shows through the client command
+  `/packages_say`. Log lines go under the package's slot (`mod:<package>`).
+- The join sheet's note no longer says packages are never code.
+- Sample `examples/wasm/clans` (the animals mod's tribes, ported: `/clan`, `/claninvite`, storage
+  by player key, tells) builds into `examples/packages/clans/code/server.wasm` (`build.sh`).
+- Tests `crates/sandbox/tests/sandbox.rs` (with `tests/guest`, built for wasm32 there: limits,
+  strikes, storage, allowances) and fuzz targets `crates/sandbox/fuzz` (`component`, `storage`)
+  are written and compile; not run here (CI; it needs `rustup target add wasm32-unknown-unknown`).
+Checked with two copies (run by the Tester session, scripts in the shared notes' `phase6/`): alice
+hosted a world with `--packages examples/packages`; bob, with no packages, was asked, downloaded
+clans (with its code) and gems, and loaded them with no error; on alice's world `/clan create
+Wolves` ran in the sandbox ("clan Wolves founded" in the log, "Clan Wolves founded." in chat), no
+strikes. The invite and join between the two weren't seen yet: the first run's scripts were out of
+step, and in the rerun bob's game froze when alice's invite reached it. That was a deadlock in
+the `packages` mod (the client's `packages:say` handler held its lock while running
+`/packages_say`, which takes it again), fixed; a second possible one (two packages on two region
+threads each waiting for the other's lock through a nested question) is avoided by nested calls
+only trying the lock. Rerun pending (Mac runs paused after the freeze).
+Slice 2 (consent marks code), after Ronald agreed the report's decisions: protocol 6, the
+`Offer` tuple's sixth field says whether the package carries `code/server.wasm`
+(`modloader::current_packages`); `download` refuses a package whose manifest says otherwise; the
+join sheet marks it (`join_sheet.code`, `OfferRow.code`). In `content::freeze_commands` a
+package's command whose name is taken is left out with a warning instead of failing the content
+build (code mods keep the old error).
+Left: components and channels in the API (slice 3), client halves (slice 4), personal mods per
+world (slice 5), `/mods` (slice 6).
+
 ## Side mods
 
 `mods/animals` (MIT, was `mods/chihuahua` until 2026-11-01, so entity ids are `animals:*` now): wild long-haired chihuahuas (a breed of the species dog: `src/dog.rs`, `source/dog/chihuahua`, `species.rs` `breed`), orange tabby cats, small packs of feathered velociraptors (two species: V. mongoliensis on grassland, the paler V. osmolskae on desert sand), groups of capybaras and rare Utahraptors on grassland (spawn rules like pigs', rarer). Cats (`src/cat.rs`) wander and now and then sit, then lie down as a loaf; their source is `source/cat` (built from research alone, see its README). Velociraptors (`src/raptor.rs`, `source/raptor`) wander and now and then rest; they don't hunt yet. Capybaras (`src/capybara.rs`, `source/capybara`) wander slowly, graze, sit and flop down. The design for taming, stats, breeding and genetics is `notes/ANIMALS.md`; its core is built (2026-11-01): every animal spawns with a wild level (1-150) as points on nine stats (`src/species.rs` per species, `src/animal.rs`), health and speed applied as attribute modifiers and damage through the attack damage chain; sneak-use one you own for the animal screen (stats, points, placing tamed points), the spyglass (`animals:spyglass`, crafted from glass and iron) shows any animal's species, sex, stage and level from 64 blocks; Wild chihuahuas, cats and capybaras are tamed by feeding them when they ask (a bubble with the food above them; favorites and kibble tame faster, mistakes lower effectiveness, a clean tame gives bonus levels; `src/taming.rs`). Tames take commands (follow, stay, wander, guard) and stances (passive, neutral, aggressive, assist) from the animal screen, plain right click (follow/stay) and whistle keys (J follow, K stay, H come, G attack, B passive); tribes (`/tribe`, `/tribeinvite`) share tames (`src/commands.rs`). Signatures (`src/signatures.rs`): chihuahuas bark at and mark monsters and track animals by their drops, cats bring gifts, capybaras calm the animals around them. Raptors are tamed by knocking them out (clubs, tranquilizer darts, sedatives; `src/knockout.rs`) and feeding them while out; wild ones fight back in packs. Saddled tame Utahraptors (`src/utahraptor.rs`, `source/utahraptor`: the mount, 1.5 m at the hip; Velociraptors are too small to ride) can be ridden: the engine now has riding (`World::mount`, held keys, a seated pose; docs/modding.md), steered by the mod (`src/riding.rs`). `/animal [show|tame|points N|wild|here]` for testing.
