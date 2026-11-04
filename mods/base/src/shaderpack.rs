@@ -85,6 +85,7 @@ pub fn register_shafts(r: &mut Registry) {
         let effects = [
             ("reflect", !option("no-reflect"), 1.0),
             ("contact", !option("no-contact"), 1.0),
+            ("volume", !option("no-volume"), 1.0),
             ("shafts", !option("no-shafts"), if option("shafts-debug") { 2.0 } else { 1.0 }),
             ("bloom", !option("no-bloom"), 1.0),
         ];
