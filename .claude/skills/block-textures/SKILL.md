@@ -74,9 +74,14 @@ deep shade of the block's own colour (never black), restrained highlights, top-l
    replaces the texture of the same name and removes its old random variants and connected
    rules (`<name>.ctm`, `<name>/`), which would show as patches. A new block's texture still
    needs the block registered (`mods/base/src/blocks.rs`, `.texture("name")`).
-8. **In the game**: `./target/release/weft --world <fresh name> --script notes/blocks/scene.txt
-   --shot-dir "$PWD/notes/blocks/preview"` builds a test patch (stone, cobble, mossy cobble, dirt,
-   sand, gravel, three logs, an oak) and shoots it. Copy and change it for other blocks.
+8. **In the game**: `notes/blocks/scene.txt` builds a test patch (stone, cobble, mossy cobble,
+   dirt, sand, gravel, three logs, an oak) and shoots it; `scene_all.txt` shows every block. Copy
+   and change one for other blocks. **Don't launch the game yourself** (Ronald's rule since
+   2026-11-04: two games at once or one GPU stall can restart the Mac). Build the binary
+   (`cargo build --release`), then SendMessage the session "Test sessions for all sessions"
+   with the dir holding `target/release/weft`, the script's absolute path, a fresh world name,
+   what to look at (the shots), and that it changes no rendering or shaders (texture swaps
+   don't). It runs games one at a time and sends back the verdict and the log path.
 9. **Approve**: add the approved tiles to `approved.txt`; they become part of the style key.
    Commit the tiles, the batch and the game textures together, one family a commit.
 

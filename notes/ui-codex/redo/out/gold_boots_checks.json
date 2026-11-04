@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a pair of ornate lemon-gold plate with orange-brown shadows and red cloth boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.413,
+   "outline": 0.44,
+   "red_line": 0.18,
+   "fill": 0.56,
+   "passed": true
+  }
+ ]
+}

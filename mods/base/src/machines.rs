@@ -203,7 +203,8 @@ fn tick_furnaces(b: &mut SystemBatch<Smelting>) {
             s.cook += 1;
             if s.cook >= s.cook_max {
                 s.cook = 0;
-                input_slot.set(0, input.shrink(1));
+                // The last one leaves its remainder: a water bucket boiled to salt, the bucket.
+                input_slot.set(0, use_one(input));
                 let merged = if output.is_empty() { out } else { output.grow(out.count) };
                 output_slot.set(0, merged);
                 w.emit(&SMELTED, Smelted { furnace: id, input: input.item, output: out });

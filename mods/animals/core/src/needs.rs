@@ -31,9 +31,7 @@ pub const STARVES_SECS: f32 = 1200.0;
 /// grown masses (farm animals aren't here: they don't come and go with the seasons).
 pub fn prey_in<'a>(hunter: &'a Species, biome: &'a str) -> impl Iterator<Item = &'static Species> + 'a {
     SPECIES.iter().filter(move |o| {
-        o.family.name != hunter.family.name
-            && hunter.takes(hunter.bio.mass, o.bio.mass)
-            && o.habitats.iter().any(|&(b, _)| b == biome)
+        o.family.name != hunter.family.name && hunter.takes(hunter.bio.mass, o.bio.mass) && o.habitats.iter().any(|&(b, _)| b == biome)
     })
 }
 

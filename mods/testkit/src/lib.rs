@@ -6,6 +6,7 @@
 //! run go to `run/test-shots/` for looking at; checks never compare pictures with references.
 //! `--test all` runs several at once, `--jobs 1` one by one, `--jobs N` for a number; see the game's `main`.
 //! `--test-keep` keeps the test worlds. `weft --world w --script file.txt` runs a line script (see `script.rs`).
+//! With `TESTKIT_CI=1` (CI's software Vulkan) what `ci-skip.txt` names is left out, by name.
 //! Without those options the mod only registers its message channels.
 
 mod runner;
@@ -72,6 +73,23 @@ fn init(r: &mut Registry) {
 
 /// Tests of how quick the game is, which other processes on the machine would fail.
 const ALONE: &[&str] = &["edit_while_loading", "skiff_smooth"];
+
+/// What CI leaves out (`ci-skip.txt`: a test, `test/scenario` or `test/check` and why), only with
+/// `TESTKIT_CI=1`: software rendering draws a few frames a second, and these count on more.
+pub fn ci_skip(name: &str) -> Option<&'static str> {
+    static ON: OnceLock<bool> = OnceLock::new();
+    if !*ON.get_or_init(|| std::env::var("TESTKIT_CI").is_ok_and(|v| v == "1")) {
+        return None;
+    }
+    include_str!("../ci-skip.txt")
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .find_map(|l| {
+            let (n, why) = l.split_once(char::is_whitespace).unwrap_or((l, ""));
+            (n == name).then(|| why.trim())
+        })
+}
 
 /// Builds the queue on the main thread, where the runner lives.
 /// Same conditions on every machine and for every test, whatever the one before left behind (a
@@ -163,6 +181,13 @@ fn start(c: &Client) {
         }
         None => queue,
     };
+    queue.retain(|t| match ci_skip(&t.name) {
+        Some(why) => {
+            runner::skip(&t.name, why);
+            false
+        }
+        None => true,
+    });
     if warm {
         queue.splice(0..0, crate::tests![tests::warm_up]);
     }

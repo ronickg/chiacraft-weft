@@ -220,9 +220,113 @@ The smallest version that works is phases 1-4.
 4. **DIDs and achievements.** Player and world DIDs through sponsors; world ownership both ways;
    achievements signed by the world DID, anchored in batches, opt-in; profile view; admission
    rules (allow lists, probation, DID age, achievements); shared ban lists.
+   Slices (agreed 2026-11-03, the open points answered as recommended through Planner: the
+   sponsor speaks iroh; ours runs on this Mac from the throwaway testnet11 wallets; it launches
+   world DIDs too, with the owner's DID and the world key written in at launch, at most one player
+   DID and 8 world DIDs per identity a day, and a few test mojos where testnet needs a fee;
+   `testnet11` is the default chain; mainnet stays off). What is already there: `crates/wallet` reads
+   DIDs from the chain, launches them for others and makes its own (`chain/did.rs`,
+   `chain/sponsor.rs`, `chain/reader.rs`), signs as a DID's owner (`OwnerSigner`) and keeps a
+   linked DID in `accounts.json` (`DidLink`); Horizon's sponsor service (`horizon-sponsor`: queue,
+   batches, daily budget, per-IP limit, a log replayed at start, no secret in its output) ran live
+   on testnet11 on 2026-10-30 from throwaway wallets kept in `~/chiacraft-testnet/`. Bans and
+   admission don't need the chain and come first, so they can be tried while the DID slices land.
+   1. *Admission rules per world* (built, seen working between two games 2026-11-04): `admission.json` in the world folder, read at every
+      join (no restart), set by the owner from the pause menu's "Who May Come In" screen and by
+      commands (`/allow`, `/probation`). Rules,
+      all of which must pass: open, or only the allow list (by login key, identity or DID);
+      probation for newcomers (see below); DID required and DID at least N days old (slice 6:
+      `/didrule`, and on the same screen). The owner and operators always get in.
+      Default: open, no probation (rule 2). A refusal is a translation key with its arguments, shown
+      on the joining player's screen. The world's status answer carries a summary ("allow list",
+      "DID 30 days or older"), so the Multiplayer screen shows it before joining. The dedicated
+      server reads the same file; its `whitelist.txt` becomes the allow list.
+      **Probation:** a player new to the world can't break or place blocks or open containers
+      (proposed default) until they have played there for N hours (owner's number, 0 = off) or the
+      owner lifts it (`/probation end <player>`); the owner picks which of the three apply.
+   2. *Bans* (built, seen working): `bans.json` in the world: entries by login key, identity or DID, each
+      with a reason, who banned, when and an optional end. `/ban <player|key|did:chia:1…>
+      [duration] [reason]`, `/unban`, `/bans`; banning someone online bans their login key,
+      identity and proven DID together and disconnects them; a banned DID refuses every identity
+      that proves it. The same screen lists and lifts them. Probation and DID age are what
+      make a ban stick: a new identity has no old DID and starts on probation.
+   3. *Shared ban lists* (built, seen working): a list is a JSON document signed by its
+      maintainer's identity key (a sequence number, entries with reasons). Any world that holds
+      it serves it over iroh (`chiacraft/bans/1` on the world's own key; signed, so any copy is as
+      good as the original). A world follows a list by a world's address (`/banlist follow
+      <address>`: that world's owner's list, the owner taken from its certificate) or by
+      maintainer key, fetches it then and daily while open, and applies its entries as bans, its
+      own allow list winning. `/banlist publish` signs the world's bans for good as the owner's
+      list. Never on by default. Not yet: lists from a URL.
+   4. *The chain in the game* (built 2026-11-04, `chiacraft/chain.rs`): the engine links the
+      wallet with `chain`. One chain reader per game or server, started only when something needs
+      it (getting, linking or checking a DID), on the network the setting `core:chain` names: `off`, `testnet11` (the default while we test)
+      or `mainnet` (only after Ronald's yes, and a confirmation in the game); peers from the DNS
+      introducers or the setting's own nodes; its cache in the run folder. Never in the game loop.
+   5. *The sponsor and the account's DID*: `horizon-sponsor` ported as `crates/sponsor`
+      (`chiacraft-sponsor`, not a default member), speaking **iroh** instead of HTTP: ALPN
+      `chiacraft/sponsor/1` on its own key, the same JSON and the same signed request (the
+      wallet's `sponsor.rs`), so anyone can run one at home with no domain, TLS certificate or open
+      port; HTTP stays an option for a web page. Setting `chiacraft:sponsors`: sponsor addresses,
+      tried in order; the default is ours. Ours runs on testnet11 from the throwaway sponsor
+      wallet. Account screen: "Get a DID" asks a sponsor to launch one to the account's first
+      wallet address (so Sage shows it after importing the words), shows it pending until the
+      chain has it (about a minute; the launcher id is saved, so a restart keeps waiting), then
+      links it (`DidLink`); "Link a DID I have" finds one these words hold (`OwnerSigner::find`).
+      A sponsor gives each identity one player DID and up to 8 world DIDs a day.
+   6. *The join proves the DID* (built 2026-11-04, not yet seen on testnet11): beside the identity's vouching for the login key, the join
+      carries the DID's launcher id, its owner key and that key's signature of `chiacraft did v1
+      <launcher> <identity>`. It needn't name the session: the identity is already bound to the
+      login key the connection proved, so a replay only proves the same link again. The world
+      checks the signature, then on chain that the DID's current owner is that key's address
+      (cached per DID and followed, so a transfer is seen; without the chain: the cache, else
+      "unverified", which DID rules treat as no DID). The check runs on a thread of its own; a
+      join waits for it (25 s at most) only when the world's rules ask for a DID. A DID's age is
+      the chain's height since its launch (4,608 blocks a day). The DID rules of slice 1 start
+      counting, and a ban by DID refuses whoever proves it.
+   7. *World DIDs, ownership both ways*: a world can get a DID from a sponsor, launched to the
+      owner's address, so the DID stays in the owner's wallet and the world holds only its key.
+      Its metadata names the owner's DID and the world's current key and generation, set at
+      launch (the player spends nothing). The owner's DID lists its worlds in its metadata (one
+      spend of the owner's DID per world added; fee 0 on mainnet while the mempool isn't full). A
+      world counts as the DID's only when both say so. The status answer and the address
+      (`d=`) carry the world DID; saved worlds and links show it; giving a world a new address
+      updates its DID (one spend). The account's certificate of the world key stays as it is.
+   Done when: a player has a DID made through our sponsor, their world and their DID point at
+   each other, and a world owner sets admission rules and bans players, seen between two games
+   or a game and a headless server, on testnet11. Then achievements (signed by the world DID) and
+   the profile view; the admission rule "has achievement X" comes with them.
 5. **Finding worlds.** On-chain listing by hint; DIG listings and curated lists; spam ranking.
 6. **Sandboxed code mods.** wasmtime with components (from `horizon-mods`), WIT v1.0 shaped on
    Weft's SDK, server halves then client halves, frozen API versions; personal mods per world.
+   Decided 2026-11-03 (`reports/Sandboxed code mods.md`, "Decisions": Ronald took its
+   recommendations): wasmtime 36 LTS components with the host in our crates and WIT v1.0 frozen
+   once released; code at `code/server.wasm` inside the package; the limits and strikes below;
+   server halves on the host only; Weft mods port through the `weft_sdk` alias; a package's
+   command that clashes is left out and the world still opens; one consent sheet that marks code.
+   In slices:
+   1. *Server halves* (built): `crates/sandbox` (wasmtime 36 LTS components, fuel per call, a
+      500 ms epoch watchdog, 64 MiB memory, per-call counts, storage quotas, three strikes stop a
+      mod in a world), API `chiacraft:mods@1.0.0` (`crates/sandbox/wit/v1.0`, frozen once
+      released), the guest SDK `crates/mod-sdk` with Weft's SDK names (commands, events,
+      questions, chains, world ticks, `World`, handles; storage instead of components). A
+      package carries it as `code/server.wasm`, under its hash and signature; the `packages` mod
+      registers its hooks through Weft's SDK and runs it per world run on the host only, with
+      storage in the world's save. Sample: `clans` (the animals mod's tribes, ported). Author
+      guide `docs/sandboxed-mods.md`.
+   2. *Consent says it is code* (built): protocol 6 offers say whether a package carries code,
+      the join sheet marks it ("runs sandboxed code"), and a package whose manifest says otherwise
+      is refused; a package's clashing command is left out instead of failing the world.
+   3. *More of the SDK* (1.1 built): API 1.1 adds per-entity components, `set_blocks`, sounds
+      and particles, and imports are checked at load; the host binds the newest 1.x and runs
+      every older one (1.x only adds; wasmtime matches by semver). Sample `tally`. Next, 1.2:
+      block and item callbacks, channels, gizmos.
+   4. *Client halves*: `code/client.wasm`, client calls only (HUD, screens, keys, channels to its
+      server half), a frame budget.
+   5. *Personal mods per world*: the player's own client halves, allowed or not by each world's
+      owner.
+   6. *Operations*: `/mods` (cost, strikes, resume), cached compiled components, a per-tick budget
+      across mods.
 7. **Headless server and administration.** No window or GPU (Weft's CPU terrain path),
    `server.toml`, console, operators and command permissions (today any player can `/give`),
    movement checks, our own relay, load tests (`horizon-bots`).

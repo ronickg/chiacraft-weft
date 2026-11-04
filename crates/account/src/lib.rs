@@ -22,7 +22,7 @@ use std::sync::{Arc, OnceLock};
 
 use chiacraft_wallet::accounts::env_passphrase;
 use chiacraft_wallet::sign::network_link_text;
-use chiacraft_wallet::{AccountInfo, Accounts, IdentitySigner, Mnemonic, Secret, Signer, StoreChoice};
+use chiacraft_wallet::{AccountInfo, Accounts, DidLink, IdentitySigner, Mnemonic, OwnerSigner, Secret, Signer, StoreChoice};
 
 /// The OS keystore's service name for chiacraft's accounts.
 pub const SERVICE: &str = "chiacraft";
@@ -36,6 +36,11 @@ pub struct Session {
     pub info: AccountInfo,
     pub signer: Arc<IdentitySigner>,
     network: Secret<[u8; 32]>,
+    /// The key that holds the linked DID (phase 4), derived when the account opens or a DID is
+    /// linked; it signs the join's DID proof and nothing else.
+    owner: parking_lot::Mutex<Option<Arc<OwnerSigner>>>,
+    /// The hardened wallet addresses' puzzle hashes (Sage derives both branches), for the chain.
+    pub hardened: Vec<[u8; 32]>,
 }
 
 impl std::fmt::Debug for Session {
@@ -92,6 +97,13 @@ impl Session {
         Ok(chiacraft_wallet::keys::hex(&sig))
     }
 
+    /// The identity key's signature of one of chiacraft's own texts (`text` must start with
+    /// `chiacraft `), hex: shared ban lists and other documents a player publishes.
+    pub fn sign_text(&self, text: &str) -> Result<String, String> {
+        let sig = self.signer.sign(text).map_err(|e| e.to_string())?;
+        Ok(chiacraft_wallet::keys::hex(&sig))
+    }
+
     /// The identity key, hex: the player's identity on every world.
     pub fn identity_hex(&self) -> String {
         self.signer.identity().hex()
@@ -115,6 +127,77 @@ impl Session {
                 None
             }
         }
+    }
+
+    /// The linked DID, if any.
+    pub fn did(&self) -> Option<DidLink> {
+        self.fresh_info().did
+    }
+
+    /// The puzzle hash of the account's first wallet address: where a sponsor launches its DID
+    /// (what Sage shows first after importing the words).
+    pub fn first_puzzle_hash(&self) -> Option<[u8; 32]> {
+        chiacraft_wallet::keys::wallet_puzzle_hash(&self.info.master_key()?, 0).ok()
+    }
+
+    /// The puzzle hashes of the account's first `count` wallet addresses, unhardened then
+    /// hardened: what the chain reader follows.
+    pub fn puzzle_hashes(&self, count: u32) -> Vec<[u8; 32]> {
+        let mut out = self
+            .info
+            .master_key()
+            .and_then(|m| chiacraft_wallet::keys::wallet_puzzle_hashes(&m, count).ok())
+            .unwrap_or_default();
+        out.extend(self.hardened.iter().take(count as usize));
+        out
+    }
+
+    /// A request to a DID sponsor for a DID at `address` (the account's first, on `network`),
+    /// signed by the identity key now.
+    pub fn sponsor_request(&self, network: &str, address: &str) -> Result<chiacraft_wallet::sponsor::Request, String> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        chiacraft_wallet::sponsor::Request::sign(&*self.signer, network, address, now).map_err(|e| e.to_string())
+    }
+
+    /// Link the DID `launcher` held at the wallet address whose puzzle hash is `owner` (one of
+    /// this account's first 20, either branch): the account remembers it and signs join proofs
+    /// with that address's key from now on.
+    pub fn link_did(&self, launcher: [u8; 32], owner: [u8; 32]) -> Result<DidLink, String> {
+        let mnemonic = self
+            .accounts()?
+            .reveal(self.info.fingerprint, env_passphrase())
+            .map_err(|e| format!("reading the words: {e}"))?;
+        let signer = OwnerSigner::find(&mnemonic, owner, 20).ok_or("that DID isn't held by one of this account's addresses")?;
+        let link = DidLink { launcher: chiacraft_wallet::keys::hex(&launcher), index: signer.index(), hardened: signer.hardened() };
+        self.accounts()?
+            .set_did(self.info.fingerprint, Some(link.clone()))
+            .map_err(|e| e.to_string())?;
+        *self.owner.lock() = Some(Arc::new(signer));
+        log::info!("DID {} linked to account {}", short_hex(&link.launcher), self.info.fingerprint);
+        Ok(link)
+    }
+
+    /// Forget the linked DID (it stays on chain, held by the same address).
+    pub fn unlink_did(&self) -> Result<(), String> {
+        self.accounts()?
+            .set_did(self.info.fingerprint, None)
+            .map_err(|e| e.to_string())?;
+        *self.owner.lock() = None;
+        Ok(())
+    }
+
+    /// The join's DID proof: `<launcher hex>:<owner key hex>:<signature hex>`, the owner key
+    /// signing [`chiacraft_wallet::sign::did_link_text`]. None without a linked DID.
+    pub fn did_proof(&self) -> Option<String> {
+        let did = self.did()?;
+        let owner = self.owner.lock().clone()?;
+        let sig = owner
+            .sign(&chiacraft_wallet::sign::did_link_text(&did.launcher, &self.identity_hex()))
+            .ok()?;
+        Some(format!("{}:{}:{}", did.launcher, chiacraft_wallet::keys::hex(&owner.public()), chiacraft_wallet::keys::hex(&sig)))
     }
 
     fn accounts(&self) -> Result<Accounts, String> {
@@ -214,6 +297,36 @@ pub fn check_world_moved(identity: &str, from: &str, to: &str, generation: u32, 
     chiacraft_wallet::sign::verify_world_moved(&id, from, to, generation, &sig)
 }
 
+/// Whether `sig` (hex) is the identity `identity`'s (hex) signature of `text` ([`Session::sign_text`]).
+pub fn check_text(identity: &str, text: &str, sig: &str) -> bool {
+    let (Some(id), Some(sig)) = (chiacraft_wallet::IdentityKey::from_hex(identity), chiacraft_wallet::keys::from_hex(sig)) else {
+        return false;
+    };
+    chiacraft_wallet::sign::verify(&id, text.as_bytes(), &sig)
+}
+
+/// A world's check of a joining player's [`Session::did_proof`] for `identity` (hex): the DID's
+/// launcher id and the puzzle hash of the address whose key signed, when the signature holds.
+/// Whether that address holds the DID now is for the chain to say.
+pub fn check_did_proof(line: &str, identity: &str) -> Option<([u8; 32], [u8; 32])> {
+    let mut parts = line.split(':');
+    let (launcher, owner, sig) = (parts.next()?, parts.next()?, parts.next()?);
+    let launcher_bytes: [u8; 32] = chiacraft_wallet::keys::from_hex(launcher)?
+        .try_into()
+        .ok()?;
+    let owner_key: [u8; 48] = chiacraft_wallet::keys::from_hex(owner)?.try_into().ok()?;
+    let sig = chiacraft_wallet::keys::from_hex(sig)?;
+    let text = chiacraft_wallet::sign::did_link_text(&chiacraft_wallet::keys::hex(&launcher_bytes), identity);
+    if !chiacraft_wallet::sign::verify_owner(&owner_key, text.as_bytes(), &sig) {
+        return None;
+    }
+    Some((launcher_bytes, chiacraft_wallet::keys::p2_of_synthetic(&owner_key)?))
+}
+
+fn short_hex(h: &str) -> String {
+    h.chars().take(12).collect()
+}
+
 pub fn check_vouch(line: &str, endpoint: &str) -> Option<String> {
     let (identity, sig) = line.split_once(':')?;
     let key = chiacraft_wallet::IdentityKey::from_hex(identity)?;
@@ -277,7 +390,15 @@ fn start(run_dir: &Path) -> Result<Session, String> {
         })?;
     let network = unlocked.signer.network_seed();
     log::info!("account {} open, identity {}", unlocked.info.fingerprint, unlocked.info.identity);
-    Ok(Session { home, choice, info: unlocked.info, signer: unlocked.signer, network })
+    Ok(Session {
+        home,
+        choice,
+        info: unlocked.info,
+        signer: unlocked.signer,
+        network,
+        owner: parking_lot::Mutex::new(unlocked.did),
+        hardened: unlocked.hardened,
+    })
 }
 
 #[cfg(test)]
@@ -302,6 +423,22 @@ mod tests {
         assert_eq!(check_vouch(&line, "abc"), Some(first.identity_hex()));
         assert_eq!(check_vouch(&line, "abd"), None);
         assert_eq!(check_vouch("nonsense", "abc"), None);
+        let sig = first.sign_text("chiacraft ban list v1\nx").unwrap();
+        assert!(check_text(&first.identity_hex(), "chiacraft ban list v1\nx", &sig));
+        assert!(!check_text(&first.identity_hex(), "chiacraft ban list v1\ny", &sig));
+        assert!(first.sign_text("not ours").is_err());
+        // A DID held at the account's first address: linked, and the proof checks out for this
+        // identity only.
+        let owner = first.first_puzzle_hash().unwrap();
+        let launcher = [7u8; 32];
+        assert!(first.did_proof().is_none());
+        first.link_did(launcher, owner).unwrap();
+        let proof = first.did_proof().unwrap();
+        assert_eq!(check_did_proof(&proof, &first.identity_hex()), Some((launcher, owner)));
+        assert_eq!(check_did_proof(&proof, &"ab".repeat(48)), None);
+        assert!(first.link_did(launcher, [1u8; 32]).is_err());
+        first.unlink_did().unwrap();
+        assert!(first.did_proof().is_none());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

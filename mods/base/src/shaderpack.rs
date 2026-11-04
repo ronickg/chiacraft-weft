@@ -10,8 +10,8 @@
 use std::path::Path;
 use std::sync::Once;
 
-use weft_sdk::*;
 use weft_sdk::settings::SHADER_PACK;
+use weft_sdk::*;
 
 pub const ID: &str = "chiacraft";
 
@@ -26,7 +26,8 @@ const FILES: [(&str, &str); 6] = [
     ("weather.wgsl", include_str!("../shaderpack/weather.wgsl")),
 ];
 
-const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\n";
+// Water writes depth, so the reflections effect finds its surface.
+const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\ntranslucent_depth = true\nsun_shadows = true\n";
 
 /// Only `--shader-pack <id>` (a script checking a look; tests reset packs when they start, so
 /// it is turned on after that), `--shader-pack-after <secs>` seconds into the run (0 by
@@ -38,11 +39,18 @@ pub fn register_for_scripts(r: &mut Registry) {
     static TIMES: AtomicU32 = AtomicU32::new(0);
     r.client_frame(|c| {
         let Some(pack) = weft_sdk::client::launch_option("shader-pack") else { return };
-        let after: f32 = weft_sdk::client::launch_option("shader-pack-after").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+        let after: f32 = weft_sdk::client::launch_option("shader-pack-after")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0.0);
         if c.state().flags & weft_sdk::client::client_flags::JOINED == 0 {
             return;
         }
-        if STARTED.get_or_init(std::time::Instant::now).elapsed().as_secs_f32() < after {
+        if STARTED
+            .get_or_init(std::time::Instant::now)
+            .elapsed()
+            .as_secs_f32()
+            < after
+        {
             return;
         }
         // The testkit turns packs off when a test begins, which on a slow start comes after the
@@ -55,8 +63,11 @@ pub fn register_for_scripts(r: &mut Registry) {
     });
 }
 
-/// The pack's light shafts (`assets/shaders/post/shafts.wgsl`, a screen effect: packs cannot
-/// add passes): on while chiacraft's pack is the one chosen, off with any other or none.
+/// The pack's screen effects (`assets/shaders/post/`: packs cannot add passes), on while
+/// chiacraft's pack is the one chosen, off with any other or none: water reflections first (only
+/// the first effect sees the water in the image's alpha), contact shadows, then the light shafts.
+/// `--no-reflect`, `--no-contact` and `--no-shafts` leave one out (a script comparing the look),
+/// `--shafts-debug` shows what the shafts see.
 pub fn register_shafts(r: &mut Registry) {
     use std::sync::atomic::{AtomicBool, Ordering};
     static ON: AtomicBool = AtomicBool::new(false);
@@ -66,13 +77,20 @@ pub fn register_shafts(r: &mut Registry) {
             ON.store(false, Ordering::Relaxed);
             return;
         }
-        // `--no-shafts`: a script comparing the look with and without them.
-        let want = SHADER_PACK.get() == ID && weft_sdk::client::launch_option("no-shafts").is_none();
-        if ON.swap(want, Ordering::Relaxed) != want {
-            // `--shafts-debug`: the effect shows what it sees instead (`shafts.wgsl`).
-            let on = if weft_sdk::client::launch_option("shafts-debug").is_some() { 2.0 } else { 1.0 };
-            let known = c.post_effect("shafts", if want { on } else { 0.0 });
-            weft_sdk::info!("light shafts {}{}", if want { "on" } else { "off" }, if known { "" } else { " (no such effect)" });
+        let want = SHADER_PACK.get() == ID;
+        if ON.swap(want, Ordering::Relaxed) == want {
+            return;
+        }
+        let option = |name: &str| weft_sdk::client::launch_option(name).is_some();
+        let effects = [
+            ("reflect", !option("no-reflect"), 1.0),
+            ("contact", !option("no-contact"), 1.0),
+            ("shafts", !option("no-shafts"), if option("shafts-debug") { 2.0 } else { 1.0 }),
+        ];
+        for (name, allowed, strength) in effects {
+            let on = want && allowed;
+            let known = c.post_effect(name, if on { strength } else { 0.0 });
+            weft_sdk::info!("screen effect {name} {}{}", if on { "on" } else { "off" }, if known { "" } else { " (no such effect)" });
         }
     });
 }
@@ -93,12 +111,16 @@ pub fn register(r: &mut Registry) {
 fn install(c: &Client) {
     let dir = Path::new(&c.run_dir()).join("shaderpacks").join(ID);
     let offered = dir.join(".offered");
-    let automated = ["test", "script"].iter().any(|o| weft_sdk::client::launch_option(o).is_some());
+    let automated = ["test", "script"]
+        .iter()
+        .any(|o| weft_sdk::client::launch_option(o).is_some());
     if let Err(e) = std::fs::create_dir_all(&dir) {
         weft_sdk::warn!("shader pack: {}: {e}", dir.display());
         return;
     }
-    let mut changed = false;
+    // New files matter only to the pack in use; a reload for nothing is a risk (a reload while the
+    // world's first terrain is still being built hung a GPU, 2026-11-04).
+    let mut files_changed = false;
     let files = FILES
         .iter()
         .map(|(name, src)| (*name, format!("{LOOK}\n{src}")))
@@ -107,11 +129,12 @@ fn install(c: &Client) {
         let path = dir.join(name);
         if std::fs::read_to_string(&path).ok().as_deref() != Some(text.as_str()) {
             match std::fs::write(&path, &text) {
-                Ok(()) => changed = true,
+                Ok(()) => files_changed = true,
                 Err(e) => weft_sdk::warn!("shader pack: {}: {e}", path.display()),
             }
         }
     }
+    let mut changed = files_changed && SHADER_PACK.get() == ID;
     // `--shader-pack <id>` picks one for this run (a script checking the look).
     if let Some(pack) = weft_sdk::client::launch_option("shader-pack") {
         if SHADER_PACK.get() != pack {

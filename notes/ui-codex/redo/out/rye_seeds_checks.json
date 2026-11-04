@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a small heap of seeds: slender grey-green rye grains on a tiny patch of dark soil, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.25,
+   "outline": 0.82,
+   "red_line": 0.05,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

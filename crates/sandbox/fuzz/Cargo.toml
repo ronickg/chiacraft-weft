@@ -1,0 +1,50 @@
+[package]
+name = "chiacraft-sandbox-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license = "MIT"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+# `pack`: the hostile target turns its mod into a component.
+chiacraft-sandbox = { path = "..", features = ["pack"] }
+
+# Its own workspace: built only by `cargo fuzz` (nightly), never by the game's builds. The
+# hostile target's mod (`hostile-guest`) is a workspace of its own too.
+[workspace]
+members = ["."]
+exclude = ["hostile-guest"]
+
+# Someone else's component: loading never panics, whatever the bytes. Seed the corpus with a real
+# one: `mkdir -p corpus/component && cp ../../../examples/packages/clans/code/server.wasm corpus/component/`.
+[[bin]]
+name = "component"
+path = "fuzz_targets/component.rs"
+test = false
+doc = false
+bench = false
+
+# A mod's storage calls: quotas hold and nothing lands outside its folder.
+[[bin]]
+name = "storage"
+path = "fuzz_targets/storage.rs"
+test = false
+doc = false
+bench = false
+
+# A hostile mod (`hostile-guest`, built for wasm32-unknown-unknown on first run) runs each input as
+# a program of API 1.0 calls with the worst arguments it finds, some in loops past every cap. The
+# game it calls asserts what the sandbox promises to keep from it: finite positions, pushes within
+# ±10, damage finite and 0 to 1e6, `near` within 64, and per call at most 32 lines, 32 replies,
+# 4096 block changes and 64 spawns, lines with keys of 128 bytes, 16 arguments, texts of 1024.
+# Needs `rustup +nightly target add wasm32-unknown-unknown`.
+[[bin]]
+name = "hostile"
+path = "fuzz_targets/hostile.rs"
+test = false
+doc = false
+bench = false

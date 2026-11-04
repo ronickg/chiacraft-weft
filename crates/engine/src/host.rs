@@ -249,6 +249,7 @@ pub static HOST: Host = Host {
     dim_column,
     dim_carved,
     dim_surface,
+    entity_tick_elapsed,
 };
 
 unsafe extern "C" fn fall_block(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u64 {
@@ -343,6 +344,16 @@ unsafe extern "C" fn navigate(w: *mut abi::WorldCtx, id: u64, target: *const [f6
 
 unsafe extern "C" fn navigating(w: *mut abi::WorldCtx, id: u64) -> u32 {
     unsafe { dim(w).entities.get(id).is_some_and(|e| e.nav.is_some()) as u32 }
+}
+
+unsafe extern "C" fn entity_tick_elapsed(w: *mut abi::WorldCtx, id: u64) -> u32 {
+    unsafe {
+        let d = dim(w);
+        d.entities
+            .get(id)
+            .filter(|e| e.ticked_at > 0)
+            .map_or(1, |e| d.time.saturating_sub(e.ticked_at).clamp(1, u32::MAX as u64) as u32)
+    }
 }
 
 unsafe extern "C" fn biome_at(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u32 {
@@ -2235,7 +2246,9 @@ unsafe extern "C" fn set_air(
                 std::slice::from_raw_parts(snow, n),
                 std::slice::from_raw_parts(flags, n),
             );
-            (0..n).map(|i| (b[i], f[i].clamp(0.0, 1.0), s[i].max(0.0), sn[i].clamp(0.0, 1.0), fl[i])).collect()
+            (0..n)
+                .map(|i| (b[i], f[i].clamp(0.0, 1.0), s[i].max(0.0), sn[i].clamp(0.0, 1.0), fl[i]))
+                .collect()
         };
         d.events
             .push(crate::server::DimEvent::SetAir { dim: d.id, air, heading });
@@ -2246,7 +2259,12 @@ unsafe extern "C" fn air_at(w: *mut abi::WorldCtx, pos: *const [i32; 3], out: *m
     unsafe {
         let d = dim(w);
         let biome = biome_at(w, pos);
-        let found = d.air.0.binary_search_by_key(&biome, |a| a.0).ok().map(|i| d.air.0[i]);
+        let found = d
+            .air
+            .0
+            .binary_search_by_key(&biome, |a| a.0)
+            .ok()
+            .map(|i| d.air.0[i]);
         *out = found.map_or([0.0; 4], |a| [a.1, a.2, a.3, a.4 as f32]);
         (!d.air.0.is_empty()) as u32
     }

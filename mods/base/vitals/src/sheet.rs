@@ -7,7 +7,7 @@ use std::fmt::Write;
 use crate::effects;
 use crate::food::{self, NUTRIENT_NAMES};
 use crate::stats::{self, Growth};
-use crate::{air, calendar, climate, difficulty, forage, levels, plants, soil, temperature};
+use crate::{air, calendar, climate, clothing, difficulty, forage, levels, meals, plants, preserve, soil, temperature, wild};
 
 pub fn markdown() -> String {
     let mut w = String::new();
@@ -18,9 +18,12 @@ pub fn markdown() -> String {
     );
     stats_table(&mut w);
     foods(&mut w);
+    cooking(&mut w);
+    clothes(&mut w);
     effects_table(&mut w);
     climates(&mut w);
     plant_table(&mut w);
+    wild_table(&mut w);
     forage_table(&mut w);
     soil_table(&mut w);
     difficulties(&mut w);
@@ -38,6 +41,16 @@ fn stats_table(w: &mut String) {
         let _ = writeln!(w, "| {name} | {} | {point} |", stats::PLAYER_BASE[i]);
     }
     let _ = writeln!(w, "\nComfortable air for a person, unclothed: {:?} °C.\n", temperature::PERSON);
+    let arrival = crate::stomach::arrival();
+    let cap = stats::PLAYER_BASE[stats::Stat::Food.index()];
+    let (health, stamina) = crate::stomach::max_health_stamina(100.0, 100.0, &arrival, cap);
+    let _ = writeln!(
+        w,
+        "A new player arrives with {} in the stomach ({:.0} units): max health {health:.0} and stamina {stamina:.0} of 100, wearing off as it digests (an empty stomach: {:.0}).\n",
+        crate::stomach::ARRIVAL.join(" and "),
+        arrival.used(),
+        crate::stomach::FLOOR * 100.0
+    );
 }
 
 fn foods(w: &mut String) {
@@ -73,6 +86,73 @@ fn foods(w: &mut String) {
             f.digest_minutes(),
             f.keeps.0,
             f.keeps.1
+        );
+    }
+    let _ = writeln!(w);
+}
+
+fn cooking(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Meals and preserving\n\nA stew (`vitals::meals`) cooks {}-{} foods in {} s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x{} (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient.\n",
+        meals::MIN,
+        meals::MAX,
+        meals::COOK_TICKS / crate::TICKS,
+        meals::BONUS
+    );
+    let _ = writeln!(
+        w,
+        "Preserving (`vitals::preserve`): a drying rack dries in {:.0} min in the best air (25 °C, humidity 0.3, a breeze; nothing below 5 °C or above humidity 0.85, nor in the rain), and smokes in {:.0} min over a fire (lava, a lit furnace) within {} blocks below, in any weather; salting is crafted with salt, boiled out of a water bucket in a furnace in {} s.\n\n| from | dried | smoked | salted | keeps (days) |\n|---|---|---|---|---|",
+        preserve::DRY_SECS / 60.0,
+        preserve::SMOKE_SECS / 60.0,
+        preserve::SMOKE_REACH,
+        preserve::SALT_TICKS / crate::TICKS
+    );
+    for (i, f) in food::FOODS.iter().enumerate() {
+        let made: Vec<String> = preserve::METHODS
+            .iter()
+            .map(|&m| preserve::product(m, i).unwrap_or("-").to_string())
+            .collect();
+        if made.iter().all(|m| m == "-") {
+            continue;
+        }
+        let keeps: Vec<String> = made
+            .iter()
+            .filter_map(|m| food::find(m))
+            .map(|p| format!("{:.0}", food::FOODS[p].keeps.0 + food::FOODS[p].keeps.1))
+            .collect();
+        let _ = writeln!(w, "| {} ({:.0}) | {} | {} |", f.name, f.keeps.0 + f.keeps.1, made.join(" | "), keeps.join(", "));
+    }
+    let _ = writeln!(w);
+}
+
+fn clothes(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Clothing\n\nWorn in four slots of their own under armor ({}), no armor value. A full set's real insulation in clo at {} °C of comfort each; a piece gives its share ({:?}, head to feet). Wet, armor keeps {:.0}% of its warmth; being wet itself feels {} °C colder. What each piece takes: {}.\n\n| material | clo | cold °C | heat °C | kept wet | windproof | from |\n|---|---|---|---|---|---|---|",
+        clothing::PIECES.join(", "),
+        clothing::PER_CLO,
+        temperature::PIECE_SHARE,
+        temperature::ARMOR_WET_KEEPS * 100.0,
+        temperature::WET_CHILL,
+        clothing::PIECES
+            .iter()
+            .zip(clothing::MAKES)
+            .map(|(p, (m, s))| format!("{p} {m} + {s} string"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    for m in clothing::MATERIALS {
+        let _ = writeln!(
+            w,
+            "| {} | {} | {:.0} | {} | {:.0}% | {:.0}% | {} |",
+            m.name,
+            m.clo,
+            m.cold(),
+            m.heat,
+            m.wet_keeps * 100.0,
+            m.windproof * 100.0,
+            m.from
         );
     }
     let _ = writeln!(w);
@@ -162,7 +242,10 @@ fn climates(w: &mut String) {
     );
     for c in climate::BIOMES.iter().filter(|c| !c.underground) {
         let wind = c.wind.map(|v| format!("{v:.1}")).join(" | ");
-        let fog = (0..4).map(|s| format!("{:.0}%", air::fog_share(c.fog, Some(s)) * 100.0)).collect::<Vec<_>>().join(" | ");
+        let fog = (0..4)
+            .map(|s| format!("{:.0}%", air::fog_share(c.fog, Some(s)) * 100.0))
+            .collect::<Vec<_>>()
+            .join(" | ");
         let kind = match c.fog_kind {
             climate::Fog::Dawn => "before dawn to mid morning",
             climate::Fog::Sea => "off the sea, any hour",
@@ -206,6 +289,24 @@ fn plant_table(w: &mut String) {
             if p.frost > plants::HARDY { format!("{} °C", p.frost) } else { "hardy".into() },
             if p.days > 0.0 { format!("{}", p.days) } else { "-".into() }
         );
+    }
+    let _ = writeln!(w);
+}
+
+fn wild_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Wild plants\n\nWhat the world grows besides grass and trees (`vitals::wild`): how each grows, the ground it stands on, what picking it gives, and the biomes it covers that share of its ground in.\n\n| block | grows | ground | gives | cover | found in |\n|---|---|---|---|---|---|"
+    );
+    for p in &wild::WILD {
+        let found = p
+            .found
+            .iter()
+            .map(|b| b.split(':').nth(1).unwrap_or(b))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let _ =
+            writeln!(w, "| {} | {:?} | {:?} | {} | {:.1}% | {found} |", p.block, p.form, p.ground, p.gives.unwrap_or("-"), p.cover * 100.0);
     }
     let _ = writeln!(w);
 }

@@ -17,8 +17,9 @@ game), `animals`, `portals`, `packages`, `testkit`.
   they are: `notes/SURVIVAL.md`, `notes/ANIMALS.md`. The loop still to build (rain by season,
   plants, grazers, hunters, rot, soil), with its numbers from real places: `notes/ECOLOGY.md`. The numbers: `mods/base/vitals/SHEET.md`,
   `mods/animals/SPECIES.md` (both generated).
-- **The look**: `notes/STYLE.md`, and the `game-art` (UI parts, item icons), `block-textures` (block
-  textures, 32 px) and `blocky-model` (models) skills.
+- **The look**: `notes/STYLE.md`, the `game-art` skill (all generated art: items, blocks, animal
+  looks, UI, from the style guides in its `guides/`), `block-textures` (the 32 px block set and
+  its batches) and `blocky-model` (box models).
 
 ## The engine's docs (Weft)
 

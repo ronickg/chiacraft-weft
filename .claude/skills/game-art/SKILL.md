@@ -1,69 +1,123 @@
 ---
 name: game-art
-description: Generated art for the game's UI and item icons, made in ChatGPT in one warm fantasy pixel style (copper-bronze frames, light from the top left) and cut into game parts here. Use when Ronald asks for a prompt for a UI part, an icon set or item icons (a new one, a redo, "the master prompt again"), when he sends generated sheets or images to put in the game or on the UI kit page, or when a generated part needs a new state, size or color.
+description: Generate any art for the game from Ronald's style guides — item icons, block textures (cubes, plants, ores, crops, liquids, glass, workstations), animal and monster looks, UI parts, effects, sky — with ChatGPT through the Codex command line, then check it, cut it to exact pixels, show it on a page and put it in the game. Use whenever Ronald says "generate/make/draw/redo <anything visual>", asks for new or redone icons, textures, sprites, UI parts or an icon set, wants to see how art looks in the inventory or the world, sends generated images to put in the game, or wants a style guide changed. Box models themselves (creatures, props) are built by blocky-model; this skill gives them their colors.
 ---
 
-# Generated game art: UI parts and item icons
+# Game art: generate anything from the style guides
 
-Ronald makes the art in ChatGPT with the prompts below; Claude cuts each sheet into game parts
-(`mods/base/source/ui/`), checks it, and shows it on the UI kit page. Claude does not draw these
-pictures itself (a kit painted in code was judged ugly), but it does make every variant of an
-approved part: new states (hover, pressed, disabled by shifting colors), recolors, other sizes
-(nine-slice), combinations (icon on a slot, a marker in a corner). New subject matter (a new icon,
-a new item, an ornate piece) goes back to ChatGPT. Block textures, creature skins and item models
-are painted in code (`blocky-model`), not here; an item's icon is the reference for its model, so
-the model in the hand matches the icon in the slot.
+One way for every kind of art. Ronald says what he wants ("generate a copper pickaxe", "redo the
+dirt texture", "make the wyvern's look"); Claude works out the kind, picks the guide, the type
+line and the reference image, writes the description, generates, checks, cuts, shows, and installs
+on his yes. Claude doesn't draw these pictures itself (a kit painted in code was judged ugly); it
+makes every variant of an approved part (states, recolors, sizes) in code.
 
-## Generating it here with Codex (no copying images by hand)
+## The guides: the one place the style lives
 
-The Codex app's command line makes the same pictures, on Ronald's ChatGPT Plus plan, from this
-shell: `/Applications/Codex.app/Contents/Resources/codex-cli/bin/codex`. It must be signed in with
-ChatGPT (`codex login status` says "Logged in using ChatGPT"; an API key bills per image), and an
-old build refused every model for a ChatGPT sign-in until the app was updated.
+`guides/` holds Ronald's style guides and their reference images, kept up to date here (his
+originals: `~/Downloads/Game Art Style Guides`). Change the style by editing a guide, never by
+patching a prompt in a script: every script reads the guides.
 
-    notes/ui-codex/gen.sh NAME request.txt [more reference images]
+| Folder | For |
+|---|---|
+| `guides/0 Making it.md` | read first: which guide for what, facts about our game, how to prompt, check, cut and show |
+| `guides/1 Items/` | item icons, 32 × 32: master prompt (section A), material sheet (B), the reference image per kind of item, recipes for tricky objects (D) |
+| `guides/2 Blocks/` | block textures: how Minecraft-style textures work, the master prompt with one type line per texture kind, ramps, the full-pack checklist |
+| `guides/3 Model Blocks/` | blocks with their own shape (torch, lantern, door) |
+| `guides/4 Animals/` | animal looks; Part 4: our animals are box models, what carries over |
+| `guides/5 Monsters and Characters/` | as animals |
+| `guides/6 UI/` | UI parts (the kit below follows it) |
+| `guides/7 Effects/`, `guides/8 Sky/` | particles and effects; sun, moon, clouds |
 
-`gen.sh` fills `style.txt` with the request and runs `codex exec --skip-git-repo-check --sandbox
-workspace-write --ephemeral -i ... -o last.txt "<prompt>" < /dev/null`, always attaching
-`approved_parts.png` and Ronald's two mockups of the game laid out as it should look
-(`notes/ui-reference/hud-in-game-mockup.jpg`, the HUD; `screens-overview-mockup.jpg`, inventory,
-crafting, taming, a creature's page, build mode, skills, journal and map).
+**Never attach other games' or texture packs' art to a generation, and keep "Minecraft" out of the
+prompt** (Ronald's rule; he finds Faithful too clean and wants our own style). The guides'
+reference images are cut from a resource pack: read them, don't attach them. `art.py` attaches
+our own style key, `Our key.png` in the guide's folder (approved sets of ours), and warns when a
+kind has none yet.
 
-- `< /dev/null` or it waits for terminal input. The prompt says to use the image tool, save ONE
-  PNG under a given name in the current folder and write no code; it takes a minute or two.
-- `notes/ui-codex/style.txt` is the master prompt for it (the UI one above, plus "NAME" and
-  "REQUEST" to fill in); `approved_parts.png` is the kit's approved parts on magenta, the style key,
-  remade from `kit/` when parts are approved. Ronald's reference sheets are in
-  `notes/ui-reference/` (his PNG originals are sharper).
-- Many parts a sheet: one image held 17 small parts in four rows (menu icons, moon, lamp, armor,
-  grip, four bars, three frames), all in style, cut in one go by `sheet.py` (`--names` by rows).
-  Say the scale ("one game pixel is 6 image pixels") and "plenty of magenta between parts". Give a
-  tile or a logo its own image. Several `codex exec` runs can go at once.
-- Glows come out as a pink ring on magenta: take those pixels out after cutting (the waiting
-  lamp: `r > 200, g < 160, b > 100`).
+**Never throw away a generated image** (Ronald, 2026-11-04: "never throw away generated images pls
+so I can also check back"). Every try, every candidate, every review sheet and every old texture an
+install replaces is kept for good in `/Users/ronald/Coding/chiacraft-archive/images/chiacraft-art/<date>/`
+(outside the repo; `ART_ARCHIVE` overrides it). `art.py` does this on its own (`generated/` each try,
+`cut/` each sprite, `replaced/` each old texture), and the redo page's builder keeps each sheet before
+it changes (`sheets/`). Anything else that makes images copies them there with `art.archive()`.
+Never delete from the archive, and never `rm` a generated image anywhere else either.
 
-The style and the reasons behind it are in `notes/STYLE.md`; the reference sheets in
-`notes/ui-reference/`.
+**Ronald's answers are lessons.** After every batch he approves or sends back, write what his answer
+taught into the guide (for items, the "Learned from Ronald's answers" list in the item guide's section
+A, which goes into every prompt), so the next generation gets it right the first time.
 
-## What ChatGPT can't do, and what the prompts do about it
+When a lesson is learned (a prompt that works, a check that catches a drift), write it into the
+guide it belongs to, or into `0 Making it.md` if it holds for every kind.
 
-- **No exact pixel grid or sizes.** Its "pixels" are uneven and it draws bigger than asked (26-33
-  for 24). So prompts ask for the design and a rough size; the cutter shrinks the picture as drawn
-  (`--smooth 2`: 2 image pixels a GUI pixel), every part of a sheet at one scale.
-- **No real transparency** (it paints a checkerboard). Ask for flat magenta `#FF00FF`; for purple
-  or pink content (poison, XP, potions, sedatives) flat green `#00FF00`.
-- **Without a reference image and the words "pixel art ... small sprite enlarged with hard square
-  pixels", it draws realistic 3D renders** on a dark background with grid lines (the first item
-  sheet came out like that). Words like "3D object", "hand-painted shading" or "Hytale" pull it
-  further toward realism. If a chat has drifted into realism, start a new chat rather than
-  correcting it.
-- **Style drifts between chats.** Attach the reference sheet and the approved parts to the master
-  prompt; that is what keeps a new chat matching.
-- **Short, positive rules work; long lists of "no X" get partly ignored.**
-- Ask for **PNG**, not WebP. An image sent in the middle of a turn may not be saved to disk: if
-  it isn't in the conversation's files, ask for it again.
+## Generating: `scripts/art.py`
 
-## UI parts
+    P=~/.venvs/blocky/bin/python; A=.claude/skills/game-art/scripts/art.py
+    $P $A refs                                   # the type lines (and the guides' reading sheets), by kind
+    $P $A item copper_pickaxe --what "a copper pickaxe: bright orange head ... lying diagonally, handle bottom left, tip top right"
+    $P $A block dirt --type "natural cube" --what "rounded brown dirt clods (#3a2926 to #94724b) ..."
+    $P $A block poppy --type flower --cutout --what "a red poppy (#d32228) ..."
+    $P $A animal wyvern --type "dinosaur" --size 48x32 --what "a wyvern: ..."
+    $P $A batch jobs.json                        # many at once (four at a time): [{kind, name, what, type, ...}]
+    $P $A prompt item NAME ...                   # print the prompt and references instead
+    $P $A install item NAME --mod base           # the cut sprite over mods/<mod>/assets/textures/item/NAME.png
+
+Each run builds the prompt from the guide (master prompt, material colors or ramps, the type line,
+the exact-grid text with the grid image attached last, our style key and the UI sheet), runs a fresh `codex exec` (a minute or two), checks the image, and makes it again (up to
+`--tries 3`) when a check fails. Output in `run/art/` (outside git): `NAME.png` as generated,
+`NAME_px.png` the exact sprite, `NAME_checks.json`, failed tries as `NAME__tryK.png`.
+
+Writing `--what` (the part that decides most):
+- Material and colors first, then shape, then view and placement, from the guide: tools diagonal
+  (handle bottom left, tip top right), blocky things three-quarter top view, armour and containers
+  front view. Colors from the material sheet (items) or ramps (blocks), as hex where it matters.
+- For a tricky object (bucket, potion, bow, book, helmet, shield, rod, shears, compass, spyglass,
+  torch...) paste the recipe's "Prompt line" from the item guide's section D.
+- `--green` for anything purple, pink or magenta (sedatives, potions, amethyst); `--pale` for pale
+  things whose outline may be light (paper, feathers, string).
+- Grass tops, leaves, short grass, ferns and water go in the game grey (tinted by biome): ask for
+  "light greyscale for biome tinting" unless it's a look test.
+- Our own things and real facts (a capybara's coat, a ginkgo seed's shape): look them up and say
+  them; the guides only know Minecraft's set.
+
+Then look at every result: the checks catch drift (a smooth painting, a black outline, the
+red-brown line, a seam), not whether it is the thing asked for.
+
+## Kinds of art and where they go
+
+| Kind | Made by | Into the game |
+|---|---|---|
+| Item icon | `art.py item` | `install item NAME --mod base|animals` (32 × 32, `mods/<mod>/assets/textures/item/`); a new item also needs its item definition and a lang key |
+| Block face | `art.py block` | `install block NAME` (32 × 32, decided 2026-11-03; the game's whole 32 px set and its batches are the `block-textures` skill's, `notes/blocks/`) |
+| Animal, monster | `art.py animal` (a concept sprite) | its colors, coat and face go to the box model (`blocky-model`: coat data, `house.MATERIALS`); never a sprite in the game |
+| UI part | the UI kit flow below | `mods/base/source/ui/` cutters, `install.py` |
+| Effect, sky | the guide's prompt by hand with `codex exec` | as the guide says |
+
+## Showing it
+
+Before anything goes into the game, show it on a page: as generated, the cut sprite in the game's
+slots (dark brown `#352015`, bronze frame) at 2-4×, the game's current version beside it, blocks
+tiled 3 × 3, and for blocks a small world scene with items and animals, so they're judged
+together. The worked example is the **Style Guide Test** page (`notes/ui-codex/guides/`: `gt.py`
+made the set, `build.py` draws the cards and the isometric island, `page.html` is the template).
+The older **Item Icon Bench** (`notes/ui-codex/viewer/`) shows the game's current icons.
+
+## Item icons in the game now
+
+The game's icons are 32 × 32 (the "A2" set, merged 2026-11-03). Earlier ways, kept only as history:
+sheets of 16 items cut and shrunk smoothly to 48 × 48 (`gen_items.sh`, `items_style.txt`,
+`icons.py`), and the item lab's prompt rounds (`notes/ui-codex/lab/`, where the exact grid with
+its guide image won). Don't "clean" generated pixel art (grid guessing, palette cuts): it mangled
+the icons. Items stay flat pictures, as in Minecraft; 3D held models are set aside
+(`mods/base/source/items/`).
+
+## UI parts (the kit)
+
+UI parts come from the master prompt below, run through Codex (`notes/ui-codex/gen.sh NAME
+request.txt`, which attaches `approved_parts.png` and Ronald's two mockups,
+`notes/ui-reference/hud-in-game-mockup.jpg` and `screens-overview-mockup.jpg`). Many small parts
+can share a sheet ("one game pixel is 6 image pixels", "plenty of magenta between parts"); glows
+come out as a pink ring on magenta, so take those pixels out after cutting. The UI guide
+(`guides/6 UI/`) is the style; the master prompt below predates it and matches it.
 
 Master prompt, pasted once per chat, with the reference sheet for that kind of part
 (`notes/ui-reference/`) and every approved part attached (the approved slot at least):
@@ -115,74 +169,6 @@ are fine too. Sizes asked for:
 | Furnace progress | arrow 24x16, flame 14x14 | empty, full |
 | Slot markers | 10x10; durability 24x4 | durability green, yellow, red |
 | Icon sets | 24x24, rows of 8 | |
-
-## Item icons
-
-A separate master prompt (the UI one would put frames round the items). The style comes from the
-images attached with it far more than from the words, so always attach references:
-- **Until an item sheet is approved:** `notes/ui-reference/pixel-fantasy-inventory-ui-reference.jpg`
-  and `crafting-workstations-ui-reference.jpg`. They show items in the target style (ingots, ores,
-  gems, tools, food in slots: three-quarter view, chunky, dark brown outline, top-left light).
-- **Once a sheet is approved:** save it as `notes/ui-reference/items/<family>.png` and attach one
-  or two approved sheets plus the inventory reference with every new chat. The approved sheets
-  become the style key, so later sheets and redos match them.
-
-Master prompt:
-
-```text
-For this whole chat you make pixel-art item icons for my game. Copy the style of the items in the attached reference images exactly: the pickaxes, ingots, ores, gems and food shown in their slots.
-
-Every icon:
-- Chunky pixel art, drawn as a small 32 x 32 pixel sprite and enlarged with hard square pixels of one even size and sharp edges. Not a 3D render, not a painting, not realistic: a game sprite like the reference.
-- Simple shapes and few colors: 3 or 4 flat shades per color, light from the top left (top and left lighter, bottom and right darker), and a dark brown outline (not black) around the whole item.
-- Warm, rich but not oversaturated colors, as in the reference.
-- Seen slightly from above at a three-quarter angle, like the reference ingots and blocks. Long items (tools, weapons, sticks) lie diagonally, handle at the bottom left, head at the top right. Items of one family (all ingots, all pickaxes) share one shape and differ only in color.
-- Every item about the same size, filling about 75% of its cell.
-- Material tiers must never look alike, even small in a slot. Each tier differs in brightness, color and finish at once, always like this:
-  - Wood: warm light brown, matte, visible grain.
-  - Stone: dark brownish-grey, the darkest tier, rough and chipped with bumpy edges, no shine.
-  - Iron: pale cool silver with a blue tint, the lightest grey, smooth, one bright white edge highlight.
-  - Gold: saturated yellow-gold, shiny, small white glints.
-  - Diamond: cyan crystal with sharp facets and white sparkles.
-  Any other material I name gets its own distinct look, unlike every tier above.
-
-Background: one flat solid #FF00FF magenta color over the whole image, unless I say green (#00FF00). No grid lines, cell borders, slots, frames, shadows, glow, text or numbers.
-
-I send one of three kinds of request:
-- A list: one sheet, the items in a grid, left to right, top to bottom, evenly spaced, no two touching.
-- One item: one image with that item alone, centered.
-- "Redo [item]: [what to change]": that item alone, centered, the same angle, size and shape as before, changing only what I say.
-
-Reply "ready" and wait for my first request.
-```
-
-Requests:
-
-```text
-[rows] x [columns] grid. Left to right, top to bottom:
-[item] ([material and colors], [shape]), [item] (...), ...
-```
-```text
-One item: [item] ([material and colors], [shape]).
-```
-```text
-Redo [item]: [what to change]. Keep everything else the same.
-```
-
-Writing the list:
-- Each item by material and colors, then shape: "iron ingot (cool grey-silver bar with beveled
-  edges)". Name the family shape again for each member ("same shape, warm yellow-gold").
-- At most 16 a sheet (4 x 4); more come out small and alike. Group a sheet by family.
-- Tiers differ in brightness, color and finish at once, not color alone: the first tool sheets had
-  stone and iron both light grey, alike in a slot. The master prompt fixes the look of each tier
-  (wood, stone, iron, gold, diamond); a new tier (copper, bronze, obsidian...) gets its own line
-  there before its first sheet, chosen unlike every other tier, and is added here too. Check a
-  new tier sheet in slots next to the other tiers before approving it.
-- Family shapes to keep across sheets: ingots a beveled bar; raw ores a rock chunk with the metal
-  showing; gems cut with bright facets; dusts a small heap; tools diagonal with a wooden handle;
-  armor seen from the front-left, empty inside.
-- The game's items: `mods/base/assets/textures/item/`, `mods/animals/assets/textures/item/`
-  (file names are the item names).
 
 ## Material palette (planned, not built yet)
 

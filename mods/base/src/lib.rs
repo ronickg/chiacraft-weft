@@ -4,6 +4,8 @@
 mod advancements;
 mod beds;
 mod blocks;
+mod clothing;
+mod cooking;
 mod farming;
 mod growth;
 mod hud;
@@ -18,6 +20,7 @@ mod shaderpack;
 mod sounds;
 mod survival;
 mod weather;
+mod wild;
 mod worldgen;
 
 use weft_sdk::*;
@@ -42,11 +45,14 @@ fn init(r: &mut Registry) {
         r.creative_tab(tab, icon);
     }
     blocks::register(r);
+    wild::register(r);
     items::register(r);
     player::register(r);
     survival::register(r);
     levels::register(r);
     machines::register(r);
+    clothing::register(r);
+    cooking::register(r);
     recipes::register(r);
     sounds::register(r);
     mobs::register(r);

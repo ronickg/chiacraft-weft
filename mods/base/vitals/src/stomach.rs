@@ -79,6 +79,28 @@ impl Stomach {
         Ok(())
     }
 
+    /// Eats a meal of several foods (`meals`: a stew's ingredients, cooked), each its own portion
+    /// stronger for the cooking (`meals::BONUS`), the whole meal warming as one hot dish.
+    pub fn eat_meal(&mut self, foods: &[usize], quality: f32, age_secs: f32, capacity: f32) -> Result<(), Refusal> {
+        if crate::meals::units(foods) > self.room(capacity) + 1e-4 {
+            return Err(Refusal::Full);
+        }
+        if self.portions.iter().filter(|p| p.food == 0).count() < foods.len() {
+            return Err(Refusal::TooMany);
+        }
+        let hot = age_secs < food::HOT_FOR;
+        for (i, &f) in foods.iter().enumerate() {
+            let slot = self
+                .portions
+                .iter_mut()
+                .find(|p| p.food == 0)
+                .ok_or(Refusal::TooMany)?;
+            let (warmth, warm_secs) = if i == 0 && hot { food::HOT_MEAL } else { (0.0, 0.0) };
+            *slot = Portion { food: f as u16 + 1, units: FOODS[f].units(), quality: quality * crate::meals::BONUS, warmth, warm_secs };
+        }
+        Ok(())
+    }
+
     /// `secs` of digestion at `pace` (1 normal; the world's difficulty, being asleep).
     pub fn digest(&mut self, secs: f32, pace: f32) {
         for p in &mut self.portions {
@@ -141,6 +163,20 @@ impl Stomach {
             .map(|p| p.warmth)
             .sum()
     }
+}
+
+/// What a new player arrives with in them (Ronald, 11-03, via Planner): a loaf and an apple, 43
+/// units, so the first night is fair (an empty stomach left 40% of max health, and one spider
+/// killed a fresh player). It digests away in half an hour like any meal; dying still empties it.
+pub const ARRIVAL: [&str; 2] = ["base:bread", "base:apple"];
+
+/// A new player's stomach: `ARRIVAL`, fresh, neither hot nor cooling.
+pub fn arrival() -> Stomach {
+    let mut s = Stomach::default();
+    for (slot, f) in ARRIVAL.iter().filter_map(|n| food::find(n)).enumerate() {
+        s.portions[slot] = Portion { food: f as u16 + 1, units: FOODS[f].units(), quality: 1.0, warmth: 0.0, warm_secs: 0.0 };
+    }
+    s
 }
 
 /// A stat's ceiling reached at that fullness of its nutrient.

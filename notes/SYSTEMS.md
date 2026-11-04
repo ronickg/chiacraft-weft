@@ -35,6 +35,10 @@ flowchart LR
   air --> animal["Animal's body<br/>animals comfort.rs"]
   air --> eggs["Eggs<br/>animals eggs.rs"]
   food["Food table<br/>vitals::food"] --> stomach["Stomach<br/>vitals::stomach"]
+  food --> meals["Stews<br/>vitals::meals, cooking pot"] --> stomach
+  air --> preserve["Drying, smoking, salting<br/>vitals::preserve, drying rack"] --> food
+  animal --> clothing["Clothing<br/>vitals::clothing"]
+  clothing --> player
   items["Food items<br/>base items.rs"] --> stomach
   stomach --> player
   stats["Nine stats<br/>vitals::stats"] --> player
@@ -84,13 +88,17 @@ built, it gets its row below and its arrows above.
 | Soil, compost | `vitals::soil`, `mods/base/src/farming.rs` | `MAX`, `FEEDS`, `COMPOSTS`, `COMPOST_DAYS` | crops' harvests, dung (grazers), spoiled food (freshness), plant waste | crops' growth on farmland (`growth.rs`), tilling with hoes |
 | Food webs | `animals_core::web` (`gaps`, `WAITING`, `grazing`), `core/tests/places.rs` | `WAITING` rows (the gaps the plan fills), `vitals::forage::GRASS_COVER` | species' diets, prey sizes, habitats, crowds and hunger, `vitals::forage::SOURCES`, the grazed grass's growth, climates | the species sheet's food web table, the check |
 | Capacity | `vitals::forage::season_lushness`, `forage.rs` (`NATURAL_SPAWN`), `animal::arrive` | `SPAWN_FLOOR`, `ARRIVES_FED`, `YOUNG_PERCENT`, `STARVES_SECS` | plants, climates, calendar, breeding seasons | natural spawning, how fed wild ones arrive, young in season, starving |
-| Plants, soil water | `vitals::plants` (`PLANTS`, `rate`, `soil_water`), `base_api::ground_at`, `mods/base/src/growth.rs` | `PLANTS` rows, `GROWING` | climates, rain schedule, calendar, height, water within 4 blocks | the growing blocks' steps (wheat, berry bush, sapling, sugar cane, cactus) |
+| Plants, soil water | `vitals::plants` (`PLANTS`, `rate`, `soil_water`), `base_api::ground_at`, `mods/base/src/growth.rs` | `PLANTS` rows, `GROWING` | climates, rain schedule, calendar, height, water within 4 blocks | the growing blocks' steps (wheat, berry bush, sapling, sugar cane, cactus, the wild plants) |
+| Wild plants | `vitals::wild` (`WILD`, `pick`), `mods/base/src/wild.rs`, `worldgen.rs` (`wild_at`), `cretaceous.rs` | `WILD` rows (form, ground, gives, found, cover), `MOST`, `REACH`, `CROWD` | plants (their growth and frost), the biomes | the world's decoration, foraging (`SOURCES` rows found where they grow), foods (`FOODS`, `DROPPED`), capacity |
 | Rain by season | `mods/base/src/weather.rs`, `vitals::climate::{spell, rains, thunders}` | `rain` per season in `BIOMES` | climates, calendar, the world's seed | the engine (`set_rain`: rain drawn only where it falls), the air (`raining_at`) |
 | Wind and fog, snow, storms | `vitals::air`, `mods/base/src/weather.rs` (`/air`) | `wind`, `fog`, `fog_kind` per biome in `BIOMES`; `DAY_SPREAD`, `DAY_SWING`, `STORM`, `CLEARS`, `SNOWS_BELOW`, `SNOWFALL`, `MELT`, `BLIZZARD`, `DRY`, `DUST`, `FOG_SIGHT` | climates, calendar, rain spells and thunder, the world's seed | the engine (`set_air`: snow drawn where it is cold, `scene.weather`/`ground` for the pack's fog, storms, snow lying, swaying plants), the air (`air_at`: wind chill, fog), hunters and prey (`base_api::sight`) |
 | Calendar, seasons | `vitals::calendar` | `SEASON_DAYS`, `MIDSUMMER` | engine day time | the air, breeding seasons, day length (`.seasons(..)` on dimensions), the HUD clock |
 | The air | `base_api::air_at`, `vitals::temperature::air` | `temperature.rs`, `air::feels` | climate, season, hour, height, sky light, rain here (`raining_at`), the wind (`World::air_at`, chilling the cold in the open), water, fires (`base_api::heat_of`) | player's body, animals' bodies, eggs |
-| Player's body | `mods/base/src/survival/` (a file per part: breath, food, temperature, camp, stamina, body, load, health) | `vitals` | air, stomach, stats, effects, armor, difficulty | HUD, health and speed modifiers, death |
+| Player's body | `mods/base/src/survival/` (a file per part: breath, food, temperature, camp, stamina, body, load, health) | `vitals` | air, stomach, stats, effects, armor, clothes, difficulty | HUD, health and speed modifiers, death |
 | Stomach, food | `vitals::food`, `vitals::stomach`, `base_api::eat` | `FOODS` | food items (`NUTRITION`, `FRESHNESS`) | max health and stamina, regen, warmth, food poisoning |
+| Meals | `vitals::meals`, `base_api::eat_meal`, `mods/base/src/cooking.rs` (the cooking pot) | `BONUS`, `MIN`, `MAX`, `COOK_TICKS` | the foods that go in (`FOODS`), fuel | the stomach (a portion an ingredient), well fed, warmth, freshness by the shortest-keeping ingredient |
+| Preserving | `vitals::preserve`, `cooking.rs` (drying rack, salt) | `DRY_SECS`, `SMOKE_SECS`, `SMOKE_REACH`, `SALT_TICKS`, `dry_rate`; the preserved foods' `FOODS` rows | the air at the rack (`air_at`: warmth, humidity, wind, rain), fires below, raw meat, apples, berries | food that keeps for weeks, lighter to carry |
+| Clothing | `vitals::clothing`, `mods/base/src/clothing.rs`, `survival/temperature.rs` (`worn`) | `MATERIALS`, `PER_CLO`, `MAKES`, `FIBRE_CHANCE`; `temperature::{PIECE_SHARE, ARMOR_WET_KEEPS, WET_CHILL}` | pelts (`animals_core::hides`), leather, wool, plant fibre | body temperature: the comfort range, what's kept wet, the wind chill felt (`through_clothes`) |
 | Effects | `vitals::effects` | `modifiers()` | | player's body, animals (cold, heat), HUD icons (`install.py` `EFFECT_ICONS`) |
 | Body effects | `base_api::{poison, bleed, sedate}`, `survival/body.rs` | `survival/body.rs` constants | animals' venom (`breath.rs`), darts (`knockout.rs`), spider eye, heavy blows | player's body |
 | Carried weight | `survival/load.rs` | `weight` there | inventory | effects (encumbered), stats screen |
@@ -100,6 +108,7 @@ built, it gets its row below and its arrows above.
 | Eggs | `mods/animals/src/eggs.rs` | `animals_core::life::EGG_AIR` | air, nests | hatching |
 | Breeding | `mods/animals/src/breeding.rs` | `biology.rs` `breeds`, `peak` | calendar, bond, food | eggs, births, XP |
 | Difficulty | `base_api::DIFFICULTY` (a world rule) | `vitals::difficulty` | Create New World, `/rule difficulty` | player's body, eating, tames |
+| Entity ranges (engine) | `server/sync.rs` (`move_every`), `server/dim.rs` (`mark_resting`) | world rules `core:entity_send_distance` 96, `core:entity_activation_distance` 48, `core:inactive_entity_interval` 20 | players' positions | what each player is sent and how often; animals' and mobs' goals and paths far from players (once a second), `World::tick_elapsed` |
 | Damage causes | `abi::damage` | | | engine death messages (`server/mod.rs`, engine lang en, ru, fr) |
 | HUD | `mods/base/src/hud.rs`, `player.rs` | `hud_element` orders 0-8 | vitals, clock | |
 | UI art | `mods/base/source/ui/install.py` | the kit | generated sheets (`game-art` skill) | `mods/base/assets/textures/gui` |
@@ -120,12 +129,27 @@ built, it gets its row below and its arrows above.
   item (`items.rs`); `balance.rs` (well fed from a few foods); the sheet. Its kind and portion
   are what animals eat it off the ground by (`forage.rs`); an item animals eat that isn't a
   player's food goes in `vitals::forage::DROPPED`.
+- **Clothes, or a new material** (`vitals::clothing::MATERIALS`): its clo, heat, wet and wind from
+  the research; the items come from the table (`clothing.rs`), with lang (base en, ru) and art;
+  `balance.rs`'s clothing checks; the sheet. A new furred species: its row in
+  `animals_core::hides`.
+- **A meal, or a new preserved food**: the stew is its ingredients (`vitals::meals`), so a new food
+  goes in it as it is; a new preserved food is a `FOODS` row, its `preserve::product` line and an
+  item in `cooking.rs`'s `PRODUCTS` and `items.rs`'s food list; the sheet.
 - **Temperature rules** (`temperature.rs`, `air_at`): players' effects, animals' comfort and
   eggs all move together; `places.rs` says if a species stops being at home or its eggs stop
   hatching.
 - **A growing plant, or a new one**: its row in `vitals::plants::PLANTS` from the research
   (`reports/ecology/plants.json`), its block's `.growth(growth::step_secs(..))` and
   `.on_grow(|e| growth::grow(..))` (`blocks.rs`); the sheet.
+- **A tree**: its wood in `WOODS` (`blocks.rs`, or `cretaceous.rs` for the Cretaceous's) with its
+  shape and fruit, its biomes' `tree_kinds`, its sapling's row in `vitals::plants::PLANTS`, its
+  leaves and fruit in `vitals::forage` (`SOURCES` found where it grows, `DROPPED`), textures and
+  names.
+- **A wild plant**: its row in `vitals::wild::WILD` (form, ground, what it gives, where, how
+  thick), its growth in `PLANTS` (not for one that stands), its `SOURCES` rows found where it
+  grows, its fruit in `FOODS` or `DROPPED`, a texture and a name. The base mod registers and
+  places every row; `wild.rs`'s check says if it can't grow where it's put or crowds the grass.
 - **A food in the world, or a new diet**: its row in `vitals::forage::SOURCES` (and the plant that
   renews it in `vitals::plants`), the species' `eats` from its research; `places.rs` checks
   plant eaters find food at home, and `web.rs` that every food in a diet is in the world and
@@ -142,6 +166,9 @@ built, it gets its row below and its arrows above.
 - **The stats** (names, order, a new one): both the player's (`vitals::stats::NAMES`) and the
   animals' (`STAT_NAMES`) must match (`places.rs` checks); both screens; the sheets.
 - **Difficulty numbers**: `vitals::difficulty`; the sheet.
+- **Anything an animal or mob counts down per tick** (a fuse, a timer, growing up): far from
+  players its kind ticks only once a second, so count down by `w.tick_elapsed(id)`, or keep a
+  due time. Projectiles and what must run every tick are `.always_active()`.
 
 ## Adding a new piece
 
@@ -160,6 +187,7 @@ built, it gets its row below and its arrows above.
 |---|---|---|
 | The climates are their real places | `vitals/tests/places.rs` | a biome's year mean, seasons or rainiest season drifting from its place's research |
 | Every plant grows somewhere | `vitals/tests/places.rs` | a plant whose warmth or water no biome gives |
+| Wild plants grow where they're put | `vitals/src/wild.rs` | a wild plant under a third of its best in every season of a biome it's found in, a gift that is no food, covers crowding out the grass |
 | Plant eaters find food where they live | `animals/core/tests/places.rs` | a plant eater whose food grows in fewer than two seasons in one of its habitats |
 | Hunters fill up on their prey at home | same | a hunter whose biggest prey at home takes more than ten kills to fill it |
 | Most of every diet is in the game | same | a species with under half its diet growing or on the ground as items |
@@ -172,6 +200,8 @@ built, it gets its row below and its arrows above.
 | Eggs hatch where and when they're laid | same | eggs that can't develop in a nest in a habitat in the breeding season |
 | The stats are the same nine | same | players' and animals' stats out of step |
 | Every food has nutrition | `testkit` `every_food_has_nutrition` | food items that can't be eaten |
-| Survival balance | `vitals/src/balance.rs` | foods, stomach, levels and calendar out of balance |
+| Clothes warm, the pot cooks | `testkit` `clothes_and_stew` | the clothing slots not read by body temperature (`/warmth`), the cooking pot not making a stew |
+| Survival balance | `vitals/src/balance.rs` | foods, stomach, levels and calendar out of balance; clothes that don't warm, cool or keep out the wind as their material should; a stew of three foods not making one well fed; preserved food keeping too little; a rack drying in the damp cold or not in a desert summer |
+| Every hide is a species | `animals/core/src/hides.rs` | a pelt or hide row for a species that isn't there |
 | Species balance | `animals/core/src/balance.rs` | species numbers against their facts |
 | The sheets are up to date | `vitals/tests/sheet.rs`, `animals/core/tests/sheet.rs` | a sheet not regenerated after a change |

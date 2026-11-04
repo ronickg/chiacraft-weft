@@ -88,6 +88,7 @@ pub fn init(r: &mut Registry) {
         .model(Model::from(vec![Part::new("body", [0.0, 1.0, 0.0]).cube([-0.5, -0.5, -4.0], [1.0, 1.0, 8.0], [0.0, 0.0])]).uv(32, 32))
         .texture("dart")
         .attach(&SHOOTER)
+        .always_active()
         .goals(ai::Goals::new().then(dart_flies));
     r.particle(&SLEEP)
         .textures(&["sleep"])

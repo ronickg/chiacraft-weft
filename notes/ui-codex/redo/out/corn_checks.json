@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "an ear of maize: golden-yellow kernels in rows, pale green husk leaves peeled back at the bottom, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.586,
+   "outline": 0.56,
+   "red_line": 0.0,
+   "fill": 0.39,
+   "passed": true
+  }
+ ]
+}

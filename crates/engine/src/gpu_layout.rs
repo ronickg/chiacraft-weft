@@ -433,6 +433,8 @@ gpu_struct! {
     /// their own camera.
     pub struct Scene as "Scene" {
         pub view_proj: [[f32; 4]; 4],
+        /// Its inverse: from the screen back to camera-relative positions (screen effects).
+        pub inv_view_proj: [[f32; 4]; 4],
         /// Camera right and up in world space (particle billboards).
         pub right: [f32; 4],
         pub up: [f32; 4],
@@ -458,6 +460,12 @@ gpu_struct! {
         /// Where the player is: x snow lying on the ground (0..1), y how much of what falls is
         /// snow, z how much dust blows (0..1); from a mod's weather (`set_air`). For shader packs.
         pub ground: [f32; 4],
+        /// From camera-relative positions to the shadow map's clip space (`sun_shadows` packs):
+        /// x and y -1..1 across the map (texel row 0 at y -1), z reverse depth along the light.
+        pub shadow_view_proj: [[f32; 4]; 4],
+        /// x the shadow map's bindless index, y its size in texels, z 1 while it holds this
+        /// frame's shadows (0: none, fall back), w the blocks a texel covers.
+        pub shadow: [f32; 4],
     }
 }
 
@@ -694,7 +702,9 @@ gpu_struct! {
         pub strength: f32,
         pub time: f32,
         pub size: [f32; 2],
-        pub pad: [f32; 2],
+        /// Bindless index of the world's depth (reverse Z: 0 is the far plane, the sky).
+        pub depth: u32,
+        pub pad: u32,
     }
 }
 

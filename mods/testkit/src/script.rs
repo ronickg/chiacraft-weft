@@ -13,6 +13,7 @@
 //! key Tab             # a key by its settings name
 //! look 90 -20         # yaw, pitch in degrees
 //! chat /give stone 10
+//! chatf ticket.txt /banlist follow {}   # chat, with `{}` replaced by that file's text (waits for it)
 //! say_config testmod:x  # a config's value as this client has it, into the chat
 //! shot name.png       # into run/screenshots (or --shot-dir)
 //! bench 5 label       # BENCH line over 5 seconds
@@ -22,6 +23,8 @@
 //! leave               # leave the world for the title screen
 //! tap screen query    # once `screen` is open, clicks the element `query` (`id:x`, `text:x`) until it closes or the element goes
 //! tap_once screen query  # the same, one click (a text field, a button that stays)
+//! mark path           # writes the file (a signal to another copy's await_file)
+//! await_file path 120 # until the file exists, at most 120 s
 //! origin              # later via points are relative to where the player stands now
 //! where label        # logs the player's position
 //! rec start|stop     # logs a marker; tools/rec.ps1 presses the OBS hotkeys on it
@@ -91,6 +94,19 @@ pub async fn run(t: T, src: String) -> R {
             }
             "look" => t.c().look(num(0, 0.0), num(1, 0.0)),
             "chat" => t.c().chat(rest),
+            "chatf" => {
+                let (file, text) = rest.split_once(' ').unwrap_or((rest, ""));
+                let mut content = String::new();
+                t.until("chat file", Duration::from_secs(120), |_| {
+                    content = std::fs::read_to_string(file)
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string();
+                    !content.is_empty()
+                })
+                .await?;
+                t.c().chat(&text.replace("{}", &content));
+            }
             "say_config" => {
                 let cfg = weft_sdk::Config::<f64>::named(Box::leak(rest.to_string().into_boxed_str()));
                 t.c().chat(&format!("config {rest} = {}", cfg.get()));
@@ -148,6 +164,18 @@ pub async fn run(t: T, src: String) -> R {
                 t.frames(15).await?;
                 t.click_ui(query, 0);
                 t.frames(15).await?;
+            }
+            "mark" => {
+                if let Err(e) = std::fs::write(rest, "1") {
+                    t.fail(format!("mark {rest}: {e}"));
+                }
+            }
+            "await_file" => {
+                let (path, secs) = rest.rsplit_once(' ').unwrap_or((rest, "120"));
+                let path = path.to_string();
+                let secs = secs.parse().unwrap_or(120.0);
+                t.until(&format!("file {path}"), Duration::from_secs_f32(secs), move |_| std::path::Path::new(&path).exists())
+                    .await?;
             }
             "leave" => {
                 t.c().leave_world();

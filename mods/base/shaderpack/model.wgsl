@@ -98,7 +98,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     if inst.light != 0xffffffffu {
         // The pack's light; no traced shadow here, the sky light stands in for it.
         let l = unpack_light(inst.light);
-        let shadow = smoothstep(0.8, 1.0, l.x);
+        let shadow = sun_on_body(world, normal, l.x);
         out.color = pow(inst.color * flash, vec3(2.2)) * light_on(normal, l, shadow, 1.0, world);
     } else {
         out.color = pow(inst.color * lit * shade * flash, vec3(2.2));
@@ -121,7 +121,7 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         discard;
     }
     if in.graded != 0u {
-        return vec4(display(haze_lit(c.rgb, in.rel, in.sky)), 1.0);
+        return vec4(display(haze_lit(c.rgb, in.rel, in.sky)), SOLID_ALPHA);
     }
     let f = fog_amount(in.dist, scene.params.x, scene.params.y);
     return vec4(mix(c.rgb, scene.fog_color.rgb, f), 1.0);

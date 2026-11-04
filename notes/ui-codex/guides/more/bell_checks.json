@@ -1,0 +1,19 @@
+{
+ "kind": "model_block",
+ "what": "a gold bell with a strong vertical highlight down the centre and a darker rim, hanging from a short dark wooden beam across the top",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.554,
+   "outline": 0.5,
+   "red_line": 0.2,
+   "fill": 0.36,
+   "passed": true
+  }
+ ]
+}

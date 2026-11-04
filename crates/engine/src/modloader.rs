@@ -527,7 +527,7 @@ pub fn stored_package(hash: chiacraft_packages::identity::Hash) -> Result<Packag
 
 /// The data packages of the content in force: (id, version, hash, size in bytes, signature
 /// envelope or empty).
-pub fn current_packages() -> Vec<(String, String, String, u64, String)> {
+pub fn current_packages() -> Vec<crate::net::p2p::Offer> {
     let Some(store) = store() else { return Vec::new() };
     content::content()
         .mods
@@ -535,8 +535,13 @@ pub fn current_packages() -> Vec<(String, String, String, u64, String)> {
         .filter_map(|m| {
             let hex = m.package.as_ref()?;
             let h = chiacraft_packages::identity::Hash::from_hex(hex)?;
-            let size = store.manifest(&h).ok()?.files.iter().map(|f| f.size).sum();
-            Some((m.id.clone(), m.version.clone(), hex.clone(), size, store.signature(&h).unwrap_or_default()))
+            let manifest = store.manifest(&h).ok()?;
+            let size = manifest.files.iter().map(|f| f.size).sum();
+            let code = manifest
+                .files
+                .iter()
+                .any(|f| f.path == chiacraft_packages::identity::SERVER_CODE);
+            Some((m.id.clone(), m.version.clone(), hex.clone(), size, store.signature(&h).unwrap_or_default(), code))
         })
         .collect()
 }

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a small heap of seeds: speckled pink-brown bean seeds on a tiny patch of dark soil, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.564,
+   "outline": 0.59,
+   "red_line": 0.01,
+   "fill": 0.43,
+   "passed": true
+  }
+ ]
+}

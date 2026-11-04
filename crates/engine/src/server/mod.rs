@@ -2,6 +2,7 @@
 //! in-process transport. Each dimension is a set of regions ticked in parallel.
 
 mod actions;
+mod admission;
 pub mod area;
 mod builtin;
 pub mod dim;
@@ -65,7 +66,8 @@ pub struct ServerConfig {
     pub view_radius: i32,
     /// `--server`: nobody plays on this machine, so nobody owns the world by connecting first.
     pub dedicated: bool,
-    /// Who may join: keys, one a line. No file, anyone.
+    /// The dedicated server's old allow list (keys, one a line): it becomes the world's allow list
+    /// (chiacraft, `admission.json`) the first time the world starts without one.
     pub whitelist: Option<std::path::PathBuf>,
     /// The world's own key and certificate (chiacraft, `world_address`): its links are this key's,
     /// and it signs travel tickets.
@@ -120,6 +122,17 @@ pub struct Player {
     sent_attributes: Vec<f32>,
     /// The view distance the client has (`ToServer::View`).
     view_radius: i32,
+    /// chiacraft, probation (`admission`): seconds played in this world before this visit, when
+    /// this visit began, whether the owner let them off, and when they were last told no.
+    played: u64,
+    since: Option<Instant>,
+    lifted: bool,
+    told: Option<Instant>,
+    /// chiacraft, phase 4: the DID this player proved on chain (`did:chia:1…`) and its age in
+    /// days, and a join waiting for that check (name, key, since).
+    did: Option<String>,
+    did_days: Option<u32>,
+    waiting: Option<(String, String, Instant)>,
 }
 
 pub struct Generated {
@@ -204,6 +217,10 @@ pub struct Server {
     /// World rule values by rule id.
     /// Synced config values as players last got them.
     configs: Vec<(u32, f64)>,
+    /// Who may enter, and what newcomers may do (chiacraft, `admission`).
+    pub gate: crate::admission::Gate,
+    /// DID checks done in the background (chiacraft, `admission`).
+    did_checks: (Sender<admission::DidChecked>, Receiver<admission::DidChecked>),
 }
 
 /// Handle the client side uses to reach a running server thread.
@@ -214,6 +231,8 @@ pub struct ServerHandle {
     pub shared: Arc<Shared>,
     /// The content the world plays with (chiacraft: the game's may change while it runs).
     pub content: &'static Content,
+    /// The world's folder (none for a world that isn't saved).
+    pub dir: Option<std::path::PathBuf>,
     stop: Sender<()>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
@@ -284,7 +303,12 @@ pub struct ServerInfo {
     pub identity: Option<Arc<crate::world_address::WorldIdentity>>,
     /// The world's folder (none for a world that isn't saved).
     pub dir: Option<std::path::PathBuf>,
+    /// Which run of a server this is, counted from 1 in this game: a world opened again is a new
+    /// run (sandboxed mods start over in each).
+    pub run: u64,
 }
+
+static RUNS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 thread_local! {
     static INFO: std::cell::RefCell<Option<Arc<ServerInfo>>> = const { std::cell::RefCell::new(None) };
@@ -338,8 +362,10 @@ pub fn spawn(cfg: ServerConfig, storage: Option<Storage>) -> ServerHandle {
         world_key: cfg.identity.as_ref().map(|i| i.key()),
         identity: cfg.identity.clone(),
         dir: storage.as_ref().map(|s| s.meta.dir.clone()),
+        run: RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1,
     }));
     let world_content = scope.content;
+    let dir = storage.as_ref().map(|s| s.meta.dir.clone());
     let thread = std::thread::Builder::new()
         .name("server".into())
         .spawn(move || {
@@ -359,7 +385,7 @@ pub fn spawn(cfg: ServerConfig, storage: Option<Storage>) -> ServerHandle {
             pool.install(move || run(cfg, incoming, storage, sh, stop_rx, console_rx));
         })
         .expect("spawning server thread");
-    ServerHandle { connect, console, shared, content: world_content, stop, thread: Some(thread) }
+    ServerHandle { connect, console, shared, content: world_content, dir, stop, thread: Some(thread) }
 }
 
 fn run(
@@ -483,6 +509,7 @@ impl Server {
         }
         let (gen_tx, gen_rx) = unbounded();
         crate::config::load_world(storage.as_ref().map_or(&[][..], |s| &s.meta.configs));
+        let gate = admission::gate(&cfg, storage.as_ref().map(|s| s.meta.dir.clone()));
         Server {
             cfg,
             dims,
@@ -503,6 +530,8 @@ impl Server {
             sprint: None,
             load_seen: (0, 0),
             configs: crate::config::synced(),
+            gate,
+            did_checks: unbounded(),
         }
     }
 
@@ -581,6 +610,13 @@ impl Server {
                 gizmos: Vec::new(),
                 sent_attributes: Vec::new(),
                 view_radius: self.cfg.view_radius,
+                played: 0,
+                since: None,
+                lifted: false,
+                told: None,
+                did: None,
+                did_days: None,
+                waiting: None,
             });
         }
     }
@@ -713,6 +749,12 @@ impl Server {
         if self.tick % AUTOSAVE_TICKS == 0 {
             self.save_all(false);
         }
+        // Bans or followed ban lists changed on disk (an edit, a fetched list): whoever is
+        // banned now leaves (chiacraft, `admission`).
+        if self.tick % (TPS as u64 * 5) == 0 && self.gate.take_changed() {
+            self.send_banned_away(c);
+        }
+        self.did_answers(c);
         lap(5, &self.shared);
         let us = start.elapsed().as_micros() as u64;
         self.shared.tick_us.store(us, Ordering::Relaxed);
@@ -889,6 +931,17 @@ impl Server {
 
     fn open_menu(&mut self, c: &'static Content, pi: usize, kind: u32, owner: u64, block: u32) {
         if kind as usize >= c.game.menus.len() {
+            return;
+        }
+        // Probation (chiacraft): no containers a block keeps (a chest, a furnace) yet.
+        let on_block = block != 0 || {
+            let p = &self.players[pi];
+            owner != p.entity
+                && self.dims[p.dim as usize]
+                    .entity(owner)
+                    .is_some_and(|e| e.anchor.is_some())
+        };
+        if on_block && !self.may(pi, admission::Act::Containers) {
             return;
         }
         let Server { players, dims, .. } = self;
