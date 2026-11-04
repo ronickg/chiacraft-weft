@@ -124,6 +124,7 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 | base:desert | 40%, 78%, 55%, 40% | - | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, jaguar | dog (chihuahua), cat, red_fox, raven, coyote, golden_eagle, turkey_vulture |
 | base:savanna | 43%, 100%, 100%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman, jaguar | dog (chihuahua), cat, turkey_vulture |
 | base:swamp | 40%, 100%, 96%, 40% | summer: eaten 8% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
+| base:tropical_forest | 21%, 71%, 77%, 45% | - | **none** | **none** | **none** |
 | base:mountains | 60%, 95%, 76%, 40% | summer: eaten 27% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:sequoia_grove | 40%, 40%, 40%, 40% | summer: eaten 80% of the regrowth | mountain_hare, field_vole, red_deer | red_fox, raven, coyote, great_horned_owl, golden_eagle, grey_wolf | red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:beach | 40%, 40%, 50%, 40% | - | hare, wood_mouse, house_sparrow | red_fox, raven, herring_gull | red_fox, raven, herring_gull |
@@ -138,6 +139,8 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 What the webs still lack, and what the plan fills it with (`web::WAITING`):
 
 - herring_gull: no prey in base:ocean: the open sea's web: its fish (later; the gull hunts on the beach meanwhile)
+- base:tropical_forest: no hunters: **not planned**
+- base:tropical_forest: no a carrion eater: **not planned**
 
 ## dog (chihuahua)
 
