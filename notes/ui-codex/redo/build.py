@@ -124,7 +124,7 @@ def main():
         print("sheet:", sheet(b, jobs))
         for j in made:
             t = json.load(open(os.path.join(OUT, j["name"] + "_checks.json")))["tries"]
-            if not (t and t[-1].get("passed")):
+            if not (t and t[-1].get("passed")) and j["name"] not in failed:
                 failed.append(j["name"])
         hot_new = "".join(f'<span class="slot"><img src="{uri(Image.open(os.path.join(OUT, j["name"] + "_px.png")), 2)}" width="32" height="32" alt="{j["name"]}" title="{j["name"]}"></span>' for j in made)
         hot_old = "".join(f'<span class="slot"><img src="{uri(o.resize((32, 32), Image.NEAREST))}" width="32" height="32" alt="{j["name"]}" title="{j["name"]}"></span>'
