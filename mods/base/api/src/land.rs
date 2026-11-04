@@ -606,6 +606,18 @@ pub const LAKE_ISLAND_SHORE: f64 = 0.25;
 /// Water deeper than a block is the ocean's where continentalness is under this, out to the
 /// coast; inland, a river's or a lake's water belongs to the land around it (its climate).
 pub const OCEAN_CONTINENT: f64 = 0.1;
+/// A beach (and in the cold the snowy coast) is low ground where the continent is under this:
+/// by the sea. Up to `OCEAN_CONTINENT` it also took the low flats of rivers some way inland, an
+/// 18 °C beach beside 6 °C birch (Planner, 11-04; seed 1: of the beach's columns 42% had the sea
+/// within 16 blocks and 37% none within 40; under 0.02 78% of the first kept, 91% of the second
+/// gone). A rule can't ask how far the sea is, so the low coast past it keeps its sand by
+/// `sea_sand` instead, its biome the land's.
+pub const BEACH_CONTINENT: f64 = 0.02;
+/// Low ground (the sea's level, a block either side) on the coast past `BEACH_CONTINENT`, not
+/// in the cold, within `SEA_SAND` blocks of the sea (or a lake): sand on top, `SEA_SAND_DEEP`
+/// blocks, as a beach's.
+pub const SEA_SAND: i32 = 8;
+pub const SEA_SAND_DEEP: i32 = 3;
 /// The land's biome rules in the order they're tried, after the coasts and the mountains, with
 /// the bed under their water: gravel in the north and the birch woods, sand in the warm lands,
 /// mud (dirt) in the swamp.
@@ -1574,6 +1586,39 @@ pub fn strata(seed: u64, [x, y, z]: [i32; 3]) -> &'static str {
     STRATA[0]
 }
 
+/// Which columns of the cube at (`ox`, `oz`) (blocks), ground `heights` high (z * 16 + x), are low
+/// coast by the sea that keeps a beach's sand (`SEA_SAND`). Whether the sea is near is read from
+/// nodes every 4 blocks on the world's grid (the same for every cube), so neighbours agree.
+pub fn sea_sand(f: &Fields, ox: i32, oz: i32, heights: &[i32; 256]) -> [bool; 256] {
+    let mut out = [false; 256];
+    let low = |i: usize| (SEA - 1..=SEA + 1).contains(&heights[i]);
+    let coast = |x: i32, z: i32| {
+        let here = Here::new(f, x * 16, z * 16);
+        let c = here.continent();
+        c >= q12(BEACH_CONTINENT) && c < q12(OCEAN_CONTINENT) && here.temperature() >= q12(SNOWY_BELOW)
+    };
+    let wanted: Vec<usize> = (0..256)
+        .filter(|&i| low(i) && coast(ox + (i % 16) as i32, oz + (i / 16) as i32))
+        .collect();
+    if wanted.is_empty() {
+        return out;
+    }
+    // Nodes from SEA_SAND before the cube to SEA_SAND past it, every 4 blocks.
+    let n = (16 + 2 * SEA_SAND) / 4 + 1;
+    let (nx, nz) = (ox - SEA_SAND, oz - SEA_SAND);
+    let sea: Vec<bool> = (0..n * n)
+        .map(|k| land_height(f, (nx + (k % n) * 4) * 16, (nz + (k / n) * 4) * 16) < q4(SEA as f64))
+        .collect();
+    for i in wanted {
+        let (x, z) = (ox + (i % 16) as i32, oz + (i / 16) as i32);
+        out[i] = (0..n * n).any(|k| {
+            let (dx, dz) = (nx + (k % n) * 4 - x, nz + (k / n) * 4 - z);
+            sea[k as usize] && dx * dx + dz * dz <= SEA_SAND * SEA_SAND
+        });
+    }
+    out
+}
+
 /// The overworld biome the rules in `mods/base/src/land.rs` pick at (`x`, `z`) (Q4), by name, in
 /// their order: for the map preview and the checks here (the engine's own pick is the truth).
 pub fn overworld_biome(f: &Fields, x: i32, z: i32) -> &'static str {
@@ -1589,7 +1634,7 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
         if top { "coral_reef" } else { "lagoon" }
     } else if h <= SEA - 2 && c < at(OCEAN_CONTINENT) {
         "ocean"
-    } else if h <= SEA + 1 && c < at(0.1) {
+    } else if h <= SEA + 1 && c < at(BEACH_CONTINENT) {
         if t < at(SNOWY_BELOW) { "snowy_plains" } else { "beach" }
     } else if MOUNTAINS_AREA.at(&here) > at(MOUNTAIN_BIOME) || snowy(f, x, z, h) {
         "mountains"

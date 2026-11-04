@@ -50,9 +50,13 @@ pub fn terrain(r: &mut Registry) {
             BiomeRule::new("snowy_plains")
                 .named("snowy_coast")
                 .height(..=SEA + 1)
-                .continent(..0.1),
+                .continent(..l::BEACH_CONTINENT),
         )
-        .biome(BiomeRule::new("beach").height(..=SEA + 1).continent(..0.1));
+        .biome(
+            BiomeRule::new("beach")
+                .height(..=SEA + 1)
+                .continent(..l::BEACH_CONTINENT),
+        );
     // Snow on the heights, the line lower in the cold and in drifts (`base_api::land::snowy`); the
     // ground is the mountains' (their climate), only its surface is snow.
     let mut low = f64::NEG_INFINITY;
@@ -106,6 +110,7 @@ pub fn terrain(r: &mut Registry) {
     r.decorate(cave_mouths).dimension(&crate::OVERWORLD);
     r.decorate(glaciers).dimension(&crate::OVERWORLD);
     r.decorate(fray_borders).dimension(&crate::OVERWORLD);
+    r.decorate(sea_sand).dimension(&crate::OVERWORLD);
     r.decorate(coral).dimension(&crate::OVERWORLD);
     r.decorate(landmarks).dimension(&crate::OVERWORLD);
     r.decorate(tropical_water).dimension(&crate::OVERWORLD);
@@ -298,6 +303,28 @@ fn fray_borders(g: &mut Gen) {
                 if SOIL.contains(&g.get(x, y, z)) {
                     g.set(x, y, z, rock(if wy == h { top } else { under }));
                 }
+            }
+        }
+    }
+}
+
+/// Sand on the low coast by the sea that the beach rule no longer reaches
+/// (`base_api::land::sea_sand`, `BEACH_CONTINENT`): its grass and dirt, `SEA_SAND_DEEP` blocks,
+/// become sand. After the borders' fray, before the plants (which then find sand).
+fn sea_sand(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let [ox, oy, oz] = g.origin();
+    if oy > SEA + 1 || oy + 15 < SEA - 1 - l::SEA_SAND_DEEP {
+        return;
+    }
+    let heights: [i32; 256] = std::array::from_fn(|i| cols[i].height);
+    let sand = l::sea_sand(&l::fields(g.seed()), ox, oz, &heights);
+    for (i, _) in sand.iter().enumerate().filter(|s| *s.1) {
+        let (x, z, h) = (i % 16, i / 16, heights[i]);
+        for wy in (h - l::SEA_SAND_DEEP + 1).max(oy)..=h.min(oy + 15) {
+            let y = (wy - oy) as usize;
+            if SOIL.contains(&g.get(x, y, z)) {
+                g.set(x, y, z, SAND.id());
             }
         }
     }
