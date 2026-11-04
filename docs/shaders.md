@@ -162,7 +162,7 @@ chiacraft's pack reads these settings (`mods/base/src/look.rs`; Mod Settings in 
 | `base:look_contrast` | 1, 0.8-1.3 | the day curve's contrast (Lottes's a, 1.2 as made) |
 | `base:look_saturation` | 1, 0.7-1.3 | saturation after the curve, by day (1.2 as made) |
 | `base:look_shade` | 1, 0.5-2 | how fast the sky's light fades under leaves and roofs (more: darker forest floors) |
-| `base:look_haze` | 1, 0-2 | the haze over distance |
+| `base:look_haze` | 1, 0-2 | the air's veil over distance: clear air blues the far land (more in blue than red, so it stays crisp); rain, the weather's fog and a forest's damp air add a grey haze. 1.6 gives more depth haze |
 | `base:look_fog` | 1, 0-2 | how bright fog is |
 | `base:night_light` | 1, 0.3-2 | the night's sky light (nights are dark by design) |
 | `base:night_moon` | 1, 0.3-2 | the moon's light at night |
