@@ -41,6 +41,7 @@ in our crates and mods.
 - After changing numbers, regenerate the sheets (tests fail while they're stale):
   - `cargo run -p vitals --bin sheet > mods/base/vitals/SHEET.md`
   - `mods/animals/web/build.sh && node mods/animals/web/sheet.mjs`
+  - `cargo run -p crafting --bin sheet > mods/base/crafting/SHEET.md`
 
 ## Trying it in the game
 

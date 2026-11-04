@@ -241,6 +241,8 @@ pub struct ServerHandle {
     pub content: &'static Content,
     /// The world's folder (none for a world that isn't saved).
     pub dir: Option<std::path::PathBuf>,
+    /// The server's own values of the synced settings (`config::playing_in`).
+    pub configs: Arc<crate::config::ServerValues>,
     stop: Sender<()>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
@@ -373,6 +375,7 @@ pub fn spawn(cfg: ServerConfig, storage: Option<Storage>) -> ServerHandle {
         run: RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1,
     }));
     let world_content = scope.content;
+    let configs = scope.configs.clone();
     let dir = storage.as_ref().map(|s| s.meta.dir.clone());
     let thread = std::thread::Builder::new()
         .name("server".into())
@@ -393,7 +396,7 @@ pub fn spawn(cfg: ServerConfig, storage: Option<Storage>) -> ServerHandle {
             pool.install(move || run(cfg, incoming, storage, sh, stop_rx, console_rx));
         })
         .expect("spawning server thread");
-    ServerHandle { connect, console, shared, content: world_content, dir, stop, thread: Some(thread) }
+    ServerHandle { connect, console, shared, content: world_content, dir, configs, stop, thread: Some(thread) }
 }
 
 fn run(

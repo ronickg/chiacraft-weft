@@ -37,10 +37,34 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     return out;
 }
 
+// One effect, or with `pad` > 0 that many in a row on this pixel (`packs::merge_effects`), each
+// on the color the one before left; only the first sees the image's alpha.
 @fragment
 fn fs(in: VOut) -> @location(0) vec4<f32> {
+    let first = passes[in.pass_index];
+    var color = textureSampleLevel(textures[first.scene], linear_clamp, in.uv, 0.0);
+    let count = max(first.pad, 1u);
+    for (var k = 0u; k < count; k++) {
+        let pass_ = passes[in.pass_index + k];
+        let px = PostPixel(in.uv, color, pass_.strength, pass_.time, pass_.size, first.scene, pass_.depth);
+        color = vec4(post_apply(pass_.slot, px).rgb, 1.0);
+    }
+    return color;
+}
+
+// A copy of the world before what is seen through is drawn (`Post::copy_behind`): its color and
+// depth, for packs whose water bends and tints what lies under it (`scene.behind`).
+struct BehindOut {
+    @location(0) color: vec4<f32>,
+    @builtin(frag_depth) depth: f32,
+}
+
+@fragment
+fn fs_copy_behind(in: VOut) -> BehindOut {
     let pass_ = passes[in.pass_index];
-    let color = textureSampleLevel(textures[pass_.scene], linear_clamp, in.uv, 0.0);
-    let px = PostPixel(in.uv, color, pass_.strength, pass_.time, pass_.size, pass_.scene, pass_.depth);
-    return vec4(post_apply(pass_.slot, px).rgb, 1.0);
+    let px = vec2<i32>(in.clip.xy);
+    var out: BehindOut;
+    out.color = textureLoad(textures[pass_.scene], px, 0);
+    out.depth = textureLoad(textures[pass_.depth], px, 0).r;
+    return out;
 }

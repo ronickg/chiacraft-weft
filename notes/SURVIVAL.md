@@ -500,6 +500,13 @@ sword, about 100 XP.
   hour as it digests. One spider at dusk had killed a fresh player in 11 s. Dying leaves the same
   light meal (step 13). The rule stays: food sets how much of the stat is reached.
 - A new player also starts with full stamina (it started at 0 and took 14 s to fill).
+- **A bigger arrival meal** (2026-11-04, Ronald: "Bigger arrival meal"): the loaf and apple and a
+  cooked chicken, 65 units: max health 90 and stamina 83 of 100, wearing off as it digests. The
+  world playtest's taiga deaths were falls, not the cold (Plants' PC runs: a naked player there
+  freezes in about 5½ minutes dry, 3¾ wet, as `balance` wants), but with the light meal's 54 max
+  health one 9-block fall took 61% of a fresh player's health. Three foods make one well fed
+  until it digests below half. Respawning gives the same meal (step 13): a death still costs XP and
+  the walk to the tombstone, and respawning at 54 in the cold was the spiral step 13 is against.
 
 **12. Research round 3's survival fixes** (2026-11-04, decided by Ronald via Planner; `reports/Research round 3.md`):
 
@@ -672,4 +679,18 @@ content plan; logged in `notes/crew/OVERNIGHT.md`):
   shows its warmth.
 - Not here: animals' fire reach and wind (`comfort.rs`, `eggs.rs`) and the hunters' hunger
   thresholds written twice (`forage.rs`, `hunt.rs`): the animals mod's.
+
+**21. Crafts that wait** (2026-11-04 overnight, `notes/CONTENT.md` decision 6, taken by the content
+plan; logged in `notes/crew/OVERNIGHT.md`; `vitals::crafts`, `mods/base/src/crafts.rs`):
+
+- What takes days in real life takes its time on the growing pace (game days = 0.0645 · real
+  days^0.7), at a station that keeps working unwatched (and catches up when its area loads):
+  a tanning frame brain-tans a raw hide into buckskin leather (3 real days: 2.8 minutes); a
+  tanning pit soaks hides with oak bark into sole leather (a year: 4.0 game days, 8 at a time);
+  a charcoal clamp chars logs into coal (7 days: 5 minutes, 16 at a time, no fuel).
+- Cows, deer and capybaras drop raw hides now, not leather. Buckskin (`#leather`) makes clothes,
+  books and the rain cape; sole leather (`materials/leather`) makes leather armor. Oak bark is
+  peeled from oak logs at the crafting table.
+- Not yet: retting (it waits for a flax plant), dressing furs (pelts come ready), seasoning bow
+  staves, kilns; the stations' faces are placeholders.
 

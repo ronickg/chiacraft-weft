@@ -57,6 +57,12 @@ shared! {
     /// Distant terrain record (`client::lod`), four words in the faces' pages: x, z in the tile
     /// (11 bits each), direction, tint kind; texture and biome like a face's; y (signed 16 bits)
     /// and the box's height; its width and depth.
+    ///
+    /// Direction `GRID` is a cell of a far tile's smooth ground instead (`lod_grid_cell`): word 2
+    /// is its record's place in the tile, whose first `GRID_WORDS` words are the heights and
+    /// biomes of its `GRID_SIDE` x `GRID_SIDE` corners (from one before the tile's first, `lod_grid`),
+    /// word 3 its cell (i, j) and level. Its corners morph to the next level's shape with distance
+    /// (`lod_corner`).
     lod_face {
         POS_MASK = 2047,
         Z_SHIFT = 11,
@@ -64,6 +70,12 @@ shared! {
         TINT_SHIFT = 25,
         HALF_SHIFT = 16,
         HALF_MASK = 0xFFFF,
+        GRID = 6,
+        GRID_SIDE = 34,
+        GRID_WORDS = 34 * 34,
+        CELL_MASK = 63,
+        CELL_J_SHIFT = 6,
+        LEVEL_SHIFT = 12,
     }
     /// Tint kinds of faces and quads (0 none); mods' kinds follow the engine's.
     tint {
@@ -119,8 +131,13 @@ pub mod terrain {
             FEAT_OFF = 26, RULE_OFF = 27, CAVE_OFF = 28,
             /// Distant terrain's scattered things (`describe_lod`).
             SCATTER_OFF = 29,
+            /// Distant terrain: from what fall (`lod::fall`) the ground is a bare face, where no
+            /// scattered things stand (`Terrain::faces`; `i32::MAX`: none).
+            FACE_FALL = 30,
+            /// The continent noise's scale (Q4, `Terrain::continent_scale`).
+            CONT_SCALE = 31,
             /// The header's length.
-            LEN = 30,
+            LEN = 32,
         }
         /// Words per record of the description, per cube's mods' heights and per cube made.
         words {
@@ -129,8 +146,11 @@ pub mod terrain {
             MASK = 6,
             RULE = 24,
             CAVE = 5,
-            /// Per scatter and biome: threshold (two words), canopy radius, top, block.
-            SCATTER_BIOME = 5,
+            /// Per scatter: cell, reach, hash seed (two words), biomes, thinning mask's place and
+            /// steps, keep.
+            SCATTER = 8,
+            /// Per scatter and biome: threshold (two words), canopy radius, top, block, thinned.
+            SCATTER_BIOME = 6,
             /// Per mod feature and cube: heights at the 256 columns and the 25 corners caves
             /// measure from.
             CUSTOM = 281,
@@ -317,6 +337,102 @@ pub fn lod_record(dir: u32, pos: [i32; 3], size: [i32; 3], tex: u32, tint: u32, 
     ]
 }
 
+/// A cell of a far tile's smooth ground (`lod_face::GRID`): cell (i, j) of a level `level` tile,
+/// the `k`th record of the tile, its top block's texture, tint kind and biome.
+pub fn lod_grid_cell(i: u32, j: u32, level: u32, k: u32, tex: u32, tint: u32, biome: u32) -> [u32; 4] {
+    let s = 1 << level;
+    [
+        i * s | (j * s) << lod_face::Z_SHIFT | lod_face::GRID << lod_face::DIR_SHIFT | tint << lod_face::TINT_SHIFT,
+        tex | biome << face::BIOME_SHIFT,
+        k,
+        i | j << lod_face::CELL_J_SHIFT | level << lod_face::LEVEL_SHIFT,
+    ]
+}
+
+/// A far tile's corner for its smooth ground: the top block's y and the biome.
+pub fn lod_grid(y: i32, biome: u32) -> u32 {
+    (y as u32 & lod_face::HALF_MASK) | biome << lod_face::HALF_SHIFT
+}
+
+/// Distant terrain's vertices, for `vs_lod` (engine's and packs'): needs `records`.
+const LOD_CORNER: &str = "
+// A distant terrain vertex: where it is in its tile, its normal, the face's direction (a smooth
+// cell's is up) and the biome its tint is from.
+struct LodCorner {
+    local: vec3<f32>,
+    normal: vec3<f32>,
+    dir: u32,
+    biome: u32,
+}
+
+fn lod_grid_word(base: u32, i: i32, j: i32) -> u32 {
+    let n = i32(LOD_FACE_GRID_SIDE) - 1;
+    return records[base + u32(clamp(j + 1, 0, n)) * LOD_FACE_GRID_SIDE + u32(clamp(i + 1, 0, n))];
+}
+
+fn lod_grid_y(base: u32, i: i32, j: i32) -> f32 {
+    return f32(bitcast<i32>(lod_grid_word(base, i, j) << LOD_FACE_HALF_SHIFT) >> LOD_FACE_HALF_SHIFT);
+}
+
+// Corner (`i`, `j`) of a smooth tile, `m` of the way to the next level's shape: on its grid of
+// even corners, odd ones lie on the line or square between them (CDLOD's morph). That level's
+// tiles have these very corners, so tiles meet without a seam and a level swap doesn't jump.
+fn lod_grid_morphed(base: u32, i: i32, j: i32, m: f32) -> f32 {
+    let h = lod_grid_y(base, i, j);
+    let oi = (i & 1) != 0;
+    let oj = (j & 1) != 0;
+    var t = h;
+    if oi && oj {
+        t = 0.25 * (lod_grid_y(base, i - 1, j - 1) + lod_grid_y(base, i + 1, j - 1) + lod_grid_y(base, i - 1, j + 1) + lod_grid_y(base, i + 1, j + 1));
+    } else if oi {
+        t = 0.5 * (lod_grid_y(base, i - 1, j) + lod_grid_y(base, i + 1, j));
+    } else if oj {
+        t = 0.5 * (lod_grid_y(base, i, j - 1) + lod_grid_y(base, i, j + 1));
+    }
+    return mix(h, t, m);
+}
+
+fn lod_box_normal(dir: u32) -> vec3<f32> {
+    switch dir {
+        case 0u: { return vec3(-1.0, 0.0, 0.0); }
+        case 1u: { return vec3(1.0, 0.0, 0.0); }
+        case 2u: { return vec3(0.0, -1.0, 0.0); }
+        case 3u: { return vec3(0.0, 1.0, 0.0); }
+        case 4u: { return vec3(0.0, 0.0, -1.0); }
+        default: { return vec3(0.0, 0.0, 1.0); }
+    }
+}
+
+// Corner `c` of record `f`; `at` is its tile's origin from the camera. A level's tiles are shown
+// from about 4 to 8 of their widths away; a smooth one has the next level's shape from 8 on, its
+// own from 6 in.
+fn lod_corner(f: u32, c: u32, at: vec3<f32>) -> LodCorner {
+    let w0 = records[f * 4u];
+    let w1 = records[f * 4u + 1u];
+    let w2 = records[f * 4u + 2u];
+    let w3 = records[f * 4u + 3u];
+    let dir = lod_dir(w0);
+    if dir != LOD_FACE_GRID {
+        let lo = lod_pos(w0, w2) - vec3(0.0, 0.125, 0.0);
+        return LodCorner(lo + CORNERS[dir * 4u + c] * lod_size(w2, w3), lod_box_normal(dir), dir, w1 >> FACE_BIOME_SHIFT);
+    }
+    let base = (f - w2) * 4u;
+    let s = f32(1u << ((w3 >> LOD_FACE_LEVEL_SHIFT) & 7u));
+    let k = CORNERS[3u * 4u + c];
+    let i = i32(w3 & LOD_FACE_CELL_MASK) + i32(k.x);
+    let j = i32((w3 >> LOD_FACE_CELL_J_SHIFT) & LOD_FACE_CELL_MASK) + i32(k.z);
+    let xz = vec2(f32(i), f32(j)) * s;
+    let width = 32.0 * s;
+    let m = clamp((length(at.xz + xz) - 6.0 * width) / (2.0 * width), 0.0, 1.0);
+    let y = lod_grid_morphed(base, i, j, m);
+    let dx = lod_grid_y(base, i + 1, j) - lod_grid_y(base, i - 1, j);
+    let dz = lod_grid_y(base, i, j + 1) - lod_grid_y(base, i, j - 1);
+    let normal = normalize(vec3(-dx, 2.0 * s, -dz));
+    let biome = lod_grid_word(base, i, j) >> LOD_FACE_HALF_SHIFT;
+    return LodCorner(vec3(xz.x, y + 1.0 - 0.125, xz.y), normal, 3u, biome);
+}
+";
+
 /// The WGSL side of the records above: `CORNERS` and their decoders.
 fn records() -> String {
     let corners: Vec<String> = CORNERS
@@ -468,6 +584,22 @@ gpu_struct! {
         /// x the shadow map's bindless index, y its size in texels, z 1 while it holds this
         /// frame's shadows (0: none, fall back), w the blocks a texel covers.
         pub shadow: [f32; 4],
+        /// The world as it was before what is seen through it was drawn (`water_behind` packs):
+        /// x its color's bindless index, y its depth's, z 1 while they hold this frame's (0: none),
+        /// w unused. Only what is drawn after (water, glass) may read them.
+        pub behind: [f32; 4],
+        /// The far shadow cascade, as `shadow_view_proj` and `shadow` for the near one: coarser,
+        /// 400 blocks to each side, where the near one ends.
+        pub shadow_far_view_proj: [[f32; 4]; 4],
+        pub shadow_far: [f32; 4],
+        /// The sky's cloud layer, for packs' cloud shadows: x its picture's bindless index + 1 (0:
+        /// no clouds), y the blocks a picture cell covers, z its underside's height over the camera
+        /// (blocks), w how much of the picture's gaps the weather fills (0..1, a hash per cell
+        /// decides which).
+        pub clouds: [f32; 4],
+        /// Where the camera is under it: x and z (in `xy`) its place in its cell, 0..1, and the
+        /// cell in the picture (`zw`), as the sky's cloud pass reads them.
+        pub cloud_cells: [f32; 4],
     }
 }
 
@@ -868,6 +1000,7 @@ pub fn prelude(shader: &str, common: &str) -> String {
     }
     if shader == "world.wgsl" {
         s.push_str(SOLID_AT);
+        s.push_str(LOD_CORNER);
     }
     s.push_str(common);
     s.push('\n');
@@ -952,6 +1085,31 @@ mod tests {
         naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all())
             .validate(&module)
             .expect("records validate");
+    }
+
+    /// Distant terrain's vertex helper compiles against the records' decoders, and a smooth
+    /// cell's words hold what it reads.
+    #[test]
+    fn lod_corner_compiles() {
+        let cell = lod_grid_cell(31, 5, 4, 300, 77, 2, 9);
+        assert_eq!((cell[0] >> lod_face::DIR_SHIFT) & face::DIR_MASK, lod_face::GRID);
+        assert_eq!([cell[0] & lod_face::POS_MASK, (cell[0] >> lod_face::Z_SHIFT) & lod_face::POS_MASK], [31 * 16, 5 * 16]);
+        assert_eq!(
+            [cell[3] & lod_face::CELL_MASK, (cell[3] >> lod_face::CELL_J_SHIFT) & lod_face::CELL_MASK, cell[3] >> lod_face::LEVEL_SHIFT],
+            [31, 5, 4]
+        );
+        assert_eq!(((lod_grid(-7, 3) << 16) as i32) >> 16, -7);
+        assert_eq!(lod_face::GRID_WORDS % 4, 0);
+        let src = format!(
+            "{}{}@group(0) @binding(0) var<storage, read> records: array<u32>;\n{LOD_CORNER}\n\
+             @vertex fn main(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4<f32> {{ let k = lod_corner(vi / 4u, vi % 4u, vec3(1.0)); return vec4(k.local + k.normal, f32(k.dir + k.biome)); }}\n",
+            wgsl(),
+            records(),
+        );
+        let module = naga::front::wgsl::parse_str(&src).expect("lod_corner parses");
+        naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all())
+            .validate(&module)
+            .expect("lod_corner validates");
     }
 
     /// The terrain prelude parses, and the header has room for every seed.

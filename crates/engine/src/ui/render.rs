@@ -106,6 +106,22 @@ fn face_of(skin: &crate::assets::Image) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// Whether stretching an image of `pixels` over `r` (screen pixels) leaves its pixels uneven: a
+/// scale that isn't a whole number, or not the same both ways. A box smaller than the image is
+/// left alone (a thumbnail, a picture shown small on purpose).
+fn uneven_stretch(r: Rect, pixels: [f32; 2]) -> bool {
+    // A 1x1 or 2x2 picture is a solid fill (an overlay, a panel's colour): any stretch is fine.
+    if pixels[0] <= 2.0 && pixels[1] <= 2.0 {
+        return false;
+    }
+    if pixels[0] <= 0.0 || pixels[1] <= 0.0 || r.w < pixels[0] || r.h < pixels[1] {
+        return false;
+    }
+    let (sx, sy) = (r.w / pixels[0], r.h / pixels[1]);
+    let whole = |s: f32| (s - s.round()).abs() < 0.02;
+    !(whole(sx) && whole(sy) && (sx - sy).abs() < 0.02)
+}
+
 fn parse_gui(src: &str, pixels: [f32; 2]) -> Slicing {
     let mut kind = "nine_slice";
     let mut border = [0.0f32; 4];
@@ -152,6 +168,8 @@ pub struct UiRenderer {
     /// drawn for (`outset` in its `.gui`: shadows, frames drawn around the content).
     slicing: FxHashMap<String, Option<Slicing>>,
     outset: FxHashMap<String, f32>,
+    /// Bare textures already warned about (`check_bare`).
+    warned_bare: std::collections::HashSet<String>,
     owned: Vec<TextureId>,
     buffers: Vec<(BufferId, u32)>,
     screen: Vec<BufferId>,
@@ -213,6 +231,7 @@ impl UiRenderer {
             strips: FxHashMap::default(),
             slicing: FxHashMap::default(),
             outset: FxHashMap::default(),
+            warned_bare: Default::default(),
             owned: Vec::new(),
             buffers: Vec::new(),
             screen,
@@ -417,6 +436,12 @@ impl UiRenderer {
         loaded
     }
 
+    /// Whether GUI texture `name` declares a nine-slice in its `.gui`.
+    fn sliced(&mut self, gpu: &mut dyn Backend, assets: &Assets, name: &str) -> bool {
+        let Some(t) = self.texture(gpu, assets, name) else { return false };
+        matches!(self.declared_slicing(assets, name, [t.1 as f32, t.2 as f32]), Some(Slicing::Nine { .. }))
+    }
+
     fn declared_slicing(&mut self, assets: &Assets, name: &str, pixels: [f32; 2]) -> Option<Slicing> {
         if let Some(s) = self.slicing.get(name) {
             return *s;
@@ -468,12 +493,32 @@ impl UiRenderer {
             Slicing::Nine { border, .. } => Slicing::Nine { size: pixels, border },
             f => f,
         });
+        if declared.is_none() {
+            self.check_bare(name, r, pixels);
+        }
         match slicing {
             Slicing::Nine { size, border } => self.nine_sliced(r, tex.0, size, border, scale, color),
             Slicing::Tile { size, turn } => self.tile(r, tex, size[0] * scale, turn, color),
             Slicing::Stretch => self.image(r, tex.0, [0.0, 0.0, 1.0, 1.0], color),
         }
         true
+    }
+
+    /// A texture with no `.gui` is stretched over its box: right for an icon or a picture drawn at
+    /// its own size or a whole multiple of it, wrong for pixel art squashed or drawn at a
+    /// fraction (its pixels come out uneven). Says so once per texture, so it gets a `.gui`.
+    fn check_bare(&mut self, name: &str, r: Rect, pixels: [f32; 2]) {
+        if !uneven_stretch(r, pixels) || !self.warned_bare.insert(name.to_string()) {
+            return;
+        }
+        log::warn!(
+            "gui texture {name} ({}x{}) has no .gui and is stretched to {}x{} screen pixels, not a whole multiple: \
+             its pixels come out uneven; give it a .gui (nine_slice with a border, or tile)",
+            pixels[0],
+            pixels[1],
+            r.w,
+            r.h
+        );
     }
 
     /// A class's look in a state (`ui::look`): the shader its `.gui` names, else its texture,
@@ -520,14 +565,13 @@ impl UiRenderer {
     pub fn draw_loaded(&mut self, name: &str, r: Rect, scale: f32, color: u32) -> bool {
         let Some(Some(tex)) = self.textures.get(name).copied() else { return false };
         let pixels = [tex.1 as f32, tex.2 as f32];
-        let slicing = self
-            .slicing
-            .get(name)
-            .copied()
-            .flatten()
-            .unwrap_or(Slicing::Stretch);
+        let declared = self.slicing.get(name).copied().flatten();
+        let slicing = declared.unwrap_or(Slicing::Stretch);
         let o = self.outset.get(name).copied().unwrap_or(0.0) * scale;
         let r = Rect { x: r.x - o, y: r.y - o, w: r.w + 2.0 * o, h: r.h + 2.0 * o };
+        if declared.is_none() {
+            self.check_bare(name, r, pixels);
+        }
         match slicing {
             Slicing::Nine { size, border } => {
                 self.nine_sliced(r, tex.0, if size == [0.0; 2] { pixels } else { size }, border, scale, color)
@@ -662,6 +706,8 @@ impl UiRenderer {
             if pass && shadow.is_none() {
                 continue;
             }
+            // The shadow is one font pixel straight down (the UI guide's rule): down and right,
+            // it made every label's visible group lean right by half a pixel.
             let off = if pass { px * self.font.pixel } else { 0.0 };
             for (index, it) in items.iter().enumerate() {
                 match *it {
@@ -677,7 +723,7 @@ impl UiRenderer {
                         // Whole physical pixels: centered text starts mid-pixel, and nearest sampling
                         // at texel borders would drop or double glyph columns.
                         self.quads.push(Quad {
-                            p0: [(x + (gx + g.bearing) * px + off).round(), (y + (gy + self.font.top) * px + off).round()],
+                            p0: [(x + (gx + g.bearing) * px).round(), (y + (gy + self.font.top) * px + off).round()],
                             u: [w, 0.0],
                             v: [0.0, self.font.height * px],
                             uv,
@@ -712,19 +758,32 @@ impl UiRenderer {
         let looks = crate::client::looks::current();
         match looks.slot_draw(c, item) {
             crate::client::looks::ItemDraw::Model(model) => self.boxes_icon(tex, x, y, size, model, &c.states[0]),
-            crate::client::looks::ItemDraw::Icon(icon) => self.quads.push(Quad {
-                p0: [x, y],
-                u: [size, 0.0],
-                v: [0.0, size],
-                uv: [0.0, 0.0, 1.0, 1.0],
-                color: 0xFFFFFFFF,
-                tex: tex.texture(icon),
-                mode: ui_mode::ICON,
-                ..Default::default()
-            }),
+            crate::client::looks::ItemDraw::Icon(icon) => self.icon(tex, x, y, size, icon),
             crate::client::looks::ItemDraw::Block(state) => self.state_icon(c, tex, x, y, size, state),
             crate::client::looks::ItemDraw::Nothing => {}
         }
+    }
+
+    /// A stack's icon: its own look (`abi::comp::LOOK`) if it has one, else its item's.
+    pub fn stack_item_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, stack: &weft_abi::ItemStack) {
+        match crate::stack::look(stack).and_then(|l| tex.look(l)) {
+            Some(t) => self.icon(tex, x, y, size, t),
+            None => self.item_icon(c, tex, x, y, size, stack.item),
+        }
+    }
+
+    /// Texture `t` as a flat icon.
+    fn icon(&mut self, tex: &GameTextures, x: f32, y: f32, size: f32, t: u32) {
+        self.quads.push(Quad {
+            p0: [x, y],
+            u: [size, 0.0],
+            v: [0.0, size],
+            uv: [0.0, 0.0, 1.0, 1.0],
+            color: 0xFFFFFFFF,
+            tex: tex.texture(t),
+            mode: ui_mode::ICON,
+            ..Default::default()
+        });
     }
 
     /// A block state the way block items show: a sprite for flat blocks, else an isometric model.
@@ -895,11 +954,11 @@ impl UiRenderer {
         let s = 16.0 * scale;
         let (x, y) = (r.x + (r.w - s) / 2.0, r.y + (r.h - s) / 2.0);
         let i = icon * scale;
-        self.item_icon(c, textures, r.x + (r.w - i) / 2.0, r.y + (r.h - i) / 2.0, i, stack.item);
-        let def = &c.items[stack.item as usize];
+        self.stack_item_icon(c, textures, r.x + (r.w - i) / 2.0, r.y + (r.h - i) / 2.0, i, &stack);
+        let max = c.max_durability(&stack);
         let damage = crate::stack::damage(&stack);
-        if def.durability > 0 && damage > 0 {
-            let f = 1.0 - damage as f32 / def.durability as f32;
+        if max > 0 && damage > 0 {
+            let f = 1.0 - damage as f32 / max as f32;
             let bar = Rect { x: x + scale, y: y + s - 2.0 * scale, w: 14.0 * scale, h: 2.0 * scale };
             self.rect(bar, 0x000000FF);
             let g = (f * 255.0) as u32;
@@ -1090,6 +1149,20 @@ impl UiRenderer {
                 background(self, class, "");
                 let v = value.clamp(0.0, 1.0);
                 match look.texture(class, "fill") {
+                    // A fill that slices (its `.gui` says nine_slice) is laid over the whole bar
+                    // like its frame and cut to the share, so its rounded ends keep their pixels
+                    // at any width; a plain one is stretched and cropped as before.
+                    Some(fill) if self.sliced(gpu, assets, &fill) => {
+                        if v > 0.0 {
+                            let start = self.quads.len();
+                            self.draw_gui(gpu, assets, &fill, r, scale, 0xFFFFFFFF, Slicing::Stretch);
+                            let c = cropped(r, super::meter::crop(v, *dir));
+                            let cut = [c.x.round(), c.y.round(), (c.x + c.w).round(), (c.y + c.h).round()];
+                            for q in &mut self.quads[start..] {
+                                q.clip = cut;
+                            }
+                        }
+                    }
                     Some(fill) => self.meter_picture(gpu, assets, &fill, v, *dir, r, scale),
                     None => self.checker(cropped(r, super::meter::crop(v, *dir)), scale),
                 }
@@ -1209,8 +1282,38 @@ impl UiRenderer {
         }
         self.icon_clips.resize(icon_start, [0.0; 4]);
         self.icon_clips.resize(icons.len(), clip);
+        let (children_quads, children_icons) = (self.quads.len(), icons.len());
         for &c in &n.children {
             self.node(gpu, assets, ui, look, c, scale, icons, custom, inner_surface);
+        }
+        // A button held down sinks: what it shows (label, icon, item) moves down a UI pixel, half a
+        // GUI pixel, whole screen pixels at the even scales. Its `.gui` can say how far
+        // (`press_offset`, GUI pixels, 0 for none), and whether a selected one sinks too
+        // (`selected_offset`, none unless it says: a selected tab stands up, it doesn't sink).
+        let sink = match &n.kind {
+            Kind::Button { class, enabled: true, selected, .. } if !class.is_empty() => {
+                let (key, default) = if ui.pressed == Some(id) {
+                    ("press_offset", 0.5)
+                } else if *selected {
+                    ("selected_offset", 0.0)
+                } else {
+                    ("", 0.0)
+                };
+                let set = (!key.is_empty())
+                    .then(|| look.sidecar(class, key))
+                    .flatten()
+                    .and_then(|v| v.trim().parse::<f32>().ok());
+                if key.is_empty() { 0.0 } else { (set.unwrap_or(default) * scale).round() }
+            }
+            _ => 0.0,
+        };
+        if sink != 0.0 {
+            for q in &mut self.quads[children_quads..] {
+                q.p0[1] += sink;
+            }
+            for i in &mut icons[children_icons..] {
+                i.1 += sink;
+            }
         }
         if let Some(bar) = n.scrollbar {
             let start = self.quads.len();
@@ -1300,7 +1403,20 @@ mod slicing_tests {
     #[test]
     fn gui_sidecar() {
         assert_eq!(parse_gui("border = 2 3 4 5\n", [16.0, 16.0]), Slicing::Nine { size: [16.0, 16.0], border: [2.0, 3.0, 4.0, 5.0] });
+        // Half GUI pixels: a 3-pixel frame in a texture drawn at twice the GUI's resolution.
+        assert_eq!(
+            parse_gui("scaling = nine_slice\nborder = 4.5\nsize = 32 32\n", [64.0, 64.0]),
+            Slicing::Nine { size: [32.0, 32.0], border: [4.5; 4] }
+        );
         assert_eq!(parse_gui("scaling = tile\nsize = 32 32", [64.0, 64.0]), Slicing::Tile { size: [32.0, 32.0], turn: false });
+        // A bare image is fine at its size and whole multiples, not squashed or at a fraction.
+        let r = |w: f32, h: f32| Rect { x: 0.0, y: 0.0, w, h };
+        assert!(!uneven_stretch(r(48.0, 48.0), [48.0, 48.0]));
+        assert!(!uneven_stretch(r(96.0, 96.0), [48.0, 48.0]));
+        assert!(uneven_stretch(r(72.0, 72.0), [48.0, 48.0]));
+        assert!(uneven_stretch(r(96.0, 48.0), [48.0, 48.0]));
+        assert!(!uneven_stretch(r(24.0, 24.0), [48.0, 48.0]));
+        assert!(!uneven_stretch(r(3456.0, 2234.0), [1.0, 1.0]));
         assert_eq!(parse_gui("scaling = tile\nturn = random", [32.0, 32.0]), Slicing::Tile { size: [32.0, 32.0], turn: true });
     }
 }

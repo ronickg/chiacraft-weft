@@ -32,6 +32,7 @@ ui.panel("panel", S::col().pad(7.0).gap(4.0), |ui| {
 | `panel(class, s, ..)` | a column with the class's background, `"panel"` is the usual window |
 | `text(key)` | a translation. `text_args(key, &[Arg::Int(5)])` fills `{0}` and the rest, `text_styled(s, key, args)` takes a style too (class, size, one line, `mono`) |
 | `button(key, s, on_click)` | a button with a translated label (`button_args` with arguments); the closure runs on click and can drive the game through `c.client()` (open screens and worlds, quit, change settings), even in the main menu |
+| `button_with(s, on_click, parts)` | a button holding other parts instead of a label, such as an item's icon |
 | `input(value, max, s, on_change)` | a one-line text field; the closure gets the text after every edit |
 | `slider(s, value, on_change)` | a slider at `value` (0..1, read every frame); the closure gets where it is dragged |
 | `item(id, count, s)` | an item's icon with its count |
@@ -96,6 +97,7 @@ r.screen(&ABOUT, |ui| {
 r.client_command("about", "", |c| { c.client().open_screen(&ABOUT); });
 ```
 `open_screen(&ABOUT)` works from a client command, a key or a button, and the command line takes it too as `--screen examplemod:about`.
+A screen is built when it opens. One whose parts follow state of its own (a page, a picked entry) keeps that state itself and calls `c.client().rebuild_screen()` when it changes, and its builder runs again (base's recipe book, `mods/base/src/book.rs`).
 
 Registering an engine screen's handle replaces that screen, so `r.screen(&screens::PAUSE, ..).pauses()` is your own pause screen. The engine's are in `screens::*`: `TITLE`, `PAUSE`, `SETTINGS`, `LANGUAGE`, `CONTROLS`, `SOUND`, `MOD_SETTINGS`, `MODS`, `PROFILE`, `WORLDS`, `CREATE_WORLD`, `MULTIPLAYER`, `RESOURCE_PACKS`, `SHADER_PACKS`, `CHAT` and `DEATH`. The engine's own screens open each other through the same names, so a replaced settings screen is the one the main menu's button opens.
 
@@ -190,7 +192,7 @@ A texture used as a background has to be stretched over parts of any size, and a
 scaling = nine_slice
 border = 4
 ```
-`scaling` is `nine_slice` (the corners keep their size, the edges and middle stretch), `tile` or `stretch`. `border` is one number for all sides or `left top right bottom`, in GUI pixels. Two more keys exist for special cases: `size = w h` for an image with more pixels than the GUI pixels it stands for, and `outset = n` for textures that reach outside their box, like shadows. A slot's `.gui` can say how big items are drawn in it, `icon = 14` (GUI pixels, 16 without), so they sit inside a thick frame. A square `tile` texture can take `turn = random`: every tile is turned and mirrored its own way, so a big background doesn't show the repeat. An image without one is simply stretched.
+`scaling` is `nine_slice` (the corners keep their size, the edges and middle stretch), `tile` or `stretch`. `border` is one number for all sides or `left top right bottom`, in GUI pixels. Two more keys exist for special cases: `size = w h` for an image with more pixels than the GUI pixels it stands for, and `outset = n` for textures that reach outside their box, like shadows. A slot's `.gui` can say how big items are drawn in it, `icon = 14` (GUI pixels, 16 without), so they sit inside a thick frame. A square `tile` texture can take `turn = random`: every tile is turned and mirrored its own way, so a big background doesn't show the repeat. `border` takes halves (`border = 4.5`), for textures drawn at twice the GUI's resolution, where one of their pixels is half a GUI pixel. An image without a `.gui` is simply stretched; the log warns once when that stretch isn't a whole multiple of its size or squashes it, because its pixels then come out uneven. A button held down moves its label and icons down by `press_offset` (GUI pixels, 0.5 by default, 0 for none), and a selected one by `selected_offset` (0 by default: a selected tab stands up rather than sinking), both read from the button class's own `.gui`.
 
 ## Shaders and animations
 A class's `.gui` can name a shader, and the part is then filled by `shaders/gui/<name>.wgsl` instead of the picture (`testmod_panel.gui`):

@@ -207,6 +207,12 @@ version, its calls so far, their average and slowest time, and its strikes in th
 minutes, and why one has stopped. An admin starts a stopped one again with `/mods resume
 <package>` (its strikes forgotten, its memory new, its storage kept).
 
+`/client_mods` is the same for the client halves running in your own game, packages' and
+personal ones, by frame: each one's time a frame on average and in the worst frame of the last
+240 (about four seconds), its calls a frame, its slowest call, its strikes, and then all of them
+together. Every call into a half is timed (starting it again after a strike included): HUD
+builds, bindings, keys, packets and its frame hook.
+
 ## Versions
 
 API versions are frozen once released. `crates/sandbox/wit/v1.0/` and `v1.1/` never change

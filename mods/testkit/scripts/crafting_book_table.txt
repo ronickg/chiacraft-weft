@@ -1,0 +1,34 @@
+# Crafting slice 1, at a table: the book takes from the bag and from a chest by the table.
+# The player has 1 iron ingot; the sticks are only in the chest, so an iron shovel proves the
+# chest was used. One copy, a fresh world.
+loaded
+idle
+chat /tk mode survival
+until mode survival within 10
+chat /tk fill ~-3 ~-1 ~-3 ~3 ~-1 ~3 base:stone
+chat /tk fill ~-3 ~ ~-3 ~3 ~3 ~3 core:air
+chat /tk set ~ ~1 ~-2 base:crafting_table
+chat /tk set ~2 ~ ~-2 base:chest
+until block ~2 ~ ~-2 base:chest within 10
+chat /tk insert ~2 ~ ~-2 base:stick 8
+chat /tk give base:iron_ingot 1
+chat /tk inv me
+look 0 0
+press core:use
+until screen core:menu within 10
+wait 1
+shot book_table_open.png
+tap core:menu text:tools
+wait 1
+shot book_table_tools.png
+tap_once core:menu class:slot
+wait 1
+shot book_table_picked.png
+tap core:menu text:all (
+wait 1
+chat /tk inv me
+until chat base:iron_shovel within 5
+shot book_table_after.png
+key Escape
+until screen none within 10
+quit

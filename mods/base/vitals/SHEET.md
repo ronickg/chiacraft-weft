@@ -18,7 +18,7 @@ Written from `mods/base/vitals` (`cargo run -p vitals --bin sheet > mods/base/vi
 
 Comfortable air for a person, unclothed: (15.0, 28.0) °C.
 
-A new player arrives with base:bread and base:apple in the stomach (43 units): max health 54 and stamina 75 of 100, wearing off as it digests (an empty stomach: 40). A new world begins on spring's day 8, a quarter of the year from midwinter.
+A new player arrives with base:bread and base:apple and base:cooked_chicken in the stomach (65 units): max health 90 and stamina 82 of 100, wearing off as it digests (an empty stomach: 40). A new world begins on spring's day 8, a quarter of the year from midwinter.
 
 ## Foods
 
@@ -26,38 +26,38 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 
 | food | kind | g | units | protein | energy | fat | greens | water | digests | keeps | |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| base:apple | fruit | 180 | 18 | 1 | 25 | 0 | 5 | 154 | 9 min | 20 + 20 | cooling |
+| base:apple | fruit | 180 | 18 | 1 | 21 | 0 | 5 | 154 | 9 min | 20 + 20 | cooling |
 | base:bread | seeds | 250 | 25 | 22 | 122 | 8 | 7 | 90 | 26 min | 5 + 5 | hot when cooked |
 | base:porkchop | meat | 150 | 15 | 31 | 0 | 9 | 0 | 108 | 22 min | 2 + 2 | raw |
 | base:cooked_porkchop | meat | 110 | 11 | 30 | 0 | 10 | 0 | 67 | 19 min | 4 + 4 | hot when cooked |
 | base:beef | meat | 200 | 20 | 42 | 0 | 16 | 0 | 140 | 31 min | 2 + 2 | raw |
 | base:cooked_beef | meat | 150 | 15 | 42 | 0 | 16 | 0 | 88 | 28 min | 4 + 4 | hot when cooked |
-| base:chicken | meat | 300 | 30 | 56 | 0 | 45 | 0 | 206 | 53 min | 2 + 2 | raw |
+| base:chicken | meat | 300 | 30 | 56 | 0 | 45 | 0 | 198 | 53 min | 2 + 2 | raw |
 | base:cooked_chicken | meat | 220 | 22 | 60 | 0 | 30 | 0 | 131 | 43 min | 4 + 4 | hot when cooked |
 | base:mutton | meat | 150 | 15 | 26 | 0 | 24 | 0 | 96 | 26 min | 2 + 2 | raw |
 | base:cooked_mutton | meat | 110 | 11 | 28 | 0 | 18 | 0 | 63 | 22 min | 4 + 4 | hot when cooked |
 | base:rotten_flesh | carrion | 120 | 12 | 18 | 0 | 12 | 0 | 78 | 18 min | 0 + 0 | raw |
 | base:spider_eye | insects | 30 | 3 | 4 | 1 | 1 | 0 | 22 | 4 min | 3 + 3 | raw, poisonous |
 | base:cooked_egg | meat | 100 | 10 | 14 | 1 | 15 | 0 | 70 | 16 min | 2 + 2 | hot when cooked |
-| base:apple_pie | fruit | 200 | 20 | 5 | 74 | 25 | 4 | 104 | 25 min | 4 + 4 | hot when cooked |
-| base:berries | fruit | 100 | 10 | 1 | 14 | 0 | 3 | 84 | 5 min | 6 + 6 | cooling |
+| base:apple_pie | fruit | 200 | 20 | 4 | 65 | 25 | 4 | 105 | 24 min | 4 + 4 | hot when cooked |
+| base:berries | fruit | 100 | 10 | 1 | 12 | 0 | 3 | 84 | 5 min | 6 + 6 | cooling |
 | base:dried_meat | meat | 75 | 8 | 41 | 2 | 11 | 0 | 15 | 20 min | 30 + 30 |  |
 | base:smoked_meat | meat | 120 | 12 | 36 | 0 | 17 | 0 | 60 | 24 min | 14 + 14 |  |
 | base:salted_meat | meat | 160 | 16 | 35 | 0 | 22 | 0 | 88 | 29 min | 45 + 45 |  |
-| base:dried_apple | fruit | 40 | 4 | 0 | 26 | 0 | 4 | 13 | 3 min | 56 + 56 |  |
-| base:dried_berries | fruit | 30 | 3 | 1 | 24 | 1 | 2 | 4 | 2 min | 56 + 56 |  |
-| base:lingonberries | fruit | 100 | 10 | 0 | 12 | 0 | 5 | 87 | 5 min | 20 + 20 | cooling |
-| base:cloudberries | fruit | 100 | 10 | 2 | 9 | 1 | 16 | 85 | 6 min | 3 + 3 | cooling |
+| base:dried_apple | fruit | 40 | 4 | 0 | 23 | 0 | 4 | 13 | 3 min | 56 + 56 |  |
+| base:dried_berries | fruit | 30 | 3 | 1 | 22 | 1 | 2 | 4 | 2 min | 56 + 56 |  |
+| base:lingonberries | fruit | 100 | 10 | 0 | 8 | 0 | 5 | 87 | 5 min | 20 + 20 | cooling |
+| base:cloudberries | fruit | 100 | 10 | 2 | 2 | 1 | 16 | 85 | 6 min | 3 + 3 | cooling |
 | base:crowberries | fruit | 100 | 10 | 1 | 7 | 1 | 5 | 85 | 6 min | 10 + 10 | cooling |
-| base:raspberries | fruit | 100 | 10 | 1 | 12 | 1 | 9 | 86 | 5 min | 2 + 2 | cooling |
-| base:prickly_pear_fruit | fruit | 100 | 10 | 1 | 10 | 0 | 5 | 88 | 5 min | 7 + 7 | cooling |
-| base:rose_hip | fruit | 30 | 3 | 0 | 11 | 0 | 20 | 18 | 2 min | 30 + 30 | cooling |
-| base:hazelnut | seeds | 30 | 3 | 4 | 5 | 18 | 3 | 2 | 10 min | 60 + 60 |  |
-| base:pine_nut | seeds | 30 | 3 | 4 | 4 | 21 | 1 | 1 | 11 min | 60 + 60 |  |
-| base:sunflower_seeds | seeds | 30 | 3 | 6 | 6 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
+| base:raspberries | fruit | 100 | 10 | 1 | 5 | 1 | 9 | 86 | 5 min | 2 + 2 | cooling |
+| base:prickly_pear_fruit | fruit | 100 | 10 | 1 | 6 | 0 | 5 | 88 | 5 min | 7 + 7 | cooling |
+| base:rose_hip | fruit | 30 | 3 | 0 | 4 | 0 | 20 | 18 | 2 min | 30 + 30 | cooling |
+| base:hazelnut | seeds | 30 | 3 | 4 | 2 | 18 | 3 | 2 | 10 min | 60 + 60 |  |
+| base:pine_nut | seeds | 30 | 3 | 4 | 3 | 21 | 1 | 1 | 11 min | 60 + 60 |  |
+| base:sunflower_seeds | seeds | 30 | 3 | 6 | 3 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
 | base:kelp | water_plants | 50 | 5 | 1 | 5 | 0 | 1 | 41 | 3 min | 3 + 3 |  |
 | base:cattail_root | roots | 100 | 10 | 1 | 17 | 0 | 3 | 78 | 6 min | 14 + 14 |  |
-| base:cooked_wild_rice | seeds | 150 | 15 | 6 | 32 | 0 | 3 | 111 | 12 min | 3 + 3 | hot when cooked |
+| base:cooked_wild_rice | seeds | 150 | 15 | 6 | 29 | 0 | 3 | 111 | 12 min | 3 + 3 | hot when cooked |
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
 | animals:venison | meat | 200 | 20 | 44 | 0 | 5 | 0 | 147 | 27 min | 2 + 2 | raw |
@@ -127,6 +127,16 @@ An enclosed space (`vitals::shelter`; up to 400 blocks of air, none open to the 
 | hide | +12 °C | 90% |
 | glass | +12 °C | 90% |
 
+## Crafts that wait
+
+What takes days in real life takes its time on the growing pace (`vitals::crafts`; game days = 0.0645 · real days^0.7), at a station that keeps working unwatched.
+
+| station | in | with | out | real days | in the game | holds |
+|---|---|---|---|---|---|---|
+| tanning_frame | #hides | - | base:leather | 3 | 2.8 min | 1 |
+| tanning_pit | #hides | #bark_tannin | base:sole_leather | 365 | 4.0 game days | 8 |
+| charcoal_clamp | #logs | - | base:coal | 7 | 5.0 min | 16 |
+
 ## Effects
 
 | effect | group | changes |
@@ -166,6 +176,7 @@ Each biome's real place (`reports/ecology/Biome climates.md`), year mean, humidi
 | base:savanna | Arauca, the Colombian llanos | 27 | 0.65 | 1.6 | 21 | 36 | 40% | 70% | 45% | 11% |
 | base:swamp | Nhumirim, the Pantanal | 25.1 | 0.42 | 3.4 | 16 | 38 | 18% | 33% | 20% | 7% |
 | base:mountains | Davos, 1,594 m | 6 | 0.63 | 8.8 | -8 | 23 | 32% | 45% | 31% | 29% |
+| base:sequoia_grove | Giant Forest, Sequoia National Park, 1,721 m | 10.4 | 0.49 | 8.4 | -4 | 28 | 20% | 5% | 10% | 24% |
 | base:ocean | Ponta Delgada, the Azores | 18.2 | 0.97 | 4.1 | 11 | 28 | 33% | 19% | 38% | 43% |
 | base:beach | Faro, Portugal | 18.2 | 0.74 | 6.2 | 8 | 32 | 16% | 1% | 16% | 20% |
 | base:deep_caves | any cave: the surface's year mean | 12 | 0.95 | 0 | 12 | 12 | 0% | 0% | 0% | 0% |
@@ -190,6 +201,7 @@ Each place's mean wind in m/s and its share of days with fog, in spring, summer,
 | base:savanna | 1.5 | 1.2 | 1.2 | 1.6 | 1% | 3% | 2% | 0% | before dawn to mid morning |
 | base:swamp | 3.5 | 2.9 | 2.9 | 3.6 | 3% | 4% | 6% | 5% | before dawn to mid morning |
 | base:mountains | 2.4 | 2.7 | 2.2 | 1.7 | 2% | 1% | 3% | 3% | before dawn to mid morning |
+| base:sequoia_grove | 2.0 | 1.8 | 1.6 | 1.8 | 3% | 1% | 2% | 4% | before dawn to mid morning |
 | base:ocean | 3.1 | 2.5 | 2.7 | 3.4 | 2% | 1% | 0% | 0% | off the sea, any hour |
 | base:beach | 4.1 | 3.7 | 3.4 | 3.8 | 1% | 2% | 2% | 3% | before dawn to mid morning |
 | animals:red_dunes | 4.5 | 3.5 | 3.3 | 2.8 | 0% | 0% | 0% | 0% | before dawn to mid morning |
@@ -206,32 +218,34 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 |---|---|---|---|---|---|---|---|
 | base:wheat | spring wheat | 0, 15-23, 34 | Moderate | -2 °C | 110 | 26 | plains (su au), forest (su au), birch_forest (su au), taiga (su), savanna (su au), swamp (au), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:berry_bush | blueberry | 7, 20-26, 32 | Moderate | -2 °C | 75 | 20 | plains (su), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
-| base:sugar_cane | sugar cane | 12, 22-30, 38 | Wet | -1 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
-| base:cactus | saguaro | 10, 25-40, 50 | Dry | -7 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
+| base:sugar_cane | sugar cane | 12, 22-30, 38 | Wet | -1 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), sequoia_grove (su), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
+| base:kelp | kelp (Laminaria) | 0, 5-15, 22 | Wet | hardy | - | the game's | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (sp su au), snowy_plains (su), desert (wi), mountains (sp su au), sequoia_grove (sp su au wi), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (wi), fern_forest (sp su au), crags (sp au wi) |
+| base:cactus | saguaro | 10, 25-40, 50 | Dry | -7 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), sequoia_grove (su), ocean (sp su au), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:sapling | oak | 5, 18-28, 38 | Moderate | hardy | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:grazed_grass | prairie grass | 5, 15-30, 40 | Moderate | hardy | 18 | 7 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:sedge | sedges | -1, 8-22, 32 | Moderate | hardy | 18 | 7 | plains (sp su au), forest (sp su au), birch_forest (su au), taiga (su), snowy_plains (su), savanna (au), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au wi) |
-| base:cottongrass | cottongrass (Eriophorum) | -2, 6-16, 25 | Moderate | hardy | 18 | 7 | plains (sp au), forest (sp su au wi), birch_forest (su au), taiga (su), snowy_plains (su), mountains (sp su au), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
-| base:reindeer_lichen | reindeer lichen (Cladonia) | 0, 5-15, 25 | Dry | hardy | 3650 | 301 | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (su au), snowy_plains (su), mountains (sp su au), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (au wi), fern_forest (sp su au), crags (sp au wi) |
+| base:cottongrass | cottongrass (Eriophorum) | -2, 6-16, 25 | Moderate | hardy | 18 | 7 | plains (sp au), forest (sp su au wi), birch_forest (su au), taiga (su), snowy_plains (su), mountains (sp su au), sequoia_grove (wi), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
+| base:reindeer_lichen | reindeer lichen (Cladonia) | 0, 5-15, 25 | Dry | hardy | 3650 | 301 | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (su au), snowy_plains (su), mountains (sp su au), sequoia_grove (sp su au wi), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (au wi), fern_forest (sp su au), crags (sp au wi) |
 | base:clover | white clover | 5, 18-25, 32 | Moderate | hardy | 30 | 10 | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (au), fern_forest (su au), crags (su au) |
 | base:lingonberry_bush | lingonberry | 5, 12-20, 28 | Moderate | -3 °C | 75 | 20 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
-| base:cloudberry_bush | cloudberry | 0, 8-16, 25 | Wet | -2 °C | 45 | 14 | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (su), snowy_plains (su), desert (wi), mountains (sp su au), ocean (sp su au wi), beach (sp au wi), red_dunes (sp au wi*), scrubland (sp au wi), floodplain (sp au wi), fern_forest (sp su au), crags (sp au wi) |
-| base:crowberry_bush | crowberry | -1, 6-15, 25 | Moderate | hardy | 60 | 17 | plains (sp au), forest (sp su au wi), birch_forest (su au), taiga (su), snowy_plains (su), mountains (su au), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
+| base:cloudberry_bush | cloudberry | 0, 8-16, 25 | Wet | -2 °C | 45 | 14 | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (su), snowy_plains (su), desert (wi), mountains (sp su au), sequoia_grove (sp su au wi*), ocean (sp su au wi), beach (sp au wi), red_dunes (sp au wi*), scrubland (sp au wi), floodplain (sp au wi), fern_forest (sp su au), crags (sp au wi) |
+| base:crowberry_bush | crowberry | -1, 6-15, 25 | Moderate | hardy | 60 | 17 | plains (sp au), forest (sp su au wi), birch_forest (su au), taiga (su), snowy_plains (su), mountains (su au), sequoia_grove (wi), ocean (sp au wi), beach (au wi), fern_forest (su au), crags (au wi) |
 | base:hazel_bush | hazel | 5, 16-24, 32 | Moderate | hardy | 180 | 37 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (su au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), floodplain (au), fern_forest (su au), crags (su au) |
 | base:bramble_bush | raspberry and blackberry | 5, 16-25, 32 | Moderate | -2 °C | 60 | 17 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (au), fern_forest (su au), crags (su au) |
-| base:prickly_pear | prickly pear (Opuntia) | 10, 20-35, 45 | Dry | -10 °C | 90 | 23 | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), ocean (sp su au wi), beach (sp su au), red_dunes (sp su), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su au) |
-| base:wild_sunflower | wild sunflower | 6, 20-28, 38 | Dry | -2 °C | 125 | 28 | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
-| base:wild_rice | wild rice (Oryza latifolia) | 12, 25-32, 38 | Wet | 0 °C | 150 | 32 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
+| base:prickly_pear | prickly pear (Opuntia) | 10, 20-35, 45 | Dry | -10 °C | 90 | 23 | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), beach (sp su au), red_dunes (sp su), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su au) |
+| base:wild_sunflower | wild sunflower | 6, 20-28, 38 | Dry | -2 °C | 125 | 28 | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
+| base:wild_rice | wild rice (Oryza latifolia) | 12, 25-32, 38 | Wet | 0 °C | 150 | 32 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), sequoia_grove (su), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:mushroom_brown | forest mushrooms | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:mushroom_red | fly agaric | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
-| base:water_hyacinth | water hyacinth | 12, 25-30, 38 | Wet | -1 °C | 10 | 5 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
+| base:water_hyacinth | water hyacinth | 12, 25-30, 38 | Wet | -1 °C | 10 | 5 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), sequoia_grove (su), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:mesquite_sapling | mesquite | 12, 25-38, 48 | Dry | -15 °C | - | the game's | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:acuri_palm_sapling | acuri palm (Attalea phalerata) | 15, 24-32, 40 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), ocean (su), scrubland (su), floodplain (su au), crags (su) |
+| base:sequoia_sapling | giant sequoia (Sequoiadendron giganteum) | 5, 15-24, 35 | Moderate | -24 °C | - | the game's | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:moriche_palm_sapling | moriche palm (Mauritia flexuosa) | 15, 24-32, 40 | Wet | 0 °C | - | the game's | plains (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
 | animals:araucaria_sapling | araucarian conifer | 5, 18-28, 38 | Moderate | -5 °C | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | animals:ginkgo_sapling | ginkgo | 5, 15-26, 36 | Moderate | hardy | - | the game's | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
-| animals:swamp_cypress_sapling | swamp cypress (Taxodioxylon) | 8, 20-30, 40 | Wet | -15 °C | - | the game's | plains (sp su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au wi), fern_forest (su), crags (sp su au) |
-| animals:scale_conifer_sapling | scale-leaved conifer (Cheirolepidiaceae) | 8, 20-32, 42 | Dry | -5 °C | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), ocean (sp su au wi), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
+| animals:swamp_cypress_sapling | swamp cypress (Taxodioxylon) | 8, 20-30, 40 | Wet | -15 °C | - | the game's | plains (sp su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au wi), fern_forest (su), crags (sp su au) |
+| animals:scale_conifer_sapling | scale-leaved conifer (Cheirolepidiaceae) | 8, 20-32, 42 | Dry | -5 °C | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), sequoia_grove (su), ocean (sp su au wi), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
 
 ## Wild plants
 
@@ -255,12 +269,17 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:mushroom_brown | Spreads | Soil | base:mushroom_brown | 0.6% | forest, birch_forest, taiga, mountains |
 | base:mushroom_red | Spreads | Soil | base:mushroom_red | 0.3% | forest, birch_forest, taiga |
 | base:water_hyacinth | Spreads | Water | - | 8.0% | swamp, savanna |
-| base:cattail | Still | Shore | base:cattail_root | 10.0% | swamp, plains, forest, taiga, savanna |
+| base:cattail | Still | Shore | base:cattail_root | 15.0% | swamp, plains, forest, taiga, savanna |
+| base:reed | Still | Shore | - | 12.0% | plains, forest, birch_forest, taiga, swamp (4.0%) |
+| base:lily_pad | Still | Water | - | 12.0% | plains, forest, birch_forest, swamp, taiga, savanna |
+| base:seagrass | Still | Bed | - | 20.0% | ocean, beach |
+| base:kelp | Column | Bed | base:kelp | 8.0% | ocean |
 | animals:cycad | Still | Soil | animals:cycad_seed | 1.0% | red_dunes, scrubland, floodplain, fern_forest, crags |
 | animals:flowering_shrub | Still | Soil | - | 2.0% | floodplain, scrubland |
 | animals:water_lily | Still | Water | - | 6.0% | floodplain, red_dunes |
 | animals:rotten_log | Log | Soil | - | 0.4% | floodplain, fern_forest |
-| base:kelp | Mat | Sand | base:kelp | 3.0% | beach |
+| animals:termite_mound | Mound | Soil | - | 0.3% | red_dunes, scrubland |
+| base:kelp_wrack | Mat | Sand | base:kelp | 3.0% | beach |
 
 ## Food in the world
 
@@ -272,14 +291,14 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | base:berry_bush (age 3) | fruit | 8 | back to age 1 | base:berry_bush |
 | base:oak_leaves | leaves | 4 | stays | always there in base:forest, base:plains, base:swamp (spring, summer, autumn), worth 40% of fresh growth |
 | base:birch_leaves | leaves | 4 | stays | always there in base:forest, base:birch_forest (spring, summer, autumn), worth 40% of fresh growth |
-| base:spruce_leaves | leaves | 4 | stays | always there in base:taiga, base:snowy_plains, base:mountains (all year), worth 40% of fresh growth |
+| base:spruce_leaves | leaves | 4 | stays | always there in base:taiga, base:snowy_plains, base:mountains, base:sequoia_grove (all year), worth 40% of fresh growth |
 | base:acacia_leaves | leaves | 4 | stays | always there in base:savanna (all year), worth 40% of fresh growth |
 | base:cactus | leaves | 3 | stays | always there in base:desert (all year), worth 40% of fresh growth |
-| base:tall_grass | seeds | 3 | stays | always there in base:plains, base:forest, base:birch_forest, base:taiga, base:savanna, base:swamp, base:mountains, base:beach (summer, autumn), worth 40% of fresh growth |
+| base:tall_grass | seeds | 3 | stays | always there in base:plains, base:forest, base:birch_forest, base:taiga, base:savanna, base:swamp, base:mountains, base:sequoia_grove, base:beach (summer, autumn), worth 40% of fresh growth |
 | base:dead_bush | seeds | 2 | stays | always there in base:desert (all year), worth 40% of fresh growth |
 | base:cactus | fruit | 3 | stays | always there in base:desert (summer, autumn), worth 40% of fresh growth |
 | animals:fern | leaves | 4 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
-| base:tall_grass | grass | 3 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:mountains, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (winter), worth 40% of fresh growth |
+| base:tall_grass | grass | 3 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:mountains, base:sequoia_grove, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (winter), worth 40% of fresh growth |
 | base:oak_leaves | leaves | 2 | stays | always there in base:forest, base:plains, base:swamp (winter), worth 40% of fresh growth |
 | base:birch_leaves | leaves | 2 | stays | always there in base:forest, base:birch_forest (winter), worth 40% of fresh growth |
 | base:oak_leaves | seeds | 3 | stays | always there in base:forest, base:plains, base:swamp (autumn, winter), worth 40% of fresh growth |
@@ -289,10 +308,10 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | base:podzol | fungi | 2 | stays | always there in base:taiga (summer, autumn), worth 40% of fresh growth |
 | base:oak_log | fungi | 2 | stays | always there in base:forest, base:plains, base:swamp (summer, autumn), worth 40% of fresh growth |
 | base:birch_log | fungi | 2 | stays | always there in base:forest, base:birch_forest (summer, autumn), worth 40% of fresh growth |
-| base:grass | roots | 2 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:mountains, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
+| base:grass | roots | 2 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:mountains, base:sequoia_grove, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
 | base:sand | roots | 1 | stays | always there in base:desert, base:beach (all year), worth 40% of fresh growth |
 | animals:red_sand | roots | 1 | stays | always there in animals:red_dunes (all year), worth 40% of fresh growth |
-| base:grass | insects | 2 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:mountains, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (spring, summer, autumn), worth 40% of fresh growth |
+| base:grass | insects | 2 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:mountains, base:sequoia_grove, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (spring, summer, autumn), worth 40% of fresh growth |
 | base:sand | insects | 2 | stays | always there in base:desert, base:beach (all year), worth 40% of fresh growth |
 | animals:red_sand | insects | 2 | stays | always there in animals:red_dunes (all year), worth 40% of fresh growth |
 | base:podzol | insects | 2 | stays | always there in base:taiga (summer), worth 40% of fresh growth |
@@ -322,8 +341,10 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | animals:cycad | seeds | 3 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (summer, autumn), worth 40% of fresh growth |
 | animals:flowering_shrub | leaves | 4 | stays | always there in animals:floodplain, animals:scrubland (spring, summer, autumn), worth 40% of fresh growth |
 | animals:water_lily | water_plants | 5 | stays | always there in animals:floodplain, animals:red_dunes (all year), worth 40% of fresh growth |
-| base:kelp | water_plants | 4 | stays | always there in base:beach (all year), worth 40% of fresh growth |
+| base:kelp_wrack | water_plants | 4 | stays | always there in base:beach (all year), worth 40% of fresh growth |
 | animals:rotten_log | insects | 3 | stays | always there in animals:floodplain, animals:fern_forest (all year), worth 40% of fresh growth |
+| animals:termite_mound | insects | 3 | stays | always there in animals:red_dunes, animals:scrubland (all year), worth 40% of fresh growth |
+| animals:termite_mound_upper | insects | 3 | stays | always there in animals:red_dunes, animals:scrubland (all year), worth 40% of fresh growth |
 | base:mesquite_leaves | leaves | 4 | stays | always there in base:desert, base:savanna (spring, summer, autumn), worth 40% of fresh growth |
 | base:mesquite_leaves | seeds | 4 | stays | always there in base:desert, base:savanna (summer, autumn), worth 40% of fresh growth |
 | base:acuri_palm_leaves | seeds | 5 | stays | always there in base:swamp (autumn, winter), worth 40% of fresh growth |

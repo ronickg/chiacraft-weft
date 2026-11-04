@@ -73,7 +73,8 @@ pub async fn held_items(t: T) -> R {
     );
     t.check(!handheld("base:apple") && !handheld("base:stone"), "the rest are not");
     t.flat().await?;
-    for (i, name) in ["wood_pickaxe", "diamond_sword", "glass", "rose", "torch"]
+    // (wool: the 32 px glass is mostly see-through in a brown frame, too little of it light)
+    for (i, name) in ["wood_pickaxe", "diamond_sword", "wool", "rose", "torch"]
         .iter()
         .enumerate()
     {
@@ -114,8 +115,8 @@ pub async fn tooltips(t: T) -> R {
     t.frames(4).await?;
     let plain = t.grab().await?;
     let (w, h) = (t.state().window[0], t.state().window[1]);
-    for (slot, name) in [(36, "furnace"), (37, "coal"), (38, "sword"), (39, "bread"), (40, "chestplate")] {
-        let Some([x, y, sw, sh]) = t.c().ui_rect(&format!("slot:{slot}")) else {
+    for (slot, name) in [(0, "furnace"), (1, "coal"), (2, "sword"), (3, "bread"), (4, "chestplate")] {
+        let Some([x, y, sw, sh]) = t.c().ui_rect(&t.hotbar(slot)) else {
             t.fail(format!("no slot {slot}"));
             continue;
         };
@@ -521,6 +522,9 @@ pub async fn multiplayer(t: T) -> R {
     let mut child = std::process::Command::new(exe)
         .args(["--run-dir", &dir, "--script", &script, "--size", "640x360"])
         .args(crate::package_args())
+        // The host runs the test-only mods (testmod), which a `--script` game leaves out: the
+        // joining game needs the same code mods.
+        .args(["--mods", &format!("{dir}/test-mods")])
         .spawn()
         .map_err(|e| format!("cannot start the second client: {e}"))?;
     let heard = t

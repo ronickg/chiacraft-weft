@@ -81,6 +81,22 @@ pub fn init(r: &mut Registry) {
     {
         let block = Block::generated(p.block.into());
         let name = p.block.split_once(':').map_or(p.block, |(_, n)| n);
+        // A termite mound: hard-baked earth, a full block, and its crown (`<name>_upper`, which
+        // the world puts on one in two, `wild::upper_of` in base); broken, the crown is a mound
+        // block again.
+        if p.form == vitals::wild::Form::Mound {
+            let upper = Block::generated(format!("{name}_upper"));
+            for (b, side) in [(block, format!("{name}_side")), (upper, format!("{name}_upper_side"))] {
+                r.block(b)
+                    .sound_group("base:block.gravel")
+                    .textures(&format!("{name}_top"), &side, &format!("{name}_top"))
+                    .hardness(0.9)
+                    .mineable("shovel")
+                    .tab(&NATURAL);
+            }
+            r.loot(upper).pool(Pool::new().entry(Entry::item(p.block)));
+            continue;
+        }
         // A rotten log lies on the ground: a soft, crumbling block, not a plant.
         if p.form == vitals::wild::Form::Log {
             r.block(block)
@@ -294,6 +310,8 @@ fn woods(r: &mut Registry) {
             .texture(&format!("leaves_{wood}"))
             .hardness(0.2)
             .cutout()
+            // Faces between two leaves of one kind aren't drawn, as base's (`blocks.rs`).
+            .cull_same()
             .opacity(1)
             .tint(base_api::trees::leaf_tint(vitals::wild::turn(&format!("animals:{wood}_leaves"))))
             .tag("leaves")
