@@ -296,7 +296,7 @@ pub struct Reporter {
     frame_sum: f64,
     frame_max: f32,
     cpu: [f64; 5],
-    gpu: [f64; 5],
+    gpu: [f64; crate::bench::GPU_N],
     gpu_frames: u32,
     mods: ModWindow,
 }
@@ -316,7 +316,7 @@ impl Reporter {
         for (a, v) in self.cpu.iter_mut().zip(s.cpu) {
             *a += *v as f64;
         }
-        if s.gpu.len() >= 5 {
+        if s.gpu.len() >= crate::bench::GPU_N {
             for (a, v) in self.gpu.iter_mut().zip(s.gpu) {
                 *a += *v as f64;
             }
@@ -408,7 +408,7 @@ impl Reporter {
         self.frame_sum = 0.0;
         self.frame_max = 0.0;
         self.cpu = [0.0; 5];
-        self.gpu = [0.0; 5];
+        self.gpu = [0.0; crate::bench::GPU_N];
         self.gpu_frames = 0;
     }
 
