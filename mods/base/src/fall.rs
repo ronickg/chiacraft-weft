@@ -388,7 +388,8 @@ fn settle(w: &World, f: &Fall, deg: f32, holder: [i32; 3]) {
     let mut put = |p: [i32; 3], state: u32| {
         let cell = turn(center(p), f.pivot, f.axis, deg).map(|v| v.floor() as i32);
         let here = w.get(cell);
-        if here == 0 || crate::leaf_decay::decays(w, cell) || HARDNESS.on_block(here).is_some_and(|h| h <= 0.0) {
+        let room = here == 0 || crate::leaf_decay::decays(w, cell) || HARDNESS.on_block(here).is_some_and(|h| h <= 0.0);
+        if room && !crate::felled::occupied(w, cell) {
             w.set(cell, state);
             Some(cell)
         } else {
