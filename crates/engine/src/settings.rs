@@ -15,8 +15,15 @@ pub struct Settings {
 }
 
 /// The largest GUI scale a window shows whole (vanilla's 320x240 per step); auto uses it.
+/// The GUI pixels every screen needs to fit whole (chiacraft: the widest and tallest window, the
+/// animal screen at about 385 x 300 with its tab, and a margin round it). The automatic scale,
+/// and the most the setting goes to, keeps at least this much room, so nothing is cut off on a
+/// small or high-density screen (a 3456 x 2234 MacBook: 6, where 320 x 240 gave 9).
+pub const GUI_MIN: (u32, u32) = (400, 320);
+
+/// The largest GUI scale at which a window of `window` physical pixels still holds `GUI_MIN`.
 pub fn max_gui_scale(window: (u32, u32)) -> u32 {
-    (window.0 / 320).min(window.1 / 240).max(1)
+    (window.0 / GUI_MIN.0).min(window.1 / GUI_MIN.1).max(1)
 }
 
 fn id(name: &str) -> u32 {
