@@ -74,6 +74,8 @@ pub static HAY_BALE: Block = Block::named("hay_bale");
 pub static PODZOL: Block = Block::named("podzol");
 /// The desert's scrub: a few sticks where there is no wood.
 pub static DEAD_BUSH: Block = Block::named("dead_bush");
+/// Game seconds between a dogwood leaf's looks at the season, on average.
+const DOGWOOD_BLOOM_SECS: f32 = 300.0;
 /// The sequoia grove's understory (`grove`).
 pub static SWORD_FERN: Block = Block::named("sword_fern");
 pub static LUPINE: Block = Block::named("lupine");
@@ -130,10 +132,12 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
         .tag(&format!("logs/{wood}"))
         .set(&FLAMMABLE, 5)
         .set(&FUEL, 300)
-        .prop("axis", ["y", "x", "z"])
+        // `bark`: bark on every face, for a trunk whose top shows (a giant's flared foot).
+        .prop("axis", ["y", "x", "z", "bark"])
         .states(move |p, s| match p.get("axis") {
             "y" => s.textures(&top, &side, &top),
             "x" => s.faces([&top, &top, &side, &side, &side, &side]),
+            "bark" => s.texture(&side),
             _ => s.faces([&side, &side, &side, &side, &top, &top]),
         })
         .placement(axis_placement)
@@ -198,9 +202,20 @@ fn grove(r: &mut Registry) {
     );
     plant(r, &LUPINE, "lupine");
     log(r, &DOGWOOD_LOG, "dogwood", "base:dogwood_leaves", None);
+    // The dogwood is white with its bracts in spring and plain green the rest of the year: a
+    // growth step every few minutes looks at the season, as the wild flowers do (`wild.rs`).
     r.block(&DOGWOOD_LEAVES)
         .sound_group("grass")
-        .texture("leaves_dogwood")
+        .prop("bloom", 0..=1)
+        .states(|p, s| s.texture(if p.get("bloom") == "1" { "leaves_dogwood" } else { "leaves_dogwood_green" }))
+        .growth(DOGWOOD_BLOOM_SECS, 0)
+        .on_grow(|e| {
+            let spring = base_api::ground_at(&e.world(), e.pos()).season == Some(0);
+            let want = if spring { "1" } else { "0" };
+            if state_prop(e.state(), "bloom") != Some(want) {
+                e.world().set_prop(e.pos(), "bloom", want);
+            }
+        })
         .hardness(0.2)
         .cutout()
         .cull_same()
