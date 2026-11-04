@@ -4,11 +4,13 @@
 //!
 //! The engine sums the features; two of ours are mods' code (`Feature::new`) because they need to
 //! know the land around them:
-//! - **Rivers** cut valleys down to the sea along the zero lines of a wandering noise, wider and
-//!   deeper toward the coast, fading out far inland and in the highlands (where they rise), and
-//!   rare where it's dry. A river's water is the sea's: its bed is under sea level all the way to
-//!   the coast, so it fills where the sea does. To know how deep to cut it rebuilds the height of
-//!   every other feature here (`land_height`), the same integers the engine adds.
+//! - **Rivers** run where the rain gathers: a network of nodes, each draining downhill to a
+//!   neighbour (`net`), so streams meet into rivers that grow toward the sea or a lake, and end
+//!   in a lake of their own where they find no way out. Where the flow is small the river is a
+//!   dry gully; with more it reaches the water and widens, with a floodplain and valley sides that
+//!   climb to the land. A river's water is the sea's: its bed is under sea level, so it fills
+//!   where the sea does. To know how deep to cut it rebuilds the height of every other feature
+//!   here (`land_height`), the same integers the engine adds.
 //! - **Mesas** in the hot, dry land: flat tops on two or three tiers, each a steep cliff and a
 //!   ledge, the cliffs bare (`ROCK_FALL`).
 //!
@@ -25,6 +27,8 @@ use weft_sdk::terrain::{Feature, Mask, preset};
 
 use crate::SEA;
 
+mod net;
+
 /// Salts of our own noises (the engine's are in `weft_noise::fixed::salt`).
 pub mod salt {
     pub const RIVERS: u64 = 0x21FE5;
@@ -33,6 +37,7 @@ pub mod salt {
     pub const LAKE_ISLANDS: u64 = 0x1A50;
     pub const RIVER_WARP_X: u64 = 0x21FE6;
     pub const RIVER_WARP_Z: u64 = 0x21FE7;
+    pub const RIVER_NODES: u64 = 0x21FE8;
     pub const MESAS: u64 = 0x3E5A;
     pub const MESA_AREA: u64 = 0x3E5B;
     pub const HIGHLANDS: u64 = 0x416A;
@@ -238,32 +243,43 @@ pub const MESA_AREA: Area = Area {
     not: false,
 };
 
-/// Rivers: the line noise's lattice and its wander, in blocks.
-pub const RIVER_SCALE: f64 = 520.0;
-pub const RIVER_WARP: f64 = 56.0;
-pub const RIVER_WARP_SCALE: f64 = 170.0;
-/// The channel's half width in line-noise units (about 0.001 a block), far inland and at the
-/// coast, and its depth in blocks under the sea at the middle (inland, at the coast).
-pub const RIVER_HALF_WIDTH: (f64, f64) = (0.0045, 0.014);
-pub const RIVER_DEPTH: (i32, i32) = (3, 5);
-/// The coast for rivers: continentalness falling from inland (`.0`) to the coast (`.1`).
-pub const RIVER_COAST: (f64, f64) = (0.35, 0.05);
-/// Rivers fade out far inland, where the continent noise rises from `.0` to `.1`.
-pub const RIVER_INLAND: (f64, f64) = (0.45, 0.62);
-/// No rivers where it's this dry (humidity), all of them from `.1` on.
-pub const RIVER_DRY: (f64, f64) = (-0.25, -0.08);
-/// Rivers rise in the mountains: full where the mountains' area (`MOUNTAINS_AREA`) is up to `.0`,
-/// gone at `.1`; through lower hills and mesas they cut their valleys.
+/// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
+/// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
+/// the rain of the nodes upstream within `RIVER_REACH` steps (about 2 km of river).
+pub const RIVER_NODE: i32 = 48;
+pub const RIVER_REGION: i32 = 32;
+pub const RIVER_REACH: i32 = 40;
+/// The height rain runs down is the land's big shape (`net::route_height`): the mountains count
+/// as a dome this high, the hills at this share.
+pub const RIVER_ROUTE_MOUNTAINS: f64 = 120.0;
+pub const RIVER_ROUTE_HILLS: f64 = 0.0;
+/// Where a river ends inland with at least this flow, it fills a lake, its radius from `.0` to
+/// `.1` blocks as its flow grows to `RIVER_FLOW.2`.
+pub const RIVER_SINK_FLOW: f64 = 6.0;
+pub const RIVER_SINK_RADIUS: (i32, i32) = (24, 80);
+/// A node's rain, by humidity: all of it from `.1` on, falling to the driest's share `.2` at `.0`.
+pub const RIVER_RAIN: (f64, f64, f64) = (-0.25, 0.05, 0.15);
+/// Flow, in wet nodes' rain: a dry gully starts at `.0`, the river reaches the water at `.1`
+/// (between, the gully deepens), and it is full size at `.2`.
+pub const RIVER_FLOW: (f64, f64, f64) = (3.0, 10.0, 120.0);
+/// The channel's half width and its depth under the sea in the middle, and the floodplain beside
+/// it, flush with the water (blocks; the smallest river's, the full one's).
+pub const RIVER_HALF_WIDTH: (i32, i32) = (2, 9);
+pub const RIVER_DEPTH: (i32, i32) = (3, 6);
+pub const RIVER_FLOODPLAIN: (i32, i32) = (1, 10);
+/// Then the valley's sides rise to the land over `RIVER_BANKS` blocks, plus
+/// `RIVER_VALLEY_PER_BLOCK` (sixteenths) for each block the land stands over the sea, counted up
+/// to `RIVER_VALLEY_RISE`.
+pub const RIVER_BANKS: i32 = 8;
+pub const RIVER_VALLEY_PER_BLOCK: i32 = 24;
+pub const RIVER_VALLEY_RISE: i32 = 60;
+/// Rivers don't carve in the mountains: full where the mountains' area (`MOUNTAINS_AREA`) is up
+/// to `.0`, gone at `.1`. Their rain still runs down, so rivers come out at the mountains' feet.
 pub const RIVER_MOUNTAINS: (f64, f64) = (0.1, 0.45);
-/// Where rivers fade (far inland, the dry, the mountains) they narrow to a creek, still at the
-/// sea's level; only under this share of their full width does the creek rise and end.
-pub const RIVER_CREEK: f64 = 0.6;
-/// The valley beside the channel: a floodplain this wide (line-noise units), then banks rising to
-/// the land, wider the higher it stands: `RIVER_VALLEY_PER_BLOCK` more (in 1/4096 of the noise)
-/// for each block of the land over the sea, counted up to `RIVER_VALLEY_RISE`.
-pub const RIVER_FLOODPLAIN: f64 = 0.006;
-pub const RIVER_VALLEY_PER_BLOCK: i32 = 6;
-pub const RIVER_VALLEY_RISE: i32 = 80;
+/// The meander: the river's line is pushed by up to about half `RIVER_WARP` blocks by a noise
+/// `RIVER_WARP_SCALE` blocks across.
+pub const RIVER_WARP: f64 = 110.0;
+pub const RIVER_WARP_SCALE: f64 = 75.0;
 
 /// Lakes in basins (Lithosphere's "big lakes anywhere, with islands"): a site per `LAKE_CELL`
 /// blocks square, kept with `LAKE_CHANCE` times its climate's share (`LAKE_WET`: the dry land a
@@ -529,7 +545,15 @@ fn lakes_on(h: &Here, ground: i32) -> i32 {
             cut = cut.min(lake_cut(h, lake, &mut ground));
         }
     }
+    for lake in net::region_at(h.f, bx, bz).lakes_near(bx, bz) {
+        cut = cut.min(lake_cut(h, lake, &mut ground));
+    }
     cut
+}
+
+/// How far a lake of this radius (blocks) can reach with its shore at its widest (blocks).
+fn lake_reach_most(radius: i32) -> i32 {
+    radius + ((radius * q12(LAKE_WOBBLE)) >> 12) + LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4)
 }
 
 /// A column's distance from a lake's middle and the lake's radius there (both Q4), if it's within
@@ -591,61 +615,76 @@ fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
     (target - ground).min(0)
 }
 
-/// Where a river runs: the line noise's distance from its zero line (Q12), at the wandered point.
-pub fn river_line(f: &Fields, x: i32, z: i32) -> i32 {
-    let (warp, ws) = (q4(RIVER_WARP), q4(RIVER_WARP_SCALE));
-    let wx = x + ((f.fbm(salt::RIVER_WARP_X, x, z, ws, 2) * warp) >> 12);
-    let wz = z + ((f.fbm(salt::RIVER_WARP_Z, x, z, ws, 2) * warp) >> 12);
-    f.fbm(salt::RIVERS, wx, wz, q4(RIVER_SCALE), 3).abs()
-}
-
-/// What the rivers take off the ground (Q4, zero or less) at (`x`, `z`).
+/// What the rivers take off the ground (Q4, zero or less) at (`x`, `z`) (Q4): the deepest cut
+/// of the river stretches near (`net`), so tributaries join their river.
 pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
-    let d = river_line(f, x, z);
-    let widest = q12(RIVER_HALF_WIDTH.1 + RIVER_FLOODPLAIN) + RIVER_VALLEY_PER_BLOCK * RIVER_VALLEY_RISE;
-    if d >= widest {
+    let (bx, bz) = (x >> 4, z >> 4);
+    let region = net::region_at(f, bx, bz);
+    let mut segs = region.near(bx, bz).peekable();
+    if segs.peek().is_none() {
         return 0;
     }
     let here = Here::new(f, x, z);
-    let cont = here.continent();
-    let inland = ONE - ramp(cont, q12(RIVER_INLAND.0), q12(RIVER_INLAND.1));
-    let wet = ramp(here.humidity(), q12(RIVER_DRY.0), q12(RIVER_DRY.1));
-    let s = (inland * wet) >> 12;
-    if s == 0 {
+    let p = net::meander(f, x, z);
+    let mountains = net::mountains(&here);
+    if mountains == 0 {
         return 0;
     }
-    let s = (s * (ONE - ramp(MOUNTAINS_AREA.at(&here), q12(RIVER_MOUNTAINS.0), q12(RIVER_MOUNTAINS.1)))) >> 12;
-    if s == 0 {
-        return 0;
-    }
-    let h0 = land_height_at(&here);
     let sea = q4(SEA as f64);
-    let rise = (h0 - sea) >> 4;
-    if rise < 0 {
-        return 0;
+    let mut h0 = i32::MIN;
+    let mut cut = 0;
+    for s in segs {
+        let (d, flow) = s.place(p);
+        let sh = net::shape(flow, mountains);
+        if sh.strength == 0 || d >= sh.half + sh.floodplain + q4(RIVER_BANKS as f64) + RIVER_VALLEY_PER_BLOCK * s.rise {
+            continue;
+        }
+        if h0 == i32::MIN {
+            h0 = land_height_at(&here);
+        }
+        let rise = (h0 - sea) >> 4;
+        if rise < 0 {
+            return 0;
+        }
+        let deep = sh.strength;
+        let flat = sh.half + ((sh.floodplain * deep) >> 12);
+        // The sides widen with the land's height, up to the stretch's bound (`net::Seg::rise`).
+        let banks = ((q4(RIVER_BANKS as f64) + RIVER_VALLEY_PER_BLOCK * rise.min(s.rise)) * deep) >> 12;
+        if d >= flat + banks {
+            continue;
+        }
+        let target = if d < sh.half {
+            // The channel: a block under the sea at its edge, `depth` in the middle.
+            let t = d * ONE / sh.half;
+            let bowl = ONE - ((t * t) >> 12);
+            sea - 16 - (((sh.depth - 16) * bowl) >> 12)
+        } else if d < flat {
+            sea
+        } else {
+            // The valley's sides: rising smoothly from the floodplain to the land.
+            let t = (d - flat) * ONE / banks.max(1);
+            let smooth = (((t * t) >> 12) * (3 * ONE - 2 * t)) >> 12;
+            sea + (((h0 - sea) * smooth) >> 12)
+        };
+        cut = cut.min((((target - h0).min(0)) * deep) >> 12);
     }
-    let coast = ramp(cont, q12(RIVER_COAST.0), q12(RIVER_COAST.1));
-    let lerp = |a: i32, b: i32, t: i32| a + (((b - a) * t) >> 12);
-    // A fading river narrows first (`s`), then its creek rises out of the sea's level (`deep`).
-    let deep = ramp(s, 0, q12(RIVER_CREEK));
-    let half = ((lerp(q12(RIVER_HALF_WIDTH.0), q12(RIVER_HALF_WIDTH.1), coast) * s) >> 12).max(1);
-    let valley = half + (((q12(RIVER_FLOODPLAIN) + RIVER_VALLEY_PER_BLOCK * rise.min(RIVER_VALLEY_RISE)) * deep) >> 12);
-    if d >= valley {
-        return 0;
-    }
-    let target = if d < half {
-        // The channel: a block under the sea at its edge, `depth` in the middle.
-        let depth = lerp(q4(RIVER_DEPTH.0 as f64), q4(RIVER_DEPTH.1 as f64), coast);
-        let t = d * ONE / half;
-        let bowl = ONE - ((t * t) >> 12);
-        sea - 16 - (((depth - 16) * bowl) >> 12)
-    } else {
-        // The banks: level with the water by the channel, then rising smoothly to the land.
-        let t = (d - half) * ONE / (valley - half).max(1);
-        let smooth = (((t * t) >> 12) * (3 * ONE - 2 * t)) >> 12;
-        sea + (((h0 - sea) * smooth) >> 12)
-    };
-    (((target - h0).min(0)) * deep) >> 12
+    cut
+}
+
+/// The river network's region holding block (`bx`, `bz`): its nodes, the pits that spilled over
+/// a neighbour, and its river stretches (for the map tools).
+pub fn river_region_stats(f: &Fields, bx: i32, bz: i32) -> [usize; 3] {
+    net::region_at(f, bx, bz).stats
+}
+
+/// The river network's stretches in the region holding block (`bx`, `bz`) that reach its cells:
+/// their ends (blocks) and flow at each (wet nodes' rain, Q12), for the map tools.
+pub fn river_region_stretches(f: &Fields, bx: i32, bz: i32) -> Vec<([i32; 2], [i32; 2], [i32; 2])> {
+    net::region_at(f, bx, bz)
+        .segs
+        .iter()
+        .map(|s| ([s.a[0] >> 4, s.a[1] >> 4], [s.b[0] >> 4, s.b[1] >> 4], s.flow))
+        .collect()
 }
 
 /// Which water a bank belongs to (`bank`).
@@ -666,15 +705,14 @@ pub struct Bank {
     pub wet: i32,
 }
 
-/// The bank band beside a river's channel, in line-noise units (about 0.001 a block), and beside a
-/// lake's shore, in blocks. Both start at the water's level: rivers' and lakes' banks are flush
+/// The bank band beside a river's channel and beside a lake's shore, in blocks. Both start at the water's level: rivers' and lakes' banks are flush
 /// with the water for their first few blocks, room for reeds.
-pub const RIVER_BANK: f64 = 0.012;
+pub const RIVER_BANK: i32 = 12;
 pub const LAKE_BANK: i32 = 14;
 
 /// The river or lake bank at (`x`, `z`) (Q4), if any; the wetter of the two where both are near.
-/// Cheap enough for a decoration's every column (it never rebuilds the land's height): about a
-/// river line and three climate fields, and the lake sites near.
+/// Cheap enough for a decoration's every column (it never rebuilds the land's height): the river
+/// stretches listed near it (none in most places), and the lake sites near.
 pub fn bank(f: &Fields, x: i32, z: i32) -> Option<Bank> {
     let here = Here::new(f, x, z);
     let mut best: Option<Bank> = None;
@@ -684,27 +722,27 @@ pub fn bank(f: &Fields, x: i32, z: i32) -> Option<Bank> {
         }
     };
     // Rivers: the channel's half width as `rivers` has it, without the land.
-    let d = river_line(f, x, z);
-    if d < q12(RIVER_HALF_WIDTH.1 + RIVER_BANK) {
-        let cont = here.continent();
-        let inland = ONE - ramp(cont, q12(RIVER_INLAND.0), q12(RIVER_INLAND.1));
-        let wet = ramp(here.humidity(), q12(RIVER_DRY.0), q12(RIVER_DRY.1));
-        let s = (((inland * wet) >> 12) * (ONE - ramp(MOUNTAINS_AREA.at(&here), q12(RIVER_MOUNTAINS.0), q12(RIVER_MOUNTAINS.1)))) >> 12;
-        if s > 0 {
-            let coast = ramp(cont, q12(RIVER_COAST.0), q12(RIVER_COAST.1));
-            let (lo, hi) = (q12(RIVER_HALF_WIDTH.0), q12(RIVER_HALF_WIDTH.1));
-            let half = (((lo + (((hi - lo) * coast) >> 12)) * s) >> 12).max(1);
-            let strength = ramp(s, 0, q12(RIVER_CREEK));
-            if d < half {
-                take(Bank { water: Water::River, in_water: true, wet: strength });
-            } else if d < half + q12(RIVER_BANK) {
-                let w = ONE - (d - half) * ONE / q12(RIVER_BANK);
-                take(Bank { water: Water::River, in_water: false, wet: (w * strength) >> 12 });
+    let (bx, bz) = (x >> 4, z >> 4);
+    let region = net::region_at(f, bx, bz);
+    let mut segs = region.near(bx, bz).peekable();
+    if segs.peek().is_some() {
+        let mountains = net::mountains(&here);
+        let p = net::meander(f, x, z);
+        for s in segs {
+            let (d, flow) = s.place(p);
+            let sh = net::shape(flow, mountains);
+            if sh.strength == 0 {
+                continue;
+            }
+            if d < sh.half {
+                take(Bank { water: Water::River, in_water: true, wet: sh.strength });
+            } else if d < sh.half + q4(RIVER_BANK as f64) {
+                let w = ONE - (d - sh.half) * ONE / q4(RIVER_BANK as f64);
+                take(Bank { water: Water::River, in_water: false, wet: (w * sh.strength) >> 12 });
             }
         }
     }
     // Lakes.
-    let (bx, bz) = (x >> 4, z >> 4);
     let (cx, cz) = (div_floor(bx, LAKE_CELL).0, div_floor(bz, LAKE_CELL).0);
     let reach = LAKE_RADIUS.1 + ((LAKE_RADIUS.1 * q12(LAKE_WOBBLE)) >> 12) + LAKE_BANK;
     for dz in -1..=1 {
@@ -714,15 +752,23 @@ pub fn bank(f: &Fields, x: i32, z: i32) -> Option<Bank> {
                 continue;
             }
             let Some(lake) = lake_site(f, cx + dx, cz + dz) else { continue };
-            let Some((d, r)) = lake_reach(&here, lake, q4(LAKE_BANK as f64)) else { continue };
-            if d < r {
-                take(Bank { water: Water::Lake, in_water: true, wet: ONE });
-            } else {
-                take(Bank { water: Water::Lake, in_water: false, wet: ONE - (d - r) * ONE / q4(LAKE_BANK as f64) });
-            }
+            lake_bank(&here, lake, &mut take);
         }
     }
+    for lake in region.lakes_near(bx, bz) {
+        lake_bank(&here, lake, &mut take);
+    }
     best
+}
+
+/// A lake's bank at a column, if it reaches (`bank`).
+fn lake_bank(here: &Here, lake: Lake, take: &mut impl FnMut(Bank)) {
+    let Some((d, r)) = lake_reach(here, lake, q4(LAKE_BANK as f64)) else { return };
+    if d < r {
+        take(Bank { water: Water::Lake, in_water: true, wet: ONE });
+    } else {
+        take(Bank { water: Water::Lake, in_water: false, wet: ONE - (d - r) * ONE / q4(LAKE_BANK as f64) });
+    }
 }
 
 /// A column near a biome border (`biome_edge`): the biome over it, and how near (`ONE` on the
@@ -960,6 +1006,30 @@ mod tests {
             }
         }
         assert!(wet > 0, "no river reached under the sea in 20 000 columns");
+    }
+
+    #[test]
+    fn river_regions_agree_and_rivers_meet() {
+        let f = Fields { seed: 2 };
+        let region = RIVER_REGION * RIVER_NODE;
+        let mut seen = std::collections::HashMap::new();
+        let mut shared = 0;
+        for rz in -1..=0 {
+            for rx in -1..=0 {
+                for (a, b, flow) in river_region_stretches(&f, rx * region, rz * region) {
+                    if let Some(other) = seen.insert((a, b), flow) {
+                        assert_eq!(other, flow, "two regions disagree on the stretch {a:?} -> {b:?}");
+                        shared += 1;
+                    }
+                }
+            }
+        }
+        assert!(shared > 0, "no stretch near a region's border");
+        let mut into = std::collections::HashMap::new();
+        for (_, b) in seen.keys() {
+            *into.entry(*b).or_insert(0) += 1;
+        }
+        assert!(into.values().any(|&n| n >= 2), "no tributary joins a river");
     }
 
     #[test]
