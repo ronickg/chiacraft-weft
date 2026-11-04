@@ -606,9 +606,10 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.normal = NORMAL[dir];
     out.ao = 1.0;
-    // Not traced: it is past the blocks the client keeps.
-    out.kind = vec4(0u, 1u, 0u, 0u);
+    // Not traced: it is past the blocks the client keeps. Its tint kind, so far water is drawn as
+    // water (and far leaves as leaves).
     let kind = lod_tint(w0);
+    out.kind = vec4(kind, 1u, 0u, 0u);
     var tint = vec3(1.0);
     if kind != 0u {
         tint = unpack_rgb(biomes[(w1 >> FACE_BIOME_SHIFT) * g.extra.z + kind - 1u]);
@@ -633,6 +634,13 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     var albedo = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
     if in.blend > 0.0 {
         albedo = mix(albedo, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    }
+    // Far water is the same water as near: deep there (no blocks are kept that far), with its
+    // Fresnel, the sky, the sun's path, and the water mask that lets the screen's reflections in.
+    // Otherwise it would be a flat grey-blue lit like land, a seam at the edge of the render distance.
+    if in.kind.x == TINT_WATER {
+        let w = water(in, albedo);
+        return vec4(w.rgb, max(w.a, 0.5));
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
