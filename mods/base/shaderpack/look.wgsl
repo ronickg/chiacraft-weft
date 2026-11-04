@@ -429,8 +429,8 @@ fn shoulder(x: vec3<f32>) -> vec3<f32> {
 fn display(c: vec3<f32>) -> vec3<f32> {
     var t = shoulder(max(c, vec3(0.0)));
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
-    let lights = smoothstep(0.04, 0.35, luma(t));
-    t *= mix(vec3(0.975, 0.99, 1.03), mix(vec3(1.0), vec3(1.10, 1.0, 0.84), golden()), lights);
+    let lights = smoothstep(0.02, 0.22, luma(t));
+    t *= mix(vec3(0.975, 0.99, 1.03), mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
     let y = luma(t);
     t = max(mix(vec3(y), t, 0.98), vec3(0.0));
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034);
