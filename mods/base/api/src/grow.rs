@@ -53,6 +53,17 @@ pub fn step(e: &BlockEvent, block: &str, last: bool) -> Step {
     {
         return Step::Rest;
     }
+    chance(e, block, last)
+}
+
+/// A growth step of a ripe plant that bears beside itself (a pumpkin or melon stem setting its
+/// fruit): as `step` for its last stage, in its ripening season, though it has no stage left.
+pub fn bear(e: &BlockEvent, block: &str) -> Step {
+    chance(e, block, true)
+}
+
+/// `step` past the last-age rest: frost, the ripening season, then its rate there.
+fn chance(e: &BlockEvent, block: &str, last: bool) -> Step {
     let p = plant(block);
     let w = e.world();
     if p.frost > plants::HARDY {
