@@ -168,6 +168,9 @@ impl Mapped {
 
 /// Meshes are kept in regions of this many cubes a side (log2), culled as a whole first.
 const REGION: i32 = 3;
+/// Meshes in view up to which the frame thread culls and writes the draws itself (`draw`): about
+/// a millisecond; a view of 12 on the Mac held about 9,000 draws.
+const SERIAL_CULL: usize = 24_576;
 
 fn region_of(key: MeshKey) -> (u64, IVec3) {
     (key.0, key.1 >> REGION)
@@ -274,7 +277,7 @@ impl Solid {
         let casts = c
             .states
             .iter()
-            .map(|st| st.opacity > 0 && st.liquid.is_none())
+            .map(|st| st.opacity > 0 && st.liquid_in().is_none())
             .collect();
         let mut s =
             Solid { buf: gpu.create_buffer(4, usage::STORAGE, "solid"), on: false, held: Vec::new(), tags: Vec::new(), casts, done: None };
@@ -1207,9 +1210,17 @@ impl WorldRenderer {
         // frame cost more than the culling.
         let mut parts = std::mem::take(&mut self.parts);
         parts.resize_with(seen.len().max(parts.len()), Vec::new);
+        // The frame thread culls and writes the draws itself up to `SERIAL_CULL` meshes (about a
+        // millisecond): handed to the pool, it waited for all of its parts, and a worker put
+        // aside for loading's threads held it for 20-70 ms (Ronald's window, standing while
+        // distant terrain came in, 11-04). Every region a thread of its own past that.
+        let meshes: usize = seen.iter().map(|s| s.1.len()).sum();
+        let split = if meshes <= SERIAL_CULL { usize::MAX } else { 1 };
+        let span = crate::diag::span("world/cull");
         let faces_drawn: u64 = seen
             .par_iter()
             .zip(parts.par_iter_mut())
+            .with_min_len(split)
             .map(|((_, list), out)| {
                 out.clear();
                 let mut faces = 0u64;
@@ -1228,6 +1239,7 @@ impl WorldRenderer {
                 faces
             })
             .sum();
+        drop(span);
         // Into runs of one pipeline and page (layer, kind, page; translucent last), written
         // straight into the mapped buffers from every core: each region knows where its draws
         // of each run go, so the near-to-far order holds inside runs without a sort.
@@ -1238,6 +1250,7 @@ impl WorldRenderer {
         let bucket = |d: &DrawRecord| (d.1 as usize * 2 + d.0 as usize) * pages + d.2 as usize;
         let counts: Vec<Vec<u32>> = seen_parts
             .par_iter()
+            .with_min_len(split)
             .map(|p| {
                 let mut c = vec![0u32; nb];
                 for d in p.iter().filter(|d| d.1 < 2) {
@@ -1339,9 +1352,11 @@ impl WorldRenderer {
                 std::ptr::copy_nonoverlapping(bytemuck::bytes_of(&a).as_ptr(), indirect.at(k as usize * 20), 20);
             }
         };
+        let span = crate::diag::span("world/write");
         seen_parts
             .par_iter()
             .zip(starts.par_iter_mut())
+            .with_min_len(split)
             .for_each(|(p, at)| {
                 for d in p.iter().filter(|d| d.1 < 2) {
                     let b = bucket(d);
@@ -1349,6 +1364,7 @@ impl WorldRenderer {
                     at[b] += 1;
                 }
             });
+        drop(span);
         for (j, d) in lod.iter().enumerate() {
             put(opaque + j as u32, d);
         }

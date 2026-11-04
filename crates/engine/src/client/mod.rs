@@ -10,6 +10,7 @@ pub mod modui;
 pub mod particles;
 mod receive;
 pub mod sky;
+pub mod stack_look;
 pub mod terrain;
 pub mod terrain_gpu;
 pub mod textures;
@@ -104,8 +105,9 @@ pub struct ClientEntity {
     pub health: f32,
     pub hurt: f32,
     pub worn: Vec<u32>,
-    /// A player's item in hand, 0 for none.
+    /// A player's item in hand, 0 for none, and that stack's own look (`abi::comp::LOOK`).
     pub held: u32,
+    pub held_look: Option<String>,
     /// Accumulated walk distance and current swing amplitude, for limb animation.
     pub walk: f32,
     /// Blocks actually walked, which limbs at full swing fall behind of.
@@ -1220,11 +1222,11 @@ impl Client {
             } else if refused {
                 self.breaking = None;
             } else if let Some(hit) = self.target {
-                let held = self.held().item;
+                let held = self.held();
                 let time = crate::server::mining_time(
                     c,
                     hit.state,
-                    held,
+                    &held,
                     self.eye_liquid().is_some(),
                     self.player.on_ground,
                     self.attribute(crate::server::extend::MINING_SPEED),
@@ -1735,7 +1737,7 @@ impl Client {
             if let Some(kind) = drip.filter(|_| {
                 c.states
                     .get(state as usize)
-                    .is_some_and(|s| s.liquid.is_some() && (r >> 24) % 8 == 0)
+                    .is_some_and(|s| s.liquid_in().is_some() && (r >> 24) % 8 == 0)
             }) {
                 let (below, air) = (self.world.block(p - IVec3::Y), self.world.block(p - IVec3::Y * 2));
                 if c.states[below as usize].flags & weft_abi::block_flags::SOLID != 0 && air == 0 {
@@ -1856,7 +1858,7 @@ impl Client {
         let liquid = self
             .world
             .block_or_air(eye)
-            .and_then(|s| c.states[s as usize].liquid)
+            .and_then(|s| c.states[s as usize].liquid_in())
             .map(|l| c.liquids[l as usize].temperature);
         crate::audio::Listener {
             pos: cam.pos,
@@ -1891,7 +1893,7 @@ impl Client {
     /// Copies an engine field component into the entity (or the own player) that shows it.
     fn engine_field(&mut self, id: u64, comp: u32, bytes: &[u8]) {
         let c = content();
-        let [health, burning, worn, shape, held, mount] = c.game.field_comps;
+        let [health, burning, worn, shape, held, mount, held_look] = c.game.field_comps;
         let mounted = || {
             let m = bytes
                 .get(..8)
@@ -1955,6 +1957,11 @@ impl Client {
             e.seat_forward = mounted().map_or(0.0, |(_, _, f)| f);
         } else if comp == held {
             e.held = words(bytes).next().map_or(0, u32::from_le_bytes);
+        } else if comp == held_look {
+            e.held_look = std::str::from_utf8(bytes)
+                .ok()
+                .filter(|l| !l.is_empty())
+                .map(str::to_string);
         } else if comp == shape {
             (e.size, e.look, e.scale) = shaped();
         }
@@ -2141,6 +2148,7 @@ impl Client {
             hurt: self.hurt_flash,
             worn,
             held: self.held().item,
+            held_look: crate::stack::look(&self.held()).map(str::to_string),
             walk: self.self_walk,
             walked: self.self_walk,
             swing: self.self_swing,
@@ -2493,8 +2501,10 @@ impl Client {
             .iter()
             .flat_map(|(&id, e)| e.world_light.iter().map(move |(cp, l)| ((id, *cp), *l)))
             .collect();
+        let s = crate::diag::span("render/world");
         self.render
             .draw(gpu, list, frame, &cam, scene_buf, &frames, &lights);
+        drop(s);
         let lit: Vec<u32> = frames
             .iter()
             .map(|(id, _)| {
@@ -2515,6 +2525,7 @@ impl Client {
         late.clear();
         // The sky fills what the opaque world left, and translucent things are seen against it.
         let overlays = self.overlays(&cam);
+        let s = crate::diag::span("render/sky");
         self.sky.draw(
             gpu,
             &mut late,
@@ -2531,6 +2542,7 @@ impl Client {
             self.frame_dt,
             &overlays,
         );
+        drop(s);
         self.render.draw_translucent(&mut late);
         let me = (self.view != 0 && !self.dead && self.mode != GameMode::Spectator).then(|| self.self_entity());
         // In first person the player's body is not drawn, but casts its shadow.
@@ -2558,6 +2570,7 @@ impl Client {
             self.breaking
                 .map(|(f, p, v)| (p, v, self.frame_place(f).origin())),
         );
+        let s = crate::diag::span("render/entities");
         self.entity_render.draw(
             gpu,
             list,
@@ -2579,10 +2592,13 @@ impl Client {
             &self.gizmo_fills,
             &mut hand_late,
         );
+        drop(s);
+        let s = crate::diag::span("render/particles and weather");
         self.particles.draw(list, &mut late, scene_buf);
         let ticks = self.smooth_time();
         self.weather_render
             .draw(gpu, &mut late, frame, &cam, scene_buf, &self.world, self.rain, ticks, self.frame_dt);
+        drop(s);
         self.sky.draw_overlay(&mut hand_late, scene_buf);
         if self.behind[2] > 0.5 {
             // After the copy of the world (the app puts it there).

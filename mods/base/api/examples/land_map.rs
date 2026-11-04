@@ -17,7 +17,7 @@ fn main() {
     let across = arg(4, 4096) as i32;
     let step = arg(5, 4).max(1) as i32;
     let out = a.get(6).cloned().unwrap_or_else(|| "land_map.png".into());
-    let f = Fields { seed };
+    let f = l::fields(seed);
     let n = (across / step) as usize;
     let (x0, z0) = (cx - across / 2, cz - across / 2);
     // Heights before and after, a pixel's column each (with one more row and column for shading).

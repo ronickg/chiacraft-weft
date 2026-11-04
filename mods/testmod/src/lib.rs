@@ -8,6 +8,8 @@
 //! - adds its own dimensions, one of them a planet built only from terrain presets,
 //! - adds an ore to the base game's overworld,
 //! - adds a liquid (oil) whose bucket is the base game's bucket filled, without bucket code,
+//! - adds blocks that stand in the base game's water: a weed that lives in it and a slab that
+//!   can be waterlogged (`holds_liquid`),
 //! - makes cooked meat heal: its own component on the base game's items plus the base game's
 //!   `eaten` event, and lets zombies drop tin through a loot modifier,
 //! - shows off particles, shaders, text effects and glow masks (`looks`).
@@ -37,6 +39,9 @@ static REINFORCED_STONE: Block = Block::named("reinforced_stone");
 static STEEL_PICKAXE: Item = Item::named("steel_pickaxe");
 static OIL: Block = Block::named("oil");
 static OIL_BUCKET: Item = Item::named("oil_bucket");
+static WATER: Block = Block::named("base:water");
+static WATERWEED: Block = Block::named("waterweed");
+static SEA_SLAB: Block = Block::named("sea_slab");
 static MACHINES: SoundCategory = SoundCategory::named("machines");
 static ENERGY_GIZMOS: GizmoGroup = GizmoGroup::named("energy");
 // The base game's things, by name: no code dependency on it.
@@ -194,6 +199,20 @@ fn init(r: &mut Registry) {
     r.shaped(&CRAFTING, "cable", 8, &["iii"], &[('i', "#ingots/iron")]);
 
     r.block(&REGOLITH).hardness(0.5).mineable("shovel");
+    // Standing in water: a weed that only lives in it (it stacks, held up by nothing, so tests
+    // can fill a pool with it), and a slab whose `waterlogged=true` state is its wet twin
+    // (placed into water it fills, a bucket drains it).
+    r.block(&WATERWEED)
+        .plant()
+        .texture("base:cottongrass")
+        .holds_liquid(&WATER);
+    r.block(&SEA_SLAB)
+        .prop("waterlogged", ["false", "true"])
+        .texture("base:planks_birch")
+        .model_box([0.0, 0.0, 0.0], [16.0, 8.0, 16.0])
+        .hardness(0.5)
+        .mineable("axe")
+        .states(|p, s| if p.is("waterlogged", "true") { s.holds_liquid(&WATER) } else { s });
     // Only the common `sand` tag: cactus and sugar cane accept it without knowing it.
     r.block(&RED_SAND)
         .hardness(0.5)

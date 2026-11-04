@@ -300,6 +300,7 @@ impl Client {
                     hurt: 0.0,
                     worn: Vec::new(),
                     held: 0,
+                    held_look: None,
                     walk: 0.0,
                     walked: 0.0,
                     swing: 0.0,

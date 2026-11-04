@@ -460,6 +460,13 @@ impl App {
             debug: self.opts.gpu_debug,
         })
         .map_err(|e| e.to_string())?;
+        // The pipelines the driver compiled last time, before any is made (saved at exit).
+        let cache = self.opts.cache_dir.join("pipelines.bin");
+        if let Ok(data) = std::fs::read(&cache) {
+            gpu.load_pipeline_cache(&data);
+            log::info!("pipeline cache: {} KB from the last start", data.len() / 1024);
+        }
+        let _ = PIPELINE_CACHE.set(cache);
 
         let mut roots: Vec<(String, PathBuf)> = vec![("core".into(), engine_assets(self.opts.dev))];
         // Code mods' and data packages' assets alike.
@@ -614,6 +621,29 @@ fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
     let t = gpu
         .create_texture(&TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: Format::Depth32, render_target: true }, "depth");
     (t, w, h)
+}
+
+/// Where the driver's compiled pipelines are kept between starts (`Backend::pipeline_cache_data`).
+static PIPELINE_CACHE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Keeps the driver's compiled pipelines for the next start: the shaders then skip most of their
+/// compiling (on the Mac, MoltenVK's translation too). Written aside and moved, never half.
+fn save_pipeline_cache(gpu: &dyn Backend) {
+    let Some(path) = PIPELINE_CACHE.get() else { return };
+    let data = gpu.pipeline_cache_data();
+    if data.is_empty() {
+        return;
+    }
+    let tmp = path.with_extension("bin.tmp");
+    let saved = path
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|_| std::fs::write(&tmp, &data))
+        .and_then(|_| std::fs::rename(&tmp, path));
+    match saved {
+        Ok(()) => log::debug!("pipeline cache: {} KB saved", data.len() / 1024),
+        Err(e) => log::warn!("pipeline cache {}: {e}", path.display()),
+    }
 }
 
 impl Running {
@@ -1005,6 +1035,8 @@ impl Running {
         ) {
             Ok(mut client) => {
                 client.sent = load_chat_history(&self.settings.run_dir);
+                // The synced settings the player changes here are this world's.
+                crate::config::playing_in(Some(server.configs.clone()));
                 self.game = Some(Game { client, server: Some(server), world, identity });
                 self.screens.clear();
                 self.hud.invalidate();
@@ -1029,6 +1061,8 @@ impl Running {
             return;
         }
         let Some(mut g) = self.game.take() else { return };
+        // Away from it: the visited world's rules stay out of it.
+        crate::config::playing_in(None);
         g.client.leave();
         self.gpu.wait_idle();
         g.client.destroy(&mut *self.gpu);
@@ -1081,6 +1115,7 @@ impl Running {
 
     fn leave_world_silent(&mut self) {
         if let Some(mut g) = self.game.take() {
+            crate::config::playing_in(None);
             if g.server.is_none() {
                 // A remote server's synced settings were in force; back to our own.
                 crate::config::left_server(&self.settings.run_dir);
@@ -2069,6 +2104,7 @@ impl ApplicationHandler for App {
             r.gpu.wait_idle();
             r.leave_world_silent();
             r.close_home();
+            save_pipeline_cache(&*r.gpu);
             drop(r.gpu);
         }
     }
@@ -2166,13 +2202,17 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
         r.depth = make_depth(&mut *r.gpu, world.width, world.height);
     }
     if r.quads_dirty {
+        let _s = crate::diag::span("ui quads");
         build_ui_quads(r, scale);
     }
+    let s = crate::diag::span("overlays");
     draw_overlays(r, &info, scale, text_unit);
+    drop(s);
     record_passes(r, &info, &world, scale);
     let capture_now = r.shot_pending;
     let t3 = Instant::now();
     r.prof[3] = t3.duration_since(t2).as_secs_f32() * 1000.0;
+    crate::diag::slow_record(r.prof[3]);
     r.gpu.end_frame(&r.list);
     r.prof[4] = t3.elapsed().as_secs_f32() * 1000.0;
     report_frame(r, dt);
@@ -2739,6 +2779,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
                 .then(|| g.client.menu.as_ref().map(|m| m.owner))
                 .flatten()
                 .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind)));
+            let s = crate::diag::span("preview");
             let tex = g.client.entity_render.draw_preview(
                 &mut *r.gpu,
                 &mut r.list,
@@ -2748,6 +2789,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
                 &worn,
                 subject,
             );
+            drop(s);
             if tex != r.preview_tex {
                 r.preview_tex = tex;
                 r.quads_dirty = true;
@@ -2771,17 +2813,23 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         Target::Surface
     };
     if let Some(g) = &mut r.game {
+        let s = crate::diag::span("terrain gpu");
         g.client
             .gpu_terrain
             .frame(&mut *r.gpu, &mut r.list, info.slot);
+        drop(s);
+        let s = crate::diag::span("particles");
         let cam = g.client.render_camera();
         g.client
             .particles
             .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
+        drop(s);
+        let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
         // The sun's light for shadow maps (packs that use them), which the world's scene samples.
         g.client.prepare_shadows(&mut *r.gpu);
         // A copy of the world for what is seen through it (`water_behind` packs, with post on).
+        drop(s);
         g.client.behind = [0.0; 4];
         if post && crate::packs::water_behind() {
             if let Some([c, d]) = r
@@ -2801,14 +2849,20 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     if let Some(g) = &mut r.game {
         let worn = g.client.worn();
         let held = g.client.held().item;
+        let s = crate::diag::span("entities preload");
         g.client
             .entity_render
             .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
+        drop(s);
+        let s = crate::diag::span("client render");
         g.client
             .render(&mut *r.gpu, &mut world, world_info, &r.textures);
+        drop(s);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
+        let s = crate::diag::span("shadows");
         g.client
             .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+        drop(s);
         // The opaque world copied, then what is seen through it drawn over it, reading the copy.
         if g.client.behind[2] > 0.5 {
             world.push(Cmd::EndPass);
@@ -2831,8 +2885,9 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
             .as_ref()
             .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
+        let _s = crate::diag::span("effects");
         r.post
-            .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth);
+            .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth, scaled);
         r.list.push(Cmd::Mark);
     } else {
         r.list.push(Cmd::Mark);
@@ -2840,7 +2895,9 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         r.list
             .push(Cmd::BeginPass { color: Some((Target::Surface, None)), depth: None });
     }
+    let s = crate::diag::span("ui draw");
     r.ui.draw(&mut *r.gpu, &mut r.list, info, scale);
+    drop(s);
     r.list.push(Cmd::Mark);
     r.list.push(Cmd::EndPass);
 }

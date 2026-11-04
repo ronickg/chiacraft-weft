@@ -80,7 +80,8 @@ pub fn init(r: &mut Registry) {
 }
 
 fn wet(w: &World, at: [f64; 3]) -> bool {
-    w.in_liquid(at) && block_name(w.get([at[0].floor() as i32, at[1].floor() as i32, at[2].floor() as i32])).starts_with("base:water")
+    w.in_liquid(at)
+        && block_name(liquid_block(w.get([at[0].floor() as i32, at[1].floor() as i32, at[2].floor() as i32]))).starts_with("base:water")
 }
 
 fn random(w: &World) -> f64 {
@@ -171,7 +172,7 @@ fn spawn(w: &World) {
             let (x, z) = ((at.pos[0] + a.cos() * r).floor() as i32, (at.pos[2] + a.sin() * r).floor() as i32);
             let top = at.pos[1].floor() as i32 + 8;
             // The water's surface, scanning down; two blocks deep or more.
-            let water = |y: i32| block_name(w.get([x, y, z])).starts_with("base:water");
+            let water = |y: i32| block_name(liquid_block(w.get([x, y, z]))).starts_with("base:water");
             let Some(y) = (top - 32..top).rev().find(|&y| water(y) && water(y - 1)) else { continue };
             let spot = [x as f64 + 0.5, (y - 1) as f64 + 0.2, z as f64 + 0.5];
             let biome = name_of(abi::entry_kind::BIOME, w.biome([x, y - 1, z]));

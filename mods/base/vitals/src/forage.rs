@@ -210,7 +210,7 @@ pub const SOURCES: [Source; 67] = [
     browse("animals:flowering_shrub", Category::Leaves, 4, wild::FLOWERING, GREEN),
     browse("animals:water_lily", Category::WaterPlants, 5, wild::PONDS, ALL_YEAR),
     // Kelp washed up on the beach, all year.
-    browse("base:kelp", Category::WaterPlants, 4, &["base:beach"], ALL_YEAR),
+    browse("base:kelp_wrack", Category::WaterPlants, 4, &["base:beach"], ALL_YEAR),
     // Grubs and beetles in the rotten logs, all year.
     browse("animals:rotten_log", Category::Insects, 3, wild::DEADWOOD, ALL_YEAR),
     // Our trees (`worldgen.rs`, `cretaceous.rs`), as browse where they grow: mesquite's leaves

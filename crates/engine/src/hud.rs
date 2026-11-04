@@ -916,13 +916,24 @@ pub fn item_tooltip(lang: &Lang, input: &crate::input::Input, stack: weft_abi::I
     if let Some(key) = name.key(lang).map(|k| format!("{k}.tooltip")) {
         group(&key, None, &mut out);
     }
-    // What a tag or component says of every item with it, its numbers from this one.
+    // What a tag or component says of every item with it, its numbers from this one; then the
+    // components only this stack carries (a part's grade, a tool's parts).
     let c = content();
-    for comp in c.components.of(crate::components::ITEM, stack.item) {
+    let mut comps: Vec<u32> = c
+        .components
+        .of(crate::components::ITEM, stack.item)
+        .collect();
+    for &(comp, _) in crate::stack::get(stack.data).iter() {
+        if !comps.contains(&comp) {
+            comps.push(comp);
+        }
+    }
+    for comp in comps {
         let key = text::lang_key("tagged", &c.components.names[comp as usize]);
         group(&key, Some(comp), &mut out);
     }
-    let max = c.items.get(stack.item as usize).map_or(0, |d| d.durability);
+    // The stack's own most uses, for one built from parts.
+    let max = c.max_durability(&stack);
     if max > 0 {
         let damage = crate::stack::damage(&stack);
         line(lang.get("tooltip.durability"), &[text::Arg::Int((max - damage.min(max)) as i64), text::Arg::Int(max as i64)], None, &mut out);

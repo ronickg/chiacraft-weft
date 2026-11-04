@@ -1,13 +1,12 @@
 //! Expected blocks for a testkit check: the first rock face (fall >= 6) near a point, and what
 //! its column should show from its top down (`rock_set`), as `expect block` lines.
 use base_api::land as l;
-use weft_sdk::noise::fixed::Fields;
 fn main() {
     let a: Vec<i32> = std::env::args()
         .skip(1)
         .map(|s| s.parse().unwrap())
         .collect();
-    let f = Fields { seed: 1 };
+    let f = l::fields(1);
     let h = |x: i32, z: i32| l::height(&f, x * 16, z * 16) >> 4;
     for r in 0..a[2] {
         for (x, z) in (-r..=r).flat_map(|i| [(a[0] + i, a[1] - r), (a[0] + i, a[1] + r), (a[0] - r, a[1] + i), (a[0] + r, a[1] + i)]) {

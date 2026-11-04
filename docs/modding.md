@@ -247,6 +247,9 @@ Anywhere a block is named as text, `base:furnace[lit=true]` picks a state: in st
 - `max_stack(N)`
 - `durability`
 - `tool("pickaxe")`, `tool_level(tier)`, `mining_speed(speed)`
+- `keeps_broken()`: worn out, it stays in its slot broken instead of vanishing, and works like an empty hand until its damage is lowered (a repair)
+- A stack can carry its own of those numbers, and they win over its item's: `stack.with(&DURABILITY, 412).with(&MINING_SPEED, 3.6).with(&TOOL_LEVEL, 100).with(&ATTACK_DAMAGE, 4.1)` is one axe built from parts (base's crafting), mined, worn and hit with by its own numbers on client and server alike
+- And its own picture: `with_look(stack, Some("base:parts/axe/haft@base:ramps/oak;base:parts/axe/head/flint"))` draws it from layers, back to front, instead of its item's icon, in slots and in hands (other players' too). A layer is a texture used as it is, or a shade map (`<map>@<ramp>,<ramp>...`: red / 36 the step 0-7, green the region) painted with one 8 x 1 ramp per region. Each distinct look is composed once; `stack_look` reads it back
 - `attack_damage`, `attack_speed(per_second)` (hitting before it has recharged does less; a sword is 1.6, and without it an item swings at an empty hand's 4) and `sweeps()` (a full swing on the ground also does 1 damage to what stands next to the target)
 - Advancements read tags, so yours count by tagging them: `cooked_meat` on food, `hostile` and `livestock` on mobs, `logs`, `torches`, `furnaces`, etc etc
 - `no_creative_break()`: in creative it doesn't break blocks, like a sword. Both sides know, so nothing flickers; a rule that depends on more is `question::BREAK_BLOCK`, which is asked when mining starts and tells the client no right away
@@ -321,6 +324,20 @@ Look at testmod's generator for an example.
 Another mod's liquid: `r.change_liquid(&WATER).fog(0x204020, 12.0)`, also `overlay`, `no_overlay`, `swimmable(bool)`. What you don't set stays.
 
 Reactions: `r.liquid_reaction("#hot", "#water").source_block("obsidian")`.
+
+#### Blocks standing in a liquid
+`.holds_liquid(&WATER)` on a block (or on some of its states) makes it stand in still water, like kelp, seagrass or a waterlogged slab. The cell is then two things at once: the block, and a source of the liquid around it.
+- **Flow**: it spreads like a source, counts as one for `renewable`, and nothing flows into it or washes it away. Reactions see its liquid (`#water` touching lava makes obsidian).
+- **Going away**: breaking it, losing its support, a piston, an explosion that keeps liquids, a fill or a mod's `w.set(pos, air)` all leave the liquid behind (`set` air once more to empty it).
+- **Placing**: a block that only ever stands in it (no dry state) can be placed only into a source of that liquid.
+- **Dry twin**: give it on some states only, and each of those states' twin one property apart becomes its dry state. Placing it into a source picks the wet state, a bucket drains the wet state to the dry one and pours back into it, and a piston moves it dry (the liquid stays). One without a dry twin is broken by a piston instead:
+  ```rust
+  r.block(&SEA_SLAB).prop("waterlogged", ["false", "true"]).model_box([0.0; 3], [16.0, 8.0, 16.0])
+      .states(|p, s| if p.is("waterlogged", "true") { s.holds_liquid(&WATER) } else { s });
+  r.block(&KELP).plant().needs_below("#kelp_soil").holds_liquid(&WATER);
+  ```
+- **Everything else** treats it as the liquid too: swimming, drowning (`Tag::in_cell`), drag (the slower of the two), light (it absorbs at least as much as the liquid), fog, sound under water, rain and drips, fish, mob paths, and `#water` supports (sugar cane beside it, a lily pad on it).
+- **In code**: `liquid_of(state)` names its liquid, `held_liquid(state)` gives the liquid's source state and `liquid_block(state)` that or the state itself. Ask `TAG.in_cell(state)` for what a place is ("is this water?") and `TAG.on_block(state)` for what a block is. testmod's `waterweed` and `sea_slab` are small working examples.
 
 ### World
 - `r.biome(..)` with its climate, surface and tints (`.temperature(0.35..).surface(..).tint(&tints::GRASS, ..)`); terrain rules inherit them
