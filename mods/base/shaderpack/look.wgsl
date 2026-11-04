@@ -537,6 +537,9 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
 
 // Light the fog sends toward the eye: the sky's from all around, the sun's mostly forward, so it
 // glows white-gold looking toward the sun.
+// The color sunlight takes through mist with the sun low.
+const MIST_GOLD: vec3<f32> = vec3(1.0, 0.7, 0.36);
+
 struct FogLight {
     sky: vec3<f32>,
     sun: vec3<f32>,
@@ -556,9 +559,12 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // At dawn and dusk the mist is lit gold toward the low sun and dims away from it (the
     // Amazon's dawn fog, the canopy refs' 07): less of the sky's cool light, the sun's glow warmer.
     // Before, a misty morning read milky white everywhere (the world playtester, Plants, 11-04).
-    let gold = golden();
-    let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.6, gold);
-    let sun_part = mix(p.sun, p.sun * 0.6 + p.glow * 0.8, gold) * light_strength() * phase;
+    // Sunlight through mist turns gold well before golden hour, while the sun is under about 30°
+    // (the refs' dawn shafts, 16; low sun scattered through haze loses its blue): with golden
+    // hour's colour alone the 07:30 shafts in a rainforest's mist read grey-white (canopy sheet).
+    let warm = 1.0 - smoothstep(0.08, 0.55, scene.sun.y);
+    let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.5, warm);
+    let sun_part = p.sun * mix(vec3(1.0), MIST_GOLD, warm * 0.9) * light_strength() * phase;
     let k = 0.75 * tint * look_opt(OPT_FOG, 1.0);
     return FogLight(sky_part * k, sun_part * k);
 }
@@ -614,7 +620,8 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         let k = f32(i) / f32(steps);
         let at = dist * (exp(2.2 * k) - 1.0) / (exp(2.2) - 1.0);
         let step = at - last;
-        let mid = at - step * (0.5 + 0.8 * jitter);
+        // Jittered by under half a step: at 0.8 of one the shafts showed a fixed grain.
+        let mid = at - step * (0.5 + 0.35 * jitter);
         let d = fog_density(eye + dir * mid, floor) * sky;
         let kept = exp(-d * step);
         let lit = sun_reaches(dir * mid);
