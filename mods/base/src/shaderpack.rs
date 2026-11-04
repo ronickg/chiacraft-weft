@@ -27,7 +27,7 @@ const FILES: [(&str, &str); 6] = [
 ];
 
 // Water writes depth, so the reflections effect finds its surface.
-const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\ntranslucent_depth = true\nsun_shadows = true\nwater_behind = true\n";
+const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\ntranslucent_depth = true\nsun_shadows = true\nwater_behind = true\nmerge_effects = true\n";
 
 /// Only `--shader-pack <id>` (a script checking a look; tests reset packs when they start, so
 /// it is turned on after that), `--shader-pack-after <secs>` seconds into the run (0 by
