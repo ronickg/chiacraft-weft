@@ -20,6 +20,8 @@ static SAND_TAG: Tag = Tag::named("sand");
 /// grass on plantable soil, which trees and flowers (block lists the engine checks), and tags `frozen` (nothing grows, set by
 /// `.frozen(..)`), `dry` (cacti).
 pub static TREES: Component<f32> = Component::named("trees");
+/// Boulders: the chance of a heap of stone per 12 x 12 cell (`boulder`).
+pub static BOULDERS: Component<f32> = Component::named("boulders");
 /// Where a forest stands thick: the chance of a tree per 3 x 3 cell in its stands, on top of
 /// `TREES`, with clearings left open between them. Mature stands hold 170-244 trees a hectare
 /// (Research round 7): a 5 x 5 site at 0.4 is 160, a 3 x 3 one at 0.2 adds 220 in the stands.
@@ -54,6 +56,7 @@ pub fn register(r: &mut Registry) {
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
     r.biome(&PLAINS)
         .set(&CLIMATE, base_api::climate("base:plains"))
+        .set(&BOULDERS, 0.05)
         .surface("grass", "dirt", 3)
         .tag("animals")
         .tag("spawn_biome")
@@ -61,6 +64,7 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:plains").unwrap_or(vitals::forage::GRASS_COVER_ELSE));
     r.biome(&FOREST)
         .set(&CLIMATE, base_api::climate("base:forest"))
+        .set(&BOULDERS, 0.12)
         .humidity(0.25..)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x79c05a)
@@ -73,6 +77,7 @@ pub fn register(r: &mut Registry) {
         .set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
     r.biome(&BIRCH_FOREST)
         .set(&CLIMATE, base_api::climate("base:birch_forest"))
+        .set(&BOULDERS, 0.1)
         .temperature(..0.1)
         .humidity(0.05..)
         .surface("grass", "dirt", 3)
@@ -86,6 +91,7 @@ pub fn register(r: &mut Registry) {
         .set_text(&TREE_KINDS, "base:birch_log");
     r.biome(&TAIGA)
         .set(&CLIMATE, base_api::climate("base:taiga"))
+        .set(&BOULDERS, 0.25)
         .temperature(..-0.15)
         .surface("podzol", "dirt", 3)
         .tint(grass, 0x86b783)
@@ -100,6 +106,7 @@ pub fn register(r: &mut Registry) {
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&SNOWY)
         .set(&CLIMATE, base_api::climate("base:snowy_plains"))
+        .set(&BOULDERS, 0.2)
         .snows()
         .temperature(..-0.45)
         .surface("snowy_grass", "dirt", 3)
@@ -113,6 +120,7 @@ pub fn register(r: &mut Registry) {
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&DESERT)
         .set(&CLIMATE, base_api::climate("base:desert"))
+        .set(&BOULDERS, 0.04)
         .temperature(0.35..)
         .humidity(..0.0)
         .surface("sand", "sand", 3)
@@ -127,6 +135,7 @@ pub fn register(r: &mut Registry) {
     // Hot grassland with few trees, between the desert and the forests (wet and dry seasons).
     r.biome(&SAVANNA)
         .set(&CLIMATE, base_api::climate("base:savanna"))
+        .set(&BOULDERS, 0.04)
         .temperature(0.2..)
         .humidity(..0.2)
         .surface("grass", "dirt", 3)
@@ -157,6 +166,7 @@ pub fn register(r: &mut Registry) {
         .set_text(&TREE_KINDS, "base:acuri_palm_log:3 base:moriche_palm_log:1 base:oak_log:1");
     r.biome(&MOUNTAINS)
         .set(&CLIMATE, base_api::climate("base:mountains"))
+        .set(&BOULDERS, 0.4)
         .surface("grass", "dirt", 3)
         .bare_above(130)
         .tint(grass, 0x8ab689)
@@ -261,11 +271,46 @@ pub fn register(r: &mut Registry) {
                 tree(s);
             }
         });
+    // Boulders where a biome has them (`BOULDERS`): a heap of stone two to five blocks across, half
+    // sunk in the ground, mossy in the woods and the wet.
+    r.scatter(&BOULDER_SITES)
+        .cell(12)
+        .reach(3)
+        .density(&BOULDERS)
+        .shape(boulder);
     r.decorate(decorate);
+}
+
+/// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet.
+fn boulder(s: &mut Site) {
+    let [x, y, z] = s.pos();
+    let h = s.random();
+    let mossy = WET.on_biome(s.biome()) || WOODS.on_biome(s.biome());
+    let r = 1 + (h % 3) as i32;
+    for dy in -1..=r {
+        for dz in -r..=r {
+            for dx in -r..=r {
+                let bump = (hash(h, (x + dx) as i64, (y + dy) as i64, (z + dz) as i64) % 3) as i32;
+                if dx * dx + 2 * dy * dy + dz * dz > r * r + bump {
+                    continue;
+                }
+                let pick = hash(h ^ 0xB0, (x + dx) as i64, (y + dy) as i64, (z + dz) as i64) % 4;
+                let block = match pick {
+                    0 if mossy => MOSSY_COBBLESTONE.id(),
+                    0 | 1 => COBBLESTONE.id(),
+                    _ => STONE.id(),
+                };
+                s.force([x + dx, y + dy, z + dz], block);
+            }
+        }
+    }
 }
 
 static TREE_SITES: Scatter = Scatter::named("trees");
 static STAND_SITES: Scatter = Scatter::named("stand_trees");
+static BOULDER_SITES: Scatter = Scatter::named("boulders");
+static WET: Tag = Tag::named("wet");
+static WOODS: Tag = Tag::named("forest");
 
 /// The stand noise over the ground, about -4096 to 4096: a forest's stands where it's over
 /// `STAND`, its clearings where it's under `-CLEARING`; one patch is some 40 blocks across.
@@ -362,6 +407,17 @@ fn decorate(g: &mut Gen) {
             // Ponds in swamps and floodplains (`vitals::wild::POND_LANDS`): still water a block deep
             // where the ground is level, its floating plants on it.
             let near = [(1, 0), (-1, 0), (0, 1), (0, -1)].map(|(dx, dz)| (wx + dx, wz + dz, g.column(wx + dx, wz + dz)));
+            // Steep ground goes bare: gravel where it falls three blocks to a neighbour, stone
+            // where it falls five (sand and the frozen north keep their own ground).
+            let fall = near
+                .iter()
+                .map(|(_, _, c)| col.height - c.height)
+                .max()
+                .unwrap_or(0);
+            if y >= 1 && fall >= 3 && PLANT_SOIL.on_block(below) && !FROZEN.on_biome(b) {
+                g.set(x, y - 1, z, if fall >= 5 { STONE.id() } else { GRAVEL.id() });
+                continue;
+            }
             if y >= 1
                 && pond(seed, wx, wz, col.height, b)
                 && PLANT_SOIL.on_block(below)
