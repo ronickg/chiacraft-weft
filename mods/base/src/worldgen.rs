@@ -453,7 +453,7 @@ pub fn register(r: &mut Registry) {
     // stand (`stand_over`).
     r.scatter(&YOUNG_SITES)
         .cell(5)
-        .reach(2)
+        .reach(base_api::tree_recipes::UNDERSTORY_REACH)
         .density(&YOUNG_TREES)
         .thin(stand_over(STAND), 0)
         .shape(young_tree);

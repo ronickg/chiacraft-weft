@@ -31,6 +31,7 @@ for now is bug fixes only, written and opened by him.
 | Under water the sky's gradient is drawn (2562a0cd) | Navy streaks where the sea floor ends | Maybe |
 | Sky pictures upright on a leaned sun path (81ff2dcc) | The moon drew as a tilted diamond | With the leaned path only |
 | clippy allows for `mut_from_ref` (0d111b9a, d7ff2255) | A newer clippy made them errors | Trivial |
+| Client: water drips (a solid block under water, air under that) read the block under with `get`: a cube not arrived yet is `u32::MAX` (`client/mod.rs`) | It indexed past the block states and crashed the client a second after arriving by a tarn (water above the sea's level, near the top of what had arrived) | Yes: a plain bug fix |
 
 ## 2. Rendering, for our shader pack (Bliss-like look)
 
