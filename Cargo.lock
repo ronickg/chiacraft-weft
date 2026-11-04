@@ -8370,6 +8370,7 @@ dependencies = [
  "bytemuck",
  "chiacraft-account",
  "chiacraft-packages",
+ "chiacraft-sponsor",
  "chiacraft-wallet",
  "crossbeam-channel",
  "glam 0.34.1",

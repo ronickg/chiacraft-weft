@@ -33,6 +33,8 @@ chiacraft-account = { path = "../account" }
 # The chain (phase 4): reading DIDs (the player's, the world's, a joining player's) through Chia
 # full nodes. Started only when something asks (`chiacraft::chain`), never in the game loop.
 chiacraft-wallet = { path = "../wallet", features = ["chain"] }
+# Asking a DID sponsor over iroh (its client only).
+chiacraft-sponsor = { path = "../sponsor" }
 iroh-mainline-address-lookup = "0.6.1"
 
 [dev-dependencies]

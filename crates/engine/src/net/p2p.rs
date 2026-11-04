@@ -344,6 +344,29 @@ pub fn warmed(key: &str) -> Option<Status> {
         .map(|(s, _)| s.clone())
 }
 
+/// Asks the DID sponsor `sponsor` (its endpoint id) through the player's own endpoint: `request`
+/// as given, or its status when `None`. Blocks (call it from a thread of its own): the answer's
+/// status and body, or why nobody answered.
+pub fn ask_sponsor(
+    settings: &Settings,
+    sponsor: &str,
+    request: Option<&chiacraft_wallet::sponsor::Request>,
+) -> Result<(u16, String), String> {
+    let id: EndpointId = sponsor
+        .trim()
+        .parse()
+        .map_err(|_| format!("'{sponsor}' isn't a sponsor's address"))?;
+    let settings = settings.clone();
+    let request = request.cloned();
+    runtime().block_on(async move {
+        let ep = account(&settings).await?;
+        match &request {
+            Some(r) => chiacraft_sponsor::client::ask(&ep, id, r).await,
+            None => chiacraft_sponsor::client::status(&ep, id).await,
+        }
+    })
+}
+
 /// Opens the player's endpoint in the background: link requests can reach this game from now on.
 pub fn start_account(settings: &Settings) {
     let settings = settings.clone();

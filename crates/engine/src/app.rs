@@ -2093,7 +2093,7 @@ fn start_frame(r: &mut Running, opts: &Options, dt: f64) {
         r.links_seen = links_now;
         if r.screens
             .last()
-            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission"].contains(&s.name()))
+            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission", "core:account"].contains(&s.name()))
         {
             r.rebuild_all();
         }
