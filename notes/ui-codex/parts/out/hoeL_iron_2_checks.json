@@ -1,0 +1,20 @@
+{
+ "kind": "item",
+ "what": "an iron hoe: bright warm-silver iron with a near-white bevel along the blade's edge, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel. Shaped like a real garden hoe and like Minecraft's: the handle runs from the bottom-left corner up toward the top-right; at its top end a short neck reaches out to ONE side only (toward the upper left), and from the neck's end a flat blade turns DOWN toward the handle, so the head is an L, never a T: nothing sticks out past the handle on the other side. The blade is about 8 px long and 3-4 px wide. 2 px margin from the canvas sides; no straight vertical edge",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.581,
+   "outline": 0.59,
+   "red_line": 0.16,
+   "fill": 0.18,
+   "vertical": 0,
+   "passed": true
+  }
+ ]
+}

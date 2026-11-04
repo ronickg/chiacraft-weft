@@ -85,7 +85,8 @@ def main():
     for name in ("grass_top", "dirt", "stone", "sand"):
         tinted = name in TINTED
         orig = np.array(Image.open(os.path.join(BLOCK, name + ".png")).convert("RGBA"))
-        vars_ = [match_colour(cut(f"var_{name}_{k}", tinted), orig) for k in (1, 2, 3)]
+        ks = (2, 4, 5) if name == "stone" else (1, 2, 3)  # stone 1 and 3 read flatter and smaller-slabbed; redrawn as 4 and 5
+        vars_ = [match_colour(cut(f"var_{name}_{k}", tinted), orig) for k in ks]
         for k, v in enumerate(vars_, 1):
             os.makedirs(os.path.join(DELIVER, name), exist_ok=True)
             p = os.path.join(DELIVER, name, f"{k}.png")

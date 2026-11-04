@@ -1,0 +1,17 @@
+[
+ {
+  "kind": "item",
+  "name": "cloak_wool_cloak",
+  "what": "a loden wool cloak hanging open from its shoulders: muted loden green wool (#586848 to #687858) falling in soft folds, a lighter woven border along its edges, a small brass clasp at the collar, seen from the front, centred with 3-5 px of padding"
+ },
+ {
+  "kind": "item",
+  "name": "cloak_fur_robe",
+  "what": "a heavy fur robe closed down the front: thick brown fur (#683828 to #886848) with a shaggy texture, a deep cream fur collar and cream cuffs at the sleeve ends, seen from the front, centred with 3-5 px of padding"
+ },
+ {
+  "kind": "item",
+  "name": "cloak_rain_cape",
+  "what": "an oilskin rain cape reaching to the waist: waxy ochre-yellow oilskin (#987838 to #b89858) with darker seams and a soft waxy sheen highlight, a short collar tied at the neck, no hood, seen from the front, centred with 3-5 px of padding"
+ }
+]

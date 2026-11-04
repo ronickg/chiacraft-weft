@@ -1,0 +1,79 @@
+# World looks: the same view of six biomes at noon and at sunset, looking slightly down.
+# For Tester 2 (Researcher's round 7). Replace each SPOT line's coordinates with a spot you
+# found in that biome (F3 or /air shows the biome): open ground with trees 20-60 blocks ahead.
+# Fresh world (a new name), creative so nothing interrupts; HUD hidden if the build allows (F1).
+loaded
+chat /gamemode creative
+chat /weather clear
+# --- plains ---
+chat /gamemode creative
+chat /tp -450 200 535
+wait 8
+loaded
+where spot
+idle
+look 45 -12
+chat /time set 6000
+wait 3
+shot plains_noon.png
+chat /time set 11900
+wait 3
+shot plains_sunset.png
+# --- forest ---
+chat /gamemode creative
+chat /tp -1280 200 780
+wait 8
+loaded
+where spot
+idle
+look 45 -12
+chat /time set 6000
+wait 3
+shot forest_noon.png
+chat /time set 11900
+wait 3
+shot forest_sunset.png
+# --- taiga ---
+chat /gamemode creative
+chat /tp -1499 200 35
+wait 8
+loaded
+where spot
+idle
+look 45 -12
+chat /time set 6000
+wait 3
+shot taiga_noon.png
+chat /time set 11900
+wait 3
+shot taiga_sunset.png
+# --- desert ---
+# --- savanna ---
+chat /gamemode creative
+chat /tp -689 200 -122
+wait 8
+loaded
+where spot
+idle
+look 45 -12
+chat /time set 6000
+wait 3
+shot savanna_noon.png
+chat /time set 11900
+wait 3
+shot savanna_sunset.png
+# --- swamp ---
+chat /gamemode creative
+chat /tp -1677 200 3071
+wait 8
+loaded
+where spot
+idle
+look 45 -12
+chat /time set 6000
+wait 3
+shot swamp_noon.png
+chat /time set 11900
+wait 3
+shot swamp_sunset.png
+quit

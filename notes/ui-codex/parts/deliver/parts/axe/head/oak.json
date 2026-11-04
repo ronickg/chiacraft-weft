@@ -1,0 +1,15 @@
+{
+ "kind": "base:axe",
+ "layer": "head",
+ "material": "oak",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 10,
+ "anchor": [
+  11.8,
+  22.2
+ ]
+}

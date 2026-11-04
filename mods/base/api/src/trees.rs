@@ -20,6 +20,21 @@ pub static PALM_TREE: Tag = Tag::named("palm_tree");
 /// A tall slim trunk under a narrow, long crown (birches).
 pub static SLIM_TREE: Tag = Tag::named("slim_tree");
 
+/// Leaves that turn differently in autumn (`vitals::wild::Turn`): evergreens never, birch-like
+/// trees yellow; the rest keep `tints::FOLIAGE`. Each biome gives all three its foliage colour, and
+/// the lighting session's seasonal tints change them through the year.
+pub static EVERGREEN: TintKind = TintKind::named("base:evergreen");
+pub static YELLOW_LEAVES: TintKind = TintKind::named("base:yellow_leaves");
+
+/// The tint kind for leaves that turn so (`vitals::wild::turn`).
+pub fn leaf_tint(turn: vitals::wild::Turn) -> &'static TintKind {
+    match turn {
+        vitals::wild::Turn::Evergreen => &EVERGREEN,
+        vitals::wild::Turn::Yellow => &YELLOW_LEAVES,
+        vitals::wild::Turn::Orange => &tints::FOLIAGE,
+    }
+}
+
 static DIRT: Block = Block::named("base:dirt");
 static TALL_GRASS: Block = Block::named("base:tall_grass");
 

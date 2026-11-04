@@ -70,6 +70,8 @@ pub fn register(r: &mut Registry) {
         .surface("grass", "dirt", 3)
         .tint(grass, 0x79c05a)
         .tint(foliage, 0x59ae30)
+        .tint(&base_api::trees::EVERGREEN, 0x59ae30)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x59ae30)
         .tag("forest")
         .tag("animals")
         .set(&TREES, 0.4)
@@ -84,6 +86,8 @@ pub fn register(r: &mut Registry) {
         .surface("grass", "dirt", 3)
         .tint(grass, 0x88bb67)
         .tint(foliage, 0x6ba941)
+        .tint(&base_api::trees::EVERGREEN, 0x6ba941)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x6ba941)
         .tag("forest")
         .tag("animals")
         .set(&TREES, 0.45)
@@ -97,6 +101,8 @@ pub fn register(r: &mut Registry) {
         .surface("podzol", "dirt", 3)
         .tint(grass, 0x86b783)
         .tint(foliage, 0x68a464)
+        .tint(&base_api::trees::EVERGREEN, 0x68a464)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x68a464)
         .tint(water, 0x3d57d6)
         .tag("forest")
         .tag("cold")
@@ -114,6 +120,8 @@ pub fn register(r: &mut Registry) {
         .frozen("ice")
         .tint(grass, 0x80b497)
         .tint(foliage, 0x60a17b)
+        .tint(&base_api::trees::EVERGREEN, 0x60a17b)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x60a17b)
         .tint(water, 0x3938c9)
         .tag("cold")
         .tag("animals")
@@ -128,6 +136,8 @@ pub fn register(r: &mut Registry) {
         .under("sandstone", 1)
         .tint(grass, 0xbfb755)
         .tint(foliage, 0xaea42a)
+        .tint(&base_api::trees::EVERGREEN, 0xaea42a)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0xaea42a)
         .tag("dry")
         .tag("hot")
         // Mesquite along the washes.
@@ -142,6 +152,8 @@ pub fn register(r: &mut Registry) {
         .surface("grass", "dirt", 3)
         .tint(grass, 0xbfb755)
         .tint(foliage, 0xaea42a)
+        .tint(&base_api::trees::EVERGREEN, 0xaea42a)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0xaea42a)
         .tag("hot")
         .tag("animals")
         .set(&TREES, 0.04)
@@ -156,6 +168,8 @@ pub fn register(r: &mut Registry) {
         .surface("grass", "dirt", 3)
         .tint(grass, 0x6a7039)
         .tint(foliage, 0x6a7039)
+        .tint(&base_api::trees::EVERGREEN, 0x6a7039)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x6a7039)
         .tint(water, 0x617b64)
         .tag("wet")
         .tag("animals")
@@ -172,6 +186,8 @@ pub fn register(r: &mut Registry) {
         .bare_above(130)
         .tint(grass, 0x8ab689)
         .tint(foliage, 0x6da36b)
+        .tint(&base_api::trees::EVERGREEN, 0x6da36b)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x6da36b)
         .tag("mountain")
         .tag("animals")
         .set(&TREES, 0.06)
@@ -207,46 +223,8 @@ pub fn register(r: &mut Registry) {
             .replace("#stone_ore_replaceables");
     }
 
-    // The overworld's shape. Other mods add to it by these names (`base:desert`, `base:mountains`).
-    r.terrain(&crate::OVERWORLD)
-        .stone("stone")
-        .base_height(SEA as f64)
-        .sea(SEA, "water")
-        .feature(preset::continents(18.0))
-        // Biomes shape the land through their climate, not their borders, so nothing seams:
-        // the cold flattens hills into tundra, deserts get dunes.
-        .feature(preset::hills(16.0, 110.0).mask(Mask::Temperature(-0.35, -0.6).not()))
-        .feature(preset::dunes(4.0, 26.0).mask(Mask::Temperature(0.25, 0.45).and(Mask::Humidity(0.1, -0.05))))
-        .feature(
-            preset::mountains(150.0, 260.0)
-                .mask(
-                    Mask::noise(700.0, -0.1, 0.3)
-                        .salt(0x44)
-                        .and(Mask::Continent(0.0, 0.2)),
-                )
-                .named("mountains"),
-        )
-        // Biomes bring their climate and surface; rules only add where else they must hold.
-        .biome(BiomeRule::new("ocean").height(..=SEA - 2))
-        .biome(
-            BiomeRule::new("snowy_plains")
-                .named("snowy_coast")
-                .height(..=SEA + 1)
-                .continent(..0.1),
-        )
-        .biome(BiomeRule::new("beach").height(..=SEA + 1).continent(..0.1))
-        .biome(BiomeRule::new("mountains").feature("mountains", 0.45..))
-        .biome(BiomeRule::new("snowy_plains"))
-        .biome(BiomeRule::new("taiga"))
-        .biome(BiomeRule::new("desert"))
-        .biome(BiomeRule::new("savanna"))
-        // Swamps only on low land, where water stands.
-        .biome(BiomeRule::new("swamp").height(..=SEA + 12).continent(0.1..))
-        .biome(BiomeRule::new("forest"))
-        .biome(BiomeRule::new("birch_forest"))
-        .biome(BiomeRule::new("plains"))
-        .cave_biome("deep_caves", 24, 96.0, 0.25)
-        .caves(Caves::new("lava", i32::MIN, 11));
+    // The overworld's shape, its snow and its bare rock (`land.rs`), before the plants below.
+    crate::land::terrain(r);
 
     // Trees wherever a biome asks for them, in any dimension.
     // Trees wherever a biome asks for them, in any dimension: a site per 5 x 5 cell, left open in
@@ -282,8 +260,12 @@ pub fn register(r: &mut Registry) {
     r.decorate(decorate);
 }
 
-/// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet.
+/// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet; none
+/// on a bare rock face (`land::site_on_rock`), which is stone already.
 fn boulder(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
     let [x, y, z] = s.pos();
     let h = s.random();
     let mossy = WET.on_biome(s.biome()) || WOODS.on_biome(s.biome());
@@ -329,8 +311,12 @@ fn flower_kind(seed: u64, wx: i32, wz: i32, h: u64) -> u64 {
 const FLOWER_MEADOW: f64 = 0.72;
 const CLEARING: i32 = 1600;
 
-/// A tree of the biome's kinds (`TREE_KINDS`) at a scatter's site.
+/// A tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face
+/// (`land::site_on_rock`).
 fn tree(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
     let [x, y, z] = s.pos();
     let log = TREE_KINDS
         .on_biome(s.biome())
@@ -404,19 +390,20 @@ fn decorate(g: &mut Gen) {
             if y == 0 && roll >= (flower_chance + grass_chance) && wild_roll(seed, wx, wz) >= wild::MOST {
                 continue;
             }
-            let below = if y == 0 { g.surface_block(wx, wz) } else { g.get(x, y - 1, z) };
+            let below = if y == 0 { crate::land::surface_block(g, wx, wz) } else { g.get(x, y - 1, z) };
             // Ponds in swamps and floodplains (`vitals::wild::POND_LANDS`): still water a block deep
             // where the ground is level, its floating plants on it.
             let near = [(1, 0), (-1, 0), (0, 1), (0, -1)].map(|(dx, dz)| (wx + dx, wz + dz, g.column(wx + dx, wz + dz)));
-            // Steep ground goes bare: gravel where it falls three blocks to a neighbour, stone
-            // where it falls five (sand and the frozen north keep their own ground).
+            // Steep ground goes bare: gravel where it falls three blocks to a neighbour (sand and the
+            // frozen north keep their own ground); from four, the terrain's rock faces have made it
+            // stone already (`land.rs`), and it isn't plant soil here.
             let fall = near
                 .iter()
                 .map(|(_, _, c)| col.height - c.height)
                 .max()
                 .unwrap_or(0);
             if y >= 1 && fall >= 3 && PLANT_SOIL.on_block(below) && !FROZEN.on_biome(b) {
-                g.set(x, y - 1, z, if fall >= 5 { STONE.id() } else { GRAVEL.id() });
+                g.set(x, y - 1, z, GRAVEL.id());
                 continue;
             }
             if y >= 1
