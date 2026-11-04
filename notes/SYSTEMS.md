@@ -72,6 +72,7 @@ built, it gets its row below and its arrows above.
 | Climates | `vitals::climate::BIOMES`, each from a real place (`reports/ecology/Biome climates.md`) | same | the research | the air, the weather; biomes set it (`base_api::climate` in `worldgen.rs`, `cretaceous.rs`) |
 | Food kinds, diets | `vitals::food::Category`, `Species::eats` | `FOODS` rows, species rows | the research | foraging, the sheets, the animal screen's kind |
 | Foraging | `vitals::forage::SOURCES`, `mods/animals/src/forage.rs` | `SOURCES` rows | diets, plants (grazed grass grows back), hunger | animals' food and condition |
+| Food off the ground | `vitals::forage::{DROPPED, dropped}`, `forage.rs` (`ground_food`), `World::dropped_item` | food items' kinds and portions (`FOODS`), `DROPPED`, `needs::MEAL` | dropped items, diets, freshness (spoiled is carrion), masses | animals' food; hunters eat it before hunting; items taken off the ground |
 | Hunting | `Species::{prey, hungry_in_the_wild}`, `OTHER_PREY`, `mods/animals/src/hunt.rs` | `prey` per species row | diets, masses (genes, growth), families, hunger | wild hunters' food, prey running (`wary`), kills (`ENTITY_DIED`) |
 | Hunters' hunger | `animals_core::needs` (`MEAL`, `fills`, `prey_in`), `hunt::prey_lush`, `animal::arrive` | `MEAL`, `ARRIVES_FED`, `STARVES_SECS` | prey at home, their food this season (`forage::season_lush`), masses | how fed a wild hunter arrives, what a kill fills (by the prey's mass against its own) |
 | Soil, compost | `vitals::soil`, `mods/base/src/farming.rs` | `MAX`, `FEEDS`, `COMPOSTS`, `COMPOST_DAYS` | crops' harvests, dung (grazers), spoiled food (freshness), plant waste | crops' growth on farmland (`growth.rs`), tilling with hoes |
@@ -107,7 +108,9 @@ built, it gets its row below and its arrows above.
   habitats (each habitat needs a climate); the species sheet; `places.rs` checks it on its own.
 - **A food, or a new food item**: a row in `vitals::food::FOODS` (an item without one can't be
   eaten; the game test `every_food_has_nutrition` fails); `NUTRITION` and `FRESHNESS` on the
-  item (`items.rs`); `balance.rs` (well fed from a few foods); the sheet.
+  item (`items.rs`); `balance.rs` (well fed from a few foods); the sheet. Its kind and portion
+  are what animals eat it off the ground by (`forage.rs`); an item animals eat that isn't a
+  player's food goes in `vitals::forage::DROPPED`.
 - **Temperature rules** (`temperature.rs`, `air_at`): players' effects, animals' comfort and
   eggs all move together; `places.rs` says if a species stops being at home or its eggs stop
   hatching.
@@ -145,6 +148,8 @@ built, it gets its row below and its arrows above.
 | The climates are their real places | `vitals/tests/places.rs` | a biome's year mean, seasons or rainiest season drifting from its place's research |
 | Every plant grows somewhere | `vitals/tests/places.rs` | a plant whose warmth or water no biome gives |
 | Plant eaters find food where they live | `animals/core/tests/places.rs` | a plant eater whose food grows in fewer than two seasons in one of its habitats |
+| Hunters fill up on their prey at home | same | a hunter whose biggest prey at home takes more than ten kills to fill it |
+| Most of every diet is in the game | same | a species with under half its diet growing or on the ground as items |
 | One growing pace | `animals/core/tests/places.rs` | `vitals::plants::GROWING` and `animals_core::biology::GROWING` apart |
 | Rain follows the shares | `vitals/src/climate.rs` | the rain schedule raining more or less often than a season's share |
 | Every habitat has a climate | `animals/core/tests/places.rs` | a species living in a biome with no climate |

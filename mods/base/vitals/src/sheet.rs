@@ -210,6 +210,13 @@ fn forage_table(w: &mut String) {
         };
         let _ = writeln!(w, "| {block} | {} | {} | {eaten} | {back} |", f.category.name(), f.food);
     }
+    let _ = writeln!(
+        w,
+        "\nOn the ground, animals eat dropped food of their diet one item a mouthful: every food (the foods table, by its kind and portion) and these seeds; spoiled food only carrion eaters. An item fills an animal by its weight against a meal of a tenth of the animal's mass (`animals_core::needs`).\n\n| item | kind | grams |\n|---|---|---|"
+    );
+    for (item, c, grams) in forage::DROPPED {
+        let _ = writeln!(w, "| {item} | {} | {grams} |", c.name());
+    }
     let _ = writeln!(w);
 }
 

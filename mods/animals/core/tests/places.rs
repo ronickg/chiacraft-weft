@@ -170,3 +170,28 @@ fn hunters_fill_up_on_their_prey_at_home() {
     }
     report(problems);
 }
+
+/// Most of every diet is food the game has (`notes/ECOLOGY.md`, "The checks"): kinds that grow
+/// in the world (`vitals::forage::grows`) or lie on the ground as items (`dropped_kind`: every
+/// food item's kind, the dropped seeds, carrion), at least half of it by share. The rest (water
+/// plants, roots, lichen, fungi, fish) waits for its plants and prey.
+#[test]
+fn most_of_every_diet_is_in_the_game() {
+    let mut problems = Vec::new();
+    for s in &SPECIES {
+        let found: f32 = s
+            .eats
+            .iter()
+            .filter(|&&(c, _)| vitals::forage::grows(c) || vitals::forage::dropped_kind(c))
+            .map(|&(_, share)| share)
+            .sum();
+        if found < 0.5 {
+            problems.push(format!(
+                "{}: only {:.0}% of its diet is in the game: its eats (species.rs) against vitals::forage SOURCES, DROPPED and food::FOODS",
+                s.name,
+                found * 100.0
+            ));
+        }
+    }
+    report(problems);
+}

@@ -85,6 +85,33 @@ pub const SOURCES: [Source; 11] = [
     ),
 ];
 
+/// Food on the ground (`notes/ECOLOGY.md`, parts 5 and 8): items animals eat that aren't a
+/// player's food (`food::FOODS` has those, each with its kind and weight): grain and seeds, as
+/// they fall from a field or a hand. By name, kind and grams.
+pub const DROPPED: [(&str, Category, f32); 2] = [
+    // A handful of seed, and an ear's grain.
+    ("base:wheat_seeds", Category::Seeds, 10.0),
+    ("base:wheat", Category::Seeds, 50.0),
+];
+
+/// What a dropped item `name` is to animals: its kind of food and grams (a food's portion,
+/// `food::FOODS`, or `DROPPED`). Spoiled food is carrion (`spoiled`): only carrion eaters take it.
+/// `None`: not food.
+pub fn dropped(name: &str, spoiled: bool) -> Option<(Category, f32)> {
+    let (c, grams) = crate::food::FOODS
+        .iter()
+        .find(|f| f.name == name)
+        .map(|f| (f.category, f.grams))
+        .or_else(|| DROPPED.iter().find(|d| d.0 == name).map(|d| (d.1, d.2)))?;
+    Some((if spoiled { Category::Carrion } else { c }, grams))
+}
+
+/// Whether the world has food of this kind on the ground for animals now and then: a food item or
+/// a dropped seed of the kind, or carrion (anything spoiled).
+pub fn dropped_kind(c: Category) -> bool {
+    c == Category::Carrion || crate::food::FOODS.iter().any(|f| f.category == c) || DROPPED.iter().any(|d| d.1 == c)
+}
+
 /// What a forager of that diet can eat of the block `block` at `age` (`None`: it has no age) in
 /// `season` (0 spring; `None`: no seasons there). One block can feed several diets: tall grass
 /// is grass to a grazer, and seeds to a mouse in summer and autumn.

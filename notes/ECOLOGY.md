@@ -490,9 +490,18 @@ and cactus.**
   more (`animals/core/tests/places.rs`).
 - **Seen in the game:** a hungry capybara in the plains grazed four tall grasses in 40 seconds,
   leaving short tufts.
+- **Food off the ground (2026-11-03):** the engine tells a mod what a dropped item carries
+  (`World::dropped_item`, `set_dropped_item`, new). A hungry animal looks within 12 blocks for
+  dropped food of its diet before growing food (`forage.rs`): every food item by its kind and
+  portion, and dropped seeds and grain (`vitals::forage::DROPPED`); spoiled food is carrion, for
+  carrion eaters only. It eats an item a mouthful, each filling it by its weight against a meal of
+  a tenth of its mass (`animals_core::needs::fills`), and a hunter with food lying near eats that
+  before it hunts. The check: at least half of every diet is food the game has, growing or on the
+  ground (`places.rs`). Testing: `/tk drop <item> <pos> [count]`. Seen: a hungry deer ate five
+  dropped berries (1% of its food each) and wheat seeds; a hungry fox with mice about went for a
+  dropped porkchop (+32%); mice ate berries and seeds.
 - **Not yet:**
   - **Hunters:** they get hungry in the wild with prey, part 6.
-  - **Eating food off the ground:** needs the engine to tell a mod what a dropped item is.
   - **Drinking.**
   - **Unloaded areas:** a wild animal's hunger doesn't run while its area is unloaded.
 
@@ -540,7 +549,8 @@ and cactus.**
 - **Not yet:**
   - **Hunting players:** a decision for later. The research says a lone raptor would take a person.
   - **Packs together:** they don't take bigger prey together yet.
-  - **Scavenging carcasses:** needs the engine to tell a mod what a dropped item is.
+  - **Carcasses of our own species:** a kill's drops are eaten off the ground now (food off the
+    ground, part 5), but the wild species drop nothing yet: a carcass item for them is to come.
   - **Not seen:** prey running from a hunter.
 
 
@@ -614,7 +624,7 @@ and cactus.**
 - **Seen in the game:** the bin filling, its top turning to dirt.
 - **Not yet:**
   - food and carcasses on the ground rotting away;
-  - scavengers eating them (both need the engine to tell a mod what a dropped item is);
+  - scavengers eat food and carrion off the ground (part 5), but our species leave no carcass yet;
   - the generated art for dung, compost and the bin (placeholders now, `notes/STYLE.md`).
 
 

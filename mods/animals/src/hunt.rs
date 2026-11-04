@@ -87,7 +87,7 @@ fn kind_mass(kind: u32, size: Option<f32>) -> Option<f32> {
 }
 
 /// What `id` weighs now.
-fn mass(w: &World, id: u64) -> Option<f32> {
+pub(crate) fn mass(w: &World, id: u64) -> Option<f32> {
     let e = w.entity(id)?;
     let size = w.component(id, &ANIMAL).and_then(|a| {
         let index = (a.species as usize).checked_sub(1)?;
@@ -144,6 +144,12 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     h[2] = now + LOOK_EVERY;
+    // Food lying near (a carcass, dropped meat) is a meal without a chase: it eats that first
+    // (`forage.rs`).
+    if crate::forage::ground_food(w, s, st.pos, crate::forage::ITEM_LOOK).is_some() {
+        w.component_mut(id, &HUNT).map(|c| *c = h);
+        return false;
+    }
     let own = mass(w, id).unwrap_or(s.bio.mass);
     let prey = w
         .near_bodies(st.pos, LOOK)
