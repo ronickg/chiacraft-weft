@@ -41,6 +41,16 @@ fn stats_table(w: &mut String) {
         let _ = writeln!(w, "| {name} | {} | {point} |", stats::PLAYER_BASE[i]);
     }
     let _ = writeln!(w, "\nComfortable air for a person, unclothed: {:?} °C.\n", temperature::PERSON);
+    let arrival = crate::stomach::arrival();
+    let cap = stats::PLAYER_BASE[stats::Stat::Food.index()];
+    let (health, stamina) = crate::stomach::max_health_stamina(100.0, 100.0, &arrival, cap);
+    let _ = writeln!(
+        w,
+        "A new player arrives with {} in the stomach ({:.0} units): max health {health:.0} and stamina {stamina:.0} of 100, wearing off as it digests (an empty stomach: {:.0}).\n",
+        crate::stomach::ARRIVAL.join(" and "),
+        arrival.used(),
+        crate::stomach::FLOOR * 100.0
+    );
 }
 
 fn foods(w: &mut String) {

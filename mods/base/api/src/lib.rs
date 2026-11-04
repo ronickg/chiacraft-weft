@@ -339,9 +339,11 @@ fn heat_by_name(state: u32) -> f32 {
 
 impl Vitals {
     /// A new player: breath full, stamina full (the first tick brings it down to what the stomach
-    /// allows), the body at 37 °C, an empty stomach.
+    /// allows), the body at 37 °C, a light meal in the stomach (`vitals::stomach::arrival`).
     pub fn new(air: f32) -> Vitals {
-        Vitals { core: vitals::temperature::CORE, air, stamina: NEW_STAMINA, ..Vitals::default() }
+        let mut v = Vitals { core: vitals::temperature::CORE, air, stamina: NEW_STAMINA, ..Vitals::default() };
+        v.set_stomach(&vitals::stomach::arrival());
+        v
     }
 
     pub fn stomach(&self) -> vitals::stomach::Stomach {
@@ -627,5 +629,12 @@ mod tests {
     fn a_new_player_starts_with_full_stamina() {
         let most = vitals::stats::player(&[u32::from(u16::MAX); vitals::stats::STATS])[vitals::stats::Stat::Stamina.index()];
         assert!(Vitals::new(10.0).stamina >= most, "a new player's stamina {} under a max of {most}", Vitals::new(10.0).stamina);
+    }
+
+    /// A new player arrives with its light meal in it.
+    #[test]
+    fn a_new_player_arrives_fed() {
+        assert_eq!(Vitals::new(10.0).stomach(), vitals::stomach::arrival());
+        assert!(vitals::stomach::arrival().used() > 0.0);
     }
 }

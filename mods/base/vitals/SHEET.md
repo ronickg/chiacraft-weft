@@ -18,6 +18,8 @@ Written from `mods/base/vitals` (`cargo run -p vitals --bin sheet > mods/base/vi
 
 Comfortable air for a person, unclothed: (15.0, 28.0) °C.
 
+A new player arrives with base:bread and base:apple in the stomach (43 units): max health 54 and stamina 75 of 100, wearing off as it digests (an empty stomach: 40).
+
 ## Foods
 
 A portion, its kind for the animals' diets, what it holds of each nutrient, how long it digests, and game days fresh then stale.

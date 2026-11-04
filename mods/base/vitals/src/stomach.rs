@@ -167,6 +167,20 @@ impl Stomach {
     }
 }
 
+/// What a new player arrives with in them (Ronald, 11-03, via Planner): a loaf and an apple, 43
+/// units, so the first night is fair (an empty stomach left 40% of max health, and one spider
+/// killed a fresh player). It digests away in half an hour like any meal; dying still empties it.
+pub const ARRIVAL: [&str; 2] = ["base:bread", "base:apple"];
+
+/// A new player's stomach: `ARRIVAL`, fresh, neither hot nor cooling.
+pub fn arrival() -> Stomach {
+    let mut s = Stomach::default();
+    for (slot, f) in ARRIVAL.iter().filter_map(|n| food::find(n)).enumerate() {
+        s.portions[slot] = Portion { food: f as u16 + 1, units: FOODS[f].units(), quality: 1.0, warmth: 0.0, warm_secs: 0.0 };
+    }
+    s
+}
+
 /// A stat's ceiling reached at that fullness of its nutrient.
 pub fn fed(stat: f32, fullness: f32) -> f32 {
     stat * (FLOOR + (1.0 - FLOOR) * fullness.clamp(0.0, 1.0))

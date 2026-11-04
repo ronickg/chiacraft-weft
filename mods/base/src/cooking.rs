@@ -75,7 +75,7 @@ pub fn register(r: &mut Registry) {
 
     r.machine(&COOKING_POT, &POT_MENU)
         .block(|b| {
-            b.sound_group("metal")
+            b.sound_group("stone")
                 .faces(["cooking_pot_side", "cooking_pot_side", "cooking_pot_top", "cooking_pot_side", "cooking_pot_side", "cooking_pot_side"])
                 .model_box([2.0, 0.0, 2.0], [14.0, 10.0, 14.0])
                 .hardness(3.0)

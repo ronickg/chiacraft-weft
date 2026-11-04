@@ -37,6 +37,16 @@ pub fn problems() -> Vec<String> {
         }
     }
 
+    // A new player's arrival meal: past half of max health and stamina, not well fed.
+    let arrival = crate::stomach::arrival();
+    let (health, stamina) = crate::stomach::max_health_stamina(100.0, 100.0, &arrival, capacity);
+    if arrival.portions.iter().filter(|p| p.food > 0).count() != crate::stomach::ARRIVAL.len() || health < 50.0 || stamina < 50.0 {
+        out.push(format!("a new player arrives with max health {health:.0} and stamina {stamina:.0} (over 50 wanted)"));
+    }
+    if arrival.well_fed(capacity) {
+        out.push("a new player arrives well fed".into());
+    }
+
     if best_meal(capacity).is_none() {
         out.push("no meal of cooked and fresh food makes a new player well fed".into());
     }

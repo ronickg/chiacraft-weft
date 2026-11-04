@@ -481,3 +481,11 @@ sword, about 100 XP.
   dry. Preserving is foods of their own with real nutrition and keeps rather than TerraFirmaCraft's
   decay multipliers (salted 0.5 and so on): our salted meat keeps over twenty times raw meat's.
 
+
+**11. A fair first night** (2026-11-03, Ronald via Planner, after Tester's playtest):
+
+- A new player arrives with a loaf and an apple in them (`vitals::stomach::ARRIVAL`, 43 units):
+  max health 54 and stamina 75 of 100 instead of an empty stomach's 40, wearing off over half an
+  hour as it digests. One spider at dusk had killed a fresh player in 11 s. Dying still empties
+  the stomach. The rule stays: food sets how much of the stat is reached.
+- A new player also starts with full stamina (it started at 0 and took 14 s to fill).
