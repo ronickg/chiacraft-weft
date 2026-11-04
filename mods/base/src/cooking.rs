@@ -93,6 +93,7 @@ pub fn register(r: &mut Registry) {
                 .light_rgb(15, 11, 6)
                 .hardness(2.0)
                 .mineable("axe")
+                .item_texture("campfire")
                 .tag("campfires")
                 .tab(&crate::tabs::FUNCTIONAL)
         })
