@@ -551,6 +551,24 @@ const OPS: &[(&str, &str, Run)] = &[
         }
         Ok(format!("{n} drops"))
     }),
+    ("feet", "<r:int> <block:block>", |w, cmd, _, me| {
+        // Where blocks of that kind stand on something else (not air, not their own kind) within
+        // `r` of the player: a log's are its trees' feet (felling: how many trees one took).
+        let r: i32 = int(cmd, "r")?;
+        let want = block_of(id(cmd, "block")?);
+        let mut feet = Vec::new();
+        for y in me[1] - r..=me[1] + r {
+            for z in me[2] - r..=me[2] + r {
+                for x in me[0] - r..=me[0] + r {
+                    let below = w.get([x, y - 1, z]);
+                    if block_of(w.get([x, y, z])) == want && below != 0 && block_of(below) != want {
+                        feet.push(format!("{x},{y},{z}"));
+                    }
+                }
+            }
+        }
+        Ok(format!("{} feet: {}", feet.len(), feet.join(" ")))
+    }),
     ("find", "<r:int> <block:block>", |w, cmd, _, me| {
         // The first block of that kind within `r` of the player, not far above or below.
         let r: i32 = int(cmd, "r")?;

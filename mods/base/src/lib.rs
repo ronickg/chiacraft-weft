@@ -18,6 +18,7 @@ mod hints;
 mod hud;
 mod items;
 mod land;
+mod leaf_decay;
 mod levels;
 mod look;
 mod machines;
@@ -106,6 +107,7 @@ fn init(r: &mut Registry) {
     growth::register(r);
     farming::register(r);
     felling::register(r);
+    leaf_decay::register(r);
     advancements::register(r);
     hints::register(r);
     death::register(r);

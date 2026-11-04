@@ -61,6 +61,17 @@ match = ["observer_*"]
 # Closer to vanilla's dark observer, in our sage stone (Planner, 11-04: the observer and piston pass).
 gain = 0.8
 
+[groups.glacier]
+match = ["glacier_ice_*"]
+# Terrain's glacier ice (11-04): a little bluer and darker, toward the middle of vanilla's packed ice
+# (luma 0.69-0.82, sat 0.35-0.43, hue 193-219): luma 0.81 -> 0.77, sat 0.26 -> 0.35.
+saturation = 1.35
+gain = 0.95
+
+[tiles.glacier_ice_side]  # flattened for irregular layers (glacier_bands.py): grain back to quiet ground's 20,
+spread = 20               # and a little less blue than the group, to sit with the top
+saturation = 1.2
+
 [groups.liquids]
 match = ["water_*", "lava_*"]
 

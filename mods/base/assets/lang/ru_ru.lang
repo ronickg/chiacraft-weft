@@ -49,6 +49,7 @@ block.base.weathered_limestone = Выветренный известняк
 block.base.red_sandstone = Красный песчаник
 block.base.snow = Снег
 block.base.ice = Лёд
+block.base.glacier_ice = Ледниковый лёд
 block.base.obsidian = Обсидиан
 block.base.coal_ore = Угольная руда
 block.base.iron_ore = Железная руда

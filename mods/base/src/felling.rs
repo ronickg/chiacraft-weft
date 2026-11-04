@@ -4,8 +4,11 @@
 //! anywhere but the foot.
 //!
 //! A tree is the logs joined to the broken one at its height or above (corners too, for
-//! branches), with leaves among them: a cabin's wall of logs has none and stays standing. A tree
-//! of more than `MAX_LOGS` (a giant) is chopped by the block.
+//! branches), with leaves among them: a cabin's wall of logs has none and stays standing. Another
+//! trunk's foot (a log standing on the ground) ends it, so trees touching at a corner fall one at
+//! a time. A tree of more than `MAX_LOGS` (a giant) is chopped by the block. The axe wears by one
+//! for each log it brings down, as if each were chopped. The leaves left in the air decay
+//! (`leaf_decay`).
 
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -52,15 +55,15 @@ pub fn register(r: &mut Registry) {
                     Kind::Log
                 } else if LEAVES.on_block(state) {
                     Kind::Leaves
+                } else if state == 0 {
+                    Kind::Air
                 } else {
-                    Kind::Other
+                    Kind::Ground
                 }
             };
             let Some(logs) = tree(kind, e.pos) else { continue };
-            let axe = w
-                .inventory(e.player)
-                .group("hotbar")
-                .get(w.selected_slot(e.player));
+            let (hotbar, slot) = (w.inventory(e.player).group("hotbar"), w.selected_slot(e.player));
+            let axe = hotbar.get(slot);
             FELLING
                 .lock()
                 .unwrap()
@@ -69,18 +72,36 @@ pub fn register(r: &mut Registry) {
             // From the top down, so every log still has its own below while it breaks; in
             // creative, as there, without drops.
             let drops = !w.creative(e.player);
+            let felled = logs.len() as u32;
             for p in logs {
                 w.break_block(p, axe, e.player, drops);
             }
+            if drops {
+                hotbar.set(slot, worn(axe, felled, DURABILITY.on_item(axe.item).unwrap_or(0)));
+            }
         }
     });
+}
+
+/// `axe` worn by `by` more (its `max` durability, 0 for none): gone once used up.
+fn worn(axe: ItemStack, by: u32, max: u32) -> ItemStack {
+    let damage = axe.damage() + by;
+    if max > 0 && damage >= max {
+        ItemStack::EMPTY
+    } else if max > 0 {
+        axe.with_damage(damage)
+    } else {
+        axe
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Kind {
     Log,
     Leaves,
-    Other,
+    Air,
+    /// Anything else: what a trunk stands on.
+    Ground,
 }
 
 /// The tree whose foot log was at `foot` (now broken): its logs, highest first, if it is one
@@ -99,6 +120,8 @@ fn tree(kind: impl Fn([i32; 3]) -> Kind, foot: [i32; 3]) -> Option<Vec<[i32; 3]>
                         continue;
                     }
                     match kind(p) {
+                        // Another trunk's foot, on the ground: its own tree.
+                        Kind::Log if kind([p[0], p[1] - 1, p[2]]) == Kind::Ground => {}
                         Kind::Log => {
                             logs.push(p);
                             if logs.len() > MAX_LOGS {
@@ -109,7 +132,7 @@ fn tree(kind: impl Fn([i32; 3]) -> Kind, foot: [i32; 3]) -> Option<Vec<[i32; 3]>
                         Kind::Leaves => {
                             leaves.insert(p);
                         }
-                        Kind::Other => {}
+                        Kind::Air | Kind::Ground => {}
                     }
                 }
             }
@@ -134,8 +157,10 @@ mod tests {
                 Kind::Log
             } else if leaves.contains(&p) {
                 Kind::Leaves
+            } else if p[1] <= 0 {
+                Kind::Ground
             } else {
-                Kind::Other
+                Kind::Air
             }
         }
     }
@@ -162,10 +187,26 @@ mod tests {
         let mut far = trunk.clone();
         far.extend([[0, -1, 0], [7, 1, 0]]);
         assert_eq!(tree(world(&far, &crown), [0, 0, 0]).unwrap().len(), 5);
+        // A neighbour touching at a corner, standing on the ground: it stays.
+        let mut pair = trunk.clone();
+        pair.extend((1..=5).map(|y| [1, y, 1]));
+        assert_eq!(tree(world(&pair, &crown), [0, 0, 0]).unwrap().len(), 5, "one tree only");
+        // But a branch reaching down toward the ground, over air, is the tree's own.
+        let mut low = trunk.clone();
+        low.extend([[1, 3, 0], [2, 2, 0]]);
+        assert_eq!(tree(world(&low, &crown), [0, 0, 0]).unwrap().len(), 7);
         // A giant: more than MAX_LOGS, chopped by the block.
         let giant: Vec<_> = (1..=40)
             .flat_map(|y| [[0, y, 0], [1, y, 0], [0, y, 1], [1, y, 1]])
             .collect();
         assert_eq!(tree(world(&giant, &crown), [0, 0, 0]), None);
+    }
+
+    #[test]
+    fn the_axe_wears_by_a_log_each() {
+        let axe = ItemStack::new(7, 1);
+        assert_eq!(worn(axe, 5, 131).damage(), 5);
+        assert_eq!(worn(axe.with_damage(129), 5, 131), ItemStack::EMPTY, "used up");
+        assert_eq!(worn(axe, 5, 0), axe, "no durability, no wear");
     }
 }

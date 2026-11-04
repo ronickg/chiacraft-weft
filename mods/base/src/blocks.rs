@@ -29,6 +29,8 @@ pub static OBSIDIAN: Block = Block::named("obsidian");
 pub static COAL_ORE: Block = Block::named("coal_ore");
 pub static IRON_ORE: Block = Block::named("iron_ore");
 pub static GOLD_ORE: Block = Block::named("gold_ore");
+/// The floor of glaciers in the high valleys (`land.rs`, `base_api::land::glacier`; Art's tiles).
+pub static GLACIER_ICE: Block = Block::named("glacier_ice");
 // Ores in the rock faces (`base_api::land::face_ore`; Art's textures, Ronald: "Yes, all four").
 pub static BANDED_CLAY_COAL_ORE: Block = Block::named("banded_clay_coal_ore");
 pub static RED_SANDSTONE_IRON_ORE: Block = Block::named("red_sandstone_iron_ore");
@@ -244,7 +246,7 @@ fn grove(r: &mut Registry) {
     log(r, &DOGWOOD_LOG, "dogwood", "base:dogwood_leaves", None);
     // The dogwood is white with its bracts in spring and plain green the rest of the year
     // (`vitals::wild::BLOOMS`), both drawn in their own colours.
-    let b = r.block(&DOGWOOD_LEAVES).sound_group("grass");
+    let b = tree_leaves(r.block(&DOGWOOD_LEAVES).sound_group("grass"));
     bloom(b, DOGWOOD_LEAVES.name(), "leaves_dogwood", "leaves_dogwood_green")
         .hardness(0.2)
         .cutout()
@@ -305,7 +307,7 @@ fn planks(r: &mut Registry, h: &'static Block, wood: &str) {
 
 /// Leaves that drop `sapling` (a time in 20) and, for our trees, `fruit` (a time in 20).
 fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fruit: Option<&str>) {
-    let b = r.block(handle).sound_group("grass").texture(tex);
+    let b = tree_leaves(r.block(handle).sound_group("grass").texture(tex));
     let b = bloom(b, handle.name(), leak(format!("{tex}_bloom")), leak(tex.to_string()))
         .hardness(0.2)
         .cutout()
@@ -358,6 +360,12 @@ fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'stat
                 e.world().set_prop(e.pos(), "bloom", want);
             }
         })
+}
+
+/// A tree's leaves: they decay once no log is near (`leaf_decay`), unless a player placed them
+/// (`placed`, set as they are placed). The shrubs' leaves have no logs and keep.
+fn tree_leaves(b: BlockBuilder<'_>) -> BlockBuilder<'_> {
+    b.prop("placed", ["false", "true"]).tag("leaves/tree")
 }
 
 /// A name kept for the game's life (registration's textures).
@@ -496,6 +504,15 @@ pub fn register(r: &mut Registry) {
         .friction(0.98)
         .mineable("pickaxe")
         // Itself with a pickaxe (Research round 3, U1: it's the only blue dye).
+        .needs_tool(0)
+        .tab(&crate::tabs::NATURAL);
+    // Packed by its own weight: opaque, slippery like ice, mined with a pickaxe.
+    r.block(&GLACIER_ICE)
+        .sound_group("glass")
+        .textures("glacier_ice_top", "glacier_ice_side", "glacier_ice_top")
+        .hardness(0.5)
+        .friction(0.98)
+        .mineable("pickaxe")
         .needs_tool(0)
         .tab(&crate::tabs::NATURAL);
     r.block(&OBSIDIAN)
