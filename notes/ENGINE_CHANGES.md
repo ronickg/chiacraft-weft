@@ -48,6 +48,7 @@ Weft's shader packs could only replace shaders. Our pack needed data the engine 
 ## 3. Distant terrain (LOD) and world generation hooks
 
 - **Trees per site, rock on steep faces, stable levels; smooth, morphing far ground; skirts under edges; a tall crown tapers** (747f25bc, 87aa8332, e2c0d171, 0399162b). *Why:* distant forests and mountains looked blocky or wrong, and giant sequoias showed flat-topped.
+- **A dithered fade where the cubes end** (branch lod-fade). The world renderer draws the cube meshes near the view's end with the pack's `fs_opaque_fade`/`fs_cutout_fade` (four more pipelines, made only when the pack has them), which dither pixels away over the last 24 blocks; `fs_lod` draws exactly those pixels; meshes past the end aren't drawn (the view's square corners). `Globals.extra.y` carries where the cubes end. *Why:* Ronald chose all three LOD fixes on 11-05; the cube edge showed as a hard line (reports/lod.md:89, Distant Horizons' fade).
 - **Scatters up to 96 blocks high** (3cfc8a9c). *Why:* giant sequoias didn't fit the old cap.
 - **A continent scale per dimension** (587208ff, f081de3b). *Why:* Ronald picked 1800-block land masses for the overworld (the default is 900).
 - **Blocks that stand in still liquid, `holds_liquid`** (c1ee7fe0, cbbeeb9b). *Why:* water plants, kelp and lily pads need water in the same block.

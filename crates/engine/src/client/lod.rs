@@ -513,6 +513,7 @@ impl Lod {
         }
         if reach == 0 || self.custom.is_none() {
             render.lod_draw.clear();
+            render.lod_fade = 0;
             return;
         }
         let p = glam::DVec2::new(cam.x, cam.z);
@@ -566,6 +567,9 @@ impl Lod {
         if self.deep_underground(c, cam) {
             shown.clear();
         }
+        // The cubes fade into the tiles over the last blocks of the view (`WorldRenderer::lod_fade`),
+        // a little inside its edge, where every cube is kept.
+        render.lod_fade = if shown.is_empty() { 0 } else { (view * 16 - 8).max(0) as u32 };
         // Other tiles shown (a cached one back, a level swapped) change what casts into the far
         // shadow map, which is kept while the terrain stays (`terrain_epoch`).
         if shown.len() != render.lod_draw.len() || render.lod_draw.iter().any(|k| !shown.contains(k)) {
