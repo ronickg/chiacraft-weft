@@ -5,13 +5,13 @@
 //! loaded              # until the world around the player is meshed
 //! idle                # until nothing is left to generate, light, send or mesh
 //! press core:inventory
-//! hold core:forward 1.5
+//! hold core:forward 1.5  # held 1.5 s, the next line after it; `hold core:forward 1.5 nowait` goes on at once
 //! click 0             # mouse button
 //! cursor 0.5 0.4      # mouse at fractions of the window
 //! scroll -3
 //! type /give dia      # text into the focused field
 //! key Tab             # a key by its settings name
-//! look 90 -20         # yaw, pitch in degrees
+//! look 90 -20         # yaw, pitch in degrees: a negative pitch looks DOWN, a positive one up
 //! chat /give stone 10
 //! chatf ticket.txt /banlist follow {}   # chat, with `{}` replaced by that file's text (waits for it)
 //! say_config testmod:x  # a config's value as this client has it, into the chat
@@ -31,24 +31,318 @@
 //! via x y z yaw pitch # a camera waypoint (eye position), or: via x y z @ tx ty tz (look at a point)
 //! travel 8            # fly through the waypoints in 8 s: spline, eased, a little hand shake
 //! glide yaw pitch 3   # turn smoothly in place over 3 s
+//! expect <condition>  # checks it now; a miss fails the run (with its line) and the script goes on
+//! until <condition> [within 30]  # waits for it, seconds; not in time stops the run
 //! quit
 //! ```
+//!
+//! Conditions (`~` is the player's feet, `~3` three blocks off them):
+//!
+//! ```text
+//! block x y z name    # `stone`, `base:stone` or `base:furnace[lit=true]`
+//! near x y z [r]      # the player within r blocks (1.5)
+//! on_ground | alive | dead | flying
+//! mode survival|creative|spectator
+//! health < 8          # the engine's health points; < <= > >= = !=
+//! fps > 30
+//! chat text           # a chat line on screen contains it (any case)
+//! screen name         # the top screen (`none` in the world)
+//! players 2           # at least 2 players in the world (the host's view)
+//! ```
+//!
+//! Before the first step the whole script is read: an unknown command or a condition that can't
+//! be read fails the run at once, with every bad line, instead of minutes in.
 
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use weft_sdk::client::client_flags as cf;
 use weft_sdk::launch_option;
 
 use crate::runner::{R, T};
 
+/// The step being run (`line N: text`), for the watchdog to name when the game stops.
+pub static STEP: Mutex<String> = Mutex::new(String::new());
+
+/// Every command `run_lines` knows; a new one goes here too (the test `every_command_is_listed`
+/// reads this file). Some come from branches not merged yet (`await_ui` to `await_file` from
+/// Phase 3's portal checks, `chatf` from Phase 4's), so the check doesn't reject their scripts.
+const COMMANDS: &[&str] = &[
+    "wait", "loaded", "idle", "press", "hold", "click", "cursor", "scroll", "type", "key", "look", "chat", "say_config", "shot", "bench", "host",
+    "join", "open", "leave", "tap", "tap_once", "origin", "where", "rec", "via", "travel", "glide", "expect", "until", "quit", "await_ui", "screen",
+    "type_file", "close", "mark", "await_file", "chatf",
+];
+/// Commands that mean nothing without an argument.
+const NEED_ARGS: &[&str] = &[
+    "wait", "press", "hold", "type", "key", "look", "chat", "say_config", "shot", "host", "join", "open", "tap", "tap_once", "via", "expect",
+    "until",
+];
+
+/// Every problem the script has before it runs: unknown commands, missing arguments, conditions
+/// that can't be read.
+pub fn preflight(src: &str) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (n, raw) in src.lines().enumerate() {
+        let line = raw.split('#').next().unwrap_or("").trim();
+        if line.is_empty() {
+            continue;
+        }
+        let (cmd, rest) = line.split_once(' ').unwrap_or((line, ""));
+        let rest = rest.trim();
+        if !COMMANDS.contains(&cmd) {
+            bad.push(format!("line {}: unknown command '{cmd}'", n + 1));
+        } else if NEED_ARGS.contains(&cmd) && rest.is_empty() {
+            bad.push(format!("line {}: '{cmd}' needs an argument", n + 1));
+        } else if cmd == "expect" || cmd == "until" {
+            let (cond, _) = split_within(rest);
+            if let Err(e) = Cond::parse(cond) {
+                bad.push(format!("line {}: {e}", n + 1));
+            }
+        }
+    }
+    bad
+}
+
+/// Lines that run but probably don't do what was meant: a click or use while the last `look`
+/// pointed up (a positive pitch is up, so a script aiming at the ground clicks the sky).
+pub fn lint(src: &str) -> Vec<String> {
+    let mut warn = Vec::new();
+    let mut up: Option<(usize, f32)> = None;
+    for (n, raw) in src.lines().enumerate() {
+        let line = raw.split('#').next().unwrap_or("").trim();
+        let (cmd, rest) = line.split_once(' ').unwrap_or((line, ""));
+        match cmd {
+            "look" => {
+                let pitch = rest
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|p| p.parse::<f32>().ok())
+                    .unwrap_or(0.0);
+                up = (pitch > 0.0).then_some((n + 1, pitch));
+            }
+            "via" | "travel" | "glide" => up = None,
+            "click" | "press" | "hold" => {
+                let aims = cmd == "click" || rest.contains("core:attack") || rest.contains("core:use");
+                if let (true, Some((at, pitch))) = (aims, up) {
+                    warn.push(format!(
+                        "line {}: '{line}' while looking UP (pitch +{pitch} at line {at}); a negative pitch looks down",
+                        n + 1
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    warn
+}
+
+/// `cond within 12` → (`cond`, 12 s); 30 s without it.
+fn split_within(rest: &str) -> (&str, f32) {
+    match rest.rsplit_once(" within ") {
+        Some((c, s)) if s.trim().parse::<f32>().is_ok() => (c.trim(), s.trim().parse().unwrap_or(30.0)),
+        _ => (rest, 30.0),
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Cmp {
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Eq,
+    Ne,
+}
+
+impl Cmp {
+    fn parse(s: &str) -> Option<Cmp> {
+        Some(match s {
+            "<" => Cmp::Lt,
+            "<=" => Cmp::Le,
+            ">" => Cmp::Gt,
+            ">=" => Cmp::Ge,
+            "=" | "==" => Cmp::Eq,
+            "!=" => Cmp::Ne,
+            _ => return None,
+        })
+    }
+    fn holds(self, a: f32, b: f32) -> bool {
+        match self {
+            Cmp::Lt => a < b,
+            Cmp::Le => a <= b,
+            Cmp::Gt => a > b,
+            Cmp::Ge => a >= b,
+            Cmp::Eq => (a - b).abs() < 1e-3,
+            Cmp::Ne => (a - b).abs() >= 1e-3,
+        }
+    }
+}
+
+/// A coordinate: a number, or `~` / `~n` off the player's feet.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Coord {
+    At(f64),
+    Off(f64),
+}
+
+impl Coord {
+    fn parse(s: &str) -> Option<Coord> {
+        match s.strip_prefix('~') {
+            Some("") => Some(Coord::Off(0.0)),
+            Some(n) => n.parse().ok().map(Coord::Off),
+            None => s.parse().ok().map(Coord::At),
+        }
+    }
+    fn at(self, feet: f64) -> f64 {
+        match self {
+            Coord::At(v) => v,
+            Coord::Off(d) => feet + d,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+enum Cond {
+    Block([Coord; 3], String),
+    Near([Coord; 3], f64),
+    Flag(&'static str, u32, bool),
+    Mode(u32),
+    Health(Cmp, f32),
+    Fps(Cmp, f32),
+    Chat(String),
+    Screen(String),
+    Players(u32),
+}
+
+impl Cond {
+    fn parse(text: &str) -> Result<Cond, String> {
+        let w: Vec<&str> = text.split_whitespace().collect();
+        let what = w.first().copied().unwrap_or("");
+        let coords = |from: usize| -> Option<[Coord; 3]> {
+            Some([Coord::parse(w.get(from)?)?, Coord::parse(w.get(from + 1)?)?, Coord::parse(w.get(from + 2)?)?])
+        };
+        let cmp = || -> Option<(Cmp, f32)> { Some((Cmp::parse(w.get(1)?)?, w.get(2)?.parse().ok()?)) };
+        let bad = |form: &str| format!("condition '{text}': want {form}");
+        Ok(match what {
+            "block" => match (coords(1), w.get(4)) {
+                (Some(p), Some(name)) => Cond::Block(p, name.to_string()),
+                _ => return Err(bad("block x y z name")),
+            },
+            "near" => match coords(1) {
+                Some(p) => Cond::Near(p, w.get(4).and_then(|r| r.parse().ok()).unwrap_or(1.5)),
+                None => return Err(bad("near x y z [r]")),
+            },
+            "on_ground" => Cond::Flag("on the ground", cf::ON_GROUND, true),
+            "flying" => Cond::Flag("flying", cf::FLYING, true),
+            "dead" => Cond::Flag("dead", cf::DEAD, true),
+            "alive" => Cond::Flag("alive", cf::DEAD, false),
+            "mode" => match w.get(1).copied() {
+                Some("survival") => Cond::Mode(0),
+                Some("creative") => Cond::Mode(1),
+                Some("spectator") => Cond::Mode(2),
+                _ => return Err(bad("mode survival|creative|spectator")),
+            },
+            "health" => cmp().map(|(c, v)| Cond::Health(c, v)).ok_or_else(|| bad("health <op> n"))?,
+            "fps" => cmp().map(|(c, v)| Cond::Fps(c, v)).ok_or_else(|| bad("fps <op> n"))?,
+            "chat" if w.len() > 1 => Cond::Chat(text["chat".len()..].trim().to_lowercase()),
+            "screen" if w.len() == 2 => Cond::Screen(w[1].to_string()),
+            "players" => match w.get(1).and_then(|n| n.parse().ok()) {
+                Some(n) => Cond::Players(n),
+                None => return Err(bad("players n")),
+            },
+            _ => return Err(format!("unknown condition '{text}'")),
+        })
+    }
+
+    /// Whether it holds now, and what was there instead.
+    async fn check(&self, t: &T) -> Result<(bool, String), String> {
+        let s = t.state();
+        let feet = [s.pos[0].floor(), s.pos[1].floor(), s.pos[2].floor()];
+        Ok(match self {
+            Cond::Block(p, want) => {
+                let at = [p[0].at(feet[0]) as i32, p[1].at(feet[1]) as i32, p[2].at(feet[2]) as i32];
+                let got = t.block(at).await?;
+                (block_matches(&got, want), format!("{got} at {} {} {}", at[0], at[1], at[2]))
+            }
+            Cond::Near(p, r) => {
+                let at = [p[0].at(s.pos[0]), p[1].at(s.pos[1]), p[2].at(s.pos[2])];
+                let d = ((s.pos[0] - at[0]).powi(2) + (s.pos[1] - at[1]).powi(2) + (s.pos[2] - at[2]).powi(2)).sqrt();
+                (d <= *r, format!("at {:.2} {:.2} {:.2}, {d:.2} away", s.pos[0], s.pos[1], s.pos[2]))
+            }
+            Cond::Flag(_, f, want) => (t.flag(*f) == *want, format!("flags {:#x}", s.flags)),
+            Cond::Mode(m) => (s.mode == *m, format!("mode {}", s.mode)),
+            Cond::Health(c, v) => (c.holds(s.health, *v), format!("health {}", s.health)),
+            Cond::Fps(c, v) => (c.holds(s.fps, *v), format!("fps {:.1}", s.fps)),
+            Cond::Chat(want) => {
+                let mut last = String::new();
+                for i in 0..100 {
+                    let line = t.c().chat_line(i);
+                    if line.is_empty() {
+                        break;
+                    }
+                    if line.to_lowercase().contains(want.as_str()) {
+                        return Ok((true, line));
+                    }
+                    if i == 0 {
+                        last = line;
+                    }
+                }
+                (false, format!("last chat line '{last}'"))
+            }
+            Cond::Screen(name) => {
+                let now = t.c().screen();
+                let shown = if now.is_empty() { "none".to_string() } else { now };
+                (shown == *name, format!("screen {shown}"))
+            }
+            Cond::Players(n) => {
+                let got: u32 = t.op("players").await?.trim().parse().unwrap_or(0);
+                (got >= *n, format!("{got} players"))
+            }
+        })
+    }
+}
+
+/// `want` names the block the server reports (`base:furnace[facing=north,lit=true]`): the whole
+/// name, the name without its namespace, or the name with some of its properties.
+fn block_matches(got: &str, want: &str) -> bool {
+    let (g_name, g_props) = got.split_once('[').unwrap_or((got, ""));
+    let (w_name, w_props) = want.split_once('[').unwrap_or((want, ""));
+    let name_ok = g_name == w_name || (!w_name.contains(':') && g_name.rsplit(':').next() == Some(w_name));
+    let have: Vec<&str> = g_props.trim_end_matches(']').split(',').collect();
+    name_ok
+        && w_props
+            .trim_end_matches(']')
+            .split(',')
+            .filter(|p| !p.is_empty())
+            .all(|p| have.contains(&p))
+}
+
 pub async fn run(t: T, src: String) -> R {
-    let started = std::time::Instant::now();
+    // Warnings first: they matter most when the script also has errors to fix.
+    for w in lint(&src) {
+        weft_sdk::warn!("script: {w}");
+    }
+    let bad = preflight(&src);
+    if !bad.is_empty() {
+        return Err(format!("the script has {} bad line(s): {}", bad.len(), bad.join("; ")));
+    }
+    // A step that stops the run names its line.
+    run_lines(t, src)
+        .await
+        .map_err(|e| format!("{}: {e}", STEP.lock().map(|s| s.clone()).unwrap_or_default()))
+}
+
+async fn run_lines(t: T, src: String) -> R {
+    let started = Instant::now();
     let mut via: Vec<[f64; 5]> = Vec::new();
     let mut origin = [0.0f64; 3];
-    for line in src.lines() {
+    for (n, line) in src.lines().enumerate() {
         let line = line.split('#').next().unwrap_or("").trim();
         if line.is_empty() {
             continue;
+        }
+        if let Ok(mut s) = STEP.lock() {
+            *s = format!("line {} '{line}'", n + 1);
         }
         let (cmd, rest) = line.split_once(' ').unwrap_or((line, ""));
         let rest = rest.trim();
@@ -79,9 +373,17 @@ pub async fn run(t: T, src: String) -> R {
                 );
             }
             "press" => t.hold(rest, 0.0),
+            // Holds for its seconds before the next line, unless `nowait` (then the next lines run
+            // while it is held: steering while walking).
             "hold" => {
-                let (a, secs) = rest.rsplit_once(' ').unwrap_or((rest, "1"));
-                t.hold(a.trim(), secs.parse().unwrap_or(1.0));
+                let mut w = rest.split_whitespace();
+                let action = w.next().unwrap_or("");
+                let secs: f32 = w.next().and_then(|s| s.parse().ok()).unwrap_or(1.0);
+                let nowait = w.next() == Some("nowait");
+                t.hold(action, secs);
+                if !nowait {
+                    t.secs(secs).await?;
+                }
             }
             "click" => t.c().click(num(0, 0.0) as u32, 0.0),
             "cursor" => t.c().cursor(num(0, 0.5), num(1, 0.5)),
@@ -223,6 +525,31 @@ pub async fn run(t: T, src: String) -> R {
                 let b = [a[0], a[1], a[2], num(0, 0.0) as f64, num(1, 0.0) as f64];
                 fly(&t, vec![a, b], num(2, 2.0) as f64, eye).await?;
             }
+            "expect" => {
+                let cond = Cond::parse(rest)?;
+                let (ok, seen) = cond.check(&t).await?;
+                if ok {
+                    weft_sdk::info!("script: line {} expect {rest}: ok ({seen})", n + 1);
+                } else {
+                    t.fail(format!("line {} expect {rest}: {seen}", n + 1));
+                }
+            }
+            "until" => {
+                let (text, secs) = split_within(rest);
+                let cond = Cond::parse(text)?;
+                let deadline = Instant::now() + Duration::from_secs_f32(secs);
+                loop {
+                    let (ok, seen) = cond.check(&t).await?;
+                    if ok {
+                        weft_sdk::info!("script: line {} until {text}: after {:.1} s", n + 1, started.elapsed().as_secs_f32());
+                        break;
+                    }
+                    if Instant::now() > deadline {
+                        return Err(format!("until {text}: not within {secs} s ({seen})"));
+                    }
+                    t.secs(0.25).await?;
+                }
+            }
             "quit" => return Ok(()),
             _ => t.fail(format!("unknown script line '{line}'")),
         }
@@ -341,4 +668,59 @@ async fn fly(t: &T, mut pts: Vec<[f64; 5]>, secs: f64, eye: f64) -> R {
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_command_is_listed() {
+        let src = include_str!("script.rs");
+        let body = src.split("async fn run_lines").nth(1).unwrap();
+        for line in body.lines() {
+            let l = line.trim();
+            if let Some(name) = l.strip_prefix('"').and_then(|r| r.split_once("\" =>")).map(|(n, _)| n) {
+                assert!(COMMANDS.contains(&name), "script command '{name}' is missing from COMMANDS");
+            }
+        }
+    }
+
+    #[test]
+    fn preflight_finds_bad_lines() {
+        let bad = preflight("loaded\nwiat 2\nexpect block 1 2\nuntil on_ground within 5\nshot\n# note\nexpect chat hello\n");
+        assert_eq!(bad.len(), 3, "{bad:?}");
+        assert!(bad[0].starts_with("line 2:"));
+        assert!(bad[1].starts_with("line 3:"));
+        assert!(bad[2].starts_with("line 5:"));
+    }
+
+    #[test]
+    fn conditions_read() {
+        assert_eq!(Cond::parse("block ~ ~-1 ~2 stone"), Ok(Cond::Block([Coord::Off(0.0), Coord::Off(-1.0), Coord::Off(2.0)], "stone".into())));
+        assert_eq!(Cond::parse("health <= 8"), Ok(Cond::Health(Cmp::Le, 8.0)));
+        assert_eq!(Cond::parse("chat You Joined"), Ok(Cond::Chat("you joined".into())));
+        assert!(Cond::parse("health about 8").is_err());
+        assert_eq!(split_within("players 2 within 90"), ("players 2", 90.0));
+        assert_eq!(split_within("on_ground"), ("on_ground", 30.0));
+    }
+
+    #[test]
+    fn lint_warns_on_clicking_upwards() {
+        let w = lint("look 0 85\nclick 0\nlook 0 -85\npress core:attack\nlook 10 20\nhold core:use 1\nhold core:forward 2\n");
+        assert_eq!(w.len(), 2, "{w:?}");
+        assert!(w[0].starts_with("line 2:"));
+        assert!(w[1].starts_with("line 6:"));
+    }
+
+    #[test]
+    fn block_names_match() {
+        let got = "base:furnace[facing=north,lit=true]";
+        assert!(block_matches(got, "base:furnace"));
+        assert!(block_matches(got, "furnace"));
+        assert!(block_matches(got, "furnace[lit=true]"));
+        assert!(!block_matches(got, "furnace[lit=false]"));
+        assert!(!block_matches(got, "base:stone"));
+        assert!(!block_matches("animals:furnace", "base:furnace"));
+    }
 }

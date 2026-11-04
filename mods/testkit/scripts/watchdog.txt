@@ -1,0 +1,8 @@
+# The watchdog's own check: run with --watchdog 5. The game must end with exit code 70 and
+# test-reports/watchdog.txt must name line 6 (the freeze) or 7 (the step after it, if the command
+# runs a frame later).
+loaded
+idle
+chat /tk_freeze 30
+wait 5
+quit
