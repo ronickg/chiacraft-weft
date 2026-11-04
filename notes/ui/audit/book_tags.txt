@@ -1,0 +1,13 @@
+# The recipe book with a tag missing (Playtest B12): only a stick held, so the club's log (any log)
+# is lacking: "Log or similar: 0/1", not one wood's name alone.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 2
+chat /tk give base:stick 1
+wait 1
+press core:inventory
+wait 1.5
+shot bt_01_hands.png
+quit
