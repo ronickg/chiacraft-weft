@@ -136,3 +136,20 @@ Ronald found the smooth Alegreya "off and not well positioned". The text is now 
 - **Menus:** title screen, pause, settings, world select, loading screen, death screen
 - **Feedback:** tooltips, toasts or notifications, badges, item pickup popups, damage numbers
 - **Text:** a heading font and a body font, in gold and cream
+
+### D) Self-review before Ronald sees it
+
+Ronald (2026-11-04), on the round-2 taming and stats sheet: "ui is much better, but ... there still lots of issues i find, text size and maybe like what's the border around one of the stats etc, it should be clever with ui". The UI worker catches these itself. Run every check on **every mock-up sheet and every in-game shot** before it goes out, and list in the report what the checks caught and what was fixed.
+
+- **Type scale.** In the game, use one pixel font at one size. Headings differ by colour (gold) and placement, not by size. A sheet's own words use the same font in two sizes: titles at twice the UI size, everything else at the UI size. A third size needs a reason written next to it.
+- **Alignment grid and fixed columns.** Lay every repeated value on a column: numbers right-aligned to one edge, counts centred, text left-aligned. A header lines up the way its values do. A unit gets its own column beside the number ("100 kg", "99 %"), so a unit or an arrow never shifts the numbers. Spell units out ("units", not "u").
+- **Every border and colour means something.** A frame or glow is a state the game really shows: hover is the game's button_hover on the control itself; selected or active is button_pressed or the pressed tab. A still sheet doesn't show a hover box around a whole row. Green means "after this change" or good, red means bad or danger, and the wild-point colours mean quality. Name a colour's meaning in a legend line, or don't use the colour.
+- **Nothing outside its panel and nothing clipped.** Every label, number and widget sits inside its panel's inner edge, with at least 3 UI px of air beside its neighbours. A label never runs into the next column.
+- **Contrast of text on bars.** Don't write a value on a bar's fill: it sits beside the bar, in its column. Text on a coloured fill (a button, a chip) uses that part's text colour (`#fff4dc` on orange).
+- **Consistent units and icon sizes.** One icon size per job: 16 UI px in a row beside text, 20 in a button or tab, 24 for a heading or badge. The same stat has the same icon, name and unit everywhere: the animal screen, the stats screen and the HUD.
+- **Disabled controls say why.** A greyed-out button carries a line or tooltip with the reason ("Ride: needs a saddle on it"), or it isn't shown.
+- **At his sizes.** Check every screen at Ronald's Mac (1728x1117 pt, 3456x2234 px: GUI scale 6) and at 1280x720 (GUI scale 2), using `notes/ui/audit/ui_fit.txt` on a tester's run. Nothing should be cut off, and every window should keep a margin round it.
+
+How to check:
+- **Measured:** mock-ups are drawn by a script that records every box it draws. Its `lint()` reports anything outside the panel, overlapping, closer than 3 px, off its column's edge, or wider than its column; see `notes/ui/mock/mock_taming_v3.py`. It must report 0 problems. For in-game shots, use `mods/base/source/ui/placement_check.py` (slots, counts, label margins).
+- **By eye, after the measuring:** zoom to 1:1 and look for what a measure can't see: a colour with no meaning, a gap that reads as a missing value, a crop that cut into a figure, the same thing named two ways. Fix it, then run the measure again.
