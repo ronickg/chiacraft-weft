@@ -148,6 +148,11 @@ toward the UI's own colours (`notes/STYLE.md`).
   tile before showing it, and fix one in code from its drawing with `notes/blocks/regrade.py
   <in> <out> <gamma> <saturation> [r,g,b pull] [amount]` (gamma below 1 lifts the shadows most), so
   the approved drawing stays. Obsidian and coal are dark on purpose.
+- **Streaks and stripes never repeat in step from block to block** (Ronald, 11-04, on the karst
+  limestone: "Yes, loosen streaks"; the first version put rain streaks in the same columns in every
+  variant, and a tall tower looked corrugated). Give each variant its own positions, gaps and
+  lengths, ending inside the tile, so a face reads as one weathered surface. Strata that must join
+  sideways (a band's level lines) are the exception: those rows stay fixed and only run across.
 - **Blades finer than a game pixel break into dots** when cut (the first two-block grass's upper
   half, 11-04): ask for "each blade 2 px wide (never 1 px), solid shapes that read at 32 px".
 - **Check a name is free in `tiles/` before a batch**: a new `fern` overwrote the approved
