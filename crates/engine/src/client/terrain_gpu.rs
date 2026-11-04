@@ -130,20 +130,50 @@ pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize
     Some((w, custom))
 }
 
-/// `describe` for distant terrain, with the dimension's scattered things (trees) after it
-/// (`d::SCATTER_OFF` points there): per scatter its cell, reach and hash seed, then per biome the chance
-/// as a threshold on the site's bits (`dim::scatter_site`'s test, exactly), and the canopy its
-/// shape callback makes there (radius, top above the site, block), from a few sample runs.
+/// `describe` for distant terrain, with what steep faces need (`d::FACE_FALL`) and the
+/// dimension's scattered things (trees) after it (`d::SCATTER_OFF` points there): per scatter
+/// its cell, reach, hash seed, biome count and thinning (`ScatterThin`: its mask's place and
+/// length, keep), the mask's steps, then per biome the chance as a threshold on the site's bits
+/// (`dim::scatter_site`'s test, exactly), the canopy its shape callback makes there (radius,
+/// top above the site, block) and whether the thinning applies there.
+///
+/// The canopy comes from sample runs of the shape on real ground spread over the world: a run at
+/// one spot only said what that spot allowed (a clearing, a rock face), for every site.
 pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize>)> {
     let (mut w, custom) = describe(c, dim, seed)?;
     let def = &c.dims[dim as usize];
+    w[d::FACE_FALL as usize] = def
+        .terrain
+        .as_ref()
+        .and_then(|t| t.faces)
+        .map_or(i32::MAX, |f| f.fall);
     w[d::SCATTER_OFF as usize] = w.len() as i32;
     w.push(def.scatters.len() as i32);
     let biomes = c.biomes.len().max(1);
     let mut buf = vec![weft_abi::ScatterBlock { offset: [0; 3], state: 0, force: 0 }; 4096];
+    // Where the sample runs stand: spread over some 20 km, on the ground there.
+    let spots: Vec<[i32; 3]> = (0..RUN_SPOTS as i32)
+        .filter_map(|k| {
+            let (x, z) = ((k * 2_741 + 113) % 20_011 - 10_000, (k * 7_919 + 457) % 20_021 - 10_000);
+            let col = def.column(seed, x, z)?;
+            (col.height != i32::MIN).then_some([x, col.height + 1, z])
+        })
+        .collect();
     for sc in &def.scatters {
         let key = seed ^ sc.salt;
         w.extend_from_slice(&[sc.cell, sc.reach, key as u32 as i32, (key >> 32) as u32 as i32, biomes as i32]);
+        let head = w.len();
+        w.extend_from_slice(&[0, 0, 0]);
+        if let Some(t) = &sc.thin {
+            let start = w.len();
+            if postfix(&t.mask, seed, &mut w, 0).is_some_and(|depth| depth <= limit::MASK_DEPTH as usize) {
+                w[head] = start as i32;
+                w[head + 1] = ((w.len() - start) / words::MASK as usize) as i32;
+                w[head + 2] = t.keep as i32;
+            } else {
+                w.truncate(start);
+            }
+        }
         for b in 0..biomes as u32 {
             let density = sc
                 .density
@@ -151,18 +181,21 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
                 .unwrap_or(0.0);
             let threshold = (density as f64 * (1u64 << 53) as f64).ceil() as u64;
             let (mut tops, mut radii, mut states) = (Vec::new(), Vec::new(), rustc_hash::FxHashMap::<u32, u32>::default());
-            for k in 0..8u64 {
+            for (k, &pos) in spots.iter().enumerate() {
+                if threshold == 0 || tops.len() >= RUNS {
+                    break;
+                }
                 let mut args = weft_abi::ScatterArgs {
                     seed,
                     dim,
-                    pos: [0, 64, 0],
+                    pos,
                     biome: b,
-                    random: weft_noise::mix(k),
+                    random: weft_noise::mix(k as u64),
                     out: buf.as_mut_ptr(),
                     cap: buf.len() as u32,
                     len: 0,
                 };
-                if threshold == 0 || !crate::host::invoke(sc.owner, sc.shape, &mut args) {
+                if !crate::host::invoke(sc.owner, sc.shape, &mut args) {
                     continue;
                 }
                 let blocks = &buf[..(args.len as usize).min(buf.len())];
@@ -187,13 +220,27 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
             tops.sort_unstable();
             radii.sort_unstable();
             let state = states.into_iter().max_by_key(|e| e.1).map_or(0, |e| e.0);
-            let entry: [i32; words::SCATTER_BIOME as usize] =
-                [threshold as u32 as i32, (threshold >> 32) as u32 as i32, radii[radii.len() / 2], tops[tops.len() / 2], state as i32];
+            let thinned = sc.thin.as_ref().is_some_and(|t| {
+                t.biomes
+                    .is_none_or(|comp| c.components.has(crate::components::BIOME, b, comp))
+            });
+            let entry: [i32; words::SCATTER_BIOME as usize] = [
+                threshold as u32 as i32,
+                (threshold >> 32) as u32 as i32,
+                radii[radii.len() / 2],
+                tops[tops.len() / 2],
+                state as i32,
+                thinned as i32,
+            ];
             w.extend_from_slice(&entry);
         }
     }
     Some((w, custom))
 }
+
+/// Sample runs of a scatter's shape per biome for its canopy, and the spots tried for them.
+const RUNS: usize = 8;
+const RUN_SPOTS: usize = 24;
 
 /// Writes a mask as postfix steps (`words::MASK` each); returns the stack depth it needs.
 fn postfix(m: &Mask, seed: u64, w: &mut Vec<i32>, depth: usize) -> Option<usize> {
@@ -269,6 +316,8 @@ struct Slot {
     lod_flight: Vec<super::lod::LodJob>,
 }
 
+type LodDesc = ((u32, u64), Arc<std::sync::OnceLock<Option<(Vec<i32>, usize)>>>);
+
 /// A frame slot's output buffer as workers read it, straight from where the GPU wrote it.
 struct Readback(*const u32, usize);
 
@@ -297,7 +346,9 @@ pub struct GpuTerrain {
     slots: Vec<Slot>,
     /// (dim, seed) and its description and mod features, for cubes and for tiles.
     desc: Option<((u32, u64), Vec<i32>, usize)>,
-    lod_desc: Option<((u32, u64), Vec<i32>, usize)>,
+    /// The same for tiles, worked out on LOD's threads (it runs mods' shapes): `None` inside
+    /// while not done, then `None` when the GPU can't make it.
+    lod_desc: Option<LodDesc>,
     /// Set once the pipeline works: the terrain thread sends jobs here instead of to the CPU.
     pub on: Arc<AtomicBool>,
 }
@@ -385,16 +436,24 @@ impl GpuTerrain {
             }
         }
         self.lod_queue.extend(self.lod_rx.try_iter());
+        // Tiles called off meanwhile (`LodJob::live`) aren't made.
+        self.lod_queue.retain(super::lod::LodJob::live);
         let Some(first) = self.lod_queue.front() else { return };
         let key = (first.dim, first.seed);
         if self.lod_desc.as_ref().is_none_or(|d| d.0 != key) {
-            let Some((words, custom)) = describe_lod(content(), key.0, key.1) else {
-                self.lod_queue.clear();
-                return;
-            };
-            self.lod_desc = Some((key, words, custom.len()));
+            let cell = Arc::new(std::sync::OnceLock::new());
+            let out = cell.clone();
+            super::lod::pool().spawn(move || {
+                let _ = out.set(describe_lod(content(), key.0, key.1).map(|(w, custom)| (w, custom.len())));
+            });
+            self.lod_desc = Some((key, cell));
         }
-        let (_, words, custom) = self.lod_desc.as_ref().unwrap();
+        let cell = self.lod_desc.as_ref().unwrap().1.clone();
+        let Some(made) = cell.get() else { return };
+        let Some((words, custom)) = made else {
+            self.lod_queue.clear();
+            return;
+        };
         let mut batch = Vec::new();
         while batch.len() < LOD_BATCH
             && self

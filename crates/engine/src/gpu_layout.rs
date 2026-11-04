@@ -119,8 +119,11 @@ pub mod terrain {
             FEAT_OFF = 26, RULE_OFF = 27, CAVE_OFF = 28,
             /// Distant terrain's scattered things (`describe_lod`).
             SCATTER_OFF = 29,
+            /// Distant terrain: from what fall (`lod::fall`) the ground is a bare face, where no
+            /// scattered things stand (`Terrain::faces`; `i32::MAX`: none).
+            FACE_FALL = 30,
             /// The header's length.
-            LEN = 30,
+            LEN = 31,
         }
         /// Words per record of the description, per cube's mods' heights and per cube made.
         words {
@@ -129,8 +132,11 @@ pub mod terrain {
             MASK = 6,
             RULE = 24,
             CAVE = 5,
-            /// Per scatter and biome: threshold (two words), canopy radius, top, block.
-            SCATTER_BIOME = 5,
+            /// Per scatter: cell, reach, hash seed (two words), biomes, thinning mask's place and
+            /// steps, keep.
+            SCATTER = 8,
+            /// Per scatter and biome: threshold (two words), canopy radius, top, block, thinned.
+            SCATTER_BIOME = 6,
             /// Per mod feature and cube: heights at the 256 columns and the 25 corners caves
             /// measure from.
             CUSTOM = 281,

@@ -8,11 +8,13 @@
 //! shows its ground the tiles' pixels are dropped (`fs_lod`, `Lod::mask`), so they fill in for
 //! cubes not made or meshed yet (flying fast), and nowhere stand through them.
 
+use std::collections::VecDeque;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use glam::{DVec3, IVec2};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::content::{Content, content};
 use crate::gpu_layout::face;
@@ -28,6 +30,11 @@ pub const MAX_LEVEL: u32 = 5;
 /// A tile splits into the level below while nearer than this many of its widths: a cell stays
 /// about the same size on screen (a 32-block cell at 4096 blocks).
 const SPLIT: f64 = 4.0;
+/// A split tile joins again only once farther than this many of its widths, so walking to and
+/// fro over the line doesn't swap levels each time.
+const MERGE: f64 = 4.5;
+/// Made tiles no longer wanted kept a while (not drawn), for coming back.
+const CACHE: usize = 192;
 /// Blocks under the land from where distant terrain is left out.
 const UNDERGROUND: i32 = 32;
 /// Tiles asked for and not back yet, at most.
@@ -77,6 +84,28 @@ pub struct LodJob {
     pub key: TileKey,
     pub custom: Vec<i32>,
     pub done: Sender<LodMesh>,
+    /// Cleared when the tile is no longer wanted: the work left is skipped.
+    pub live: Arc<AtomicBool>,
+}
+
+impl LodJob {
+    pub fn live(&self) -> bool {
+        self.live.load(Ordering::Relaxed)
+    }
+}
+
+/// LOD's own threads, at low priority: its mods' heights and meshing never hold up the pool that
+/// finishes the near cubes (joining and flying wait on those).
+pub fn pool() -> &'static rayon::ThreadPool {
+    static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
+    POOL.get_or_init(|| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(3)
+            .thread_name(|i| format!("distant terrain {i}"))
+            .start_handler(|_| crate::lower_priority())
+            .build()
+            .expect("distant terrain pool")
+    })
 }
 
 /// A made tile's quads (`mesh`) and the heights they span.
@@ -90,8 +119,14 @@ pub struct LodMesh {
 
 /// What came back for `job`, meshed on a worker.
 pub fn made(job: LodJob, words: Vec<u32>) {
-    crate::background().spawn(move || {
-        let (quads, y) = mesh(content(), job.key, &words);
+    if !job.live() {
+        return;
+    }
+    pool().spawn(move || {
+        if !job.live() {
+            return;
+        }
+        let (quads, y) = mesh(content(), job.dim, job.seed, job.key, &words);
         let _ = job
             .done
             .send(LodMesh { dim: job.dim, seed: job.seed, key: job.key, quads, y });
@@ -105,10 +140,24 @@ fn quad(dir: u32, x: i32, y: i32, z: i32, size: (i32, i32, i32), tex: u32, tint:
     crate::gpu_layout::lod_record(dir, [x, y, z], [size.0, size.1, size.2], tex, tint, biome)
 }
 
+/// How far the ground falls per block to its lowest neighbour, from a `drop` between samples `s`
+/// blocks apart: a little more than the mean, as the fall between blocks gathers in steps (the
+/// same as `terrain.wgsl`'s `lod_fall`).
+pub fn fall(drop: i32, s: i32) -> i32 {
+    (drop.max(0) * 3 + 2 * s - 1) / (2 * s)
+}
+
+/// Blocks of soil under a column's top before the stone, as most surface rules have it.
+const FILLER: i32 = 3;
+/// Bands a steep wall is drawn in at most, each asking the face what it shows there.
+const BANDS: i32 = 8;
+
 /// The tile's top faces (runs along x merged) and the walls down to lower neighbors: the top
 /// block's top color for its own height (a grass side averages to the dirt under its rim, and
-/// every slope came out striped brown), then the block under it for the rest.
-pub fn mesh(c: &Content, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, (i32, i32)) {
+/// every slope came out striped brown), then the block under it for the rest. Where the ground
+/// falls steeply the dimension's faces (`Terrain::faces`) say what shows instead (bare rock), in
+/// bands down the wall.
+pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, (i32, i32)) {
     let s = 1 << key.level;
     let at = |i: i32, j: i32| {
         let k = ((j + 1) * SIDE + i + 1) as usize * 2;
@@ -121,14 +170,62 @@ pub fn mesh(c: &Content, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, (i32, i
         let tint = if info.tint_faces & (1 << dir) != 0 { info.tint as u32 } else { 0 };
         (looks.drawn(state, info).textures[dir] & face::TEX_MASK, tint)
     };
+    let terrain = c.dims.get(dim as usize).and_then(|d| d.terrain.as_ref());
+    let faces = terrain.and_then(|t| t.faces);
+    let stone = terrain.map_or(0, |t| t.stone);
+    let o = key.origin();
+    // Per cell: its top as shown, and for a steep one its fall and wall bands from the top down
+    // (bottom, block), down to its lowest neighbour.
+    let n = CELLS as usize;
+    let mut tops = vec![0u32; n * n];
+    let mut walls: Vec<Option<Vec<(i32, u32)>>> = vec![None; n * n];
+    for j in 0..CELLS {
+        for i in 0..CELLS {
+            let (y, top, biome, under) = at(i, j);
+            let k = (j * CELLS + i) as usize;
+            tops[k] = top;
+            // Water, ice and canopies have the same block under: no ground face there.
+            let Some(f) = faces.filter(|_| top != under) else { continue };
+            let low = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+                .iter()
+                .map(|&(di, dj)| at(i + di, j + dj).0)
+                .min()
+                .unwrap_or(y);
+            let fall = fall(y - low, s);
+            if fall < f.fall {
+                continue;
+            }
+            let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
+            let shown = |wy: i32, before: u32| f.block(seed, dim, [x, wy, z], y, biome, fall, before);
+            tops[k] = shown(y, top);
+            // The wall below the top block, to the skirt's depth at most.
+            let bottom = low.min(y - 1) - 2 * s;
+            let step = ((y - 1 - bottom) + BANDS - 1) / BANDS;
+            let mut bands: Vec<(i32, u32)> = Vec::new();
+            let mut wy = y - 1;
+            while wy > bottom && step > 0 {
+                let before = if y - wy <= FILLER { under } else { stone };
+                let block = shown(wy, before);
+                let lo = (wy - step + 1).max(bottom + 1);
+                match bands.last_mut() {
+                    Some(last) if last.1 == block => last.0 = lo,
+                    _ => bands.push((lo, block)),
+                }
+                wy = lo - 1;
+            }
+            walls[k] = Some(bands);
+        }
+    }
     let mut out = Vec::new();
     let (mut lo, mut hi) = (i32::MAX, i32::MIN);
+    let top_at = |i: i32, j: i32| tops[(j * CELLS + i) as usize];
     for j in 0..CELLS {
         let mut i = 0;
         while i < CELLS {
-            let (y, top, biome, _) = at(i, j);
+            let (y, _, biome, _) = at(i, j);
+            let top = top_at(i, j);
             let mut end = i + 1;
-            while end < CELLS && at(end, j).0 == y && at(end, j).1 == top && at(end, j).2 == biome {
+            while end < CELLS && at(end, j).0 == y && top_at(end, j) == top && at(end, j).2 == biome {
                 end += 1;
             }
             let (tex, tint) = face_of(top, 3);
@@ -139,7 +236,9 @@ pub fn mesh(c: &Content, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, (i32, i
     }
     for j in 0..CELLS {
         for i in 0..CELLS {
-            let (y, top, biome, under) = at(i, j);
+            let (y, _, biome, under) = at(i, j);
+            let k = (j * CELLS + i) as usize;
+            let top = tops[k];
             for (dir, (di, dj)) in [(0usize, (-1, 0)), (1, (1, 0)), (4, (0, -1)), (5, (0, 1))] {
                 let mut ny = at(i + di, j + dj).0;
                 // At the tile's edge the tile beside may be of another level, its ground not
@@ -153,11 +252,28 @@ pub fn mesh(c: &Content, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, (i32, i
                 }
                 let (tex, tint) = face_of(top, 3);
                 out.push(quad(dir as u32, i * s, y, j * s, (s, 1, s), tex, tint, biome));
-                if y - 1 > ny {
-                    let (tex, tint) = face_of(under, dir);
-                    out.push(quad(dir as u32, i * s, ny + 1, j * s, (s, y - 1 - ny, s), tex, tint, biome));
-                }
                 lo = lo.min(ny + 1);
+                if y - 1 <= ny {
+                    continue;
+                }
+                match &walls[k] {
+                    Some(bands) => {
+                        let mut from = y - 1;
+                        for &(band_lo, block) in bands {
+                            let b = band_lo.max(ny + 1);
+                            if b > from {
+                                break;
+                            }
+                            let (tex, tint) = face_of(block, dir);
+                            out.push(quad(dir as u32, i * s, b, j * s, (s, from + 1 - b, s), tex, tint, biome));
+                            from = b - 1;
+                        }
+                    }
+                    None => {
+                        let (tex, tint) = face_of(under, dir);
+                        out.push(quad(dir as u32, i * s, ny + 1, j * s, (s, y - 1 - ny, s), tex, tint, biome));
+                    }
+                }
             }
         }
     }
@@ -176,7 +292,13 @@ pub struct Lod {
     /// `None`: no distant terrain here.
     custom: Option<Arc<Vec<usize>>>,
     ready: FxHashSet<TileKey>,
-    pending: FxHashSet<TileKey>,
+    /// Asked for, and their jobs' flags (cleared to call them off).
+    pending: FxHashMap<TileKey, Arc<AtomicBool>>,
+    /// Made tiles not wanted now, oldest first, kept until `CACHE` of them.
+    cached: FxHashSet<TileKey>,
+    dropped: VecDeque<TileKey>,
+    /// Tiles split in the last pick (`MERGE`).
+    split: FxHashSet<TileKey>,
     /// Tiles wanted, nearest first, and where the camera was then.
     wanted: Vec<TileKey>,
     wanted_at: Option<(glam::DVec2, i32, i32)>,
@@ -202,7 +324,10 @@ impl Lod {
             seed: 0,
             custom: None,
             ready: FxHashSet::default(),
-            pending: FxHashSet::default(),
+            pending: FxHashMap::default(),
+            cached: FxHashSet::default(),
+            dropped: VecDeque::new(),
+            split: FxHashSet::default(),
             wanted: Vec::new(),
             wanted_at: None,
             mask: Vec::new(),
@@ -247,7 +372,12 @@ impl Lod {
             for key in self.ready.drain() {
                 render.remove_lod(key);
             }
-            self.pending.clear();
+            for (_, live) in self.pending.drain() {
+                live.store(false, Ordering::Relaxed);
+            }
+            self.cached.clear();
+            self.dropped.clear();
+            self.split.clear();
             self.wanted.clear();
             self.wanted_at = None;
         }
@@ -267,7 +397,7 @@ impl Lod {
             hide = 0;
         }
         while let Ok(m) = self.done.1.try_recv() {
-            if (m.dim, m.seed) != (self.dim, self.seed) || !self.pending.remove(&m.key) {
+            if (m.dim, m.seed) != (self.dim, self.seed) || self.pending.remove(&m.key).is_none() {
                 continue;
             }
             render.upload_lod(gpu, textures, m.key, &m.quads, m.y);
@@ -286,17 +416,19 @@ impl Lod {
             self.pick(p, hide as f64, reach as f64);
         }
         // Shown: each wanted tile when made, else its children when all four are, else its
-        // nearest made ancestor.
-        let mut shown = FxHashSet::default();
+        // nearest made ancestor, which then stands in for every wanted tile under it: a child
+        // shows only with its three siblings, never over its parent.
         let mut keep = FxHashSet::default();
+        let mut made = Vec::new();
+        let mut standing = FxHashSet::default();
         for &key in &self.wanted {
             keep.insert(key);
             if self.ready.contains(&key) {
-                shown.insert(key);
+                made.push(key);
                 continue;
             }
             if key.level > 1 && key.children().iter().all(|k| self.ready.contains(k)) {
-                shown.extend(key.children());
+                made.extend(key.children());
                 keep.extend(key.children());
                 continue;
             }
@@ -304,28 +436,55 @@ impl Lod {
             while a.level < MAX_LEVEL {
                 a = a.parent();
                 if self.ready.contains(&a) {
-                    shown.insert(a);
+                    standing.insert(a);
                     keep.insert(a);
                     break;
                 }
             }
         }
+        let under_standing = |mut k: TileKey| {
+            while k.level < MAX_LEVEL {
+                k = k.parent();
+                if standing.contains(&k) {
+                    return true;
+                }
+            }
+            false
+        };
+        let mut shown: FxHashSet<TileKey> = made.into_iter().filter(|&k| !under_standing(k)).collect();
+        shown.extend(standing.iter().copied());
         render.lod_draw.clear();
         // It is a shell over the land with nothing under it: from deep below, its walls would hang
         // in the sky. Only rock is that way anyway.
         if !self.deep_underground(c, cam) {
             render.lod_draw.extend(shown);
         }
-        let gone: Vec<TileKey> = self
-            .ready
-            .iter()
-            .copied()
-            .filter(|k| !keep.contains(k))
-            .collect();
-        for key in gone {
-            self.ready.remove(&key);
-            render.remove_lod(key);
+        // Tiles no longer wanted wait in the cache, the oldest freed past `CACHE`.
+        for &key in &self.ready {
+            if !keep.contains(&key) && self.cached.insert(key) {
+                self.dropped.push_back(key);
+            }
         }
+        self.cached.retain(|k| !keep.contains(k));
+        while self.cached.len() > CACHE {
+            let Some(key) = self.dropped.pop_front() else { break };
+            if self.cached.remove(&key) {
+                self.ready.remove(&key);
+                render.remove_lod(key);
+            }
+        }
+        if self.dropped.len() > 4 * CACHE {
+            let cached = &self.cached;
+            self.dropped.retain(|k| cached.contains(k));
+        }
+        // Work for tiles no longer wanted is called off.
+        self.pending.retain(|k, live| {
+            let on = keep.contains(k);
+            if !on {
+                live.store(false, Ordering::Relaxed);
+            }
+            on
+        });
         self.request();
     }
 
@@ -419,12 +578,15 @@ impl Lod {
                 stack.push(TileKey { level: MAX_LEVEL, x, z });
             }
         }
+        let mut split = FxHashSet::default();
         while let Some(key) = stack.pop() {
             let (near, far) = key.distance(p);
             if near > reach || far < hide {
                 continue;
             }
-            if key.level > 1 && near < SPLIT * key.size() as f64 {
+            let edge = if self.split.contains(&key) { MERGE } else { SPLIT };
+            if key.level > 1 && near < edge * key.size() as f64 {
+                split.insert(key);
                 stack.extend(key.children());
             } else {
                 out.push((near, key));
@@ -432,6 +594,7 @@ impl Lod {
         }
         out.sort_by(|a, b| a.0.total_cmp(&b.0));
         self.wanted = out.into_iter().map(|t| t.1).collect();
+        self.split = split;
     }
 
     /// Asks for the nearest wanted tiles not made yet.
@@ -442,20 +605,24 @@ impl Lod {
             if self.pending.len() >= IN_FLIGHT {
                 break;
             }
-            if self.ready.contains(&key) || self.pending.contains(&key) {
+            if self.ready.contains(&key) || self.pending.contains_key(&key) {
                 continue;
             }
-            self.pending.insert(key);
+            let live = Arc::new(AtomicBool::new(true));
+            self.pending.insert(key, live.clone());
             let (dim, seed, done, jobs) = (self.dim, self.seed, self.done.0.clone(), self.jobs.clone());
             if custom.is_empty() {
-                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done });
+                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live });
                 continue;
             }
             let custom = custom.clone();
-            // Mods' features run their code: on a worker.
-            crate::background().spawn(move || {
+            // Mods' features run their code: on LOD's own threads.
+            pool().spawn(move || {
+                if !live.load(Ordering::Relaxed) {
+                    return;
+                }
                 let heights = custom_heights(c, dim, seed, key, &custom);
-                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done });
+                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live });
             });
         }
     }

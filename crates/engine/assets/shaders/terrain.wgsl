@@ -583,6 +583,16 @@ fn hash64(seed: vec2<u32>, x: i32, z: i32) -> vec2<u32> {
     return h ^ shr64(h, 31u);
 }
 
+// `weft_noise::hash(seed, x, y, z)`.
+fn hash64y(seed: vec2<u32>, x: i32, y: i32, z: i32) -> vec2<u32> {
+    var h = seed ^ mul64(widen(x), vec2<u32>(0x7F4A7C15u, 0x9E3779B9u));
+    h = h ^ mul64(widen(y), vec2<u32>(0x27D4EB4Fu, 0xC2B2AE3Du));
+    h = h ^ mul64(widen(z), vec2<u32>(0x9E3779F9u, 0x165667B1u));
+    h = mul64(h ^ shr64(h, 30u), vec2<u32>(0x1CE4E5B9u, 0xBF58476Du));
+    h = mul64(h ^ shr64(h, 27u), vec2<u32>(0x133111EBu, 0x94D049BBu));
+    return h ^ shr64(h, 31u);
+}
+
 fn mod64(a: vec2<u32>, m: u32) -> u32 {
     let wrap = (4294967295u % m + 1u) % m;
     return ((a.y % m) * wrap + a.x % m) % m;
@@ -597,6 +607,19 @@ const LOD_LAST: i32 = i32(LOD_SIDE) - 1;
 var<workgroup> lod_ground: array<u32, LOD_SAMPLES>;
 var<workgroup> canopy: array<atomic<u32>, LOD_SAMPLES>;
 var<workgroup> cover: array<atomic<u32>, LOD_SAMPLES>;
+
+// The ground height of sample (`i`, `j`), clamped to the tile's samples.
+fn lod_height(i: i32, j: i32) -> i32 {
+    let g = lod_ground[u32(clamp(j, 0, LOD_LAST)) * LOD_SIDE + u32(clamp(i, 0, LOD_LAST))];
+    return bitcast<i32>(g << 16u) >> 16u;
+}
+
+// How far the ground at sample (`i`, `j`) falls to its lowest neighbour, per block, from samples
+// `s` blocks apart (`lod::fall`, the same on the CPU).
+fn lod_fall(i: i32, j: i32, s: i32) -> i32 {
+    let low = min(min(lod_height(i - 1, j), lod_height(i + 1, j)), min(lod_height(i, j - 1), lod_height(i, j + 1)));
+    return (max(lod_height(i, j) - low, 0) * 3 + 2 * s - 1) / (2 * s);
+}
 
 @compute @workgroup_size(256)
 fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t: u32) {
@@ -652,8 +675,10 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
     }
     workgroupBarrier();
     // Trees: every site whose canopy may reach the samples, found as `dim::scatter_site` does
-    // (standing on the nearest sample's ground), its canopy laid over the samples it covers.
+    // (standing on the nearest sample's ground, thinned where it stands), its canopy laid over
+    // the samples it covers. None on bare faces, which the shapes leave alone.
     let so = u32(desc[D_SCATTER_OFF]);
+    let face_fall = desc[D_FACE_FALL];
     var sea = -2147483647 - 1;
     if (desc[D_HAS_SEA] != 0) {
         sea = desc[D_SEA];
@@ -665,7 +690,10 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
         let reach = desc[at + 1u];
         let key = vec2<u32>(u32(desc[at + 2u]), u32(desc[at + 3u]));
         let nb = u32(desc[at + 4u]);
-        let table = at + 5u;
+        let thin_at = u32(desc[at + 5u]);
+        let thin_len = u32(desc[at + 6u]);
+        let keep = u32(desc[at + 7u]);
+        let table = at + WORDS_SCATTER + thin_len * WORDS_MASK;
         at = table + nb * WORDS_SCATTER_BIOME;
         let c0 = div_floor(ox - s - reach, cell).x;
         let c1 = div_floor(ox + LOD_LAST * s + reach, cell).x;
@@ -691,6 +719,15 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             let limit = vec2<u32>(u32(desc[b]), u32(desc[b + 1u]));
             let bits = shr64(shl64(h, 17u) | shr64(h, 47u), 11u);
             if (!(bits.y < limit.y || (bits.y == limit.y && bits.x < limit.x))) {
+                continue;
+            }
+            if (thin_len > 0u && desc[b + 5u] != 0) {
+                let random = hash64y(h, 1, 2, 3);
+                if ((keep == 0u || mod64(random, keep) != 0u) && mask(thin_at, thin_len, px * 16, pz * 16) > 0) {
+                    continue;
+                }
+            }
+            if (lod_fall(si, sj, s) >= face_fall) {
                 continue;
             }
             let r = desc[b + 2u];
