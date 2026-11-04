@@ -1,0 +1,15 @@
+{
+ "kind": "base:shovel",
+ "layer": "head",
+ "material": "stone",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 14,
+ "anchor": [
+  16.8,
+  15.1
+ ]
+}

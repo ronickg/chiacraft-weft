@@ -1,0 +1,56 @@
+{
+ "axe": [
+  "oak",
+  "stone",
+  "flint",
+  "copper",
+  "bronze",
+  "wrought_iron",
+  "steel",
+  "gold",
+  "diamond"
+ ],
+ "pickaxe": [
+  "oak",
+  "stone",
+  "flint",
+  "copper",
+  "bronze",
+  "wrought_iron",
+  "steel",
+  "gold",
+  "diamond"
+ ],
+ "shovel": [
+  "oak",
+  "stone",
+  "flint",
+  "copper",
+  "bronze",
+  "wrought_iron",
+  "steel",
+  "gold",
+  "diamond"
+ ],
+ "hoe": [
+  "oak",
+  "stone",
+  "flint",
+  "copper",
+  "bronze",
+  "wrought_iron",
+  "steel",
+  "gold",
+  "diamond"
+ ],
+ "sword": [
+  "oak",
+  "stone",
+  "copper",
+  "bronze",
+  "wrought_iron",
+  "steel",
+  "gold",
+  "diamond"
+ ]
+}
