@@ -460,9 +460,11 @@ fn place(u: &mut ItemUse) -> bool {
 
 /// `/animal hurry` (for testing): every egg near `at` hatches within a second.
 pub fn hurry(w: &World, at: [f64; 3]) {
+    // Nothing left: it hatches at its next step whatever the air (with a little left, an egg in
+    // air too cool to develop never did, B7's playtest).
     for id in w.near(at, 16.0, Some(&EGG_ENTITY)) {
         if let Some(e) = w.component_mut(id, &EGG) {
-            e.left = e.left.min(20);
+            e.left = 0;
         }
     }
 }
