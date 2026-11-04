@@ -1,0 +1,24 @@
+# Are animals drawn? For bisecting "the client has them but draws nothing" (11-04): only script
+# lines every build since 11-03 knows, so it runs on old commits too. Five animals and two base
+# mobs straight ahead (+z is yaw 180; negative pitch looks down), on whatever ground is there.
+loaded
+wait 3
+chat /tk mode creative
+chat /tk time 6000
+chat /weather clear
+chat /tk spawn animals:grey_wolf ~0 ~1 ~6
+chat /tk spawn animals:capybara ~3 ~1 ~7
+chat /tk spawn animals:cat ~-3 ~1 ~6
+chat /tk spawn animals:red_deer ~-5 ~1 ~10
+chat /tk spawn animals:jaguar ~5 ~1 ~10
+chat /tk spawn base:sheep ~-1 ~1 ~4
+chat /tk spawn base:cow ~2 ~1 ~4
+wait 1
+look 180 -20
+wait 1
+shot animals_drawn_a.png
+wait 4
+look 180 -20
+wait 1
+shot animals_drawn_b.png
+quit
