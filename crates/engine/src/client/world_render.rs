@@ -680,6 +680,9 @@ impl WorldRenderer {
     /// The terrain's solid and cutout blocks within the shadow box `light` (camera-relative to its
     /// clip space, an orthographic box along the light) into the bound depth target: the world's
     /// cubes only (structures and distant terrain cast none), with `scene` the shadow pass's.
+    /// `leaning`: structures that lean (chiacraft, a falling tree), their block (0, 0, 0)'s place
+    /// in the world, pivot and rotation: they cast shadows, turned; other structures cast none.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_shadow(
         &mut self,
         gpu: &mut dyn Backend,
@@ -689,6 +692,7 @@ impl WorldRenderer {
         light: Mat4,
         scene: BufferId,
         cascade: usize,
+        leaning: &[(u64, DVec3, Lean)],
     ) {
         let Some(pipes) = self.shadow_pipes else { return };
         let cam_block = cam.pos.floor();
@@ -734,6 +738,21 @@ impl WorldRenderer {
                 }
             }
         }
+        // Leaning structures (a falling tree), every face (the light's side turns with them).
+        for (i, &(id, origin, _)) in leaning.iter().enumerate() {
+            let at = (origin - (cam_cube * 16).as_dvec3()).as_vec3();
+            for (&(f, _), meshes) in &self.regions {
+                if f != id {
+                    continue;
+                }
+                for &(key, m) in meshes {
+                    if key.0 == id {
+                        let lo = at + key.1.as_vec3() * 16.0 - cam_frac;
+                        mesh_draws(&m, key, lo, i as i32 + 1, cam_cube, [true; 6], &mut draws);
+                    }
+                }
+            }
+        }
         // Solid and cutout layers only, in runs of one pipeline and page.
         draws.retain(|d| d.1 < 2);
         // The far cascade: the distant terrain's tiles shown (`lod_draw`) within the light's box,
@@ -769,9 +788,30 @@ impl WorldRenderer {
             crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_origins[cascade], frame.slot, n, 16, usage::STORAGE, "shadow origins");
         let ibuf =
             crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_indirect[cascade], frame.slot, n, 20, usage::INDIRECT, "shadow indirect");
-        let fbuf =
-            crate::gpu_layout::frame_buffer(gpu, &mut self.shadow_offsets[cascade], frame.slot, 1, 16, usage::STORAGE, "shadow offsets");
-        gpu.mapped(fbuf)[..16].fill(0);
+        // As `draw`'s: three vec4 a structure (offset and light, rotation, pivot and 1 for leaning).
+        let entries = (leaning.len() as u32 + 1) * 3;
+        let fbuf = crate::gpu_layout::frame_buffer(
+            gpu,
+            &mut self.shadow_offsets[cascade],
+            frame.slot,
+            entries,
+            16,
+            usage::STORAGE,
+            "shadow offsets",
+        );
+        {
+            let offs = gpu.mapped(fbuf);
+            offs[..48].fill(0);
+            for (i, &(_, origin, (pivot, rot))) in leaning.iter().enumerate() {
+                let at = (i + 1) * 48;
+                let o = (origin - (cam_cube * 16).as_dvec3()).as_vec3();
+                offs[at..at + 12].copy_from_slice(bytemuck::cast_slice(&o.to_array()));
+                offs[at + 12..at + 16].copy_from_slice(&(crate::world::light::SKY_FULL as u32).to_le_bytes());
+                offs[at + 16..at + 32].copy_from_slice(bytemuck::cast_slice(&rot.to_array()));
+                offs[at + 32..at + 44].copy_from_slice(bytemuck::cast_slice(&pivot.to_array()));
+                offs[at + 44..at + 48].copy_from_slice(&1.0f32.to_le_bytes());
+            }
+        }
         {
             let origins = gpu.mapped(obuf);
             for (k, d) in draws.iter().enumerate() {

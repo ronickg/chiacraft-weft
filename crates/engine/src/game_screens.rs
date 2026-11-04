@@ -184,7 +184,15 @@ impl Screen for Death {
 
 /// The chat's messages: the last 20 in the open chat, otherwise the last 10 of those under ten
 /// seconds old (the HUD).
-pub fn chat_lines(ui: &mut Ui, client: &crate::client::Client, lang: &crate::ui::lang::Lang, input: &crate::input::Input, open: bool) {
+/// `room`: the height free for it over the game (`Hud::chat_room`), which its lines keep to.
+pub fn chat_lines(
+    ui: &mut Ui,
+    client: &crate::client::Client,
+    lang: &crate::ui::lang::Lang,
+    input: &crate::input::Input,
+    open: bool,
+    room: Option<f32>,
+) {
     let now = std::time::Instant::now();
     let look = crate::settings::chat_look();
     let said: Vec<_> = client
@@ -193,7 +201,7 @@ pub fn chat_lines(ui: &mut Ui, client: &crate::client::Client, lang: &crate::ui:
         .filter(|(_, at)| open || now.duration_since(*at).as_secs() < 10)
         .collect();
     // Over the game, only what fits; a line is about this tall.
-    let room = if open { usize::MAX } else { (look.closed_height / 11.0).max(1.0) as usize };
+    let room = if open { usize::MAX } else { (look.closed_height.min(room.unwrap_or(f32::MAX)) / 11.0).max(1.0) as usize };
     let fill = (look.dim > 0 && !said.is_empty()).then_some(look.dim as u32);
     let shown = Style {
         fill,
@@ -292,7 +300,7 @@ impl Screen for Chat {
                 .stretch(),
             |ui| {
                 if let Some(client) = cx.client {
-                    chat_lines(ui, client, cx.lang, cx.input, true);
+                    chat_lines(ui, client, cx.lang, cx.input, true, None);
                 }
                 if let Some(comp) = &st.completion {
                     if !comp.suggestions.is_empty() {

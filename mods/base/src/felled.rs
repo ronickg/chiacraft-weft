@@ -76,6 +76,27 @@ pub fn turned_axis(axis: &str, along_x: bool) -> &'static str {
     }
 }
 
+/// A creature (a player too) stands in `cell`: a log falling there drops as its item instead, so
+/// nobody is buried in a trunk (fell_hang1 buried the player standing in its way).
+pub fn occupied(w: &World, cell: [i32; 3]) -> bool {
+    let mid = [cell[0] as f64 + 0.5, cell[1] as f64 + 0.5, cell[2] as f64 + 0.5];
+    !in_box(w, mid, 0.5).is_empty()
+}
+
+/// The creatures (players too) whose box reaches within `half` of `mid` each way.
+pub fn in_box(w: &World, mid: [f64; 3], half: f64) -> Vec<u64> {
+    w.near_bodies(mid, half + 3.0)
+        .into_iter()
+        .filter(|&id| {
+            w.entity(id).is_some_and(|e| {
+                let r = e.size[0] as f64 / 2.0;
+                let (lo, hi) = ([e.pos[0] - r, e.pos[1], e.pos[2] - r], [e.pos[0] + r, e.pos[1] + e.size[1] as f64, e.pos[2] + r]);
+                (0..3).all(|i| lo[i] < mid[i] + half && hi[i] > mid[i] - half)
+            })
+        })
+        .collect()
+}
+
 /// What a lying trunk may take the place of: air, leaves and what breaks at a touch (plants).
 fn gives_way(state: u32) -> bool {
     state == 0 || LEAVES.on_block(state) || HARDNESS.on_block(state).is_some_and(|h| h <= 0.0)
@@ -123,6 +144,18 @@ pub fn lay(w: &World, foot: [i32; 3], logs: &[[i32; 3]], states: &[u32], d: [i32
         let lying = state_with(state, "axis", axis)
             .and_then(|s| state_with(s, "felled", piece))
             .unwrap_or(state);
+        if occupied(w, at) {
+            let item = Item::lookup(
+                name_of(abi::entry_kind::BLOCK, block_of(state))
+                    .split('[')
+                    .next()
+                    .unwrap_or(""),
+            );
+            if let Some(item) = item {
+                w.spawn_item([at[0] as f64 + 0.5, at[1] as f64 + 0.5, at[2] as f64 + 0.5], ItemStack::new(item, 1));
+            }
+            continue;
+        }
         if w.get(at) != 0 {
             // A plant or leaves in the way: broken as if by nobody, its loot where it was.
             w.break_block(at, ItemStack::EMPTY, 0, true);

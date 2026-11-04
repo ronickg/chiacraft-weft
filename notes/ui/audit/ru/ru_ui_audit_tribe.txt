@@ -1,0 +1,21 @@
+# The same in Russian (--config core:language=ru_ru).
+# UI audit (UI redo, 11-04): the tribe, which has no screen of its own: its chat lines, in the
+# open chat so all of them show at once.
+loaded
+idle
+chat /tk mode creative
+chat /tk time 6000
+wait 2
+chat /tribe info
+chat /tribe join
+chat /tribe create
+chat /tribe create Wolfpack of the North
+chat /tribe info
+chat /tribe leave
+wait 0.5
+press core:chat
+wait 1
+shot 60_tribe_chat.png
+key Escape
+wait 1
+quit

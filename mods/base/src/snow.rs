@@ -3,7 +3,7 @@
 //! eighth of a block a layer, on open ground near players, and melts back. Cheaply: no column
 //! is scanned every tick. Each tick a few columns at random near each player move a layer toward
 //! the cover (`air::SNOW_SAMPLES`, `air::SNOW_REACH`), and each layer block steps down on its own
-//! while there is less snow than it (`air::SNOW_MELT_SECS`, a growth step, so land away from
+//! while there is less snow than it and the air is above freezing (`air::SNOW_MELT_SECS`, `air::melt_chance`: a growth step, so land away from
 //! players melts too and catches up when it loads). Far land shows the cover in the shader
 //! pack's dusting (`snow_on`). The cover is blended over the biomes round a column (`cover_at`).
 
@@ -38,11 +38,18 @@ pub fn register(r: &mut Registry) {
             let Some(snow) = cover_at(&w, pos) else { return };
             let have = layers(e.state());
             let want = air::snow_layers(snow);
-            if want < have {
+            if want < have && melts(&w, pos) {
                 w.set(pos, with_layers(have - 1));
             }
         });
     r.world_tick(tick);
+}
+
+/// Whether a melt step takes a layer of the snow at `pos`: by the warmth of the air there
+/// (`base_api::air_at`: the hour, sun or shade, the season, the height), `air::melt_chance`.
+fn melts(w: &World, pos: [i32; 3]) -> bool {
+    let here = base_api::air_at(w, [pos[0] as f64 + 0.5, pos[1] as f64, pos[2] as f64 + 0.5], 0.2, false, 0, |_| {});
+    (w.random_below(1 << 16) as f32) < air::melt_chance(here.celsius) * (1 << 16) as f32
 }
 
 /// The snow cover at `pos`, blended over the biomes round it (`vitals::air::AIR_BLEND`), so the
@@ -103,8 +110,10 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     let want = air::snow_layers(snow);
     if SNOW_LAYER.is(state) {
         let have = layers(state);
-        if want != have {
-            w.set(pos, with_layers(if want > have { have + 1 } else { have - 1 }));
+        if want > have {
+            w.set(pos, with_layers(have + 1));
+        } else if want < have && melts(w, pos) {
+            w.set(pos, with_layers(have - 1));
         }
         return;
     }

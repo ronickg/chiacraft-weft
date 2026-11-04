@@ -32,9 +32,10 @@ static LEAVES: Tag = Tag::named("leaves");
 
 /// The most logs one felling brings down; a bigger tree is taken by the block.
 const MAX_LOGS: usize = 2048;
-/// How far from the foot, across, a tree's logs may reach (an acacia's branches, a big oak's; a
-/// sequoia's reach 6: `cargo run -p base_api --example tree_logs`).
-const REACH: i32 = 6;
+/// How far from the foot, across, a tree's logs may reach: the ordinary trees' 6 at most and a
+/// sequoia's 6, the tropical giants' (Plants: the Brazil nut, ipê, andiroba) 8 to 12 (Tree looks,
+/// 11-05, `cargo run -p base_api --example tree_logs`), so none of their limbs is left in the air.
+const REACH: i32 = 12;
 /// Leaves touching its logs a tree has at least: a log wall or a pile has none.
 const MIN_LEAVES: usize = 4;
 /// The modifier that slows a player chopping a tree's foot.
@@ -156,11 +157,15 @@ pub fn register(r: &mut Registry) {
                 }
                 continue;
             }
+            // A hung tree held by this log comes down (`fall::release`).
+            if LOGS.on_block(e.state) {
+                crate::fall::release(&w, &[e.pos]);
+            }
             // What the lost log held up falls: its whole tree from the foot, or what stood on a
             // log of its trunk.
             let Some(logs) = loose(&w, e.pos, e.state) else { continue };
             let foot = !LOGS.on_block(w.get([e.pos[0], e.pos[1] - 1, e.pos[2]]));
-            let felling = if by_player && foot { chop(logs.len(), &tool) } else { vitals::felling::by_hand(logs.len() as u32) };
+            let felling = if by_player && foot { chop(logs.len(), &tool) } else { vitals::felling::fruitless(logs.len() as u32) };
             // It falls (`fall`): lifted out with its crown, it leans over away from the player
             // (any way for no one) and, felled for its wood in survival, lies down to be cut in
             // pieces (`felled`); otherwise it shatters. If it can't be lifted it is taken down
@@ -416,7 +421,7 @@ mod tests {
         assert_eq!(tree(world(&wall, &[]), [0, 0, 0]), None);
         // Nothing under the foot's height and nothing beyond reach comes with it.
         let mut far = trunk.clone();
-        far.extend([[0, -1, 0], [7, 1, 0]]);
+        far.extend([[0, -1, 0], [13, 1, 0]]);
         assert_eq!(tree(world(&far, &crown), [0, 0, 0]).unwrap().len(), 5);
         // A neighbour touching at a corner, standing on the ground: it stays.
         let mut pair = trunk.clone();
