@@ -1915,7 +1915,9 @@ pub async fn dedicated_server(t: T) -> R {
         std::process::Command::new(exe)
             .args(["--server", "--world", "w", "--seed", "1", "--view", "4", "--port", &port.to_string(), "--run-dir", &dir])
             .args(crate::package_args())
-            .args(crate::package_args())
+            // The test-only mods too (testmod, whose setting this checks): the server needs the
+            // joining game's code mods, and only `--test` games load them by themselves.
+            .args(["--mods", &format!("{dir}/test-mods")])
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
