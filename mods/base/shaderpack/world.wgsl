@@ -480,7 +480,8 @@ fn water(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
     let l = light_dir();
-    let hv = normalize(l + v);
+    // Never a zero vector (light exactly behind the eye): its normalize would be NaN.
+    let hv = normalize(l + v + vec3(0.0, 1e-4, 0.0));
     let nh = max(dot(n, hv), 0.0);
     let a2 = 0.0016;
     let dd = nh * nh * (a2 - 1.0) + 1.0;
