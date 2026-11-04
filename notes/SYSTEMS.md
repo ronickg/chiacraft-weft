@@ -101,6 +101,7 @@ built, it gets its row below and its arrows above.
 | Block sounds | `mods/base/src/sounds.rs` (`GROUPS`), `assets/sounds/groups.txt` (which block sounds like what), `.sound_group` where blocks are made | the groups' files and pitches | | breaking, placing, steps and mining knocks (engine); `block sounds:` in the log names blocks with none |
 | Creature voices | `animals_core::voices` (`FAMILIES`, `VOICES`), `mods/animals/src/voices.rs`, `mods/base/src/mobs.rs` (`.sound`) | a family's files, volume and range; a species' pitch | species (a new one needs a `VOICES` row or the check fails) | hurt, death and idle calls (engine), herds capped per species (`AT_ONCE`); `sound files:` in the log names events missing files |
 | Calendar, seasons | `vitals::calendar` | `SEASON_DAYS`, `MIDSUMMER` | engine day time | the air, breeding seasons, day length (`.seasons(..)` on dimensions), the HUD clock |
+| Grass and leaves by the year | `vitals::foliage` (`strength`, `tint`; `rain_strength`, `rain_tint`), `mods/base/src/seasons.rs` | `FRESH`, `AUTUMN_*`, `WINTER` (leaves a dead grey-brown), `RAINY_GRASS`, `DRY_GRASS`, `RAIN_AMOUNT` | climates (`seasons` swing in warmth, `rain` by season), calendar, the biomes' base tints | grass and leaf tints through the year: by warmth where the year turns (Kassel), by rain where it doesn't (the llanos, the Pantanal) |
 | The air | `base_api::air_at`, `vitals::temperature::air` | `temperature.rs`, `air::feels` | climate, season, hour, height, sky light, rain here (`raining_at`), the wind (`World::air_at`, chilling the cold in the open), water, fires (`base_api::heat_of`) | player's body, animals' bodies, eggs |
 | Player's body | `mods/base/src/survival/` (a file per part: breath, food, temperature, camp, stamina, body, load, health) | `vitals` | air, stomach, stats, effects, armor, clothes, difficulty | HUD, health and speed modifiers, death |
 | Stomach, food | `vitals::food`, `vitals::stomach`, `base_api::eat` | `FOODS` | food items (`NUTRITION`, `FRESHNESS`) | max health and stamina, regen, warmth, food poisoning |
@@ -206,6 +207,7 @@ built, it gets its row below and its arrows above.
 | Check | Where | Catches |
 |---|---|---|
 | The climates are their real places | `vitals/tests/places.rs` | a biome's year mean, seasons or rainiest season drifting from its place's research |
+| The year's colors read right | `vitals/src/foliage.rs` | summer off the biome's own color, the tropics' warmth not turning them, autumn leaves not warm, winter leaves greener or brighter than autumn's, the llanos not green in the rains and straw in the dry season, a jump at the year's end |
 | Every plant grows somewhere | `vitals/tests/places.rs` | a plant whose warmth or water no biome gives |
 | Wild plants grow where they're put | `vitals/src/wild.rs` | a wild plant under a third of its best in every season of a biome it's found in, a gift that is no food, covers crowding out the grass |
 | Vegetation layers leave room | `vitals/src/layers.rs` | floor patches over half the soil under crowns, ferns over half the bare soil round trunks, shrubs with no kinds, a biome with no climate |
