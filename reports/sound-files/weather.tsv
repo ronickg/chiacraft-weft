@@ -1,0 +1,11 @@
+mods/base/assets/sounds/weather/rain1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/177479_unfa_slowly_raining_loop.mp3	loop:5	24	-22
+mods/base/assets/sounds/weather/rain_heavy1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/200272_jmbphilmes_rain_heavy_2_rural.mp3	loop:5	24	-20
+mods/base/assets/sounds/weather/rain_roof1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/242889_samesamesame_rain_from_indoors_loop.mp3	loop:4	24	-22
+mods/base/assets/sounds/weather/wind1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/697217_dhallcomposer_gentle_wind_open_plain.mp3	loop:3	24	-22
+mods/base/assets/sounds/weather/wind_trees1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/403051_teadrinker_wind_forest_08_strong.mp3	loop:10	24	-22
+mods/base/assets/sounds/weather/thunder_near1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/399656_bajko_thunder_blast.mp3	copy	10	-1
+mods/base/assets/sounds/weather/thunder_near2.ogg	~/Coding/chiacraft-archive/references/sound/freesound/446753_bluedelta_heavy_thunder_strike_no_rain.mp3	at:0.3	14	-1
+mods/base/assets/sounds/weather/thunder_far1.ogg	~/Coding/chiacraft-archive/references/sound/freesound/347562_mikala_oidua_distant_thunder_clap_gentle.mp3	copy	12	-3
+mods/base/assets/sounds/weather/thunder_far2.ogg	~/Coding/chiacraft-archive/references/sound/freesound/193170_netaj_thunder.mp3	copy	6	-3
+mods/base/assets/sounds/weather/thunder_far3.ogg	~/Coding/chiacraft-archive/references/sound/freesound/361401_richwise_distant_thunder.mp3	at:91.5	14	-3
+mods/base/assets/sounds/weather/thunder_far4.ogg	~/Coding/chiacraft-archive/references/sound/freesound/361401_richwise_distant_thunder.mp3	at:230	14	-3
