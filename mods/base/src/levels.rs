@@ -277,7 +277,7 @@ fn client(r: &mut Registry) {
                         });
                         ui.button(
                             "levels.base.plus",
-                            S::default().size(10.0, 9.0).tooltip(&format!("stat.base.{}.desc", stat.name())),
+                            S::default().size(10.0, 9.0).pad(0.5).tooltip(&format!("stat.base.{}.desc", stat.name())),
                             move |c| {
                                 c.client().send(&PLACE, &(i as u32));
                             },

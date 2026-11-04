@@ -161,8 +161,13 @@ fn title(ui: &mut Ui, with_level: bool) {
 }
 
 /// Where it sits in the tree of life, sex and stage, size, age, breeding, family, coat and what
-/// its kind does: the lines under the title.
+/// its kind does: the lines under the title. `short`: without what the animal screen shows
+/// elsewhere (sex and stage, the coat, what its kind does).
 fn facts(ui: &mut Ui) {
+    facts_of(ui, false);
+}
+
+fn facts_of(ui: &mut Ui, short: bool) {
     // Where it sits in the tree of life: "Canis familiaris · Mammalia › Carnivora › Canidae
     // (dog family) › Caninae".
     ui.text_bind(|c, t| {
@@ -179,11 +184,13 @@ fn facts(ui: &mut Ui) {
             ],
         );
     });
-    ui.text_bind(|c, t| {
-        let Some(a) = c.menu_component(&ANIMAL) else { return };
-        let owner = if tamed(c) { "screen.animals.tamed" } else { "screen.animals.wild" };
-        t.set("screen.animals.about", &[Arg::Key(sex_key(&a)), Arg::Key(&stage_key(&a)), Arg::Key(owner)]);
-    });
+    if !short {
+        ui.text_bind(|c, t| {
+            let Some(a) = c.menu_component(&ANIMAL) else { return };
+            let owner = if tamed(c) { "screen.animals.tamed" } else { "screen.animals.wild" };
+            t.set("screen.animals.about", &[Arg::Key(sex_key(&a)), Arg::Key(&stage_key(&a)), Arg::Key(owner)]);
+        });
+    }
     // How big it is ("Size: 21 cm at the shoulder"; a young one, what it grows to).
     ui.text_bind(|c, t| {
         let (Some(a), Some(g)) = (c.menu_component(&ANIMAL), c.menu_component(&crate::coats::GENOME)) else { return };
@@ -273,6 +280,9 @@ fn facts(ui: &mut Ui) {
             );
         }
     });
+    if short {
+        return;
+    }
     // Its coat, read from its genes ("Fawn sable with white").
     ui.text_bind(|c, t| {
         let Some(look) = c
@@ -302,7 +312,8 @@ fn shown(a: &Animal, i: usize) -> String {
 /// A window as base's (`mods/base/src/window.rs`, the UI redo): the menu's title on an orange tab
 /// on the frame, a close button at the top right, `body` in the panel.
 fn window(ui: &mut Ui, s: S, body: impl FnOnce(&mut Ui)) {
-    ui.column(S::col().stretch(), |ui| {
+    // The tabs stand on the frame: the column's gap of -2 tucks their bottom under its top line.
+    ui.column(S::col().stretch().gap(-2.0), |ui| {
         ui.row(S::row().gap(2.0), |ui| {
             ui.row(S::row().w(6.0), |_| {});
             ui.panel("tab_pressed", S::row().pad(2.0).h(13.0).center(), |ui| ui.title());
@@ -428,7 +439,7 @@ fn animal_screen(ui: &mut Ui) {
                     ],
                 );
             });
-            ui.column(S::col().gap(1.0).max_w(108.0), |ui| facts(ui));
+            ui.column(S::col().gap(1.0).max_w(108.0), |ui| facts_of(ui, true));
         });
         // Middle: the nine stats as bars, coloured by their wild points, with the points.
         ui.column(S::col().gap(2.0), |ui| {
@@ -441,8 +452,9 @@ fn animal_screen(ui: &mut Ui) {
                     });
                 });
             });
+            // The header in the rows' own columns: name, bar, wild, tamed, +.
             ui.row(S::row().gap(3.0), |ui| {
-                ui.spacer();
+                ui.row(S::row().w(34.0 + 3.0 + STAT_BAR.0), |_| {});
                 ui.row(S::row().w(14.0).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.wild_points", &[]));
                 ui.row(S::row().w(18.0).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.tamed_points", &[]));
                 ui.row(S::row().w(10.0), |_| {});
@@ -483,7 +495,7 @@ fn animal_screen(ui: &mut Ui) {
                         });
                     });
                     if i != species::TORPOR {
-                        ui.button("screen.animals.plus", S::default().size(10.0, 9.0).tooltip("screen.animals.place"), move |c| {
+                        ui.button("screen.animals.plus", S::default().size(10.0, 9.0).pad(0.5).tooltip("screen.animals.place"), move |c| {
                             if let Some(id) = c.menu_owner() {
                                 c.client().send(&PLACE, &[id, i as u64]);
                             }
@@ -902,9 +914,11 @@ fn being_tamed(c: &ClientView) -> Option<(u64, crate::taming::Taming, Option<cra
             if d2 > TAMING_RANGE * TAMING_RANGE {
                 return None;
             }
-            let g = c.component_of(id, &TAMING)?;
+            // (a knocked-out one may have no taming yet: it starts at its first feeding)
             let k = c.component_of(id, &KNOCKOUT).filter(|k| k.out > 0);
-            (g.feedings > 0 && g.progress < 1.0 || k.is_some()).then_some((d2, id, g, k))
+            let g = c.component_of(id, &TAMING);
+            let taming = g.is_some_and(|g| g.feedings > 0 && g.progress < 1.0);
+            (taming || k.is_some()).then(|| (d2, id, g.unwrap_or(crate::taming::FRESH), k))
         })
         .min_by(|a, b| a.0.total_cmp(&b.0))
         .map(|(_, id, g, k)| (id, g, k))

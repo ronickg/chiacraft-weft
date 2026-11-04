@@ -14,7 +14,8 @@ pub type Tab = (&'static str, fn(&ClientView));
 
 /// The title tab, `tabs` beside it, the close button, then `body` in the `panel` with style `s`.
 pub fn window(ui: &mut Ui, s: S, tabs: &[Tab], body: impl FnOnce(&mut Ui)) {
-    ui.column(S::col().stretch(), |ui| {
+    // The tabs stand on the frame: the column's gap of -2 tucks their bottom under its top line.
+    ui.column(S::col().stretch().gap(-2.0), |ui| {
         ui.row(S::row().gap(2.0).pad(0.0), |ui| {
             ui.row(S::row().w(6.0), |_| {});
             ui.panel("tab_pressed", S::row().pad(TAB_PAD).h(TAB_H).center(), |ui| ui.title());
