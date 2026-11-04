@@ -388,14 +388,22 @@ pub fn book(ui: &mut Ui, station: Station) {
         ui.row(S::row().gap(1.0), |ui| {
             for (i, t) in TABS.iter().enumerate() {
                 let key = if t.is_empty() { "crafting.book.all".to_string() } else { format!("tab.{}", t.replace(':', ".")) };
-                // UI redo's "tab" class replaces "button" here once its branch is in dev.
-                ui.button(&key, S::default().h(12.0).pad(2.0).selected(i == tab), move |c| {
-                    edit(|b| {
-                        b.tab = i;
-                        b.page = 0;
-                    });
-                    c.client().rebuild_screen();
-                });
+                // Categories (UI redo's class): transparent at rest, a gold outline when open.
+                ui.button(
+                    &key,
+                    S::default()
+                        .h(12.0)
+                        .pad(2.0)
+                        .class("category")
+                        .selected(i == tab),
+                    move |c| {
+                        edit(|b| {
+                            b.tab = i;
+                            b.page = 0;
+                        });
+                        c.client().rebuild_screen();
+                    },
+                );
             }
         });
         // Slots touch: their dark groove is the gap (UI guide).

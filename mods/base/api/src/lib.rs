@@ -7,6 +7,9 @@
 
 use weft_sdk::*;
 
+pub mod grow;
+pub mod trees;
+
 value! {
     /// Fired when a furnace finishes one item.
     pub struct Smelted { pub furnace: u64, pub input: u32, pub output: ItemStack }
@@ -330,7 +333,7 @@ const HEAT_STATES: usize = 1 << 20;
 fn heat_by_name(state: u32) -> f32 {
     // The state's name without its properties (`base:lava[level=0]`).
     match block_name(state).split('[').next().unwrap_or("") {
-        "base:lava" => 1.0,
+        "base:lava" | "base:campfire" => 1.0,
         "base:furnace" if state_prop(state, "lit") == Some("true") => 0.7,
         "base:torch" | "base:wall_torch" => 0.25,
         _ => 0.0,
@@ -548,6 +551,29 @@ fn with_body(w: &World, player: u64, f: impl FnOnce(&mut Vitals, f32)) {
     let resist = vitals::stats::fortitude_resists(v.stats()[vitals::stats::Stat::Fortitude.index()]);
     f(v, resist);
 }
+
+/// Things a player has done that other mods know of and the base game's advancements read
+/// (`advancements.rs`, the "Surviving" group): a bit each (`milestones`), kept through death.
+pub static MILESTONES: Component<u32> = Component::named("base:milestones");
+pub mod milestones {
+    /// Tamed an animal (the animals mod).
+    pub const TAME: u32 = 1;
+}
+
+/// Marks a milestone (`milestones::TAME`...) for `player`: the advancement for it comes within a
+/// second.
+pub fn milestone(w: &World, player: u64, m: u32) {
+    if let Some(done) = w.component_mut(player, &MILESTONES) {
+        *done |= m;
+    }
+}
+
+value! {
+    /// Where a player's tombstone was put when they last died (`set` 0: none yet), for the hint
+    /// after respawning.
+    pub struct Grave { pub x: i32, pub y: i32, pub z: i32, pub set: u32 }
+}
+pub static GRAVE: Component<Grave> = Component::named("base:grave");
 
 /// Gives `player` XP for what they did (`vitals::levels::xp`): other mods call it for theirs
 /// (taming, raising young, hatching eggs). Rested raises it; nothing in creative.

@@ -86,8 +86,11 @@ pub struct Body {
     pub fortitude: f32,
     /// Fat's fullness in the stomach, 0 to 1: up to 4 °C warmer in the cold.
     pub fat: f32,
-    /// Degrees a meal warms (cools) one (`Stomach::meal_warmth`).
+    /// Degrees the warmest meal warms one (`Stomach::meal_warming`), and the coolest cools one
+    /// (`meal_cooling`, 0 or less): cooling only widens the hot side, it doesn't chill one in the
+    /// cold.
     pub meal: f32,
+    pub meal_cool: f32,
     /// Wet: insulation is mostly lost.
     pub wet: bool,
 }
@@ -104,7 +107,7 @@ impl Body {
         let wide = stats::fortitude_degrees(self.fortitude);
         let cold = if self.wet { self.wet_cold_insulation.min(self.cold_insulation) } else { self.cold_insulation };
         let lo = self.comfort.0 - wide - cold - 4.0 * self.fat.clamp(0.0, 1.0) - self.meal + if self.wet { WET_CHILL } else { 0.0 };
-        let hi = self.comfort.1 + wide + self.heat_insulation - self.meal;
+        let hi = self.comfort.1 + wide + self.heat_insulation - self.meal - self.meal_cool.min(0.0);
         (lo, hi)
     }
 
@@ -154,13 +157,12 @@ pub fn feeling(core: f32) -> Feeling {
     }
 }
 
-/// Cold and heat insulation of a full set of armor of that material (proposed): leather warm and a
-/// little hot (heat -3: the sign was wrong, the content plan's research), metal cold to wear in
-/// snow and hot in the sun. A piece gives its share (`PIECE_SHARE`). Fur,
+/// Cold and heat insulation of a full set of armor of that material (proposed): leather is hide
+/// (`clothing::armor_cloth`), metal cold to wear in snow and hot in the sun. A piece gives its share (`PIECE_SHARE`). Fur,
 /// wool, hide and linen are clothes (`clothing`), worn under armor.
 pub fn set_insulation(material: &str) -> (f32, f32) {
     match material {
-        "leather" => (8.0, -3.0),
+        "leather" => crate::clothing::armor_cloth(material).map_or((0.0, 0.0), |m| (m.cold(), m.heat)),
         "iron" | "chainmail" => (4.0, -4.0),
         "gold" => (3.0, -5.0),
         "diamond" => (5.0, -2.0),

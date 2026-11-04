@@ -5,7 +5,9 @@ texture) with the blocky-model skill. No concept sheet: its color areas are rule
 
     ../dog/chihuahua/.venv/bin/python cat.py      # writes out/spec.json, out/texture.png
 
-Units are Blockbench's (1 texel each, 64 a block), y up, the cat faces +z.
+Units are its own (exported at 0.174 model pixels a unit, `build.SCALE`: 92 a block), y up, the
+cat faces +z. Painted at the house density, 32 texels a block (`TX` texels a unit), as the blocks
+and items are.
 
 Proportions from research (README.md): a house cat is about 24 cm at the shoulder, 46 cm head and
 body, 30 cm tail, the head about a quarter of the body. Here the back is 22 units up, the body 30
@@ -25,9 +27,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit, swing  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import texels  # noqa: E402
+
+TX = texels(0.174)  # texels a unit: the house's 32 a block at the cat's export scale (build.SCALE)
 
 OUT = os.environ.get("CAT_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -70,9 +75,18 @@ EYES.update({
                               "OBPPsO",
                               ".ObbO."], colors={"O": _O, "P": _P, "H": _H, "B": (84, 134, 196), "b": (130, 176, 220),
                                                  "s": (210, 226, 240)}, halo="round"),
+    # At 32 a block the face is 6 texels by 5: an eye is 2 by 2.
+    "cat_px": dict(pattern=["HP", "GP"], colors={"P": _P, "H": _H, "G": (112, 168, 72)}, halo="none", iris="G"),
+    "cat_px_slit": dict(pattern=["GP", "gP"], colors={"P": _P, "G": (112, 168, 72), "g": (170, 198, 92)}, halo="none",
+                        iris="Gg"),
+    "cat_px_in": dict(pattern=["GP", "GP"], colors={"P": _P, "G": (112, 168, 72)}, halo="none", iris="G", mirror=True),
+    "cat_px_lit": dict(pattern=["gP", "GP"], colors={"P": _P, "G": (112, 168, 72), "g": (170, 198, 92)}, halo="none",
+                       iris="Gg", mirror=True),
+    "cat_px_glow": dict(pattern=["HP", "gG"], colors={"P": _P, "H": _H, "G": (112, 168, 72), "g": (170, 198, 92)},
+                        halo="none", iris="Gg"),
 })
-EYE_STYLE = os.environ.get("CAT_EYES", "cat_green")
-EYE_Y, EYE_X = 29.5, 4.0  # eye centers on the face
+EYE_STYLE = os.environ.get("CAT_EYES", "cat_px_lit")
+EYE_Y, EYE_X = 29.5, 5.0  # eye centers on the face: at 6 texels across, 2-texel eyes at its edges, 2 between
 LID_Z = 24.4  # the eyelids' hinge line, in front of the face (z = 24)
 
 # ------------------------------------------------------------------ the model
@@ -97,15 +111,28 @@ def el(name, bone, lo, hi, quad=None, rot=None, origin=None, cut=None):
                 origin=[float(v) for v in origin] if origin else None, cut=cut)
 
 
+def skull_grid():
+    """The skull front's texels: (width, height) and the size of one texel in units (u, v)."""
+    sx, sy = SKULL[1][0] - SKULL[0][0], SKULL[1][1] - SKULL[0][1]
+    w, h = max(1, round(TX * sx)), max(1, round(TX * sy))
+    return w, h, sx / w, sy / h
+
+
+def eye_center(cx):
+    """The eye centered at x = cx on the skull's front, in its texels."""
+    w, h, su, sv = skull_grid()
+    return (cx - SKULL[0][0]) / su, (SKULL[1][1] - EYE_Y) / sv
+
+
 def eye_box(cx):
     """(x0, x1, top, bottom) of the eye centered at x = cx, rounded exactly as `stamp_eyes` places
     it on the skull's front, so the eyelid covers it to the texel."""
     pat = EYES[EYE_STYLE]["pattern"]
     ph, pw = len(pat), len(pat[0])
-    u0 = int(round(cx - SKULL[0][0] - pw / 2))
-    v0 = int(round(SKULL[1][1] - EYE_Y - ph / 2))
-    x0, top = SKULL[0][0] + u0, SKULL[1][1] - v0
-    return x0, x0 + pw, top, top - ph
+    w, h, su, sv = skull_grid()
+    u0, v0 = eye_corner(*eye_center(cx), pat, w)
+    x0, top = SKULL[0][0] + u0 * su, SKULL[1][1] - v0 * sv
+    return x0, x0 + pw * su, top, top - ph * sv
 
 
 def bones():
@@ -183,7 +210,10 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, int(round(abs(size @ du))), int(round(abs(size @ dv))), n
+    w, h = int(round(TX * abs(size @ du))), int(round(TX * abs(size @ dv)))
+    if abs(size @ du) > 0 and abs(size @ dv) > 0:
+        w, h = max(1, w), max(1, h)
+    return np.array(corner, float), du, dv, w, h, n
 
 
 def rotm(rot):
@@ -196,8 +226,14 @@ def rotm(rot):
     return Z @ Y @ X
 
 
+WAVE = 1.0 if TX >= 0.75 else 0.0  # stripes wave a little; at 32 a block a wave only staggers them a texel a row
+
+
 def stripes(t, period=5.5, width=0.3):
-    return ((t / period) % 1.0) < width
+    """Bands across `t` (units): at 32 a block a texel is ~2.9 units, so a band is at least one
+    texel and two texels of coat lie between."""
+    period = max(period, 3 / TX)
+    return ((t / period) % 1.0) < max(width, 1 / (TX * period))
 
 
 def area(e, face, p, uu, vv):
@@ -208,9 +244,9 @@ def area(e, face, p, uu, vv):
     side = face in ("east", "west")
     if name in ("hips", "chest", "neck"):
         if side:  # stripes down the flanks, waving a little
-            a = np.where(stripes(z + 1.6 * np.sin(y * 0.5), 5.5, 0.36) & (y > 14), STRIPE, a)
+            a = np.where(stripes(z + WAVE * 1.6 * np.sin(y * 0.5), 5.5, 0.36) & (y > 14), STRIPE, a)
         if face == "up":  # and across the back, meeting the flank stripes
-            a = np.where(stripes(z + 1.2 * np.sin(x * 0.6), 5.5, 0.36), STRIPE, a)
+            a = np.where(stripes(z + WAVE * 1.2 * np.sin(x * 0.6), 5.5, 0.36), STRIPE, a)
         a = np.where(y < 13.5, WHITE, a)  # the belly
         if face == "down":
             a[:] = WHITE
@@ -219,13 +255,9 @@ def area(e, face, p, uu, vv):
     elif name in ("skull",):
         if face == "south":
             a = np.where((y < 27) & (np.abs(x) < 4.5), WHITE, a)  # around the muzzle
-            M = ["S...S", "SS.SS", "S.S.S"]  # the tabby's M on the forehead
-            for r, row in enumerate(M):
-                for c, ch in enumerate(row):
-                    if ch == "S":
-                        a[r, 5 + c + 1] = STRIPE
+            a = np.where((y > 31) & (np.abs(x) < 3), STRIPE, a)  # the tabby's M, a dark mark on the forehead
         if side:  # two cheek stripes from the eye back
-            a = np.where(((np.abs(y - 28.5) < 0.6) | (np.abs(y - 26.5) < 0.6)) & (z > 17), STRIPE, a)
+            a = np.where((np.abs(y - 27.8) < 1.3) & (z > 17), STRIPE, a)  # a cheek stripe from the eye back
             a = np.where((y < 24) & (z > 16), WHITE, a)
         if face == "up":
             a = np.where(stripes(z + 1.5, 4.0, 0.3) & (np.abs(x) < 4), STRIPE, a)
@@ -321,6 +353,9 @@ def paint_face(e, face, boxes):
     if w == 0 or h == 0:
         return None
     uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
+    size = np.array(e["hi"]) - np.array(e["lo"])
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    uu, vv = uu * su, vv * sv  # texel centers, in units across the face
     p = corner + uu[..., None] * du + vv[..., None] * dv
     R = rotm(e["rot"])
     if e["rot"]:
@@ -345,21 +380,21 @@ def paint_face(e, face, boxes):
     if e["name"] == "skull" and face == "south":
         u0 = SKULL[0][0]
         top = SKULL[1][1]
-        stamp_eyes(img, [(cx - u0, top - EYE_Y) for cx in (-EYE_X, EYE_X)], EYE_STYLE)
+        stamp_eyes(img, [eye_center(cx) for cx in (-EYE_X, EYE_X)], EYE_STYLE)
     if e["name"].startswith("eyelid"):
         img[-1, :, :3] = EYE_DARK
         img[-2, :, :3] = (img[-2, :, :3] * 0.85).astype(np.uint8)
-    if e["name"] == "muzzle" and face == "south":  # the mouth under the nose, whisker dots
+    if e["name"] == "muzzle" and face == "south" and h >= 4:  # the mouth under the nose, whisker dots (too small at 32)
         for r, c in ((2, 3), (3, 2), (3, 4)):
             img[r, c, :3] = (120, 70, 74)
         for r, c in ((1, 1), (2, 0), (1, 5), (2, 6)):
             img[r, c, :3] = (img[r, c, :3] * 0.8).astype(np.uint8)
     if e["name"] == "jaw" and face == "up":
         img[..., :3] = np.array(BASE[PINK]) * 0.7
-    if e["name"].endswith("_paw") and face == "south":  # three toes
+    if e["name"].endswith("_paw") and face == "south" and w >= 5:  # three toes (a paw is 2 texels at 32)
         for c in (2, 4):
             img[:, c, :3] = (img[:, c, :3] * 0.6 + np.array([150, 110, 100]) * 0.4).astype(np.uint8)
-    if e["name"].endswith("_paw") and face == "down":
+    if e["name"].endswith("_paw") and face == "down" and h >= 5:
         img[1, [0, 1, 3, 5, 6], :3] = (210, 130, 136)
         img[3:5, 2:5, :3] = (210, 130, 136)
     if LAYERS["rec"] is not None:

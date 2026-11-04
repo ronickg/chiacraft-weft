@@ -578,7 +578,12 @@ are rows.
      `Ui::button_with` and `InventoryGroup::slot`.
    - Not yet: filling the grid itself from the book (Minecraft's ghost placement), and the
      queue.
-2. **Discovery:** known recipes per player, "?" hints, R and U showing only what you know.
+2. **Discovery:** known recipes per player, saved.
+   - A recipe unlocks once you've touched all its ingredients, as Valheim does. Minecraft's book,
+     which unlocks on the first, floods (the Researcher, 11-04).
+   - Near misses show as "2 of 3", with the missing ingredient as "?".
+   - R and U show only what you know.
+   - Slice 1's book shows every recipe until then.
 3. **Stations, add-ons and the queue:** the workbench levels; the queue with sub-parts and
    refunds; cold hands and the warm room.
 4. **Parts, core** (4A):

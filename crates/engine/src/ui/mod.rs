@@ -175,6 +175,17 @@ pub struct Rect {
 }
 
 impl Rect {
+    /// Edges rounded to the nearest multiple of `unit` (sizes follow from the rounded edges, so
+    /// neighbours stay touching). A unit of 0 leaves it as it is.
+    pub fn snapped(&self, unit: f32) -> Rect {
+        if unit <= 0.0 {
+            return *self;
+        }
+        let r = |v: f32| (v / unit).round() * unit;
+        let (x0, y0, x1, y1) = (r(self.x), r(self.y), r(self.x + self.w), r(self.y + self.h));
+        Rect { x: x0, y: y0, w: (x1 - x0).max(0.0), h: (y1 - y0).max(0.0) }
+    }
+
     pub fn intersect(&self, o: Rect) -> Rect {
         let (x0, y0) = (self.x.max(o.x), self.y.max(o.y));
         let (x1, y1) = ((self.x + self.w).min(o.x + o.w), (self.y + self.h).min(o.y + o.h));
@@ -663,6 +674,10 @@ impl Ui {
     }
 
     fn arrange(&mut self, id: NodeId, rect: Rect, font: &font::Font) {
+        // Every edge on the UI's pixel grid (a font pixel: half a GUI pixel at even GUI scales,
+        // always whole screen pixels), so frames, items and text inside them line up exactly:
+        // centring would otherwise leave half pixels.
+        let rect = rect.snapped(self.text_unit);
         self.nodes[id].rect = rect;
         let style = self.nodes[id].style;
         let inner = Rect {

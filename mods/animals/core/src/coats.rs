@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 37] = [
+const FILES: [(&str, &str); 41] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -296,6 +296,10 @@ const FILES: [(&str, &str); 37] = [
     ("jaguar", include_str!("../../genetics/jaguar.json")),
     ("lungfish", include_str!("../../genetics/lungfish.json")),
     ("lycoptera", include_str!("../../genetics/lycoptera.json")),
+    ("psittacosaurus", include_str!("../../genetics/psittacosaurus.json")),
+    ("gastonia", include_str!("../../genetics/gastonia.json")),
+    ("pinacosaurus", include_str!("../../genetics/pinacosaurus.json")),
+    ("iguanodont", include_str!("../../genetics/iguanodont.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1467,6 +1471,54 @@ fn cretaceous_fish(r: &Read, lungfish: bool) -> Look {
     }
 }
 
+/// Psittacosaurus: dark brown above to a warmer, redder brown, pale below (countershaded, as its
+/// skin shows: Vinther et al. 2016).
+fn psittacosaurus(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.62 {
+            "Red-brown".into()
+        } else if ru < 0.38 {
+            "Dark brown".into()
+        } else {
+            "Brown".into()
+        },
+        base: mix([118.0, 88.0, 62.0], [150.0, 96.0, 58.0], ru),
+        under: [214.0, 194.0, 156.0],
+        ..Look::default()
+    }
+}
+
+/// The ankylosaurs: Gastonia olive-brown to dun, Pinacosaurus a paler sand to ochre, both paler
+/// below (no record of their colors: est.).
+fn ankylosaur(r: &Read, gobi: bool) -> Look {
+    let ru = r.qv("Ru");
+    let (dull, warm) = if gobi { ([176.0, 154.0, 110.0], [180.0, 132.0, 82.0]) } else { ([116.0, 104.0, 70.0], [140.0, 112.0, 72.0]) };
+    Look {
+        name: match (gobi, ru > 0.6) {
+            (false, false) => "Olive-brown".into(),
+            (false, true) => "Dun".into(),
+            (true, false) => "Sandy".into(),
+            (true, true) => "Ochre".into(),
+        },
+        base: mix(dull, warm, ru),
+        under: [198.0, 184.0, 146.0],
+        ..Look::default()
+    }
+}
+
+/// The iguanodont: olive-dun to a warmer buff, darker along the top, pale below (no record of its
+/// colors: est.).
+fn iguanodont(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.6 { "Buff".into() } else { "Olive-dun".into() },
+        base: mix([150.0, 142.0, 104.0], [168.0, 140.0, 96.0], ru),
+        under: [214.0, 202.0, 166.0],
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1645,6 +1697,10 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "jaguar" => jaguar(&r),
         "lungfish" => cretaceous_fish(&r, true),
         "lycoptera" => cretaceous_fish(&r, false),
+        "psittacosaurus" => psittacosaurus(&r),
+        "gastonia" => ankylosaur(&r, false),
+        "pinacosaurus" => ankylosaur(&r, true),
+        "iguanodont" => iguanodont(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1911,10 +1967,12 @@ fn pattern(kind: &str, p: [f32; 3], u: f32, s: i32, m: &Marks) -> f32 {
         "streaks" => band((y + 1.5 * noise3(z * 0.08, x * 0.2, 0.0, s)) / 4.5, w(0.3)),
         "rosettes" => {
             let (cx, cy, cz) = ((x / 4.0).floor(), (y / 4.0).floor(), (z / 4.0).floor());
-            if hash3(cx as i32, cy as i32, cz as i32, s) > 0.55 + 0.6 * d {
+            if hash3(cx as i32, cy as i32, cz as i32, s) > 0.7 + 0.6 * d {
                 return 0.0;
             }
-            let (dx, dz, dy) = (x - (cx + 0.5) * 4.0, z - (cz + 0.5) * 4.0, (y - (cy + 0.5) * 4.0) * 0.6);
+            // A ring a little longer along the body than tall, inside its cell: squeezing the height
+            // (as it was) drew rings taller than the cell, cut by it into vertical streaks.
+            let (dx, dz, dy) = (x - (cx + 0.5) * 4.0, (z - (cz + 0.5) * 4.0) * 0.85, y - (cy + 0.5) * 4.0);
             let dist = (dx * dx + dy * dy + dz * dz).sqrt();
             smooth(dist, 0.6, 0.8) * (1.0 - smooth(dist, 1.5, 1.7))
         }
@@ -2226,7 +2284,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 26] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 29] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2252,7 +2310,10 @@ const MODEL_LAYERS: [ModelLayers; 26] = model_layers!(
     "gull",
     "caiman",
     "wolf",
-    "jaguar"
+    "jaguar",
+    "psittacosaurus",
+    "ankylosaur",
+    "iguanodont"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {

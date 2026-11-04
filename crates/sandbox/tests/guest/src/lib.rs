@@ -12,6 +12,9 @@ value! {
 static COUNTER: Component<Counter> = Component::named("counter");
 static CLICK: Sound = Sound::named("base:ui.click");
 static FLAME: Particle = Particle::named("base:flame");
+static BELL: Block = Block::named("probe:bell");
+static WAND: Item = Item::named("probe:wand");
+static PINGS: Channel<String> = Channel::named("pings");
 
 thread_local! {
     /// Lost when the mod starts over: shows a strike dropped its memory.
@@ -114,6 +117,29 @@ fn init(r: &mut Registry) {
     r.world_tick(|w| {
         if w.time() % 20 == 0 {
             info!("tick {}", w.time());
+        }
+    });
+    // 1.2: the package's own block and item, and a channel.
+    r.block(&BELL)
+        .on_use(|u| {
+            u.world()
+                .tell(u.player(), "probe.rang", &[Arg::Int(u.pos()[1] as i64)]);
+            u.world().schedule(u.pos(), 0);
+            u.pos()[1] >= 0
+        })
+        .on_scheduled(|e| {
+            e.world()
+                .tell(7, "probe.scheduled", &[Arg::Int(e.pos()[1] as i64)])
+        });
+    r.item(&WAND).on_use(|u| {
+        let mut s = u.stack();
+        s.count -= 1;
+        u.set_stack(s);
+        true
+    });
+    r.packet(&PINGS, |p, text| {
+        for _ in 0..40 {
+            p.reply(&PINGS, &format!("pong {text}"));
         }
     });
 }

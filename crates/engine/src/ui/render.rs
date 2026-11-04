@@ -906,17 +906,22 @@ impl UiRenderer {
             self.rect(Rect { w: 13.0 * scale * f, h: scale, ..bar }, ((255 - g) << 24) | (g << 16) | 0xFF);
         }
         if stack.count > 1 {
-            // A smooth font's count a size up, to read at a glance; a bitmap's stays whole pixels.
+            // A smooth font's count a size up, to read at a glance; a pixel font's stays whole.
             let px = scale * text_unit * if self.font.smooth { 1.3 } else { 1.0 };
             let layout = super::text::layout(&super::text::plain(&stack.count.to_string()), &self.font, None);
             let mut none = Vec::new();
+            // In the icon's bottom right, clear of the slot's frame: the digits' ink two font
+            // pixels inside the icon's right and bottom edges, their shadow one. The pen ends one
+            // pixel inside (the last glyph's own spacing is the other); the ink stands on the row
+            // above the baseline, font pixel 14 of the line.
+            let (ix, iy) = (r.x + (r.w - i) / 2.0, r.y + (r.h - i) / 2.0);
             self.glyph_run(
                 &layout.items,
-                x + s - layout.width * px + scale,
-                y + s - 16.0 * px + scale,
+                (ix + i - layout.width * px - px).round(),
+                (iy + i - 15.0 * px).round(),
                 px,
-                0xFFFFFFFF,
-                Some(0x3F3F3FFF),
+                0xF4EAD8FF,
+                Some(0x28180CFF),
                 &mut none,
             );
         }
@@ -927,7 +932,17 @@ impl UiRenderer {
         let px = scale * text_unit;
         let layout = super::text::layout(&super::text::plain(&n.to_string()), &self.font, None);
         let mut none = Vec::new();
-        self.glyph_run(&layout.items, r.x + 2.0 * scale, r.y + scale, px, 0xF5E4BCD0, Some(0x2A1A0EFF), &mut none);
+        // The capitals' top three font pixels inside the slot's corner, and three from its left.
+        let top = 14.0 - self.font.caps;
+        self.glyph_run(
+            &layout.items,
+            (r.x + 3.0 * px).round(),
+            (r.y + 3.0 * px - top * px).round(),
+            px,
+            0xE4DACFE0,
+            Some(0x28180CFF),
+            &mut none,
+        );
     }
 
     /// The hovered node's tooltip next to the mouse (physical pixels), drawn every frame on top:

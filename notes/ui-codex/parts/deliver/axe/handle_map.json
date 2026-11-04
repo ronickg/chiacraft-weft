@@ -1,0 +1,8 @@
+{
+ "kind": "base:axe",
+ "layer": "haft",
+ "regions": [
+  "haft"
+ ],
+ "steps": 8
+}

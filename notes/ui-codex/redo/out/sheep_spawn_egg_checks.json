@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a spawn egg: an upright oval egg, pale cream-white shell with soft pink spots, a soft highlight on the upper left, drawn small: its longest side only about 22 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": true,
+ "tries": [
+  {
+   "grid": 0.293,
+   "outline": 0.67,
+   "red_line": 0.0,
+   "fill": 0.29,
+   "passed": true
+  }
+ ]
+}

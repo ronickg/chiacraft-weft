@@ -26,6 +26,7 @@ use weft_sdk::*;
 declare_mod!(deps: ["base"], init: init);
 
 mod animal;
+mod ankylosaur;
 mod birds;
 mod breath;
 mod breeding;
@@ -51,6 +52,7 @@ mod gull;
 mod habitats;
 mod hare;
 mod hunt;
+mod iguanodont;
 mod jaguar;
 mod knockout;
 mod kryptobaatar;
@@ -59,9 +61,11 @@ mod meat;
 mod mouse;
 mod owl;
 mod protoceratops;
+mod psittacosaurus;
 mod raptor;
 mod raven;
 mod reindeer;
+mod rest;
 mod riding;
 mod scars;
 mod screen;
@@ -123,6 +127,8 @@ fn data_dir() -> String {
 
 fn init(r: &mut Registry) {
     dog::init(r);
+    // The full creatures' resting state, before they attach it.
+    rest::init(r);
     cat::init(r);
     capybara::init(r);
     raptor::init(r);
@@ -137,6 +143,9 @@ fn init(r: &mut Registry) {
     fox::init(r);
     raven::init(r);
     protoceratops::init(r);
+    psittacosaurus::init(r);
+    ankylosaur::init(r);
+    iguanodont::init(r);
     kryptobaatar::init(r);
     lizard::init(r);
     reindeer::init(r);
@@ -195,27 +204,21 @@ fn init(r: &mut Registry) {
         .fullbright();
 }
 
-/// Knocked out: lying down (`index` into `species::SPECIES`; the raptors, the wyvern and the jaguar).
-fn sleep(w: &World, id: u64, index: usize) {
-    match index {
-        3 | 5 => raptor::sleep(w, id),
-        4 => utahraptor::sleep(w, id),
-        6 => wyvern::sleep(w, id),
-        34 => jaguar::sleep(w, id),
-        _ => {}
-    }
+/// The squared distance between two points (blocks²).
+pub(crate) fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
+    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)
+}
+
+/// Knocked out: lying down (`index` into `species::SPECIES`; the raptors, the wyvern and the jaguar
+/// as they rest, `rest.rs`).
+fn sleep(w: &World, id: u64, _index: usize) {
+    rest::sleep(w, id);
 }
 
 /// Up from resting, to follow or fight (`index` into `species::SPECIES`).
 fn wake(w: &World, id: u64, index: usize) {
     match index {
-        1 => cat::wake(w, id),
-        2 => capybara::wake(w, id),
-        3 | 5 => raptor::wake(w, id),
-        4 => utahraptor::wake(w, id),
-        6 => wyvern::wake(w, id),
-        33 => wolf::wake(w, id),
-        34 => jaguar::wake(w, id),
+        1..=6 | 33 | 34 => rest::wake(w, id),
         7..=12 | 15 | 16 | 18..=22 | 31 | 32 => wild::wake(w, id),
         _ => {}
     }

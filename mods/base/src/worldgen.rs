@@ -26,18 +26,11 @@ pub static GRASS_COVER: Component<f32> = Component::named("grass");
 pub static TREE_KINDS: Component<BlockList> = Component::named("tree_kinds");
 /// Flowers a biome grows, picked evenly (`"base:dandelion base:rose"` where unset).
 pub static FLOWERS: Component<BlockList> = Component::named("flowers");
-/// On a log, the tree it grows into: `round <leaves>` (like oaks, 4-6 high) or `cone <leaves>`
-/// (like spruces, 6-9 high).
-pub static TREE_LEAVES: Component<BlockRef> = Component::named("tree_leaves");
-/// Logs with this tag grow into cones (spruces), the others round (oaks, birches).
-pub static CONE_TREE: Tag = Tag::named("cone_tree");
-/// A tall bare trunk under one wide, flat crown (the acacia).
-pub static FLAT_TREE: Tag = Tag::named("flat_tree");
-/// A taller bare trunk under a crown of fronds that droop at their tips (palms, tree ferns).
-pub static PALM_TREE: Tag = Tag::named("palm_tree");
+// The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
+pub use base_api::trees::{TREE_LEAVES, grow_tree};
+use base_api::trees::{tree_at, tree_blocks};
 static FROZEN: Tag = Tag::named("frozen");
 static DRY: Tag = Tag::named("dry");
-static FOREST_TAG: Tag = Tag::named("forest");
 
 pub static PLAINS: Biome = Biome::named("plains");
 pub static FOREST: Biome = Biome::named("forest");
@@ -253,118 +246,6 @@ pub fn register(r: &mut Registry) {
 
 static TREE_SITES: Scatter = Scatter::named("trees");
 
-struct TreeAt {
-    x: i32,
-    y: i32,
-    z: i32,
-    log: u32,
-    leaves: u32,
-    cone: bool,
-    flat: bool,
-    palm: bool,
-    height: i32,
-}
-
-/// A tree growing from `log` (its `tree` component), `h` deciding the height.
-fn tree_at(log: u32, x: i32, y: i32, z: i32, h: u64) -> Option<TreeAt> {
-    let leaves = TREE_LEAVES.on_block(log)?.0;
-    let cone = CONE_TREE.on_block(log);
-    let flat = FLAT_TREE.on_block(log);
-    let palm = PALM_TREE.on_block(log);
-    let height = if cone {
-        6 + (h % 4) as i32
-    } else if palm {
-        6 + (h % 3) as i32
-    } else if flat {
-        5 + (h % 2) as i32
-    } else {
-        4 + (h % 3) as i32
-    };
-    Some(TreeAt { x, y, z, log, leaves, cone, flat, palm, height })
-}
-
-/// Calls `put(x, y, z, state, force)` for every block of the tree.
-fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
-    let (log, leaves) = (t.log, t.leaves);
-    let top = t.y + t.height;
-    match t.cone {
-        _ if t.palm => {
-            // A tuft on top, fronds out two blocks each way, their tips a block lower.
-            put(t.x, top, t.z, leaves, false);
-            for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-                for k in 1..=2 {
-                    put(t.x + dx * k, top - 1, t.z + dz * k, leaves, false);
-                }
-                put(t.x + dx * 3, top - 2, t.z + dz * 3, leaves, false);
-            }
-            for (dx, dz) in [(1, 1), (1, -1), (-1, 1), (-1, -1)] {
-                put(t.x + dx, top - 1, t.z + dz, leaves, false);
-                put(t.x + dx * 2, top - 2, t.z + dz * 2, leaves, false);
-            }
-        }
-        _ if t.flat => {
-            // One wide flat layer on the trunk's top, a small one over its middle.
-            for (y, r2) in [(top, 10), (top + 1, 2)] {
-                for dz in -3i32..=3 {
-                    for dx in -3i32..=3 {
-                        let d = dx * dx + dz * dz;
-                        if d <= r2 && (d < r2 || hash(1, (t.x + dx) as i64, y as i64, (t.z + dz) as i64) & 1 == 0) {
-                            put(t.x + dx, y, t.z + dz, leaves, false);
-                        }
-                    }
-                }
-            }
-        }
-        true => {
-            for dy in 2..=t.height + 1 {
-                let y = t.y + dy;
-                let r = if dy == t.height + 1 { 0 } else { 1 + ((t.height + 1 - dy) % 3).min(2) };
-                for dz in -r..=r {
-                    for dx in -r..=r {
-                        if dx * dx + dz * dz <= r * r + 1 {
-                            put(t.x + dx, y, t.z + dz, leaves, false);
-                        }
-                    }
-                }
-            }
-        }
-        false => {
-            for y in top - 3..=top {
-                let r: i32 = if y >= top - 1 { 1 } else { 2 };
-                for dz in -r..=r {
-                    for dx in -r..=r {
-                        let corner = dx.abs() == r && dz.abs() == r;
-                        if corner && (y == top || hash(0, (t.x + dx) as i64, y as i64, (t.z + dz) as i64) & 1 == 0) {
-                            continue;
-                        }
-                        put(t.x + dx, y, t.z + dz, leaves, false);
-                    }
-                }
-            }
-        }
-    }
-    for y in t.y..top {
-        put(t.x, y, t.z, log, true);
-    }
-    put(t.x, t.y - 1, t.z, DIRT.id(), true);
-}
-
-/// Places a tree of `log` into a live world (saplings). Checks for room first.
-pub fn grow_tree(w: World, p: [i32; 3], log: u32) {
-    let Some(t) = tree_at(log, p[0], p[1], p[2], w.random()) else { return };
-    for y in t.y + 1..t.y + t.height {
-        if w.get([t.x, y, t.z]) != 0 {
-            return;
-        }
-    }
-    tree_blocks(&t, |x, y, z, s, overwrite| {
-        let cur = w.get([x, y, z]);
-        if overwrite || cur == 0 || TALL_GRASS.is(cur) {
-            w.set([x, y, z], s);
-        }
-    });
-}
-
 /// Plants, after the terrain and trees filled the cube.
 fn decorate(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
@@ -381,13 +262,27 @@ fn decorate(g: &mut Gen) {
         for x in 0..16usize {
             let col = &cols[z * 16 + x];
             let (wx, wz) = (ox + x as i32, oz + z as i32);
-            // Floating plants on still, shallow water (`wild.rs`); frozen water is ice.
+            // Floating plants on still, shallow water (`wild.rs`); frozen water is ice. Clay lies in
+            // patches under shallow inland water, most in swamps, as real clay settles in still
+            // water; the sea's floor is sand.
             if col.height < SEA {
+                let shore = shore_biome(g, wx, wz, col.biome);
+                let floor = col.height - oy;
+                if col.height >= SEA - CLAY_DEPTH && (0..16).contains(&floor) {
+                    let share = match name_of(abi::entry_kind::BIOME, shore) {
+                        "base:swamp" => 0.5,
+                        "base:ocean" | "base:beach" => 0.0,
+                        _ => 0.2,
+                    };
+                    if unit(hash(seed ^ 0xC1A, (wx >> 2) as i64, 0, (wz >> 2) as i64)) < share {
+                        g.set(x, floor as usize, z, CLAY.id());
+                    }
+                }
                 if col.height >= SEA - WILD_WATER_DEPTH {
                     for top in [SEA, SEA - 1] {
                         let y = top + 1 - oy;
                         if (1..16).contains(&y) && g.get(x, y as usize, z) == 0 && WATER.is(g.get(x, y as usize - 1, z)) {
-                            if let Some(s) = wild_at(seed, wx, wz, col.biome, wild::Ground::Water) {
+                            if let Some(s) = wild_at(seed, wx, wz, shore, wild::Ground::Water) {
                                 g.set(x, y as usize, z, s);
                             }
                             break;
@@ -416,11 +311,26 @@ fn decorate(g: &mut Gen) {
                 continue;
             }
             let below = if y == 0 { g.surface_block(wx, wz) } else { g.get(x, y - 1, z) };
-            // The wild plants first, on their own roll (`wild.rs`), in the frozen north too.
-            let shore = col.height == SEA
-                && [(1, 0), (-1, 0), (0, 1), (0, -1)]
+            // Ponds in swamps and floodplains (`vitals::wild::POND_LANDS`): still water a block deep
+            // where the ground is level, its floating plants on it.
+            let near = [(1, 0), (-1, 0), (0, 1), (0, -1)].map(|(dx, dz)| (wx + dx, wz + dz, g.column(wx + dx, wz + dz)));
+            if y >= 1
+                && pond(seed, wx, wz, col.height, b)
+                && PLANT_SOIL.on_block(below)
+                && near.iter().all(|(_, _, c)| c.height >= col.height)
+            {
+                g.set(x, y - 1, z, WATER.id());
+                if let Some(s) = wild_at(seed, wx, wz, b, wild::Ground::Water) {
+                    g.set(x, y, z, s);
+                }
+                continue;
+            }
+            // The wild plants first, on their own roll (`wild.rs`), in the frozen north too; a shore
+            // is the sea's edge or a pond's (a pond's neighbour at its own height).
+            let shore = (col.height == SEA && near.iter().any(|(_, _, c)| c.height < SEA))
+                || near
                     .iter()
-                    .any(|&(dx, dz)| g.column(wx + dx, wz + dz).height < SEA);
+                    .any(|&(nx, nz, c)| c.height == col.height && pond(seed, nx, nz, c.height, c.biome));
             let ground = if PLANT_SOIL.on_block(below) {
                 Some(if shore { wild::Ground::Shore } else { wild::Ground::Soil })
             } else if SAND_TAG.on_block(below) {
@@ -443,9 +353,6 @@ fn decorate(g: &mut Gen) {
                     if flower != 0 {
                         g.set(x, y, z, flower);
                     }
-                } else if roll < 0.016 && FOREST_TAG.on_biome(b) {
-                    // Berry bushes in forests, unripe: found, then come back for.
-                    g.set(x, y, z, BERRY_BUSH.id());
                 } else if roll < grass_chance {
                     g.set(x, y, z, TALL_GRASS.id());
                 }
@@ -474,8 +381,46 @@ fn decorate(g: &mut Gen) {
     }
 }
 
+/// Water clay lies under is this deep at most.
+const CLAY_DEPTH: i32 = 4;
+
 /// Water a floating wild plant grows on is this deep at most.
 const WILD_WATER_DEPTH: i32 = 3;
+
+/// The biome water at a column belongs to for its plants: the land's beside it. Water deeper
+/// than a block is the ocean to the world (`BiomeRule`), but a swamp's pond or a floodplain's
+/// river is theirs; open water far from land stays its own.
+fn shore_biome(g: &Gen, wx: i32, wz: i32, own: u32) -> u32 {
+    [(3, 0), (-3, 0), (0, 3), (0, -3), (6, 0), (-6, 0), (0, 6), (0, -6)]
+        .iter()
+        .map(|&(dx, dz)| g.column(wx + dx, wz + dz))
+        .find(|c| c.height >= SEA)
+        .map_or(own, |c| c.biome)
+}
+
+/// Whether the column at `wx`, `wz` (ground at `height`, in `biome`) is a pond's: round ponds of
+/// radius 2 to 4, one in the share of 8 x 8 cells `vitals::wild::POND_LANDS` gives its biome, on
+/// ground above the sea (the swamps' own low land; where it isn't level, the caller leaves it dry).
+fn pond(seed: u64, wx: i32, wz: i32, height: i32, biome: u32) -> bool {
+    if height < SEA {
+        return false;
+    }
+    let name = name_of(abi::entry_kind::BIOME, biome);
+    let Some(&(_, share)) = wild::POND_LANDS.iter().find(|(b, _)| *b == name) else { return false };
+    let (cx, cz) = (wx.div_euclid(8), wz.div_euclid(8));
+    (-1..=1).any(|i| {
+        (-1..=1).any(|k| {
+            let (ox, oz) = (cx + i, cz + k);
+            let h = hash(seed ^ 0x90D, ox as i64, 0, oz as i64);
+            if unit(h) >= share as f64 {
+                return false;
+            }
+            let (px, pz) = (ox * 8 + 2 + ((h >> 20) % 4) as i32, oz * 8 + 2 + ((h >> 28) % 4) as i32);
+            let r = 2 + ((h >> 36) % 3) as i32;
+            (wx - px).pow(2) + (wz - pz).pow(2) <= r * r
+        })
+    })
+}
 
 /// A column's roll for the wild plants, 0 to 1.
 fn wild_roll(seed: u64, wx: i32, wz: i32) -> f32 {

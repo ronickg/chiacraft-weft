@@ -1,0 +1,26 @@
+{
+ "kind": "item",
+ "what": "strips of dried meat: three dark red-brown leathery jerky strips, wrinkled, lying across each other, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.559,
+   "outline": 0.9,
+   "red_line": 0.05,
+   "fill": 0.4,
+   "passed": false
+  },
+  {
+   "grid": 0.492,
+   "outline": 0.82,
+   "red_line": 0.12,
+   "fill": 0.41,
+   "passed": true
+  }
+ ]
+}

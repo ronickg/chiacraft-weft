@@ -345,10 +345,38 @@ by name to whatever command had that name, so a package whose clashing command w
 open another mod's (`/tk give` to everyone); a permission now carries its mod and applies to that
 mod's own command only (`content::freeze_commands`, test
 `a_left_out_command_leaves_its_permission_too`).
-Not yet seen in the game: protocol 8 (a pair run is to come).
-Left: the `required` flag (agreed: at the next `package.toml` change), callcost numbers, 1.2
-(block and item callbacks, channels), client halves (slice 4), personal mods per world (slice
-5), `/mods` (slice 6).
+Checked on the Linux PC (Tester 2, c41da9e4, with Phase 4 merged in; logs `~/looktest/p6pair8`):
+bob's join sheet listed clans "runs sandboxed code (mod API 1.0)", tally "(mod API 1.1)" and the
+signed gems; bob downloaded all three, joined, and the clan flow ran as before (2 members); no
+protocol, strike or load errors. `callcost` on that PC (Ryzen 7 9800X3D), microseconds per call:
+a command 0.6 to 0.9, an empty event batch 0.2 to 0.3, a batch of 64 block changes 3.5 (clans,
+ignoring them) to 14 (tally, a component call each): about 0.2 µs per crossing into the mod and
+back. Questions, chain steps and world ticks not measured yet (the test guest needs the wasm32
+target, not on the PC).
+API 1.2 (built, and checked in one game on the Linux PC by Tester 2 at e6866f7b with the `at`
+ABI change: the striker's use on the sky wore it from 3 to 2 ("wears down: 2 left"); using the
+bell while holding the striker rang the bell, not the striker (the block's use goes first); the
+log had "the bell at [16, 95, 0] rang (1)" and, after stone beside it, the neighbour line; no
+strikes or load errors; the scheduled puff wasn't in the shot. Placing a block also gives it a
+neighbour update for itself, Weft's way): `crates/sandbox/wit/v1.2/mod.wit` adds
+`registry.on-block-use`/`on-block-neighbor`/`on-block-scheduled`/`on-item-use` (the package's own
+blocks and items only, `State::own`), `registry.channel`, `world.schedule` and `world.send`, and
+the export `content-hooks` (`block-use`, `block-update`, `item-use`, `packet`). The game binds
+the world `host`, which exports `hooks` only, and finds `content-hooks` at run time
+(`ContentHooks::find`, typed functions with `post_return`): checked that clans (1.0) and tally
+(1.1) still load and run in it with `callcost`. A mod registering 1.2 callbacks without the
+export is refused. In `mods/packages`, `sandboxed::load` runs before the package's content, so
+`block`/`item` take the callbacks on their builders (`on_block`, `on_item`), and
+`sandboxed::register` does the rest and refuses a callback for a block or item the package
+lacks; channels are `Channel<Vec<u8>>` with at most 64 packets a tick handed over. The SDK is
+1.2.0 (`r.block(&B).on_use/on_neighbor/on_scheduled`, `r.item(&I).on_use`, `Use`, `BlockEvent`,
+`ItemUse`, `Channel<T>`, `Payload`, `r.packet`, `w.send`, `w.schedule`). `componentize` loads a
+component as the package it goes into. Sample `examples/wasm/bell` (a bell block that rings, a
+striker item that wears down, a channel), built as a size-optimised dev build since the Mac does
+no release builds now. With it, the mod UI ABI got `at` (b2877719: `UiNode::at`, `S::at`,
+`S::at_pivot`, onto the engine's `Style::at`), for the UI redo's numbers inside bars.
+Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
+and chain steps, client halves (slice 4), personal mods per world (slice 5), `/mods` (slice 6).
 
 ## Side mods
 

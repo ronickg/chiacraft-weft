@@ -220,8 +220,10 @@ fn a_drink_lasts_a_while() {
         if let Some(secs) = animals_core::needs::drink_lasts(s, s.bio.mass)
             && secs < MIN_SECS
         {
-            problems
-                .push(format!("{}: a drink lasts it {secs:.0} s (want {MIN_SECS} or more): needs::{{SPARE, DAY_SECS, DRINKS}}", s.name));
+            problems.push(format!(
+                "{}: a drink lasts it {secs:.0} s (want {MIN_SECS} or more): needs::{{SPARE, DRINK_DAY_SECS, DRINKS}}",
+                s.name
+            ));
         }
     }
     report(problems);
@@ -249,4 +251,10 @@ fn desert_animals_barely_drink() {
         }
     }
     report(problems);
+}
+
+/// Every taming food is food of its diet (`species::foods_off_diet`): a deer isn't tamed with meat.
+#[test]
+fn taming_foods_are_in_the_diet() {
+    report(animals_core::species::foods_off_diet());
 }

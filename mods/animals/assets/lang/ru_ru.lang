@@ -1,0 +1,6 @@
+
+entity.animals.iguanodont = Игуанодонт
+species.animals.iguanodont = игуанодонт
+family.animals.styracosterna = игуанодонты
+item.animals.iguanodont_egg = Яйцо игуанодонта
+hint.animals.tamed = Теперь оно ваше. Присядьте и используйте его, чтобы открыть меню; свист {key:animals:whistle_follow} — за мной, {key:animals:whistle_stay} — стоять, {key:animals:whistle_come} — ко мне, {key:animals:whistle_attack} — в атаку, {key:animals:whistle_passive} — успокоиться.

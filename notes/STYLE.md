@@ -6,6 +6,9 @@ the world, the animals and what players hold all show the same detail; items are
 (boxes, as the creatures), drawn from their model in slots and in the hand at one fixed angle;
 textures **painted by Claude** by rule; the HUD after designs Ronald sends.
 
+Changed since (2026-11-03/04, Ronald): **32 texture pixels a block for everything** (blocks, item
+icons, box models), and items stay flat pictures (the `game-art` skill's guides, "0 Making it").
+
 ## Where it stands
 
 - Block size decided (2026-11-03): **32 px**, like the items, from Ronald's block style guide
@@ -14,12 +17,15 @@ textures **painted by Claude** by rule; the HUD after designs Ronald sends.
 - Blocks (2026-11-03): 107 textures at 64 px, generated with Codex (ChatGPT's image model) from
   one prompt, the palette (`notes/texture-test/palette.png`) and the approved tiles, four an image
   (`notes/texture-test/codex/gen_grid.sh`, `gen_sprites.sh` for plants), cut by `grid_cut.py` and
-  put in the game by `install_blocks.py` (see `notes/texture-test/PROMPTS.md`). Still 16 px: the
+  put in the game by `install_blocks.py` (see `notes/texture-test/PROMPTS.md`; those scripts and tiles
+  left the repo 2026-11-04 and are in git history and `/Users/ronald/Coding/chiacraft-archive/images/repo-cleanup/2026-11-04/texture-test/`). Still 16 px: the
   model-mapped ones (torches, redstone dust, repeaters, comparators, levers, buttons, beds, the
   piston's inside), glass, water and lava (animated), the anchor and floater.
-- Creatures are meant to be 64 px a block (the blocky-model skill, `.claude/skills/blocky-model`),
-  but some are still off it (chihuahua 131, cat 92, Velociraptor 58, capybara 47, Utahraptor 19):
-  to rebuild at 64.
+- Creatures and props (2026-11-04): every box model repainted at **32 texels a block**, like the
+  blocks and items (Ronald: "Yes, rebuild at 32"; the blocky-model skill, `.claude/skills/blocky-model`).
+  Boxes, rigs, poses and animations kept; eyes redesigned for faces of 4-7 texels. Finer only
+  where 32 would lose the face (under 3 texels): raven, gull, vulture and fish at 64; mouse, vole,
+  kryptobaatar, small bird and lizard at 128.
 - Items: the generated icons (the kit's `items/`, 48 px) are installed for tools, ingots, ores, gems
   and the animals mod's; the rest are old 16 px sprites. To remake as small box models at 64 px a block. To check first:
   block and item models take texture coordinates only in 128ths of the texture (the skill's
@@ -185,7 +191,7 @@ Each with the UI master prompt (`game-art` skill), the approved slot attached:
 - **Health and stamina bars** instead of hearts and food (the kit's `bar`, `bar_health`,
   `bar_stamina`, `bar_xp`, food buffs with timers, temperature): a HUD change in the base mod.
 - **Creative tabs** as tabs (`tab`, `tab_active`, `tab_hover`).
-- **Item icons** in slots: the generated icons (`kit/items` when added; `notes/ui-reference/items`)
+- **Item icons** in slots: the generated icons (redone from the style guides with the game-art skill, 2026-11-04)
   replace `textures/item/*.png`, which the hand also shows until each item has its model.
 - **Bigger slots**: the kit is drawn for 32-pixel slots at GUI scale 2; the screens lay out 18.
 

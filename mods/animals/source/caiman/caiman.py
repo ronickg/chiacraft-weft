@@ -11,6 +11,7 @@ long tall tail, short sprawled legs), then drawn `K` times bigger. Its colors ar
 Units are the house's (64 a block, 1.56 cm each), y up, it faces +z. A yacare caiman is about 2.2 m
 long, half of it tail: here 27.4 lizard units from the snout to the tail's tip, times K = 5.2: 142
 units. Its eyes and nostrils sit high on the head, so it can lie in the water with only them out.
+Painted at the house density, 32 texels a block (`TX` texels a unit), as the blocks and items are.
 """
 
 import json
@@ -25,9 +26,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import TX  # noqa: E402
+
+# TX: texels a unit, the house's 32 a block (0.5). The eye is on the skull's side, 11 units by 6:
+# 6 texels by 3 at 32, at least `house.MIN_FACE` both ways, so no finer density.
 
 OUT = os.environ.get("CAIMAN_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -47,13 +52,21 @@ COAT = (SKIN, BACK, BELLY, PALE)
 ROLES = [("coat", 0, 0), ("coat", 0, -1.6), ("coat", 1, 0), ("coat", 0.6, 0.6), "fixed", "fixed", "fixed"]
 
 # A crocodilian's eye: olive-gold round a tall slit pupil, a catchlight, the dark of the lids round it.
+# "caiman" is the old one at 64 a block (for comparison); at 32 the skull's side is 6 texels by 3
+# and the eye 3 by 2: the slit pupil down its middle, gold either side.
 EYES.update({
     "caiman": dict(pattern=["GHG",
                             "GPG",
                             "gPg"], colors={"G": (168, 150, 64), "g": (196, 176, 84), "P": (20, 18, 14), "H": (236, 232, 210)},
-                   halo="round"),
+                   halo="round", iris="Gg"),
+    "caiman_px": dict(pattern=["GPG", "gPg"], colors={"G": (168, 150, 64), "g": (196, 176, 84), "P": (20, 18, 14)},
+                      halo="none", iris="Gg"),
+    "caiman_px_lit": dict(pattern=["HPG", "gPg"], colors={"G": (168, 150, 64), "g": (196, 176, 84), "P": (20, 18, 14),
+                                                          "H": (236, 232, 210)}, halo="none", iris="Gg"),
+    "caiman_px2": dict(pattern=["GP", "gP"], colors={"G": (168, 150, 64), "g": (196, 176, 84), "P": (20, 18, 14)},
+                       halo="none", iris="Gg"),
 })
-EYE_STYLE = os.environ.get("CAIMAN_EYES", "caiman")
+EYE_STYLE = os.environ.get("CAIMAN_EYES", "caiman_px")
 
 # In the lizard's space (scaled by K when the model is built).
 K_ = 5.2
@@ -65,16 +78,35 @@ LID_X = SKULL[1][0] + 0.2  # the eyelids' hinge plane, just outside the head's s
 LASH = (40, 40, 32)
 
 
+def skull_side():
+    """The skull side's texels: (width, height) and one texel's size in units (u along z, v along y)."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h = max(1, round(TX * (z1 - z0))), max(1, round(TX * (y1 - y0)))
+    return w, h, (z1 - z0) / w, (y1 - y0) / h
+
+
+def eye_pattern(side):
+    """The eye's design on one side: mirrored on the west face (its texels run back to front)."""
+    pat = EYES[EYE_STYLE]["pattern"]
+    return pat if side > 0 else [row[::-1] for row in pat]
+
+
+def eye_center(side):
+    """The eye's center on the skull's east (side > 0) or west face, in that face's texels."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h, su, sv = skull_side()
+    return ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0)) / su, (y1 - EYE_Y) / sv
+
+
 def eye_box(side):
     """(z0, z1, top, bottom) of the eye on one side (scaled), rounded as `stamp_eyes` places it."""
-    pat = EYES[EYE_STYLE]["pattern"]
+    pat = eye_pattern(side)
     ph, pw = len(pat), len(pat[0])
     (x0, y0, z0), (x1, y1, z1) = SKULL
-    cu = (z1 - EYE_Z) if side > 0 else (EYE_Z - z0)
-    u0 = int(round(cu - pw / 2))
-    v0 = int(round((y1 - EYE_Y) - ph / 2))
-    za, zb = (z1 - u0 - pw, z1 - u0) if side > 0 else (z0 + u0, z0 + u0 + pw)
-    return za, zb, y1 - v0, y1 - v0 - ph
+    w, h, su, sv = skull_side()
+    u0, v0 = eye_corner(*eye_center(side), pat, w)
+    za, zb = (z1 - (u0 + pw) * su, z1 - u0 * su) if side > 0 else (z0 + u0 * su, z0 + (u0 + pw) * su)
+    return za, zb, y1 - v0 * sv, y1 - (v0 + ph) * sv
 
 # ------------------------------------------------------------------ the model
 
@@ -144,7 +176,7 @@ def elements():
         # blink swings it down over the eye. Tilted a few degrees about its hinge.
         za, zb, top, bottom = eye_box(s)
         lx0, lx1 = (LID_X - (top - bottom), LID_X) if s > 0 else (-LID_X, -LID_X + (top - bottom))
-        # A quarter texel bigger all round than the eye, so no edge of it shows past a closed lid.
+        # A quarter unit bigger all round than the eye, so no edge of it shows past a closed lid.
         za, zb, lx0, lx1 = za - 0.25, zb + 0.25, (lx0 - 0.25 if s > 0 else lx0), (lx1 if s > 0 else lx1 + 0.25)
         top, lx0, lx1 = top + 0.25, (lx0 - 0.25 if s > 0 else lx0), (lx1 if s > 0 else lx1 + 0.25)
         E.append(el(f"eyelid_{n}", f"eyelid_{n}", (lx0, top, za), (lx1, top, zb), quad="down", rot=(0, 0, s * 4),
@@ -167,7 +199,7 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(abs(size @ du)))), max(1, int(round(abs(size @ dv)))), n
+    return np.array(corner, float), du, dv, max(1, int(round(TX * abs(size @ du)))), max(1, int(round(TX * abs(size @ dv)))), n
 
 
 def area(e, face, p, uu, vv, h):
@@ -176,12 +208,13 @@ def area(e, face, p, uu, vv, h):
     bars along the jaws, the inside of the mouth pink."""
     name = e["name"]
     p = p / K
+    U = 1 / (TX * K)  # a texel, in the lizard's units (0.38): plates, bars and bands at least 1 by 2 of them
     x, y, z = p[..., 0], p[..., 1], p[..., 2]
     a = np.full(x.shape, SKIN)
     side = face in ("east", "west")
     if name in ("hips", "chest", "neck"):
         if face == "up":
-            plates = (np.floor(z * 2.2) % 2 == 0) & (np.floor(np.abs(x) * 2.4) % 2 == 0)  # the osteoderms' rows
+            plates = (np.floor(z / (2 * U)) % 2 == 0) & (np.floor(np.abs(x) / U) % 2 == 0)  # the osteoderms in rows: a plate 1 texel across, 2 long
             a = np.where(plates, BACK, SKIN)
             a = np.where(np.abs(x) > 1.55, PALE, a)
         elif face == "down":
@@ -198,9 +231,10 @@ def area(e, face, p, uu, vv, h):
         if face == "down":
             a[:] = BELLY
         elif face == "up" and name == "skull":
-            a = np.where(np.abs(z - 4.5) < 0.18, BACK, SKIN)  # the bony 'spectacles' ridge before the eyes
-        elif side and name == "snout":
+            a = np.where(np.abs(z - 4.5) < max(0.18, U / 2), BACK, SKIN)  # the bony 'spectacles' ridge before the eyes
+        elif side and name == "snout" and h >= 3:
             a = np.where(np.mod(z, 1.4) < 0.45, BACK, SKIN)  # the dark bars along the jaws
+            # (at 32 the snout's side is one texel tall: it carries the teeth, the jaw the bars)
     elif name == "jaw":
         a[:] = MOUTH if face == "up" else BELLY
         if side:
@@ -210,7 +244,7 @@ def area(e, face, p, uu, vv, h):
     elif name.startswith("eyelid"):
         a[:] = SKIN
     elif name.startswith("leg_"):
-        a = np.where((np.floor(z * 2.0) % 2 == 0) & (face == "up"), BACK, SKIN)
+        a = np.where((np.floor(z / (2 * U)) % 2 == 0) & (face == "up"), BACK, SKIN)  # bands 2 texels wide
         if face == "down":
             a[:] = BELLY
     return a
@@ -261,19 +295,29 @@ def paint_face(e, face, boxes):
                             seed=sum(map(ord, e["name"] + face)) % 97, tuft=False, merge=False)
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["name"] == "skull" and face in ("east", "west"):
-        (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
-        stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
+        side = 1 if face == "east" else -1
+        EYES["_caiman_side"] = dict(EYES[EYE_STYLE], pattern=eye_pattern(side))
+        stamp_eyes(img, [eye_center(side)], "_caiman_side")
     if e["name"] in ("snout", "nose") and face in ("east", "west"):  # teeth along the lip, every few texels
-        cols = np.arange(w)
-        img[h - 1, cols % 3 == 1, :3] = BASE[TOOTH]
-    if e["name"] == "jaw" and face in ("east", "west"):
+        t = np.arange(w) % 3 == 1
+        if h >= 3:
+            img[h - 1, t, :3] = BASE[TOOTH]
+        else:  # one texel tall at 32: a whole tooth-white texel reads as a picket fence, so a softer one
+            img[h - 1, t, :3] = (img[h - 1, t, :3] * 0.35 + np.array(BASE[TOOTH]) * 0.65).astype(np.uint8)
+    if e["name"] == "jaw" and face in ("east", "west") and h >= 3:  # (one texel tall at 32: its bars, no teeth)
         cols = np.arange(w)
         img[0, cols % 3 == 2, :3] = BASE[TOOTH]
     if e["name"] == "nose" and face == "up":  # the nostrils: two slits on the raised tip
-        img[h - 3, [w // 2 - 2, w // 2 + 1], :3] = BASE[CLAW]
+        if h >= 6:
+            img[h - 3, [w // 2 - 2, w // 2 + 1], :3] = BASE[CLAW]
+        else:  # 4 texels by 4 at 32: the two side by side, toward the front
+            img[h - 2, [w // 2 - 1, w // 2], :3] = BASE[CLAW]
     if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
-        img[:, 0 if e["name"].endswith("L") else w - 1, :3] = LASH
+        c = 0 if e["name"].endswith("L") else w - 1
+        if w >= 3:
+            img[:, c, :3] = LASH
+        else:  # a 2-texel lid: a full dark lash would cover half the eye
+            img[:, c, :3] = (img[:, c, :3] * 0.5 + np.array(LASH) * 0.5).astype(np.uint8)
     if e["name"].endswith("_paw") and face == "south":  # the claws
         img[:, ::2, :3] = (img[:, ::2, :3] * 0.7).astype(np.uint8)
     if LAYERS["rec"] is not None:

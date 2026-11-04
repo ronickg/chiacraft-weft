@@ -1,0 +1,122 @@
+[
+ {
+  "kind": "item",
+  "name": "repeater",
+  "what": "a repeater seen from slightly above: a thick smooth grey stone slab filling most of the canvas width, two small red torches standing on it and a red arrow line between them, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "insects",
+  "what": "a few insects seen from above: two clear beetles and one cricket, fewer and bigger than a swarm, browns and greens with a highlight each, drawn small: its longest side only about 19 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "wyvern_saddle",
+  "what": "a big riding saddle for a flying wyvern, seen from the side and slightly above, reading clearly as a saddle: a dark red-brown leather seat with a high back and a front horn, a gold buckle strap, one stirrup hanging below, its longest side about 26 px of the 32",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "utahraptor_saddle",
+  "what": "a saddle seen from the side and slightly above, reading clearly as a saddle: a dark brown leather seat with a raised back, one stirrup hanging below with a metal ring, a few metal studs, drawn small: its longest side only about 22 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "earthworm",
+  "what": "an earthworm: a pink-brown segmented worm curled in an S shape, faint ring segments and a slightly paler band, drawn small: its longest side only about 16 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": true,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "grub",
+  "what": "a beetle grub: a plump curled C-shaped cream-white larva with a small orange-brown head, drawn small: its longest side only about 16 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "egg",
+  "what": "an egg: an upright oval, slightly narrower at the top, warm cream shell with a soft highlight on the upper left, an outline no darker than mid brown, drawn small: its longest side only about 18 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "chicken_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, cream shell with red speckles, a soft highlight on the upper left, drawn small: its longest side only about 17 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "pig_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, pale pink shell with darker rose spots, a soft highlight on the upper left, drawn small: its longest side only about 22 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "sheep_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, pale cream-white shell with soft pink spots, a soft highlight on the upper left, drawn small: its longest side only about 22 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cow_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, dark brown shell with big cream patches, a soft highlight on the upper left, drawn small: its longest side only about 26 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "zombie_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, teal-green shell with dark green blotches, a soft highlight on the upper left, drawn small: its longest side only about 23 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "skeleton_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, pale bone-grey shell with darker grey spots, a soft highlight on the upper left, drawn small: its longest side only about 23 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "spider_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, dark brown shell with red speckles, a soft highlight on the upper left, drawn small: its longest side only about 21 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "creeper_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, bright green shell with dark green-black blotches, a soft highlight on the upper left, drawn small: its longest side only about 22 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ }
+]
