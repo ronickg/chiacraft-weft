@@ -282,6 +282,41 @@ impl Species {
     pub fn forages_wild(&self) -> bool {
         self.plant_share() >= 0.5
     }
+    /// Whether it lives in the Cretaceous rather than the overworld: its habitats are that
+    /// dimension's biomes (`animals:`; the overworld's are `base:`). Each species lives in one, and
+    /// spawns only there (`habitats.rs`), even where the two share a biome (the Cretaceous's
+    /// beaches and seas are `base:beach` and `base:ocean`: hares, mice, foxes, sparrows, gulls and
+    /// ravens came to its shores).
+    pub fn cretaceous(&self) -> bool {
+        self.habitats.iter().any(|(b, _)| b.starts_with("animals:"))
+    }
+    /// The chance a natural spawn that picks it in `biome` brings a group (0 where it doesn't
+    /// live): its rarity's, by how common it is there (`Rarity::spawn_chance`, its habitat's
+    /// share). In the Cretaceous, each biome's rules are raised together until they average
+    /// `CRETACEOUS_FLOW`, each keeping its share by rarity: the engine picks a rule at random and
+    /// then rolls its chance, and the overworld's biomes also hold base's farm animals at 5%,
+    /// so the Cretaceous, with only its own and rarer ones, brought a half to a fifth as many
+    /// (the creatures playtest: no utahraptor, wyvern, crocodyliform or fish in 7 minutes).
+    /// Fish count among fish (their own spawner, `fish.rs`), the rest among the rest.
+    pub fn spawn_chance(&self, biome: &str) -> f32 {
+        let at = |t: &Species| {
+            t.habitats
+                .iter()
+                .find(|(b, _)| *b == biome)
+                .map(|&(_, share)| t.bio.rarity.spawn_chance() * share)
+        };
+        let Some(mine) = at(self) else { return 0.0 };
+        if !self.cretaceous() {
+            return mine;
+        }
+        let peers: Vec<f32> = SPECIES
+            .iter()
+            .filter(|t| t.cretaceous() && t.in_water() == self.in_water())
+            .filter_map(at)
+            .collect();
+        let mean = peers.iter().sum::<f32>() / peers.len().max(1) as f32;
+        (mine * (CRETACEOUS_FLOW / mean).max(1.0)).min(1.0)
+    }
     /// Whether it hunts at all.
     pub fn hunts(&self) -> bool {
         self.prey.1 > 0.0
@@ -363,6 +398,10 @@ impl Species {
         self.tune.litter.unwrap_or_else(|| self.bio.litter())
     }
 }
+
+/// What a Cretaceous biome's spawn rules average (`Species::spawn_chance`): about the
+/// overworld's plains, whose own animals and base's farm animals (5%) come to this.
+pub const CRETACEOUS_FLOW: f32 = 0.025;
 
 /// ARK's shape: health grows fastest, speed slowest, torpor only from wild points.
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];

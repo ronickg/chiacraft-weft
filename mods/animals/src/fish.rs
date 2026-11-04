@@ -164,6 +164,7 @@ fn spawn(w: &World) {
     if w.time() % 40 != 0 {
         return;
     }
+    let dim = name_of(abi::entry_kind::DIMENSION, w.dimension());
     for p in w.players() {
         let Some(at) = w.entity(p) else { continue };
         for _ in 0..2 {
@@ -178,8 +179,11 @@ fn spawn(w: &World) {
             let biome = name_of(abi::entry_kind::BIOME, w.biome([x, y - 1, z]));
             for kind in KINDS {
                 let s = &SPECIES[crate::species::of(kind)];
-                let Some(&(_, share)) = s.habitats.iter().find(|(b, _)| *b == biome) else { continue };
-                if random(w) as f32 >= s.bio.rarity.spawn_chance() * share || w.near(spot, ROOM_RADIUS, Some(kind)).len() >= ROOM {
+                // In its own world only (`habitats::world`): the two share their seas.
+                if crate::habitats::world(s) != dim {
+                    continue;
+                }
+                if random(w) as f32 >= s.spawn_chance(biome) || w.near(spot, ROOM_RADIUS, Some(kind)).len() >= ROOM {
                     continue;
                 }
                 let (few, most) = s.bio.social.group();

@@ -36,6 +36,13 @@ pub struct Layers {
     /// they take (before the ferns).
     pub mushrooms: &'static str,
     pub mushroom_cover: f32,
+    /// The share of the biome's trees with lianas hanging from their crowns (the tropical
+    /// forest's climbers: a quarter to a half of its canopy trees carry them).
+    pub lianas: f32,
+    /// Big-leaved plants two blocks tall (wild bananas, philodendrons), the share of the bare soil
+    /// they take after the ferns, and which, by weight.
+    pub big_leaves: f32,
+    pub big_leaf_kinds: &'static str,
 }
 
 const fn l(
@@ -60,6 +67,9 @@ const fn l(
         tall_grass: 0.0,
         mushrooms: "",
         mushroom_cover: 0.0,
+        lianas: 0.0,
+        big_leaves: 0.0,
+        big_leaf_kinds: "",
     }
 }
 
@@ -69,7 +79,7 @@ const fn l(
 /// willow at the edges and juniper; Konza's dogwood and sumac thickets (oak leaves stand in); the
 /// llanos' and the Pantanal's scattered shrubs; Davos' juniper mats; the tundra's dwarf willow;
 /// Sonora's creosote bush.
-pub const LAYERS: [Layers; 10] = [
+pub const LAYERS: [Layers; 11] = [
     Layers { tall_grass: 0.4, ..l("base:plains", "base:coarse_dirt", 0.03, 0.0, 0.06, "base:oak_leaves", 0.0) },
     // Mushrooms round trunks: Białowieża's honey fungus on the oaks' roots and ceps; Moscow's
     // chanterelles under birches; the taiga's chanterelles and ceps under spruce.
@@ -103,7 +113,26 @@ pub const LAYERS: [Layers; 10] = [
         young_kinds: "base:dogwood_log:3 base:spruce_log:1 base:sequoia_log:1",
         ..l("base:sequoia_grove", "base:podzol:2 base:leaf_litter:1", 0.2, 0.1, 0.06, "base:dogwood_leaves", 0.2)
     },
+    // The central Amazon's terra firme (Manaus): a deep litter of leaves on a dark floor, ferns in
+    // the shade, cacao and young trees in the understorey (the canopy shades out grass: little of
+    // it), fungi on the litter, and lianas on some four trees in ten.
+    Layers {
+        mushrooms: "base:mushroom_brown",
+        mushroom_cover: 0.06,
+        young_kinds: "base:cacao_log:3 base:brazil_nut_log:1 base:acuri_palm_log:1",
+        lianas: 0.4,
+        // Ronald, 11-04: "A + C's giants + some B": a few of B's big-leaved plants on A's floor.
+        big_leaves: 0.03,
+        big_leaf_kinds: "base:philodendron:2 base:banana:1",
+        // The floor is litter, not grass: nearly all of it (the playtest's first look still read
+        // grass at 0.6).
+        ..l("base:tropical_forest", "base:deep_leaf_litter:3 base:leaf_litter:1 base:podzol:1", 0.95, 0.1, 0.25, "base:cacao_leaves", 0.3)
+    },
 ];
+
+/// Biomes with layers here that the world doesn't register yet (a biome on another branch): their
+/// rows wait; take a biome out once it's registered.
+pub const PENDING: &[&str] = &[];
 
 /// A biome's layers, if it has any.
 pub fn of(biome: &str) -> Option<&'static Layers> {
@@ -139,6 +168,11 @@ mod tests {
             assert!(l.mushroom_cover + l.ferns * 3.0 < 0.6, "{}: mushrooms and ferns crowd the trunks", l.biome);
             assert!(l.mushroom_cover == 0.0 || !l.mushrooms.is_empty(), "{}: mushrooms with no kinds", l.biome);
             assert!(crate::climate::of(l.biome).is_some(), "{}: no climate", l.biome);
+            assert!((0.0..=1.0).contains(&l.lianas), "{}: lianas {}", l.biome, l.lianas);
+        }
+        // A biome waiting to be registered has its row here, or it isn't waiting for anything.
+        for b in PENDING {
+            assert!(of(b).is_some(), "{b}: pending with no layers");
         }
     }
 }

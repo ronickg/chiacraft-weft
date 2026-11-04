@@ -507,6 +507,20 @@ overlay = "ore_gold_b"
 [items.tepary_beans]  # outline 0.60 -> 0.40 (new, Plants' batch 3: pale beans, the edge too light)
 outline = 0.67
 
+# The tropical forest (11-04): cacao's pale bark down into our logs' range (0.24-0.36); its grey bark
+# and the Brazil nut's are the species' own (identity, like the sequoia), so they keep it.
+[tiles.log_cacao]  # luma 0.43 -> 0.36
+gain = 0.84
+
+[tiles.log_cacao_top]  # luma 0.52 -> 0.47
+gain = 0.894  # wood pass: luma 0.46->0.46, sat 0.41->0.47; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.172  # wood pass: luma 0.46->0.46, sat 0.41->0.47; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+[tiles.planks_andiroba]  # sat 0.68 -> 0.60, into jungle planks' band (0.49-0.52 +0.10)
+saturation = 0.757  # wood pass: luma 0.32->0.33, sat 0.63->0.57; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+gain = 1.028  # wood pass: luma 0.32->0.33, sat 0.63->0.57; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+[items.ipe_seed]  # outline 0.64 -> 0.40 (new, the tropical forest: pale papery wings, the edge too light)
+outline = 0.62
+
 # Walked-on ground (Planner, 11-04: the red sand floor read very saturated orange in the PC looks).
 # Vanilla's red sand is 0.83 and Pixel Perfection's 0.50; ours moves to the middle, with base's graded
 # red sandstone (0.62), so a canyon floor and its walls match. The Cretaceous copies (animals) had no rows.
@@ -686,3 +700,32 @@ gain = 0.895
 
 [tiles.log_ipe_stripped_top]  # luma 0.45->0.39, sat 0.58->0.58; ~ stripped_dark_oak_log_top (0.18-0.33, 0.27-0.66) half way
 gain = 0.861
+
+# The wood pass for the tropical woods (Planner, 11-05; from art-tropical 6457dfb4): tops and planks half way to
+# jungle's (dark oak's for ipe) band; their grey barks are the species' own (approved), kept.
+[tiles.log_brazil_nut_top]  # luma 0.43->0.43, sat 0.52->0.52; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.016
+
+[tiles.planks_brazil_nut]  # luma 0.39->0.39, sat 0.56->0.54; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 0.938
+
+[tiles.planks_cacao]  # luma 0.47->0.47, sat 0.47->0.48; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 1.023
+
+[tiles.log_andiroba_top]  # luma 0.33->0.33, sat 0.63->0.59; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 0.892
+gain = 1.015
+
+[tiles.log_matamata_top]  # luma 0.56->0.51, sat 0.39->0.46; ~ jungle_log_top (0.34-0.46, 0.53-0.54) half way
+saturation = 1.211
+gain = 0.909
+
+[tiles.planks_matamata]  # luma 0.54->0.52, sat 0.44->0.47; ~ jungle_planks (0.34-0.50, 0.49-0.52) half way
+saturation = 1.073
+gain = 0.963
+
+[tiles.log_ipe_top]  # luma 0.37->0.34, sat 0.53->0.53; ~ dark_oak_log_top (0.18-0.30, 0.27-0.67) half way
+gain = 0.906
+
+[tiles.planks_ipe]  # luma 0.32->0.31, sat 0.53->0.53; ~ dark_oak_planks (0.18-0.29, 0.31-0.70) half way
+gain = 0.965
