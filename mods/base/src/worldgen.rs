@@ -762,6 +762,8 @@ fn decorate(g: &mut Gen) {
     if oy > top + 16 || oy + 15 < min_h - 1 {
         return;
     }
+    // The world's first place, for the loose things thicker round it (`first.rs`).
+    let spawn = crate::fair_spawn(seed);
     for z in 0..16usize {
         for x in 0..16usize {
             let col = &cols[z * 16 + x];
@@ -819,8 +821,14 @@ fn decorate(g: &mut Gen) {
                 * (0.35 + 1.3 * meadow))
                 .min(0.9);
             let flower_chance = if meadow > FLOWER_MEADOW { 0.06 } else { 0.004 };
+            // Loose rocks, flint and fallen branches (`first.rs`), on their own roll.
+            let ground_u = unit(hash(seed ^ 0x6A0D, wx as i64, 0, wz as i64)) as f32;
             // What is under the lowest layer takes a look at the terrain: only if anything would grow.
-            if y == 0 && roll >= (flower_chance + grass_chance) && wild_roll(seed, wx, wz) >= wild::MOST {
+            if y == 0
+                && roll >= (flower_chance + grass_chance)
+                && wild_roll(seed, wx, wz) >= wild::MOST
+                && ground_u >= vitals::first::MOST
+            {
                 continue;
             }
             let below = if y == 0 { crate::land::surface_block(g, wx, wz) } else { g.get(x, y - 1, z) };
@@ -835,6 +843,22 @@ fn decorate(g: &mut Gen) {
                 .map(|(_, _, c)| col.height - c.height)
                 .max()
                 .unwrap_or(0);
+            // The loose things lie on open soil, sand and gravel, thicker on steep ground and gravel
+            // and round the spawn; fallen branches under the crowns (`vitals::first`).
+            if ground_u < vitals::first::MOST
+                && !FROZEN.on_biome(b)
+                && (PLANT_SOIL.on_block(below) || SAND_TAG.on_block(below) || GRAVEL.is(below))
+            {
+                let stony = fall >= 2 || GRAVEL.is(below);
+                let from_spawn = (((wx - spawn[0]) as f32).powi(2) + ((wz - spawn[2]) as f32).powi(2)).sqrt();
+                if let Some(thing) = vitals::first::ground_at(ground_u, stony, under_crown(g, x, y, z), from_spawn) {
+                    if y >= 1 && fall >= 3 && PLANT_SOIL.on_block(below) {
+                        g.set(x, y - 1, z, GRAVEL.id());
+                    }
+                    g.set(x, y, z, crate::first::ground_block(thing));
+                    continue;
+                }
+            }
             if y >= 1 && fall >= 3 && PLANT_SOIL.on_block(below) && !FROZEN.on_biome(b) {
                 g.set(x, y - 1, z, GRAVEL.id());
                 continue;

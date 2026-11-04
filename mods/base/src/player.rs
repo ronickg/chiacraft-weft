@@ -225,6 +225,8 @@ fn craft_result(m: &MenuCtx) {
     let made = recipe_match(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
     // Food made of food is as far along as its stalest part, and nothing comes of spoiled food.
     let made = crate::survival::crafted(&cells, made, m.world().day_time());
+    // An axe lashed by hand takes its parts from the grid (`first.rs`).
+    let made = crate::first::finish(&cells, made, m.world().day_time());
     m.group("result").set(0, made);
 }
 

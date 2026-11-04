@@ -394,6 +394,11 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
         if !found {
             break;
         }
+        // What it's made of, as it was (an axe lashed by hand takes its head's parts: `first.rs`).
+        let used: Vec<ItemStack> = take
+            .iter()
+            .map(|&(i, _)| w.inventory(src[i].owner).get(src[i].slot))
+            .collect();
         for &(i, n) in &take {
             if src[i].owner != player {
                 from_chests += n;
@@ -413,8 +418,11 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
             let out = if r.kind() == crate::parts::PART_RECIPES.name() {
                 crate::parts::finish(w, player, r, out, (w.random() >> 40) as f32 / (1u64 << 24) as f32)
             } else {
-                out
+                crate::first::finish(&used, out, w.day_time())
             };
+            if out.is_empty() {
+                continue;
+            }
             let left = w.inventory(player).insert(out);
             if !left.is_empty() {
                 w.spawn_item(pos, left);

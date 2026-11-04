@@ -15,7 +15,8 @@ use vitals::effects::Effect;
 use weft_sdk::*;
 
 /// The hints, by their bit in `SEEN`: `hint.base.<name>` in the lang files.
-const HINTS: [&str; 11] = ["logs", "table", "night", "cold", "freezing", "wet", "empty", "raw_meat", "grave", "hot", "rest"];
+const HINTS: [&str; 14] =
+    ["logs", "table", "night", "cold", "freezing", "wet", "empty", "raw_meat", "grave", "hot", "rest", "knap", "flake", "lash"];
 const LOGS: u32 = 0;
 const TABLE: u32 = 1;
 const NIGHT: u32 = 2;
@@ -27,9 +28,13 @@ const RAW_MEAT: u32 = 7;
 const GRAVE_AT: u32 = 8;
 const HOT: u32 = 9;
 const REST: u32 = 10;
+/// The first hours (`first.rs`): a rock and flint in the bag, a sharp flake, an axe head.
+const KNAP: u32 = 11;
+const FLAKE: u32 = 12;
+const LASH: u32 = 13;
 
-/// Seconds played before the first hint about logs.
-const LOGS_AFTER: u64 = 60;
+/// Seconds played before the first hint, that bare hands can't fell a tree (`first.rs`).
+const LOGS_AFTER: u64 = 20;
 /// The felt air under which being wet is worth a word, °C.
 const WET_BELOW: f32 = 15.0;
 
@@ -50,6 +55,8 @@ static TABLE_TAG: Tag = Tag::named("crafting_tables");
 static FURNACE_TAG: Tag = Tag::named("furnaces");
 static RAW_MEAT_TAG: Tag = Tag::named("raw_meat");
 static CAMPFIRE_TAG: Tag = Tag::named("campfires");
+static ROCKS_TAG: Tag = Tag::named("rocks");
+static FLINT_TAG: Tag = Tag::named("flint");
 /// The evening the night hint was last shown (the day count; not saved).
 static NIGHT_SHOWN: Component<u32> = Component::named("hints_night_shown");
 /// Game hours before sunset the night hint comes (the sunset by the calendar's daylight: 18:00 at
@@ -137,6 +144,18 @@ fn watch(w: &World) {
         }
         if logs && !table {
             once(w, id, TABLE);
+        }
+        // The way to the first axe, a step at a time.
+        let flake = has(&crate::first::CUTTERS);
+        let head = items.iter().any(|&i| item_name(i) == "base:part_felling_axe_head");
+        if has(&ROCKS_TAG) && has(&FLINT_TAG) && !flake {
+            once(w, id, KNAP);
+        }
+        if flake && !logs {
+            once(w, id, FLAKE);
+        }
+        if head && !logs {
+            once(w, id, LASH);
         }
         // Each evening at dusk until a campfire is built, by the season's sunset (as the HUD clock
         // and beds have it; integration review: fixed at 16-18 it came after dark in winter).

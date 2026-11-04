@@ -15,6 +15,7 @@ mod fall;
 mod farming;
 mod felled;
 mod felling;
+mod first;
 mod growth;
 mod hints;
 mod hud;
@@ -101,6 +102,7 @@ fn init(r: &mut Registry) {
     book::register(r);
     discovery::register(r);
     parts::register(r);
+    first::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);
@@ -179,7 +181,7 @@ fn init(r: &mut Registry) {
 /// The overworld's first place for `seed` (`base_api::land::spawn_where`), out of the caves' mouths
 /// (none in the three by three columns round it); worked out once per seed, as the engine asks on
 /// every join.
-fn fair_spawn(seed: u64) -> [i32; 3] {
+pub(crate) fn fair_spawn(seed: u64) -> [i32; 3] {
     static KNOWN: std::sync::Mutex<Vec<(u64, [i32; 3])>> = std::sync::Mutex::new(Vec::new());
     if let Some(&(_, p)) = KNOWN.lock().unwrap().iter().find(|(s, _)| *s == seed) {
         return p;

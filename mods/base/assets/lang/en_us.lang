@@ -633,7 +633,7 @@ block.base.campfire.tooltip = Logs and sticks burning: warms you, counts as a fi
 # Hints (hints.rs, Research round 4)
 config.base.hints = Hints
 config.base.hints.tooltip = Short tips under the crosshair when something new happens: the cold, an empty stomach, night coming
-hint.base.logs = Hold {key:core:attack} on a tree trunk to get logs.
+hint.base.logs = Bare hands can't fell a tree. Look on the ground: rocks, flint and fallen branches.
 hint.base.table = Press {key:core:inventory}: logs make planks, planks a crafting table, and logs and sticks a campfire.
 hint.base.night = Night falls about {0}:00, and monsters come out in the dark. Build a campfire (two logs, two sticks): no monster appears in its light, and it warms you.
 hint.base.cold = Getting cold. Stand by a fire, get out of the wind, or wear warmer clothes.
@@ -1025,3 +1025,18 @@ grade.base.superior = Superior
 grade.base.exquisite = Exquisite
 grade.base.masterwork = Masterwork
 grade.base.legendary = Legendary
+
+# The first hours (first.rs, notes/FIRST_HOURS.md)
+block.base.loose_rock = Loose Rock
+block.base.loose_flint = Flint Nodule
+block.base.fallen_branch = Fallen Branch
+item.base.rock = Rock
+item.base.rock.tooltip = Lies loose on the ground. A hammerstone: use it on flint lying on the ground to strike off a sharp flake.
+item.base.flint = Flint Nodule
+item.base.flint.tooltip = Lies loose on the ground, most on gravel and slopes. Put it down and strike it with a rock: flakes, or sneak to knap an axe head.
+item.base.sharp_flake = Sharp Flake
+item.base.sharp_flake.tooltip = Struck off flint. Cuts grass for four times the fibre. Wears out.
+material.base.branch = Branch
+hint.base.knap = Put the flint down and strike it with a rock ({key:core:use}) for a sharp flake. Sneak while striking to knap an axe head.
+hint.base.flake = A sharp flake cuts grass for fibre. Two fibres twist into string.
+hint.base.lash = Lash the axe head to a stick with two string in your inventory's grid ({key:core:inventory}).
