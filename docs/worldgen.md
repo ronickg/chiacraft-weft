@@ -8,7 +8,7 @@ Examples to copy from:
 - `mods/testmod/src/lib.rs`: Mars, a planet made only from terrain presets, `void`, an island written by hand, and a biome, a rock needle and boulders added to base's overworld
 - `mods/testmod/src/looks.rs`: an obelisk structure standing in another mod's desert
 - `mods/base/src/worldgen.rs`: the overworld, with biomes, caves, trees and flowers
-- `mods/base/src/land.rs` and `mods/base/api/src/land.rs`: the overworld's shape: rivers and mesas as `Feature::new` (a river rebuilds the other features' height to know how deep to cut), snow by rules on height and temperature, bare rock on steep faces as a decoration
+- `mods/base/src/land.rs` and `mods/base/api/src/land.rs`: the overworld's shape: lakes, rivers and mesas as `Feature::new` (a river rebuilds the other features' height to know how deep to cut), snow by rules on height and temperature, bare rock on steep faces as a decoration
 
 ## Quick links
 [how generation works](#how-generation-works) | [ores](#ores) | [structures](#structures) | [spawns](#spawns) | [biomes](#biomes) | [dimensions](#dimensions) | [terrain](#terrain) | [trees](#trees-and-other-scattered-things) | [decorations](#decorations) | [changing another mod's terrain](#changing-another-mods-terrain) | [writing a generator](#writing-a-generator)

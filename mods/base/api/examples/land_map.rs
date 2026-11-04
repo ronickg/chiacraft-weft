@@ -142,6 +142,8 @@ fn colour(f: &Fields, x: i32, z: i32, h: i32, rock: bool, after: bool) -> ([u8; 
         "mountains" => [105, 140, 100],
         "snowy_plains" => [215, 225, 225],
         "taiga" => [60, 100, 70],
+        // Giant sequoia groves: rust-red, to find them.
+        "sequoia_grove" => [175, 70, 45],
         "desert" => [220, 200, 130],
         "savanna" => [170, 165, 80],
         "swamp" => [90, 105, 60],
