@@ -329,10 +329,11 @@ pub const IPE: Recipe = Recipe {
     branch_every: 0.55,
     branch_count: 3,
     branch_angle: 50.0,
-    branch_width: 0.55,
+    // Limbs thick enough to stay wood to their tips (thin, their last third was leaves alone).
+    branch_width: 0.8,
     orders: 2,
     branch_len: 0.3,
-    leaf_r: 2.8,
+    leaf_r: 2.5,
     leaf_ry: 1.4,
     ragged: 0.45,
     reach: 8,
