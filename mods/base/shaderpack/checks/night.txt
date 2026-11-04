@@ -1,0 +1,64 @@
+loaded
+idle
+chat /tk mode creative
+chat /weather clear
+chat /air 0 1 90 mist
+# The night sky in the taiga (an aurora's place by latitude): stars that come out brightest first
+# at dusk, twinkle and have colors, the Milky Way, the aurora in the north, and the night's light by
+# the moon's phase. North is -z, yaw 0 (a new world starts on day 7: phase 7, nearly full; day 8 full; day 12 new).
+chat /gamemode spectator
+chat /tp -1499 160 35
+wait 8
+chat /gamemode creative
+wait 3
+chat /time set 12700
+chat /time query
+look 90 40
+wait 4
+shot 01_dusk_stars.png
+chat /time set 18000
+chat /time query
+wait 4
+look 0 20
+wait 2
+shot 02_day7_north.png
+look 180 20
+wait 2
+shot 03_day7_south.png
+look 90 75
+wait 2
+shot 04_day7_up.png
+look 90 -25
+wait 2
+shot 05_day7_ground.png
+chat /time set 42000
+chat /time query
+wait 4
+look 0 20
+wait 2
+shot 06_day8_full_north.png
+look 180 20
+wait 2
+shot 07_day8_full_south.png
+look 90 75
+wait 2
+shot 08_day8_full_up.png
+look 90 -25
+wait 2
+shot 09_day8_full_ground.png
+chat /time set 114000
+chat /time query
+wait 4
+look 0 20
+wait 2
+shot 10_day12_new_north.png
+look 180 20
+wait 2
+shot 11_day12_new_south.png
+look 90 75
+wait 2
+shot 12_day12_new_up.png
+look 90 -25
+wait 2
+shot 13_day12_new_ground.png
+quit

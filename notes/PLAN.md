@@ -43,6 +43,9 @@ erase what they earned.
      after it: a joining player read an empty name. Now the values follow their names into the new
      content's ids, and mods' setting handles get the new content's ids back. Small, general,
      with a check (`a_content_switch_keeps_values_by_name`).
+   - To offer: room for more worn layers (`client/models.rs`, `MAX_LAYERS` 8 to 12). Armour's
+     four, clothes' four and a cloak are nine over the skin, and past 8 the rest were dropped
+     silently (the cloak never drew). One constant (branch `claude/cloaks`).
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 

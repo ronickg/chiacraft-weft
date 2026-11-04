@@ -434,6 +434,8 @@ pub struct Client {
     snow_cover: f32,
     snowing: f32,
     dust: f32,
+    /// How strong an aurora is where the player is (a mod's air, `air_flags::AURORA_SHIFT`).
+    aurora: f32,
     frame_dt: f32,
     /// Seconds left of a lightning's flash.
     lightning: f32,
@@ -713,6 +715,7 @@ impl Client {
             snow_cover: 0.0,
             snowing: 0.0,
             dust: 0.0,
+            aurora: 0.0,
             lightning: 0.0,
             using: None,
             burning: false,
@@ -2184,6 +2187,8 @@ impl Client {
         let on = |f: u32| if flags & f != 0 { 1.0 } else { 0.0 };
         self.snowing += (on(weft_abi::air_flags::SNOWING) - self.snowing).clamp(-dt / 5.0, dt / 5.0);
         self.dust += (on(weft_abi::air_flags::DUST) - self.dust).clamp(-dt / 5.0, dt / 5.0);
+        let aurora = ((flags >> weft_abi::air_flags::AURORA_SHIFT) & 255) as f32 / 255.0;
+        self.aurora += (aurora - self.aurora).clamp(-dt / 20.0, dt / 20.0);
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
@@ -2239,8 +2244,8 @@ impl Client {
             light: [content().dims[self.world.dim as usize].ambient as f32 / 15.0, self.brightness, ticks, 0.0],
             sun: self.sun(),
             weather: [self.wind.x, self.wind.y, self.fog, self.thunder],
-            eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, 0.0],
-            ground: [self.snow_cover, self.snowing, self.dust, 0.0],
+            eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, self.moon_light()],
+            ground: [self.snow_cover, self.snowing, self.dust, self.aurora],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow: match self.shadow_map {
                 Some(t) if self.shadow.1 => [self.shadow_index(t) as f32, SHADOW_SIZE as f32, 1.0, 2.0 * SHADOW_REACH / SHADOW_SIZE as f32],
@@ -2259,6 +2264,15 @@ impl Client {
         let a = d.day_turn(self.world.time as f64) * std::f64::consts::TAU;
         let v = Vec3::new(a.cos() as f32, a.sin() as f32, 0.35).normalize();
         [v.x, v.y, v.z, v.y.max(0.0)]
+    }
+
+    /// The moon's light by its phase, 1 full to 0 new: vanilla's eight phases, one a day, the one
+    /// the sky's moon picture shows (`sky.rs`).
+    fn moon_light(&self) -> f32 {
+        let d = &content().dims[self.world.dim as usize];
+        let day = if d.day_length != 0 { d.day_length as f64 } else { 24000.0 };
+        let phase = (self.smooth_time() / day).floor().rem_euclid(8.0);
+        (0.5 + 0.5 * (phase * std::f64::consts::TAU / 8.0).cos()) as f32
     }
 
     /// The shadow map's bindless index (set when it was made).
@@ -2416,6 +2430,8 @@ impl Client {
             self.eye_liquid().is_some(),
             self.rain,
             self.thunder,
+            self.wind,
+            self.frame_dt,
             &overlays,
         );
         self.render.draw_translucent(&mut late);

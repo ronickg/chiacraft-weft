@@ -105,6 +105,9 @@ struct Picture {
     size: [u32; 2],
 }
 
+/// How much faster than the wind on the ground the clouds move (the air up there is freer).
+const CLOUD_WIND: f64 = 3.0;
+
 pub struct Sky {
     pipe: Option<PipelineId>,
     clouds_pipe: Option<PipelineId>,
@@ -119,6 +122,8 @@ pub struct Sky {
     liquid_colors: Vec<Vec3>,
     /// This frame's buffer and the entries over the screen: where they start, how many.
     overlay: Option<(BufferId, u32, u32)>,
+    /// How far the wind has carried the clouds (blocks along x and z), on top of their own drift.
+    cloud_drift: glam::DVec2,
 }
 
 /// A picture over the whole screen, drawn last: from inside a liquid, a block or a fire.
@@ -171,6 +176,7 @@ impl Sky {
             list: Vec::new(),
             liquid_colors: Vec::new(),
             overlay: None,
+            cloud_drift: glam::DVec2::ZERO,
         };
         s.reload(gpu, assets);
         s
@@ -352,9 +358,14 @@ impl Sky {
         in_liquid: bool,
         rain: f32,
         thunder: f32,
+        wind: glam::Vec2,
+        dt: f32,
         overlays: &[Overlay],
     ) {
         self.overlay = None;
+        // Clouds ride the wind where the player is (m/s, the way it blows), faster than it blows
+        // on the ground: the air up there is freer.
+        self.cloud_drift += wind.as_dvec2() * CLOUD_WIND * dt.clamp(0.0, 0.25) as f64;
         let Some(pipe) = self.pipe else { return };
         let c = content();
         let d = &c.dims[dim];
@@ -420,21 +431,24 @@ impl Sky {
                     .max(1365.0)
                     * 1.5;
                 let lifted = s.height as f64 + setting("core:cloud_height");
-                let (x, z) = ((cam.pos.x + time * s.drift as f64) / CELL, cam.pos.z / CELL);
+                let (x, z) = ((cam.pos.x + time * s.drift as f64 - self.cloud_drift.x) / CELL, (cam.pos.z - self.cloud_drift.y) / CELL);
                 // Vanilla's: rain grays them, the time of day colors them, thunder darkens the rest.
                 let day = if d.sky_light { (height * 2.0 + 0.5).clamp(0.0, 1.0) } else { 1.0 };
                 let color = rained(rgb(s.color), rain, 0.95) * Vec3::new(day * 0.9 + 0.1, day * 0.9 + 0.1, day * 0.85 + 0.15);
                 let color = color.lerp(Vec3::splat((color.x * 0.3 + color.y * 0.59 + color.z * 0.11) * 0.2), thunder * 0.95);
                 clouds = Some(self.list.len() as u32);
+                // The weather for packs: x how much more of the sky they cover as rain comes, y how
+                // dark their undersides go, z an overcast deck in a storm.
+                let cover = (rain * 0.75 + thunder * 0.25).min(1.0);
                 self.list.push(GpuSky {
-                    axes: [[0.0; 4]; 3],
+                    axes: [[cover, (rain * 0.6 + thunder * 0.4).min(1.0), thunder, 0.0], [0.0; 4], [0.0; 4]],
                     uv: [
                         x.rem_euclid(1.0) as f32,
                         z.rem_euclid(1.0) as f32,
                         x.floor().rem_euclid(4096.0) as f32,
                         z.floor().rem_euclid(4096.0) as f32,
                     ],
-                    color: color.powf(2.2).extend(0.8).to_array(),
+                    color: color.powf(2.2).extend(0.8 + 0.15 * cover).to_array(),
                     ids: [index, kind::CLOUDS, w, h],
                     extra: [CELL as f32, 4.0, (lifted - cam.pos.y) as f32, reach as f32],
                 });
