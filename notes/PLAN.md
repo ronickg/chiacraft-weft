@@ -324,8 +324,10 @@ The smallest version that works is phases 1-4.
       the offer (protocol 8), so the join sheet refuses a too-new mod before downloading (built);
       a `required` flag per package at the next `package.toml` change, optional by default (a
       stopped required mod closes its world to joins and sends its players home); a call-cost
-      benchmark (`callcost`) before a release freezes 1.0. Next, 1.2: block and item callbacks,
-      channels, gizmos.
+      benchmark (`callcost`) before a release freezes 1.0. API 1.2 (built): callbacks on the
+      package's own blocks and items, `schedule`, channels; a second export (`content-hooks`)
+      found at run time so older components still run. Sample `bell`. The mod UI ABI's `at`
+      came with it (Weft mods rebuild once).
    4. *Client halves*: `code/client.wasm`, client calls only (HUD, screens, keys, channels to its
       server half), a frame budget.
    5. *Personal mods per world*: the player's own client halves, allowed or not by each world's

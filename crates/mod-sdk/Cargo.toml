@@ -1,10 +1,10 @@
 [package]
 name = "chiacraft-mod-sdk"
-version = "1.1.0"
+version = "1.2.0"
 edition.workspace = true
 license = "MIT"
 rust-version.workspace = true
-description = "Write sandboxed chiacraft mods in Rust: Weft's SDK names over the chiacraft:mods@1.1.0 WIT world, built for wasm32-unknown-unknown (docs/sandboxed-mods.md)"
+description = "Write sandboxed chiacraft mods in Rust: Weft's SDK names over the chiacraft:mods@1.2.0 WIT world, built for wasm32-unknown-unknown (docs/sandboxed-mods.md)"
 
 [dependencies]
 wit-bindgen = { version = "0.57.1", default-features = false, features = ["macros", "realloc"] }

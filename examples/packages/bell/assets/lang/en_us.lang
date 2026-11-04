@@ -1,0 +1,4 @@
+block.bell.bell = Bell
+item.bell.striker = Bell Striker
+bell.rang = The bell rings ({0} times now).
+bell.struck = The striker wears down: {0} left.
