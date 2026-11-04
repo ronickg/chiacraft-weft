@@ -85,6 +85,21 @@ fn reflect_project(rel: vec3<f32>) -> vec4<f32> {
     return vec4(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5, ndc.z, 1.0);
 }
 
+// How much the screen's reflections may show at `pos` (camera relative): none toward where the
+// cubes end. Past them the water is distant terrain, which is left out of these reflections (for
+// their cost), so near water mirrored the far shore's trees right up to that square's edge and the
+// far water beyond did not: a hard-edged rectangle of reflection, its sides straight (Ronald's
+// lake on the Mac, at a smaller view distance; the LOD worker's sea views, 11-05). The view
+// distance in chunks is the pack's 15th option (`core:view_distance`, `mods/base/src/look.rs`).
+fn reflect_reach(pos: vec3<f32>) -> f32 {
+    let chunks = scene.options[3].z;
+    if chunks <= 0.0 {
+        return 1.0;
+    }
+    let end = chunks * 16.0;
+    return 1.0 - smoothstep(end - 72.0, end - 24.0, max(abs(pos.x), abs(pos.z)));
+}
+
 fn apply(p: PostPixel) -> vec4<f32> {
     let water = p.color.a;
     // Not water, the eye in a liquid, or nothing drawn.
@@ -117,7 +132,10 @@ fn apply(p: PostPixel) -> vec4<f32> {
     let fresnel = reflect_fresnel(dot(-v, n));
     // Strength under 0.75 (the Low setting): as strong, in 16 longer steps that reach as far.
     let cheap = p.strength < 0.75;
-    let mask = smoothstep(0.02, 0.3, water) * select(min(p.strength, 1.0), 1.0, cheap);
+    let mask = smoothstep(0.02, 0.3, water) * select(min(p.strength, 1.0), 1.0, cheap) * reflect_reach(pos);
+    if mask <= 0.0 {
+        return p.color;
+    }
     // Walk out along it, the steps growing, from a random start against banding. Past something
     // thin without a clean hit it keeps going; a hit is narrowed down between the last two steps.
     let steps = select(REFLECT_STEPS, 16, cheap);
