@@ -90,8 +90,10 @@ value! {
     /// humidity 0 dry to 1 wet (dry air swings more between day and night), half the range
     /// between summer and winter, and the share of days with rain in each season (spring
     /// first). Set on biomes (`r.biome(..).set(&CLIMATE, ..)`); body temperature and the weather
-    /// read it (`notes/SURVIVAL.md`, `notes/ECOLOGY.md`).
-    pub struct Climate { pub celsius: f32, pub humidity: f32, pub seasons: f32, pub rain: [f32; 4] }
+    /// read it (`notes/SURVIVAL.md`, `notes/ECOLOGY.md`). And its air (`vitals::air`): the mean
+    /// wind in m/s and the days with fog in each season, and the kind of fog
+    /// (`vitals::climate::Fog::index`).
+    pub struct Climate { pub celsius: f32, pub humidity: f32, pub seasons: f32, pub rain: [f32; 4], pub wind: [f32; 4], pub fog: [f32; 4], pub fog_kind: u8 }
 }
 pub static CLIMATE: Component<Climate> = Component::named("base:climate");
 /// The calendar a dimension has (`vitals::calendar`): spring, summer, autumn and winter, or a
@@ -119,11 +121,12 @@ pub mod calendars {
 /// on it: every biome's numbers in one place, where the checks across systems read them.
 pub fn climate(biome: &str) -> Climate {
     let c = vitals::climate::of(biome).unwrap_or_else(|| panic!("no climate for {biome} in vitals::climate::BIOMES"));
-    Climate { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons, rain: c.rain }
+    Climate { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons, rain: c.rain, wind: c.wind, fog: c.fog, fog_kind: c.fog_kind.index() }
 }
 
-/// A biome without one: a mild, temperate place, raining a quarter of the days.
-pub const TEMPERATE: Climate = Climate { celsius: 12.0, humidity: 0.5, seasons: 10.0, rain: [0.25; 4] };
+/// A biome without one: a mild, temperate place, raining a quarter of the days, a light breeze
+/// and a few foggy mornings.
+pub const TEMPERATE: Climate = Climate { celsius: 12.0, humidity: 0.5, seasons: 10.0, rain: [0.25; 4], wind: [4.0; 4], fog: [8.0; 4], fog_kind: 0 };
 
 /// How hard survival is in this world (`vitals::difficulty::ALL`: gentle, normal, harsh), a
 /// game rule picked when the world is made and changed with `/rule difficulty`.
@@ -152,6 +155,11 @@ pub struct Air {
     pub open_sky: bool,
     pub raining: bool,
     pub snowing: bool,
+    /// The weather's air in this biome (`World::air_at`): the wind in m/s (it chills the cold out in
+    /// the open), the fog 0..1 (it shortens how far animals see, `sight`) and the snow lying.
+    pub wind: f32,
+    pub fog: f32,
+    pub snow: f32,
     /// Today in the dimension's calendar (`vitals::calendar`), and its kind (0: none).
     pub day: u16,
     pub calendar: u8,
@@ -187,6 +195,7 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
     let kind = SEASONS.on_dimension(w.dimension()).unwrap_or(0);
     let date = calendar::date(w.day_time());
     let year = if kind > 0 { date.from_midwinter() } else { 0.25 };
+    let weather = w.air_at(eye);
     let mut place = temperature::Place {
         biome_c: climate.celsius,
         humidity: climate.humidity,
@@ -200,6 +209,7 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
         fire,
         season: temperature::season(climate.seasons, year),
         underground,
+        wind: weather.wind,
     };
     if place.raining && temperature::air(&place) < 1.0 {
         (place.raining, place.snowing) = (false, true);
@@ -212,9 +222,18 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
         open_sky: place.open_sky,
         raining: place.raining,
         snowing: place.snowing,
+        wind: weather.wind,
+        fog: weather.fog,
+        snow: weather.snow,
         day: if kind > 0 { date.day as u16 + 1 } else { 0 },
         calendar: kind,
     }
+}
+
+/// How far an animal sees at `pos` against clear air, 1 to `vitals::air::FOG_SIGHT`: fog, a
+/// blizzard or a dust storm (`World::air_at`) close it in.
+pub fn sight(w: &World, pos: [f64; 3]) -> f32 {
+    vitals::air::sight(w.air_at(pos.map(|v| v.floor() as i32)).fog)
 }
 
 /// What the ground offers a plant at `pos` (`ground_at`): the day's mean air, how wet the soil

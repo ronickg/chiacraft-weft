@@ -1,0 +1,115 @@
+{
+ "species": "jaguar",
+ "about": "The jaguar (Panthera onca): pale yellow to reddish gold with black rosettes, bigger, darker and fewer than a leopard's, often with a spot in the middle; solid spots on the head, legs and cream belly; the tail ringed toward its black tip. Black jaguars carry a dominant black (an MC1R deletion), the rosettes still faintly seen.",
+ "loci": [
+  {
+   "id": "Mb",
+   "name": "Melanism",
+   "alleles": [
+    {
+     "a": "Mb",
+     "freq": 0.06,
+     "about": "black (dominant)"
+    },
+    {
+     "a": "mb",
+     "freq": 0.94
+    }
+   ]
+  },
+  {
+   "id": "Tn",
+   "name": "Tone",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "pale gold to deep orange-gold"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   204,
+   150,
+   48
+  ],
+  [
+   230,
+   184,
+   76
+  ]
+ ],
+ "habitats": {},
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw",
+    "eyelid_L",
+    "eyelid_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.07
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2",
+    "tail_3",
+    "tail_0_tilt",
+    "tail_1_tilt",
+    "tail_2_tilt",
+    "tail_3_tilt"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.12
+  },
+  "Lg": {
+   "bones": [
+    "leg_FL_upper",
+    "leg_FL_lower",
+    "leg_FR_upper",
+    "leg_FR_lower",
+    "leg_BL_upper",
+    "leg_BL_lower",
+    "leg_BR_upper",
+    "leg_BR_lower"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.07
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.1
+  }
+ },
+ "mark_scale": 2.2
+}

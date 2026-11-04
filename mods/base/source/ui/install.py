@@ -124,6 +124,11 @@ def fmt(v):
     return f"{round(v * 4) / 4:g}"
 
 
+# how wide items are drawn in a slot of the class (GUI pixels; the engine's 16 without): the
+# kit's frame is 2.5 of the slot's 18, so a 16-pixel icon would lie over it
+ICON = {"slot": 14, "hotbar": 14}
+
+
 def write(name, im, spec):
     im.save(os.path.join(GUI, name + ".png"))
     lines = []
@@ -131,6 +136,8 @@ def write(name, im, spec):
         w, h = (float(v) * F for v in spec["size"].split())
         border = " ".join(fmt(float(b) * F) for b in spec["border"].split())
         lines = ["scaling = nine_slice", f"border = {border}", f"size = {fmt(w)} {fmt(h)}"]
+    if name in ICON:
+        lines.append(f"icon = {ICON[name]}")
     path = os.path.join(GUI, name + ".gui")
     if lines:
         open(path, "w").write("\n".join(lines) + "\n")
@@ -252,9 +259,9 @@ def main():
     # the kit's toast laid out at its box's size, 160 x 32
     im, spec = load("toast")
     write("advancement_toast", muted(nine(im, 16, 320, 64).resize((160, 32), Image.LANCZOS)), {})
-    # the HUD's own frames in weathered bronze (the hotbar, the shortcuts, the clock), as the
-    # mockup: bright amber only for the selected slot
-    for name, part in (("hotbar", "slot"), ("tooltip", "tooltip")):
+    # the frames in weathered bronze (the hotbar, the shortcuts, the clock, the menus' slots and
+    # advancement tiles), as the mockup: bright amber only for the selected slot and what is done
+    for name, part in (("hotbar", "slot"), ("tooltip", "tooltip"), ("slot", "slot"), ("advancement_tile", "slot")):
         im, spec = load(part)
         write(name, muted(im), spec)
     # the vitals' bars (`hud.rs`): the kit's frame as a picture, and each fill laid on a canvas the

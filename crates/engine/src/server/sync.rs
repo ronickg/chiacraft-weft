@@ -121,6 +121,7 @@ impl Server {
         for d in &mut self.dims {
             d.day_moved = false;
             d.weather_moved = false;
+            d.air_moved = false;
             for r in &mut d.regions {
                 for st in r.bodies.values_mut() {
                     st.resend.clear();
@@ -215,6 +216,10 @@ fn send_clock(p: &mut Player, dim: &DimSet, tick: u64) {
     if dim.weather_moved || p.first_sync {
         p.conn
             .send(ToClient::Weather { raining: dim.raining, thunder: dim.thunder, only: dim.rain_here().map(|o| o.to_vec()) });
+    }
+    if dim.air_moved || p.first_sync {
+        p.conn
+            .send(ToClient::Air { air: dim.air.0.clone(), heading: dim.air.1 });
     }
     if tick % TPS as u64 == 0 || dim.day_moved {
         p.conn

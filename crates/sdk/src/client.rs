@@ -492,6 +492,17 @@ impl Packet {
     }
 }
 
+/// One biome's air (`World::set_air`): fog 0 clear to 1 thick, wind m/s, snow lying on the
+/// ground 0 to 1, and `abi::air_flags` (snowing, dust).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct BiomeAir {
+    pub biome: u32,
+    pub fog: f32,
+    pub wind: f32,
+    pub snow: f32,
+    pub flags: u32,
+}
+
 impl World {
     /// Sends `value` on `channel` to `player`'s client.
     pub fn send<T: Payload>(&self, player: u64, channel: &Channel<T>, value: &T) {
@@ -540,6 +551,37 @@ impl World {
     /// timing. A `/weather` command still wins for its time.
     pub fn set_rain(&self, biomes: &[u32], thunder: bool) {
         unsafe { (host().set_rain)(self.raw(), biomes.as_ptr(), biomes.len() as u32, thunder as u32) }
+    }
+
+    /// The air in this dimension's biomes until the next call, for each biome its `BiomeAir`, and
+    /// where the wind blows to (`heading`, degrees clockwise from north, -z). Biomes not named are
+    /// clear and still. Players see it (`scene.weather` in shader packs) and mods read it back
+    /// (`air_at`).
+    pub fn set_air(&self, air: &[BiomeAir], heading: f32) {
+        let biomes: Vec<u32> = air.iter().map(|a| a.biome).collect();
+        let fog: Vec<f32> = air.iter().map(|a| a.fog).collect();
+        let wind: Vec<f32> = air.iter().map(|a| a.wind).collect();
+        let snow: Vec<f32> = air.iter().map(|a| a.snow).collect();
+        let flags: Vec<u32> = air.iter().map(|a| a.flags).collect();
+        unsafe {
+            (host().set_air)(
+                self.raw(),
+                biomes.as_ptr(),
+                fog.as_ptr(),
+                wind.as_ptr(),
+                snow.as_ptr(),
+                flags.as_ptr(),
+                air.len() as u32,
+                heading,
+            )
+        }
+    }
+
+    /// The air set (`set_air`) in the biome at `pos`; clear and still if none was.
+    pub fn air_at(&self, pos: [i32; 3]) -> BiomeAir {
+        let mut out = [0.0f32; 4];
+        unsafe { (host().air_at)(self.raw(), &pos, &mut out) };
+        BiomeAir { biome: 0, fog: out[0], wind: out[1], snow: out[2], flags: out[3] as u32 }
     }
 
     pub fn thundering(&self) -> bool {

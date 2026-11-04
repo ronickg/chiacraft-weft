@@ -99,8 +99,11 @@ fn main() {
     if let Some(code) = test_jobs(&extra, &opts.run_dir) {
         std::process::exit(code);
     }
+    let testing = extra.iter().any(|(k, _)| k == "test");
     weft_engine::set_launch_options(extra);
     let player_mods = opts.run_dir.join("mods");
+    // Mods only the test kit's checks use (`play = false`) are kept apart and loaded for those.
+    let test_mods = opts.run_dir.join("test-mods");
     opts.package_dirs.insert(0, opts.run_dir.join("packages"));
     if let Some(dir) = pack {
         match weft_engine::modloader::pack(&dir, &player_mods) {
@@ -137,7 +140,8 @@ fn main() {
     // file in `run/mods` (again only when it changed).
     if !cfg!(debug_assertions) && root.join("mods").is_dir() {
         for dir in subdirs(&root.join("mods")) {
-            match weft_engine::modloader::pack_if_stale(&dir, &player_mods) {
+            let into = if marked(&dir, "play=false") { &test_mods } else { &player_mods };
+            match weft_engine::modloader::pack_if_stale(&dir, into) {
                 Ok((path, true)) => log::info!("packed {}", path.display()),
                 Ok(_) => {}
                 Err(e) => log::warn!("cannot pack {}: {e}", dir.display()),
@@ -150,6 +154,9 @@ fn main() {
     let shipped = root.join("run").join("mods");
     let separate = shipped != player_mods;
     opts.mod_dirs.push(player_mods);
+    if testing {
+        opts.mod_dirs.push(test_mods);
+    }
     if separate {
         opts.mod_dirs.push(shipped);
     }
@@ -292,6 +299,15 @@ fn subdirs(dir: &std::path::Path) -> Vec<PathBuf> {
     v
 }
 
+/// Whether a mod's Cargo.toml has `line` (spaces aside), as `dist = false` under
+/// `[package.metadata.weft]`.
+fn marked(dir: &std::path::Path, line: &str) -> bool {
+    std::fs::read_to_string(dir.join("Cargo.toml"))
+        .unwrap_or_default()
+        .lines()
+        .any(|l| l.replace(' ', "") == line)
+}
+
 /// A folder to hand to someone: the executable, the engine's assets and every mod packed.
 fn make_dist(root: &std::path::Path, out: &std::path::Path) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -300,8 +316,7 @@ fn make_dist(root: &std::path::Path, out: &std::path::Path) -> Result<(), String
     copy_dir(&root.join("crates").join("engine").join("assets"), &out.join("assets").join("core"))?;
     for dir in subdirs(&root.join("mods")) {
         // Development tools (the test kit) mark themselves `dist = false` in Cargo.toml.
-        let manifest = std::fs::read_to_string(dir.join("Cargo.toml")).unwrap_or_default();
-        if manifest.lines().any(|l| l.replace(' ', "") == "dist=false") {
+        if marked(&dir, "dist=false") {
             continue;
         }
         weft_engine::modloader::pack(&dir, &out.join("run").join("mods"))?;

@@ -1,0 +1,60 @@
+{
+ "species": "savanna_hawk",
+ "about": "The savanna hawk (Buteogallus meridionalis): rufous-cinnamon, the back greyer, finely barred dark below, long yellow legs; a black band on the tail.",
+ "loci": [
+  {
+   "id": "Tn",
+   "name": "Tone",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "deep rufous to cinnamon"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.08,
+   "sd": 0.04,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   150,
+   90,
+   40
+  ],
+  [
+   176,
+   116,
+   52
+  ]
+ ],
+ "habitats": {},
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  }
+ }
+}

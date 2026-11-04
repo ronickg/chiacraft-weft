@@ -15,6 +15,10 @@ flowchart LR
   climate --> weather["Rain by season<br/>base weather.rs"]
   calendar --> weather
   weather --> air
+  climate --> wind["Wind and fog<br/>vitals::air"]
+  wind --> weather
+  wind --> air
+  wind --> hunting
   weather --> plants["Plants grow<br/>base growth.rs"]
   climate --> plants
   plants --> forage["Foraging<br/>animals forage.rs"]
@@ -72,13 +76,19 @@ built, it gets its row below and its arrows above.
 | Climates | `vitals::climate::BIOMES`, each from a real place (`reports/ecology/Biome climates.md`) | same | the research | the air, the weather; biomes set it (`base_api::climate` in `worldgen.rs`, `cretaceous.rs`) |
 | Food kinds, diets | `vitals::food::Category`, `Species::eats` | `FOODS` rows, species rows | the research | foraging, the sheets, the animal screen's kind |
 | Foraging | `vitals::forage::SOURCES`, `mods/animals/src/forage.rs` | `SOURCES` rows | diets, plants (grazed grass grows back), hunger | animals' food and condition |
+| Drinking | `animals_core::needs` (`WATER`, `DRINKS`, `drink_lasts`), `mods/animals/src/drink.rs` | `WATER`, `SPARE`, `DAY_SECS`, `THIRSTY`, `SLAKED`, `GULP`, `PARCHED_SECS`, `DRINKS` rows | masses (genes, growth), cold blood, comfort (faster out of it), rain on it, water blocks near | `Animal::thirst`, condition (`comfort::condition`: parched is as weak as starving), wild ones dying of thirst, its screen's water |
+| Food off the ground | `vitals::forage::{DROPPED, dropped}`, `forage.rs` (`ground_food`), `World::dropped_item` | food items' kinds and portions (`FOODS`), `DROPPED`, `needs::MEAL` | dropped items, diets, freshness (spoiled is carrion), masses | animals' food; hunters eat it before hunting; items taken off the ground |
 | Hunting | `Species::{prey, hungry_in_the_wild}`, `OTHER_PREY`, `mods/animals/src/hunt.rs` | `prey` per species row | diets, masses (genes, growth), families, hunger | wild hunters' food, prey running (`wary`), kills (`ENTITY_DIED`) |
+| Birds' flight | `mods/animals/src/birds.rs` (`Wings` per model: raven, small birds, owls, eagles, vulture, gull) | `Wings` rows | walkers (scared), hunters (`hunt::wary`), now and then | the flying look (`<model>_fly`), where a bird lands to forage and hunt again |
+| Hunters' hunger | `animals_core::needs` (`MEAL`, `fills`, `prey_in`), `hunt::prey_lush`, `animal::arrive` | `MEAL`, `ARRIVES_FED`, `STARVES_SECS` | prey at home, their food this season (`forage::season_lush`), masses | how fed a wild hunter arrives, what a kill fills (by the prey's mass against its own) |
 | Soil, compost | `vitals::soil`, `mods/base/src/farming.rs` | `MAX`, `FEEDS`, `COMPOSTS`, `COMPOST_DAYS` | crops' harvests, dung (grazers), spoiled food (freshness), plant waste | crops' growth on farmland (`growth.rs`), tilling with hoes |
+| Food webs | `animals_core::web` (`gaps`, `WAITING`, `grazing`), `core/tests/places.rs` | `WAITING` rows (the gaps the plan fills), `vitals::forage::GRASS_COVER` | species' diets, prey sizes, habitats, crowds and hunger, `vitals::forage::SOURCES`, the grazed grass's growth, climates | the species sheet's food web table, the check |
 | Capacity | `vitals::forage::season_lushness`, `forage.rs` (`NATURAL_SPAWN`), `animal::arrive` | `SPAWN_FLOOR`, `ARRIVES_FED`, `YOUNG_PERCENT`, `STARVES_SECS` | plants, climates, calendar, breeding seasons | natural spawning, how fed wild ones arrive, young in season, starving |
 | Plants, soil water | `vitals::plants` (`PLANTS`, `rate`, `soil_water`), `base_api::ground_at`, `mods/base/src/growth.rs` | `PLANTS` rows, `GROWING` | climates, rain schedule, calendar, height, water within 4 blocks | the growing blocks' steps (wheat, berry bush, sapling, sugar cane, cactus) |
 | Rain by season | `mods/base/src/weather.rs`, `vitals::climate::{spell, rains, thunders}` | `rain` per season in `BIOMES` | climates, calendar, the world's seed | the engine (`set_rain`: rain drawn only where it falls), the air (`raining_at`) |
+| Wind and fog, snow, storms | `vitals::air`, `mods/base/src/weather.rs` (`/air`) | `wind`, `fog`, `fog_kind` per biome in `BIOMES`; `DAY_SPREAD`, `DAY_SWING`, `STORM`, `CLEARS`, `SNOWS_BELOW`, `SNOWFALL`, `MELT`, `BLIZZARD`, `DRY`, `DUST`, `FOG_SIGHT` | climates, calendar, rain spells and thunder, the world's seed | the engine (`set_air`: snow drawn where it is cold, `scene.weather`/`ground` for the pack's fog, storms, snow lying, swaying plants), the air (`air_at`: wind chill, fog), hunters and prey (`base_api::sight`) |
 | Calendar, seasons | `vitals::calendar` | `SEASON_DAYS`, `MIDSUMMER` | engine day time | the air, breeding seasons, day length (`.seasons(..)` on dimensions), the HUD clock |
-| The air | `base_api::air_at`, `vitals::temperature::air` | `temperature.rs` | climate, season, hour, height, sky light, rain here (`raining_at`), water, fires (`base_api::heat_of`) | player's body, animals' bodies, eggs |
+| The air | `base_api::air_at`, `vitals::temperature::air` | `temperature.rs`, `air::feels` | climate, season, hour, height, sky light, rain here (`raining_at`), the wind (`World::air_at`, chilling the cold in the open), water, fires (`base_api::heat_of`) | player's body, animals' bodies, eggs |
 | Player's body | `mods/base/src/survival/` (a file per part: breath, food, temperature, camp, stamina, body, load, health) | `vitals` | air, stomach, stats, effects, armor, difficulty | HUD, health and speed modifiers, death |
 | Stomach, food | `vitals::food`, `vitals::stomach`, `base_api::eat` | `FOODS` | food items (`NUTRITION`, `FRESHNESS`) | max health and stamina, regen, warmth, food poisoning |
 | Effects | `vitals::effects` | `modifiers()` | | player's body, animals (cold, heat), HUD icons (`install.py` `EFFECT_ICONS`) |
@@ -103,10 +113,13 @@ built, it gets its row below and its arrows above.
   panics at start; a biome that sets none is a mild temperate place raining a quarter of the
   days); the species living there (comfort, eggs: `places.rs` checks); the sheet.
 - **A species, or a new one**: its row in `species.rs` with comfort, breeding seasons and
-  habitats (each habitat needs a climate); the species sheet; `places.rs` checks it on its own.
+  habitats (each habitat needs a climate); how much of its water it drinks (`needs::DRINKS`; not
+  listed, all of it); the species sheet; `places.rs` checks it on its own.
 - **A food, or a new food item**: a row in `vitals::food::FOODS` (an item without one can't be
   eaten; the game test `every_food_has_nutrition` fails); `NUTRITION` and `FRESHNESS` on the
-  item (`items.rs`); `balance.rs` (well fed from a few foods); the sheet.
+  item (`items.rs`); `balance.rs` (well fed from a few foods); the sheet. Its kind and portion
+  are what animals eat it off the ground by (`forage.rs`); an item animals eat that isn't a
+  player's food goes in `vitals::forage::DROPPED`.
 - **Temperature rules** (`temperature.rs`, `air_at`): players' effects, animals' comfort and
   eggs all move together; `places.rs` says if a species stops being at home or its eggs stop
   hatching.
@@ -115,7 +128,11 @@ built, it gets its row below and its arrows above.
   `.on_grow(|e| growth::grow(..))` (`blocks.rs`); the sheet.
 - **A food in the world, or a new diet**: its row in `vitals::forage::SOURCES` (and the plant that
   renews it in `vitals::plants`), the species' `eats` from its research; `places.rs` checks
-  plant eaters find food at home; the sheets.
+  plant eaters find food at home, and `web.rs` that every food in a diet is in the world and
+  every plant eater eats in every season; the sheets.
+- **A species, or a habitat**: the food webs (`animals_core::web`): its foods, prey and
+  predators where it lives. A gap it closes comes off `web::WAITING`; a gap it opens goes on
+  with what fills it, or gets filled.
 - **The calendar** (season length, midsummer): breeding seasons, day length, the clock, the
   climates' seasons, eggs in each breeding season.
 - **An effect, or a new one**: `effects.rs` (`ALL`, `modifiers`, `icon`); its icon in
@@ -144,6 +161,10 @@ built, it gets its row below and its arrows above.
 | The climates are their real places | `vitals/tests/places.rs` | a biome's year mean, seasons or rainiest season drifting from its place's research |
 | Every plant grows somewhere | `vitals/tests/places.rs` | a plant whose warmth or water no biome gives |
 | Plant eaters find food where they live | `animals/core/tests/places.rs` | a plant eater whose food grows in fewer than two seasons in one of its habitats |
+| Hunters fill up on their prey at home | same | a hunter whose biggest prey at home takes more than ten kills to fill it |
+| Most of every diet is in the game | same | a species with under half its diet growing or on the ground as items |
+| A drink lasts a while | same | a species that would be thirsty again in under 10 minutes |
+| Desert animals barely drink | same | a species living only in dry places that drinks over half its water |
 | One growing pace | `animals/core/tests/places.rs` | `vitals::plants::GROWING` and `animals_core::biology::GROWING` apart |
 | Rain follows the shares | `vitals/src/climate.rs` | the rain schedule raining more or less often than a season's share |
 | Every habitat has a climate | `animals/core/tests/places.rs` | a species living in a biome with no climate |

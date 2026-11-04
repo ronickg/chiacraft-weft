@@ -68,6 +68,7 @@ pub fn problems() -> Vec<String> {
         fire: 0.0,
         season: 0.0,
         underground: false,
+        wind: 0.0,
     };
     let feels = |b: &Body, p: &Place| temperature::feeling(b.target(temperature::air(p)));
     if feels(&person, &noon(18.0)) != Feeling::Comfortable {

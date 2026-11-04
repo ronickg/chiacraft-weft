@@ -27,6 +27,8 @@ pub struct Place {
     pub season: f32,
     /// Deep under ground: the air keeps the year's mean, no day, sun or weather.
     pub underground: bool,
+    /// The wind in m/s (at 10 m): out in the open it chills the cold (`air::feels`).
+    pub wind: f32,
 }
 
 /// The air's temperature where one stands, in °C.
@@ -48,6 +50,9 @@ pub fn air(p: &Place) -> f32 {
     }
     if p.open_sky && p.snowing {
         t -= 5.0;
+    }
+    if p.open_sky && !p.in_water {
+        t = crate::air::feels(t, p.wind);
     }
     if p.in_water {
         t = t.min(p.biome_c - 4.0); // water is cooler than the air, and takes heat fast

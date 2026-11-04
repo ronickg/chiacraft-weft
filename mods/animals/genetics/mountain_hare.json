@@ -1,0 +1,183 @@
+{
+ "species": "mountain_hare",
+ "about": "The mountain hare (Lepus timidus): greyer brown in summer, white in its winter coat with the ear tips staying black, the tail white all year. Most of them turn white; in milder country (Ireland's lowlands) many stay brown. The game has no moult yet, so a white one is white all year: commonest where there is snow.",
+ "loci": [
+  {
+   "id": "Wi",
+   "name": "Winter white",
+   "alleles": [
+    {
+     "a": "Wi",
+     "freq": 0.8,
+     "about": "white coat (the mountain hare's winter coat; dominant, as the snowshoe hare's winter-white Agouti allele)"
+    },
+    {
+     "a": "wi",
+     "freq": 0.2,
+     "about": "stays brown"
+    }
+   ]
+  },
+  {
+   "id": "Bt",
+   "name": "Black tail",
+   "alleles": [
+    {
+     "a": "Bt",
+     "freq": 0.0,
+     "about": "the tail black on top (the brown hare's)"
+    },
+    {
+     "a": "bt",
+     "freq": 1.0,
+     "about": "the tail white all over (the mountain hare's)"
+    }
+   ]
+  },
+  {
+   "id": "Mel",
+   "name": "Melanism",
+   "alleles": [
+    {
+     "a": "Mel",
+     "freq": 0.99
+    },
+    {
+     "a": "mel",
+     "freq": 0.01,
+     "about": "black (very rare, recessive)"
+    }
+   ]
+  },
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.3,
+   "sd": 0.12,
+   "about": "grey-brown to rufous"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   150,
+   96,
+   40
+  ],
+  [
+   186,
+   128,
+   56
+  ]
+ ],
+ "traits": {
+  "Md": {
+   "mean": 0.7,
+   "sd": 0.12
+  },
+  "Ms": {
+   "mean": 0.3,
+   "sd": 0.1
+  },
+  "Ct": {
+   "mean": 0.4,
+   "sd": 0.12
+  }
+ },
+ "habitats": {
+  "snow": {
+   "freq": {
+    "Wi": {
+     "Wi": 0.97,
+     "wi": 0.03
+    }
+   }
+  },
+  "taiga": {
+   "freq": {
+    "Wi": {
+     "Wi": 0.9,
+     "wi": 0.1
+    }
+   }
+  },
+  "mountains": {
+   "freq": {
+    "Wi": {
+     "Wi": 0.88,
+     "wi": 0.12
+    }
+   }
+  },
+  "forest": {
+   "freq": {
+    "Wi": {
+     "Wi": 0.6,
+     "wi": 0.4
+    }
+   }
+  },
+  "grassland": {
+   "freq": {
+    "Wi": {
+     "Wi": 0.3,
+     "wi": 0.7
+    }
+   }
+  }
+ },
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw",
+    "eyelid_L",
+    "eyelid_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Lg": {
+   "bones": [
+    "leg_FL_upper",
+    "leg_FL_lower",
+    "leg_FR_upper",
+    "leg_FR_lower",
+    "leg_BL_upper",
+    "leg_BL_lower",
+    "leg_BR_upper",
+    "leg_BR_lower"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.08
+  }
+ }
+}

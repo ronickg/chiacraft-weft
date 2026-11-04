@@ -1,0 +1,138 @@
+{
+ "species": "coyote",
+ "about": "The coyote (Canis latrans): grizzled light grey and fulvous, black hairs mixed in along the back, pale to white below, the legs, the ears' backs and the muzzle tawny, the tail tipped black with a dark spot at its base. Darker and greyer high up, more fulvous or whitish-grey in the desert. Black coyotes (a dominant black, from dogs) turn up rarely.",
+ "loci": [
+  {
+   "id": "Kb",
+   "name": "Dominant black",
+   "alleles": [
+    {
+     "a": "Kb",
+     "freq": 0.003,
+     "about": "black (dominant)"
+    },
+    {
+     "a": "kb",
+     "freq": 0.997
+    }
+   ]
+  },
+  {
+   "id": "Ru",
+   "name": "Fulvous",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.12,
+   "about": "grey to fulvous buff"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   206,
+   156,
+   52
+  ],
+  [
+   196,
+   168,
+   80
+  ]
+ ],
+ "traits": {
+  "Ho": {
+   "mean": 0.5,
+   "sd": 0.08
+  }
+ },
+ "habitats": {
+  "desert": {
+   "quantitative": {
+    "Ru": {
+     "mean": 0.62,
+     "sd": 0.1
+    },
+    "Dk": {
+     "mean": 0.32,
+     "sd": 0.1
+    }
+   }
+  },
+  "mountains": {
+   "quantitative": {
+    "Ru": {
+     "mean": 0.35,
+     "sd": 0.1
+    },
+    "Dk": {
+     "mean": 0.62,
+     "sd": 0.1
+    }
+   }
+  }
+ },
+ "build": {
+  "Ho": {
+   "bones": [
+    "ear_L",
+    "ear_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.4
+  },
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  },
+  "Lg": {
+   "bones": [
+    "leg_FL_upper",
+    "leg_FL_lower",
+    "leg_FR_upper",
+    "leg_FR_lower",
+    "leg_BL_upper",
+    "leg_BL_lower",
+    "leg_BR_upper",
+    "leg_BR_lower"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.05
+  }
+ }
+}

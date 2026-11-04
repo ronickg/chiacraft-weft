@@ -1,22 +1,29 @@
 //! Hunters and prey (`notes/ECOLOGY.md`, part 6). A hungry wild hunter looks round for prey of
 //! the sizes it takes (`Species::prey`, from its research: as shares of its own mass), chases the
 //! nearest and fights it (a knock-out kind through its anger, so a pack's kin join in); when it
-//! kills, it eats its fill (`ENTITY_DIED`), and what the kill drops is left as the carcass. It
-//! gives up a long chase. Animals of its own family it leaves alone, and players for now.
+//! kills, it eats the kill (`ENTITY_DIED`): it fills it by the prey's mass against its own
+//! (`animals_core::needs::fills`: a mouse is a twentieth of a fox's meal, a hare all of it), and
+//! what the kill drops is left as the carcass. It gives up a long chase. Animals of its own family
+//! it leaves alone, and players for now.
 //!
-//! Prey keep watch (`wary`): a wild animal that sees a hunter able to take it runs off.
+//! Its hunger is its prey's: it gets hungry in the wild where it has prey (`hungry_in_the_wild`),
+//! arrives as fed as its prey are (`animal::arrive`), and a full one leaves them be.
+//!
+//! Prey keep watch (`wary`): a wild animal that sees a hunter able to take it runs off. In fog
+//! both see less far (`base_api::sight`).
 
 use weft_sdk::*;
 
 use crate::animal::{self, ANIMAL};
-use crate::species::{self, OTHER_PREY, SPECIES};
+use crate::species::{self, OTHER_PREY, SPECIES, Species};
 
 /// The prey it chases (0: none), since when, and when it looks again (not saved).
 static HUNT: Component<[u64; 3]> = Component::named("animal_hunt");
 /// Until when it runs from a hunter (not saved).
 static WARY: Component<u64> = Component::named("animal_wary");
 
-/// Blocks a hunter looks for prey and prey watches for hunters.
+/// Blocks a hunter looks for prey and prey watches for hunters, in clear air: fog, a blizzard or
+/// a dust storm close both in (`base_api::sight`).
 const LOOK: f64 = 16.0;
 const WATCH: f64 = 10.0;
 /// It hunts under this share of its food, until this full (as foraging, `forage.rs`).
@@ -26,8 +33,6 @@ const FULL: f32 = 0.95;
 const GIVE_UP: u64 = 600;
 const LOOK_EVERY: u64 = 60;
 const RUN: u64 = 80;
-/// A meal of this share of its own mass fills it.
-const MEAL: f32 = 0.1;
 
 pub fn init(r: &mut Registry) {
     r.entity_component(&HUNT, [0u64; 3], 0);
@@ -36,7 +41,7 @@ pub fn init(r: &mut Registry) {
         r.attach(s.kind, &HUNT);
         r.attach(s.kind, &WARY);
     }
-    // A kill feeds the hunter that made it: a meal of a tenth of its mass fills it.
+    // A kill feeds the hunter that made it, by the prey's mass against its own.
     r.on(&ENTITY_DIED, |b| {
         let w = b.world();
         for d in b.iter() {
@@ -44,7 +49,7 @@ pub fn init(r: &mut Registry) {
             let Some(s) = a.species().filter(|s| s.hunts()) else { continue };
             let (Some(own), Some(prey)) = (mass(&w, d.killer), kind_mass(d.kind, None)) else { continue };
             let max = a.stat(species::FOOD);
-            let meal = (max * (prey / (own * MEAL)).min(1.0)).round() as u16;
+            let meal = (max * animals_core::needs::fills(own, prey)).round().max(1.0) as u16;
             animal::feed(&w, d.killer, meal);
             weft_sdk::info!(
                 "{} {} eats its kill ({:.1} kg of {}): food {} of {max:.0}",
@@ -57,6 +62,17 @@ pub fn init(r: &mut Registry) {
             w.component_mut(d.killer, &HUNT).map(|h| *h = [0; 3]);
         }
     });
+}
+
+/// How fed its prey are where `pos` is this season, 0 to 1: the best fed of its prey that live in
+/// that biome (`needs::prey_in`), by how much of their own food grows there now
+/// (`forage::season_lush`). `None`: none of its prey live there (only farm animals, which don't
+/// thin with the seasons).
+pub fn prey_lush(w: &World, s: &Species, pos: [i32; 3]) -> Option<f32> {
+    let biome = name_of(abi::entry_kind::BIOME, w.biome(pos));
+    animals_core::needs::prey_in(s, biome)
+        .map(|o| crate::forage::season_lush(w, o, pos))
+        .reduce(f32::max)
 }
 
 /// The mass in kg of an entity of `kind`: a species' grown mass (scaled by `size`, its genes and
@@ -73,7 +89,7 @@ fn kind_mass(kind: u32, size: Option<f32>) -> Option<f32> {
 }
 
 /// What `id` weighs now.
-fn mass(w: &World, id: u64) -> Option<f32> {
+pub(crate) fn mass(w: &World, id: u64) -> Option<f32> {
     let e = w.entity(id)?;
     let size = w.component(id, &ANIMAL).and_then(|a| {
         let index = (a.species as usize).checked_sub(1)?;
@@ -130,9 +146,15 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     h[2] = now + LOOK_EVERY;
+    // Food lying near (a carcass, dropped meat) is a meal without a chase: it eats that first
+    // (`forage.rs`).
+    if crate::forage::ground_food(w, s, st.pos, crate::forage::ITEM_LOOK).is_some() {
+        w.component_mut(id, &HUNT).map(|c| *c = h);
+        return false;
+    }
     let own = mass(w, id).unwrap_or(s.bio.mass);
     let prey = w
-        .near_bodies(st.pos, LOOK)
+        .near_bodies(st.pos, LOOK * base_api::sight(w, st.pos) as f64)
         .into_iter()
         .filter(|&t| t != id && family(w, t) != Some(s.family.name))
         .filter_map(|t| Some((t, w.entity(t)?, mass(w, t)?)))
@@ -168,7 +190,7 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(me) = mass(w, id) else { return false };
     let mine = family(w, id);
     let hunter = w
-        .near_bodies(st.pos, WATCH)
+        .near_bodies(st.pos, WATCH * base_api::sight(w, st.pos) as f64)
         .into_iter()
         .filter(|&t| t != id && family(w, t) != mine && !animal::tamed(w, t))
         .filter_map(|t| {

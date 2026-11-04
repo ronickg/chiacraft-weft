@@ -76,7 +76,7 @@ pub fn init(r: &mut Registry) {
         .tag("dry")
         .tag("hot")
         .set(&TREES, 0.0)
-        .set(&GRASS_COVER, 0.0)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("animals:red_dunes").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set(&FERNS, 0.004)
         .set_text(&FLOWERS, "animals:fern");
     // Dry, open land with a few conifers and ferns: between the dunes and the wet.
@@ -88,7 +88,7 @@ pub fn init(r: &mut Registry) {
         .tint(foliage, 0x8f9a3c)
         .tag("hot")
         .set(&TREES, 0.02)
-        .set(&GRASS_COVER, 0.1)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("animals:scrubland").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:spruce_log")
         .set(&FERNS, 0.06)
         .set_text(&FLOWERS, "animals:fern");
@@ -102,7 +102,7 @@ pub fn init(r: &mut Registry) {
         .tint(water, 0x4a6e5a)
         .tag("wet")
         .set(&TREES, 0.04)
-        .set(&GRASS_COVER, 0.05)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("animals:floodplain").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:spruce_log")
         .set(&FERNS, 0.35)
         .set_text(&FLOWERS, "animals:fern");
@@ -115,7 +115,7 @@ pub fn init(r: &mut Registry) {
         .tint(foliage, 0x4f8a2c)
         .tag("forest")
         .set(&TREES, 0.35)
-        .set(&GRASS_COVER, 0.03)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("animals:fern_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:spruce_log")
         .set(&FERNS, 0.3)
         .set_text(&FLOWERS, "animals:fern");

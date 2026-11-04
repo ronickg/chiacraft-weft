@@ -236,6 +236,16 @@ impl World {
         buf.truncate(n);
         buf
     }
+    /// What a dropped item carries (`None` for any other entity): food on the ground, for one.
+    pub fn dropped_item(&self, id: u64) -> Option<ItemStack> {
+        let s = unsafe { (host().entity_item)(self.raw(), id) };
+        (!s.is_empty()).then_some(s)
+    }
+    /// Sets what a dropped item carries (one fewer when an animal eats one); an empty stack
+    /// removes it.
+    pub fn set_dropped_item(&self, id: u64, stack: ItemStack) {
+        unsafe { (host().entity_set_item)(self.raw(), id, stack) }
+    }
     /// Whether that point is under a liquid's surface, which a block that isn't full lies below
     /// its top: for what the block alone can't tell, like a head above shallow water.
     pub fn in_liquid(&self, pos: [f64; 3]) -> bool {

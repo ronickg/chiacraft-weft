@@ -147,10 +147,12 @@ impl Weather {
                 let biome = world
                     .cube(cell >> 4i32)
                     .map_or(0, |cube| cube.biome((x & 15) as usize, (z & 15) as usize));
+                // Snowy biomes always, and wherever a mod's weather says it snows now (`set_air`).
                 let cold = c
                     .ids
                     .snowy
-                    .is_some_and(|t| c.components.has(crate::components::BIOME, biome as u32, t));
+                    .is_some_and(|t| c.components.has(crate::components::BIOME, biome as u32, t))
+                    || world.air_at(cell).3 & weft_abi::air_flags::SNOWING != 0;
                 let seed = (x.wrapping_mul(3121) ^ z.wrapping_mul(45238971)) as u32;
                 self.columns
                     .push(Column { x, z, bottom, top, cold, light: world.light(cell), seed: seed.wrapping_mul(0x9E37_79B1) >> 8 });

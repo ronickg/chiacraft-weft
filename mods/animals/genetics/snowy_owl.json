@@ -1,0 +1,78 @@
+{
+ "species": "snowy_owl",
+ "about": "The snowy owl (Bubo scandiacus): white, the male nearly pure, the female and the young barred dark; tiny ear tufts hidden in the head's feathers; yellow eyes. Bigger than the great horned owl.",
+ "loci": [
+  {
+   "id": "Tn",
+   "name": "Barring",
+   "quantitative": true,
+   "mean": 0.4,
+   "sd": 0.15,
+   "about": "how heavily a male is barred"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.85,
+   "sd": 0.12,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   226,
+   168,
+   40
+  ],
+  [
+   240,
+   190,
+   70
+  ]
+ ],
+ "traits": {
+  "Ho": {
+   "mean": 0.06,
+   "sd": 0.03
+  }
+ },
+ "habitats": {},
+ "build": {
+  "Ho": {
+   "bones": [
+    "tuft_L",
+    "tuft_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.98
+  },
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  }
+ }
+}

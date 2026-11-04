@@ -8,6 +8,7 @@
 //! reached.** Well fed, max health and stamina are the stats' values; on an empty stomach they
 //! fall to a floor, never to death.
 
+pub mod air;
 pub mod balance;
 pub mod calendar;
 pub mod climate;

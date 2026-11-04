@@ -409,10 +409,16 @@ and cactus.**
   species' (`animals/core/tests/places.rs`).
 - **Seen in the game (plains):** wheat at 18% of its best in early spring, 64% in summer, 0 in a
   dry autumn spell and in winter frost, and 76% beside water in summer.
+- **Frost** (2026-11-03): each plant's frost point from its research (`Plant::frost`: spring wheat
+  and a blueberry's fruit -2 °C, sugar cane -1, a saguaro -7, oaks and grass hardy). A growth step
+  in colder air where it stands (a fire nearby keeps it off) kills the wheat, takes the bush's
+  fruit, or kills a cane's or cactus's stalk down to its base, which sprouts again in spring
+  (`growth.rs`). Every tender plant keeps a frost-free season where it grows well
+  (`vitals/tests/places.rs`); the sheet marks the seasons whose nights freeze it. Not yet seen in
+  the game: a 90-second midwinter night didn't kill a fresh wheat field (likely no growth step came
+  in that time).
 - **Not yet:**
-  - grass and tall grass regrowing (comes with grazing, part 5);
-  - frost killing tender crops;
-  - the new crops and wild plants from the research;
+  - the new crops and wild plants from the research (winter wheat and rye, hardy);
   - unloaded plants catch up at today's season, not the season they missed.
 
 
@@ -445,7 +451,13 @@ and cactus.**
 - **Diets:** every species' row has its researched diet as shares (`Species::eats`). Its label
   (carnivore, omnivore, herbivore) follows from the plant share.
 - **The sheets:** `SPECIES.md` lists each diet.
-- **Not yet:** taming foods still come from each species' item list; water as a need.
+- **Water (2026-11-03):** each species needs its own water, `0.099 · kg^0.9` litres a day (a
+  cold-blooded one a fifth), and drinks its share of it (`animals_core::needs::DRINKS`: a deer
+  70%, a vole 10%, the desert's Kryptobaatar and lizard 10%, fish none). A drink lasts it the 15%
+  of its mass it can spare over what it drinks a day, a real day being 600 s on the hunger meter's
+  clock: a deer is thirsty every 17 minutes, a vole every 54, the lizard every 4½ hours. The goal is
+  `mods/animals/src/drink.rs`, part 5.
+- **Not yet:** taming foods still come from each species' item list.
 
 
 - **The categories:** grass, leaves, water plants, fruit, seeds, roots, lichen, fungi, insects, meat, fish, carrion and water. Water plants, lichen and fungi came from the research: the capybara lives on water plants, reindeer on lichen in winter, and the taiga's fungi feed rodents and boar.
@@ -470,7 +482,8 @@ and cactus.**
 - **Food in the world:** `vitals::forage::SOURCES` lists tall grass (grazed short, growing back
   by warmth and rain as `base:grazed_grass`), ripe berries (the bush starts again), and browse.
   Browse is leaves where their trees grow (deciduous ones from spring to autumn, spruce and
-  acacia all year) and cactus pads in the desert, worth 40% of fresh growth. Seeds and fruit
+  acacia all year), cactus pads in the desert, and the Cretaceous's ferns all year (Protoceratops's
+  low browse), worth 40% of fresh growth. Seeds and fruit
   that are always there count the same way:
   - tall grass seeding in summer and autumn;
   - the desert's seed bank under dead bushes all year;
@@ -489,11 +502,29 @@ and cactus.**
   more (`animals/core/tests/places.rs`).
 - **Seen in the game:** a hungry capybara in the plains grazed four tall grasses in 40 seconds,
   leaving short tufts.
+- **Food off the ground (2026-11-03):** the engine tells a mod what a dropped item carries
+  (`World::dropped_item`, `set_dropped_item`, new). A hungry animal looks within 12 blocks for
+  dropped food of its diet before growing food (`forage.rs`): every food item by its kind and
+  portion, and dropped seeds and grain (`vitals::forage::DROPPED`); spoiled food is carrion, for
+  carrion eaters only. It eats an item a mouthful, each filling it by its weight against a meal of
+  a tenth of its mass (`animals_core::needs::fills`), and a hunter with food lying near eats that
+  before it hunts. The check: at least half of every diet is food the game has, growing or on the
+  ground (`places.rs`). Testing: `/tk drop <item> <pos> [count]`. Seen: a hungry deer ate five
+  dropped berries (1% of its food each) and wheat seeds; a hungry fox with mice about went for a
+  dropped porkchop (+32%); mice ate berries and seeds.
+- **Drinking (2026-11-03):** the animals that get hungry get thirsty too, once a second, faster
+  out of their comfort; rain on them and wading slake them a little. Under half its water an
+  animal walks to the nearest open water within 16 blocks it can stand beside, and drinks a
+  quarter a gulp until slaked, before it forages (`drink.rs`). Parched, it's as weak as starving
+  (`comfort::condition` takes the worse), and a wild one dies of thirst in a game day. Its screen
+  shows its water. The checks: a drink lasts every drinker 10 minutes or more, and one living only
+  in dry places drinks at most half its water (`places.rs`). Testing: `/animal thirsty [percent]`.
+  Seen: a deer at 30% water and 30% food walked to a pool 9 blocks off, drank to full in three
+  gulps, then ate dropped berries; a hare at 20% drank there too.
 - **Not yet:**
-  - **Hunters:** they get hungry in the wild with prey, part 6.
-  - **Eating food off the ground:** needs the engine to tell a mod what a dropped item is.
-  - **Drinking.**
-  - **Unloaded areas:** a wild animal's hunger doesn't run while its area is unloaded.
+  - **Unloaded areas:** a wild animal's hunger and thirst don't run while its area is unloaded.
+  - **Remembered water:** an animal finds water only within 16 blocks; a herd doesn't know its
+    waterholes (part of migration, later).
 
 
 - **Hunger:** wild animals get the food meter tames have, using it up at the species' rate.
@@ -521,6 +552,13 @@ and cactus.**
   family or a player, and chases it. A knock-out kind fights through its anger, so a pack's kin
   join in. It gives up after 30 seconds, and a kill feeds it, a tenth of its own mass filling it.
   What the kill drops stays as the carcass.
+- **Hunger by prey (2026-11-03):** a kill fills a hunter by the prey's mass against a meal of a
+  tenth of its own (`animals_core::needs::fills`: a mouse is 4% of a fox's food, a hare all of
+  it), and a wild hunter arrives as fed as its best-fed prey there are this season
+  (`hunt::prey_lush`), so hunters are thin in the winter their prey are thin in. The check: every
+  hunter fills up on its biggest prey at home in ten kills or fewer (`places.rs`; the raven takes
+  3.4 mice, the wyvern 1.7 kills). Seen: a fox at 10% hunted a mouse, gave up a 30-second chase,
+  took it on the next try and ate it (food 10 to 12 of 96).
 - **Prey watch:** a wild animal that sees a hunter able to take it within 10 blocks runs.
 - **The old random hunts are gone:** the raptors' and Utahraptor's "now and then" hunts are
   replaced.
@@ -532,7 +570,8 @@ and cactus.**
 - **Not yet:**
   - **Hunting players:** a decision for later. The research says a lone raptor would take a person.
   - **Packs together:** they don't take bigger prey together yet.
-  - **Scavenging carcasses:** needs the engine to tell a mod what a dropped item is.
+  - **Carcasses of our own species:** a kill's drops are eaten off the ground now (food off the
+    ground, part 5), but the wild species drop nothing yet: a carcass item for them is to come.
   - **Not seen:** prey running from a hunter.
 
 
@@ -606,7 +645,7 @@ and cactus.**
 - **Seen in the game:** the bin filling, its top turning to dirt.
 - **Not yet:**
   - food and carcasses on the ground rotting away;
-  - scavengers eating them (both need the engine to tell a mod what a dropped item is);
+  - scavengers eat food and carrion off the ground (part 5), but our species leave no carcass yet;
   - the generated art for dung, compost and the bin (placeholders now, `notes/STYLE.md`).
 
 
@@ -683,6 +722,19 @@ Each step closes a smaller loop and can be played on its own.
 7. **The player's links**: clothing and meals, in Survival's order.
 
 ## The checks that keep it balanced
+
+Built (2026-11-03): `animals_core::web` checks the diets, every season's food, hunters' prey,
+whole webs and predators, and the species sheet shows each biome's web and its gaps; the gaps the
+plan fills are listed in `web::WAITING` with what fills them. It found the temperate biomes bare in
+winter, and the diets' insects, roots, fungi, lichen and water plants in no place of the world.
+The world's food (`vitals::forage::SOURCES`) gained winter's standing hay, deciduous twigs and
+fallen mast, lichen (the tundra's and taiga's ground, the mountains' rocks), fungi, roots dug
+from the ground, insects in the grass, sand and the north's summer, and reeds and horsetails as
+water plants. A year holds too (`web::grazing`): in each biome's best season for grass, its
+grazers, as many of each as live together, eat at most 18% of what its tall grass grows back (the
+mountains; the plains 3%): nothing grazes a biome bare. That is far under what real grazers take
+of a grassland (a quarter to a half), so tall grass rarely looks grazed down but round a herd; a
+choice for later. The grass cover is now `vitals::forage::GRASS_COVER`, which the world reads.
 
 These are like `places.rs`: they read the tables, so a new biome, plant or species is checked
 the moment it's added.

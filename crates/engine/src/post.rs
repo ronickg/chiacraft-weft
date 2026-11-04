@@ -27,13 +27,15 @@ pub struct Post {
     /// bindless indices.
     targets: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
     params: Vec<BufferId>,
+    /// A scene of zeros, bound when there is no world's (`apply`).
+    no_scene: Option<BufferId>,
 }
 
 const MAX_PASSES: usize = 16;
 
 impl Post {
     pub fn new(gpu: &mut dyn Backend, assets: &Assets) -> Post {
-        let mut p = Post { pipeline: None, slots: Slots::default(), active: Vec::new(), targets: None, params: Vec::new() };
+        let mut p = Post { pipeline: None, slots: Slots::default(), active: Vec::new(), targets: None, params: Vec::new(), no_scene: None };
         p.reload(gpu, assets);
         p
     }
@@ -99,8 +101,18 @@ impl Post {
 
     /// Runs the effects over the scene; the last one draws onto the screen and leaves that pass
     /// open for the UI.
-    pub fn apply(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo) {
+    /// `scene` is the buffer the world was drawn with (`gpu_layout::Scene`).
+    pub fn apply(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, scene: Option<BufferId>) {
         let (Some(pipe), Some((tex, idx, _))) = (self.pipeline, self.targets) else { return };
+        let scene = match scene {
+            Some(b) => b,
+            None => *self.no_scene.get_or_insert_with(|| {
+                let size = size_of::<crate::gpu_layout::Scene>();
+                let b = gpu.create_buffer(size as u64, usage::STORAGE | usage::HOST, "post no scene");
+                gpu.mapped(b)[..size].fill(0);
+                b
+            }),
+        };
         while self.params.len() < gpu.frames_in_flight() {
             self.params
                 .push(gpu.create_buffer((size_of::<Pass>() * MAX_PASSES) as u64, usage::STORAGE | usage::HOST, "post passes"));
@@ -126,6 +138,7 @@ impl Post {
             list.push(Cmd::BeginPass { color: Some((target, Some([0.0; 4]))), depth: None });
             list.pipeline(pipe);
             list.bind(crate::gpu_layout::bind::post::PASSES, buf);
+            list.bind(crate::gpu_layout::bind::post::SCENE, scene);
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: i as u32 });
             if i + 1 < n {
                 list.push(Cmd::EndPass);

@@ -1,0 +1,130 @@
+{
+ "species": "red_deer",
+ "about": "The red deer (Cervus elaphus): red-brown in summer, greyer brown in winter, the rump patch and underside buff; calves spotted. Bigger than the white-tailed deer, drawn so by its size genes on the same model.",
+ "loci": [
+  {
+   "id": "Pb",
+   "name": "Piebald",
+   "alleles": [
+    {
+     "a": "Pb",
+     "freq": 0.995
+    },
+    {
+     "a": "pb",
+     "freq": 0.005,
+     "about": "piebald: white patches (recessive)"
+    }
+   ]
+  },
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.55,
+   "sd": 0.12,
+   "about": "grey-brown (a winter coat's) to red-brown"
+  },
+  {
+   "id": "Bu",
+   "name": "Buff",
+   "quantitative": true,
+   "mean": 0.85,
+   "sd": 0.1,
+   "about": "the underside and rump white to buff"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.92,
+   "sd": 0.05,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   22,
+   16,
+   14
+  ],
+  [
+   56,
+   36,
+   26
+  ]
+ ],
+ "traits": {
+  "Ho": {
+   "mean": 0.52,
+   "sd": 0.08
+  }
+ },
+ "sexes": {
+  "female": {
+   "Ho": -0.7
+  }
+ },
+ "young": {
+  "traits": {
+   "Ho": -0.45
+  },
+  "pattern": "spotted"
+ },
+ "habitats": {},
+ "build": {
+  "Ho": {
+   "bones": [
+    "antler_L",
+    "antler_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.98
+  },
+  "Nk": {
+   "bones": [
+    "neck"
+   ],
+   "axes": [
+    0.2,
+    1,
+    0.2
+   ],
+   "range": 0.06
+  },
+  "Lg": {
+   "bones": [
+    "leg_FL_upper",
+    "leg_FL_lower",
+    "leg_FR_upper",
+    "leg_FR_lower",
+    "leg_BL_upper",
+    "leg_BL_lower",
+    "leg_BR_upper",
+    "leg_BR_lower"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.05
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.08
+  }
+ }
+}
