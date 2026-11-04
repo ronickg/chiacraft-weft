@@ -1,0 +1,18 @@
+{
+ "kind": "block",
+ "what": "a campfire seen from straight above, filling the face edge to edge: a ring of grey stones round the border, crossed split oak logs inside, glowing orange embers and a bright yellow-white fire core in the middle, grey ash between the logs (this whole face shows)",
+ "size": [
+  32,
+  32
+ ],
+ "full": true,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.582,
+   "empty": 0,
+   "seam": 1.02,
+   "passed": true
+  }
+ ]
+}

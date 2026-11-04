@@ -86,6 +86,8 @@ again (once or twice) rather than fixed by hand:
   as that line: look, and keep it if the outline is its own darker shade.
   A dark, glossy thing (coal) has bright glints on its edges, so its edge measures lighter than
   its inside and fails the outline rule too: look, and keep it if it reads right.
+  Glass (a potion flask) is outlined in white on purpose (the item guide's recipe), so it fails the
+  outline rule by design: pass `--pale` for glass.
 - **Full faces** (a chest front, a workstation face, a cloud or star tile) fill their canvas: make
   them as tiles (`--tile`, blocks without `--cutout`), or the fill check fails them.
 - **Background**: flat magenta (or green) all round, nothing stray on it.
@@ -101,8 +103,27 @@ again (once or twice) rather than fixed by hand:
 - Don't "clean" it afterwards (guessing a grid, reducing the palette, voting colors): that was
   tried and mangled the icons.
 - Magenta (or green) cells become transparent; every other pixel is fully opaque.
+- On green, don't ask for a shadow under the thing: it gets drawn in the key color and stays as a
+  green fringe. Key out pixels where green clearly beats red and blue (the beans, 11-04).
 - Glows (the sun, fire, magic) blend into magenta as a pink ring: ask for glows on green, or take
   the pink pixels out after cutting (`r > 200, g < 160, b > 100`).
+
+## Part-built tools (crafting)
+
+Tools built from parts (head, haft, binding; blade, guard, grip, pommel) sit on fixed sockets on the
+32 px diagonal. What Ronald's first answer taught (11-04, "axe heads are kinda bad"): a head
+recoloured from one material's map loses what makes each material read (crude knapped stone and
+carved wood, gold's flared shape and shadow bands, diamond's facets), and the collar thins out.
+So every head is drawn per material (an override: cut from that material's drawn tool by position,
+`notes/ui-codex/parts/heads.py`, set on the shared socket at the average of the heads' bases),
+crude heads go on a plain wooden haft (its own part shape), and the shade map with a material ramp
+is only the fallback for a material with no drawn head yet, with 10 fill steps, not 5.
+
+## Keeping it
+
+Nothing generated is ever thrown away: each try, cut sprite, review sheet and replaced texture goes
+to `/Users/ronald/Coding/chiacraft-archive/images/chiacraft-art/<date>/`, outside the repo, and is
+never deleted (Ronald's rule, 2026-11-04). `art.py` does it on its own.
 
 ## Showing it
 

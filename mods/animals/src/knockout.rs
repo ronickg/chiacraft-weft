@@ -187,12 +187,14 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
     move |w, id, st| {
         let Some(k) = w.component(id, &KNOCKOUT).copied() else { return false };
         let max = max_torpor(w, id);
+        // Ticks since it last ticked (a resting one, no player near, ticks now and then).
+        let e = w.tick_elapsed(id);
         if k.out == 0 {
             if k.torpor > 0.0 {
-                set(w, id, |k| k.torpor = (k.torpor - max * AWAKE_DRAIN).max(0.0));
+                set(w, id, |k| k.torpor = (k.torpor - max * AWAKE_DRAIN * e as f32).max(0.0));
             }
             if k.angry > 0 {
-                set(w, id, |k| k.angry -= 1);
+                set(w, id, |k| k.angry = k.angry.saturating_sub(e as _));
                 let alive = w.entity(k.angry_at).is_some_and(|e| e.health > 0.0);
                 if alive {
                     crate::wake(w, id, index);
@@ -215,15 +217,15 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                     .spread(0.1),
             );
         }
-        let torpor = k.torpor - max * OUT_DRAIN;
+        let torpor = k.torpor - max * OUT_DRAIN * e as f32;
         if torpor <= 0.0 {
             wake_up(w, id, index, st);
             return true;
         }
         set(w, id, |k| {
             k.torpor = torpor;
-            k.bite = k.bite.saturating_sub(1);
-            k.out = k.out.saturating_add(1);
+            k.bite = k.bite.saturating_sub(e as _);
+            k.out = k.out.saturating_add(e as _);
         });
         if k.bite <= 1 && k.count > 0 {
             bite(w, id, st);

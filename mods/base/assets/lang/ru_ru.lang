@@ -521,3 +521,6 @@ item.base.salt.tooltip = Вываривается из ведра воды в п
 item.base.leather.tooltip = С коров и оленей.
 item.base.string.tooltip = С пауков или спрядена из двух растительных волокон.
 block.base.wool.tooltip = С овец или из четырёх нитей.
+block.base.kelp = Ламинария
+item.base.kelp = Ламинария
+item.base.cooked_wild_rice = Варёный дикий рис

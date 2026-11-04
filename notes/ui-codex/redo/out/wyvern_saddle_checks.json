@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a big riding saddle for a flying wyvern, seen from the side and slightly above, reading clearly as a saddle: a dark red-brown leather seat with a high back and a front horn, a gold buckle strap, one stirrup hanging below, its longest side about 26 px of the 32",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.24,
+   "outline": 0.78,
+   "red_line": 0.18,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

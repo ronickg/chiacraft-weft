@@ -26,15 +26,47 @@ use crate::species::SPECIES;
 
 pub static GENOME: Component<Genome> = Component::named("genome");
 
+/// The size an animal's genes draw (`size`) and the genes it was read from (a fingerprint), not
+/// saved: reading its gene file every tick for every animal cost the tick (P3), and its genes
+/// rarely change (given once, `upkeep`).
+static SIZE: Component<[u32; 2]> = Component::named("animal_gene_size");
+
 pub fn init(r: &mut Registry) {
     r.entity_component(&GENOME, Genome::default(), component_flags::SAVE | component_flags::SYNC_WATCHERS | component_flags::SYNC_MENU);
+    r.entity_component(&SIZE, [0u32; 2], 0);
     for (i, s) in SPECIES.iter().enumerate() {
         r.attach(s.kind, &GENOME);
+        r.attach(s.kind, &SIZE);
         r.entity_skin(s.kind, &GENOME, move |g, skin| paint_skin(i, g, skin));
     }
     for p in animals_core::problems() {
         weft_sdk::error!("{p}");
     }
+}
+
+/// The size `id`'s genes draw (`size`): read once for the genes it has, then kept.
+pub fn size_of(w: &World, id: u64) -> Option<f32> {
+    let g = w.component(id, &GENOME)?;
+    let print = fingerprint(g);
+    if let Some(&[bits, p]) = w.component(id, &SIZE)
+        && bits != 0
+        && p == print
+    {
+        return Some(f32::from_bits(bits));
+    }
+    let size = size(g);
+    if let Some(c) = w.component_mut(id, &SIZE) {
+        *c = [size.to_bits(), print];
+    }
+    Some(size)
+}
+
+/// What a genome's size is read from: its species, sex and genes (FNV-1a).
+fn fingerprint(g: &Genome) -> u32 {
+    [g.species, g.female]
+        .iter()
+        .chain(&g.genes)
+        .fold(0x811c_9dc5u32, |h, &b| (h ^ b as u32).wrapping_mul(0x0100_0193))
 }
 
 /// Paints an animal's coat from its genes over its kind's texture, and sets its build.

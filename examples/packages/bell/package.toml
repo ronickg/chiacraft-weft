@@ -1,0 +1,11 @@
+# An example package with a sandboxed server half built against API 1.2: callbacks on the
+# package's own block and item, a scheduled tick, a channel. code/server.wasm, from
+# examples/wasm/bell.
+format = "1.0"
+id = "bell"
+version = "0.1.0"
+name = "Bell"
+description = "A bell that rings when used and puffs a moment later; a striker that wears out."
+
+[dependencies]
+base = "*"

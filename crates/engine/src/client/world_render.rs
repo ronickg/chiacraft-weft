@@ -566,7 +566,15 @@ impl WorldRenderer {
     /// The terrain's solid and cutout blocks within the shadow box `light` (camera-relative to its
     /// clip space, an orthographic box along the light) into the bound depth target: the world's
     /// cubes only (structures and distant terrain cast none), with `scene` the shadow pass's.
-    pub fn draw_shadow(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, cam: &Camera, light: Mat4, scene: BufferId) {
+    pub fn draw_shadow(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        cam: &Camera,
+        light: Mat4,
+        scene: BufferId,
+    ) {
         let Some([face_pipe, quad_pipe]) = self.shadow_pipes else { return };
         let cam_block = cam.pos.floor();
         let cam_cube: IVec3 = cam_block.as_ivec3() >> 4i32;
@@ -587,7 +595,10 @@ impl WorldRenderer {
                 continue;
             }
             let center = ((r << REGION) - cam_cube).as_vec3() * 16.0 - cam_frac + Vec3::splat(side / 2.0);
-            if !planes.iter().all(|pl| pl.dot(center.extend(1.0)) > -side * 0.8661) {
+            if !planes
+                .iter()
+                .all(|pl| pl.dot(center.extend(1.0)) > -side * 0.8661)
+            {
                 continue;
             }
             for &(key, m) in meshes {
@@ -634,11 +645,8 @@ impl WorldRenderer {
             while end < draws.len() && draws[end].0 == kind && draws[end].2 == page {
                 end += 1;
             }
-            let (pipe, buf) = if kind == 0 {
-                (face_pipe, self.faces.pages[page as usize].0)
-            } else {
-                (quad_pipe, self.quads.pages[page as usize].0)
-            };
+            let (pipe, buf) =
+                if kind == 0 { (face_pipe, self.faces.pages[page as usize].0) } else { (quad_pipe, self.quads.pages[page as usize].0) };
             list.pipeline(pipe);
             use crate::gpu_layout::bind::world as b;
             list.bind(b::G, gbuf);

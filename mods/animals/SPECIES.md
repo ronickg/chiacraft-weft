@@ -11,40 +11,40 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | Species | Scientific name | Rarity | Size | Height | Mass | Lives in | Diet | Taming | Carrying | Grown in | Lives | Litter | Room |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | dog (chihuahua) | *Canis familiaris* | common | small | 0.2 m | 2.5 kg | pack | carnivore | passive | 1.25 d | 3.5 d | 49.9 d | 1-4 | 17 |
-| cat | *Felis catus* | common | small | 0.24 m | 4.5 kg | solitary | carnivore | passive | 1.28 d | 2.99 d | 49.9 d | 1-4 | 20 |
-| capybara | *Hydrochoerus hydrochaeris* | common | medium | 0.56 m | 50 kg | herd | herbivore | passive | 2.28 d | 5.34 d | 30.7 d | 2-6 | 24 |
+| cat | *Felis catus* | common | small | 0.24 m | 4.5 kg | solitary | carnivore | passive | 1.28 d | 2.99 d | 49.9 d | 1-4 | 13 |
+| capybara | *Hydrochoerus hydrochaeris* | common | medium | 0.56 m | 50 kg | herd | herbivore | passive | 2.28 d | 5.34 d | 30.7 d | 2-6 | 16 |
 | raptor | *Velociraptor mongoliensis* | uncommon | medium | 0.5 m | 15 kg | solitary | carnivore | knockout | eggs, hatch 1.41 d | 7.54 d | 76.7 d | 1-4 | 10 |
 | utahraptor | *Utahraptor ostrommaysi* | rare | large | 1.5 m | 300 kg | pack | carnivore | knockout | eggs, hatch 2.28 d | 12.3 d | 153.3 d | 1-3 | 7 |
 | osmolskae | *Velociraptor osmolskae* | uncommon | medium | 0.5 m | 15 kg | solitary | carnivore | knockout | eggs, hatch 1.41 d | 7.54 d | 76.7 d | 1-4 | 10 |
-| wyvern | *Wyverna montana* | legendary | large | 3.9 m | 5000 kg | solitary | carnivore | knockout | eggs, hatch 5.47 d | 32.7 d | 421.6 d | 1 | 8 |
-| hare | *Lepus europaeus* | common | small | 0.3 m | 3.8 kg | solitary | herbivore | wild | 0.92 d | 2.81 d | 19.2 d | 1-4 | 26 |
-| mountain_hare | *Lepus timidus* | common | small | 0.3 m | 3 kg | solitary | herbivore | wild | 1.05 d | 3.5 d | 19.2 d | 1-4 | 26 |
-| wood_mouse | *Apodemus sylvaticus* | common | small | 0.05 m | 0.023 kg | solitary | herbivore | wild | 0.63 d | 3 d | 16 d | 2-6 | 30 |
-| field_vole | *Microtus agrestis* | common | small | 0.05 m | 0.035 kg | solitary | herbivore | wild | 0.55 d | 3 d | 16 d | 2-5 | 30 |
+| wyvern | *Wyverna montana* | legendary | large | 3.9 m | 5000 kg | solitary | carnivore | knockout | eggs, hatch 5.47 d | 32.7 d | 421.6 d | 1 | 3 |
+| hare | *Lepus europaeus* | common | small | 0.3 m | 3.8 kg | solitary | herbivore | wild | 0.92 d | 2.81 d | 19.2 d | 1-4 | 13 |
+| mountain_hare | *Lepus timidus* | common | small | 0.3 m | 3 kg | solitary | herbivore | wild | 1.05 d | 3.5 d | 19.2 d | 1-4 | 14 |
+| wood_mouse | *Apodemus sylvaticus* | common | small | 0.05 m | 0.023 kg | solitary | herbivore | wild | 0.63 d | 3 d | 16 d | 2-6 | 24 |
+| field_vole | *Microtus agrestis* | common | small | 0.05 m | 0.035 kg | solitary | herbivore | wild | 0.55 d | 3 d | 14 d | 2-6 | 24 |
 | white_tailed_deer | *Odocoileus virginianus* | common | large | 0.95 m | 70 kg | herd | herbivore | wild | 2.98 d | 5.28 d | 38.3 d | 1-3 | 15 |
 | red_deer | *Cervus elaphus* | uncommon | large | 0.95 m | 160 kg | herd | herbivore | wild | 3.52 d | 6.51 d | 57.5 d | 1 | 12 |
-| brown_trout | *Salmo trutta* | uncommon | small | 0.37 m | 0.5 kg | solitary | carnivore | wild | eggs, hatch 0.97 d | 8.65 d | 46 d | 3-8 | 26 |
+| brown_trout | *Salmo trutta* | uncommon | small | 0.37 m | 0.5 kg | solitary | carnivore | wild | eggs, hatch 0.97 d | 8.65 d | 46 d | 3-11 | 20 |
 | pacu | *Piaractus mesopotamicus* | uncommon | small | 0.37 m | 4 kg | herd | omnivore | wild | eggs, hatch 0.06 d | 8.65 d | 57.5 d | 2-8 | 26 |
-| red_fox | *Vulpes vulpes* | common | small | 0.38 m | 5.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 2-7 | 24 |
-| arctic_fox | *Vulpes lagopus* | common | small | 0.38 m | 3.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 3-10 | 24 |
+| red_fox | *Vulpes vulpes* | common | small | 0.38 m | 5.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 2-7 | 15 |
+| arctic_fox | *Vulpes lagopus* | common | small | 0.38 m | 3.5 kg | pack | carnivore | wild | 1.08 d | 3.5 d | 19.2 d | 3-10 | 16 |
 | raven | *Corvus corax* | uncommon | small | 0.34 m | 1.2 kg | solitary | carnivore | wild | 0.53 d | 6.51 d | 46 d | 2-6 | 17 |
-| protoceratops | *Protoceratops andrewsi* | common | medium | 0.6 m | 83 kg | herd | herbivore | wild | eggs, hatch 1.54 d | 6 d | 53.7 d | 3-8 | 20 |
-| kryptobaatar | *Kryptobaatar dashzevegi* | common | small | 0.05 m | 0.04 kg | solitary | omnivore | wild | 0.53 d | 3 d | 16 d | 1-5 | 30 |
+| protoceratops | *Protoceratops andrewsi* | common | medium | 0.6 m | 83 kg | herd | herbivore | wild | eggs, hatch 1.54 d | 6 d | 53.7 d | 3-8 | 14 |
+| kryptobaatar | *Kryptobaatar dashzevegi* | common | small | 0.05 m | 0.04 kg | solitary | omnivore | wild | 0.53 d | 3 d | 16 d | 1-5 | 24 |
 | priscagama | *Priscagama gobiensis* | common | small | 0.04 m | 0.03 kg | solitary | carnivore | wild | eggs, hatch 1.21 d | 4.01 d | 23 d | 2-6 | 24 |
-| reindeer | *Rangifer tarandus* | common | large | 1.05 m | 120 kg | herd | herbivore | wild | 3.31 d | 4.58 d | 46 d | 1 | 20 |
-| coyote | *Canis latrans* | common | medium | 0.61 m | 13 kg | pack | carnivore | wild | 1.25 d | 3.5 d | 23 d | 2-8 | 22 |
-| house_sparrow | *Passer domesticus* | common | small | 0.1 m | 0.03 kg | herd | omnivore | wild | 0.36 d | 2.75 d | 14 d | 2-6 | 30 |
-| snow_bunting | *Plectrophenax nivalis* | common | small | 0.1 m | 0.035 kg | herd | omnivore | wild | 0.37 d | 2.75 d | 14 d | 2-7 | 30 |
+| reindeer | *Rangifer tarandus* | common | large | 1.05 m | 120 kg | herd | herbivore | wild | 3.31 d | 4.58 d | 46 d | 1 | 13 |
+| coyote | *Canis latrans* | common | medium | 0.61 m | 13 kg | pack | carnivore | wild | 1.25 d | 3.5 d | 23 d | 2-8 | 12 |
+| house_sparrow | *Passer domesticus* | common | small | 0.1 m | 0.03 kg | herd | omnivore | wild | 0.36 d | 2.75 d | 14 d | 2-6 | 24 |
+| snow_bunting | *Plectrophenax nivalis* | common | small | 0.1 m | 0.035 kg | herd | omnivore | wild | 0.37 d | 2.75 d | 14 d | 2-7 | 24 |
 | great_horned_owl | *Bubo virginianus* | uncommon | small | 0.45 m | 1.4 kg | solitary | carnivore | wild | 0.77 d | 6.51 d | 49.8 d | 1-3 | 16 |
 | snowy_owl | *Bubo scandiacus* | uncommon | small | 0.45 m | 2 kg | solitary | carnivore | wild | 0.75 d | 6.51 d | 38.3 d | 2-8 | 15 |
 | golden_eagle | *Aquila chrysaetos* | uncommon | medium | 0.6 m | 4.5 kg | solitary | carnivore | wild | 0.94 d | 8.33 d | 76.7 d | 1-3 | 13 |
 | savanna_hawk | *Buteogallus meridionalis* | common | small | 0.6 m | 0.85 kg | solitary | carnivore | wild | 0.87 d | 6.51 d | 46 d | 1 | 18 |
 | turkey_vulture | *Cathartes aura* | common | small | 0.5 m | 1.4 kg | herd | carnivore | wild | 0.89 d | 4.58 d | 61.3 d | 1-3 | 24 |
 | herring_gull | *Larus argentatus* | common | small | 0.45 m | 1 kg | herd | carnivore | wild | 0.7 d | 4.58 d | 46 d | 1-4 | 24 |
-| yacare_caiman | *Caiman yacare* | common | large | 2.2 m | 35 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 4-8 | 26 |
-| spectacled_caiman | *Caiman crocodilus* | common | large | 2.2 m | 25 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 4-8 | 26 |
-| grey_wolf | *Canis lupus* | uncommon | medium | 0.8 m | 42 kg | pack | carnivore | passive | 1.25 d | 6.07 d | 46 d | 2-8 | 16 |
-| jaguar | *Panthera onca* | uncommon | large | 0.7 m | 85 kg | solitary | carnivore | knockout | 1.77 d | 7.54 d | 65.1 d | 1-2 | 12 |
+| yacare_caiman | *Caiman yacare* | common | large | 2.2 m | 35 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 6-12 | 17 |
+| spectacled_caiman | *Caiman crocodilus* | common | large | 2.2 m | 25 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 6-12 | 18 |
+| grey_wolf | *Canis lupus* | uncommon | medium | 0.8 m | 42 kg | pack | carnivore | passive | 1.25 d | 6.07 d | 46 d | 2-8 | 10 |
+| jaguar | *Panthera onca* | uncommon | large | 0.7 m | 85 kg | solitary | carnivore | knockout | 1.77 d | 7.54 d | 65.1 d | 1-2 | 7 |
 
 ## Stats at level 1
 
@@ -94,15 +94,15 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 
 | Biome | Plant food (spring, summer, autumn, winter) | Grazing (best season) | Plant eaters | Hunters | Carrion |
 |---|---|---|---|---|---|
-| base:plains | 40%, 86%, 46%, 40% | summer: eaten 5% of the regrowth | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, herring_gull, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, herring_gull, grey_wolf |
-| base:forest | 40%, 73%, 41%, 40% | summer: eaten 9% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer, red_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
-| base:birch_forest | 40%, 62%, 40%, 40% | summer: eaten 13% of the regrowth | mountain_hare, field_vole, red_deer | dog (chihuahua), cat, red_fox, raven, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, golden_eagle, grey_wolf |
-| base:taiga | 40%, 93%, 40%, 40% | summer: eaten 20% of the regrowth | mountain_hare, field_vole, reindeer, snow_bunting | cat, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | cat, brown_trout, red_fox, arctic_fox, raven, golden_eagle, grey_wolf |
+| base:plains | 40%, 86%, 46%, 40% | summer: eaten 3% of the regrowth | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, herring_gull, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, herring_gull, grey_wolf |
+| base:forest | 40%, 73%, 41%, 40% | summer: eaten 7% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer, red_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
+| base:birch_forest | 40%, 62%, 40%, 40% | summer: eaten 10% of the regrowth | mountain_hare, field_vole, red_deer | dog (chihuahua), cat, red_fox, raven, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, golden_eagle, grey_wolf |
+| base:taiga | 40%, 93%, 40%, 40% | summer: eaten 14% of the regrowth | mountain_hare, field_vole, reindeer, snow_bunting | cat, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | cat, brown_trout, red_fox, arctic_fox, raven, golden_eagle, grey_wolf |
 | base:snowy_plains | 40%, 62%, 40%, 40% | - | mountain_hare, field_vole, reindeer, snow_bunting | arctic_fox, raven, snowy_owl, golden_eagle, grey_wolf | arctic_fox, raven, golden_eagle, grey_wolf |
 | base:desert | 40%, 78%, 55%, 40% | - | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, jaguar | dog (chihuahua), cat, red_fox, raven, coyote, golden_eagle, turkey_vulture |
 | base:savanna | 43%, 100%, 100%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman, jaguar | dog (chihuahua), cat, turkey_vulture |
-| base:swamp | 40%, 100%, 96%, 40% | summer: eaten 8% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
-| base:mountains | 60%, 95%, 76%, 40% | summer: eaten 27% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
+| base:swamp | 40%, 100%, 96%, 40% | summer: eaten 6% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
+| base:mountains | 60%, 95%, 76%, 40% | summer: eaten 21% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:beach | 40%, 40%, 50%, 40% | - | hare, wood_mouse, house_sparrow | red_fox, raven, herring_gull | red_fox, raven, herring_gull |
 | animals:red_dunes | 40%, 40%, 40%, 40% | - | protoceratops | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
 | animals:scrubland | 40%, 43%, 40%, 40% | - | protoceratops | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
@@ -222,7 +222,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | comfortable in | 5 to 32 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 240 d | 2.99 d |
 | lives | 13 y | 49.9 d, give or take a fifth; an elder from 80% of it |
-| lives in | solitary | room for 20 **set** within 48 blocks |
+| lives in | solitary | room for 13 within 48 blocks |
 
 **Balance** (common): a generation 4.3 d; a line four deep in 13 d (4 h of play); 6.2 young per mother in 10 days, 23 in her life.
 
@@ -230,7 +230,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 - ✓ grown most of its life: grows 3.0 of 50 days (want under a fifth)
 - ✓ young in a life: 22.7 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
-- ✓ room near: 20 (want 3-30)
+- ✓ room near: 13 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -283,7 +283,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | comfortable in | 12 to 32 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 1.5 y | 5.34 d |
 | lives | 8 y | 30.7 d, give or take a fifth; an elder from 80% of it |
-| lives in | herd | room for 24 **set** within 48 blocks |
+| lives in | herd | room for 16 within 48 blocks |
 
 **Balance** (common): a generation 7.6 d; a line four deep in 23 d (8 h of play); 5.4 young per mother in 10 days, 10 in her life.
 
@@ -291,7 +291,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 - ✓ grown most of its life: grows 5.3 of 31 days (want under a fifth)
 - ✓ young in a life: 10.4 (want 6-40)
 - ✓ litter: 2-6 (want 1-12, fewest first)
-- ✓ room near: 24 (want 3-30)
+- ✓ room near: 16 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -529,7 +529,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | comfortable in | -10 to 30 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 20 y | 32.7 d |
 | lives | 110 y | 421.6 d, give or take a fifth; an elder from 80% of it |
-| lives in | solitary | room for 8 **set** within 48 blocks |
+| lives in | solitary | room for 3 within 48 blocks |
 
 **Balance** (legendary): a generation 38.4 d; a line four deep in 115 d (38 h of play); 0.6 young per mother in 10 days, 20 in her life.
 
@@ -537,7 +537,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 - ✓ grown most of its life: grows 32.7 of 422 days (want under a fifth)
 - ✓ young in a life: 19.7 (want 6-40)
 - ✓ litter: 1-1 (want 1-12, fewest first)
-- ✓ room near: 8 (want 3-30)
+- ✓ room near: 3 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -592,7 +592,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | comfortable in | -5 to 30 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 220 d | 2.81 d |
 | lives | 5 y | 19.2 d, give or take a fifth; an elder from 80% of it |
-| lives in | solitary | room for 26 **set** within 48 blocks |
+| lives in | solitary | room for 13 within 48 blocks |
 
 **Balance** (common): a generation 3.7 d; a line four deep in 11 d (4 h of play); 14.2 young per mother in 10 days, 18 in her life.
 
@@ -600,7 +600,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 - ✓ grown most of its life: grows 2.8 of 19 days (want under a fifth)
 - ✓ young in a life: 17.8 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
-- ✓ room near: 26 (want 3-30)
+- ✓ room near: 13 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -654,7 +654,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | comfortable in | -15 to 24 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 300 d | 3.5 d |
 | lives | 5 y | 19.2 d, give or take a fifth; an elder from 80% of it |
-| lives in | solitary | room for 26 **set** within 48 blocks |
+| lives in | solitary | room for 14 within 48 blocks |
 
 **Balance** (common): a generation 4.5 d; a line four deep in 14 d (5 h of play); 12.3 young per mother in 10 days, 15 in her life.
 
@@ -662,7 +662,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 - ✓ grown most of its life: grows 3.5 of 19 days (want under a fifth)
 - ✓ young in a life: 14.6 (want 6-40)
 - ✓ litter: 1-4 (want 1-12, fewest first)
-- ✓ room near: 26 (want 3-30)
+- ✓ room near: 14 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -717,7 +717,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | comfortable in | -5 to 32 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 60 d | 3 d **set** |
 | lives | 1.5 y | 16 d **set**, give or take a fifth; an elder from 80% of it |
-| lives in | solitary | room for 30 **set** within 48 blocks |
+| lives in | solitary | room for 24 **set** within 48 blocks |
 
 **Balance** (common): a generation 3.6 d; a line four deep in 11 d (4 h of play); 38.3 young per mother in 10 days, 38 in her life.
 
@@ -725,7 +725,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 - ✓ grown most of its life: grows 3.0 of 16 days (want under a fifth)
 - ✓ young in a life: 37.6 (want 6-40)
 - ✓ litter: 2-6 (want 1-12, fewest first)
-- ✓ room near: 30 (want 3-30)
+- ✓ room near: 24 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -774,21 +774,21 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 |---|---|---|
 | mass | 0.035 kg | |
 | carries her young | 21 d | 0.55 d |
-| litter or clutch | 4.5 on average | 2-5 **set** |
+| litter or clutch | 4.5 on average | 2-6 |
 | between litters | 25 d | rests 0.35 d |
 | breeds in | all year, most in spring and summer |  |
 | comfortable in | -15 to 28 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 35 d | 3 d **set** |
-| lives | 2 y | 16 d **set**, give or take a fifth; an elder from 80% of it |
-| lives in | solitary | room for 30 **set** within 48 blocks |
+| lives | 2 y | 14 d **set**, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 24 **set** within 48 blocks |
 
-**Balance** (common): a generation 3.5 d; a line four deep in 11 d (4 h of play); 39 young per mother in 10 days, 38 in her life.
+**Balance** (common): a generation 3.5 d; a line four deep in 11 d (4 h of play); 44.6 young per mother in 10 days, 37 in her life.
 
 - ✓ fourth generation: 10.6 days (want 10-25 days (common))
-- ✓ grown most of its life: grows 3.0 of 16 days (want under a fifth)
-- ✓ young in a life: 38.2 (want 6-40)
-- ✓ litter: 2-5 (want 1-12, fewest first)
-- ✓ room near: 30 (want 3-30)
+- ✗ grown most of its life: grows 3.0 of 14 days (want under a fifth)
+- ✓ young in a life: 36.6 (want 6-40)
+- ✓ litter: 2-6 (want 1-12, fewest first)
+- ✓ room near: 24 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -962,21 +962,21 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | mass | 0.5 kg | |
 | lays | | 0.25 d after mating |
 | eggs hatch in | 45 d | 0.97 d |
-| litter or clutch | 8 on average | 3-8 **set** |
+| litter or clutch | 8 on average | 3-11 |
 | between litters | 1 y | rests 5.07 d |
 | breeds in |  | out of it, only a tame well cared for |
 | comfortable in | 4 to 20 °C air | cold-blooded: slower in the cold |
 | grows up in | 3 y | 8.65 d |
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
-| lives in | solitary | room for 26 **set** within 48 blocks |
+| lives in | solitary | room for 20 within 48 blocks |
 
-**Balance** (uncommon): a generation 9.9 d; a line four deep in 30 d (10 h of play); 10.3 young per mother in 10 days, 29 in her life.
+**Balance** (uncommon): a generation 9.9 d; a line four deep in 30 d (10 h of play); 13.1 young per mother in 10 days, 37 in her life.
 
 - ✓ fourth generation: 29.6 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 8.7 of 46 days (want under a fifth)
-- ✓ young in a life: 29.1 (want 6-40)
-- ✓ litter: 3-8 (want 1-12, fewest first)
-- ✓ room near: 26 (want 3-30)
+- ✓ young in a life: 37.0 (want 6-40)
+- ✓ litter: 3-11 (want 1-12, fewest first)
+- ✓ room near: 20 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -1087,20 +1087,20 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | mass | 5.5 kg | |
 | carries her young | 52 d | 1.08 d |
 | litter or clutch | 5 on average | 2-7 |
-| between litters | 1 y | rests 2.5 d **set** |
+| between litters | 1 y | rests 5.07 d |
 | breeds in | winter | out of it, only a tame well cared for |
 | comfortable in | -20 to 30 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 300 d | 3.5 d |
 | lives | 5 y | 19.2 d, give or take a fifth; an elder from 80% of it |
-| lives in | pack | room for 24 **set** within 48 blocks |
+| lives in | pack | room for 15 within 48 blocks |
 
-**Balance** (common): a generation 4.6 d; a line four deep in 14 d (5 h of play); 12.6 young per mother in 10 days, 15 in her life.
+**Balance** (common): a generation 4.6 d; a line four deep in 14 d (5 h of play); 7.3 young per mother in 10 days, 9 in her life.
 
 - ✓ fourth generation: 13.7 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 3.5 of 19 days (want under a fifth)
-- ✓ young in a life: 14.9 (want 6-40)
+- ✓ young in a life: 8.6 (want 6-40)
 - ✓ litter: 2-7 (want 1-12, fewest first)
-- ✓ room near: 24 (want 3-30)
+- ✓ room near: 15 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -1152,7 +1152,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | comfortable in | -35 to 18 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 300 d | 3.5 d |
 | lives | 5 y | 19.2 d, give or take a fifth; an elder from 80% of it |
-| lives in | pack | room for 24 **set** within 48 blocks |
+| lives in | pack | room for 16 within 48 blocks |
 
 **Balance** (common): a generation 4.6 d; a line four deep in 14 d (5 h of play); 10.6 young per mother in 10 days, 12 in her life.
 
@@ -1160,7 +1160,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 - ✓ grown most of its life: grows 3.5 of 19 days (want under a fifth)
 - ✓ young in a life: 12.5 (want 6-40)
 - ✓ litter: 3-10 (want 1-12, fewest first)
-- ✓ room near: 24 (want 3-30)
+- ✓ room near: 16 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -1279,7 +1279,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | comfortable in | 8 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 3 y | 6 d **set** |
 | lives | 14 y | 53.7 d, give or take a fifth; an elder from 80% of it |
-| lives in | herd | room for 20 **set** within 48 blocks |
+| lives in | herd | room for 14 within 48 blocks |
 
 **Balance** (common): a generation 7.8 d; a line four deep in 23 d (8 h of play); 10.3 young per mother in 10 days, 38 in her life.
 
@@ -1287,7 +1287,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 - ✓ grown most of its life: grows 6.0 of 54 days (want under a fifth)
 - ✓ young in a life: 38.1 (want 6-40)
 - ✓ litter: 3-8 (want 1-12, fewest first)
-- ✓ room near: 20 (want 3-30)
+- ✓ room near: 14 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -1339,7 +1339,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | comfortable in | 5 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 60 d | 3 d **set** |
 | lives | 2 y | 16 d **set**, give or take a fifth; an elder from 80% of it |
-| lives in | solitary | room for 30 **set** within 48 blocks |
+| lives in | solitary | room for 24 **set** within 48 blocks |
 
 **Balance** (common): a generation 3.5 d; a line four deep in 11 d (4 h of play); 31.7 young per mother in 10 days, 31 in her life.
 
@@ -1347,7 +1347,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 - ✓ grown most of its life: grows 3.0 of 16 days (want under a fifth)
 - ✓ young in a life: 31.1 (want 6-40)
 - ✓ litter: 1-5 (want 1-12, fewest first)
-- ✓ room near: 30 (want 3-30)
+- ✓ room near: 24 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -1459,7 +1459,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | comfortable in | -45 to 18 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 1.6 y | 4.58 d **set** |
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
-| lives in | herd | room for 20 **set** within 48 blocks |
+| lives in | herd | room for 13 within 48 blocks |
 
 **Balance** (common): a generation 7.9 d; a line four deep in 24 d (8 h of play); 2 young per mother in 10 days, 6 in her life.
 
@@ -1467,7 +1467,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 - ✓ grown most of its life: grows 4.6 of 46 days (want under a fifth)
 - ✓ young in a life: 6.5 (want 6-40)
 - ✓ litter: 1-1 (want 1-12, fewest first)
-- ✓ room near: 20 (want 3-30)
+- ✓ room near: 13 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -1521,7 +1521,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | comfortable in | -30 to 36 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 300 d | 3.5 d |
 | lives | 6 y | 23 d, give or take a fifth; an elder from 80% of it |
-| lives in | pack | room for 22 **set** within 48 blocks |
+| lives in | pack | room for 12 within 48 blocks |
 
 **Balance** (common): a generation 4.7 d; a line four deep in 14 d (5 h of play); 7.9 young per mother in 10 days, 12 in her life.
 
@@ -1529,7 +1529,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 - ✓ grown most of its life: grows 3.5 of 23 days (want under a fifth)
 - ✓ young in a life: 11.8 (want 6-40)
 - ✓ litter: 2-8 (want 1-12, fewest first)
-- ✓ room near: 22 (want 3-30)
+- ✓ room near: 12 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -1585,7 +1585,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | comfortable in | -25 to 38 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 300 d | 2.75 d **set** |
 | lives | 3 y | 14 d **set**, give or take a fifth; an elder from 80% of it |
-| lives in | herd | room for 30 **set** within 48 blocks |
+| lives in | herd | room for 24 **set** within 48 blocks |
 
 **Balance** (common): a generation 3.5 d; a line four deep in 10 d (3 h of play); 22.8 young per mother in 10 days, 19 in her life.
 
@@ -1593,7 +1593,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 - ✓ grown most of its life: grows 2.8 of 14 days (want under a fifth)
 - ✓ young in a life: 19.3 (want 6-40)
 - ✓ litter: 2-6 (want 1-12, fewest first)
-- ✓ room near: 30 (want 3-30)
+- ✓ room near: 24 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -1602,7 +1602,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | seeds 60%, insects 30%, fruit 10% |
 | a meal that fills it | 0.003 kg |
 | drinks | 100% of its 0.004 L a day; a drink lasts 11 min, thirsty after 5 |
-| its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, savanna 40/100/100/0%, desert 40/78/55/40%, beach 40/40/43/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
+| its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, savanna 40/100/100/0%, desert 40/78/55/40%, beach 40/40/40/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 2; `base:berries` 3, favorite |
@@ -1646,7 +1646,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | comfortable in | -40 to 18 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 300 d | 2.75 d **set** |
 | lives | 3 y | 14 d **set**, give or take a fifth; an elder from 80% of it |
-| lives in | herd | room for 30 **set** within 48 blocks |
+| lives in | herd | room for 24 **set** within 48 blocks |
 
 **Balance** (common): a generation 3.5 d; a line four deep in 10 d (3 h of play); 15.7 young per mother in 10 days, 13 in her life.
 
@@ -1654,7 +1654,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 - ✓ grown most of its life: grows 2.8 of 14 days (want under a fifth)
 - ✓ young in a life: 13.2 (want 6-40)
 - ✓ litter: 2-7 (want 1-12, fewest first)
-- ✓ room near: 30 (want 3-30)
+- ✓ room near: 24 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -1957,18 +1957,18 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | mass | 1.4 kg | |
 | carries her young | 0 d | 0.89 d **set** |
 | litter or clutch | 2 on average | 1-3 |
-| between litters | 1 y | rests 3.33 d **set** |
+| between litters | 1 y | rests 5.07 d |
 | breeds in | spring | out of it, only a tame well cared for |
 | comfortable in | -12 to 42 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 3 y | 4.58 d **set** |
 | lives | 16 y | 61.3 d, give or take a fifth; an elder from 80% of it |
 | lives in | herd | room for 24 **set** within 48 blocks |
 
-**Balance** (common): a generation 6.4 d; a line four deep in 19 d (6 h of play); 4.7 young per mother in 10 days, 21 in her life.
+**Balance** (common): a generation 6.4 d; a line four deep in 19 d (6 h of play); 3.4 young per mother in 10 days, 15 in her life.
 
 - ✓ fourth generation: 19.1 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 4.6 of 61 days (want under a fifth)
-- ✓ young in a life: 21.1 (want 6-40)
+- ✓ young in a life: 14.9 (want 6-40)
 - ✓ litter: 1-3 (want 1-12, fewest first)
 - ✓ room near: 24 (want 3-30)
 
@@ -2078,21 +2078,21 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | mass | 35 kg | |
 | lays | | 0.25 d after mating |
 | eggs hatch in | 73 d | 1.4 d |
-| litter or clutch | 30 on average | 4-8 **set** |
+| litter or clutch | 30 on average | 6-12 **set** |
 | between litters | 1 y | rests 16.7 d **set** |
 | breeds in | spring and summer, most in summer | out of it, only a tame well cared for |
 | comfortable in | 20 to 36 °C air | cold-blooded: slower in the cold |
 | grows up in | 7 y | 6.25 d **set** |
 | lives | 35 y | 75 d **set**, give or take a fifth; an elder from 80% of it |
-| lives in | herd | room for 26 **set** within 48 blocks |
+| lives in | herd | room for 17 within 48 blocks |
 
-**Balance** (common): a generation 7.9 d; a line four deep in 24 d (8 h of play); 3.5 young per mother in 10 days, 19 in her life.
+**Balance** (common): a generation 7.9 d; a line four deep in 24 d (8 h of play); 5.3 young per mother in 10 days, 29 in her life.
 
 - ✓ fourth generation: 23.7 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 6.2 of 75 days (want under a fifth)
-- ✓ young in a life: 19.1 (want 6-40)
-- ✓ litter: 4-8 (want 1-12, fewest first)
-- ✓ room near: 26 (want 3-30)
+- ✓ young in a life: 28.6 (want 6-40)
+- ✓ litter: 6-12 (want 1-12, fewest first)
+- ✓ room near: 17 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -2139,21 +2139,21 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | mass | 25 kg | |
 | lays | | 0.25 d after mating |
 | eggs hatch in | 73 d | 1.4 d |
-| litter or clutch | 25 on average | 4-8 **set** |
+| litter or clutch | 25 on average | 6-12 **set** |
 | between litters | 1 y | rests 16.7 d **set** |
 | breeds in | spring and summer, most in summer | out of it, only a tame well cared for |
 | comfortable in | 20 to 36 °C air | cold-blooded: slower in the cold |
 | grows up in | 7 y | 6.25 d **set** |
 | lives | 35 y | 75 d **set**, give or take a fifth; an elder from 80% of it |
-| lives in | herd | room for 26 **set** within 48 blocks |
+| lives in | herd | room for 18 within 48 blocks |
 
-**Balance** (common): a generation 7.9 d; a line four deep in 24 d (8 h of play); 3.5 young per mother in 10 days, 19 in her life.
+**Balance** (common): a generation 7.9 d; a line four deep in 24 d (8 h of play); 5.3 young per mother in 10 days, 29 in her life.
 
 - ✓ fourth generation: 23.7 days (want 10-25 days (common))
 - ✓ grown most of its life: grows 6.2 of 75 days (want under a fifth)
-- ✓ young in a life: 19.1 (want 6-40)
-- ✓ litter: 4-8 (want 1-12, fewest first)
-- ✓ room near: 26 (want 3-30)
+- ✓ young in a life: 28.6 (want 6-40)
+- ✓ litter: 6-12 (want 1-12, fewest first)
+- ✓ room near: 18 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -2209,7 +2209,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 | comfortable in | -40 to 28 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 1.8 y | 6.07 d |
 | lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
-| lives in | pack | room for 16 **set** within 48 blocks |
+| lives in | pack | room for 10 within 48 blocks |
 
 **Balance** (uncommon): a generation 7.3 d; a line four deep in 22 d (7 h of play); 7.9 young per mother in 10 days, 24 in her life.
 
@@ -2217,7 +2217,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 - ✓ grown most of its life: grows 6.1 of 46 days (want under a fifth)
 - ✓ young in a life: 24.3 (want 6-40)
 - ✓ litter: 2-8 (want 1-12, fewest first)
-- ✓ room near: 16 (want 3-30)
+- ✓ room near: 10 (want 3-30)
 
 | Taming and food | |
 |---|---|
@@ -2270,7 +2270,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | comfortable in | 8 to 38 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 2.5 y | 7.54 d |
 | lives | 17 y | 65.1 d, give or take a fifth; an elder from 80% of it |
-| lives in | solitary | room for 12 **set** within 48 blocks |
+| lives in | solitary | room for 7 within 48 blocks |
 
 **Balance** (uncommon): a generation 9.3 d; a line four deep in 28 d (9 h of play); 1.9 young per mother in 10 days, 8 in her life.
 
@@ -2278,7 +2278,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 - ✓ grown most of its life: grows 7.5 of 65 days (want under a fifth)
 - ✓ young in a life: 8.3 (want 6-40)
 - ✓ litter: 1-2 (want 1-12, fewest first)
-- ✓ room near: 12 (want 3-30)
+- ✓ room near: 7 (want 3-30)
 
 | Taming and food | |
 |---|---|

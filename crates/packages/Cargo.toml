@@ -10,3 +10,5 @@ description = "Data-only content packages (chiacraft plan, phase 2): reads and c
 serde = { version = "1", features = ["derive"] }
 toml = "1.1"
 blake3 = "1.8"
+# Reads a sandboxed component's imports (its API version) without running it (`code`).
+wasmparser = { version = "0.236", default-features = false, features = ["std", "component-model"] }

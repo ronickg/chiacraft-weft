@@ -28,17 +28,13 @@ pub struct Gap {
 /// gap's key and what fills it. Remove an entry when what it waits for comes.
 pub const WAITING: &[(&str, &str)] = &[
     // The overworld: what wave two (`notes/ECOLOGY.md`) left.
-    ("red_deer: no predator", "a wolf pack taking big prey together (`hunt.rs`): a lone wolf takes up to three times its mass"),
     ("herring_gull: no prey in base:ocean", "the open sea's web: its fish (later; the gull hunts on the beach meanwhile)"),
     // The Cretaceous's tier 2 and 3.
     ("animals:floodplain: no plant eaters", "the iguanodont, the ankylosaur and the sauropod (the Cretaceous's tier 2)"),
     ("animals:fern_forest: no plant eaters", "Psittacosaurus and the iguanodont (the Cretaceous's tier 2)"),
     ("animals:crags: no plant eaters", "the ankylosaur (the Cretaceous's tier 2)"),
-    ("utahraptor: no prey in animals:floodplain", "the iguanodont and its herbivores (the Cretaceous's tier 2)"),
     ("utahraptor: no prey in animals:fern_forest", "Psittacosaurus and the iguanodont (the Cretaceous's tier 2)"),
     ("wyvern: no prey in animals:crags", "the ankylosaur (the Cretaceous's tier 2)"),
-    ("utahraptor: no Fish", "the Cretaceous's fish, lungfish and Lycoptera (tier 3)"),
-    ("wyvern: no Fish", "the Cretaceous's fish, lungfish and Lycoptera (tier 3)"),
 ];
 
 /// The biomes the webs are for: every climate but the caves (no web of their own) and the open
@@ -69,14 +65,14 @@ pub fn food_in(eats: impl Fn(Category) -> bool, biome: &str, season: usize) -> f
 pub fn prey_in(s: &Species, biome: &str) -> Vec<&'static str> {
     let mut out: Vec<&'static str> = SPECIES
         .iter()
-        .filter(|o| o.family.name != s.family.name && lives(o, biome) && s.takes(s.bio.mass, o.bio.mass))
+        .filter(|o| o.family.name != s.family.name && lives(o, biome) && s.takes_at_most(s.bio.mass, o.bio.mass))
         .map(|o| o.name)
         .collect();
     if overworld_land(biome) {
         out.extend(
             OTHER_PREY
                 .iter()
-                .filter(|&&(_, kg)| s.takes(s.bio.mass, kg))
+                .filter(|&&(_, kg)| s.takes_at_most(s.bio.mass, kg))
                 .map(|&(n, _)| n),
         );
     }
@@ -87,7 +83,7 @@ pub fn prey_in(s: &Species, biome: &str) -> Vec<&'static str> {
 pub fn predators_of(s: &Species) -> Vec<&'static str> {
     SPECIES
         .iter()
-        .filter(|h| h.family.name != s.family.name && h.takes(h.bio.mass, s.bio.mass))
+        .filter(|h| h.family.name != s.family.name && h.takes_at_most(h.bio.mass, s.bio.mass))
         .filter(|h| s.habitats.iter().any(|&(b, _)| lives(h, b)))
         .map(|h| h.name)
         .collect()

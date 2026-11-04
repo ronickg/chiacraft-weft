@@ -34,6 +34,14 @@ reference images are cut from a resource pack: read them, don't attach them. `ar
 our own style key, `Our key.png` in the guide's folder (approved sets of ours), and warns when a
 kind has none yet.
 
+**Never throw away a generated image** (Ronald, 2026-11-04: "never throw away generated images pls
+so I can also check back"). Every try, every candidate, every review sheet and every old texture an
+install replaces is kept for good in `/Users/ronald/Coding/chiacraft-archive/images/chiacraft-art/<date>/`
+(outside the repo; `ART_ARCHIVE` overrides it). `art.py` does this on its own (`generated/` each try,
+`cut/` each sprite, `replaced/` each old texture), and the redo page's builder keeps each sheet before
+it changes (`sheets/`). Anything else that makes images copies them there with `art.archive()`.
+Never delete from the archive, and never `rm` a generated image anywhere else either.
+
 **Ronald's answers are lessons.** After every batch he approves or sends back, write what his answer
 taught into the guide (for items, the "Learned from Ronald's answers" list in the item guide's section
 A, which goes into every prompt), so the next generation gets it right the first time.
@@ -112,7 +120,7 @@ come out as a pink ring on magenta, so take those pixels out after cutting. The 
 (`guides/6 UI/`) is the style; the master prompt below predates it and matches it.
 
 Master prompt, pasted once per chat, with the reference sheet for that kind of part
-(`notes/ui-reference/`) and every approved part attached (the approved slot at least):
+(Ronald's sheets: `guides/6 UI/UI Prompt References/`; his two mockups stay in `notes/ui-reference/`) and every approved part attached (the approved slot at least):
 
 ```text
 You are making UI assets for my game, one component at a time. Keep everything in this chat in one consistent style.

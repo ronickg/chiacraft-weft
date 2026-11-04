@@ -520,3 +520,6 @@ item.base.salt.tooltip = Boiled out of a water bucket in a furnace. Salts raw me
 item.base.leather.tooltip = From cows and deer.
 item.base.string.tooltip = From spiders, or spun from two plant fibres.
 block.base.wool.tooltip = From sheep, or made of four string.
+block.base.kelp = Kelp
+item.base.kelp = Kelp
+item.base.cooked_wild_rice = Cooked Wild Rice

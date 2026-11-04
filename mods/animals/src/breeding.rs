@@ -147,10 +147,13 @@ pub fn count(what: &[AtomicU32; KINDS], index: usize) {
 /// from how far it has grown, and a mother's young born (or eggs laid) when the time comes.
 pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
     let s = &SPECIES[index];
-    let n = speed();
+    // Ticks since it last ticked: one with no player near rests, ticking now and then
+    // (`World::tick_elapsed`), and its timers run as fast all the same.
+    let e = w.tick_elapsed(id);
+    let n = speed() * e;
     let Some(b) = w.component_mut(id, &BREEDING) else { return };
     // Love isn't sped up: they still have to walk to each other.
-    b.love = b.love.saturating_sub(1);
+    b.love = b.love.saturating_sub(e);
     b.rest = b.rest.saturating_sub(n);
     b.growing = b.growing.saturating_sub(n);
     a.stage = life::stage(s, b.growing, a.stage);
@@ -167,9 +170,9 @@ pub fn upkeep(w: &World, id: u64, index: usize, a: &mut Animal) {
     let b = *b;
     // Checked as often in game time at any speed (`/animal speed`), or a sped-up herd falls in
     // love all at once.
-    let every = (WILD_LOVE_EVERY / n as u64).max(1);
-    if (w.time() + id) % every == 0 && !crate::animal::tamed(w, id) {
-        let days = (every * n as u64) as f64 / life::DAY as f64;
+    let every = (WILD_LOVE_EVERY / speed() as u64).max(1);
+    if (w.time() + id) % every < e as u64 && !crate::animal::tamed(w, id) {
+        let days = (every * speed() as u64) as f64 / life::DAY as f64;
         let (kin, near) = kin_near(w, id, index, a);
         let roll = w.random_below(1_000_000) as f64 / 1_000_000.0;
         if roll < life::want_chance(days, near, s.crowd(), a.stage) {
