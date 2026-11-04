@@ -153,12 +153,12 @@ impl Area {
 pub const SNOWY_BELOW: f64 = -0.22;
 pub const TAIGA_BELOW: f64 = -0.12;
 /// Desert from this temperature and under this humidity; savanna likewise, after it.
-pub const DESERT: (f64, f64) = (0.15, -0.05);
+pub const DESERT: (f64, f64) = (0.14, 0.0);
 pub const SAVANNA: (f64, f64) = (0.1, 0.1);
 /// Swamp from this temperature and this humidity, on low land.
-pub const SWAMP: (f64, f64) = (0.0, 0.08);
+pub const SWAMP: (f64, f64) = (0.0, 0.04);
 /// Forest from this humidity; birch forest under this temperature and from this humidity.
-pub const FOREST_HUMIDITY: f64 = 0.1;
+pub const FOREST_HUMIDITY: f64 = 0.07;
 pub const BIRCH: (f64, f64) = (0.05, 0.0);
 
 /// Oceans and land masses, this many blocks above or below the sea.
