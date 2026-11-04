@@ -102,6 +102,15 @@ Decided by Ronald (2026-11-04): **always attach `Voxel Fantasy Survival UI Suite
 
 What a first round missed against his sheet, so say it in every frame prompt: thick bronze frames with a double line (an outer and an inner bronze line with a dark groove between), bevelled corner blocks with a rivet; slots lighter and warmer than the panel; title tabs in orange with an icon; a soft gold glow around the hovered part.
 
+### Yellow and gold only for state, never at rest (Ronald, 2026-11-04)
+
+Round 2 of the parts was "too yellow everywhere". The rule:
+- **At rest:** frames, slots, tabs and secondary buttons in the bronze and brown of the palette (`#89451e`–`#b35a26`, slots `#3b2e27`). Main buttons and the active title tab in the orange (`#e47c02`), a little desaturated and darker, never gold.
+- **Gold (`#ffdd20`–`#f3ab1f`) only for state:** hover, selected, the active toggle or tick.
+- **Bars:** red health, a muted orange stamina; no gold fills.
+- **Text:** cream (`#e4dacf`); gold text only for a name or heading, sparingly.
+- In prompts, ask for bronze and brown frames and say "no gold except where I name it". After cutting, `pxkit.tone()` pulls any leftover orange-yellow toward bronze (hue about 25 degrees, saturation x0.78, value x0.84); the states (`glow`) add the gold back where it belongs.
+
 ### Text (decided 2026-11-04)
 
 Ronald found the smooth Alegreya "off and not well positioned". The text is now a **pixel font on the UI's own grid**:

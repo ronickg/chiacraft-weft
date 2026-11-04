@@ -103,6 +103,18 @@ def darker(a, k=0.82):
     return hsv_map(a, lambda h, s, v: (h, s, v * k))
 
 
+def tone(a, to=0.072, pull=0.55, sat=0.78, val=0.84, lo=0.068, hi=0.19, min_s=0.3):
+    """Ronald (2026-11-04): "too yellow everywhere". Gold and yellow are for state (hover,
+    selected), never at rest: every warm pixel from orange to yellow (hue lo..hi, saturated) is
+    pulled toward bronze (`to`, about #b35a26's 22-27 degrees), a little less saturated and darker.
+    Reds, browns and greens are left alone."""
+    def f(h, s, v):
+        if lo <= h <= hi and s >= min_s:
+            return (h + (to - h) * pull, s * sat, v * val)
+        return (h, s, v)
+    return hsv_map(a, f)
+
+
 def disabled(a):
     """Grey-brown and flat: most of the color out, darker, the light kept."""
     return hsv_map(a, lambda h, s, v: (0.07, s * 0.25, v * 0.72))
