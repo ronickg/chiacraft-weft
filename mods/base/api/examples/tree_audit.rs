@@ -30,7 +30,10 @@ fn main() {
             if seed > first {
                 out.push(',');
             }
-            let b: Vec<String> = blocks(r, seed)
+            let grown =
+                if key.starts_with("young:") || key.starts_with("understory:") { None } else { base_api::tree_recipes::grown(key, seed) };
+            let b: Vec<String> = grown
+                .unwrap_or_else(|| blocks(r, seed))
                 .iter()
                 .map(|&(x, y, z, p)| {
                     let k = match p {
