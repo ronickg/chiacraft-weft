@@ -364,12 +364,21 @@ pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]
             let (tex, tint) = face_of(top, 3);
             let k = out.len() as u32;
             out.push(lod_grid_cell(i as u32, j as u32, key.level, k, tex, tint, biome));
-            // Skirts: down from the lower corner of the edge, as deep as two cells.
-            for (dir, edge, a, b) in [(0u32, i == 0, 0, 2), (1, i == CELLS - 1, 1, 3), (4, j == 0, 0, 1), (5, j == CELLS - 1, 2, 3)] {
+            // Skirts: as deep as two cells, from under the edge however it morphs (an odd corner
+            // goes to the middle of its neighbours, so from the lowest of the four along it).
+            for (dir, edge) in [(0u32, i == 0), (1, i == CELLS - 1), (4, j == 0), (5, j == CELLS - 1)] {
                 if !edge {
                     continue;
                 }
-                let y = corners[a].0.min(corners[b].0) + 1 - 2 * s;
+                let along = |d: i32| match dir {
+                    0 => at(i, (j + d).clamp(-1, CELLS)),
+                    1 => at(i + 1, (j + d).clamp(-1, CELLS)),
+                    4 => at((i + d).clamp(-1, CELLS), j),
+                    _ => at((i + d).clamp(-1, CELLS), j + 1),
+                };
+                let bottom = (-1..=2).map(|d| along(d).0).min().unwrap_or(0);
+                let y = bottom + 1 - 2 * s;
+                lo = lo.min(y);
                 let (tex, tint) = face_of(top, dir as usize);
                 out.push(quad(dir, i * s, y, j * s, (s, 2 * s, s), tex, tint, biome));
             }
