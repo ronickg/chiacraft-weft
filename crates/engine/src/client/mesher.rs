@@ -89,8 +89,12 @@ pub fn build(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm) -> Mesh {
                 let info = &c.states[s as usize];
                 let biome = n.biomes[(z * 16 + x) as usize] as u32;
                 if info.liquid.is_some() {
-                    liquid(c, n, ctm, &mut mesh, x, y, z, biome);
+                    liquid(c, n, ctm, &mut mesh, x, y, z, biome, s);
                     continue;
+                }
+                // A block standing in a liquid: the liquid's source around it, then the block.
+                if let Some(l) = info.holds {
+                    liquid(c, n, ctm, &mut mesh, x, y, z, biome, c.source_of(l));
                 }
                 // A resource pack may draw it differently (its shape and light stay the mod's).
                 let drawn = looks.drawn(s, info);
@@ -338,12 +342,15 @@ fn quad(corners: [[f32; 3]; 4], uv: [f32; 4], texture: u32, biome: u32, tint: u8
     ]
 }
 
-fn liquid(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm, mesh: &mut Mesh, x: i32, y: i32, z: i32, biome: u32) {
+/// The liquid in the cell at (x, y, z), drawn as `drawn` (its own state, or the source of the
+/// liquid a block there stands in). Cells with the same liquid in them, a block standing in it
+/// or not, share their faces and corners.
+#[allow(clippy::too_many_arguments)]
+fn liquid(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm, mesh: &mut Mesh, x: i32, y: i32, z: i32, biome: u32, drawn: u32) {
     let i = pidx(x, y, z);
-    let s = n.states[i];
-    let info = &c.states[s as usize];
-    let block = info.block;
-    let same = |xx: i32, yy: i32, zz: i32| c.states[n.states[pidx(xx, yy, zz)] as usize].block == block;
+    let info = &c.states[drawn as usize];
+    let here = info.liquid;
+    let same = |xx: i32, yy: i32, zz: i32| c.states[n.states[pidx(xx, yy, zz)] as usize].liquid_in() == here;
     let height = |xx: i32, zz: i32| -> Option<f32> {
         if !same(xx, y, zz) {
             return None;
@@ -351,7 +358,9 @@ fn liquid(c: &Content, n: &Neighborhood, ctm: &super::ctm::Ctm, mesh: &mut Mesh,
         if same(xx, y + 1, zz) {
             return Some(1.0);
         }
-        let lvl = c.states[n.states[pidx(xx, y, zz)] as usize].level.min(7) as f32;
+        // A block standing in it is in its source.
+        let st = &c.states[n.states[pidx(xx, y, zz)] as usize];
+        let lvl = if st.liquid.is_some() { st.level.min(7) as f32 } else { 0.0 };
         Some((8.0 - lvl) / 9.0)
     };
     let corner_h = |cx: i32, cz: i32| -> f32 {

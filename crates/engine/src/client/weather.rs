@@ -134,6 +134,7 @@ impl Weather {
                         .block_or_air(IVec3::new(x, y, z))
                         .unwrap_or(crate::content::AIR);
                     c.states[s as usize].flags & (weft_abi::block_flags::SOLID | weft_abi::block_flags::LIQUID) != 0
+                        || c.states[s as usize].holds.is_some()
                 });
                 let bottom = floor.map_or(eye.y - REACH, |y| y + 1);
                 if bottom >= top {

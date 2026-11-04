@@ -219,6 +219,7 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:wheat | spring wheat | 0, 15-23, 34 | Moderate | -2 °C | 110 | 26 | plains (su au), forest (su au), birch_forest (su au), taiga (su), savanna (su au), swamp (au), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:berry_bush | blueberry | 7, 20-26, 32 | Moderate | -2 °C | 75 | 20 | plains (su), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
 | base:sugar_cane | sugar cane | 12, 22-30, 38 | Wet | -1 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), sequoia_grove (su), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
+| base:kelp | kelp (Laminaria) | 0, 5-15, 22 | Wet | hardy | - | the game's | plains (sp au), forest (sp su au), birch_forest (sp su au), taiga (sp su au), snowy_plains (su), desert (wi), mountains (sp su au), sequoia_grove (sp su au wi), ocean (sp au wi), beach (sp au wi), red_dunes (sp au wi), scrubland (sp au wi), floodplain (wi), fern_forest (sp su au), crags (sp au wi) |
 | base:cactus | saguaro | 10, 25-40, 50 | Dry | -7 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), sequoia_grove (su), ocean (sp su au), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:sapling | oak | 5, 18-28, 38 | Moderate | hardy | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:grazed_grass | prairie grass | 5, 15-30, 40 | Moderate | hardy | 18 | 7 | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
@@ -268,12 +269,16 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:mushroom_brown | Spreads | Soil | base:mushroom_brown | 0.6% | forest, birch_forest, taiga, mountains |
 | base:mushroom_red | Spreads | Soil | base:mushroom_red | 0.3% | forest, birch_forest, taiga |
 | base:water_hyacinth | Spreads | Water | - | 8.0% | swamp, savanna |
-| base:cattail | Still | Shore | base:cattail_root | 10.0% | swamp, plains, forest, taiga, savanna |
+| base:cattail | Still | Shore | base:cattail_root | 15.0% | swamp, plains, forest, taiga, savanna |
+| base:reed | Still | Shore | - | 12.0% | plains, forest, birch_forest, taiga, swamp (4.0%) |
+| base:lily_pad | Still | Water | - | 12.0% | plains, forest, birch_forest, swamp, taiga, savanna |
+| base:seagrass | Still | Bed | - | 20.0% | ocean, beach |
+| base:kelp | Column | Bed | base:kelp | 8.0% | ocean |
 | animals:cycad | Still | Soil | animals:cycad_seed | 1.0% | red_dunes, scrubland, floodplain, fern_forest, crags |
 | animals:flowering_shrub | Still | Soil | - | 2.0% | floodplain, scrubland |
 | animals:water_lily | Still | Water | - | 6.0% | floodplain, red_dunes |
 | animals:rotten_log | Log | Soil | - | 0.4% | floodplain, fern_forest |
-| base:kelp | Mat | Sand | base:kelp | 3.0% | beach |
+| base:kelp_wrack | Mat | Sand | base:kelp | 3.0% | beach |
 
 ## Food in the world
 
@@ -335,7 +340,7 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | animals:cycad | seeds | 3 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (summer, autumn), worth 40% of fresh growth |
 | animals:flowering_shrub | leaves | 4 | stays | always there in animals:floodplain, animals:scrubland (spring, summer, autumn), worth 40% of fresh growth |
 | animals:water_lily | water_plants | 5 | stays | always there in animals:floodplain, animals:red_dunes (all year), worth 40% of fresh growth |
-| base:kelp | water_plants | 4 | stays | always there in base:beach (all year), worth 40% of fresh growth |
+| base:kelp_wrack | water_plants | 4 | stays | always there in base:beach (all year), worth 40% of fresh growth |
 | animals:rotten_log | insects | 3 | stays | always there in animals:floodplain, animals:fern_forest (all year), worth 40% of fresh growth |
 | base:mesquite_leaves | leaves | 4 | stays | always there in base:desert, base:savanna (spring, summer, autumn), worth 40% of fresh growth |
 | base:mesquite_leaves | seeds | 4 | stays | always there in base:desert, base:savanna (summer, autumn), worth 40% of fresh growth |

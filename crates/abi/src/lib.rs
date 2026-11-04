@@ -279,6 +279,11 @@ pub mod comp {
     /// Block: the tag one of the supporting block's horizontal neighbors needs (`tag`, sugar
     /// cane: `#water`), unless the support is the same block.
     pub const SUPPORT_NEAR: &str = "support_near";
+    /// Block: the liquid it stands in (`block`, the liquid's name): the cell is a still source of
+    /// it as well, which flows, is swum in and stays when the block goes (kelp, a waterlogged
+    /// slab). A state of the same block one property apart without it is its dry twin, which
+    /// placing into the liquid fills and a bucket drains.
+    pub const HOLDS_LIQUID: &str = "holds_liquid";
     /// The own name of one stack or block entity (UTF-8), as a player gave it: shown instead of
     /// the item's or block's, and carried from the stack to the placed block and back.
     pub const NAME: &str = "core:name";

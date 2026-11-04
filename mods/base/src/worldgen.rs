@@ -555,8 +555,9 @@ fn decorate(g: &mut Gen) {
     let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
     let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
 
-    // Surface decoration only near the surface.
-    if oy > max_h + 16 || oy + 15 < min_h - 1 {
+    // Surface decoration only near the surface, which under the sea is its water's (kelp).
+    let top = if min_h < SEA { max_h.max(SEA) } else { max_h };
+    if oy > top + 16 || oy + 15 < min_h - 1 {
         return;
     }
     for z in 0..16usize {
@@ -572,10 +573,19 @@ fn decorate(g: &mut Gen) {
                 if col.height >= SEA - CLAY_DEPTH && (0..16).contains(&floor) && clay(seed, wx, wz, shore) {
                     g.set(x, floor as usize, z, CLAY.id());
                 }
+                // Under it, plants of the bed standing in the water (eelgrass, kelp).
+                bed(g, seed, [x, z], [wx, wz], col.height, col.biome);
                 if col.height >= SEA - WILD_WATER_DEPTH {
                     for top in [SEA, SEA - 1] {
                         let y = top + 1 - oy;
-                        if (1..16).contains(&y) && g.get(x, y as usize, z) == 0 && WATER.is(g.get(x, y as usize - 1, z)) {
+                        if !(0..16).contains(&y) || g.get(x, y as usize, z) != 0 {
+                            continue;
+                        }
+                        // The water it floats on: in this cube, or, on the cube's floor, the sea's
+                        // surface (y 63 tops a cube, so a plant on it is always the next cube's),
+                        // water unless the biome freezes it.
+                        let water = if y >= 1 { WATER.is(g.get(x, y as usize - 1, z)) } else { top == SEA && !FROZEN.on_biome(col.biome) };
+                        if water {
                             if let Some(s) = wild_at(seed, wx, wz, shore, wild::Ground::Water) {
                                 g.set(x, y as usize, z, s);
                             }
@@ -672,7 +682,11 @@ fn decorate(g: &mut Gen) {
             } else {
                 None
             };
-            if let Some(s) = ground.and_then(|gr| wild_at(seed, wx, wz, b, gr)) {
+            // A sandy lake or river shore grows the shore's reeds too, else its sand's own plants
+            // (a beach's washed-up kelp).
+            let sandy_shore = shore && ground == Some(wild::Ground::Sand);
+            let pick = if sandy_shore { wild_at(seed, wx, wz, b, wild::Ground::Shore) } else { None };
+            if let Some(s) = pick.or_else(|| ground.and_then(|gr| wild_at(seed, wx, wz, b, gr))) {
                 g.set(x, y, z, s);
                 continue;
             }
@@ -748,6 +762,37 @@ fn decorate(g: &mut Gen) {
                     g.set(x, y + k, z, SUGAR_CANE.id());
                 }
             }
+        }
+    }
+}
+
+/// The plant of the bed (eelgrass, kelp; `vitals::wild::Ground::Bed`) on a column whose floor is
+/// at `floor` under the sea, in this cube's part of it: in the water just over the floor, kelp on
+/// up to its height, a block below the surface at most.
+fn bed(g: &mut Gen, seed: u64, [x, z]: [usize; 2], [wx, wz]: [i32; 2], floor: i32, biome: u32) {
+    let roll = wild_roll(seed, wx, wz);
+    if roll >= wild::MOST {
+        return;
+    }
+    let Some(i) = wild::pick(name_of(abi::entry_kind::BIOME, biome), wild::Ground::Bed, roll) else { return };
+    let plant = &wild::WILD[i];
+    let depth = SEA - floor;
+    if !wild::depths(plant.block).contains(&depth) {
+        return;
+    }
+    let s = crate::wild::state(i);
+    if s == u32::MAX {
+        return;
+    }
+    let tall =
+        if plant.form == wild::Form::Column { 1 + (hash(seed ^ 0xCE1, wx as i64, 0, wz as i64) % (depth - 1) as u64) as i32 } else { 1 };
+    let oy = g.origin()[1];
+    for y in floor + 1..=floor + tall {
+        let ly = y - oy;
+        if (0..16).contains(&ly) && WATER.is(g.get(x, ly as usize, z)) {
+            // A kelp column's top shows its tip (`wild.rs`, `top`); the blocks under it the stalk.
+            let here = if plant.form == wild::Form::Column && y < floor + tall { state_with(s, "top", "false").unwrap_or(s) } else { s };
+            g.set(x, ly as usize, z, here);
         }
     }
 }

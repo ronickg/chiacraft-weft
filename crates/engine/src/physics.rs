@@ -566,18 +566,27 @@ fn ray_box(o: DVec3, d: DVec3, b: &[f32; 6], max: f64) -> Option<(f64, u8)> {
 /// Whether liquid fills the block `level` above the feet at `pos` (0 the feet, the eye height for
 /// eyes): the one question of "in water", asked at the height the caller means.
 pub fn in_liquid(c: &Content, block: &impl Fn(IVec3) -> Option<u32>, pos: DVec3, level: f64) -> bool {
-    block((pos + DVec3::Y * level).floor().as_ivec3()).is_some_and(|s| c.states[s as usize].liquid.is_some())
+    block((pos + DVec3::Y * level).floor().as_ivec3()).is_some_and(|s| c.states[s as usize].liquid_in().is_some())
 }
 
 /// Which liquid a point is under, its surface considered: water in a block only fills it up to
-/// its level, unless more of the same is on top.
+/// its level, unless more of the same is on top. A block standing in a liquid is in its source.
 pub fn liquid_at(c: &Content, block: &impl Fn(IVec3) -> Option<u32>, p: DVec3) -> Option<u16> {
     let at = p.floor().as_ivec3();
     let st = &c.states[block(at)? as usize];
-    let liquid = st.liquid?;
-    let covered = block(at + IVec3::Y).is_some_and(|s| c.states[s as usize].liquid == Some(liquid));
-    let surface = if covered { 1.0 } else { (8.0 - st.level as f64) / 9.0 };
+    let liquid = st.liquid_in()?;
+    let covered = block(at + IVec3::Y).is_some_and(|s| c.states[s as usize].liquid_in() == Some(liquid));
+    let level = if st.liquid.is_some() { st.level } else { 0 };
+    let surface = if covered { 1.0 } else { (8.0 - level as f64) / 9.0 };
     (p.y - at.y as f64 <= surface).then_some(liquid)
+}
+
+/// How much a cell in `state` slows what moves in it: the block's drag, or its liquid's if that
+/// is more (kelp in water drags like the water).
+pub fn drag_of(c: &Content, state: u32) -> f64 {
+    let st = &c.states[state as usize];
+    st.holds
+        .map_or(st.drag, |l| st.drag.min(c.states[c.source_of(l) as usize].drag)) as f64
 }
 
 /// How a walker moves itself this tick, in blocks per tick like vanilla.
@@ -640,7 +649,7 @@ pub fn walk(
     let feet = pos.floor().as_ivec3();
     let flags = |q: IVec3| block(q).map_or(0, |s| c.states[s as usize].flags);
     let liquid = in_liquid(c, block, *pos, 0.0) || in_liquid(c, block, *pos, (f.height * 0.5).min(1.0));
-    let drag = block(feet).map_or(1.0, |s| c.states[s as usize].drag as f64);
+    let drag = block(feet).map_or(1.0, |s| drag_of(c, s));
     let slip_at =
         |y: f64| block(IVec3::new(feet.x, (y - 0.5).floor() as i32, feet.z)).map_or(0.6, |s| c.states[s as usize].friction as f64);
     let accelerate = |vel: &mut DVec3, k: f64| {

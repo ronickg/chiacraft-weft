@@ -1922,7 +1922,7 @@ unsafe extern "C" fn reg_liquid_reaction(r: *mut abi::Registrar, d: *const abi::
 unsafe extern "C" fn liquid_of(state: u32) -> u32 {
     try_content()
         .and_then(|c| c.states.get(state as usize))
-        .and_then(|s| s.liquid)
+        .and_then(|s| s.liquid_in())
         .map_or(u32::MAX, |l| l as u32)
 }
 
