@@ -75,8 +75,9 @@ pub fn terrain(r: &mut Registry) {
         .caves(Caves::new("lava", i32::MIN, 11))
         // Distant terrain runs no decorations: it asks this what its steep faces show.
         .faces(l::SNOW_FALL, |f| {
-            let sandy = STONE.is(f.block()) && SAND.is(f.surface_block());
-            if let Some(rock) = bare(f.seed(), f.pos(), f.block(), f.fall(), f.biome(), sandy) {
+            let [x, _, z] = f.pos();
+            let rocks = l::rock_set(&Fields { seed: f.seed() }, x * 16, z * 16, f.height(), SAND.is(f.surface_block()));
+            if let Some(rock) = bare(f.seed(), f.pos(), f.block(), f.fall(), f.biome(), rocks) {
                 f.set(rock);
             }
         });
