@@ -7,7 +7,7 @@
 use std::sync::Mutex;
 
 use base_api::GRAVE;
-use vitals::difficulty::{GRACE_SECS, GRAVE_REACHED};
+use vitals::difficulty::{GRACE_AT_GRAVE, GRACE_SECS, GRAVE_REACHED};
 use weft_sdk::*;
 
 /// Seconds left of the grace after respawning (0: none), synced to show on the HUD.
@@ -88,8 +88,8 @@ pub fn tell(w: &World, d: &abi::Death) {
     w.send(d.entity, &DIED, &text);
 }
 
-/// Once a second: the grace runs down, and reaching the tombstone (or its being gone) ends it and
-/// the marker.
+/// Once a second: the grace runs down; reaching the tombstone (or its being gone) ends the marker
+/// and leaves the grace `GRACE_AT_GRAVE` seconds at most.
 fn watch(w: &World) {
     if w.time() % 20 != 3 {
         return;
@@ -115,7 +115,7 @@ fn watch(w: &World) {
                 g.set = 0;
             }
             if let Some(gr) = w.component_mut(id, &GRACE) {
-                *gr = 0.0;
+                *gr = gr.min(GRACE_AT_GRAVE);
             }
         } else if let Some(gr) = w.component_mut(id, &GRACE) {
             *gr = (*gr - 1.0).max(0.0);

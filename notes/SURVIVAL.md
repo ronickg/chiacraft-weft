@@ -590,6 +590,9 @@ chosen without Ronald, logged in `notes/crew/OVERNIGHT.md`; `mods/base/src/death
 - The corpse run (Valheim's): for 3 minutes after respawning, or until the tombstone is reached,
   no creature hurts one and monsters don't come for one (`vitals::difficulty::GRACE_SECS`); the
   line says how long is left. Falls, fire, cold and poison still hurt.
+  Once the tombstone is reached the grace lasts 30 s more (`GRACE_AT_GRAVE`): time to take one's
+  things and get away from what killed one. A killing blow no longer leaves one bleeding after
+  the respawn.
 - With the respawn kit (plain clothes, the arrival meal, full stamina: steps 13 and 11).
 - Not yet: a beam or marker in the world at the tombstone (needs the engine), the tombstone
   crumbling after a while.

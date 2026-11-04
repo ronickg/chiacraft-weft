@@ -36,5 +36,9 @@ pub fn named(name: &str) -> Difficulty {
 /// Seconds after respawning that monsters leave a player be, or until they reach their tombstone
 /// (Valheim's corpse run; Research round 4 and the first-hour report).
 pub const GRACE_SECS: f32 = 180.0;
+/// Seconds the grace still lasts once the tombstone is reached: time to take one's things and get
+/// away from whatever killed one (Tester 11-04: the zombie still there killed the player again 5 s
+/// after arriving).
+pub const GRACE_AT_GRAVE: f32 = 30.0;
 /// Blocks from the tombstone that count as reaching it.
 pub const GRAVE_REACHED: f64 = 3.0;
