@@ -166,5 +166,10 @@ fn short(s: &str) -> String {
 }
 
 fn short_did(d: &str) -> String {
-    if d.len() > 24 { format!("{}…{}", &d[..16], &d[d.len() - 6..]) } else { d.to_string() }
+    let c: Vec<char> = d.chars().collect();
+    if c.len() > 24 {
+        format!("{}…{}", c[..16].iter().collect::<String>(), c[c.len() - 6..].iter().collect::<String>())
+    } else {
+        d.to_string()
+    }
 }

@@ -10,7 +10,8 @@ Read `notes/PLAN.md` first: it is the plan and the decisions. This page says whe
   1. The texture pack Weft built from a player's Minecraft copy is removed.
   2. `crates/wallet` (`chiacraft-wallet`): the wallet core from the Horizon-based chiacraft
      (`horizon-wallet` at `101dee332`), renamed. Env vars still use the `HORIZON_` prefix
-     (`HORIZON_WALLET_STORE`, `HORIZON_WALLET_PASSPHRASE`, the live test tool's); rename later.
+     (the live test tool's); `CHIACRAFT_WALLET_STORE` and `CHIACRAFT_WALLET_PASSPHRASE` replaced
+     `HORIZON_WALLET_*` (2026-11-04; the old names are still read).
   3. `notes/PLAN.md`.
   4. Phase 1, the account (see below).
 

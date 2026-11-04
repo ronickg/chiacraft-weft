@@ -45,6 +45,7 @@ pub mod source;
 pub mod sponsor;
 pub mod sync;
 pub mod tls;
+#[cfg(feature = "tool")]
 pub mod tool;
 pub mod wallet;
 pub mod world;

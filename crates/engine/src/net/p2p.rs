@@ -812,11 +812,14 @@ async fn fetch_lists(dir: &std::path::Path) {
                         st.owner
                     }
                     Ok(_) => {
-                        log::info!("ban list from {}: that world's certificate doesn't check out", &key[..12.min(key.len())]);
+                        log::info!(
+                            "ban list from {}: that world's certificate doesn't check out",
+                            key.chars().take(12).collect::<String>()
+                        );
                         continue;
                     }
                     Err(e) => {
-                        log::info!("ban list from {}: {e}", &key[..12.min(key.len())]);
+                        log::info!("ban list from {}: {e}", key.chars().take(12).collect::<String>());
                         continue;
                     }
                 }
@@ -834,7 +837,11 @@ async fn fetch_lists(dir: &std::path::Path) {
                     }
                     break;
                 }
-                Err(e) => log::info!("ban list of {} from {}: {e}", &maintainer[..12.min(maintainer.len())], &key[..12.min(key.len())]),
+                Err(e) => log::info!(
+                    "ban list of {} from {}: {e}",
+                    maintainer.chars().take(12).collect::<String>(),
+                    key.chars().take(12).collect::<String>()
+                ),
             }
         }
     }
