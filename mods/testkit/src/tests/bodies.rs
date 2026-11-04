@@ -311,7 +311,8 @@ pub async fn lift(t: T) -> R {
     let (me, lift) = (t.state().pos, pos_of(&t, &format!("{id}")).await?);
     t.check(lift[1] < p[1] + 1.5, "the lift came down");
     t.check((me[1] - (lift[1] + 1.0)).abs() < 0.15, format!("the player rode it down (feet {:.2}, deck {:.2})", me[1], lift[1] + 1.0));
-    t.check_eq(t.op("health").await?, "20".to_string(), "health after the ride");
+    let health: f32 = t.op("health").await?.parse().unwrap_or(0.0);
+    t.check(super::full(&t, health), format!("health after the ride: {health}, full {}", super::max_health(&t)));
     Ok(())
 }
 
@@ -535,10 +536,15 @@ pub async fn neutral_mobs(t: T) -> R {
     let health = |t: T| async move { Ok::<f32, String>(t.op("health").await?.parse().unwrap_or(0.0)) };
     let spider = spawn(&t, "spider", add(f, [3, 0, 0])).await?;
     t.secs(3.0).await?;
-    t.check_eq(health(t.clone()).await?, 20.0, "by day a spider leaves you alone");
+    let h = health(t.clone()).await?;
+    t.check(super::full(&t, h), format!("by day a spider leaves you alone: {h}, full {}", super::max_health(&t)));
     t.op(&format!("hurt {spider} 1")).await?;
-    t.until("the spider fights back", std::time::Duration::from_secs(6), |t| t.c().entity(0).is_some_and(|e| e.health < 20.0))
-        .await?;
+    t.until("the spider fights back", std::time::Duration::from_secs(6), |t| {
+        t.c()
+            .entity(0)
+            .is_some_and(|e| e.health < super::max_health(t) - 0.5)
+    })
+    .await?;
     // Away for longer than it holds a grudge, and back.
     t.cmd(&format!("/tp {} {} {}", f[0], f[1], f[2] + 60))
         .await?;
@@ -549,7 +555,8 @@ pub async fn neutral_mobs(t: T) -> R {
         .await?;
     t.op("heal").await?;
     t.secs(3.0).await?;
-    t.check_eq(health(t.clone()).await?, 20.0, "it calms down");
+    let h = health(t.clone()).await?;
+    t.check(super::full(&t, h), format!("it calms down: {h}"));
     t.op(&format!("remove {spider}")).await?;
 
     // In the dark it needs no reason (this dimension's time stands still, so under a roof).
@@ -558,7 +565,9 @@ pub async fn neutral_mobs(t: T) -> R {
     let dark = spawn(&t, "spider", add(f, [3, 0, 0])).await?;
     t.cmd(&format!("/tp {} {} {}", f[0], f[1], f[2])).await?;
     t.until("a spider in the dark comes by itself", std::time::Duration::from_secs(8), |t| {
-        t.c().entity(0).is_some_and(|e| e.health < 20.0)
+        t.c()
+            .entity(0)
+            .is_some_and(|e| e.health < super::max_health(t) - 0.5)
     })
     .await?;
     t.op(&format!("remove {dark}")).await?;
@@ -566,13 +575,18 @@ pub async fn neutral_mobs(t: T) -> R {
 
     let sentry = spawn(&t, "testkit:sentry", add(f, [10, 0, 0])).await?;
     t.secs(2.5).await?;
-    t.check_eq(health(t.clone()).await?, 20.0, "out of its distance it does nothing");
+    let h = health(t.clone()).await?;
+    t.check(super::full(&t, h), format!("out of its distance it does nothing: {h}"));
     let at = pos_of(&t, &format!("{sentry}")).await?;
     t.check((at[0] - (f[0] as f64 + 10.5)).abs() < 1.0, format!("nor does it come: {at:?}"));
     t.cmd(&format!("/tp {} {} {}", at[0] + 3.0, at[1], at[2]))
         .await?;
-    t.until("within it, it attacks", std::time::Duration::from_secs(5), |t| t.c().entity(0).is_some_and(|e| e.health < 20.0))
-        .await?;
+    t.until("within it, it attacks", std::time::Duration::from_secs(5), |t| {
+        t.c()
+            .entity(0)
+            .is_some_and(|e| e.health < super::max_health(t) - 0.5)
+    })
+    .await?;
     Ok(())
 }
 
@@ -584,18 +598,26 @@ pub async fn zombie_chases(t: T) -> R {
         .await?;
     t.fill(add(f, [4, 0, 5]), add(f, [4, 1, 5]), "air").await?;
     let id = spawn(&t, "zombie", add(f, [8, 0, 0])).await?;
-    t.secs(10.0).await?;
+    // Until its first hit: a player of the survival vitals has about half the base game's health,
+    // and a zombie left at it for ten seconds killed them (and every test after, CI 11-04).
+    let hit = t
+        .until("the zombie hits the player", std::time::Duration::from_secs(15), |t| {
+            t.c()
+                .entity(0)
+                .is_some_and(|e| e.health < super::max_health(t) - 0.5)
+        })
+        .await;
     let z = pos_of(&t, &format!("{id}")).await?;
-    let health: f32 = t.op("health").await?.parse().unwrap_or(20.0);
     t.check(z[0] < f[0] as f64 + 4.0, format!("the zombie came round the wall (x {:.1})", z[0]));
-    t.check(health < 20.0, format!("and hit the player (health {health})"));
+    t.check(hit.is_ok(), "and hit the player");
     // Mobs hit through the same question as players: a mod that forbids attacks stops them.
-    t.op("heal").await?;
     t.cmd("/rule testkit:peace 1").await?;
+    t.op("heal").await?;
     t.secs(2.5).await?;
     let calm: f32 = t.op("health").await?.parse().unwrap_or(0.0);
+    t.op(&format!("remove {id}")).await?;
     t.cmd("/rule testkit:peace 0").await?;
-    t.check(calm >= 20.0, format!("a zombie hit while attacks were forbidden (health {calm})"));
+    t.check(super::full(&t, calm), format!("a zombie hit while attacks were forbidden (health {calm}, full {})", super::max_health(&t)));
     Ok(())
 }
 
