@@ -159,10 +159,13 @@ jobs:
       - name: Software Vulkan
         run: xvfb-run -a vulkaninfo --summary
 
-      # Every wait in a test has its own timeout; this is for a game that stops answering.
+      # Every wait in a test has its own timeout; this is for a game that stops answering. The
+      # packages tests need the examples' packages; the other tests don't mind them.
       - name: Testkit ${{ matrix.shard }}
         timeout-minutes: 45
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" target/release/weft --test all --test-shard ${{ matrix.shard }}
+        run: >-
+          xvfb-run -a -s "-screen 0 1920x1080x24"
+          target/release/weft --packages examples/packages --test all --test-shard ${{ matrix.shard }}
 
       - name: Report name
         if: always()
@@ -173,7 +176,7 @@ jobs:
         with:
           name: ${{ env.REPORT }}
           path: |
-            run/test-reports
+            run/test-reports/report.txt
             run/test-shots
             run/logs
           if-no-files-found: ignore
