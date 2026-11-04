@@ -485,7 +485,8 @@ and cactus.**
   air and ground, so a ripe field or bush costs nothing until it's picked or eaten. A ripe one
   keeps its fruit through a frost now (lingonberries and crowberries really do).
 - **Not yet:**
-  - kelp, since the engine has no block standing in water;
+  - the water plants as food: reeds, lily pads, eelgrass and kelp (2026-11-04, standing in the
+    water) have no `forage::SOURCES` rows yet;
   - saplings for the Cretaceous's trees: they grow by base's plant rule, which the animals mod
     can't call;
   - the crops (barley, rye, potato, maize, rice, beans and the rest);

@@ -1,8 +1,10 @@
 //! The wild plants (`notes/ECOLOGY.md`, part 3; the numbers in `vitals::wild`, their growth in
 //! `vitals::plants`): every `base:` row of `vitals::wild::WILD` as a block, growing by its form.
 //! Tufts and mats grazed down (a bitten look) grow back, bushes ripen their fruit through four
-//! stages, fruit and seed heads ripen in their season (a ripe look), mushrooms and water hyacinth spread near the old ones, the
-//! rest stand. What picking one gives plants it again. `worldgen.rs` puts them where they grow.
+//! stages, fruit and seed heads ripen in their season (a ripe look), mushrooms and water hyacinth spread near the old ones, kelp
+//! grows up towards the surface, the rest stand. What picking one gives plants it again. Plants of
+//! the bed stand in the water (`holds_liquid`): breaking one leaves the water. `worldgen.rs` puts
+//! them where they grow.
 
 use std::sync::OnceLock;
 
@@ -28,6 +30,9 @@ fn short(block: &'static str) -> &'static str {
 }
 
 pub fn register(r: &mut Registry) {
+    // What plants of the bed root in, and what kelp stands on: the bed or kelp under it.
+    r.tag("water_bed", &["#dirt", "#sand", "gravel", "clay"]);
+    r.tag("kelp_soil", &["#water_bed", "kelp"]);
     for (_, p) in mine() {
         let name = short(p.block);
         let block = Block::generated(name.into());
@@ -37,10 +42,14 @@ pub fn register(r: &mut Registry) {
             Ground::Sand => b.needs_below("#sand"),
             Ground::Shore => b.needs_below("#plant_soil").needs_near_support("#water"),
             Ground::Water => b.needs_below("#water"),
+            Ground::Bed => b
+                .needs_below(if p.form == Form::Column { "#kelp_soil" } else { "#water_bed" })
+                .holds_liquid(&crate::blocks::WATER),
         };
         let full = p.block;
-        // Spreading plants come up in the shade too (mushrooms); the others need daylight.
-        let light = if p.ground == Ground::Soil && p.form == Form::Spreads { 0 } else { 9 };
+        // Spreading plants come up in the shade too (mushrooms), and the bed's under water that
+        // dims the light; the others need daylight.
+        let light = if p.ground == Ground::Soil && p.form == Form::Spreads || p.ground == Ground::Bed { 0 } else { 9 };
         let b = match p.form {
             // Grazed down (age 0) and grown back (age 1); the world makes them grown.
             Form::Tuft => b
@@ -71,8 +80,20 @@ pub fn register(r: &mut Registry) {
                     .on_grow(move |e| growth::grow(e, full, true, |e| spread(e, full)));
                 if p.gives.is_some() { b.no_item() } else { b.tab(&crate::tabs::NATURAL) }
             }
+            // A lily pad lies flat on the water.
+            Form::Still if name == "lily_pad" => b
+                .texture(name)
+                .model_box([0.0, 0.0, 0.0], [16.0, 0.5, 16.0])
+                .tab(&crate::tabs::NATURAL),
+            // A reed stands for the reeds sugar cane borrowed its look from.
+            Form::Still if name == "reed" => b.texture("reeds").tab(&crate::tabs::NATURAL),
             // No base plant lies as a log yet (the Cretaceous's rotten log is the animals mod's).
             Form::Still | Form::Log => b.texture(name).tab(&crate::tabs::NATURAL),
+            Form::Column => b
+                .texture(name)
+                .growth(growth::step_secs(full, 1, 270.0), light)
+                .on_grow(move |e| growth::grow(e, full, false, grow_up))
+                .tab(&crate::tabs::NATURAL),
         };
         drop(b);
         // Picking gives what plants it again: one at any stage, two more when ripe.
@@ -118,6 +139,18 @@ pub fn state(i: usize) -> u32 {
             })
             .collect()
     })[i]
+}
+
+/// A column's growth step (kelp): one more on top while it is still a block below the surface.
+fn grow_up(e: &mut BlockEvent) {
+    let w = e.world();
+    let [x, y, z] = e.pos();
+    let (above, over) = ([x, y + 1, z], [x, y + 2, z]);
+    // A water source, the first of its states.
+    let still = |p| w.get(p) == crate::blocks::WATER.id();
+    if still(above) && still(over) {
+        w.set(above, e.state());
+    }
 }
 
 /// A spreading plant's growth step: a new one nearby on its ground, unless `CROWD` are there.

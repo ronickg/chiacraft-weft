@@ -18,6 +18,8 @@ pub enum Ground {
     Shore,
     /// Floating on still, shallow water.
     Water,
+    /// Rooted on the bottom under still water, standing in it (`depths` says how deep).
+    Bed,
 }
 
 /// How it grows.
@@ -36,6 +38,9 @@ pub enum Form {
     Still,
     /// A fallen log lying on the ground, a full block, rotting (grubs live in it).
     Log,
+    /// A stalk standing in water, growing up a block at a time until one below the surface
+    /// (kelp); the world makes it a random height of that.
+    Column,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -77,6 +82,16 @@ pub const PRAIRIE: &[&str] = &["base:plains"];
 pub const CYCAD_LANDS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:floodplain", "animals:fern_forest", "animals:crags"];
 pub const FLOWERING: &[&str] = &["animals:floodplain", "animals:scrubland"];
 pub const PONDS: &[&str] = &["animals:floodplain", "animals:red_dunes"];
+/// Still fresh water in the temperate and boreal lands: white water lilies' (Nymphaea alba, and
+/// N. tetragona into the taiga).
+pub const LAKES: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:swamp", "base:taiga"];
+/// Common reed (Phragmites australis) rings the temperate and boreal lakes; the swamp's and the
+/// llanos' shores are the cattails' and the wild rice's.
+pub const REEDBEDS: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:taiga"];
+/// Sheltered sea floor: eelgrass meadows (Zostera) off the beaches.
+pub const SEA_MEADOWS: &[&str] = &["base:ocean", "base:beach"];
+/// Kelp forests: the open sea's rocky and sandy floor.
+pub const KELP_FORESTS: &[&str] = &["base:ocean"];
 /// Where the Cretaceous's trees fall and rot: its forests and the wooded floodplain.
 pub const DEADWOOD: &[&str] = &["animals:floodplain", "animals:fern_forest"];
 
@@ -94,7 +109,7 @@ const fn w(
 /// Covers are shares of the cells of that ground (tall grass covers 5-35% of the turf, berry bushes
 /// 0.4% of the forest's; `forage::GRASS_COVER`): the tundra's sedges and cottongrass are its grass,
 /// the bushes and mushrooms are found, not walked through.
-pub const WILD: [Wild; 20] = [
+pub const WILD: [Wild; 24] = [
     w("base:sedge", Form::Tuft, Ground::Soil, None, SEDGE_LANDS, 0.12),
     w("base:cottongrass", Form::Tuft, Ground::Soil, None, TUNDRA, 0.08),
     w("base:reindeer_lichen", Form::Tuft, Ground::Soil, None, NORTH, 0.05),
@@ -110,13 +125,25 @@ pub const WILD: [Wild; 20] = [
     w("base:mushroom_brown", Form::Spreads, Ground::Soil, Some("base:mushroom_brown"), FOREST_FLOOR, 0.006),
     w("base:mushroom_red", Form::Spreads, Ground::Soil, Some("base:mushroom_red"), AGARICS, 0.003),
     w("base:water_hyacinth", Form::Spreads, Ground::Water, None, WETLANDS, 0.08),
-    w("base:cattail", Form::Still, Ground::Shore, None, MARSHES, 0.1),
+    w("base:cattail", Form::Still, Ground::Shore, None, MARSHES, 0.15),
+    w("base:reed", Form::Still, Ground::Shore, None, REEDBEDS, 0.12),
+    w("base:lily_pad", Form::Still, Ground::Water, None, LAKES, 0.12),
+    w("base:seagrass", Form::Still, Ground::Bed, None, SEA_MEADOWS, 0.2),
+    w("base:kelp", Form::Column, Ground::Bed, None, KELP_FORESTS, 0.08),
     w("animals:cycad", Form::Still, Ground::Soil, Some("animals:cycad_seed"), CYCAD_LANDS, 0.01),
     w("animals:flowering_shrub", Form::Still, Ground::Soil, None, FLOWERING, 0.02),
     w("animals:water_lily", Form::Still, Ground::Water, None, PONDS, 0.06),
     w("animals:rotten_log", Form::Log, Ground::Soil, None, DEADWOOD, 0.004),
 ];
-// Kelp waits: the engine has no block that stands in water yet.
+
+/// How deep the water over a plant rooted on the bed is, from its floor to the surface, in
+/// blocks: eelgrass in the shallows, kelp further out.
+pub fn depths(block: &str) -> std::ops::RangeInclusive<i32> {
+    match block {
+        "base:kelp" => 6..=20,
+        _ => 1..=6,
+    }
+}
 
 /// A wild plant by its block's full name.
 pub fn of(block: &str) -> Option<&'static Wild> {

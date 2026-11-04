@@ -373,16 +373,19 @@ fn decorate(g: &mut Gen) {
     let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
     let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
 
-    // Surface decoration only near the surface.
-    if oy > max_h + 16 || oy + 15 < min_h - 1 {
+    // Surface decoration only near the surface, which under the sea is its water's (kelp).
+    let top = if min_h < SEA { max_h.max(SEA) } else { max_h };
+    if oy > top + 16 || oy + 15 < min_h - 1 {
         return;
     }
     for z in 0..16usize {
         for x in 0..16usize {
             let col = &cols[z * 16 + x];
             let (wx, wz) = (ox + x as i32, oz + z as i32);
-            // Floating plants on still, shallow water (`wild.rs`); frozen water is ice.
+            // Floating plants on still, shallow water (`wild.rs`); frozen water is ice. Under it,
+            // plants of the bed standing in the water.
             if col.height < SEA {
+                bed(g, seed, [x, z], [wx, wz], col.height, col.biome);
                 if col.height >= SEA - WILD_WATER_DEPTH {
                     for top in [SEA, SEA - 1] {
                         let y = top + 1 - oy;
@@ -470,6 +473,35 @@ fn decorate(g: &mut Gen) {
                     g.set(x, y + k, z, SUGAR_CANE.id());
                 }
             }
+        }
+    }
+}
+
+/// The plant of the bed (eelgrass, kelp; `vitals::wild::Ground::Bed`) on a column whose floor is
+/// at `floor` under the sea, in this cube's part of it: in the water just over the floor, kelp on
+/// up to its height, a block below the surface at most.
+fn bed(g: &mut Gen, seed: u64, [x, z]: [usize; 2], [wx, wz]: [i32; 2], floor: i32, biome: u32) {
+    let roll = wild_roll(seed, wx, wz);
+    if roll >= wild::MOST {
+        return;
+    }
+    let Some(i) = wild::pick(name_of(abi::entry_kind::BIOME, biome), wild::Ground::Bed, roll) else { return };
+    let plant = &wild::WILD[i];
+    let depth = SEA - floor;
+    if !wild::depths(plant.block).contains(&depth) {
+        return;
+    }
+    let s = crate::wild::state(i);
+    if s == u32::MAX {
+        return;
+    }
+    let tall =
+        if plant.form == wild::Form::Column { 1 + (hash(seed ^ 0xCE1, wx as i64, 0, wz as i64) % (depth - 1) as u64) as i32 } else { 1 };
+    let oy = g.origin()[1];
+    for y in floor + 1..=floor + tall {
+        let ly = y - oy;
+        if (0..16).contains(&ly) && WATER.is(g.get(x, ly as usize, z)) {
+            g.set(x, ly as usize, z, s);
         }
     }
 }
