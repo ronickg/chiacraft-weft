@@ -83,6 +83,74 @@ Our light is the strongest part: sun shadows, light shafts, reflections, ground 
 
 **The check.** Tester 2's six-biome, noon-and-sunset shots from fixed spots are the "before". The same script and spots give the "after" for each change.
 
+## Flowers per biome (for `FLOWERS`, and for Chiacraft's art)
+
+Each biome's flowers come from the real place its climate already comes from
+(`reports/ecology/biome_climates.json`). Four to six per biome, picked to read at a glance: each
+looks unlike the others in the set. Each entry gives the colour, when it blooms in that place,
+and a reference: the species page, whose photos are the art reference.
+- **Confidence:** "check" marks a species chosen from a genus a source names for the place, not
+  from a place checklist.
+- **The game's calendar:** the bloom is the real place's own season, so a flower only needs to
+  open in its season.
+- **Already in the game:** dandelion, rose and wild sunflower stay, where they fit.
+
+| biome (real place) | flower | colour | blooms | reference |
+|---|---|---|---|---|
+| **plains** (Konza Prairie, Kansas tallgrass) | narrow-leaf purple coneflower, *Echinacea angustifolia* | pink-purple, dark cone | summer | [wiki](https://en.wikipedia.org/wiki/Echinacea_angustifolia) |
+| | black-eyed Susan, *Rudbeckia hirta* | yellow, dark centre | summer | [wiki](https://en.wikipedia.org/wiki/Rudbeckia_hirta) |
+| | butterfly milkweed, *Asclepias tuberosa* | orange clusters | summer | [wiki](https://en.wikipedia.org/wiki/Asclepias_tuberosa) |
+| | leadplant, *Amorpha canescens* | purple spikes, grey leaves | early summer | [wiki](https://en.wikipedia.org/wiki/Amorpha_canescens) |
+| | dotted blazing star, *Liatris punctata* | magenta spikes | late summer, autumn | [wiki](https://en.wikipedia.org/wiki/Liatris_punctata) |
+| | wild sunflower (in the game) | yellow | summer, autumn | |
+| **forest** (Hessian beech-oak) | wood anemone, *Anemone nemorosa* | white carpets | early spring, before the leaves | [wiki](https://en.wikipedia.org/wiki/Anemonoides_nemorosa) |
+| | lesser celandine, *Ficaria verna* | glossy yellow | early spring | [wiki](https://en.wikipedia.org/wiki/Ficaria_verna) |
+| | lungwort, *Pulmonaria officinalis* | pink turning blue | spring | [wiki](https://en.wikipedia.org/wiki/Pulmonaria_officinalis) |
+| | sweet woodruff, *Galium odoratum* | small white stars | late spring | [wiki](https://en.wikipedia.org/wiki/Galium_odoratum) |
+| | foxglove, *Digitalis purpurea* (in clearings) | purple-pink spires | summer | [wiki](https://en.wikipedia.org/wiki/Digitalis_purpurea) |
+| **birch forest** (Moscow's mixed forest) | lily of the valley, *Convallaria majalis* | white bells | late spring | [wiki](https://en.wikipedia.org/wiki/Lily_of_the_valley) |
+| | wood cranesbill, *Geranium sylvaticum* | violet | early summer | [wiki](https://en.wikipedia.org/wiki/Geranium_sylvaticum) |
+| | May lily, *Maianthemum bifolium* | white spikes | late spring | [wiki](https://en.wikipedia.org/wiki/Maianthemum_bifolium) |
+| | peach-leaved bellflower, *Campanula persicifolia* | blue bells | summer | [wiki](https://en.wikipedia.org/wiki/Campanula_persicifolia) |
+| | fireweed, *Chamaenerion angustifolium* (in clearings) | magenta spires | summer | [wiki](https://en.wikipedia.org/wiki/Chamaenerion_angustifolium) |
+| **taiga** (Fairbanks interior Alaska) | fireweed, *Chamaenerion angustifolium* | magenta spires | summer | as above |
+| | twinflower, *Linnaea borealis* | pale pink pairs | early summer | [wiki](https://en.wikipedia.org/wiki/Linnaea_borealis) |
+| | bunchberry, *Cornus canadensis* | white, red berries later | early summer | [wiki](https://en.wikipedia.org/wiki/Cornus_canadensis) |
+| | prickly wild rose, *Rosa acicularis* | pink | early summer | [wiki](https://en.wikipedia.org/wiki/Rosa_acicularis) |
+| | bog Labrador tea, *Rhododendron groenlandicum* | white clusters | early summer | [wiki](https://en.wikipedia.org/wiki/Rhododendron_groenlandicum) |
+| **snowy plains** (Utqiaġvik coastal tundra) | Macoun's poppy, *Papaver macounii* (photographed at Barrow, [Arctic Atlas](https://www.arcticatlas.org/photos/pltspecies/alphaList?queryID=P)) | pale yellow cups | midsummer | [wiki](https://en.wikipedia.org/wiki/Papaver_macounii) |
+| | lousewort, *Pedicularis* (woolly, *P. kanei*, or Langsdorff's; [a Barrow garden](https://tundragarden.blogspot.com/2006/07)) | pink spikes | early summer | [wiki](https://en.wikipedia.org/wiki/Pedicularis_lanata) |
+| | heart-leaved saxifrage, *Saxifraga punctata*; tufted saxifrage, *S. cespitosa* (same Barrow garden) | white | summer | [wiki](https://en.wikipedia.org/wiki/Saxifraga_cespitosa) |
+| | Arctic sweet coltsfoot, *Petasites frigidus* | white-pink heads | earliest, as the snow goes | [wiki](https://en.wikipedia.org/wiki/Petasites_frigidus) |
+| | pygmy buttercup, *Ranunculus pygmaeus* | tiny yellow | summer | [wiki](https://en.wikipedia.org/wiki/Ranunculus_pygmaeus) |
+| **desert** (Sonoran, Hermosillo) | brittlebush, *Encelia farinosa* | yellow over grey-white leaves | late winter, spring | [wiki](https://en.wikipedia.org/wiki/Encelia_farinosa) |
+| | desert globemallow, *Sphaeralcea ambigua* | apricot-orange | spring | [wiki](https://en.wikipedia.org/wiki/Sphaeralcea_ambigua) |
+| | Mexican gold poppy, *Eschscholzia californica* subsp. *mexicana* | orange-gold | late winter, spring after rain | [wiki](https://en.wikipedia.org/wiki/Eschscholzia_californica) |
+| | desert marigold, *Baileya multiradiata* | bright yellow | spring to autumn | [wiki](https://en.wikipedia.org/wiki/Baileya_multiradiata) |
+| | ocotillo, *Fouquieria splendens* (a shrub, red tips) | scarlet | spring | [wiki](https://en.wikipedia.org/wiki/Fouquieria_splendens) |
+| **savanna** (Arauca llanos) | sensitive plant, *Mimosa pudica* (check: Mimosa is a llanos genus, [WWF](https://ecoregions.worldwildlife.org/ecoregions/nt0709)) | pink puffballs | wet season | [wiki](https://en.wikipedia.org/wiki/Mimosa_pudica) |
+| | a *Senna* or *Cassia* (check, same source) | yellow | wet season | [wiki](https://en.wikipedia.org/wiki/Senna_(plant)) |
+| | pencil flower, *Stylosanthes* (check, same source) | small yellow | wet season | [wiki](https://en.wikipedia.org/wiki/Stylosanthes) |
+| | bush morning glory, *Ipomoea carnea* subsp. *fistulosa* (wet ground; [llanos notes](https://anacondas.org/anacondas.org/llanos.htm), an older source) | pale pink trumpets | much of the year | [wiki](https://en.wikipedia.org/wiki/Ipomoea_carnea) |
+| **swamp** (Pantanal) | water hyacinth, *Pontederia crassipes* (aguapé) | lilac spikes on floating rosettes | wet season | [wiki](https://en.wikipedia.org/wiki/Pontederia_crassipes) |
+| | bush morning glory, *Ipomoea carnea* (algodão-bravo) | pale pink | much of the year | as above |
+| | water primrose, *Ludwigia* | yellow | wet season | [wiki](https://en.wikipedia.org/wiki/Ludwigia_(plant)) |
+| | alligator flag, *Thalia geniculata* | violet on tall stems | wet season | [wiki](https://en.wikipedia.org/wiki/Thalia_geniculata) |
+| **mountains** (Davos, subalpine) | alpenrose, *Rhododendron ferrugineum* | deep pink | early summer | [wiki](https://en.wikipedia.org/wiki/Rhododendron_ferrugineum) |
+| | trumpet gentian, *Gentiana acaulis* | deep blue | late spring, early summer | [wiki](https://en.wikipedia.org/wiki/Gentiana_acaulis) |
+| | edelweiss, *Leontopodium nivale* subsp. *alpinum* | woolly white stars | summer | [wiki](https://en.wikipedia.org/wiki/Leontopodium_nivale) |
+| | globeflower, *Trollius europaeus* | yellow globes, in wet meadows | early summer | [wiki](https://en.wikipedia.org/wiki/Trollius_europaeus) |
+| | alpine aster, *Aster alpinus* | violet, yellow centre | summer | [wiki](https://en.wikipedia.org/wiki/Aster_alpinus) |
+| **beach** (Faro, Ria Formosa) | sea daffodil, *Pancratium maritimum* | white | late summer | [wiki](https://en.wikipedia.org/wiki/Pancratium_maritimum) |
+| | sea holly, *Eryngium maritimum* | blue-grey | summer | [wiki](https://en.wikipedia.org/wiki/Eryngium_maritimum) |
+| | yellow horned poppy, *Glaucium flavum* | yellow | summer | [wiki](https://en.wikipedia.org/wiki/Glaucium_flavum) |
+| | sea rocket, *Cakile maritima* | pale lilac | spring, summer | [wiki](https://en.wikipedia.org/wiki/Cakile_maritima) |
+| | Hottentot fig, *Carpobrotus edulis* (introduced, everywhere on the Algarve coast) | magenta or yellow | spring | [wiki](https://en.wikipedia.org/wiki/Carpobrotus_edulis) |
+
+Ocean has none. The Cretaceous biomes are left out here. Flowering plants were already spreading
+then, and varied by the Late Cretaceous, but mostly small and plain. Their sets should come from
+the Cretaceous ecology research (`reports/ecology/`), not from guesses.
+
 ## Sources
 
 - Vintage Story: [modding: trees](https://wiki.vintagestory.at/index.php/Modding:Trees), [trees](https://wiki.vintagestory.at/Trees), [seasons](https://wiki.vintagestory.at/Seasons), [v1.13 blog](https://www.vintagestory.at/blog.html/news/the-seasons-update-v113-pre1-r251/).
