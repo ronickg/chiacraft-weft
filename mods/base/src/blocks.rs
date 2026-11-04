@@ -714,14 +714,14 @@ pub fn register(r: &mut Registry) {
         .tag("dirt")
         .tab(&crate::tabs::NATURAL);
     // The forest floor (`vitals::layers`): soil like dirt, so plants grow on it.
-    for (b, top, side, sound) in [
-        (&LEAF_LITTER, "leaf_litter_top", "leaf_litter_side", "grass"),
-        (&MOSS_BLOCK, "moss_block_top", "moss_block_side", "grass"),
-        (&COARSE_DIRT, "coarse_dirt", "coarse_dirt", "gravel"),
+    for (b, top, side, bottom, sound) in [
+        (&LEAF_LITTER, "leaf_litter_top", "leaf_litter_side", "dirt", "grass"),
+        (&MOSS_BLOCK, "moss_block_top", "moss_block_side", "dirt", "grass"),
+        (&COARSE_DIRT, "coarse_dirt", "coarse_dirt", "coarse_dirt", "gravel"),
     ] {
         r.block(b)
             .sound_group(sound)
-            .textures(top, side, "dirt")
+            .textures(top, side, bottom)
             .hardness(0.5)
             .mineable("shovel")
             .tag("dirt")
