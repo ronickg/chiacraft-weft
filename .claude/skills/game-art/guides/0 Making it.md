@@ -86,6 +86,8 @@ again (once or twice) rather than fixed by hand:
   as that line: look, and keep it if the outline is its own darker shade.
   A dark, glossy thing (coal) has bright glints on its edges, so its edge measures lighter than
   its inside and fails the outline rule too: look, and keep it if it reads right.
+  Glass (a potion flask) is outlined in white on purpose (the item guide's recipe), so it fails the
+  outline rule by design: pass `--pale` for glass.
 - **Full faces** (a chest front, a workstation face, a cloud or star tile) fill their canvas: make
   them as tiles (`--tile`, blocks without `--cutout`), or the fill check fails them.
 - **Background**: flat magenta (or green) all round, nothing stray on it.
