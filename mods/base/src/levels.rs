@@ -255,8 +255,12 @@ fn after(v: &base_api::Vitals) -> base_api::Vitals {
 
 /// The stats screen's columns after the bar (GUI pixels): the value now (right-aligned), its unit,
 /// the value after the waiting points (right-aligned), the points waiting (centred).
-const NOW_W: f32 = 18.0;
-const UNIT_W: f32 = 16.0;
+/// (as wide as their words in either language: "сейчас" 20.5 and "units" 17.5 GUI px were shrunk
+/// at 18 and 16, the Russian pass)
+const NOW_W: f32 = 21.0;
+/// The stat names' column, as wide as the longest in either language ("Выносливость", 42.5 GUI px).
+const NAME_W: f32 = 43.0;
+const UNIT_W: f32 = 18.0;
 const AFTER_W: f32 = 18.0;
 const WAITING_W: f32 = 8.0;
 
@@ -356,7 +360,7 @@ fn client(r: &mut Registry) {
                 // The header in the rows' columns: "now" over the values, "after" over what the
                 // waiting points make of them, each lined up as its values are (right).
                 ui.row(S::row().gap(4.0), |ui| {
-                    ui.row(S::row().w(8.0 + 4.0 + 40.0 + 4.0 + STAT_BAR.0), |_| {});
+                    ui.row(S::row().w(8.0 + 4.0 + NAME_W + 4.0 + STAT_BAR.0), |_| {});
                     ui.row(S::row().w(NOW_W).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "levels.base.now_head", &[]));
                     ui.row(S::row().w(UNIT_W), |_| {});
                     ui.row(S::row().w(AFTER_W).end(), |ui| {
@@ -366,7 +370,7 @@ fn client(r: &mut Registry) {
                 for (i, stat) in stats::ALL.into_iter().enumerate() {
                     ui.row(S::row().gap(4.0).center(), |ui| {
                         ui.image(&format!("base:gui/stat_icon_{}", stat.name()), 8.0, 8.0);
-                        ui.text_styled(S::default().w(40.0).no_wrap(), &format!("stat.base.{}", stat.name()), &[]);
+                        ui.text_styled(S::default().w(NAME_W).no_wrap(), &format!("stat.base.{}", stat.name()), &[]);
                         ui.progress_bind(
                             Box::leak(format!("stat_{}", stat.name()).into_boxed_str()),
                             S::default().size(STAT_BAR.0, STAT_BAR.1),

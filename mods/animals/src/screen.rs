@@ -496,17 +496,22 @@ const OVERVIEW_GAP: f32 = 6.0;
 const GENE_LINES: usize = 40;
 /// The Genes page's list: taller, it has the page to itself.
 const GENES_PAGE_H: f32 = 110.0;
-/// (28 wide, from 32, so the window fits 380 with its columns as wide as their headings.)
-const STAT_BAR: (f32, f32) = (28.0, 6.0);
+/// The stat names' column: as wide as the longest name in either language ("Выносливость" 42.5 GUI
+/// px: at 34 it was shrunk to 80%, the Russian pass); the bars 18 to make room (and the wild column
+/// 16, so "Дикий" and "Ручной" over their columns keep 2 GUI px between them), so the window still
+/// fits 380 with every column as wide as its words.
+const STAT_NAME_W: f32 = 43.0;
+const STAT_BAR: (f32, f32) = (18.0, 6.0);
 /// The stat rows' columns after the bar: the value (right-aligned), wild and tamed points
 /// (centred), then the + (GUI pixels).
-const STAT_VALUE_W: f32 = 18.0;
+/// ("152%" is 16.5 GUI px)
+const STAT_VALUE_W: f32 = 17.0;
 /// (as wide as their headings, "Wild" 13.5 and "Tamed" 19.5 GUI px: narrower, the row shrank them,
 /// PC runs fit1280 and fit760b)
-const STAT_WILD_W: f32 = 14.0;
+const STAT_WILD_W: f32 = 16.0;
 const STAT_TAMED_W: f32 = 20.0;
 /// A stat row's whole width, for the divider over torpor.
-const STAT_ROW_W: f32 = 8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0 + STAT_WILD_W + 3.0 + STAT_TAMED_W + 3.0 + 10.0;
+const STAT_ROW_W: f32 = 8.0 + 3.0 + STAT_NAME_W + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0 + STAT_WILD_W + 3.0 + STAT_TAMED_W + 3.0 + 10.0;
 
 /// The screen of a tame animal (`notes/ui/BATCHES.md`, the taming and stats upgrade): who it is
 /// and how it is on the left, its stats as bars in the middle, its coat and orders on the right.
@@ -664,15 +669,15 @@ fn animal_screen(ui: &mut Ui) {
             });
             // The header in the rows' own columns: name, bar, value, wild, tamed, +. A header
             // lines up as its column's values do (centred over centred counts).
-            ui.row(S::row().gap(3.0), |ui| {
-                ui.row(S::row().w(8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W), |_| {});
-                ui.row(S::row().w(STAT_WILD_W).center(), |ui| {
-                    ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.wild_points", &[])
-                });
-                ui.row(S::row().w(STAT_TAMED_W).center(), |ui| {
-                    ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.tamed_points", &[])
-                });
-                ui.row(S::row().w(10.0), |_| {});
+            // The columns' headings, each centred over its column and free to reach past it into
+            // the empty heading room beside it: in a row the longer Russian ones ("Дикий" 17.5,
+            // "Ручной" 20.5 GUI px) were shrunk to the columns' 14 and 20.
+            ui.row(S::row().size(STAT_ROW_W, 8.5), |ui| {
+                let wild = 8.0 + 3.0 + STAT_NAME_W + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0;
+                let tamed = wild + STAT_WILD_W + 3.0;
+                for (x, w, key) in [(wild, STAT_WILD_W, "screen.animals.wild_points"), (tamed, STAT_TAMED_W, "screen.animals.tamed_points")] {
+                    ui.text_styled(S::default().class("dim").no_wrap().at_pivot(x + w / 2.0, 0.0, [0.5, 0.0]), key, &[]);
+                }
             });
             for (i, name) in STAT_NAMES.iter().enumerate() {
                 if i == species::TORPOR {
@@ -680,7 +685,7 @@ fn animal_screen(ui: &mut Ui) {
                 }
                 ui.row(S::row().gap(3.0).center(), |ui| {
                     ui.image(&format!("base:gui/stat_icon_{name}"), 8.0, 8.0);
-                    ui.text_styled(S::default().w(34.0).no_wrap(), &format!("stat.animals.{name}"), &[]);
+                    ui.text_styled(S::default().w(STAT_NAME_W).no_wrap(), &format!("stat.animals.{name}"), &[]);
                     ui.row(S::row().size(STAT_BAR.0, STAT_BAR.1), move |ui| {
                         // One bar per quality on the same place: the one matching its wild points shows.
                         for q in 0..5usize {
@@ -1258,7 +1263,8 @@ fn taming_hud(r: &mut Registry) {
                     t.set("hud.animals.taming.who", &[Arg::Key(&format!("entity.animals.{}", s.kind_name()))]);
                 });
                 ui.row(S::row().gap(3.0).center(), |ui| {
-                    ui.text_bind_styled(S::default().w(30.0).no_wrap(), |c, t| {
+                    // as wide as "Приручено" (31 GUI px; at 30 it was shrunk, the Russian pass)
+                    ui.text_bind_styled(S::default().w(32.0).no_wrap(), |c, t| {
                         if being_tamed(c).is_some() { t.set("hud.animals.taming.bar", &[]) } else { t.text("") }
                     });
                     ui.progress_bind("life_taming", S::default().size(LIFE_BAR.0, LIFE_BAR.1), |c| {

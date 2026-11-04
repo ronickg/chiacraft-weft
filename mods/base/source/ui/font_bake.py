@@ -154,8 +154,12 @@ def pixel_main(path, also=None):
             if c != " " and not has_glyph(p, c):
                 continue
             img = Image.new("L", (cw, ch))
-            # every font's baseline on the first one's
-            ImageDraw.Draw(img).text((PAD, top + ascent - f.getmetrics()[0]), c, font=f, fill=255)
+            # every font's baseline on the first one's, a font with smaller capitals lifted by half
+            # the difference so its capitals sit centred where the first one's are (Pixeloid's
+            # Cyrillic capitals are 7 px to PixelOperator's 9: on the same baseline they sat a pixel
+            # low in every button, the Russian pass, 11-04)
+            lift = (cap_h - (f.getbbox("H")[3] - f.getbbox("H")[1])) // 2 if f is not f0 else 0
+            ImageDraw.Draw(img).text((PAD, top + ascent - f.getmetrics()[0] - lift), c, font=f, fill=255)
             img = img.point(lambda v: 255 if v >= 128 else 0)
             a = np.asarray(img)
             cols = np.nonzero(a.max(0))[0]
