@@ -767,7 +767,7 @@ pub fn draw_custom(
                 .get(data as usize)
                 .copied()
                 .unwrap_or_default();
-            stack_icon(ren, textures, r, stack, scale, text_unit);
+            slot_icon(ren, look, "hotbar", textures, r, stack, scale, text_unit);
             ren.slot_number(r, data + 1, scale, text_unit);
         }
         TAG_ENTITY => {
@@ -777,7 +777,7 @@ pub fn draw_custom(
         modui::TAG_ICON => stack_icon(ren, textures, r, ItemStack::new(data as u32, 1), scale, text_unit),
         modui::TAG_CREATIVE => {
             slot_background(ren, look, "slot", r, false, scale);
-            stack_icon(ren, textures, r, ItemStack::new(data as u32, 1), scale, text_unit);
+            slot_icon(ren, look, "slot", textures, r, ItemStack::new(data as u32, 1), scale, text_unit);
             if hovered {
                 loaded(
                     ren,
@@ -801,7 +801,7 @@ pub fn draw_custom(
                 let s = 16.0 * scale;
                 ren.image(Rect { x: r.x + (r.w - s) / 2.0, y: r.y + (r.h - s) / 2.0, w: s, h: s }, t, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
             }
-            stack_icon(ren, textures, r, stack, scale, text_unit);
+            slot_icon(ren, look, "slot", textures, r, stack, scale, text_unit);
             let dragged = client
                 .drag
                 .as_ref()
@@ -823,6 +823,26 @@ pub fn draw_custom(
 /// A stack in `r` (`UiRenderer::stack_icon`).
 pub fn stack_icon(ren: &mut UiRenderer, textures: &GameTextures, r: Rect, stack: ItemStack, scale: f32, text_unit: f32) {
     ren.stack_icon(content(), textures, r, stack, scale, text_unit);
+}
+
+/// A stack in a slot of class `class`, its icon as big as the class's `.gui` asks (`icon = 14`,
+/// GUI pixels; 16 without).
+#[allow(clippy::too_many_arguments)]
+fn slot_icon(
+    ren: &mut UiRenderer,
+    look: &Look,
+    class: &str,
+    textures: &GameTextures,
+    r: Rect,
+    stack: ItemStack,
+    scale: f32,
+    text_unit: f32,
+) {
+    let icon = look
+        .sidecar(class, "icon")
+        .and_then(|v| v.trim().parse::<f32>().ok())
+        .unwrap_or(16.0);
+    ren.stack_icon_sized(content(), textures, r, stack, icon, scale, text_unit);
 }
 
 /// A slot of class `class` (`slot` in menus, `hotbar` on the HUD), with `hotbar_selected` around

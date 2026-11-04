@@ -189,7 +189,7 @@ A texture used as a background has to be stretched over parts of any size, and a
 scaling = nine_slice
 border = 4
 ```
-`scaling` is `nine_slice` (the corners keep their size, the edges and middle stretch), `tile` or `stretch`. `border` is one number for all sides or `left top right bottom`, in GUI pixels. Two more keys exist for special cases: `size = w h` for an image with more pixels than the GUI pixels it stands for, and `outset = n` for textures that reach outside their box, like shadows. A square `tile` texture can take `turn = random`: every tile is turned and mirrored its own way, so a big background doesn't show the repeat. An image without one is simply stretched.
+`scaling` is `nine_slice` (the corners keep their size, the edges and middle stretch), `tile` or `stretch`. `border` is one number for all sides or `left top right bottom`, in GUI pixels. Two more keys exist for special cases: `size = w h` for an image with more pixels than the GUI pixels it stands for, and `outset = n` for textures that reach outside their box, like shadows. A slot's `.gui` can say how big items are drawn in it, `icon = 14` (GUI pixels, 16 without), so they sit inside a thick frame. A square `tile` texture can take `turn = random`: every tile is turned and mirrored its own way, so a big background doesn't show the repeat. An image without one is simply stretched.
 
 ## Shaders and animations
 A class's `.gui` can name a shader, and the part is then filled by `shaders/gui/<name>.wgsl` instead of the picture (`testmod_panel.gui`):

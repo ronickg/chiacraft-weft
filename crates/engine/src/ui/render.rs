@@ -872,12 +872,29 @@ impl UiRenderer {
     /// A stack the one way slots, the hotbar, item nodes and the held cursor stack show it: the
     /// icon centered in `r`, the durability bar, the count at the bottom right.
     pub fn stack_icon(&mut self, c: &Content, textures: &GameTextures, r: Rect, stack: weft_abi::ItemStack, scale: f32, text_unit: f32) {
+        self.stack_icon_sized(c, textures, r, stack, 16.0, scale, text_unit);
+    }
+
+    /// `stack_icon` with the icon `icon` GUI pixels wide (a slot's `.gui` says, `icon = 14`, so
+    /// the icon sits inside its frame); the durability bar and the count keep to the slot's 16.
+    #[allow(clippy::too_many_arguments)]
+    pub fn stack_icon_sized(
+        &mut self,
+        c: &Content,
+        textures: &GameTextures,
+        r: Rect,
+        stack: weft_abi::ItemStack,
+        icon: f32,
+        scale: f32,
+        text_unit: f32,
+    ) {
         if stack.is_empty() {
             return;
         }
         let s = 16.0 * scale;
         let (x, y) = (r.x + (r.w - s) / 2.0, r.y + (r.h - s) / 2.0);
-        self.item_icon(c, textures, x, y, s, stack.item);
+        let i = icon * scale;
+        self.item_icon(c, textures, r.x + (r.w - i) / 2.0, r.y + (r.h - i) / 2.0, i, stack.item);
         let def = &c.items[stack.item as usize];
         let damage = crate::stack::damage(&stack);
         if def.durability > 0 && damage > 0 {
