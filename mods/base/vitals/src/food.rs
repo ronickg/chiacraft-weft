@@ -494,6 +494,40 @@ pub const FOODS: &[Food] = &[
         poison: 0.0,
         category: Category::Fruit,
     },
+    // A cacao pod's beans, dried in the sun (estimates near cocoa nibs': half fat, a fifth fibre,
+    // bitter), a handful (30 g), keeping a year; roasted, a little drier, keeping half a year.
+    Food {
+        name: "base:cacao_beans",
+        grams: 30.0,
+        per100: per(5.0, 12.9, 13.0, 46.0, 21.0, 0.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (365.0, 365.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    Food {
+        name: "base:roasted_cacao",
+        grams: 30.0,
+        per100: per(2.0, 13.5, 13.5, 48.0, 21.5, 0.0),
+        meal: Meal::Cooked,
+        raw: false,
+        keeps: (180.0, 180.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    // A hand of the wild banana's fruit (USDA, raw banana; carbs without the fiber; the wild
+    // ones are seedy and smaller), a few small fruit (150 g), keeping under a week once picked.
+    Food {
+        name: "base:bananas",
+        grams: 150.0,
+        per100: per(74.9, 1.1, 20.2, 0.3, 2.6, 8.7),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (6.0, 6.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
     Food {
         name: "base:sunflower_seeds",
         grams: 30.0,

@@ -60,6 +60,9 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:tepary_beans | seeds | 50 | 5 | 12 | 22 | 1 | 8 | 5 | 7 min | 365 + 365 |  |
 | base:brazil_nut | seeds | 30 | 3 | 4 | 1 | 20 | 2 | 1 | 11 min | 180 + 180 |  |
 | base:cacao_pod | fruit | 100 | 10 | 1 | 13 | 0 | 3 | 81 | 6 min | 7 + 7 | cooling |
+| base:cacao_beans | seeds | 30 | 3 | 4 | 4 | 14 | 6 | 2 | 9 min | 365 + 365 |  |
+| base:roasted_cacao | seeds | 30 | 3 | 4 | 4 | 14 | 6 | 1 | 9 min | 180 + 180 | hot when cooked |
+| base:bananas | fruit | 150 | 15 | 2 | 30 | 0 | 5 | 112 | 11 min | 6 + 6 | cooling |
 | base:sunflower_seeds | seeds | 30 | 3 | 6 | 3 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
 | base:kelp | water_plants | 50 | 5 | 1 | 5 | 0 | 1 | 41 | 3 min | 3 + 3 |  |
 | base:cattail_root | roots | 100 | 10 | 1 | 17 | 0 | 3 | 78 | 6 min | 14 + 14 |  |
@@ -109,6 +112,7 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | base:beach_plums (10) | base:dried_berries | - | - | 112 |
 | base:prickly_pear_fruit (14) | base:dried_berries | - | - | 112 |
 | base:cacao_pod (14) | base:dried_berries | - | - | 112 |
+| base:bananas (12) | base:dried_berries | - | - | 112 |
 | animals:venison (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | animals:hare (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | animals:trout (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |

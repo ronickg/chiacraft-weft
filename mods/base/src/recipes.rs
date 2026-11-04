@@ -32,6 +32,10 @@ pub fn register(r: &mut Registry) {
     // into its own white `cooked_rice`).
     r.shapeless(S, "cooked_wild_rice", 1, &["#rice"], 200);
     r.shapeless(C, "apple_pie", 1, &["#apple", "#sugar", "#egg", "#crops/wheat"], 0);
+    // A cacao pod opens into its beans (the pulp eaten, `cacao_pod` the food), and the beans
+    // roast in the furnace.
+    r.shapeless(C, "cacao_beans", 1, &["cacao_pod"], 0);
+    r.shapeless(S, "roasted_cacao", 1, &["cacao_beans"], 200);
     // Wheat packed nine to a bale and back.
     r.shaped(C, "hay_bale", 1, &["www", "www", "www"], &[('w', "#crops/wheat")]);
     r.shapeless(C, "wheat", 9, &["#hay_bale"], 0);
