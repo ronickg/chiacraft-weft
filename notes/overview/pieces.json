@@ -181,6 +181,7 @@
       "parts": [
         {"name": "Style guide", "status": "built"},
         {"name": "UI kit in the game", "status": "built", "code": ["mods/base/source/ui"]},
+        {"name": "Shader pack light: shadows, reflections, rays", "status": "built", "note": "In chiacraft's pack (mods/base/shaderpack, its screen effects in mods/base/assets/shaders/post): sun shadows from a 2048 shadow map 80 blocks around the player, cast by blocks (leaves and plants dappled), mobs and the player's own body (in first person too); water reflecting the hills and sky from the screen (reflect.wgsl); contact shadows in corners and under overhangs (contact.wgsl); light shafts round a low sun and in fog (shafts.wgsl). The engine gives packs the scene's depth and the shadow map (pack.cfg: translucent_depth, sun_shadows). Checked on an RTX 5090 (and an M3 Max for the pack before shadows) with the testkit scripts in checks/. Not yet: dropped and held items cast none, a comparison sampler for softer edges.", "code": ["mods/base/shaderpack", "mods/base/assets/shaders/post", "crates/engine/src/client/mod.rs"], "docs": ["reports/Shadow maps.md", "reports/Shader pack testing.md", "mods/base/shaderpack/checks/README.md"]},
         {"name": "HUD", "status": "built", "code": ["mods/base/src/hud.rs"]},
         {"name": "Remaining UI art", "status": "partial", "note": "Menu background, logo, menu icons, armor points and more: the list is in STYLE.md."},
         {"name": "Fonts", "status": "missing", "note": "Alegreya needs the smooth-font change."},
