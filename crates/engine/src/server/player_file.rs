@@ -161,6 +161,8 @@ impl Server {
         if dim == c.void_dim {
             p.conn.send(ToClient::Chat(void_note(c)));
         }
+        // The anchors of their achievements from this world (chiacraft), since they were here.
+        self.send_anchor_proofs(pi);
         // The skins of who is here already.
         let skins: Vec<(u64, Arc<Vec<u8>>)> = self
             .players

@@ -2126,13 +2126,13 @@ fn start_frame(r: &mut Running, opts: &Options, dt: f64) {
     // Link requests and answers arrive in the background: the links screen shows them as they do.
     let links_now = crate::links::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
         + crate::friends::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
-        + crate::admission::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
+        + crate::admission::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
+        + crate::chiacraft::achievements::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
     if links_now != r.links_seen {
         r.links_seen = links_now;
-        if r.screens
-            .last()
-            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission", "core:account"].contains(&s.name()))
-        {
+        if r.screens.last().is_some_and(|(s, _)| {
+            ["core:links", "core:multiplayer", "core:friends", "core:admission", "core:account", "core:achievements"].contains(&s.name())
+        }) {
             r.rebuild_all();
         }
     }

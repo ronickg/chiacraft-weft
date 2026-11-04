@@ -180,6 +180,20 @@ impl Session {
         Ok(link)
     }
 
+    /// The account's first wallet address's key signing `text` (one of chiacraft's own texts):
+    /// its public key and the signature, hex. What holds a sponsored DID (the player's or a
+    /// world's) signs this way, e.g. an achievement issuer's DID proof. The words are read for it
+    /// and not kept.
+    pub fn first_owner_sign(&self, text: &str) -> Result<(String, String), String> {
+        let mnemonic = self
+            .accounts()?
+            .reveal(self.info.fingerprint, env_passphrase())
+            .map_err(|e| format!("reading the words: {e}"))?;
+        let signer = OwnerSigner::from_mnemonic(&mnemonic, 0, false);
+        let sig = signer.sign(text).map_err(|e| e.to_string())?;
+        Ok((chiacraft_wallet::keys::hex(&signer.public()), chiacraft_wallet::keys::hex(&sig)))
+    }
+
     /// Forget the linked DID (it stays on chain, held by the same address).
     pub fn unlink_did(&self) -> Result<(), String> {
         self.accounts()?
