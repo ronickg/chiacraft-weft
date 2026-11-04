@@ -213,6 +213,7 @@ built, it gets its row below and its arrows above.
 | The stats are the same nine | same | players' and animals' stats out of step |
 | Every food has nutrition | `testkit` `every_food_has_nutrition` | food items that can't be eaten |
 | Clothes warm, the pot cooks | `testkit` `clothes_and_stew` | the clothing slots not read by body temperature (`/warmth`), the cooking pot not making a stew |
+| The calendar follows the day | `testkit` `calendar_follows_time` | the date (HUD, seasonal tints) not following a time jump, also in creative |
 | Survival balance | `vitals/src/balance.rs` | foods, stomach, levels and calendar out of balance; clothes that don't warm, cool or keep out the wind as their material should; a stew of three foods not making one well fed; preserved food keeping too little; a rack drying in the damp cold or not in a desert summer |
 | Every hide is a species | `animals/core/src/hides.rs` | a pelt or hide row for a species that isn't there |
 | Every meat is a species and a food | `animals/core/src/meat.rs` | a meat row for a species that isn't there, or a meat with no raw or cooked `FOODS` row |

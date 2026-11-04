@@ -2000,3 +2000,29 @@ pub async fn clothes_and_stew(t: T) -> R {
     t.check(left.starts_with('-'), format!("the beef went into the stew: {left}"));
     Ok(())
 }
+
+/// The calendar follows the world's day, after a time jump and in creative too: the date the HUD and
+/// the seasonal tints read (`Vitals::date`) is day 49 of the year, winter by the calendar's
+/// seasons (Tester 2 11-04: after `/time set` in creative it stayed on its old day).
+pub async fn calendar_follows_time(t: T) -> R {
+    let mode = |t: T, m: &'static str| async move { t.op(&format!("mode {m}")).await };
+    mode(t.clone(), "creative").await?;
+    let day: u64 = 48;
+    let at = day * vitals::calendar::DAY_TICKS + 6000;
+    t.op(&format!("time {at}")).await?;
+    let moved = t
+        .until("the date follows the jump", Duration::from_secs(3), |t| {
+            t.c()
+                .view()
+                .component(&VITALS)
+                .is_some_and(|v| v.date as u64 == day + 1)
+        })
+        .await;
+    let season = vitals::calendar::date(at).season;
+    t.check(season == vitals::calendar::Season::Winter, format!("day 49 is {season:?} by the calendar, winter wanted"));
+    // Back to the world's first day (spring's 8th) and survival, for the tests after.
+    t.op(&format!("time {}", vitals::calendar::START_DAY as u64 * vitals::calendar::DAY_TICKS + 6000))
+        .await?;
+    mode(t.clone(), "survival").await?;
+    moved
+}
