@@ -44,6 +44,9 @@ pub mod salt {
     pub const SNOW_DRIFT: u64 = 0x5A0D;
     pub const MOUNTAIN_AREA: u64 = 0x44;
     pub const SEQUOIA: u64 = 0x5E0A;
+    pub const COAST_CLIFFS: u64 = 0xC1F;
+    pub const ISLANDS: u64 = 0x151A;
+    pub const ARCHIPELAGOS: u64 = 0x151B;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -195,9 +198,39 @@ pub const SEQUOIA_AREA: Area = Area {
 /// Oceans and land masses, this many blocks above or below the sea.
 pub const CONTINENTS: f64 = 18.0;
 
-/// Rolling hills (height, size), flattened in the cold into tundra.
+/// Rolling hills (height, size), flattened in the cold into tundra and calmed by the coast:
+/// `COAST_CALM` of them everywhere (`HILLS_AREA`), the rest only inland from the coast
+/// (`HILLS_INLAND`), so the land comes down to the sea in a gentle plain with wide beaches
+/// instead of ragged hills.
 pub const HILLS: (f64, f64) = (16.0, 110.0);
 pub const HILLS_AREA: Area = Area { all: &[Ramp::Temperature(-0.15, -0.26)], not: true };
+pub const COAST_CALM: f64 = 0.45;
+pub const HILLS_INLAND: Area = Area { all: &[Ramp::Temperature(-0.26, -0.15), Ramp::Continent(0.0, 0.12)], not: false };
+
+/// Sea cliffs: in patches along the coast (`COAST_CLIFF_AREA`: the cliff noise's patches, some
+/// 650 blocks across) the land stands `COAST_CLIFF` blocks higher from the shoreline inland, so
+/// it meets the sea in a rock face (rock faces show their stone, limestone low down) and rivers
+/// cut gorges through it.
+pub const COAST_CLIFF: f64 = 14.0;
+pub const COAST_CLIFF_AREA: Area =
+    Area { all: &[Ramp::Noise { salt: salt::COAST_CLIFFS, scale: 650.0, from: 0.0, to: 0.1 }, Ramp::Continent(0.0, 0.0025)], not: false };
+/// The deep sea: past the shallows the floor drops `OCEAN_DEEP` blocks more (continentalness
+/// `OCEAN_DEEP_AREA`), so the sea shows shallow water by the shore and dark water out deep.
+pub const OCEAN_DEEP: f64 = 22.0;
+pub const OCEAN_DEEP_AREA: Area = Area { all: &[Ramp::Continent(-0.1, -0.25)], not: false };
+/// Islands in groups (Lithosphere's archipelagos): in archipelago patches (`ARCHIPELAGO`, some
+/// 900 blocks across) out in the sea past the shallows, the island noise's blobs (some
+/// `ISLAND_SIZE` blocks across) lift the sea floor by up to `ISLAND_HEIGHT` blocks.
+pub const ISLAND_HEIGHT: f64 = 30.0;
+pub const ISLAND_SIZE: f64 = 120.0;
+pub const ISLANDS_AREA: Area = Area {
+    all: &[
+        Ramp::Noise { salt: salt::ISLANDS, scale: ISLAND_SIZE, from: 0.12, to: 0.32 },
+        Ramp::Noise { salt: salt::ARCHIPELAGOS, scale: 900.0, from: -0.05, to: 0.1 },
+        Ramp::Continent(-0.02, -0.07),
+    ],
+    not: false,
+};
 
 /// Highlands: the land swells up to this many blocks in broad patches inland, and the hills roll
 /// on top, so the temperate lands stand some 30 blocks over the sea in places; not in the cold
@@ -215,7 +248,9 @@ pub const HIGHLANDS_AREA: Area = Area {
 
 /// Sand dunes (height, wavelength) in the hot, dry land.
 pub const DUNES: (f64, f64) = (4.0, 26.0);
-pub const DUNES_AREA: Area = Area { all: &[Ramp::Temperature(0.12, 0.22), Ramp::Humidity(0.0, -0.08)], not: false };
+/// Not by the sea: they fade out toward the coast (combs of dunes ran into the water).
+pub const DUNES_AREA: Area =
+    Area { all: &[Ramp::Temperature(0.12, 0.22), Ramp::Humidity(0.0, -0.08), Ramp::Continent(0.01, 0.07)], not: false };
 
 /// Mountain ranges (height, width between ridge lines), in patches inland; the mountains biome
 /// stands where this area is 0.45 or more (`MOUNTAIN_BIOME`).
@@ -373,7 +408,15 @@ pub const STRATA_TILT: i32 = 3;
 pub fn features() -> Vec<Feature> {
     vec![
         preset::continents(CONTINENTS),
-        preset::hills(HILLS.0, HILLS.1).mask(HILLS_AREA.mask()),
+        preset::hills(HILLS.0 * COAST_CALM, HILLS.1).mask(HILLS_AREA.mask()),
+        preset::hills(HILLS.0 * (1.0 - COAST_CALM), HILLS.1).mask(HILLS_INLAND.mask()),
+        Feature::new(|_, _, _| q4(COAST_CLIFF))
+            .mask(COAST_CLIFF_AREA.mask())
+            .named("coast_cliffs"),
+        Feature::new(|_, _, _| -q4(OCEAN_DEEP)).mask(OCEAN_DEEP_AREA.mask()),
+        Feature::new(|_, _, _| q4(ISLAND_HEIGHT))
+            .mask(ISLANDS_AREA.mask())
+            .named("islands"),
         Feature::new(|_, _, _| q4(HIGHLANDS))
             .mask(HIGHLANDS_AREA.mask())
             .named("highlands"),
@@ -417,7 +460,11 @@ fn ground_at(h: &Here) -> i32 {
     let (f, x, z) = (h.f, h.x, h.z);
     q4(SEA as f64)
         + shape::continents(f, x, z, q4(CONTINENTS))
-        + masked(h, &HILLS_AREA, || shape::hills(f, x, z, q4(HILLS.0), q4(HILLS.1)))
+        + masked(h, &HILLS_AREA, || shape::hills(f, x, z, q4(HILLS.0 * COAST_CALM), q4(HILLS.1)))
+        + masked(h, &HILLS_INLAND, || shape::hills(f, x, z, q4(HILLS.0 * (1.0 - COAST_CALM)), q4(HILLS.1)))
+        + masked(h, &COAST_CLIFF_AREA, || q4(COAST_CLIFF))
+        + masked(h, &OCEAN_DEEP_AREA, || -q4(OCEAN_DEEP))
+        + masked(h, &ISLANDS_AREA, || q4(ISLAND_HEIGHT))
         + masked(h, &HIGHLANDS_AREA, || q4(HIGHLANDS))
         + masked(h, &DUNES_AREA, || shape::dunes(f, x, z, q4(DUNES.0), q4(DUNES.1)))
         + masked(h, &MOUNTAINS_AREA, || shape::mountains(f, x, z, q4(MOUNTAINS.0), q4(MOUNTAINS.1)))
@@ -1030,6 +1077,29 @@ mod tests {
             *into.entry(*b).or_insert(0) += 1;
         }
         assert!(into.values().any(|&n| n >= 2), "no tributary joins a river");
+    }
+
+    #[test]
+    fn coasts_have_cliffs_and_islands() {
+        let f = Fields { seed: 1 };
+        let (mut cliffs, mut islands) = (0, 0);
+        for i in 0..40_000 {
+            let (bx, bz) = ((i % 200) * 16 - 1600, (i / 200) * 16 - 1600);
+            let h = height(&f, bx * 16, bz * 16) >> 4;
+            if h < SEA {
+                continue;
+            }
+            if ISLANDS_AREA.value(&f, bx * 16, bz * 16) > q12(0.3) {
+                islands += 1;
+            }
+            let sea_near = [(16, 0), (-16, 0), (0, 16), (0, -16)]
+                .iter()
+                .any(|(dx, dz)| height(&f, (bx + dx) * 16, (bz + dz) * 16) >> 4 < SEA);
+            if sea_near && h >= SEA + 8 && COAST_CLIFF_AREA.value(&f, bx * 16, bz * 16) > q12(0.8) {
+                cliffs += 1;
+            }
+        }
+        assert!(cliffs > 0 && islands > 0, "{cliffs} cliff columns, {islands} island columns in 3.2 km");
     }
 
     #[test]
