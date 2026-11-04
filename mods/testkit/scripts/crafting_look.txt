@@ -1,7 +1,7 @@
 # Crafting: the look hook (core:look). Builds a stone axe on an oak haft from parts (as crafting_parts.txt),
 # then shows its composed icon in the inventory and the hotbar, and held in first and third person.
 # One copy, a fresh world. Placeholder art only (cut from today's stone axe); Chiacraft's replaces it.
-# The table menu's slots: grid 0-8, result 9, assembly 10-13, assembled 14, apart 15,
+# The table menu's slots: grid 0-8, result 9, assembly 10-13, assembled 14, apart 15, the bag 16-42, the hotbar 43-51.
 loaded
 idle
 chat /tk mode survival
