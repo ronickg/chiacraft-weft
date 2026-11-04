@@ -126,7 +126,11 @@ impl Server {
                     .filter(|c| !withdrawn.as_ref().is_some_and(|r| r.revokes(c)))
                     .map(|c| (c.achievement.id, c.issuer.key))
                     .collect();
-                log::info!("{} showed {} achievement(s)", self.players[pi].key, shown.len());
+                let name = self.players[pi]
+                    .waiting
+                    .as_ref()
+                    .map_or_else(|| self.players[pi].name.clone(), |w| w.0.clone());
+                log::info!("{name} showed {} achievement(s)", shown.len());
                 let p = &mut self.players[pi];
                 p.achievements = shown;
                 p.proofs_pending = false;
