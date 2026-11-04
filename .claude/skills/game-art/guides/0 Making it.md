@@ -27,12 +27,14 @@ item lab, the UI kit and the model skill learned (2026-10 to 11), so every guide
   (block tint `core:grass`, `core:foliage`, `core:water`). A grass block's sides carry their own
   color. Ask for light greyscale for those textures; full color only for a look test.
 - **Animals and monsters are box models** (the `blocky-model` skill: boxes, a painted texture,
-  64 texels a block, light baked in by its painter). An image model cannot lay out a model's
+  32 texels a block like the blocks and items, light baked in by its painter). An image model cannot lay out a model's
   texture: from it we take colors, coat patterns and faces, never the skin itself.
 - **Block textures are 32 × 32** (Ronald's choice, 2026-11-03, after the style guide test), like
   the items. The whole block set, redone at 32 from the block master prompt, is in the game
   (the `block-textures` skill, `notes/blocks/`, merged 2026-11-03).
-  Models stay 64 texels a block for now.
+- **One pixel size everywhere: 32 a block.** Box models are being rebuilt at 32 texels a block to
+  match (Ronald, 2026-11-04, "Yes, rebuild at 32"; the session "Animal models rebuilt at 32 texels
+  a block"); very small creatures still paint finer so their faces fit.
 - Our things, by kind: tools in wood, stone, iron, gold and diamond (pickaxe, axe, shovel, hoe,
   sword); club, tranquilizer dart, arrow; leather, iron, gold and diamond armour; raw iron and
   gold, ingots, coal, diamond, amber, redstone; many seeds, grains, berries, nuts and wild fruits;
