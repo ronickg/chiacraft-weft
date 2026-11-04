@@ -440,11 +440,71 @@ fn shore_distance(pos: vec3<f32>) -> f32 {
     return d;
 }
 
+// The world copied before the water was drawn (`scene.behind`): its color (as it reached the screen)
+// and where it is, camera relative, at screen position `uv`; w -1 where nothing was drawn.
+fn behind_color(uv: vec2<f32>) -> vec3<f32> {
+    return textureSampleLevel(textures[u32(scene.behind.x)], linear_clamp, uv, 0.0).rgb;
+}
+
+fn behind_at(uv: vec2<f32>, size: vec2<f32>) -> vec4<f32> {
+    let px = clamp(vec2<i32>(uv * size), vec2(0), vec2<i32>(size) - vec2(1));
+    let d = textureLoad(textures[u32(scene.behind.y)], px, 0).r;
+    if d <= 0.0 {
+        return vec4(0.0, 0.0, 0.0, -1.0);
+    }
+    let p = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+    return vec4(p.xyz / p.w, 1.0);
+}
+
+// Light playing on the bottom through the waves (`p` world xz): bright crossing lines that drift.
+fn caustics(p: vec2<f32>) -> f32 {
+    let t = scene.params.w;
+    let q = p * 0.8;
+    let a = 1.0 - abs(noise3(vec3(q.x + t * 0.25, t * 0.4, q.y)) * 2.0 - 1.0);
+    let b = 1.0 - abs(noise3(vec3(q.x * 1.7 + 5.0, t * 0.55, q.y * 1.7 - t * 0.2)) * 2.0 - 1.0);
+    return pow(a, 6.0) + 0.5 * pow(b, 8.0);
+}
+
+// What is seen through the surface at this pixel, as it reaches the screen: the bottom (or what
+// stands in the water) bent by the waves (glass-like refraction, index 1.33), its colors taken away
+// with depth (red first), light from the scattering water in their place, caustics on the bottom
+// in the sun. w: how far the view goes through the water (blocks).
+fn water_under(in: VOut, n: vec3<f32>, v: vec3<f32>, scatter: vec3<f32>, shadow: f32) -> vec4<f32> {
+    let size = vec2<f32>(textureDimensions(textures[u32(scene.behind.x)]));
+    let uv = in.clip.xy / size;
+    let straight = behind_at(uv, size);
+    let deep = display(scatter);
+    if straight.w < 0.0 {
+        return vec4(deep, 8.0);
+    }
+    var through = length(straight.xyz - in.rel);
+    // Bent at the surface; where that lands on something standing above the water, unbent.
+    let bent = refract(-v, n, 1.0 / 1.33);
+    let aim = scene.view_proj * vec4(in.rel + bent * min(through, 6.0), 1.0);
+    var at = uv;
+    if aim.w > 0.0 {
+        let suv = vec2(aim.x / aim.w * 0.5 + 0.5, 0.5 - aim.y / aim.w * 0.5);
+        let b = behind_at(suv, size);
+        if b.w > 0.0 && length(b.xyz) > length(in.rel) && all(suv > vec2(0.0)) && all(suv < vec2(1.0)) {
+            at = suv;
+            through = length(b.xyz - in.rel);
+        }
+    }
+    let bottom = behind_color(at);
+    let gone = exp(-vec3(0.42, 0.11, 0.07) * through);
+    var seen = bottom * gone + deep * (vec3(1.0) - gone);
+    // The sun's light focused by the waves onto the bottom, less as it goes deeper.
+    let floor_world = in.pos + (straight.xyz - in.rel);
+    let lightning = caustics(floor_world.xz) * light_strength() * shadow * exp(-through * 0.25) * smoothstep(0.1, 0.8, through);
+    seen += bottom * gone * lightning * 0.9;
+    return vec4(seen, through);
+}
+
 // Water seen from above: dark and clear looking down close by, the bottom showing through the
 // shallows (lighter and greener there), blue and opaque where deep, a mirror of the sky toward the
 // horizon (Fresnel), a path of sun glitter toward a low sun and a soft line of foam at the shore.
 // The screen's reflections (`post/reflect.wgsl`) then mirror the hills into it.
-fn water(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
+fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     let v = -normalize(in.rel);
     let top = in.normal.y > 0.5;
     if (top && v.y <= 0.0) || in_liquid() {
@@ -464,7 +524,7 @@ fn water(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
         shore = shore_distance(in.pos);
     }
     let ndv = max(dot(n, v), 0.02);
-    let fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+    let fresnel = 0.04 + 0.96 * pow(1.0 - ndv, 4.0);
     let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos);
     // What the light in the water sends back up: turquoise in the shallows, deep blue further down,
@@ -495,6 +555,16 @@ fn water(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     let px = floor(in.pos.xz * 16.0) / 16.0;
     let wobble = noise3(vec3(px.x * 2.0, scene.params.w * 0.6, px.y * 2.0));
     let foam = (1.0 - smoothstep(0.06, 0.22 + 0.16 * wobble, shore)) * 0.7;
+    // With the world's copy (`scene.behind`, drawn in the see-through pass): what lies under the
+    // surface itself, bent by the waves, tinted by the true depth, with caustics, and foam wherever
+    // the water meets something. Opaque from here: the water does its own mixing.
+    if see_through && top && scene.behind.z > 0.5 {
+        let under = water_under(in, n, v, scatter, shadow);
+        let foam_all = max(foam, (1.0 - smoothstep(0.05, 0.3 + 0.1 * wobble, under.w)) * 0.6);
+        let surface = refl * fresnel + glint + (lit * 0.9 + vec3(0.03)) * foam_all;
+        let below = under.rgb * (1.0 - fresnel) * (1.0 - foam_all);
+        return vec4(below + display(haze_lit(surface, in.rel, in.light.x)), 1.0);
+    }
     let lost = (1.0 - fresnel) * through;
     let a = clamp(max(1.0 - lost, max(luma(glint), foam)), 0.02, 1.0);
     let c = (refl * fresnel + scatter * (1.0 - fresnel) * (1.0 - through) + glint + (lit * 0.9 + vec3(0.03)) * foam) / a;
@@ -568,7 +638,7 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
     if in.kind.x == TINT_WATER {
-        return water(in, albedo);
+        return water(in, albedo, true);
     }
     return shade(in, albedo);
 }
@@ -639,7 +709,7 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     // Fresnel, the sky, the sun's path, and the water mask that lets the screen's reflections in.
     // Otherwise it would be a flat grey-blue lit like land, a seam at the edge of the render distance.
     if in.kind.x == TINT_WATER {
-        let w = water(in, albedo);
+        let w = water(in, albedo, false);
         return vec4(w.rgb, max(w.a, 0.5));
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);

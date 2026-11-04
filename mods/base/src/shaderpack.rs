@@ -27,7 +27,7 @@ const FILES: [(&str, &str); 6] = [
 ];
 
 // Water writes depth, so the reflections effect finds its surface.
-const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\ntranslucent_depth = true\nsun_shadows = true\n";
+const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\ntranslucent_depth = true\nsun_shadows = true\nwater_behind = true\n";
 
 /// Only `--shader-pack <id>` (a script checking a look; tests reset packs when they start, so
 /// it is turned on after that), `--shader-pack-after <secs>` seconds into the run (0 by
@@ -86,6 +86,7 @@ pub fn register_shafts(r: &mut Registry) {
             ("reflect", !option("no-reflect"), 1.0),
             ("contact", !option("no-contact"), 1.0),
             ("shafts", !option("no-shafts"), if option("shafts-debug") { 2.0 } else { 1.0 }),
+            ("bloom", !option("no-bloom"), 1.0),
         ];
         for (name, allowed, strength) in effects {
             let on = want && allowed;

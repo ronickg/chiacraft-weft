@@ -468,6 +468,14 @@ gpu_struct! {
         /// x the shadow map's bindless index, y its size in texels, z 1 while it holds this
         /// frame's shadows (0: none, fall back), w the blocks a texel covers.
         pub shadow: [f32; 4],
+        /// The world as it was before what is seen through it was drawn (`water_behind` packs):
+        /// x its color's bindless index, y its depth's, z 1 while they hold this frame's (0: none),
+        /// w unused. Only what is drawn after (water, glass) may read them.
+        pub behind: [f32; 4],
+        /// The far shadow cascade, as `shadow_view_proj` and `shadow` for the near one: coarser,
+        /// 400 blocks to each side, where the near one ends.
+        pub shadow_far_view_proj: [[f32; 4]; 4],
+        pub shadow_far: [f32; 4],
     }
 }
 
