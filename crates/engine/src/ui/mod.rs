@@ -860,7 +860,7 @@ impl Ui {
     }
 }
 
-/// Logs, once per text, that a no-wrap text was shrunk to fit a box narrower than its words.
+/// Logs, once per text and box width, that a no-wrap text was shrunk to fit a box narrower than its words.
 fn squeezed(text: &str, scale: f32, width: f32) {
     thread_local! {
         static SAID: std::cell::RefCell<rustc_hash::FxHashSet<String>> = Default::default();
@@ -869,7 +869,8 @@ fn squeezed(text: &str, scale: f32, width: f32) {
         return;
     }
     SAID.with(|s| {
-        if s.borrow_mut().insert(text.to_string()) {
+        // per text and box: the same words can be too wide for one box and fit another
+        if s.borrow_mut().insert(format!("{text}\u{0}{width:.1}")) {
             log::warn!("ui: \"{text}\" squeezed to {:.0}% to fit {width:.1} GUI px", scale * 100.0);
         }
     });
