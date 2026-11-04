@@ -1,10 +1,11 @@
 """The parts art in the exact files the crafting hook reads (crafting session, e7afa85e), laid out under
 deliver/textures/ like mods/base/assets/textures/, ready to copy after Ronald's pick:
 
-  parts/<kind>/head/<art>.png    painted head (with its lashing or collar) where its drawing has it
+  parts/<kind>/<shape>/<art>.png painted head (with its lashing or collar) where its drawing has it
+                                 (felling_axe_head, pick_head, shovel_blade, hoe_blade)
   parts/<kind>/haft.png          the haft as a shade map (R = step x 36, G = region 0, A), where it meets the iron head
-  parts/sword/blade/<art>.png    painted blade (the blade alone), where its drawing has it
-  parts/sword/hilt.png           the hilt as a map, regions 0 grip, 1 guard, 2 pommel, where it meets the iron blade
+  parts/sword/straight_blade/<art>.png  painted blade (the blade alone), where its drawing has it
+  parts/sword/grip.png           the hilt as a map, regions 0 grip, 1 guard, 2 pommel, where it meets the iron blade
   ramps/<id>.png                 8 x 1 ramps for handle materials: oak, birch, spruce, mesquite, bone, antler
   anchors.json                   every head's and blade's anchor (the handle moves by anchor - socket)
 
@@ -29,6 +30,7 @@ import toolfix as tf  # noqa: E402
 OUT = os.path.join(HERE, "deliver", "textures")
 BLOCK = os.path.join(ROOT, "mods", "base", "assets", "textures", "block")
 M = ["wood", "stone", "flint", "copper", "bronze", "iron", "steel", "gold", "diamond"]
+SHAPE = {"axe": "felling_axe_head", "pickaxe": "pick_head", "shovel": "shovel_blade", "hoe": "hoe_blade"}
 TOOLS = {
     "axe": lambda m: "axe_C_felling_1" if m == "iron" else f"felling_{m}_axe",
     "pickaxe": lambda m: f"pick2_{m}_pickaxe",
@@ -66,7 +68,7 @@ def main():
             layer = np.zeros((32, 32, 4))
             layer[sel] = a[sel]
             layer[..., 3] = np.where(sel, 255, 0)
-            save(layer, f"parts/{kind}/head/{m}.png")
+            save(layer, f"parts/{kind}/{SHAPE[kind]}/{m}.png")
             anchors[kind][m] = [round(float(base[0]), 1), round(float(base[1]), 1)]
         # the haft: the plain wooden one (no wrap bands, so any wood ramp reads), moved to meet the iron head
         w = tf.drawn(name("wood"))
@@ -82,15 +84,15 @@ def main():
         a = tf.drawn(f"{m}_sword")
         if a is None:
             continue
-        lab, base = tf.regions(a, "sword")
+        lab, base = tf.sword_regions(a)
         sel = lab == tf.WORK
         layer = np.zeros((32, 32, 4))
         layer[sel] = a[sel]
         layer[..., 3] = np.where(sel, 255, 0)
-        save(layer, f"parts/sword/blade/{m}.png")
+        save(layer, f"parts/sword/straight_blade/{m}.png")
         anchors["sword"][m] = [round(float(base[0]), 1), round(float(base[1]), 1)]
     s = tf.drawn("iron_sword")
-    sl, sb = tf.regions(s, "sword")
+    sl, sb = tf.sword_regions(s)
     hilt = (sl == tf.HANDLE) | (sl == tf.JOINT)
     _, _, (c, d) = heads.cut(s)
     t, dist = heads.frame(s, c, d)
@@ -98,7 +100,7 @@ def main():
     region[sl == tf.JOINT] = 1                       # the guard
     tmin = t[hilt].min()
     region[(sl == tf.HANDLE) & (t <= tmin + 3)] = 2  # the pommel: the last 3 px at the handle's end
-    save(as_map(s, hilt, region), "parts/sword/hilt.png")
+    save(as_map(s, hilt, region), "parts/sword/grip.png")  # named by its region-0 part, the grip
     # ramps for handle materials, by the crate's ids
     r = parts.ramps()
 
