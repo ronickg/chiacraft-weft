@@ -33,6 +33,7 @@ mod commands;
 mod cretaceous;
 mod deer;
 mod dog;
+mod drink;
 mod eggs;
 mod evolution;
 mod fish;
@@ -126,6 +127,7 @@ fn init(r: &mut Registry) {
     animal::init(r);
     comfort::init(r);
     forage::init(r);
+    drink::init(r);
     hunt::init(r);
     screen::init(r);
     taming::init(r);

@@ -140,6 +140,13 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | base:sugar_cane | water_plants | 4 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:beach (all year), worth 40% of fresh growth |
 | animals:horsetail | water_plants | 4 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
 
+On the ground, animals eat dropped food of their diet one item a mouthful: every food (the foods table, by its kind and portion) and these seeds; spoiled food only carrion eaters. An item fills an animal by its weight against a meal of a tenth of the animal's mass (`animals_core::needs`).
+
+| item | kind | grams |
+|---|---|---|
+| base:wheat_seeds | seeds | 10 |
+| base:wheat | seeds | 50 |
+
 ## Soil and compost
 
 Farmland's fertility (`vitals::soil`): how fast crops grow at each level, what wears it, what gives it back; and what a compost bin takes.

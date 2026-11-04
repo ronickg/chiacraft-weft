@@ -19,6 +19,7 @@ screen.animals.stage.adolescent = adolescent
 screen.animals.stage.adult = adult
 screen.animals.stage.elder = elder
 screen.animals.needs = Health {0} of {1} · food {2} of {3} · bond {4}
+screen.animals.water = Water {0}%
 screen.animals.body = Feels {0} · air {1} °C, comfortable {2} to {3} °C · condition {4}%
 screen.animals.body_cold = Cold-blooded · air {0} °C: {1}% speed · condition {2}%
 screen.animals.feel.comfortable = {#8fd16a}comfortable{/}

@@ -149,6 +149,8 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | diet | carnivore |
 | eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
 | hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, base:chicken |
+| a meal that fills it | 0.25 kg; its biggest prey at home fills it in one kill |
+| drinks | 100% of its 0.226 L a day; a drink lasts 17 min, thirsty after 8 |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 8; `base:mutton` 8; `base:cooked_beef` 20, favorite; `base:cooked_porkchop` 20, favorite; `base:cooked_chicken` 16, favorite; `base:cooked_mutton` 16, favorite; `base:bone` 5, favorite; `animals:kibble` 30, kibble |
@@ -211,6 +213,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | diet | carnivore |
 | eats | meat 80%, insects 10%, carrion 5%, fish 5% |
 | hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, base:chicken |
+| a meal that fills it | 0.45 kg; its biggest prey at home fills it in one kill |
+| drinks | 50% of its 0.383 L a day; a drink lasts 35 min, thirsty after 18 |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:mutton` 8; `base:egg` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:chicken` 10, favorite; `base:cooked_chicken` 16, favorite; `animals:kibble` 30, kibble |
@@ -269,6 +273,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | how | passive |
 | diet | herbivore |
 | eats | grass 75%, water plants 20%, fruit 5% |
+| a meal that fills it | 5 kg |
+| drinks | 100% of its 3.347 L a day; a drink lasts 22 min, thirsty after 11 |
 | its food grows at home (spring/summer/autumn/winter) | swamp 40/59/45/40%, savanna 43/82/75/40%, forest 40/73/41/40% |
 | feedings to tame at level 1 | 3 (2.5x at level 150) |
 | scared by a walking player within | nothing |
@@ -329,6 +335,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
 | hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar |
+| a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
+| drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
@@ -389,6 +397,8 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | diet | carnivore |
 | eats | meat 80%, carrion 15%, fish 5% |
 | hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops |
+| a meal that fills it | 30 kg; its biggest prey at home fills it in one kill |
+| drinks | 80% of its 16.79 L a day; a drink lasts 34 min, thirsty after 17 |
 | feedings to tame at level 1 | 18 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:porkchop` 15; `base:beef` 20, favorite; `base:mutton` 15, favorite; `animals:kibble` 30, kibble |
@@ -447,6 +457,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
 | hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar |
+| a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
+| drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:mutton` 10; `base:porkchop` 12; `base:beef` 15, favorite; `animals:kibble` 30, kibble |
@@ -508,6 +520,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | diet | carnivore |
 | eats | meat 80%, fish 10%, carrion 10% |
 | hunts | 0.1%-60% of its mass alone (5.00-3000 kg); at home: raptor, utahraptor, osmolskae, protoceratops |
+| a meal that fills it | 500 kg; its biggest prey at home in 1.7 kills |
+| drinks | 100% of its 211.207 L a day; a drink lasts 36 min, thirsty after 18 |
 | feedings to tame at level 1 | 45 (2.5x at level 150) |
 | scared by a walking player within | nothing |
 | eats (food points) | `base:chicken` 10; `base:porkchop` 15; `base:beef` 20; `base:mutton` 20, favorite; `base:cooked_mutton` 30, favorite; `animals:kibble` 30, kibble |
@@ -568,6 +582,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | wild |
 | diet | herbivore |
 | eats | grass 60%, leaves 30%, roots 10% |
+| a meal that fills it | 0.38 kg |
+| drinks | 30% of its 0.329 L a day; a drink lasts 58 min, thirsty after 29 |
 | its food grows at home (spring/summer/autumn/winter) | plains 40/53/46/40%, desert 40/40/40/40%, forest 40/73/41/40%, savanna 43/82/75/40%, beach 40/40/50/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 12 blocks (twice that running) |
@@ -628,6 +644,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | wild |
 | diet | herbivore |
 | eats | grass 40%, leaves 55%, lichen 5% |
+| a meal that fills it | 0.3 kg |
+| drinks | 30% of its 0.266 L a day; a drink lasts 56 min, thirsty after 28 |
 | its food grows at home (spring/summer/autumn/winter) | taiga 40/62/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/40/40/40%, mountains 40/70/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 12 blocks (twice that running) |
@@ -689,6 +707,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | wild |
 | diet | herbivore |
 | eats | seeds 45%, insects 20%, fruit 15%, grass 10%, fungi 5%, roots 5% |
+| a meal that fills it | 0.002 kg |
+| drinks | 20% of its 0.003 L a day; a drink lasts 52 min, thirsty after 26 |
 | its food grows at home (spring/summer/autumn/winter) | plains 40/53/46/40%, forest 40/73/41/40%, desert 40/40/40/40%, savanna 43/82/75/40%, beach 40/40/50/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
@@ -750,6 +770,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | wild |
 | diet | herbivore |
 | eats | grass 60%, leaves 15%, roots 15%, seeds 5%, insects 5% |
+| a meal that fills it | 0.004 kg |
+| drinks | 10% of its 0.005 L a day; a drink lasts 108 min, thirsty after 54 |
 | its food grows at home (spring/summer/autumn/winter) | taiga 40/62/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/40/40/40%, mountains 40/70/40/40%, swamp 40/59/45/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 5 blocks (twice that running) |
@@ -811,6 +833,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | how | wild |
 | diet | herbivore |
 | eats | leaves 50%, grass 20%, fruit 15%, seeds 10%, fungi 5% |
+| a meal that fills it | 7 kg |
+| drinks | 70% of its 4.531 L a day; a drink lasts 33 min, thirsty after 17 |
 | its food grows at home (spring/summer/autumn/winter) | plains 40/53/46/40%, savanna 43/82/75/40%, desert 40/40/40/40%, forest 40/73/41/40%, swamp 40/59/45/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 16 blocks (twice that running) |
@@ -870,6 +894,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | how | wild |
 | diet | herbivore |
 | eats | grass 50%, leaves 40%, fruit 5%, seeds 5% |
+| a meal that fills it | 16 kg |
+| drinks | 80% of its 9.535 L a day; a drink lasts 31 min, thirsty after 16 |
 | its food grows at home (spring/summer/autumn/winter) | forest 40/73/41/40%, birch_forest 40/62/40/40%, mountains 40/70/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 20 blocks (twice that running) |
@@ -932,6 +958,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | how | wild |
 | diet | carnivore |
 | eats | insects 65%, fish 30%, carrion 5% |
+| a meal that fills it | 0.05 kg |
+| drinks | never: it lives in the water |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) |  |
@@ -990,6 +1018,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | how | wild |
 | diet | omnivore |
 | eats | fruit 30%, seeds 15%, insects 35%, fish 20% |
+| a meal that fills it | 0.4 kg |
+| drinks | never: it lives in the water |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 5 blocks (twice that running) |
 | eats (food points) |  |
@@ -1053,6 +1083,8 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | diet | carnivore |
 | eats | meat 50%, fruit 20%, insects 15%, carrion 15% |
 | hunts | 0.4%-80% of its mass alone (0.02-4 kg); at home: hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, base:chicken |
+| a meal that fills it | 0.55 kg; its biggest prey at home fills it in one kill |
+| drinks | 50% of its 0.459 L a day; a drink lasts 36 min, thirsty after 18 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
@@ -1111,6 +1143,8 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | diet | carnivore |
 | eats | meat 55%, carrion 25%, fruit 10%, insects 5%, fish 5% |
 | hunts | 0.4%-100% of its mass alone (0.01-4 kg); at home: mountain_hare, field_vole, brown_trout, raven, base:chicken |
+| a meal that fills it | 0.35 kg; its biggest prey at home fills it in one kill |
+| drinks | 30% of its 0.306 L a day; a drink lasts 57 min, thirsty after 29 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
@@ -1175,6 +1209,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | diet | carnivore |
 | eats | carrion 40%, meat 20%, insects 15%, seeds 15%, fruit 10% |
 | hunts | 1.0%-10% of its mass alone (0.01-0 kg); at home: wood_mouse, field_vole |
+| a meal that fills it | 0.12 kg; its biggest prey at home in 3.4 kills |
+| drinks | 70% of its 0.117 L a day; a drink lasts 22 min, thirsty after 11 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:wheat_seeds` 2; `base:rotten_flesh` 8, favorite |
@@ -1233,6 +1269,8 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | how | wild |
 | diet | herbivore |
 | eats | leaves 75%, roots 15%, seeds 10% |
+| a meal that fills it | 8.3 kg |
+| drinks | 40% of its 5.282 L a day; a drink lasts 59 min, thirsty after 29 |
 | its food grows at home (spring/summer/autumn/winter) | red_dunes 40/40/40/40%, scrubland 40/40/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 12 blocks (twice that running) |
@@ -1291,6 +1329,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | wild |
 | diet | omnivore |
 | eats | insects 60%, seeds 25%, fruit 10%, roots 5% |
+| a meal that fills it | 0.004 kg |
+| drinks | 10% of its 0.005 L a day; a drink lasts 110 min, thirsty after 55 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 4; `base:wheat` 6; `base:berries` 4, favorite |
@@ -1349,6 +1389,8 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | wild |
 | diet | carnivore |
 | eats | insects 90%, leaves 10% |
+| a meal that fills it | 0.003 kg |
+| drinks | 10% of its 0.001 L a day; a drink lasts 534 min, thirsty after 267 |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 5 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 2; `base:berries` 4, favorite |
@@ -1376,6 +1418,15 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | a life | 0.0105 · real days^1 |
 | rest between litters | 0.0139 · real days^1 |
 | room near | 13 · (mass / 4 kg)^-0.2, x1.2 a pack, x2 a herd, at least 3 |
+
+| Hunger (`needs.rs`) | |
+|---|---|
+| a meal that fills it | 10% of its mass: a kill, a mouthful off the ground, by mass |
+| a wild one arrives fed | 30% where its food grows least (or its prey are thinnest), all of it where most |
+| starving, a wild one dies in | 1200 s on an empty stomach |
+| water needed a day | 0.099 · kg^0.9 L (a mammal's), x0.2 cold-blooded; a species drinks its share of it (`DRINKS`) |
+| a drink lasts | 15% of its mass spared, a real day of drinking 600 s of play |
+| thirsty | under 50% water, drinking 25% a gulp every 1.5 s until 95%; parched, a wild one dies in 1200 s |
 
 | Breeding and life (`life.rs`) | |
 |---|---|

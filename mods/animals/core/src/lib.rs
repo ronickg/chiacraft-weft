@@ -10,6 +10,7 @@ pub mod biology;
 pub mod coats;
 pub mod evolution;
 pub mod life;
+pub mod needs;
 pub mod sheet;
 pub mod species;
 pub mod web;
