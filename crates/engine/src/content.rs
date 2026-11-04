@@ -2809,6 +2809,12 @@ fn freeze_commands(mods: &[ModMeta], games: &mut [crate::registry::RawGame], err
                 log::info!("{} replaces the engine's command /{name}", mod_name(owner));
                 *d = def;
             }
+            // A package's command that another mod or package already has is left out, and the
+            // world still opens (chiacraft, phase 6): packages come after code mods, so the
+            // earlier one keeps the name.
+            Some(_) if mods[owner.0 as usize].package.is_some() => {
+                log::warn!("{}: command /{name} is already taken; left out", mod_name(owner));
+            }
             Some(_) => errors.push(format!("{}: command /{name} is already taken", mod_name(owner))),
             None => commands.push(def),
         }

@@ -69,13 +69,25 @@ thread_local! {
 
 impl Runs {
     /// Runs `f` on the instance for the world this callback runs in. Skipped when the mod's own
-    /// call led here, and outside a server.
+    /// call led here, and outside a server. Inside another sandboxed call (one mod's world call
+    /// asking a question another mod hooks) it never waits for the lock: two mods on two region
+    /// threads could otherwise each wait for the other's. Busy, it skips the mod.
     fn with<T>(&self, f: impl FnOnce(&mut Instance) -> T) -> Option<T> {
         let me = self as *const Runs as usize;
-        if BUSY.with(|b| b.borrow().contains(&me)) {
-            return None;
-        }
+        let nested = BUSY.with(|b| {
+            let b = b.borrow();
+            if b.contains(&me) { None } else { Some(!b.is_empty()) }
+        })?;
         let (run, dir) = world()?;
+        let mut runs = if nested {
+            match self.runs.try_lock() {
+                Ok(g) => g,
+                Err(std::sync::TryLockError::Poisoned(e)) => e.into_inner(),
+                Err(std::sync::TryLockError::WouldBlock) => return None,
+            }
+        } else {
+            self.runs.lock().unwrap_or_else(|e| e.into_inner())
+        };
         BUSY.with(|b| b.borrow_mut().push(me));
         struct Done(usize);
         impl Drop for Done {
@@ -84,7 +96,6 @@ impl Runs {
             }
         }
         let _done = Done(me);
-        let mut runs = self.runs.lock().unwrap_or_else(|e| e.into_inner());
         let i = match runs.iter().position(|(r, _)| *r == run) {
             Some(i) => i,
             None => {

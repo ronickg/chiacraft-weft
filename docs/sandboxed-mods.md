@@ -107,7 +107,7 @@ from the package's `assets/lang` files, like Weft's command replies.
 | Component size | 16 MiB (`code/server.wasm`) |
 | Per call | 64 log lines, 32 tells, 32 replies, 4096 block changes, 64 spawns; `near` within 64 blocks, 256 entities |
 | Storage | 1024 keys, 4 MiB in all, keys of `a-z 0-9 _ - .` |
-| Registrations | 256; commands of `a-z 0-9 _`, not the engine's (`/op`, `/give`, `/tp`, ...) |
+| Registrations | 256; commands of `a-z 0-9 _`, not the engine's (`/op`, `/give`, `/tp`, ...); a name another mod or package already has is left out (a warning in the log) and the world still opens |
 
 A call that runs out of fuel, traps (a panic is a trap) or grows its memory past the cap is a
 **strike**: the mod's memory is dropped and it starts over with `init` (its storage stays). Three
@@ -119,7 +119,8 @@ Floats are deterministic (NaNs canonicalized, no relaxed SIMD) and there are no 
 ## Where and when it runs
 
 - On the world's host only: players who join download the package (and with it the code) so
-  their content matches, but their games never call it.
+  their content matches, but their games never call it. The join sheet tells them which packages
+  carry code ("runs sandboxed code"); a host that doesn't say so truly is refused.
 - Once per world: each world (each run of it: opening it again starts afresh) has its own
   instance, memory and storage (`<world>/mods/packages/<package>/`). A player walking through a
   portal into another world meets that world's mods, never this one's.

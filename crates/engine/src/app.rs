@@ -750,6 +750,7 @@ impl Running {
                                 creator,
                                 problem,
                                 trusted,
+                                code: o.5,
                             }
                         })
                         .collect();

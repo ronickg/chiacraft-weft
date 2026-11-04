@@ -262,10 +262,20 @@ Checked with two copies (run by the Tester session, scripts in the shared notes'
 hosted a world with `--packages examples/packages`; bob, with no packages, was asked, downloaded
 clans (with its code) and gems, and loaded them with no error; on alice's world `/clan create
 Wolves` ran in the sandbox ("clan Wolves founded" in the log, "Clan Wolves founded." in chat), no
-strikes. The invite and join between the two weren't seen yet (the first run's scripts were out of
-step; rerun pending).
-Left: offers marking code for the join sheet (slice 2), components and channels in the API
-(slice 3), client halves (slice 4), personal mods per world (slice 5), `/mods` (slice 6).
+strikes. The invite and join between the two weren't seen yet: the first run's scripts were out of
+step, and in the rerun bob's game froze when alice's invite reached it. That was a deadlock in
+the `packages` mod (the client's `packages:say` handler held its lock while running
+`/packages_say`, which takes it again), fixed; a second possible one (two packages on two region
+threads each waiting for the other's lock through a nested question) is avoided by nested calls
+only trying the lock. Rerun pending (Mac runs paused after the freeze).
+Slice 2 (consent marks code), after Ronald agreed the report's decisions: protocol 6, the
+`Offer` tuple's sixth field says whether the package carries `code/server.wasm`
+(`modloader::current_packages`); `download` refuses a package whose manifest says otherwise; the
+join sheet marks it (`join_sheet.code`, `OfferRow.code`). In `content::freeze_commands` a
+package's command whose name is taken is left out with a warning instead of failing the content
+build (code mods keep the old error).
+Left: components and channels in the API (slice 3), client halves (slice 4), personal mods per
+world (slice 5), `/mods` (slice 6).
 
 ## Side mods
 

@@ -32,14 +32,18 @@ fn init(r: &mut Registry) {
     // A sandboxed mod's line for this player goes through a command of this mod's own, whose
     // reply the client shows in its own language.
     r.client_packet(&sandboxed::SAY, |c, text| {
-        let mut lines = LINES.lock().unwrap();
-        if lines.len() < 64 {
+        {
+            let mut lines = LINES.lock().unwrap_or_else(|e| e.into_inner());
+            if lines.len() >= 64 {
+                return;
+            }
             lines.push_back(text);
         }
+        // The lock is let go first: the command may run right here, and it takes the lock.
         c.chat("/packages_say");
     });
     r.client_command("packages_say", "", |cmd| {
-        let Some(text) = LINES.lock().unwrap().pop_front() else { return };
+        let Some(text) = LINES.lock().unwrap_or_else(|e| e.into_inner()).pop_front() else { return };
         sandboxed::with_line(&text, |key, args| cmd.reply(key, args));
     });
 }
