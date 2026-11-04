@@ -178,7 +178,7 @@ pub fn behave(w: &World, id: u64, st: &EntityState) -> bool {
     }
     if breath.t >= from {
         let kind = w.component(id, &GENOME).map_or("fire", coats::breath);
-        let size = w.component(id, &GENOME).map_or(1.0, coats::size) as f64;
+        let size = coats::size_of(w, id).unwrap_or(1.0) as f64;
         let (ahead, up) = if breath.flying != 0 { MOUTH_AIR } else { MOUTH_GROUND };
         let (sy, cy) = (st.yaw as f64).sin_cos();
         let mouth = [st.pos[0] - sy * ahead * size, st.pos[1] + up * size, st.pos[2] - cy * ahead * size];
