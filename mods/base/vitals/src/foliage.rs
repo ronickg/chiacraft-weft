@@ -44,7 +44,13 @@ pub const fn muted(c: u32) -> u32 {
 /// One channel `v` of a colour of luminance `l`, muted (`muted`).
 const fn channel(l: f32, v: f32) -> u32 {
     let v = l + (v - l) * TINT_SATURATION + 0.5;
-    if v < 0.0 { 0 } else if v > 255.0 { 255 } else { v as u32 }
+    if v < 0.0 {
+        0
+    } else if v > 255.0 {
+        255
+    } else {
+        v as u32
+    }
 }
 
 /// The look each season pulls toward, grass then foliage (0xRRGGBB), and how far each goes at
@@ -205,7 +211,13 @@ mod tests {
     fn hue(c: [f32; 3]) -> f32 {
         let (hi, lo) = (c[0].max(c[1]).max(c[2]), c[0].min(c[1]).min(c[2]));
         let d = hi - lo;
-        let h = if hi == c[0] { (c[1] - c[2]) / d } else if hi == c[1] { (c[2] - c[0]) / d + 2.0 } else { (c[0] - c[1]) / d + 4.0 };
+        let h = if hi == c[0] {
+            (c[1] - c[2]) / d
+        } else if hi == c[1] {
+            (c[2] - c[0]) / d + 2.0
+        } else {
+            (c[0] - c[1]) / d + 4.0
+        };
         (h * 60.0).rem_euclid(360.0)
     }
 
@@ -245,7 +257,9 @@ mod tests {
                 let body = &biome[..biome.find(';').unwrap()];
                 let name = &body[..body.find(')').unwrap()];
                 for kind in ["grass", "foliage", "&base_api::trees::EVERGREEN", "&base_api::trees::YELLOW_LEAVES"] {
-                    let at = body.find(&format!(".tint({kind}, ")).unwrap_or_else(|| panic!("{file}: {name} has no {kind} tint"));
+                    let at = body
+                        .find(&format!(".tint({kind}, "))
+                        .unwrap_or_else(|| panic!("{file}: {name} has no {kind} tint"));
                     let line = body[at..].lines().next().unwrap();
                     assert!(line.contains("muted("), "{file}: {name}'s {kind} tint isn't muted: {line}");
                 }
