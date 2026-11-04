@@ -6,6 +6,7 @@ pub mod admission;
 pub mod admission_screen;
 pub mod friends;
 pub mod links;
+pub mod listing;
 pub mod saved_worlds;
 pub mod travel;
 pub mod world_address;

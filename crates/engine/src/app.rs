@@ -397,6 +397,14 @@ impl App {
         if chiacraft_account::current().is_some() {
             net::p2p::start_account(&settings);
             crate::chiacraft::chain::configure(&settings.run_dir, &settings.chain(), settings.chain_peers());
+            // The account's first address on that chain, public, in a file: where to send it test
+            // coins (a listing's deposit, phase 5).
+            if let (Some(s), Ok(net)) = (chiacraft_account::current(), crate::chiacraft::chain::network(&settings.chain()))
+                && let Some(ph) = s.first_puzzle_hash()
+            {
+                let address = chiacraft_wallet::chain::address(chiacraft_wallet::chain::Bytes32::from(ph), net);
+                let _ = std::fs::write(s.home.join(format!("address-{}.txt", net.name())), format!("{address}\n"));
+            }
         }
         let icon = crate::assets::decode_png_file(&engine_assets(self.opts.dev).join("icon.png"))
             .and_then(|(w, h, px)| winit::window::Icon::from_rgba(px, w, h).ok());

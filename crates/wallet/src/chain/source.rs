@@ -63,6 +63,15 @@ pub trait ChainSource: Send + Sync {
     fn children(&self, coin_id: Bytes32) -> impl Future<Output = Result<Vec<CoinState>>> + Send;
     /// Send a spend bundle to the mempool.
     fn push(&self, bundle: SpendBundle) -> impl Future<Output = Result<PushOutcome>> + Send;
+    /// Unspent coins hinted with `hint` (a coin's first memo) holding at least `min_amount`
+    /// mojos, a page from `from`: the node filters spent and small coins itself (finding worlds,
+    /// phase 5). Never subscribes.
+    fn hinted_unspent(
+        &self,
+        hint: Bytes32,
+        min_amount: u64,
+        from: Option<(u32, Bytes32)>,
+    ) -> impl Future<Output = Result<std::result::Result<PuzzleStatePage, Refused>>> + Send;
 }
 
 /// A full-node peer (chia-sdk-client's [`Peer`]) on a network.
@@ -86,6 +95,29 @@ fn refused(reason: RejectStateReason) -> Refused {
 }
 
 impl ChainSource for PeerSource {
+    async fn hinted_unspent(
+        &self,
+        hint: Bytes32,
+        min_amount: u64,
+        from: Option<(u32, Bytes32)>,
+    ) -> Result<std::result::Result<PuzzleStatePage, Refused>> {
+        let (height, header) = match from {
+            Some((h, hash)) => (Some(h), hash),
+            None => (None, self.network.genesis_challenge()),
+        };
+        let reply = self
+            .peer
+            .request_puzzle_state(vec![hint], height, header, CoinStateFilters::new(false, true, true, min_amount), false)
+            .await
+            .map_err(failed("hinted coins"))?;
+        Ok(match reply {
+            Ok(r) => {
+                Ok(PuzzleStatePage { coin_states: r.coin_states, height: r.height, header_hash: r.header_hash, finished: r.is_finished })
+            }
+            Err(rejected) => Err(refused(rejected.reason)),
+        })
+    }
+
     async fn puzzle_state(
         &self,
         puzzle_hashes: Vec<Bytes32>,

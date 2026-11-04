@@ -928,6 +928,89 @@ impl ChainReader {
         self.read(timeout, move |source| async move { super::anchor::anchor_root(&source, coin_id).await })
     }
 
+    /// List a world (phase 5, [`super::listing`]): a coin of `deposit` mojos at `owner` (one of
+    /// `keys`' addresses: the one holding the world DID) hinted with the listing tag, naming
+    /// `world_did`, made from the smallest spendable coin that covers it and `fee`. Pushed; the
+    /// listing coin is reserved (no coin selection spends it) until [`Self::delist_world`].
+    pub fn list_world(
+        &self,
+        keys: &WalletKeys,
+        owner: Bytes32,
+        world_did: Bytes32,
+        deposit: u64,
+        fee: u64,
+        timeout: Duration,
+    ) -> Result<(PushOutcome, chia_protocol::Coin)> {
+        let caps = self.caps();
+        caps.check_fee(fee)?;
+        caps.check("max-send", "the listing's deposit", deposit)?;
+        self.check_keys(keys)?;
+        if !keys.puzzle_hashes().contains(&owner) {
+            return Err(Error::new("the listing's address isn't one of this wallet's"));
+        }
+        let need = deposit
+            .checked_add(fee)
+            .ok_or_else(|| Error::new("the amounts overflow"))?;
+        let (source, coins) = {
+            let s = self.state();
+            (
+                s.active_source()
+                    .ok_or_else(|| Error::new("no chain peer reachable"))?,
+                s.cache.spendable(),
+            )
+        };
+        let coin = coins
+            .iter()
+            .filter(|c| c.amount >= need)
+            .min_by_key(|c| c.amount)
+            .copied()
+            .ok_or_else(|| Error::new(format!("no coin of at least {need} mojos to list the world with")))?;
+        let (coin_spends, signature, listing) = super::listing::build(keys, coin, owner, world_did, deposit, fee)?;
+        let push = self.run(timeout, async { source.push(SpendBundle::new(coin_spends, signature)).await })?;
+        if !matches!(push, PushOutcome::Rejected { .. }) {
+            let mut s = self.state();
+            s.cache
+                .pending
+                .insert(hex32(coin.coin_id()), offer::now_seconds());
+            s.cache.reserved.insert(hex32(listing.coin_id()));
+            s.save();
+        }
+        Ok((push, listing))
+    }
+
+    /// Delist: spend the listing coin back to the primary address, less `fee`. Pushed.
+    pub fn delist_world(&self, keys: &WalletKeys, listing: chia_protocol::Coin, fee: u64, timeout: Duration) -> Result<PushOutcome> {
+        self.caps().check_fee(fee)?;
+        self.check_keys(keys)?;
+        let source = self
+            .state()
+            .active_source()
+            .ok_or_else(|| Error::new("no chain peer reachable"))?;
+        let (coin_spends, signature) = super::listing::build_delist(keys, listing, fee)?;
+        let push = self.run(timeout, async { source.push(SpendBundle::new(coin_spends, signature)).await })?;
+        if !matches!(push, PushOutcome::Rejected { .. }) {
+            let mut s = self.state();
+            let id = hex32(listing.coin_id());
+            s.cache.reserved.remove(&id);
+            s.cache.pending.insert(id, offer::now_seconds());
+            s.save();
+        }
+        Ok(push)
+    }
+
+    /// Keep coin `coin_id` out of coin selection (a listing made before this cache).
+    pub fn reserve(&self, coin_id: Bytes32) {
+        let mut s = self.state();
+        if s.cache.reserved.insert(hex32(coin_id)) {
+            s.save();
+        }
+    }
+
+    /// The listings on chain holding at least `min_amount`, the newest `max` (phase 5).
+    pub fn listings(&self, min_amount: u64, max: usize, timeout: Duration) -> Result<Vec<super::listing::Listing>> {
+        self.read(timeout, move |source| async move { super::listing::listings(&source, min_amount, max).await })
+    }
+
     /// Spendable XCH of the wallet, in mojos (unspent coins no offer or pending spend holds).
     pub fn spendable_balance(&self) -> u64 {
         self.state()
