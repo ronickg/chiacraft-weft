@@ -325,10 +325,11 @@ pub const RIVER_VALLEY_RISE: i32 = 60;
 /// River terraces (Tectonic's tiers by a river's distance): the valley sides of the bigger
 /// rivers (flow from `RIVER_TERRACE_FLOW.0`, full at `.1`) climb in benches `RIVER_TERRACE`
 /// blocks high, each flat for all but `RIVER_TERRACE_RISER` of its width: meadows by the water
-/// (Ronald, 11-04: "All 3, in order").
+/// (Ronald, 11-04: "All 3, in order"). Low steps with wide risers so a player can walk up them:
+/// at 5 blocks with 0.3 risers the walk test stuck at the first one (a 5-block rise in 3).
 pub const RIVER_TERRACE_FLOW: (f64, f64) = (10.0, 40.0);
-pub const RIVER_TERRACE: i32 = 5;
-pub const RIVER_TERRACE_RISER: f64 = 0.3;
+pub const RIVER_TERRACE: i32 = 3;
+pub const RIVER_TERRACE_RISER: f64 = 0.5;
 /// Rivers don't carve in the mountains: full where the mountains' area (`MOUNTAINS_AREA`) is up
 /// to `.0`, gone at `.1`. Their rain still runs down, so rivers come out at the mountains' feet.
 pub const RIVER_MOUNTAINS: (f64, f64) = (0.1, 0.45);
@@ -1163,7 +1164,7 @@ mod tests {
             }
             last = t;
         }
-        assert!(flat > q4(60.0) / 2, "most of the side is bench: {flat}");
+        assert!(flat > q4(60.0) * 2 / 5, "much of the side is bench: {flat}");
     }
 
     #[test]
