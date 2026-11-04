@@ -22,15 +22,15 @@ fruitless", as Ronald chose). The numbers are in `vitals::felling` and the sheet
 
 | tier (harvest) | takes up to | oak (20 logs) | birch (34) | araucaria (72) | young sequoia (165) | sequoia (1015) |
 |---|---|---|---|---|---|---|
-| wood, gold (0) | 24 logs | 14 s | 3 min * | 5 min * | 9 min * | 36 min * |
-| bone, antler (50) | 40 | 11 s | 17 s | 4 min * | 7 min * | 29 min * |
+| wood, gold (0) | 40 logs | 14 s | 21 s | 5 min * | 9 min * | 36 min * |
+| bone, antler (50) | 64 | 11 s | 17 s | 4 min * | 7 min * | 29 min * |
 | flint, stone (100) | 96 | 10 s | 15 s | 25 s | 6 min * | 25 min * |
 | copper (150) | 192 | 6 s | 9 s | 15 s | 28 s | 15 min * |
 | bronze, iron (200) | 512 | 4 s | 6 s | 11 s | 20 s | 11 min * |
 | steel (300) | 1536 | 4 s | 5 s | 10 s | 18 s | 70 s |
 | diamond (400) | 4096 | 4 s | 5 s | 9 s | 17 s | 67 s |
 
-`*` past the tier: no wood. Log counts are each species' median over 40 grown trees
+`*` past the tier: no wood. The wooden axe takes the first day's common trees (oak, birch and spruce medians; Planner, 11-05). Log counts are each species' median over 40 grown trees
 (`cargo run -p base_api --example tree_logs`): the ordinary trees grow 5-72 logs, a young sequoia 76-231,
 a grown one 444-1421. Before, any tree up to 128 logs fell in one log's time (about 1 s with a stone axe),
 and bigger ones were chopped block by block.

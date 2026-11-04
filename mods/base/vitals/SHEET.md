@@ -162,8 +162,8 @@ An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log'
 
 | tier | harvest | takes up to | speed | oak (20) | birch (34) | araucaria (72) | young sequoia (165) | sequoia (1015) |
 |---|---|---|---|---|---|---|---|---|
-| wood, gold | 0 | 24 logs | 2 | 14 s | 3 min * | 5 min * | 9 min * | 36 min * |
-| bone, antler | 50 | 40 logs | 2.5 | 11 s | 17 s | 4 min * | 7 min * | 29 min * |
+| wood, gold | 0 | 40 logs | 2 | 14 s | 21 s | 5 min * | 9 min * | 36 min * |
+| bone, antler | 50 | 64 logs | 2.5 | 11 s | 17 s | 4 min * | 7 min * | 29 min * |
 | flint, chert, obsidian, stone | 100 | 96 logs | 2.91 | 10 s | 15 s | 25 s | 6 min * | 25 min * |
 | copper | 150 | 192 logs | 4.85 | 6 s | 9 s | 15 s | 28 s | 15 min * |
 | bronze, iron, wrought iron | 200 | 512 logs | 6.79 | 4 s | 6 s | 11 s | 20 s | 11 min * |

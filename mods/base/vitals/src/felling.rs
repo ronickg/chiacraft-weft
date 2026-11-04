@@ -29,12 +29,12 @@ pub const LONGEST_SECS: f32 = 3600.0;
 /// Axe tiers by harvest level (`abi::tool_tier`, the crafting materials' `harvest`): the most
 /// logs a tree may have for an axe of that level to fell it for its wood. The highest row at or
 /// under the axe's level counts. Sized on the species (`cargo run -p base_api --example
-/// tree_logs`, 11-05): the ordinary trees grow 5 to 72 logs (a stone axe takes them all, a
-/// wooden one the median oak), a young sequoia 76 to 231 (copper), a grown one 444 to 1421
-/// (steel).
+/// tree_logs`, 11-05): the ordinary trees grow 5 to 72 logs (a stone axe takes them all; a
+/// wooden one the first day's common trees, the oak's, birch's and spruce's medians, 16 to 34:
+/// Planner, 11-05), a young sequoia 76 to 231 (copper), a grown one 444 to 1421 (steel).
 pub const TIERS: &[Tier] = &[
-    Tier { harvest: 0, name: "wood, gold", logs: 24, speed: 2.0 },
-    Tier { harvest: 50, name: "bone, antler", logs: 40, speed: 2.5 },
+    Tier { harvest: 0, name: "wood, gold", logs: 40, speed: 2.0 },
+    Tier { harvest: 50, name: "bone, antler", logs: 64, speed: 2.5 },
     Tier { harvest: 100, name: "flint, chert, obsidian, stone", logs: 96, speed: 2.91 },
     Tier { harvest: 150, name: "copper", logs: 192, speed: 4.85 },
     Tier { harvest: 200, name: "bronze, iron, wrought iron", logs: 512, speed: 6.79 },
