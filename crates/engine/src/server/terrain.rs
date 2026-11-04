@@ -1170,6 +1170,34 @@ mod tests {
         (t.rules.iter().map(|r| r.biome).collect(), errors)
     }
 
+    /// A dimension's continent scale is 900 blocks unless its terrain sets one; the fields, the
+    /// `continents` preset and continent masks all follow it.
+    #[test]
+    fn continent_scale_defaults_and_follows_its_op() {
+        let names = Names { block: &|n| (n == "a:stone").then_some(1), biome: &|_| Some(0), biome_rule: &|_| None };
+        let make = |scale: Option<f64>| {
+            let mut ops = vec![raw(0, op::STONE, "", None)];
+            if let Some(v) = scale {
+                ops.push(RawTerrain { value: v, ..raw(0, op::CONTINENT_SCALE, "", None) });
+            }
+            let mut errors = Vec::new();
+            let t = build("a:dim", &|m| format!("mod{}", m.0), ops, &names, &mut errors);
+            (t, errors)
+        };
+        let (plain, errors) = make(None);
+        assert!(errors.is_empty(), "{errors:?}");
+        assert_eq!(plain.continent_scale, weft_noise::fixed::CONTINENT_SCALE);
+        assert_eq!(plain.fields(7), Fields::new(7));
+        let (wide, _) = make(Some(1800.0));
+        assert_eq!(wide.continent_scale, 1800 * 16);
+        // Twice as wide: the same continentalness twice as far out.
+        let (n, w) = (plain.fields(7), wide.fields(7));
+        for (x, z) in [(0, 0), (300, -500), (-1200, 800)] {
+            assert_eq!(w.continent(2 * x * 16, 2 * z * 16), n.continent(x * 16, z * 16));
+        }
+        assert_eq!(make(Some(0.0)).1.len(), 1, "a scale under a block is an error");
+    }
+
     /// Edits find rules by name (a biome's own name by default) and keep the owner's order around them.
     #[test]
     fn edits_insert_by_name() {
