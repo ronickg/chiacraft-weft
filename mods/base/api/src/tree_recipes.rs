@@ -267,10 +267,10 @@ pub const RECIPES: &[Recipe] = &[
     },
 ];
 
-/// The tropical canopy (28-32 blocks): andiroba's broad dark crown on a tall clean trunk.
+/// The tropical canopy (about 26-29 blocks, under its emergents): andiroba's broad dark crown on a tall clean trunk.
 pub const ANDIROBA: Recipe = Recipe {
     log: "base:andiroba_log",
-    height: 28.0,
+    height: 25.0,
     size_var: 0.12,
     width: 1.3,
     width_loss: 0.06,
@@ -295,7 +295,7 @@ pub const ANDIROBA: Recipe = Recipe {
 /// Matamatá: Manaus's commonest canopy tree, a slimmer trunk and a narrower, rounder crown.
 pub const MATAMATA: Recipe = Recipe {
     log: "base:matamata_log",
-    height: 26.0,
+    height: 23.0,
     size_var: 0.15,
     width: 1.0,
     width_loss: 0.06,
@@ -318,7 +318,7 @@ pub const MATAMATA: Recipe = Recipe {
 /// The golden ipê: a tall straight trunk and a high, open, spreading crown.
 pub const IPE: Recipe = Recipe {
     log: "base:ipe_log",
-    height: 30.0,
+    height: 27.0,
     size_var: 0.12,
     width: 1.1,
     width_loss: 0.06,
@@ -341,7 +341,9 @@ pub const IPE: Recipe = Recipe {
 /// A grown Brazil nut (`RECIPES`' own row), the world's (the giant scatter, `GIANT_KINDS`).
 pub const BRAZIL_NUT: Recipe = Recipe {
     log: "base:brazil_nut_log",
-    height: 50.0,
+    // Its crown clears the canopy (26-29) by 15-20 blocks, as a real emergent rises 10-20 m over a
+    // 30-40 m canopy (Ronald, 11-04: "C's giants"; Planner: "well above the canopy").
+    height: 58.0,
     size_var: 0.15,
     width: 3.0,
     width_loss: 0.06,
@@ -351,7 +353,7 @@ pub const BRAZIL_NUT: Recipe = Recipe {
     droop: 0.1,
     // An umbrella of a few big limbs, not many small ones: a scatter's shape keeps 4,096 blocks
     // (the first try's limbs every 0.6 overran it, and the crown was dropped).
-    branch_start: 0.72,
+    branch_start: 0.75,
     branch_every: 1.6,
     branch_count: 3,
     branch_angle: 62.0,
@@ -364,7 +366,8 @@ pub const BRAZIL_NUT: Recipe = Recipe {
     ragged: 0.3,
     // The giant scatter's reach (`worldgen.rs`): a crown up to 24 across.
     reach: 12,
-    max_height: 70,
+    // 58 high, a sixth more at most, and its crown over that; the scatter reaches 96 up.
+    max_height: 80,
     flare: 0.55,
     flare_up: 3.0,
     lobes: 0.35,
