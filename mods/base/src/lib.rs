@@ -7,6 +7,7 @@ mod blocks;
 mod book;
 mod clothing;
 mod cooking;
+mod discovery;
 mod farming;
 mod growth;
 mod hints;
@@ -58,6 +59,7 @@ fn init(r: &mut Registry) {
     cooking::register(r);
     recipes::register(r);
     book::register(r);
+    discovery::register(r);
     parts::register(r);
     sounds::register(r);
     mobs::register(r);

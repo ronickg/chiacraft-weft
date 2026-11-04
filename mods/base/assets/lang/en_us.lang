@@ -593,3 +593,5 @@ material.base.sinew = Sinew
 material.base.rawhide = Rawhide
 material.base.birch_tar = Birch Tar
 material.base.leather = Leather
+crafting.book.near = Something you could make: you've held {0} of its {1} materials
+crafting.book.unknown = ?

@@ -639,7 +639,14 @@ are rows.
    - **Today's materials only:** wood, stone, bone, iron, gold, diamond, string, leather.
      Content's flint, sinew and bronze come with its step 1.
    - **Test:** `mods/testkit/scripts/crafting_parts.txt`.
-3. **Discovery:** known recipes per player, saved.
+3. **Discovery** (built 11-04, `mods/base/src/discovery.rs`, waiting for a game run):
+   - **Held items:** saved per player as a bitset, kept through death.
+   - **The book:** shows a recipe once all its ingredients have been held, and a "?" with "2 of
+     3" once some have. Creative shows all.
+   - **Not yet:** R and U filtered, and picking a near miss to see which ingredients you lack.
+   - **Test:** `crafting_discovery.txt`.
+
+   The plan it follows:
    - A recipe unlocks once you've touched all its ingredients, as Valheim does. Minecraft's book,
      which unlocks on the first, floods (the Researcher, 11-04).
    - Near misses show as "2 of 3", with the missing ingredient as "?".

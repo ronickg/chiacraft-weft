@@ -593,3 +593,5 @@ material.base.sinew = Жилы
 material.base.rawhide = Сыромятная кожа
 material.base.birch_tar = Берёзовый дёготь
 material.base.leather = Кожа
+crafting.book.near = Это можно сделать: из {1} материалов вы держали {0}
+crafting.book.unknown = ?

@@ -1,0 +1,33 @@
+# Crafting, discovery (choice 2A): a recipe shows once every ingredient has been held, a "?" once
+# some of them have. One copy, a fresh world, survival. The bag is looked at every 2 seconds.
+loaded
+idle
+chat /tk mode survival
+until mode survival within 10
+# Nothing held: the book is empty.
+press core:inventory
+until screen core:menu within 10
+wait 1
+shot discovery_empty
+key Escape
+until screen none within 10
+# A log: planks show (you can make them); what needs planks doesn't yet.
+chat /tk give base:oak_log 2
+wait 3
+press core:inventory
+until screen core:menu within 10
+wait 1
+shot discovery_log
+# Make planks; once they've been held, sticks and the crafting table show.
+tap core:menu class:slot
+tap core:menu text:all (
+wait 3
+key Escape
+until screen none within 10
+press core:inventory
+until screen core:menu within 10
+wait 1
+shot discovery_planks
+key Escape
+until screen none within 10
+quit

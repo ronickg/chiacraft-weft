@@ -387,7 +387,15 @@ pub fn book(ui: &mut Ui, station: Station) {
         (b.tab, b.page, b.picked, b.pool.clone())
     };
     let have = have(ui, station, &pool);
-    let mut list: Vec<(Recipe, u32)> = shown(station)
+    // What the player has ever held (`discovery.rs`), and what they hold now; creative knows all.
+    let creative = ui.client().creative();
+    let mut touched = if creative { Vec::new() } else { crate::discovery::held_items(&ui.client()) };
+    for &(item, _) in &have {
+        if !touched.contains(&item) {
+            touched.push(item);
+        }
+    }
+    let mut list: Vec<(Recipe, u32, Option<(u32, u32)>)> = shown(station)
         .into_iter()
         .filter(|r| match TABS[tab] {
             "" => true,
@@ -397,13 +405,22 @@ pub fn book(ui: &mut Ui, station: Station) {
                 .first()
                 .is_some_and(|(o, _)| item_has_tag(o.item, &format!("tab/{t}"))),
         })
-        .map(|r| {
+        .filter_map(|r| {
             let n = times(&r, &have, MAX_BATCH);
-            (r, n)
+            if creative || n > 0 {
+                return Some((r, n, None));
+            }
+            // Known once every ingredient has been held; some of them: a "?" with how many.
+            let (got, all) = crate::discovery::standing(&r, &touched);
+            match got {
+                0 => None,
+                g if g == all => Some((r, 0, None)),
+                g => Some((r, 0, Some((g, all)))),
+            }
         })
         .collect();
-    // What you can make first; otherwise as registered.
-    list.sort_by_key(|(_, n)| (*n == 0) as u8);
+    // What you can make first, then what you know, then the near misses; otherwise as registered.
+    list.sort_by_key(|(_, n, near)| ((*n == 0) as u8, near.is_some() as u8));
     let pages = list.len().div_ceil(PER_PAGE).max(1);
     let page = page.min(pages - 1);
 
@@ -443,7 +460,18 @@ pub fn book(ui: &mut Ui, station: Station) {
             }
             for row in on_page.chunks(COLS) {
                 ui.row(S::row(), |ui| {
-                    for (r, n) in row {
+                    for (r, n, near) in row {
+                        if let Some((got, all)) = *near {
+                            ui.button_with(
+                                S::default()
+                                    .size(18.0, 18.0)
+                                    .class("slot")
+                                    .tooltip_args("crafting.book.near", &[Arg::Int(got as i64), Arg::Int(all as i64)]),
+                                |_| {},
+                                |ui| ui.text_styled(S::col().class("dim"), "crafting.book.unknown", &[]),
+                            );
+                            continue;
+                        }
                         let Some((out, _)) = r.outputs().into_iter().next() else { continue };
                         let index = id_of(r);
                         let class = if picked == Some(index) { "slot_highlight" } else { "slot" };

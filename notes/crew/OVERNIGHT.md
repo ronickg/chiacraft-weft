@@ -51,3 +51,11 @@ change any of them in the morning.
       Chiacraft's files replace them at the same paths.
     - Alternative: test with no art (the look would fall back to the plain icon, testing
       nothing).
+13. **Discovery stores what a player has held as a fixed bitset of item-name hashes.**
+    - Chosen: two bits an item, 1 KB a player, saved and kept through death. It survives new
+      items and a changed load order. A false "held" (a few in a thousand) only shows a recipe
+      early.
+    - What you hold right now counts at once; the bag is looked at every 2 seconds.
+    - Near misses show as "?" with "you've held 2 of its 3 materials". They can't be picked yet.
+    - Alternative: an exact list of item names (needs a variable-size component, which the engine
+      doesn't have).
