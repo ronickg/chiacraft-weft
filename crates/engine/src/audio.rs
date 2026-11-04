@@ -137,6 +137,9 @@ struct Wait {
     asked: Instant,
 }
 
+/// How many started sounds `/sounds recent` remembers.
+const RECENT: usize = 40;
+
 struct Voice {
     id: u64,
     sound: u32,
@@ -194,6 +197,9 @@ pub struct Audio {
     rng: weft_noise::Rng,
     /// Sounds started so far.
     pub played: u32,
+    /// The last sounds started, newest last (name, volume, looped): `/sounds recent`, for checking
+    /// one-shot steps and calls after the fact.
+    recent: std::collections::VecDeque<(String, f32, bool)>,
     /// Sounds not played or cut short for more important ones.
     pub dropped: u32,
     /// Automated runs (tests, scripts): everything plays and counts, silently.
@@ -316,6 +322,7 @@ impl Audio {
                 volumes: Vec::new(),
                 rng: weft_noise::Rng(0x2545_F491_4F6C_DD1D),
                 played: 0,
+                recent: std::collections::VecDeque::new(),
                 dropped: 0,
                 muted: false,
                 volume_ids: None,
@@ -345,6 +352,11 @@ impl Audio {
     /// Sounds playing now, and of them those a mod holds a handle to.
     pub fn counts(&self) -> (u32, u32) {
         (self.voices.len() as u32, self.voices.iter().filter(|v| v.held).count() as u32)
+    }
+
+    /// `/sounds recent`: the last sounds started, newest first (name, volume, looped).
+    pub fn recent(&self) -> Vec<(String, f32, bool)> {
+        self.recent.iter().rev().cloned().collect()
     }
 
     /// `/sounds`: what plays now, most important first.
@@ -744,12 +756,22 @@ impl Audio {
             self.forget(id);
             return;
         }
+        let (sound, volume, looped) = (v.sound, v.volume, v.looped);
         match play(v, data) {
             Ok(h) => {
                 v.handle = Some(h);
                 v.wait = None;
                 v.started = Instant::now();
                 self.played += 1;
+                let name = content()
+                    .game
+                    .sounds
+                    .get(sound as usize)
+                    .map_or_else(String::new, |d| d.name.clone());
+                if self.recent.len() >= RECENT {
+                    self.recent.pop_front();
+                }
+                self.recent.push_back((name, volume, looped));
             }
             Err(e) => {
                 log::debug!("sound {id}: {e}");

@@ -278,6 +278,7 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | animals:flowering_shrub | Still | Soil | - | 2.0% | floodplain, scrubland |
 | animals:water_lily | Still | Water | - | 6.0% | floodplain, red_dunes |
 | animals:rotten_log | Log | Soil | - | 0.4% | floodplain, fern_forest |
+| animals:termite_mound | Mound | Soil | - | 0.3% | red_dunes, scrubland |
 | base:kelp_wrack | Mat | Sand | base:kelp | 3.0% | beach |
 
 ## Food in the world
@@ -342,6 +343,8 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | animals:water_lily | water_plants | 5 | stays | always there in animals:floodplain, animals:red_dunes (all year), worth 40% of fresh growth |
 | base:kelp_wrack | water_plants | 4 | stays | always there in base:beach (all year), worth 40% of fresh growth |
 | animals:rotten_log | insects | 3 | stays | always there in animals:floodplain, animals:fern_forest (all year), worth 40% of fresh growth |
+| animals:termite_mound | insects | 3 | stays | always there in animals:red_dunes, animals:scrubland (all year), worth 40% of fresh growth |
+| animals:termite_mound_upper | insects | 3 | stays | always there in animals:red_dunes, animals:scrubland (all year), worth 40% of fresh growth |
 | base:mesquite_leaves | leaves | 4 | stays | always there in base:desert, base:savanna (spring, summer, autumn), worth 40% of fresh growth |
 | base:mesquite_leaves | seeds | 4 | stays | always there in base:desert, base:savanna (summer, autumn), worth 40% of fresh growth |
 | base:acuri_palm_leaves | seeds | 5 | stays | always there in base:swamp (autumn, winter), worth 40% of fresh growth |

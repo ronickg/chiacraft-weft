@@ -372,6 +372,7 @@ command.sounds.count = {0} sons en cours, dont {1} tenus par des mods ; {2} non 
 command.sounds.one = {0} à {1}
 command.sounds.loop = {0} à {1}, en boucle
 command.sounds.reading = {0} à {1}, fichier en cours de lecture
+command.sounds.none_recent = aucun son n'a encore démarré
 gizmo.value = {0}
 gizmo.cubes = les bordures du cube dans lequel vous êtes et ses voisins
 gizmo.hitboxes = boîtes des entité

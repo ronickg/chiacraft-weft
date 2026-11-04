@@ -690,6 +690,12 @@ fn decorate(g: &mut Gen) {
             let pick = if sandy_shore { wild_at(seed, wx, wz, b, wild::Ground::Shore) } else { None };
             if let Some(s) = pick.or_else(|| ground.and_then(|gr| wild_at(seed, wx, wz, b, gr))) {
                 g.set(x, y, z, s);
+                // A mound's crown on it, in one place in two (`wild::upper_of`).
+                if let Some(u) = crate::wild::upper_of(s, unit(hash(seed ^ 0x7E3, wx as i64, 1, wz as i64)) as f32)
+                    && y + 1 < 16
+                {
+                    g.set(x, y + 1, z, u);
+                }
                 continue;
             }
             if FROZEN.on_biome(b) {

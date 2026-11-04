@@ -458,6 +458,7 @@ command.sounds.count = {0} sounds playing, {1} held by mods; {2} not played so f
 command.sounds.one = {0} at {1}
 command.sounds.loop = {0} at {1}, looping
 command.sounds.reading = {0} at {1}, its file still being read
+command.sounds.none_recent = No sound has started yet
 gizmo.value = {0}
 gizmo.cubes = borders of the cube you are in and its neighbors
 gizmo.hitboxes = entity boxes
