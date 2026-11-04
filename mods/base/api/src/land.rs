@@ -352,10 +352,14 @@ pub const LAKE_STRETCH: (i32, i32) = (16, 34);
 /// The 8 directions a lake can lie in, as (x, z) in 1/64.
 const LAKE_AXES: [(i32, i32); 8] = [(64, 0), (59, 24), (45, 45), (24, 59), (0, 64), (-24, 59), (-45, 45), (-59, 24)];
 pub const LAKE_DEPTH: (i32, i32) = (3, 9);
-/// The shore rises from the water to the land over `LAKE_SHORE` blocks, plus `LAKE_SHORE_PER_BLOCK`
-/// (in sixteenths) for each block the land stands over the sea, counted up to `LAKE_SHORE_RISE`.
+/// The shore: first `LAKE_BEACH` blocks flush with the water (room for reeds and a beach, so
+/// trees don't stand in it), then rising to the land over `LAKE_SHORE` blocks, plus
+/// `LAKE_SHORE_PER_BLOCK` (in sixteenths) for each block the land stands over the sea, counted up
+/// to `LAKE_SHORE_RISE`. At 36 the steepest of the rise is about two blocks in three (Tester 2,
+/// 11-04: at 24 the banks rose in blocky steps where trees came down to the water).
+pub const LAKE_BEACH: i32 = 3;
 pub const LAKE_SHORE: i32 = 10;
-pub const LAKE_SHORE_PER_BLOCK: i32 = 24;
+pub const LAKE_SHORE_PER_BLOCK: i32 = 36;
 pub const LAKE_SHORE_RISE: i32 = 40;
 /// Islands: where the island noise (patches about `LAKE_ISLAND_SIZE` blocks across) is over
 /// `LAKE_ISLANDS`, the bed rises back over the water, up to `LAKE_ISLAND_HEIGHT` blocks; not in
@@ -592,7 +596,7 @@ pub fn lakes(f: &Fields, x: i32, z: i32) -> i32 {
 fn lakes_on(h: &Here, ground: i32) -> i32 {
     let (bx, bz) = (h.x >> 4, h.z >> 4);
     let (cx, cz) = (div_floor(bx, LAKE_CELL).0, div_floor(bz, LAKE_CELL).0);
-    let reach = LAKE_RADIUS.1 + ((LAKE_RADIUS.1 * q12(LAKE_WOBBLE)) >> 12) + LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4);
+    let reach = LAKE_RADIUS.1 + ((LAKE_RADIUS.1 * q12(LAKE_WOBBLE)) >> 12) + lake_shore_most();
     let mut cut = 0;
     let mut ground = ground;
     for dz in -1..=1 {
@@ -611,9 +615,14 @@ fn lakes_on(h: &Here, ground: i32) -> i32 {
     cut
 }
 
+/// The widest a lake's shore can be (blocks): the beach and the rise at its widest.
+const fn lake_shore_most() -> i32 {
+    LAKE_BEACH + LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4)
+}
+
 /// How far a lake of this radius (blocks) can reach with its shore at its widest (blocks).
 fn lake_reach_most(radius: i32) -> i32 {
-    radius + ((radius * q12(LAKE_WOBBLE)) >> 12) + LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4)
+    radius + ((radius * q12(LAKE_WOBBLE)) >> 12) + lake_shore_most()
 }
 
 /// A column's distance from a lake's middle and the lake's radius there (both Q4), if it's within
@@ -643,7 +652,7 @@ fn lake_reach(h: &Here, lake: Lake, extra: i32) -> Option<(i32, i32)> {
 /// (`i32::MIN` until then).
 fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
     let sea = q4(SEA as f64);
-    let shore_most = q4((LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4)) as f64);
+    let shore_most = q4((lake_shore_most()) as f64);
     let Some((d, r)) = lake_reach(h, lake, shore_most) else { return 0 };
     if *ground == i32::MIN {
         *ground = ground_at(h);
@@ -662,13 +671,14 @@ fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
         let island = sea - 16 + ((q4((LAKE_ISLAND_HEIGHT + 1) as f64) * lift) >> 12);
         if lift > 0 { bed.max(island) } else { bed }
     } else {
-        // The shore: level with the water at its edge, rising smoothly to the land.
+        // The shore: level with the water for the beach, then rising smoothly to the land.
         let rise = ((ground - sea) >> 4).clamp(0, LAKE_SHORE_RISE);
+        let beach = q4(LAKE_BEACH as f64);
         let width = q4((LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * rise) >> 4)) as f64);
-        if d >= r + width {
+        if d >= r + beach + width {
             return 0;
         }
-        let t = (d - r) * ONE / width;
+        let t = (d - r - beach).max(0) * ONE / width;
         let smooth = (((t * t) >> 12) * (3 * ONE - 2 * t)) >> 12;
         sea + (((ground - sea) * smooth) >> 12)
     };
