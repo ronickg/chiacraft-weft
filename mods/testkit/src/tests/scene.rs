@@ -310,8 +310,15 @@ async fn commands(t: &T) -> R {
     t.cmd("/summon pig 3").await?;
     t.frames(3).await?;
     t.check_eq(count_at(t, "base:pig", me, 4.0).await?, 3, "summoned pigs");
-    let feed = t.cmd("/feed 9").await?;
-    t.check(feed.contains('9'), format!("/feed said '{feed}'"));
+    // /feed fills with whole foods (an apple, a loaf, a steak, over and over) while they fit: 45
+    // units take an apple and a loaf.
+    let fits: f32 = ["base:apple", "base:bread"]
+        .iter()
+        .filter_map(|n| vitals::food::find(n))
+        .map(|f| vitals::food::FOODS[f].units())
+        .sum();
+    let feed = t.cmd("/feed 45").await?;
+    t.check(feed.contains(&format!("{}", fits.round())), format!("/feed 45 fits {fits} units, it said '{feed}'"));
     let time = t.cmd("/time query").await?;
     t.check(time.contains("time is"), format!("/time query said '{time}'"));
     Ok(())
