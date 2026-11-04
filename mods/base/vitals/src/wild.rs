@@ -214,6 +214,32 @@ pub const LEAVES: [(&str, Turn); 17] = [
     ("animals:tempskya_leaves", Turn::Evergreen),
 ];
 
+/// Trees and shrubs whose leaves flower (the bloom look), and the seasons they bloom in, bits spring
+/// first: their leaves show `leaves_<x>_bloom` then (the tinted ones under a tinted `_bloom_overlay`,
+/// so the leaves keep their biome's and season's green), a growth step every few minutes looking at
+/// the season as the wild flowers do. In spring, all from their real flowering: the Pacific dogwood's
+/// white bracts (April-May); the umbrella thorn's cream puffballs, as its rains begin; honey
+/// mesquite's yellow catkins (April-June); the creosote bush's small yellow flowers (February-April);
+/// the willow's catkins (March-April, with the first leaves).
+pub const BLOOMS: [(&str, u8); 5] = [
+    ("base:dogwood_leaves", SP),
+    ("base:acacia_leaves", SP),
+    ("base:mesquite_leaves", SP),
+    ("base:creosote_leaves", SP),
+    ("base:willow_leaves", SP),
+];
+
+/// The seasons `leaves` bloom in (`BLOOMS`), if they do.
+pub fn blooms(leaves: &str) -> Option<u8> {
+    BLOOMS.iter().find(|(l, _)| *l == leaves).map(|&(_, s)| s)
+}
+
+/// Whether leaves blooming in `seasons` (`BLOOMS`) are in flower in `season` (spring 0; `None`: a
+/// world without a calendar, where nothing blooms).
+pub fn in_bloom(seasons: u8, season: Option<usize>) -> bool {
+    season.is_some_and(|s| seasons >> s & 1 != 0)
+}
+
 /// How `leaves` turn (`Turn::Orange` for leaves not listed).
 pub fn turn(leaves: &str) -> Turn {
     LEAVES
@@ -403,5 +429,18 @@ mod tests {
                 assert!(all < MOST, "{b}: wild plants cover {:.0}% of its {:?} ground", all * 100.0, p.ground);
             }
         }
+    }
+
+    /// Each blooming tree or shrub is one of the world's leaves, blooms in some season, and nothing
+    /// blooms in a world without a calendar.
+    #[test]
+    fn blooms_are_known_leaves() {
+        for (leaves, seasons) in BLOOMS {
+            assert!(LEAVES.iter().any(|(l, _)| *l == leaves), "{leaves} isn't in LEAVES");
+            assert!(seasons != 0 && seasons < 16, "{leaves}: seasons {seasons:b}");
+            assert!((0..4).any(|s| in_bloom(seasons, Some(s))), "{leaves} never blooms");
+            assert!(!in_bloom(seasons, None), "{leaves} blooms without a calendar");
+        }
+        assert_eq!(blooms("base:oak_leaves"), None);
     }
 }
