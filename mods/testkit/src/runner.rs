@@ -237,11 +237,15 @@ impl T {
     pub async fn cmd(&self, line: &str) -> Result<String, String> {
         let before = self.c().chat_line(0);
         let marker = self.0.borrow().state.frame;
+        let sent = Instant::now();
         self.c().chat(line);
         let mut seen = String::new();
+        // A reply the same as the line before (time frozen) or none at all (`/rename`) shows as no
+        // change: then 600 frames or 5 s, whichever first, count as answered. Frames alone never
+        // came in time on a software renderer (a few frames a second).
         self.until(&format!("reply to {line}"), Duration::from_secs(10), |t| {
             let now = t.c().chat_line(0);
-            if now != before || t.state().frame > marker + 600 {
+            if now != before || t.state().frame > marker + 600 || sent.elapsed() > Duration::from_secs(5) {
                 seen = now;
                 true
             } else {
@@ -709,6 +713,8 @@ pub fn frame(c: &Client) {
             lines.extend(i.failures.iter().map(|f| format!("FAIL {f}")));
             if let Err(e) = res {
                 ok = false;
+                // In the log too: CI keeps the log, not always the report.
+                weft_sdk::warn!("[{}] ERROR {e}", i.name);
                 lines.push(format!("ERROR {e}"));
             }
             let out = Outcome { name: i.name.clone(), ok, secs: began.elapsed().as_secs_f32(), lines };
