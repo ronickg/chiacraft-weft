@@ -87,10 +87,31 @@ def approved_sheet():
     return out
 
 
+def like_sheet(names):
+    """The game's own textures a batch names (`BLOCK_LIKE=kelp,cattail`): a third reference, for
+    families the approved key doesn't hold yet (plants, water plants)."""
+    s = 192
+    sheet = Image.new("RGB", (len(names) * s, s), (255, 0, 255))
+    for i, n in enumerate(names):
+        path = next((os.path.join(d, n + ".png") for d in MODS.values() if os.path.exists(os.path.join(d, n + ".png"))),
+                    os.path.join(TILES, n + ".png"))
+        t = Image.open(path).convert("RGBA").resize((s, s), Image.NEAREST)
+        sheet.paste(t, (i * s, 0), t)
+    out = os.path.join(GEN, "like.png")
+    sheet.save(out)
+    return out
+
+
 def gen(rows):
     style = open(os.path.join(HERE, "style.txt")).read()
     os.makedirs(GEN, exist_ok=True)
     refs = ["-i", PALETTE, "-i", approved_sheet()]
+    like = [n for n in os.environ.get("BLOCK_LIKE", "").split(",") if n]
+    if like:
+        refs += ["-i", like_sheet(like)]
+        style = style.replace("Match their pixel size, shading and colour.",
+                              "Match their pixel size, shading and colour. The third image shows textures already in the game "
+                              f"({', '.join(like)}, left to right): match their pixel size, outline and shading.")
 
     def one(row):
         image, entries = row
@@ -105,7 +126,8 @@ def gen(rows):
                             "-o", f"last_{image}.txt", prompt], cwd=GEN, stdin=subprocess.DEVNULL, stdout=log, stderr=log)
         return f"{image}: {'ok' if os.path.exists(os.path.join(GEN, image + '.png')) else 'FAILED, see gen/run_' + image + '.log'}"
 
-    with ThreadPoolExecutor(4) as pool:
+    # Two at a time (the crew's rule for batch scripts on the Mac).
+    with ThreadPoolExecutor(2) as pool:
         for r in pool.map(one, rows):
             print(r, flush=True)
 
