@@ -129,9 +129,12 @@ built, it gets its row below and its arrows above.
 - **A species, or a new one**: its row in `species.rs` with comfort, breeding seasons and
   habitats (each habitat needs a climate); how much of its water it drinks (`needs::DRINKS`; not
   listed, all of it); the species sheet; `places.rs` checks it on its own.
-- **A food, or a new food item**: a row in `vitals::food::FOODS` (an item without one can't be
-  eaten; the game test `every_food_has_nutrition` fails); `NUTRITION` and `FRESHNESS` on the
-  item (`items.rs`); `balance.rs` (well fed from a few foods); the sheet. Its kind and portion
+- **A food, or a new food item**: a row in `vitals::food::FOODS`, the one list. A `base:` row is
+  the item (`items.rs` makes it from the table: nutrition, freshness, hunger from its size, and
+  a raw meat with a `cooked_` row tagged `raw_meat/<name>` and `cooked_meat/<name>`, so it
+  smelts, salts, dries and goes in stews). Another mod's food registers its own item (an item
+  without a row can't be eaten; the game test `every_food_has_nutrition` fails). Then its lang
+  (en, ru) and icon; `balance.rs` (well fed from a few foods); the sheet. Its kind and portion
   are what animals eat it off the ground by (`forage.rs`); an item animals eat that isn't a
   player's food goes in `vitals::forage::DROPPED`.
 - **Clothes, or a new material** (`vitals::clothing::MATERIALS`): its clo, heat, wet and wind from

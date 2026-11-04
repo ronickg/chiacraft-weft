@@ -47,7 +47,8 @@ pub fn register(r: &mut Registry) {
         Verdict::Abstain
     });
     // Fills the stomach with a balanced meal (an apple, a loaf, a steak, over and over) up to that
-    // many units; 0 empties it. For testing.
+    // many units; 0 empties it. For testing: game masters only, as `/give` (Research round 5: open to
+    // everyone it filled stomachs in multiplayer).
     r.command("feed", "[units:int]", |cmd| {
         let w = cmd.world();
         let Some(v) = w.component_mut(cmd.player(), &VITALS) else { return };
@@ -61,8 +62,7 @@ pub fn register(r: &mut Registry) {
         }
         v.set_stomach(&s);
         cmd.reply("command.base.feed", &[Arg::Int(s.used().round() as i64)]);
-    })
-    .permission(permission::EVERYONE);
+    });
 }
 
 /// A tick's digesting at the world's pace; what the stomach holds now.
