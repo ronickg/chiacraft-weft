@@ -71,7 +71,17 @@ pub fn open(w: &World, player: u64, id: u64) -> bool {
     }
     let full = crate::commands::can_command(w, id, player) || w.creative(player);
     let spyglass = w.inventory(player).get(w.selected_slot(player)).item == SPYGLASS.id();
-    w.open_menu(player, if full { &ANIMAL_MENU } else if spyglass { &SCOUT_MENU } else { &LOOK_MENU }, id);
+    w.open_menu(
+        player,
+        if full {
+            &ANIMAL_MENU
+        } else if spyglass {
+            &SCOUT_MENU
+        } else {
+            &LOOK_MENU
+        },
+        id,
+    );
     true
 }
 
