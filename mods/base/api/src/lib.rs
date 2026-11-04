@@ -8,6 +8,7 @@
 use weft_sdk::*;
 
 pub mod branchy;
+pub mod colonize;
 pub mod grow;
 pub mod land;
 pub mod tree_recipes;

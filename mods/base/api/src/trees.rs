@@ -177,6 +177,21 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     // giant's species stands here as its young one, the world's as a sapling's: the grown giants
     // are the giant scatter's (`giant_tree_blocks`), too tall for a tree's site.
     let name = block_name(log).split('[').next().unwrap_or("");
+    // A broad-crowned species grows by space colonization (`colonize`, Ronald's hybrid, 11-05).
+    if let Some(c) = crate::tree_recipes::colonized(name) {
+        for (dx, dy, dz, part, _) in crate::colonize::blocks(c, t.seed) {
+            let (x, y, z) = (t.x + dx, t.y + dy, t.z + dz);
+            match part {
+                branchy::Part::Log { axis } => {
+                    let along = ["x", "y", "z"][axis as usize];
+                    put(x, y, z, state_with(log, "axis", along).unwrap_or(log), true)
+                }
+                branchy::Part::Leaves => put(x, y, z, t.leaves, false),
+            }
+        }
+        put(t.x, t.y - 1, t.z, DIRT.id(), true);
+        return;
+    }
     let recipe = crate::tree_recipes::sapling_of(name);
     if let Some(recipe) = recipe {
         branchy::grow(recipe, t.x, t.y, t.z, t.seed, |x, y, z, part| match part {

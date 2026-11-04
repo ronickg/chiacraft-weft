@@ -12,12 +12,15 @@ fn main() {
         let (mut counts, mut reach) = (Vec::new(), 0);
         for seed in 0..40u64 {
             let mut n = 0;
-            branchy::grow(r, 0, 0, 0, seed.wrapping_mul(0x9E37_79B9_7F4A_7C15), |x, _, z, part| {
+            let s = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+            // A colonized species' grown tree (its young row keeps `branchy`).
+            let grown = if YOUNG.iter().any(|y| std::ptr::eq(y, r)) { None } else { base_api::tree_recipes::grown(r.log, s) };
+            for (x, _, z, part) in grown.unwrap_or_else(|| branchy::blocks(r, s)) {
                 if let Part::Log { .. } = part {
                     n += 1;
                     reach = reach.max(x.abs()).max(z.abs());
                 }
-            });
+            }
             counts.push(n);
         }
         counts.sort_unstable();
