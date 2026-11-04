@@ -13,6 +13,14 @@ use crate::taming::TAMING;
 
 static ANIMAL_MENU: Menu = Menu::named("animal");
 static SCOUT_MENU: Menu = Menu::named("scout");
+/// The animal screen's other pages (round 2: what was a wall of text moves to tabs): its genes
+/// and kind, and its family and life. Each is a menu of its own on the same animal; a tab asks
+/// the server to open the page (`PAGE`).
+static GENES_MENU: Menu = Menu::named("animal_genes");
+static FAMILY_MENU: Menu = Menu::named("animal_family");
+static PAGE: Channel<[u64; 2]> = Channel::named("animal_page");
+/// The pages' names, in tab order (`screen.animals.tab.<name>`).
+const PAGES: [&str; 3] = ["overview", "genes", "family"];
 pub static SPYGLASS: Item = Item::named("spyglass");
 static TOOLS: CreativeTab = CreativeTab::named("base:tools");
 static CRAFTING: RecipeKind = RecipeKind::named("base:crafting");
@@ -28,6 +36,16 @@ pub fn init(r: &mut Registry) {
     r.menu(&ANIMAL_MENU).screen(animal_screen);
     taming_hud(r);
     r.menu(&SCOUT_MENU).screen(scout_screen);
+    r.menu(&GENES_MENU).screen(genes_screen);
+    r.menu(&FAMILY_MENU).screen(family_screen);
+    r.packet(&PAGE, |p, [id, page]| {
+        let (w, player) = (p.world(), p.player());
+        if w.component(id, &ANIMAL).is_none() || !(crate::commands::can_command(&w, id, player) || w.creative(player)) {
+            return;
+        }
+        let menu = [&ANIMAL_MENU, &GENES_MENU, &FAMILY_MENU][(page as usize).min(2)];
+        w.open_menu(player, menu, id);
+    });
     r.packet(&PLACE, |p, [id, stat]| animal::place_point(&p.world(), id, p.player(), stat as usize));
     r.item(&SPYGLASS).max_stack(1).tab(&TOOLS).on_use(|u| {
         let (w, player) = (u.world(), u.player());
@@ -167,8 +185,25 @@ fn facts(ui: &mut Ui) {
 }
 
 fn facts_of(ui: &mut Ui, short: bool) {
-    // Where it sits in the tree of life: "Canis familiaris · Mammalia › Carnivora › Canidae
-    // (dog family) › Caninae".
+    taxon_line(ui);
+    if !short {
+        about_line(ui);
+    }
+    height_line(ui);
+    age_line(ui);
+    breeds_line(ui);
+    breeding_line(ui);
+    family_line(ui);
+    if short {
+        return;
+    }
+    coat_line(ui);
+    signature_line(ui);
+}
+
+/// Where it sits in the tree of life: "Canis familiaris · Mammalia › Carnivora › Canidae
+/// (dog family) › Caninae".
+fn taxon_line(ui: &mut Ui) {
     ui.text_bind(|c, t| {
         let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
         let above = s.family.above.join(" › ");
@@ -183,14 +218,18 @@ fn facts_of(ui: &mut Ui, short: bool) {
             ],
         );
     });
-    if !short {
-        ui.text_bind(|c, t| {
-            let Some(a) = c.menu_component(&ANIMAL) else { return };
-            let owner = if tamed(c) { "screen.animals.tamed" } else { "screen.animals.wild" };
-            t.set("screen.animals.about", &[Arg::Key(sex_key(&a)), Arg::Key(&stage_key(&a)), Arg::Key(owner)]);
-        });
-    }
-    // How big it is ("Size: 21 cm at the shoulder"; a young one, what it grows to).
+}
+
+fn about_line(ui: &mut Ui) {
+    ui.text_bind(|c, t| {
+        let Some(a) = c.menu_component(&ANIMAL) else { return };
+        let owner = if tamed(c) { "screen.animals.tamed" } else { "screen.animals.wild" };
+        t.set("screen.animals.about", &[Arg::Key(sex_key(&a)), Arg::Key(&stage_key(&a)), Arg::Key(owner)]);
+    });
+}
+
+/// How big it is ("Size: 21 cm at the shoulder"; a young one, what it grows to).
+fn height_line(ui: &mut Ui) {
     ui.text_bind(|c, t| {
         let (Some(a), Some(g)) = (c.menu_component(&ANIMAL), c.menu_component(&crate::coats::GENOME)) else { return };
         let Some(s) = a.species() else { return };
@@ -199,14 +238,20 @@ fn facts_of(ui: &mut Ui, short: bool) {
         let key = if a.stage < animal::ADULT { "screen.animals.height_young" } else { "screen.animals.height" };
         t.set(key, &[Arg::Text(&shown), Arg::Key(&format!("screen.animals.height.{}", s.height.1))]);
     });
-    // How old it is, and how long its kind lives (`animal::old_age`).
+}
+
+/// How old it is, and how long its kind lives (`animal::old_age`).
+fn age_line(ui: &mut Ui) {
     ui.text_bind(|c, t| {
         let Some(a) = c.menu_component(&ANIMAL) else { return };
         let Some((age, span, vigor)) = animal::age_days(&a) else { return t.text("") };
         t.set("screen.animals.age", &[Arg::Int(age as i64), Arg::Int(span as i64), Arg::Int(vigor as i64)]);
     });
-    // When its kind breeds, and whether it's that season now where the player is ("Breeds in
-    // spring, summer and autumn · in season now"; the wet season in a world with a wet and a dry).
+}
+
+/// When its kind breeds, and whether it's that season now where the player is ("Breeds in
+/// spring, summer and autumn · in season now"; the wet season in a world with a wet and a dry).
+fn breeds_line(ui: &mut Ui) {
     ui.text_bind(|c, t| {
         use animals_core::biology::seasons;
         let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return t.text("") };
@@ -245,7 +290,10 @@ fn facts_of(ui: &mut Ui, short: bool) {
         args.push(status);
         t.set(&key, &args);
     });
-    // In love, expecting, growing up or resting (`breeding.rs`), when it is.
+}
+
+/// In love, expecting, growing up or resting (`breeding.rs`), when it is.
+fn breeding_line(ui: &mut Ui) {
     ui.text_bind(|c, t| {
         let Some(b) = c.menu_component(&crate::breeding::BREEDING) else { return };
         let laying = c
@@ -262,7 +310,10 @@ fn facts_of(ui: &mut Ui, short: bool) {
             _ => t.text(""),
         }
     });
-    // Its family: its generation and its parents' coats, or born in the wild.
+}
+
+/// Its family: its generation and its parents' coats, or born in the wild.
+fn family_line(ui: &mut Ui) {
     ui.text_bind(|c, t| {
         let Some(b) = c.menu_component(&crate::breeding::BREEDING) else { return };
         let coat = |g: &[u32; 10], more: &crate::breeding::More| {
@@ -279,10 +330,10 @@ fn facts_of(ui: &mut Ui, short: bool) {
             );
         }
     });
-    if short {
-        return;
-    }
-    // Its coat, read from its genes ("Fawn sable with white").
+}
+
+/// Its coat, read from its genes ("Fawn sable with white").
+fn coat_line(ui: &mut Ui) {
     ui.text_bind(|c, t| {
         let Some(look) = c
             .menu_component(&crate::coats::GENOME)
@@ -292,6 +343,9 @@ fn facts_of(ui: &mut Ui, short: bool) {
         };
         t.set("screen.animals.coat", &[Arg::Text(&look.name)]);
     });
+}
+
+fn signature_line(ui: &mut Ui) {
     ui.text_bind(|c, t| {
         let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
         t.set("screen.animals.signature", &[Arg::Key(&format!("screen.animals.signature.{}", s.signature))]);
@@ -311,26 +365,57 @@ fn shown(a: &Animal, i: usize) -> String {
 /// A window as base's (`mods/base/src/window.rs`, the UI redo): the menu's title on an orange tab
 /// on the frame, a close button at the top right, `body` in the panel.
 fn window(ui: &mut Ui, s: S, body: impl FnOnce(&mut Ui)) {
+    framed(ui, None, s, body);
+}
+
+/// The owner's window, its pages as tabs, `page` the open one.
+fn window_page(ui: &mut Ui, page: usize, s: S, body: impl FnOnce(&mut Ui)) {
+    framed(ui, Some(page), s, body);
+}
+
+/// The window: the menu's title on the orange tab (the spyglass view), or the owner's pages as
+/// tabs with the open one orange.
+fn framed(ui: &mut Ui, page: Option<usize>, s: S, body: impl FnOnce(&mut Ui)) {
     // The tabs stand on the frame: the column's gap tucks their bottom 3 UI px under its top
     // line, an even 12 rows of face round a label's capitals (kit 2, as in base's window.rs).
     ui.column(S::col().stretch().gap(-1.5), |ui| {
         ui.row(S::row().gap(2.0), |ui| {
             ui.row(S::row().w(6.0), |_| {});
-            ui.panel("tab_pressed", S::row().pad(2.0).h(13.0).center(), |ui| ui.title());
-            ui.spacer();
-            ui.button(
-                "window.base.close",
-                S::default()
-                    .class("close")
-                    .size(7.0, 7.0)
-                    .pad(0.5)
-                    .tooltip("window.base.close_tip"),
-                |c| c.client().close_screen(),
-            );
-            ui.row(S::row().w(4.0), |_| {});
+            let Some(page) = page else {
+                ui.panel("tab_pressed", S::row().pad(2.0).h(13.0).center(), |ui| ui.title());
+                return framed_close(ui);
+            };
+            for (j, name) in PAGES.iter().enumerate() {
+                let key = format!("screen.animals.tab.{name}");
+                if j == page {
+                    ui.panel("tab_pressed", S::row().pad(2.0).h(13.0).center(), |ui| ui.text_styled(S::default().no_wrap(), &key, &[]));
+                } else {
+                    ui.button(&key, S::default().class("tab").h(13.0).pad(2.0), move |c| {
+                        if let Some(id) = c.menu_owner() {
+                            c.client().send(&PAGE, &[id, j as u64]);
+                        }
+                    });
+                }
+            }
+            framed_close(ui);
         });
         ui.panel("panel", s, body);
     });
+}
+
+/// The close button at the right of a window's tab row.
+fn framed_close(ui: &mut Ui) {
+    ui.spacer();
+    ui.button(
+        "window.base.close",
+        S::default()
+            .class("close")
+            .size(7.0, 7.0)
+            .pad(0.5)
+            .tooltip("window.base.close_tip"),
+        |c| c.client().close_screen(),
+    );
+    ui.row(S::row().w(4.0), |_| {});
 }
 
 /// Tamed points placed on the animal screen and not kept yet, for the animal they were placed on
@@ -385,9 +470,10 @@ fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Opt
 /// columns beside them: an icon, then the bar, then the value (left column 108 wide: 8 + 3 + 56 + 3 + 38).
 const LIFE_BAR: (f32, f32) = (56.0, 6.0);
 const LIFE_VALUE_W: f32 = 38.0;
-/// The genes list: how many lines it can hold and how tall it is (it scrolls), GUI pixels.
+/// The genes list (on the Genes page): how many lines it can hold.
 const GENE_LINES: usize = 40;
-const GENES_H: f32 = 52.0;
+/// The Genes page's list: taller, it has the page to itself.
+const GENES_PAGE_H: f32 = 110.0;
 const STAT_BAR: (f32, f32) = (32.0, 6.0);
 /// The stat rows' columns after the bar: the value (right-aligned), wild and tamed points
 /// (centred), then the + (GUI pixels).
@@ -400,7 +486,7 @@ const STAT_ROW_W: f32 = 8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W
 /// The screen of a tame animal (`notes/ui/BATCHES.md`, the taming and stats upgrade): who it is
 /// and how it is on the left, its stats as bars in the middle, its coat and orders on the right.
 fn animal_screen(ui: &mut Ui) {
-    window(ui, S::row().pad(8.0).gap(10.0), |ui| {
+    window_page(ui, 0, S::row().pad(8.0).gap(10.0), |ui| {
         // Left: the level on a badge, the name, life, how it feels, and the facts.
         ui.column(S::col().gap(3.0).w(108.0), |ui| {
             // The animal itself, turning with the mouse, its level on a badge in the corner.
@@ -420,6 +506,42 @@ fn animal_screen(ui: &mut Ui) {
                         let Some(a) = c.menu_component(&ANIMAL) else { return };
                         let owner = if tamed(c) { "screen.animals.tamed" } else { "screen.animals.wild" };
                         t.set("screen.animals.about", &[Arg::Key(sex_key(&a)), Arg::Key(&stage_key(&a)), Arg::Key(owner)]);
+                    });
+                });
+            });
+            // Its coat, what its kind does and its temperament, as chips, one under another (a row
+            // can't wrap, and "Hunts in packs" alone nearly fills the column).
+            ui.column(S::col().gap(2.0).max_w(108.0), |ui| {
+                ui.panel("chip", S::row().pad(2.0), |ui| {
+                    ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
+                        let Some(look) = c
+                            .menu_component(&crate::coats::GENOME)
+                            .and_then(|g| crate::coats::phenotype(&g))
+                        else {
+                            return;
+                        };
+                        t.set("screen.animals.chip", &[Arg::Text(&look.name)]);
+                    });
+                });
+                ui.panel("chip", S::row().pad(2.0), |ui| {
+                    ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
+                        let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
+                        t.set("screen.animals.chip", &[Arg::Key(&format!("screen.animals.signature.{}", s.signature))]);
+                    });
+                });
+                // Its temperament, an inherited trait: calm to skittish.
+                ui.panel("chip", S::row().pad(2.0), |ui| {
+                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                        let Some(g) = c.menu_component(&crate::coats::GENOME) else { return };
+                        let v = animals_core::coats::temperament(&g);
+                        let word = if v < 0.34 {
+                            "calm"
+                        } else if v < 0.67 {
+                            "steady"
+                        } else {
+                            "skittish"
+                        };
+                        t.set("screen.animals.temper", &[Arg::Key(&format!("screen.animals.temper.{word}"))]);
                     });
                 });
             });
@@ -491,7 +613,6 @@ fn animal_screen(ui: &mut Ui) {
                     ],
                 );
             });
-            ui.column(S::col().gap(1.0).max_w(108.0), |ui| facts_of(ui, true));
         });
         // Middle: the nine stats as bars, coloured by their wild points, with the points.
         ui.column(S::col().gap(2.0), |ui| {
@@ -619,55 +740,6 @@ fn animal_screen(ui: &mut Ui) {
         });
         // Right: its coat and what its kind does, then its orders.
         ui.column(S::col().gap(3.0).w(100.0), |ui| {
-            ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.coat_title", &[]);
-            ui.panel("chip", S::row().pad(2.0), |ui| {
-                ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
-                    let Some(look) = c
-                        .menu_component(&crate::coats::GENOME)
-                        .and_then(|g| crate::coats::phenotype(&g))
-                    else {
-                        return;
-                    };
-                    t.set("screen.animals.chip", &[Arg::Text(&look.name)]);
-                });
-            });
-            ui.panel("chip", S::row().pad(2.0), |ui| {
-                ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
-                    let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
-                    t.set("screen.animals.chip", &[Arg::Key(&format!("screen.animals.signature.{}", s.signature))]);
-                });
-            });
-            // Its temperament, an inherited trait: calm to skittish.
-            ui.panel("chip", S::row().pad(2.0), |ui| {
-                ui.text_bind_styled(S::default().no_wrap(), |c, t| {
-                    let Some(g) = c.menu_component(&crate::coats::GENOME) else { return };
-                    let v = animals_core::coats::temperament(&g);
-                    let word = if v < 0.34 {
-                        "calm"
-                    } else if v < 0.67 {
-                        "steady"
-                    } else {
-                        "skittish"
-                    };
-                    t.set("screen.animals.temper", &[Arg::Key(&format!("screen.animals.temper.{word}"))]);
-                });
-            });
-            // Its genes, one line each: its kind's own first, then the core traits.
-            ui.panel("well", S::col().pad(3.0).gap(1.0).w(100.0).h(GENES_H).scroll(), |ui| {
-                for i in 0..GENE_LINES {
-                    ui.text_bind_styled(S::default().max_w(92.0), move |c, t| {
-                        let Some(g) = c.menu_component(&crate::coats::GENOME) else { return t.text("") };
-                        let Some(l) = animals_core::coats::genes_of(&g).into_iter().nth(i) else { return t.text("") };
-                        match l.value {
-                            Some(v) => t.set("screen.animals.gene_value", &[Arg::Text(&l.name), Arg::Int((v * 100.0).round() as i64)]),
-                            None => {
-                                let pair = l.alleles.join("/");
-                                t.set("screen.animals.gene_alleles", &[Arg::Text(&l.name), Arg::Text(&l.shows), Arg::Text(&pair)]);
-                            }
-                        }
-                    });
-                }
-            });
             ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.orders_title", &[]);
             ui.text_bind_styled(S::default().max_w(100.0), |c, t| {
                 let (Some(a), Some(o)) = (c.menu_component(&ANIMAL), c.menu_component(&ORDERS)) else { return };
@@ -710,6 +782,86 @@ fn animal_screen(ui: &mut Ui) {
                 order_button_w(ui, "screen.animals.release", 40, 32.0);
             });
             ui.text_styled(S::default().class("dim").max_w(100.0), "screen.animals.whistles", &[]);
+        });
+    });
+}
+
+/// The Genes page: its coat and kind as chips, every gene on a line of its own, then its kind.
+fn genes_screen(ui: &mut Ui) {
+    window_page(ui, 1, S::col().pad(8.0).gap(4.0).w(230.0), |ui| {
+        ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.coat_title", &[]);
+        ui.column(S::col().gap(2.0).max_w(214.0), |ui| {
+            ui.panel("chip", S::row().pad(2.0), |ui| {
+                ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
+                    let Some(look) = c
+                        .menu_component(&crate::coats::GENOME)
+                        .and_then(|g| crate::coats::phenotype(&g))
+                    else {
+                        return;
+                    };
+                    t.set("screen.animals.chip", &[Arg::Text(&look.name)]);
+                });
+            });
+            ui.panel("chip", S::row().pad(2.0), |ui| {
+                ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
+                    let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
+                    t.set("screen.animals.chip", &[Arg::Key(&format!("screen.animals.signature.{}", s.signature))]);
+                });
+            });
+            // Its temperament, an inherited trait: calm to skittish.
+            ui.panel("chip", S::row().pad(2.0), |ui| {
+                ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                    let Some(g) = c.menu_component(&crate::coats::GENOME) else { return };
+                    let v = animals_core::coats::temperament(&g);
+                    let word = if v < 0.34 {
+                        "calm"
+                    } else if v < 0.67 {
+                        "steady"
+                    } else {
+                        "skittish"
+                    };
+                    t.set("screen.animals.temper", &[Arg::Key(&format!("screen.animals.temper.{word}"))]);
+                });
+            });
+        });
+        ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.genes_title", &[]);
+        // Its genes, one line each: its kind's own first, then the core traits.
+        ui.panel("well", S::col().pad(3.0).gap(1.0).w(214.0).h(GENES_PAGE_H).scroll(), |ui| {
+            for i in 0..GENE_LINES {
+                ui.text_bind_styled(S::default().max_w(206.0), move |c, t| {
+                    let Some(g) = c.menu_component(&crate::coats::GENOME) else { return t.text("") };
+                    let Some(l) = animals_core::coats::genes_of(&g).into_iter().nth(i) else { return t.text("") };
+                    match l.value {
+                        Some(v) => t.set("screen.animals.gene_value", &[Arg::Text(&l.name), Arg::Int((v * 100.0).round() as i64)]),
+                        None => {
+                            let pair = l.alleles.join("/");
+                            t.set("screen.animals.gene_alleles", &[Arg::Text(&l.name), Arg::Text(&l.shows), Arg::Text(&pair)]);
+                        }
+                    }
+                });
+            }
+        });
+        ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.kind_title", &[]);
+        ui.column(S::col().gap(1.0).max_w(214.0), |ui| {
+            taxon_line(ui);
+            height_line(ui);
+            signature_line(ui);
+        });
+    });
+}
+
+/// The Family page: who it is, how old, when its kind breeds and how it stands now, its parents.
+fn family_screen(ui: &mut Ui) {
+    window_page(ui, 2, S::col().pad(8.0).gap(4.0).w(230.0), |ui| {
+        title(ui, false);
+        ui.column(S::col().gap(2.0).max_w(214.0), |ui| {
+            about_line(ui);
+            age_line(ui);
+            ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.breeding_title", &[]);
+            breeds_line(ui);
+            breeding_line(ui);
+            ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.family_title", &[]);
+            family_line(ui);
         });
     });
 }
