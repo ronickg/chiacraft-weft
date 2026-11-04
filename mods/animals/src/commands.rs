@@ -6,6 +6,8 @@
 
 use weft_sdk::*;
 
+use crate::dist2;
+
 use crate::animal::{self, ANIMAL, OWNER};
 use crate::species::{self, SPECIES};
 
@@ -407,10 +409,6 @@ pub fn hold(w: &World, id: u64, st: &EntityState) -> bool {
             false
         }
     }
-}
-
-fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (0..3).map(|i| (a[i] - b[i]).powi(2)).sum()
 }
 
 /// What `id` should be fighting: the one it is on while that is still worth it, else (now and

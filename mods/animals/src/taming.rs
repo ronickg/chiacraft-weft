@@ -183,7 +183,7 @@ fn near_player(w: &World, st: &EntityState) -> Option<u64> {
 }
 
 fn dist2(a: &EntityState, b: &EntityState) -> f64 {
-    (0..3).map(|i| (a.pos[i] - b.pos[i]).powi(2)).sum()
+    crate::dist2(a.pos, b.pos)
 }
 
 /// A player walking upright within `shy` blocks, or running within twice that.

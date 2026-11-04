@@ -610,7 +610,7 @@ from a cat, a shy cat that stays beside a capybara (and runs without one).
 **Step 5, knock-out taming and the raptor** (2026-11-01, `knockout.rs`, `raptor.rs`):
 
 - **Torpor**: a player's hit adds 5 bare-handed, 20 with a **club** (`animals:club`, a log on a
-  stick); a **tranquilizer dart** (`animals:tranquilizer_dart`, an arrow and a spider eye make
+  stick); a **tranquilizer dart** (`animals:tranquilizer_dart`, a stick, a feather and a spider eye make
   four; thrown with use) stings for 1 and adds 60. Awake, torpor wears off in two minutes. Past
   the torpor stat the animal falls unconscious (its resting pose, "z"s above it).
 - **Keeping it under**: out, torpor drains in four minutes; a **sedative** (`animals:sedative`,

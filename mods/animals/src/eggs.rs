@@ -377,7 +377,8 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
         return true;
     }
     let nest = in_nest(w, st.pos);
-    let air = base_api::air_at(w, st.pos, 0.3, st.in_liquid != 0, 3, |_| {}).celsius;
+    // The air itself: wind chill is what a body loses, and an egg never falls below the air (B5).
+    let air = base_api::air_at(w, st.pos, 0.3, st.in_liquid != 0, 3, |_| {}).still;
     let step = match life::develops(life::egg_air(air, nest)) {
         false => 0,
         true if nest => 40,

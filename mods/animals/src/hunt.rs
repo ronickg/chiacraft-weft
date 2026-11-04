@@ -14,6 +14,8 @@
 
 use weft_sdk::*;
 
+use crate::dist2;
+
 use crate::animal::{self, ANIMAL};
 use crate::species::{self, OTHER_PREY, SPECIES, Species};
 
@@ -247,8 +249,4 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
     w.navigate(id, [st.pos[0] + x / n * 10.0, st.pos[1], st.pos[2] + z / n * 10.0], 1.6);
     w.component_mut(id, &WARY).map(|u| *u = now + RUN);
     true
-}
-
-fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)
 }

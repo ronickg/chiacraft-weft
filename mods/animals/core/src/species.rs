@@ -122,6 +122,23 @@ pub struct Food {
     pub liking: Liking,
 }
 
+/// Taming foods outside the eater's diet (`reports/Research round 3.md`, C5): a hand-fed food whose
+/// kind (`vitals::forage::dropped`: the food table's, or a dropped seed's) isn't in its `eats`.
+/// Kibble is every species' (`taming.rs`); an item neither table knows is left out (ferns and
+/// seeds of the Cretaceous's plants, which the tables don't list as foods).
+pub fn foods_off_diet() -> Vec<String> {
+    SPECIES
+        .iter()
+        .flat_map(|s| s.foods.iter().map(move |f| (s, f)))
+        .filter(|(_, f)| f.item != "animals:kibble")
+        .filter_map(|(s, f)| {
+            let (c, _) = vitals::forage::dropped(f.item, false)?;
+            (!s.eats(c))
+                .then(|| format!("{}: is hand-fed {} ({c:?}), which isn't in its diet (species.rs foods against eats)", s.name, f.item))
+        })
+        .collect()
+}
+
 const fn eats(item: &'static str, food: u16) -> Food {
     Food { item, food, liking: Liking::Eats }
 }
@@ -482,7 +499,7 @@ pub static SPECIES: [Species; 38] = [
         subfamily: "Hydrochoerinae",
         breed: None,
         size: Size::Medium,
-        eats: &[(Grass, 0.75), (WaterPlants, 0.2), (Fruit, 0.05)],
+        eats: &[(Grass, 0.7), (WaterPlants, 0.2), (Seeds, 0.05), (Fruit, 0.05)],
         prey: (0.0, 0.0),
         taming: Taming::Passive,
         // It holds its breath for five minutes.
@@ -514,8 +531,9 @@ pub static SPECIES: [Species; 38] = [
         dimorphism: 0.97,
         size_spread: 0.08,
         height: (0.56, "shoulder"),
-        // Savannas, flooded grasslands and swamps of South America, always near water.
-        habitats: &[("base:swamp", 1.0), ("base:savanna", 0.8), ("base:forest", 0.2)],
+        // Savannas, flooded grasslands and swamps of South America, always near water (not the
+        // forest, whose climate is a German beech wood's: B10).
+        habitats: &[("base:swamp", 1.0), ("base:savanna", 0.8)],
         bio: Biology {
             mass: 50.0,
             gestation: 140.0,
@@ -777,7 +795,7 @@ pub static SPECIES: [Species; 38] = [
         breed: None,
         size: Size::Small,
         // Grasses most of the year, herbs and crops, twigs and bark in winter.
-        eats: &[(Grass, 0.6), (Leaves, 0.3), (Roots, 0.1)],
+        eats: &[(Grass, 0.55), (Leaves, 0.25), (Roots, 0.1), (Seeds, 0.05), (Fruit, 0.05)],
         prey: (0.0, 0.0),
         taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
@@ -838,14 +856,14 @@ pub static SPECIES: [Species; 38] = [
         breed: None,
         size: Size::Small,
         // Grasses and herbs in summer; in winter birch, willow and heather twigs and bark.
-        eats: &[(Grass, 0.4), (Leaves, 0.55), (Lichen, 0.05)],
+        eats: &[(Grass, 0.4), (Leaves, 0.5), (Fruit, 0.05), (Lichen, 0.05)],
         prey: (0.0, 0.0),
         taming: Taming::Wild,
         base: [5.0, 120.0, 40.0, 0.5, 1.0, 13.0, 60.0, 20.0, 5.0],
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 30.0,
-        foods: &[eats("base:wheat", 8), eats("base:wheat_seeds", 2), favorite("base:apple", 10), favorite("base:berries", 6)],
+        foods: &[eats("base:crowberries", 4), favorite("base:lingonberries", 6)],
         feedings: 0.0,
         shy: 12.0,
         fights: false,
@@ -973,7 +991,7 @@ pub static SPECIES: [Species; 38] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 30.0,
-        foods: &[eats("base:wheat", 6), eats("base:wheat_seeds", 3), favorite("base:apple", 6)],
+        foods: &[eats("base:wheat", 6), eats("base:wheat_seeds", 3), favorite("base:sunflower_seeds", 6)],
         feedings: 0.0,
         shy: 5.0,
         fights: false,
@@ -1495,7 +1513,7 @@ pub static SPECIES: [Species; 38] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 15.0,
-        foods: &[eats("animals:fern", 8), eats("base:wheat", 8), favorite("base:berries", 10)],
+        foods: &[eats("animals:fern", 8), eats("base:wheat", 8), favorite("animals:cycad_seed", 10)],
         feedings: 0.0,
         shy: 12.0,
         fights: false,
@@ -1627,7 +1645,7 @@ pub static SPECIES: [Species; 38] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 40.0,
-        foods: &[eats("base:wheat_seeds", 2), favorite("base:berries", 4)],
+        foods: &[favorite("base:spider_eye", 4)],
         feedings: 0.0,
         shy: 5.0,
         fights: false,
@@ -1687,7 +1705,7 @@ pub static SPECIES: [Species; 38] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 15.0,
-        foods: &[eats("base:wheat", 10), favorite("base:berries", 6), favorite("base:apple", 12)],
+        foods: &[eats("base:mushroom_brown", 8)],
         feedings: 0.0,
         shy: 18.0,
         fights: false,
@@ -2232,7 +2250,7 @@ pub static SPECIES: [Species; 38] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 40.0,
-        foods: &[eats("base:beef", 10), favorite("base:rotten_flesh", 10)],
+        foods: &[favorite("base:rotten_flesh", 10)],
         feedings: 0.0,
         shy: 16.0,
         fights: false,

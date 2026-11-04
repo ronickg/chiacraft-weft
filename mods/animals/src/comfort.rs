@@ -42,9 +42,9 @@ pub const FEELINGS: [Feeling; 7] =
     [Feeling::Comfortable, Feeling::Chilly, Feeling::Cold, Feeling::Freezing, Feeling::Warm, Feeling::Hot, Feeling::Heatstroke];
 pub const FEELING_NAMES: [&str; 7] = ["comfortable", "chilly", "cold", "freezing", "warm", "hot", "heatstroke"];
 
-/// Strength on an empty stomach, as the player's (`vitals::stomach`): the rest comes back as it
-/// is fed, all of it from half full.
-const FLOOR: f32 = 0.4;
+/// Strength on an empty stomach, the player's (`vitals::stomach::FLOOR`): the rest comes back as
+/// it is fed, all of it from half full.
+const FLOOR: f32 = vitals::stomach::FLOOR;
 /// Blocks searched for a fire around it, and for a better place.
 const REACH: i32 = 3;
 const LOOK: f64 = 10.0;
