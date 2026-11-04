@@ -1526,14 +1526,24 @@ impl Running {
 
     /// Recipes of (or uses for) the item under the cursor, in any screen.
     fn recipe_keys(&mut self, requests: &mut Vec<Request>) {
+        let menu = self.game.is_some() && ui_shows_menu(&self.screens);
         let Some((_, ui)) = self.screens.last_mut() else { return };
         let typing = ui
             .focused
             .is_some_and(|f| matches!(ui.nodes[f].kind, Kind::Input { .. }));
         for (action, uses) in [("core:recipes", false), ("core:uses", true)] {
             if !typing && self.input.pressed(action) {
-                if let Some(item) = crate::game_screens::hovered_item(ui, self.game.as_ref().map(|g| &g.client)) {
-                    requests.push(Request::Open(Box::new(crate::game_screens::RecipeView::item(item, uses))));
+                match crate::game_screens::hovered_item(ui, self.game.as_ref().map(|g| &g.client)) {
+                    Some(item) => requests.push(Request::Open(Box::new(crate::game_screens::RecipeView::item(item, uses)))),
+                    // Nothing under the mouse in a menu: every recipe, by kind (the HUD shows R).
+                    None if menu => {
+                        let mut kinds: Vec<String> = content().game.recipe_kinds.iter().cloned().collect();
+                        kinds.sort();
+                        requests.push(Request::Open(Box::new(crate::game_screens::RecipeView::new(
+                            crate::game_screens::RecipeQuery::Kinds(kinds),
+                        ))));
+                    }
+                    None => {}
                 }
             }
         }
@@ -2348,6 +2358,12 @@ fn client_events(r: &mut Running) {
             }
         }
     }
+}
+
+/// Whether the top screen is a menu (inventory, a machine): where R with nothing hovered opens
+/// the whole recipe list. Not the recipe view itself, or chat and the like, where R is typed.
+fn ui_shows_menu(screens: &[(Box<dyn Screen>, Ui)]) -> bool {
+    screens.last().is_some_and(|(s, _)| s.shows_menu())
 }
 
 /// Chat and inventory keys, which open and close screens around the game.
