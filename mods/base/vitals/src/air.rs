@@ -110,14 +110,26 @@ pub const SNOW_BURIES: u8 = 2;
 
 /// How the layers follow the cover cheaply: each tick `SNOW_SAMPLES` columns at random within
 /// `SNOW_REACH` blocks of each player move a layer toward it (a column every
-/// `snow_visit_secs()` on average), and each layer block steps down on its own every
+/// `snow_visit_secs()` on average), and each layer block may step down on its own every
 /// `SNOW_MELT_SECS` on average while there is less snow than it, also while nobody is near
 /// (caught up when its land loads). A column is looked down `SNOW_SCAN` blocks from above
 /// the player.
 pub const SNOW_SAMPLES: u32 = 12;
 pub const SNOW_REACH: i32 = 40;
 pub const SNOW_SCAN: i32 = 48;
-pub const SNOW_MELT_SECS: f32 = 45.0;
+pub const SNOW_MELT_SECS: f32 = 20.0;
+/// Snow melts with the warmth where it lies (World playtester, 11-04: with the cover gone,
+/// layers still lay at dusk; Planner: gone within minutes on a warm day, kept only by a frost).
+/// A step down comes only with the air there above freezing, every step at `SNOW_MELT_WARM` °C
+/// and warmer (3 layers in about a minute), fewer the colder; at 0 °C and under none (and the
+/// sampler near players melts it no faster).
+pub const SNOW_MELT_WARM: f32 = 8.0;
+
+/// The chance a melt step takes a layer at `celsius` (the air where it lies): 0 in a frost, 1 from
+/// `SNOW_MELT_WARM`.
+pub fn melt_chance(celsius: f32) -> f32 {
+    (celsius / SNOW_MELT_WARM).clamp(0.0, 1.0)
+}
 
 /// How many snow layers a cover of `snow` (0..1, `Place::snow_lying`) lies as.
 pub fn snow_layers(snow: f32) -> u8 {
@@ -397,6 +409,13 @@ mod tests {
         // A layer a visit: deep in under five minutes, gone in under five.
         assert!(snow_visit_secs() * SNOW_LAYERS_DEEP as f32 <= 300.0, "{}", snow_visit_secs());
         assert!(SNOW_MELT_SECS * SNOW_LAYERS_DEEP as f32 <= 300.0);
+        // The warmth: none in a frost, all from a mild spring day, half at half of it; 3 layers
+        // on a warm day in under 2 minutes on average.
+        assert_eq!(melt_chance(-5.0), 0.0);
+        assert_eq!(melt_chance(0.0), 0.0);
+        assert_eq!(melt_chance(SNOW_MELT_WARM * 2.0), 1.0);
+        assert!((melt_chance(SNOW_MELT_WARM / 2.0) - 0.5).abs() < 1e-6);
+        assert!(SNOW_MELT_SECS * 3.0 / melt_chance(12.0) <= 120.0);
         // The scan reaches the ground below a player on a hill and above one in a valley; plants
         // are buried by a cover that has layers.
         const { assert!(SNOW_SCAN >= 32 && SNOW_BURIES >= 1 && SNOW_BURIES <= 8) };
