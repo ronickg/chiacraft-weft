@@ -367,14 +367,22 @@ fn signature_line(ui: &mut Ui) {
     });
 }
 
-/// A stat's value as it is read: health with a decimal, damage and speed as a percentage of
-/// the species' own, the rest whole.
+/// A stat's value as it is read: health with a decimal (whole from 100: "369.0" was squeezed in
+/// its column for a big animal, Playtest), damage and speed as a percentage of the species' own,
+/// the rest whole.
 fn shown(a: &Animal, i: usize) -> String {
     match i {
-        species::HEALTH => format!("{:.1}", a.stat(i)),
+        species::HEALTH if a.stat(i) < 100.0 => format!("{:.1}", a.stat(i)),
+        species::HEALTH => format!("{:.0}", a.stat(i)),
         species::DAMAGE | species::SPEED => format!("{:.0}%", a.factor(i) * 100.0),
         _ => format!("{:.0}", a.stat(i)),
     }
+}
+
+/// "now / most" for a life bar, without the spaces from four digits ("1991 / 2050" was squeezed in
+/// its column for a big animal, Playtest).
+fn of(now: f32, most: f32) -> String {
+    if most >= 1000.0 { format!("{now:.0}/{most:.0}") } else { format!("{now:.0} / {most:.0}") }
 }
 
 /// A window as base's (`mods/base/src/window.rs`, the UI redo): the menu's title on an orange tab
@@ -486,8 +494,8 @@ fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Opt
 const LIFE_BAR: (f32, f32) = (52.0, 6.0);
 const LIFE_VALUE_W: f32 = 34.0;
 /// The Overview's left column (the portrait, name, chips and life), and the window's padding and
-/// the gap between its three columns, GUI px: the whole window is 6 + 100 + 6 + 155 (`STAT_ROW_W`) + 6
-/// + 100 + 6 = 379, inside the 380 a 760 px wide window has at GUI scale 2 (Playtest B9c: at 396 it lost 8 px
+/// the gap between its three columns, GUI px: the whole window is 6, 100, 6, 155 (`STAT_ROW_W`), 6,
+/// 100 and 6, 379 in all, inside the 380 a 760 px wide window has at GUI scale 2 (Playtest B9c: at 396 it lost 8 px
 /// each side).
 const LEFT_W: f32 = 100.0;
 const OVERVIEW_PAD: f32 = 6.0;
@@ -597,14 +605,14 @@ fn animal_screen(ui: &mut Ui) {
                                     .filter(|a| a.species().is_some())?;
                                 let e = c.menu_owner().and_then(|id| c.client().entity(id))?;
                                 let max = a.stat(species::HEALTH) * crate::comfort::condition(&a);
-                                Some((e.health / max.max(0.1), format!("{:.0} / {:.0}", e.health, max)))
+                                Some((e.health / max.max(0.1), of(e.health, max)))
                             }),
                             "food" => life_bar(ui, class, |c| {
                                 let a = c
                                     .menu_component(&ANIMAL)
                                     .filter(|a| a.species().is_some())?;
                                 let max = a.stat(species::FOOD).round();
-                                Some((a.food as f32 / max.max(1.0), format!("{} / {:.0}", a.food, max)))
+                                Some((a.food as f32 / max.max(1.0), of(a.food as f32, max)))
                             }),
                             "water" => life_bar(ui, class, |c| {
                                 let a = c.menu_component(&ANIMAL)?;
