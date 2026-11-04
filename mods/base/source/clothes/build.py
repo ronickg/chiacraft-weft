@@ -316,7 +316,10 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--sheet")
     ap.add_argument("--out", default=OUT, help="where the textures go (default: the game's)")
+    ap.add_argument("--k", type=int, default=K, help="texels a skin pixel (1: 64 x 32; 2: 128 x 64, 32 a block)")
+    ap.add_argument("--skin", default=SKIN, help="the skin the sheet draws them on (any multiple of 64 x 32)")
     a = ap.parse_args()
+    K, SKIN = a.k, a.skin
     os.makedirs(a.out, exist_ok=True)
     painted = {}
     for m in PALETTE:
