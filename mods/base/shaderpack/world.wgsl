@@ -610,7 +610,12 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // what it reflects (the screen's reflections, `post/reflect.wgsl`, use the same).
     // (^2: more of a mirror at a slant, toward Bliss's pale sky-mirror lakes; Water 12.)
     let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.0);
-    let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
+    // Shade on the water from the near shadow map only, fading to sunlit past it: the far map's
+    // coarse texels shaded far water wrongly (duller, no sun's path), and the near map's edge, a
+    // square seen at a slant, showed as a hard-edged rectangle of bright water (the LOD worker's
+    // sea views, very likely Ronald's lake; it went with shadows off, 11-05).
+    let near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0));
+    let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
     // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
     // further down so that what it mirrors carries, in a little of the biome's own tint (a swamp's
