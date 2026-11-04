@@ -136,7 +136,10 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
         let alive = w
             .entity(h[0])
             .is_some_and(|e| e.health > 0.0 && dist2(e.pos, st.pos) < (LOOK * 1.5).powi(2));
-        if alive && now < h[1] + GIVE_UP {
+        // A pack runs its prey down: they take turns at the front, faster than one alone could
+        // keep up, and keep at it twice as long (a wolf pack's chase of an elk lasts minutes).
+        let pack = s.pack_prey().is_some() && pack_near(w, id, st) >= species::PACK;
+        if alive && now < h[1] + if pack { 2 * GIVE_UP } else { GIVE_UP } {
             if knockout {
                 // Its anger does the chasing; kept up while the chase lasts.
                 if w.component(id, &crate::knockout::KNOCKOUT)
@@ -146,7 +149,7 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
                 }
                 return false;
             }
-            crate::commands::fight(w, id, st, h[0]);
+            crate::commands::fight_at(w, id, st, h[0], if pack { PACK_SPEED } else { 1.4 });
             return true;
         }
         weft_sdk::info!("{} {id} gives up on {} ({})", s.name, h[0], if alive { "too long" } else { "gone" });
@@ -190,6 +193,10 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     crate::commands::fight(w, id, st, t);
     true
 }
+
+/// Its kind's speed a pack chases at (one alone: 1.4, `commands::fight`): a wolf 5.5 blocks a
+/// second, at this nearly 10, past a fleeing deer's 8.
+const PACK_SPEED: f32 = 1.75;
 
 /// Blocks within which a pack's kind hunt together.
 const PACK_RANGE: f64 = 16.0;

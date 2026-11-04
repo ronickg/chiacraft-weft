@@ -475,6 +475,11 @@ const LUNGE: f64 = 1.6;
 /// After `t`, striking when in reach (the engine keeps the pace of its attacks), each hit shown
 /// by one of its species' attacks (a bite, a swipe...), at random.
 pub fn fight(w: &World, id: u64, st: &EntityState, t: u64) {
+    fight_at(w, id, st, t, 1.4);
+}
+
+/// `fight` at `speed` times its kind's speed while it closes in (a pack runs its prey down).
+pub fn fight_at(w: &World, id: u64, st: &EntityState, t: u64, speed: f32) {
     let Some(e) = w.entity(t) else { return };
     let species = w.component(id, &ANIMAL).and_then(|a| a.species());
     // At least a lunge: the path ends a block and a half short of a target that stands still.
@@ -487,7 +492,7 @@ pub fn fight(w: &World, id: u64, st: &EntityState, t: u64) {
         }
     }
     if (w.time() + id) % 5 == 0 || !w.navigating(id) {
-        w.navigate(id, e.pos, 1.4);
+        w.navigate(id, e.pos, speed);
     }
 }
 
