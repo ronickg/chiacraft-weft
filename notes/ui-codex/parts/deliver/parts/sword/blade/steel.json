@@ -1,0 +1,15 @@
+{
+ "kind": "base:sword",
+ "layer": "blade",
+ "material": "steel",
+ "override": true,
+ "regions": [
+  "blade",
+  "guard"
+ ],
+ "joint_region_pixels": 15,
+ "anchor": [
+  14.0,
+  17.3
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "kind": "base:pickaxe",
+ "layer": "head",
+ "material": "oak",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 13,
+ "anchor": [
+  13.3,
+  16.6
+ ]
+}

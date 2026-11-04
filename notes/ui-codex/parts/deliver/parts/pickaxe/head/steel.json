@@ -1,0 +1,15 @@
+{
+ "kind": "base:pickaxe",
+ "layer": "head",
+ "material": "steel",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 13,
+ "anchor": [
+  13.8,
+  17.0
+ ]
+}

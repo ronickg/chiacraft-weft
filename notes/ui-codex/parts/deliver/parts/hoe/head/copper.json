@@ -1,0 +1,15 @@
+{
+ "kind": "base:hoe",
+ "layer": "head",
+ "material": "copper",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 15,
+ "anchor": [
+  15.2,
+  18.4
+ ]
+}

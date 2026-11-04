@@ -1,0 +1,15 @@
+{
+ "kind": "base:hoe",
+ "layer": "head",
+ "material": "diamond",
+ "override": true,
+ "regions": [
+  "head",
+  "fitting"
+ ],
+ "joint_region_pixels": 15,
+ "anchor": [
+  14.7,
+  19.8
+ ]
+}

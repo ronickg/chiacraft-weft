@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "Macoun's arctic poppy: a tuft of hairy grey-green leaves at the base and two or three thin hairy stems each holding one pale yellow cup-shaped poppy, 12-16 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.35,
+   "outline": 1.03,
+   "red_line": 0.0,
+   "fill": 0.15,
+   "passed": false
+  },
+  {
+   "grid": 0.249,
+   "outline": 1.12,
+   "red_line": 0.0,
+   "fill": 0.11,
+   "passed": false
+  },
+  {
+   "grid": 0.404,
+   "outline": 0.82,
+   "red_line": 0.0,
+   "fill": 0.1,
+   "passed": true
+  }
+ ]
+}

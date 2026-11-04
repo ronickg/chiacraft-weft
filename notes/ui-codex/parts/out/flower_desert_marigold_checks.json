@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "desert marigold: a low mound of woolly grey-white leaves with three or four bright yellow daisies on bare woolly stems, 14-18 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.27,
+   "outline": 1.13,
+   "red_line": 0.0,
+   "fill": 0.13,
+   "passed": false
+  },
+  {
+   "grid": 0.491,
+   "outline": 1.05,
+   "red_line": 0.0,
+   "fill": 0.18,
+   "passed": false
+  },
+  {
+   "grid": 0.519,
+   "outline": 0.98,
+   "red_line": 0.0,
+   "fill": 0.21,
+   "passed": false
+  }
+ ]
+}
