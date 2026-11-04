@@ -281,13 +281,27 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 
 // ---- sun shadows ----
 
-// Shade from the sky light alone: dark under cover, open where the sky reaches. Shadows traced
-// through the blocks (`shadows.wgsl`, not shipped) cost a walk per pixel that stalled a laptop's
-// whole screen (GPU hang, kernel watchdog panic): they stay out of the pack until they are made
-// cheap enough and measured. This file must not even name the engine's block lookup: its name
-// anywhere in it makes the engine upload the blocks around the camera every frame.
+// Where the sun reaches: the engine's shadow map near the camera (trees, hills and houses cast
+// shadows that move with the sun), the sky light alone beyond it, and never deep under cover. This
+// file must not name the engine's block lookup: its name anywhere in it makes the engine upload
+// the blocks around the camera every frame.
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
-    return smoothstep(0.75, 1.0, in.light.x);
+    let sky = smoothstep(0.75, 1.0, in.light.x);
+    let mapped = shadow_at(in.rel, n);
+    return mix(sky, min(mapped.x, smoothstep(0.3, 0.8, in.light.x)), mapped.y);
+}
+
+// The shadow pass (`sun_shadows`): only depth, without the see-through texels of leaves and
+// plants, so they cast dappled shade.
+@fragment
+fn fs_shadow(in: VOut) {
+    // A plant's flat quad nearly edge-on to the light casts nothing: as a sliver it would draw a
+    // dotted line of shadow across the ground. Its true facing, from how its surface runs.
+    let facing = normalize(cross(dpdx(in.rel), dpdy(in.rel)) + vec3(0.0, 1e-9, 0.0));
+    let a = textureSampleLevel(textures[in.layer], nearest_clamp, in.uv, 0.0).a;
+    if a < 0.5 || (in.kind.z != 0u && abs(dot(facing, light_dir())) < 0.3) {
+        discard;
+    }
 }
 
 // ---- shading ----

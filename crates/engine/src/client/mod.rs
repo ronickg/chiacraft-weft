@@ -299,6 +299,12 @@ pub struct Client {
     ambient_kinds: Option<Vec<Vec<u32>>>,
     /// The frame's `Scene`, one buffer per frame in flight.
     scene_bufs: Vec<BufferId>,
+    /// Sun shadows (`sun_shadows` packs): the shadow map, the shadow pass's scene per frame, and
+    /// this frame's light matrix with whether the map holds it.
+    shadow_map: Option<weft_render::TextureId>,
+    shadow_bufs: Vec<BufferId>,
+    shadow: (glam::Mat4, bool),
+    shadow_index: u32,
     pub target: Option<Hit>,
     pub target_entity: Option<u64>,
     pub selected: usize,
@@ -613,6 +619,10 @@ impl Client {
             since_time: 0,
             ambient_kinds: None,
             scene_bufs: Vec::new(),
+            shadow_map: None,
+            shadow_bufs: Vec::new(),
+            shadow: (glam::Mat4::IDENTITY, false),
+            shadow_index: 0,
             target: None,
             target_entity: None,
             selected: 0,
@@ -2121,6 +2131,12 @@ impl Client {
     }
 
     pub fn destroy(&mut self, gpu: &mut dyn Backend) {
+        if let Some(t) = self.shadow_map.take() {
+            gpu.destroy_texture(t);
+        }
+        for b in self.shadow_bufs.drain(..) {
+            gpu.destroy_buffer(b);
+        }
         for b in self.scene_bufs.drain(..) {
             gpu.destroy_buffer(b);
         }
@@ -2214,6 +2230,11 @@ impl Client {
             weather: [self.wind.x, self.wind.y, self.fog, self.thunder],
             eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, 0.0],
             ground: [self.snow_cover, self.snowing, self.dust, 0.0],
+            shadow_view_proj: self.shadow.0.to_cols_array_2d(),
+            shadow: match self.shadow_map {
+                Some(t) if self.shadow.1 => [self.shadow_index(t) as f32, SHADOW_SIZE as f32, 1.0, 2.0 * SHADOW_REACH / SHADOW_SIZE as f32],
+                _ => [0.0; 4],
+            },
         }
     }
 
@@ -2227,6 +2248,87 @@ impl Client {
         let a = d.day_turn(self.world.time as f64) * std::f64::consts::TAU;
         let v = Vec3::new(a.cos() as f32, a.sin() as f32, 0.35).normalize();
         [v.x, v.y, v.z, v.y.max(0.0)]
+    }
+
+    /// The shadow map's bindless index (set when it was made).
+    fn shadow_index(&self, _t: weft_render::TextureId) -> u32 {
+        self.shadow_index
+    }
+
+    /// Sun shadows, before the world's pass (`sun_shadows` packs): the terrain drawn from the sun,
+    /// or the moon once it has set, into the shadow map, an orthographic box `SHADOW_REACH`
+    /// blocks to each side of the camera along the light, moved in whole texels so its edges do
+    /// not crawl as the camera moves.
+    pub fn render_shadows(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo) {
+        self.shadow.1 = false;
+        if !self.render.has_shadows() || !content().dims[self.world.dim as usize].sky_light {
+            return;
+        }
+        let sun = self.sun();
+        let dir = if sun[1] > -0.06 { Vec3::new(sun[0], sun[1], sun[2]) } else { -Vec3::new(sun[0], sun[1], sun[2]) };
+        // So low the shadows would run off the map (the pack fades them out above this).
+        if dir.y < 0.02 {
+            return;
+        }
+        let map = match self.shadow_map {
+            Some(t) => t,
+            None => {
+                let t = gpu.create_texture(
+                    &weft_render::TextureDesc {
+                        width: SHADOW_SIZE,
+                        height: SHADOW_SIZE,
+                        mips: 1,
+                        format: weft_render::Format::Depth32,
+                        render_target: true,
+                    },
+                    "shadow map",
+                );
+                self.shadow_index = gpu.texture_index(t);
+                self.shadow_map = Some(t);
+                t
+            }
+        };
+        let cam = self.render_camera();
+        let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
+        // Looking from the light's side of the camera toward it (right-handed, -z forward).
+        let eye = dir * SHADOW_DEPTH * 0.5;
+        let f = -dir;
+        let s = f.cross(up).normalize();
+        let u = s.cross(f);
+        let view = glam::Mat4::from_cols(
+            glam::Vec4::new(s.x, u.x, -f.x, 0.0),
+            glam::Vec4::new(s.y, u.y, -f.y, 0.0),
+            glam::Vec4::new(s.z, u.z, -f.z, 0.0),
+            glam::Vec4::new(-s.dot(eye), -u.dot(eye), f.dot(eye), 1.0),
+        );
+        // The camera's place across the light, in whole texels of the world (doubles: far from
+        // the world's origin a float would lose them).
+        let texel = 2.0 * SHADOW_REACH as f64 / SHADOW_SIZE as f64;
+        let right = view.row(0).truncate().as_dvec3();
+        let upward = view.row(1).truncate().as_dvec3();
+        let across = glam::DVec2::new(cam.pos.dot(right), cam.pos.dot(upward));
+        let off = (across - (across / texel).floor() * texel).as_vec2();
+        // x and y over the box (moved back by the camera's part of a texel), z reverse depth:
+        // 1 nearest the light, 0 `SHADOW_DEPTH` along it.
+        let (r, d) = (SHADOW_REACH, SHADOW_DEPTH);
+        let proj = glam::Mat4::from_cols(
+            glam::Vec4::new(1.0 / r, 0.0, 0.0, 0.0),
+            glam::Vec4::new(0.0, 1.0 / r, 0.0, 0.0),
+            glam::Vec4::new(0.0, 0.0, 1.0 / d, 0.0),
+            glam::Vec4::new(off.x / r, off.y / r, 1.0, 1.0),
+        );
+        let light = proj * view;
+        while self.shadow_bufs.len() < gpu.frames_in_flight() {
+            self.shadow_bufs.push(gpu.create_buffer(size_of::<Scene>() as u64, weft_render::usage::STORAGE | weft_render::usage::HOST, "shadow scene"));
+        }
+        let mut scene = self.scene(&cam, frame);
+        scene.view_proj = light.to_cols_array_2d();
+        let buf = self.shadow_bufs[frame.slot];
+        gpu.mapped(buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
+        list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((map, Some(0.0))) });
+        self.render.draw_shadow(gpu, list, frame, &cam, light, buf);
+        list.push(weft_render::Cmd::EndPass);
+        self.shadow = (light, true);
     }
 
     pub fn render(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, textures: &GameTextures) {
@@ -2363,6 +2465,12 @@ impl Client {
             .to_array()
     }
 }
+
+/// The sun's shadow map: texels a side, blocks it reaches to each side of the camera, and the
+/// depth of its box along the light (half of it on the sun's side of the camera).
+const SHADOW_SIZE: u32 = 2048;
+const SHADOW_REACH: f32 = 80.0;
+const SHADOW_DEPTH: f32 = 400.0;
 
 /// Vanilla's tickHeadTurn: the body turns towards where it walks (or stays put), and the head
 /// drags it along only once it has turned more than 50 degrees away. Radians, `moved` this frame.
