@@ -359,15 +359,17 @@ pub const BRAZIL_NUT: Recipe = Recipe {
     branch_angle: 62.0,
     branch_width: 0.6,
     orders: 2,
-    // Limbs scale with the height: shorter, so the umbrella stays inside the giant scatter's
-    // reach (12) and every leaf within LEAF_REACH of a log (at 0.3 a 58-high crown overran both).
-    branch_len: 0.22,
+    // Limbs scale with the height: short, so the umbrella stays inside the giant scatter's reach
+    // and every leaf within LEAF_REACH of a log (at 0.3 and 0.22 a 58-high crown's limbs ran past
+    // the reach, which cut their wood and left leaves with no log).
+    branch_len: 0.18,
     taper: 0.4,
-    leaf_r: 2.8,
+    leaf_r: 2.6,
     leaf_ry: 1.2,
     ragged: 0.3,
-    // The giant scatter's reach (`worldgen.rs`): a crown up to 24 across.
-    reach: 12,
+    // The giant scatter's reach (`worldgen.rs`): a crown up to 28 across, its wood within about
+    // 12 of the trunk so no limb runs past the reach and leaves a cluster without its log.
+    reach: 14,
     // 58 high, a sixth more at most, and its crown over that; the scatter reaches 96 up.
     max_height: 80,
     flare: 0.55,
