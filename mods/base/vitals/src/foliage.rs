@@ -26,10 +26,11 @@ const FRESH: (u32, u32) = (0xa0e060, 0xb0e060);
 const FRESH_AMOUNT: (f32, f32) = (0.45, 0.45);
 const AUTUMN_GRASS: u32 = 0xb0a058;
 const AUTUMN_AMOUNT: (f32, f32) = (0.45, 0.75);
-// Winter: grass gone the color of hay, the leaves that turned a dry grey-brown (until trees can
-// stand bare).
-const WINTER: (u32, u32) = (0x9a8f62, 0x7a6a4e);
-const WINTER_AMOUNT: (f32, f32) = (0.6, 0.75);
+// Winter: grass gone the color of hay, the leaves that turned a dead grey-brown, darker and less
+// green than autumn's russet so the year runs on from it (until trees can stand bare; at 0.75 of
+// an older, lighter brown they came out olive and read as early autumn: the world playtest).
+const WINTER: (u32, u32) = (0x9a8f62, 0x66574a);
+const WINTER_AMOUNT: (f32, f32) = (0.6, 0.9);
 
 /// The color of `base` (the biome's own, 0xRRGGBB) on `day` of the year (0 at spring's start, a
 /// fraction for the hour; `YEAR_DAYS` long) where the year has `strength` (`strength`).
@@ -101,6 +102,15 @@ mod tests {
         let late_autumn = YEAR_DAYS as f32 * 0.7;
         let c = rgb(tint(OAK, OAK_LEAVES, late_autumn, 1.0));
         assert!(c[0] > c[1] * 0.9, "{c:?}");
+    }
+
+    #[test]
+    fn winter_leaves_are_duller_than_autumns_not_greener() {
+        let late_autumn = rgb(tint(OAK, OAK_LEAVES, YEAR_DAYS as f32 * 0.7, 1.0));
+        let deep_winter = rgb(tint(OAK, OAK_LEAVES, YEAR_DAYS as f32 * 0.95, 1.0));
+        // Green no stronger than its red, and darker than the autumn color.
+        assert!(deep_winter[1] <= deep_winter[0] * 1.05, "{deep_winter:?}");
+        assert!(deep_winter.iter().sum::<f32>() < late_autumn.iter().sum::<f32>(), "{deep_winter:?} {late_autumn:?}");
     }
 
     #[test]
