@@ -327,15 +327,16 @@ pub const MATAMATA: Colonize = Colonize {
 };
 
 /// The Brazil nut, the emergent: its own trunk (`tree_recipes::BRAZIL_NUT`: round, flared,
-/// buttressed, as Plants made it) to about four fifths of its height, then a broad dome of a
-/// crown 15-20 over the canopy (about 45-55), at least 2 wide where it starts.
+/// buttressed, as Plants made it, 2 x 2 at least at its top) to about two thirds of its height,
+/// then its limbs fanning up to a flat, wide umbrella of a crown 15-20 over the canopy (about
+/// 45-55; a dome read as a lollipop from the side, Plants' look).
 pub const BRAZIL_NUT: Colonize = Colonize {
     log: "base:brazil_nut_log",
-    trunk: 0.76,
-    crown_h: 9.0,
-    crown_r: 10.0,
+    trunk: 0.68,
+    crown_h: 12.0,
+    crown_r: 10.5,
     size_var: 0.1,
-    shape: Shape::Dome,
+    shape: Shape::Umbrella,
     points: 320,
     influence: 6.0,
     kill: 2.6,
@@ -344,8 +345,8 @@ pub const BRAZIL_NUT: Colonize = Colonize {
     twig_r: 0.16,
     min_trunk: 2.0,
     leaf_r: 2.6,
-    leaf_ry: 1.4,
-    ragged: 0.3,
+    leaf_ry: 1.2,
+    ragged: 0.4,
     leaf_along: false,
     twig: 0.34,
     leader: false,
