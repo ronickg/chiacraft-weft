@@ -1,0 +1,39 @@
+[package]
+name = "chiacraft-packages-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license = "MIT"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+toml = "1.1"
+chiacraft-packages = { path = ".." }
+
+# Its own workspace: built only by `cargo fuzz` (nightly), never by the game's builds.
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "manifest"
+path = "fuzz_targets/manifest.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "signature"
+path = "fuzz_targets/signature.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "defs"
+path = "fuzz_targets/defs.rs"
+test = false
+doc = false
+bench = false

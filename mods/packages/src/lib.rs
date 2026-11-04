@@ -4,7 +4,8 @@
 //!
 //! The engine gives every package its own mod slot (its namespace and `assets/`) and calls
 //! [`chiacraft_register_package`] once per package after the code mods have registered. The mod's
-//! own `init` registers nothing.
+//! own `init` registers one block: `packages:unknown`, what a saved block shows as while the mod or
+//! package it came from is missing (the save keeps its real name).
 
 use std::sync::Mutex;
 
@@ -14,7 +15,11 @@ use weft_sdk::*;
 
 declare_mod!(deps: [], init: init);
 
-fn init(_: &mut Registry) {}
+static UNKNOWN: Block = Block::named("unknown");
+
+fn init(r: &mut Registry) {
+    r.block(&UNKNOWN).hardness(0.5).drops_nothing().no_item();
+}
 
 /// The package being registered: `__init` takes a plain function.
 static CURRENT: Mutex<Option<Package>> = Mutex::new(None);
@@ -27,7 +32,10 @@ static CURRENT: Mutex<Option<Package>> = Mutex::new(None);
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn chiacraft_register_package(host: *const Host, me: ModId, reg: *mut Registrar, dir: Str) -> u32 {
     let dir = std::path::PathBuf::from(unsafe { dir.as_str() });
-    let pkg = match chiacraft_packages::load(&dir) {
+    // Someone else's files must not take the game down, and a panic may not cross into the engine.
+    let loaded =
+        std::panic::catch_unwind(|| chiacraft_packages::load(&dir)).unwrap_or_else(|_| Err(vec!["reading the package failed".into()]));
+    let pkg = match loaded {
         Ok(p) => p,
         Err(errors) => {
             for e in errors {
@@ -176,7 +184,11 @@ fn recipe(r: &mut Registry, d: &RecipeDef) {
         r.shapeless(kind, &d.result, d.count, &inputs, d.time);
     } else {
         let pattern: Vec<&str> = d.pattern.iter().map(String::as_str).collect();
-        let keys: Vec<(char, &str)> = d.key.iter().filter_map(|(k, v)| Some((k.chars().next()?, v.as_str()))).collect();
+        let keys: Vec<(char, &str)> = d
+            .key
+            .iter()
+            .filter_map(|(k, v)| Some((k.chars().next()?, v.as_str())))
+            .collect();
         r.shaped(kind, &d.result, d.count, &pattern, &keys);
     }
 }

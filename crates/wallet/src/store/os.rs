@@ -17,9 +17,7 @@ pub struct OsStore {
 impl OsStore {
     /// Items under `service` (the game uses "chiacraft wallet").
     pub fn new(service: &str) -> Self {
-        Self {
-            service: service.to_owned(),
-        }
+        Self { service: service.to_owned() }
     }
 }
 
@@ -72,10 +70,7 @@ mod imp {
     use std::ptr::null_mut;
     use windows_sys::Win32::{
         Foundation::{ERROR_NOT_FOUND, FILETIME, GetLastError},
-        Security::Credentials::{
-            CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredDeleteW, CredFree,
-            CredReadW, CredWriteW,
-        },
+        Security::Credentials::{CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredDeleteW, CredFree, CredReadW, CredWriteW},
     };
 
     fn wide(s: &str) -> Vec<u16> {
@@ -86,9 +81,7 @@ mod imp {
     }
     fn last_error(what: &str) -> Error {
         // SAFETY: reads the calling thread's last-error value.
-        Error::new(format!("Credential Manager {what}: error {}", unsafe {
-            GetLastError()
-        }))
+        Error::new(format!("Credential Manager {what}: error {}", unsafe { GetLastError() }))
     }
     pub fn put(service: &str, account: &str, secret: &[u8]) -> Result<()> {
         let target = target(service, account);
@@ -99,10 +92,7 @@ mod imp {
             Type: CRED_TYPE_GENERIC,
             TargetName: target.as_ptr() as *mut u16,
             Comment: null_mut(),
-            LastWritten: FILETIME {
-                dwLowDateTime: 0,
-                dwHighDateTime: 0,
-            },
+            LastWritten: FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 },
             CredentialBlobSize: blob.len() as u32,
             CredentialBlob: blob.as_mut_ptr(),
             Persist: CRED_PERSIST_LOCAL_MACHINE,
@@ -132,8 +122,7 @@ mod imp {
         // SAFETY: `found` is valid until CredFree; the blob is `CredentialBlobSize` bytes.
         let secret = unsafe {
             let c = &*found;
-            let bytes = std::slice::from_raw_parts(c.CredentialBlob, c.CredentialBlobSize as usize)
-                .to_vec();
+            let bytes = std::slice::from_raw_parts(c.CredentialBlob, c.CredentialBlobSize as usize).to_vec();
             CredFree(found as *const _);
             bytes
         };
@@ -170,13 +159,8 @@ mod imp {
     }
     pub fn put(service: &str, account: &str, secret: &[u8]) -> Result<()> {
         let k = keyring()?;
-        futures_lite::future::block_on(k.create_item(
-            &format!("{service} {account}"),
-            &attributes(service, account),
-            secret,
-            true,
-        ))
-        .map_err(|e| Error::new(format!("Secret Service: {e}")))
+        futures_lite::future::block_on(k.create_item(&format!("{service} {account}"), &attributes(service, account), secret, true))
+            .map_err(|e| Error::new(format!("Secret Service: {e}")))
     }
     pub fn get(service: &str, account: &str) -> Result<Option<Secret<Vec<u8>>>> {
         let k = keyring()?;
@@ -194,17 +178,11 @@ mod imp {
     }
     pub fn delete(service: &str, account: &str) -> Result<()> {
         let k = keyring()?;
-        futures_lite::future::block_on(k.delete(&attributes(service, account)))
-            .map_err(|e| Error::new(format!("Secret Service: {e}")))
+        futures_lite::future::block_on(k.delete(&attributes(service, account))).map_err(|e| Error::new(format!("Secret Service: {e}")))
     }
 }
 
-#[cfg(not(any(
-    target_os = "macos",
-    target_os = "windows",
-    target_os = "linux",
-    target_os = "freebsd"
-)))]
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux", target_os = "freebsd")))]
 mod imp {
     use super::*;
     pub fn put(_: &str, _: &str, _: &[u8]) -> Result<()> {

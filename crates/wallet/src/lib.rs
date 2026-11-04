@@ -47,16 +47,10 @@ pub struct Error {
 }
 impl Error {
     pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-            wrong_passphrase: false,
-        }
+        Self { message: message.into(), wrong_passphrase: false }
     }
     pub fn wrong_passphrase() -> Self {
-        Self {
-            message: "wrong passphrase".into(),
-            wrong_passphrase: true,
-        }
+        Self { message: "wrong passphrase".into(), wrong_passphrase: true }
     }
     pub fn is_wrong_passphrase(&self) -> bool {
         self.wrong_passphrase

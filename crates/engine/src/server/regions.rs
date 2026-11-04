@@ -21,6 +21,25 @@ pub struct DimSet {
     pub regions: Vec<Dim>,
     pub generating: FxHashSet<IVec3>,
     pub time: u64,
+    pub day_offset: i64,
+    /// `/time` moved the sky: players hear at once, not at the next second.
+    pub day_moved: bool,
+    pub raining: bool,
+    pub thunder: bool,
+    /// When the weather changes by itself.
+    pub weather_until: u64,
+    /// The biomes a mod rains in (`set_rain`): from then on the weather is the mod's, not the
+    /// dimension's own timing.
+    pub rain_in: Option<Arc<Vec<u32>>>,
+    /// Until when a `/weather` command rains (or doesn't) everywhere, over the mod's.
+    pub manual_until: u64,
+    /// Changed: players hear at once.
+    pub weather_moved: bool,
+    /// The air a mod says its biomes have (`set_air`): (biome, fog 0..1, wind m/s, snow lying 0..1,
+    /// `air_flags`) sorted by biome, and where the wind blows to, in degrees clockwise from north.
+    pub air: Arc<(Vec<(u32, f32, f32, f32, u32)>, f32)>,
+    /// Changed: players hear at once.
+    pub air_moved: bool,
     seed: u64,
     next_id: Arc<AtomicU64>,
     owner: FxHashMap<IVec3, usize>,
@@ -31,14 +50,43 @@ pub struct DimSet {
 }
 
 impl DimSet {
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+
     pub fn new(id: u32, seed: u64, next_id: Arc<AtomicU64>) -> DimSet {
-        DimSet { id, regions: Vec::new(), generating: FxHashSet::default(), time: 1000, seed, next_id, owner: FxHashMap::default(), dirty: false, edits: Arc::default() }
+        DimSet {
+            id,
+            regions: Vec::new(),
+            generating: FxHashSet::default(),
+            time: 1000,
+            day_offset: 0,
+            day_moved: false,
+            raining: false,
+            thunder: false,
+            weather_until: 0,
+            rain_in: None,
+            manual_until: 0,
+            weather_moved: false,
+            air: Arc::default(),
+            air_moved: false,
+            seed,
+            next_id,
+            owner: FxHashMap::default(),
+            dirty: false,
+            edits: Arc::default(),
+        }
     }
 
     fn new_region(&mut self, section: IVec3) -> usize {
         let mut d = Dim::new(self.id, self.seed, self.next_id.clone());
         d.set_rng(weft_noise::hash(self.seed ^ self.time, section.x as i64, section.y as i64, section.z as i64));
         d.time = self.time;
+        d.day_offset = self.day_offset;
+        d.raining = self.raining;
+        d.thunder = self.thunder;
+        d.rain_in = self.rain_here();
+        d.air = self.air.clone();
         self.regions.push(d);
         self.regions.len() - 1
     }
@@ -73,7 +121,10 @@ impl DimSet {
 
     /// Folds regions into the largest of them; returns its index afterwards.
     fn merge(&mut self, c: &Content, list: &[usize]) -> usize {
-        let target = *list.iter().max_by_key(|&&i| self.regions[i].cubes.len()).unwrap();
+        let target = *list
+            .iter()
+            .max_by_key(|&&i| self.regions[i].space.cubes.len())
+            .unwrap();
         for &i in list.iter().rev() {
             if i != target {
                 let parcel = self.regions[i].take_sections(|_| true);
@@ -102,25 +153,40 @@ impl DimSet {
     }
 
     pub fn entity_region(&mut self, id: u64) -> Option<&mut Dim> {
-        self.regions.iter_mut().find(|r| r.entities.get(id).is_some())
+        self.regions
+            .iter_mut()
+            .find(|r| r.entities.get(id).is_some())
     }
 
     pub fn entity_region_ref(&self, id: u64) -> Option<&Dim> {
         self.regions.iter().find(|r| r.entities.get(id).is_some())
     }
 
+    pub fn entity(&self, id: u64) -> Option<&super::entity::Entity> {
+        self.entity_region_ref(id).and_then(|r| r.entities.get(id))
+    }
+
     pub fn has(&self, pos: IVec3) -> bool {
-        self.owner.get(&section_of_cube(pos)).is_some_and(|&r| self.regions[r].has(pos))
+        self.owner
+            .get(&section_of_cube(pos))
+            .is_some_and(|&r| self.regions[r].has(pos))
     }
 
     /// Cubes settled since the last call.
     pub fn take_settled(&mut self) -> Vec<IVec3> {
-        self.regions.iter_mut().flat_map(|r| r.newly_settled.drain(..)).collect()
+        self.regions
+            .iter_mut()
+            .flat_map(|r| r.newly_settled.drain(..))
+            .collect()
     }
 
     /// Cubes with block changes since the last call.
     pub fn take_edited(&mut self) -> Vec<IVec3> {
-        let mut out: Vec<IVec3> = self.regions.iter_mut().flat_map(|r| r.edited.drain()).collect();
+        let mut out: Vec<IVec3> = self
+            .regions
+            .iter_mut()
+            .flat_map(|r| r.space.edited.drain())
+            .collect();
         out.sort_unstable_by_key(|p| (p.x, p.y, p.z));
         out
     }
@@ -128,12 +194,18 @@ impl DimSet {
     /// Changes whenever a cube was loaded or became settled, or regions were reshaped.
     pub fn settled_version(&self) -> u64 {
         let settled: u64 = self.regions.iter().map(|r| r.settled_gen).sum();
-        let cubes: u64 = self.regions.iter().map(|r| r.cubes.len() as u64).sum();
+        let cubes: u64 = self
+            .regions
+            .iter()
+            .map(|r| r.space.cubes.len() as u64)
+            .sum();
         settled ^ cubes << 24 ^ (self.regions.len() as u64) << 52
     }
 
     pub fn settled(&self, pos: IVec3) -> bool {
-        self.owner.get(&section_of_cube(pos)).is_some_and(|&r| self.regions[r].settled.contains(&pos))
+        self.owner
+            .get(&section_of_cube(pos))
+            .is_some_and(|&r| self.regions[r].settled.contains(&pos))
     }
 
     pub fn snapshot(&self, pos: IVec3) -> Option<Arc<Cube>> {
@@ -143,7 +215,12 @@ impl DimSet {
 
     /// Loaded cubes of nothing but air right under `pos`, at most `max`.
     pub fn air_below(&self, pos: IVec3, max: i32) -> i32 {
-        (1..=max).take_while(|&d| self.snapshot(pos - IVec3::Y * d).is_some_and(|c| c.palette() == [crate::content::AIR])).count() as i32
+        (1..=max)
+            .take_while(|&d| {
+                self.snapshot(pos - IVec3::Y * d)
+                    .is_some_and(|c| c.palette() == [crate::content::AIR])
+            })
+            .count() as i32
     }
 
     pub fn get(&self, p: IVec3) -> Option<u32> {
@@ -166,16 +243,27 @@ impl DimSet {
         let r = self.region_for(c, section_of_cube(pos));
         let d = &mut self.regions[r];
         d.insert(c, pos, cube, prelit);
-        d.conn.insert(pos, conn);
+        d.space.conn.insert(pos, conn);
         if edited {
-            d.modified.insert(pos);
+            d.space.modified.insert(pos);
         }
+        // What the save held may need writing again once it is gone from here.
+        let ticks = super::persist::read_ticks(entities);
+        d.restore_ticks(pos, &ticks);
+        if !ticks.is_empty() || entities.len() > 12 {
+            d.on_disk.insert(pos);
+        }
+        let mut bodies = Vec::new();
         for (e, inv, comps, blocks) in super::persist::read(c, entities) {
             let id = e.id;
             if d.entities.get(id).is_some() {
                 continue;
             }
-            if c.game.is_block_entity(e.kind) && !d.block_entity_fits(c, &e) {
+            if c.game.is_block_entity(e.kind)
+                && !d
+                    .in_frame(e.block_frame(), |d| d.block_entity_fits(c, &e))
+                    .unwrap_or(false)
+            {
                 // Its block is gone (or it never had one): what it held stays in the world.
                 for s in inv.into_iter().flatten() {
                     d.spawn_item(c, e.pos, s);
@@ -183,9 +271,14 @@ impl DimSet {
                 continue;
             }
             if let Some(blocks) = blocks {
-                d.structures.insert(id, Box::new(super::dim::Dim::new_structure(c, d.id, d.seed, self.next_id.clone(), &blocks)));
+                d.bodies
+                    .insert(id, Box::new(super::space::Space::with_blocks(c, &blocks)));
+                bodies.push(id);
             }
             d.entities.insert_with(c, e, inv, comps);
+        }
+        for id in bodies {
+            d.add_missing_on_body(c, id);
         }
         d.add_missing_block_entities(c, pos);
     }
@@ -198,7 +291,9 @@ impl DimSet {
 
     /// Loaded cubes changed since they were generated or loaded (saved when they unload).
     pub fn modified(&self) -> impl Iterator<Item = IVec3> + '_ {
-        self.regions.iter().flat_map(|r| r.modified.iter().copied())
+        self.regions
+            .iter()
+            .flat_map(|r| r.space.modified.iter().copied())
     }
 
     pub fn connectivity(&mut self, c: &Content, pos: IVec3) -> Option<u16> {
@@ -269,13 +364,110 @@ impl DimSet {
         }
     }
 
+    /// `/time`: moves the sky only. `time` keeps counting, since everything waiting on a tick
+    /// (flowing water, timers, growth, effects) is timed by it.
+    pub fn set_day_time(&mut self, t: u64) {
+        self.day_offset = t as i64 - self.time as i64;
+        self.day_moved = true;
+        for r in &mut self.regions {
+            r.day_offset = self.day_offset;
+        }
+    }
+
+    /// The time of day's own clock.
+    pub fn set_weather(&mut self, raining: bool, thunder: bool, ticks: u64) {
+        (self.raining, self.thunder) = (raining, raining && thunder);
+        self.weather_until = self.time + ticks;
+        self.weather_moved = true;
+        let only = self.rain_here();
+        for r in &mut self.regions {
+            r.raining = raining;
+            r.thunder = self.thunder;
+            r.rain_in = only.clone();
+        }
+    }
+
+    /// Where it rains when it rains: the mod's biomes, or everywhere (no mod saying, or a
+    /// `/weather` command's time).
+    /// The air in its biomes from now on (`air`); players hear only of a change.
+    pub fn set_air(&mut self, mut air: Vec<(u32, f32, f32, f32, u32)>, heading: f32) {
+        air.sort_unstable_by_key(|a| a.0);
+        air.dedup_by_key(|a| a.0);
+        let heading = heading.rem_euclid(360.0);
+        if self.air.0 == air && self.air.1 == heading {
+            return;
+        }
+        self.air = Arc::new((air, heading));
+        self.air_moved = true;
+        for r in &mut self.regions {
+            r.air = self.air.clone();
+        }
+    }
+
+    pub fn rain_here(&self) -> Option<Arc<Vec<u32>>> {
+        if self.time < self.manual_until { None } else { self.rain_in.clone() }
+    }
+
+    /// `/weather`: everywhere for `ticks`, whatever a mod says, then the mod's again.
+    pub fn set_manual_weather(&mut self, raining: bool, thunder: bool, ticks: u64) {
+        self.manual_until = self.time + ticks;
+        self.set_weather(raining, thunder, ticks);
+    }
+
+    /// Rain from now on only in `biomes` (none: dry), thunder with it: a mod's weather by place
+    /// and season (`set_rain`). Players hear only of a change.
+    pub fn set_rain(&mut self, mut biomes: Vec<u32>, thunder: bool) {
+        biomes.sort_unstable();
+        biomes.dedup();
+        if self.rain_in.as_deref() == Some(&biomes) && self.thunder == (thunder && !biomes.is_empty()) {
+            return;
+        }
+        let raining = !biomes.is_empty();
+        self.rain_in = Some(Arc::new(biomes));
+        if self.time >= self.manual_until {
+            self.set_weather(raining, thunder, u32::MAX as u64);
+        }
+    }
+
+    /// Vanilla's timing: clear for 10 minutes to 2.5 hours, rain for 10 to 20 minutes, a third of
+    /// it with thunder.
+    pub fn tick_weather(&mut self) {
+        if let Some(only) = self.rain_in.clone() {
+            // A mod's weather: back to it when a `/weather` command's time is up.
+            if self.manual_until != 0 && self.time >= self.manual_until {
+                self.manual_until = 0;
+                self.set_weather(!only.is_empty(), self.thunder, u32::MAX as u64);
+            }
+            return;
+        }
+        if self.time < self.weather_until {
+            return;
+        }
+        let r = weft_noise::hash(self.seed ^ 0x5745_4154, self.time as i64, 0, 0);
+        let first = self.weather_until == 0;
+        let raining = !first && !self.raining;
+        let ticks = if raining { 12000 + r % 12000 } else { 12000 + r % 168000 };
+        self.set_weather(raining, raining && r >> 32 & 3 == 0, ticks);
+    }
+
+    pub fn day_time(&self) -> u64 {
+        self.time.saturating_add_signed(self.day_offset)
+    }
+
     /// Recomputes regions from the sections in use: merges touching regions, splits separated
     /// parts. Data moves in parcels; each region keeps the part it holds most of.
     pub fn regionize(&mut self, c: &Content) {
         self.dirty = false;
-        self.regions.retain(|r| !r.cubes.is_empty() || !r.entities.list.is_empty());
+        self.regions
+            .retain(|r| !r.space.cubes.is_empty() || !r.entities.list.is_empty());
         let per_region: Vec<FxHashSet<IVec3>> = self.regions.iter().map(|r| r.sections()).collect();
-        let all: Vec<IVec3> = per_region.iter().flatten().copied().collect::<FxHashSet<_>>().into_iter().collect();
+        let all: Vec<IVec3> = per_region
+            .iter()
+            .flatten()
+            .copied()
+            .collect::<FxHashSet<_>>()
+            .into_iter()
+            .collect();
         let index: FxHashMap<IVec3, usize> = all.iter().enumerate().map(|(i, &s)| (s, i)).collect();
         let mut parent: Vec<usize> = (0..all.len()).collect();
         fn find(p: &mut [usize], mut x: usize) -> usize {
@@ -318,16 +510,31 @@ impl DimSet {
             for &s in secs {
                 *counts.entry(comp_of(s, &mut parent)).or_default() += 1;
             }
-            primary.push(counts.into_iter().max_by(|a, b| a.1.cmp(&b.1).then((b.0.x, b.0.y, b.0.z).cmp(&(a.0.x, a.0.y, a.0.z)))).map(|x| x.0));
+            primary.push(
+                counts
+                    .into_iter()
+                    .max_by(|a, b| {
+                        a.1.cmp(&b.1)
+                            .then((b.0.x, b.0.y, b.0.z).cmp(&(a.0.x, a.0.y, a.0.z)))
+                    })
+                    .map(|x| x.0),
+            );
         }
         let sec_comp: FxHashMap<IVec3, IVec3> = all.iter().map(|&s| (s, comp_of(s, &mut parent))).collect();
-        let changed = per_region.iter().enumerate().any(|(i, secs)| secs.iter().any(|s| Some(sec_comp[s]) != primary[i]))
+        let changed = per_region
+            .iter()
+            .enumerate()
+            .any(|(i, secs)| secs.iter().any(|s| Some(sec_comp[s]) != primary[i]))
             || {
                 let mut seen = FxHashSet::default();
                 primary.iter().flatten().any(|p| !seen.insert(*p))
             };
         if !changed {
-            self.owner = per_region.iter().enumerate().flat_map(|(i, secs)| secs.iter().map(move |&s| (s, i))).collect();
+            self.owner = per_region
+                .iter()
+                .enumerate()
+                .flat_map(|(i, secs)| secs.iter().map(move |&s| (s, i)))
+                .collect();
             return;
         }
 
@@ -335,7 +542,11 @@ impl DimSet {
         let mut parcels: Vec<(IVec3, super::dim::Parcel)> = Vec::new();
         for (i, r) in self.regions.iter_mut().enumerate() {
             let mine = primary[i];
-            let foreign: FxHashSet<IVec3> = per_region[i].iter().filter(|s| Some(sec_comp[*s]) != mine).map(|s| sec_comp[s]).collect();
+            let foreign: FxHashSet<IVec3> = per_region[i]
+                .iter()
+                .filter(|s| Some(sec_comp[*s]) != mine)
+                .map(|s| sec_comp[s])
+                .collect();
             for comp in foreign {
                 let sc = &sec_comp;
                 parcels.push((comp, r.take_sections(|s| sc.get(&s) == Some(&comp))));
@@ -404,7 +615,12 @@ fn search_spawn(c: &Content, def: &crate::content::DimensionDef, seed: u64) -> O
     let good = |x: i32, z: i32, prefer: bool| {
         let col = def.column(seed, x, z)?;
         let biome_ok = !prefer || preferred.is_some_and(|t| c.components.has(crate::components::BIOME, col.biome, t));
-        (col.height != i32::MIN && col.height > sea + 1 && biome_ok && !def.carved(seed, x, z) && !super::dim::scattered_near(def, c, seed, x, z)).then_some([x, col.height, z])
+        (col.height != i32::MIN
+            && col.height > sea + 1
+            && biome_ok
+            && !def.carved(seed, x, z)
+            && !super::dim::scattered_near(def, c, seed, x, z))
+        .then_some([x, col.height, z])
     };
     for prefer in [true, false] {
         for r in 0..200 {

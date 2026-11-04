@@ -9,3 +9,4 @@ description = "Data-only content packages (chiacraft plan, phase 2): reads and c
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 toml = "1.1"
+blake3 = "1.8"

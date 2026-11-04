@@ -2,20 +2,21 @@
 
 ## Contents
 1. [Introduction](#introduction)
-2. [Creating a mod in two minutes](#creating-a-mod-in-two-minutes)
-3. [Names and paths](#names-and-paths)
+2. [Preparation](#preparation)
+3. [Creating a mod in two minutes](#creating-a-mod-in-two-minutes)
+4. [Names and paths](#names-and-paths)
    - [Names](#names), [References](#references), [Handles](#handles), [Textures](#textures), [Translations](#translations)
-4. [Components and tags as inter-mod communication](#components-and-tags-as-inter-mod-communication)
-5. [Content builders](#content-builders)
+5. [Components and tags as inter-mod communication](#components-and-tags-as-inter-mod-communication)
+6. [Content builders](#content-builders)
    - [Blocks](#blocks), [Items](#items), [Entities](#entities), [Machines](#machines), [Liquids](#liquids), [World](#world), [Recipes](#recipes), [Loot](#loot), [Replacing something of another mod](#replacing-something-of-another-mod)
-6. [Hooking into the game](#hooking-into-the-game)
+7. [Hooking into the game](#hooking-into-the-game)
    - [Built-in events](#built-in-events), [Systems and energy](#systems-and-energy)
-7. [Commands](#commands)
-8. [World API](#world-api)
-9. [Client side](#client-side)
-10. [Debugging](#debugging)
-11. [Things that make your and other modders' life easier](#things-that-make-your-and-other-modders-life-easier)
-12. [Guides for bigger systems](#guides-for-other-systems)
+8. [Commands](#commands)
+9. [World API](#world-api)
+10. [Client side](#client-side)
+11. [Debugging](#debugging)
+12. [Things that make your and other modders' life easier](#things-that-make-your-and-other-modders-life-easier)
+13. [Guides for bigger systems](#guides-for-other-systems)
 
 ## Introduction
 This is a guide describing how the base game itself is written.\
@@ -23,6 +24,11 @@ The game is a mod called `base`, which has no private hooks or priorities from t
 your mod can too.\
 When in doubt, check `mods/base` and `mods/testmod` and copy from there.\
 testmod exists to prove you don't have to touch the engine.
+
+## Preparation
+1. Before starting working on Weft, you'll need workspace. The best recommendation I can give is using JetBrains RustRover, which is free and has everything needed.\
+2. Clone the repo using built-in Clone Repository feature, where you'll put https://github.com/Weft-Rust/Weft as a link, which will create folder on your pc with the code.\
+3. Then after finishing you need to configure Run Configuration. Find Run Configuration tab in top-right corner, and set the command to `run`, and call it whatever, after that the game will be launched from your local copy of the repo.
 
 ## Creating a mod in two minutes
 
@@ -67,7 +73,7 @@ fn init(r: &mut Registry) {
 }
 ```
 
-Build with `cargo build --release`, then make a folder in `run/mods/` and copy the library from `target/release/` into it:
+Build with `cargo build --release`, then make a folder in the mods folder and copy the library from `target/release/` into it. That's `run/mods/` when you run the game from the repo; a released game keeps it in your user folders (see the README), and the Mods screen has a button that opens it.
 
 ```
 run/mods/mymod/
@@ -133,7 +139,7 @@ Textures can also be [animated, glow and have overlays](textures.md), or [be con
 
 ### Translations
 Format: `type.modname.name = value`, e.g. `item.examplemod.example_item = Example Item`\
-Any item can have a tooltip using `type.modname.name.tooltip = Some tooltip`, more in the [tooltips guide](tooltips.md).\
+Any item can have a tooltip using `type.modname.name.tooltip = Some tooltip`, more in the [localization guide](localization.md).\
 If the player's language doesn't have a key (or a whole file), English is shown, so `en_us.lang` is the one you always need.\
 The Mods screen reads your mod's page from there too: `mod.mymod.name`, `mod.mymod.description` (as long as you like, with pictures), `mod.mymod.authors` and `mod.mymod.url`, and its icon is `assets/textures/gui/icon.png`.
 
@@ -192,9 +198,9 @@ A value that names blocks is a reference, not text: `Component<BlockRef>` for on
 Per-entity components like a state of a machine, hunger or anything else that changes in time go through
 `r.entity_component(&COMP, default, flags)`, declared once, and then carried by the kinds that need it: `.attach(&COMP)` on an entity or machine builder, `r.attach(&PLAYER, &COMP)` for someone else's kind, `.attach_with(&COMP, value)` to start from another value.\
 `.set(&C, v)` is different: one value of the kind itself (like a mob's attack damage), while `.attach` gives every entity its own value that changes.\
-Flags from `component_flags` are `SAVE`, `SYNC_OWNER`, `SYNC_WATCHERS`, `SYNC_MENU`.\
+Flags from `component_flags` are `SAVE`, `SYNC_OWNER`, `SYNC_WATCHERS`, `SYNC_MENU`, `KEEP` (kept when a player respawns; everything else starts over from its default).\
 You can change them through `w.component_mut(id, &COMP)` and the engine will figure out what to send.\
-What the engine itself shows of an entity travels the same way, so a client can read it with `view.component_of(id, &C)`: `core:health` (`[f32; 2]`, health and, for players, max health) and `core:burning` (`u8`). They are the engine's copies: writing them changes nothing.
+What the engine itself shows of an entity travels the same way, so a client can read it with `view.component_of(id, &C)`: `core:health` (`[f32; 2]`, health and, for players, max health) `core:burning` (`u8`) and `core:held` (`u32`, a player's item in hand, 0 for none). They are the engine's copies: writing them changes nothing.
 
 ### Sharing types with other mods
 Events and components carry values, and two mods have to agree on their layout. Copying a struct into every mod works, but the mistake shows up only when the game loads.
@@ -227,7 +233,7 @@ is dropped.
 - `growth(seconds, min_light)` + `on_grow(..)` for plants
 - `spreads("#grass_spreads_to", seconds, min_light)` for what creeps onto neighbors (grass onto dirt), `smothered("dirt", seconds)` for what turns when covered. There are no random ticks: these, growth and scheduled ticks all run on world time, so they catch up on time nobody was there for
 - `ambient_particle("mymod:spark")` for particles the client shows around a block now and then (torch smoke), nothing on the server
-- `on_use`, `on_neighbor`, `on_scheduled`
+- `on_use`, `on_neighbor`, `on_scheduled`, `on_pass` (on a moving body, it came to another cell of the world: a drill, a plow)
 - `on_placed(|w, change| ..)`, `on_broken(..)`: the `BLOCK_PLACED` and `BLOCK_BROKEN` events for this block only, at the end of the tick
 - `prop("lit", ["false", "true"])`, `prop("age", 0..=7)` and `facing(Facings::HORIZONTAL, Toward::Player)` for states, like blockstates in modern Minecraft: every combination of values is a state
 - `states(|p, s| ..)` to make each state look different (`p.facing()`, `p.is("lit", "true")`), `placement(|place, p| p.set(..))` to pick values when placed
@@ -241,13 +247,18 @@ Anywhere a block is named as text, `base:furnace[lit=true]` picks a state: in st
 - `max_stack(N)`
 - `durability`
 - `tool("pickaxe")`, `tool_level(tier)`, `mining_speed(speed)`
-- `attack_damage`
+- `attack_damage`, `attack_speed(per_second)` (hitting before it has recharged does less; a sword is 1.6, and without it an item swings at an empty hand's 4) and `sweeps()` (a full swing on the ground also does 1 damage to what stands next to the target)
+- Advancements read tags, so yours count by tagging them: `cooked_meat` on food, `hostile` and `livestock` on mobs, `logs`, `torches`, `furnaces`, etc etc
+- `no_creative_break()`: in creative it doesn't break blocks, like a sword. Both sides know, so nothing flickers; a rule that depends on more is `question::BREAK_BLOCK`, which is asked when mining starts and tells the client no right away
+- `spawns(&ENTITY)`: used on a block it puts the entity there. Every entity already has an egg of its own, see below
 - `placed_block(&BLOCK)`
+- `handheld()`: held by its end and pointing ahead in third person, like a stick. `tool(..)` does it already, and so does the tag `handheld`
 - `wearable(&HEAD, inflate, texture)` for armor and anything else worn in an equipment slot
-- `on_use`: what using it does. Before it runs anyone can say no to `question::USE_ITEM`, and after it the `ITEM_USED` event tells every mod (testmod heals with base's food through it)
+- `on_use`: what using it does. Before it runs anyone can say no to `question::USE_ITEM`, and after it the `ITEM_USED` event tells every mod (testmod heals with base's food through it). `base_api::eat` is the base game's eating: `.set(&FOOD, ..).use_ticks(32).on_use(base_api::eat)`
 
 ### Entities
 `r.entity(&ENTITY)` and then:
+- every entity gets a spawn egg by itself, `<name>_spawn_egg`, called after it and in the creative tab of eggs. Draw `item/<name>_spawn_egg.png` or it looks generic; `no_egg()` for what isn't a creature
 - `size(w, h)`, `health`, `speed`
 - `hostile()` or `passive()` or `category(..)`
 - `texture` (by default `entity/<name>`)
@@ -255,12 +266,23 @@ Anywhere a block is named as text, `base:furnace[lit=true]` picks a state: in st
 - `sound("hurt")`, `sound("death")`, `sound("ambient")`: files from `sounds/entity/<name>/`
 - `animations(..)`
 - `goals(..)` for AI (see `weft_sdk::ai`); `ai::melee(reach)` with `.attack_damage(3.0)` makes it hit like a player does, so `question::ATTACK` and `chain::ATTACK_DAMAGE` (a strength effect, a peaceful zone) work on mobs too
+- `neutral(|w, mob, player| ..)`: leaves a player alone while that holds, unless they hit it in the last 20 seconds. A spider is calm in daylight, and a mob that only minds you up close is `|_, m, p| dist(m, p) > 16.0`. `ai::melee` and `ai::follow_player` go by it, `ai::target` is the same for goals of your own
 - `on_tick`: every entity of the kind at once, once per tick
 - `on_hurt(|w, hurt| ..)`, `on_death(|w, death| ..)`: the `ENTITY_HURT` and `ENTITY_DIED` events for this kind. The damage itself is the `chain::DAMAGE` chain and `question::HURT` can stop it, for any kind, yours or not
 - `on_interact`: a player right clicked one (after `question::INTERACT_ENTITY`)
 
 Moving platforms: `solid()`, `kinematic()`, `carry_height(..)`, and
-`blocks(&DECK)` with a template (`r.template(&DECK).fill("base:oak_planks", from, to)`) makes a flying structure players can build on; its box is what the blocks fill, no `size` needed. `EntityState.size` is an entity's box and eye height as they are now (crouching and `w.set_size` included), so `st.pos[1] + st.size[2]` is where its eyes are.
+`blocks(&DECK)` with a template (`r.template(&DECK).fill("base:oak_planks", from, to)`) makes a flying structure players can build on; its box is what the blocks fill, no `size` needed. `EntityState.size` is an entity's box and eye height as they are now (crouching and `w.set_size` included), so `st.pos[1] + st.size[2]` is where its eyes are. `w.set_scale(id, 1.2)` draws one entity a fifth bigger than its kind, its box and eyes alike (individuals that differ in size; not saved, so set it again when it loads).
+
+Riding: `w.mount(rider, mount, seat)` seats a player (or any entity) on another, `seat` blocks
+above its feet; `w.dismount(rider)` gets it off where it is (`w.teleport` it beside). A riding
+player's client puts them on the seat in a sitting pose and stops walking them; their movement
+keys come to the server as `w.keys(player)` (`held_keys::FORWARD`, `BACK`, `LEFT`, `RIGHT`,
+`JUMP`, `SPRINT`, `SNEAK`), and the mount's mod steers it with them (`w.walk(..)` each tick,
+facing `w.entity(rider).yaw`), sneaking usually meaning "get off". `w.rider_of(mount)` and
+`w.mount_of(rider)` say who rides what. Riders aren't saved, and a mount that dies or is removed
+leaves its rider on foot. The animals mod's Utahraptor (`mods/animals/src/riding.rs`) is a worked
+example.
 
 ### Machines
 `r.machine(&BLOCK, &MENU)` is block + block entity + inventory + menu + screen in one go.\
@@ -272,13 +294,19 @@ Look at testmod's generator for an example.
 - `flow_delay`, `drop_off`, `slope_find`, `flows_up()`
 - `renewable(n)`: a new source where n sources meet (water 2)
 - `temperature`
+- `not_swimmable()`: sprinting in it doesn't swim. `attribute::SWIM_ANYWHERE` lifts that per player, with a modifier for as long as it should last: `w.add_modifier(id, &attribute::SWIM_ANYWHERE, "mymod:swims", attr_op::ADD, 1.0, 20)`. It changes nothing else: a burning liquid keeps burning unless `question::HURT` says no
+- `fog(rgb, blocks)` and `overlay(texture, opacity)` or `no_overlay()`: what you see from inside. By default both come from its texture; set them when the inside should look different from the surface: `r.liquid(&TAR).fog(0x1A1408, 6.0).overlay("tar_inside", 0.4)`
+- `drag(d)`: how fast things move inside (water 1, lava 0.4), `light`, `opacity` (light it absorbs per block), `texture`, `tint`
 - `bucket(..)`
+
+Another mod's liquid: `r.change_liquid(&WATER).fog(0x204020, 12.0)`, also `overlay`, `no_overlay`, `swimmable(bool)`. What you don't set stays.
 
 Reactions: `r.liquid_reaction("#hot", "#water").source_block("obsidian")`.
 
 ### World
 - `r.biome(..)` with its climate, surface and tints (`.temperature(0.35..).surface(..).tint(&tints::GRASS, ..)`); terrain rules inherit them
 - `r.dimension(..)` (`spawn`, `height`, `gravity`, `fixed_time`, `sky`, `bare`, or `generator` + `column` to fill it in code)
+- `r.sky_body(&DIM, &OBJECT)`, `r.sky_stars`, `r.sky_dome`, `r.remove_sky` for what is in its sky, the sun and the moon included
 - `r.terrain(dim)` for its terrain, yours or another mod's
 - `r.ore(block)`, in every dimension whose stone it replaces (`.dimension(..)` limits it)
 - `r.scatter(&TREES)` for trees and the like, `r.decorate(f)` for plants, in every dimension
@@ -328,7 +356,7 @@ r.attribute(&MANA, 100.0, 0.0, 1000.0);
 Two helpers go with them. `w.after(entity, ticks, &EVENT, value)` fires an event later, saved with the entity (base's animals calm down 3 seconds after being hurt, players' hunger pulses every 4); one per entity and event, so setting it again moves it, instead of counters in components. `r.world_tick(|w| ..)` runs once per tick in every region for logic that is nobody's own, `w.players()` being the players there.
 
 ### Built-in events
-`BLOCK_BROKEN`, `BLOCK_PLACED`, `ITEM_PICKED_UP`, `ITEM_USED`, `ENTITY_HURT`, `ENTITY_DIED`, `PLAYER_JOINED`, and the questions `BREAK_BLOCK`, `PLACE_BLOCK`, `USE_BLOCK`, `USE_ITEM`, `INTERACT_ENTITY`, `ATTACK`, `HURT`, `PICKUP_ITEM`, `ENTER_DIMENSION`\
+`BLOCK_BROKEN`, `BLOCK_PLACED`, `ITEM_PICKED_UP`, `ITEM_USED`, `ENTITY_HURT`, `ENTITY_DIED`, `PLAYER_JOINED`, `PLAYER_RESPAWNED`, and the questions `BREAK_BLOCK`, `PLACE_BLOCK`, `USE_BLOCK`, `USE_ITEM`, `INTERACT_ENTITY`, `ATTACK`, `HURT`, `PICKUP_ITEM`, `ENTER_DIMENSION`\
 base adds `base:smelted`.
 
 ### Systems and energy
@@ -345,18 +373,21 @@ The usage string is the whole spec: the engine parses it, checks types, complete
 Reading values by name: `cmd.int("amount")`, `cmd.targets("who")`.\
 Answering: `cmd.reply("mymod.healed", &[Arg::Int(amount)])` with `mymod.healed = healed by {0}` in your lang files. The reply travels as the key and its arguments and each player's client formats it in its own language, so a server never sends English text. The same goes for gizmo labels (`w.draw_text(&GROUP, pos, key, &args, ..)`) and the client's `draw_text`/`screen_text`.\
 The client draws the same shapes for one frame: `c.draw_line/box/fill/text(None, ..)`, or `Some(&GROUP)` to show them only while that group is on.\
+Who may run it goes by permission levels, the same for the engine's commands and yours: 0 everyone, 1 moderator, 2 game master, 3 admin, 4 the host. A command asks for level 2 unless you say otherwise, `r.command(..).permission(permission::EVERYONE)`, and players below it are refused and not offered it. `/op <who> [level]` hands them out, and for anything else your mod does, `w.permission(player)` tells a player's level and `w.set_permission(player, level)` changes it.
+
 The callback gets a `ServerCommand`: `cmd.world()` is where it runs, and what it changes settles when it returns (neighbors updated, events delivered), like `/setblock`.`r.client_command` is the same for commands that run on the client that typed them: a `ClientCommand` with `cmd.client()` and no world.`r.command_branch("time", "dawn", ..)` adds a branch to someone else's command (`r.client_command_branch` for client ones like `/gizmo`), and a `r.command` named like one of the engine's (`/give`, `/tp`...) replaces it.
 
 ## World API
 
 Inside any callback you get a `World` (`w`):
+- the world's seed (`seed`, and `position_seed(pos)`, `cube_seed(pos)` for a number that belongs to a place: what a chest holds when first opened, a villager's trades)
 - blocks (`get`, `set`, `schedule`); for anything big, `w.fill_sphere(center, radius, block, keep_unbreakable)` fills a whole ball in one call (a crater with air): the engine does it at the end of the tick on every core, a cube at a time, lights each cube once, loads what it opens up in players' views right away and gives the rest the change when it loads. Players see it appear whole. Hundreds of blocks of radius take well under a second, where `set` per block costs about 1.6 µs each. Testmod's dynamite uses it
-- entities (`spawn`, `entity`, `set_entity`, `damage`, `near`, `navigate`, `walk`, `push` for a trampoline or a blast, players too). Speed and jump are attributes (`attribute::MOVEMENT_SPEED`, `JUMP_STRENGTH`) for mobs and players alike: `w.add_modifier(player, &MOVEMENT_SPEED, ..)` is a speed effect
+- entities (`spawn`, `entity`, `set_entity`, `damage`, `near`, `near_bodies` for what can be hit, `dropped_item` and `set_dropped_item` for what a dropped item carries, `navigate`, `walk`, `push` for a trampoline or a blast, players too). Speed and jump are attributes (`attribute::MOVEMENT_SPEED`, `JUMP_STRENGTH`) for mobs and players alike: `w.add_modifier(player, &MOVEMENT_SPEED, ..)` is a speed effect Reach and mining speed are attributes too (`attribute::BLOCK_REACH`, `ENTITY_REACH`, `MINING_SPEED`), and the client reads them: a modifier is all a long tool or a haste effect takes. `w.in_liquid(pos)` knows a liquid's surface, which the block alone doesn't tell.
 - inventories (`inventory(id).get/set/insert`, `inventory(id).group("fuel")`); a player's by the groups its inventory was declared with (`r.player_inventory().group("hotbar", Slots::row(9).hotbar())..`), `core:equipment` for all equipment slots
 - components, energy, menus
 - particles (`w.spawn_particles(&SPARK, pos).count(20)`)
 - sounds (`w.play_sound(&S, pos, volume)`)
-- game rules: settings of the world, `r.config(&HARD_MODE).bool(false).world()`, read with `HARD_MODE.get()`, changed with `/rule hard_mode 1`
+- game rules: settings of the world, `r.config(&HARD_MODE).bool(false).world()`, read with `HARD_MODE.get()`, changed with `/rule hard_mode 1`; toggles and choices with a name in the language files (`config.<ns>.<key>`) are also offered on Create New World
 - gizmos for debugging (`w.draw_line/box/text/fill(&GROUP, ..)`)
 
 ## Client side
@@ -372,6 +403,15 @@ Also:
 - messages both ways on a typed channel: `static BOOST: Channel<Boost> = Channel::named("boost")` with a `value!` struct (or `String`, `Vec<u8>`, `()`), `r.packet(&BOOST, |p, b| ..)` on the server (`p.reply(&OTHER, &v)` answers), `r.client_packet` on the client, `w.send` / `client.send`. Both ends must declare the same type, the engine checks it like event values
 - `client.run_command("/tp ~ ~5 ~")` runs a command as the player and `client.command_reply(id)` gives its answer to your code instead of the chat (testkit drives its server half like this)
 - frame hooks (`r.client_frame`)
+- skins painted from a few bytes: `r.entity_skin(&MOB, &GENES, |genes, skin| ..)` paints each
+  mob's own texture on every client from its component (registered with `SYNC_WATCHERS`): `skin`
+  is a copy of the kind's texture (`skin.rgba`, `width` x `height`) to paint over, drawn on the
+  mob in its own kind and every look with the same texture, painted again when the component
+  changes. Only the component travels. The animals mod paints every animal's coat from its genes
+  this way (`mods/animals/src/coats.rs`). The same callback may set the mob's build:
+  `skin.scale_bone("neck_0", [1.0, 1.1, 1.1])` draws that bone's own boxes scaled about its pivot
+  (along the model's axes) in every look of the mob, its child bones keeping their size and moving
+  with its ends, the mob raised or lowered so its feet stay on the ground (up to 64 bones)
 - cosmetics of your mobs: `r.client_entity_tick(&MOB, |c, e| ..)` every frame, with its position, distance walked, age and death; it replaces the engine's steps, idle noises and death smoke unless you call `e.engine_effects()`
 - particles and screen effects from shader snippets in `assets/shaders`
 - sounds with `r.sound(..).category(..)` (every category gets its own volume slider), music
@@ -385,7 +425,7 @@ Also:
 F3 shows your mod's time per tick. `/gizmo` draws debug shapes, your own groups included (`r.gizmo_group(&PIPES)`).
 
 A panic in your callback disables that callback and names your mod in the log instead of taking the game down.\
-Native crashes write a report into `run/crash-reports/` with the mod that was running.
+Native crashes write a report into `crash-reports/` of the game folder (`run/` from the repo) with the mod that was running.
 
 F3+T reloads textures, lang, shaders and UI without restarting.
 
@@ -403,8 +443,10 @@ You can contact me on Discord: `@vortex_so`
 ## Guides for other systems
 - [Textures](textures.md): animation, glow, tinted overlays
 - [CTM](ctm.md): connected and varied block textures (glass, logs, random stone)
-- [Tooltips](tooltips.md): item tooltips, rich text and effects, adding them from other mods and packs
+- [Redstone](redstone.md): wire on any face, gates, pistons, and blocks of your own that join in
+- [Localization](localization.md): all text, item tooltips, rich text and effects, icons and meters, lines by tag, adding them from other mods and packs
 - [Worldgen](worldgen.md): ores, structures, biomes, spawns, new dimensions and terrain, also in other mods' dimensions
+- [Sky](sky.md): suns, moons, stars and skyboxes in any dimension, changing or removing the ones there
 - [Models and animations](models.md): mob models in code or Blockbench, keyframes, the first-person hand, armor
 - [UI](ui.md): screens, HUD, menus, looks, GUI textures
 - [Machines](machines.md): blocks with inventories, recipes, energy

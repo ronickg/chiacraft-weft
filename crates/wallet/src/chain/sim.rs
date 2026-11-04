@@ -50,17 +50,11 @@ impl Sim {
             .enable_all()
             .build()
             .map_err(|e| Error::new(e.to_string()))?;
-        let config = chia_sdk_test::PeerSimulatorConfig {
-            genesis_challenge: network.genesis_challenge(),
-            ..Default::default()
-        };
+        let config = chia_sdk_test::PeerSimulatorConfig { genesis_challenge: network.genesis_challenge(), ..Default::default() };
         let sim = rt
             .block_on(PeerSimulator::with_config(config))
             .map_err(|e| Error::new(e.to_string()))?;
-        Ok(Self {
-            rt,
-            sim: Arc::new(sim),
-        })
+        Ok(Self { rt, sim: Arc::new(sim) })
     }
 
     /// `ws://127.0.0.1:<port>`: where a reader in another process reaches it. The simulator keeps
@@ -81,21 +75,9 @@ impl Sim {
     /// subscribed are told about; [`Sim::fund`] only adds a coin, which a running reader doesn't
     /// see until it syncs again). Paid from a throwaway faucet key funded on the spot.
     pub fn pay(&self, puzzle_hash: Bytes32, amount: u64) -> Result<Coin> {
-        let faucet = WalletKeys::from_mnemonic(
-            &crate::Mnemonic::generate()?,
-            super::ChainNetwork::Testnet11,
-            1,
-        );
+        let faucet = WalletKeys::from_mnemonic(&crate::Mnemonic::generate()?, super::ChainNetwork::Testnet11, 1);
         self.fund(faucet.primary(), amount);
-        let out = self.spend(
-            &faucet,
-            &[Action::send(
-                Id::Xch,
-                puzzle_hash,
-                amount,
-                chia_puzzle_types::Memos::None,
-            )],
-        )?;
+        let out = self.spend(&faucet, &[Action::send(Id::Xch, puzzle_hash, amount, chia_puzzle_types::Memos::None)])?;
         out.xch
             .iter()
             .find(|c| c.puzzle_hash == puzzle_hash)
@@ -145,10 +127,7 @@ impl Sim {
             Ok(match ack.status {
                 1 => PushOutcome::Accepted { txid: ack.txid },
                 2 => PushOutcome::Pending { txid: ack.txid },
-                _ => PushOutcome::Rejected {
-                    txid: ack.txid,
-                    error: ack.error.unwrap_or_default(),
-                },
+                _ => PushOutcome::Rejected { txid: ack.txid, error: ack.error.unwrap_or_default() },
             })
         })
     }
@@ -167,12 +146,7 @@ impl Sim {
             .apply(&mut ctx, actions)
             .map_err(|e| Error::new(e.to_string()))?;
         let outputs = spends
-            .finish_with_keys(
-                &mut ctx,
-                &deltas,
-                Relation::AssertConcurrent,
-                &keys.synthetic_keys(),
-            )
+            .finish_with_keys(&mut ctx, &deltas, Relation::AssertConcurrent, &keys.synthetic_keys())
             .map_err(|e| Error::new(e.to_string()))?;
         let coin_spends = ctx.take();
         let signature = keys.sign(&coin_spends)?;
@@ -198,11 +172,7 @@ impl Sim {
     /// faucet key, so the owner signs nothing and the sponsor never holds it. Its launcher id.
     pub fn sponsor_did(&self, p2_puzzle_hash: Bytes32) -> Result<Bytes32> {
         use chia_sdk_driver::{Launcher, StandardLayer};
-        let faucet = WalletKeys::from_mnemonic(
-            &crate::Mnemonic::generate()?,
-            super::ChainNetwork::Testnet11,
-            1,
-        );
+        let faucet = WalletKeys::from_mnemonic(&crate::Mnemonic::generate()?, super::ChainNetwork::Testnet11, 1);
         let coin = self.fund(faucet.primary(), 1_000);
         let mut ctx = SpendContext::new();
         let launcher = Launcher::new(coin.coin_id(), 1);
@@ -210,11 +180,7 @@ impl Sim {
         let (conditions, _did) = launcher
             .create_eve_did(&mut ctx, p2_puzzle_hash, None, 1, HashedPtr::NIL)
             .map_err(|e| Error::new(e.to_string()))?;
-        let conditions = conditions.create_coin(
-            faucet.primary(),
-            coin.amount - 1,
-            chia_puzzle_types::Memos::None,
-        );
+        let conditions = conditions.create_coin(faucet.primary(), coin.amount - 1, chia_puzzle_types::Memos::None);
         let key = *faucet
             .synthetic_keys()
             .get(&faucet.primary())
@@ -234,16 +200,7 @@ impl Sim {
 
     /// An NFT (no royalty, no DID) held by `keys`' primary address.
     pub fn mint_nft(&self, keys: &WalletKeys) -> Result<Bytes32> {
-        let out = self.spend(
-            keys,
-            &[Action::mint_nft(
-                HashedPtr::NIL,
-                Bytes32::default(),
-                keys.primary(),
-                0,
-                1,
-            )],
-        )?;
+        let out = self.spend(keys, &[Action::mint_nft(HashedPtr::NIL, Bytes32::default(), keys.primary(), 0, 1)])?;
         Ok(out.nfts[&Id::New(0)].info.launcher_id)
     }
 

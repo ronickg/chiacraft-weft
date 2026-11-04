@@ -18,6 +18,10 @@
 //! bench 5 label       # BENCH line over 5 seconds
 //! host ticket.txt     # host, write the join ticket there
 //! join ticket.txt     # join with the ticket from that file (waits for it)
+//! open name           # leave this world and open (or make) the saved world called name
+//! leave               # leave the world for the title screen
+//! tap screen query    # once `screen` is open, clicks the element `query` (`id:x`, `text:x`) until it closes or the element goes
+//! tap_once screen query  # the same, one click (a text field, a button that stays)
 //! origin              # later via points are relative to where the player stands now
 //! where label        # logs the player's position
 //! rec start|stop     # logs a marker; tools/rec.ps1 presses the OBS hotkeys on it
@@ -45,7 +49,10 @@ pub async fn run(t: T, src: String) -> R {
         }
         let (cmd, rest) = line.split_once(' ').unwrap_or((line, ""));
         let rest = rest.trim();
-        let nums: Vec<f32> = rest.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+        let nums: Vec<f32> = rest
+            .split_whitespace()
+            .filter_map(|s| s.parse().ok())
+            .collect();
         let num = |i: usize, d: f32| nums.get(i).copied().unwrap_or(d);
         match cmd {
             "wait" => t.secs(num(0, 1.0)).await?,
@@ -101,13 +108,58 @@ pub async fn run(t: T, src: String) -> R {
             }
             "host" => {
                 t.c().host_world();
-                t.until("hosting", Duration::from_secs(60), |t| t.flag(cf::HOSTING)).await?;
+                t.until("hosting", Duration::from_secs(60), |t| t.flag(cf::HOSTING))
+                    .await?;
                 let _ = std::fs::write(rest, t.c().ticket());
+            }
+            "open" => {
+                t.c().open_world(rest, 1);
+                // The old world's client is gone by the next frames; then wait for the new one.
+                t.frames(3).await?;
+                t.until("the world open", Duration::from_secs(60), |t| t.flag(cf::JOINED))
+                    .await?;
+                t.loaded().await?;
+            }
+            "tap" => {
+                // Clicked again while a rebuilding screen may have lost the click; done once the
+                // screen changes or the element is gone (a button that did its job).
+                let (screen, query) = rest.split_once(' ').ok_or("tap: a screen and an element")?;
+                t.screen(screen).await?;
+                if !t.click_ui(query, 0) {
+                    continue;
+                }
+                for _ in 0..9 {
+                    t.frames(15).await?;
+                    if t.c().screen() != screen || !t.c().click_ui(query, 0) {
+                        break;
+                    }
+                }
+            }
+            // One click, for what stays on screen and must happen once (a text field, "Ask").
+            "tap_once" => {
+                // Only the screen's name: a focused text field keeps a screen from ever being
+                // "ready" (its caret redraws it).
+                let (screen, query) = rest
+                    .split_once(' ')
+                    .ok_or("tap_once: a screen and an element")?;
+                let name = screen.to_string();
+                t.until(&format!("screen {screen}"), Duration::from_secs(60), move |t| t.c().screen() == name)
+                    .await?;
+                t.frames(15).await?;
+                t.click_ui(query, 0);
+                t.frames(15).await?;
+            }
+            "leave" => {
+                t.c().leave_world();
+                t.screen("core:title").await?;
             }
             "join" => {
                 let mut ticket = String::new();
                 t.until("ticket file", Duration::from_secs(120), |_| {
-                    ticket = std::fs::read_to_string(rest).unwrap_or_default().trim().to_string();
+                    ticket = std::fs::read_to_string(rest)
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string();
                     !ticket.is_empty()
                 })
                 .await?;
@@ -157,10 +209,16 @@ fn waypoint(origin: [f64; 3], rest: &str) -> Option<[f64; 5]> {
         Some((h, a)) => (h, Some(a)),
         None => (rest, None),
     };
-    let n: Vec<f64> = head.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+    let n: Vec<f64> = head
+        .split_whitespace()
+        .filter_map(|s| s.parse().ok())
+        .collect();
     match at {
         Some(a) => {
-            let m: Vec<f64> = a.split_whitespace().filter_map(|s| s.parse().ok()).collect();
+            let m: Vec<f64> = a
+                .split_whitespace()
+                .filter_map(|s| s.parse().ok())
+                .collect();
             if n.len() < 3 || m.len() < 3 {
                 return None;
             }
@@ -229,7 +287,13 @@ async fn fly(t: &T, mut pts: Vec<[f64; 5]>, secs: f64, eye: f64) -> R {
         };
         let (a, la) = dense[i.saturating_sub(1)];
         let (b, lb) = dense[i];
-        let f = if turn { 0.0 } else if lb > la { ((e * len - la) / (lb - la)).clamp(0.0, 1.0) } else { 1.0 };
+        let f = if turn {
+            0.0
+        } else if lb > la {
+            ((e * len - la) / (lb - la)).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
         let mut p = [0.0; 5];
         for k in 0..5 {
             p[k] = a[k] + (b[k] - a[k]) * f;

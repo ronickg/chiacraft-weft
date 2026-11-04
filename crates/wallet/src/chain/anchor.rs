@@ -13,21 +13,13 @@ use clvm_traits::{FromClvm, ToClvm};
 
 /// The spends that put `root` on chain from `coin` (one of `keys`' coins), paying `fee`; and the
 /// anchor coin they create.
-pub fn build(
-    keys: &WalletKeys,
-    coin: Coin,
-    root: [u8; 32],
-    fee: u64,
-) -> Result<(Vec<CoinSpend>, chia_bls::Signature, Coin)> {
+pub fn build(keys: &WalletKeys, coin: Coin, root: [u8; 32], fee: u64) -> Result<(Vec<CoinSpend>, chia_bls::Signature, Coin)> {
     if coin.amount <= fee {
         return Err(Error::new("the coin doesn't cover the anchor's fee"));
     }
     let mut ctx = SpendContext::new();
     let memos = ctx
-        .memos(&vec![
-            Bytes::from(ANCHOR_MEMO.to_vec()),
-            Bytes::from(root.to_vec()),
-        ])
+        .memos(&vec![Bytes::from(ANCHOR_MEMO.to_vec()), Bytes::from(root.to_vec())])
         .map_err(failed("anchor"))?;
     let mut spends = Spends::new(keys.primary());
     spends.add(coin);
@@ -38,12 +30,7 @@ pub fn build(
     }
     let deltas = spends.apply(&mut ctx, &actions).map_err(failed("anchor"))?;
     spends
-        .finish_with_keys(
-            &mut ctx,
-            &deltas,
-            Relation::AssertConcurrent,
-            &keys.synthetic_keys(),
-        )
+        .finish_with_keys(&mut ctx, &deltas, Relation::AssertConcurrent, &keys.synthetic_keys())
         .map_err(failed("anchor"))?;
     let coin_spends = ctx.take();
     let signature = keys.sign(&coin_spends)?;

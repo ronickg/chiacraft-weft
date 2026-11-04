@@ -79,6 +79,7 @@ r.biome(&DESERT).temperature(0.35..).humidity(..0.0).surface("sand", "sand", 3).
 - `bare_above(y)`: plain stone above this height
 - `frozen(block)`: the water surface turns into this block, and the biome gets the tag `frozen` (base grows no flowers there)
 - `tint(&kind, color)`: what blocks tinted with that kind take here, `tints::GRASS`, `FOLIAGE`, `WATER` or a mod's own kind. Kinds you don't give keep their default. To color another mod's biome with your kind, `r.biome_tint(&biome, &kind, color)`.
+- `snows()`: rain falls as snow here
 
 Tags (`tag("animals")`) are how everything else asks what a biome is, since spawns, ores and structures look at tags and never at names. `set(&COMPONENT, value)` attaches data, like how many trees base grows there.
 
@@ -109,6 +110,7 @@ All the settings:
 - `no_sky_light()`: no sky light at all, for caves and the like
 - `gravity(g)`: blocks per second squared, 32 by default
 - `day_length(ticks)` or `fixed_time(time)`: either a day of that length, or a time of day that never changes
+- `seasons(days, day_swing)`: a year of that many days, the days longer in summer and shorter in winter by `day_swing` (a share of the day: 0.17 is about sixteen hours of light at midsummer and eight at midwinter, midsummer three eighths into the year); the sun rises and sets by it, and so do daylight and the sky
 - `sky(sky, fog)`: the two colors
 - `ambient(level)`: the lowest light any block gets, 0 to 15
 - `no_block_updates()`: nothing grows, falls or flows here

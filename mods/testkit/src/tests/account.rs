@@ -17,7 +17,8 @@ fn shown(t: &T, text: &str) -> bool {
 
 async fn wait_text(t: &T, text: &str) -> R {
     let what = format!("\"{text}\" on screen");
-    t.until(&what, Duration::from_secs(3), |t| shown(t, text)).await
+    t.until(&what, Duration::from_secs(3), |t| shown(t, text))
+        .await
 }
 
 pub async fn account(t: T) -> R {
@@ -29,11 +30,18 @@ pub async fn account(t: T) -> R {
     t.laid_out(&["text:from your account's 24 words", "text:Copy Key", "text:Account and Words"]);
     let needs_backup = shown(&t, "aren't written down");
 
-    t.check(t.click_ui("text:Account and Words", 0), "the profile's Account and Words button");
-    t.screen("core:account").await?;
+    t.click_until_screen("text:Account and Words", "core:account")
+        .await?;
     t.frames(2).await?;
     t.shot("account").await?;
-    t.laid_out(&["text:Account ", "text:Identity ", "text:Kept in a file", "text:Show My 24 Words", "text:Restore from words", "id:restore_words"]);
+    t.laid_out(&[
+        "text:Account ",
+        "text:Identity ",
+        "text:Kept in a file",
+        "text:Show My 24 Words",
+        "text:Restore from words",
+        "id:restore_words",
+    ]);
     t.check_eq(shown(&t, "Write your 24 words down"), needs_backup, "the account screen agrees with the profile about the backup");
 
     // The words appear only on request, in 24 numbered places.
@@ -54,7 +62,8 @@ pub async fn account(t: T) -> R {
     } else {
         t.note("this run's account was already written down: the reminder is not checked");
         t.check(t.click_ui("text:Hide Words", 0), "the Hide Words button");
-        t.until("the words hidden", Duration::from_secs(3), |t| !shown(t, "Anyone with these words")).await?;
+        t.until("the words hidden", Duration::from_secs(3), |t| !shown(t, "Anyone with these words"))
+            .await?;
     }
 
     // Words that are not a phrase are refused; a phrase becomes the account from the next start.
@@ -70,8 +79,8 @@ pub async fn account(t: T) -> R {
     // A fresh screen has an empty field.
     t.c().close_screen();
     t.screen("core:profile").await?;
-    t.check(t.click_ui("text:Account and Words", 0), "the Account and Words button again");
-    t.screen("core:account").await?;
+    t.click_until_screen("text:Account and Words", "core:account")
+        .await?;
     t.frames(2).await?;
     t.check(t.click_ui("id:restore_words", 0), "the restore field again");
     t.frames(2).await?;

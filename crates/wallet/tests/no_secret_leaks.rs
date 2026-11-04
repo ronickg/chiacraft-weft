@@ -155,11 +155,7 @@ fn no_log_print_or_panic_takes_a_secret() {
             }
         }
     }
-    assert!(
-        found.is_empty(),
-        "wallet secrets must never be logged, printed or put in a panic (docs/identity.md):\n{}",
-        found.join("\n")
-    );
+    assert!(found.is_empty(), "wallet secrets must never be logged, printed or put in a panic (docs/identity.md):\n{}", found.join("\n"));
 }
 
 #[test]
@@ -218,8 +214,7 @@ fn secret_types_format_redacted() {
 
 #[test]
 fn the_scanner_finds_a_leak() {
-    let src =
-        r#"fn f() { log::info!("words {}", m.words().expose().join(" ")); warn!("ok {seed}"); }"#;
+    let src = r#"fn f() { log::info!("words {}", m.words().expose().join(" ")); warn!("ok {seed}"); }"#;
     let hits: Vec<_> = macro_args(src, "info!")
         .into_iter()
         .filter_map(|(_, a)| leaks(a))
@@ -236,17 +231,7 @@ fn the_scanner_finds_a_leak() {
 
 /// The chain reader's words for what must never be logged: a spend's private parts (its
 /// solutions and signatures, before it is pushed), and keys.
-const CHAIN_WORDS: &[&str] = &[
-    "bundle",
-    "coin_spend",
-    "coin_spends",
-    "solution",
-    "signature",
-    "secret",
-    "keys",
-    "sk",
-    "synthetic",
-];
+const CHAIN_WORDS: &[&str] = &["bundle", "coin_spend", "coin_spends", "solution", "signature", "secret", "keys", "sk", "synthetic"];
 
 fn chain_sources() -> Vec<PathBuf> {
     let mut out = Vec::new();
@@ -310,11 +295,7 @@ fn the_chain_reader_logs_no_spend_or_key() {
             // arguments and `SecretKey::from_bytes` at the point of signing are fine).
             let owned = t.contains(": SecretKey") || t.contains("<SecretKey");
             if owned || t.contains("static") && t.contains("SecretKey") {
-                found.push(format!(
-                    "{}:{}: a SecretKey outside Secret",
-                    path.display(),
-                    i + 1
-                ));
+                found.push(format!("{}:{}: a SecretKey outside Secret", path.display(), i + 1));
             }
         }
     }
@@ -326,8 +307,7 @@ fn admission_logs_no_spend_or_key() {
     let files = admission_sources();
     let mut found = Vec::new();
     for path in files {
-        let text =
-            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         for name in MACROS {
             for (line, args) in macro_args(&text, name) {
                 if let Some(what) = mentions(args, CHAIN_WORDS).or_else(|| leaks(args)) {
@@ -338,11 +318,7 @@ fn admission_logs_no_spend_or_key() {
         for (i, l) in text.lines().enumerate() {
             let t = l.trim_start();
             if !t.starts_with("//") && (t.contains(": SecretKey") || t.contains("<SecretKey")) {
-                found.push(format!(
-                    "{}:{}: a SecretKey outside Secret",
-                    path.display(),
-                    i + 1
-                ));
+                found.push(format!("{}:{}: a SecretKey outside Secret", path.display(), i + 1));
             }
         }
     }
@@ -382,9 +358,7 @@ fn wallet_keys_format_redacted() {
     let cache = ChainCache::new(ChainNetwork::Testnet11, keys.puzzle_hashes());
     let json = serde_json::to_string(&cache).unwrap();
     assert!(!json.contains(&chiacraft_wallet::keys::hex(m.entropy().expose())));
-    assert!(!json.contains(&chiacraft_wallet::keys::hex(
-        &chiacraft_wallet::keys::facts_of(&m).master
-    )));
+    assert!(!json.contains(&chiacraft_wallet::keys::hex(&chiacraft_wallet::keys::facts_of(&m).master)));
 }
 
 /// Identity row I8's code: the sponsor contract, hardened addresses, DIDs made and linked from the
@@ -407,8 +381,7 @@ fn did_sources() -> Vec<PathBuf> {
 fn did_code_logs_no_spend_key_or_passphrase() {
     let mut found = Vec::new();
     for path in did_sources() {
-        let text =
-            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         for name in MACROS {
             for (line, args) in macro_args(&text, name) {
                 if let Some(what) = mentions(args, CHAIN_WORDS)
@@ -422,13 +395,9 @@ fn did_code_logs_no_spend_key_or_passphrase() {
     }
     assert!(found.is_empty(), "{}", found.join("\n"));
     // Both passphrase prompts draw their field as a secret (dots; redacted to the control socket).
-    for (file, field) in [
-        ("crates/horizon-client/src/menus/account.rs", "PASS,"),
-        (
-            "crates/horizon-client/src/game/admission.rs",
-            "\"admission.pass\",",
-        ),
-    ] {
+    for (file, field) in
+        [("crates/horizon-client/src/menus/account.rs", "PASS,"), ("crates/horizon-client/src/game/admission.rs", "\"admission.pass\",")]
+    {
         let text = std::fs::read_to_string(repo().join(file)).unwrap();
         let mut seen = 0;
         for (i, _) in text.match_indices(field) {
@@ -449,9 +418,7 @@ fn sponsor_requests_carry_nothing_secret() {
     let r = chiacraft_wallet::sponsor::Request::sign(&s, "testnet11", "txch1x", 1).unwrap();
     let json = r.to_json();
     assert!(!json.contains(&chiacraft_wallet::keys::hex(m.entropy().expose())));
-    assert!(!json.contains(&chiacraft_wallet::keys::hex(
-        &chiacraft_wallet::keys::facts_of(&m).master
-    )));
+    assert!(!json.contains(&chiacraft_wallet::keys::hex(&chiacraft_wallet::keys::facts_of(&m).master)));
     let words = m.words();
     assert!(!json.contains(&words.expose()[..3].join(" ")));
 }
@@ -482,8 +449,7 @@ fn in_test(text: &str, i: usize) -> bool {
 fn achievements_sign_only_through_the_signer_for_the_call() {
     let mut found = Vec::new();
     for path in achievement_sources() {
-        let text =
-            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         for name in MACROS {
             for (line, args) in macro_args(&text, name) {
                 if let Some(what) = mentions(args, CHAIN_WORDS).or_else(|| leaks(args)) {
@@ -497,13 +463,7 @@ fn achievements_sign_only_through_the_signer_for_the_call() {
             if t.starts_with("//") {
                 continue;
             }
-            for bad in [
-                "SecretKey",
-                ".expose(",
-                "reveal(",
-                "from_mnemonic(",
-                "WalletKeys",
-            ] {
+            for bad in ["SecretKey", ".expose(", "reveal(", "from_mnemonic(", "WalletKeys"] {
                 if t.contains(bad) && !in_test(&text, i) {
                     found.push(format!("{}:{}: {bad}", path.display(), i + 1));
                 }
@@ -512,11 +472,7 @@ fn achievements_sign_only_through_the_signer_for_the_call() {
                 in_state = true;
             }
             if in_state && t.contains("Signer") {
-                found.push(format!(
-                    "{}:{}: the state keeps a signer",
-                    path.display(),
-                    i + 1
-                ));
+                found.push(format!("{}:{}: the state keeps a signer", path.display(), i + 1));
             }
             if in_state && t == "}" {
                 in_state = false;
@@ -541,8 +497,7 @@ fn the_live_test_tool_writes_no_secret() {
     ];
     let mut found = Vec::new();
     for path in &files {
-        let text =
-            std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         for name in ["writeln!", "write!", "format!", "say", "Error::new"]
             .iter()
             .chain(MACROS)
@@ -557,10 +512,7 @@ fn the_live_test_tool_writes_no_secret() {
     let tool = std::fs::read_to_string(wallet.join("chain/tool.rs")).unwrap();
     // The words are read into a Secret and exposed once: to parse them.
     let exposed: Vec<&str> = tool.lines().filter(|l| l.contains(".expose(")).collect();
-    assert!(
-        exposed.len() == 1 && exposed[0].contains("Mnemonic::parse("),
-        "{exposed:?}"
-    );
+    assert!(exposed.len() == 1 && exposed[0].contains("Mnemonic::parse("), "{exposed:?}");
     assert!(!tool.contains(".words()"), "the tool never lists the words");
     let bin = std::fs::read_to_string(wallet.join("bin/chiacraft-wallet-test.rs")).unwrap();
     assert!(bin.contains("log::LevelFilter::Warn") && !bin.contains("LevelFilter::Debug"));
@@ -599,18 +551,13 @@ fn the_onboarding_scripts_print_no_words() {
             if traces {
                 found.push(format!("{name}:{}: traces commands", i + 1));
             }
-            let words_var = [
-                "$HORIZON_SERVER_WORDS",
-                "${HORIZON_SERVER_WORDS",
-                "$HORIZON_SPONSOR_WORDS",
-                "${HORIZON_SPONSOR_WORDS",
-                "${!direct",
-            ]
-            .iter()
-            .any(|v| {
-                t.match_indices(v)
-                    .any(|(at, _)| !t[at + v.len()..].starts_with("_FILE"))
-            });
+            let words_var =
+                ["$HORIZON_SERVER_WORDS", "${HORIZON_SERVER_WORDS", "$HORIZON_SPONSOR_WORDS", "${HORIZON_SPONSOR_WORDS", "${!direct"]
+                    .iter()
+                    .any(|v| {
+                        t.match_indices(v)
+                            .any(|(at, _)| !t[at + v.len()..].starts_with("_FILE"))
+                    });
             let prints = t.contains("echo ") || t.contains("printf ");
             // The one comparison prints into a pipe that normalises it, never to the terminal.
             if words_var && prints && !t.contains("| tr -s") {

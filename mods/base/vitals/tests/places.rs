@@ -1,0 +1,102 @@
+//! The climate table against the research it comes from (`reports/ecology/biome_climates.json`):
+//! each overworld biome's year mean, its seasons and its rainiest season stay those of its real
+//! place, so the table can't drift from the research unnoticed. The Cretaceous's are estimates
+//! from the rocks, with no months to compare.
+
+use vitals::climate::BIOMES;
+
+const RESEARCH: &str = include_str!("../../../../reports/ecology/biome_climates.json");
+
+/// Months to the calendar's seasons (spring first), a southern place six months on.
+fn season_of(month: usize, south: bool) -> usize {
+    let m = if south { (month + 6) % 12 } else { month };
+    // March, April, May are spring; December, January, February winter.
+    ((m + 10) % 12) / 3
+}
+
+#[test]
+fn the_climates_are_their_real_places() {
+    let places: Vec<serde_json::Value> = serde_json::from_str(RESEARCH).expect("biome_climates.json");
+    let mut problems = Vec::new();
+    for c in BIOMES.iter().filter(|c| !c.underground) {
+        let Some(p) = places.iter().find(|p| p["biome"] == c.biome) else {
+            problems.push(format!("{}: not in the research (reports/ecology/biome_climates.json)", c.biome));
+            continue;
+        };
+        if p["estimate"].as_bool() == Some(true) {
+            continue;
+        }
+        let months = p["months"].as_array().expect("months");
+        let t: Vec<f32> = months
+            .iter()
+            .map(|m| m["t_mean"].as_f64().unwrap_or(0.0) as f32)
+            .collect();
+        let mean = t.iter().sum::<f32>() / 12.0;
+        let half = (t.iter().cloned().fold(f32::MIN, f32::max) - t.iter().cloned().fold(f32::MAX, f32::min)) / 2.0;
+        // The mountains' mean is at sea level (the air cools with height): not compared.
+        if c.biome != "base:mountains" && (mean - c.celsius).abs() > 1.0 {
+            problems.push(format!("{}: year mean {} °C, {} has {mean:.1}", c.biome, c.celsius, c.place));
+        }
+        if (half - c.seasons).abs() > 1.0 {
+            problems.push(format!("{}: seasons ±{} °C, {} has ±{half:.1}", c.biome, c.seasons, c.place));
+        }
+        let south = p["hemisphere"].as_str().is_some_and(|h| h.starts_with('s'));
+        let mut days = [0.0f32; 4];
+        for (i, m) in months.iter().enumerate() {
+            days[season_of(i, south)] += m["rain_days"].as_f64().unwrap_or(0.0) as f32;
+        }
+        // The first of equals (max_by keeps the last, so from the end).
+        let rainiest = |v: &[f32]| (0..4).rev().max_by(|&a, &b| v[a].total_cmp(&v[b])).unwrap();
+        if rainiest(&days) != rainiest(&c.rain) {
+            problems.push(format!(
+                "{}: rainiest in season {} of the table, but {} rains most in season {}",
+                c.biome,
+                rainiest(&c.rain),
+                c.place,
+                rainiest(&days)
+            ));
+        }
+    }
+    assert!(problems.is_empty(), "\n{}\n(vitals::climate::BIOMES against the research)\n", problems.join("\n"));
+}
+
+/// Every growing plant grows somewhere, in some season, at least a third of its best: a plant
+/// with warmth or water no biome gives would never grow (`vitals::plants` against the climates).
+#[test]
+fn every_plant_grows_somewhere() {
+    use vitals::plants::{PLANTS, season_rate};
+    let mut problems = Vec::new();
+    for p in &PLANTS {
+        let best = BIOMES
+            .iter()
+            .filter(|c| !c.underground)
+            .flat_map(|c| (0..4).map(move |s| season_rate(p, c, s)))
+            .fold(0.0f32, f32::max);
+        if best < 0.33 {
+            problems.push(format!("{}: grows at most {:.0}% of its best in any biome and season", p.block, best * 100.0));
+        }
+    }
+    assert!(problems.is_empty(), "\n{}\n(vitals::plants against vitals::climate)\n", problems.join("\n"));
+}
+
+/// A plant frost hurts still has a season somewhere that it grows in (a third of its best or
+/// more) with nights above its frost (`Plant::frost` against the climates' lows): otherwise it
+/// could never be grown.
+#[test]
+fn tender_plants_have_a_frost_free_season() {
+    use vitals::plants::{HARDY, PLANTS, season_low, season_rate};
+    let mut problems = Vec::new();
+    for p in PLANTS.iter().filter(|p| p.frost > HARDY) {
+        let ok = BIOMES
+            .iter()
+            .filter(|c| !c.underground)
+            .any(|c| (0..4).any(|s| season_rate(p, c, s) >= 0.33 && season_low(c, s) >= p.frost));
+        if !ok {
+            problems.push(format!(
+                "{}: frost ({} °C) every season it grows, in every biome: its frost (vitals::plants) against the climates' nights",
+                p.block, p.frost
+            ));
+        }
+    }
+    assert!(problems.is_empty(), "\n{}\n", problems.join("\n"));
+}

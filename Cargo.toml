@@ -1,15 +1,15 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "backends/*", "mods/*", "mods/base/api"]
+members = ["crates/*", "backends/*", "mods/*", "mods/base/api", "mods/base/vitals", "mods/animals/core", "mods/animals/web"]
 # Bare `cargo build`/`cargo run` build the game and its mods, and `cargo run` starts the game (the
 # wallet's live test tool is a second binary); use `--workspace` or `-p` for everything else.
 default-members = ["crates/app", "mods/*"]
 
 [workspace.package]
-version = "26.10.2"
+version = "26.10.4"
 edition = "2024"
 license = "MPL-2.0"
-rust-version = "1.90"
+rust-version = "1.95"
 
 [workspace.dependencies]
 weft_abi = { path = "crates/abi" }
@@ -19,6 +19,7 @@ weft_render = { path = "crates/render" }
 weft_engine = { path = "crates/engine" }
 weft_vulkan = { path = "backends/vulkan" }
 base_api = { path = "mods/base/api" }
+vitals = { path = "mods/base/vitals" }
 
 ash = "0.38"
 ash-window = "0.13"
@@ -39,7 +40,7 @@ png = "0.18"
 rustc-hash = "2"
 arboard = { version = "3", default-features = false }
 iroh = "1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net", "io-util"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 kira = { version = "0.12.5", default-features = false, features = ["cpal", "wav", "pcm", "ogg", "vorbis"] }
 serde_json = "1"

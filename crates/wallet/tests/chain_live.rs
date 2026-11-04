@@ -21,10 +21,7 @@ fn live_testnet11_read() {
     }
     let puzzle_hash = match std::env::var("HORIZON_CHAIN_LIVE_ADDRESS") {
         Ok(a) => chain::parse_address(&a).expect("HORIZON_CHAIN_LIVE_ADDRESS"),
-        Err(_) => {
-            WalletKeys::from_mnemonic(&Mnemonic::generate().unwrap(), ChainNetwork::Testnet11, 1)
-                .primary()
-        }
+        Err(_) => WalletKeys::from_mnemonic(&Mnemonic::generate().unwrap(), ChainNetwork::Testnet11, 1).primary(),
     };
     let dir = std::env::temp_dir().join(format!("hz-chain-live-{}", std::process::id()));
     let mut config = ChainConfig::new(ChainNetwork::Testnet11);
@@ -37,11 +34,7 @@ fn live_testnet11_read() {
     assert!(synced, "no testnet11 peer synced in 2 minutes: {status:?}");
     assert_eq!(status.phase, Phase::Synced);
     // testnet11 passed height 4.3 million in July 2026.
-    assert!(
-        status.peak.unwrap_or(0) > 4_000_000,
-        "peak {:?}",
-        status.peak
-    );
+    assert!(status.peak.unwrap_or(0) > 4_000_000, "peak {:?}", status.peak);
     if let Ok(did) = std::env::var("HORIZON_CHAIN_LIVE_DID") {
         let id = chain::parse_did(&did).expect("HORIZON_CHAIN_LIVE_DID");
         let found = reader

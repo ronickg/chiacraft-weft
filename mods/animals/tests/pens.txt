@@ -1,0 +1,92 @@
+loaded
+chat /dim base:flatlands
+wait 6
+loaded
+idle
+chat /tk mode creative
+chat /tk fill ~-34 ~ ~8 ~-20 ~1 ~8 base:glass
+chat /tk fill ~-34 ~ ~22 ~-20 ~1 ~22 base:glass
+chat /tk fill ~-34 ~ ~8 ~-34 ~1 ~22 base:glass
+chat /tk fill ~-20 ~ ~8 ~-20 ~1 ~22 base:glass
+chat /tk spawn animals:cat ~-31 ~ ~12
+chat /tk spawn animals:cat ~-27 ~ ~12
+chat /tk spawn animals:cat ~-23 ~ ~12
+chat /tk spawn animals:cat ~-31 ~ ~17
+chat /tk fill ~-16 ~ ~8 ~-2 ~1 ~8 base:glass
+chat /tk fill ~-16 ~ ~22 ~-2 ~1 ~22 base:glass
+chat /tk fill ~-16 ~ ~8 ~-16 ~1 ~22 base:glass
+chat /tk fill ~-2 ~ ~8 ~-2 ~1 ~22 base:glass
+chat /tk spawn animals:chihuahua ~-13 ~ ~12
+chat /tk spawn animals:chihuahua ~-9 ~ ~12
+chat /tk spawn animals:chihuahua ~-5 ~ ~12
+chat /tk spawn animals:chihuahua ~-13 ~ ~17
+chat /tk fill ~2 ~ ~8 ~16 ~1 ~8 base:glass
+chat /tk fill ~2 ~ ~22 ~16 ~1 ~22 base:glass
+chat /tk fill ~2 ~ ~8 ~2 ~1 ~22 base:glass
+chat /tk fill ~16 ~ ~8 ~16 ~1 ~22 base:glass
+chat /tk spawn animals:capybara ~5 ~ ~12
+chat /tk spawn animals:capybara ~9 ~ ~12
+chat /tk spawn animals:capybara ~13 ~ ~12
+chat /tk spawn animals:capybara ~5 ~ ~17
+chat /tk spawn animals:capybara ~9 ~ ~17
+chat /tk spawn animals:capybara ~13 ~ ~17
+chat /tk fill ~20 ~ ~8 ~34 ~1 ~8 base:glass
+chat /tk fill ~20 ~ ~22 ~34 ~1 ~22 base:glass
+chat /tk fill ~20 ~ ~8 ~20 ~1 ~22 base:glass
+chat /tk fill ~34 ~ ~8 ~34 ~1 ~22 base:glass
+chat /tk spawn animals:raptor ~23 ~ ~12
+chat /tk spawn animals:raptor ~27 ~ ~12
+chat /tk spawn animals:raptor ~31 ~ ~12
+chat /tk spawn animals:raptor ~23 ~ ~17
+chat /tk spawn animals:cat ~-27 ~ ~17
+chat /tk spawn animals:cat ~-23 ~ ~17
+chat /tk spawn animals:chihuahua ~-9 ~ ~17
+chat /tk spawn animals:chihuahua ~-5 ~ ~17
+chat /tk spawn animals:raptor ~27 ~ ~17
+chat /tk spawn animals:raptor ~31 ~ ~17
+wait 2
+chat /tp ~ ~30 ~-6
+look 180 -55
+wait 1
+chat /animal reset
+chat /animal census 200
+shot pens0.png
+chat /animal speed 1000
+wait 15
+chat /animal census 200
+shot pens1.png
+wait 15
+chat /animal census 200
+shot pens2.png
+wait 15
+chat /animal census 200
+shot pens3.png
+wait 15
+chat /animal census 200
+shot pens4.png
+wait 15
+chat /animal census 200
+shot pens5.png
+wait 15
+chat /animal census 200
+shot pens6.png
+wait 15
+chat /animal census 200
+shot pens7.png
+wait 15
+chat /animal census 200
+shot pens8.png
+wait 15
+chat /animal census 200
+shot pens9.png
+wait 15
+chat /animal census 200
+shot pens10.png
+wait 15
+chat /animal census 200
+shot pens11.png
+wait 15
+chat /animal census 200
+shot pens12.png
+chat /animal speed 1
+quit

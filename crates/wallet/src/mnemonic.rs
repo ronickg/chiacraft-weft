@@ -46,8 +46,7 @@ impl Mnemonic {
     /// A fresh 24-word mnemonic from the system's randomness.
     pub fn generate() -> Result<Self> {
         let mut entropy = Secret::new([0u8; 32]);
-        getrandom::fill(entropy.expose_mut())
-            .map_err(|e| Error::new(format!("randomness: {e}")))?;
+        getrandom::fill(entropy.expose_mut()).map_err(|e| Error::new(format!("randomness: {e}")))?;
         Self::from_entropy(entropy.expose())
     }
     /// The mnemonic of stored entropy (16 to 32 bytes).
@@ -148,22 +147,13 @@ mod tests {
 
     #[test]
     fn says_what_is_wrong() {
-        assert_eq!(
-            Mnemonic::parse("abandon abandon").unwrap_err(),
-            WordsProblem::Count(2)
-        );
+        assert_eq!(Mnemonic::parse("abandon abandon").unwrap_err(), WordsProblem::Count(2));
         let mut words: Vec<&str> = TEST_WORDS.split(' ').collect();
         words[4] = "notaword";
-        assert_eq!(
-            Mnemonic::parse(&words.join(" ")).unwrap_err(),
-            WordsProblem::Unknown(5)
-        );
+        assert_eq!(Mnemonic::parse(&words.join(" ")).unwrap_err(), WordsProblem::Unknown(5));
         words[4] = "abandon";
         words[11] = "abandon";
-        assert_eq!(
-            Mnemonic::parse(&words.join(" ")).unwrap_err(),
-            WordsProblem::Checksum
-        );
+        assert_eq!(Mnemonic::parse(&words.join(" ")).unwrap_err(), WordsProblem::Checksum);
         assert!(Mnemonic::known_word("About"));
         assert!(!Mnemonic::known_word("aboutt"));
     }

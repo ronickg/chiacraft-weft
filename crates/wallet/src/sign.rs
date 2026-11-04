@@ -14,11 +14,7 @@ pub const PREFIX: &str = "chiacraft ";
 
 /// The 32 bytes a Chia wallet signs for `message` (CHIP-0002).
 pub fn message_hash(message: &[u8]) -> [u8; 32] {
-    tree_hash_pair(
-        tree_hash_atom(b"Chia Signed Message"),
-        tree_hash_atom(message),
-    )
-    .to_bytes()
+    tree_hash_pair(tree_hash_atom(b"Chia Signed Message"), tree_hash_atom(message)).to_bytes()
 }
 
 /// Whether `signature` is `key`'s signature of `message` as a Chia signed message.
@@ -26,10 +22,7 @@ pub fn verify(key: &IdentityKey, message: &[u8], signature: &[u8]) -> bool {
     let Ok(signature): std::result::Result<[u8; 96], _> = signature.try_into() else {
         return false;
     };
-    let (Ok(public), Ok(signature)) = (
-        PublicKey::from_bytes(&key.0),
-        Signature::from_bytes(&signature),
-    ) else {
+    let (Ok(public), Ok(signature)) = (PublicKey::from_bytes(&key.0), Signature::from_bytes(&signature)) else {
         return false;
     };
     chia_bls::verify(&signature, &public, message_hash(message))
@@ -56,11 +49,7 @@ impl std::fmt::Debug for IdentitySigner {
 impl IdentitySigner {
     pub(crate) fn new(master: &SecretKey, index: u32) -> Self {
         let secret = crate::keys::identity_secret(master, index);
-        Self {
-            index,
-            public: IdentityKey(secret.public_key().to_bytes()),
-            secret: Secret::new(secret.to_bytes()),
-        }
+        Self { index, public: IdentityKey(secret.public_key().to_bytes()), secret: Secret::new(secret.to_bytes()) }
     }
     /// A signer for identity key `index` of `mnemonic`.
     pub fn from_mnemonic(mnemonic: &crate::Mnemonic, index: u32) -> Self {
@@ -73,6 +62,8 @@ impl IdentitySigner {
 /// What a network key's seed is made from: this label, then the identity key's secret.
 /// Fixed forever: changing it gives every player a new address and a new player on every world.
 const NETWORK_KEY_LABEL: &[u8] = b"chiacraft network key v1";
+const CONTENT_KEY_LABEL: &[u8] = b"chiacraft content key v1";
+const WORLD_KEY_LABEL: &[u8] = b"chiacraft world key v1";
 
 impl IdentitySigner {
     /// The 32-byte seed of this identity's **network key**: the Ed25519 key of the game's
@@ -87,6 +78,66 @@ impl IdentitySigner {
         h.update(self.secret.expose());
         Secret::new(h.finalize().into())
     }
+
+    /// The Ed25519 seed of the content key, which signs the data packages this player makes:
+    /// one-way from this identity key on its own label, like the network key, so a content key
+    /// that leaks gives away neither the identity nor the network key.
+    pub fn content_seed(&self) -> Secret<[u8; 32]> {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(CONTENT_KEY_LABEL);
+        h.update(self.secret.expose());
+        Secret::new(h.finalize().into())
+    }
+}
+
+impl IdentitySigner {
+    /// The Ed25519 seed of a world's key: its address and the id of the endpoint that hosts it.
+    /// One-way from this identity key on its own label, like the network key; `index` is a random
+    /// number the world keeps (so worlds made on two computers never share a key) and `generation`
+    /// replaces a key that leaked.
+    pub fn world_seed(&self, index: u32, generation: u32) -> Secret<[u8; 32]> {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(WORLD_KEY_LABEL);
+        h.update(self.secret.expose());
+        h.update(index.to_le_bytes());
+        h.update(generation.to_le_bytes());
+        Secret::new(h.finalize().into())
+    }
+}
+
+/// The text an identity key signs to certify that it owns a world: the world's key (`world`, as
+/// the network writes it), its generation, and when the world was made (seconds since 1970).
+pub fn world_cert_text(world: &str, generation: u32, created: u64) -> String {
+    format!("{PREFIX}world v1\nworld: {world}\ngeneration: {generation}\ncreated: {created}")
+}
+
+/// Whether `signature` is `identity` certifying the world `world`.
+pub fn verify_world_cert(identity: &IdentityKey, world: &str, generation: u32, created: u64, signature: &[u8]) -> bool {
+    verify(identity, world_cert_text(world, generation, created).as_bytes(), signature)
+}
+
+/// The text an identity key signs when its world moves to a new key (a new generation): the old
+/// address leads to the new one.
+pub fn world_moved_text(from: &str, to: &str, generation: u32) -> String {
+    format!("{PREFIX}world moved v1\nfrom: {from}\nto: {to}\ngeneration: {generation}")
+}
+
+/// Whether `signature` is `identity` saying its world `from` moved to `to`.
+pub fn verify_world_moved(identity: &IdentityKey, from: &str, to: &str, generation: u32, signature: &[u8]) -> bool {
+    verify(identity, world_moved_text(from, to, generation).as_bytes(), signature)
+}
+
+/// The text an identity key signs to vouch for a content key (`key`: its public half, hex), so a
+/// package signed by the content key is known to come from this identity.
+pub fn content_link_text(key: &str) -> String {
+    format!("{PREFIX}content key v1\nkey: {key}")
+}
+
+/// Whether `signature` is `identity` vouching for the content key `key`.
+pub fn verify_content_link(identity: &IdentityKey, key: &str, signature: &[u8]) -> bool {
+    verify(identity, content_link_text(key).as_bytes(), signature)
 }
 
 /// The text an identity key signs to vouch for a network key (`endpoint`: the network key's
@@ -107,12 +158,9 @@ impl Signer for IdentitySigner {
     }
     fn sign(&self, message: &str) -> Result<[u8; 96]> {
         if !message.starts_with(PREFIX) {
-            return Err(Error::new(
-                "the identity key signs only chiacraft's own texts",
-            ));
+            return Err(Error::new("the identity key signs only chiacraft's own texts"));
         }
-        let secret = SecretKey::from_bytes(self.secret.expose())
-            .map_err(|_| Error::new("identity key damaged in memory"))?;
+        let secret = SecretKey::from_bytes(self.secret.expose()).map_err(|_| Error::new("identity key damaged in memory"))?;
         Ok(chia_bls::sign(&secret, message_hash(message.as_bytes())).to_bytes())
     }
 }
@@ -132,12 +180,7 @@ pub struct OwnerSigner {
 }
 impl std::fmt::Debug for OwnerSigner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "OwnerSigner({}{}, [redacted])",
-            self.index,
-            if self.hardened { "h" } else { "" }
-        )
+        write!(f, "OwnerSigner({}{}, [redacted])", self.index, if self.hardened { "h" } else { "" })
     }
 }
 impl OwnerSigner {
@@ -149,24 +192,11 @@ impl OwnerSigner {
         use chia_bls::DerivableKey;
         use chia_puzzle_types::DeriveSynthetic;
         let master = master.clone();
-        let path = [
-            crate::keys::CHIA_ROOT[0],
-            crate::keys::CHIA_ROOT[1],
-            crate::keys::WALLET_PURPOSE,
-            index,
-        ];
-        let key = if hardened {
-            crate::keys::derive_hardened(&master, &path)
-        } else {
-            path.iter().fold(master, |k, i| k.derive_unhardened(*i))
-        };
+        let path = [crate::keys::CHIA_ROOT[0], crate::keys::CHIA_ROOT[1], crate::keys::WALLET_PURPOSE, index];
+        let key =
+            if hardened { crate::keys::derive_hardened(&master, &path) } else { path.iter().fold(master, |k, i| k.derive_unhardened(*i)) };
         let synthetic = key.derive_synthetic();
-        Self {
-            index,
-            hardened,
-            public: synthetic.public_key().to_bytes(),
-            secret: Secret::new(synthetic.to_bytes()),
-        }
+        Self { index, hardened, public: synthetic.public_key().to_bytes(), secret: Secret::new(synthetic.to_bytes()) }
     }
     /// The wallet address of `mnemonic` whose standard puzzle hash is `owner`, among its first
     /// `count` unhardened and hardened addresses (linking a DID: which key owns it).
@@ -196,12 +226,9 @@ impl OwnerSigner {
     /// Sign `message` as a Chia signed message; refused unless it starts with [`PREFIX`].
     pub fn sign(&self, message: &str) -> Result<[u8; 96]> {
         if !message.starts_with(PREFIX) {
-            return Err(Error::new(
-                "a wallet key signs only chiacraft's own texts here",
-            ));
+            return Err(Error::new("a wallet key signs only chiacraft's own texts here"));
         }
-        let secret = SecretKey::from_bytes(self.secret.expose())
-            .map_err(|_| Error::new("wallet key damaged in memory"))?;
+        let secret = SecretKey::from_bytes(self.secret.expose()).map_err(|_| Error::new("wallet key damaged in memory"))?;
         Ok(chia_bls::sign(&secret, message_hash(message.as_bytes())).to_bytes())
     }
 }
@@ -222,10 +249,7 @@ mod tests {
         let m = Mnemonic::generate().unwrap();
         let o = OwnerSigner::from_mnemonic(&m, 0, false);
         let facts = crate::keys::facts_of(&m);
-        assert_eq!(
-            o.puzzle_hash(),
-            crate::keys::wallet_puzzle_hash(&facts.master, 0).unwrap()
-        );
+        assert_eq!(o.puzzle_hash(), crate::keys::wallet_puzzle_hash(&facts.master, 0).unwrap());
         let text = "chiacraft sign-in v1\nsession: 00";
         let sig = o.sign(text).unwrap();
         assert!(verify_owner(&o.public(), text.as_bytes(), &sig));
@@ -244,11 +268,7 @@ mod tests {
         let text = "chiacraft sign-in v2\nsession: 00";
         let sig = s.sign(text).unwrap();
         assert!(verify(&s.identity(), text.as_bytes(), &sig));
-        assert!(!verify(
-            &s.identity(),
-            b"chiacraft sign-in v2\nsession: 01",
-            &sig
-        ));
+        assert!(!verify(&s.identity(), b"chiacraft sign-in v2\nsession: 01", &sig));
         let other = IdentitySigner::from_mnemonic(&Mnemonic::generate().unwrap(), 0);
         assert!(!verify(&other.identity(), text.as_bytes(), &sig));
         assert!(!verify(&s.identity(), text.as_bytes(), &sig[..95]));

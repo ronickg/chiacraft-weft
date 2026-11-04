@@ -33,9 +33,7 @@ impl MainnetConsent {
         if t == MAINNET_CONFIRM {
             Ok(Self(()))
         } else {
-            Err(Error::new(format!(
-                "mainnet spends real XCH: it also needs {setting} = \"{MAINNET_CONFIRM}\" (word for word)"
-            )))
+            Err(Error::new(format!("mainnet spends real XCH: it also needs {setting} = \"{MAINNET_CONFIRM}\" (word for word)")))
         }
     }
 }
@@ -43,21 +41,14 @@ impl MainnetConsent {
 /// The network a setting names (`testnet11`, the default when empty, or `mainnet`), and for
 /// mainnet the consent the confirmation setting gives. `setting`/`confirm_setting` name the two
 /// settings, for the refusals.
-pub fn choose_network(
-    network: &str,
-    confirm: &str,
-    setting: &str,
-    confirm_setting: &str,
-) -> Result<(Network, Option<MainnetConsent>)> {
+pub fn choose_network(network: &str, confirm: &str, setting: &str, confirm_setting: &str) -> Result<(Network, Option<MainnetConsent>)> {
     match network.trim() {
         "" | "testnet11" => Ok((Network::Testnet11, None)),
         "mainnet" => {
             let consent = MainnetConsent::confirm(confirm, confirm_setting)?;
             Ok((Network::Mainnet, Some(consent)))
         }
-        other => Err(Error::new(format!(
-            "{setting} = {other}: unknown (testnet11, the default, or mainnet)"
-        ))),
+        other => Err(Error::new(format!("{setting} = {other}: unknown (testnet11, the default, or mainnet)"))),
     }
 }
 
@@ -133,15 +124,7 @@ pub struct SpendCaps {
 }
 
 /// The cap names, as settings and flags spell them after a prefix (`chain-max-fee`, `--max-fee`).
-pub const CAP_NAMES: [&str; 7] = [
-    "max-fee",
-    "max-offer-price",
-    "max-take",
-    "max-did-fee",
-    "max-anchor-fee",
-    "max-split",
-    "max-send",
-];
+pub const CAP_NAMES: [&str; 7] = ["max-fee", "max-offer-price", "max-take", "max-did-fee", "max-anchor-fee", "max-split", "max-send"];
 
 impl SpendCaps {
     /// testnet11: no caps (test coins, worth nothing).
@@ -188,21 +171,15 @@ impl SpendCaps {
     /// Change caps from settings: `lookup(name)` gives the value set for each of [`CAP_NAMES`]
     /// (None or empty: keep the default). `prefix` is how the settings spell them
     /// (`chain-`), for errors.
-    pub fn with_overrides(
-        mut self,
-        prefix: &str,
-        lookup: impl Fn(&str) -> Option<String>,
-    ) -> Result<Self> {
+    pub fn with_overrides(mut self, prefix: &str, lookup: impl Fn(&str) -> Option<String>) -> Result<Self> {
         for name in CAP_NAMES {
             let Some(text) = lookup(name).filter(|t| !t.trim().is_empty()) else {
                 continue;
             };
-            let value: u64 = text.trim().parse().map_err(|_| {
-                Error::new(format!(
-                    "{prefix}{name} = {}: not a number of mojos",
-                    text.trim()
-                ))
-            })?;
+            let value: u64 = text
+                .trim()
+                .parse()
+                .map_err(|_| Error::new(format!("{prefix}{name} = {}: not a number of mojos", text.trim())))?;
             *self.slot(name) = value;
         }
         Ok(self)
@@ -251,11 +228,7 @@ impl SpendCaps {
             .iter()
             .map(|n| {
                 let v = self.get(n);
-                if v == u64::MAX {
-                    format!("{n} = none")
-                } else {
-                    format!("{n} = {}", mojos_and_amount(v, self.network))
-                }
+                if v == u64::MAX { format!("{n} = none") } else { format!("{n} = {}", mojos_and_amount(v, self.network)) }
             })
             .collect::<Vec<_>>()
             .join(", ")
@@ -268,26 +241,14 @@ mod tests {
 
     #[test]
     fn mainnet_needs_both_settings() {
-        assert_eq!(
-            choose_network("", "", "chain", "chain-mainnet-confirm").unwrap(),
-            (Network::Testnet11, None)
-        );
-        assert_eq!(
-            choose_network("testnet11", "", "chain", "c").unwrap().0,
-            Network::Testnet11
-        );
+        assert_eq!(choose_network("", "", "chain", "chain-mainnet-confirm").unwrap(), (Network::Testnet11, None));
+        assert_eq!(choose_network("testnet11", "", "chain", "c").unwrap().0, Network::Testnet11);
         let e = choose_network("mainnet", "", "chain", "chain-mainnet-confirm").unwrap_err();
         assert!(e.to_string().contains("chain-mainnet-confirm"), "{e}");
         assert!(e.to_string().contains(MAINNET_CONFIRM), "{e}");
         assert!(choose_network("mainnet", "i understand this spends real xch", "a", "b").is_err());
         assert!(choose_network("mainnet", "yes", "a", "b").is_err());
-        let (n, consent) = choose_network(
-            "mainnet",
-            "  \"I understand this spends real XCH\" ",
-            "chain",
-            "chain-mainnet-confirm",
-        )
-        .unwrap();
+        let (n, consent) = choose_network("mainnet", "  \"I understand this spends real XCH\" ", "chain", "chain-mainnet-confirm").unwrap();
         assert_eq!(n, Network::Mainnet);
         assert!(consent.is_some());
         assert!(choose_network("testnet10", "", "chain", "c").is_err());

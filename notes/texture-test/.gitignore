@@ -1,0 +1,15 @@
+# The full-size generated originals, previews and run logs stay local; the 64 px tiles are kept.
+*.log
+last*.txt
+*.webp
+before-after*.png
+current-blocks-tiled.png
+chatgpt/tiled_raw.png
+chatgpt/*_64raw.png
+codex/*.png
+!codex/*_64.png
+tiles_contact*.png
+stonevar_check.png
+!codex/approved_blocks.png
+wheat_check.png
+acacia_check.png

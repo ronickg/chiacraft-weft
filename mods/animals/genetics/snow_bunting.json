@@ -1,0 +1,60 @@
+{
+ "species": "snow_bunting",
+ "about": "The snow bunting (Plectrophenax nivalis): in winter buff and white, a rusty crown and cheeks, the back streaked black and buff, big white wing patches; paler the further north.",
+ "loci": [
+  {
+   "id": "Wb",
+   "name": "Warmth",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "grey-brown to warm brown (a bunting's buff to pale)"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   26,
+   18,
+   16
+  ],
+  [
+   60,
+   40,
+   28
+  ]
+ ],
+ "habitats": {},
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  }
+ }
+}

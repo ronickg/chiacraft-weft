@@ -81,10 +81,7 @@ pub(crate) fn derive_hardened(key: &SecretKey, path: &[u32]) -> SecretKey {
 
 /// Identity key `index`'s secret: `m/12381/8444/25443/index`, hardened at every step.
 pub(crate) fn identity_secret(master: &SecretKey, index: u32) -> SecretKey {
-    derive_hardened(
-        master,
-        &[CHIA_ROOT[0], CHIA_ROOT[1], IDENTITY_PURPOSE, index],
-    )
+    derive_hardened(master, &[CHIA_ROOT[0], CHIA_ROOT[1], IDENTITY_PURPOSE, index])
 }
 
 pub(crate) fn facts(master: &SecretKey) -> PublicFacts {
@@ -104,8 +101,7 @@ pub fn facts_of(mnemonic: &crate::Mnemonic) -> PublicFacts {
 /// The standard puzzle hash of wallet address `index` (the unhardened
 /// `m/12381/8444/2/index`, then the synthetic key), from the master public key alone.
 pub fn wallet_puzzle_hash(master_public: &[u8; 48], index: u32) -> Result<[u8; 32]> {
-    let master =
-        PublicKey::from_bytes(master_public).map_err(|_| Error::new("bad master public key"))?;
+    let master = PublicKey::from_bytes(master_public).map_err(|_| Error::new("bad master public key"))?;
     let key = [CHIA_ROOT[0], CHIA_ROOT[1], WALLET_PURPOSE, index]
         .iter()
         .fold(master, |k, i| k.derive_unhardened(*i));
@@ -128,8 +124,7 @@ pub const HARDENED_ADDRESSES: u32 = 20;
 /// The standard puzzle hash of hardened wallet address `index` (`m/12381'/8444'/2'/index'`, then
 /// the synthetic key). Hardened keys need the secret: there is no public derivation.
 pub(crate) fn hardened_puzzle_hash(master: &SecretKey, index: u32) -> [u8; 32] {
-    let key = derive_hardened(master, &[CHIA_ROOT[0], CHIA_ROOT[1], WALLET_PURPOSE, index])
-        .derive_synthetic();
+    let key = derive_hardened(master, &[CHIA_ROOT[0], CHIA_ROOT[1], WALLET_PURPOSE, index]).derive_synthetic();
     StandardArgs::curry_tree_hash(key.public_key()).to_bytes()
 }
 
@@ -198,10 +193,7 @@ mod tests {
         assert_eq!(facts(&master).fingerprint, 3781984839);
         let sk = derive_hardened(&master, &[12381, 8444, 2, 0]).derive_synthetic();
         let ph = StandardArgs::curry_tree_hash(sk.public_key()).to_bytes();
-        assert_eq!(
-            address(ph, Network::Mainnet).unwrap(),
-            "xch17m20cjztjwevl3rtql5j02rc0mgvmtup24lpq8esctctkaj3g54szqxuju"
-        );
+        assert_eq!(address(ph, Network::Mainnet).unwrap(), "xch17m20cjztjwevl3rtql5j02rc0mgvmtup24lpq8esctctkaj3g54szqxuju");
     }
 
     #[test]
@@ -213,17 +205,11 @@ mod tests {
             .iter()
             .fold(master.clone(), |k, i| k.derive_unhardened(*i))
             .derive_synthetic();
-        assert_eq!(
-            wallet_puzzle_hash(&f.master, 0).unwrap(),
-            StandardArgs::curry_tree_hash(from_secret.public_key()).to_bytes()
-        );
+        assert_eq!(wallet_puzzle_hash(&f.master, 0).unwrap(), StandardArgs::curry_tree_hash(from_secret.public_key()).to_bytes());
         assert!(
-            address(
-                wallet_puzzle_hash(&f.master, 0).unwrap(),
-                Network::Testnet11
-            )
-            .unwrap()
-            .starts_with("txch1")
+            address(wallet_puzzle_hash(&f.master, 0).unwrap(), Network::Testnet11)
+                .unwrap()
+                .starts_with("txch1")
         );
     }
 
@@ -232,10 +218,7 @@ mod tests {
         // Ronald's vector above is the hardened m/12381'/8444'/2'/0' address.
         let m = Mnemonic::parse(TEST_WORDS).unwrap();
         let hardened = hardened_puzzle_hashes(&m, 2);
-        assert_eq!(
-            address(hardened[0], Network::Mainnet).unwrap(),
-            "xch17m20cjztjwevl3rtql5j02rc0mgvmtup24lpq8esctctkaj3g54szqxuju"
-        );
+        assert_eq!(address(hardened[0], Network::Mainnet).unwrap(), "xch17m20cjztjwevl3rtql5j02rc0mgvmtup24lpq8esctctkaj3g54szqxuju");
         let f = facts_of(&m);
         let plain = wallet_puzzle_hashes(&f.master, 2).unwrap();
         assert_eq!(plain[1], wallet_puzzle_hash(&f.master, 1).unwrap());

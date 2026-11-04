@@ -17,7 +17,8 @@ erase what they earned.
    work fully offline. If we disappeared, players keep their identity, achievements, worlds and
    links; they lose only conveniences.
 2. **Freedom for owners.** The game gates nothing. Every gate (admission rules, personal mods,
-   inventory carry-over, native mods) is the world owner's choice. Defaults are open.
+   inventory carry-over, native mods) is the world owner's choice. Defaults are open to
+   *receiving* (requests, visitors), never to auto-accepting strangers.
 3. **The chain only where it adds trust.** Now: accounts (DIDs) and achievements. Never in the
    game loop. Not for portal links, bans or inventories.
 4. **Leave Weft's engine alone where we can.** Our features live in our own crates and mods; the
@@ -132,25 +133,90 @@ The smallest version that works is phases 1-4.
       + `assets/` like a mod's; registered through the SDK by the `packages` mod into their own
       slots; package ids sort after code mods' so packages never move them; broken packages are
       left out, not fatal. Format: `docs/packages.md`.
-   2. *Identity and store*: a package is the BLAKE3 hash of a canonical manifest listing every
+   2. *Identity and store* (done): a package is the BLAKE3 hash of a canonical manifest listing every
       file's path, size and BLAKE3 (not a hash of a zip); files cached by hash in
       `run/cache/blobs/`, never unpacked to author-chosen paths; each world keeps a lockfile of
       exact package hashes; unknown blocks in saves load as a placeholder that keeps their name.
-   3. *Content swap between worlds*: an atomic pointer to `Content` interned by hash (each kept
+   3. *Content swap between worlds* (done): an atomic pointer to `Content` interned by hash (each kept
       once); swap only with no world loaded; native mods re-resolve package ids by name per swap.
-   4. *Configuration phase and transfer*: protocol 4; the hello carries the world's lock hash; then
+   4. *Configuration phase and transfer* (done; files are checked whole, by BLAKE3, not piece by
+      piece with bao-tree yet): protocol 4; the hello carries the world's lock hash; then
       offer, have/need/declined, verified streaming (bao-tree) on extra streams of the iroh
       connection, status per package, and the hash of the content actually loaded before play.
       Joining stops freezing the window (a progress screen instead).
-   5. *Signing and trust*: a content-signing key derived from the words on its own path and
+   5. *Signing and trust* (done): a content-signing key derived from the words on its own path and
       certified by the account (DID later); signatures in an envelope outside the pinned hash;
       join sheet with sizes, creators and key fingerprints; trust defaults to this package or this
       world's set, trusting a creator is a deliberate step.
-   6. *Hardening*: format allow-list, decode and size limits, host serves only pinned hashes.
+   6. *Hardening* (done): format allow-list by folder and extension with a size per kind
+      (`identity::check_file`, enforced on import and on every downloaded manifest); PNGs capped at
+      4096 a side and decoded under `catch_unwind`; package reading can't panic across the FFI;
+      packed frames checked before decompressing; time limits on the hello, the configuration
+      phase and stalled downloads; the host serves only offered hashes, at most twice each, four
+      streams a peer, eight joins at once, files streamed in pieces; the guest refuses malformed or
+      oversized offers; store tidy at start (pins + installed kept, 512 MiB LRU for the rest,
+      orphan files and crash leftovers removed); cargo-fuzz targets for the manifest, signature
+      and definition parsers (`crates/packages/fuzz`, nightly, not run in CI yet).
    Later: iroh-blobs for downloads from other players and mirrors, reviewer lists, key rotation.
 3. **Portals.** World addresses (key, DID later); link requests inbox with pre-allow; links
    signed by both worlds, revocable; portal blocks; travel with the connection prepared ahead; a
-   safe return when a world goes offline; keep your own world open while you visit others.
+   safe return when a world goes offline; keep your own world open while you visit others. In
+   slices:
+   1. *Your world runs on* (done): decided 2026-10-31 that a server keeps its own world's state
+      instead of a second process or one shared package set. `server::Scope` holds its world's
+      `Content` and its own values of the synced settings; its thread, its own rayon pool and its
+      jobs on shared pools take them as theirs (`content::for_thread`/`with`,
+      `config::for_thread`/`with`), so the game can switch content for another world meanwhile.
+      Joining another world while yours is hosted keeps it running (`Running.home`); "Back to
+      <world>" in the pause menu; back home automatically when the visited world goes away or the
+      join fails. Joins went out through the hosting endpoint while both used the login key;
+      slice 2 gives worlds their own keys and joins go back to the account's.
+   Decided 2026-10-31 after research (`reports/World addresses links and portals.md`):
+   2. *World addresses* (done): each world has its own Ed25519 key, derived from the words on its own
+      label with a **random** index saved in the world (a counter would collide across machines)
+      and a generation (to replace a leaked key); the account signs a world certificate. The world
+      key is the address and its hosting endpoint's id; joins go out through the account's key.
+      Address `chiacraft://w/<key>?n=<name>&r=<relay>&a=<ip:port,..>` (the key alone is enough;
+      the old ticket still works). Found through n0 DNS/pkarr and the Mainline DHT, relay URL
+      only. A world answers `chiacraft/status/1` (name, certificate, players, packages, join
+      policy); before hosting, the game pings its own world key so one world never runs twice. A
+      saved-worlds list (proposed name, owner, last seen, status). Not yet: petnames, the join
+      policy in the status answer, rotating a key (the generation is kept; the "world moved"
+      notice needs slice 3's account endpoint).
+   3. *Link requests* (done, apart from friends' worlds, "world moved", invite tokens and a block
+      list screen): the account endpoint runs while the game does and is the inbox for all
+      the owner's worlds (worlds are offline most of the time); requesters keep an outbox and
+      retry; friends' worlds and "world moved" notices are served there (`chiacraft/worlds/1`).
+      A link is one labelled record both world keys sign over the same bytes (id: its BLAKE3);
+      declines are silent; either side revokes alone with a permanent tombstone; pre-allow by
+      world or owner key, or an invite token. Signatures carry key ids, so world DIDs replace
+      only the certificate later.
+   4. *Portal blocks* (done): built into the game (the `portals` mod, not a package, whose blocks
+      differ per world), holding only a link id; binding one needs the world owner (checked on the
+      server; anyone can `/give` today); portal positions stay in each world. Walking in joins the
+      linked world (at its spawn until slice 5), or goes home if it is yours; a player is sent only
+      after a second outside every portal, so arriving in one never bounces. The mod asks the engine
+      what Weft's interface doesn't carry through `bridge` (owner? links?).
+   5. *Travel prepared ahead* (done, apart from warming up before the player reaches the portal
+      and the few seconds' protection): a 60-second travel ticket signed by the origin world
+      (`travel`), carried in the protocol 5 hello, its player key checked against the
+      connection, used once, for a link the destination has with the origin; arrivals stand
+      beside the destination's portal for that link (the spot the mod finds when the owner binds
+      it, kept in the world's `portals.txt`), coming home too; the player stays in the world they
+      are in while the trip connects, asks and downloads, and leaves only when the destination's
+      packages are ready (a failed trip leaves them where they were); when a world reached through
+      a portal goes away, back to the world joined before it, else home, else the title; a
+      second outside every portal before a portal sends anyone.
+   Extras (done): invites (a token the world signs, in its address as `i=`, one use within a
+   week; a request carrying it is accepted without asking); warm-up as a player nears a bound
+   portal (their game asks the destination's status through its own endpoint, and says where the
+   portal leads); five seconds' protection after arriving; a scrolling Links screen; friends
+   (added from a saved world's owner or a link, mutual; `chiacraft/worlds/1` on the account
+   endpoint lists a player's worlds to friends, open ones joinable from the Friends screen);
+   "world moved" notices (a world given a new address from the world list leaves a notice its
+   owner's identity signs; saved entries follow it when the old address stops answering). Left:
+   arrival spots in dimensions other than the spawn's (the SDK has no dimension id), carrying
+   links over to a world's new address.
 4. **DIDs and achievements.** Player and world DIDs through sponsors; world ownership both ways;
    achievements signed by the world DID, anchored in batches, opt-in; profile view; admission
    rules (allow lists, probation, DID age, achievements); shared ban lists.
@@ -173,5 +239,5 @@ is the content.
 - Verify Chia full nodes return hinted coins for an arbitrary hint fast enough for a world list.
 - Weft upstream: keep merging (proposed) or cut loose.
 - The Horizon-based project: frozen as it is, W7-W9 work left in its worktrees.
-- Phase 3, "keep your own world open while you visit others": `Content` is one per process, so
-  both worlds share a package set unless the server gets its own `Content`. Decide at Phase 3.
+- Settings in the game's own store that servers read without being synced (text settings,
+  client-scope ones) are still shared by a world kept running and the game; none matters yet.

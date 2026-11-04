@@ -1,0 +1,12 @@
+Use your image generation tool to make ONE image, then save it as a PNG file named NAME.png in the current folder. Do not write any code or edit any other files.
+
+The attached images: a colour palette, and a sheet of my game's approved block textures (smooth stone, cobblestone, oak planks, dirt, oak bark, oak log top, sand, bricks, coal ore). Match their style exactly: 64 x 64 pixel game textures enlarged with square pixels, soft painterly clusters in big simple shapes of three sizes, smooth light in fine steps, warm earthy colours from the palette, each small shape lit on its own from the top left with a soft shadow at its bottom right, never pure black or white, not a photo, not a 3D render.
+
+The image is square, 1024 x 1024, divided into four equal squares (2 x 2), each 512 x 512. Each square holds one plant sprite for a block game: the plant alone, centred, standing on the bottom edge of its square, seen from the side, filling most of its square, on a flat solid #FF00FF magenta background that fills the rest of the square. No ground, no shadow, no border, nothing crossing from one square into another.
+
+Top left: TL
+Top right: TR
+Bottom left: BL
+Bottom right: BR
+
+When done, reply with the file name you saved.

@@ -5,8 +5,8 @@
 use weft_render::*;
 
 use crate::assets::Assets;
-use crate::shaders::{Hook, Slots};
 use crate::gpu_layout::Pass;
+use crate::shaders::{Hook, Slots};
 
 pub const HOOK: Hook = Hook {
     kind: "post",
@@ -27,25 +27,39 @@ pub struct Post {
     /// bindless indices.
     targets: Option<([TextureId; 2], [u32; 2], (u32, u32))>,
     params: Vec<BufferId>,
+    /// A scene of zeros, bound when there is no world's (`apply`).
+    no_scene: Option<BufferId>,
 }
 
 const MAX_PASSES: usize = 16;
 
 impl Post {
     pub fn new(gpu: &mut dyn Backend, assets: &Assets) -> Post {
-        let mut p = Post { pipeline: None, slots: Slots::default(), active: Vec::new(), targets: None, params: Vec::new() };
+        let mut p = Post { pipeline: None, slots: Slots::default(), active: Vec::new(), targets: None, params: Vec::new(), no_scene: None };
         p.reload(gpu, assets);
         p
     }
 
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
         let snippets = crate::shaders::snippets(assets, &HOOK);
-        let made = crate::packs::compose(assets, "post.wgsl", &[(&HOOK, &snippets)]).map_err(|e| e.0).and_then(|(s, mut slots)| {
-            let p = gpu
-                .create_pipeline(&PipelineDesc { label: "post", shader: &s, vertex: "vs", fragment: Some("fs"), color: Some(Format::Surface), depth: None, blend: Blend::None, cull_back: false, topology: Topology::Triangles })
-                .map_err(|e| e.0)?;
-            Ok((p, slots.pop().unwrap_or_default()))
-        });
+        let made = crate::packs::compose(assets, "post.wgsl", &[(&HOOK, &snippets)])
+            .map_err(|e| e.0)
+            .and_then(|(s, mut slots)| {
+                let p = gpu
+                    .create_pipeline(&PipelineDesc {
+                        label: "post",
+                        shader: &s,
+                        vertex: "vs",
+                        fragment: Some("fs"),
+                        color: Some(Format::Surface),
+                        depth: None,
+                        blend: Blend::None,
+                        cull_back: false,
+                        topology: Topology::Triangles,
+                    })
+                    .map_err(|e| e.0)?;
+                Ok((p, slots.pop().unwrap_or_default()))
+            });
         match made {
             Ok((p, slots)) => {
                 if let Some(old) = self.pipeline.replace(p) {
@@ -87,17 +101,35 @@ impl Post {
 
     /// Runs the effects over the scene; the last one draws onto the screen and leaves that pass
     /// open for the UI.
-    pub fn apply(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo) {
+    /// `scene` is the buffer the world was drawn with (`gpu_layout::Scene`).
+    pub fn apply(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, scene: Option<BufferId>) {
         let (Some(pipe), Some((tex, idx, _))) = (self.pipeline, self.targets) else { return };
+        let scene = match scene {
+            Some(b) => b,
+            None => *self.no_scene.get_or_insert_with(|| {
+                let size = size_of::<crate::gpu_layout::Scene>();
+                let b = gpu.create_buffer(size as u64, usage::STORAGE | usage::HOST, "post no scene");
+                gpu.mapped(b)[..size].fill(0);
+                b
+            }),
+        };
         while self.params.len() < gpu.frames_in_flight() {
-            self.params.push(gpu.create_buffer((size_of::<Pass>() * MAX_PASSES) as u64, usage::STORAGE | usage::HOST, "post passes"));
+            self.params
+                .push(gpu.create_buffer((size_of::<Pass>() * MAX_PASSES) as u64, usage::STORAGE | usage::HOST, "post passes"));
         }
         let time = crate::shaders::time();
         let n = self.active.len().min(MAX_PASSES);
         let passes: Vec<Pass> = self.active[..n]
             .iter()
             .enumerate()
-            .map(|(i, (name, strength))| Pass { scene: idx[i % 2], slot: self.slots.slot(name), strength: *strength, time, size: [frame.width as f32, frame.height as f32], pad: [0.0; 2] })
+            .map(|(i, (name, strength))| Pass {
+                scene: idx[i % 2],
+                slot: self.slots.slot(name),
+                strength: *strength,
+                time,
+                size: [frame.width as f32, frame.height as f32],
+                pad: [0.0; 2],
+            })
             .collect();
         let buf = self.params[frame.slot];
         gpu.mapped(buf)[..passes.len() * size_of::<Pass>()].copy_from_slice(bytemuck::cast_slice(&passes));
@@ -106,22 +138,11 @@ impl Post {
             list.push(Cmd::BeginPass { color: Some((target, Some([0.0; 4]))), depth: None });
             list.pipeline(pipe);
             list.bind(crate::gpu_layout::bind::post::PASSES, buf);
+            list.bind(crate::gpu_layout::bind::post::SCENE, scene);
             list.push(Cmd::Draw { vertices: 3, instances: 1, first_vertex: 0, first_instance: i as u32 });
             if i + 1 < n {
                 list.push(Cmd::EndPass);
             }
-        }
-    }
-
-    pub fn destroy(&mut self, gpu: &mut dyn Backend) {
-        if let Some((t, ..)) = self.targets.take() {
-            t.into_iter().for_each(|t| gpu.destroy_texture(t));
-        }
-        if let Some(p) = self.pipeline.take() {
-            gpu.destroy_pipeline(p);
-        }
-        for b in self.params.drain(..) {
-            gpu.destroy_buffer(b);
         }
     }
 }

@@ -35,18 +35,9 @@ fn a_days_root_goes_on_chain_and_proofs_lead_to_it() {
     let creds: Vec<Credential> = (0..3)
         .map(|i| {
             Credential::unsigned(
-                Issuer {
-                    key: issuer.identity().hex(),
-                    name: "Sim server".into(),
-                    did: None,
-                },
+                Issuer { key: issuer.identity().hex(), name: "Sim server".into(), did: None },
                 &player.identity().0,
-                Achievement {
-                    id: format!("t:a{i}"),
-                    title: format!("A{i}"),
-                    description: "d".into(),
-                    icon: None,
-                },
+                Achievement { id: format!("t:a{i}"), title: format!("A{i}"), description: "d".into(), icon: None },
                 1_790_000_000,
                 achievement::new_nonce().unwrap(),
                 None,
@@ -62,8 +53,7 @@ fn a_days_root_goes_on_chain_and_proofs_lead_to_it() {
     let (push, coin) = server.anchor(&keys, root, 0, WAIT).unwrap();
     assert!(matches!(push, PushOutcome::Accepted { .. }), "{push:?}");
     // Anyone's reader (another account's) reads the root back from the anchor coin.
-    let other =
-        WalletKeys::from_mnemonic(&Mnemonic::generate().unwrap(), ChainNetwork::Testnet11, 1);
+    let other = WalletKeys::from_mnemonic(&Mnemonic::generate().unwrap(), ChainNetwork::Testnet11, 1);
     let anyone = reader(&sim, &other);
     let mut seen = None;
     let end = std::time::Instant::now() + WAIT;

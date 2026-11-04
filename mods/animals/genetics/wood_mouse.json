@@ -1,0 +1,100 @@
+{
+ "species": "wood_mouse",
+ "about": "The wood mouse (Apodemus sylvaticus): warm sandy brown above, sharply grey-white below; greyer in some, sandier in others, paler in dry country (Gloger's rule). Albinos turn up very rarely.",
+ "loci": [
+  {
+   "id": "Al",
+   "name": "Albino",
+   "alleles": [
+    {
+     "a": "Al",
+     "freq": 0.995
+    },
+    {
+     "a": "al",
+     "freq": 0.005,
+     "about": "albino: white, recessive"
+    }
+   ]
+  },
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.6,
+   "sd": 0.15,
+   "about": "grey-brown to warm sandy brown"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   20,
+   14,
+   16
+  ],
+  [
+   34,
+   24,
+   22
+  ]
+ ],
+ "habitats": {
+  "desert": {
+   "quantitative": {
+    "Dk": {
+     "mean": 0.3,
+     "sd": 0.12
+    },
+    "Ru": {
+     "mean": 0.7,
+     "sd": 0.12
+    }
+   }
+  }
+ },
+ "build": {
+  "Hd": {
+   "bones": [
+    "head"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1"
+   ],
+   "axes": [
+    0.4,
+    0.4,
+    1
+   ],
+   "range": 0.1
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.08
+  }
+ }
+}

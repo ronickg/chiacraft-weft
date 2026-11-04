@@ -1,0 +1,19 @@
+[package]
+name = "animals_core"
+version = "0.1.0"
+edition.workspace = true
+license = "MIT"
+description = "The animals mod's pure logic (species, genes, coats, evolution), shared by the game and the website (WASM)"
+
+[features]
+# The genome as a component value (`weft_sdk::Value`), for the game.
+sdk = ["dep:weft_sdk"]
+
+[dependencies]
+weft_sdk = { workspace = true, optional = true }
+png.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json.workspace = true
+# Food categories for diets; the checks across systems (tests/places.rs) read the climates and
+# body rules too.
+vitals.workspace = true

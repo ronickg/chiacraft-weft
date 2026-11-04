@@ -21,7 +21,7 @@ use crate::abi::{self, ItemStack, Slice, Str};
 use crate::component::Value;
 use crate::{Attribute, Chain, LootSource, Question, Registry, World, callback, host, qualify};
 
-pub use abi::{BlockChange, Death, Hurt, ItemUsed, Pickup, PlayerEvent, attr_op, stage};
+pub use abi::{BlockChange, Death, Hurt, ItemUsed, Pickup, PlayerEvent, attr_op, permission, stage};
 
 /// The engine's questions (`Registry::intercept`, `World::ask`).
 pub mod question {
@@ -37,6 +37,8 @@ pub mod question {
     pub static ENTER_DIMENSION: Question = Question::named(q::ENTER_DIMENSION);
     /// `entity` (a player) picking up `item` (count in `amount`), `other` the item entity.
     pub static PICKUP_ITEM: Question = Question::named(q::PICKUP_ITEM);
+    /// A natural spawn about to happen at `pos`: `other` the entity kind, `amount` how many.
+    pub static NATURAL_SPAWN: Question = Question::named(q::NATURAL_SPAWN);
     /// `entity` attacking `other` with `item`.
     pub static ATTACK: Question = Question::named(q::ATTACK);
     /// `entity` about to be hurt by `other` for `amount` of `cause`: deny to prevent it.
@@ -66,6 +68,18 @@ pub mod attribute {
     pub static VISIBILITY: Attribute = Attribute::named(crate::abi::attribute::VISIBILITY);
     /// Multiplier on jump speed, players and mobs (1).
     pub static JUMP_STRENGTH: Attribute = Attribute::named(crate::abi::attribute::JUMP_STRENGTH);
+    /// 1 or more: can swim in any liquid, also those that are `not_swimmable`.
+    pub static SWIM_ANYWHERE: Attribute = Attribute::named(crate::abi::attribute::SWIM_ANYWHERE);
+    /// Multiplier on how fast a swing recharges (1).
+    pub static ATTACK_SPEED: Attribute = Attribute::named(crate::abi::attribute::ATTACK_SPEED);
+    /// Below 1: can't sprint (1).
+    pub static CAN_SPRINT: Attribute = Attribute::named(crate::abi::attribute::CAN_SPRINT);
+    /// How far a player reaches blocks (4.5; 5 in creative).
+    pub static BLOCK_REACH: Attribute = Attribute::named(crate::abi::attribute::BLOCK_REACH);
+    /// How far a player reaches entities (3; 5 in creative).
+    pub static ENTITY_REACH: Attribute = Attribute::named(crate::abi::attribute::ENTITY_REACH);
+    /// Multiplier on how fast a player mines (1).
+    pub static MINING_SPEED: Attribute = Attribute::named(crate::abi::attribute::MINING_SPEED);
 }
 
 const UNRESOLVED: u32 = u32::MAX - 1;
@@ -117,6 +131,9 @@ pub static BLOCK_BROKEN: Event<abi::BlockChange> = Event::named(abi::event::BLOC
 pub static BLOCK_PLACED: Event<abi::BlockChange> = Event::named(abi::event::BLOCK_PLACED);
 pub static ENTITY_DIED: Event<abi::Death> = Event::named(abi::event::ENTITY_DIED);
 pub static PLAYER_JOINED: Event<abi::PlayerEvent> = Event::named(abi::event::PLAYER_JOINED);
+/// A dead player came back at the spawn point, components reset but the `KEEP` ones; moving
+/// them on from here (a bed) happens before anyone saw them there.
+pub static PLAYER_RESPAWNED: Event<abi::PlayerEvent> = Event::named(abi::event::PLAYER_RESPAWNED);
 pub static ITEM_PICKED_UP: Event<abi::Pickup> = Event::named(abi::event::ITEM_PICKED_UP);
 pub static ENTITY_HURT: Event<abi::Hurt> = Event::named(abi::event::ENTITY_HURT);
 /// A player used the held item and something happened (`stack` as it was before): eating,
@@ -223,6 +240,9 @@ pub enum Cond {
     /// The block was harvested: broken by the world, or mined with a tool its `needs_tool`
     /// accepts. `drops(..)` tables have it; write it on pools of your own tables that should.
     Harvested,
+    /// The block's state has this property at this value, written as in `w.prop`:
+    /// `BlockState("age=7")` for a ripe crop, `BlockState("lit=true")`.
+    BlockState(&'static str),
 }
 
 impl Cond {
@@ -238,6 +258,7 @@ impl Cond {
             Cond::ToolLevel(l) => (k::TOOL_LEVEL, *l as f32, ""),
             Cond::KilledByPlayer => (k::KILLED_BY_PLAYER, 1.0, ""),
             Cond::OnFire => (k::ON_FIRE, 1.0, ""),
+            Cond::BlockState(prop) => (k::BLOCK_STATE, 1.0, *prop),
             Cond::Harvested => (k::HARVESTED, 1.0, ""),
         }
     }
@@ -334,17 +355,26 @@ pub(crate) fn raw_pools(ns: &str, pools: &[Pool]) -> RawPools {
     let mut out = RawPools { conds: Vec::new(), entries: Vec::new(), pools: Vec::new(), _names: Vec::new() };
     let mut cond_index = Vec::new();
     for p in pools {
-        let pc: Vec<abi::LootCond> = p.when.iter().map(|c| {
-            let (kind, value, text) = c.raw();
-            abi::LootCond { kind, value, text: Str::new(text), ..abi::LootCond::DEFAULT }
-        }).collect();
+        let pc: Vec<abi::LootCond> = p
+            .when
+            .iter()
+            .map(|c| {
+                let (kind, value, text) = c.raw();
+                abi::LootCond { kind, value, text: Str::new(text), ..abi::LootCond::DEFAULT }
+            })
+            .collect();
         cond_index.push(out.conds.len());
         out.conds.push(pc);
         for e in &p.entries {
-            out.conds.push(e.when.iter().map(|c| {
-                let (kind, value, text) = c.raw();
-                abi::LootCond { kind, value, text: Str::new(text), ..abi::LootCond::DEFAULT }
-            }).collect());
+            out.conds.push(
+                e.when
+                    .iter()
+                    .map(|c| {
+                        let (kind, value, text) = c.raw();
+                        abi::LootCond { kind, value, text: Str::new(text), ..abi::LootCond::DEFAULT }
+                    })
+                    .collect(),
+            );
         }
     }
     let mut n = 0;
@@ -356,14 +386,28 @@ pub(crate) fn raw_pools(ns: &str, pools: &[Pool]) -> RawPools {
             .enumerate()
             .map(|(ei, e)| {
                 let name = Str::new(&names[n + ei]);
-                abi::LootEntry { item: name, weight: e.weight, min: e.min, max: e.max, conditions: Slice::new(&out.conds[first + 1 + ei]), smelt: Str::new(&e.smelt), ..abi::LootEntry::DEFAULT }
+                abi::LootEntry {
+                    item: name,
+                    weight: e.weight,
+                    min: e.min,
+                    max: e.max,
+                    conditions: Slice::new(&out.conds[first + 1 + ei]),
+                    smelt: Str::new(&e.smelt),
+                    ..abi::LootEntry::DEFAULT
+                }
             })
             .collect();
         n += p.entries.len();
         out.entries.push(entries);
     }
     for (pi, p) in pools.iter().enumerate() {
-        out.pools.push(abi::LootPool { rolls_min: p.rolls.0, rolls_max: p.rolls.1, conditions: Slice::new(&out.conds[cond_index[pi]]), entries: Slice::new(&out.entries[pi]), ..abi::LootPool::DEFAULT });
+        out.pools.push(abi::LootPool {
+            rolls_min: p.rolls.0,
+            rolls_max: p.rolls.1,
+            conditions: Slice::new(&out.conds[cond_index[pi]]),
+            entries: Slice::new(&out.entries[pi]),
+            ..abi::LootPool::DEFAULT
+        });
     }
     out._names = names;
     out
@@ -404,7 +448,10 @@ impl LootModBuilder<'_> {
     fn send(&mut self, op: u32, pool: Option<&Pool>, from: &str, to: &str) {
         let pools: Vec<Pool> = pool.into_iter().cloned().collect();
         let raw = raw_pools(self.reg.ns, &pools);
-        let (from, to) = (if from.is_empty() { String::new() } else { qualify(self.reg.ns, from) }, if to.is_empty() { String::new() } else { qualify(self.reg.ns, to) });
+        let (from, to) = (
+            if from.is_empty() { String::new() } else { qualify(self.reg.ns, from) },
+            if to.is_empty() { String::new() } else { qualify(self.reg.ns, to) },
+        );
         let desc = abi::LootModDesc {
             table: Str::new(&self.table),
             op,
@@ -459,7 +506,12 @@ impl<T> SystemBatch<'_, T> {
     }
     /// (entity, its value, ticks to do).
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (u64, &mut T, u32)> {
-        self.ids.iter().copied().zip(self.values.iter_mut()).zip(self.ticks.iter().copied()).map(|((id, v), t)| (id, v, t))
+        self.ids
+            .iter()
+            .copied()
+            .zip(self.values.iter_mut())
+            .zip(self.ticks.iter().copied())
+            .map(|((id, v), t)| (id, v, t))
     }
 }
 
@@ -490,7 +542,9 @@ impl Registry {
             if stride != size_of::<T>() {
                 return;
             }
-            let values = (0..a.count as usize).map(|i| unsafe { std::ptr::read_unaligned(a.data.add(i * stride) as *const T) }).collect();
+            let values = (0..a.count as usize)
+                .map(|i| unsafe { std::ptr::read_unaligned(a.data.add(i * stride) as *const T) })
+                .collect();
             f(&EventBatch { world: World::from_raw(a.world), values });
         });
         unsafe { (host().reg_event_handler)(self.raw, Str::new(event.name()), Str::new(&T::schema()), cb) }
@@ -499,7 +553,11 @@ impl Registry {
     /// Answers `question` (`question::*` or a mod's own) before it happens.
     pub fn intercept(&mut self, question: &Question, f: impl Fn(&Ask) -> Verdict + Send + Sync + 'static) {
         let cb = callback(move |a: &mut abi::InterceptArgs| {
-            let ask = Ask { world: World::from_raw(a.world), question: unsafe { std::mem::transmute::<&str, &'static str>(a.question.as_str()) }, query: a.query };
+            let ask = Ask {
+                world: World::from_raw(a.world),
+                question: unsafe { std::mem::transmute::<&str, &'static str>(a.question.as_str()) },
+                query: a.query,
+            };
             let v = f(&ask);
             unsafe {
                 (*a.query).verdict = match v {
@@ -541,7 +599,6 @@ impl Registry {
         unsafe { (host().reg_stack_component)(self.raw, Str::new(c.name()), Str::new(&T::schema()), flags) }
     }
 }
-
 
 impl World {
     /// In `ticks` ticks `event` fires with `value` (a calm-down, a hunger pulse). The timer is
@@ -600,7 +657,13 @@ impl World {
 
     pub fn roll_loot(&self, table: &dyn LootSource, ctx: &LootCtx) -> Vec<ItemStack> {
         let table = table.table_name();
-        let c = abi::LootCtx { tool: ctx.tool, killer: ctx.killer, by_player: ctx.by_player as u32, on_fire: ctx.on_fire as u32, mined: ctx.mined };
+        let c = abi::LootCtx {
+            tool: ctx.tool,
+            killer: ctx.killer,
+            by_player: ctx.by_player as u32,
+            on_fire: ctx.on_fire as u32,
+            mined: ctx.mined,
+        };
         let mut buf = vec![ItemStack::EMPTY; 16];
         let n = unsafe { (host().roll_loot)(self.raw(), Str::new(table), &c, buf.as_mut_ptr(), buf.len()) };
         if n > buf.len() {

@@ -1,0 +1,60 @@
+{
+ "species": "priscagama",
+ "about": "Priscagama (Priscagama gobiensis): no record of its colors; here a desert agama's, sandy grey to warm sand with dark blotches across the back and bands round the tail, pale below.",
+ "loci": [
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.45,
+   "sd": 0.15,
+   "about": "sandy grey to warm sand"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   30,
+   24,
+   18
+  ],
+  [
+   60,
+   44,
+   24
+  ]
+ ],
+ "build": {
+  "Hd": {
+   "bones": [
+    "head"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  }
+ }
+}

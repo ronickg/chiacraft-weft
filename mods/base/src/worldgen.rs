@@ -1,6 +1,7 @@
 //! Base's worldgen as data: biomes, the overworld's terrain, ores, trees (a scatter the engine
 //! places in every dimension whose biomes ask for them) and plants (a decoration).
 
+use base_api::CLIMATE;
 use weft_sdk::*;
 
 use crate::blocks::*;
@@ -8,7 +9,7 @@ use crate::blocks::*;
 use weft_sdk::noise::*;
 use weft_sdk::terrain::*;
 
-pub const SEA: i32 = 63;
+pub const SEA: i32 = base_api::SEA;
 
 static PLANT_SOIL: Tag = Tag::named("plant_soil");
 static CACTUS_SOIL: Tag = Tag::named("cactus_soil");
@@ -28,8 +29,11 @@ pub static FLOWERS: Component<BlockList> = Component::named("flowers");
 pub static TREE_LEAVES: Component<BlockRef> = Component::named("tree_leaves");
 /// Logs with this tag grow into cones (spruces), the others round (oaks, birches).
 pub static CONE_TREE: Tag = Tag::named("cone_tree");
+/// A tall bare trunk under one wide, flat crown (the acacia).
+pub static FLAT_TREE: Tag = Tag::named("flat_tree");
 static FROZEN: Tag = Tag::named("frozen");
 static DRY: Tag = Tag::named("dry");
+static FOREST_TAG: Tag = Tag::named("forest");
 
 pub static PLAINS: Biome = Biome::named("plains");
 pub static FOREST: Biome = Biome::named("forest");
@@ -37,6 +41,8 @@ pub static BIRCH_FOREST: Biome = Biome::named("birch_forest");
 pub static TAIGA: Biome = Biome::named("taiga");
 pub static SNOWY: Biome = Biome::named("snowy_plains");
 pub static DESERT: Biome = Biome::named("desert");
+pub static SAVANNA: Biome = Biome::named("savanna");
+pub static SWAMP: Biome = Biome::named("swamp");
 pub static MOUNTAINS: Biome = Biome::named("mountains");
 pub static OCEAN: Biome = Biome::named("ocean");
 pub static BEACH: Biome = Biome::named("beach");
@@ -45,20 +51,136 @@ pub static DEEP_CAVES: Biome = Biome::named("deep_caves");
 pub fn register(r: &mut Registry) {
     // Tags say what a biome is (spawning, decoration and mods ask these, not names).
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
-    r.biome(&PLAINS).surface("grass", "dirt", 3).tag("animals").tag("spawn_biome").set(&TREES, 0.025).set(&GRASS_COVER, 0.25);
-    r.biome(&FOREST).humidity(0.25..).surface("grass", "dirt", 3).tint(grass, 0x79c05a).tint(foliage, 0x59ae30).tag("forest").tag("animals").set(&TREES, 0.4).set(&GRASS_COVER, 0.12).set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
-    r.biome(&BIRCH_FOREST).temperature(..0.1).humidity(0.05..).surface("grass", "dirt", 3).tint(grass, 0x88bb67).tint(foliage, 0x6ba941).tag("forest").tag("animals").set(&TREES, 0.45).set(&GRASS_COVER, 0.12).set_text(&TREE_KINDS, "base:birch_log");
-    r.biome(&TAIGA).temperature(..-0.15).surface("grass", "dirt", 3).tint(grass, 0x86b783).tint(foliage, 0x68a464).tint(water, 0x3d57d6).tag("forest").tag("cold").tag("animals").set(&TREES, 0.45).set(&GRASS_COVER, 0.08).set_text(&TREE_KINDS, "base:spruce_log");
-    r.biome(&SNOWY).temperature(..-0.45).surface("snowy_grass", "dirt", 3).frozen("ice").tint(grass, 0x80b497).tint(foliage, 0x60a17b).tint(water, 0x3938c9).tag("cold").tag("animals").set(&TREES, 0.03).set_text(&TREE_KINDS, "base:spruce_log");
-    r.biome(&DESERT).temperature(0.35..).humidity(..0.0).surface("sand", "sand", 3).under("sandstone", 1).tint(grass, 0xbfb755).tint(foliage, 0xaea42a).tag("dry").tag("hot");
-    r.biome(&MOUNTAINS).surface("grass", "dirt", 3).bare_above(130).tint(grass, 0x8ab689).tint(foliage, 0x6da36b).tag("mountain").tag("animals").set(&TREES, 0.06).set(&GRASS_COVER, 0.05).set_text(&TREE_KINDS, "base:spruce_log");
-    r.biome(&OCEAN).surface("sand", "sand", 3).deep_top("gravel", SEA - 8).tag("ocean");
-    r.biome(&BEACH).surface("sand", "sand", 3).tag("beach");
+    r.biome(&PLAINS)
+        .set(&CLIMATE, base_api::climate("base:plains"))
+        .surface("grass", "dirt", 3)
+        .tag("animals")
+        .tag("spawn_biome")
+        .set(&TREES, 0.025)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:plains").unwrap_or(vitals::forage::GRASS_COVER_ELSE));
+    r.biome(&FOREST)
+        .set(&CLIMATE, base_api::climate("base:forest"))
+        .humidity(0.25..)
+        .surface("grass", "dirt", 3)
+        .tint(grass, 0x79c05a)
+        .tint(foliage, 0x59ae30)
+        .tag("forest")
+        .tag("animals")
+        .set(&TREES, 0.4)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
+    r.biome(&BIRCH_FOREST)
+        .set(&CLIMATE, base_api::climate("base:birch_forest"))
+        .temperature(..0.1)
+        .humidity(0.05..)
+        .surface("grass", "dirt", 3)
+        .tint(grass, 0x88bb67)
+        .tint(foliage, 0x6ba941)
+        .tag("forest")
+        .tag("animals")
+        .set(&TREES, 0.45)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:birch_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set_text(&TREE_KINDS, "base:birch_log");
+    r.biome(&TAIGA)
+        .set(&CLIMATE, base_api::climate("base:taiga"))
+        .temperature(..-0.15)
+        .surface("podzol", "dirt", 3)
+        .tint(grass, 0x86b783)
+        .tint(foliage, 0x68a464)
+        .tint(water, 0x3d57d6)
+        .tag("forest")
+        .tag("cold")
+        .tag("animals")
+        .set(&TREES, 0.45)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:taiga").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set_text(&TREE_KINDS, "base:spruce_log");
+    r.biome(&SNOWY)
+        .set(&CLIMATE, base_api::climate("base:snowy_plains"))
+        .snows()
+        .temperature(..-0.45)
+        .surface("snowy_grass", "dirt", 3)
+        .frozen("ice")
+        .tint(grass, 0x80b497)
+        .tint(foliage, 0x60a17b)
+        .tint(water, 0x3938c9)
+        .tag("cold")
+        .tag("animals")
+        .set(&TREES, 0.03)
+        .set_text(&TREE_KINDS, "base:spruce_log");
+    r.biome(&DESERT)
+        .set(&CLIMATE, base_api::climate("base:desert"))
+        .temperature(0.35..)
+        .humidity(..0.0)
+        .surface("sand", "sand", 3)
+        .under("sandstone", 1)
+        .tint(grass, 0xbfb755)
+        .tint(foliage, 0xaea42a)
+        .tag("dry")
+        .tag("hot");
+    // Hot grassland with few trees, between the desert and the forests (wet and dry seasons).
+    r.biome(&SAVANNA)
+        .set(&CLIMATE, base_api::climate("base:savanna"))
+        .temperature(0.2..)
+        .humidity(..0.2)
+        .surface("grass", "dirt", 3)
+        .tint(grass, 0xbfb755)
+        .tint(foliage, 0xaea42a)
+        .tag("hot")
+        .tag("animals")
+        .set(&TREES, 0.04)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:savanna").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set_text(&TREE_KINDS, "base:acacia_log");
+    // Warm, wet lowland: still, dark water, low trees.
+    r.biome(&SWAMP)
+        .set(&CLIMATE, base_api::climate("base:swamp"))
+        .temperature(-0.05..)
+        .humidity(0.1..)
+        .surface("grass", "dirt", 3)
+        .tint(grass, 0x6a7039)
+        .tint(foliage, 0x6a7039)
+        .tint(water, 0x617b64)
+        .tag("wet")
+        .tag("animals")
+        .set(&TREES, 0.12)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:swamp").unwrap_or(vitals::forage::GRASS_COVER_ELSE));
+    r.biome(&MOUNTAINS)
+        .set(&CLIMATE, base_api::climate("base:mountains"))
+        .surface("grass", "dirt", 3)
+        .bare_above(130)
+        .tint(grass, 0x8ab689)
+        .tint(foliage, 0x6da36b)
+        .tag("mountain")
+        .tag("animals")
+        .set(&TREES, 0.06)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:mountains").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set_text(&TREE_KINDS, "base:spruce_log");
+    r.biome(&OCEAN)
+        .set(&CLIMATE, base_api::climate("base:ocean"))
+        .surface("sand", "sand", 3)
+        .deep_top("gravel", SEA - 8)
+        .tag("ocean");
+    r.biome(&BEACH)
+        .set(&CLIMATE, base_api::climate("base:beach"))
+        .surface("sand", "sand", 3)
+        .tag("beach");
     // Underground (3D): whole cubes deep under the surface; spiders like it there.
-    r.biome(&DEEP_CAVES).tag("cave").tag("dark");
+    r.biome(&DEEP_CAVES)
+        .set(&CLIMATE, base_api::climate("base:deep_caves"))
+        .tag("cave")
+        .tag("dark");
 
-    for (ore, max_y, veins, size) in [(&COAL_ORE, 128, 8, 12), (&IRON_ORE, 64, 6, 8), (&GOLD_ORE, 32, 2, 7), (&DIAMOND_ORE, 16, 1, 6)] {
-        r.ore(ore).y(i32::MIN, max_y).veins(veins).size(size).replace("#stone_ore_replaceables");
+    for (ore, max_y, veins, size) in [
+        (&COAL_ORE, 128, 8, 12),
+        (&IRON_ORE, 64, 6, 8),
+        (&GOLD_ORE, 32, 2, 7),
+        (&crate::redstone::REDSTONE_ORE, 16, 4, 8),
+        (&DIAMOND_ORE, 16, 1, 6),
+    ] {
+        r.ore(ore)
+            .y(i32::MIN, max_y)
+            .veins(veins)
+            .size(size)
+            .replace("#stone_ore_replaceables");
     }
 
     // The overworld's shape. Other mods add to it by these names (`base:desert`, `base:mountains`).
@@ -71,15 +193,31 @@ pub fn register(r: &mut Registry) {
         // the cold flattens hills into tundra, deserts get dunes.
         .feature(preset::hills(16.0, 110.0).mask(Mask::Temperature(-0.35, -0.6).not()))
         .feature(preset::dunes(4.0, 26.0).mask(Mask::Temperature(0.25, 0.45).and(Mask::Humidity(0.1, -0.05))))
-        .feature(preset::mountains(150.0, 260.0).mask(Mask::noise(700.0, -0.1, 0.3).salt(0x44).and(Mask::Continent(0.0, 0.2))).named("mountains"))
+        .feature(
+            preset::mountains(150.0, 260.0)
+                .mask(
+                    Mask::noise(700.0, -0.1, 0.3)
+                        .salt(0x44)
+                        .and(Mask::Continent(0.0, 0.2)),
+                )
+                .named("mountains"),
+        )
         // Biomes bring their climate and surface; rules only add where else they must hold.
         .biome(BiomeRule::new("ocean").height(..=SEA - 2))
-        .biome(BiomeRule::new("snowy_plains").named("snowy_coast").height(..=SEA + 1).continent(..0.1))
+        .biome(
+            BiomeRule::new("snowy_plains")
+                .named("snowy_coast")
+                .height(..=SEA + 1)
+                .continent(..0.1),
+        )
         .biome(BiomeRule::new("beach").height(..=SEA + 1).continent(..0.1))
         .biome(BiomeRule::new("mountains").feature("mountains", 0.45..))
         .biome(BiomeRule::new("snowy_plains"))
         .biome(BiomeRule::new("taiga"))
         .biome(BiomeRule::new("desert"))
+        .biome(BiomeRule::new("savanna"))
+        // Swamps only on low land, where water stands.
+        .biome(BiomeRule::new("swamp").height(..=SEA + 12).continent(0.1..))
         .biome(BiomeRule::new("forest"))
         .biome(BiomeRule::new("birch_forest"))
         .biome(BiomeRule::new("plains"))
@@ -87,12 +225,19 @@ pub fn register(r: &mut Registry) {
         .caves(Caves::new("lava", i32::MIN, 11));
 
     // Trees wherever a biome asks for them, in any dimension.
-    r.scatter(&TREE_SITES).cell(5).reach(3).density(&TREES).shape(|s| {
-        let [x, y, z] = s.pos();
-        let log = TREE_KINDS.on_biome(s.biome()).and_then(|l| l.pick(s.random() >> 40)).unwrap_or(OAK_LOG.id());
-        let Some(t) = tree_at(log, x, y, z, s.random() >> 32) else { return };
-        tree_blocks(&t, |x, y, z, state, force| if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) });
-    });
+    r.scatter(&TREE_SITES)
+        .cell(5)
+        .reach(3)
+        .density(&TREES)
+        .shape(|s| {
+            let [x, y, z] = s.pos();
+            let log = TREE_KINDS
+                .on_biome(s.biome())
+                .and_then(|l| l.pick(s.random() >> 40))
+                .unwrap_or(OAK_LOG.id());
+            let Some(t) = tree_at(log, x, y, z, s.random() >> 32) else { return };
+            tree_blocks(&t, |x, y, z, state, force| if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) });
+        });
     r.decorate(decorate);
 }
 
@@ -105,6 +250,7 @@ struct TreeAt {
     log: u32,
     leaves: u32,
     cone: bool,
+    flat: bool,
     height: i32,
 }
 
@@ -112,8 +258,15 @@ struct TreeAt {
 fn tree_at(log: u32, x: i32, y: i32, z: i32, h: u64) -> Option<TreeAt> {
     let leaves = TREE_LEAVES.on_block(log)?.0;
     let cone = CONE_TREE.on_block(log);
-    let height = if cone { 6 + (h % 4) as i32 } else { 4 + (h % 3) as i32 };
-    Some(TreeAt { x, y, z, log, leaves, cone, height })
+    let flat = FLAT_TREE.on_block(log);
+    let height = if cone {
+        6 + (h % 4) as i32
+    } else if flat {
+        5 + (h % 2) as i32
+    } else {
+        4 + (h % 3) as i32
+    };
+    Some(TreeAt { x, y, z, log, leaves, cone, flat, height })
 }
 
 /// Calls `put(x, y, z, state, force)` for every block of the tree.
@@ -121,6 +274,19 @@ fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     let (log, leaves) = (t.log, t.leaves);
     let top = t.y + t.height;
     match t.cone {
+        _ if t.flat => {
+            // One wide flat layer on the trunk's top, a small one over its middle.
+            for (y, r2) in [(top, 10), (top + 1, 2)] {
+                for dz in -3i32..=3 {
+                    for dx in -3i32..=3 {
+                        let d = dx * dx + dz * dz;
+                        if d <= r2 && (d < r2 || hash(1, (t.x + dx) as i64, y as i64, (t.z + dz) as i64) & 1 == 0) {
+                            put(t.x + dx, y, t.z + dz, leaves, false);
+                        }
+                    }
+                }
+            }
+        }
         true => {
             for dy in 2..=t.height + 1 {
                 let y = t.y + dy;
@@ -195,7 +361,6 @@ fn decorate(g: &mut Gen) {
                 continue;
             }
             let (wx, wz) = (ox + x as i32, oz + z as i32);
-            let below = if y == 0 { g.surface_block(wx, wz) } else { g.get(x, y - 1, z) };
             let h = hash(seed ^ 0xF10, wx as i64, 0, wz as i64);
             let roll = unit(h);
             // Plants go where they could be planted (soil tags); the biome decides how many.
@@ -203,13 +368,25 @@ fn decorate(g: &mut Gen) {
             if FROZEN.on_biome(b) {
                 continue;
             }
+            let grass_chance = GRASS_COVER
+                .on_biome(b)
+                .unwrap_or(vitals::forage::GRASS_COVER_ELSE) as f64;
+            // What is under the lowest layer takes a look at the terrain: only if anything would grow.
+            if y == 0 && roll >= grass_chance.max(0.08) {
+                continue;
+            }
+            let below = if y == 0 { g.surface_block(wx, wz) } else { g.get(x, y - 1, z) };
             if PLANT_SOIL.on_block(below) {
-                let grass_chance = GRASS_COVER.on_biome(b).unwrap_or(0.05) as f64;
                 if roll < 0.012 {
-                    let flower = FLOWERS.on_biome(b).map_or_else(|| [DANDELION.id(), ROSE.id()][(h >> 32) as usize % 2], |l| l.pick(h >> 32).unwrap_or(0));
+                    let flower = FLOWERS
+                        .on_biome(b)
+                        .map_or_else(|| [DANDELION.id(), ROSE.id()][(h >> 32) as usize % 2], |l| l.pick(h >> 32).unwrap_or(0));
                     if flower != 0 {
                         g.set(x, y, z, flower);
                     }
+                } else if roll < 0.016 && FOREST_TAG.on_biome(b) {
+                    // Berry bushes in forests, unripe: found, then come back for.
+                    g.set(x, y, z, BERRY_BUSH.id());
                 } else if roll < grass_chance {
                     g.set(x, y, z, TALL_GRASS.id());
                 }
@@ -218,7 +395,17 @@ fn decorate(g: &mut Gen) {
                 for k in 0..n as usize {
                     g.set(x, y + k, z, CACTUS.id());
                 }
-            } else if SUGAR_CANE_SOIL.on_block(below) && col.height == SEA && roll < 0.08 && y + 2 < 16 && [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().any(|&(dx, dz)| g.column(wx + dx, wz + dz).height < SEA) {
+            } else if CACTUS_SOIL.on_block(below) && DRY.on_biome(b) && roll < 0.02 {
+                // Dead bushes: the desert's few sticks.
+                g.set(x, y, z, DEAD_BUSH.id());
+            } else if SUGAR_CANE_SOIL.on_block(below)
+                && col.height == SEA
+                && roll < 0.08
+                && y + 2 < 16
+                && [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                    .iter()
+                    .any(|&(dx, dz)| g.column(wx + dx, wz + dz).height < SEA)
+            {
                 let n = 1 + (h >> 40) % 3;
                 for k in 0..n as usize {
                     g.set(x, y + k, z, SUGAR_CANE.id());

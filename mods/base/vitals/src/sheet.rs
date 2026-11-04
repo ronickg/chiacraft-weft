@@ -1,0 +1,310 @@
+//! The survival numbers as one page (`mods/base/vitals/SHEET.md`), written from this crate so it
+//! can't drift: `cargo run -p vitals --bin sheet > mods/base/vitals/SHEET.md`. A test fails while
+//! the page is out of date (`tests/sheet.rs`).
+
+use std::fmt::Write;
+
+use crate::effects;
+use crate::food::{self, NUTRIENT_NAMES};
+use crate::stats::{self, Growth};
+use crate::{air, calendar, climate, difficulty, forage, levels, plants, soil, temperature};
+
+pub fn markdown() -> String {
+    let mut w = String::new();
+    let _ = writeln!(w, "# Survival numbers\n");
+    let _ = writeln!(
+        w,
+        "Written from `mods/base/vitals` (`cargo run -p vitals --bin sheet > mods/base/vitals/SHEET.md`); do not edit by hand. How the systems connect: `notes/SYSTEMS.md`; why: `notes/SURVIVAL.md`.\n"
+    );
+    stats_table(&mut w);
+    foods(&mut w);
+    effects_table(&mut w);
+    climates(&mut w);
+    plant_table(&mut w);
+    forage_table(&mut w);
+    soil_table(&mut w);
+    difficulties(&mut w);
+    level_table(&mut w);
+    w
+}
+
+fn stats_table(w: &mut String) {
+    let _ = writeln!(w, "## A player's stats\n\n| stat | level 1 | a point |\n|---|---|---|");
+    for (i, name) in stats::NAMES.iter().enumerate() {
+        let point = match stats::PLAYER_GROWTH[i] {
+            Growth::Share(s) => format!("+{:.0}%", s * 100.0),
+            Growth::Add(a) => format!("+{a}"),
+        };
+        let _ = writeln!(w, "| {name} | {} | {point} |", stats::PLAYER_BASE[i]);
+    }
+    let _ = writeln!(w, "\nComfortable air for a person, unclothed: {:?} °C.\n", temperature::PERSON);
+}
+
+fn foods(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Foods\n\nA portion, its kind for the animals' diets, what it holds of each nutrient, how long it digests, and game days fresh then stale.\n\n| food | kind | g | units | {} | digests | keeps | |\n|---|---|---|---|---|---|---|---|---|---|---|---|",
+        NUTRIENT_NAMES.join(" | ")
+    );
+    for f in food::FOODS {
+        let p = f.portion();
+        let notes = [
+            (f.raw, "raw"),
+            (f.poison >= 1.0, "poisonous"),
+            (f.meal == food::Meal::Cooked, "hot when cooked"),
+            (f.meal == food::Meal::Cooling, "cooling"),
+        ]
+        .iter()
+        .filter(|(on, _)| *on)
+        .map(|(_, n)| *n)
+        .collect::<Vec<_>>()
+        .join(", ");
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {:.0} | {} | {:.0} min | {} + {} | {notes} |",
+            f.name,
+            f.category.name(),
+            f.grams,
+            f.units(),
+            p.iter()
+                .map(|v| format!("{v:.0}"))
+                .collect::<Vec<_>>()
+                .join(" | "),
+            f.digest_minutes(),
+            f.keeps.0,
+            f.keeps.1
+        );
+    }
+    let _ = writeln!(w);
+}
+
+fn effects_table(w: &mut String) {
+    let _ = writeln!(w, "## Effects\n\n| effect | group | changes |\n|---|---|---|");
+    for e in effects::ALL {
+        let m = e.modifiers();
+        let n = effects::NONE;
+        let mut parts = Vec::new();
+        let mul = |parts: &mut Vec<String>, name: &str, v: f32, base: f32| {
+            if v != base {
+                parts.push(format!("{name} x{v}"));
+            }
+        };
+        mul(&mut parts, "health regen", m.health_regen, n.health_regen);
+        mul(&mut parts, "stamina regen", m.stamina_regen, n.stamina_regen);
+        mul(&mut parts, "speed", m.speed, n.speed);
+        mul(&mut parts, "stamina costs", m.stamina_cost, n.stamina_cost);
+        mul(&mut parts, "XP", m.xp, n.xp);
+        mul(&mut parts, "water used", m.water_use, n.water_use);
+        if m.health_loss > 0.0 {
+            parts.push(format!("loses {}% of max health a second", m.health_loss * 100.0));
+        }
+        if m.stamina_loss > 0.0 {
+            parts.push(format!("loses {}% of max stamina a second", m.stamina_loss * 100.0));
+        }
+        if !m.can_sprint {
+            parts.push("no sprinting".into());
+        }
+        let _ = writeln!(w, "| {} | {:?} | {} |", e.name(), e.group(), parts.join(", "));
+    }
+    // How the core feels, read off `temperature::feeling` a tenth of a degree at a time.
+    let mut lines = Vec::new();
+    let mut last = temperature::feeling(30.0);
+    for tenth in 301..=430 {
+        let core = tenth as f32 / 10.0;
+        let f = temperature::feeling(core);
+        if f != last {
+            lines.push(format!("{f:?} from {core} °C"));
+            last = f;
+        }
+    }
+    let _ = writeln!(
+        w,
+        "\nRested lasts {:.0} s and a minute more a comfort level. The core temperature: {:?}, then {}.\n",
+        effects::rested_secs(0),
+        temperature::feeling(30.0),
+        lines.join(", ")
+    );
+}
+
+fn climates(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Climates\n\nEach biome's real place (`reports/ecology/Biome climates.md`), year mean, humidity and half its summer-to-winter range, the air at sea level under an open sky (midwinter before dawn, midsummer mid afternoon), and the share of days with rain in spring, summer, autumn and winter.\n\n| biome | place | mean °C | humidity | seasons ± | coldest | hottest | rain: spring | summer | autumn | winter |\n|---|---|---|---|---|---|---|---|---|---|---|"
+    );
+    let midwinter = calendar::MIDSUMMER + calendar::YEAR_DAYS as f32 / 2.0;
+    for c in &climate::BIOMES {
+        let cold = climate::air(c, midwinter, 4.0);
+        let hot = climate::air(c, calendar::MIDSUMMER, 15.0);
+        let rain = c.rain.map(|r| format!("{:.0}%", r * 100.0)).join(" | ");
+        let _ =
+            writeln!(w, "| {} | {} | {} | {} | {} | {cold:.0} | {hot:.0} | {rain} |", c.biome, c.place, c.celsius, c.humidity, c.seasons);
+    }
+    let _ = writeln!(w);
+    let _ = writeln!(
+        w,
+        "## Wind and fog\n\nEach place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from {:.0}% to {:.0}% of the mean, a quarter more mid afternoon than before dawn, {:.1} times under a thunderstorm; still fog clears from {} to {} m/s, sea fog from {} to {}. Under {} °C what falls is snow; a day of it lays {} of a deep cover and each degree of a day's mean above freezing melts {}; falling snow in {} to {} m/s of wind is a blizzard, dry ground (humidity under {}) lifts dust from {} to {} m/s. Out in the open the wind chills the cold (the wind chill index, 10 °C and under), and in thick fog animals see {:.0}% as far.\n\n| biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |\n|---|---|---|---|---|---|---|---|---|---|",
+        air::DAY_SPREAD.0 * 100.0,
+        air::DAY_SPREAD.1 * 100.0,
+        air::STORM,
+        air::CLEARS.0,
+        air::CLEARS.1,
+        air::SEA_CLEARS.0,
+        air::SEA_CLEARS.1,
+        air::SNOWS_BELOW,
+        air::SNOWFALL,
+        air::MELT,
+        air::BLIZZARD.0,
+        air::BLIZZARD.1,
+        air::DRY,
+        air::DUST.0,
+        air::DUST.1,
+        air::FOG_SIGHT * 100.0
+    );
+    for c in climate::BIOMES.iter().filter(|c| !c.underground) {
+        let wind = c.wind.map(|v| format!("{v:.1}")).join(" | ");
+        let fog = (0..4).map(|s| format!("{:.0}%", air::fog_share(c.fog, Some(s)) * 100.0)).collect::<Vec<_>>().join(" | ");
+        let kind = match c.fog_kind {
+            climate::Fog::Dawn => "before dawn to mid morning",
+            climate::Fog::Sea => "off the sea, any hour",
+            climate::Fog::Ice => "ice fog, cold nights and the dark",
+        };
+        let _ = writeln!(w, "| {} | {wind} | {fog} | {kind} |", c.biome);
+    }
+    let _ = writeln!(w);
+}
+
+fn plant_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Plants\n\nWhat each growing plant needs (`vitals::plants`, from `reports/ecology/Plants and crops.md`): the air it grows in (from, best, to), its water, the frost that kills it (or its fruit, or its stalk to the base), its real days to harvest and the game's minutes at the best rate, and where and in which seasons it grows at least a third of its best (sp, su, au, wi; marked * where that season's nights freeze it), with each biome's rain and warmth.\n\n| plant | real plant | °C | water | frost | real days | minutes | grows |\n|---|---|---|---|---|---|---|---|"
+    );
+    const SHORT: [&str; 4] = ["sp", "su", "au", "wi"];
+    for p in &plants::PLANTS {
+        let minutes = plants::step_secs(p, 1).map_or("the game's".into(), |s| format!("{:.0}", s / 60.0));
+        let grows = climate::BIOMES
+            .iter()
+            .filter(|c| !c.underground)
+            .filter_map(|c| {
+                let seasons: Vec<String> = (0..4)
+                    .filter(|&s| plants::season_rate(p, c, s) >= 0.33)
+                    .map(|s| if plants::frosted(p, plants::season_low(c, s)) { format!("{}*", SHORT[s]) } else { SHORT[s].to_string() })
+                    .collect();
+                (!seasons.is_empty()).then(|| format!("{} ({})", c.biome.split(':').nth(1).unwrap_or(c.biome), seasons.join(" ")))
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let _ = writeln!(
+            w,
+            "| {} | {} | {}, {}-{}, {} | {:?} | {} | {} | {minutes} | {grows} |",
+            p.block,
+            p.real,
+            p.base,
+            p.best.0,
+            p.best.1,
+            p.max,
+            p.water,
+            if p.frost > plants::HARDY { format!("{} °C", p.frost) } else { "hardy".into() },
+            if p.days > 0.0 { format!("{}", p.days) } else { "-".into() }
+        );
+    }
+    let _ = writeln!(w);
+}
+
+fn forage_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Food in the world\n\nWhat foraging animals eat of the world's blocks (`vitals::forage`), how much a mouthful feeds (a capybara holds 200), what eating it leaves, and what brings it back.\n\n| block | kind | food | eaten | grows back as |\n|---|---|---|---|---|"
+    );
+    for f in &forage::SOURCES {
+        let block = match f.age {
+            Some(a) => format!("{} (age {a})", f.block),
+            None => f.block.to_string(),
+        };
+        let eaten = match f.eaten {
+            forage::Eaten::Becomes(b) => format!("becomes {b}"),
+            forage::Eaten::Age(a) => format!("back to age {a}"),
+            forage::Eaten::Stays => "stays".into(),
+        };
+        let back = match f.renews {
+            Some(p) => p.to_string(),
+            None => {
+                let when = if f.seasons == 15 {
+                    "all year".to_string()
+                } else {
+                    (0..4)
+                        .filter(|s| f.seasons >> s & 1 != 0)
+                        .map(|s| calendar::SEASONS[s].name())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                format!("always there in {} ({when}), worth {:.0}% of fresh growth", f.found.join(", "), forage::BROWSE * 100.0)
+            }
+        };
+        let _ = writeln!(w, "| {block} | {} | {} | {eaten} | {back} |", f.category.name(), f.food);
+    }
+    let _ = writeln!(
+        w,
+        "\nOn the ground, animals eat dropped food of their diet one item a mouthful: every food (the foods table, by its kind and portion) and these seeds; spoiled food only carrion eaters. An item fills an animal by its weight against a meal of a tenth of the animal's mass (`animals_core::needs`).\n\n| item | kind | grams |\n|---|---|---|"
+    );
+    for (item, c, grams) in forage::DROPPED {
+        let _ = writeln!(w, "| {item} | {} | {grams} |", c.name());
+    }
+    let _ = writeln!(w);
+}
+
+fn soil_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Soil and compost\n\nFarmland's fertility (`vitals::soil`): how fast crops grow at each level, what wears it, what gives it back; and what a compost bin takes.\n\n| fertility | crops grow |\n|---|---|"
+    );
+    for f in (0..=soil::MAX).rev() {
+        let _ = writeln!(w, "| {f} | {:.0}% |", soil::growth(f) * 100.0);
+    }
+    let feeds = soil::FEEDS
+        .iter()
+        .map(|(n, v)| format!("{n} +{v}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let composts = soil::COMPOSTS
+        .iter()
+        .map(|(n, v)| format!("{n} {v}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let _ = writeln!(
+        w,
+        "\nA ripe harvest of {} takes a level; {feeds}; a season unplanted (about {:.0} game days, at grass's rate) gives one back. A compost bin fills in {} steps: spoiled food {}, {composts}; full, it rots into compost in about {:.0} minutes.\n",
+        soil::TIRES.join(", "),
+        soil::FALLOW_SECS / crate::DAY_SECS,
+        soil::BIN_FULL,
+        soil::SPOILED,
+        soil::compost_secs() / 60.0
+    );
+}
+
+fn difficulties(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Difficulty (the `base:difficulty` rule)\n\n| | digests | keeps | harm | can kill | XP lost on death | stamina costs |\n|---|---|---|---|---|---|---|"
+    );
+    for d in difficulty::ALL {
+        let _ = writeln!(
+            w,
+            "| {} | x{} | x{} | x{} | {} | {:.0}% | x{} |",
+            d.name,
+            d.digest,
+            d.keep,
+            d.harm,
+            if d.deadly { "yes" } else { "no, stops at a tenth" },
+            d.death_xp * 100.0,
+            d.stamina_cost
+        );
+    }
+    let _ = writeln!(w);
+}
+
+fn level_table(w: &mut String) {
+    let _ = writeln!(w, "## Levels\n\n| level | XP to the next | XP from level 1 |\n|---|---|---|");
+    for l in [1, 2, 5, 10, 25, 50, 75, 99, 100] {
+        let _ = writeln!(w, "| {l} | {} | {} |", levels::to_next(l), levels::total_to(l));
+    }
+}

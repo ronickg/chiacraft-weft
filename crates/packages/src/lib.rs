@@ -13,6 +13,10 @@
 //! (`#ores/ruby`) are shared vocabulary and stay as written. This crate reads and checks packages;
 //! the game registers them through the `packages` mod.
 
+pub mod identity;
+pub mod signature;
+pub mod store;
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -217,11 +221,20 @@ pub fn qualify(ns: &str, name: &str) -> String {
 }
 
 fn valid_id(id: &str) -> bool {
-    id.len() <= 64 && id.starts_with(|c: char| c.is_ascii_lowercase()) && id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+    id.len() <= 64
+        && id.starts_with(|c: char| c.is_ascii_lowercase())
+        && id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 fn valid_path(path: &str) -> bool {
-    !path.is_empty() && path.split('/').all(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'))
+    !path.is_empty()
+        && path.split('/').all(|s| {
+            !s.is_empty()
+                && s.chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+        })
 }
 
 fn parse_format(text: &str) -> Option<(u32, u32)> {
@@ -239,7 +252,12 @@ pub fn read_manifest(dir: &Path) -> Result<Manifest, String> {
     if m.id == "core" {
         return Err("package.toml: id `core` belongs to the engine".into());
     }
-    if m.version.is_empty() || !m.version.chars().all(|c| c.is_ascii_alphanumeric() || ".+-".contains(c)) {
+    if m.version.is_empty()
+        || !m
+            .version
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || ".+-".contains(c))
+    {
         return Err(format!("package.toml: version `{}`: use something like 1.0.0", m.version));
     }
     match parse_format(&m.format) {
@@ -258,7 +276,11 @@ pub fn discover(dirs: &[PathBuf]) -> Vec<PathBuf> {
     let mut found: Vec<PathBuf> = Vec::new();
     for dir in dirs {
         let Ok(entries) = std::fs::read_dir(dir) else { continue };
-        let mut entries: Vec<PathBuf> = entries.flatten().map(|e| e.path()).filter(|p| p.join("package.toml").is_file()).collect();
+        let mut entries: Vec<PathBuf> = entries
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.join("package.toml").is_file())
+            .collect();
         entries.sort();
         for p in entries {
             if !found.iter().any(|f| f.file_name() == p.file_name()) {
@@ -277,11 +299,24 @@ pub fn load(dir: &Path) -> Result<Package, Vec<String>> {
     let ns = manifest.id.clone();
     let mut errors = Vec::new();
     let mut count = 0;
-    let mut pkg = Package { dir: dir.to_path_buf(), manifest, blocks: Vec::new(), items: Vec::new(), recipes: Vec::new(), tags: Vec::new() };
-    read_kind(dir, "blocks", &mut count, &mut errors, |path, d: BlockDef| pkg.blocks.push(Def { id: format!("{ns}:{path}"), def: qualify_block(&ns, d) }));
-    read_kind(dir, "items", &mut count, &mut errors, |path, d: ItemDef| pkg.items.push(Def { id: format!("{ns}:{path}"), def: qualify_item(&ns, d) }));
-    read_kind(dir, "recipes", &mut count, &mut errors, |path, d: RecipeDef| pkg.recipes.push(Def { id: format!("{ns}:{path}"), def: qualify_recipe(&ns, d) }));
-    read_kind(dir, "tags", &mut count, &mut errors, |path, d: TagDef| pkg.tags.push(Def { id: path.to_string(), def: TagDef { entries: d.entries.iter().map(|e| qualify(&ns, e)).collect() } }));
+    let mut pkg =
+        Package { dir: dir.to_path_buf(), manifest, blocks: Vec::new(), items: Vec::new(), recipes: Vec::new(), tags: Vec::new() };
+    read_kind(dir, "blocks", &mut count, &mut errors, |path, d: BlockDef| {
+        pkg.blocks
+            .push(Def { id: format!("{ns}:{path}"), def: qualify_block(&ns, d) })
+    });
+    read_kind(dir, "items", &mut count, &mut errors, |path, d: ItemDef| {
+        pkg.items
+            .push(Def { id: format!("{ns}:{path}"), def: qualify_item(&ns, d) })
+    });
+    read_kind(dir, "recipes", &mut count, &mut errors, |path, d: RecipeDef| {
+        pkg.recipes
+            .push(Def { id: format!("{ns}:{path}"), def: qualify_recipe(&ns, d) })
+    });
+    read_kind(dir, "tags", &mut count, &mut errors, |path, d: TagDef| {
+        pkg.tags
+            .push(Def { id: path.to_string(), def: TagDef { entries: d.entries.iter().map(|e| qualify(&ns, e)).collect() } })
+    });
     if let Ok(entries) = std::fs::read_dir(dir.join("defs")) {
         for e in entries.flatten() {
             let name = e.file_name().to_string_lossy().into_owned();
@@ -295,13 +330,23 @@ pub fn load(dir: &Path) -> Result<Package, Vec<String>> {
 }
 
 /// Every `defs/<kind>/**.toml`, parsed into `T` and handed to `add` with its path.
-fn read_kind<T: serde::de::DeserializeOwned>(dir: &Path, kind: &str, count: &mut usize, errors: &mut Vec<String>, mut add: impl FnMut(&str, T)) {
+fn read_kind<T: serde::de::DeserializeOwned>(
+    dir: &Path,
+    kind: &str,
+    count: &mut usize,
+    errors: &mut Vec<String>,
+    mut add: impl FnMut(&str, T),
+) {
     let root = dir.join("defs").join(kind);
     let mut files = Vec::new();
     walk(&root, &mut files);
     files.sort();
     for file in files {
-        let rel = file.strip_prefix(&root).unwrap_or(&file).to_string_lossy().replace('\\', "/");
+        let rel = file
+            .strip_prefix(&root)
+            .unwrap_or(&file)
+            .to_string_lossy()
+            .replace('\\', "/");
         let shown = format!("defs/{kind}/{rel}");
         let Some(path) = rel.strip_suffix(".toml") else {
             errors.push(format!("{shown}: definitions are .toml files"));
@@ -320,7 +365,10 @@ fn read_kind<T: serde::de::DeserializeOwned>(dir: &Path, kind: &str, count: &mut
             errors.push(format!("{shown}: bigger than {} KiB", MAX_DEF_BYTES / 1024));
             continue;
         }
-        match std::fs::read_to_string(&file).map_err(|e| e.to_string()).and_then(|t| toml::from_str::<T>(&t).map_err(|e| e.to_string())) {
+        match std::fs::read_to_string(&file)
+            .map_err(|e| e.to_string())
+            .and_then(|t| toml::from_str::<T>(&t).map_err(|e| e.to_string()))
+        {
             Ok(d) => add(path, d),
             Err(e) => errors.push(format!("{shown}: {}", e.trim_end())),
         }
@@ -371,7 +419,11 @@ fn qualify_recipe(ns: &str, mut d: RecipeDef) -> RecipeDef {
     d.kind = qualify(ns, &d.kind);
     d.result = qualify(ns, &d.result);
     d.inputs = d.inputs.iter().map(|i| qualify(ns, i)).collect();
-    d.key = d.key.into_iter().map(|(k, v)| (k, qualify(ns, &v))).collect();
+    d.key = d
+        .key
+        .into_iter()
+        .map(|(k, v)| (k, qualify(ns, &v)))
+        .collect();
     d
 }
 
@@ -406,7 +458,12 @@ fn check(p: &Package, errors: &mut Vec<String>) {
                         errors.push(format!("{at}: key `{k}`: keys are single characters"));
                     }
                 }
-                for c in d.pattern.iter().flat_map(|row| row.chars()).filter(|c| *c != ' ') {
+                for c in d
+                    .pattern
+                    .iter()
+                    .flat_map(|row| row.chars())
+                    .filter(|c| *c != ' ')
+                {
                     if !d.key.contains_key(&c.to_string()) {
                         errors.push(format!("{at}: `{c}` in the pattern has no key"));
                         break;
@@ -446,9 +503,17 @@ mod tests {
     fn reads_a_package() {
         let d = temp("ok");
         write(&d, "package.toml", "format = \"1.0\"\nid = \"gems\"\nversion = \"0.1.0\"\n[dependencies]\nbase = \"*\"\n");
-        write(&d, "defs/blocks/ruby_block.toml", "hardness = 3.0\nsound = \"stone\"\nmineable = \"pickaxe\"\ntags = [\"ore_blocks/ruby\"]\n");
+        write(
+            &d,
+            "defs/blocks/ruby_block.toml",
+            "hardness = 3.0\nsound = \"stone\"\nmineable = \"pickaxe\"\ntags = [\"ore_blocks/ruby\"]\n",
+        );
         write(&d, "defs/items/ruby.toml", "max_stack = 64\n");
-        write(&d, "defs/recipes/ruby_block.toml", "pattern = [\"RRR\", \"RRR\", \"RRR\"]\nkey = { R = \"ruby\" }\nresult = \"ruby_block\"\n");
+        write(
+            &d,
+            "defs/recipes/ruby_block.toml",
+            "pattern = [\"RRR\", \"RRR\", \"RRR\"]\nkey = { R = \"ruby\" }\nresult = \"ruby_block\"\n",
+        );
         write(&d, "defs/tags/gems/red.toml", "entries = [\"ruby\", \"#ores/ruby\", \"base:redstone\"]\n");
         let p = load(&d).unwrap();
         assert_eq!(p.id(), "gems");

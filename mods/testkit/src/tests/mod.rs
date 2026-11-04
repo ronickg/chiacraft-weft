@@ -1,6 +1,7 @@
 //! The test list. Each test is an `async fn(T) -> R`; failed checks are collected, `?` stops it.
 
 mod account;
+mod audit;
 mod bodies;
 mod extend;
 mod gameplay;
@@ -8,6 +9,7 @@ mod liquids;
 mod looks;
 mod packages;
 mod probe;
+pub mod redstone;
 mod scene;
 mod sync;
 mod ui;
@@ -32,6 +34,7 @@ pub fn all() -> Vec<TestDef> {
         ui::screens,
         account::account,
         packages::packages,
+        packages::package_pins,
         ui::scrollbar,
         ui::rebind,
         ui::f3,
@@ -41,12 +44,14 @@ pub fn all() -> Vec<TestDef> {
         ui::inventory_crafting,
         ui::creative_inventory,
         ui::chat,
+        ui::chat_overflow,
         ui::mod_settings,
         ui::recipe_viewer,
         ui::inventory_hotkeys,
         world::persistence,
         world::missing_dimension,
         world::dimensions,
+        world::world_seed,
         world::virtual_menus,
         world::worldgen,
         world::plants_on_cube_tops,
@@ -61,25 +66,52 @@ pub fn all() -> Vec<TestDef> {
         world::edit_while_loading,
         world::gpu_terrain,
         world::distant_terrain,
+        world::distant_terrain_underground,
         gameplay::crafting_table_tags,
         gameplay::sprint_and_sneak_modes,
         gameplay::mining_and_wear,
         gameplay::creative_and_invulnerable,
         gameplay::creative_clicks,
+        gameplay::furnace_one_coal,
+        gameplay::creative_middle_click,
+        gameplay::presses_never_wait,
+        gameplay::replaced_plants_drop,
+        gameplay::swimming,
+        gameplay::attack_charge,
+        gameplay::permissions,
+        gameplay::creative_sword,
         gameplay::armor,
         gameplay::slot_accepts,
         gameplay::slot_limit,
         gameplay::bucket,
+        gameplay::advancements,
+        gameplay::beds,
+        gameplay::beds_far,
+        gameplay::spawn_eggs,
+        gameplay::dedicated_server,
+        gameplay::base_alone,
+        ui::mods_switch,
+        gameplay::toast_with_the_gui,
+        gameplay::advancements_by_tags,
+        gameplay::names_translated,
+        gameplay::air_in_creative,
+        gameplay::swimming_no_bob,
         gameplay::battery,
         gameplay::burning,
         gameplay::entity_fields,
         gameplay::fall_damage,
+        gameplay::mob_in_the_way,
+        gameplay::dust_rests_on_the_floor,
+        gameplay::landing_dust_scatters,
+        gameplay::sprint_kicks_up_dust,
+        gameplay::explosions_and_water,
         gameplay::sneak_edge,
         gameplay::movement_attributes,
         gameplay::mob_physics,
         gameplay::player_box,
         gameplay::own_names,
         gameplay::food,
+        gameplay::every_food_has_nutrition,
         gameplay::drop_and_pickup,
         gameplay::sounds,
         extend::events_batched,
@@ -110,7 +142,75 @@ pub fn all() -> Vec<TestDef> {
         visual::gizmos,
         visual::multiplayer,
         visual::client_hooks,
+        audit::saved_entities_stay_gone,
+        audit::death_is_a_state,
+        audit::respawn_keeps_mode,
+        audit::kill_and_void,
+        audit::leaving_keeps_cursor,
+        audit::containers,
+        audit::water_keeps_flowing,
+        audit::ladder_no_fall,
+        audit::bucket_not_wasted,
+        audit::shift_click_skips_grid,
+        audit::no_block_into_mob,
+        audit::tp_nan,
+        audit::changes_in_one_tick,
+        audit::no_ghost_light,
+        audit::chat_down_keeps_text,
+        audit::break_refused,
+        audit::creative_sword_no_flicker,
+        audit::reach_and_mining_attributes,
+        audit::liquid_surface,
+        audit::bodies_only,
         looks::particles,
+        looks::sky,
+        looks::clouds,
+        looks::distant_terrain_from_above,
+        looks::third_person_shakes,
+        looks::block_dust_scatters,
+        looks::ctm_off_the_cube,
+        looks::translucent_order,
+        looks::light_by_day,
+        looks::ctm_any_model,
+        redstone::redstone_wire,
+        redstone::redstone_on_walls,
+        redstone::redstone_conduction,
+        redstone::redstone_torch,
+        redstone::redstone_repeater,
+        redstone::redstone_comparator,
+        redstone::redstone_piston,
+        redstone::redstone_piston_moves,
+        redstone::redstone_door,
+        redstone::redstone_contest,
+        redstone::redstone_rides,
+        redstone::redstone_body_edges,
+        redstone::redstone_floaters_together,
+        redstone::redstone_floater_up,
+        redstone::redstone_floater_riders,
+        redstone::redstone_floater,
+        redstone::redstone_lift_api,
+        redstone::redstone_copper_lamp,
+        redstone::redstone_body_light,
+        redstone::redstone_body_and_world,
+        redstone::redstone_moves_chest,
+        redstone::redstone_timing,
+        redstone::redstone_spit,
+        redstone::redstone_anchor,
+        redstone::redstone_flying_machine,
+        redstone::redstone_flying_rider,
+        redstone::redstone_observer,
+        redstone::redstone_dispenser,
+        redstone::redstone_by_hand,
+        redstone::redstone_looks,
+        redstone::redstone_first_piece,
+        redstone::redstone_head_stays_inside,
+        redstone::redstone_for_mods,
+        redstone::redstone_clock,
+        redstone::redstone_saved,
+        redstone::redstone_saved_moving,
+        redstone::redstone_on_a_structure,
+        redstone::redstone_turned,
+        looks::attack_indicator,
         looks::shaders_and_glow,
         looks::texture_seams,
         looks::texture_reload,
@@ -129,15 +229,29 @@ pub fn all() -> Vec<TestDef> {
         bodies::skiff_pause,
         gameplay::respawn,
         bodies::skiff_blocks,
+        bodies::body_chest,
+        bodies::body_sneak_edge,
+        bodies::body_no_bob,
+        bodies::body_place,
+        bodies::body_lit_at_once,
+        redstone::body_walking,
         bodies::natural_spawning,
         bodies::zombie_chases,
+        bodies::neutral_mobs,
         bodies::morph,
     ]
 }
 
 /// Measurements without a verdict worth failing a run over; `--test bench`.
 pub fn bench() -> Vec<TestDef> {
-    crate::tests![world::load_benchmark, world::item_farm, looks::particle_crowd, world::crater]
+    crate::tests![redstone::redstone_bench, world::fly_load, world::load_benchmark, world::item_farm, looks::particle_crowd, world::crater]
+}
+
+/// A process's first world is slow to open and to settle, which timings shouldn't be measuring.
+/// Left out of the report unless it fails.
+pub async fn warm_up(t: T) -> R {
+    t.flat().await?;
+    t.secs(0.5).await
 }
 
 impl T {
@@ -145,7 +259,8 @@ impl T {
     pub async fn flat(&self) -> R {
         self.world(1).await?;
         self.cmd("/dim base:flatlands").await?;
-        self.until("flatlands", Duration::from_secs(20), |t| t.state().dim != 0 || t.state().pos[1] < 10.0).await?;
+        self.until("flatlands", Duration::from_secs(20), |t| t.state().dim != 0 || t.state().pos[1] < 10.0)
+            .await?;
         self.loaded().await?;
         self.op("mode survival").await?;
         self.idle().await
@@ -164,6 +279,9 @@ impl T {
     /// Counts entities of a kind near the player as the server has them.
     pub async fn count_near(&self, kind: &str, r: f64) -> Result<usize, String> {
         let list = self.op(&format!("near ~ ~ ~ {r}")).await?;
-        Ok(list.split_whitespace().filter(|e| e.ends_with(&format!(":{kind}"))).count())
+        Ok(list
+            .split_whitespace()
+            .filter(|e| e.ends_with(&format!(":{kind}")))
+            .count())
     }
 }

@@ -27,8 +27,33 @@ fn number(name: &str) -> f64 {
     config::get(id(name))
 }
 
+/// How the chat is shown, as its settings have it.
+#[derive(Clone, Copy, PartialEq)]
+pub struct ChatLook {
+    pub width: f32,
+    /// The most it takes up open, and shown over the game.
+    pub open_height: f32,
+    pub closed_height: f32,
+    /// Of the dark behind it, 0..255.
+    pub dim: u8,
+}
+
+pub fn chat_look() -> ChatLook {
+    ChatLook {
+        width: number("core:chat_width") as f32,
+        open_height: number("core:chat_height") as f32,
+        closed_height: number("core:chat_height_closed") as f32,
+        dim: (number("core:chat_opacity") * 2.55) as u8,
+    }
+}
+
 fn list(name: &str) -> Vec<String> {
-    config::text(id(name)).split(',').map(str::trim).filter(|p| !p.is_empty()).map(String::from).collect()
+    config::text(id(name))
+        .split(',')
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(String::from)
+        .collect()
 }
 
 impl Settings {
@@ -45,9 +70,6 @@ impl Settings {
     }
     pub fn view_distance(&self) -> i32 {
         number("core:view_distance") as i32
-    }
-    pub fn lod_distance(&self) -> i32 {
-        number("core:lod_distance") as i32
     }
     pub fn vsync(&self) -> bool {
         number("core:vsync") != 0.0
@@ -80,6 +102,9 @@ impl Settings {
     }
     pub fn name(&self) -> String {
         config::text(id("core:name"))
+    }
+    pub fn server_port(&self) -> u16 {
+        number("core:server_port") as u16
     }
     /// Extra iroh relay URLs; empty uses the public defaults.
     pub fn relays(&self) -> Vec<String> {
@@ -125,7 +150,8 @@ impl Settings {
 
 /// The old `config/settings.txt` joins `config/core.txt` once (lists were one line per entry).
 pub fn migrate(run_dir: &Path) {
-    let (old, new) = (run_dir.join("config").join("settings.txt"), run_dir.join("config").join("core.txt"));
+    let config = crate::paths::config(run_dir);
+    let (old, new) = (config.join("settings.txt"), config.join("core.txt"));
     let Ok(src) = std::fs::read_to_string(&old) else { return };
     let mut out = std::fs::read_to_string(&new).unwrap_or_default();
     let (mut packs, mut relays) = (Vec::new(), Vec::new());
@@ -133,13 +159,19 @@ pub fn migrate(run_dir: &Path) {
         match k {
             "resource_pack" => packs.push(v),
             "relay" => relays.push(v),
-            _ => out.push_str(&format!("{k} = {v}
-")),
+            _ => out.push_str(&format!(
+                "{k} = {v}
+"
+            )),
         }
     }
-    out.push_str(&format!("resource_packs = {}
+    out.push_str(&format!(
+        "resource_packs = {}
 relays = {}
-", packs.join(","), relays.join(",")));
+",
+        packs.join(","),
+        relays.join(",")
+    ));
     if std::fs::write(&new, out).is_ok() {
         let _ = std::fs::remove_file(&old);
     }
@@ -191,7 +223,10 @@ pub fn parse_chord(s: &str) -> Option<Chord> {
     let key = parse_key(parts.pop()?)?;
     let mut mods = 0;
     for p in parts {
-        mods |= MODIFIERS.iter().find(|m| m.1.eq_ignore_ascii_case(p) || (m.1 == "ctrl" && p.eq_ignore_ascii_case("control")))?.0;
+        mods |= MODIFIERS
+            .iter()
+            .find(|m| m.1.eq_ignore_ascii_case(p) || (m.1 == "ctrl" && p.eq_ignore_ascii_case("control")))?
+            .0;
     }
     Some(Chord { key, mods })
 }
@@ -202,13 +237,124 @@ pub fn parse_key(s: &str) -> Option<Key> {
     }
     use winit::keyboard::KeyCode::*;
     const ALL: &[winit::keyboard::KeyCode] = &[
-        KeyA, KeyB, KeyC, KeyD, KeyE, KeyF, KeyG, KeyH, KeyI, KeyJ, KeyK, KeyL, KeyM, KeyN, KeyO, KeyP, KeyQ, KeyR, KeyS,
-        KeyT, KeyU, KeyV, KeyW, KeyX, KeyY, KeyZ, Digit0, Digit1, Digit2, Digit3, Digit4, Digit5, Digit6, Digit7,
-        Digit8, Digit9, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, Space, Enter, Tab, Backspace, Escape,
-        ShiftLeft, ShiftRight, ControlLeft, ControlRight, AltLeft, AltRight, ArrowUp, ArrowDown, ArrowLeft,
-        ArrowRight, Minus, Equal, BracketLeft, BracketRight, Backslash, Semicolon, Quote, Comma, Period, Slash,
-        Backquote, CapsLock, Insert, Delete, Home, End, PageUp, PageDown, Numpad0, Numpad1, Numpad2, Numpad3,
-        Numpad4, Numpad5, Numpad6, Numpad7, Numpad8, Numpad9,
+        KeyA,
+        KeyB,
+        KeyC,
+        KeyD,
+        KeyE,
+        KeyF,
+        KeyG,
+        KeyH,
+        KeyI,
+        KeyJ,
+        KeyK,
+        KeyL,
+        KeyM,
+        KeyN,
+        KeyO,
+        KeyP,
+        KeyQ,
+        KeyR,
+        KeyS,
+        KeyT,
+        KeyU,
+        KeyV,
+        KeyW,
+        KeyX,
+        KeyY,
+        KeyZ,
+        Digit0,
+        Digit1,
+        Digit2,
+        Digit3,
+        Digit4,
+        Digit5,
+        Digit6,
+        Digit7,
+        Digit8,
+        Digit9,
+        F1,
+        F2,
+        F3,
+        F4,
+        F5,
+        F6,
+        F7,
+        F8,
+        F9,
+        F10,
+        F11,
+        F12,
+        Space,
+        Enter,
+        Tab,
+        Backspace,
+        Escape,
+        ShiftLeft,
+        ShiftRight,
+        ControlLeft,
+        ControlRight,
+        AltLeft,
+        AltRight,
+        ArrowUp,
+        ArrowDown,
+        ArrowLeft,
+        ArrowRight,
+        Minus,
+        Equal,
+        BracketLeft,
+        BracketRight,
+        Backslash,
+        Semicolon,
+        Quote,
+        Comma,
+        Period,
+        Slash,
+        Backquote,
+        CapsLock,
+        Insert,
+        Delete,
+        Home,
+        End,
+        PageUp,
+        PageDown,
+        Numpad0,
+        Numpad1,
+        Numpad2,
+        Numpad3,
+        Numpad4,
+        Numpad5,
+        Numpad6,
+        Numpad7,
+        Numpad8,
+        Numpad9,
+        NumpadAdd,
+        NumpadSubtract,
+        NumpadMultiply,
+        NumpadDivide,
+        NumpadDecimal,
+        NumpadEnter,
+        NumpadEqual,
+        NumLock,
+        ScrollLock,
+        PrintScreen,
+        Pause,
+        ContextMenu,
+        IntlBackslash,
+        F13,
+        F14,
+        F15,
+        F16,
+        F17,
+        F18,
+        F19,
+        F20,
+        F21,
+        F22,
+        F23,
+        F24,
+        SuperLeft,
+        SuperRight,
     ];
     // Short names ("R", "5", "space", "lshift") as well as winit's ("KeyR", "Digit5", "ShiftLeft").
     let short = match s.to_ascii_lowercase().as_str() {
@@ -227,7 +373,9 @@ pub fn parse_key(s: &str) -> Option<Key> {
         "right" => "ArrowRight".into(),
         _ => s.into(),
     };
-    ALL.iter().find(|c| format!("{c:?}").eq_ignore_ascii_case(&short)).map(|c| Key::Code(*c))
+    ALL.iter()
+        .find(|c| format!("{c:?}").eq_ignore_ascii_case(&short))
+        .map(|c| Key::Code(*c))
 }
 
 #[cfg(test)]
@@ -246,7 +394,10 @@ mod tests {
         assert_eq!(parse_key("mouse3"), Some(Key::Mouse(3)));
         assert_eq!(parse_key("Rr"), None);
         assert_eq!(parse_chord("ctrl+T"), Some(Chord { key: Key::Code(KeyCode::KeyT), mods: crate::input::CTRL }));
-        assert_eq!(parse_chord("Shift + Alt + F6"), Some(Chord { key: Key::Code(KeyCode::F6), mods: crate::input::SHIFT | crate::input::ALT }));
+        assert_eq!(
+            parse_chord("Shift + Alt + F6"),
+            Some(Chord { key: Key::Code(KeyCode::F6), mods: crate::input::SHIFT | crate::input::ALT })
+        );
         assert_eq!(parse_chord("LShift"), Some(Chord { key: Key::Code(KeyCode::ShiftLeft), mods: 0 }));
         assert_eq!(parse_chord("meta+T"), None);
         let c = parse_chord("ctrl+shift+R").unwrap();

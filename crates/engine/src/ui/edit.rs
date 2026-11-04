@@ -64,7 +64,9 @@ impl Field<'_> {
     }
 
     pub fn selection(&self) -> Option<(usize, usize)> {
-        self.anchor.filter(|&a| a != *self.caret).map(|a| (a.min(*self.caret), a.max(*self.caret)))
+        self.anchor
+            .filter(|&a| a != *self.caret)
+            .map(|a| (a.min(*self.caret), a.max(*self.caret)))
     }
 
     fn set(&mut self, chars: Vec<char>) {
@@ -119,6 +121,8 @@ impl Field<'_> {
         let mut out = Outcome::default();
         let held = |k: KeyCode| input.held_key(Key::Code(k));
         let ctrl = held(KeyCode::ControlLeft) || held(KeyCode::ControlRight);
+        // Select all, copy, cut and paste: Cmd on a Mac, Ctrl elsewhere (and Ctrl on a Mac too).
+        let cmd = ctrl || (cfg!(target_os = "macos") && (held(KeyCode::SuperLeft) || held(KeyCode::SuperRight)));
         let shift = held(KeyCode::ShiftLeft) || held(KeyCode::ShiftRight);
         let key = |k: KeyCode| input.pressed_or_repeated(Key::Code(k));
         let chars = self.chars();
@@ -126,11 +130,11 @@ impl Field<'_> {
         *self.caret = (*self.caret).min(len);
         *self.anchor = self.anchor.map(|a| a.min(len));
 
-        if ctrl && key(KeyCode::KeyA) {
+        if cmd && key(KeyCode::KeyA) {
             *self.anchor = Some(0);
             *self.caret = len;
             out.moved = true;
-        } else if ctrl && (key(KeyCode::KeyC) || key(KeyCode::KeyX)) {
+        } else if cmd && (key(KeyCode::KeyC) || key(KeyCode::KeyX)) {
             if let Some((a, b)) = self.selection() {
                 crate::clipboard::set(&chars[a..b].iter().collect::<String>());
                 if key(KeyCode::KeyX) {
@@ -138,11 +142,11 @@ impl Field<'_> {
                     out.changed = true;
                 }
             }
-        } else if ctrl && key(KeyCode::KeyV) {
+        } else if cmd && key(KeyCode::KeyV) {
             if let Some(clip) = crate::clipboard::get() {
                 out.changed |= self.insert(clip.lines().next().unwrap_or(""));
             }
-        } else if !input.typed.is_empty() && !ctrl {
+        } else if !input.typed.is_empty() && !cmd {
             out.changed |= self.insert(&input.typed);
         }
 

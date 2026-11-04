@@ -1,0 +1,14 @@
+You are making UI assets for my game. Use your image generation tool to make ONE image, then save it as a PNG file named NAME.png in the current folder. Do not write any code or edit any other files.
+
+Style: copy the attached images exactly. The approved parts image shows the game's real parts: copper-bronze frames with a dark outline, a bright top edge and lit left side, shaded right side, small 45-degree cut corners with faceted corner blocks, dark charcoal-brown insides, warm ivory symbols, amber-gold for selected or done, grey-brown for disabled. Light always comes from the top left. The two mockups show the HUD and the screens laid out as the game should look: match their frames, tabs, icons and colours. Any other references show the wider look.
+
+Every asset:
+- Chunky pixel art, enlarged with hard square pixels of one even size and sharp edges. Not a 3D render, not a painting.
+- Empty: no text, numbers or labels; the game adds text, numbers, items and glow.
+- Straight edges plain and even along their length, details only in the corners, so the game can stretch it.
+- On a flat solid #FF00FF magenta background filling the whole image, with plenty of magenta between parts so no two parts touch.
+
+The image:
+REQUEST
+
+When done, reply with the file name you saved.

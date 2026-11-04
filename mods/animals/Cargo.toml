@@ -1,0 +1,19 @@
+[package]
+name = "animals"
+version = "0.1.0"
+edition.workspace = true
+license = "MIT"
+description = "Animals: dogs, cats, capybaras and raptors to tame, ride and breed, with coats from real genes"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Species, genes, coats and evolution, shared with the website (`core/`).
+animals_core = { path = "core", features = ["sdk"] }
+weft_sdk.workspace = true
+# The overworld, its sky objects (the Cretaceous has the same sun and moon).
+base_api.workspace = true
+vitals.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json.workspace = true

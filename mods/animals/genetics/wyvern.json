@@ -1,0 +1,475 @@
+{
+ "species": "wyvern",
+ "about": "A wyvern's genes (a fantasy animal: imagined, on the pattern of real reptiles): what it breathes, its scales' color, its markings, how far its accent spreads, how dark, how big. Wyverns of different country differ as a reptile's populations do (`habitats`): crag wyverns of the mountains, frost wyverns of the cold, sand wyverns of the deserts, wood wyverns of the forests, storm wyverns of the open country. They are one species and interbreed; every one is still marked its own way (the core traits).",
+ "loci": [
+  {
+   "id": "Br",
+   "name": "Breath",
+   "about": "what it breathes; the commoner breaths dominant over the rarer",
+   "alleles": [
+    {
+     "a": "fire",
+     "freq": 0.55,
+     "about": "fire"
+    },
+    {
+     "a": "frost",
+     "freq": 0.25,
+     "about": "frost"
+    },
+    {
+     "a": "lightning",
+     "freq": 0.12,
+     "about": "lightning"
+    },
+    {
+     "a": "venom",
+     "freq": 0.08,
+     "about": "venom (a burning, poisonous spray)"
+    }
+   ]
+  },
+  {
+   "id": "Sc",
+   "name": "Scales",
+   "about": "the scales' color",
+   "alleles": [
+    {
+     "a": "slate",
+     "freq": 0.35,
+     "about": "slate grey"
+    },
+    {
+     "a": "bronze",
+     "freq": 0.25,
+     "about": "bronze"
+    },
+    {
+     "a": "green",
+     "freq": 0.15,
+     "about": "dark green"
+    },
+    {
+     "a": "black",
+     "freq": 0.13,
+     "about": "black"
+    },
+    {
+     "a": "red",
+     "freq": 0.09,
+     "about": "deep red"
+    },
+    {
+     "a": "white",
+     "freq": 0.03,
+     "about": "pale cream (recessive, rare)"
+    }
+   ]
+  },
+  {
+   "id": "Dk",
+   "name": "Darkness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.2,
+   "about": "light to dark"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  },
+  {
+   "id": "Mk",
+   "name": "Markings",
+   "about": "the dark markings over its scales; a reptile's commonest patterns",
+   "alleles": [
+    {
+     "a": "bands",
+     "freq": 0.3,
+     "about": "bands across the back and tail, like a monitor lizard's"
+    },
+    {
+     "a": "blotches",
+     "freq": 0.2,
+     "about": "blotches along the flanks"
+    },
+    {
+     "a": "mottle",
+     "freq": 0.2,
+     "about": "mottled"
+    },
+    {
+     "a": "stripes",
+     "freq": 0.15,
+     "about": "stripes along the body"
+    },
+    {
+     "a": "plain",
+     "freq": 0.15,
+     "about": "plain (recessive)"
+    }
+   ]
+  },
+  {
+   "id": "Ac",
+   "name": "Accent spread",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.2,
+   "about": "how far the accent color reaches over the wings, horns and spikes"
+  }
+ ],
+ "mark_scale": 10,
+ "traits": {
+  "Ms": {
+   "mean": 0.55,
+   "sd": 0.15
+  },
+  "Ct": {
+   "mean": 0.45,
+   "sd": 0.15
+  }
+ },
+ "eyes": [
+  [
+   214,
+   150,
+   40
+  ],
+  [
+   232,
+   118,
+   32
+  ],
+  [
+   196,
+   58,
+   34
+  ],
+  [
+   226,
+   206,
+   96
+  ]
+ ],
+ "sexes": {
+  "male": {
+   "Ho": 0.15,
+   "Ac": 0.08,
+   "Ct": 0.08
+  }
+ },
+ "young": {
+  "traits": {
+   "Ac": -0.15,
+   "Ct": 0.2
+  },
+  "pattern": "blotches"
+ },
+ "habitats": {
+  "mountains": {
+   "freq": {
+    "Sc": {
+     "slate": 0.45,
+     "bronze": 0.15,
+     "green": 0.05,
+     "black": 0.25,
+     "red": 0.07,
+     "white": 0.03
+    },
+    "Mk": {
+     "bands": 0.5,
+     "blotches": 0.1,
+     "mottle": 0.2,
+     "stripes": 0.1,
+     "plain": 0.1
+    },
+    "Br": {
+     "fire": 0.5,
+     "frost": 0.35,
+     "lightning": 0.1,
+     "venom": 0.05
+    }
+   },
+   "quantitative": {
+    "Ho": {
+     "mean": 0.62,
+     "sd": 0.15
+    },
+    "Sz": {
+     "mean": 0.55,
+     "sd": 0.15
+    }
+   }
+  },
+  "snow": {
+   "freq": {
+    "Sc": {
+     "slate": 0.45,
+     "bronze": 0.05,
+     "green": 0.05,
+     "black": 0.1,
+     "red": 0.05,
+     "white": 0.3
+    },
+    "Mk": {
+     "bands": 0.2,
+     "blotches": 0.05,
+     "mottle": 0.5,
+     "stripes": 0.05,
+     "plain": 0.2
+    },
+    "Br": {
+     "fire": 0.2,
+     "frost": 0.7,
+     "lightning": 0.08,
+     "venom": 0.02
+    }
+   },
+   "quantitative": {
+    "Dk": {
+     "mean": 0.35,
+     "sd": 0.18
+    },
+    "Wm": {
+     "mean": 0.38,
+     "sd": 0.12
+    }
+   }
+  },
+  "taiga": {
+   "freq": {
+    "Sc": {
+     "slate": 0.4,
+     "bronze": 0.1,
+     "green": 0.15,
+     "black": 0.15,
+     "red": 0.05,
+     "white": 0.15
+    },
+    "Mk": {
+     "bands": 0.25,
+     "blotches": 0.1,
+     "mottle": 0.4,
+     "stripes": 0.1,
+     "plain": 0.15
+    },
+    "Br": {
+     "fire": 0.3,
+     "frost": 0.55,
+     "lightning": 0.1,
+     "venom": 0.05
+    }
+   },
+   "quantitative": {
+    "Dk": {
+     "mean": 0.42,
+     "sd": 0.18
+    },
+    "Wm": {
+     "mean": 0.42,
+     "sd": 0.12
+    }
+   }
+  },
+  "desert": {
+   "freq": {
+    "Sc": {
+     "slate": 0.1,
+     "bronze": 0.5,
+     "green": 0.03,
+     "black": 0.1,
+     "red": 0.25,
+     "white": 0.02
+    },
+    "Mk": {
+     "bands": 0.25,
+     "blotches": 0.45,
+     "mottle": 0.15,
+     "stripes": 0.05,
+     "plain": 0.1
+    },
+    "Br": {
+     "fire": 0.55,
+     "frost": 0.05,
+     "lightning": 0.1,
+     "venom": 0.3
+    }
+   },
+   "quantitative": {
+    "Wm": {
+     "mean": 0.65,
+     "sd": 0.12
+    },
+    "Dk": {
+     "mean": 0.45,
+     "sd": 0.18
+    },
+    "Ho": {
+     "mean": 0.45,
+     "sd": 0.15
+    }
+   }
+  },
+  "forest": {
+   "freq": {
+    "Sc": {
+     "slate": 0.1,
+     "bronze": 0.2,
+     "green": 0.55,
+     "black": 0.1,
+     "red": 0.03,
+     "white": 0.02
+    },
+    "Mk": {
+     "bands": 0.05,
+     "blotches": 0.15,
+     "mottle": 0.35,
+     "stripes": 0.4,
+     "plain": 0.05
+    },
+    "Br": {
+     "fire": 0.35,
+     "frost": 0.1,
+     "lightning": 0.1,
+     "venom": 0.45
+    }
+   },
+   "quantitative": {
+    "Dk": {
+     "mean": 0.56,
+     "sd": 0.18
+    },
+    "Sz": {
+     "mean": 0.45,
+     "sd": 0.15
+    }
+   }
+  },
+  "grassland": {
+   "freq": {
+    "Sc": {
+     "slate": 0.35,
+     "bronze": 0.2,
+     "green": 0.1,
+     "black": 0.1,
+     "red": 0.1,
+     "white": 0.15
+    },
+    "Mk": {
+     "bands": 0.3,
+     "blotches": 0.2,
+     "mottle": 0.2,
+     "stripes": 0.2,
+     "plain": 0.1
+    },
+    "Br": {
+     "fire": 0.35,
+     "frost": 0.1,
+     "lightning": 0.45,
+     "venom": 0.1
+    }
+   }
+  }
+ },
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw",
+    "cheek_L0_tilt",
+    "cheek_L1_tilt",
+    "cheek_L2_tilt",
+    "cheek_R0_tilt",
+    "cheek_R1_tilt",
+    "cheek_R2_tilt"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Nk": {
+   "bones": [
+    "neck_0",
+    "neck_1",
+    "neck_2",
+    "neck_3"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.12
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2",
+    "tail_3",
+    "tail_4",
+    "tail_5",
+    "tail_6",
+    "tail_7"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.12
+  },
+  "Lg": {
+   "bones": [
+    "thigh_L",
+    "thigh_R",
+    "shin_L",
+    "shin_R"
+   ],
+   "axes": [
+    0.3,
+    1,
+    1
+   ],
+   "range": 0.05
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.08
+  },
+  "Ho": {
+   "bones": [
+    "horn_L0_tilt",
+    "horn_L1_tilt",
+    "horn_L2_tilt",
+    "horn_Llow_tilt",
+    "horn_R0_tilt",
+    "horn_R1_tilt",
+    "horn_R2_tilt",
+    "horn_Rlow_tilt"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.3
+  }
+ }
+}

@@ -1,0 +1,105 @@
+{
+ "species": "arctic_fox",
+ "about": "The Arctic fox (Vulpes lagopus): white in its winter coat; the blue morph (a dominant allele, about one in ten worldwide) charcoal blue-grey all year. Smaller than the red fox with short, thick ears, drawn so by its genes (size and the ears' build) on the same model.",
+ "loci": [
+  {
+   "id": "Bl",
+   "name": "Blue",
+   "alleles": [
+    {
+     "a": "Bl",
+     "freq": 0.05,
+     "about": "the blue morph (dominant)"
+    },
+    {
+     "a": "bl",
+     "freq": 0.95,
+     "about": "white"
+    }
+   ]
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.1,
+   "sd": 0.06,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   150,
+   108,
+   56
+  ],
+  [
+   184,
+   140,
+   70
+  ]
+ ],
+ "traits": {
+  "Ho": {
+   "mean": 0.1,
+   "sd": 0.05
+  }
+ },
+ "build": {
+  "Ho": {
+   "bones": [
+    "ear_L",
+    "ear_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.4
+  },
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  },
+  "Lg": {
+   "bones": [
+    "leg_FL_upper",
+    "leg_FL_lower",
+    "leg_FR_upper",
+    "leg_FR_lower",
+    "leg_BL_upper",
+    "leg_BL_lower",
+    "leg_BR_upper",
+    "leg_BR_lower"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.05
+  }
+ }
+}

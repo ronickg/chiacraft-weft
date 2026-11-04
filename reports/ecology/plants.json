@@ -1,0 +1,4139 @@
+{
+  "_about": {
+    "what": "Real agronomy and plant ecology for the plant table (notes/ECOLOGY.md part 3) and fertile soil (part 9). Companion to 'Plants and crops.md' in this folder, which explains the numbers and lists the sources in full.",
+    "date": "2026-11-03",
+    "units": {
+      "t_base": "degC below which the plant does not grow (development base temperature)",
+      "t_best": "[lo, hi] degC, the mean daily temperature range for best growth",
+      "t_max": "degC above which growth stops or the crop is badly damaged",
+      "frost": "{tolerance: none | light (to about -2) | moderate (to about -8) | hardy (below -15), kill_c: the rough killing temperature, note}",
+      "days_to_harvest": "[lo, hi] days from sowing (or from bloom for perennials, see notes) to harvest",
+      "gdd": "{base_c, value: [lo, hi]} growing degree days from sowing to harvest at that base, or null",
+      "water_mm": "[lo, hi] crop water need (evapotranspiration) per season in mm; for perennials and wild plants, the yearly rain they grow in",
+      "sow_months / harvest_months": "1-12, temperate northern hemisphere unless the plant is tropical-only; 'tropics' gives the llanos / Pantanal calendar where it differs",
+      "yield_kg_ha": "[lo, hi] fresh weight of the harvested part per hectare (grain at market moisture); see notes for world averages",
+      "nitrogen": "{effect: depletes | neutral | fixes, kg_ha: [lo, hi] removed by a harvest (depletes) or fixed per season (fixes)}",
+      "estimates": "field names whose values are estimates (agronomy common knowledge or my own reasoning), not read from a cited source"
+    },
+    "biome_ids": "as in mods/base/vitals/src/climate.rs (base:plains ... animals:crags)"
+  },
+  "plants": [
+    {
+      "name": "winter wheat",
+      "id": "base:wheat",
+      "kind": "crop",
+      "in_game": true,
+      "t_base": 0,
+      "t_best": [
+        15,
+        23
+      ],
+      "t_max": 34,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -20,
+        "note": "hardened young plants survive about -20 (hardiest cultivars -21); frost at heading (May) costs the ear at about -2"
+      },
+      "days_to_harvest": [
+        180,
+        250
+      ],
+      "gdd": {
+        "base_c": 0,
+        "value": [
+          1900,
+          2400
+        ]
+      },
+      "water_mm": [
+        450,
+        650
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        9,
+        10
+      ],
+      "harvest_months": [
+        7,
+        8
+      ],
+      "irrigated_desert": {
+        "sow_months": [
+          11,
+          12
+        ],
+        "harvest_months": [
+          4,
+          5
+        ],
+        "note": "winter wheat is the irrigated winter crop of the Sonoran desert valleys (Yaqui, Mexicali)"
+      },
+      "yield_kg_ha": [
+        1000,
+        8000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          70,
+          200
+        ],
+        "per_tonne_grain": [
+          22,
+          26
+        ]
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:birch_forest",
+        "base:mountains",
+        "base:desert"
+      ],
+      "food_category": "seeds",
+      "needs_vernalization": true,
+      "sources": [
+        "https://www.fao.org/land-water/databases-and-software/crop-information/wheat/fr/",
+        "https://www.fao.org/4/i2800e/i2800e07.pdf",
+        "https://www.fao.org/4/u3160e/u3160e04.htm",
+        "https://www.era.rothamsted.ac.uk/dataset/rbk1/02-OAWWYields",
+        "https://www.agrojournal.org/23/03-14.html",
+        "https://scilit.com/publications/0e7c5f90c31f7b119b398bb344b2df2f"
+      ],
+      "estimates": [
+        "t_max",
+        "gdd",
+        "irrigated_desert"
+      ],
+      "notes": "Needs a cold spell (vernalization) to head, so it is sown in autumn, rests in winter and finishes in early summer. Unfertilized it settles near 1,000 kg/ha (Broadbalk, 170 years); well fed 6,000-8,000, record 13,800. World average about 3,500 (estimate). Removes about 23 kg N per tonne of grain."
+    },
+    {
+      "name": "spring wheat",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 0,
+      "t_best": [
+        15,
+        23
+      ],
+      "t_max": 34,
+      "frost": {
+        "tolerance": "light",
+        "kill_c": -3,
+        "note": "sensitive to frost (FAO); seedlings take a light frost"
+      },
+      "days_to_harvest": [
+        100,
+        130
+      ],
+      "gdd": {
+        "base_c": 0,
+        "value": [
+          1300,
+          1700
+        ]
+      },
+      "water_mm": [
+        450,
+        650
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        8,
+        9
+      ],
+      "yield_kg_ha": [
+        1500,
+        5000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          50,
+          130
+        ],
+        "per_tonne_grain": [
+          22,
+          26
+        ]
+      },
+      "biomes": [
+        "base:plains",
+        "base:taiga",
+        "base:mountains",
+        "base:birch_forest"
+      ],
+      "food_category": "seeds",
+      "sources": [
+        "https://www.fao.org/land-water/databases-and-software/crop-information/wheat/fr/",
+        "https://www.fao.org/4/u3160e/u3160e04.htm"
+      ],
+      "estimates": [
+        "frost.kill_c",
+        "gdd",
+        "yield_kg_ha"
+      ],
+      "notes": "The wheat of short summers (Canadian prairies, the southern edge of the boreal forest). In the game this can be the same wheat block sown in spring: no vernalization, a shorter season, a smaller yield."
+    },
+    {
+      "name": "barley",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 0,
+      "t_best": [
+        15,
+        20
+      ],
+      "t_max": 32,
+      "frost": {
+        "tolerance": "light",
+        "kill_c": -4,
+        "note": "spring barley; the hardiest winter barley reaches about -15"
+      },
+      "days_to_harvest": [
+        90,
+        120
+      ],
+      "gdd": {
+        "base_c": 0,
+        "value": [
+          1200,
+          1500
+        ]
+      },
+      "water_mm": [
+        350,
+        500
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        7,
+        8
+      ],
+      "yield_kg_ha": [
+        1500,
+        6000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          50,
+          120
+        ]
+      },
+      "biomes": [
+        "base:taiga",
+        "base:mountains",
+        "base:plains",
+        "base:birch_forest"
+      ],
+      "food_category": "seeds",
+      "sources": [
+        "https://www.fao.org/4/u3160e/u3160e04.htm",
+        "https://scilit.com/publications/0e7c5f90c31f7b119b398bb344b2df2f"
+      ],
+      "estimates": [
+        "t_best",
+        "t_max",
+        "days_to_harvest",
+        "gdd",
+        "water_mm",
+        "yield_kg_ha",
+        "nitrogen"
+      ],
+      "notes": "The shortest-season cereal: the grain of the north and of high mountains (Tibet, the Andes, Scandinavia). The obvious crop the taiga and mountains lack."
+    },
+    {
+      "name": "winter rye",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 0,
+      "t_best": [
+        12,
+        20
+      ],
+      "t_max": 30,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -30,
+        "note": "the most winter-hardy cereal: hardiest cultivars about -30 (wheat -21, barley -15, oats -13); its northern limit is central Finland"
+      },
+      "days_to_harvest": [
+        280,
+        320
+      ],
+      "gdd": null,
+      "water_mm": [
+        400,
+        500
+      ],
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": [
+        9
+      ],
+      "harvest_months": [
+        7,
+        8
+      ],
+      "yield_kg_ha": [
+        1500,
+        5000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          40,
+          100
+        ]
+      },
+      "biomes": [
+        "base:taiga",
+        "base:birch_forest",
+        "base:plains",
+        "base:mountains"
+      ],
+      "food_category": "seeds",
+      "needs_vernalization": true,
+      "sources": [
+        "https://scilit.com/publications/0e7c5f90c31f7b119b398bb344b2df2f",
+        "https://journal.fi/afs/article/download/72654/34443/96775"
+      ],
+      "estimates": [
+        "t_best",
+        "t_max",
+        "days_to_harvest",
+        "water_mm",
+        "yield_kg_ha",
+        "nitrogen"
+      ],
+      "notes": "The bread grain of poor sandy soils and cold winters (Russia, Finland, Poland). Grows on poorer soil than wheat."
+    },
+    {
+      "name": "carrot",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 4,
+      "t_best": [
+        16,
+        21
+      ],
+      "t_max": 30,
+      "frost": {
+        "tolerance": "moderate",
+        "kill_c": -5,
+        "note": "roots keep in the ground under light frost; seedlings are tender"
+      },
+      "days_to_harvest": [
+        70,
+        120
+      ],
+      "gdd": {
+        "base_c": 4.4,
+        "value": [
+          750,
+          1000
+        ]
+      },
+      "water_mm": [
+        350,
+        550
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "harvest_months": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "yield_kg_ha": [
+        25000,
+        60000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          80,
+          120
+        ]
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:birch_forest",
+        "base:taiga",
+        "base:mountains"
+      ],
+      "food_category": "roots",
+      "sources": [
+        "https://growbydate-site.pages.dev/data/crop-heat-requirements/",
+        "https://mrcc.purdue.edu/resources/growing-degree-day-description"
+      ],
+      "estimates": [
+        "t_best",
+        "t_max",
+        "frost",
+        "days_to_harvest",
+        "water_mm",
+        "yield_kg_ha",
+        "nitrogen"
+      ],
+      "notes": "A cool-season root. Base temperature 3.3-4.4 by source. The GDD target comes from a low-authority table: treat as rough."
+    },
+    {
+      "name": "potato",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 7,
+      "t_best": [
+        15,
+        20
+      ],
+      "t_max": 30,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": -1,
+        "note": "leaves die at the first frost; tubers in the ground are safe until the soil freezes"
+      },
+      "days_to_harvest": [
+        120,
+        150
+      ],
+      "gdd": {
+        "base_c": 7,
+        "value": [
+          1100,
+          1500
+        ]
+      },
+      "water_mm": [
+        500,
+        700
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": [
+        15000,
+        45000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          120,
+          200
+        ]
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:birch_forest",
+        "base:taiga",
+        "base:mountains"
+      ],
+      "food_category": "roots",
+      "sources": [
+        "https://www.fao.org/land-water/databases-and-software/crop-information/potato/fr",
+        "https://www.cropj.com/mbugua_14_9_2020_1405_1414.pdf",
+        "https://www.pda.org.uk/?p=509"
+      ],
+      "estimates": [
+        "t_base",
+        "t_max",
+        "frost.kill_c",
+        "gdd",
+        "yield_kg_ha",
+        "nitrogen"
+      ],
+      "notes": "Tubers form best with soil at 15-18 (FAO) and nights below 15; growth slows sharply below 10 and above 30. Sensitive to drought. From the high Andes, so it suits the mountains. World average about 21,000 kg/ha (estimate)."
+    },
+    {
+      "name": "beetroot",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 4.5,
+      "t_best": [
+        15,
+        20
+      ],
+      "t_max": 30,
+      "frost": {
+        "tolerance": "light",
+        "kill_c": -3
+      },
+      "days_to_harvest": [
+        55,
+        90
+      ],
+      "gdd": {
+        "base_c": 4.4,
+        "value": [
+          650,
+          900
+        ]
+      },
+      "water_mm": [
+        350,
+        500
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "harvest_months": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": [
+        25000,
+        50000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          80,
+          120
+        ]
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:birch_forest",
+        "base:taiga",
+        "base:mountains"
+      ],
+      "food_category": "roots",
+      "sources": [
+        "https://agris.fao.org/search/ru/records/6765996f6784547a43e36c19",
+        "https://growbydate-site.pages.dev/data/crop-heat-requirements/"
+      ],
+      "estimates": [
+        "t_best",
+        "t_max",
+        "frost",
+        "days_to_harvest",
+        "water_mm",
+        "yield_kg_ha",
+        "nitrogen"
+      ],
+      "notes": "Base temperature 4.6 for red beet development (cardinal-temperature study). Fast: several sowings a summer."
+    },
+    {
+      "name": "pumpkin",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 10,
+      "t_best": [
+        20,
+        30
+      ],
+      "t_max": 35,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0
+      },
+      "days_to_harvest": [
+        90,
+        120
+      ],
+      "gdd": {
+        "base_c": 10,
+        "value": [
+          1100,
+          1400
+        ]
+      },
+      "water_mm": [
+        400,
+        600
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        5,
+        6
+      ],
+      "harvest_months": [
+        9,
+        10
+      ],
+      "tropics": {
+        "sow_months": [
+          5,
+          6
+        ],
+        "harvest_months": [
+          8,
+          9
+        ],
+        "note": "squash sown with the first rains"
+      },
+      "yield_kg_ha": [
+        15000,
+        40000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          60,
+          120
+        ]
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:savanna",
+        "base:desert"
+      ],
+      "food_category": "fruit",
+      "sources": [
+        "https://growbydate-site.pages.dev/data/crop-heat-requirements/",
+        "https://www.fao.org/4/u3160e/u3160e04.htm"
+      ],
+      "estimates": [
+        "t_best",
+        "t_max",
+        "gdd",
+        "water_mm",
+        "yield_kg_ha",
+        "nitrogen",
+        "tropics"
+      ],
+      "notes": "Squash takes 95-120 days (FAO). One of the 'three sisters' with maize and beans in the Americas, including Sonoran monsoon fields. Keeps for months after harvest, a winter food."
+    },
+    {
+      "name": "melon",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 12,
+      "t_best": [
+        25,
+        30
+      ],
+      "t_max": 38,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0
+      },
+      "days_to_harvest": [
+        120,
+        160
+      ],
+      "gdd": null,
+      "water_mm": [
+        400,
+        600
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        7,
+        8,
+        9
+      ],
+      "yield_kg_ha": [
+        15000,
+        35000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          80,
+          120
+        ]
+      },
+      "biomes": [
+        "base:desert",
+        "base:savanna",
+        "base:plains",
+        "base:beach"
+      ],
+      "food_category": "fruit",
+      "sources": [
+        "https://www.fao.org/4/u3160e/u3160e04.htm"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "water_mm",
+        "yield_kg_ha",
+        "nitrogen"
+      ],
+      "notes": "A heat lover that ripens sweetest in dry sunny weather; grown irrigated in desert valleys. Growing period 120-160 days (FAO, from sowing in cool areas; 80-100 in hot ones)."
+    },
+    {
+      "name": "sugar cane",
+      "id": "base:sugar_cane",
+      "kind": "crop",
+      "in_game": true,
+      "t_base": 12,
+      "t_best": [
+        22,
+        30
+      ],
+      "t_max": 38,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0,
+        "note": "ripening wants dry, sunny, cool but frost-free weather"
+      },
+      "days_to_harvest": [
+        270,
+        720
+      ],
+      "gdd": null,
+      "water_mm": [
+        1500,
+        2500
+      ],
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": [
+        8,
+        9
+      ],
+      "harvest_months": [
+        10,
+        11,
+        12,
+        1
+      ],
+      "tropics": {
+        "sow_months": [
+          4,
+          5
+        ],
+        "harvest_months": [
+          12,
+          1,
+          2,
+          3,
+          4
+        ],
+        "note": "planted at the start of the rains, cut in the next dry season or the one after; regrows from the stool (ratoon) 3-5 times"
+      },
+      "yield_kg_ha": [
+        50000,
+        120000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          100,
+          200
+        ]
+      },
+      "biomes": [
+        "base:savanna",
+        "base:swamp",
+        "base:beach"
+      ],
+      "food_category": "grass",
+      "sources": [
+        "https://www.fao.org/land-water/databases-software/crop-information/sugarcane/en/",
+        "https://www.fao.org/land-water/databases-and-software/crop-information/sugarcane/fr"
+      ],
+      "estimates": [
+        "t_base",
+        "t_max",
+        "sow_months",
+        "harvest_months",
+        "yield_kg_ha",
+        "nitrogen",
+        "waterlogging_ok"
+      ],
+      "notes": "Optimum growth at 22-30 mean daily, minimum active growth about 20, cuttings sprout best at 32-38 (FAO). Total growing period 9 months (harvest before frost) to 24 (Hawaii), usually 15-16. Needs 1500-2500 mm evenly spread. A giant grass: grazers (capybara) eat it, the player gets sugar. Tolerates short floods (estimate). Not native to the Americas: the Pantanal and llanos grow it as a crop."
+    },
+    {
+      "name": "maize",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 10,
+      "t_best": [
+        24,
+        30
+      ],
+      "t_max": 38,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0,
+        "note": "grown where mean daily temperature is above 15 and frost-free"
+      },
+      "days_to_harvest": [
+        125,
+        180
+      ],
+      "gdd": {
+        "base_c": 10,
+        "value": [
+          2500,
+          3000
+        ],
+        "early_varieties": 1800,
+        "late_varieties": 3700
+      },
+      "water_mm": [
+        500,
+        800
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        9,
+        10
+      ],
+      "tropics": {
+        "sow_months": [
+          5,
+          6
+        ],
+        "harvest_months": [
+          8,
+          9,
+          10
+        ],
+        "note": "llanos: sown with the rains in May"
+      },
+      "yield_kg_ha": [
+        1000,
+        11000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          100,
+          200
+        ],
+        "per_tonne_grain": [
+          13,
+          15
+        ]
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:savanna",
+        "base:desert"
+      ],
+      "food_category": "seeds",
+      "sources": [
+        "https://www.fao.org/land-water/databases-and-software/crop-information/maize/fr/",
+        "https://www.fao.org/4/u3160e/u3160e04.htm",
+        "https://applbiolchem.springeropen.com/articles/10.1186/s13765-020-0493-6/tables/2"
+      ],
+      "estimates": [
+        "t_best",
+        "t_max",
+        "yield_kg_ha",
+        "nitrogen.kg_ha"
+      ],
+      "notes": "Germination needs 10, best 18-20. Very drought sensitive at flowering (FAO group 4), tolerant before and after. Below 15 mean it only makes fodder. World average about 5,800 kg/ha, US 11,000, smallholder unfertilized 1,000-2,000 (estimates). In the Sonoran desert it is grown on monsoon floodwater."
+    },
+    {
+      "name": "rice",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 10,
+      "t_best": [
+        25,
+        30
+      ],
+      "t_max": 35,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0,
+        "note": "chilling below about 15 at flowering makes the grain sterile"
+      },
+      "days_to_harvest": [
+        90,
+        150
+      ],
+      "gdd": {
+        "base_c": 10,
+        "value": [
+          1800,
+          2500
+        ]
+      },
+      "water_mm": [
+        1000,
+        1800
+      ],
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        9,
+        10
+      ],
+      "tropics": {
+        "sow_months": [
+          5,
+          6
+        ],
+        "harvest_months": [
+          9,
+          10
+        ],
+        "note": "rain-fed in the llanos' wet season; irrigated rice (Calabozo) also sown in the dry season, Nov-Dec, for a Mar-Apr harvest"
+      },
+      "yield_kg_ha": [
+        2000,
+        8000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          60,
+          120
+        ]
+      },
+      "biomes": [
+        "base:swamp",
+        "base:savanna"
+      ],
+      "food_category": "seeds",
+      "sources": [
+        "https://www.phytojournal.com/archives/2020/vol9issue4S/PartH/S-9-4-67-408.pdf",
+        "https://agris.fao.org/search/fr/records/66e845a3cd53c72de2ca1999",
+        "https://www.fao.org/4/u3160e/u3160e04.htm"
+      ],
+      "estimates": [
+        "t_best",
+        "t_max",
+        "frost.note",
+        "gdd",
+        "water_mm",
+        "tropics",
+        "yield_kg_ha",
+        "nitrogen"
+      ],
+      "notes": "Base 10 is the standard for rice degree days; above 35 at flowering hurts. Paddy water includes what seeps away, so the field figure is far above the crop's own use. The one grain that wants its feet wet: the swamp's crop. The Pantanal also has wild rice (Oryza latifolia, O. glumaepatula)."
+    },
+    {
+      "name": "common bean",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 10,
+      "t_best": [
+        18,
+        25
+      ],
+      "t_max": 30,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0
+      },
+      "days_to_harvest": [
+        95,
+        110
+      ],
+      "gdd": {
+        "base_c": 10,
+        "value": [
+          1100,
+          1400
+        ]
+      },
+      "water_mm": [
+        300,
+        500
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        5,
+        6
+      ],
+      "harvest_months": [
+        8,
+        9
+      ],
+      "tropics": {
+        "sow_months": [
+          5,
+          9
+        ],
+        "harvest_months": [
+          8,
+          12
+        ],
+        "note": "two seasons a year where the rains allow"
+      },
+      "yield_kg_ha": [
+        500,
+        2500
+      ],
+      "nitrogen": {
+        "effect": "fixes",
+        "kg_ha": [
+          20,
+          60
+        ],
+        "note": "a poor fixer among legumes; soybean fixes 100-175, faba bean about 90, lupin 165, clover 60-540"
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:savanna",
+        "base:mountains"
+      ],
+      "food_category": "seeds",
+      "sources": [
+        "https://www.fao.org/4/u3160e/u3160e04.htm",
+        "https://www.frontiersin.org/journals/plant-science/articles/10.3389/fpls.2020.01172/pdf",
+        "https://open-science.canada.ca/server/api/core/bitstreams/ee09721f-acbe-4af8-881a-ea38b0136ebb/content"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "gdd",
+        "tropics",
+        "yield_kg_ha"
+      ],
+      "notes": "Dry beans 95-110 days, green beans 75-90 (FAO); water 300-500 mm; moderately drought sensitive (FAO group 3). Flowers drop above about 30. Fixes 20-60 kg N/ha in the tropics, little of which is left after the beans are taken; it 'feeds the soil' mostly by needing no nitrogen itself. World average about 900 kg/ha (estimate)."
+    },
+    {
+      "name": "tepary bean",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 12,
+      "t_best": [
+        25,
+        32
+      ],
+      "t_max": 40,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0
+      },
+      "days_to_harvest": [
+        60,
+        120
+      ],
+      "gdd": null,
+      "water_mm": [
+        200,
+        350
+      ],
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": [
+        7
+      ],
+      "harvest_months": [
+        9,
+        10
+      ],
+      "yield_kg_ha": [
+        400,
+        1700
+      ],
+      "nitrogen": {
+        "effect": "fixes",
+        "kg_ha": [
+          20,
+          60
+        ]
+      },
+      "biomes": [
+        "base:desert",
+        "animals:scrubland"
+      ],
+      "food_category": "seeds",
+      "sources": [
+        "https://en.wikipedia.org/wiki/Phaseolus_acutifolius",
+        "https://prosea.prota4u.org/view.aspx?id=3311",
+        "https://www.kirkhousetrust.org/_files/ugd/b134c0_770becd89c514de99542dc62176c6a6d.pdf"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "water_mm",
+        "sow_months",
+        "harvest_months",
+        "nitrogen"
+      ],
+      "notes": "The Sonoran desert's own bean (Tohono O'odham), sown when the summer monsoon arrives. Matures in 60-120 days (some lines 64-75); 400-800 kg/ha dry-farmed, 900-1,700 irrigated. Nitrogen fixed: assumed like common bean."
+    },
+    {
+      "name": "sorghum",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 8,
+      "t_best": [
+        27,
+        34
+      ],
+      "t_max": 42,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0
+      },
+      "days_to_harvest": [
+        120,
+        130
+      ],
+      "gdd": {
+        "base_c": 10,
+        "value": [
+          1500,
+          2000
+        ]
+      },
+      "water_mm": [
+        450,
+        650
+      ],
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": [
+        5,
+        6
+      ],
+      "harvest_months": [
+        9,
+        10
+      ],
+      "tropics": {
+        "sow_months": [
+          5,
+          6
+        ],
+        "harvest_months": [
+          9,
+          10
+        ]
+      },
+      "yield_kg_ha": [
+        1000,
+        5000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          50,
+          120
+        ]
+      },
+      "biomes": [
+        "base:savanna",
+        "base:plains",
+        "base:desert"
+      ],
+      "food_category": "seeds",
+      "sources": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC7581754/table/Tab3",
+        "https://oar.icrisat.org/4112/1/CP_154.pdf",
+        "https://www.fao.org/4/u3160e/u3160e04.htm"
+      ],
+      "estimates": [
+        "gdd",
+        "yield_kg_ha",
+        "nitrogen"
+      ],
+      "notes": "Cardinal temperatures 8 / 34 / 40 in one compilation, 11 / 30 / 42 in another. Less drought sensitive than maize (FAO group 2): it stalls in a drought and resumes. Kansas is the top US sorghum state, so it fits the plains too. World average about 1,500 kg/ha (estimate)."
+    },
+    {
+      "name": "pearl millet",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 10,
+      "t_best": [
+        30,
+        34
+      ],
+      "t_max": 45,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0
+      },
+      "days_to_harvest": [
+        70,
+        140
+      ],
+      "gdd": null,
+      "water_mm": [
+        300,
+        500
+      ],
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": [
+        6,
+        7
+      ],
+      "harvest_months": [
+        9,
+        10
+      ],
+      "yield_kg_ha": [
+        500,
+        2000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          30,
+          80
+        ]
+      },
+      "biomes": [
+        "base:savanna",
+        "base:desert"
+      ],
+      "food_category": "seeds",
+      "sources": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC7581754/table/Tab3",
+        "https://www.fao.org/4/u3160e/u3160e04.htm"
+      ],
+      "estimates": [
+        "t_max",
+        "days_to_harvest",
+        "water_mm",
+        "yield_kg_ha",
+        "nitrogen"
+      ],
+      "notes": "The driest-land cereal (Sahel, India). Base 10, optimum 34; germinates up to 41-47. FAO gives millet 105-140 days; early types 70-90. African and Indian, not American: fine for a generic dry savanna, out of place in the llanos."
+    },
+    {
+      "name": "cassava",
+      "id": null,
+      "kind": "crop",
+      "in_game": false,
+      "t_base": 12,
+      "t_best": [
+        25,
+        29
+      ],
+      "t_max": 37,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0,
+        "note": "growth stops below about 15"
+      },
+      "days_to_harvest": [
+        240,
+        540
+      ],
+      "gdd": null,
+      "water_mm": [
+        1000,
+        1500
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        12,
+        1,
+        2,
+        3,
+        4
+      ],
+      "yield_kg_ha": [
+        8000,
+        30000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          40,
+          100
+        ],
+        "note": "removes much potassium"
+      },
+      "biomes": [
+        "base:savanna",
+        "base:swamp",
+        "base:beach"
+      ],
+      "food_category": "roots",
+      "sources": [
+        "https://naads.or.ug/?p=5026",
+        "https://www.redalyc.org/pdf/331/33144653006.pdf",
+        "https://robpyne.com.au/cassava-growing/"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "nitrogen",
+        "sow_months",
+        "harvest_months"
+      ],
+      "notes": "The llanos' staple root (yuca). Planted from stem cuttings at the start of the rains; early types are ready in 8-10 months, late ones 12-18, and roots can stay in the ground and be dug any time after (a living store through the dry season). Survives more than three months without rain and 500-5,000 mm a year; best with 1,000-1,500. Rots in waterlogged ground: in the swamp only on raised land. Improved varieties 25-30 t/ha; world average about 10-11 (estimate). Optimum quoted as 25-35 by some sources."
+    },
+    {
+      "name": "blueberry (berry bush)",
+      "id": "base:berry_bush",
+      "kind": "crop",
+      "in_game": true,
+      "t_base": 7,
+      "t_best": [
+        20,
+        26
+      ],
+      "t_max": 32,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -30,
+        "note": "dormant bushes are very hardy (lowbush under snow even more); open flowers die at about -2"
+      },
+      "chill_hours": [
+        800,
+        1200
+      ],
+      "days_to_harvest": [
+        60,
+        90
+      ],
+      "gdd": null,
+      "water_mm": [
+        500,
+        750
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        4,
+        10
+      ],
+      "bloom_months": [
+        5
+      ],
+      "harvest_months": [
+        7,
+        8,
+        9
+      ],
+      "yield_kg_ha": [
+        2000,
+        10000
+      ],
+      "wild_yield_kg_ha": [
+        4,
+        22
+      ],
+      "nitrogen": {
+        "effect": "neutral",
+        "kg_ha": [
+          30,
+          70
+        ],
+        "note": "needs little; wants acid soil"
+      },
+      "biomes": [
+        "base:forest",
+        "base:birch_forest",
+        "base:taiga",
+        "base:mountains",
+        "base:snowy_plains"
+      ],
+      "food_category": "fruit",
+      "sources": [
+        "https://growables.org/information/LowChillFruit/BlueberryArcRFC.htm",
+        "https://redi.cedia.edu.ec/document/7223",
+        "https://doaj.org/article/9b6f10d886fc456b82704247eec0ea62"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "days_to_harvest",
+        "water_mm",
+        "nitrogen",
+        "sow_months"
+      ],
+      "notes": "A perennial: days_to_harvest counts from bloom. Needs 800-1,200 hours of winter chill to flower. Planted highbush averages about 10,100 kg/ha (Chile survey); managed wild lowbush 2,000-5,000 (estimate); wild bilberry in Finnish forest only 4-22 kg per hectare of forest, a sparse but real food for bears, birds and foxes in late summer. The bog blueberry reaches the tundra."
+    },
+    {
+      "name": "apple",
+      "id": "base:apple",
+      "kind": "tree",
+      "in_game": true,
+      "t_base": 4.4,
+      "t_best": [
+        18,
+        24
+      ],
+      "t_max": 35,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -30,
+        "note": "dormant trees very hardy; blossom killed at about -2"
+      },
+      "chill_hours": [
+        800,
+        1200
+      ],
+      "days_to_harvest": [
+        120,
+        180
+      ],
+      "gdd": null,
+      "water_mm": [
+        600,
+        900
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        3,
+        4,
+        11
+      ],
+      "bloom_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": [
+        20000,
+        45000
+      ],
+      "nitrogen": {
+        "effect": "neutral",
+        "kg_ha": [
+          30,
+          80
+        ]
+      },
+      "biomes": [
+        "base:forest",
+        "base:birch_forest",
+        "base:plains",
+        "base:mountains"
+      ],
+      "food_category": "fruit",
+      "sources": [
+        "https://www.horticulturejournal.usamv.ro/pdf/2023/issue_2/Art4.pdf",
+        "https://ojs.lib.unideb.hu/actaagrar/article/download/13162/11743/29136",
+        "https://apples.extension.org/timing-of-apple-tree-bloom"
+      ],
+      "estimates": [
+        "t_best",
+        "t_max",
+        "frost",
+        "days_to_harvest",
+        "water_mm",
+        "nitrogen",
+        "sow_months"
+      ],
+      "notes": "A perennial: days_to_harvest counts from bloom. Chill 800-1,200 hours (cultivars 250-1,200); degree hours counted above 4.4. Orchards: France 42.8 t/ha, Italy 38.1, Hungary 40-45 'excellent'. Wild crab apples in forest edges give far less (estimate). Windfalls feed deer, boar and bears in autumn."
+    },
+    {
+      "name": "grass (temperate prairie and pasture)",
+      "id": "base:tall_grass",
+      "kind": "grass",
+      "in_game": true,
+      "t_base": 5,
+      "t_best": [
+        15,
+        30
+      ],
+      "t_max": 40,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -30,
+        "note": "tops die back in the first hard frost; crowns and roots survive winter"
+      },
+      "days_to_harvest": [
+        15,
+        40
+      ],
+      "gdd": null,
+      "water_mm": [
+        500,
+        900
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        3,
+        4,
+        5
+      ],
+      "harvest_months": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": [
+        1800,
+        7600
+      ],
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:birch_forest",
+        "base:mountains",
+        "base:taiga",
+        "base:beach"
+      ],
+      "food_category": "grass",
+      "sources": [
+        "https://daac.ornl.gov/NPP/guides/NPP_KNZ.html",
+        "https://link.springer.com/doi/10.1007/s100210000057",
+        "https://www.fas.scot/downloads/guide-to-rotational-grazing-for-dairy-farms"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost.kill_c",
+        "water_mm"
+      ],
+      "notes": "days_to_harvest here is the regrowth rest after grazing: 15-21 days in spring, 25-30 in summer, 30-40 in autumn, 90-100 in winter (Scottish dairy guide); 40-60+ in heat or drought. yield_kg_ha is dry matter a year: Konza tallgrass prairie 1,790-7,560, mean 3,940. Cool-season (C3) grasses grow from about 5, warm-season prairie grasses (C4, big bluestem) from about 10 and peak in July."
+    },
+    {
+      "name": "tropical savanna grass (Trachypogon, Paspalum)",
+      "id": "base:tall_grass",
+      "kind": "grass",
+      "in_game": true,
+      "t_base": 15,
+      "t_best": [
+        25,
+        35
+      ],
+      "t_max": 42,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": -2
+      },
+      "days_to_harvest": [
+        20,
+        40
+      ],
+      "gdd": null,
+      "water_mm": [
+        1000,
+        1600
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        5
+      ],
+      "harvest_months": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "yield_kg_ha": [
+        3750,
+        13000
+      ],
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:savanna",
+        "base:swamp"
+      ],
+      "food_category": "grass",
+      "sources": [
+        "https://daac.ornl.gov/NPP/guides/NPP_CLB.html",
+        "https://rcin.org.pl/miiz//Content/115849/PDF/WA058_91427_P2840-T49_Eko-Pol-A-Nr-4.pdf"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "days_to_harvest",
+        "water_mm",
+        "sow_months"
+      ],
+      "notes": "Calabozo (llanos): aboveground production 3,750 kg DM/ha a year unburned (1969), total with roots 6,820, later 8,230-13,100. Trachypogon is the least productive savanna grass. Green in the rains (May-Nov), standing dry and brown Dec-Apr; burning brings a green flush. In the game, the same tall-grass block, growing by the savanna's rain."
+    },
+    {
+      "name": "sedges and cottongrass",
+      "id": null,
+      "kind": "grass",
+      "in_game": false,
+      "t_base": 0,
+      "t_best": [
+        10,
+        20
+      ],
+      "t_max": 30,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -40
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": [
+        6,
+        7,
+        8
+      ],
+      "yield_kg_ha": [
+        300,
+        3000
+      ],
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:snowy_plains",
+        "base:taiga",
+        "base:swamp"
+      ],
+      "food_category": "grass",
+      "sources": [
+        "https://openpolar.no/Record/crwiley:10.2307%2F1942997/Details",
+        "https://journals.uair.arizona.edu/index.php/jrm/article/download/20242/19872"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost"
+      ],
+      "notes": "The tundra's 'grass' (tussock tundra is cottongrass, Eriophorum) and, with grasses, the capybara's staple in the Pantanal (Poaceae and Cyperaceae). Tundra vascular production 320-3,050 kg/ha a year (Toolik, without roots)."
+    },
+    {
+      "name": "white clover",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 5,
+      "t_best": [
+        18,
+        25
+      ],
+      "t_max": 32,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -20
+      },
+      "days_to_harvest": [
+        20,
+        40
+      ],
+      "gdd": null,
+      "water_mm": [
+        600,
+        900
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        3,
+        4,
+        8,
+        9
+      ],
+      "harvest_months": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": [
+        2000,
+        8000
+      ],
+      "nitrogen": {
+        "effect": "fixes",
+        "kg_ha": [
+          80,
+          540
+        ],
+        "note": "55-295 under grazing; red clover 60-370, alfalfa 100-350 (up to 466 in a stand's third year)"
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:birch_forest",
+        "base:mountains"
+      ],
+      "food_category": "leaves",
+      "sources": [
+        "https://research.slu.se/en/publications/nitrogen-fixation-in-perennial-forage-legumes-in-the-field/",
+        "https://www.saskforage.ca/s/Growing-Forage-Legumes-in-Rotation.pdf"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "days_to_harvest",
+        "water_mm",
+        "sow_months",
+        "yield_kg_ha"
+      ],
+      "notes": "The best soil-feeder for the game: a forage legume in grass, grazed and fixing far more than beans. A clover ley (1-3 years) before wheat is the classic way to restore fields without manure."
+    },
+    {
+      "name": "dandelion",
+      "id": "base:dandelion",
+      "kind": "wild",
+      "in_game": true,
+      "t_base": 3,
+      "t_best": [
+        15,
+        25
+      ],
+      "t_max": 32,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -25,
+        "note": "rosette and taproot overwinter"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "flower_months": [
+        4,
+        5,
+        6,
+        9,
+        10
+      ],
+      "harvest_months": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:birch_forest",
+        "base:mountains",
+        "base:taiga"
+      ],
+      "food_category": "leaves",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "flower_months",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. Leaves, flowers and the taproot are all edible; one of the first green foods of spring for grazers and bears, and its seeds feed finches."
+    },
+    {
+      "name": "wild rose (rose hips)",
+      "id": "base:rose",
+      "kind": "wild",
+      "in_game": true,
+      "t_base": 5,
+      "t_best": [
+        15,
+        25
+      ],
+      "t_max": 35,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -35
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "flower_months": [
+        6,
+        7
+      ],
+      "harvest_months": [
+        9,
+        10,
+        11,
+        12,
+        1,
+        2
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:plains",
+        "base:forest",
+        "base:birch_forest",
+        "base:taiga",
+        "base:mountains"
+      ],
+      "food_category": "fruit",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "flower_months",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. Hips ripen in autumn and hang on through winter: a winter fruit for birds and small mammals when nothing else is left."
+    },
+    {
+      "name": "oak",
+      "id": "base:oak",
+      "kind": "tree",
+      "in_game": true,
+      "t_base": 5,
+      "t_best": [
+        18,
+        28
+      ],
+      "t_max": 38,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -35
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        500,
+        1200
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": [
+        10,
+        11
+      ],
+      "leaf_months": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "harvest_months": [
+        9,
+        10,
+        11
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:forest",
+        "base:plains",
+        "base:mountains"
+      ],
+      "food_category": "seeds",
+      "browse": true,
+      "sources": [
+        "https://beaufort.ces.ncsu.edu/2025/11/the-secret-life-of-acorns-oaks-wildlife-and-the-science-of-mast-years/",
+        "https://www.douglascountymg.org/mg_articles/Acorns.pdf",
+        "https://research.fs.usda.gov/treesearch/41034"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm",
+        "leaf_months"
+      ],
+      "notes": "Acorns (Sep-Nov) are the forest's big autumn food for deer, boar, bears, squirrels, jays. Oaks crop heavily only every 3-4 years, bumper crops about 2 years in 10: a natural boom-and-bust year for the forest. Leaves and twigs are deer browse; browse under closed forest is about 225-560 kg/ha, in a fresh clearing 560-1,120."
+    },
+    {
+      "name": "birch",
+      "id": "base:birch",
+      "kind": "tree",
+      "in_game": true,
+      "t_base": 4,
+      "t_best": [
+        15,
+        22
+      ],
+      "t_max": 32,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -45
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        400,
+        900
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "leaf_months": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "harvest_months": [
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:birch_forest",
+        "base:taiga",
+        "base:forest",
+        "base:snowy_plains"
+      ],
+      "food_category": "leaves",
+      "browse": true,
+      "sources": [
+        "https://www.adfg.alaska.gov/static/home/library/pdfs/wildlife/propubs/wb17_1_55_seaton-et-al.pdf"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm",
+        "leaf_months",
+        "harvest_months",
+        "waterlogging_ok"
+      ],
+      "notes": "A pioneer after fire or felling, and a main moose and hare browse: an 11-year-old Alaskan birch stand held 167 kg/ha of browse, stands older than 25 years under 10. Seeds (late summer-autumn) feed redpolls and siskins. Dwarf birch reaches the tundra."
+    },
+    {
+      "name": "spruce",
+      "id": "base:spruce",
+      "kind": "tree",
+      "in_game": true,
+      "t_base": 4,
+      "t_best": [
+        12,
+        20
+      ],
+      "t_max": 30,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -50
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        300,
+        900
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": [
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:taiga",
+        "base:mountains",
+        "base:snowy_plains"
+      ],
+      "food_category": "seeds",
+      "browse": false,
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. Needles are poor browse (only grouse eat them in winter); cone seeds, ripe in late summer and held into winter, feed red squirrels and crossbills, with good cone years every few years."
+    },
+    {
+      "name": "acacia",
+      "id": "base:acacia",
+      "kind": "tree",
+      "in_game": true,
+      "t_base": 12,
+      "t_best": [
+        25,
+        35
+      ],
+      "t_max": 45,
+      "frost": {
+        "tolerance": "light",
+        "kill_c": -5
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        300,
+        1200
+      ],
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": [
+        12,
+        1,
+        2,
+        3
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "fixes",
+        "note": "acacias (Vachellia, Senegalia) are legumes and fix nitrogen"
+      },
+      "biomes": [
+        "base:savanna",
+        "base:desert"
+      ],
+      "food_category": "leaves",
+      "browse": true,
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. Leaves and pods are dry-season browse; pods ripen in the dry season when grass is dead. The llanos' own trees are mostly chaparro (Curatella) and Byrsonima with gallery forest and moriche palms; thorny Vachellia grows in the drier parts and in the Sonoran desert (whitethorn)."
+    },
+    {
+      "name": "saguaro (columnar cactus)",
+      "id": "base:cactus",
+      "kind": "wild",
+      "in_game": true,
+      "t_base": 10,
+      "t_best": [
+        25,
+        40
+      ],
+      "t_max": 50,
+      "frost": {
+        "tolerance": "light",
+        "kill_c": -7,
+        "note": "a long freeze kills; frost limits it northward and upward"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        75,
+        300
+      ],
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "flower_months": [
+        5,
+        6
+      ],
+      "harvest_months": [
+        6,
+        7
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:desert"
+      ],
+      "food_category": "fruit",
+      "sources": [
+        "https://savorthesouthwest.blog/2016/07/07/promise-preparedness-present-fulfillment-with-fruits-of-the-desert/"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm",
+        "flower_months"
+      ],
+      "notes": "Its fruit ripens in June, the driest month, and the Tohono O'odham year began with the saguaro harvest camps. A key early-summer food for birds, bats, coyotes and javelinas. The game's cactus gives no fruit yet."
+    },
+    {
+      "name": "prickly pear",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 10,
+      "t_best": [
+        20,
+        35
+      ],
+      "t_max": 45,
+      "frost": {
+        "tolerance": "moderate",
+        "kill_c": -10
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        150,
+        500
+      ],
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "flower_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        7,
+        8,
+        9
+      ],
+      "yield_kg_ha": [
+        5000,
+        20000
+      ],
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:desert",
+        "base:plains",
+        "animals:scrubland"
+      ],
+      "food_category": "fruit",
+      "sources": [
+        "https://tucsonfoodie.com/2018/09/07/prickly-pear-harvesting-preparation/",
+        "https://savorthesouthwest.blog/2016/07/07/promise-preparedness-present-fulfillment-with-fruits-of-the-desert/"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm",
+        "flower_months",
+        "yield_kg_ha"
+      ],
+      "notes": "Fruit (tunas) ripen late summer into early autumn (August in Tucson); pads (nopales) are eaten all year, by javelinas, tortoises, packrats and people, and are a drought fodder for cattle. Yield is for plantations (estimate). Grows into the shortgrass plains too."
+    },
+    {
+      "name": "mesquite",
+      "id": null,
+      "kind": "tree",
+      "in_game": false,
+      "t_base": 12,
+      "t_best": [
+        25,
+        38
+      ],
+      "t_max": 48,
+      "frost": {
+        "tolerance": "moderate",
+        "kill_c": -15
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        200,
+        500
+      ],
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "flower_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": [
+        3000,
+        4000
+      ],
+      "nitrogen": {
+        "effect": "fixes"
+      },
+      "biomes": [
+        "base:desert",
+        "base:savanna",
+        "animals:scrubland"
+      ],
+      "food_category": "seeds",
+      "browse": true,
+      "sources": [
+        "https://www.fs.usda.gov/database/feis/plants/tree/provel/all.html",
+        "https://www.osti.gov/biblio/6838849-prosopis-pod-production-comparison-north-american-south-american-hawaiian-african-germplasm-young-plantations",
+        "https://dunbarspringneighborhoodforesters.org/?p=66"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm",
+        "flower_months"
+      ],
+      "notes": "Velvet mesquite pods ripen June to late October ('an abundant food source for many wildlife species'), with a second crop after the monsoon. Young trees gave 3-12 kg of pods each; a plantation estimate 3,000-4,000 kg/ha. A legume: fixes nitrogen. The desert's biggest single food for rodents, coyotes, deer, cattle and people (pod flour)."
+    },
+    {
+      "name": "lingonberry",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 5,
+      "t_best": [
+        12,
+        20
+      ],
+      "t_max": 28,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -40
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "flower_months": [
+        6
+      ],
+      "harvest_months": [
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": [
+        8,
+        18
+      ],
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:taiga",
+        "base:birch_forest",
+        "base:snowy_plains",
+        "base:mountains"
+      ],
+      "food_category": "fruit",
+      "sources": [
+        "https://doaj.org/article/9b6f10d886fc456b82704247eec0ea62",
+        "https://www.silvafennica.fi/keyword/Vaccinium+vitis-idaea"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "flower_months",
+        "harvest_months"
+      ],
+      "notes": "8-18 kg per hectare of Finnish forest (Finland's whole crop about 180 million kg). Berries keep on the plant under snow into spring: the taiga's winter fruit for grouse, bears in spring, foxes."
+    },
+    {
+      "name": "cloudberry",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 3,
+      "t_best": [
+        10,
+        18
+      ],
+      "t_max": 25,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -40,
+        "note": "flowers are frost-sensitive in June"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "flower_months": [
+        6
+      ],
+      "harvest_months": [
+        7,
+        8
+      ],
+      "yield_kg_ha": [
+        5,
+        100
+      ],
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:taiga",
+        "base:snowy_plains"
+      ],
+      "food_category": "fruit",
+      "sources": [
+        "https://doaj.org/article/9b6f10d886fc456b82704247eec0ea62"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "flower_months",
+        "harvest_months",
+        "yield_kg_ha"
+      ],
+      "notes": "A bog berry: best on Sphagnum fuscum bogs and pine swamps. Yields vary hugely year to year with June frost (estimate)."
+    },
+    {
+      "name": "crowberry",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 2,
+      "t_best": [
+        8,
+        16
+      ],
+      "t_max": 25,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -45
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": [
+        8,
+        9,
+        10,
+        5,
+        6
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:snowy_plains",
+        "base:mountains",
+        "base:taiga"
+      ],
+      "food_category": "fruit",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. The tundra's commonest berry; holds over winter, so geese, bears and ptarmigan eat last year's berries in spring before anything else is out."
+    },
+    {
+      "name": "reindeer lichen",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 0,
+      "t_best": [
+        5,
+        15
+      ],
+      "t_max": 25,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -60
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:snowy_plains",
+        "base:taiga",
+        "base:mountains"
+      ],
+      "food_category": "lichen",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. Cladonia lichens grow only a few mm a year and take decades to recover from heavy grazing, but they are what caribou and reindeer dig from under the snow all winter. Not a plant, but a forage block in the same table. Category set to lichen to match the diets (the shared list in notes/ECOLOGY.md)."
+    },
+    {
+      "name": "mushrooms (forest fungi)",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 5,
+      "t_best": [
+        10,
+        20
+      ],
+      "t_max": 30,
+      "frost": {
+        "tolerance": "light",
+        "kill_c": -2
+      },
+      "days_to_harvest": [
+        3,
+        14
+      ],
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": [
+        7,
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral",
+        "note": "fungi are the decomposers: they belong on the rot side of the loop"
+      },
+      "biomes": [
+        "base:taiga",
+        "base:birch_forest",
+        "base:forest",
+        "base:mountains",
+        "base:swamp"
+      ],
+      "food_category": "fungi",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "days_to_harvest",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. Fruit bodies appear after late-summer rain and last days; squirrels dry them for winter, deer, boar and bears eat them. Food category is a stand-in: they may want their own (fungi). Category set to fungi to match the diets (the shared list in notes/ECOLOGY.md)."
+    },
+    {
+      "name": "hazelnut",
+      "id": null,
+      "kind": "tree",
+      "in_game": false,
+      "t_base": 5,
+      "t_best": [
+        16,
+        24
+      ],
+      "t_max": 32,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -30
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        600,
+        900
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "flower_months": [
+        2,
+        3
+      ],
+      "harvest_months": [
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:forest",
+        "base:birch_forest",
+        "base:plains"
+      ],
+      "food_category": "seeds",
+      "browse": true,
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm",
+        "flower_months",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. An understory shrub of deciduous forest and its edges; nuts in early autumn for squirrels, dormice, jays, and people."
+    },
+    {
+      "name": "brambles (raspberry, blackberry, wild strawberry)",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 5,
+      "t_best": [
+        16,
+        25
+      ],
+      "t_max": 32,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -25
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:forest",
+        "base:birch_forest",
+        "base:plains",
+        "base:taiga",
+        "base:mountains"
+      ],
+      "food_category": "fruit",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. Strawberries in June, raspberries in July, blackberries Aug-Sep: a fruit calendar across the summer at forest edges and clearings."
+    },
+    {
+      "name": "pine nuts (whitebark, limber, pinyon pine)",
+      "id": null,
+      "kind": "tree",
+      "in_game": false,
+      "t_base": 4,
+      "t_best": [
+        10,
+        20
+      ],
+      "t_max": 30,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -40
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        300,
+        800
+      ],
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": [
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:mountains",
+        "base:desert"
+      ],
+      "food_category": "seeds",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. The mountains' big fat-rich autumn food (grizzlies, Clark's nutcrackers, squirrels), in mast years. Pinyon pine fills the same place at the desert's upper edge."
+    },
+    {
+      "name": "sunflower (wild)",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 6,
+      "t_best": [
+        20,
+        28
+      ],
+      "t_max": 38,
+      "frost": {
+        "tolerance": "light",
+        "kill_c": -2
+      },
+      "days_to_harvest": [
+        125,
+        130
+      ],
+      "gdd": null,
+      "water_mm": [
+        600,
+        1000
+      ],
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": [
+        4,
+        5
+      ],
+      "harvest_months": [
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": [
+        1000,
+        3000
+      ],
+      "nitrogen": {
+        "effect": "depletes",
+        "kg_ha": [
+          40,
+          100
+        ]
+      },
+      "biomes": [
+        "base:plains",
+        "base:desert"
+      ],
+      "food_category": "seeds",
+      "sources": [
+        "https://www.fao.org/4/u3160e/u3160e04.htm"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "yield_kg_ha",
+        "nitrogen"
+      ],
+      "notes": "Native to the North American prairie (the Kansas state flower). Growing period 125-130 days and 600-1000 mm are FAO's figures for the crop. Seeds in autumn for finches, doves, rodents."
+    },
+    {
+      "name": "water hyacinth",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 12,
+      "t_best": [
+        25,
+        30
+      ],
+      "t_max": 38,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": -1
+      },
+      "days_to_harvest": [
+        7,
+        14
+      ],
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:swamp",
+        "base:savanna"
+      ],
+      "food_category": "water_plants",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "days_to_harvest",
+        "harvest_months"
+      ],
+      "notes": "Native to South American wetlands (Pantanal, llanos esteros). A floating plant that doubles in about one to two weeks in warm water (estimate). Eaten by capybaras and marsh deer according to general sources; the Pantanal diet studies found grasses, sedges and browse as staples, so its weight in their diet is unverified. Category set to water_plants to match the diets (the shared list in notes/ECOLOGY.md)."
+    },
+    {
+      "name": "wild rice (Oryza latifolia, O. glumaepatula)",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 12,
+      "t_best": [
+        25,
+        32
+      ],
+      "t_max": 38,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0
+      },
+      "days_to_harvest": [
+        120,
+        180
+      ],
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": [
+        10,
+        11
+      ],
+      "harvest_months": [
+        3,
+        4,
+        5
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:swamp",
+        "base:savanna"
+      ],
+      "food_category": "seeds",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "days_to_harvest",
+        "sow_months",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. Native rices of the Pantanal floodplains; grows with the rising flood and seeds as it peaks. Seeds for ducks, whistling ducks, rodents; leaves for capybara."
+    },
+    {
+      "name": "acuri palm (Attalea phalerata)",
+      "id": null,
+      "kind": "tree",
+      "in_game": false,
+      "t_base": 15,
+      "t_best": [
+        24,
+        32
+      ],
+      "t_max": 40,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        1000,
+        1500
+      ],
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": [
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:swamp"
+      ],
+      "food_category": "fruit",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched; months uncertain. The Pantanal's commonest palm, on ground above the flood; its nuts feed hyacinth macaws, peccaries, agoutis and cattle. The fruit months here are a guess (dry season)."
+    },
+    {
+      "name": "moriche palm (Mauritia flexuosa)",
+      "id": null,
+      "kind": "tree",
+      "in_game": false,
+      "t_base": 15,
+      "t_best": [
+        24,
+        32
+      ],
+      "t_max": 40,
+      "frost": {
+        "tolerance": "none",
+        "kill_c": 0
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": [
+        1200,
+        2500
+      ],
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:savanna",
+        "base:swamp"
+      ],
+      "food_category": "fruit",
+      "sources": [
+        "https://ethnobiology.org/sites/default/files/pdfs/JoE/15-2/Gragson1995.pdf",
+        "https://scalar.usc.edu/works/plants-and-people/muritia-flexuosa-habitat---amazon-wetlands-and-llanos"
+      ],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "water_mm"
+      ],
+      "notes": "Grows in lines along the llanos' streams (morichales), which stay wet in the dry season. The Pume of the llanos collect its fruit in Mar-May and Jun-Aug, and its palm heart and grubs. A key dry-season fruit for birds (macaws), mammals, reptiles and fish."
+    },
+    {
+      "name": "cattail and reeds",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 8,
+      "t_best": [
+        20,
+        30
+      ],
+      "t_max": 38,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -30,
+        "note": "rhizomes in mud survive; tops die"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:swamp",
+        "base:plains",
+        "base:forest",
+        "base:taiga",
+        "base:savanna"
+      ],
+      "food_category": "water_plants",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. Every wetland edge, warm or cold. Shoots and starchy rhizomes eaten by muskrats, geese, capybaras, people; cover for birds. Category set to water_plants to match the diets (the shared list in notes/ECOLOGY.md)."
+    },
+    {
+      "name": "kelp and seaweed",
+      "id": null,
+      "kind": "wild",
+      "in_game": false,
+      "t_base": 2,
+      "t_best": [
+        8,
+        18
+      ],
+      "t_max": 24,
+      "frost": {
+        "tolerance": "hardy",
+        "kill_c": -2
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "base:ocean",
+        "base:beach"
+      ],
+      "food_category": "water_plants",
+      "sources": [],
+      "estimates": [
+        "t_base",
+        "t_best",
+        "t_max",
+        "frost",
+        "harvest_months"
+      ],
+      "notes": "Common knowledge, no source fetched. The ocean's plant base (for fish, urchins, turtles) and, washed up as wrack, the beach's: sand fleas and flies on it feed shorebirds. Also a classic coastal fertilizer. Category set to water_plants to match the diets (the shared list in notes/ECOLOGY.md)."
+    },
+    {
+      "name": "fern (Cretaceous, leptosporangiate)",
+      "id": "animals:fern",
+      "kind": "cretaceous",
+      "in_game": true,
+      "t_base": null,
+      "t_best": null,
+      "t_max": null,
+      "frost": {
+        "tolerance": "none",
+        "note": "Cretaceous floras grew in frost-free or nearly frost-free climates"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "moderate",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": null,
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "animals:fern_forest",
+        "animals:floodplain",
+        "animals:scrubland",
+        "animals:crags"
+      ],
+      "food_category": "leaves",
+      "sources": [
+        "https://ui.adsabs.harvard.edu/abs/2020RSOS....700305B",
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911",
+        "https://par.nsf.gov/servlets/purl/10167697",
+        "https://gsa.confex.com/gsa/2023SC/webprogram/Paper385130.html"
+      ],
+      "estimates": [
+        "frost",
+        "water_need"
+      ],
+      "notes": "The ground cover where there was no grass. The nodosaur Borealopelta's last meal was 88% leaves, 85% of them leptosporangiate ferns (cycads 3%, conifers a trace), picked selectively, from a burned conifer forest regrowing as fern. Cedar Mountain pollen: spores make 90% of the Short Canyon Member's palynoflora; Gleicheniidites (gleicheniaceous ferns) in the Mussentuchit. Fern energy varies: some (Angiopteris) as good as modern browse, tree ferns poor."
+    },
+    {
+      "name": "horsetail (Equisetum)",
+      "id": "animals:horsetail",
+      "kind": "cretaceous",
+      "in_game": true,
+      "t_base": null,
+      "t_best": null,
+      "t_max": null,
+      "frost": {
+        "tolerance": "hardy",
+        "note": "living horsetails are frost-hardy; Cretaceous ones lived in mild climates"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": null,
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "animals:floodplain",
+        "animals:fern_forest",
+        "animals:red_dunes"
+      ],
+      "food_category": "grass",
+      "sources": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911",
+        "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10723699/",
+        "https://sciencedaily.com/releases/2019/11/191108155447.htm",
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC2708679/"
+      ],
+      "estimates": [
+        "water_need",
+        "biomes"
+      ],
+      "notes": "The best-energy Mesozoic forage measured: Equisetum, Araucaria and Angiopteris were the most digestible in both seasons (2023 re-test). Grows in wet ground and stands like a grass, so the 'grass' category for grazers fits. Edmontosaurus tooth wear suggests grazing low, silica-rich plants, horsetails being the guess. In the red dunes only at interdune ponds (inference)."
+    },
+    {
+      "name": "araucarian conifer (drawn as spruce)",
+      "id": "base:spruce",
+      "kind": "cretaceous",
+      "in_game": true,
+      "t_base": null,
+      "t_best": null,
+      "t_max": null,
+      "frost": {
+        "tolerance": "light"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": null,
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "animals:fern_forest",
+        "animals:floodplain",
+        "animals:scrubland",
+        "animals:crags"
+      ],
+      "food_category": "leaves",
+      "browse": true,
+      "sources": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911",
+        "https://en.wikipedia.org/wiki/Nemegt_Formation"
+      ],
+      "estimates": [
+        "frost",
+        "water_need",
+        "biomes"
+      ],
+      "notes": "Araucaria foliage is rich in energy but ferments slowly: a food for big, long-gutted high browsers (sauropods). Araucarians probably dominated the Nemegt flora of the Gobi (wetter, later than the Djadokhta). Large cones with big seeds."
+    },
+    {
+      "name": "swamp cypress conifer (Taxodioxylon)",
+      "id": null,
+      "kind": "cretaceous",
+      "in_game": false,
+      "t_base": null,
+      "t_best": null,
+      "t_max": null,
+      "frost": {
+        "tolerance": "light"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": null,
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "animals:floodplain"
+      ],
+      "food_category": "leaves",
+      "sources": [
+        "https://shareok.org/handle/11244/337587"
+      ],
+      "estimates": [
+        "frost"
+      ],
+      "notes": "Petrified wood of Taxodioxylon albertense, a cupressaceous (swamp-cypress-like) conifer, from the Cedar Mountain's Short Canyon Member. The floodplain's tree of wet ground."
+    },
+    {
+      "name": "Tempskya (Cretaceous tree fern)",
+      "id": null,
+      "kind": "cretaceous",
+      "in_game": false,
+      "t_base": null,
+      "t_best": null,
+      "t_max": null,
+      "frost": {
+        "tolerance": "none"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": null,
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "animals:floodplain",
+        "animals:fern_forest"
+      ],
+      "food_category": "leaves",
+      "sources": [
+        "https://www.journals.uchicago.edu/doi/10.1086/297057",
+        "https://scholarsarchive.byu.edu/facpub/1445/",
+        "https://scholarsarchive.byu.edu/etd/7989"
+      ],
+      "estimates": [
+        "frost"
+      ],
+      "notes": "A false-trunked tree fern found in the Cedar Mountain, Burro Canyon and Dakota formations (nine species). It grew in relatively humid conditions in floodplain swamps. Its stems hold tunnels with fecal pellets of three sizes: three different small animals (probably insects or other arthropods) ate inside it. Found with early angiosperm and conifer woods."
+    },
+    {
+      "name": "cycads and bennettitaleans (cycadophytes)",
+      "id": null,
+      "kind": "cretaceous",
+      "in_game": false,
+      "t_base": null,
+      "t_best": null,
+      "t_max": null,
+      "frost": {
+        "tolerance": "light"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "dry",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": null,
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "animals:scrubland",
+        "animals:red_dunes",
+        "animals:crags",
+        "animals:fern_forest"
+      ],
+      "food_category": "leaves",
+      "sources": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911",
+        "https://ui.adsabs.harvard.edu/abs/2020RSOS....700305B",
+        "https://www.ebsco.com/research-starters/earth-and-atmospheric-sciences/protoceratops"
+      ],
+      "estimates": [
+        "frost",
+        "water_need",
+        "biomes"
+      ],
+      "notes": "Tough, palm-like plants of drier ground. Poor energy in Hummel's gas test (an older ash-based test ranked them best, so it is disputed). 3% of Borealopelta's leaves. A general source says conifers and cycads were the dominant plants in Protoceratops' time; ceratopsian shearing beaks suggest tough, fibrous plants like these. Seeds and cones as fruit for small animals (inference)."
+    },
+    {
+      "name": "ginkgo",
+      "id": null,
+      "kind": "cretaceous",
+      "in_game": false,
+      "t_base": null,
+      "t_best": null,
+      "t_max": null,
+      "frost": {
+        "tolerance": "hardy"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "moderate",
+      "waterlogging_ok": false,
+      "sow_months": null,
+      "harvest_months": null,
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "animals:fern_forest",
+        "animals:floodplain"
+      ],
+      "food_category": "leaves",
+      "browse": true,
+      "sources": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC2600911",
+        "https://en.wikipedia.org/wiki/Nemegt_Formation"
+      ],
+      "estimates": [
+        "frost",
+        "biomes"
+      ],
+      "notes": "High-energy browse in the gas test. Present in the Nemegt flora. Deciduous, so a seasonal leaf food."
+    },
+    {
+      "name": "early flowering plants (Cretaceous angiosperm shrubs and herbs)",
+      "id": null,
+      "kind": "cretaceous",
+      "in_game": false,
+      "t_base": null,
+      "t_best": null,
+      "t_max": null,
+      "frost": {
+        "tolerance": "none"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "moderate",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": null,
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "animals:floodplain",
+        "animals:scrubland"
+      ],
+      "food_category": "fruit",
+      "browse": true,
+      "sources": [
+        "https://www.cambridge.org/core/journals/journal-of-paleontology/article/midcretaceous-angiospermdominated-macroflora-from-the-cedar-mountain-formation-of-utah-usa/03B8EE5F8918C6206DDDBFEB9DDE3ACA",
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC3529080"
+      ],
+      "estimates": [
+        "frost",
+        "biomes",
+        "food_category"
+      ],
+      "notes": "By the Cenomanian (Mussentuchit Member, ~99 Ma) the floodplain's leaf flora was angiosperm: 152 of 153 leaves, 18 dicot types, with almost no conifer or fern leaves (the pollen says ferns and conifers still lived around). Angiosperms spread first into wet, disturbed places: water plants from the Barremian, all environments from the Cenomanian. Small fruits for small animals (inference; Cretaceous fruits were mostly small)."
+    },
+    {
+      "name": "aquatic flowering plants (Cretaceous water plants)",
+      "id": null,
+      "kind": "cretaceous",
+      "in_game": false,
+      "t_base": null,
+      "t_best": null,
+      "t_max": null,
+      "frost": {
+        "tolerance": "none"
+      },
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "wet",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": null,
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [
+        "animals:floodplain",
+        "animals:red_dunes"
+      ],
+      "food_category": "water_plants",
+      "sources": [
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC3529080",
+        "https://en.wikipedia.org/wiki/Nemegt_Formation"
+      ],
+      "estimates": [
+        "frost",
+        "biomes"
+      ],
+      "notes": "Among the first angiosperms to spread (Barremian-Aptian, Europe). The Nemegt has a pondweed-like plant and duckweeds. For the floodplain's pools and the dunes' interdune ponds. Category set to water_plants to match the diets (the shared list in notes/ECOLOGY.md)."
+    },
+    {
+      "name": "Cretaceous grass (Poaceae)",
+      "id": null,
+      "kind": "cretaceous",
+      "in_game": false,
+      "t_base": null,
+      "t_best": null,
+      "t_max": null,
+      "frost": null,
+      "days_to_harvest": null,
+      "gdd": null,
+      "water_mm": null,
+      "water_need": "moderate",
+      "waterlogging_ok": true,
+      "sow_months": null,
+      "harvest_months": null,
+      "yield_kg_ha": null,
+      "nitrogen": {
+        "effect": "neutral"
+      },
+      "biomes": [],
+      "food_category": "grass",
+      "sources": [
+        "https://www.dinodata.de/bibliothek/pdf_d/2018/nwx145.pdf",
+        "https://ui.adsabs.harvard.edu/abs/2005Sci...310.1177P/abstract",
+        "https://ideas.repec.org/a/nat/natcom/v2y2011i1d10.1038_ncomms1482.html",
+        "https://www.biology.washington.edu/pubs/evolution-grasses-and-grassland-ecosystems"
+      ],
+      "estimates": [],
+      "notes": "Not for our Cretaceous biomes. Grasses existed but were rare: the oldest are Albian (113-101 Ma) epidermis and phytoliths from the teeth of the iguanodontian Equijubus in China; by the Maastrichtian, India had five or more grass lineages (incl. the rice tribe) in titanosaur dung, as a small part of an indiscriminate diet. Grass-dominated land came only in the Cenozoic (open-habitat grasses in the Paleogene, C4 grasslands in the late Neogene). None is recorded from the Cedar Mountain or Djadokhta."
+    }
+  ],
+  "forage_by_biome": {
+    "base:plains": {
+      "real_place": "Konza Prairie, Kansas (tallgrass)",
+      "kg_dm_ha_yr": 3940,
+      "range": [
+        1790,
+        7560
+      ],
+      "growing_months": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "dormant_months": [
+        11,
+        12,
+        1,
+        2,
+        3
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0.02,
+        0.08,
+        0.2,
+        0.25,
+        0.2,
+        0.13,
+        0.08,
+        0.04,
+        0,
+        0
+      ],
+      "sources": [
+        "https://daac.ornl.gov/NPP/guides/NPP_KNZ.html",
+        "https://link.springer.com/doi/10.1007/s100210000057"
+      ],
+      "notes": "Mean aboveground NPP 394 g/m2 (1975-84), lowland 528, years 179-756. A western shortgrass prairie gives a quarter of this (estimate). monthly_share is an estimate (cool-season grass in spring, warm-season peak Jun-Jul)."
+    },
+    "base:forest": {
+      "real_place": "eastern deciduous oak forest (Michigan, Appalachians)",
+      "kg_dm_ha_yr": 600,
+      "range": [
+        225,
+        1120
+      ],
+      "growing_months": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "dormant_months": [
+        11,
+        12,
+        1,
+        2,
+        3
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0,
+        0.08,
+        0.22,
+        0.25,
+        0.2,
+        0.14,
+        0.08,
+        0.03,
+        0,
+        0
+      ],
+      "sources": [
+        "https://research.fs.usda.gov/treesearch/41034",
+        "https://beaufort.ces.ncsu.edu/2025/11/the-secret-life-of-acorns-oaks-wildlife-and-the-science-of-mast-years/"
+      ],
+      "notes": "Forage within a grazer's reach (herbs and browse), not the canopy: woody browse 225-560 kg/ha in uncut forest, 560-1,120 in a fresh clearing (Gysel and Stearns 1968, converted). Plus acorns in Sep-Nov, heavy every 3-4 years. kg_dm_ha_yr and monthly_share are estimates."
+    },
+    "base:birch_forest": {
+      "real_place": "southern boreal / hemiboreal birch forest",
+      "kg_dm_ha_yr": 500,
+      "range": [
+        100,
+        1000
+      ],
+      "growing_months": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "dormant_months": [
+        10,
+        11,
+        12,
+        1,
+        2,
+        3,
+        4
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0,
+        0,
+        0.15,
+        0.3,
+        0.3,
+        0.18,
+        0.07,
+        0,
+        0,
+        0
+      ],
+      "sources": [
+        "https://www.adfg.alaska.gov/static/home/library/pdfs/wildlife/propubs/wb17_1_55_seaton-et-al.pdf"
+      ],
+      "notes": "Estimate between deciduous forest and taiga; young birch stands hold 167 kg/ha of browse alone. Winter food is twigs only."
+    },
+    "base:taiga": {
+      "real_place": "boreal forest (Alaska, Quebec, central Siberia)",
+      "kg_dm_ha_yr": 300,
+      "range": [
+        17,
+        600
+      ],
+      "growing_months": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "dormant_months": [
+        10,
+        11,
+        12,
+        1,
+        2,
+        3,
+        4
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0,
+        0,
+        0.05,
+        0.3,
+        0.35,
+        0.23,
+        0.07,
+        0,
+        0,
+        0
+      ],
+      "sources": [
+        "https://www.adfg.alaska.gov/static/home/library/pdfs/wildlife/propubs/wb17_1_55_seaton-et-al.pdf",
+        "https://openpolar.no/Record/crwiley:10.1111%2Fj.1469-7998.1997.tb05825.x/Description"
+      ],
+      "notes": "Moose browse: 17 kg/ha in unproductive northern Quebec forest, 144-241 in the core of moose range, 66-198 in young Alaskan stands, under 10 in stands older than 25 years. Plus ground layer (berries, herbs, lichen). Total is an estimate. Old taiga feeds little; burns and clearings feed much more."
+    },
+    "base:snowy_plains": {
+      "real_place": "arctic tundra (Toolik Lake, Alaska)",
+      "kg_dm_ha_yr": 800,
+      "range": [
+        320,
+        3050
+      ],
+      "growing_months": [
+        6,
+        7,
+        8
+      ],
+      "dormant_months": [
+        9,
+        10,
+        11,
+        12,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.25,
+        0.5,
+        0.25,
+        0,
+        0,
+        0,
+        0
+      ],
+      "sources": [
+        "https://openpolar.no/Record/crwiley:10.2307%2F1942997/Details",
+        "https://daac.ornl.gov/NPP/guides/NPP_TLK.html"
+      ],
+      "notes": "Vascular production 32-305 g/m2 a year without roots across four tundra types; 800 is an estimate for typical moist tundra. Ten weeks of growth. Winter forage is lichen and last year's dead sedge under the snow."
+    },
+    "base:desert": {
+      "real_place": "Sonoran Desert (Phoenix, Tucson); Chihuahuan for comparison",
+      "kg_dm_ha_yr": 900,
+      "range": [
+        113,
+        2296
+      ],
+      "growing_months": [
+        2,
+        3,
+        4,
+        7,
+        8,
+        9
+      ],
+      "dormant_months": [
+        5,
+        6,
+        11,
+        12,
+        1
+      ],
+      "monthly_share": [
+        0.04,
+        0.1,
+        0.18,
+        0.12,
+        0.03,
+        0.02,
+        0.12,
+        0.2,
+        0.12,
+        0.04,
+        0.02,
+        0.01
+      ],
+      "sources": [
+        "https://archive.jornada.nmsu.edu/files/bibliography/86-UNM-Whitford.pdf",
+        "https://fds.duke.edu/db/aas/Biology/faculty/jfreynol/publications/259979",
+        "https://link.springer.com/article/10.1007/s10021-023-00850-4",
+        "https://read.qxmd.com/read/17968592/aboveground-net-primary-production-dynamics-in-a-northern-chihuahuan-desert-ecosystem"
+      ],
+      "notes": "Sonoran ANPP 920-1,290 kg/ha (Whittaker and Niering); a creosote-shrub model 723 a year, range 113-2,296 over 15 years. Chihuahuan black grama grassland 511. Two pulses: winter annuals after Oct-Mar rain, shrubs and grasses with the Jul-Sep monsoon. Most of it is shrub, not grass. monthly_share is an estimate."
+    },
+    "base:savanna": {
+      "real_place": "Venezuelan llanos (Calabozo, Guarico)",
+      "kg_dm_ha_yr": 3750,
+      "range": [
+        3750,
+        5440
+      ],
+      "growing_months": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "dormant_months": [
+        12,
+        1,
+        2,
+        3
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0.01,
+        0.04,
+        0.12,
+        0.18,
+        0.19,
+        0.18,
+        0.14,
+        0.1,
+        0.04,
+        0
+      ],
+      "sources": [
+        "https://daac.ornl.gov/NPP/guides/NPP_CLB.html",
+        "https://rcin.org.pl/miiz//Content/115849/PDF/WA058_91427_P2840-T49_Eko-Pol-A-Nr-4.pdf"
+      ],
+      "notes": "Aboveground 375 g/m2 a year unburned (1969); rainy-season standing crop 544 g/m2 in Trachypogon savanna. Grass dries standing in the dry season: still forage, but poor (low protein), so grazers lose condition. Burning in the dry season brings a green flush. monthly_share is an estimate following the rains (May-Nov)."
+    },
+    "base:swamp": {
+      "real_place": "Pantanal (Nhecolandia, Fazenda Nhumirim, Brazil)",
+      "kg_dm_ha_yr": 4500,
+      "range": [
+        1500,
+        6000
+      ],
+      "growing_months": [
+        10,
+        11,
+        12,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "dormant_months": [
+        7,
+        8,
+        9
+      ],
+      "monthly_share": [
+        0.14,
+        0.14,
+        0.12,
+        0.1,
+        0.07,
+        0.04,
+        0.02,
+        0.02,
+        0.03,
+        0.08,
+        0.11,
+        0.13
+      ],
+      "sources": [
+        "https://www.infoteca.cnptia.embrapa.br/infoteca/bitstream/doc/812049/1/CT52.pdf",
+        "https://www.alice.cnptia.embrapa.br/alice/bitstream/doc/1057897/1/crispimbiomass.pdf",
+        "https://www.infoteca.cnptia.embrapa.br/infoteca/bitstream/doc/812653/1/FOL07.pdf"
+      ],
+      "notes": "Standing forage 944-5,219 kg DM/ha on open grassland, peak in the rains (Feb), low in Aug; 1,500-6,000 in the lowlands; over half dead matter in Aug-Sep. These are standing crops, so the yearly production is an estimate. The flood (about Feb-Jun) covers low ground: grazers move to higher ground while aquatic plants grow."
+    },
+    "base:mountains": {
+      "real_place": "Rocky Mountain subalpine meadows (Montana, Wyoming)",
+      "kg_dm_ha_yr": 1500,
+      "range": [
+        600,
+        2900
+      ],
+      "growing_months": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "dormant_months": [
+        10,
+        11,
+        12,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.2,
+        0.4,
+        0.3,
+        0.1,
+        0,
+        0,
+        0
+      ],
+      "sources": [
+        "https://journals.uair.arizona.edu/index.php/jrm/article/download/7210/6822",
+        "https://research.fs.usda.gov/treesearch/27788"
+      ],
+      "notes": "Western Montana grassland and shrubland habitat types 600-2,900 kg/ha peak standing crop; aspen understory 1,120-2,240. 1,500 is an estimate for meadows; bare rock and scree give nothing, so a mountain biome's average is lower. Growth follows the snowmelt upward, so grazers migrate up in summer."
+    },
+    "base:ocean": {
+      "real_place": "temperate coastal sea",
+      "kg_dm_ha_yr": 0,
+      "range": [
+        0,
+        0
+      ],
+      "growing_months": [],
+      "dormant_months": [],
+      "monthly_share": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "sources": [],
+      "notes": "No land forage. Kelp and seagrass are the sea's plant base (for fish, urchins, turtles), better modelled as fish catch than as grazing."
+    },
+    "base:beach": {
+      "real_place": "temperate dunes (marram grass)",
+      "kg_dm_ha_yr": 500,
+      "range": [
+        100,
+        1500
+      ],
+      "growing_months": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "dormant_months": [
+        11,
+        12,
+        1,
+        2,
+        3
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0,
+        0.1,
+        0.2,
+        0.2,
+        0.2,
+        0.15,
+        0.1,
+        0.05,
+        0,
+        0
+      ],
+      "sources": [],
+      "notes": "Estimate, no source fetched. Sparse, tough dune grass; the beach's real food is washed-up seaweed (wrack) and what lives in it."
+    },
+    "animals:red_dunes": {
+      "real_place": "Djadokhta Formation, Bayn Dzak, Mongolia (Campanian, ~75-71 Ma)",
+      "kg_dm_ha_yr": 200,
+      "range": [
+        50,
+        600
+      ],
+      "growing_months": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "dormant_months": [
+        10,
+        11,
+        12,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.2,
+        0.35,
+        0.3,
+        0.15,
+        0,
+        0,
+        0
+      ],
+      "sources": [
+        "https://journals.rcsi.science/0031-0301/article/view/166820",
+        "https://mdwiki.org/wiki/Djadochta_Formation"
+      ],
+      "notes": "Estimate by analogy with semi-arid dunes today. Plant fossils are almost absent (only fossil roots, Radicites gobiensis, in caliche paleosols, read as semi-arid with seasonal rain); interdune ponds and streams were the green spots. The wet season's months follow the climate table, an assumption here."
+    },
+    "animals:scrubland": {
+      "real_place": "semi-arid Cretaceous upland (no single type locality)",
+      "kg_dm_ha_yr": 800,
+      "range": [
+        300,
+        1500
+      ],
+      "growing_months": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "dormant_months": [
+        11,
+        12,
+        1,
+        2,
+        3,
+        4
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0,
+        0,
+        0.1,
+        0.2,
+        0.25,
+        0.25,
+        0.15,
+        0.05,
+        0,
+        0
+      ],
+      "sources": [],
+      "notes": "Estimate by analogy with modern semi-arid shrubland. Cycadophytes, conifer shrubs, ferns in gullies, early angiosperm shrubs."
+    },
+    "animals:floodplain": {
+      "real_place": "Cedar Mountain Formation, Utah (Mussentuchit Member, Cenomanian ~99 Ma)",
+      "kg_dm_ha_yr": 4000,
+      "range": [
+        2000,
+        8000
+      ],
+      "growing_months": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "dormant_months": [],
+      "monthly_share": [
+        0.05,
+        0.05,
+        0.06,
+        0.08,
+        0.1,
+        0.11,
+        0.11,
+        0.11,
+        0.1,
+        0.09,
+        0.07,
+        0.07
+      ],
+      "sources": [
+        "https://par.nsf.gov/biblio/10339584",
+        "https://www.cambridge.org/core/journals/journal-of-paleontology/article/midcretaceous-angiospermdominated-macroflora-from-the-cedar-mountain-formation-of-utah-usa/03B8EE5F8918C6206DDDBFEB9DDE3ACA"
+      ],
+      "notes": "Estimate by analogy with warm marshes and floodplains today. A coastal plain with a high water table (paralic, like modern coastal Louisiana) and soils forming in it: wet ground all year, a drier half slowing growth."
+    },
+    "animals:fern_forest": {
+      "real_place": "conifer forest with fern understory (analog: Clearwater Formation, Alberta, Borealopelta's home)",
+      "kg_dm_ha_yr": 1500,
+      "range": [
+        500,
+        3000
+      ],
+      "growing_months": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "dormant_months": [],
+      "monthly_share": [
+        0.07,
+        0.07,
+        0.08,
+        0.08,
+        0.09,
+        0.09,
+        0.09,
+        0.09,
+        0.09,
+        0.09,
+        0.08,
+        0.08
+      ],
+      "sources": [
+        "https://ui.adsabs.harvard.edu/abs/2020RSOS....700305B"
+      ],
+      "notes": "Estimate. Understory ferns and horsetails plus conifer and ginkgo browse; a burned patch regrowing as fern feeds far more than closed forest."
+    },
+    "animals:crags": {
+      "real_place": "rocky Cretaceous uplands",
+      "kg_dm_ha_yr": 300,
+      "range": [
+        50,
+        800
+      ],
+      "growing_months": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "dormant_months": [
+        10,
+        11,
+        12,
+        1,
+        2,
+        3,
+        4
+      ],
+      "monthly_share": [
+        0,
+        0,
+        0,
+        0,
+        0.1,
+        0.2,
+        0.3,
+        0.25,
+        0.15,
+        0,
+        0,
+        0
+      ],
+      "sources": [],
+      "notes": "Estimate, no source fetched. Ferns and lycopsids in crevices, scattered conifers and cycadophytes."
+    }
+  }
+}

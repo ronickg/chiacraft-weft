@@ -1,0 +1,49 @@
+{
+ "species": "turkey_vulture",
+ "about": "The turkey vulture (Cathartes aura): blackish-brown, the wing coverts edged brown, the flight feathers silvery grey below; a small bald red head, an ivory bill, pinkish legs. Young ones have greyish heads.",
+ "loci": [
+  {
+   "id": "Br",
+   "name": "Brownness",
+   "quantitative": true,
+   "mean": 0.45,
+   "sd": 0.15,
+   "about": "black to brown-black"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   44,
+   30,
+   26
+  ],
+  [
+   92,
+   52,
+   40
+  ]
+ ],
+ "habitats": {},
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  }
+ }
+}

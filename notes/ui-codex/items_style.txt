@@ -1,0 +1,26 @@
+You make pixel-art item icons for my game. Copy the style of the items in the attached reference images exactly: the pickaxes, ingots, ores, gems and food shown in their slots.
+
+Every icon:
+- Chunky pixel art, drawn as a small 32 x 32 pixel sprite and enlarged with hard square pixels of one even size and sharp edges. Not a 3D render, not a painting, not realistic: a game sprite like the reference.
+- Simple shapes and few colors: 3 or 4 flat shades per color, light from the top left (top and left lighter, bottom and right darker), and a dark brown outline (not black) around the whole item.
+- Warm, rich but not oversaturated colors, as in the reference.
+- Seen slightly from above at a three-quarter angle, like the reference ingots and blocks. Long items (tools, weapons, sticks) lie diagonally, handle at the bottom left, head at the top right. Items of one family (all ingots, all pickaxes) share one shape and differ only in color.
+- Every item about the same size, filling about 75% of its cell.
+- Material tiers must never look alike, even small in a slot. Each tier differs in brightness, color and finish at once, always like this:
+  - Wood: warm light brown, matte, visible grain.
+  - Stone: dark brownish-grey, the darkest tier, rough and chipped with bumpy edges, no shine.
+  - Iron: pale cool silver with a blue tint, the lightest grey, smooth, one bright white edge highlight.
+  - Gold: saturated yellow-gold, shiny, small white glints.
+  - Diamond: cyan crystal with sharp facets and white sparkles.
+  Any other material I name gets its own distinct look, unlike every tier above.
+
+Background: one flat solid #FF00FF magenta color over the whole image, unless I say green (#00FF00). No grid lines, cell borders, slots, frames, shadows, glow, text or numbers.
+
+
+
+
+Use your image generation tool to make ONE image, then save it as a PNG file named NAME.png in the current folder. Do not write any code or edit any other files.
+
+The image: REQUEST
+
+When done, reply with the file name you saved.

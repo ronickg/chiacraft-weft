@@ -145,12 +145,7 @@ fn node(allocator: &mut Allocator, program: &Program) -> Result<NodePtr> {
 
 /// Resolve a DID from its launcher id. `known` (a cached record) lets it continue from the last
 /// coin it saw; `peak` is the height recorded as checked.
-pub async fn resolve<S: ChainSource>(
-    source: &S,
-    launcher_id: Bytes32,
-    known: Option<DidRecord>,
-    peak: u32,
-) -> Result<DidRecord> {
+pub async fn resolve<S: ChainSource>(source: &S, launcher_id: Bytes32, known: Option<DidRecord>, peak: u32) -> Result<DidRecord> {
     let mut record = match known {
         Some(k) if k.launcher_id == launcher_id && !k.history.is_empty() => k,
         _ => start(source, launcher_id).await?,
@@ -188,15 +183,11 @@ pub async fn resolve<S: ChainSource>(
         let solution_ptr = node(&mut allocator, &solution)?;
         let parsed = Puzzle::parse(&allocator, puzzle_ptr);
         // The spent coin's own owner, read from its revealed puzzle.
-        let Some((did, _)) =
-            Did::parse(&allocator, coin, parsed, solution_ptr).map_err(failed("DID spend"))?
-        else {
+        let Some((did, _)) = Did::parse(&allocator, coin, parsed, solution_ptr).map_err(failed("DID spend"))? else {
             return Err(Error::new("a coin in the DID's line isn't a DID"));
         };
         if did.info.launcher_id != launcher_id {
-            return Err(Error::new(
-                "a coin in the DID's line belongs to another DID",
-            ));
+            return Err(Error::new("a coin in the DID's line belongs to another DID"));
         }
         record.history.last_mut().expect("non-empty").owner = Some(did.info.p2_puzzle_hash);
         // Its child: the odd coin the spend made, as the parent's spend says it must be.
@@ -205,9 +196,7 @@ pub async fn resolve<S: ChainSource>(
             if child.coin.amount % 2 != 1 {
                 continue;
             }
-            let parsed_child =
-                Did::parse_child(&mut allocator, coin, parsed, solution_ptr, child.coin)
-                    .map_err(failed("DID child"))?;
+            let parsed_child = Did::parse_child(&mut allocator, coin, parsed, solution_ptr, child.coin).map_err(failed("DID child"))?;
             if let Some(d) = parsed_child
                 && Bytes32::from(d.info.puzzle_hash()) == child.coin.puzzle_hash
             {
@@ -250,10 +239,5 @@ async fn start<S: ChainSource>(source: &S, launcher_id: Bytes32) -> Result<DidRe
         .into_iter()
         .find(|c| c.coin.amount % 2 == 1)
         .ok_or_else(|| Error::new("the launcher made no singleton"))?;
-    Ok(DidRecord {
-        launcher_id,
-        history: vec![DidStep::of(&eve, None)],
-        melted: false,
-        checked_height: 0,
-    })
+    Ok(DidRecord { launcher_id, history: vec![DidStep::of(&eve, None)], melted: false, checked_height: 0 })
 }

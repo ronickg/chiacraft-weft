@@ -37,14 +37,8 @@ fn main() {
         matches!(line.trim().to_ascii_lowercase().as_str(), "y" | "yes")
     };
     let mut out = std::io::stdout();
-    let mut io = Io {
-        var: &var,
-        ask: &mut ask,
-        out: &mut out,
-        dialer: None,
-        wait: Duration::from_secs(20 * 60),
-        step: Duration::from_secs(5),
-    };
+    let mut io =
+        Io { var: &var, ask: &mut ask, out: &mut out, dialer: None, wait: Duration::from_secs(20 * 60), step: Duration::from_secs(5) };
     if let Err(e) = tool::run(&args, &mut io) {
         eprintln!("chiacraft-wallet-test: {e}");
         std::process::exit(1);

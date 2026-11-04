@@ -66,7 +66,11 @@ pub mod role {
 /// `leg<n>` bones the model has; more than four are a spider's.
 pub fn role_of(name: &str, legs: usize) -> u32 {
     let n = name.to_ascii_lowercase().replace('_', "");
-    if let Some(i) = n.strip_prefix("leg").and_then(|i| i.parse::<u32>().ok()).filter(|_| legs > 4) {
+    if let Some(i) = n
+        .strip_prefix("leg")
+        .and_then(|i| i.parse::<u32>().ok())
+        .filter(|_| legs > 4)
+    {
         // Spider legs: pairs left, right from the back; neighbors and opposite sides alternate.
         return if (i / 2 + i % 2) % 2 == 0 { role::LEG_SWEEP_A } else { role::LEG_SWEEP_B };
     }
@@ -84,7 +88,15 @@ pub fn role_of(name: &str, legs: usize) -> u32 {
 
 /// Every part's role from its name.
 pub fn assign_roles(parts: &mut [Part]) {
-    let legs = parts.iter().filter(|p| p.name.to_ascii_lowercase().strip_prefix("leg").is_some_and(|i| i.parse::<u32>().is_ok())).count();
+    let legs = parts
+        .iter()
+        .filter(|p| {
+            p.name
+                .to_ascii_lowercase()
+                .strip_prefix("leg")
+                .is_some_and(|i| i.parse::<u32>().is_ok())
+        })
+        .count();
     for p in parts {
         p.role = role_of(&p.name, legs);
     }
@@ -120,37 +132,73 @@ pub fn load_geo(src: &str) -> Result<Geo, String> {
     let root: Value = serde_json::from_str(src).map_err(|e| e.to_string())?;
     let geo = match root.get("minecraft:geometry") {
         Some(Value::Array(list)) => list.first().cloned(),
-        _ => root.as_object().and_then(|o| o.iter().find(|(k, _)| k.starts_with("geometry.")).map(|(_, v)| v.clone())),
+        _ => root.as_object().and_then(|o| {
+            o.iter()
+                .find(|(k, _)| k.starts_with("geometry."))
+                .map(|(_, v)| v.clone())
+        }),
     }
     .ok_or("no geometry in the file")?;
-    let bones = geo.get("bones").and_then(Value::as_array).ok_or("geometry without bones")?;
+    let bones = geo
+        .get("bones")
+        .and_then(Value::as_array)
+        .ok_or("geometry without bones")?;
     let desc = geo.get("description").unwrap_or(&geo);
     let size = |k: &str| desc.get(k).and_then(Value::as_u64).map(|v| v as u32);
-    let texture = size("texture_width").zip(size("texture_height")).map(|(w, h)| [w, h]);
+    let texture = size("texture_width")
+        .zip(size("texture_height"))
+        .map(|(w, h)| [w, h]);
     let tex = texture.map_or([64.0, 64.0], |t| [t[0] as f32, t[1] as f32]);
-    let names: Vec<String> = bones.iter().map(|b| b.get("name").and_then(Value::as_str).unwrap_or("").to_string()).collect();
+    let names: Vec<String> = bones
+        .iter()
+        .map(|b| {
+            b.get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string()
+        })
+        .collect();
     let mut parts = Vec::new();
     for b in bones {
-        let name = b.get("name").and_then(Value::as_str).unwrap_or("").to_string();
-        let parent = b.get("parent").and_then(Value::as_str).and_then(|p| names.iter().position(|n| n == p)).map(|i| i as u32);
+        let name = b
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let parent = b
+            .get("parent")
+            .and_then(Value::as_str)
+            .and_then(|p| names.iter().position(|n| n == p))
+            .map(|i| i as u32);
         let pivot = vec3(b.get("pivot")).unwrap_or([0.0; 3]);
         let rest = angles(vec3(b.get("rotation")).unwrap_or([0.0; 3]));
         let bone_mirror = b.get("mirror").and_then(Value::as_bool).unwrap_or(false);
         let bone_inflate = b.get("inflate").map(num).unwrap_or(0.0);
         let mut cuboids = Vec::new();
         let mut mesh = Vec::new();
-        for c in b.get("cubes").and_then(Value::as_array).into_iter().flatten() {
+        for c in b
+            .get("cubes")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
             let origin = vec3(c.get("origin")).unwrap_or([0.0; 3]);
             let size = vec3(c.get("size")).unwrap_or([1.0; 3]);
             let inflate = c.get("inflate").map(num).unwrap_or(bone_inflate);
-            let mirror = c.get("mirror").and_then(Value::as_bool).unwrap_or(bone_mirror);
+            let mirror = c
+                .get("mirror")
+                .and_then(Value::as_bool)
+                .unwrap_or(bone_mirror);
             let rel = [origin[0] - pivot[0], origin[1] - pivot[1], origin[2] - pivot[2]];
             let mut cub = Cuboid { origin: rel, size, uv: [0.0; 2], inflate, mirror, faces: None };
             match c.get("uv") {
                 Some(Value::Object(faces)) => {
                     // Per face; Blockbench writes "down" flipped in v compared with the box unwrap.
                     let mut rects = [[0.0f32; 4]; 6];
-                    for (i, face) in ["east", "west", "down", "up", "north", "south"].into_iter().enumerate() {
+                    for (i, face) in ["east", "west", "down", "up", "north", "south"]
+                        .into_iter()
+                        .enumerate()
+                    {
                         let Some(f) = faces.get(face) else { continue };
                         let uv = vec2(f.get("uv")).unwrap_or([0.0; 2]);
                         let sz = vec2(f.get("uv_size")).unwrap_or([0.0; 2]);
@@ -177,10 +225,21 @@ pub fn load_geo(src: &str) -> Result<Geo, String> {
 /// Bedrock `poly_mesh`: positions, uvs and polys of 3 or 4 corners `[position, normal, uv]`,
 /// made into triangles. With `normalized_uvs` the uvs are 0..1 of a texture `tex` texels big.
 fn poly_mesh(pm: &Value, tex: [f32; 2]) -> Vec<MeshVertex> {
-    let list = |k: &str| pm.get(k).and_then(Value::as_array).cloned().unwrap_or_default();
-    let positions: Vec<[f32; 3]> = list("positions").iter().filter_map(|p| vec3(Some(p))).collect();
+    let list = |k: &str| {
+        pm.get(k)
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+    };
+    let positions: Vec<[f32; 3]> = list("positions")
+        .iter()
+        .filter_map(|p| vec3(Some(p)))
+        .collect();
     let uvs: Vec<[f32; 2]> = list("uvs").iter().filter_map(|p| vec2(Some(p))).collect();
-    let normalized = pm.get("normalized_uvs").and_then(Value::as_bool).unwrap_or(false);
+    let normalized = pm
+        .get("normalized_uvs")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     let polys = match pm.get("polys") {
         Some(Value::Array(a)) => a.clone(),
         _ => Vec::new(),
@@ -194,7 +253,11 @@ fn poly_mesh(pm: &Value, tex: [f32; 2]) -> Vec<MeshVertex> {
             .filter_map(|c| {
                 let c = c.as_array()?;
                 let p = *positions.get(num(c.first()?) as usize)?;
-                let mut uv = c.get(2).and_then(|i| uvs.get(num(i) as usize)).copied().unwrap_or([0.0; 2]);
+                let mut uv = c
+                    .get(2)
+                    .and_then(|i| uvs.get(num(i) as usize))
+                    .copied()
+                    .unwrap_or([0.0; 2]);
                 if normalized {
                     // Normalized uvs count from the bottom of the texture.
                     uv = [uv[0] * tex[0], (1.0 - uv[1]) * tex[1]];
@@ -248,7 +311,10 @@ pub struct Animation {
 /// Every animation in a `.animation.json`.
 pub fn load_animations(src: &str) -> Result<Vec<Animation>, String> {
     let root: Value = serde_json::from_str(src).map_err(|e| e.to_string())?;
-    let anims = root.get("animations").and_then(Value::as_object).ok_or("no animations in the file")?;
+    let anims = root
+        .get("animations")
+        .and_then(Value::as_object)
+        .ok_or("no animations in the file")?;
     let mut out = Vec::new();
     for (full, a) in anims {
         let name = full.rsplit('.').next().unwrap_or(full).to_string();
@@ -256,7 +322,12 @@ pub fn load_animations(src: &str) -> Result<Vec<Animation>, String> {
         let hold = a.get("loop").and_then(Value::as_str) == Some("hold_on_last_frame");
         let mut channels = Vec::new();
         let mut longest = 0.0f32;
-        for (bone, props) in a.get("bones").and_then(Value::as_object).into_iter().flatten() {
+        for (bone, props) in a
+            .get("bones")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+        {
             for (key, prop) in [("rotation", Prop::Rotation), ("position", Prop::Position), ("scale", Prop::Scale)] {
                 let Some(v) = props.get(key) else { continue };
                 let mut keys: Vec<Key> = match v {
@@ -267,7 +338,11 @@ pub fn load_animations(src: &str) -> Result<Vec<Animation>, String> {
                             let (pre, post, smooth) = match f {
                                 Value::Object(o) => {
                                     let post = vec3(o.get("post")).or_else(|| vec3(o.get("pre")))?;
-                                    (vec3(o.get("pre")).unwrap_or(post), post, o.get("lerp_mode").and_then(Value::as_str) == Some("catmullrom"))
+                                    (
+                                        vec3(o.get("pre")).unwrap_or(post),
+                                        post,
+                                        o.get("lerp_mode").and_then(Value::as_str) == Some("catmullrom"),
+                                    )
                                 }
                                 other => {
                                     let v = vec3(Some(other))?;
@@ -277,7 +352,9 @@ pub fn load_animations(src: &str) -> Result<Vec<Animation>, String> {
                             Some(Key { time, pre, post, smooth })
                         })
                         .collect(),
-                    constant => vec3(Some(constant)).map(|v| vec![Key { time: 0.0, pre: v, post: v, smooth: false }]).unwrap_or_default(),
+                    constant => vec3(Some(constant))
+                        .map(|v| vec![Key { time: 0.0, pre: v, post: v, smooth: false }])
+                        .unwrap_or_default(),
                 };
                 keys.sort_by(|a, b| a.time.total_cmp(&b.time));
                 longest = longest.max(keys.last().map_or(0.0, |k| k.time));
@@ -286,7 +363,11 @@ pub fn load_animations(src: &str) -> Result<Vec<Animation>, String> {
                 }
             }
         }
-        let length = a.get("animation_length").map(num).unwrap_or(longest).max(1e-3);
+        let length = a
+            .get("animation_length")
+            .map(num)
+            .unwrap_or(longest)
+            .max(1e-3);
         out.push(Animation { name, length, looping, hold, channels });
     }
     Ok(out)
@@ -296,7 +377,11 @@ impl Animation {
     /// Where a bone that no model has (the first person `hand`) is moved at `t`: its position
     /// in pixels and rotation, like a model bone's.
     pub fn free_bone(&self, bone: &str, t: f32) -> Option<Mat4> {
-        let ch = |prop: Prop| self.channels.iter().find(|c| c.prop == prop && c.bone.eq_ignore_ascii_case(bone));
+        let ch = |prop: Prop| {
+            self.channels
+                .iter()
+                .find(|c| c.prop == prop && c.bone.eq_ignore_ascii_case(bone))
+        };
         let (rot, pos) = (ch(Prop::Rotation), ch(Prop::Position));
         if rot.is_none() && pos.is_none() {
             return None;
@@ -326,7 +411,10 @@ impl Channel {
             let (p1, p2) = (a.post, b.pre);
             std::array::from_fn(|j| {
                 let (p0, p1, p2, p3) = (p0[j], p1[j], p2[j], p3[j]);
-                0.5 * (2.0 * p1 + (p2 - p0) * f + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * f * f + (3.0 * p1 - p0 - 3.0 * p2 + p3) * f * f * f)
+                0.5 * (2.0 * p1
+                    + (p2 - p0) * f
+                    + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * f * f
+                    + (3.0 * p1 - p0 - 3.0 * p2 + p3) * f * f * f)
             })
         } else {
             std::array::from_fn(|j| a.post[j] + (b.pre[j] - a.post[j]) * f)
@@ -346,7 +434,11 @@ impl Bound {
         let bones = parts
             .iter()
             .map(|p| {
-                let find = |prop: Prop| anim.channels.iter().position(|c| c.prop == prop && c.bone.eq_ignore_ascii_case(&p.name));
+                let find = |prop: Prop| {
+                    anim.channels
+                        .iter()
+                        .position(|c| c.prop == prop && c.bone.eq_ignore_ascii_case(&p.name))
+                };
                 [find(Prop::Rotation), find(Prop::Position), find(Prop::Scale)]
             })
             .collect();
@@ -368,19 +460,32 @@ impl Bound {
 /// swing), and keyframe animations with their time and weight.
 pub struct Motion<'a> {
     pub pitch: f32,
+    /// Where the head turns apart from the body, about y.
+    pub head_yaw: f32,
+    /// Limbs by the swimming stroke instead of `swing`, this far into it (vanilla's limbSwing).
+    pub swim: Option<f32>,
+    /// How far a swing of the arm is, 0..1, 0 for none.
+    pub attack: f32,
     pub swing: f32,
     pub anims: &'a [(&'a Bound, f32, f32)],
     /// Vanilla's sneaking pose for bipeds (the bones Bedrock names `body`, arms, legs, head).
     pub crouch: bool,
+    /// Vanilla's riding pose for bipeds: legs forward and a little apart, arms forward.
+    pub sit: bool,
+    /// Something in its hand: that arm hangs a little forward and swings less (`ArmPose.ITEM`).
+    pub holding: bool,
+    /// Per part, the scale of its own boxes about its pivot (an entity's build,
+    /// `SkinArgs::bones`); its children keep their size and move with its ends. Empty: none.
+    pub build: &'a [[f32; 3]],
 }
 
 /// (about x, about y) added to a part's rest (`rest_x` about x) by its role.
-pub fn role_angles(r: u32, rest_x: f32, pitch: f32, swing: f32) -> [f32; 2] {
+pub fn role_angles(r: u32, rest_x: f32, pitch: f32, head_yaw: f32, swing: f32) -> [f32; 2] {
     // Arms resting held out (a zombie's) only sway a little.
     let arm = if rest_x.abs() > 1.0 { swing * 0.2 } else { swing };
     match r {
         // Faces look along -Z: tilting the front up is a positive turn about X.
-        role::HEAD => [pitch, 0.0],
+        role::HEAD => [pitch, head_yaw],
         role::ARM_LEFT => [arm, 0.0],
         role::ARM_RIGHT => [-arm, 0.0],
         role::LEG_RIGHT | role::LEG_FRONT_LEFT => [swing, 0.0],
@@ -391,15 +496,60 @@ pub fn role_angles(r: u32, rest_x: f32, pitch: f32, swing: f32) -> [f32; 2] {
     }
 }
 
+/// The stroke of vanilla's HumanoidModel, as a limb's rotation about x, y, z in our model space
+/// (y up where vanilla's is down, so x and z turn the other way). The bone named `rightArm` has the
+/// role `ARM_LEFT`, and legs the same. `None`: not a limb.
+fn swim_angles(r: u32, limb_swing: f32) -> Option<Vec3> {
+    use std::f32::consts::{FRAC_PI_2, PI};
+    let reach = |l: f32| (-65.0 * l + l * l) / (-65.0 * 14.0 + 14.0 * 14.0) * 1.870_796_4;
+    let l = limb_swing.rem_euclid(26.0);
+    // The arm turned over above the head, a pull down to the side, and back forward.
+    let arm = |right: bool| {
+        let side = if right { -1.0 } else { 1.0 };
+        let (x, z) = if l < 14.0 {
+            (0.0, PI + side * reach(l))
+        } else if l < 22.0 {
+            let o = (l - 14.0) / 8.0;
+            (FRAC_PI_2 * o, if right { 1.270_796_3 + 1.870_796_4 * o } else { 5.012_389 - 1.870_796_4 * o })
+        } else {
+            (FRAC_PI_2 - FRAC_PI_2 * (l - 22.0) / 4.0, PI)
+        };
+        Vec3::new(-x, PI, -z)
+    };
+    let kick = |phase: f32| Vec3::new(-0.3 * (limb_swing * 0.333_333_34 + phase).cos(), 0.0, 0.0);
+    match r {
+        role::ARM_LEFT => Some(arm(true)),
+        role::ARM_RIGHT => Some(arm(false)),
+        role::LEG_RIGHT => Some(kick(PI)),
+        role::LEG_LEFT => Some(kick(0.0)),
+        _ => None,
+    }
+}
+
 /// Bone transforms (model pixels in, `root` space out), parents before children as models list
 /// them; a part listed before its parent gets the root.
 pub fn pose(parts: &[Part], root: Mat4, m: &Motion, out: &mut Vec<Mat4>) {
     out.clear();
     for (i, p) in parts.iter().enumerate() {
-        let a = role_angles(p.role, p.rest[0], m.pitch, m.swing);
+        let a = role_angles(p.role, p.rest[0], m.pitch, m.head_yaw, m.swing);
         let mut rot = Vec3::new(p.rest[0] + a[0], p.rest[1] + a[1], p.rest[2]);
         let mut offset = Vec3::ZERO;
         let mut scale = Vec3::ONE;
+        if let Some(stroke) = m.swim.and_then(|limb| swim_angles(p.role, limb)) {
+            rot = stroke;
+        }
+        if m.holding && m.swim.is_none() && p.role == role::ARM_RIGHT {
+            rot.x = rot.x * 0.5 + std::f32::consts::PI / 10.0;
+        }
+        // Vanilla's setupAttackAnimation: up, across and down, higher the higher it looks. The arm
+        // at +x, which is the right one looking from behind (`hand_bone`) whatever its bone's name.
+        if m.attack > 0.0 && p.role == role::ARM_RIGHT {
+            use std::f32::consts::PI;
+            let eased = 1.0 - (1.0 - m.attack).powi(4);
+            let across = (m.attack * PI).sin();
+            rot.x += (eased * PI).sin() * 1.2 + across * (m.pitch + 0.7) * 0.75;
+            rot.z -= across * 0.4;
+        }
         if m.crouch {
             // ModelBiped.isSneak: body leans 0.5 forward, arms 0.4 more, legs move up 3 and back
             // 4 to stay under it, the head drops 1.
@@ -408,6 +558,17 @@ pub fn pose(parts: &[Part], root: Mat4, m: &Motion, out: &mut Vec<Mat4>) {
                 role::LEG_LEFT | role::LEG_RIGHT => offset += Vec3::new(0.0, 3.0, 4.0),
                 role::HEAD => offset.y -= 1.0,
                 _ if p.name.eq_ignore_ascii_case("body") => rot.x -= 0.5,
+                _ => {}
+            }
+        }
+        if m.sit {
+            // ModelBiped.riding: legs 0.45 turns forward (-1.41 about x there, which this
+            // model's x runs the other way of) and 0.1 out; arms 0.2 forward.
+            use std::f32::consts::PI;
+            match p.role {
+                role::LEG_RIGHT => rot = Vec3::new(PI * 0.45, PI * 0.1, 0.0),
+                role::LEG_LEFT => rot = Vec3::new(PI * 0.45, -PI * 0.1, 0.0),
+                role::ARM_LEFT | role::ARM_RIGHT if p.rest[0].abs() <= 1.0 => rot.x += PI * 0.2,
                 _ => {}
             }
         }
@@ -424,10 +585,62 @@ pub fn pose(parts: &[Part], root: Mat4, m: &Motion, out: &mut Vec<Mat4>) {
             }
         }
         let pivot = Vec3::from_array(p.pivot);
-        let local = Mat4::from_translation(offset + pivot) * Mat4::from_quat(Quat::from_euler(EulerRot::ZYX, rot.z, rot.y, rot.x)) * Mat4::from_scale(scale) * Mat4::from_translation(-pivot);
-        let parent = p.parent.and_then(|q| out.get(q as usize)).copied().unwrap_or(root);
+        // A parent drawn bigger or smaller carries this joint along with its ends.
+        if let Some(q) = p.parent
+            && let Some(&s) = m.build.get(q as usize)
+            && let Some(pp) = parts.get(q as usize)
+        {
+            offset += (Vec3::from_array(s) - Vec3::ONE) * (pivot - Vec3::from_array(pp.pivot));
+        }
+        let local = Mat4::from_translation(offset + pivot)
+            * Mat4::from_quat(Quat::from_euler(EulerRot::ZYX, rot.z, rot.y, rot.x))
+            * Mat4::from_scale(scale)
+            * Mat4::from_translation(-pivot);
+        let parent = p
+            .parent
+            .and_then(|q| out.get(q as usize))
+            .copied()
+            .unwrap_or(root);
         out.push(parent * local);
     }
+    // Each part's own boxes at its build's scale (after the loop: children hang from the
+    // unscaled transforms).
+    for (i, (s, p)) in m.build.iter().zip(parts).enumerate() {
+        if *s != [1.0; 3] {
+            let pivot = Vec3::from_array(p.pivot);
+            out[i] = out[i] * Mat4::from_translation(pivot) * Mat4::from_scale(Vec3::from_array(*s)) * Mat4::from_translation(-pivot);
+        }
+    }
+}
+
+/// The lowest point of a model's boxes at rest (model pixels), drawn with `build`: how far a
+/// build lowers its feet.
+pub fn lowest(parts: &[Part], build: &[[f32; 3]]) -> f32 {
+    let mut mats = Vec::new();
+    let rest = Motion {
+        pitch: 0.0,
+        head_yaw: 0.0,
+        swim: None,
+        attack: 0.0,
+        swing: 0.0,
+        anims: &[],
+        crouch: false,
+        sit: false,
+        holding: false,
+        build,
+    };
+    pose(parts, Mat4::IDENTITY, &rest, &mut mats);
+    let mut low = f32::MAX;
+    for (p, m) in parts.iter().zip(&mats) {
+        for c in &p.cuboids {
+            let o = Vec3::from_array(p.pivot) + Vec3::from_array(c.origin);
+            for k in 0..8 {
+                let corner = o + Vec3::from_array(c.size) * Vec3::new((k & 1) as f32, (k >> 1 & 1) as f32, (k >> 2 & 1) as f32);
+                low = low.min(m.transform_point3(corner).y);
+            }
+        }
+    }
+    if low == f32::MAX { 0.0 } else { low }
 }
 
 #[cfg(test)]
@@ -437,13 +650,16 @@ mod tests {
     #[test]
     fn roles_from_names() {
         assert_eq!((role_of("rightArm", 0), role_of("left_leg", 0), role_of("body", 0)), (role::ARM_LEFT, role::LEG_RIGHT, role::STATIC));
-        assert_eq!([0, 1, 2, 3].map(|i| role_of(&format!("leg{i}"), 4)), [role::LEG_RIGHT, role::LEG_LEFT, role::LEG_FRONT_RIGHT, role::LEG_FRONT_LEFT]);
+        assert_eq!(
+            [0, 1, 2, 3].map(|i| role_of(&format!("leg{i}"), 4)),
+            [role::LEG_RIGHT, role::LEG_LEFT, role::LEG_FRONT_RIGHT, role::LEG_FRONT_LEFT]
+        );
         // A spider's eight: each left leg and its right twin sweep opposite, and so do neighbors.
         let (a, b) = (role::LEG_SWEEP_A, role::LEG_SWEEP_B);
         assert_eq!([0, 1, 2, 3].map(|i| role_of(&format!("leg{i}"), 8)), [a, b, b, a]);
         // An arm resting held out (a zombie's) only sways.
-        assert_eq!(role_angles(role::ARM_LEFT, std::f32::consts::FRAC_PI_2, 0.0, 1.0), [0.2, 0.0]);
-        assert_eq!(role_angles(role::ARM_LEFT, 0.0, 0.0, 1.0), [1.0, 0.0]);
+        assert_eq!(role_angles(role::ARM_LEFT, std::f32::consts::FRAC_PI_2, 0.0, 0.0, 1.0), [0.2, 0.0]);
+        assert_eq!(role_angles(role::ARM_LEFT, 0.0, 0.0, 0.0, 1.0), [1.0, 0.0]);
     }
 
     #[test]
@@ -461,7 +677,23 @@ mod tests {
         assert!(parts[1].cuboids[0].mirror && parts[2].mesh.len() == 6);
         // A Bedrock arm at x = -90 points forward (-Z): its hand ends up in front of the shoulder.
         let mut mats = Vec::new();
-        pose(&parts, Mat4::IDENTITY, &Motion { pitch: 0.0, swing: 0.0, anims: &[], crouch: false }, &mut mats);
+        pose(
+            &parts,
+            Mat4::IDENTITY,
+            &Motion {
+                pitch: 0.0,
+                head_yaw: 0.0,
+                swing: 0.0,
+                swim: None,
+                attack: 0.0,
+                holding: false,
+                anims: &[],
+                crouch: false,
+                sit: false,
+                build: &[],
+            },
+            &mut mats,
+        );
         let hand = mats[1].transform_point3(Vec3::new(-6.0, 12.0, 0.0));
         assert!(hand.z < -8.0 && (hand.y - 22.0).abs() < 0.01, "{hand}");
 
@@ -473,5 +705,32 @@ mod tests {
         let b = Bound::new(a, &parts);
         assert_eq!((b.bones[1][0], b.bones[0][0]), (Some(0), None));
         assert_eq!(b.at(3.0, false), 1.0);
+    }
+}
+
+/// Vanilla's `WalkAnimationState`, per second: the swing follows the speed, full at 5 blocks a
+/// second and no more, and the limbs move by the swing. However fast it flies, they keep their pace.
+pub fn walk_limbs(limb: &mut f32, swing: &mut f32, speed: f32, dt: f32) {
+    *swing += ((speed / 5.0).min(1.0) - *swing) * (1.0 - 0.6f32.powf(dt * crate::world::TPS as f32));
+    *limb += *swing * 5.0 * dt;
+}
+
+#[cfg(test)]
+mod walk_tests {
+    use super::walk_limbs;
+
+    fn after(speed: f32) -> f32 {
+        let (mut limb, mut swing) = (0.0, 0.0);
+        for _ in 0..600 {
+            walk_limbs(&mut limb, &mut swing, speed, 1.0 / 60.0);
+        }
+        limb / 10.0
+    }
+
+    #[test]
+    fn limbs_have_a_top_speed() {
+        assert!((after(2.5) - 2.5).abs() < 0.2, "at a walk they follow the feet: {}", after(2.5));
+        assert!((after(40.0) - 5.0).abs() < 0.2, "flying fast they don't: {}", after(40.0));
+        assert_eq!(after(40.0), after(500.0));
     }
 }

@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Rebuilds the raven: paints its two models and their animations (raven.py, into out/) and exports
+the game's files into the mod (`../../assets`): models/raven[_fly].geo.json,
+animations/raven[_fly].animation.json and textures/entity/raven/raven.png (one texture for both),
+and its coat layers into `../../genetics/layers/raven`. Blockbench isn't needed for this.
+
+    ~/.venvs/blocky/bin/python build.py     (any Python with numpy, scipy and Pillow)
+
+Commit what it writes under `../../assets` and `../../genetics/layers/raven`.
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.normpath(os.path.join(HERE, "..", "..", "..", ".."))
+SKILL = os.path.join(REPO, ".claude", "skills", "blocky-model", "scripts")
+OUT = os.path.join(HERE, "out")
+ASSETS = os.path.join(HERE, "..", "..", "assets")
+
+sys.path.insert(0, SKILL)
+from house import SCALE  # noqa: E402  the house density: 64 texels a block
+
+# On the ground the engine plays `idle`, `walk` and `run` by itself; flying is a look of its own
+# (`raven_fly`, put on by `raven.rs`), its wings beating whatever it does.
+GROUND = {"": {"idle": "idle", "walk": "walk", "run": "run"}}
+FLY = {"": {"idle": "flap", "walk": "flap", "run": "flap"}}
+FEET = ["toes_l", "toes_r"]
+AXIS = ["neck", "skull", "chest", "hips", "tail"]
+
+if __name__ == "__main__":
+    subprocess.run([sys.executable, os.path.join(HERE, "raven.py")], check=True)
+    for name in ("spec.json", "spec_fly.json"):
+        subprocess.run([sys.executable, os.path.join(SKILL, "boxcheck.py"), os.path.join(OUT, name)], check=True)
+    from to_bedrock import export  # noqa: E402
+    from ground import gait, joints, pokes  # noqa: E402
+
+    ground = json.load(open(os.path.join(OUT, "spec.json")))
+    fly = json.load(open(os.path.join(OUT, "spec_fly.json")))
+    for spec in (ground, fly):
+        loose = joints(spec)  # every joint inside both parts it joins, or they come apart when it turns
+        assert not loose, f"{spec['name']}: loose joints: {loose}"
+        poking = pokes(spec, AXIS)  # no neck corner through the head or the back
+        assert not poking, f"{spec['name']}: poking through: {sorted(poking)}"
+    for anim in ("walk", "run"):  # a foot in the air must swing forward, or it moonwalks
+        back = {f: v for f, v in gait(ground, anim, FEET).items() if v is not None and v <= 0}
+        assert not back, f"{anim} goes backwards: {back}"
+    texture = os.path.join(OUT, "texture.png")
+    made = export(ground, texture, ASSETS, "raven", SCALE, "raven/raven", pose_files=GROUND)
+    made += export(fly, texture, ASSETS, "raven_fly", SCALE, "raven/raven", pose_files=FLY)
+    # Its coat layers, for plumage painted from genes in the game (`core/src/coats.rs`).
+    shutil.copytree(os.path.join(OUT, "layers"), os.path.join(HERE, "..", "..", "genetics", "layers", "raven"), dirs_exist_ok=True)
+    print("wrote", made, "into", os.path.normpath(ASSETS))

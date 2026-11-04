@@ -19,8 +19,20 @@ pub fn register(r: &mut Registry) {
     r.shaped(C, "torch", 4, &["c", "s"], &[('c', "#gems/coal"), ('s', "#stick")]);
     r.shaped(C, "ladder", 3, &["s s", "sss", "s s"], &[('s', "#stick")]);
     r.shaped(C, "bread", 1, &["www"], &[('w', "#crops/wheat")]);
+    // Sugar cane's uses: sugar, and paper for books, which make bookshelves (camp comfort).
+    r.shapeless(C, "sugar", 1, &["#sugar_cane"], 0);
+    r.shaped(C, "paper", 3, &["###"], &[('#', "#sugar_cane")]);
+    r.shapeless(C, "book", 1, &["#paper", "#paper", "#paper", "#materials/leather"], 0);
+    r.shaped(C, "bookshelf", 1, &["###", "bbb", "###"], &[('#', "#planks"), ('b', "#book")]);
+    // Eggs: fried in the furnace, or baked into a pie with an apple, sugar and wheat.
+    r.shapeless(S, "cooked_egg", 1, &["#egg"], 200);
+    r.shapeless(C, "apple_pie", 1, &["#apple", "#sugar", "#egg", "#crops/wheat"], 0);
+    // Wheat packed nine to a bale and back.
+    r.shaped(C, "hay_bale", 1, &["www", "www", "www"], &[('w', "#crops/wheat")]);
+    r.shapeless(C, "wheat", 9, &["#hay_bale"], 0);
     r.shaped(C, "stone_bricks", 4, &["##", "##"], &[('#', "#smooth_stone")]);
     r.shaped(C, "wool", 1, &["ss", "ss"], &[('s', "#string")]);
+    r.shaped(C, "bed", 1, &["www", "ppp"], &[('w', "wool"), ('p', "#planks")]);
     r.shaped(C, "bucket", 1, &["i i", " i "], &[('i', "#ingots/iron")]);
     r.shaped(C, "glowstone", 1, &["ttt", "tgt", "ttt"], &[('t', "#torches"), ('g', "#glass")]);
     r.shapeless(C, "#lamps/{m}", 1, &["#glowstone", "#dyes/{m}"], 0);
@@ -45,16 +57,17 @@ pub fn register(r: &mut Registry) {
     ] {
         r.shaped(C, &format!("#{tool}/{{m}}"), 1, pattern, &[('X', "#materials/{m}"), ('#', "#stick")]);
     }
-    for (slot, pattern) in crate::items::ARMOR_SLOTS.iter().zip([&["XXX", "X X"][..], &["X X", "XXX", "XXX"], &["XXX", "X X", "X X"], &["X X", "X X"]]) {
+    for (slot, pattern) in
+        crate::items::ARMOR_SLOTS
+            .iter()
+            .zip([&["XXX", "X X"][..], &["X X", "XXX", "XXX"], &["XXX", "X X", "X X"], &["X X", "X X"]])
+    {
         r.shaped(C, &format!("#{slot}/{{m}}"), 1, pattern, &[('X', "#materials/{m}")]);
     }
 
-    for (input, output, ticks) in [
-        ("#sand", "glass", 200),
-        ("#cobblestone", "stone", 200),
-        ("#logs", "coal", 200),
-        ("#clay", "bricks", 200),
-    ] {
+    for (input, output, ticks) in
+        [("#sand", "glass", 200), ("#cobblestone", "stone", 200), ("#logs", "coal", 200), ("#clay", "bricks", 200)]
+    {
         r.shapeless(S, output, 1, &[input], ticks);
     }
 }

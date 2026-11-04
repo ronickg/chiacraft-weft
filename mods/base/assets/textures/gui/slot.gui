@@ -1,1 +1,4 @@
-border = 1
+scaling = nine_slice
+border = 5.5
+size = 18 18
+icon = 14

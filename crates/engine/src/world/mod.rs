@@ -12,6 +12,35 @@ pub const TPS: u32 = 20;
 /// One tick in seconds.
 pub const TICK: f64 = 1.0 / TPS as f64;
 
+/// How a player holds itself, which decides its box and eyes.
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub enum Pose {
+    #[default]
+    Stand,
+    Crouch,
+    /// In a liquid, lying along where it looks.
+    Swim,
+    /// Where nothing higher fits: lying flat, with the same low box.
+    Crawl,
+    /// In bed, on its back.
+    Sleep,
+    /// Riding something, seated with its legs forward; its position is the seat.
+    Sit,
+}
+
+impl Pose {
+    pub fn from_u8(v: u8) -> Pose {
+        match v {
+            1 => Pose::Crouch,
+            2 => Pose::Swim,
+            3 => Pose::Crawl,
+            4 => Pose::Sleep,
+            5 => Pose::Sit,
+            _ => Pose::Stand,
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub enum GameMode {
     #[default]
@@ -76,6 +105,3 @@ pub fn block_bounds<'a>(cubes: impl Iterator<Item = (&'a IVec3, &'a cube::Cube)>
     }
     out
 }
-
-
-

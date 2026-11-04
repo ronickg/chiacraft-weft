@@ -1,0 +1,145 @@
+{
+ "species": "grey_wolf",
+ "about": "The grey wolf (Canis lupus): grizzled grey with a darker saddle, buff legs and ears, a cream muzzle, throat and belly, the tail tipped dark. Black wolves (a dominant black that came from dogs long ago) are common in the forests; Arctic wolves are white (recessive here).",
+ "loci": [
+  {
+   "id": "Kb",
+   "name": "Dominant black",
+   "alleles": [
+    {
+     "a": "Kb",
+     "freq": 0.08,
+     "about": "black (dominant)"
+    },
+    {
+     "a": "kb",
+     "freq": 0.92
+    }
+   ]
+  },
+  {
+   "id": "Ar",
+   "name": "Arctic white",
+   "alleles": [
+    {
+     "a": "Ar",
+     "freq": 0.95
+    },
+    {
+     "a": "ar",
+     "freq": 0.05,
+     "about": "white (recessive)"
+    }
+   ]
+  },
+  {
+   "id": "Tn",
+   "name": "Tone",
+   "quantitative": true,
+   "mean": 0.45,
+   "sd": 0.15,
+   "about": "dark grey to tawny grey"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   200,
+   146,
+   44
+  ],
+  [
+   214,
+   174,
+   70
+  ]
+ ],
+ "traits": {
+  "Ho": {
+   "mean": 0.5,
+   "sd": 0.08
+  }
+ },
+ "habitats": {
+  "snow": {
+   "freq": {
+    "Ar": {
+     "Ar": 0.3,
+     "ar": 0.7
+    }
+   }
+  },
+  "forest": {
+   "freq": {
+    "Kb": {
+     "Kb": 0.15,
+     "kb": 0.85
+    }
+   }
+  }
+ },
+ "build": {
+  "Ho": {
+   "bones": [
+    "ear_L",
+    "ear_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.4
+  },
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  },
+  "Lg": {
+   "bones": [
+    "leg_FL_upper",
+    "leg_FL_lower",
+    "leg_FR_upper",
+    "leg_FR_lower",
+    "leg_BL_upper",
+    "leg_BL_lower",
+    "leg_BR_upper",
+    "leg_BR_lower"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.05
+  }
+ }
+}

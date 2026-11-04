@@ -1,0 +1,2578 @@
+[
+ {
+  "biome": "base:plains",
+  "place": "Manhattan, Kansas, USA (Konza Prairie tallgrass prairie lies just south)",
+  "lat": 39.19,
+  "lon": -96.6,
+  "elevation_m": 322,
+  "hemisphere": "north",
+  "koppen": "Dfa",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": -1.6,
+    "t_min": -7.4,
+    "t_max": 4.2,
+    "precip_mm": 16,
+    "rain_days": 5.2,
+    "snow_cover": 7
+   },
+   {
+    "month": "Feb",
+    "t_mean": 0.9,
+    "t_min": -5.5,
+    "t_max": 7.3,
+    "precip_mm": 29,
+    "rain_days": 5.6,
+    "snow_cover": 6
+   },
+   {
+    "month": "Mar",
+    "t_mean": 6.6,
+    "t_min": -0.3,
+    "t_max": 13.5,
+    "precip_mm": 55,
+    "rain_days": 8.2,
+    "snow_cover": 1.5
+   },
+   {
+    "month": "Apr",
+    "t_mean": 12.4,
+    "t_min": 5.7,
+    "t_max": 19.1,
+    "precip_mm": 86,
+    "rain_days": 10.4,
+    "snow_cover": 0
+   },
+   {
+    "month": "May",
+    "t_mean": 18.3,
+    "t_min": 12.3,
+    "t_max": 24.4,
+    "precip_mm": 133,
+    "rain_days": 12.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 23.9,
+    "t_min": 17.9,
+    "t_max": 29.9,
+    "precip_mm": 139,
+    "rain_days": 10.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 26.7,
+    "t_min": 20.7,
+    "t_max": 32.7,
+    "precip_mm": 117,
+    "rain_days": 9.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 25.4,
+    "t_min": 19.1,
+    "t_max": 31.7,
+    "precip_mm": 112,
+    "rain_days": 10.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 20.7,
+    "t_min": 13.9,
+    "t_max": 27.4,
+    "precip_mm": 87,
+    "rain_days": 8.4,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 13.7,
+    "t_min": 6.7,
+    "t_max": 20.6,
+    "precip_mm": 64,
+    "rain_days": 8.1,
+    "snow_cover": 0
+   },
+   {
+    "month": "Nov",
+    "t_mean": 6.2,
+    "t_min": -0.1,
+    "t_max": 12.6,
+    "precip_mm": 41,
+    "rain_days": 6.4,
+    "snow_cover": 0.8
+   },
+   {
+    "month": "Dec",
+    "t_mean": 0.4,
+    "t_min": -5.3,
+    "t_max": 6.1,
+    "precip_mm": 30,
+    "rain_days": 5.4,
+    "snow_cover": 5
+   }
+  ],
+  "wet_months": [
+   "Apr",
+   "May",
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep"
+  ],
+  "dry_months": [],
+  "sources": [
+   "https://www.ncei.noaa.gov/access/us-climate-normals/ (station USC00144972, Manhattan KS, 1991-2020)",
+   "https://en.wikipedia.org/wiki/Manhattan,_Kansas (climate box citing NOAA 1991-2020)",
+   "https://lter.konza.ksu.edu/"
+  ],
+  "estimate": false,
+  "notes": "NOAA 1991-2020 normals, station Manhattan KS (USC00144972). rain_days are days with >=0.01 in (0.25 mm), NOAA's threshold. snow_cover: NOAA gives only a yearly 20.3 days with >=1 in of snow on the ground; the split by month is an ESTIMATE following monthly snowfall. Snowfall 45 cm a year. Rain peaks May-June (thunderstorms); winter is the dry season. Wichita (the other suggestion) is Cfa, 14.3 C, 871 mm: Manhattan sits beside the Konza Prairie LTER, the reference tallgrass site.",
+  "rain_days_threshold": "0.25 mm (0.01 in)",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 12.8,
+   "half_range_c": 14.2,
+   "precip_year_mm": 909,
+   "rain_days_year": 102.0,
+   "mean_daily_range_c": 12.7,
+   "mean_rh_pct": null,
+   "humidity_implied_by_daily_range": 0.71,
+   "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:forest",
+  "place": "Kassel, Hesse, Germany (central German beech-oak upland forests: Reinhardswald, Kaufunger Wald)",
+  "lat": 51.32,
+  "lon": 9.5,
+  "elevation_m": 167,
+  "hemisphere": "north",
+  "koppen": "Cfb (Dfb by the 1961-1990 normals)",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 0.9,
+    "t_min": -1.6,
+    "t_max": 3.1,
+    "precip_mm": 53.8,
+    "rain_days": 16.6,
+    "snow_cover": null
+   },
+   {
+    "month": "Feb",
+    "t_mean": 1.4,
+    "t_min": -1.4,
+    "t_max": 4.5,
+    "precip_mm": 46.6,
+    "rain_days": 16.0,
+    "snow_cover": null
+   },
+   {
+    "month": "Mar",
+    "t_mean": 5.0,
+    "t_min": 1.2,
+    "t_max": 9.2,
+    "precip_mm": 51.6,
+    "rain_days": 16.0,
+    "snow_cover": null
+   },
+   {
+    "month": "Apr",
+    "t_mean": 9.3,
+    "t_min": 4.4,
+    "t_max": 14.4,
+    "precip_mm": 39.7,
+    "rain_days": 13.3,
+    "snow_cover": null
+   },
+   {
+    "month": "May",
+    "t_mean": 13.4,
+    "t_min": 8.4,
+    "t_max": 18.6,
+    "precip_mm": 69.1,
+    "rain_days": 14.7,
+    "snow_cover": null
+   },
+   {
+    "month": "Jun",
+    "t_mean": 16.1,
+    "t_min": 11.1,
+    "t_max": 21.3,
+    "precip_mm": 67.6,
+    "rain_days": 14.2,
+    "snow_cover": null
+   },
+   {
+    "month": "Jul",
+    "t_mean": 18.3,
+    "t_min": 13.3,
+    "t_max": 23.6,
+    "precip_mm": 74.4,
+    "rain_days": 15.7,
+    "snow_cover": null
+   },
+   {
+    "month": "Aug",
+    "t_mean": 17.9,
+    "t_min": 13.0,
+    "t_max": 23.6,
+    "precip_mm": 60.1,
+    "rain_days": 14.5,
+    "snow_cover": null
+   },
+   {
+    "month": "Sep",
+    "t_mean": 13.8,
+    "t_min": 9.5,
+    "t_max": 18.8,
+    "precip_mm": 56.2,
+    "rain_days": 13.5,
+    "snow_cover": null
+   },
+   {
+    "month": "Oct",
+    "t_mean": 9.2,
+    "t_min": 5.9,
+    "t_max": 13.3,
+    "precip_mm": 58.4,
+    "rain_days": 16.0,
+    "snow_cover": null
+   },
+   {
+    "month": "Nov",
+    "t_mean": 4.8,
+    "t_min": 2.3,
+    "t_max": 7.2,
+    "precip_mm": 61.3,
+    "rain_days": 18.7,
+    "snow_cover": null
+   },
+   {
+    "month": "Dec",
+    "t_mean": 1.3,
+    "t_min": -0.9,
+    "t_max": 3.5,
+    "precip_mm": 68.2,
+    "rain_days": 20.1,
+    "snow_cover": null
+   }
+  ],
+  "wet_months": [
+   "May",
+   "Jun",
+   "Jul",
+   "Aug",
+   "Nov",
+   "Dec"
+  ],
+  "dry_months": [],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Kassel (climate box citing WMO 1991-2020 normals via NOAA, station 10438)",
+   "https://www.ncei.noaa.gov/products/wmo-climate-normals",
+   "https://opendata.dwd.de/climate_environment/CDC/"
+  ],
+  "estimate": false,
+  "notes": "WMO 1991-2020 normals, Kassel (WMO 10438). Elevation as given on the source page (may be the city's; the station is on a hill above it). rain_days: the source labels them >=1.0 mm, but 188 a year is what German lowland stations count at >=0.1 mm, so read them as days with any rain. snow_cover: no sourced monthly value; lying snow is irregular, a few weeks a year in Dec-Feb (the DWD Climate Data Center has daily snow depth to count it). Rain is spread through the year, a little more in summer (thunderstorms) and December.",
+  "rain_days_threshold": "labelled 1.0 mm (likely 0.1 mm)",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 9.3,
+   "half_range_c": 8.7,
+   "precip_year_mm": 707.0,
+   "rain_days_year": 189.3,
+   "mean_daily_range_c": 8.0,
+   "mean_rh_pct": 77.9,
+   "humidity_implied_by_daily_range": 1.0,
+   "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:birch_forest",
+  "place": "Moscow (VDNKh), Russia (mixed spruce-birch-pine forest of the central Russian plain)",
+  "lat": 55.83,
+  "lon": 37.62,
+  "elevation_m": 147,
+  "hemisphere": "north",
+  "koppen": "Dfb",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": -6.2,
+    "t_min": -8.7,
+    "t_max": -3.9,
+    "precip_mm": 53,
+    "rain_days": 21.4,
+    "snow_cover": 31
+   },
+   {
+    "month": "Feb",
+    "t_mean": -5.9,
+    "t_min": -8.8,
+    "t_max": -3.0,
+    "precip_mm": 44,
+    "rain_days": 17.6,
+    "snow_cover": 28
+   },
+   {
+    "month": "Mar",
+    "t_mean": -0.7,
+    "t_min": -4.2,
+    "t_max": 3.0,
+    "precip_mm": 39,
+    "rain_days": 12.2,
+    "snow_cover": 28
+   },
+   {
+    "month": "Apr",
+    "t_mean": 6.9,
+    "t_min": 2.3,
+    "t_max": 11.7,
+    "precip_mm": 37,
+    "rain_days": 12.3,
+    "snow_cover": 4
+   },
+   {
+    "month": "May",
+    "t_mean": 13.6,
+    "t_min": 8.1,
+    "t_max": 19.0,
+    "precip_mm": 61,
+    "rain_days": 14.1,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 17.3,
+    "t_min": 12.2,
+    "t_max": 22.4,
+    "precip_mm": 78,
+    "rain_days": 12.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 19.7,
+    "t_min": 14.8,
+    "t_max": 24.7,
+    "precip_mm": 84,
+    "rain_days": 14.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 17.6,
+    "t_min": 13.0,
+    "t_max": 22.7,
+    "precip_mm": 78,
+    "rain_days": 11.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 11.9,
+    "t_min": 8.0,
+    "t_max": 16.4,
+    "precip_mm": 66,
+    "rain_days": 11.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 5.8,
+    "t_min": 3.0,
+    "t_max": 8.9,
+    "precip_mm": 70,
+    "rain_days": 15.3,
+    "snow_cover": 3
+   },
+   {
+    "month": "Nov",
+    "t_mean": -0.5,
+    "t_min": -2.4,
+    "t_max": 1.6,
+    "precip_mm": 52,
+    "rain_days": 15.1,
+    "snow_cover": 16
+   },
+   {
+    "month": "Dec",
+    "t_mean": -4.4,
+    "t_min": -6.5,
+    "t_max": -2.3,
+    "precip_mm": 51,
+    "rain_days": 21.1,
+    "snow_cover": 28
+   }
+  ],
+  "wet_months": [
+   "May",
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep",
+   "Oct"
+  ],
+  "dry_months": [],
+  "sources": [
+   "http://www.pogodaiklimat.ru/climate/27612.htm (Pogoda i Klimat, VDNKh 1991-2020)",
+   "https://en.wikipedia.org/wiki/Climate_of_Moscow (climate box, 1991-2020, citing Pogoda.ru.net)",
+   "https://ru.wikipedia.org/wiki/Климат_Москвы (snow cover days; precipitation days 2015-2024)"
+  ],
+  "estimate": false,
+  "notes": "Temperatures and rain: 1991-2020 normals for VDNKh (WMO 27612) from Pogoda i Klimat. The station is in the city: the countryside is about 1 C colder. rain_days: days with precipitation for 2015-2024 (Pogoda i Klimat via Russian Wikipedia; threshold not stated, probably >=0.1 mm; the months sum to 180, the source's year column says 170). snow_cover: days with snow cover by month, Russian Wikipedia's table (source and period not stated); stable cover forms in late November and goes in early April, 30-40 cm deep by February-March. Southern Finland (Jyvaskyla, FMI 1991-2020: 3.8 C, 622 mm, 155 snow-cover days) is the colder alternative.",
+  "rain_days_threshold": "not stated (likely 0.1 mm)",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 6.3,
+   "half_range_c": 12.9,
+   "precip_year_mm": 713,
+   "rain_days_year": 180.4,
+   "mean_daily_range_c": 7.5,
+   "mean_rh_pct": 78.0,
+   "humidity_implied_by_daily_range": 1.0,
+   "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:taiga",
+  "place": "Fairbanks, Alaska, USA (interior boreal forest; Bonanza Creek LTER)",
+  "lat": 64.8,
+  "lon": -147.88,
+  "elevation_m": 132,
+  "hemisphere": "north",
+  "koppen": "Dfb bordering Dfc (subarctic)",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": -22.4,
+    "t_min": -27.3,
+    "t_max": -17.4,
+    "precip_mm": 15,
+    "rain_days": 8.7,
+    "snow_cover": 31
+   },
+   {
+    "month": "Feb",
+    "t_mean": -17.7,
+    "t_min": -24.0,
+    "t_max": -11.3,
+    "precip_mm": 13,
+    "rain_days": 6.9,
+    "snow_cover": 28
+   },
+   {
+    "month": "Mar",
+    "t_mean": -11.8,
+    "t_min": -19.7,
+    "t_max": -3.9,
+    "precip_mm": 10,
+    "rain_days": 5.7,
+    "snow_cover": 31
+   },
+   {
+    "month": "Apr",
+    "t_mean": 0.9,
+    "t_min": -5.7,
+    "t_max": 7.6,
+    "precip_mm": 8.6,
+    "rain_days": 3.7,
+    "snow_cover": 23
+   },
+   {
+    "month": "May",
+    "t_mean": 10.2,
+    "t_min": 3.7,
+    "t_max": 16.7,
+    "precip_mm": 14,
+    "rain_days": 6.2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 16.1,
+    "t_min": 10.1,
+    "t_max": 22.1,
+    "precip_mm": 38,
+    "rain_days": 10.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 17.2,
+    "t_min": 11.7,
+    "t_max": 22.6,
+    "precip_mm": 57,
+    "rain_days": 12.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 13.9,
+    "t_min": 8.7,
+    "t_max": 19.1,
+    "precip_mm": 53,
+    "rain_days": 13.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 7.7,
+    "t_min": 2.3,
+    "t_max": 12.9,
+    "precip_mm": 34,
+    "rain_days": 10.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": -3.2,
+    "t_min": -7.6,
+    "t_max": 1.2,
+    "precip_mm": 19,
+    "rain_days": 9.8,
+    "snow_cover": 14
+   },
+   {
+    "month": "Nov",
+    "t_mean": -15.5,
+    "t_min": -20.1,
+    "t_max": -10.9,
+    "precip_mm": 19,
+    "rain_days": 9.5,
+    "snow_cover": 30
+   },
+   {
+    "month": "Dec",
+    "t_mean": -20.2,
+    "t_min": -25.0,
+    "t_max": -15.4,
+    "precip_mm": 14,
+    "rain_days": 8.8,
+    "snow_cover": 31
+   }
+  ],
+  "wet_months": [
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep"
+  ],
+  "dry_months": [
+   "May"
+  ],
+  "sources": [
+   "https://www.ncei.noaa.gov/access/us-climate-normals/ (Fairbanks Intl Airport, USW00026411, 1991-2020)",
+   "https://en.wikipedia.org/wiki/Fairbanks,_Alaska (climate box citing NOAA 1991-2020)",
+   "https://www.lter.uaf.edu/"
+  ],
+  "estimate": false,
+  "notes": "NOAA 1991-2020 normals, Fairbanks International Airport. rain_days >=0.01 in (0.25 mm). snow_cover: from the mean snowpack season, established 18 October and gone 23 April (NWS figures quoted on Wikipedia); a thin cover lingers into May in some years (mean extreme depth 3.8 cm). Snow depth peaks around 60 cm in March. Summer (Jun-Aug) brings most of the year's 296 mm; May is dry (fire season). Chosen over Yakutsk (-8.0 C, 235 mm, January -36.9 C, Dfc/Dfd border), which is the extreme continental end of the taiga.",
+  "rain_days_threshold": "0.25 mm (0.01 in)",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": -2.1,
+   "half_range_c": 19.8,
+   "precip_year_mm": 294.6,
+   "rain_days_year": 107.1,
+   "mean_daily_range_c": 11.4,
+   "mean_rh_pct": null,
+   "humidity_implied_by_daily_range": 0.79,
+   "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:snowy_plains",
+  "place": "Utqiagvik (Barrow), Alaska, USA (arctic coastal tundra)",
+  "lat": 71.29,
+  "lon": -156.79,
+  "elevation_m": 10,
+  "hemisphere": "north",
+  "koppen": "ET",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": -24.2,
+    "t_min": -27.7,
+    "t_max": -20.7,
+    "precip_mm": 3.6,
+    "rain_days": 4.8,
+    "snow_cover": 31
+   },
+   {
+    "month": "Feb",
+    "t_mean": -24.4,
+    "t_min": -27.9,
+    "t_max": -20.8,
+    "precip_mm": 5.3,
+    "rain_days": 5.5,
+    "snow_cover": 28
+   },
+   {
+    "month": "Mar",
+    "t_mean": -23.6,
+    "t_min": -27.3,
+    "t_max": -19.9,
+    "precip_mm": 4.6,
+    "rain_days": 5.1,
+    "snow_cover": 31
+   },
+   {
+    "month": "Apr",
+    "t_mean": -15.6,
+    "t_min": -19.2,
+    "t_max": -11.9,
+    "precip_mm": 4.6,
+    "rain_days": 5.3,
+    "snow_cover": 30
+   },
+   {
+    "month": "May",
+    "t_mean": -5.2,
+    "t_min": -7.5,
+    "t_max": -2.8,
+    "precip_mm": 7.1,
+    "rain_days": 6.3,
+    "snow_cover": 31
+   },
+   {
+    "month": "Jun",
+    "t_mean": 2.2,
+    "t_min": -0.5,
+    "t_max": 4.9,
+    "precip_mm": 11,
+    "rain_days": 6.3,
+    "snow_cover": 10
+   },
+   {
+    "month": "Jul",
+    "t_mean": 5.4,
+    "t_min": 2.0,
+    "t_max": 8.7,
+    "precip_mm": 25,
+    "rain_days": 9.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 4.3,
+    "t_min": 1.7,
+    "t_max": 6.9,
+    "precip_mm": 28,
+    "rain_days": 11.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 0.9,
+    "t_min": -0.9,
+    "t_max": 2.8,
+    "precip_mm": 20,
+    "rain_days": 13.6,
+    "snow_cover": 3
+   },
+   {
+    "month": "Oct",
+    "t_mean": -6.0,
+    "t_min": -8.4,
+    "t_max": -3.6,
+    "precip_mm": 14,
+    "rain_days": 13.5,
+    "snow_cover": 21
+   },
+   {
+    "month": "Nov",
+    "t_mean": -14.6,
+    "t_min": -17.8,
+    "t_max": -11.4,
+    "precip_mm": 9.4,
+    "rain_days": 9.7,
+    "snow_cover": 30
+   },
+   {
+    "month": "Dec",
+    "t_mean": -21.3,
+    "t_min": -24.6,
+    "t_max": -18.0,
+    "precip_mm": 5.6,
+    "rain_days": 6.7,
+    "snow_cover": 31
+   }
+  ],
+  "wet_months": [
+   "Jul",
+   "Aug",
+   "Sep",
+   "Oct"
+  ],
+  "dry_months": [],
+  "sources": [
+   "https://www.ncei.noaa.gov/access/us-climate-normals/ (Utqiagvik Wiley Post-Will Rogers Airport, USW00027502, 1991-2020)",
+   "https://en.wikipedia.org/wiki/Utqiagvik,_Alaska (climate box citing NOAA 1991-2020)",
+   "https://gml.noaa.gov/grad/snomelt.html",
+   "https://www.eurekalert.org/news-releases/850307"
+  ],
+  "estimate": false,
+  "notes": "NOAA 1991-2020 normals. rain_days >=0.01 in (0.25 mm). snow_cover is an ESTIMATE: snow lies from about the second week of October to about the second week of June (NOAA GML measures the melt date; a 18 June melt in 2017 was called late, and the snow-free season has lengthened about a week per decade since 1975). Permafrost under all of it. Most precipitation falls Jul-Oct, as rain then snow; 116 cm of snowfall a year; winter air is very dry (137 mm a year).",
+  "rain_days_threshold": "0.25 mm (0.01 in)",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": -10.2,
+   "half_range_c": 14.9,
+   "precip_year_mm": 138.2,
+   "rain_days_year": 98.0,
+   "mean_daily_range_c": 6.0,
+   "mean_rh_pct": 81.2,
+   "humidity_implied_by_daily_range": 1.0,
+   "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:desert",
+  "place": "Hermosillo, Sonora, Mexico (Sonoran Desert)",
+  "lat": 29.1,
+  "lon": -110.95,
+  "elevation_m": 200,
+  "hemisphere": "north",
+  "koppen": "BWh (borderline BSh)",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 17.2,
+    "t_min": 9.8,
+    "t_max": 24.6,
+    "precip_mm": 15.8,
+    "rain_days": 2.0,
+    "snow_cover": 0
+   },
+   {
+    "month": "Feb",
+    "t_mean": 18.8,
+    "t_min": 10.9,
+    "t_max": 26.6,
+    "precip_mm": 15.4,
+    "rain_days": 1.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Mar",
+    "t_mean": 21.2,
+    "t_min": 12.8,
+    "t_max": 29.5,
+    "precip_mm": 6.2,
+    "rain_days": 0.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Apr",
+    "t_mean": 24.5,
+    "t_min": 15.7,
+    "t_max": 33.2,
+    "precip_mm": 1.9,
+    "rain_days": 0.3,
+    "snow_cover": 0
+   },
+   {
+    "month": "May",
+    "t_mean": 28.8,
+    "t_min": 19.8,
+    "t_max": 37.8,
+    "precip_mm": 1.6,
+    "rain_days": 0.2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 33.1,
+    "t_min": 24.3,
+    "t_max": 41.9,
+    "precip_mm": 5.1,
+    "rain_days": 0.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 33.2,
+    "t_min": 26.1,
+    "t_max": 40.2,
+    "precip_mm": 91.1,
+    "rain_days": 8.4,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 32.8,
+    "t_min": 26.2,
+    "t_max": 39.3,
+    "precip_mm": 92.2,
+    "rain_days": 8.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 31.8,
+    "t_min": 24.8,
+    "t_max": 38.8,
+    "precip_mm": 63.4,
+    "rain_days": 5.1,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 27.6,
+    "t_min": 19.9,
+    "t_max": 35.2,
+    "precip_mm": 15.5,
+    "rain_days": 1.3,
+    "snow_cover": 0
+   },
+   {
+    "month": "Nov",
+    "t_mean": 21.7,
+    "t_min": 13.9,
+    "t_max": 29.5,
+    "precip_mm": 13.1,
+    "rain_days": 1.2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Dec",
+    "t_mean": 17.1,
+    "t_min": 9.8,
+    "t_max": 24.4,
+    "precip_mm": 23.4,
+    "rain_days": 2.2,
+    "snow_cover": 0
+   }
+  ],
+  "wet_months": [
+   "Jul",
+   "Aug",
+   "Sep"
+  ],
+  "dry_months": [
+   "Jan",
+   "Feb",
+   "Mar",
+   "Apr",
+   "May",
+   "Jun",
+   "Oct",
+   "Nov",
+   "Dec"
+  ],
+  "sources": [
+   "https://smn.conagua.gob.mx/es/informacion-climatologica-por-estado?estado=son (SMN normals, Sonora)",
+   "https://en.wikipedia.org/wiki/Hermosillo (climate box, Hermosillo Observatorio, citing SMN)"
+  ],
+  "estimate": false,
+  "notes": "Servicio Meteorologico Nacional normals for Hermosillo (Observatorio). The source page captions the table 1991-2020 but cites SMN 1981-2010 for temperature: treat the period as 1981-2010. rain_days >=0.1 mm (SMN's threshold). Two rain seasons: the North American monsoon (July-September, 72% of the year's 345 mm, thunderstorms) and light Pacific winter rains (Dec-Feb, 'equipatas'). April-June is the driest and hottest stretch (June max 41.9 C). Elevation is the city's (about 200 m). Chihuahua city, the dogs' namesake, is semi-arid steppe at 1,400 m (BSh/BSk, about 18 C): Hermosillo is the true desert.",
+  "rain_days_threshold": "0.1 mm",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 25.7,
+   "half_range_c": 8.1,
+   "precip_year_mm": 344.7,
+   "rain_days_year": 32.7,
+   "mean_daily_range_c": 15.6,
+   "mean_rh_pct": 47.4,
+   "humidity_implied_by_daily_range": 0.53,
+   "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:savanna",
+  "place": "Arauca, Colombia (the llanos of the Arauca river, chiguiro / capybara country)",
+  "lat": 7.09,
+  "lon": -70.76,
+  "elevation_m": 128,
+  "hemisphere": "north",
+  "koppen": "Aw",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 27.4,
+    "t_min": 20.6,
+    "t_max": 33.1,
+    "precip_mm": 11.9,
+    "rain_days": 2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Feb",
+    "t_mean": 28.3,
+    "t_min": 21.2,
+    "t_max": 34.3,
+    "precip_mm": 23.8,
+    "rain_days": 3,
+    "snow_cover": 0
+   },
+   {
+    "month": "Mar",
+    "t_mean": 28.8,
+    "t_min": 22.2,
+    "t_max": 34.6,
+    "precip_mm": 50.6,
+    "rain_days": 5,
+    "snow_cover": 0
+   },
+   {
+    "month": "Apr",
+    "t_mean": 27.7,
+    "t_min": 22.9,
+    "t_max": 33.2,
+    "precip_mm": 147.2,
+    "rain_days": 13,
+    "snow_cover": 0
+   },
+   {
+    "month": "May",
+    "t_mean": 26.6,
+    "t_min": 23.0,
+    "t_max": 31.2,
+    "precip_mm": 267.5,
+    "rain_days": 19,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 25.8,
+    "t_min": 22.8,
+    "t_max": 30.0,
+    "precip_mm": 304.7,
+    "rain_days": 22,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 25.7,
+    "t_min": 22.6,
+    "t_max": 29.9,
+    "precip_mm": 309.6,
+    "rain_days": 22,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 26.1,
+    "t_min": 22.7,
+    "t_max": 30.6,
+    "precip_mm": 224.7,
+    "rain_days": 20,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 26.6,
+    "t_min": 22.8,
+    "t_max": 31.5,
+    "precip_mm": 187.1,
+    "rain_days": 17,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 26.8,
+    "t_min": 22.9,
+    "t_max": 31.7,
+    "precip_mm": 200.1,
+    "rain_days": 14,
+    "snow_cover": 0
+   },
+   {
+    "month": "Nov",
+    "t_mean": 26.9,
+    "t_min": 22.9,
+    "t_max": 31.5,
+    "precip_mm": 109.7,
+    "rain_days": 10,
+    "snow_cover": 0
+   },
+   {
+    "month": "Dec",
+    "t_mean": 26.9,
+    "t_min": 21.9,
+    "t_max": 31.9,
+    "precip_mm": 30.8,
+    "rain_days": 5,
+    "snow_cover": 0
+   }
+  ],
+  "wet_months": [
+   "Apr",
+   "May",
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep",
+   "Oct",
+   "Nov"
+  ],
+  "dry_months": [
+   "Jan",
+   "Feb",
+   "Mar",
+   "Dec"
+  ],
+  "sources": [
+   "http://www.ideam.gov.co/ (IDEAM climatological normals 1981-2010)",
+   "https://en.wikipedia.org/wiki/Arauca,_Arauca (climate box, Santiago Perez Quiroz Airport, citing IDEAM 1981-2010)",
+   "https://ds.data.jma.go.jp/cpd/monitor/nrmlist/NrmMonth.php?stn=80450 (JMA normals, San Fernando de Apure, for comparison)",
+   "https://en.wikipedia.org/wiki/San_Fernando_de_Apure (WMO/NCEI 1991-2020, for comparison)"
+  ],
+  "estimate": false,
+  "notes": "IDEAM 1981-2010 normals, Arauca airport, on the Arauca river at the Venezuelan border, in the same flooded llanos as San Fernando de Apure (about 330 km east). rain_days >=1.0 mm. Wet season April-November (peak June-July, the savanna floods), dry season December-March (January 12 mm, 2 rain days; grass burns and dries, capybaras crowd at the remaining water). Chosen over San Fernando de Apure because San Fernando's two sources disagree: WMO/NCEI 1991-2020 gives 2,022 mm with 36 mm and 13 rain days in January (implausible for the llanos dry season), JMA's normals give 1,544 mm with 0.4 mm in January. San Fernando's temperatures (27.5 C, range 26.0-29.3) match Arauca's.",
+  "rain_days_threshold": "1.0 mm",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 27.0,
+   "half_range_c": 1.6,
+   "precip_year_mm": 1867.7,
+   "rain_days_year": 152,
+   "mean_daily_range_c": 9.6,
+   "mean_rh_pct": 79.7,
+   "humidity_implied_by_daily_range": 0.9,
+   "wet_dry_rule": "tropical: wet = month >= 100 mm; dry = P < 2T (Walter-Lieth)"
+  }
+ },
+ {
+  "biome": "base:swamp",
+  "place": "Nhecolandia (Embrapa's Fazenda Nhumirim), Pantanal, Mato Grosso do Sul, Brazil",
+  "lat": -18.99,
+  "lon": -56.62,
+  "elevation_m": 100,
+  "hemisphere": "south",
+  "koppen": "Aw",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 27.6,
+    "t_min": 23.4,
+    "t_max": 33.3,
+    "precip_mm": 172.8,
+    "rain_days": 11,
+    "snow_cover": 0
+   },
+   {
+    "month": "Feb",
+    "t_mean": 27.5,
+    "t_min": 23.4,
+    "t_max": 33.0,
+    "precip_mm": 142.1,
+    "rain_days": 10,
+    "snow_cover": 0
+   },
+   {
+    "month": "Mar",
+    "t_mean": 27.2,
+    "t_min": 22.8,
+    "t_max": 33.3,
+    "precip_mm": 128.9,
+    "rain_days": 9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Apr",
+    "t_mean": 25.5,
+    "t_min": 20.6,
+    "t_max": 32.4,
+    "precip_mm": 68.2,
+    "rain_days": 5,
+    "snow_cover": 0
+   },
+   {
+    "month": "May",
+    "t_mean": 22.3,
+    "t_min": 16.8,
+    "t_max": 29.7,
+    "precip_mm": 55.8,
+    "rain_days": 4,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 21.2,
+    "t_min": 15.5,
+    "t_max": 29.1,
+    "precip_mm": 17.2,
+    "rain_days": 2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 20.8,
+    "t_min": 14.2,
+    "t_max": 29.8,
+    "precip_mm": 10.2,
+    "rain_days": 2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 22.6,
+    "t_min": 15.4,
+    "t_max": 32.3,
+    "precip_mm": 17.5,
+    "rain_days": 2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 24.7,
+    "t_min": 18.3,
+    "t_max": 33.1,
+    "precip_mm": 33.8,
+    "rain_days": 2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 27.0,
+    "t_min": 21.5,
+    "t_max": 34.2,
+    "precip_mm": 100.7,
+    "rain_days": 6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Nov",
+    "t_mean": 27.3,
+    "t_min": 21.8,
+    "t_max": 34.1,
+    "precip_mm": 135.9,
+    "rain_days": 8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Dec",
+    "t_mean": 27.6,
+    "t_min": 22.8,
+    "t_max": 33.6,
+    "precip_mm": 163.1,
+    "rain_days": 9,
+    "snow_cover": 0
+   }
+  ],
+  "wet_months": [
+   "Jan",
+   "Feb",
+   "Mar",
+   "Oct",
+   "Nov",
+   "Dec"
+  ],
+  "dry_months": [
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep"
+  ],
+  "sources": [
+   "https://portal.inmet.gov.br/normais (INMET Normais Climatologicas do Brasil 1981-2010)",
+   "https://en.wikipedia.org/wiki/Corumbá (climate boxes for Corumba and Nhecolandia/Nhumirim, citing INMET 1981-2010)"
+  ],
+  "estimate": false,
+  "notes": "INMET 1981-2010 normals for Nhecolandia (Nhumirim), a station inside the Pantanal (Corumba, the city on its western edge: 25.7 C, 998 mm, nearly the same). rain_days >=1.0 mm. Coordinates and elevation are approximate (the Nhumirim farm). SOUTHERN HEMISPHERE: months here are the place's own; shift by six months for the game's calendar. Wet season October/November-March (summer), dry season June-September (winter; cold fronts bring the 14 C minimums). The floods lag the rain: the local plains fill in January-April, and the Paraguay river peaks around June-July, so standing water lasts into the early dry season.",
+  "rain_days_threshold": "1.0 mm",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 25.1,
+   "half_range_c": 3.4,
+   "precip_year_mm": 1046.2,
+   "rain_days_year": 70,
+   "mean_daily_range_c": 12.6,
+   "mean_rh_pct": 78.5,
+   "humidity_implied_by_daily_range": 0.71,
+   "wet_dry_rule": "tropical: wet = month >= 100 mm; dry = P < 2T (Walter-Lieth)"
+  }
+ },
+ {
+  "biome": "base:mountains",
+  "place": "Davos, Graubuenden, Switzerland (subalpine valley, 1,594 m)",
+  "lat": 46.81,
+  "lon": 9.84,
+  "elevation_m": 1594,
+  "hemisphere": "north",
+  "koppen": "Dfc",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": -4.7,
+    "t_min": -8.8,
+    "t_max": 0.0,
+    "precip_mm": 70.1,
+    "rain_days": 8.8,
+    "snow_cover": 31
+   },
+   {
+    "month": "Feb",
+    "t_mean": -4.2,
+    "t_min": -9.0,
+    "t_max": 1.2,
+    "precip_mm": 52.0,
+    "rain_days": 7.9,
+    "snow_cover": 28
+   },
+   {
+    "month": "Mar",
+    "t_mean": -0.7,
+    "t_min": -5.5,
+    "t_max": 4.6,
+    "precip_mm": 56.7,
+    "rain_days": 8.9,
+    "snow_cover": 31
+   },
+   {
+    "month": "Apr",
+    "t_mean": 3.0,
+    "t_min": -2.0,
+    "t_max": 8.3,
+    "precip_mm": 54.4,
+    "rain_days": 9.0,
+    "snow_cover": 20
+   },
+   {
+    "month": "May",
+    "t_mean": 7.4,
+    "t_min": 2.3,
+    "t_max": 12.8,
+    "precip_mm": 88.7,
+    "rain_days": 12.0,
+    "snow_cover": 2
+   },
+   {
+    "month": "Jun",
+    "t_mean": 11.0,
+    "t_min": 5.8,
+    "t_max": 16.5,
+    "precip_mm": 128.7,
+    "rain_days": 13.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 12.8,
+    "t_min": 7.6,
+    "t_max": 18.5,
+    "precip_mm": 133.1,
+    "rain_days": 13.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 12.6,
+    "t_min": 7.7,
+    "t_max": 18.2,
+    "precip_mm": 149.5,
+    "rain_days": 13.6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 8.7,
+    "t_min": 4.1,
+    "t_max": 14.2,
+    "precip_mm": 96.3,
+    "rain_days": 10.0,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 5.1,
+    "t_min": 0.8,
+    "t_max": 10.8,
+    "precip_mm": 77.1,
+    "rain_days": 8.7,
+    "snow_cover": 3
+   },
+   {
+    "month": "Nov",
+    "t_mean": 0.0,
+    "t_min": -3.8,
+    "t_max": 4.8,
+    "precip_mm": 71.2,
+    "rain_days": 9.1,
+    "snow_cover": 18
+   },
+   {
+    "month": "Dec",
+    "t_mean": -3.6,
+    "t_min": -7.2,
+    "t_max": 0.6,
+    "precip_mm": 68.1,
+    "rain_days": 9.8,
+    "snow_cover": 31
+   }
+  ],
+  "wet_months": [
+   "May",
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep"
+  ],
+  "dry_months": [],
+  "sources": [
+   "https://www.meteoswiss.admin.ch/services-and-publications/applications/ext/climate-tables-normals.html (MeteoSwiss normals 1991-2020, Davos DAV)",
+   "https://en.wikipedia.org/wiki/Davos (climate box citing MeteoSwiss 1991-2020)"
+  ],
+  "estimate": false,
+  "notes": "MeteoSwiss 1991-2020 normals, Davos. rain_days >=1.0 mm. Snowfall 452 cm a year, with 68 days of >=1 cm new snow. snow_cover is an ESTIMATE (no monthly snow-cover normal found): a lasting cover from mid-November to late April, about 160-165 days, shrinking since 1970. Summer is the wet season (Jun-Aug, convective rain), as in most of the Alps. Mean daily range is only 8-10 C.",
+  "rain_days_threshold": "1.0 mm",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 3.9,
+   "half_range_c": 8.8,
+   "precip_year_mm": 1045.9,
+   "rain_days_year": 125.3,
+   "mean_daily_range_c": 9.9,
+   "mean_rh_pct": 74.2,
+   "humidity_implied_by_daily_range": 0.88,
+   "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:ocean",
+  "place": "Ponta Delgada, Sao Miguel, Azores, Portugal (mid-Atlantic islands)",
+  "lat": 37.74,
+  "lon": -25.66,
+  "elevation_m": 35,
+  "hemisphere": "north",
+  "koppen": "Csa (borderline Cfa/Csb)",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 15.1,
+    "t_min": 12.7,
+    "t_max": 17.5,
+    "precip_mm": 102.1,
+    "rain_days": 13.0,
+    "snow_cover": 0
+   },
+   {
+    "month": "Feb",
+    "t_mean": 14.8,
+    "t_min": 12.1,
+    "t_max": 17.4,
+    "precip_mm": 87.2,
+    "rain_days": 10.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Mar",
+    "t_mean": 15.2,
+    "t_min": 12.6,
+    "t_max": 17.9,
+    "precip_mm": 97.1,
+    "rain_days": 11.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Apr",
+    "t_mean": 16.0,
+    "t_min": 13.3,
+    "t_max": 18.8,
+    "precip_mm": 79.6,
+    "rain_days": 10.2,
+    "snow_cover": 0
+   },
+   {
+    "month": "May",
+    "t_mean": 17.4,
+    "t_min": 14.6,
+    "t_max": 20.2,
+    "precip_mm": 61.0,
+    "rain_days": 8.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 19.6,
+    "t_min": 16.8,
+    "t_max": 22.4,
+    "precip_mm": 44.4,
+    "rain_days": 6.6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 21.8,
+    "t_min": 18.9,
+    "t_max": 24.7,
+    "precip_mm": 26.0,
+    "rain_days": 4.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 23.0,
+    "t_min": 19.9,
+    "t_max": 26.0,
+    "precip_mm": 45.8,
+    "rain_days": 6.5,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 22.1,
+    "t_min": 19.1,
+    "t_max": 25.0,
+    "precip_mm": 78.2,
+    "rain_days": 9.4,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 19.8,
+    "t_min": 17.1,
+    "t_max": 22.6,
+    "precip_mm": 118.0,
+    "rain_days": 13.7,
+    "snow_cover": 0
+   },
+   {
+    "month": "Nov",
+    "t_mean": 17.4,
+    "t_min": 14.9,
+    "t_max": 19.9,
+    "precip_mm": 95.3,
+    "rain_days": 11.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Dec",
+    "t_mean": 15.9,
+    "t_min": 13.4,
+    "t_max": 18.3,
+    "precip_mm": 152.8,
+    "rain_days": 15.0,
+    "snow_cover": 0
+   }
+  ],
+  "wet_months": [
+   "Jan",
+   "Feb",
+   "Mar",
+   "Oct",
+   "Nov",
+   "Dec"
+  ],
+  "dry_months": [
+   "Jul",
+   "Aug"
+  ],
+  "sources": [
+   "https://www.ipma.pt/pt/oclima/normais.clima/ (IPMA normals 1991-2020, Ponta Delgada Observatorio Afonso Chaves)",
+   "https://en.wikipedia.org/wiki/Ponta_Delgada (climate box citing IPMA 1991-2020)"
+  ],
+  "estimate": false,
+  "notes": "IPMA 1991-2020 normals, Afonso Chaves Observatory. rain_days >=1.0 mm (the airport's 1981-2010 count at >=0.1 mm is 178 a year: drizzle is frequent). Coordinates are the town's. The sea keeps the year range small (14.8-23.0 C) and the daily range small (about 5 C). Wet season October-March (Atlantic storms), driest July. Relative humidity is about 80% all year (NOAA 1961-1990).",
+  "rain_days_threshold": "1.0 mm",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 18.2,
+   "half_range_c": 4.1,
+   "precip_year_mm": 987.5,
+   "rain_days_year": 122.2,
+   "mean_daily_range_c": 5.4,
+   "mean_rh_pct": 80.5,
+   "humidity_implied_by_daily_range": 1.0,
+   "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:beach",
+  "place": "Faro, Algarve, Portugal (Ria Formosa barrier-island beaches)",
+  "lat": 37.02,
+  "lon": -7.97,
+  "elevation_m": 8,
+  "hemisphere": "north",
+  "koppen": "Csa",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": 12.3,
+    "t_min": 8.3,
+    "t_max": 16.3,
+    "precip_mm": 49.3,
+    "rain_days": 6.0,
+    "snow_cover": 0
+   },
+   {
+    "month": "Feb",
+    "t_mean": 12.9,
+    "t_min": 8.8,
+    "t_max": 17.0,
+    "precip_mm": 41.9,
+    "rain_days": 5.4,
+    "snow_cover": 0
+   },
+   {
+    "month": "Mar",
+    "t_mean": 14.9,
+    "t_min": 10.8,
+    "t_max": 18.9,
+    "precip_mm": 46.8,
+    "rain_days": 5.6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Apr",
+    "t_mean": 16.6,
+    "t_min": 12.4,
+    "t_max": 20.7,
+    "precip_mm": 39.0,
+    "rain_days": 5.3,
+    "snow_cover": 0
+   },
+   {
+    "month": "May",
+    "t_mean": 19.3,
+    "t_min": 15.0,
+    "t_max": 23.5,
+    "precip_mm": 26.2,
+    "rain_days": 3.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jun",
+    "t_mean": 22.3,
+    "t_min": 17.8,
+    "t_max": 26.8,
+    "precip_mm": 5.1,
+    "rain_days": 0.8,
+    "snow_cover": 0
+   },
+   {
+    "month": "Jul",
+    "t_mean": 24.5,
+    "t_min": 19.6,
+    "t_max": 29.4,
+    "precip_mm": 0.9,
+    "rain_days": 0.2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Aug",
+    "t_mean": 24.6,
+    "t_min": 19.9,
+    "t_max": 29.2,
+    "precip_mm": 3.0,
+    "rain_days": 0.2,
+    "snow_cover": 0
+   },
+   {
+    "month": "Sep",
+    "t_mean": 22.4,
+    "t_min": 18.3,
+    "t_max": 26.4,
+    "precip_mm": 21.5,
+    "rain_days": 1.9,
+    "snow_cover": 0
+   },
+   {
+    "month": "Oct",
+    "t_mean": 19.6,
+    "t_min": 15.8,
+    "t_max": 23.3,
+    "precip_mm": 56.0,
+    "rain_days": 6.0,
+    "snow_cover": 0
+   },
+   {
+    "month": "Nov",
+    "t_mean": 15.7,
+    "t_min": 11.9,
+    "t_max": 19.6,
+    "precip_mm": 75.5,
+    "rain_days": 6.6,
+    "snow_cover": 0
+   },
+   {
+    "month": "Dec",
+    "t_mean": 13.4,
+    "t_min": 9.7,
+    "t_max": 17.1,
+    "precip_mm": 90.0,
+    "rain_days": 7.0,
+    "snow_cover": 0
+   }
+  ],
+  "wet_months": [
+   "Jan",
+   "Feb",
+   "Mar",
+   "Apr",
+   "Oct",
+   "Nov",
+   "Dec"
+  ],
+  "dry_months": [
+   "May",
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep"
+  ],
+  "sources": [
+   "https://www.ipma.pt/pt/oclima/normais.clima/ (IPMA normals 1991-2020, Faro)",
+   "https://en.wikipedia.org/wiki/Faro,_Portugal (climate box citing IPMA 'Faro 1991-2020'; humidity from NOAA 1961-1990)"
+  ],
+  "estimate": false,
+  "notes": "IPMA 1991-2020 normals, Faro airport (on the lagoon behind the barrier beaches). rain_days >=1.0 mm. Mediterranean: wet season October-March (December wettest), a near-rainless summer (June-August 9 mm in all). Humidity row is NOAA 1961-1990. Sea about 16-17 C in January and 22-24 C in August-September (seatemperature.org, via Wikipedia).",
+  "rain_days_threshold": "1.0 mm",
+  "snow_cover_unit": "days in the month with snow lying on the ground (see notes for which are estimates)",
+  "summary": {
+   "year_mean_c": 18.2,
+   "half_range_c": 6.2,
+   "precip_year_mm": 455.2,
+   "rain_days_year": 48.8,
+   "mean_daily_range_c": 8.3,
+   "mean_rh_pct": 69.2,
+   "humidity_implied_by_daily_range": 0.98,
+   "wet_dry_rule": "wet = month at or above the monthly average; dry = P(mm) < 2 x T(C) (Walter-Lieth), not counting wet months"
+  }
+ },
+ {
+  "biome": "base:deep_caves",
+  "place": "Any cave below the surface (rule, not a place)",
+  "lat": null,
+  "lon": null,
+  "elevation_m": null,
+  "hemisphere": "either",
+  "koppen": null,
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Feb",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Mar",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Apr",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "May",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jun",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jul",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Aug",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Sep",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Oct",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Nov",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Dec",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   }
+  ],
+  "wet_months": [],
+  "dry_months": [],
+  "sources": [
+   "https://home.nps.gov/cave/learn/nature/weather.htm",
+   "https://www.nps.gov/grba/learn/nature/airflow-and-cave-climate.htm",
+   "https://digitalcommons.usf.edu/kip_articles/811"
+  ],
+  "estimate": false,
+  "notes": "Rule: away from the entrances, cave air sits at about the mean annual surface temperature of the ground above at that elevation (NPS Carlsbad Caverns: caves 'tend to reflect the average annual temperature for the area at that given elevation'; NPS Great Basin: bedrock is 'often just about the average year round surface temperature'; Badino 2004, Int. J. Speleology 33: cave temperature is closely tied to the external climate, short swings filtered out by the rock). Exceptions: cold-air traps that take in winter air run colder (Carlsbad's Big Room 13 C under a 17 C surface), and depth adds geothermal warmth (Carlsbad's deepest point 20 C). Humidity: 90-100% (Lehman Caves 90-100%; Carlsbad near 100% deep inside, down to 87.5% in the Big Room in winter). Near entrances both follow the outside more. No months: no day, no season, no rain.",
+  "rule": {
+   "t_mean": "year mean of the surface biome above (at that elevation)",
+   "relative_humidity_pct": [
+    90,
+    100
+   ],
+   "seasons_c": 0
+  }
+ },
+ {
+  "biome": "animals:red_dunes",
+  "place": "Djadokhta Formation, Bayan Zag (Flaming Cliffs) and Ukhaa Tolgod, southern Gobi, Mongolia",
+  "lat": 44.14,
+  "lon": 103.73,
+  "elevation_m": null,
+  "hemisphere": "north",
+  "koppen": "BWk/BWh (estimate)",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Feb",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Mar",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Apr",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "May",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jun",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jul",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Aug",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Sep",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Oct",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Nov",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Dec",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   }
+  ],
+  "wet_months": [
+   "Jul",
+   "Aug"
+  ],
+  "dry_months": [
+   "Jan",
+   "Feb",
+   "Mar",
+   "Apr",
+   "May",
+   "Jun",
+   "Sep",
+   "Oct",
+   "Nov",
+   "Dec"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Djadochta_Formation",
+   "https://www2.jpgu.org/meeting/2008/program/pdf/E111/E111-P010_e.pdf",
+   "https://journals.rcsi.science/0031-0301/article/view/166820",
+   "https://doi.org/10.1016/j.jseaes.2008.11.010",
+   "https://doi.org/10.1206/442.1",
+   "https://doi.org/10.1016/j.palaeo.2019.05.012",
+   "https://en.wikipedia.org/wiki/Nemegt_Formation"
+  ],
+  "estimate": true,
+  "notes": "Campanian, about 80-72 Ma (eolian deposition from about 80 Ma: Hasegawa et al. 2008). LITERATURE: an arid sand-dune desert of at least 160,000 km2 with large cross-bedded dunes and mature calcretes (Hasegawa et al. 2008, 2009); paleosols at Bayan Zag read as semi-arid with seasonal rain, hot dry summers and short, probably humid winters (Naugolnykh 2016); short-lived ponds and streams between dunes, and dune collapses after heavy rain (Dingus et al. 2008; Loope et al. 1999); the Okavango-Kalahari is the modern analogue (Jerzykiewicz 1998). NO published MAT or MAP for the Djadokhta was found. The nearest number is the younger, wetter Nemegt Formation (Maastrichtian, Owocki et al. 2020, from Tarbosaurus tooth enamel): a monsoonal climate with summer rain, MAP 775-835 mm, and an MAT reported as about 7.6 C on Wikipedia's summary but 'ten degrees above today's Mongolia' in the paper's abstract, so treat that MAT as unsettled. ESTIMATES (ours): MAT about 17 C (12-22), warmest month about 30 C, coldest about 5 C (half range about 12 C: a continental interior at about 40-45 N), MAP about 100-250 mm in a short summer wet season (2-3 months), and wet/dry months are a guess following the Nemegt's summer monsoon (Naugolnykh's 'humid winters' would put the rain in winter instead).",
+  "formation": "Djadokhta Formation",
+  "age_ma": [
+   80,
+   72
+  ],
+  "palaeolatitude": "about 40-45 N (reconstructions vary; Wikipedia infoboxes give 30.7 N for the Djadokhta and 40.5 N for the Barun Goyot, both unsourced)",
+  "mat_c": 17,
+  "mat_range_c": [
+   12,
+   22
+  ],
+  "map_mm": 175,
+  "map_range_mm": [
+   100,
+   250
+  ],
+  "half_range_c": 12,
+  "wet_season_months": 2,
+  "dry_season_months": 10
+ },
+ {
+  "biome": "animals:scrubland",
+  "place": "Barun Goyot (Baruungoyot) Formation, Nemegt Basin (Khulsan, Hermiin Tsav), southern Gobi, Mongolia",
+  "lat": 43.6,
+  "lon": 101.1,
+  "elevation_m": null,
+  "hemisphere": "north",
+  "koppen": "BSk/BSh (estimate)",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Feb",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Mar",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Apr",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "May",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jun",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jul",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Aug",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Sep",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Oct",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Nov",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Dec",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   }
+  ],
+  "wet_months": [
+   "Jun",
+   "Jul",
+   "Aug"
+  ],
+  "dry_months": [
+   "Jan",
+   "Feb",
+   "Mar",
+   "Apr",
+   "Oct",
+   "Nov",
+   "Dec"
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/Barun_Goyot_Formation",
+   "https://en.wikipedia.org/wiki/Nemegt_Formation",
+   "https://doi.org/10.1016/j.palaeo.2017.11.018",
+   "https://doi.org/10.1139/cjes-2020-0148",
+   "https://doi.org/10.1016/j.palaeo.2019.05.012"
+  ],
+  "estimate": true,
+  "notes": "Late Campanian to early Maastrichtian, partly coeval with the Djadokhta. LITERATURE: red eolian and interdune sandstones, transitional between the Djadokhta's dunes and the Nemegt's river plains; in the 'lithobiotope' model the Djadokhta is the arid dune habitat, the Barun Goyot the semi-arid transition and the Nemegt the wetter plains (Jerzykiewicz et al. 2021); wetness increases up through the Baruungoyot into the Nemegt (Eberth 2018). No MAT or MAP for the Barun Goyot itself was found; the Nemegt above it had summer monsoon rain and MAP 775-835 mm (Owocki et al. 2020). ESTIMATES (ours): MAT about 17 C (12-22), half range about 11 C, MAP about 250-450 mm, a summer wet season of about 3 months and a dry winter-spring.",
+  "formation": "Barun Goyot (Baruungoyot) Formation",
+  "age_ma": [
+   75,
+   70
+  ],
+  "palaeolatitude": "about 40-45 N (estimate)",
+  "mat_c": 17,
+  "mat_range_c": [
+   12,
+   22
+  ],
+  "map_mm": 350,
+  "map_range_mm": [
+   250,
+   450
+  ],
+  "half_range_c": 11,
+  "wet_season_months": 3,
+  "dry_season_months": 7
+ },
+ {
+  "biome": "animals:floodplain",
+  "place": "Cedar Mountain Formation, Ruby Ranch Member type area and 'Lake Carpenter' near Arches, east-central Utah, USA",
+  "lat": 38.8,
+  "lon": -109.9,
+  "elevation_m": null,
+  "hemisphere": "north",
+  "koppen": "Aw/BSh-like seasonal subtropics (estimate)",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Feb",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Mar",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Apr",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "May",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jun",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jul",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Aug",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Sep",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Oct",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Nov",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Dec",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   }
+  ],
+  "wet_months": [
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep"
+  ],
+  "dry_months": [
+   "Nov",
+   "Dec",
+   "Jan",
+   "Feb",
+   "Mar",
+   "Apr"
+  ],
+  "sources": [
+   "https://geolsoc.figshare.com/collections/Multi-proxy_strategy_for_determining_palaeoclimate_parameters_in_the_Ruby_Ranch_Member_of_the_Cedar_Mountain_Formation/5087091",
+   "https://studio.m-anage.com/gsa/2017AM/webprogram/Paper304788.html",
+   "https://par.nsf.gov/biblio/10437392",
+   "https://par.nsf.gov/biblio/10654206",
+   "https://archives.datapages.com/data/sepm/journals/084/084011/975_i1527-1404-84-11-975.htm",
+   "https://scholarworks.uark.edu/etd/1199/",
+   "https://en.wikipedia.org/wiki/Cedar_Mountain_Formation",
+   "https://doi.org/10.3390/geosciences13020032"
+  ],
+  "estimate": true,
+  "notes": "Ruby Ranch Member, late Aptian-early Albian (about 116-110 Ma; 'Lake Carpenter' ash 115.65 Ma). LITERATURE: a semi-arid to seasonal floodplain with calcrete and vertic paleosols, carbonate concentrated by dry-season evaporation, and dolomite showing strong evaporation; aridity from the rain shadow of the Sevier highlands ('Nevadaplano') to the west (Suarez et al. 2014, J. Sed. Res. 84: 975). MAP from paleosol chemistry (Suarez et al. 2020/2021, Geol. Soc. London Spec. Publ. 498): CALMAG 736-1,042 mm, CIA-K 795-1,275 mm, a little lower during the C10 carbon-isotope event; a thesis using carbon-isotope methods got much lower values (274 and 599 mm for the member: Univ. of Arkansas). Temperatures: clumped isotopes of lake carbonate 15-31 C (calcite 27-41 C, dolomite 19-21 C), palustrine 19.8-44.5 C; these are spring-summer water temperatures, not the year mean, and values above 50 C are diagenesis (Suarez et al. 2023, 2025). Palaeolatitude about 34 N (Suarez et al. 2014). No published MAT. ESTIMATES (ours): MAT about 21 C (17-25), half range about 8 C, MAP about 800 mm (the proxies' overlap, likely high), a summer wet season of about 4 months and a winter-spring dry season of about 6 (monsoon-like, as the paleosols suggest; the exact months are a guess). Note: Utahraptor comes from the older Yellow Cat Member, now dated Berriasian-Valanginian (about 139-134 Ma, Joeckel et al. 2023), also seasonally dry with vertic paleosols, outside the 75-125 Ma window.",
+  "formation": "Cedar Mountain Formation (Ruby Ranch Member)",
+  "age_ma": [
+   116,
+   110
+  ],
+  "palaeolatitude": "about 34 N (Suarez et al. 2014); Wikipedia's infobox gives 40.2 N",
+  "mat_c": 21,
+  "mat_range_c": [
+   17,
+   25
+  ],
+  "map_mm": 800,
+  "map_range_mm": [
+   600,
+   1100
+  ],
+  "half_range_c": 8,
+  "wet_season_months": 4,
+  "dry_season_months": 6
+ },
+ {
+  "biome": "animals:fern_forest",
+  "place": "Kaiparowits Formation, Grand Staircase-Escalante, southern Utah, USA (wet coastal-plain forest of southern Laramidia)",
+  "lat": 37.4,
+  "lon": -111.7,
+  "elevation_m": null,
+  "hemisphere": "north",
+  "koppen": "Cwa/Aw-like humid subtropical with a dry season (estimate)",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Feb",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Mar",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Apr",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "May",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jun",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jul",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Aug",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Sep",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Oct",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Nov",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Dec",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   }
+  ],
+  "wet_months": [
+   "May",
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep",
+   "Oct"
+  ],
+  "dry_months": [
+   "Dec",
+   "Jan",
+   "Feb",
+   "Mar"
+  ],
+  "sources": [
+   "https://pmc.ncbi.nlm.nih.gov/articles/PMC8061582/",
+   "https://pmc.ncbi.nlm.nih.gov/articles/PMC8782542/",
+   "https://www.researchgate.net/publication/284916111_A_Late_Campanian_Flora_from_the_Kaiparowits_Formation_southern_Utah_and_a_brief_overview_of_the_widely_sampled_but_little-known_Campanian_vegetation_of_the_Western_Interior_of_North_America",
+   "https://www.sciencedirect.com/science/article/abs/pii/S0031018218307144",
+   "https://doi.org/10.1144/sp507-2020-52",
+   "https://www.researchgate.net/publication/223755918_Facies_architecture_and_depositional_environments_of_the_Upper_Cretaceous_Kaiparowits_Formation_southern_Utah",
+   "https://en.wikipedia.org/wiki/Kaiparowits_Formation"
+  ],
+  "estimate": true,
+  "notes": "Late Campanian, about 76.6-74.5 Ma. LITERATURE: alluvial to coastal plain beside the Western Interior Seaway, 'extensively ponded and annually flooded', humid and subtropical 'similar to the present-day Gulf Coast or certain areas of Southeast Asia' (Maccracken et al. 2022, PLOS ONE); 'overall wet (humid), tropical to subtropical wet-dry setting, with episodic longer dry spells' (Titus et al. 2021, PeerJ). MAT 20 +/- 1 C from leaf-margin analysis (Miller et al. 2013); paleosol carbonate clumped isotopes give warm-season soil temperatures of about 35 +/- 4 C (Burgener et al. 2019). Tyrannosaur tooth isotopes point to a monsoonal setting, compared with Hanoi and Cuiaba, with cold-season highland runoff (Yamamura et al. 2021). Roberts (2007) is quoted as 'humid, subtropical (150 cm annual precipitation)', seen only in a search snippet: UNCONFIRMED. Flora: 80+ plant morphotypes, mostly angiosperms, with ferns, a lycopod and a horsetail in the understory, and cupressaceous, podocarp and pine conifers (charcoal). A purer fern-and-conifer forest would be Early Cretaceous, but no such formation with comparable climate numbers was found. ESTIMATES (ours): half range about 8 C (coldest month about 12 C, warmest about 28 C), MAP about 1,200-1,600 mm, a wet season of about 6 summer months and a dry season of about 4 winter months (monsoonal analogues); the months themselves are a guess.",
+  "formation": "Kaiparowits Formation",
+  "age_ma": [
+   76.6,
+   74.5
+  ],
+  "palaeolatitude": "mid-latitude southern Laramidia (value not looked up)",
+  "mat_c": 20,
+  "mat_range_c": [
+   19,
+   21
+  ],
+  "map_mm": 1400,
+  "map_range_mm": [
+   1200,
+   1600
+  ],
+  "half_range_c": 8,
+  "wet_season_months": 6,
+  "dry_season_months": 4
+ },
+ {
+  "biome": "animals:crags",
+  "place": "High rock in the Cretaceous world: the Sevier fold-thrust highlands west of the Utah basins (ESTIMATE)",
+  "lat": null,
+  "lon": null,
+  "elevation_m": null,
+  "hemisphere": "north",
+  "koppen": "Cfb/Cwb-like upland (estimate)",
+  "months": [
+   {
+    "month": "Jan",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Feb",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Mar",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Apr",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "May",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jun",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Jul",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Aug",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Sep",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Oct",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Nov",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   },
+   {
+    "month": "Dec",
+    "t_mean": null,
+    "t_min": null,
+    "t_max": null,
+    "precip_mm": null,
+    "rain_days": null,
+    "snow_cover": null
+   }
+  ],
+  "wet_months": [
+   "Jun",
+   "Jul",
+   "Aug",
+   "Sep"
+  ],
+  "dry_months": [],
+  "sources": [
+   "https://archives.datapages.com/data/sepm/journals/084/084011/975_i1527-1404-84-11-975.htm"
+  ],
+  "estimate": true,
+  "notes": "ALL ESTIMATE. No palaeoclimate data for the highlands themselves. Suarez et al. (2014) tie the floodplain's dryness to the rain shadow of the Sevier highlands ('Nevadaplano'), and Yamamura et al. (2021) find cold-season highland runoff reaching the Kaiparowits rivers, so the uplands were real, wetter on their windward side and cooler. Rule used: the standard lapse rate, 6.5 C per km (the game's own temperature::air already applies 0.0065 C per block of altitude). Crags about 1-1.5 km above lowlands at 20-21 C give MAT about 12-14 C; we suggest 13 C at the crags' base, half range about 8 C, MAP about 700-1,000 mm with a summer wet season, frost and some snow on the tops in winter. If the game also lowers the air with the block's altitude, set this at the biome's base height so it is not counted twice.",
+  "formation": null,
+  "age_ma": null,
+  "palaeolatitude": null,
+  "mat_c": 13,
+  "mat_range_c": [
+   11,
+   15
+  ],
+  "map_mm": 850,
+  "map_range_mm": [
+   700,
+   1000
+  ],
+  "half_range_c": 8,
+  "wet_season_months": 4,
+  "dry_season_months": 0
+ }
+]

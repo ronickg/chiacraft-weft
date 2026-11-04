@@ -15,8 +15,7 @@ use chia_puzzle_types::{DeriveSynthetic, standard::StandardArgs};
 use chiacraft_wallet::{Mnemonic, OwnerSigner, keys, sign};
 use sha2::{Digest, Sha256};
 
-const TEST_WORDS: &str =
-    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+const TEST_WORDS: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
 /// Sage's `parse_signature_message`.
 fn sage_parse(input: &str) -> Vec<u8> {
@@ -71,17 +70,13 @@ fn sage_style_signatures_verify_and_match_ours() {
         // Our checks accept Sage's signature …
         assert!(sign::verify_owner(&public, text.as_bytes(), &signature));
         // … and the address Sage signs for is the one our owner check compares.
-        let ph = StandardArgs::curry_tree_hash(chia_bls::PublicKey::from_bytes(&public).unwrap())
-            .to_bytes();
+        let ph = StandardArgs::curry_tree_hash(chia_bls::PublicKey::from_bytes(&public).unwrap()).to_bytes();
         assert_eq!(keys::p2_of_synthetic(&public), Some(ph));
         if !hardened {
             let facts = keys::facts_of(&m);
             assert_eq!(keys::wallet_puzzle_hash(&facts.master, index).unwrap(), ph);
         } else {
-            assert_eq!(
-                keys::hardened_puzzle_hashes(&m, index + 1)[index as usize],
-                ph
-            );
+            assert_eq!(keys::hardened_puzzle_hashes(&m, index + 1)[index as usize], ph);
         }
         // Ours is the very same signature (BLS signing is deterministic).
         let ours = OwnerSigner::from_mnemonic(&m, index, hardened);
@@ -95,15 +90,9 @@ fn sage_style_signatures_verify_and_match_ours() {
 fn our_texts_are_never_read_as_hex_by_sage() {
     // Every text we sign starts with "chiacraft ", which has a space and non-hex letters, so
     // Sage signs its UTF-8 bytes as we do. A hex-looking message would differ.
-    for text in [
-        "chiacraft sign-in v1\nsession: 00",
-        "chiacraft sponsor v1 txch1abc 1700000000",
-    ] {
+    for text in ["chiacraft sign-in v1\nsession: 00", "chiacraft sponsor v1 txch1abc 1700000000"] {
         assert_eq!(sage_parse(text), text.as_bytes());
-        assert_eq!(
-            sage_hash(&sage_parse(text)),
-            sign::message_hash(text.as_bytes())
-        );
+        assert_eq!(sage_hash(&sage_parse(text)), sign::message_hash(text.as_bytes()));
     }
     assert_ne!(sage_parse("0xcafe"), b"0xcafe".to_vec());
 }

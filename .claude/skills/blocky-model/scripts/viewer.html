@@ -1,0 +1,719 @@
+<title>Animals</title>
+<!-- Generic viewer for box models: a switcher between creatures, one live view, a button per
+     animation in the creature's GLB and a button per texture variant (eyes, coats...).
+     Next to it:
+       animals.json        [{"name": "Cat", "model": "models/cat.json", "variants": "models/cat_eyes.json",
+                             "variant_label": "Eyes", "about": "one line"}]
+       models/<x>.json     {"glb": "<base64 of the .glb>"}   (artifact hosts serve .json, not .glb)
+       variants file       {"name": "data:image/png;base64,..."}   (scripts/variants.py; optional)
+       fit                 optional: "size" scales a prop by its biggest side (default: height)
+       zoom                optional: times that (a winged creature framed by its span looks small)
+       person              optional: [x, z] meters: a 1.8 m person stands there for scale
+       unit                optional: the GLB's units a meter (default 1; 4 at the house density)
+       rates               optional: {"walk": 1.5, "run": 2.7}: playback rates (a game times gaits by
+                           distance, so a stride's clip plays at the rate a typical speed gives it)
+       texture             optional: a PNG for the same model (another species that shares it)
+       coat file           models/<x>_coat.json (scripts/coatdata.py; optional): its layers and gene
+                           file, for the coat panel (Random, Mother, Father, Breed, Roll, Scar)
+       animals.wasm        the game's own logic (mods/animals/web/build.sh), through animals.js;
+                           lab.js runs the breeding lab on it
+     Set the heading and blurb below. -->
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #1b1d24; --panel: #23262f; --line: #343845; --fg: #ece6df; --muted: #a39b93;
+  --accent: #d98b52; --accent-ink: #1b1d24; --alt: #e1977d; --good: #8fbf8a;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body); margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; gap: 16px; }
+h1 { font: 700 clamp(30px, 5vw, 46px)/1.05 var(--display); letter-spacing: -0.01em; margin: 0; }
+.lede { color: var(--muted); margin: 0; max-width: 70ch; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg:empty { display: none; }
+.seg button { font: 500 13px var(--mono); color: var(--fg); background: transparent; border: 0; padding: 8px 13px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+#animals button { font: 700 15px var(--display); padding: 9px 18px; }
+#variants button[aria-pressed="true"] { background: var(--alt); }
+.seg button:focus-visible, .toggle input:focus-visible { outline: 2px solid var(--alt); outline-offset: 2px; }
+.label { font: 12px var(--mono); color: var(--muted); }
+.toggle { display: inline-flex; gap: 8px; align-items: center; font: 13px var(--mono); color: var(--muted); cursor: pointer; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.view { position: relative; aspect-ratio: 16 / 9; max-height: 74vh; width: 100%; }
+@media (max-width: 760px) { .view { aspect-ratio: 4 / 5; } }
+.view canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; touch-action: none; }
+.status { position: absolute; inset: 0; display: grid; place-items: center; font: 13px var(--mono); color: var(--muted); }
+.about { padding: 10px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.coat-name { font: 600 15px var(--display); color: var(--fg); }
+.genotype { font: 12px var(--mono); color: var(--muted); padding: 0 14px 12px; overflow-wrap: anywhere; }
+.genotype:empty { display: none; }
+.paint { display: inline-flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font: 13px var(--mono); color: var(--muted); }
+.paint label { display: inline-flex; gap: 6px; align-items: center; }
+.paint input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+.paint select { font: 13px var(--mono); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.paint button { font: 500 13px var(--mono); color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.paint select, .coatopt select { font: 13px var(--mono); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.roll { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.roll:empty { display: none; }
+.roll button { display: flex; flex-direction: column; gap: 4px; padding: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; color: var(--fg); text-align: left; }
+.roll button[aria-pressed="true"] { border-color: var(--accent); }
+.roll img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.roll span { font: 12px var(--mono); color: var(--muted); padding: 0 8px 8px; }
+/* How it works: the live animal's data, step by step down the pipeline the game runs. */
+.how { display: flex; flex-direction: column; gap: 14px; padding-top: 18px; border-top: 1px solid var(--line); }
+.how h2 { font: 700 clamp(24px, 3.4vw, 32px)/1.1 var(--display); margin: 0; text-wrap: balance; }
+.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 12px; }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.stage.wide { grid-column: 1 / -1; }
+.stage header { display: flex; gap: 10px; align-items: baseline; }
+.step { font: 500 12px var(--mono); color: var(--accent); letter-spacing: 0.06em; }
+.stage h3 { font: 700 18px/1.2 var(--display); margin: 0; }
+.stage p { margin: 0; color: var(--muted); font-size: 14px; max-width: 70ch; }
+.stage .where { font: 12px var(--mono); color: var(--muted); }
+.tex { width: 100%; image-rendering: pixelated; display: block; border-radius: 6px; max-height: 340px; object-fit: contain;
+  background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 12px 12px; }
+.maps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+.maps figure { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.maps figcaption { font-size: 13px; color: var(--muted); }
+.maps figcaption b { color: var(--fg); font-weight: 500; }
+.key { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 13px var(--mono); color: var(--muted); }
+.facts b { color: var(--fg); font: 600 15px var(--display); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; max-height: 120px; overflow: auto; }
+.chips span { font: 11px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; }
+.chips span.on { color: var(--accent-ink); background: var(--alt); border-color: var(--alt); }
+.tablewrap { overflow-x: auto; }
+.genes { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.genes th { text-align: left; font: 500 11px var(--mono); color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.genes td { padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.genes td.id { font: 12px var(--mono); color: var(--accent); width: 3.5em; }
+.genes td.val { font: 12px var(--mono); white-space: nowrap; }
+.genes td.note { color: var(--muted); }
+.meter { position: relative; width: 120px; height: 10px; border-radius: 5px; background: var(--bg); border: 1px solid var(--line); }
+.meter i { position: absolute; inset: 0 auto 0 0; border-radius: 5px; background: var(--accent); opacity: 0.75; }
+.meter b { position: absolute; top: -3px; width: 2px; height: 14px; background: var(--fg); }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.swatch { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.swatch span { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line); }
+.bytes { display: flex; height: 30px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.bytes div { display: grid; place-items: center; font: 11px var(--mono); color: var(--accent-ink); border-right: 1px solid var(--bg); min-width: 0; overflow: hidden; white-space: nowrap; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.empty { font-size: 14px; color: var(--muted); font-style: italic; }
+#how-build .tablewrap { max-height: 320px; overflow: auto; }
+/* Breeding lab: the game's breeding and evolution, run as a population over time. */
+.lab-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.lab-bar select, .lab-bar input[type=number] { font: 13px var(--mono); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px; }
+.lab-bar input[type=number] { width: 5em; }
+.lab button, .lab-bar button { font: 500 13px var(--mono); color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.lab button:hover:not(:disabled) { border-color: var(--accent); }
+.lab button:disabled { opacity: 0.4; cursor: default; }
+.lab button.go { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.lab-day { font: 700 20px var(--display); }
+.lab-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; }
+@media (max-width: 860px) { .lab-grid { grid-template-columns: minmax(0, 1fr); } }
+.lab-scroll { max-height: 420px; overflow: auto; }
+.lab table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.lab th { position: sticky; top: 0; background: var(--panel); text-align: left; font: 500 11px var(--mono); color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; padding: 6px; border-bottom: 1px solid var(--line); }
+.lab td { padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.lab td.num { font-family: var(--mono); font-size: 12px; }
+.lab tr { cursor: pointer; }
+.lab tr.on td { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.lab tr.dead td { opacity: 0.45; }
+.lab .muted { color: var(--muted); }
+.chip { display: inline-flex; border-radius: 4px; overflow: hidden; border: 1px solid var(--line); vertical-align: middle; position: relative; }
+.chip i { width: 10px; height: 16px; }
+.chip i.eye { position: absolute; right: 2px; top: 2px; width: 4px; height: 4px; border-radius: 50%; }
+.who { display: flex; gap: 8px; align-items: center; font: 600 15px var(--display); }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.lab-tree { display: flex; flex-direction: column; gap: 8px; }
+.gen { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.gen h4 { flex: 0 0 100%; margin: 0; font: 500 11px var(--mono); color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.fam { display: inline-flex; gap: 6px; align-items: center; padding: 4px 8px !important; font-size: 12px !important; }
+.fam.on { border-color: var(--accent) !important; }
+.fam.dead { opacity: 0.5; }
+.fam.unknown { border: 1px dashed var(--line); border-radius: 6px; font-size: 12px; }
+.lab-log { margin: 0; padding-left: 0; list-style: none; font: 12px var(--mono); color: var(--muted); max-height: 180px; overflow: auto; }
+.lab-msg { font-size: 14px; color: var(--fg); min-height: 1.4em; }
+.lab-msg.bad { color: var(--alt); }
+.genes td.fail { color: var(--alt); font-weight: 600; }
+.genes td.pass { color: var(--good); }
+.evs { display: inline-flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); max-width: 120px; }
+.lab-live { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; background: var(--bg); display: block; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.charts figure { margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.charts figcaption { font: 500 12px var(--mono); color: var(--muted); }
+.charts canvas { width: 100%; height: 180px; display: block; }
+.ev-bg { display: inline-block; width: 26px; height: 16px; border-radius: 4px; border: 1px solid var(--line); vertical-align: middle; }
+[hidden] { display: none !important; }
+</style>
+
+<div class="wrap">
+  <h1 id="title">Animals</h1>
+  <p class="lede" id="lede">Box models with hand-painted pixel textures. Pick an animal; drag to orbit, scroll or pinch to zoom.</p>
+  <div class="bar"><div class="seg" id="animals" role="group" aria-label="Animal"></div></div>
+  <div class="bar">
+    <div class="seg" id="anims" role="group" aria-label="Animation"></div>
+    <span class="label" id="variant-label"></span>
+    <div class="seg" id="variants" role="group" aria-label="Texture"></div>
+    <label class="toggle"><input type="checkbox" id="spin"> Turntable</label>
+  </div>
+  <div class="bar" id="coatbar" hidden>
+    <span class="label">Coat</span>
+    <div class="seg" id="coatbtns" role="group" aria-label="Coat">
+      <button type="button" id="c-natural">Natural</button><button type="button" id="c-random">Random</button><button type="button" id="c-mother">Mother</button><button type="button" id="c-father">Father</button><button type="button" id="c-breed">Breed</button><button type="button" id="c-roll">Roll 12</button><button type="button" id="c-scar">Scar</button>
+    </div>
+    <label class="toggle coatopt" id="habitat-wrap" hidden>Country <select id="habitat"></select></label>
+    <label class="toggle"><input type="checkbox" id="young"> Young</label>
+    <span class="coat-name" id="coatname"></span>
+    <span class="label" id="parents"></span>
+  </div>
+  <div class="card">
+    <div class="view" id="view"><div class="status">Loading</div></div>
+    <div class="about" id="about"></div>
+    <div class="genotype" id="genotype"></div>
+  </div>
+  <div class="roll" id="roll" aria-label="Individuals"></div>
+  <section class="how" id="how" aria-labelledby="how-title">
+    <h2 id="how-title">How it works</h2>
+    <p class="lede" id="how-lede">What the game does to draw the animal above, step by step, with its real data. Roll, breed, scar or tick Young and watch each step change.</p>
+    <ol class="flow">
+      <li class="stage"><header><span class="step">STEP 1</span><h3>Model</h3></header>
+        <p>Only boxes, each hung on a bone. Bones turn in animations; the bones the build genes scale are highlighted.</p>
+        <div id="how-model"></div></li>
+      <li class="stage"><header><span class="step">STEP 2</span><h3>Painted texture</h3></header>
+        <p>Every box face painted once, by hand rules: light from above, hue-shifted shading, eyes stamped on. This is the "natural" look.</p>
+        <canvas class="tex" id="how-base" aria-label="The model's painted texture"></canvas></li>
+      <li class="stage wide"><header><span class="step">STEP 3</span><h3>Coat layers</h3></header>
+        <p>Written next to the texture when the model is built: per texel, whether it is coat or fixed, its light, where on the body it sits, and where white, points, a mask, patterns and the iris may show. Genes repaint the coat using these, never the picture.</p>
+        <div class="maps" id="how-layers"></div></li>
+      <li class="stage wide"><header><span class="step">STEP 4</span><h3>Genes</h3></header>
+        <p id="how-genes-lede">One copy of each gene from each parent. The species' own genes pick its colors and patterns; the core traits every animal carries decide how this one wears them.</p>
+        <div id="how-genes"></div></li>
+      <li class="stage"><header><span class="step">STEP 5</span><h3>Look</h3></header>
+        <p>What the genes add up to: colors, pattern, how its marks are drawn, its eyes and scars.</p>
+        <div id="how-look"></div></li>
+      <li class="stage"><header><span class="step">STEP 6</span><h3>Repainted coat</h3></header>
+        <p>The painted texture with its coat texels recolored from the look: the light from step 2 kept, the colors and marks new. Fixed parts (claws, teeth, nose) stay as painted.</p>
+        <canvas class="tex" id="how-coat" aria-label="The texture repainted from this animal's genes"></canvas></li>
+      <li class="stage"><header><span class="step">STEP 7</span><h3>Build</h3></header>
+        <p>The build genes scale single bones: a bone's own boxes grow or shrink, its children keep their size and move with its ends, and the animal is lifted so its feet stay down.</p>
+        <div id="how-build"></div></li>
+      <li class="stage"><header><span class="step">STEP 8</span><h3>In the game</h3></header>
+        <p>Only the genome travels: 84 bytes per animal, saved with it and sent to everyone who sees it. Each player's game runs steps 4 to 7 itself.</p>
+        <div id="how-game"></div></li>
+    </ol>
+  </section>
+  <section class="how lab" id="lab" aria-labelledby="lab-title">
+    <h2 id="lab-title">Breeding lab</h2>
+    <p class="lede">A population run by the game's own code (its Rust, compiled to WASM): matings, carrying, litters and clutches, eggs hatching, growing up, old age and families, on the game's clock.</p>
+    <div class="stage">
+      <div class="lab-bar">
+        <span class="lab-day" id="lab-day">Day 0</span><span class="muted" id="lab-count"></span>
+        <button type="button" class="go" id="lab-play">Play</button>
+        <label class="toggle">Speed <select id="lab-speed"><option value="0.25">6 hours a second</option><option value="1" selected>1 day a second</option><option value="5">5 days a second</option><option value="30">30 days a second</option></select></label>
+        <button type="button" id="lab-hour">+1 hour</button><button type="button" id="lab-1d">+1 day</button><button type="button" id="lab-10d">+10 days</button><button type="button" id="lab-100d">+100 days</button>
+      </div>
+      <div class="lab-bar">
+        <label class="toggle">Species <select id="lab-species"></select></label>
+        <label class="toggle">From <select id="lab-habitat"></select></label>
+        <button type="button" id="lab-add-pair">Add a wild pair</button><button type="button" id="lab-add-six">Add 6 wild</button>
+        <label class="toggle"><input type="checkbox" id="lab-auto"> Breed by themselves</label>
+        <label class="toggle">Old age <select id="lab-life-rule"><option value="game" selected>as in the game</option><option value="off">off</option><option value="days">lives about</option></select></label>
+        <label class="toggle" id="lab-life-wrap" hidden><input type="number" id="lab-life" min="1" value="20"> days</label>
+        <label class="toggle">Room for <input type="number" id="lab-cap" min="2" value="40"></label>
+        <button type="button" id="lab-reset">Start over</button>
+      </div>
+      <div class="lab-bar"><span class="muted" id="lab-pair"></span><button type="button" class="go" id="lab-mate">Mate them</button><span class="lab-msg" id="lab-msg" role="status"></span></div>
+    </div>
+    <div class="lab-grid">
+      <div class="stage">
+        <header><h3>Animals</h3><label class="toggle"><input type="checkbox" id="lab-dead"> Show the dead</label></header>
+        <div class="lab-scroll"><table><thead><tr><th>#</th><th></th><th>Coat</th><th></th><th>Stage</th><th>Gen</th><th>Parents</th><th>Now</th></tr></thead><tbody id="lab-list"></tbody></table></div>
+      </div>
+      <div class="stage">
+        <header><h3>Chosen</h3></header>
+        <canvas class="lab-live" id="lab-live" aria-label="The chosen animal, live"></canvas>
+        <div id="lab-chosen"></div>
+        <div class="lab-tree" id="lab-tree"></div>
+      </div>
+    </div>
+    <div class="stage">
+      <header><h3>Over time</h3><span class="muted" id="lab-chart-note"></span></header>
+      <div class="charts">
+        <figure><figcaption>Alive, by species</figcaption><canvas id="lab-chart-alive" height="180"></canvas><div class="legend" id="lab-chart-key"></div></figure>
+        <figure><figcaption>Born and died, per day</figcaption><canvas id="lab-chart-flow" height="180"></canvas><div class="legend"><span><span class="key" style="background:var(--good)"></span>born</span><span><span class="key" style="background:var(--alt)"></span>died</span></div></figure>
+      </div>
+    </div>
+    <div class="stage">
+      <header><h3>Balance</h3></header>
+      <p>Each species is a few real facts (its mass, how long it carries or hatches, grows up and lives, its litter, whether it lives alone, in a pack or a herd). The game's numbers follow from them by one pacing for all, so a new animal falls in line with the rest; a number a species sets itself shows &ldquo;set&rdquo;. The checks are the website tests&rsquo;, against each rarity&rsquo;s targets (a common pet&rsquo;s line four generations deep in 10&ndash;25 in-game days, a legendary&rsquo;s in 80&ndash;160). One in-game day is 20 minutes of play.</p>
+      <div class="tablewrap"><table class="genes" id="lab-balance"></table></div>
+    </div>
+    <div class="lab-grid">
+      <div class="stage">
+        <header><h3>Evolution</h3></header>
+        <p>One habitat's wild pool, a generation an in-game day: coats that stand out from the ground there leave fewer young, chance and mutation do the rest.</p>
+        <div class="lab-bar">
+          <select id="lab-ev-species" aria-label="Species"></select><select id="lab-ev-habitat" aria-label="Habitat"></select>
+          <span class="muted">ground <span class="ev-bg" id="lab-ev-bg"></span></span>
+          <button type="button" id="lab-ev-10">+10 generations</button><button type="button" id="lab-ev-100">+100</button><button type="button" id="lab-ev-reset">Start over</button>
+          <span class="muted">generation <b id="lab-ev-gen">0</b></span>
+        </div>
+        <div class="tablewrap"><p class="genotype" id="lab-ev-text" style="padding:0"></p></div>
+        <div class="swatches" id="lab-ev-sample"></div>
+      </div>
+      <div class="stage">
+        <header><h3>What happened</h3></header>
+        <ol class="lab-log" id="lab-log" reversed></ol>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="animals.js"></script>
+<script src="lab.js" defer></script>
+<script>
+const el = document.getElementById("view"), spin = document.getElementById("spin");
+let status = el.querySelector(".status");
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) spin.checked = false;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x23262f, 1);
+el.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 16 / 9, 0.01, 10);
+camera.position.set(0.42, 0.26, 0.62);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.15, 0); controls.enableDamping = true; controls.minDistance = 0.2; controls.maxDistance = 2;
+scene.add(new THREE.HemisphereLight(0xfff4e8, 0x3a3326, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(-0.6, 1.2, 0.9); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(0.36, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x2c3039).convertSRGBToLinear() }));
+ground.rotation.x = -Math.PI / 2; scene.add(ground);
+const pivot = new THREE.Group(); scene.add(pivot);
+
+const loaded = {};  // name -> {model, mixer, actions, textures, variantNames}
+let current = null, active = null, animName = null;
+
+function buttons(box, names, onPick, label = n => n, pressed = 0) {
+  box.innerHTML = "";
+  names.forEach((n, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = label(n, i); b.setAttribute("aria-pressed", String(i === pressed));
+    b.onclick = () => { for (const x of box.children) x.setAttribute("aria-pressed", String(x === b)); onPick(n); };
+    box.appendChild(b);
+  });
+}
+function play(a, name, fade = 0.35) {
+  const next = a.actions[name]; if (!next) return;
+  next.reset().play();
+  if (active && active !== next && a.mixer === active.getMixer()) active.crossFadeTo(next, fade, false);
+  else if (active && active !== next) active.stop();
+  active = next; animName = name;
+}
+function setStatus(text) {
+  if (!status) { status = document.createElement("div"); status.className = "status"; el.appendChild(status); }
+  status.textContent = text;
+}
+// A 1.8 m person for scale, standing at [x, z] meters (`unit`: the model's units a meter).
+function person(unit, [x, z]) {
+  const g = new THREE.Group();
+  const box = (w, h, d, px, py, color) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w * unit, h * unit, d * unit), new THREE.MeshStandardMaterial({ color, roughness: 1 }));
+    m.position.set(px * unit, py * unit, 0); g.add(m);
+  };
+  box(0.22, 0.86, 0.24, -0.12, 0.43, 0x3a4660); box(0.22, 0.86, 0.24, 0.12, 0.43, 0x3a4660);  // legs
+  box(0.5, 0.64, 0.26, 0, 1.18, 0x7a8fa8);                                                      // body
+  box(0.18, 0.62, 0.22, -0.35, 1.18, 0x7a8fa8); box(0.18, 0.62, 0.22, 0.35, 1.18, 0x7a8fa8);  // arms
+  box(0.3, 0.3, 0.3, 0, 1.65, 0xd9b38c);                                                        // head
+  g.position.set(x * unit, 0, z * unit);
+  return g;
+}
+async function load(entry) {
+  if (loaded[entry.name]) return loaded[entry.name];
+  const { glb } = await (await fetch(entry.model)).json();
+  const bytes = Uint8Array.from(atob(glb), c => c.charCodeAt(0));
+  const gltf = await new Promise((ok, fail) => new THREE.GLTFLoader().parse(bytes.buffer, "", ok, fail));
+  const box = new THREE.Box3().setFromObject(gltf.scene);
+  // Creatures by height; props (`fit: "size"`, a flat nest) by their biggest side.
+  const sz = box.getSize(new THREE.Vector3());
+  gltf.scene.scale.setScalar((entry.zoom || 1) * (entry.fit === "size" ? 0.5 / Math.max(sz.x, sz.y, sz.z, 1e-6) : 0.32 / Math.max(sz.y, 1e-6)));
+  if (entry.person) gltf.scene.add(person(entry.unit || 1, entry.person));
+  gltf.scene.traverse(o => { if (o.material && o.material.map) { o.material.map.magFilter = o.material.map.minFilter = THREE.NearestFilter; o.material.map.needsUpdate = true; } });
+  const a = { model: gltf.scene, mixer: new THREE.AnimationMixer(gltf.scene), actions: {}, textures: {}, variantNames: [] };
+  for (const clip of gltf.animations) a.actions[clip.name] = a.mixer.clipAction(clip);
+  // Gaits the game times by distance walked play at the rate a typical speed gives them.
+  for (const [n, r] of Object.entries(entry.rates || {})) if (a.actions[n]) a.actions[n].timeScale = r;
+  if (entry.texture) {  // another species on the same model: its own texture
+    const t = await new Promise(done => new THREE.TextureLoader().load(entry.texture, done));
+    t.flipY = false; t.encoding = THREE.sRGBEncoding; t.magFilter = t.minFilter = THREE.NearestFilter;
+    setMap(a, t);
+  }
+  if (entry.variants) {
+    const urls = await (await fetch(entry.variants)).json();
+    a.variantNames = Object.keys(urls);
+    const loader = new THREE.TextureLoader();
+    await Promise.all(Object.entries(urls).map(([n, u]) => new Promise(done => loader.load(u, t => {
+      t.flipY = false; t.encoding = THREE.sRGBEncoding; t.magFilter = t.minFilter = THREE.NearestFilter; a.textures[n] = t; done();
+    }))));
+  }
+  if (entry.coat) a.coat = await loadCoat(entry.coat, a);
+  return (loaded[entry.name] = a);
+}
+
+// ---------------------------------------------------------------- coats (the game's own logic, WASM)
+
+// Every coat, baby and build below comes from the game's Rust (`Animals`, animals.wasm): an
+// animal here is what it answers (`genome` as the game saves it, `look`, `loci`, `build`).
+function pixels(img, w, h) {
+  const c = document.createElement("canvas"); c.width = w || img.width; c.height = h || img.height;
+  const x = c.getContext("2d"); x.drawImage(img, 0, 0);
+  return x.getImageData(0, 0, c.width, c.height).data;
+}
+const loadImage = url => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = url; });
+async function loadCoat(url, a) {
+  const d = await (await fetch(url)).json();
+  const imgs = {};
+  for (const n of ["info", "pos", "props", "props2"]) imgs[n] = await loadImage(d.layers[n]);
+  const w = imgs.info.width, h = imgs.info.height;
+  let map = null;
+  a.model.traverse(o => { if (!map && o.material && o.material.map) map = o.material.map; });
+  const img = map.image, stride = img.width, mapH = img.height;
+  const canvas = document.createElement("canvas"); canvas.width = stride; canvas.height = mapH;
+  const coat = { genes: d.genes, species: d.genes.species, breed: d.breed || null, original: map, canvas, ctx: canvas.getContext("2d"), stride, mapH,
+    base: pixels(img), layers: { w, h, bounds: d.bounds }, current: null, mother: null, father: null };
+  for (const n in imgs) coat.layers[n] = pixels(imgs[n]);
+  return coat;
+}
+function setMap(a, tex) {
+  // Texels a coat leaves clear (torn wing skin) cut out, as the game's model shader does.
+  a.model.traverse(o => { if (o.material && o.material.map) { o.material.map = tex; o.material.alphaTest = 0.5; o.material.needsUpdate = true; } });
+}
+// The game's answer, or the reason it refused (shown briefly).
+function ask(req) {
+  const r = Animals.call(req);
+  if (r.error) { setStatusBrief(r.error); return null; }
+  return r;
+}
+// A new wild one: of the chosen country's kind, young if "Young" is ticked.
+function rollOne(c) {
+  const h = document.getElementById("habitat").value || null;
+  let an = ask({ op: "random", species: c.species, breed: c.breed, habitat: h, seed: Animals.seed() });
+  if (an && document.getElementById("young").checked) an = ask({ op: "edit", genome: an.genome, stage: 0 }) || an;
+  return an;
+}
+const sexMark = female => female ? "\u2640" : "\u2642";
+function describe(c, an) { return an ? `${an.look.name} ${sexMark(an.female)}` : ""; }
+function paintCoat(a) {
+  const c = a.coat;
+  if (!c.current) { setMap(a, c.original); setBuild(a); return; }
+  const px = Animals.paint(c.current.genome, new Uint8ClampedArray(c.base), c.stride, c.mapH);
+  c.ctx.putImageData(new ImageData(px, c.stride, c.mapH), 0, 0);
+  if (!c.tex) {
+    c.tex = new THREE.CanvasTexture(c.canvas);
+    c.tex.flipY = false; c.tex.encoding = THREE.sRGBEncoding; c.tex.magFilter = c.tex.minFilter = THREE.NearestFilter;
+  }
+  c.tex.needsUpdate = true;
+  setMap(a, c.tex);
+  setBuild(a);
+}
+// The animal's build (the game's `build`): each scaled bone's own boxes at its scale, its child
+// bones kept their size (moving with its ends), and the model lifted so its feet stay down;
+// applied after the animation each frame (`applyBuild`).
+function setBuild(a) {
+  const c = a.coat;
+  const scales = Object.fromEntries(c && c.current ? c.current.build : []);
+  unapplyBuild(a);
+  a.build = [];
+  a.model.position.y = a.baseY ?? (a.baseY = a.model.position.y);
+  const own = {};
+  a.model.traverse(o => { if (!o.isMesh && scales[o.name]) own[o.uuid] = scales[o.name]; });
+  a.model.traverse(o => {
+    if (o.isMesh) return;
+    const mine = own[o.uuid] || [1, 1, 1], up = (o.parent && own[o.parent.uuid]) || [1, 1, 1];
+    const f = mine.map((v, k) => v / up[k]);
+    if (f.some(v => Math.abs(v - 1) > 1e-6)) a.build.push([o, f]);
+  });
+  if (!a.build.length) return;
+  const low = () => { a.model.updateMatrixWorld(true); return new THREE.Box3().setFromObject(a.model).min.y; };
+  const before = low();
+  applyBuild(a);
+  const after = low();
+  a.model.position.y += before - after;
+}
+function applyBuild(a) {
+  for (const [o, f] of a.build || []) o.scale.set(o.scale.x * f[0], o.scale.y * f[1], o.scale.z * f[2]);
+}
+function unapplyBuild(a) {
+  for (const [o, f] of a.build || []) o.scale.set(o.scale.x / f[0], o.scale.y / f[1], o.scale.z / f[2]);
+}
+// Its genes in a line: `E Em/E · I 0.62 ...`.
+const genotype = an => an.loci.map(l => l.quantitative ? `${l.id} ${l.genetic.toFixed(2)}` : `${l.id} ${l.alleles.join("/")}`).join(" \u00b7 ");
+function showCoat() {
+  const a = current, c = a && a.coat;
+  document.getElementById("coatbar").hidden = !c;
+  if (!c) { document.getElementById("genotype").textContent = ""; renderHow(); return; }
+  document.getElementById("coatname").textContent = c.current
+    ? `${describe(c, c.current)}${c.current.stage < 3 ? " (young)" : ""}` : "Natural (the painted model)";
+  document.getElementById("parents").textContent = [c.mother && `mother: ${describe(c, c.mother)}`, c.father && `father: ${describe(c, c.father)}`].filter(Boolean).join(" \u00b7 ");
+  document.getElementById("genotype").textContent = c.current ? genotype(c.current) : "";
+  const hs = Object.keys(c.genes.habitats || {}), sel = document.getElementById("habitat");
+  document.getElementById("habitat-wrap").hidden = !hs.length;
+  if (sel.dataset.for !== (c.genes.species || "")) {
+    sel.dataset.for = c.genes.species || "";
+    sel.replaceChildren(...["", ...hs].map(h => Object.assign(document.createElement("option"), { value: h, textContent: h || "anywhere" })));
+  }
+  document.getElementById("young").checked = !!c.current && c.current.stage < 3;
+  renderHow();
+}
+function onCoat(fn) {
+  const a = current; if (!a || !a.coat) return;
+  fn(a.coat); paintCoat(a); showCoat();
+}
+document.getElementById("c-natural").onclick = () => onCoat(c => { c.current = null; });
+document.getElementById("c-random").onclick = () => onCoat(c => { c.current = rollOne(c) || c.current; });
+document.getElementById("c-mother").onclick = () => onCoat(c => {
+  if (c.current && c.current.female) c.mother = c.current;
+  else setStatusBrief(c.current ? "That one is a male" : "Roll or breed an animal first");
+});
+document.getElementById("c-father").onclick = () => onCoat(c => {
+  if (c.current && !c.current.female) c.father = c.current;
+  else setStatusBrief(c.current ? "That one is a female" : "Roll or breed an animal first");
+});
+document.getElementById("c-breed").onclick = () => onCoat(c => {
+  if (!c.mother || !c.father) { setStatusBrief("Pick a mother and a father first"); return; }
+  const r = ask({ op: "breed", mother: c.mother.genome, father: c.father.genome, seed: Animals.seed() });
+  if (r) c.current = r.young[0];
+});
+// A scar of a random kind at a random place, as a bad wound leaves one (`scars.rs`).
+document.getElementById("c-scar").onclick = () => onCoat(c => {
+  if (!c.current) c.current = rollOne(c);
+  if (c.current) c.current = ask({ op: "edit", genome: c.current.genome, scar: 1 + Math.floor(Math.random() * 5), place: Math.floor(Math.random() * 256) }) || c.current;
+});
+document.getElementById("young").onchange = e => onCoat(c => {
+  if (!c.current) c.current = rollOne(c);
+  if (c.current) c.current = ask({ op: "edit", genome: c.current.genome, stage: e.target.checked ? 0 : 3 }) || c.current;
+});
+document.getElementById("habitat").onchange = () => onCoat(c => { c.current = rollOne(c) || c.current; });
+// Twelve wild ones side by side, each painted and photographed from the current view: no two
+// alike. Pick one to look at it.
+document.getElementById("c-roll").onclick = () => {
+  const a = current, c = a && a.coat; if (!c) return;
+  const keep = c.current, grid = document.getElementById("roll"), shots = [];
+  for (let i = 0; i < 12; i++) {
+    const an = rollOne(c);
+    c.current = an; paintCoat(a);
+    controls.update(); renderer.render(scene, camera);
+    shots.push([an, renderer.domElement.toDataURL("image/jpeg", 0.82)]);
+  }
+  c.current = keep; paintCoat(a);
+  grid.replaceChildren(...shots.map(([an, url]) => {
+    const b = document.createElement("button"); b.type = "button";
+    b.append(Object.assign(document.createElement("img"), { src: url, alt: describe(c, an) }),
+             Object.assign(document.createElement("span"), { textContent: describe(c, an) }));
+    b.onclick = () => {
+      grid.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+      onCoat(cc => { cc.current = an; });
+    };
+    return b;
+  }));
+};
+// ---------------------------------------------------------------- how it works
+
+const hex = c => "#" + c.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("");
+const elt = (tag, props, ...kids) => { const e = Object.assign(document.createElement(tag), props || {}); e.append(...kids.filter(k => k != null)); return e; };
+// RGBA rows into a canvas.
+function drawPixels(canvas, px, w, h) {
+  canvas.width = w; canvas.height = h;
+  canvas.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(px.buffer ? px : px), w, h), 0, 0);
+}
+// One of the coat layers as a picture: `f` maps a texel (index into the RGBA arrays) to RGBA.
+function layerCanvas(L, f) {
+  const out = new Uint8ClampedArray(L.w * L.h * 4);
+  for (let i = 0; i < L.w * L.h; i++) {
+    const c = L.info[i * 4] >= 128 ? f(i * 4) : null;
+    if (c) out.set(c, i * 4);
+  }
+  const cv = elt("canvas", { className: "tex" });
+  drawPixels(cv, out, L.w, L.h);
+  return cv;
+}
+function howLayers(a) {
+  const L = a.coat.layers, box = document.getElementById("how-layers");
+  if (a.howLayers) { box.replaceChildren(...a.howLayers); return; }
+  const key = (c, t) => elt("span", {}, elt("span", { className: "key", style: `background:${c}` }), t);
+  const fig = (cv, title, ...legend) => elt("figure", {}, cv, elt("figcaption", {}, elt("b", { textContent: title }), " ", ...legend));
+  a.howLayers = [
+    fig(layerCanvas(L, i => { const v = Math.min(255, L.info[i + 1] * 1.05); return [v * (1 - 0.25 * L.info[i + 2] / 255), v, v, 255]; }),
+      "Coat and light.", "Grey: the painted light (ramp step). Pinker toward the underside. Empty: fixed parts the genes never touch."),
+    fig(layerCanvas(L, i => [L.pos[i], L.pos[i + 1], L.pos[i + 2], 255]),
+      "Where on the body.", "Red, green, blue: side to side, up, along. Patterns are drawn in 3D from this, so stripes run across seams."),
+    fig(layerCanvas(L, i => [L.props[i], L.props[i + 1], L.props[i + 2], 255]),
+      "White, points, mask.", key("#f33", "white spotting starts"), " ", key("#3f3", "points (tan, accent)"), " ", key("#33f", "face mask")),
+    fig(layerCanvas(L, i => [L.props2[i], L.props2[i + 1], Math.max(L.props2[i + 2], 0), 255]),
+      "Extremities, patterns, iris.", key("#f33", "extremities"), " ", key("#3f3", "where patterns show"), " ", key("#33f", "iris")),
+  ];
+  box.replaceChildren(...a.howLayers);
+}
+function meter(genes, shown) {
+  return elt("div", { className: "meter", title: `genes ${genes.toFixed(2)}, shows ${shown.toFixed(2)}` },
+    elt("i", { style: `width:${(shown * 100).toFixed(1)}%` }), elt("b", { style: `left:calc(${(genes * 100).toFixed(1)}% - 1px)` }));
+}
+function geneTable(rows, quantitative) {
+  const head = quantitative ? ["", "Trait", "Genes \u00b7 shows", "", "Inherited"] : ["", "Gene", "Copies", "Shows", ""];
+  const body = rows.map(r => quantitative
+    ? elt("tr", {}, elt("td", { className: "id", textContent: r.id }), elt("td", { textContent: r.name || r.id }),
+        elt("td", {}, meter(r.genetic, r.shown)), elt("td", { className: "val", textContent: `${r.genetic.toFixed(2)} \u2192 ${r.shown.toFixed(2)}` }),
+        elt("td", { className: "note", textContent: `${Math.round(r.h * 100)}%` }))
+    : elt("tr", {}, elt("td", { className: "id", textContent: r.id }), elt("td", { textContent: r.name || r.id }),
+        elt("td", { className: "val", textContent: r.alleles.join(" / ") }), elt("td", { className: "val", textContent: r.shows }),
+        elt("td", { className: "note", textContent: r.meaning })));
+  return elt("div", { className: "tablewrap" }, elt("table", { className: "genes" },
+    elt("thead", {}, elt("tr", {}, ...head.map(t => elt("th", { textContent: t })))), elt("tbody", {}, ...body)));
+}
+function renderHow() {
+  const a = current, sec = document.getElementById("how");
+  if (!a) return;
+  // Step 1: the model.
+  const bones = [], scaled = Object.fromEntries(a.coat && a.coat.current ? a.coat.current.build : []);
+  let boxes = 0;
+  a.model.traverse(o => {
+    if (o.isMesh) { const g = o.geometry; boxes += Math.round((g.index ? g.index.count : g.attributes.position.count) / 36); }
+    else if (o !== a.model && o.name && !o.isCamera && !/person/i.test(o.name)) bones.push(o.name);
+  });
+  const buildBones = a.coat ? new Set(Object.values(a.coat.genes.build || {}).flatMap(b => b.bones)) : new Set();
+  document.getElementById("how-model").replaceChildren(
+    elt("div", { className: "facts" }, elt("span", {}, elt("b", { textContent: bones.length }), " bones"),
+      elt("span", {}, "about ", elt("b", { textContent: boxes }), " boxes"),
+      elt("span", {}, elt("b", { textContent: Object.keys(a.actions).length }), " animations")),
+    elt("div", { className: "chips" }, ...bones.map(n => elt("span", { textContent: n, className: buildBones.has(n) ? "on" : "" }))));
+  // Step 2: the painted texture.
+  const map = (() => { let m = null; a.model.traverse(o => { if (!m && o.material && o.material.map) m = o.material.map; }); return m; })();
+  const baseCv = document.getElementById("how-base");
+  if (a.coat) drawPixels(baseCv, a.coat.base, a.coat.stride, a.coat.mapH);
+  else if (map && map.image) { baseCv.width = map.image.width; baseCv.height = map.image.height; baseCv.getContext("2d").drawImage(map.image, 0, 0); }
+  const c = a.coat;
+  const none = t => elt("p", { className: "empty", textContent: t });
+  if (!c) {
+    for (const id of ["how-layers", "how-genes", "how-look", "how-build", "how-game"]) document.getElementById(id).replaceChildren(none("This one has no genes: it is drawn as painted."));
+    document.getElementById("how-coat").width = 0;
+    return;
+  }
+  howLayers(a);
+  if (!c.current) {
+    const t = "Natural: the painted model. Press Random or Roll 12 to see one animal's genes.";
+    for (const id of ["how-genes", "how-look", "how-build", "how-game"]) document.getElementById(id).replaceChildren(none(t));
+    drawPixels(document.getElementById("how-coat"), c.base, c.stride, c.mapH);
+    return;
+  }
+  // Step 4: genes.
+  const rows = c.current.loci.map(l => Object.assign({}, l, { h: l.heritability }));
+  const own = rows.filter(r => !r.core), core = rows.filter(r => r.core);
+  document.getElementById("how-genes").replaceChildren(
+    elt("div", { className: "legend" }, `${c.current.female ? "Female" : "Male"}${c.current.stage < 3 ? ", young" : ""}. The bar is how a trait shows; the tick is its genes. The gap is this animal's own chance, its sex and its age.`),
+    elt("h3", { textContent: "Its species' genes", style: "font: 600 14px var(--display); margin: 6px 0 0" }),
+    geneTable(own.filter(r => !r.quantitative), false), geneTable(own.filter(r => r.quantitative), true),
+    elt("h3", { textContent: "Core traits (every animal)", style: "font: 600 14px var(--display); margin: 6px 0 0" }),
+    geneTable(core, true));
+  // Step 5: the look.
+  const look = c.current.look, m = Object.fromEntries(["size", "density", "contrast", "edge", "stretch"].map((k, i) => [k, look.marks[i]]));
+  const sw = (col, t) => col ? elt("div", { className: "swatch" }, elt("span", { style: `background:${hex(col)}` }), t) : null;
+  const scarNames = { 1: "claw marks", 2: "a bite", 3: "a slash", 4: "a burn", 5: "a torn wing" };
+  document.getElementById("how-look").replaceChildren(
+    elt("div", { className: "facts" }, elt("b", { textContent: look.name })),
+    elt("div", { className: "swatches" }, sw(look.base, "coat"), sw(look.under, "underside"), sw(look.points, "points / accent"),
+      look.pattern ? sw(look.pattern[1], look.pattern[0]) : null, look.pattern2 ? sw(look.pattern2[1], look.pattern2[0]) : null, look.patches ? sw(look.patches, "patches") : null, look.merle ? sw(look.merle, "merle") : null, sw(look.eye, "eyes")),
+    elt("div", { className: "facts" }, ...["size", "density", "contrast", "edge", "stretch"].map(k => elt("span", {}, `marks ${k} `, elt("b", { textContent: (m[k] ?? 0.5).toFixed(2) })))),
+    elt("div", { className: "facts" }, elt("span", {}, "white ", elt("b", { textContent: `${Math.round(Math.min(1, look.white || 0) * 100)}%` })),
+      elt("span", {}, "scars ", elt("b", { textContent: look.scars.length ? look.scars.map(k => scarNames[k]).join(", ") : "none" }))));
+  // Step 6: the repainted coat.
+  const coatCv = document.getElementById("how-coat");
+  coatCv.width = c.canvas.width; coatCv.height = c.canvas.height;
+  coatCv.getContext("2d").drawImage(c.canvas, 0, 0);
+  // Step 7: build.
+  const entries = Object.entries(scaled).sort((x, y) => x[0].localeCompare(y[0]));
+  document.getElementById("how-build").replaceChildren(entries.length
+    ? elt("div", { className: "tablewrap" }, elt("table", { className: "genes" }, elt("tbody", {}, ...entries.map(([n, v]) => {
+        const pct = (Math.max(...v.map(x => Math.abs(x - 1))) * Math.sign(v.reduce((s, x) => s + x - 1, 0))) * 100;
+        return elt("tr", {}, elt("td", { className: "val", textContent: n }),
+          elt("td", {}, elt("div", { className: "meter" }, elt("i", { style: `left:${pct < 0 ? 50 + pct * 2 : 50}%; width:${Math.abs(pct) * 2}%; right:auto` }), elt("b", { style: "left:calc(50% - 1px)" }))),
+          elt("td", { className: "val", textContent: `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` }));
+      }))))
+    : none("This species has no build genes yet."));
+  // Step 8: what travels.
+  const parts = [["seed", 4, "#d98b52"], ["species, breed, sex", 3, "#e1977d"], ["own genes", 32, "#b9a27a"], ["core traits", 32, "#8fa7a0"], ["age", 2, "#a39b93"], ["scars", 8, "#c47a7a"], ["pad", 3, "#343845"]];
+  document.getElementById("how-game").replaceChildren(
+    elt("div", { className: "bytes", role: "img", ariaLabel: "The 84 bytes of a genome" }, ...parts.map(([t, n, col]) => elt("div", { style: `flex:${n};background:${col}`, title: `${t}: ${n} bytes`, textContent: n >= 8 ? t : "" }))),
+    elt("div", { className: "legend" }, ...parts.map(([t, n, col]) => elt("span", {}, elt("span", { className: "key", style: `background:${col}` }), `${t} ${n}`))),
+    elt("p", { textContent: "The seed places every mark and the animal's own chance; the rest are the genes, its life stage and its scars. Breeding mixes the genes and draws a new seed, so siblings differ." }));
+}
+
+let briefTimer = 0;
+function setStatusBrief(text) {
+  const n = document.getElementById("parents"), was = n.textContent;
+  n.textContent = text; clearTimeout(briefTimer);
+  briefTimer = setTimeout(showCoat, 1600);
+}
+async function show(entry) {
+  setStatus("Loading " + entry.name);
+  let a;
+  try { a = await load(entry); } catch (err) { setStatus(entry.name + " did not load: " + (err && err.message || err)); return; }
+  if (status) { status.remove(); status = null; }
+  if (current) pivot.remove(current.model);
+  if (active) active.stop();
+  active = null; current = a; pivot.add(a.model);
+  document.getElementById("roll").replaceChildren();
+  document.getElementById("about").textContent = entry.about || "";
+  const names = Object.keys(a.actions);
+  const keep = names.includes(animName) ? animName : names[0];
+  buttons(document.getElementById("anims"), names, n => play(a, n), n => n, names.indexOf(keep));
+  play(a, keep, 0);
+  document.getElementById("variant-label").textContent = a.variantNames.length ? (entry.variant_label || "Texture") : "";
+  buttons(document.getElementById("variants"), a.variantNames, n => {
+    a.model.traverse(o => { if (o.material && o.material.map) { o.material.map = a.textures[n]; o.material.needsUpdate = true; } });
+  }, (n, i) => `${i + 1} ${n}`);
+  showCoat();
+}
+let entries = [];
+// A lab animal in the 3D view: its species' model, painted from its genome.
+window.showAnimal = async (sp, genome, opts) => {
+  const file = `models/${sp.breed || sp.name}_coat.json`;
+  const entry = entries.find(e => e.coat === file);
+  if (!entry) { setStatusBrief(`No model of ${sp.name} here`); return; }
+  await show(entry);
+  document.querySelectorAll("#animals button").forEach(b => b.setAttribute("aria-pressed", String(b.textContent.startsWith(entry.name))));
+  const about = Animals.call({ op: "describe", genome });
+  if (about.error || !current.coat) return;
+  current.coat.current = about;
+  paintCoat(current); showCoat();
+  if (!opts || opts.scroll !== false) document.getElementById("view").scrollIntoView({ behavior: "smooth", block: "center" });
+};
+Animals.ready.then(() => fetch("animals.json")).then(r => r.json()).then(list => {
+  entries = list;
+  buttons(document.getElementById("animals"), list.map(e => e.name), n => show(list.find(e => e.name === n)),
+    n => { const e = list.find(x => x.name === n); return e.species ? `${n} (${e.species})` : n; });
+  show(list[0]);
+}).catch(err => setStatus("animals.json did not load: " + err));
+new ResizeObserver(() => {
+  const r = el.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+}).observe(el);
+const clock = new THREE.Clock();
+(function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (current) { unapplyBuild(current); current.mixer.update(dt); applyBuild(current); }
+  if (spin.checked) pivot.rotation.y += dt * 0.45;
+  controls.update(); renderer.render(scene, camera);
+  if (window.afterRender) window.afterRender(renderer.domElement);
+  requestAnimationFrame(tick);
+})();
+</script>

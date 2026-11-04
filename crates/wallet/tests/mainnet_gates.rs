@@ -7,10 +7,7 @@
 
 use chiacraft_wallet::{
     Mnemonic,
-    chain::{
-        Bytes32, ChainConfig, ChainNetwork, ChainReader, MakeOffer, OfferGive, PushOutcome,
-        WalletKeys, sim::Sim,
-    },
+    chain::{Bytes32, ChainConfig, ChainNetwork, ChainReader, MakeOffer, OfferGive, PushOutcome, WalletKeys, sim::Sim},
     spending::{self, MAINNET_CONFIRM, SpendCaps},
 };
 use std::time::Duration;
@@ -29,9 +26,7 @@ fn until(mut f: impl FnMut() -> bool) -> bool {
 }
 
 fn mainnet_config(puzzle_hashes: Vec<Bytes32>) -> ChainConfig {
-    let (network, consent) =
-        spending::choose_network("mainnet", MAINNET_CONFIRM, "chain", "chain-mainnet-confirm")
-            .unwrap();
+    let (network, consent) = spending::choose_network("mainnet", MAINNET_CONFIRM, "chain", "chain-mainnet-confirm").unwrap();
     let mut config = ChainConfig::chosen(network, consent);
     config.target_peers = 1;
     config.puzzle_hashes = puzzle_hashes;
@@ -46,8 +41,7 @@ fn mainnet_needs_the_confirmation() {
     let e = ChainReader::start_with(config, sim.dialer()).unwrap_err();
     assert!(e.to_string().contains(MAINNET_CONFIRM), "{e}");
     // The settings refuse it too, naming the second setting.
-    let e =
-        spending::choose_network("mainnet", "yes", "chain", "chain-mainnet-confirm").unwrap_err();
+    let e = spending::choose_network("mainnet", "yes", "chain", "chain-mainnet-confirm").unwrap_err();
     assert!(e.to_string().contains("chain-mainnet-confirm"), "{e}");
     // Caps made for another network are refused.
     let mut config = mainnet_config(Vec::new());
@@ -77,46 +71,19 @@ fn mainnet_caps_refuse_every_spend_above_them() {
         assert!(t.contains(cap), "{t}");
         assert!(t.contains("mainnet"), "{t}");
     };
+    refused(r.create_did(&keys, caps.max_did_fee + 1, WAIT).unwrap_err(), "max-did-fee");
     refused(
-        r.create_did(&keys, caps.max_did_fee + 1, WAIT).unwrap_err(),
-        "max-did-fee",
-    );
-    refused(
-        r.make_offer(
-            MakeOffer {
-                give: OfferGive::Xch(1),
-                price: caps.max_offer_price + 1,
-                expires_at: None,
-                fee: 0,
-            },
-            &keys,
-            WAIT,
-        )
-        .unwrap_err(),
+        r.make_offer(MakeOffer { give: OfferGive::Xch(1), price: caps.max_offer_price + 1, expires_at: None, fee: 0 }, &keys, WAIT)
+            .unwrap_err(),
         "max-offer-price",
     );
     refused(
-        r.make_offer(
-            MakeOffer {
-                give: OfferGive::Xch(1),
-                price: 1_000,
-                expires_at: None,
-                fee: caps.max_fee + 1,
-            },
-            &keys,
-            WAIT,
-        )
-        .unwrap_err(),
+        r.make_offer(MakeOffer { give: OfferGive::Xch(1), price: 1_000, expires_at: None, fee: caps.max_fee + 1 }, &keys, WAIT)
+            .unwrap_err(),
         "max-fee",
     );
-    refused(
-        r.split(&keys, 4, 1, caps.max_fee + 1, WAIT).unwrap_err(),
-        "max-fee",
-    );
-    refused(
-        r.split(&keys, 2, caps.max_split, 0, WAIT).unwrap_err(),
-        "max-split",
-    );
+    refused(r.split(&keys, 4, 1, caps.max_fee + 1, WAIT).unwrap_err(), "max-fee");
+    refused(r.split(&keys, 2, caps.max_split, 0, WAIT).unwrap_err(), "max-split");
     refused(
         r.anchor(&keys, [7; 32], caps.max_anchor_fee + 1, WAIT)
             .unwrap_err(),
@@ -129,10 +96,7 @@ fn mainnet_caps_refuse_every_spend_above_them() {
     );
     // A raw bundle passed no cap: refused on mainnet.
     let e = r
-        .push(
-            chiacraft_wallet::chain::SpendBundle::new(Vec::new(), Default::default()),
-            WAIT,
-        )
+        .push(chiacraft_wallet::chain::SpendBundle::new(Vec::new(), Default::default()), WAIT)
         .unwrap_err();
     assert!(e.to_string().contains("raw pushes"), "{e}");
     // Nothing above moved a mojo.
@@ -153,8 +117,7 @@ fn mainnet_caps_refuse_every_spend_above_them() {
 fn taking_an_offer_above_the_cap_is_refused_before_signing() {
     // A maker on testnet11 asks 1 XCH; the offer text is the same on any network.
     let maker_sim = Sim::start().unwrap();
-    let maker =
-        WalletKeys::from_mnemonic(&Mnemonic::generate().unwrap(), ChainNetwork::Testnet11, 1);
+    let maker = WalletKeys::from_mnemonic(&Mnemonic::generate().unwrap(), ChainNetwork::Testnet11, 1);
     let mut config = ChainConfig::new(ChainNetwork::Testnet11);
     config.target_peers = 1;
     config.puzzle_hashes = maker.puzzle_hashes();
@@ -163,16 +126,7 @@ fn taking_an_offer_above_the_cap_is_refused_before_signing() {
     maker_sim.pay(maker.primary(), 10).unwrap();
     assert!(until(|| m.status().balance == 10));
     let offer = m
-        .make_offer(
-            MakeOffer {
-                give: OfferGive::Xch(1),
-                price: spending::MOJOS_PER_XCH,
-                expires_at: None,
-                fee: 0,
-            },
-            &maker,
-            WAIT,
-        )
+        .make_offer(MakeOffer { give: OfferGive::Xch(1), price: spending::MOJOS_PER_XCH, expires_at: None, fee: 0 }, &maker, WAIT)
         .unwrap();
 
     let sim = Sim::start_on(ChainNetwork::Mainnet).unwrap();
@@ -194,8 +148,7 @@ fn taking_an_offer_above_the_cap_is_refused_before_signing() {
 #[test]
 fn testnet_caps_set_by_the_operator_hold_too() {
     let sim = Sim::start().unwrap();
-    let keys =
-        WalletKeys::from_mnemonic(&Mnemonic::generate().unwrap(), ChainNetwork::Testnet11, 2);
+    let keys = WalletKeys::from_mnemonic(&Mnemonic::generate().unwrap(), ChainNetwork::Testnet11, 2);
     let mut config = ChainConfig::new(ChainNetwork::Testnet11);
     config.target_peers = 1;
     config.puzzle_hashes = keys.puzzle_hashes();
@@ -210,9 +163,5 @@ fn testnet_caps_set_by_the_operator_hold_too() {
     assert!(e.to_string().contains("max-did-fee = 10 mojos"), "{e}");
     assert!(e.to_string().contains("TXCH"), "{e}");
     let made = r.create_did(&keys, 10, WAIT).unwrap();
-    assert!(
-        !matches!(made.push, PushOutcome::Rejected { .. }),
-        "{:?}",
-        made.push
-    );
+    assert!(!matches!(made.push, PushOutcome::Rejected { .. }), "{:?}", made.push);
 }

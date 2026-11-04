@@ -33,7 +33,7 @@ Anything a mod keeps in `assets`, at the same path:
 | `textures/block/`, `item/`, `entity/` | blocks, items and mob skins. `_e` glow masks and `.anim` files go along, see the [textures guide](textures.md) |
 | `textures/gui/` | windows, buttons and bars, with `.gui` files for how they stretch ([UI guide](ui.md#gui-textures)) |
 | `textures/entity/armor/`, `textures/particle/` | worn armor and particles |
-| `lang/en_us.lang` | all text, [tooltips](tooltips.md) included, and the named colors (`color.button = {#ffffff}`, [UI guide](ui.md#looks)) |
+| `lang/en_us.lang` | all text, [tooltips](localization.md) included, and the named colors (`color.button = {#ffffff}`, [UI guide](ui.md#looks)) |
 | `models/`, `animations/` | block and item shapes (`models/block/`, `models/item/`, Java models) and mob models and keyframes ([models guide](models.md)); a block's new shape is only drawn, its collision stays |
 | `shaders/` (`fx`, `gui`, `entity`, `particle`, `post`) | the shader snippets ([shaders guide](shaders.md)) |
 | `sounds/` | sounds and music, `.ogg` or `.wav` |
@@ -41,7 +41,7 @@ Anything a mod keeps in `assets`, at the same path:
 
 Two things catch people out. First, files are replaced whole. Translations are the exception: a pack's `base/lang/en_us.lang` goes on top of base's, so it needs only the lines it changes (colors included). Second, the extra files that belong to a texture (`.anim`, `_e`, `_overlay`, `.ctm`) are taken from the same pack or mod as the picture itself. If a pack swaps `glass.png`, it should bring its own `glass.ctm` and tiles too, otherwise the mod's connected tiles end up on the pack's picture.
 
-A pack can't add blocks, items or mobs, since those are code and so need a mod. What it can add is looks for things that already exist: a `.ctm` for a texture that had none (in the folder of the mod that owns it, like `my_pack/base/textures/block/glass.ctm`, which a mod can't do for someone else's texture), or `_e`, `.anim` and `_overlay` files for existing textures.
+A pack can't add blocks, items or mobs, since those are code and so need a mod. What it can add is looks for things that already exist: a `.ctm` for a texture that had none (in the folder of the mod that owns it, like `my_pack/base/textures/block/glass.ctm`, which a mod can't do for someone else's texture), or `_e`, `.anim` and `_overlay` files for existing textures. Models too: any block can be redrawn, or [varied by a `.ctm`](ctm.md#models-as-tiles).
 
 ## Order of packs
 Several packs can be on at once, and they stack. Drag a pack by its handle: over to the other list to turn it on or off, or up and down to change its place. The list reads **Selected (top wins)**: where two packs have the same file, the one higher up is used. A pack only needs the files it changes, so a small pack of textures can sit on top of a big one without copying anything.

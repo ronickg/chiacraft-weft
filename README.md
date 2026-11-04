@@ -1,7 +1,11 @@
 <p align="center"><img src="docs/img/banner.png" alt="Weft"></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Rust-1.90%2B-B7410E?logo=rust&logoColor=white" alt="Rust 1.90+">
+  <a href="https://discord.gg/zTEekbrc7U"><img src="https://img.shields.io/badge/Discord-join%20the%20server-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Rust-1.95%2B-B7410E?logo=rust&logoColor=white" alt="Rust 1.95+">
   <img src="https://img.shields.io/badge/graphics-Vulkan-A41E22?logo=vulkan&logoColor=white" alt="Vulkan">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-2A6CB0" alt="Windows, Linux and macOS">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MPL--2.0-3B2F7E" alt="MPL-2.0"></a>
@@ -43,7 +47,7 @@ Weft ships with its own textures.
 
 ## Build from source
 
-Requires Rust 1.90 or newer.
+Requires Rust 1.95 or newer.
 
 ```sh
 git clone https://github.com/VortexSo4/Weft.git
@@ -53,6 +57,17 @@ cargo run --release
 
 Run it from the repository root. Release builds pack each mod in `mods/` into `run/mods/` on start; settings, saves and logs go to `run/`. `cargo run --release -- --dist <dir>` makes a standalone build to share.
 
+A game from a release writes nothing next to itself, so it can live in a read-only folder and be replaced by an update:
+
+| | Saves, mods, packs, logs | Settings | Cache |
+|---|---|---|---|
+| Linux | `$XDG_DATA_HOME/weft` (`~/.local/share/weft`) | `$XDG_CONFIG_HOME/weft` (`~/.config/weft`) | `$XDG_CACHE_HOME/weft` (`~/.cache/weft`) |
+| Windows | `%APPDATA%\Weft` | `%APPDATA%\Weft\config` | `%LOCALAPPDATA%\Weft` |
+| macOS | `~/Library/Application Support/Weft` | `.../Weft/config` | `~/Library/Caches/Weft` |
+
+A game that already has a `run/config` folder next to it keeps everything in `run/`, as older versions did; make that folder to keep a copy portable. `--run-dir <dir>` puts everything in one folder of your choice.
+
+
 ## Modding
 
 Copy [`examples/examplemod`](examples/examplemod): every kind of registration is there as a commented example. Then read the [modding cheat sheet](docs/modding.md); the guides for worldgen, machines, models, UI, tooltips, textures, CTM, resource packs and shaders are in [`docs/`](docs). [`mods/base`](mods/base) is the game itself and [`mods/testmod`](mods/testmod) shows a mod extending and replacing it without engine changes.
@@ -61,9 +76,15 @@ Copy [`examples/examplemod`](examples/examplemod): every kind of registration is
 
 Early. The mod interface and the save format can still change between versions. A mod built against another engine version refuses to load and asks to be rebuilt rather than crashing.
 
+## Running a server
+
+`weft --server --world myworld --port 27182` runs a world with no window and no GPU. Forward the port, TCP and UDP, and players join with `host:port` in the Multiplayer screen, or with the ticket it logs. It keeps what a game keeps in the same folders as above, or in `--run-dir`.
+
+Type `stop` to save and leave, `list`, `say <text>`, `op <player> [level]` or `deop <player>`. Nobody can use commands until you `op` them. To limit who may join, list their keys one a line in `config/whitelist.txt`: anyone refused is logged with the line to add.
+
 ## Contributing
 
-Issues and pull requests are welcome, for the engine, mods, textures or docs.
+Issues and pull requests are welcome, for the engine, mods, textures or docs. Read the [AI policy](AI_POLICY.md) before opening a pull request, it applies to everyone and the template asks for it.
 
 ## License - [MPL-2.0](LICENSE)
 

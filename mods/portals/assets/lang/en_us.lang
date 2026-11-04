@@ -1,0 +1,17 @@
+block.portals.portal = Portal
+portals.title = Portal
+portals.pick = Lead this portal to:
+portals.to = {0}
+portals.unbind = Lead nowhere
+portals.close = Close
+portals.not_owner = Only this world's owner can choose where its portals lead.
+portals.no_links = This world has no links yet. Ask another world to link on the Links screen (Multiplayer, Links).
+portals.msg.not_owner = Only this world's owner can bind its portals.
+portals.msg.link_gone = That link has ended; see the Links screen.
+portals.msg.bound = The portal now leads to '{0}'.
+portals.msg.unbound = The portal leads nowhere now ({0} blocks).
+portals.msg.unbound_portal = This portal leads nowhere yet: the world's owner chooses where.
+portals.msg.ended = This portal's link has ended.
+portals.msg.going = Going to '{0}'...
+portals.msg.no_room = There is no room beside this portal for arrivals; they will land at the world's spawn.
+portals.msg.near = This portal leads to '{0}'.
