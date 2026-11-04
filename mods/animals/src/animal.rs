@@ -151,8 +151,7 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         let Some(a) = w.component_mut(id, &ANIMAL) else { return false };
         let new = a.species == 0;
         if new {
-            *a = roll(w, index);
-            arrive(w, id, index, a, st.pos);
+            first_roll(w, id, index, a, st.pos);
         }
         let away = if a.seen == 0 { 0 } else { life::age(w.time(), a.seen) };
         a.seen = life::birth(w.time(), 0);
@@ -194,6 +193,29 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         }
         false
     }
+}
+
+/// A new one's wild level, sex, age and food (`roll`, `arrive`).
+fn first_roll(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
+    *a = roll(w, index);
+    arrive(w, id, index, a, pos);
+}
+
+/// Rolls `id` now if its first `upkeep` hasn't yet: what reaches an animal before its own goals
+/// do (a tame, a command, its screen) finds its species, level and stats (Playtest B2: a chihuahua
+/// tamed and shown after `/tk spawn` was still unrolled, level 1, every stat 0, and its screen
+/// showed "{0}"). Its genes come with it, as `upkeep` gives them. True if it is an animal.
+pub fn ensure_rolled(w: &World, id: u64) -> bool {
+    let Some(st) = w.entity(id) else { return false };
+    let Some(index) = SPECIES.iter().position(|s| s.kind.id() == st.kind) else { return false };
+    let Some(a) = w.component_mut(id, &ANIMAL) else { return false };
+    if a.species == 0 {
+        weft_sdk::warn!("animal {id} ({}) reached before its first upkeep: rolled now", SPECIES[index].name);
+        first_roll(w, id, index, a, st.pos);
+        a.seen = life::birth(w.time(), 0);
+        crate::coats::upkeep(w, id, index, a, st.pos);
+    }
+    true
 }
 
 /// A wild one of species `index`: its level (most of them low), a point per level on a random
