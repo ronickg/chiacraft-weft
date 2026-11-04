@@ -590,6 +590,14 @@ gpu_struct! {
         /// 400 blocks to each side, where the near one ends.
         pub shadow_far_view_proj: [[f32; 4]; 4],
         pub shadow_far: [f32; 4],
+        /// The sky's cloud layer, for packs' cloud shadows: x its picture's bindless index + 1 (0:
+        /// no clouds), y the blocks a picture cell covers, z its underside's height over the camera
+        /// (blocks), w how much of the picture's gaps the weather fills (0..1, a hash per cell
+        /// decides which).
+        pub clouds: [f32; 4],
+        /// Where the camera is under it: x and z (in `xy`) its place in its cell, 0..1, and the
+        /// cell in the picture (`zw`), as the sky's cloud pass reads them.
+        pub cloud_cells: [f32; 4],
     }
 }
 

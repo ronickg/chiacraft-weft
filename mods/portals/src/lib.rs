@@ -63,6 +63,7 @@ fn link(id: &str) -> Option<(String, String)> {
 
 fn init(r: &mut Registry) {
     r.block(&PORTAL)
+        .sound_group("base:block.glass")
         .hardness(1.5)
         .not_solid()
         .translucent()

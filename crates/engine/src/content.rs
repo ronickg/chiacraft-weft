@@ -3213,6 +3213,21 @@ fn resolve_sounds(
         for (prefix, what) in unknown {
             errors.push(format!("{what}: no sound events named {prefix}.*"));
         }
+        // Blocks nobody gave a sound (liquids and air have none on purpose), for whoever adds
+        // the missing groups.
+        let mut silent: Vec<&str> = Vec::new();
+        for s in states.iter() {
+            let name = block_defs[s.block as usize].name.as_str();
+            if s.block != 0 && s.liquid.is_none() && s.sounds.iter().all(|&x| x == u32::MAX) && silent.last() != Some(&name) {
+                silent.push(name);
+            }
+        }
+        silent.dedup();
+        if silent.is_empty() {
+            log::info!("block sounds: every block has some");
+        } else {
+            log::info!("block sounds: {} blocks have none: {}", silent.len(), silent.join(", "));
+        }
     }
 }
 

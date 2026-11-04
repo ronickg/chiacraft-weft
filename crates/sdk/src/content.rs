@@ -494,6 +494,19 @@ impl Registry {
         self.send_set(target, &Pending::text_as(comp.name(), &T::schema(), text), false);
     }
 
+    /// Gives blocks of any mod (a name, or `#tag` for all tagged so) sound group `group`, as
+    /// `.sound_group` does where a block is made: for a table of what sounds like what.
+    pub fn sound_group_on(&mut self, block: &str, group: &str) {
+        let prefix = if group.contains(':') { group.to_string() } else { format!("{}:block.{group}", self.ns) };
+        self.sounds_on(Target::Name(block), &prefix);
+    }
+
+    /// Gives blocks or entity kinds of any mod the sound events `<prefix>.<event>`: blocks
+    /// `break`, `place`, `step`, `hit`; kinds `hurt`, `death`, `ambient`, `step`.
+    pub fn sounds_on(&mut self, target: Target, prefix: &str) {
+        self.send_set(target, &Pending::text(abi::comp::SOUND, prefix), false);
+    }
+
     /// Takes a component or tag away from entries of any mod.
     pub fn remove(&mut self, target: Target, component: &str) {
         self.send_set(target, &Pending::tag(component), true);

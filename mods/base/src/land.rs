@@ -63,6 +63,12 @@ pub fn terrain(r: &mut Registry) {
             .feature("mountains", l::MOUNTAIN_BIOME..)
             .deep_top("gravel", SEA),
     );
+    // Giant sequoia groves, on the mountains' front slopes (`base_api::land::SEQUOIA_AREA`).
+    t = t.biome(
+        BiomeRule::new("sequoia_grove")
+            .height(SEA + l::SEQUOIA_RISE.0..=SEA + l::SEQUOIA_RISE.1)
+            .feature("sequoia_groves", l::SEQUOIA_GROVE..),
+    );
     for (biome, bed) in l::RIVER_BEDS {
         let mut rule = BiomeRule::new(biome).deep_top(bed, SEA);
         // Swamps only on low land, where water stands.

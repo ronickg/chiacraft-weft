@@ -440,14 +440,16 @@ Also:
   mob's own texture on every client from its component (registered with `SYNC_WATCHERS`): `skin`
   is a copy of the kind's texture (`skin.rgba`, `width` x `height`) to paint over, drawn on the
   mob in its own kind and every look with the same texture, painted again when the component
-  changes. Only the component travels. The animals mod paints every animal's coat from its genes
+  changes. Only the component travels. The callback runs on a worker thread, not the frame's
+  (a big texture's coat took 40 ms), so it reads only what it is given; the mob shows its plain
+  texture until it is done. The animals mod paints every animal's coat from its genes
   this way (`mods/animals/src/coats.rs`). The same callback may set the mob's build:
   `skin.scale_bone("neck_0", [1.0, 1.1, 1.1])` draws that bone's own boxes scaled about its pivot
   (along the model's axes) in every look of the mob, its child bones keeping their size and moving
   with its ends, the mob raised or lowered so its feet stay on the ground (up to 64 bones)
 - cosmetics of your mobs: `r.client_entity_tick(&MOB, |c, e| ..)` every frame, with its position, distance walked, age and death; it replaces the engine's steps, idle noises and death smoke unless you call `e.engine_effects()`
 - particles and screen effects from shader snippets in `assets/shaders`
-- sounds with `r.sound(..).category(..)` (every category gets its own volume slider), music
+- sounds with `r.sound(..).category(..)` (every category gets its own volume slider), music. Sounds that last get a handle: `let h = c.start_sound(&RAIN, None, 0.8, true, 2.0)` loops until `h.stop(c, 3.0)` (fade-out seconds); while it plays, `h.volume(c, v, secs)`, `h.pitch(c, p, secs)`, `h.moved(c, pos, secs)` (a positioned one) and `h.muffle(c, hz, secs)` (a low-pass: indoors, through walls) all ease over `secs`, and `h.playing(c)` says whether it still plays. At most 64 sounds play at once (`audio::VOICES`): a new one replaces the one that matters least, by `.priority(p)` (higher first, then the louder where the listener is) or is not played, and `.voices(n)` caps one event of its own (a herd, a fire field). Files are read off the frame's thread: small ones decoded once, large ones streamed, and one too large (32 MiB) or broken plays nothing and logs once. `/sounds` lists what plays now. Sound groups can come from a table instead of each block: `r.sound_group_on("base:ice", "ice")` (a name or `#tag` of any mod), and `r.sounds_on(Target::Entity("animals:fox"), "animals:fox")` points a kind at `<prefix>.hurt|death|ambient|step` (base's `assets/sounds/groups.txt`, the animals' `animals_core::voices`). At load the log says which blocks have no sounds (`block sounds:`) and which events miss files (`sound files:`). Base's weather (`mods/base/src/weather_sound.rs`) is a full example: rain, roof and wind beds eased by the weather and the cover over the player, thunder delayed by its distance
 - settings that show up in Mod Settings by themselves (`r.config(&SPARKS).bool(true)`); the player's own by default, `.server()` for the server's value (sent to its players on every change), `.world()` for one saved with the world. The engine's settings are the same kind of thing (`settings::FOV`, `settings::LANGUAGE`, key bindings `core:key.<action>`, all in `config/core.txt`): set one and the client applies it
 
 ## Debugging

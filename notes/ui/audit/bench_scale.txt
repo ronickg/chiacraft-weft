@@ -1,0 +1,16 @@
+# Render scale (core:render_scale, set per run with --config): frame time over a fixed view, and a
+# shot to check the look. Run with --config "core:render_scale=1.0", then 0.75, then 0.67.
+loaded
+idle
+chat /tk mode creative
+chat /tk time 6000
+wait 3
+look 30 -8
+wait 2
+shot scale_view.png
+bench 10 scale
+look 210 -5
+wait 2
+shot scale_view_back.png
+bench 10 scale_back
+quit

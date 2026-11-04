@@ -206,6 +206,10 @@ pub static HOST: Host = Host {
     play_animation,
     play_sound,
     client_play_sound: crate::app::api::client_play_sound,
+    client_sound_start: crate::app::api::client_sound_start,
+    client_sound_set: crate::app::api::client_sound_set,
+    client_sound_stop: crate::app::api::client_sound_stop,
+    client_sound_playing: crate::app::api::client_sound_playing,
     reg_spawn,
     biome_at,
     navigate,
@@ -403,6 +407,8 @@ unsafe extern "C" fn reg_sound(r: *mut abi::Registrar, d: *const abi::SoundDesc)
             volume: d.volume,
             pitch: [d.pitch[0].min(d.pitch[1]).max(0.01), d.pitch[0].max(d.pitch[1]).max(0.01)],
             range: d.range.max(1.0),
+            priority: d.priority,
+            voices: d.voices,
         };
         reg(r).game.sounds.push((d.cell as usize, def));
     }
