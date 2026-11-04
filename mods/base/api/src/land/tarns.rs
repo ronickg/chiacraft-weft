@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use weft_sdk::noise::fixed::{self, div_floor, q4, q12};
 
 use super::{
-    Here, MOUNTAIN_BIOME, MOUNTAINS_AREA, STREAM_MAX, STREAM_MIN, TARN_BAND, TARN_CARVE, TARN_CELL, TARN_CHANCE, TARN_DEPTH, TARN_RADIUS,
-    TARN_TRIES, salt, snow_line,
+    Here, MOUNTAIN_BIOME, MOUNTAINS_AREA, STREAM_BEND, STREAM_MAX, STREAM_MIN, STREAM_WANDER, TARN_BAND, TARN_CARVE, TARN_CELL,
+    TARN_CHANCE, TARN_DEPTH, TARN_RADIUS, TARN_TRIES, salt, snow_line,
 };
 use crate::SEA;
 use weft_sdk::noise::fixed::Fields;
@@ -178,7 +178,7 @@ fn stream(f: &Fields, cx: i32, cz: i32, before: &dyn Fn(i32, i32) -> i32, ground
     }
     let made = std::rc::Rc::new(
         tarn(f, cx, cz, before)
-            .and_then(|t| trace(&t, ground))
+            .and_then(|t| trace(f, &t, ground))
             .unwrap_or_default(),
     );
     STREAMS.with(|c| {
@@ -192,7 +192,7 @@ fn stream(f: &Fields, cx: i32, cz: i32, before: &dyn Fn(i32, i32) -> i32, ground
 }
 
 /// The way down from tarn `t`'s outlet, if it ends well.
-fn trace(t: &Tarn, ground: &dyn Fn(i32, i32) -> i32) -> Option<Stream> {
+fn trace(f: &Fields, t: &Tarn, ground: &dyn Fn(i32, i32) -> i32) -> Option<Stream> {
     let r2 = t.radius * t.radius;
     let inside = |x: i32, z: i32| (x - t.x) * (x - t.x) + (z - t.z) * (z - t.z) <= r2;
     // The outlet: the ring's lowest column, the nearest to the middle of those.
@@ -205,13 +205,20 @@ fn trace(t: &Tarn, ground: &dyn Fn(i32, i32) -> i32) -> Option<Stream> {
         if path.len() > STREAM_MAX as usize {
             break false;
         }
-        let next = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        let round: Vec<(i32, i32, i32)> = [(1, 0), (-1, 0), (0, 1), (0, -1)]
             .iter()
             .map(|&(dx, dz)| (x + dx, z + dz))
             .filter(|&(nx, nz)| !inside(nx, nz) && !seen.contains(&(nx, nz)))
             .map(|(nx, nz)| (ground(nx, nz), nx, nz))
-            .min();
-        let Some((g, nx, nz)) = next else { break true };
+            .collect();
+        let Some(&(lowest, ..)) = round.iter().min() else { break true };
+        // It winds (Planner, 11-04: they ran like canals): of the ways nearly as low as the lowest
+        // (`STREAM_WANDER`) and not uphill, a noise `STREAM_BEND` blocks across picks.
+        let (g, nx, nz) = *round
+            .iter()
+            .filter(|&&(g, ..)| g <= lowest + STREAM_WANDER && (g <= here || g == lowest))
+            .min_by_key(|&&(g, nx, nz)| (g - lowest) * 4096 + f.fbm(salt::STREAMS, nx * 16, nz * 16, q4(STREAM_BEND), 2))
+            .unwrap_or(&round.iter().min().copied().unwrap());
         // A hollow: nothing lower round it (the water gathers there), or the sea's level.
         if g > here {
             break true;

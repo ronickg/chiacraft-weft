@@ -124,6 +124,9 @@ pub const MATERIALS: &[Material] = &[
     m("elm", "material.base.elm", &[W, H], 0.56, 1.6, 0, 55.0, 2.0, 0.0, (0.05, 0.0), 0.0, "", Making::Carve),
     m("osage_orange", "material.base.osage_orange", &[W, H], 0.86, 1.6, 0, 65.0, 2.0, 0.0, (0.08, 0.0), 0.0, "", Making::Carve),
     m("spruce", "material.base.spruce", &[W, H], 0.45, 1.6, 0, 45.0, 2.0, 0.0, (-0.05, 0.05), 0.0, "light", Making::Carve),
+    // A stick shaved for a haft (`vitals::first`): the first stone axe's, before split hafts.
+    // Green or dead wood off the ground, weaker than a haft split from a log.
+    m("branch", "material.base.branch", &[H], 0.6, 1.6, 0, 40.0, 2.0, 0.0, (-0.10, 0.0), 0.0, "", Making::Carve),
     // Fittings: what holds a head on.
     m("plant_cordage", "material.base.plant_cordage", &[F], 1.3, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 30.0, "cheap", Making::Hands),
     m("sinew", "material.base.sinew", &[F], 1.3, 1.0, 0, 0.0, 0.0, 0.0, (0.0, 0.0), 60.0, "shrinks_tight", Making::Hands),
