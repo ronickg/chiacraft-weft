@@ -36,30 +36,30 @@ BEFORE = [b for b in AFTER if b not in ("cream_sandstone", "banded_clay")]
 
 def weathered(seed):
     """The karst towers' weathered limestone (Terrain): the installed limestone side and its 3 variants
-    with their level lines softened and 5-6 vertical rain streaks, 1-2 px wide, 10-20% darker, some a
-    little grey-green, in the same columns in every tile (so they run down a tower whichever variant
-    the game picks); each streak's strength repeats every 32 rows. (The
-    generated tries had no streaks, so this is made in code from the approved limestone.)"""
+    with their level lines softened and 2-4 faint rain streaks each, 1 px wide, 8-15% darker, some a
+    little grey-green. Each variant has its own columns, and each streak starts and ends inside the
+    tile (14-30 px, fading at both ends), so nothing lines up from block to block (Ronald, 11-04:
+    "Yes, loosen streaks"; the first version, the same columns in every tile, looked corrugated).
+    Made in code from the approved limestone: the generated tries had no streaks."""
     tiles = [rs.tex("limestone_side")] + [rs.load(os.path.join(BLOCK, "limestone_side", f"{k}.png")) for k in (1, 2, 3)]
-    pick = random.Random(seed)
-    streaks = [(c, pick.choice((1, 1, 2)), pick.random() < 0.4) for c in pick.sample(range(32), pick.randint(5, 6))]
     out = []
     for i, t in enumerate(tiles):
-        rnd = random.Random(seed + 1 + i)
+        rnd = random.Random(seed + i)
         a = t.astype(float)
         L = rs.parts.lum(a[..., :3]).mean(1)
         for r in np.nonzero(L < L.mean() - 0.6 * L.std())[0]:  # the level lines, half way to their neighbours
             a[r, :, :3] = 0.5 * a[r, :, :3] + 0.25 * (a[r - 1, :, :3] + a[(r + 1) % 32, :, :3])
-        for c, w, green in streaks:  # the same columns in every tile, so a streak runs down a tower
-            dark = rnd.uniform(0.80, 0.90)
-            phase, amp = rnd.uniform(0, 2 * np.pi), rnd.uniform(0.3, 0.6)
-            for y in range(32):
-                k = 1 - (1 - dark) * (1 - amp + amp * (0.5 + 0.5 * np.cos(2 * np.pi * y / 32 + phase)))
+        for c in rnd.sample(range(1, 31), rnd.randint(2, 4)):
+            w, dark, green = 1, rnd.uniform(0.85, 0.92), rnd.random() < 0.4
+            length = rnd.randint(14, 30)
+            top = rnd.randint(0, 32 - length)
+            for y in range(top, top + length):
+                f = min(y - top + 1, top + length - y, 4) / 4  # fades in and out over 4 px
+                k = 1 - (1 - dark) * f
                 for dx in range(w):
-                    x = (c + dx) % 32
-                    a[y, x, :3] *= k
+                    a[y, c + dx if c + dx < 32 else c, :3] *= k
                     if green:
-                        a[y, x, :3] *= (0.97, 1.0, 0.94)
+                        a[y, c + dx if c + dx < 32 else c, :3] *= 1 - f * np.array((0.03, 0.0, 0.06))
         out.append(a.clip(0, 255).astype(np.uint8))
     return out
 
