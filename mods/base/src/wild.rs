@@ -109,27 +109,48 @@ pub fn register(r: &mut Registry) {
     flowers(r);
 }
 
-/// Each biome's wild flowers (`vitals::wild::FLOWERS`): plants that stand and give themselves.
+/// Each biome's wild flowers (`vitals::wild::FLOWERS`): plants that stand and give themselves,
+/// in bloom (`bloom` 1) only in their own seasons and green the rest of the year, a growth step
+/// every few minutes opening or closing them as the seasons turn.
 fn flowers(r: &mut Registry) {
     for f in &wild::FLOWERS {
         let name = short(f.block);
+        let blooms = f.blooms;
         r.block(Block::generated(name.into()))
             .sound_group("grass")
             .plant()
             .needs_below(if f.ground == Ground::Sand { "#sand" } else { "#plant_soil" })
-            .texture(name)
+            .prop("bloom", 0..=1)
+            .states(move |p, s| s.texture(&if p.get("bloom") == "1" { name.to_string() } else { format!("{name}_green") }))
+            .growth(BLOOM_SECS, 0)
+            .on_grow(move |e| {
+                let season = base_api::ground_at(&e.world(), e.pos()).season;
+                let open = season.is_none_or(|s| blooms >> s & 1 != 0);
+                let want = if open { "1" } else { "0" };
+                if state_prop(e.state(), "bloom") != Some(want) {
+                    e.world().set_prop(e.pos(), "bloom", want);
+                }
+            })
             .tab(&crate::tabs::NATURAL);
     }
 }
 
+/// Game seconds between a flower's looks at the season, on average.
+const BLOOM_SECS: f32 = 300.0;
+
 /// A flower of `biome` on `ground` for the world to put (`worldgen.rs`), `kind` choosing among
 /// them; `None`: the biome has none of its own there.
 pub fn flower(biome: &str, ground: Ground, kind: u64) -> Option<u32> {
+    // A world starts in spring: the spring bloomers come open, the others green.
     static IDS: OnceLock<Vec<u32>> = OnceLock::new();
     let ids = IDS.get_or_init(|| {
         wild::FLOWERS
             .iter()
-            .map(|f| Block::lookup(f.block).unwrap_or(u32::MAX))
+            .map(|f| {
+                let Some(id) = Block::lookup(f.block) else { return u32::MAX };
+                let open = if f.blooms & 1 != 0 { "1" } else { "0" };
+                state_with(id, "bloom", open).unwrap_or(id)
+            })
             .collect()
     });
     let here: Vec<usize> = (0..wild::FLOWERS.len())
