@@ -558,14 +558,15 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     let a2 = 0.0016;
     let dd = nh * nh * (a2 - 1.0) + 1.0;
     let spec = a2 / (3.14159 * dd * dd) * (0.02 + 0.98 * pow(1.0 - max(dot(v, hv), 0.0), 5.0)) * 0.25;
-    // Toward a low sun the path stays orange: capped lower, so only its red reaches white.
+    // Toward a low sun the path stays orange: capped at 1.5 then (it was 8, and every channel went
+    // white through the curve: Tester 2's golden-hour shots), so only its red nears white.
     // Sparkle: a much sharper highlight on the fine chop close by, one texel of the surface at a
     // time (its normal is on the pixel grid there), flickering as the chop moves.
     let a2s = 0.00012;
     let ds = nh * nh * (a2s - 1.0) + 1.0;
     let near = 1.0 - smoothstep(12.0, 40.0, in.dist);
     let sparkle = a2s / (3.14159 * ds * ds) * 0.02 * near;
-    let glint = palette().sun * light_strength() * min(spec + sparkle, mix(40.0, 8.0, golden())) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
+    let glint = palette().sun * light_strength() * min(spec + sparkle, mix(40.0, 1.5, golden())) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
     // Foam where it laps the land, in a wobbling line on the pixel grid.
     let px = floor(in.pos.xz * 16.0) / 16.0;
     let wobble = noise3(vec3(px.x * 2.0, scene.params.w * 0.6, px.y * 2.0));
