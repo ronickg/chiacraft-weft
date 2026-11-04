@@ -56,6 +56,32 @@ pub const KNOCK_FROM: f32 = 10.0;
 pub const KNOCK_SAMPLES: usize = 96;
 pub const KNOCK_FELLS: usize = 2;
 
+/// A tree caught on a trunk it can't knock down leans back this much onto it and settles there
+/// as blocks after this many ticks.
+pub const HANG_BACK: f32 = 4.0;
+pub const HANG_SETTLE_TICKS: u32 = 16;
+
+/// What a falling tree does to a creature in its way (Planner, 11-05): 2 and a tenth of its logs,
+/// at most 20, once; it hits what is within this of a log's middle each way (half a block and a
+/// little more, for the ticks between).
+pub const HURT_BASE: f32 = 2.0;
+pub const HURT_PER_LOGS: f32 = 10.0;
+pub const HURT_MOST: f32 = 20.0;
+pub const HURT_REACH: f64 = 0.8;
+
+pub fn hurt(logs: u32) -> f32 {
+    (HURT_BASE + logs as f32 / HURT_PER_LOGS).min(HURT_MOST)
+}
+
+/// The thud sounds this many ticks before the tree reaches the ground (Panda's 0.25 s: the sound
+/// lands with the sight of it).
+pub const THUD_EARLY_TICKS: u32 = 5;
+
+/// How loud a falling tree `height` blocks high sounds: a sapling's half, a 20-high tree's full.
+pub fn sound_volume(height: f32) -> f32 {
+    (0.5 + height / 40.0).clamp(0.5, 1.0)
+}
+
 /// The longest a felling may take, in seconds, past tier or not: past an hour nobody is
 /// chopping, and the engine's mining speed has a floor.
 pub const LONGEST_SECS: f32 = 3600.0;
@@ -116,9 +142,25 @@ pub fn felling(logs: u32, harvest: u32) -> Felling {
     Felling { chops, fruitful }
 }
 
+/// STOPGAP until first-hours (Planner, 11-05): a fresh survival world had no way to a first tool
+/// (bare hands chopped fruitlessly, and planks, the table and every tool need logs). Bare hands
+/// keep the wood of a tree this small (a bush, a young tree) at the hand's own pace, a log's
+/// time the hand's. The First hours worker replaces it with stones, knapping and a hand-made axe.
+pub const HAND_STOPGAP_LOGS: u32 = 8;
+
 /// Chopping a tree's foot with bare hands or any tool but an axe: as slow as an axe past its tier
-/// and as fruitless (Planner, 11-05), with one log's time the hand's.
+/// and as fruitless (Planner, 11-05), with one log's time the hand's; but a tree of up to
+/// `HAND_STOPGAP_LOGS` gives its wood at the hand's pace (STOPGAP until first-hours).
 pub fn by_hand(logs: u32) -> Felling {
+    if logs <= HAND_STOPGAP_LOGS {
+        return Felling { chops: (logs.max(1) as f32).powf(GROWTH), fruitful: true };
+    }
+    fruitless(logs)
+}
+
+/// A tree that falls for nothing: cut above its foot, or its foot gone to no player (an
+/// explosion, a falling tree). Slow if chopped, and it gives no wood.
+pub fn fruitless(logs: u32) -> Felling {
     Felling { chops: (logs.max(1) as f32).powf(GROWTH) * PAST_TIER, fruitful: false }
 }
 
@@ -181,11 +223,16 @@ mod tests {
         assert!(seconds(felling(1350, 0), log_secs(2.0, 1.0)) <= LONGEST_SECS);
         // Bare hands are as slow and fruitless as an axe past its tier.
         assert_eq!(by_hand(60), felling(60, 0));
-        assert!(!by_hand(5).fruitful && by_hand(5).chops > felling(5, 0).chops);
+        assert!(!fruitless(5).fruitful && fruitless(5).chops > felling(5, 0).chops);
+        // STOPGAP until first-hours: bare hands keep a small tree's wood, not a bigger one's.
+        assert!(by_hand(HAND_STOPGAP_LOGS).fruitful && !by_hand(HAND_STOPGAP_LOGS + 1).fruitful);
         // A piece of four logs is 2.8 logs' time; the axe wears by chops, not by logs.
         assert!((piece(4).chops - 2.83).abs() < 0.01);
         assert_eq!(wear(20), 9);
         assert!(wear(1015) < 1015 / 4);
+        // A falling tree hurts by its size, within bounds.
+        assert_eq!(hurt(20), 4.0);
+        assert_eq!(hurt(1015), HURT_MOST);
         // A tall tree falls slower, within its bounds.
         assert_eq!(fall_ticks(10.0), 50);
         assert!(fall_ticks(40.0) > fall_ticks(10.0) && fall_ticks(400.0) == 100 && fall_ticks(1.0) == 40);
