@@ -33,6 +33,7 @@ mod craters;
 mod karst;
 pub mod landmarks;
 mod net;
+mod reefs;
 
 /// Salts of our own noises (the engine's are in `weft_noise::fixed::salt`).
 pub mod salt {
@@ -57,6 +58,7 @@ pub mod salt {
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
     pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const REEFS: u64 = 0x4EEF;
     pub const IGAPO: u64 = 0x16A;
     pub const IGARAPE: u64 = 0x16B;
     pub const IGARAPE_WARP: u64 = 0x16C;
@@ -470,6 +472,26 @@ pub const IGARAPE_SCALE: f64 = 140.0;
 pub const IGARAPE_WIDTH: f64 = 0.03;
 pub const IGARAPE_RISE: i32 = 4;
 
+/// Warm shallow seas (Ronald, 11-04: "all three", Terrain's fourth sheet; `land::reefs`): off coasts
+/// where the sea is warm (temperature `REEF_WARM`, the savanna's heat), from `REEF_SHORE` blocks
+/// out a lagoon whose floor is `REEF_LAGOON` blocks under the surface, from `REEF_OUT.0` to
+/// `REEF_OUT.1` blocks out a reef 2 under it in patches (`REEF_PATCH_SIZE` blocks, where their
+/// noise is over `REEF_PATCHES`), and a slope down to `REEF_SLOPE` blocks out. The biomes
+/// `lagoon` and `coral_reef` take those depths in warm water.
+pub const REEF_WARM: (f64, f64) = (0.06, 0.12);
+/// The biomes' rules: warm from this temperature (the middle of `REEF_WARM`), near the coasts
+/// (continent under `REEF_COAST`).
+pub const REEF_WARM_RULE: f64 = 0.09;
+pub const REEF_COAST: f64 = 0.15;
+pub const REEF_SHORE: i32 = 4;
+pub const REEF_LAGOON: (i32, i32) = (3, 5);
+pub const REEF_OUT: (i32, i32) = (28, 40);
+pub const REEF_PATCH_SIZE: f64 = 20.0;
+pub const REEF_PATCHES: f64 = -0.02;
+pub const REEF_SLOPE: i32 = 48;
+pub const REEF_REGION: i32 = 128;
+pub const REEF_STEP: i32 = 4;
+
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
 /// the rain of the nodes upstream within `RIVER_REACH` steps (about 2 km of river).
@@ -659,6 +681,7 @@ pub fn features() -> Vec<Feature> {
         Feature::new(mesa).named("mesas"),
         Feature::new(canyons).named("canyons"),
         Feature::new(karst).named("karst"),
+        Feature::new(reefs).named("reefs"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
         // Last: a crater is measured from its ground, the rivers' cut included (none reach one).
@@ -694,7 +717,7 @@ fn land_height_at(h: &Here) -> i32 {
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
     let base = base_ground(h);
-    base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base)
+    base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base) + reefs::add(h, base)
 }
 
 /// The ground before the karst towers (which stand on it, or rise out of the water over it).
@@ -1005,6 +1028,21 @@ pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
     let h = Here::new(f, x, z);
     let towers = if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base_ground(&h)) };
     towers + karst::sink(&h, || base_ground(&h))
+}
+
+/// What the warm seas' lagoons and reefs add at (`x`, `z`) (Q4), as the engine adds it.
+pub fn reefs(f: &Fields, x: i32, z: i32) -> i32 {
+    let h = Here::new(f, x, z);
+    if reefs::warm(&h) < q12(0.5) {
+        return 0;
+    }
+    reefs::add(&h, base_ground(&h))
+}
+
+/// Whether column (`x`, `z`) (Q4), `height` (blocks) high, is a warm sea's reef top (`true`) or
+/// lagoon floor (`false`): where the biomes `coral_reef` and `lagoon` stand.
+pub fn reef_part(f: &Fields, x: i32, z: i32, height: i32) -> Option<bool> {
+    reefs::part(&Here::new(f, x, z), height)
 }
 
 /// What the meteor craters add at (`x`, `z`) (Q4), as the engine adds it.
@@ -1510,7 +1548,9 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
     let here = Here::new(f, x, z);
     let (t, hu, c) = (here.temperature(), here.humidity(), here.continent());
     let at = |v: f64| q12(v);
-    if h <= SEA - 2 && c < at(OCEAN_CONTINENT) {
+    if let Some(top) = reefs::part(&here, h) {
+        if top { "coral_reef" } else { "lagoon" }
+    } else if h <= SEA - 2 && c < at(OCEAN_CONTINENT) {
         "ocean"
     } else if h <= SEA + 1 && c < at(0.1) {
         if t < at(SNOWY_BELOW) { "snowy_plains" } else { "beach" }
