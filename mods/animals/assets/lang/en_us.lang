@@ -235,3 +235,7 @@ family.animals.accipitridae = hawk and eagle family
 entity.animals.savanna_hawk = Savanna Hawk
 species.animals.savanna_hawk = savanna hawk
 screen.animals.signature.stoop = Soars high on broad wings and stoops on its prey
+entity.animals.turkey_vulture = Turkey Vulture
+species.animals.turkey_vulture = turkey vulture
+family.animals.cathartidae = New World vulture family
+screen.animals.signature.scent = Soars for hours on still wings and smells the dead from the air

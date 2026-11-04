@@ -40,6 +40,7 @@ DEFAULTS = dict(
     head=1.0,  # the skull's size against the raven's
     head_y=0.0,  # the skull raised (raven units)
     neck=True,  # a neck box between the chest and the head (an owl's head sits on its shoulders)
+    neck_w=1.0,  # the neck's thickness against the raven's (a vulture's bare neck is thin)
     bill=dict(w=2.0, h=2.3, len=5.7, rot=6, hook=False, y=1.0),  # its top `y` above the skull's middle
     body_w=1.0,  # the body's width against the raven's
     tail=dict(len=1.0, w=1.0, cut="wedge"),  # wedge, square, round, notch
@@ -183,7 +184,9 @@ def raven_elements(c):
     E = [el("hips", "spine_0", (-3.4 * bw, 9.0, -7.2), (3.4 * bw, 16.0, 1.4)),
          el("chest", "spine_1", (-4.0 * bw, 8.4, -0.4), (4.0 * bw, 16.6, 8.4))]
     if c["neck"]:
-        E.append(el("neck", "neck", (-2.0, 12.4, 5.0), (2.0, 18.2, 10.4)))  # deep in the head
+        nw, nz = 2.0 * c["neck_w"], 7.7 + (1 - c["neck_w"])  # a thin neck still holds both its joints
+        y0, y1, z0, z1 = c.get("neck_box") or (12.4, 18.2, nz - 2.7 * c["neck_w"], nz + 2.7 * c["neck_w"])
+        E.append(el("neck", "neck", (-nw, y0, z0), (nw, y1, z1)))  # deep in the head
     E += [el("skull", "head", *g["skull"]),
           el("bill", "head", *g["bill"], rot=(c["bill"]["rot"], 0, 0), origin=(0, (g["bill"][0][1] + g["bill"][1][1]) / 2, g["front"] - 0.5)),
           el("jaw", "jaw", *g["jaw"]),  # shorter than the bill

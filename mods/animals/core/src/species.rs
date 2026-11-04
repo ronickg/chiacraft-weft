@@ -102,6 +102,7 @@ pub static PASSERIDAE: Family = Family { name: "Passeridae", above: &["Aves", "P
 pub static CALCARIIDAE: Family = Family { name: "Calcariidae", above: &["Aves", "Passeriformes"] };
 pub static STRIGIDAE: Family = Family { name: "Strigidae", above: &["Aves", "Strigiformes"] };
 pub static ACCIPITRIDAE: Family = Family { name: "Accipitridae", above: &["Aves", "Accipitriformes"] };
+pub static CATHARTIDAE: Family = Family { name: "Cathartidae", above: &["Aves", "Accipitriformes"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -305,7 +306,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 29] = [
+pub static SPECIES: [Species; 30] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -2136,6 +2137,79 @@ pub static SPECIES: [Species; 29] = [
         // No nests yet: fledglings after the eggs' time. One young a year: her rest set shorter so
         // the wild replaces its dead (`balance::checks`: six young in a life).
         tune: Tune { gestation: Some(20_975), recovery: Some(60_000), ..Tune::NONE },
+        birth_size: 0.3,
+    },
+    // The turkey vulture (`reports/ecology/Overworld food webs.md`: something for the dead in the warm
+    // biomes, the raven's counterpart): a wild bird on its own model (`source/vulture`), on the
+    // ground and in the air (`vulture.rs`), finding the dead by smell from the air. It hunts nothing;
+    // carcasses as food in the world come with the web's third tier. No nests yet (Ronald,
+    // 2026-11-03): its young come out as fledglings after the eggs' time.
+    Species {
+        model: "vulture",
+        name: "turkey_vulture",
+        binomial: "Cathartes aura",
+        family: &CATHARTIDAE,
+        subfamily: "",
+        breed: None,
+        size: Size::Small,
+        // Carrion almost only, found by smell; now and then a newborn or a stranded fish, rotting fruit.
+        eats: &[(Carrion, 0.9), (Meat, 0.05), (Fruit, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [10.0, 140.0, 50.0, 1.0, 1.0, 14.0, 60.0, 24.0, 10.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 40.0,
+        foods: &[eats("base:beef", 10), favorite("base:rotten_flesh", 10)],
+        feedings: 0.0,
+        shy: 16.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.4,
+        signature: "scent",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.2,
+        dimorphism: 1.0,
+        size_spread: 0.1,
+        // Standing, at the crown.
+        height: (0.5, "crown"),
+        // The llanos and the Pantanal above all, the desert and the prairie, a few over the woods and
+        // the mountains.
+        habitats: &[
+            ("base:savanna", 1.0),
+            ("base:swamp", 1.0),
+            ("base:desert", 0.8),
+            ("base:plains", 0.6),
+            ("base:forest", 0.3),
+            ("base:mountains", 0.3),
+        ],
+        bio: Biology {
+            mass: 1.4,
+            gestation: 0.0,
+            // 38-41 days, both parents sitting; the young fly at 60-80 days.
+            incubation: 40.0,
+            // Breeding at about three.
+            maturity: 1095.0,
+            // About 16 years in the wild.
+            lifespan: 5840.0,
+            interval: 365.0,
+            // 1-3 eggs, usually two.
+            litter: 2.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            breeds: seasons::SPRING,
+            peak: seasons::SPRING,
+            // It leaves the north's winters; at ease in the tropics' heat (cooling by urohidrosis).
+            comfort: (-12.0, 42.0),
+            cold_blooded: false,
+        },
+        // No nests yet: fledglings after the eggs' time. A young vulture is grown in its first year
+        // and breeds at three, which no line in the game could wait for (`balance::checks`).
+        // Roosts of dozens, but spread over a big range by day: room near as a herd's at most.
+        tune: Tune { gestation: Some(21_377), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
     },
 ];
