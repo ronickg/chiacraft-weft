@@ -685,6 +685,16 @@ Each step closes a smaller loop and can be played on its own.
 
 ## The checks that keep it balanced
 
+Built (2026-11-03): `animals_core::web` checks the diets, every season's food, hunters' prey,
+whole webs and predators, and the species sheet shows each biome's web and its gaps; the gaps the
+plan fills are listed in `web::WAITING` with what fills them. It found the temperate biomes bare in
+winter, and the diets' insects, roots, fungi, lichen and water plants in no place of the world.
+The world's food (`vitals::forage::SOURCES`) gained winter's standing hay, deciduous twigs and
+fallen mast, lichen (the tundra's and taiga's ground, the mountains' rocks), fungi, roots dug
+from the ground, insects in the grass, sand and the north's summer, and reeds and horsetails as
+water plants. Still to build: the year simulation (grazers can't eat a biome bare in its best
+season).
+
 These are like `places.rs`: they read the tables, so a new biome, plant or species is checked
 the moment it's added.
 

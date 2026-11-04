@@ -74,6 +74,7 @@ built, it gets its row below and its arrows above.
 | Foraging | `vitals::forage::SOURCES`, `mods/animals/src/forage.rs` | `SOURCES` rows | diets, plants (grazed grass grows back), hunger | animals' food and condition |
 | Hunting | `Species::{prey, hungry_in_the_wild}`, `OTHER_PREY`, `mods/animals/src/hunt.rs` | `prey` per species row | diets, masses (genes, growth), families, hunger | wild hunters' food, prey running (`wary`), kills (`ENTITY_DIED`) |
 | Soil, compost | `vitals::soil`, `mods/base/src/farming.rs` | `MAX`, `FEEDS`, `COMPOSTS`, `COMPOST_DAYS` | crops' harvests, dung (grazers), spoiled food (freshness), plant waste | crops' growth on farmland (`growth.rs`), tilling with hoes |
+| Food webs | `animals_core::web` (`gaps`, `WAITING`), `core/tests/places.rs` | `WAITING` rows (the gaps the plan fills) | species' diets, prey sizes and habitats, `vitals::forage::SOURCES`, climates | the species sheet's food web table, the check |
 | Capacity | `vitals::forage::season_lushness`, `forage.rs` (`NATURAL_SPAWN`), `animal::arrive` | `SPAWN_FLOOR`, `ARRIVES_FED`, `YOUNG_PERCENT`, `STARVES_SECS` | plants, climates, calendar, breeding seasons | natural spawning, how fed wild ones arrive, young in season, starving |
 | Plants, soil water | `vitals::plants` (`PLANTS`, `rate`, `soil_water`), `base_api::ground_at`, `mods/base/src/growth.rs` | `PLANTS` rows, `GROWING` | climates, rain schedule, calendar, height, water within 4 blocks | the growing blocks' steps (wheat, berry bush, sapling, sugar cane, cactus) |
 | Rain by season | `mods/base/src/weather.rs`, `vitals::climate::{spell, rains, thunders}` | `rain` per season in `BIOMES` | climates, calendar, the world's seed | the engine (`set_rain`: rain drawn only where it falls), the air (`raining_at`) |
@@ -115,7 +116,11 @@ built, it gets its row below and its arrows above.
   `.on_grow(|e| growth::grow(..))` (`blocks.rs`); the sheet.
 - **A food in the world, or a new diet**: its row in `vitals::forage::SOURCES` (and the plant that
   renews it in `vitals::plants`), the species' `eats` from its research; `places.rs` checks
-  plant eaters find food at home; the sheets.
+  plant eaters find food at home, and `web.rs` that every food in a diet is in the world and
+  every plant eater eats in every season; the sheets.
+- **A species, or a habitat**: the food webs (`animals_core::web`): its foods, prey and
+  predators where it lives. A gap it closes comes off `web::WAITING`; a gap it opens goes on
+  with what fills it, or gets filled.
 - **The calendar** (season length, midsummer): breeding seasons, day length, the clock, the
   climates' seasons, eggs in each breeding season.
 - **An effect, or a new one**: `effects.rs` (`ALL`, `modifiers`, `icon`); its icon in

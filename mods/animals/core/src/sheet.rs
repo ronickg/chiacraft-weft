@@ -101,11 +101,67 @@ pub fn markdown() -> String {
     }
     let _ = writeln!(w);
 
+    web(w);
     for s in &SPECIES {
         species(w, s);
     }
     shared(w);
     o
+}
+
+/// Who eats what where (`web.rs`): each biome's plant food by season, its plant eaters, hunters
+/// and carrion eaters, and the web's gaps with what fills them.
+fn web(w: &mut String) {
+    use vitals::food::Category;
+    let _ = writeln!(
+        w,
+        "## The food web
+"
+    );
+    let _ = writeln!(
+        w,
+        "Each biome's web, from the species' habitats and diets and the world's plant food (`core/src/web.rs`). \
+         Plant food is how much of any plant eater's food grows or is found there in each season, against fresh growth \
+         at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome.\n"
+    );
+    let _ = writeln!(w, "| Biome | Plant food (spring, summer, autumn, winter) | Plant eaters | Hunters | Carrion |");
+    let _ = writeln!(w, "|---|---|---|---|---|");
+    let names = |f: &dyn Fn(&Species) -> bool, biome: &str| {
+        let v: Vec<String> = SPECIES
+            .iter()
+            .filter(|s| s.habitats.iter().any(|&(b, _)| b == biome) && f(s))
+            .map(name)
+            .collect();
+        if v.is_empty() { "**none**".to_string() } else { v.join(", ") }
+    };
+    for biome in crate::web::biomes() {
+        let food: Vec<String> = (0..4)
+            .map(|i| format!("{:.0}%", 100.0 * crate::web::food_in(Category::plant, biome, i)))
+            .collect();
+        let _ = writeln!(
+            w,
+            "| {biome} | {} | {} | {} | {} |",
+            food.join(", "),
+            names(&|s| s.plant_share() >= 0.5, biome),
+            names(&|s| s.hunts() && !s.forages_wild(), biome),
+            names(&|s| s.eats(Category::Carrion), biome)
+        );
+    }
+    let gaps = crate::web::gaps();
+    let _ = writeln!(w, "\n### Gaps in the web\n");
+    if gaps.is_empty() {
+        let _ = writeln!(w, "None.\n");
+        return;
+    }
+    let _ = writeln!(w, "What the webs still lack, and what the plan fills it with (`web::WAITING`):\n");
+    for g in &gaps {
+        let why = crate::web::WAITING
+            .iter()
+            .find(|&&(k, _)| k == g.key)
+            .map_or("**not planned**".to_string(), |&(_, why)| why.to_string());
+        let _ = writeln!(w, "- {}: {why}", g.key);
+    }
+    let _ = writeln!(w);
 }
 
 /// Its breeding season, in words ("spring, summer and autumn, most in spring"; for one of the

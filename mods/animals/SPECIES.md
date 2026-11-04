@@ -60,6 +60,47 @@ Damage and speed are each kind's own (1 = 100%).
 | kryptobaatar | 2 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
 | priscagama | 2 | 60 | 12 | 0.2 | 1 | 2 | 40 | 5 | 2 | 40 |
 
+## The food web
+
+Each biome's web, from the species' habitats and diets and the world's plant food (`core/src/web.rs`). Plant food is how much of any plant eater's food grows or is found there in each season, against fresh growth at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome.
+
+| Biome | Plant food (spring, summer, autumn, winter) | Plant eaters | Hunters | Carrion |
+|---|---|---|---|---|
+| base:plains | 40%, 53%, 46%, 40% | hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, brown_trout, red_fox, raven |
+| base:forest | 40%, 73%, 41%, 40% | capybara, hare, wood_mouse, white_tailed_deer, red_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, brown_trout, red_fox, raven |
+| base:birch_forest | 40%, 62%, 40%, 40% | mountain_hare, field_vole, red_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, brown_trout, red_fox, raven |
+| base:taiga | 40%, 62%, 40%, 40% | mountain_hare, field_vole | cat, red_fox, arctic_fox, raven | cat, brown_trout, red_fox, arctic_fox, raven |
+| base:snowy_plains | 40%, 40%, 40%, 40% | mountain_hare, field_vole | arctic_fox, raven | arctic_fox, raven |
+| base:desert | 40%, 40%, 40%, 40% | hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, red_fox, raven |
+| base:savanna | 43%, 82%, 75%, 40% | capybara, hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat | dog (chihuahua), cat |
+| base:swamp | 40%, 59%, 45%, 40% | capybara, field_vole, white_tailed_deer | **none** | **none** |
+| base:mountains | 40%, 70%, 40%, 40% | mountain_hare, field_vole, red_deer | red_fox, raven | brown_trout, red_fox, raven |
+| base:beach | 40%, 40%, 50%, 40% | hare, wood_mouse | red_fox, raven | red_fox, raven |
+| animals:red_dunes | 40%, 40%, 40%, 40% | protoceratops | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
+| animals:scrubland | 40%, 43%, 40%, 40% | protoceratops | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
+| animals:floodplain | 40%, 59%, 63%, 40% | **none** | utahraptor | utahraptor |
+| animals:fern_forest | 40%, 70%, 45%, 40% | **none** | utahraptor, wyvern | utahraptor, wyvern |
+| animals:crags | 40%, 66%, 65%, 40% | **none** | wyvern | wyvern |
+
+### Gaps in the web
+
+What the webs still lack, and what the plan fills it with (`web::WAITING`):
+
+- capybara: no predator: the jaguar and the caiman (wave two)
+- utahraptor: no Fish: the Cretaceous's fish, lungfish and Lycoptera (tier 3)
+- utahraptor: no prey in animals:floodplain: the iguanodont and its herbivores (the Cretaceous's tier 2)
+- utahraptor: no prey in animals:fern_forest: Psittacosaurus and the iguanodont (the Cretaceous's tier 2)
+- wyvern: no Fish: the Cretaceous's fish, lungfish and Lycoptera (tier 3)
+- wyvern: no prey in animals:crags: the ankylosaur (the Cretaceous's tier 2)
+- white_tailed_deer: no predator: the wolf and the jaguar (wave two)
+- red_deer: no predator: the wolf (wave two)
+- pacu: no predator: the jaguar and the caiman (wave two)
+- base:swamp: no hunters: the jaguar and the caiman (wave two)
+- base:swamp: no a carrion eater: the vulture and the caiman (wave two)
+- animals:floodplain: no plant eaters: the iguanodont, the ankylosaur and the sauropod (the Cretaceous's tier 2)
+- animals:fern_forest: no plant eaters: Psittacosaurus and the iguanodont (the Cretaceous's tier 2)
+- animals:crags: no plant eaters: the ankylosaur (the Cretaceous's tier 2)
+
 ## dog (chihuahua)
 
 *Canis familiaris*, Mammalia › Carnivora › Canidae › Caninae. Model `chihuahua`, entity `animals:chihuahua`.
@@ -228,7 +269,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | how | passive |
 | diet | herbivore |
 | eats | grass 75%, water plants 20%, fruit 5% |
-| its food grows at home (spring/summer/autumn/winter) | swamp 8/59/45/0%, savanna 43/82/75/19%, forest 11/73/41/0% |
+| its food grows at home (spring/summer/autumn/winter) | swamp 40/59/45/40%, savanna 43/82/75/40%, forest 40/73/41/40% |
 | feedings to tame at level 1 | 3 (2.5x at level 150) |
 | scared by a walking player within | nothing |
 | eats (food points) | `base:wheat` 10; `base:wheat_seeds` 3; `base:bread` 15; `base:hay_bale` 90; `base:apple` 15, favorite; `base:sugar_cane` 12, favorite; `base:berries` 8, favorite; `animals:kibble` 30, kibble |
@@ -527,7 +568,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | wild |
 | diet | herbivore |
 | eats | grass 60%, leaves 30%, roots 10% |
-| its food grows at home (spring/summer/autumn/winter) | plains 13/53/46/0%, desert 40/40/40/40%, forest 40/73/41/0%, savanna 43/82/75/40%, beach 14/20/50/33% |
+| its food grows at home (spring/summer/autumn/winter) | plains 40/53/46/40%, desert 40/40/40/40%, forest 40/73/41/40%, savanna 43/82/75/40%, beach 40/40/50/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `base:wheat` 8; `base:wheat_seeds` 2; `base:apple` 10, favorite; `base:berries` 6, favorite |
@@ -587,7 +628,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | wild |
 | diet | herbivore |
 | eats | grass 40%, leaves 55%, lichen 5% |
-| its food grows at home (spring/summer/autumn/winter) | taiga 40/62/40/40%, birch_forest 40/62/40/0%, snowy_plains 40/40/40/40%, mountains 40/70/40/40% |
+| its food grows at home (spring/summer/autumn/winter) | taiga 40/62/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/40/40/40%, mountains 40/70/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `base:wheat` 8; `base:wheat_seeds` 2; `base:apple` 10, favorite; `base:berries` 6, favorite |
@@ -648,7 +689,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | wild |
 | diet | herbivore |
 | eats | seeds 45%, insects 20%, fruit 15%, grass 10%, fungi 5%, roots 5% |
-| its food grows at home (spring/summer/autumn/winter) | plains 13/53/46/0%, forest 11/73/41/0%, desert 40/40/40/40%, savanna 43/82/75/19%, beach 14/40/50/33% |
+| its food grows at home (spring/summer/autumn/winter) | plains 40/53/46/40%, forest 40/73/41/40%, desert 40/40/40/40%, savanna 43/82/75/40%, beach 40/40/50/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 4; `base:wheat` 6; `base:berries` 4, favorite |
@@ -709,7 +750,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | wild |
 | diet | herbivore |
 | eats | grass 60%, leaves 15%, roots 15%, seeds 5%, insects 5% |
-| its food grows at home (spring/summer/autumn/winter) | taiga 40/62/40/40%, birch_forest 40/62/40/0%, snowy_plains 40/40/40/40%, mountains 40/70/40/40%, swamp 8/59/45/0% |
+| its food grows at home (spring/summer/autumn/winter) | taiga 40/62/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/40/40/40%, mountains 40/70/40/40%, swamp 40/59/45/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 5 blocks (twice that running) |
 | eats (food points) | `base:wheat` 6; `base:wheat_seeds` 3; `base:apple` 6, favorite |
@@ -770,7 +811,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | how | wild |
 | diet | herbivore |
 | eats | leaves 50%, grass 20%, fruit 15%, seeds 10%, fungi 5% |
-| its food grows at home (spring/summer/autumn/winter) | plains 13/53/46/0%, savanna 43/82/75/40%, desert 40/40/40/40%, forest 40/73/41/0%, swamp 8/59/45/0% |
+| its food grows at home (spring/summer/autumn/winter) | plains 40/53/46/40%, savanna 43/82/75/40%, desert 40/40/40/40%, forest 40/73/41/40%, swamp 40/59/45/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 16 blocks (twice that running) |
 | eats (food points) | `base:wheat` 8; `base:apple` 12, favorite; `base:berries` 6, favorite |
@@ -829,7 +870,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | how | wild |
 | diet | herbivore |
 | eats | grass 50%, leaves 40%, fruit 5%, seeds 5% |
-| its food grows at home (spring/summer/autumn/winter) | forest 40/73/41/0%, birch_forest 40/62/40/0%, mountains 40/70/40/40% |
+| its food grows at home (spring/summer/autumn/winter) | forest 40/73/41/40%, birch_forest 40/62/40/40%, mountains 40/70/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 20 blocks (twice that running) |
 | eats (food points) | `base:wheat` 10; `base:apple` 12, favorite |

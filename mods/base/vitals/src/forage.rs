@@ -49,13 +49,33 @@ const fn browse(block: &'static str, category: Category, food: u16, found: &'sta
 /// How much of a diet's food browse is worth where it's found, against fresh growth at its best.
 pub const BROWSE: f32 = 0.4;
 const GREEN: u8 = 1 | 2 | 4;
+const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
+const AUTUMN_WINTER: u8 = 4 | 8;
+const WINTER: u8 = 8;
 const ALL_YEAR: u8 = 15;
 
-pub const SOURCES: [Source; 11] = [
+/// Where the ground is turf (`worldgen.rs` surfaces: "grass"), in both worlds.
+const TURF: &[&str] = &[
+    "base:plains",
+    "base:forest",
+    "base:birch_forest",
+    "base:savanna",
+    "base:swamp",
+    "base:mountains",
+    "animals:scrubland",
+    "animals:floodplain",
+    "animals:fern_forest",
+    "animals:crags",
+];
+/// Where oaks grow (the plains' and swamp's few trees are oaks, the forest's mostly).
+const OAKS: &[&str] = &["base:forest", "base:plains", "base:swamp"];
+const BIRCHES: &[&str] = &["base:forest", "base:birch_forest"];
+
+pub const SOURCES: [Source; 31] = [
     s("base:tall_grass", None, Category::Grass, 10, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
     s("base:berry_bush", Some(3), Category::Fruit, 8, Eaten::Age(1), Some("base:berry_bush")),
-    browse("base:oak_leaves", Category::Leaves, 4, &["base:forest"], GREEN),
+    browse("base:oak_leaves", Category::Leaves, 4, OAKS, GREEN),
     browse("base:birch_leaves", Category::Leaves, 4, &["base:forest", "base:birch_forest"], GREEN),
     // Evergreen: a winter's browse (and the tundra's few trees).
     browse("base:spruce_leaves", Category::Leaves, 4, &["base:taiga", "base:snowy_plains", "base:mountains"], ALL_YEAR),
@@ -83,18 +103,74 @@ pub const SOURCES: [Source; 11] = [
         &["animals:red_dunes", "animals:scrubland", "animals:floodplain", "animals:fern_forest", "animals:crags"],
         ALL_YEAR,
     ),
+    // Winter (`animals_core::web` found the temperate biomes bare then): the standing grass,
+    // cured into hay (tall grass doesn't grow back in winter, but it stands, poor food: bison and
+    // hares live on it), the deciduous trees' twigs and buds (deer and hares browse them), and the
+    // acorns and beechnuts fallen under them through autumn and winter (mice and deer).
+    browse("base:tall_grass", Category::Grass, 3, TURF, WINTER),
+    browse("base:oak_leaves", Category::Leaves, 2, OAKS, WINTER),
+    browse("base:birch_leaves", Category::Leaves, 2, BIRCHES, WINTER),
+    browse("base:oak_leaves", Category::Seeds, 3, OAKS, AUTUMN_WINTER),
+    // Lichen: the tundra's and the taiga's ground cover, and the mountains' rocks, all year (a
+    // reindeer's winter food, dug from under the snow).
+    browse("base:snowy_grass", Category::Lichen, 3, &["base:snowy_plains"], ALL_YEAR),
+    browse("base:podzol", Category::Lichen, 3, &["base:taiga"], ALL_YEAR),
+    browse("base:stone", Category::Lichen, 2, &["base:mountains"], ALL_YEAR),
+    // Fungi: mushrooms on the taiga's floor and brackets on the trees, summer and autumn.
+    browse("base:podzol", Category::Fungi, 2, &["base:taiga"], SUMMER_AUTUMN),
+    browse("base:oak_log", Category::Fungi, 2, OAKS, SUMMER_AUTUMN),
+    browse("base:birch_log", Category::Fungi, 2, BIRCHES, SUMMER_AUTUMN),
+    // Roots, bulbs and tubers dug from the ground, all year (voles live on them under the snow).
+    browse("base:grass", Category::Roots, 2, TURF, ALL_YEAR),
+    browse("base:sand", Category::Roots, 1, &["base:desert", "base:beach"], ALL_YEAR),
+    browse("animals:red_sand", Category::Roots, 1, &["animals:red_dunes"], ALL_YEAR),
+    // Insects in the grass and leaf litter from spring to autumn, in the warm sand all year,
+    // in the north's short summer.
+    browse("base:grass", Category::Insects, 2, TURF, GREEN),
+    browse("base:sand", Category::Insects, 2, &["base:desert", "base:beach"], ALL_YEAR),
+    browse("animals:red_sand", Category::Insects, 2, &["animals:red_dunes"], ALL_YEAR),
+    browse("base:podzol", Category::Insects, 2, &["base:taiga"], SUMMER),
+    browse("base:snowy_grass", Category::Insects, 2, &["base:snowy_plains"], SUMMER),
+    // Water plants: reeds at the water's edge (the sugar cane stands for them) and the
+    // Cretaceous's horsetails on wet ground, all year.
+    browse(
+        "base:sugar_cane",
+        Category::WaterPlants,
+        4,
+        &["base:plains", "base:forest", "base:birch_forest", "base:savanna", "base:swamp", "base:beach"],
+        ALL_YEAR,
+    ),
+    browse(
+        "animals:horsetail",
+        Category::WaterPlants,
+        4,
+        &["animals:red_dunes", "animals:scrubland", "animals:floodplain", "animals:fern_forest", "animals:crags"],
+        ALL_YEAR,
+    ),
 ];
 
 /// What a forager of that diet can eat of the block `block` at `age` (`None`: it has no age) in
 /// `season` (0 spring; `None`: no seasons there). One block can feed several diets: tall grass
-/// is grass to a grazer, and seeds to a mouse in summer and autumn.
+/// is grass to a grazer, and seeds to a mouse in summer and autumn. The first source that fits
+/// is the one eaten: tall grass eaten in winter is the growing grass's row (it grows back in
+/// spring); the winter hay's row only counts it in what a place feeds (`season_lushness`).
 pub fn of(block: &str, age: Option<u8>, eats: impl Fn(Category) -> bool, season: Option<usize>) -> Option<&'static Source> {
     SOURCES
         .iter()
         .find(|s| s.block == block && (s.age.is_none() || s.age == age) && eats(s.category) && s.in_season(season))
 }
 
+/// The ground itself (turf, sand, the forest floor, the tundra, bare rock): roots, insects and
+/// lichen are in it everywhere, so a forager eats from it only when no richer food is in sight
+/// (`Source::fallback`), as real ones graze and browse first.
+pub const GROUND: [&str; 6] = ["base:grass", "base:sand", "animals:red_sand", "base:podzol", "base:snowy_grass", "base:stone"];
+
 impl Source {
+    /// Whether a forager takes it only when nothing else of its diet is in sight (the ground's
+    /// roots, insects and lichen).
+    pub fn fallback(&self) -> bool {
+        GROUND.contains(&self.block)
+    }
     /// Whether it's there in `season` (food that grows back always is; browse in its seasons).
     pub fn in_season(&self, season: Option<usize>) -> bool {
         self.seasons == 0 || season.is_none_or(|s| self.seasons >> s & 1 != 0)

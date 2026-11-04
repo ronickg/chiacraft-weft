@@ -151,3 +151,14 @@ fn plant_eaters_find_food_where_they_live() {
     }
     report(problems);
 }
+
+/// The living world's loop holds (`animals_core::web`, `notes/ECOLOGY.md` "The checks that keep
+/// it balanced"): every food in a diet is in the game, every plant eater finds something to eat in
+/// each of its habitats every season, every hunter has prey wherever it lives, every biome's web
+/// has plants, plant eaters, hunters and a carrion eater, and everything but the top hunters is
+/// somebody's prey. Gaps the plan fills are in `web::WAITING`; a gap closed stays listed until
+/// it is taken out.
+#[test]
+fn the_food_webs_hold() {
+    report(animals_core::web::problems());
+}

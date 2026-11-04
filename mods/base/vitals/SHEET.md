@@ -110,7 +110,7 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 |---|---|---|---|---|
 | base:tall_grass | grass | 10 | becomes base:grazed_grass | base:grazed_grass |
 | base:berry_bush (age 3) | fruit | 8 | back to age 1 | base:berry_bush |
-| base:oak_leaves | leaves | 4 | stays | always there in base:forest (spring, summer, autumn), worth 40% of fresh growth |
+| base:oak_leaves | leaves | 4 | stays | always there in base:forest, base:plains, base:swamp (spring, summer, autumn), worth 40% of fresh growth |
 | base:birch_leaves | leaves | 4 | stays | always there in base:forest, base:birch_forest (spring, summer, autumn), worth 40% of fresh growth |
 | base:spruce_leaves | leaves | 4 | stays | always there in base:taiga, base:snowy_plains, base:mountains (all year), worth 40% of fresh growth |
 | base:acacia_leaves | leaves | 4 | stays | always there in base:savanna (all year), worth 40% of fresh growth |
@@ -119,6 +119,26 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | base:dead_bush | seeds | 2 | stays | always there in base:desert (all year), worth 40% of fresh growth |
 | base:cactus | fruit | 3 | stays | always there in base:desert (summer, autumn), worth 40% of fresh growth |
 | animals:fern | leaves | 4 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
+| base:tall_grass | grass | 3 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:mountains, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (winter), worth 40% of fresh growth |
+| base:oak_leaves | leaves | 2 | stays | always there in base:forest, base:plains, base:swamp (winter), worth 40% of fresh growth |
+| base:birch_leaves | leaves | 2 | stays | always there in base:forest, base:birch_forest (winter), worth 40% of fresh growth |
+| base:oak_leaves | seeds | 3 | stays | always there in base:forest, base:plains, base:swamp (autumn, winter), worth 40% of fresh growth |
+| base:snowy_grass | lichen | 3 | stays | always there in base:snowy_plains (all year), worth 40% of fresh growth |
+| base:podzol | lichen | 3 | stays | always there in base:taiga (all year), worth 40% of fresh growth |
+| base:stone | lichen | 2 | stays | always there in base:mountains (all year), worth 40% of fresh growth |
+| base:podzol | fungi | 2 | stays | always there in base:taiga (summer, autumn), worth 40% of fresh growth |
+| base:oak_log | fungi | 2 | stays | always there in base:forest, base:plains, base:swamp (summer, autumn), worth 40% of fresh growth |
+| base:birch_log | fungi | 2 | stays | always there in base:forest, base:birch_forest (summer, autumn), worth 40% of fresh growth |
+| base:grass | roots | 2 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:mountains, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
+| base:sand | roots | 1 | stays | always there in base:desert, base:beach (all year), worth 40% of fresh growth |
+| animals:red_sand | roots | 1 | stays | always there in animals:red_dunes (all year), worth 40% of fresh growth |
+| base:grass | insects | 2 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:mountains, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (spring, summer, autumn), worth 40% of fresh growth |
+| base:sand | insects | 2 | stays | always there in base:desert, base:beach (all year), worth 40% of fresh growth |
+| animals:red_sand | insects | 2 | stays | always there in animals:red_dunes (all year), worth 40% of fresh growth |
+| base:podzol | insects | 2 | stays | always there in base:taiga (summer), worth 40% of fresh growth |
+| base:snowy_grass | insects | 2 | stays | always there in base:snowy_plains (summer), worth 40% of fresh growth |
+| base:sugar_cane | water_plants | 4 | stays | always there in base:plains, base:forest, base:birch_forest, base:savanna, base:swamp, base:beach (all year), worth 40% of fresh growth |
+| animals:horsetail | water_plants | 4 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
 
 ## Soil and compost
 

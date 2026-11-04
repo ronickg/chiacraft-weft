@@ -100,23 +100,30 @@ fn season(w: &World) -> Option<usize> {
     crate::breeding::season_bit(w).map(|bit| bit.trailing_zeros() as usize)
 }
 
-/// The nearest food of its diet within `LOOK` blocks it can reach from the ground.
+/// The nearest food of its diet within `LOOK` blocks it can reach from the ground; the ground's
+/// own roots, insects and lichen only when nothing richer is in sight (`Source::fallback`).
 fn nearest(w: &World, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]> {
     let p = pos.map(|v| v.floor() as i32);
     let now = season(w);
     let mut best: Option<([i32; 3], i32)> = None;
+    let mut ground: Option<([i32; 3], i32)> = None;
     for dx in -LOOK..=LOOK {
         for dz in -LOOK..=LOOK {
             for dy in -2..=LOOK_UP {
                 let at = [p[0] + dx, p[1] + dy, p[2] + dz];
                 let d = dx * dx + dz * dz + dy * dy * 4;
-                if best.is_none_or(|(_, b)| d < b) && food(s, w.get(at), now).is_some() {
-                    best = Some((at, d));
+                if best.is_some_and(|(_, b)| d >= b) {
+                    continue;
+                }
+                match food(s, w.get(at), now) {
+                    Some(src) if !src.fallback() => best = Some((at, d)),
+                    Some(_) if ground.is_none_or(|(_, b)| d < b) => ground = Some((at, d)),
+                    _ => {}
                 }
             }
         }
     }
-    best.map(|(at, _)| at)
+    best.or(ground).map(|(at, _)| at)
 }
 
 /// A goal: hungry, it goes to the nearest food of its diet and eats there; it takes the turn

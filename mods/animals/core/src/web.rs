@@ -1,0 +1,212 @@
+//! Whether the living world's loop holds (`notes/ECOLOGY.md`, "The checks that keep it
+//! balanced"): every food in a species' diet exists in the game, every plant eater finds
+//! something to eat in each of its habitats in every season, every hunter has prey where it
+//! lives, every biome's web is whole (plants, plant eaters, hunters, something for the dead), and
+//! everything but the top hunters is somebody's prey. It reads the tables (`species::SPECIES`,
+//! `vitals::forage`, `vitals::climate`), so a new species or biome is checked the moment it is
+//! added.
+//!
+//! `gaps()` lists what is missing. Gaps that a planned species or food will fill are in
+//! `WAITING`, each with what fills it; the test asks that every gap is listed there and that
+//! nothing listed is no longer a gap, so the list stays the plan.
+
+use crate::species::{OTHER_PREY, SPECIES, Species};
+use vitals::climate::{self, BIOMES};
+use vitals::food::Category;
+
+pub const SEASONS: [&str; 4] = ["spring", "summer", "autumn", "winter"];
+
+/// A gap in the web: `key` names it (the same words every time, for `WAITING`), `text` says what
+/// to look at.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Gap {
+    pub key: String,
+    pub text: String,
+}
+
+/// Gaps that the plan fills (`notes/ECOLOGY.md`, "The food webs and the species to add"): the
+/// gap's key and what fills it. Remove an entry when what it waits for comes.
+pub const WAITING: &[(&str, &str)] = &[
+    // The overworld's wave two (tier 1 and 2).
+    ("capybara: no predator", "the jaguar and the caiman (wave two)"),
+    ("white_tailed_deer: no predator", "the wolf and the jaguar (wave two)"),
+    ("red_deer: no predator", "the wolf (wave two)"),
+    ("pacu: no predator", "the jaguar and the caiman (wave two)"),
+    ("base:swamp: no hunters", "the jaguar and the caiman (wave two)"),
+    ("base:swamp: no a carrion eater", "the vulture and the caiman (wave two)"),
+    // The Cretaceous's tier 2 and 3.
+    ("animals:floodplain: no plant eaters", "the iguanodont, the ankylosaur and the sauropod (the Cretaceous's tier 2)"),
+    ("animals:fern_forest: no plant eaters", "Psittacosaurus and the iguanodont (the Cretaceous's tier 2)"),
+    ("animals:crags: no plant eaters", "the ankylosaur (the Cretaceous's tier 2)"),
+    ("utahraptor: no prey in animals:floodplain", "the iguanodont and its herbivores (the Cretaceous's tier 2)"),
+    ("utahraptor: no prey in animals:fern_forest", "Psittacosaurus and the iguanodont (the Cretaceous's tier 2)"),
+    ("wyvern: no prey in animals:crags", "the ankylosaur (the Cretaceous's tier 2)"),
+    ("utahraptor: no Fish", "the Cretaceous's fish, lungfish and Lycoptera (tier 3)"),
+    ("wyvern: no Fish", "the Cretaceous's fish, lungfish and Lycoptera (tier 3)"),
+];
+
+/// The biomes the webs are for: every climate but the caves (no web of their own) and the open
+/// sea (its web, gulls and seals, comes later; its fish live in the rivers and lakes).
+pub fn biomes() -> impl Iterator<Item = &'static str> {
+    BIOMES
+        .iter()
+        .filter(|c| !c.underground && c.biome != "base:ocean")
+        .map(|c| c.biome)
+}
+
+fn lives(s: &Species, biome: &str) -> bool {
+    s.habitats.iter().any(|&(b, _)| b == biome)
+}
+
+fn overworld_land(biome: &str) -> bool {
+    biome.starts_with("base:") && biome != "base:ocean"
+}
+
+/// How much of that diet's food the biome grows or holds in `season` (`vitals::forage`), 0 to 1.
+pub fn food_in(eats: impl Fn(Category) -> bool, biome: &str, season: usize) -> f32 {
+    let Some(c) = climate::of(biome) else { return 0.0 };
+    vitals::forage::season_lushness(eats, biome, c.celsius, c.seasons, c.rain, Some(season)).unwrap_or(0.0)
+}
+
+/// The prey a hunter takes in this biome: species of other families living there within its
+/// prey's sizes, and the farm animals' wild kinds on the overworld's land.
+pub fn prey_in(s: &Species, biome: &str) -> Vec<&'static str> {
+    let mut out: Vec<&'static str> = SPECIES
+        .iter()
+        .filter(|o| o.family.name != s.family.name && lives(o, biome) && s.takes(s.bio.mass, o.bio.mass))
+        .map(|o| o.name)
+        .collect();
+    if overworld_land(biome) {
+        out.extend(
+            OTHER_PREY
+                .iter()
+                .filter(|&&(_, kg)| s.takes(s.bio.mass, kg))
+                .map(|&(n, _)| n),
+        );
+    }
+    out
+}
+
+/// Who takes this species where it lives.
+pub fn predators_of(s: &Species) -> Vec<&'static str> {
+    SPECIES
+        .iter()
+        .filter(|h| h.family.name != s.family.name && h.takes(h.bio.mass, s.bio.mass))
+        .filter(|h| s.habitats.iter().any(|&(b, _)| lives(h, b)))
+        .map(|h| h.name)
+        .collect()
+}
+
+/// Whether a kind of food is there for this species somewhere it lives: plants and browse grow
+/// (`vitals::forage`), meat and fish are its prey, carrion is what hunters leave.
+fn food_exists(s: &Species, c: Category) -> bool {
+    match c {
+        Category::Meat => s.habitats.iter().any(|&(b, _)| !prey_in(s, b).is_empty()),
+        Category::Fish => s
+            .habitats
+            .iter()
+            .any(|&(b, _)| SPECIES.iter().any(|o| o.in_water() && lives(o, b))),
+        Category::Carrion => s
+            .habitats
+            .iter()
+            .any(|&(b, _)| SPECIES.iter().any(|h| h.hunts() && lives(h, b))),
+        c => vitals::forage::grows(c),
+    }
+}
+
+fn gap(key: String, text: String) -> Gap {
+    Gap { key, text }
+}
+
+/// Everything missing from the webs.
+pub fn gaps() -> Vec<Gap> {
+    let mut out = Vec::new();
+
+    for s in &SPECIES {
+        // Every food in its diet is in the game.
+        for &(c, share) in s.eats {
+            if share > 0.0 && !food_exists(s, c) {
+                out.push(gap(
+                    format!("{}: no {c:?}", s.name),
+                    format!(
+                        "{}: eats {c:?} ({:.0}% of its food, species.rs eats), which nothing in the game gives where it lives (vitals::forage SOURCES, or prey there)",
+                        s.name,
+                        share * 100.0
+                    ),
+                ));
+            }
+        }
+        // A plant eater finds something every season where it lives.
+        if s.forages_wild() && !s.in_water() {
+            for &(biome, _) in s.habitats {
+                for (i, season) in SEASONS.iter().enumerate() {
+                    if food_in(|k| s.eats(k), biome, i) <= 0.0 {
+                        out.push(gap(
+                            format!("{}: nothing to eat in {biome} in {season}", s.name),
+                            format!(
+                                "{}: none of its plant food grows or is found in {biome} in {season}: its diet (species.rs eats) against vitals::forage (a browse source there then, or a plant that grows then)",
+                                s.name
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+        // A hunter has prey wherever it lives (a mostly-plant eater that hunts a little needn't).
+        if s.hunts() && !s.forages_wild() {
+            for &(biome, _) in s.habitats {
+                if prey_in(s, biome).is_empty() {
+                    out.push(gap(
+                        format!("{}: no prey in {biome}", s.name),
+                        format!("{}: nothing it takes ({:?} of its own mass, species.rs prey) lives in {biome}", s.name, s.prey),
+                    ));
+                }
+            }
+        }
+        // Everything but the top hunters is somebody's prey somewhere it lives.
+        if s.plant_share() > 0.25 && predators_of(s).is_empty() {
+            out.push(gap(
+                format!("{}: no predator", s.name),
+                format!(
+                    "{}: no hunter living where it does takes {:.0} kg (the hunters' prey sizes, species.rs prey), so nothing keeps it in check but food",
+                    s.name, s.bio.mass
+                ),
+            ));
+        }
+    }
+
+    // Every biome's web is whole.
+    for biome in biomes() {
+        let here: Vec<&Species> = SPECIES.iter().filter(|s| lives(s, biome)).collect();
+        let green = (0..4).any(|i| food_in(Category::plant, biome, i) > 0.0);
+        let grazers = here.iter().any(|s| s.plant_share() >= 0.5) || overworld_land(biome);
+        let hunters = here.iter().any(|s| s.hunts() && !s.forages_wild());
+        let dead = here.iter().any(|s| s.eats(Category::Carrion));
+        for (has, what) in [(green, "plants"), (grazers, "plant eaters"), (hunters, "hunters"), (dead, "a carrion eater")] {
+            if !has {
+                out.push(gap(
+                    format!("{biome}: no {what}"),
+                    format!("{biome}: its web has no {what} (species.rs habitats, vitals::forage SOURCES)"),
+                ));
+            }
+        }
+    }
+    out
+}
+
+/// The gaps not in `WAITING`, and the `WAITING` entries no longer gaps: what the test asks to be
+/// empty.
+pub fn problems() -> Vec<String> {
+    let found = gaps();
+    let mut out: Vec<String> = found
+        .iter()
+        .filter(|g| !WAITING.iter().any(|&(k, _)| k == g.key))
+        .map(|g| g.text.clone())
+        .collect();
+    for &(key, why) in WAITING {
+        if !found.iter().any(|g| g.key == key) {
+            out.push(format!("web::WAITING lists \"{key}\" (waiting for {why}), but it is no longer a gap: remove it"));
+        }
+    }
+    out
+}
