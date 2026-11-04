@@ -326,7 +326,7 @@ fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'stat
 /// A tree's leaves: they decay once no log is near (`leaf_decay`), unless a player placed them
 /// (`placed`, set as they are placed). The shrubs' leaves have no logs and keep.
 fn tree_leaves(b: BlockBuilder<'_>) -> BlockBuilder<'_> {
-    b.prop("placed", ["false", "true"]).tag("tree_leaves")
+    b.prop("placed", ["false", "true"]).tag("leaves/tree")
 }
 
 /// A name kept for the game's life (registration's textures).

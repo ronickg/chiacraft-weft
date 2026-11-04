@@ -1,7 +1,7 @@
 //! Leaf decay, vanilla-like: a tree's leaves with no log within `REACH` fall over the next second
 //! to a minute, dropping what their loot gives (saplings, sticks, their species' fruit). Leaves are
 //! looked at only round a log that went (chopped or felled, `felling`): nothing scans the world.
-//! Leaves a player placed (`placed`) keep, and so do the shrubs' leaves (no `tree_leaves` tag: a
+//! Leaves a player placed (`placed`) keep, and so do the shrubs' leaves (no `leaves/tree` tag: a
 //! shrub has no log).
 
 use std::collections::HashSet;
@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use weft_sdk::*;
 
 static LOGS: Tag = Tag::named("logs");
-static TREE_LEAVES: Tag = Tag::named("tree_leaves");
+static TREE_LEAVES: Tag = Tag::named("leaves/tree");
 
 /// Leaves this far (each way) from a log that went are looked at.
 const NEAR: i32 = 5;
