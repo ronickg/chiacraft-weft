@@ -300,6 +300,11 @@ messages! {
         /// The signed list of achievements the world's issuer withdrew (chiacraft: JSON,
         /// `achievement::Revocations`), sent on joining and whenever it changes.
         Revocations(String),
+        /// Body `frame` leans (chiacraft, a falling tree): turned by `rot` (a quaternion x, y, z,
+        /// w) about `pivot` (in its own coordinates, from its block (0, 0, 0)'s corner), reached
+        /// in `ticks`. The identity stands it up again. A leaning body is only drawn: nothing
+        /// collides with it or picks it.
+        BodyLean { frame: u64, pivot: [f32; 3], rot: [f32; 4], ticks: u32 },
     }
 }
 

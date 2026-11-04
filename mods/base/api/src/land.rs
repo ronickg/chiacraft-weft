@@ -322,6 +322,21 @@ pub const MOUNTAINS_AREA: Area = Area {
     not: false,
 };
 pub const MOUNTAIN_BIOME: f64 = 0.45;
+/// How the ranges rise (Planner, 11-04: the foothill a new player sees from the spawn should be
+/// walkable, mostly steps of one): by their area's band squared, so a range's foot climbs gently
+/// (half the slope a quarter of the way in) and its spine is steeper. Only the height: where the
+/// mountains' biome, the rivers and the spawn stand still go by `MOUNTAINS_AREA`.
+pub const MOUNTAINS_RISE: Area = Area {
+    all: &[
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: -RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: -RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::RANGE_GAPS, scale: 2600.0, from: -RANGE_GAPS, to: -RANGE_GAPS + 0.15 },
+        Ramp::Continent(0.0, 0.2),
+    ],
+    not: false,
+};
 
 /// Mesas: flat-topped hills `MESA_HEIGHT` blocks high in `MESA_TIERS` tiers, patches about
 /// `MESA_SIZE` blocks across where the mesa noise runs from `MESA_FROM` to `MESA_TO`; in each
@@ -591,6 +606,18 @@ pub const LAKE_ISLAND_SHORE: f64 = 0.25;
 /// Water deeper than a block is the ocean's where continentalness is under this, out to the
 /// coast; inland, a river's or a lake's water belongs to the land around it (its climate).
 pub const OCEAN_CONTINENT: f64 = 0.1;
+/// A beach (and in the cold the snowy coast) is low ground where the continent is under this:
+/// by the sea. Up to `OCEAN_CONTINENT` it also took the low flats of rivers some way inland, an
+/// 18 °C beach beside 6 °C birch (Planner, 11-04; seed 1: of the beach's columns 42% had the sea
+/// within 16 blocks and 37% none within 40; under 0.02 78% of the first kept, 91% of the second
+/// gone). A rule can't ask how far the sea is, so the low coast past it keeps its sand by
+/// `sea_sand` instead, its biome the land's.
+pub const BEACH_CONTINENT: f64 = 0.02;
+/// Low ground (the sea's level, a block either side) on the coast past `BEACH_CONTINENT`, not
+/// in the cold, within `SEA_SAND` blocks of the sea (or a lake): sand on top, `SEA_SAND_DEEP`
+/// blocks, as a beach's.
+pub const SEA_SAND: i32 = 8;
+pub const SEA_SAND_DEEP: i32 = 3;
 /// The land's biome rules in the order they're tried, after the coasts and the mountains, with
 /// the bed under their water: gravel in the north and the birch woods, sand in the warm lands,
 /// mud (dirt) in the swamp.
@@ -679,8 +706,8 @@ pub fn features() -> Vec<Feature> {
             .named("highlands"),
         preset::dunes(DUNES.0, DUNES.1).mask(DUNES_AREA.mask()),
         preset::mountains(MOUNTAINS.0, MOUNTAINS.1)
-            .mask(MOUNTAINS_AREA.mask())
-            .named("mountains"),
+            .mask(MOUNTAINS_RISE.mask())
+            .named("mountain_rise"),
         Feature::new(mesa).named("mesas"),
         Feature::new(canyons).named("canyons"),
         Feature::new(karst).named("karst"),
@@ -694,6 +721,9 @@ pub fn features() -> Vec<Feature> {
         preset::hills(0.0, 64.0)
             .mask(SEQUOIA_AREA.mask())
             .named("sequoia_groves"),
+        preset::hills(0.0, 64.0)
+            .mask(MOUNTAINS_AREA.mask())
+            .named("mountains"),
         preset::hills(0.0, 64.0)
             .mask(Mask::noise(SNOW_DRIFT_SIZE, -0.2, 0.2).salt(salt::SNOW_DRIFT))
             .named("snow_drift"),
@@ -735,7 +765,7 @@ fn base_ground(h: &Here) -> i32 {
         + masked(h, &ISLANDS_AREA, || q4(ISLAND_HEIGHT))
         + masked(h, &HIGHLANDS_AREA, || q4(HIGHLANDS))
         + masked(h, &DUNES_AREA, || shape::dunes(f, x, z, q4(DUNES.0), q4(DUNES.1)))
-        + masked(h, &MOUNTAINS_AREA, || shape::mountains(f, x, z, q4(MOUNTAINS.0), q4(MOUNTAINS.1)))
+        + masked(h, &MOUNTAINS_RISE, || shape::mountains(f, x, z, q4(MOUNTAINS.0), q4(MOUNTAINS.1)))
         + mesa_at(h)
 }
 
@@ -978,8 +1008,11 @@ pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
         }
         let deep = sh.strength;
         let flat = sh.half + ((sh.floodplain * deep) >> 12);
-        // The sides widen with the land's height, up to the stretch's bound (`net::Seg::rise`).
-        let banks = ((q4(RIVER_BANKS as f64) + RIVER_VALLEY_PER_BLOCK * rise.min(s.rise)) * deep) >> 12;
+        // The sides widen with the land's height, up to the stretch's bound (`net::Seg::rise`);
+        // as wide where the mountains fade the river out (`RIVER_MOUNTAINS`): narrowed with it, a
+        // valley's end climbed into the foothills in faces of two (Planner, 11-04, the climb from
+        // seed 1's spawn).
+        let banks = ((q4(RIVER_BANKS as f64) + RIVER_VALLEY_PER_BLOCK * rise.min(s.rise)) * net::shape(flow, ONE).strength) >> 12;
         if d >= flat + banks {
             continue;
         }
@@ -1553,6 +1586,39 @@ pub fn strata(seed: u64, [x, y, z]: [i32; 3]) -> &'static str {
     STRATA[0]
 }
 
+/// Which columns of the cube at (`ox`, `oz`) (blocks), ground `heights` high (z * 16 + x), are low
+/// coast by the sea that keeps a beach's sand (`SEA_SAND`). Whether the sea is near is read from
+/// nodes every 4 blocks on the world's grid (the same for every cube), so neighbours agree.
+pub fn sea_sand(f: &Fields, ox: i32, oz: i32, heights: &[i32; 256]) -> [bool; 256] {
+    let mut out = [false; 256];
+    let low = |i: usize| (SEA - 1..=SEA + 1).contains(&heights[i]);
+    let coast = |x: i32, z: i32| {
+        let here = Here::new(f, x * 16, z * 16);
+        let c = here.continent();
+        c >= q12(BEACH_CONTINENT) && c < q12(OCEAN_CONTINENT) && here.temperature() >= q12(SNOWY_BELOW)
+    };
+    let wanted: Vec<usize> = (0..256)
+        .filter(|&i| low(i) && coast(ox + (i % 16) as i32, oz + (i / 16) as i32))
+        .collect();
+    if wanted.is_empty() {
+        return out;
+    }
+    // Nodes from SEA_SAND before the cube to SEA_SAND past it, every 4 blocks.
+    let n = (16 + 2 * SEA_SAND) / 4 + 1;
+    let (nx, nz) = (ox - SEA_SAND, oz - SEA_SAND);
+    let sea: Vec<bool> = (0..n * n)
+        .map(|k| land_height(f, (nx + (k % n) * 4) * 16, (nz + (k / n) * 4) * 16) < q4(SEA as f64))
+        .collect();
+    for i in wanted {
+        let (x, z) = (ox + (i % 16) as i32, oz + (i / 16) as i32);
+        out[i] = (0..n * n).any(|k| {
+            let (dx, dz) = (nx + (k % n) * 4 - x, nz + (k / n) * 4 - z);
+            sea[k as usize] && dx * dx + dz * dz <= SEA_SAND * SEA_SAND
+        });
+    }
+    out
+}
+
 /// The overworld biome the rules in `mods/base/src/land.rs` pick at (`x`, `z`) (Q4), by name, in
 /// their order: for the map preview and the checks here (the engine's own pick is the truth).
 pub fn overworld_biome(f: &Fields, x: i32, z: i32) -> &'static str {
@@ -1568,7 +1634,7 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
         if top { "coral_reef" } else { "lagoon" }
     } else if h <= SEA - 2 && c < at(OCEAN_CONTINENT) {
         "ocean"
-    } else if h <= SEA + 1 && c < at(0.1) {
+    } else if h <= SEA + 1 && c < at(BEACH_CONTINENT) {
         if t < at(SNOWY_BELOW) { "snowy_plains" } else { "beach" }
     } else if MOUNTAINS_AREA.at(&here) > at(MOUNTAIN_BIOME) || snowy(f, x, z, h) {
         "mountains"
@@ -1721,7 +1787,10 @@ mod tests {
         for i in 0..40_000 {
             let (x, z) = ((i % 200) * 12 * 16 - 1200 * 16, (i / 200) * 12 * 16 - 1200 * 16);
             let add = karst(&f, x, z);
-            assert!((0..=q4(KARST_WIDE_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
+            // Down only into a sinkhole: to `SINK_FLOOR` under the sea from ground at most
+            // `SINK_LAND.1` over it (Tester 2, 11-04: the sinkholes made this fail at -410).
+            let deepest = -q4((SINK_LAND.1 + SINK_FLOOR + 1) as f64);
+            assert!((deepest..=q4(KARST_WIDE_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
             if add > q4(8.0) {
                 towers += 1;
                 if KARST_AREA.value(&f, x, z) == 0 {
@@ -1785,6 +1854,48 @@ mod tests {
             let t = f.temperature(x * 16, z * 16);
             assert!((q12(SPAWN_TEMPERATURE.0)..q12(SPAWN_TEMPERATURE.1)).contains(&t), "seed {seed}: too cold or hot");
             assert!(x.abs().max(z.abs()) <= SPAWN_REACH, "seed {seed}: spawn {x} {z} far out");
+        }
+    }
+
+    /// A range's foothills and lower flanks walk up in steps of one, mostly: few columns there
+    /// have a face of two or more to a neighbour (dev before 11-04: 10-13%, and 22% where a river
+    /// valley ends in them), while the spines stay steep.
+    #[test]
+    fn foothills_are_walkable() {
+        for seed in [1, 2, 3] {
+            let f = fields(seed);
+            let h = |x: i32, z: i32| height(&f, x * 16, z * 16) >> 4;
+            // Columns, and those with a face of 2+: on the flanks (0.1..0.45), on the spines (0.7+).
+            let (mut flank, mut spine) = ([0u32; 2], [0u32; 2]);
+            for z in (-2000..=2000).step_by(9) {
+                for x in (-2000..=2000).step_by(9) {
+                    let m = MOUNTAINS_AREA.value(&f, x * 16, z * 16);
+                    let c = if (q12(0.1)..q12(0.45)).contains(&m) {
+                        &mut flank
+                    } else if m >= q12(0.7) {
+                        &mut spine
+                    } else {
+                        continue;
+                    };
+                    let here = h(x, z);
+                    if here <= SEA + 1 || here >= snow_line(f.temperature(x * 16, z * 16)) - 20 {
+                        continue;
+                    }
+                    let face = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                        .iter()
+                        .any(|&(dx, dz)| (h(x + dx, z + dz) - here).abs() >= 2);
+                    c[0] += 1;
+                    c[1] += face as u32;
+                }
+            }
+            let share = |c: [u32; 2]| c[1] as f64 / c[0].max(1) as f64;
+            assert!(
+                flank[0] > 1000 && share(flank) < 0.09,
+                "seed {seed}: {:.1}% of {} flank columns have faces",
+                share(flank) * 100.0,
+                flank[0]
+            );
+            assert!(spine[0] < 200 || share(spine) > 0.15, "seed {seed}: the spines are {:.1}% faces", share(spine) * 100.0);
         }
     }
 

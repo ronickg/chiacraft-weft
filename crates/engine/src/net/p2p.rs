@@ -33,8 +33,10 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// only whether it has code (empty: no code; chiacraft, phase 6). 9: worlds send players their
 /// signed achievements (`ToClient::Achievement`; chiacraft, phase 4). 10: a world asks a joining
 /// game for an achievement its rules need (`AskAchievement`, `Proofs`; chiacraft, phase 4). 11: a
-/// world sends its issuer's revocation list (`ToClient::Revocations`; chiacraft, phase 4).
-const PROTOCOL: u32 = 12;
+/// world sends its issuer's revocation list (`ToClient::Revocations`; chiacraft, phase 4). 12: a
+/// time-of-day rate per dimension (`ToClient::Time`). 13: a moving structure leans
+/// (`ToClient::BodyLean`; chiacraft, falling trees).
+const PROTOCOL: u32 = 13;
 const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its
@@ -611,8 +613,11 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
                     serve_status(conn, world, &hw).await;
                 } else if conn.alpn() == BANS_ALPN {
                     serve_bans(conn, hw.dir.clone()).await;
-                } else if let Err(e) = accept(conn, connect, world, &key, hw.dir.clone()).await {
-                    log::warn!("incoming player: {e}");
+                } else {
+                    watch_path(conn.clone(), "player in");
+                    if let Err(e) = accept(conn, connect, world, &key, hw.dir.clone()).await {
+                        log::warn!("incoming player: {e}");
+                    }
                 }
             });
         }
@@ -1248,6 +1253,67 @@ async fn pump_out<T: Send + crate::net::Message + 'static>(
     }
 }
 
+/// Logs which way a connection to another game goes (Ronald, 11-04: do joins really go over the
+/// network?), when it opens and whenever that changes, until it closes: `net: path to <id> relay`,
+/// `direct` or `mixed` (both open), and the kind of address in use (loopback, LAN, VPN, public, or
+/// the relay). `what`: a join, a portal arrival, or a player coming in (the host's side).
+fn watch_path(conn: iroh::endpoint::Connection, what: &'static str) {
+    runtime().spawn(async move {
+        let id = conn.remote_id().to_string();
+        let id = &id[..id.len().min(8)];
+        let mut last = String::new();
+        while conn.close_reason().is_none() {
+            let line = path_line(&conn);
+            if line != last {
+                log::info!("net: path to {id} {line} ({what})");
+                last = line;
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    });
+}
+
+/// `relay`, `direct` or `mixed`, and the address the connection sends on now with its kind.
+fn path_line(conn: &iroh::endpoint::Connection) -> String {
+    let (mut ip, mut relay, mut used) = (false, false, None);
+    for p in conn.paths().iter() {
+        ip |= p.is_ip();
+        relay |= p.is_relay();
+        if p.is_selected() {
+            used = Some(p.remote_addr().clone());
+        }
+    }
+    let way = match (ip, relay) {
+        (true, true) => "mixed",
+        (true, false) => "direct",
+        (false, true) => "relay",
+        (false, false) => "none",
+    };
+    match used {
+        Some(TransportAddr::Ip(a)) => format!("{way} {} {a}", ip_kind(a.ip())),
+        Some(TransportAddr::Relay(url)) => format!("{way} relay {url}"),
+        Some(other) => format!("{way} {other:?}"),
+        None => format!("{way} (no path in use yet)"),
+    }
+}
+
+/// Where an address is: this machine, the local network, a VPN or carrier NAT range (Tailscale's
+/// 100.64/10), or the internet.
+fn ip_kind(ip: std::net::IpAddr) -> &'static str {
+    use std::net::IpAddr;
+    match ip {
+        IpAddr::V4(v) if v.is_loopback() => "loopback",
+        IpAddr::V4(v) if v.is_private() || v.is_link_local() => "LAN",
+        IpAddr::V4(v) if v.octets()[0] == 100 && (64..128).contains(&v.octets()[1]) => "VPN",
+        IpAddr::V6(v) if v.is_loopback() => "loopback",
+        IpAddr::V6(v) if (v.segments()[0] & 0xfe00) == 0xfc00 || (v.segments()[0] & 0xffc0) == 0xfe80 => "LAN",
+        IpAddr::V6(v) if v.to_ipv4_mapped().is_some() => v
+            .to_ipv4_mapped()
+            .map_or("public", |v4| ip_kind(IpAddr::V4(v4))),
+        _ => "public",
+    }
+}
+
 /// Connects to `addr`: every address at once first; if the handshake does not finish soon, again
 /// from a new endpoint through the relay alone. With several network adapters (VPNs, virtual
 /// switches) the host may take the handshake's first packet from an address its answers never
@@ -1332,6 +1398,7 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
     runtime().spawn(async move {
         let result = async {
             let conn = connect(&settings, addr).await?;
+            watch_path(conn.clone(), if travel.is_empty() { "join" } else { "portal arrival" });
             let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
             let mut hello = codec::W::default();
             codec::Wire::put(&(PROTOCOL, native_hash(), travel.clone()), &mut hello);
@@ -1405,6 +1472,21 @@ pub fn start_join(ticket: &str, settings: &Settings) -> Result<Joining, String> 
 
 #[cfg(test)]
 mod tests {
+
+    /// Which kind of network a joined game's address is on (`net: path to`).
+    #[test]
+    fn address_kinds() {
+        let kind = |a: &str| super::ip_kind(a.parse().unwrap());
+        assert_eq!(kind("127.0.0.1"), "loopback");
+        assert_eq!(kind("::1"), "loopback");
+        assert_eq!(kind("192.168.1.13"), "LAN");
+        assert_eq!(kind("10.0.0.5"), "LAN");
+        assert_eq!(kind("fe80::1"), "LAN");
+        assert_eq!(kind("100.127.39.114"), "VPN");
+        assert_eq!(kind("::ffff:192.168.1.13"), "LAN");
+        assert_eq!(kind("5.223.65.62"), "public");
+        assert_eq!(kind("2a01:4ff:f0:b1b3::1"), "public");
+    }
     /// The identity is the account's network key: made on the first call, the same afterwards.
     #[test]
     fn identity_is_the_accounts_network_key() {

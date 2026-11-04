@@ -604,12 +604,13 @@ fn mod64(a: vec2<u32>, m: u32) -> u32 {
 // takes the columns at the cells' corners instead, from one before its first to its last.
 const LOD_LAST: i32 = i32(LOD_SIDE) - 1;
 // Per sample: ground height (low half) and biome; and what scattered things put on it: the
-// highest canopy top + 32768 and its block, and how many of its blocks they cover.
+// highest crown (its top above the sample's ground, 9 bits, how far it reaches down from there,
+// 7, its leaves), how many of its blocks crowns cover, and the tallest trunk standing in it (the
+// crown's top, 8 bits, the trunk's width, 4, and place, 2 and 2, its block).
 var<workgroup> lod_ground: array<u32, LOD_SAMPLES>;
 var<workgroup> canopy: array<atomic<u32>, LOD_SAMPLES>;
-// Crowns this many blocks above their site or more (the giants') taper from afar.
-const TALL_CROWN: i32 = 24;
 var<workgroup> cover: array<atomic<u32>, LOD_SAMPLES>;
+var<workgroup> trunk: array<atomic<u32>, LOD_SAMPLES>;
 
 // The ground height of sample (`i`, `j`), clamped to the tile's samples.
 fn lod_height(i: i32, j: i32) -> i32 {
@@ -671,17 +672,21 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             }
             under = top;
         }
-        let o = (tile * LOD_SAMPLES + k) * 2u;
+        let o = (tile * LOD_SAMPLES + k) * LOD_WORDS;
         outp[o] = (u32(y) & 65535u) | (u32(top) << 16u);
         outp[o + 1u] = (u32(c.biome) & 65535u) | (u32(under) << 16u);
+        outp[o + 2u] = 0u;
+        outp[o + 3u] = 0u;
         lod_ground[k] = (u32(c.height) & 65535u) | (u32(c.biome) << 16u);
         atomicStore(&canopy[k], 0u);
         atomicStore(&cover[k], 0u);
+        atomicStore(&trunk[k], 0u);
     }
     workgroupBarrier();
-    // Trees: every site whose canopy may reach the samples, found as `dim::scatter_site` does
-    // (standing on the nearest sample's ground, thinned where it stands), its canopy laid over
-    // the samples it covers. None on bare faces, which the shapes leave alone.
+    // Trees: every site whose crown may reach the samples, found as `dim::scatter_site` does
+    // (standing on the nearest sample's ground, thinned where it stands), one of its biome's
+    // sampled crowns (`crown`) laid over the samples it covers, its trunk in the one it stands in.
+    // None on bare faces, which the shapes leave alone.
     let so = u32(desc[D_SCATTER_OFF]);
     let face_fall = desc[D_FACE_FALL];
     var sea = -2147483647 - 1;
@@ -726,7 +731,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             if (!(bits.y < limit.y || (bits.y == limit.y && bits.x < limit.x))) {
                 continue;
             }
-            if (thin_len > 0u && desc[b + 5u] != 0) {
+            if (thin_len > 0u && desc[b + 2u] != 0) {
                 let random = hash64y(h, 1, 2, 3);
                 if ((keep == 0u || mod64(random, keep) != 0u) && mask(thin_at, thin_len, px * 16, pz * 16) > 0) {
                     continue;
@@ -735,9 +740,26 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             if (lod_fall(si, sj, s) >= face_fall) {
                 continue;
             }
-            let r = desc[b + 2u];
-            let tall = desc[b + 3u];
-            let leaves = u32(desc[b + 4u]);
+            // Which crown: the site's own bits, mixed apart from those its chance took.
+            var m = h.x ^ (h.y * 0x9E3779B9u);
+            m = (m ^ (m >> 16u)) * 0x85EBCA6Bu;
+            m = m ^ (m >> 13u);
+            let sh = b + 3u + (m % LOD_SHAPES) * 2u;
+            let shape = u32(desc[sh]);
+            if (shape == 0u) {
+                continue;
+            }
+            let blocks = u32(desc[sh + 1u]);
+            let leaves = blocks & CROWN_BLOCK_MASK;
+            let r = i32(shape & CROWN_RADIUS_MASK);
+            let top = i32((shape >> CROWN_TOP_SHIFT) & CROWN_TOP_MASK);
+            let bottom = i32((shape >> CROWN_BOTTOM_SHIFT) & CROWN_BOTTOM_MASK);
+            let widest = bottom + (top - bottom) * i32((shape >> CROWN_WIDEST_SHIFT) & CROWN_FIFTEENTHS) / 15;
+            // Its top falls off as 1 - u^p out from the trunk (u from 0 to 1 at the edge): p from how
+            // wide it is halfway up from its widest layer (a pine's spire low, an oak's dome about 2).
+            let rounded = clamp(f32((shape >> CROWN_ROUND_SHIFT) & CROWN_FIFTEENTHS) / 15.0, 0.07, 0.97);
+            let p = log(0.5) / log(rounded);
+            let edge = f32(r) + 0.5;
             let a0 = clamp(div_floor(px - r - ox + off, s).x + 1, 0, LOD_LAST);
             let a1 = clamp(div_floor(px + r - ox + off, s).x + 1, 0, LOD_LAST);
             let e0 = clamp(div_floor(pz - r - oz + off, s).x + 1, 0, LOD_LAST);
@@ -748,34 +770,55 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
                     let z0 = oz + (j - 1) * s - off;
                     let wx = min(px + r + 1, x0 + s) - max(px - r, x0);
                     let wz = min(pz + r + 1, z0 + s) - max(pz - r, z0);
-                    if (wx > 0 && wz > 0) {
-                        // A crown far taller than the rest (a giant sequoia's) narrows toward its
-                        // top from afar instead of standing as a flat-topped box: a sample is lower
-                        // the further its middle is from the trunk, half the height at the edge.
-                        var above = tall;
-                        if (tall >= TALL_CROWN) {
-                            let d = min(max(abs(x0 + s / 2 - px), abs(z0 + s / 2 - pz)), r);
-                            above = tall - (d * tall) / (2 * max(r, 1));
-                        }
-                        let packed = (u32(gh + 1 + above + 32768) << 16u) | leaves;
-                        let q = u32(j) * LOD_SIDE + u32(i);
-                        atomicAdd(&cover[q], u32(wx * wz));
-                        atomicMax(&canopy[q], packed);
+                    // The crown is round: how far its nearest point in the cell is from the trunk.
+                    let nx = f32(clamp(px, x0, x0 + s - 1) - px);
+                    let nz = f32(clamp(pz, z0, z0 + s - 1) - pz);
+                    let d = sqrt(nx * nx + nz * nz);
+                    if (wx <= 0 || wz <= 0 || d > edge) {
+                        continue;
                     }
+                    let u = min(d / edge, 1.0);
+                    let up = 1.0 - pow(u, p);
+                    let down = 1.0 - u * u;
+                    let ct = gh + 1 + widest + i32(round(f32(top - widest) * up));
+                    let cb = gh + 1 + widest - i32(round(f32(widest - bottom) * down));
+                    // Over water from the water's top.
+                    let ground = max(lod_height(i, j), sea);
+                    let above = ct - ground;
+                    if (above <= 0) {
+                        continue;
+                    }
+                    let depth = min(ct - max(cb, ground + 1), 127);
+                    let packed = (u32(min(above, 511)) << 23u) | (u32(depth) << 16u) | leaves;
+                    let q = u32(j) * LOD_SIDE + u32(i);
+                    atomicAdd(&cover[q], u32(wx * wz));
+                    atomicMax(&canopy[q], packed);
                 }
+            }
+            // Its trunk, in the cell it stands in (its place there in 2 bits: box tiles' cells are 4
+            // blocks at most).
+            let width = (shape >> CROWN_TRUNK_SHIFT) & CROWN_TRUNK_MASK;
+            let tx = px - (ox + (si - 1) * s - off);
+            let tz = pz - (oz + (sj - 1) * s - off);
+            if (width > 0u && tx >= 0 && tx < s && tz >= 0 && tz < s) {
+                let place = (width << 4u) | (u32(min(tx, 3)) << 2u) | u32(min(tz, 3));
+                let word = (u32(min(top, 255)) << 24u) | (place << 16u) | (blocks >> CROWN_TRUNK_BLOCK_SHIFT);
+                atomicMax(&trunk[u32(sj) * LOD_SIDE + u32(si)], word);
             }
         }
     }
     workgroupBarrier();
-    // A sample is canopy where trees cover a third of it (a forest from afar, single trees up
-    // close), as high as the highest.
+    // A sample has a crown where crowns cover a third of it (a forest from afar, single trees up
+    // close), the highest one's.
     for (var k = t; k < LOD_SAMPLES; k += 256u) {
         let p = atomicLoad(&canopy[k]);
         if (p != 0u && atomicLoad(&cover[k]) * 3u >= u32(s * s)) {
-            let o = (tile * LOD_SAMPLES + k) * 2u;
-            let leaves = p & 65535u;
-            outp[o] = ((u32(i32(p >> 16u) - 32768)) & 65535u) | (leaves << 16u);
-            outp[o + 1u] = (outp[o + 1u] & 65535u) | (leaves << 16u);
+            let o = (tile * LOD_SAMPLES + k) * LOD_WORDS;
+            let ground = max(bitcast<i32>(lod_ground[k] << 16u) >> 16u, sea);
+            let top = ground + i32(p >> 23u);
+            let tr = atomicLoad(&trunk[k]);
+            outp[o + 2u] = (u32(top) & LOD_OUT_HALF_MASK) | ((p & 65535u) << LOD_OUT_HALF_SHIFT);
+            outp[o + 3u] = ((p >> 16u) & 127u) | (((tr >> 16u) & 255u) << LOD_OUT_TRUNK_DZ_SHIFT) | ((tr & 65535u) << LOD_OUT_HALF_SHIFT);
         }
     }
 }

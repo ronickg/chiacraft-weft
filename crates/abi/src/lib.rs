@@ -2358,6 +2358,10 @@ pub struct Host {
     pub put_down_body: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64),
     /// A moving structure goes to `pos` in exactly `ticks`, whatever it was doing.
     pub body_go: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, pos: *const [f64; 3], ticks: u32),
+    /// chiacraft: a moving structure leans about `pivot` (world) by `rot` (a quaternion x, y, z,
+    /// w), reached in `ticks` on clients; the identity stands it up. While it leans it is only
+    /// drawn: nothing collides with it or picks it.
+    pub body_turn: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64, pivot: *const [f64; 3], rot: *const [f32; 4], ticks: u32),
     /// What a comparator would read of the block at `pos` may be different now.
     pub signal_read_changed: unsafe extern "C" fn(world: *mut WorldCtx, pos: *const [i32; 3]),
     /// Adds `cb` (`UiArgs`) to place `area` of screen `screen` (`core:title` has `buttons` and
