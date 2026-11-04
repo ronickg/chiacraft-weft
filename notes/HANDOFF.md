@@ -264,8 +264,14 @@ clans (with its code) and gems, and loaded them with no error; on alice's world 
 Wolves` ran in the sandbox ("clan Wolves founded" in the log, "Clan Wolves founded." in chat), no
 strikes. The invite and join between the two weren't seen yet (the first run's scripts were out of
 step; rerun pending).
-Left: offers marking code for the join sheet (slice 2), components and channels in the API
-(slice 3), client halves (slice 4), personal mods per world (slice 5), `/mods` (slice 6).
+Slice 2 (consent marks code), after Ronald agreed the report's decisions: protocol 6, the
+`Offer` tuple's sixth field says whether the package carries `code/server.wasm`
+(`modloader::current_packages`); `download` refuses a package whose manifest says otherwise; the
+join sheet marks it (`join_sheet.code`, `OfferRow.code`). In `content::freeze_commands` a
+package's command whose name is taken is left out with a warning instead of failing the content
+build (code mods keep the old error).
+Left: components and channels in the API (slice 3), client halves (slice 4), personal mods per
+world (slice 5), `/mods` (slice 6).
 
 ## Side mods
 

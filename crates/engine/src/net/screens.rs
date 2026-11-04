@@ -157,6 +157,8 @@ pub struct OfferRow {
     /// Why a signature it carries doesn't check out.
     pub problem: Option<String>,
     pub trusted: bool,
+    /// It carries sandboxed code (`code/server.wasm`).
+    pub code: bool,
 }
 
 /// Asks before downloading packages the player has not trusted yet (chiacraft): each with its
@@ -203,6 +205,9 @@ impl Screen for JoinSheet {
                         (None, None) => {
                             label(ui, cx, "join_sheet.unsigned", &[], "dim");
                         }
+                    }
+                    if r.code {
+                        label(ui, cx, "join_sheet.code", &[], "dim");
                     }
                 }
             });

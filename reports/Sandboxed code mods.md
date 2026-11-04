@@ -1,7 +1,7 @@
 # Sandboxed code mods: the design (phase 6)
 
-Status: 2026-11-03, for Ronald to agree. Slice 1 (server halves) is built on the branch
-`claude/phase6-sandboxed-mods-ef818a`; "Decisions to agree" lists what needs his yes.
+Status: 2026-11-03, agreed (see "Decisions"). Slices 1 (server halves) and 2 (consent marks code)
+are built on the branch `claude/phase6-sandboxed-mods-ef818a`.
 
 ## The goal
 
@@ -83,8 +83,9 @@ nested callback skips the mod (it is busy) rather than re-entering the store.
    registration through the `packages` mod, per-world instances and storage, limits and strikes,
    the sample `clans` (the animals mod's tribes) with tests and fuzz targets. Seen working: see
    `notes/HANDOFF.md`.
-2. *Consent says it is code*: the join sheet's note now says code runs sandboxed; next, offers
-   carry "has code" so the sheet marks those packages, and trust settings may refuse code alone.
+2. *Consent says it is code* (built): the join sheet's note says code runs sandboxed; offers carry
+   "has code" (protocol 6) and the sheet marks those packages; a host that hides code is refused
+   when the manifest arrives. Later, perhaps: a trust setting that refuses code alone.
 3. *More of the SDK*: components (per-entity values with flags, the biggest gap for porting),
    channels to a mod's client half, block and item callbacks (`on_use`, `on_neighbor`), gizmos,
    sounds and particles. Each is a new frozen API version (1.1, ...) beside 1.0.
@@ -97,22 +98,24 @@ nested callback skips the mod (it is busy) rather than re-entering the store.
 6. *Operations*: `/mods` (which run, their cost per tick, strikes, resume a stopped one),
    ahead-of-time compiled components cached in the store, per-tick budgets across all mods.
 
-## Decisions to agree
+## Decisions (agreed 2026-11-03)
 
-1. wasmtime 36 LTS components, host in our crates, WIT v1.0 as written (and frozen once a
-   release ships it).
+Ronald took the recommendations ("Take its recommendations", through Planner):
+
+1. wasmtime 36 LTS components, the host in our crates, WIT v1.0 as written, frozen once a release
+   ships it.
 2. A package's code lives at `code/server.wasm` (later `code/client.wasm`), under the package's
    hash and signature; no separate code packages.
-3. The limits and strike rule above.
-4. Server halves run only on the world's host; joining players download the code but never run
-   it (their content must match).
-5. The SDK alias trick (`weft_sdk = { package = "chiacraft-mod-sdk" }`) as the way Weft mods
-   port.
-6. Command names: the engine's are reserved; a name another mod already has fails the content
-   build (Weft's rule), so a world whose packages clash doesn't open. Proposed instead: refuse the
-   later package's command and keep the world opening.
-7. The consent sheet: one sheet for data and code, with "runs sandboxed code" on the packages that
-   carry it (slice 2), or a separate, stronger question for code.
+3. The limits and the strike rule above.
+4. Server halves run only on the world's host; joining players download the code (their content
+   must match) but never run it.
+5. Weft mods port through the alias `weft_sdk = { package = "chiacraft-mod-sdk" }`.
+6. A package's command whose name another mod or package already has is left out (with a
+   warning) and the world still opens; the engine's own commands stay reserved. Built in slice 2
+   (`content::freeze_commands`).
+7. One consent sheet for data and code, marking "runs sandboxed code" on the packages that carry
+   it. Built in slice 2: offers say whether a package carries code (protocol 6) and the joining
+   game refuses a package whose manifest says otherwise.
 
 ## Not done or not checked
 
