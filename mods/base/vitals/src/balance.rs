@@ -90,6 +90,71 @@ pub fn problems() -> Vec<String> {
         out.push("wet in leather on an 8 °C evening feels comfortable".into());
     }
 
+    // Clothes (`clothing`): fur against a winter night, linen in the desert sun, wool wet.
+    let wearing = |m: &str| {
+        let w = crate::clothing::find(m).map(crate::clothing::Worn::set).unwrap_or_default();
+        Body { cold_insulation: w.cold, heat_insulation: w.heat, wet_cold_insulation: w.cold_wet, ..person }
+    };
+    let night = Place { hour: 3.0, ..noon(-5.0) };
+    if matches!(feels(&wearing("fur"), &night), Feeling::Cold | Feeling::Freezing) {
+        out.push("a full set of fur on a -5 °C night is still cold".into());
+    }
+    if feels(&person, &night) != Feeling::Freezing {
+        out.push("unclothed on a -5 °C night doesn't freeze (clothes would matter little)".into());
+    }
+    let desert = Place { humidity: 0.1, ..noon(38.0) };
+    let core = |b: &Body, p: &Place| b.target(temperature::air(p));
+    if core(&wearing("linen"), &desert) >= core(&person, &desert) {
+        out.push("linen in the desert sun is no cooler than bare skin".into());
+    }
+    if core(&wearing("fur"), &desert) <= core(&person, &desert) {
+        out.push("fur in the desert sun is no hotter than bare skin".into());
+    }
+    let soaked = |m: &str| Body { wet: true, ..wearing(m) };
+    let evening = Place { hour: 20.0, ..noon(5.0) };
+    if core(&soaked("wool"), &evening) <= core(&soaked("linen"), &evening) {
+        out.push("wet wool is no warmer than wet linen".into());
+    }
+    let still = temperature::air(&Place { wind: 0.0, ..night });
+    let chilled = temperature::air(&Place { wind: 10.0, ..night });
+    if temperature::through_clothes(still, chilled, crate::clothing::Worn::set(&crate::clothing::MATERIALS[0]).windproof) <= chilled {
+        out.push("fur doesn't keep out the wind".into());
+    }
+
+    // Meals (`meals`): a stew of three foods alone makes one well fed, and is more than its parts.
+    let stew: Vec<usize> = ["base:beef", "base:bread", "base:apple"]
+        .iter()
+        .filter_map(|n| food::find(n))
+        .map(crate::meals::cooked)
+        .collect();
+    let mut s = Stomach::default();
+    if stew.len() != 3 || s.eat_meal(&stew, 1.0, food::HOT_FOR, capacity).is_err() || !s.well_fed(capacity) {
+        out.push("a stew of beef, bread and an apple doesn't make one well fed".into());
+    }
+    if crate::meals::units(&stew) > capacity {
+        out.push("a stew of three foods doesn't fit a new player's stomach".into());
+    }
+
+    // Preserving (`preserve`): every product is a food, keeping at least twice as long as what it's
+    // made of (meat seven times and more; an apple keeps well already); a desert summer dries food in two game days, a German winter not in five.
+    for m in crate::preserve::METHODS {
+        for (i, f) in FOODS.iter().enumerate() {
+            let Some(p) = crate::preserve::product(m, i) else { continue };
+            if food::find(p).is_none() {
+                out.push(format!("{} {} makes {p}, which isn't a food", m.name(), f.name));
+            } else if crate::preserve::lasts_over(p, f.name) < 2.0 {
+                out.push(format!("{p} keeps under twice as long as {}", f.name));
+            }
+        }
+    }
+    let dries_in = |celsius: f32, humidity: f32, wind: f32| 1.0 / crate::preserve::dry_rate(celsius, humidity, wind, false).max(1e-9) / crate::DAY_SECS;
+    if dries_in(32.0, 0.18, 2.6) > 2.0 {
+        out.push("a rack in a desert summer takes over two game days".into());
+    }
+    if dries_in(2.0, 0.77, 3.0) < 5.0 {
+        out.push("a rack in a damp winter dries in under five game days".into());
+    }
+
     // Freezing takes a full new player in two to five minutes at normal difficulty.
     let freeze = 1.0 / Effect::Freezing.modifiers().health_loss;
     if !(120.0..=300.0).contains(&freeze) {

@@ -35,6 +35,10 @@ flowchart LR
   air --> animal["Animal's body<br/>animals comfort.rs"]
   air --> eggs["Eggs<br/>animals eggs.rs"]
   food["Food table<br/>vitals::food"] --> stomach["Stomach<br/>vitals::stomach"]
+  food --> meals["Stews<br/>vitals::meals, cooking pot"] --> stomach
+  air --> preserve["Drying, smoking, salting<br/>vitals::preserve, drying rack"] --> food
+  animal --> clothing["Clothing<br/>vitals::clothing"]
+  clothing --> player
   items["Food items<br/>base items.rs"] --> stomach
   stomach --> player
   stats["Nine stats<br/>vitals::stats"] --> player
@@ -89,8 +93,11 @@ built, it gets its row below and its arrows above.
 | Wind and fog, snow, storms | `vitals::air`, `mods/base/src/weather.rs` (`/air`) | `wind`, `fog`, `fog_kind` per biome in `BIOMES`; `DAY_SPREAD`, `DAY_SWING`, `STORM`, `CLEARS`, `SNOWS_BELOW`, `SNOWFALL`, `MELT`, `BLIZZARD`, `DRY`, `DUST`, `FOG_SIGHT` | climates, calendar, rain spells and thunder, the world's seed | the engine (`set_air`: snow drawn where it is cold, `scene.weather`/`ground` for the pack's fog, storms, snow lying, swaying plants), the air (`air_at`: wind chill, fog), hunters and prey (`base_api::sight`) |
 | Calendar, seasons | `vitals::calendar` | `SEASON_DAYS`, `MIDSUMMER` | engine day time | the air, breeding seasons, day length (`.seasons(..)` on dimensions), the HUD clock |
 | The air | `base_api::air_at`, `vitals::temperature::air` | `temperature.rs`, `air::feels` | climate, season, hour, height, sky light, rain here (`raining_at`), the wind (`World::air_at`, chilling the cold in the open), water, fires (`base_api::heat_of`) | player's body, animals' bodies, eggs |
-| Player's body | `mods/base/src/survival/` (a file per part: breath, food, temperature, camp, stamina, body, load, health) | `vitals` | air, stomach, stats, effects, armor, difficulty | HUD, health and speed modifiers, death |
+| Player's body | `mods/base/src/survival/` (a file per part: breath, food, temperature, camp, stamina, body, load, health) | `vitals` | air, stomach, stats, effects, armor, clothes, difficulty | HUD, health and speed modifiers, death |
 | Stomach, food | `vitals::food`, `vitals::stomach`, `base_api::eat` | `FOODS` | food items (`NUTRITION`, `FRESHNESS`) | max health and stamina, regen, warmth, food poisoning |
+| Meals | `vitals::meals`, `base_api::eat_meal`, `mods/base/src/cooking.rs` (the cooking pot) | `BONUS`, `MIN`, `MAX`, `COOK_TICKS` | the foods that go in (`FOODS`), fuel | the stomach (a portion an ingredient), well fed, warmth, freshness by the shortest-keeping ingredient |
+| Preserving | `vitals::preserve`, `cooking.rs` (drying rack, salt) | `DRY_SECS`, `SMOKE_SECS`, `SMOKE_REACH`, `SALT_TICKS`, `dry_rate`; the preserved foods' `FOODS` rows | the air at the rack (`air_at`: warmth, humidity, wind, rain), fires below, raw meat, apples, berries | food that keeps for weeks, lighter to carry |
+| Clothing | `vitals::clothing`, `mods/base/src/clothing.rs`, `survival/temperature.rs` (`worn`) | `MATERIALS`, `PER_CLO`, `MAKES`, `FIBRE_CHANCE`; `temperature::{PIECE_SHARE, ARMOR_WET_KEEPS, WET_CHILL}` | pelts (`animals_core::hides`), leather, wool, plant fibre | body temperature: the comfort range, what's kept wet, the wind chill felt (`through_clothes`) |
 | Effects | `vitals::effects` | `modifiers()` | | player's body, animals (cold, heat), HUD icons (`install.py` `EFFECT_ICONS`) |
 | Body effects | `base_api::{poison, bleed, sedate}`, `survival/body.rs` | `survival/body.rs` constants | animals' venom (`breath.rs`), darts (`knockout.rs`), spider eye, heavy blows | player's body |
 | Carried weight | `survival/load.rs` | `weight` there | inventory | effects (encumbered), stats screen |
@@ -120,6 +127,13 @@ built, it gets its row below and its arrows above.
   item (`items.rs`); `balance.rs` (well fed from a few foods); the sheet. Its kind and portion
   are what animals eat it off the ground by (`forage.rs`); an item animals eat that isn't a
   player's food goes in `vitals::forage::DROPPED`.
+- **Clothes, or a new material** (`vitals::clothing::MATERIALS`): its clo, heat, wet and wind from
+  the research; the items come from the table (`clothing.rs`), with lang (base en, ru) and art;
+  `balance.rs`'s clothing checks; the sheet. A new furred species: its row in
+  `animals_core::hides`.
+- **A meal, or a new preserved food**: the stew is its ingredients (`vitals::meals`), so a new food
+  goes in it as it is; a new preserved food is a `FOODS` row, its `preserve::product` line and an
+  item in `cooking.rs`'s `PRODUCTS` and `items.rs`'s food list; the sheet.
 - **Temperature rules** (`temperature.rs`, `air_at`): players' effects, animals' comfort and
   eggs all move together; `places.rs` says if a species stops being at home or its eggs stop
   hatching.
@@ -172,6 +186,7 @@ built, it gets its row below and its arrows above.
 | Eggs hatch where and when they're laid | same | eggs that can't develop in a nest in a habitat in the breeding season |
 | The stats are the same nine | same | players' and animals' stats out of step |
 | Every food has nutrition | `testkit` `every_food_has_nutrition` | food items that can't be eaten |
-| Survival balance | `vitals/src/balance.rs` | foods, stomach, levels and calendar out of balance |
+| Survival balance | `vitals/src/balance.rs` | foods, stomach, levels and calendar out of balance; clothes that don't warm, cool or keep out the wind as their material should; a stew of three foods not making one well fed; preserved food keeping too little; a rack drying in the damp cold or not in a desert summer |
+| Every hide is a species | `animals/core/src/hides.rs` | a pelt or hide row for a species that isn't there |
 | Species balance | `animals/core/src/balance.rs` | species numbers against their facts |
 | The sheets are up to date | `vitals/tests/sheet.rs`, `animals/core/tests/sheet.rs` | a sheet not regenerated after a change |

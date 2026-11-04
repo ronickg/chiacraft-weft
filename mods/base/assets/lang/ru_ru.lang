@@ -282,3 +282,42 @@ config.base.difficulty.tooltip = Насколько суровы еда, хол�
 config.base.difficulty.gentle = Мягкое
 config.base.difficulty.normal = Обычное
 config.base.difficulty.harsh = Суровое
+
+# Одежда (clothing.rs, vitals::clothing)
+item.base.fur = Мех
+item.base.plant_fibre = Растительное волокно
+item.base.cloth = Льняная ткань
+item.base.fur_hat = Меховая шапка
+item.base.fur_coat = Меховая парка
+item.base.fur_trousers = Меховые штаны
+item.base.fur_boots = Меховые унты
+item.base.wool_hat = Шерстяная шапка
+item.base.wool_coat = Шерстяной свитер
+item.base.wool_trousers = Шерстяные штаны
+item.base.wool_boots = Шерстяные носки
+item.base.hide_hat = Кожаная шапка
+item.base.hide_coat = Замшевая рубаха
+item.base.hide_trousers = Замшевые штаны
+item.base.hide_boots = Мокасины
+item.base.linen_hat = Льняной капюшон
+item.base.linen_coat = Льняная рубаха
+item.base.linen_trousers = Льняные штаны
+item.base.linen_boots = Льняные обмотки
+tagged.base.warmth = {#ffbe45}+{value.cold} °C тепла{/}{if:value.heat>0} · {#7ac4f0}на солнце прохладнее на {value.heat} °C{/}{/if}{if:value.heat<0} · {#e8907a}{value.heat} °C в жару{/}{/if}\nМокрым сохраняет {value.wet}% · держит {value.wind}% ветра
+
+# Готовка и хранение еды (cooking.rs, vitals::meals, vitals::preserve)
+block.base.cooking_pot = Котелок
+block.base.cooking_pot.tooltip = Варит из двух–четырёх продуктов и миски похлёбку, сытнее, чем всё по отдельности.
+menu.base.cooking_pot = Котелок
+block.base.drying_rack = Сушилка
+block.base.drying_rack.tooltip = Сушит мясо, яблоки и ягоды в тёплом, сухом и ветреном воздухе; над огнём коптит мясо.
+menu.base.drying_rack = Сушилка
+item.base.bowl = Миска
+item.base.stew = Похлёбка
+item.base.salt = Соль
+item.base.dried_meat = Вяленое мясо
+item.base.smoked_meat = Копчёное мясо
+item.base.salted_meat = Солонина
+item.base.dried_apple = Сушёные яблоки
+item.base.dried_berries = Сушёные ягоды
+tagged.base.meal_nutrition = {value.units}0 г: {#e8907a}Б{/} {value.protein} · {#ffbe45}Э{/} {value.energy} · {#f0d27a}Ж{/} {value.fat} · {#8fd16a}З{/} {value.greens} · {#7ac4f0}В{/} {value.water}

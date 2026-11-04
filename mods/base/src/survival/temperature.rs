@@ -1,12 +1,13 @@
 //! Body temperature (`vitals::temperature`): once a second the air where one stands
 //! (`base_api::air_at`: the biome's climate, the season, the hour, height, sun, rain or snow,
 //! water, caves, fires near by), wet from rain and water and drying (faster by a fire), armor's
-//! insulation, and the core temperature moving toward what that leaves it at. Sets the weather's
+//! and clothes' insulation (`vitals::clothing`: warmth, what of it stays wet, the wind they stop), and the core temperature moving toward what that leaves it at. Sets the weather's
 //! effects, chilly to freezing and warm to heatstroke. Also `/season`, which jumps to a day of a
 //! season.
 
 use base_api::{Air, Vitals};
 use vitals::effects::{self, Effect, Group};
+use vitals::clothing::{self, Worn};
 use vitals::temperature::{self, Body};
 use vitals::{calendar, stomach};
 use weft_sdk::*;
@@ -48,11 +49,12 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
     } else {
         v.wet = (v.wet - 1.0 - here.fire / 3.0).max(0.0);
     }
-    let (cold, heat) = armor(w, id);
+    let worn = worn(w, id);
     let body = Body {
         comfort: temperature::PERSON,
-        cold_insulation: cold,
-        heat_insulation: heat,
+        cold_insulation: worn.cold,
+        heat_insulation: worn.heat,
+        wet_cold_insulation: worn.cold_wet,
         fortitude,
         fat,
         meal: s.meal_warmth(),
@@ -61,8 +63,10 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
     if v.core < 20.0 {
         v.core = temperature::CORE; // saved before the body had a temperature
     }
-    v.core = temperature::step_core(v.core, body.target(here.celsius), 1.0, 70.0);
-    v.outside = here.celsius;
+    // Through windproof clothes, only part of the wind chills.
+    let felt = temperature::through_clothes(here.still, here.celsius, worn.windproof);
+    v.core = temperature::step_core(v.core, body.target(felt), 1.0, 70.0);
+    v.outside = felt;
 
     let mut on = Vec::new();
     on.extend(effects::from_feeling(temperature::feeling(v.core)));
@@ -77,26 +81,23 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
     (here, comfort)
 }
 
-/// The cold and heat insulation of the armor one wears, a share a piece (head to feet).
-fn armor(w: &World, id: u64) -> (f32, f32) {
-    let (mut cold, mut heat) = (0.0, 0.0);
-    if let Some(worn) = w.inventory(id).find_group(EQUIPMENT_GROUP) {
-        for i in 0..worn.len().min(4) {
-            let stack = worn.get(i);
-            if stack.is_empty() {
-                continue;
-            }
-            let name = item_name(stack.item);
-            let material = name
-                .split_once(':')
-                .map_or(name, |(_, n)| n)
-                .split('_')
-                .next()
-                .unwrap_or("");
-            let (c, h) = temperature::set_insulation(material);
-            cold += c * temperature::PIECE_SHARE[i as usize];
-            heat += h * temperature::PIECE_SHARE[i as usize];
+/// What one wears: armor by its material, a share a piece (head to feet), and clothes by theirs
+/// (`vitals::clothing`, named `<material>_<piece>`).
+fn worn(w: &World, id: u64) -> Worn {
+    let mut worn = Worn::default();
+    let Some(slots) = w.inventory(id).find_group(EQUIPMENT_GROUP) else { return worn };
+    for i in 0..slots.len() {
+        let stack = slots.get(i);
+        if stack.is_empty() {
+            continue;
+        }
+        let name = item_name(stack.item);
+        if let Some((m, piece)) = clothing::piece_of(name) {
+            worn.clothes(m, piece);
+        } else if i < 4 {
+            let material = name.split_once(':').map_or(name, |(_, n)| n).split('_').next().unwrap_or("");
+            worn.armor(material, i as usize);
         }
     }
-    (cold, heat)
+    worn
 }

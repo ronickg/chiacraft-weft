@@ -169,8 +169,10 @@ temperature effects' strength (gentle never kills by cold), the XP lost at death
 ## Open questions
 
 - Comfort items list and values (which furniture counts).
-- Which food items exist and their recipes (bread, stews, roasts, salted and smoked meat...).
-- Clothing: armor only, or also cloth and fur clothes without armor value.
+- Which food items exist and their recipes (bread, stews, roasts, salted and smoked meat...):
+  stews and the preserved foods are built (step 6b); roasts and pies of several ingredients wait.
+- Clothing: decided (2026-11-03, via the Planner): clothes of their own, without armor value, in
+  four slots under armor (step 10). Easy to change: the numbers are `vitals::clothing`.
 - A stats screen of its own, or a tab in the inventory.
 
 ## Built so far
@@ -347,7 +349,29 @@ sword, about 100 XP.
   hot from the fire.
 - Not yet: meals from several ingredients (stews, pies) wait for crops and their items and
   icons; salting, smoking and drying (keeping longer); food in chests ages only from when a player
-  first held it.
+  first held it. (All three since step 6b.)
+
+**6b. Stews, drying, smoking, salting** (2026-11-03, `vitals::meals`, `vitals::preserve`,
+`mods/base/src/cooking.rs`):
+
+- The cooking pot (iron, its own fuel): two to four foods and a bowl make a stew in 10 s. A stew
+  is what went into it (`base:meal` on the stack, raw meat counted cooked): eating it puts each
+  into the stomach as its own portion at x1.25, so one bowl of three foods makes one well fed;
+  hot, it warms as one dish; it keeps as its shortest-keeping ingredient; the bowl comes back.
+  Its tooltip shows what it holds (`base:meal_nutrition`). The stomach and its save are unchanged.
+- Preserved foods, one per method, each its own row of real nutrition (USDA), the water gone so
+  lighter to carry: dried meat (30 + 30 days; jerky), smoked meat (14 + 14), salted meat (45 +
+  45), dried apple and dried berries (56 + 56, a game year).
+- The drying rack (sticks, four slots) dries by its air (`air_at`): about a game day at 25 °C,
+  humidity 0.3 and a breeze, nothing under 5 °C, above humidity 0.85 or in the rain; with a fire
+  within two blocks below it smokes meat in half a day, in any weather.
+- Salt: a water bucket boiled in a furnace (20 s), the bucket back (the furnace's input now
+  leaves its remainder, as crafting does); raw meat and salt craft into salted meat.
+- Food is stamped as the pot and the rack make it, and opening any block's inventory (a chest)
+  brings its food's freshness up to date; food a player held was stamped then and ages wherever
+  it is, since its day is fixed.
+- Not yet: roasts and pies from several ingredients (the apple pie is still a fixed row), smoked
+  fish (no fish item), food going stale on a rack left in the rain.
 
 **7. Poison, bleeding, sedation, carried weight** (2026-11-02, `survival/body.rs`, `survival/load.rs`, `base_api`):
 
@@ -425,3 +449,25 @@ sword, about 100 XP.
   world made with "Survival: Gentle" is gentle.
 - Not seen in the game: each number's effect at gentle and harsh (they use the same code as
   normal, multiplied).
+
+**10. Clothing** (2026-11-03, `vitals::clothing`, `mods/base/src/clothing.rs`):
+
+- Four slots of their own under armor, beside it in the inventory: hat, coat, trousers, boots.
+  No armor value; armor keeps its insulation. Fur's row left armor's table for clothing's.
+- Four materials from real insulation (clo, ISO 9920; arctic fur suits) at 6 °C of comfort a
+  clo, a piece its share of the set (head 0.15, body 0.4, legs 0.3, feet 0.15): fur 3.5 clo
+  (21 °C, -8 in the heat), wool 1.8 (11, -3), hide 1.2 (7, -1), linen 0.5 (3, +4: cooler than bare
+  skin in the sun).
+- Wet keeps a share by material (wool 60%, hide 70%, fur 50%, linen 10%, armor 35%), on top of
+  being wet feeling 6 °C colder. Windproof clothes stop a share of the wind chill (fur 80%, hide
+  70%, wool 30%, linen 10%): `air_at` gives the air with and without the wind.
+- Materials: fur from wild furred animals (hares and foxes one, wolves and coyotes up to two,
+  reindeer and jaguars up to three: `animals_core::hides`), leather from cows and deer, sheep's
+  wool, and linen from string, which plant fibre from cutting tall grass (1 in 8) spins into.
+  Each piece is sewn with string.
+- Their tooltips say their warmth (`base:warmth`). Placeholder art: tinted leather armor.
+- Checks (`vitals::balance`): fur holds off the cold on a -5 °C night that freezes one unclothed,
+  linen is cooler than bare skin in the desert sun and fur hotter, wet wool warmer than wet linen,
+  fur keeps out the wind.
+- Not yet: clothes wearing out, dyes, flax for linen (the plants work), generated art.
+
