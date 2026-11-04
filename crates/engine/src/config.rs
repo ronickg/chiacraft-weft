@@ -584,6 +584,11 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:chat_height", ck::INT, 180.0, 20.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_height_closed", ck::INT, 110.0, 20.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_opacity", ck::INT, 50.0, 0.0, 100.0, 5.0),
+        ConfigDef {
+            kind: ck::CHOICE,
+            choices: vec!["all".into(), "system".into(), "hidden".into()],
+            ..ConfigDef::number("core:chat_visibility", ck::CHOICE, 0.0, 0.0, 2.0, 0.0)
+        },
         ConfigDef::number("core:vsync", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         // Frames a second at most (0: as many as it can draw): less heat and battery, steadier.
         ConfigDef::number("core:fps_cap", ck::INT, 0.0, 0.0, 360.0, 10.0),
@@ -596,8 +601,6 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:brightness", ck::FLOAT, 0.5, 0.0, 1.0, 0.0),
         ConfigDef::number("core:debug_groups", ck::INT, u32::MAX as f64, 0.0, u32::MAX as f64, 1.0),
         ConfigDef::number("core:invert_y", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
-        ConfigDef::number("core:toggle_sneak", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
-        ConfigDef::number("core:toggle_sprint", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::text("core:debug_lines", ""),
         ConfigDef::text("core:name", &user),
         ConfigDef::text("core:relays", ""),
@@ -635,6 +638,13 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // `core:inactive_entity_interval` ticks; 0: all tick every tick.
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:entity_activation_distance", ck::INT, 48.0, 0.0, 512.0, 16.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:inactive_entity_interval", ck::INT, 20.0, 1.0, 200.0, 1.0) },
+        // Most cubes mods' tickets keep loaded with no player near (`Host::force_load`).
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:max_forced_cubes", ck::INT, 4096.0, 0.0, 1048576.0, 1.0) },
+        ConfigDef::number("core:first_person_model", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:show_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        ConfigDef::number("core:occlusion_culling", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:allow_avatars", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:keep_inventory", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
     ];
     out.extend(
         keys.iter()

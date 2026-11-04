@@ -8,17 +8,21 @@ use super::probe;
 use super::{add, at};
 use crate::runner::{R, T};
 
-/// A player saved in a dimension that is gone (its mod removed) keeps everything and starts at
-/// the spawn; the world remembers the mods it was played with.
+/// A player saved in a dimension that is gone (its mod removed) keeps everything, storages too,
+/// and starts at the spawn; the world remembers the mods it was played with.
 pub async fn missing_dimension(t: T) -> R {
     t.world(7).await?;
     t.op("put me 3 diamond 5").await?;
+    t.op("stash base:chest stick 7").await?;
+    t.screen("core:menu").await?;
+    t.c().screen_close();
+    t.no_screen().await?;
     let flat = Dimension::lookup("base:flatlands").ok_or("no flatlands")?;
     t.cmd("/dim base:flatlands").await?;
     t.until("in the flatlands", Duration::from_secs(20), |t| t.state().dim == flat)
         .await?;
     let name = format!("test-{}", t.name());
-    t.c().leave_world();
+    t.c().world_leave();
     t.screen("core:title").await?;
     let dir = format!("{}/saves/{name}", t.c().run_dir());
     let world = std::fs::read_to_string(format!("{dir}/world.txt")).map_err(|e| e.to_string())?;
@@ -32,7 +36,7 @@ pub async fn missing_dimension(t: T) -> R {
         std::fs::write(f.path(), src.replace("dim = base:flatlands", "dim = ghost:gone")).map_err(|e| e.to_string())?;
     }
     // Opened from the list like a player would: the missing mod is named first.
-    t.c().open_screen(&screens::WORLDS);
+    t.c().screen_open(&screens::WORLDS);
     t.screen("core:worlds").await?;
     t.frames(2).await?;
     // A click lasts 50 ms; buttons act on release.
@@ -48,23 +52,264 @@ pub async fn missing_dimension(t: T) -> R {
     t.loaded().await?;
     t.check_eq(t.state().dim, Dimension::lookup("base:overworld").unwrap_or(u32::MAX), "the player is in the spawn dimension");
     t.check_eq(t.slot("me", 3).await?, ("base:diamond".into(), 5, 0), "and kept the inventory");
+    t.check_eq(t.op("stashed 0").await?, "base:stick 7 0".to_string(), "and the stash");
     Ok(())
 }
 
-/// Menus open on virtual inventories and on far away blocks; a menu for a block without an
-/// entity is refused with a reason instead of opening something broken.
+/// Riding: chains of mounts without rings, a mob jockey steering by its AI, the player steering
+/// from its client with the kind's keys, getting off where the seat says.
+pub async fn riding(t: T) -> R {
+    t.flat().await?;
+    let f = t.feet();
+    let spawn = async |t: &T, kind: &str, dz: i32| {
+        t.op(&format!("spawn {kind} {} {} {}", f[0], f[1], f[2] + dz))
+            .await
+    };
+    let (a, b) = (spawn(&t, "testmod:steed", -4).await?, spawn(&t, "testmod:steed", -7).await?);
+    let y = |s: String| {
+        s.split_whitespace()
+            .nth(2)
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(f64::NAN)
+    };
+    t.check_eq(t.op(&format!("mount {a} {b}")).await?, "1".to_string(), "a steed on a steed");
+    t.check_eq(t.op(&format!("mount {b} {a}")).await?, "0".to_string(), "no ring of riders");
+    t.secs(0.3).await?;
+    let (ya, yb) = (y(t.op(&format!("entity {a}")).await?), y(t.op(&format!("entity {b}")).await?));
+    t.check((yb - ya - 1.0).abs() < 0.05, format!("the one on top sits in its seat: {yb:.2} over {ya:.2}"));
+
+    // A zombie in the saddle walks the steed with its AI, towards the player.
+    let z = spawn(&t, "base:zombie", -12).await?;
+    let c = spawn(&t, "testmod:steed", -12).await?;
+    t.op("time 18000").await?;
+    t.check_eq(t.op(&format!("mount {c} {z}")).await?, "1".to_string(), "a zombie jockey");
+    let at = |s: String| {
+        let v: Vec<f64> = s
+            .split_whitespace()
+            .skip(1)
+            .take(3)
+            .filter_map(|v| v.parse().ok())
+            .collect();
+        (v.first().copied().unwrap_or(f64::NAN), v.get(2).copied().unwrap_or(f64::NAN))
+    };
+    let before = at(t.op(&format!("entity {c}")).await?);
+    t.secs(2.0).await?;
+    let after = at(t.op(&format!("entity {c}")).await?);
+    let walked = (after.0 - before.0).hypot(after.1 - before.1);
+    t.probe("blocks the zombie walked its steed", walked as f32, walked > 1.0);
+
+    // The player in the saddle of the free one: its keys walk it where it looks.
+    t.op(&format!("remove {z}")).await?;
+    t.op(&format!("remove {c}")).await?;
+    let d = spawn(&t, "testmod:steed", 3).await?;
+    t.check_eq(t.op(&format!("mount {d}")).await?, "1".to_string(), "the player gets on");
+    t.c().set_look(0.0, 0.0);
+    t.secs(0.5).await?;
+    let before = at(t.op(&format!("entity {d}")).await?);
+    t.hold("core:forward", 1.0);
+    t.secs(1.3).await?;
+    let after = at(t.op(&format!("entity {d}")).await?);
+    let rode = (after.0 - before.0).hypot(after.1 - before.1);
+    t.probe("blocks the player rode it in a second", rode as f32, rode > 2.0);
+    let seat = t.op("vehicle").await?;
+    t.check(seat.starts_with(&d), format!("still on it: {seat}"));
+    // From behind: sitting, legs forward.
+    t.press("core:perspective");
+    t.c().set_look(180.0, -35.0);
+    t.secs(0.6).await?;
+    t.shot("seated").await?;
+    t.press("core:perspective");
+    t.press("core:perspective");
+
+    // Sent away, the steed takes its rider: in this dimension, then to another.
+    t.op(&format!("send {d} here {} {} {}", f[0] + 40, f[1] + 3, f[2]))
+        .await?;
+    t.until("the rider came along", Duration::from_secs(5), |t| (t.state().pos.x - (f[0] + 40) as f64).abs() < 3.0)
+        .await?;
+    t.check(t.op("vehicle").await?.starts_with(&d), "still in the saddle after a teleport");
+    let over = Dimension::lookup("base:overworld").ok_or("no overworld")?;
+    t.op(&format!("send {d} base:overworld 0 200 0")).await?;
+    t.until("the rider came to the other dimension", Duration::from_secs(10), |t| t.state().dim == over)
+        .await?;
+    t.secs(0.5).await?;
+    t.check(t.op("vehicle").await?.starts_with(&d), "still in the saddle in the other dimension");
+    t.press("core:dismount");
+    t.secs(0.5).await?;
+    t.check_eq(t.op("vehicle").await?, "0 0".to_string(), "the dismount key gets off");
+    Ok(())
+}
+
+/// Camera modes: F5 through the three, third person kept out of a wall and sliding along it
+/// smoothly, the free camera only in a game mode that flies and moving while the player stands,
+/// a mod's own on its key, and a mode the server holds.
+pub async fn camera(t: T) -> R {
+    t.flat().await?;
+    t.op("mode survival").await?;
+    let f = t.feet();
+    // From the eyes to the camera.
+    let back = |t: &T| {
+        let s = t.state();
+        let (c, p) = (s.camera_pos, s.shown);
+        ((c.x - p.x).powi(2) + (c.y - p.y - 1.62).powi(2) + (c.z - p.z).powi(2)).sqrt() as f32
+    };
+    t.c().set_look(0.0, 0.0);
+    t.secs(0.3).await?;
+    t.check_eq(t.state().camera, 0, "first person to begin with");
+    t.press("core:perspective");
+    t.secs(0.3).await?;
+    t.check_eq(t.state().camera, 1, "F5: from behind");
+    let d = back(&t);
+    t.probe("blocks from the eyes behind", d, (d - 4.0).abs() < 0.2);
+
+    // A wall 1.5 blocks behind the eyes (looking north, behind is south).
+    t.op(&format!("fill {} {} {} {} {} {} base:stone", f[0] - 6, f[1], f[2] + 2, f[0] + 6, f[1] + 5, f[2] + 2))
+        .await?;
+    t.secs(0.3).await?;
+    let d = back(&t);
+    t.probe("blocks back with a wall at 1.5", d, d > 1.3 && d < 1.5);
+    // Turning, it slides along the wall: no jumps from one block to the next.
+    let mut last = d;
+    let mut worst = 0.0f32;
+    for i in 1..=30 {
+        t.c().set_look(i as f32, 0.0);
+        t.frames(2).await?;
+        let d = back(&t);
+        worst = worst.max((d - last).abs());
+        last = d;
+    }
+    t.probe("biggest step along the wall, blocks", worst, worst < 0.08);
+    t.op(&format!("fill {} {} {} {} {} {} core:air", f[0] - 6, f[1], f[2] + 2, f[0] + 6, f[1] + 5, f[2] + 2))
+        .await?;
+    for _ in 0..2 {
+        t.press("core:perspective");
+        t.frames(2).await?;
+    }
+    t.secs(0.2).await?;
+    t.check_eq(t.state().camera, 0, "F5 comes round to first person");
+
+    t.press("core:freecam");
+    t.secs(0.4).await?;
+    t.check_eq(t.state().camera, 0, "no free camera in survival");
+    t.op("mode creative").await?;
+    t.secs(0.2).await?;
+    t.press("core:freecam");
+    t.secs(0.4).await?;
+    t.check_eq(t.state().camera, 3, "the free camera in creative");
+    let pos = t.state().pos;
+    t.c().set_look(0.0, 0.0);
+    t.hold("core:forward", 1.0);
+    t.secs(1.3).await?;
+    let d = back(&t);
+    t.probe("blocks the free camera flew", d, d > 5.0);
+    let s = t.state().pos;
+    let stood = ((s.x - pos.x).powi(2) + (s.z - pos.z).powi(2)).sqrt() as f32;
+    t.probe("blocks the player moved meanwhile", stood, stood < 0.05);
+    t.press("core:freecam");
+    t.secs(0.3).await?;
+    t.check_eq(t.state().camera, 0, "its key again comes back");
+
+    let orbit = CameraMode::generated("testmod:orbit".to_string()).camera_id();
+    t.press("testmod:orbit");
+    t.secs(0.8).await?;
+    t.check_eq(t.state().camera, orbit, "a mod's camera on its key");
+    let d = back(&t);
+    t.probe("blocks the orbit is out", d, (d - 6.0).abs() < 0.3);
+    t.press("testmod:orbit");
+    t.secs(0.8).await?;
+
+    t.op("camera core:behind 1").await?;
+    t.secs(0.3).await?;
+    t.check_eq(t.state().camera, 1, "the server puts it behind");
+    t.press("core:perspective");
+    t.secs(0.2).await?;
+    t.check_eq(t.state().camera, 1, "and holds it there");
+    t.op("camera release").await?;
+    t.secs(0.3).await?;
+    t.check_eq(t.state().camera, 0, "released, back to its own");
+    Ok(())
+}
+
+/// Mods change a player's state from the server, and its client follows: a mace's smash by the
+/// fall it reads, then the look, the hand, flight and fire set from outside.
+pub async fn entity_edit(t: T) -> R {
+    t.flat().await?;
+    let (dmg, fell) = {
+        let s = t.op("attack_damage testmod:mace 5").await?;
+        let mut p = s
+            .split_whitespace()
+            .map(|v| v.parse::<f64>().unwrap_or(f64::NAN));
+        (p.next().unwrap_or(f64::NAN), p.next().unwrap_or(f64::NAN))
+    };
+    t.check_eq(fell, 5.0, "the fall distance a mod set");
+    t.check_eq(dmg, 22.0, "a mace after five blocks: 6 + 4 * 3 + 2 * 2");
+    let (plain, _) = {
+        let s = t.op("attack_damage base:stick 5").await?;
+        (s.split_whitespace().next().unwrap_or("").to_string(), ())
+    };
+    t.check_eq(plain, "6".to_string(), "anything else doesn't care how far it fell");
+    let ground = t.state().pos.y;
+    t.check_eq(t.op("edit_me 1.5 4 1 60").await?, "4 60".to_string(), "slot and fire on the server");
+    t.until("the client follows", Duration::from_secs(10), |t| {
+        let s = t.state();
+        (s.yaw - 1.5).abs() < 1e-3 && s.selected == 4 && t.flag(client::client_flags::FLYING) && s.pos.y > ground + 2.5
+    })
+    .await?;
+
+    // The smash throws back what stands around the one hit.
+    let f = t.feet();
+    let f = [f[0], f[1] - 3, f[2]];
+    t.op("put me 4 testmod:mace").await?;
+    let hit = t
+        .op(&format!("spawn base:pig {} {} {}", f[0], f[1], f[2] - 3))
+        .await?;
+    let near = t
+        .op(&format!("spawn base:pig {} {} {}", f[0] + 1, f[1], f[2] - 3))
+        .await?;
+    t.secs(0.5).await?;
+    let x = |s: String| {
+        s.split_whitespace()
+            .nth(1)
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(f64::NAN)
+    };
+    let before = x(t.op(&format!("entity {near}")).await?);
+    t.op(&format!("hit_falling {hit} 5")).await?;
+    t.secs(0.5).await?;
+    let after = x(t.op(&format!("entity {near}")).await?);
+    t.probe("the pig beside is thrown back", (after - before) as f32, after - before > 0.8);
+    Ok(())
+}
+
+/// Menus open on a storage a player carries and on far away blocks; a menu for a block without
+/// an entity is refused with a reason instead of opening something broken.
 pub async fn virtual_menus(t: T) -> R {
     t.flat().await?;
-    let id = t.op("vmenu base:chest 27 diamond 3 stick 10").await?;
+    t.check_eq(t.op("stash base:chest diamond 3 stick 10").await?, "54".to_string(), "stash slots");
     t.screen("core:menu").await?;
     let diamond = Item::lookup("base:diamond").ok_or("no item base:diamond")?;
     t.until("chest contents on the client", Duration::from_secs(5), |t| t.c().menu_slot(0).item == diamond)
         .await?;
-    t.check_eq(t.c().menu_slot(1).count, 10, "second virtual slot");
+    t.check_eq(t.c().menu_slot(1).count, 10, "second stash slot");
     t.shot("virtual_chest").await?;
-    t.c().close_screen();
+    t.c().screen_close();
     t.no_screen().await?;
-    t.op(&format!("remove {id}")).await?;
+
+    // On a held stack: what goes in stays in that stack, and the menu closes when it goes.
+    t.op("put me 8 testmod:pouch").await?;
+    t.check_eq(t.op("hput 8 2 base:stick 5").await?, "9".to_string(), "pouch slots");
+    t.op("hmenu testmod:pouch 8").await?;
+    t.screen("core:menu").await?;
+    let stick = Item::lookup("base:stick").ok_or("no item base:stick")?;
+    t.until("pouch contents on the client", Duration::from_secs(5), |t| t.c().menu_slot(2).item == stick)
+        .await?;
+    t.op("put me 8 base:dirt").await?;
+    t.no_screen().await?;
+    t.op("put me 8 testmod:pouch").await?;
+    t.op("hmenu testmod:pouch 8").await?;
+    t.frames(10).await?;
+    t.check(t.c().menu_slot(2).is_empty(), "a new pouch shows the old one's items");
+    t.c().screen_close();
+    t.no_screen().await?;
 
     let f = t.feet();
     let plain = add(f, [2, -1, 0]);
@@ -92,11 +337,11 @@ pub async fn virtual_menus(t: T) -> R {
         t.op(&format!("menu {menu} {} {} {}", p[0], p[1], p[2]))
             .await?;
         let want = Menu::lookup(menu).unwrap_or(u32::MAX);
-        t.until(&format!("{menu} open"), Duration::from_secs(5), |t| t.c().menu().is_some_and(|m| m[0] == want))
+        t.until(&format!("{menu} open"), Duration::from_secs(5), |t| t.c().menu().is_some_and(|m| m.kind == want))
             .await?;
         t.screen("core:menu").await?;
     }
-    t.c().close_screen();
+    t.c().screen_close();
     t.no_screen().await
 }
 
@@ -155,10 +400,10 @@ pub async fn fly_load(t: T) -> R {
     t.secs(0.5).await?;
     t.loaded().await?;
     t.idle().await?;
-    t.c().look(0.0, 0.0);
+    t.c().set_look(0.0, 0.0);
     // A step of the wheel per frame, up to spectators' top speed.
     for _ in 0..12 {
-        t.c().scroll(1.0);
+        t.c().input_scroll(1.0);
         t.frames(2).await?;
     }
     let secs = 45.0;
@@ -171,13 +416,13 @@ pub async fn fly_load(t: T) -> R {
     while begin.elapsed().as_secs_f32() < secs - 12.0 {
         t.secs(1.0).await?;
         let s = t.state();
-        let speed = ((s.pos[0] - last_pos[0]).powi(2) + (s.pos[2] - last_pos[2]).powi(2)).sqrt();
+        let speed = ((s.pos.x - last_pos.x).powi(2) + (s.pos.z - last_pos.z).powi(2)).sqrt();
         last_pos = s.pos;
         // Yaw 0 looks along -Z: the ground ahead, the first column not there yet.
         let reach = (1..=64)
             .map(|i| i * 16)
             .find(|d| {
-                let (x, z) = (s.pos[0].floor() as i32, s.pos[2].floor() as i32 - d);
+                let (x, z) = (s.pos.x.floor() as i32, s.pos.z.floor() as i32 - d);
                 t.c()
                     .block([x, OVERWORLD.column(5, x, z).height, z])
                     .is_none()
@@ -193,7 +438,7 @@ pub async fn fly_load(t: T) -> R {
         // Every few seconds: the ground ahead, well behind the front of what has arrived, has to
         // be drawn: a cube here but waiting for its mesh is a hole in the picture.
         if samples.len() % 5 == 4 {
-            let (px, pz) = (s.pos[0].floor() as i32, s.pos[2].floor() as i32);
+            let (px, pz) = (s.pos.x.floor() as i32, s.pos.z.floor() as i32);
             for dz in (32..(reach / 2).max(33)).step_by(16) {
                 for dx in (-448..=448).step_by(16) {
                     let (x, z) = (px + dx, pz - dz);
@@ -213,7 +458,7 @@ pub async fn fly_load(t: T) -> R {
     t.shot("flying").await?;
     let b = t.bench(10.0, "flying").await?;
     let s = t.state();
-    t.note(format!("flew to {:.0}: worst reach ahead {worst} blocks, seconds under 512: {lows}, peak meshes waiting {peak_pending}, generated {} cubes on the way, p99 {:.1} ms", s.pos[2], s.generated - cubes_at_start, b[2]));
+    t.note(format!("flew to {:.0}: worst reach ahead {worst} blocks, seconds under 512: {lows}, peak meshes waiting {peak_pending}, generated {} cubes on the way, p99 {:.1} ms", s.pos.z, s.generated - cubes_at_start, b[2]));
     // Stopped, the rest of the columns comes.
     t.secs(2.5).await?;
     let stop = std::time::Instant::now();
@@ -292,7 +537,7 @@ pub async fn crater(t: T) -> R {
         let rim = f[2] + r + 40;
         let top = OVERWORLD.column(5, f[0], rim).height.max(f[1]);
         t.cmd(&format!("/tp {} {} {}", f[0], top + 40, rim)).await?;
-        t.c().look(0.0, -25.0);
+        t.c().set_look(0.0, -25.0);
         t.secs(1.0).await?;
         t.loaded().await?;
         t.secs(1.0).await?;
@@ -302,44 +547,28 @@ pub async fn crater(t: T) -> R {
     Ok(())
 }
 
-/// Testmod's dynamite: lit with a right click, it burns down its fuse and leaves a crater of
-/// the set radius, dug by the engine's area edit in one go.
-pub async fn dynamite(t: T) -> R {
-    static RADIUS: Config<i32> = Config::named("testmod:dynamite_radius");
-    t.flat().await?;
+/// Distant terrain shows what was built: a tower's columns reach the client once its cubes are
+/// saved (left behind), and again after reopening; the untouched land around costs nothing.
+pub async fn lod_columns(t: T) -> R {
+    t.world(5).await?;
     t.op("mode creative").await?;
-    let before = RADIUS.get();
-    RADIUS.set(24);
-    // Into whatever block the player looks at, whatever the ground does there.
-    t.c().look(0.0, -20.0);
-    t.secs(0.4).await?;
-    let aim = t.op("look").await?;
-    let v: Vec<i32> = aim
-        .split_whitespace()
-        .skip(1)
-        .take(3)
-        .filter_map(|v| v.parse().ok())
-        .collect();
-    let [x, y, z] = v[..] else { return Err(format!("looking at nothing: {aim}")) };
-    let d = [x, y, z];
-    t.set(d, "testmod:dynamite").await?;
-    t.secs(0.2).await?;
-    t.press("core:use");
-    t.secs(0.5).await?;
-    let lit = t.block(d).await?;
-    t.check(lit.starts_with("testmod:dynamite[fuse="), format!("lit dynamite is {lit}"));
-    t.check(lit != "testmod:dynamite[fuse=0]", "the click lit the fuse");
-    // Out of the blast, above it, looking down into where it will be.
-    t.cmd(&format!("/tp {} {} {}", d[0], d[1] + 30, d[2] + 40))
+    let f = t.feet();
+    t.check_eq(t.state().lod_columns, 0, "nothing built, nothing sent");
+    t.op(&format!("fill {} {} {} {} {} {} base:stone", f[0] + 4, f[1], f[2] + 4, f[0] + 6, f[1] + 40, f[2] + 6))
         .await?;
-    t.c().look(0.0, -35.0);
-    t.secs(6.0).await?;
-    RADIUS.set(before);
-    t.check_eq(t.block(d).await?, "core:air".to_string(), "the dynamite went off");
-    for p in [add(d, [0, -20, 0]), add(d, [20, 0, 0]), add(d, [0, 0, -20]), add(d, [10, -10, 10])] {
-        t.check_eq(t.block(p).await?, "core:air".to_string(), &format!("{p:?} is in the crater"));
-    }
-    t.shot("crater").await?;
+    t.cmd(&format!("/tp {} 200 {}", f[0] + 3000, f[2])).await?;
+    t.until("the tower's columns sent", Duration::from_secs(30), |t| t.state().lod_columns >= 9)
+        .await?;
+    let n = t.state().lod_columns;
+    t.probe("columns sent", n as f32, n < 64);
+    let name = format!("test-{}", t.name());
+    t.c().world_leave();
+    t.screen("core:title").await?;
+    t.c().world_open(&name, 5);
+    t.until("joined again", Duration::from_secs(60), |t| t.flag(client::client_flags::JOINED))
+        .await?;
+    t.until("the columns again after reopening", Duration::from_secs(5), |t| t.state().lod_columns >= 9)
+        .await?;
     Ok(())
 }
 
@@ -355,9 +584,9 @@ pub async fn crater_saved(t: T) -> R {
     let built = add(f, [3, -20, 0]);
     t.set(built, "gold_block").await?;
     let name = format!("test-{}", t.name());
-    t.c().leave_world();
+    t.c().world_leave();
     t.screen("core:title").await?;
-    t.c().open_world(&name, 8);
+    t.c().world_open(&name, 8);
     t.until("joined again", Duration::from_secs(60), |t| t.flag(client::client_flags::JOINED))
         .await?;
     t.loaded().await?;
@@ -373,76 +602,21 @@ pub async fn crater_saved(t: T) -> R {
     Ok(())
 }
 
-/// The view reaches as far down as sideways: standing beyond a deep crater's rim, its bottom
-/// stays loaded and lit (it used to reach six cubes down plus the air under the player, so the
-/// bottom unloaded the moment the player stepped off the rim).
-pub async fn crater_view(t: T) -> R {
-    t.world(5).await?;
-    t.idle().await?;
-    t.op("mode creative").await?;
-    let f = t.feet();
-    t.op("crater_fast 150").await?;
-    t.op("look").await?;
-    // The wall's cubes, cut through, reach the client at once with the rest (they used to wait
-    // for their light to be redone, a share per tick: pillars of old blocks for seconds).
-    t.secs(0.2).await?;
-    t.sync_blocks(add(f, [144, -6, -2]), add(f, [152, -1, 2]))
-        .await?;
-    let rim = [f[0], OVERWORLD.column(5, f[0], f[2] + 170).height.max(f[1]) + 1, f[2] + 170];
-    t.cmd(&format!("/tp {} {} {}", rim[0], rim[1], rim[2]))
-        .await?;
-    t.secs(1.0).await?;
-    t.loaded().await?;
-    t.idle().await?;
-    // Beyond what the server simulates: the client made the crater on its own terrain and lit it.
-    let bottom = add(f, [0, -140, 0]);
-    let light = t.c().light(bottom).unwrap_or(0);
-    t.check_eq(light & 255, 15, "the crater's bottom, seen from beyond the rim, is loaded and lit");
-    t.check_eq(t.c().block(bottom), Some(0), "the crater's bottom is air on the client");
-    t.c().look(0.0, -30.0);
-    t.frames(20).await?;
-    t.shot("from_rim").await?;
-    Ok(())
-}
-
-/// An edited cube in the sky column over the view (generated so sky light comes down right,
-/// never drawn) is announced like any other: the client keeps the edit, not generation. It
-/// used to be announced only up to the view's top.
-pub async fn sky_column_edit(t: T) -> R {
-    weft_sdk::settings::VIEW_DISTANCE.set(6);
-    let r = sky_column(&t).await;
-    weft_sdk::settings::VIEW_DISTANCE.set(12);
-    r
-}
-
-async fn sky_column(t: &T) -> R {
-    t.world(5).await?;
-    t.idle().await?;
-    let f = t.feet();
-    // Two cubes over the view's top (6 over the player's cube), under open sky (cube 16).
-    let cube = (f[1] >> 4) + 8;
-    if cube >= 16 {
-        t.fail(format!("the player stands too high ({}) for a sky column", f[1]));
-        return Ok(());
-    }
-    let p = [f[0], cube * 16 + 5, f[2]];
-    t.set(p, "gold_block").await?;
-    t.until("the client has the block", Duration::from_secs(5), |t| t.c().block(p).is_some_and(|b| b != 0))
-        .await?;
-    Ok(())
-}
-
 use base_api::OVERWORLD;
 
-/// Testmod edits base's overworld from outside: a biome of its own tried before base's desert,
-/// with its own surface and boulders, and a rock needle from a feature written in testmod.
+/// Testmod edits Mars as from outside: a biome tried before its dust, with its own surface
+/// and boulders, and a rock needle from a feature written in testmod.
 pub async fn foreign_terrain(t: T) -> R {
+    static MARS: Dimension = Dimension::named("testmod:mars");
     t.world(5).await?;
     t.op("mode spectator").await?;
+    t.cmd("/dim testmod:mars").await?;
+    t.until("on Mars", Duration::from_secs(20), |t| t.state().dim == MARS.id())
+        .await?;
     let seed = 5;
     // testmod's `NEEDLE`.
-    let needle = OVERWORLD.column(seed, 1000, 1000);
-    let beside = OVERWORLD.column(seed, 1010, 1000);
+    let needle = MARS.column(seed, 1000, 1000);
+    let beside = MARS.column(seed, 1010, 1000);
     t.note(format!("needle {} beside {}", needle.height, beside.height));
     t.check(needle.height - beside.height > 60, "the needle rises from the land around it");
     t.cmd(&format!("/tp 1000 {} 1000", needle.height + 3))
@@ -454,18 +628,18 @@ pub async fn foreign_terrain(t: T) -> R {
 
     let grid: Vec<(i32, i32, Column)> = (-80..80)
         .flat_map(|i| (-80..80).map(move |j| (i * 64, j * 64)))
-        .map(|(x, z)| (x, z, OVERWORLD.column(seed, x, z)))
+        .map(|(x, z)| (x, z, MARS.column(seed, x, z)))
         .collect();
     let count = |name: &str| {
         grid.iter()
             .filter(|g| name_of(ek::BIOME, g.2.biome) == name)
             .count()
     };
-    t.note(format!("of {} columns: desert {}, scorched {}", grid.len(), count("base:desert"), count("testmod:scorched")));
+    t.note(format!("of {} columns: dust {}, scorched {}", grid.len(), count("testmod:dust"), count("testmod:scorched")));
     let scorched = grid
         .into_iter()
-        .find(|&(x, z, c)| name_of(ek::BIOME, c.biome) == "testmod:scorched" && !OVERWORLD.surface_carved(seed, x, z));
-    let (x, z, c) = scorched.ok_or("no scorched biome in base's overworld")?;
+        .find(|&(x, z, c)| name_of(ek::BIOME, c.biome) == "testmod:scorched" && !MARS.surface_carved(seed, x, z));
+    let (x, z, c) = scorched.ok_or("no scorched biome on Mars")?;
     t.note(format!("scorched at {x} {z}, height {}", c.height));
     t.cmd(&format!("/tp {x} {} {z}", c.height + 3)).await?;
     t.secs(0.5).await?;
@@ -580,7 +754,7 @@ pub async fn tick_control(t: T) -> R {
 pub async fn item_farm(t: T) -> R {
     t.flat().await?;
     t.op("drops 3000").await?;
-    t.c().look(0.0, -30.0);
+    t.c().set_look(0.0, -30.0);
     t.secs(2.0).await?;
     t.note(format!("{} entities on the client", t.c().entities().len()));
     t.shot("farm").await?;
@@ -589,6 +763,20 @@ pub async fn item_farm(t: T) -> R {
         "fps {:.0}, frame {:.2} ms, p99 {:.2} ms (in tests the hidden window's presents are throttled: compare the log's cpu record ms)",
         b[0], b[1], b[2]
     ));
+    Ok(())
+}
+
+/// A crowd of walking mobs in view: what posing their bones costs a frame.
+pub async fn mob_crowd(t: T) -> R {
+    t.flat().await?;
+    t.cmd("/rule testkit:peace 1").await?;
+    t.op("crowd base:zombie 4000").await?;
+    t.op("crowd base:pig 4000").await?;
+    t.c().set_look(0.0, -20.0);
+    t.secs(4.0).await?;
+    t.note(format!("{} entities on the client", t.c().entities().len()));
+    t.shot("crowd").await?;
+    t.bench(5.0, "mob_crowd").await?;
     Ok(())
 }
 
@@ -710,7 +898,11 @@ pub async fn persistence(t: T) -> R {
     t.op("secret me 0 1234").await?;
     t.check_eq(t.op("secret me 0").await?, "1234".into(), "server keeps the secret");
     t.frames(5).await?;
-    t.check_eq(crate::server::SECRET.stack_only(&t.c().inventory_slot(0)), None, "client never sees the secret");
+    t.check_eq(crate::server::SECRET.on_stack_own(&t.c().inventory_slot(0)), None, "client never sees the secret");
+    // What a mod makes with a handle, data and all: the client has it, and damage is its own.
+    static STICK: Item = Item::named("base:stick");
+    let made = STICK.stack(3).with_wear(5);
+    t.check_eq((made.item, made.count, made.wear(), made.without(&DAMAGE).data), (STICK.id(), 3, 5, 0), "a stack made from a handle");
     t.check_eq(value(&t.op("attr me core:movement_speed").await?), 1.0, "speed without modifiers");
     // The survival vitals lower max health with the stomach (`base:fed`): an empty stomach keeps it
     // still through the reload, and the modifier is checked against what it was before.
@@ -736,9 +928,9 @@ pub async fn persistence(t: T) -> R {
     t.cmd("/rule testkit:count_marks 1").await?;
 
     let name = format!("test-{}", t.name());
-    t.c().leave_world();
+    t.c().world_leave();
     t.screen("core:title").await?;
-    t.c().open_world(&name, 7);
+    t.c().world_open(&name, 7);
     t.until("joined again", Duration::from_secs(60), |t| t.flag(client::client_flags::JOINED))
         .await?;
     t.loaded().await?;
@@ -851,7 +1043,7 @@ pub async fn dimensions(t: T) -> R {
         t.loaded().await?;
         t.idle().await?;
         t.settled().await?;
-        t.c().look(30.0, -20.0);
+        t.c().set_look(30.0, -20.0);
         t.frames(3).await?;
         let shot = t.shot(dim.split(':').nth(1).unwrap_or(dim)).await?;
         if let Some(look) = look {
@@ -874,9 +1066,9 @@ pub async fn dimensions(t: T) -> R {
     let p = add(t.feet(), [0, -1, 0]);
     t.check(t.set(p, "stone").await.is_err(), "no block can be set in the void");
     t.check(t.block(p).await? != "base:stone", "the void stays empty");
-    let y = t.state().pos[1];
+    let y = t.state().pos.y;
     t.secs(1.0).await?;
-    t.check((t.state().pos[1] - y).abs() < 0.01, format!("no gravity in the void (y {y:.2} -> {:.2})", t.state().pos[1]));
+    t.check((t.state().pos.y - y).abs() < 0.01, format!("no gravity in the void (y {y:.2} -> {:.2})", t.state().pos.y));
 
     t.cmd("/dim core:debug_blocks").await?;
     t.secs(0.5).await?;
@@ -919,7 +1111,7 @@ pub async fn dimensions(t: T) -> R {
         .collect();
     t.check(spawned.is_empty(), format!("nothing spawns among the debug blocks: {spawned:?}"));
     // Lava is drawn solid: blocks behind ice do not show through it.
-    let at = t.op("find 60 base:lava").await?;
+    let at = t.op("find 200 base:lava").await?;
     let l: Vec<i32> = at
         .split_whitespace()
         .filter_map(|v| v.parse().ok())
@@ -927,12 +1119,12 @@ pub async fn dimensions(t: T) -> R {
     if let [lx, ly, lz] = l[..] {
         t.cmd(&format!("/tp {} {} {}", lx as f64 + 0.5, ly + 2, lz as f64 + 4.5))
             .await?;
-        t.c().look(0.0, -30.0);
+        t.c().set_look(0.0, -30.0);
         t.frames(20).await?;
         t.shot("lava").await?;
     }
     t.cmd("/tp -3 1 -3").await?;
-    t.c().look(225.0, -25.0);
+    t.c().set_look(225.0, -25.0);
     t.frames(20).await?;
     let grid = t.shot("debug_blocks").await?;
     // Many different blocks in view: no color class covers most of the grid (it floats in the
@@ -945,37 +1137,12 @@ pub async fn dimensions(t: T) -> R {
     Ok(())
 }
 
-/// World generation from data, sampled with seed 5: deep caves (an underground biome) with the
-/// test mod's glow crystals only there, birches in birch forests and oaks on the plains, and
-/// structures where the engine says they are.
+/// World generation from data, sampled with seed 5: birches in birch forests and oaks on the
+/// plains, structures where the engine says they are, and on Mars the test mod's glow crystals
+/// only in its crystal caves (an underground biome).
 pub async fn worldgen(t: T) -> R {
     t.world(5).await?;
     t.op("mode spectator").await?;
-    let (mut caves, mut inside, mut outside) = (0, 0, 0);
-    for (i, x) in [0, 200].into_iter().enumerate() {
-        t.cmd(&format!("/tp {x} -60 {}", i * 150)).await?;
-        t.secs(0.5).await?;
-        t.loaded().await?;
-        let survey = t.op("survey 12").await?;
-        let (biomes, crystals) = survey
-            .split_once(" | crystals ")
-            .ok_or(format!("survey: {survey}"))?;
-        caves += biomes
-            .split_whitespace()
-            .filter_map(|e| e.strip_prefix("base:deep_caves="))
-            .filter_map(|n| n.parse::<u32>().ok())
-            .sum::<u32>();
-        let n: Vec<u32> = crystals
-            .split_whitespace()
-            .filter_map(|n| n.parse().ok())
-            .collect();
-        inside += n.first().copied().unwrap_or(0);
-        outside += n.get(1).copied().unwrap_or(0);
-        t.note(format!("{x}: {survey}"));
-    }
-    t.check(caves > 0, "deep caves were found underground");
-    t.check(inside > 0, format!("glow crystals grow in deep caves ({inside})"));
-    t.check_eq(outside, 0, "glow crystals outside deep caves");
 
     // Birch forests and plains of seed 5, found from the generator's columns: the middle of
     // a patch of the biome, above ground.
@@ -1017,7 +1184,6 @@ pub async fn worldgen(t: T) -> R {
         t.check_eq(n[2] + n[3], 0, &format!("the test mod's glowing plants are not generated ({x} {z})"));
     }
 
-    t.check(t.op("structure testmod:obelisk 3000").await? != "none", "another mod's obelisks are in the world too");
     // The same template placed by code.
     let f = t.feet();
     t.check_eq(
@@ -1057,6 +1223,42 @@ pub async fn worldgen(t: T) -> R {
         .collect();
     t.check(n[0] + n[1] > 0, "trees grow in base's forest on Mars");
     t.check(n[2] > 0, "the forest brings its grass to Mars");
+    t.check(t.op("structure testmod:obelisk 3000").await? != "none", "obelisks on Mars");
+    let (mut caves, mut inside, mut outside) = (0, 0, 0);
+    for (i, x) in [0, 200].into_iter().enumerate() {
+        t.cmd(&format!("/tp {x} -40 {}", i * 150)).await?;
+        t.secs(0.5).await?;
+        t.loaded().await?;
+        let survey = t.op("survey 12").await?;
+        let (biomes, crystals) = survey
+            .split_once(" | crystals ")
+            .ok_or(format!("survey: {survey}"))?;
+        caves += biomes
+            .split_whitespace()
+            .filter_map(|e| e.strip_prefix("testmod:crystal_caves="))
+            .filter_map(|n| n.parse::<u32>().ok())
+            .sum::<u32>();
+        let n: Vec<u32> = crystals
+            .split_whitespace()
+            .filter_map(|n| n.parse().ok())
+            .collect();
+        inside += n.first().copied().unwrap_or(0);
+        outside += n.get(1).copied().unwrap_or(0);
+        t.note(format!("{x}: {survey}"));
+    }
+    t.check(caves > 0, "crystal caves were found under Mars");
+    t.check(inside > 0, format!("glow crystals grow in crystal caves ({inside})"));
+    t.check_eq(outside, 0, "glow crystals outside crystal caves");
+    // Testmod's tin goes on as its basalt variant where a vein meets Mars' basalt.
+    let ores = t
+        .op("census 20 testmod:tin_ore,testmod:basalt_tin_ore")
+        .await?;
+    t.note(format!("Mars ores: {ores}"));
+    let n: Vec<u32> = ores
+        .split_whitespace()
+        .filter_map(|e| e.rsplit_once('=')?.1.parse().ok())
+        .collect();
+    t.check(n[0] == 0 && n[1] > 0, "tin in basalt is basalt tin ore");
     Ok(())
 }
 
@@ -1084,12 +1286,12 @@ async fn edit_while_loading_once(t: &T) -> Result<f64, String> {
     t.world(5).await?;
     t.idle().await?;
     t.op("mode spectator").await?;
-    let low = t.state().pos[1];
+    let low = t.state().pos.y;
     t.cmd("/tp ~ ~40 ~").await?;
     // Read too early, "here" is still the ground, and the block goes where the camera doesn't look.
-    t.until("up in the air", Duration::from_secs(5), |t| t.state().pos[1] > low + 30.0)
+    t.until("up in the air", Duration::from_secs(5), |t| t.state().pos.y > low + 30.0)
         .await?;
-    t.c().look(0.0, 0.0);
+    t.c().set_look(0.0, 0.0);
     t.frames(5).await?;
     // Eye level, three blocks north.
     let f = t.feet();
@@ -1117,92 +1319,31 @@ async fn edit_while_loading_once(t: &T) -> Result<f64, String> {
     Ok(ms)
 }
 
-/// Past the view, distant terrain is made and drawn: tiles come, and the horizon seen from up
-/// high is land, not the sky it is with distant terrain off.
-pub async fn distant_terrain(t: T) -> R {
-    static VIEW: Config<i32> = Config::named("core:view_distance");
-    static LOD: Config<i32> = Config::named("core:lod_distance");
-    let before = (VIEW.get(), LOD.get());
-    VIEW.set(8);
-    LOD.set(256);
-    let out = distant_terrain_at(&t).await;
-    VIEW.set(before.0);
-    LOD.set(before.1);
-    out
-}
-
-async fn distant_terrain_at(t: &T) -> R {
-    static LOD: Config<i32> = Config::named("core:lod_distance");
-    t.world(5).await?;
-    t.idle().await?;
-    t.op("mode spectator").await?;
-    t.cmd("/tp ~ ~100 ~").await?;
-    t.c().look(0.0, -8.0);
-    t.until("distant terrain made", Duration::from_secs(20), |t| t.state().lod_tiles > 50 && t.state().lod_pending == 0)
-        .await?;
-    t.frames(5).await?;
-    let tiles = t.state().lod_tiles;
-    t.note(format!("{tiles} distant terrain tiles shown"));
-    let with = t.grab().await?;
-    LOD.set(0);
-    t.frames(10).await?;
-    let without = t.grab().await?;
-    let changed = T::differ(&with, &without);
-    t.note(format!("share of the picture that is distant terrain: {changed:.2}"));
-    t.check(changed > 0.1, format!("the horizon has land on it ({changed:.2} of the picture changes without it)"));
-    t.check_eq(t.state().lod_tiles, 0, "no tiles shown with it off");
-    Ok(())
-}
-
 /// Terrain the GPU makes is the CPU's to the bit (integer math on both sides): every cube of a
-/// fresh world is made again on the CPU and compared.
+/// fresh world is made again on the CPU and compared, in the overworld and on Mars, whose
+/// presets use the rest of the expression steps.
 pub async fn gpu_terrain(t: T) -> R {
     static CHECK: Config<i32> = Config::named("core:terrain_check");
+    static MARS: Dimension = Dimension::named("testmod:mars");
     let before = CHECK.get();
     CHECK.set(1);
-    let start = t.state().gpu_cubes;
     let out = async {
+        let start = t.state().gpu_cubes;
         t.world(5).await?;
         t.idle().await?;
+        let overworld = t.state().gpu_cubes - start;
+        t.cmd("/dim testmod:mars").await?;
+        t.until("on Mars", Duration::from_secs(20), |t| t.state().dim == MARS.id())
+            .await?;
+        t.idle().await?;
         let s = t.state();
-        let made = s.gpu_cubes - start;
-        t.note(format!("{made} cubes made on the GPU, {} differing", s.gpu_mismatches));
-        t.check(made > 1000, format!("the GPU made the terrain ({made} cubes)"));
+        let mars = s.gpu_cubes - start - overworld;
+        t.note(format!("{overworld} cubes made on the GPU in the overworld, {mars} on Mars, {} differing", s.gpu_mismatches));
+        t.check(overworld > 1000 && mars > 1000, format!("the GPU made the terrain ({overworld} and {mars} cubes)"));
         t.check_eq(s.gpu_mismatches, 0, "cubes the GPU made differently from the CPU");
         Ok(())
     }
     .await;
     CHECK.set(before);
-    out
-}
-
-/// Distant terrain has no underside: from deep below the land it isn't drawn, and it is back on
-/// coming up.
-pub async fn distant_terrain_underground(t: T) -> R {
-    static VIEW: Config<i32> = Config::named("core:view_distance");
-    static LOD: Config<i32> = Config::named("core:lod_distance");
-    let before = (VIEW.get(), LOD.get());
-    VIEW.set(8);
-    LOD.set(256);
-    let out = async {
-        t.world(5).await?;
-        t.idle().await?;
-        t.op("mode spectator").await?;
-        let s = t.state().pos;
-        t.until("distant terrain made", Duration::from_secs(20), |t| t.state().lod_tiles > 50)
-            .await?;
-        t.c().teleport([s[0], -300.0, s[2]]);
-        t.until("none deep under the land", Duration::from_secs(5), |t| t.state().lod_tiles == 0)
-            .await?;
-        t.c().look(0.0, 30.0);
-        t.secs(0.3).await?;
-        t.shot("below").await?;
-        t.c().teleport(s);
-        t.until("back over the land", Duration::from_secs(5), |t| t.state().lod_tiles > 50)
-            .await
-    }
-    .await;
-    VIEW.set(before.0);
-    LOD.set(before.1);
     out
 }

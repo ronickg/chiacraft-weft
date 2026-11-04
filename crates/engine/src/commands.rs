@@ -5,7 +5,7 @@
 //!
 //! Types: int, float, word (`word(a,b)`: any word, completing a and b; `word(#set)` completes
 //! from a word set mods add to, like `#core:rules`), text (rest of the line), item, block,
-//! entity, dim, player, time
+//! entity, dim, attribute, player, time
 //! (`day`, `noon`, `night`, `midnight` or ticks), pos (three coordinates; `~` relative to the player,
 //! `^left ^up ^forward` relative to where they look) and targets (a player name or a selector:
 //! `@p` nearest player, `@a` all players, `@e` entities, `@s` yourself, `@r` a random player, with
@@ -29,6 +29,7 @@ pub enum Kind {
     Block,
     Entity,
     Dim,
+    Attribute,
     Player,
     Pos,
     Targets,
@@ -81,6 +82,7 @@ pub fn parse_usage(usage: &str) -> Result<Vec<Alt>, String> {
                 "block" => Kind::Block,
                 "entity" => Kind::Entity,
                 "dim" => Kind::Dim,
+                "attribute" => Kind::Attribute,
                 "player" => Kind::Player,
                 "pos" => Kind::Pos,
                 "targets" => Kind::Targets,
@@ -205,6 +207,13 @@ impl Args {
             _ => None,
         }
     }
+    pub fn float(&self, name: &str) -> Option<f64> {
+        match self.get(name)? {
+            Value::Float(v) => Some(*v),
+            Value::Int(v) => Some(*v as f64),
+            _ => None,
+        }
+    }
     pub fn text(&self, name: &str) -> Option<&str> {
         match self.get(name)? {
             Value::Text(t) | Value::Id(_, t) => Some(t),
@@ -225,8 +234,8 @@ impl Args {
     }
 }
 
-/// A full registry name from what the player typed: exact `ns:name`, or a bare name matching
-/// exactly one entry's path (the base game's wins ties).
+/// A full registry name from what the player typed: exact `ns:name`, or a bare name matching an
+/// entry's path, the first loaded mod's when several do.
 pub fn resolve<'a>(names: impl Iterator<Item = &'a String> + Clone, typed: &str) -> Option<String> {
     if typed.contains(':') {
         return names.into_iter().find(|n| n.as_str() == typed).cloned();
@@ -237,10 +246,17 @@ pub fn resolve<'a>(names: impl Iterator<Item = &'a String> + Clone, typed: &str)
     match matches.as_slice() {
         [one] => Some((*one).clone()),
         [] => None,
-        many => many
-            .iter()
-            .find(|n| n.starts_with("base:"))
-            .map(|n| (*n).clone()),
+        many => {
+            let order = |n: &&&String| {
+                crate::content::content()
+                    .mods
+                    .iter()
+                    .position(|m| n.split_once(':').is_some_and(|(ns, _)| ns == m.id))
+            };
+            many.iter()
+                .min_by_key(|n| order(n).unwrap_or(usize::MAX))
+                .map(|n| (**n).clone())
+        }
     }
 }
 
@@ -258,9 +274,8 @@ fn coordinate(tok: &str, base: f64) -> Option<f64> {
 fn position(t: &[&str], o: Origin) -> Option<DVec3> {
     if t.iter().all(|s| s.starts_with('^')) {
         let num = |s: &str| if s.len() == 1 { Some(0.0) } else { s[1..].parse::<f64>().ok() };
+        let forward = crate::physics::look_dir(o.yaw, o.pitch);
         let (sy, cy) = (o.yaw as f64).sin_cos();
-        let (sp, cp) = (o.pitch as f64).sin_cos();
-        let forward = DVec3::new(-sy * cp, sp, -cy * cp);
         let right = DVec3::new(cy, 0.0, -sy);
         let up = right.cross(forward);
         return Some(o.pos - right * num(t[0])? + up * num(t[1])? + forward * num(t[2])?);
@@ -321,6 +336,10 @@ fn parse_alt(c: &Content, alt: &Alt, tokens: &[&str], here: Origin, players: &[S
             Kind::Dim => {
                 let n = resolve(c.dim_names.keys(), tok).ok_or_else(|| err("unknown_dimension", tok))?;
                 Value::Id(c.dim_names[&n], n)
+            }
+            Kind::Attribute => {
+                let n = resolve(c.game.attr_names.keys(), tok).ok_or_else(|| err("unknown_attribute", tok))?;
+                Value::Id(c.game.attr_names[&n], n)
             }
             Kind::Player => {
                 if !players.iter().any(|n| n == tok) {
@@ -479,6 +498,7 @@ fn type_name(k: &Kind) -> String {
         Kind::Block => "block".into(),
         Kind::Entity => "entity".into(),
         Kind::Dim => "dim".into(),
+        Kind::Attribute => "attribute".into(),
         Kind::Player => "player".into(),
         Kind::Pos => "pos".into(),
         Kind::Targets => "targets".into(),
@@ -516,7 +536,7 @@ pub fn abi_values(args: &Args, selected: &[Option<String>]) -> Vec<weft_abi::Com
                 int: 0,
                 float: 0.0,
                 text: Str::new(""),
-                pos: [0.0; 3],
+                pos: [0.0; 3].into(),
                 name: Str::new(&args.names[i]),
             };
             match v {
@@ -525,7 +545,7 @@ pub fn abi_values(args: &Args, selected: &[Option<String>]) -> Vec<weft_abi::Com
                 Some(Value::Float(f)) => (out.kind, out.float) = (cv::FLOAT, *f),
                 Some(Value::Text(t)) => (out.kind, out.text) = (cv::TEXT, Str::new(t)),
                 Some(Value::Id(n, name)) => (out.kind, out.int, out.text) = (cv::ID, *n as i64, Str::new(name)),
-                Some(Value::Pos(p)) => (out.kind, out.pos) = (cv::POS, p.to_array()),
+                Some(Value::Pos(p)) => (out.kind, out.pos) = (cv::POS, p.to_array().into()),
                 Some(Value::Targets(_)) => {
                     let ids = selected.get(i).and_then(|s| s.as_deref()).unwrap_or("");
                     (out.kind, out.int, out.text) = (cv::TARGETS, ids.split_whitespace().count() as i64, Str::new(ids));
@@ -685,6 +705,7 @@ pub fn complete(c: &Content, line: &str, players: &[String], permission: u32) ->
                     .collect(),
             ),
             Kind::Dim => names_from(c.dim_names.keys().collect()),
+            Kind::Attribute => names_from(c.game.attr_names.keys().collect()),
             Kind::Player => players
                 .iter()
                 .filter(|n| n.starts_with(partial))

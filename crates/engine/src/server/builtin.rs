@@ -2,11 +2,12 @@
 //! side by side, so a listed command always has one.
 
 use glam::{DVec3, IVec3};
-use weft_abi::{ItemStack, damage};
+use weft_abi::{ItemStack, Who, damage_cause as damage};
 
 use super::Server;
 use crate::commands::Args;
 use crate::content::Content;
+use crate::net::Shown;
 use crate::ui::text::{Arg, Msg, Name};
 use crate::world::GameMode;
 
@@ -61,19 +62,28 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
     ("give", "<who:targets> <item:item> [count:int] | <item:item> [count:int]", give, p::GAME_MASTER),
     ("time", "set <time:time> | add <ticks:int> | query", time, p::GAME_MASTER),
     ("summon", "<entity:entity> [pos:pos] [count:int]", summon, p::GAME_MASTER),
-    ("kill", "[who:targets]", kill, p::GAME_MASTER),
+    ("clear", "[who:targets] | [item:item]", clear, p::GAME_MASTER),
     ("setblock", "<pos:pos> <block:block>", set_block, p::GAME_MASTER),
     ("insert", "<pos:pos> <item:item> [count:int]", insert, p::GAME_MASTER),
     ("block", "<pos:pos>", block, p::GAME_MASTER),
-    ("gamemode", "survival [who:targets] | creative [who:targets] | spectator [who:targets]", game_mode, p::GAME_MASTER),
+    ("gamemode", "<mode:word(#core:game_modes)> [who:targets]", game_mode, p::GAME_MASTER),
     ("heal", "[who:targets]", heal, p::GAME_MASTER),
     ("tick", "query | rate <tps:int> | freeze | unfreeze | step [ticks:int] | sprint <ticks:int>", tick, p::ADMIN),
     ("regions", "", regions, p::GAME_MASTER),
     ("seed", "", seed, p::GAME_MASTER),
-    ("weather", "clear [ticks:int] | rain [ticks:int] | thunder [ticks:int]", weather, p::GAME_MASTER),
+    ("weather", "<weather:word(#core:weathers)> [ticks:int]", weather, p::GAME_MASTER),
     ("op", "<who:targets> [level:int]", op, p::ADMIN),
     ("deop", "<who:targets>", deop, p::ADMIN),
     ("rule", "[name:word(#core:rules)] [value:word]", rule, p::ADMIN),
+    (
+        "title",
+        "<who:targets> title <text:text> | <who:targets> subtitle <text:text> | <who:targets> hint <text:text> | <who:targets> show <x:float> <y:float> <size:float> <text:text> | <who:targets> times <fade_in:float> <stay:float> <fade_out:float> | <who:targets> clear | <who:targets> reset",
+        title,
+        p::GAME_MASTER,
+    ),
+    ("say", "<text:text>", say_all, p::GAME_MASTER),
+    ("msg", "<who:player> <text:text>", whisper, p::EVERYONE),
+    ("tellraw", "<who:targets> <text:text>", tellraw, p::GAME_MASTER),
     // chiacraft: admission rules and bans (`server::admission`).
     ("ban", "<who:word> [reason:text]", super::admission::ban, p::ADMIN),
     ("tempban", "<who:word> <time:word> [reason:text]", super::admission::tempban, p::ADMIN),
@@ -96,6 +106,76 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
         p::ADMIN,
     ),
 ];
+
+fn title(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    use weft_abi::show_place as place;
+    let a = x.a;
+    let players: Vec<usize> = x
+        .targets(s, "who")
+        .iter()
+        .filter_map(|t| s.player_index(t.1))
+        .collect();
+    let text = a.text("text").unwrap_or("");
+    let shown = |p: u32| Shown::new(p, Msg::template(text));
+    let to_all = |s: &mut Server, shown: Shown| {
+        for &pi in &players {
+            let times = s.players[pi].title_times;
+            let timed = if shown.place == place::FREE || shown.place == place::HINT { None } else { times };
+            let one = Shown { times: timed.unwrap_or(shown.times), ..shown.clone() };
+            s.show(Who::Player(s.players[pi].entity), one);
+        }
+    };
+    if a.get("times").is_some() {
+        let t = [a.float("fade_in").unwrap_or(0.0), a.float("stay").unwrap_or(0.0), a.float("fade_out").unwrap_or(0.0)];
+        for &pi in &players {
+            s.players[pi].title_times = Some(t.map(|v| v.max(0.0) as f32));
+        }
+    } else if a.get("reset").is_some() {
+        for &pi in &players {
+            s.players[pi].title_times = None;
+        }
+    } else if a.get("clear").is_some() {
+        let empty = Msg::new("", vec![]);
+        for p in [place::TITLE, place::SUBTITLE] {
+            to_all(s, Shown::new(p, empty.clone()));
+        }
+    } else if a.get("show").is_some() {
+        let at = [a.float("x").unwrap_or(0.5) as f32, a.float("y").unwrap_or(0.5) as f32];
+        let scale = a.float("size").unwrap_or(1.0) as f32;
+        to_all(s, Shown { at: Some(at), scale, ..shown(place::FREE) });
+    } else {
+        let named = [("subtitle", place::SUBTITLE), ("hint", place::HINT), ("title", place::TITLE)];
+        for (_, p) in named.into_iter().filter(|(name, _)| a.get(name).is_some()) {
+            to_all(s, shown(p));
+        }
+    }
+    say("title.done", vec![int(players.len())])
+}
+
+fn say_all(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    let name = s.players[x.pi].name.clone();
+    let line = Msg::new("chat.say", vec![Arg::Text(name), text(x.a.text("text").unwrap_or(""))]);
+    s.show(Who::All, Shown::chat(line));
+    Vec::new()
+}
+
+fn whisper(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    let said = text(x.a.text("text").unwrap_or(""));
+    let to = x.a.text("who").unwrap_or("");
+    let Some(target) = s.players.iter().find(|p| p.name == to).map(|p| p.entity) else { return Vec::new() };
+    let name = s.players[x.pi].name.clone();
+    let heard = Msg::new("chat.whisper", vec![Arg::Text(name), said.clone()]);
+    s.show(Who::Player(target), Shown { from: Shown::PLAYER, ..Shown::chat(heard) });
+    vec![Msg::new("chat.whisper_to", vec![text(to), said])]
+}
+
+fn tellraw(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    let line = Msg::template(x.a.text("text").unwrap_or(""));
+    for (_, id) in x.targets(s, "who") {
+        s.show(Who::Player(id), Shown::chat(line.clone()));
+    }
+    Vec::new()
+}
 
 fn help(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let (c, a) = (x.c, x.a);
@@ -216,15 +296,34 @@ fn summon(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     say("summon.done", vec![int(count), text(&kname)])
 }
 
-fn kill(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+/// `/clear <targets>`: kills them. `/clear [item]`: empties the player's own inventory, or only
+/// the stacks of `item`.
+fn clear(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let c = x.c;
-    let who = x.targets(s, "who");
-    for &(d, id) in &who {
-        if let Some(r) = s.dims[d as usize].entity_region(id) {
-            r.damage(c, id, f32::MAX, 0, damage::VOID);
+    if x.a.get("who").is_some() {
+        let who = x.targets(s, "who");
+        for &(d, id) in &who {
+            if let Some(r) = s.dims[d as usize].entity_region(id) {
+                r.damage(c, id, f32::MAX, 0, damage::VOID);
+            }
+        }
+        return say("clear.killed", vec![int(who.len())]);
+    }
+    let (d, id) = x.me;
+    let filter = x.a.id("item");
+    let mut total: u64 = 0;
+    if let Some(r) = s.dims[d as usize].entity_region(id) {
+        let slots = r.entities.inventories.get(&id).map_or(0, Vec::len) as u32;
+        for slot in 0..slots {
+            let stack = r.entities.inventory_slot(id, slot);
+            if stack.is_empty() || filter.is_some_and(|item| item != stack.item) {
+                continue;
+            }
+            total += u64::from(stack.count);
+            r.entities.set_slot(id, slot, ItemStack::EMPTY);
         }
     }
-    say("kill.done", vec![int(who.len())])
+    say("clear.done", vec![int(total)])
 }
 
 fn set_block(s: &mut Server, x: &Ctx) -> Vec<Msg> {
@@ -273,10 +372,10 @@ fn block(s: &mut Server, x: &Ctx) -> Vec<Msg> {
 
 fn game_mode(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let a = x.a;
-    let mode = GameMode::ALL
-        .into_iter()
-        .find(|m| a.get(m.name()).is_some())
-        .unwrap_or_default();
+    let named = a.text("mode").unwrap_or("");
+    let Some(mode) = GameMode::parse(named) else {
+        return say("gamemode.unknown", vec![text(named)]);
+    };
     let who: Vec<usize> = x
         .targets(s, "who")
         .iter()
@@ -290,12 +389,19 @@ fn game_mode(s: &mut Server, x: &Ctx) -> Vec<Msg> {
 
 fn weather(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     let d = &mut s.dims[x.me.0 as usize];
-    if !x.c.dims[d.id as usize].weather {
+    if !x.c.dims[d.id as usize].has_weather() {
         return say("weather.none", Vec::new());
     }
-    let (raining, thunder) = (x.a.get("rain").is_some() || x.a.get("thunder").is_some(), x.a.get("thunder").is_some());
+    let named = x.a.text("weather").unwrap_or("");
+    let names = &x.c.game.weather_names;
+    let Some(&w) = names
+        .get(named)
+        .or_else(|| names.get(&format!("core:{named}")))
+    else {
+        return say("weather.unknown", vec![text(named)]);
+    };
     let ticks = x.a.int("ticks").map_or(12000, |t| t.max(1) as u64);
-    d.set_manual_weather(raining, thunder, ticks);
+    d.set_manual_weather(w as u16, ticks);
     say("weather.done", Vec::new())
 }
 

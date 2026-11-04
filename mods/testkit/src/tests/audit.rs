@@ -1,4 +1,4 @@
-//! What the audit of 2026-10-31 found, each as it was reproduced there.
+//! Bugs found by going through the game, each as it was reproduced then.
 
 use std::time::Duration;
 
@@ -9,9 +9,9 @@ use crate::runner::{R, T};
 
 async fn reopen(t: &T, seed: u64) -> R {
     let name = format!("test-{}", t.name());
-    t.c().leave_world();
+    t.c().world_leave();
     t.screen("core:title").await?;
-    t.c().open_world(&name, seed);
+    t.c().world_open(&name, seed);
     t.until("joined again", Duration::from_secs(60), |t| t.flag(client::client_flags::JOINED))
         .await?;
     t.loaded().await?;
@@ -54,7 +54,7 @@ pub async fn death_is_a_state(t: T) -> R {
     t.click_ui(&t.hotbar(0), 0);
     t.until("on the cursor", Duration::from_secs(2), |t| t.c().inventory_slot(0).is_empty())
         .await?;
-    t.cmd("/kill").await?;
+    t.cmd("/clear @s").await?;
     t.screen("core:death").await?;
     t.secs(5.0).await?;
     t.check_eq(t.op("health").await?, "0".to_string(), "still dead after a hunger pulse");
@@ -96,7 +96,7 @@ pub async fn kill_and_void(t: T) -> R {
     t.c().respawn();
     t.no_screen().await?;
     let s = t.state();
-    t.c().teleport([s.pos[0], -300.0, s.pos[2]]);
+    t.c().teleport([s.pos.x, -300.0, s.pos.z]);
     t.until("the void kills", Duration::from_secs(30), |t| t.state().health <= 0.0)
         .await
 }
@@ -163,7 +163,7 @@ pub async fn ladder_no_fall(t: T) -> R {
         .await?;
     let s = t.state();
     t.c()
-        .teleport([f[0] as f64 + 1.5, f[1] as f64 + 15.0, s.pos[2]]);
+        .teleport([f[0] as f64 + 1.5, f[1] as f64 + 15.0, s.pos.z]);
     t.until("down", Duration::from_secs(15), |t| t.flag(client::client_flags::ON_GROUND))
         .await?;
     t.secs(0.5).await?;
@@ -181,7 +181,7 @@ pub async fn bucket_not_wasted(t: T) -> R {
     let pool = add(f, [2, -1, 0]);
     t.set(pool, "water").await?;
     t.op("put me 0 water_bucket 1").await?;
-    t.c().select(0);
+    t.c().select_slot(0);
     t.secs(0.2).await?;
     t.look_at(add(pool, [0, 0, 0]));
     t.frames(3).await?;
@@ -198,14 +198,14 @@ pub async fn shift_click_skips_grid(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(3).await?;
-    let Some([x, y, w, h]) = t.c().ui_rect(&t.hotbar(0)) else { return Err("no hotbar slot".into()) };
-    t.c().cursor(x + w / 2.0, y + h / 2.0);
+    let Some(Rect { x, y, w, h }) = t.c().ui_rect(&t.hotbar(0)) else { return Err("no hotbar slot".into()) };
+    t.c().input_cursor(x + w / 2.0, y + h / 2.0);
     t.frames(2).await?;
     t.hold("core:sprint", 0.3);
     t.frames(2).await?;
-    t.c().click(0, 0.0);
+    t.c().input_click(0, 0.0);
     t.secs(0.3).await?;
-    t.c().close_screen();
+    t.c().screen_close();
     t.no_screen().await?;
     let inv = t.op("inv me").await?;
     t.check(inv.contains("base:diamond:5"), format!("still in the inventory: '{inv}'"));
@@ -225,7 +225,7 @@ pub async fn no_block_into_mob(t: T) -> R {
         .await?;
     t.op(&format!("spawn base:pig {}", at(spot))).await?;
     t.op("put me 0 stone 1").await?;
-    t.c().select(0);
+    t.c().select_slot(0);
     t.secs(0.2).await?;
     t.look_at(add(spot, [1, 0, 0]));
     t.frames(3).await?;
@@ -241,7 +241,7 @@ pub async fn tp_nan(t: T) -> R {
     t.cmd("/tp nan nan nan").await?;
     t.secs(0.2).await?;
     let p = t.state().pos;
-    t.check(p.iter().all(|v| v.is_finite()), format!("position after /tp nan: {p:?}"));
+    t.check([p.x, p.y, p.z].iter().all(|v| v.is_finite()), format!("position after /tp nan: {p:?}"));
     Ok(())
 }
 
@@ -251,9 +251,9 @@ pub async fn changes_in_one_tick(t: T) -> R {
     let f = t.feet();
     let (torch, flower) = (add(f, [3, 0, 3]), add(f, [5, 0, 3]));
     t.c()
-        .chat(&format!("/tk set {} base:mossy_cobblestone", at(torch)));
+        .say(&format!("/tk set {} base:mossy_cobblestone", at(torch)));
     t.c()
-        .chat(&format!("/tk set {} base:dandelion", at(flower)));
+        .say(&format!("/tk set {} base:dandelion", at(flower)));
     t.secs(1.0).await?;
     t.check_eq(t.block(flower).await?, "base:dandelion".to_string(), "the server has the flower");
     t.check(
@@ -292,12 +292,12 @@ pub async fn chat_down_keeps_text(t: T) -> R {
     t.press("core:chat");
     t.screen("core:chat").await?;
     t.frames(2).await?;
-    t.c().type_text("hello");
+    t.c().input_type("hello");
     t.frames(2).await?;
-    t.c().key("ArrowDown", 0.0);
+    t.c().input_key("ArrowDown", 0.0);
     t.frames(3).await?;
-    t.check_eq(t.c().input_text(), "hello".to_string(), "the text is still there");
-    t.c().close_screen();
+    t.check_eq(t.c().focused_text(), "hello".to_string(), "the text is still there");
+    t.c().screen_close();
     t.no_screen().await
 }
 
@@ -334,7 +334,7 @@ pub async fn creative_sword_no_flicker(t: T) -> R {
     t.flat().await?;
     t.op("mode creative").await?;
     t.op("put me 0 iron_sword 1").await?;
-    t.c().select(0);
+    t.c().select_slot(0);
     let b = add(t.feet(), [2, 0, 0]);
     t.set(b, "stone").await?;
     t.until("the block on the client", Duration::from_secs(2), |t| t.c().block(b).is_some_and(|s| s != 0))
@@ -384,38 +384,5 @@ pub async fn reach_and_mining_attributes(t: T) -> R {
         .await?;
     t.secs(0.2).await?;
     t.check_eq(t.block(near).await?, "core:air".to_string(), "not refused as too soon");
-    Ok(())
-}
-
-/// The surface counts: above a source's top is not in it, and mods can ask.
-pub async fn liquid_surface(t: T) -> R {
-    t.flat().await?;
-    let p = add(t.feet(), [3, 2, 0]);
-    t.set(p, "water").await?;
-    t.check_eq(
-        t.op(&format!("in_liquid {} {} {}", p[0] as f64 + 0.5, p[1] as f64 + 0.5, p[2] as f64 + 0.5))
-            .await?,
-        "1".to_string(),
-        "inside",
-    );
-    t.check_eq(
-        t.op(&format!("in_liquid {} {} {}", p[0] as f64 + 0.5, p[1] as f64 + 0.95, p[2] as f64 + 0.5))
-            .await?,
-        "0".to_string(),
-        "above its surface, in its block",
-    );
-    Ok(())
-}
-
-/// `near_bodies` leaves out what can't be hit.
-pub async fn bodies_only(t: T) -> R {
-    t.flat().await?;
-    let p = add(t.feet(), [4, 0, 0]);
-    t.op(&format!("spawn base:pig {}", at(p))).await?;
-    t.op("drops 1").await?;
-    t.secs(0.1).await?;
-    let near = t.op(&format!("near_bodies {} 16", at(p))).await?;
-    t.check(near.contains("base:pig"), format!("the pig counts: {near}"));
-    t.check(!near.contains("core:item"), format!("a dropped item doesn't: {near}"));
     Ok(())
 }

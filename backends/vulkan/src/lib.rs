@@ -392,6 +392,7 @@ impl VulkanBackend {
             let base = has.features;
             let missing: Vec<&str> = [
                 ("multiDrawIndirect", base.multi_draw_indirect),
+                ("drawIndirectCount", has12.draw_indirect_count),
                 ("drawIndirectFirstInstance", base.draw_indirect_first_instance),
                 ("samplerAnisotropy", base.sampler_anisotropy),
                 ("fillModeNonSolid", base.fill_mode_non_solid),
@@ -1348,8 +1349,7 @@ impl Backend for VulkanBackend {
     fn destroy_buffer(&mut self, buffer: BufferId) {
         if let Some(b) = self.buffers.remove(buffer.0) {
             // Writes still queued for it go with it: its slot is free at once, and a buffer made
-            // before the uploads run (a reload makes many) would take them, past its end (16 KB
-            // into a 1.6 KB buffer hung an NVIDIA GPU, Xid 109, 2026-11-04).
+            // before the uploads run (a reload makes many) would take them, past its end.
             self.uploads
                 .retain(|u| !matches!(u, Upload::Buffer { dst, .. } if *dst == buffer.0));
             self.defer(Deferred::Buffer(b.raw, b.alloc));
@@ -1362,7 +1362,7 @@ impl Backend for VulkanBackend {
         // Depth is also sampled: screen effects read how far each pixel is (it stays bindless,
         // read in SHADER_READ_ONLY_OPTIMAL between the passes that draw into it).
         let usage = if depth {
-            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_SRC
         } else {
             let mut u = vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST;
             if desc.render_target {
@@ -1839,6 +1839,19 @@ impl Backend for VulkanBackend {
                         self.device
                             .cmd_draw_indexed_indirect(cmd, b, offset, count, size_of::<DrawIndexedArgs>() as u32);
                     }
+                    Cmd::DrawIndexedIndirectCount { buffer, offset, count_buffer, count_offset, max } => {
+                        let b = self.buffers.get(buffer.0).raw;
+                        let c = self.buffers.get(count_buffer.0).raw;
+                        self.device.cmd_draw_indexed_indirect_count(
+                            cmd,
+                            b,
+                            offset,
+                            c,
+                            count_offset,
+                            max,
+                            size_of::<DrawIndexedArgs>() as u32,
+                        );
+                    }
                     Cmd::DrawIndirectCount { buffer, offset, count_buffer, count_offset, max } => {
                         let b = self.buffers.get(buffer.0).raw;
                         let c = self.buffers.get(count_buffer.0).raw;
@@ -1847,6 +1860,35 @@ impl Backend for VulkanBackend {
                     }
                     Cmd::Dispatch { x, y, z } => self.device.cmd_dispatch(cmd, x, y, z),
                     Cmd::Barrier => self.memory_barrier(cmd),
+                    Cmd::CopyDepthToBuffer { depth, buffer } => {
+                        let t = self.textures.get(depth.0);
+                        let (image, width, height) = (t.image, t.desc.width, t.desc.height);
+                        let raw = self.buffers.get(buffer.0).raw;
+                        self.barrier_image(
+                            cmd,
+                            image,
+                            depth_range(),
+                            vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
+                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                        );
+                        let region = vk::BufferImageCopy::default()
+                            .image_subresource(vk::ImageSubresourceLayers {
+                                aspect_mask: vk::ImageAspectFlags::DEPTH,
+                                mip_level: 0,
+                                base_array_layer: 0,
+                                layer_count: 1,
+                            })
+                            .image_extent(vk::Extent3D { width, height, depth: 1 });
+                        self.device
+                            .cmd_copy_image_to_buffer(cmd, image, vk::ImageLayout::TRANSFER_SRC_OPTIMAL, raw, &[region]);
+                        self.barrier_image(
+                            cmd,
+                            image,
+                            depth_range(),
+                            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                            vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
+                        );
+                    }
                     Cmd::Mark => {
                         if marks < MAX_MARKS - 1 {
                             self.device

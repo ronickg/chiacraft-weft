@@ -92,6 +92,8 @@ pub mod settings {
     pub static LANGUAGE: TextConfig = TextConfig::named("core:language");
     /// 0 = automatic.
     pub static GUI_SCALE: Config<u32> = Config::named("core:gui_scale");
+    /// Which chat lines show: 0 all, 1 no players' messages, 2 none but replies to one's commands.
+    pub static CHAT_VISIBILITY: Config<u32> = Config::named("core:chat_visibility");
     pub static VIEW_DISTANCE: Config<i32> = Config::named("core:view_distance");
     pub static VSYNC: Config<bool> = Config::named("core:vsync");
     pub static FOV: Config<f32> = Config::named("core:fov");
@@ -108,6 +110,7 @@ pub mod settings {
     pub static VOLUME_MASTER: Config<u32> = Config::named("core:volume_master");
     /// A world's: mobs appear by themselves.
     pub static MOB_SPAWNING: Config<bool> = Config::named("core:mob_spawning");
+    pub static KEEP_INVENTORY: Config<bool> = Config::named("core:keep_inventory");
 }
 
 pub struct ConfigBuilder<'a> {
@@ -163,7 +166,7 @@ impl ConfigBuilder<'_> {
     }
     /// Only read at start: the screen says a restart is needed.
     pub fn restart_required(mut self) -> Self {
-        self.desc.flags |= cf::RESTART;
+        self.desc.flags |= cf::RESTART_REQUIRED;
         self
     }
 }
@@ -188,28 +191,23 @@ impl Drop for ConfigBuilder<'_> {
 impl Registry {
     /// A setting, see `ConfigBuilder` (a bool `false` unless told otherwise).
     pub fn config<'a, T: ConfigValue>(&'a mut self, config: &'static Config<T>) -> ConfigBuilder<'a> {
-        ConfigBuilder {
-            raw: self.raw,
-            name: config.h.name().to_string(),
-            choices: Vec::new(),
-            text: String::new(),
-            cell: config.h.cell(),
-            desc: abi::ConfigDesc::DEFAULT,
-            _p: PhantomData,
-        }
+        self.config_builder(&config.h)
     }
 
     /// A text setting, see `ConfigBuilder::text`.
     pub fn text_config<'a>(&'a mut self, config: &'static TextConfig, default: &str) -> ConfigBuilder<'a> {
+        self.config_builder(&config.h).text(default)
+    }
+
+    fn config_builder(&mut self, h: &'static Handle<kind::Config>) -> ConfigBuilder<'_> {
         ConfigBuilder {
             raw: self.raw,
-            name: config.h.name().to_string(),
+            name: h.name().to_string(),
             choices: Vec::new(),
             text: String::new(),
-            cell: config.h.cell(),
+            cell: h.id_cell(),
             desc: abi::ConfigDesc::DEFAULT,
             _p: PhantomData,
         }
-        .text(default)
     }
 }

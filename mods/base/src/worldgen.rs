@@ -351,18 +351,20 @@ pub fn register(r: &mut Registry) {
         .tag("cave")
         .tag("dark");
 
-    for (ore, max_y, veins, size) in [
-        (&COAL_ORE, 128, 8, 12),
-        (&IRON_ORE, 64, 6, 8),
-        (&GOLD_ORE, 32, 2, 7),
-        (&crate::redstone::REDSTONE_ORE, 16, 4, 8),
-        (&DIAMOND_ORE, 16, 1, 6),
+    // The last: share left out where it would touch a cave, vanilla's.
+    for (ore, max_y, veins, size, exposed) in [
+        (&COAL_ORE, 128, 8, 12, 0.0),
+        (&IRON_ORE, 64, 6, 8, 0.0),
+        (&GOLD_ORE, 32, 2, 7, 0.5),
+        (&crate::redstone::REDSTONE_ORE, 16, 4, 8, 0.0),
+        (&DIAMOND_ORE, 16, 1, 6, 0.5),
     ] {
         r.ore(ore)
             .y(i32::MIN, max_y)
             .veins(veins)
-            .size(size)
-            .replace("#stone_ore_replaceables");
+            .vein_size(size)
+            .replace("#stone_ore_replaceables")
+            .exposed(exposed);
     }
 
     // The layers under the trees, each biome's (`vitals::layers`).
@@ -419,6 +421,7 @@ pub fn register(r: &mut Registry) {
     r.scatter(&TREE_SITES)
         .cell(5)
         .reach(8)
+        .ground("#plant_soil")
         .density(&TREES)
         // A forest's clearings keep one tree in four.
         .thin_in(&STAND_TREES, stand_over(-CLEARING).not(), 4)
@@ -426,11 +429,15 @@ pub fn register(r: &mut Registry) {
     r.scatter(&GIANT_SITES)
         .cell(24)
         .reach(12)
+        // Giants rise higher than the default reach (Weft's 32 up).
+        .reach_y(96, 16)
+        .ground("#plant_soil")
         .density(&GIANT_TREES)
         .shape(giant);
     r.scatter(&STAND_SITES)
         .cell(3)
         .reach(8)
+        .ground("#plant_soil")
         .density(&STAND_TREES)
         .thin(stand_over(STAND + 1).not(), 0)
         .shape(tree);
@@ -447,17 +454,18 @@ pub fn register(r: &mut Registry) {
         .cell(4)
         .reach(1)
         .density(&SHRUBS)
-        .thin(Mask::Noise { salt: 0x5B2B, scale: 24.0, octaves: 1, from: 0.0, to: 0.0 }.not(), 0)
+        .thin(Expr::fbm(0x5B2B, 24.0, 1).ramp(0.0, 0.0).not(), 0)
         .shape(shrub);
     // Young trees where light comes in: in clearings and at the stands' edges, none deep in a
     // stand (`stand_over`).
     r.scatter(&YOUNG_SITES)
         .cell(5)
         .reach(base_api::tree_recipes::UNDERSTORY_REACH)
+        .ground("#plant_soil")
         .density(&YOUNG_TREES)
         .thin(stand_over(STAND), 0)
         .shape(young_tree);
-    r.decorate(decorate);
+    r.decoration(decorate);
 }
 
 /// A young tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face.
@@ -465,7 +473,7 @@ fn young_tree(s: &mut Site) {
     if !site_open(s) {
         return;
     }
-    let [x, y, z] = s.pos();
+    let [x, y, z] = s.pos().to_array();
     let h = s.random();
     let log = YOUNG_KINDS
         .on_biome(s.biome())
@@ -474,7 +482,7 @@ fn young_tree(s: &mut Site) {
         .unwrap_or(OAK_LOG.id());
     base_api::trees::young_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
         let state = made_leaves(state);
-        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+        if force { s.put_force([x, y, z], state) } else { s.put([x, y, z], state) }
     });
 }
 
@@ -493,7 +501,7 @@ fn shrub(s: &mut Site) {
         return;
     };
     let tall = vitals::layers::shrub_height(name_of(abi::entry_kind::BIOME, s.biome()));
-    let [x, y, z] = s.pos();
+    let [x, y, z] = s.pos().to_array();
     for dy in 0..tall {
         for dz in -1..=1i32 {
             for dx in -1..=1i32 {
@@ -519,17 +527,17 @@ fn shrub(s: &mut Site) {
 /// Whether a tree or shrub may stand at a scatter's site: not on a bare rock face, nor at the foot
 /// of a wall (`land::site_on_rock`, `site_under_wall`).
 fn site_open(s: &Site) -> bool {
-    let (seed, dim, pos) = (s.seed(), s.dimension(), s.pos());
+    let (seed, dim, pos) = (s.seed(), s.dimension(), s.pos().to_array());
     !crate::land::site_on_rock(seed, dim, pos) && !crate::land::site_under_wall(seed, dim, pos)
 }
 
 /// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet; none
 /// on a bare rock face (`land::site_on_rock`), which is stone already.
 fn boulder(s: &mut Site) {
-    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos().to_array()) {
         return;
     }
-    let [x, y, z] = s.pos();
+    let [x, y, z] = s.pos().to_array();
     let h = s.random();
     let mossy = WET.on_biome(s.biome()) || WOODS.on_biome(s.biome());
     let r = 1 + (h % 3) as i32;
@@ -546,7 +554,7 @@ fn boulder(s: &mut Site) {
                     0 | 1 => COBBLESTONE.id(),
                     _ => STONE.id(),
                 };
-                s.force([x + dx, y + dy, z + dz], block);
+                s.put_force([x + dx, y + dy, z + dz], block);
             }
         }
     }
@@ -568,7 +576,7 @@ fn giant(s: &mut Site) {
     else {
         return;
     };
-    let [x, y, z] = s.pos();
+    let [x, y, z] = s.pos().to_array();
     if TREEFALL
         .on_biome(s.biome())
         .and_then(|share| in_gap(s.seed(), x, z, share, GAP_MARGIN_GIANT))
@@ -598,7 +606,7 @@ fn giant(s: &mut Site) {
             limbs.push([x, y, z]);
         }
         let state = made_leaves(state);
-        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+        if force { s.put_force([x, y, z], state) } else { s.put([x, y, z], state) }
     });
     lianas(s, &crown, y, h);
     // Bromeliads on one limb block in five.
@@ -636,7 +644,7 @@ fn giant_foot(s: &mut Site, [x, y, z]: [i32; 3], h: u64) {
             let (fx, fz) = (x + (dx * r).round() as i32, z + (dz * r).round() as i32);
             let up = (tall - tall * step / len).max(1);
             for dy in 0..up {
-                s.force([fx, y + dy, fz], BRAZIL_NUT_BUTTRESS.id());
+                s.put_force([fx, y + dy, fz], BRAZIL_NUT_BUTTRESS.id());
             }
         }
     }
@@ -689,7 +697,7 @@ fn gap_growth(s: &mut Site, log: u32, [x, y, z]: [i32; 3], h: u64) {
         }
         1 => base_api::trees::young_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
             let state = made_leaves(state);
-            if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+            if force { s.put_force([x, y, z], state) } else { s.put([x, y, z], state) }
         }),
         _ => {}
     }
@@ -741,7 +749,7 @@ fn lianas(s: &mut Site, crown: &[[i32; 3]], ground: i32, h: u64) {
 /// A fallen giant: a mossy trunk three wide lying 14 to 22 long through its site, following the
 /// ground under it (half sunk in it, only filling air), its root end a little wider.
 fn fallen_giant(s: &mut Site, h: u64) {
-    let [x, _, z] = s.pos();
+    let [x, _, z] = s.pos().to_array();
     let (ax, az, axis) = if h >> 12 & 1 == 0 { (1, 0, "x") } else { (0, 1, "z") };
     let log = state_with(MOSSY_SEQUOIA_LOG.id(), "axis", axis).unwrap_or(MOSSY_SEQUOIA_LOG.id());
     let half = 7 + ((h >> 16) % 5) as i32;
@@ -774,9 +782,9 @@ static WOODS: Tag = Tag::named("forest");
 /// `STAND`, its clearings where it's under `-CLEARING`; one patch is some 40 blocks across. As a
 /// mask that is on where the noise is `edge` or more (one octave of `fbm` is `perlin2` exactly),
 /// so the engine thins sites by it near and in distant terrain alike.
-fn stand_over(edge: i32) -> Mask {
+fn stand_over(edge: i32) -> Expr {
     let e = edge as f64 / fixed::ONE as f64;
-    Mask::Noise { salt: 0x57A4D, scale: 40.0, octaves: 1, from: e, to: e }
+    Expr::fbm(0x57A4D, 40.0, 1).ramp(e, e)
 }
 const STAND: i32 = 600;
 /// Which flower a column of a flower patch grows: one kind to a patch (its 16 x 16 cell), a few
@@ -795,7 +803,7 @@ fn tree(s: &mut Site) {
     if !site_open(s) {
         return;
     }
-    let [x, y, z] = s.pos();
+    let [x, y, z] = s.pos().to_array();
     let log = TREE_KINDS
         .on_biome(s.biome())
         .and_then(|l| l.pick(s.random() >> 40))
@@ -819,16 +827,16 @@ fn tree(s: &mut Site) {
             crown.push([x, y, z]);
         }
         let state = made_leaves(state);
-        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+        if force { s.put_force([x, y, z], state) } else { s.put([x, y, z], state) }
     });
     lianas(s, &crown, y, h);
 }
 
-/// Plants, after the terrain and trees filled the cube.
+/// Plants and Clay after the terrain and trees filled the cube.
 fn decorate(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
     let seed = g.seed();
-    let [ox, oy, oz] = g.origin();
+    let BlockPos { x: ox, y: oy, z: oz } = g.origin();
     let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
     let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
 
@@ -839,6 +847,7 @@ fn decorate(g: &mut Gen) {
     }
     // The world's first place, for the loose things thicker round it (`first.rs`).
     let spawn = crate::fair_spawn(seed);
+    // Plant decorations
     for z in 0..16usize {
         for x in 0..16usize {
             let col = &cols[z * 16 + x];
@@ -1076,6 +1085,32 @@ fn decorate(g: &mut Gen) {
             }
         }
     }
+    // Clay patches in shallow water (rivers, lakes, ocean shores), replacing the top blocks in
+    // bodies of water
+    for z in 0..16usize {
+        for x in 0..16usize {
+            let col = &cols[z * 16 + x];
+            // Make sure we only generate clay patches in shallower waters
+            if col.height >= SEA || col.height < SEA - 6 {
+                continue;
+            }
+            let y = col.height - oy;
+            if !(0..16).contains(&y) {
+                continue;
+            }
+            let y = y as usize;
+            let (wx, wz) = (ox + x as i32, oz + z as i32);
+            // Clay patch size based on noise scale
+            let clay = fixed::fbm(fixed::seed32(seed, 0xC1A7), wx * 16, wz * 16, 18 * 16, 3);
+            // Threshold for clay generation
+            if clay > fixed::ONE / 4 {
+                let surface = g.get(x, y, z);
+                if SAND.is(surface) || GRAVEL.is(surface) {
+                    g.set(x, y, z, CLAY.id());
+                }
+            }
+        }
+    }
 }
 
 /// The plant of the bed (eelgrass, kelp; `vitals::wild::Ground::Bed`) on a column whose floor is
@@ -1098,7 +1133,7 @@ fn bed(g: &mut Gen, seed: u64, [x, z]: [usize; 2], [wx, wz]: [i32; 2], floor: i3
     }
     let tall =
         if plant.form == wild::Form::Column { 1 + (hash(seed ^ 0xCE1, wx as i64, 0, wz as i64) % (depth - 1) as u64) as i32 } else { 1 };
-    let oy = g.origin()[1];
+    let oy = g.origin().y;
     for y in floor + 1..=floor + tall {
         let ly = y - oy;
         if (0..16).contains(&ly) && WATER.is(g.get(x, ly as usize, z)) {
@@ -1196,7 +1231,7 @@ fn wild_at(seed: u64, wx: i32, wz: i32, biome: u32, ground: wild::Ground) -> Opt
 
 /// The test dimension: flat, bounded in height, nothing else.
 pub fn flat(g: &mut Gen) {
-    let [_, oy, _] = g.origin();
+    let BlockPos { y: oy, .. } = g.origin();
     for y in 0..16usize {
         let wy = oy + y as i32;
         let s = match wy {

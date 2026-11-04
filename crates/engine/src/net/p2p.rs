@@ -35,8 +35,9 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// game for an achievement its rules need (`AskAchievement`, `Proofs`; chiacraft, phase 4). 11: a
 /// world sends its issuer's revocation list (`ToClient::Revocations`; chiacraft, phase 4). 12: a
 /// time-of-day rate per dimension (`ToClient::Time`). 13: a moving structure leans
-/// (`ToClient::BodyLean`; chiacraft, falling trees).
-const PROTOCOL: u32 = 13;
+/// (`ToClient::BodyLean`; chiacraft, falling trees). 14: Weft's 26.11.2 messages merged in (structs
+/// for positions, weather by id, cell parts, riding, camera modes; chiacraft's upstream sync).
+const PROTOCOL: u32 = 14;
 const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its

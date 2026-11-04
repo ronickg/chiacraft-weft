@@ -162,8 +162,8 @@ pub struct UiRenderer {
     font_tex: TextureId,
     font_idx: u32,
     textures: FxHashMap<String, Option<(u32, u32, u32)>>,
-    /// Animated GUI textures by bindless index: `Quad::layer` for them.
-    strips: FxHashMap<u32, u32>,
+    /// Animated GUI textures by bindless index.
+    strips: FxHashMap<u32, crate::assets::Anim>,
     /// Slicing a texture declares for itself, and how far it reaches outside the box it is
     /// drawn for (`outset` in its `.gui`: shadows, frames drawn around the content).
     slicing: FxHashMap<String, Option<Slicing>>,
@@ -413,17 +413,11 @@ impl UiRenderer {
                 gpu.write_texture(t, 0, &img.rgba);
                 self.owned.push(t);
                 let idx = gpu.texture_index(t);
-                // Animated like a block texture: frames stacked down (square, or `frame_height` pixels
-                // high), `frametime` ticks each.
-                let num = |src: &str, k: &str| crate::kv::get(src, k).and_then(|v| v.parse::<u32>().ok());
-                let frame = anim
-                    .as_deref()
-                    .map(|src| num(src, "frame_height").unwrap_or(img.width).max(1));
-                match (anim.as_deref(), frame) {
-                    (Some(src), Some(fh)) if img.height > fh && img.height % fh == 0 => {
-                        let ticks = num(src, "frametime").unwrap_or(1);
-                        self.strips
-                            .insert(idx, (img.height / fh).min(0xFFFF) | ticks.clamp(1, 0xFFFF) << 16);
+                // Animated like a block texture, with frames stacked down that needn't be square.
+                match anim.map(|src| crate::assets::parse_anim(&src, [img.width, img.height], 0)) {
+                    Some(a) if img.height > a.frame_height && img.height % a.frame_height == 0 => {
+                        let fh = a.frame_height;
+                        self.strips.insert(idx, a);
                         (idx, img.width, fh)
                     }
                     _ => (idx, img.width, img.height),
@@ -541,9 +535,24 @@ impl UiRenderer {
     /// Share `v` of a picture in `r`: its nearest state, or cut off toward `dir` (`ui::meter`).
     #[allow(clippy::too_many_arguments)]
     fn meter_picture(&mut self, gpu: &mut dyn Backend, assets: &Assets, name: &str, v: f32, dir: u32, r: Rect, scale: f32) {
+        self.meter_picture_tinted(gpu, assets, name, v, dir, r, scale, 0xFFFFFFFF)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn meter_picture_tinted(
+        &mut self,
+        gpu: &mut dyn Backend,
+        assets: &Assets,
+        name: &str,
+        v: f32,
+        dir: u32,
+        r: Rect,
+        scale: f32,
+        color: u32,
+    ) {
         let Some((picture, crop)) = super::meter::part(name, v, dir) else { return };
         match self.texture(gpu, assets, &picture) {
-            Some((idx, _, _)) => self.image(cropped(r, crop), idx, crop, 0xFFFFFFFF),
+            Some((idx, _, _)) => self.image(cropped(r, crop), idx, crop, color),
             None => self.checker(cropped(r, crop), scale),
         }
     }
@@ -753,37 +762,75 @@ impl UiRenderer {
         }
     }
 
-    /// Item icon: its picture, else its model, or an isometric cube for block items.
+    /// Item icon: its picture, else its model, or an isometric cube for block items (as a slot
+    /// shows it, `slot_icon`).
     pub fn item_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, item: u32) {
+        self.slot_icon(c, tex, x, y, size, &weft_abi::ItemStack { item, count: 1, data: 0 });
+    }
+
+    /// A stack as slots show it: an item with an icon shows its icon (`Looks::slot_draw`, painted
+    /// for the slot), one with only a model its model's picture once drawn (`model_icon`), and
+    /// otherwise its own picture (`plain_icon`).
+    pub fn slot_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, stack: &weft_abi::ItemStack) {
+        let looks = crate::client::looks::current();
+        let icon_first = matches!(looks.slot_draw(c, stack.item), crate::client::looks::ItemDraw::Icon(_));
+        if icon_first || !self.model_icon(x, y, size, *stack) {
+            self.plain_icon(c, tex, x, y, size, stack);
+        }
+    }
+
+    /// An item's own picture, what it shows until its model has one or without a model.
+    // SYNC: our stack look (`abi::comp::LOOK`, drawn through `GameTextures::look`) is not drawn
+    // here any more: a stack's own pictures are upstream's `layers` (`abi::comp::LAYERS`). Mods
+    // that set LOOK (base's parts tools) must set LAYERS.
+    fn plain_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, stack: &weft_abi::ItemStack) {
+        let item = stack.item;
         let looks = crate::client::looks::current();
         match looks.slot_draw(c, item) {
+            // Its own pictures, one over the other.
+            crate::client::looks::ItemDraw::Icon(_) if crate::stack::layers(stack).is_some() => {
+                let t = tex.layered(crate::stack::layers(stack).unwrap_or_default());
+                self.icon(tex, x, y, size, t, 0xFFFFFFFF);
+            }
             crate::client::looks::ItemDraw::Model(model) => self.boxes_icon(tex, x, y, size, model, &c.states[0]),
-            crate::client::looks::ItemDraw::Icon(icon) => self.icon(tex, x, y, size, icon),
+            crate::client::looks::ItemDraw::Icon(icon) => {
+                // A liquid's item is its texture, tinted as the liquid is (water is gray).
+                let color = c
+                    .item_fluid
+                    .get(&item)
+                    .and_then(|&l| c.states.get(c.liquids[l as usize].first_state as usize))
+                    .filter(|s| s.tint != 0)
+                    .map_or(0xFFFFFFFF, |s| crate::content::item_tint(s.tint) << 8 | 0xFF);
+                self.icon(tex, x, y, size, icon, color);
+            }
             crate::client::looks::ItemDraw::Block(state) => self.state_icon(c, tex, x, y, size, state),
             crate::client::looks::ItemDraw::Nothing => {}
         }
     }
 
-    /// A stack's icon: its own look (`abi::comp::LOOK`) if it has one, else its item's.
-    pub fn stack_item_icon(&mut self, c: &Content, tex: &GameTextures, x: f32, y: f32, size: f32, stack: &weft_abi::ItemStack) {
-        match crate::stack::look(stack).and_then(|l| tex.look(l)) {
-            Some(t) => self.icon(tex, x, y, size, t),
-            None => self.item_icon(c, tex, x, y, size, stack.item),
-        }
-    }
-
-    /// Texture `t` as a flat icon.
-    fn icon(&mut self, tex: &GameTextures, x: f32, y: f32, size: f32, t: u32) {
+    /// Texture `t` as a flat icon, multiplied by `color`.
+    fn icon(&mut self, tex: &GameTextures, x: f32, y: f32, size: f32, t: u32, color: u32) {
         self.quads.push(Quad {
             p0: [x, y],
             u: [size, 0.0],
             v: [0.0, size],
             uv: [0.0, 0.0, 1.0, 1.0],
-            color: 0xFFFFFFFF,
+            color,
             tex: tex.texture(t),
             mode: ui_mode::ICON,
             ..Default::default()
         });
+    }
+
+    /// The picture of what `stack` shows as if that is a model, drawn by now.
+    fn model_icon(&mut self, x: f32, y: f32, size: f32, stack: weft_abi::ItemStack) -> bool {
+        match crate::client::models::icon_of(stack) {
+            Some((t, uv)) => {
+                self.image(Rect { x, y, w: size, h: size }, t, uv, 0xFFFFFFFF);
+                true
+            }
+            None => false,
+        }
     }
 
     /// A block state the way block items show: a sprite for flat blocks, else an isometric model.
@@ -791,7 +838,11 @@ impl UiRenderer {
         let Some(s) = c.states.get(state as usize) else { return };
         let looks = crate::client::looks::current();
         if let Some(t) = looks.block_sprite(state, s) {
-            let tint = if s.tint == 0 || s.tint_faces & 1 == 0 { 0xFFFFFFFF } else { crate::content::item_tint(s.tint) << 8 | 0xFF };
+            let tint = if crate::content::face_paint(s, 0, false).base_tinted {
+                crate::content::item_tint(s.tint) << 8 | 0xFF
+            } else {
+                0xFFFFFFFF
+            };
             self.quads.push(Quad {
                 p0: [x, y],
                 u: [size, 0.0],
@@ -817,12 +868,8 @@ impl UiRenderer {
         boxes: &[crate::content::ModelBox],
         s: &crate::content::StateInfo,
     ) {
-        let tint = |face: usize| -> u32 {
-            if s.tint == 0 || s.tint_faces & (1 << face) == 0 {
-                return 0xFFFFFFFF;
-            }
-            crate::content::item_tint(s.tint) << 8 | 0xFF
-        };
+        let grass = crate::content::item_tint(s.tint) << 8 | 0xFF;
+        let color_of = |tinted: bool| if tinted { grass } else { 0xFFFFFFFF };
         let shade = |c: u32, k: f32| {
             let ch = |s: u32| (((c >> s) & 255) as f32 * k) as u32;
             ch(24) << 24 | ch(16) << 16 | ch(8) << 8 | 0xFF
@@ -836,7 +883,6 @@ impl UiRenderer {
         let at = |p: [f32; 3]| [o[0] + (p[0] - p[2]) * h, o[1] + (p[0] + p[2] - 1.0) * q - (p[1] - 0.5) * up];
         // Toward the one looking, from that same turn.
         let toward = glam::Vec3::new(0.612_372_4, 0.5, 0.612_372_4);
-        let grass = crate::content::item_tint(s.tint) << 8 | 0xFF;
         let mut shape = boxes.to_vec();
         // Back to front.
         shape.sort_by(|a, b| (a.min[0] + a.min[1] + a.min[2]).total_cmp(&(b.min[0] + b.min[1] + b.min[2])));
@@ -853,23 +899,24 @@ impl UiRenderer {
                 let u = [top_right[0] - p0[0], top_right[1] - p0[1]];
                 let v = [bottom_left[0] - p0[0], bottom_left[1] - p0[1]];
                 let uv = uv.map(|t| t / 16.0);
+                let overlay = tex
+                    .overlays
+                    .get(b.textures[face] as usize)
+                    .filter(|&&ov| ov != 0);
+                let paint = crate::content::face_paint(s, face, overlay.is_some());
                 self.quads.push(Quad {
                     p0,
                     u,
                     v,
                     uv,
-                    color: shade(tint(face), k),
+                    color: shade(color_of(paint.base_tinted), k),
                     tex: tex.texture(b.textures[face]),
                     mode: ui_mode::ICON,
                     ..Default::default()
                 });
-                // Tinted overlay on top of its face.
-                if let Some(&ov) = tex
-                    .overlays
-                    .get(b.textures[face] as usize)
-                    .filter(|&&ov| ov != 0)
-                {
-                    let color = shade(if s.tint == 0 { 0xFFFFFFFF } else { grass }, k);
+                // The part of a face over it.
+                if let Some(&ov) = overlay {
+                    let color = shade(color_of(paint.overlay_tinted), k);
                     self.quads
                         .push(Quad { p0, u, v, uv, color, tex: tex.texture(ov - 1), mode: ui_mode::ICON, ..Default::default() });
                 }
@@ -954,20 +1001,29 @@ impl UiRenderer {
         let s = 16.0 * scale;
         let (x, y) = (r.x + (r.w - s) / 2.0, r.y + (r.h - s) / 2.0);
         let i = icon * scale;
-        self.stack_item_icon(c, textures, r.x + (r.w - i) / 2.0, r.y + (r.h - i) / 2.0, i, &stack);
-        let max = c.max_durability(&stack);
-        let damage = crate::stack::damage(&stack);
-        if max > 0 && damage > 0 {
-            let f = 1.0 - damage as f32 / max as f32;
+        self.slot_icon(c, textures, r.x + (r.w - i) / 2.0, r.y + (r.h - i) / 2.0, i, &stack);
+        let (most, damage) = (c.durability(&stack), crate::stack::damage(&stack));
+        if most > 0 && damage > 0 {
+            let f = 1.0 - damage as f32 / most as f32;
             let bar = Rect { x: x + scale, y: y + s - 2.0 * scale, w: 14.0 * scale, h: 2.0 * scale };
             self.rect(bar, 0x000000FF);
             let g = (f * 255.0) as u32;
             self.rect(Rect { w: 13.0 * scale * f, h: scale, ..bar }, ((255 - g) << 24) | (g << 16) | 0xFF);
         }
-        if stack.count > 1 {
+        let liquid = c.item_fluid.contains_key(&stack.item);
+        if stack.count > 1 || liquid {
             // A smooth font's count a size up, to read at a glance; a pixel font's stays whole.
             let px = scale * text_unit * if self.font.smooth { 1.3 } else { 1.0 };
-            let layout = super::text::layout(&super::text::plain(&stack.count.to_string()), &self.font, None);
+            let shown = if !liquid {
+                stack.count.to_string()
+            } else if stack.count % 1000 == 0 {
+                format!("{}B", stack.count / 1000)
+            } else if stack.count >= 1000 {
+                format!("{:.1}B", stack.count as f32 / 1000.0)
+            } else {
+                format!("{}mB", stack.count)
+            };
+            let layout = super::text::layout(&super::text::plain(&shown), &self.font, None);
             let mut none = Vec::new();
             // In the icon's bottom right, clear of the slot's frame: the digits' ink two font
             // pixels inside the icon's right and bottom edges, their shadow one (a line's width
@@ -1167,27 +1223,89 @@ impl UiRenderer {
                     None => self.checker(cropped(r, super::meter::crop(v, *dir)), scale),
                 }
             }
-            Kind::Icons { class, count, value, dir, shake, .. } if *value >= 0.0 => {
-                use weft_abi::ui_dir;
-                let tick = (crate::shaders::clock() * crate::world::TPS as f32) as i64;
+            Kind::Icons { class, count, value, dir, shake, effects, change, .. } if *value >= 0.0 => {
+                use weft_abi::{icon_effect as fx, ui_dir};
+                let now = crate::shaders::clock();
+                let tick = (now * crate::world::TPS as f32) as i64;
                 let full = look.texture(class, "full");
                 let empty = look
                     .texture(class, "empty")
                     .and_then(|n| self.texture(gpu, assets, &n));
+                let overlay = look.texture(&format!("{class}_overlay"), "full");
+                let lit = look
+                    .texture(class, "flash")
+                    .and_then(|n| self.texture(gpu, assets, &n));
+                // A flash going on: what the row was, and whether this is a bright moment of it.
+                let flash = effects
+                    .iter()
+                    .filter_map(|e| {
+                        let (was, at, up) = (*change)?;
+                        let wanted = if up { fx::FLASH_GAIN } else { fx::FLASH_LOSS };
+                        (e.kind == wanted && e.value > 0.0 && now - at < e.amount).then_some(was)
+                    })
+                    .next();
+                // Vanilla's blink: three ticks on, three off.
+                let bright = flash.is_some() && (tick / 3) % 2 == 0;
+                let shown = flash.map_or(*value, |was| if bright { value.max(was) } else { value.min(was) });
+                let preview = effects
+                    .iter()
+                    .find(|e| e.kind == fx::PREVIEW && e.value > *value)
+                    .map(|e| (e.value, 0.5 - 0.5 * (now / e.amount.max(0.1) * std::f32::consts::TAU).cos()));
+                let wave = effects
+                    .iter()
+                    .find(|e| e.kind == fx::WAVE && e.value > 0.0)
+                    .map(|e| ((tick % (*count as i64 + 5)) as u32, e.amount));
+                let shaking = effects
+                    .iter()
+                    .filter(|e| e.kind == fx::SHAKE)
+                    .map(|e| e.value.max(0.0) * if e.amount > 0.0 { e.amount } else { 1.0 })
+                    .fold(if shake.is_some_and(|s| *value <= s) { 1.0f32 } else { 0.0 }, f32::max);
                 for i in 0..*count {
                     // A value counts halves of an icon, as vanilla's bars do.
-                    let v = *value / 2.0 - i as f32;
+                    let v = shown / 2.0 - i as f32;
                     let slot = if matches!(*dir, ui_dir::LEFT | ui_dir::UP) { count - 1 - i } else { i } as f32 * 8.0 * scale;
-                    let jump = if *shake && *value <= 4.0 { (weft_noise::hash(0, tick, i as i64, 0) & 1) as f32 } else { 0.0 };
+                    let mut jump = if shaking > 0.0 {
+                        let h = weft_noise::hash(0, tick, i as i64, 0);
+                        ((h % 1000) as f32 / 1000.0 * (shaking + 1.0))
+                            .floor()
+                            .min(shaking)
+                    } else {
+                        0.0
+                    };
+                    if let Some((at, high)) = wave
+                        && at == i
+                    {
+                        jump -= high.max(1.0);
+                    }
                     let (dx, dy) = if matches!(*dir, ui_dir::UP | ui_dir::DOWN) { (0.0, slot) } else { (slot, 0.0) };
                     let rr = Rect { x: r.x + dx, y: r.y + dy + jump * scale, w: 9.0 * scale, h: 9.0 * scale };
                     if let Some((idx, _, _)) = empty {
                         self.image(rr, idx, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
                     }
+                    if let Some((p, alpha)) = preview {
+                        let pv = p / 2.0 - i as f32;
+                        if pv > 0.0 && pv > v {
+                            let a = (alpha * 255.0) as u32;
+                            if let Some(full) = &full {
+                                self.meter_picture_tinted(gpu, assets, full, pv.min(1.0), *dir, rr, scale, 0xFFFFFF00 | a);
+                            }
+                        }
+                    }
                     if v > 0.0 {
                         match &full {
                             Some(full) => self.meter_picture(gpu, assets, full, v.min(1.0), *dir, rr, scale),
                             None => self.checker(rr, scale),
+                        }
+                    }
+                    if bright && let Some((idx, _, _)) = lit {
+                        self.image(rr, idx, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
+                    }
+                    for e in effects.iter().filter(|e| e.kind == fx::OVERLAY) {
+                        let ov = e.value / 2.0 - i as f32;
+                        if ov > 0.0
+                            && let Some(o) = &overlay
+                        {
+                            self.meter_picture(gpu, assets, o, ov.min(1.0), *dir, rr, scale);
                         }
                     }
                 }
@@ -1369,10 +1487,18 @@ impl UiRenderer {
         if self.quads.is_empty() {
             return;
         }
+        // Written every frame anyway, so which frame shows is decided here, by one reading of a
+        // `.anim` for all textures.
         if !self.strips.is_empty() {
+            let ticks = crate::shaders::time() * crate::world::TPS as f32;
             for q in &mut self.quads {
                 if q.mode != ui_mode::FONT {
-                    q.layer = self.strips.get(&q.tex).copied().unwrap_or(0);
+                    let strip = self
+                        .strips
+                        .get(&q.tex)
+                        .map(|a| (a.frame_at(ticks), a.frame_count));
+                    (q.layer, q.index) = strip
+                        .map_or((0, 0.0), |((frame, next, blend), count)| (crate::gpu_layout::ui_strip_record(frame, next, count), blend));
                 }
             }
         }

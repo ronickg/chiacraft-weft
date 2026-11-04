@@ -42,7 +42,7 @@ pub struct Table {
 }
 
 /// What a roll knows about the situation.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 pub struct Ctx {
     pub tool: ItemStack,
     pub by_player: bool,
@@ -51,6 +51,26 @@ pub struct Ctx {
     pub mined: u32,
     /// The block state the table is rolled for, however it was broken (0 for none).
     pub state: u32,
+    /// The conditions (`loot_cond::CONDITION`) that hold for this roll, by name.
+    pub holds: Vec<String>,
+}
+
+/// The names of conditions a table asks, for whoever rolls it to answer first.
+pub fn conditions_in(t: &Table) -> Vec<&str> {
+    let mut out: Vec<&str> = t
+        .pools
+        .iter()
+        .flat_map(|p| {
+            p.conds
+                .iter()
+                .chain(p.entries.iter().flat_map(|e| &e.conds))
+        })
+        .filter(|cd| cd.kind == lc::CONDITION)
+        .map(|cd| cd.prop.as_str())
+        .collect();
+    out.sort_unstable();
+    out.dedup();
+    out
 }
 
 // ---------------------------------------------------------------- registration
@@ -149,7 +169,7 @@ impl Resolve<'_> {
     fn conds(&self, c: &[RawCond], errors: &mut Vec<String>, table: &str) -> Vec<Cond> {
         c.iter()
             .map(|c| {
-                let tag = if c.text.is_empty() || c.kind == lc::BLOCK_STATE {
+                let tag = if c.text.is_empty() || c.kind == lc::BLOCK_STATE || c.kind == lc::CONDITION {
                     u32::MAX
                 } else {
                     crate::refs::tag(self.components, &c.text).unwrap_or_else(|e| {
@@ -157,7 +177,8 @@ impl Resolve<'_> {
                         u32::MAX
                     })
                 };
-                Cond { kind: c.kind, value: c.value, tag, prop: if c.kind == lc::BLOCK_STATE { c.text.clone() } else { String::new() } }
+                let prop = if c.kind == lc::BLOCK_STATE || c.kind == lc::CONDITION { c.text.clone() } else { String::new() };
+                Cond { kind: c.kind, value: c.value, tag, prop }
             })
             .collect()
     }
@@ -248,8 +269,8 @@ pub fn harvested(item: u32, count: u32) -> Table {
 fn passes(c: &crate::content::Content, conds: &[Cond], ctx: &Ctx, rng: &mut dyn FnMut() -> f32) -> bool {
     conds.iter().all(|cd| match cd.kind {
         lc::CHANCE => rng() < cd.value,
-        lc::TOOL_TAG => !ctx.tool.is_empty() && c.components.has(comps::ITEM, ctx.tool.item, cd.tag),
-        lc::NOT_TOOL_TAG => ctx.tool.is_empty() || !c.components.has(comps::ITEM, ctx.tool.item, cd.tag),
+        lc::TOOL_TAG => !ctx.tool.is_empty() && c.stack_has(&ctx.tool, Some(cd.tag)),
+        lc::NOT_TOOL_TAG => ctx.tool.is_empty() || !c.stack_has(&ctx.tool, Some(cd.tag)),
         lc::TOOL_LEVEL => {
             !ctx.tool.is_empty()
                 && c.stack_value::<u32>(&ctx.tool, c.ids.tool_level)
@@ -259,6 +280,7 @@ fn passes(c: &crate::content::Content, conds: &[Cond], ctx: &Ctx, rng: &mut dyn 
         lc::KILLED_BY_PLAYER => ctx.by_player,
         lc::ON_FIRE => ctx.on_fire,
         lc::HARVESTED => ctx.mined == 0 || c.harvests(ctx.mined, &ctx.tool),
+        lc::CONDITION => ctx.holds.iter().any(|h| *h == cd.prop),
         // Not per tick or per entity: only when a table is rolled for a block.
         lc::BLOCK_STATE => {
             let name = c.state_name(ctx.state);

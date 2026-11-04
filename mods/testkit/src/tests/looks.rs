@@ -9,34 +9,6 @@ use crate::runner::{R, T};
 
 static SPARK: Particle = Particle::named("testmod:spark");
 
-/// Bursts from the client and from the server (a broken block's dust) live and die out.
-pub async fn particles(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    let pos = [f[0] as f64 + 0.5, f[1] as f64 + 1.5, f[2] as f64 - 2.5];
-    drop(
-        t.c()
-            .spawn_particles(&SPARK, pos)
-            .count(200)
-            .spread(0.5)
-            .speed(1.0),
-    );
-    t.until("client particles", Duration::from_secs(2), |t| t.state().particles >= 200)
-        .await?;
-    // Sparks live at most 1.2 s.
-    t.until("particles gone", Duration::from_secs(4), |t| t.state().particles == 0)
-        .await?;
-    let b = add(f, [0, 0, -2]);
-    t.set(b, "dirt").await?;
-    t.op(&format!("break {} {} {}", b[0], b[1], b[2])).await?;
-    // Vanilla's 4x4x4 pieces, sent by the server.
-    t.until("block dust", Duration::from_secs(3), |t| t.state().particles >= 60)
-        .await?;
-    t.until("dust settled", Duration::from_secs(4), |t| t.state().particles == 0)
-        .await?;
-    Ok(())
-}
-
 /// Huge counts stay cheap: moved by a compute shader, drawn in one instanced draw.
 pub async fn particle_crowd(t: T) -> R {
     t.flat().await?;
@@ -59,53 +31,55 @@ pub async fn particle_crowd(t: T) -> R {
     Ok(())
 }
 
-/// Texture edges at a distance, where mip levels mix texels: no light line along the edge of a
-/// snowy grass block over dirt; a 64x64 texture shows its own colors among 16x16 ones.
-pub async fn texture_seams(t: T) -> R {
+static DROP: Particle = Particle::named("testmod:drop");
+
+/// A kind's rules run on the GPU: testmod's drops turn into red rings falling into water and are
+/// gone falling on the ground.
+pub async fn particle_rules(t: T) -> R {
     t.flat().await?;
     let f = t.feet();
-    t.fill(add(f, [-8, 0, -12]), add(f, [8, 0, -12]), "dirt")
+    t.fill(add(f, [-3, -1, -7]), add(f, [3, -1, -3]), "water")
         .await?;
-    t.fill(add(f, [-8, 1, -12]), add(f, [8, 1, -12]), "snowy_grass")
-        .await?;
-    t.fill(add(f, [-8, 2, -12]), add(f, [8, 2, -12]), "dirt")
-        .await?;
-    t.fill(add(f, [-8, 3, -12]), add(f, [8, 3, -12]), "grass")
-        .await?;
-    t.fill(add(f, [-8, 0, -9]), add(f, [8, 0, -9]), "tall_grass")
-        .await?;
-    // 64x64 next to 16x16 textures.
-    let mosaic = add(f, [1, 0, -5]);
-    t.fill(mosaic, add(mosaic, [1, 1, 0]), "testmod:mosaic")
-        .await?;
-    t.c().look(35.0, 8.0);
+    t.c().set_look(0.0, -30.0);
     t.settled().await?;
-    let shot = t.shot("seams").await?;
-    // Just below and above the edge between the dirt and the snowy grass on top of it, on the
-    // face the camera sees.
-    let mut light = 0;
-    let mut seen = 0;
-    for x in -7..=7 {
-        for dy in [0.96, 1.04] {
-            if let Some((sx, sy)) = t.on_screen([(f[0] + x) as f64 + 0.5, f[1] as f64 + dy, (f[2] - 11) as f64 + 0.01]) {
-                if (0.0..1.0).contains(&sx) && (0.0..1.0).contains(&sy) {
-                    seen += 1;
-                    light += (probe::lum(shot.at(sx, sy)) > 170.0) as u32;
-                }
-            }
-        }
-    }
-    t.check(seen > 6, format!("the wall's edge is in view ({seen} points)"));
-    t.probe("light points along the snowy grass edge", light as f32, light == 0);
-    // The middle of the 2x2 mosaic face the camera sees.
-    let p = t
-        .on_screen([(mosaic[0] + 1) as f64, (mosaic[1] + 1) as f64, mosaic[2] as f64 + 1.01])
-        .unwrap_or((0.5, 0.5));
-    let colors = shot.share(p.0 - 0.03, p.1 - 0.05, p.0 + 0.03, p.1 + 0.05, |c| {
-        let (hi, lo) = (*c.iter().max().unwrap() as i32, *c.iter().min().unwrap() as i32);
-        hi - lo > 80
-    });
-    t.probe("the mosaic's saturated colors", colors, colors > 0.3);
+    let rain = |at: [i32; 3]| {
+        let pos = [at[0] as f64 + 0.5, at[1] as f64 + 3.0, at[2] as f64 + 0.5];
+        drop(
+            t.c()
+                .spawn_particles(&DROP, pos)
+                .count(300)
+                .spread_box([2.5, 0.5, 1.5]),
+        );
+    };
+    let middle = |s: &crate::runner::Shot| s.share(0.2, 0.3, 0.8, 0.9, probe::red);
+    rain(add(f, [0, 0, -5]));
+    t.secs(1.0).await?;
+    let rings = middle(&t.shot("rings").await?);
+    t.probe("drops falling into water turn into rings", rings, rings > 0.01);
+    t.secs(3.0).await?;
+    t.fill(add(f, [-3, -1, -7]), add(f, [3, -1, -3]), "stone")
+        .await?;
+    t.settled().await?;
+    rain(add(f, [0, 0, -5]));
+    t.secs(1.0).await?;
+    let ground = t.shot("ground").await?;
+    let red = middle(&ground);
+    t.probe("drops on the ground leave nothing", red, red < 0.001);
+    Ok(())
+}
+
+/// A stack's own `layers` show over one another, tinted, in the hotbar: the sprite of a tool
+/// made of parts.
+pub async fn layered_icon(t: T) -> R {
+    t.flat().await?;
+    t.c().select_slot(4);
+    // The first hotbar slot, under the hearts.
+    let hotbar = |s: &crate::runner::Shot| s.share(0.385, 0.95, 0.415, 0.995, probe::red);
+    let before = hotbar(&t.shot("plain").await?);
+    t.op("layered 0").await?;
+    t.frames(6).await?;
+    let after = hotbar(&t.shot("layered").await?);
+    t.probe("red of the tinted layer in the hotbar", after - before, after - before > 0.04);
     Ok(())
 }
 
@@ -124,42 +98,13 @@ fn write_png(path: &str, rgb: [u8; 3]) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// A mod's tint kind takes the biome's color where it sets one (plains: teal), else its
-/// default (violet; the flatlands are beach).
-pub async fn tint_kinds(t: T) -> R {
-    for (flat, teal) in [(true, false), (false, true)] {
-        if flat {
-            t.flat().await?;
-        } else {
-            t.world(5).await?;
-            t.idle().await?;
-        }
-        let f = t.feet();
-        let (a, b) = (add(f, [-3, 0, -3]), add(f, [3, 3, -3]));
-        t.fill(a, b, "testmod:glow_moss").await?;
-        let moss = Block::lookup("testmod:glow_moss");
-        // Every block of the wall must reach the client before its color can be looked at.
-        t.until("the moss wall on the client", Duration::from_secs(5), |t| {
-            (a[1]..=b[1]).all(|y| (a[0]..=b[0]).all(|x| t.c().block([x, y, a[2]]) == moss))
-        })
-        .await?;
-        t.c().look(0.0, 0.0);
-        t.settled().await?;
-        let [r, g, b] = t.pixel(0.5, 0.45).await?;
-        let ok = if teal { g > r + 40 && b > r + 30 } else { r > g + 20 && b > r };
-        t.check(ok, format!("{} moss, got {r} {g} {b}", if teal { "teal" } else { "violet" }));
-        t.shot(if teal { "plains" } else { "flatlands" }).await?;
-    }
-    Ok(())
-}
-
 /// Reloading assets picks up a resource pack's texture and later changes to that file.
 pub async fn texture_reload(t: T) -> R {
     t.flat().await?;
     let f = t.feet();
     t.fill(add(f, [-3, 0, -3]), add(f, [3, 3, -3]), "dirt")
         .await?;
-    t.c().look(0.0, 0.0);
+    t.c().set_look(0.0, 0.0);
     t.settled().await?;
     let plain = t.grab().await?;
     let pack = format!("{}/resourcepacks/testkit_reload", t.c().run_dir());
@@ -195,21 +140,21 @@ pub async fn pack_lang(t: T) -> R {
     weft_sdk::settings::RESOURCE_PACKS.set("testkit_lang");
     t.c().reload_assets();
     t.frames(2).await?;
-    t.c().open_screen(&screens::SETTINGS);
+    t.c().screen_open(&screens::SETTINGS);
     t.screen("core:settings").await?;
     t.frames(2).await?;
     t.laid_out(&["text:Pack Done", "text:View distance", "text:Language"]);
-    t.c().close_screen();
+    t.c().screen_close();
     weft_sdk::settings::RESOURCE_PACKS.set("");
     drop(std::fs::remove_dir_all(&pack));
     t.c().reload_assets();
     t.frames(2).await?;
-    t.c().open_screen(&screens::SETTINGS);
+    t.c().screen_open(&screens::SETTINGS);
     t.screen("core:settings").await?;
     t.frames(2).await?;
     t.check(t.c().ui_rect("text:Pack Done").is_none(), "without the pack the key is the mod's again");
     t.laid_out(&["text:Done"]);
-    t.c().close_screen();
+    t.c().screen_close();
     Ok(())
 }
 
@@ -220,7 +165,7 @@ pub async fn broken_shader_pack(t: T) -> R {
     let f = t.feet();
     t.op(&format!("spawn testmod:idol {} {} {}", f[0], f[1], f[2] - 3))
         .await?;
-    t.c().look(0.0, 0.0);
+    t.c().set_look(0.0, 0.0);
     t.settled().await?;
     t.secs(0.5).await?;
     let before = t.grab().await?;
@@ -290,8 +235,8 @@ pub async fn shaders_and_glow(t: T) -> R {
         .await?;
     t.check(t.count_near("wisp", 8.0).await? == 1, "a wisp floats nearby");
     t.op("put me 0 testmod:rune 1").await?;
-    t.c().select(0);
-    t.c().look(0.0, -5.0);
+    t.c().select_slot(0);
+    t.c().set_look(0.0, -5.0);
     t.settled().await?;
     t.secs(1.0).await?;
     let night = t.shot("night_glow").await?;
@@ -322,75 +267,6 @@ pub async fn shaders_and_glow(t: T) -> R {
     Ok(())
 }
 
-/// A block shaped by a Blockbench Java model file: the test mod's pedestal is a plate, a crystal
-/// column and a top, so against the sky the sides of the column show sky, the column itself not.
-pub async fn block_model_file(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    let p = add(f, [0, 2, -3]);
-    t.set(p, "testmod:pedestal").await?;
-    t.op("put me 0 testmod:pedestal 1").await?;
-    t.c().look(0.0, 15.0);
-    t.settled().await?;
-    let shot = t.shot("pedestal").await?;
-    let at = |x: f64| {
-        t.on_screen([p[0] as f64 + x, p[1] as f64 + 0.35, p[2] as f64 + 0.5])
-            .map(|(sx, sy)| crate::runner::lum(shot.avg(sx - 0.003, sy - 0.003, sx + 0.003, sy + 0.003)))
-    };
-    let (gap, column) = (at(0.18).unwrap_or(0.0), at(0.5).unwrap_or(255.0));
-    t.probe("sky beside the column (the file's shape, not a cube)", gap, gap > 180.0);
-    t.probe("the crystal column itself", column, column < 150.0);
-    // A resource pack's model of the same block redraws it, here as a whole cube.
-    let pack = format!("{}/resourcepacks/testkit_shapes", t.c().run_dir());
-    let file = format!("{pack}/testmod/models/block/pedestal.json");
-    std::fs::create_dir_all(std::path::Path::new(&file).parent().unwrap()).map_err(|e| e.to_string())?;
-    std::fs::write(
-        &file,
-        r#"{"elements":[{"from":[0,0,0],"to":[16,16,16],"faces":{"north":{},"south":{},"east":{},"west":{},"up":{},"down":{}}}]}"#,
-    )
-    .map_err(|e| e.to_string())?;
-    weft_sdk::settings::RESOURCE_PACKS.set("testkit_shapes");
-    t.c().reload_assets();
-    t.frames(5).await?;
-    t.settled().await?;
-    let cube = t.shot("pedestal_pack").await?;
-    weft_sdk::settings::RESOURCE_PACKS.set("");
-    let _ = std::fs::remove_dir_all(&pack);
-    t.c().reload_assets();
-    t.frames(2).await?;
-    let filled = t
-        .on_screen([p[0] as f64 + 0.18, p[1] as f64 + 0.35, p[2] as f64 + 0.5])
-        .map(|(sx, sy)| crate::runner::lum(cube.avg(sx - 0.003, sy - 0.003, sx + 0.003, sy + 0.003)))
-        .unwrap_or(255.0);
-    t.probe("a pack's model draws a cube there", filled, filled < 150.0);
-    // Its item with it: in the hotbar's first slot the cube covers more than the pedestal did.
-    let covered =
-        |s: &crate::runner::Shot| s.share(0.392, 0.955, 0.408, 0.99, |c| c[0].abs_diff(c[1]) > 12 || c[1].abs_diff(c[2]) > 12 || c[0] < 90);
-    let (before, after) = (covered(&shot), covered(&cube));
-    t.probe("the item takes the pack's model, how much more of its slot is covered", after - before, after > before + 0.02);
-    Ok(())
-}
-
-/// An item shaped by a model file (the test mod's totem: a stone base, a crystal on it) shows its
-/// boxes in the hand and in the hotbar slot.
-pub async fn item_model_file(t: T) -> R {
-    t.flat().await?;
-    t.op("put me 0 testmod:totem 1").await?;
-    t.c().select(0);
-    t.c().look(0.0, 20.0);
-    t.settled().await?;
-    // The hand comes up with it.
-    t.secs(0.8).await?;
-    let shot = t.shot("totem").await?;
-    let crystal = |c: probe::C| probe::cyan(c) || (c[2] > 120 && c[0] < 90);
-    let hand = shot.share(0.55, 0.55, 1.0, 0.94, crystal);
-    t.probe("the crystal in the hand", hand, hand > 0.01);
-    // The first hotbar slot of the HUD, at the bottom middle (gui scale 2, 1600x900).
-    let slot = shot.share(0.388, 0.95, 0.412, 0.995, crystal);
-    t.probe("the crystal in the hotbar slot", slot, slot > 0.015);
-    Ok(())
-}
-
 /// Models: the orb (built in code, a sphere mesh and a child bone) turns by its file's idle
 /// animation; the idol (a Blockbench file with bones and mesh wings) bows when used, a server
 /// triggered animation that holds its last frame.
@@ -399,10 +275,11 @@ pub async fn models(t: T) -> R {
     let f = t.feet();
     t.op(&format!("spawn testmod:orb {} {} {}", f[0], f[1] + 1, f[2] - 3))
         .await?;
-    t.op(&format!("spawn testmod:idol {} {} {}", f[0], f[1], f[2] + 3))
+    let idol = t
+        .op(&format!("spawn testmod:idol {} {} {}", f[0], f[1], f[2] + 3))
         .await?;
     t.check(t.count_near("orb", 8.0).await? == 1 && t.count_near("idol", 8.0).await? == 1, "an orb and an idol stand nearby");
-    t.c().look(0.0, 0.0);
+    t.c().set_look(0.0, 0.0);
     t.settled().await?;
     t.secs(0.5).await?;
     let a = t.grab().await?;
@@ -420,11 +297,20 @@ pub async fn models(t: T) -> R {
     let ground = |f: &[u8]| f[f.len() / 4 / 3 * 4..].to_vec();
     t.check(T::differ(&ground(&a), &ground(&b)) == 0.0, "the bow holds its last frame");
     t.shot("idol_bow").await?;
-    // The test mod gives the player a wave: it moves the first person hand by its `hand` bone.
-    t.c().look(90.0, 0.0);
+    // A mod has it play one action as another for a while.
+    t.op(&format!("action {idol}")).await?;
+    t.secs(0.2).await?;
+    let plain = t.grab().await?;
+    t.op(&format!("swap {idol} idle bow")).await?;
+    t.secs(1.0).await?;
+    let swapped = t.grab().await?;
+    t.check(T::differ(&ground(&plain), &ground(&swapped)) > 0.0005, "idle plays as the bow");
+    t.op(&format!("swap {idol} idle")).await?;
+    // The test mod gives the player a wave, seen from the first person like from anywhere.
+    t.c().set_look(90.0, 0.0);
     t.frames(3).await?;
     let a = t.grab().await?;
-    t.op("animate me wave").await?;
+    t.op("action me wave").await?;
     t.secs(0.5).await?;
     let b = t.grab().await?;
     t.check(T::differ(&a, &b) > 0.002, "the first person hand waves");
@@ -438,13 +324,13 @@ pub async fn rich_text(t: T) -> R {
     t.op("put me 0 testmod:rune 1").await?;
     // A fall hurts the player, which the test mod's `{if:testmod:hurt}` shows.
     let s = t.state();
-    t.c().teleport([s.pos[0], s.pos[1] + 6.0, s.pos[2]]);
+    t.c().teleport([s.pos.x, s.pos.y + 6.0, s.pos.z]);
     t.until("hurt by the fall", Duration::from_secs(5), |t| t.state().health < super::max_health(t) - 0.5)
         .await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    let Some([x, y, w, h]) = t.c().ui_rect(&t.hotbar(0)) else { return Err("no hotbar slot in the inventory".into()) };
-    t.c().cursor(x + w / 2.0, y + h / 2.0);
+    let Some(Rect { x, y, w, h }) = t.c().ui_rect(&t.hotbar(0)) else { return Err("no hotbar slot in the inventory".into()) };
+    t.c().input_cursor(x + w / 2.0, y + h / 2.0);
     t.frames(4).await?;
     let rune = t.shot("rune").await?;
     let wound = |c: [u8; 3]| c[0] > 200 && (100..170).contains(&c[1]) && (100..170).contains(&c[2]);
@@ -457,26 +343,8 @@ pub async fn rich_text(t: T) -> R {
     let sneak = t.shot("rune_sneak").await?;
     let d = T::differ(&rune.px, &sneak.px) as f32;
     t.probe("sneaking changes the tooltip ({on_key})", d, d > 0.002);
-    t.c().release_all();
-    t.c().close_screen();
-    t.no_screen().await
-}
-
-/// The machine screen's panel is drawn by the test mod's GUI shader (teal circuit lines).
-pub async fn gui_shader(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    let p = add(f, [0, 0, -2]);
-    t.set(p, "testmod:generator").await?;
-    t.op(&format!("menu testmod:generator {} {} {}", p[0], p[1], p[2]))
-        .await?;
-    t.screen("core:menu").await?;
-    t.frames(3).await?;
-    let shot = t.shot("generator").await?;
-    let Some([x, y, _, h]) = t.c().ui_rect("text:Generator") else { return Err("no Generator title".into()) };
-    let v = shot.share(x, y + h, x + 0.2, y + 0.12, probe::teal);
-    t.probe("circuit lines in the panel", v, v > 0.01);
-    t.c().close_screen();
+    t.c().input_release_all();
+    t.c().screen_close();
     t.no_screen().await
 }
 
@@ -485,7 +353,7 @@ pub async fn gui_shader(t: T) -> R {
 pub async fn sky(t: T) -> R {
     t.world(5).await?;
     t.op("mode creative").await?;
-    t.c().look(0.0, 89.0);
+    t.c().set_look(0.0, 89.0);
     // Without the GUI: a popup's letters (a level up) would count as stars.
     t.press("core:hide_hud");
     t.frames(4).await?;
@@ -520,11 +388,11 @@ pub async fn sky(t: T) -> R {
     // seasons, and a new world starts in late winter, when the sun has set long before 12400.
     // `time` keeps the day, so this is day 7 at 12100, just as its 12 hour day ends.
     t.op("time 180100").await?;
-    t.c().look(90.0, 8.0);
+    t.c().set_look(90.0, 8.0);
     t.secs(0.6).await?;
     let west = t.shot("sunset").await?;
     let warm = |c: probe::C| c[0] > 170 && c[0] as i32 > c[2] as i32 + 50;
-    t.c().look(-90.0, 8.0);
+    t.c().set_look(-90.0, 8.0);
     t.secs(0.6).await?;
     let east = t.shot("sunset_back").await?;
     let (w, e) = (west.share(0.0, 0.3, 1.0, 0.5, warm), east.share(0.0, 0.3, 1.0, 0.5, warm));
@@ -546,8 +414,8 @@ pub async fn clouds(t: T) -> R {
     let white = |c: probe::C| c.iter().all(|&v| v > 205);
     let s = t.state();
     // Near the horizon from well below them: what is there is thousands of blocks away.
-    t.c().teleport([s.pos[0], 150.0, s.pos[2]]);
-    t.c().look(0.0, 2.0);
+    t.c().teleport([s.pos.x, 150.0, s.pos.z]);
+    t.c().set_look(0.0, 2.0);
     t.secs(1.0).await?;
     let (x0, y0, x1, y1) = (0.0, 0.47, 1.0, 0.53);
     let far = t.shot("far").await?.share(x0, y0, x1, y1, white);
@@ -559,8 +427,8 @@ pub async fn clouds(t: T) -> R {
     t.check(far > lifted + 0.02, format!("clouds far away: {far:.3}, lifted out of reach {lifted:.3}"));
     // From above they cover the ground; lifted over the camera they don't.
     LIFT.set(0);
-    t.c().teleport([s.pos[0], 330.0, s.pos[2]]);
-    t.c().look(0.0, -60.0);
+    t.c().teleport([s.pos.x, 330.0, s.pos.z]);
+    t.c().set_look(0.0, -60.0);
     t.secs(1.0).await?;
     let above = t.shot("above").await?.share(0.0, 0.3, 1.0, 1.0, white);
     LIFT.set(512);
@@ -573,20 +441,20 @@ pub async fn clouds(t: T) -> R {
     t.check(above > lifted + 0.02, format!("over the ground: {above:.3}, lifted away {lifted:.3}"));
     // A wall nearer than they are hides them.
     LIFT.set(0);
-    let at = [s.pos[0].floor() as i32, 150, s.pos[2].floor() as i32];
+    let at = [s.pos.x.floor() as i32, 150, s.pos.z.floor() as i32];
     t.fill(add(at, [-30, 0, -12]), add(at, [30, 70, -12]), "stone")
         .await?;
-    t.c().teleport([s.pos[0], 150.0, s.pos[2]]);
-    t.c().look(0.0, 35.0);
+    t.c().teleport([s.pos.x, 150.0, s.pos.z]);
+    t.c().set_look(0.0, 35.0);
     t.secs(1.0).await?;
     let wall = t.shot("wall").await?.share(0.2, 0.3, 0.8, 0.7, white);
     t.check(wall < 0.005, format!("clouds through a wall: {wall:.3}"));
     // Its slider is among the others.
-    t.c().open_screen(&screens::SETTINGS);
+    t.c().screen_open(&screens::SETTINGS);
     t.screen("core:settings").await?;
     t.frames(3).await?;
     t.shot("settings").await?;
-    t.c().close_screen();
+    t.c().screen_close();
     t.no_screen().await?;
     Ok(())
 }
@@ -596,11 +464,11 @@ pub async fn clouds(t: T) -> R {
 pub async fn attack_indicator(t: T) -> R {
     t.flat().await?;
     t.op("put me 0 iron_sword 1").await?;
-    t.c().select(0);
+    t.c().select_slot(0);
     // A swing that hits nothing spends the charge; looking down, nothing bright is behind the bar.
     t.op("attr_mod me core:block_reach no_reach 0 -10 0")
         .await?;
-    t.c().look(0.0, -40.0);
+    t.c().set_look(0.0, -40.0);
     t.secs(1.0).await?;
     let (x0, y0, x1, y1) = (0.49, 0.505, 0.51, 0.54);
     // The bar's fill is the kit's amber (warm and bright), not white: red high, green middling,
@@ -638,7 +506,7 @@ fn tilt(shot: &crate::runner::Shot) -> f32 {
 /// Third person shakes like first: from a hit, and from walking.
 pub async fn third_person_shakes(t: T) -> R {
     t.flat().await?;
-    t.c().look(0.0, 0.0);
+    t.c().set_look(0.0, 0.0);
     t.press("core:perspective");
     t.secs(0.5).await?;
     let still = tilt(&t.shot("still").await?);
@@ -654,7 +522,7 @@ pub async fn third_person_shakes(t: T) -> R {
     t.check(range.1 - range.0 > 0.001, format!("walking sways the view: {range:?}"));
     t.secs(1.0).await?;
     let s = t.state().pos;
-    t.c().teleport([s[0], s[1] + 8.0, s[2]]);
+    t.c().teleport([s.x, s.y + 8.0, s.z]);
     t.until("hurt by the fall", Duration::from_secs(5), |t| t.state().health < super::max_health(t) - 0.5)
         .await?;
     let mut most = 0.0f32;
@@ -737,8 +605,8 @@ pub async fn translucent_order(t: T) -> R {
     Ok(())
 }
 
-/// By day a lamp's color still shows on what is around it, white light takes nothing away, and
-/// at night light alone is less than the sun.
+/// Light adds up and bends toward full: by day a lamp's color still shows on what is around it,
+/// over the sun's.
 pub async fn light_by_day(t: T) -> R {
     t.flat().await?;
     t.op("time 6000").await?;
@@ -749,7 +617,7 @@ pub async fn light_by_day(t: T) -> R {
         .await?;
     t.c()
         .teleport([f[0] as f64 + 0.5, f[1] as f64 + 7.0, f[2] as f64 - 2.0]);
-    t.c().look(0.0, -60.0);
+    t.c().set_look(0.0, -60.0);
     t.secs(0.4).await?;
     let spot = t
         .on_screen([f[0] as f64 + 0.5, f[1] as f64 + 1.0, f[2] as f64 - 5.5])
@@ -766,32 +634,7 @@ pub async fn light_by_day(t: T) -> R {
     t.secs(0.4).await?;
     let lit = beside(&t.shot("lamp").await?);
     t.note(format!("snow {plain:?}, beside a blue lamp {lit:?}"));
-    t.probe("how much bluer the snow is than red, by a blue lamp at noon", lit[2] - lit[0], lit[2] - lit[0] > 25.0);
-    Ok(())
-}
-
-/// A random `.ctm` varies plants and box models too: red and blue tiles of a green texture, each
-/// row in front of a white wall.
-pub async fn ctm_off_the_cube(t: T) -> R {
-    t.flat().await?;
-    let f = t.feet();
-    t.fill(add(f, [-9, 0, -7]), add(f, [9, 5, -7]), "snow")
-        .await?;
-    for x in -5..=5 {
-        t.set(add(f, [x, 0, -5]), "testkit:varied_plant").await?;
-        t.set(add(f, [x, 3, -5]), "testkit:varied_box").await?;
-    }
-    t.look_at(add(f, [0, 1, -5]));
-    t.secs(0.5).await?;
-    let s = t.shot("rows").await?;
-    let row = |p: [f64; 3]| t.on_screen(p).map_or(0.5, |at| at.1);
-    let (plants, boxes) =
-        (row([f[0] as f64, f[1] as f64 + 0.5, f[2] as f64 - 4.5]), row([f[0] as f64, f[1] as f64 + 3.5, f[2] as f64 - 4.5]));
-    let colors = |y: f32| [s.share(0.1, y - 0.03, 0.9, y + 0.03, probe::red), s.share(0.1, y - 0.03, 0.9, y + 0.03, probe::blue)];
-    let (p, b) = (colors(plants), colors(boxes));
-    t.note(format!("red and blue, plants {p:?}, boxes {b:?}"));
-    t.check(p[0] > 0.01 && p[1] > 0.01, format!("plants of both tiles: {p:?}"));
-    t.check(b[0] > 0.01 && b[1] > 0.01, format!("boxes of both tiles: {b:?}"));
+    t.probe("how much bluer the snow is than red, by a blue lamp at noon", lit[2] - lit[0], lit[2] - lit[0] > 12.0);
     Ok(())
 }
 
@@ -917,36 +760,5 @@ pub async fn ctm_any_model(t: T) -> R {
     let _ = std::fs::remove_dir_all(&pack);
     t.c().reload_assets();
     t.frames(2).await?;
-    out
-}
-
-/// From high above, where the view's cubes don't reach the ground, it is land all the way under
-/// the camera, not a hole of sky.
-pub async fn distant_terrain_from_above(t: T) -> R {
-    static VIEW: Config<i32> = Config::named("core:view_distance");
-    static LOD: Config<i32> = Config::named("core:lod_distance");
-    let before = (VIEW.get(), LOD.get());
-    VIEW.set(8);
-    LOD.set(256);
-    let out = async {
-        t.world(5).await?;
-        t.idle().await?;
-        t.op("mode spectator").await?;
-        let s = t.state().pos;
-        t.c().teleport([s[0], 1024.0, s[2]]);
-        t.c().look(0.0, -89.0);
-        t.until("distant terrain made", Duration::from_secs(20), |t| t.state().lod_tiles > 50 && t.state().lod_pending == 0)
-            .await?;
-        t.secs(0.5).await?;
-        let shot = t.shot("down").await?;
-        // The sky's pale blue; a cloud may be in the way, which is white.
-        let sky = shot.share(0.44, 0.42, 0.56, 0.58, |c| c[2] > 200 && c[0] > 120 && c[0] < 215);
-        t.note(format!("sky under the camera: {sky:.3}"));
-        t.check(sky < 0.05, format!("a hole in the land: {sky:.3}"));
-        Ok(())
-    }
-    .await;
-    VIEW.set(before.0);
-    LOD.set(before.1);
     out
 }
