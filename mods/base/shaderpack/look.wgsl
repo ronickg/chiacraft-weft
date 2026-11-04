@@ -836,9 +836,10 @@ fn held_in_fog(rel: vec3<f32>, sigma: f32) -> vec3<f32> {
     let t0 = dot(at, dir);
     let h = sqrt(max(dot(at, at) - t0 * t0, 0.0) + 0.5);
     let along = (atan((dist - t0) / h) + atan(t0 / h)) / h;
-    // Lit as surfaces are (a block away, its full light), scattered all round (a quarter of what a
-    // surface sends back).
-    return block_light(l, scene.eye.xyz + at) * sigma * along * 0.3;
+    // Lit as surfaces are (a block away, its full light), scattered all round. Thick mist is capped:
+    // with its whole thickness, and a quarter of what a surface sends back, a torch in a dawn bank
+    // washed the whole view beige, the sky too (the after-rain check, 11-05).
+    return block_light(l, scene.eye.xyz + at) * min(sigma, 0.04) * along * 0.07;
 }
 
 // Placed lights in the fog: the air just before a lit surface glows with the light there (`b`, its
@@ -848,7 +849,7 @@ fn placed_in_fog(b: vec3<f32>, rel: vec3<f32>, pos: vec3<f32>, sigma: f32) -> ve
     if max(max(b.x, b.y), b.z) <= 0.0 {
         return vec3(0.0);
     }
-    return block_light(b, pos) * sigma * min(length(rel), 3.0) * 0.3;
+    return block_light(b, pos) * min(sigma, 0.04) * min(length(rel), 4.0) * 0.6;
 }
 
 // ---- to the screen ----

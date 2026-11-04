@@ -41,11 +41,10 @@ chat /air 0 0
 wait 10
 shot ar_5_clear_placed.png
 # 2. A shower in the evening, the sun low behind: the rainbow as the rain comes (its amount rises
-#    over a few seconds), then as it clears.
-chat /tp -689 120 -122
-loaded
-idle
-wait 10
+#    over a few seconds), then as it clears. High over the platform in the open, spectator.
+chat /tk mode spectator
+chat /tp 40 240 52
+wait 3
 chat /time set 10800
 look 270 12
 wait 3
