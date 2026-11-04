@@ -1,0 +1,138 @@
+[
+ {
+  "kind": "item",
+  "name": "coal",
+  "what": "a lump of coal: a chunky faceted black-brown lump, never pure black, soft grey-blue glints on its upper-left facets, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "diamond",
+  "what": "a diamond: a cluster of faceted cyan shards with teal shadow and white facet tips, one white plus-shaped sparkle, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "amber",
+  "what": "a chunk of amber: a rounded glossy honey-orange resin lump that looks translucent, a tiny dark insect inside, a pale yellow highlight on the upper left, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "redstone",
+  "what": "a pile of glowing red powder: a lumpy pile of saturated red nuggets with pink highlights, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "iron_ingot",
+  "what": "an iron ingot: a warm-silver bar in three-quarter top view, tilted along the diagonal rising to the top right, a near-white lit top face, a darker side face 2 px thick along the bottom right, a faint embossed rune, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "gold_ingot",
+  "what": "a gold ingot: a lemon-gold bar in three-quarter top view, tilted along the diagonal rising to the top right, a bright lit top face, an orange-brown side face 2 px thick along the bottom right, a faint embossed rune, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "raw_iron",
+  "what": "a lump of raw iron ore: a rough chunky rock of warm grey stone with tan-copper iron nuggets showing on it, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "raw_gold",
+  "what": "a lump of raw gold ore: a rough chunky nugget of lemon-gold with orange-brown shadows and bits of grey stone stuck to it, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "stick",
+  "what": "a wooden stick: a slightly crooked warm-brown twig 3 px wide with grain and a small knot, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "string",
+  "what": "a loose coil of pale cream string forming loops with a loose tail, centred with 3-5 px of padding",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "feather",
+  "what": "a feather: a soft cream-white feather with a pale quill shaft, lying diagonally, shaft end at the bottom left",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "leather",
+  "what": "a piece of leather hide: a soft irregular warm-brown hide shape with mottled texture, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "bone",
+  "what": "a bone: warm cream bone with knobbed ends, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "gunpowder",
+  "what": "a small heap of gunpowder: dark grey-black grains with a few lighter grey specks, a soft pile, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "sugar",
+  "what": "a small heap of white sugar: pale cream-white crystals with tiny white sparkles and a soft blue-grey shadow, centred with 3-5 px of padding",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "paper",
+  "what": "a slightly crumpled square sheet of parchment lying at an angle, soft cream with gentle fold shading and a warm brown edge",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "book",
+  "what": "a closed leather book lying at an angle, deep red cover with a darker border, a cream page block 4 px thick showing on the lower-left edge, dark brown spine, small metal corner caps",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ }
+]

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a diamond pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of faceted cyan diamond with teal shadows, white facet tips and one small sparkle, a gold collar, on a handle wrapped in red-brown leather with gold bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.523,
+   "outline": 0.55,
+   "red_line": 0.07,
+   "fill": 0.31,
+   "passed": true
+  }
+ ]
+}

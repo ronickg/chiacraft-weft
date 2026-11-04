@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "soft warm-brown leather with stitching leggings, front view: a brown leather belt with a small buckle, two leather legs with knee panels, a dark gap between the legs, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.333,
+   "outline": 0.62,
+   "red_line": 0.44,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

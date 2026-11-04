@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a feather: a soft cream-white feather with a pale quill shaft, lying diagonally, shaft end at the bottom left",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.534,
+   "outline": 0.55,
+   "red_line": 0.0,
+   "fill": 0.36,
+   "passed": true
+  }
+ ]
+}

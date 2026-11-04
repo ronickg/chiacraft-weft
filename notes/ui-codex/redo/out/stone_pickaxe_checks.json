@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a stone pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of chunky chipped warm grey-tan stone with rough bumpy edges, no shine, bound with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.393,
+   "outline": 0.62,
+   "red_line": 0.15,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

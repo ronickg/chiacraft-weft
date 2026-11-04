@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a heavy wooden club: a thick knobbly warm-brown wooden head with a few sharp stone chips set into it, narrowing to a grip wrapped in red-brown leather, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.576,
+   "outline": 0.49,
+   "red_line": 0.23,
+   "fill": 0.28,
+   "passed": true
+  }
+ ]
+}
