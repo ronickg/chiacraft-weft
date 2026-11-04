@@ -1794,9 +1794,7 @@ pub async fn swimming_no_bob(t: T) -> R {
 pub async fn toast_with_the_gui(t: T) -> R {
     // The toast's dark panel, under the clock at the top right (the clock's sun and the title
     // screen's painted sky are yellow there, so not by its colour any more).
-    let toast = |s: &crate::runner::Shot| {
-        s.share(0.80, 0.10, 0.99, 0.16, |c| crate::runner::lum(c.map(f32::from)) < 45.0 && c[0] >= c[2])
-    };
+    let toast = |s: &crate::runner::Shot| s.share(0.80, 0.10, 0.99, 0.16, |c| crate::runner::lum(c.map(f32::from)) < 45.0 && c[0] >= c[2]);
     t.flat().await?;
     t.op("put me 0 iron_ingot 1").await?;
     t.op("put me 1 gold_ingot 1").await?;

@@ -141,7 +141,12 @@ fn step(i: usize, dir: i32) {
         .values
         .iter()
         .position(|&v| (v - now).abs() < 1e-3)
-        .unwrap_or_else(|| row.values.iter().position(|&v| v > now).unwrap_or(row.values.len() - 1));
+        .unwrap_or_else(|| {
+            row.values
+                .iter()
+                .position(|&v| v > now)
+                .unwrap_or(row.values.len() - 1)
+        });
     let next = (at as i32 + dir).rem_euclid(row.values.len() as i32) as usize;
     (row.set)(row.values[next]);
     QUALITY.set(4);

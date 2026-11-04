@@ -24,9 +24,9 @@ mod seasons;
 mod shaderpack;
 mod sounds;
 mod survival;
+mod video;
 mod weather;
 mod wild;
-mod video;
 mod window;
 mod worldgen;
 
