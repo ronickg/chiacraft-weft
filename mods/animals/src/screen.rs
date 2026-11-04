@@ -311,8 +311,9 @@ fn shown(a: &Animal, i: usize) -> String {
 /// A window as base's (`mods/base/src/window.rs`, the UI redo): the menu's title on an orange tab
 /// on the frame, a close button at the top right, `body` in the panel.
 fn window(ui: &mut Ui, s: S, body: impl FnOnce(&mut Ui)) {
-    // The tabs stand on the frame: the column's gap of -2 tucks their bottom under its top line.
-    ui.column(S::col().stretch().gap(-2.0), |ui| {
+    // The tabs stand on the frame: the column's gap tucks their bottom 3 UI px under its top
+    // line, an even 12 rows of face round a label's capitals (kit 2, as in base's window.rs).
+    ui.column(S::col().stretch().gap(-1.5), |ui| {
         ui.row(S::row().gap(2.0), |ui| {
             ui.row(S::row().w(6.0), |_| {});
             ui.panel("tab_pressed", S::row().pad(2.0).h(13.0).center(), |ui| ui.title());
