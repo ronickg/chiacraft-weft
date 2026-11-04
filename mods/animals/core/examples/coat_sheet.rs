@@ -14,9 +14,14 @@ fn main() {
     let (who, tex, out) = (&a[1], &a[2], &a[3]);
     let count: usize = a.get(4).and_then(|s| s.parse().ok()).unwrap_or(12);
     let mut state: u64 = a.get(5).and_then(|s| s.parse().ok()).unwrap_or(7);
-    let index = SPECIES.iter().position(|s| s.name == who || s.model == who).expect("no such species");
+    let index = SPECIES
+        .iter()
+        .position(|s| s.name == who || s.model == who)
+        .expect("no such species");
     let mut rng = move || {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (state >> 40) as f32 / (1u64 << 24) as f32
     };
     let decoder = png::Decoder::new(std::io::BufReader::new(std::fs::File::open(tex).expect("texture")));
@@ -36,7 +41,9 @@ fn main() {
         let mut e = png::Encoder::new(std::io::BufWriter::new(f), w as u32, h as u32);
         e.set_color(png::ColorType::Rgba);
         e.set_depth(png::BitDepth::Eight);
-        e.write_header().and_then(|mut wr| wr.write_image_data(&rgba)).expect("png write");
+        e.write_header()
+            .and_then(|mut wr| wr.write_image_data(&rgba))
+            .expect("png write");
     }
     eprintln!("{count} {} coats into {out}", SPECIES[index].name);
 }
