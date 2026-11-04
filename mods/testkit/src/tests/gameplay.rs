@@ -2410,9 +2410,12 @@ pub async fn crafting_table_tags(t: T) -> R {
     t.screen("core:menu").await?;
     // Crafting table menu: 0-8 grid, 9 result, 10-36 main, 37-45 hotbar.
     let planks = item("base:birch_planks");
-    t.click_ui("slot:37", 0);
+    // The hotbar is the menu's last nine slots (37 once; `t.hotbar` finds them as the menus change).
+    let hot = t.hotbar(0);
+    t.click_ui(&hot, 0);
     t.until("planks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == planks)
-        .await?;
+        .await
+        .map_err(|e| format!("{e} (clicked {hot}; cursor {:?}, slot 0 {:?}, hotbar slot 0 {:?})", t.c().cursor_stack(), t.c().menu_slot(0), t.c().inventory_slot(0)))?;
     t.click_ui("slot:0", 1);
     t.frames(3).await?;
     t.click_ui("slot:3", 1);
@@ -2449,7 +2452,8 @@ pub async fn creative_middle_click(t: T) -> R {
     t.frames(2).await?;
     t.click_ui(&t.hotbar(0), 2);
     t.until("a whole stack on the cursor", Duration::from_secs(2), |t| t.c().cursor_stack().count == 64)
-        .await?;
+        .await
+        .map_err(|e| format!("{e} (mode {}, screen {}, clicked {}; cursor {:?}, hotbar slot 0 {:?})", t.state().mode, t.c().screen(), t.hotbar(0), t.c().cursor_stack(), t.c().inventory_slot(0)))?;
     t.check_eq(t.c().inventory_slot(0).count, 3, "and the slot keeps what it had");
     t.c().screen_close();
     t.no_screen().await?;
