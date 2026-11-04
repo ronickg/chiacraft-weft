@@ -9,7 +9,28 @@ Researcher, 2026-11-04, round 7, for Planner and Ronald ("the biomes, trees etc 
 
 **Pictures:**
 - **References:** `world-looks/refs/` holds small copies of 12 reference pictures. The originals (28 MB) are archived in `~/Coding/chiacraft-archive/world-looks/refs/`. They are for internal reference only; no image licence was stated.
-- **Ours:** `world-looks/ours/` holds shots from 3 November, as an interim "before". Tester 2 has a request for fixed-spot shots of six biomes at noon and at sunset, looking slightly down (`biome-shots.script` in the shared notes folder). They go in that folder when taken, and the same spots serve for every "after".
+- **Ours:** `world-looks/ours/`.
+  - **The before set** is the `2026-11-04_*` files: Tester 2's fixed-spot shots.
+    - Taken on `dev` `74914282`, seed 1, world `biome_looks1`, at 1280×720, yaw 45, pitch −12.
+    - Spots (x, y, z): plains −450 138 535, forest −1280 69 780, taiga −1499 127 35, savanna −689 71 −122, swamp −1677 123 3071.
+    - The script used is `2026-11-04_biome-shots.script`; the spots are in `2026-11-04_NOTE.txt`.
+  - **Each "after" is retaken from these spots.**
+  - **The 2026-11-03 shots** are older, kept for the grass tiling.
+
+### What the before shots show
+
+- **Plains** (`2026-11-04_plains_noon.jpg`):
+  - one-block terraces, each showing a dirt stripe;
+  - a dark stone slope above, with no rock variety;
+  - one tall grass and a few flowers.
+- **Forest:** down among cube leaves, a dark close-up. Trunks are 1×1 and the canopy is a wall of identical leaf cubes.
+- **Taiga and swamp:** the player landed on the canopy. That shows how square the leaf cubes read even from above. The swamp's foliage tint is olive-yellow, and the distance is rows of identical trees.
+- **Savanna** is the best: a flat-crowned acacia over a lake, with hills behind. Even so, its crown is stacked flat plates, and the grass is one shape.
+- **"Sunset" is late afternoon:** `/time set 11900` still reads 17:56 in full light. Real sunset light needs about 12500–13000. In the taiga shot toward the sun, the light shafts make a hard white wedge.
+- **No desert to shoot.**
+  - Tester 2 found none in 114 spots surveyed out to 18,000 blocks on seed 1. They found plains, forest, birch forest, taiga, savanna, swamp, mountains, snowy plains, beach and ocean.
+  - The desert's rule is temperature ≥ 0.35 and humidity < 0 (`mods/base/src/worldgen.rs:133-134`, picked before the savanna at `:257`), which is evidently far rarer than its climate table suggests.
+  - This goes to the worldgen session to measure biome shares over a grid.
 
 ## Why their worlds look good, by technique
 
