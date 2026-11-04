@@ -74,6 +74,12 @@ pub static HAY_BALE: Block = Block::named("hay_bale");
 pub static PODZOL: Block = Block::named("podzol");
 /// The desert's scrub: a few sticks where there is no wood.
 pub static DEAD_BUSH: Block = Block::named("dead_bush");
+/// The sequoia grove's understory (`grove`).
+pub static SWORD_FERN: Block = Block::named("sword_fern");
+pub static LUPINE: Block = Block::named("lupine");
+pub static DOGWOOD_LOG: Block = Block::named("dogwood_log");
+pub static DOGWOOD_LEAVES: Block = Block::named("dogwood_leaves");
+pub static MOSSY_SEQUOIA_LOG: Block = Block::named("mossy_sequoia_log");
 
 /// Log axis along the clicked face, like vanilla.
 fn axis_placement(p: &Place, props: &mut Props) {
@@ -154,6 +160,51 @@ fn woods(r: &mut Registry) {
     }
     // Desert and beach trees take root in sand as well.
     r.tag("sapling_soil", &["#dirt", "#sand"]);
+}
+
+/// The sequoia grove's understory (Giant Forest): sword fern and lupine on its floor, the Pacific
+/// dogwood (a small tree, its white bracts in spring, drawn in its own colours and so not tinted)
+/// under the giants, and a fallen giant's mossy log. Their places are the grove's (`worldgen.rs`).
+fn grove(r: &mut Registry) {
+    r.block(&SWORD_FERN)
+        .sound_group("grass")
+        .texture("sword_fern")
+        .plant()
+        .needs_below("#plant_soil")
+        .tint(&tints::GRASS)
+        .tab(&crate::tabs::NATURAL);
+    r.loot(&SWORD_FERN).pool(Pool::new().when(Cond::Chance(vitals::clothing::FIBRE_CHANCE)).item("plant_fibre"));
+    plant(r, &LUPINE, "lupine");
+    log(r, &DOGWOOD_LOG, "dogwood", "base:dogwood_leaves", None);
+    r.block(&DOGWOOD_LEAVES)
+        .sound_group("grass")
+        .texture("leaves_dogwood")
+        .hardness(0.2)
+        .cutout()
+        .cull_same()
+        .opacity(1)
+        .tag("leaves")
+        .redstone_blocker()
+        .mineable("shears")
+        .tab(&crate::tabs::NATURAL);
+    r.loot(&DOGWOOD_LEAVES).pool(Pool::new().when(Cond::Chance(0.05)).item("stick"));
+    // A fallen giant's bark under moss; its end is the sequoia's until its own is drawn.
+    r.block(&MOSSY_SEQUOIA_LOG)
+        .sound_group("wood")
+        .hardness(2.0)
+        .mineable("axe")
+        .tag("logs")
+        .tag("logs/sequoia")
+        .set(&FLAMMABLE, 5)
+        .set(&FUEL, 300)
+        .prop("axis", ["y", "x", "z"])
+        .states(|p, s| match p.get("axis") {
+            "y" => s.textures("log_sequoia_top", "log_sequoia_mossy", "log_sequoia_top"),
+            "x" => s.faces(["log_sequoia_top", "log_sequoia_top", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy"]),
+            _ => s.faces(["log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_top", "log_sequoia_top"]),
+        })
+        .placement(axis_placement)
+        .tab(&crate::tabs::NATURAL);
 }
 
 fn planks(r: &mut Registry, h: &'static Block, wood: &str) {
@@ -388,6 +439,7 @@ pub fn register(r: &mut Registry) {
     leaves(r, &SPRUCE_LEAVES, "leaves_spruce", "sapling", None);
     leaves(r, &ACACIA_LEAVES, "leaves_acacia", "sapling", None);
     woods(r);
+    grove(r);
 
     // Vanilla numbers: water steps every 5 ticks and reaches 7 blocks, lava every 30 and 3.
     r.liquid(&WATER)

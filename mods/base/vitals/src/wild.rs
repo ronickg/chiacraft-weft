@@ -184,7 +184,7 @@ impl Turn {
 /// Every tree's leaves and how they turn: the conifers, palms and the tree fern stay green;
 /// birches and ginkgos go gold; oaks, acacias, mesquite and the swamp cypress (a deciduous conifer)
 /// go russet.
-pub const LEAVES: [(&str, Turn); 13] = [
+pub const LEAVES: [(&str, Turn); 14] = [
     ("base:oak_leaves", Turn::Orange),
     ("base:birch_leaves", Turn::Yellow),
     ("base:spruce_leaves", Turn::Evergreen),
@@ -193,6 +193,8 @@ pub const LEAVES: [(&str, Turn); 13] = [
     ("base:acuri_palm_leaves", Turn::Evergreen),
     ("base:moriche_palm_leaves", Turn::Evergreen),
     ("base:sequoia_leaves", Turn::Evergreen),
+    // Drawn in its own colours (white bracts), so its tint isn't used (`blocks.rs`, `grove`).
+    ("base:dogwood_leaves", Turn::Orange),
     ("animals:araucaria_leaves", Turn::Evergreen),
     ("animals:ginkgo_leaves", Turn::Yellow),
     ("animals:swamp_cypress_leaves", Turn::Orange),
