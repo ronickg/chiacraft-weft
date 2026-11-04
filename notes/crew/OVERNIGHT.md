@@ -112,3 +112,8 @@ change any of them in the morning.
     - Engine, along the way: tooltips now show lines for the stack's own components (a part's
       grade, a tool's attack damage), and the durability line uses the stack's own maximum. It
       used the item's, which was wrong for tools built from parts.
+21. **Discovery has starters** (from the Researcher's review).
+    - Chosen: planks, sticks, the crafting table, campfire, torch, string and cloth are always
+      known. A near miss names one material still to find. The recipe viewer's titles say "all
+      recipes" and "all uses", because they still list everything.
+    - Alternative: make R and U show only what you know (an engine change to the viewer).
