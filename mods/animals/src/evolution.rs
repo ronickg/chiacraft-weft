@@ -29,8 +29,8 @@ use weft_sdk::*;
 pub use animals_core::evolution::*;
 
 use crate::coats::{self, Pool};
-use crate::store;
 use crate::species::SPECIES;
+use crate::store;
 
 static COLD: Tag = Tag::named("cold");
 static DRY: Tag = Tag::named("dry");
@@ -107,7 +107,9 @@ fn shard_of(cell: (i64, i64)) -> (i64, i64) {
 }
 
 fn shard_path(dir: &str, s: (i64, i64)) -> PathBuf {
-    Path::new(dir).join("pools").join(format!("{}_{}.json", s.0, s.1))
+    Path::new(dir)
+        .join("pools")
+        .join(format!("{}_{}.json", s.0, s.1))
 }
 
 impl Pools {
@@ -141,7 +143,14 @@ impl Pools {
 
     /// Puts the least used shard away, writing it first if it changed.
     fn put_away(&mut self) {
-        let Some(&s) = self.shards.iter().min_by_key(|(_, sh)| sh.used).map(|(s, _)| s) else { return };
+        let Some(&s) = self
+            .shards
+            .iter()
+            .min_by_key(|(_, sh)| sh.used)
+            .map(|(s, _)| s)
+        else {
+            return;
+        };
         if let Some(sh) = self.shards.remove(&s)
             && sh.dirty
             && sh.writable
@@ -199,7 +208,9 @@ impl Pools {
             .map_or(0, |d| d.as_secs());
         let moved = old.with_file_name(format!("pools.json.moved-{secs}"));
         match std::fs::rename(&old, &moved) {
-            Ok(()) => weft_sdk::info!("animals: {n} gene pools moved from pools.json into pools/ (the old file kept as {})", moved.display()),
+            Ok(()) => {
+                weft_sdk::info!("animals: {n} gene pools moved from pools.json into pools/ (the old file kept as {})", moved.display())
+            }
             Err(e) => weft_sdk::warn!("animals: {n} gene pools moved into pools/, but pools.json stays ({e})"),
         }
     }
@@ -388,7 +399,12 @@ fn history(index: usize, h: Habitat, gens: u64, r: &mut impl coats::Rng) -> Opti
 /// One generation of the pool at `k`, with the neighbors' pools (the places around, any habitat)
 /// mixing in.
 fn step(p: &mut Pools, k: &str, index: usize, cell: (i64, i64), h: Habitat, r: &mut impl coats::Rng) {
-    let Some(mut next) = p.get(k, cell).and_then(|l| generation(index, &l.pool, h, r)) else { return };
+    let Some(mut next) = p
+        .get(k, cell)
+        .and_then(|l| generation(index, &l.pool, h, r))
+    else {
+        return;
+    };
     let neighbors: Vec<Pool> = (-1..=1)
         .flat_map(|dx| (-1..=1).map(move |dz| (cell.0 + dx, cell.1 + dz)))
         .flat_map(|c| HABITATS.map(|h2| (key(index, c, h2), c)))

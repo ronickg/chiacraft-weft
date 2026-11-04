@@ -1844,13 +1844,7 @@ pub static SPECIES: [Species; 37] = [
         // Wherever people farm and build, from the prairie to the desert's towns and the coast; few in
         // the deep woods. Not in the birch woods', the Alps' or the llanos' dry-season winters, where
         // it lives only on what people leave (`web`: nothing of its diet there then).
-        habitats: &[
-            ("base:plains", 1.0),
-            ("base:desert", 0.5),
-            ("base:beach", 0.5),
-            ("base:forest", 0.4),
-            ("base:swamp", 0.3),
-        ],
+        habitats: &[("base:plains", 1.0), ("base:desert", 0.5), ("base:beach", 0.5), ("base:forest", 0.4), ("base:swamp", 0.3)],
         bio: Biology {
             mass: 0.03,
             gestation: 0.0,

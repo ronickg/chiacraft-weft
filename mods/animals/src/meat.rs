@@ -19,10 +19,9 @@ fn filling(meat: &str) -> [(u32, f32); 2] {
 pub fn init(r: &mut Registry) {
     for &meat in animals_core::meat::MEATS {
         let [raw, cooked] = filling(meat);
-        for (name, (hunger, saturation), tag) in [
-            (meat.to_string(), raw, format!("raw_meat/{meat}")),
-            (format!("cooked_{meat}"), cooked, format!("cooked_meat/{meat}")),
-        ] {
+        for (name, (hunger, saturation), tag) in
+            [(meat.to_string(), raw, format!("raw_meat/{meat}")), (format!("cooked_{meat}"), cooked, format!("cooked_meat/{meat}"))]
+        {
             // What a portion holds (from the vitals' food table), shown in its tooltip.
             let [units, protein, energy, fat, greens, water] = vitals::food::find(&format!("animals:{name}"))
                 .map_or([0.0; 6], |f| {
