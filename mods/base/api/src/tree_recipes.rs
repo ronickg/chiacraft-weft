@@ -370,9 +370,9 @@ pub const BRAZIL_NUT: Recipe = Recipe {
     leaf_r: 2.6,
     leaf_ry: 1.2,
     ragged: 0.3,
-    // The giant scatter's reach (`worldgen.rs`): a crown up to 28 across, its wood within about
-    // 12 of the trunk so no limb runs past the reach and leaves a cluster without its log.
-    reach: 14,
+    // The giant scatter's reach (`worldgen.rs`, 12; at 14 the world never finished generating
+    // round a giant). Its wood stays within 8 (the PC's measure), so the reach trims only leaves.
+    reach: 12,
     // 58 high, a sixth more at most, and its crown over that; the scatter reaches 96 up.
     max_height: 80,
     flare: 0.55,

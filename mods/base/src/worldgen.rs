@@ -398,8 +398,7 @@ pub fn register(r: &mut Registry) {
         .shape(tree);
     r.scatter(&GIANT_SITES)
         .cell(24)
-        // As far as the widest giant's recipe reaches (the Brazil nut's umbrella, 14).
-        .reach(14)
+        .reach(12)
         .density(&GIANT_TREES)
         .shape(giant);
     r.scatter(&STAND_SITES)
