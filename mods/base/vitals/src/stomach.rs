@@ -90,15 +90,13 @@ impl Stomach {
         }
         let hot = age_secs < food::HOT_FOR;
         for (i, &f) in foods.iter().enumerate() {
-            let slot = self.portions.iter_mut().find(|p| p.food == 0).ok_or(Refusal::TooMany)?;
+            let slot = self
+                .portions
+                .iter_mut()
+                .find(|p| p.food == 0)
+                .ok_or(Refusal::TooMany)?;
             let (warmth, warm_secs) = if i == 0 && hot { food::HOT_MEAL } else { (0.0, 0.0) };
-            *slot = Portion {
-                food: f as u16 + 1,
-                units: FOODS[f].units(),
-                quality: quality * crate::meals::BONUS,
-                warmth,
-                warm_secs,
-            };
+            *slot = Portion { food: f as u16 + 1, units: FOODS[f].units(), quality: quality * crate::meals::BONUS, warmth, warm_secs };
         }
         Ok(())
     }
