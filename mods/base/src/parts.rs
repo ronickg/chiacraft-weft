@@ -88,6 +88,23 @@ fn cut_when_apart(material: &str) -> bool {
 pub fn register(r: &mut Registry) {
     r.entity_component(&SKILLS, Skills { xp: [0; 6] }, component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP);
     r.attach(&PLAYER, &SKILLS);
+    // What the held part or tool is made of and has been through, and the player's crafts.
+    r.command("inspect", "", |cmd| {
+        let (w, player) = (cmd.world(), cmd.player());
+        inspect(&w, player, |key, args| cmd.reply(key, args));
+    })
+    .permission(permission::EVERYONE);
+    r.command("skills", "", |cmd| {
+        let xp = cmd
+            .world()
+            .component(cmd.player(), &SKILLS)
+            .map_or([0; 6], |s| s.xp);
+        for (i, (_, key)) in crafting::skills::SKILLS.iter().enumerate() {
+            let level = crafting::skills::level(xp[i]);
+            cmd.reply("command.base.skills.line", &[Arg::Key(key), Arg::Int(level as i64), Arg::Int(xp[i] as i64)]);
+        }
+    })
+    .permission(permission::EVERYONE);
     r.stack_component(&PART, 0);
     r.stack_component(&PARTS, 0);
     r.recipe_kind(&PART_RECIPES).inputs(3, 1).outputs(1, 1);
@@ -536,4 +553,50 @@ pub fn ui(ui: &mut Ui) {
         ui.text_styled(S::col().class("dim"), "crafting.parts.apart", &[]);
         ui.group("apart");
     });
+}
+
+// ---------------------------------------------------------------- inspecting
+
+/// Tells what the held stack is: a part's material, grade and history, or a tool's grade and each
+/// of its parts, as chat lines (`/inspect`).
+fn inspect(w: &World, player: u64, mut reply: impl FnMut(&str, &[Arg])) {
+    let held = w
+        .inventory(player)
+        .group("hotbar")
+        .get(w.selected_slot(player));
+    let grade_key = |g: u32| grades::grade(g.clamp(1, 10) as u8).key;
+    if let Some(p) = PART.stack_only(&held) {
+        let m = material_of(p.material).map_or("", |m| m.key);
+        reply(
+            "command.base.inspect.part",
+            &[
+                Arg::Item(held.item),
+                Arg::Key(m),
+                Arg::Key(grade_key(p.grade)),
+                Arg::Int(p.made_day as i64),
+                Arg::Int(p.repairs as i64),
+                Arg::Int(p.worn as i64),
+            ],
+        );
+    } else if let Some(t) = PARTS.stack_only(&held) {
+        reply("command.base.inspect.tool", &[Arg::Item(held.item), Arg::Key(grade_key(t.grade)), Arg::Int(t.n as i64)]);
+        let kind = kind_of(t.kind);
+        for i in 0..t.n.min(4) as usize {
+            let shape = kind.and_then(|k| shape_of(k.id, t.shapes[i]));
+            let Some(item) = shape.map(|s| part_item(s.id).id()) else { continue };
+            let m = material_of(t.materials[i]).map_or("", |m| m.key);
+            reply(
+                "command.base.inspect.tool_part",
+                &[
+                    Arg::Item(item),
+                    Arg::Key(m),
+                    Arg::Key(grade_key(t.grades[i])),
+                    Arg::Int(t.made_days[i] as i64),
+                    Arg::Int(t.repairs[i] as i64),
+                ],
+            );
+        }
+    } else {
+        reply("command.base.inspect.plain", &[]);
+    }
 }
