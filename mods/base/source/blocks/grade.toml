@@ -72,13 +72,15 @@ saturation = 0.85
 pull = [118, 132, 126]
 pull_amount = 0.25
 
-[tiles."animals:termite_mound_side"]
+[tiles."animals:termite_mound_side"]  # closer to vanilla: luma 0.35->0.38, sat 0.70->0.63, hue 14->14; ~ terracotta (half way)
 gamma = 0.8
-saturation = 0.88
+saturation = 0.734
+gain = 1.079
 
-[tiles."animals:termite_mound_upper_side"]
+[tiles."animals:termite_mound_upper_side"]  # closer to vanilla: luma 0.34->0.37, sat 0.74->0.65, hue 14->14; ~ terracotta (half way)
 gamma = 0.8
-saturation = 0.88
+saturation = 0.697
+gain = 1.104
 
 [tiles."animals:termite_mound_top"]
 gamma = 0.8
@@ -95,11 +97,13 @@ saturation = 0.85
 [tiles.log_spruce]
 gamma = 0.85
 
-[tiles.podzol]
+[tiles.podzol]  # closer to vanilla: luma 0.30->0.32, sat 0.42->0.42, hue 18->30; ~ podzol_top
 gamma = 0.85
 saturation = 0.95
+hue = 11.3
 
 # The block reads as one material with its lifted side (Planner, 11-04).
+
 [tiles.red_sandstone_top]
 saturation = 0.75
 
@@ -110,5 +114,113 @@ saturation = 0.75
 [tiles.stone]
 spread = 30
 
-[tiles.gravel]
+[tiles.gravel]  # closer to vanilla: luma 0.35->0.42, sat 0.25->0.25, hue 25->25; ~ gravel
 spread = 42
+gain = 1.22
+
+# Closer to vanilla, so packs and shaders fit (Ronald, 11-04: "Yes, all 31"); each comment: before -> after,
+# against vanilla 1.21.4, Faithful 32x and Pixel Perfection CE (notes/blocks/vanilla_compare.py).
+[tiles.kelp]  # luma 0.41->0.43, sat 0.72->0.72, hue 47->88; ~ kelp
+hue = 40.6
+
+[tiles.lily_pad]  # luma 0.48->0.46, sat 0.56->0.55, hue 89->125; ~ lily_pad
+hue = 36.1
+
+[tiles.snow]  # luma 0.85->0.91, sat 0.12->0.12, hue 214->213; ~ snow
+gain = 1.073
+
+[tiles.wool_white]  # luma 0.75->0.81, sat 0.08->0.08, hue 25->25; ~ white_wool
+gain = 1.081
+
+[tiles.crafting_table_side]  # luma 0.33->0.41, sat 0.48->0.48, hue 27->27; ~ crafting_table_side
+gain = 1.248
+
+[tiles.crafting_table_front]  # luma 0.34->0.40, sat 0.46->0.46, hue 28->28; ~ crafting_table_front
+gain = 1.19
+
+[tiles.granite]  # luma 0.50->0.50, sat 0.16->0.28, hue 15->15; ~ granite
+saturation = 1.857
+
+[tiles.coarse_dirt]  # luma 0.30->0.36, sat 0.56->0.56, hue 19->19; ~ coarse_dirt
+gain = 1.175
+
+[tiles.moss_block_top]  # luma 0.29->0.39, sat 0.58->0.58, hue 90->90; ~ moss_block
+gain = 1.332
+
+[tiles.glowstone]  # luma 0.59->0.59, sat 0.73->0.56, hue 36->36; ~ glowstone
+saturation = 0.708
+
+[tiles.slime_block]  # luma 0.57->0.57, sat 0.68->0.52, hue 100->100; ~ slime_block
+saturation = 0.743
+
+[tiles.ladder]  # luma 0.35->0.35, sat 0.75->0.56, hue 25->25; ~ ladder
+saturation = 0.664
+
+[tiles.redstone_lamp_on]  # luma 0.43->0.43, sat 0.70->0.57, hue 32->32; ~ redstone_lamp_on
+saturation = 0.762
+
+[tiles.lily_of_the_valley]  # luma 0.48->0.47, sat 0.58->0.46, hue 72->90; ~ lily_of_the_valley
+hue = 17.8
+saturation = 0.767
+
+[tiles.sapling_oak]  # luma 0.45->0.38, sat 0.56->0.57, hue 65->82; ~ oak_sapling
+hue = 15.3
+gain = 0.854
+
+[tiles.mushroom_red]  # luma 0.50->0.43, sat 0.57->0.57, hue 14->14; ~ red_mushroom
+gain = 0.861
+
+[tiles.mushroom_brown]  # luma 0.51->0.51, sat 0.57->0.46, hue 27->27; ~ brown_mushroom
+saturation = 0.743
+
+[tiles.redstone_ore]  # luma 0.40->0.40, sat 0.17->0.15, hue 27->20; ~ redstone_ore
+hue = -15.2
+
+[tiles.obsidian]  # luma 0.19->0.19, sat 0.25->0.25, hue 280->264; ~ obsidian
+hue = -15.0
+
+[tiles.iron_block]  # luma 0.58->0.58, sat 0.13->0.00, hue 22->0; ~ iron_block
+saturation = 0.0
+
+[tiles.log_acacia_top]  # luma 0.45->0.39, sat 0.68->0.68, hue 22->22; ~ acacia_log_top
+gain = 0.868
+
+[tiles.piston_side]  # luma 0.40->0.40, sat 0.42->0.20, hue 32->32; ~ piston_side
+saturation = 0.443
+
+[tiles.piston_top]  # luma 0.36->0.36, sat 0.56->0.44, hue 24->24; ~ piston_top
+saturation = 0.726
+
+[tiles.lever]  # luma 0.32->0.37, sat 0.49->0.49, hue 30->30; ~ lever
+gain = 1.161
+
+[tiles.ochre_sandstone_side]  # luma 0.63->0.63, sat 0.70->0.55, hue 34->34; ~ sandstone (half way)
+saturation = 0.728
+
+[tiles.ochre_sandstone_top]  # luma 0.72->0.72, sat 0.60->0.50, hue 36->36; ~ sandstone_top (half way)
+saturation = 0.794
+
+[tiles.planks_mesquite]  # luma 0.26->0.33, sat 0.72->0.72, hue 14->14; ~ acacia_planks (half way)
+gain = 1.302
+
+# Farmland read brick-red on Plants' crop sheet (11-04): hue 14 deg against vanilla's 26 and Pixel Perfection's 21,
+# and darker than both. Turned toward their orange-brown and lifted a little; the wet one keeps its darkness;
+# the worn stages (already less red) turned less, keeping their paler-per-level ladder.
+[tiles.farmland]
+hue = 9.0
+gain = 1.2
+
+[tiles.farmland_wet]
+hue = 9.0
+
+[tiles.farmland_worn_1]
+hue = 7.0
+gain = 1.19
+
+[tiles.farmland_worn_2]
+hue = 4.0
+gain = 1.17
+
+[tiles.farmland_worn_3]
+hue = 1.0
+gain = 1.12
