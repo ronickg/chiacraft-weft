@@ -687,7 +687,7 @@ pub fn blocks(c: &Colonize, seed: u64) -> Vec<(i32, i32, i32, Part, f32)> {
         let (z0, z1) = (c(z + reach - d, nx), c(z + reach + d + 1, nx));
         let (y0, y1) = (c(y - d, ny), c(y + d + 1, ny));
         sums[at(y1, z1, x1)] + sums[at(y0, z0, x1)] + sums[at(y0, z1, x0)] + sums[at(y1, z0, x0)]
-            >= sums[at(y0, z1, x1)] + sums[at(y1, z0, x1)] + sums[at(y1, z1, x0)] + sums[at(y0, z0, x0)] + 1
+            > sums[at(y0, z1, x1)] + sums[at(y1, z0, x1)] + sums[at(y1, z1, x0)] + sums[at(y0, z0, x0)]
     };
     out.extend(
         leaves
