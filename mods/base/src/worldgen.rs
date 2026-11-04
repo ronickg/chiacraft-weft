@@ -899,10 +899,7 @@ fn decorate(g: &mut Gen) {
             // Loose rocks, flint and fallen branches (`first.rs`), on their own roll.
             let ground_u = unit(hash(seed ^ 0x6A0D, wx as i64, 0, wz as i64)) as f32;
             // What is under the lowest layer takes a look at the terrain: only if anything would grow.
-            if y == 0
-                && roll >= (flower_chance + grass_chance)
-                && wild_roll(seed, wx, wz) >= wild::MOST
-                && ground_u >= vitals::first::MOST
+            if y == 0 && roll >= (flower_chance + grass_chance) && wild_roll(seed, wx, wz) >= wild::MOST && ground_u >= vitals::first::MOST
             {
                 continue;
             }

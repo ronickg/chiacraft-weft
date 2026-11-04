@@ -145,14 +145,60 @@ pub const FLAKE_FROM_FLINT: f32 = 0.8;
 pub const FLAKE_FROM_ROCK: f32 = 0.25;
 /// Flakes a nodule or rock gives before it is used up.
 pub const FLAKES_PER_STONE: u32 = 3;
-/// Shaping an axe head (sneaking while striking a flint nodule): strikes to finish it, and the
-/// chance each strike breaks it (it falls apart into a flake).
-pub const HEAD_STRIKES: u32 = 6;
-pub const HEAD_SPOIL: f32 = 0.05;
-/// The chance a head comes out whole, all strikes taken (about 0.74).
-pub fn head_whole() -> f32 {
-    (1.0 - HEAD_SPOIL).powi(HEAD_STRIKES as i32)
+/// Knapping a head (sneaking while striking a flint nodule opens the knapping screen): a 5 × 5
+/// nodule, each square outside the head's outline struck away with a click; a click inside the
+/// outline breaks the nodule into a flake (TerraFirmaCraft's rock knapping, about 8 clicks;
+/// Ronald, 11-05: "Knapping screen, then book"). After a head of a shape has been held, the
+/// book makes it from a nodule (`book_heads`).
+pub const KNAP_SIZE: usize = 5;
+
+/// A head knapped by hand: its part shape, the tool kind it hafts into, and its outline, top row
+/// first (`X` kept, `.` struck away).
+#[derive(Clone, Copy, Debug)]
+pub struct Knapped {
+    pub shape: &'static str,
+    pub kind: &'static str,
+    pub outline: [&'static str; KNAP_SIZE],
+    /// Flint nodules the book takes for it (the grid's own pattern: one, two side by side, two
+    /// stacked), so the 2 × 2 tells them apart.
+    pub book: &'static [&'static str],
 }
+
+pub const KNAPPED: [Knapped; 3] = [
+    Knapped { shape: "felling_axe_head", kind: "axe", outline: [".XX..", "XXXX.", "XXXXX", "XXXX.", ".XX.."], book: &["F"] },
+    Knapped { shape: "pick_head", kind: "pickaxe", outline: [".....", "XXXXX", "XXXXX", "X...X", "....."], book: &["FF"] },
+    Knapped { shape: "shovel_blade", kind: "shovel", outline: [".XXX.", ".XXX.", "XXXXX", "XXXXX", "..X.."], book: &["F", "F"] },
+];
+
+impl Knapped {
+    /// Whether square `i` (row by row) is inside the outline.
+    pub fn keeps(&self, i: usize) -> bool {
+        self.outline
+            .get(i / KNAP_SIZE)
+            .and_then(|row| row.as_bytes().get(i % KNAP_SIZE))
+            == Some(&b'X')
+    }
+
+    /// The squares to strike away, as a bit each.
+    pub fn away(&self) -> u32 {
+        (0..KNAP_SIZE * KNAP_SIZE)
+            .filter(|&i| !self.keeps(i))
+            .fold(0, |m, i| m | 1 << i)
+    }
+}
+
+/// The knapped head of part shape `shape`.
+pub fn knapped(shape: &str) -> Option<&'static Knapped> {
+    KNAPPED.iter().find(|k| k.shape == shape)
+}
+
+/// What hafting a head of a kind by hand takes: the holding part's shape and the cordage of its
+/// lashing. A knife is a flake on a short grip.
+pub const HAFTED: [(&str, &str, u32); 4] = [("axe", "haft", 2), ("pickaxe", "haft", 2), ("shovel", "haft", 2), ("knife", "grip", 1)];
+
+/// Hands-on work scores this much over the same work from memory (`crafting::grades`), up to the
+/// most work gives.
+pub const BY_HAND_BONUS: u32 = 10;
 
 /// A sharp flake's uses before it's blunt: grass cut, sticks shaved.
 pub const FLAKE_USES: u32 = 40;
@@ -171,8 +217,8 @@ pub const HEAD_MATERIAL_POINTS: u32 = 24;
 pub fn axe_hands_secs() -> f32 {
     // A flake: strikes until one comes.
     let flake = STRIKE_SECS / FLAKE_FROM_FLINT;
-    // A head: its strikes, with spoiled tries started again.
-    let head = HEAD_STRIKES as f32 * STRIKE_SECS / head_whole();
+    // A head: a second a click on the knapping screen.
+    let head = (KNAPPED[0].away().count_ones()) as f32;
     // Fibre: 2 cordage of 2 fibres, cut at 0.4 s a plant.
     let fibre = LASHING_CORDAGE as f32 * crate::clothing::FIBRE_PER_STRING as f32 / FIBRE_CUT * 0.4;
     flake + head + fibre
@@ -231,7 +277,23 @@ mod tests {
     fn the_axe_is_earned_not_a_chore() {
         // More than a minute of the hands' own work for one who knows the way, less than three.
         let s = axe_hands_secs();
-        assert!((25.0..180.0).contains(&s), "{s} s");
-        assert!(head_whole() > 0.6 && head_whole() < 0.9);
+        assert!((15.0..180.0).contains(&s), "{s} s");
+    }
+
+    #[test]
+    fn heads_take_a_few_clicks_and_tell_apart() {
+        for k in KNAPPED {
+            let clicks = k.away().count_ones();
+            assert!((6..=13).contains(&clicks), "{}: {clicks} clicks", k.shape);
+            assert!(k.outline.iter().all(|r| r.len() == KNAP_SIZE));
+            assert!(HAFTED.iter().any(|h| h.0 == k.kind), "{} hafts", k.kind);
+        }
+        for (i, a) in KNAPPED.iter().enumerate() {
+            assert!(
+                KNAPPED[i + 1..]
+                    .iter()
+                    .all(|b| b.book != a.book && b.outline != a.outline)
+            );
+        }
     }
 }

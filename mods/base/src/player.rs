@@ -226,7 +226,7 @@ fn craft_result(m: &MenuCtx) {
     // Food made of food is as far along as its stalest part, and nothing comes of spoiled food.
     let made = crate::survival::crafted(&cells, made, m.world().day_time());
     // An axe lashed by hand takes its parts from the grid (`first.rs`).
-    let made = crate::first::finish(&cells, made, m.world().day_time());
+    let made = crate::first::finish(&m.world(), m.player(), &cells, made, None);
     m.group("result").set(0, made);
 }
 

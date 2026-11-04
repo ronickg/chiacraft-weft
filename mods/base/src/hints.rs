@@ -147,7 +147,9 @@ fn watch(w: &World) {
         }
         // The way to the first axe, a step at a time.
         let flake = has(&crate::first::CUTTERS);
-        let head = items.iter().any(|&i| item_name(i) == "base:part_felling_axe_head");
+        let head = items
+            .iter()
+            .any(|&i| item_name(i) == "base:part_felling_axe_head");
         if has(&ROCKS_TAG) && has(&FLINT_TAG) && !flake {
             once(w, id, KNAP);
         }

@@ -20,6 +20,7 @@ mod growth;
 mod hints;
 mod hud;
 mod items;
+mod knapping;
 mod land;
 mod leaf_decay;
 mod levels;
@@ -103,6 +104,7 @@ fn init(r: &mut Registry) {
     discovery::register(r);
     parts::register(r);
     first::register(r);
+    knapping::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);
