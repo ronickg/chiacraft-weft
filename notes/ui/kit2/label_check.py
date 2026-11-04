@@ -14,8 +14,8 @@ colour alone:
   and text pixels must be a theme colour (no blur, no half pixels);
 - clear: no text pixel within 2 UI px of an outline or frame pixel.
 
-A known false alarm: an icon in a button that happens to use a text colour (the title screen's
-Singleplayer figure) counts as ink, so its label reads "low" with a long descender; look at it.
+The height is measured on the word (the widest run of ink), so an icon set apart from its word
+doesn't count even where it uses a text colour (the title screen's Singleplayer figure).
 
 Usage: python3 label_check.py SHOT.png [--scale 2] [--json out.json] [--zoom out.png]"""
 import argparse
@@ -129,7 +129,18 @@ def measure(path, scale=2, lang=LANG):
             t = text[ya:yb, x1:x2 + 1]
             if not t.any():
                 continue
-            ty = np.nonzero(t.any(1))[0] + (ya - y1)
+            # The height from the word: the widest run of ink columns (gaps of up to 6 px are
+            # letters and spaces), so an icon far off to the left that has a text-coloured pixel
+            # (the title's Singleplayer figure) doesn't count (Tester's "first button 4 px low").
+            cols = np.nonzero(t.any(0))[0]
+            runs, start = [], cols[0]
+            for c0, c1 in zip(cols[:-1], cols[1:]):
+                if c1 - c0 > 6:
+                    runs.append((start, c0))
+                    start = c1
+            runs.append((start, cols[-1]))
+            w0, w1 = max(runs, key=lambda r: r[1] - r[0])
+            ty = np.nonzero(t[:, w0:w1 + 1].any(1))[0] + (ya - y1)
             tx = np.nonzero(t.any(0))[0]
             it, ib = int(ty.min()), int(ty.max())
             ink_h = ib - it + 1
