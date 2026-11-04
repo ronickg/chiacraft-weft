@@ -529,13 +529,21 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     // dawn, 25-35 blocks up).
     let low = exp(-max(h - 3.0, 0.0) / mix(7.0 + 12.0 * min(canopy(), 1.0), 40.0, s));
     let high = exp(-max(h, 0.0) / 45.0);
-    let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
-    let q = p - drift;
-    let shape = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0)) * 0.7 + noise3(q * vec3(1.0 / 15.0, 1.0 / 8.0, 1.0 / 15.0)) * 0.3;
-    let eaten = noise3(q * vec3(1.0 / 6.0, 1.0 / 4.0, 1.0 / 6.0) + vec3(0.0, scene.params.w * 0.04, 0.0));
-    let banks = smoothstep(0.45, 0.66, shape - 0.25 * eaten + 0.12);
     // Deep under it, in the ground, there is none.
     let open = smoothstep(-24.0, -10.0, h);
+    // Banks: a broad octave, and a fine one that both shapes and eats them, rising slowly (one
+    // octave fewer than before: three noises a step were most of the mist's cost, +3.4 ms on the
+    // PC at 3456 px, Research round 15). Its weight keeps the mix's spread, so the banks cover as
+    // much. Well above the low layer, or under the ground, the banks barely count: their mean
+    // stands in and no noise is walked.
+    var banks = 0.3;
+    if low * open > 0.02 {
+        let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
+        let q = p - drift;
+        let broad = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0));
+        let fine = noise3(q * vec3(1.0 / 9.0, 1.0 / 5.5, 1.0 / 9.0) + vec3(0.0, scene.params.w * 0.03, 0.0));
+        banks = smoothstep(0.45, 0.66, broad * 0.7 + fine * 0.39 - 0.05);
+    }
     // The sun thins the banks by day to a third (mornings and evenings keep them); a storm's
     // blowing snow or dust it leaves.
     let burn = mix(1.0, mix(0.35, 1.0, s), smoothstep(0.25, 0.65, scene.sun.y));
@@ -632,10 +640,14 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
     // Jittered along the view per pixel, so the shafts' edges don't band.
     let jitter = fract(sin(dot(rel, vec3(12.9898, 78.233, 37.719))) * 43758.547) - 0.5;
-    let steps = 12u;
+    // 8 steps (12 before), and the shadow map asked once for each pair of them, between the two:
+    // the jitter blends the coarser shafts (Research round 15: the mist's cost, the shadow taps
+    // about 3 ms of it on the Mac).
+    let steps = 8u;
     var through = 1.0;
     var gained = vec3(0.0);
     var last = 0.0;
+    var lit = 1.0;
     for (var i = 1u; i <= steps; i++) {
         let k = f32(i) / f32(steps);
         let near = (exp(2.2 * k) - 1.0) / (exp(2.2) - 1.0);
@@ -646,7 +658,10 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         let mid = at - step * (0.5 + 0.35 * jitter);
         let d = fog_density(eye + dir * mid, floor) * sky;
         let kept = exp(-d * step);
-        let lit = sun_reaches(dir * mid);
+        if (i & 1u) == 1u {
+            // At this step's far end, the pair's middle.
+            lit = sun_reaches(dir * (at - step * 0.35 * jitter));
+        }
         gained += through * (1.0 - kept) * (mix(shaded_sky, light.sky, lit) + light.sun * lit);
         through *= kept;
         last = at;
