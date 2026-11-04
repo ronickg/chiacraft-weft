@@ -351,10 +351,24 @@ impl VulkanBackend {
                 .device_name_as_c_str()
                 .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            log::info!("GPU: {device_name}");
             let mut indexing = vk::PhysicalDeviceDescriptorIndexingProperties::default();
-            let mut props2 = vk::PhysicalDeviceProperties2::default().push_next(&mut indexing);
+            let mut driver = vk::PhysicalDeviceDriverProperties::default();
+            let mut props2 = vk::PhysicalDeviceProperties2::default()
+                .push_next(&mut indexing)
+                .push_next(&mut driver);
             instance.get_physical_device_properties2(pdev, &mut props2);
+            // Which driver too: on a Mac MoltenVK or Mesa's KosmicKrisp can stand behind the
+            // same GPU, and runs comparing them must say which they had.
+            let text = |s: Result<&std::ffi::CStr, _>| {
+                s.map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_default()
+            };
+            log::info!(
+                "GPU: {device_name}, driver {} {} ({:?})",
+                text(driver.driver_name_as_c_str()),
+                text(driver.driver_info_as_c_str()),
+                driver.driver_id
+            );
             let images = indexing
                 .max_per_stage_descriptor_update_after_bind_sampled_images
                 .min(indexing.max_descriptor_set_update_after_bind_sampled_images);

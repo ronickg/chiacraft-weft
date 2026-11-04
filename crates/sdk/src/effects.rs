@@ -435,6 +435,17 @@ impl SoundBuilder<'_> {
         self.desc.range = blocks;
         self
     }
+    /// Which sounds keep playing when too many play at once: higher first, then the louder.
+    /// Weather beds and voices above footsteps; 0 by default.
+    pub fn priority(mut self, p: i32) -> Self {
+        self.desc.priority = p;
+        self
+    }
+    /// At most `n` of it at once: one more replaces the quietest (a herd, a fire field).
+    pub fn voices(mut self, n: u32) -> Self {
+        self.desc.voices = n;
+        self
+    }
 }
 
 impl Drop for SoundBuilder<'_> {
@@ -544,6 +555,61 @@ impl Client {
             .as_ref()
             .map_or(std::ptr::null(), |p| p as *const [f64; 3]);
         unsafe { (host().client_play_sound)(self.raw(), sound.id(), p, volume, 0.0) }
+    }
+
+    /// Starts a sound only this client hears and keeps a handle to it (`SoundHandle`): `looped`
+    /// plays until stopped, fading in over `fade` seconds; `None` = heard as in the head.
+    pub fn start_sound(&self, sound: &crate::Sound, pos: Option<[f64; 3]>, volume: f32, looped: bool, fade: f32) -> SoundHandle {
+        use abi::sound_start as ss;
+        let start = abi::SoundStart {
+            sound: sound.id(),
+            pos: pos.unwrap_or_default(),
+            volume,
+            fade,
+            flags: if pos.is_some() { ss::POSITIONED } else { 0 } | if looped { ss::LOOP } else { 0 },
+            ..abi::SoundStart::DEFAULT
+        };
+        SoundHandle(unsafe { (host().client_sound_start)(self.raw(), &start) })
+    }
+}
+
+/// A sound a client started (`Client::start_sound`), to change while it plays. Every change
+/// eases over `secs`. A handle of 0 (no sound device) does nothing.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct SoundHandle(pub u64);
+
+impl SoundHandle {
+    fn set(self, c: &Client, ch: abi::SoundChange) {
+        if self.0 != 0 {
+            unsafe { (host().client_sound_set)(c.raw(), self.0, &ch) }
+        }
+    }
+    /// Times the event's volume.
+    pub fn volume(self, c: &Client, volume: f32, secs: f32) {
+        self.set(c, abi::SoundChange { what: abi::sound_change::VOLUME, volume, secs, ..abi::SoundChange::DEFAULT });
+    }
+    /// Playback speed, 1 = as recorded.
+    pub fn pitch(self, c: &Client, pitch: f32, secs: f32) {
+        self.set(c, abi::SoundChange { what: abi::sound_change::PITCH, pitch, secs, ..abi::SoundChange::DEFAULT });
+    }
+    /// Moves a positioned one.
+    pub fn moved(self, c: &Client, pos: [f64; 3], secs: f32) {
+        self.set(c, abi::SoundChange { what: abi::sound_change::POS, pos, secs, ..abi::SoundChange::DEFAULT });
+    }
+    /// Muffles it: a low-pass at `hz` (indoors, through walls); 20000 is clear.
+    pub fn muffle(self, c: &Client, hz: f32, secs: f32) {
+        self.set(c, abi::SoundChange { what: abi::sound_change::LOWPASS, lowpass: hz, secs, ..abi::SoundChange::DEFAULT });
+    }
+    /// Fades it out over `fade` seconds; then it ends.
+    pub fn stop(self, c: &Client, fade: f32) {
+        if self.0 != 0 {
+            unsafe { (host().client_sound_stop)(c.raw(), self.0, fade) }
+        }
+    }
+    /// Still playing (or still being read); false once it ended, was stopped, or gave way to a
+    /// more important sound.
+    pub fn playing(self, c: &Client) -> bool {
+        self.0 != 0 && unsafe { (host().client_sound_playing)(c.raw(), self.0) != 0 }
     }
 }
 
