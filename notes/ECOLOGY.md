@@ -522,6 +522,13 @@ and cactus.**
   family or a player, and chases it. A knock-out kind fights through its anger, so a pack's kin
   join in. It gives up after 30 seconds, and a kill feeds it, a tenth of its own mass filling it.
   What the kill drops stays as the carcass.
+- **Hunger by prey (2026-11-03):** a kill fills a hunter by the prey's mass against a meal of a
+  tenth of its own (`animals_core::needs::fills`: a mouse is 4% of a fox's food, a hare all of
+  it), and a wild hunter arrives as fed as its best-fed prey there are this season
+  (`hunt::prey_lush`), so hunters are thin in the winter their prey are thin in. The check: every
+  hunter fills up on its biggest prey at home in ten kills or fewer (`places.rs`; the raven takes
+  3.4 mice, the wyvern 1.7 kills). Seen: a fox at 10% hunted a mouse, gave up a 30-second chase,
+  took it on the next try and ate it (food 10 to 12 of 96).
 - **Prey watch:** a wild animal that sees a hunter able to take it within 10 blocks runs.
 - **The old random hunts are gone:** the raptors' and Utahraptor's "now and then" hunts are
   replaced.

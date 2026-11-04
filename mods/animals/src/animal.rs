@@ -196,17 +196,26 @@ fn roll(w: &World, index: usize) -> Animal {
     a
 }
 
-/// A wild one just met (`notes/ECOLOGY.md`, part 7): a plant eater is as fed as its place feeds
-/// it now (thin in a drought); in its breeding season a share of them are this year's young.
+/// A wild one just met (`notes/ECOLOGY.md`, parts 6 and 7): a plant eater is as fed as its place
+/// feeds it now (thin in a drought), a hunter as its prey are (`crate::hunt::prey_lush`: thin in
+/// the winter its prey are thin in); in its breeding season a share of them are this year's young.
 fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
     let s = &SPECIES[index];
-    if s.forages_wild() {
-        let lush = crate::forage::season_lush(w, s, pos.map(|v| v.floor() as i32));
+    let at = pos.map(|v| v.floor() as i32);
+    let lush = if s.forages_wild() {
+        Some(crate::forage::season_lush(w, s, at))
+    } else if s.hungry_in_the_wild() {
+        crate::hunt::prey_lush(w, s, at)
+    } else {
+        None
+    };
+    if let Some(lush) = lush {
         a.food = (a.stat(species::FOOD) * (ARRIVES_FED + (1.0 - ARRIVES_FED) * lush)).round() as u16;
         weft_sdk::info!(
-            "wild {} {id} arrives {:.0}% fed (its food grows at {:.0}% here this season)",
+            "wild {} {id} arrives {:.0}% fed (its {} at {:.0}% here this season)",
             s.name,
             a.food as f32 / a.stat(species::FOOD) * 100.0,
+            if s.forages_wild() { "food grows" } else { "prey are fed" },
             lush * 100.0
         );
     }
@@ -223,12 +232,9 @@ fn arrive(w: &World, id: u64, index: usize, a: &mut Animal, pos: [f64; 3]) {
     }
 }
 
-/// Share of its food a wild plant eater has where nothing grows, and the share of wild ones met
-/// in their breeding season that are young.
-const ARRIVES_FED: f32 = 0.3;
+/// The share of wild ones met in their breeding season that are young.
 const YOUNG_PERCENT: u32 = 25;
-/// Seconds a wild one lives on an empty stomach at full health before it starves.
-const STARVES_SECS: f32 = 1200.0;
+use animals_core::needs::{ARRIVES_FED, STARVES_SECS};
 
 /// Its area was away (unloaded) for `away` ticks, and life went on there (`notes/ANIMALS.md`,
 /// "Time away"): its timers run out (a mother due gives birth now), it has aged (by the world's

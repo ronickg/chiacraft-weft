@@ -151,3 +151,22 @@ fn plant_eaters_find_food_where_they_live() {
     }
     report(problems);
 }
+
+/// A hunter that gets hungry in the wild can fill up on its prey at home (`needs::kills_to_fill`):
+/// its biggest prey there fills it in at most `MOST_KILLS` kills, or it would chase all day and
+/// starve full of mice.
+#[test]
+fn hunters_fill_up_on_their_prey_at_home() {
+    const MOST_KILLS: f32 = 10.0;
+    let mut problems = Vec::new();
+    for s in SPECIES.iter().filter(|s| s.hunts() && !s.forages_wild() && s.hungry_in_the_wild()) {
+        match animals_core::needs::kills_to_fill(s) {
+            Some(k) if k <= MOST_KILLS => {}
+            k => problems.push(format!(
+                "{}: its biggest prey at home fills it in {k:?} kills (want {MOST_KILLS} or fewer): its prey sizes (species.rs prey) and needs::MEAL",
+                s.name
+            )),
+        }
+    }
+    report(problems);
+}

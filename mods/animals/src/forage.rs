@@ -65,7 +65,7 @@ const SPAWN_FLOOR: f32 = 0.2;
 
 /// How much of its food its biome grows through this season, 0 to 1
 /// (`vitals::forage::season_lushness`); 1 for one that doesn't forage.
-pub fn season_lush(w: &World, s: &Species, pos: [i32; 3]) -> f32 {
+pub fn season_lush(w: &World, s: &animals_core::species::Species, pos: [i32; 3]) -> f32 {
     let biome = w.biome(pos);
     let c = base_api::CLIMATE
         .on_biome(biome)
