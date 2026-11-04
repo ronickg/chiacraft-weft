@@ -34,6 +34,11 @@ pub static GRASS_COVER: Component<f32> = Component::named("grass");
 pub static TREE_KINDS: Component<BlockList> = Component::named("tree_kinds");
 /// Flowers a biome grows, picked evenly (`"base:dandelion base:rose"` where unset).
 pub static FLOWERS: Component<BlockList> = Component::named("flowers");
+/// Giant trees (a sequoia grove's): the chance of one per 24 x 24 cell, and which (logs with a
+/// recipe, `tree_recipes`), in a scatter of their own so distant terrain draws them at their own
+/// height, not averaged with the small trees.
+pub static GIANT_TREES: Component<f32> = Component::named("giant_trees");
+pub static GIANT_KINDS: Component<BlockList> = Component::named("giant_kinds");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
 pub use base_api::trees::{TREE_LEAVES, grow_tree};
 use base_api::trees::{tree_blocks, wild_tree_at};
@@ -239,6 +244,11 @@ pub fn register(r: &mut Registry) {
         // A forest's clearings keep one tree in four.
         .thin_in(&STAND_TREES, stand_over(-CLEARING).not(), 4)
         .shape(tree);
+    r.scatter(&GIANT_SITES)
+        .cell(24)
+        .reach(12)
+        .density(&GIANT_TREES)
+        .shape(giant);
     r.scatter(&STAND_SITES)
         .cell(3)
         .reach(8)
@@ -286,6 +296,20 @@ fn boulder(s: &mut Site) {
 
 static TREE_SITES: Scatter = Scatter::named("trees");
 static STAND_SITES: Scatter = Scatter::named("stand_trees");
+static GIANT_SITES: Scatter = Scatter::named("giant_trees");
+
+/// A giant of the biome's `GIANT_KINDS` at a scatter's site; none on a bare rock face.
+fn giant(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
+    let h = s.random();
+    let Some(log) = GIANT_KINDS.on_biome(s.biome()).and_then(|l| l.pick(h >> 40)) else { return };
+    let [x, y, z] = s.pos();
+    base_api::trees::giant_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
+        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+    });
+}
 static BOULDER_SITES: Scatter = Scatter::named("boulders");
 static WET: Tag = Tag::named("wet");
 static WOODS: Tag = Tag::named("forest");

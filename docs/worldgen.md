@@ -178,7 +178,7 @@ r.scatter(&TREE_SITES).cell(5).reach(3).density(&TREES).shape(|s| {
 });
 ```
 - `cell(n)`: one spot per `n` x `n` blocks at most
-- `reach(n)`: how far the shape goes sideways from its spot (up and down it may go 32 and 16)
+- `reach(n)`: how far the shape goes sideways from its spot (up and down it may go 96 and 16)
 - `density(&COMPONENT)`: a biome component, 0 to 1, the chance of a spot per cell; biomes without it get none
 - `shape(f)`: the blocks, in world coordinates. `s.biome()` and `s.random()` (the same bits every time) pick the kind. It runs again for each cube the thing reaches, so it has to be pure
 - `dimension(&D)`: only there

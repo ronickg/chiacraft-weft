@@ -119,11 +119,14 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
 /// Our trees (`notes/ECOLOGY.md`, part 3): mesquite in the desert's washes and the llanos, flat
 /// topped like an acacia, its pods a summer food; the Pantanal's acuri palm and the llanos'
 /// moriche palm, their fruit falling through their seasons. Wood, its tree's shape, and what its
-/// leaves drop besides its sapling. Their saplings grow by the place (`vitals::plants`).
-const WOODS: [(&str, Option<&str>, &str); 3] = [
+/// leaves drop besides its sapling. Their saplings grow by the place (`vitals::plants`). The giant
+/// sequoia of the Sierra Nevada's groves, cone-shaped young and grown from branches
+/// (`tree_recipes::SEQUOIA`), its cones planting it.
+const WOODS: [(&str, Option<&str>, &str); 4] = [
     ("mesquite", Some("flat_tree"), "mesquite_pod"),
     ("acuri_palm", Some("palm_tree"), "acuri_nut"),
     ("moriche_palm", Some("palm_tree"), "moriche_fruit"),
+    ("sequoia", Some("cone_tree"), "sequoia_cone"),
 ];
 
 /// Our trees' logs, planks, leaves and saplings (`WOODS`), and the fruit their leaves drop, which

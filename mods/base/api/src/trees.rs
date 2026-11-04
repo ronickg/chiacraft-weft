@@ -73,6 +73,8 @@ pub struct TreeAt {
     lean: (i32, i32),
     /// Its seed, for a tree grown from branches (`branchy`).
     seed: u64,
+    /// The world grew it (not a sapling): a sapling of a giant grows its young one's recipe.
+    wild: bool,
 }
 
 const LEANS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
@@ -121,7 +123,7 @@ fn shaped(log: u32, x: i32, y: i32, z: i32, h: u64, wild: bool) -> Option<TreeAt
         Crown::Slim => 6 + (h % 3) as i32 + 2 * big,
     };
     let lean = LEANS[(h >> 20) as usize % 4];
-    Some(TreeAt { x, y, z, log, leaves, crown, form, height, lean, seed: h })
+    Some(TreeAt { x, y, z, log, leaves, crown, form, height, lean, seed: h, wild })
 }
 
 /// Calls `put(x, y, z, state, force)` for every block of the tree.
@@ -148,7 +150,8 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     }
     // A species with a recipe grows from branches (`branchy`), its log turned along each limb.
     let name = block_name(log).split('[').next().unwrap_or("");
-    if let Some(recipe) = crate::tree_recipes::of(name) {
+    let recipe = if t.wild { crate::tree_recipes::of(name) } else { crate::tree_recipes::sapling_of(name) };
+    if let Some(recipe) = recipe {
         branchy::grow(recipe, t.x, t.y, t.z, t.seed, |x, y, z, part| match part {
             branchy::Part::Log { axis } => {
                 let along = ["x", "y", "z"][axis as usize];
@@ -261,6 +264,21 @@ fn crown(t: &TreeAt, cx: i32, cz: i32, top: i32, put: &mut impl FnMut(i32, i32, 
             }
         }
     }
+}
+
+/// A grown giant of `log` (its recipe's full size, `tree_recipes::of`; a sequoia's 60 blocks), for
+/// a scatter of its own: nothing for a log without a recipe. Calls `put(x, y, z, state, force)`.
+pub fn giant_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
+    let Some(leaves) = TREE_LEAVES.on_block(log).map(|l| l.0) else { return };
+    let Some(recipe) = crate::tree_recipes::of(block_name(log).split('[').next().unwrap_or("")) else { return };
+    branchy::grow(recipe, x, y, z, h, |x, y, z, part| match part {
+        branchy::Part::Log { axis } => {
+            let along = ["x", "y", "z"][axis as usize];
+            put(x, y, z, state_with(log, "axis", along).unwrap_or(log), true)
+        }
+        branchy::Part::Leaves => put(x, y, z, leaves, false),
+    });
+    put(x, y - 1, z, DIRT.id(), true);
 }
 
 /// Places a tree of `log` into a live world (saplings). Checks for room first.

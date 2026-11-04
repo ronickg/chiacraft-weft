@@ -299,6 +299,15 @@ pub const YOUNG_SEQUOIA: Recipe = Recipe {
     ..Recipe::BASE
 };
 
+/// The young of the trees that grow too big to come from a sapling at once: a planted sequoia
+/// grows into a young one (`YOUNG_SEQUOIA`), not a giant.
+pub const YOUNG: &[Recipe] = &[YOUNG_SEQUOIA];
+
+/// The recipe a sapling of this log grows by: its young one's, if it has one, else its own.
+pub fn sapling_of(log: &str) -> Option<&'static Recipe> {
+    YOUNG.iter().find(|r| r.log == log).or_else(|| of(log))
+}
+
 /// The recipe for a log, by its block name (`base:oak_log`).
 pub fn of(log: &str) -> Option<&'static Recipe> {
     RECIPES.iter().find(|r| r.log == log)
