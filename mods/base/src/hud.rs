@@ -12,25 +12,28 @@ static HUD_CLOCK: HudElement = HudElement::named("clock");
 static HUD_POSITION: HudElement = HudElement::named("position");
 static HUD_SHORTCUTS: HudElement = HudElement::named("shortcuts");
 static HUD_HEALTH: HudElement = HudElement::named("health");
-static HUD_STAMINA: HudElement = HudElement::named("stamina");
 static HUD_STOMACH: HudElement = HudElement::named("food");
 static HUD_EFFECTS: HudElement = HudElement::named("effects");
 static HUD_TEMPERATURE: HudElement = HudElement::named("temperature");
-static HUD_XP: HudElement = HudElement::named("xp");
 
-/// A bar's size in GUI pixels: the kit's bar frame (256 x 36 pixels) at its own proportions, so
-/// its fill (`hud_<bar>_fill`, laid on a canvas the frame's size by `install.py`) stays inside.
-const BAR: (f32, f32) = (96.0, 13.5);
+/// A bar's size in GUI pixels: the UI kit's bar at the item pixel (`pxkit.py`, two image pixels a
+/// GUI pixel), drawn at exactly its size so its pixels stay whole. The XP bar is thinner.
+const BAR: (f32, f32) = (96.0, 7.0);
+const BAR_XP: (f32, f32) = (96.0, 4.0);
+/// How far a bar's numbers end from its right end, GUI pixels: its rim (1) and two of padding.
+const BAR_TEXT_INSET: f32 = 3.0;
+/// The level badge beside the bars (`hud_badge`, 40 x 48 pixels).
+const BADGE: (f32, f32) = (20.0, 24.0);
 
-/// Where a bar's fill ends for a share filled: the kit's fill starts 10 of the frame's 256 pixels
-/// in and spans 236.
+/// Where a bar's fill ends for a share filled: the kit's fill starts 2 of the bar's 192 pixels in
+/// and spans 188 (its rim).
 fn bar_fill(share: f32) -> f32 {
-    (10.0 + share.clamp(0.0, 1.0) * 236.0) / 256.0
+    (2.0 + share.clamp(0.0, 1.0) * 188.0) / 192.0
 }
 
-/// The thermometer's size (the kit's temperature bar, 178 x 28 pixels, at its proportions), and
-/// the body temperatures at its ends, °C.
-const THERMOMETER: (f32, f32) = (64.0, 10.0);
+/// The thermometer's size (the kit's gauge, 128 x 10 pixels), and the body temperatures at its
+/// ends, °C.
+const THERMOMETER: (f32, f32) = (64.0, 5.0);
 const COLDEST: f32 = 31.0;
 const HOTTEST: f32 = 43.0;
 
@@ -44,44 +47,55 @@ fn vitals_of(c: &ClientView) -> Option<Vitals> {
 const SHORTCUTS: [&str; 4] = ["inventory", "recipes", "stats", "advancements"];
 
 pub fn register(r: &mut Registry) {
-    // Health and stamina: the bar, and the numbers beside it in the vitals' units.
+    // Health, stamina and experience as Ronald's sheet has them: the level on a badge, and beside
+    // it the bars, each with its numbers in the vitals' units; the points waiting to be placed (P)
+    // after the XP bar.
     r.hud_element(&HUD_HEALTH, hud_anchor::TOP_LEFT, 0, |ui| {
         ui.row(S::row().gap(3.0).center(), |ui| {
-            ui.progress_bind("hud_health", S::default().size(BAR.0, BAR.1), |c| {
-                let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return -1.0 };
-                bar_fill(me.health * HEALTH_SCALE / v.max_health.max(1.0))
+            ui.panel("hud_badge", S::row().size(BADGE.0, BADGE.1).center(), |ui| {
+                ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                    let Some(v) = vitals_of(c) else { return t.text("") };
+                    t.set("hud.base.badge", &[Arg::Int(vitals::levels::level_of(v.xp).0 as i64)]);
+                });
             });
-            ui.text_bind_styled(S::default().no_wrap(), |c, t| {
-                let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return t.text("") };
-                t.set("hud.base.bar_value", &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)]);
-            });
-        });
-    });
-    r.hud_element(&HUD_STAMINA, hud_anchor::TOP_LEFT, 1, |ui| {
-        ui.row(S::row().gap(3.0).center(), |ui| {
-            ui.progress_bind("hud_stamina", S::default().size(BAR.0, BAR.1), |c| {
-                let Some(v) = vitals_of(c) else { return -1.0 };
-                bar_fill(v.stamina / v.max_stamina.max(1.0))
-            });
-            ui.text_bind_styled(S::default().no_wrap(), |c, t| {
-                let Some(v) = vitals_of(c) else { return t.text("") };
-                t.set("hud.base.bar_value", &[Arg::Int(v.stamina.round() as i64), Arg::Int(v.max_stamina.round() as i64)]);
-            });
-        });
-    });
-    // The level, the XP bar toward the next, and the points waiting to be placed (P).
-    r.hud_element(&HUD_XP, hud_anchor::TOP_LEFT, 2, |ui| {
-        ui.row(S::row().gap(3.0).center(), |ui| {
-            ui.progress_bind("hud_xp", S::default().size(BAR.0, BAR.1), |c| {
-                let Some(v) = vitals_of(c) else { return -1.0 };
-                let (level, into) = vitals::levels::level_of(v.xp);
-                bar_fill(into as f32 / vitals::levels::to_next(level) as f32)
-            });
-            ui.text_bind_styled(S::default().no_wrap(), |c, t| {
-                let Some(v) = vitals_of(c) else { return t.text("") };
-                let unspent = crate::levels::unspent(&v);
-                let key = if unspent > 0 { "hud.base.level_points" } else { "hud.base.level" };
-                t.set(key, &[Arg::Int(vitals::levels::level_of(v.xp).0 as i64), Arg::Int(unspent as i64)]);
+            ui.column(S::col().gap(1.0), |ui| {
+                // The numbers inside the bar's right end, as on Ronald's sheet.
+                ui.row(S::row().size(BAR.0, BAR.1), |ui| {
+                    ui.progress_bind("hud_health", S::default().size(BAR.0, BAR.1), |c| {
+                        let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return -1.0 };
+                        bar_fill(me.health * HEALTH_SCALE / v.max_health.max(1.0))
+                    });
+                    ui.text_bind_styled(S::default().no_wrap().at_pivot(BAR.0 - BAR_TEXT_INSET, BAR.1 / 2.0, [1.0, 0.5]), |c, t| {
+                        let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return t.text("") };
+                        t.set("hud.base.bar_value", &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)]);
+                    });
+                });
+                ui.row(S::row().size(BAR.0, BAR.1), |ui| {
+                    ui.progress_bind("hud_stamina", S::default().size(BAR.0, BAR.1), |c| {
+                        let Some(v) = vitals_of(c) else { return -1.0 };
+                        bar_fill(v.stamina / v.max_stamina.max(1.0))
+                    });
+                    ui.text_bind_styled(S::default().no_wrap().at_pivot(BAR.0 - BAR_TEXT_INSET, BAR.1 / 2.0, [1.0, 0.5]), |c, t| {
+                        let Some(v) = vitals_of(c) else { return t.text("") };
+                        t.set("hud.base.bar_value", &[Arg::Int(v.stamina.round() as i64), Arg::Int(v.max_stamina.round() as i64)]);
+                    });
+                });
+                ui.row(S::row().gap(3.0).center(), |ui| {
+                    ui.progress_bind("hud_xp", S::default().size(BAR_XP.0, BAR_XP.1), |c| {
+                        let Some(v) = vitals_of(c) else { return -1.0 };
+                        let (level, into) = vitals::levels::level_of(v.xp);
+                        bar_fill(into as f32 / vitals::levels::to_next(level) as f32)
+                    });
+                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                        let Some(v) = vitals_of(c) else { return t.text("") };
+                        let unspent = crate::levels::unspent(&v);
+                        if unspent > 0 {
+                            t.set("hud.base.level_points", &[Arg::Int(unspent as i64)]);
+                        } else {
+                            t.text("");
+                        }
+                    });
+                });
             });
         });
     });
@@ -136,8 +150,8 @@ pub fn register(r: &mut Registry) {
             });
             ui.progress_bind("hud_temperature", S::default().size(THERMOMETER.0, THERMOMETER.1), |c| {
                 let Some(v) = vitals_of(c) else { return -1.0 };
-                // The kit's bar: the gradient starts 10 of its 178 pixels in and spans 158.
-                (10.0 + ((v.core - COLDEST) / (HOTTEST - COLDEST)).clamp(0.0, 1.0) * 158.0) / 178.0
+                // The kit's gauge: the gradient starts 2 of its 128 pixels in and spans 124.
+                (2.0 + ((v.core - COLDEST) / (HOTTEST - COLDEST)).clamp(0.0, 1.0) * 124.0) / 128.0
             });
             ui.text_bind_styled(S::default().no_wrap(), |c, t| {
                 let Some(v) = vitals_of(c) else { return t.text("") };
