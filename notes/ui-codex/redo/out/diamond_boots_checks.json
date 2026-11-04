@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a pair of cyan diamond plates with white facet tips over dark leather boots side by side, front view, a dark gap between them, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.584,
+   "outline": 0.43,
+   "red_line": 0.27,
+   "fill": 0.47,
+   "passed": true
+  }
+ ]
+}

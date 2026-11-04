@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a pair of soft warm-brown leather with stitching boots side by side, front view, a dark gap between them, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.54,
+   "outline": 0.69,
+   "red_line": 0.33,
+   "fill": 0.67,
+   "passed": true
+  }
+ ]
+}

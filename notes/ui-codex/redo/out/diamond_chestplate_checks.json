@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a cyan diamond plates with white facet tips over dark leather chestplate, front view: a breastplate with rounded shoulder plates, a collar at the neck, a brown leather belt at the waist, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.536,
+   "outline": 0.58,
+   "red_line": 0.22,
+   "fill": 0.52,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,234 @@
+[
+ {
+  "kind": "item",
+  "name": "fur_hat",
+  "what": "a thick shaggy grey-brown fur with a cream trim hat, front view, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "fur_coat",
+  "what": "a thick shaggy grey-brown fur with a cream trim coat, front view, sleeves out a little, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "fur_trousers",
+  "what": "a pair of thick shaggy grey-brown fur with a cream trim trousers, front view, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "fur_boots",
+  "what": "a pair of thick shaggy grey-brown fur with a cream trim boots side by side, front view, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "wool_hat",
+  "what": "a soft knitted cream-white wool with a visible stitch pattern hat, front view, centred",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "wool_coat",
+  "what": "a soft knitted cream-white wool with a visible stitch pattern sweater, front view, sleeves out a little, centred",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "wool_trousers",
+  "what": "a pair of soft knitted cream-white wool with a visible stitch pattern trousers, front view, centred",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "wool_boots",
+  "what": "a pair of soft knitted cream-white wool with a visible stitch pattern socks side by side, front view, centred",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "hide_hat",
+  "what": "a soft tan buckskin leather with fringed seams hat, front view, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "hide_coat",
+  "what": "a soft tan buckskin leather with fringed seams shirt, front view, sleeves out a little, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "hide_trousers",
+  "what": "a pair of soft tan buckskin leather with fringed seams trousers, front view, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "hide_boots",
+  "what": "a pair of soft tan buckskin leather with fringed seams moccasins side by side, front view, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "linen_hat",
+  "what": "a light undyed beige linen with a coarse weave hood, front view, centred",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "linen_coat",
+  "what": "a light undyed beige linen with a coarse weave shirt, front view, sleeves out a little, centred",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "linen_trousers",
+  "what": "a pair of light undyed beige linen with a coarse weave trousers, front view, centred",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "linen_boots",
+  "what": "a pair of light undyed beige linen with a coarse weave foot wraps side by side, front view, centred",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "fur",
+  "what": "a pelt: a rolled-up shaggy grey-brown fur pelt with a lighter cream underside showing, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "plant_fibre",
+  "what": "a bundle of plant fibre: pale green-tan long fibres twisted together and tied in the middle, lying diagonally",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cloth",
+  "what": "a folded piece of linen cloth: two neat folds of light undyed beige fabric with a coarse weave, centred with 3-5 px of padding",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "salt",
+  "what": "a small heap of coarse salt: white-grey crystals with tiny sparkles, a soft blue-grey shadow, centred with 3-5 px of padding",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "bowl",
+  "what": "a wide wooden bowl seen from the front and slightly above, oval opening showing the empty inside, bright rim, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "stew",
+  "what": "a wide wooden bowl seen from the front and slightly above, bright rim, filled with a thick orange-brown meat stew with chunks of meat and vegetables, a wooden spoon handle sticking out to the upper left, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "dried_meat",
+  "what": "strips of dried meat: three dark red-brown leathery jerky strips, wrinkled, lying across each other, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "smoked_meat",
+  "what": "smoked meat: a dark mahogany-brown smoked cut with a glossy crust and a pale fat edge, tied with string, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "salted_meat",
+  "what": "salted meat: a red cut of meat crusted with white salt crystals, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "dried_apple",
+  "what": "dried apple rings: three wrinkled pale golden apple rings with red edges, overlapping, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "dried_berries",
+  "what": "a small heap of dried berries: wrinkled dark red and purple raisins, centred with 3-5 px of padding",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cooking_pot",
+  "what": "a cooking pot: a round black-iron cauldron pot seen from the front and slightly above, a thick rim, two small handles, a wisp of steam, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "drying_rack",
+  "what": "a drying rack: a small wooden A-frame rack with crossbars, three strips of meat hanging from it, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ }
+]

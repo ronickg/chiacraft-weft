@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a diamond axe: a broad wedge-shaped blade flaring to a long straight edge, made of faceted cyan diamond with teal shadows, white facet tips and one small sparkle, a gold collar, on a handle wrapped in red-brown leather with gold bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.618,
+   "outline": 0.53,
+   "red_line": 0.08,
+   "fill": 0.32,
+   "passed": true
+  }
+ ]
+}

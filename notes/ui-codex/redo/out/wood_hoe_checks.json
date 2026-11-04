@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a wooden hoe: a flat blade set at a right angle to the shaft, made of warm orange-brown wood with clear grain, crudely carved, lashed with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.452,
+   "outline": 0.48,
+   "red_line": 0.0,
+   "fill": 0.21,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+{
+ "kind": "item",
+ "what": "a soft warm-brown leather with stitching helmet, front view: a rounded dome narrowing to the chin, a horizontal eye slit, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.455,
+   "outline": 0.63,
+   "red_line": 0.5,
+   "fill": 0.47,
+   "passed": false
+  },
+  {
+   "grid": 0.217,
+   "outline": 0.6,
+   "red_line": 0.45,
+   "fill": 0.42,
+   "passed": false
+  },
+  {
+   "grid": 0.262,
+   "outline": 0.75,
+   "red_line": 0.18,
+   "fill": 0.48,
+   "passed": true
+  }
+ ]
+}

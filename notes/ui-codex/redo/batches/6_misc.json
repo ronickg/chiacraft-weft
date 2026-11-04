@@ -1,0 +1,234 @@
+[
+ {
+  "kind": "item",
+  "name": "bucket",
+  "what": "a metal bucket seen from the front and slightly above, slightly tapered, thick bright warm-silver rim, vertical highlight just left of centre, a dark rope band around the middle, small round handle lugs on both sides, the oval opening showing the dark inside, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "water_bucket",
+  "what": "a metal bucket seen from the front and slightly above, slightly tapered, thick bright warm-silver rim, vertical highlight just left of centre, a dark rope band around the middle, small round handle lugs on both sides, filled to just below the rim with water: a flat oval blue surface with one pale glint, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "lava_bucket",
+  "what": "a metal bucket seen from the front and slightly above, slightly tapered, thick bright warm-silver rim, vertical highlight just left of centre, a dark rope band around the middle, small round handle lugs on both sides, filled to just below the rim with lava: a flat oval red surface with bright orange swirls, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "sedative",
+  "what": "a round glass potion flask, front view, white glass outline with a pale inner edge, transparent glass with one curved white highlight on the upper left, small tan cork, a white cloth tied round the neck with thin red cords, filled two-thirds with a sleepy lavender-purple liquid",
+  "green": true,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "bandage",
+  "what": "a rolled bandage: a cream linen roll with a loose end trailing, faint weave texture, centred with 3-5 px of padding",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "compost",
+  "what": "a heap of compost: dark crumbly brown soil with bits of green leaf and straw, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "dung",
+  "what": "a dung pat: a round flattened dark brown dropping with a lighter rim, a few straw bits, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "earthworm",
+  "what": "an earthworm: a pink-brown segmented worm curled in an S shape, faint ring segments and a slightly paler band, centred with 3-5 px of padding",
+  "green": true,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "grub",
+  "what": "a beetle grub: a plump curled C-shaped cream-white larva with a small orange-brown head, centred with 3-5 px of padding",
+  "green": false,
+  "pale": true,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "insects",
+  "what": "a few small insects: two beetles and a cricket in browns and greens, seen from above, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "beetle",
+  "what": "a beetle seen from above: a shiny dark green-bronze shell with a highlight, six thin legs and short antennae, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "torch",
+  "what": "a torch, upright and centred: a short wooden handle 3-4 px wide with a small iron collar, a teardrop flame on top, dark orange at its edge, orange in the body and yellow-white in the core",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "redstone_torch",
+  "what": "a redstone torch, upright and centred: a short wooden handle with a small iron collar, a glowing round red crystal tip with a bright pink highlight",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "lever",
+  "what": "a lever: a small grey cobblestone base plate in three-quarter top view with a wooden handle sticking up and tilted to the right, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "repeater",
+  "what": "a repeater seen from slightly above: a thin smooth grey stone slab with two small red torches on it and a faint red arrow line, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "comparator",
+  "what": "a comparator seen from slightly above: a thin smooth grey stone slab with three small red torches in a triangle, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "spyglass",
+  "what": "a spyglass lying diagonally from the bottom left (eyepiece) to the top right (lens): a copper-and-leather tube in three segments that get wider toward the lens, a pale blue glint on the lens",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "nest",
+  "what": "a bird nest: a round bowl of woven twigs and dry grass seen from the front and slightly above, empty inside, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "raptor_egg",
+  "what": "a large raptor egg: an upright oval, slightly narrower at the top, pale olive-cream shell with dark brown speckles, a soft highlight on the upper left, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "utahraptor_saddle",
+  "what": "a saddle seen from the side and slightly above, reading clearly as a saddle: a dark brown leather seat with a raised back, one stirrup hanging below with a metal ring, a few metal studs, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "wyvern_saddle",
+  "what": "a riding saddle for a flying beast, seen from the side and slightly above: a dark red-brown leather seat with a high back, a gold buckle strap and a stirrup hanging below, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "animals"
+ },
+ {
+  "kind": "item",
+  "name": "chicken_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, cream shell with red speckles, a soft highlight on the upper left, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "cow_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, dark brown shell with big cream patches, a soft highlight on the upper left, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "pig_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, pale pink shell with darker rose spots, a soft highlight on the upper left, centred with 3-5 px of padding",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "sheep_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, pale cream-white shell with soft pink spots, a soft highlight on the upper left, centred with 3-5 px of padding",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "zombie_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, teal-green shell with dark green blotches, a soft highlight on the upper left, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "skeleton_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, pale bone-grey shell with darker grey spots, a soft highlight on the upper left, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "spider_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, dark brown shell with red speckles, a soft highlight on the upper left, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "creeper_spawn_egg",
+  "what": "a spawn egg: an upright oval egg, bright green shell with dark green-black blotches, a soft highlight on the upper left, centred with 3-5 px of padding",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ }
+]
