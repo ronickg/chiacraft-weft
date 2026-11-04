@@ -578,3 +578,18 @@ sword, about 100 XP.
   at once (air -9.5 °C), the core fell to 34.5 °C by night (Cold, not yet Freezing) and came back
   beside a campfire (air +9.6 °C).
 
+
+**15. Dying and the way back** (2026-11-04 overnight, Research round 4 H1 and the first-hour report;
+chosen without Ronald, logged in `notes/crew/OVERNIGHT.md`; `mods/base/src/death.rs`):
+
+- The death screen is base's own (it replaces the engine's `core:death`): "You Died!", what killed
+  one (`death.base.cause.*`: "Killed by a Zombie", "You froze to death"...), where the tombstone
+  is (x, y, z) or that one carried nothing, Respawn and Save and Quit.
+- After respawning, a line over the hotbar points the way: "Tombstone: 42 m, ahead to the left",
+  until one is within 3 blocks of it or it's gone (`base_api::GRAVE`, synced to its owner).
+- The corpse run (Valheim's): for 3 minutes after respawning, or until the tombstone is reached,
+  no creature hurts one and monsters don't come for one (`vitals::difficulty::GRACE_SECS`); the
+  line says how long is left. Falls, fire, cold and poison still hurt.
+- With the respawn kit (plain clothes, the arrival meal, full stamina: steps 13 and 11).
+- Not yet: a beam or marker in the world at the tombstone (needs the engine), the tombstone
+  crumbling after a while.

@@ -29,3 +29,9 @@ pub const ALL: [Difficulty; 3] = [GENTLE, NORMAL, HARSH];
 pub fn named(name: &str) -> Difficulty {
     ALL.into_iter().find(|d| d.name == name).unwrap_or(NORMAL)
 }
+
+/// Seconds after respawning that monsters leave a player be, or until they reach their tombstone
+/// (Valheim's corpse run; Research round 4 and the first-hour report).
+pub const GRACE_SECS: f32 = 180.0;
+/// Blocks from the tombstone that count as reaching it.
+pub const GRAVE_REACHED: f64 = 3.0;
