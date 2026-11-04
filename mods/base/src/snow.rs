@@ -5,11 +5,13 @@
 //! the cover (`air::SNOW_SAMPLES`, `air::SNOW_REACH`), and each layer block steps down on its own
 //! while there is less snow than it and the air is above freezing (`air::SNOW_MELT_SECS`, `air::melt_chance`: a growth step, so land away from
 //! players melts too and catches up when it loads). Far land shows the cover in the shader
-//! pack's dusting (`snow_on`). The cover is blended over the biomes round a column (`cover_at`).
+//! pack's dusting (`snow_on`). Still water freezes the same way (`air::freeze_chance`): its open top
+//! turns to ice in the cold, and ice on water thaws in the warmth. The cover is blended over the biomes round a column (`cover_at`).
 
 use vitals::air;
 use weft_sdk::*;
 
+use crate::blocks::{ICE, WATER};
 use crate::weather;
 
 pub static SNOW_LAYER: Block = Block::named("snow_layer");
@@ -43,6 +45,28 @@ pub fn register(r: &mut Registry) {
             }
         });
     r.world_tick(tick);
+}
+
+/// Whether a visit freezes the open water at `pos`: by the cold of the air there (`air::freeze_chance`).
+fn freezes(w: &World, pos: [i32; 3]) -> bool {
+    let here = base_api::air_at(w, [pos[0] as f64 + 0.5, pos[1] as f64, pos[2] as f64 + 0.5], 0.2, false, 0, |_| {});
+    (w.random_below(1 << 16) as f32) < air::freeze_chance(here.celsius) * (1 << 16) as f32
+}
+
+/// Whether the block at `pos` lies on water: a skin of ice, which may thaw (not ice set on land).
+fn on_water(w: &World, pos: [i32; 3]) -> bool {
+    w.get_loaded([pos[0], pos[1] - 1, pos[2]])
+        .is_some_and(|s| WATER.is(s))
+}
+
+/// A growth step of ice (`blocks.rs`, `air::ICE_THAW_SECS`): a skin on water thaws in the warmth,
+/// also away from players.
+pub fn ice_step(e: &mut BlockEvent) {
+    let w = e.world();
+    let pos = e.pos();
+    if on_water(&w, pos) && melts(&w, pos) {
+        w.set(pos, WATER.id());
+    }
 }
 
 /// Whether a melt step takes a layer of the snow at `pos`: by the warmth of the air there
@@ -106,6 +130,17 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     }
     let Some((pos, state)) = top else { return };
     let above = [x, pos[1] + 1, z];
+    // Open still water freezes in the cold; a skin of ice on water thaws in the warmth.
+    if state == WATER.id() {
+        if w.sky_light(above) >= 15 && freezes(w, pos) {
+            w.set(pos, ICE.id());
+        }
+        return;
+    }
+    if ICE.is(state) && on_water(w, pos) && melts(w, pos) {
+        w.set(pos, WATER.id());
+        return;
+    }
     let Some(snow) = cover_at(w, above) else { return };
     let want = air::snow_layers(snow);
     if SNOW_LAYER.is(state) {
@@ -121,7 +156,8 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
         return;
     }
     let flags = state_flags(state);
-    let ground = |state: u32| state_flags(state) & abi::block_flags::OPAQUE != 0 || LEAVES.on_block(state);
+    // Snow lies on the ground, on leaves and on ice.
+    let ground = |state: u32| state_flags(state) & abi::block_flags::OPAQUE != 0 || LEAVES.on_block(state) || ICE.is(state);
     if ground(state) {
         // Open sky over it: snow falls there.
         if w.sky_light(above) >= 15 {

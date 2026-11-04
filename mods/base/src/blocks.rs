@@ -557,6 +557,9 @@ pub fn register(r: &mut Registry) {
         .mineable("pickaxe")
         // Itself with a pickaxe (Research round 3, U1: it's the only blue dye).
         .needs_tool(0)
+        // A skin of it on water thaws in the warmth (`snow::ice_step`, `vitals::air`).
+        .growth(vitals::air::ICE_THAW_SECS, 0)
+        .on_grow(crate::snow::ice_step)
         .tab(&crate::tabs::NATURAL);
     // Packed by its own weight: opaque, slippery like ice, mined with a pickaxe.
     r.block(&GLACIER_ICE)
