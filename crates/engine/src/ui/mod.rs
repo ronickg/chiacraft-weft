@@ -783,9 +783,15 @@ impl Ui {
         // made for it: 2 px of frame above, 3 below).
         let unit = self.text_unit;
         let down = |v: f32| if unit > 0.0 { (v / unit + 1e-4).floor() * unit } else { v };
+        // A button's label taller than the room inside its padding (a small button with the
+        // default padding) still centres, sticking out of the padding evenly: clamping its
+        // overflow to nothing put the label on the top padding, 4 UI px low in an 11 px button
+        // (the label check, 11-04). Other containers keep their overflow at the end.
+        let overflow_centres = matches!(self.nodes[id].kind, Kind::Button { .. });
+        let free_c = if overflow_centres { free } else { free.max(0.0) };
         let (mut pos, spacing) = match style.justify {
             Justify::Start => (-scrolled, style.gap),
-            Justify::Center => (down(free.max(0.0) / 2.0), style.gap),
+            Justify::Center => (down(free_c / 2.0), style.gap),
             // Overflowing content sticks out at the start, the end edge stays put. Scrolling goes
             // from there.
             Justify::End => (free - past_end, style.gap),

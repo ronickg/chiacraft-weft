@@ -139,6 +139,15 @@ toward the UI's own colours (`notes/STYLE.md`).
 - **Thin plants go muddy at 32 px** (the first cattail almost vanished, the mushroom's spots
   blurred): give them a clear silhouette, a size in px, and few parts. If one still reads
   badly, ask for "a 1-px outline in a darker shade of its own colour".
+- **Not too dark for the game's grade** (Ronald, 11-04, on the grade review: "Yes, all four",
+  "Yes, both"). Dev's colour grade is darker, toned toward Bliss, and dark tiles read as black holes
+  in it (slate as gaps at a distance, termite mounds, podzol, spruce and sequoia trunks). Keep a
+  tile's own mean luminance (0.2126 R + 0.7152 G + 0.0722 B, 0..1) at about **0.24 or more**, the
+  darkest bark, and stone-family tiles (slate, granite, cobble kin) **near stone's 0.4-0.5**. Very
+  saturated tiles (above about 0.6) read hot in the grade; keep them nearer 0.5. Measure every new
+  tile before showing it, and fix one in code from its drawing with `notes/blocks/regrade.py
+  <in> <out> <gamma> <saturation> [r,g,b pull] [amount]` (gamma below 1 lifts the shadows most), so
+  the approved drawing stays. Obsidian and coal are dark on purpose.
 - **Blades finer than a game pixel break into dots** when cut (the first two-block grass's upper
   half, 11-04): ask for "each blade 2 px wide (never 1 px), solid shapes that read at 32 px".
 - **Check a name is free in `tiles/` before a batch**: a new `fern` overwrote the approved

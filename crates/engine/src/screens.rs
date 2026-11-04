@@ -619,7 +619,10 @@ impl Screen for SettingsScreen {
                     pad: [8.0; 4],
                     gap: 6.0,
                     align: abi::ui_align::STRETCH,
-                    width: 320.0,
+                    // Its rows are 300 wide (two of 147 and a gap of 6): 300 + its padding (16) and
+                    // the scrollbar's room (14) keep them whole; at 320 they ran under the
+                    // scrollbar and past the left edge (the label check, 11-04).
+                    width: 334.0,
                     height: 0.0,
                     grow: 1.0,
                     min: [0.0, 40.0],

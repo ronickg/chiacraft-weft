@@ -91,7 +91,8 @@ def button_set(prefix, kind):
             key = "disabled"
         light, face, shade = k.FACES[key]
         a = raised_part(64, 20, light, face, shade, k.GLOW if state == "hover" else k.OUTLINE, state == "pressed")
-        save(prefix + suffix, a, [NINE, border(3)])
+        # A chosen button (a list's selected row) is drawn pressed, sunk 1 px: its label goes too.
+        save(prefix + suffix, a, [NINE, border(3)] + ([("selected_offset", "0.5")] if suffix == "" else []))
 
 
 button_set("button", "main")
@@ -112,12 +113,13 @@ for prefix, w, h in (("category", 32, 24), ("list_row", 64, 24)):
         else:
             light, face, shade = k.FACES["second" if state == "normal" else "second_hover"]
         a = raised_part(w, h, light, face, shade, k.GLOW if state == "hover" else k.OUTLINE, state == "pressed")
-        save(prefix + suffix, a, [NINE, border(3)])
+        # The chosen one is drawn pressed (sunk 1 px): its label goes down with it.
+        save(prefix + suffix, a, [NINE, border(3)] + ([("selected_offset", "0.5")] if suffix == "" else []))
 
 # ---------------------------------------------------------------- tabs
 # A tab stands on the window's frame (the window draws over its bottom 4 px), so it has no bottom
 # edge of its own; the active one is the frame's bronze, the others darker.
-TAB_FACES = {"": ((110, 72, 46), (78, 50, 32), (58, 36, 24)), "_hover": ((140, 96, 62), (98, 64, 40), (66, 42, 28)),
+TAB_FACES = {"": k.FACES["second"], "_hover": k.FACES["second_hover"],
              "_pressed": (k.BRONZE_HI, k.BRONZE, k.BRONZE_D), "_disabled": k.FACES["disabled"]}
 for suffix, (light, face, shade) in TAB_FACES.items():
     w, h = 48, 26
