@@ -37,6 +37,9 @@ erase what they earned.
      128 x 64 armour or clothes layer on a 64 x 32 skin then maps over all of it, as Minecraft's
      armour does in 32x packs; one at the layout's width reads as before. One general line and a
      test (branch `claude/clothes-worn`).
+   - To offer: room for more worn layers (`client/models.rs`, `MAX_LAYERS` 8 to 12). Armour's
+     four, clothes' four and a cloak are nine over the skin, and past 8 the rest were dropped
+     silently (the cloak never drew). One constant (branch `claude/cloaks`).
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 
