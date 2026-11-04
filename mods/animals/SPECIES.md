@@ -94,15 +94,15 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 
 | Biome | Plant food (spring, summer, autumn, winter) | Grazing (best season) | Plant eaters | Hunters | Carrion |
 |---|---|---|---|---|---|
-| base:plains | 40%, 53%, 46%, 40% | summer: eaten 5% of the regrowth | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, herring_gull, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, herring_gull, grey_wolf |
+| base:plains | 40%, 86%, 46%, 40% | summer: eaten 5% of the regrowth | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, herring_gull, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, herring_gull, grey_wolf |
 | base:forest | 40%, 73%, 41%, 40% | summer: eaten 9% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer, red_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:birch_forest | 40%, 62%, 40%, 40% | summer: eaten 13% of the regrowth | mountain_hare, field_vole, red_deer | dog (chihuahua), cat, red_fox, raven, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, golden_eagle, grey_wolf |
-| base:taiga | 40%, 62%, 40%, 40% | summer: eaten 20% of the regrowth | mountain_hare, field_vole, reindeer, snow_bunting | cat, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | cat, brown_trout, red_fox, arctic_fox, raven, golden_eagle, grey_wolf |
-| base:snowy_plains | 40%, 40%, 40%, 40% | - | mountain_hare, field_vole, reindeer, snow_bunting | arctic_fox, raven, snowy_owl, golden_eagle, grey_wolf | arctic_fox, raven, golden_eagle, grey_wolf |
-| base:desert | 40%, 40%, 40%, 40% | - | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, jaguar | dog (chihuahua), cat, red_fox, raven, coyote, golden_eagle, turkey_vulture |
-| base:savanna | 43%, 82%, 75%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman, jaguar | dog (chihuahua), cat, turkey_vulture |
-| base:swamp | 40%, 59%, 45%, 40% | summer: eaten 8% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
-| base:mountains | 40%, 70%, 40%, 40% | summer: eaten 27% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
+| base:taiga | 40%, 93%, 40%, 40% | summer: eaten 20% of the regrowth | mountain_hare, field_vole, reindeer, snow_bunting | cat, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | cat, brown_trout, red_fox, arctic_fox, raven, golden_eagle, grey_wolf |
+| base:snowy_plains | 40%, 62%, 40%, 40% | - | mountain_hare, field_vole, reindeer, snow_bunting | arctic_fox, raven, snowy_owl, golden_eagle, grey_wolf | arctic_fox, raven, golden_eagle, grey_wolf |
+| base:desert | 40%, 78%, 55%, 40% | - | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, jaguar | dog (chihuahua), cat, red_fox, raven, coyote, golden_eagle, turkey_vulture |
+| base:savanna | 43%, 100%, 100%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman, jaguar | dog (chihuahua), cat, turkey_vulture |
+| base:swamp | 40%, 100%, 96%, 40% | summer: eaten 8% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
+| base:mountains | 60%, 95%, 76%, 40% | summer: eaten 27% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:beach | 40%, 40%, 50%, 40% | - | hare, wood_mouse, house_sparrow | red_fox, raven, herring_gull | red_fox, raven, herring_gull |
 | animals:red_dunes | 40%, 40%, 40%, 40% | - | protoceratops | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
 | animals:scrubland | 40%, 43%, 40%, 40% | - | protoceratops | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
@@ -120,6 +120,7 @@ What the webs still lack, and what the plan fills it with (`web::WAITING`):
 - wyvern: no Fish: the Cretaceous's fish, lungfish and Lycoptera (tier 3)
 - wyvern: no prey in animals:crags: the ankylosaur (the Cretaceous's tier 2)
 - red_deer: no predator: a wolf pack taking big prey together (`hunt.rs`): a lone wolf takes up to three times its mass
+- house_sparrow: nothing to eat in base:savanna in winter: **not planned**
 - herring_gull: no prey in base:ocean: the open sea's web: its fish (later; the gull hunts on the beach meanwhile)
 - animals:floodplain: no plant eaters: the iguanodont, the ankylosaur and the sauropod (the Cretaceous's tier 2)
 - animals:fern_forest: no plant eaters: Psittacosaurus and the iguanodont (the Cretaceous's tier 2)
@@ -670,7 +671,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | grass 40%, leaves 55%, lichen 5% |
 | a meal that fills it | 0.3 kg |
 | drinks | 30% of its 0.266 L a day; a drink lasts 56 min, thirsty after 28 |
-| its food grows at home (spring/summer/autumn/winter) | taiga 40/62/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/40/40/40%, mountains 40/70/40/40% |
+| its food grows at home (spring/summer/autumn/winter) | taiga 40/80/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/62/40/40%, mountains 60/95/76/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `base:wheat` 8; `base:wheat_seeds` 2; `base:apple` 10, favorite; `base:berries` 6, favorite |
@@ -733,7 +734,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | seeds 45%, insects 20%, fruit 15%, grass 10%, fungi 5%, roots 5% |
 | a meal that fills it | 0.002 kg |
 | drinks | 20% of its 0.003 L a day; a drink lasts 52 min, thirsty after 26 |
-| its food grows at home (spring/summer/autumn/winter) | plains 40/53/46/40%, forest 40/73/41/40%, desert 40/40/40/40%, savanna 43/82/75/40%, beach 40/40/50/40% |
+| its food grows at home (spring/summer/autumn/winter) | plains 40/86/46/40%, forest 40/73/41/40%, desert 40/78/55/40%, savanna 43/100/100/40%, beach 40/40/50/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 4; `base:wheat` 6; `base:berries` 4, favorite |
@@ -796,7 +797,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | grass 60%, leaves 15%, roots 15%, seeds 5%, insects 5% |
 | a meal that fills it | 0.004 kg |
 | drinks | 10% of its 0.005 L a day; a drink lasts 108 min, thirsty after 54 |
-| its food grows at home (spring/summer/autumn/winter) | taiga 40/62/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/40/40/40%, mountains 40/70/40/40%, swamp 40/59/45/40% |
+| its food grows at home (spring/summer/autumn/winter) | taiga 40/65/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/50/40/40%, mountains 40/70/40/40%, swamp 40/100/96/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 5 blocks (twice that running) |
 | eats (food points) | `base:wheat` 6; `base:wheat_seeds` 3; `base:apple` 6, favorite |
@@ -859,7 +860,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | leaves 50%, grass 20%, fruit 15%, seeds 10%, fungi 5% |
 | a meal that fills it | 7 kg |
 | drinks | 70% of its 4.531 L a day; a drink lasts 33 min, thirsty after 17 |
-| its food grows at home (spring/summer/autumn/winter) | plains 40/53/46/40%, savanna 43/82/75/40%, desert 40/40/40/40%, forest 40/73/41/40%, swamp 40/59/45/40% |
+| its food grows at home (spring/summer/autumn/winter) | plains 40/86/46/40%, savanna 43/100/100/40%, desert 40/78/55/40%, forest 40/73/41/40%, swamp 40/100/96/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 16 blocks (twice that running) |
 | eats (food points) | `base:wheat` 8; `base:apple` 12, favorite; `base:berries` 6, favorite |
@@ -920,7 +921,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | eats | grass 50%, leaves 40%, fruit 5%, seeds 5% |
 | a meal that fills it | 16 kg |
 | drinks | 80% of its 9.535 L a day; a drink lasts 31 min, thirsty after 16 |
-| its food grows at home (spring/summer/autumn/winter) | forest 40/73/41/40%, birch_forest 40/62/40/40%, mountains 40/70/40/40% |
+| its food grows at home (spring/summer/autumn/winter) | forest 40/73/41/40%, birch_forest 40/62/40/40%, mountains 40/78/74/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 20 blocks (twice that running) |
 | eats (food points) | `base:wheat` 10; `base:apple` 12, favorite |
@@ -1475,7 +1476,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | lichen 40%, grass 35%, leaves 20%, fungi 5% |
 | a meal that fills it | 12 kg |
 | drinks | 100% of its 7.36 L a day; a drink lasts 24 min, thirsty after 12 |
-| its food grows at home (spring/summer/autumn/winter) | snowy_plains 40/40/40/40%, taiga 40/62/40/40%, mountains 40/70/40/40% |
+| its food grows at home (spring/summer/autumn/winter) | snowy_plains 40/62/40/40%, taiga 40/80/40/40%, mountains 60/95/76/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 18 blocks (twice that running) |
 | eats (food points) | `base:wheat` 10; `base:berries` 6, favorite; `base:apple` 12, favorite |
@@ -1601,7 +1602,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | seeds 60%, insects 30%, fruit 10% |
 | a meal that fills it | 0.003 kg |
 | drinks | 100% of its 0.004 L a day; a drink lasts 11 min, thirsty after 5 |
-| its food grows at home (spring/summer/autumn/winter) | plains 40/50/40/40%, savanna 40/48/63/19%, desert 40/40/40/40%, beach 40/40/43/40%, forest 40/57/40/40%, swamp 40/40/44/40% |
+| its food grows at home (spring/summer/autumn/winter) | plains 40/86/45/40%, savanna 40/100/100/0%, desert 40/78/55/40%, beach 40/40/43/40%, forest 40/73/40/40%, swamp 40/100/96/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 2; `base:berries` 3, favorite |
@@ -1662,7 +1663,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | eats | seeds 40%, insects 30%, grass 15%, leaves 10%, fruit 5% |
 | a meal that fills it | 0.004 kg |
 | drinks | 100% of its 0.005 L a day; a drink lasts 11 min, thirsty after 5 |
-| its food grows at home (spring/summer/autumn/winter) | snowy_plains 40/40/40/40%, mountains 40/70/40/40%, taiga 40/62/40/40% |
+| its food grows at home (spring/summer/autumn/winter) | snowy_plains 40/50/40/40%, mountains 40/78/74/40%, taiga 40/93/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 8 blocks (twice that running) |
 | eats (food points) | `base:wheat_seeds` 2; `base:berries` 3, favorite |
