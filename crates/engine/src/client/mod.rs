@@ -2416,6 +2416,8 @@ impl Client {
             self.eye_liquid().is_some(),
             self.rain,
             self.thunder,
+            self.wind,
+            self.frame_dt,
             &overlays,
         );
         self.render.draw_translucent(&mut late);

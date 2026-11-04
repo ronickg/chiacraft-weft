@@ -107,9 +107,20 @@ fn vs_clouds(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -
     return out;
 }
 
+// A cell of the layer is cloud where the picture says, and as rain comes in more of the gaps fill
+// (`axes[0]` x, the engine's cover), until a storm's deck (z) closes nearly all of them.
 fn cloud_at(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> bool {
     let at = fract((cell + s.uv.zw + vec2(0.5)) / dims);
-    return textureSampleLevel(textures[s.ids.x], nearest_clamp, at, 0.0).a >= 0.5;
+    if textureSampleLevel(textures[s.ids.x], nearest_clamp, at, 0.0).a >= 0.5 {
+        return true;
+    }
+    let fill = s.axes[0].x * 0.75 + s.axes[0].z * 0.3;
+    if fill <= 0.0 {
+        return false;
+    }
+    let w = cell + s.uv.zw;
+    let n = noise3(vec3(w.x * 0.21, 3.7, w.y * 0.21)) * 0.65 + noise3(vec3(w.x * 0.53, 9.1, w.y * 0.53)) * 0.35;
+    return n > 1.0 - fill;
 }
 
 @fragment
@@ -186,7 +197,9 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         let albedo = s.color.rgb / max(dimmed, vec3(0.005));
         let ndl = max(dot(n, light_dir()), 0.0);
         // Undersides take the horizon's color, so they go rose at sunset.
-        let below = mix(p.ambient * 1.6, p.horizon * 0.9 + p.ambient * 0.6, select(0.0, 1.0, n.y < 0.0));
+        var below = mix(p.ambient * 1.6, p.horizon * 0.9 + p.ambient * 0.6, select(0.0, 1.0, n.y < 0.0));
+        // Rain clouds are dark underneath (`axes[0]` y), their sides a little too.
+        below *= mix(1.0, select(0.6, 0.35, n.y < 0.0), s.axes[0].y);
         var lit = below * (0.85 + 0.15 * n.y) + p.sun * light_strength() * ndl * 0.95;
         // Toward the sun they glow, and the rim facing it shines.
         let mu = max(dot(dir, scene.sun.xyz), 0.0);
