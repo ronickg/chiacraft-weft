@@ -36,10 +36,13 @@ spread = 48
 
 [groups.leaves]
 match = ["leaves_*"]
-# Waits for Lighting's Colour 8 (Ronald: leaves and grass "After the grade").
+# Under Colour 9 sunlit foliage measured luma median 143 (target 125-170), its brightest tenth 170-181:
+# a small step down (Ronald, 11-04: "Tints -15% + small step"; the -15% is the biome tints', in Plants).
+gain = 0.94
 
 [groups.grass]
 match = ["grass_top", "tallgrass", "tall_grass_*", "sword_fern", "bracken"]
+gain = 0.94  # with the leaves (Ronald, 11-04: "Tints -15% + small step")
 
 [groups.sand]
 match = ["sand", "red_sand", "*sandstone_*", "sandstone_*"]
