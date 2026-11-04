@@ -366,6 +366,9 @@ pub const KARST_WIDE_HEIGHT: (i32, i32) = (22, 38);
 /// slit widens a block where nothing stands on the ground.
 pub const MOUTH_MIN: usize = 3;
 pub const MOUTH_LIP: i32 = 2;
+/// The lip's outer ring is rock in patches, this share of its columns (the first look: a full
+/// ring read as paving on the grass).
+pub const MOUTH_LIP_PATCHES: f64 = 0.4;
 
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is

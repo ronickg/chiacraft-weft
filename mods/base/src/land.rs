@@ -350,6 +350,11 @@ fn cave_mouths(g: &mut Gen) {
                 continue;
             };
             let (wx, wz) = (ox + x, oz + z);
+            if near == l::MOUTH_LIP
+                && (noise::fixed::hash(noise::fixed::seed32(seed, 0x30C7), wx, 0, wz) & 4095) >= (l::MOUTH_LIP_PATCHES * 4096.0) as u32
+            {
+                continue;
+            }
             let h = height(g, wx, wz);
             let col = cols[(z * 16 + x) as usize];
             let set = rocks(g, wx, wz, h, g.surface_block(wx, wz));
