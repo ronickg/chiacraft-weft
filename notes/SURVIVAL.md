@@ -454,13 +454,17 @@ sword, about 100 XP.
 
 - Four slots of their own under armor, beside it in the inventory: hat, coat, trousers, boots.
   No armor value; armor keeps its insulation. Fur's row left armor's table for clothing's.
-- Four materials from real insulation (clo, ISO 9920; arctic fur suits) at 6 °C of comfort a
-  clo, a piece its share of the set (head 0.15, body 0.4, legs 0.3, feet 0.15): fur 3.5 clo
-  (21 °C, -8 in the heat), wool 1.8 (11, -3), hide 1.2 (7, -1), linen 0.5 (3, +4: cooler than bare
-  skin in the sun).
-- Wet keeps a share by material (wool 60%, hide 70%, fur 50%, linen 10%, armor 35%), on top of
+- Four sets of the content plan's research (`reports/content/Clothing and armor.md`, section E,
+  branch `claude/content-plan-d6bc49`), at 12 °C of comfort a clo walking (ISO 11079), a piece
+  its share of the set (head 0.15, body 0.4, legs 0.3, feet 0.15): fur, a single caribou suit,
+  2.5 clo (30 °C, -9 in the heat), wool 1.2 (14, -2), hide (buckskin) 0.8 (10, -1), linen 0.5
+  (6, +4: with its hat cooler than bare skin in the sun). The research's other sets (double
+  caribou for the Arctic winter, sheepskin, loden, a desert robe, sealskin) and a cloak slot are
+  rows and a slot to add.
+- Wet keeps a share by material (wool 60%, fur and hide 30%, linen 20%, armor 35%), on top of
   being wet feeling 6 °C colder. Windproof clothes stop a share of the wind chill (fur 80%, hide
-  70%, wool 30%, linen 10%): `air_at` gives the air with and without the wind.
+  70%, wool 30%, linen 10%): `air_at` gives the air with and without the wind. Leather armor's
+  heat had the wrong sign (+3, now -3).
 - Materials: fur from wild furred animals (hares and foxes one, wolves and coyotes up to two,
   reindeer and jaguars up to three: `animals_core::hides`), leather from cows and deer, sheep's
   wool, and linen from string, which plant fibre from cutting tall grass (1 in 8) spins into.

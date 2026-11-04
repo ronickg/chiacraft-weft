@@ -154,12 +154,13 @@ pub fn feeling(core: f32) -> Feeling {
     }
 }
 
-/// Cold and heat insulation of a full set of armor of that material (proposed): leather warm,
-/// metal cold to wear in snow and hot in the sun. A piece gives its share (`PIECE_SHARE`). Fur,
+/// Cold and heat insulation of a full set of armor of that material (proposed): leather warm and a
+/// little hot (heat -3: the sign was wrong, the content plan's research), metal cold to wear in
+/// snow and hot in the sun. A piece gives its share (`PIECE_SHARE`). Fur,
 /// wool, hide and linen are clothes (`clothing`), worn under armor.
 pub fn set_insulation(material: &str) -> (f32, f32) {
     match material {
-        "leather" => (8.0, 3.0),
+        "leather" => (8.0, -3.0),
         "iron" | "chainmail" => (4.0, -4.0),
         "gold" => (3.0, -5.0),
         "diamond" => (5.0, -2.0),

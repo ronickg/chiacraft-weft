@@ -63,14 +63,14 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 
 ## Clothing
 
-Worn in four slots of their own under armor (hat, coat, trousers, boots), no armor value. A full set's real insulation in clo at 6 °C of comfort each; a piece gives its share ([0.15, 0.4, 0.3, 0.15], head to feet). Wet, armor keeps 35% of its warmth; being wet itself feels 6 °C colder. What each piece takes: hat 2 + 1 string, coat 4 + 2 string, trousers 3 + 1 string, boots 2 + 1 string.
+Worn in four slots of their own under armor (hat, coat, trousers, boots), no armor value. A full set's real insulation in clo at 12 °C of comfort each; a piece gives its share ([0.15, 0.4, 0.3, 0.15], head to feet). Wet, armor keeps 35% of its warmth; being wet itself feels 6 °C colder. What each piece takes: hat 2 + 1 string, coat 4 + 2 string, trousers 3 + 1 string, boots 2 + 1 string.
 
 | material | clo | cold °C | heat °C | kept wet | windproof | from |
 |---|---|---|---|---|---|---|
-| fur | 3.5 | 21 | -8 | 50% | 80% | pelts of furred wild animals |
-| wool | 1.8 | 11 | -3 | 60% | 30% | sheep's wool |
-| hide | 1.2 | 7 | -1 | 70% | 70% | leather |
-| linen | 0.5 | 3 | 4 | 10% | 10% | plant fibre spun and woven |
+| fur | 2.5 | 30 | -9 | 30% | 80% | pelts of furred wild animals |
+| wool | 1.2 | 14 | -2 | 60% | 30% | sheep's wool |
+| hide | 0.8 | 10 | -1 | 30% | 70% | leather |
+| linen | 0.5 | 6 | 4 | 20% | 10% | plant fibre spun and woven |
 
 ## Effects
 
