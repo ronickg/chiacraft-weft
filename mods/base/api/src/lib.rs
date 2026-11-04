@@ -552,6 +552,23 @@ fn with_body(w: &World, player: u64, f: impl FnOnce(&mut Vitals, f32)) {
     f(v, resist);
 }
 
+/// Server to client: a hint from any mod (`hint`), as its lang key and number arguments, tab
+/// separated.
+pub static HINT_TEXT: weft_sdk::Channel<String> = weft_sdk::Channel::named("base:hint_text");
+
+/// Shows `player` a hint: the line under the crosshair the base game's hints use (`hints.rs`), a
+/// few seconds, one at a time, off when the player's `base:hints` setting is. `key` is a lang key
+/// of any mod (`hint.animals.tamed`), `args` fill its `{0}`, `{1}`... The caller decides how often
+/// (the base game's own show once per player).
+pub fn hint(w: &World, player: u64, key: &str, args: &[i64]) {
+    let mut text = key.to_string();
+    for a in args {
+        text.push('\t');
+        text.push_str(&a.to_string());
+    }
+    w.send(player, &HINT_TEXT, &text);
+}
+
 /// Things a player has done that other mods know of and the base game's advancements read
 /// (`advancements.rs`, the "Surviving" group): a bit each (`milestones`), kept through death.
 pub static MILESTONES: Component<u32> = Component::named("base:milestones");
