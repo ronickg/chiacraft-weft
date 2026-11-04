@@ -602,3 +602,12 @@ logged in `notes/crew/OVERNIGHT.md`):
   that is the engine's (`saves.rs`).
 - Gentle's grace: in a new world's first three nights no monsters appear by themselves
   (`Difficulty::grace_nights`, counted from the world's first day; normal and harsh 0).
+
+**17. Food stacks** (2026-11-04 overnight, Tester's spring run; logged in `notes/crew/OVERNIGHT.md`):
+
+- Picked or crafted food came in unstamped, was stamped a moment later in a slot of its own, and
+  never stacked (three cattail roots in three slots). Now food stacks that differ only in their
+  day stamp and are at the same freshness stage merge into the earlier slot, keeping the older day
+  (TerraFirmaCraft's way: never fresher by merging; `survival::food::merge_food`). Hot food stays
+  apart until it cools; stews don't stack.
+
