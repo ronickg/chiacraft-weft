@@ -408,7 +408,11 @@ impl Particles {
             let through = k.flags & pf::COLLIDE != 0 && crate::physics::collides(c, &|p| world.block_or_air(p), particle_box(at));
             // Born in a liquid is no going into one.
             let middle = (at + DVec3::Y * 0.1).floor().as_ivec3();
-            let in_liquid = c.states[world.block(middle) as usize].liquid.is_some();
+            // Where no cube has come yet (just after a teleport) the block is `u32::MAX`: no liquid.
+            let in_liquid = c
+                .states
+                .get(world.block(middle) as usize)
+                .is_some_and(|s| s.liquid.is_some());
             let slot = start + ((head + i as u64) % capacity) as u32;
             self.spawned
                 .push(Spawned { slot, through, in_liquid, pos: at, vel, life, size, kind: b.kind as u16, layer, piece, tint });
