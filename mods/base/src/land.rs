@@ -92,6 +92,7 @@ pub fn terrain(r: &mut Registry) {
     r.decorate(cave_mouths).dimension(&crate::OVERWORLD);
     r.decorate(fray_borders).dimension(&crate::OVERWORLD);
     r.decorate(landmarks).dimension(&crate::OVERWORLD);
+    r.decorate(tropical_water).dimension(&crate::OVERWORLD);
 }
 
 static WET: Tag = Tag::named("wet");
@@ -420,6 +421,45 @@ fn landmarks(g: &mut Gen) {
                 // The front: flowing, amount 7; under it falling.
                 let state = if wy == sy { water + 1 } else { water + 8 };
                 g.set((fx - ox) as usize, (wy - oy) as usize, (fz - oz) as usize, state);
+            }
+        }
+    }
+}
+
+/// The tropical forest's still water (`base_api::land::tropical_water`): flooded forest by the
+/// rivers and winding igarapés on the low floor, at the sea's level so it stays put. The ground
+/// over that level goes where nothing stands on it (a trunk keeps its ground: the trees stand on
+/// mounds in the water; the block over the ground must be in the same cube to be seen); the
+/// block at the sea's level and one under it where deep are water whatever stands on them (under
+/// kept ground it is a closed pocket). Before the plants.
+fn tropical_water(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let tropical = crate::worldgen::TROPICAL_FOREST.id();
+    let [ox, oy, oz] = g.origin();
+    if !cols.iter().any(|c| c.biome == tropical) || oy > SEA + l::IGAPO_RISE.max(l::IGARAPE_RISE) || oy + 15 < SEA - 1 {
+        return;
+    }
+    let f = l::fields(g.seed());
+    for z in 0..16i32 {
+        for x in 0..16i32 {
+            let col = cols[(z * 16 + x) as usize];
+            let h = col.height;
+            if col.biome != tropical {
+                continue;
+            }
+            let (wx, wz) = (ox + x, oz + z);
+            let Some(depth) = l::tropical_water(&f, wx, wz, h) else { continue };
+            let (xu, zu) = (x as usize, z as usize);
+            // The ground over the sea's level, unless something stands on it.
+            if h > SEA && h >= oy && h < oy + 15 && g.get(xu, (h + 1 - oy) as usize, zu) == 0 {
+                for wy in (SEA + 1).max(oy)..=h {
+                    g.set(xu, (wy - oy) as usize, zu, 0);
+                }
+            }
+            for wy in (SEA - depth + 1)..=SEA {
+                if (oy..oy + 16).contains(&wy) {
+                    g.set(xu, (wy - oy) as usize, zu, WATER.id());
+                }
             }
         }
     }

@@ -56,6 +56,9 @@ pub mod salt {
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
     pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const IGAPO: u64 = 0x16A;
+    pub const IGARAPE: u64 = 0x16B;
+    pub const IGARAPE_WARP: u64 = 0x16C;
     pub const ARCHES: u64 = 0xA2C;
     pub const FALLS: u64 = 0xFA11;
     pub const SINKS: u64 = 0x4A9;
@@ -423,6 +426,21 @@ pub const ARCH_DEPTH: (i32, i32) = (3, 5);
 pub const FALL_CELL: i32 = 256;
 pub const FALL_CHANCE: f64 = 0.3;
 pub const FALL_CLIFF: i32 = 8;
+
+/// The tropical forest's water (Ronald, 11-04: "A + C's giants + some B"; Plants' sheet): still
+/// water at the sea's level, the level the rivers and the sea hold, so it stays put: the ground
+/// over it is taken away and the block at the sea's level (and one under, where deep) is water.
+/// Flooded forest (igapó): on ground `IGAPO_RISE` or less over the sea, in patches `IGAPO_SIZE`
+/// blocks across where their noise is over `IGAPO_PATCHES` (more by a river's or a lake's bank,
+/// `bank`), a block deep and two in the patches' middles, the trees standing in it. Igarapés:
+/// narrow, winding creeks along a noise's zero line (`IGARAPE_SCALE` across, `IGARAPE_WIDTH`
+/// either side), a block deep, on ground `IGARAPE_RISE` or less over the sea.
+pub const IGAPO_RISE: i32 = 3;
+pub const IGAPO_SIZE: f64 = 36.0;
+pub const IGAPO_PATCHES: f64 = 0.0;
+pub const IGARAPE_SCALE: f64 = 140.0;
+pub const IGARAPE_WIDTH: f64 = 0.03;
+pub const IGARAPE_RISE: i32 = 4;
 
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
@@ -1248,6 +1266,32 @@ pub fn fray(f: &Fields, x: i32, z: i32, height: i32) -> Option<(&'static str, &'
     }
     let n = ONE / 2 + f.fbm(salt::FRAY, x, z, q4(FRAY_SIZE), 2) * 2;
     (n < (q12(FRAY_SHARE) * e.near) >> 12).then_some(theirs)
+}
+
+/// How deep under the sea's level the tropical forest's still water stands at column (`x`, `z`)
+/// (blocks), `h` high, if any (`IGAPO_*`, `IGARAPE_*`): 1 or 2. Whether its ground may go (nothing
+/// standing on it) is the decoration's to see.
+pub fn tropical_water(f: &Fields, x: i32, z: i32, h: i32) -> Option<i32> {
+    if h < SEA || h > SEA + IGAPO_RISE.max(IGARAPE_RISE) {
+        return None;
+    }
+    let (qx, qz) = (x * 16, z * 16);
+    if h <= SEA + IGAPO_RISE {
+        let wet = bank(f, qx, qz).map_or(0, |b| b.wet);
+        let n = f.fbm(salt::IGAPO, qx, qz, q4(IGAPO_SIZE), 3) + (wet >> 3);
+        if n > q12(IGAPO_PATCHES) {
+            return Some(if n > q12(IGAPO_PATCHES + 0.12) { 2 } else { 1 });
+        }
+    }
+    if h <= SEA + IGARAPE_RISE {
+        let w = q4(40.0);
+        let wx = qx + ((f.fbm(salt::IGARAPE_WARP, qx, qz, q4(90.0), 2) * w) >> 12);
+        let wz = qz + ((f.fbm(salt::IGARAPE_WARP + 1, qx, qz, q4(90.0), 2) * w) >> 12);
+        if f.fbm(salt::IGARAPE, wx, wz, q4(IGARAPE_SCALE), 2).abs() < q12(IGARAPE_WIDTH) {
+            return Some(1);
+        }
+    }
+    None
 }
 
 /// The snow line (blocks) at temperature `t` (Q12): the band's height from `SNOW_LINES`.
