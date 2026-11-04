@@ -207,18 +207,22 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     return vec4(fog(in, albedo.rgb * light), select(1.0, SOLID_ALPHA, in.graded != 0u));
 }
 
+// How much a crack darkens the face under it (0 none, 1 black).
+const CRACK_DARKEN: f32 = 0.6;
+
 @fragment
 fn fs_overlay(in: VOut) -> @location(0) vec4<f32> {
-    // Block faces mode: the breaking cracks, lit like the block.
+    // Block faces mode: the breaking cracks. They darken the block's own face, as vanilla's do
+    // (a multiply), rather than being painted over it: the crack pictures are near black at 0.9
+    // alpha, and drawn as they are, lit only by the light inside the block itself, each stage
+    // stamped a hard black maze on the face that read as glitchy (Ronald, 11-04). Their alpha
+    // still says where a crack is; the face shows through at under half its brightness there.
     if in.mode == BOX_MODE_FACES {
         let t = textureSample(textures[in.layer], nearest_mipped, in.uv);
         if t.a < 0.1 {
             discard;
         }
-        if in.graded != 0u {
-            return vec4(display(t.rgb * in.color.rgb), t.a);
-        }
-        return vec4(t.rgb * in.color.rgb, t.a);
+        return vec4(vec3(0.0), t.a * CRACK_DARKEN);
     }
     if in.mode == BOX_MODE_FILLED {
         return vec4(in.color.rgb, bitcast<f32>(in.layer));
