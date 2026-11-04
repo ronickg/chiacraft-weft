@@ -101,6 +101,8 @@ pub struct LodJob {
     pub live: Arc<AtomicBool>,
     /// What the server said of columns, taken over the terrain's where the tile samples them.
     pub columns: Arc<Columns>,
+    /// When it was asked for (`diag::LOD_AGE_NS`).
+    pub asked: std::time::Instant,
 }
 
 impl LodJob {
@@ -132,6 +134,7 @@ pub struct LodMesh {
     pub quads: Vec<[u32; 4]>,
     pub skip: u32,
     pub y: (i32, i32),
+    pub asked: std::time::Instant,
 }
 
 /// What came back for `job`, meshed on a worker.
@@ -143,6 +146,7 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
         if !job.live() {
             return;
         }
+        let start = std::time::Instant::now();
         if !job.columns.is_empty() {
             take_columns(&job, &mut words);
         }
@@ -152,9 +156,11 @@ pub fn made(job: LodJob, mut words: Vec<u32>) {
             let (quads, y) = mesh(content(), job.dim, job.seed, job.key, &words);
             (quads, 0, y)
         };
+        crate::diag::LOD_MESHED.add(1);
+        crate::diag::LOD_MESH_NS.add(start.elapsed().as_nanos() as u64);
         let _ = job
             .done
-            .send(LodMesh { dim: job.dim, seed: job.seed, key: job.key, quads, skip, y });
+            .send(LodMesh { dim: job.dim, seed: job.seed, key: job.key, quads, skip, y, asked: job.asked });
     });
 }
 
@@ -174,6 +180,16 @@ fn take_columns(job: &LodJob, words: &mut [u32]) {
             words[w + 3] = 0;
         }
     }
+}
+
+/// What a steep face shows (`Faces::block`, the dimension's mod), timed for `diag`.
+#[allow(clippy::too_many_arguments)]
+fn face_block(f: crate::server::terrain::Faces, seed: u64, dim: u32, pos: [i32; 3], height: i32, biome: u32, fall: i32, block: u32) -> u32 {
+    let start = std::time::Instant::now();
+    let b = f.block(seed, dim, pos, height, biome, fall, block);
+    crate::diag::LOD_FACES.add(1);
+    crate::diag::LOD_FACES_NS.add(start.elapsed().as_nanos() as u64);
+    b
 }
 
 /// Sample (i, j)'s ground (from -1 to 32): its height, top block, biome and the block under.
@@ -314,7 +330,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 continue;
             }
             let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
-            let shown = |wy: i32, before: u32| f.block(seed, dim, [x, wy, z], y, biome, fall, before);
+            let shown = |wy: i32, before: u32| face_block(f, seed, dim, [x, wy, z], y, biome, fall, before);
             tops[k] = shown(y, top);
             // The wall below the top block, to the skirt's depth at most.
             let bottom = low.min(y - 1) - 2 * s;
@@ -517,7 +533,7 @@ pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]
                 let fall = fall(high - low, s);
                 if fall >= f.fall {
                     let (x, z) = (o.x + i * s + s / 2, o.y + j * s + s / 2);
-                    top = f.block(seed, dim, [x, high, z], high, biome, fall, top);
+                    top = face_block(f, seed, dim, [x, high, z], high, biome, fall, top);
                 }
             }
             let (tex, tint) = face_of(top, 3);
@@ -580,6 +596,8 @@ pub struct Lod {
     columns_dim: u32,
     /// Made tiles to make again for columns that changed, shown as they are till then.
     stale: FxHashSet<TileKey>,
+    /// Since when some wanted tiles are not made, and the most missing since (`diag`).
+    missing_since: Option<(std::time::Instant, usize)>,
 }
 
 /// Columns the mask reaches past the view radius (cubes are kept that far).
@@ -608,6 +626,7 @@ impl Lod {
             columns: Arc::default(),
             columns_dim: u32::MAX,
             stale: FxHashSet::default(),
+            missing_since: None,
         }
     }
 
@@ -717,6 +736,7 @@ impl Lod {
             render.upload_lod(gpu, textures, m.key, &m.quads, m.skip, m.y);
             self.ready.insert(m.key);
             crate::diag::LOD_MADE.add(1);
+            crate::diag::LOD_AGE_NS.add(m.asked.elapsed().as_nanos() as u64);
         }
         if reach == 0 || self.custom.is_none() {
             render.lod_draw.clear();
@@ -737,6 +757,7 @@ impl Lod {
         let mut keep = FxHashSet::default();
         let mut made = Vec::new();
         let mut standing = FxHashSet::default();
+        let mut missing = 0;
         for &key in &self.wanted {
             keep.insert(key);
             if self.ready.contains(&key) {
@@ -748,6 +769,7 @@ impl Lod {
                 keep.extend(key.children());
                 continue;
             }
+            missing += 1;
             let mut a = key;
             while a.level < MAX_LEVEL {
                 a = a.parent();
@@ -767,6 +789,7 @@ impl Lod {
             }
             false
         };
+        self.count_missing(missing);
         let mut shown: FxHashSet<TileKey> = made.into_iter().filter(|&k| !under_standing(k)).collect();
         shown.extend(standing.iter().copied());
         // It is a shell over the land with nothing under it: from deep below, its walls would hang
@@ -812,6 +835,28 @@ impl Lod {
             on
         });
         self.request();
+    }
+
+    /// Keeps `diag`'s gauges, and says how long it took until every wanted tile was made again.
+    fn count_missing(&mut self, missing: usize) {
+        use std::sync::atomic::Ordering::Relaxed;
+        crate::diag::LOD_WANTED.store(self.wanted.len() as u64, Relaxed);
+        crate::diag::LOD_MISSING.store(missing as u64, Relaxed);
+        crate::diag::LOD_PENDING.store(self.pending.len() as u64, Relaxed);
+        match (&mut self.missing_since, missing) {
+            (None, 0) => {}
+            (None, n) => self.missing_since = Some((std::time::Instant::now(), n)),
+            (Some((_, most)), n) if n > 0 => *most = (*most).max(n),
+            (Some((since, most)), _) => {
+                log::debug!(
+                    target: "load",
+                    "distant terrain: every wanted tile made ({} of them), {:.1} s after some were missing (at most {most})",
+                    self.wanted.len(),
+                    since.elapsed().as_secs_f64()
+                );
+                self.missing_since = None;
+            }
+        }
     }
 
     /// Well under the land at the camera's column, so its sky can't be seen. Near the surface a cave
@@ -939,8 +984,9 @@ impl Lod {
             let live = Arc::new(AtomicBool::new(true));
             self.pending.insert(key, live.clone());
             let (dim, seed, done, jobs, columns) = (self.dim, self.seed, self.done.0.clone(), self.jobs.clone(), columns.clone());
+            let asked = std::time::Instant::now();
             if custom.is_empty() {
-                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live, columns });
+                let _ = jobs.send(LodJob { dim, seed, key, custom: Vec::new(), done, live, columns, asked });
                 continue;
             }
             let custom = custom.clone();
@@ -949,8 +995,11 @@ impl Lod {
                 if !live.load(Ordering::Relaxed) {
                     return;
                 }
+                let start = std::time::Instant::now();
                 let heights = custom_heights(c, dim, seed, key, &custom);
-                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live, columns });
+                crate::diag::LOD_HEIGHTS.add(1);
+                crate::diag::LOD_HEIGHTS_NS.add(start.elapsed().as_nanos() as u64);
+                let _ = jobs.send(LodJob { dim, seed, key, custom: heights, done, live, columns, asked });
             });
         }
         self.stale.retain(|k| self.ready.contains(k));
