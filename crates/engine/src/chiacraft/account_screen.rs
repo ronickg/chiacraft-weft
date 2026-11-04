@@ -52,6 +52,10 @@ impl Screen for Account {
                 return;
             };
             let info = s.fresh_info();
+            // The cards in a scrolling column and Back under it, always in view: the page was
+            // taller than a 1280 x 720 window, Restore cut off and nothing to leave by above the
+            // fold (Tester's audit, 11-04).
+            let cards = ui.container(Style::default().gap(10.0).w(372.0).h(0.0).grow().min_h(60.0).scroll(), |ui| {
             ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(360.0), |ui| {
                 label(ui, cx, "account.fingerprint", &[Arg::Int(info.fingerprint as i64)], "default");
                 label(ui, cx, "account.identity", &[Arg::Text(short(&info.identity))], "dim");
@@ -59,6 +63,10 @@ impl Screen for Account {
                 label(ui, cx, store, &[], "dim");
                 if !info.backed_up {
                     label(ui, cx, "account.backup_needed", &[], "default");
+                }
+                // In the account's card (it floated between two cards).
+                if !show_words {
+                    button(ui, cx, "account.show_words", &[], 200.0, |c| update(c, |a| a.show_words = true));
                 }
             });
 
@@ -149,8 +157,6 @@ impl Screen for Account {
                         });
                     }
                 });
-            } else {
-                button(ui, cx, "account.show_words", &[], 200.0, |c| update(c, |a| a.show_words = true));
             }
 
             ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(360.0), |ui| {
@@ -175,6 +181,8 @@ impl Screen for Account {
             if let Some((key, arg)) = &note {
                 label(ui, cx, key, &[Arg::Text(arg.clone())], "default");
             }
+            });
+            ui.set_id(cards, "account_cards");
             button(ui, cx, "menu.back", &[], 200.0, |c| c.requests.push(Request::Close));
         });
     }
