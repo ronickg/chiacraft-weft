@@ -8,11 +8,9 @@ wait 240
 screen core:admission
 tap_once core:admission id:world_did_get   # the world's DID, then her DID lists it
 wait 600
-mark finder-mark-need-coins           # the tester sends 0.0002 TXCH to her address file now
-await_file finder-mark-funded 1800
-wait 180                              # the payment confirmed and read
+wait 120                              # the change of that spend (the sponsor's gift less its fee) read
 screen core:admission
-tap_once core:admission id:list_world # the listing: 0.0001 TXCH locked in a coin hinted to the tag
+tap_once core:admission id:list_world # the listing: 0.000001 TXCH (this check's deposit) locked in a coin hinted to the tag
 wait 300
 shot finder-alice-1-listed.png
 mark finder-mark-listed

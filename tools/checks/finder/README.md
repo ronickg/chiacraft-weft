@@ -1,37 +1,27 @@
 # Finding worlds on testnet11: the two-copy check
 
 Phase 5, slices 1-2 (`notes/PLAN.md`, `reports/Finding worlds.md`), against the real testnet11
-chain and our sponsor. Alice gets a DID and a world DID (as in `tools/checks/did`), is paid a
-little test XCH by the tester, lists her world (a 0.0001 TXCH deposit, setting
-`core:listing_deposit`, testnet11 only), and bob finds it in Find Worlds (from Multiplayer)
-and joins it from there. Alice then delists it and gets the deposit back. 25-40 minutes;
-nothing here touches rendering or shaders; it needs the internet.
+chain and our sponsor. Alice gets a DID and a world DID (as in `tools/checks/did`), lists her
+world, and bob finds it in Find Worlds (from Multiplayer) and joins it from there. Alice then
+delists it and gets the deposit back. 20-35 minutes; nothing here touches rendering or shaders;
+it needs the internet. No one sends coins: the check pays for itself.
+
+The game's deposit is 0.0001 TXCH (`core:listing_deposit`), more than a fresh account has on
+purpose. This check sets it to 0.000001 TXCH in both copies (`listing_deposit = 1000000`): alice
+pays it from what the sponsor gave with her world DID (0.00001 TXCH, less the 0.000005 fee of her
+DID's listing spend), and bob's finder reads listings of at least that much. Spending stays
+testnet11 only.
 
 From the folder holding `target/release/weft`, with fresh run folders:
 
 ```sh
 rm -f finder-mark-*
 mkdir -p run-finder-alice/config run-finder-bob/config
-echo "name = alice" > run-finder-alice/config/core.txt
-echo "name = bob" > run-finder-bob/config/core.txt
+printf "name = alice\nlisting_deposit = 1000000\n" > run-finder-alice/config/core.txt
+printf "name = bob\nlisting_deposit = 1000000\n" > run-finder-bob/config/core.txt
 ./target/release/weft --run-dir run-finder-alice --world finder-alice-1 --script tools/checks/finder/alice.txt &
 ./target/release/weft --run-dir run-finder-bob --script tools/checks/finder/bob.txt
 ```
-
-## The tester's one step: pay alice
-
-The sponsor's gift (0.00001 TXCH) is too little for a deposit, on purpose. When
-`finder-mark-need-coins` appears, send her 0.0002 TXCH from a throwaway testnet wallet (never
-print its words) and touch the mark the script waits for:
-
-```sh
-cargo build --release -p chiacraft-wallet --features tool --bin chiacraft-wallet-test
-ADDR=$(cat run-finder-alice/test-account/address-testnet11.txt)
-./target/release/chiacraft-wallet-test send "$ADDR" --amount 200000000 --fee 0 --words-file ~/chiacraft-testnet/server.words --yes
-touch finder-mark-funded
-```
-
-(If the run uses the OS keystore the file is in `run-finder-alice/account/` instead.)
 
 ## What to look for
 
@@ -46,8 +36,8 @@ Bob's log:
 - `bob joined` in alice's log
 
 Shots:
-- `finder-alice-1-listed`: Who May Come In, "Finding this world": listed, 0.0001 TXCH locked
-- `finder-bob-1-found`: Find Worlds: alice's world, "online: 1 playing", "listed 0 days ago, 0.0001 TXCH locked", its rules
+- `finder-alice-1-listed`: Who May Come In, "Finding this world": listed, 0.000001 TXCH locked
+- `finder-bob-1-found`: Find Worlds: alice's world, "online: 1 playing", "listed 0 days ago, 0.000001 TXCH locked", its rules
 - `finder-bob-2-in`: bob in alice's world, joined from the finder
 - `finder-alice-2-delisted`: "Finding this world": not listed
 
