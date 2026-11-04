@@ -61,7 +61,7 @@ fn palette() -> Palette {
     // the day's exposure of 2.2 (`exposure`). A warm sun; the sky's light in the shade about a
     // quarter of the sun's (it was a third; Bliss's is a sixth, which our curve's toe crushes to
     // near black), still blue, so sun and shade part and the land stops looking flat.
-    let day = key(vec3(0.065, 0.115, 0.219), vec3(0.242, 0.323, 0.451), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.155, 0.222, 0.303));
+    let day = key(vec3(0.065, 0.115, 0.219), vec3(0.242, 0.323, 0.451), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.185, 0.222, 0.262));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
     let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
@@ -637,11 +637,22 @@ fn exposure() -> f32 {
 }
 
 fn display(c: vec3<f32>) -> vec3<f32> {
-    var t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
+    let lin = max(c, vec3(0.0)) * exposure();
+    var t = hejl(lin, 3.0);
+    // By day the curve's toe is lifted a little: it crushed red and green far harder than blue in
+    // dim light, so shade went near black and deep blue (Lighting's sun/shade test, 11-04: cobble
+    // in shade sRGB 8 9 32, the same block in sun 82 84 82; the playtesters' "lapis" trunks). Not
+    // at night: nights stay dark by design.
+    let day = smoothstep(-0.05, 0.15, scene.sun.y);
+    t = max(t, lin / (vec3(1.0) + lin) * 0.3 * day);
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
     let shade = mix(vec3(0.975, 0.99, 1.03), vec3(0.92, 0.96, 1.10), golden());
     t *= mix(shade, mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
+    // The darkest tones keep half their colour: what is left of a dim light's hue is no longer
+    // pushed to a saturated blue.
+    let dim = luma(t);
+    t = mix(vec3(dim), t, 0.5 + 0.5 * smoothstep(0.0, 0.18, dim));
     // No saturation added here: it was 8 to 25 % on top of a picture already twice as colourful as
     // Bliss's (mean saturation 0.46-0.52 against 0.19-0.29 in its pictures), and it took all the
     // blue out of grass (sRGB 113 177 56 became 96 181 11).
