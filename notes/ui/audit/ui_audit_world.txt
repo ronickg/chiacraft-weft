@@ -141,6 +141,10 @@ chat /tk spawn animals:grey_wolf ~ ~ ~-4
 wait 3
 look 0 -10
 wait 0.5
+# Knocked out first: the taming plate under the crosshair.
+chat /animal ko
+wait 2
+shot 16a_taming_plate.png
 chat /animal tame
 wait 1
 chat /animal show
