@@ -178,8 +178,12 @@ impl Font {
     /// `scale = n` atlas pixels a font pixel, `baseline = y` in the cell, then `g <code> <col> <row> <left> <width> <bearing> <advance>`,
     /// all in atlas pixels; see `mods/base/source/ui/font_bake.py`), and Unifont, scaled up, for the
     /// rest. Its baseline sits where the bitmap font's does (font pixel 14 of the line).
+    /// A pixel font baked one design pixel a font pixel says so: `pixel = 1` (font pixels a design
+    /// pixel, 2 by default), `line = n` (the line's height in font pixels, 18 by default) and
+    /// `sharp = true` (sampled nearest, not smoothly).
     pub fn coverage(hex: &str, desc: &str, img: &crate::assets::Image) -> Option<Font> {
         let (mut size, mut cell_h, mut baseline, mut unit) = (0u32, 0u32, 0.0f32, 0u32);
+        let (mut pixel, mut line_height, mut smooth) = (2.0f32, 18.0f32, true);
         let mut baked: Vec<(char, u32, u32, f32, f32, f32, f32)> = Vec::new();
         for line in desc.lines() {
             if let Some(v) = line.strip_prefix("cell = ") {
@@ -194,6 +198,12 @@ impl Font {
                 unit = v.trim().parse().ok()?;
             } else if let Some(v) = line.strip_prefix("baseline = ") {
                 baseline = v.trim().parse().ok()?;
+            } else if let Some(v) = line.strip_prefix("pixel = ") {
+                pixel = v.trim().parse().ok()?;
+            } else if let Some(v) = line.strip_prefix("line = ") {
+                line_height = v.trim().parse().ok()?;
+            } else if let Some(v) = line.strip_prefix("sharp = ") {
+                smooth = v.trim() != "true";
             } else if let Some(v) = line.strip_prefix("g ") {
                 let f: Vec<&str> = v.split_whitespace().collect();
                 let [code, col, row, left, width, bearing, advance] = f[..] else { continue };
@@ -274,15 +284,15 @@ impl Font {
             atlas_width,
             atlas_height,
             atlas,
-            line_height: 18.0,
-            pixel: 2.0,
+            line_height,
+            pixel,
             mono,
             cell_w: size,
             cell_h,
             unit: k,
             top: 14.0 - baseline / k,
             height: cell_h as f32 / k,
-            smooth: true,
+            smooth,
             fallback,
         })
     }
