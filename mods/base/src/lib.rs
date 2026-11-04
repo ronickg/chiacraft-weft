@@ -12,6 +12,7 @@ mod crops;
 mod death;
 mod discovery;
 mod farming;
+mod felled;
 mod felling;
 mod growth;
 mod hints;

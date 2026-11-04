@@ -14,6 +14,14 @@ pub const GROWTH: f32 = 0.75;
 /// A tree past its axe's tier takes this many times longer (and gives nothing).
 pub const PAST_TIER: f32 = 8.0;
 
+/// A felled trunk lies in pieces this many logs long (Valheim's large log in two halves; a
+/// lying trunk is cut a piece at a time, `piece`).
+pub const PIECE: i32 = 4;
+
+/// How far a slice of a felled trunk may drop to the ground (down a slope) before it rests where
+/// it is.
+pub const LAND_DROP: i32 = 8;
+
 /// The longest a felling may take, in seconds, past tier or not: past an hour nobody is
 /// chopping, and the engine's mining speed has a floor.
 pub const LONGEST_SECS: f32 = 3600.0;
@@ -74,6 +82,18 @@ pub fn felling(logs: u32, harvest: u32) -> Felling {
     Felling { chops, fruitful }
 }
 
+/// Cutting a piece of `logs` of a felled trunk: as long as felling a tree of them, whatever the
+/// axe (the tree was already its tier's).
+pub fn piece(logs: u32) -> Felling {
+    Felling { chops: (logs.max(1) as f32).powf(GROWTH), fruitful: true }
+}
+
+/// What a felling or a piece wears the axe by: its chops at the tier's pace (a tree past the tier
+/// takes longer, not more of the axe).
+pub fn wear(logs: u32) -> u32 {
+    (logs.max(1) as f32).powf(GROWTH).round() as u32
+}
+
 /// Seconds to fell it, given one log's mining time with the axe (`log_secs`), capped at
 /// `LONGEST_SECS`.
 pub fn seconds(f: Felling, log_secs: f32) -> f32 {
@@ -119,5 +139,9 @@ mod tests {
         let (f, one) = (felling(30, 100), log_secs(2.0, 2.91));
         assert!((one / speed(f, one) - seconds(f, one)).abs() < 1e-3);
         assert!(seconds(felling(1350, 0), log_secs(2.0, 1.0)) <= LONGEST_SECS);
+        // A piece of four logs is 2.8 logs' time; the axe wears by chops, not by logs.
+        assert!((piece(4).chops - 2.83).abs() < 0.01);
+        assert_eq!(wear(20), 9);
+        assert!(wear(1015) < 1015 / 4);
     }
 }

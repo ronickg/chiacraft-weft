@@ -54,9 +54,16 @@ pub fn register(r: &mut Registry) {
             return Verdict::Abstain;
         }
         let w = q.world();
-        if let Some(logs) = foot_of_tree(&w, q.pos(), q.state(), q.item()) {
+        let cut = crate::felled::piece_logs(&w, q.pos(), q.state(), q.item())
+            .map(|n| vitals::felling::piece(n as u32))
+            .or_else(|| {
+                foot_of_tree(&w, q.pos(), q.state(), q.item()).map(|logs| {
+                    let axe = held(&w, player);
+                    vitals::felling::felling(logs.len() as u32, TOOL_LEVEL.on_stack(&axe).unwrap_or(0))
+                })
+            });
+        if let Some(f) = cut {
             let axe = held(&w, player);
-            let f = vitals::felling::felling(logs.len() as u32, TOOL_LEVEL.on_stack(&axe).unwrap_or(0));
             let hardness = HARDNESS.on_block(q.state()).unwrap_or(2.0);
             let one = vitals::felling::log_secs(hardness, MINING_SPEED.on_stack(&axe).unwrap_or(1.0));
             SLOWING
@@ -116,24 +123,51 @@ pub fn register(r: &mut Registry) {
                     .unwrap()
                     .push((w.dimension(), e.player, None));
             }
-            let Some(logs) = foot_of_tree(&w, e.pos, e.state, e.item) else { continue };
             let (hotbar, slot) = (w.inventory(e.player).group("hotbar"), w.selected_slot(e.player));
             let axe = hotbar.get(slot);
+            let survival = !w.creative(e.player);
+            // A piece of a felled trunk: the rest of it goes too, its wood at the player's feet.
+            if AXES.on_item(e.item) && crate::felled::piece_of(e.state).is_some() {
+                let piece = crate::felled::piece(&w, e.pos, e.state, crate::felled::MAX_PIECE);
+                FELLING
+                    .lock()
+                    .unwrap()
+                    .get_or_insert_with(HashSet::new)
+                    .extend(piece.iter().copied());
+                for &p in &piece {
+                    w.break_block(p, axe, e.player, survival);
+                }
+                if survival {
+                    let by = vitals::felling::wear(piece.len() as u32 + 1);
+                    hotbar.set(slot, worn(axe, by, DURABILITY.on_item(axe.item).unwrap_or(0)));
+                }
+                continue;
+            }
+            let Some(logs) = foot_of_tree(&w, e.pos, e.state, e.item) else { continue };
             let felling = vitals::felling::felling(logs.len() as u32, TOOL_LEVEL.on_stack(&axe).unwrap_or(0));
             FELLING
                 .lock()
                 .unwrap()
                 .get_or_insert_with(HashSet::new)
                 .extend(logs.iter().copied());
-            // From the top down, so every log still has its own below while it breaks; in
-            // creative, as there, without drops, and past the axe's tier without wood.
-            let drops = !w.creative(e.player);
-            let felled = logs.len() as u32;
-            for p in logs {
-                w.break_block(p, axe, e.player, drops && felling.fruitful);
+            // In survival a tree within the axe's tier is laid down to be cut in pieces
+            // (`felled`); in creative, as there, it goes without drops, and past the axe's tier
+            // without wood. Taken out from the top down, so every log still has its own below
+            // while it breaks.
+            let lays = survival && felling.fruitful;
+            let states: Vec<u32> = logs.iter().map(|&p| w.get(p)).collect();
+            for &p in &logs {
+                w.break_block(p, axe, e.player, false);
             }
-            if drops {
-                hotbar.set(slot, worn(axe, felled, DURABILITY.on_item(axe.item).unwrap_or(0)));
+            if lays {
+                let from = w
+                    .entity(e.player)
+                    .map_or([e.pos[0] as f64, 0.0, e.pos[2] as f64 - 1.0], |st| st.pos);
+                crate::felled::lay(&w, e.pos, &logs, &states, crate::felled::away(e.pos, from));
+            }
+            if survival {
+                let by = vitals::felling::wear(logs.len() as u32);
+                hotbar.set(slot, worn(axe, by, DURABILITY.on_item(axe.item).unwrap_or(0)));
             }
         }
     });
@@ -165,8 +199,9 @@ fn held(w: &World, player: u64) -> ItemStack {
 /// tree's foot mined with an axe (`item`).
 fn foot_of_tree(w: &World, pos: [i32; 3], state: u32, item: u32) -> Option<Vec<[i32; 3]>> {
     let [x, y, z] = pos;
-    // Only from the foot: the block below is no log.
-    if !AXES.on_item(item) || !LOGS.on_block(state) || LOGS.on_block(w.get([x, y - 1, z])) {
+    // Only from the foot: the block below is no log. A felled log is no tree's.
+    let felled = |s: u32| crate::felled::piece_of(s).is_some();
+    if !AXES.on_item(item) || !LOGS.on_block(state) || felled(state) || LOGS.on_block(w.get([x, y - 1, z])) {
         return None;
     }
     let kind = |p: [i32; 3]| {
@@ -174,6 +209,8 @@ fn foot_of_tree(w: &World, pos: [i32; 3], state: u32, item: u32) -> Option<Vec<[
         if p == pos {
             // Mining starts with the foot still there; it is the tree's, not ground.
             Kind::Air
+        } else if felled(state) {
+            Kind::Ground
         } else if LOGS.on_block(state) {
             Kind::Log
         } else if LEAVES.on_block(state) {

@@ -158,7 +158,7 @@ What takes days in real life takes its time on the growing pace (`vitals::crafts
 
 ## Felling
 
-An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, 8 times slower, and gives nothing. Never more than 60 min. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:
+An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, 8 times slower, and gives nothing. Never more than 60 min. Felled, a tree within its tier lies on the ground in pieces of 4 logs, each cut as long as felling a tree of its logs takes; the axe wears by logs^0.75 for a felling or a piece. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:
 
 | tier | harvest | takes up to | speed | oak (20) | birch (34) | araucaria (72) | young sequoia (165) | sequoia (1015) |
 |---|---|---|---|---|---|---|---|---|

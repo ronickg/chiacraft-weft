@@ -149,6 +149,8 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
         .set(&FUEL, 300)
         // `bark`: bark on every face, for a trunk whose top shows (a giant's flared foot).
         .prop("axis", ["y", "x", "z", "bark"])
+        // Lying after a felling, in alternating pieces (`felled`): chopped a piece at a time.
+        .prop("felled", ["no", "a", "b"])
         .states(move |p, s| match p.get("axis") {
             "y" => s.textures(&top, &side, &top),
             "x" => s.faces([&top, &top, &side, &side, &side, &side]),
