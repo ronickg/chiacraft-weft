@@ -135,10 +135,10 @@ pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize
 /// dimension's scattered things (trees) after it (`d::SCATTER_OFF` points there): per scatter
 /// its cell, reach, hash seed, biome count and thinning (`ScatterThin`: its mask's place and
 /// length, keep), the mask's steps, then per biome the chance as a threshold on the site's bits
-/// (`dim::scatter_site`'s test, exactly), the canopy its shape callback makes there (radius,
-/// top above the site, block) and whether the thinning applies there.
+/// (`dim::scatter_site`'s test, exactly), whether the thinning applies there and the crowns its
+/// shape callback makes there (`crown_of`), each site drawn with one of them.
 ///
-/// The canopy comes from sample runs of the shape on real ground spread over the world: a run at
+/// The crowns come from sample runs of the shape on real ground spread over the world: a run at
 /// one spot only said what that spot allowed (a clearing, a rock face), for every site.
 pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<usize>)> {
     let (mut w, custom) = describe(c, dim, seed)?;
@@ -181,11 +181,10 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
                 .and_then(|d| c.components.get::<f32>(crate::components::BIOME, b, d))
                 .unwrap_or(0.0);
             let threshold = (density as f64 * (1u64 << 53) as f64).ceil() as u64;
-            let (mut tops, mut radii, mut states) = (Vec::new(), Vec::new(), rustc_hash::FxHashMap::<u32, u32>::default());
-            // What it is made of where it puts nothing only into air (a boulder forces every block).
-            let mut forced = rustc_hash::FxHashMap::<u32, u32>::default();
+            // Each run's crown, with its top for sorting.
+            let mut runs: Vec<(i32, [u32; 2])> = Vec::new();
             for (k, &pos) in spots.iter().enumerate() {
-                if threshold == 0 || tops.len() >= RUNS {
+                if threshold == 0 || runs.len() >= RUNS {
                     break;
                 }
                 let mut args = weft_abi::ScatterArgs {
@@ -202,57 +201,104 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
                     continue;
                 }
                 let blocks = &buf[..(args.len as usize).min(buf.len())];
-                let Some(top) = blocks.iter().map(|b| b.offset[1]).max() else { continue };
-                tops.push(top);
-                radii.push(
-                    blocks
-                        .iter()
-                        .filter(|b| b.offset[1] >= 1)
-                        .map(|b| b.offset[0].abs().max(b.offset[2].abs()))
-                        .max()
-                        .unwrap_or(0),
-                );
-                for b in blocks {
-                    *(if b.force == 0 { &mut states } else { &mut forced })
-                        .entry(b.state)
-                        .or_default() += 1;
+                if let Some(run) = crown_of(blocks) {
+                    runs.push(run);
                 }
             }
-            if tops.is_empty() {
-                w.extend_from_slice(&[0; words::SCATTER_BIOME as usize]);
-                continue;
-            }
-            tops.sort_unstable();
-            radii.sort_unstable();
-            // Its canopy's block: the commonest it puts into air (a tree's leaves), else the commonest
-            // it forces (a boulder's stone). None at all was state 0, air, which far terrain drew
-            // as a violet block over the snowy lands' boulders.
-            let state = states
-                .into_iter()
-                .max_by_key(|e| (e.1, e.0))
-                .or_else(|| forced.into_iter().max_by_key(|e| (e.1, e.0)))
-                .map_or(0, |e| e.0);
             let thinned = sc.thin.as_ref().is_some_and(|t| {
                 t.biomes
                     .is_none_or(|comp| c.components.has(crate::components::BIOME, b, comp))
             });
-            let entry: [i32; words::SCATTER_BIOME as usize] = [
-                threshold as u32 as i32,
-                (threshold >> 32) as u32 as i32,
-                radii[radii.len() / 2],
-                tops[tops.len() / 2],
-                state as i32,
-                thinned as i32,
-            ];
+            let mut entry = [0i32; words::SCATTER_BIOME as usize];
+            if !runs.is_empty() {
+                (entry[0], entry[1], entry[2]) = (threshold as u32 as i32, (threshold >> 32) as u32 as i32, thinned as i32);
+                // Crowns spread over the runs from the lowest to the tallest, so the sites keep the
+                // mix of sizes (a forest's few emergents among the rest), not one median tree.
+                runs.sort_by_key(|r| r.0);
+                let n = layout::lod::SHAPES as usize;
+                for i in 0..n {
+                    let run = runs[(2 * i + 1) * runs.len() / (2 * n)].1;
+                    entry[3 + 2 * i] = run[0] as i32;
+                    entry[4 + 2 * i] = run[1] as i32;
+                }
+            }
             w.extend_from_slice(&entry);
         }
     }
     Some((w, custom))
 }
 
-/// Sample runs of a scatter's shape per biome for its canopy, and the spots tried for them.
-const RUNS: usize = 8;
-const RUN_SPOTS: usize = 24;
+/// Sample runs of a scatter's shape per biome for its crowns, and the spots tried for them.
+const RUNS: usize = 16;
+const RUN_SPOTS: usize = 48;
+
+/// What a run of a scatter's shape looks like from afar (`gpu_layout::terrain::crown`), and its
+/// top: its crown, of the block it puts most into air (a tree's leaves; else the one it forces
+/// most, a boulder's stone, as none at all was air, drawn violet), and the trunk under it. None
+/// when it put nothing.
+fn crown_of(blocks: &[weft_abi::ScatterBlock]) -> Option<(i32, [u32; 2])> {
+    use layout::crown as cr;
+    let commonest = |forced: bool, keep: &dyn Fn(&weft_abi::ScatterBlock) -> bool| {
+        let mut n = rustc_hash::FxHashMap::<u32, u32>::default();
+        for b in blocks
+            .iter()
+            .filter(|b| (b.force != 0) == forced && keep(b))
+        {
+            *n.entry(b.state).or_default() += 1;
+        }
+        n.into_iter().max_by_key(|e| (e.1, e.0)).map(|e| e.0)
+    };
+    let leaves = commonest(false, &|_| true).or_else(|| commonest(true, &|_| true))?;
+    let crown: Vec<_> = blocks.iter().filter(|b| b.state == leaves).collect();
+    let top = crown.iter().map(|b| b.offset[1]).max()?;
+    let bottom = crown.iter().map(|b| b.offset[1]).min()?.clamp(0, top);
+    // Out from the trunk at a layer, and at all.
+    let out = |b: &&weft_abi::ScatterBlock| ((b.offset[0] * b.offset[0] + b.offset[2] * b.offset[2]) as f32).sqrt();
+    let width = |y: i32| {
+        crown
+            .iter()
+            .filter(|b| b.offset[1] == y)
+            .map(out)
+            .fold(0.0f32, f32::max)
+    };
+    let radius = crown.iter().map(out).fold(0.0f32, f32::max);
+    // The widest layer, the middle one of a tie.
+    let layers: Vec<f32> = (bottom..=top).map(width).collect();
+    let most = layers.iter().copied().fold(0.0f32, f32::max);
+    let wide: Vec<i32> = (bottom..=top)
+        .filter(|&y| layers[(y - bottom) as usize] >= most - 0.01)
+        .collect();
+    let widest = (wide[0] + wide[wide.len() - 1]) / 2;
+    let fifteenths = |part: i32, whole: i32| if whole <= 0 { 0 } else { ((part * 15 + whole / 2) / whole).clamp(0, 15) };
+    let round =
+        if radius < 0.5 || top == widest { 15 } else { ((width((widest + top + 1) / 2) / radius * 15.0).round() as i32).clamp(1, 15) };
+    // The trunk: what stands under the crown at its middle, as wide as it is at the bottom.
+    let under = |b: &weft_abi::ScatterBlock| {
+        b.state != leaves && b.offset[0].abs() <= 3 && b.offset[2].abs() <= 3 && (0..bottom).contains(&b.offset[1])
+    };
+    let trunk = commonest(false, &under).or_else(|| commonest(true, &under));
+    let trunk_width = trunk.map_or(0, |t| {
+        let low = blocks
+            .iter()
+            .filter(|b| b.state == t && under(b))
+            .map(|b| b.offset[1])
+            .min()
+            .unwrap_or(0);
+        let n = blocks
+            .iter()
+            .filter(|b| b.state == t && under(b) && b.offset[1] == low)
+            .count();
+        ((n as f32).sqrt().round() as u32).clamp(1, cr::TRUNK_MASK)
+    });
+    let shape = (radius.round() as u32).min(cr::RADIUS_MASK)
+        | (top as u32).min(cr::TOP_MASK) << cr::TOP_SHIFT
+        | (bottom as u32).min(cr::BOTTOM_MASK) << cr::BOTTOM_SHIFT
+        | (fifteenths(widest - bottom, top - bottom) as u32) << cr::WIDEST_SHIFT
+        | (round as u32) << cr::ROUND_SHIFT
+        | trunk_width << cr::TRUNK_SHIFT;
+    // Round 15 is never 0: a crown's first word always says it is there.
+    Some((top, [shape, (leaves & cr::BLOCK_MASK) | (trunk.unwrap_or(0) & cr::BLOCK_MASK) << cr::TRUNK_BLOCK_SHIFT]))
+}
 
 /// Writes a mask as postfix steps (`words::MASK` each); returns the stack depth it needs.
 fn postfix(m: &Mask, seed: u64, w: &mut Vec<i32>, depth: usize) -> Option<usize> {

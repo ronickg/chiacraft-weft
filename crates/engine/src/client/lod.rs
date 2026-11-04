@@ -24,8 +24,9 @@ pub const CELLS: i32 = 32;
 /// Columns a tile is made from: its cells and one around them (for the walls at its edges).
 pub const SAMPLES: usize = crate::gpu_layout::terrain::lod::SAMPLES as usize;
 const SIDE: i32 = crate::gpu_layout::terrain::lod::SIDE as i32;
-/// Words per tile coming back from the GPU.
-pub const LOD_WORDS_PER_TILE: usize = SAMPLES * 2;
+/// Words per sample and per tile coming back from the GPU.
+const WORDS: usize = crate::gpu_layout::terrain::lod::WORDS as usize;
+pub const LOD_WORDS_PER_TILE: usize = SAMPLES * WORDS;
 pub const MAX_LEVEL: u32 = 5;
 /// From this level on tiles are smooth ground, morphing into the next level with distance: at
 /// 8-block cells and more (from about 1000 blocks away), boxes only drew stairs.
@@ -148,6 +149,64 @@ pub fn made(job: LodJob, words: Vec<u32>) {
     });
 }
 
+/// Sample (i, j)'s ground (from -1 to 32): its height, top block, biome and the block under.
+fn ground(words: &[u32], i: i32, j: i32) -> (i32, u32, u32, u32) {
+    let k = ((j + 1) * SIDE + i + 1) as usize * WORDS;
+    let (a, b) = (words[k], words[k + 1]);
+    ((a & 0xFFFF) as u16 as i16 as i32, a >> 16, b & 0xFFFF, b >> 16)
+}
+
+/// Trees' crowns over a sample, from its top block down to `bottom`, and the trunk standing in
+/// its cell.
+#[derive(Clone, Copy, PartialEq, Debug)]
+struct Crown {
+    top: i32,
+    bottom: i32,
+    leaves: u32,
+    trunk: Option<Trunk>,
+}
+
+/// A trunk: its place in its cell (x, z), width and block.
+#[derive(Clone, Copy, PartialEq, Debug)]
+struct Trunk {
+    x: i32,
+    z: i32,
+    width: i32,
+    block: u32,
+}
+
+/// Sample (i, j)'s crown (`gpu_layout::terrain::lod_out`), if trees cover it.
+fn crown(words: &[u32], i: i32, j: i32) -> Option<Crown> {
+    use crate::gpu_layout::terrain::lod_out as o;
+    let k = ((j + 1) * SIDE + i + 1) as usize * WORDS;
+    let (a, b) = (words[k + 2], words[k + 3]);
+    let leaves = a >> o::HALF_SHIFT;
+    if leaves == 0 {
+        return None;
+    }
+    let top = (a & o::HALF_MASK) as u16 as i16 as i32;
+    let width = ((b >> o::TRUNK_W_SHIFT) & o::TRUNK_W_MASK) as i32;
+    let block = b >> o::HALF_SHIFT;
+    let trunk = (width > 0 && block != 0).then_some(Trunk {
+        x: ((b >> o::TRUNK_DX_SHIFT) & o::PLACE_MASK) as i32,
+        z: ((b >> o::TRUNK_DZ_SHIFT) & o::PLACE_MASK) as i32,
+        width,
+        block,
+    });
+    Some(Crown { top, bottom: top - (b & o::DEPTH_MASK) as i32, leaves, trunk })
+}
+
+/// What of `lo..=hi` stays open beside a neighbour whose ground reaches `ground` and whose crown
+/// fills `filled`: at most two spans, above its ground and around its crown.
+fn open_spans(lo: i32, hi: i32, ground: i32, filled: Option<(i32, i32)>) -> impl Iterator<Item = (i32, i32)> {
+    let lo = lo.max(ground + 1);
+    let (a, b) = match filled {
+        Some((f0, f1)) if f0 <= hi && f1 >= lo => ((lo, f0 - 1), (f1 + 1, hi)),
+        _ => ((lo, hi), (1, 0)),
+    };
+    [a, b].into_iter().filter(|(a, b)| a <= b)
+}
+
 /// A record of `world.wgsl`'s `vs_lod`: the `dir` face of a box at (x, y, z) in the tile, size
 /// (sx, sy, sz) blocks, drawn in the average color of texture `tex` (its smallest mip), tinted
 /// for `biome` when `tint`.
@@ -191,14 +250,13 @@ const BANDS: i32 = 8;
 /// block's top color for its own height (a grass side averages to the dirt under its rim, and
 /// every slope came out striped brown), then the block under it for the rest. Where the ground
 /// falls steeply the dimension's faces (`Terrain::faces`) say what shows instead (bare rock), in
-/// bands down the wall.
+/// bands down the wall. Over the ground stand trees' crowns (`crown`): a box per cell from its top
+/// down to its lowest leaves, rounded or tapering over the cells as the trees are, its sides where
+/// the next cell's crown or ground doesn't hide them, and a trunk under it.
 pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, (i32, i32)) {
     let s = 1 << key.level;
-    let at = |i: i32, j: i32| {
-        let k = ((j + 1) * SIDE + i + 1) as usize * 2;
-        let (a, b) = (words[k], words[k + 1]);
-        ((a & 0xFFFF) as u16 as i16 as i32, a >> 16, b & 0xFFFF, b >> 16)
-    };
+    let at = |i: i32, j: i32| ground(words, i, j);
+    let crown_at = |i: i32, j: i32| crown(words, i, j);
     let looks = super::looks::current();
     let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
     let terrain = c.dims.get(dim as usize).and_then(|d| d.terrain.as_ref());
@@ -250,17 +308,22 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
     let mut out = Vec::new();
     let (mut lo, mut hi) = (i32::MAX, i32::MIN);
     let top_at = |i: i32, j: i32| tops[(j * CELLS + i) as usize];
+    // A crown sitting right on the ground hides its top.
+    let covered = |i: i32, j: i32| crown_at(i, j).is_some_and(|c| c.bottom <= at(i, j).0 + 1);
     for j in 0..CELLS {
         let mut i = 0;
         while i < CELLS {
             let (y, _, biome, _) = at(i, j);
             let top = top_at(i, j);
+            let hidden = covered(i, j);
             let mut end = i + 1;
-            while end < CELLS && at(end, j).0 == y && top_at(end, j) == top && at(end, j).2 == biome {
+            while end < CELLS && at(end, j).0 == y && top_at(end, j) == top && at(end, j).2 == biome && covered(end, j) == hidden {
                 end += 1;
             }
-            let (tex, tint) = face_of(top, 3);
-            out.push(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome));
+            if !hidden {
+                let (tex, tint) = face_of(top, 3);
+                out.push(quad(3, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome));
+            }
             (lo, hi) = (lo.min(y), hi.max(y + 1));
             i = end;
         }
@@ -308,6 +371,69 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
             }
         }
     }
+    let side = CELLS * s;
+    // Crowns: tops and undersides in runs along x, as the ground's tops.
+    for (dir, face_y) in [(3u32, true), (2, false)] {
+        for j in 0..CELLS {
+            let mut i = 0;
+            while i < CELLS {
+                let Some(c) = crown_at(i, j) else {
+                    i += 1;
+                    continue;
+                };
+                let biome = at(i, j).2;
+                let y = if face_y { c.top } else { c.bottom };
+                let shows = face_y || c.bottom > at(i, j).0 + 1;
+                let same = |e: i32| {
+                    crown_at(e, j).is_some_and(|d| {
+                        d.leaves == c.leaves
+                            && at(e, j).2 == biome
+                            && (if face_y { d.top } else { d.bottom }) == y
+                            && (face_y || d.bottom > at(e, j).0 + 1) == shows
+                    })
+                };
+                let mut end = i + 1;
+                while end < CELLS && same(end) {
+                    end += 1;
+                }
+                if shows {
+                    let (tex, tint) = face_of(c.leaves, dir as usize);
+                    out.push(quad(dir, i * s, y, j * s, ((end - i) * s, 1, s), tex, tint, biome));
+                }
+                (lo, hi) = (lo.min(c.bottom), hi.max(c.top + 1));
+                i = end;
+            }
+        }
+    }
+    for j in 0..CELLS {
+        for i in 0..CELLS {
+            let Some(c) = crown_at(i, j) else { continue };
+            let (y, _, biome, _) = at(i, j);
+            // Its sides, where the cell beside shows neither ground nor crown (at the tile's edge
+            // the tile beside may be another level's: there the side is whole).
+            for (dir, (di, dj)) in [(0usize, (-1, 0)), (1, (1, 0)), (4, (0, -1)), (5, (0, 1))] {
+                let inside = (0..CELLS).contains(&(i + di)) && (0..CELLS).contains(&(j + dj));
+                let (ny, filled) =
+                    if inside { (at(i + di, j + dj).0, crown_at(i + di, j + dj).map(|n| (n.bottom, n.top))) } else { (y, None) };
+                let (tex, tint) = face_of(c.leaves, dir);
+                for (a, b) in open_spans(c.bottom, c.top, ny, filled) {
+                    out.push(quad(dir as u32, i * s, a, j * s, (s, b + 1 - a, s), tex, tint, biome));
+                }
+            }
+            // Its trunk, from the ground to the crown, in the tile.
+            let Some(t) = c.trunk else { continue };
+            if c.bottom <= y + 1 {
+                continue;
+            }
+            let w = t.width.min(side);
+            let x = (i * s + t.x - (w - 1) / 2).clamp(0, side - w);
+            let z = (j * s + t.z - (w - 1) / 2).clamp(0, side - w);
+            for dir in [0u32, 1, 4, 5] {
+                let (tex, tint) = face_of(t.block, dir as usize);
+                out.push(quad(dir, x, y + 1, z, (w, c.bottom - 1 - y, w), tex, tint, biome));
+            }
+        }
+    }
     (out, (lo, hi))
 }
 
@@ -319,11 +445,11 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
 pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (Vec<[u32; 4]>, u32, (i32, i32)) {
     use crate::gpu_layout::{lod_face, lod_grid, lod_grid_cell};
     let s = 1 << key.level;
-    // Corner (i, j), from -1 to 32.
+    // Corner (i, j), from -1 to 32: its ground, or a forest's crowns over it as a canopy (its top
+    // block over the same, so no rock face).
     let at = |i: i32, j: i32| {
-        let k = ((j + 1) * SIDE + i + 1) as usize * 2;
-        let (a, b) = (words[k], words[k + 1]);
-        ((a & 0xFFFF) as u16 as i16 as i32, a >> 16, b & 0xFFFF, b >> 16)
+        let g = ground(words, i, j);
+        crown(words, i, j).map_or(g, |c| (c.top, c.leaves, g.2, c.leaves))
     };
     let looks = super::looks::current();
     let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
