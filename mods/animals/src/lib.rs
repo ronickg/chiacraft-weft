@@ -18,9 +18,6 @@
 //! is `notes/ANIMALS.md`. An owner is kept by player key, which the engine's bridge gives
 //! (`player_key`), so a tame knows its owner after a restart.
 
-use std::sync::OnceLock;
-
-use weft_sdk::abi::Str;
 use weft_sdk::*;
 
 declare_mod!(deps: ["base"], init: init);
@@ -89,41 +86,17 @@ static HEART: Particle = Particle::named("heart");
 
 // ------------------------------------------------------------------ the engine's bridge
 
-type Query = unsafe extern "C" fn(query: Str, arg: Str) -> Str;
-static BRIDGE: OnceLock<Query> = OnceLock::new();
-
-/// The engine hands the mod its bridge when the mod loads.
-///
-/// # Safety
-/// `q` must be the engine's `bridge::query`.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn chiacraft_bridge(q: Query) {
-    let _ = BRIDGE.set(q);
-}
+chiacraft_bridge::install!();
 
 /// A player's key: what their saves are keyed by, the same after a restart.
 fn player_key(player: u64) -> String {
-    BRIDGE
-        .get()
-        .map(|f| unsafe {
-            f(Str::new("player_key"), Str::new(&player.to_string()))
-                .as_str()
-                .to_string()
-        })
-        .unwrap_or_default()
+    chiacraft_bridge::ask("player_key", &player.to_string())
 }
 
 /// A folder in the world's save for this mod's own files (`evolution.rs`'s gene pools); empty
 /// without one.
 fn data_dir() -> String {
-    BRIDGE
-        .get()
-        .map(|f| unsafe {
-            f(Str::new("data_dir"), Str::new("animals"))
-                .as_str()
-                .to_string()
-        })
-        .unwrap_or_default()
+    chiacraft_bridge::ask("data_dir", "animals")
 }
 
 // ------------------------------------------------------------------ registration
