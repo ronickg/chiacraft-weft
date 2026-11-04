@@ -580,9 +580,16 @@ pub fn held_list(world: &Path, maintainer: &str) -> Option<Vec<u8>> {
 /// identity and the DID.
 pub fn at_the_door(world: &Path, key: &str) -> Option<Msg> {
     let gate = Gate::new(Some(world.to_path_buf()));
-    let rules = Rules { only_listed: false, did_required: false, did_min_days: 0, ..gate.rules.clone() };
+    door_verdict(&gate.rules, &gate.bans, &gate.lists, key, crate::saves::now_secs())
+}
+
+/// [`at_the_door`]'s verdict: bans only. The rules are rebuilt from what the door can judge (the
+/// allow list, which wins over a followed list, and the lists), so a rule that needs the join
+/// (the allow list alone, a DID, an achievement shown when asked) never refuses here.
+fn door_verdict(rules: &Rules, bans: &Bans, lists: &[BanList], key: &str, now: u64) -> Option<Msg> {
+    let rules = Rules { allow: rules.allow.clone(), lists: rules.lists.clone(), ..Default::default() };
     let who = Who { key: key.to_string(), ..Default::default() };
-    match verdict(&rules, &gate.bans, &gate.lists, &who, false, crate::saves::now_secs()) {
+    match verdict(&rules, bans, lists, &who, false, now) {
         Verdict::Refuse(m) => Some(m),
         Verdict::Admit => None,
     }
@@ -909,6 +916,23 @@ mod tests {
             .push(("base:workbench".into(), "owner".into()));
         assert_eq!(verdict(&rules, &Bans::default(), &[], &bob, false, 0), Verdict::Admit);
         assert_eq!(summary(&rules), vec![("admission.summary.achievement".into(), 0)]);
+    }
+
+    #[test]
+    fn the_door_refuses_bans_only() {
+        let rules = Rules {
+            only_listed: true,
+            did_required: true,
+            did_min_days: 30,
+            achievement: Some(AchievementRule { id: "base:workbench".into(), title: String::new(), from: vec!["owner".into()] }),
+            ..Default::default()
+        };
+        // Nobody is refused at the door for what the join shows later.
+        assert_eq!(door_verdict(&rules, &Bans::default(), &[], "k1", 0), None);
+        let mut bans = Bans::default();
+        ban_all(&mut bans, &who("k1", None), "", "alice", None);
+        assert!(door_verdict(&rules, &bans, &[], "k1", 0).is_some());
+        assert_eq!(door_verdict(&rules, &bans, &[], "k2", 0), None);
     }
 
     #[test]
