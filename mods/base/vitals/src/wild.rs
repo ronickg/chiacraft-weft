@@ -274,6 +274,10 @@ pub const POND_LANDS: [(&str, f32); 2] = [("base:swamp", 0.35), ("animals:floodp
 /// the tundra and the marshes have fibre too (Research round 3, B3).
 pub const FIBRE: [(&str, f32); 4] = [("base:sedge", 0.5), ("base:cottongrass", 0.5), ("base:cattail", 1.0), ("base:dune_grass", 0.3)];
 
+/// The chance a wild banana, cut, gives a hand of its fruit (`food`'s `bananas`): a stem fruits once
+/// and dies back, so at any time about one plant in three of a stand carries a bunch.
+pub const BANANA_FRUIT: f32 = 0.3;
+
 /// The most of one ground all its wild plants cover in a biome (the world rolls for them first).
 pub const MOST: f32 = 0.3;
 
@@ -312,6 +316,11 @@ pub const REEDBEDS: &[&str] = &["base:plains", "base:forest", "base:birch_forest
 pub const SEA_MEADOWS: &[&str] = &["base:ocean", "base:beach"];
 /// Kelp forests: the open sea's rocky and sandy floor.
 pub const KELP_FORESTS: &[&str] = &["base:ocean"];
+/// The warm sea's reefs and lagoons (Terrain's, Key West's climate): the reef top 2 under the
+/// surface, the lagoon's sand floor 3 to 5 under.
+pub const REEFS: &[&str] = &["base:coral_reef"];
+pub const LAGOONS: &[&str] = &["base:lagoon"];
+pub const WARM_SEA: &[&str] = &["base:coral_reef", "base:lagoon"];
 /// Where the Cretaceous's trees fall and rot: its forests and the wooded floodplain.
 pub const DEADWOOD: &[&str] = &["animals:floodplain", "animals:fern_forest"];
 /// The Djadokhta's dry lands, where termites built (the report's "termite and ant nests: red
@@ -332,7 +341,7 @@ const fn w(
 /// Covers are shares of the cells of that ground (tall grass covers 5-35% of the turf, berry bushes
 /// 0.4% of the forest's; `forage::GRASS_COVER`): the tundra's sedges and cottongrass are its grass,
 /// the bushes and mushrooms are found, not walked through.
-pub const WILD: [Wild; 32] = [
+pub const WILD: [Wild; 38] = [
     w("base:sedge", Form::Tuft, Ground::Soil, None, SEDGE_LANDS, 0.12),
     w("base:cottongrass", Form::Tuft, Ground::Soil, None, TUNDRA, 0.08),
     w("base:reindeer_lichen", Form::Tuft, Ground::Soil, None, NORTH, 0.05),
@@ -374,6 +383,15 @@ pub const WILD: [Wild; 32] = [
     w("base:huckleberry_bush", Form::Bush, Ground::Soil, Some("base:huckleberries"), &["base:mountains"], 0.01),
     w("base:chia", Form::Ripens, Ground::Sand, Some("base:chia_seeds"), DESERT, 0.02),
     w("base:dwarf_birch", Form::Still, Ground::Soil, None, &["base:snowy_plains"], 0.02),
+    // The warm reefs and lagoons (Art's, Ronald 11-05 "Yes, approve"), as on the Florida Reef
+    // Tract: staghorn and elkhorn coral on the reef (elkhorn the shallowest, in the surf), sea
+    // fans on it, finger coral and sea rods on reef and lagoon, turtle grass on the lagoon's sand.
+    w("base:staghorn_coral", Form::Still, Ground::Bed, None, REEFS, 0.09),
+    w("base:elkhorn_coral", Form::Still, Ground::Bed, None, REEFS, 0.06),
+    w("base:sea_fan", Form::Still, Ground::Bed, None, REEFS, 0.05),
+    w("base:finger_coral", Form::Still, Ground::Bed, None, WARM_SEA, 0.05),
+    w("base:sea_rod", Form::Still, Ground::Bed, None, WARM_SEA, 0.04),
+    w("base:turtle_grass", Form::Still, Ground::Bed, None, LAGOONS, 0.2),
 ];
 
 /// How deep the water over a plant rooted on the bed is, from its floor to the surface, in
@@ -381,6 +399,9 @@ pub const WILD: [Wild; 32] = [
 pub fn depths(block: &str) -> std::ops::RangeInclusive<i32> {
     match block {
         "base:kelp" => 6..=20,
+        // Elkhorn in the surf on the reef's crest; sea fans down the reef's face too.
+        "base:elkhorn_coral" => 1..=3,
+        "base:sea_fan" => 1..=8,
         _ => 1..=6,
     }
 }

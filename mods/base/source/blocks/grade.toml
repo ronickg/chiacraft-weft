@@ -729,3 +729,7 @@ gain = 0.906
 
 [tiles.planks_ipe]  # luma 0.32->0.31, sat 0.53->0.53; ~ dark_oak_planks (0.18-0.29, 0.31-0.70) half way
 gain = 0.965
+
+[items.roasted_cacao]  # darker chocolate than the dried beans, less orange: sat 0.79 -> ~0.6, luma 0.25 -> ~0.22
+saturation = 0.75
+gain = 0.9

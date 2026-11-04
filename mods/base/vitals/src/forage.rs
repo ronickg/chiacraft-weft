@@ -85,7 +85,7 @@ const ARAUCARIAS: &[&str] = &["animals:scrubland", "animals:floodplain", "animal
 const SCALE_CONIFERS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:crags"];
 const BIRCHES: &[&str] = &["base:forest", "base:birch_forest"];
 
-pub const SOURCES: [Source; 75] = [
+pub const SOURCES: [Source; 76] = [
     s("base:tall_grass", None, Category::Grass, 10, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
     wild("base:berry_bush", 3, Category::Fruit, 8, Eaten::Age(1), wild::FORESTS),
     browse("base:oak_leaves", Category::Leaves, 4, OAKS, GREEN),
@@ -211,6 +211,8 @@ pub const SOURCES: [Source; 75] = [
     browse("animals:water_lily", Category::WaterPlants, 5, wild::PONDS, ALL_YEAR),
     // Kelp washed up on the beach, all year.
     browse("base:kelp_wrack", Category::WaterPlants, 4, &["base:beach"], ALL_YEAR),
+    // Turtle grass on the lagoons' floor, all year (green turtles and manatees graze it).
+    browse("base:turtle_grass", Category::WaterPlants, 5, wild::LAGOONS, ALL_YEAR),
     // Grubs and beetles in the rotten logs, all year.
     browse("animals:rotten_log", Category::Insects, 3, wild::DEADWOOD, ALL_YEAR),
     // The next batch (`wild::WILD`): beachgrass grazed and growing back, beach plums and

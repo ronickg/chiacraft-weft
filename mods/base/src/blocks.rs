@@ -1006,11 +1006,21 @@ pub fn register(r: &mut Registry) {
             .prop("half", ["lower", "upper"])
             .states(move |p, s| s.texture(&format!("{name}_{}", p.get("half"))))
             .no_item();
-        r.loot(b).pool(
+        let table = r.loot(b).pool(
             Pool::new()
                 .when(Cond::Chance(vitals::clothing::FIBRE_CHANCE))
                 .item("plant_fibre"),
         );
+        // A wild banana now and then carries a hand of fruit: its lower half gives it, once
+        // a plant (`vitals::wild::BANANA_FRUIT`).
+        if name == "banana" {
+            table.pool(
+                Pool::new()
+                    .when(Cond::BlockState("half=lower"))
+                    .when(Cond::Chance(vitals::wild::BANANA_FRUIT))
+                    .item("bananas"),
+            );
+        }
     }
     r.loot(&TALL_GRASS_DOUBLE)
         .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))

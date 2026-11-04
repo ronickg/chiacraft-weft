@@ -75,6 +75,9 @@ pub struct Recipe {
     /// cone; 0: all alike).
     pub branch_len: f32,
     pub taper: f32,
+    /// How much branches vary in angle (±10 degrees at 1) and length (±20 % at 1): a spruce's
+    /// whorls are regular, an oak's limbs are not.
+    pub branch_var: f32,
     /// Whether the trunk ends at its first branching, in a fork of leaders (acacia, mesquite).
     pub fork: bool,
     /// Leaf clusters: radius across and up (blocks), how ragged their edge (0..1), and whether
@@ -83,10 +86,18 @@ pub struct Recipe {
     pub leaf_ry: f32,
     pub ragged: f32,
     pub leaf_along: bool,
+    /// A branch thinner than this is a leafy spray, not wood: small clusters along it instead of
+    /// logs (0: off, wood down to a twig's width). Keeps a small tree's crown from showing bare
+    /// log arms (the dogwood's, the tree-look audit).
+    pub twig: f32,
     /// Fronds at the top (palms, tree ferns): how many, how long, and how hard they droop.
     pub fronds: u32,
     pub frond_len: f32,
     pub frond_droop: f32,
+    /// The fronds' angle from upright where they leave the top, and how much it varies (± degrees):
+    /// a feather palm's rise steep and arch over, a fan palm's go every way, a round ball.
+    pub frond_angle: f32,
+    pub frond_spread: f32,
     /// Its own reach sideways and height (0: `REACH`, `MAX_HEIGHT`), for the giants; its
     /// scatter must reach as far.
     pub reach: i32,
@@ -119,14 +130,18 @@ impl Recipe {
         orders: 2,
         branch_len: 0.55,
         taper: 0.0,
+        branch_var: 1.0,
         fork: false,
         leaf_r: 2.0,
         leaf_ry: 1.6,
         ragged: 0.35,
         leaf_along: false,
+        twig: 0.0,
         fronds: 0,
         frond_len: 0.0,
         frond_droop: 0.42,
+        frond_angle: 62.0,
+        frond_spread: 8.0,
         reach: 0,
         max_height: 0,
         flare: 0.0,
@@ -222,8 +237,9 @@ fn block(p: V) -> (i32, i32, i32) {
 
 // ------------------------------------------------------------------ growing
 
-/// The blocks so far: each block's part, wood over leaves; and the tree's reach and height.
-struct Out(std::collections::HashMap<(i32, i32, i32), Part>, i32, i32);
+/// The blocks so far: each block's part, wood over leaves; the tree's reach and height; and each
+/// wood block's width (the widest limb through it) with the width being drawn now.
+struct Out(std::collections::HashMap<(i32, i32, i32), Part>, i32, i32, std::collections::HashMap<(i32, i32, i32), f32>, f32);
 
 impl Out {
     fn put(&mut self, k: (i32, i32, i32), part: Part) {
@@ -234,6 +250,10 @@ impl Out {
             (Some(Part::Log { .. }), Part::Leaves) => {}
             _ => {
                 self.0.insert(k, part);
+                if let Part::Log { .. } = part {
+                    let w = self.3.entry(k).or_insert(0.0);
+                    *w = w.max(self.4);
+                }
             }
         }
     }
@@ -351,38 +371,60 @@ impl Grow<'_> {
         // A branch thins to nothing over its own length; the trunk by the recipe's loss.
         let loss = if order == 0 { r.width_loss / self.size } else { width / len.max(STEP) };
         // Under needles (a conifer) the twigs and the trunk's top are all needles, no bare wood.
-        let min_wood = if r.leaf_along { 0.25 } else { MIN_WOOD };
+        let min_wood = if r.leaf_along {
+            0.25
+        } else if order > 0 {
+            MIN_WOOD.max(r.twig)
+        } else {
+            MIN_WOOD
+        };
+        let spray = !r.leaf_along && order > 0 && r.twig > 0.0;
+        // A trunk with a 2 x 2 foot stays 2 x 2 up to its first branch: narrowing on the bare
+        // trunk steps it to one side, as if broken (the tree-look audit: araucaria, spruce).
+        let first = r.branch_start * len;
+        let thick_foot = order == 0 && (1.5..ROUND).contains(&width);
         while grown < len && width > 0.0 {
+            let shown = if thick_foot && grown < first { width.max(1.5) } else { width };
             let needle_top = r.leaf_along && order == 0 && grown > len * 0.85;
             if (width >= min_wood || order == 0) && !needle_top {
                 // A round trunk flares at its foot into buttresses (`flare`, `lobes`).
                 let foot = if order == 0 { (1.0 - grown / r.flare_up.max(STEP)).max(0.0) } else { 0.0 };
-                let w = width * (1.0 + r.flare * foot * foot);
+                let w = shown * (1.0 + r.flare * foot * foot);
+                self.out.4 = w;
                 last = Some(if w >= ROUND {
                     self.out
                         .wood_round(p, d, w, r.lobes * foot, self.turn, last)
                 } else {
-                    self.out.wood(p, d, width >= 1.5, last)
+                    self.out.wood(p, d, shown >= 1.5, last)
                 });
+            }
+            if spray && width < r.twig && needled != Some(block(p)) {
+                needled = Some(block(p));
+                self.out
+                    .cluster(p, r.leaf_r * 0.6, r.leaf_ry * 0.8, r.ragged, self.seed); // a leafy spray
             }
             if r.leaf_along && (order > 0 || grown > len * 0.3) && needled != Some(block(p)) {
                 needled = Some(block(p));
-                let (lr, lry) = if order == 0 { (1.4, 1.0) } else { (r.leaf_r, r.leaf_ry) };
-                self.out.cluster(p, lr, lry, r.ragged, self.seed); // needles on the twigs and the upper trunk
+                // On the trunk fuller, so its wood doesn't show through bare near the top.
+                let (lr, lry, rag) = if order == 0 { (1.4, 1.0, r.ragged * 0.4) } else { (r.leaf_r, r.leaf_ry, r.ragged) };
+                self.out.cluster(p, lr, lry, rag, self.seed); // needles on the twigs and the upper trunk
             }
             if order < r.orders && grown >= next_branch {
                 let n = r.branch_count.max(1);
                 let up = grown / len;
                 for i in 0..n {
                     let yaw = if n == 1 { spiral } else { spiral + 360.0 * i as f32 / n as f32 };
-                    let angle = r.branch_angle + self.rng.s() * 10.0;
+                    let angle = r.branch_angle + self.rng.s() * 10.0 * r.branch_var;
                     let mut bd = dir(angle, yaw);
                     if order > 0 {
                         bd = norm(add(bd, mul(d, 0.6))); // a twig follows its branch's way
                     }
-                    let blen = (len * r.branch_len).max(1.5) * (1.0 - r.taper * up).max(0.15) * (0.8 + 0.4 * self.rng.f());
+                    let blen = (len * r.branch_len).max(1.5) * (1.0 - r.taper * up).max(0.15) * (1.0 + 0.2 * r.branch_var * self.rng.s());
                     let blen = if order == 0 { blen } else { blen.min((len - grown) * 0.8 + 1.0) };
-                    self.limb(p, bd, width.min(1.4) * r.branch_width, order + 1, blen, [0.0; 3]);
+                    // Off a needled top (no wood drawn there) a branch is needles too, or its wood floats.
+                    let bw = width.min(1.4) * r.branch_width;
+                    let bw = if needle_top { bw.min(min_wood * 0.9) } else { bw };
+                    self.limb(p, bd, bw, order + 1, blen, [0.0; 3]);
                 }
                 spiral += 137.5;
                 next_branch = grown + r.branch_every * (0.8 + 0.4 * self.rng.f());
@@ -405,7 +447,9 @@ impl Grow<'_> {
             grown += STEP;
             width -= loss * STEP;
         }
-        if !(r.leaf_along && order > 0) && (order > 0 || r.orders == 0 && r.fronds == 0 || r.fork) {
+        // (A forked trunk ends at its fork, under its leaders: leaves there hung a skirt round the
+        // trunk below the crown, the tree-look audit.)
+        if !(r.leaf_along && order > 0) && (order > 0 || r.orders == 0 && r.fronds == 0) {
             self.out
                 .cluster(p, r.leaf_r, r.leaf_ry, r.ragged, self.seed); // leaves where the wood gave out
         }
@@ -427,7 +471,7 @@ impl Grow<'_> {
         self.out.cluster(top, 1.0, 0.9, 0.0, self.seed);
         for i in 0..r.fronds {
             let yaw = 360.0 * i as f32 / r.fronds as f32 + self.rng.s() * 12.0;
-            let mut d = dir(62.0 + self.rng.s() * 8.0, yaw);
+            let mut d = dir(r.frond_angle + self.rng.s() * r.frond_spread, yaw);
             let mut p = top;
             let mut l = 0.0;
             while l < r.frond_len * self.size {
@@ -443,6 +487,21 @@ impl Grow<'_> {
 /// The blocks of one tree of `recipe` from `seed`, relative to its base (see the module's notes),
 /// in a fixed order.
 pub fn blocks(recipe: &Recipe, seed: u64) -> Vec<(i32, i32, i32, Part)> {
+    grown(recipe, seed).0
+}
+
+/// Each wood block of `blocks(recipe, seed)` with the width of the widest limb through it (in
+/// blocks): for a look at thin branch blocks, the tree-look study.
+pub fn wood_widths(recipe: &Recipe, seed: u64) -> Vec<(i32, i32, i32, f32)> {
+    let (b, w) = grown(recipe, seed);
+    b.iter()
+        .filter(|b| matches!(b.3, Part::Log { .. }))
+        .map(|&(x, y, z, _)| (x, y, z, w.get(&(x, y, z)).copied().unwrap_or(1.0)))
+        .collect()
+}
+
+#[allow(clippy::type_complexity)]
+fn grown(recipe: &Recipe, seed: u64) -> (Vec<(i32, i32, i32, Part)>, std::collections::HashMap<(i32, i32, i32), f32>) {
     let mut rng = Rng(seed.wrapping_mul(0x2545_F491_4F6C_DD1D) ^ 0x5DEE_CE66);
     let size = 1.0 + recipe.size_var * rng.s();
     let height = recipe.height * size;
@@ -455,7 +514,7 @@ pub fn blocks(recipe: &Recipe, seed: u64) -> Vec<(i32, i32, i32, Part)> {
     let two = (1.5..ROUND).contains(&width);
     let foot = if two { [1.0, 0.0, 1.0] } else { [0.5, 0.0, 0.5] };
     let turn = if recipe.lobes > 0.0 { rng.f() * 90.0 } else { 0.0 };
-    let mut g = Grow { r: recipe, rng, out: Out(Default::default(), reach, max_height), seed, size, turn };
+    let mut g = Grow { r: recipe, rng, out: Out(Default::default(), reach, max_height, Default::default(), 0.0), seed, size, turn };
     g.limb(foot, start, width, 0, height.min(max_height as f32 - 2.0), lean);
     // The reach is measured from the trunk's middle: a 2 x 2's is at 1, so 1 more on the plus side.
     let lo = -reach;
@@ -468,7 +527,7 @@ pub fn blocks(recipe: &Recipe, seed: u64) -> Vec<(i32, i32, i32, Part)> {
         .map(|((x, y, z), p)| (x, y, z, p))
         .collect();
     out.sort_unstable_by_key(|b| (b.0, b.1, b.2)); // a fixed order, whatever the map's
-    out
+    (out, g.out.3)
 }
 
 /// Grows a tree of `recipe` at (`x`, `y`, `z`) (its base) from `seed`: `put(x, y, z, part)` for
@@ -490,8 +549,14 @@ mod tests {
     /// giants and the young ones too, or its crown falls by itself near a chopped log.
     #[test]
     fn every_leaf_grows_within_leaf_reach_of_a_log() {
-        use crate::tree_recipes::{SEQUOIA, YOUNG};
-        for r in RECIPES.iter().chain([&SEQUOIA]).chain(YOUNG.iter()) {
+        use crate::tree_recipes::{SEQUOIA, YOUNG, understory};
+        let under: Vec<Recipe> = RECIPES.iter().map(understory).collect();
+        for r in RECIPES
+            .iter()
+            .chain([&SEQUOIA])
+            .chain(YOUNG.iter())
+            .chain(under.iter())
+        {
             for seed in 0..20 {
                 let t = blocks(r, seed);
                 let logs: std::collections::HashSet<_> = t
@@ -568,6 +633,31 @@ mod tests {
                 // A scatter's shape keeps 4,096 blocks; past that the engine drops the rest
                 // (`dim.rs`), and a giant would lose its crown (the sequoia did).
                 assert!(t.len() <= 4096, "{name} {seed}: {} blocks, over a shape's 4,096", t.len());
+            }
+        }
+    }
+
+    /// The understory's young stay within their scatter's reach and stand on a log.
+    #[test]
+    fn every_understory_young_stays_in_its_reach() {
+        use crate::tree_recipes::{UNDERSTORY_REACH, understory};
+        for r in RECIPES {
+            let y = understory(r);
+            for seed in 0..30 {
+                let t = blocks(&y, seed);
+                let d = UNDERSTORY_REACH;
+                assert!(
+                    t.iter()
+                        .any(|&(x, y, z, p)| (x, y, z) == (0, 0, 0) && matches!(p, Part::Log { .. })),
+                    "{} {seed}",
+                    r.log
+                );
+                assert!(
+                    t.iter()
+                        .all(|b| b.0 >= -d && b.0 <= d && b.2 >= -d && b.2 <= d),
+                    "{} {seed}: out of reach",
+                    r.log
+                );
             }
         }
     }
