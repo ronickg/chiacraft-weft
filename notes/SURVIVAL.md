@@ -536,8 +536,9 @@ sword, about 100 XP.
 
 **13. The first hour and the first death** (2026-11-04, Research round 4, H1 and H2, via Planner):
 
-- **H1, no death spiral.** Respawning brings back the plain arrival clothes when none are worn
-  (the tombstone keeps what one wore), the stomach holds the arrival meal instead of nothing, and
+- **H1, no death spiral.** One respawns in the clothes and cloak one wore (the tombstone leaves
+  them out, `clothing::set_aside`; it once took them and each death gave a new plain set), or in
+  the plain arrival clothes with none, the stomach holds the arrival meal instead of nothing, and
   stamina comes back full. After respawning a hint says where the tombstone is (x and z, kept in
   `base_api::GRAVE`). The death screen's cause is the engine's (`core:death`, not done here).
 - **The campfire** is made in the inventory's 2x2 grid (two sticks over two logs) and cooks:

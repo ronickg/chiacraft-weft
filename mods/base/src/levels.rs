@@ -126,6 +126,9 @@ fn tick(w: &World) {
 /// What one carried goes into a tombstone where one died (the first open space at or over the
 /// spot), before the engine drops what's left.
 fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
+    if !w.creative(player) {
+        crate::clothing::set_aside(w, player);
+    }
     let inv = w.inventory(player);
     let carried: Vec<ItemStack> = (0..inv.size()).map(|i| inv.get(i)).collect();
     if carried.iter().all(|s| s.is_empty()) || w.creative(player) {
