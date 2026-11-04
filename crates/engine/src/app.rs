@@ -2628,6 +2628,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             .particles
             .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
         g.client.update_wires(&mut *r.gpu, &r.textures);
+        // The sun's shadow map first, for packs that use it.
+        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
     }
     r.list
         .push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });

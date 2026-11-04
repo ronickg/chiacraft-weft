@@ -70,11 +70,24 @@ pub fn set_shader_pack(dir: Option<PathBuf>) {
 /// glass) write depth, so screen effects find the water's surface (reflections), at the price of
 /// hiding blended particles behind them.
 pub fn translucent_depth() -> bool {
+    pack_flag("translucent_depth")
+}
+
+/// The chosen pack's `pack.cfg` says `sun_shadows = true`: the engine draws the terrain from the
+/// sun into a shadow map each frame (`scene.shadow`), and the pack's `world.wgsl` has the
+/// `fs_shadow` entry that pass uses.
+pub fn sun_shadows() -> bool {
+    pack_flag("sun_shadows")
+}
+
+/// `name = true` in the chosen shader pack's `pack.cfg`.
+fn pack_flag(name: &str) -> bool {
     let Some(dir) = SHADER_PACK.read().unwrap().clone() else { return false };
+    let want = format!("{name}=true");
     std::fs::read_to_string(dir.join("pack.cfg"))
         .unwrap_or_default()
         .lines()
-        .any(|l| l.replace(' ', "") == "translucent_depth=true")
+        .any(|l| l.replace(' ', "") == want)
 }
 
 /// The chosen pack's `name` mentions `what` (features the engine only pays for when used).
