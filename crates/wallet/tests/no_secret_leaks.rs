@@ -4,15 +4,16 @@
 //! 1. No log, print or panic macro anywhere in `crates/*/src` takes a secret: an argument naming
 //!    a mnemonic, passphrase or entropy, or calling `.expose()`, `.words()` or `.entropy()` (the
 //!    only ways a secret leaves [`chiacraft_wallet::Secret`] and [`chiacraft_wallet::Mnemonic`]).
-//! 2. The telemetry crate and the crash reporter don't know the wallet at all.
-//! 3. Nothing puts an account page value on the clipboard (`Event::Copy` in its module).
+//! 2. The engine's diagnostics and log setup (what a crash report or a shared log is made of)
+//!    don't know the wallet at all.
+//! 3. Nothing on the Account screen goes to the clipboard.
 //! 4. Every secret-bearing type formats as redacted.
 //! 5. The chain reader (`src/chain/`, feature `chain`) keeps spending keys only in `Secret` and
 //!    logs no spend bundle, coin spend, solution, signature or key.
 //!
-//! The runtime half, `tools/chiacraft/identity_check.py`, restores a known test account and greps
-//! the logs, the telemetry outbox, crash reports, the control socket's replies and the saves for
-//! its words.
+//! The paths are this repository's (chiacraft on Weft): `crates/wallet`, `crates/account`, the
+//! engine's `chiacraft/` parts and its admission code. The sponsor service (`crates/sponsor`) has
+//! a test of its own over its sources, logs and files.
 use std::path::{Path, PathBuf};
 
 const MACROS: &[&str] = &[
@@ -159,30 +160,25 @@ fn no_log_print_or_panic_takes_a_secret() {
 }
 
 #[test]
-fn telemetry_and_crash_reports_dont_know_the_wallet() {
-    let mut files = Vec::new();
-    rust_files(&repo().join("crates/horizon-telemetry/src"), &mut files);
-    files.push(repo().join("crates/horizon-client/src/crash.rs"));
-    files.push(repo().join("crates/horizon-client/src/telemetry.rs"));
+fn diagnostics_and_logging_dont_know_the_wallet() {
+    let files = [repo().join("crates/engine/src/diag.rs"), repo().join("crates/engine/src/log.rs")];
     let mut found = Vec::new();
     for f in files {
-        let text = std::fs::read_to_string(&f).unwrap_or_default();
-        for word in ["chiacraft_wallet", "account::", "Mnemonic", "Secret<"] {
+        let text = std::fs::read_to_string(&f).unwrap_or_else(|e| panic!("{}: {e}", f.display()));
+        for word in ["chiacraft_wallet", "chiacraft_account", "Mnemonic", "Secret<"] {
             if text.contains(word) {
                 found.push(format!("{}: {word}", f.display()));
             }
         }
     }
     assert!(found.is_empty(), "{}", found.join("\n"));
-    let toml = std::fs::read_to_string(repo().join("crates/horizon-telemetry/Cargo.toml")).unwrap();
-    assert!(!toml.contains("horizon-wallet"));
 }
 
 #[test]
-fn the_account_page_copies_nothing() {
-    let page = repo().join("crates/horizon-client/src/menus/account.rs");
-    let text = std::fs::read_to_string(&page).expect("the account page");
-    for word in ["Event::Copy", "clipboard"] {
+fn the_account_screen_copies_nothing() {
+    let page = repo().join("crates/engine/src/chiacraft/account_screen.rs");
+    let text = std::fs::read_to_string(&page).expect("the account screen");
+    for word in ["clipboard", "Event::Copy"] {
         assert!(
             !text
                 .lines()
@@ -235,24 +231,23 @@ const CHAIN_WORDS: &[&str] = &["bundle", "coin_spend", "coin_spends", "solution"
 
 fn chain_sources() -> Vec<PathBuf> {
     let mut out = Vec::new();
-    rust_files(&repo().join("crates/horizon-wallet/src/chain"), &mut out);
+    rust_files(&repo().join("crates/wallet/src/chain"), &mut out);
     out
 }
 
-/// The game's code that signs or spends with wallet keys (identity row I7): the admission policy
-/// engine (offers signed with the server account's keys), the player's wallet calls (taking an
-/// offer, holding proofs), the admission screen and the door.
+/// The game's code that signs or spends with wallet keys (phase 4): the account (its DID's owner
+/// key, the join's DID proof), the chain reader's use in the game, the account's and the world's
+/// DIDs (the owner's metadata spend), and admission (the DID check at the join).
 fn admission_sources() -> Vec<PathBuf> {
-    let client = repo().join("crates/horizon-client/src");
-    let mut out = vec![
-        client.join("admission.rs"),
-        client.join("wallet_chain.rs"),
-        client.join("game/admission.rs"),
-        client.join("lan/admission.rs"),
-        client.join("account.rs"),
-    ];
-    rust_files(&client.join("admission"), &mut out);
-    out
+    let engine = repo().join("crates/engine/src");
+    vec![
+        repo().join("crates/account/src/lib.rs"),
+        engine.join("chiacraft/chain.rs"),
+        engine.join("chiacraft/did.rs"),
+        engine.join("chiacraft/worlds/world_did.rs"),
+        engine.join("chiacraft/worlds/admission.rs"),
+        engine.join("server/admission.rs"),
+    ]
 }
 
 fn mentions(args: &str, words: &[&str]) -> Option<String> {
@@ -361,19 +356,19 @@ fn wallet_keys_format_redacted() {
     assert!(!json.contains(&chiacraft_wallet::keys::hex(&chiacraft_wallet::keys::facts_of(&m).master)));
 }
 
-/// Identity row I8's code: the sponsor contract, hardened addresses, DIDs made and linked from the
-/// Account page (its passphrase prompt), the admission screen's prompt, the verified-DID mark.
+/// The DID code (phase 4): the sponsor contract, keys and hardened addresses, the accounts file
+/// (the linked DID), the Account screen, and getting and linking DIDs in the game.
 fn did_sources() -> Vec<PathBuf> {
-    let client = repo().join("crates/horizon-client/src");
-    let wallet = repo().join("crates/horizon-wallet/src");
+    let wallet = repo().join("crates/wallet/src");
+    let engine = repo().join("crates/engine/src");
     vec![
         wallet.join("sponsor.rs"),
         wallet.join("keys.rs"),
         wallet.join("accounts.rs"),
-        client.join("menus/account.rs"),
-        client.join("player_list.rs"),
-        client.join("wallet_chain.rs"),
-        client.join("game/admission.rs"),
+        repo().join("crates/account/src/lib.rs"),
+        engine.join("chiacraft/account_screen.rs"),
+        engine.join("chiacraft/did.rs"),
+        engine.join("chiacraft/worlds/world_did.rs"),
     ]
 }
 
@@ -394,21 +389,6 @@ fn did_code_logs_no_spend_key_or_passphrase() {
         }
     }
     assert!(found.is_empty(), "{}", found.join("\n"));
-    // Both passphrase prompts draw their field as a secret (dots; redacted to the control socket).
-    for (file, field) in
-        [("crates/horizon-client/src/menus/account.rs", "PASS,"), ("crates/horizon-client/src/game/admission.rs", "\"admission.pass\",")]
-    {
-        let text = std::fs::read_to_string(repo().join(file)).unwrap();
-        let mut seen = 0;
-        for (i, _) in text.match_indices(field) {
-            let after = &text[i..(i + 400).min(text.len())];
-            if after.contains("ui.account.pass\"") {
-                seen += 1;
-                assert!(after.contains("secret: true"), "{file}: {field} not secret");
-            }
-        }
-        assert!(seen > 0, "{file}: no passphrase field found");
-    }
 }
 
 #[test]
@@ -425,13 +405,8 @@ fn sponsor_requests_carry_nothing_secret() {
 
 /// Achievements (identity row I10): the credential, the store, the game's granting and the page.
 fn achievement_sources() -> Vec<PathBuf> {
-    let client = repo().join("crates/horizon-client/src");
-    vec![
-        repo().join("crates/horizon-wallet/src/achievement.rs"),
-        client.join("achievements.rs"),
-        client.join("game/achievements.rs"),
-        client.join("menus/achievements.rs"),
-    ]
+    // The game grants none yet (phase 4 after DIDs): the credential alone.
+    vec![repo().join("crates/wallet/src/achievement.rs")]
 }
 
 /// Whether line `i` of `text` comes after its `#[cfg(test)]` module starts (tests make
@@ -488,12 +463,12 @@ fn achievements_sign_only_through_the_signer_for_the_call() {
 /// `account::server_words`) the same.
 #[test]
 fn the_live_test_tool_writes_no_secret() {
-    let wallet = repo().join("crates/horizon-wallet/src");
+    let wallet = repo().join("crates/wallet/src");
     let files = [
         wallet.join("chain/tool.rs"),
         wallet.join("bin/chiacraft-wallet-test.rs"),
         wallet.join("spending.rs"),
-        repo().join("crates/horizon-client/src/account.rs"),
+        repo().join("crates/account/src/lib.rs"),
     ];
     let mut found = Vec::new();
     for path in &files {
@@ -519,55 +494,22 @@ fn the_live_test_tool_writes_no_secret() {
     assert!(found.is_empty(), "{}", found.join("\n"));
 }
 
-/// The onboarding server's scripts (I12, `packaging/onboarding/`) never trace or echo the wallet
-/// words: no `set -x`, no `echo`/`printf` of a words variable to the terminal, and the templates
-/// name no words variable but the comment pointing at the environment. The runtime half is
-/// `tools/chiacraft/onboarding_check.py`.
+/// The sponsor's example settings and README name the words only by where they are kept (a file
+/// or an environment variable), never hold any.
 #[test]
-fn the_onboarding_scripts_print_no_words() {
-    let dir = repo().join("packaging/onboarding");
+fn the_sponsors_settings_hold_no_words() {
+    let dir = repo().join("crates/sponsor");
     let mut found = Vec::new();
-    let mut scripts = 0;
-    for e in std::fs::read_dir(&dir).unwrap().flatten() {
-        let path = e.path();
-        if path.is_dir() {
-            continue; // the achievements package: content, no script
-        }
-        let text = std::fs::read_to_string(&path).unwrap();
-        let name = path.display().to_string();
-        if name.ends_with(".sh") {
-            scripts += 1;
-        }
+    for name in ["sponsor.example.toml", "README.md"] {
+        let path = dir.join(name);
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         for (i, l) in text.lines().enumerate() {
             let t = l.trim_start();
-            if t.starts_with('#') {
-                continue;
-            }
-            let traces = t.contains("set -o xtrace")
-                || t.split_whitespace()
-                    .collect::<Vec<_>>()
-                    .windows(2)
-                    .any(|w| w[0] == "set" && w[1].starts_with('-') && w[1].contains('x'));
-            if traces {
-                found.push(format!("{name}:{}: traces commands", i + 1));
-            }
-            let words_var =
-                ["$HORIZON_SERVER_WORDS", "${HORIZON_SERVER_WORDS", "$HORIZON_SPONSOR_WORDS", "${HORIZON_SPONSOR_WORDS", "${!direct"]
-                    .iter()
-                    .any(|v| {
-                        t.match_indices(v)
-                            .any(|(at, _)| !t[at + v.len()..].starts_with("_FILE"))
-                    });
-            let prints = t.contains("echo ") || t.contains("printf ");
-            // The one comparison prints into a pipe that normalises it, never to the terminal.
-            if words_var && prints && !t.contains("| tr -s") {
-                found.push(format!("{name}:{}: prints a words variable", i + 1));
-            }
-            if name.ends_with(".template") && t.contains("WORDS") {
-                found.push(format!("{name}:{}: a template names words", i + 1));
+            // A words value written in: `words = "…"` (only `words_file` may be set).
+            if t.starts_with("words") && !t.starts_with("words_file") && t.contains('=') {
+                found.push(format!("{}:{}: words written in", path.display(), i + 1));
             }
         }
     }
-    assert!(scripts >= 1, "found the scripts in {}", dir.display());
     assert!(found.is_empty(), "{}", found.join("\n"));
 }

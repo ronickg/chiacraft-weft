@@ -849,7 +849,9 @@ impl Running {
                     }
                     self.return_home();
                     self.screens.clear();
-                    self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] }));
+                    // A world's refusal at the door (chiacraft, `admission`) in this player's language.
+                    let why = crate::admission::refusal_from_text(&e).map_or(Arg::Text(e), Arg::Msg);
+                    self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![why] }));
                     return;
                 }
             }
@@ -928,7 +930,7 @@ impl Running {
 
     /// Plays in the world `server` runs in this process.
     fn play_local(&mut self, server: ServerHandle, world: String, identity: Option<Arc<crate::world_address::WorldIdentity>>) {
-        crate::admission::set_local_world(server.dir.clone());
+        crate::admission::set_local_world(server.dir.clone(), identity.clone());
         let (client_conn, server_conn) = net::local_pair();
         let _ = server.connect.send(server_conn);
         let key = net::p2p::player_key(&self.settings.run_dir);
@@ -2104,7 +2106,7 @@ fn start_frame(r: &mut Running, opts: &Options, dt: f64) {
         r.links_seen = links_now;
         if r.screens
             .last()
-            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission"].contains(&s.name()))
+            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission", "core:account"].contains(&s.name()))
         {
             r.rebuild_all();
         }

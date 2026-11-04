@@ -10,7 +10,8 @@ Read `notes/PLAN.md` first: it is the plan and the decisions. This page says whe
   1. The texture pack Weft built from a player's Minecraft copy is removed.
   2. `crates/wallet` (`chiacraft-wallet`): the wallet core from the Horizon-based chiacraft
      (`horizon-wallet` at `101dee332`), renamed. Env vars still use the `HORIZON_` prefix
-     (`HORIZON_WALLET_STORE`, `HORIZON_WALLET_PASSPHRASE`, the live test tool's); rename later.
+     (the live test tool's); `CHIACRAFT_WALLET_STORE` and `CHIACRAFT_WALLET_PASSPHRASE` replaced
+     `HORIZON_WALLET_*` (2026-11-04; the old names are still read).
   3. `notes/PLAN.md`.
   4. Phase 1, the account (see below).
 
@@ -267,6 +268,19 @@ the server checks the proof, then the chain on a thread (`server/admission.rs` `
 `did_answers`), waits up to 25 s only when the rules ask for a DID (`Rules::needs_did`), and keeps
 `did` in the player file. `/didrule required on|off`, `/didrule age <days>`, and the screen.
 
+Slices 5 and 7 (2026-11-04, built, not yet seen on testnet11). `crates/sponsor`
+(`chiacraft-sponsor`): Horizon's sponsor on iroh (`chiacraft/sponsor/1`, JSON request and answer,
+key in `<data_dir>/sponsor.key`), feature `service` for the binary; a proof of work per request and
+the budget released by the hour; world requests (`Request::sign_world`, `WorldAsk`: a world DID
+launched to the owner's address with `WorldMeta` and a gift for the listing fee). The wallet:
+`chain/world.rs` (`WorldMeta`, `OwnerMeta`, `DidMetadata`, `world_link_expecting`),
+`build_eve_dids_with`, `set_did_metadata` (an update carries the new metadata as a memo, since
+chia-sdk-driver's `parse_child` assumes it unchanged). The game: `chiacraft/did.rs` (the Account
+screen's Get a DID / Link a DID, asking `core:sponsors` through `p2p::ask_sponsor`), and
+`worlds/world_did.rs` (`did.json` in the world folder; Get a DID for This World on the Who May
+Come In screen, then the owner's DID lists it; the status answer carries both DIDs and the saved
+worlds list checks them both ways). Our sponsor: see "Our DID sponsor" below.
+
 ## Phase 6, sandboxed code mods
 
 Slice 1 (server halves) is built; the design for Ronald to agree is `reports/Sandboxed code
@@ -377,6 +391,24 @@ no release builds now. With it, the mod UI ABI got `at` (b2877719: `UiNode::at`,
 `S::at_pivot`, onto the engine's `Style::at`), for the UI redo's numbers inside bars.
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
 and chain steps, client halves (slice 4), personal mods per world (slice 5), `/mods` (slice 6).
+
+## Our DID sponsor (testnet11, since 2026-11-04)
+
+Ronald's yes: "testnet only". It runs on Ronald's Mac from the throwaway testnet11 wallet
+(`~/chiacraft-testnet/sponsor.words`, never printed or copied), in `~/chiacraft-testnet-sponsor/`:
+`sponsor.toml` (testnet11, `data_dir` and `words_file`), its own copy of the binary, `sponsor.log`,
+and `data/` (`sponsor.key`, the iroh key behind its address; `sponsor-log.jsonl`, what it launched).
+Its address, the game's default `core:sponsors`, is
+`d468728d7e0e3f417c822af6e87ff924c0adbdeeb89a3c0f2d0745b2de40a792`. Funding address
+`txch124f375vnry5zfk5ss8qv2ucw3ayhhnjz25x7m9w4gspw0rh8u8zs7xhj5x` (top up from a testnet faucet).
+To start it again:
+
+```sh
+cd ~/chiacraft-testnet-sponsor && ./chiacraft-sponsor --config sponsor.toml >> sponsor.log 2>&1 &
+```
+
+Mainnet stays off: the binary refuses mainnet without `allow_mainnet = true`, and that needs
+Ronald's own yes.
 
 ## Side mods
 

@@ -24,15 +24,22 @@ use crate::ui::text::{Arg, Msg};
 /// Raised whenever a world's rules, bans or lists are saved: the Admission screen shows them anew.
 pub static GENERATION: AtomicU64 = AtomicU64::new(0);
 
-/// The world this game runs (its folder), for the Admission screen.
-static LOCAL_WORLD: parking_lot::Mutex<Option<PathBuf>> = parking_lot::Mutex::new(None);
+type LocalWorld = (Option<PathBuf>, Option<std::sync::Arc<crate::world_address::WorldIdentity>>);
 
-pub fn set_local_world(dir: Option<PathBuf>) {
-    *LOCAL_WORLD.lock() = dir;
+/// The world this game runs (its folder and key), for the Admission screen.
+static LOCAL_WORLD: parking_lot::Mutex<LocalWorld> = parking_lot::Mutex::new((None, None));
+
+pub fn set_local_world(dir: Option<PathBuf>, identity: Option<std::sync::Arc<crate::world_address::WorldIdentity>>) {
+    *LOCAL_WORLD.lock() = (dir, identity);
 }
 
 pub fn local_world() -> Option<PathBuf> {
-    LOCAL_WORLD.lock().clone()
+    LOCAL_WORLD.lock().0.clone()
+}
+
+/// The key of the world this game runs.
+pub fn local_identity() -> Option<std::sync::Arc<crate::world_address::WorldIdentity>> {
+    LOCAL_WORLD.lock().1.clone()
 }
 
 pub const RULES_FILE: &str = "admission.json";
@@ -411,18 +418,37 @@ pub fn summary(rules: &Rules) -> Vec<(String, i64)> {
     out
 }
 
+/// A file that is there but won't read or parse is moved aside as `<name>.bad-<seconds>` and
+/// logged as an error, and the world starts from empty: never written over, so a damaged
+/// `bans.json` loses no ban (research round 5). The same as `chiacraft-store`'s `JsonStore`
+/// (phase 3 leftovers); this moves to it once that crate is in `dev`.
 fn read_json<T: for<'a> Deserialize<'a> + Default>(path: &Path) -> T {
-    match std::fs::read(path) {
-        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|e| {
-            log::warn!("{} can't be read, so it counts as empty: {e}", path.display());
-            T::default()
-        }),
-        Err(_) => T::default(),
+    let why = match std::fs::read(path) {
+        Ok(bytes) => match serde_json::from_slice(&bytes) {
+            Ok(v) => return v,
+            Err(e) => e.to_string(),
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return T::default(),
+        Err(e) => e.to_string(),
+    };
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(format!(".bad-{}", crate::saves::now_secs()));
+    let aside = path.with_file_name(name);
+    match std::fs::rename(path, &aside) {
+        Ok(()) => log::error!("{} could not be read ({why}): kept as {}, starting empty", path.display(), aside.display()),
+        Err(e) => log::error!("{} could not be read ({why}) nor moved aside ({e}): it will not be written over", path.display()),
     }
+    T::default()
 }
 
-/// Whole or not at all.
+/// Whole or not at all, and never over a file that is there but doesn't parse (it couldn't be
+/// moved aside: saving would lose it).
 fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
+    if let Ok(bytes) = std::fs::read(path)
+        && serde_json::from_slice::<serde_json::Value>(&bytes).is_err()
+    {
+        return Err(format!("{} could not be read, so it is not written over", path.display()));
+    }
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
@@ -495,7 +521,7 @@ pub fn load_list(world: &Path, maintainer: &str) -> Option<BanList> {
         Ok(l) if l.maintainer == maintainer => Some(l),
         Ok(_) => None,
         Err(e) => {
-            log::warn!("the ban list of {}: {e}", &maintainer[..12]);
+            log::warn!("the ban list of {}: {e}", maintainer.chars().take(12).collect::<String>());
             None
         }
     }
@@ -516,6 +542,55 @@ pub fn store_list(world: &Path, list: &BanList) -> Result<bool, String> {
 pub fn held_list(world: &Path, maintainer: &str) -> Option<Vec<u8>> {
     let bytes = std::fs::read(list_path(world, maintainer)?).ok()?;
     (bytes.len() <= MAX_LIST_BYTES).then_some(bytes)
+}
+
+/// The bans that keep the login key `key` out of the world in `world` (its own and the lists it
+/// follows), checked at the door: before the world serves the joining game anything, when only
+/// the connection's key is known. The rest of the rules wait for the join, which proves the
+/// identity and the DID.
+pub fn at_the_door(world: &Path, key: &str) -> Option<Msg> {
+    let gate = Gate::new(Some(world.to_path_buf()));
+    let rules = Rules { only_listed: false, did_required: false, did_min_days: 0, ..gate.rules.clone() };
+    let who = Who { key: key.to_string(), ..Default::default() };
+    match verdict(&rules, &gate.bans, &gate.lists, &who, false, crate::saves::now_secs()) {
+        Verdict::Refuse(m) => Some(m),
+        Verdict::Admit => None,
+    }
+}
+
+/// A refusal as one line of text for a reply that carries only text (the hello's): the lang key
+/// and its text arguments, separated by U+001F. [`refusal_from_text`] reads it back.
+pub fn refusal_text(m: &Msg) -> String {
+    let mut parts = vec![m.key.clone()];
+    parts.extend(m.args.iter().map(|a| match a {
+        Arg::Text(t) => t.replace('\u{1f}', " "),
+        Arg::Int(n) => n.to_string(),
+        Arg::Key(k) => format!("@{k}"),
+        _ => String::new(),
+    }));
+    parts.join("\u{1f}")
+}
+
+/// A refusal written by [`refusal_text`], as a message to show; none for any other text. Only
+/// `admission.` keys, so a world can't make the game say anything else.
+pub fn refusal_from_text(text: &str) -> Option<Msg> {
+    let mut parts = text.split('\u{1f}');
+    let key = parts.next()?;
+    if !key.starts_with("admission.")
+        || !key
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_')
+    {
+        return None;
+    }
+    let args = parts
+        .map(|p| match (p.strip_prefix('@'), p.parse::<i64>()) {
+            (Some(k), _) if k.starts_with("admission.") => Arg::Key(k.to_string()),
+            (_, Ok(n)) => Arg::Int(n),
+            _ => Arg::Text(p.chars().take(200).collect()),
+        })
+        .collect();
+    Some(Msg::new(key, args))
 }
 
 /// Whether the world follows a list it holds no copy of yet (fetched again soon, not daily).
@@ -805,8 +880,22 @@ mod tests {
     }
 
     #[test]
+    fn refusals_survive_a_text_reply() {
+        let m = Msg::new("admission.banned_for", vec![Arg::Int(3), Arg::Text("grief\u{1f}ing".into())]);
+        let back = refusal_from_text(&refusal_text(&m)).unwrap();
+        assert_eq!(back, Msg::new("admission.banned_for", vec![Arg::Int(3), Arg::Text("grief ing".into())]));
+        let m = Msg::new("admission.banned", vec![Arg::Key("admission.no_reason".into())]);
+        assert_eq!(refusal_from_text(&refusal_text(&m)), Some(m));
+        assert_eq!(refusal_from_text("protocol mismatch: server 7, client 6"), None);
+        assert_eq!(refusal_from_text("menu.quit\u{1f}x"), None);
+        let at = Msg::new("admission.banned", vec![Arg::Key("menu.quit".into())]);
+        assert!(matches!(refusal_from_text(&refusal_text(&at)).unwrap().args[0], Arg::Text(_)));
+    }
+
+    #[test]
     fn durations_and_kinds() {
         assert_eq!(parse_duration("30m"), Some(1800));
+        assert_eq!(parse_duration("3ü"), None);
         assert_eq!(parse_duration("12h"), Some(43_200));
         assert_eq!(parse_duration("7d"), Some(604_800));
         assert_eq!(parse_duration("2w"), Some(1_209_600));
@@ -871,6 +960,33 @@ mod tests {
         assert_eq!(maintainer_of(&f, &owners(&dir)), Some(list.maintainer.clone()));
         f.maintainer = "ab".repeat(48);
         assert_eq!(maintainer_of(&f, &owners(&dir)), Some("ab".repeat(48)));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_damaged_file_is_kept_aside_not_lost() {
+        let dir = std::env::temp_dir().join(format!("chiacraft-admission-bad-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(BANS_FILE), b"{\"bans\": [ {\"kind\": \"key\", \"value\": \"k1\"} ").unwrap();
+        assert!(load_bans(&dir).bans.is_empty());
+        let kept: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.starts_with("bans.json.bad-"))
+            .collect();
+        assert_eq!(kept.len(), 1, "{kept:?}");
+        assert!(
+            std::fs::read_to_string(dir.join(&kept[0]))
+                .unwrap()
+                .contains("k1")
+        );
+        // Moved aside: saving is safe again. A damaged file still in place is not written over.
+        save_bans(&dir, &Bans::default()).unwrap();
+        std::fs::write(dir.join(RULES_FILE), b"not json").unwrap();
+        assert!(save_rules(&dir, &Rules::default()).is_err());
+        assert_eq!(std::fs::read(dir.join(RULES_FILE)).unwrap(), b"not json");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
