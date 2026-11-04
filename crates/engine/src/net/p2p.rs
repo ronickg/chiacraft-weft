@@ -22,10 +22,14 @@ const STATUS_ALPN: &[u8] = b"chiacraft/status/1";
 const LINKS_ALPN: &[u8] = b"chiacraft/links/1";
 /// A player's worlds, for their friends, and where their worlds moved, for anyone (`friends`).
 const WORLDS_ALPN: &[u8] = b"chiacraft/worlds/1";
+/// Ban lists a world holds, its own and the ones it follows, for anyone (`admission`).
+const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// 3: `Join` carries the account's vouching (chiacraft). 4: the hello offers the world's data
 /// packages, which the joining game downloads and loads before it is let in (chiacraft). 5: the
-/// hello may carry a travel ticket from a linked world's portal (chiacraft, `travel`).
-const PROTOCOL: u32 = 5;
+/// hello may carry a travel ticket from a linked world's portal (chiacraft, `travel`). 6: a world
+/// refuses with a reason in the player's language (`ToClient::Refused`), and its status says
+/// what its admission rules ask (chiacraft, `admission`).
+const PROTOCOL: u32 = 6;
 const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, and its
@@ -193,7 +197,7 @@ async fn endpoint(settings: &Settings, who: Who) -> Result<Endpoint, String> {
             .address_lookup(DhtAddressLookup::builder()),
         Who::World(key) => b
             .secret_key(*key)
-            .alpns(vec![ALPN.to_vec(), STATUS_ALPN.to_vec()])
+            .alpns(vec![ALPN.to_vec(), STATUS_ALPN.to_vec(), BANS_ALPN.to_vec()])
             .address_lookup(DhtAddressLookup::builder()),
         Who::Anonymous => b.secret_key(throwaway_key()),
     };
@@ -496,6 +500,8 @@ pub static HOSTING: Mutex<Option<Hosting>> = Mutex::new(None);
 
 /// The hosting endpoint (chiacraft), closed when hosting stops.
 static HOST_ENDPOINT: Mutex<Option<Endpoint>> = Mutex::new(None);
+/// The settings the hosted world was opened with (its relays), for fetching its ban lists.
+static HOST_SETTINGS: Mutex<Option<Settings>> = Mutex::new(None);
 
 /// Starts accepting players for the running server. The ticket appears in `HOSTING` once the
 /// endpoint is online.
@@ -510,6 +516,8 @@ pub struct HostWorld {
     /// The owner's account endpoint (their inbox for link requests) and their identity's vouching
     /// for it; empty without an account.
     pub inbox: (String, String),
+    /// The world's folder: its admission rules (summed up in the status) and ban lists (served).
+    pub dir: Option<std::path::PathBuf>,
 }
 
 /// Starts hosting under the world's own key: its address appears in `HOSTING` once the endpoint
@@ -520,6 +528,7 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
         return;
     }
     *HOSTING.lock() = Some(Hosting { ticket: None, error: None });
+    *HOST_SETTINGS.lock() = Some(settings.clone());
     let settings = settings.clone();
     runtime().spawn(async move {
         let key = hw.identity.key();
@@ -547,6 +556,15 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
             h.ticket = Some(t);
         }
         let hw = std::sync::Arc::new(hw);
+        // The ban lists it follows: now, then daily while it is open.
+        if let Some(dir) = hw.dir.clone() {
+            tokio::spawn(async move {
+                while HOSTING.lock().is_some() {
+                    fetch_lists(&dir).await;
+                    tokio::time::sleep(Duration::from_secs(24 * 3600)).await;
+                }
+            });
+        }
         while let Some(incoming) = ep.accept().await {
             let (connect, hw, key) = (connect.clone(), hw.clone(), key.clone());
             tokio::spawn(async move {
@@ -556,6 +574,8 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
                 };
                 if conn.alpn() == STATUS_ALPN {
                     serve_status(conn, world, &hw).await;
+                } else if conn.alpn() == BANS_ALPN {
+                    serve_bans(conn, hw.dir.clone()).await;
                 } else if let Err(e) = accept(conn, connect, world, &key).await {
                     log::warn!("incoming player: {e}");
                 }
@@ -578,6 +598,9 @@ pub struct Status {
     pub package_bytes: u64,
     /// The owner's account endpoint, where link requests go: only if the owner vouches for it.
     pub inbox: String,
+    /// What its admission rules ask, as lang keys with a number (`admission::summary`); empty:
+    /// open to all, or a world from before protocol 6.
+    pub admission: Vec<(String, i64)>,
 }
 
 async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::content::Content, hw: &HostWorld) {
@@ -588,8 +611,15 @@ async fn serve_status(conn: iroh::endpoint::Connection, world: &'static crate::c
         (PROTOCOL, hw.name.clone(), hw.identity.cert.text(), players, packages.len() as u32, packages.iter().map(|p| p.3).sum::<u64>()),
         hw.inbox.clone(),
     );
+    let admission = hw
+        .dir
+        .as_deref()
+        .map(|d| crate::admission::summary(&crate::admission::load_rules(d)))
+        .unwrap_or_default();
     let mut w = codec::W::default();
     codec::Wire::put(&answer, &mut w);
+    // After the rest, so a game from before protocol 6 still reads the start.
+    codec::Wire::put(&admission, &mut w);
     if write_frame(&mut send, &w.0).await.is_ok() {
         let _ = send.finish();
         // Wait for the asker to read it and close.
@@ -615,9 +645,14 @@ async fn status_on(ep: &Endpoint, addr: EndpointAddr, wait: Duration) -> Result<
         write_frame(&mut send, &[]).await?;
         let frame = read_frame_max(&mut recv, 8 << 10).await?;
         conn.close(0u32.into(), b"thanks");
+        let mut r = codec::R(&frame);
         let ((protocol, name, cert, players, packages, package_bytes), (inbox, vouch)) =
-            <((u32, String, String, u32, u32, u64), (String, String)) as codec::Wire>::get(&mut codec::R(&frame))
+            <((u32, String, String, u32, u32, u64), (String, String)) as codec::Wire>::get(&mut r)
                 .ok_or("a status this game can't read")?;
+        let mut admission = <Vec<(String, i64)> as codec::Wire>::get(&mut r).unwrap_or_default();
+        // Only keys this game knows, so a world can't make a list say anything.
+        admission.retain(|(k, _)| k.starts_with("admission.summary."));
+        admission.truncate(8);
         // The certificate must be for the key that answered, and the inbox the owner's.
         let owner = crate::world_address::WorldCert::parse(&cert)
             .ok()
@@ -638,6 +673,7 @@ async fn status_on(ep: &Endpoint, addr: EndpointAddr, wait: Duration) -> Result<
             packages,
             package_bytes,
             inbox,
+            admission,
         })
     })
     .await
@@ -660,6 +696,109 @@ pub fn ping(address: &str, settings: &Settings) -> crossbeam_channel::Receiver<R
         }
     }
     rx
+}
+
+/// Answers `chiacraft/bans/1`: the asker names a maintainer (identity hex), the world answers
+/// with the copy of their ban list it holds, or nothing. Lists are signed, so it serves any.
+async fn serve_bans(conn: iroh::endpoint::Connection, dir: Option<std::path::PathBuf>) {
+    let Ok(Ok((mut send, mut recv))) = tokio::time::timeout(Duration::from_secs(5), conn.accept_bi()).await else { return };
+    let Ok(Ok(asked)) = tokio::time::timeout(Duration::from_secs(5), read_frame_max(&mut recv, 256)).await else { return };
+    let maintainer = String::from_utf8_lossy(&asked).into_owned();
+    let list = match dir {
+        Some(d) => tokio::task::spawn_blocking(move || crate::admission::held_list(&d, &maintainer))
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_default(),
+        None => Vec::new(),
+    };
+    if write_frame(&mut send, &list).await.is_ok() {
+        let _ = send.finish();
+        let _ = tokio::time::timeout(Duration::from_secs(5), conn.closed()).await;
+    }
+}
+
+/// Asks the world at `address` for `maintainer`'s ban list.
+async fn ask_list(ep: &Endpoint, address: &str, maintainer: &str) -> Result<crate::admission::BanList, String> {
+    let addr = parse_ticket(address)?;
+    tokio::time::timeout(Duration::from_secs(15), async {
+        let conn = ep
+            .connect(addr, BANS_ALPN)
+            .await
+            .map_err(|e| e.to_string())?;
+        let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+        write_frame(&mut send, maintainer.as_bytes()).await?;
+        let frame = read_frame_max(&mut recv, crate::admission::MAX_LIST_BYTES).await?;
+        conn.close(0u32.into(), b"thanks");
+        if frame.is_empty() {
+            return Err("it holds no such list".to_string());
+        }
+        let list = crate::admission::BanList::parse(&frame)?;
+        if list.maintainer != maintainer {
+            return Err("it sent someone else's list".into());
+        }
+        Ok(list)
+    })
+    .await
+    .unwrap_or_else(|_| Err("no answer".into()))
+}
+
+/// Fetches the ban lists the world in `dir` follows from where each is served, keeping each
+/// newer version that its maintainer signed.
+async fn fetch_lists(dir: &std::path::Path) {
+    let rules = crate::admission::load_rules(dir);
+    if rules.lists.is_empty() {
+        return;
+    }
+    let Some(settings) = HOST_SETTINGS.lock().clone() else { return };
+    let Ok(ep) = endpoint(&settings, Who::Anonymous).await else { return };
+    for f in rules.lists.iter().take(crate::admission::MAX_LISTS) {
+        for from in f.from.iter().take(4) {
+            let Some(key) = crate::admission::world_key(from) else { continue };
+            // Whose list: the one named, else the owner of that world, as its certificate says.
+            let maintainer = if f.maintainer.is_empty() {
+                let Ok(addr) = parse_ticket(from) else { continue };
+                match status_on(&ep, addr, Duration::from_secs(10)).await {
+                    Ok(st) if !st.owner.is_empty() => {
+                        let (d, k, o) = (dir.to_path_buf(), key.clone(), st.owner.clone());
+                        if let Ok(Err(e)) = tokio::task::spawn_blocking(move || crate::admission::set_owner(&d, &k, &o)).await {
+                            log::warn!("{e}");
+                        }
+                        st.owner
+                    }
+                    Ok(_) => {
+                        log::info!("ban list from {}: that world's certificate doesn't check out", &key[..12.min(key.len())]);
+                        continue;
+                    }
+                    Err(e) => {
+                        log::info!("ban list from {}: {e}", &key[..12.min(key.len())]);
+                        continue;
+                    }
+                }
+            } else {
+                f.maintainer.clone()
+            };
+            match ask_list(&ep, from, &maintainer).await {
+                Ok(list) => {
+                    let (d, name, seq) = (dir.to_path_buf(), list.name.clone(), list.seq);
+                    match tokio::task::spawn_blocking(move || crate::admission::store_list(&d, &list)).await {
+                        Ok(Ok(true)) => log::info!("ban list '{name}' version {seq} fetched"),
+                        Ok(Ok(false)) => log::info!("ban list '{name}' is up to date (version {seq})"),
+                        Ok(Err(e)) => log::warn!("ban list '{name}': {e}"),
+                        Err(_) => {}
+                    }
+                    break;
+                }
+                Err(e) => log::info!("ban list of {} from {}: {e}", &maintainer[..12.min(maintainer.len())], &key[..12.min(key.len())]),
+            }
+        }
+    }
+    ep.close().await;
+}
+
+/// [`fetch_lists`] in the background.
+pub fn fetch_ban_lists(dir: std::path::PathBuf) {
+    runtime().spawn(async move { fetch_lists(&dir).await });
 }
 
 pub fn stop_hosting() {

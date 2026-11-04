@@ -230,6 +230,29 @@ the trip ("on the way"); both added each other from the link; alice joined bob's
 Friends screen; bob gave his world a new address; alice's saved entry followed it. Test scripts:
 build scripts that contain addresses with Python, not sed (`&` in the replacement).
 
+## Phase 4: admission rules, bans and ban lists (2026-11-03, built, the two-game check pending)
+
+Slices 1-3 of phase 4 (`notes/PLAN.md`). `crates/engine/src/chiacraft/worlds/admission.rs`: the
+world's `admission.json` (`Rules`: `only_listed`, `allow`, `probation`, `lists`) and `bans.json`
+(`Bans`), the verdict on a join (`verdict`: bans, then the allow list, then followed lists, then
+"allow list only"; the owner and operators always in), probation (`probation_for`), signed ban lists
+(`BanList`, text `chiacraft ban list v1`, the account's `sign_text`/`check_text`), copies kept in the
+world's `banlists/` (newer `seq` wins; `owners.json` maps a followed world's key to its certified
+owner), and `Gate`, the server's view of all of it, read again when the files change.
+`crates/engine/src/server/admission.rs`: `trusted` (the world certificate's owner, ops; connection
+order only for a world without a certificate), `may`/`barred` (probation on breaking, placing, and
+containers a block keeps, checked in `actions.rs` and `open_menu`), `send_banned_away` (every 5 s
+when the files changed, and on `/ban`), and the commands `/ban`, `/tempban`, `/unban`, `/bans`,
+`/allow`, `/probation`, `/banlist` (ADMIN). The join (`player_file.rs`) asks the gate instead of
+`whitelist.txt` (a dedicated server's whitelist becomes the allow list once); player files keep
+`identity`, `played` (seconds) and `probation = lifted`. Protocol 6: `ToClient::Refused(Msg)` (the
+reason in the player's language), the status answer carries the rules' summary (shown in the saved
+worlds list), and worlds serve ban lists on `chiacraft/bans/1` and fetch the ones they follow when
+hosting starts and daily (`p2p::fetch_lists`). The owner's screen: pause menu, "Who May Come In"
+(`admission_screen.rs`), which acts through the same commands. Unit tests in `admission.rs` (not run
+here). testkit's new script line `chatf <file> <text with {}>`. The check: `tools/checks/admission`
+(two copies, alice and bob), to run through the Tester.
+
 ## Side mods
 
 `mods/animals` (MIT, was `mods/chihuahua` until 2026-11-01, so entity ids are `animals:*` now): wild long-haired chihuahuas (a breed of the species dog: `src/dog.rs`, `source/dog/chihuahua`, `species.rs` `breed`), orange tabby cats, small packs of feathered velociraptors (two species: V. mongoliensis on grassland, the paler V. osmolskae on desert sand), groups of capybaras and rare Utahraptors on grassland (spawn rules like pigs', rarer). Cats (`src/cat.rs`) wander and now and then sit, then lie down as a loaf; their source is `source/cat` (built from research alone, see its README). Velociraptors (`src/raptor.rs`, `source/raptor`) wander and now and then rest; they don't hunt yet. Capybaras (`src/capybara.rs`, `source/capybara`) wander slowly, graze, sit and flop down. The design for taming, stats, breeding and genetics is `notes/ANIMALS.md`; its core is built (2026-11-01): every animal spawns with a wild level (1-150) as points on nine stats (`src/species.rs` per species, `src/animal.rs`), health and speed applied as attribute modifiers and damage through the attack damage chain; sneak-use one you own for the animal screen (stats, points, placing tamed points), the spyglass (`animals:spyglass`, crafted from glass and iron) shows any animal's species, sex, stage and level from 64 blocks; Wild chihuahuas, cats and capybaras are tamed by feeding them when they ask (a bubble with the food above them; favorites and kibble tame faster, mistakes lower effectiveness, a clean tame gives bonus levels; `src/taming.rs`). Tames take commands (follow, stay, wander, guard) and stances (passive, neutral, aggressive, assist) from the animal screen, plain right click (follow/stay) and whistle keys (J follow, K stay, H come, G attack, B passive); tribes (`/tribe`, `/tribeinvite`) share tames (`src/commands.rs`). Signatures (`src/signatures.rs`): chihuahuas bark at and mark monsters and track animals by their drops, cats bring gifts, capybaras calm the animals around them. Raptors are tamed by knocking them out (clubs, tranquilizer darts, sedatives; `src/knockout.rs`) and feeding them while out; wild ones fight back in packs. Saddled tame Utahraptors (`src/utahraptor.rs`, `source/utahraptor`: the mount, 1.5 m at the hip; Velociraptors are too small to ride) can be ridden: the engine now has riding (`World::mount`, held keys, a seated pose; docs/modding.md), steered by the mod (`src/riding.rs`). `/animal [show|tame|points N|wild|here]` for testing.

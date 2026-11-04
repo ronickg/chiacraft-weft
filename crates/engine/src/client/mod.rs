@@ -303,6 +303,9 @@ pub struct Client {
     pub target_entity: Option<u64>,
     pub selected: usize,
     pub disconnected: Option<String>,
+    /// Why the world refused this player or sent them away (`ToClient::Refused`), to show in
+    /// their language.
+    pub refused: Option<crate::ui::text::Msg>,
     /// Seconds until holding a button repeats its action. A new press never waits.
     break_delay: f32,
     use_delay: f32,
@@ -617,6 +620,7 @@ impl Client {
             target_entity: None,
             selected: 0,
             disconnected: None,
+            refused: None,
             break_delay: 0.0,
             use_delay: 0.0,
             view_radius,
@@ -2357,7 +2361,9 @@ impl Client {
     }
 
     pub fn fog_color(&self) -> [f32; 4] {
-        self.fog_linear().extend(self.rain.clamp(0.0, 1.0)).to_array()
+        self.fog_linear()
+            .extend(self.rain.clamp(0.0, 1.0))
+            .to_array()
     }
 }
 

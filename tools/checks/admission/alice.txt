@@ -1,0 +1,22 @@
+# Phase 4, slices 1-3 (admission rules, bans, ban lists), the owner's side. Run beside bob.txt
+# from the same folder (both use adm-ticket.txt there; delete it first): see README.md.
+loaded
+host adm-ticket.txt
+chat /probation hours 1
+chat /ban did:chia:1testlistentry000000000000000000000000000000000000000 a spammer, for the shared list
+wait 60          # bob joins and tries to break a block: refused, he is on probation
+shot adm-alice-1.png
+chat /ban bob testing bans
+wait 25          # bob is sent away, tries again and is refused
+chat /unban bob
+chat /allow only
+wait 25          # bob tries again: refused, he is not on the allow list
+chat /allow add bob
+wait 35          # bob gets in, still on probation
+chat /probation end bob
+wait 20          # bob breaks a block now
+chat /banlist publish Alice test list
+chat /bans
+wait 60          # bob opens his own world and follows alice's list from hers
+shot adm-alice-2.png
+quit

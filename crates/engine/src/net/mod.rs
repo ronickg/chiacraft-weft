@@ -42,8 +42,13 @@ pub fn host(
                 .map(|v| (me, v))
         })
         .unwrap_or_default();
-    let hw = p2p::HostWorld { identity, name: name.to_string(), shared: server.shared.clone(), inbox };
+    let hw = p2p::HostWorld { identity, name: name.to_string(), shared: server.shared.clone(), inbox, dir: server.dir.clone() };
     p2p::host(server.connect.clone(), server.content, hw, settings);
+}
+
+/// Fetches the ban lists the world in `dir` follows (chiacraft, `admission`), in the background.
+pub fn fetch_ban_lists(dir: std::path::PathBuf) {
+    p2p::fetch_ban_lists(dir);
 }
 
 pub fn start_join(ticket: &str, settings: &crate::settings::Settings) -> Result<p2p::Joining, String> {
@@ -276,6 +281,9 @@ messages! {
         Animate(Vec<(u64, String, bool)>),
         /// A player's own skin (PNG), for their entity.
         Skin { entity: u64, png: Vec<u8> },
+        /// Not let in, or sent away, with the reason in the player's own language (chiacraft:
+        /// admission rules and bans). The connection ends after it.
+        Refused(crate::ui::text::Msg),
     }
 }
 

@@ -29,7 +29,7 @@
         {"name": "24 words in the keychain", "status": "built", "note": "Made quietly at first start (phase 1).", "code": ["crates/wallet"]},
         {"name": "Login key", "status": "built", "note": "Derived from the words; can never spend; the iroh key.", "code": ["crates/account"]},
         {"name": "Content-signing key", "status": "built"},
-        {"name": "Player and world DIDs", "status": "missing", "core": true, "note": "Phase 4: through sponsors; world ownership both ways."},
+        {"name": "Player and world DIDs", "status": "missing", "core": true, "note": "Phase 4, slices 4-7 in notes/PLAN.md, waiting for Ronald's answers on the sponsor (iroh or HTTP, the testnet wallets, world DIDs from the sponsor, testnet11 by default). crates/wallet can already read DIDs from the chain, create one and ask a sponsor for one (chain/did.rs, sponsor.rs), behind its `chain` feature, used by its tests and chiacraft-wallet-test; the game links none of it. Horizon's sponsor service (horizon-sponsor) ran live on testnet11 and is to be ported."},
         {"name": "Achievements on chain", "status": "missing", "note": "Phase 4: signed by the world's DID, anchored in batches, opt-in. In-game advancements exist."},
         {"name": "Profile view", "status": "missing", "note": "Phase 4."}
       ]
@@ -64,7 +64,7 @@
         {"name": "Portal blocks and travel", "status": "built", "code": ["crates/engine/src/chiacraft/worlds/travel.rs", "mods/portals"]},
         {"name": "Friends", "status": "built", "code": ["crates/engine/src/chiacraft/worlds/friends.rs"]},
         {"name": "Leftovers", "status": "partial", "note": "Arrivals in other dimensions; links carried to a world's new address."},
-        {"name": "Admission rules and bans", "status": "missing", "core": true, "note": "Phase 4: allow lists, probation, DID age, shared ban lists."},
+        {"name": "Admission rules and bans", "status": "partial", "core": true, "note": "Phase 4 slices 1-3 built, not yet seen working between two games: per world admission.json (open or allow list only, the allow list by login key, identity or DID; probation for newcomers: no building, no containers, for N hours of play, liftable) and bans.json (by login key, identity and DID, timed or for good; banned players are sent away), checked at every join; refusals in the player's language; /ban, /tempban, /unban, /bans, /allow, /probation, /banlist and the owner's \"Who May Come In\" screen; the status answer shows the rules before joining. Shared ban lists: signed by their maintainer's identity, served by any world holding one (chiacraft/bans/1), followed by a world's address (its owner's list), fetched daily. Left: the DID rules (DID required, DID age) with the DID slices; the check in tools/checks/admission.", "code": ["crates/engine/src/chiacraft/worlds/admission.rs", "crates/engine/src/server/admission.rs", "crates/engine/src/chiacraft/worlds/admission_screen.rs"], "docs": ["tools/checks/admission/README.md"]},
         {"name": "Finding worlds", "status": "missing", "note": "Phase 5: listings on chain and on DIG, curated lists."}
       ]
     },

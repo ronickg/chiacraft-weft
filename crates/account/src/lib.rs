@@ -92,6 +92,13 @@ impl Session {
         Ok(chiacraft_wallet::keys::hex(&sig))
     }
 
+    /// The identity key's signature of one of chiacraft's own texts (`text` must start with
+    /// `chiacraft `), hex: shared ban lists and other documents a player publishes.
+    pub fn sign_text(&self, text: &str) -> Result<String, String> {
+        let sig = self.signer.sign(text).map_err(|e| e.to_string())?;
+        Ok(chiacraft_wallet::keys::hex(&sig))
+    }
+
     /// The identity key, hex: the player's identity on every world.
     pub fn identity_hex(&self) -> String {
         self.signer.identity().hex()
@@ -214,6 +221,14 @@ pub fn check_world_moved(identity: &str, from: &str, to: &str, generation: u32, 
     chiacraft_wallet::sign::verify_world_moved(&id, from, to, generation, &sig)
 }
 
+/// Whether `sig` (hex) is the identity `identity`'s (hex) signature of `text` ([`Session::sign_text`]).
+pub fn check_text(identity: &str, text: &str, sig: &str) -> bool {
+    let (Some(id), Some(sig)) = (chiacraft_wallet::IdentityKey::from_hex(identity), chiacraft_wallet::keys::from_hex(sig)) else {
+        return false;
+    };
+    chiacraft_wallet::sign::verify(&id, text.as_bytes(), &sig)
+}
+
 pub fn check_vouch(line: &str, endpoint: &str) -> Option<String> {
     let (identity, sig) = line.split_once(':')?;
     let key = chiacraft_wallet::IdentityKey::from_hex(identity)?;
@@ -302,6 +317,10 @@ mod tests {
         assert_eq!(check_vouch(&line, "abc"), Some(first.identity_hex()));
         assert_eq!(check_vouch(&line, "abd"), None);
         assert_eq!(check_vouch("nonsense", "abc"), None);
+        let sig = first.sign_text("chiacraft ban list v1\nx").unwrap();
+        assert!(check_text(&first.identity_hex(), "chiacraft ban list v1\nx", &sig));
+        assert!(!check_text(&first.identity_hex(), "chiacraft ban list v1\ny", &sig));
+        assert!(first.sign_text("not ours").is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

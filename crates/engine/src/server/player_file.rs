@@ -11,17 +11,26 @@ impl Server {
                 .send(ToClient::Disconnect(format!("{name} is already playing")));
             return;
         }
-        // Read each time, so a key added takes effect with no restart. The key is what the
-        // connection proved, not what the client claims.
-        if let Some(Ok(list)) = self.cfg.whitelist.as_ref().map(std::fs::read_to_string) {
-            if !list.lines().any(|l| l.trim() == key) {
-                log::info!("{name} is not on the whitelist; to let them in, add this line: {key}");
-                self.players[pi]
-                    .conn
-                    .send(ToClient::Disconnect("not on this server's whitelist".into()));
-                return;
-            }
+        // The world's admission rules and bans (chiacraft, `admission`), read again when they
+        // change. The key is what the connection proved, not what the client claims.
+        let trusted = self.trusted(pi, &key);
+        let who = crate::admission::Who { name: name.clone(), key: key.clone(), identity: self.players[pi].identity.clone(), did: None };
+        if let crate::admission::Verdict::Refuse(why) = self.gate.verdict(&who, trusted) {
+            log::info!("{name} ({key}) is not let in: {}", why.key);
+            self.players[pi].conn.send(ToClient::Refused(why));
+            return;
         }
+        // Time played here, for probation, and whether the owner let them off it.
+        let file = self
+            .storage
+            .as_ref()
+            .map(|s| std::fs::read_to_string(s.lock().player_path(&key)).unwrap_or_default())
+            .unwrap_or_default();
+        self.players[pi].played = crate::kv::get(&file, "played")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0);
+        self.players[pi].lifted = crate::kv::get(&file, "probation") == Some("lifted");
+        self.players[pi].since = Some(Instant::now());
         let saved = self
             .storage
             .as_ref()
@@ -110,6 +119,13 @@ impl Server {
             Some(identity) => log::info!("{} joined (account identity {identity})", p.name),
             None => log::info!("{} joined", p.name),
         }
+        if let Some(probation) = self.probation_of(pi) {
+            let left = self.players[pi].probation_left(&probation);
+            self.players[pi]
+                .conn
+                .send(ToClient::Chat(Msg::new("admission.probation_on", vec![Arg::Int(left.div_ceil(60) as i64)])));
+        }
+        let p = &mut self.players[pi];
         let line = Msg::new("multiplayer.joined", vec![Arg::Text(p.name.clone())]);
         for q in self.players.iter_mut().filter(|q| q.joined) {
             q.conn.send(ToClient::Chat(line.clone()));
@@ -164,6 +180,15 @@ pub(super) fn save_player(s: &Storage, p: &Player, d: &Dim) {
         p.name, c.dims[p.dim as usize].name, e.pos.x, e.pos.y, e.pos.z, e.yaw, e.pitch, e.selected, e.health
     );
     text.push_str(&format!("flying = {}\nfire = {}\n", e.flying as u8, e.fire));
+    // chiacraft: who vouched for the key (to ban an absent player by identity), the time played
+    // here (probation), and whether the owner let them off probation.
+    if let Some(identity) = &p.identity {
+        text.push_str(&format!("identity = {identity}\n"));
+    }
+    text.push_str(&format!("played = {}\n", p.played_now()));
+    if p.lifted {
+        text.push_str("probation = lifted\n");
+    }
     if e.mode != GameMode::Survival {
         text.push_str(&format!("mode = {}\n", e.mode.name()));
     }

@@ -92,6 +92,14 @@ impl Server {
             ToServer::StartBreak { pos, frame } => {
                 let Some((r, _)) = self.region(pi) else { return };
                 let (frame, pos) = r.landed_as(frame, pos);
+                // Probation (chiacraft): no breaking yet.
+                if !self.may(pi, admission::Act::Build) {
+                    self.players[pi].mining = None;
+                    self.players[pi]
+                        .conn
+                        .send(ToClient::BreakRefused { frame, pos });
+                    return;
+                }
                 self.players[pi].mining = Some((frame, pos, self.tick));
                 let Some((r, entity)) = self.region(pi) else { return };
                 let held = r.entities.held(entity).item;
@@ -159,6 +167,21 @@ impl Server {
             ToServer::Break { pos, face, frame } => {
                 let Some((r, _)) = self.region(pi) else { return };
                 let (frame, pos) = r.landed_as(frame, pos);
+                // Probation (chiacraft): the client already shows air, so the block goes back.
+                if !self.may(pi, admission::Act::Build) {
+                    self.players[pi].mining = None;
+                    if let Some((r, _)) = self.region(pi) {
+                        r.with_space(c, frame, |d, _| {
+                            if let Some(state) = d.get(pos) {
+                                d.space.changes.push((pos, state));
+                            }
+                        });
+                    }
+                    self.players[pi]
+                        .conn
+                        .send(ToClient::BreakRefused { frame, pos });
+                    return;
+                }
                 let mining = self.players[pi].mining.take();
                 let now = self.tick;
                 let Some((r, entity)) = self.region(pi) else { return };
@@ -216,6 +239,8 @@ impl Server {
                 let (frame, pos) = r.landed_as(frame, pos);
                 enum Did {
                     Used,
+                    /// Would have placed a block, but its player is on probation (chiacraft).
+                    Barred,
                     Placed,
                     Nothing,
                     NoBlock,
@@ -225,12 +250,25 @@ impl Server {
                 let (eye, sel, player_box, creative) = (e.pos + DVec3::Y * e.eye(c), e.selected, e.aabb(c), e.mode == GameMode::Creative);
                 let held = r.entities.held(entity);
                 let reach = r.attribute(c, entity, extend::BLOCK_REACH, false) + BLOCK_SLACK;
+                // Probation (chiacraft): using blocks yes, placing them no. Asked only when
+                // the hand holds a block, so a door or a lever never says no.
+                let holds_block = c
+                    .items
+                    .get(held.item as usize)
+                    .is_some_and(|i| i.block.is_some())
+                    && !held.is_empty();
+                let barred = if holds_block { self.barred(pi, admission::Act::Build) } else { None };
+                let may_place = barred.is_none();
+                let Some((r, _)) = self.region(pi) else { return };
                 let did = r.with_space(c, frame, |d, o| {
                     if !within(o.to_local(eye), pos, reach) {
                         return Did::Nothing;
                     }
                     if !sneak && d.player_use(c, pos, face, entity) {
                         return Did::Used;
+                    }
+                    if !may_place {
+                        return Did::Barred;
                     }
                     let Some(state) = c
                         .items
@@ -278,6 +316,11 @@ impl Server {
                             .send(ToClient::Swing { used_item: true });
                     }
                     // Items used on a block (buckets) work on the world's blocks only, so far.
+                    Some(Did::Barred) => {
+                        if let Some(p) = barred {
+                            self.tell_barred(pi, admission::Act::Build, &p);
+                        }
+                    }
                     Some(Did::NoBlock) => self.handle(c, pi, ToServer::UseItem { target: (frame == 0).then_some((pos, face)) }),
                     _ => {}
                 }
@@ -562,30 +605,34 @@ impl Server {
                 names.truncate(64);
                 self.players[pi].gizmos = names;
             }
-            ToServer::Leave => {
-                if !self.players[pi].joined {
-                    return;
-                }
-                log::info!("{} left", self.players[pi].name);
-                let line = Msg::new("multiplayer.left", vec![Arg::Text(self.players[pi].name.clone())]);
-                for q in self.players.iter_mut().filter(|q| q.joined) {
-                    q.conn.send(ToClient::Chat(line.clone()));
-                }
-                let Server { players, dims, storage, .. } = self;
-                let p = &mut players[pi];
-                if let Some(r) = dims[p.dim as usize].entity_region(p.entity) {
-                    if let Some(m) = p.menu.take() {
-                        menu::close(m, r, c, p.entity);
-                    }
-                    if let Some(s) = storage {
-                        save_player(&s.lock(), p, r);
-                    }
-                    r.entities.remove(p.entity);
-                }
-                p.conn.send(ToClient::Disconnect("bye".into()));
-                p.joined = false;
-            }
+            ToServer::Leave => self.leave(c, pi, ToClient::Disconnect("bye".into())),
         }
+    }
+
+    /// A player leaves, or is sent away with `last` (the last thing they hear): saved and taken
+    /// out of the world.
+    pub(super) fn leave(&mut self, c: &'static Content, pi: usize, last: ToClient) {
+        if !self.players[pi].joined {
+            return;
+        }
+        log::info!("{} left", self.players[pi].name);
+        let line = Msg::new("multiplayer.left", vec![Arg::Text(self.players[pi].name.clone())]);
+        for q in self.players.iter_mut().filter(|q| q.joined) {
+            q.conn.send(ToClient::Chat(line.clone()));
+        }
+        let Server { players, dims, storage, .. } = self;
+        let p = &mut players[pi];
+        if let Some(r) = dims[p.dim as usize].entity_region(p.entity) {
+            if let Some(m) = p.menu.take() {
+                menu::close(m, r, c, p.entity);
+            }
+            if let Some(s) = storage {
+                save_player(&s.lock(), p, r);
+            }
+            r.entities.remove(p.entity);
+        }
+        p.conn.send(last);
+        p.joined = false;
     }
 }
 
