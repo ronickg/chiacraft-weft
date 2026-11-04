@@ -229,9 +229,11 @@ def build():
     put("slot", slot, 4, extra=["icon = 16"])
     put("recipe_slot", disabled(slot), 4, extra=["icon = 16"])
     put("slot_highlight", ring(slot), 4)
-    hot = fit9(src("c_hotbar", 0), 36, 36, 5)
+    # The HUD's hotbar slots are 20 GUI pixels (engine `hud.rs`), the selected frame one GUI
+    # pixel bigger all round: drawn at those sizes so nothing stretches.
+    hot = fit9(src("c_hotbar", 0), 40, 40, 5)
     put("hotbar", hot, 5, extra=["icon = 16"])
-    put("hotbar_selected", fit9(src("c_hotbar", 1, toned=False), 40, 40, 7), 7)
+    put("hotbar_selected", fit9(src("c_hotbar", 1, toned=False), 44, 44, 7), 7)
     put("advancement_tile", slot, 4)
     put("advancement_tile_done", glow(slot, GOLD1), 4)
     panel = src("c_panel")
