@@ -470,7 +470,19 @@ impl Sky {
             let t = turn_of(s, d, time);
             let spin =
                 if s.spin != 0.0 { Mat3::from_rotation_x((time / s.spin as f64 * std::f64::consts::TAU) as f32) } else { Mat3::IDENTITY };
-            let m = frame_of(s, t) * spin;
+            let mut m = frame_of(s, t) * spin;
+            // A body on a leaned path (`tilt`) keeps its picture upright, its edges level with the
+            // horizon: leaned with the path, the moon's square stood as a diamond (the world
+            // playtester's "white rotated square"). Its picture's up toward the world's up; right
+            // at the zenith the path's own frame.
+            if s.kind == sky_kind::BODY && s.tilt != 0.0 && s.spin == 0.0 {
+                let toward = m.x_axis;
+                let right = toward.cross(Vec3::Y);
+                if right.length() > 0.05 {
+                    let right = right.normalize();
+                    m = Mat3::from_cols(toward, right.cross(toward), right);
+                }
+            }
             let picture = self.picture(gpu, &s.texture);
             let slot = self
                 .slots
