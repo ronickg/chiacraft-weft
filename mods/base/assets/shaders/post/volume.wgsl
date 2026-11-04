@@ -32,11 +32,45 @@ fn vol_lit(rel: vec3<f32>) -> f32 {
     return 1.0;
 }
 
+// The rain's cloud deck as the sky draws it (`look.wgsl` `deck_field`, which this pass has no copy
+// of): its breaks let the sun through, so beams stand in the rain under them (Ronald: "Soft clouds
+// first", with Bliss's storm light).
+fn vol_hash(p: vec3<i32>) -> f32 {
+    var h = bitcast<u32>(p.x) * 73856093u ^ bitcast<u32>(p.y) * 19349663u ^ bitcast<u32>(p.z) * 83492791u;
+    h = (h ^ (h >> 16u)) * 0x45d9f3bu;
+    h = (h ^ (h >> 16u)) * 0x45d9f3bu;
+    h = h ^ (h >> 16u);
+    return f32(h & 0xffffffu) / 16777215.0;
+}
+
+fn vol_noise(p: vec3<f32>) -> f32 {
+    let i = vec3<i32>(floor(p));
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = mix(mix(vol_hash(i), vol_hash(i + vec3(1, 0, 0)), u.x), mix(vol_hash(i + vec3(0, 1, 0)), vol_hash(i + vec3(1, 1, 0)), u.x), u.y);
+    let b = mix(mix(vol_hash(i + vec3(0, 0, 1)), vol_hash(i + vec3(1, 0, 1)), u.x), mix(vol_hash(i + vec3(0, 1, 1)), vol_hash(i + vec3(1, 1, 1)), u.x), u.y);
+    return mix(a, b, u.z);
+}
+
+// 1 where the sun reaches camera-relative `rel` through a break in the rain's deck, 0 under it.
+fn vol_deck_open(rel: vec3<f32>) -> f32 {
+    let c = scene.clouds;
+    let l = scene.sun.xyz;
+    if c.x < 0.5 || l.y < 0.03 {
+        return 1.0;
+    }
+    let t = max(c.z - rel.y, 0.0) / l.y;
+    let cell = scene.cloud_cells.xy + scene.cloud_cells.zw + (rel.xz + l.xz * t) / c.y;
+    let n = vol_noise(vec3(cell.x / 9.0, 5.5, cell.y / 9.0)) * 0.7 + vol_noise(vec3(cell.x / 3.5, 9.5, cell.y / 3.5)) * 0.3;
+    return 1.0 - smoothstep(0.24, 0.4, n);
+}
+
 fn apply(p: PostPixel) -> vec4<f32> {
     let sun = scene.sun;
     let day = smoothstep(-0.02, 0.06, sun.y);
     // At night, in rain, or with the eye in a liquid (its fog no longer starts at 0.6 of its end).
-    if day <= 0.0 || scene.fog_color.w > 0.95 || abs(scene.params.x - 0.6 * scene.params.y) > 0.5 {
+    // In rain the beams come only through the deck's breaks (below).
+    if day <= 0.0 || abs(scene.params.x - 0.6 * scene.params.y) > 0.5 {
         return p.color;
     }
     // Under a forest's canopy (`scene.canopy`) the beams are thin and near: walk a shorter view in
@@ -62,10 +96,15 @@ fn apply(p: PostPixel) -> vec4<f32> {
     // Strength under 0.75 (the Video screen's Low): as strong, in half the steps.
     let cheap = p.strength < 0.75;
     let steps = select(VOL_STEPS, VOL_STEPS / 2, cheap) + select(0, 8, leafy > 0.25);
+    let rain = clamp(scene.fog_color.w, 0.0, 1.0);
     var lit = 0.0;
     for (var i = 0; i < steps; i++) {
         let t = (f32(i) + jitter) / f32(steps) * end;
-        lit += vol_lit(dir * t);
+        var through = vol_lit(dir * t);
+        if rain > 0.0 && through > 0.0 {
+            through *= mix(1.0, vol_deck_open(dir * t), rain);
+        }
+        lit += through;
     }
     lit /= f32(steps);
     // Toward the sun the air glows most (Henyey-Greenstein, g 0.65), a little all round.
@@ -83,7 +122,7 @@ fn apply(p: PostPixel) -> vec4<f32> {
     let canopy = min(scene.canopy.x, 1.0) * select(k, 1.0, k == 0.0);
     // At 0.004 + 0.02 x fog the beams under Plants' rainforest were faint (Lighting's dawn checks,
     // 11-04); Planner: make the shafts the canopy's signature.
-    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.018 + 0.04 * scene.weather.z)) * (1.0 - scene.fog_color.w);
+    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.018 + 0.04 * scene.weather.z)) * (1.0 - 0.6 * rain) + 0.004 * rain;
     let air = 1.0 - exp(-density * end);
     // Gold while the sun is under about 30° (the fog's MIST_GOLD in look.wgsl), white toward noon.
     let color = mix(vec3(1.0, 0.62, 0.3), vec3(1.0, 0.95, 0.85), smoothstep(0.1, 0.65, sun.y));

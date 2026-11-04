@@ -133,9 +133,13 @@ fn cloud_cell(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> f32 {
 // where it is lowest it opens into lighter breaks. Picked cell by cell (a hash), the towers' dark
 // bottoms read from below as a checkered ceiling (Ronald: "Merge, then refine storm", 11-05).
 fn storm_field(s: Sky, cellp: vec2<f32>) -> f32 {
-    let at = cellp + s.uv.zw;
-    return noise3(vec3(at.x / 3.5, 5.5, at.y / 3.5));
+    return deck_field(cellp + s.uv.zw);
 }
+
+// How far the view at this pixel looks toward the sun's side of the sky, 0 away to 1 toward it, by
+// day (`fs_clouds` sets it): the rain's deck sweeps from dark masses to a brighter side there, its
+// breaks wider, as Bliss's does.
+var<private> SUN_SIDE: f32 = 0.0;
 
 // How much a storm deck stands up in a tower at a field value `n`.
 fn storm_tower(n: f32) -> f32 {
@@ -146,7 +150,8 @@ fn storm_tower(n: f32) -> f32 {
 // by cell.
 fn cloud_lumps(s: Sky, cellp: vec2<f32>, along: f32) -> f32 {
     let at = cellp + s.uv.zw;
-    return noise3(vec3(at.x / 1.6, along * 2.5, at.y / 1.6));
+    // Forms of about fifty blocks, not lumps of twenty (Ronald's "scales", 11-05).
+    return noise3(vec3(at.x / 4.5, along * 1.5, at.y / 4.5)) * 0.75 + noise3(vec3(at.x / 1.8, along * 2.5 + 3.0, at.y / 1.8)) * 0.25;
 }
 
 // Henyey-Greenstein's phase for the clouds' light, `g` forward (> 0) or back (< 0).
@@ -182,11 +187,15 @@ fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
     // A storm's deck is one sheet: rounded puffs would leave lens-shaped gaps where four meet, the
     // bright sky showing through them.
     // Where the storm's field is lowest the deck breaks open a little.
-    var deck = s.axes[0].z * smoothstep(0.0, 0.4, middle);
-    if scene.weather.w > 0.0 {
-        deck *= mix(1.0, smoothstep(0.12, 0.3, storm_field(s, cellp)), scene.weather.w);
+    let deck = s.axes[0].z * smoothstep(0.0, 0.4, middle);
+    let shaped = max(smoothstep(0.35, 0.6, cover - (1.0 - middle) * 0.5), deck);
+    // In rain the deck breaks open where its large forms are lowest, wider on the sun's side (the
+    // light shafts in `post/volume.wgsl` come through the same breaks).
+    let wet = max(s.axes[0].x, scene.weather.w);
+    if wet > 0.0 {
+        return shaped * mix(1.0, 1.0 - deck_open(storm_field(s, cellp), SUN_SIDE), wet);
     }
-    return max(smoothstep(0.35, 0.6, cover - (1.0 - middle) * 0.5), deck);
+    return shaped;
 }
 
 @fragment
@@ -245,6 +254,11 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     // phase for the silver lining and the backlit glow, and three octaves of multiple scattering.
     let l = light_dir();
     let mu_l = dot(dir, l);
+    // The sun's side of the sky, by day: a sweep across the whole sky, not a glow about the sun.
+    let flat_dir = normalize(vec2(dir.x, dir.z) + vec2(1e-4, 0.0));
+    let flat_sun = normalize(vec2(scene.sun.x, scene.sun.z) + vec2(1e-4, 0.0));
+    SUN_SIDE = smoothstep(-0.7, 0.9, dot(flat_dir, flat_sun)) * smoothstep(-0.02, 0.1, scene.sun.y);
+    let wet = max(s.axes[0].x, storm);
     let phase = 0.7 * cloud_hg(mu_l, 0.8) + 0.3 * cloud_hg(mu_l, -0.2);
     for (var i = 0u; i < CLOUD_SAMPLES; i++) {
         let t = near + (f32(i) + jitter) * step;
@@ -287,9 +301,14 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
             // By the height in the deck (the same at the same height everywhere), and darker under a
             // tower's whole column, smoothly, as the towers rise.
             var albedo = 1.0;
-            if storm > 0.0 {
-                let deep = mix(0.45, 1.0, smoothstep(0.0, 0.5, along)) * mix(1.0, 0.75, storm_tower(storm_field(s, cellp)));
-                albedo = mix(1.0, deep, storm);
+            if wet > 0.0 {
+                let n = storm_field(s, cellp);
+                let deep = mix(0.45, 1.0, smoothstep(0.0, 0.5, along)) * mix(1.0, 0.7, storm_tower(n));
+                // Dark masses away from the sun, a brighter side toward it, and the thin deck about
+                // the breaks there lit through (Bliss's storm: dark to bright across the sky).
+                let thin = 1.0 - smoothstep(0.24, 0.6, n);
+                let sweep = mix(0.6, 1.3, SUN_SIDE) * (1.0 + 1.4 * thin * SUN_SIDE);
+                albedo = mix(1.0, deep, storm) * mix(1.0, sweep, wet);
             }
             let below = mix(p.horizon * 0.9 + p.ambient * 0.6, p.ambient * 1.6, h) * mix(1.0, 0.4, dark * (1.0 - h)) * albedo;
             c = below + p.sun * light_strength() * scatter * mix(0.6, 1.0, powder) * 0.55 * (1.0 - dark * 0.6) * albedo;

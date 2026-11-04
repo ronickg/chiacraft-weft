@@ -364,6 +364,24 @@ fn cloud_shadow(rel: vec3<f32>) -> f32 {
     return 1.0 - 0.8 * smoothstep(0.35, 0.6, cover) * lift;
 }
 
+// ---- the rain's cloud deck, shared by the sky and the light ----
+
+// The deck's large forms at `cell` (the cloud picture's cells, absolute: the place in the cell plus
+// the cell, as `scene.cloud_cells` and the sky's `uv` give them), 0..1: masses about nine cells
+// (a hundred blocks) across with forms of forty inside them. Low where the deck breaks open, high
+// where it stands up in towers. At three and a half cells the deck read as small repeating lumps,
+// "scales", beside Bliss's clouds hundreds of blocks big (Ronald: "Still looks so much worse the
+// bliss why ?", 11-05).
+fn deck_field(cell: vec2<f32>) -> f32 {
+    return noise3(vec3(cell.x / 9.0, 5.5, cell.y / 9.0)) * 0.7 + noise3(vec3(cell.x / 3.5, 9.5, cell.y / 3.5)) * 0.3;
+}
+
+// How open the deck is at a field value `n`, 0 closed to 1 a clear break; `wide` (0..1) opens the
+// breaks further (toward the sun, where light breaks through).
+fn deck_open(n: f32, wide: f32) -> f32 {
+    return 1.0 - smoothstep(0.24 + 0.1 * wide, 0.4 + 0.1 * wide, n);
+}
+
 // ---- light on things ----
 
 // Block light (red, green and blue levels 0..1) as color: warm firelight, whiter right at the
