@@ -215,6 +215,7 @@ fn rally(w: &World, id: u64, st: &EntityState, target: u64, now: u64) {
             && c[0] == 0
         {
             *c = [target, now, now + LOOK_EVERY];
+            weft_sdk::info!("animal {o} joins {id}'s hunt of {target}");
         }
     }
 }
