@@ -55,6 +55,15 @@ pub fn grow(e: &mut BlockEvent, block: &str, last: bool, step: impl FnOnce(&mut 
     }
 }
 
+/// A ripe plant's step that bears beside it (`base_api::grow::bear`): `step` when it does.
+pub fn bear(e: &mut BlockEvent, block: &str, step: impl FnOnce(&mut BlockEvent)) {
+    match base_api::grow::bear(e, block) {
+        base_api::grow::Step::Grow => step(e),
+        base_api::grow::Step::Frost => frost(e, block),
+        base_api::grow::Step::Rest => {}
+    }
+}
+
 /// What a frost does to the plant at `e` (`grow`).
 fn frost(e: &mut BlockEvent, block: &str) {
     let w = e.world();

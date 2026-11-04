@@ -126,7 +126,7 @@ fn crop(r: &mut Registry, c: &'static Crop) {
             let age = growth::age(e);
             // A ripe stem sets its fruit beside it in its season (`set_fruit`), again and again.
             if let Some(fruit) = c.fruit.filter(|_| age >= ripe) {
-                growth::grow(e, c.block, true, |e| set_fruit(e, fruit));
+                growth::bear(e, c.block, |e| set_fruit(e, fruit));
                 return;
             }
             // A stem grows in any season; the others' last step waits for their ripening one.
