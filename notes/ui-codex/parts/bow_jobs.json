@@ -2,11 +2,13 @@
  {
   "kind": "item",
   "name": "bow_self_stave",
-  "what": "a long self bow: a tall slender stave, Lying corner to corner: the stave curves in a smooth bow from the bottom-left corner round the upper left to the top-right corner, the bowstring a straight thin pale cream line from tip to tip facing the lower right, the grip wrapped in red-brown leather at the middle of the stave, small horn-coloured tips. Warm orange-brown oak wood with clear grain; the string clearly paler than the wood. 1-2 px margin"
+  "what": "a long self bow: a tall slender stave, Lying corner to corner: the stave curves in a smooth bow from the bottom-left corner round the upper left to the top-right corner, the bowstring a straight thin pale cream line from tip to tip facing the lower right, the grip wrapped in red-brown leather at the middle of the stave, small horn-coloured tips. Warm orange-brown oak wood with clear grain; the string clearly paler than the wood. 1-2 px margin",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
  },
  {
   "kind": "item",
   "name": "bow_short_stave",
-  "what": "a short bow: a shorter, more strongly curved stave that fills about three quarters of the diagonal, Lying corner to corner: the stave curves in a smooth bow from the bottom-left corner round the upper left to the top-right corner, the bowstring a straight thin pale cream line from tip to tip facing the lower right, the grip wrapped in red-brown leather at the middle of the stave, small horn-coloured tips. Warm orange-brown oak wood with clear grain; the string clearly paler than the wood. 1-2 px margin"
+  "what": "a short bow: a shorter, more strongly curved stave that fills about three quarters of the diagonal, Lying corner to corner: the stave curves in a smooth bow from the bottom-left corner round the upper left to the top-right corner, the bowstring a straight thin pale cream line from tip to tip facing the lower right, the grip wrapped in red-brown leather at the middle of the stave, small horn-coloured tips. Warm orange-brown oak wood with clear grain; the string clearly paler than the wood. 1-2 px margin",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out"
  }
 ]
