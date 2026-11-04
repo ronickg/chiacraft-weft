@@ -42,12 +42,18 @@ mkdir -p "$out_dir"
 fail() { echo "package: $*" >&2; exit 1; }
 [ -f "$folder/$exe" ] || fail "no $exe in $folder"
 [ -f "$folder/assets/core/icon.png" ] || fail "no engine assets in $folder/assets/core"
-for m in base animals portals packages; do
-	[ -f "$folder/run/mods/$m.zip" ] || fail "mod $m was not packed (is target/release missing its library?)"
+# Every mod in mods/ is packed, except the development ones marked `dist = false`.
+[ -f "$folder/run/mods/base.zip" ] || fail "base was not packed"
+for dir in mods/*/; do
+	m=$(basename "$dir")
+	[ -f "$dir/Cargo.toml" ] || continue
+	if tr -d ' ' < "$dir/Cargo.toml" | grep -qx 'dist=false'; then
+		[ ! -e "$folder/run/mods/$m.zip" ] || fail "development mod $m was packed"
+	else
+		[ -f "$folder/run/mods/$m.zip" ] || fail "mod $m was not packed (is its library missing from target/release?)"
+	fi
 done
-for m in testkit testmod; do
-	[ ! -e "$folder/run/mods/$m.zip" ] || fail "development mod $m was packed"
-done
+ls "$folder/run/mods"
 
 if [[ "$platform" == macos-* ]]; then
 	[ -f "${MOLTENVK_DYLIB:-}" ] || fail "set MOLTENVK_DYLIB to the libMoltenVK.dylib to bundle"
