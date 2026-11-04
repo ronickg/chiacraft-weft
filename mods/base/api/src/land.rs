@@ -317,9 +317,10 @@ pub const RIVER_DEPTH: (i32, i32) = (3, 6);
 pub const RIVER_FLOODPLAIN: (i32, i32) = (2, 12);
 /// Then the valley's sides rise to the land over `RIVER_BANKS` blocks, plus
 /// `RIVER_VALLEY_PER_BLOCK` (sixteenths) for each block the land stands over the sea, counted up
-/// to `RIVER_VALLEY_RISE`.
+/// to `RIVER_VALLEY_RISE`. 36, as the lakes' shores (24 left a sixth of the bank in steps of two
+/// blocks or more, 36 a ninth; 48 costs a third more time for little more).
 pub const RIVER_BANKS: i32 = 8;
-pub const RIVER_VALLEY_PER_BLOCK: i32 = 24;
+pub const RIVER_VALLEY_PER_BLOCK: i32 = 36;
 pub const RIVER_VALLEY_RISE: i32 = 60;
 /// Rivers don't carve in the mountains: full where the mountains' area (`MOUNTAINS_AREA`) is up
 /// to `.0`, gone at `.1`. Their rain still runs down, so rivers come out at the mountains' feet.
