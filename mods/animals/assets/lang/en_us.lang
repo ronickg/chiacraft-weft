@@ -255,3 +255,6 @@ screen.animals.signature.ambush = Lies still with only its eyes above the water,
 screen.animals.height.length = length, from the snout
 entity.animals.grey_wolf = Grey Wolf
 species.animals.grey_wolf = grey wolf
+entity.animals.jaguar = Jaguar
+species.animals.jaguar = jaguar
+screen.animals.signature.skull_bite = Kills with a bite through the skull or the shell, and takes caimans from the water

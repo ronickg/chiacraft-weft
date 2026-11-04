@@ -308,7 +308,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 34] = [
+pub static SPECIES: [Species; 35] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -2502,6 +2502,77 @@ pub static SPECIES: [Species; 34] = [
         },
         tune: Tune::NONE,
         birth_size: 0.2,
+    },
+    // The jaguar (`reports/ecology/Overworld food webs.md`: the top hunter of the swamp and the savanna,
+    // which in the Pantanal eats mostly caiman, capybara and fish): a full creature on its own model
+    // built on the cat's (`source/jaguar`). Too dangerous to feed from the hand: tamed as the raptors
+    // are, knocked out and fed while it sleeps (`knockout.rs`).
+    Species {
+        model: "jaguar",
+        name: "jaguar",
+        binomial: "Panthera onca",
+        family: &FELIDAE,
+        subfamily: "Pantherinae",
+        breed: None,
+        size: Size::Large,
+        // Capybaras, caimans and peccaries first, deer, giant anteaters, fish, turtles; cattle calves.
+        eats: &[(Meat, 0.85), (Fish, 0.15)],
+        // A fish of a few hundred grams to a capybara or a caiman near its own mass (prey of 1-130 kg,
+        // 45-85 kg liked best).
+        prey: (0.01, 1.5),
+        taming: Taming::Knockout,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [45.0, 260.0, 200.0, 9.0, 1.0, 120.0, 160.0, 300.0, 25.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 20.0,
+        foods: &[eats("base:chicken", 8), eats("base:porkchop", 14), favorite("base:beef", 18), eats("base:mutton", 14), KIBBLE],
+        feedings: 14.0,
+        shy: 12.0,
+        fights: true,
+        attacks: &["swipe", "bite"],
+        reach: 1.0,
+        signature: "skull_bite",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.8,
+        // Females 10-20% smaller.
+        dimorphism: 1.1,
+        size_spread: 0.15,
+        height: (0.7, "shoulder"),
+        // The Pantanal's marshes and gallery forest first, the llanos, a few in the Sonoran desert's
+        // canyons (the northernmost jaguars).
+        habitats: &[("base:swamp", 1.0), ("base:savanna", 0.6), ("base:desert", 0.05)],
+        bio: Biology {
+            // Pantanal males 90-100 kg, females 70.
+            mass: 85.0,
+            // 91-111 days.
+            gestation: 100.0,
+            incubation: 0.0,
+            // Females at about 2.5 years, males at 3-4.
+            maturity: 900.0,
+            // Rarely past 11 in the wild; up to 22 kept.
+            lifespan: 6200.0,
+            // The cubs stay with her nearly two years.
+            interval: 700.0,
+            // One or two in the Pantanal.
+            litter: 1.6,
+            social: Social::Solitary,
+            // The Pantanal has the most jaguars anywhere (about 12 in 100 km2): uncommon in its
+            // biomes rather than rare.
+            rarity: Rarity::Uncommon,
+            // Mating all year, more in the rains.
+            breeds: seasons::ALL_YEAR,
+            peak: seasons::WET,
+            // A tropical cat at ease in the heat (it cools off swimming), uneasy in frost.
+            comfort: (8.0, 38.0),
+            cold_blooded: false,
+        },
+        // A mother's rest after a litter set shorter than her two years with the cubs, so the wild
+        // replaces its dead (`balance::checks`: six young in a life).
+        tune: Tune { recovery: Some(150_000), ..Tune::NONE },
+        birth_size: 0.12,
     },
 ];
 

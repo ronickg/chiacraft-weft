@@ -44,6 +44,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | yacare_caiman | *Caiman yacare* | common | large | 2.2 m | 35 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 6-12 | 17 |
 | spectacled_caiman | *Caiman crocodilus* | common | large | 2.2 m | 25 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 6-12 | 18 |
 | grey_wolf | *Canis lupus* | uncommon | medium | 0.8 m | 42 kg | pack | carnivore | passive | 1.25 d | 6.07 d | 46 d | 2-8 | 10 |
+| jaguar | *Panthera onca* | uncommon | large | 0.7 m | 85 kg | solitary | carnivore | knockout | 1.77 d | 7.54 d | 65.1 d | 1-2 | 7 |
 
 ## Stats at level 1
 
@@ -85,6 +86,7 @@ Damage and speed are each kind's own (1 = 100%).
 | yacare_caiman | 30 | 160 | 120 | 5 | 1 | 80 | 300 | 60 | 30 | 60 |
 | spectacled_caiman | 26 | 150 | 100 | 4.5 | 1 | 60 | 300 | 50 | 26 | 60 |
 | grey_wolf | 30 | 220 | 120 | 6 | 1 | 60 | 80 | 90 | 20 | 40 |
+| jaguar | 45 | 260 | 200 | 9 | 1 | 120 | 160 | 300 | 25 | 20 |
 
 ## The food web
 
@@ -97,9 +99,9 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 | base:birch_forest | 40%, 62%, 40%, 40% | summer: eaten 10% of the regrowth | mountain_hare, field_vole, red_deer | dog (chihuahua), cat, red_fox, raven, great_horned_owl, golden_eagle, grey_wolf | dog (chihuahua), cat, brown_trout, red_fox, raven, golden_eagle, grey_wolf |
 | base:taiga | 40%, 62%, 40%, 40% | summer: eaten 14% of the regrowth | mountain_hare, field_vole, reindeer, snow_bunting | cat, red_fox, arctic_fox, raven, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | cat, brown_trout, red_fox, arctic_fox, raven, golden_eagle, grey_wolf |
 | base:snowy_plains | 40%, 40%, 40%, 40% | - | mountain_hare, field_vole, reindeer, snow_bunting | arctic_fox, raven, snowy_owl, golden_eagle, grey_wolf | arctic_fox, raven, golden_eagle, grey_wolf |
-| base:desert | 40%, 40%, 40%, 40% | - | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle | dog (chihuahua), cat, red_fox, raven, coyote, golden_eagle, turkey_vulture |
-| base:savanna | 43%, 82%, 75%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman | dog (chihuahua), cat, turkey_vulture |
-| base:swamp | 40%, 59%, 45%, 40% | summer: eaten 6% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman | turkey_vulture, herring_gull |
+| base:desert | 40%, 40%, 40%, 40% | - | hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, red_fox, raven, coyote, great_horned_owl, golden_eagle, jaguar | dog (chihuahua), cat, red_fox, raven, coyote, golden_eagle, turkey_vulture |
+| base:savanna | 43%, 82%, 75%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer, house_sparrow | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman, jaguar | dog (chihuahua), cat, turkey_vulture |
+| base:swamp | 40%, 59%, 45%, 40% | summer: eaten 6% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
 | base:mountains | 40%, 70%, 40%, 40% | summer: eaten 21% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:beach | 40%, 40%, 50%, 40% | - | hare, wood_mouse, house_sparrow | red_fox, raven, herring_gull | red_fox, raven, herring_gull |
 | animals:red_dunes | 40%, 40%, 40%, 40% | - | protoceratops | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
@@ -2236,6 +2238,67 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn 
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.5 |
+
+## jaguar
+
+*Panthera onca*, Mammalia › Carnivora › Felidae › Pantherinae. Model `jaguar`, entity `animals:jaguar`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:swamp` | commonest |
+| `base:savanna` | 60% |
+| `base:desert` | 5% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | large |
+| height (grown, average) | 0.7 m at the shoulder |
+| males against females | 1.1x as tall |
+| size spread (an individual's, either way) | 15% |
+| newborn's size | 12% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 85 kg | |
+| carries her young | 100 d | 1.77 d |
+| litter or clutch | 1.6 on average | 1-2 |
+| between litters | 1.9 y | rests 6.25 d **set** |
+| breeds in | all year, most in spring and summer |  |
+| comfortable in | 8 to 38 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 2.5 y | 7.54 d |
+| lives | 17 y | 65.1 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 7 within 48 blocks |
+
+**Balance** (uncommon): a generation 9.3 d; a line four deep in 28 d (9 h of play); 1.9 young per mother in 10 days, 8 in her life.
+
+- ✓ fourth generation: 27.9 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 7.5 of 65 days (want under a fifth)
+- ✓ young in a life: 8.3 (want 6-40)
+- ✓ litter: 1-2 (want 1-12, fewest first)
+- ✓ room near: 7 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | knockout |
+| diet | carnivore |
+| eats | meat 85%, fish 15% |
+| hunts | 1.0%-150% of its mass alone (0.85-128 kg); at home: dog, capybara, hare, white_tailed_deer, pacu, red_fox, raven, coyote, great_horned_owl, golden_eagle, savanna_hawk, turkey_vulture, herring_gull, yacare_caiman, spectacled_caiman, base:chicken, base:pig, base:sheep |
+| a meal that fills it | 8.5 kg; its biggest prey at home fills it in one kill |
+| drinks | 100% of its 5.397 L a day; a drink lasts 24 min, thirsty after 12 |
+| feedings to tame at level 1 | 14 (2.5x at level 150) |
+| scared by a walking player within | 12 blocks (twice that running) |
+| eats (food points) | `base:chicken` 8; `base:porkchop` 14; `base:beef` 18, favorite; `base:mutton` 14; `animals:kibble` 30, kibble |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes: swipe, bite |
+| reach past its body | 1 blocks |
+| signature | skull_bite |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.8 |
 
 ## Shared by every species
 

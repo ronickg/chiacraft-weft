@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 34] = [
+const FILES: [(&str, &str); 35] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -293,6 +293,7 @@ const FILES: [(&str, &str); 34] = [
     ("yacare_caiman", include_str!("../../genetics/yacare_caiman.json")),
     ("spectacled_caiman", include_str!("../../genetics/spectacled_caiman.json")),
     ("grey_wolf", include_str!("../../genetics/grey_wolf.json")),
+    ("jaguar", include_str!("../../genetics/jaguar.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1412,6 +1413,36 @@ fn wolf(r: &Read) -> Look {
     }
 }
 
+/// The jaguar: golden tan (paler to deeper orange), the rosettes black with darker centers, cream
+/// below; black jaguars (a dominant black, the rosettes still faint in it), now and then.
+fn jaguar(r: &Read) -> Look {
+    let tone = r.qv("Tn");
+    if r.shows("Mb") == "Mb" {
+        return Look {
+            name: "Black".into(),
+            base: [40.0, 34.0, 32.0],
+            under: [54.0, 46.0, 42.0],
+            pattern: Some(Pattern { kind: "rosettes", color: [24.0, 20.0, 20.0], amount: 0.6 }),
+            ..Look::default()
+        };
+    }
+    let base = mix([206.0, 166.0, 98.0], [214.0, 140.0, 58.0], tone);
+    Look {
+        name: if tone > 0.62 {
+            "Deep gold".into()
+        } else if tone < 0.38 {
+            "Pale gold".into()
+        } else {
+            "Gold".into()
+        },
+        base,
+        under: [236.0, 226.0, 204.0],
+        pattern: Some(Pattern { kind: "rosettes", color: [38.0, 30.0, 28.0], amount: 1.0 }),
+        pattern2: Some(Pattern { kind: "spotted", color: [42.0, 34.0, 30.0], amount: 0.5 }),
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1587,6 +1618,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "yacare_caiman" => caiman(&r, false),
         "spectacled_caiman" => caiman(&r, true),
         "grey_wolf" => wolf(&r),
+        "jaguar" => jaguar(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -2168,7 +2200,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 25] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 26] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2193,7 +2225,8 @@ const MODEL_LAYERS: [ModelLayers; 25] = model_layers!(
     "vulture",
     "gull",
     "caiman",
-    "wolf"
+    "wolf",
+    "jaguar"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
