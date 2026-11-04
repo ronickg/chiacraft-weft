@@ -5,7 +5,7 @@
 # a fresh world. Spectator, absolute /tp, mobs off. Yaw 0 faces -z.
 loaded
 idle
-chat /rule core:mob_spawning 0
+chat /rule core:mob_spawning false
 chat /tk mode spectator
 chat /weather clear 99999
 chat /time set 6000

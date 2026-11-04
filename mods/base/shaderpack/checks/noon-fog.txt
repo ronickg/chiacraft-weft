@@ -3,7 +3,7 @@
 # 1280x720, --shader-pack chiacraft, a fresh world. Spectator, mobs off.
 loaded
 idle
-chat /rule core:mob_spawning 0
+chat /rule core:mob_spawning false
 chat /tk mode spectator
 chat /tp 272 76 -208
 loaded

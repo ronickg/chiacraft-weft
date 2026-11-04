@@ -5,7 +5,7 @@
 # Creative on a grass floor high in the open (x 40 y 200 z 40), mobs off. Yaw 0 faces -z; the moon sets in the west (yaw 90).
 loaded
 idle
-chat /rule core:mob_spawning 0
+chat /rule core:mob_spawning false
 chat /weather clear 99999
 chat /tk mode creative
 chat /time set 6000
