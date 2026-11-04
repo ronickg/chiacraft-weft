@@ -1,16 +1,16 @@
 //! Grass and leaves through the year: the colors a biome's grass and foliage tints take by the
 //! day of the year, fresh in spring, the biome's own in summer, gold and orange then straw in
 //! autumn, dull in winter, as strongly as the place's year swings (`mods/base/src/seasons.rs`
-//! tells the engine, `World::set_biome_tints`). One tint for all leaves for now: evergreens turn
-//! with the rest until leaf kinds per species exist.
+//! tells the engine, `World::set_biome_tints`). Leaves turn as their tree does (`wild::Turn`):
+//! evergreens keep their color, birches go gold, oaks russet.
 
 use crate::calendar::YEAR_DAYS;
 
-/// What a tint colors.
+/// What a tint colors: grass, or leaves that turn to `autumn` (0xRRGGBB, `wild::Turn::autumn`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Part {
     Grass,
-    Foliage,
+    Leaves { autumn: u32 },
 }
 
 /// How strongly a place's year shows in its plants, 0 to 1: from its seasons' swing (°C a side
@@ -24,7 +24,7 @@ pub fn strength(seasons: f32) -> f32 {
 /// its fullest.
 const FRESH: (u32, u32) = (0x98d860, 0xa8d85a);
 const FRESH_AMOUNT: (f32, f32) = (0.35, 0.35);
-const AUTUMN: (u32, u32) = (0xb0a058, 0xd08a2a);
+const AUTUMN_GRASS: u32 = 0xb0a058;
 const AUTUMN_AMOUNT: (f32, f32) = (0.45, 0.75);
 const WINTER: (u32, u32) = (0x908860, 0x6e6648);
 const WINTER_AMOUNT: (f32, f32) = (0.5, 0.6);
@@ -41,9 +41,13 @@ pub fn tint(base: u32, part: Part, day: f32, strength: f32) -> u32 {
     let winter = smoothstep(2.9 * q, 3.3 * q, d).max(1.0 - smoothstep(0.0, 0.25 * q, d));
     let pick = |look: (u32, u32)| if part == Part::Grass { look.0 } else { look.1 };
     let amount = |a: (f32, f32)| if part == Part::Grass { a.0 } else { a.1 };
+    let autumn_look = match part {
+        Part::Grass => AUTUMN_GRASS,
+        Part::Leaves { autumn } => autumn,
+    };
     let mut c = rgb(base);
     c = mix(c, rgb(pick(FRESH)), fresh * amount(FRESH_AMOUNT) * strength);
-    c = mix(c, rgb(pick(AUTUMN)), autumn * amount(AUTUMN_AMOUNT) * strength);
+    c = mix(c, rgb(autumn_look), autumn * amount(AUTUMN_AMOUNT) * strength);
     c = mix(c, rgb(pick(WINTER)), winter * amount(WINTER_AMOUNT) * strength);
     pack(c)
 }
@@ -75,24 +79,25 @@ mod tests {
     use super::*;
 
     const OAK: u32 = 0x59ae30;
+    const OAK_LEAVES: Part = Part::Leaves { autumn: 0xb8622a };
 
     #[test]
     fn summer_keeps_the_biomes_own_color() {
         let mid_summer = YEAR_DAYS as f32 * 3.0 / 8.0;
-        assert_eq!(tint(OAK, Part::Foliage, mid_summer, 1.0), OAK);
+        assert_eq!(tint(OAK, OAK_LEAVES, mid_summer, 1.0), OAK);
     }
 
     #[test]
     fn the_tropics_stay_green_all_year() {
         for day in 0..YEAR_DAYS {
-            assert_eq!(tint(OAK, Part::Foliage, day as f32, strength(1.0)), OAK);
+            assert_eq!(tint(OAK, OAK_LEAVES, day as f32, strength(1.0)), OAK);
         }
     }
 
     #[test]
     fn late_autumn_leaves_are_warm() {
         let late_autumn = YEAR_DAYS as f32 * 0.7;
-        let c = rgb(tint(OAK, Part::Foliage, late_autumn, 1.0));
+        let c = rgb(tint(OAK, OAK_LEAVES, late_autumn, 1.0));
         assert!(c[0] > c[1] * 0.9, "{c:?}");
     }
 

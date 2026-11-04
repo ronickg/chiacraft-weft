@@ -1,10 +1,12 @@
 //! Grass and leaves follow the calendar: every biome's grass and foliage tints by the time of
 //! year and how strongly the place's year swings (`vitals::foliage`), told to the engine
-//! (`set_biome_tints`) four times a day, in dimensions with four seasons.
+//! (`set_biome_tints`) four times a day, in dimensions with four seasons. Leaves turn by kind
+//! (`base_api::trees::leaf_tint`): birches gold, oaks russet, evergreens not at all.
 
 use std::sync::{Mutex, OnceLock};
 
 use base_api::{CLIMATE, Climate, SEASONS, calendars};
+use vitals::wild::Turn;
 use vitals::{calendar, foliage};
 use weft_sdk::*;
 
@@ -49,7 +51,12 @@ fn tick(w: &World) {
         if strength <= 0.0 {
             continue;
         }
-        for (kind, part) in [(&tints::GRASS, foliage::Part::Grass), (&tints::FOLIAGE, foliage::Part::Foliage)] {
+        // Grass, and the leaves that turn (evergreens keep the biome's color).
+        let turning = [Turn::Yellow, Turn::Orange].into_iter().filter_map(|t| {
+            t.autumn()
+                .map(|a| (base_api::trees::leaf_tint(t), foliage::Part::Leaves { autumn: a }))
+        });
+        for (kind, part) in std::iter::once((&tints::GRASS, foliage::Part::Grass)).chain(turning) {
             let base = w.content_tint(id, kind);
             let now = foliage::tint(base, part, day, strength);
             if now != base {
