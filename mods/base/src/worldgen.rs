@@ -237,7 +237,7 @@ pub fn register(r: &mut Registry) {
     r.biome(&TROPICAL_FOREST)
         .tint(water, 0x5d7f6a)
         .set(&CLIMATE, base_api::climate("base:tropical_forest"))
-        .set(&BOULDERS, 0.04)
+        .set(&BOULDERS, 0.01)
         .temperature(land::TROPICAL.0..)
         .humidity(land::TROPICAL.1..)
         .surface("grass", "dirt", 3)

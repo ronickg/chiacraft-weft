@@ -124,7 +124,9 @@ pub const LAYERS: [Layers; 11] = [
         // Ronald, 11-04: "A + C's giants + some B": a few of B's big-leaved plants on A's floor.
         big_leaves: 0.03,
         big_leaf_kinds: "base:philodendron:2 base:banana:1",
-        ..l("base:tropical_forest", "base:deep_leaf_litter:3 base:leaf_litter:1 base:podzol:1", 0.6, 0.1, 0.25, "base:cacao_leaves", 0.3)
+        // The floor is litter, not grass: nearly all of it (the playtest's first look still read
+        // grass at 0.6).
+        ..l("base:tropical_forest", "base:deep_leaf_litter:3 base:leaf_litter:1 base:podzol:1", 0.95, 0.1, 0.25, "base:cacao_leaves", 0.3)
     },
 ];
 
