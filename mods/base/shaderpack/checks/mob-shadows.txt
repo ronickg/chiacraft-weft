@@ -3,11 +3,71 @@ idle
 chat /tk mode creative
 chat /weather clear
 chat /air 0 0 90 mist
+wait 3
+# A flat open pad at spawn, so only the mobs and the player cast shadows near the camera.
+chat /tk fill ~-12 ~ ~-12 ~12 ~14 ~12 air
+chat /tk fill ~-12 ~-1 ~-12 ~12 ~-1 ~12 grass
+wait 2
+# Two suns. Each time: fresh mobs on all four sides, then the world frozen (`/tick freeze`: they
+# stand still) and the same four views, so the shots with and without the change match.
+chat /time set 9000
+chat /summon base:cow ~4 ~ ~0
+chat /summon base:sheep ~-4 ~ ~0
+chat /summon base:pig ~0 ~ ~4
+chat /summon base:chicken ~0 ~ ~-4
+wait 1
+chat /tick freeze
+look 0 -25
+wait 1
+shot 1_afternoon_0.png
+look 90 -25
+wait 1
+shot 2_afternoon_90.png
+look 180 -25
+wait 1
+shot 3_afternoon_180.png
+look 270 -25
+wait 1
+shot 4_afternoon_270.png
+chat /tick unfreeze
+chat /time set 10300
+chat /summon base:cow ~5 ~ ~1
+chat /summon base:sheep ~-5 ~ ~-1
+chat /summon base:pig ~1 ~ ~5
+chat /summon base:chicken ~-1 ~ ~-5
+wait 1
+chat /tick freeze
+look 0 -25
+wait 1
+shot 5_golden_0.png
+look 90 -25
+wait 1
+shot 6_golden_90.png
+look 180 -25
+wait 1
+shot 7_golden_180.png
+look 270 -25
+wait 1
+shot 8_golden_270.png
+# The player's own shadow, looking down each way.
+look 0 -55
+wait 1
+shot 9_own_shadow_0.png
+look 90 -55
+wait 1
+shot 10_own_shadow_90.png
+look 180 -55
+wait 1
+shot 11_own_shadow_180.png
+look 270 -55
+wait 1
+shot 12_own_shadow_270.png
+chat /tick unfreeze
+# The flatlands: one side of the open ground looked shaded to the horizon. The light on both sides
+# (the sky light should be full everywhere in the open) and the horizon each way.
 chat /dim base:flatlands
 wait 5
 where
-# The light on both sides of the player and further out (the sky light should be full everywhere
-# in the open).
 chat /tk light ~0 ~ ~0
 chat /tk light ~8 ~ ~0
 chat /tk light ~-8 ~ ~0
@@ -17,54 +77,16 @@ chat /tk light ~40 ~ ~40
 chat /tk light ~-40 ~ ~-40
 chat /tk light ~40 ~ ~-40
 chat /tk light ~-40 ~ ~40
-# The time is fixed in the flatlands: one low morning sun. Fresh mobs on all four sides right before
-# each view, so they stand still in it and the shots with and without the change match.
-chat /summon base:cow ~4 ~ ~0
-chat /summon base:sheep ~-4 ~ ~0
-chat /summon base:pig ~0 ~ ~4
-chat /summon base:chicken ~0 ~ ~-4
-look 0 -25
-wait 1
-shot 1_mobs_0.png
-chat /summon base:cow ~4 ~ ~0
-chat /summon base:sheep ~-4 ~ ~0
-chat /summon base:pig ~0 ~ ~4
-chat /summon base:chicken ~0 ~ ~-4
-look 90 -25
-wait 1
-shot 2_mobs_90.png
-chat /summon base:cow ~4 ~ ~0
-chat /summon base:sheep ~-4 ~ ~0
-chat /summon base:pig ~0 ~ ~4
-chat /summon base:chicken ~0 ~ ~-4
-look 180 -25
-wait 1
-shot 3_mobs_180.png
-chat /summon base:cow ~4 ~ ~0
-chat /summon base:sheep ~-4 ~ ~0
-chat /summon base:pig ~0 ~ ~4
-chat /summon base:chicken ~0 ~ ~-4
-look 270 -25
-wait 1
-shot 4_mobs_270.png
-# The player's own shadow, looking down each way.
-look 0 -55
-wait 1
-shot 5_own_shadow_0.png
-look 90 -55
-wait 1
-shot 6_own_shadow_90.png
-look 180 -55
-wait 1
-shot 7_own_shadow_180.png
-look 270 -55
-wait 1
-shot 8_own_shadow_270.png
-# The open horizon each way, for the light across the whole view.
 look 0 -8
 wait 1
-shot 9_horizon_0.png
+shot 13_flat_horizon_0.png
+look 90 -8
+wait 1
+shot 14_flat_horizon_90.png
 look 180 -8
 wait 1
-shot 10_horizon_180.png
+shot 15_flat_horizon_180.png
+look 270 -8
+wait 1
+shot 16_flat_horizon_270.png
 quit
