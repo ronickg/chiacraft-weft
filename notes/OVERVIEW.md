@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 64 · ◧ partly built: 18 · □ not built yet: 15 · ◌ planned for later: 6
+■ built and seen working: 64 · ◧ partly built: 19 · □ not built yet: 15 · ◌ planned for later: 6
 
 ## Core next
 
@@ -12,6 +12,7 @@ What's missing that the rest leans on (marked `core` in the data).
 
 - **Account and identity: Player and world DIDs**. Phase 4, slices 4-7 in notes/PLAN.md, waiting for Ronald's answers on the sponsor (iroh or HTTP, the testnet wallets, world DIDs from the sponsor, testnet11 by default). crates/wallet can already read DIDs from the chain, create one and ask a sponsor for one (chain/did.rs, sponsor.rs), behind its `chain` feature, used by its tests and chiacraft-wallet-test; the game links none of it. Horizon's sponsor service (horizon-sponsor) ran live on testnet11 and is to be ported.
 - **Linked worlds: Admission rules and bans**. Phase 4 slices 1-3 built and seen working between two games on the PC (2026-11-04, tools/checks/admission): per world admission.json (open or allow list only, the allow list by login key, identity or DID; probation for newcomers: no building, no containers, for N hours of play, liftable) and bans.json (by login key, identity and DID, timed or for good; banned players are sent away), checked at every join; refusals in the player's language; /ban, /tempban, /unban, /bans, /allow, /probation, /banlist and the owner's "Who May Come In" screen; the status answer shows the rules before joining. Shared ban lists: signed by their maintainer's identity, served by any world holding one (chiacraft/bans/1), followed by a world's address (its owner's list), fetched daily. DID rules (/didrule: DID required, DID age, checked on chain at the join) built, not yet seen on testnet11.
+- **Running worlds safely: Entity send and activation ranges**. Research round 2, E1, in Weft's engine (to offer upstream): entities go to players within 96 blocks, far ones' moves every 2nd or 4th tick, and those no player is within 48 blocks of tick their goals and paths once a second. Built; Tester's measurement with a 200-animal pen and two players pending. The animals mod's per-tick countdowns (breeding, cat gifts, knockout anger) still to switch to `tick_elapsed`.
 - **Running worlds safely: Permissions**. Operator levels exist, but any player can still /give.
 - **Running worlds safely: Sandboxed code mods**. Phase 6 slices 1 and 2 built and seen between two games (Linux PC): a package's code/server.wasm (a wasmtime component, API chiacraft:mods@1.0.0 shaped on Weft's SDK) downloads with it on join and runs on the world's host under fuel, time and memory limits, per world, with storage in the save; sample clans (the animals mod's tribes). Slice 2: the join sheet marks packages that carry code (protocol 6), and a package's clashing command is left out. Slice 3: API 1.1 (components, set_blocks, sounds, particles; 1.0 mods still run), sample tally. Left: 1.2 (block and item callbacks, channels), client halves, personal mods.
 - **Living world: Real places and pacing**. Researched (2026-11-03): a real place and its monthly climate for every biome, 57 plants' agronomy, real diets and food webs, and the pacing (the calendar for weather, the species' growing pace for plants). Decided: the fern forest after the Yixian (cool), the dunes wet in winter and spring, Velociraptors alone, temperatures as the real places have them. The climate table follows it (vitals/tests/places.rs holds it there). Next: the plant table and the species' diets.
@@ -89,11 +90,12 @@ Code: `crates/engine/src/chiacraft/worlds`, `mods/portals`, `crates/engine/src/c
 
 ## Running worlds safely
 
-Always-on servers and code mods that can't hurt the player. 0 of 6 parts built.
+Always-on servers and code mods that can't hurt the player. 0 of 7 parts built.
 
 | | Part | Notes |
 |---|---|---|
 | ◧ | Headless server | A dedicated mode exists; no server.toml, console or load tests (phase 7). |
+| ◧ | Entity send and activation ranges (core) | Research round 2, E1, in Weft's engine (to offer upstream): entities go to players within 96 blocks, far ones' moves every 2nd or 4th tick, and those no player is within 48 blocks of tick their goals and paths once a second. Built; Tester's measurement with a 200-animal pen and two players pending. The animals mod's per-tick countdowns (breeding, cat gifts, knockout anger) still to switch to `tick_elapsed`. Docs: `docs/modding.md`. |
 | ◧ | Permissions (core) | Operator levels exist, but any player can still /give. |
 | □ | Movement checks | Phase 7. |
 | ◧ | Sandboxed code mods (core) | Phase 6 slices 1 and 2 built and seen between two games (Linux PC): a package's code/server.wasm (a wasmtime component, API chiacraft:mods@1.0.0 shaped on Weft's SDK) downloads with it on join and runs on the world's host under fuel, time and memory limits, per world, with storage in the save; sample clans (the animals mod's tribes). Slice 2: the join sheet marks packages that carry code (protocol 6), and a package's clashing command is left out. Slice 3: API 1.1 (components, set_blocks, sounds, particles; 1.0 mods still run), sample tally. Left: 1.2 (block and item callbacks, channels), client halves, personal mods. Code: `crates/sandbox`, `crates/mod-sdk`, `mods/packages/src/sandboxed.rs`, `examples/wasm/clans`. Docs: `docs/sandboxed-mods.md`, `reports/Sandboxed code mods.md`. |
