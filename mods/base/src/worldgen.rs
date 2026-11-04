@@ -260,8 +260,12 @@ pub fn register(r: &mut Registry) {
     r.decorate(decorate);
 }
 
-/// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet.
+/// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet; none
+/// on a bare rock face (`land::site_on_rock`), which is stone already.
 fn boulder(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
     let [x, y, z] = s.pos();
     let h = s.random();
     let mossy = WET.on_biome(s.biome()) || WOODS.on_biome(s.biome());
@@ -307,8 +311,12 @@ fn flower_kind(seed: u64, wx: i32, wz: i32, h: u64) -> u64 {
 const FLOWER_MEADOW: f64 = 0.72;
 const CLEARING: i32 = 1600;
 
-/// A tree of the biome's kinds (`TREE_KINDS`) at a scatter's site.
+/// A tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face
+/// (`land::site_on_rock`).
 fn tree(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
     let [x, y, z] = s.pos();
     let log = TREE_KINDS
         .on_biome(s.biome())
@@ -386,15 +394,16 @@ fn decorate(g: &mut Gen) {
             // Ponds in swamps and floodplains (`vitals::wild::POND_LANDS`): still water a block deep
             // where the ground is level, its floating plants on it.
             let near = [(1, 0), (-1, 0), (0, 1), (0, -1)].map(|(dx, dz)| (wx + dx, wz + dz, g.column(wx + dx, wz + dz)));
-            // Steep ground goes bare: gravel where it falls three blocks to a neighbour, stone
-            // where it falls five (sand and the frozen north keep their own ground).
+            // Steep ground goes bare: gravel where it falls three blocks to a neighbour (sand and the
+            // frozen north keep their own ground); from four, the terrain's rock faces have made it
+            // stone already (`land.rs`), and it isn't plant soil here.
             let fall = near
                 .iter()
                 .map(|(_, _, c)| col.height - c.height)
                 .max()
                 .unwrap_or(0);
             if y >= 1 && fall >= 3 && PLANT_SOIL.on_block(below) && !FROZEN.on_biome(b) {
-                g.set(x, y - 1, z, if fall >= 5 { STONE.id() } else { GRAVEL.id() });
+                g.set(x, y - 1, z, GRAVEL.id());
                 continue;
             }
             if y >= 1
