@@ -29,6 +29,8 @@ pub static OBSIDIAN: Block = Block::named("obsidian");
 pub static COAL_ORE: Block = Block::named("coal_ore");
 pub static IRON_ORE: Block = Block::named("iron_ore");
 pub static GOLD_ORE: Block = Block::named("gold_ore");
+/// The floor of glaciers in the high valleys (`land.rs`, `base_api::land::glacier`; Art's tiles).
+pub static GLACIER_ICE: Block = Block::named("glacier_ice");
 // Ores in the rock faces (`base_api::land::face_ore`; Art's textures, Ronald: "Yes, all four").
 pub static BANDED_CLAY_COAL_ORE: Block = Block::named("banded_clay_coal_ore");
 pub static RED_SANDSTONE_IRON_ORE: Block = Block::named("red_sandstone_iron_ore");
@@ -465,6 +467,15 @@ pub fn register(r: &mut Registry) {
         .friction(0.98)
         .mineable("pickaxe")
         // Itself with a pickaxe (Research round 3, U1: it's the only blue dye).
+        .needs_tool(0)
+        .tab(&crate::tabs::NATURAL);
+    // Packed by its own weight: opaque, slippery like ice, mined with a pickaxe.
+    r.block(&GLACIER_ICE)
+        .sound_group("glass")
+        .textures("glacier_ice_top", "glacier_ice_side", "glacier_ice_top")
+        .hardness(0.5)
+        .friction(0.98)
+        .mineable("pickaxe")
         .needs_tool(0)
         .tab(&crate::tabs::NATURAL);
     r.block(&OBSIDIAN)
