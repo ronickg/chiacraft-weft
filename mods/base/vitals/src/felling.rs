@@ -116,6 +116,12 @@ pub fn felling(logs: u32, harvest: u32) -> Felling {
     Felling { chops, fruitful }
 }
 
+/// Chopping a tree's foot with bare hands or any tool but an axe: as slow as an axe past its tier
+/// and as fruitless (Planner, 11-05), with one log's time the hand's.
+pub fn by_hand(logs: u32) -> Felling {
+    Felling { chops: (logs.max(1) as f32).powf(GROWTH) * PAST_TIER, fruitful: false }
+}
+
 /// Cutting a piece of `logs` of a felled trunk: as long as felling a tree of them, whatever the
 /// axe (the tree was already its tier's).
 pub fn piece(logs: u32) -> Felling {
@@ -173,6 +179,9 @@ mod tests {
         let (f, one) = (felling(30, 100), log_secs(2.0, 2.91));
         assert!((one / speed(f, one) - seconds(f, one)).abs() < 1e-3);
         assert!(seconds(felling(1350, 0), log_secs(2.0, 1.0)) <= LONGEST_SECS);
+        // Bare hands are as slow and fruitless as an axe past its tier.
+        assert_eq!(by_hand(60), felling(60, 0));
+        assert!(!by_hand(5).fruitful && by_hand(5).chops > felling(5, 0).chops);
         // A piece of four logs is 2.8 logs' time; the axe wears by chops, not by logs.
         assert!((piece(4).chops - 2.83).abs() < 0.01);
         assert_eq!(wear(20), 9);
