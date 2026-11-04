@@ -22,10 +22,21 @@ pub struct Layers {
     pub shrubs: f32,
     /// The leaves the shrubs are made of, by weight.
     pub shrub_kinds: &'static str,
+    /// Young trees of the biome's kinds, the chance of one per 5 x 5 cell, in clearings and at
+    /// the stands' edges where light comes in (none deep in a stand).
+    pub young: f32,
 }
 
-const fn l(biome: &'static str, floor: &'static str, floor_cover: f32, ferns: f32, shrubs: f32, shrub_kinds: &'static str) -> Layers {
-    Layers { biome, floor, floor_cover, ferns, shrubs, shrub_kinds }
+const fn l(
+    biome: &'static str,
+    floor: &'static str,
+    floor_cover: f32,
+    ferns: f32,
+    shrubs: f32,
+    shrub_kinds: &'static str,
+    young: f32,
+) -> Layers {
+    Layers { biome, floor, floor_cover, ferns, shrubs, shrub_kinds, young }
 }
 
 /// Each biome's layers. Shrubs: Białowieża's hazel and hornbeam under the oaks; Moscow's rowan
@@ -35,15 +46,15 @@ const fn l(biome: &'static str, floor: &'static str, floor_cover: f32, ferns: f3
 /// (spruce); the tundra's dwarf willow and birch (birch). The look of their own leaves is Chiacraft's
 /// to draw; until then they are the trees' leaves.
 pub const LAYERS: [Layers; 9] = [
-    l("base:plains", "base:dirt", 0.03, 0.0, 0.06, "base:oak_leaves"),
-    l("base:forest", "base:podzol:3 base:dirt:1", 0.25, 0.05, 0.2, "base:oak_leaves:3 base:birch_leaves:1"),
-    l("base:birch_forest", "base:podzol", 0.15, 0.06, 0.18, "base:birch_leaves:2 base:oak_leaves:1"),
-    l("base:taiga", "", 0.0, 0.03, 0.16, "base:birch_leaves:2 base:spruce_leaves:1"),
-    l("base:snowy_plains", "", 0.0, 0.0, 0.1, "base:birch_leaves"),
-    l("base:savanna", "base:dirt", 0.04, 0.0, 0.05, "base:acacia_leaves"),
-    l("base:swamp", "", 0.0, 0.02, 0.12, "base:oak_leaves"),
-    l("base:mountains", "base:gravel", 0.04, 0.02, 0.14, "base:spruce_leaves"),
-    l("base:desert", "base:gravel", 0.03, 0.0, 0.08, "base:mesquite_leaves"),
+    l("base:plains", "base:dirt", 0.03, 0.0, 0.06, "base:oak_leaves", 0.0),
+    l("base:forest", "base:podzol:3 base:dirt:1", 0.25, 0.05, 0.2, "base:oak_leaves:3 base:birch_leaves:1", 0.15),
+    l("base:birch_forest", "base:podzol", 0.15, 0.06, 0.18, "base:birch_leaves:2 base:oak_leaves:1", 0.25),
+    l("base:taiga", "", 0.0, 0.03, 0.16, "base:birch_leaves:2 base:spruce_leaves:1", 0.25),
+    l("base:snowy_plains", "", 0.0, 0.0, 0.1, "base:birch_leaves", 0.0),
+    l("base:savanna", "base:dirt", 0.04, 0.0, 0.05, "base:acacia_leaves", 0.0),
+    l("base:swamp", "", 0.0, 0.02, 0.12, "base:oak_leaves", 0.0),
+    l("base:mountains", "base:gravel", 0.04, 0.02, 0.14, "base:spruce_leaves", 0.1),
+    l("base:desert", "base:gravel", 0.03, 0.0, 0.08, "base:mesquite_leaves", 0.0),
 ];
 
 /// A biome's layers, if it has any.
@@ -74,6 +85,7 @@ mod tests {
             assert!((0.0..=0.5).contains(&l.shrubs), "{}: shrubs", l.biome);
             assert!(l.shrubs == 0.0 || !l.shrub_kinds.is_empty(), "{}: shrubs with no kinds", l.biome);
             assert!(l.floor_cover == 0.0 || !l.floor.is_empty(), "{}: a floor cover with no blocks", l.biome);
+            assert!((0.0..=0.5).contains(&l.young), "{}: young trees", l.biome);
             assert!(crate::climate::of(l.biome).is_some(), "{}: no climate", l.biome);
         }
     }

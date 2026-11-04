@@ -56,11 +56,14 @@ biomes. No engine change for any of it.
 3. **Shrubs** (a scatter): `SHRUB_SITES`, a site per 4 x 4 cell at the biome's `SHRUBS` chance,
    the kind from `SHRUB_KINDS` (leaf blocks, weighted); a clump 1-2 high and 1-3 across, on a
    log stub or not. Thickets in patches by a noise (`.thin()`, so far terrain agrees).
-4. **Understory** (the tree scatter): a `Young` form in `trees.rs` (2-4 tall, a small crown of
-   the same leaves), placed by a `YOUNG_TREES` component in clearings and at stand edges, where
-   the light comes in.
-5. **Deadwood:** a `Snag` form (a bare trunk 3-6 high) beside the fallen and stump forms, for the
-   taiga and forests.
+4. **Understory** (a scatter): `young_tree_blocks` in `base_api::trees` (a trunk 2-4 tall under
+   a small crown of the same leaves, a spire for spruces), a site per 5 x 5 cell at the biome's
+   `YOUNG_TREES`, none deep in a stand: in clearings and at stand edges, where the light comes in.
+5. **Deadwood:** a `Snag` form (a bare trunk 3-6 high with a branch stub), 3% of wild forest
+   trees, beside the fallen and stump forms.
+
+Built (2026-11-04, branch `vegetation-layers`): 1, 2 (ferns; the two-block grass waits for its
+art), 3, 4, 5. Mushrooms round trunks are still to do.
 
 ## Cost
 

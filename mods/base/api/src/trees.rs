@@ -58,6 +58,8 @@ enum Form {
     Twin,
     Fallen,
     Stump,
+    /// A standing dead trunk, bare (the taiga's fire-killed spruces, a wood's old snags).
+    Snag,
 }
 
 pub struct TreeAt {
@@ -106,6 +108,7 @@ fn shaped(log: u32, x: i32, y: i32, z: i32, h: u64, wild: bool) -> Option<TreeAt
     let form = match roll {
         0..4 if wild && forest => Form::Fallen,
         4..8 if wild && forest => Form::Stump,
+        42..45 if wild && forest => Form::Snag,
         8..22 if crown != Crown::Palm => Form::Big,
         22..34 if crown != Crown::Cone => Form::Crooked,
         34..42 if crown == Crown::Round => Form::Twin,
@@ -135,6 +138,17 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
             for k in 0..3 + t.height % 3 {
                 put(t.x + t.lean.0 * k, t.y, t.z + t.lean.1 * k, lying, false);
             }
+            return;
+        }
+        // A bare trunk three to six high, a stub of a branch near its top.
+        Form::Snag => {
+            let top = t.y + 3 + t.height % 4;
+            for y in t.y..top {
+                put(t.x, y, t.z, log, true);
+            }
+            let axis = if t.lean.0 != 0 { "x" } else { "z" };
+            put(t.x + t.lean.0, top - 2, t.z + t.lean.1, state_with(log, "axis", axis).unwrap_or(log), false);
+            put(t.x, t.y - 1, t.z, DIRT.id(), true);
             return;
         }
         Form::Stump => {
@@ -260,6 +274,46 @@ fn crown(t: &TreeAt, cx: i32, cz: i32, top: i32, put: &mut impl FnMut(i32, i32, 
                 }
             }
         }
+    }
+}
+
+/// A young tree of `log` (the understory: in clearings and at a wood's edge), `h` deciding its
+/// height: a trunk two to four high under a small crown of its leaves, a spire for the cone trees,
+/// a ragged ball for the rest. None for palms and flat-topped trees, which grow up in the open.
+/// Calls `put(x, y, z, state, force)` for every block.
+pub fn young_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
+    let Some(leaves) = TREE_LEAVES.on_block(log).map(|l| l.0) else { return };
+    if PALM_TREE.on_block(log) || FLAT_TREE.on_block(log) {
+        return;
+    }
+    let height = 2 + (h % 3) as i32;
+    let top = y + height;
+    if CONE_TREE.on_block(log) {
+        // Rings of one round the trunk from its first block up, and a tip on top.
+        for k in 1..height {
+            for (dx, dz) in LEANS {
+                if k % 2 == 1 || hash(h, dx as i64, k as i64, dz as i64) & 1 == 0 {
+                    put(x + dx, y + k, z + dz, leaves, false);
+                }
+            }
+        }
+        put(x, top, z, leaves, false);
+        put(x, top + 1, z, leaves, false);
+    } else {
+        for cy in top - 1..=top {
+            for dz in -1i32..=1 {
+                for dx in -1i32..=1 {
+                    if dx.abs() + dz.abs() == 2 && hash(h, dx as i64, cy as i64, dz as i64) & 3 != 0 {
+                        continue;
+                    }
+                    put(x + dx, cy, z + dz, leaves, false);
+                }
+            }
+        }
+        put(x, top + 1, z, leaves, false);
+    }
+    for k in 0..height {
+        put(x, y + k, z, log, true);
     }
 }
 

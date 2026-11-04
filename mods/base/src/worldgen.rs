@@ -42,6 +42,8 @@ pub static FLOOR_COVER: Component<f32> = Component::named("floor_cover");
 pub static FERNS: Component<f32> = Component::named("ferns");
 pub static SHRUBS: Component<f32> = Component::named("shrubs");
 pub static SHRUB_KINDS: Component<BlockList> = Component::named("shrub_kinds");
+/// Young trees of the biome's `TREE_KINDS`, the chance per 5 x 5 cell, out of the thick stands.
+pub static YOUNG_TREES: Component<f32> = Component::named("young_trees");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
 pub use base_api::trees::{TREE_LEAVES, grow_tree};
 use base_api::trees::{tree_blocks, wild_tree_at};
@@ -240,6 +242,9 @@ pub fn register(r: &mut Registry) {
             r.set_on(b(), &FLOOR_COVER, l.floor_cover);
         }
         r.set_on(b(), &FERNS, l.ferns);
+        if l.young > 0.0 {
+            r.set_on(b(), &YOUNG_TREES, l.young);
+        }
         if l.shrubs > 0.0 {
             r.set_on(b(), &SHRUBS, l.shrubs);
             r.set_text_on(b(), &SHRUB_KINDS, l.shrub_kinds);
@@ -282,7 +287,28 @@ pub fn register(r: &mut Registry) {
         .density(&SHRUBS)
         .thin(Mask::Noise { salt: 0x5B2B, scale: 24.0, octaves: 1, from: 0.0, to: 0.0 }.not(), 0)
         .shape(shrub);
+    // Young trees where light comes in: in clearings and at the stands' edges, none deep in a
+    // stand (`stand_over`).
+    r.scatter(&YOUNG_SITES)
+        .cell(5)
+        .reach(2)
+        .density(&YOUNG_TREES)
+        .thin(stand_over(STAND), 0)
+        .shape(young_tree);
     r.decorate(decorate);
+}
+
+/// A young tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face.
+fn young_tree(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
+    let [x, y, z] = s.pos();
+    let h = s.random();
+    let log = TREE_KINDS.on_biome(s.biome()).and_then(|l| l.pick(h >> 40)).unwrap_or(OAK_LOG.id());
+    base_api::trees::young_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
+        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+    });
 }
 
 /// A shrub at a scatter's site: a clump of the biome's shrub leaves (`SHRUB_KINDS`), one or two
@@ -350,6 +376,7 @@ static TREE_SITES: Scatter = Scatter::named("trees");
 static STAND_SITES: Scatter = Scatter::named("stand_trees");
 static BOULDER_SITES: Scatter = Scatter::named("boulders");
 static SHRUB_SITES: Scatter = Scatter::named("shrubs");
+static YOUNG_SITES: Scatter = Scatter::named("young_trees");
 static LOGS: Tag = Tag::named("logs");
 static LEAVES: Tag = Tag::named("leaves");
 static WET: Tag = Tag::named("wet");
