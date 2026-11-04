@@ -389,19 +389,20 @@ fn soil_table(w: &mut String) {
 fn difficulties(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Difficulty (the `base:difficulty` rule)\n\n| | digests | keeps | harm | can kill | XP lost on death | stamina costs |\n|---|---|---|---|---|---|---|"
+        "## Difficulty (the `base:difficulty` rule)\n\n| | digests | keeps | harm | can kill | XP lost on death | stamina costs | first nights without monsters |\n|---|---|---|---|---|---|---|---|"
     );
     for d in difficulty::ALL {
         let _ = writeln!(
             w,
-            "| {} | x{} | x{} | x{} | {} | {:.0}% | x{} |",
+            "| {} | x{} | x{} | x{} | {} | {:.0}% | x{} | {} |",
             d.name,
             d.digest,
             d.keep,
             d.harm,
             if d.deadly { "yes" } else { "no, stops at a tenth" },
             d.death_xp * 100.0,
-            d.stamina_cost
+            d.stamina_cost,
+            d.grace_nights
         );
     }
     let _ = writeln!(w);

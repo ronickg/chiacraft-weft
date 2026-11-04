@@ -12,7 +12,7 @@
 //!   `<run dir>/test-account`, beside the player's), or `CHIACRAFT_ACCOUNT_HOME`;
 //! - the secret in the OS keystore (macOS Keychain, Windows Credential Manager, Linux Secret
 //!   Service), or in the account home's encrypted file store for automated runs and machines
-//!   without a keystore ([`use_file_store`], or `HORIZON_WALLET_STORE=file`).
+//!   without a keystore ([`use_file_store`], or `CHIACRAFT_WALLET_STORE=file`).
 //!
 //! Nothing here touches the network or the chain.
 
@@ -383,7 +383,7 @@ fn start(run_dir: &Path) -> Result<Session, String> {
         .unlock(info.fingerprint, env_passphrase())
         .map_err(|e| {
             if e.is_wrong_passphrase() {
-                "the account's file needs its passphrase (HORIZON_WALLET_PASSPHRASE)".to_string()
+                "the account's file needs its passphrase (CHIACRAFT_WALLET_PASSPHRASE)".to_string()
             } else {
                 format!("unlocking the account: {e}")
             }

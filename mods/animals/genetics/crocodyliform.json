@@ -1,0 +1,62 @@
+{
+ "species": "crocodyliform",
+ "about": "A neosuchian crocodyliform of the Cedar Mountain Formation's rivers: no record of its colors; here dark olive-brown with darker bands, pale below.",
+ "loci": [
+  {
+   "id": "Ol",
+   "name": "Olive",
+   "quantitative": true,
+   "mean": 0.4,
+   "sd": 0.15,
+   "about": "near black to olive"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.95,
+   "sd": 0.04,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   168,
+   150,
+   64
+  ],
+  [
+   150,
+   130,
+   70
+  ]
+ ],
+ "build": {
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2",
+    "tail_3"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  }
+ }
+}

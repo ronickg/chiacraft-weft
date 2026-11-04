@@ -443,6 +443,18 @@ pub const FOODS: &[Food] = &[
         poison: 0.0,
         category: Category::WaterPlants,
     },
+    // A cattail's rhizome (100 g), spring's classic survival starch, roasted or raw: about 17 g of
+    // starch in 100 g fresh (an estimate, Research round 3), the rest mostly water and fibre.
+    Food {
+        name: "base:cattail_root",
+        grams: 100.0,
+        per100: per(78.0, 1.2, 17.0, 0.2, 3.0, 2.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (14.0, 14.0),
+        poison: 0.0,
+        category: Category::Roots,
+    },
     // A bowl (150 g) of wild rice cooked from its grain (USDA, cooked wild rice): spring's real
     // grain in the swamp and the llanos.
     Food {

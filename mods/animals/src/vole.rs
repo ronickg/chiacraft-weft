@@ -22,5 +22,5 @@ static BODY: Body = Body {
 };
 
 pub fn init(r: &mut Registry) {
-    wild::register(r, &[(&FIELD_VOLE, 10)], &BODY);
+    wild::register(r, &[&FIELD_VOLE], &BODY);
 }

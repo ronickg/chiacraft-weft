@@ -16,6 +16,7 @@
   {"id": "Tl", "name": "Tail", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.5, "about": "shorter to longer tail"},
   {"id": "Lg", "name": "Legs", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.5, "about": "shorter to longer legs"},
   {"id": "Gt", "name": "Girth", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.4, "about": "slimmer to stockier body"},
-  {"id": "Ho", "name": "Horns", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.6, "about": "smaller to bigger horns, crests, frills"}
+  {"id": "Ho", "name": "Horns", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.6, "about": "smaller to bigger horns, crests, frills"},
+  {"id": "Tp", "name": "Temperament", "quantitative": true, "mean": 0.5, "sd": 0.15, "h": 0.4, "about": "calm to skittish: how near a walker comes before it runs (heritable in part, as boldness is in animals)"}
  ]
 }

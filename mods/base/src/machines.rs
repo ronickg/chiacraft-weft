@@ -43,8 +43,7 @@ pub fn register(r: &mut Registry) {
         .recipes(&crate::recipes::SMELTING)
         .attach(&SMELTING)
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0).stretch(), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.column(S::col().gap(2.0), |ui| {
@@ -84,8 +83,7 @@ pub fn register(r: &mut Registry) {
         })
         .group("chest", Slots::chest(3))
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0), &[], |ui| {
                 ui.group("chest");
                 ui.player_inventory(true);
             });

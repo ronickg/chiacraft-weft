@@ -51,6 +51,11 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | gastonia | *Gastonia burgei* | common | large | 1.25 m | 1900 kg | herd | herbivore | wild | eggs, hatch 1.77 d | 6 d | 95.8 d | 1-4 | 12 |
 | pinacosaurus | *Pinacosaurus grangeri* | common | large | 1.25 m | 1900 kg | herd | herbivore | wild | eggs, hatch 1.77 d | 6 d | 95.8 d | 1-4 | 12 |
 | iguanodont | *Iguanacolossus fortis* | common | large | 2.2 m | 4000 kg | herd | herbivore | wild | eggs, hatch 1.9 d | 6 d | 115 d | 1-3 | 12 |
+| crocodyliform | *Neosuchia indet.* | uncommon | large | 2.2 m | 150 kg | solitary | carnivore | wild | eggs, hatch 1.5 d | 6.25 d | 75 d | 4-8 | 20 |
+| citipati | *Citipati osmolskae* | common | medium | 0.9 m | 90 kg | solitary | herbivore | wild | eggs, hatch 1.36 d | 6 d | 57.5 d | 2-6 | 18 |
+| confuciusornis | *Confuciusornis sanctus* | common | small | 0.3 m | 0.5 kg | herd | omnivore | wild | 0.7 d | 4.58 d | 38.3 d | 1-4 | 24 |
+| gobipteryx | *Gobipteryx minuta* | uncommon | small | 0.3 m | 0.3 kg | herd | omnivore | wild | 0.7 d | 6.25 d | 38.3 d | 1-4 | 24 |
+| cedarosaurus | *Cedarosaurus weiskopfae* | uncommon | large | 4.1 m | 10000 kg | herd | herbivore | wild | eggs, hatch 2.03 d | 6.67 d | 153.3 d | 1-2 | 10 |
 
 ## Stats at level 1
 
@@ -99,6 +104,11 @@ Damage and speed are each kind's own (1 = 100%).
 | gastonia | 120 | 300 | 400 | 6 | 0.8 | 600 | 200 | 400 | 60 | 12 |
 | pinacosaurus | 120 | 300 | 400 | 6 | 0.8 | 600 | 200 | 400 | 60 | 12 |
 | iguanodont | 150 | 400 | 600 | 8 | 1 | 800 | 250 | 500 | 50 | 12 |
+| crocodyliform | 45 | 180 | 160 | 7 | 1 | 120 | 400 | 90 | 40 | 60 |
+| citipati | 40 | 220 | 120 | 3 | 1.2 | 80 | 90 | 80 | 20 | 15 |
+| confuciusornis | 6 | 120 | 30 | 1 | 1 | 6 | 60 | 15 | 6 | 30 |
+| gobipteryx | 6 | 120 | 30 | 1 | 1 | 6 | 60 | 15 | 6 | 30 |
+| cedarosaurus | 300 | 600 | 1200 | 10 | 0.8 | 2000 | 400 | 1200 | 80 | 10 |
 
 ## The food web
 
@@ -116,11 +126,11 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 | base:swamp | 40%, 100%, 96%, 40% | summer: eaten 8% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
 | base:mountains | 60%, 95%, 76%, 40% | summer: eaten 27% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:beach | 40%, 40%, 50%, 40% | - | hare, wood_mouse, house_sparrow | red_fox, raven, herring_gull | red_fox, raven, herring_gull |
-| animals:red_dunes | 40%, 40%, 40%, 40% | - | protoceratops, pinacosaurus | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
-| animals:scrubland | 40%, 43%, 40%, 40% | - | protoceratops, psittacosaurus, gastonia, pinacosaurus | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
-| animals:floodplain | 40%, 59%, 63%, 40% | - | psittacosaurus, gastonia, iguanodont | utahraptor | utahraptor |
-| animals:fern_forest | 40%, 70%, 45%, 40% | - | psittacosaurus, gastonia, iguanodont | utahraptor, wyvern | utahraptor, wyvern |
-| animals:crags | 40%, 66%, 65%, 40% | - | pinacosaurus | wyvern | wyvern |
+| animals:red_dunes | 40%, 40%, 40%, 40% | - | protoceratops, pinacosaurus, citipati, gobipteryx | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
+| animals:scrubland | 40%, 43%, 40%, 40% | - | protoceratops, psittacosaurus, gastonia, pinacosaurus, citipati, gobipteryx | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
+| animals:floodplain | 40%, 59%, 63%, 40% | - | psittacosaurus, gastonia, iguanodont, cedarosaurus | utahraptor, crocodyliform | utahraptor, crocodyliform |
+| animals:fern_forest | 40%, 70%, 45%, 40% | - | psittacosaurus, gastonia, iguanodont, cedarosaurus | utahraptor, wyvern, crocodyliform | utahraptor, wyvern, crocodyliform |
+| animals:crags | 40%, 66%, 65%, 40% | - | pinacosaurus, gobipteryx | wyvern | wyvern |
 
 ### Gaps in the web
 
@@ -360,7 +370,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | how | knockout |
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
-| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar, psittacosaurus |
+| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar, psittacosaurus, citipati, gobipteryx |
 | a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
 | drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
@@ -422,7 +432,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | how | knockout |
 | diet | carnivore |
 | eats | meat 80%, carrion 15%, fish 5% |
-| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops, lungfish, psittacosaurus, gastonia, pinacosaurus, iguanodont |
+| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops, lungfish, psittacosaurus, gastonia, pinacosaurus, iguanodont, crocodyliform, citipati |
 | a meal that fills it | 30 kg; its biggest prey at home fills it in one kill |
 | drinks | 80% of its 16.79 L a day; a drink lasts 34 min, thirsty after 17 |
 | feedings to tame at level 1 | 18 (2.5x at level 150) |
@@ -482,7 +492,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | how | knockout |
 | diet | carnivore |
 | eats | meat 70%, carrion 25%, insects 5% |
-| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar |
+| hunts | 0.2%-600% of its mass alone (0.03-90 kg); at home: protoceratops, kryptobaatar, citipati, gobipteryx |
 | a meal that fills it | 1.5 kg; its biggest prey at home fills it in one kill |
 | drinks | 50% of its 1.133 L a day; a drink lasts 40 min, thirsty after 20 |
 | feedings to tame at level 1 | 10 (2.5x at level 150) |
@@ -545,7 +555,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.06% of spa
 | how | knockout |
 | diet | carnivore |
 | eats | meat 80%, fish 10%, carrion 10% |
-| hunts | 0.1%-60% of its mass alone (5.00-3000 kg); at home: raptor, utahraptor, osmolskae, protoceratops, psittacosaurus, gastonia, pinacosaurus |
+| hunts | 0.1%-60% of its mass alone (5.00-3000 kg); at home: raptor, utahraptor, osmolskae, protoceratops, psittacosaurus, gastonia, pinacosaurus, crocodyliform, citipati |
 | a meal that fills it | 500 kg; its biggest prey at home fills it in one kill |
 | drinks | 100% of its 211.207 L a day; a drink lasts 36 min, thirsty after 18 |
 | feedings to tame at level 1 | 45 (2.5x at level 150) |
@@ -2265,18 +2275,18 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | mass | 85 kg | |
 | carries her young | 100 d | 1.77 d |
 | litter or clutch | 1.6 on average | 1-2 |
-| between litters | 1.9 y | rests 6.25 d **set** |
+| between litters | 1.9 y | rests 4.17 d **set** |
 | breeds in | all year, most in spring and summer |  |
 | comfortable in | 8 to 38 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 2.5 y | 7.54 d |
 | lives | 17 y | 65.1 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 12 **set** within 48 blocks |
 
-**Balance** (uncommon): a generation 9.3 d; a line four deep in 28 d (9 h of play); 1.9 young per mother in 10 days, 8 in her life.
+**Balance** (uncommon): a generation 9.3 d; a line four deep in 28 d (9 h of play); 2.5 young per mother in 10 days, 11 in her life.
 
 - ✓ fourth generation: 27.9 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 7.5 of 65 days (want under a fifth)
-- ✓ young in a life: 8.3 (want 6-40)
+- ✓ young in a life: 11.3 (want 6-40)
 - ✓ litter: 1-2 (want 1-12, fewest first)
 - ✓ room near: 12 (want 3-30)
 
@@ -2661,6 +2671,310 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 |---|---|
 | fights | no |
 | reach past its body | 2 blocks |
+| signature | herd |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.9 |
+
+## crocodyliform
+
+*Neosuchia indet.*, Crocodylomorpha › Crocodyliformes › Neosuchia › . Model `caiman`, entity `animals:crocodyliform`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:floodplain` | commonest |
+| `animals:fern_forest` | 40% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | large |
+| height (grown, average) | 2.2 m at the length |
+| males against females | 1.2x as tall |
+| size spread (an individual's, either way) | 67% |
+| newborn's size | 15% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 150 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 80 d | 1.5 d |
+| litter or clutch | 25 on average | 4-8 **set** |
+| between litters | 1 y | rests 16.7 d **set** |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 20 to 36 °C air | cold-blooded: slower in the cold |
+| grows up in | 10 y | 6.25 d **set** |
+| lives | 50 y | 75 d **set**, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 20 **set** within 48 blocks |
+
+**Balance** (uncommon): a generation 8 d; a line four deep in 24 d (8 h of play); 3.5 young per mother in 10 days, 19 in her life.
+
+- ✓ fourth generation: 24.0 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 6.2 of 75 days (want under a fifth)
+- ✓ young in a life: 19.1 (want 6-40)
+- ✓ litter: 4-8 (want 1-12, fewest first)
+- ✓ room near: 20 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | fish 60%, meat 30%, carrion 10% |
+| hunts | 0.3%-100% of its mass alone (0.45-150 kg); at home: lungfish, psittacosaurus, confuciusornis |
+| a meal that fills it | 15 kg; its biggest prey at home fills it in one kill |
+| drinks | 100% of its 1.799 L a day; a drink lasts 125 min, thirsty after 63 |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 6 blocks (twice that running) |
+| eats (food points) | `animals:trout` 10; `animals:venison` 14, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes: bite |
+| reach past its body | 1.2 blocks |
+| signature | ambush |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.8 |
+
+## citipati
+
+*Citipati osmolskae*, Dinosauria › Theropoda › Oviraptoridae › Citipatiinae. Model `citipati`, entity `animals:citipati`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:red_dunes` | commonest |
+| `animals:scrubland` | 70% |
+
+Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | medium |
+| height (grown, average) | 0.9 m at the hip |
+| males against females | 1.05x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 12% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 90 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 70 d | 1.36 d |
+| litter or clutch | 18 on average | 2-6 **set** |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 2 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 3 y | 6 d **set** |
+| lives | 15 y | 57.5 d, give or take a fifth; an elder from 80% of it |
+| lives in | solitary | room for 18 **set** within 48 blocks |
+
+**Balance** (common): a generation 7.6 d; a line four deep in 23 d (8 h of play); 7.5 young per mother in 10 days, 30 in her life.
+
+- ✓ fourth generation: 22.8 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 6.0 of 57 days (want under a fifth)
+- ✓ young in a life: 30.0 (want 6-40)
+- ✓ litter: 2-6 (want 1-12, fewest first)
+- ✓ room near: 18 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | leaves 40%, seeds 25%, fruit 10%, meat 15%, insects 10% |
+| hunts | 0.0%-5% of its mass alone (0.04-4 kg); at home: kryptobaatar, gobipteryx |
+| a meal that fills it | 9 kg |
+| drinks | 100% of its 5.681 L a day; a drink lasts 24 min, thirsty after 12 |
+| its food grows at home (spring/summer/autumn/winter) | red_dunes 40/40/40/40%, scrubland 40/40/40/40% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 12 blocks (twice that running) |
+| eats (food points) | `animals:cycad_seed` 8; `base:berries` 10, favorite; `base:wheat_seeds` 3 |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 1 blocks |
+| signature | herd |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.9 |
+
+## confuciusornis
+
+*Confuciusornis sanctus*, Dinosauria › Avialae › Confuciusornithidae › . Model `early_bird`, entity `animals:confuciusornis`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:fern_forest` | commonest |
+| `animals:floodplain` | 60% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.3 m at the crown |
+| males against females | 1.05x as tall |
+| size spread (an individual's, either way) | 15% |
+| newborn's size | 30% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 0.5 kg | |
+| carries her young | 0 d | 0.7 d **set** |
+| litter or clutch | 3 on average | 1-4 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 0 to 34 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 1 y | 4.58 d **set** |
+| lives | 10 y | 38.3 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 24 **set** within 48 blocks |
+
+**Balance** (common): a generation 5.7 d; a line four deep in 17 d (6 h of play); 4.3 young per mother in 10 days, 11 in her life.
+
+- ✓ fourth generation: 17.1 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 4.6 of 38 days (want under a fifth)
+- ✓ young in a life: 11.3 (want 6-40)
+- ✓ litter: 1-4 (want 1-12, fewest first)
+- ✓ room near: 24 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | omnivore |
+| eats | fish 40%, seeds 40%, insects 20% |
+| a meal that fills it | 0.05 kg |
+| drinks | 100% of its 0.053 L a day; a drink lasts 14 min, thirsty after 7 |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 10 blocks (twice that running) |
+| eats (food points) | `animals:cycad_seed` 4; `base:wheat_seeds` 3, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes:  |
+| reach past its body | 0.5 blocks |
+| signature | flock |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.6 |
+
+## gobipteryx
+
+*Gobipteryx minuta*, Dinosauria › Avialae › Enantiornithes › . Model `early_bird`, entity `animals:gobipteryx`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:crags` | commonest |
+| `animals:scrubland` | commonest |
+| `animals:red_dunes` | 50% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.3 m at the crown |
+| males against females | 1.05x as tall |
+| size spread (an individual's, either way) | 15% |
+| newborn's size | 30% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 0.3 kg | |
+| carries her young | 0 d | 0.7 d **set** |
+| litter or clutch | 3 on average | 1-4 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 0 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 1 y | 6.25 d **set** |
+| lives | 10 y | 38.3 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 24 **set** within 48 blocks |
+
+**Balance** (uncommon): a generation 7.4 d; a line four deep in 22 d (7 h of play); 4.3 young per mother in 10 days, 11 in her life.
+
+- ✓ fourth generation: 22.1 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 6.2 of 38 days (want under a fifth)
+- ✓ young in a life: 10.6 (want 6-40)
+- ✓ litter: 1-4 (want 1-12, fewest first)
+- ✓ room near: 24 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | omnivore |
+| eats | insects 50%, seeds 40%, leaves 10% |
+| a meal that fills it | 0.03 kg |
+| drinks | 100% of its 0.033 L a day; a drink lasts 13 min, thirsty after 7 |
+| its food grows at home (spring/summer/autumn/winter) | crags 40/40/40/40%, scrubland 40/40/40/40%, red_dunes 40/40/40/40% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 10 blocks (twice that running) |
+| eats (food points) | `animals:cycad_seed` 4; `base:wheat_seeds` 3, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.5 blocks |
+| signature | flock |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.6 |
+
+## cedarosaurus
+
+*Cedarosaurus weiskopfae*, Dinosauria › Sauropoda › Brachiosauridae › . Model `sauropod`, entity `animals:cedarosaurus`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:floodplain` | commonest |
+| `animals:fern_forest` | 50% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn attempts that pick it where commonest (uncommon).
+
+| Body | |
+|---|---|
+| size class | large |
+| height (grown, average) | 4.1 m at the shoulder |
+| males against females | 1.03x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 5% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 10000 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 120 d | 2.03 d |
+| litter or clutch | 25 on average | 1-2 **set** |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 6 to 40 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 10 y | 6.67 d **set** |
+| lives | 40 y | 153.3 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 10 **set** within 48 blocks |
+
+**Balance** (uncommon): a generation 8.9 d; a line four deep in 27 d (9 h of play); 2.8 young per mother in 10 days, 33 in her life.
+
+- ✓ fourth generation: 26.8 days (want 20-40 days (uncommon))
+- ✓ grown most of its life: grows 6.7 of 153 days (want under a fifth)
+- ✓ young in a life: 32.7 (want 6-40)
+- ✓ litter: 1-2 (want 1-12, fewest first)
+- ✓ room near: 10 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | leaves 95%, seeds 5% |
+| a meal that fills it | 1000 kg |
+| drinks | 100% of its 394.126 L a day; a drink lasts 38 min, thirsty after 19 |
+| its food grows at home (spring/summer/autumn/winter) | floodplain 40/40/40/40%, fern_forest 40/40/40/40% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 6 blocks (twice that running) |
+| eats (food points) | `animals:fern` 10; `animals:araucaria_cone` 16, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 3 blocks |
 | signature | herd |
 | ridden | no |
 | flies ridden | no |

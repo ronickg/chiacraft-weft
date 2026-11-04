@@ -410,8 +410,7 @@ pub fn register(r: &mut Registry) {
         })
         .group("dispenser", Slots::chest(1))
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0), &[], |ui| {
                 ui.group("dispenser");
                 ui.player_inventory(true);
             });

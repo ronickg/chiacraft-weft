@@ -51,7 +51,9 @@ pub fn init(r: &mut Registry) {
         for d in b.iter() {
             let Some(a) = w.component(d.killer, &ANIMAL).copied() else { continue };
             let Some(s) = a.species().filter(|s| s.hunts()) else { continue };
-            let (Some(own), Some(prey)) = (mass(&w, d.killer), kind_mass(d.kind, None)) else { continue };
+            // The prey's own mass if it can still be read (its genes and growth), its kind's if not.
+            let prey = mass(&w, d.entity).or_else(|| kind_mass(d.kind, None));
+            let (Some(own), Some(prey)) = (mass(&w, d.killer), prey) else { continue };
             let max = a.stat(species::FOOD);
             let meal = (max * animals_core::needs::fills(own, prey))
                 .round()
@@ -81,9 +83,30 @@ pub fn prey_lush(w: &World, s: &Species, pos: [i32; 3]) -> Option<f32> {
         .reduce(f32::max)
 }
 
+/// An egg's mass, kg, at a Velociraptor's egg's size (about a goose egg's; `eggs::egg_size` scales
+/// the others): eggs lying in a nest are food for the egg eaters of their sizes (the report's tier
+/// 3: "eggs are real food and nests are built already"), Citipati, the raptors, the foxes.
+const EGG_KG: f32 = 0.2;
+
+/// The species `index` an egg `id` holds, if it is one.
+fn egg_of(w: &World, id: u64) -> Option<usize> {
+    let e = w.component(id, &crate::eggs::EGG)?;
+    (e.species as usize)
+        .checked_sub(1)
+        .filter(|&i| i < SPECIES.len())
+}
+
+/// A player's egg (its nest's, or one laid by a tame): the wild's egg eaters leave those alone.
+fn owned_egg(w: &World, id: u64) -> bool {
+    egg_of(w, id).is_some() && w.component(id, &animal::OWNER).is_some_and(|o| o[0] != 0)
+}
+
 /// The mass in kg of an entity of `kind`: a species' grown mass (scaled by `size`, its genes and
-/// growth), or a farm animal's wild kind's (`OTHER_PREY`). `None`: not prey to anything.
+/// growth), an egg's, or a farm animal's wild kind's (`OTHER_PREY`). `None`: not prey to anything.
 fn kind_mass(kind: u32, size: Option<f32>) -> Option<f32> {
+    if kind == crate::eggs::EGG_ENTITY.id() {
+        return Some(EGG_KG * size.unwrap_or(1.0).powi(3));
+    }
     if let Some(s) = SPECIES.iter().find(|s| s.kind.id() == kind) {
         return Some(s.bio.mass * size.unwrap_or(1.0).powi(3));
     }
@@ -97,9 +120,13 @@ fn kind_mass(kind: u32, size: Option<f32>) -> Option<f32> {
 /// What `id` weighs now.
 pub(crate) fn mass(w: &World, id: u64) -> Option<f32> {
     let e = w.entity(id)?;
+    if let Some(index) = egg_of(w, id) {
+        return kind_mass(e.kind, Some(crate::eggs::egg_size(index)));
+    }
     let size = w.component(id, &ANIMAL).and_then(|a| {
         let index = (a.species as usize).checked_sub(1)?;
-        Some(crate::coats::size_of(w, id)? * crate::breeding::growth(w, id, index))
+        // Against its species' average size: its row's mass is an average grown one's.
+        Some(crate::coats::size_of(w, id)? / crate::coats::mean_size(index) * crate::breeding::growth(w, id, index))
     });
     kind_mass(e.kind, size)
 }
@@ -117,6 +144,8 @@ fn family(w: &World, id: u64) -> Option<&'static str> {
                 .find(|s| s.kind.id() == kind)
                 .map(|s| s.family.name)
         })
+        // An egg is its species' family's: a hunter leaves its own kind's eggs.
+        .or_else(|| egg_of(w, id).map(|i| SPECIES[i].family.name))
 }
 
 /// A goal for wild hunters: hungry, it goes after the nearest prey it can take; it takes the turn
@@ -174,7 +203,7 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     let prey = w
         .near_bodies(st.pos, LOOK * base_api::sight(w, st.pos) as f64)
         .into_iter()
-        .filter(|&t| t != id && family(w, t) != Some(s.family.name))
+        .filter(|&t| t != id && family(w, t) != Some(s.family.name) && !owned_egg(w, t))
         .filter_map(|t| Some((t, w.entity(t)?, mass(w, t)?)))
         .filter(|(_, e, kg)| e.health > 0.0 && s.takes_with(own, *kg, pack))
         .min_by(|a, b| dist2(a.1.pos, st.pos).total_cmp(&dist2(b.1.pos, st.pos)));

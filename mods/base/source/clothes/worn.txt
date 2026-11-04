@@ -83,4 +83,30 @@ wait 1
 look 0 5
 press core:perspective
 wait 0.5
+# armour over clothes (still 64 x 32 layers on the 128 x 64 skin): fur, an iron chestplate, leather leggings
+chat /tk put me 40 base:fur_hat
+chat /tk put me 41 base:fur_coat
+chat /tk put me 42 base:fur_trousers
+chat /tk put me 43 base:fur_boots
+chat /tk put me 37 base:iron_chestplate
+chat /tk put me 38 base:leather_leggings
+wait 1
+press core:perspective
+wait 1
+shot clothes_armour_back.png
+press core:perspective
+wait 1
+shot clothes_armour_front.png
+press core:perspective
+wait 0.5
+# first person: the hand in the new skin (the coat's sleeve over it)
+look 0 -20
+wait 1
+shot clothes_hand.png
+# the inventory figure
+press core:inventory
+wait 1
+shot clothes_inventory.png
+key escape
+wait 0.5
 quit

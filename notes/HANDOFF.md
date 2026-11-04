@@ -10,7 +10,8 @@ Read `notes/PLAN.md` first: it is the plan and the decisions. This page says whe
   1. The texture pack Weft built from a player's Minecraft copy is removed.
   2. `crates/wallet` (`chiacraft-wallet`): the wallet core from the Horizon-based chiacraft
      (`horizon-wallet` at `101dee332`), renamed. Env vars still use the `HORIZON_` prefix
-     (`HORIZON_WALLET_STORE`, `HORIZON_WALLET_PASSPHRASE`, the live test tool's); rename later.
+     (the live test tool's); `CHIACRAFT_WALLET_STORE` and `CHIACRAFT_WALLET_PASSPHRASE` replaced
+     `HORIZON_WALLET_*` (2026-11-04; the old names are still read).
   3. `notes/PLAN.md`.
   4. Phase 1, the account (see below).
 
@@ -267,6 +268,25 @@ the server checks the proof, then the chain on a thread (`server/admission.rs` `
 `did_answers`), waits up to 25 s only when the rules ask for a DID (`Rules::needs_did`), and keeps
 `did` in the player file. `/didrule required on|off`, `/didrule age <days>`, and the screen.
 
+Slices 4-7 passed the two-copy check on testnet11 on the Mac (2026-11-04, Tester, fd673712,
+`tools/checks/did`, about 20 minutes): alice's DID from our sponsor reached the chain in about 70 s,
+her world's DID in about 3 minutes and her DID's listing of it 3 minutes later; bob was refused for
+having no DID, got one, was let in once the world checked it on chain, and his saved worlds list
+showed alice's world "DID required, a DID its owner's DID confirms".
+
+Slices 5 and 7 (2026-11-04). `crates/sponsor`
+(`chiacraft-sponsor`): Horizon's sponsor on iroh (`chiacraft/sponsor/1`, JSON request and answer,
+key in `<data_dir>/sponsor.key`), feature `service` for the binary; a proof of work per request and
+the budget released by the hour; world requests (`Request::sign_world`, `WorldAsk`: a world DID
+launched to the owner's address with `WorldMeta` and a gift for the listing fee). The wallet:
+`chain/world.rs` (`WorldMeta`, `OwnerMeta`, `DidMetadata`, `world_link_expecting`),
+`build_eve_dids_with`, `set_did_metadata` (an update carries the new metadata as a memo, since
+chia-sdk-driver's `parse_child` assumes it unchanged). The game: `chiacraft/did.rs` (the Account
+screen's Get a DID / Link a DID, asking `core:sponsors` through `p2p::ask_sponsor`), and
+`worlds/world_did.rs` (`did.json` in the world folder; Get a DID for This World on the Who May
+Come In screen, then the owner's DID lists it; the status answer carries both DIDs and the saved
+worlds list checks them both ways). Our sponsor: see "Our DID sponsor" below.
+
 ## Phase 6, sandboxed code mods
 
 Slice 1 (server halves) is built; the design for Ronald to agree is `reports/Sandboxed code
@@ -375,8 +395,58 @@ component as the package it goes into. Sample `examples/wasm/bell` (a bell block
 striker item that wears down, a channel), built as a size-optimised dev build since the Mac does
 no release builds now. With it, the mod UI ABI got `at` (b2877719: `UiNode::at`, `S::at`,
 `S::at_pivot`, onto the engine's `Style::at`), for the UI redo's numbers inside bars.
+Slice 4, client halves (built; not yet seen in the game): `code/client.wasm` (allowed beside
+`code/server.wasm`, `identity::is_code`), a component for the world `client-mod` in
+`crates/sandbox/wit/v1.2` (`client`, `client-registry`, `ui` parts, exported `client-hooks`).
+`crates/sandbox/src/client.rs`: `ClientMod`, `ClientInstance` (strikes as server halves;
+`well_formed` checks a build's parts), `ClientGame` (the player's game; `can_act` false in
+bindings). `crates/mod-sdk-client` (Weft's client names: `hud_element`, `screen`, `key`,
+`client_packet`, `client_frame`, `Ui` parts, `S` with `at`, `ClientView`/`Client`).
+`mods/packages/src/client_half.rs` registers its hooks through Weft's SDK in every game and
+replays its parts into `Ui` (classes interned; flags limited); a client reads a sandboxed
+component through the same byte buckets (`sandboxed::client_component`). The offer's API is the
+newer half's; "has code" means either half. Sample: `examples/wasm/bell-client` (a `hud_badge`
+with the ring count, an `hud_xp` bar with the count inside it through `at`, the key N), with the
+bell's server half now sending `bell:rings`. Tests `crates/sandbox/tests/client.rs`.
+Checked on the Linux PC (Tester 2, aa03294f): alice's side of the client-half pair ran: the
+bell rang and the puff showed above it ("a puff above the bell", seen in the shot; it had been
+inside the block), the join sheet listed the bell "(mod API 1.2)"; but the badge drew as the
+missing texture: `hud_badge` comes with the UI redo, not in `dev` yet, so the sample now uses
+`tooltip`. Bob's side is untested: his game ran out of GPU memory both times on the PC, next to
+vLLM ("allocating 67108864 bytes for quad page: Out of memory", a panic in the Vulkan backend).
+Bob also joined with an empty name although his `core.txt` says `name = bob` (on c41da9e4 it was
+right): not this work's, passed to Planner.
+Slice 5, personal mods (built, and checked in one game on the PC: off by default with "Your
+personal mods are off in this world: clock.", on after `/rule personal_mods 1` with the clock
+showing 07:07 top left, its key in slot 1 hid it, off again; Create World's choice not looked at): `mods/packages/src/personal.rs`. The
+world rule `packages:personal_mods` (choice off/client, off by default, a world rule so it is on
+Create World and synced to players); the player's own client halves from `<run dir>/personal/`
+(up to 16, loaded on the first client frame); slots registered the same in every game so the
+content hash is unchanged: a HUD element per anchor (`personal_<anchor>`, order 1000), the
+screen `packages:personal`, keys `packages:personal_1..8` (Shift+Alt+1..8), and a client frame
+that runs their frames and tells the player once per world which are off or on. A personal mod's
+`Half` has its own `Words` (from its `assets/lang`, the player's language over English), and no
+channels or components. Sample `examples/personal/clock` (from `examples/wasm/clock`).
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
-and chain steps, client halves (slice 4), personal mods per world (slice 5), `/mods` (slice 6).
+and chain steps, `/mods` (slice 6).
+
+## Our DID sponsor (testnet11, since 2026-11-04)
+
+Ronald's yes: "testnet only". It runs on Ronald's Mac from the throwaway testnet11 wallet
+(`~/chiacraft-testnet/sponsor.words`, never printed or copied), in `~/chiacraft-testnet-sponsor/`:
+`sponsor.toml` (testnet11, `data_dir` and `words_file`), its own copy of the binary, `sponsor.log`,
+and `data/` (`sponsor.key`, the iroh key behind its address; `sponsor-log.jsonl`, what it launched).
+Its address, the game's default `core:sponsors`, is
+`d468728d7e0e3f417c822af6e87ff924c0adbdeeb89a3c0f2d0745b2de40a792`. Funding address
+`txch124f375vnry5zfk5ss8qv2ucw3ayhhnjz25x7m9w4gspw0rh8u8zs7xhj5x` (top up from a testnet faucet).
+To start it again:
+
+```sh
+cd ~/chiacraft-testnet-sponsor && ./chiacraft-sponsor --config sponsor.toml >> sponsor.log 2>&1 &
+```
+
+Mainnet stays off: the binary refuses mainnet without `allow_mainnet = true`, and that needs
+Ronald's own yes.
 
 ## Side mods
 

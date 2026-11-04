@@ -38,7 +38,7 @@ unsafe impl weft_sdk::Value for coats::Genome {
     // As `weft_sdk::value!` writes it, so saves and other mods read it alike.
     fn schema() -> String {
         format!(
-            "{{seed:{},species:{},breed:{},female:{},genes:{},core:{},version:{},stage:{},scars:{}}}",
+            "{{seed:{},species:{},breed:{},female:{},genes:{},core:{},version:{},stage:{},scars:{},temper:{}}}",
             <u32 as weft_sdk::Value>::schema(),
             <u8 as weft_sdk::Value>::schema(),
             <u8 as weft_sdk::Value>::schema(),
@@ -47,7 +47,8 @@ unsafe impl weft_sdk::Value for coats::Genome {
             <[u8; 32] as weft_sdk::Value>::schema(),
             <u8 as weft_sdk::Value>::schema(),
             <u8 as weft_sdk::Value>::schema(),
-            <[u8; 8] as weft_sdk::Value>::schema()
+            <[u8; 8] as weft_sdk::Value>::schema(),
+            <[u8; 2] as weft_sdk::Value>::schema()
         )
     }
 }

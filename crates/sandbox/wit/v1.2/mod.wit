@@ -440,6 +440,157 @@ interface content-hooks {
     packet: func(callback: u32, player: entity, data: list<u8>);
 }
 
+// ------------------------------------------------------------------ client halves (1.2)
+
+/// What a client half reads and does in the player's own game (1.2). Only what that game shows
+/// the player anyway; never the account, files or network.
+interface client {
+    use types.{arg, item-stack, vec3};
+
+    /// The player: feet position, health and max health; none until the world is in.
+    me: func() -> option<tuple<vec3, f32, f32>>;
+    /// Ticks into the day, 0 to 24000.
+    day-time: func() -> u64;
+    raining: func() -> bool;
+    creative: func() -> bool;
+    /// The player's own value of one of the package's components (one synced to its owner or
+    /// watchers), its bytes.
+    component: func(name: string) -> option<list<u8>>;
+    /// A slot of the player's inventory.
+    inventory-slot: func(slot: u32) -> item-stack;
+    /// The id of the screen showing, empty for none.
+    screen: func() -> string;
+
+    // Only from keys, buttons, packets and frames, never from a binding (which only shows).
+    /// Bytes to the package's server half on one of its channels: at most 16 KiB, 32 a call.
+    send: func(channel: string, data: list<u8>);
+    /// Opens one of the mod's screens.
+    open-screen: func(name: string);
+    close-screen: func();
+    /// A line in the player's chat: the translation `key` with `args`. At most 8 a call.
+    show: func(key: string, args: list<arg>);
+}
+
+/// What a client half adds to the player's game. Only while `init` runs; each returns the
+/// callback's number, as `registry` does.
+interface client-registry {
+    /// A HUD element `<package>:<name>`, at `anchor` (Weft's `hud_anchor`: `top_left`,
+    /// `top_right`, `bottom_left`, `bottom_right`, `hotbar`, `hotbar_left`, `hotbar_right`,
+    /// `above_hotbar`, `under_crosshair`), `order` within it. Its parts come from `client-hooks.build`.
+    hud-element: func(name: string, anchor: string, order: s32) -> result<u32, string>;
+    /// A screen `<package>:<name>`, its parts from `client-hooks.build`; `pauses` stops a world
+    /// played alone while it shows.
+    screen: func(name: string, pauses: bool) -> result<u32, string>;
+    /// A key `<package>:<name>` with its default binding (`J`, `ctrl+R`), which the player can
+    /// change in Controls: `client-hooks.key` on each press.
+    key: func(name: string, default: string) -> result<u32, string>;
+    /// What the server half sends on its channel `<package>:<name>`: `client-hooks.packet`.
+    packet: func(channel: string) -> result<u32, string>;
+    /// Every frame: `client-hooks.frame`. Off unless needed; keys and bindings are cheaper.
+    frame: func() -> u32;
+}
+
+/// The parts a HUD element or screen is built from: Weft's UI parts, as data. Classes are the
+/// game's kit (`panel`, `tooltip`, `button`, `slot`, `hotbar`, `hud_badge`, the `hud_health`,
+/// `hud_stamina`, `hud_xp` and `hud_temperature` bars, `tab`, `category`; text classes `title`,
+/// `dim`, `button`, `chat`), so a mod looks like the game; or the package's own `gui/` textures.
+interface ui {
+    use types.{arg};
+
+    /// Weft's `S`: sizes in GUI pixels, none = fit the content.
+    record style {
+        row: bool,
+        width: option<f32>,
+        height: option<f32>,
+        gap: f32,
+        pad: f32,
+        grow: f32,
+        /// `ui_align`: 0 start, 1 center, 2 end, 3 stretch.
+        align: u32,
+        /// `ui_justify`: 0 start, 1 center, 2 end, 3 space between.
+        justify: u32,
+        /// Placed at a point of the parent, over its other parts: x, y, and which point of the
+        /// part goes there (Weft's `S::at_pivot`).
+        at: option<tuple<f32, f32, f32, f32>>,
+        /// Text size, 1 = normal.
+        scale: f32,
+        /// Weft's `ui_flags`: 2 one line, 4 digit-wide cells, 8 disabled, 16 selected.
+        %flags: u32,
+        /// A style class, empty for the part's own.
+        class: string,
+    }
+
+    enum part-kind {
+        /// Children in a column or row (`style.row`).
+        container,
+        /// A container drawn with class `class`.
+        panel,
+        /// The translation `text` with `args`.
+        text,
+        /// Text worded every frame from `client-hooks.text(bind)`.
+        text-bind,
+        /// A bar of class `class`, filled from `client-hooks.value(bind)` (0 to 1, hidden while
+        /// below 0); `count` is Weft's `ui_dir`.
+        progress,
+        /// `count` icons of class `class`, as many lit as `client-hooks.value(bind)`.
+        icons,
+        /// The texture `class` (`gui/` of this package or `mod:name`), `size` big.
+        image,
+        /// Item `item`, `count` of it.
+        item,
+        /// Takes the free space.
+        spacer,
+        /// A button showing `text` with `args`: `client-hooks.click(bind)` when pressed.
+        button,
+    }
+
+    /// One part. A build is a list of parts in order, each followed by its `children` parts.
+    record part {
+        kind: part-kind,
+        style: style,
+        class: string,
+        text: string,
+        args: list<arg>,
+        children: u32,
+        bind: u32,
+        count: u32,
+        item: u32,
+        size: tuple<f32, f32>,
+    }
+}
+
+/// What the game calls of a client half. Fuel budgets as for a server half's hooks; a failing
+/// client half is stopped in the player's game until the world is joined again.
+interface client-hooks {
+    use types.{arg};
+    use ui.{part};
+
+    init: func() -> result<_, string>;
+    /// The parts of the HUD element or screen `callback` (at most 512).
+    build: func(callback: u32) -> list<part>;
+    /// A bar's or icons' value.
+    value: func(bind: u32) -> f32;
+    /// A text binding's line.
+    text: func(bind: u32) -> tuple<string, list<arg>>;
+    /// A button was pressed.
+    click: func(bind: u32);
+    /// A key was pressed.
+    key: func(callback: u32);
+    /// Bytes from the server half.
+    packet: func(callback: u32, data: list<u8>);
+    /// A frame, `seconds` after the last.
+    frame: func(callback: u32, seconds: f32);
+}
+
+/// A package's client half: `code/client.wasm`, run in each player's own game (1.2).
+world client-mod {
+    import log;
+    import names;
+    import client;
+    import client-registry;
+    export client-hooks;
+}
+
 /// A package's server half: `code/server.wasm`, run where the world is simulated.
 world server-mod {
     import log;

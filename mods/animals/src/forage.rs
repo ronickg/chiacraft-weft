@@ -171,6 +171,9 @@ fn nearest(w: &World, s: &Species, pos: [f64; 3]) -> Option<[i32; 3]> {
     best.or(ground).map(|(at, _)| at)
 }
 
+/// The share of a spoiled carcass's weight an insect eater gets from it (its insects).
+const CARRION_INSECTS: f32 = 0.1;
+
 /// Grams of the dropped item `id` that `s` eats: food of its diet (spoiled food as carrion).
 fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32> {
     let stack = w.dropped_item(id)?;
@@ -186,7 +189,13 @@ fn edible(w: &World, s: &animals_core::species::Species, id: u64) -> Option<f32>
         vitals::food::freshness(f, age, base_api::difficulty().keep) == vitals::food::Freshness::Spoiled
     });
     let (c, grams) = vitals::forage::dropped(name, spoiled)?;
-    // Kibble is every species' (`taming.rs`), though the food table files it as meat (C6).
+    // Kibble is every species' (`taming.rs`), though the food table files it as meat (C6); a
+    // carcass gone off is the insects' as well, its beetles and grubs an insect eater's (the
+    // Djadokhta's bones are bored by them), a share of it.
+    let insects = c == vitals::food::Category::Carrion && s.eats(vitals::food::Category::Insects);
+    if insects && !s.eats(c) {
+        return Some(grams * CARRION_INSECTS);
+    }
     (s.eats(c) || name == "animals:kibble").then_some(grams)
 }
 
@@ -217,7 +226,7 @@ fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
     animal::feed(w, id, points);
     stack.count -= 1;
     w.set_dropped_item(item, stack);
-    weft_sdk::info!(
+    weft_sdk::debug!(
         "animal {id} eats {} off the ground ({grams} g, it {own:.3} kg): food {} of {max:.0}",
         name_of(abi::entry_kind::ITEM, stack.item),
         a.food.saturating_add(points).min(max as u16)
@@ -284,7 +293,7 @@ pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
             // Growing food feeds as well as it grows now: dry-season grass is poor fodder.
             let fodder = if src.renews.is_some() { 0.4 + 0.6 * lush(w, s, at) } else { 1.0 };
             animal::feed(w, id, (src.food as f32 * fodder).round().max(1.0) as u16);
-            weft_sdk::info!(
+            weft_sdk::debug!(
                 "animal {id} eats {} at {at:?} ({:.0}% as good as at its best; food {} of {:.0})",
                 src.block,
                 fodder * 100.0,

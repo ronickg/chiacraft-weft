@@ -101,8 +101,7 @@ pub fn register(r: &mut Registry) {
         .group("output", Slots::single().output())
         .attach(&ROASTING)
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0).stretch(), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.group("input");
@@ -149,8 +148,7 @@ pub fn register(r: &mut Registry) {
         .group("output", Slots::single().output())
         .attach(&COOKING)
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0).stretch(), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.group("ingredients");
@@ -189,8 +187,7 @@ pub fn register(r: &mut Registry) {
         .group("rack", Slots::row(4).accepts("food"))
         .attach(&DRYING)
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0).stretch(), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.column(S::col().gap(2.0), |ui| {

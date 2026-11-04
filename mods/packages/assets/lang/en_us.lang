@@ -1,1 +1,16 @@
 block.packages.unknown = Unknown Block
+packages.line = {0}
+packages.personal.off = Your personal mods are off in this world: {0}.
+packages.personal.on = Your personal mods run in this world: {0}.
+config.packages.personal_mods = Personal Mods
+config.packages.personal_mods.tooltip = Whether players' own client mods (a minimap, tweaks) run in this world. Downloaded mods aren't affected.
+config.packages.personal_mods.off = Off
+config.packages.personal_mods.client = Client Halves
+key.packages.personal_1 = Personal Key 1
+key.packages.personal_2 = Personal Key 2
+key.packages.personal_3 = Personal Key 3
+key.packages.personal_4 = Personal Key 4
+key.packages.personal_5 = Personal Key 5
+key.packages.personal_6 = Personal Key 6
+key.packages.personal_7 = Personal Key 7
+key.packages.personal_8 = Personal Key 8

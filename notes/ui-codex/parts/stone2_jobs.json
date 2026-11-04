@@ -1,0 +1,16 @@
+[
+ {
+  "kind": "block",
+  "name": "var_stone_4",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/stone.png",
+  "what": "large sage-grey stone slabs. A new variant of the attached stone texture (the last image before the grid, from my game): exactly the same colours, the same SIZE of slabs (about 6-9 rounded sage-grey slabs per tile, as large as in the attached one), the same soft rounded shapes, light and crevice darkness; only their arrangement differs. Not flatter, not more cartoony, no smaller stones. Seamless on all four edges, every cell filled."
+ },
+ {
+  "kind": "block",
+  "name": "var_stone_5",
+  "type": "natural cube",
+  "like": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out/likes/stone.png",
+  "what": "large sage-grey stone slabs. A new variant of the attached stone texture (the last image before the grid, from my game): exactly the same colours, the same SIZE of slabs (about 6-9 rounded sage-grey slabs per tile, as large as in the attached one), the same soft rounded shapes, light and crevice darkness; only their arrangement differs. Not flatter, not more cartoony, no smaller stones. Seamless on all four edges, every cell filled."
+ }
+]

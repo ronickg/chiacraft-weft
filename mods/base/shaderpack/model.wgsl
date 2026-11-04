@@ -126,3 +126,12 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     let f = fog_amount(in.dist, scene.params.x, scene.params.y);
     return vec4(mix(c.rgb, scene.fog_color.rgb, f), 1.0);
 }
+
+// The sun's shadow map (`sun_shadows`): only depth, without the model's see-through texels, so
+// mobs and the player's own body cast their shade, wings and whiskers as they are drawn.
+@fragment
+fn fs_shadow(in: VOut) {
+    if textureSampleLevel(textures[in.tex], nearest_clamp, in.uv, 0.0).a < 0.5 {
+        discard;
+    }
+}

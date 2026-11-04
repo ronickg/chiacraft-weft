@@ -10,6 +10,7 @@ pub(crate) static CAT: Entity = Entity::named("cat");
 const TEXTURE: &str = "cat/cat";
 
 pub fn init(r: &mut Registry) {
+    let index = crate::species::of(&CAT);
     // Settling down: its poses, drawn in place of it (`rest.rs`).
     crate::rest::register(
         r,
@@ -37,13 +38,13 @@ pub fn init(r: &mut Registry) {
         })
         .goals(
             Goals::new()
-                .then(crate::animal::upkeep(1))
-                .then(crate::taming::behave(1))
+                .then(crate::animal::upkeep(index))
+                .then(crate::taming::behave(index))
                 .then(crate::hunt::wary)
                 .then(crate::hunt::hunt)
                 .then(crate::signatures::gifts)
-                .then(crate::commands::act(1))
-                .then(crate::breeding::behave(1))
+                .then(crate::commands::act(index))
+                .then(crate::breeding::behave(index))
                 .then(crate::rest::settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)

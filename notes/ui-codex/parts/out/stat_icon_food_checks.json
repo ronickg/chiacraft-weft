@@ -1,0 +1,19 @@
+{
+ "kind": "ui",
+ "what": "a 16 x 16 stat icon of a roast drumstick, its main colour #b4783c with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel",
+ "size": [
+  16,
+  16
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.527,
+   "outline": 0.39,
+   "red_line": 0.75,
+   "fill": 0.46,
+   "passed": true
+  }
+ ]
+}
