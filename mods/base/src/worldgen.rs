@@ -628,14 +628,16 @@ fn lianas(s: &mut Site, crown: &[[i32; 3]], ground: i32, h: u64) {
     if crown.is_empty() || (hash(h, 0x11A, 0, 0) & 1023) as f32 / 1024.0 >= share {
         return;
     }
-    // The crown's lowest leaf in each column it covers.
-    let mut lowest: Vec<[i32; 3]> = Vec::new();
+    // The crown's lowest leaf in each column it covers (a map: a crown has hundreds of leaves,
+    // and every column of cubes runs its shape again).
+    let mut by_column: std::collections::HashMap<(i32, i32), i32> = std::collections::HashMap::new();
     for &[x, y, z] in crown {
-        match lowest.iter_mut().find(|p| p[0] == x && p[2] == z) {
-            Some(p) => p[1] = p[1].min(y),
-            None => lowest.push([x, y, z]),
-        }
+        by_column
+            .entry((x, z))
+            .and_modify(|low| *low = (*low).min(y))
+            .or_insert(y);
     }
+    let mut lowest: Vec<[i32; 3]> = by_column.into_iter().map(|((x, z), y)| [x, y, z]).collect();
     lowest.sort_unstable();
     let count = 2 + hash(h, 0x11B, 0, 0) % 3;
     for k in 0..count {
