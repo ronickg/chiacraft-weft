@@ -66,9 +66,12 @@ pub fn register_shafts(r: &mut Registry) {
             ON.store(false, Ordering::Relaxed);
             return;
         }
-        let want = SHADER_PACK.get() == ID;
+        // `--no-shafts`: a script comparing the look with and without them.
+        let want = SHADER_PACK.get() == ID && weft_sdk::client::launch_option("no-shafts").is_none();
         if ON.swap(want, Ordering::Relaxed) != want {
-            let known = c.post_effect("shafts", if want { 1.0 } else { 0.0 });
+            // `--shafts-debug`: the effect shows what it sees instead (`shafts.wgsl`).
+            let on = if weft_sdk::client::launch_option("shafts-debug").is_some() { 2.0 } else { 1.0 };
+            let known = c.post_effect("shafts", if want { on } else { 0.0 });
             weft_sdk::info!("light shafts {}{}", if want { "on" } else { "off" }, if known { "" } else { " (no such effect)" });
         }
     });
