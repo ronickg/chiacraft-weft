@@ -2120,6 +2120,15 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     r.prof[2] = t2.duration_since(t).as_secs_f32() * 1000.0;
     let world = world_frame(r, &info);
     if (r.depth.1, r.depth.2) != (world.width, world.height) {
+        log::info!(
+            "world drawn at {}x{} of the window's {}x{} (render scale {:.2}, density {:.1})",
+            world.width,
+            world.height,
+            info.width,
+            info.height,
+            crate::settings::render_scale(r.window.scale_factor()),
+            r.window.scale_factor()
+        );
         r.gpu.destroy_texture(r.depth.0);
         r.depth = make_depth(&mut *r.gpu, world.width, world.height);
     }
