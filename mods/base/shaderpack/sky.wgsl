@@ -240,14 +240,15 @@ fn star_look(star: u32, uv: vec2<f32>, dir: vec3<f32>) -> vec4<f32> {
     let warmth = unit(star * 9u + 6u);
     var tint = mix(vec3(1.0, 0.72, 0.5), vec3(1.0), smoothstep(0.0, 0.3, warmth));
     tint = mix(tint, vec3(0.78, 0.86, 1.0), smoothstep(0.55, 1.0, warmth));
+    // Stars are a few pixels across: only the corners rounded off.
     let r = length(uv - vec2(0.5)) * 2.0;
-    let shape = pow(1.0 - smoothstep(0.0, 1.0, r), 2.0);
+    let shape = 1.0 - smoothstep(0.75, 1.05, r);
     let speed = 2.0 + 3.0 * unit(star * 9u + 7u);
-    let twinkle = 1.0 - (0.15 + 0.3 * (1.0 - clamp(dir.y, 0.0, 1.0))) * (0.5 + 0.5 * sin(scene.params.w * speed + unit(star * 9u + 8u) * 40.0));
+    let twinkle = 1.0 - (0.08 + 0.2 * (1.0 - clamp(dir.y, 0.0, 1.0))) * (0.5 + 0.5 * sin(scene.params.w * speed + unit(star * 9u + 8u) * 40.0));
     let dark = smoothstep(0.05, -0.18, scene.sun.y);
     let needs = 1.0 - (0.25 + 0.75 * bright);
     let shows = smoothstep(needs, needs + 0.15, dark);
-    return vec4(tint, shape * (0.4 + 1.2 * bright) * twinkle * shows);
+    return vec4(tint, shape * (0.8 + 1.4 * bright) * twinkle * shows);
 }
 
 // The Milky Way: a faint band across the night, fixed among the stars (it turns with the sky, as the
