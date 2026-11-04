@@ -18,8 +18,9 @@ use crate::parts::{PART, PartOf, SKILLS};
 
 value! {
     /// A player's nodule on the knapping screen: the head picked (`KNAPPED`), the squares struck
-    /// away (a bit each, row by row), and where it lies.
-    pub struct Knap { pub shape: u32, pub removed: u32, pub x: i32, pub y: i32, pub z: i32 }
+    /// away (a bit each, row by row), and where it lies; at the end, the square that broke it
+    /// (`broken`, 1 + the square) or the head freed (`done`), shown a moment before it closes.
+    pub struct Knap { pub shape: u32, pub removed: u32, pub x: i32, pub y: i32, pub z: i32, pub broken: u32, pub done: u32 }
 }
 static OPEN: Channel<Knap> = Channel::named("knap_open");
 static UPDATE: Channel<Knap> = Channel::named("knap_update");
@@ -36,6 +37,14 @@ static CRACK: Sound = Sound::named("block.stone.break");
 static NODULES: Mutex<Vec<(u64, Knap)>> = Mutex::new(Vec::new());
 /// The local player's, on the client.
 static VIEW: Mutex<Option<Knap>> = Mutex::new(None);
+/// When the client closes a screen that ended (broken or a head freed): shown this long first.
+static CLOSE_AT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+const END_SHOWN: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// The local player's nodule as the screen shows it (UI's `screen`).
+pub fn view() -> Option<Knap> {
+    *VIEW.lock().unwrap()
+}
 
 /// How far a player may be from their nodule and still knap it, blocks.
 const REACH: f64 = 6.0;
@@ -51,10 +60,58 @@ pub fn register(r: &mut Registry) {
         *VIEW.lock().unwrap() = Some(v);
         c.rebuild_screen();
     });
+    // A nodule that broke or freed its head stays on screen a moment (UI redo); one taken away
+    // closes at once.
     r.client_packet(&CLOSE, |c, _| {
-        *VIEW.lock().unwrap() = None;
-        c.close_screen();
+        if VIEW
+            .lock()
+            .unwrap()
+            .is_some_and(|v| v.broken != 0 || v.done != 0)
+        {
+            *CLOSE_AT.lock().unwrap() = Some(std::time::Instant::now() + END_SHOWN);
+        } else {
+            *VIEW.lock().unwrap() = None;
+            c.close_screen();
+        }
     });
+    r.client_frame(|c| {
+        let mut at = CLOSE_AT.lock().unwrap();
+        if at.is_some_and(|t| std::time::Instant::now() >= t) {
+            *at = None;
+            *VIEW.lock().unwrap() = None;
+            c.close_screen();
+        }
+    });
+    // A nodule at the feet and its screen, without striking (for checks and looks; UI redo).
+    r.command("knap", "[head:word]", |cmd| {
+        let w = cmd.world();
+        let player = cmd.player();
+        let Some(e) = w.entity(player) else { return };
+        let feet = e.block_pos();
+        let shape = cmd
+            .text("head")
+            .and_then(|h| {
+                KNAPPED
+                    .iter()
+                    .position(|k| k.kind == h || k.shape == h || (h == "pick" && k.kind == "pickaxe"))
+            })
+            .unwrap_or(0) as u32;
+        if w.get(feet) == 0 {
+            w.set(feet, LOOSE_FLINT.id());
+        }
+        open(&w, player, feet);
+        if shape != 0
+            && let Some((_, k)) = NODULES
+                .lock()
+                .unwrap()
+                .iter_mut()
+                .find(|(p, _)| *p == player)
+        {
+            k.shape = shape;
+            w.send(player, &UPDATE, k);
+        }
+    })
+    .permission(permission::GAME_MASTER);
     r.screen(&SCREEN, screen);
 }
 
@@ -63,7 +120,7 @@ pub fn open(w: &World, player: u64, pos: [i32; 3]) {
     let mut nodules = NODULES.lock().unwrap();
     let knap = match nodules.iter().find(|(p, _)| *p == player) {
         Some(&(_, k)) if [k.x, k.y, k.z] == pos => k,
-        _ => Knap { shape: 0, removed: 0, x: pos[0], y: pos[1], z: pos[2] },
+        _ => Knap { shape: 0, removed: 0, x: pos[0], y: pos[1], z: pos[2], broken: 0, done: 0 },
     };
     nodules.retain(|(p, _)| *p != player);
     nodules.push((player, knap));
@@ -108,6 +165,8 @@ fn hit(w: &World, player: u64, v: u32) {
         w.spawn_item(at, ItemStack::new(SHARP_FLAKE.id(), 1));
         w.play_sound(&CRACK, at, 1.0);
         nodules.remove(i);
+        k.broken = square as u32 + 1;
+        w.send(player, &UPDATE, &k);
         w.send(player, &CLOSE, &0);
         return;
     }
@@ -123,6 +182,8 @@ fn hit(w: &World, player: u64, v: u32) {
         }
         w.play_sound(&CRACK, at, 1.0);
         nodules.remove(i);
+        k.done = 1;
+        w.send(player, &UPDATE, &k);
         w.send(player, &CLOSE, &0);
     } else {
         nodules[i].1 = k;
