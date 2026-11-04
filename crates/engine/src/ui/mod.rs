@@ -402,17 +402,14 @@ impl Ui {
 
     /// Scrolls the innermost scrolling node under `p` by `lines` wheel steps; true if one moved.
     pub fn scroll_at(&mut self, p: Vec2, lines: f32) -> bool {
-        let Some(id) = (0..self.nodes.len())
-            .rev()
-            .find(|&i| {
-                self.nodes[i].style.scroll
+        let Some(id) = (0..self.nodes.len()).rev().find(|&i| {
+            self.nodes[i].style.scroll
                     && self.nodes[i].rect.contains(p)
                     && self.nodes[i].clip.is_none_or(|c| c.contains(p))
                     // a screen's root scrolls only when the screen is taller than the window, and
                     // leaves the wheel to the rest otherwise
                     && (i != 0 || self.nodes[0].scrollbar.is_some())
-            })
-        else {
+        }) else {
             return false;
         };
         // Held to its end, a node counts from there: up is further from it.
