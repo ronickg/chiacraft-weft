@@ -43,8 +43,10 @@ fn main() {
     let lakes = time("lakes", &|x, z| l::lakes(&f, x, z));
     let rivers = time("rivers", &|x, z| l::rivers(&f, x, z));
     time("karst", &|x, z| l::karst(&f, x, z));
+    time("canyons", &|x, z| l::canyons(&f, x, z));
     time("bank", &|x, z| l::bank(&f, x, z).map_or(0, |b| b.wet));
     time("edge", &|x, z| l::biome_edge(&f, x, z, 80).map_or(0, |e| e.near));
+    time("fray", &|x, z| l::fray(&f, x, z, 70).map_or(0, |g| g.0.len() as i32));
     println!(
         "  mods' features: {:.2} ms a chunk column, the lakes {:.0}% of it ({sum})",
         (mesa + lakes + rivers) * 281.0 / 1e6,

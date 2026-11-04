@@ -89,6 +89,7 @@ pub fn terrain(r: &mut Registry) {
         });
 
     r.decorate(rock_faces).dimension(&crate::OVERWORLD);
+    r.decorate(fray_borders).dimension(&crate::OVERWORLD);
 }
 
 static WET: Tag = Tag::named("wet");
@@ -116,6 +117,28 @@ pub fn site_on_rock(seed: u64, dimension: u32, [x, _, z]: [i32; 3]) -> bool {
     rock_face(fall)
 }
 
+/// Whether a scatter's site in the overworld stands at the foot of a wall: ground `WALL_RISE` or
+/// more blocks higher within `WALL_REACH` (a karst tower, a cliff, a rock face), where a tree's
+/// crown would press against the rock; trees and shrubs skip it, boulders (fallen rock) don't.
+/// It looks along the eight directions at 2 and 4 blocks, and beside the site: a crown reaches
+/// three to five blocks (the first rule, 2 blocks, left the towers' crowns as they were).
+pub fn site_under_wall(seed: u64, dimension: u32, [x, _, z]: [i32; 3]) -> bool {
+    if dimension != crate::OVERWORLD.id() {
+        return false;
+    }
+    let h = crate::OVERWORLD.column(seed, x, z).height;
+    let high = |dx: i32, dz: i32| crate::OVERWORLD.column(seed, x + dx, z + dz).height - h >= WALL_RISE;
+    const DIRS: [(i32, i32); 8] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
+    DIRS[..4].iter().any(|&(dx, dz)| high(dx, dz))
+        || [WALL_REACH / 2, WALL_REACH]
+            .iter()
+            .any(|&d| DIRS.iter().any(|&(dx, dz)| high(dx * d, dz * d)))
+}
+
+/// A wall this many blocks over a site's ground, this near, keeps trees off it (`site_under_wall`).
+pub const WALL_RISE: i32 = 4;
+pub const WALL_REACH: i32 = 4;
+
 /// How far the ground of column (`wx`, `wz`), `height` high, falls to its lowest neighbour.
 pub fn fall(g: &Gen, wx: i32, wz: i32, height: i32) -> i32 {
     [(1, 0), (-1, 0), (0, 1), (0, -1)]
@@ -130,10 +153,10 @@ pub fn fall(g: &Gen, wx: i32, wz: i32, height: i32) -> i32 {
 /// rocks (`rocks`, `base_api::land::rock_set`): strata, slate, granite or limestone in patches.
 fn bare(seed: u64, pos: [i32; 3], block: u32, fall: i32, biome: u32, rocks: l::RockSet) -> Option<u32> {
     let face = |pos| rock(rocks.block(seed, pos, WET.on_biome(biome) || WOODS.on_biome(biome)));
-    if fall >= l::SNOW_FALL && SNOW.is(block) && fall < l::ROCK_FALL {
+    if fall >= l::SNOW_FALL && SNOW.is(block) && fall < rocks.bare_from() {
         return Some(face(pos));
     }
-    if fall < l::ROCK_FALL {
+    if fall < rocks.bare_from() {
         return None;
     }
     let soil = [GRASS.id(), SNOWY_GRASS.id(), DIRT.id(), PODZOL.id(), SNOW.id(), GRAVEL.id(), SAND.id(), SANDSTONE.id(), STONE.id()];
@@ -149,8 +172,17 @@ fn rock(name: &str) -> u32 {
         "sandstone" => SANDSTONE.id(),
         "ochre_sandstone" => OCHRE_SANDSTONE.id(),
         "red_sandstone" => RED_SANDSTONE.id(),
+        "cream_sandstone" => CREAM_SANDSTONE.id(),
+        "banded_clay" => BANDED_CLAY.id(),
+        "weathered_limestone" => WEATHERED_LIMESTONE.id(),
         "cobblestone" => COBBLESTONE.id(),
         "mossy_cobblestone" => MOSSY_COBBLESTONE.id(),
+        // The ground the borders fray into (`fray_borders`).
+        "sand" => SAND.id(),
+        "dirt" => DIRT.id(),
+        "grass" => GRASS.id(),
+        "podzol" => PODZOL.id(),
+        "snowy_grass" => SNOWY_GRASS.id(),
         _ => STONE.id(),
     }
 }
@@ -169,11 +201,22 @@ pub fn surface_block(g: &Gen, wx: i32, wz: i32) -> u32 {
     }
     let c = g.column(wx, wz);
     let fall = fall(g, wx, wz, c.height);
-    if fall < l::SNOW_FALL {
-        return top;
+    if fall >= l::SNOW_FALL
+        && let Some(face) = bare(g.seed(), [wx, c.height, wz], top, fall, c.biome, rocks(g, wx, wz, c.height, top))
+    {
+        return face;
     }
-    bare(g.seed(), [wx, c.height, wz], top, fall, c.biome, rocks(g, wx, wz, c.height, top)).unwrap_or(top)
+    // Then the border's fray (`fray_borders`), on soil.
+    if SOIL.contains(&top)
+        && let Some((frayed, _)) = l::fray(&l::fields(g.seed()), wx * 16, wz * 16, c.height)
+    {
+        return rock(frayed);
+    }
+    top
 }
+
+/// The ground a border's fray may change (`fray_borders`).
+static SOIL: std::sync::LazyLock<[u32; 5]> = std::sync::LazyLock::new(|| [GRASS.id(), SNOWY_GRASS.id(), PODZOL.id(), SAND.id(), DIRT.id()]);
 
 /// Steep faces go bare: where the ground falls `ROCK_FALL` blocks or more to a neighbour, its soil
 /// and stone are rock as far down as the face shows, the column's own (`rock_set`): the mesas'
@@ -206,6 +249,31 @@ fn rock_faces(g: &mut Gen) {
                 let y = (wy - oy) as usize;
                 if let Some(rock) = bare(seed, [wx, wy, wz], g.get(x, y, z), fall, col.biome, set) {
                     g.set(x, y, z, rock);
+                }
+            }
+        }
+    }
+}
+
+/// Biome borders fray (`base_api::land::fray`): near a border that changes the ground, the
+/// neighbour's top and under block in patches, on soil only (rock faces, water and what stands
+/// on the ground stay). After the rock faces, before the plants, which then grow on what it left.
+fn fray_borders(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let [ox, oy, oz] = g.origin();
+    let f = l::fields(g.seed());
+    for z in 0..16usize {
+        for x in 0..16usize {
+            let h = cols[z * 16 + x].height;
+            if h < SEA || h < oy || h - 2 > oy + 15 {
+                continue;
+            }
+            let (wx, wz) = (ox + x as i32, oz + z as i32);
+            let Some((top, under)) = l::fray(&f, wx * 16, wz * 16, h) else { continue };
+            for wy in (h - 2).max(oy)..=h.min(oy + 15) {
+                let y = (wy - oy) as usize;
+                if SOIL.contains(&g.get(x, y, z)) {
+                    g.set(x, y, z, rock(if wy == h { top } else { under }));
                 }
             }
         }

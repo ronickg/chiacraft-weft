@@ -68,6 +68,14 @@ impl ConfigDef {
         }
     }
 
+    /// A value typed for it (`/rule`): what `parse` takes, and for numbers only those within
+    /// its range, so a typo is refused rather than clamped into a different value.
+    pub fn read(&self, s: &str) -> Option<f64> {
+        let v = self.parse(s)?;
+        let in_range = matches!(self.kind, ck::BOOL | ck::CHOICE) || (v >= self.min.min(self.max) && v <= self.max.max(self.min));
+        in_range.then_some(v)
+    }
+
     pub fn show(&self, v: f64) -> String {
         match self.kind {
             ck::BOOL => (v != 0.0).to_string(),
@@ -341,7 +349,7 @@ pub fn set_text(id: u32, v: &str) {
 /// changed after. The test kit put back vsync, a view of 12 and no shader pack when each test
 /// began, so every lag bench (11-04) ran with vsync on, `--view 8` at 12 and without the pack,
 /// whatever its `--no-vsync`, `--view` or `--config` said.
-fn held_for_run(id: u32) -> bool {
+pub(crate) fn held_for_run(id: u32) -> bool {
     let held = OVERRIDES.lock().unwrap().iter().any(|o| o.0 == id);
     if held {
         log::debug!("config {}: kept as set for this run", def(id).map_or("?", |d| d.name.as_str()));
@@ -538,6 +546,14 @@ pub fn load_world(saved: &[(String, f64)]) {
                 .map_or(d.default, |s| s.1),
         );
     }
+    // A world rule set for the run (`--config core:mob_spawning=0`) holds in the worlds it opens
+    // too: the world's own value came after it, and the hold (`held_for_run`) then refused the
+    // script's `/rule core:mob_spawning 0`, so monsters spawned in every look on the PC (11-04).
+    for (id, value, _) in OVERRIDES.lock().unwrap().iter() {
+        if def(*id).is_some_and(|d| d.scope == scope::WORLD) {
+            put_value(*id, value);
+        }
+    }
 }
 
 /// Settings the engine itself reads: the client's options, `core:mob_spawning` for worlds, and
@@ -664,5 +680,16 @@ mod tests {
         assert_eq!((c.parse("high"), c.parse("mid"), c.show(0.0)), (Some(1.0), None, "low".into()));
         let b = ConfigDef { kind: ck::BOOL, ..d };
         assert_eq!((b.parse("on"), b.show(1.0)), (Some(1.0), "true".into()));
+    }
+
+    /// `/rule core:mob_spawning false` was refused as not a whole number, and `2` was clamped to
+    /// true: a switch takes its words and 0/1, a number its range, and nothing else.
+    #[test]
+    fn typed_values_are_read_or_refused() {
+        let b = ConfigDef::number("t:mobs", ck::BOOL, 1.0, 0.0, 1.0, 0.0);
+        assert_eq!([b.read("false"), b.read("0"), b.read("true"), b.read("1")], [Some(0.0), Some(0.0), Some(1.0), Some(1.0)]);
+        assert_eq!([b.read("2"), b.read("no"), b.read("")], [None, None, None]);
+        let n = ConfigDef::number("t:dist", ck::INT, 8.0, 2.0, 64.0, 1.0);
+        assert_eq!([n.read("12"), n.read("1"), n.read("65"), n.read("far")], [Some(12.0), None, None, None]);
     }
 }

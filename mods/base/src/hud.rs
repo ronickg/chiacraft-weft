@@ -75,7 +75,12 @@ const FOOD_MINUTES_Y: f32 = 17.0;
 fn foods_held(v: &base_api::Vitals) -> Vec<(&'static vitals::food::Food, u32, f32)> {
     let mut out: Vec<(&'static vitals::food::Food, u32, f32)> = Vec::new();
     for i in 0..base_api::PORTIONS {
-        let Some(f) = (v.foods[i] as usize).checked_sub(1).and_then(|f| FOODS.get(f)) else { continue };
+        let Some(f) = (v.foods[i] as usize)
+            .checked_sub(1)
+            .and_then(|f| FOODS.get(f))
+        else {
+            continue;
+        };
         if v.units[i] <= 0.0 {
             continue;
         }
@@ -101,19 +106,29 @@ fn food_tile(ui: &mut Ui, k: usize) {
             ui.progress_bind("hud_food", S::default().size(FOOD_TILE.0, FOOD_TILE.1).at(0.0, 0.0), move |c| {
                 if held(c).is_some() { 1.0 } else { -1.0 }
             });
-            ui.text_bind_styled(S::default().no_wrap().scale(2.0).at(FOOD_PICTURE.0, FOOD_PICTURE.1), move |c, t| {
-                match held(c).and_then(|(f, _, _)| Item::lookup(f.name)) {
+            ui.text_bind_styled(
+                S::default()
+                    .no_wrap()
+                    .scale(2.0)
+                    .at(FOOD_PICTURE.0, FOOD_PICTURE.1),
+                move |c, t| match held(c).and_then(|(f, _, _)| Item::lookup(f.name)) {
                     Some(item) => t.set("", &[Arg::Item(item)]),
                     None => t.text(""),
-                }
-            });
+                },
+            );
             // The minutes, centred on the tile (the layout rounds their odd leftover down).
-            ui.row(S::row().size(FOOD_TILE.0, 8.5).center().at(0.0, FOOD_MINUTES_Y), move |ui| {
-                ui.text_bind_styled(S::default().no_wrap(), move |c, t| match held(c) {
-                    Some((f, _, units)) => t.set("hud.base.food_minutes", &[Arg::Int((units / f.digest_rate()).ceil() as i64)]),
-                    None => t.text(""),
-                });
-            });
+            ui.row(
+                S::row()
+                    .size(FOOD_TILE.0, 8.5)
+                    .center()
+                    .at(0.0, FOOD_MINUTES_Y),
+                move |ui| {
+                    ui.text_bind_styled(S::default().no_wrap(), move |c, t| match held(c) {
+                        Some((f, _, units)) => t.set("hud.base.food_minutes", &[Arg::Int((units / f.digest_rate()).ceil() as i64)]),
+                        None => t.text(""),
+                    });
+                },
+            );
             ui.text_bind_styled(S::default().no_wrap().at(2.0, 0.0), move |c, t| match held(c) {
                 Some((_, n, _)) if n > 1 => t.set("hud.base.food_count", &[Arg::Int(n as i64)]),
                 _ => t.text(""),
