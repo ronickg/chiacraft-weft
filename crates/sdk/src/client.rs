@@ -633,6 +633,13 @@ impl World {
         unsafe { (host().set_time)(self.raw(), time) }
     }
 
+    /// How fast this dimension's time of day runs (1 the usual, 0.5 half as fast), until set
+    /// again; a world opened again starts at 1. Only the sky and what follows the day: what waits
+    /// on ticks keeps its pace.
+    pub fn set_day_rate(&self, rate: f32) {
+        unsafe { (host().set_day_rate)(self.raw(), rate) }
+    }
+
     /// This dimension's time of day, counting on past a day. `w.time()` is another clock: ticks
     /// the world has run, which nothing moves.
     pub fn day_time(&self) -> u64 {

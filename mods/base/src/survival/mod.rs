@@ -99,13 +99,22 @@ fn tick(w: &World) {
         if !begun.contains(&w.dimension()) {
             begun.push(w.dimension());
             let seasons = base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0) == base_api::calendars::FOUR;
+            // At `START_HOUR` of that day: warmer than sunrise.
             if seasons && w.day_time() < vitals::calendar::DAY_TICKS / 2 {
-                w.set_day_time(w.day_time() + vitals::calendar::START_DAY as u64 * vitals::calendar::DAY_TICKS);
+                w.set_day_time(
+                    vitals::calendar::START_DAY as u64 * vitals::calendar::DAY_TICKS
+                        + vitals::calendar::ticks_at_hour(vitals::calendar::START_HOUR),
+                );
             }
         }
     }
     let d = base_api::difficulty();
     let pulse = w.time() % 20 == 0;
+    // The first day runs slow until its dusk (`vitals::calendar::day_rate`); a world opened again
+    // starts at the engine's 1, so it is said every second.
+    if pulse && base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0) == base_api::calendars::FOUR {
+        w.set_day_rate(vitals::calendar::day_rate(w.day_time()));
+    }
     // Today's date for the HUD and everything reading it (seasonal tints), for every player,
     // creative and dead too: it was set only with the body's warmth, so after `/time set` in
     // creative the clock stayed on its old day (Tester 2, 11-04).

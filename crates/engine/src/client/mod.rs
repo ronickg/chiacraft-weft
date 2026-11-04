@@ -297,6 +297,8 @@ pub struct Client {
     start: Instant,
     /// Ticks counted since the server last said the time (`Scene` ticks).
     since_time: u32,
+    /// How fast the time of day runs (`ToClient::Time`): the sky between the server's seconds.
+    day_rate: f32,
     /// Particle kind per block state shown around the player (`ambient`), `u32::MAX` none.
     ambient_kinds: Option<Vec<Vec<u32>>>,
     /// The frame's `Scene`, one buffer per frame in flight.
@@ -645,6 +647,7 @@ impl Client {
             drawn_frames: FxHashSet::default(),
             start: Instant::now(),
             since_time: 0,
+            day_rate: 1.0,
             ambient_kinds: None,
             scene_bufs: Vec::new(),
             shadow_map: None,
@@ -2247,7 +2250,7 @@ impl Client {
     /// Game ticks now, with the fraction of the current one.
     fn smooth_time(&self) -> f64 {
         let fraction = if self.since_time < 20 { (self.accum / STEP).clamp(0.0, 1.0) } else { 0.0 };
-        self.world.time as f64 + self.since_time as f64 + fraction
+        self.world.time as f64 + (self.since_time as f64 + fraction) * self.day_rate as f64
     }
 
     /// Fog color (linear): the liquid's from inside one; else vanilla's dimming towards night,

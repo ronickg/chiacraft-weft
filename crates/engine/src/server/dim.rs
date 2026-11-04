@@ -90,6 +90,10 @@ pub enum DimEvent {
         dim: u32,
         time: u64,
     },
+    SetDayRate {
+        dim: u32,
+        rate: f32,
+    },
     SkipTicks {
         dim: u32,
         ticks: u64,
