@@ -365,6 +365,7 @@ stat.base.fortitude = Fortitude
 stat.base.fortitude.desc = Cold and heat bother you less (half a degree a point), and poison and sedatives less
 levels.base.up = Level {0}!
 levels.base.place = A point to place: press {key:base:stats}
+levels.base.toast = Level {0}: a point to place {key:base:stats}
 levels.base.title = Level {0}
 levels.base.badge = {0}
 levels.base.points = {0} points to place

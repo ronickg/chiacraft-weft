@@ -538,6 +538,7 @@ stat.base.fortitude = Закалка
 stat.base.fortitude.desc = Холод и жара меньше вас беспокоят (полградуса за очко), как и яд со снотворным
 levels.base.up = Уровень {0}!
 levels.base.place = Есть очко для распределения: нажмите {key:base:stats}
+levels.base.toast = Уровень {0}: очко для распределения {key:base:stats}
 levels.base.title = Уровень {0}
 levels.base.badge = {0}
 levels.base.points = Очков к распределению: {0}
