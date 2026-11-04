@@ -1,5 +1,5 @@
 """Crafting's fallback icons: the icon a part (or a tool kind) shows when nothing more exact is drawn.
-Writes deliver/fallback/item/part_<shape>.png and item/<kind>.png (the crafting hook's names) and a
+Writes deliver/fallback/item/part_<shape>.png and item/<kind>.png (the crafting hook's names; run bow.py first for bow.png) and a
 sheet of them all at 4x and slot size. The axe, pickaxe, shovel, hoe and sword kind icons are the
 chosen iron designs; knife and spear are new.
 
@@ -23,6 +23,9 @@ KINDS = {"axe": "axe_C_felling_1", "pickaxe": "pick2_iron_pickaxe", "shovel": "f
          "hoe": "hoeL_iron_1", "sword": "iron_sword", "knife": "fb_knife", "spear": "fb_spear"}
 
 
+REDRAWN = {"fb_part_round_pommel_2"}  # smaller, with its peg: the first read as a gold ball
+
+
 def load(name):
     return Image.open(os.path.join(OUT, name + "_px.png")).convert("RGBA")
 
@@ -30,10 +33,15 @@ def load(name):
 def main():
     os.makedirs(DELIVER, exist_ok=True)
     icons = []
-    for j in json.load(open(os.path.join(HERE, "fallback_jobs.json"))):
+    jobs = json.load(open(os.path.join(HERE, "fallback_jobs.json"))) + json.load(open(os.path.join(HERE, "bowparts_jobs.json")))
+    for j in jobs:
         if j["name"].startswith("fb_part_"):
-            icons.append(("part_" + j["name"][8:], load(j["name"])))
+            n = j["name"]
+            if n + "_2" in REDRAWN:
+                n += "_2"
+            icons.append(("part_" + j["name"][8:], load(n)))
     icons += [(k, Image.fromarray(tf.drawn(v).astype(np.uint8))) for k, v in KINDS.items()]
+    icons.append(("bow", load("bow_icon")))  # bow.py: the self bow strung with a coded string
     for n, im in icons:
         p = os.path.join(DELIVER, n + ".png")
         im.save(p)
