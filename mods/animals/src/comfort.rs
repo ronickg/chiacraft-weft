@@ -93,7 +93,7 @@ fn comfort(a: &Animal) -> Option<Comfort> {
 /// Once a second, from `animal::upkeep`: the air, the core, how it feels, its condition; a tame
 /// out of comfort loses health if freezing or overheating. Returns how many times faster a tame
 /// eats now (out of comfort, and by the world's difficulty).
-pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState) -> f32 {
+pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState, secs: f32) -> f32 {
     let Some(s) = a.species() else { return 1.0 };
     let Some(body) = comfort(a) else { return 1.0 };
     let air = base_api::air_at(w, st.pos, st.size[1], st.in_liquid != 0, REACH, |_| {}).celsius;
@@ -106,7 +106,7 @@ pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState) -> f32 {
         (air, Feeling::Comfortable, temperature::ectotherm_speed(air, mid))
     } else {
         let start = if old.core < 20.0 { temperature::CORE } else { old.core };
-        let core = temperature::step_core(start, body.target(air), 1.0, mass);
+        let core = temperature::step_core(start, body.target(air), secs, mass);
         (core, temperature::feeling(core), 1.0)
     };
     let feel = FEELINGS.iter().position(|&f| f == feeling).unwrap_or(0);
@@ -127,7 +127,7 @@ pub fn upkeep(w: &World, id: u64, a: &Animal, st: &EntityState) -> f32 {
     };
     if let Some(e) = effect {
         let max = st.max_health;
-        let loss = (e.modifiers().health_loss * max * d.harm).min((st.health - max * TAME_FLOOR).max(0.0));
+        let loss = (e.modifiers().health_loss * max * d.harm * secs).min((st.health - max * TAME_FLOOR).max(0.0));
         if loss > 0.0 {
             let cause = if e == Effect::Freezing { damage::FREEZE } else { damage::HEAT };
             w.damage(id, loss, 0, cause);

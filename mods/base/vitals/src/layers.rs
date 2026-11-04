@@ -43,6 +43,11 @@ pub struct Layers {
     /// they take after the ferns, and which, by weight.
     pub big_leaves: f32,
     pub big_leaf_kinds: &'static str,
+    /// Treefall gaps (Lighting, 11-05: where the morning beams come in): the chance a 48-block cell
+    /// holds one, a round opening 8 to 20 blocks across with no canopy, a fallen trunk or young
+    /// growth where its trees stood (0.3: some 2% of the forest open, as central Amazon studies
+    /// find 1-3% in fresh gaps).
+    pub gaps: f32,
 }
 
 const fn l(
@@ -70,6 +75,7 @@ const fn l(
         lianas: 0.0,
         big_leaves: 0.0,
         big_leaf_kinds: "",
+        gaps: 0.0,
     }
 }
 
@@ -124,6 +130,7 @@ pub const LAYERS: [Layers; 11] = [
         // Ronald, 11-04: "A + C's giants + some B": a few of B's big-leaved plants on A's floor.
         big_leaves: 0.03,
         big_leaf_kinds: "base:philodendron:2 base:banana:1",
+        gaps: 0.3,
         // The floor is litter, not grass: nearly all of it (the playtest's first look still read
         // grass at 0.6).
         ..l("base:tropical_forest", "base:deep_leaf_litter:3 base:leaf_litter:1 base:podzol:1", 0.95, 0.1, 0.25, "base:cacao_leaves", 0.3)
@@ -169,6 +176,7 @@ mod tests {
             assert!(l.mushroom_cover == 0.0 || !l.mushrooms.is_empty(), "{}: mushrooms with no kinds", l.biome);
             assert!(crate::climate::of(l.biome).is_some(), "{}: no climate", l.biome);
             assert!((0.0..=1.0).contains(&l.lianas), "{}: lianas {}", l.biome, l.lianas);
+            assert!((0.0..=1.0).contains(&l.gaps), "{}: gaps {}", l.biome, l.gaps);
         }
         // A biome waiting to be registered has its row here, or it isn't waiting for anything.
         for b in PENDING {

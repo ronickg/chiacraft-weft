@@ -927,6 +927,14 @@ season), and `/animal room` (the guard's own count) turned a pack away at 30 nea
 at 13. Without water (aw_wolves2) or food (aw_wolves) a pen dies of thirst or hunger within days
 instead, as it should.
 
+**Far animals keep time** (2026-11-05). With the engine's activation ranges an animal no player
+is within 48 blocks of rests, ticking only every `core:inactive_entity_interval` ticks (20). Its
+countdowns run down by the ticks elapsed (`World::tick_elapsed`: breeding, gifts, anger, taming's
+fright and wait, a dog's sitting; the last three still counted one a call, so a far one stayed
+frightened twenty times as long), and its once-a-second body, hunger and thirst run on the tick a
+second turns over for it and cover the seconds that passed (`life::seconds_due`, `steps_in`):
+before, they lived one second a wake, right only at the default interval.
+
 **Time away** (2026-11-02; Ronald: "my animals should die even while I'm gone"). Animals only
 live where a player is: the engine spawns them 20-45 blocks from players (at most 6 passive ones
 within 64) and ticks only loaded areas. So what happens elsewhere is caught up when an area loads,

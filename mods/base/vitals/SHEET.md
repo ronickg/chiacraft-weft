@@ -161,11 +161,11 @@ What takes days in real life takes its time on the growing pace (`vitals::crafts
 
 ## Felling
 
-An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, 8 times slower, and gives nothing. A tree that loses its foot, or a log of its trunk, by any means falls (none stands in the air); bare hands and other tools chop the foot as slowly as an axe past its tier, and as fruitlessly, but keep the wood of a tree of up to 8 logs at the hand's pace (a stopgap until the first hours give a hand-made axe). Never more than 60 min. Felled, a tree within its tier lies on the ground in pieces of 4 logs, each cut as long as felling a tree of its logs takes; the axe wears by logs^0.75 for a felling or a piece. A tree falls as itself: a 1 s creak, then 2.5 s for one 10 high (2-5 s, by the square root of its height), its leaves breaking off past 20° until 70% have, the rest bursting on the ground; on the way leaves and branches in its path break, and a trunk it strikes falls too if the falling tree has 2x its logs, or else it catches there and settles as blocks; a creature it hits takes 2 + a tenth of its logs, up to 20. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:
+An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, 8 times slower, and gives nothing. A tree that loses its foot, or a log of its trunk, by any means falls (none stands in the air); bare hands and other tools chop the foot as slowly as an axe past its tier, and as fruitlessly, but keep the wood of a tree of up to 10 logs at the hand's pace (a stopgap until the first hours give a hand-made axe). Never more than 60 min. Felled, a tree within its tier lies on the ground in pieces of 4 logs, each cut as long as felling a tree of its logs takes; the axe wears by logs^0.75 for a felling or a piece. A tree falls as itself: a 1 s creak, then 2.5 s for one 10 high (2-5 s, by the square root of its height), its leaves breaking off past 20° until 70% have, the rest bursting on the ground; on the way leaves and branches in its path break, and a trunk it strikes falls too if the falling tree has 2x its logs, or else it catches there and settles as blocks; a creature it hits takes 2 + a tenth of its logs, up to 20. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:
 
 | tier | harvest | takes up to | speed | oak (20) | birch (34) | araucaria (72) | young sequoia (165) | sequoia (1015) |
 |---|---|---|---|---|---|---|---|---|
-| bare hands, other tools | - | 8 logs (stopgap) | 1 | 4 min * | 6 min * | 10 min * | 18 min * | 60 min * |
+| bare hands, other tools | - | 10 logs (stopgap) | 1 | 4 min * | 6 min * | 10 min * | 18 min * | 60 min * |
 | wood, gold | 0 | 40 logs | 2 | 14 s | 21 s | 5 min * | 9 min * | 36 min * |
 | bone, antler | 50 | 64 logs | 2.5 | 11 s | 17 s | 4 min * | 7 min * | 29 min * |
 | flint, chert, obsidian, stone | 100 | 96 logs | 2.91 | 10 s | 15 s | 25 s | 6 min * | 25 min * |
@@ -373,6 +373,12 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:huckleberry_bush | Bush | Soil | base:huckleberries | 1.0% | mountains |
 | base:chia | Ripens | Sand | base:chia_seeds | 2.0% | desert |
 | base:dwarf_birch | Still | Soil | - | 2.0% | snowy_plains |
+| base:staghorn_coral | Still | Bed | - | 9.0% | coral_reef |
+| base:elkhorn_coral | Still | Bed | - | 6.0% | coral_reef |
+| base:sea_fan | Still | Bed | - | 5.0% | coral_reef |
+| base:finger_coral | Still | Bed | - | 5.0% | coral_reef, lagoon |
+| base:sea_rod | Still | Bed | - | 4.0% | coral_reef, lagoon |
+| base:turtle_grass | Still | Bed | - | 20.0% | lagoon |
 
 ## Food in the world
 
@@ -435,6 +441,7 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | animals:flowering_shrub | leaves | 4 | stays | always there in animals:floodplain, animals:scrubland (spring, summer, autumn), worth 40% of fresh growth |
 | animals:water_lily | water_plants | 5 | stays | always there in animals:floodplain, animals:red_dunes (all year), worth 40% of fresh growth |
 | base:kelp_wrack | water_plants | 4 | stays | always there in base:beach (all year), worth 40% of fresh growth |
+| base:turtle_grass | water_plants | 5 | stays | always there in base:lagoon (all year), worth 40% of fresh growth |
 | animals:rotten_log | insects | 3 | stays | always there in animals:floodplain, animals:fern_forest (all year), worth 40% of fresh growth |
 | base:dune_grass (age 1) | grass | 4 | back to age 0 | base:dune_grass |
 | base:beach_plum_bush (age 3) | fruit | 6 | back to age 1 | base:beach_plum_bush |
