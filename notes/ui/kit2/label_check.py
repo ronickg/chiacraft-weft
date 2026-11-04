@@ -14,6 +14,9 @@ colour alone:
   and text pixels must be a theme colour (no blur, no half pixels);
 - clear: no text pixel within 2 UI px of an outline or frame pixel.
 
+A known false alarm: an icon in a button that happens to use a text colour (the title screen's
+Singleplayer figure) counts as ink, so its label reads "low" with a long descender; look at it.
+
 Usage: python3 label_check.py SHOT.png [--scale 2] [--json out.json] [--zoom out.png]"""
 import argparse
 import json
@@ -199,7 +202,8 @@ def main():
             print(f"   {p['kind']:24s} at {p['box'][0]},{p['box'][1]} face {p['face_rows']} rows: above {p['above']} below {p['below']}"
                   f" (desc {p['descender']}), left {p['left']} right {p['right']}{'' if p['even_face'] else ' odd face'}{flag}")
     if a.json:
-        json.dump(out, open(a.json, "w"), indent=1)
+        # numpy's ints and bools as plain ones (Tester: "--json crashes on numpy ints")
+        json.dump(out, open(a.json, "w"), indent=1, default=lambda o: o.item() if hasattr(o, "item") else str(o))
 
 
 if __name__ == "__main__":
