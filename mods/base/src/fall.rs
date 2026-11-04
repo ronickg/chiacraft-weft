@@ -300,7 +300,10 @@ fn leaf_off(w: &World, f: &Fall, p: [i32; 3], state: u32, deg: f32, speed: f32) 
         .speed(1.0);
     if w.random_below(n::SHED_LOOT_ONE_IN) == 0 {
         // The block's name, without the state's props: its loot table.
-        let name = name_of(abi::entry_kind::BLOCK, block_of(state)).split('[').next().unwrap_or("");
+        let name = name_of(abi::entry_kind::BLOCK, block_of(state))
+            .split('[')
+            .next()
+            .unwrap_or("");
         for stack in w.roll_loot(&LootOf(name), &LootCtx { mined: state, ..LootCtx::default() }) {
             w.spawn_item(at, stack);
         }
