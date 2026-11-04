@@ -416,9 +416,24 @@ fn haze(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
 }
 
 // `haze` for a point with `sky` (0..1) sky light: fog gathers only out under the sky.
+// The water itself seen from inside it: teal, lit by the sky and the sun above (the engine's water
+// fog is a dark navy). Its fog is blue rather than lava's red, so lava keeps the engine's.
+fn in_water() -> bool {
+    return in_liquid() && scene.fog_color.b > scene.fog_color.r;
+}
+
+fn underwater_color() -> vec3<f32> {
+    let p = palette();
+    let light = p.ambient * 1.4 + p.sun * light_strength() * 0.35;
+    return vec3(0.05, 0.2, 0.2) * light * 2.0;
+}
+
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     let dist = length(rel);
+    if in_water() {
+        return mix(c, underwater_color(), fog_amount(dist, scene.params.x, scene.params.y));
+    }
     if in_liquid() || !open_sky() {
         return mix(c, scene.fog_color.rgb, fog_amount(dist, scene.params.x, scene.params.y));
     }

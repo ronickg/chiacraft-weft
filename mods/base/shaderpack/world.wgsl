@@ -364,6 +364,9 @@ fn wave_height(p: vec2<f32>, t: f32, detail: f32) -> f32 {
     h += (noise3(vec3(q.x, t * 0.25, q.y)) - 0.5) * 0.07 * detail;
     let q2 = p * 1.4 + side * t * 0.3;
     h += (noise3(vec3(q2.x, t * 0.4 + 7.0, q2.y)) - 0.5) * 0.03 * detail;
+    // A fine, quick chop close by, where the sun's highlight should sparkle on it.
+    let q3 = p * 3.2 + vec2(t * 0.9, -t * 0.6);
+    h += (noise3(vec3(q3.x, t * 0.8 + 13.0, q3.y)) - 0.5) * 0.014 * detail * detail;
     return h * (0.6 + 0.4 * smoothstep(1.0, 8.0, speed));
 }
 
@@ -524,7 +527,8 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
         shore = shore_distance(in.pos);
     }
     let ndv = max(dot(n, v), 0.02);
-    let fresnel = 0.04 + 0.96 * pow(1.0 - ndv, 4.0);
+    // Mirror-like at an ordinary look, as water is: most of what it shows is what it reflects.
+    let fresnel = 0.06 + 0.94 * pow(1.0 - ndv, 3.0);
     let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos);
     // What the light in the water sends back up: turquoise in the shallows, deep blue further down,
@@ -534,9 +538,9 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // The biome's tint counts for more where it is deep (a swamp's brown-green); the shallows keep
     // their turquoise.
     let shallow = vec3(0.06, 0.30, 0.27);
-    let deep = vec3(0.012, 0.05, 0.085);
+    let deep = vec3(0.012, 0.055, 0.065);
     let deepness = 1.0 - exp(-0.35 * depth);
-    let scatter = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.3, 0.7, deepness)) * pattern * lit;
+    let scatter = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
     // How much of the bottom shows: the way through the water to it, longer at a slant; never all
     // of it, so even the shallowest water tints what lies under it.
     let through = exp(-0.28 * depth / max(v.y, 0.2)) * 0.82;

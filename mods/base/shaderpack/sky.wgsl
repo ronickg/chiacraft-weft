@@ -291,6 +291,10 @@ fn aurora(dir: vec3<f32>) -> vec3<f32> {
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.
 fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
+    // Under water, the water's own color all round (`look.wgsl`), not the engine's dark fog.
+    if in_water() {
+        return vec4(display(underwater_color()), 1.0);
+    }
     if open_sky() && !in_liquid() {
         var c = sky_color(dir) + milky_way(dir) + aurora(dir);
         if dir.y < 0.0 {
