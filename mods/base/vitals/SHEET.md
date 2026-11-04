@@ -18,7 +18,7 @@ Written from `mods/base/vitals` (`cargo run -p vitals --bin sheet > mods/base/vi
 
 Comfortable air for a person, unclothed: (15.0, 28.0) °C.
 
-A new player arrives with base:bread and base:apple and base:cooked_chicken in the stomach (65 units): max health 90 and stamina 83 of 100, wearing off as it digests (an empty stomach: 40). A new world begins on spring's day 8, a quarter of the year from midwinter.
+A new player arrives with base:bread and base:apple and base:cooked_chicken in the stomach (65 units): max health 90 and stamina 82 of 100, wearing off as it digests (an empty stomach: 40). A new world begins on spring's day 8, a quarter of the year from midwinter.
 
 ## Foods
 
@@ -26,38 +26,38 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 
 | food | kind | g | units | protein | energy | fat | greens | water | digests | keeps | |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| base:apple | fruit | 180 | 18 | 1 | 25 | 0 | 5 | 154 | 9 min | 20 + 20 | cooling |
+| base:apple | fruit | 180 | 18 | 1 | 21 | 0 | 5 | 154 | 9 min | 20 + 20 | cooling |
 | base:bread | seeds | 250 | 25 | 22 | 122 | 8 | 7 | 90 | 26 min | 5 + 5 | hot when cooked |
 | base:porkchop | meat | 150 | 15 | 31 | 0 | 9 | 0 | 108 | 22 min | 2 + 2 | raw |
 | base:cooked_porkchop | meat | 110 | 11 | 30 | 0 | 10 | 0 | 67 | 19 min | 4 + 4 | hot when cooked |
 | base:beef | meat | 200 | 20 | 42 | 0 | 16 | 0 | 140 | 31 min | 2 + 2 | raw |
 | base:cooked_beef | meat | 150 | 15 | 42 | 0 | 16 | 0 | 88 | 28 min | 4 + 4 | hot when cooked |
-| base:chicken | meat | 300 | 30 | 56 | 0 | 45 | 0 | 206 | 53 min | 2 + 2 | raw |
+| base:chicken | meat | 300 | 30 | 56 | 0 | 45 | 0 | 198 | 53 min | 2 + 2 | raw |
 | base:cooked_chicken | meat | 220 | 22 | 60 | 0 | 30 | 0 | 131 | 43 min | 4 + 4 | hot when cooked |
 | base:mutton | meat | 150 | 15 | 26 | 0 | 24 | 0 | 96 | 26 min | 2 + 2 | raw |
 | base:cooked_mutton | meat | 110 | 11 | 28 | 0 | 18 | 0 | 63 | 22 min | 4 + 4 | hot when cooked |
 | base:rotten_flesh | carrion | 120 | 12 | 18 | 0 | 12 | 0 | 78 | 18 min | 0 + 0 | raw |
 | base:spider_eye | insects | 30 | 3 | 4 | 1 | 1 | 0 | 22 | 4 min | 3 + 3 | raw, poisonous |
 | base:cooked_egg | meat | 100 | 10 | 14 | 1 | 15 | 0 | 70 | 16 min | 2 + 2 | hot when cooked |
-| base:apple_pie | fruit | 200 | 20 | 5 | 74 | 25 | 4 | 104 | 25 min | 4 + 4 | hot when cooked |
-| base:berries | fruit | 100 | 10 | 1 | 14 | 0 | 3 | 84 | 5 min | 6 + 6 | cooling |
+| base:apple_pie | fruit | 200 | 20 | 4 | 65 | 25 | 4 | 105 | 24 min | 4 + 4 | hot when cooked |
+| base:berries | fruit | 100 | 10 | 1 | 12 | 0 | 3 | 84 | 5 min | 6 + 6 | cooling |
 | base:dried_meat | meat | 75 | 8 | 41 | 2 | 11 | 0 | 15 | 20 min | 30 + 30 |  |
 | base:smoked_meat | meat | 120 | 12 | 36 | 0 | 17 | 0 | 60 | 24 min | 14 + 14 |  |
 | base:salted_meat | meat | 160 | 16 | 35 | 0 | 22 | 0 | 88 | 29 min | 45 + 45 |  |
-| base:dried_apple | fruit | 40 | 4 | 0 | 26 | 0 | 4 | 13 | 3 min | 56 + 56 |  |
-| base:dried_berries | fruit | 30 | 3 | 1 | 24 | 1 | 2 | 4 | 2 min | 56 + 56 |  |
-| base:lingonberries | fruit | 100 | 10 | 0 | 12 | 0 | 5 | 87 | 5 min | 20 + 20 | cooling |
-| base:cloudberries | fruit | 100 | 10 | 2 | 9 | 1 | 16 | 85 | 6 min | 3 + 3 | cooling |
+| base:dried_apple | fruit | 40 | 4 | 0 | 23 | 0 | 4 | 13 | 3 min | 56 + 56 |  |
+| base:dried_berries | fruit | 30 | 3 | 1 | 22 | 1 | 2 | 4 | 2 min | 56 + 56 |  |
+| base:lingonberries | fruit | 100 | 10 | 0 | 8 | 0 | 5 | 87 | 5 min | 20 + 20 | cooling |
+| base:cloudberries | fruit | 100 | 10 | 2 | 2 | 1 | 16 | 85 | 6 min | 3 + 3 | cooling |
 | base:crowberries | fruit | 100 | 10 | 1 | 7 | 1 | 5 | 85 | 6 min | 10 + 10 | cooling |
-| base:raspberries | fruit | 100 | 10 | 1 | 12 | 1 | 9 | 86 | 5 min | 2 + 2 | cooling |
-| base:prickly_pear_fruit | fruit | 100 | 10 | 1 | 10 | 0 | 5 | 88 | 5 min | 7 + 7 | cooling |
-| base:rose_hip | fruit | 30 | 3 | 0 | 11 | 0 | 20 | 18 | 2 min | 30 + 30 | cooling |
-| base:hazelnut | seeds | 30 | 3 | 4 | 5 | 18 | 3 | 2 | 10 min | 60 + 60 |  |
-| base:pine_nut | seeds | 30 | 3 | 4 | 4 | 21 | 1 | 1 | 11 min | 60 + 60 |  |
-| base:sunflower_seeds | seeds | 30 | 3 | 6 | 6 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
+| base:raspberries | fruit | 100 | 10 | 1 | 5 | 1 | 9 | 86 | 5 min | 2 + 2 | cooling |
+| base:prickly_pear_fruit | fruit | 100 | 10 | 1 | 6 | 0 | 5 | 88 | 5 min | 7 + 7 | cooling |
+| base:rose_hip | fruit | 30 | 3 | 0 | 4 | 0 | 20 | 18 | 2 min | 30 + 30 | cooling |
+| base:hazelnut | seeds | 30 | 3 | 4 | 2 | 18 | 3 | 2 | 10 min | 60 + 60 |  |
+| base:pine_nut | seeds | 30 | 3 | 4 | 3 | 21 | 1 | 1 | 11 min | 60 + 60 |  |
+| base:sunflower_seeds | seeds | 30 | 3 | 6 | 3 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
 | base:kelp | water_plants | 50 | 5 | 1 | 5 | 0 | 1 | 41 | 3 min | 3 + 3 |  |
 | base:cattail_root | roots | 100 | 10 | 1 | 17 | 0 | 3 | 78 | 6 min | 14 + 14 |  |
-| base:cooked_wild_rice | seeds | 150 | 15 | 6 | 32 | 0 | 3 | 111 | 12 min | 3 + 3 | hot when cooked |
+| base:cooked_wild_rice | seeds | 150 | 15 | 6 | 29 | 0 | 3 | 111 | 12 min | 3 + 3 | hot when cooked |
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
 | animals:venison | meat | 200 | 20 | 44 | 0 | 5 | 0 | 147 | 27 min | 2 + 2 | raw |
