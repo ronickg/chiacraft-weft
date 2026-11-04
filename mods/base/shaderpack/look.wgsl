@@ -448,7 +448,9 @@ fn fog_density(p: vec3<f32>) -> f32 {
     let banks = smoothstep(0.45, 0.66, shape - 0.25 * eaten + 0.12);
     // Deep under it, in the ground, there is none.
     let open = smoothstep(-24.0, -10.0, h);
-    return f * open * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
+    // The sun thins the banks toward noon (mornings and evenings keep them).
+    let burn = mix(1.0, 0.55, smoothstep(0.35, 0.75, scene.sun.y));
+    return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
 }
 
 // Light the fog sends toward the eye: the sky's from all around, the sun's mostly forward, so it
@@ -458,10 +460,13 @@ fn fog_light(dir: vec3<f32>) -> vec3<f32> {
     let mu = dot(dir, light_dir());
     let g = 0.6;
     let hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566;
-    let phase = hg * 2.5 + 0.3;
+    // The sun's glow in the fog capped: uncapped it was over twice the sunlight looking toward a high
+    // sun, and noon fog by a river or on snow went a milky white-out (the world playtester's shots,
+    // frame luma 0.76, saturation 0.06). Valheim's daytime fog reads grey and soft.
+    let phase = min(hg * 1.6, 0.9) + 0.3;
     // Droplets are white, snow whiter, dust the color of sand.
     let tint = mix(mix(vec3(0.9), vec3(1.0, 1.0, 1.03), scene.ground.y), vec3(0.95, 0.68, 0.42), scene.ground.z);
-    return ((p.ambient * 1.25 + p.horizon * 0.2) + p.sun * light_strength() * phase) * 0.9 * tint;
+    return ((p.ambient * 1.25 + p.horizon * 0.2) + p.sun * light_strength() * phase) * 0.75 * tint;
 }
 
 // The fog between the eye and a point `rel` away (camera relative), walked in a few steps that are
