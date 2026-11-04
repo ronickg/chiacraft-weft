@@ -1,6 +1,6 @@
 # Round 2's animal pages and Keep/Undo (UI redo): a tamed wolf's Overview, Genes and Family tabs,
 # a point placed and waiting (green) on it, then the player's stats with a point waiting.
-# Fresh world name each run. Shots go to --shot-dir.
+# Fresh world name each run. Shots go to --shot-dir. A menu's screen is `core:menu` whichever menu.
 loaded
 idle
 chat /tk mode survival
@@ -17,13 +17,13 @@ chat /animal show
 wait 1.5
 shot pages_overview.png
 # One point placed, not kept yet: its value and points show green, the chip counts 2 left.
-tap_once animals:animal text:+
+tap_once core:menu text:+
 wait 0.5
 shot pages_overview_waiting.png
-tap_once animals:animal text:Genes
+tap_once core:menu text:Genes
 wait 1.5
 shot pages_genes.png
-tap_once animals:animal_genes text:Family
+tap_once core:menu text:Family
 wait 1.5
 shot pages_family.png
 key Escape
