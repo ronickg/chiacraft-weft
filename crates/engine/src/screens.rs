@@ -118,6 +118,7 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
         "core:mods" => Box::new(ModList::default()),
         "core:profile" => Box::new(Profile::default()),
         "core:account" => Box::new(crate::account_screen::Account::default()),
+        "core:achievements" => Box::new(crate::chiacraft::achievements_screen::Achievements),
         "core:admission" => Box::new(crate::chiacraft::worlds::admission_screen::Admission),
         _ => return None,
     })
@@ -343,6 +344,12 @@ impl Screen for Profile {
                     label(ui, cx, "profile.account_backup", &[], "dim");
                 }
                 button(ui, cx, "profile.account", &[], 160.0, |c| c.requests.push(Request::Screen("core:account".into())));
+                // What worlds signed for this account (chiacraft, phase 4).
+                let n = crate::chiacraft::achievements::load().credentials.len();
+                let id = button(ui, cx, "profile.achievements", &[Arg::Int(n as i64)], 160.0, |c| {
+                    c.requests.push(Request::Screen("core:achievements".into()))
+                });
+                ui.set_id(id, "achievements");
                 ui.add(Kind::Container { class: None }, Style::default().h(4.0));
                 label(ui, cx, "profile.skin", &[], "default");
                 label(ui, cx, "profile.skin_hint", &[], "dim");

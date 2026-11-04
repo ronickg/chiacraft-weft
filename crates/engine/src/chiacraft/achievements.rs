@@ -101,6 +101,83 @@ pub fn keep(path: &Path, me: &str, json: &str) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Whether the world that issued `c` is the owner's, on chain: its DID (the credential's issuer
+/// DID) and the owner's DID name each other, and the key that vouched for the issuer holds the
+/// owner's DID. None for a credential without an issuer DID. Blocks; never from an async task.
+pub fn check_issuer(c: &Credential) -> Option<Result<bool, String>> {
+    let d = c.issuer.did.as_ref()?;
+    Some((|| {
+        let data: serde_json::Value =
+            serde_json::from_str(c.data.as_deref().ok_or("no world in the credential")?).map_err(|e| e.to_string())?;
+        let w = data.get("world").ok_or("no world in the credential")?;
+        let owner = w.get("owner").and_then(|v| v.as_str()).ok_or("no owner")?;
+        let key = w.get("key").and_then(|v| v.as_str()).ok_or("no key")?;
+        let generation = w
+            .get("generation")
+            .and_then(|v| v.as_u64())
+            .ok_or("no generation")? as u32;
+        let owner_bytes: [u8; 32] = chiacraft_wallet::keys::from_hex(owner)
+            .and_then(|b| b.try_into().ok())
+            .ok_or("a bad owner")?;
+        let owner_did = chiacraft_wallet::keys::encode_did(&owner_bytes).ok_or("a bad owner")?;
+        if !crate::chiacraft::worlds::world_did::check(&d.did, &owner_did, key, generation)? {
+            return Ok(false);
+        }
+        let reader = crate::chiacraft::chain::get()?;
+        let (record, _) = crate::chiacraft::chain::did(&reader, &owner_did)?;
+        let signer: [u8; 48] = chiacraft_wallet::keys::from_hex(&d.owner)
+            .and_then(|b| b.try_into().ok())
+            .ok_or("a bad DID owner key")?;
+        let p2 = chiacraft_wallet::keys::p2_of_synthetic(&signer).ok_or("a bad DID owner key")?;
+        Ok(record.owned_by(p2.into()))
+    })())
+}
+
+/// Issuer checks done in this game, by issuer DID: none yet (checking), or the answer.
+type Check = std::sync::Arc<parking_lot::Mutex<Option<bool>>>;
+static CHECKS: parking_lot::Mutex<Option<std::collections::HashMap<String, Check>>> = parking_lot::Mutex::new(None);
+
+/// [`check_issuer`] in the background, once per issuer DID per game: None while it runs.
+pub fn issuer_checked(c: &Credential) -> Option<bool> {
+    let d = c.issuer.did.as_ref()?;
+    let mut all = CHECKS.lock();
+    let slot = all
+        .get_or_insert_with(Default::default)
+        .entry(d.did.clone())
+        .or_insert_with(|| {
+            let slot = Check::default();
+            let (out, c) = (slot.clone(), c.clone());
+            let _ = std::thread::Builder::new()
+                .name("achievement check".into())
+                .spawn(move || {
+                    let r = check_issuer(&c).unwrap_or(Ok(false));
+                    if let Err(e) = &r {
+                        log::info!("the DID of '{}' (achievements): {e}", c.issuer.name);
+                    }
+                    *out.lock() = Some(r.unwrap_or(false));
+                    GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                });
+            slot
+        })
+        .clone();
+    *slot.lock()
+}
+
+/// `2026-11-04` for unix seconds (UTC).
+pub fn date(unix: u64) -> String {
+    // Howard Hinnant's days-to-civil.
+    let z = (unix / 86_400) as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + (m <= 2) as i64;
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,6 +196,13 @@ mod tests {
         )
         .sign(issuer)
         .unwrap()
+    }
+
+    #[test]
+    fn dates() {
+        assert_eq!(date(0), "1970-01-01");
+        assert_eq!(date(1_793_764_725), "2026-11-04");
+        assert_eq!(date(951_782_400), "2000-02-29");
     }
 
     #[test]

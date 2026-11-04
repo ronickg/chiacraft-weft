@@ -39,6 +39,12 @@ impl Server {
             .identity
             .as_ref()
             .map(|i| format!("chiacraft://w/{}", i.key()));
+        // What the world's DID was launched with, so a verifier can confirm a DID never spent.
+        let data = dir
+            .as_deref()
+            .and_then(crate::chiacraft::worlds::world_did::load)
+            .filter(|_| issuer.did.is_some())
+            .map(|d| serde_json::json!({ "world": { "owner": d.owner, "key": d.key, "generation": d.generation } }).to_string());
         for g in grants {
             let Some(p) = self
                 .players
@@ -64,7 +70,7 @@ impl Server {
                     .map(|i| cut(&i, chiacraft_wallet::achievement::MAX_ICON)),
             };
             let signed = new_nonce().and_then(|nonce| {
-                Credential::unsigned(issuer.clone(), &subject.0, achievement, crate::saves::now_secs(), nonce, None, status.clone())
+                Credential::unsigned(issuer.clone(), &subject.0, achievement, crate::saves::now_secs(), nonce, data.clone(), status.clone())
                     .sign(&*session.signer)
             });
             let c = match signed {
