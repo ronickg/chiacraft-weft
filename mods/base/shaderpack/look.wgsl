@@ -54,12 +54,13 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 // sunset, dusk and night, blended between.
 fn palette() -> Palette {
     let e = scene.sun.y;
-    // Day, after Bliss's own colours (Ronald's settings, reports/bliss-source in the crew notes): a
-    // greyish blue overhead, about sRGB 64 88 113, going to a pale grey-beige at the horizon
-    // (167 171 157), not a saturated #4A90E2 blue; a warm sun (toward Bliss's 4300 K); and the sky's
-    // light in the shade about a fifth of the sun's (Bliss's is a sixth, which our curve's toe
-    // crushed), still blue, so sun and shade part and the land stops looking flat.
-    let day = key(vec3(0.104, 0.142, 0.188), vec3(0.368, 0.387, 0.324), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.138, 0.197, 0.269));
+    // Day, after Bliss's own colours (reports in the crew notes, bliss-source.md): a muted blue
+    // overhead, about sRGB 50 92 148 (it was 6 139 237), going to a light grey-blue at the horizon
+    // (155 178 202), as Bliss's default sky; not a saturated #4A90E2 blue, and not the grey-beige
+    // of Bliss with Ronald's 4300 K sun, which read overcast and olive here (Tester 2). A warm sun;
+    // the sky's light in the shade about a fifth of the sun's (Bliss's is a sixth, which our
+    // curve's toe crushed), still blue, so sun and shade part and the land stops looking flat.
+    let day = key(vec3(0.084, 0.149, 0.283), vec3(0.314, 0.418, 0.584), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.138, 0.197, 0.269));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
     let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
