@@ -734,6 +734,7 @@ impl EntityRenderer {
                     .filter(|p| p.texture == k.texture)
                     .map(|p| &p.tex)
             });
+        let layout = size;
         let (skin, size) = own.map_or((skin, size), |o| (&o.1, o.2));
         let base = Instance {
             color: [1.0; 3],
@@ -753,7 +754,7 @@ impl EntityRenderer {
                 if let Some(Some((_, idx, size))) = self.skins.get(t).filter(|_| out.1 < MAX_LAYERS) {
                     out.0[out.1] = Instance {
                         tex: *idx,
-                        tex_size: [size[0] as f32, size[1] as f32],
+                        tex_size: worn_tex_size(layout, *size),
                         roles: crate::model::role_mask(w.roles),
                         inflate: w.inflate,
                         glow: glow(t),
@@ -1527,5 +1528,35 @@ fn ground_transform(base: Vec3, age: f32, item: u32) -> Mat4 {
         spin * Mat4::from_translation(Vec3::splat(-0.125)) * Mat4::from_scale(Vec3::splat(0.25))
     } else {
         spin * Mat4::from_translation(Vec3::new(-0.25, 0.0, -0.25)) * Mat4::from_scale(Vec3::splat(0.5))
+    }
+}
+
+
+/// What a worn layer's pixels are read against: the wearer's layout width, at the layer's own
+/// shape. A layer drawn at a multiple of the layout (a 128 x 64 armour or clothes layer on a
+/// 64 x 32 skin: 32 texels a block on a 16 one) spreads the layout's pixels over all of it, as
+/// Minecraft's armour layers do in high-resolution packs; one at the layout's width reads as before.
+pub(crate) fn worn_tex_size(layout: [u32; 2], worn: [u32; 2]) -> [f32; 2] {
+    if layout[0] == 0 || worn[0] == 0 {
+        return [worn[0] as f32, worn[1] as f32];
+    }
+    let w = layout[0] as f32;
+    [w, worn[1] as f32 * w / worn[0] as f32]
+}
+
+#[cfg(test)]
+mod worn_tests {
+    use super::worn_tex_size;
+
+    #[test]
+    fn worn_layers_map_by_the_skins_layout() {
+        // As before: a 64 x 32 layer on a 64 x 32 skin, or on a 64 x 64 one (its top half).
+        assert_eq!(worn_tex_size([64, 32], [64, 32]), [64.0, 32.0]);
+        assert_eq!(worn_tex_size([64, 64], [64, 32]), [64.0, 32.0]);
+        // Twice the layout (32 a block on a 16 skin) and four times: the same layout pixels.
+        assert_eq!(worn_tex_size([64, 32], [128, 64]), [64.0, 32.0]);
+        assert_eq!(worn_tex_size([64, 32], [256, 128]), [64.0, 32.0]);
+        // No layout known: the layer's own size.
+        assert_eq!(worn_tex_size([0, 0], [128, 64]), [128.0, 64.0]);
     }
 }
