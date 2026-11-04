@@ -65,10 +65,17 @@ pub fn register(r: &mut Registry) {
     // after the XP bar.
     r.hud_element(&HUD_HEALTH, hud_anchor::TOP_LEFT, 0, |ui| {
         ui.row(S::row().gap(3.0).center(), |ui| {
-            ui.panel("hud_badge", S::row().size(BADGE.0, BADGE.1).center(), |ui| {
-                ui.text_bind_styled(S::default().no_wrap(), |c, t| {
-                    let Some(v) = vitals_of(c) else { return t.text("") };
-                    t.set("hud.base.badge", &[Arg::Int(vitals::levels::level_of(v.xp).0 as i64)]);
+            // The shield as a gauge, full or hidden, so it hides with the bars (in creative it
+            // stayed, empty, as a panel: PC shot, 11-04); the level centred on it.
+            ui.row(S::row().size(BADGE.0, BADGE.1), |ui| {
+                ui.progress_bind("hud_badge", S::default().size(BADGE.0, BADGE.1).at(0.0, 0.0), |c| {
+                    if vitals_of(c).is_some() { 1.0 } else { -1.0 }
+                });
+                ui.row(S::row().size(BADGE.0, BADGE.1).center().at(0.0, 0.0), |ui| {
+                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                        let Some(v) = vitals_of(c) else { return t.text("") };
+                        t.set("hud.base.badge", &[Arg::Int(vitals::levels::level_of(v.xp).0 as i64)]);
+                    });
                 });
             });
             ui.column(S::col().gap(1.0), |ui| {

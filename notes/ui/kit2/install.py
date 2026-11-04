@@ -376,6 +376,8 @@ inner_top = np.zeros_like(m)
 inner_top[1:] = ~inside[:-1]
 k.paint(badge, inside & inner_top, k.PANEL_DEEP)
 save("hud_badge", badge, [("scaling", "stretch")])
+# The HUD draws it as a gauge (full, or hidden with the bars): its fill is the shield itself.
+save("hud_badge_fill", badge, [("scaling", "stretch")])
 
 
 # The hotbar's slots (and the shortcuts' frames, the same part): kit 2's slot with a wood rim, and
