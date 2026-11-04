@@ -104,6 +104,7 @@ pub static STRIGIDAE: Family = Family { name: "Strigidae", above: &["Aves", "Str
 pub static ACCIPITRIDAE: Family = Family { name: "Accipitridae", above: &["Aves", "Accipitriformes"] };
 pub static CATHARTIDAE: Family = Family { name: "Cathartidae", above: &["Aves", "Accipitriformes"] };
 pub static LARIDAE: Family = Family { name: "Laridae", above: &["Aves", "Charadriiformes"] };
+pub static ALLIGATORIDAE: Family = Family { name: "Alligatoridae", above: &["Reptilia", "Crocodylia"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -307,7 +308,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 31] = [
+pub static SPECIES: [Species; 33] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1871,7 +1872,14 @@ pub static SPECIES: [Species; 31] = [
         },
         // No nests yet: the young come out as fledglings after the eggs' time; paced as the sparrow,
         // a second brood in a long summer, flocks close together (`balance::checks`).
-        tune: Tune { gestation: Some(8_935), growth: Some(66_000), lifespan: Some(336_000), recovery: Some(60_000), crowd: Some(24), ..Tune::NONE },
+        tune: Tune {
+            gestation: Some(8_935),
+            growth: Some(66_000),
+            lifespan: Some(336_000),
+            recovery: Some(60_000),
+            crowd: Some(24),
+            ..Tune::NONE
+        },
         birth_size: 0.6,
     },
     // The owls (`reports/ecology/Overworld food webs.md`: the night's hunter of every land biome, the
@@ -2279,6 +2287,139 @@ pub static SPECIES: [Species; 31] = [
         // (`balance::checks`).
         tune: Tune { gestation: Some(16_796), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
+    },
+    // The caimans (`reports/ecology/Overworld food webs.md`: the water's hunter of the swamp and the
+    // savanna, the jaguar's main prey in the Pantanal and the capybara's danger): the yacare caiman of
+    // the Pantanal and the spectacled caiman of the llanos, two wild species on one model
+    // (`source/caiman`), the spectacled drawn smaller by its size genes. Cold-blooded; eggs in nest
+    // mounds in the rains.
+    Species {
+        model: "caiman",
+        name: "yacare_caiman",
+        binomial: "Caiman yacare",
+        family: &ALLIGATORIDAE,
+        subfamily: "Caimaninae",
+        breed: None,
+        size: Size::Large,
+        // Fish first, snails and crabs, water birds, rodents and the young of capybaras; it eats
+        // little, being cold-blooded.
+        eats: &[(Fish, 0.6), (Meat, 0.3), (Insects, 0.1)],
+        // A snail or a minnow to a capybara near its own mass.
+        prey: (0.005, 1.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [30.0, 160.0, 120.0, 5.0, 1.0, 80.0, 300.0, 60.0, 30.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 60.0,
+        foods: &[eats("base:beef", 14), favorite("base:chicken", 12), eats("base:porkchop", 12)],
+        feedings: 0.0,
+        shy: 8.0,
+        fights: true,
+        attacks: &["bite"],
+        reach: 1.0,
+        signature: "ambush",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.8,
+        // Males the longer by about a fifth.
+        dimorphism: 1.2,
+        size_spread: 0.2,
+        // Its length, from the snout to the tail's tip.
+        height: (2.2, "length"),
+        // The Pantanal's lagoons and flooded grassland, by the thousand at the dry season's pools.
+        habitats: &[("base:swamp", 1.0), ("base:savanna", 0.3)],
+        bio: Biology {
+            mass: 35.0,
+            gestation: 0.0,
+            // 70-75 days in a mound of rotting plants the female guards.
+            incubation: 73.0,
+            // Females lay at about 1.2 m long, at six to eight years.
+            maturity: 2555.0,
+            // 30 to 40 years.
+            lifespan: 12775.0,
+            interval: 365.0,
+            litter: 30.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            // Nesting in the rains, the young hatching as the water rises.
+            breeds: seasons::WET,
+            peak: seasons::SUMMER,
+            // Cold-blooded: at ease at 25-35 degrees, basking or cooling in the water, sluggish below.
+            comfort: (20.0, 36.0),
+            cold_blooded: true,
+        },
+        // A clutch of 20-35 eggs, most of which jaguars, foxes, coatis and birds take: a dozen at
+        // most, so a pen doesn't flood. Growing up and a life paced so a line can be bred, and a
+        // female's rest after a clutch long, as she guards the mound and the young for months
+        // (`balance::checks`: a fourth generation in 25 days, at most 40 young in a life).
+        tune: Tune { litter: Some((6, 12)), growth: Some(150_000), lifespan: Some(1_800_000), recovery: Some(400_000), ..Tune::NONE },
+        birth_size: 0.15,
+    },
+    Species {
+        model: "caiman",
+        name: "spectacled_caiman",
+        binomial: "Caiman crocodilus",
+        family: &ALLIGATORIDAE,
+        subfamily: "Caimaninae",
+        breed: None,
+        size: Size::Large,
+        // Fish first, snails and crabs, water birds, rodents and the young of capybaras; it eats
+        // little, being cold-blooded.
+        eats: &[(Fish, 0.6), (Meat, 0.3), (Insects, 0.1)],
+        // A snail or a minnow to a capybara near its own mass.
+        prey: (0.005, 1.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [26.0, 150.0, 100.0, 4.5, 1.0, 60.0, 300.0, 50.0, 26.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 60.0,
+        foods: &[eats("base:beef", 14), favorite("base:chicken", 12), eats("base:porkchop", 12)],
+        feedings: 0.0,
+        shy: 8.0,
+        fights: true,
+        attacks: &["bite"],
+        reach: 1.0,
+        signature: "ambush",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.8,
+        // Males the longer by about a fifth.
+        dimorphism: 1.2,
+        size_spread: 0.2,
+        // Its length, from the snout to the tail's tip.
+        height: (2.2, "length"),
+        // The llanos' rivers, lagoons and flooded savanna.
+        habitats: &[("base:savanna", 1.0), ("base:swamp", 0.5)],
+        bio: Biology {
+            mass: 25.0,
+            gestation: 0.0,
+            // 70-75 days in a mound of rotting plants the female guards.
+            incubation: 73.0,
+            // Females lay at about 1.2 m long, at six to eight years.
+            maturity: 2555.0,
+            // 30 to 40 years.
+            lifespan: 12775.0,
+            interval: 365.0,
+            litter: 25.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            // Nesting in the rains, the young hatching as the water rises.
+            breeds: seasons::WET,
+            peak: seasons::SUMMER,
+            // Cold-blooded: at ease at 25-35 degrees, basking or cooling in the water, sluggish below.
+            comfort: (20.0, 36.0),
+            cold_blooded: true,
+        },
+        // A clutch of 20-35 eggs, most of which jaguars, foxes, coatis and birds take: a dozen at
+        // most, so a pen doesn't flood. Growing up and a life paced so a line can be bred, and a
+        // female's rest after a clutch long, as she guards the mound and the young for months
+        // (`balance::checks`: a fourth generation in 25 days, at most 40 young in a life).
+        tune: Tune { litter: Some((6, 12)), growth: Some(150_000), lifespan: Some(1_800_000), recovery: Some(400_000), ..Tune::NONE },
+        birth_size: 0.15,
     },
 ];
 

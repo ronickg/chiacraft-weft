@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 31] = [
+const FILES: [(&str, &str); 33] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -290,6 +290,8 @@ const FILES: [(&str, &str); 31] = [
     ("savanna_hawk", include_str!("../../genetics/savanna_hawk.json")),
     ("turkey_vulture", include_str!("../../genetics/turkey_vulture.json")),
     ("herring_gull", include_str!("../../genetics/herring_gull.json")),
+    ("yacare_caiman", include_str!("../../genetics/yacare_caiman.json")),
+    ("spectacled_caiman", include_str!("../../genetics/spectacled_caiman.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1354,6 +1356,21 @@ fn gull(r: &Read) -> Look {
     }
 }
 
+/// The caimans: olive grey-brown, the dark bands of the back, the tail and the jaws its points (a
+/// yacare's near black, a spectacled caiman's paler and fewer), the flanks yellower, pale below.
+fn caiman(r: &Read, spectacled: bool) -> Look {
+    let ol = r.qv("Ol");
+    let base =
+        if spectacled { mix([110.0, 110.0, 84.0], [140.0, 134.0, 96.0], ol) } else { mix([78.0, 80.0, 64.0], [104.0, 104.0, 78.0], ol) };
+    Look {
+        name: if ol > 0.6 { "Olive".into() } else { "Dark olive".into() },
+        base,
+        under: [214.0, 206.0, 164.0],
+        points: Some(if spectacled { darken(base, 0.35) } else { darken(base, 0.55) }),
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1526,6 +1543,8 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "savanna_hawk" => eagle(&r, true),
         "turkey_vulture" => vulture(&r),
         "herring_gull" => gull(&r),
+        "yacare_caiman" => caiman(&r, false),
+        "spectacled_caiman" => caiman(&r, true),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -2107,7 +2126,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 23] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 24] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2130,7 +2149,8 @@ const MODEL_LAYERS: [ModelLayers; 23] = model_layers!(
     "owl",
     "eagle",
     "vulture",
-    "gull"
+    "gull",
+    "caiman"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {

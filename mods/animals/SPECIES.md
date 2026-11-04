@@ -41,6 +41,8 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | savanna_hawk | *Buteogallus meridionalis* | common | small | 0.6 m | 0.85 kg | solitary | carnivore | wild | 0.87 d | 6.51 d | 46 d | 1 | 18 |
 | turkey_vulture | *Cathartes aura* | common | small | 0.5 m | 1.4 kg | herd | carnivore | wild | 0.89 d | 4.58 d | 61.3 d | 1-3 | 24 |
 | herring_gull | *Larus argentatus* | common | small | 0.45 m | 1 kg | herd | carnivore | wild | 0.7 d | 4.58 d | 46 d | 1-4 | 24 |
+| yacare_caiman | *Caiman yacare* | common | large | 2.2 m | 35 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 6-12 | 17 |
+| spectacled_caiman | *Caiman crocodilus* | common | large | 2.2 m | 25 kg | herd | carnivore | wild | eggs, hatch 1.4 d | 6.25 d | 75 d | 6-12 | 18 |
 
 ## Stats at level 1
 
@@ -79,6 +81,8 @@ Damage and speed are each kind's own (1 = 100%).
 | savanna_hawk | 8 | 110 | 40 | 2 | 1 | 10 | 60 | 20 | 6 | 30 |
 | turkey_vulture | 10 | 140 | 50 | 1 | 1 | 14 | 60 | 24 | 10 | 40 |
 | herring_gull | 8 | 130 | 40 | 1.5 | 1 | 10 | 70 | 20 | 8 | 30 |
+| yacare_caiman | 30 | 160 | 120 | 5 | 1 | 80 | 300 | 60 | 30 | 60 |
+| spectacled_caiman | 26 | 150 | 100 | 4.5 | 1 | 60 | 300 | 50 | 26 | 60 |
 
 ## dog (chihuahua)
 
@@ -1947,6 +1951,124 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.2 |
+
+## yacare_caiman
+
+*Caiman yacare*, Reptilia › Crocodylia › Alligatoridae › Caimaninae. Model `caiman`, entity `animals:yacare_caiman`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:swamp` | commonest |
+| `base:savanna` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | large |
+| height (grown, average) | 2.2 m at the length |
+| males against females | 1.2x as tall |
+| size spread (an individual's, either way) | 20% |
+| newborn's size | 15% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 35 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 73 d | 1.4 d |
+| litter or clutch | 30 on average | 6-12 **set** |
+| between litters | 1 y | rests 16.7 d **set** |
+| breeds in | spring and summer, most in summer | out of it, only a tame well cared for |
+| comfortable in | 20 to 36 °C air | cold-blooded: slower in the cold |
+| grows up in | 7 y | 6.25 d **set** |
+| lives | 35 y | 75 d **set**, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 17 within 48 blocks |
+
+**Balance** (common): a generation 7.9 d; a line four deep in 24 d (8 h of play); 5.3 young per mother in 10 days, 29 in her life.
+
+- ✓ fourth generation: 23.7 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 6.2 of 75 days (want under a fifth)
+- ✓ young in a life: 28.6 (want 6-40)
+- ✓ litter: 6-12 (want 1-12, fewest first)
+- ✓ room near: 17 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | fish 60%, meat 30%, insects 10% |
+| hunts | 0.5%-100% of its mass alone (0.17-35 kg); at home: dog, cat, hare, pacu, great_horned_owl, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 8 blocks (twice that running) |
+| eats (food points) | `base:beef` 14; `base:chicken` 12, favorite; `base:porkchop` 12 |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes: bite |
+| reach past its body | 1 blocks |
+| signature | ambush |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.8 |
+
+## spectacled_caiman
+
+*Caiman crocodilus*, Reptilia › Crocodylia › Alligatoridae › Caimaninae. Model `caiman`, entity `animals:spectacled_caiman`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:savanna` | commonest |
+| `base:swamp` | 50% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | large |
+| height (grown, average) | 2.2 m at the length |
+| males against females | 1.2x as tall |
+| size spread (an individual's, either way) | 20% |
+| newborn's size | 15% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 25 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 73 d | 1.4 d |
+| litter or clutch | 25 on average | 6-12 **set** |
+| between litters | 1 y | rests 16.7 d **set** |
+| breeds in | spring and summer, most in summer | out of it, only a tame well cared for |
+| comfortable in | 20 to 36 °C air | cold-blooded: slower in the cold |
+| grows up in | 7 y | 6.25 d **set** |
+| lives | 35 y | 75 d **set**, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 18 within 48 blocks |
+
+**Balance** (common): a generation 7.9 d; a line four deep in 24 d (8 h of play); 5.3 young per mother in 10 days, 29 in her life.
+
+- ✓ fourth generation: 23.7 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 6.2 of 75 days (want under a fifth)
+- ✓ young in a life: 28.6 (want 6-40)
+- ✓ litter: 6-12 (want 1-12, fewest first)
+- ✓ room near: 18 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | fish 60%, meat 30%, insects 10% |
+| hunts | 0.5%-100% of its mass alone (0.12-25 kg); at home: dog, cat, hare, pacu, great_horned_owl, savanna_hawk, turkey_vulture, herring_gull, base:chicken |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 8 blocks (twice that running) |
+| eats (food points) | `base:beef` 14; `base:chicken` 12, favorite; `base:porkchop` 12 |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes: bite |
+| reach past its body | 1 blocks |
+| signature | ambush |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.8 |
 
 ## Shared by every species
 
