@@ -194,6 +194,11 @@ fn craft_result(m: &MenuCtx) {
 /// gives XP by how many things went into it.
 fn consume_grid(m: &MenuCtx) {
     let grid = m.group("grid");
+    let cells: Vec<ItemStack> = (0..grid.len()).map(|i| grid.get(i)).collect();
+    let made = recipe_match(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());
+    if !made.is_empty() {
+        crate::advancements::crafted(&m.world(), m.player(), made.item);
+    }
     let mut used = 0;
     for i in 0..grid.len() {
         let s = grid.get(i);

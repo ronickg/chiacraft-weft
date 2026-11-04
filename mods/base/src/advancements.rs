@@ -29,6 +29,14 @@ enum Rule {
     Below(i32),
     /// Standing on the ground this high up.
     Above(i32),
+    /// Takes a crafted thing with this tag from a crafting grid.
+    Craft(&'static Tag),
+    /// Has this effect on (`vitals::effects`).
+    Effect(vitals::effects::Effect),
+    /// Eats food still hot from the fire.
+    EatHot,
+    /// A milestone another mod marked (`base_api::milestone`).
+    Milestone(u32),
 }
 
 struct Advancement {
@@ -41,7 +49,7 @@ struct Advancement {
 }
 
 /// `advancements.base.group.<name>` in the lang files.
-const GROUPS: [&str; 4] = ["start", "progress", "food_and_combat", "exploration"];
+const GROUPS: [&str; 5] = ["start", "progress", "food_and_combat", "exploration", "surviving"];
 
 static LOGS: Tag = Tag::named("logs");
 static CRAFTING_TABLES: Tag = Tag::named("crafting_tables");
@@ -58,10 +66,15 @@ static LIVESTOCK: Tag = Tag::named("livestock");
 static COOKED_MEAT: Tag = Tag::named("cooked_meat");
 static HOSTILE: Tag = Tag::named("hostile");
 static LAVA_BUCKETS: Tag = Tag::named("buckets/lava");
+static CAMPFIRES: Tag = Tag::named("campfires");
+static STRING: Tag = Tag::named("string");
+static CLOTHES: Tag = Tag::named("clothes");
+static STEWS: Tag = Tag::named("stew");
+static PRESERVED: Tag = Tag::named("preserved");
 
 /// In the order they usually come. The index is the bit in `Advancements::done`, so new ones go
 /// at the end (at most 64).
-static ALL: [Advancement; 19] = [
+static ALL: [Advancement; 27] = [
     Advancement { id: "timber", icon: Item::named("oak_log"), group: 0, rule: Rule::Break(&LOGS) },
     Advancement { id: "workbench", icon: Item::named("crafting_table"), group: 0, rule: Rule::Have(&CRAFTING_TABLES) },
     Advancement { id: "first_pickaxe", icon: Item::named("wood_pickaxe"), group: 0, rule: Rule::Have(&PICKAXES) },
@@ -81,6 +94,15 @@ static ALL: [Advancement; 19] = [
     Advancement { id: "hot_stuff", icon: Item::named("lava_bucket"), group: 1, rule: Rule::Have(&LAVA_BUCKETS) },
     Advancement { id: "deep", icon: Item::named("diamond_ore"), group: 3, rule: Rule::Below(0) },
     Advancement { id: "summit", icon: Item::named("snow"), group: 3, rule: Rule::Above(180) },
+    // Surviving (Research round 4, H2): through the first night and into the loop.
+    Advancement { id: "hearth", icon: Item::named("campfire"), group: 4, rule: Rule::Place(&CAMPFIRES) },
+    Advancement { id: "spun", icon: Item::named("string"), group: 4, rule: Rule::Have(&STRING) },
+    Advancement { id: "tailor", icon: Item::named("hide_coat"), group: 4, rule: Rule::Craft(&CLOTHES) },
+    Advancement { id: "rested", icon: Item::named("bed"), group: 4, rule: Rule::Effect(vitals::effects::Effect::Rested) },
+    Advancement { id: "hot_meal", icon: Item::named("cooked_porkchop"), group: 4, rule: Rule::EatHot },
+    Advancement { id: "stew", icon: Item::named("stew"), group: 4, rule: Rule::Have(&STEWS) },
+    Advancement { id: "preserved", icon: Item::named("dried_meat"), group: 4, rule: Rule::Have(&PRESERVED) },
+    Advancement { id: "tame", icon: Item::named("bone"), group: 4, rule: Rule::Milestone(base_api::milestones::TAME) },
 ];
 
 /// Server to the player who made it: the index into `ALL`.
@@ -133,7 +155,12 @@ pub fn register(r: &mut Registry) {
     r.on(&ITEM_USED, |b| {
         let w = b.world();
         for u in b.iter() {
-            grant_where(&w, u.player, |rule| matches!(rule, Rule::Eat(t) if t.on_item(u.stack.item)));
+            let hot = base_api::food_age(&u.stack, w.day_time()).1;
+            grant_where(&w, u.player, |rule| match rule {
+                Rule::Eat(t) => t.on_item(u.stack.item),
+                Rule::EatHot => hot,
+                _ => false,
+            });
         }
     });
 
@@ -171,7 +198,11 @@ fn check_players(w: &World) {
                 .count() as u32
         });
         let y = st.pos[1];
+        let effects = w.component(id, &base_api::VITALS).map_or(0, |v| v.effects);
+        let milestones = w.component(id, &base_api::MILESTONES).copied().unwrap_or(0);
         grant_where(w, id, |rule| match *rule {
+            Rule::Effect(e) => effects & (1 << e.index()) != 0,
+            Rule::Milestone(m) => milestones & m != 0,
             Rule::Have(tag) => items.iter().any(|&i| tag.on_item(i)),
             Rule::Wear(n) => worn >= n,
             Rule::Below(min) => y < min as f64,
@@ -179,6 +210,11 @@ fn check_players(w: &World) {
             _ => false,
         });
     }
+}
+
+/// A player took `item` from a crafting grid (`player.rs`).
+pub fn crafted(w: &World, player: u64, item: u32) {
+    grant_where(w, player, |rule| matches!(rule, Rule::Craft(t) if t.on_item(item)));
 }
 
 /// Grants every advancement whose rule `met` says so to `player`, if it is a player in survival

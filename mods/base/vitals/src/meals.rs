@@ -14,6 +14,8 @@ pub const MIN: usize = 2;
 pub const MAX: usize = 4;
 /// Ticks a pot takes to cook a stew (a furnace's smelt).
 pub const COOK_TICKS: u32 = 200;
+/// How much longer food takes over a campfire than in a furnace (an open fire, no fuel needed).
+pub const CAMPFIRE_PACE: f32 = 1.5;
 
 /// The food an ingredient is in a stew: raw meat cooks (`base:beef` is `base:cooked_beef`), the
 /// rest stays as it is (a spider's eye stays poisonous).

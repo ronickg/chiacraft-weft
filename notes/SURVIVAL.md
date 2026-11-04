@@ -494,8 +494,8 @@ sword, about 100 XP.
 
 - A new player arrives with a loaf and an apple in them (`vitals::stomach::ARRIVAL`, 43 units):
   max health 54 and stamina 75 of 100 instead of an empty stomach's 40, wearing off over half an
-  hour as it digests. One spider at dusk had killed a fresh player in 11 s. Dying still empties
-  the stomach. The rule stays: food sets how much of the stat is reached.
+  hour as it digests. One spider at dusk had killed a fresh player in 11 s. Dying leaves the same
+  light meal (step 13). The rule stays: food sets how much of the stat is reached.
 - A new player also starts with full stamina (it started at 0 and took 14 s to fill).
 
 **12. Research round 3's survival fixes** (2026-11-04, decided by Ronald via Planner; `reports/Research round 3.md`):
@@ -529,3 +529,28 @@ sword, about 100 XP.
 - Not done from round 3: B7 (the warm effects' water use), B8 (salt from sea water only), B12 (a
   cheaper pot), the stations in the recipe viewer, "from" lines on fur, fibre and salt, the
   compost bin's drawn textures, first-week advancements.
+
+**13. The first hour and the first death** (2026-11-04, Research round 4, H1 and H2, via Planner):
+
+- **H1, no death spiral.** Respawning brings back the plain arrival clothes when none are worn
+  (the tombstone keeps what one wore), the stomach holds the arrival meal instead of nothing, and
+  stamina comes back full. After respawning a hint says where the tombstone is (x and z, kept in
+  `base_api::GRAVE`). The death screen's cause is the engine's (`core:death`, not done here).
+- **The campfire** is made in the inventory's 2x2 grid (two sticks over two logs) and cooks:
+  a slot in, a slot out, whatever a furnace cooks of food at 1.5 times its time, no fuel; what it
+  cooks comes off hot, as far along as the raw food was. It still burns without fuel.
+- **Hints** (`hints.rs`): eleven lines under the crosshair for six seconds, from the player's
+  state once a second, each once per player (saved, kept through death), freezing each time it
+  starts, the tombstone each death; the player's own setting turns them off (`base:hints`, Mod
+  Settings). Logs, a crafting table, night coming with no fire, cold, freezing, wet in cool air,
+  an empty stomach, raw meat with no furnace yet, the tombstone, too hot, resting by a fire
+  under a roof. A hint isn't shown for what one has already done (logs held, a fire placed, a
+  furnace had). Not here: the recipe keys' hint and the taming hint (engine and animals).
+- **A "Surviving" advancement group**: Hearth (place a campfire), Spun (string), Tailor (craft a
+  piece of clothing), A Night In (rested), Hot Meal (eat food still hot), One Pot (a stew), Put
+  By (a preserved food), A Friend (tame: the animals mod calls `base_api::milestone(w, player,
+  base_api::milestones::TAME)`).
+- **"Comes from" tooltips** on fur, plant fibre, salt, leather, string and wool.
+- Not done here: R and U with nothing hovered (the engine's `app.rs` `recipe_keys` only looks
+  under the cursor in a screen), the death screen's cause, the HUD labels (the UI session).
+

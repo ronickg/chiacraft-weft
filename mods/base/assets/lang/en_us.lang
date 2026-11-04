@@ -477,3 +477,46 @@ item.base.acuri_nut = Acuri Nut
 item.base.moriche_fruit = Moriche Fruit
 block.base.campfire = Campfire
 block.base.campfire.tooltip = Logs and sticks burning: warms you, counts as a fire for rest, and smokes food on a drying rack above it.
+
+# Hints (hints.rs, Research round 4)
+config.base.hints = Hints
+config.base.hints.tooltip = Short tips under the crosshair when something new happens: the cold, an empty stomach, night coming
+hint.base.logs = Hold {key:core:attack} on a tree trunk to get logs.
+hint.base.table = Press {key:core:inventory}: logs make planks, planks a crafting table, and logs and sticks a campfire.
+hint.base.night = Night falls at 18:00. A campfire (two logs, two sticks) warms you and keeps monsters away.
+hint.base.cold = Getting cold. Stand by a fire, get out of the wind, or wear warmer clothes.
+hint.base.freezing = Freezing: you are losing health. Get to a fire, or dig into the ground.
+hint.base.wet = Wet clothes keep little warmth. Dry off under a roof or by a fire.
+hint.base.empty = Your stomach is empty: you can't reach full health or stamina. Eat meat, berries or bread.
+hint.base.raw_meat = Raw meat is better cooked. A campfire or a furnace cooks it, and hot food warms you.
+hint.base.grave = Your things are in a tombstone where you died: x {0}, z {1}.
+hint.base.hot = Too hot. Find shade or water, and take off warm clothes.
+hint.base.rest = Under a roof by a fire you rest, and wake Rested.
+
+# The Surviving advancements (advancements.rs)
+advancements.base.group.surviving = Surviving
+advancement.base.hearth = Hearth
+advancement.base.hearth.desc = Build a campfire from logs and sticks
+advancement.base.spun = Spun
+advancement.base.spun.desc = Spin plant fibre into string
+advancement.base.tailor = Tailor
+advancement.base.tailor.desc = Sew a piece of clothing
+advancement.base.rested = A Night In
+advancement.base.rested.desc = Rest under a roof by a fire
+advancement.base.hot_meal = Hot Meal
+advancement.base.hot_meal.desc = Eat something hot from the fire
+advancement.base.stew = One Pot
+advancement.base.stew.desc = Cook a stew
+advancement.base.preserved = Put By
+advancement.base.preserved.desc = Preserve food for later
+advancement.base.tame = A Friend
+advancement.base.tame.desc = Tame an animal
+
+# Where things come from (tooltips)
+menu.base.campfire = Campfire
+item.base.fur.tooltip = From furred wild animals: hares, foxes, wolves, reindeer.
+item.base.plant_fibre.tooltip = From cutting tall grass. Two spin into string.
+item.base.salt.tooltip = Boiled out of a water bucket in a furnace. Salts raw meat.
+item.base.leather.tooltip = From cows and deer.
+item.base.string.tooltip = From spiders, or spun from two plant fibres.
+block.base.wool.tooltip = From sheep, or made of four string.

@@ -95,11 +95,12 @@ fn foods(w: &mut String) {
 fn cooking(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Meals and preserving\n\nA stew (`vitals::meals`) cooks {}-{} foods in {} s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x{} (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient.\n",
+        "## Meals and preserving\n\nA stew (`vitals::meals`) cooks {}-{} foods in {} s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x{} (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient. A campfire cooks what a furnace cooks of food, x{} the time, with no fuel. Nothing is made of spoiled food, and what is made of stale food starts as far through its own life as its stalest part.\n",
         meals::MIN,
         meals::MAX,
         meals::COOK_TICKS / crate::TICKS,
-        meals::BONUS
+        meals::BONUS,
+        meals::CAMPFIRE_PACE
     );
     let _ = writeln!(
         w,

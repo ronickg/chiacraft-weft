@@ -25,6 +25,7 @@ pub static DRYING_RACK: Block = Block::named("drying_rack");
 pub static CAMPFIRE: Block = Block::named("campfire");
 pub static POT_MENU: Menu = Menu::named("cooking_pot");
 pub static RACK_MENU: Menu = Menu::named("drying_rack");
+pub static CAMPFIRE_MENU: Menu = Menu::named("campfire");
 pub static STEW: Item = Item::named("stew");
 pub static SALT: Item = Item::named("salt");
 
@@ -46,6 +47,11 @@ value! {
     /// since it last looked at the air, and whether a fire below smokes it.
     pub struct Drying { pub done: [u32; 4], pub items: [u32; 4], pub wait: u32, pub smoking: u32 }
 }
+value! {
+    /// A campfire's cooking: how far along, of how long, and the item it's for.
+    pub struct Roasting { pub cook: u32, pub cook_max: u32, pub item: u32 }
+}
+static ROASTING: Component<Roasting> = Component::named("campfire");
 static COOKING: Component<Cooking> = Component::named("cooking_pot");
 static DRYING: Component<Drying> = Component::named("drying_rack");
 
@@ -57,6 +63,7 @@ pub fn register(r: &mut Registry) {
     r.stack_component(&MEAL_NUTRITION, 0);
     r.item(&BOWL).tag("bowl").max_stack(16).tab(&crate::tabs::FOOD);
     r.item(&STEW)
+        .tag("stew")
         .max_stack(1)
         .set_text(&REMAINDER, "base:bowl")
         .set(&FRESHNESS, freshness::FRESH)
@@ -70,15 +77,38 @@ pub fn register(r: &mut Registry) {
     r.shapeless(&CRAFTING, "salted_meat", 1, &["#raw_meat", "#salt"], 0);
     r.shaped(&CRAFTING, "cooking_pot", 1, &["i i", "i i", "iii"], &[('i', "#ingots/iron")]);
     r.shaped(&CRAFTING, "drying_rack", 1, &["sss", "s s"], &[('s', "#stick")]);
-    r.shaped(&CRAFTING, "campfire", 1, &[" s ", "sls", "lll"], &[('s', "#stick"), ('l', "#logs")]);
-    r.block(&CAMPFIRE)
-        .sound_group("wood")
-        .textures("campfire_top", "campfire_side", "campfire_side")
-        .model_box([0.0, 0.0, 0.0], [16.0, 7.0, 16.0])
-        .light_rgb(15, 11, 6)
-        .hardness(2.0)
-        .mineable("axe")
-        .tab(&crate::tabs::FUNCTIONAL);
+    // In the inventory's own grid: a fire comes before a crafting table (Research round 4).
+    r.shaped(&CRAFTING, "campfire", 1, &["ss", "ll"], &[('s', "#stick"), ('l', "#logs")]);
+    r.entity_component(&ROASTING, Roasting { cook: 0, cook_max: 0, item: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
+    r.system(&ROASTING, tick_campfires);
+    // It cooks what a furnace cooks of food, a little slower, with no fuel.
+    r.machine(&CAMPFIRE, &CAMPFIRE_MENU)
+        .block(|b| {
+            b.sound_group("wood")
+                .textures("campfire_top", "campfire_side", "campfire_side")
+                .model_box([0.0, 0.0, 0.0], [16.0, 7.0, 16.0])
+                .light_rgb(15, 11, 6)
+                .hardness(2.0)
+                .mineable("axe")
+                .tag("campfires")
+                .tab(&crate::tabs::FUNCTIONAL)
+        })
+        .group("input", Slots::single().accepts("food"))
+        .group("output", Slots::single().output())
+        .attach(&ROASTING)
+        .screen(|ui| {
+            ui.panel("panel", S::col().pad(7.0).gap(4.0).stretch(), |ui| {
+                ui.title();
+                ui.row(S::row().gap(8.0), |ui| {
+                    ui.spacer();
+                    ui.group("input");
+                    ui.recipe_arrow_bind(|c| c.menu_component(&ROASTING).map_or(0.0, |s| ratio(s.cook, s.cook_max)));
+                    ui.group("output");
+                    ui.spacer();
+                });
+                ui.player_inventory(true);
+            });
+        });
 
     r.entity_component(&COOKING, Cooking { burn: 0, burn_max: 0, cook: 0, cooking: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
     r.entity_component(&DRYING, Drying { done: [0; 4], items: [0; 4], wait: 0, smoking: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
@@ -178,6 +208,52 @@ pub fn stew(w: &World, foods: &[usize], used: f32) -> ItemStack {
         .with(&MADE, crate::survival::made_for(used, meals::keeps(&cooked), w.day_time()))
         .with(&HOT, (w.day_time() / 20) as u32)
         .with(&FRESHNESS, freshness::HOT)
+}
+
+/// Every campfire of a region: cooking the food in it.
+fn tick_campfires(b: &mut SystemBatch<Roasting>) {
+    let w = b.world();
+    for (id, s, ticks) in b.iter_mut() {
+        for _ in 0..ticks.clamp(1, CATCH_UP) {
+            if !roast_step(&w, id, s) {
+                break;
+            }
+        }
+    }
+}
+
+/// A tick of a campfire; false when it has nothing to cook.
+fn roast_step(w: &World, id: u64, s: &mut Roasting) -> bool {
+    let inv = w.inventory(id);
+    let (input, output) = (inv.group("input"), inv.group("output"));
+    let (st, out_now) = (input.get(0), output.get(0));
+    if st.item != s.item {
+        (s.item, s.cook) = (st.item, 0);
+    }
+    let now = w.day_time();
+    let Some((out, time)) = (!st.is_empty() && !crate::survival::spoiled(&st, now))
+        .then(|| recipe_process(&SMELTING, st.item))
+        .flatten()
+        .filter(|(out, _)| food_of(out.item).is_some())
+    else {
+        s.cook = 0;
+        return false;
+    };
+    let keeps = food_of(out.item).map_or((1.0, 1.0), |f| food::FOODS[f].keeps);
+    let used = crate::survival::life_used(&st, now).unwrap_or(0.0);
+    let made = out.with(&MADE, crate::survival::made_for(used, keeps, now)).with(&HOT, (now / 20) as u32).with(&FRESHNESS, freshness::HOT);
+    let fits = out_now.is_empty() || (out_now.stacks_with(&made) && out_now.count + made.count <= max_stack(made.item));
+    if !fits {
+        return false;
+    }
+    s.cook_max = (time as f32 * meals::CAMPFIRE_PACE).round().max(1.0) as u32;
+    s.cook += 1;
+    if s.cook >= s.cook_max {
+        s.cook = 0;
+        input.set(0, st.shrink(1));
+        output.set(0, if out_now.is_empty() { made } else { out_now.grow(made.count) });
+    }
+    true
 }
 
 /// Every pot of a region: burning its fuel while it has foods and a bowl to cook, then a stew.

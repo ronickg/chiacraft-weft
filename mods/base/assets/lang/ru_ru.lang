@@ -478,3 +478,46 @@ hud.base.shortcut.stats = {keyname:base:stats}
 key.base.stats = Характеристики
 block.base.campfire = Костёр
 block.base.campfire.tooltip = Горящие брёвна и палки: греет, считается огнём для отдыха и коптит еду на сушилке над ним.
+
+# Подсказки (hints.rs, Research round 4)
+config.base.hints = Подсказки
+config.base.hints.tooltip = Короткие советы под прицелом, когда случается новое: холод, пустой желудок, близкая ночь
+hint.base.logs = Удерживайте {key:core:attack} на стволе дерева, чтобы добыть брёвна.
+hint.base.table = Нажмите {key:core:inventory}: из брёвен — доски, из досок — верстак, из брёвен и палок — костёр.
+hint.base.night = Ночь наступает в 18:00. Костёр (два бревна, две палки) греет и отпугивает чудовищ.
+hint.base.cold = Становится холодно. Встаньте у огня, укройтесь от ветра или оденьтесь теплее.
+hint.base.freezing = Вы замерзаете и теряете здоровье. Скорее к огню или зароитесь в землю.
+hint.base.wet = Мокрая одежда почти не греет. Обсохните под крышей или у огня.
+hint.base.empty = Желудок пуст: здоровье и выносливость не восполнятся до конца. Съешьте мясо, ягоды или хлеб.
+hint.base.raw_meat = Сырое мясо лучше приготовить. Его жарят на костре или в печи, а горячая еда греет.
+hint.base.grave = Ваши вещи в надгробии там, где вы погибли: x {0}, z {1}.
+hint.base.hot = Слишком жарко. Найдите тень или воду и снимите тёплую одежду.
+hint.base.rest = Под крышей у огня вы отдыхаете и просыпаетесь отдохнувшим.
+
+# Достижения «Выживание» (advancements.rs)
+advancements.base.group.surviving = Выживание
+advancement.base.hearth = Очаг
+advancement.base.hearth.desc = Разведите костёр из брёвен и палок
+advancement.base.spun = Пряжа
+advancement.base.spun.desc = Спрядите нить из растительного волокна
+advancement.base.tailor = Портной
+advancement.base.tailor.desc = Сшейте предмет одежды
+advancement.base.rested = Ночь под крышей
+advancement.base.rested.desc = Отдохните под крышей у огня
+advancement.base.hot_meal = С пылу с жару
+advancement.base.hot_meal.desc = Съешьте что-нибудь горячее с огня
+advancement.base.stew = Один котёл
+advancement.base.stew.desc = Сварите похлёбку
+advancement.base.preserved = Про запас
+advancement.base.preserved.desc = Заготовьте еду впрок
+advancement.base.tame = Друг
+advancement.base.tame.desc = Приручите животное
+
+# Откуда что берётся (подсказки к предметам)
+menu.base.campfire = Костёр
+item.base.fur.tooltip = С пушных диких зверей: зайцев, лис, волков, северных оленей.
+item.base.plant_fibre.tooltip = Со срезанной высокой травы. Из двух выпрядается нить.
+item.base.salt.tooltip = Вываривается из ведра воды в печи. Ею солят сырое мясо.
+item.base.leather.tooltip = С коров и оленей.
+item.base.string.tooltip = С пауков или спрядена из двух растительных волокон.
+block.base.wool.tooltip = С овец или из четырёх нитей.

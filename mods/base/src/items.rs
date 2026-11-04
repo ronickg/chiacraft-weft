@@ -124,6 +124,8 @@ pub fn register(r: &mut Registry) {
             .on_use(base_api::eat)
             .tab(&crate::tabs::FOOD);
         let i = if tag.starts_with("cooked_meat/") { i.tag("cooked_meat") } else { i };
+        // Dried, smoked or salted (`vitals::preserve`).
+        let i = if vitals::preserve::PRODUCTS.contains(&format!("base:{name}").as_str()) { i.tag("preserved") } else { i };
         // Any raw meat salts (`cooking.rs`).
         let i = if tag.starts_with("raw_meat/") { i.tag("raw_meat") } else { i };
         // Berries are planted like seeds: a new bush; so are the wild plants' fruit and seeds.

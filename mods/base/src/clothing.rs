@@ -28,6 +28,21 @@ fn sewn_from(material: &str) -> &'static str {
     }
 }
 
+/// Puts the arrival clothes (`vitals::clothing::ARRIVAL`) on `player` if no clothes are worn.
+fn dress(w: &World, player: u64) {
+    let Some(slots) = w.inventory(player).find_group(EQUIPMENT_GROUP) else { return };
+    if (4..slots.len().min(8)).any(|i| !slots.get(i).is_empty()) {
+        return;
+    }
+    for (material, piece) in clothing::ARRIVAL {
+        let at = (4 + piece) as u32;
+        let Some(item) = Item::lookup(&format!("base:{material}_{}", PIECES[piece])) else { continue };
+        if at < slots.len() {
+            slots.set(at, ItemStack::new(item, 1));
+        }
+    }
+}
+
 /// A piece's shape in the grid by how much material it takes (`X`, with `vitals::clothing::STRING`
 /// of string `s`): each piece of a material its own, so a hat and boots of the same stuff differ.
 fn pattern(piece: usize, material: u32) -> Option<&'static [&'static str]> {
@@ -54,6 +69,10 @@ static DRESSED: Component<u8> = Component::named("base:dressed");
 pub fn register(r: &mut Registry) {
     r.entity_component(&DRESSED, 0, component_flags::SAVE | component_flags::KEEP);
     r.attach(&PLAYER, &DRESSED);
+    r.entity_component(&base_api::MILESTONES, 0, component_flags::SAVE | component_flags::KEEP);
+    r.attach(&PLAYER, &base_api::MILESTONES);
+    r.entity_component(&base_api::GRAVE, base_api::Grave { x: 0, y: 0, z: 0, set: 0 }, component_flags::SAVE | component_flags::KEEP);
+    r.attach(&PLAYER, &base_api::GRAVE);
     // A new player arrives in plain clothes, once (Research round 3, B1).
     r.on(&PLAYER_JOINED, |b| {
         let w = b.world();
@@ -63,13 +82,16 @@ pub fn register(r: &mut Registry) {
                 continue;
             }
             *d = 1;
-            let Some(slots) = w.inventory(p.player).find_group(EQUIPMENT_GROUP) else { continue };
-            for (material, piece) in clothing::ARRIVAL {
-                let at = (4 + piece) as u32;
-                let Some(item) = Item::lookup(&format!("base:{material}_{}", PIECES[piece])) else { continue };
-                if at < slots.len() && slots.get(at).is_empty() {
-                    slots.set(at, ItemStack::new(item, 1));
-                }
+            dress(&w, p.player);
+        }
+    });
+    // And comes back in them when the tombstone kept what they wore (Research round 4, H1: dying
+    // naked at night was a spiral). Only with no clothes on.
+    r.on(&PLAYER_RESPAWNED, |b| {
+        let w = b.world();
+        for p in b.iter() {
+            if !w.creative(p.player) {
+                dress(&w, p.player);
             }
         }
     });

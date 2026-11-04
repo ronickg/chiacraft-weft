@@ -48,13 +48,15 @@ pub fn register(r: &mut Registry) {
     temperature::register(r);
     stamina::register(r);
     body::register(r);
-    // Dying empties the stomach and costs part of the XP into the level.
+    // Dying empties the stomach but for a light meal (the one a new player arrives with: Research
+    // round 4, H1, so the first death isn't a spiral), and costs part of the XP into the level.
     r.on(&ENTITY_DIED, |b| {
         let w = b.world();
         for d in b.iter() {
             let Some(v) = w.component_mut(d.entity, &VITALS) else { continue };
-            v.set_stomach(&stomach::Stomach::default());
-            v.stamina = 0.0;
+            v.set_stomach(&stomach::arrival());
+            // Back with breath to run (the first tick clamps it to what the stomach allows).
+            v.stamina = base_api::NEW_STAMINA;
             v.xp = levels::after_death(v.xp, base_api::difficulty().death_xp);
             v.air = MAX_AIR;
             v.wet = 0.0;

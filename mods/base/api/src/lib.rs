@@ -547,6 +547,29 @@ fn with_body(w: &World, player: u64, f: impl FnOnce(&mut Vitals, f32)) {
     f(v, resist);
 }
 
+/// Things a player has done that other mods know of and the base game's advancements read
+/// (`advancements.rs`, the "Surviving" group): a bit each (`milestones`), kept through death.
+pub static MILESTONES: Component<u32> = Component::named("base:milestones");
+pub mod milestones {
+    /// Tamed an animal (the animals mod).
+    pub const TAME: u32 = 1;
+}
+
+/// Marks a milestone (`milestones::TAME`...) for `player`: the advancement for it comes within a
+/// second.
+pub fn milestone(w: &World, player: u64, m: u32) {
+    if let Some(done) = w.component_mut(player, &MILESTONES) {
+        *done |= m;
+    }
+}
+
+value! {
+    /// Where a player's tombstone was put when they last died (`set` 0: none yet), for the hint
+    /// after respawning.
+    pub struct Grave { pub x: i32, pub y: i32, pub z: i32, pub set: u32 }
+}
+pub static GRAVE: Component<Grave> = Component::named("base:grave");
+
 /// Gives `player` XP for what they did (`vitals::levels::xp`): other mods call it for theirs
 /// (taming, raising young, hatching eggs). Rested raises it; nothing in creative.
 pub fn give_xp(w: &World, player: u64, amount: u64) {
