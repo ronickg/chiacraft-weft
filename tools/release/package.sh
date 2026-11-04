@@ -17,8 +17,9 @@
 set -euo pipefail
 
 platform="${1:?usage: tools/release/package.sh <platform> [label]}"
-# The commit: GitHub's, git's, or none (a tree without .git, as on the test PC).
-commit="${GITHUB_SHA:-$(git rev-parse HEAD 2> /dev/null || echo unknown)}"
+# The commit checked out (on a run by hand with another `ref`, GITHUB_SHA is the workflow's, not
+# this one), else GitHub's, else none (a tree without .git, as on the test PC).
+commit="$(git rev-parse HEAD 2> /dev/null || echo "${GITHUB_SHA:-unknown}")"
 label="${2:-${commit:0:8}}"
 out_dir="${OUT_DIR:-dist}"
 name="chiacraft-$label-$platform"

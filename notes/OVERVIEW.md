@@ -239,7 +239,7 @@ What keeps it all working: game scripts and tests, balance and cross-system chec
 | ■ | Generated sheets | Code: `mods/base/vitals/src/sheet.rs`, `mods/animals/core/src/sheet.rs`. |
 | ■ | Tests on CI | ci.yml: build, clippy, unit tests, sheets and the testkit on software Vulkan, on pushes to dev and main and on pull requests; runs on GitHub only once those branches are pushed. Code: `.github/workflows/ci.yml`. |
 | ■ | Fuzzing on CI | fuzz.yml: packages and sandbox targets, five minutes each, weekly. Code: `.github/workflows/fuzz.yml`. |
-| ◧ | Release builds | chiacraft-build.yml: Windows, Linux and macOS archives by hand or on a chiacraft-v* tag, optional macOS signing and notarization (docs/release-builds.md). Not yet run on GitHub. Windows signing not set up. Code: `.github/workflows/chiacraft-build.yml`, `tools/release`. Docs: `docs/release-builds.md`. |
+| ◧ | Release builds | chiacraft-build.yml: Windows, Linux and macOS archives by hand or on a chiacraft-v* tag, optional macOS signing and notarization (docs/release-builds.md). Linux packaging checked on the PC (2026-11-04: packed, server and a look from the unpacked folder); not yet run on GitHub. Windows signing not set up. Code: `.github/workflows/chiacraft-build.yml`, `tools/release`. Docs: `docs/release-builds.md`. |
 | ■ | Species website | The animals' logic as WASM. Code: `mods/animals/web`. |
 
 Code: `mods/testkit`, `mods/animals/core/tests`, `mods/base/vitals/tests`, `.github/workflows`. Docs: `notes/SYSTEMS.md`, `CLAUDE.md`.
