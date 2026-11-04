@@ -173,7 +173,13 @@ fn region_of(key: MeshKey) -> (u64, IVec3) {
 /// The draws of one visible mesh (its corner `lo` relative to the camera, `k` its structure or
 /// 0), returning the faces drawn. A face direction can be seen only from the side its normal
 /// points to; contiguous visible runs become one draw.
-fn mesh_draws(m: &GpuMesh, key: MeshKey, lo: Vec3, k: i32, cam_cube: IVec3, out: &mut Vec<DrawRecord>) -> u64 {
+/// Which way faces a mesh at `lo` (camera relative) shows the camera: by rank +X +Y +Z -X -Y -Z.
+fn camera_sides(lo: Vec3) -> [bool; 6] {
+    [lo.x < 0.0, lo.y < 0.0, lo.z < 0.0, lo.x > -16.0, lo.y > -16.0, lo.z > -16.0]
+}
+
+/// A mesh's draws, with only the faces whose direction `seen` keeps (by rank, see `camera_sides`).
+fn mesh_draws(m: &GpuMesh, key: MeshKey, lo: Vec3, k: i32, cam_cube: IVec3, seen: [bool; 6], out: &mut Vec<DrawRecord>) -> u64 {
     let rel = if k == 0 { key.1 - cam_cube } else { key.1 };
     let origin = [rel.x, rel.y, rel.z, k];
     let center = lo + Vec3::splat(8.0);
@@ -186,8 +192,6 @@ fn mesh_draws(m: &GpuMesh, key: MeshKey, lo: Vec3, k: i32, cam_cube: IVec3, out:
         first_instance: 0,
     };
     if let Some(a) = m.faces {
-        // Directions by rank: +X +Y +Z -X -Y -Z.
-        let seen = [lo.x < 0.0, lo.y < 0.0, lo.z < 0.0, lo.x > -16.0, lo.y > -16.0, lo.z > -16.0];
         let mut off = a.offset;
         for layer in 0..3 {
             let counts = m.face_counts[layer];
@@ -588,6 +592,18 @@ impl WorldRenderer {
         let gbuf = self.globals[frame.slot];
         gpu.mapped(gbuf)[..size_of::<Globals>()].copy_from_slice(bytemuck::bytes_of(&globals));
         let planes = frustum_planes(light);
+        // The faces the light falls on: the same for every mesh (it comes from one direction), not
+        // the ones the camera sees. Its depth row points toward it (reverse depth). Faces nearly
+        // edge-on to it are kept either way.
+        let to_light = light.row(2).truncate().normalize_or_zero();
+        let sides = [
+            to_light.x > -0.05,
+            to_light.y > -0.05,
+            to_light.z > -0.05,
+            to_light.x < 0.05,
+            to_light.y < 0.05,
+            to_light.z < 0.05,
+        ];
         let side = (16 << REGION) as f32;
         let mut draws: Vec<DrawRecord> = Vec::new();
         for (&(f, r), meshes) in &self.regions {
@@ -608,7 +624,7 @@ impl WorldRenderer {
                 let lo = (key.1 - cam_cube).as_vec3() * 16.0 - cam_frac;
                 let c = lo + Vec3::splat(8.0);
                 if planes.iter().all(|pl| pl.dot(c.extend(1.0)) > -13.86) {
-                    mesh_draws(&m, key, lo, 0, cam_cube, &mut draws);
+                    mesh_draws(&m, key, lo, 0, cam_cube, sides, &mut draws);
                 }
             }
         }
@@ -1080,7 +1096,7 @@ impl WorldRenderer {
                     };
                     let center = lo + Vec3::splat(8.0);
                     if planes.iter().all(|pl| pl.dot(center.extend(1.0)) > -13.86) {
-                        faces += mesh_draws(&m, key, lo, k, cam_cube, out);
+                        faces += mesh_draws(&m, key, lo, k, cam_cube, camera_sides(lo), out);
                     }
                 }
                 faces
