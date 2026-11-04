@@ -117,7 +117,7 @@ for prefix, w, h in (("category", 32, 24), ("list_row", 64, 24)):
 # ---------------------------------------------------------------- tabs
 # A tab stands on the window's frame (the window draws over its bottom 4 px), so it has no bottom
 # edge of its own; the active one is the frame's bronze, the others darker.
-TAB_FACES = {"": ((110, 72, 46), (78, 50, 32), (58, 36, 24)), "_hover": ((140, 96, 62), (98, 64, 40), (66, 42, 28)),
+TAB_FACES = {"": k.FACES["second"], "_hover": k.FACES["second_hover"],
              "_pressed": (k.BRONZE_HI, k.BRONZE, k.BRONZE_D), "_disabled": k.FACES["disabled"]}
 for suffix, (light, face, shade) in TAB_FACES.items():
     w, h = 48, 26

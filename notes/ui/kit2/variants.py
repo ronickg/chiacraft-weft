@@ -18,20 +18,26 @@ import kit2 as k  # noqa: E402
 
 SHOTS, OUT = sys.argv[1], sys.argv[2]
 
+# Kit 2's colours with tones A (what the shots were taken with), frozen here so the sheet stays
+# reproducible after kit 2 takes a variant's palette.
+A = dict(PANEL=(29, 25, 24), PANEL_DEEP=(19, 16, 15), BRONZE_D=(92, 46, 20), BRONZE=(137, 69, 30), BRONZE_HI=(205, 120, 60), OUTLINE=(40, 24, 12), SLOT=(52, 44, 40), SLOT_D=(40, 33, 30), SLOT_L=(76, 64, 57), WELL=(44, 37, 34), WELL_D=(33, 28, 26), WELL_L=(64, 54, 49), SLIDER=(74, 56, 48), SLIDER_D=(56, 42, 36), SLIDER_L=(98, 76, 64), GLOW=(255, 221, 32), GLOW_D=(243, 171, 31),
+         FACES={'main': ((236, 150, 64), (200, 108, 22), (138, 70, 12)), 'main_hover': ((248, 176, 92), (222, 128, 34), (150, 78, 14)), 'main_pressed': ((150, 78, 14), (170, 88, 16), (200, 108, 22)), 'second': ((122, 82, 56), (90, 58, 38), (58, 36, 24)), 'second_hover': ((146, 100, 68), (110, 72, 46), (66, 42, 28)), 'second_pressed': ((58, 36, 24), (70, 46, 30), (90, 58, 38)), 'disabled': ((86, 78, 72), (70, 63, 58), (54, 48, 44)), 'danger': ((222, 90, 70), (176, 44, 34), (112, 24, 18))},
+         CHIPS={'plain': ((122, 82, 56), (52, 38, 30), (72, 50, 36)), 'points': ((220, 130, 60), (150, 80, 24), (110, 56, 16)), 'dim': ((86, 62, 46), (36, 27, 22), (50, 36, 28))})
+
 # ---------------------------------------------------------------- the colours kit 2 draws now
 NOW = {
-    "panel": k.PANEL, "groove": k.PANEL_DEEP, "frame_d": k.BRONZE_D, "frame": k.BRONZE, "frame_hi": k.BRONZE_HI,
-    "outline": k.OUTLINE, "slot": k.SLOT, "slot_d": k.SLOT_D, "slot_l": k.SLOT_L,
-    "well": k.WELL, "well_d": k.WELL_D, "well_l": k.WELL_L,
-    "slider": k.SLIDER, "slider_d": k.SLIDER_D, "slider_l": k.SLIDER_L,
-    "glow": k.GLOW, "glow_d": k.GLOW_D,
+    "panel": A["PANEL"], "groove": A["PANEL_DEEP"], "frame_d": A["BRONZE_D"], "frame": A["BRONZE"], "frame_hi": A["BRONZE_HI"],
+    "outline": A["OUTLINE"], "slot": A["SLOT"], "slot_d": A["SLOT_D"], "slot_l": A["SLOT_L"],
+    "well": A["WELL"], "well_d": A["WELL_D"], "well_l": A["WELL_L"],
+    "slider": A["SLIDER"], "slider_d": A["SLIDER_D"], "slider_l": A["SLIDER_L"],
+    "glow": A["GLOW"], "glow_d": A["GLOW_D"],
     # text, as the game draws it (one level over the theme's colours)
     "text": (229, 219, 208), "dim": (199, 164, 132), "button_text": (244, 235, 217), "title": (242, 219, 155),
     "on_orange": (255, 244, 220),
 }
-for name, (l, f, s) in k.FACES.items():
+for name, (l, f, s) in A["FACES"].items():
     NOW[f"{name}_l"], NOW[f"{name}_f"], NOW[f"{name}_s"] = l, f, s
-for name, (l, f, s, _) in k.CHIPS.items():
+for name, (l, f, s) in A["CHIPS"].items():
     NOW[f"chip_{name}_l"], NOW[f"chip_{name}_f"], NOW[f"chip_{name}_s"] = l, f, s
 
 

@@ -19,34 +19,35 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 
-# ---------------------------------------------------------------- palette (UI guide, section 1)
-OUTLINE = (40, 24, 12)
+# ---------------------------------------------------------------- palette
+# Ronald's pick, 2026-11-04 ("lets go valheim look its good"): variant 2 of
+# `notes/ui/palettes.md`, Valheim's quiet dark wood with an orange accent. Near-black brown
+# insides, slots and wells a step lighter, a mid-brown wood frame, dark leather-brown buttons, beige
+# text, orange for titles, hover and the selected thing. Every shade here is the one
+# `variants.palette` drew on the sheet he picked from.
+OUTLINE = (14, 10, 7)
 INK_DARK = (58, 36, 22)
-# Window insides, slots and wells: Ronald's sheet's own tones (he picked A, 2026-11-04: "the dark
-# part of the UI ... looks a bit too dark"). Measured on `Voxel Fantasy Survival UI Suite.png`:
-# window insides V 0.10-0.12, nearly neutral charcoal; slots and insets V 0.20, a soft warm grey,
-# lighter than the panel (kit 2 first had a redder near-black panel and wells darker than it).
-PANEL = (29, 25, 24)
-PANEL_DEEP = (19, 16, 15)
-WELL, WELL_D, WELL_L = (44, 37, 34), (33, 28, 26), (64, 54, 49)
-SLIDER, SLIDER_D, SLIDER_L = (74, 56, 48), (56, 42, 36), (98, 76, 64)
-BRONZE_D, BRONZE, BRONZE_L, BRONZE_HI = (92, 46, 20), (137, 69, 30), (167, 81, 32), (205, 120, 60)
-SLOT, SLOT_D, SLOT_L = (52, 44, 40), (40, 33, 30), (76, 64, 57)
-CREAM, DIM, GOLD_TEXT, ON_ORANGE = (228, 218, 207), (198, 163, 131), (242, 218, 154), (255, 244, 220)
-GLOW, GLOW_D = (255, 221, 32), (243, 171, 31)
+PANEL = (31, 23, 18)
+PANEL_DEEP = (19, 14, 10)
+WELL, WELL_D, WELL_L = (41, 31, 24), (31, 23, 17), (57, 45, 36)
+SLIDER, SLIDER_D, SLIDER_L = (74, 53, 36), (56, 39, 26), (96, 71, 51)
+BRONZE_D, BRONZE, BRONZE_L, BRONZE_HI = (73, 48, 28), (110, 76, 48), (134, 94, 62), (160, 116, 80)
+SLOT, SLOT_D, SLOT_L = (51, 40, 31), (40, 31, 23), (72, 58, 47)
+CREAM, DIM, GOLD_TEXT, ON_ORANGE = (232, 214, 176), (180, 156, 118), (255, 184, 74), (255, 240, 207)
+GLOW, GLOW_D = (255, 161, 60), (217, 134, 45)
 GREEN, GREEN_D, GREEN_L = (138, 200, 15), (85, 125, 10), (193, 237, 66)
 RED_UI = (216, 34, 30)
 
 # Button faces: (light edge, face, shade) per kind and state.
 FACES = {
-    "main": ((236, 150, 64), (200, 108, 22), (138, 70, 12)),
-    "main_hover": ((248, 176, 92), (222, 128, 34), (150, 78, 14)),
-    "main_pressed": ((150, 78, 14), (170, 88, 16), (200, 108, 22)),
-    "second": ((122, 82, 56), (90, 58, 38), (58, 36, 24)),
-    "second_hover": ((146, 100, 68), (110, 72, 46), (66, 42, 28)),
-    "second_pressed": ((58, 36, 24), (70, 46, 30), (90, 58, 38)),
-    "disabled": ((86, 78, 72), (70, 63, 58), (54, 48, 44)),
-    "danger": ((222, 90, 70), (176, 44, 34), (112, 24, 18)),
+    "main": ((144, 90, 47), (122, 74, 36), (83, 48, 20)),
+    "main_hover": ((158, 99, 54), (137, 84, 43), (88, 51, 22)),
+    "main_pressed": ((85, 49, 21), (104, 61, 28), (122, 74, 36)),
+    "second": ((68, 50, 37), (58, 42, 30), (39, 28, 19)),
+    "second_hover": ((75, 56, 42), (65, 48, 35), (42, 29, 20)),
+    "second_pressed": ((41, 29, 20), (49, 35, 25), (58, 42, 30)),
+    "disabled": ((58, 53, 50), (48, 44, 41), (36, 33, 30)),
+    "danger": ((208, 59, 48), (176, 44, 34), (120, 23, 15)),
 }
 TEXT_ON = {"main": ON_ORANGE, "second": CREAM, "disabled": (143, 133, 124), "danger": ON_ORANGE}
 
@@ -959,9 +960,9 @@ def slot_r(size=36, selected=False, r=R):
     return a
 
 
-CHIPS = {"plain": ((122, 82, 56), (52, 38, 30), (72, 50, 36), CREAM),
-         "points": ((220, 130, 60), (150, 80, 24), (110, 56, 16), ON_ORANGE),
-         "dim": ((86, 62, 46), (36, 27, 22), (50, 36, 28), DIM)}
+CHIPS = {"plain": ((90, 73, 61), (56, 44, 35), (70, 56, 45), CREAM),
+         "points": ((195, 130, 78), (122, 74, 36), (152, 96, 52), ON_ORANGE),
+         "dim": ((72, 58, 48), (45, 35, 27), (56, 45, 35), DIM)}
 
 
 def chip_r(label, kind="plain", h=20, r=R):
