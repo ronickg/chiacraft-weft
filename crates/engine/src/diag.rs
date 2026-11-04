@@ -47,6 +47,9 @@ pub static TERRAIN_FINISHED: Counter = Counter::new();
 pub static TERRAIN_FINISH_NS: Counter = Counter::new();
 pub static TERRAIN_JOINED: Counter = Counter::new();
 pub static TERRAIN_BUSY_NS: Counter = Counter::new();
+/// Distant terrain: tiles made (shown or cached) and asked for then called off.
+pub static LOD_MADE: Counter = Counter::new();
+pub static LOD_CALLED_OFF: Counter = Counter::new();
 
 /// Messages and bytes per message kind: `[0]` to clients, `[1]` to the server.
 static NET: [[(AtomicU64, AtomicU64); 64]; 2] = [const { [const { (AtomicU64::new(0), AtomicU64::new(0)) }; 64] }; 2];
@@ -392,6 +395,10 @@ impl Reporter {
                     fin_ns as f64 / fin.max(1) as f64 / 1000.0,
                     busy as f64 / secs / 1e7
                 );
+            }
+            let (made, off) = (LOD_MADE.take(), LOD_CALLED_OFF.take());
+            if made + off > 0 {
+                log::debug!(target: "load", "distant terrain per {secs:.1} s: {made} tiles made, {off} called off");
             }
         }
         if on(Channel::Mesh, Level::Debug) {

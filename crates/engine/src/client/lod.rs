@@ -402,6 +402,7 @@ impl Lod {
             }
             render.upload_lod(gpu, textures, m.key, &m.quads, m.y);
             self.ready.insert(m.key);
+            crate::diag::LOD_MADE.add(1);
         }
         if reach == 0 || self.custom.is_none() {
             render.lod_draw.clear();
@@ -482,6 +483,7 @@ impl Lod {
             let on = keep.contains(k);
             if !on {
                 live.store(false, Ordering::Relaxed);
+                crate::diag::LOD_CALLED_OFF.add(1);
             }
             on
         });
