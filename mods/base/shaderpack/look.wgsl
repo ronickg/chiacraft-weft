@@ -542,7 +542,13 @@ fn fog_light(dir: vec3<f32>) -> vec3<f32> {
     let phase = min(hg * 1.6, 0.9) + 0.3;
     // Droplets are white, snow whiter, dust the color of sand.
     let tint = mix(mix(vec3(0.9), vec3(1.0, 1.0, 1.03), scene.ground.y), vec3(0.95, 0.68, 0.42), scene.ground.z);
-    return ((p.ambient * 1.25 + p.horizon * 0.2) + p.sun * light_strength() * phase) * 0.75 * tint * look_opt(OPT_FOG, 1.0);
+    // At dawn and dusk the mist is lit gold toward the low sun and dims away from it (the
+    // Amazon's dawn fog, the canopy refs' 07): less of the sky's cool light, the sun's glow warmer.
+    // Before, a misty morning read milky white everywhere (the world playtester, Plants, 11-04).
+    let g = golden();
+    let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.6, g);
+    let sun_part = mix(p.sun, p.sun * 0.6 + p.glow * 0.8, g) * light_strength() * phase;
+    return (sky_part + sun_part) * 0.75 * tint * look_opt(OPT_FOG, 1.0);
 }
 
 // The fog between the eye and a point `rel` away (camera relative), walked in a few steps that are
