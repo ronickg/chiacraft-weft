@@ -18,7 +18,7 @@ fn main() {
     let q = |x: i32, z: i32| (f.temperature(x * 16, z * 16), f.humidity(x * 16, z * 16), f.continent(x * 16, z * 16));
     let mountain = |x: i32, z: i32| l::MOUNTAINS_AREA.value(&f, x * 16, z * 16) > q12(l::MOUNTAIN_BIOME);
     // The best spot of each kind: (score, x, z), nearest the middle among equals.
-    let mut best: [(i64, i32, i32); 6] = [(i64::MIN, 0, 0); 6];
+    let mut best: [(i64, i32, i32); 8] = [(i64::MIN, 0, 0); 8];
     let step = 6;
     for z in (-radius..=radius).step_by(step) {
         for x in (-radius..=radius).step_by(step) {
@@ -57,15 +57,23 @@ fn main() {
             if fall >= 12 && mountain(x, z) && h == h0 && !l::snowy(&f, x * 16, z * 16, h) && h > SEA + 10 {
                 put(4, fall as i64 * 8 + near);
             }
+            // 6, 7: a slate cliff in the cold, a limestone cliff by low land.
+            if fall >= 8 && h > SEA + 4 {
+                match l::rock_set(&f, x * 16, z * 16, h, false) {
+                    l::RockSet::Slate => put(6, fall as i64 * 8 + near),
+                    l::RockSet::Limestone => put(7, fall as i64 * 8 + near),
+                    _ => {}
+                }
+            }
             // 5: highlands: rolling forest well over the sea, away from the mountains.
             if temperate && hu >= q12(l::FOREST_HUMIDITY) && h >= SEA + 24 && h - h0 >= 8 && cont > q12(0.2) {
                 put(5, (h - h0) as i64 * 4 + h as i64 + near);
             }
         }
     }
-    let names = ["river", "estuary", "mesa", "snow", "rock_face", "highlands"];
+    let names = ["river", "estuary", "mesa", "snow", "rock_face", "highlands", "slate_face", "limestone_face"];
     // How far back the eye stands and how high over the ground, per kind.
-    let (back, up) = ([48, 70, 75, 110, 40, 60], [26, 30, 18, 25, 12, 30]);
+    let (back, up) = ([48, 70, 75, 110, 40, 60, 36, 36], [26, 30, 18, 25, 12, 30, 10, 10]);
     println!("# Terrain shapes before/after (reports/world-looks.md change 5), seed {seed}.");
     println!("# Run once on dev before claude/terrain-shape and once on the branch, each in a fresh");
     println!("# world with `--seed {seed}`. Each spot is a fixed eye looking at a fixed point.");
