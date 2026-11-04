@@ -1,0 +1,34 @@
+[package]
+name = "chiacraft-sandbox-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license = "MIT"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+chiacraft-sandbox = { path = ".." }
+
+# Its own workspace: built only by `cargo fuzz` (nightly), never by the game's builds.
+[workspace]
+members = ["."]
+
+# Someone else's component: loading never panics, whatever the bytes. Seed the corpus with a real
+# one: `mkdir -p corpus/component && cp ../../../examples/packages/clans/code/server.wasm corpus/component/`.
+[[bin]]
+name = "component"
+path = "fuzz_targets/component.rs"
+test = false
+doc = false
+bench = false
+
+# A mod's storage calls: quotas hold and nothing lands outside its folder.
+[[bin]]
+name = "storage"
+path = "fuzz_targets/storage.rs"
+test = false
+doc = false
+bench = false

@@ -6,8 +6,14 @@
 //! [`chiacraft_register_package`] once per package after the code mods have registered. The mod's
 //! own `init` registers one block: `packages:unknown`, what a saved block shows as while the mod or
 //! package it came from is missing (the save keeps its real name).
+//!
+//! A package may also carry a sandboxed server half, `code/server.wasm` (phase 6): see
+//! `sandboxed`.
 
-use std::sync::Mutex;
+mod sandboxed;
+
+use std::collections::VecDeque;
+use std::sync::{Mutex, OnceLock};
 
 use chiacraft_packages::{BlockDef, Drops, ItemDef, Package, RecipeDef, Render};
 use weft_sdk::abi::{Host, ModId, Registrar, Str};
@@ -17,9 +23,50 @@ declare_mod!(deps: [], init: init);
 
 static UNKNOWN: Block = Block::named("unknown");
 
+/// Lines from sandboxed mods waiting to be shown (`sandboxed::SAY`).
+static LINES: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
+
 fn init(r: &mut Registry) {
     r.block(&UNKNOWN).hardness(0.5).drops_nothing().no_item();
+    chiacraft_sandbox::set_logger(sandboxed::logger);
+    // A sandboxed mod's line for this player goes through a command of this mod's own, whose
+    // reply the client shows in its own language.
+    r.client_packet(&sandboxed::SAY, |c, text| {
+        let mut lines = LINES.lock().unwrap();
+        if lines.len() < 64 {
+            lines.push_back(text);
+        }
+        c.chat("/packages_say");
+    });
+    r.client_command("packages_say", "", |cmd| {
+        let Some(text) = LINES.lock().unwrap().pop_front() else { return };
+        sandboxed::with_line(&text, |key, args| cmd.reply(key, args));
+    });
 }
+
+// ------------------------------------------------------------------ the engine's bridge
+
+type Query = unsafe extern "C" fn(query: Str, arg: Str) -> Str;
+static BRIDGE: OnceLock<Query> = OnceLock::new();
+
+/// The engine hands the mod its bridge when the mod loads (`crates/engine/src/chiacraft/bridge.rs`).
+///
+/// # Safety
+/// `q` must be the engine's `bridge::query`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn chiacraft_bridge(q: Query) {
+    let _ = BRIDGE.set(q);
+}
+
+fn ask(q: &str, arg: &str) -> String {
+    BRIDGE
+        .get()
+        .map(|f| unsafe { f(Str::new(q), Str::new(arg)).as_str().to_string() })
+        .unwrap_or_default()
+}
+
+/// What registering the current package's sandboxed half found wrong, for the engine as load errors.
+static CODE_ERROR: Mutex<Option<String>> = Mutex::new(None);
 
 /// The package being registered: `__init` takes a plain function.
 static CURRENT: Mutex<Option<Package>> = Mutex::new(None);
@@ -32,6 +79,7 @@ static CURRENT: Mutex<Option<Package>> = Mutex::new(None);
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn chiacraft_register_package(host: *const Host, me: ModId, reg: *mut Registrar, dir: Str) -> u32 {
     let dir = std::path::PathBuf::from(unsafe { dir.as_str() });
+    sandboxed::CURRENT_SLOT.store(me.0, std::sync::atomic::Ordering::Relaxed);
     // Someone else's files must not take the game down, and a panic may not cross into the engine.
     let loaded =
         std::panic::catch_unwind(|| chiacraft_packages::load(&dir)).unwrap_or_else(|_| Err(vec!["reading the package failed".into()]));
@@ -46,7 +94,11 @@ pub unsafe extern "C" fn chiacraft_register_package(host: *const Host, me: ModId
     };
     let id: &'static str = Box::leak(pkg.id().to_string().into_boxed_str());
     *CURRENT.lock().unwrap() = Some(pkg);
-    unsafe { weft_sdk::__init(host, me, reg, id, register_current) }
+    let r = unsafe { weft_sdk::__init(host, me, reg, id, register_current) };
+    if let Some(e) = CODE_ERROR.lock().unwrap().take() {
+        unsafe { ((*host).reg_error)(reg, Str::new(&e)) };
+    }
+    r
 }
 
 fn register_current(r: &mut Registry) {
@@ -63,6 +115,12 @@ fn register_current(r: &mut Registry) {
     for t in &p.tags {
         let names: Vec<&str> = t.def.entries.iter().map(String::as_str).collect();
         r.tag(&t.id, &names);
+    }
+    // Someone else's code: a panic while loading it is a load error, not the game's end.
+    let loaded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| sandboxed::register(r, p.id(), &p.dir)))
+        .unwrap_or_else(|_| Err("loading code/server.wasm failed".into()));
+    if let Err(e) = loaded {
+        *CODE_ERROR.lock().unwrap() = Some(e);
     }
 }
 

@@ -1,0 +1,17 @@
+[package]
+# The sandbox tests' mod: built for wasm32-unknown-unknown by tests/sandbox.rs.
+name = "sandbox_test_guest"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+chiacraft-mod-sdk = { path = "../../../mod-sdk" }
+
+[workspace]
+
+[profile.release]
+opt-level = "s"
