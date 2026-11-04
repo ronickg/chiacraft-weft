@@ -110,6 +110,7 @@ pub static LYCOPTERIDAE: Family = Family { name: "Lycopteridae", above: &["Actin
 pub static PSITTACOSAURIDAE: Family = Family { name: "Psittacosauridae", above: &["Dinosauria", "Ceratopsia"] };
 pub static POLACANTHIDAE: Family = Family { name: "Polacanthidae", above: &["Dinosauria", "Ankylosauria"] };
 pub static ANKYLOSAURIDAE: Family = Family { name: "Ankylosauridae", above: &["Dinosauria", "Ankylosauria"] };
+pub static STYRACOSTERNA: Family = Family { name: "Styracosterna", above: &["Dinosauria", "Ornithopoda"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -157,7 +158,12 @@ pub const OTHER_PREY: [(&str, f32); 4] = [("base:chicken", 1.0), ("base:pig", 80
 /// The hunters that take bigger prey together than alone, and how big, as shares of one's mass:
 /// grey wolves kill moose, elk and bison, ten times a wolf (`reports/ecology/Overworld food webs.md`:
 /// "packs take moose and elk"; the hunting is `hunt.rs`).
-pub const PACK_PREY: &[(&str, f32)] = &[("grey_wolf", 10.0)];
+pub const PACK_PREY: &[(&str, f32)] = &[
+    ("grey_wolf", 10.0),
+    // Utahraptors in a group went after an iguanodont many times their mass (the Stikes Quarry
+    // block: an adult, juveniles and hatchlings caught with one).
+    ("utahraptor", 15.0),
+];
 /// How many of its kind hunt together as a pack (itself among them).
 pub const PACK: u32 = 3;
 
@@ -357,7 +363,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 40] = [
+pub static SPECIES: [Species; 41] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -2985,6 +2991,69 @@ pub static SPECIES: [Species; 40] = [
         // clutch kept to what a mother raises, and a room that lets a small group last
         // (`web/test.mjs`).
         tune: Tune { growth: Some(144_000), litter: Some((1, 4)), crowd: Some(12), ..Tune::NONE },
+        birth_size: 0.1,
+    },
+    // The iguanodont (`reports/ecology/Cretaceous food webs.md`: the floodplain's and the forest's big
+    // plant eater, what the Utahraptor was caught hunting in the Stikes Quarry block): Iguanacolossus
+    // fortis standing for the Yellow Cat's iguanodonts and the Yixian's Jinzhousaurus, wild for now
+    // (a tame beast of burden later: tier 1), in herds (`source/iguanodont`).
+    Species {
+        model: "iguanodont",
+        name: "iguanodont",
+        binomial: "Iguanacolossus fortis",
+        family: &STYRACOSTERNA,
+        subfamily: "",
+        breed: None,
+        size: Size::Large,
+        // Browse up to about 4 m: ferns, horsetails, conifers and cycads; a few seeds and fruit.
+        eats: &[(Leaves, 0.85), (Seeds, 0.1), (Fruit, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [150.0, 400.0, 600.0, 8.0, 1.0, 800.0, 250.0, 500.0, 50.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 12.0,
+        foods: &[eats("animals:fern", 10), favorite("animals:cycad_seed", 14)],
+        feedings: 0.0,
+        shy: 10.0,
+        fights: false,
+        attacks: &[],
+        reach: 2.0,
+        signature: "herd",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.03,
+        size_spread: 0.1,
+        height: (2.2, "hip"),
+        // The Yellow Cat floodplain first, the fern forest (as Jinzhousaurus) less often.
+        habitats: &[("animals:floodplain", 1.0), ("animals:fern_forest", 0.6)],
+        bio: Biology {
+            mass: 4000.0,
+            gestation: 0.0,
+            // No record; a big ornithopod's egg, longer than Protoceratops's 83 days (est.).
+            incubation: 110.0,
+            // Growth lines of its kin (Iguanodon, Tenontosaurus): grown at about ten, breeding
+            // before that, at about seven (est.); living about 30 years.
+            maturity: 2555.0,
+            lifespan: 10950.0,
+            interval: 365.0,
+            // No record of a clutch (est.).
+            litter: 12.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The floodplain's monsoon heat and dry spells, the forest's cooler seasons.
+            comfort: (4.0, 38.0),
+            cold_blooded: false,
+        },
+        // A big plant eater at a common species' pace, its young what the hunters take, a wild
+        // clutch kept to what a mother raises, and a room that lets a small group last
+        // (`web/test.mjs`).
+        tune: Tune { growth: Some(144_000), litter: Some((1, 3)), crowd: Some(12), ..Tune::NONE },
         birth_size: 0.1,
     },
 ];

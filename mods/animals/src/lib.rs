@@ -52,6 +52,7 @@ mod gull;
 mod habitats;
 mod hare;
 mod hunt;
+mod iguanodont;
 mod jaguar;
 mod knockout;
 mod kryptobaatar;
@@ -144,6 +145,7 @@ fn init(r: &mut Registry) {
     protoceratops::init(r);
     psittacosaurus::init(r);
     ankylosaur::init(r);
+    iguanodont::init(r);
     kryptobaatar::init(r);
     lizard::init(r);
     reindeer::init(r);

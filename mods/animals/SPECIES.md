@@ -50,6 +50,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | psittacosaurus | *Psittacosaurus lujiatunensis* | common | medium | 0.5 m | 25 kg | herd | herbivore | wild | eggs, hatch 1.43 d | 6 d | 42.2 d | 3-8 | 20 |
 | gastonia | *Gastonia burgei* | common | large | 1.25 m | 1900 kg | herd | herbivore | wild | eggs, hatch 1.77 d | 6 d | 95.8 d | 1-4 | 12 |
 | pinacosaurus | *Pinacosaurus grangeri* | common | large | 1.25 m | 1900 kg | herd | herbivore | wild | eggs, hatch 1.77 d | 6 d | 95.8 d | 1-4 | 12 |
+| iguanodont | *Iguanacolossus fortis* | common | large | 2.2 m | 4000 kg | herd | herbivore | wild | eggs, hatch 1.9 d | 6 d | 115 d | 1-3 | 12 |
 
 ## Stats at level 1
 
@@ -97,6 +98,7 @@ Damage and speed are each kind's own (1 = 100%).
 | psittacosaurus | 22 | 160 | 80 | 1.5 | 1.1 | 45 | 70 | 45 | 14 | 15 |
 | gastonia | 120 | 300 | 400 | 6 | 0.8 | 600 | 200 | 400 | 60 | 12 |
 | pinacosaurus | 120 | 300 | 400 | 6 | 0.8 | 600 | 200 | 400 | 60 | 12 |
+| iguanodont | 150 | 400 | 600 | 8 | 1 | 800 | 250 | 500 | 50 | 12 |
 
 ## The food web
 
@@ -116,8 +118,8 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 | base:beach | 40%, 40%, 50%, 40% | - | hare, wood_mouse, house_sparrow | red_fox, raven, herring_gull | red_fox, raven, herring_gull |
 | animals:red_dunes | 40%, 40%, 40%, 40% | - | protoceratops, pinacosaurus | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
 | animals:scrubland | 40%, 43%, 40%, 40% | - | protoceratops, psittacosaurus, gastonia, pinacosaurus | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
-| animals:floodplain | 40%, 59%, 63%, 40% | - | psittacosaurus, gastonia | utahraptor | utahraptor |
-| animals:fern_forest | 40%, 70%, 45%, 40% | - | psittacosaurus, gastonia | utahraptor, wyvern | utahraptor, wyvern |
+| animals:floodplain | 40%, 59%, 63%, 40% | - | psittacosaurus, gastonia, iguanodont | utahraptor | utahraptor |
+| animals:fern_forest | 40%, 70%, 45%, 40% | - | psittacosaurus, gastonia, iguanodont | utahraptor, wyvern | utahraptor, wyvern |
 | animals:crags | 40%, 66%, 65%, 40% | - | pinacosaurus | wyvern | wyvern |
 
 ### Gaps in the web
@@ -420,7 +422,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.4% of spawn 
 | how | knockout |
 | diet | carnivore |
 | eats | meat 80%, carrion 15%, fish 5% |
-| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops, lungfish, psittacosaurus |
+| hunts | 1.0%-300% of its mass alone (3.00-900 kg); at home: protoceratops, lungfish, psittacosaurus, gastonia, pinacosaurus, iguanodont |
 | a meal that fills it | 30 kg; its biggest prey at home fills it in one kill |
 | drinks | 80% of its 16.79 L a day; a drink lasts 34 min, thirsty after 17 |
 | feedings to tame at level 1 | 18 (2.5x at level 150) |
@@ -2598,6 +2600,67 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 |---|---|
 | fights | no |
 | reach past its body | 1.5 blocks |
+| signature | herd |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.9 |
+
+## iguanodont
+
+*Iguanacolossus fortis*, Dinosauria › Ornithopoda › Styracosterna › . Model `iguanodont`, entity `animals:iguanodont`.
+
+| Where it lives | how common there |
+|---|---|
+| `animals:floodplain` | commonest |
+| `animals:fern_forest` | 60% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | large |
+| height (grown, average) | 2.2 m at the hip |
+| males against females | 1.03x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 10% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 4000 kg | |
+| lays | | 0.25 d after mating |
+| eggs hatch in | 110 d | 1.9 d |
+| litter or clutch | 12 on average | 1-3 **set** |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | the wet season | out of it, only a tame well cared for |
+| comfortable in | 4 to 38 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 7 y | 6 d **set** |
+| lives | 30 y | 115 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 12 **set** within 48 blocks |
+
+**Balance** (common): a generation 8.2 d; a line four deep in 24 d (8 h of play); 3.8 young per mother in 10 days, 32 in her life.
+
+- ✓ fourth generation: 24.5 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 6.0 of 115 days (want under a fifth)
+- ✓ young in a life: 32.3 (want 6-40)
+- ✓ litter: 1-3 (want 1-12, fewest first)
+- ✓ room near: 12 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | leaves 85%, seeds 10%, fruit 5% |
+| a meal that fills it | 400 kg |
+| drinks | 100% of its 172.778 L a day; a drink lasts 35 min, thirsty after 17 |
+| its food grows at home (spring/summer/autumn/winter) | floodplain 40/40/40/40%, fern_forest 40/40/40/40% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 10 blocks (twice that running) |
+| eats (food points) | `animals:fern` 10; `animals:cycad_seed` 14, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 2 blocks |
 | signature | herd |
 | ridden | no |
 | flies ridden | no |

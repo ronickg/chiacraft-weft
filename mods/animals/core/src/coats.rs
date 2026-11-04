@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 40] = [
+const FILES: [(&str, &str); 41] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -299,6 +299,7 @@ const FILES: [(&str, &str); 40] = [
     ("psittacosaurus", include_str!("../../genetics/psittacosaurus.json")),
     ("gastonia", include_str!("../../genetics/gastonia.json")),
     ("pinacosaurus", include_str!("../../genetics/pinacosaurus.json")),
+    ("iguanodont", include_str!("../../genetics/iguanodont.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1506,6 +1507,18 @@ fn ankylosaur(r: &Read, gobi: bool) -> Look {
     }
 }
 
+/// The iguanodont: olive-dun to a warmer buff, darker along the top, pale below (no record of its
+/// colors: est.).
+fn iguanodont(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.6 { "Buff".into() } else { "Olive-dun".into() },
+        base: mix([150.0, 142.0, 104.0], [168.0, 140.0, 96.0], ru),
+        under: [214.0, 202.0, 166.0],
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1687,6 +1700,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "psittacosaurus" => psittacosaurus(&r),
         "gastonia" => ankylosaur(&r, false),
         "pinacosaurus" => ankylosaur(&r, true),
+        "iguanodont" => iguanodont(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -2270,7 +2284,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 28] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 29] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2298,7 +2312,8 @@ const MODEL_LAYERS: [ModelLayers; 28] = model_layers!(
     "wolf",
     "jaguar",
     "psittacosaurus",
-    "ankylosaur"
+    "ankylosaur",
+    "iguanodont"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
