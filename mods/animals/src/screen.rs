@@ -339,10 +339,16 @@ fn family_line(ui: &mut Ui) {
         if b.generation == 0 {
             t.set("screen.animals.wild_born", &[]);
         } else {
-            t.set(
-                "screen.animals.family",
-                &[Arg::Int(b.generation as i64), Arg::Text(&coat(&b.dam, &b.dam_more)), Arg::Text(&coat(&b.sire, &b.sire_more))],
-            );
+            // In pieces, the coats' words translated each (`coat_pieces`).
+            let mut p = vec![Piece::Key("screen.animals.family_generation".into()), Piece::Text(format!(" {} · ", b.generation))];
+            p.push(Piece::Key("screen.animals.family_mother".into()));
+            p.push(Piece::Text(" ".into()));
+            p.extend(coat_pieces(&coat(&b.dam, &b.dam_more)));
+            p.push(Piece::Text(" · ".into()));
+            p.push(Piece::Key("screen.animals.family_father".into()));
+            p.push(Piece::Text(" ".into()));
+            p.extend(coat_pieces(&coat(&b.sire, &b.sire_more)));
+            set_pieces(t, &p);
         }
     });
 }
@@ -356,9 +362,70 @@ fn coat_line(ui: &mut Ui) {
         else {
             return;
         };
-        t.set("screen.animals.coat", &[Arg::Text(&look.name)]);
+        let mut p = vec![Piece::Key("screen.animals.coat_label".into()), Piece::Text(" ".into())];
+        p.extend(coat_pieces(&look.name));
+        set_pieces(t, &p);
     });
 }
+
+/// A piece of a text put together in the client: a translation, or text as it is (numbers,
+/// spaces, commas).
+enum Piece {
+    Key(String),
+    Text(String),
+}
+
+/// The phrases a coat's name is made of that read as one in a translation ("Dark brown" is one
+/// word in Russian, "and tan" one phrase), longest first; the other words are translated each.
+const COAT_PHRASES: [&str; 30] = [
+    "darker grey back", "breathes lightning", "breathes venom", "breathes frost", "breathes fire", "golden nape",
+    "Grizzled buff", "Glossy black", "Rufous brown", "Female brown", "Sandy brown", "winter coat", "Rusty brown",
+    "Tawny grey", "Sandy grey", "Warm brown", "Dark brown", "Dark olive", "with white", "Light tan", "black bib",
+    "Pale gold", "Pale grey", "Pale sand", "Pale buff", "Warm sand", "Dark grey", "Deep gold", "grey back", "and tan",
+];
+
+/// A coat's name ("Fawn sable with white", made in `animals_core::coats` from its genes) as pieces
+/// to translate: each phrase or word a key `coat.<words>`, the spaces and commas between as they
+/// are (Ronald, 11-04: the coat chips were English in Russian).
+fn coat_pieces(name: &str) -> Vec<Piece> {
+    let mut out = Vec::new();
+    let mut rest = name;
+    while !rest.is_empty() {
+        if let Some(p) = COAT_PHRASES.iter().find(|p| {
+            rest.starts_with(**p) && !rest[p.len()..].starts_with(|c: char| c.is_alphabetic() || c == '-')
+        }) {
+            out.push(Piece::Key(format!("coat.{}", p.replace(' ', "_"))));
+            rest = &rest[p.len()..];
+            continue;
+        }
+        let word: String = rest.chars().take_while(|c| c.is_alphabetic() || *c == '-').collect();
+        if word.is_empty() {
+            let sep: String = rest.chars().take_while(|c| !c.is_alphabetic()).collect();
+            rest = &rest[sep.len()..];
+            out.push(Piece::Text(sep));
+        } else {
+            rest = &rest[word.len()..];
+            out.push(Piece::Key(format!("coat.{word}")));
+        }
+    }
+    out
+}
+
+/// Sets `t` to `pieces` joined (`screen.animals.join_<n>`, "{0}{1}..."), at most `JOIN_MAX`.
+fn set_pieces(t: &mut TextOut, pieces: &[Piece]) {
+    let pieces = &pieces[..pieces.len().min(JOIN_MAX)];
+    let args: Vec<Arg> = pieces
+        .iter()
+        .map(|p| match p {
+            Piece::Key(k) => Arg::Key(k),
+            Piece::Text(s) => Arg::Text(s),
+        })
+        .collect();
+    t.set(&format!("screen.animals.join_{}", args.len()), &args);
+}
+
+/// The most pieces a joined text has (`screen.animals.join_<n>` up to it in the lang files).
+const JOIN_MAX: usize = 48;
 
 fn signature_line(ui: &mut Ui) {
     ui.text_bind(|c, t| {
@@ -551,7 +618,7 @@ fn animal_screen(ui: &mut Ui) {
                         else {
                             return;
                         };
-                        t.set("screen.animals.chip", &[Arg::Text(&look.name)]);
+                        set_pieces(t, &coat_pieces(&look.name));
                     });
                 });
                 ui.panel("chip", S::row().pad(2.0), |ui| {
@@ -845,7 +912,7 @@ fn genes_screen(ui: &mut Ui) {
                     else {
                         return;
                     };
-                    t.set("screen.animals.chip", &[Arg::Text(&look.name)]);
+                    set_pieces(t, &coat_pieces(&look.name));
                 });
             });
             ui.panel("chip", S::row().pad(2.0), |ui| {
@@ -1302,4 +1369,44 @@ fn taming_hud(r: &mut Registry) {
             });
         });
     });
+}
+
+#[cfg(test)]
+mod coat_name_tests {
+    use super::*;
+
+    fn keys(lang: &str) -> std::collections::HashSet<String> {
+        lang.lines().filter_map(|l| l.split_once(" = ").map(|(k, _)| k.trim().to_string())).collect()
+    }
+
+    /// Every word and phrase of every coat a species can have has its translation in English and
+    /// Russian (a missing one would show its key on the animal screen).
+    #[test]
+    fn every_coat_word_has_a_translation() {
+        let (en, ru) = (keys(include_str!("../assets/lang/en_us.lang")), keys(include_str!("../assets/lang/ru_ru.lang")));
+        let mut seed = 12345u32;
+        let mut rng = move || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (seed >> 8) as f32 / (1u32 << 24) as f32
+        };
+        let mut missing = std::collections::BTreeSet::new();
+        for index in 0..crate::species::SPECIES.len() {
+            for habitat in ["", "grassland", "forest", "taiga", "snow", "desert", "mountains", "swamp"] {
+                let Some(pool) = crate::coats::wild_pool(index, habitat) else { continue };
+                for n in 0..200 {
+                    let Some(g) = crate::coats::sample(index, n % 2 == 0, &pool, &mut rng) else { continue };
+                    let Some(look) = crate::coats::phenotype(&g) else { continue };
+                    for p in coat_pieces(&look.name) {
+                        if let Piece::Key(k) = p {
+                            if !en.contains(&k) || !ru.contains(&k) {
+                                missing.insert(format!("{k} (in \"{}\")", look.name));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(missing.is_empty(), "coat words without a translation: {missing:?}");
+        assert!(en.contains(&format!("screen.animals.join_{JOIN_MAX}")) && ru.contains(&format!("screen.animals.join_{JOIN_MAX}")));
+    }
 }
