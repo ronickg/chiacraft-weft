@@ -466,10 +466,13 @@ fn gust(p: vec3<f32>) -> f32 {
     return 0.55 + 1.1 * smoothstep(0.35, 0.85, band);
 }
 
-// Where the fog lies: on the ground about the player (a few blocks under the eye), or on the sea
-// if that is higher. Valleys under it fill, hills stand out of it.
-fn fog_floor() -> f32 {
-    return max(SEA_LEVEL, scene.eye.y - 5.0);
+// Where the fog lies along a look `rel` away (camera relative): on the ground about the player (a few
+// blocks under the eye), or lower where the look ends lower (the ground there), or on the sea if
+// that is higher. Valleys under it fill, hills stand out of it. Pinned to the eye alone, a layer hung
+// 5 under a player high above the land and filled the air 24 below that: looking straight down from
+// y 120 over a sinkhole at 14:00 went a milky white-out (the world playtester, 11-04).
+fn fog_floor(rel: vec3<f32>) -> f32 {
+    return max(SEA_LEVEL, min(scene.eye.y - 5.0, scene.eye.y + rel.y));
 }
 
 // How foggy the air is at `p` (world): a layer lying on the ground and in the valleys, broken into
@@ -480,10 +483,10 @@ fn storm() -> f32 {
     return clamp(max(scene.ground.y * smoothstep(5.0, 9.0, length(wind_now())), scene.ground.z), 0.0, 1.0);
 }
 
-fn fog_density(p: vec3<f32>) -> f32 {
+fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
     let f = scene.weather.z;
     let s = storm();
-    let h = p.y - fog_floor();
+    let h = p.y - floor;
     let low = exp(-max(h - 3.0, 0.0) / mix(7.0, 40.0, s));
     let high = exp(-max(h, 0.0) / 45.0);
     let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
@@ -493,8 +496,9 @@ fn fog_density(p: vec3<f32>) -> f32 {
     let banks = smoothstep(0.45, 0.66, shape - 0.25 * eaten + 0.12);
     // Deep under it, in the ground, there is none.
     let open = smoothstep(-24.0, -10.0, h);
-    // The sun thins the banks toward noon (mornings and evenings keep them).
-    let burn = mix(1.0, 0.55, smoothstep(0.35, 0.75, scene.sun.y));
+    // The sun thins the banks by day to a third (mornings and evenings keep them); a storm's
+    // blowing snow or dust it leaves.
+    let burn = mix(1.0, mix(0.35, 1.0, s), smoothstep(0.25, 0.65, scene.sun.y));
     return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
 }
 
@@ -523,6 +527,7 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let dist = min(length(rel), 220.0);
     let dir = rel / max(length(rel), 1e-4);
     let eye = scene.eye.xyz;
+    let floor = fog_floor(rel);
     let light = fog_light(dir);
     let steps = 12u;
     var through = 1.0;
@@ -532,7 +537,7 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
         let k = f32(i) / f32(steps);
         let at = dist * (exp(2.2 * k) - 1.0) / (exp(2.2) - 1.0);
         let step = at - last;
-        let d = fog_density(eye + dir * (at - step * 0.5)) * sky;
+        let d = fog_density(eye + dir * (at - step * 0.5), floor) * sky;
         let kept = exp(-d * step);
         gained += through * (1.0 - kept) * light;
         through *= kept;
