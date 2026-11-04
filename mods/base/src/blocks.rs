@@ -130,9 +130,12 @@ fn axis_placement(p: &Place, props: &mut Props) {
 
 /// A log that grows into a tree of `leaves` (a cone, like a spruce, when `cone`).
 /// `shape`: the tree's tag (`cone_tree`, `flat_tree`; none: round), `worldgen::tree_blocks`.
-/// A stripped log (`wood` `<wood>_stripped`, no `leaves`) is its wood's log for recipes. An axe
-/// used on an oak log strips it (`crafts::strip_oak`).
-pub(crate) fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape: Option<&str>) {
+/// Each has a stripped twin, `stripped_<wood>_log` (`wood` `<wood>_stripped`, no `leaves`), its
+/// wood's log for recipes, which an axe used on it makes (`crafts::strip`).
+fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape: Option<&str>) {
+    if !leaves.is_empty() {
+        log(r, Block::generated(format!("stripped_{wood}_log")), &format!("{wood}_stripped"), "", None);
+    }
     let side = format!("log_{wood}");
     let top = format!("log_{wood}_top");
     let b = r.block(handle);
@@ -141,7 +144,7 @@ pub(crate) fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: 
         Some(tag) => b.tag(tag),
         None => b,
     };
-    let b = if wood == "oak" { b.on_use(crate::crafts::strip_oak) } else { b };
+    let b = if leaves.is_empty() { b } else { b.on_use(crate::crafts::strip) };
     b.sound_group("wood")
         .hardness(2.0)
         .mineable("axe")
