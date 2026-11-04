@@ -1,0 +1,138 @@
+{
+ "species": "reindeer",
+ "about": "The reindeer or caribou (Rangifer tarandus): grey-brown with a cream neck and mane, a white rump and belly, dark legs and face with white above the hooves; paler toward the high Arctic, darker in the woods. White reindeer (recessive) turn up in some herds. Both sexes grow antlers, a cow's smaller; calves are plain brown, not spotted.",
+ "loci": [
+  {
+   "id": "Wr",
+   "name": "White",
+   "alleles": [
+    {
+     "a": "Wr",
+     "freq": 0.98
+    },
+    {
+     "a": "wr",
+     "freq": 0.02,
+     "about": "white (recessive)"
+    }
+   ]
+  },
+  {
+   "id": "Pl",
+   "name": "Paleness",
+   "quantitative": true,
+   "mean": 0.45,
+   "sd": 0.15,
+   "about": "dark brown (a woodland caribou's) to pale grey (a high-Arctic one's)"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   26,
+   18,
+   14
+  ],
+  [
+   52,
+   34,
+   24
+  ]
+ ],
+ "traits": {
+  "Ho": {
+   "mean": 0.6,
+   "sd": 0.08
+  }
+ },
+ "sexes": {
+  "female": {
+   "Ho": -0.3
+  }
+ },
+ "young": {
+  "traits": {
+   "Ho": -0.45
+  }
+ },
+ "habitats": {
+  "snowy_plains": {
+   "quantitative": {
+    "Pl": {
+     "mean": 0.6,
+     "sd": 0.12
+    }
+   }
+  },
+  "taiga": {
+   "quantitative": {
+    "Pl": {
+     "mean": 0.35,
+     "sd": 0.12
+    }
+   }
+  }
+ },
+ "build": {
+  "Ho": {
+   "bones": [
+    "antler_L",
+    "antler_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.98
+  },
+  "Nk": {
+   "bones": [
+    "neck"
+   ],
+   "axes": [
+    0.2,
+    1,
+    0.2
+   ],
+   "range": 0.06
+  },
+  "Lg": {
+   "bones": [
+    "leg_FL_upper",
+    "leg_FL_lower",
+    "leg_FR_upper",
+    "leg_FR_lower",
+    "leg_BL_upper",
+    "leg_BL_lower",
+    "leg_BR_upper",
+    "leg_BR_lower"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.05
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.08
+  }
+ }
+}

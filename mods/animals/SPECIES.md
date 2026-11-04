@@ -31,6 +31,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | protoceratops | *Protoceratops andrewsi* | common | medium | 0.6 m | 83 kg | herd | herbivore | wild | eggs, hatch 1.54 d | 6 d | 53.7 d | 3-8 | 14 |
 | kryptobaatar | *Kryptobaatar dashzevegi* | common | small | 0.05 m | 0.04 kg | solitary | omnivore | wild | 0.53 d | 3 d | 16 d | 1-5 | 24 |
 | priscagama | *Priscagama gobiensis* | common | small | 0.04 m | 0.03 kg | solitary | carnivore | wild | eggs, hatch 1.21 d | 4.01 d | 23 d | 2-6 | 24 |
+| reindeer | *Rangifer tarandus* | common | large | 1.05 m | 120 kg | herd | herbivore | wild | 3.31 d | 4.58 d | 46 d | 1 | 13 |
 
 ## Stats at level 1
 
@@ -59,6 +60,7 @@ Damage and speed are each kind's own (1 = 100%).
 | protoceratops | 35 | 200 | 120 | 2 | 1 | 90 | 80 | 70 | 18 | 15 |
 | kryptobaatar | 2 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
 | priscagama | 2 | 60 | 12 | 0.2 | 1 | 2 | 40 | 5 | 2 | 40 |
+| reindeer | 40 | 260 | 160 | 3 | 1 | 110 | 80 | 80 | 25 | 15 |
 
 ## dog (chihuahua)
 
@@ -1320,6 +1322,65 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 1 |
+
+## reindeer
+
+*Rangifer tarandus*, Mammalia › Artiodactyla › Cervidae › Capreolinae. Model `reindeer`, entity `animals:reindeer`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:snowy_plains` | commonest |
+| `base:taiga` | 60% |
+| `base:mountains` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | large |
+| height (grown, average) | 1.05 m at the shoulder |
+| males against females | 1.12x as tall |
+| size spread (an individual's, either way) | 15% |
+| newborn's size | 35% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 120 kg | |
+| carries her young | 230 d | 3.31 d |
+| litter or clutch | 1 on average | 1 |
+| between litters | 1 y | rests 1.67 d **set** |
+| breeds in | autumn | out of it, only a tame well cared for |
+| comfortable in | -45 to 18 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 1.6 y | 4.58 d **set** |
+| lives | 12 y | 46 d, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 13 within 48 blocks |
+
+**Balance** (common): a generation 7.9 d; a line four deep in 24 d (8 h of play); 2 young per mother in 10 days, 6 in her life.
+
+- ✓ fourth generation: 23.7 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 4.6 of 46 days (want under a fifth)
+- ✓ young in a life: 6.5 (want 6-40)
+- ✓ litter: 1-1 (want 1-12, fewest first)
+- ✓ room near: 13 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | herbivore |
+| eats | lichen 40%, grass 35%, leaves 20%, fungi 5% |
+| its food grows at home (spring/summer/autumn/winter) | snowy_plains 40/40/40/40%, taiga 40/62/40/40%, mountains 40/70/40/40% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 18 blocks (twice that running) |
+| eats (food points) | `base:wheat` 10; `base:berries` 6, favorite; `base:apple` 12, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 1 blocks |
+| signature | crater |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.7 |
 
 ## Shared by every species
 

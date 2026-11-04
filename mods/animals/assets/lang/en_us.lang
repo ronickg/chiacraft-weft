@@ -210,3 +210,6 @@ species.animals.priscagama = Priscagama
 family.animals.priscagamidae = early agamid lizard family
 item.animals.priscagama_egg = Priscagama Egg
 screen.animals.signature.bask = Basks in the sun; bobs its head and pushes up on its front legs to warn rivals off
+entity.animals.reindeer = Reindeer
+species.animals.reindeer = reindeer
+screen.animals.signature.crater = Digs through the snow to the lichen below; wanders in great herds

@@ -301,7 +301,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 21] = [
+pub static SPECIES: [Species; 22] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1597,6 +1597,78 @@ pub static SPECIES: [Species; 21] = [
         // A lizard's room by its tiny mass (35) would crowd its dunes: as the mouse's.
         tune: Tune { crowd: Some(24), ..Tune::NONE },
         birth_size: 0.2,
+    },
+    // The reindeer (`reports/ecology/Overworld food webs.md`: the only big grazer of the tundra, the
+    // wolf's prey there): a simple wild creature on its own model, built on the deer's
+    // (`source/reindeer`). The only deer whose females carry antlers too: a build gene its sex sets
+    // smaller in cows (`genetics/reindeer.json`).
+    Species {
+        model: "reindeer",
+        name: "reindeer",
+        binomial: "Rangifer tarandus",
+        family: &CERVIDAE,
+        subfamily: "Capreolinae",
+        breed: None,
+        size: Size::Large,
+        // Lichen through the winter (dug from under the snow), sedges, grasses and willow and birch
+        // leaves in summer, mushrooms in autumn.
+        eats: &[(Lichen, 0.4), (Grass, 0.35), (Leaves, 0.2), (Fungi, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [40.0, 260.0, 160.0, 3.0, 1.0, 110.0, 80.0, 80.0, 25.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 15.0,
+        foods: &[eats("base:wheat", 10), favorite("base:berries", 6), favorite("base:apple", 12)],
+        feedings: 0.0,
+        shy: 18.0,
+        fights: false,
+        attacks: &[],
+        reach: 1.0,
+        signature: "crater",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.7,
+        // Bulls usually 159-182 kg, cows 80-120: about 1.2 times as tall.
+        dimorphism: 1.12,
+        size_spread: 0.15,
+        height: (1.05, "shoulder"),
+        // The tundra's herds, wintering in the taiga's edge; the mountain reindeer of Norway's
+        // fells.
+        habitats: &[("base:snowy_plains", 1.0), ("base:taiga", 0.6), ("base:mountains", 0.3)],
+        bio: Biology {
+            mass: 120.0,
+            // 228-234 days.
+            gestation: 230.0,
+            incubation: 0.0,
+            // Cows breed from one to three years old, by their summer's food.
+            maturity: 600.0,
+            // Cows live to 17 at most, bulls about four years less; 12 or so is old in the wild.
+            lifespan: 4380.0,
+            interval: 365.0,
+            litter: 1.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            // The rut from late September to early November, the calves born in May and June.
+            breeds: seasons::AUTUMN,
+            peak: seasons::AUTUMN,
+            // Hollow hair and countercurrent legs: at ease far below -30; it pants and seeks snow
+            // patches and wind in the summer's warmth (est.).
+            comfort: (-45.0, 18.0),
+            cold_blooded: false,
+        },
+        tune: Tune {
+            // A calf runs with the herd within a day and doubles its weight in two weeks, and a cow
+            // calves nearly every year: growing up and her rest set shorter, so a herd keeps up
+            // with its wolves (`balance::checks`: a fourth generation in 25 days, six young in a
+            // life).
+            growth: Some(110_000),
+            recovery: Some(40_000),
+            ..Tune::NONE
+        },
+        birth_size: 0.35,
     },
 ];
 

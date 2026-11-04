@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 21] = [
+const FILES: [(&str, &str); 22] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -280,6 +280,7 @@ const FILES: [(&str, &str); 21] = [
     ("protoceratops", include_str!("../../genetics/protoceratops.json")),
     ("kryptobaatar", include_str!("../../genetics/kryptobaatar.json")),
     ("priscagama", include_str!("../../genetics/priscagama.json")),
+    ("reindeer", include_str!("../../genetics/reindeer.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1175,6 +1176,30 @@ fn lizard(r: &Read) -> Look {
     }
 }
 
+/// The reindeer: grey-brown, darker in the south's woodland caribou, nearly white in the high
+/// Arctic's; the legs and face dark; a white reindeer now and then (recessive, prized by herders).
+fn reindeer(r: &Read) -> Look {
+    let pl = r.qv("Pl");
+    let points = Some(mix([72.0, 56.0, 46.0], [150.0, 140.0, 128.0], pl * pl));
+    if r.copies("Wr", "wr") == 2 {
+        return Look { name: "White".into(), base: [228.0, 224.0, 214.0], under: [236.0, 232.0, 224.0], ..Look::default() };
+    }
+    let name = if pl > 0.7 {
+        "Pale grey"
+    } else if pl < 0.3 {
+        "Dark brown"
+    } else {
+        "Grey-brown"
+    };
+    Look {
+        name: name.into(),
+        base: mix([118.0, 96.0, 76.0], [196.0, 188.0, 174.0], pl),
+        under: [228.0, 222.0, 208.0],
+        points,
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1337,6 +1362,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "protoceratops" => protoceratops(&r),
         "kryptobaatar" => kryptobaatar(&r),
         "priscagama" => lizard(&r),
+        "reindeer" => reindeer(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1918,7 +1944,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 16] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 17] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -1934,7 +1960,8 @@ const MODEL_LAYERS: [ModelLayers; 16] = model_layers!(
     "raven",
     "protoceratops",
     "kryptobaatar",
-    "lizard"
+    "lizard",
+    "reindeer"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
