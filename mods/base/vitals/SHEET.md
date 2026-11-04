@@ -344,7 +344,6 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:huckleberry_bush | Bush | Soil | base:huckleberries | 1.0% | mountains |
 | base:chia | Ripens | Sand | base:chia_seeds | 2.0% | desert |
 | base:dwarf_birch | Still | Soil | - | 2.0% | snowy_plains |
-| animals:horsetail | Still | Soil | - | 6.0% | floodplain, fern_forest |
 
 ## Food in the world
 
@@ -414,7 +413,6 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | base:chia (age 1) | seeds | 6 | back to age 0 | base:chia |
 | base:dwarf_birch | leaves | 4 | stays | always there in base:snowy_plains (spring, summer, autumn), worth 40% of fresh growth |
 | base:dwarf_birch | leaves | 2 | stays | always there in base:snowy_plains (winter), worth 40% of fresh growth |
-| animals:horsetail | grass | 6 | stays | always there in animals:floodplain, animals:fern_forest (spring, summer, autumn), worth 40% of fresh growth |
 | animals:termite_mound | insects | 3 | stays | always there in animals:red_dunes, animals:scrubland (all year), worth 40% of fresh growth |
 | animals:termite_mound_upper | insects | 3 | stays | always there in animals:red_dunes, animals:scrubland (all year), worth 40% of fresh growth |
 | base:mesquite_leaves | leaves | 4 | stays | always there in base:desert, base:savanna (spring, summer, autumn), worth 40% of fresh growth |
