@@ -78,3 +78,25 @@ fn every_plant_grows_somewhere() {
     }
     assert!(problems.is_empty(), "\n{}\n(vitals::plants against vitals::climate)\n", problems.join("\n"));
 }
+
+/// A plant frost hurts still has a season somewhere that it grows in (a third of its best or
+/// more) with nights above its frost (`Plant::frost` against the climates' lows): otherwise it
+/// could never be grown.
+#[test]
+fn tender_plants_have_a_frost_free_season() {
+    use vitals::plants::{HARDY, PLANTS, season_low, season_rate};
+    let mut problems = Vec::new();
+    for p in PLANTS.iter().filter(|p| p.frost > HARDY) {
+        let ok = BIOMES
+            .iter()
+            .filter(|c| !c.underground)
+            .any(|c| (0..4).any(|s| season_rate(p, c, s) >= 0.33 && season_low(c, s) >= p.frost));
+        if !ok {
+            problems.push(format!(
+                "{}: frost ({} °C) every season it grows, in every biome: its frost (vitals::plants) against the climates' nights",
+                p.block, p.frost
+            ));
+        }
+    }
+    assert!(problems.is_empty(), "\n{}\n", problems.join("\n"));
+}

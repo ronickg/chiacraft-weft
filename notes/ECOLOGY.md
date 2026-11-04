@@ -409,10 +409,16 @@ and cactus.**
   species' (`animals/core/tests/places.rs`).
 - **Seen in the game (plains):** wheat at 18% of its best in early spring, 64% in summer, 0 in a
   dry autumn spell and in winter frost, and 76% beside water in summer.
+- **Frost** (2026-11-03): each plant's frost point from its research (`Plant::frost`: spring wheat
+  and a blueberry's fruit -2 °C, sugar cane -1, a saguaro -7, oaks and grass hardy). A growth step
+  in colder air where it stands (a fire nearby keeps it off) kills the wheat, takes the bush's
+  fruit, or kills a cane's or cactus's stalk down to its base, which sprouts again in spring
+  (`growth.rs`). Every tender plant keeps a frost-free season where it grows well
+  (`vitals/tests/places.rs`); the sheet marks the seasons whose nights freeze it. Not yet seen in
+  the game: a 90-second midwinter night didn't kill a fresh wheat field (likely no growth step came
+  in that time).
 - **Not yet:**
-  - grass and tall grass regrowing (comes with grazing, part 5);
-  - frost killing tender crops;
-  - the new crops and wild plants from the research;
+  - the new crops and wild plants from the research (winter wheat and rye, hardy);
   - unloaded plants catch up at today's season, not the season they missed.
 
 
