@@ -106,6 +106,37 @@ pub fn register(r: &mut Registry) {
             }
         }
     }
+    flowers(r);
+}
+
+/// Each biome's wild flowers (`vitals::wild::FLOWERS`): plants that stand and give themselves.
+fn flowers(r: &mut Registry) {
+    for f in &wild::FLOWERS {
+        let name = short(f.block);
+        r.block(Block::generated(name.into()))
+            .sound_group("grass")
+            .plant()
+            .needs_below(if f.ground == Ground::Sand { "#sand" } else { "#plant_soil" })
+            .texture(name)
+            .tab(&crate::tabs::NATURAL);
+    }
+}
+
+/// A flower of `biome` on `ground` for the world to put (`worldgen.rs`), `kind` choosing among
+/// them; `None`: the biome has none of its own there.
+pub fn flower(biome: &str, ground: Ground, kind: u64) -> Option<u32> {
+    static IDS: OnceLock<Vec<u32>> = OnceLock::new();
+    let ids = IDS.get_or_init(|| {
+        wild::FLOWERS
+            .iter()
+            .map(|f| Block::lookup(f.block).unwrap_or(u32::MAX))
+            .collect()
+    });
+    let here: Vec<usize> = (0..wild::FLOWERS.len())
+        .filter(|&i| wild::FLOWERS[i].ground == ground && wild::FLOWERS[i].found.contains(&biome))
+        .collect();
+    let i = *here.get(kind as usize % here.len().max(1))?;
+    (ids[i] != u32::MAX).then_some(ids[i])
 }
 
 /// The block a picked item of that name plants again, if any (`items.rs`): a wild plant that
