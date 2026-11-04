@@ -181,7 +181,9 @@ fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
     let Some(mut stack) = w.dropped_item(item) else { return };
     let own = crate::hunt::mass(w, id).unwrap_or_else(|| a.species().map_or(1.0, |s| s.bio.mass));
     let max = a.stat(species::FOOD);
-    let points = (max * animals_core::needs::fills(own, grams / 1000.0)).round().max(1.0) as u16;
+    let points = (max * animals_core::needs::fills(own, grams / 1000.0))
+        .round()
+        .max(1.0) as u16;
     animal::feed(w, id, points);
     stack.count -= 1;
     w.set_dropped_item(item, stack);

@@ -348,9 +348,11 @@ pub fn register(r: &mut Registry) {
         .tint(&tints::GRASS)
         .no_item()
         .growth(crate::growth::step_secs("base:grazed_grass", 1, 600.0), 9)
-        .on_grow(|e| crate::growth::grow(e, "base:grazed_grass", false, |e| {
-            e.world().set(e.pos(), TALL_GRASS.id());
-        }));
+        .on_grow(|e| {
+            crate::growth::grow(e, "base:grazed_grass", false, |e| {
+                e.world().set(e.pos(), TALL_GRASS.id());
+            })
+        });
     plant(r, &DANDELION, "flower_dandelion");
     plant(r, &ROSE, "flower_rose");
     r.block(&SAPLING)
@@ -570,8 +572,16 @@ pub fn register(r: &mut Registry) {
     // Any age gives a berry back to plant again; ripe, two more.
     r.loot(&BERRY_BUSH)
         .pool(Pool::new().entry(Entry::item("berries")))
-        .pool(Pool::new().when(Cond::BlockState("age=3")).entry(Entry::item("berries")))
-        .pool(Pool::new().when(Cond::BlockState("age=3")).entry(Entry::item("berries")));
+        .pool(
+            Pool::new()
+                .when(Cond::BlockState("age=3"))
+                .entry(Entry::item("berries")),
+        )
+        .pool(
+            Pool::new()
+                .when(Cond::BlockState("age=3"))
+                .entry(Entry::item("berries")),
+        );
     // Spoiled food, dung and plant waste rot into compost (`farming.rs`): its level shows as it
     // fills, the top dark and rich when it's ready (placeholder look, `notes/STYLE.md`).
     r.block(&COMPOST_BIN)

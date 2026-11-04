@@ -49,7 +49,9 @@ pub fn init(r: &mut Registry) {
             let Some(s) = a.species().filter(|s| s.hunts()) else { continue };
             let (Some(own), Some(prey)) = (mass(&w, d.killer), kind_mass(d.kind, None)) else { continue };
             let max = a.stat(species::FOOD);
-            let meal = (max * animals_core::needs::fills(own, prey)).round().max(1.0) as u16;
+            let meal = (max * animals_core::needs::fills(own, prey))
+                .round()
+                .max(1.0) as u16;
             animal::feed(&w, d.killer, meal);
             weft_sdk::info!(
                 "{} {} eats its kill ({:.1} kg of {}): food {} of {max:.0}",

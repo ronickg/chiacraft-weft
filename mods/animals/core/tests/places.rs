@@ -170,7 +170,10 @@ fn the_food_webs_hold() {
 fn hunters_fill_up_on_their_prey_at_home() {
     const MOST_KILLS: f32 = 10.0;
     let mut problems = Vec::new();
-    for s in SPECIES.iter().filter(|s| s.hunts() && !s.forages_wild() && s.hungry_in_the_wild()) {
+    for s in SPECIES
+        .iter()
+        .filter(|s| s.hunts() && !s.forages_wild() && s.hungry_in_the_wild())
+    {
         match animals_core::needs::kills_to_fill(s) {
             Some(k) if k <= MOST_KILLS => {}
             k => problems.push(format!(
@@ -217,10 +220,8 @@ fn a_drink_lasts_a_while() {
         if let Some(secs) = animals_core::needs::drink_lasts(s, s.bio.mass)
             && secs < MIN_SECS
         {
-            problems.push(format!(
-                "{}: a drink lasts it {secs:.0} s (want {MIN_SECS} or more): needs::{{SPARE, DAY_SECS, DRINKS}}",
-                s.name
-            ));
+            problems
+                .push(format!("{}: a drink lasts it {secs:.0} s (want {MIN_SECS} or more): needs::{{SPARE, DAY_SECS, DRINKS}}", s.name));
         }
     }
     report(problems);

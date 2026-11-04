@@ -80,25 +80,81 @@ impl Climate {
 // (`reports/ecology/Wind and fog.md`, with which are estimates).
 pub const BIOMES: [Climate; 17] = [
     // The overworld (`mods/base/src/worldgen.rs`).
-    c("base:plains", "Manhattan, Kansas (Konza Prairie)", 12.8, 0.42, 14.2, [0.27, 0.27, 0.2, 0.14]).air([3.8, 3.0, 3.0, 3.1], [5.3, 5.8, 6.3, 8.4], Fog::Dawn),
-    c("base:forest", "Kassel, Germany", 9.3, 0.77, 8.7, [0.34, 0.34, 0.37, 0.41]).air([2.5, 2.0, 2.4, 3.0], [5.8, 4.9, 16.1, 11.3], Fog::Dawn),
+    c("base:plains", "Manhattan, Kansas (Konza Prairie)", 12.8, 0.42, 14.2, [0.27, 0.27, 0.2, 0.14]).air(
+        [3.8, 3.0, 3.0, 3.1],
+        [5.3, 5.8, 6.3, 8.4],
+        Fog::Dawn,
+    ),
+    c("base:forest", "Kassel, Germany", 9.3, 0.77, 8.7, [0.34, 0.34, 0.37, 0.41]).air(
+        [2.5, 2.0, 2.4, 3.0],
+        [5.8, 4.9, 16.1, 11.3],
+        Fog::Dawn,
+    ),
     c("base:birch_forest", "Moscow", 6.3, 0.8, 12.9, [0.29, 0.3, 0.32, 0.47]).air([1.5, 1.1, 1.4, 1.6], [1.5, 2.3, 3.0, 1.6], Fog::Dawn),
-    c("base:taiga", "Fairbanks, Alaska", -2.1, 0.51, 19.8, [0.14, 0.32, 0.26, 0.22]).air([2.3, 2.0, 1.5, 1.1], [2.0, 2.7, 7.3, 7.8], Fog::Ice),
-    c("base:snowy_plains", "Utqiaġvik, Alaska", -10.2, 0.92, 14.9, [0.14, 0.24, 0.32, 0.15]).air([5.3, 5.3, 6.1, 6.0], [26.9, 46.4, 29.1, 17.9], Fog::Sea),
-    c("base:desert", "Hermosillo, Sonora", 25.7, 0.18, 8.1, [0.01, 0.13, 0.06, 0.05]).air([2.3, 2.6, 1.6, 1.4], [0.2, 0.2, 0.2, 0.3], Fog::Dawn),
-    c("base:savanna", "Arauca, the Colombian llanos", 27.0, 0.65, 1.6, [0.4, 0.7, 0.45, 0.11]).air([1.5, 1.2, 1.2, 1.6], [1.2, 2.7, 1.4, 0.1], Fog::Dawn),
-    c("base:swamp", "Nhumirim, the Pantanal", 25.1, 0.42, 3.4, [0.18, 0.33, 0.2, 0.07]).air([3.5, 2.9, 2.9, 3.6], [3.0, 3.5, 5.5, 5.0], Fog::Dawn),
-    c("base:mountains", "Davos, 1,594 m", 6.0, 0.63, 8.8, [0.32, 0.45, 0.31, 0.29]).air([2.4, 2.7, 2.2, 1.7], [1.5, 1.0, 2.5, 2.5], Fog::Dawn),
-    c("base:ocean", "Ponta Delgada, the Azores", 18.2, 0.97, 4.1, [0.33, 0.19, 0.38, 0.43]).air([3.1, 2.5, 2.7, 3.4], [1.4, 0.7, 0.3, 0.4], Fog::Sea),
+    c("base:taiga", "Fairbanks, Alaska", -2.1, 0.51, 19.8, [0.14, 0.32, 0.26, 0.22]).air(
+        [2.3, 2.0, 1.5, 1.1],
+        [2.0, 2.7, 7.3, 7.8],
+        Fog::Ice,
+    ),
+    c("base:snowy_plains", "Utqiaġvik, Alaska", -10.2, 0.92, 14.9, [0.14, 0.24, 0.32, 0.15]).air(
+        [5.3, 5.3, 6.1, 6.0],
+        [26.9, 46.4, 29.1, 17.9],
+        Fog::Sea,
+    ),
+    c("base:desert", "Hermosillo, Sonora", 25.7, 0.18, 8.1, [0.01, 0.13, 0.06, 0.05]).air(
+        [2.3, 2.6, 1.6, 1.4],
+        [0.2, 0.2, 0.2, 0.3],
+        Fog::Dawn,
+    ),
+    c("base:savanna", "Arauca, the Colombian llanos", 27.0, 0.65, 1.6, [0.4, 0.7, 0.45, 0.11]).air(
+        [1.5, 1.2, 1.2, 1.6],
+        [1.2, 2.7, 1.4, 0.1],
+        Fog::Dawn,
+    ),
+    c("base:swamp", "Nhumirim, the Pantanal", 25.1, 0.42, 3.4, [0.18, 0.33, 0.2, 0.07]).air(
+        [3.5, 2.9, 2.9, 3.6],
+        [3.0, 3.5, 5.5, 5.0],
+        Fog::Dawn,
+    ),
+    c("base:mountains", "Davos, 1,594 m", 6.0, 0.63, 8.8, [0.32, 0.45, 0.31, 0.29]).air(
+        [2.4, 2.7, 2.2, 1.7],
+        [1.5, 1.0, 2.5, 2.5],
+        Fog::Dawn,
+    ),
+    c("base:ocean", "Ponta Delgada, the Azores", 18.2, 0.97, 4.1, [0.33, 0.19, 0.38, 0.43]).air(
+        [3.1, 2.5, 2.7, 3.4],
+        [1.4, 0.7, 0.3, 0.4],
+        Fog::Sea,
+    ),
     c("base:beach", "Faro, Portugal", 18.2, 0.74, 6.2, [0.16, 0.01, 0.16, 0.2]).air([4.1, 3.7, 3.4, 3.8], [1.0, 1.6, 2.1, 2.3], Fog::Dawn),
     Climate { underground: true, ..c("base:deep_caves", "any cave: the surface's year mean", 12.0, 0.95, 0.0, [0.0; 4]) },
     // The Cretaceous (`mods/animals/src/cretaceous.rs`), estimated from the formations' rocks
     // (`reports/ecology/Cretaceous food webs.md`; Ronald's choices in `notes/ECOLOGY.md`).
-    c("animals:red_dunes", "the Djadokhta Formation, Mongolia", 17.0, 0.2, 12.0, [0.1, 0.02, 0.03, 0.12]).air([4.5, 3.5, 3.3, 2.8], [0.3, 0.3, 0.3, 0.3], Fog::Dawn),
-    c("animals:scrubland", "the Barun Goyot Formation, Mongolia", 17.0, 0.3, 11.0, [0.06, 0.25, 0.08, 0.04]).air([3.8, 3.2, 2.9, 2.5], [0.5, 1.0, 0.5, 0.0], Fog::Dawn),
-    c("animals:floodplain", "the Cedar Mountain Formation, Utah", 21.0, 0.5, 8.0, [0.08, 0.45, 0.25, 0.04]).air([2.5, 2.5, 2.0, 1.8], [2.0, 1.0, 2.0, 5.0], Fog::Dawn),
-    c("animals:fern_forest", "the Yixian Formation, Liaoning", 10.0, 0.8, 10.0, [0.25, 0.45, 0.3, 0.15]).air([2.8, 2.0, 1.8, 1.8], [2.0, 4.0, 6.0, 2.0], Fog::Dawn),
-    c("animals:crags", "the Sevier highlands, Utah", 15.0, 0.6, 8.0, [0.25, 0.4, 0.25, 0.15]).air([4.5, 3.7, 3.7, 3.7], [5.0, 1.0, 3.0, 6.0], Fog::Dawn),
+    c("animals:red_dunes", "the Djadokhta Formation, Mongolia", 17.0, 0.2, 12.0, [0.1, 0.02, 0.03, 0.12]).air(
+        [4.5, 3.5, 3.3, 2.8],
+        [0.3, 0.3, 0.3, 0.3],
+        Fog::Dawn,
+    ),
+    c("animals:scrubland", "the Barun Goyot Formation, Mongolia", 17.0, 0.3, 11.0, [0.06, 0.25, 0.08, 0.04]).air(
+        [3.8, 3.2, 2.9, 2.5],
+        [0.5, 1.0, 0.5, 0.0],
+        Fog::Dawn,
+    ),
+    c("animals:floodplain", "the Cedar Mountain Formation, Utah", 21.0, 0.5, 8.0, [0.08, 0.45, 0.25, 0.04]).air(
+        [2.5, 2.5, 2.0, 1.8],
+        [2.0, 1.0, 2.0, 5.0],
+        Fog::Dawn,
+    ),
+    c("animals:fern_forest", "the Yixian Formation, Liaoning", 10.0, 0.8, 10.0, [0.25, 0.45, 0.3, 0.15]).air(
+        [2.8, 2.0, 1.8, 1.8],
+        [2.0, 4.0, 6.0, 2.0],
+        Fog::Dawn,
+    ),
+    c("animals:crags", "the Sevier highlands, Utah", 15.0, 0.6, 8.0, [0.25, 0.4, 0.25, 0.15]).air(
+        [4.5, 3.7, 3.7, 3.7],
+        [5.0, 1.0, 3.0, 6.0],
+        Fog::Dawn,
+    ),
 ];
 
 /// The climate of a biome by its full name.
