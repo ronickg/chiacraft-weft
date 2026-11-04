@@ -280,7 +280,8 @@ pub(crate) struct Running {
     ui_cached: Vec<crate::ui::render::Quad>,
     ui_animated: Vec<crate::ui::render::Animated>,
     /// Where UI asked for the player model, physical pixels.
-    previews: Vec<[f32; 4]>,
+    /// Where 3D previews go, and whose: the player (0) or the open menu's own entity (1).
+    previews: Vec<([f32; 4], u64)>,
     /// Texture holding the rendered inventory figure, drawn by the UI.
     preview_tex: Option<u32>,
     shot_path: Option<PathBuf>,
@@ -2562,7 +2563,7 @@ fn build_ui_quads(r: &mut Running, scale: f32) {
             crate::hud::draw_custom(ren, look, textures, client, tag, data, rect, hovered, icon, scale, unit);
             if tag == crate::client::modui::TAG_ENTITY {
                 let inner = crate::ui::Rect { x: rect.x + scale, y: rect.y + scale, w: rect.w - 2.0 * scale, h: rect.h - 2.0 * scale };
-                previews.push([inner.x, inner.y, inner.w, inner.h]);
+                previews.push(([inner.x, inner.y, inner.w, inner.h], data));
                 if let Some(t) = preview_tex {
                     ren.image(inner, t, [0.0, 0.0, 1.0, 1.0], 0xFFFFFFFF);
                 }
@@ -2652,13 +2653,22 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
 fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
     r.list.clear();
     if let Some(g) = r.game.as_mut().filter(|_| !r.screens.is_empty()) {
-        if let Some(&[x, y, w, h]) = r.previews.first() {
+        if let Some(&([x, y, w, h], whose)) = r.previews.first() {
             let worn = g.client.worn();
             let look = r.input.cursor - Vec2::new(x, y);
-            let tex =
-                g.client
-                    .entity_render
-                    .draw_preview(&mut *r.gpu, &mut r.list, info, [w.round() as u32, h.round() as u32], look, &worn);
+            let subject = (whose == 1)
+                .then(|| g.client.menu.as_ref().map(|m| m.owner))
+                .flatten()
+                .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind)));
+            let tex = g.client.entity_render.draw_preview(
+                &mut *r.gpu,
+                &mut r.list,
+                info,
+                [w.round() as u32, h.round() as u32],
+                look,
+                &worn,
+                subject,
+            );
             if tex != r.preview_tex {
                 r.preview_tex = tex;
                 r.quads_dirty = true;

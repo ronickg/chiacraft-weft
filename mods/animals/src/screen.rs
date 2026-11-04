@@ -354,13 +354,17 @@ fn animal_screen(ui: &mut Ui) {
     window(ui, S::row().pad(8.0).gap(10.0), |ui| {
         // Left: the level on a badge, the name, life, how it feels, and the facts.
         ui.column(S::col().gap(3.0).w(108.0), |ui| {
-            ui.row(S::row().gap(4.0).center(), |ui| {
-                ui.panel("hud_badge", S::row().size(20.0, 24.0).center(), |ui| {
+            // The animal itself, turning with the mouse, its level on a badge in the corner.
+            ui.panel("well", S::row().size(108.0, 70.0), |ui| {
+                ui.entity_model(106.0, 68.0);
+                ui.panel("hud_badge", S::row().size(20.0, 24.0).center().at(2.0, 2.0), |ui| {
                     ui.text_bind_styled(S::default().no_wrap(), |c, t| {
                         let Some(a) = c.menu_component(&ANIMAL) else { return };
                         t.set("screen.animals.badge", &[Arg::Int(a.level() as i64)]);
                     });
                 });
+            });
+            ui.row(S::row().gap(4.0).center(), |ui| {
                 ui.column(S::col().gap(1.0), |ui| {
                     title(ui, false);
                     ui.text_bind_styled(S::default().class("dim").no_wrap(), |c, t| {
