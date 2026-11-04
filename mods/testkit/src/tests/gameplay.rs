@@ -187,9 +187,10 @@ pub async fn armor(t: T) -> R {
     }
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    // The inventory menu: the 2x2 grid (0-3), its result (4), the eight equipment slots (armor's
-    // four and the clothes' four, 5-12), the main inventory (13-39), then the hotbar (40-48).
-    for i in 40..44 {
+    // The inventory menu: the 2x2 grid (0-3), its result (4), the nine equipment slots (armor's
+    // four, the clothes' four and the cloak, 5-13), the main inventory (14-40), then the hotbar
+    // (41-49).
+    for i in 41..45 {
         t.c().key("ShiftLeft", 0.3);
         t.frames(1).await?;
         t.click_ui(&format!("slot:{i}"), 0);
@@ -198,8 +199,8 @@ pub async fn armor(t: T) -> R {
     t.until("armor worn", Duration::from_secs(5), |t| (36..40).all(|s| !t.c().inventory_slot(s).is_empty()))
         .await?;
     // The player's inventory by group name: four equipment slots, all filled; the hotbar empty.
-    // Armor's four and the clothes' four, the arrival clothes on.
-    t.check_eq(t.op("group me core:equipment").await?, "8 8".to_string(), "equipment group (slots, filled)");
+    // Armor's four, the clothes' four and the cloak; the arrival clothes on, no cloak.
+    t.check_eq(t.op("group me core:equipment").await?, "9 8".to_string(), "equipment group (slots, filled)");
     t.check_eq(t.op("group me base:head").await?, "1 1".to_string(), "the head slot");
     t.check_eq(t.op("group me hotbar").await?, "9 0".to_string(), "hotbar group");
     t.shot("worn").await?;

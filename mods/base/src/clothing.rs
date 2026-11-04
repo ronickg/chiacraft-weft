@@ -43,6 +43,17 @@ fn dress(w: &World, player: u64) {
     }
 }
 
+/// What each cloak is sewn from, its shape (`X` the material, `s` string), and how far out it's drawn
+/// (over armor's 1).
+fn cloak_recipe(name: &str) -> (&'static str, &'static [&'static str]) {
+    match name {
+        "wool_cloak" => ("wool", &["XsX", " X "]),
+        "fur_robe" => ("#pelts", &["XXX", "XsX"]),
+        _ => ("#materials/leather", &["XsX", "XXX"]),
+    }
+}
+const CLOAK_INFLATE: f32 = 1.2;
+
 /// A piece's shape in the grid by how much material it takes (`X`, with `vitals::clothing::STRING`
 /// of string `s`): each piece of a material its own, so a hat and boots of the same stuff differ.
 fn pattern(piece: usize, material: u32) -> Option<&'static [&'static str]> {
@@ -111,6 +122,23 @@ pub fn register(r: &mut Registry) {
     r.shapeless(&CRAFTING, "string", 1, &vec!["#plant_fibre"; clothing::FIBRE_PER_STRING as usize], 0);
     r.shaped(&CRAFTING, "cloth", 1, &["sss"], &[('s', "#string")]);
 
+    for c in &clothing::CLOAKS {
+        let warmth = Warmth {
+            cold: c.cold.round() as u32,
+            heat: c.heat.round() as i32,
+            wet: (c.wet_keeps * 100.0).round() as u32,
+            wind: (c.windproof * clothing::CLOAK_COVERS * 100.0).round() as u32,
+        };
+        r.item(Item::generated(c.name.into()))
+            .max_stack(1)
+            .set(&WARMTH, warmth)
+            .tag("clothes")
+            .tag("cloaks")
+            .wearable(&base_api::CLOAK, CLOAK_INFLATE, &format!("clothes/{}", c.name))
+            .tab(&crate::tabs::COMBAT);
+        let (from, rows) = cloak_recipe(c.name);
+        r.shaped(&CRAFTING, c.name, 1, rows, &[('X', from), ('s', "#string")]);
+    }
     for m in &MATERIALS {
         for (piece, name) in PIECES.iter().enumerate() {
             let share = PIECE_SHARE[piece];

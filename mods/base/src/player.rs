@@ -42,6 +42,8 @@ pub fn register(r: &mut Registry) {
         (&base_api::COAT, worn_parts::BODY | worn_parts::ARMS, "coat"),
         (&base_api::TROUSERS, worn_parts::BODY | worn_parts::LEGS, "trousers"),
         (&base_api::SHOES, worn_parts::LEGS, "shoes"),
+        // And a cloak over everything (CONTENT decision 3: nine slots).
+        (&base_api::CLOAK, worn_parts::BODY | worn_parts::ARMS, "cloak"),
     ] {
         r.equipment_slot(slot, parts, &format!("slot_{piece}"));
     }
@@ -138,14 +140,18 @@ pub fn register(r: &mut Registry) {
             ];
             crate::window::window(ui, S::col().pad(7.0).gap(5.0), &tabs, |ui| {
                 ui.row(S::row().gap(1.0), |ui| {
-                    // Armor, and the clothes worn under it beside.
-                    for slots in [&EQUIPMENT, &base_api::CLOTHES] {
-                        ui.column(S::col(), |ui| {
-                            for slot in slots.iter() {
-                                ui.group(slot.name());
-                            }
-                        });
-                    }
+                    // Armor, and the clothes worn under it beside, the cloak under them.
+                    ui.column(S::col(), |ui| {
+                        for slot in EQUIPMENT.iter() {
+                            ui.group(slot.name());
+                        }
+                    });
+                    ui.column(S::col(), |ui| {
+                        for slot in base_api::CLOTHES.iter() {
+                            ui.group(slot.name());
+                        }
+                        ui.group(base_api::CLOAK.name());
+                    });
                     ui.player_model(51.0, 72.0);
                     ui.spacer();
                     ui.column(S::col().gap(2.0), |ui| {

@@ -175,6 +175,24 @@ fn clothes(w: &mut String) {
             m.from
         );
     }
+    let _ = writeln!(
+        w,
+        "\nCloaks, in a slot of their own over clothes and armor (covering {:.0}% of the body against the wind):\n\n| cloak | cold °C | heat °C | kept wet | windproof | keeps the rain off | from |\n|---|---|---|---|---|---|---|",
+        clothing::CLOAK_COVERS * 100.0
+    );
+    for c in clothing::CLOAKS {
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {:.0}% | {:.0}% | {} | {} |",
+            c.name,
+            c.cold,
+            c.heat,
+            c.wet_keeps * 100.0,
+            c.windproof * 100.0,
+            if c.keeps_dry { "yes" } else { "no" },
+            c.from
+        );
+    }
     let _ = writeln!(w);
 }
 

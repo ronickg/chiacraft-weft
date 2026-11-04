@@ -644,6 +644,8 @@ pub static COAT: EquipmentSlot = EquipmentSlot::named("base:coat");
 pub static TROUSERS: EquipmentSlot = EquipmentSlot::named("base:trousers");
 pub static SHOES: EquipmentSlot = EquipmentSlot::named("base:shoes");
 pub const CLOTHES: [&EquipmentSlot; 4] = [&HAT, &COAT, &TROUSERS, &SHOES];
+/// A cloak, over clothes and armor (`vitals::clothing::CLOAKS`).
+pub static CLOAK: EquipmentSlot = EquipmentSlot::named("base:cloak");
 
 pub static OVERWORLD: Dimension = Dimension::named("base:overworld");
 pub static FLATLANDS: Dimension = Dimension::named("base:flatlands");

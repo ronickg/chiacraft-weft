@@ -623,3 +623,9 @@ hud.base.wall.plank = plank
 hud.base.wall.stone = stone
 hud.base.wall.hide = hide
 hud.base.wall.glass = glass
+
+# Cloaks (clothing.rs, vitals::clothing::CLOAKS)
+item.base.wool_cloak = Wool Cloak
+item.base.fur_robe = Fur Robe
+item.base.rain_cape = Rain Cape
+item.base.rain_cape.tooltip = Rain doesn't make you wet under it.

@@ -84,12 +84,13 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
     let mut comfort = 0u32;
     let here = base_api::air_at(w, st.pos, st.size[2], st.in_liquid != 0, HEAT_REACH, |state| comfort |= super::camp::comfort_of(state));
     (v.date, v.calendar) = (here.day, here.calendar);
-    if st.in_liquid != 0 || (here.open_sky && here.raining) {
+    let worn = worn(w, id);
+    // A rain cape keeps the rain off; water still soaks.
+    if st.in_liquid != 0 || (here.open_sky && here.raining && !worn.dry_in_rain) {
         v.wet = WET_SECS;
     } else {
         v.wet = (v.wet - 1.0 - here.fire / 3.0).max(0.0);
     }
-    let worn = worn(w, id);
     let body = Body {
         comfort: temperature::PERSON,
         cold_insulation: worn.cold,
@@ -149,7 +150,9 @@ fn worn(w: &World, id: u64) -> Worn {
             continue;
         }
         let name = item_name(stack.item);
-        if let Some((m, piece)) = clothing::piece_of(name) {
+        if let Some(c) = clothing::cloak_of(name) {
+            worn.cloak(c);
+        } else if let Some((m, piece)) = clothing::piece_of(name) {
             worn.clothes(m, piece);
         } else if i < 4 {
             let material = name

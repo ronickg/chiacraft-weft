@@ -616,3 +616,9 @@ hud.base.wall.plank = доски
 hud.base.wall.stone = камень
 hud.base.wall.hide = шкуры
 hud.base.wall.glass = стекло
+
+# Плащи (clothing.rs, vitals::clothing::CLOAKS)
+item.base.wool_cloak = Шерстяной плащ
+item.base.fur_robe = Меховая накидка
+item.base.rain_cape = Дождевая накидка
+item.base.rain_cape.tooltip = Под ней дождь вас не мочит.

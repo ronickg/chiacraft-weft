@@ -635,3 +635,16 @@ numbers are `reports/content/Building and workstations.md` B3; `vitals::shelter`
   when open (an open door already lets the fill out), body heat in a small room, snow walls
   melting, thatch roofs' extra.
 
+**19. Two layers and a cloak** (2026-11-04 overnight, `notes/CONTENT.md` decision 3, taken by the
+content plan; logged in `notes/crew/OVERNIGHT.md`):
+
+- Nine equipment slots: armor's four, the clothes' four under it, and a cloak over everything
+  (`base_api::CLOAK`), shown under the clothes' column in the inventory.
+- Three cloaks (`vitals::clothing::CLOAKS`, from the content research): a wool cloak (+4 °C,
+  keeps 60% wet), a fur robe (+8, -3 in the heat), a rain cape (+1; rain doesn't make one wet
+  under it, water still does). A cloak covers 60% of the body against the wind.
+- Recipes: wool cloak 3 wool and a string, fur robe 5 pelts and a string, rain cape 5 leather and
+  a string. Placeholder art (tinted leather) until the art pass; the worn layer draws over armor.
+- Not yet: the research's other cloaks (bison robe, down cloak, the Cretaceous's feather cloak,
+  a gut parka once there's gut), and a cloak as bedding.
+
