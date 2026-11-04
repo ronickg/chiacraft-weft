@@ -90,7 +90,8 @@ type Entry = (Recipe, u32, Option<(u32, u32, u32)>);
 /// The bag as the open book last saw it (`client_frame` above).
 static BAG_SIG: Mutex<u64> = Mutex::new(0);
 
-static BOOK: Mutex<Book> = Mutex::new(Book { tab: 0, page: 0, picked: None, order: Vec::new(), pool: Vec::new(), asked: u32::MAX, ask: None });
+static BOOK: Mutex<Book> =
+    Mutex::new(Book { tab: 0, page: 0, picked: None, order: Vec::new(), pool: Vec::new(), asked: u32::MAX, ask: None });
 
 pub fn register(r: &mut Registry) {
     r.tag("chests", &["chest"]);
@@ -190,7 +191,11 @@ fn first_missing(r: &Recipe, have: &[(u32, u32)]) -> Option<(u32, u32)> {
         }
     }
     lines.into_iter().find_map(|(n, shown, need)| {
-        let got: u32 = have.iter().filter(|(i, _)| r.accepts(n, *i)).map(|(_, c)| c).sum();
+        let got: u32 = have
+            .iter()
+            .filter(|(i, _)| r.accepts(n, *i))
+            .map(|(_, c)| c)
+            .sum();
         (got < need).then_some((shown, need - got))
     })
 }
@@ -523,19 +528,34 @@ pub fn book(ui: &mut Ui, station: Station) {
         let ids: Vec<u32> = list.iter().map(|(r, _, _)| id_of(r)).collect();
         edit(|b| b.order = ids);
     } else {
-        list.sort_by_key(|(r, _, _)| order.iter().position(|&o| o == id_of(r)).unwrap_or(usize::MAX));
+        list.sort_by_key(|(r, _, _)| {
+            order
+                .iter()
+                .position(|&o| o == id_of(r))
+                .unwrap_or(usize::MAX)
+        });
     }
     // Something picked from the start, so the book names a recipe at once.
     let picked = picked
-        .filter(|p| list.iter().any(|(r, _, near)| near.is_none() && id_of(r) == *p))
-        .or_else(|| list.iter().find(|(_, _, near)| near.is_none()).map(|(r, _, _)| id_of(r)));
+        .filter(|p| {
+            list.iter()
+                .any(|(r, _, near)| near.is_none() && id_of(r) == *p)
+        })
+        .or_else(|| {
+            list.iter()
+                .find(|(_, _, near)| near.is_none())
+                .map(|(r, _, _)| id_of(r))
+        });
     let pages = list.len().div_ceil(PER_PAGE).max(1);
     let page = page.min(pages - 1);
 
     ui.panel("panel", S::col().pad(7.0).gap(3.0), |ui| {
         ui.text_styled(S::col().class("title"), "crafting.book.title", &[]);
         // The picked recipe's name, at the top (Ronald's first-day test: the book was icons only).
-        if let Some((out, _)) = picked.and_then(recipe_of).and_then(|r| r.outputs().into_iter().next()) {
+        if let Some((out, _)) = picked
+            .and_then(recipe_of)
+            .and_then(|r| r.outputs().into_iter().next())
+        {
             let name = name_of(out.item);
             ui.text_args("crafting.book.picked", &[Arg::Name(&name)]);
         }
@@ -580,10 +600,10 @@ pub fn book(ui: &mut Ui, station: Station) {
                     for (r, n, near) in row {
                         if let Some((got, all, missing)) = *near {
                             ui.button_with(
-                                S::default()
-                                    .size(18.0, 18.0)
-                                    .class("slot")
-                                    .tooltip_args("crafting.book.near", &[Arg::Int(got as i64), Arg::Int(all as i64), Arg::Name(&name_of(missing))]),
+                                S::default().size(18.0, 18.0).class("slot").tooltip_args(
+                                    "crafting.book.near",
+                                    &[Arg::Int(got as i64), Arg::Int(all as i64), Arg::Name(&name_of(missing))],
+                                ),
                                 |_| {},
                                 |ui| ui.text_styled(S::col().class("dim"), "crafting.book.unknown", &[]),
                             );
