@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a campfire seen from the front and slightly above: three or four short split logs crossed in a ring on a few grey stones, a bright teardrop flame rising from the middle (yellow-white core, orange body, dark orange edge), a little grey ash, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.597,
+   "outline": 0.62,
+   "red_line": 0.04,
+   "fill": 0.5,
+   "passed": true
+  }
+ ]
+}

@@ -67,8 +67,6 @@ pub static HAY_BALE: Block = Block::named("hay_bale");
 pub static PODZOL: Block = Block::named("podzol");
 /// The desert's scrub: a few sticks where there is no wood.
 pub static DEAD_BUSH: Block = Block::named("dead_bush");
-/// Wild berries in forests: a food found, then come back for when it has ripened.
-pub static BERRY_BUSH: Block = Block::named("berry_bush");
 
 /// Log axis along the clicked face, like vanilla.
 fn axis_placement(p: &Place, props: &mut Props) {
@@ -468,7 +466,14 @@ pub fn register(r: &mut Registry) {
         .sound_group("gravel")
         // How worn its fertility is (`farming.rs`): 0 fresh, 3 worn out.
         .prop("worn", 0..=3)
-        .textures("farmland", "dirt", "dirt")
+        // Paler and cracked as it wears.
+        .states(|p, s| {
+            let top = match p.get("worn") {
+                "0" => "farmland".to_string(),
+                n => format!("farmland_worn_{n}"),
+            };
+            s.textures(&top, "dirt", "dirt")
+        })
         .growth(vitals::soil::FALLOW_SECS, 0)
         .on_grow(crate::farming::fallow)
         .model_box([0.0, 0.0, 0.0], [16.0, 15.0, 16.0])
@@ -620,6 +625,7 @@ pub fn register(r: &mut Registry) {
     r.loot(&DEAD_BUSH)
         .pool(Pool::new().when(Cond::Chance(0.7)).item("stick"))
         .pool(Pool::new().when(Cond::Chance(0.35)).item("stick"));
+<<<<<<< HEAD
     r.block(&BERRY_BUSH)
         .sound_group("grass")
         .prop("age", 0..=3)
@@ -646,18 +652,21 @@ pub fn register(r: &mut Registry) {
                 .when(Cond::BlockState("age=3"))
                 .entry(Entry::item("berries")),
         );
+=======
+>>>>>>> chihuahua-papillon-model
     // Spoiled food, dung and plant waste rot into compost (`farming.rs`): its level shows as it
-    // fills, the top dark and rich when it's ready (placeholder look, `notes/STYLE.md`).
+    // fills, the top dark and rich when it's ready.
     r.block(&COMPOST_BIN)
         .sound_group("wood")
         .prop("level", 0..=8)
         .states(|p, s| {
+            // Empty, filling, then full while it rots and when it's compost.
             let top = match p.get("level") {
-                "0" => "planks_oak",
-                "8" => "podzol",
-                _ => "dirt",
+                "0" => "compost_bin_top_empty",
+                "7" | "8" => "compost_bin_top_full",
+                _ => "compost_bin_top_filling",
             };
-            s.textures(top, "planks_oak", "planks_oak")
+            s.textures(top, "compost_bin_side", "compost_bin_side")
         })
         .hardness(0.6)
         .mineable("axe")

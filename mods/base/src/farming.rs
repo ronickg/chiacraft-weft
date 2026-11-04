@@ -36,16 +36,9 @@ pub fn register(r: &mut Registry) {
     });
 }
 
-/// Farmland's fertility at `pos` (`None`: not farmland).
+/// Farmland's fertility at `pos` (`None`: not farmland; `base_api::grow::fertility`).
 pub fn fertility(w: &World, pos: [i32; 3]) -> Option<u8> {
-    let state = w.get(pos);
-    if !FARMLAND.is(state) {
-        return None;
-    }
-    let worn = state_prop(state, "worn")
-        .and_then(|v| v.parse::<u8>().ok())
-        .unwrap_or(0);
-    Some(soil::MAX.saturating_sub(worn))
+    base_api::grow::fertility(w, pos)
 }
 
 /// Farmland at `pos` worn by `by` levels (negative: given back).

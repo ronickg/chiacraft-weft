@@ -7,6 +7,9 @@
 
 use weft_sdk::*;
 
+pub mod grow;
+pub mod trees;
+
 value! {
     /// Fired when a furnace finishes one item.
     pub struct Smelted { pub furnace: u64, pub input: u32, pub output: ItemStack }

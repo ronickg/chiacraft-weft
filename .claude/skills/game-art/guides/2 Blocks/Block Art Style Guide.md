@@ -278,6 +278,8 @@ Earthy, aged medieval fantasy: mossy sage stone, dark walnut wood, iron-banded w
 > **Background (cutouts):** flat `#FF00FF` magenta where the texture is see-through (gaps in leaves, around a plant); it becomes transparent. Full cubes fill every pixel.
 >
 > **Tinted textures:** in our game grass tops, leaves, short grass, ferns and water are drawn in light greyscale and tinted by the biome; a grass block's sides carry their own colour.
+>
+> **Faces of smaller boxes:** a block shaped as a smaller box (a pot, a campfire, a rack) shows only the part of each face texture matching the box's position, as in Minecraft: a side of a box 10 px high (of 16) shows only the bottom 20 of the 32 rows, a box 12 wide only the middle 24 columns. Say in the prompt which rows and columns show, and put the rim, the stones or the flames there (Survival's pot and campfire, 11-04).
 
 How to prompt, check and cut it: `0 Making it.md`.
 

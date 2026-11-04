@@ -366,6 +366,7 @@ block.base.moriche_palm_sapling = Саженец пальмы морише
 item.base.mesquite_pod = Стручки мескита
 item.base.acuri_nut = Орех акури
 item.base.moriche_fruit = Плод морише
+<<<<<<< HEAD
 
 # Filled from en_us (Research round 3, T1)
 color.default = {#f5e4bc}
@@ -521,3 +522,8 @@ item.base.salt.tooltip = Вываривается из ведра воды в п
 item.base.leather.tooltip = С коров и оленей.
 item.base.string.tooltip = С пауков или спрядена из двух растительных волокон.
 block.base.wool.tooltip = С овец или из четырёх нитей.
+=======
+block.base.kelp = Ламинария
+item.base.kelp = Ламинария
+item.base.cooked_wild_rice = Варёный дикий рис
+>>>>>>> chihuahua-papillon-model
