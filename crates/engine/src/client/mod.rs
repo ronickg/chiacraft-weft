@@ -2286,7 +2286,9 @@ impl Client {
                 _ => [0.0; 4],
             },
             shadow: match self.shadow_map {
-                Some(t) if self.shadow.1 => [self.shadow_index(t) as f32, self.shadow_size as f32, 1.0, 2.0 * SHADOW_REACH / self.shadow_size as f32],
+                Some(t) if self.shadow.1 => {
+                    [self.shadow_index(t) as f32, self.shadow_size as f32, 1.0, 2.0 * SHADOW_REACH / self.shadow_size as f32]
+                }
                 _ => [0.0; 4],
             },
         }
@@ -2341,7 +2343,10 @@ impl Client {
             _ => 4096,
         };
         if size != self.shadow_size {
-            for t in [self.shadow_map.take(), self.shadow_far_map.take()].into_iter().flatten() {
+            for t in [self.shadow_map.take(), self.shadow_far_map.take()]
+                .into_iter()
+                .flatten()
+            {
                 gpu.destroy_texture(t);
             }
             self.shadow_size = size;
@@ -2354,13 +2359,7 @@ impl Client {
         }
         let map = |gpu: &mut dyn Backend, label: &str| {
             gpu.create_texture(
-                &weft_render::TextureDesc {
-                    width: size,
-                    height: size,
-                    mips: 1,
-                    format: weft_render::Format::Depth32,
-                    render_target: true,
-                },
+                &weft_render::TextureDesc { width: size, height: size, mips: 1, format: weft_render::Format::Depth32, render_target: true },
                 label,
             )
         };
