@@ -893,9 +893,17 @@ impl Terrain {
         if self.surface_carved(seed, x, z) {
             return 0;
         }
-        let cols = self.columns(seed, x.div_euclid(16), z.div_euclid(16));
-        let i = (z.rem_euclid(16) * 16 + x.rem_euclid(16)) as usize;
-        self.surface_of(cols.rules[i], cols.cols[i].height)
+        // Its own column unless its cube's are known: working out all 256 of the cube (every
+        // feature, mods' included) for one cost 1-2 ms, and distant terrain asks this (through the
+        // dimension's faces) for steep cells far apart, where no cube is.
+        let (col, rule) = match self.cache.peek(seed, x.div_euclid(16), z.div_euclid(16)) {
+            Some(c) => {
+                let i = (z.rem_euclid(16) * 16 + x.rem_euclid(16)) as usize;
+                (c.cols[i], c.rules[i])
+            }
+            None => self.compute(seed, x, z),
+        };
+        self.surface_of(rule, col.height)
     }
 
     /// Smoothed surface height (Q4) at local column (x, z) from the cube's corner grid.

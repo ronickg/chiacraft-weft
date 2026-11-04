@@ -991,8 +991,10 @@ impl Lod {
                 continue;
             }
             order.push((key.level, n, key));
+            // A stale tile still shows as it was: no stand-in for it.
             let up = key.parent();
-            if key.level < MAX_LEVEL
+            if !self.ready.contains(&key)
+                && key.level < MAX_LEVEL
                 && !self.ready.contains(&up)
                 && !key.children().iter().all(|k| self.ready.contains(k))
                 && parents.insert(up)
