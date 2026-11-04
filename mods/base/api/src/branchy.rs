@@ -90,6 +90,10 @@ pub struct Recipe {
     pub fronds: u32,
     pub frond_len: f32,
     pub frond_droop: f32,
+    /// The fronds' angle from upright where they leave the top, and how much it varies (± degrees):
+    /// a feather palm's rise steep and arch over, a fan palm's go every way, a round ball.
+    pub frond_angle: f32,
+    pub frond_spread: f32,
     /// Its own reach sideways and height (0: `REACH`, `MAX_HEIGHT`), for the giants; its
     /// scatter must reach as far.
     pub reach: i32,
@@ -131,6 +135,8 @@ impl Recipe {
         fronds: 0,
         frond_len: 0.0,
         frond_droop: 0.42,
+        frond_angle: 62.0,
+        frond_spread: 8.0,
         reach: 0,
         max_height: 0,
         flare: 0.0,
@@ -442,7 +448,7 @@ impl Grow<'_> {
         self.out.cluster(top, 1.0, 0.9, 0.0, self.seed);
         for i in 0..r.fronds {
             let yaw = 360.0 * i as f32 / r.fronds as f32 + self.rng.s() * 12.0;
-            let mut d = dir(62.0 + self.rng.s() * 8.0, yaw);
+            let mut d = dir(r.frond_angle + self.rng.s() * r.frond_spread, yaw);
             let mut p = top;
             let mut l = 0.0;
             while l < r.frond_len * self.size {
