@@ -746,14 +746,16 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // thousands of blocks off, and the haze would barely start where the kept blocks give way to it.
     // Clear air veils by wavelength, as Bliss's and Photon's atmospheres do: the sky's blue
     // (Rayleigh) goes first, red hardly at all, so far land goes a little blue and keeps its
-    // contrast; a grey veil the same in every channel (the old haze, and its paling) made it
-    // milky (Ronald, 11-05: "a bit hazy ... much clearer ... crisp"). Grey haze (Mie) comes with
-    // the conditions: rain, the weather's fog, a forest's damp air. Per block at the ground:
-    // blue 1.6e-4, so a tenth of the way to the sky's colour at about 650 blocks, a third at 2500.
+    // contrast. And it starts further out (Ronald, 11-05: "it should be a bit hazy ... that's in
+    // real life the same ... but in the close proximity it can be a bit more clear"): next to
+    // nothing within about 150 blocks, rising steeply past it to the far haze as it was (in the
+    // blue, about a fifth of the way to the sky's colour at 1000 blocks). Grey haze (Mie) comes
+    // with the conditions: rain, the weather's fog, a forest's damp air, and a little always.
     let k = look_opt(OPT_HAZE, 1.0) * mix(0.45, 1.0, thin);
-    let rayleigh = vec3(0.35, 0.6, 1.0) * 1.6e-4 * k;
-    let mie = (0.3e-4 + 3.0e-4 * rain + 2.0e-4 * scene.weather.z + 0.8e-4 * min(canopy(), 1.0)) * k;
-    let veil = vec3(1.0) - exp(-(rayleigh + vec3(mie)) * dist);
+    let rayleigh = vec3(0.35, 0.6, 1.0) * 2.6e-4 * k;
+    let mie = (0.4e-4 + 3.0e-4 * rain + 2.0e-4 * scene.weather.z + 0.8e-4 * min(canopy(), 1.0)) * k;
+    let far = dist * smoothstep(90.0, 450.0, dist);
+    let veil = vec3(1.0) - exp(-(rayleigh + vec3(mie)) * far);
     // Only the last sixth of the view hands over to the sky's colour where the terrain ends.
     let edge = smoothstep(end * 0.84, end, dist);
     // Valheim's air: lit from behind by the sun, so the haze toward it glows warm (a forward
@@ -766,8 +768,10 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let near_end = 1.0 - edge;
     var lit = color + p.glow * light_strength() * lobe * mix(0.25, 0.7, golden()) * (1.0 - rain) * near_end;
     lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
-    // Per channel (the veil's blue thicker than its red), then the handover at the end.
-    let seen = mix(c, lit, veil);
+    // Far ridges still lose a little colour (as before, but only where the veil has begun), then
+    // the veil per channel (its blue thicker than its red), then the handover at the end.
+    let pale = mix(c, vec3(luma(c)), clamp(veil.b * 0.6, 0.0, 0.3));
+    let seen = mix(pale, lit, veil);
     return mix(seen, lit, edge);
 }
 
