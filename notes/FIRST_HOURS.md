@@ -1,7 +1,21 @@
 # The first hours
 
-Status: **a proposal for Ronald** (11-05), nothing built. The research behind it is
-`reports/The first hours.md`.
+Status: **decided by Ronald** (11-05, relayed by Planner): "B: about 13-15 min", "Knapping
+screen, then book", "Fire bed + bow drill", "Knapped stone pick, no chopper". Slices 1-3 built
+(`mods/base/src/first.rs`, `knapping.rs`, `firebed.rs`; numbers `vitals::first`), waiting for PC
+runs. The research behind it is `reports/The first hours.md`.
+
+**As built, where it differs from the proposal below:**
+- The fire bed is three sticks and a fibre (the 2 × 2 holds four).
+- The knapping screen opens by sneaking and striking a flint nodule on the ground with a rock. It
+  knaps an axe head (8 squares away), a pick head (13) or a shovel blade (8). A click inside the
+  outline breaks the nodule into a flake. No knife blade: a knife is a flake on a stick.
+- After a head of a shape has been held, flint makes it from the book or the grid (1 flint an
+  axe head, 2 side by side a pick head, 2 stacked a shovel blade), from memory. It's instant;
+  a craft time waits for the book's queue.
+- No shaved-haft step: the stick in the hafting recipe is the haft (`branch` wood).
+- The lit bed becomes today's campfire. Today's campfire recipe (two logs, two sticks) still
+  places a lit one; lighting it with the drill is Survival's campfire, for later.
 
 Ronald (11-05): "you can't just punch down a tree. You first got to get a rock, and then if you
 want to create an axe, well, what do you need for axe? ... wood, sticks, you need ropes." And:
