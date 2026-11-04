@@ -1645,7 +1645,11 @@ impl Dim {
             .par_iter()
             .map(|&i| {
                 let (e, nav) = (&list[i], list[i].nav.as_ref().unwrap());
-                let height = c.game.entities[e.kind as usize].height.ceil() as i32;
+                // Its own size: a mod may set it (`World::set_size`), and scale it (`set_scale`).
+                let kind = &c.game.entities[e.kind as usize];
+                let [w, h] = e.size.map_or([kind.width, kind.height], |s| [s[0], s[1]]);
+                let height = (h * e.scale).ceil().max(1.0) as i32;
+                let width = w * e.scale;
                 match on_body(e) {
                     Some((f, place)) => {
                         let deck = &bodies[&f];
@@ -1655,9 +1659,10 @@ impl Dim {
                             place.to_local(e.pos).floor().as_ivec3(),
                             nav.target.floor().as_ivec3(),
                             height,
+                            width,
                         )
                     }
-                    None => super::path::find(c, &block, e.pos.floor().as_ivec3(), nav.target.floor().as_ivec3(), height),
+                    None => super::path::find(c, &block, e.pos.floor().as_ivec3(), nav.target.floor().as_ivec3(), height, width),
                 }
             })
             .collect();
