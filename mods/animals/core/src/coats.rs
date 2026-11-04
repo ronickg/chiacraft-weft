@@ -1650,6 +1650,17 @@ pub fn size(genome: &Genome) -> f32 {
     (1.0 + s.size_spread * (sz - 0.5) * 2.0) * sex
 }
 
+/// How big an average one of species `index` is drawn against its model (its gene file's `Sz`
+/// mean, spread by `size_spread`): a species drawn bigger or smaller than its model (the lungfish
+/// on the trout's, the spectacled caiman on the yacare's) has its row's mass at this size, not at 1.
+pub fn mean_size(index: usize) -> f32 {
+    let Some(s) = SPECIES.get(index) else { return 1.0 };
+    let mean = gene_file(s.name)
+        .and_then(|g| g.loci.iter().find(|l| l.id == "Sz"))
+        .map_or(0.5, |l| l.mean);
+    1.0 + s.size_spread * (mean - 0.5) * 2.0
+}
+
 /// Its size genes (`Sz`), 0..1: small to big for its kind (what it passes on).
 pub fn size_gene(genome: &Genome) -> f32 {
     let Some(s) = (genome.species as usize)
