@@ -73,7 +73,8 @@ pub async fn held_items(t: T) -> R {
     );
     t.check(!handheld("base:apple") && !handheld("base:stone"), "the rest are not");
     t.flat().await?;
-    for (i, name) in ["wood_pickaxe", "diamond_sword", "glass", "rose", "torch"]
+    // (wool: the 32 px glass is mostly see-through in a brown frame, too little of it light)
+    for (i, name) in ["wood_pickaxe", "diamond_sword", "wool", "rose", "torch"]
         .iter()
         .enumerate()
     {
