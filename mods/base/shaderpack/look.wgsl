@@ -772,6 +772,9 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let near_end = 1.0 - edge;
     var lit = color + p.glow * light_strength() * lobe * mix(0.25, 0.7, golden()) * (1.0 - rain) * near_end;
     lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
+    // Rain's mist is as dark as the rain's sky, darker in a thunderstorm: lit as a clear day's
+    // air, a storm's mist was pale under a dark sky.
+    lit *= mix(1.0, 0.75 - 0.35 * scene.weather.w, rain);
     // Far ridges still lose a little colour (as before, but only where the veil has begun), then
     // the veil per channel (its blue thicker than its red), then the handover at the end.
     // In rain everything takes a little grey-blue wash, near too.
