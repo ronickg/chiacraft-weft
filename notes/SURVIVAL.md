@@ -572,4 +572,9 @@ sword, about 100 XP.
   one within 8 blocks across (4 up or down) walks out of the ring, and a player inside it isn't
   chased, shot or blown up; the monster waits at the edge. Zombies, spiders, creepers and
   skeletons; each looks for a campfire once a second.
+- Seen in the game (Tester 2, clothcook5, 11-04): the night hint at 16:02 on spring day 8; a
+  player-placed campfire, then a midnight with monsters on: none within 32 blocks for a minute,
+  the player unharmed. In the taiga at dawn on spring day 8 in arrival clothes the cold hint came
+  at once (air -9.5 °C), the core fell to 34.5 °C by night (Cold, not yet Freezing) and came back
+  beside a campfire (air +9.6 °C).
 
