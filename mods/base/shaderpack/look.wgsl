@@ -57,10 +57,11 @@ fn palette() -> Palette {
     // Day, after Bliss's own colours (reports in the crew notes, bliss-source.md): a muted blue
     // overhead, about sRGB 50 92 148 (it was 6 139 237), going to a light grey-blue at the horizon
     // (155 178 202), as Bliss's default sky; not a saturated #4A90E2 blue, and not the grey-beige
-    // of Bliss with Ronald's 4300 K sun, which read overcast and olive here (Tester 2). A warm sun;
-    // the sky's light in the shade about a fifth of the sun's (Bliss's is a sixth, which our
-    // curve's toe crushed), still blue, so sun and shade part and the land stops looking flat.
-    let day = key(vec3(0.084, 0.149, 0.283), vec3(0.314, 0.418, 0.584), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.138, 0.197, 0.269));
+    // of Bliss with Ronald's 4300 K sun, which read overcast and olive here (Tester 2). Values for
+    // the day's exposure of 2.2 (`exposure`). A warm sun; the sky's light in the shade about a
+    // quarter of the sun's (it was a third; Bliss's is a sixth, which our curve's toe crushes to
+    // near black), still blue, so sun and shade part and the land stops looking flat.
+    let day = key(vec3(0.065, 0.115, 0.219), vec3(0.242, 0.323, 0.451), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.155, 0.222, 0.303));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
     let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
@@ -606,7 +607,11 @@ fn exposure() -> f32 {
     if in_liquid() {
         return 3.0;
     }
-    return mix(1.7, 4.0, smoothstep(0.0, -0.2, scene.sun.y));
+    // By day 2.2 (it was 1.7): with less of the sky's light in the shade (Colour 1) the picture went
+    // darker than Bliss's (mean brightness 0.55 against about 0.6, shallows dark navy). Golden hour
+    // keeps 1.7, its palette made for it.
+    let day = mix(1.7, 2.2, smoothstep(0.1, 0.35, scene.sun.y));
+    return mix(day, 4.0, smoothstep(0.0, -0.2, scene.sun.y));
 }
 
 fn display(c: vec3<f32>) -> vec3<f32> {
