@@ -344,7 +344,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
 
     log(r, &OAK_LOG, "oak", "oak_leaves", None);
-    log(r, &BIRCH_LOG, "birch", "birch_leaves", None);
+    log(r, &BIRCH_LOG, "birch", "birch_leaves", Some("slim_tree"));
     log(r, &SPRUCE_LOG, "spruce", "spruce_leaves", Some("cone_tree"));
     log(r, &ACACIA_LOG, "acacia", "acacia_leaves", Some("flat_tree"));
     for (h, wood) in [(&OAK_PLANKS, "oak"), (&BIRCH_PLANKS, "birch"), (&SPRUCE_PLANKS, "spruce"), (&ACACIA_PLANKS, "acacia")] {
