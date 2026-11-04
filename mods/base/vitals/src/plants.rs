@@ -62,7 +62,7 @@ const SPRING: u8 = 1;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 53] = [
+pub const PLANTS: [Plant; 54] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -101,6 +101,10 @@ pub const PLANTS: [Plant; 53] = [
     p("base:sapling", "oak", (5.0, 18.0, 28.0, 38.0), Water::Moderate, 0.0, ANY, HARDY),
     // Grazed grass growing back to tall grass: 15-21 days in spring (`vitals::forage`).
     p("base:grazed_grass", "prairie grass", (5.0, 15.0, 30.0, 40.0), Water::Moderate, 18.0, ANY, HARDY),
+    // A dung pat rotting into the grass (`vitals::soil`, the pats): dung beetles bury it and fungi
+    // and rain break it down, a cow pat in about 45 days of a warm wet summer; dried out, or in the
+    // cold, it lies for months (pasture studies: one to three months, a year in a drought).
+    p("base:dung_pat", "a cow pat (dung beetles, fungi)", (5.0, 20.0, 30.0, 42.0), Water::Moderate, 45.0, ANY, HARDY),
     // The wild plants (`vitals::wild`; the research's estimates where it has no source). A tuft
     // or a mat grazed down grows back in `days`: sedges and cottongrass as grass, white clover in
     // 20-40 days, reindeer lichen in about ten years (it grows millimetres a year and takes

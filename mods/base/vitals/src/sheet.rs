@@ -529,6 +529,24 @@ fn soil_table(w: &mut String) {
         soil::SPOILED,
         soil::compost_secs() / 60.0
     );
+    let _ = writeln!(
+        w,
+        "Dung pats: a grazer drops one every {} mouthfuls where it stands on the ground, never within {} blocks of another; it rots by warmth and soil water into a tuft of fresh grass (at most {} game days, frozen or dry), and while it lies grazed grass within {} blocks grows back x{}. How long one lies, in game minutes (a game day is {:.0}):\n\n| biome | spring | summer | autumn | winter |\n|---|---|---|---|---|",
+        soil::MOUTHFULS_A_PAT,
+        soil::PAT_SPACING,
+        soil::PAT_MOST_DAYS,
+        soil::PAT_REACH,
+        soil::PAT_GROWTH,
+        crate::DAY_SECS / 60.0
+    );
+    for c in crate::climate::BIOMES.iter().filter(|c| !c.underground && crate::forage::grass_grows(c.biome) > 0.0) {
+        let lies = (0..4)
+            .map(|s| format!("{:.0}", soil::pat_season_secs(c.celsius, c.seasons, c.rain, s) / 60.0))
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let _ = writeln!(w, "| {} | {lies} |", c.biome);
+    }
+    let _ = writeln!(w);
 }
 
 /// The crops that leave the soil so, by name.
