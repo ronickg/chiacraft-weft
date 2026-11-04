@@ -643,8 +643,7 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
     return vec4(mix(albedo.rgb, ov.rgb * pow(in.tint, vec3(2.2)), ov.a), albedo.a);
 }
 
-@fragment
-fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
+fn opaque(in: VOut) -> vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
@@ -664,7 +663,55 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
 }
 
 @fragment
+fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
+    return opaque(in);
+}
+
+@fragment
 fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    if albedo.a <= 0.1 {
+        discard;
+    }
+    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+}
+
+// Where the cubes end, they fade into distant terrain over this many blocks (as the engine's
+// `FADE_BAND`), so the edge isn't a line (Distant Horizons' fade).
+const FADE_BAND: f32 = 24.0;
+
+// Whether this pixel, near where the cubes end (`g.extra.y` blocks across from the camera), is
+// left to distant terrain: more of them the nearer the end, in a fine noise over the screen
+// (interleaved gradient noise). A cube's pixel and the distant terrain's at the same place agree,
+// so one of the two always draws it.
+fn faded(in: VOut) -> bool {
+    let end = f32(g.extra.y);
+    if end <= 0.0 {
+        return false;
+    }
+    let f = clamp((length(in.rel.xz) - (end - FADE_BAND)) / FADE_BAND, 0.0, 1.0);
+    let p = floor(in.clip.xy);
+    return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
+}
+
+// The cubes near where they end (the engine draws only those meshes with these, so the rest keep
+// early depth).
+@fragment
+fn fs_opaque_fade(in: VOut) -> @location(0) vec4<f32> {
+    if faded(in) {
+        discard;
+    }
+    return opaque(in);
+}
+
+@fragment
+fn fs_cutout_fade(in: VOut) -> @location(0) vec4<f32> {
+    if faded(in) {
+        discard;
+    }
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
@@ -758,7 +805,8 @@ fn fs_lod_shadow(in: VOut) {
 
 @fragment
 fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
-    if lod_hidden(in) {
+    // Where cubes show the ground they stand there, except for the pixels they leave as they fade.
+    if lod_hidden(in) && !faded(in) {
         discard;
     }
     var albedo = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);

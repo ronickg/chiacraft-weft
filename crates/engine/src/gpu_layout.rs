@@ -687,7 +687,8 @@ gpu_struct! {
         /// Origins are relative to this cube.
         pub cam_cube: [i32; 4],
         /// x start of the overlay table in `frames` (per texture: overlay texture + 1, or 0),
-        /// z tint kinds, w half the width of `lod_mask`.
+        /// y how far across from the camera the cubes end, fading into distant terrain before it
+        /// (`WorldRenderer::lod_fade`, 0: no fade), z tint kinds, w half the width of `lod_mask`.
         pub extra: [u32; 4],
     }
 }
