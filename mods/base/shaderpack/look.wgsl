@@ -443,8 +443,17 @@ fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     return pow(max(f.rgb / f.w, vec3(0.0)), vec3(2.2));
 }
 
+// How bright the picture is taken: the filmic curve deepens the mid-tones, so by day it is opened
+// up to keep them where they were, and more as night falls and under water, the eye adjusting.
+fn exposure() -> f32 {
+    if in_liquid() {
+        return 2.2;
+    }
+    return mix(1.7, 2.6, smoothstep(0.0, -0.2, scene.sun.y));
+}
+
 fn display(c: vec3<f32>) -> vec3<f32> {
-    var t = hejl(max(c, vec3(0.0)) * 1.15, 3.0);
+    var t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
     t *= mix(vec3(0.975, 0.99, 1.03), mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
