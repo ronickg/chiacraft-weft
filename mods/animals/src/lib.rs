@@ -55,6 +55,7 @@ mod jaguar;
 mod knockout;
 mod kryptobaatar;
 mod lizard;
+mod meat;
 mod mouse;
 mod owl;
 mod protoceratops;
@@ -161,10 +162,20 @@ fn init(r: &mut Registry) {
     signatures::init(r);
     knockout::init(r);
     riding::init(r);
-    // Pelts and hides for clothes (`animals_core::hides`).
-    for &(species, item, lo, hi) in animals_core::hides::HIDES {
-        r.loot(&Entity::named(species))
-            .pool(Pool::new().items(item, lo, hi));
+    // What a carcass gives: pelts and hides for clothes (`animals_core::hides`) and meat
+    // (`animals_core::meat`), one table a species.
+    meat::init(r);
+    for s in &species::SPECIES {
+        let hide = animals_core::hides::HIDES
+            .iter()
+            .find(|h| h.0 == s.name)
+            .map(|&(_, item, lo, hi)| Pool::new().items(item, lo, hi));
+        let pools: Vec<Pool> = hide.into_iter().chain(meat::pool(s.name)).collect();
+        if !pools.is_empty() {
+            pools
+                .into_iter()
+                .fold(r.loot(&Entity::named(s.name)), |l, p| l.pool(p));
+        }
     }
     coats::init(r);
     scars::init(r);
