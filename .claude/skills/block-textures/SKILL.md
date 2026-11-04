@@ -133,6 +133,9 @@ engine's tinted overlay as on grass_side: `leaves_<x>_bloom` (untinted base: sil
 flowers in their own colours) and `leaves_<x>_bloom_overlay` (the leaf with the flowers cut out).
 A leaf drawn in its own colours (willow, creosote, juniper) blooms as one tile. Copy the sources
 to source/blocks/tiles and the game folder, then `regrade.py --all` (the leaves group grades them).
+`bloom.py bushes <out>` adds flowers to the fruiting bushes' stage 2 (their drawings kept in
+source/blocks/bloom/, outside the grade); copy the results to the game folder. Cloudberry keeps its
+one flower to a stem.
 
 ## Colour ramps (dark to light)
 
