@@ -649,7 +649,11 @@ fn snow_on(n: vec3<f32>, pos: vec3<f32>, sky: f32) -> f32 {
     }
     let q = vec3<i32>(floor(pos * 16.0));
     let spot = noise3(pos * 0.35) * 0.8 + hash3(q) * 0.2;
-    return smoothstep(0.85, 1.0, sky) * smoothstep(0.55, 0.9, n.y) * smoothstep(1.0 - deep * 1.3, 1.05 - deep * 1.3, spot);
+    // Patches while it is a dusting, every top covered from about 0.3: the snow layers near the
+    // player (Terrain's base:snow_layer) cover the ground from 0.2, and at the old rate (full only
+    // near 0.8) the land past them stayed green with white specks, a white disc round the player
+    // (Terrain's edge look, 11-04).
+    return smoothstep(0.85, 1.0, sky) * smoothstep(0.55, 0.9, n.y) * smoothstep(1.0 - deep * 3.2, 1.05 - deep * 3.2, spot);
 }
 
 // ---- haze and fog ----
