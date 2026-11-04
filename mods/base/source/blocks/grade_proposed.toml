@@ -1,0 +1,12 @@
+# Proposed (11-04, not applied): leaves and grass under Lighting's Colour 9 (N13 shots, forest and plains at noon).
+# Sunlit foliage measured luma median 143 (target 125-170: in range) with its brightest tenth at 170-181, and
+# saturation 0.71 (target 0.45-0.65: high). The tiles are grey and the game tints them, so the saturation comes
+# from the biome tint colours and the grade, not the tiles: that half belongs to the tints (Lighting/Plants).
+# The tiles can only trim the top: a gain of 0.94 brings the median to about 134 and the brightest tenth under 170.
+# Preview: python3 notes/blocks/regrade.py --all --with mods/base/source/blocks/grade_proposed.toml --dry --preview out.png
+
+[groups.leaves]
+gain = 0.94
+
+[groups.grass]
+gain = 0.94
