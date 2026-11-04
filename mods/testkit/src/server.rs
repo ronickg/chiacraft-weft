@@ -38,6 +38,9 @@ static LAST_SAID: std::sync::Mutex<String> = std::sync::Mutex::new(String::new()
 /// Fired by `after` timers; counted.
 static RANG: Event<u64> = Event::named("rang");
 static RINGS: AtomicU32 = AtomicU32::new(0);
+/// A key whose presses reach the server (`on_press_server`); `/tk pings` counts them (`extend::key_to_server`).
+static PING: Key = Key::named("ping");
+static PINGS: AtomicU32 = AtomicU32::new(0);
 /// Mobs walked by tests (`drive`): (entity, direction, ticks left).
 static DRIVEN: std::sync::Mutex<Vec<(u64, [f32; 2], u32)>> = std::sync::Mutex::new(Vec::new());
 
@@ -182,6 +185,9 @@ fn usage() -> String {
 }
 
 pub fn register_ops(r: &mut Registry) {
+    r.key(&PING, "F10").on_press_server(|_| {
+        PINGS.fetch_add(1, Ordering::Relaxed);
+    });
     r.command("tk", &usage(), |cmd| {
         let w = cmd.world();
         let answer = match run(&w, cmd) {
@@ -270,6 +276,26 @@ fn clock(w: &World, p: [i32; 3]) -> Result<String, String> {
 
 /// `(name, usage, what it does)`, the running player and where it stands given.
 type Run = fn(&World, &Command, u64, [i32; 3]) -> Result<String, String>;
+
+/// Opens menu `which` on the player's stash, filled with item/count pairs (`stash`; `vmenu` is its old name).
+fn open_stash(w: &World, cmd: &Command, player: u64) -> Result<String, String> {
+        let name = word(cmd, "which")?;
+        let m = Menu::lookup(name).ok_or_else(|| format!("no menu {name}"))?;
+        let inv = w.inventory(STASH.of(player));
+        // Pairs of item and count, the rest emptied.
+        let words: Vec<&str> = cmd.text("items").unwrap_or("").split_whitespace().collect();
+        for i in 0..inv.len() {
+            let stack = match words.chunks(2).nth(i as usize) {
+                Some([n, c]) => ItemStack::new(item(n)?, c.parse().map_err(|_| format!("bad count {c}"))?),
+                _ => ItemStack::EMPTY,
+            };
+            inv.set(i, stack);
+        }
+        if !w.open_menu(player, m, STASH.of(player)) {
+            return Err(format!("cannot open {name} on the stash"));
+        }
+        Ok(inv.len().to_string())
+}
 
 /// The operations tests run on the server, as one command (`/tk set ~ ~ ~2 stone`): the engine
 /// parses positions (`~dx`), block, item and entity names, and the answer goes back to the test
@@ -836,24 +862,16 @@ const OPS: &[(&str, &str, Run)] = &[
         held.set(int(cmd, "index")?, ItemStack::new(id(cmd, "item")?, int(cmd, "count").unwrap_or(1)));
         Ok(held.len().to_string())
     }),
-    ("stash", "<which:word> [items:text]", |w, cmd, player, _| {
-        let name = word(cmd, "which")?;
-        let m = Menu::lookup(name).ok_or_else(|| format!("no menu {name}"))?;
-        let inv = w.inventory(STASH.of(player));
-        // Pairs of item and count, the rest emptied.
-        let words: Vec<&str> = cmd.text("items").unwrap_or("").split_whitespace().collect();
-        for i in 0..inv.len() {
-            let stack = match words.chunks(2).nth(i as usize) {
-                Some([n, c]) => ItemStack::new(item(n)?, c.parse().map_err(|_| format!("bad count {c}"))?),
-                _ => ItemStack::EMPTY,
-            };
-            inv.set(i, stack);
-        }
-        if !w.open_menu(player, m, STASH.of(player)) {
-            return Err(format!("cannot open {name} on the stash"));
-        }
-        Ok(inv.len().to_string())
+    ("stash", "<which:word> [items:text]", |w, cmd, player, _| open_stash(w, cmd, player)),
+    // Dev's old name for `stash`, with its slot count (ignored: the stash has its own); answers the slots, not an inventory id.
+    ("vmenu", "<which:word> <slots:int> [items:text]", |w, cmd, player, _| open_stash(w, cmd, player)),
+    // Plays a keyframe animation on an owner (`play_animation` is now `action_play`).
+    ("animate", "@owner [name:word]", |w, cmd, _, _| {
+        w.action_play(owner(w, cmd)?, cmd.text("name").unwrap_or(""), false);
+        Ok(String::new())
     }),
+    // Presses of the `ping` key (F10) that reached the server.
+    ("pings", "", |_, _, _, _| Ok(PINGS.load(Ordering::Relaxed).to_string())),
     // A stick with a diamond over it, tinted red: a stack's own layered picture.
     ("layered", "<index:int>", |w, cmd, player, _| {
         let s = ItemStack::new(item("base:stick")?, 1).with_layers(&[("base:stick", None), ("base:diamond", Some(0xFF2020))]);
@@ -894,6 +912,13 @@ const OPS: &[(&str, &str, Run)] = &[
     }),
     ("vehicle", "[id:int]", |w, cmd, player, _| {
         let id = cmd.int("id").map_or(player, |r| r as u64);
+        Ok(w.vehicle(id)
+            .map_or("0 0".to_string(), |(m, s)| format!("{m} {s}")))
+    }),
+    // Off what it rides, as the dismount key does (scripts, without the key).
+    ("dismount", "[id:int]", |w, cmd, player, _| {
+        let id = cmd.int("id").map_or(player, |r| r as u64);
+        w.dismount(id);
         Ok(w.vehicle(id)
             .map_or("0 0".to_string(), |(m, s)| format!("{m} {s}")))
     }),
