@@ -13,6 +13,7 @@
 //!   strike: the instance is dropped and started again on the next call. Three strikes within
 //!   [`STRIKE_WINDOW`] stop it in that world.
 
+pub mod client;
 pub mod engine;
 pub mod storage;
 

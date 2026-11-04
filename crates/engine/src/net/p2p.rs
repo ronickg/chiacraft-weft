@@ -36,7 +36,7 @@ const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its
 /// signature envelope (empty if unsigned), and the mod API its sandboxed code
-/// (`code/server.wasm`) needs, as `1.1` (empty: no code). The joining game refuses an API it
+/// (`code/server.wasm`, `code/client.wasm`) needs, as `1.1` (empty: no code). The joining game refuses an API it
 /// doesn't run before downloading, and checks there is code exactly when the manifest says so.
 pub type Offer = (String, String, String, u64, String, String);
 
@@ -1190,7 +1190,7 @@ async fn download(
         if manifest
             .files
             .iter()
-            .any(|f| f.path == chiacraft_packages::identity::SERVER_CODE)
+            .any(|f| chiacraft_packages::identity::is_code(&f.path))
             != !code.is_empty()
         {
             return Err(format!("package {id}: the host didn't say truly whether it carries code"));

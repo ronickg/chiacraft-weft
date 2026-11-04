@@ -395,8 +395,40 @@ component as the package it goes into. Sample `examples/wasm/bell` (a bell block
 striker item that wears down, a channel), built as a size-optimised dev build since the Mac does
 no release builds now. With it, the mod UI ABI got `at` (b2877719: `UiNode::at`, `S::at`,
 `S::at_pivot`, onto the engine's `Style::at`), for the UI redo's numbers inside bars.
+Slice 4, client halves (built; not yet seen in the game): `code/client.wasm` (allowed beside
+`code/server.wasm`, `identity::is_code`), a component for the world `client-mod` in
+`crates/sandbox/wit/v1.2` (`client`, `client-registry`, `ui` parts, exported `client-hooks`).
+`crates/sandbox/src/client.rs`: `ClientMod`, `ClientInstance` (strikes as server halves;
+`well_formed` checks a build's parts), `ClientGame` (the player's game; `can_act` false in
+bindings). `crates/mod-sdk-client` (Weft's client names: `hud_element`, `screen`, `key`,
+`client_packet`, `client_frame`, `Ui` parts, `S` with `at`, `ClientView`/`Client`).
+`mods/packages/src/client_half.rs` registers its hooks through Weft's SDK in every game and
+replays its parts into `Ui` (classes interned; flags limited); a client reads a sandboxed
+component through the same byte buckets (`sandboxed::client_component`). The offer's API is the
+newer half's; "has code" means either half. Sample: `examples/wasm/bell-client` (a `hud_badge`
+with the ring count, an `hud_xp` bar with the count inside it through `at`, the key N), with the
+bell's server half now sending `bell:rings`. Tests `crates/sandbox/tests/client.rs`.
+Checked on the Linux PC (Tester 2, aa03294f): alice's side of the client-half pair ran: the
+bell rang and the puff showed above it ("a puff above the bell", seen in the shot; it had been
+inside the block), the join sheet listed the bell "(mod API 1.2)"; but the badge drew as the
+missing texture: `hud_badge` comes with the UI redo, not in `dev` yet, so the sample now uses
+`tooltip`. Bob's side is untested: his game ran out of GPU memory both times on the PC, next to
+vLLM ("allocating 67108864 bytes for quad page: Out of memory", a panic in the Vulkan backend).
+Bob also joined with an empty name although his `core.txt` says `name = bob` (on c41da9e4 it was
+right): not this work's, passed to Planner.
+Slice 5, personal mods (built, and checked in one game on the PC: off by default with "Your
+personal mods are off in this world: clock.", on after `/rule personal_mods 1` with the clock
+showing 07:07 top left, its key in slot 1 hid it, off again; Create World's choice not looked at): `mods/packages/src/personal.rs`. The
+world rule `packages:personal_mods` (choice off/client, off by default, a world rule so it is on
+Create World and synced to players); the player's own client halves from `<run dir>/personal/`
+(up to 16, loaded on the first client frame); slots registered the same in every game so the
+content hash is unchanged: a HUD element per anchor (`personal_<anchor>`, order 1000), the
+screen `packages:personal`, keys `packages:personal_1..8` (Shift+Alt+1..8), and a client frame
+that runs their frames and tells the player once per world which are off or on. A personal mod's
+`Half` has its own `Words` (from its `assets/lang`, the player's language over English), and no
+channels or components. Sample `examples/personal/clock` (from `examples/wasm/clock`).
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
-and chain steps, client halves (slice 4), personal mods per world (slice 5), `/mods` (slice 6).
+and chain steps, `/mods` (slice 6).
 
 ## Our DID sponsor (testnet11, since 2026-11-04)
 
