@@ -1,5 +1,5 @@
 # The clothes worn on the player (mods/base/source/clothes/build.py), each material's whole outfit
-# from behind and from the front (third person), and the clothes a new player arrives in.
+# from behind and from the front (third person; `look` turns the player with the camera, so no three-quarter view), and the clothes a new player arrives in.
 # Shots: run/screenshots/clothes_*.png.
 loaded
 chat /dim base:flatlands
@@ -31,9 +31,7 @@ shot clothes_fur_back.png
 press core:perspective
 wait 1
 shot clothes_fur_front.png
-look 60 5
 wait 1
-shot clothes_fur_front_side.png
 look 0 5
 press core:perspective
 wait 0.5
@@ -49,9 +47,7 @@ shot clothes_wool_back.png
 press core:perspective
 wait 1
 shot clothes_wool_front.png
-look 60 5
 wait 1
-shot clothes_wool_front_side.png
 look 0 5
 press core:perspective
 wait 0.5
@@ -67,9 +63,7 @@ shot clothes_hide_back.png
 press core:perspective
 wait 1
 shot clothes_hide_front.png
-look 60 5
 wait 1
-shot clothes_hide_front_side.png
 look 0 5
 press core:perspective
 wait 0.5
@@ -85,9 +79,7 @@ shot clothes_linen_back.png
 press core:perspective
 wait 1
 shot clothes_linen_front.png
-look 60 5
 wait 1
-shot clothes_linen_front_side.png
 look 0 5
 press core:perspective
 wait 0.5

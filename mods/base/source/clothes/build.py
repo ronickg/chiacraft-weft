@@ -63,7 +63,7 @@ NONE, MAIN, DARK, LIGHT, INNER, SOLE, LACE = range(-1, 6)
 # Per material, the colours of MAIN, DARK, LIGHT, INNER, SOLE and LACE (the icons' clusters), and
 # which are soft (fur and knit: strands and tufted edges).
 PALETTE = {
-    "fur": ([(150, 117, 95), (108, 80, 62), (236, 212, 174), (104, 74, 54), (92, 66, 50), (70, 50, 40)], (MAIN, LIGHT)),
+    "fur": ([(150, 117, 95), (108, 80, 62), (246, 228, 194), (104, 74, 54), (92, 66, 50), (70, 50, 40)], (MAIN, LIGHT)),
     "wool": ([(226, 196, 150), (186, 152, 108), (247, 230, 192), (168, 128, 96), (150, 112, 84), (150, 112, 84)], (MAIN, LIGHT)),
     "hide": ([(212, 138, 60), (160, 90, 36), (240, 174, 92), (140, 74, 34), (108, 56, 26), (98, 50, 24)], ()),
     "linen": ([(228, 202, 166), (184, 152, 116), (246, 230, 200), (150, 116, 84), (126, 96, 72), (150, 116, 84)], ()),
@@ -85,6 +85,11 @@ def area(m, piece, part, face, p, col, row, w, h):
     x, y, z = p[..., 0], p[..., 1], p[..., 2]
     a = np.full(x.shape, MAIN)
     none = np.full(x.shape, NONE)
+    # Designs are in skin pixels (pc, pr: which pixel of the 64 x 32 layout a texel is in), so a
+    # rib, a fringe or a wrap keeps its size at any K; a line (a cable, a fold, a seam) keeps its
+    # spacing and stays one texel thick (`ln`: the first texel of each pixel column).
+    pc, pr, wp = col // K, row // K, w // K
+    ln = col % K == 0
     # numpy booleans: `~` on a Python bool is -2, not False
     front, side, top, bottom = (np.bool_(v) for v in (face == "south", face in ("east", "west"), face == "up", face == "down"))
 
@@ -97,21 +102,21 @@ def area(m, piece, part, face, p, col, row, w, h):
             a = np.where(~top & (32 - y > drop - 2.1) & (a != NONE), LIGHT, a)
         elif m == "wool":  # a beanie: cables up the crown, a ribbed brim
             a = np.where(32 - y > drop, NONE, a)
-            a = np.where(bands(col, 3) & ~top & (a != NONE), DARK, a)
+            a = np.where(bands(pc, 3) & ln & ~top & (a != NONE), DARK, a)
             brim = ~top & (32 - y > drop - 2.1) & (a != NONE)
-            a = np.where(brim, np.where(bands(col, 2), LIGHT, MAIN), a)
+            a = np.where(brim, np.where(bands(pc, 2), LIGHT, MAIN), a)
         elif m == "hide":  # a trapper: the crown, ear flaps down the sides, a fleece edge
             reach = np.where(side & (z > -1.5), 7.5, drop - 1)
             a = np.where(32 - y > reach, NONE, a)
             a = np.where(~top & (32 - y > reach - 1.1) & (a != NONE), LIGHT, a)
-            a = np.where(top & bands(col, 4) & (col > 0), DARK, a)  # the crown's seams
+            a = np.where(top & bands(pc, 4) & ln & (pc > 0), DARK, a)  # the crown's seams
         else:  # linen: a hood round the face
             if front:
                 opening = (np.abs(x) < 3) & (y < 30)
                 a = np.where(opening, NONE, a)
                 a = np.where(~opening & (y < 31), LIGHT, a)  # its hem round the face
             if face == "north":
-                a = np.where(bands(col, 4) & (col > 0), DARK, a)  # the back seam's folds
+                a = np.where(bands(pc, 4) & ln & (pc > 0), DARK, a)  # the back seam's folds
     elif piece == "coat":
         if part == "arm":
             if bottom:
@@ -120,9 +125,9 @@ def area(m, piece, part, face, p, col, row, w, h):
             cuff = (y >= 14) & (y < 15) & ~top
             a = np.where(cuff, {"fur": LIGHT, "wool": MAIN, "hide": DARK, "linen": LIGHT}[m], a)
             if m == "wool":
-                a = np.where(cuff & bands(col, 2), DARK, a)
+                a = np.where(cuff & bands(pc, 2), DARK, a)
             if m == "hide" and face == "west":
-                a = np.where(bands(row, 2) & (col == w // 2) & (y >= 15), LIGHT, a)  # fringe down the outer seam
+                a = np.where(bands(pr, 2) & (pc == wp // 2) & (y >= 15), LIGHT, a)  # fringe down the outer seam
         else:
             if bottom:
                 a[:] = DARK if m in ("hide", "linen") else MAIN
@@ -135,23 +140,24 @@ def area(m, piece, part, face, p, col, row, w, h):
                     a = np.where(np.abs(x) > 1.9, LIGHT, a)
                 a = np.where(~top & ~bottom & (y < 13), LIGHT, a)  # the hem
             elif m == "wool":  # a jumper: cables, a ribbed hem and neck
+                if front or side:  # the back a plain panel
+                    cable = ((pc % 4 == 1) if wp >= 6 else (pc % 3 == 1)) & ln
+                    a = np.where(cable, np.where(pr % 3 == 1, LIGHT, DARK), a)  # a cable and its twists
                 if not (top or bottom):
-                    cable = (col % 4 == 1) if w >= 6 else (col % 3 == 1)
-                    a = np.where(cable, np.where(row % 3 == 1, LIGHT, DARK), a)  # a cable and its twists
-                    a = np.where(y < 13, np.where(bands(col, 2), DARK, MAIN), a)
+                    a = np.where(y < 13, np.where(bands(pc, 2), DARK, MAIN), a)
                 if front:
                     a = np.where((y > 22.9) & (np.abs(x) < 2), DARK, a)
             elif m == "hide":  # buckskin: a laced collar, a fringed yoke across the chest
                 yoke = (y > 19.9) & (y < 21)
                 if front:
-                    a = np.where(yoke & (np.abs(x) >= 1), np.where(bands(col, 2), LIGHT, DARK), a)
+                    a = np.where(yoke & (np.abs(x) >= 1), np.where(bands(pc, 2), LIGHT, DARK), a)
                     a = np.where((np.abs(x) < 1) & (y > 19.9), LACE, a)
                 if face == "north":
-                    a = np.where(yoke, np.where(bands(col, 2), LIGHT, DARK), a)
+                    a = np.where(yoke, np.where(bands(pc, 2), LIGHT, DARK), a)
                 a = np.where(~top & ~bottom & (y < 13), DARK, a)
             else:  # linen: a shirt with a slit at the collar, soft folds
                 if not (top or bottom):
-                    a = np.where(bands(col, 3) & (col > 0) & (y < 20), DARK, a)
+                    a = np.where(bands(pc, 3) & ln & (pc > 0) & (y < 20), DARK, a)
                     a = np.where(y < 13, LIGHT, a)
                 if front:
                     a = np.where((np.abs(x) < 1) & (y > 20.9), INNER, a)
@@ -172,17 +178,17 @@ def area(m, piece, part, face, p, col, row, w, h):
             if m == "fur":
                 a = np.where(hem, LIGHT, a)
             elif m == "wool":
-                a = np.where(bands(col, 3) & ~bottom, DARK, a)
-                a = np.where(hem, np.where(bands(col, 2), DARK, MAIN), a)
+                a = np.where(bands(pc, 3) & ln & ~bottom, DARK, a)
+                a = np.where(hem, np.where(bands(pc, 2), DARK, MAIN), a)
             elif m == "hide":
                 if face == "west":  # fringe down the outer seam
-                    a = np.where(col == w - 1, np.where(bands(row, 2), LIGHT, DARK), a)
+                    a = np.where(pc == wp - 1, np.where(bands(pr, 2), LIGHT, DARK), a)
                 if front:
-                    a = np.where(col == 0, DARK, a)  # the seam
+                    a = np.where((pc == 0) & ln, DARK, a)  # the seam
                 a = np.where(hem, DARK, a)
             else:
                 if not bottom:
-                    a = np.where(bands(col, 3) & (col > 0) & (y > 3), DARK, a)  # folds
+                    a = np.where(bands(pc, 3) & ln & (pc > 0) & (y > 3), DARK, a)  # folds
                 a = np.where(hem, LIGHT, a)
     else:  # shoes
         if top:
@@ -195,14 +201,14 @@ def area(m, piece, part, face, p, col, row, w, h):
             if m == "fur":
                 a = np.where((y > tall - 1.2) & (y <= tall), LIGHT, a)  # the fur cuff
             elif m == "wool":  # socks: a ribbed top, a heel and toe
-                a = np.where((y > tall - 2) & (y <= tall), np.where(bands(col, 2), DARK, LIGHT), a)
+                a = np.where((y > tall - 2) & (y <= tall), np.where(bands(pc, 2), DARK, LIGHT), a)
                 a = np.where((y < 2) & (face in ("south", "north")), DARK, a)
             elif m == "hide":  # moccasins: a stitched vamp, a turned cuff
                 if front:
-                    a = np.where((y > 1) & (y < 2) & bands(col, 2), LACE, a)
+                    a = np.where((y > 1) & (y < 2) & bands(pc, 2), LACE, a)
                 a = np.where((y > tall - 1.2) & (y <= tall), LIGHT, a)
             else:  # linen wraps, wound round and round
-                a = np.where(((row + col) % 3 == 0) & (y >= 1) & (a != NONE), DARK, a)
+                a = np.where(((row + col) % (3 * K) < K) & (y >= 1) & (a != NONE), DARK, a)  # a band K texels thick
                 a = np.where((y > tall - 1) & (y <= tall), LIGHT, a)
             a = np.where((y < 1) & (a != NONE), SOLE if m in ("fur", "hide") else DARK, a)
     return a
@@ -229,8 +235,11 @@ def paint_piece(m, piece, sheet):
                 continue
             occ = occlusion(p * U, np.array(NORMAL[face], float), Uv, Vv, BOXES, own=part)
             light_face = "north" if face == "down" else face  # seen only from below: not near-black
+            # A hat is lit as one piece down its sides (its brim is at the bottom of each face,
+            # where a face's own light runs darkest: in the game a cream brim read tan).
+            down = np.full((h, w), 0.3) if piece == "hat" else None
             col = paint_face_smooth(np.where(a == NONE, MAIN, a), tone, light_face, coat=soft, y_world=p[..., 1] * U,
-                                    occ=occ * 0.6, seed=sum(map(ord, m + piece + part + face)) % 97, merge=False,
+                                    occ=occ * 0.6, down=down, seed=sum(map(ord, m + piece + part + face)) % 97, merge=False,
                                     tuft=False)  # tufts hang two texels: on a 16-a-block hat they eat its brim
             img = np.dstack([np.clip(np.round(col), 0, 255), np.where(a == NONE, 0, 255)]).astype(np.uint8)
             region = sheet[fv * K:fv * K + h, fu * K:fu * K + w]
