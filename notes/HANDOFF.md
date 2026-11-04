@@ -353,9 +353,25 @@ a command 0.6 to 0.9, an empty event batch 0.2 to 0.3, a batch of 64 block chang
 ignoring them) to 14 (tally, a component call each): about 0.2 µs per crossing into the mod and
 back. Questions, chain steps and world ticks not measured yet (the test guest needs the wasm32
 target, not on the PC).
-Left: the `required` flag (agreed: at the next `package.toml` change), callcost numbers, 1.2
-(block and item callbacks, channels), client halves (slice 4), personal mods per world (slice
-5), `/mods` (slice 6).
+API 1.2 (built; not yet seen in the game): `crates/sandbox/wit/v1.2/mod.wit` adds
+`registry.on-block-use`/`on-block-neighbor`/`on-block-scheduled`/`on-item-use` (the package's own
+blocks and items only, `State::own`), `registry.channel`, `world.schedule` and `world.send`, and
+the export `content-hooks` (`block-use`, `block-update`, `item-use`, `packet`). The game binds
+the world `host`, which exports `hooks` only, and finds `content-hooks` at run time
+(`ContentHooks::find`, typed functions with `post_return`): checked that clans (1.0) and tally
+(1.1) still load and run in it with `callcost`. A mod registering 1.2 callbacks without the
+export is refused. In `mods/packages`, `sandboxed::load` runs before the package's content, so
+`block`/`item` take the callbacks on their builders (`on_block`, `on_item`), and
+`sandboxed::register` does the rest and refuses a callback for a block or item the package
+lacks; channels are `Channel<Vec<u8>>` with at most 64 packets a tick handed over. The SDK is
+1.2.0 (`r.block(&B).on_use/on_neighbor/on_scheduled`, `r.item(&I).on_use`, `Use`, `BlockEvent`,
+`ItemUse`, `Channel<T>`, `Payload`, `r.packet`, `w.send`, `w.schedule`). `componentize` loads a
+component as the package it goes into. Sample `examples/wasm/bell` (a bell block that rings, a
+striker item that wears down, a channel), built as a size-optimised dev build since the Mac does
+no release builds now. With it, the mod UI ABI got `at` (b2877719: `UiNode::at`, `S::at`,
+`S::at_pivot`, onto the engine's `Style::at`), for the UI redo's numbers inside bars.
+Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
+and chain steps, client halves (slice 4), personal mods per world (slice 5), `/mods` (slice 6).
 
 ## Side mods
 

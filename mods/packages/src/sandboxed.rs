@@ -13,7 +13,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use chiacraft_sandbox::{
-    self as sandbox, Arg as WArg, Decl, EntityState as WEntity, EventValue, Game, Hook, Instance, Invocation, Mod, Value,
+    self as sandbox, Arg as WArg, BlockUpdateEvent, BlockUseEvent, Decl, EntityState as WEntity, EventValue, Game, Hook, Instance,
+    Invocation, ItemUseEvent, Mod, Value,
 };
 use weft_sdk::abi::{self, Str};
 use weft_sdk::*;
@@ -57,8 +58,11 @@ pub fn logger(level: sandbox::Level, package: &str, line: &str) {
     }
 }
 
-/// The package's mod in each world it has run in.
-struct Runs {
+/// A mod's channel: its full name, the SDK's handle, and (tick, packets handed over in it).
+type ModChannel = (String, &'static Channel<Vec<u8>>, Mutex<(u64, u32)>);
+
+/// A package's mod, registered with one content build, in each world it has run in.
+pub struct Runs {
     m: Arc<Mod>,
     package: String,
     runs: Mutex<Vec<(u64, Instance)>>,
@@ -66,6 +70,10 @@ struct Runs {
     comps: Comps,
     /// Sounds and particles the mod has named, as the SDK's handles (made once each).
     effects: Mutex<Vec<(String, Effect)>>,
+    /// Its channels (1.2), by full name, with the tick and count of packets handed over.
+    channels: Vec<ModChannel>,
+    /// The block and item callbacks the package's builders took (by callback number).
+    attached: Mutex<Vec<u32>>,
 }
 
 /// A sandboxed mod's component as the SDK holds it: bytes in a size of the next bucket up.
@@ -172,6 +180,19 @@ fn flag_bits(f: sandbox::ComponentFlags) -> u32 {
     .fold(0, |acc, (_, bit)| acc | bit)
 }
 
+impl Runs {
+    /// Whether one more packet on `channel` may reach the mod this tick.
+    fn packet_allowed(&self, channel: &str, tick: u64) -> bool {
+        let Some((_, _, count)) = self.channels.iter().find(|(n, ..)| n == channel) else { return false };
+        let mut c = count.lock().unwrap_or_else(|e| e.into_inner());
+        if c.0 != tick {
+            *c = (tick, 0);
+        }
+        c.1 += 1;
+        c.1 <= sandbox::PACKETS_PER_TICK
+    }
+}
+
 thread_local! {
     /// Packages whose mods this thread is calling now, by their `Runs`' address.
     static BUSY: RefCell<Vec<usize>> = const { RefCell::new(Vec::new()) };
@@ -229,12 +250,14 @@ fn world() -> Option<(u64, Option<PathBuf>)> {
     Some((run, (!dir.is_empty()).then(|| PathBuf::from(dir))))
 }
 
-/// Loads `dir/code/server.wasm`, if the package has one, and registers what it registers.
-/// Mistakes are load errors (`r`'s), and the package is left out.
-pub fn register(r: &mut Registry, package: &str, dir: &Path) -> Result<(), String> {
+/// Loads `dir/code/server.wasm`, if the package has one, and registers its components (before
+/// the package's own content, whose blocks and items then take its callbacks: [`on_block`],
+/// [`on_item`]; then [`register`] for the rest). Mistakes are load errors, and the package is
+/// left out.
+pub fn load(r: &mut Registry, package: &str, dir: &Path) -> Result<Option<Arc<Runs>>, String> {
     let path = dir.join(chiacraft_packages::identity::SERVER_CODE);
     if !path.is_file() {
-        return Ok(());
+        return Ok(None);
     }
     let slot = CURRENT_SLOT.load(Ordering::Relaxed);
     {
@@ -251,7 +274,6 @@ pub fn register(r: &mut Registry, package: &str, dir: &Path) -> Result<(), Strin
             return Err(format!("{}: the command /{name} is the game's", chiacraft_packages::identity::SERVER_CODE));
         }
     }
-    let hooks = m.hooks().to_vec();
     // Components first (1.1): they are content, registered with the package's.
     let mut comps: Comps = Vec::new();
     for d in m.decls() {
@@ -267,17 +289,132 @@ pub fn register(r: &mut Registry, package: &str, dir: &Path) -> Result<(), Strin
             }
         }
     }
-    let runs = Arc::new(Runs {
+    let channels = m
+        .hooks()
+        .iter()
+        .filter_map(|h| match h {
+            Hook::Channel(name) => {
+                let c: &'static Channel<Vec<u8>> = Box::leak(Box::new(Channel::named(Box::leak(name.clone().into_boxed_str()))));
+                Some((name.clone(), c, Mutex::new((0, 0))))
+            }
+            _ => None,
+        })
+        .collect();
+    Ok(Some(Arc::new(Runs {
         m: Arc::new(m),
         package: package.to_string(),
         runs: Mutex::new(Vec::new()),
         comps,
         effects: Mutex::new(Vec::new()),
-    });
-    for (i, hook) in hooks.into_iter().enumerate() {
+        channels,
+        attached: Mutex::new(Vec::new()),
+    })))
+}
+
+/// The package's own block `id` takes the mod's callbacks for it (1.2).
+pub fn on_block<'a>(mut b: BlockBuilder<'a>, runs: &Arc<Runs>, id: &str) -> BlockBuilder<'a> {
+    for (i, h) in runs.m.hooks().iter().enumerate() {
+        let cb = i as u32;
+        let rs = runs.clone();
+        match h {
+            Hook::BlockUse(name) if name == id => {
+                b = b.on_use(move |u| {
+                    let (w, ev) = (u.world(), BlockUseEvent { player: u.player(), pos: t3(u.pos()), state: u.state(), face: u.face() });
+                    rs.with(|inst| inst.block_use(|| Box::new(WorldGame::of(w, &rs)), cb, ev))
+                        .unwrap_or(false)
+                });
+            }
+            Hook::BlockNeighbor(name) if name == id => {
+                b = b.on_neighbor(move |e| block_update(&rs, cb, e));
+            }
+            Hook::BlockScheduled(name) if name == id => {
+                b = b.on_scheduled(move |e| block_update(&rs, cb, e));
+            }
+            _ => continue,
+        }
+        runs.attached
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(cb);
+    }
+    b
+}
+
+fn block_update(runs: &Arc<Runs>, cb: u32, e: &mut BlockEvent) {
+    let w = e.world();
+    let ev = BlockUpdateEvent { pos: t3(e.pos()), state: e.state(), other: t3(e.other()), entity: e.entity() };
+    runs.with(|inst| inst.block_update(|| Box::new(WorldGame::of(w, runs)), cb, ev));
+}
+
+/// The package's own item `id` takes the mod's use callback for it (1.2).
+pub fn on_item<'a>(mut i: ItemBuilder<'a>, runs: &Arc<Runs>, id: &str) -> ItemBuilder<'a> {
+    for (n, h) in runs.m.hooks().iter().enumerate() {
+        let Hook::ItemUse(name) = h else { continue };
+        if name != id {
+            continue;
+        }
+        let cb = n as u32;
+        let rs = runs.clone();
+        i = i.on_use(move |u| {
+            let w = u.world();
+            let (player, held) = (u.player(), u.stack());
+            let ev = ItemUseEvent {
+                player,
+                stack: stack(held),
+                slot: w.selected_slot(player),
+                target: u.target().map(|(p, face)| (t3(p), face)),
+            };
+            let Some(result) = rs.with(|inst| inst.item_use(|| Box::new(WorldGame::of(w, &rs)), cb, ev)) else { return false };
+            // What the hand holds: only a real item, or nothing; what the stack carries stays.
+            if let Some(s) = result.stack {
+                let next = if s.count == 0 {
+                    ItemStack::EMPTY
+                } else if known_item(s.item) {
+                    ItemStack { item: s.item, count: s.count.min(64 * 64), data: if s.item == held.item { held.data } else { 0 } }
+                } else {
+                    held
+                };
+                u.set_stack(next);
+            }
+            result.handled
+        });
+        runs.attached
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(cb);
+    }
+    i
+}
+
+/// Registers the rest of what the mod registered (after the package's content), and refuses a
+/// block or item callback for something the package doesn't have.
+pub fn register(r: &mut Registry, runs: &Arc<Runs>) -> Result<(), String> {
+    let attached = runs
+        .attached
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    for (i, hook) in runs.m.hooks().to_vec().into_iter().enumerate() {
         let cb = i as u32;
         let runs = runs.clone();
         match hook {
+            Hook::BlockUse(name) | Hook::BlockNeighbor(name) | Hook::BlockScheduled(name) if !attached.contains(&cb) => {
+                return Err(format!("{}: `{name}` is no block of this package", chiacraft_packages::identity::SERVER_CODE));
+            }
+            Hook::ItemUse(name) if !attached.contains(&cb) => {
+                return Err(format!("{}: `{name}` is no item of this package", chiacraft_packages::identity::SERVER_CODE));
+            }
+            Hook::BlockUse(_) | Hook::BlockNeighbor(_) | Hook::BlockScheduled(_) | Hook::ItemUse(_) => {}
+            Hook::Channel(name) => {
+                let Some((_, channel, _)) = runs.channels.iter().find(|(n, ..)| *n == name) else { continue };
+                r.packet(*channel, move |p, data| {
+                    let (w, player) = (p.world(), p.player());
+                    if data.len() > sandbox::PACKET_BYTES || !runs.packet_allowed(&name, w.time()) {
+                        return;
+                    }
+                    runs.with(|inst| inst.packet(|| Box::new(WorldGame::of(w, &runs)), cb, player, &data));
+                });
+            }
             Hook::Command { name, usage, permission } => {
                 let params = params(&usage);
                 r.command(&name, &usage, move |cmd| {
@@ -675,6 +812,15 @@ impl Game for WorldGame {
     fn set_component(&mut self, id: u64, name: &str, value: &[u8]) -> bool {
         self.comp(name)
             .is_some_and(|c| set_component(&self.w, id, c, value))
+    }
+    fn schedule(&mut self, pos: [i32; 3], ticks: u32) {
+        self.w.schedule(pos, ticks)
+    }
+    fn send(&mut self, player: u64, channel: &str, data: &[u8]) {
+        let Some((_, c, _)) = self.runs.channels.iter().find(|(n, ..)| n == channel) else { return };
+        if self.w.players().contains(&player) {
+            self.w.send(player, c, &data.to_vec());
+        }
     }
     fn play_sound(&mut self, sound: &str, pos: [f64; 3], volume: f32) {
         if let Some(Effect::Sound(s)) = self.effect(abi::entry_kind::SOUND, sound) {
