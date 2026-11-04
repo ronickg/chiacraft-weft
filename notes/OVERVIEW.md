@@ -92,7 +92,7 @@ Always-on servers and code mods that can't hurt the player. 1 of 7 parts built.
 
 | | Part | Notes |
 |---|---|---|
-| ◧ | Headless server | A dedicated mode exists; no server.toml, console or load tests (phase 7). |
+| ◧ | Headless server | A dedicated mode exists, with an identity of its own (server-account: its worlds' keys come from it, no player account needed); no server.toml, console or load tests, and no owner certifying a server yet (phase 7). |
 | ◧ | Entity send and activation ranges (core) | Research round 2, E1, in Weft's engine (to offer upstream): entities go to players within 96 blocks, far ones' moves every 2nd or 4th tick, and those no player is within 48 blocks of tick their goals and paths once a second. Built; Tester's measurement with a 200-animal pen and two players pending. The animals mod's per-tick countdowns (breeding, cat gifts, knockout anger) still to switch to `tick_elapsed`. Docs: `docs/modding.md`. |
 | ◧ | Permissions (core) | Operator levels exist, but any player can still /give. |
 | □ | Movement checks | Phase 7. |
