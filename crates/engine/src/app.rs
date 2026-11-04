@@ -389,6 +389,7 @@ impl App {
             crate::config::override_for_run("core:view_distance", &v.to_string());
         }
         let mut settings = Settings::new(&self.opts.run_dir);
+        log::info!("player name '{}' (setting core:name)", settings.name());
         // Links between worlds, and the inbox for them, open while the game runs (chiacraft).
         crate::links::init(&self.opts.run_dir, &settings.saves_dir());
         crate::friends::init(&self.opts.run_dir, &settings.saves_dir());
@@ -725,6 +726,19 @@ impl Running {
         );
         self.assets.set_mods(roots);
         self.reload_assets();
+        // Keys the new content brings (a package's client half, chiacraft phase 6): known to the
+        // input as the start's are, with the player's binding if they set one.
+        for (action, key) in &content().game.keys {
+            if let Some(k) = crate::settings::parse_chord(key) {
+                self.input.register(action, k);
+            }
+            let bound = crate::config::by_name(&format!("core:key.{action}"))
+                .map(crate::config::text)
+                .and_then(|t| crate::settings::parse_chord(&t));
+            if let Some(k) = bound {
+                self.input.rebind(action, k);
+            }
+        }
     }
 
     /// The join in progress: answers what it reports, until the game is let in or it fails.

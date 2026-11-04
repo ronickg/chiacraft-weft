@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "alpine aster: two or three short stems each with one violet daisy flower of many narrow petals round a yellow centre, spoon-shaped leaves at the base, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.341,
+   "outline": 0.94,
+   "red_line": 0.0,
+   "fill": 0.07,
+   "passed": false
+  },
+  {
+   "grid": 0.28,
+   "outline": 0.96,
+   "red_line": 0.0,
+   "fill": 0.06,
+   "passed": false
+  },
+  {
+   "grid": 0.417,
+   "outline": 0.96,
+   "red_line": 0.0,
+   "fill": 0.09,
+   "passed": false
+  }
+ ]
+}

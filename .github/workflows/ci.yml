@@ -26,7 +26,18 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # The build, clippy's and the tests' builds of the whole workspace filled the runner's disk.
+    # Debug info is most of it, and nothing here reads it.
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
+      # The runner's own tools that nothing here uses (.NET, Android, Haskell, CodeQL): about 30 GB.
+      - name: Disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - uses: actions/checkout@v7
 
       # wasm32: the sandbox's tests build a mod for it.

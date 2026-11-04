@@ -8,6 +8,12 @@ Shadow-Tutorial, OptiFine's `shaders.txt`, Microsoft's shadow-map article and MJ
 **Ours**: one 2048² reverse-Z map, an orthographic box 80 blocks to each side of the camera and
 400 deep along the light, snapped to whole texels: 0.078 blocks a texel.
 
+**Which way up**: the engine's shaders draw with y up (naga flips it for Vulkan), so a light-space
+point's texel is `(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * size`, as the screen effects read the
+screen. Read the other way up (until 2026-11-04) every shadow was mirrored across the camera's row of
+the map: near casters looked about right, and one side of open ground was shaded by the mirror image
+of the ground itself.
+
 ## Distortion (not used yet)
 
 All the packs warp the map's clip xy so texels are small near the player: `xy / (length(xy) * k +

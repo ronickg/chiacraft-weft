@@ -13,10 +13,13 @@ chat /tk spawn animals:red_deer ~-5 ~1 ~10
 chat /tk spawn animals:jaguar ~5 ~1 ~10
 chat /tk spawn base:sheep ~-1 ~1 ~4
 chat /tk spawn base:cow ~2 ~1 ~4
+# Wild animals run from a player at once: frozen, they stay where they spawned.
+chat /tick freeze
 wait 1
 look 180 -20
 wait 1
 shot animals_drawn_a.png
+chat /tick unfreeze
 wait 4
 look 180 -20
 wait 1
