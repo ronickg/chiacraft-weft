@@ -74,13 +74,18 @@ pub fn register(r: &mut Registry) {
     // Every food of the base game is a row of the vitals' food table (`vitals::food::FOODS`), the one
     // list: its nutrition, freshness and tags come from there. The base game's hunger and
     // saturation (only the tooltip's food icons read them) follow its size: a unit is 10 g.
-    for f in vitals::food::FOODS.iter().filter(|f| f.name.starts_with("base:")) {
+    for f in vitals::food::FOODS
+        .iter()
+        .filter(|f| f.name.starts_with("base:"))
+    {
         let name = &f.name["base:".len()..];
         let hunger = ((f.units() / 4.0).round() as u32).clamp(1, 10);
         let saturation = hunger as f32 * 1.2;
         // Raw meat with a cooked row pairs with it by name (`#raw_meat/beef` smelts into
         // `#cooked_meat/beef`), so cooking, salting, drying and stews take any meat.
-        let cooked_of = name.strip_prefix("cooked_").filter(|raw| vitals::food::find(&format!("base:{raw}")).is_some());
+        let cooked_of = name
+            .strip_prefix("cooked_")
+            .filter(|raw| vitals::food::find(&format!("base:{raw}")).is_some());
         let raw_with_cooked = f.raw && vitals::food::find(&format!("base:cooked_{name}")).is_some();
         let tag = match (cooked_of, raw_with_cooked) {
             (Some(raw), _) => format!("cooked_meat/{raw}"),
