@@ -286,9 +286,11 @@ fn client(r: &mut Registry) {
     // Built when the screen opens, from what the player has made by then.
     r.screen(&SCREEN, |ui| {
         let done = ui.client().component(&ADVANCEMENTS).map_or(0, |a| a.done);
-        ui.panel("panel", S::col().pad(8.0).gap(6.0), |ui| {
+        let tabs: [crate::window::Tab; 1] = [("window.base.tab.stats", |c| {
+            c.client().open_screen(&crate::levels::SCREEN);
+        })];
+        crate::window::window_titled(ui, S::col().pad(8.0).gap(6.0), "advancements.base.title", &tabs, |ui| {
             ui.row(S::row().gap(8.0), |ui| {
-                ui.text_styled(S::col().class("title").scale(1.5).no_wrap(), "advancements.base.title", &[]);
                 ui.spacer();
                 ui.text_bind_styled(S::col().class("dim").no_wrap(), |v, out| {
                     let done = v

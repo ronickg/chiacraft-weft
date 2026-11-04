@@ -220,7 +220,10 @@ fn client(r: &mut Registry) {
     // The stats (the UI redo's stats screen): the level on a badge with the XP bar and the points
     // to place, then each stat as a bar with its value inside, its points and a +.
     r.screen(&SCREEN, |ui| {
-        ui.panel("panel", S::col().pad(8.0).gap(4.0), |ui| {
+        let tabs: [crate::window::Tab; 1] = [("window.base.tab.advancements", |c| {
+            c.client().open_screen(&crate::advancements::SCREEN);
+        })];
+        crate::window::window_titled(ui, S::col().pad(8.0).gap(4.0), "window.base.tab.stats", &tabs, |ui| {
             ui.row(S::row().gap(5.0).center(), |ui| {
                 ui.panel("hud_badge", S::row().size(20.0, 24.0).center(), |ui| {
                     ui.text_bind_styled(S::default().no_wrap(), |c, t| {

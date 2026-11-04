@@ -14,11 +14,24 @@ pub type Tab = (&'static str, fn(&ClientView));
 
 /// The title tab, `tabs` beside it, the close button, then `body` in the `panel` with style `s`.
 pub fn window(ui: &mut Ui, s: S, tabs: &[Tab], body: impl FnOnce(&mut Ui)) {
+    framed(ui, s, None, tabs, body);
+}
+
+/// The same for a screen that isn't a menu (stats, advancements): its title from `title`, a
+/// translation key.
+pub fn window_titled(ui: &mut Ui, s: S, title: &str, tabs: &[Tab], body: impl FnOnce(&mut Ui)) {
+    framed(ui, s, Some(title), tabs, body);
+}
+
+fn framed(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], body: impl FnOnce(&mut Ui)) {
     // The tabs stand on the frame: the column's gap of -2 tucks their bottom under its top line.
     ui.column(S::col().stretch().gap(-2.0), |ui| {
         ui.row(S::row().gap(2.0).pad(0.0), |ui| {
             ui.row(S::row().w(6.0), |_| {});
-            ui.panel("tab_pressed", S::row().pad(TAB_PAD).h(TAB_H).center(), |ui| ui.title());
+            ui.panel("tab_pressed", S::row().pad(TAB_PAD).h(TAB_H).center(), |ui| match title {
+                Some(key) => ui.text_styled(S::default().no_wrap(), key, &[]),
+                None => ui.title(),
+            });
             for &(key, open) in tabs {
                 ui.button(key, S::default().class("tab").h(TAB_H).pad(TAB_PAD), move |c| open(c));
             }
