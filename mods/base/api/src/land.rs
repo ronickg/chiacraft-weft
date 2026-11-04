@@ -357,6 +357,14 @@ pub const RIVER_FLOODPLAIN: (i32, i32) = (2, 12);
 pub const RIVER_BANKS: i32 = 8;
 pub const RIVER_VALLEY_PER_BLOCK: i32 = 36;
 pub const RIVER_VALLEY_RISE: i32 = 60;
+/// River terraces (Tectonic's tiers by a river's distance): the valley sides of the bigger
+/// rivers (flow from `RIVER_TERRACE_FLOW.0`, full at `.1`) climb in benches `RIVER_TERRACE`
+/// blocks high, each flat for all but `RIVER_TERRACE_RISER` of its width: meadows by the water
+/// (Ronald, 11-04: "All 3, in order"). Low steps with wide risers so a player can walk up them:
+/// at 5 blocks with 0.3 risers the walk test stuck at the first one (a 5-block rise in 3).
+pub const RIVER_TERRACE_FLOW: (f64, f64) = (10.0, 40.0);
+pub const RIVER_TERRACE: i32 = 3;
+pub const RIVER_TERRACE_RISER: f64 = 0.5;
 /// Rivers don't carve in the mountains: full where the mountains' area (`MOUNTAINS_AREA`) is up
 /// to `.0`, gone at `.1`. Their rain still runs down, so rivers come out at the mountains' feet.
 pub const RIVER_MOUNTAINS: (f64, f64) = (0.1, 0.45);
@@ -788,10 +796,13 @@ pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
         } else if d < flat {
             sea
         } else {
-            // The valley's sides: rising smoothly from the floodplain to the land.
+            // The valley's sides: rising smoothly from the floodplain to the land, in benches
+            // by the bigger rivers.
             let t = (d - flat) * ONE / banks.max(1);
             let smooth = (((t * t) >> 12) * (3 * ONE - 2 * t)) >> 12;
-            sea + (((h0 - sea) * smooth) >> 12)
+            let raise = ((h0 - sea) * smooth) >> 12;
+            let benches = ramp(flow, q12(RIVER_TERRACE_FLOW.0), q12(RIVER_TERRACE_FLOW.1));
+            sea + raise + (((net::terraced(raise) - raise) * benches) >> 12)
         };
         cut = cut.min((((target - h0).min(0)) * deep) >> 12);
     }
@@ -1189,6 +1200,22 @@ mod tests {
             }
         }
         assert!(cliffs > 0 && islands > 0, "{cliffs} cliff columns, {islands} island columns in 3.2 km");
+    }
+
+    #[test]
+    fn terraces_are_benches_that_never_fill() {
+        let mut last = 0;
+        let mut flat = 0;
+        for raise in 0..q4(60.0) {
+            let t = net::terraced(raise);
+            assert!(t >= last, "benches only climb");
+            assert!(t <= raise + q4(1.0), "a bench stands at most a block over the smooth side");
+            if t == last {
+                flat += 1;
+            }
+            last = t;
+        }
+        assert!(flat > q4(60.0) * 2 / 5, "much of the side is bench: {flat}");
     }
 
     #[test]
