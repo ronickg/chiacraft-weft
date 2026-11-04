@@ -125,6 +125,7 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 | base:savanna | 43%, 100%, 100%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, great_horned_owl, savanna_hawk, yacare_caiman, spectacled_caiman, jaguar | dog (chihuahua), cat, turkey_vulture |
 | base:swamp | 40%, 100%, 96%, 40% | summer: eaten 8% of the regrowth | capybara, field_vole, white_tailed_deer, house_sparrow | great_horned_owl, savanna_hawk, herring_gull, yacare_caiman, spectacled_caiman, jaguar | turkey_vulture, herring_gull |
 | base:mountains | 60%, 95%, 76%, 40% | summer: eaten 27% of the regrowth | mountain_hare, field_vole, red_deer, reindeer, snow_bunting | red_fox, raven, coyote, great_horned_owl, snowy_owl, golden_eagle, grey_wolf | brown_trout, red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
+| base:sequoia_grove | 40%, 40%, 40%, 40% | summer: eaten 80% of the regrowth | mountain_hare, field_vole, red_deer | red_fox, raven, coyote, great_horned_owl, golden_eagle, grey_wolf | red_fox, raven, coyote, golden_eagle, turkey_vulture, grey_wolf |
 | base:beach | 40%, 40%, 50%, 40% | - | hare, wood_mouse, house_sparrow | red_fox, raven, herring_gull | red_fox, raven, herring_gull |
 | animals:red_dunes | 40%, 40%, 40%, 40% | - | protoceratops, pinacosaurus, citipati, gobipteryx | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
 | animals:scrubland | 40%, 43%, 40%, 40% | - | protoceratops, psittacosaurus, gastonia, pinacosaurus, citipati, gobipteryx | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
@@ -644,6 +645,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | `base:birch_forest` | commonest |
 | `base:snowy_plains` | 75% |
 | `base:mountains` | 75% |
+| `base:sequoia_grove` | 30% |
 
 Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn attempts that pick it where commonest (common).
 
@@ -682,7 +684,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | grass 40%, leaves 50%, fruit 5%, lichen 5% |
 | a meal that fills it | 0.3 kg |
 | drinks | 30% of its 0.266 L a day; a drink lasts 56 min, thirsty after 28 |
-| its food grows at home (spring/summer/autumn/winter) | taiga 40/93/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/62/40/40%, mountains 60/95/76/40% |
+| its food grows at home (spring/summer/autumn/winter) | taiga 40/93/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/62/40/40%, mountains 60/95/76/40%, sequoia_grove 40/40/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 12 blocks (twice that running) |
 | eats (food points) | `base:crowberries` 4; `base:lingonberries` 6, favorite |
@@ -770,6 +772,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | `base:snowy_plains` | 80% |
 | `base:mountains` | 80% |
 | `base:swamp` | 60% |
+| `base:sequoia_grove` | commonest |
 
 Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn attempts that pick it where commonest (common).
 
@@ -808,7 +811,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | eats | grass 60%, leaves 15%, roots 15%, seeds 5%, insects 5% |
 | a meal that fills it | 0.004 kg |
 | drinks | 10% of its 0.005 L a day; a drink lasts 108 min, thirsty after 54 |
-| its food grows at home (spring/summer/autumn/winter) | taiga 40/65/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/50/40/40%, mountains 40/70/40/40%, swamp 40/100/96/40% |
+| its food grows at home (spring/summer/autumn/winter) | taiga 40/65/40/40%, birch_forest 40/62/40/40%, snowy_plains 40/50/40/40%, mountains 40/70/40/40%, swamp 40/100/96/40%, sequoia_grove 40/40/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 5 blocks (twice that running) |
 | eats (food points) | `base:wheat` 6; `base:wheat_seeds` 3; `base:sunflower_seeds` 6, favorite |
@@ -894,6 +897,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | `base:forest` | commonest |
 | `base:birch_forest` | 80% |
 | `base:mountains` | 80% |
+| `base:sequoia_grove` | 80% |
 
 Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 
@@ -932,7 +936,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | eats | grass 50%, leaves 40%, fruit 5%, seeds 5% |
 | a meal that fills it | 16 kg |
 | drinks | 80% of its 9.535 L a day; a drink lasts 31 min, thirsty after 16 |
-| its food grows at home (spring/summer/autumn/winter) | forest 40/73/41/40%, birch_forest 40/62/40/40%, mountains 40/78/74/40% |
+| its food grows at home (spring/summer/autumn/winter) | forest 40/73/41/40%, birch_forest 40/62/40/40%, mountains 40/78/74/40%, sequoia_grove 40/40/40/40% |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 20 blocks (twice that running) |
 | eats (food points) | `base:wheat` 10; `base:apple` 12, favorite |
@@ -1082,6 +1086,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 0.8% of spawn 
 | `base:plains` | 60% |
 | `base:desert` | 40% |
 | `base:beach` | 40% |
+| `base:sequoia_grove` | 60% |
 
 Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn attempts that pick it where commonest (common).
 
@@ -1208,6 +1213,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | `base:desert` | 40% |
 | `base:plains` | 30% |
 | `base:beach` | 30% |
+| `base:sequoia_grove` | 80% |
 
 Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 
@@ -1511,6 +1517,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | `base:desert` | commonest |
 | `base:forest` | 40% |
 | `base:mountains` | 40% |
+| `base:sequoia_grove` | 60% |
 
 Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn attempts that pick it where commonest (common).
 
@@ -1701,6 +1708,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | `base:desert` | 60% |
 | `base:swamp` | 60% |
 | `base:savanna` | 40% |
+| `base:sequoia_grove` | 80% |
 
 Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 
@@ -1827,6 +1835,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | `base:snowy_plains` | 30% |
 | `base:forest` | 30% |
 | `base:birch_forest` | 30% |
+| `base:sequoia_grove` | 30% |
 
 Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 
@@ -1951,6 +1960,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | `base:plains` | 60% |
 | `base:forest` | 30% |
 | `base:mountains` | 30% |
+| `base:sequoia_grove` | 40% |
 
 Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
 
@@ -2198,6 +2208,7 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | `base:mountains` | 50% |
 | `base:snowy_plains` | 40% |
 | `base:plains` | 10% |
+| `base:sequoia_grove` | 30% |
 
 Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 0.8% of spawn attempts that pick it where commonest (uncommon).
 
