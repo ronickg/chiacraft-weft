@@ -2,6 +2,8 @@
 // of the space around each point is closed in by what is drawn near it, from the world's depth.
 // Corners, the ground under an overhang, the foot of a wall and the gaps between leaves darken a
 // little more than the blocks' own corner shading does; open ground and the sky stay as they are.
+// Kept gentle on purpose (2 to 4% in shaded spots, Ronald's choice on 2026-11-04): the sun shadows
+// do the visible shading, and stronger darkening here once darkened grass and the held hand.
 
 const CONTACT_DIRS: i32 = 8;
 

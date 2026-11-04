@@ -9,8 +9,8 @@ in a male house sparrow's; the snow bunting is the same model in its own colors,
 A house sparrow is 16 cm long with a 23 cm span and weighs 30 g: laid out in its own units (`layout`:
 the raven's drawn this small would put faces too near each other), 11 from the bill to the tail's
 tip and 15 across the open wings; a songbird's round head, a short thick seed-cracking bill, short
-rounded wings, a short notched tail, short legs. Painted `FINE` (4 texels a unit), as small
-creatures are.
+rounded wings, a short notched tail, short legs. Painted at 128 a block (2 texels a unit), finer
+than the house's 32, so its face still carries an eye.
 """
 
 import os
@@ -20,7 +20,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts")))
-from house import FINE  # noqa: E402
+from house import texels  # noqa: E402
 from paint import EYES  # noqa: E402
 
 BROWN, STREAK, GREY, CHESTNUT, BIB, CHEEK, BILL, LEG, BAR = range(9)
@@ -41,7 +41,16 @@ EYES.update({
                                 "PHPP",
                                 "PPPP",
                                 ".II."], colors={"I": (80, 54, 38), "P": (26, 18, 16), "H": (236, 234, 228)}, halo="none"),
+    # At 128 a block the head's side is 4 texels by 4: the dark bead of an eye 2 by 2 in the
+    # chestnut band, a highlight up front, the brown iris under the pupil.
+    "small_bird_px": dict(pattern=["HP",
+                                   "PI"], colors={"I": (96, 64, 44), "P": (26, 18, 16), "H": (236, 234, 228)}, halo="none", iris="I"),
 })
+
+# Painted at 128 a block (texels(k=4), 2 texels a unit; it was house.FINE, 256): the eye-bearing
+# side of the head is 2.2 by 2.0 units, 1.1 by 1.0 texels at 32 and 2.2 by 2.0 at 64 (under 3),
+# 4 by 4 at 128.
+TX = texels(k=4)
 
 
 def area(e, face, p, uu, vv, h):
@@ -93,7 +102,7 @@ def area(e, face, p, uu, vv, h):
     if n == "hips":
         if face in ("up", "north"):
             a[:] = BROWN
-            a = np.where((np.floor(x * 4) % 3 == 0) & (face == "up"), STREAK, a)  # the streaked back
+            a = np.where((np.floor(x * 2) % 3 == 0) & (face == "up"), STREAK, a)  # the streaked back (a streak a texel)
         elif face == "down":
             a[:] = GREY
         else:
@@ -102,15 +111,15 @@ def area(e, face, p, uu, vv, h):
     if n.startswith(("wingf_", "wing_", "hand_")):
         a[:] = BROWN
         if face in ("east", "west", "up"):
-            a = np.where(np.floor(z * 4) % 3 == 0, STREAK, a)  # the coverts' dark centers
-            a = np.where((y > 3.15) & (y < 3.4) & (face != "up"), BAR, a)  # the white wing bar
-            a = np.where((z > 0.9) & (z < 1.2) & (face == "up"), BAR, a)
+            a = np.where(np.floor(z * 2) % 3 == 0, STREAK, a)  # the coverts' dark centers (a texel each)
+            a = np.where((y > 3.03) & (y < 3.53) & (face != "up"), BAR, a)  # the white wing bar, a texel
+            a = np.where((z > 0.8) & (z < 1.3) & (face == "up"), BAR, a)
         if face == "down":
             a[:] = GREY
         return a
     if n.startswith(("primaries", "flight")):
         a[:] = STREAK
-        a = np.where((np.abs(x) % 0.65) < 0.22, BROWN, a)  # pale edges to the dark feathers
+        a = np.where((np.abs(x) % 1.5) < 0.5, BROWN, a)  # pale edges to the dark feathers (a texel, two dark between)
         return a
     if n.startswith("primariesf"):
         a[:] = STREAK
@@ -187,7 +196,7 @@ CFG = dict(
     K=1.0,
     D=0.0,
     layout=layout(),
-    TX=FINE,
+    TX=TX,  # 128 a block (see TX above)
     head=1.5,
     bill=dict(w=2.6, h=2.6, len=3.0, rot=12, hook=False, y=0.55),
     body_w=1.12,
@@ -198,7 +207,7 @@ CFG = dict(
     tilt=-24,
     neck_share=0.0,
     neck_hidden=True,  # the head sits on the breast: the neck is a hidden link
-    eyes=dict(kind="side", pattern="small_bird", z=3.05, y=5.5, lash=(40, 30, 26)),
+    eyes=dict(kind="side", pattern="small_bird_px", z=2.9, y=5.5, lash=(40, 30, 26)),  # z: the eye a texel back from the bill
     materials=MATERIALS,
     feather=(BROWN, STREAK, GREY, CHESTNUT, BIB, CHEEK, BAR),
     area=area,

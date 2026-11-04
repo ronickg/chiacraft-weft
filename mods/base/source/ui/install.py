@@ -303,7 +303,11 @@ def main():
         if name != "air":
             write(name + "_empty", empty, {})
             write(name + "_half", half(full, empty), {})
-    print(f"{len(PARTS) + 3 + 2 + 7} parts into {os.path.normpath(GUI)}")
+    # The UI redo's kit at the item pixel (pxkit.py) replaces the frames, slots and controls above.
+    import pxkit
+    pxkit.build()
+    pxkit.install()
+    print(f"{len(PARTS) + 3 + 2 + 7} parts into {os.path.normpath(GUI)}, then pxkit's over them")
     print("still to draw:")
     for k, v in MISSING.items():
         print(f"  {k}: {v}")

@@ -1,0 +1,4 @@
+# The grass top turned four ways at random, so a field doesn't show its tile repeating.
+method = random
+tiles = <default> grass_top/1-3
+symmetry = all

@@ -31,6 +31,10 @@ pub static CRAGS: Biome = Biome::named("crags");
 static TREES: Component<f32> = Component::named("trees");
 static GRASS_COVER: Component<f32> = Component::named("grass");
 static TREE_KINDS: Component<BlockList> = Component::named("tree_kinds");
+/// Extra trees where a forest stands thick, in stands with clearings between (base's worldgen).
+static STAND_TREES: Component<f32> = Component::named("stand_trees");
+/// Boulders, a heap of stone per 12 x 12 cell (base's worldgen).
+static BOULDERS: Component<f32> = Component::named("boulders");
 static FLOWERS: Component<BlockList> = Component::named("flowers");
 /// On a log, the leaves of the tree base's worldgen grows from it; tags `cone_tree`, `flat_tree`,
 /// `palm_tree` give its shape.
@@ -123,6 +127,7 @@ pub fn init(r: &mut Registry) {
     // Dry, open land with a few conifers and ferns: between the dunes and the wet.
     r.biome(&SCRUBLAND)
         .set(&CLIMATE, base_api::climate("animals:scrubland"))
+        .set(&BOULDERS, 0.08)
         .humidity(-0.12..0.05)
         .surface("base:grass", "base:dirt", 3)
         .tint(grass, 0xb5ad5a)
@@ -143,6 +148,7 @@ pub fn init(r: &mut Registry) {
         .tint(water, 0x4a6e5a)
         .tag("wet")
         .set(&TREES, 0.04)
+        .set(&STAND_TREES, 0.1)
         .set(&GRASS_COVER, vitals::forage::grass_cover("animals:floodplain").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "animals:swamp_cypress_log:3 animals:araucaria_log:2 animals:tempskya_log:2")
         .set(&FERNS, 0.35)
@@ -156,6 +162,7 @@ pub fn init(r: &mut Registry) {
         .tint(foliage, 0x4f8a2c)
         .tag("forest")
         .set(&TREES, 0.35)
+        .set(&STAND_TREES, 0.18)
         .set(&GRASS_COVER, vitals::forage::grass_cover("animals:fern_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "animals:araucaria_log:3 animals:ginkgo_log:2 base:spruce_log:2 animals:tempskya_log:1")
         .set(&FERNS, 0.3)
@@ -163,6 +170,7 @@ pub fn init(r: &mut Registry) {
     // High rock: the wyverns'.
     r.biome(&CRAGS)
         .set(&CLIMATE, base_api::climate("animals:crags"))
+        .set(&BOULDERS, 0.3)
         .surface("base:grass", "base:dirt", 3)
         .bare_above(115)
         .tint(grass, 0x8aa864)

@@ -463,7 +463,7 @@ fn shared(w: &mut String) {
         w,
         "| a drink lasts | {}% of its mass spared, a real day of drinking {} s of play |",
         trim(needs::SPARE as f64 * 100.0, 0),
-        needs::DAY_SECS
+        needs::DRINK_DAY_SECS
     );
     let _ = writeln!(
         w,

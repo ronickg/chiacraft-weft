@@ -3,6 +3,11 @@ engine reads (`crates/engine/src/ui/font.rs`, `Font::coverage`): every glyph's c
 CELL x CELL pixels, and a `.font` file with where each sits and how wide it is.
 
     ~/.venvs/blocky/bin/python mods/base/source/ui/font_bake.py   (needs fontTools)
+    ~/.venvs/blocky/bin/python mods/base/source/ui/font_bake.py --pixel FONT.ttf [--also OTHER.ttf]
+
+`--pixel` bakes a pixel font instead (the UI redo, 2026-11-04): at its design size, one design pixel
+a font pixel (half a GUI pixel, the UI's pixel), no smoothing, sampled sharp; `--also` takes the
+characters the first font lacks (Cyrillic) from a second pixel font of the same size.
 
 Alegreya Sans's digits are old-style (a 3 dips below the line): the font's lining figures
 (`zero.lf`...) are put in their place first, as a HUD wants "40/40" to stand level.
@@ -20,7 +25,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FONT = os.path.join(HERE, "fonts", "AlegreyaSans-Medium.ttf")
-OUT = os.path.join(HERE, "..", "..", "assets", "fonts")
+OUT = os.environ.get("FONT_OUT") or os.path.join(HERE, "..", "..", "assets", "fonts")
 UNIT = 3  # atlas pixels a font pixel
 CELL = 64
 CELL_H = 80
@@ -110,5 +115,92 @@ def main():
     print(f"{len(glyphs)} glyphs at {size} pt, ascent {ascent} descent {descent}, atlas {atlas.size[0]}x{atlas.size[1]}")
 
 
+def design_size(path, probe="HOWxgq"):
+    """The smallest size at which the font draws with no grey pixels: one design pixel a pixel."""
+    for size in range(6, 49):
+        f = ImageFont.truetype(path, size)
+        a = np.asarray(f.getmask(probe, mode="L"))
+        if a.size and a.max() == 255 and np.isin(a, (0, 255)).all():
+            return size
+    raise SystemExit(f"{path}: no size draws without grey pixels; is it a pixel font?")
+
+
+def pixel_main(path, also=None):
+    """A pixel font: `format = coverage` with `scale = 1`, `pixel = 1`, `sharp = true`. The line is
+    as tall as its capitals need to sit centred on the engine's baseline (font pixel 14):
+    as much room above the capitals as below the baseline."""
+    fonts = []
+    for p in [path] + ([also] if also else []):
+        size = design_size(p)
+        fonts.append((p, size, ImageFont.truetype(p, size)))
+    f0 = fonts[0][2]
+    ascent, descent = f0.getmetrics()
+    caps = f0.getbbox("H")
+    cap_h = caps[3] - caps[1]
+    # The line: the capitals with the same room above them as below the baseline (the descenders
+    # and one pixel), so text sits centred in buttons and tabs. The engine stands every font's
+    # baseline on font pixel 14 of the line; `baseline` is declared that much lower in the cell so
+    # the real one lands on the line's own (`room + cap_h`).
+    room = descent + 1
+    line = cap_h + 2 * room
+    cw, ch = 32, ascent + descent + 4
+    top = 2
+    baseline = top + ascent + (14 - (room + cap_h))
+    glyphs = []
+    for c in CHARS:
+        for p, size, f in fonts:
+            if c != " " and np.asarray(f.getmask(c, mode="1")).sum() == 0:
+                continue
+            if c != " " and not has_glyph(p, c):
+                continue
+            img = Image.new("L", (cw, ch))
+            # every font's baseline on the first one's
+            ImageDraw.Draw(img).text((PAD, top + ascent - f.getmetrics()[0]), c, font=f, fill=255)
+            img = img.point(lambda v: 255 if v >= 128 else 0)
+            a = np.asarray(img)
+            cols = np.nonzero(a.max(0))[0]
+            left, right = (int(cols[0]), int(cols[-1]) + 1) if len(cols) else (PAD, PAD)
+            advance = round(f.getlength(c))
+            glyphs.append((c, img, left, right - left, left - PAD, advance))
+            break
+    rows = (len(glyphs) + COLS - 1) // COLS
+    atlas = Image.new("L", (COLS * cw, rows * ch))
+    names = " + ".join(f"{os.path.basename(p)} at {s} px" for p, s, _ in fonts)
+    lines = [
+        f"# Baked by mods/base/source/ui/font_bake.py --pixel from {names}; do not edit.",
+        "format = coverage",
+        f"cell = {cw} {ch}",
+        "scale = 1",
+        f"baseline = {baseline}",
+        "pixel = 1",
+        f"line = {line}",
+        f"caps = {cap_h}",
+        "sharp = true",
+    ]
+    for n, (c, img, left, width, bearing, advance) in enumerate(glyphs):
+        col, row = n % COLS, n // COLS
+        atlas.paste(img, (col * cw, row * ch))
+        lines.append(f"g {ord(c):04x} {col} {row} {left} {width} {bearing} {advance}")
+    os.makedirs(OUT, exist_ok=True)
+    atlas.save(os.path.join(OUT, "default.png"))
+    open(os.path.join(OUT, "default.font"), "w").write("\n".join(lines) + "\n")
+    print(f"{len(glyphs)} glyphs ({names}), capitals {cap_h} px, line {line}, atlas {atlas.size[0]}x{atlas.size[1]}")
+
+
+_CMAPS = {}
+
+
+def has_glyph(path, c):
+    from fontTools.ttLib import TTFont
+    if path not in _CMAPS:
+        _CMAPS[path] = TTFont(path).getBestCmap()
+    return ord(c) in _CMAPS[path]
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    if len(sys.argv) > 2 and sys.argv[1] == "--pixel":
+        also = sys.argv[sys.argv.index("--also") + 1] if "--also" in sys.argv else None
+        pixel_main(sys.argv[2], also)
+    else:
+        main()

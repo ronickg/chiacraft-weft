@@ -473,7 +473,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // comma separated), and DID sponsors' addresses, tried in order.
         ConfigDef::text("core:chain", "testnet11"),
         ConfigDef::text("core:chain_peers", ""),
-        ConfigDef::text("core:sponsors", ""),
+        // Ours: testnet11, run on Ronald's Mac from a throwaway wallet while we test (HANDOFF.md,
+        // "Our DID sponsor").
+        ConfigDef::text("core:sponsors", "d468728d7e0e3f417c822af6e87ff924c0adbdeeb89a3c0f2d0745b2de40a792"),
         // Where others reach this game by address; forward it, TCP and UDP.
         ConfigDef::number("core:server_port", ck::INT, 27182.0, 1.0, 65535.0, 1.0),
         ConfigDef::text("core:resource_packs", ""),

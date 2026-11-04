@@ -489,24 +489,46 @@ and cactus.**
   same rule. The Cretaceous's araucaria, ginkgo, swamp cypress and scale-leaved conifer now have
   saplings, dropped by their leaves, that grow their trees (Tempskya spread by its roots: none).
 - **Research round 3's fixes** (2026-11-04):
-  - **B4, spring's real food:** lingonberries and crowberries, which hold their fruit over
-    winter, are made ripe; wild rice's grain cooks into a bowl of wild rice (`base:cooked_wild_rice`,
-    USDA cooked wild rice; `cooked_rice`, white, waits for the paddy crop). An unripe bush dropping nothing waits for the cattail's root and fibre, so
-    the spring plains keep a plant food (Research round 4: land them together).
-  - **U1, clay:** clay lies in patches under shallow inland water, half the swamp's floor, none
-    under the sea.
+  - **B4, spring's real food,** in the order Research round 4 asks, so the spring plains always
+    have a plant food:
+    - wild rice's grain cooks into a bowl of wild rice (`base:cooked_wild_rice`, USDA cooked wild
+      rice; `cooked_rice`, white, waits for the paddy crop);
+    - a cattail gives its root (`base:cattail_root`, about 17 g of starch in 100 g, an estimate),
+      spring's classic survival starch;
+    - lingonberries and crowberries, which hold their fruit over winter, are made ripe;
+    - then a bush or a seed head drops nothing until it's ripe (three when it is).
+  - **B3, fibre in the north and the marshes:** sedge and cottongrass give plant fibre half the
+    time, a cattail always (`vitals::wild::FIBRE`), as tall grass does a time in eight.
+  - **B5, frost by the still air:** wind chill is what a body loses; a plant reads the still air
+    (`base_api::grow`, with the Survival work's `Air::still`).
+  - **U1, clay:** clay lies in 4 x 4 patches under still water, the shallow inland water's and
+    the ponds', half the swamp's floor, none under the sea.
   - **The berry bush** is a row of `vitals::wild` like the other bushes: one rule for its growth,
     frost, drops and placement.
   - **Art wired in:** the compost bin's own sides and tops, and farmland paler as it wears.
   - **Kelp washed up** (wrack) lies on the beaches as a flat mat, a food for people and animals;
     kelp under the sea waits for the engine's blocks that hold water (another session).
-  - **Not yet:** B3 (fibre from sedge, cottongrass and cattail) and B5 (plant frost by the still
-    air) need the Survival work (fibre, `Air::still`) in this branch; the cattail's root needs its
-    icon.
 - **Ponds** (2026-11-04): swamps had no still water (their water is the sea's, with beaches), so
   their water plants had nowhere to grow. Round ponds a block deep now lie on their low, level
   ground (`vitals::wild::POND_LANDS`: 35% of the swamp's 8 x 8 cells, 20% of the floodplain's),
   with hyacinth or water lilies on them and wild rice and cattails on their shores.
+- **The world's looks** (2026-11-04, Ronald: "the biomes, trees etc all kinda still suck";
+  Research round 7, `reports/world-looks.md`):
+  - **Trees vary** (`base_api::trees`): round crowns about seven blocks across, big ones nine
+    (real mature broadleaves are 6-12 m; the count was already right, about 160 trees a hectare
+    at a forest's 0.4); some trees big, crooked or twin, and in the wild some fallen or stumps;
+    birch slim; palms with drooping fronds.
+  - **Stands and clearings:** one smooth noise; a second scatter (`stand_trees`, a site per
+    3 x 3) thickens the stands to about 380 trees a hectare (mature stands are 170-244), and the
+    main one leaves the clearings open.
+  - **Grass and flowers in patches** (a meadow noise), the biome's grass cover on average so
+    grazing's numbers hold; flowers in one-kind patches.
+  - **Each biome's own flowers:** 45 from its real place (`vitals::wild::FLOWERS`), their bloom
+    seasons stored; placeholder pictures until Chiacraft's art.
+  - **The grass top** turned four ways at random (`grass_top.ctm`); tall grass's variant waits on
+    a check of Weft's random CTM on plants.
+  - **Next:** trees grown from branches (the Animal models session's `branchy`), a bloom look,
+    moss, boulders and coarse ground by noise and slope.
 - **Looks:** a grazed tuft shows bitten down (`<plant>_grazed`), a ripe seed head its fruit or
   seed (`<plant>_ripe`).
 - **Grown plants rest:** a plant at its last age returns from its growth step before reading the

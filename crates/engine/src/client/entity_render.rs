@@ -73,6 +73,9 @@ pub struct EntityRenderer {
     /// Model pipelines for the screen and for the inventory figure's image.
     model_pipe: PipelineId,
     preview_pipe: PipelineId,
+    /// Models into the sun's shadow map, when the shader pack draws one and its model shader has
+    /// `fs_shadow`.
+    shadow_pipe: Option<PipelineId>,
     pub models: Models,
     buffers: Vec<(BufferId, u32)>,
     /// The held item's projection: a fixed field of view, like vanilla, so it keeps its shape
@@ -149,7 +152,7 @@ fn light_boxes(boxes: &mut [GpuBox], from: usize, light: u32) {
 impl EntityRenderer {
     pub fn new(gpu: &mut dyn Backend, assets: &Assets) -> Result<EntityRenderer, String> {
         let (pipeline, overlay) = Self::pipelines(gpu, assets)?;
-        let ([model_pipe, preview_pipe], kind_shaders) = Self::model_pipelines(gpu, assets)?;
+        let ([model_pipe, preview_pipe], shadow_pipe, kind_shaders) = Self::model_pipelines(gpu, assets)?;
         let models = Models::new(gpu, assets);
         let frames = gpu.frames_in_flight();
         let hand_views = (0..frames)
@@ -173,6 +176,7 @@ impl EntityRenderer {
             overlay,
             hand_pipe,
             model_pipe,
+            shadow_pipe,
             models,
             buffers: Vec::new(),
             hand_views,
@@ -265,9 +269,10 @@ impl EntityRenderer {
         Ok((main, overlay))
     }
 
-    /// The model pipelines (screen, inventory figure image) with every entity shader snippet,
-    /// and each kind's slot.
-    fn model_pipelines(gpu: &mut dyn Backend, assets: &Assets) -> Result<([PipelineId; 2], Vec<u32>), String> {
+    /// The model pipelines (screen, inventory figure image) with every entity shader snippet, the
+    /// sun's shadow map's (with the pack's sun shadows) and each kind's slot.
+    #[allow(clippy::type_complexity)]
+    fn model_pipelines(gpu: &mut dyn Backend, assets: &Assets) -> Result<([PipelineId; 2], Option<PipelineId>, Vec<u32>), String> {
         let snippets = crate::shaders::snippets(assets, &HOOK);
         let (s, mut slots) = crate::packs::compose(assets, "model.wgsl", &[(&HOOK, &snippets)]).map_err(|e| e.0)?;
         let slots = slots.pop().unwrap_or_default();
@@ -297,15 +302,37 @@ impl EntityRenderer {
             })
             .map_err(|e| e.0)
         };
-        Ok(([make("models", Format::Surface)?, make("entity preview", Format::Rgba8Srgb)?], kinds))
+        let pipes = [make("models", Format::Surface)?, make("entity preview", Format::Rgba8Srgb)?];
+        // Depth only, both sides (a model's thin parts are open boxes), its see-through texels left out.
+        let shadow = crate::packs::sun_shadows()
+            .then(|| {
+                gpu.create_pipeline(&PipelineDesc {
+                    label: "models shadow",
+                    shader: &s,
+                    vertex: "vs",
+                    fragment: Some("fs_shadow"),
+                    color: None,
+                    depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
+                    blend: Blend::None,
+                    cull_back: false,
+                    topology: Topology::Triangles,
+                })
+                .map_err(|e| log::warn!("models cast no sun shadows: {}", e.0))
+                .ok()
+            })
+            .flatten();
+        Ok((pipes, shadow, kinds))
     }
 
     pub fn reload(&mut self, gpu: &mut dyn Backend, assets: &Assets) {
         match Self::model_pipelines(gpu, assets) {
-            Ok(([p, q], kinds)) => {
+            Ok(([p, q], shadow, kinds)) => {
                 gpu.destroy_pipeline(self.model_pipe);
                 gpu.destroy_pipeline(self.preview_pipe);
-                (self.model_pipe, self.preview_pipe) = (p, q);
+                if let Some(s) = self.shadow_pipe.take() {
+                    gpu.destroy_pipeline(s);
+                }
+                (self.model_pipe, self.preview_pipe, self.shadow_pipe) = (p, q, shadow);
                 self.kind_shaders = kinds;
             }
             Err(e) => log::error!("model shader: {e}"),
@@ -382,6 +409,9 @@ impl EntityRenderer {
         gpu.destroy_pipeline(self.model_pipe);
         gpu.destroy_pipeline(self.hand_pipe);
         gpu.destroy_pipeline(self.preview_pipe);
+        if let Some(s) = self.shadow_pipe.take() {
+            gpu.destroy_pipeline(s);
+        }
         if let Some((c, d, ..)) = self.preview_target.take() {
             gpu.destroy_texture(c);
             gpu.destroy_texture(d);
@@ -734,6 +764,7 @@ impl EntityRenderer {
                     .filter(|p| p.texture == k.texture)
                     .map(|p| &p.tex)
             });
+        let layout = size;
         let (skin, size) = own.map_or((skin, size), |o| (&o.1, o.2));
         let base = Instance {
             color: [1.0; 3],
@@ -753,7 +784,7 @@ impl EntityRenderer {
                 if let Some(Some((_, idx, size))) = self.skins.get(t).filter(|_| out.1 < MAX_LAYERS) {
                     out.0[out.1] = Instance {
                         tex: *idx,
-                        tex_size: [size[0] as f32, size[1] as f32],
+                        tex_size: worn_tex_size(layout, *size),
                         roles: crate::model::role_mask(w.roles),
                         inflate: w.inflate,
                         glow: glow(t),
@@ -846,6 +877,7 @@ impl EntityRenderer {
         cam: &Camera,
         entities: &FxHashMap<u64, ClientEntity>,
         me: Option<&ClientEntity>,
+        shadow_me: Option<&ClientEntity>,
         hand: Option<Hand>,
         textures: &GameTextures,
         light: &impl Fn(IVec3) -> u32,
@@ -880,10 +912,16 @@ impl EntityRenderer {
         frame_builds.clear();
         // Who holds something: its place in `posed`, the item and its light.
         let mut holders: Vec<(usize, u32, u32)> = Vec::new();
-        for (id, e) in entities
+        // The player's own body in first person only casts its shadow (`shadow_me`).
+        for (id, e, shadow_only) in entities
             .iter()
-            .map(|(i, e)| (*i, e))
-            .chain(me.map(|m| (self.local, m)))
+            .map(|(i, e)| (*i, e, false))
+            .chain(me.map(|m| (self.local, m, false)))
+            .chain(
+                shadow_me
+                    .filter(|_| self.shadow_pipe.is_some())
+                    .map(|m| (self.local, m, true)),
+            )
         {
             let base = rel(e.pos);
             if base.length_squared() > 160.0 * 160.0 {
@@ -903,7 +941,7 @@ impl EntityRenderer {
             if layer_count == 0 {
                 continue;
             }
-            if e.burning {
+            if e.burning && !shadow_only {
                 let (hw, h, _) = e.dims();
                 let from = boxes.len();
                 fire_boxes(&mut boxes, textures, base, hw as f32 * 2.0, h as f32, cam.yaw, e.age);
@@ -1023,8 +1061,9 @@ impl EntityRenderer {
                 layers,
                 layer_count,
                 build,
+                shadow_only,
             });
-            if e.held != 0 && !sleeping {
+            if e.held != 0 && !sleeping && !shadow_only {
                 holders.push((posed.len() - 1, e.held, lit));
             }
         }
@@ -1292,6 +1331,15 @@ impl EntityRenderer {
         }
         self.instances = instances;
     }
+
+    /// The models posed by this frame's `draw` (and the player's own body in first person) into
+    /// the bound sun's shadow map, with `view` the shadow pass's scene.
+    pub fn draw_shadow(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, view: BufferId) {
+        if let Some(pipe) = self.shadow_pipe {
+            self.models
+                .draw(gpu, list, frame, super::models::Batch::Shadow, pipe, view);
+        }
+    }
 }
 
 /// Two layers of flames facing the camera, the inner one smaller, like vanilla's burning mobs.
@@ -1527,5 +1575,34 @@ fn ground_transform(base: Vec3, age: f32, item: u32) -> Mat4 {
         spin * Mat4::from_translation(Vec3::splat(-0.125)) * Mat4::from_scale(Vec3::splat(0.25))
     } else {
         spin * Mat4::from_translation(Vec3::new(-0.25, 0.0, -0.25)) * Mat4::from_scale(Vec3::splat(0.5))
+    }
+}
+
+/// What a worn layer's pixels are read against: the wearer's layout width, at the layer's own
+/// shape. A layer drawn at a multiple of the layout (a 128 x 64 armour or clothes layer on a
+/// 64 x 32 skin: 32 texels a block on a 16 one) spreads the layout's pixels over all of it, as
+/// Minecraft's armour layers do in high-resolution packs; one at the layout's width reads as before.
+pub(crate) fn worn_tex_size(layout: [u32; 2], worn: [u32; 2]) -> [f32; 2] {
+    if layout[0] == 0 || worn[0] == 0 {
+        return [worn[0] as f32, worn[1] as f32];
+    }
+    let w = layout[0] as f32;
+    [w, worn[1] as f32 * w / worn[0] as f32]
+}
+
+#[cfg(test)]
+mod worn_tests {
+    use super::worn_tex_size;
+
+    #[test]
+    fn worn_layers_map_by_the_skins_layout() {
+        // As before: a 64 x 32 layer on a 64 x 32 skin, or on a 64 x 64 one (its top half).
+        assert_eq!(worn_tex_size([64, 32], [64, 32]), [64.0, 32.0]);
+        assert_eq!(worn_tex_size([64, 64], [64, 32]), [64.0, 32.0]);
+        // Twice the layout (32 a block on a 16 skin) and four times: the same layout pixels.
+        assert_eq!(worn_tex_size([64, 32], [128, 64]), [64.0, 32.0]);
+        assert_eq!(worn_tex_size([64, 32], [256, 128]), [64.0, 32.0]);
+        // No layout known: the layer's own size.
+        assert_eq!(worn_tex_size([0, 0], [128, 64]), [128.0, 64.0]);
     }
 }

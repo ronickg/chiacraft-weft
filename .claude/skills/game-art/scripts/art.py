@@ -80,8 +80,10 @@ LABEL = {"item": "item icon", "block": "block texture", "animal": "animal sprite
          "monster": "character sprite", "ui": "UI element", "effect": "effect", "sky": "sky element"}
 KEY_FROM = {"model_block": "block", "monster": "animal", "effect": "item", "sky": "item"}
 UI_SHEETS = os.path.join(GUIDES, "6 UI", "UI Prompt References")
+UI_SUITE = os.path.join(UI_SHEETS, "Voxel Fantasy Survival UI Suite.png")  # Ronald's target for every UI part
 # Ronald's own UI sheets (his, not a pack's), by the UI guide's type
-UI_KEY = {"button": "Fantasy UI Controls Reference Sheet.png", "tab": "Fantasy UI Controls Reference Sheet.png",
+UI_KEY = {"slot": "Pixel-Fantasy Inventory UI Reference.png", "frame": "Pixel-Fantasy Inventory UI Reference.png",
+          "button": "Fantasy UI Controls Reference Sheet.png", "tab": "Fantasy UI Controls Reference Sheet.png",
           "control": "Fantasy UI Controls Reference Sheet.png", "bar": "Pixel-Art Survival HUD Reference Panel.png",
           "hud": "Pixel-Art Survival HUD Reference Panel.png", "status": "Pixel-Art Survival HUD Reference Panel.png",
           "window": "Pixel-Fantasy Inventory UI Reference.png", "tooltip": "Pixel-Fantasy Inventory UI Reference.png"}
@@ -240,9 +242,15 @@ def build(a):
         if a.kind == "ui":
             sheet = next((v for k, v in UI_KEY.items() if k in a.type.lower()), "Fantasy Pixel UI Reference Poster.png")
             key = os.path.join(UI_SHEETS, sheet)
-            refs = [key, UI_REF]
-            attached = ("Attached: first and second, my game's own UI sheets, the style key: take their frames, "
-                        "colors and light, not their layout.")
+            if getattr(a, "guide_only", False):  # Ronald's A/B (11-04): the guide's words and our own art only
+                refs = [os.path.join(ROOT, "notes", "ui-codex", "approved_parts.png"), key_path("item")]
+                attached = ("Attached: first, UI parts already approved for my game; second, approved item icons "
+                            "that sit in its slots: together the style key. Take their frames, colors and light.")
+            else:
+                refs = [UI_SUITE, key, UI_REF]
+                attached = ("Attached: first, my game's whole UI as I want it (menus, HUD, inventory, components), "
+                            "then two more of my own UI sheets: together the style key. Take their frames, colors "
+                            "and light, not their layout.")
         else:
             refs = [key, key_path("item") if a.kind != "item" else None, UI_REF]
             attached = ("Attached: first, approved art of my game, the style key: take its look, not its designs. "
@@ -403,7 +411,7 @@ def install(a):
 def main():
     if len(sys.argv) > 2 and sys.argv[1] == "batch":
         jobs = json.load(open(sys.argv[2]))
-        base = dict(what="", ref="", type="", cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3,
+        base = dict(what="", ref="", type="", guide_only=False, cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3,
                     dir=SCRATCH, mod="base")
         with ThreadPoolExecutor(4) as ex:
             for r in ex.map(lambda j: make(argparse.Namespace(**dict(base, **j))), jobs):
@@ -433,6 +441,7 @@ def main():
     ap.add_argument("--tile", action="store_true", help="the other kinds: a full tile with no background (clouds, star field)")
     ap.add_argument("--green", action="store_true", help="on green: the thing is purple, pink or magenta")
     ap.add_argument("--pale", action="store_true", help="a pale thing whose outline may be light (paper, feather)")
+    ap.add_argument("--guide-only", action="store_true", help="ui: no UI sheets of Ronald's attached, only the guide's words and our approved parts")
     ap.add_argument("--tries", type=int, default=3)
     ap.add_argument("--dir", default=SCRATCH)
     ap.add_argument("--mod", default="base", help="install: the mod whose texture it replaces")

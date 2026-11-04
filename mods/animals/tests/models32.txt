@@ -1,0 +1,225 @@
+# Every animal model after the rebuild at 32 texels a block (source/<animal>, the blocky-model skill).
+# Groups along x, two of each species (a second coat), shots on arrival and after they have
+# rested (cats and dogs sit then lie, deer lie...). Then a sped-up pen for young ones, the
+# Utahraptor and the wyvern, eggs and a nest. Shots: run/screenshots/m32_*.png.
+loaded
+chat /dim base:flatlands
+wait 6
+loaded
+idle
+chat /tk mode creative
+chat /tk time 6000
+# pets
+chat /tp 0 ~ 0
+wait 3
+chat /tk spawn animals:chihuahua ~-3 ~ ~5
+chat /tk spawn animals:chihuahua ~-3 ~ ~8
+chat /tk spawn animals:cat ~0 ~ ~5
+chat /tk spawn animals:cat ~0 ~ ~8
+chat /tk spawn animals:capybara ~3 ~ ~5
+chat /tk spawn animals:capybara ~3 ~ ~8
+wait 2
+look 180 -28
+wait 1
+shot m32_pets_a.png
+look 210 -35
+wait 1
+shot m32_pets_b.png
+# raptors
+chat /tp 60 ~ 0
+wait 3
+chat /tk spawn animals:raptor ~-3 ~ ~5
+chat /tk spawn animals:raptor ~-3 ~ ~8
+chat /tk spawn animals:velociraptor_osmolskae ~0 ~ ~5
+chat /tk spawn animals:velociraptor_osmolskae ~0 ~ ~8
+chat /tk spawn animals:protoceratops ~3 ~ ~5
+chat /tk spawn animals:protoceratops ~3 ~ ~8
+wait 2
+look 180 -28
+wait 1
+shot m32_raptors_a.png
+look 210 -35
+wait 1
+shot m32_raptors_b.png
+# canids
+chat /tp 120 ~ 0
+wait 3
+chat /tk spawn animals:grey_wolf ~-5 ~ ~5
+chat /tk spawn animals:grey_wolf ~-5 ~ ~8
+chat /tk spawn animals:coyote ~-2 ~ ~5
+chat /tk spawn animals:coyote ~-2 ~ ~8
+chat /tk spawn animals:red_fox ~1 ~ ~5
+chat /tk spawn animals:red_fox ~1 ~ ~8
+chat /tk spawn animals:arctic_fox ~4 ~ ~5
+chat /tk spawn animals:arctic_fox ~4 ~ ~8
+wait 2
+look 180 -28
+wait 1
+shot m32_canids_a.png
+look 210 -35
+wait 1
+shot m32_canids_b.png
+# deer
+chat /tp 180 ~ 0
+wait 3
+chat /tk spawn animals:red_deer ~-5 ~ ~5
+chat /tk spawn animals:red_deer ~-5 ~ ~8
+chat /tk spawn animals:white_tailed_deer ~-2 ~ ~5
+chat /tk spawn animals:white_tailed_deer ~-2 ~ ~8
+chat /tk spawn animals:reindeer ~1 ~ ~5
+chat /tk spawn animals:reindeer ~1 ~ ~8
+chat /tk spawn animals:jaguar ~4 ~ ~5
+chat /tk spawn animals:jaguar ~4 ~ ~8
+wait 2
+look 180 -28
+wait 1
+shot m32_deer_a.png
+look 210 -35
+wait 1
+shot m32_deer_b.png
+# small
+chat /tp 240 ~ 0
+wait 3
+chat /tk spawn animals:mountain_hare ~-6 ~ ~5
+chat /tk spawn animals:mountain_hare ~-6 ~ ~8
+chat /tk spawn animals:wood_mouse ~-3 ~ ~5
+chat /tk spawn animals:wood_mouse ~-3 ~ ~8
+chat /tk spawn animals:field_vole ~0 ~ ~5
+chat /tk spawn animals:field_vole ~0 ~ ~8
+chat /tk spawn animals:kryptobaatar ~3 ~ ~5
+chat /tk spawn animals:kryptobaatar ~3 ~ ~8
+chat /tk spawn animals:priscagama ~6 ~ ~5
+chat /tk spawn animals:priscagama ~6 ~ ~8
+wait 2
+look 180 -28
+wait 1
+shot m32_small_a.png
+look 210 -35
+wait 1
+shot m32_small_b.png
+# birds
+chat /tp 300 ~ 0
+wait 3
+chat /tk spawn animals:raven ~-8 ~ ~5
+chat /tk spawn animals:raven ~-8 ~ ~8
+chat /tk spawn animals:golden_eagle ~-5 ~ ~5
+chat /tk spawn animals:golden_eagle ~-5 ~ ~8
+chat /tk spawn animals:great_horned_owl ~-2 ~ ~5
+chat /tk spawn animals:great_horned_owl ~-2 ~ ~8
+chat /tk spawn animals:herring_gull ~1 ~ ~5
+chat /tk spawn animals:herring_gull ~1 ~ ~8
+chat /tk spawn animals:turkey_vulture ~4 ~ ~5
+chat /tk spawn animals:turkey_vulture ~4 ~ ~8
+chat /tk spawn animals:house_sparrow ~7 ~ ~5
+chat /tk spawn animals:house_sparrow ~7 ~ ~8
+wait 2
+look 180 -28
+wait 1
+shot m32_birds_a.png
+look 210 -35
+wait 1
+shot m32_birds_b.png
+# water
+chat /tp 360 ~ 0
+wait 3
+chat /tk spawn animals:spectacled_caiman ~-5 ~ ~5
+chat /tk spawn animals:spectacled_caiman ~-5 ~ ~8
+chat /tk spawn animals:yacare_caiman ~-2 ~ ~5
+chat /tk spawn animals:yacare_caiman ~-2 ~ ~8
+chat /tk spawn animals:brown_trout ~1 ~ ~5
+chat /tk spawn animals:brown_trout ~1 ~ ~8
+chat /tk spawn animals:pacu ~4 ~ ~5
+chat /tk spawn animals:pacu ~4 ~ ~8
+wait 2
+look 180 -28
+wait 1
+shot m32_water_a.png
+look 210 -35
+wait 1
+shot m32_water_b.png
+# after a minute: sitting and lying
+wait 60
+chat /tp 0 ~ 0
+wait 3
+look 180 -28
+wait 1
+shot m32_pets_rest.png
+chat /tp 60 ~ 0
+wait 3
+look 180 -28
+wait 1
+shot m32_raptors_rest.png
+chat /tp 120 ~ 0
+wait 3
+look 180 -28
+wait 1
+shot m32_canids_rest.png
+chat /tp 180 ~ 0
+wait 3
+look 180 -28
+wait 1
+shot m32_deer_rest.png
+chat /tp 240 ~ 0
+wait 3
+look 180 -28
+wait 1
+shot m32_small_rest.png
+chat /tp 300 ~ 0
+wait 3
+look 180 -28
+wait 1
+shot m32_birds_rest.png
+chat /tp 360 ~ 0
+wait 3
+look 180 -28
+wait 1
+shot m32_water_rest.png
+# young ones: a pen of chihuahuas and cats at 1000x time
+chat /tp 420 ~ 0
+wait 3
+chat /tk fill ~-8 ~ ~3 ~8 ~1 ~3 base:glass
+chat /tk fill ~-8 ~ ~14 ~8 ~1 ~14 base:glass
+chat /tk fill ~-8 ~ ~3 ~-8 ~1 ~14 base:glass
+chat /tk fill ~8 ~ ~3 ~8 ~1 ~14 base:glass
+chat /tk spawn animals:chihuahua ~-6 ~ ~6
+chat /tk spawn animals:cat ~-6 ~ ~11
+chat /tk spawn animals:chihuahua ~-2 ~ ~6
+chat /tk spawn animals:cat ~-2 ~ ~11
+chat /tk spawn animals:chihuahua ~2 ~ ~6
+chat /tk spawn animals:cat ~2 ~ ~11
+chat /tk spawn animals:chihuahua ~6 ~ ~6
+chat /tk spawn animals:cat ~6 ~ ~11
+wait 2
+chat /animal speed 1000
+wait 25
+chat /animal speed 1
+chat /animal census 32
+look 180 -40
+wait 1
+shot m32_young_a.png
+look 200 -55
+wait 1
+shot m32_young_b.png
+# the big ones
+chat /tp 480 ~ 0
+wait 3
+chat /tk spawn animals:utahraptor ~-4 ~ ~10
+chat /tk spawn animals:wyvern ~8 ~ ~22
+wait 2
+look 180 -12
+wait 1
+shot m32_big_a.png
+look 215 -18
+wait 1
+shot m32_big_b.png
+# props
+chat /tp 540 ~ 0
+wait 3
+chat /tk spawn animals:nest ~0 ~ ~3
+chat /tk spawn animals:egg ~1 ~ ~3
+chat /tk spawn animals:egg ~-1 ~ ~4
+wait 1
+look 180 -55
+wait 1
+shot m32_props.png
+quit

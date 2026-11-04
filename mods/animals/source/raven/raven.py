@@ -5,7 +5,8 @@ hand-painted texture) with the blocky-model skill, from research alone (README.m
     ~/.venvs/blocky/bin/python raven.py      # writes out/spec.json (on the ground), out/spec_fly.json
                                             # (flying) and out/texture.png
 
-Units are texels at the house density (64 a block, 1.56 cm each), y up, the raven faces +z. A raven
+Units are the house's (64 a block, 1.56 cm each), y up, the raven faces +z; painted `TX` texels a
+unit (64 a block: see TX for why not the house's 32). A raven
 is about 63 cm from the bill to the tail's tip with a 1.2 m span: here 40 long and 76 across the
 open wings, the head a little bigger than life. One build paints both of its models on one texture:
 standing with the wings folded along its sides, and flying with them open (`raven_fly`, a look of
@@ -24,8 +25,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import SCALE, fine, texels  # noqa: E402
+
+# Texels a unit. The eye sits on the head's side, 5.5 units by 5: at the house's 32 a block that is
+# 2.75 by 2.5 texels, under `house.MIN_FACE` (3), so it paints at twice that (k = 2, 64 a block): 6 by 5.
+TX = texels(SCALE, fine(5.0))
 
 OUT = os.environ.get("RAVEN_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -57,16 +63,30 @@ LID_X = SKULL[1][0] + 0.35  # the eyelids' hinge plane, 0.35 outside the head's 
 LASH = (12, 10, 14)  # darker than the feathers
 
 
+def side_grid():
+    """The head side's texels: (width, height) and one texel's size in units (u, v)."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h = max(1, round(TX * (z1 - z0))), max(1, round(TX * (y1 - y0)))
+    return w, h, (z1 - z0) / w, (y1 - y0) / h
+
+
+def eye_center(side):
+    """The eye's center on the head's east (side > 0) or west side, in that face's texels."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h, su, sv = side_grid()
+    return ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0)) / su, (y1 - EYE_Y) / sv
+
+
 def eye_box(side):
-    """(z0, z1, top, bottom) of the eye on one side, rounded as `stamp_eyes` places it."""
+    """(z0, z1, top, bottom) of the eye on one side, in units, from the corner `stamp_eyes` puts it
+    at, so the eyelid covers the painted eye to the texel."""
     pat = EYES[EYE_STYLE]["pattern"]
     ph, pw = len(pat), len(pat[0])
     (x0, y0, z0), (x1, y1, z1) = SKULL
-    cu = (z1 - EYE_Z) if side > 0 else (EYE_Z - z0)
-    u0 = int(round(cu - pw / 2))
-    v0 = int(round((y1 - EYE_Y) - ph / 2))
-    za, zb = (z1 - u0 - pw, z1 - u0) if side > 0 else (z0 + u0, z0 + u0 + pw)
-    return za, zb, y1 - v0, y1 - v0 - ph
+    w, h, su, sv = side_grid()
+    u0, v0 = eye_corner(*eye_center(side), pat, w)
+    za, zb = (z1 - (u0 + pw) * su, z1 - u0 * su) if side > 0 else (z0 + u0 * su, z0 + (u0 + pw) * su)
+    return za, zb, y1 - v0 * sv, y1 - (v0 + ph) * sv
 
 # ------------------------------------------------------------------ the model
 
@@ -161,7 +181,10 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(abs(size @ du)))), max(1, int(round(abs(size @ dv)))), n
+    w, h = int(round(TX * abs(size @ du))), int(round(TX * abs(size @ dv)))
+    if abs(size @ du) > 0 and abs(size @ dv) > 0:  # a small face is still a texel
+        w, h = max(1, w), max(1, h)
+    return np.array(corner, float), du, dv, w, h, n
 
 
 def area(e, face, p, uu, vv, h):
@@ -217,8 +240,9 @@ def layer_props(e, face, p, a):
 def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     size = np.array(e["hi"]) - np.array(e["lo"])
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du * (abs(size @ du) / w) + vv[..., None] * dv * (abs(size @ dv) / h)
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel indices (+0.5)
+    p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
     R = rotm(e["rot"])
     if e["rot"]:
         o = np.array(e["origin"])
@@ -235,9 +259,7 @@ def paint_face(e, face, boxes):
     if e["cut"]:
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
     if e["name"] == "skull" and face in ("east", "west"):
-        (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
-        stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
+        stamp_eyes(img, [eye_center(1 if face == "east" else -1)], EYE_STYLE)
     if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
         img[:, 0 if e["name"].endswith("L") else w - 1, :3] = LASH
     if e["quad"] and e["cut"] in ("primaries", "secondaries", "folded", "wedge"):  # the feathers' shafts and edges

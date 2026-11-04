@@ -56,6 +56,7 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:pine_nut | seeds | 30 | 3 | 4 | 4 | 21 | 1 | 1 | 11 min | 60 + 60 |  |
 | base:sunflower_seeds | seeds | 30 | 3 | 6 | 6 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
 | base:kelp | water_plants | 50 | 5 | 1 | 5 | 0 | 1 | 41 | 3 min | 3 + 3 |  |
+| base:cattail_root | roots | 100 | 10 | 1 | 17 | 0 | 3 | 78 | 6 min | 14 + 14 |  |
 | base:cooked_wild_rice | seeds | 150 | 15 | 6 | 32 | 0 | 3 | 111 | 12 min | 3 + 3 | hot when cooked |
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
@@ -232,7 +233,7 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:mushroom_brown | Spreads | Soil | base:mushroom_brown | 0.6% | forest, birch_forest, taiga, mountains |
 | base:mushroom_red | Spreads | Soil | base:mushroom_red | 0.3% | forest, birch_forest, taiga |
 | base:water_hyacinth | Spreads | Water | - | 8.0% | swamp, savanna |
-| base:cattail | Still | Shore | - | 10.0% | swamp, plains, forest, taiga, savanna |
+| base:cattail | Still | Shore | base:cattail_root | 10.0% | swamp, plains, forest, taiga, savanna |
 | animals:cycad | Still | Soil | animals:cycad_seed | 1.0% | red_dunes, scrubland, floodplain, fern_forest, crags |
 | animals:flowering_shrub | Still | Soil | - | 2.0% | floodplain, scrubland |
 | animals:water_lily | Still | Water | - | 6.0% | floodplain, red_dunes |

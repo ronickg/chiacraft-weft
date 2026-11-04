@@ -10,6 +10,8 @@
 use weft_sdk::ai::Goals;
 use weft_sdk::*;
 
+use crate::dist2;
+
 use crate::taming::TAMING;
 
 /// One bird's body, for every species on its model.
@@ -189,8 +191,4 @@ fn set(w: &World, id: u64, f: Flight) {
     if let Some(c) = w.component_mut(id, &STATE) {
         *c = f;
     }
-}
-
-fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)
 }

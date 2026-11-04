@@ -210,6 +210,8 @@ pub(crate) struct Running {
     window: Arc<Window>,
     depth: (TextureId, u32, u32),
     list: CommandList,
+    /// The world's pass, recorded before the sun's shadow map that goes ahead of it in `list`.
+    world_list: CommandList,
     input: Input,
     pub(crate) settings: Settings,
     lang: Lang,
@@ -466,6 +468,7 @@ impl App {
             window,
             depth,
             list: CommandList::default(),
+            world_list: CommandList::default(),
             input,
             settings,
             lang,
@@ -846,7 +849,9 @@ impl Running {
                     }
                     self.return_home();
                     self.screens.clear();
-                    self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] }));
+                    // A world's refusal at the door (chiacraft, `admission`) in this player's language.
+                    let why = crate::admission::refusal_from_text(&e).map_or(Arg::Text(e), Arg::Msg);
+                    self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![why] }));
                     return;
                 }
             }
@@ -925,7 +930,7 @@ impl Running {
 
     /// Plays in the world `server` runs in this process.
     fn play_local(&mut self, server: ServerHandle, world: String, identity: Option<Arc<crate::world_address::WorldIdentity>>) {
-        crate::admission::set_local_world(server.dir.clone());
+        crate::admission::set_local_world(server.dir.clone(), identity.clone());
         let (client_conn, server_conn) = net::local_pair();
         let _ = server.connect.send(server_conn);
         let key = net::p2p::player_key(&self.settings.run_dir);
@@ -2101,7 +2106,7 @@ fn start_frame(r: &mut Running, opts: &Options, dt: f64) {
         r.links_seen = links_now;
         if r.screens
             .last()
-            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission"].contains(&s.name()))
+            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission", "core:account"].contains(&s.name()))
         {
             r.rebuild_all();
         }
@@ -2255,6 +2260,10 @@ fn toggle_keys(r: &mut Running) {
         r.hud_off = !r.hud_off;
         r.quads_dirty = true;
     }
+    // The crosshair shows only in first person (`hud::draw_custom`): redraw when the view turns.
+    if r.input.pressed("core:perspective") {
+        r.quads_dirty = true;
+    }
     if let Some(g) = &mut r.game {
         g.client.hide_gui = r.hud_off;
     }
@@ -2354,6 +2363,23 @@ fn world_keys(r: &mut Running) {
         if command || (r.input.pressed("core:chat") && !f3_held) {
             r.open(Box::new(crate::game_screens::Chat::new(if command { "/" } else { "" })));
             r.input.typed.clear();
+        }
+        // The recipe keys in the game itself: what the held item is made from (or used in), or
+        // with an empty hand every recipe, by kind.
+        else if let Some(uses) = [("core:recipes", false), ("core:uses", true)]
+            .into_iter()
+            .find(|(a, _)| r.input.pressed(a))
+            .map(|(_, u)| u)
+        {
+            let held = r.game.as_ref().map(|g| g.client.held()).unwrap_or_default();
+            let view = if held.item != 0 {
+                crate::game_screens::RecipeView::item(held.item, uses)
+            } else {
+                let mut kinds: Vec<String> = content().game.recipe_kinds.iter().cloned().collect();
+                kinds.sort();
+                crate::game_screens::RecipeView::new(crate::game_screens::RecipeQuery::Kinds(kinds))
+            };
+            r.open(Box::new(view));
         }
     }
     let (top_chat, top_menu) = r
@@ -2641,20 +2667,25 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             .particles
             .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
         g.client.update_wires(&mut *r.gpu, &r.textures);
-        // The sun's shadow map first, for packs that use it.
-        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
+        // The sun's light for shadow maps (packs that use them), which the world's scene samples.
+        g.client.prepare_shadows(&mut *r.gpu);
     }
-    r.list
-        .push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
+    let mut world = std::mem::take(&mut r.world_list);
+    world.clear();
+    world.push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
     if let Some(g) = &mut r.game {
         let worn = g.client.worn();
         let held = g.client.held().item;
         g.client
             .entity_render
             .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
-        g.client.render(&mut *r.gpu, &mut r.list, info, &r.textures);
+        g.client.render(&mut *r.gpu, &mut world, info, &r.textures);
+        // The shadow map once the models are posed, ahead of the world's pass that samples it.
+        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
     }
-    r.list.push(Cmd::EndPass);
+    world.push(Cmd::EndPass);
+    r.list.append(&mut world);
+    r.world_list = world;
     if post {
         let scene = r
             .game

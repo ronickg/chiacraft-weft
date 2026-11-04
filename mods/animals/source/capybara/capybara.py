@@ -5,7 +5,9 @@ creatures (boxes and a hand-painted texture) with the blocky-model skill, from r
 
     ../dog/chihuahua/.venv/bin/python capybara.py      # writes out/spec.json, out/texture.png
 
-Units are Blockbench's (1 texel each), y up, the capybara faces +z. A real one is 50-62 cm at the
+Units are its own (exported at 0.34 model pixels a unit, `build.SCALE`: 47 a block), y up, the
+capybara faces +z. Painted at the house density, 32 texels a block (`TX` texels a unit), as the
+blocks and items are. A real one is 50-62 cm at the
 shoulder and 100-130 cm long: here the back is 25.5 up, the whole animal 54 long; the head 1.15x
 (Hytale's chunky look).
 """
@@ -22,9 +24,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import texels  # noqa: E402
+
+TX = texels(0.34)  # texels a unit: the house's 32 a block at the capybara's export scale (build.SCALE)
 
 OUT = os.environ.get("CAPYBARA_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -45,7 +50,12 @@ EYES.update({"capybara": dict(pattern=[".DD.",
                                        "DHDD",
                                        "DDDD",
                                        ".DD."], colors={"D": (34, 22, 20), "H": (226, 220, 206)}, halo="round")})
-EYE_STYLE = os.environ.get("CAPYBARA_EYES", "capybara")
+# At 32 a block the head's side is 7 texels by 7: an eye is 2 by 2, dark, with a catchlight up and
+# toward the snout. `mirror` is the west side's copy (its texels run front to back the other way).
+_D, _H = (34, 22, 20), (226, 220, 206)
+EYES.update({"capybara_px": dict(pattern=["DH", "DD"], colors={"D": _D, "H": _H}, halo="none", iris=""),
+             "capybara_px_m": dict(pattern=["HD", "DD"], colors={"D": _D, "H": _H}, halo="none", iris="")})
+EYE_STYLE = os.environ.get("CAPYBARA_EYES", "capybara_px")
 SKULL = ((-6, 17, 15), (6, 28, 26))
 EYE_Z, EYE_Y = 22.5, 25.0  # high on the head, toward the front
 LID_X = 6.4  # the eyelids' hinge plane, just outside the head's side (x = 6)
@@ -58,16 +68,32 @@ def el(name, bone, lo, hi, quad=None, rot=None, origin=None):
                 origin=[float(v) for v in origin] if origin else None, cut=None)
 
 
+def skull_grid():
+    """The skull side's texels: (width along z, height) and the units a texel spans (u, v)."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    sz, sy = z1 - z0, y1 - y0
+    w, h = max(1, round(TX * sz)), max(1, round(TX * sy))
+    return w, h, sz / w, sy / h
+
+
+def eye_center(side):
+    """The eye's center on one side of the skull (east, side > 0: u runs from the front back;
+    west: from the back forward), in that face's texels."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h, su, sv = skull_grid()
+    return ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0)) / su, (y1 - EYE_Y) / sv
+
+
 def eye_box(side):
-    """(z0, z1, top, bottom) of the eye on one side, rounded as `stamp_eyes` places it."""
+    """(z0, z1, top, bottom) of the eye on one side, rounded as `stamp_eyes` places it, so the
+    eyelid covers it to the texel."""
     pat = EYES[EYE_STYLE]["pattern"]
     ph, pw = len(pat), len(pat[0])
     (x0, y0, z0), (x1, y1, z1) = SKULL
-    cu = (z1 - EYE_Z) if side > 0 else (EYE_Z - z0)
-    u0 = int(round(cu - pw / 2))
-    v0 = int(round(y1 - EYE_Y - ph / 2))
-    za, zb = (z1 - u0 - pw, z1 - u0) if side > 0 else (z0 + u0, z0 + u0 + pw)
-    return za, zb, y1 - v0, y1 - v0 - ph
+    w, h, su, sv = skull_grid()
+    u0, v0 = eye_corner(*eye_center(side), pat, w)
+    za, zb = (z1 - (u0 + pw) * su, z1 - u0 * su) if side > 0 else (z0 + u0 * su, z0 + (u0 + pw) * su)
+    return za, zb, y1 - v0 * sv, y1 - (v0 + ph) * sv
 
 
 LEGS = ("FL", "FR", "BL", "BR")
@@ -139,12 +165,16 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, int(round(abs(size @ du))), int(round(abs(size @ dv))), n
+    w, h = int(round(TX * abs(size @ du))), int(round(TX * abs(size @ dv)))
+    if abs(size @ du) > 0 and abs(size @ dv) > 0:  # a small face is still a texel
+        w, h = max(1, w), max(1, h)
+    return np.array(corner, float), du, dv, w, h, n
 
 
 def area(e, face, p, uu, vv, h):
     """A capybara's coat: reddish brown, darker along the back, lighter underneath; the dark bald
-    patch on top of the snout; dark nostrils; darker, bare feet with claws."""
+    patch on top of the snout; dark nostrils; darker, bare feet with claws. `p` is in units, `uu`,
+    `vv` are texel centers (indices + 0.5)."""
     name = e["name"]
     x, y, z = p[..., 0], p[..., 1], p[..., 2]
     a = np.full(x.shape, FUR)
@@ -172,7 +202,7 @@ def area(e, face, p, uu, vv, h):
         a[:] = MOUTH
     elif name.startswith("ear_"):
         a[:] = BACK
-        if face == "south":
+        if face == "south" and a.shape[1] >= 3:  # the ear's inside (an ear is 2 texels at 32)
             a = np.where((uu > 0.6) & (uu < a.shape[1] - 0.6) & (vv > 0.6), EARIN, a)
     elif name.startswith(("leg_", "thigh_")):
         a = np.where(y < 4.5, SKIN, FUR) if not name.endswith("_paw") else np.full(x.shape, SKIN)
@@ -206,8 +236,10 @@ def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     if w == 0 or h == 0:
         return None
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du + vv[..., None] * dv
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel centers, in texels
+    size = np.array(e["hi"]) - np.array(e["lo"])
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
     light_face = face
     if face == "down" and e["name"].startswith(("leg_", "thigh_", "jaw")):
         light_face = "north"  # seen when a pose lifts or folds it
@@ -218,24 +250,27 @@ def paint_face(e, face, boxes):
                             seed=sum(map(ord, e["name"] + face)) % 97)
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["name"] == "skull" and face in ("east", "west"):
-        (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
-        stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
-    if e["name"] == "muzzle" and face == "south":  # big nostrils high on the blunt snout, a split lip
-        c = w // 2  # slits, not holes: big round nostrils read as a second pair of eyes
-        img[1, [c - 3, c - 2, c + 1, c + 2], :3] = (72, 48, 40)
-        img[3:h - 1, c, :3] = (img[3:h - 1, c, :3] * 0.75).astype(np.uint8)
-        img[h - 1, c - 1:c + 1, :3] = (img[h - 1, c - 1:c + 1, :3] * 0.5 + np.array(BASE[TEETH]) * 0.5).astype(np.uint8)
+        design = EYE_STYLE + "_m" if face == "west" and EYE_STYLE + "_m" in EYES else EYE_STYLE
+        stamp_eyes(img, [eye_center(1 if face == "east" else -1)], design)
+    if e["name"] == "muzzle" and face == "south" and w >= 5 and h >= 4:  # big nostrils high on the blunt snout, a split lip
+        # Slits, not holes: big round nostrils read as a second pair of eyes. At 32 the snout's front
+        # is 7 by 6: one texel a nostril, the lip line down the middle, the incisors under it.
+        mid = [w // 2] if w % 2 else [w // 2 - 1, w // 2]
+        img[1, [mid[0] - 2, mid[-1] + 2], :3] = (72, 48, 40)
+        img[3:h - 1, mid, :3] = (img[3:h - 1, mid, :3] * 0.75).astype(np.uint8)
+        img[h - 1, mid, :3] = (img[h - 1, mid, :3] * 0.5 + np.array(BASE[TEETH]) * 0.5).astype(np.uint8)
     if e["name"].startswith("eyelid"):
         col_idx = 0 if e["name"].endswith("L") else w - 1
         img[:, col_idx, :3] = LASH
-    if e["name"].endswith("_paw") and face == "south":  # webbed toes: 4 in front, 3 behind, dark claws
+    if e["name"].endswith("_paw") and face == "south" and h >= 2:  # webbed toes: 4 in front, 3 behind, dark claws
         toes = (1, 2, 3) if e["name"].startswith("leg_F") else (1, 3)
         step = w / (len(toes) + 1)
         for k in range(len(toes)):
             c = int(round(step * (k + 1))) - 1
             img[:, c, :3] = (img[:, c, :3] * 0.7).astype(np.uint8)
         img[h - 1, :, :3] = BASE[DARK]
+    elif e["name"].endswith("_paw") and face == "south":  # at 32 the paw's front is one texel high: claws between the toes
+        img[0, 1::2, :3] = BASE[DARK]
     if LAYERS["rec"] is not None:
         LAYERS["rec"].face(LAYERS["key"], cap["weights"], cap["level"], ROLES, np.clip(np.round(col), 0, 255), img, p,
                            layer_props(e, face, p, a))
