@@ -481,9 +481,8 @@ interface client-registry {
     /// A screen `<package>:<name>`, its parts from `client-hooks.build`; `pauses` stops a world
     /// played alone while it shows.
     screen: func(name: string, pauses: bool) -> result<u32, string>;
-    /// A key `<package>:<name>`: `client-hooks.key` on each press. The game gives it one of its
-    /// shared Package Key slots (in package order) and tells the player which; `default` is
-    /// checked but the slot's own binding counts, which the player can change in Controls.
+    /// A key `<package>:<name>` with its default binding (`J`, `ctrl+R`), which the player can
+    /// change in Controls: `client-hooks.key` on each press.
     key: func(name: string, default: string) -> result<u32, string>;
     /// What the server half sends on its channel `<package>:<name>`: `client-hooks.packet`.
     packet: func(channel: string) -> result<u32, string>;

@@ -114,11 +114,8 @@ adds, with Weft's client names:
 - HUD elements and screens: `r.hud_element(&H, hud_anchor::TOP_RIGHT, 0, |ui| ..)`,
   `r.screen(&S, |ui| ..).pauses()`, built from `ui.panel`, `row`, `column`, `text`, `text_bind`,
   `progress_bind`, `icons`, `image`, `item`, `spacer`, `button` with `S` styles, `at` included;
-- keys: `r.key(&K, "N").on_press(|c| ..)`: a client half's keys take the shared slots Package
-  Key 1 to 8 (Ctrl+Shift+1 to 8 unless rebound in Controls) in the order of the world's packages
-  and their registration, not their own default binding, and the player is told which is which
-  on entering the world. (A key's binding is a setting, and the settings must be the same in
-  every world's content);
+- keys: `r.key(&K, "N").on_press(|c| ..)`, rebindable in Controls (named by
+  `key.<package>.<name>` in the package's language file);
 - packets from its server half: `r.client_packet(&CH, |c, v| ..)`, and `c.send(&CH, &v)` back;
 - `r.client_frame(|c, seconds| ..)`, every frame (off unless needed).
 

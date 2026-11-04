@@ -6,7 +6,7 @@
 //! ones like any other, in `config/core.txt`.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock, RwLock};
 
 use weft_abi::{config_kind as ck, config_scope as scope};
@@ -100,8 +100,12 @@ impl ConfigDef {
     }
 }
 
-/// Value bits by config id.
-static VALUES: OnceLock<Vec<AtomicU64>> = OnceLock::new();
+/// Value bits by config id, for the content in force. Ids follow each content's settings in
+/// name order, so a content switch that adds or drops a setting (a package with a key) moves
+/// the ids after it: [`content_switched`] then carries every value over by name to a table for
+/// the new content. A table replaced so is kept (a few hundred values per switch, a handful of
+/// switches a session), so a slice someone holds stays valid.
+static VALUES: AtomicPtr<Vec<AtomicU64>> = AtomicPtr::new(std::ptr::null_mut());
 /// Values of text settings by config id (empty for the others).
 static TEXTS: RwLock<Vec<String>> = RwLock::new(Vec::new());
 /// Counts changes, so whoever applies settings (the client) sees that something moved.
@@ -117,14 +121,82 @@ static OVERRIDES: Mutex<Vec<(u32, String, String)>> = Mutex::new(Vec::new());
 static FROM_SERVER: Mutex<Vec<(u32, String, String)>> = Mutex::new(Vec::new());
 
 fn values() -> &'static [AtomicU64] {
-    VALUES.get_or_init(|| {
+    let p = VALUES.load(Ordering::Acquire);
+    if !p.is_null() {
+        // SAFETY: only Box::leak'd tables are stored, and never freed.
+        return unsafe { &*p };
+    }
+    let fresh: &'static mut Vec<AtomicU64> = Box::leak(Box::new(
         content()
             .game
             .configs
             .iter()
             .map(|d| AtomicU64::new(d.default.to_bits()))
-            .collect()
-    })
+            .collect(),
+    ));
+    match VALUES.compare_exchange(std::ptr::null_mut(), fresh, Ordering::AcqRel, Ordering::Acquire) {
+        Ok(_) => fresh,
+        // Another thread made one first: use that (this one stays unused).
+        // SAFETY: as above.
+        Err(other) => unsafe { &*other },
+    }
+}
+
+/// The values of settings `old` (with `old_bits` and `old_texts` by its ids) laid out for
+/// settings `new`: each by its name, a setting `new` adds at its default, one it drops gone.
+fn rekeyed(old: &[ConfigDef], old_bits: &[u64], old_texts: &[String], new: &[ConfigDef]) -> (Vec<u64>, Vec<String>) {
+    let by_name: std::collections::HashMap<&str, usize> = old
+        .iter()
+        .enumerate()
+        .map(|(i, d)| (d.name.as_str(), i))
+        .collect();
+    new.iter()
+        .map(|d| match by_name.get(d.name.as_str()) {
+            Some(&i) => {
+                (old_bits.get(i).copied().unwrap_or(d.default.to_bits()), old_texts.get(i).cloned().unwrap_or_else(|| d.text.clone()))
+            }
+            None => (d.default.to_bits(), d.text.clone()),
+        })
+        .unzip()
+}
+
+/// The content in force switched from `old` to `new` (`content::set`): the game's values follow
+/// their settings by name, so a join into a world whose packages add a setting reads every
+/// other setting (the player's name, the keys) where it was (chiacraft, phase 6).
+pub(crate) fn content_switched(old: &crate::content::Content, new: &crate::content::Content) {
+    let (old_defs, new_defs) = (&old.game.configs, &new.game.configs);
+    // Mods' handles read the ids of the content in force: a content built earlier comes back
+    // with its own (building another wrote theirs into the same cells).
+    for &(cell, id) in &new.game.config_cells {
+        crate::registry::write_cell(cell, id);
+    }
+    if old_defs.len() == new_defs.len() && old_defs.iter().zip(new_defs).all(|(a, b)| a.name == b.name) {
+        return;
+    }
+    if VALUES.load(Ordering::Acquire).is_null() {
+        // Nothing read yet: the first read lays the table out for the content then in force.
+        return;
+    }
+    let old_bits: Vec<u64> = values().iter().map(|v| v.load(Ordering::Relaxed)).collect();
+    let mut texts = TEXTS.write().unwrap();
+    let (bits, new_texts) = rekeyed(old_defs, &old_bits, &texts, new_defs);
+    let table: &'static mut Vec<AtomicU64> = Box::leak(Box::new(bits.into_iter().map(AtomicU64::new).collect()));
+    VALUES.store(table, Ordering::Release);
+    *texts = new_texts;
+    drop(texts);
+    // What this run and a remote server set are kept by id: follow the names there too.
+    let move_id = |id: u32| {
+        let name = &old_defs.get(id as usize)?.name;
+        new.game.config_names.get(name).copied()
+    };
+    for list in [&OVERRIDES, &FROM_SERVER] {
+        let mut l = list.lock().unwrap();
+        *l = l
+            .drain(..)
+            .filter_map(|(id, now, saved)| Some((move_id(id)?, now, saved)))
+            .collect();
+    }
+    GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
 /// A server's own values of the settings it decides (chiacraft). The values above are the game's:
@@ -504,6 +576,33 @@ pub fn volume(name: &str) -> ConfigDef {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A content switch that adds a setting before `core:name` (a package's key, which made a
+    /// joining player nameless) keeps the name and every other value where it was.
+    #[test]
+    fn a_content_switch_keeps_values_by_name() {
+        let old = [
+            ConfigDef::text("core:debug_lines", "fps=always"),
+            ConfigDef::text("core:name", "Steve"),
+            ConfigDef::number("core:zoom", ck::INT, 1.0, 0.0, 9.0, 1.0),
+        ];
+        let bits = [0f64.to_bits(), 0f64.to_bits(), 7f64.to_bits()];
+        let texts = ["fps=always".to_string(), "bob".to_string(), String::new()];
+        let new = [
+            old[0].clone(),
+            ConfigDef::text("core:key.bell.ping", "N"),
+            old[1].clone(),
+            ConfigDef::number("core:new", ck::INT, 3.0, 0.0, 9.0, 1.0),
+            old[2].clone(),
+        ];
+        let (b, t) = rekeyed(&old, &bits, &texts, &new);
+        assert_eq!(t[2], "bob", "core:name keeps the player's name");
+        assert_eq!(t[1], "N", "a setting the new content adds starts at its default");
+        assert_eq!((f64::from_bits(b[3]), f64::from_bits(b[4])), (3.0, 7.0));
+        // And back: the added ones go, the rest stay.
+        let (b2, t2) = rekeyed(&new, &b, &t, &old);
+        assert_eq!((t2[1].as_str(), f64::from_bits(b2[2])), ("bob", 7.0));
+    }
 
     #[test]
     fn values_fit_their_setting() {

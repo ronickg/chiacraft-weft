@@ -397,10 +397,14 @@ vLLM ("allocating 67108864 bytes for quad page: Out of memory", a panic in the V
 Bob also joined with an empty name although his `core.txt` says `name = bob`. That was this
 work's: the bell's client half registered a key, a key's binding is a setting, and the engine
 numbers settings by name per content while their values sit in one table by id, so the content
-switch on joining shifted `core:name` onto an empty slot. Fixed: client halves' keys take shared
-Package Key slots (`client_half::register_slots`, Ctrl+Shift+1 to 8), registered the same in
-every game, and the player is told which key is which on entering a world. The engine's general
-hazard (anything that changes the settings on a content switch) is passed to Planner.
+switch on joining shifted `core:name` onto an empty slot. Fixed in the engine, generally (Planner's call):
+`content::set` calls `config::content_switched`, which carries the game's setting values, the
+run's overrides and a remote server's values over to the new content's ids by name, and writes
+mods' setting handles (`Game::config_cells`) back to the new content's ids; `VALUES` is a table
+per content (the old ones kept, so held slices stay valid). Check
+`a_content_switch_keeps_values_by_name`. So packages may add settings, and client halves' keys
+are their own again (an interim fix had given them shared slots). Not covered: other kinds of
+handle cells (blocks, items, sounds) when a content built earlier comes back.
 Slice 5, personal mods (built, and checked in one game on the PC: off by default with "Your
 personal mods are off in this world: clock.", on after `/rule personal_mods 1` with the clock
 showing 07:07 top left, its key in slot 1 hid it, off again; Create World's choice not looked at): `mods/packages/src/personal.rs`. The

@@ -36,6 +36,12 @@ erase what they earned.
      layout (`client/entity_render.rs`, `worn_tex_size`). A 128 x 64 armour or clothes layer on a
      64 x 32 skin then maps over all of it, as Minecraft's armour does in 32x packs; one at the
      layout's width reads as before. One general line and a test (branch `claude/clothes-worn`).
+   - To offer: settings carried over by name on a content switch (`config::content_switched`,
+     phase 6). Weft numbers settings by name within each content but keeps their values in one
+     table by id, so switching to a content with one more setting (a mod's key) moved the values
+     after it: a joining player read an empty name. Now the values follow their names into the new
+     content's ids, and mods' setting handles get the new content's ids back. Small, general,
+     with a check (`a_content_switch_keeps_values_by_name`).
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 

@@ -5,7 +5,6 @@
 //! them into Weft's `Ui`, so it draws with the game's own kit; bars, icons and text bindings ask
 //! it for their values every frame, and buttons call it back.
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use chiacraft_sandbox::client::{ClientGame, ClientHook, ClientInstance, ClientMod, Part, PartKind, Shared};
@@ -93,20 +92,14 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
                     drop(b.pauses());
                 }
             }
-            ClientHook::Key { name, .. } => {
-                // Not a key of its own: a key's binding is a setting, and settings must stay the
-                // same in every content (the engine numbers them by name), so the client half's
-                // keys take the shared Package Key slots ([`register_slots`]).
-                let entry = Arc::new(KeyEntry { half: h, cb, name: name.clone(), seen: AtomicU64::new(0) });
-                KEYED
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .push(entry.clone());
-                r.client_frame(move |_| {
-                    entry
-                        .seen
-                        .store(FRAME.load(Ordering::Relaxed), Ordering::Relaxed)
-                });
+            ClientHook::Key { name, default } => {
+                // A key's binding is a setting: the engine carries settings over by name when
+                // the content switches (`config::content_switched`), so a package may add one.
+                r.key(Key::generated(name.clone()), default)
+                    .on_press(move |c| {
+                        let g = game(*c, true, &h);
+                        lock(&h).key(g, cb)
+                    });
             }
             ClientHook::Packet(channel) => {
                 let ch = half.channel(channel);
@@ -133,66 +126,6 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
         }
     }
     Ok(())
-}
-
-// ------------------------------------------------------------------ the Package Key slots
-
-/// Slots for client halves' keys: `packages:key_1` to `_8`, Ctrl+Shift+1 to 8 unless rebound.
-const SLOTS: usize = 8;
-
-/// A client half's key, and the frame its content was last in force (its frame hook ran).
-struct KeyEntry {
-    half: Arc<Half>,
-    cb: u32,
-    name: String,
-    seen: AtomicU64,
-}
-
-/// Every client half's keys in every content built, in the order registered (packages by id).
-static KEYED: Mutex<Vec<Arc<KeyEntry>>> = Mutex::new(Vec::new());
-/// Frames, counted by this mod's own frame hook (which runs in every content).
-static FRAME: AtomicU64 = AtomicU64::new(0);
-/// The content last told which keys are which: the first key's entry address.
-static TOLD: AtomicU64 = AtomicU64::new(0);
-
-/// The keys of the content in force: those whose frame hook ran in the last two frames.
-fn active_keys() -> Vec<Arc<KeyEntry>> {
-    let now = FRAME.load(Ordering::Relaxed);
-    KEYED
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .iter()
-        .filter(|k| k.seen.load(Ordering::Relaxed) + 2 >= now)
-        .cloned()
-        .collect()
-}
-
-/// Registers the Package Key slots and the frame counter (in this mod's own `init`, the same in
-/// every game). On entering a world whose packages have keys, the player is told which is which.
-pub fn register_slots(r: &mut Registry) {
-    for slot in 0..SLOTS {
-        let key = Key::generated(format!("key_{}", slot + 1));
-        r.key(key, &format!("ctrl+shift+{}", slot + 1))
-            .on_press(move |c| {
-                if let Some(k) = active_keys().get(slot) {
-                    let g = game(*c, true, &k.half);
-                    lock(&k.half).key(g, k.cb);
-                }
-            });
-    }
-    r.client_frame(|c| {
-        FRAME.fetch_add(1, Ordering::Relaxed);
-        let keys = active_keys();
-        let Some(first) = keys.first() else { return };
-        let marker = Arc::as_ptr(first) as u64;
-        if TOLD.swap(marker, Ordering::Relaxed) != marker {
-            for (i, k) in keys.iter().take(SLOTS).enumerate() {
-                // `key.<package>.<name>` from the package's own language file.
-                let label = format!("key.{}", k.name.replacen(':', ".", 1));
-                crate::show_line(c, crate::sandboxed::line_text("packages.key_slot", &[WArg::Int(i as i64 + 1), WArg::Key(label)]));
-            }
-        }
-    });
 }
 
 pub(crate) fn lock(h: &Half) -> std::sync::MutexGuard<'_, ClientInstance> {

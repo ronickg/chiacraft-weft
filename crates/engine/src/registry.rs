@@ -409,6 +409,9 @@ pub struct Game {
     /// Settings by id (sorted by name), see `config.rs`.
     pub configs: Vec<crate::config::ConfigDef>,
     pub config_names: FxHashMap<String, u32>,
+    /// Mods' setting handles (their id cells) and the ids they have in this content: written
+    /// again when this content comes back into force (`config::content_switched`).
+    pub config_cells: Vec<(usize, u32)>,
 }
 
 #[derive(Clone)]
@@ -1164,7 +1167,7 @@ pub(crate) unsafe fn copy_recipe(d: &abi::RecipeDesc) -> RawRecipe {
     }
 }
 
-fn write_cell(cell: usize, id: u32) {
+pub(crate) fn write_cell(cell: usize, id: u32) {
     if cell != 0 {
         unsafe { (*(cell as *const AtomicU32)).store(id, Ordering::Relaxed) }
     }
@@ -1498,6 +1501,9 @@ pub fn freeze(
         }
         let id = g.configs.len() as u32;
         write_cell(cell, id);
+        if cell != 0 {
+            g.config_cells.push((cell, id));
+        }
         g.config_names.insert(d.name.clone(), id);
         g.configs.push(d);
     }

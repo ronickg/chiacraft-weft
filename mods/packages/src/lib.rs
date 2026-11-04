@@ -36,8 +36,6 @@ fn init(r: &mut Registry) {
     r.client_packet(&sandboxed::SAY, show_line);
     // Personal mods (slice 5): the world rule and the shared slots their parts and keys use.
     personal::register(r);
-    // Package Key slots for client halves' keys (slice 4).
-    client_half::register_slots(r);
     // `/mods` (slice 6).
     sandboxed::register_command(r);
     r.client_command("packages_say", "", |cmd| {
