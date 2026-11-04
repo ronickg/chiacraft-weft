@@ -10,10 +10,13 @@ import colorsys, csv, glob, os, sys
 import numpy as np
 from PIL import Image
 
-OURS, PACKS, OUT = sys.argv[1:4]
-REFS = {"vanilla": f"{PACKS}/vanilla/assets/minecraft/textures/block",
-        "faithful32": f"{PACKS}/faithful32/assets/minecraft/textures/block",
-        "pixelperf": f"{PACKS}/pixelperfection/assets/minecraft/textures/block"}
+
+
+def refs_in(packs):
+    """The three packs' block-texture folders under `packs` (sparse checkouts, see block-textures)."""
+    return {"vanilla": f"{packs}/vanilla/assets/minecraft/textures/block",
+            "faithful32": f"{packs}/faithful32/assets/minecraft/textures/block",
+            "pixelperf": f"{packs}/pixelperfection/assets/minecraft/textures/block"}
 TINTS = {"grass": "91BD59", "foliage": "77AB2F", "spruce": "619961", "birch": "80A755", "lily": "208030"}
 TOL = dict(hue=15.0, luma=0.05, sat=0.10)
 # our name -> vanilla name (rules below cover the regular ones)
@@ -120,6 +123,9 @@ def correct(a, tint, m, target):
 
 
 def main():
+    global OURS, PACKS, OUT, REFS
+    OURS, PACKS, OUT = sys.argv[1:4]
+    REFS = refs_in(PACKS)
     rows = []
     for mod in ("base", "animals"):
         root = f"{OURS}/mods/{mod}/assets/textures/block"

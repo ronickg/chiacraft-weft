@@ -90,6 +90,27 @@ deep shade of the block's own colour (never black), restrained highlights, top-l
 9. **Approve**: add the approved tiles to `approved.txt`; they become part of the style key.
    Commit the tiles, the batch and the game textures together, one family a commit.
 
+## The grade: tune, don't redraw
+
+Ronald, 11-04: "ideally it should be something we can tune easily without having to like now redo
+every asset of the game if it's too dark or too light or high contrast, low contrast ... but ideally
+something that's quick". So a tile that is too dark, too light, too flat, too busy or off-colour is
+fixed in the grade table first; only a tile wrong in shape or idea is regenerated.
+
+- **Sources stay untouched**: every graded tile's approved drawing (and its CTM variants) lives in
+  `mods/<mod>/source/blocks/tiles/`; the game's tile is built from it.
+- **The table**: `mods/base/source/blocks/grade.toml`, material groups (stone, ore, wood, planks,
+  leaves, grass, sand, soil, clay, plants, liquids) and per-tile rows, with the knobs gamma, gain,
+  contrast or spread (target p10-p90 in codes), saturation, hue and pull. The file explains them.
+- **One command**: `python3 notes/blocks/regrade.py --all [--packs DIR] [--preview out.png]` rebuilds
+  every graded tile in under a second, prints luma, saturation and spread before and after against
+  the vanilla band, and draws a tiled before/after of each changed tile. `--with other.toml --dry`
+  previews proposals without writing (`notes/blocks/vanilla_proposals.py <packs>` writes the vanilla
+  comparison's as `grade_proposed.toml`; approved rows move into `grade.toml`).
+- **Safe with other sessions**: a tile graded for the first time is adopted from the game as its
+  source; a game tile someone replaced since the last build (`grade.lock.json`) becomes the new
+  source and is graded on top, never silently overwritten. After `blocks.py install`, run the grade.
+
 ## Made in code, not generated
 
 `notes/blocks/derive.py` makes what must keep its layout or is a recolour of an approved tile,
@@ -149,8 +170,7 @@ toward the UI's own colours (`notes/STYLE.md`).
   - in-tile contrast as the p10-p90 spread in codes: **quiet ground 20-30** (grass top, stone, sand,
     podzol), **busy blocks 45-80** (cobble, dirt, logs, planks, ores). Ronald, 11-04: "Yes, stone,
     gravel, planks": stone calmed to 30, gravel to 42, planks given grain at 48.
-  Fix a tile in code from its drawing: `notes/blocks/contrast.py <target> <tile> [variants]` sets
-  the spread, `notes/blocks/regrade.py` the level and saturation. The six tiles lifted for the
+  Fix a tile's level, contrast or colour in the grade table, not in its pixels (see "The grade"). The six tiles lifted for the
   earlier floor (slate, termite mound, red sandstone, sequoia and spruce bark, podzol) stay until
   they're re-judged under Lighting's new grade; leaves and grass top wait for it too ("After the
   grade").
