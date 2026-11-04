@@ -97,9 +97,13 @@ nested callback skips the mod (it is busy) rather than re-entering the store.
    at run time: the game's own world (`host`) exports `hooks` only, so 1.0 and 1.1 components
    still instantiate (checked with clans and tally). Sample `bell`. With 1.2 the mod UI ABI got
    `at` (a part placed at a point of its parent), so Weft mods rebuilt once for both.
-4. *Client halves*: `code/client.wasm` in the same package, run in the player's game with
-   client calls only (HUD lines, screens built from the SDK's UI parts, keys, channels to its
-   server half), the same limits plus a frame budget. Downloaded on join like the rest.
+4. *Client halves* (built): `code/client.wasm` in the same package, a component for the world
+   `client-mod` (in 1.2), run in each player's game: it reads what that game shows the player and
+   adds HUD elements, screens, keys, packets from its server half and frame hooks
+   (`crates/mod-sdk-client`, Weft's client names). A HUD element or screen is a list of parts
+   (Weft's UI parts as data) the game replays into its own UI, so mods draw with the UI redo's
+   kit; bindings may only read. Downloaded on join like the rest; the offer's API is the newer
+   half's. Sample: the bell's client half.
 5. *Personal mods per world*: a player's own client-half packages (minimap, tweaks), installed by
    them, never downloaded; each world's owner allows them or not (`world.txt`), and the join tells
    the player which of theirs are off there.

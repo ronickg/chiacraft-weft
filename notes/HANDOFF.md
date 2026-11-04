@@ -375,8 +375,21 @@ component as the package it goes into. Sample `examples/wasm/bell` (a bell block
 striker item that wears down, a channel), built as a size-optimised dev build since the Mac does
 no release builds now. With it, the mod UI ABI got `at` (b2877719: `UiNode::at`, `S::at`,
 `S::at_pivot`, onto the engine's `Style::at`), for the UI redo's numbers inside bars.
+Slice 4, client halves (built; not yet seen in the game): `code/client.wasm` (allowed beside
+`code/server.wasm`, `identity::is_code`), a component for the world `client-mod` in
+`crates/sandbox/wit/v1.2` (`client`, `client-registry`, `ui` parts, exported `client-hooks`).
+`crates/sandbox/src/client.rs`: `ClientMod`, `ClientInstance` (strikes as server halves;
+`well_formed` checks a build's parts), `ClientGame` (the player's game; `can_act` false in
+bindings). `crates/mod-sdk-client` (Weft's client names: `hud_element`, `screen`, `key`,
+`client_packet`, `client_frame`, `Ui` parts, `S` with `at`, `ClientView`/`Client`).
+`mods/packages/src/client_half.rs` registers its hooks through Weft's SDK in every game and
+replays its parts into `Ui` (classes interned; flags limited); a client reads a sandboxed
+component through the same byte buckets (`sandboxed::client_component`). The offer's API is the
+newer half's; "has code" means either half. Sample: `examples/wasm/bell-client` (a `hud_badge`
+with the ring count, an `hud_xp` bar with the count inside it through `at`, the key N), with the
+bell's server half now sending `bell:rings`. Tests `crates/sandbox/tests/client.rs`.
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
-and chain steps, client halves (slice 4), personal mods per world (slice 5), `/mods` (slice 6).
+and chain steps, personal mods per world (slice 5), `/mods` (slice 6).
 
 ## Side mods
 

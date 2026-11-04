@@ -539,17 +539,27 @@ pub fn current_packages() -> Vec<crate::net::p2p::Offer> {
             let size = manifest.files.iter().map(|f| f.size).sum();
             // The API its code needs, read from the component's imports (unreadable code would
             // not have loaded here; "?" stands for it so the guest refuses rather than guesses).
-            let api = match manifest
+            // The newest API either half needs (its server and client code), read from the
+            // components' imports; code that can't be read stands as "?", so the guest refuses
+            // rather than guesses.
+            let code: Vec<Option<(u32, u32)>> = manifest
                 .files
                 .iter()
-                .find(|f| f.path == chiacraft_packages::identity::SERVER_CODE)
-            {
-                None => String::new(),
-                Some(f) => store
-                    .blob_path(&f.hash)
-                    .and_then(|p| std::fs::read(p).ok())
-                    .and_then(|b| chiacraft_packages::code::api_of(&b).ok())
-                    .map_or_else(|| "?".into(), |v| chiacraft_packages::code::text(Some(v.unwrap_or((1, 0))))),
+                .filter(|f| chiacraft_packages::identity::is_code(&f.path))
+                .map(|f| {
+                    store
+                        .blob_path(&f.hash)
+                        .and_then(|p| std::fs::read(p).ok())
+                        .and_then(|b| chiacraft_packages::code::api_of(&b).ok())
+                        .map(|v| v.unwrap_or((1, 0)))
+                })
+                .collect();
+            let api = if code.is_empty() {
+                String::new()
+            } else if code.iter().any(Option::is_none) {
+                "?".into()
+            } else {
+                chiacraft_packages::code::text(code.into_iter().flatten().max())
             };
             Some((m.id.clone(), m.version.clone(), hex.clone(), size, store.signature(&h).unwrap_or_default(), api))
         })

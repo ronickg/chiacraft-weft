@@ -103,6 +103,35 @@ Ours, beyond Weft's: `w.tell(player, key, args)` (a line in a player's chat, in 
 Every line a mod shows players is a translation key and arguments, worded by each player's game
 from the package's `assets/lang` files, like Weft's command replies.
 
+## Client halves
+
+A package may also carry `code/client.wasm`, a client half (API 1.2): a component for the world
+`chiacraft:mods/client-mod`, built against `crates/mod-sdk-client`, that runs in each player's
+own game (the host's too). It reads what that game shows the player (`c.me()`, `day_time`,
+`raining`, `creative`, the package's components synced to them, `inventory_slot`, `screen`) and
+adds, with Weft's client names:
+
+- HUD elements and screens: `r.hud_element(&H, hud_anchor::TOP_RIGHT, 0, |ui| ..)`,
+  `r.screen(&S, |ui| ..).pauses()`, built from `ui.panel`, `row`, `column`, `text`, `text_bind`,
+  `progress_bind`, `icons`, `image`, `item`, `spacer`, `button` with `S` styles, `at` included;
+- keys: `r.key(&K, "N").on_press(|c| ..)`, rebindable in Controls;
+- packets from its server half: `r.client_packet(&CH, |c, v| ..)`, and `c.send(&CH, &v)` back;
+- `r.client_frame(|c, seconds| ..)`, every frame (off unless needed).
+
+A HUD element or screen is built as a list of parts the game replays into its own UI, so a
+client half draws with the game's kit: use its classes (`panel`, `tooltip`, `button`, `slot`,
+`hotbar`, `hud_badge`, the `hud_health`, `hud_stamina`, `hud_xp` and `hud_temperature` bars,
+`tab`, `category`; text classes `title`, `dim`, `button`, `chat`) and it looks like the game. A
+binding (`text_bind`, `progress_bind`, `icons`) may only read; keys, buttons, packets and frames
+may also send, open screens and show lines. It never reaches the account, files or network, and
+the same limits and strikes hold (a failing client half stops in the player's game). Lines it
+shows are translation keys from the package's `assets/lang`; key names too (`key.<package>.<name>`).
+
+`examples/wasm/bell-client` is the bell's client half: a `hud_badge` with the ring count and an
+`hud_xp` bar with the count inside it, fed by the server half on `bell:rings`, and the key N
+asking for it on `bell:ping`. Build it like a server half; `componentize` treats an output named
+`client.wasm` as a client half.
+
 ## Limits
 
 | What | Limit |
