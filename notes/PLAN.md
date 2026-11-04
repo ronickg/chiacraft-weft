@@ -350,7 +350,23 @@ The smallest version that works is phases 1-4.
       it withdrew, and it no longer counts at the door.
    Later: achievements a sandboxed mod grants; other worlds fetching an issuer's list (each
    world sends its own today).
-5. **Finding worlds.** On-chain listing by hint; DIG listings and curated lists; spam ranking.
+5. **Finding worlds.** Decided 2026-11-04 after research (`reports/Finding worlds.md`; Ronald: "Yes,
+   all four"), in slices, testnet11 only:
+   1. *Listing a world*: the owner lists a world that has a DID: a coin at the address holding
+      the world DID, locking a deposit (setting `core:listing_deposit`, 0.0001 TXCH), hinted with
+      `sha256("chiacraft worlds v1")`, the world DID's launcher id as its second memo. Delisting
+      spends it back. A 1-mojo listing would be free to spam, so the deposit is the floor.
+   2. *The finder*: a Multiplayer tab reads the index through the light wallet protocol
+      (`RequestPuzzleState`: hinted, unspent, at least the deposit; not the hint RPC, which stops
+      at 50,000), keeps only listings whose world DID checks both ways and whose coin sits at the
+      DID's holder, and asks each world's status.
+   3. *Details from the world*: description, tags and language in the status answer, set by the
+      owner, cached by the games that see them (a screenshot later).
+   4. *Curated lists*: signed world lists, served and followed like ban lists; ours is offered in
+      the finder, never followed by default.
+   5. *Ranking*: friends' and linked worlds and followed lists first, then world DID age,
+      deposit and trusted links; lists can hide worlds.
+   Not now: a Nostr mirror, DIG (alpha, GPL-2, reads through central services), gossip heartbeats.
 6. **Sandboxed code mods.** wasmtime with components (from `horizon-mods`), WIT v1.0 shaped on
    Weft's SDK, server halves then client halves, frozen API versions; personal mods per world.
    Decided 2026-11-03 (`reports/Sandboxed code mods.md`, "Decisions": Ronald took its
