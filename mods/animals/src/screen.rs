@@ -346,6 +346,9 @@ fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Opt
 
 /// The life bars and stat bars' sizes in GUI pixels (the kit's `life_*` and `stat_q*`).
 const LIFE_BAR: (f32, f32) = (63.0, 6.0);
+/// The genes list: how many lines it can hold and how tall it is (it scrolls), GUI pixels.
+const GENE_LINES: usize = 40;
+const GENES_H: f32 = 52.0;
 const STAT_BAR: (f32, f32) = (54.0, 6.0);
 
 /// The screen of a tame animal (`notes/ui/BATCHES.md`, the taming and stats upgrade): who it is
@@ -506,6 +509,31 @@ fn animal_screen(ui: &mut Ui) {
                     let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
                     t.set("screen.animals.chip", &[Arg::Key(&format!("screen.animals.signature.{}", s.signature))]);
                 });
+            });
+            // Its temperament, an inherited trait: calm to skittish.
+            ui.panel("chip", S::row().pad(2.0), |ui| {
+                ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                    let Some(g) = c.menu_component(&crate::coats::GENOME) else { return };
+                    let v = animals_core::coats::temperament(&g);
+                    let word = if v < 0.34 { "calm" } else if v < 0.67 { "steady" } else { "skittish" };
+                    t.set("screen.animals.temper", &[Arg::Key(&format!("screen.animals.temper.{word}"))]);
+                });
+            });
+            // Its genes, one line each: its kind's own first, then the core traits.
+            ui.panel("well", S::col().pad(3.0).gap(1.0).w(100.0).h(GENES_H).scroll(), |ui| {
+                for i in 0..GENE_LINES {
+                    ui.text_bind_styled(S::default().max_w(92.0), move |c, t| {
+                        let Some(g) = c.menu_component(&crate::coats::GENOME) else { return t.text("") };
+                        let Some(l) = animals_core::coats::genes_of(&g).into_iter().nth(i) else { return t.text("") };
+                        match l.value {
+                            Some(v) => t.set("screen.animals.gene_value", &[Arg::Text(&l.name), Arg::Int((v * 100.0).round() as i64)]),
+                            None => {
+                                let pair = l.alleles.join("/");
+                                t.set("screen.animals.gene_alleles", &[Arg::Text(&l.name), Arg::Text(&l.shows), Arg::Text(&pair)]);
+                            }
+                        }
+                    });
+                }
             });
             ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.orders_title", &[]);
             ui.text_bind_styled(S::default().max_w(100.0), |c, t| {
