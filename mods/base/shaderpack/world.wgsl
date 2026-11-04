@@ -516,6 +516,15 @@ fn water_under(in: VOut, n: vec3<f32>, v: vec3<f32>, scatter: vec3<f32>, shadow:
 fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     let v = -normalize(in.rel);
     let top = in.normal.y > 0.5;
+    // The surface from below, the eye in the water: not the texture's navy but the water's own
+    // teal, bright straight up where the sky comes through (Snell's window, about 48° about the
+    // vertical) and darker toward the sides, where it mirrors the water below. Tester 2's shots
+    // had it a flat dark navy looking up while the water around was teal.
+    if top && in_water() {
+        let window = smoothstep(0.55, 0.85, -v.y);
+        let sky = mix(0.6, 2.4, window) * mix(0.15, 1.0, brightness_curve(in.light.x));
+        return vec4(display(haze_lit(underwater_color() * sky, in.rel, in.light.x)), 1.0);
+    }
     if (top && v.y <= 0.0) || in_liquid() {
         return shade(in, albedo);
     }

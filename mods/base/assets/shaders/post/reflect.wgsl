@@ -165,7 +165,16 @@ fn apply(p: PostPixel) -> vec4<f32> {
         let amount = clamp(fresnel, 0.0, 0.97) * mask * edge;
         return vec4(mix(p.color.rgb, sky, amount), p.color.a);
     }
-    let mirrored = textureSampleLevel(textures[p.scene], linear_clamp, hit, 0.0).rgb;
+    // Blurred more the farther the ray went before it hit (a reflection in rippled water softens
+    // with distance): the hit and four samples about it. One sharp sample turned dark tree crowns
+    // over a bright sky into a hard black-and-white mosaic looking down at a lake (Tester 2).
+    let spread = clamp(travelled * 0.0006, 0.002, 0.014) * vec2(p.size.y / p.size.x, 1.0);
+    var mirrored = textureSampleLevel(textures[p.scene], linear_clamp, hit, 0.0).rgb * 2.0;
+    mirrored += textureSampleLevel(textures[p.scene], linear_clamp, clamp(hit + vec2(spread.x, 0.0), vec2(0.0), vec2(1.0)), 0.0).rgb;
+    mirrored += textureSampleLevel(textures[p.scene], linear_clamp, clamp(hit - vec2(spread.x, 0.0), vec2(0.0), vec2(1.0)), 0.0).rgb;
+    mirrored += textureSampleLevel(textures[p.scene], linear_clamp, clamp(hit + vec2(0.0, spread.y), vec2(0.0), vec2(1.0)), 0.0).rgb;
+    mirrored += textureSampleLevel(textures[p.scene], linear_clamp, clamp(hit - vec2(0.0, spread.y), vec2(0.0), vec2(1.0)), 0.0).rgb;
+    mirrored /= 6.0;
     // Less toward the screen's edges and far along the ray; as much as the water mirrors at that
     // angle (Fresnel: little looking down, nearly all at a glancing look), the sky's share of
     // which the water already shows.
@@ -174,6 +183,8 @@ fn apply(p: PostPixel) -> vec4<f32> {
     let near = 1.0 - smoothstep(300.0, 700.0, travelled);
     // The mask is the water's own opacity: low only in clear shallows seen from above. A little more
     // than the Fresnel share: the water's own body under it is dark, so what it mirrors carries.
-    let amount = clamp(fresnel + 0.15, 0.0, 0.97) * mask * edge * near;
+    // That extra fades looking steeply down, where the water shows its body more than what it mirrors.
+    let steep = smoothstep(0.5, 0.9, dot(-v, n));
+    let amount = clamp(fresnel + 0.15 * (1.0 - steep), 0.0, 0.97) * mask * edge * near;
     return vec4(mix(p.color.rgb, mirrored, amount), p.color.a);
 }
