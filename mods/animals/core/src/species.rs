@@ -363,6 +363,61 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
+/// What most rows share, written once (`..BASE` ends every row; Research round 5, item 4): a wild
+/// species of no breed that hunts nothing, never fights, carries no rider and doesn't fly, on the
+/// usual level steps and its research's pace (`Tune::NONE`). The fields every row sets for itself
+/// (its name, family, diet, numbers, habitats and biology) are placeholders here.
+const BASE: Species = Species {
+    model: "",
+    name: "",
+    binomial: "",
+    family: &NO_FAMILY,
+    subfamily: "",
+    breed: None,
+    size: Size::Small,
+    eats: &[],
+    prey: (0.0, 0.0),
+    taming: Taming::Wild,
+    base: [0.0; STATS],
+    wild_step: WILD_STEP,
+    tamed_step: TAMED_STEP,
+    hunger: 0.0,
+    foods: &[],
+    feedings: 0.0,
+    shy: 0.0,
+    fights: false,
+    attacks: &[],
+    reach: 0.0,
+    signature: "",
+    seat: 0.0,
+    seat_forward: 0.0,
+    flight: 0.0,
+    camouflage: 0.0,
+    dimorphism: 1.0,
+    size_spread: 0.0,
+    height: (0.0, ""),
+    habitats: &[],
+    bio: Biology {
+        mass: 0.0,
+        gestation: 0.0,
+        incubation: 0.0,
+        maturity: 0.0,
+        lifespan: 0.0,
+        interval: 0.0,
+        litter: 0.0,
+        social: Social::Solitary,
+        rarity: Rarity::Common,
+        breeds: 0,
+        peak: 0,
+        comfort: (0.0, 0.0),
+        cold_blooded: false,
+    },
+    tune: Tune::NONE,
+    birth_size: 0.0,
+};
+/// `BASE`'s family, a placeholder every row replaces.
+static NO_FAMILY: Family = Family { name: "", above: &[] };
+
 pub static SPECIES: [Species; 41] = [
     Species {
         model: "chihuahua",
@@ -377,8 +432,6 @@ pub static SPECIES: [Species; 41] = [
         taming: Taming::Passive,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [8.0, 100.0, 80.0, 2.0, 1.0, 40.0, 100.0, 60.0, 10.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[
             eats("base:beef", 10),
@@ -398,9 +451,6 @@ pub static SPECIES: [Species; 41] = [
         attacks: &["bite"],
         reach: 0.8,
         signature: "alarm",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.3,
         dimorphism: 1.04,
         size_spread: 0.2,
@@ -425,8 +475,8 @@ pub static SPECIES: [Species; 41] = [
             comfort: (7.0, 29.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
         birth_size: 1.0,
+        ..BASE
     },
     Species {
         model: "cat",
@@ -434,14 +484,11 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Felis catus",
         family: &FELIDAE,
         subfamily: "Felinae",
-        breed: None,
         size: Size::Small,
         eats: &[(Meat, 0.8), (Insects, 0.1), (Carrion, 0.05), (Fish, 0.05)],
         prey: (0.005, 0.4),
         taming: Taming::Passive,
         base: [6.0, 80.0, 60.0, 1.0, 1.0, 30.0, 80.0, 40.0, 10.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 40.0,
         // No fish in the game yet: birds and eggs are what it likes best.
         foods: &[
@@ -460,9 +507,6 @@ pub static SPECIES: [Species; 41] = [
         attacks: &["swipe", "bite"],
         reach: 0.8,
         signature: "gifts",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.5,
         dimorphism: 1.08,
         size_spread: 0.08,
@@ -498,6 +542,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { crowd: Some(20), ..Tune::NONE },
         birth_size: 0.35,
+        ..BASE
     },
     Species {
         model: "capybara",
@@ -505,15 +550,11 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Hydrochoerus hydrochaeris",
         family: &CAVIIDAE,
         subfamily: "Hydrochoerinae",
-        breed: None,
         size: Size::Medium,
         eats: &[(Grass, 0.7), (WaterPlants, 0.2), (Seeds, 0.05), (Fruit, 0.05)],
-        prey: (0.0, 0.0),
         taming: Taming::Passive,
         // It holds its breath for five minutes.
         base: [12.0, 150.0, 200.0, 1.0, 1.0, 150.0, 400.0, 150.0, 20.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 25.0,
         foods: &[
             eats("base:wheat", 10),
@@ -528,13 +569,8 @@ pub static SPECIES: [Species; 41] = [
         ],
         feedings: 3.0,
         shy: 0.0,
-        fights: false,
-        attacks: &[],
         reach: 0.8,
         signature: "calm",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.8,
         dimorphism: 0.97,
         size_spread: 0.08,
@@ -563,6 +599,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
+        ..BASE
     },
     Species {
         model: "raptor",
@@ -570,14 +607,11 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Velociraptor mongoliensis",
         family: &DROMAEOSAURIDAE,
         subfamily: "Velociraptorinae",
-        breed: None,
         size: Size::Medium,
         eats: &[(Meat, 0.7), (Carrion, 0.25), (Insects, 0.05)],
         prey: (0.002, 6.0),
         taming: Taming::Knockout,
         base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 20.0,
         foods: &[eats("base:chicken", 10), eats("base:mutton", 10), eats("base:porkchop", 12), favorite("base:beef", 15), KIBBLE],
         feedings: 10.0,
@@ -586,9 +620,6 @@ pub static SPECIES: [Species; 41] = [
         attacks: &["bite", "kick"],
         reach: 0.8,
         signature: "pack",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.0,
         size_spread: 0.08,
@@ -614,8 +645,8 @@ pub static SPECIES: [Species; 41] = [
             comfort: (12.0, 40.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
         birth_size: 0.3,
+        ..BASE
     },
     Species {
         model: "utahraptor",
@@ -623,14 +654,11 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Utahraptor ostrommaysi",
         family: &DROMAEOSAURIDAE,
         subfamily: "Dromaeosaurinae",
-        breed: None,
         size: Size::Large,
         eats: &[(Meat, 0.8), (Carrion, 0.15), (Fish, 0.05)],
         prey: (0.01, 3.0),
         taming: Taming::Knockout,
         base: [60.0, 300.0, 400.0, 10.0, 1.0, 400.0, 200.0, 700.0, 30.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 12.0,
         foods: &[eats("base:chicken", 10), eats("base:porkchop", 15), favorite("base:beef", 20), favorite("base:mutton", 15), KIBBLE],
         feedings: 18.0,
@@ -641,8 +669,6 @@ pub static SPECIES: [Species; 41] = [
         signature: "mount",
         // On its back, above the hips (1.69 blocks up, the rider's hips a little above).
         seat: 1.55,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.8,
         dimorphism: 1.0,
         size_spread: 0.08,
@@ -667,8 +693,8 @@ pub static SPECIES: [Species; 41] = [
             comfort: (6.0, 36.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
         birth_size: 0.15,
+        ..BASE
     },
     // Velociraptor's second species (named 2008, from Bayan Mandahu, Inner Mongolia; known from
     // skull bones only, so the same body and numbers, its own coat).
@@ -678,14 +704,11 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Velociraptor osmolskae",
         family: &DROMAEOSAURIDAE,
         subfamily: "Velociraptorinae",
-        breed: None,
         size: Size::Medium,
         eats: &[(Meat, 0.7), (Carrion, 0.25), (Insects, 0.05)],
         prey: (0.002, 6.0),
         taming: Taming::Knockout,
         base: [14.0, 150.0, 150.0, 4.0, 1.0, 140.0, 150.0, 200.0, 15.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 20.0,
         foods: &[eats("base:chicken", 10), eats("base:mutton", 10), eats("base:porkchop", 12), favorite("base:beef", 15), KIBBLE],
         feedings: 10.0,
@@ -694,9 +717,6 @@ pub static SPECIES: [Species; 41] = [
         attacks: &["bite", "kick"],
         reach: 0.8,
         signature: "pack",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.0,
         size_spread: 0.08,
@@ -719,8 +739,8 @@ pub static SPECIES: [Species; 41] = [
             comfort: (12.0, 40.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
         birth_size: 0.3,
+        ..BASE
     },
     // The wyvern, a fantasy animal (`wyvern.rs`): a dragon with two legs and bat wings, about
     // 3.9 m at the shoulder and 16 m long, rare in the mountains.
@@ -730,15 +750,12 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Wyverna montana",
         family: &WYVERNIDAE,
         subfamily: "Wyverninae",
-        breed: None,
         size: Size::Large,
         eats: &[(Meat, 0.8), (Fish, 0.1), (Carrion, 0.1)],
         prey: (0.001, 0.6),
         taming: Taming::Knockout,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [400.0, 800.0, 2000.0, 30.0, 1.0, 1200.0, 400.0, 3000.0, 80.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 5.0,
         foods: &[
             eats("base:chicken", 10),
@@ -789,6 +806,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { crowd: Some(8), ..Tune::NONE },
         birth_size: 0.08,
+        ..BASE
     },
     // The hares (`reports/ecology/Overworld food webs.md`: the mid-sized prey everywhere, the fox's,
     // coyote's, eagle's and lynx's main food): wild, never tamed (`Taming::Wild`). Two species on
@@ -800,28 +818,17 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Lepus europaeus",
         family: &LEPORIDAE,
         subfamily: "Leporinae",
-        breed: None,
         size: Size::Small,
         // Grasses most of the year, herbs and crops, twigs and bark in winter.
         eats: &[(Grass, 0.55), (Leaves, 0.25), (Roots, 0.1), (Seeds, 0.05), (Fruit, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [5.0, 120.0, 40.0, 0.5, 1.0, 15.0, 60.0, 20.0, 5.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:wheat", 8), eats("base:wheat_seeds", 2), favorite("base:apple", 10), favorite("base:berries", 6)],
-        feedings: 0.0,
         // It sits tight in its form, then bolts when a walker comes within about 12 m.
         shy: 12.0,
-        fights: false,
-        attacks: &[],
         reach: 0.8,
         signature: "bolt",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         // Females a little bigger (by mass, about 5%).
         dimorphism: 0.98,
@@ -854,6 +861,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { crowd: Some(26), ..Tune::NONE },
         birth_size: 0.3,
+        ..BASE
     },
     Species {
         model: "hare",
@@ -861,26 +869,15 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Lepus timidus",
         family: &LEPORIDAE,
         subfamily: "Leporinae",
-        breed: None,
         size: Size::Small,
         // Grasses and herbs in summer; in winter birch, willow and heather twigs and bark.
         eats: &[(Grass, 0.4), (Leaves, 0.5), (Fruit, 0.05), (Lichen, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         base: [5.0, 120.0, 40.0, 0.5, 1.0, 13.0, 60.0, 20.0, 5.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:crowberries", 4), favorite("base:lingonberries", 6)],
-        feedings: 0.0,
         shy: 12.0,
-        fights: false,
-        attacks: &[],
         reach: 0.8,
         signature: "bolt",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         // Females slightly heavier.
         dimorphism: 0.98,
@@ -911,6 +908,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { crowd: Some(26), ..Tune::NONE },
         birth_size: 0.3,
+        ..BASE
     },
     // The wood mouse (`reports/ecology/Overworld food webs.md`: the rodent, the small hunters' main
     // food), a simple wild creature on its own model (`source/mouse`). It stands in for the deer
@@ -922,28 +920,17 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Apodemus sylvaticus",
         family: &MURIDAE,
         subfamily: "Murinae",
-        breed: None,
         size: Size::Small,
         // Seeds and mast most of the year, insects and snails in late spring, berries, fungi and
         // roots later.
         eats: &[(Seeds, 0.45), (Insects, 0.2), (Fruit, 0.15), (Grass, 0.1), (Fungi, 0.05), (Roots, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [2.0, 60.0, 15.0, 0.2, 1.0, 2.0, 30.0, 5.0, 2.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:wheat_seeds", 4), eats("base:wheat", 6), favorite("base:berries", 4)],
-        feedings: 0.0,
         shy: 6.0,
-        fights: false,
-        attacks: &[],
         reach: 0.5,
         signature: "dart",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.0,
         size_spread: 0.1,
@@ -978,6 +965,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { growth: Some(72_000), lifespan: Some(384_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.35,
+        ..BASE
     },
     // The field vole, the north's rodent (the lemming's, the snow vole's and the marsh rats' stand-in),
     // a simple wild creature on its own model (`source/vole`): what the owls and foxes of the cold
@@ -988,27 +976,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Microtus agrestis",
         family: &CRICETIDAE,
         subfamily: "Arvicolinae",
-        breed: None,
         size: Size::Small,
         // Grasses and herbs, root tubers and moss; bark in winter; a few insect larvae.
         eats: &[(Grass, 0.6), (Leaves, 0.15), (Roots, 0.15), (Seeds, 0.05), (Insects, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [2.0, 60.0, 15.0, 0.2, 1.0, 3.0, 30.0, 5.0, 2.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:wheat", 6), eats("base:wheat_seeds", 3), favorite("base:sunflower_seeds", 6)],
-        feedings: 0.0,
         shy: 5.0,
-        fights: false,
-        attacks: &[],
         reach: 0.5,
         signature: "dart",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.0,
         size_spread: 0.1,
@@ -1051,6 +1028,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { growth: Some(72_000), lifespan: Some(384_000), litter: Some((2, 5)), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.35,
+        ..BASE
     },
     // The deer (`reports/ecology/Overworld food webs.md`: the big browser and grazer of seven biomes,
     // the wolf's and jaguar's prey): two simple wild creatures on one model (`source/deer`), as the
@@ -1061,27 +1039,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Odocoileus virginianus",
         family: &CERVIDAE,
         subfamily: "Capreolinae",
-        breed: None,
         size: Size::Large,
         // A browser: leaves, twigs and buds first, grass and herbs, acorns and other mast, fruit, fungi.
         eats: &[(Leaves, 0.5), (Grass, 0.2), (Fruit, 0.15), (Seeds, 0.1), (Fungi, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [30.0, 200.0, 120.0, 2.0, 1.0, 70.0, 80.0, 60.0, 15.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 15.0,
         foods: &[eats("base:wheat", 8), favorite("base:apple", 12), favorite("base:berries", 6)],
-        feedings: 0.0,
         shy: 16.0,
-        fights: false,
-        attacks: &[],
         reach: 1.0,
         signature: "bolt",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.9,
         dimorphism: 1.08,
         size_spread: 0.1,
@@ -1109,8 +1076,8 @@ pub static SPECIES: [Species; 41] = [
             comfort: (-15.0, 30.0),
             cold_blooded: false,
         },
-        tune: Tune::NONE,
         birth_size: 0.4,
+        ..BASE
     },
     Species {
         model: "deer",
@@ -1118,26 +1085,15 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Cervus elaphus",
         family: &CERVIDAE,
         subfamily: "Cervinae",
-        breed: None,
         size: Size::Large,
         // A mixed feeder: grasses and sedges, browse of trees and shrubs, heather, mast and fruit.
         eats: &[(Grass, 0.5), (Leaves, 0.4), (Fruit, 0.05), (Seeds, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         base: [45.0, 250.0, 180.0, 3.0, 1.0, 120.0, 80.0, 90.0, 20.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 15.0,
         foods: &[eats("base:wheat", 10), favorite("base:apple", 12)],
-        feedings: 0.0,
         shy: 20.0,
-        fights: false,
-        attacks: &[],
         reach: 1.0,
         signature: "bolt",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.9,
         dimorphism: 1.1,
         size_spread: 0.3,
@@ -1172,6 +1128,7 @@ pub static SPECIES: [Species; 41] = [
             ..Tune::NONE
         },
         birth_size: 0.4,
+        ..BASE
     },
     // The fish (`reports/ecology/Overworld food webs.md`: the middle of the water webs): two wild
     // species on one model (`source/fish`), spawned into water by the mod (`fish.rs`). They don't
@@ -1184,27 +1141,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Salmo trutta",
         family: &SALMONIDAE,
         subfamily: "Salmoninae",
-        breed: None,
         size: Size::Small,
         // Insects (larvae and those fallen on the water), crustaceans and snails, small fish.
         eats: &[(Insects, 0.65), (Fish, 0.3), (Carrion, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [3.0, 60.0, 20.0, 0.3, 1.0, 5.0, 400.0, 10.0, 3.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[],
-        feedings: 0.0,
         shy: 6.0,
-        fights: false,
-        attacks: &[],
         reach: 0.5,
         signature: "dart",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.0,
         size_spread: 0.2,
@@ -1236,6 +1182,7 @@ pub static SPECIES: [Species; 41] = [
         // threefold (`web/test.mjs`).
         tune: Tune { litter: Some((3, 8)), crowd: Some(26), ..Tune::NONE },
         birth_size: 0.1,
+        ..BASE
     },
     Species {
         model: "fish",
@@ -1243,28 +1190,17 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Piaractus mesopotamicus",
         family: &SERRASALMIDAE,
         subfamily: "Colossomatinae",
-        breed: None,
         size: Size::Small,
         // Fruit and seeds fallen into the floods (it spreads the forest's seeds), insects, snails
         // and small fish the rest of the year.
         // (Under half plants: it doesn't forage on land, `Species::forages_wild`.)
         eats: &[(Fruit, 0.3), (Seeds, 0.15), (Insects, 0.35), (Fish, 0.2)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         base: [6.0, 80.0, 40.0, 0.5, 1.0, 20.0, 400.0, 15.0, 4.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 25.0,
         foods: &[],
-        feedings: 0.0,
         shy: 5.0,
-        fights: false,
-        attacks: &[],
         reach: 0.5,
         signature: "dart",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.8,
         dimorphism: 1.0,
         size_spread: 0.4,
@@ -1289,8 +1225,8 @@ pub static SPECIES: [Species; 41] = [
             comfort: (20.0, 32.0),
             cold_blooded: true,
         },
-        tune: Tune::NONE,
         birth_size: 0.05,
+        ..BASE
     },
     // The foxes (`reports/ecology/Overworld food webs.md`: the small hunter of ten biomes, the
     // tundra's main one): two wild hunters on one model (`source/fox`), the dog's family (so they
@@ -1301,29 +1237,21 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Vulpes vulpes",
         family: &CANIDAE,
         subfamily: "Caninae",
-        breed: None,
         size: Size::Small,
         // Small rodents first, rabbits and hares, birds and eggs; insects, berries and other fruit,
         // carrion.
         eats: &[(Meat, 0.5), (Fruit, 0.2), (Insects, 0.15), (Carrion, 0.15)],
         // Voles and mice from about 20 g to hares near its own size (most under a fifth of it).
         prey: (0.004, 0.8),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [10.0, 120.0, 60.0, 2.0, 1.0, 30.0, 80.0, 40.0, 10.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:chicken", 10), eats("base:beef", 10), favorite("base:berries", 6)],
-        feedings: 0.0,
         shy: 10.0,
         fights: true,
         attacks: &["pounce", "bite"],
         reach: 0.6,
         signature: "pounce",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.6,
         dimorphism: 1.05,
         size_spread: 0.12,
@@ -1365,6 +1293,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { recovery: Some(60_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.25,
+        ..BASE
     },
     Species {
         model: "fox",
@@ -1372,28 +1301,20 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Vulpes lagopus",
         family: &CANIDAE,
         subfamily: "Caninae",
-        breed: None,
         size: Size::Small,
         // Lemmings and voles first (a family eats dozens a day), birds and eggs, fish, carrion
         // (following wolves), berries.
         eats: &[(Meat, 0.55), (Carrion, 0.25), (Fruit, 0.1), (Insects, 0.05), (Fish, 0.05)],
         // Lemmings to an Arctic hare about its own size.
         prey: (0.004, 1.0),
-        taming: Taming::Wild,
         base: [8.0, 120.0, 60.0, 1.6, 1.0, 22.0, 80.0, 35.0, 12.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:chicken", 10), eats("base:beef", 10), favorite("base:berries", 6)],
-        feedings: 0.0,
         shy: 10.0,
         fights: true,
         attacks: &["pounce", "bite"],
         reach: 0.6,
         signature: "pounce",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.6,
         dimorphism: 1.05,
         size_spread: 0.35,
@@ -1425,6 +1346,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { crowd: Some(24), ..Tune::NONE },
         birth_size: 0.25,
+        ..BASE
     },
     // The raven (`reports/ecology/Overworld food webs.md`: for the dead in the cold biomes, where
     // there are no vultures): wild, on the ground and in the air (`source/raven`, `raven.rs`).
@@ -1434,29 +1356,20 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Corvus corax",
         family: &CORVIDAE,
         subfamily: "Corvinae",
-        breed: None,
         size: Size::Small,
         // Carrion first (it follows wolves), eggs and small animals, insects, grain, berries and
         // scraps.
         eats: &[(Carrion, 0.4), (Meat, 0.2), (Insects, 0.15), (Seeds, 0.15), (Fruit, 0.1)],
         // Mice and voles to a nestling or a young hare, a tenth of its own mass.
         prey: (0.01, 0.1),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [6.0, 120.0, 40.0, 1.0, 1.0, 10.0, 60.0, 20.0, 5.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:beef", 10), eats("base:wheat_seeds", 2), favorite("base:rotten_flesh", 8)],
-        feedings: 0.0,
         shy: 14.0,
         fights: true,
-        attacks: &[],
         reach: 0.4,
         signature: "soar",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.2,
         dimorphism: 1.08,
         size_spread: 0.1,
@@ -1499,6 +1412,7 @@ pub static SPECIES: [Species; 41] = [
         // north's cold (`eggs.rs`), so its young come out as fledglings after the eggs' time.
         tune: Tune { gestation: Some(12_700), ..Tune::NONE },
         birth_size: 0.3,
+        ..BASE
     },
     // Protoceratops (`reports/ecology/Cretaceous food webs.md`: the Djadokhta's "extremely common"
     // plant eater and the Velociraptors' prey, the Fighting Dinosaurs): wild, in herds of mixed
@@ -1509,28 +1423,17 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Protoceratops andrewsi",
         family: &PROTOCERATOPSIDAE,
         subfamily: "Protoceratopsinae",
-        breed: None,
         size: Size::Medium,
         // Low browse, chopped and sheared with a strong bite (Button & Zanno 2019; Tanoue et al.
         // 2009): ferns, cycads and shrubs, their roots and seeds.
         eats: &[(Leaves, 0.75), (Roots, 0.15), (Seeds, 0.1)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [35.0, 200.0, 120.0, 2.0, 1.0, 90.0, 80.0, 70.0, 18.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 15.0,
         foods: &[eats("animals:fern", 8), eats("base:wheat", 8), favorite("animals:cycad_seed", 10)],
-        feedings: 0.0,
         shy: 12.0,
-        fights: false,
-        attacks: &[],
         reach: 1.0,
         signature: "herd",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.9,
         dimorphism: 1.05,
         size_spread: 0.1,
@@ -1567,6 +1470,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { growth: Some(144_000), litter: Some((3, 8)), crowd: Some(20), ..Tune::NONE },
         birth_size: 0.15,
+        ..BASE
     },
     // Kryptobaatar (`reports/ecology/Cretaceous food webs.md`: the commonest mammal of the
     // Djadokhta, Kielan-Jaworowska et al. 2003): a multituberculate, wild, on the wood mouse's build
@@ -1577,28 +1481,17 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Kryptobaatar dashzevegi",
         family: &DJADOCHTATHERIIDAE,
         subfamily: "Djadochtatheriinae",
-        breed: None,
         size: Size::Small,
         // An omnivore leaning to animal food (its teeth): insects and their grubs first, seeds,
         // fruit and roots.
         eats: &[(Insects, 0.6), (Seeds, 0.25), (Fruit, 0.1), (Roots, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [2.0, 60.0, 15.0, 0.2, 1.0, 2.0, 30.0, 5.0, 2.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:wheat_seeds", 4), eats("base:wheat", 6), favorite("base:berries", 4)],
-        feedings: 0.0,
         shy: 6.0,
-        fights: false,
-        attacks: &[],
         reach: 0.5,
         signature: "dart",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.0,
         size_spread: 0.1,
@@ -1632,6 +1525,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { growth: Some(72_000), lifespan: Some(384_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.35,
+        ..BASE
     },
     // Priscagama (`reports/ecology/Cretaceous food webs.md`: the Djadokhta's lizards, "rather
     // abundant and diverse"): an agama's kin, wild, on the dunes and the scrubland
@@ -1642,27 +1536,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Priscagama gobiensis",
         family: &PRISCAGAMIDAE,
         subfamily: "Priscagaminae",
-        breed: None,
         size: Size::Small,
         // Insects first (as agamas), a few leaves and flowers.
         eats: &[(Insects, 0.9), (Leaves, 0.1)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [2.0, 60.0, 12.0, 0.2, 1.0, 2.0, 40.0, 5.0, 2.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 40.0,
         foods: &[favorite("base:spider_eye", 4)],
-        feedings: 0.0,
         shy: 5.0,
-        fights: false,
-        attacks: &[],
         reach: 0.4,
         signature: "bask",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.05,
         size_spread: 0.1,
@@ -1690,6 +1573,7 @@ pub static SPECIES: [Species; 41] = [
         // A lizard's room by its tiny mass (35) would crowd its dunes: as the mouse's.
         tune: Tune { crowd: Some(24), ..Tune::NONE },
         birth_size: 0.2,
+        ..BASE
     },
     // The reindeer (`reports/ecology/Overworld food webs.md`: the only big grazer of the tundra, the
     // wolf's prey there): a simple wild creature on its own model, built on the deer's
@@ -1701,28 +1585,17 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Rangifer tarandus",
         family: &CERVIDAE,
         subfamily: "Capreolinae",
-        breed: None,
         size: Size::Large,
         // Lichen through the winter (dug from under the snow), sedges, grasses and willow and birch
         // leaves in summer, mushrooms in autumn.
         eats: &[(Lichen, 0.4), (Grass, 0.35), (Leaves, 0.2), (Fungi, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [40.0, 260.0, 160.0, 3.0, 1.0, 110.0, 80.0, 80.0, 25.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 15.0,
         foods: &[eats("base:mushroom_brown", 8)],
-        feedings: 0.0,
         shy: 18.0,
-        fights: false,
-        attacks: &[],
         reach: 1.0,
         signature: "crater",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.7,
         // Bulls usually 159-182 kg, cows 80-120: about 1.2 times as tall.
         dimorphism: 1.12,
@@ -1765,6 +1638,7 @@ pub static SPECIES: [Species; 41] = [
             ..Tune::NONE
         },
         birth_size: 0.35,
+        ..BASE
     },
     // The coyote (`reports/ecology/Overworld food webs.md`: the middle hunter of the prairie and the
     // desert, the hare's, the fawn's and the small dog's hunter): a simple wild hunter on its own
@@ -1776,29 +1650,21 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Canis latrans",
         family: &CANIDAE,
         subfamily: "Caninae",
-        breed: None,
         size: Size::Medium,
         // Rabbits, hares and rodents first, deer fawns and birds; carrion, insects, fruit.
         eats: &[(Meat, 0.6), (Fruit, 0.15), (Carrion, 0.15), (Insects, 0.1)],
         // Mice of a few dozen grams to a hare or a fawn, under half its own mass alone (a family takes
         // deer).
         prey: (0.001, 0.4),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [18.0, 150.0, 80.0, 3.5, 1.0, 45.0, 80.0, 60.0, 12.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:beef", 12), favorite("base:chicken", 10), eats("base:berries", 4)],
-        feedings: 0.0,
         shy: 14.0,
         fights: true,
         attacks: &["pounce", "bite"],
         reach: 0.7,
         signature: "howl",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.6,
         // Males 8-20 kg, females 7-18.
         dimorphism: 1.05,
@@ -1831,6 +1697,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { crowd: Some(22), ..Tune::NONE },
         birth_size: 0.25,
+        ..BASE
     },
     // The small birds (`reports/ecology/Overworld food webs.md`: the songbirds of every land biome, the
     // cat's, the owl's and the hawk's prey): two wild species on one model (`source/small_bird`), on
@@ -1842,27 +1709,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Passer domesticus",
         family: &PASSERIDAE,
         subfamily: "Passerinae",
-        breed: None,
         size: Size::Small,
         // Seeds and grain first, insects (most of what the nestlings get), buds and berries.
         eats: &[(Seeds, 0.6), (Insects, 0.3), (Fruit, 0.1)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [2.0, 60.0, 15.0, 0.2, 1.0, 1.0, 40.0, 5.0, 2.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 20.0,
         foods: &[eats("base:wheat_seeds", 2), favorite("base:berries", 3)],
-        feedings: 0.0,
         shy: 8.0,
-        fights: false,
-        attacks: &[],
         reach: 0.2,
         signature: "flock",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.6,
         dimorphism: 1.02,
         size_spread: 0.1,
@@ -1900,6 +1756,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { gestation: Some(8_665), growth: Some(66_000), lifespan: Some(336_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.6,
+        ..BASE
     },
     Species {
         model: "small_bird",
@@ -1907,27 +1764,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Plectrophenax nivalis",
         family: &CALCARIIDAE,
         subfamily: "",
-        breed: None,
         size: Size::Small,
         // Seeds of grasses and sedges, their shoots and willow buds, insects in the Arctic summer
         // (what the young are raised on).
         eats: &[(Seeds, 0.4), (Insects, 0.3), (Grass, 0.15), (Leaves, 0.1), (Fruit, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         base: [2.0, 60.0, 15.0, 0.2, 1.0, 1.2, 40.0, 5.0, 3.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 20.0,
         foods: &[eats("base:wheat_seeds", 2), favorite("base:berries", 3)],
-        feedings: 0.0,
         shy: 8.0,
-        fights: false,
-        attacks: &[],
         reach: 0.2,
         signature: "flock",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.6,
         dimorphism: 1.03,
         size_spread: 0.1,
@@ -1968,6 +1814,7 @@ pub static SPECIES: [Species; 41] = [
             ..Tune::NONE
         },
         birth_size: 0.6,
+        ..BASE
     },
     // The owls (`reports/ecology/Overworld food webs.md`: the night's hunter of every land biome, the
     // rodent's and the hare's): two wild species on one model (`source/owl`), on the ground and in
@@ -1979,28 +1826,19 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Bubo virginianus",
         family: &STRIGIDAE,
         subfamily: "Striginae",
-        breed: None,
         size: Size::Small,
         // Rodents and rabbits first, birds up to geese, skunks, frogs, fish, big insects.
         eats: &[(Meat, 0.9), (Insects, 0.05), (Fish, 0.05)],
         // A deer mouse of 20 g to a hare or a skunk near twice its own mass.
         prey: (0.005, 1.8),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [8.0, 100.0, 40.0, 2.5, 1.0, 14.0, 60.0, 20.0, 6.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:beef", 10), favorite("base:chicken", 10)],
-        feedings: 0.0,
         shy: 14.0,
         fights: true,
-        attacks: &[],
         reach: 0.5,
         signature: "silent",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.7,
         // Females are the bigger.
         dimorphism: 0.95,
@@ -2042,6 +1880,7 @@ pub static SPECIES: [Species; 41] = [
         },
         tune: Tune { gestation: Some(18_505), ..Tune::NONE },
         birth_size: 0.3,
+        ..BASE
     },
     Species {
         model: "owl",
@@ -2049,27 +1888,18 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Bubo scandiacus",
         family: &STRIGIDAE,
         subfamily: "Striginae",
-        breed: None,
         size: Size::Small,
         // Lemmings and voles above all (3-5 a day), ptarmigan, Arctic hares, seabirds.
         eats: &[(Meat, 1.0)],
         // A lemming of 50 g to a hare about its own mass.
         prey: (0.005, 1.2),
-        taming: Taming::Wild,
         base: [10.0, 110.0, 45.0, 3.0, 1.0, 20.0, 60.0, 24.0, 8.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:beef", 10), favorite("base:chicken", 10)],
-        feedings: 0.0,
         shy: 16.0,
         fights: true,
-        attacks: &[],
         reach: 0.5,
         signature: "silent",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.7,
         dimorphism: 0.95,
         size_spread: 0.12,
@@ -2100,6 +1930,7 @@ pub static SPECIES: [Species; 41] = [
         },
         tune: Tune { gestation: Some(18_083), ..Tune::NONE },
         birth_size: 0.3,
+        ..BASE
     },
     // The eagles (`reports/ecology/Overworld food webs.md`: the day's big hunter of every land biome,
     // the hare's, the marmot's, the fawn's and the small dog's): the golden eagle of the north's and
@@ -2113,29 +1944,20 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Aquila chrysaetos",
         family: &ACCIPITRIDAE,
         subfamily: "Aquilinae",
-        breed: None,
         size: Size::Medium,
         // Hares, rabbits, marmots and ground squirrels first, grouse, foxes and young deer; carrion
         // in winter.
         eats: &[(Meat, 0.85), (Carrion, 0.15)],
         // A vole to a fawn or a fox, up to about one and a half times its own mass.
         prey: (0.01, 1.5),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [16.0, 150.0, 60.0, 4.0, 1.0, 30.0, 60.0, 40.0, 10.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:beef", 12), favorite("base:chicken", 10), eats("base:rotten_flesh", 4)],
-        feedings: 0.0,
         shy: 24.0,
         fights: true,
-        attacks: &[],
         reach: 0.6,
         signature: "stoop",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.4,
         // Females are the bigger (a third heavier).
         dimorphism: 0.92,
@@ -2178,6 +2000,7 @@ pub static SPECIES: [Species; 41] = [
         // breeding in the game could wait for (`balance::checks`: a fourth generation in 40 days).
         tune: Tune { gestation: Some(22_568), growth: Some(200_000), ..Tune::NONE },
         birth_size: 0.3,
+        ..BASE
     },
     Species {
         model: "eagle",
@@ -2185,26 +2008,17 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Buteogallus meridionalis",
         family: &ACCIPITRIDAE,
         subfamily: "Buteoninae",
-        breed: None,
         size: Size::Small,
         // Rodents, lizards, snakes, frogs and crabs, big insects; following fires and the plough.
         eats: &[(Meat, 0.7), (Insects, 0.2), (Fish, 0.1)],
         prey: (0.005, 0.6),
-        taming: Taming::Wild,
         base: [8.0, 110.0, 40.0, 2.0, 1.0, 10.0, 60.0, 20.0, 6.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:beef", 8), favorite("base:chicken", 8)],
-        feedings: 0.0,
         shy: 16.0,
         fights: true,
-        attacks: &[],
         reach: 0.5,
         signature: "stoop",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.4,
         dimorphism: 0.95,
         // Its size genes draw the golden eagle's model about two thirds as big (55 cm).
@@ -2234,6 +2048,7 @@ pub static SPECIES: [Species; 41] = [
         // the wild replaces its dead (`balance::checks`: six young in a life).
         tune: Tune { gestation: Some(20_975), recovery: Some(60_000), ..Tune::NONE },
         birth_size: 0.3,
+        ..BASE
     },
     // The turkey vulture (`reports/ecology/Overworld food webs.md`: something for the dead in the warm
     // biomes, the raven's counterpart): a wild bird on its own model (`source/vulture`), on the
@@ -2246,28 +2061,17 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Cathartes aura",
         family: &CATHARTIDAE,
         subfamily: "",
-        breed: None,
         size: Size::Small,
         // Carrion almost only, found by smell; rotting fruit now and then (the rare newborn it kills is
         // left out: it hunts nothing here).
         eats: &[(Carrion, 0.95), (Fruit, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [10.0, 140.0, 50.0, 1.0, 1.0, 14.0, 60.0, 24.0, 10.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 40.0,
         foods: &[favorite("base:rotten_flesh", 10)],
-        feedings: 0.0,
         shy: 16.0,
-        fights: false,
-        attacks: &[],
         reach: 0.4,
         signature: "scent",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.2,
         dimorphism: 1.0,
         size_spread: 0.1,
@@ -2309,6 +2113,7 @@ pub static SPECIES: [Species; 41] = [
         // Her rest after a brood set shorter, so a roost of a few lasts on its own (`web/test.mjs`).
         tune: Tune { gestation: Some(21_377), growth: Some(110_000), recovery: Some(80_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
+        ..BASE
     },
     // The herring gull (`reports/ecology/Overworld food webs.md`: the coast's hunter and its eater of
     // the dead): a wild bird on its own model (`source/gull`), on the ground and in the air
@@ -2320,28 +2125,19 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Larus argentatus",
         family: &LARIDAE,
         subfamily: "Larinae",
-        breed: None,
         size: Size::Small,
         // Fish first, crabs and mussels, the strandline's dead, eggs and young birds, insects, scraps.
         eats: &[(Fish, 0.45), (Carrion, 0.25), (Meat, 0.1), (Insects, 0.1), (Seeds, 0.05), (Fruit, 0.05)],
         // Small fish and mice to a young rabbit or a duckling, under a third of its mass.
         prey: (0.005, 0.3),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [8.0, 130.0, 40.0, 1.5, 1.0, 10.0, 70.0, 20.0, 8.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[eats("base:beef", 8), favorite("base:bread", 6), eats("base:rotten_flesh", 6)],
-        feedings: 0.0,
         shy: 10.0,
         fights: true,
-        attacks: &[],
         reach: 0.5,
         signature: "colony",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.2,
         // Males a little bigger.
         dimorphism: 1.05,
@@ -2376,6 +2172,7 @@ pub static SPECIES: [Species; 41] = [
         // (`balance::checks`).
         tune: Tune { gestation: Some(16_796), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
+        ..BASE
     },
     // The caimans (`reports/ecology/Overworld food webs.md`: the water's hunter of the swamp and the
     // savanna, the jaguar's main prey in the Pantanal and the capybara's danger): the yacare caiman of
@@ -2388,29 +2185,21 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Caiman yacare",
         family: &ALLIGATORIDAE,
         subfamily: "Caimaninae",
-        breed: None,
         size: Size::Large,
         // Fish first, snails and crabs, water birds, rodents and the young of capybaras; it eats
         // little, being cold-blooded.
         eats: &[(Fish, 0.6), (Meat, 0.3), (Insects, 0.1)],
         // A snail or a minnow to a capybara near its own mass.
         prey: (0.005, 1.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [30.0, 160.0, 120.0, 5.0, 1.0, 80.0, 300.0, 60.0, 30.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 60.0,
         foods: &[eats("base:beef", 14), favorite("base:chicken", 12), eats("base:porkchop", 12)],
-        feedings: 0.0,
         shy: 8.0,
         fights: true,
         attacks: &["bite"],
         reach: 1.0,
         signature: "ambush",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.8,
         // Males the longer by about a fifth.
         dimorphism: 1.2,
@@ -2455,6 +2244,7 @@ pub static SPECIES: [Species; 41] = [
             ..Tune::NONE
         },
         birth_size: 0.15,
+        ..BASE
     },
     Species {
         model: "caiman",
@@ -2462,29 +2252,21 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Caiman crocodilus",
         family: &ALLIGATORIDAE,
         subfamily: "Caimaninae",
-        breed: None,
         size: Size::Large,
         // Fish first, snails and crabs, water birds, rodents and the young of capybaras; it eats
         // little, being cold-blooded.
         eats: &[(Fish, 0.6), (Meat, 0.3), (Insects, 0.1)],
         // A snail or a minnow to a capybara near its own mass.
         prey: (0.005, 1.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [26.0, 150.0, 100.0, 4.5, 1.0, 60.0, 300.0, 50.0, 26.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 60.0,
         foods: &[eats("base:beef", 14), favorite("base:chicken", 12), eats("base:porkchop", 12)],
-        feedings: 0.0,
         shy: 8.0,
         fights: true,
         attacks: &["bite"],
         reach: 1.0,
         signature: "ambush",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.8,
         // Males the longer by about a fifth.
         dimorphism: 1.2,
@@ -2529,6 +2311,7 @@ pub static SPECIES: [Species; 41] = [
             ..Tune::NONE
         },
         birth_size: 0.15,
+        ..BASE
     },
     // The grey wolf (`reports/ecology/Overworld food webs.md`: the top hunter of the forests, the
     // taiga, the tundra and the mountains, the deer's, the reindeer's and the boar's): a full creature
@@ -2540,7 +2323,6 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Canis lupus",
         family: &CANIDAE,
         subfamily: "Caninae",
-        breed: None,
         size: Size::Medium,
         // Hoofed animals above all (red and roe deer, moose and reindeer, boar, bison calves), hares
         // and beavers; carrion, its own kills' and others'.
@@ -2551,8 +2333,6 @@ pub static SPECIES: [Species; 41] = [
         taming: Taming::Passive,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [30.0, 220.0, 120.0, 6.0, 1.0, 60.0, 80.0, 90.0, 20.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 40.0,
         foods: &[
             eats("base:beef", 10),
@@ -2570,9 +2350,6 @@ pub static SPECIES: [Species; 41] = [
         attacks: &["pounce", "bite"],
         reach: 0.9,
         signature: "pack",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.5,
         // Males a little bigger (about a fifth heavier).
         dimorphism: 1.07,
@@ -2613,6 +2390,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { crowd: Some(16), ..Tune::NONE },
         birth_size: 0.2,
+        ..BASE
     },
     // The jaguar (`reports/ecology/Overworld food webs.md`: the top hunter of the swamp and the savanna,
     // which in the Pantanal eats mostly caiman, capybara and fish): a full creature on its own model
@@ -2624,7 +2402,6 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Panthera onca",
         family: &FELIDAE,
         subfamily: "Pantherinae",
-        breed: None,
         size: Size::Large,
         // Capybaras, caimans and peccaries first, deer, giant anteaters, fish, turtles; cattle calves.
         eats: &[(Meat, 0.85), (Fish, 0.15)],
@@ -2634,8 +2411,6 @@ pub static SPECIES: [Species; 41] = [
         taming: Taming::Knockout,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [45.0, 260.0, 200.0, 9.0, 1.0, 120.0, 160.0, 300.0, 25.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 20.0,
         foods: &[eats("base:chicken", 8), eats("base:porkchop", 14), favorite("base:beef", 18), eats("base:mutton", 14), KIBBLE],
         feedings: 14.0,
@@ -2644,9 +2419,6 @@ pub static SPECIES: [Species; 41] = [
         attacks: &["swipe", "bite"],
         reach: 1.0,
         signature: "skull_bite",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.8,
         // Females 10-20% smaller.
         dimorphism: 1.1,
@@ -2686,6 +2458,7 @@ pub static SPECIES: [Species; 41] = [
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
         tune: Tune { recovery: Some(150_000), crowd: Some(12), ..Tune::NONE },
         birth_size: 0.12,
+        ..BASE
     },
     // The Cretaceous's fish (`reports/ecology/Cretaceous food webs.md`, tier 3: fish as a catch in its
     // waters), two wild species on the fish model, spawned into water as the overworld's are
@@ -2697,27 +2470,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Ceratodus kempae",
         family: &CERATODONTIDAE,
         subfamily: "",
-        breed: None,
         size: Size::Small,
         // Snails, insect larvae and crayfish, water plants, small fish.
         eats: &[(Insects, 0.5), (WaterPlants, 0.2), (Fish, 0.3)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [8.0, 90.0, 40.0, 0.6, 1.0, 12.0, 600.0, 20.0, 6.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[],
-        feedings: 0.0,
         shy: 6.0,
-        fights: false,
-        attacks: &[],
         reach: 0.5,
         signature: "dart",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.0,
         size_spread: 0.6,
@@ -2746,6 +2508,7 @@ pub static SPECIES: [Species; 41] = [
         // little sooner, or a cell fills with lungfish (the balance checks' generation and young).
         tune: Tune { growth: Some(240_000), litter: Some((1, 4)), ..Tune::NONE },
         birth_size: 0.1,
+        ..BASE
     },
     Species {
         model: "fish",
@@ -2753,27 +2516,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Lycoptera davidi",
         family: &LYCOPTERIDAE,
         subfamily: "",
-        breed: None,
         size: Size::Small,
         // Insect larvae and plankton.
         eats: &[(Insects, 1.0)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [1.0, 40.0, 8.0, 0.1, 1.0, 1.0, 300.0, 4.0, 1.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 30.0,
         foods: &[],
-        feedings: 0.0,
         shy: 6.0,
-        fights: false,
-        attacks: &[],
         reach: 0.5,
         signature: "dart",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 1.0,
         dimorphism: 1.0,
         size_spread: 0.5,
@@ -2802,6 +2554,7 @@ pub static SPECIES: [Species; 41] = [
         // room a pond holds (the balance checks' growth and room).
         tune: Tune { growth: Some(70_000), crowd: Some(30), ..Tune::NONE },
         birth_size: 0.1,
+        ..BASE
     },
     // Psittacosaurus (`reports/ecology/Cretaceous food webs.md`: the Jehol's "dominant" plant eater,
     // the commonest dinosaur of the Yixian, and the Utahraptor's prey where it is rare): wild, the
@@ -2812,28 +2565,17 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Psittacosaurus lujiatunensis",
         family: &PSITTACOSAURIDAE,
         subfamily: "",
-        breed: None,
         size: Size::Medium,
         // Tough plants ground with stomach stones, even as hatchlings (Wang et al. 2025): leaves and
         // fronds first, seeds and nuts, some fruit.
         eats: &[(Leaves, 0.6), (Seeds, 0.3), (Fruit, 0.1)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [22.0, 160.0, 80.0, 1.5, 1.1, 45.0, 70.0, 45.0, 14.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 15.0,
         foods: &[eats("animals:fern", 8), eats("animals:ginkgo_seed", 8), favorite("base:berries", 10)],
-        feedings: 0.0,
         shy: 12.0,
-        fights: false,
-        attacks: &[],
         reach: 1.0,
         signature: "herd",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.9,
         dimorphism: 1.05,
         size_spread: 0.1,
@@ -2866,6 +2608,7 @@ pub static SPECIES: [Species; 41] = [
         // (`web/test.mjs`).
         tune: Tune { growth: Some(144_000), litter: Some((3, 8)), crowd: Some(20), ..Tune::NONE },
         birth_size: 0.15,
+        ..BASE
     },
     // Gastonia (`reports/ecology/Cretaceous food webs.md`: "among the most common dinosaur fossils
     // in the Cedar Mountain Formation", found with the Utahraptor): a polacanthid ankylosaur,
@@ -2876,27 +2619,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Gastonia burgei",
         family: &POLACANTHIDAE,
         subfamily: "",
-        breed: None,
         size: Size::Large,
         // Low plants: ferns, horsetails, cycads' fronds, a little fruit and seed.
         eats: &[(Leaves, 0.9), (Fruit, 0.05), (Seeds, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [120.0, 300.0, 400.0, 6.0, 0.8, 600.0, 200.0, 400.0, 60.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 12.0,
         foods: &[eats("animals:fern", 10), favorite("animals:cycad_seed", 12)],
-        feedings: 0.0,
         shy: 8.0,
-        fights: false,
-        attacks: &[],
         reach: 1.5,
         signature: "herd",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.9,
         dimorphism: 1.03,
         size_spread: 0.1,
@@ -2929,6 +2661,7 @@ pub static SPECIES: [Species; 41] = [
         // (`web/test.mjs`).
         tune: Tune { growth: Some(144_000), litter: Some((1, 4)), crowd: Some(12), ..Tune::NONE },
         birth_size: 0.1,
+        ..BASE
     },
     // Pinacosaurus (`reports/ecology/Cretaceous food webs.md`: the scrubland's big plant eater,
     // "dominant" at Bayan Mandahu, mostly juveniles in groups killed together by sandstorms:
@@ -2939,27 +2672,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Pinacosaurus grangeri",
         family: &ANKYLOSAURIDAE,
         subfamily: "",
-        breed: None,
         size: Size::Large,
         // Low plants, perhaps pulpy fruit, roots and a few insects (speculative).
         eats: &[(Leaves, 0.8), (Fruit, 0.1), (Roots, 0.05), (Insects, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [120.0, 300.0, 400.0, 6.0, 0.8, 600.0, 200.0, 400.0, 60.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 12.0,
         foods: &[eats("animals:fern", 10), favorite("base:berries", 12)],
-        feedings: 0.0,
         shy: 8.0,
-        fights: false,
-        attacks: &[],
         reach: 1.5,
         signature: "herd",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.9,
         dimorphism: 1.03,
         size_spread: 0.1,
@@ -2992,6 +2714,7 @@ pub static SPECIES: [Species; 41] = [
         // (`web/test.mjs`).
         tune: Tune { growth: Some(144_000), litter: Some((1, 4)), crowd: Some(12), ..Tune::NONE },
         birth_size: 0.1,
+        ..BASE
     },
     // The iguanodont (`reports/ecology/Cretaceous food webs.md`: the floodplain's and the forest's big
     // plant eater, what the Utahraptor was caught hunting in the Stikes Quarry block): Iguanacolossus
@@ -3003,27 +2726,16 @@ pub static SPECIES: [Species; 41] = [
         binomial: "Iguanacolossus fortis",
         family: &STYRACOSTERNA,
         subfamily: "",
-        breed: None,
         size: Size::Large,
         // Browse up to about 4 m: ferns, horsetails, conifers and cycads; a few seeds and fruit.
         eats: &[(Leaves, 0.85), (Seeds, 0.1), (Fruit, 0.05)],
-        prey: (0.0, 0.0),
-        taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [150.0, 400.0, 600.0, 8.0, 1.0, 800.0, 250.0, 500.0, 50.0],
-        wild_step: WILD_STEP,
-        tamed_step: TAMED_STEP,
         hunger: 12.0,
         foods: &[eats("animals:fern", 10), favorite("animals:cycad_seed", 14)],
-        feedings: 0.0,
         shy: 10.0,
-        fights: false,
-        attacks: &[],
         reach: 2.0,
         signature: "herd",
-        seat: 0.0,
-        seat_forward: 0.0,
-        flight: 0.0,
         camouflage: 0.9,
         dimorphism: 1.03,
         size_spread: 0.1,
@@ -3055,6 +2767,7 @@ pub static SPECIES: [Species; 41] = [
         // (`web/test.mjs`).
         tune: Tune { growth: Some(144_000), litter: Some((1, 3)), crowd: Some(12), ..Tune::NONE },
         birth_size: 0.1,
+        ..BASE
     },
 ];
 
