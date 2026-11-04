@@ -669,11 +669,12 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.glow = 0xffffffffu;
     out.slot = 0u;
     out.overlay = 0u;
+    // A little of the near blocks' corner shading: their slopes' sides darker than their tops.
     out.light = vec4(1.0, 0.0, 0.0, 0.0);
     let o = origins[ii] + g.cam_cube;
     out.pos = vec3<f32>(o.xyz * 16) + local;
     out.normal = corner.normal;
-    out.ao = 1.0;
+    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0));
     // Not traced: it is past the blocks the client keeps. Its tint kind, so far water is drawn as
     // water (and far leaves as leaves).
     let kind = lod_tint(w0);
