@@ -1193,6 +1193,9 @@ impl WorldRenderer {
         let mut cube_pick: FxHashMap<MeshKey, i32> = FxHashMap::default();
         for (&key, &light) in lights {
             if let Some(k) = frames.iter().position(|f| f.0 == key.0) {
+                // A leaning one's cubes are elsewhere than where the world's light on them was
+                // sampled (a falling trunk's lowest cube is centred in the ground): its own light.
+                let light = if lean_of(k).is_some() { crate::world::light::SKY_FULL as u32 } else { light };
                 picks.push((frame_offsets[k], light, lean_of(k)));
                 cube_pick.insert(key, picks.len() as i32);
             }

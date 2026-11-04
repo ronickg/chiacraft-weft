@@ -259,8 +259,9 @@ pub fn loose(w: &World, pos: [i32; 3], state: u32) -> Option<Vec<[i32; 3]>> {
 /// The most leaves a falling tree takes along (a sequoia's crown is a few thousand).
 const MAX_CROWN: usize = 8192;
 
-/// A tree's crown: the tree leaves (none a player placed) joined face to face to its `logs`
-/// within `base_api::branchy::LEAF_REACH` steps, as leaf decay counts them.
+/// A tree's crown: the tree leaves (none a player placed) joined to its `logs` through leaves
+/// within `base_api::branchy::LEAF_REACH` steps any way (corners too: the box leaf decay looks
+/// in), so none of it is left in the air.
 pub fn crown(w: &World, logs: &[[i32; 3]]) -> Vec<([i32; 3], u32)> {
     let mut seen: HashSet<[i32; 3]> = logs.iter().copied().collect();
     let mut ring: Vec<[i32; 3]> = logs.to_vec();
@@ -268,8 +269,8 @@ pub fn crown(w: &World, logs: &[[i32; 3]]) -> Vec<([i32; 3], u32)> {
     for _ in 0..base_api::branchy::LEAF_REACH {
         let mut next = Vec::new();
         for [x, y, z] in ring {
-            for d in [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] {
-                let p = [x + d[0], y + d[1], z + d[2]];
+            for (dx, dy, dz) in (-1..=1).flat_map(|a| (-1..=1).flat_map(move |b| (-1..=1).map(move |c| (a, b, c)))) {
+                let p = [x + dx, y + dy, z + dz];
                 if seen.insert(p) && crate::leaf_decay::decays(w, p) {
                     out.push((p, w.get(p)));
                     if out.len() >= MAX_CROWN {
