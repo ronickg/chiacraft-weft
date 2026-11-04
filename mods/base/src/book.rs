@@ -166,6 +166,12 @@ fn shown(station: Station) -> Vec<Recipe> {
         .collect()
 }
 
+/// An item's display name for a text (`Arg::Name`): its picture beside it in the book, the name in
+/// words (an item in text is its picture: the book was icons only, Ronald's first-day test).
+fn name_of(item: u32) -> String {
+    format!("item:{}", item_name(item))
+}
+
 /// Made only at a table, seen from `station`.
 fn table_only(station: Station, r: &Recipe) -> bool {
     station == Station::Hands && !fits_hands(r)
@@ -530,7 +536,8 @@ pub fn book(ui: &mut Ui, station: Station) {
         ui.text_styled(S::col().class("title"), "crafting.book.title", &[]);
         // The picked recipe's name, at the top (Ronald's first-day test: the book was icons only).
         if let Some((out, _)) = picked.and_then(recipe_of).and_then(|r| r.outputs().into_iter().next()) {
-            ui.text_args("crafting.book.picked", &[Arg::Item(out.item)]);
+            let name = name_of(out.item);
+            ui.text_args("crafting.book.picked", &[Arg::Name(&name)]);
         }
         ui.row(S::row().gap(1.0), |ui| {
             for (i, t) in TABS.iter().enumerate() {
@@ -576,7 +583,7 @@ pub fn book(ui: &mut Ui, station: Station) {
                                 S::default()
                                     .size(18.0, 18.0)
                                     .class("slot")
-                                    .tooltip_args("crafting.book.near", &[Arg::Int(got as i64), Arg::Int(all as i64), Arg::Item(missing)]),
+                                    .tooltip_args("crafting.book.near", &[Arg::Int(got as i64), Arg::Int(all as i64), Arg::Name(&name_of(missing))]),
                                 |_| {},
                                 |ui| ui.text_styled(S::col().class("dim"), "crafting.book.unknown", &[]),
                             );
@@ -588,14 +595,15 @@ pub fn book(ui: &mut Ui, station: Station) {
                         // What it takes, in plain words: a table, or the first thing still lacking.
                         let lack = first_missing(r, &have);
                         let s = S::default().size(18.0, 18.0).class(class);
+                        let name = name_of(out.item);
                         let s = if *n > 0 {
-                            s.tooltip_args("crafting.book.can", &[Arg::Item(out.item)])
+                            s.tooltip_args("crafting.book.can", &[Arg::Name(&name)])
                         } else if table_only(station, r) {
-                            s.tooltip_args("crafting.book.needs_table_tip", &[Arg::Item(out.item)])
+                            s.tooltip_args("crafting.book.needs_table_tip", &[Arg::Name(&name)])
                         } else if let Some((item, more)) = lack {
-                            s.tooltip_args("crafting.book.lacks", &[Arg::Item(out.item), Arg::Int(more as i64), Arg::Item(item)])
+                            s.tooltip_args("crafting.book.lacks", &[Arg::Name(&name), Arg::Int(more as i64), Arg::Name(&name_of(item))])
                         } else {
-                            s.tooltip_args("crafting.book.missing", &[Arg::Item(out.item)])
+                            s.tooltip_args("crafting.book.missing", &[Arg::Name(&name)])
                         };
                         ui.button_with(
                             s,
@@ -635,7 +643,7 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
     let index = id_of(r);
     ui.row(S::row().gap(3.0), |ui| {
         ui.item(out.item, out.count, S::default().size(16.0, 16.0));
-        ui.text_args("crafting.book.makes", &[Arg::Item(out.item), Arg::Int(out.count as i64)]);
+        ui.text_args("crafting.book.makes", &[Arg::Name(&name_of(out.item)), Arg::Int(out.count as i64)]);
     });
     // A part: of what, and the grade it's likely to come out (`parts.rs`).
     if let Some(key) = crate::parts::material_key(r) {
@@ -665,7 +673,7 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
         let key = if got >= need { "crafting.book.have" } else { "crafting.book.lack" };
         ui.row(S::row().gap(3.0), |ui| {
             ui.item(shown, 1, S::default().size(16.0, 16.0));
-            ui.text_args(key, &[Arg::Item(shown), Arg::Int(got as i64), Arg::Int(need as i64)]);
+            ui.text_args(key, &[Arg::Name(&name_of(shown)), Arg::Int(got as i64), Arg::Int(need as i64)]);
         });
     }
     if station == Station::Hands && !fits_hands(r) {
