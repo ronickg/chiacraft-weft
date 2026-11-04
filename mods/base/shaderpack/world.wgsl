@@ -768,8 +768,7 @@ fn fs_cutout_fade(in: VOut) -> @location(0) vec4<f32> {
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
 
-@fragment
-fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
+fn translucent(in: VOut) -> vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
@@ -779,6 +778,24 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     }
     return shade(in, albedo);
 }
+
+@fragment
+fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
+    return translucent(in);
+}
+
+// Near water (and glass) where the cubes end fades with them, distant terrain's water taking the
+// pixels it leaves: otherwise the near water ran on over the band and stopped in the meshes' steps.
+@fragment
+fn fs_translucent_fade(in: VOut) -> @location(0) vec4<f32> {
+    if faded(in) {
+        discard;
+    }
+    return translucent(in);
+}
+
+// Distances (blocks) over which distant terrain's textures give way to their average color.
+const LOD_DETAIL: vec2<f32> = vec2(220.0, 520.0);
 
 // Distant terrain (`client::lod`): faces of boxes with their blocks' textures, laid over the
 // world block by block (`lod_albedo`), under open sky.
@@ -882,9 +899,13 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     if in.blend > 0.0 {
         avg = mix(avg, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
     }
-    let t = sample(in, fract(at), d.xy, d.zw);
+    // A mip and a half coarser than the pixels ask, and only the nearer tiles' texture: farther
+    // out the terraces' rows of top and wall texels beat into dashes, so it gives way to the
+    // average between `LOD_DETAIL` blocks.
+    let t = sample(in, fract(at), d.xy * 2.8, d.zw * 2.8);
+    let detail = 1.0 - smoothstep(LOD_DETAIL.x, LOD_DETAIL.y, in.dist);
     // A cutout's clear texels (leaves' gaps) show the average, not their unset color.
-    var albedo = vec4(mix(avg.rgb, t.rgb, t.a), avg.a);
+    var albedo = vec4(mix(avg.rgb, t.rgb, t.a * detail), avg.a);
     // Far water is the same water as near: deep there (no blocks are kept that far), with its
     // Fresnel, the sky and the sun's path. Otherwise it would be a flat grey-blue lit like land, a
     // seam at the edge of the render distance. It is left out of the screen's reflections (solid in

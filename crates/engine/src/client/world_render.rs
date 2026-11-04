@@ -326,11 +326,11 @@ pub struct WorldRenderer {
     face_pipes: [PipelineId; 3],
     quad_pipes: [PipelineId; 3],
     lod_pipe: PipelineId,
-    /// Faces opaque, faces cutout, quads opaque, quads cutout for the cubes near where they end,
+    /// Faces opaque, cutout, translucent, then quads the same, for the cubes near where they end,
     /// when the pack's `world.wgsl` has `fs_opaque_fade`: dithered away toward `lod_fade`, distant
     /// terrain taking the pixels they leave (Distant Horizons' fade), so the edge isn't a line.
     /// Only those meshes, so the rest keep early depth (no `discard`).
-    fade_pipes: Option<[PipelineId; 4]>,
+    fade_pipes: Option<[PipelineId; 6]>,
     /// How far from the camera (blocks, across) the cubes end while distant terrain is shown; 0:
     /// no fade. Cubes past it aren't drawn.
     pub lod_fade: u32,
@@ -574,19 +574,25 @@ impl WorldRenderer {
         Ok((faces, quads, lod))
     }
 
-    /// `fade_pipes`: None when the pack has no `fs_opaque_fade` (and `fs_cutout_fade`) or one
-    /// fails.
-    fn fade_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 4]> {
-        if !crate::packs::pack_uses("world.wgsl", "fs_opaque_fade") {
+    /// `fade_pipes`: None when the pack lacks `fs_opaque_fade`, `fs_cutout_fade` or
+    /// `fs_translucent_fade`, or one fails.
+    fn fade_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 6]> {
+        if !["fs_opaque_fade", "fs_cutout_fade", "fs_translucent_fade"]
+            .iter()
+            .all(|e| crate::packs::pack_uses("world.wgsl", e))
+        {
             return None;
         }
-        let depth = Some(DepthState { write: true, compare: Compare::GreaterEqual });
+        let solid = Some(DepthState { write: true, compare: Compare::GreaterEqual });
+        let see_through = Some(DepthState { write: crate::packs::translucent_depth(), compare: Compare::GreaterEqual });
         let mut made = Vec::new();
-        for (label, vs, fs) in [
-            ("faces opaque fading", "vs_face", "fs_opaque_fade"),
-            ("faces cutout fading", "vs_face", "fs_cutout_fade"),
-            ("quads opaque fading", "vs_quad", "fs_opaque_fade"),
-            ("quads cutout fading", "vs_quad", "fs_cutout_fade"),
+        for (label, vs, fs, depth, blend) in [
+            ("faces opaque fading", "vs_face", "fs_opaque_fade", solid, Blend::None),
+            ("faces cutout fading", "vs_face", "fs_cutout_fade", solid, Blend::None),
+            ("faces translucent fading", "vs_face", "fs_translucent_fade", see_through, Blend::Alpha),
+            ("quads opaque fading", "vs_quad", "fs_opaque_fade", solid, Blend::None),
+            ("quads cutout fading", "vs_quad", "fs_cutout_fade", solid, Blend::None),
+            ("quads translucent fading", "vs_quad", "fs_translucent_fade", see_through, Blend::Alpha),
         ] {
             match gpu.create_pipeline(&PipelineDesc {
                 label,
@@ -595,7 +601,7 @@ impl WorldRenderer {
                 fragment: Some(fs),
                 color: Some(Format::Surface),
                 depth,
-                blend: Blend::None,
+                blend,
                 cull_back: true,
                 topology: Topology::Triangles,
             }) {
@@ -1364,7 +1370,7 @@ impl WorldRenderer {
                         let from = out.len();
                         faces += mesh_draws(&m, key, lo, k, cam_cube, camera_sides(lo), out);
                         if fading {
-                            for d in out[from..].iter_mut().filter(|d| d.1 < 2) {
+                            for d in out[from..].iter_mut() {
                                 d.0 |= 2;
                             }
                         }
@@ -1535,9 +1541,11 @@ impl WorldRenderer {
         }
         self.translucent = runs.len();
         for (j, d) in trans.iter().enumerate() {
+            // Fading ones (kind 2 and 3) run as kinds 4 and 5, like the opaque ones.
+            let kind = if d.0 & 2 != 0 { 4 + (d.0 & 1) } else { d.0 };
             match runs.last_mut() {
-                Some(r) if r.1 == 2 && (r.0, r.1, r.2) == (d.0, d.1, d.2) => r.4 += 1,
-                _ => runs.push((d.0, d.1, d.2, opaque + lods + j as u32, 1)),
+                Some(r) if r.1 == 2 && (r.0, r.1, r.2) == (kind, d.1, d.2) => r.4 += 1,
+                _ => runs.push((kind, d.1, d.2, opaque + lods + j as u32, 1)),
             }
         }
         (self.parts, self.trans, self.runs) = (parts, trans, runs);
@@ -1565,7 +1573,7 @@ impl WorldRenderer {
                 (0, _) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
                 (3, _) => (self.lod_pipe, self.faces.pages[page as usize].0),
                 (4, Some(f)) => (f[layer as usize], self.faces.pages[page as usize].0),
-                (5, Some(f)) => (f[2 + layer as usize], self.quads.pages[page as usize].0),
+                (5, Some(f)) => (f[3 + layer as usize], self.quads.pages[page as usize].0),
                 (4, None) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
                 _ => (self.quad_pipes[layer as usize], self.quads.pages[page as usize].0),
             };
