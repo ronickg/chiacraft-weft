@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "lungwort: a low clump of white-spotted green leaves with small funnel flowers on short stems, some pink and some blue on the same plant, 12-16 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.262,
+   "outline": 0.97,
+   "red_line": 0.0,
+   "fill": 0.18,
+   "passed": false
+  },
+  {
+   "grid": 0.28,
+   "outline": 1.0,
+   "red_line": 0.0,
+   "fill": 0.23,
+   "passed": false
+  },
+  {
+   "grid": 0.477,
+   "outline": 1.07,
+   "red_line": 0.0,
+   "fill": 0.23,
+   "passed": false
+  }
+ ]
+}
