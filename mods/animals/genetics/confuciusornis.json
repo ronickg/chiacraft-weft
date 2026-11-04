@@ -1,0 +1,35 @@
+{
+ "species": "confuciusornis",
+ "about": "Confuciusornis sanctus: mottled grey-black and brown, the wings spotted pale (Li et al. 2018, from its color cells), pale below.",
+ "loci": [
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "greyer to browner"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   90,
+   62,
+   40
+  ],
+  [
+   70,
+   48,
+   32
+  ]
+ ],
+ "build": {}
+}

@@ -650,7 +650,12 @@ pub fn with<R>(c: &'static Content, f: impl FnOnce() -> R) -> R {
 }
 
 pub(crate) fn set(c: &'static Content) {
-    CONTENT.store(c as *const Content as *mut Content, std::sync::atomic::Ordering::Release);
+    let old = CONTENT.swap(c as *const Content as *mut Content, std::sync::atomic::Ordering::AcqRel);
+    // The game's setting values follow their names into the new content's ids (chiacraft).
+    // SAFETY: only `set` stores here, a `&'static Content`.
+    if !old.is_null() && !std::ptr::eq(old, c) {
+        crate::config::content_switched(unsafe { &*old }, c);
+    }
 }
 
 /// Color (0xRRGGBB) of a tint kind on items, which have no biome: the kind's default.
@@ -1610,7 +1615,11 @@ fn merge_registrars(mods: &[ModMeta], regs: Vec<RawRegistrar>, errors: &mut Vec<
     let mut biome_tints = Vec::new();
     let mut games = Vec::new();
     for r in regs {
-        games.push(r.game);
+        let mut game = r.game;
+        game.package = mods
+            .get(r.owner.0 as usize)
+            .is_some_and(|m| m.package.is_some());
+        games.push(game);
         tint_kinds.extend(r.tint_kinds);
         biome_tints.extend(
             r.biome_tints

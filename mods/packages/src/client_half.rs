@@ -93,6 +93,8 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
                 }
             }
             ClientHook::Key { name, default } => {
+                // A key's binding is a setting: the engine carries settings over by name when
+                // the content switches (`config::content_switched`), so a package may add one.
                 r.key(Key::generated(name.clone()), default)
                     .on_press(move |c| {
                         let g = game(*c, true, &h);

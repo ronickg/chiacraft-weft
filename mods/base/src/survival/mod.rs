@@ -43,6 +43,19 @@ pub fn register(r: &mut Registry) {
     r.config(&base_api::DIFFICULTY)
         .choice(1, &difficulty::ALL.map(|d| d.name))
         .world();
+    // Gentle's grace: no monsters appear by themselves in a new world's first nights
+    // (`Difficulty::grace_nights`, counted from the world's first day, `calendar::START_DAY`).
+    r.intercept(&question::NATURAL_SPAWN, |q| {
+        static HOSTILE: Tag = Tag::named("hostile");
+        let w = q.world();
+        let nights = base_api::difficulty().grace_nights;
+        let day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
+        if nights > 0 && day < vitals::calendar::START_DAY + nights && HOSTILE.on_entity(q.query().other as u32) {
+            Verdict::Deny
+        } else {
+            Verdict::Abstain
+        }
+    });
     r.entity_component(&VITALS, Vitals::new(MAX_AIR), component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP);
     r.attach(&PLAYER, &VITALS);
     r.world_tick(tick);

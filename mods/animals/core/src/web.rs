@@ -74,11 +74,18 @@ pub fn prey_in(s: &Species, biome: &str) -> Vec<&'static str> {
     out
 }
 
-/// Who takes this species where it lives.
+/// A young one's mass against a grown one's, as hunters meet them: half grown, an eighth of the
+/// mass. Hunters weigh prey by its own mass (`hunt.rs`), so the young of animals too big to take
+/// grown (a sauropod, an iguanodont) are what keeps them in check, as they were in life.
+pub const YOUNG: f32 = 0.125;
+
+/// Who takes this species where it lives, grown or young.
 pub fn predators_of(s: &Species) -> Vec<&'static str> {
     SPECIES
         .iter()
-        .filter(|h| h.family.name != s.family.name && h.takes_at_most(h.bio.mass, s.bio.mass))
+        .filter(|h| {
+            h.family.name != s.family.name && (h.takes_at_most(h.bio.mass, s.bio.mass) || h.takes_at_most(h.bio.mass, s.bio.mass * YOUNG))
+        })
         .filter(|h| s.habitats.iter().any(|&(b, _)| lives(h, b)))
         .map(|h| h.name)
         .collect()

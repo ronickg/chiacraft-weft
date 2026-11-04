@@ -149,7 +149,11 @@ fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
         return vec2(1.0, 0.0);
     }
     let size = i32(scene.shadow.y);
-    let at = vec2<i32>((ndc.xy * 0.5 + 0.5) * f32(size));
+    // Rows run down the map as y runs up the light's view: the engine's shaders draw with y up, the
+    // way the screen effects read the screen (`0.5 - ndc.y * 0.5`). Read the other way up, every
+    // shadow was mirrored across the camera's row of the map, and one side of open ground lay in
+    // the mirror image of the ground itself.
+    let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * f32(size));
     let index = u32(scene.shadow.x);
     // A few hundredths of a block along the light, more on surfaces the light grazes, in the map's
     // depth (it spans 400 blocks): no floating shadows at the foot of things.

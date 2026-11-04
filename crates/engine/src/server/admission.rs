@@ -13,15 +13,15 @@ pub(super) fn gate(cfg: &ServerConfig, dir: Option<std::path::PathBuf>) -> Gate 
         && !dir.join(adm::RULES_FILE).exists()
         && let Ok(text) = std::fs::read_to_string(list)
     {
-        let keys: Vec<&str> = text
+        let listed: Vec<&str> = text
             .lines()
             .map(str::trim)
             .filter(|l| !l.is_empty() && !l.starts_with('#'))
             .collect();
-        if !keys.is_empty() {
+        if !listed.is_empty() {
             let rules = adm::Rules {
                 only_listed: true,
-                allow: keys
+                allow: listed
                     .iter()
                     .map(|k| adm::Allowed {
                         kind: adm::kind_of(k),
@@ -33,7 +33,9 @@ pub(super) fn gate(cfg: &ServerConfig, dir: Option<std::path::PathBuf>) -> Gate 
                 ..Default::default()
             };
             match adm::save_rules(dir, &rules) {
-                Ok(()) => log::info!("{} keys of {} are this world's allow list now ({})", keys.len(), list.display(), adm::RULES_FILE),
+                Ok(()) => {
+                    log::info!("{} players of {} are this world's allow list now ({})", listed.len(), list.display(), adm::RULES_FILE)
+                }
                 Err(e) => log::warn!("{e}"),
             }
         }

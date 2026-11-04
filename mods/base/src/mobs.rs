@@ -547,9 +547,10 @@ fn keep_from_fire() -> impl ai::Goal {
             w.navigate(id, [f[0] as f64 + 0.5 + dx / len * out, st.pos[1], f[2] as f64 + 0.5 + dz / len * out], 1.0);
             return true;
         }
-        // The player's own campfire, looked for once a second (players' ids share the map).
+        // The player's own campfire, looked for once a second (players' ids share the map), or a
+        // player back from the dead on their way to their tombstone (`death.rs`).
         match ai::target(w, id, st, 35.0) {
-            Some((p, ps)) if fire_for(w, p, ps.pos).is_some() => {
+            Some((p, ps)) if crate::death::in_grace(w, p) || fire_for(w, p, ps.pos).is_some() => {
                 if w.navigating(id) {
                     w.navigate(id, st.pos, 1.0);
                 }
