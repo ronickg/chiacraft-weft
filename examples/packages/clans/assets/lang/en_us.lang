@@ -1,0 +1,11 @@
+command.clans.none = You are in no clan.
+command.clans.name = Give the clan a name.
+command.clans.created = Clan {0} founded.
+command.clans.invited = Invited to {0}.
+command.clans.no_invite = Nobody invited you to a clan.
+command.clans.joined = You joined {0}.
+command.clans.left = You left {0}.
+command.clans.info = Your clan: {0}, {1} members.
+clans.invite = You are invited to the clan {0}: /clan join
+clans.member_joined = A new member joined {0}.
+clans.welcome = Welcome back to {0}.

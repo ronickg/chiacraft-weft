@@ -14,6 +14,8 @@
 //! - `spot <link id> <x> <y> <z>`: arrivals through the link stand here; `unspot <link id>` forgets it;
 //! - `data_dir <mod>`: a folder in the world's save for that mod's own files (made if missing),
 //!   or empty (no world open, or a name that isn't lowercase letters, digits and `_`).
+//! - `world`: `<run>\t<folder>`: which run of a server this is (a world opened again is a new one)
+//!   and the world's folder (empty for a world that isn't saved). Sandboxed mods run anew in each.
 //!
 //! Asked anywhere (from a mod's client hooks too):
 //! - `warm <world key>`: asks that world for its status through the player's own endpoint, in the
@@ -61,6 +63,14 @@ fn answer(q: &str, arg: &str) -> String {
     }
     let Some(info) = crate::server::current_info() else { return String::new() };
     match q {
+        "world" => format!(
+            "{}\t{}",
+            info.run,
+            info.dir
+                .as_ref()
+                .map(|d| d.to_string_lossy().into_owned())
+                .unwrap_or_default()
+        ),
         "player_key" => {
             let Ok(entity) = arg.parse::<u64>() else { return String::new() };
             info.shared

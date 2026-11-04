@@ -1,0 +1,337 @@
+// chiacraft's sandboxed mod API, version 1.0 (chiacraft plan, phase 6; `docs/sandboxed-mods.md`).
+//
+// Frozen once released: a component built against 1.0 keeps loading in every later game. A
+// change is a new version beside this one (`../v1.1/`), never an edit here.
+//
+// The shape follows Weft's mod SDK (`crates/sdk`, `docs/modding.md`) on purpose: a mod registers
+// commands, event handlers, question interceptors, value-chain steps and world ticks during
+// `init`, and the game calls them back with the world they run in. The guest SDK
+// (`crates/mod-sdk`) gives these the SDK's own names (`r.command`, `r.on(&BLOCK_BROKEN, ..)`,
+// `r.intercept(&question::BREAK_BLOCK, ..)`, `w.get(pos)`, `cmd.reply(key, args)`), so a Weft
+// mod's server code recompiles to WebAssembly with few changes.
+//
+// What a mod never sees: the player's account, words or keys; files, the network, the clock of
+// the computer, other packages' storage, the engine's memory. Every call has a fuel budget, the
+// mod's memory is capped, and a call that runs away is stopped (`docs/sandboxed-mods.md`, "Limits").
+package chiacraft:mods@1.0.0;
+
+/// Types the other interfaces share.
+interface types {
+    /// An entity in the world the call runs in. Players are entities. 0 is nothing.
+    type entity = u64;
+    /// A block state: what `world.get-block` gives. Its name with `names.block`.
+    type state = u32;
+    /// A block's position.
+    type block-pos = tuple<s32, s32, s32>;
+    /// A point, in blocks.
+    type vec3 = tuple<f64, f64, f64>;
+
+    /// One argument of a line players read. Lines travel as a translation key and its arguments,
+    /// and each player's game words them in its own language (the package's `assets/lang`).
+    variant arg {
+        /// Shown as it is.
+        text(string),
+        /// Another translation key, worded too.
+        key(string),
+        int(s64),
+        /// A number with this many decimals.
+        float(tuple<f64, u32>),
+        /// An item, by id.
+        item(u32),
+        /// A display name, as `{name:..}` writes it: `item:base:coal`, `block:base:furnace`.
+        name(string),
+    }
+
+    record item-stack {
+        item: u32,
+        count: u32,
+        data: u32,
+    }
+
+    /// An entity as the world has it now.
+    record entity-state {
+        /// Its kind's id (`names.entity-kind`).
+        kind: u32,
+        /// Feet.
+        pos: vec3,
+        vel: vec3,
+        yaw: f32,
+        pitch: f32,
+        on-ground: bool,
+        in-liquid: bool,
+        health: f32,
+        max-health: f32,
+        /// Ticks it has lived.
+        age: u64,
+    }
+
+    /// What a question or a value chain is about. Which fields mean something depends on the
+    /// question (Weft's `abi::Query`).
+    record query {
+        entity: entity,
+        other: entity,
+        pos: block-pos,
+        state: state,
+        item: u32,
+        dim: u32,
+        cause: u32,
+        amount: f64,
+    }
+}
+
+/// The mod's log: lines in the game's log as `mod:<package>`. At most 64 lines a call, each
+/// clipped to 512 characters.
+interface log {
+    enum level {
+        error,
+        warn,
+        info,
+        debug,
+    }
+    write: func(level: level, message: string);
+}
+
+/// What the mod adds to the game. Only while `init` runs: a call at any other time is refused.
+/// Each call returns the callback's number, counted from 0 in the order of registration; the
+/// game calls the mod's `hooks` with it.
+interface registry {
+    /// Events the engine sends, batched once per tick (Weft's `BLOCK_BROKEN`, ...).
+    enum event {
+        block-broken,
+        block-placed,
+        entity-died,
+        entity-hurt,
+        player-joined,
+        player-respawned,
+        item-used,
+        item-picked-up,
+    }
+
+    /// Questions anyone may answer no to (Weft's `question::*`).
+    enum question {
+        break-block,
+        place-block,
+        use-block,
+        use-item,
+        interact-entity,
+        attack,
+        hurt,
+        pickup-item,
+        enter-dimension,
+        natural-spawn,
+    }
+
+    /// Value chains (Weft's `chain::*`).
+    enum chain {
+        damage,
+        attack-damage,
+    }
+
+    /// A server command, `/name`. `usage` is Weft's: `[action:word(create,join)] <who:targets>`
+    /// (kinds `int`, `float`, `word`, `word(..)`, `text`, `item`, `block`, `entity`, `dim`,
+    /// `player`, `pos`, `targets`, `time`). `permission`: 0 every player, 1 moderators, 2 game
+    /// masters, 3 admins, 4 the host. A name the game or another mod already has is refused.
+    command: func(name: string, usage: string, permission: u32) -> result<u32, string>;
+    /// Called with every batch of `event`.
+    on: func(event: event) -> u32;
+    /// Asked `question`; any deny wins.
+    intercept: func(question: question) -> u32;
+    /// A step of `chain` at `stage` (100 add, 200 multiply, 300 final; between them is fine).
+    modify: func(chain: chain, stage: u32) -> u32;
+    /// Once per tick in every region of the world, for logic that is nobody's own.
+    world-tick: func() -> u32;
+}
+
+/// The world a callback runs in. Only during a callback; outside one each call does nothing and
+/// gives nothing (0, empty, none, false).
+interface %world {
+    use types.{entity, state, block-pos, vec3, arg, item-stack, entity-state};
+
+    /// Ticks since the world began.
+    time: func() -> u64;
+    /// The world's seed.
+    seed: func() -> u64;
+    /// 64 random bits from the world's own random source.
+    random: func() -> u64;
+    /// The id of the dimension the call runs in.
+    dimension: func() -> u32;
+
+    /// The block at `pos`: 0 (air) where nothing is loaded.
+    get-block: func(pos: block-pos) -> state;
+    /// False if `pos` is not loaded. At most 4096 changes a call.
+    set-block: func(pos: block-pos, state: state) -> bool;
+    /// Light at `pos`, 0 to 15.
+    light: func(pos: block-pos) -> u32;
+    /// The biome's id at `pos`.
+    biome: func(pos: block-pos) -> u32;
+
+    /// The players in this region.
+    players: func() -> list<entity>;
+    get-entity: func(id: entity) -> option<entity-state>;
+    /// Entities whose feet are within `radius` (at most 64 blocks) of `pos`, at most 256.
+    near: func(pos: vec3, radius: f64) -> list<entity>;
+    /// Moves an entity, a player too.
+    teleport: func(id: entity, pos: vec3);
+    /// Adds to its velocity.
+    push: func(id: entity, velocity: vec3);
+    /// Hurts it as `source` (0: nothing) with the engine's damage `cause`; false if it took none.
+    damage: func(id: entity, amount: f32, source: entity, cause: u32) -> bool;
+    /// A new entity of kind `kind` (`base:pig`), 0 if there is no such kind. At most 64 a call.
+    spawn: func(kind: string, pos: vec3) -> entity;
+    /// Takes a non-player entity out of the world.
+    remove: func(id: entity);
+    creative: func(player: entity) -> bool;
+
+    /// Puts a stack into a player's (or a block entity's) inventory: what didn't fit comes back.
+    give: func(owner: entity, stack: item-stack) -> item-stack;
+    /// A dropped item at `pos`.
+    spawn-item: func(pos: vec3, stack: item-stack);
+
+    /// A line in a player's chat: the translation `key` with `args`, worded by their own game.
+    /// At most 32 lines a call.
+    tell: func(player: entity, key: string, args: list<arg>);
+    /// The player's key: who they are, the same in every world and every visit (what saves are
+    /// kept by). Empty for an entity that isn't a player.
+    player-key: func(player: entity) -> string;
+}
+
+/// Names and ids of the game's content, which differ from world to world: look them up by name.
+interface names {
+    use types.{state};
+
+    /// A block state's full name: `base:furnace[facing=north,lit=false]`. Empty if unknown.
+    block: func(state: state) -> string;
+    /// The first state of the block named `name` (`base:stone`), or a state written with its
+    /// properties (`base:furnace[lit=true]`).
+    block-state: func(name: string) -> option<state>;
+    /// The value of property `prop` in `state`, if its block has that property.
+    prop: func(state: state, prop: string) -> option<string>;
+    /// `state` with property `prop` set to `value`, its others kept.
+    with-prop: func(state: state, prop: string, value: string) -> option<state>;
+    item: func(id: u32) -> string;
+    item-id: func(name: string) -> option<u32>;
+    entity-kind: func(id: u32) -> string;
+    entity-kind-id: func(name: string) -> option<u32>;
+}
+
+/// The mod's own data in this world, kept in the world's save. A key is 1 to 64 lowercase
+/// letters, digits, `_`, `-` and `.`; values are bytes. At most 1024 keys and 4 MiB in all, and
+/// 1 MiB written per call. Other packages' data and other worlds' are out of reach.
+interface storage {
+    get: func(key: string) -> option<list<u8>>;
+    set: func(key: string, value: list<u8>) -> result<_, string>;
+    remove: func(key: string);
+    /// Every key, sorted.
+    keys: func() -> list<string>;
+}
+
+/// While a command runs: answers to whoever ran it.
+interface command {
+    use types.{arg};
+
+    /// A line for whoever ran the command: the translation `key` with `args`. At most 32 a call.
+    reply: func(key: string, args: list<arg>);
+}
+
+/// What the game calls. Each call has a fuel budget; one that runs out, traps or grows memory
+/// past the cap is a strike: the mod's memory is dropped and it starts over (`init` again, its
+/// storage kept). Three strikes within ten minutes stop it in this world until the world is
+/// opened again.
+interface hooks {
+    use types.{entity, state, block-pos, vec3, item-stack, query};
+
+    /// A command argument's value, parsed and checked by the game.
+    variant value {
+        int(s64),
+        float(f64),
+        /// Words, text, player names; item, block, entity and dimension names.
+        text(string),
+        /// Items, blocks, entity kinds, dimensions: the id and the name.
+        id(tuple<u32, string>),
+        /// What a `targets` argument picked.
+        targets(list<entity>),
+        pos(vec3),
+    }
+
+    record invocation {
+        /// Who ran it.
+        player: entity,
+        /// The arguments given, by name; ones left out are absent.
+        args: list<tuple<string, value>>,
+    }
+
+    record block-change {
+        player: entity,
+        pos: block-pos,
+        state: state,
+        item: u32,
+    }
+
+    record death {
+        entity: entity,
+        killer: entity,
+        kind: u32,
+        cause: u32,
+        pos: vec3,
+    }
+
+    record hurt {
+        entity: entity,
+        source: entity,
+        amount: f32,
+        cause: u32,
+    }
+
+    record item-used {
+        player: entity,
+        stack: item-stack,
+        pos: block-pos,
+        on-block: bool,
+    }
+
+    record pickup {
+        player: entity,
+        stack: item-stack,
+    }
+
+    variant event-value {
+        block-change(block-change),
+        death(death),
+        hurt(hurt),
+        player(entity),
+        item-used(item-used),
+        pickup(pickup),
+    }
+
+    enum verdict {
+        abstain,
+        allow,
+        deny,
+    }
+
+    /// Once when the mod starts in a world (and again after a strike): register everything here.
+    /// An error keeps the mod off in that world, with the reason in the log.
+    init: func() -> result<_, string>;
+    /// One of the mod's commands (`registry.command`).
+    command: func(callback: u32, call: invocation);
+    /// A batch of an event the mod listens to (`registry.on`).
+    event: func(callback: u32, batch: list<event-value>);
+    /// A question the mod intercepts (`registry.intercept`).
+    question: func(callback: u32, question: query) -> verdict;
+    /// A step of a value chain (`registry.modify`): the new value from the chain's base and its
+    /// value so far.
+    modify: func(callback: u32, query: query, base: f64, value: f64) -> f64;
+    /// A world tick (`registry.world-tick`).
+    world-tick: func(callback: u32);
+}
+
+/// A package's server half: `code/server.wasm`, run where the world is simulated.
+world server-mod {
+    import log;
+    import registry;
+    import %world;
+    import names;
+    import storage;
+    import command;
+    export hooks;
+}

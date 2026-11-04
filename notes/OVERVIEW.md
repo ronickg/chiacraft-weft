@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 62 · ◧ partly built: 17 · □ not built yet: 18 · ◌ planned for later: 6
+■ built and seen working: 62 · ◧ partly built: 18 · □ not built yet: 17 · ◌ planned for later: 6
 
 ## Core next
 
@@ -13,7 +13,7 @@ What's missing that the rest leans on (marked `core` in the data).
 - **Account and identity: Player and world DIDs**. Phase 4: through sponsors; world ownership both ways.
 - **Linked worlds: Admission rules and bans**. Phase 4: allow lists, probation, DID age, shared ban lists.
 - **Running worlds safely: Permissions**. Operator levels exist, but any player can still /give.
-- **Running worlds safely: Sandboxed code mods**. Phase 6: wasmtime components, WIT shaped on Weft's SDK.
+- **Running worlds safely: Sandboxed code mods**. Phase 6 slice 1 built: a package's code/server.wasm (a wasmtime component, API chiacraft:mods@1.0.0 shaped on Weft's SDK) downloads with it on join and runs on the world's host under fuel, time and memory limits, per world, with storage in the save; sample clans (the animals mod's tribes). Left: the join sheet marking code, more of the SDK (components, channels), client halves.
 - **Survival: Clothing**. Fur and cloth clothes without armor value (open question).
 - **Survival: Freshness and cooking**. Freshness and hot meals. Not yet: meals from several ingredients, salting and smoking.
 - **Living world: Real places and pacing**. Researched (2026-11-03): a real place and its monthly climate for every biome, 57 plants' agronomy, real diets and food webs, and the pacing (the calendar for weather, the species' growing pace for plants). Decided: the fern forest after the Yixian (cool), the dunes wet in winter and spring, Velociraptors alone, temperatures as the real places have them. The climate table follows it (vitals/tests/places.rs holds it there). Next: the plant table and the species' diets.
@@ -98,7 +98,7 @@ Always-on servers and code mods that can't hurt the player. 0 of 6 parts built.
 | ◧ | Headless server | A dedicated mode exists; no server.toml, console or load tests (phase 7). |
 | ◧ | Permissions (core) | Operator levels exist, but any player can still /give. |
 | □ | Movement checks | Phase 7. |
-| □ | Sandboxed code mods (core) | Phase 6: wasmtime components, WIT shaped on Weft's SDK. |
+| ◧ | Sandboxed code mods (core) | Phase 6 slice 1 built: a package's code/server.wasm (a wasmtime component, API chiacraft:mods@1.0.0 shaped on Weft's SDK) downloads with it on join and runs on the world's host under fuel, time and memory limits, per world, with storage in the save; sample clans (the animals mod's tribes). Left: the join sheet marking code, more of the SDK (components, channels), client halves. Code: `crates/sandbox`, `crates/mod-sdk`, `mods/packages/src/sandboxed.rs`, `examples/wasm/clans`. Docs: `docs/sandboxed-mods.md`, `reports/Sandboxed code mods.md`. |
 | □ | Personal mods per world | Phase 6, owner's choice. |
 | □ | Our own relay | Phase 7. |
 
