@@ -1531,7 +1531,6 @@ fn ground_transform(base: Vec3, age: f32, item: u32) -> Mat4 {
     }
 }
 
-
 /// What a worn layer's pixels are read against: the wearer's layout width, at the layer's own
 /// shape. A layer drawn at a multiple of the layout (a 128 x 64 armour or clothes layer on a
 /// 64 x 32 skin: 32 texels a block on a 16 one) spreads the layout's pixels over all of it, as
