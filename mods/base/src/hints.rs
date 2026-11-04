@@ -194,6 +194,12 @@ fn watch(w: &World) {
 /// Where the hint line sits, a share of the window's height down: over the crosshair's lower
 /// half and clear of the chat in the bottom left (at 0.78 the two overlapped, Tester 2 11-04).
 const HINT_Y: f32 = 0.64;
+/// The widest a hint is (GUI px), and the room kept on each side for the HUD's top-left column
+/// (the shortcuts, about 100 wide): a long hint wraps rather than running over it in a narrow
+/// window (760 x 600, the audit, 11-04). It wraps no narrower than `HINT_MIN_W`.
+const HINT_MAX_W: f32 = 360.0;
+const HINT_SIDES: f32 = 108.0;
+const HINT_MIN_W: f32 = 140.0;
 /// Seconds a hint stays, and fades at the end.
 const SHOW_SECS: f32 = 6.0;
 const FADE_SECS: f32 = 0.6;
@@ -252,6 +258,9 @@ fn client(r: &mut Registry) {
         }
         let alpha = ((SHOW_SECS - since) / FADE_SECS).clamp(0.0, 1.0);
         let args: Vec<Arg> = args.iter().map(|&a| Arg::Int(a)).collect();
-        c.screen_text(0.5, HINT_Y, key, &args, 0xe4dacf00 | (alpha * 255.0) as u32, 1.0);
+        let st = c.state();
+        let gw = st.window[0] as f32 / st.gui_scale.max(1.0);
+        let width = (gw - 2.0 * HINT_SIDES).clamp(HINT_MIN_W, HINT_MAX_W);
+        c.screen_text_wrapped(0.5, HINT_Y, key, &args, 0xe4dacf00 | (alpha * 255.0) as u32, 1.0, width);
     });
 }
