@@ -155,6 +155,26 @@ fn quad(dir: u32, x: i32, y: i32, z: i32, size: (i32, i32, i32), tex: u32, tint:
     crate::gpu_layout::lod_record(dir, [x, y, z], [size.0, size.1, size.2], tex, tint, biome)
 }
 
+/// The texture (its average color) and tint kind a distant face of `state` in direction `dir`
+/// is drawn in. A box model's faces are its boxes' own (its block's textures may be unset, and
+/// came out as the missing texture's magenta): its largest box's. A plant's is its picture.
+fn face_of(c: &Content, looks: &super::looks::Looks, state: u32, dir: usize) -> (u32, u32) {
+    let info = &c.states[state as usize];
+    let tint = if info.tint_faces & (1 << dir) != 0 { info.tint as u32 } else { 0 };
+    let drawn = looks.drawn(state, info);
+    let volume = |b: &crate::content::ModelBox| (0..3).map(|a| (b.max[a] - b.min[a]).abs()).product::<f32>();
+    let tex = match drawn.model {
+        weft_abi::Model::Boxes => drawn
+            .boxes
+            .iter()
+            .max_by(|a, b| volume(a).total_cmp(&volume(b)))
+            .map_or(drawn.textures[dir], |b| b.textures[dir]),
+        weft_abi::Model::Cross | weft_abi::Model::Wire => drawn.textures[0],
+        _ => drawn.textures[dir],
+    };
+    (tex & face::TEX_MASK, tint)
+}
+
 /// How far the ground falls per block to its lowest neighbour, from a `drop` between samples `s`
 /// blocks apart: a little more than the mean, as the fall between blocks gathers in steps (the
 /// same as `terrain.wgsl`'s `lod_fall`).
@@ -180,11 +200,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
         ((a & 0xFFFF) as u16 as i16 as i32, a >> 16, b & 0xFFFF, b >> 16)
     };
     let looks = super::looks::current();
-    let face_of = |state: u32, dir: usize| {
-        let info = &c.states[state as usize];
-        let tint = if info.tint_faces & (1 << dir) != 0 { info.tint as u32 } else { 0 };
-        (looks.drawn(state, info).textures[dir] & face::TEX_MASK, tint)
-    };
+    let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
     let terrain = c.dims.get(dim as usize).and_then(|d| d.terrain.as_ref());
     let faces = terrain.and_then(|t| t.faces);
     let stone = terrain.map_or(0, |t| t.stone);
@@ -310,11 +326,7 @@ pub fn mesh_smooth(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]
         ((a & 0xFFFF) as u16 as i16 as i32, a >> 16, b & 0xFFFF, b >> 16)
     };
     let looks = super::looks::current();
-    let face_of = |state: u32, dir: usize| {
-        let info = &c.states[state as usize];
-        let tint = if info.tint_faces & (1 << dir) != 0 { info.tint as u32 } else { 0 };
-        (looks.drawn(state, info).textures[dir] & face::TEX_MASK, tint)
-    };
+    let face_of = |state: u32, dir: usize| face_of(c, &looks, state, dir);
     let faces = c
         .dims
         .get(dim as usize)
