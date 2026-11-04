@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 68 · ◧ partly built: 18 · □ not built yet: 13 · ◌ planned for later: 6
+■ built and seen working: 68 · ◧ partly built: 19 · □ not built yet: 12 · ◌ planned for later: 6
 
 ## Core next
 
@@ -47,7 +47,7 @@ Who a player is, kept by them: 24 words, keys derived from them, later a DID on 
 | ■ | Login key | Derived from the words; can never spend; the iroh key. Code: `crates/account`. |
 | ■ | Content-signing key |  |
 | ■ | Player and world DIDs | Phase 4 slices 4-7, seen working on testnet11 between two games (2026-11-04, tools/checks/did): the game reads the chain (core:chain, testnet11; mainnet off); the Account screen gets a DID from a sponsor (ours runs on Ronald's Mac from a throwaway testnet wallet, the default core:sponsors) or links one the words hold; the join proves the DID (its owner key names the identity) and the world checks it on chain; owners require a DID or a DID age (/didrule); a world's DID, from the sponsor, names its owner's DID and the world key, and the owner's DID lists it back (one spend); visitors see it confirmed both ways in the saved worlds list. The sponsor (crates/sponsor) speaks iroh, asks a proof of work and opens its budget by the hour. Not yet: a world DID following a new address. Code: `crates/engine/src/chiacraft/chain.rs`, `crates/engine/src/chiacraft/did.rs`, `crates/engine/src/chiacraft/worlds/world_did.rs`, `crates/sponsor`, `crates/wallet/src/chain/world.rs`. Docs: `tools/checks/did/README.md`, `crates/sponsor/README.md`. |
-| □ | Achievements on chain | Phase 4: signed by the world's DID, anchored in batches, opt-in. In-game advancements exist. |
+| ◧ | Achievements on chain | Phase 4 slices 8-10 built 2026-11-04, not yet seen in a game: a world signs a credential for each advancement a player earns there (the wallet's achievement::Credential: issued by the owner's account, named after the world, with the world DID and its owner key's proof and what the DID was launched with); the player's game keeps it in the account home; Profile > Achievements lists them by world, with the world's DID confirmed both ways on chain; the owner can anchor each day's on chain (/rule anchor_achievements 1) and players get the proofs. Later: the admission rule 'has achievement X', revocation lists, achievements sandboxed mods grant. Code: `crates/engine/src/chiacraft/achievements.rs`, `crates/engine/src/server/achievements.rs`, `crates/engine/src/chiacraft/achievements_screen.rs`, `crates/wallet/src/achievement.rs`. Docs: `tools/checks/achievements/README.md`. |
 | □ | Profile view | Phase 4. |
 
 Code: `crates/wallet`, `crates/account`, `crates/engine/src/chiacraft/account_screen.rs`. Docs: `notes/PLAN.md`, `notes/HANDOFF.md`.

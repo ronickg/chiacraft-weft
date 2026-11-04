@@ -450,6 +450,18 @@ Left: the `required` flag (agreed: at the next `package.toml` change), callcost 
 and chain steps, cached compiled components and a per-tick budget across mods, `/mods` for
 client halves, the engine's settings hazard on a content switch (Planner).
 
+## Phase 4: achievements (2026-11-04 overnight, built, not yet seen in a game)
+
+Slices 8-10. `crates/engine/src/chiacraft/achievements.rs` (the player's store, `achievements.json`
+in the account home; `received`, `anchored`; `check_issuer`, the world DID confirmed both ways),
+`server/achievements.rs` (the server signs what mods grant through the bridge's `achievement`
+question, `Shared.grants`, with the owner's account as issuer and the world DID's proof kept in
+`did.json`; `achievements/issued.jsonl`; the daily anchor behind the world rule
+`anchor_achievements`, `achievements/anchors.json`, proofs sent on join), `achievements_screen.rs`
+(Profile > Achievements). The base mod asks the bridge in `advancements.rs` `grant_where`.
+World rules `sign_achievements` (on) and `anchor_achievements` (off). Protocol 9. The check:
+`tools/checks/achievements` (two copies, no chain).
+
 ## Our DID sponsor (testnet11, since 2026-11-04)
 
 Ronald's yes: "testnet only". It runs on Ronald's Mac from the throwaway testnet11 wallet

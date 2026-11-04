@@ -320,7 +320,7 @@ The smallest version that works is phases 1-4.
    the wallet's credential (`achievement.rs`: a record naming player, issuer and achievement,
    signed by the issuer's identity key, an optional issuer DID with its owner key's proof,
    revocation lists, a daily Merkle anchor):
-   8. *Worlds sign achievements*: when a world grants an advancement (the base mod's, or any mod
+   8. *Worlds sign achievements* (built 2026-11-04, not yet seen in a game): when a world grants an advancement (the base mod's, or any mod
       through the bridge's `achievement` question), the world signs a credential for the player:
       the issuer is the owner's identity key (the world runs in the owner's game or a headless
       server with the owner's account), named after the world, with the world's DID and its
@@ -328,10 +328,10 @@ The smallest version that works is phases 1-4.
       Players without an account identity get none. The player's game checks it and keeps it in
       the account home (`achievements.json`), so it follows the words to any computer. Free and
       off chain; on in every world (an owner can turn it off).
-   9. *The profile view*: the Profile screen gains the player's achievements, by world: title,
+   9. *The profile view* (built): the Profile screen gains the player's achievements, by world: title,
       when, and how sure it is (signature; the issuing world's DID confirmed both ways on chain;
       anchored). Self-signed ones (earned in your own world) say so.
-   10. *The daily anchor* (opt-in, the owner's): once a day the owner's game commits one Merkle
+   10. *The daily anchor* (opt-in, the owner's; built, not yet run on chain): once a day the owner's game commits one Merkle
       root of the day's credentials on chain (the wallet's `anchor`, a spend from the owner's
       wallet; testnet11 for now) and gives each player the inclusion proof for theirs when they
       next join.
