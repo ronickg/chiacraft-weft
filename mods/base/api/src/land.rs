@@ -378,9 +378,10 @@ pub const SINK_CLEAR: i32 = 4;
 /// woods' wet, the mountains or the karst) and over the sea: `CRATER_RADIUS` blocks from the
 /// middle to the rim's crest, `CRATER_DEPTH` radii deep, the rim `CRATER_RIM` blocks high and
 /// blending back into the land by `CRATER_RIM_OUT` radii; all measured from the ground at the
-/// middle, and only where the land round it is level. Where the floor dips under the sea's level
+/// middle, and only where the land round it is level and no river or lake reaches; the last of
+/// the features, after the rivers. Where the floor dips under the sea's level
 /// water stands in it.
-pub const CRATER_CELL: i32 = 1280;
+pub const CRATER_CELL: i32 = 640;
 pub const CRATER_CHANCE: f64 = 1.0;
 pub const CRATER_RADIUS: (i32, i32) = (20, 30);
 pub const CRATER_DEPTH: f64 = 0.65;
@@ -575,9 +576,10 @@ pub fn features() -> Vec<Feature> {
         Feature::new(mesa).named("mesas"),
         Feature::new(canyons).named("canyons"),
         Feature::new(karst).named("karst"),
-        Feature::new(craters).named("craters"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
+        // Last: a crater is measured from its ground, the rivers' cut included (none reach one).
+        Feature::new(craters).named("craters"),
         // No height: their masks say where the snow drifts and where the sequoias stand (rules
         // ask for them).
         preset::hills(0.0, 64.0)
@@ -609,7 +611,7 @@ fn land_height_at(h: &Here) -> i32 {
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
     let base = base_ground(h);
-    base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base) + craters::add(h, || base)
+    base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base)
 }
 
 /// The ground before the karst towers (which stand on it, or rise out of the water over it).
@@ -630,7 +632,8 @@ fn base_ground(h: &Here) -> i32 {
 
 /// The ground's height (Q4) with the rivers: what the engine makes of `features`.
 pub fn height(f: &Fields, x: i32, z: i32) -> i32 {
-    land_height(f, x, z) + rivers(f, x, z)
+    let ground = land_height(f, x, z) + rivers(f, x, z);
+    ground + craters::add(&Here::new(f, x, z), || ground)
 }
 
 /// The mesas' height (Q4) at (`x`, `z`).
@@ -923,8 +926,7 @@ pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
 
 /// What the meteor craters add at (`x`, `z`) (Q4), as the engine adds it.
 pub fn craters(f: &Fields, x: i32, z: i32) -> i32 {
-    let h = Here::new(f, x, z);
-    craters::add(&h, || base_ground(&h))
+    craters::add(&Here::new(f, x, z), || land_height(f, x, z) + rivers(f, x, z))
 }
 
 /// The meteor craters (middle x, z and radius, blocks) within `r` blocks of (`x`, `z`) (blocks).
@@ -1614,9 +1616,9 @@ mod tests {
         assert!(sites.len() >= 4, "{} craters in 16 km", sites.len());
         for &(x, z, r) in &sites {
             // A bowl at the middle under its rim's crest, nothing past the rim's foot.
-            let deep = land_height(&f, x * 16, z * 16);
+            let deep = height(&f, x * 16, z * 16);
             for (dx, dz) in [(r, 0), (-r, 0), (0, r), (0, -r)] {
-                let crest = land_height(&f, (x + dx) * 16, (z + dz) * 16);
+                let crest = height(&f, (x + dx) * 16, (z + dz) * 16);
                 assert!(crest - deep >= q4(r as f64 * CRATER_DEPTH * 0.8), "crater at {x} {z}: shallow");
             }
             assert_eq!(craters(&f, (x + r * 2) * 16, z * 16), 0, "crater at {x} {z}: reaches too far");

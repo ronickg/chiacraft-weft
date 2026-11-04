@@ -10,7 +10,7 @@ use weft_sdk::noise::fixed::{self, ONE, div_floor, q4, q12};
 
 use super::{
     CRATER_CELL, CRATER_CHANCE, CRATER_DEPTH, CRATER_RADIUS, CRATER_RIM, CRATER_RIM_OUT, FOREST_HUMIDITY, Here, KARST_AREA, MOUNTAINS_AREA,
-    TAIGA_BELOW, base_ground, salt,
+    TAIGA_BELOW, base_ground, lakes_on, rivers, salt,
 };
 use crate::SEA;
 
@@ -73,7 +73,19 @@ fn crater(h: &Here, cx: i32, cz: i32) -> Option<Crater> {
                     .collect();
                 round.iter().max().unwrap() - round.iter().min().unwrap() <= q4(CRATER_LEVEL as f64)
             };
-            (open && level()).then(|| {
+            // Dry: no river or lake in the bowl (the rivers run before the craters; one passing outside
+            // meets the rim, which the crater's own heights win).
+            let dry = || {
+                let out = CRATER_RADIUS.1 as f64;
+                (0..24).all(|k| {
+                    let a = k as f64 / 24.0 * std::f64::consts::TAU;
+                    [0.0, 0.35, 0.7, 1.0].iter().all(|m| {
+                        let (px, pz) = ((x as f64 + a.cos() * out * m) as i32 * 16, (z as f64 + a.sin() * out * m) as i32 * 16);
+                        rivers(h.f, px, pz) == 0 && lakes_on(&Here::new(h.f, px, pz), i32::MIN) == 0
+                    })
+                })
+            };
+            (open && level() && dry()).then(|| {
                 let h2 = fixed::fmix(hash ^ 0xC4A7);
                 let pick = |v: u32, (lo, hi): (i32, i32)| lo + (v % (hi - lo + 1) as u32) as i32;
                 let radius = pick(h2, CRATER_RADIUS);
@@ -91,7 +103,8 @@ fn crater(h: &Here, cx: i32, cz: i32) -> Option<Crater> {
     site
 }
 
-/// What a crater adds to the ground (`base`, Q4, asked only near one) at a column. Measured
+/// What a crater adds to the ground (`base`, Q4: the land with the rivers' cut; asked only near
+/// one) at a column. Measured
 /// from the ground at its middle, so it stands level on gentle slopes: inside the rim's crest a
 /// bowl `depth` deep at the middle rising to the rim; outside it the rim, blending back into the
 /// land by `CRATER_RIM_OUT` radii.
