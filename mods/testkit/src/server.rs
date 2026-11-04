@@ -153,6 +153,9 @@ pub fn register(r: &mut Registry) {
         }
         driven.retain(|d| d.2 > 0);
     });
+    r.intercept(&actions::BREAK_BLOCK, |q| {
+        if *PROTECTED.lock().unwrap() == Some(q.pos().to_array()) { Verdict::Deny } else { Verdict::Abstain }
+    });
     register_ops(r);
 }
 
@@ -271,7 +274,38 @@ type Run = fn(&World, &Command, u64, [i32; 3]) -> Result<String, String>;
 /// The operations tests run on the server, as one command (`/tk set ~ ~ ~2 stone`): the engine
 /// parses positions (`~dx`), block, item and entity names, and the answer goes back to the test
 /// that ran it (`Client::run_command`), as `ok ..` or `err ..`.
+/// A block `actions::BREAK_BLOCK` says no about (`/tk protect`).
+static PROTECTED: std::sync::Mutex<Option<[i32; 3]>> = std::sync::Mutex::new(None);
+
 const OPS: &[(&str, &str, Run)] = &[
+    // Items into the player's inventory (the crew's scripts set up with it).
+    ("give", "<item:item> [count:int]", |w, cmd, player, _| {
+        let count: u32 = int(cmd, "count").unwrap_or(1);
+        let left = w
+            .inventory(player)
+            .insert(ItemStack::new(id(cmd, "item")?, count));
+        Ok((count - left.count).to_string())
+    }),
+    ("protect", "<pos:pos> | off", |_, cmd, _, _| {
+        *PROTECTED.lock().unwrap() = if cmd.given("off") { None } else { Some(pos(cmd, "pos")?) };
+        Ok(String::new())
+    }),
+    ("setprop", "<pos:pos> <prop:word> <value:word>", |w, cmd, _, _| {
+        Ok((w.prop_set(pos(cmd, "pos")?, word(cmd, "prop")?, word(cmd, "value")?) as u32).to_string())
+    }),
+    // What can be hit near a point (`World::targets_near`), by kind.
+    ("near_bodies", "<pos:pos> <r:float>", |w, cmd, _, _| {
+        let p = pos(cmd, "pos")?;
+        let ids = w.targets_near([p[0] as f64 + 0.5, p[1] as f64, p[2] as f64 + 0.5], cmd.float("r").ok_or("missing r")?, None);
+        Ok(ids
+            .iter()
+            .filter_map(|&id| {
+                w.entity(id)
+                    .map(|e| name_of(ek::ENTITY, e.kind).to_string())
+            })
+            .collect::<Vec<_>>()
+            .join(" "))
+    }),
     ("last_said", "", |_, _, _, _| Ok(LAST_SAID.lock().unwrap().clone())),
     ("show", "<who:word> <place:word> <text:text>", |w, cmd, player, _| {
         let pos = w.entity(player).map_or([0.0; 3], |e| e.pos.to_array());
