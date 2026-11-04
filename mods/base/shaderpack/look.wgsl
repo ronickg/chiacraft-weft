@@ -67,7 +67,8 @@ fn canopy() -> f32 {
 const LEAF_LIGHT: vec3<f32> = vec3(0.6, 1.0, 0.5);
 
 fn under_leaves(sky_light: f32) -> f32 {
-    return min(canopy(), 1.0) * (1.0 - smoothstep(0.8, 1.0, sky_light));
+    // Not in deep cover (a cave in the forest): the leaves' light is from what the sky reaches.
+    return min(canopy(), 1.0) * (1.0 - smoothstep(0.8, 1.0, sky_light)) * smoothstep(0.35, 0.6, sky_light);
 }
 
 // ---- the colors of the day ----
@@ -410,14 +411,19 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // The sky's light falls off steeply under cover (Bliss's lightmap, (L^15 x 2 + L^2.5) / 3: 1 in the
     // open, 0.39 a step under, 0.21 two): a forest floor sits a few times below open shade, the open
     // stays as it was.
-    // Under a closed canopy steeper still: a rainforest floor gets 1-2 % of the sun.
-    let steep = look_opt(OPT_SHADE, 1.0) * (1.0 + 0.4 * canopy());
+    let steep = look_opt(OPT_SHADE, 1.0);
     let sky = (pow(light.x, 15.0 * steep) * 2.0 + pow(light.x, 2.5 * steep)) / 3.0;
-    let leaves = mix(vec3(1.0), LEAF_LIGHT, under_leaves(light.x) * 0.8);
+    let under = under_leaves(light.x);
+    let leaves = mix(vec3(1.0), LEAF_LIGHT, under * 0.5);
     // More of the sky's light comes from above than from the sides, and less from below: tops 1,
     // sides 0.75, bottoms 0.5 (Complementary's), so shade still shows form.
     let hemi = 0.75 + 0.25 * n.y;
     var c = p.ambient * sky * hemi * ao * leaves;
+    // Under a forest's canopy most of the floor's light is the sun's, come down through the leaves:
+    // green and soft (a rainforest's floor gets 1-2 % of the sun, more of it this way than from the
+    // sky). Without it the floor of Plants' rainforest sat at luma 12-17 at noon, under the daytime
+    // targets' 15-60 for deep forest shade (Lighting's canopy check, 11-04).
+    c += p.sun * light_strength() * 0.035 * LEAF_LIGHT * under * hemi * ao;
     // At golden hour the sky round the low sun glows: a warm fill from its side of the sky, on
     // the faces turned that way; those turned away keep the sky's cool light (Valheim's warm light,
     // blue shade).
@@ -531,7 +537,12 @@ fn fog_density(p: vec3<f32>, floor: f32) -> f32 {
 
 // Light the fog sends toward the eye: the sky's from all around, the sun's mostly forward, so it
 // glows white-gold looking toward the sun.
-fn fog_light(dir: vec3<f32>) -> vec3<f32> {
+struct FogLight {
+    sky: vec3<f32>,
+    sun: vec3<f32>,
+}
+
+fn fog_light(dir: vec3<f32>) -> FogLight {
     let p = palette();
     let mu = dot(dir, light_dir());
     let g = 0.6;
@@ -548,15 +559,41 @@ fn fog_light(dir: vec3<f32>) -> vec3<f32> {
     let gold = golden();
     let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.6, gold);
     let sun_part = mix(p.sun, p.sun * 0.6 + p.glow * 0.8, gold) * light_strength() * phase;
-    return (sky_part + sun_part) * 0.75 * tint * look_opt(OPT_FOG, 1.0);
+    let k = 0.75 * tint * look_opt(OPT_FOG, 1.0);
+    return FogLight(sky_part * k, sun_part * k);
+}
+
+// 1 where the sun reaches camera-relative `rel` (one tap of the near shadow map, else the far one;
+// 1 beyond both), for the fog's light: shafts where it comes through, dark mist in the shade.
+fn sun_reaches(rel: vec3<f32>) -> f32 {
+    var lit = 1.0;
+    if scene.shadow.z > 0.5 {
+        let c = scene.shadow_view_proj * vec4(rel, 1.0);
+        let ndc = c.xyz / c.w;
+        if abs(ndc.x) < 0.98 && abs(ndc.y) < 0.98 && ndc.z > 0.0 && ndc.z < 1.0 {
+            let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * scene.shadow.y);
+            lit = select(0.0, 1.0, textureLoad(textures[u32(scene.shadow.x)], at, 0).r <= ndc.z + 0.0005);
+            return mix(1.0, lit, smoothstep(0.02, 0.06, light_dir().y));
+        }
+    }
+    if scene.shadow_far.z > 0.5 {
+        let c = scene.shadow_far_view_proj * vec4(rel, 1.0);
+        let ndc = c.xyz / c.w;
+        if abs(ndc.x) < 0.98 && abs(ndc.y) < 0.98 && ndc.z > 0.0 && ndc.z < 1.0 {
+            let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * scene.shadow_far.y);
+            lit = select(0.0, 1.0, textureLoad(textures[u32(scene.shadow_far.x)], at, 0).r <= ndc.z + 0.0004);
+        }
+    }
+    return mix(1.0, lit, smoothstep(0.02, 0.06, light_dir().y));
 }
 
 // The fog between the eye and a point `rel` away (camera relative), walked in a few steps that are
-// closer together near the eye; `sky` (0..1) the sky light at the point, so caves stay clear;
-// `leaf` how far under a forest's leaves the point is (`under_leaves`): mist there is lit by the dim
-// green light that comes through them, not the open sky's (in a rainforest's morning mist it was a
-// white wall between the trunks, Lighting's canopy check 11-04), so the light shafts stand out in it.
-fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32, leaf: f32) -> vec3<f32> {
+// closer together near the eye; `sky` (0..1) the sky light at the point, so caves stay clear. Each
+// step asks the shadow map whether the sun reaches it: mist in the shade of a hill or a forest's
+// canopy gets only the sky's light (under a canopy dim and green, the leaves cut the sky too), mist
+// the sun reaches its glow, so light shafts show where it comes through. Lit as if all in the open,
+// a rainforest's morning mist was a white wall between the trunks (Lighting's canopy checks, 11-04).
+fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     if scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 {
         return c;
     }
@@ -564,7 +601,11 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32, leaf: f32) -> vec3<f32> {
     let dir = rel / max(length(rel), 1e-4);
     let eye = scene.eye.xyz;
     let floor = fog_floor(rel);
-    let light = fog_light(dir) * mix(vec3(1.0), LEAF_LIGHT * 0.35, leaf * 0.85);
+    let light = fog_light(dir);
+    let leafy = min(canopy(), 1.0);
+    let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.3, leafy * 0.85);
+    // Jittered along the view per pixel, so the shafts' edges don't band.
+    let jitter = fract(sin(dot(rel, vec3(12.9898, 78.233, 37.719))) * 43758.547) - 0.5;
     let steps = 12u;
     var through = 1.0;
     var gained = vec3(0.0);
@@ -573,9 +614,11 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32, leaf: f32) -> vec3<f32> {
         let k = f32(i) / f32(steps);
         let at = dist * (exp(2.2 * k) - 1.0) / (exp(2.2) - 1.0);
         let step = at - last;
-        let d = fog_density(eye + dir * (at - step * 0.5), floor) * sky;
+        let mid = at - step * (0.5 + 0.8 * jitter);
+        let d = fog_density(eye + dir * mid, floor) * sky;
         let kept = exp(-d * step);
-        gained += through * (1.0 - kept) * light;
+        let lit = sun_reaches(dir * mid);
+        gained += through * (1.0 - kept) * (mix(shaded_sky, light.sky, lit) + light.sun * lit);
         through *= kept;
         last = at;
     }
@@ -653,11 +696,7 @@ fn under_water(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
 }
 
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
-    // The mist's light eases in over a wider band of the sky light than the surfaces' green: at
-    // 0.2 and a step at 0.8-1 a trunk's misty half under the leaves came out dark green against
-    // its white half in the open (the canopy check's morning, 11-04).
-    let leaf = min(canopy(), 1.0) * (1.0 - smoothstep(0.55, 1.0, sky));
-    let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky), leaf);
+    let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     let dist = length(rel);
     if in_water() {
         return under_water(c, rel);
