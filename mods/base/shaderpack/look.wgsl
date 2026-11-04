@@ -485,7 +485,8 @@ fn in_water() -> bool {
 fn underwater_color() -> vec3<f32> {
     let p = palette();
     let light = p.ambient * 1.4 + p.sun * light_strength() * 0.5;
-    return vec3(0.06, 0.27, 0.25) * light * 2.2;
+    // A murky green-teal (Bliss's under water), not the bright cyan step 2 showed.
+    return vec3(0.040, 0.19, 0.15) * light * 1.8;
 }
 
 // Where the water's surface is above the eye under water: the sea's, or just over the eye in a
@@ -590,6 +591,10 @@ fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
 // How bright the picture is taken: the filmic curve deepens the mid-tones, so by day it is opened
 // up to keep them where they were, and more as night falls and under water, the eye adjusting.
 fn exposure() -> f32 {
+    // Under water a little less than in lava's glare (3.0 there): it washed the water to cyan.
+    if in_water() {
+        return 2.2;
+    }
     if in_liquid() {
         return 3.0;
     }
