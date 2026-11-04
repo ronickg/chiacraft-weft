@@ -295,8 +295,23 @@ one `set_blocks`, digging logged "has broken 10 blocks" up to 90 and told the pl
 no strikes or load errors. The particles weren't visible in the shots (a dark shaft), the chime
 isn't in the log: neither is confirmed. Script `tally.txt` in the shared notes' `phase6/`
 (testkit: negative pitch looks down, `hold` doesn't wait).
-Left: 1.2 (block and item callbacks, channels), client halves (slice 4), personal mods per world
-(slice 5), `/mods` (slice 6).
+After slice 3, decided by Planner for Ronald: the API version a mod needs is read from its
+imports (`chiacraft_packages::code`, with `wasmparser`; also the one place the game's API, 1.1,
+is written) and travels in the offer (protocol 7: the sixth field is `1.1`, or empty for no
+code), so `check_offers` refuses a too-new mod before downloading and the sheet shows "mod API
+1.1"; the sandbox checks imports with the same rule before compiling. Storage now holds the WIT's
+1 MiB written per call. `callcost` (feature `pack`) times each kind of call against a `NullGame`;
+no numbers yet (it needs a release build, which the Mac doesn't do now). The hostile fuzz target
+(`crates/sandbox/fuzz`, `hostile` with `hostile-guest`, written by a subagent): 4,188 replayed
+inputs broke no promise. Security fix (Research round 4, S8): a mod's `.permission` used to apply
+by name to whatever command had that name, so a package whose clashing command was left out could
+open another mod's (`/tk give` to everyone); a permission now carries its mod and applies to that
+mod's own command only (`content::freeze_commands`, test
+`a_left_out_command_leaves_its_permission_too`).
+Not yet seen in the game: protocol 7 (a pair run is to come).
+Left: the `required` flag (agreed: at the next `package.toml` change), callcost numbers, 1.2
+(block and item callbacks, channels), client halves (slice 4), personal mods per world (slice
+5), `/mods` (slice 6).
 
 ## Side mods
 

@@ -2275,10 +2275,11 @@ unsafe extern "C" fn entity_flash(w: *mut abi::WorldCtx, id: u64) {
 
 unsafe extern "C" fn reg_command_permission(r: *mut abi::Registrar, command: Str, level: u32) {
     unsafe {
-        reg(r)
-            .game
+        let r = reg(r);
+        let owner = r.owner;
+        r.game
             .command_permissions
-            .push((command.as_str().to_string(), level));
+            .push((owner, command.as_str().to_string(), level));
     }
 }
 
