@@ -514,7 +514,8 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // teal, bright straight up where the sky comes through (Snell's window, about 48° about the
     // vertical) and darker toward the sides, where it mirrors the water below. Tester 2's shots
     // had it a flat dark navy looking up while the water around was teal.
-    if top && in_water() {
+    // (Either face: from below it is usually the downward one, its normal pointing at the eye.)
+    if in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
         let window = smoothstep(0.55, 0.85, -v.y);
         let sky = mix(0.6, 2.4, window) * mix(0.15, 1.0, brightness_curve(in.light.x));
         return vec4(display(haze_lit(underwater_color() * sky, in.rel, in.light.x)), 1.0);
