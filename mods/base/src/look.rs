@@ -39,7 +39,8 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_CONTRAST).float(1.0, 0.8, 1.3);
     r.config(&LOOK_SATURATION).float(1.0, 0.7, 1.3);
     r.config(&LOOK_SHADE).float(1.0, 0.5, 2.0);
-    r.config(&LOOK_HAZE).float(1.0, 0.0, 2.0);
+    // 1.6: Ronald's pick, "crisp + more depth" (11-05).
+    r.config(&LOOK_HAZE).float(1.6, 0.0, 3.0);
     r.config(&LOOK_FOG).float(1.0, 0.0, 2.0);
     // By night (dark by design): the night's sky light and the moon's light.
     r.config(&NIGHT_LIGHT).float(1.0, 0.3, 2.0);

@@ -330,7 +330,8 @@ pub(crate) struct Running {
     mod_gizmos: Vec<crate::net::GizmoShape>,
     /// Sounds of the UI and of mods' client code, played after this frame's world sounds.
     ui_sounds: Vec<crate::audio::Play>,
-    mod_screen_text: Vec<(f32, f32, Msg, u32, f32)>,
+    /// Mods' screen text: where (window fractions), what, colour, size, the width it wraps to.
+    mod_screen_text: Vec<(f32, f32, Msg, u32, f32, f32)>,
     frame_no: u64,
     frame_dt: f32,
     /// The top screen as of the last frame (stack depth, name) and frames since it changed.
@@ -2766,7 +2767,7 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
     }
     // Gizmo labels and mods' screen text: text nodes placed at points (GUI pixels), the same
     // text as anywhere else.
-    let mut labels: Vec<(f32, f32, &crate::ui::text::Msg, u32, f32)> = Vec::new();
+    let mut labels: Vec<(f32, f32, &crate::ui::text::Msg, u32, f32, f32)> = Vec::new();
     if let Some(g) = &r.game {
         let cam = g.client.render_camera();
         let view_proj = cam.proj(info.width as f32 / info.height.max(1) as f32) * cam.view();
@@ -2776,7 +2777,7 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
                 continue;
             }
             let (x, y) = ((clip.x / clip.w * 0.5 + 0.5) * info.width as f32, (0.5 - clip.y / clip.w * 0.5) * info.height as f32);
-            labels.push((x / scale, y / scale - 4.0, text, *color, *size));
+            labels.push((x / scale, y / scale - 4.0, text, *color, *size, 0.0));
         }
     }
     let (sw, sh) = r.gpu.surface_size();
@@ -2784,17 +2785,29 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
         labels.extend(
             r.mod_screen_text
                 .iter()
-                .map(|(x, y, text, color, size)| (x * sw as f32 / scale, y * sh as f32 / scale, text, *color, *size)),
+                .map(|(x, y, text, color, size, wrap)| (x * sw as f32 / scale, y * sh as f32 / scale, text, *color, *size, *wrap)),
         );
     }
     if !labels.is_empty() {
         let mut o = crate::ui::Ui::new();
         o.text_unit = text_unit;
-        for (x, y, text, color, size) in labels {
-            let id = o.text(text.spans(&r.lang, Some(&r.input)), "label");
+        for (x, y, text, color, size, wrap) in labels {
+            let mut spans = text.spans(&r.lang, Some(&r.input));
+            if wrap > 0.0 {
+                for s in &mut spans {
+                    s.align = crate::ui::text::align::CENTER;
+                }
+            }
+            let id = o.text(spans, "label");
             o.nodes[id].style = crate::ui::Style::default().at(x, y, [0.5, 0.0]);
+            if wrap > 0.0 {
+                o.nodes[id].style.max_w = wrap;
+            }
             if let crate::ui::Kind::Text(t) = &mut o.nodes[id].kind {
-                t.wrap = false;
+                // A width given: wrapped to it, the lines centered (a mod's long hint in a narrow
+                // window ran over the HUD's top-left column, 11-04).
+                t.wrap = wrap > 0.0;
+                t.center = wrap > 0.0;
                 t.color = Some(color);
                 t.scale = size;
             }

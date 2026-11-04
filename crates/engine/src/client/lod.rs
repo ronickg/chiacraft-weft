@@ -247,8 +247,9 @@ const FILLER: i32 = 3;
 const BANDS: i32 = 8;
 
 /// The tile's top faces (runs along x merged) and the walls down to lower neighbors: the top
-/// block's top color for its own height (a grass side averages to the dirt under its rim, and
-/// every slope came out striped brown), then the block under it for the rest. Where the ground
+/// block's top color down a cell's height (a grass side averages to the dirt under its rim, and
+/// every slope came out striped brown; one block of it still left rows of dirt dashes on far
+/// terraces), then the block under it for the rest. Where the ground
 /// falls steeply the dimension's faces (`Terrain::faces`) say what shows instead (bare rock), in
 /// bands down the wall. Over the ground stand trees' crowns (`crown`): a box per cell from its top
 /// down to its lowest leaves, rounded or tapering over the cells as the trees are, its sides where
@@ -344,10 +345,14 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                 if ny >= y {
                     continue;
                 }
+                // The top block's own color down the step, a cell's height at most: a gentle slope's
+                // steps read as its grass from afar, not as rows of dirt dashes (bare faces keep
+                // their bands under a block of it).
+                let band = if walls[k].is_some() { 1 } else { s.min(y - ny) };
                 let (tex, tint) = face_of(top, 3);
-                out.push(quad(dir as u32, i * s, y, j * s, (s, 1, s), tex, tint, biome));
+                out.push(quad(dir as u32, i * s, y + 1 - band, j * s, (s, band, s), tex, tint, biome));
                 lo = lo.min(ny + 1);
-                if y - 1 <= ny {
+                if y - band <= ny {
                     continue;
                 }
                 match &walls[k] {
@@ -365,7 +370,7 @@ pub fn mesh(c: &Content, dim: u32, seed: u64, key: TileKey, words: &[u32]) -> (V
                     }
                     None => {
                         let (tex, tint) = face_of(under, dir);
-                        out.push(quad(dir as u32, i * s, ny + 1, j * s, (s, y - 1 - ny, s), tex, tint, biome));
+                        out.push(quad(dir as u32, i * s, ny + 1, j * s, (s, y - band - ny, s), tex, tint, biome));
                     }
                 }
             }

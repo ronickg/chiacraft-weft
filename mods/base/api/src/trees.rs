@@ -177,6 +177,24 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     // giant's species stands here as its young one, the world's as a sapling's: the grown giants
     // are the giant scatter's (`giant_tree_blocks`), too tall for a tree's site.
     let name = block_name(log).split('[').next().unwrap_or("");
+    // A broad-crowned species grows by space colonization (`colonize`, Ronald's hybrid, 11-05).
+    // (A giant's species in a tree's site grows its young recipe, below: the grown giant is the
+    // giant scatter's.)
+    let giant_young = crate::tree_recipes::YOUNG.iter().any(|y| y.log == name);
+    if let Some(c) = crate::tree_recipes::colonized(name).filter(|_| !giant_young) {
+        for (dx, dy, dz, part, _) in crate::colonize::blocks(c, t.seed) {
+            let (x, y, z) = (t.x + dx, t.y + dy, t.z + dz);
+            match part {
+                branchy::Part::Log { axis } => {
+                    let along = ["x", "y", "z"][axis as usize];
+                    put(x, y, z, state_with(log, "axis", along).unwrap_or(log), true)
+                }
+                branchy::Part::Leaves => put(x, y, z, t.leaves, false),
+            }
+        }
+        put(t.x, t.y - 1, t.z, DIRT.id(), true);
+        return;
+    }
     let recipe = crate::tree_recipes::sapling_of(name);
     if let Some(recipe) = recipe {
         branchy::grow(recipe, t.x, t.y, t.z, t.seed, |x, y, z, part| match part {
@@ -297,7 +315,25 @@ fn crown(t: &TreeAt, cx: i32, cz: i32, top: i32, put: &mut impl FnMut(i32, i32, 
 /// a scatter of its own: nothing for a log without a recipe. Calls `put(x, y, z, state, force)`.
 pub fn giant_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     let Some(leaves) = TREE_LEAVES.on_block(log).map(|l| l.0) else { return };
-    let Some(recipe) = crate::tree_recipes::of(block_name(log).split('[').next().unwrap_or("")) else { return };
+    let name = block_name(log).split('[').next().unwrap_or("");
+    // A colonized giant (the Brazil nut): its trunk from its recipe, its crown by colonization.
+    if let Some(c) = crate::tree_recipes::colonized(name) {
+        let bark = state_with(log, "axis", "bark");
+        for (dx, dy, dz, part, _) in crate::colonize::blocks(c, h) {
+            let (x, y, z) = (x + dx, y + dy, z + dz);
+            match part {
+                branchy::Part::Log { axis: 1 } => put(x, y, z, bark.unwrap_or(log), true),
+                branchy::Part::Log { axis } => {
+                    let along = ["x", "y", "z"][axis as usize];
+                    put(x, y, z, state_with(log, "axis", along).unwrap_or(log), true)
+                }
+                branchy::Part::Leaves => put(x, y, z, leaves, false),
+            }
+        }
+        put(x, y - 1, z, DIRT.id(), true);
+        return;
+    }
+    let Some(recipe) = crate::tree_recipes::of(name) else { return };
     // The upright trunk in bark all round: its flared foot spreads out at the ground, where an
     // upright log's top would show its rings (the PC look, 11-04).
     let bark = state_with(log, "axis", "bark");
