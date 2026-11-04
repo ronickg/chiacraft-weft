@@ -45,8 +45,9 @@ pub const FEELING_NAMES: [&str; 7] = ["comfortable", "chilly", "cold", "freezing
 /// Strength on an empty stomach, the player's (`vitals::stomach::FLOOR`): the rest comes back as
 /// it is fed, all of it from half full.
 const FLOOR: f32 = vitals::stomach::FLOOR;
-/// Blocks searched for a fire around it, and for a better place.
-const REACH: i32 = 3;
+/// Blocks searched for a fire around it (the animals' reach, `vitals::temperature::FIRE_REACH`),
+/// and for a better place.
+const REACH: i32 = vitals::temperature::FIRE_REACH;
 const LOOK: f64 = 10.0;
 /// Blocks a cold one notices a fire from (its light and smell carry further).
 const FIRE_LOOK: i32 = 16;
