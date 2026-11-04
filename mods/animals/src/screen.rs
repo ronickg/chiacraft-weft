@@ -482,25 +482,25 @@ fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Opt
 }
 
 /// The life bars and stat bars' sizes in GUI pixels (the kit's `life_*` and `stat_q*`), and the
-/// columns beside them: an icon, then the bar, then the value (left column `LEFT_W`: 8 + 3 + 56 + 3 + 34).
-const LIFE_BAR: (f32, f32) = (56.0, 6.0);
+/// columns beside them: an icon, then the bar, then the value (left column `LEFT_W`: 8 + 3 + 52 + 3 + 34).
+const LIFE_BAR: (f32, f32) = (52.0, 6.0);
 const LIFE_VALUE_W: f32 = 34.0;
 /// The Overview's left column (the portrait, name, chips and life), and the window's padding and
-/// the gap between its three columns, GUI px: the whole window is 6 + 104 + 6 + 150 (`STAT_ROW_W`) + 6
-/// + 100 + 6 = 378, inside the 380 a 760 px wide window has at GUI scale 2 (Playtest B9c: at 396 it lost 8 px
+/// the gap between its three columns, GUI px: the whole window is 6 + 100 + 6 + 155 (`STAT_ROW_W`) + 6
+/// + 100 + 6 = 379, inside the 380 a 760 px wide window has at GUI scale 2 (Playtest B9c: at 396 it lost 8 px
 /// each side).
-const LEFT_W: f32 = 104.0;
+const LEFT_W: f32 = 100.0;
 const OVERVIEW_PAD: f32 = 6.0;
 const OVERVIEW_GAP: f32 = 6.0;
 /// The genes list (on the Genes page): how many lines it can hold.
 const GENE_LINES: usize = 40;
 /// The Genes page's list: taller, it has the page to itself.
 const GENES_PAGE_H: f32 = 110.0;
-/// The stat names' column: as wide as the longest name in either language ("Выносливость" 42.5 GUI
-/// px: at 34 it was shrunk to 80%, the Russian pass); the bars 18 to make room (and the wild column
+/// The stat names' column: as wide as the longest name in either language ("Выносливость" 48 GUI px
+/// in the Cyrillic drawn for PixelOperator; at 34 it was shrunk to 80%, the Russian pass); the bars 18 to make room (and the wild column
 /// 16, so "Дикий" and "Ручной" over their columns keep 2 GUI px between them), so the window still
 /// fits 380 with every column as wide as its words.
-const STAT_NAME_W: f32 = 43.0;
+const STAT_NAME_W: f32 = 48.0;
 const STAT_BAR: (f32, f32) = (18.0, 6.0);
 /// The stat rows' columns after the bar: the value (right-aligned), wild and tamed points
 /// (centred), then the + (GUI pixels).
@@ -1272,8 +1272,8 @@ fn taming_hud(r: &mut Registry) {
                     t.set("hud.animals.taming.who", &[Arg::Key(&format!("entity.animals.{}", s.kind_name()))]);
                 });
                 ui.row(S::row().gap(3.0).center(), |ui| {
-                    // as wide as "Приручено" (31 GUI px; at 30 it was shrunk, the Russian pass)
-                    ui.text_bind_styled(S::default().w(32.0).no_wrap(), |c, t| {
+                    // as wide as "Приручено" (35 GUI px; narrower it was shrunk, the Russian pass)
+                    ui.text_bind_styled(S::default().w(36.0).no_wrap(), |c, t| {
                         if being_tamed(c).is_some() { t.set("hud.animals.taming.bar", &[]) } else { t.text("") }
                     });
                     ui.progress_bind("life_taming", S::default().size(LIFE_BAR.0, LIFE_BAR.1), |c| {
