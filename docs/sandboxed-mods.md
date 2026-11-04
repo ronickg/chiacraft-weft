@@ -109,7 +109,7 @@ from the package's `assets/lang` files, like Weft's command replies.
 | Memory | 64 MiB |
 | Component size | 16 MiB (`code/server.wasm`) |
 | Per call | 64 log lines, 32 tells, 32 replies, 4096 block changes (`set_blocks` included), 64 spawns, 64 sounds, 64 particle bursts of at most 256; `near` within 64 blocks, 256 entities |
-| Storage | 1024 keys, 4 MiB in all, keys of `a-z 0-9 _ - .` |
+| Storage | 1024 keys, 4 MiB in all, 1 MiB written per call, keys of `a-z 0-9 _ - .` |
 | Registrations | 256 hooks, 64 components, 256 attaches; commands of `a-z 0-9 _`, not the engine's (`/op`, `/give`, `/tp`, ...); a name another mod or package already has is left out (a warning in the log) and the world still opens |
 
 A call that runs out of fuel, traps (a panic is a trap) or grows its memory past the cap is a
@@ -139,7 +139,9 @@ API versions are frozen once released. `crates/sandbox/wit/v1.0/` and `v1.1/` ne
 after that. A 1.x version only adds calls, so the game binds the newest it has, and a component
 built for an older 1.x links unchanged (wasmtime matches 1.x imports and exports by semver). A
 component is refused when it loads, with the reason in the log, if it imports anything but this
-API (WASI, say) or a newer 1.x than the game runs. A change that removes or alters a call would
+API (WASI, say) or a newer 1.x than the game runs. The host's offer names the API each package's
+code needs, so a game too old for it refuses on joining, before downloading anything; the join
+sheet shows the version ("runs sandboxed code (mod API 1.1)"). A change that removes or alters a call would
 be 2.0, which nothing plans.
 
 The SDK builds for the newest version (1.1): a mod built with it needs a game that runs 1.1.

@@ -13,6 +13,7 @@
 //! (`#ores/ruby`) are shared vocabulary and stay as written. This crate reads and checks packages;
 //! the game registers them through the `packages` mod.
 
+pub mod code;
 pub mod identity;
 pub mod signature;
 pub mod store;

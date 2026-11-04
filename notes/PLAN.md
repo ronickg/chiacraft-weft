@@ -319,8 +319,13 @@ The smallest version that works is phases 1-4.
       is refused; a package's clashing command is left out instead of failing the world.
    3. *More of the SDK* (1.1 built): API 1.1 adds per-entity components, `set_blocks`, sounds
       and particles, and imports are checked at load; the host binds the newest 1.x and runs
-      every older one (1.x only adds; wasmtime matches by semver). Sample `tally`. Next, 1.2:
-      block and item callbacks, channels, gizmos.
+      every older one (1.x only adds; wasmtime matches by semver). Sample `tally`. Decided
+      2026-11-04 (Planner for Ronald): the API version comes from a mod's imports and travels in
+      the offer (protocol 8), so the join sheet refuses a too-new mod before downloading (built);
+      a `required` flag per package at the next `package.toml` change, optional by default (a
+      stopped required mod closes its world to joins and sends its players home); a call-cost
+      benchmark (`callcost`) before a release freezes 1.0. Next, 1.2: block and item callbacks,
+      channels, gizmos.
    4. *Client halves*: `code/client.wasm`, client calls only (HUD, screens, keys, channels to its
       server half), a frame budget.
    5. *Personal mods per world*: the player's own client halves, allowed or not by each world's
