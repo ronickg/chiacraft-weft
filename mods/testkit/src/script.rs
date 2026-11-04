@@ -89,6 +89,7 @@ const COMMANDS: &[&str] = &[
     "look",
     "chat",
     "say_config",
+    "set_config",
     "shot",
     "bench",
     "host",
@@ -125,6 +126,7 @@ const NEED_ARGS: &[&str] = &[
     "look",
     "chat",
     "say_config",
+    "set_config",
     "shot",
     "host",
     "join",
@@ -481,6 +483,14 @@ async fn run_lines(t: T, src: String) -> R {
             "say_config" => {
                 let cfg = weft_sdk::Config::<f64>::named(Box::leak(rest.to_string().into_boxed_str()));
                 t.c().say(&format!("config {rest} = {}", cfg.get()));
+            }
+            // `set_config base:fx_reflect 0`: changes a setting mid-run, so one run benches each
+            // effect on and off over the same loaded world (Research round 16).
+            "set_config" => {
+                let (name, value) = rest.split_once(' ').unwrap_or((rest, "0"));
+                let cfg = weft_sdk::Config::<f64>::named(Box::leak(name.trim().to_string().into_boxed_str()));
+                cfg.set(value.trim().parse().unwrap_or(0.0));
+                weft_sdk::info!("set_config {} = {}", name.trim(), cfg.get());
             }
             "shot" => {
                 let path = match launch_option("shot-dir") {
