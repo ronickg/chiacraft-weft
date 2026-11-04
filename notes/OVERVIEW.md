@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 71 · ◧ partly built: 35 · □ not built yet: 11 · ◌ planned for later: 6
+■ built and seen working: 73 · ◧ partly built: 35 · □ not built yet: 10 · ◌ planned for later: 6
 
 ## Core next
 
@@ -22,7 +22,6 @@ What's missing that the rest leans on (marked `core` in the data).
 - **World content: The first hours**. Ronald, 11-05: "you can't just punch down a tree. You first got to get a rock", "you got to feel like you earned it"; his picks: "B: about 13-15 min", "Knapping screen, then book", "Fire bed + bow drill", "Knapped stone pick, no chopper". Built and seen in PC runs (t2_fh1_spawn*, fh8_fire, fh8_pick_fire, fh9_axe, 11-05): rocks, flint nodules and fallen branches lie loose on open ground (thicker on gravel and slopes, 4x within 32 blocks of the spawn; worldgen.rs, vitals::first); a rock used on flint on the ground strikes a sharp flake (80%, a rock 25%); sneaking it opens the knapping screen (knapping.rs: a 5x5 nodule, an axe head 8 squares away, a pick head 13, a shovel blade 8; a click inside the outline breaks it into a flake), and once a head of a shape has been held flint makes it from the book or grid from memory; a flake cuts fibre plants for 50% fibre (12.5% by hand) and wears; bare hands get a stick from leaves 20% of the time; a head, a stick and 2 string in the 2x2 make a stone axe, pick or shovel with its parts (a branch haft, a cordage lashing; first.rs finish), a flake, a stick and a string a knife; the knapping screen in our UI theme (UI redo); the first fire (firebed.rs): a fire bed of three sticks and fibre lit by holding a bow drill (6 s, 70%) or hand drill (10 s, 35%) on it, none in the rain under open sky, a campfire when lit; hints in order (bare hands can't fell a tree, knap, flake, lash, the dusk hint names the drill). Art's rock, flint, flake, nodule, branch and haft ramp approved. Not yet: craft times for book heads (the book's queue), lighting today's log campfire with the drill (Survival's), the bone, copper and later tiers' first steps.
 - **World content: Crafting system**. Decided by Ronald 2026-11-04 (1A 2A 3A 4B, notes/CRAFTING.md). Built, waiting for game runs: the recipe book beside the 2x2 and the crafting table, crafting from the bag and chests within 7 blocks (book.rs); parts (parts.rs, crate mods/base/crafting): part items with material, rolled grade and wear, made from the book's Parts tab; tools built from parts in the table's assembly row, taken apart, repaired per part with their material; engine hooks for a stack's own tool numbers, tools that stay when broken (keep_broken) and a stack's look from layers (core:look, with placeholder axe art). Next: discovery, skills, history, knapping, armour from parts.
 - **World content: Our own content plan**. The plan leaves game content out until the foundations stand; survival and animals now need it. For food, the living world's research is the plan: the species' diets and the biomes' plants and crops.
-- **Tools and checks: Tests on CI**. This branch's CI checks formatting only; a workflow that runs the tests is on the claude/ci-workflow branch, not merged.
 
 ## Engine
 
@@ -232,7 +231,7 @@ Code: `mods/base/source/ui`, `mods/base/source/items`, `mods/animals/source`. Do
 
 ## Tools and checks
 
-What keeps it all working: game scripts and tests, balance and cross-system checks, generated sheets, this map. 5 of 7 parts built.
+What keeps it all working: game scripts and tests, balance and cross-system checks, generated sheets, this map. 7 of 8 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -240,8 +239,9 @@ What keeps it all working: game scripts and tests, balance and cross-system chec
 | ■ | Balance checks | Code: `mods/base/vitals/src/balance.rs`, `mods/animals/core/src/balance.rs`. |
 | ■ | Cross-system checks | Code: `mods/animals/core/tests/places.rs`. |
 | ■ | Generated sheets | Code: `mods/base/vitals/src/sheet.rs`, `mods/animals/core/src/sheet.rs`. |
-| ◧ | Tests on CI (core) | This branch's CI checks formatting only; a workflow that runs the tests is on the claude/ci-workflow branch, not merged. |
-| □ | Fuzzing on CI |  |
+| ■ | Tests on CI | ci.yml: build, clippy, unit tests, sheets and the testkit on software Vulkan, on pushes to dev and main and on pull requests; runs on GitHub only once those branches are pushed. Code: `.github/workflows/ci.yml`. |
+| ■ | Fuzzing on CI | fuzz.yml: packages and sandbox targets, five minutes each, weekly. Code: `.github/workflows/fuzz.yml`. |
+| ◧ | Release builds | chiacraft-build.yml: Windows, Linux and macOS archives by hand or on a chiacraft-v* tag, optional macOS signing and notarization (docs/release-builds.md). Linux packaging checked on the PC (2026-11-04: packed, server and a look from the unpacked folder); not yet run on GitHub. Windows signing not set up. Code: `.github/workflows/chiacraft-build.yml`, `tools/release`. Docs: `docs/release-builds.md`. |
 | ■ | Species website | The animals' logic as WASM. Code: `mods/animals/web`. |
 
 Code: `mods/testkit`, `mods/animals/core/tests`, `mods/base/vitals/tests`, `.github/workflows`. Docs: `notes/SYSTEMS.md`, `CLAUDE.md`.

@@ -220,8 +220,9 @@
         {"name": "Balance checks", "status": "built", "code": ["mods/base/vitals/src/balance.rs", "mods/animals/core/src/balance.rs"]},
         {"name": "Cross-system checks", "status": "built", "code": ["mods/animals/core/tests/places.rs"]},
         {"name": "Generated sheets", "status": "built", "code": ["mods/base/vitals/src/sheet.rs", "mods/animals/core/src/sheet.rs"]},
-        {"name": "Tests on CI", "status": "partial", "core": true, "note": "This branch's CI checks formatting only; a workflow that runs the tests is on the claude/ci-workflow branch, not merged."},
-        {"name": "Fuzzing on CI", "status": "missing"},
+        {"name": "Tests on CI", "status": "built", "core": true, "note": "ci.yml: build, clippy, unit tests, sheets and the testkit on software Vulkan, on pushes to dev and main and on pull requests; runs on GitHub only once those branches are pushed.", "code": [".github/workflows/ci.yml"]},
+        {"name": "Fuzzing on CI", "status": "built", "note": "fuzz.yml: packages and sandbox targets, five minutes each, weekly.", "code": [".github/workflows/fuzz.yml"]},
+        {"name": "Release builds", "status": "partial", "note": "chiacraft-build.yml: Windows, Linux and macOS archives by hand or on a chiacraft-v* tag, optional macOS signing and notarization (docs/release-builds.md). Linux packaging checked on the PC (2026-11-04: packed, server and a look from the unpacked folder); not yet run on GitHub. Windows signing not set up.", "code": [".github/workflows/chiacraft-build.yml", "tools/release"], "docs": ["docs/release-builds.md"]},
         {"name": "Species website", "status": "built", "note": "The animals' logic as WASM.", "code": ["mods/animals/web"]}
       ]
     }
