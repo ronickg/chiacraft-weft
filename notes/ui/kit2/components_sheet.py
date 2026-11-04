@@ -13,7 +13,7 @@ import kit2 as k  # noqa: E402
 OUT = sys.argv[1]
 OLD = sys.argv[2] if len(sys.argv) > 2 else None
 BG = (26, 19, 19)
-W, H = 1340, 820
+W, H = 1340, 1000
 S = k.canvas(W, H, BG)
 PLACED = []
 
@@ -37,7 +37,7 @@ def heading(s, x, y):
 
 # ---------------------------------------------------------------- 1. icons
 x0, y = 16, 16
-heading("Icons: 16 x 16, one outline, light from the top left, one palette", x0, y)
+heading("Kit 2 with Ronald's pick, C: every corner steps 3 px. Icons: 16 x 16, one outline, light from the top left", x0, y)
 names = ["follow", "stay", "wander", "guard", "passive", "neutral", "aggressive", "assist", "ride", "tribe",
          "sniff", "release", "undo", "rename", "male", "female", "taming", "close", "plus", "minus", "check"]
 labels = {"follow": "Follow", "stay": "Stay", "wander": "Wander", "guard": "Guard", "passive": "Passive",
@@ -47,7 +47,7 @@ labels = {"follow": "Follow", "stay": "Stay", "wander": "Wander", "guard": "Guar
 y += 20
 for i, n in enumerate(names):
     cx = x0 + i * 62
-    at(k.slot(24), cx + 18, y)
+    at(k.slot_r(24), cx + 18, y)
     at(k.icon(n), cx + 22, y + 4)
     lw = k.F.width(labels[n])
     k.F.draw(S, labels[n], cx + 30 - lw // 2, y + 30, k.DIM, (12, 8, 7))
@@ -64,38 +64,38 @@ heading("Buttons: normal, hover, pressed, disabled", x0, y)
 y += 20
 for row, kind in enumerate(("main", "second")):
     for col, state in enumerate(("normal", "hover", "pressed", "disabled")):
-        at(k.button(96, 22, kind, state, "Craft" if kind == "main" else "Back"), x0 + col * 104, y + row * 28)
-at(k.button(96, 22, "danger", "normal", "Release", "release"), x0 + 4 * 104, y)
-at(k.button(96, 22, "second", "normal", "Undo", "undo"), x0 + 4 * 104, y + 28)
+        at(k.button_r(96, 22, kind, state, "Craft" if kind == "main" else "Back"), x0 + col * 104, y + row * 28)
+at(k.button_r(96, 22, "danger", "normal", "Release", "release"), x0 + 4 * 104, y)
+at(k.button_r(96, 22, "second", "normal", "Undo", "undo"), x0 + 4 * 104, y + 28)
 yb = y + 62
 heading("A toggle group: Neutral chosen (pressed, orange), Attack under the pointer", x0, yb)
 yb += 20
 group = (("Passive", "passive", "second", "normal"), ("Neutral", "neutral", "main", "pressed"),
          ("Attack", "aggressive", "second", "hover"), ("Assist", "assist", "second", "normal"))
 for i, (t, ic, kind, st) in enumerate(group):
-    at(k.button(100, 22, kind, st, t, ic, align="left"), x0 + (i % 2) * 104, yb + (i // 2) * 26)
+    at(k.button_r(100, 22, kind, st, t, ic, align="left"), x0 + (i % 2) * 104, yb + (i // 2) * 26)
 orders = (("Follow", "follow", "main", "pressed"), ("Stay", "stay", "second", "normal"),
           ("Wander", "wander", "second", "normal"), ("Guard", "guard", "second", "normal"))
 for i, (t, ic, kind, st) in enumerate(orders):
-    at(k.button(100, 22, kind, st, t, ic, align="left"), x0 + 216 + (i % 2) * 104, yb + (i // 2) * 26)
-at(k.button(100, 22, "second", "disabled", "Ride", "ride", align="left"), x0 + 432, yb)
+    at(k.button_r(100, 22, kind, st, t, ic, align="left"), x0 + 216 + (i % 2) * 104, yb + (i // 2) * 26)
+at(k.button_r(100, 22, "second", "disabled", "Ride", "ride", align="left"), x0 + 432, yb)
 text("Ride: needs a saddle on it", x0 + 432, yb + 32, k.DIM)
 y = yb + 60
 
 # ---------------------------------------------------------------- 3. tabs on a panel
 heading("Tabs and a window", x0, y)
 y += 20
-p = k.panel(560, 200)
+p = k.panel_r(560, 200)
 tx = x0 + 8
 for t, ic, act in (("Overview", "follow", True), ("Genes", "taming", False), ("Family", "tribe", False)):
     w = k.F.width(t) + 16 + 4 + 16
     w += w % 2
-    at(k.tab(w, t, act, ic), tx, y)
+    at(k.tab_r(w, t, act, ic), tx, y)
     tx += w + 2
 at(p, x0, y + 20)
 px, py = x0 + k.INNER + 6, y + 20 + k.INNER + 6
 heading("Stats", px, py)
-at(k.chip("2 to place", "points"), px + 44, py - 4)
+at(k.chip_r("2 to place", "points"), px + 44, py - 4)
 rows = (("health", "33.9", "q1", 0.55, "8", "+2"), ("stamina", "207", "q2", 0.6, "12", "0"),
         ("food", "140", "q0", 0.5, "5", "+1"), ("speed", "94 %", "q0", 0.4, "1", "0"))
 yy = py + 24
@@ -107,19 +107,19 @@ for name, val, q, share, wild, tamed in rows:
     ic = np.array(Image.open(os.path.join(stat_icons, f"stat_icon_{name}.png")).convert("RGBA"))
     at(ic, px, yy)
     text(name.capitalize(), px + 22, yy + 4)
-    at(k.bar(100, share, q), px + 104, yy + 4)
+    at(k.bar_r(100, share, q), px + 104, yy + 4)
     vw = k.F.width(val)
     k.F.draw(S, val, px + 246 - vw, yy + 4, k.GREEN if tamed == "+1" else k.CREAM, (12, 8, 7))
     ww = k.F.width(wild)
     k.F.draw(S, wild, px + 264 - ww // 2, yy + 4, k.BAR_FILLS[q][1], (12, 8, 7))
     tw = k.F.width(tamed)
     k.F.draw(S, tamed, px + 306 - tw // 2, yy + 4, k.GREEN if tamed == "+1" else k.CREAM, (12, 8, 7))
-    at(k.button(20, 20, "main", "hover" if name == "food" else "normal", "", "plus", pad=2), px + 330, yy - 2)
+    at(k.round_button(20, "main", "hover" if name == "food" else "normal", "plus"), px + 330, yy - 2)
     yy += 26
 at(k.divider(360), px, yy)
 yy += 8
-at(k.button(120, 22, "main", "normal", "Keep 1 point"), px, yy)
-at(k.button(84, 22, "second", "normal", "Undo", "undo"), px + 126, yy)
+at(k.button_r(120, 22, "main", "normal", "Keep 1 point"), px, yy)
+at(k.button_r(84, 22, "second", "normal", "Undo", "undo"), px + 126, yy)
 # right of the window: bars, slots, chips, keys
 rx = x0 + 600
 by = y
@@ -127,26 +127,26 @@ heading("Bars: the value beside, never on it", rx, by)
 by += 20
 for fill, share, val in (("health", 0.97, "33 / 34"), ("food", 0.98, "132 / 134"), ("water", 1.0, "100 / 100"),
                          ("taming", 0.68, "68 %"), ("torpor", 0.8, "2:40"), ("xp", 0.74, "108 / 146")):
-    at(k.bar(160, share, fill), rx, by + 2)
+    at(k.bar_r(160, share, fill), rx, by + 2)
     text("XP" if fill == "xp" else fill.capitalize(), rx + 168, by + 2, k.DIM)
     vw = k.F.width(val)
     text(val, rx + 300 - vw, by + 2)
     by += 18
 for i in range(5):
-    at(k.bar(56, 0.3 + i * 0.15, f"q{i}"), rx + i * 64, by + 2)
+    at(k.bar_r(56, 0.3 + i * 0.15, f"q{i}"), rx + i * 64, by + 2)
 text("Wild points: grey few, then green, blue, purple, gold", rx, by + 18, k.DIM)
 by += 38
 heading("Slots, chips, keys", rx, by)
 by += 20
-at(k.slot(36), rx, by)
-at(k.slot(36, True), rx + 42, by)
-s3 = k.slot(36)
+at(k.slot_r(36), rx, by)
+at(k.slot_r(36, True), rx + 42, by)
+s3 = k.slot_r(36)
 item = os.path.join(k.REPO, "mods/base/assets/textures/item/beef.png")
 at(s3, rx + 84, by)
 at(np.array(Image.open(item).convert("RGBA")), rx + 86, by + 2)
 cx = rx + 130
 for t, kind in (("Adult, 22 days", "plain"), ("Steady", "plain"), ("4 to place", "points")):
-    cx += at(k.chip(t, kind), cx, by) + 4
+    cx += at(k.chip_r(t, kind), cx, by) + 4
 cx = rx + 130
 for i, (key, ic) in enumerate((("J", "follow"), ("K", "stay"), ("H", "wander"), ("G", "assist"), ("B", "passive"))):
     at(k.keycap(key), cx + i * 40, by + 22)
@@ -170,8 +170,29 @@ if OLD:
     crop = old.crop((1186, 344, 1574, 484)).resize((194, 70), Image.NEAREST)
     at(np.array(crop), x0, y + 20)
     for i, (t, ic, kind, st) in enumerate(group):
-        at(k.button(100, 22, kind, st, t, ic, align="left"), x0 + 220 + (i % 2) * 104, y + 24 + (i // 2) * 26)
+        at(k.button_r(100, 22, kind, st, t, ic, align="left"), x0 + 220 + (i % 2) * 104, y + 24 + (i // 2) * 26)
     y += 96
+
+# ---------------------------------------------------------------- 5. chip text, before and after
+ROUND_1X = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rounding_1x.png")
+if os.path.exists(ROUND_1X):
+    zx = x0
+    zy = y + 10
+    heading("Chip text, 4x: before 1 px above the capitals, 4 below; now 3 and 3", zx, zy)
+    zy += 20
+    before = np.array(Image.open(ROUND_1X).convert("RGBA"))[266:284, 570:770]
+    chips = [k.chip_r(t, kind) for t, kind in (("Adult", "plain"), ("Steady", "plain"), ("2 to place", "points"))]
+    after = k.canvas(sum(c.shape[1] + 4 for c in chips), 20)
+    cx = 0
+    for c in chips:
+        k.blit(after, c, cx, 0)
+        cx += c.shape[1] + 4
+    for i, (part, name) in enumerate(((before, "before"), (after, "now"))):
+        big4 = np.array(Image.fromarray(part).resize((part.shape[1] * 4, part.shape[0] * 4), Image.NEAREST))
+        text(name, zx, zy + 34, k.DIM)
+        at(big4, zx + 60, zy)
+        zy += big4.shape[0] + 8
+    y = max(y, zy + 4)
 
 S2 = S[:y + 10]
 os.makedirs(OUT, exist_ok=True)
