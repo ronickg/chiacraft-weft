@@ -153,15 +153,18 @@ pub struct VulkanBackend {
     queries: vk::QueryPool,
     ts_period: f32,
     gpu_times: Vec<f32>,
-    /// Where `end_frame`'s time goes (recording, `vkQueueSubmit2`, `vkQueuePresentKHR`), logged
-    /// each second (`log_submit`): whether a long "submit" is waiting for the display or working.
+    /// Where `begin_frame`'s and `end_frame`'s time goes (waiting for the GPU, `vkAcquireNextImageKHR`,
+    /// recording, `vkQueueSubmit2`, `vkQueuePresentKHR`), logged each second (`log_submit`):
+    /// whether the frame waits for the GPU, for the display or works.
     submit_split: SubmitSplit,
 }
 
 #[derive(Default)]
 struct SubmitSplit {
-    sum: [f64; 3],
-    max: [f32; 3],
+    /// This frame's `begin_frame`: waiting for the slot's last frame on the GPU, and the acquire.
+    begun: [f32; 2],
+    sum: [f64; 5],
+    max: [f32; 5],
     frames: u32,
     since: Option<std::time::Instant>,
     mode: i32,
@@ -644,12 +647,16 @@ impl VulkanBackend {
     }
 
     /// Adds a frame to `submit_split`; once a second, with `--log frame=debug`, a line of where
-    /// `end_frame` spent it: recording our commands, `vkQueueSubmit2` (on MoltenVK the Metal
-    /// encoding, and waiting for a drawable to draw into) and `vkQueuePresentKHR`.
+    /// the frame's GPU calls spent it: in `begin_frame` (the app's "acquire") waiting for this
+    /// slot's frame before last to finish on the GPU (long when the GPU is the bottleneck: the
+    /// 3456 x 2234 rows, 11-04) and acquiring an image; in `end_frame` (the app's "submit")
+    /// recording our commands, `vkQueueSubmit2` (on MoltenVK the Metal encoding, and waiting for a
+    /// drawable to draw into: the display) and `vkQueuePresentKHR`.
     fn log_submit(&mut self, began: std::time::Instant, queued: std::time::Instant, submitted: std::time::Instant) {
         let now = std::time::Instant::now();
         let s = &mut self.submit_split;
-        let parts = [queued - began, submitted - queued, now - submitted].map(|d| d.as_secs_f32() * 1000.0);
+        let ends = [queued - began, submitted - queued, now - submitted].map(|d| d.as_secs_f32() * 1000.0);
+        let parts = [s.begun[0], s.begun[1], ends[0], ends[1], ends[2]];
         for ((sum, max), p) in s.sum.iter_mut().zip(&mut s.max).zip(parts) {
             *sum += p as f64;
             *max = max.max(p);
@@ -662,13 +669,17 @@ impl VulkanBackend {
         let n = s.frames.max(1) as f64;
         log::debug!(
             target: "frame",
-            "submit split: record {:.2} (max {:.2}), queue {:.2} (max {:.2}), present {:.2} (max {:.2}) ms over {} frames, {:?}",
+            "submit split: gpu wait {:.2} (max {:.2}), acquire {:.2} (max {:.2}), record {:.2} (max {:.2}), queue {:.2} (max {:.2}), present {:.2} (max {:.2}) ms over {} frames, {:?}",
             s.sum[0] / n,
             s.max[0],
             s.sum[1] / n,
             s.max[1],
             s.sum[2] / n,
             s.max[2],
+            s.sum[3] / n,
+            s.max[3],
+            s.sum[4] / n,
+            s.max[4],
             s.frames,
             vk::PresentModeKHR::from_raw(s.mode)
         );
@@ -1538,7 +1549,9 @@ impl Backend for VulkanBackend {
     }
 
     fn begin_frame(&mut self) -> Option<FrameInfo> {
+        let t0 = std::time::Instant::now();
         self.ensure_slot_ready();
+        let t1 = std::time::Instant::now();
         if self.dirty_swapchain || self.swapchain.is_none() {
             if let Err(e) = unsafe { self.recreate_swapchain() } {
                 log::error!("{e}");
@@ -1551,6 +1564,7 @@ impl Backend for VulkanBackend {
             self.swapchain_fn
                 .acquire_next_image(sc.raw, u64::MAX, acquired, vk::Fence::null())
         };
+        self.submit_split.begun = [t1 - t0, t1.elapsed()].map(|d| d.as_secs_f32() * 1000.0);
         match result {
             Ok((index, suboptimal)) => {
                 if suboptimal {

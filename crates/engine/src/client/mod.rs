@@ -2277,6 +2277,8 @@ impl Client {
             eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, self.moon_light()],
             ground: [self.snow_cover, self.snowing, self.dust, self.aurora],
             behind: self.behind,
+            clouds: self.sky.cloud_shade[0],
+            cloud_cells: self.sky.cloud_shade[1],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
@@ -2294,16 +2296,38 @@ impl Client {
         }
     }
 
-    /// Toward the sun: it rises in +x, is highest at noon and leans a little south so that
-    /// shadows are never straight down.
+    /// Toward the sun: it rises in +x and is highest at noon, where the sky draws it: the
+    /// dimension's first glowing body that follows the day (its tilt leans the path south, so that
+    /// shadows are never straight down and stay long at noon). Without one, a path leaned 19°.
     fn sun(&self) -> [f32; 4] {
         let d = &content().dims[self.world.dim as usize];
         if !d.sky_light {
             return [0.0, 1.0, 0.0, 0.0];
         }
-        let a = d.day_turn(self.world.time as f64) * std::f64::consts::TAU;
-        let v = Vec3::new(a.cos() as f32, a.sin() as f32, 0.35).normalize();
+        let time = self.world.time as f64;
+        let v = match self.sun_body() {
+            Some(s) => sky::frame_of(s, sky::turn_of(s, d, time)).x_axis,
+            None => {
+                let a = d.day_turn(time) * std::f64::consts::TAU;
+                SUN_LEAN * Vec3::new(a.cos() as f32, a.sin() as f32, 0.0)
+            }
+        };
         [v.x, v.y, v.z, v.y.max(0.0)]
+    }
+
+    /// The sky's sun (`sun`): the first glowing body following the day.
+    fn sun_body(&self) -> Option<&'static crate::registry::SkyDef> {
+        content()
+            .game
+            .sky
+            .get(self.world.dim as usize)?
+            .iter()
+            .find(|s| s.kind == weft_abi::sky_kind::BODY && s.glow != 0 && s.orbit.is_infinite())
+    }
+
+    /// The plane the sun turns in (its x and y axes; `settled`).
+    fn sun_plane(&self) -> glam::Mat3 {
+        self.sun_body().map_or(SUN_LEAN, |s| sky::frame_of(s, 0.0))
     }
 
     /// The moon's light by its phase, 1 full to 0 new: vanilla's eight phases, one a day, the one
@@ -2352,7 +2376,8 @@ impl Client {
             self.shadow_size = size;
         }
         let sun = self.sun();
-        let dir = settled(if sun[1] > -0.06 { Vec3::new(sun[0], sun[1], sun[2]) } else { -Vec3::new(sun[0], sun[1], sun[2]) });
+        let dir =
+            settled(if sun[1] > -0.06 { Vec3::new(sun[0], sun[1], sun[2]) } else { -Vec3::new(sun[0], sun[1], sun[2]) }, self.sun_plane());
         // So low the shadows would run off the map (the pack fades them out above this).
         if dir.y < 0.02 {
             return;
@@ -2591,19 +2616,24 @@ fn shadow_setting(name: &str, default: f64) -> f64 {
 const FAR_REACH: f32 = 400.0;
 const FAR_DEPTH: f32 = 1200.0;
 
+/// The sun's path leaned south when the sky has no sun to follow (`Client::sun`).
+const SUN_LEAN: glam::Mat3 = glam::Mat3::from_cols(Vec3::X, Vec3::new(0.0, 0.944, 0.33), Vec3::new(0.0, -0.33, 0.944));
+
+/// The light's direction in steps of 1/2000 of its turn (0.18°, a step every 0.6 s of a 20-minute
+/// day) along its path (`plane`, the sun's x and y axes): between steps the shadow maps' light
+/// stays put, so a map can be kept (`render_shadows`). A step moves the shadow of a 20-block tree
+/// by about 0.06 blocks.
+fn settled(dir: Vec3, plane: glam::Mat3) -> Vec3 {
+    let step = std::f32::consts::TAU / 2000.0;
+    let l = plane.transpose() * dir;
+    let a = (l.y.atan2(l.x) / step).round() * step;
+    let r = glam::Vec2::new(l.x, l.y).length();
+    (plane * Vec3::new(a.cos() * r, a.sin() * r, l.z)).normalize()
+}
+
 /// From camera-relative positions to an orthographic box along the light `dir` (toward it), `reach`
 /// blocks to each side of the camera and `depth` deep (reverse depth: 1 nearest the light), moved in
 /// whole texels of the world so its edges do not crawl as the camera moves.
-/// The light's direction in steps of 1/2000 of its turn (0.18°, a step every 0.6 s of a 20-minute
-/// day): between steps the shadow maps' light stays put, so a map can be kept (`render_shadows`).
-/// A step moves the shadow of a 20-block tree by about 0.06 blocks.
-fn settled(dir: Vec3) -> Vec3 {
-    let step = std::f32::consts::TAU / 2000.0;
-    let a = (dir.y.atan2(dir.x) / step).round() * step;
-    let r = glam::Vec2::new(dir.x, dir.y).length();
-    Vec3::new(a.cos() * r, a.sin() * r, dir.z).normalize()
-}
-
 fn light_box(dir: Vec3, cam: glam::DVec3, reach: f32, depth: f32, size: u32) -> glam::Mat4 {
     let up = if dir.y.abs() > 0.99 { Vec3::Z } else { Vec3::Y };
     // Looking from the light's side of the camera toward it (right-handed, -z forward).

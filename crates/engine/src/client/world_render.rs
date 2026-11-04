@@ -302,6 +302,10 @@ pub struct WorldRenderer {
     /// quads cutout. Solid blocks have no fragment shader (nothing to leave out, and a pass without
     /// `discard` keeps Apple GPUs' hidden-surface removal on); cutout ones the pack's `fs_shadow`.
     shadow_pipes: Option<[PipelineId; 4]>,
+    /// Distant terrain into the far cascade, when the pack's `world.wgsl` has `fs_lod_shadow` (it
+    /// leaves out the columns cubes show, as `fs_lod` does): hills and canopies past the render
+    /// distance cast shadows too.
+    lod_shadow_pipe: Option<PipelineId>,
     /// Counts every change to the terrain drawn (cubes or distant tiles uploaded or removed): a
     /// cached shadow map is drawn again when it moves (`Client::render_shadows`).
     pub terrain_epoch: u64,
@@ -423,6 +427,7 @@ impl WorldRenderer {
         let (shader, slots) = world_shader(assets).map_err(|e| e.0)?;
         let (face_pipes, quad_pipes, lod_pipe) = Self::pipelines(gpu, &shader)?;
         let shadow_pipes = Self::shadow_pipelines(gpu, &shader);
+        let lod_shadow_pipe = Self::lod_shadow_pipeline(gpu, &shader, shadow_pipes.is_some());
         let tex_shader = shader_table(gpu, c, textures, &slots);
 
         let (tex_info, anim, overlays) = Self::texture_info(gpu, textures);
@@ -451,6 +456,7 @@ impl WorldRenderer {
             .collect();
         Ok(WorldRenderer {
             shadow_pipes,
+            lod_shadow_pipe,
             terrain_epoch: 0,
             shadow_origins: Default::default(),
             shadow_indirect: Default::default(),
@@ -587,6 +593,27 @@ impl WorldRenderer {
         Some([made[0], made[1], made[2], made[3]])
     }
 
+    /// The far cascade's pipeline for distant terrain (`lod_shadow_pipe`): depth only, the pack's
+    /// `fs_lod_shadow` dropping the columns cubes show. None without sun shadows or that entry.
+    fn lod_shadow_pipeline(gpu: &mut dyn Backend, shader: &Shader, shadows: bool) -> Option<PipelineId> {
+        if !shadows || !crate::packs::pack_uses("world.wgsl", "fs_lod_shadow") {
+            return None;
+        }
+        gpu.create_pipeline(&PipelineDesc {
+            label: "distant terrain shadow",
+            shader,
+            vertex: "vs_lod",
+            fragment: Some("fs_lod_shadow"),
+            color: None,
+            depth: Some(DepthState { write: true, compare: Compare::GreaterEqual }),
+            blend: Blend::None,
+            cull_back: false,
+            topology: Topology::Triangles,
+        })
+        .map_err(|e| log::error!("distant terrain shadows: {}", e.0))
+        .ok()
+    }
+
     /// Whether the shader pack's sun shadows can be drawn (`draw_shadow`).
     pub fn has_shadows(&self) -> bool {
         self.shadow_pipes.is_some()
@@ -651,6 +678,30 @@ impl WorldRenderer {
         }
         // Solid and cutout layers only, in runs of one pipeline and page.
         draws.retain(|d| d.1 < 2);
+        // The far cascade: the distant terrain's tiles shown (`lod_draw`) within the light's box,
+        // behind the camera too (their shadows fall into view), as `draw` makes their records.
+        if cascade == 1 && self.lod_shadow_pipe.is_some() {
+            for key in &self.lod_draw {
+                let Some(&(a, count, (y0, y1), skip)) = self.lod.get(key) else { continue };
+                let o = key.origin();
+                let half = Vec3::new(key.size() as f32, (y1 - y0) as f32, key.size() as f32) / 2.0;
+                let center = Vec3::new(o.x as f32, y0 as f32, o.y as f32) + half - (cam_cube * 16).as_vec3() - cam_frac;
+                if !planes
+                    .iter()
+                    .all(|pl| pl.dot(center.extend(1.0)) > -half.length())
+                {
+                    continue;
+                }
+                let args = DrawIndexedArgs {
+                    indices: (count - skip) * 6,
+                    instances: 1,
+                    first_index: 0,
+                    vertex_offset: ((a.offset + skip) * 4) as i32,
+                    first_instance: 0,
+                };
+                draws.push((3, 0, a.page, args, [o.x / 16 - cam_cube.x, -cam_cube.y, o.y / 16 - cam_cube.z, 0], center));
+            }
+        }
         draws.sort_unstable_by_key(|d| (d.0, d.1, d.2));
         let n = draws.len() as u32;
         if n == 0 {
@@ -686,7 +737,10 @@ impl WorldRenderer {
                 end += 1;
             }
             let cutout = layer as usize;
-            let (pipe, buf) = if kind == 0 {
+            let (pipe, buf) = if kind == 3 {
+                // Only pushed with the pipeline there (above).
+                (self.lod_shadow_pipe.unwrap_or(pipes[0]), self.faces.pages[page as usize].0)
+            } else if kind == 0 {
                 (pipes[cutout], self.faces.pages[page as usize].0)
             } else {
                 (pipes[2 + cutout], self.quads.pages[page as usize].0)
@@ -728,11 +782,18 @@ impl WorldRenderer {
                 self.face_pipes = f;
                 self.quad_pipes = q;
                 self.lod_pipe = l;
-                for p in self.shadow_pipes.take().into_iter().flatten() {
+                for p in self
+                    .shadow_pipes
+                    .take()
+                    .into_iter()
+                    .flatten()
+                    .chain(self.lod_shadow_pipe.take())
+                {
                     gpu.destroy_pipeline(p);
                 }
                 if let Ok((s, _)) = world_shader(assets) {
                     self.shadow_pipes = Self::shadow_pipelines(gpu, &s);
+                    self.lod_shadow_pipe = Self::lod_shadow_pipeline(gpu, &s, self.shadow_pipes.is_some());
                     self.terrain_epoch += 1;
                 }
                 gpu.destroy_buffer(self.tex_shader);
@@ -833,6 +894,7 @@ impl WorldRenderer {
             .chain(self.quad_pipes)
             .chain([self.lod_pipe])
             .chain(self.shadow_pipes.take().into_iter().flatten())
+            .chain(self.lod_shadow_pipe.take())
         {
             gpu.destroy_pipeline(p);
         }
