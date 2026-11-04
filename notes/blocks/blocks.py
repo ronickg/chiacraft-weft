@@ -99,7 +99,8 @@ def like_sheet(names):
                     os.path.join(TILES, n + ".png"))
         t = Image.open(path).convert("RGBA").resize((s, s), Image.NEAREST)
         sheet.paste(t, (i * s, 0), t)
-    out = os.path.join(GEN, "like.png")
+    # Named by its contents, so two runs at once don't overwrite each other's.
+    out = os.path.join(GEN, "like_" + "_".join(os.path.basename(n).split(".")[0] for n in names)[:80] + ".png")
     sheet.save(out)
     return out
 
