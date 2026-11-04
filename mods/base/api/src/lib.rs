@@ -284,8 +284,30 @@ pub fn rain_key(w: &World, biome: u32) -> u64 {
     w.seed() ^ (biome as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93)
 }
 
-/// How much a block heats the air near it (1 lava's).
+/// How much a block heats the air near it (1 lava's). Looked up by name once per block state and
+/// kept in a table (`HEATS`): the air's scan (7×7×7 a player a second) and the animals' search for
+/// a fire (33×7×33) ask it for every block they pass.
 pub fn heat_of(state: u32) -> f32 {
+    use std::sync::OnceLock;
+    use std::sync::atomic::{AtomicU8, Ordering};
+    // Hundredths of heat + 1 per state; 0 not looked up yet.
+    static HEATS: OnceLock<Box<[AtomicU8]>> = OnceLock::new();
+    let table = HEATS.get_or_init(|| (0..HEAT_STATES).map(|_| AtomicU8::new(0)).collect());
+    let Some(slot) = table.get(state as usize) else { return heat_by_name(state) };
+    match slot.load(Ordering::Relaxed) {
+        0 => {
+            let h = heat_by_name(state);
+            slot.store((h * 100.0).round().clamp(0.0, 254.0) as u8 + 1, Ordering::Relaxed);
+            h
+        }
+        v => (v - 1) as f32 / 100.0,
+    }
+}
+
+/// Block states `heat_of` keeps in its table (a byte each); any past it are looked up by name.
+const HEAT_STATES: usize = 1 << 20;
+
+fn heat_by_name(state: u32) -> f32 {
     // The state's name without its properties (`base:lava[level=0]`).
     match block_name(state).split('[').next().unwrap_or("") {
         "base:lava" => 1.0,
