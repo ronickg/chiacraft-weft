@@ -29,12 +29,13 @@ pub async fn held_water_place(t: T) -> R {
     t.op("put me 1 testmod:waterweed 4").await?;
     t.c().select(0);
     t.secs(0.2).await?;
-    // Onto the pool's floor, through the water.
-    t.look_at(add(f, [2, -3, -2]));
+    // Onto the pool's floor, through the water. Cells whose ray from the eye misses the pool's
+    // grass edge and the slab, wherever in its cell the player stands.
+    t.look_at(add(f, [3, -3, -3]));
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check_eq(t.block(add(f, [2, -2, -2])).await?, WET.to_string(), "a slab placed into water stands in it");
+    t.check_eq(t.block(add(f, [3, -2, -3])).await?, WET.to_string(), "a slab placed into water stands in it");
     t.look_at(add(f, [-2, -1, 0]));
     t.frames(3).await?;
     t.secs(0.3).await?;
@@ -44,11 +45,11 @@ pub async fn held_water_place(t: T) -> R {
 
     t.c().select(1);
     t.secs(0.3).await?;
-    t.look_at(add(f, [1, -3, -2]));
+    t.look_at(add(f, [2, -3, -2]));
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check_eq(t.block(add(f, [1, -2, -2])).await?, WEED.to_string(), "the weed placed into water");
+    t.check_eq(t.block(add(f, [2, -2, -2])).await?, WEED.to_string(), "the weed placed into water");
     t.look_at(add(f, [-3, -1, 1]));
     t.frames(3).await?;
     t.secs(0.3).await?;

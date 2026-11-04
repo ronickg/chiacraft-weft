@@ -394,7 +394,7 @@ mod tests {
     }
 
     /// Stone, water, kelp (always in water, held up by what is under it) and a slab that can be
-    /// waterlogged, in an editable world with block updates.
+    /// waterlogged, in an editable world with block updates, in force on this thread.
     fn content() -> &'static Content {
         let mods =
             vec![ModMeta { id: "t".into(), version: "1".into(), deps: Vec::new(), order: 0, assets: "/nonexistent".into(), package: None }];
@@ -423,7 +423,11 @@ mod tests {
         let void = c.void_dim as usize;
         c.dims[void].editable = true;
         c.dims[void].block_updates = true;
-        Box::leak(Box::new(c))
+        // This test's thread plays on it (the server code asks for `content()`); each test has
+        // its own thread.
+        let c: &'static Content = Box::leak(Box::new(c));
+        crate::content::for_thread(c);
+        c
     }
 
     fn id(c: &Content, name: &str) -> u32 {

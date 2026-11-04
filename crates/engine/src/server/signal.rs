@@ -1838,6 +1838,19 @@ impl Dim {
         let head = plan.p + DIRS[plan.dir as usize];
         for &b in &plan.broken {
             if let Some(there) = self.get(b) {
+                // A source that a block coming into it will stand in stays: it lands in it
+                // (a slab pushed on into water, wet).
+                let stands_in = |m: &IVec3| {
+                    *m + plan.step == b
+                        && self.get(*m).is_some_and(|s| {
+                            let dry = c.drained.get(&s).copied().unwrap_or(s);
+                            c.placed_into(dry, there)
+                                .is_some_and(|w| c.states[w as usize].holds.is_some())
+                        })
+                };
+                if plan.moved.iter().any(stands_in) {
+                    continue;
+                }
                 if c.states[there as usize].liquid.is_none() {
                     self.drop_block_loot(c, b, there, abi::ItemStack::EMPTY, false, None);
                 }
