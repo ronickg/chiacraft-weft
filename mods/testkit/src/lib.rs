@@ -58,6 +58,12 @@ fn init(r: &mut Registry) {
         let what = cmd.text("what").unwrap_or("").to_string();
         cmd.reply("command.testkit.probe", &[Arg::Text(&what), Arg::Key(side)]);
     });
+    // Stops the main thread for n seconds, so the watchdog can be seen working
+    // (`scripts/watchdog.txt`). testkit is never shipped.
+    r.client_command("tk_freeze", "<secs:int>", |cmd| {
+        let secs = cmd.int("secs").unwrap_or(1).clamp(0, 600) as u64;
+        std::thread::sleep(std::time::Duration::from_secs(secs));
+    });
     let (test, script) = (launch_option("test"), launch_option("script"));
     if test.is_none() && script.is_none() {
         return;
