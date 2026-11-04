@@ -10,6 +10,11 @@ Flowers wrap across the tile's edges, so the tile stays seamless. Sources go to 
 grade (regrade.py --all) builds the game's tiles from them, the leaves group with them.
 
     python3 notes/blocks/bloom.py <density: a|b> <out dir>        # writes the tiles and a preview sheet
+    python3 notes/blocks/bloom.py bushes <out dir>                  # the fruiting bushes' stage 2, in flower
+
+The fruiting bushes flower at their stage 2 (art only): more flowers added to the approved drawing, kept
+in mods/base/source/blocks/bloom/ (not source/blocks/tiles: the bushes take no grade). Flowers sit on the
+bush's own pixels only, so the outline stays, and never on a flower already drawn.
 """
 import os
 import sys
@@ -140,6 +145,86 @@ def sheet(out, results):
     return out
 
 
+BUSHES = {
+    # bramble: pale pink-white five-petal flowers, a yellow heart (as the drawing's)
+    "bramble": dict(pal={"h": "FBE6E6", "b": "E8A9A4", "s": "B87878", "c": "E2C056"}, n=6,
+                    stamps=[[".h.", "hcb", ".s."], ["hb", "bs"]], weights=[3, 2]),
+    # berry bush: small white flowers
+    "berry": dict(pal={"h": "FFFFFF", "b": "ECEBE0", "s": "B9B8A6", "c": "DCC24E"}, n=7,
+                  stamps=[[".h.", "hcb", ".s."], ["hb", "bs"], ["h"]], weights=[3, 3, 2]),
+    # (cloudberry keeps its drawing: one flower to a stem, as the real plant)
+    # lingonberry: pink bells
+    "lingonberry": dict(pal={"h": "F6B4C2", "b": "E58CA6", "s": "B0607E"}, n=6,
+                        stamps=[["h", "s"], ["hb", "bs"], [".h.", "hbb", ".s."]], weights=[3, 3, 1]),
+    # crowberry: tiny purple flowers
+    "crowberry": dict(pal={"h": "9C5A92", "b": "7B3A6E", "s": "56264C"}, n=8,
+                      stamps=[["h"], ["hb"], ["h", "s"]], weights=[3, 2, 2]),
+}
+BUSH_SRC = os.path.join(ROOT, "mods", "base", "source", "blocks", "bloom")
+GAME = os.path.join(ROOT, "mods", "base", "assets", "textures", "block")
+
+
+def drawn_flower(px):
+    """A pixel of a flower already in the drawing: not green, not bark."""
+    import colorsys
+    r, g, b, a = px
+    if a == 0:
+        return False
+    h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+    return h * 360 < 25 or h * 360 > 200 or l > 0.75
+
+
+def bush_bloom(name):
+    spec = BUSHES[name]
+    src = os.path.join(BUSH_SRC, f"{name}_bush_stage_2.png")
+    if not os.path.exists(src):  # the first run keeps the approved drawing
+        os.makedirs(BUSH_SRC, exist_ok=True)
+        Image.open(os.path.join(GAME, f"{name}_bush_stage_2.png")).save(src)
+    tile = np.asarray(Image.open(src).convert("RGBA")).copy()
+    n = tile.shape[0]
+    taken = np.array([[drawn_flower(tile[y, x]) for x in range(n)] for y in range(n)])
+    rng = np.random.default_rng(SEED.get(name, sum(map(ord, name))))
+    w = np.array(spec["weights"], float)
+    out = tile.copy()
+    placed, tries = 0, 0
+    while placed < spec["n"] and tries < 6000:
+        tries += 1
+        st = spec["stamps"][rng.choice(len(w), p=w / w.sum())]
+        y, x = rng.integers(0, n, 2)
+        cells = [(y + i, x + j, ch) for i, row in enumerate(st) for j, ch in enumerate(row) if ch != "."]
+        if any(cy >= n or cx >= n or tile[cy, cx, 3] == 0 for cy, cx, _ in cells):
+            continue
+        if any(taken[min(max(cy + dy, 0), n - 1), min(max(cx + dx, 0), n - 1)] for cy, cx, _ in cells for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
+            continue
+        for cy, cx, ch in cells:
+            out[cy, cx, :3] = hexc(spec["pal"][ch])
+            taken[cy, cx] = True
+        placed += 1
+    return tile, out, placed
+
+
+def bushes(outdir):
+    os.makedirs(outdir, exist_ok=True)
+    F = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial Bold.ttf", 20)
+    S = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 15)
+    cell = 224
+    im = Image.new("RGB", (40 + len(BUSHES) * (2 * cell + 40), 70 + cell + 60), (42, 32, 26))
+    d = ImageDraw.Draw(im)
+    d.text((14, 14), "Fruiting bushes in flower (stage 2): the drawing today | with more flowers (dense, as B)", font=F, fill=(245, 228, 188))
+    for i, name in enumerate(BUSHES):
+        before, after, placed = bush_bloom(name)
+        Image.fromarray(after).save(os.path.join(outdir, f"{name}_bush_stage_2.png"))
+        x = 20 + i * (2 * cell + 40)
+        for j, arr in enumerate((before, after)):
+            g = Image.new("RGBA", (cell, cell), (53, 44, 36, 255))
+            g.alpha_composite(Image.fromarray(arr).resize((cell, cell), Image.NEAREST))
+            im.paste(g.convert("RGB"), (x + j * (cell + 6), 60))
+        d.text((x, 60 + cell + 8), f"{name}: +{placed} flowers", font=S, fill=(255, 190, 69))
+    out = os.path.join(outdir, "bushes_sheet.png")
+    im.save(out)
+    print(out)
+
+
 def main(density, outdir):
     os.makedirs(outdir, exist_ok=True)
     results = []
@@ -156,4 +241,4 @@ def main(density, outdir):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    (bushes(sys.argv[2]) if sys.argv[1] == "bushes" else main(sys.argv[1], sys.argv[2]))
