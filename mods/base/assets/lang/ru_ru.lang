@@ -622,3 +622,4 @@ item.base.wool_cloak = Шерстяной плащ
 item.base.fur_robe = Меховая накидка
 item.base.rain_cape = Дождевая накидка
 item.base.rain_cape.tooltip = Под ней дождь вас не мочит.
+death.base.dropped = Надгробию негде было встать: ваши вещи упали там, где вы погибли.

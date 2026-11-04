@@ -129,21 +129,38 @@ fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
     if !w.creative(player) {
         crate::clothing::set_aside(w, player);
     }
+    // This death's tombstone or none: never the last one's (integration review: dying in lava
+    // pointed the way to an older one).
+    if let Some(g) = w.component_mut(player, &base_api::GRAVE) {
+        g.set = 0;
+    }
+    if let Some(d) = w.component_mut(player, &crate::death::DROPPED) {
+        *d = 0;
+    }
     let inv = w.inventory(player);
     let carried: Vec<ItemStack> = (0..inv.size()).map(|i| inv.get(i)).collect();
     if carried.iter().all(|s| s.is_empty()) || w.creative(player) {
         return;
     }
+    // Into air, or water, lava or anything a block replaces (tall grass, snow), up to 8 above.
     let base = [pos[0].floor() as i32, pos[1].floor() as i32, pos[2].floor() as i32];
+    let room = |s: u32| {
+        s == 0 || block_name(s).starts_with("core:air") || state_flags(s) & (abi::block_flags::REPLACEABLE | abi::block_flags::LIQUID) != 0
+    };
     let Some(at) = (0..8)
         .map(|dy| [base[0], base[1] + dy, base[2]])
-        .find(|&p| w.get(p) == 0 || block_name(w.get(p)).starts_with("core:air"))
+        .find(|&p| room(w.get(p)))
     else {
+        // Nowhere: the engine drops it all where one died.
+        if let Some(d) = w.component_mut(player, &crate::death::DROPPED) {
+            *d = 1;
+        }
         return;
     };
     w.set(at, TOMBSTONE.id());
     if let Some(g) = w.component_mut(player, &base_api::GRAVE) {
-        *g = base_api::Grave { x: at[0], y: at[1], z: at[2], set: 1 };
+        // `set` is the dimension + 1: the marker and the grace look for it only there.
+        *g = base_api::Grave { x: at[0], y: at[1], z: at[2], set: w.dimension() + 1 };
     }
     let grave = w.block_entity(at);
     if grave == 0 {

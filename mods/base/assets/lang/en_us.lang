@@ -629,3 +629,4 @@ item.base.wool_cloak = Wool Cloak
 item.base.fur_robe = Fur Robe
 item.base.rain_cape = Rain Cape
 item.base.rain_cape.tooltip = Rain doesn't make you wet under it.
+death.base.dropped = There was nowhere for a tombstone: your things fell where you died.
