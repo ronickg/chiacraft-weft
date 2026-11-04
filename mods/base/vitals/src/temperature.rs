@@ -60,6 +60,12 @@ pub fn air(p: &Place) -> f32 {
     t + p.fire
 }
 
+/// The day's mean air where one stands: the biome's mean, the season, the height (what a room's
+/// heavy walls hold to, `shelter::Room::air`).
+pub fn day_mean(p: &Place) -> f32 {
+    if p.underground { p.biome_c } else { p.biome_c + p.season - 0.0065 * p.altitude.max(0.0) }
+}
+
 /// Degrees the season adds to a biome's mean: `swing` its half range between summer and winter
 /// (a taiga's 18, a jungle's 2), `year` 0 to 1 from midwinter (coldest at 0, warmest at 0.5).
 pub fn season(swing: f32, year: f32) -> f32 {

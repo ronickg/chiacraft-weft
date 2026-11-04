@@ -613,3 +613,13 @@ hud.base.way.4 = behind you
 hud.base.way.5 = behind to the right
 hud.base.way.6 = to the right
 hud.base.way.7 = ahead to the right
+
+# Rooms (survival/shelter.rs, vitals::shelter)
+hud.base.room = Sheltered · {0} walls, {1} °C
+hud.base.wall.log = log
+hud.base.wall.earth = earth
+hud.base.wall.snow = snow
+hud.base.wall.plank = plank
+hud.base.wall.stone = stone
+hud.base.wall.hide = hide
+hud.base.wall.glass = glass

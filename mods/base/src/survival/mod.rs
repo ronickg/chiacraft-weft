@@ -20,6 +20,7 @@ mod camp;
 mod food;
 mod health;
 mod load;
+mod shelter;
 mod stamina;
 mod temperature;
 

@@ -614,3 +614,24 @@ logged in `notes/crew/OVERNIGHT.md`):
   (TerraFirmaCraft's way: never fresher by merging; `survival::food::merge_food`). Hot food stays
   apart until it cools; stews don't stack.
 
+**18. Rooms** (2026-11-04 overnight, `notes/CONTENT.md` decision 7, taken by the content plan; the
+numbers are `reports/content/Building and workstations.md` B3; `vitals::shelter`,
+`survival/shelter.rs`):
+
+- A room is the air around a player found by a flood fill of the open blocks once a second: if it
+  reaches open sky or grows past 400 blocks, it's the outdoors. Its wall faces are classed by what
+  they're made of (logs; earth, sand, clay; snow; planks and other wood; stone and brick; wool,
+  leaves and hay as hide; glass).
+- In a room the wind is shut out, the walls let in their share of the day's swing (earth and
+  stone 15%, logs 40%, planks 60%, hide, snow and glass 90%), and it keeps 2 °C over the outside
+  empty; with a fire it warms by its walls (log, earth, snow +25 °C; plank, stone +16; hide,
+  glass +12), fully up to 60 blocks of air and down to 40% in a bigger room, never less than the
+  fire gives beside it.
+- The HUD says "Sheltered · log walls, +18 °C" while in one.
+- Checks (`vitals::balance`): a fire in a log cabin keeps a player in arrival clothes
+  comfortable on a -20 °C night; logs keep a fire's heat better than stone, stone than hide; an
+  earthen room is cooler than a desert afternoon.
+- Not yet: rooms for tames and eggs (only players' air uses them), doors counted as openings
+  when open (an open door already lets the fill out), body heat in a small room, snow walls
+  melting, thatch roofs' extra.
+

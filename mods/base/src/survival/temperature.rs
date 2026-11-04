@@ -8,6 +8,7 @@
 use base_api::{Air, Vitals};
 use vitals::clothing::{self, Worn};
 use vitals::effects::{self, Effect, Group};
+use vitals::shelter::WALLS;
 use vitals::temperature::{self, Body};
 use vitals::{calendar, stomach};
 use weft_sdk::*;
@@ -19,7 +20,28 @@ const WET_SECS: f32 = 120.0;
 /// Blocks around one searched for heat and comfort.
 const HEAT_REACH: i32 = 7;
 
+value! {
+    /// The room a player is in (`shelter.rs`), for the HUD: its main wall class (`WALLS` index + 1, 0
+    /// for none) and the degrees it is over the air outside.
+    pub struct Shelter { pub wall: u32, pub gain: i32 }
+}
+pub static ROOM: Component<Shelter> = Component::named("base:room");
+static HUD_ROOM: HudElement = HudElement::named("room");
+
 pub fn register(r: &mut Registry) {
+    r.entity_component(&ROOM, Shelter { wall: 0, gain: 0 }, component_flags::SYNC_OWNER);
+    r.attach(&PLAYER, &ROOM);
+    // "Sheltered · log walls, +18 °C" (over the air outside), under the vitals' bars while in a room.
+    r.hud_element(&HUD_ROOM, hud_anchor::TOP_LEFT, 8, |ui| {
+        ui.text_bind(|c, out| match c.component(&ROOM) {
+            Some(r) if r.wall > 0 && !c.creative() => {
+                let wall = WALLS[(r.wall as usize - 1).min(WALLS.len() - 1)].name();
+                let gain = format!("{:+}", r.gain);
+                out.set("hud.base.room", &[Arg::Key(&format!("hud.base.wall.{wall}")), Arg::Text(&gain)]);
+            }
+            _ => out.text(""),
+        });
+    });
     // Jumps to a day of a season (the first without one), keeping the hour.
     r.command("season", "[season:word(spring,summer,autumn,winter)] [day:int]", |cmd| {
         let w = cmd.world();
@@ -82,8 +104,24 @@ pub fn feel(w: &World, id: u64, st: &EntityState, v: &mut Vitals, s: &stomach::S
     if v.core < 20.0 {
         v.core = temperature::CORE; // saved before the body had a temperature
     }
-    // Through windproof clothes, only part of the wind chills.
-    let felt = temperature::through_clothes(here.still, here.celsius, worn.windproof);
+    // Through windproof clothes, only part of the wind chills; in a room (`shelter.rs`) the wind
+    // is shut out, its walls even out the day and a fire in it warms it by its walls.
+    let outdoors = temperature::through_clothes(here.still, here.celsius, worn.windproof);
+    let feet = st.pos.map(|v| v.floor() as i32);
+    let room = if here.underground || st.in_liquid != 0 { None } else { super::shelter::room(w, feet) };
+    let felt = room.map_or(outdoors, |r| r.air(here.mean, here.still - here.fire, here.fire));
+    if let Some(r) = w.component_mut(id, &ROOM) {
+        *r = match room {
+            Some(room) => Shelter {
+                wall: WALLS
+                    .iter()
+                    .position(|&x| x == room.main_wall())
+                    .map_or(0, |i| i as u32 + 1),
+                gain: (felt - outdoors).round() as i32,
+            },
+            None => Shelter { wall: 0, gain: 0 },
+        };
+    }
     v.core = temperature::step_core(v.core, body.target(felt), 1.0, 70.0);
     v.outside = felt;
 

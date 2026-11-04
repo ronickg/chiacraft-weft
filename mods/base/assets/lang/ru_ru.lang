@@ -606,3 +606,13 @@ hud.base.way.5 = сзади справа
 hud.base.way.6 = справа
 hud.base.way.7 = впереди справа
 hud.base.badge = {0}
+
+# Комнаты (survival/shelter.rs, vitals::shelter)
+hud.base.room = Укрытие · стены: {0}, {1} °C
+hud.base.wall.log = брёвна
+hud.base.wall.earth = земля
+hud.base.wall.snow = снег
+hud.base.wall.plank = доски
+hud.base.wall.stone = камень
+hud.base.wall.hide = шкуры
+hud.base.wall.glass = стекло

@@ -169,6 +169,8 @@ pub struct Air {
     pub still: f32,
     /// The biome's humidity, 0 dry to 1 wet (drying racks).
     pub humidity: f32,
+    /// The day's mean air here (`temperature::day_mean`): what a room's walls hold to.
+    pub mean: f32,
     /// Degrees from the nearest fire (lava, a lit furnace, torches).
     pub fire: f32,
     /// Sky light at the eyes: under 13 a roof, 0 deep inside.
@@ -240,6 +242,7 @@ pub fn air_at(w: &World, pos: [f64; 3], height: f32, in_water: bool, reach: i32,
         celsius: temperature::air(&place),
         still: temperature::air(&temperature::Place { wind: 0.0, ..place }),
         humidity: climate.humidity,
+        mean: temperature::day_mean(&place),
         fire,
         sky,
         underground,

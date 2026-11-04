@@ -105,6 +105,20 @@ Worn in four slots of their own under armor (hat, coat, trousers, boots), no arm
 | hide | 0.8 | 10 | -1 | 30% | 70% | [1, 2, 1, 1] | leather |
 | linen | 0.5 | 6 | 4 | 20% | 10% | [2, 4, 3, 2] | plant fibre spun and woven |
 
+## Rooms
+
+An enclosed space (`vitals::shelter`; up to 400 blocks of air, none open to the sky) shuts out the wind, lets in its walls' share of the day's swing, and keeps 2 °C over the air outside empty, or a fire's gain by its walls with a fire in it (full up to 60 blocks of air, at least 40% in a bigger room; never less than the fire gives beside it).
+
+| wall | a fire in the room | the day's swing let in |
+|---|---|---|
+| log | +25 °C | 40% |
+| earth | +25 °C | 15% |
+| snow | +25 °C | 90% |
+| plank | +16 °C | 60% |
+| stone | +16 °C | 15% |
+| hide | +12 °C | 90% |
+| glass | +12 °C | 90% |
+
 ## Effects
 
 | effect | group | changes |
