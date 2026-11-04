@@ -49,7 +49,10 @@ pub fn register(r: &mut Registry) {
             (1, base_api::has_room(&w, player, q.item()))
         } else if q.item() == crate::cooking::STEW.id() {
             // A stew all at once: what it holds is on the stack in hand.
-            let held = w.inventory(player).group("hotbar").get(w.selected_slot(player));
+            let held = w
+                .inventory(player)
+                .group("hotbar")
+                .get(w.selected_slot(player));
             if held.item != q.item() {
                 return Verdict::Abstain;
             }
@@ -69,7 +72,10 @@ pub fn register(r: &mut Registry) {
         };
         let now = w.time();
         let mut told = TOLD.lock().unwrap();
-        let last = told.get_or_insert_with(HashMap::new).entry(player).or_insert(0);
+        let last = told
+            .get_or_insert_with(HashMap::new)
+            .entry(player)
+            .or_insert(0);
         if *last == 0 || now >= *last + REFUSED_EVERY || now < *last {
             *last = now.max(1);
             w.send(player, &REFUSED, &refused);
