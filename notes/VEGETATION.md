@@ -62,8 +62,11 @@ biomes. No engine change for any of it.
 5. **Deadwood:** a `Snag` form (a bare trunk 3-6 high with a branch stub), 3% of wild forest
    trees, beside the fallen and stump forms.
 
-Built (2026-11-04, branch `vegetation-layers`): 1, 2 (ferns; the two-block grass waits for its
-art), 3, 4, 5. Mushrooms round trunks are still to do.
+Built (2026-11-04, branches `vegetation-layers`, then `sequoia`): all five, with Art's floor
+blocks (leaf litter, moss block, coarse dirt), bracken, the two-block grass, and willow, juniper and
+creosote leaves in their own colours (Ronald: "Yes, Art's picks"). Per biome also `FERN_KINDS`
+(the grove's sword fern), `YOUNG_KINDS` (the grove's dogwoods, firs and sequoias) and
+`TALL_GRASS_SHARE`. Mushrooms round trunks are still to do.
 
 ## Cost
 

@@ -47,8 +47,14 @@ pub static FLOOR_COVER: Component<f32> = Component::named("floor_cover");
 pub static FERNS: Component<f32> = Component::named("ferns");
 pub static SHRUBS: Component<f32> = Component::named("shrubs");
 pub static SHRUB_KINDS: Component<BlockList> = Component::named("shrub_kinds");
-/// Young trees of the biome's `TREE_KINDS`, the chance per 5 x 5 cell, out of the thick stands.
+/// Young trees of the biome's `YOUNG_KINDS` (else its `TREE_KINDS`), the chance per 5 x 5 cell,
+/// out of the thick stands.
 pub static YOUNG_TREES: Component<f32> = Component::named("young_trees");
+pub static YOUNG_KINDS: Component<BlockList> = Component::named("young_kinds");
+/// The biome's fern (`FERN`, bracken, where unset).
+pub static FERN_KINDS: Component<BlockList> = Component::named("fern_kinds");
+/// The share of a biome's tall grass that grows two blocks tall (`TALL_GRASS_DOUBLE`).
+pub static TALL_GRASS_SHARE: Component<f32> = Component::named("tall_grass_share");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
 pub use base_api::trees::{TREE_LEAVES, grow_tree};
 use base_api::trees::{tree_blocks, wild_tree_at};
@@ -230,7 +236,13 @@ pub fn register(r: &mut Registry) {
         .set(&TREES, 0.12)
         .set(&STAND_TREES, 0.1)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:sequoia_grove").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
-        .set_text(&TREE_KINDS, "base:spruce_log:3 base:oak_log:1");
+        .set_text(&TREE_KINDS, "base:spruce_log:3 base:oak_log:1")
+        // The giants among them (Plants): Giant Forest holds some 4-12 big sequoias a hectare;
+        // a grove patch about 260 across at 0.45 per 24 x 24 cell is some 50, about 7 a hectare.
+        .set(&GIANT_TREES, 0.45)
+        .set_text(&GIANT_KINDS, "base:sequoia_log")
+        // Lupine in its sunny gaps and meadows.
+        .set_text(&FLOWERS, "base:lupine");
     r.biome(&OCEAN)
         .set(&CLIMATE, base_api::climate("base:ocean"))
         .surface("sand", "sand", 3)
@@ -270,6 +282,15 @@ pub fn register(r: &mut Registry) {
         r.set_on(b(), &FERNS, l.ferns);
         if l.young > 0.0 {
             r.set_on(b(), &YOUNG_TREES, l.young);
+        }
+        if !l.young_kinds.is_empty() {
+            r.set_text_on(b(), &YOUNG_KINDS, l.young_kinds);
+        }
+        if !l.fern.is_empty() {
+            r.set_text_on(b(), &FERN_KINDS, l.fern);
+        }
+        if l.tall_grass > 0.0 {
+            r.set_on(b(), &TALL_GRASS_SHARE, l.tall_grass);
         }
         if l.shrubs > 0.0 {
             r.set_on(b(), &SHRUBS, l.shrubs);
@@ -336,7 +357,11 @@ fn young_tree(s: &mut Site) {
     }
     let [x, y, z] = s.pos();
     let h = s.random();
-    let log = TREE_KINDS.on_biome(s.biome()).and_then(|l| l.pick(h >> 40)).unwrap_or(OAK_LOG.id());
+    let log = YOUNG_KINDS
+        .on_biome(s.biome())
+        .or_else(|| TREE_KINDS.on_biome(s.biome()))
+        .and_then(|l| l.pick(h >> 40))
+        .unwrap_or(OAK_LOG.id());
     base_api::trees::young_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
         if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
     });
@@ -415,9 +440,39 @@ fn giant(s: &mut Site) {
     let h = s.random();
     let Some(log) = GIANT_KINDS.on_biome(s.biome()).and_then(|l| l.pick(h >> 40)) else { return };
     let [x, y, z] = s.pos();
+    // One in twelve lies fallen, mossy, along the ground (the overworld's: its height is known).
+    if (h >> 4).is_multiple_of(12) && s.dimension() == crate::OVERWORLD.id() {
+        fallen_giant(s, h);
+        return;
+    }
     base_api::trees::giant_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
         if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
     });
+}
+
+/// A fallen giant: a mossy trunk three wide lying 14 to 22 long through its site, following the
+/// ground under it (half sunk in it, only filling air), its root end a little wider.
+fn fallen_giant(s: &mut Site, h: u64) {
+    let [x, _, z] = s.pos();
+    let (ax, az, axis) = if h >> 12 & 1 == 0 { (1, 0, "x") } else { (0, 1, "z") };
+    let log = state_with(MOSSY_SEQUOIA_LOG.id(), "axis", axis).unwrap_or(MOSSY_SEQUOIA_LOG.id());
+    let half = 7 + ((h >> 16) % 5) as i32;
+    let seed = s.seed();
+    for k in -half..=half {
+        let (cx, cz) = (x + ax * k, z + az * k);
+        let ground = crate::OVERWORLD.column(seed, cx, cz).height;
+        let r2 = if k <= -half + 2 { 5 } else { 2 };
+        for dy in -2i32..=2 {
+            for d in -2i32..=2 {
+                if d * d + dy * dy > r2 {
+                    continue;
+                }
+                // Across the trunk: the other axis.
+                let (px, pz) = (cx + az * d, cz + ax * d);
+                s.put([px, ground + 1 + dy, pz], log);
+            }
+        }
+    }
 }
 static BOULDER_SITES: Scatter = Scatter::named("boulders");
 static SHRUB_SITES: Scatter = Scatter::named("shrubs");
@@ -607,12 +662,20 @@ fn decorate(g: &mut Gen) {
                         g.set(x, y, z, flower);
                     }
                 } else if roll < flower_chance + grass_chance {
-                    g.set(x, y, z, TALL_GRASS.id());
+                    // Part of it two blocks tall where the biome grows it (`TALL_GRASS_SHARE`).
+                    let double = TALL_GRASS_SHARE.on_biome(b).unwrap_or(0.0) as f64;
+                    if y + 1 < 16 && g.get(x, y + 1, z) == 0 && unit(hash(seed ^ 0x2A55, wx as i64, 0, wz as i64)) < double {
+                        g.set(x, y, z, state_with(TALL_GRASS_DOUBLE.id(), "half", "lower").unwrap_or(TALL_GRASS_DOUBLE.id()));
+                        g.set(x, y + 1, z, state_with(TALL_GRASS_DOUBLE.id(), "half", "upper").unwrap_or(TALL_GRASS_DOUBLE.id()));
+                    } else {
+                        g.set(x, y, z, TALL_GRASS.id());
+                    }
                 } else if let Some(ferns) = FERNS.on_biome(b).filter(|&f| f > 0.0) {
                     // Ferns on the bare soil (`FERNS`), three times as thick round a trunk.
                     let thick = if beside_log(g, x, y, z) { 3.0 } else { 1.0 };
                     if unit(hash(seed ^ 0xFE4, wx as i64, 0, wz as i64)) < (ferns * thick) as f64 {
-                        g.set(x, y, z, FERN.id());
+                        let fern = FERN_KINDS.on_biome(b).and_then(|l| l.pick(h >> 20)).unwrap_or(FERN.id());
+                        g.set(x, y, z, fern);
                     }
                 }
             } else if SAND_TAG.on_block(below)

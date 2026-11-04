@@ -17,6 +17,8 @@ pub struct Layers {
     /// Ferns, the share of the plant soil left bare by grass and flowers; round trunks three times
     /// as thick.
     pub ferns: f32,
+    /// Which fern (`base:fern`, bracken, where empty; the grove's sword fern).
+    pub fern: &'static str,
     /// Shrub clumps, the chance of one per 4 x 4 cell (in thickets: patches some 24 blocks across
     /// hold them, the rest of the ground none).
     pub shrubs: f32,
@@ -25,6 +27,11 @@ pub struct Layers {
     /// Young trees of the biome's kinds, the chance of one per 5 x 5 cell, in clearings and at
     /// the stands' edges where light comes in (none deep in a stand).
     pub young: f32,
+    /// The young trees' kinds, by weight (the biome's own `TREE_KINDS` where empty).
+    pub young_kinds: &'static str,
+    /// The share of the tall grass that grows two blocks tall (the prairie's big bluestem, the
+    /// llanos' grasses).
+    pub tall_grass: f32,
 }
 
 const fn l(
@@ -36,25 +43,33 @@ const fn l(
     shrub_kinds: &'static str,
     young: f32,
 ) -> Layers {
-    Layers { biome, floor, floor_cover, ferns, shrubs, shrub_kinds, young }
+    Layers { biome, floor, floor_cover, ferns, fern: "", shrubs, shrub_kinds, young, young_kinds: "", tall_grass: 0.0 }
 }
 
-/// Each biome's layers. Shrubs: Białowieża's hazel and hornbeam under the oaks; Moscow's rowan
-/// and raspberry under birches (birch leaves stand in); Fairbanks' willow and alder at the edges
-/// (birch leaves stand in) and juniper (spruce); Konza's dogwood and sumac thickets (oak); the
-/// llanos' and the Pantanal's scattered shrubs; Davos' dwarf mountain pine and juniper mats
-/// (spruce); the tundra's dwarf willow and birch (birch). The look of their own leaves is Chiacraft's
-/// to draw; until then they are the trees' leaves.
-pub const LAYERS: [Layers; 9] = [
-    l("base:plains", "base:dirt", 0.03, 0.0, 0.06, "base:oak_leaves", 0.0),
-    l("base:forest", "base:podzol:3 base:dirt:1", 0.25, 0.05, 0.2, "base:oak_leaves:3 base:birch_leaves:1", 0.15),
-    l("base:birch_forest", "base:podzol", 0.15, 0.06, 0.18, "base:birch_leaves:2 base:oak_leaves:1", 0.25),
-    l("base:taiga", "", 0.0, 0.03, 0.16, "base:birch_leaves:2 base:spruce_leaves:1", 0.25),
-    l("base:snowy_plains", "", 0.0, 0.0, 0.1, "base:birch_leaves", 0.0),
-    l("base:savanna", "base:dirt", 0.04, 0.0, 0.05, "base:acacia_leaves", 0.0),
-    l("base:swamp", "", 0.0, 0.02, 0.12, "base:oak_leaves", 0.0),
-    l("base:mountains", "base:gravel", 0.04, 0.02, 0.14, "base:spruce_leaves", 0.1),
-    l("base:desert", "base:gravel", 0.03, 0.0, 0.08, "base:mesquite_leaves", 0.0),
+/// Each biome's layers. Floors: Białowieża's leaf litter and moss, Fairbanks' moss carpet,
+/// Konza's, the llanos' and Sonora's bare stony ground. Shrubs: Białowieża's hazel and hornbeam
+/// under the oaks; Moscow's rowan and raspberry under birches (birch leaves stand in); Fairbanks'
+/// willow at the edges and juniper; Konza's dogwood and sumac thickets (oak leaves stand in); the
+/// llanos' and the Pantanal's scattered shrubs; Davos' juniper mats; the tundra's dwarf willow;
+/// Sonora's creosote bush.
+pub const LAYERS: [Layers; 10] = [
+    Layers { tall_grass: 0.4, ..l("base:plains", "base:coarse_dirt", 0.03, 0.0, 0.06, "base:oak_leaves", 0.0) },
+    l("base:forest", "base:leaf_litter:3 base:moss_block:1", 0.25, 0.05, 0.2, "base:oak_leaves:3 base:birch_leaves:1", 0.15),
+    l("base:birch_forest", "base:leaf_litter", 0.15, 0.06, 0.18, "base:birch_leaves:2 base:oak_leaves:1", 0.25),
+    l("base:taiga", "base:moss_block:3 base:podzol:1", 0.2, 0.03, 0.16, "base:willow_leaves:2 base:juniper_leaves:1", 0.25),
+    l("base:snowy_plains", "", 0.0, 0.0, 0.1, "base:willow_leaves", 0.0),
+    Layers { tall_grass: 0.5, ..l("base:savanna", "base:coarse_dirt", 0.04, 0.0, 0.05, "base:acacia_leaves", 0.0) },
+    l("base:swamp", "base:moss_block", 0.08, 0.02, 0.12, "base:oak_leaves", 0.0),
+    l("base:mountains", "base:moss_block:1 base:gravel:1", 0.06, 0.02, 0.14, "base:juniper_leaves", 0.1),
+    l("base:desert", "base:gravel:1 base:coarse_dirt:1", 0.03, 0.0, 0.08, "base:creosote_leaves", 0.0),
+    // Giant Forest: needle and bark litter under the giants, sword fern on the moist floor, the
+    // Pacific dogwood the commonest small tree under them with young firs and sequoias in the
+    // gaps, few shrubs (`blocks.rs`, `grove`).
+    Layers {
+        fern: "base:sword_fern",
+        young_kinds: "base:dogwood_log:3 base:spruce_log:1 base:sequoia_log:1",
+        ..l("base:sequoia_grove", "base:podzol:2 base:leaf_litter:1", 0.2, 0.1, 0.06, "base:dogwood_leaves", 0.2)
+    },
 ];
 
 /// A biome's layers, if it has any.
@@ -86,6 +101,7 @@ mod tests {
             assert!(l.shrubs == 0.0 || !l.shrub_kinds.is_empty(), "{}: shrubs with no kinds", l.biome);
             assert!(l.floor_cover == 0.0 || !l.floor.is_empty(), "{}: a floor cover with no blocks", l.biome);
             assert!((0.0..=0.5).contains(&l.young), "{}: young trees", l.biome);
+            assert!((0.0..=1.0).contains(&l.tall_grass), "{}: tall grass share", l.biome);
             assert!(crate::climate::of(l.biome).is_some(), "{}: no climate", l.biome);
         }
     }

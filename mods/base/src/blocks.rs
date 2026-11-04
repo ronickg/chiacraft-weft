@@ -82,6 +82,16 @@ pub static DOGWOOD_LEAVES: Block = Block::named("dogwood_leaves");
 pub static MOSSY_SEQUOIA_LOG: Block = Block::named("mossy_sequoia_log");
 /// Bracken and the woods' ferns, under the trees (`vitals::layers`).
 pub static FERN: Block = Block::named("fern");
+/// The forest floor's blocks (`vitals::layers`): fallen leaves, a moss carpet, stony bare dirt.
+pub static LEAF_LITTER: Block = Block::named("leaf_litter");
+pub static MOSS_BLOCK: Block = Block::named("moss_block");
+pub static COARSE_DIRT: Block = Block::named("coarse_dirt");
+/// The shrubs' own leaves, in their own colours: willow, juniper, creosote bush.
+pub static WILLOW_LEAVES: Block = Block::named("willow_leaves");
+pub static JUNIPER_LEAVES: Block = Block::named("juniper_leaves");
+pub static CREOSOTE_LEAVES: Block = Block::named("creosote_leaves");
+/// Grass two blocks tall (the prairie's big bluestem, the llanos' grasses): `half` lower, upper.
+pub static TALL_GRASS_DOUBLE: Block = Block::named("tall_grass_double");
 
 /// Log axis along the clicked face, like vanilla.
 fn axis_placement(p: &Place, props: &mut Props) {
@@ -190,7 +200,7 @@ fn grove(r: &mut Registry) {
         .mineable("shears")
         .tab(&crate::tabs::NATURAL);
     r.loot(&DOGWOOD_LEAVES).pool(Pool::new().when(Cond::Chance(0.05)).item("stick"));
-    // A fallen giant's bark under moss; its end is the sequoia's until its own is drawn.
+    // A fallen giant's bark under moss, its end mossy too.
     r.block(&MOSSY_SEQUOIA_LOG)
         .sound_group("wood")
         .hardness(2.0)
@@ -201,9 +211,9 @@ fn grove(r: &mut Registry) {
         .set(&FUEL, 300)
         .prop("axis", ["y", "x", "z"])
         .states(|p, s| match p.get("axis") {
-            "y" => s.textures("log_sequoia_top", "log_sequoia_mossy", "log_sequoia_top"),
-            "x" => s.faces(["log_sequoia_top", "log_sequoia_top", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy"]),
-            _ => s.faces(["log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_top", "log_sequoia_top"]),
+            "y" => s.textures("log_sequoia_mossy_top", "log_sequoia_mossy", "log_sequoia_mossy_top"),
+            "x" => s.faces(["log_sequoia_mossy_top", "log_sequoia_mossy_top", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy"]),
+            _ => s.faces(["log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy_top", "log_sequoia_mossy_top"]),
         })
         .placement(axis_placement)
         .tab(&crate::tabs::NATURAL);
@@ -703,10 +713,53 @@ pub fn register(r: &mut Registry) {
         .mineable("shovel")
         .tag("dirt")
         .tab(&crate::tabs::NATURAL);
-    // Ferns on the forest floor (`vitals::layers`): the Cretaceous fern's look until bracken's own.
+    // The forest floor (`vitals::layers`): soil like dirt, so plants grow on it.
+    for (b, top, side, sound) in [
+        (&LEAF_LITTER, "leaf_litter_top", "leaf_litter_side", "grass"),
+        (&MOSS_BLOCK, "moss_block_top", "moss_block_side", "grass"),
+        (&COARSE_DIRT, "coarse_dirt", "coarse_dirt", "gravel"),
+    ] {
+        r.block(b)
+            .sound_group(sound)
+            .textures(top, side, "dirt")
+            .hardness(0.5)
+            .mineable("shovel")
+            .tag("dirt")
+            .tab(&crate::tabs::NATURAL);
+    }
+    // The shrubs' leaves (`vitals::layers`), drawn in their own colours: not tinted.
+    for (b, tex) in [(&WILLOW_LEAVES, "leaves_willow"), (&JUNIPER_LEAVES, "leaves_juniper"), (&CREOSOTE_LEAVES, "leaves_creosote")] {
+        r.block(b)
+            .sound_group("grass")
+            .texture(tex)
+            .hardness(0.2)
+            .cutout()
+            .cull_same()
+            .opacity(1)
+            .tag("leaves")
+            .redstone_blocker()
+            .mineable("shears")
+            .tab(&crate::tabs::NATURAL);
+        r.loot(b).pool(Pool::new().when(Cond::Chance(0.05)).item("stick"));
+    }
+    // Grass two blocks tall: the lower half on soil, the upper on the lower; breaking the lower
+    // takes the upper with it (it loses its support).
+    r.tag("tall_grass_soil", &["#plant_soil", "tall_grass_double"]);
+    r.block(&TALL_GRASS_DOUBLE)
+        .sound_group("grass")
+        .plant()
+        .needs_below("#tall_grass_soil")
+        .tint(&tints::GRASS)
+        .prop("half", ["lower", "upper"])
+        .states(|p, s| s.texture(if p.get("half") == "upper" { "tall_grass_upper" } else { "tall_grass_lower" }))
+        .no_item();
+    r.loot(&TALL_GRASS_DOUBLE)
+        .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
+        .pool(Pool::new().when(Cond::Chance(vitals::clothing::FIBRE_CHANCE)).item("plant_fibre"));
+    // Ferns on the forest floor (`vitals::layers`): bracken.
     r.block(&FERN)
         .sound_group("grass")
-        .texture("fern")
+        .texture("bracken")
         .plant()
         .needs_below("#plant_soil")
         .tab(&crate::tabs::NATURAL);
