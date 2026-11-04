@@ -508,6 +508,20 @@ fn behind_at(uv: vec2<f32>, size: vec2<f32>) -> vec4<f32> {
     return vec4(p.xyz / p.w, 1.0);
 }
 
+// How deep the water is under this surface pixel, from the blocks below (`water_depth`). The
+// blocks are known only in a square about 112 blocks to each side of the camera (`solid_at`, the
+// cubes within 7 of the camera's), and past it every water reads "deep": seen from high up, near
+// water turned calm deep teal along a straight edge (the LOD worker's Mac views, 11-05). So the
+// depth eases to "deep" over the square's last stretch, and the edge is a soft band instead.
+// (Taking the depth from the bottom drawn behind instead showed dark stepped squares, a184e9e8.)
+const PROBE_REACH: f32 = 112.0;
+
+fn water_depth_seen(in: VOut) -> f32 {
+    let probed = water_depth(in.pos);
+    let out = max(abs(in.rel.x), abs(in.rel.z));
+    return mix(probed, f32(WATER_PROBE) + 2.0, smoothstep(PROBE_REACH - 40.0, PROBE_REACH - 8.0, out));
+}
+
 // Light playing on the bottom through the waves (`p` world xz): bright crossing lines that drift.
 fn caustics(p: vec2<f32>) -> f32 {
     let t = scene.params.w;
@@ -588,7 +602,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
             let s = rain_rings(in.pos.xz) * rain;
             n = normalize(n + vec3(-s.x, 0.0, -s.y));
         }
-        depth = water_depth(in.pos);
+        depth = water_depth_seen(in);
         shore = shore_distance(in.pos);
     }
     let ndv = max(dot(n, v), 0.02);
@@ -596,7 +610,12 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // what it reflects (the screen's reflections, `post/reflect.wgsl`, use the same).
     // (^2: more of a mirror at a slant, toward Bliss's pale sky-mirror lakes; Water 12.)
     let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.0);
-    let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
+    // Shade on the water from the near shadow map only, fading to sunlit past it: the far map's
+    // coarse texels shaded far water wrongly (duller, no sun's path), and the near map's edge, a
+    // square seen at a slant, showed as a hard-edged rectangle of bright water (the LOD worker's
+    // sea views, very likely Ronald's lake; it went with shadows off, 11-05).
+    let near_map = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, in.rel, vec3(0.0, 1.0, 0.0));
+    let shadow = mix(1.0, min(near_map.x, smoothstep(0.3, 0.8, in.light.x)), near_map.y) * smoothstep(0.75, 1.0, max(in.light.x, near_map.y)) * cloud_shadow(in.rel);
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
     // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
     // further down so that what it mirrors carries, in a little of the biome's own tint (a swamp's
