@@ -236,21 +236,15 @@ pub fn register(r: &mut Registry) {
         .cell(5)
         .reach(8)
         .density(&TREES)
-        .shape(|s| {
-            if STAND_TREES.on_biome(s.biome()).is_some() && stand(s.seed(), s.pos()) < -CLEARING && s.random() % 4 != 0 {
-                return;
-            }
-            tree(s);
-        });
+        // A forest's clearings keep one tree in four.
+        .thin_in(&STAND_TREES, stand_over(-CLEARING).not(), 4)
+        .shape(tree);
     r.scatter(&STAND_SITES)
         .cell(3)
         .reach(8)
         .density(&STAND_TREES)
-        .shape(|s| {
-            if stand(s.seed(), s.pos()) > STAND {
-                tree(s);
-            }
-        });
+        .thin(stand_over(STAND + 1).not(), 0)
+        .shape(tree);
     // Boulders where a biome has them (`BOULDERS`): a heap of stone two to five blocks across, half
     // sunk in the ground, mossy in the woods and the wet.
     r.scatter(&BOULDER_SITES)
@@ -297,9 +291,12 @@ static WET: Tag = Tag::named("wet");
 static WOODS: Tag = Tag::named("forest");
 
 /// The stand noise over the ground, about -4096 to 4096: a forest's stands where it's over
-/// `STAND`, its clearings where it's under `-CLEARING`; one patch is some 40 blocks across.
-fn stand(seed: u64, [x, _, z]: [i32; 3]) -> i32 {
-    fixed::perlin2(fixed::seed32(seed, 0x57A4D), x * 16, z * 16, 40 * 16)
+/// `STAND`, its clearings where it's under `-CLEARING`; one patch is some 40 blocks across. As a
+/// mask that is on where the noise is `edge` or more (one octave of `fbm` is `perlin2` exactly),
+/// so the engine thins sites by it near and in distant terrain alike.
+fn stand_over(edge: i32) -> Mask {
+    let e = edge as f64 / fixed::ONE as f64;
+    Mask::Noise { salt: 0x57A4D, scale: 40.0, octaves: 1, from: e, to: e }
 }
 const STAND: i32 = 600;
 /// Which flower a column of a flower patch grows: one kind to a patch (its 16 x 16 cell), a few

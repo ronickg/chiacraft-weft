@@ -1675,6 +1675,9 @@ unsafe extern "C" fn reg_scatter(r: *mut abi::Registrar, d: *const abi::ScatterD
             reach: d.reach,
             density: d.density.as_str().to_string(),
             shape: d.shape,
+            thin: d.thin.as_slice().to_vec(),
+            thin_keep: d.thin_keep,
+            thin_biomes: d.thin_biomes.as_str().to_string(),
         });
     }
 }

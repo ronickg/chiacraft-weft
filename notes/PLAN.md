@@ -46,6 +46,25 @@ erase what they earned.
    - To offer: room for more worn layers (`client/models.rs`, `MAX_LAYERS` 8 to 12). Armour's
      four, clothes' four and a cloak are nine over the skin, and past 8 the rest were dropped
      silently (the cloak never drew). One constant (branch `claude/cloaks`).
+   - To offer: distant terrain (LOD) fixes, Weft's own LOD (`reports/lod.md`; branch
+     `claude/lod-fixes`):
+     - **Trees per site.** `describe_lod` ran each scatter shape 8 times at the world origin, so
+       far forests were all or nothing by seed. Scatters can now declare a thinning rule
+       (`ScatterBuilder::thin` / `thin_in`: a terrain mask, keep one in N, optionally per biome
+       component) that the engine applies near (`dim::scatter_site`) and on the GPU per real site
+       alike; the canopy sample runs stand on real ground spread over the world.
+     - **Steep faces.** A terrain op `FACES` (`TerrainBuilder::faces(fall, f)`): what bare faces
+       show from a given fall. Distant terrain asks it for steep cells' tops and wall bands, and
+       puts no scattered things there.
+     - **Stable levels.** Split at 4 tile widths, join only past 4.5; a parent stays until all
+       four children are made (no child over its parent); 192 dropped tiles cached; jobs no
+       longer wanted are called off; LOD's mods' heights, meshing and description run on their
+       own low-priority pool, not the one finishing near cubes.
+     - **Smooth far ground.** Tiles from level 3 (8-block cells, about 1 km on) are a heightmap
+       sampled at cell corners, not boxes: a corner grid at the start of the tile's records, a
+       record per cell, skirts at the edges. A prelude helper (`lod_corner`, used by `vs_lod`)
+       morphs odd corners into the next level's shape between 6 and 8 tile widths (CDLOD), so
+       levels meet without seams and swap without a jump; normals from the grid, tints per corner.
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 
