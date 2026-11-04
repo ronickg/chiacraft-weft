@@ -1869,7 +1869,10 @@ fn hosting_address(dir: &str) -> Option<String> {
     let log = std::fs::read_to_string(format!("{dir}/logs/latest.log")).ok()?;
     log.lines()
         .filter(|l| l.contains("hosting '"))
-        .find_map(|l| l.find("chiacraft://w/").map(|i| l[i..].split_whitespace().next().unwrap_or("").to_string()))
+        .find_map(|l| {
+            l.find("chiacraft://w/")
+                .map(|i| l[i..].split_whitespace().next().unwrap_or("").to_string())
+        })
         .filter(|a| a.len() > "chiacraft://w/".len())
 }
 
