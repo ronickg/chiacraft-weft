@@ -56,14 +56,14 @@ pub fn register(r: &mut Registry) {
             .item("stick"),
     );
 
+    // Not `placed_block`: the engine places an item's block before its use, so a rock used on a
+    // nodule would replace it (PC run fh1_tools). `strike` puts them down itself.
     r.item(&ROCK)
         .tag("rocks")
-        .placed_block(&LOOSE_ROCK)
         .on_use(strike)
         .tab(&crate::tabs::INGREDIENTS);
     r.item(&FLINT)
         .tag("flint")
-        .placed_block(&LOOSE_FLINT)
         .on_use(strike)
         .tab(&crate::tabs::INGREDIENTS);
     r.item(&SHARP_FLAKE)
@@ -149,14 +149,14 @@ fn unit(w: &World) -> f32 {
 }
 
 /// A rock or a nodule used on a loose rock or nodule on the ground: one strike (`vitals::first`).
-/// Anything else it's used on, it's put down (its `placed_block`).
+/// Used on the top of anything else, it's put down there.
 fn strike(u: &mut ItemUse) -> bool {
-    let Some((p, _)) = u.target() else { return false };
+    let Some((p, face)) = u.target() else { return false };
     let w = u.world();
     let state = w.get(p);
     let (flint, rock) = (LOOSE_FLINT.is(state), LOOSE_ROCK.is(state));
     if !flint && !rock {
-        return false;
+        return put_down(u, p, face);
     }
     let player = u.player();
     let at = [p[0] as f64 + 0.5, p[1] as f64 + 0.2, p[2] as f64 + 0.5];
@@ -193,6 +193,23 @@ fn strike(u: &mut ItemUse) -> bool {
         } else {
             w.set_prop(p, "struck", &struck.to_string());
         }
+    }
+    true
+}
+
+/// A rock or a nodule put down on the top face of the block at `p` (face 3, +Y), where there's
+/// room: its loose block, one fewer in hand.
+fn put_down(u: &mut ItemUse, p: [i32; 3], face: u32) -> bool {
+    let w = u.world();
+    let at = [p[0], p[1] + 1, p[2]];
+    if face != 3 || w.get(at) != 0 || state_flags(w.get(p)) & abi::block_flags::SOLID == 0 {
+        return false;
+    }
+    let s = u.stack();
+    let block = if s.item == FLINT.id() { LOOSE_FLINT.id() } else { LOOSE_ROCK.id() };
+    w.set(at, block);
+    if !w.creative(u.player()) {
+        u.set_stack(StackData::shrink(s, 1));
     }
     true
 }
