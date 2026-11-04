@@ -625,35 +625,6 @@ pub fn register(r: &mut Registry) {
     r.loot(&DEAD_BUSH)
         .pool(Pool::new().when(Cond::Chance(0.7)).item("stick"))
         .pool(Pool::new().when(Cond::Chance(0.35)).item("stick"));
-<<<<<<< HEAD
-    r.block(&BERRY_BUSH)
-        .sound_group("grass")
-        .prop("age", 0..=3)
-        .states(|p, s| s.texture(&format!("berry_bush_stage_{}", p.get("age"))))
-        .plant()
-        .needs_below("#plant_soil")
-        .no_item()
-        // Flowers to ripe berries by warmth and rain; ripe only in summer and autumn (`growth.rs`).
-        .growth(crate::growth::step_secs("base:berry_bush", 3, 300.0), 9)
-        .on_grow(|e| {
-            let last = crate::growth::age(e) == 2;
-            crate::growth::grow(e, "base:berry_bush", last, |e| crate::growth::next_age(e, 3))
-        });
-    // Any age gives a berry back to plant again; ripe, two more.
-    r.loot(&BERRY_BUSH)
-        .pool(Pool::new().entry(Entry::item("berries")))
-        .pool(
-            Pool::new()
-                .when(Cond::BlockState("age=3"))
-                .entry(Entry::item("berries")),
-        )
-        .pool(
-            Pool::new()
-                .when(Cond::BlockState("age=3"))
-                .entry(Entry::item("berries")),
-        );
-=======
->>>>>>> chihuahua-papillon-model
     // Spoiled food, dung and plant waste rot into compost (`farming.rs`): its level shows as it
     // fills, the top dark and rich when it's ready.
     r.block(&COMPOST_BIN)
