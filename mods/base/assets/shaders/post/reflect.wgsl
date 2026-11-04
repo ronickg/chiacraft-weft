@@ -112,8 +112,8 @@ fn apply(p: PostPixel) -> vec4<f32> {
     let edge = smoothstep(0.0, 0.12, min(min(hit.x, 1.0 - hit.x), min(hit.y, 1.0 - hit.y)));
     // Hills across a lake are hundreds of blocks off: only the very far fades.
     let near = 1.0 - smoothstep(300.0, 700.0, travelled);
-    let fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(-v, n), 0.0), 5.0);
+    let fresnel = 0.04 + 0.96 * pow(1.0 - max(dot(-v, n), 0.0), 4.0);
     // The mask is the water's own opacity: low only in clear shallows seen from above.
-    let amount = clamp(fresnel * 0.95 + 0.04, 0.0, 0.97) * smoothstep(0.02, 0.3, water) * edge * near * min(p.strength, 1.0);
+    let amount = clamp(fresnel * 0.95 + 0.08, 0.0, 0.97) * smoothstep(0.02, 0.3, water) * edge * near * min(p.strength, 1.0);
     return vec4(mix(p.color.rgb, mirrored, amount), p.color.a);
 }

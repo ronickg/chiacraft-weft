@@ -78,7 +78,15 @@ pub fn terrain(r: &mut Registry) {
         t = t.biome(rule);
     }
     t.cave_biome("deep_caves", 24, 96.0, 0.25)
-        .caves(Caves::new("lava", i32::MIN, 11));
+        .caves(Caves::new("lava", i32::MIN, 11))
+        // Distant terrain runs no decorations: it asks this what its steep faces show.
+        .faces(l::SNOW_FALL, |f| {
+            let [x, _, z] = f.pos();
+            let rocks = l::rock_set(&Fields { seed: f.seed() }, x * 16, z * 16, f.height(), SAND.is(f.surface_block()));
+            if let Some(rock) = bare(f.seed(), f.pos(), f.block(), f.fall(), f.biome(), rocks) {
+                f.set(rock);
+            }
+        });
 
     r.decorate(rock_faces).dimension(&crate::OVERWORLD);
 }

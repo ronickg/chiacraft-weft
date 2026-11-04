@@ -703,8 +703,26 @@ pub struct ScatterDesc {
     pub density: Str,
     /// `ScatterArgs`. Pure: called once for each cube the site reaches.
     pub shape: Callback,
+    /// Sites thinned by where they stand, before `shape` runs: where this mask (postfix steps,
+    /// as a terrain feature's) is over 0, only one site in `thin_keep` stays (by its random bits;
+    /// 0: none). The engine applies it near and in distant terrain alike, which can't run `shape`
+    /// at every site. Empty: no thinning.
+    pub thin: Slice<MaskStep>,
+    pub thin_keep: u32,
+    /// A biome component: thinning only in biomes that have it. Empty: in all.
+    pub thin_biomes: Str,
 }
-defaults!(ScatterDesc { name: Str::EMPTY, dimensions: Str::EMPTY, cell: 8, reach: 0, density: Str::EMPTY, shape: Callback::NONE });
+defaults!(ScatterDesc {
+    name: Str::EMPTY,
+    dimensions: Str::EMPTY,
+    cell: 8,
+    reach: 0,
+    density: Str::EMPTY,
+    shape: Callback::NONE,
+    thin: Slice::EMPTY,
+    thin_keep: 0,
+    thin_biomes: Str::EMPTY
+});
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -3699,6 +3717,26 @@ pub mod terrain_op {
     pub const CAVE_BIOME: u32 = 13;
     /// The cave biome `anchor` goes away.
     pub const REMOVE_CAVE_BIOME: u32 = 14;
+    /// What steep faces show where the generator's own passes make them bare (rock): `face`
+    /// (`FaceArgs`) for ground falling `level` blocks or more to a neighbour. Distant terrain,
+    /// which runs no decorations, asks it, and puts no scattered things there.
+    pub const FACES: u32 = 15;
+}
+
+/// A steep column's top as distant terrain sees it (`terrain_op::FACES`).
+#[repr(C)]
+pub struct FaceArgs {
+    pub seed: u64,
+    pub dim: u32,
+    /// The block at the face: its column's top, or lower down the face.
+    pub pos: [i32; 3],
+    /// The column's ground height (its top block's y).
+    pub height: i32,
+    pub biome: u32,
+    /// How far the ground falls to its lowest neighbour (estimated from a coarse grid).
+    pub fall: i32,
+    /// The block there before (the surface rules'); output: what the face shows.
+    pub block: u32,
 }
 
 /// One part of a dimension's terrain (`Host::reg_terrain`). The mod that owns the dimension
@@ -3719,6 +3757,8 @@ pub struct TerrainDesc {
     pub size: f64,
     pub feature: FeatureDesc,
     pub rule: BiomeRuleDesc,
+    /// `FACES`: `FaceArgs`.
+    pub face: Callback,
 }
 defaults!(TerrainDesc {
     dimension: Str::EMPTY,
@@ -3730,7 +3770,8 @@ defaults!(TerrainDesc {
     value: 0.0,
     size: 0.0,
     feature: FeatureDesc::DEFAULT,
-    rule: BiomeRuleDesc::DEFAULT
+    rule: BiomeRuleDesc::DEFAULT,
+    face: Callback::NONE
 });
 
 /// One command argument; kinds in `command_value`.

@@ -105,8 +105,10 @@ struct Picture {
     size: [u32; 2],
 }
 
-/// How much faster than the wind on the ground the clouds move (the air up there is freer).
-const CLOUD_WIND: f64 = 3.0;
+/// How fast the wind carries the clouds, against its speed on the ground (m/s): slow, near
+/// vanilla's pace (about a block in 3 s) in a breeze, a few blocks a second in a gale. Three
+/// times the ground wind was true to the air up there but read as clouds racing (Ronald).
+const CLOUD_WIND: f64 = 0.12;
 
 pub struct Sky {
     pipe: Option<PipelineId>,
@@ -363,8 +365,7 @@ impl Sky {
         overlays: &[Overlay],
     ) {
         self.overlay = None;
-        // Clouds ride the wind where the player is (m/s, the way it blows), faster than it blows
-        // on the ground: the air up there is freer.
+        // Clouds ride the wind where the player is (m/s, the way it blows), at a game's pace.
         self.cloud_drift += wind.as_dvec2() * CLOUD_WIND * dt.clamp(0.0, 0.25) as f64;
         let Some(pipe) = self.pipe else { return };
         let c = content();

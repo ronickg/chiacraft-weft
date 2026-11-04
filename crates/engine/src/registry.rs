@@ -984,6 +984,9 @@ pub struct RawScatter {
     pub reach: i32,
     pub density: String,
     pub shape: Callback,
+    pub thin: Vec<weft_abi::MaskStep>,
+    pub thin_keep: u32,
+    pub thin_biomes: String,
 }
 
 #[derive(Clone)]

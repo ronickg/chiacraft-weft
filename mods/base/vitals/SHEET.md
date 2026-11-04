@@ -127,6 +127,16 @@ An enclosed space (`vitals::shelter`; up to 400 blocks of air, none open to the 
 | hide | +12 °C | 90% |
 | glass | +12 °C | 90% |
 
+## Crafts that wait
+
+What takes days in real life takes its time on the growing pace (`vitals::crafts`; game days = 0.0645 · real days^0.7), at a station that keeps working unwatched.
+
+| station | in | with | out | real days | in the game | holds |
+|---|---|---|---|---|---|---|
+| tanning_frame | #hides | - | base:leather | 3 | 2.8 min | 1 |
+| tanning_pit | #hides | #bark_tannin | base:sole_leather | 365 | 4.0 game days | 8 |
+| charcoal_clamp | #logs | - | base:coal | 7 | 5.0 min | 16 |
+
 ## Effects
 
 | effect | group | changes |
