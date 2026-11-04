@@ -563,8 +563,8 @@ sword, about 100 XP.
 
 - Normal monsters stay. A fresh player in arrival clothes on the plains died to one zombie in the
   first night (Tester's runs); the answer is the campfire, not weaker nights.
-- The night hint comes each evening at dusk (16:00 to 18:00, two game hours before dark) until the
-  player builds a campfire: "Night falls at 18:00, and monsters come out in the dark. Build a
+- The night hint comes each evening two game hours before the season's sunset (by the calendar's
+  daylight, as the clock has it) until the player builds a campfire: "Night falls at 18:00, and monsters come out in the dark. Build a
   campfire (two logs, two sticks): no monster appears in its light, and it warms you." A torch or
   a bed no longer stills it.
 - Its light (15) keeps monsters from spawning within about eight blocks (they need light 6 or
@@ -628,7 +628,7 @@ numbers are `reports/content/Building and workstations.md` B3; `vitals::shelter`
   empty; with a fire it warms by its walls (log, earth, snow +25 °C; plank, stone +16; hide,
   glass +12), fully up to 60 blocks of air and down to 40% in a bigger room, never less than the
   fire gives beside it.
-- The HUD says "Sheltered · log walls, +18 °C" while in one.
+- The HUD says "Room · log walls, +18 °C" while in one.
 - Checks (`vitals::balance`): a fire in a log cabin keeps a player in arrival clothes
   comfortable on a -20 °C night; logs keep a fire's heat better than stone, stone than hide; an
   earthen room is cooler than a desert afternoon.
@@ -648,4 +648,24 @@ content plan; logged in `notes/crew/OVERNIGHT.md`):
   a string. Placeholder art (tinted leather) until the art pass; the worn layer draws over armor.
 - Not yet: the research's other cloaks (bison robe, down cloak, the Cretaceous's feather cloak,
   a gut parka once there's gut), and a cloak as bedding.
+
+**20. The integration review's fixes** (2026-11-04 overnight, `reports/integration-review.md`):
+
+- The campfire and the furnace put a new result into an output slot by item, keeping the stamps
+  already there (the campfire cooked one steak and stopped); the furnace stamps what it cooks hot,
+  and nothing else does (crafted bread came out hot).
+- Death keeps the clothes and cloak worn (the tombstone sets them aside, the respawn puts them
+  back); no new arrival set while something is worn.
+- Food stacks merge only in players' inventories and chests, never in a pot or a rack.
+- A death's own tombstone or none: `GRAVE` is cleared first, a tombstone goes into water, lava or
+  a replaceable block too, and with nowhere for one the death screen says the things fell where
+  one died; `Grave::set` is the dimension + 1.
+- Rest needs a real fire (heat 0.7 and up: a campfire, a lit furnace, lava); a torch is a lamp.
+  The heat table and the fire reaches (players 7 blocks, everything else 3, for cost) are
+  `vitals::temperature` constants.
+- Death clears food poisoning and rest.
+- The HUD line reads "air"; a clothing piece's tooltip gives its own share of the wind; armor
+  shows its warmth.
+- Not here: animals' fire reach and wind (`comfort.rs`, `eggs.rs`) and the hunters' hunger
+  thresholds written twice (`forage.rs`, `hunt.rs`): the animals mod's.
 
