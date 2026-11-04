@@ -19,8 +19,10 @@ use crate::dist2;
 use crate::animal::{self, ANIMAL};
 use crate::species::{self, OTHER_PREY, SPECIES, Species};
 
-/// The prey it chases (0: none), since when, and when it looks again (not saved).
-static HUNT: Component<[u64; 3]> = Component::named("animal_hunt");
+/// The prey it chases (0: none), since when, when it looks again, and whether it hunts with its
+/// pack (1: from when the hunt began, so the pack strung out in the chase still runs it down; not
+/// saved).
+static HUNT: Component<[u64; 4]> = Component::named("animal_hunt");
 /// Until when it runs from a hunter (not saved).
 static WARY: Component<u64> = Component::named("animal_wary");
 
@@ -37,7 +39,7 @@ const LOOK_EVERY: u64 = 60;
 const RUN: u64 = 80;
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(&HUNT, [0u64; 3], 0);
+    r.entity_component(&HUNT, [0u64; 4], 0);
     r.entity_component(&WARY, 0u64, 0);
     for s in &SPECIES {
         r.attach(s.kind, &HUNT);
@@ -63,7 +65,7 @@ pub fn init(r: &mut Registry) {
                 name_of(abi::entry_kind::ENTITY, d.kind),
                 a.food.saturating_add(meal).min(max as u16)
             );
-            w.component_mut(d.killer, &HUNT).map(|h| *h = [0; 3]);
+            w.component_mut(d.killer, &HUNT).map(|h| *h = [0; 4]);
         }
     });
 }
@@ -126,7 +128,7 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     let full = a.food as f32 / a.stat(species::FOOD).max(1.0);
     if animal::tamed(w, id) || full >= FULL || (h[0] == 0 && full >= HUNGRY) {
         if h[0] != 0 {
-            w.component_mut(id, &HUNT).map(|h| *h = [0; 3]);
+            w.component_mut(id, &HUNT).map(|h| *h = [0; 4]);
         }
         return false;
     }
@@ -138,7 +140,7 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
             .is_some_and(|e| e.health > 0.0 && dist2(e.pos, st.pos) < (LOOK * 1.5).powi(2));
         // A pack runs its prey down: they take turns at the front, faster than one alone could
         // keep up, and keep at it twice as long (a wolf pack's chase of an elk lasts minutes).
-        let pack = s.pack_prey().is_some() && pack_near(w, id, st) >= species::PACK;
+        let pack = h[3] == 1;
         if alive && now < h[1] + if pack { 2 * GIVE_UP } else { GIVE_UP } {
             if knockout {
                 // Its anger does the chasing; kept up while the chase lasts.
@@ -153,7 +155,7 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
             return true;
         }
         weft_sdk::info!("{} {id} gives up on {} ({})", s.name, h[0], if alive { "too long" } else { "gone" });
-        h = [0, 0, now + LOOK_EVERY];
+        h = [0, 0, now + LOOK_EVERY, 0];
     }
     if now < h[2] {
         w.component_mut(id, &HUNT).map(|c| *c = h);
@@ -184,7 +186,7 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     if pack >= species::PACK && !s.takes(own, kg) {
         rally(w, id, st, t, now);
     }
-    h = [t, now, now + LOOK_EVERY];
+    h = [t, now, now + LOOK_EVERY, (pack >= species::PACK) as u64];
     w.component_mut(id, &HUNT).map(|c| *c = h);
     if knockout {
         crate::knockout::anger(w, id, t);
@@ -221,7 +223,7 @@ fn rally(w: &World, id: u64, st: &EntityState, target: u64, now: u64) {
         if let Some(c) = w.component_mut(o, &HUNT)
             && c[0] == 0
         {
-            *c = [target, now, now + LOOK_EVERY];
+            *c = [target, now, now + LOOK_EVERY, 1];
             weft_sdk::info!("animal {o} joins {id}'s hunt of {target}");
         }
     }
