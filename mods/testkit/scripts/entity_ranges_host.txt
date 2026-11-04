@@ -4,7 +4,8 @@
 # entity_ranges_join.txt (a second game process, from the same folder): the host logs
 # "to clients per 1.0 s: ... Moves N (size)" for the joined player, and two BENCH lines with the
 # server tick time ("server avg") and "mods per tick". Compare the Moves bytes between the REC
-# markers.
+# markers. The net lines count only the joined player (the host's own client is local); it
+# stays at spawn, so in "near" it still hears the pen from ~70 blocks, every 4th tick.
 loaded
 idle
 chat /tk mode creative
@@ -221,8 +222,6 @@ chat /rule entity_activation_distance 0
 host run/entity_ranges_ticket.txt
 # The second player joins and loads (its script waits for the ticket file).
 wait 45
-look 90 -10
-shot entity_ranges_pen.png
 rec before start
 bench 30 before
 rec before end
@@ -233,7 +232,12 @@ wait 3
 rec after start
 bench 30 after
 rec after end
+# From above, over the hills and the joiner, onto the resting pen.
+chat /tp ~ ~30 ~
+look 90 -25
+wait 2
 shot entity_ranges_after.png
+chat /tp ~ ~-30 ~
 # Near the pen: they all wake up and move every tick again.
 chat /tp ~60 ~ ~
 wait 3
