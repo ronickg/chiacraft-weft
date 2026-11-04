@@ -246,6 +246,19 @@ def build():
     put("button_hover", glow(brighter(btn, 1.08), GOLD1), 5)
     put("button_pressed", pressed(btn), 5)
     put("button_disabled", disabled(btn), 5)
+    # the secondary button (dark brown): `S::default().class("button_secondary")`
+    b2 = fit9(src("c_buttons", 1), 64, 20, 5)
+    put("button_secondary", b2, 5)
+    put("button_secondary_hover", glow(brighter(b2, 1.15), GOLD1), 5)
+    put("button_secondary_pressed", pressed(b2), 5)
+    put("button_secondary_disabled", disabled(b2), 5)
+    # behind the death screen: dark red-brown, darker at the edges
+    yy, xx = np.mgrid[0:64, 0:64]
+    r = np.sqrt(((xx - 31.5) / 32) ** 2 + ((yy - 31.5) / 32) ** 2)
+    death = np.zeros((64, 64, 4), np.uint8)
+    death[..., 0], death[..., 1], death[..., 2] = 52, 14, 10
+    death[..., 3] = np.clip(150 + 90 * r, 0, 235).astype(np.uint8)
+    put("death", death, scaling="stretch")
     q = red(btn)
     put("button_quit", q, 5)
     put("button_quit_hover", glow(brighter(q, 1.1), GOLD1), 5)
