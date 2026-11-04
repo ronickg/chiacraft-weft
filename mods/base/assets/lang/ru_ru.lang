@@ -65,6 +65,7 @@ block.base.granite_gold_ore = Золотоносный кварц
 block.base.granite_iron_ore = Магнетит
 block.base.diamond_ore = Алмазная руда
 block.base.oak_log = Дубовое бревно
+block.base.stripped_oak_log = Окорённое дубовое бревно
 block.base.birch_log = Берёзовое бревно
 block.base.spruce_log = Еловое бревно
 block.base.oak_planks = Дубовые доски
@@ -832,7 +833,7 @@ item.base.hide.tooltip = С коров, оленей и капибар. Выде
 item.base.sole_leather = Подошвенная кожа
 item.base.sole_leather.tooltip = Дублёная корой в яме: жёсткая и прочная, для кожаных доспехов.
 item.base.oak_bark = Дубовая кора
-item.base.oak_bark.tooltip = Снята с дубовых брёвен: её дубильные вещества выделывают шкуры в яме.
+item.base.oak_bark.tooltip = Снимается с дубового бревна топором (используйте топор на бревне): её дубильные вещества выделывают шкуры в яме.
 
 # The look's knobs (look.rs), in Mod Settings
 config.base.look_exposure = Экспозиция днём

@@ -690,7 +690,8 @@ plan; logged in `notes/crew/OVERNIGHT.md`; `vitals::crafts`, `mods/base/src/craf
   a charcoal clamp chars logs into coal (7 days: 5 minutes, 16 at a time, no fuel).
 - Cows, deer and capybaras drop raw hides now, not leather. Buckskin (`#leather`) makes clothes,
   books and the rain cape; sole leather (`materials/leather`) makes leather armor. Oak bark is
-  peeled from oak logs at the crafting table.
+  peeled off an oak log with an axe (use it on the log: a stripped oak log and 2 bark; Planner,
+  11-05, so one log in the grid makes planks).
 - Not yet: retting (it waits for a flax plant), dressing furs (pelts come ready), seasoning bow
   staves, kilns; the stations' faces are placeholders.
 

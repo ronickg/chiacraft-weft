@@ -286,7 +286,7 @@ pub fn crown(w: &World, logs: &[[i32; 3]]) -> Vec<([i32; 3], u32)> {
 }
 
 /// `axe` worn by `by` more (its `max` durability, 0 for none): gone once used up.
-fn worn(axe: ItemStack, by: u32, max: u32) -> ItemStack {
+pub(crate) fn worn(axe: ItemStack, by: u32, max: u32) -> ItemStack {
     let damage = axe.damage() + by;
     if max > 0 && damage >= max {
         ItemStack::EMPTY

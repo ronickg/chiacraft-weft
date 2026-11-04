@@ -130,21 +130,23 @@ fn axis_placement(p: &Place, props: &mut Props) {
 
 /// A log that grows into a tree of `leaves` (a cone, like a spruce, when `cone`).
 /// `shape`: the tree's tag (`cone_tree`, `flat_tree`; none: round), `worldgen::tree_blocks`.
-fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape: Option<&str>) {
+/// A stripped log (`wood` `<wood>_stripped`, no `leaves`) is its wood's log for recipes. An axe
+/// used on an oak log strips it (`crafts::strip_oak`).
+pub(crate) fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape: Option<&str>) {
     let side = format!("log_{wood}");
     let top = format!("log_{wood}_top");
-    let b = r
-        .block(handle)
-        .set_text(&crate::worldgen::TREE_LEAVES, leaves);
+    let b = r.block(handle);
+    let b = if leaves.is_empty() { b } else { b.set_text(&crate::worldgen::TREE_LEAVES, leaves) };
     let b = match shape {
         Some(tag) => b.tag(tag),
         None => b,
     };
+    let b = if wood == "oak" { b.on_use(crate::crafts::strip_oak) } else { b };
     b.sound_group("wood")
         .hardness(2.0)
         .mineable("axe")
         .tag("logs")
-        .tag(&format!("logs/{wood}"))
+        .tag(&format!("logs/{}", wood.trim_end_matches("_stripped")))
         .set(&FLAMMABLE, 5)
         .set(&FUEL, 300)
         // `bark`: bark on every face, for a trunk whose top shows (a giant's flared foot).
