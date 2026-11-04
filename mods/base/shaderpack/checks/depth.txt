@@ -59,5 +59,6 @@ wait 3
 look 45 -4
 wait 2
 shot depth_4_ground_noon.png
+wait 1
 bench 5 depth_ground
 quit
