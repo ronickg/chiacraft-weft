@@ -67,6 +67,7 @@ mod screen;
 mod signatures;
 mod small_bird;
 mod species;
+mod store;
 mod taming;
 mod utahraptor;
 mod vole;
