@@ -413,21 +413,25 @@ As Tinkers' Construct 3 does it, which our prototype already proved at 32 px:
   glass, wooden heads), used instead of the map painted with its ramp.
 - **Grades:** craft quality within one material, never a material tier. 1–2 rough and chipped,
   3–8 plain, a cleaner edge from 7, 9–10 a glint. Material tiers are the materials themselves.
-- **Sockets** on the 32 × 32 diagonal (handle bottom left, working end top right), as boxes x0,
-  y0 – x1, y1:
+- **Sockets**, settled by Chiacraft and Ronald 11-04 ("Yes, do the rest": all pieces, made
+  readable through texture). On the 32 × 32 grid, handle bottom left, boxes x0, y0 – x1, y1:
 
-  | Kind | Part | Box |
+  | Kind | Socket (where they meet) | Layers |
   |---|---|---|
-  | Sword (the prototype's) | blade | 9, 2 – 29, 22 |
-  | | guard | 6, 15 – 16, 25 |
-  | | grip | 2, 19 – 12, 29 |
-  | | pommel | 1, 25 – 6, 30 |
-  | Axe (today's stone axe icon) | haft | a 2–3 px line from about 2, 29 to 21, 10 |
-  | | head | about 14, 1 – 30, 17 |
-  | | lashing | where they meet, about 16, 8 – 22, 14 |
+  | Axe | 14.9, 14.8 | head 13, 0 – 31, 20, with the joint band (lashing or collar) 11, 11 – 18, 16 as its region 1; haft 0, 10 – 17, 31 |
+  | Sword | 8.1, 23.4 (the guard) | blade 6, 0 – 31, 26; hilt: guard 3, 17 – 15, 28 as a region, grip and pommel 0, 23 – 8, 31 |
 
-  The axe boxes are from today's icon; Chiacraft fixes them in the test, and every later head
-  of that kind fits the same box.
+  Pickaxe, shovel and hoe come next; `crafting::looks` holds each kind's as it's fixed.
+- **How the files come:**
+  - **Working parts:** each material's working part is a fully painted layer (an override),
+    because a recoloured map lost crude flint and stone, gold's shape and diamond's facets.
+    Ronald approved drawn heads per material.
+  - **Handles:** both painted (leather-wrapped with gold fittings, plain wood) and as maps, so
+    oak, birch and antler are ramp materials.
+  - **Every layer** has its `.json`.
+  - **The first materials:** wood, stone, flint, copper, bronze, iron, steel, gold, diamond (the
+    sword without flint).
+  - **Grade overlays** come after the tools.
 - **First test** (Chiacraft, now):
   - an axe and a sword
   - 6 materials: flint, copper, bronze, iron, steel, and gold for the sword
