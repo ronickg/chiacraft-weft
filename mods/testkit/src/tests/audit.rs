@@ -61,7 +61,9 @@ pub async fn death_is_a_state(t: T) -> R {
     t.check_eq(t.op("inv me").await?, String::new(), "picked up nothing, carried nothing");
     let f = t.feet();
     let near = t.op(&format!("near {} 8", at(f))).await?;
-    t.check(near.matches("core:item").count() >= 2, format!("the cursor fell with the rest: {near}"));
+    // The cursor's stack falls loose; the rest falls loose too, or (Survival) into a tombstone.
+    let kept = near.matches("core:item").count() >= 2 || (near.contains("core:item") && near.contains("tombstone"));
+    t.check(kept, format!("the cursor fell with the rest: {near}"));
     // And leaving doesn't undo it.
     reopen(&t, 1).await?;
     t.screen("core:death").await?;
