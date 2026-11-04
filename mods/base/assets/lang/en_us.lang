@@ -811,6 +811,31 @@ item.base.sole_leather.tooltip = Bark-tanned in a tanning pit: stiff and strong,
 item.base.oak_bark = Oak Bark
 item.base.oak_bark.tooltip = Peeled from oak logs: its tannin tans hides in a pit.
 
+# The look's knobs (look.rs), in Mod Settings
+config.base.look_exposure = Day exposure
+config.base.look_exposure.tooltip = How bright the day is taken (1: as made)
+config.base.look_sun = Sunlight
+config.base.look_sun.tooltip = The sun's strength by day
+config.base.look_sun_warmth = Sun warmth
+config.base.look_sun_warmth.tooltip = -1 whiter, +1 a warmer orange sun
+config.base.look_fill = Shade light
+config.base.look_fill.tooltip = The sky's light in the shade by day
+config.base.look_fill_cool = Shade coolness
+config.base.look_fill_cool.tooltip = -1 neutral, +1 a bluer shade
+config.base.look_contrast = Contrast
+config.base.look_contrast.tooltip = The picture's contrast by day
+config.base.look_saturation = Colour
+config.base.look_saturation.tooltip = Saturation after the tone curve
+config.base.look_shade = Shade under cover
+config.base.look_shade.tooltip = How fast the sky's light fades under leaves and roofs: more, darker
+config.base.look_haze = Haze
+config.base.look_haze.tooltip = The haze over distance
+config.base.look_fog = Fog light
+config.base.look_fog.tooltip = How bright fog is
+config.base.night_light = Night sky light
+config.base.night_light.tooltip = The night's light (nights are dark by design)
+config.base.night_moon = Moonlight
+config.base.night_moon.tooltip = The moon's light at night
 # The recipe book beside the crafting grids (book.rs)
 crafting.book.title = Recipes
 crafting.book.all = All

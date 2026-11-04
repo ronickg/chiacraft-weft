@@ -1,0 +1,42 @@
+# Daylight against Bliss (Ronald, 11-04: "the world a bit too dark during the daytime"): noon in
+# the dense forest of terraces2 (seed 1, x 210 z 1040, the blue log), on open plains, and a stone
+# wall in the shade of a roof. Seed 1, --view 12, 1280x720, --shader-pack chiacraft, a fresh
+# world. Spectator, absolute /tp, mobs off. Yaw 0 faces -z.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /time set 6000
+# 1. Ronald's forest (terraces2).
+chat /tp 210 90 1040
+loaded
+idle
+wait 10
+look 180 -10
+wait 2
+shot day_1_forest.png
+look 0 -10
+wait 2
+shot day_1b_forest_back.png
+# 2. Open plains.
+chat /tp -120 90 136
+loaded
+idle
+wait 8
+look 45 -8
+wait 2
+shot day_2_plains.png
+# 3. A stone wall in a roof's shade, next to the same wall in sun.
+chat /tp 40 205 52
+wait 4
+chat /tk fill 22 199 30 58 199 60 grass
+chat /tk fill 30 200 40 35 202 40 stone
+chat /tk fill 44 200 40 49 202 40 stone
+chat /tk fill 40 205 32 56 205 49 stone
+chat /tp 40 201.6 52
+wait 3
+look 0 0
+wait 2
+shot day_3_wall.png
+quit

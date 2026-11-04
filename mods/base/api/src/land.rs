@@ -53,6 +53,7 @@ pub mod salt {
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
     pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const FRAY: u64 = 0xF4A;
     pub const CANYONS: u64 = 0xCA1;
     pub const CANYON_AREA: u64 = 0xCA2;
     pub const CANYON_WARP: u64 = 0xCA3;
@@ -885,6 +886,78 @@ pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
     if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base_ground(&h)) }
 }
 
+/// A fair first place (Ronald, 11-04: "All 3: 1, 2, 3"): the nearest spot to the world's middle,
+/// searched in rings `SPAWN_STEP` blocks apart out to `SPAWN_REACH`, that is plains (few trees to
+/// spawn in), temperate (`SPAWN_TEMPERATURE`: away from the taiga's cold and the desert's heat),
+/// `SPAWN_RISE` over the sea, level (no neighbour two blocks off more than a block higher or
+/// lower), out of the mountains, with water (a lake or a river, not the sea) within
+/// `SPAWN_WATER` blocks and woods within `SPAWN_WOODS`. The engine's own search took the first
+/// plains column near the middle: on seeds 1, 7, 42 and 1234 that stood 34-54 blocks up a hill,
+/// two of them without water within 96 blocks.
+pub const SPAWN_STEP: i32 = 16;
+pub const SPAWN_REACH: i32 = 1600;
+pub const SPAWN_TEMPERATURE: (f64, f64) = (-0.06, 0.12);
+pub const SPAWN_RISE: (i32, i32) = (2, 30);
+pub const SPAWN_WATER: i32 = 48;
+pub const SPAWN_WOODS: i32 = 64;
+
+/// The first block's column (x, height, z in blocks) of the fair first place for world `seed`,
+/// or, failing that within `SPAWN_REACH`, the first level plains, then the first land above the
+/// sea, on the same rings.
+pub fn spawn(seed: u64) -> [i32; 3] {
+    spawn_where(seed, &|_, _| true)
+}
+
+/// `spawn`, only where `open` (blocks) also holds: what the terrain here can't see, as the
+/// engine's caves (seed 42's first fair place stood over a cave's mouth, PC look fv_new_42: the
+/// player fell 15 blocks).
+pub fn spawn_where(seed: u64, open: &dyn Fn(i32, i32) -> bool) -> [i32; 3] {
+    let f = fields(seed);
+    let h = |x: i32, z: i32| height(&f, x * 16, z * 16) >> 4;
+    let biome = |x: i32, z: i32| overworld_biome(&f, x * 16, z * 16);
+    let level = |x: i32, z: i32, hh: i32| {
+        [(2, 0), (-2, 0), (0, 2), (0, -2)]
+            .iter()
+            .all(|(dx, dz)| (h(x + dx, z + dz) - hh).abs() <= 1)
+    };
+    let near = |x: i32, z: i32, reach: i32, step: i32, hit: &dyn Fn(i32, i32) -> bool| {
+        (0..=reach).step_by(step as usize).any(|d| {
+            (0..16).any(|k| {
+                let a = k as f64 / 16.0 * std::f64::consts::TAU;
+                let (px, pz) = (x + (d as f64 * a.cos()).round() as i32, z + (d as f64 * a.sin()).round() as i32);
+                hit(px, pz)
+            })
+        })
+    };
+    let fair = |x: i32, z: i32| -> bool {
+        let hh = h(x, z);
+        let t = f.temperature(x * 16, z * 16);
+        biome(x, z) == "plains"
+            && (q12(SPAWN_TEMPERATURE.0)..q12(SPAWN_TEMPERATURE.1)).contains(&t)
+            && (SEA + SPAWN_RISE.0..=SEA + SPAWN_RISE.1).contains(&hh)
+            && level(x, z, hh)
+            && MOUNTAINS_AREA.value(&f, x * 16, z * 16) < q12(0.2)
+            && near(x, z, SPAWN_WATER, 4, &|px, pz| h(px, pz) < SEA && biome(px, pz) != "ocean")
+            && near(x, z, SPAWN_WOODS, 8, &|px, pz| matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove"))
+    };
+    let plains = |x: i32, z: i32| biome(x, z) == "plains" && h(x, z) > SEA + 1 && level(x, z, h(x, z));
+    let land = |x: i32, z: i32| h(x, z) > SEA + 1;
+    for test in [&fair as &dyn Fn(i32, i32) -> bool, &plains, &land] {
+        for r in 0..=SPAWN_REACH / SPAWN_STEP {
+            let n = (r * 8).max(1);
+            for k in 0..n {
+                let a = k as f64 / n as f64 * std::f64::consts::TAU;
+                let (x, z) = ((r * SPAWN_STEP) as f64 * a.cos(), (r * SPAWN_STEP) as f64 * a.sin());
+                let (x, z) = (x.round() as i32, z.round() as i32);
+                if test(x, z) && open(x, z) {
+                    return [x, h(x, z), z];
+                }
+            }
+        }
+    }
+    [0, h(0, 0).max(SEA), 0]
+}
+
 /// Which water a bank belongs to (`bank`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Water {
@@ -1037,6 +1110,52 @@ pub fn biome_edge(f: &Fields, x: i32, z: i32, height: i32) -> Option<Edge> {
     None
 }
 
+/// Biome borders that fray (Ronald, 11-04: "All 3: 1, 2, 3"): where two biomes with different
+/// ground meet (the desert's sand against grass, the taiga's podzol, the snowy plains' snow-grass),
+/// the neighbour's ground comes in patches (`FRAY_SIZE` blocks across) over the border band
+/// (`biome_edge`): on the border `FRAY_SHARE` of the ground is the other's, less further in.
+pub const FRAY_SHARE: f64 = 0.55;
+pub const FRAY_SIZE: f64 = 7.0;
+
+/// A biome's ground: its top block and what lies under it (base's biome rules' `surface`).
+pub fn surface_of(biome: &str) -> (&'static str, &'static str) {
+    match biome {
+        "desert" | "beach" => ("sand", "sand"),
+        "taiga" => ("podzol", "dirt"),
+        "snowy_plains" => ("snowy_grass", "dirt"),
+        _ => ("grass", "dirt"),
+    }
+}
+
+/// The ground column (`x`, `z`) (Q4), `height` blocks high, takes from the biome over the border,
+/// if it frays here: its top and under block. Cheap away from the borders that change the ground
+/// (a test of the climate against their thresholds first).
+pub fn fray(f: &Fields, x: i32, z: i32, height: i32) -> Option<(&'static str, &'static str)> {
+    let here = Here::new(f, x, z);
+    let (t, hu) = (here.temperature(), here.humidity());
+    let band = q12(EDGE_BAND);
+    let close = |v: i32, at: f64| (v - q12(at)).abs() < band;
+    let ground_border = close(t, SNOWY_BELOW)
+        || close(t, TAIGA_BELOW)
+        || (close(t, DESERT.0) && hu < q12(DESERT.1) + band)
+        || (close(hu, DESERT.1) && t >= q12(DESERT.0) - band);
+    if !ground_border {
+        return None;
+    }
+    let e = biome_edge(f, x, z, height)?;
+    let own = biome_at(f, x, z, height);
+    // The coasts and the mountains keep their own ground (theirs are height rules, not climate).
+    if matches!(own, "beach" | "ocean" | "mountains") {
+        return None;
+    }
+    let theirs = surface_of(e.to);
+    if surface_of(own) == theirs {
+        return None;
+    }
+    let n = ONE / 2 + f.fbm(salt::FRAY, x, z, q4(FRAY_SIZE), 2) * 2;
+    (n < (q12(FRAY_SHARE) * e.near) >> 12).then_some(theirs)
+}
+
 /// The snow line (blocks) at temperature `t` (Q12): the band's height from `SNOW_LINES`.
 pub fn snow_line(t: i32) -> i32 {
     SNOW_LINES
@@ -1132,8 +1251,12 @@ pub fn strata(seed: u64, [x, y, z]: [i32; 3]) -> &'static str {
 /// The overworld biome the rules in `mods/base/src/land.rs` pick at (`x`, `z`) (Q4), by name, in
 /// their order: for the map preview and the checks here (the engine's own pick is the truth).
 pub fn overworld_biome(f: &Fields, x: i32, z: i32) -> &'static str {
+    biome_at(f, x, z, height(f, x, z) >> 4)
+}
+
+/// `overworld_biome` for ground `h` blocks high, already known.
+fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
     let here = Here::new(f, x, z);
-    let h = height(f, x, z) >> 4;
     let (t, hu, c) = (here.temperature(), here.humidity(), here.continent());
     let at = |v: f64| q12(v);
     if h <= SEA - 2 && c < at(OCEAN_CONTINENT) {
@@ -1315,6 +1438,34 @@ mod tests {
             }
         }
         assert!(deep > 0, "no canyon 20 deep in 3.2 km");
+    }
+
+    #[test]
+    fn spawns_are_fair() {
+        for seed in [1, 2, 3, 7, 42, 1234] {
+            let [x, y, z] = spawn(seed);
+            let f = fields(seed);
+            assert_eq!(overworld_biome(&f, x * 16, z * 16), "plains", "seed {seed}: spawn at {x} {z}");
+            assert!((SEA + SPAWN_RISE.0..=SEA + SPAWN_RISE.1).contains(&y), "seed {seed}: spawn {y} high");
+            let t = f.temperature(x * 16, z * 16);
+            assert!((q12(SPAWN_TEMPERATURE.0)..q12(SPAWN_TEMPERATURE.1)).contains(&t), "seed {seed}: too cold or hot");
+            assert!(x.abs().max(z.abs()) <= SPAWN_REACH, "seed {seed}: spawn {x} {z} far out");
+        }
+    }
+
+    #[test]
+    fn borders_fray_only_where_the_ground_changes() {
+        let f = fields(1);
+        let mut frayed = 0;
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 8 * 16 - 800 * 16, (i / 200) * 8 * 16 - 800 * 16);
+            let h = height(&f, x, z) >> 4;
+            if let Some((top, _)) = fray(&f, x, z, h) {
+                assert_ne!(top, surface_of(overworld_biome(&f, x, z)).0, "a fray to the same ground at {x} {z}");
+                frayed += 1;
+            }
+        }
+        assert!(frayed > 0 && frayed < 4_000, "{frayed} frayed columns of 40 000");
     }
 
     #[test]

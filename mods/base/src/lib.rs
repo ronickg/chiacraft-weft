@@ -18,6 +18,7 @@ mod hud;
 mod items;
 mod land;
 mod levels;
+mod look;
 mod machines;
 mod mobs;
 mod parts;
@@ -109,6 +110,7 @@ fn init(r: &mut Registry) {
     beds::register(r);
     hud::register(r);
     redstone::register(r);
+    look::register(r);
     shaderpack::register(r);
     shaderpack::register_for_scripts(r);
     shaderpack::register_shafts(r);
@@ -118,6 +120,8 @@ fn init(r: &mut Registry) {
     // eight at midwinter.
     r.dimension(&OVERWORLD)
         .player_spawn()
+        // A fair first place: level plains, temperate, by water and woods (`base_api::land::spawn`).
+        .spawn(fair_spawn)
         .sky_above(16)
         .day_length(24000)
         .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)
@@ -146,13 +150,33 @@ fn init(r: &mut Registry) {
             // lit and a shaded side (Ronald, 11-04: "it all seems so flat"). The engine's sun
             // light and shadows follow this body.
             .tilt(35.0);
-        // The moon on the same leaned path, opposite the sun: the night's shadows come from it.
+        // The moon on the same leaned path, lagging the day as the real one does: a turn every 8/7
+        // of a day, so it rises later each night and goes round the sky once against the sun in
+        // the eight days of its phases (one picture a day). Full (day 0) it is opposite the sun and
+        // up all night; at a half moon half the night; new (day 4) it is up with the sun and the
+        // night has none. The night's light and shadows come from it (Ronald, 11-04: a full moon
+        // lights the night, no moon is dark).
         r.sky_body(dim, &MOON)
             .texture("moon_phases")
             .additive()
             .frames(4, 2)
             .size(23.0)
+            .orbit(vitals::calendar::DAY_TICKS as f32 * 8.0 / 7.0)
             .phase(0.5)
             .tilt(35.0);
     }
+}
+
+/// The overworld's first place for `seed` (`base_api::land::spawn_where`), out of the caves' mouths
+/// (none in the three by three columns round it); worked out once per seed, as the engine asks on
+/// every join.
+fn fair_spawn(seed: u64) -> [i32; 3] {
+    static KNOWN: std::sync::Mutex<Vec<(u64, [i32; 3])>> = std::sync::Mutex::new(Vec::new());
+    if let Some(&(_, p)) = KNOWN.lock().unwrap().iter().find(|(s, _)| *s == seed) {
+        return p;
+    }
+    let open = |x: i32, z: i32| (-1..=1).all(|dz| (-1..=1).all(|dx| !OVERWORLD.surface_carved(seed, x + dx, z + dz)));
+    let p = base_api::land::spawn_where(seed, &open);
+    KNOWN.lock().unwrap().push((seed, p));
+    p
 }

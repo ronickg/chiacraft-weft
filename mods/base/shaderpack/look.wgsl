@@ -29,6 +29,27 @@ fn luma(c: vec3<f32>) -> f32 {
 // (`mods/base/assets/shaders/post/reflect.wgsl`). The screen never shows the alpha.
 const SOLID_ALPHA: f32 = 0.0;
 
+// ---- the look's knobs (`mods/base/src/look.rs`: settings in Mod Settings, `--config` for a run) ----
+// `scene.options` holds them in this order; a setting the engine can't find reads 0, so a factor
+// falls back to `missing` (1) and an offset to 0.
+const OPT_EXPOSURE: u32 = 0u;
+const OPT_SUN: u32 = 1u;
+const OPT_SUN_WARMTH: u32 = 2u;
+const OPT_FILL: u32 = 3u;
+const OPT_FILL_COOL: u32 = 4u;
+const OPT_CONTRAST: u32 = 5u;
+const OPT_SATURATION: u32 = 6u;
+const OPT_SHADE: u32 = 7u;
+const OPT_HAZE: u32 = 8u;
+const OPT_FOG: u32 = 9u;
+const OPT_NIGHT_LIGHT: u32 = 10u;
+const OPT_NIGHT_MOON: u32 = 11u;
+
+fn look_opt(i: u32, missing: f32) -> f32 {
+    let v = scene.options[i / 4u][i % 4u];
+    return select(v, missing, v == 0.0);
+}
+
 // ---- the colors of the day ----
 
 struct Palette {
@@ -60,8 +81,20 @@ fn palette() -> Palette {
     // of Bliss with Ronald's 4300 K sun, which read overcast and olive here (Tester 2). Values for
     // the day's exposure of 2.2 (`exposure`). A warm sun; the sky's light in the shade about a
     // quarter of the sun's (it was a third; Bliss's is a sixth, which our curve's toe crushes to
-    // near black), still blue, so sun and shade part and the land stops looking flat.
-    let day = key(vec3(0.065, 0.115, 0.219), vec3(0.242, 0.323, 0.451), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.155, 0.222, 0.303));
+    // near black), still blue, so sun and shade part and the land stops looking flat. Then half as
+    // bright again (Colour 6): shade under leaves and on walls still read near black by day (Art's
+    // regraded tiles, the sun/shade test's walls at sRGB 33 35 45).
+    // (Colour 8, reports/Daytime look targets.md: values for the day's Lottes curve at exposure 1.3.
+    // A sky a little brighter than before, about sRGB 118 157 196 overhead and 169 188 205 at the
+    // horizon; a 6300 K sun (1.0 0.91 0.81, Bliss's); a neutral-cool fill, blue 1.4x red, which
+    // `light_on` gives a direction.)
+    // The sun's warmth (-1 whiter, +1 toward a 4300 K orange) and the fill's coolness (-1 neutral,
+    // +1 bluer) from the knobs, each kept about as bright.
+    let warmth = look_opt(OPT_SUN_WARMTH, 0.0);
+    let sun_hue = select(mix(vec3(1.0, 0.91, 0.81), vec3(1.0, 0.97, 0.94), -warmth), mix(vec3(1.0, 0.91, 0.81), vec3(1.0, 0.74, 0.52), warmth), warmth >= 0.0);
+    let cool = look_opt(OPT_FILL_COOL, 0.0);
+    let fill_hue = select(mix(vec3(0.85, 0.95, 1.2), vec3(1.0, 1.0, 1.0), -cool), mix(vec3(0.85, 0.95, 1.2), vec3(0.7, 0.92, 1.45), cool), cool >= 0.0);
+    let day = key(vec3(0.137, 0.289, 0.612), vec3(0.378, 0.538, 0.797), vec3(1.0, 0.92, 0.78), sun_hue * 1.92 * look_opt(OPT_SUN, 1.0), fill_hue * 0.3 * look_opt(OPT_FILL, 1.0));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
     let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
@@ -69,7 +102,7 @@ fn palette() -> Palette {
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
     // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
     // Valheim's, mixed with the orange of a fire into olive on the ground: Tester 2's campfire.)
-    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.025, 0.04, 0.10), vec3(0.010, 0.017, 0.050));
+    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.07, 0.11, 0.24) * look_opt(OPT_NIGHT_MOON, 1.0), vec3(0.010, 0.017, 0.050) * look_opt(OPT_NIGHT_LIGHT, 1.0));
     var p: Palette;
     if e > 0.08 {
         p = blend(golden, day, smoothstep(0.08, 0.28, e));
@@ -81,7 +114,12 @@ fn palette() -> Palette {
         p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
     // A new moon's night is darker than a full moon's.
-    p.ambient *= mix(1.0, mix(0.55, 1.0, moon_light()), smoothstep(-0.14, -0.3, e));
+    // The night follows the moon (Ronald, 11-04: "if the moon is light, then it can be lighter, and
+    // if there's no moon, it should be darker"): under a full moon high up a dim cool light to
+    // walk by, darker as it sets or wanes, near black with no moon up (a torch needed).
+    // (Full and high 3x the night's sky light, new or down a quarter: at 1.8x a full moon's night
+    // measured only a little brighter than a new moon's, luma 0.115 against 0.100.)
+    p.ambient *= mix(1.0, mix(0.25, 3.0, scene.moon.w), smoothstep(-0.14, -0.3, e));
     // Overcast: grey and dim, and the sun no more than a brighter part of the sky.
     let r = rain_amount();
     let grey = vec3(luma(p.horizon)) * vec3(0.92, 0.95, 1.0);
@@ -107,14 +145,18 @@ fn moon_light() -> f32 {
 
 // Where direct light comes from: the sun while it is up, then the moon opposite it.
 fn light_dir() -> vec3<f32> {
-    return select(-scene.sun.xyz, scene.sun.xyz, scene.sun.y > -0.06);
+    // At night the moon where it stands (`scene.moon`: it lags the day by its phase), not simply
+    // opposite the sun.
+    return select(scene.moon.xyz, scene.sun.xyz, scene.sun.y > -0.06);
 }
 
 // How much of the palette's direct light there is: it fades out as the sun sets and the moon comes
 // up a little after.
 fn light_strength() -> f32 {
     let e = scene.sun.y;
-    return select(smoothstep(0.06, 0.2, -e) * mix(0.2, 1.0, moon_light()), smoothstep(-0.04, 0.05, e), e > -0.06);
+    // At night the moon's light: its phase times how high it stands (`scene.moon.w`), none when it
+    // is down or new.
+    return select(smoothstep(0.06, 0.2, -e) * scene.moon.w, smoothstep(-0.04, 0.05, e), e > -0.06);
 }
 
 // ---- the sky ----
@@ -144,7 +186,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
     c += vec3(0.55, 0.22, 0.05) * toward;
     c += sun_glow(dir, p);
-    let moon = pow(max(-mu, 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y);
+    // The glow about the moon where it stands, as bright as its light (`scene.moon.w`): on a new
+    // moon there is none, and a glow alone read as a dark-blue ring (the world playtester's nights).
+    let moon = pow(max(dot(dir, scene.moon.xyz), 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * scene.moon.w;
     c += vec3(0.05, 0.07, 0.12) * moon;
     if dir.y < 0.0 {
         // Below the horizon it darkens a little toward the ground the haze stands on.
@@ -316,13 +360,36 @@ fn sun_facing(n: vec3<f32>) -> f32 {
     return max((dot(n, light_dir()) + wrap) / (1.0 + wrap), 0.0);
 }
 
+// The light the player holds (`scene.hand`, `scene.hand_light`: a torch, a lantern) at `rel`
+// (camera relative) on a surface facing `n`, as block light levels per channel: it falls off a
+// level a block, as placed torches do, and is a little weaker on faces turned away (`n` zero: no
+// facing, particles). Nights are dark by design and torches light the way (Ronald, 11-04).
+fn held_light(rel: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
+    let l = scene.hand_light.rgb;
+    if max(max(l.x, l.y), l.z) <= 0.0 {
+        return vec3(0.0);
+    }
+    let to = scene.hand.xyz - rel;
+    let d = length(to);
+    var facing = 0.85;
+    if dot(n, n) > 0.5 {
+        facing = mix(0.5, 1.0, clamp(dot(n, to / max(d, 1e-3)), 0.0, 1.0));
+    }
+    return max(l - vec3(d / 15.0), vec3(0.0)) * facing;
+}
+
 // Light arriving at a surface with normal `n`. `light` is the world's (sky, red, green, blue, 0..1),
-// `shadow` 1 where the sun reaches it, `ao` the corner shading.
-fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>) -> vec3<f32> {
+// `shadow` 1 where the sun reaches it, `ao` the corner shading, `rel` where it is from the camera.
+fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let p = palette();
-    let sky = brightness_curve(light.x);
-    // More of the sky's light comes from above than from the sides, and little from below.
-    let hemi = 0.62 + 0.38 * n.y;
+    // The sky's light falls off steeply under cover (Bliss's lightmap, (L^15 x 2 + L^2.5) / 3: 1 in the
+    // open, 0.39 a step under, 0.21 two): a forest floor sits a few times below open shade, the open
+    // stays as it was.
+    let steep = look_opt(OPT_SHADE, 1.0);
+    let sky = (pow(light.x, 15.0 * steep) * 2.0 + pow(light.x, 2.5 * steep)) / 3.0;
+    // More of the sky's light comes from above than from the sides, and less from below: tops 1,
+    // sides 0.75, bottoms 0.5 (Complementary's), so shade still shows form.
+    let hemi = 0.75 + 0.25 * n.y;
     var c = p.ambient * sky * hemi * ao;
     // At golden hour the sky round the low sun glows: a warm fill from its side of the sky, on
     // the faces turned that way; those turned away keep the sky's cool light (Valheim's warm light,
@@ -335,7 +402,8 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // gaps), and without corner shading: corners are dark where little sky gets in.
     let open = smoothstep(0.5, 0.95, light.x);
     c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
-    c += block_light(light.yzw, pos) * mix(0.5, 1.0, ao);
+    // A held torch's light where it is brighter than the placed lights there (no doubling).
+    c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao);
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
@@ -343,12 +411,12 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
 }
 
 // For what has no normal to speak of (particles, rain, the hand): half the direct light.
-fn light_round(light: vec4<f32>, pos: vec3<f32>) -> vec3<f32> {
+fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let p = palette();
     let sky = brightness_curve(light.x);
     var c = p.ambient * sky * 0.85;
     c += p.sun * light_strength() * 0.5 * smoothstep(0.5, 0.95, light.x);
-    c += block_light(light.yzw, pos);
+    c += block_light(max(light.yzw, held_light(rel, vec3(0.0))), pos);
     c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
     return c;
 }
@@ -420,7 +488,9 @@ fn fog_density(p: vec3<f32>) -> f32 {
     let banks = smoothstep(0.45, 0.66, shape - 0.25 * eaten + 0.12);
     // Deep under it, in the ground, there is none.
     let open = smoothstep(-24.0, -10.0, h);
-    return f * open * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
+    // The sun thins the banks toward noon (mornings and evenings keep them).
+    let burn = mix(1.0, 0.55, smoothstep(0.35, 0.75, scene.sun.y));
+    return f * open * burn * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
 }
 
 // Light the fog sends toward the eye: the sky's from all around, the sun's mostly forward, so it
@@ -430,10 +500,13 @@ fn fog_light(dir: vec3<f32>) -> vec3<f32> {
     let mu = dot(dir, light_dir());
     let g = 0.6;
     let hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566;
-    let phase = hg * 2.5 + 0.3;
+    // The sun's glow in the fog capped: uncapped it was over twice the sunlight looking toward a high
+    // sun, and noon fog by a river or on snow went a milky white-out (the world playtester's shots,
+    // frame luma 0.76, saturation 0.06). Valheim's daytime fog reads grey and soft.
+    let phase = min(hg * 1.6, 0.9) + 0.3;
     // Droplets are white, snow whiter, dust the color of sand.
     let tint = mix(mix(vec3(0.9), vec3(1.0, 1.0, 1.03), scene.ground.y), vec3(0.95, 0.68, 0.42), scene.ground.z);
-    return ((p.ambient * 1.25 + p.horizon * 0.2) + p.sun * light_strength() * phase) * 0.9 * tint;
+    return ((p.ambient * 1.25 + p.horizon * 0.2) + p.sun * light_strength() * phase) * 0.75 * tint * look_opt(OPT_FOG, 1.0);
 }
 
 // The fog between the eye and a point `rel` away (camera relative), walked in a few steps that are
@@ -554,7 +627,10 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // The air's own depth, whatever the view distance: with distant terrain the fog's end lies
     // thousands of blocks off, and the haze would barely start where the kept blocks give way to it.
     let reach = min(end, 2500.0);
-    let amount = 1.0 - exp(-dist / (reach * mix(0.9, 0.4, rain)) * mix(0.45, 1.0, thin));
+    // A little hazier than it was (0.9): Bliss's air veils the middle distance more, lighter.
+    // (Half as thick as it was: with it off a forest frame's darkest twentieth went 35 -> 25 and its
+    // saturation 0.41 -> 0.57; the haze was the grey veil over the middle distance, Colour 9.)
+    let amount = 1.0 - exp(-dist / (reach * mix(0.75, 0.4, rain)) * mix(0.45, 1.0, thin) * 0.5 * look_opt(OPT_HAZE, 1.0));
     let edge = smoothstep(end * 0.72, end, dist);
     // Valheim's air: lit from behind by the sun, so the haze toward it glows warm (a forward
     // scattering lobe, Henyey-Greenstein) and the side away goes a cool blue-teal, most at a low
@@ -568,7 +644,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
     // The far loses its colour before the haze covers it: far ridges go pale and grey-blue while the
     // near stays rich.
-    let pale = mix(c, vec3(luma(c)), clamp(amount * 1.2, 0.0, 0.7));
+    let pale = mix(c, vec3(luma(c)), clamp(amount * 0.6, 0.0, 0.35));
     return mix(pale, lit, clamp(max(amount * 0.9, edge), 0.0, 1.0));
 }
 
@@ -590,6 +666,23 @@ fn shoulder(x: vec3<f32>) -> vec3<f32> {
 // Jim Hejl's 2015 filmic curve (his published formula): a toe that deepens the darks and a long
 // shoulder that keeps bright skies and sunlit faces from flattening; its output is display-coded,
 // so it is brought back to linear for the sRGB screen.
+// Timothy Lottes's tone curve, our code from his published formula: x^a / (x^(a d) b + c), with b
+// and c solved so that 0.25 maps to 0.25 and 8 to 1 (contrast a 1.05, shoulder d 0.97). Display-
+// linear out, black at black.
+fn lottes(x: vec3<f32>) -> vec3<f32> {
+    // The contrast knob scales a (1.2 as made: Complementary's 1.05 read flat, Colour 9); b and c
+    // follow from it.
+    let a = 1.2 * look_opt(OPT_CONTRAST, 1.0);
+    let ad = a * 0.97;
+    let mid = 0.25;
+    let peak = 8.0;
+    let den = (pow(peak, ad) - pow(mid, ad)) * mid;
+    let b = (-pow(mid, a) + pow(peak, a) * mid) / den;
+    let c = (pow(peak, ad) * pow(mid, a) - pow(peak, a) * pow(mid, ad) * mid) / den;
+    let xa = pow(max(x, vec3(1e-6)), vec3(a));
+    return xa / (pow(max(x, vec3(1e-6)), vec3(ad)) * b + vec3(c));
+}
+
 fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     let v = vec4(c, white);
     let a = 1.425 * v + vec4(0.05);
@@ -615,14 +708,28 @@ fn exposure() -> f32 {
 }
 
 fn display(c: vec3<f32>) -> vec3<f32> {
-    var t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
+    // By day Timothy Lottes's curve (his published formula, GDC 2016; Complementary's settings:
+    // contrast 1.05, mid-grey 0.25 in and out, peak 8) at exposure 1.3: black stays black (no toe
+    // lift, which raised the black point and halved saturation: Colour 4-7) and the darks keep their
+    // colour, where Hejl's toe crushed them. At night and under water Hejl's as before (nights
+    // dark by design), blended as the sun comes up.
+    let day = smoothstep(-0.05, 0.15, scene.sun.y) * select(1.0, 0.0, in_liquid());
+    let night_t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
+    let day_t = min(lottes(max(c, vec3(0.0)) * 1.3 * look_opt(OPT_EXPOSURE, 1.0)), vec3(1.0));
+    var t = mix(night_t, day_t, day);
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
     let shade = mix(vec3(0.975, 0.99, 1.03), vec3(0.92, 0.96, 1.10), golden());
     t *= mix(shade, mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
-    // No saturation added here: it was 8 to 25 % on top of a picture already twice as colourful as
-    // Bliss's (mean saturation 0.46-0.52 against 0.19-0.29 in its pictures), and it took all the
-    // blue out of grass (sRGB 113 177 56 became 96 181 11).
-    t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034);
+    // The near-black loses some colour: at night 60 % of it (a dim light's hue was pushed to a
+    // saturated blue), by day a quarter below a tenth of luminance (Complementary's).
+    let dim = luma(t);
+    let keep = mix(0.4 + 0.6 * smoothstep(0.0, 0.05, dim), 0.75 + 0.25 * smoothstep(0.0, 0.1, dim), day);
+    t = mix(vec3(dim), t, keep);
+    // By day 1.2 of saturation after the curve (Colour 9; 1.07, Complementary's, read pale here).
+    let y = luma(t);
+    t = max(mix(vec3(y), t, mix(1.0, 1.2 * look_opt(OPT_SATURATION, 1.0), day)), vec3(0.0));
+    // A cool floor so the night is never pure black; by day black stays black.
+    t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
     return clamp(t, vec3(0.0), vec3(1.0));
 }
