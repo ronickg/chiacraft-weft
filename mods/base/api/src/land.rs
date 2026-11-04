@@ -208,12 +208,15 @@ pub const COAST_CALM: f64 = 0.45;
 pub const HILLS_INLAND: Area = Area { all: &[Ramp::Temperature(-0.26, -0.15), Ramp::Continent(0.0, 0.12)], not: false };
 
 /// Sea cliffs: in patches along the coast (`COAST_CLIFF_AREA`: the cliff noise's patches, some
-/// 650 blocks across) the land stands `COAST_CLIFF` blocks higher from the shoreline inland, so
+/// 650 blocks across, about 11% of the shore on seeds 1-3; Ronald asked for 10-15%; its noise
+/// ramp sets the share) the land stands `COAST_CLIFF` blocks higher from the shoreline inland, so
 /// it meets the sea in a rock face (rock faces show their stone, limestone low down) and rivers
 /// cut gorges through it.
 pub const COAST_CLIFF: f64 = 14.0;
-pub const COAST_CLIFF_AREA: Area =
-    Area { all: &[Ramp::Noise { salt: salt::COAST_CLIFFS, scale: 650.0, from: 0.0, to: 0.1 }, Ramp::Continent(0.0, 0.0025)], not: false };
+pub const COAST_CLIFF_AREA: Area = Area {
+    all: &[Ramp::Noise { salt: salt::COAST_CLIFFS, scale: 650.0, from: -0.15, to: -0.05 }, Ramp::Continent(0.0, 0.0025)],
+    not: false,
+};
 /// The deep sea: past the shallows the floor drops `OCEAN_DEEP` blocks more (continentalness
 /// `OCEAN_DEEP_AREA`), so the sea shows shallow water by the shore and dark water out deep.
 pub const OCEAN_DEEP: f64 = 22.0;
