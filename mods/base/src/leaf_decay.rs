@@ -35,6 +35,9 @@ pub fn register(r: &mut Registry) {
     r.on(&BLOCK_BROKEN, |b| {
         let w = b.world();
         let (dim, now) = (w.dimension(), w.time());
+        // A felled giant breaks a thousand logs at once, their boxes mostly the same places:
+        // each looked at once.
+        let mut looked = HashSet::new();
         for e in b.iter().filter(|e| LOGS.on_block(e.state)) {
             let mut due = DUE.lock().unwrap();
             let Due { list, waiting } = &mut *due;
@@ -44,7 +47,7 @@ pub fn register(r: &mut Registry) {
                 for dz in -NEAR..=NEAR {
                     for dx in -NEAR..=NEAR {
                         let p = [x + dx, y + dy, z + dz];
-                        if decays(&w, p) && waiting.insert((dim, p)) {
+                        if looked.insert(p) && decays(&w, p) && waiting.insert((dim, p)) {
                             let wait = SOONEST + (w.random() % (LATEST - SOONEST));
                             list.push((dim, now + wait, p));
                         }

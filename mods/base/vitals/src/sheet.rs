@@ -24,6 +24,7 @@ pub fn markdown() -> String {
     clothes(&mut w);
     rooms(&mut w);
     waiting(&mut w);
+    felling_table(&mut w);
     effects_table(&mut w);
     climates(&mut w);
     plant_table(&mut w);
@@ -129,6 +130,37 @@ fn cooking(w: &mut String) {
             .map(|p| format!("{:.0}", food::FOODS[p].keeps.0 + food::FOODS[p].keeps.1))
             .collect();
         let _ = writeln!(w, "| {} ({:.0}) | {} | {} |", f.name, f.keeps.0 + f.keeps.1, made.join(" | "), keeps.join(", "));
+    }
+    let _ = writeln!(w);
+}
+
+fn felling_table(w: &mut String) {
+    use crate::felling::{self, LONGEST_SECS, PAST_TIER, SHEET_TREES, TIERS};
+    let _ = write!(
+        w,
+        "## Felling\n\nAn axe at a tree's foot fells it in one chop that takes logs^{} times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, {} times slower, and gives nothing. Never more than {} min. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:\n\n| tier | harvest | takes up to | speed |",
+        felling::GROWTH,
+        PAST_TIER,
+        LONGEST_SECS / 60.0
+    );
+    for (name, logs) in SHEET_TREES {
+        let _ = write!(w, " {name} ({logs}) |");
+    }
+    let _ = write!(w, "\n|---|---|---|---|");
+    for _ in SHEET_TREES {
+        let _ = write!(w, "---|");
+    }
+    let _ = writeln!(w);
+    for t in TIERS {
+        let _ = write!(w, "| {} | {} | {} logs | {} |", t.name, t.harvest, t.logs, t.speed);
+        let one = felling::log_secs(2.0, t.speed);
+        for &(_, logs) in SHEET_TREES {
+            let f = felling::felling(logs, t.harvest);
+            let secs = felling::seconds(f, one);
+            let time = if secs < 120.0 { format!("{secs:.0} s") } else { format!("{:.0} min", secs / 60.0) };
+            let _ = write!(w, " {time}{} |", if f.fruitful { "" } else { " *" });
+        }
+        let _ = writeln!(w);
     }
     let _ = writeln!(w);
 }

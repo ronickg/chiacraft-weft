@@ -156,6 +156,20 @@ What takes days in real life takes its time on the growing pace (`vitals::crafts
 | tanning_pit | #hides | #bark_tannin | base:sole_leather | 365 | 4.0 game days | 8 |
 | charcoal_clamp | #logs | - | base:coal | 7 | 5.0 min | 16 |
 
+## Felling
+
+An axe at a tree's foot fells it in one chop that takes logs^0.75 times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, 8 times slower, and gives nothing. Never more than 60 min. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:
+
+| tier | harvest | takes up to | speed | oak (20) | birch (34) | araucaria (72) | young sequoia (165) | sequoia (1015) |
+|---|---|---|---|---|---|---|---|---|
+| wood, gold | 0 | 24 logs | 2 | 14 s | 3 min * | 5 min * | 9 min * | 36 min * |
+| bone, antler | 50 | 40 logs | 2.5 | 11 s | 17 s | 4 min * | 7 min * | 29 min * |
+| flint, chert, obsidian, stone | 100 | 96 logs | 2.91 | 10 s | 15 s | 25 s | 6 min * | 25 min * |
+| copper | 150 | 192 logs | 4.85 | 6 s | 9 s | 15 s | 28 s | 15 min * |
+| bronze, iron, wrought iron | 200 | 512 logs | 6.79 | 4 s | 6 s | 11 s | 20 s | 11 min * |
+| steel, diamond (old) | 300 | 1536 logs | 7.76 | 4 s | 5 s | 10 s | 18 s | 70 s |
+| diamond | 400 | 4096 logs | 8 | 4 s | 5 s | 9 s | 17 s | 67 s |
+
 ## Effects
 
 | effect | group | changes |
