@@ -169,6 +169,51 @@ pub fn problems() -> Vec<String> {
         out.push("a rack in a damp winter dries in under five game days".into());
     }
 
+    // Research round 3: a new player in arrival clothes on a spring night in the plains (day 8 of
+    // spring, 03:00) is no worse than cold; four hot steaks warm as one; leather armor is hide.
+    let arrival = {
+        let mut w = crate::clothing::Worn::default();
+        for (m, piece) in crate::clothing::ARRIVAL {
+            if let Some(m) = crate::clothing::find(m) {
+                w.clothes(m, piece);
+            }
+        }
+        w
+    };
+    let dressed = Body { cold_insulation: arrival.cold, heat_insulation: arrival.heat, wet_cold_insulation: arrival.cold_wet, ..person };
+    let spring_night = Place {
+        hour: 3.0,
+        humidity: 0.42,
+        season: temperature::season(14.2, crate::calendar::from_midwinter(crate::calendar::START_DAY as f32)),
+        ..noon(12.8)
+    };
+    if feels(&dressed, &spring_night) == Feeling::Freezing {
+        out.push("arrival clothes on a plains night at the world's start freeze".into());
+    }
+    if !(8.0..=14.0).contains(&arrival.cold) {
+        out.push(format!("arrival clothes give {:.1} °C (about 1 clo, 8 to 14, wanted)", arrival.cold));
+    }
+    let mut steaks = Stomach::default();
+    if let Some(steak) = food::find("base:cooked_beef") {
+        for _ in 0..4 {
+            let _ = steaks.eat(steak, 1.0, 0.0, capacity);
+        }
+    }
+    if steaks.meal_warming() > food::HOT_MEAL.0 + 1e-3 {
+        out.push(format!("four hot steaks warm {} °C, more than one", steaks.meal_warming()));
+    }
+    let mut leather = crate::clothing::Worn::default();
+    let mut hide = crate::clothing::Worn::default();
+    for p in 0..4 {
+        leather.armor("leather", p);
+        if let Some(m) = crate::clothing::find("hide") {
+            hide.clothes(m, p);
+        }
+    }
+    if leather != hide {
+        out.push("leather armor isn't as warm as hide clothes".into());
+    }
+
     // Freezing takes a full new player in two to five minutes at normal difficulty.
     let freeze = 1.0 / Effect::Freezing.modifiers().health_loss;
     if !(120.0..=300.0).contains(&freeze) {

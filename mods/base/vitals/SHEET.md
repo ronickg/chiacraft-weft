@@ -18,7 +18,7 @@ Written from `mods/base/vitals` (`cargo run -p vitals --bin sheet > mods/base/vi
 
 Comfortable air for a person, unclothed: (15.0, 28.0) °C.
 
-A new player arrives with base:bread and base:apple in the stomach (43 units): max health 54 and stamina 75 of 100, wearing off as it digests (an empty stomach: 40).
+A new player arrives with base:bread and base:apple in the stomach (43 units): max health 54 and stamina 75 of 100, wearing off as it digests (an empty stomach: 40). A new world begins on spring's day 8, a quarter of the year from midwinter.
 
 ## Foods
 
@@ -69,7 +69,7 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 
 ## Meals and preserving
 
-A stew (`vitals::meals`) cooks 2-4 foods in 10 s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x1.25 (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient.
+A stew (`vitals::meals`) cooks 2-4 foods in 10 s in a cooking pot; raw meat in it is cooked. Each goes into the stomach as its own portion at x1.25 (so each counts toward well fed), the meal warms as one hot dish, and it keeps as long as its shortest-keeping ingredient. A campfire cooks what a furnace cooks of food, x1.5 the time, with no fuel. Nothing is made of spoiled food, and what is made of stale food starts as far through its own life as its stalest part.
 
 Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (25 °C, humidity 0.3, a breeze; nothing below 5 °C or above humidity 0.85, nor in the rain), and smokes in 10 min over a fire (lava, a lit furnace) within 2 blocks below, in any weather; salting is crafted with salt, boiled out of a water bucket in a furnace in 20 s.
 
@@ -81,19 +81,26 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | base:chicken (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | base:mutton (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | base:berries (12) | base:dried_berries | - | - | 112 |
+| base:lingonberries (40) | base:dried_berries | - | - | 112 |
+| base:cloudberries (6) | base:dried_berries | - | - | 112 |
+| base:crowberries (20) | base:dried_berries | - | - | 112 |
+| base:raspberries (4) | base:dried_berries | - | - | 112 |
+| base:prickly_pear_fruit (14) | base:dried_berries | - | - | 112 |
 | animals:venison (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 | animals:hare (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| animals:trout (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| animals:pacu (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 
 ## Clothing
 
-Worn in four slots of their own under armor (hat, coat, trousers, boots), no armor value. A full set's real insulation in clo at 12 °C of comfort each; a piece gives its share ([0.15, 0.4, 0.3, 0.15], head to feet). Wet, armor keeps 35% of its warmth; being wet itself feels 6 °C colder. What each piece takes: hat 2 + 1 string, coat 4 + 2 string, trousers 3 + 1 string, boots 2 + 1 string.
+Worn in four slots of their own under armor (hat, coat, trousers, boots), no armor value; armor and clothes stack, and leather armor is hide. A full set's real insulation in clo at 12 °C of comfort each; a piece gives its share ([0.15, 0.4, 0.3, 0.15], head to feet). Wet, armor keeps 35% of its warmth; being wet itself feels 6 °C colder. Each piece is sewn with [1, 2, 1, 1] string, a string is 2 plant fibre. A new player arrives in linen hat, wool coat, hide trousers, hide boots.
 
-| material | clo | cold °C | heat °C | kept wet | windproof | from |
-|---|---|---|---|---|---|---|
-| fur | 2.5 | 30 | -9 | 30% | 80% | pelts of furred wild animals |
-| wool | 1.2 | 14 | -2 | 60% | 30% | sheep's wool |
-| hide | 0.8 | 10 | -1 | 30% | 70% | leather |
-| linen | 0.5 | 6 | 4 | 20% | 10% | plant fibre spun and woven |
+| material | clo | cold °C | heat °C | kept wet | windproof | pieces to make | from |
+|---|---|---|---|---|---|---|---|
+| fur | 2.5 | 30 | -9 | 30% | 80% | [2, 4, 3, 2] | pelts of furred wild animals |
+| wool | 1.2 | 14 | -2 | 60% | 30% | [1, 2, 1, 1] | sheep's wool |
+| hide | 0.8 | 10 | -1 | 30% | 70% | [1, 2, 1, 1] | leather |
+| linen | 0.5 | 6 | 4 | 20% | 10% | [2, 4, 3, 2] | plant fibre spun and woven |
 
 ## Effects
 

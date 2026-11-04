@@ -8,6 +8,7 @@ mod clothing;
 mod cooking;
 mod farming;
 mod growth;
+mod hints;
 mod hud;
 mod items;
 mod levels;
@@ -61,6 +62,7 @@ fn init(r: &mut Registry) {
     growth::register(r);
     farming::register(r);
     advancements::register(r);
+    hints::register(r);
     beds::register(r);
     hud::register(r);
     redstone::register(r);

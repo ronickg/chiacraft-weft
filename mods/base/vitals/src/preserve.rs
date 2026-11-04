@@ -30,20 +30,32 @@ impl Method {
     }
 }
 
-/// What a method makes of a food (`FOODS` index), if anything: raw meat of any animal dries,
-/// smokes or salts into one meat of each; apples and berries dry.
+/// What a method makes of a food (`FOODS` index), if anything: raw meat and fish of any animal
+/// dry, smoke or salt into one meat of each; every fresh fruit dries, apples into rings and the
+/// rest as dried berries (wild berries, prickly pears); a fruit that keeps half as long as dried
+/// fruit already (rose hips, which hold on the bush) has nothing to gain.
 pub fn product(method: Method, food: usize) -> Option<&'static str> {
     let f = &FOODS[food];
-    let meat = f.raw && f.category == Category::Meat && f.poison == 0.0;
+    let meat = f.raw && matches!(f.category, Category::Meat | Category::Fish) && f.poison == 0.0;
+    let preserved = PRODUCTS.contains(&f.name);
+    let dried = food::find("base:dried_berries").map_or(0.0, |d| FOODS[d].keeps.0 + FOODS[d].keeps.1);
+    let fruit = f.category == Category::Fruit
+        && f.meal != food::Meal::Cooked
+        && f.poison == 0.0
+        && !preserved
+        && (f.keeps.0 + f.keeps.1) * 2.0 <= dried;
     match method {
         Method::Dried if meat => Some("base:dried_meat"),
-        Method::Dried if f.name == "base:apple" => Some("base:dried_apple"),
-        Method::Dried if f.name == "base:berries" => Some("base:dried_berries"),
+        Method::Dried if fruit && f.name == "base:apple" => Some("base:dried_apple"),
+        Method::Dried if fruit => Some("base:dried_berries"),
         Method::Smoked if meat => Some("base:smoked_meat"),
         Method::Salted if meat => Some("base:salted_meat"),
         _ => None,
     }
 }
+
+/// Every preserved food.
+pub const PRODUCTS: [&str; 5] = ["base:dried_meat", "base:smoked_meat", "base:salted_meat", "base:dried_apple", "base:dried_berries"];
 
 /// Seconds a rack dries its food in the best air.
 pub const DRY_SECS: f32 = DAY_SECS;
