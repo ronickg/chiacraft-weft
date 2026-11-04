@@ -122,10 +122,13 @@ fn web(w: &mut String) {
         w,
         "Each biome's web, from the species' habitats and diets and the world's plant food (`core/src/web.rs`). \
          Plant food is how much of any plant eater's food grows or is found there in each season, against fresh growth \
-         at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome.\n"
+         at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome. Grazing: in \
+         the best season for grass, what its grazers eat a day (as many of each as live together, `crowd`, by how \
+         common there) against what its tall grass grows back within the crowd's radius.\n"
     );
-    let _ = writeln!(w, "| Biome | Plant food (spring, summer, autumn, winter) | Plant eaters | Hunters | Carrion |");
-    let _ = writeln!(w, "|---|---|---|---|---|");
+    let _ =
+        writeln!(w, "| Biome | Plant food (spring, summer, autumn, winter) | Grazing (best season) | Plant eaters | Hunters | Carrion |");
+    let _ = writeln!(w, "|---|---|---|---|---|---|");
     let names = |f: &dyn Fn(&Species) -> bool, biome: &str| {
         let v: Vec<String> = SPECIES
             .iter()
@@ -138,9 +141,12 @@ fn web(w: &mut String) {
         let food: Vec<String> = (0..4)
             .map(|i| format!("{:.0}%", 100.0 * crate::web::food_in(Category::plant, biome, i)))
             .collect();
+        let grazing = crate::web::grazing(biome).map_or("-".to_string(), |g| {
+            format!("{}: eaten {:.0}% of the regrowth", crate::web::SEASONS[g.season], 100.0 * g.eaten / g.regrown.max(1e-6))
+        });
         let _ = writeln!(
             w,
-            "| {biome} | {} | {} | {} | {} |",
+            "| {biome} | {} | {grazing} | {} | {} | {} |",
             food.join(", "),
             names(&|s| s.plant_share() >= 0.5, biome),
             names(&|s| s.hunts() && !s.forages_wild(), biome),

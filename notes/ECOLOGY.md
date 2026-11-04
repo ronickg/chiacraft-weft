@@ -692,8 +692,11 @@ winter, and the diets' insects, roots, fungi, lichen and water plants in no plac
 The world's food (`vitals::forage::SOURCES`) gained winter's standing hay, deciduous twigs and
 fallen mast, lichen (the tundra's and taiga's ground, the mountains' rocks), fungi, roots dug
 from the ground, insects in the grass, sand and the north's summer, and reeds and horsetails as
-water plants. Still to build: the year simulation (grazers can't eat a biome bare in its best
-season).
+water plants. A year holds too (`web::grazing`): in each biome's best season for grass, its
+grazers, as many of each as live together, eat at most 18% of what its tall grass grows back (the
+mountains; the plains 3%): nothing grazes a biome bare. That is far under what real grazers take
+of a grassland (a quarter to a half), so tall grass rarely looks grazed down but round a herd; a
+choice for later. The grass cover is now `vitals::forage::GRASS_COVER`, which the world reads.
 
 These are like `places.rs`: they read the tables, so a new biome, plant or species is checked
 the moment it's added.

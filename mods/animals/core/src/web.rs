@@ -191,7 +191,80 @@ pub fn gaps() -> Vec<Gap> {
             }
         }
     }
+    // A year in each biome holds: its grazers, as many as live together where commonest, can't
+    // eat its grass bare in its best season.
+    for biome in biomes() {
+        if let Some(g) = grazing(biome)
+            && g.eaten > g.regrown
+        {
+            out.push(gap(
+                format!("{biome}: grazed bare"),
+                format!(
+                    "{biome}: its grazers eat {:.0} food a day within {:.0} blocks in {}, its grass grows back {:.0}: the grazers' crowds and hunger (species.rs) against vitals::forage GRASS_COVER and the grazed grass's growth (vitals::plants)",
+                    g.eaten,
+                    crate::life::CROWD_RADIUS,
+                    SEASONS[g.season],
+                    g.regrown
+                ),
+            ));
+        }
+    }
     out
+}
+
+/// A biome's grass and its grazers in its best season for grass (`grazing`).
+#[derive(Clone, Copy, Debug)]
+pub struct Grazing {
+    pub season: usize,
+    /// Food a day the grazed grass gives back within `life::CROWD_RADIUS` blocks.
+    pub regrown: f32,
+    /// Food a day its grazers eat of it there, as many of each as live together (`crowd`, by how
+    /// common it is there) and the grass's share of their diets.
+    pub eaten: f32,
+}
+
+/// The tall grass's balance in a biome's best season for grass (`None`: no grass, or nothing
+/// grazes it): the area within `life::CROWD_RADIUS` blocks, its grass cover
+/// (`vitals::forage::grass_grows`), a grazed tuft growing back by the grazed grass's plant at the
+/// season's rate (`vitals::plants`) and feeding as a mouthful of fresh grass does then.
+pub fn grazing(biome: &str) -> Option<Grazing> {
+    let c = climate::of(biome)?;
+    let cover = vitals::forage::grass_grows(biome);
+    let plant = vitals::plants::of("base:grazed_grass")?;
+    let tuft = vitals::forage::SOURCES
+        .iter()
+        .find(|s| s.block == "base:tall_grass" && s.category == Category::Grass)?;
+    let secs = vitals::plants::step_secs(plant, 1)?;
+    let grazers: Vec<(&Species, f32)> = SPECIES
+        .iter()
+        .filter_map(|s| {
+            let share = s
+                .eats
+                .iter()
+                .find(|&&(k, _)| k == Category::Grass)
+                .map(|&(_, v)| v)?;
+            let weight = s
+                .habitats
+                .iter()
+                .find(|&&(b, _)| b == biome)
+                .map(|&(_, w)| w)?;
+            Some((s, share * weight))
+        })
+        .collect();
+    if cover <= 0.0 || grazers.is_empty() {
+        return None;
+    }
+    let (season, rate) = (0..4)
+        .map(|i| (i, vitals::plants::season_rate_in(plant, c.celsius, c.seasons, c.rain, i)))
+        .fold((0, 0.0f32), |a, b| if b.1 > a.1 { b } else { a });
+    let blocks = std::f32::consts::PI * (crate::life::CROWD_RADIUS as f32).powi(2) * cover;
+    let mouthful = tuft.food as f32 * (0.4 + 0.6 * rate);
+    let regrown = blocks * mouthful * rate * vitals::DAY_SECS / secs;
+    let eaten = grazers
+        .iter()
+        .map(|&(s, share)| s.crowd() as f32 * share * vitals::DAY_SECS / s.hunger.max(1.0))
+        .sum();
+    Some(Grazing { season, regrown, eaten })
 }
 
 /// The gaps not in `WAITING`, and the `WAITING` entries no longer gaps: what the test asks to be

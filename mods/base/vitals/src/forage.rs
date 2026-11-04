@@ -160,6 +160,40 @@ pub fn of(block: &str, age: Option<u8>, eats: impl Fn(Category) -> bool, season:
         .find(|s| s.block == block && (s.age.is_none() || s.age == age) && eats(s.category) && s.in_season(season))
 }
 
+/// Share of the ground tall grass covers where the world makes it (`worldgen.rs`,
+/// `cretaceous.rs` read it): the grass that grazers eat and that grows back. A biome not listed
+/// gets the world's default (`GRASS_COVER_ELSE`) wherever its ground takes plants; frozen ground
+/// and sand take none (`grass_grows`).
+pub const GRASS_COVER: [(&str, f32); 11] = [
+    ("base:plains", 0.25),
+    ("base:forest", 0.12),
+    ("base:birch_forest", 0.12),
+    ("base:taiga", 0.08),
+    ("base:savanna", 0.35),
+    ("base:swamp", 0.2),
+    ("base:mountains", 0.05),
+    ("animals:red_dunes", 0.0),
+    ("animals:scrubland", 0.1),
+    ("animals:floodplain", 0.05),
+    ("animals:fern_forest", 0.03),
+];
+pub const GRASS_COVER_ELSE: f32 = 0.05;
+/// Where no tall grass grows at all: frozen ground, and sand (no plant soil).
+const NO_GRASS: [&str; 4] = ["base:snowy_plains", "base:desert", "base:beach", "base:ocean"];
+
+/// A biome's tall grass cover as the world sets it (`None`: the world's default).
+pub fn grass_cover(biome: &str) -> Option<f32> {
+    GRASS_COVER
+        .iter()
+        .find(|&&(b, _)| b == biome)
+        .map(|&(_, c)| c)
+}
+
+/// The share of a biome's ground in tall grass, as the world makes it.
+pub fn grass_grows(biome: &str) -> f32 {
+    if NO_GRASS.contains(&biome) { 0.0 } else { grass_cover(biome).unwrap_or(GRASS_COVER_ELSE) }
+}
+
 /// The ground itself (turf, sand, the forest floor, the tundra, bare rock): roots, insects and
 /// lichen are in it everywhere, so a forager eats from it only when no richer food is in sight
 /// (`Source::fallback`), as real ones graze and browse first.

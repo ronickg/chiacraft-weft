@@ -62,25 +62,25 @@ Damage and speed are each kind's own (1 = 100%).
 
 ## The food web
 
-Each biome's web, from the species' habitats and diets and the world's plant food (`core/src/web.rs`). Plant food is how much of any plant eater's food grows or is found there in each season, against fresh growth at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome.
+Each biome's web, from the species' habitats and diets and the world's plant food (`core/src/web.rs`). Plant food is how much of any plant eater's food grows or is found there in each season, against fresh growth at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome. Grazing: in the best season for grass, what its grazers eat a day (as many of each as live together, `crowd`, by how common there) against what its tall grass grows back within the crowd's radius.
 
-| Biome | Plant food (spring, summer, autumn, winter) | Plant eaters | Hunters | Carrion |
-|---|---|---|---|---|
-| base:plains | 40%, 53%, 46%, 40% | hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, brown_trout, red_fox, raven |
-| base:forest | 40%, 73%, 41%, 40% | capybara, hare, wood_mouse, white_tailed_deer, red_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, brown_trout, red_fox, raven |
-| base:birch_forest | 40%, 62%, 40%, 40% | mountain_hare, field_vole, red_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, brown_trout, red_fox, raven |
-| base:taiga | 40%, 62%, 40%, 40% | mountain_hare, field_vole | cat, red_fox, arctic_fox, raven | cat, brown_trout, red_fox, arctic_fox, raven |
-| base:snowy_plains | 40%, 40%, 40%, 40% | mountain_hare, field_vole | arctic_fox, raven | arctic_fox, raven |
-| base:desert | 40%, 40%, 40%, 40% | hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, red_fox, raven |
-| base:savanna | 43%, 82%, 75%, 40% | capybara, hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat | dog (chihuahua), cat |
-| base:swamp | 40%, 59%, 45%, 40% | capybara, field_vole, white_tailed_deer | **none** | **none** |
-| base:mountains | 40%, 70%, 40%, 40% | mountain_hare, field_vole, red_deer | red_fox, raven | brown_trout, red_fox, raven |
-| base:beach | 40%, 40%, 50%, 40% | hare, wood_mouse | red_fox, raven | red_fox, raven |
-| animals:red_dunes | 40%, 40%, 40%, 40% | protoceratops | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
-| animals:scrubland | 40%, 43%, 40%, 40% | protoceratops | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
-| animals:floodplain | 40%, 59%, 63%, 40% | **none** | utahraptor | utahraptor |
-| animals:fern_forest | 40%, 70%, 45%, 40% | **none** | utahraptor, wyvern | utahraptor, wyvern |
-| animals:crags | 40%, 66%, 65%, 40% | **none** | wyvern | wyvern |
+| Biome | Plant food (spring, summer, autumn, winter) | Grazing (best season) | Plant eaters | Hunters | Carrion |
+|---|---|---|---|---|---|
+| base:plains | 40%, 53%, 46%, 40% | summer: eaten 3% of the regrowth | hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, brown_trout, red_fox, raven |
+| base:forest | 40%, 73%, 41%, 40% | summer: eaten 7% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer, red_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, brown_trout, red_fox, raven |
+| base:birch_forest | 40%, 62%, 40%, 40% | summer: eaten 10% of the regrowth | mountain_hare, field_vole, red_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, brown_trout, red_fox, raven |
+| base:taiga | 40%, 62%, 40%, 40% | summer: eaten 10% of the regrowth | mountain_hare, field_vole | cat, red_fox, arctic_fox, raven | cat, brown_trout, red_fox, arctic_fox, raven |
+| base:snowy_plains | 40%, 40%, 40%, 40% | - | mountain_hare, field_vole | arctic_fox, raven | arctic_fox, raven |
+| base:desert | 40%, 40%, 40%, 40% | - | hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat, red_fox, raven | dog (chihuahua), cat, red_fox, raven |
+| base:savanna | 43%, 82%, 75%, 40% | summer: eaten 2% of the regrowth | capybara, hare, wood_mouse, white_tailed_deer | dog (chihuahua), cat | dog (chihuahua), cat |
+| base:swamp | 40%, 59%, 45%, 40% | summer: eaten 6% of the regrowth | capybara, field_vole, white_tailed_deer | **none** | **none** |
+| base:mountains | 40%, 70%, 40%, 40% | summer: eaten 18% of the regrowth | mountain_hare, field_vole, red_deer | red_fox, raven | brown_trout, red_fox, raven |
+| base:beach | 40%, 40%, 50%, 40% | - | hare, wood_mouse | red_fox, raven | red_fox, raven |
+| animals:red_dunes | 40%, 40%, 40%, 40% | - | protoceratops | raptor, osmolskae, wyvern | raptor, osmolskae, wyvern |
+| animals:scrubland | 40%, 43%, 40%, 40% | - | protoceratops | raptor, utahraptor, wyvern | raptor, utahraptor, wyvern |
+| animals:floodplain | 40%, 59%, 63%, 40% | - | **none** | utahraptor | utahraptor |
+| animals:fern_forest | 40%, 70%, 45%, 40% | - | **none** | utahraptor, wyvern | utahraptor, wyvern |
+| animals:crags | 40%, 66%, 65%, 40% | - | **none** | wyvern | wyvern |
 
 ### Gaps in the web
 
