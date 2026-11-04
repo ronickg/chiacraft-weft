@@ -8,7 +8,10 @@ use std::collections::HashMap;
 
 use weft_sdk::noise::fixed::{self, ONE, div_floor, q4, q12, ramp};
 
-use super::{Here, KARST_AREA, KARST_CELL, KARST_CHANCE, KARST_HEIGHT, KARST_RADIUS, salt};
+use super::{
+    Here, KARST_AREA, KARST_CELL, KARST_CHANCE, KARST_CLUSTER, KARST_CLUSTER_SIZE, KARST_HEIGHT, KARST_LONE, KARST_RADIUS,
+    KARST_WIDE_HEIGHT, KARST_WIDE_ONE_IN, KARST_WIDE_RADIUS, salt,
+};
 use crate::SEA;
 
 /// A tower: its middle (blocks), radius and height (blocks).
@@ -34,14 +37,21 @@ fn tower(h: &Here, cx: i32, cz: i32) -> Option<Tower> {
         return hit;
     }
     let hash = fixed::hash(fixed::seed32(h.f.seed, salt::KARST), cx, 0, cz);
-    let span = (KARST_CELL - 2 * KARST_RADIUS.1).max(1) as u32;
-    let x = cx * KARST_CELL + KARST_RADIUS.1 + (hash % span) as i32;
-    let z = cz * KARST_CELL + KARST_RADIUS.1 + ((hash >> 12) % span) as i32;
-    let chance = (q12(KARST_CHANCE) * KARST_AREA.value(h.f, x * 16, z * 16)) >> 12;
+    // Anywhere in the cell: a tower reaches at most `reach` (under a cell) past its middle, and
+    // the columns look in their three by three cells.
+    let span = KARST_CELL as u32;
+    let x = cx * KARST_CELL + (hash % span) as i32;
+    let z = cz * KARST_CELL + ((hash >> 12) % span) as i32;
+    let (qx, qz) = (x * 16, z * 16);
+    let cluster = ramp(h.f.fbm(salt::KARST_CLUSTER, qx, qz, q4(KARST_CLUSTER_SIZE), 2), q12(KARST_CLUSTER.0), q12(KARST_CLUSTER.1));
+    let keep = q12(KARST_LONE) + (((q12(KARST_CHANCE) - q12(KARST_LONE)) * cluster) >> 12);
+    let chance = (keep * KARST_AREA.value(h.f, qx, qz)) >> 12;
     let site = ((fixed::fmix(hash) & 4095) < chance as u32).then(|| {
         let h2 = fixed::fmix(hash ^ 0x9E37);
         let pick = |v: u32, (lo, hi): (i32, i32)| lo + (v % (hi - lo + 1) as u32) as i32;
-        Tower { x, z, radius: pick(h2, KARST_RADIUS), height: pick(h2 >> 8, KARST_HEIGHT) }
+        let wide = (h2 >> 20) % KARST_WIDE_ONE_IN == 0;
+        let (r, ht) = if wide { (KARST_WIDE_RADIUS, KARST_WIDE_HEIGHT) } else { (KARST_RADIUS, KARST_HEIGHT) };
+        Tower { x, z, radius: pick(h2, r), height: pick(h2 >> 8, ht) }
     });
     SITES.with(|c| {
         let mut c = c.borrow_mut();
