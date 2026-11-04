@@ -309,6 +309,9 @@ pub struct Client {
     pub target_entity: Option<u64>,
     pub selected: usize,
     pub disconnected: Option<String>,
+    /// Why the world refused this player or sent them away (`ToClient::Refused`), to show in
+    /// their language.
+    pub refused: Option<crate::ui::text::Msg>,
     /// Seconds until holding a button repeats its action. A new press never waits.
     break_delay: f32,
     use_delay: f32,
@@ -556,7 +559,10 @@ impl Client {
         let account = chiacraft_account::current()
             .and_then(|s| s.vouch_line(key))
             .unwrap_or_default();
-        conn.send(ToServer::Join { name: name.to_string(), key: key.to_string(), account });
+        let did = chiacraft_account::current()
+            .and_then(|s| s.did_proof())
+            .unwrap_or_default();
+        conn.send(ToServer::Join { name: name.to_string(), key: key.to_string(), account, did });
         conn.send(ToServer::View(view_radius as u32));
         if let Some(png) = skin {
             conn.send(ToServer::Skin(png));
@@ -627,6 +633,7 @@ impl Client {
             target_entity: None,
             selected: 0,
             disconnected: None,
+            refused: None,
             break_delay: 0.0,
             use_delay: 0.0,
             view_radius,

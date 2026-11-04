@@ -4,14 +4,14 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 64 · ◧ partly built: 17 · □ not built yet: 16 · ◌ planned for later: 6
+■ built and seen working: 64 · ◧ partly built: 18 · □ not built yet: 15 · ◌ planned for later: 6
 
 ## Core next
 
 What's missing that the rest leans on (marked `core` in the data).
 
-- **Account and identity: Player and world DIDs**. Phase 4: through sponsors; world ownership both ways.
-- **Linked worlds: Admission rules and bans**. Phase 4: allow lists, probation, DID age, shared ban lists.
+- **Account and identity: Player and world DIDs**. Phase 4, slices 4-7 in notes/PLAN.md, waiting for Ronald's answers on the sponsor (iroh or HTTP, the testnet wallets, world DIDs from the sponsor, testnet11 by default). crates/wallet can already read DIDs from the chain, create one and ask a sponsor for one (chain/did.rs, sponsor.rs), behind its `chain` feature, used by its tests and chiacraft-wallet-test; the game links none of it. Horizon's sponsor service (horizon-sponsor) ran live on testnet11 and is to be ported.
+- **Linked worlds: Admission rules and bans**. Phase 4 slices 1-3 built and seen working between two games on the PC (2026-11-04, tools/checks/admission): per world admission.json (open or allow list only, the allow list by login key, identity or DID; probation for newcomers: no building, no containers, for N hours of play, liftable) and bans.json (by login key, identity and DID, timed or for good; banned players are sent away), checked at every join; refusals in the player's language; /ban, /tempban, /unban, /bans, /allow, /probation, /banlist and the owner's "Who May Come In" screen; the status answer shows the rules before joining. Shared ban lists: signed by their maintainer's identity, served by any world holding one (chiacraft/bans/1), followed by a world's address (its owner's list), fetched daily. DID rules (/didrule: DID required, DID age, checked on chain at the join) built, not yet seen on testnet11.
 - **Running worlds safely: Permissions**. Operator levels exist, but any player can still /give.
 - **Running worlds safely: Sandboxed code mods**. Phase 6 slices 1 and 2 built and seen between two games (Linux PC): a package's code/server.wasm (a wasmtime component, API chiacraft:mods@1.0.0 shaped on Weft's SDK) downloads with it on join and runs on the world's host under fuel, time and memory limits, per world, with storage in the save; sample clans (the animals mod's tribes). Slice 2: the join sheet marks packages that carry code (protocol 6), and a package's clashing command is left out. Slice 3: API 1.1 (components, set_blocks, sounds, particles; 1.0 mods still run), sample tally. Left: 1.2 (block and item callbacks, channels), client halves, personal mods.
 - **Living world: Real places and pacing**. Researched (2026-11-03): a real place and its monthly climate for every biome, 57 plants' agronomy, real diets and food webs, and the pacing (the calendar for weather, the species' growing pace for plants). Decided: the fern forest after the Yixian (cool), the dunes wet in winter and spring, Velociraptors alone, temperatures as the real places have them. The climate table follows it (vitals/tests/places.rs holds it there). Next: the plant table and the species' diets.
@@ -47,7 +47,7 @@ Who a player is, kept by them: 24 words, keys derived from them, later a DID on 
 | ■ | 24 words in the keychain | Made quietly at first start (phase 1). Code: `crates/wallet`. |
 | ■ | Login key | Derived from the words; can never spend; the iroh key. Code: `crates/account`. |
 | ■ | Content-signing key |  |
-| □ | Player and world DIDs (core) | Phase 4: through sponsors; world ownership both ways. |
+| □ | Player and world DIDs (core) | Phase 4, slices 4-7 in notes/PLAN.md, waiting for Ronald's answers on the sponsor (iroh or HTTP, the testnet wallets, world DIDs from the sponsor, testnet11 by default). crates/wallet can already read DIDs from the chain, create one and ask a sponsor for one (chain/did.rs, sponsor.rs), behind its `chain` feature, used by its tests and chiacraft-wallet-test; the game links none of it. Horizon's sponsor service (horizon-sponsor) ran live on testnet11 and is to be ported. |
 | □ | Achievements on chain | Phase 4: signed by the world's DID, anchored in batches, opt-in. In-game advancements exist. |
 | □ | Profile view | Phase 4. |
 
@@ -82,7 +82,7 @@ Worlds with their own addresses, linked by both owners, with portals between the
 | ■ | Portal blocks and travel | Code: `crates/engine/src/chiacraft/worlds/travel.rs`, `mods/portals`. |
 | ■ | Friends | Code: `crates/engine/src/chiacraft/worlds/friends.rs`. |
 | ◧ | Leftovers | Arrivals in other dimensions; links carried to a world's new address. |
-| □ | Admission rules and bans (core) | Phase 4: allow lists, probation, DID age, shared ban lists. |
+| ◧ | Admission rules and bans (core) | Phase 4 slices 1-3 built and seen working between two games on the PC (2026-11-04, tools/checks/admission): per world admission.json (open or allow list only, the allow list by login key, identity or DID; probation for newcomers: no building, no containers, for N hours of play, liftable) and bans.json (by login key, identity and DID, timed or for good; banned players are sent away), checked at every join; refusals in the player's language; /ban, /tempban, /unban, /bans, /allow, /probation, /banlist and the owner's "Who May Come In" screen; the status answer shows the rules before joining. Shared ban lists: signed by their maintainer's identity, served by any world holding one (chiacraft/bans/1), followed by a world's address (its owner's list), fetched daily. DID rules (/didrule: DID required, DID age, checked on chain at the join) built, not yet seen on testnet11. Code: `crates/engine/src/chiacraft/worlds/admission.rs`, `crates/engine/src/server/admission.rs`, `crates/engine/src/chiacraft/worlds/admission_screen.rs`. Docs: `tools/checks/admission/README.md`. |
 | □ | Finding worlds | Phase 5: listings on chain and on DIG, curated lists. |
 
 Code: `crates/engine/src/chiacraft/worlds`, `mods/portals`, `crates/engine/src/chiacraft/bridge.rs`. Docs: `notes/PLAN.md`, `reports/World addresses links and portals.md`.

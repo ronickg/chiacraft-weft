@@ -390,6 +390,7 @@ impl App {
         crate::saved_worlds::set_settings(&settings);
         if chiacraft_account::current().is_some() {
             net::p2p::start_account(&settings);
+            crate::chiacraft::chain::configure(&settings.run_dir, &settings.chain(), settings.chain_peers());
         }
         let icon = crate::assets::decode_png_file(&engine_assets(self.opts.dev).join("icon.png"))
             .and_then(|(w, h, px)| winit::window::Icon::from_rgba(px, w, h).ok());
@@ -921,6 +922,7 @@ impl Running {
 
     /// Plays in the world `server` runs in this process.
     fn play_local(&mut self, server: ServerHandle, world: String, identity: Option<Arc<crate::world_address::WorldIdentity>>) {
+        crate::admission::set_local_world(server.dir.clone());
         let (client_conn, server_conn) = net::local_pair();
         let _ = server.connect.send(server_conn);
         let key = net::p2p::player_key(&self.settings.run_dir);
@@ -2083,12 +2085,13 @@ fn start_frame(r: &mut Running, opts: &Options, dt: f64) {
     r.frame_no += 1;
     // Link requests and answers arrive in the background: the links screen shows them as they do.
     let links_now = crate::links::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
-        + crate::friends::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
+        + crate::friends::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
+        + crate::admission::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
     if links_now != r.links_seen {
         r.links_seen = links_now;
         if r.screens
             .last()
-            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends"].contains(&s.name()))
+            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission"].contains(&s.name()))
         {
             r.rebuild_all();
         }
@@ -2386,6 +2389,7 @@ fn world_keys(r: &mut Running) {
 fn handle_disconnect(r: &mut Running) {
     if let Some(reason) = r.game.as_ref().and_then(|g| g.client.disconnected.clone()) {
         log::info!("disconnected: {reason}");
+        let refused = r.game.as_ref().and_then(|g| g.client.refused.clone());
         r.leave_world_silent();
         r.screens.clear();
         if let Some(origin) = r.came_from.take() {
@@ -2398,7 +2402,8 @@ fn handle_disconnect(r: &mut Running) {
         } else {
             r.open(screens::engine("core:title"));
         }
-        r.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(reason)] }));
+        let why = refused.map_or(Arg::Text(reason), Arg::Msg);
+        r.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![why] }));
     }
 }
 

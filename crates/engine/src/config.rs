@@ -468,6 +468,12 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::text("core:debug_lines", ""),
         ConfigDef::text("core:name", &user),
         ConfigDef::text("core:relays", ""),
+        // chiacraft (phase 4): the Chia network DIDs are read from (`off`, `testnet11`; mainnet
+        // only once Ronald says yes), own full nodes instead of the DNS introducers (`host:port`,
+        // comma separated), and DID sponsors' addresses, tried in order.
+        ConfigDef::text("core:chain", "testnet11"),
+        ConfigDef::text("core:chain_peers", ""),
+        ConfigDef::text("core:sponsors", ""),
         // Where others reach this game by address; forward it, TCP and UDP.
         ConfigDef::number("core:server_port", ck::INT, 27182.0, 1.0, 65535.0, 1.0),
         ConfigDef::text("core:resource_packs", ""),
