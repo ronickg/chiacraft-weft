@@ -2587,8 +2587,18 @@ impl Client {
         let buf = self.shadow_bufs[frame.slot];
         gpu.mapped(buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((map, Some(0.0))) });
+        // Leaning structures (chiacraft, a falling tree) cast theirs, turned.
+        let leaning: Vec<(u64, DVec3, (Vec3, glam::Quat))> = self
+            .entities
+            .iter()
+            .filter(|(_, e)| e.structure.is_some())
+            .filter_map(|(&id, e)| {
+                e.lean
+                    .map(|l| (id, physics::Transform::of(e.pos).origin(), (l.pivot, l.now())))
+            })
+            .collect();
         self.render
-            .draw_shadow(gpu, list, frame, &cam, light, buf, 0);
+            .draw_shadow(gpu, list, frame, &cam, light, buf, 0, &leaning);
         self.entity_render.draw_shadow(gpu, list, frame, buf);
         list.push(weft_render::Cmd::EndPass);
         // The far cascade: the terrain alone, coarser, to where hills stand far off.
@@ -2613,7 +2623,7 @@ impl Client {
         gpu.mapped(far_buf)[..size_of::<Scene>()].copy_from_slice(bytemuck::bytes_of(&scene));
         list.push(weft_render::Cmd::BeginPass { color: None, depth: Some((far_map, Some(0.0))) });
         self.render
-            .draw_shadow(gpu, list, frame, &cam, far, far_buf, 1);
+            .draw_shadow(gpu, list, frame, &cam, far, far_buf, 1, &[]);
         list.push(weft_render::Cmd::EndPass);
     }
 

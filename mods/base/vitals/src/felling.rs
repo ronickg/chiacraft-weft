@@ -56,6 +56,31 @@ pub const KNOCK_FROM: f32 = 10.0;
 pub const KNOCK_SAMPLES: usize = 96;
 pub const KNOCK_FELLS: usize = 2;
 
+/// A tree caught on a trunk it can't knock down leans back this much onto it and settles there
+/// as blocks after this many ticks.
+pub const HANG_BACK: f32 = 4.0;
+pub const HANG_SETTLE_TICKS: u32 = 16;
+
+/// What a falling tree does to a creature in its way (Planner, 11-05): 2 and a tenth of its logs,
+/// at most 20, once; it hits what is this near its logs.
+pub const HURT_BASE: f32 = 2.0;
+pub const HURT_PER_LOGS: f32 = 10.0;
+pub const HURT_MOST: f32 = 20.0;
+pub const HURT_REACH: f64 = 1.0;
+
+pub fn hurt(logs: u32) -> f32 {
+    (HURT_BASE + logs as f32 / HURT_PER_LOGS).min(HURT_MOST)
+}
+
+/// The thud sounds this many ticks before the tree reaches the ground (Panda's 0.25 s: the sound
+/// lands with the sight of it).
+pub const THUD_EARLY_TICKS: u32 = 5;
+
+/// How loud a falling tree `height` blocks high sounds: a sapling's half, a 20-high tree's full.
+pub fn sound_volume(height: f32) -> f32 {
+    (0.5 + height / 40.0).clamp(0.5, 1.0)
+}
+
 /// The longest a felling may take, in seconds, past tier or not: past an hour nobody is
 /// chopping, and the engine's mining speed has a floor.
 pub const LONGEST_SECS: f32 = 3600.0;
@@ -186,6 +211,9 @@ mod tests {
         assert!((piece(4).chops - 2.83).abs() < 0.01);
         assert_eq!(wear(20), 9);
         assert!(wear(1015) < 1015 / 4);
+        // A falling tree hurts by its size, within bounds.
+        assert_eq!(hurt(20), 4.0);
+        assert_eq!(hurt(1015), HURT_MOST);
         // A tall tree falls slower, within its bounds.
         assert_eq!(fall_ticks(10.0), 50);
         assert!(fall_ticks(40.0) > fall_ticks(10.0) && fall_ticks(400.0) == 100 && fall_ticks(1.0) == 40);

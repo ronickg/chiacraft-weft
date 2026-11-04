@@ -18,6 +18,11 @@ use vitals::felling as n;
 use weft_sdk::*;
 
 static BLOCK_BITS: Particle = Particle::named("core:block");
+/// Its sounds in three beats (`reports/sound-files/fall_sounds.py`): the hinge creaking as it
+/// starts to lean, the rush of its crown, the thud just before it lands.
+static CREAK: Sound = Sound::named("tree.creak");
+static RUSH: Sound = Sound::named("tree.fall");
+static THUD: Sound = Sound::named("tree.thud");
 static LOGS: Tag = Tag::named("logs");
 
 /// A leaf's loot, by its block's name.
@@ -53,7 +58,28 @@ struct Fall {
     sent_at: u64,
     /// Cells of the world its trunk has gone through, so each is struck once.
     struck: HashSet<[i32; 3]>,
+    /// Creatures it has hit, each once.
+    hurt: HashSet<u64>,
+    /// Caught on a trunk it can't knock down: the angle it rests at, when, and the log holding it.
+    hung: Option<(f32, u64, [i32; 3])>,
+    /// Its rush and thud have sounded.
+    rushed: bool,
+    thudded: bool,
 }
+
+/// A tree that hung up on a trunk and settled there as blocks, leaning (`settle`): what holds it
+/// up, its lowest log, the way it fell and whether it gives wood. When the log holding it goes
+/// (chopped, or that tree falls), it comes down the rest of the way (`release`). Chopping it
+/// at its lowest log fells it like any tree. Not saved: after a restart it is only a leaning tree.
+struct Hung {
+    dim: u32,
+    holder: [i32; 3],
+    base: [i32; 3],
+    d: [i32; 2],
+    lays: bool,
+}
+
+static HUNG: Mutex<Vec<Hung>> = Mutex::new(Vec::new());
 
 static FALLING: Mutex<Vec<Fall>> = Mutex::new(Vec::new());
 /// Falls started since the last tick (a tree struck by a falling one starts while the falls
@@ -132,6 +158,7 @@ pub fn start(
     if body == 0 {
         return false;
     }
+    release(w, &logs);
     let height = logs
         .iter()
         .map(|p| p[1] - foot[1])
@@ -161,11 +188,31 @@ pub fn start(
         fall,
         sent_at: now,
         struck: HashSet::new(),
+        hurt: HashSet::new(),
+        hung: None,
+        rushed: false,
+        thudded: false,
     });
+    w.play_sound(&CREAK, pivot, n::sound_volume(height as f32));
     true
 }
 
 pub fn register(r: &mut Registry) {
+    r.sound(&CREAK)
+        .files(&["tree/creak1", "tree/creak2"])
+        .category(&sound_categories::BLOCKS)
+        .pitch(0.85, 1.1)
+        .range(48.0);
+    r.sound(&RUSH)
+        .files(&["tree/fall1", "tree/fall2"])
+        .category(&sound_categories::BLOCKS)
+        .pitch(0.9, 1.1)
+        .range(48.0);
+    r.sound(&THUD)
+        .files(&["tree/thud1", "tree/thud2"])
+        .category(&sound_categories::BLOCKS)
+        .pitch(0.85, 1.05)
+        .range(64.0);
     r.world_tick(|w| {
         let (dim, now) = (w.dimension(), w.time());
         let mut falling = FALLING.lock().unwrap();
@@ -179,6 +226,14 @@ pub fn register(r: &mut Registry) {
 
 /// One tick of a fall; false once it lies.
 fn step(w: &World, f: &mut Fall, now: u64) -> bool {
+    // Caught on a trunk: it rests there a moment, then settles as blocks, leaning.
+    if let Some((deg, at, holder)) = f.hung {
+        if now < at + n::HANG_SETTLE_TICKS as u64 {
+            return true;
+        }
+        settle(w, f, deg, holder);
+        return false;
+    }
     let t = now.saturating_sub(f.start) as f32;
     let end = done_at(f.fall) as f32;
     // The pose, a few ticks ahead, every few ticks (clients ease between).
@@ -188,6 +243,17 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
         f.sent_at = now;
     }
     let deg = angle(t, f.fall);
+    // The rush as it goes over, from its crown; the thud a little before it lands, where it does.
+    let height = f.logs.iter().map(|p| p[1] - f.foot[1]).max().unwrap_or(1) as f32;
+    let crown = [f.foot[0], f.foot[1] + height as i32, f.foot[2]];
+    if !f.rushed && t >= n::CREAK_TICKS as f32 {
+        f.rushed = true;
+        w.play_sound(&RUSH, turn(center(crown), f.pivot, f.axis, deg), n::sound_volume(height));
+    }
+    if !f.thudded && t >= (n::CREAK_TICKS + f.fall) as f32 - n::THUD_EARLY_TICKS as f32 {
+        f.thudded = true;
+        w.play_sound(&THUD, turn(center(crown), f.pivot, f.axis, 90.0), n::sound_volume(height));
+    }
     // Leaves break off as it goes: the share shed grows with the angle past SHED_FROM.
     let past = ((deg - n::SHED_FROM) / (90.0 - n::SHED_FROM)).clamp(0.0, 1.0);
     let shed_by_now = (f.leaves_at_start as f32 * n::SHED_SHARE * past) as usize;
@@ -200,8 +266,17 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
         w.set_structure_block(f.body, local, 0);
         leaf_off(w, f, p, state, deg, speed);
     }
+    if deg > n::KNOCK_FROM && deg < 90.0 {
+        hurt(w, f, deg);
+    }
     if deg > n::KNOCK_FROM {
-        knock(w, f, deg);
+        if let Some(holder) = knock(w, f, deg) {
+            // It leans back a little onto what caught it and rests there.
+            let rest = (deg - n::HANG_BACK).max(n::KNOCK_FROM);
+            w.body_turn(f.body, f.pivot, quat(f.axis, rest), n::HANG_SETTLE_TICKS / 2);
+            f.hung = Some((rest, now, holder));
+            return true;
+        }
     }
     if t < end {
         return true;
@@ -235,7 +310,7 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
 /// takes the blow once: leaves and plants break, a branch log (one over air) breaks off, and
 /// another tree's trunk falls too, the same way, if this tree has at least `KNOCK_FELLS` times
 /// its logs (Valheim's chain felling). A trunk too big for that is passed through.
-fn knock(w: &World, f: &mut Fall, deg: f32) {
+fn knock(w: &World, f: &mut Fall, deg: f32) -> Option<[i32; 3]> {
     let step = (f.logs.len() / n::KNOCK_SAMPLES).max(1);
     let mut hit = Vec::new();
     for p in f.logs.iter().step_by(step) {
@@ -267,12 +342,100 @@ fn knock(w: &World, f: &mut Fall, deg: f32) {
             continue;
         }
         let Some(logs) = crate::felling::tree_on(w, foot, w.get(foot)) else { continue };
+        // Too big to knock down: it catches there.
         if f.logs.len() < logs.len() * n::KNOCK_FELLS {
-            continue;
+            return Some(cell);
         }
         let states: Vec<u32> = logs.iter().map(|&p| w.get(p)).collect();
         let leaves = crate::felling::crown(w, &logs);
         if start(w, foot, logs.clone(), states, leaves, f.d, f.lays) {
+            crate::leaf_decay::logs_gone(w, logs.iter().copied());
+        }
+    }
+    None
+}
+
+/// Creatures in the falling trunk's way (Planner's numbers: 2 + a tenth of its logs, up to 20),
+/// each hit once while it falls.
+fn hurt(w: &World, f: &mut Fall, deg: f32) {
+    let step = (f.logs.len() / n::KNOCK_SAMPLES).max(1);
+    let harm = n::hurt(f.logs.len() as u32);
+    for p in f.logs.iter().step_by(step) {
+        let at = turn(center(*p), f.pivot, f.axis, deg);
+        for id in w.near_bodies(at, n::HURT_REACH) {
+            if id != f.body && f.hurt.insert(id) {
+                w.damage(id, harm, 0, abi::damage::CRUSH);
+            }
+        }
+    }
+}
+
+/// A caught tree settles where it rests, `deg` over: the structure goes and its logs and what is
+/// left of its crown are put back into the world where they are now, a block each (a leaning
+/// trunk of blocks, corners joined), wherever there is room. It is then a tree like any other,
+/// chopped at its lowest log; and `holder` going brings it down (`release`).
+fn settle(w: &World, f: &Fall, deg: f32, holder: [i32; 3]) {
+    w.remove(f.body);
+    // Upright under 45 degrees, lying along the fall past it.
+    let axis = if deg < 45.0 {
+        "y"
+    } else if f.d[0] != 0 {
+        "x"
+    } else {
+        "z"
+    };
+    let mut base: Option<[i32; 3]> = None;
+    let mut put = |p: [i32; 3], state: u32| {
+        let cell = turn(center(p), f.pivot, f.axis, deg).map(|v| v.floor() as i32);
+        let here = w.get(cell);
+        if here == 0 || crate::leaf_decay::decays(w, cell) || HARDNESS.on_block(here).is_some_and(|h| h <= 0.0) {
+            w.set(cell, state);
+            Some(cell)
+        } else {
+            None
+        }
+    };
+    for (&p, &state) in f.logs.iter().zip(&f.states) {
+        let state = state_with(state, "axis", axis).unwrap_or(state);
+        if let Some(cell) = put(p, state) {
+            if base.is_none_or(|b| cell[1] < b[1]) {
+                base = Some(cell);
+            }
+        }
+    }
+    for &(p, state) in &f.leaves {
+        put(p, state);
+    }
+    if let Some(base) = base {
+        HUNG.lock()
+            .unwrap()
+            .push(Hung { dim: w.dimension(), holder, base, d: f.d, lays: f.lays });
+    }
+}
+
+/// The logs at `gone` went (chopped, or lifted by a fall): a hung tree held by one of them comes
+/// down the rest of the way, from its lowest log, the way it was falling.
+pub fn release(w: &World, gone: &[[i32; 3]]) {
+    let dim = w.dimension();
+    let freed: Vec<Hung> = {
+        let mut hung = HUNG.lock().unwrap();
+        if hung.is_empty() {
+            return;
+        }
+        let gone: HashSet<[i32; 3]> = gone.iter().copied().collect();
+        let (freed, kept) = std::mem::take(&mut *hung)
+            .into_iter()
+            .partition(|h| h.dim == dim && gone.contains(&h.holder));
+        *hung = kept;
+        freed
+    };
+    for h in freed {
+        let state = w.get(h.base);
+        let Some(mut logs) = crate::felling::loose(w, h.base, state) else { continue };
+        logs.push(h.base);
+        let states: Vec<u32> = logs.iter().map(|&p| w.get(p)).collect();
+        let leaves = crate::felling::crown(w, &logs);
+        if start(w, h.base, logs.clone(), states, leaves, h.d, h.lays) {
             crate::leaf_decay::logs_gone(w, logs.iter().copied());
         }
     }

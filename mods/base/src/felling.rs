@@ -156,6 +156,10 @@ pub fn register(r: &mut Registry) {
                 }
                 continue;
             }
+            // A hung tree held by this log comes down (`fall::release`).
+            if LOGS.on_block(e.state) {
+                crate::fall::release(&w, &[e.pos]);
+            }
             // What the lost log held up falls: its whole tree from the foot, or what stood on a
             // log of its trunk.
             let Some(logs) = loose(&w, e.pos, e.state) else { continue };
