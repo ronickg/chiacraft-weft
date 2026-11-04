@@ -274,6 +274,47 @@ def build():
     put("category_hover", box, 4)
     put("category_pressed", glow(box, GOLD1), 4)
     put("category_disabled", np.zeros_like(box), 4)
+    # Chips: a small dark plate with a bronze edge, for traits and genes (`ui.panel("chip", ..)`);
+    # `chip_new` dashed, for something not built yet.
+    chip = np.zeros((16, 16, 4), np.uint8)
+    chip[..., :3] = (42, 32, 27)
+    chip[..., 3] = 255
+    chip[[0, -1], :, :3] = (120, 78, 48)
+    chip[:, [0, -1], :3] = (120, 78, 48)
+    for y, x in ((0, 0), (0, -1), (-1, 0), (-1, -1)):
+        chip[y, x, 3] = 0
+    put("chip", chip, 2)
+    chip_points = chip.copy()
+    chip_points[1:-1, 1:-1, :3] = (120, 64, 24)
+    put("chip_points", chip_points, 2)
+
+    # Bars of the animal and stats screens: a frame (the HUD bar's) and a fill on a canvas its
+    # size, each colour its own class (`progress_bind` draws a class at its own size).
+    def stat_bar(name, w, h, color):
+        fr = fit9(src("c_bars", 0), w, h, 3)
+        put(name, fr, scaling="stretch")
+        c = np.array(color, float)
+        fill = np.zeros_like(fr)
+        fill[2:h - 2, 2:w - 2, :3] = c
+        fill[2, 2:w - 2, :3] = np.minimum(255, c * 1.25 + 20)
+        fill[h - 3, 2:w - 2, :3] = c * 0.65
+        fill[2:h - 2, 2:w - 2, 3] = 255
+        put(name + "_fill", fill, scaling="stretch")
+
+    # wild points' quality, few to many (`mods/animals/src/screen.rs`, QUALITY)
+    for i, col in enumerate(((150, 140, 130), (138, 200, 15), (47, 141, 228), (155, 79, 224), (240, 170, 40))):
+        stat_bar(f"stat_q{i}", 108, 12, col)
+    life = {"health": (224, 48, 42), "food": (196, 120, 40), "water": (70, 150, 220), "bond": (200, 110, 150),
+            "taming": (240, 170, 40), "torpor": (155, 79, 224)}
+    for n, col in life.items():
+        stat_bar(f"life_{n}", 126, 12, col)
+    # the player's stats screen (`mods/base/src/levels.rs`), a colour per stat
+    stats = {"health": (224, 48, 42), "stamina": (196, 130, 50), "food": (180, 120, 60), "damage": (180, 70, 50),
+             "speed": (110, 170, 80), "weight": (150, 110, 80), "oxygen": (70, 150, 220), "torpor": (155, 79, 224),
+             "fortitude": (140, 150, 170)}
+    for n, col in stats.items():
+        stat_bar(f"stat_{n}", 150, 12, col)
+    stat_bar("stat_xp", 220, 8, (155, 79, 224))
     # The HUD (`mods/base/src/hud.rs`): each bar a frame and a fill on a canvas the frame's size,
     # which the engine crops to the value (`BAR_*` and `bar_fill` there follow these sizes).
     def bar(name, fill, w, h):

@@ -133,17 +133,33 @@ fn tamed(c: &ClientView) -> bool {
 
 /// Name, sex and stage, level: the top of both screens.
 fn heading(ui: &mut Ui) {
-    ui.text_bind_styled(S::default().scale(1.5).no_wrap(), |c, t| {
+    title(ui, true);
+    facts(ui);
+}
+
+/// The species (and breed) as the screen's title, with its level unless a badge shows it.
+fn title(ui: &mut Ui, with_level: bool) {
+    ui.text_bind_styled(S::default().class("title").no_wrap(), move |c, t| {
         let Some(a) = c.menu_component(&ANIMAL) else { return };
         match a.species() {
             // A breed with its species: "Chihuahua (dog)".
+            Some(s) if s.breed.is_some() && !with_level => t.set(
+                "screen.animals.name_breed",
+                &[Arg::Key(&species_key(&a)), Arg::Key(&format!("species.animals.{}", s.name))],
+            ),
             Some(s) if s.breed.is_some() => t.set(
                 "screen.animals.heading_breed",
                 &[Arg::Key(&species_key(&a)), Arg::Key(&format!("species.animals.{}", s.name)), Arg::Int(a.level() as i64)],
             ),
+            _ if !with_level => t.set("screen.animals.name", &[Arg::Key(&species_key(&a))]),
             _ => t.set("screen.animals.heading", &[Arg::Key(&species_key(&a)), Arg::Int(a.level() as i64)]),
         }
     });
+}
+
+/// Where it sits in the tree of life, sex and stage, size, age, breeding, family, coat and what
+/// its kind does: the lines under the title.
+fn facts(ui: &mut Ui) {
     // Where it sits in the tree of life: "Canis familiaris · Mammalia › Carnivora › Canidae
     // (dog family) › Caninae".
     ui.text_bind(|c, t| {
@@ -280,143 +296,239 @@ fn shown(a: &Animal, i: usize) -> String {
     }
 }
 
-fn animal_screen(ui: &mut Ui) {
-    ui.panel("panel", S::col().pad(8.0).gap(3.0).min_w(250.0), |ui| {
-        heading(ui);
-        ui.text_bind(|c, t| {
-            let Some(a) = c.menu_component(&ANIMAL) else { return };
-            // Health now, and its stat as the maximum (clients see no attribute modifiers of
-            // others: their max health is the kind's).
-            let Some(e) = c.menu_owner().and_then(|id| c.client().entity(id)) else { return };
-            t.set(
-                "screen.animals.needs",
-                &[
-                    Arg::Float(e.health as f64, 1),
-                    Arg::Float((a.stat(species::HEALTH) * crate::comfort::condition(&a)) as f64, 1),
-                    Arg::Int(a.food as i64),
-                    Arg::Int(a.stat(species::FOOD).round() as i64),
-                    Arg::Int(a.bond as i64),
-                ],
-            );
-        });
-        // Its water, for one that drinks (`drink.rs`).
-        ui.text_bind(|c, t| {
-            let Some(a) = c.menu_component(&ANIMAL) else { return };
-            if a.species()
-                .is_none_or(|s| animals_core::needs::drinks(s) <= 0.0)
-            {
-                return;
+/// Wild points' quality, by a stat's wild points: the bar's colour (`stat_q0`..`stat_q4`, grey few,
+/// then green, blue, purple, gold). A wild one's level is spread over nine stats, so 20 in one
+/// is rare.
+const QUALITY: [u8; 4] = [4, 8, 13, 20];
+
+fn quality(points: u8) -> usize {
+    QUALITY.iter().filter(|&&q| points >= q).count()
+}
+
+/// A stat bar's share: its points (wild and tamed) against 40, a strong one.
+fn points_share(a: &Animal, i: usize) -> f32 {
+    ((a.wild[i] as f32 + a.tamed[i] as f32) / 40.0).clamp(0.02, 1.0)
+}
+
+/// A bar of the kit (`class`, drawn at its own size) with its value written inside its right end.
+fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Option<(f32, String)> + Send + Sync + Clone + 'static) {
+    let v2 = value.clone();
+    ui.row(S::row().size(LIFE_BAR.0, LIFE_BAR.1), move |ui| {
+        ui.progress_bind(class, S::default().size(LIFE_BAR.0, LIFE_BAR.1), move |c| value(c).map_or(-1.0, |v| v.0.clamp(0.0, 1.0)));
+        ui.text_bind_styled(S::default().no_wrap().at_pivot(LIFE_BAR.0 - 3.0, LIFE_BAR.1 / 2.0, [1.0, 0.5]), move |c, t| {
+            match v2(c) {
+                Some((_, s)) => t.text(&s),
+                None => t.text(""),
             }
-            t.set("screen.animals.water", &[Arg::Int(((1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0).round() as i64)]);
-        });
-        // Its body: how it feels in this air against its comfort, and its condition.
-        ui.text_bind(|c, t| {
-            let (Some(a), Some(b)) = (c.menu_component(&ANIMAL), c.menu_component(&crate::comfort::BODY)) else { return };
-            let Some(s) = a.species().filter(|_| b.core > 0.0) else { return };
-            let (lo, hi) = s.bio.comfort;
-            if s.bio.cold_blooded {
-                t.set(
-                    "screen.animals.body_cold",
-                    &[Arg::Int(b.air.round() as i64), Arg::Int(b.warmth as i64), Arg::Int(b.condition as i64)],
-                );
-                return;
-            }
-            let feel = crate::comfort::FEELING_NAMES[(b.feel as usize).min(6)];
-            t.set(
-                "screen.animals.body",
-                &[
-                    Arg::Key(&format!("screen.animals.feel.{feel}")),
-                    Arg::Int(b.air.round() as i64),
-                    Arg::Int(lo.round() as i64),
-                    Arg::Int(hi.round() as i64),
-                    Arg::Int(b.condition as i64),
-                ],
-            );
-        });
-        ui.row(S::row().gap(4.0), |ui| {
-            ui.text_styled(S::default().w(70.0), "screen.animals.stat", &[]);
-            ui.text_styled(S::default().w(50.0), "screen.animals.value", &[]);
-            ui.text_styled(S::default().w(40.0), "screen.animals.wild_points", &[]);
-            ui.text_styled(S::default().w(40.0), "screen.animals.tamed_points", &[]);
-        });
-        for (i, name) in STAT_NAMES.iter().enumerate() {
-            ui.row(S::row().gap(4.0), |ui| {
-                ui.text_styled(S::default().w(70.0), &format!("stat.animals.{name}"), &[]);
-                ui.text_bind_styled(S::default().w(50.0).mono(), move |c, t| {
-                    if let Some(a) = c.menu_component(&ANIMAL) {
-                        t.text(&shown(&a, i));
-                    }
-                });
-                ui.text_bind_styled(S::default().w(40.0).mono(), move |c, t| {
-                    if let Some(a) = c.menu_component(&ANIMAL) {
-                        t.text(&a.wild[i].to_string());
-                    }
-                });
-                ui.text_bind_styled(S::default().w(40.0).mono(), move |c, t| {
-                    if let Some(a) = c.menu_component(&ANIMAL) {
-                        t.text(&a.tamed[i].to_string());
-                    }
-                });
-                if i != species::TORPOR {
-                    ui.button(
-                        "screen.animals.plus",
-                        S::default()
-                            .size(14.0, 12.0)
-                            .tooltip("screen.animals.place"),
-                        move |c| {
-                            if let Some(id) = c.menu_owner() {
-                                c.client().send(&PLACE, &[id, i as u64]);
-                            }
-                        },
-                    );
-                }
-            });
-        }
-        // Orders: what it does and how it fights, and sharing with your tribe.
-        ui.text_bind(|c, t| {
-            let (Some(a), Some(o)) = (c.menu_component(&ANIMAL), c.menu_component(&ORDERS)) else { return };
-            let command = format!("screen.animals.command.{}", COMMAND_NAMES[(a.command as usize).min(3)]);
-            let stance = format!("screen.animals.stance.{}", STANCE_NAMES[(o.stance as usize).min(3)]);
-            let shared = c
-                .menu_component(&SHARED)
-                .map(|s| {
-                    String::from_utf8_lossy(&s.name)
-                        .trim_end_matches('\0')
-                        .to_string()
-                })
-                .unwrap_or_default();
-            if shared.is_empty() {
-                t.set("screen.animals.orders", &[Arg::Key(&command), Arg::Key(&stance)]);
-            } else {
-                t.set("screen.animals.orders_shared", &[Arg::Key(&command), Arg::Key(&stance), Arg::Text(&shared)]);
-            }
-        });
-        ui.row(S::row().gap(3.0), |ui| {
-            for (i, name) in COMMAND_NAMES.iter().enumerate() {
-                order_button(ui, &format!("screen.animals.do.{name}"), i as u64);
-            }
-        });
-        ui.row(S::row().gap(3.0), |ui| {
-            for (i, name) in STANCE_NAMES.iter().enumerate() {
-                order_button(ui, &format!("screen.animals.stance.{name}"), 10 + i as u64);
-            }
-            order_button(ui, "screen.animals.share", 20);
-            order_button(ui, "screen.animals.track", 30);
-            order_button(ui, "screen.animals.release", 40);
-        });
-        ui.text_bind(|c, t| {
-            let Some(a) = c.menu_component(&ANIMAL) else { return };
-            t.set(
-                "screen.animals.points",
-                &[Arg::Int(a.unspent as i64), Arg::Int(a.tamed_points() as i64), Arg::Int(animal::MAX_TAMED_POINTS as i64)],
-            );
         });
     });
 }
 
-/// A button that gives the animal whose screen is open `order` (`commands::ORDER`).
-fn order_button(ui: &mut Ui, key: &str, order: u64) {
-    ui.button(key, S::default().h(14.0).pad(2.0), move |c| {
+/// The life bars and stat bars' sizes in GUI pixels (the kit's `life_*` and `stat_q*`).
+const LIFE_BAR: (f32, f32) = (63.0, 6.0);
+const STAT_BAR: (f32, f32) = (54.0, 6.0);
+
+/// The screen of a tame animal (`notes/ui/BATCHES.md`, the taming and stats upgrade): who it is
+/// and how it is on the left, its stats as bars in the middle, its coat and orders on the right.
+fn animal_screen(ui: &mut Ui) {
+    ui.panel("panel", S::row().pad(8.0).gap(10.0), |ui| {
+        // Left: the level on a badge, the name, life, how it feels, and the facts.
+        ui.column(S::col().gap(3.0).w(108.0), |ui| {
+            ui.row(S::row().gap(4.0).center(), |ui| {
+                ui.panel("hud_badge", S::row().size(20.0, 24.0).center(), |ui| {
+                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                        let Some(a) = c.menu_component(&ANIMAL) else { return };
+                        t.set("screen.animals.badge", &[Arg::Int(a.level() as i64)]);
+                    });
+                });
+                ui.column(S::col().gap(1.0), |ui| {
+                    title(ui, false);
+                    ui.text_bind_styled(S::default().class("dim").no_wrap(), |c, t| {
+                        let Some(a) = c.menu_component(&ANIMAL) else { return };
+                        let owner = if tamed(c) { "screen.animals.tamed" } else { "screen.animals.wild" };
+                        t.set("screen.animals.about", &[Arg::Key(sex_key(&a)), Arg::Key(&stage_key(&a)), Arg::Key(owner)]);
+                    });
+                });
+            });
+            for (label, class) in [("health", "life_health"), ("food", "life_food"), ("water", "life_water"), ("bond", "life_bond")] {
+                ui.row(S::row().gap(3.0).center(), move |ui| {
+                    ui.text_styled(S::default().w(40.0).no_wrap(), &format!("screen.animals.life.{label}"), &[]);
+                    match label {
+                        "health" => life_bar(ui, class, |c| {
+                            let a = c.menu_component(&ANIMAL)?;
+                            let e = c.menu_owner().and_then(|id| c.client().entity(id))?;
+                            let max = a.stat(species::HEALTH) * crate::comfort::condition(&a);
+                            Some((e.health / max.max(0.1), format!("{:.0} / {:.0}", e.health, max)))
+                        }),
+                        "food" => life_bar(ui, class, |c| {
+                            let a = c.menu_component(&ANIMAL)?;
+                            let max = a.stat(species::FOOD).round();
+                            Some((a.food as f32 / max.max(1.0), format!("{} / {:.0}", a.food, max)))
+                        }),
+                        "water" => life_bar(ui, class, |c| {
+                            let a = c.menu_component(&ANIMAL)?;
+                            if a.species().is_none_or(|s| animals_core::needs::drinks(s) <= 0.0) {
+                                return None;
+                            }
+                            let w = 1.0 - a.thirst.clamp(0.0, 1.0);
+                            Some((w, format!("{:.0}%", w * 100.0)))
+                        }),
+                        _ => life_bar(ui, class, |c| {
+                            let a = c.menu_component(&ANIMAL)?;
+                            Some((a.bond as f32 / 100.0, a.bond.to_string()))
+                        }),
+                    }
+                });
+            }
+            // How it feels in this air, against its comfort, and its condition.
+            ui.text_bind_styled(S::default().max_w(108.0), |c, t| {
+                let (Some(a), Some(b)) = (c.menu_component(&ANIMAL), c.menu_component(&crate::comfort::BODY)) else { return };
+                let Some(s) = a.species().filter(|_| b.core > 0.0) else { return };
+                let (lo, hi) = s.bio.comfort;
+                if s.bio.cold_blooded {
+                    t.set("screen.animals.body_cold", &[Arg::Int(b.air.round() as i64), Arg::Int(b.warmth as i64), Arg::Int(b.condition as i64)]);
+                    return;
+                }
+                let feel = crate::comfort::FEELING_NAMES[(b.feel as usize).min(6)];
+                t.set(
+                    "screen.animals.body",
+                    &[
+                        Arg::Key(&format!("screen.animals.feel.{feel}")),
+                        Arg::Int(b.air.round() as i64),
+                        Arg::Int(lo.round() as i64),
+                        Arg::Int(hi.round() as i64),
+                        Arg::Int(b.condition as i64),
+                    ],
+                );
+            });
+            ui.column(S::col().gap(1.0).max_w(108.0), |ui| facts(ui));
+        });
+        // Middle: the nine stats as bars, coloured by their wild points, with the points.
+        ui.column(S::col().gap(2.0), |ui| {
+            ui.row(S::row().gap(4.0).center(), |ui| {
+                ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.stats", &[]);
+                ui.panel("chip_points", S::row().pad(2.0), |ui| {
+                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                        let Some(a) = c.menu_component(&ANIMAL) else { return };
+                        t.set("screen.animals.points_chip", &[Arg::Int(a.unspent as i64), Arg::Int(a.tamed_points() as i64), Arg::Int(animal::MAX_TAMED_POINTS as i64)]);
+                    });
+                });
+            });
+            ui.row(S::row().gap(3.0), |ui| {
+                ui.spacer();
+                ui.row(S::row().w(14.0).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.wild_points", &[]));
+                ui.row(S::row().w(18.0).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.tamed_points", &[]));
+                ui.row(S::row().w(10.0), |_| {});
+            });
+            for (i, name) in STAT_NAMES.iter().enumerate() {
+                ui.row(S::row().gap(3.0).center(), |ui| {
+                    ui.text_styled(S::default().w(34.0).no_wrap(), &format!("stat.animals.{name}"), &[]);
+                    ui.row(S::row().size(STAT_BAR.0, STAT_BAR.1), move |ui| {
+                        // One bar per quality on the same place: the one matching its wild points shows.
+                        for q in 0..5usize {
+                            ui.progress_bind(
+                                ["stat_q0", "stat_q1", "stat_q2", "stat_q3", "stat_q4"][q],
+                                S::default().size(STAT_BAR.0, STAT_BAR.1).at(0.0, 0.0),
+                                move |c| match c.menu_component(&ANIMAL) {
+                                    Some(a) if quality(a.wild[i]) == q => points_share(&a, i),
+                                    _ => -1.0,
+                                },
+                            );
+                        }
+                        ui.text_bind_styled(S::default().no_wrap().at_pivot(STAT_BAR.0 - 3.0, STAT_BAR.1 / 2.0, [1.0, 0.5]), move |c, t| {
+                            if let Some(a) = c.menu_component(&ANIMAL) {
+                                t.text(&shown(&a, i));
+                            }
+                        });
+                    });
+                    ui.row(S::row().w(14.0).end(), move |ui| {
+                        ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
+                            if let Some(a) = c.menu_component(&ANIMAL) {
+                                let color = ["", "{#8ac80f}", "{#2f8de4}", "{#9b4fe0}", "{#f0aa28}"][quality(a.wild[i])];
+                                t.text(&format!("{color}{}", a.wild[i]));
+                            }
+                        });
+                    });
+                    ui.row(S::row().w(18.0).end(), move |ui| {
+                        ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
+                            if let Some(a) = c.menu_component(&ANIMAL) {
+                                t.text(&a.tamed[i].to_string());
+                            }
+                        });
+                    });
+                    if i != species::TORPOR {
+                        ui.button("screen.animals.plus", S::default().size(10.0, 9.0).tooltip("screen.animals.place"), move |c| {
+                            if let Some(id) = c.menu_owner() {
+                                c.client().send(&PLACE, &[id, i as u64]);
+                            }
+                        });
+                    } else {
+                        ui.row(S::row().w(10.0), |_| {});
+                    }
+                });
+            }
+            ui.text_styled(S::default().class("dim").max_w(150.0), "screen.animals.quality_legend", &[]);
+        });
+        // Right: its coat and what its kind does, then its orders.
+        ui.column(S::col().gap(3.0).w(100.0), |ui| {
+            ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.coat_title", &[]);
+            ui.panel("chip", S::row().pad(2.0), |ui| {
+                ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
+                    let Some(look) = c.menu_component(&crate::coats::GENOME).and_then(|g| crate::coats::phenotype(&g)) else { return };
+                    t.set("screen.animals.chip", &[Arg::Text(&look.name)]);
+                });
+            });
+            ui.panel("chip", S::row().pad(2.0), |ui| {
+                ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
+                    let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
+                    t.set("screen.animals.chip", &[Arg::Key(&format!("screen.animals.signature.{}", s.signature))]);
+                });
+            });
+            ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.orders_title", &[]);
+            ui.text_bind_styled(S::default().max_w(100.0), |c, t| {
+                let (Some(a), Some(o)) = (c.menu_component(&ANIMAL), c.menu_component(&ORDERS)) else { return };
+                let command = format!("screen.animals.command.{}", COMMAND_NAMES[(a.command as usize).min(3)]);
+                let stance = format!("screen.animals.stance.{}", STANCE_NAMES[(o.stance as usize).min(3)]);
+                let shared = c
+                    .menu_component(&SHARED)
+                    .map(|s| String::from_utf8_lossy(&s.name).trim_end_matches('\0').to_string())
+                    .unwrap_or_default();
+                if shared.is_empty() {
+                    t.set("screen.animals.orders", &[Arg::Key(&command), Arg::Key(&stance)]);
+                } else {
+                    t.set("screen.animals.orders_shared", &[Arg::Key(&command), Arg::Key(&stance), Arg::Text(&shared)]);
+                }
+            });
+            for pair in COMMAND_NAMES.chunks(2).enumerate() {
+                let (row, names) = pair;
+                ui.row(S::row().gap(2.0), move |ui| {
+                    for (j, name) in names.iter().enumerate() {
+                        order_button_w(ui, &format!("screen.animals.do.{name}"), (row * 2 + j) as u64, 49.0);
+                    }
+                });
+            }
+            ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.stance_title", &[]);
+            for pair in STANCE_NAMES.chunks(2).enumerate() {
+                let (row, names) = pair;
+                ui.row(S::row().gap(2.0), move |ui| {
+                    for (j, name) in names.iter().enumerate() {
+                        order_button_w(ui, &format!("screen.animals.stance.{name}"), 10 + (row * 2 + j) as u64, 49.0);
+                    }
+                });
+            }
+            ui.row(S::row().gap(2.0), |ui| {
+                order_button_w(ui, "screen.animals.share", 20, 32.0);
+                order_button_w(ui, "screen.animals.track", 30, 32.0);
+                order_button_w(ui, "screen.animals.release", 40, 32.0);
+            });
+            ui.text_styled(S::default().class("dim").max_w(100.0), "screen.animals.whistles", &[]);
+        });
+    });
+}
+
+/// An order button of a fixed width, so the grid of orders lines up.
+fn order_button_w(ui: &mut Ui, key: &str, order: u64, w: f32) {
+    ui.button(key, S::default().size(w, 11.0), move |c| {
         if let Some(id) = c.menu_owner() {
             c.client().send(&ORDER, &[id, order]);
         }
