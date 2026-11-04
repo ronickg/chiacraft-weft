@@ -196,8 +196,11 @@ def grid_image(w, h):
 
 def build(a):
     """(prompt, reference images, (w, h), full tile?) for one request."""
-    bg = "solid flat #00FF00 green" if a.green else "solid flat #FF00FF magenta"
+    bg = ("solid flat #00FFFF cyan" if a.green == "cyan" else
+          "solid flat #00FF00 green" if a.green else "solid flat #FF00FF magenta")
     key = key_path(a.kind) if a.kind != "ui" else None
+    if getattr(a, "key", ""):  # another style key of ours (approved art), e.g. the plants sheet for flowers
+        key = a.key
     if a.kind == "item":
         w, h = 32, 32
         t = (f"Make one item icon for my block game.\n\n{style('item')}\n\n{GRID.format(w=w, h=h, W=1024, H=1024, c=32)} "
@@ -281,11 +284,17 @@ def corner_green(path):
     c = np.concatenate([a[:16, :16], a[:16, -16:], a[-16:, :16], a[-16:, -16:]]).reshape(-1, 3)
     green = ((c[:, 1] > 190) & (c[:, 0] < 90) & (c[:, 2] < 90)).mean()
     magenta = ((c[:, 0] > 190) & (c[:, 1] < 90) & (c[:, 2] > 190)).mean()
+    cyan = ((c[:, 0] < 90) & (c[:, 1] > 190) & (c[:, 2] > 190)).mean()
+    if cyan > max(green, magenta):
+        return "cyan"  # plants with pink or purple flowers AND green leaves (neither magenta nor green would do)
     return bool(green > magenta)
 
 
 def is_key(rgb, green):
+    """The background pixels: green (True), cyan ("cyan") or magenta (False)."""
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    if green == "cyan":
+        return (r < 90) & (g > 190) & (b > 190)
     return ((g > 190) & (r < 90) & (b < 90)) if green else ((r > 190) & (g < 90) & (b > 190))
 
 
@@ -440,7 +449,7 @@ def install(a):
 def main():
     if len(sys.argv) > 2 and sys.argv[1] == "batch":
         jobs = json.load(open(sys.argv[2]))
-        base = dict(what="", ref="", type="", guide_only=False, cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3, like="", diagonal=False,
+        base = dict(what="", ref="", type="", guide_only=False, cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3, like="", diagonal=False, key="",
                     dir=SCRATCH, mod="base")
         with ThreadPoolExecutor(4) as ex:
             for r in ex.map(lambda j: make(argparse.Namespace(**dict(base, **j))), jobs):
@@ -468,10 +477,12 @@ def main():
     ap.add_argument("--cutout", action="store_true", help="blocks: see-through (plants, leaves)")
     ap.add_argument("--size", default="48x32", help="animals and the other kinds: the canvas in pixels (16x16, 32x32, 48x32, 64x64...)")
     ap.add_argument("--tile", action="store_true", help="the other kinds: a full tile with no background (clouds, star field)")
+    ap.add_argument("--cyan", dest="green", action="store_const", const="cyan", help="on cyan: pink or purple flowers with green leaves")
     ap.add_argument("--green", action="store_true", help="on green: the thing is purple, pink or magenta")
     ap.add_argument("--pale", action="store_true", help="a pale thing whose outline may be light (paper, feather)")
     ap.add_argument("--guide-only", action="store_true", help="ui: no UI sheets of Ronald's attached, only the guide's words and our approved parts")
     ap.add_argument("--diagonal", action="store_true", help="a tool: fail any straight vertical edge (the working part must follow the diagonal)")
+    ap.add_argument("--key", default="", help="another style key of ours (approved art) instead of the kind's Our key.png")
     ap.add_argument("--like", default="", help="our own drawing(s), comma-separated paths, to match in shape (a chosen design)")
     ap.add_argument("--tries", type=int, default=3)
     ap.add_argument("--dir", default=SCRATCH)

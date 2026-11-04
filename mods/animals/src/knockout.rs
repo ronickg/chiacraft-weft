@@ -63,7 +63,7 @@ const FAVORITE_BITE: f32 = 0.01;
 const DART_SPEED: f64 = 30.0;
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(&KNOCKOUT, Knockout::default(), component_flags::SAVE | component_flags::SYNC_MENU);
+    r.entity_component(&KNOCKOUT, Knockout::default(), component_flags::SAVE | component_flags::SYNC_MENU | component_flags::SYNC_WATCHERS);
     for s in SPECIES.iter().filter(|s| s.taming == Method::Knockout) {
         r.attach(s.kind, &KNOCKOUT);
     }

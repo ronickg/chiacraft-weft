@@ -18,6 +18,7 @@ pub const RECIPES: &[Recipe] = &[
         branch_width: 0.75,
         leaf_r: 2.3,
         leaf_ry: 1.8,
+        ragged: 0.5,
         ..Recipe::BASE
     },
     // A birch: tall and slim, a pale trunk, short branches steep up, small clusters, narrow.
@@ -56,7 +57,7 @@ pub const RECIPES: &[Recipe] = &[
         taper: 1.0,
         leaf_r: 1.1,
         leaf_ry: 0.9,
-        ragged: 0.25,
+        ragged: 0.45,
         leaf_along: true,
         ..Recipe::BASE
     },
@@ -78,14 +79,14 @@ pub const RECIPES: &[Recipe] = &[
         ragged: 0.3,
         ..Recipe::BASE
     },
-    // A mesquite: low, wide and crooked, forking near the ground, a thin open flat crown.
+    // A mesquite: low, wide and crooked, forking at about three blocks (lower read as a bush), a thin open flat crown.
     Recipe {
         log: "base:mesquite_log",
         height: 6.0,
         width_loss: 0.1,
         drift: 18.0,
         lean: 8.0,
-        branch_start: 0.35,
+        branch_start: 0.5,
         branch_every: 0.5,
         branch_count: 3,
         branch_angle: 55.0,

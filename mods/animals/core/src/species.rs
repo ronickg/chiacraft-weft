@@ -112,6 +112,10 @@ pub static POLACANTHIDAE: Family = Family { name: "Polacanthidae", above: &["Din
 pub static ANKYLOSAURIDAE: Family = Family { name: "Ankylosauridae", above: &["Dinosauria", "Ankylosauria"] };
 pub static STYRACOSTERNA: Family = Family { name: "Styracosterna", above: &["Dinosauria", "Ornithopoda"] };
 pub static NEOSUCHIA: Family = Family { name: "Neosuchia", above: &["Crocodylomorpha", "Crocodyliformes"] };
+pub static OVIRAPTORIDAE: Family = Family { name: "Oviraptoridae", above: &["Dinosauria", "Theropoda"] };
+pub static CONFUCIUSORNITHIDAE: Family = Family { name: "Confuciusornithidae", above: &["Dinosauria", "Avialae"] };
+pub static ENANTIORNITHIDAE: Family = Family { name: "Enantiornithes", above: &["Dinosauria", "Avialae"] };
+pub static BRACHIOSAURIDAE: Family = Family { name: "Brachiosauridae", above: &["Dinosauria", "Sauropoda"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -419,7 +423,7 @@ const BASE: Species = Species {
 /// `BASE`'s family, a placeholder every row replaces.
 static NO_FAMILY: Family = Family { name: "", above: &[] };
 
-pub static SPECIES: [Species; 42] = [
+pub static SPECIES: [Species; 46] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -2784,8 +2788,8 @@ pub static SPECIES: [Species; 42] = [
         size: Size::Large,
         // Fish first, then what comes to the water to drink, and carrion.
         eats: &[(Fish, 0.6), (Meat, 0.3), (Carrion, 0.1)],
-        // A fish to a young dinosaur near its own mass.
-        prey: (0.005, 1.0),
+        // A fish or a bird at the water (as crocodiles take them) to a young dinosaur near its own mass.
+        prey: (0.003, 1.0),
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [45.0, 180.0, 160.0, 7.0, 1.0, 120.0, 400.0, 90.0, 40.0],
         hunger: 60.0,
@@ -2832,6 +2836,220 @@ pub static SPECIES: [Species; 42] = [
             ..Tune::NONE
         },
         birth_size: 0.15,
+        ..BASE
+    },
+    // Citipati (`reports/ecology/Cretaceous food webs.md`: the red dunes' omnivore, "common at Ukhaa
+    // Tolgod", and the oviraptorid found brooding its nests like a bird, Norell et al. 1995, 2018):
+    // wild, on two legs, its arms feathered (`source/citipati`). It takes lizards and Kryptobaatar
+    // as well as plants, and lies on its eggs with its wings spread.
+    Species {
+        model: "citipati",
+        name: "citipati",
+        binomial: "Citipati osmolskae",
+        family: &OVIRAPTORIDAE,
+        subfamily: "Citipatiinae",
+        size: Size::Medium,
+        // An omnivore or a plant eater (its beak; inference): leaves and seeds, fruit, small animals
+        // and insects.
+        eats: &[(Leaves, 0.4), (Seeds, 0.25), (Fruit, 0.1), (Meat, 0.15), (Insects, 0.1)],
+        // A lizard (50 g) to a Kryptobaatar or a hatchling.
+        prey: (0.0004, 0.05),
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [40.0, 220.0, 120.0, 3.0, 1.2, 80.0, 90.0, 80.0, 20.0],
+        hunger: 15.0,
+        foods: &[eats("animals:cycad_seed", 8), favorite("base:berries", 10), eats("base:wheat_seeds", 3)],
+        shy: 12.0,
+        signature: "herd",
+        reach: 1.0,
+        camouflage: 0.9,
+        dimorphism: 1.05,
+        size_spread: 0.1,
+        height: (0.9, "hip"),
+        // The Djadokhta's dunes first, the scrub's flats often.
+        habitats: &[("animals:red_dunes", 1.0), ("animals:scrubland", 0.7)],
+        bio: Biology {
+            mass: 90.0,
+            gestation: 0.0,
+            // No record; Protoceratops's 83 days (Erickson et al. 2017), for a bird-like egg it sat on.
+            incubation: 70.0,
+            // Breeding at about three, as Protoceratops (est.); living about 15 years.
+            maturity: 1095.0,
+            lifespan: 5475.0,
+            interval: 365.0,
+            // Nests of up to 22 eggs in a ring, brooded (Norell et al. 1995, 2018).
+            litter: 18.0,
+            social: Social::Solitary,
+            rarity: Rarity::Common,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The Djadokhta's semi-arid seasons: hot days, cold nights; feathered.
+            comfort: (2.0, 40.0),
+            cold_blooded: false,
+        },
+        // A common species' pace, a clutch most of which the dunes' egg eaters take, and a room
+        // that lets a small group last (`web/test.mjs`).
+        tune: Tune { growth: Some(144_000), litter: Some((2, 6)), crowd: Some(18), ..Tune::NONE },
+        birth_size: 0.12,
+        ..BASE
+    },
+    // The early birds (`reports/ecology/Cretaceous food webs.md`: "flocks in the air; the crags' small
+    // life"): Confuciusornis, the first bird with a toothless beak and "abundant" in the Jehol's
+    // forests and lakes, many killed together in flocks by eruptions; and Gobipteryx of the Gobi,
+    // an enantiornithine, on the same model (`source/early_bird`) in its own colors.
+    Species {
+        model: "early_bird",
+        name: "confuciusornis",
+        binomial: "Confuciusornis sanctus",
+        family: &CONFUCIUSORNITHIDAE,
+        subfamily: "",
+        size: Size::Small,
+        // Fish remains in one specimen; seeds or plants proposed; insects (inference).
+        eats: &[(Fish, 0.4), (Seeds, 0.4), (Insects, 0.2)],
+        // It caught its fish from the water (fish remains in one specimen); on the ground here it
+        // takes none (its fish are what lies on the shore).
+        prey: (0.0, 0.0),
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [6.0, 120.0, 30.0, 1.0, 1.0, 6.0, 60.0, 15.0, 6.0],
+        hunger: 30.0,
+        foods: &[eats("animals:cycad_seed", 4), favorite("base:wheat_seeds", 3)],
+        shy: 10.0,
+        fights: true,
+        reach: 0.5,
+        signature: "flock",
+        camouflage: 0.6,
+        dimorphism: 1.05,
+        size_spread: 0.15,
+        // Standing, at the crown.
+        height: (0.3, "crown"),
+        // The Jehol's forests and lakes first, the floodplain less often.
+        habitats: &[("animals:fern_forest", 1.0), ("animals:floodplain", 0.6)],
+        bio: Biology {
+            mass: 0.5,
+            gestation: 0.0,
+            // No record; a bird's of its size, about two weeks (est.).
+            incubation: 14.0,
+            // Early birds grew slowly, over a year or more (their bones' growth lines): breeding at
+            // about one (est.); living about ten years.
+            maturity: 365.0,
+            lifespan: 3650.0,
+            interval: 365.0,
+            litter: 3.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The Jehol's cool, seasonal forests.
+            comfort: (0.0, 34.0),
+            cold_blooded: false,
+        },
+        // No nests yet: fledglings after the eggs' time, as the other birds (`birds.rs`), grown in
+        // a few weeks of the game's, and a room that lets a flock last (`web/test.mjs`).
+        tune: Tune { gestation: Some(16_796), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
+        birth_size: 0.3,
+        ..BASE
+    },
+    Species {
+        model: "early_bird",
+        name: "gobipteryx",
+        binomial: "Gobipteryx minuta",
+        family: &ENANTIORNITHIDAE,
+        subfamily: "",
+        size: Size::Small,
+        // Insects and seeds (inference), and in the dry winter the green buds and shoots of the
+        // conifers that stay green (est.).
+        eats: &[(Insects, 0.5), (Seeds, 0.4), (Leaves, 0.1)],
+        prey: (0.0, 0.0),
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [6.0, 120.0, 30.0, 1.0, 1.0, 6.0, 60.0, 15.0, 6.0],
+        hunger: 30.0,
+        foods: &[eats("animals:cycad_seed", 4), favorite("base:wheat_seeds", 3)],
+        shy: 10.0,
+        fights: false,
+        reach: 0.5,
+        signature: "flock",
+        camouflage: 0.6,
+        dimorphism: 1.05,
+        size_spread: 0.15,
+        // Standing, at the crown.
+        height: (0.3, "crown"),
+        // The Gobi's crags and scrub, the dunes less often (its eggs, with embryos, are known).
+        habitats: &[("animals:crags", 1.0), ("animals:scrubland", 1.0), ("animals:red_dunes", 0.5)],
+        bio: Biology {
+            mass: 0.3,
+            gestation: 0.0,
+            // No record; a bird's of its size, about two weeks (est.).
+            incubation: 14.0,
+            // Early birds grew slowly, over a year or more (their bones' growth lines): breeding at
+            // about one (est.); living about ten years.
+            maturity: 365.0,
+            lifespan: 3650.0,
+            interval: 365.0,
+            litter: 3.0,
+            social: Social::Herd,
+            rarity: Rarity::Uncommon,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The Djadokhta's semi-arid seasons: hot days, cold nights.
+            comfort: (0.0, 40.0),
+            cold_blooded: false,
+        },
+        // No nests yet: fledglings after the eggs' time, as the other birds (`birds.rs`), grown in
+        // a few weeks of the game's, and a room that lets a flock last (`web/test.mjs`).
+        tune: Tune { gestation: Some(16_796), growth: Some(150_000), crowd: Some(24), ..Tune::NONE },
+        birth_size: 0.3,
+        ..BASE
+    },
+    // The sauropod (`reports/ecology/Cretaceous food webs.md`: the floodplain's high browser, "a giant
+    // carcass for the dead"): Cedarosaurus weiskopfae, a brachiosaurid of the Yellow Cat, standing for
+    // the Yixian's Dongbeititan in the fern forest too; wild, in herds (`source/sauropod`).
+    Species {
+        model: "sauropod",
+        name: "cedarosaurus",
+        binomial: "Cedarosaurus weiskopfae",
+        family: &BRACHIOSAURIDAE,
+        subfamily: "",
+        size: Size::Large,
+        // High browse: conifers (Araucaria), horsetails, ferns; a few seeds and cones.
+        eats: &[(Leaves, 0.95), (Seeds, 0.05)],
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [300.0, 600.0, 1200.0, 10.0, 0.8, 2000.0, 400.0, 1200.0, 80.0],
+        hunger: 10.0,
+        foods: &[eats("animals:fern", 10), favorite("animals:araucaria_cone", 16)],
+        shy: 6.0,
+        reach: 3.0,
+        signature: "herd",
+        camouflage: 0.9,
+        dimorphism: 1.03,
+        size_spread: 0.1,
+        // At the shoulder (the back slopes down to the hips).
+        height: (4.1, "shoulder"),
+        // The floodplain first; the fern forest (as Dongbeititan) less often.
+        habitats: &[("animals:floodplain", 1.0), ("animals:fern_forest", 0.5)],
+        bio: Biology {
+            // About 10 t (est.).
+            mass: 10000.0,
+            gestation: 0.0,
+            // No record; sauropod eggs took perhaps four to six months (est., from embryos' teeth
+            // in other dinosaurs).
+            incubation: 120.0,
+            // Sauropods grew fast: breeding at about ten (est.), living about 40 years.
+            maturity: 3650.0,
+            lifespan: 14600.0,
+            interval: 365.0,
+            // Clutches of 20-40 small eggs left in the ground, the young on their own (est.).
+            litter: 25.0,
+            social: Social::Herd,
+            rarity: Rarity::Uncommon,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The floodplain's monsoon heat and its dry spells.
+            comfort: (6.0, 40.0),
+            cold_blooded: false,
+        },
+        // A giant at a common species' pace, a clutch most of which the hunters and the floods take,
+        // and a room that lets a small herd last (`web/test.mjs`).
+        tune: Tune { growth: Some(160_000), litter: Some((1, 2)), crowd: Some(10), ..Tune::NONE },
+        birth_size: 0.05,
         ..BASE
     },
 ];

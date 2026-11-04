@@ -20,6 +20,21 @@ use std::time::Duration;
 
 use crate::runner::{R, T, TestDef};
 
+/// The player's max health in the engine's points (the base game's 20): the survival vitals set it
+/// from what's in the stomach (a new player's light meal comes to about 10.8), so checks compare
+/// with this, not with 20.
+pub fn max_health(t: &crate::runner::T) -> f32 {
+    t.c()
+        .view()
+        .component(&base_api::VITALS)
+        .map_or(20.0, |v| v.max_health / base_api::HEALTH_SCALE)
+}
+
+/// Whether `health` is the full `max_health` (it drifts down a little as the stomach digests).
+pub fn full(t: &crate::runner::T, health: f32) -> bool {
+    health >= max_health(t) - 0.1
+}
+
 pub fn add(p: [i32; 3], d: [i32; 3]) -> [i32; 3] {
     [p[0] + d[0], p[1] + d[1], p[2] + d[2]]
 }

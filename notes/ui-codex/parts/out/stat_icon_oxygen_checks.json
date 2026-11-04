@@ -1,0 +1,19 @@
+{
+ "kind": "ui",
+ "what": "a 16 x 16 stat icon of two air bubbles, one large and one small, its main colour #4696dc with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel",
+ "size": [
+  16,
+  16
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.534,
+   "outline": 0.41,
+   "red_line": 0.0,
+   "fill": 0.42,
+   "passed": true
+  }
+ ]
+}

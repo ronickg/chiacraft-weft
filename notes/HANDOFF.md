@@ -414,8 +414,23 @@ inside the block), the join sheet listed the bell "(mod API 1.2)"; but the badge
 missing texture: `hud_badge` comes with the UI redo, not in `dev` yet, so the sample now uses
 `tooltip`. Bob's side is untested: his game ran out of GPU memory both times on the PC, next to
 vLLM ("allocating 67108864 bytes for quad page: Out of memory", a panic in the Vulkan backend).
-Bob also joined with an empty name although his `core.txt` says `name = bob` (on c41da9e4 it was
-right): not this work's, passed to Planner.
+Bob also joined with an empty name although his `core.txt` says `name = bob`. That was this
+work's: the bell's client half registered a key, a key's binding is a setting, and the engine
+numbers settings by name per content while their values sit in one table by id, so the content
+switch on joining shifted `core:name` onto an empty slot. Fixed in the engine, generally (Planner's call):
+`content::set` calls `config::content_switched`, which carries the game's setting values, the
+run's overrides and a remote server's values over to the new content's ids by name, and writes
+mods' setting handles (`Game::config_cells`) back to the new content's ids; `VALUES` is a table
+per content (the old ones kept, so held slices stay valid). Check
+`a_content_switch_keeps_values_by_name`. So packages may add settings, and client halves' keys
+are their own again (an interim fix had given them shared slots).
+Checked on the Mac (Tester, c4a527ea, two copies): bob joined with his name; the sheet listed
+the bell "(mod API 1.2)"; `/mods` answered ("bell (mod API 1.2): 1 calls, 121.0 µs each ...").
+Found and fixed after it: the input registered key bindings only at start, so a key a package
+brings on joining was unknown on the joining game (`content_changed` in `app.rs` now registers
+the new content's keys with the player's bindings); the badge's text wrapped a letter a line (it
+needs `no_wrap` in a HUD panel). Bob's HUD after alice's ring and his key: rerun pending. Not covered: other kinds of
+handle cells (blocks, items, sounds) when a content built earlier comes back.
 Slice 5, personal mods (built, and checked in one game on the PC: off by default with "Your
 personal mods are off in this world: clock.", on after `/rule personal_mods 1` with the clock
 showing 07:07 top left, its key in slot 1 hid it, off again; Create World's choice not looked at): `mods/packages/src/personal.rs`. The
@@ -427,8 +442,13 @@ screen `packages:personal`, keys `packages:personal_1..8` (Shift+Alt+1..8), and 
 that runs their frames and tells the player once per world which are off or on. A personal mod's
 `Half` has its own `Words` (from its `assets/lang`, the player's language over English), and no
 channels or components. Sample `examples/personal/clock` (from `examples/wasm/clock`).
+Slice 6 (built; not yet seen in the game): `/mods` (`sandboxed::register_command`, in this
+mod's init): each server half running in this world (by the bridge's run) with its API, calls,
+average and slowest time and strikes in ten minutes (`Instance::stats`), and why one stopped;
+`/mods resume <package>` for admins (`Instance::resume`). Every `Runs` is kept in `ALL` (weak).
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
-and chain steps, `/mods` (slice 6).
+and chain steps, cached compiled components and a per-tick budget across mods, `/mods` for
+client halves, the engine's settings hazard on a content switch (Planner).
 
 ## Our DID sponsor (testnet11, since 2026-11-04)
 

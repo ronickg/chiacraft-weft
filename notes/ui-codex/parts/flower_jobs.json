@@ -1,0 +1,407 @@
+[
+ {
+  "kind": "block",
+  "name": "flower_purple_coneflower",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "narrow-leaf purple coneflower: two or three stems with daisy heads of drooping pink-purple petals round a raised dark orange-brown cone, narrow leaves low down, 20-24 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_black_eyed_susan",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "black-eyed Susan: two or three golden-yellow daisy heads with dark brown-black domed centres on hairy green stems, narrow leaves, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_butterfly_milkweed",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "butterfly milkweed: a bushy clump topped by flat clusters of bright orange star-shaped flowers, narrow green leaves, 16-20 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_leadplant",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "leadplant: a small grey-green shrub with fine feathery grey leaves and several upright spikes of dark purple flowers with orange tips, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_blazing_star",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "dotted blazing star: three or four stiff upright spikes densely covered in fluffy magenta-purple flowers, grass-like leaves at the base, 22-26 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_wood_anemone",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "wood anemone: a low carpet of three or four small white six-petalled flowers with yellow centres, nodding a little, over deeply divided green leaves, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_lesser_celandine",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "lesser celandine: a low clump of glossy heart-shaped dark green leaves with three or four shining yellow star flowers of many narrow petals, 8-12 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_lungwort",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "lungwort: a low clump of white-spotted green leaves with small funnel flowers on short stems, some pink and some blue on the same plant, 12-16 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_sweet_woodruff",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "sweet woodruff: low stems with whorls of narrow green leaves like little stars, topped by clusters of tiny white four-petalled flowers, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_foxglove",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "foxglove: one tall spire hung on one side with many purple-pink tubular bells, speckled inside, broad soft green leaves at the base, 26-30 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_lily_of_the_valley",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "lily of the valley: two broad upright green leaves and an arching stem hung with a row of small white bell flowers, 14-18 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_wood_cranesbill",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "wood cranesbill: a leafy clump of deeply lobed green leaves with five or six open violet five-petalled flowers with pale centres, 16-20 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_may_lily",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "May lily: two glossy heart-shaped leaves on a short stem with a small upright spike of fluffy white flowers, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_bellflower",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "peach-leaved bellflower: two slender stems with narrow leaves carrying several wide open blue-violet bells, 22-26 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_fireweed",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "fireweed: two or three tall stems with long narrow willow-like leaves, ending in spires of bright magenta-pink four-petalled flowers, opening from the bottom up, 26-30 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_twinflower",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "twinflower: a low mat of small round evergreen leaves with thin upright stalks, each forked into a pair of tiny nodding pale pink bells, 8-12 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_bunchberry",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "bunchberry: a low plant with a whorl of four to six oval veined green leaves holding one white four-bracted flower in the middle, two plants side by side, 8-12 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_prickly_rose",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "prickly wild rose: a small bristly shrub with toothed leaves and three or four open pink five-petalled roses with yellow centres, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_labrador_tea",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "bog Labrador tea: a small shrub with narrow leathery dark green leaves curled at the edges, topped by rounded clusters of small white flowers, 16-20 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_arctic_poppy",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "Macoun's arctic poppy: a tuft of hairy grey-green leaves at the base and two or three thin hairy stems each holding one pale yellow cup-shaped poppy, 12-16 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_lousewort",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "woolly lousewort: one or two short stout spikes wrapped in white woolly hair with pink-purple hooded flowers, fern-like leaves at the base, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_saxifrage",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "tufted saxifrage: a tight cushion of small green leaf rosettes with several short stems carrying small white five-petalled flowers, 8-12 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_arctic_coltsfoot",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "Arctic sweet coltsfoot: a stout stem with a rounded cluster of fuzzy white-pink flower heads, one or two big lobed leaves beside it, 12-16 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_pygmy_buttercup",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "pygmy buttercup: a tiny tuft of small three-lobed leaves with two or three tiny glossy yellow buttercup flowers, 6-8 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_brittlebush",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "brittlebush: a round shrub of silvery grey-white leaves with many yellow daisy flowers held above it on bare stems, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_globemallow",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "desert globemallow: several upright stems of crinkly grey-green leaves with many small cup-shaped apricot-orange flowers along them, 20-24 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_gold_poppy",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "Mexican gold poppy: a low clump of feathery blue-grey leaves with three or four orange-gold cup poppies on thin stems, 12-16 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_desert_marigold",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "desert marigold: a low mound of woolly grey-white leaves with three or four bright yellow daisies on bare woolly stems, 14-18 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_ocotillo",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "ocotillo: a few long thin spiny grey-brown canes rising and spreading from one base, small green leaves along them and clusters of scarlet flowers at the tips, 28-30 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_sensitive_plant",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "sensitive plant: a low sprawling plant with fern-like pairs of tiny leaflets and three or four round fluffy pink puffball flowers, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_senna",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "senna: a small leafy shrub with pinnate green leaves and clusters of bright yellow cup-shaped five-petalled flowers, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_pencil_flower",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "pencil flower: a low wiry clump with small three-part leaves and a few tiny bright yellow pea flowers, 8-12 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_morning_glory",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "bush morning glory: a leafy clump with heart-shaped green leaves and three large pale pink trumpet flowers with darker throats, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_water_primrose",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "water primrose: upright reddish stems with lance-shaped glossy leaves and three or four bright yellow four-petalled flowers, 14-18 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_alligator_flag",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "alligator flag: a tall clump of big paddle-shaped blue-green leaves on long stalks and a zigzag stem with small violet flowers at the top, 26-30 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_alpenrose",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "alpenrose: a small evergreen shrub with glossy dark leaves, rusty underneath, and clusters of deep pink trumpet flowers on top, 16-20 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_gentian",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "trumpet gentian: a low rosette of glossy leaves with two big upright deep blue trumpet flowers, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_edelweiss",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "edelweiss: a small woolly grey-white plant with narrow fuzzy leaves and two or three white felty star-shaped flower heads with yellow-grey centres, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_globeflower",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "globeflower: two or three stems with deeply lobed leaves, each topped by a round closed globe of glossy lemon-yellow petals, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_alpine_aster",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "alpine aster: two or three short stems each with one violet daisy flower of many narrow petals round a yellow centre, spoon-shaped leaves at the base, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_sea_daffodil",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "sea daffodil: a clump of strap-like blue-green leaves and a stout stem topped by several large white lily-like flowers with long thin petals and a frilled central cup, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_sea_holly",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "sea holly: a stiff spiny plant with leathery blue-grey holly-like leaves and two or three round spiky pale blue flower heads, 14-18 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_horned_poppy",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": false,
+  "what": "yellow horned poppy: a clump of crinkled silvery blue-grey leaves with two bright yellow four-petalled poppies and one long curved seed horn, 16-20 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_sea_rocket",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "sea rocket: a low sprawling fleshy plant with lobed succulent leaves and small clusters of pale lilac four-petalled flowers, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ },
+ {
+  "kind": "block",
+  "name": "flower_hottentot_fig",
+  "type": "flower",
+  "cutout": true,
+  "key": "/Users/ronald/Coding/chiacraft-weft/.claude/skills/game-art/guides/2 Blocks/Our plants key.png",
+  "green": "cyan",
+  "what": "Hottentot fig: a low mat of fleshy three-sided green leaves with two large many-petalled magenta flowers with yellow centres, 8-12 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game"
+ }
+]

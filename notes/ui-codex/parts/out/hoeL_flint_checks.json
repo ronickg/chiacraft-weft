@@ -1,0 +1,20 @@
+{
+ "kind": "item",
+ "what": "a flint hoe: the blade of crude knapped grey-brown flint with chipped faceted edges, a plain wooden handle, the head lashed on with tan sinew cord. Same shape as the attached iron hoe: at the handle's top a short neck reaches out to ONE side (the upper left) and a flat blade turns down from it, an L, never a T; nothing past the handle on the other side. 2 px margin; no straight vertical edge",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.334,
+   "outline": 0.58,
+   "red_line": 0.05,
+   "fill": 0.19,
+   "vertical": 0,
+   "passed": true
+  }
+ ]
+}

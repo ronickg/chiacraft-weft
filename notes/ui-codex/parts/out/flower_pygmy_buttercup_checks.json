@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "pygmy buttercup: a tiny tuft of small three-lobed leaves with two or three tiny glossy yellow buttercup flowers, 6-8 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.339,
+   "outline": 0.76,
+   "red_line": 0.0,
+   "fill": 0.04,
+   "passed": false
+  },
+  {
+   "grid": 0.29,
+   "outline": 0.92,
+   "red_line": 0.0,
+   "fill": 0.03,
+   "passed": false
+  },
+  {
+   "grid": 0.477,
+   "outline": 0.65,
+   "red_line": 0.0,
+   "fill": 0.03,
+   "passed": false
+  }
+ ]
+}
