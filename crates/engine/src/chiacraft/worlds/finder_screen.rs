@@ -21,12 +21,18 @@ impl Screen for FinderScreen {
             finder::refresh(cx.settings);
         }
         frame(ui, cx, "finder.title", |ui| {
+            // On a panel, as the other Multiplayer screens: dim text straight on the title's
+            // picture couldn't be read (the UI audit, 11-04).
             let (key, args) = f.phase.clone();
-            if !key.is_empty() {
-                label(ui, cx, &key, &args.into_iter().map(Arg::Text).collect::<Vec<_>>(), "dim");
-            }
-            if f.left_out > 0 {
-                label(ui, cx, "finder.left_out", &[Arg::Int(f.left_out as i64)], "dim");
+            if !key.is_empty() || f.left_out > 0 {
+                ui.panel("panel", Style::default().pad(6.0).gap(2.0).w(400.0), |ui| {
+                    if !key.is_empty() {
+                        label(ui, cx, &key, &args.into_iter().map(Arg::Text).collect::<Vec<_>>(), "dim");
+                    }
+                    if f.left_out > 0 {
+                        label(ui, cx, "finder.left_out", &[Arg::Int(f.left_out as i64)], "dim");
+                    }
+                });
             }
             let mut worlds = f.worlds.clone();
             // Online first, then the longest listed.
@@ -41,7 +47,9 @@ impl Screen for FinderScreen {
                     .scroll(),
                 |ui| {
                     if worlds.is_empty() {
-                        label(ui, cx, "finder.none", &[], "dim");
+                        ui.panel("panel", Style::default().pad(6.0).w(400.0), |ui| {
+                            label(ui, cx, "finder.none", &[], "dim");
+                        });
                     }
                     for (i, w) in worlds.iter().enumerate() {
                         ui.panel("panel", Style::default().pad(6.0).gap(2.0).stretch().w(400.0), |ui| {

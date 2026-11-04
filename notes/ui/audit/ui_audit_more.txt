@@ -47,7 +47,7 @@ key Escape
 wait 1
 key Escape
 wait 1
-tap core:title text:Profile
+tap core:title id:profile
 wait 1.5
 shot 46_profile.png
 tap core:profile text:Account
