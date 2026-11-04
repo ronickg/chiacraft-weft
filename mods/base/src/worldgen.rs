@@ -18,6 +18,8 @@ pub const SEA: i32 = base_api::SEA;
 /// scatters back, 30% in the shallows to 70% deep; the cold biomes and the swamp keep their own.
 const WATER_TINT: u32 = 0x607ca0;
 const OCEAN_WATER_TINT: u32 = 0x557a9e;
+/// The warm shallow seas' water: clearer and greener over the sand (Lighting may grade it).
+const LAGOON_WATER_TINT: u32 = 0x4f9aa6;
 
 static PLANT_SOIL: Tag = Tag::named("plant_soil");
 static CACTUS_SOIL: Tag = Tag::named("cactus_soil");
@@ -83,6 +85,9 @@ pub static TROPICAL_FOREST: Biome = Biome::named("tropical_forest");
 pub static MOUNTAINS: Biome = Biome::named("mountains");
 pub static SEQUOIA_GROVE: Biome = Biome::named("sequoia_grove");
 pub static OCEAN: Biome = Biome::named("ocean");
+/// Warm shallow seas (`base_api::land::REEF_*`): the lagoon along the shore, the reef farther out.
+pub static LAGOON: Biome = Biome::named("lagoon");
+pub static CORAL_REEF: Biome = Biome::named("coral_reef");
 pub static BEACH: Biome = Biome::named("beach");
 pub static DEEP_CAVES: Biome = Biome::named("deep_caves");
 
@@ -297,6 +302,20 @@ pub fn register(r: &mut Registry) {
         .surface("sand", "sand", 3)
         .deep_top("gravel", SEA - 8)
         .tag("ocean");
+    // Warm shallow seas (Ronald, 11-04: "all three"): clear turquoise water over sand, and the
+    // reef's coral (`land.rs` coral); Plants' coral plants and fans key to their names.
+    for (biome, name) in [(&LAGOON, "base:lagoon"), (&CORAL_REEF, "base:coral_reef")] {
+        r.biome(biome)
+            .tint(grass, muted(ENGINE_GRASS))
+            .tint(foliage, muted(ENGINE_FOLIAGE))
+            .tint(&base_api::trees::EVERGREEN, muted(LEAF_TINT))
+            .tint(&base_api::trees::YELLOW_LEAVES, muted(LEAF_TINT))
+            .tint(water, LAGOON_WATER_TINT)
+            .set(&CLIMATE, base_api::climate(name))
+            .surface("sand", "sand", 3)
+            .tag("ocean")
+            .tag("warm_sea");
+    }
     r.biome(&BEACH)
         .tint(grass, muted(ENGINE_GRASS))
         .tint(foliage, muted(ENGINE_FOLIAGE))

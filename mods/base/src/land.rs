@@ -26,7 +26,21 @@ pub fn terrain(r: &mut Registry) {
     // Biomes bring their climate and surface; rules only add where else they must hold. The sea
     // is the ocean's out to the coast; water inland (rivers, lakes) belongs to the land around it
     // and lies on its own bed (`RIVER_BEDS`).
+    // Warm shallow seas first (`base_api::land::reef_part`): the reef's top 2 under the surface,
+    // the lagoon's floor 3-5 under, in warm water near the coasts.
     t = t
+        .biome(
+            BiomeRule::new("coral_reef")
+                .height(SEA - 2..=SEA - 2)
+                .temperature(l::REEF_WARM_RULE..)
+                .continent(..l::REEF_COAST),
+        )
+        .biome(
+            BiomeRule::new("lagoon")
+                .height(SEA - l::REEF_LAGOON.1..=SEA - l::REEF_LAGOON.0)
+                .temperature(l::REEF_WARM_RULE..)
+                .continent(..l::REEF_COAST),
+        )
         .biome(
             BiomeRule::new("ocean")
                 .height(..=SEA - 2)
@@ -92,6 +106,7 @@ pub fn terrain(r: &mut Registry) {
     r.decorate(cave_mouths).dimension(&crate::OVERWORLD);
     r.decorate(glaciers).dimension(&crate::OVERWORLD);
     r.decorate(fray_borders).dimension(&crate::OVERWORLD);
+    r.decorate(coral).dimension(&crate::OVERWORLD);
     r.decorate(landmarks).dimension(&crate::OVERWORLD);
     r.decorate(tropical_water).dimension(&crate::OVERWORLD);
 }
@@ -505,6 +520,53 @@ fn tropical_water(g: &mut Gen) {
                 if (oy..oy + 16).contains(&wy) {
                     g.set(xu, (wy - oy) as usize, zu, WATER.id());
                 }
+            }
+        }
+    }
+}
+
+/// Coral (`base_api::land::REEF_*`; Art's blocks): the reef's top and the block under it coral, in
+/// patches of brain, staghorn and porites coral, where the reef itself stands (`reef_top`; natural
+/// shallows at its depth share its biome's name, not its coral); single coral heads on the
+/// lagoon's floor; coral rubble in the reef's gaps and on its landward edge.
+fn coral(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let (reef, lagoon) = (crate::worldgen::CORAL_REEF.id(), crate::worldgen::LAGOON.id());
+    let [ox, oy, oz] = g.origin();
+    if oy > SEA || oy + 15 < SEA - 8 || !cols.iter().any(|c| c.biome == reef || c.biome == lagoon) {
+        return;
+    }
+    let seed = g.seed();
+    let f = l::fields(seed);
+    let kinds = [BRAIN_CORAL_BLOCK.id(), STAGHORN_CORAL_BLOCK.id(), PORITES_CORAL_BLOCK.id()];
+    for z in 0..16usize {
+        for x in 0..16usize {
+            let col = cols[z * 16 + x];
+            let (wx, wz) = (ox + x as i32, oz + z as i32);
+            let pick = noise::fixed::perlin2(noise::fixed::seed32(seed, 0xC07A), wx * 16, wz * 16, 9 * 16);
+            let kind = kinds[if pick < -600 {
+                0
+            } else if pick < 700 {
+                1
+            } else {
+                2
+            }];
+            let h = col.height;
+            let mut put = |wy: i32, block: u32| {
+                if (oy..oy + 16).contains(&wy) {
+                    g.set(x, (wy - oy) as usize, z, block);
+                }
+            };
+            if col.biome == reef && l::reef_top(&f, wx * 16, wz * 16) {
+                put(h, kind);
+                put(h - 1, kind);
+            } else if (col.biome == reef || col.biome == lagoon || col.biome == crate::worldgen::OCEAN.id())
+                && l::reef_rubble(&f, wx * 16, wz * 16)
+            {
+                put(h, CORAL_RUBBLE.id());
+            } else if col.biome == lagoon && noise::fixed::hash(noise::fixed::seed32(seed, 0xC07B), wx, 0, wz) % 1000 < 25 {
+                // A head on the sand, in the water.
+                put(h + 1, kind);
             }
         }
     }

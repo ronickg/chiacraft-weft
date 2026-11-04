@@ -1,0 +1,4 @@
+# Coral rubble (Terrain, 11-04): three variants beside the plain tile, picked at random, for the reef's back slope and gaps.
+method = random
+tiles = <default> coral_rubble/1-3
+symmetry = all

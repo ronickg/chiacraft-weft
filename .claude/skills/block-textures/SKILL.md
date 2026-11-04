@@ -211,6 +211,12 @@ toward the UI's own colours (`notes/STYLE.md`).
   sideways (a band's level lines) are the exception: those rows stay fixed and only run across.
 - **Blades finer than a game pixel break into dots** when cut (the first two-block grass's upper
   half, 11-04): ask for "each blade 2 px wide (never 1 px), solid shapes that read at 32 px".
+- **Random variants go in after `install`, and `install` wipes them** (coral, 11-04): `install` removes
+  a tile's `<name>/` variants and `<name>.ctm` on purpose, so reinstalling a batch (to add its other
+  rows) deleted the coral blocks' variants. Install a batch once, then copy the `_vN` tiles to
+  `<name>/N.png` and write the `.ctm`; if a batch must be reinstalled, put them back afterwards, and
+  copy the ungraded tiles to `source/blocks/tiles` too, or the grade takes an already-graded tile as its
+  source and grades it twice.
 - **Check a name is free in `tiles/` before a batch**: a new `fern` overwrote the approved
   Cretaceous fern's tile (11-04). Give a new plant its own name (`bracken`) and let the block point
   at it.
