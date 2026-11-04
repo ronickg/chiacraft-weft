@@ -249,7 +249,7 @@ pub const SOURCES: [Source; 75] = [
 /// Food on the ground (`notes/ECOLOGY.md`, parts 5 and 8): items animals eat that aren't a
 /// player's food (`food::FOODS` has those, each with its kind and weight): grain and seeds, as
 /// they fall from a field or a hand. By name, kind and grams.
-pub const DROPPED: [(&str, Category, f32); 10] = [
+pub const DROPPED: [(&str, Category, f32); 12] = [
     // A handful of seed, and an ear's grain.
     ("base:wheat_seeds", Category::Seeds, 10.0),
     ("base:wheat", Category::Seeds, 50.0),
@@ -263,6 +263,10 @@ pub const DROPPED: [(&str, Category, f32); 10] = [
     ("base:mesquite_pod", Category::Seeds, 30.0),
     ("base:acuri_nut", Category::Seeds, 30.0),
     ("base:moriche_fruit", Category::Fruit, 50.0),
+    // The tropical forest's: a handful of Brazil nuts (agoutis open the pods and bury the nuts),
+    // a cacao pod's sweet pulp (monkeys and birds).
+    ("base:brazil_nut", Category::Seeds, 30.0),
+    ("base:cacao_pod", Category::Fruit, 40.0),
     ("animals:araucaria_cone", Category::Seeds, 50.0),
     ("animals:ginkgo_seed", Category::Fruit, 10.0),
 ];

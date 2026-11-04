@@ -89,6 +89,8 @@ pub static SWORD_FERN: Block = Block::named("sword_fern");
 pub static LUPINE: Block = Block::named("lupine");
 pub static DOGWOOD_LOG: Block = Block::named("dogwood_log");
 pub static DOGWOOD_LEAVES: Block = Block::named("dogwood_leaves");
+/// The tropical forest's lianas, hanging from the crowns (`worldgen.rs`, `lianas`).
+pub static LIANA: Block = Block::named("liana");
 pub static MOSSY_SEQUOIA_LOG: Block = Block::named("mossy_sequoia_log");
 /// Bracken and the woods' ferns, under the trees (`vitals::layers`).
 pub static FERN: Block = Block::named("fern");
@@ -158,12 +160,25 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
 /// leaves drop besides its sapling. Their saplings grow by the place (`vitals::plants`). The giant
 /// sequoia of the Sierra Nevada's groves, cone-shaped young and grown from branches
 /// (`tree_recipes::SEQUOIA`), its cones planting it.
-const WOODS: [(&str, Option<&str>, &str); 4] = [
+/// The tropical forest's (Manaus's terra firme): the Brazil nut, its emergent, grown from branches
+/// (`tree_recipes::BRAZIL_NUT`), its nuts a food; cacao, its understorey tree, its pods a food.
+const WOODS: [(&str, Option<&str>, &str); 6] = [
     ("mesquite", Some("flat_tree"), "mesquite_pod"),
     ("acuri_palm", Some("palm_tree"), "acuri_nut"),
     ("moriche_palm", Some("palm_tree"), "moriche_fruit"),
     ("sequoia", Some("cone_tree"), "sequoia_cone"),
+    ("brazil_nut", None, "brazil_nut"),
+    ("cacao", None, "cacao_pod"),
 ];
+
+/// The sapling a tree's fruit plants (`WOODS`), for fruit that's a food (`items.rs` registers
+/// those).
+pub fn sapling_planted_by(item: &str) -> Option<&'static Block> {
+    WOODS
+        .iter()
+        .find(|(_, _, fruit)| *fruit == item)
+        .map(|(wood, _, _)| Block::generated(format!("{wood}_sapling")))
+}
 
 /// Our trees' logs, planks, leaves and saplings (`WOODS`), and the fruit their leaves drop, which
 /// plants a sapling too.
@@ -184,9 +199,12 @@ fn woods(r: &mut Registry) {
             .growth(crate::growth::step_secs(plant, 1, 470.0), 9)
             .on_grow(move |e| crate::growth::grow(e, plant, false, |e| worldgen::grow_tree(e.world(), e.pos(), log_block.id())))
             .tab(&crate::tabs::NATURAL);
-        r.item(Item::generated(fruit.into()))
-            .placed_block(sapling_block)
-            .tab(&crate::tabs::NATURAL);
+        // A fruit that's a food is registered with the foods (`items.rs`), which plants it too.
+        if vitals::food::find(&format!("base:{fruit}")).is_none() {
+            r.item(Item::generated(fruit.into()))
+                .placed_block(sapling_block)
+                .tab(&crate::tabs::NATURAL);
+        }
     }
     // Desert and beach trees take root in sand as well.
     r.tag("sapling_soil", &["#dirt", "#sand"]);
@@ -537,6 +555,17 @@ pub fn register(r: &mut Registry) {
     leaves(r, &ACACIA_LEAVES, "leaves_acacia", "sapling", None);
     woods(r);
     grove(r);
+    // Lianas: woody climbers hanging from the tropical forest's crowns, a rope one can climb;
+    // cut, their stems are cordage now and then (`vitals::clothing`).
+    r.block(&LIANA)
+        .sound_group("grass")
+        .texture("liana")
+        .plant()
+        .climbable()
+        .mineable("shears")
+        .tab(&crate::tabs::NATURAL);
+    r.loot(&LIANA)
+        .pool(Pool::new().when(Cond::Chance(0.5)).item("plant_fibre"));
 
     // Vanilla numbers: water steps every 5 ticks and reaches 7 blocks, lava every 30 and 3.
     r.liquid(&WATER)

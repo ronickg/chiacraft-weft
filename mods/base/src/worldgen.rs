@@ -62,6 +62,8 @@ pub static FERN_KINDS: Component<BlockList> = Component::named("fern_kinds");
 /// Mushrooms at the foot of trunks: which, and their share of the bare soil beside a trunk.
 pub static MUSHROOMS: Component<BlockList> = Component::named("mushrooms");
 pub static MUSHROOM_COVER: Component<f32> = Component::named("mushroom_cover");
+/// The share of a biome's trees with lianas hanging from their crowns (`vitals::layers`).
+pub static LIANAS: Component<f32> = Component::named("lianas");
 /// The share of a biome's tall grass that grows two blocks tall (`TALL_GRASS_DOUBLE`).
 pub static TALL_GRASS_SHARE: Component<f32> = Component::named("tall_grass_share");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
@@ -310,7 +312,7 @@ pub fn register(r: &mut Registry) {
     }
 
     // The layers under the trees, each biome's (`vitals::layers`).
-    for l in &vitals::layers::LAYERS {
+    for l in vitals::layers::LAYERS.iter().filter(|l| !vitals::layers::PENDING.contains(&l.biome)) {
         let b = || Target::Biome(l.biome);
         if !l.floor.is_empty() {
             r.set_text_on(b(), &FLOOR, l.floor);
@@ -336,6 +338,9 @@ pub fn register(r: &mut Registry) {
         if l.shrubs > 0.0 {
             r.set_on(b(), &SHRUBS, l.shrubs);
             r.set_text_on(b(), &SHRUB_KINDS, l.shrub_kinds);
+        }
+        if l.lianas > 0.0 {
+            r.set_on(b(), &LIANAS, l.lianas);
         }
     }
 
@@ -505,11 +510,14 @@ fn giant(s: &mut Site) {
         return;
     };
     let [x, y, z] = s.pos();
-    // One in twelve lies fallen, mossy, along the ground (the overworld's: its height is known).
-    if (h >> 4).is_multiple_of(12) && s.dimension() == crate::OVERWORLD.id() {
+    // One sequoia in twelve lies fallen, mossy, along the ground (the overworld's: its height is
+    // known).
+    if (h >> 4).is_multiple_of(12) && s.dimension() == crate::OVERWORLD.id() && Block::lookup("base:sequoia_log") == Some(log) {
         fallen_giant(s, h);
         return;
     }
+    let mut crown = Vec::new();
+    let climbers = LIANAS.on_biome(s.biome()).is_some();
     base_api::trees::giant_tree_blocks(
         log,
         x,
@@ -517,9 +525,41 @@ fn giant(s: &mut Site) {
         z,
         h >> 8,
         |x, y, z, state, force| {
+            if climbers && LEAVES.on_block(state) {
+                crown.push([x, y, z]);
+            }
             if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
         },
     );
+    lianas(s, &crown, y, h);
+}
+
+/// Lianas hanging from a tree's crown (`LIANAS`, the share of trees that carry them): two to four
+/// columns from the underside of the crown, three to twelve long, stopping two above the ground.
+fn lianas(s: &mut Site, crown: &[[i32; 3]], ground: i32, h: u64) {
+    let Some(share) = LIANAS.on_biome(s.biome()) else { return };
+    if crown.is_empty() || (hash(h, 0x11A, 0, 0) & 1023) as f32 / 1024.0 >= share {
+        return;
+    }
+    // The crown's lowest leaf in each column it covers.
+    let mut lowest: Vec<[i32; 3]> = Vec::new();
+    for &[x, y, z] in crown {
+        match lowest.iter_mut().find(|p| p[0] == x && p[2] == z) {
+            Some(p) => p[1] = p[1].min(y),
+            None => lowest.push([x, y, z]),
+        }
+    }
+    lowest.sort_unstable();
+    let count = 2 + hash(h, 0x11B, 0, 0) % 3;
+    for k in 0..count {
+        let r = hash(h, 0x11C, k as i64, 0);
+        let [x, top, z] = lowest[(r % lowest.len() as u64) as usize];
+        let len = 3 + ((r >> 16) % 10) as i32;
+        let bottom = (top - len).max(ground + 2);
+        for y in (bottom..top).rev() {
+            s.put([x, y, z], LIANA.id());
+        }
+    }
 }
 
 /// A fallen giant: a mossy trunk three wide lying 14 to 22 long through its site, following the
@@ -584,8 +624,17 @@ fn tree(s: &mut Site) {
         .on_biome(s.biome())
         .and_then(|l| l.pick(s.random() >> 40))
         .unwrap_or(OAK_LOG.id());
-    let Some(t) = wild_tree_at(log, x, y, z, s.random() >> 32) else { return };
-    tree_blocks(&t, |x, y, z, state, force| if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) });
+    let h = s.random();
+    let Some(t) = wild_tree_at(log, x, y, z, h >> 32) else { return };
+    let mut crown = Vec::new();
+    let climbers = LIANAS.on_biome(s.biome()).is_some();
+    tree_blocks(&t, |x, y, z, state, force| {
+        if climbers && LEAVES.on_block(state) {
+            crown.push([x, y, z]);
+        }
+        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+    });
+    lianas(s, &crown, y, h);
 }
 
 /// Plants, after the terrain and trees filled the cube.

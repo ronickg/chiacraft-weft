@@ -238,7 +238,85 @@ pub const RECIPES: &[Recipe] = &[
     // into buttresses at the foot; bare for its lower half, then short branches all round,
     // shorter up the tree, in rounded clumps: a narrow, rounded spire.
     SEQUOIA,
+    // The tropical forest's emergent, the Brazil nut (Bertholletia excelsa, Manaus's terra
+    // firme): 30-50 m on a dead-straight trunk bare for two thirds, buttressed at the foot, its
+    // umbrella crown above the canopy.
+    BRAZIL_NUT,
+    // Cacao (Theobroma cacao), the Amazon's understorey tree: 4-8 m, slender, branching low
+    // into a few limbs held out under a crown of big drooping leaves.
+    Recipe {
+        log: "base:cacao_log",
+        height: 5.0,
+        width: 0.9,
+        width_loss: 0.1,
+        drift: 4.0,
+        droop: 0.3,
+        branch_start: 0.3,
+        branch_every: 0.6,
+        branch_count: 3,
+        branch_angle: 50.0,
+        branch_width: 0.6,
+        orders: 1,
+        leaf_r: 1.8,
+        leaf_ry: 1.2,
+        ragged: 0.4,
+        ..Recipe::BASE
+    },
 ];
+
+/// A grown Brazil nut (`RECIPES`' own row), the world's (the giant scatter, `GIANT_KINDS`).
+pub const BRAZIL_NUT: Recipe = Recipe {
+    log: "base:brazil_nut_log",
+    height: 38.0,
+    size_var: 0.2,
+    width: 2.4,
+    width_loss: 0.06,
+    leaf_width: 0.7,
+    drift: 1.0,
+    rise: 1.0,
+    droop: 0.1,
+    branch_start: 0.68,
+    branch_every: 0.6,
+    branch_count: 2,
+    branch_angle: 62.0,
+    branch_width: 0.6,
+    orders: 2,
+    branch_len: 0.28,
+    taper: 0.4,
+    leaf_r: 2.6,
+    leaf_ry: 1.3,
+    ragged: 0.3,
+    reach: 12,
+    max_height: 52,
+    flare: 0.5,
+    flare_up: 3.0,
+    lobes: 0.35,
+    ..Recipe::BASE
+};
+
+/// A young Brazil nut, grown from a planted nut: a pole of a tree with a small crown, under the
+/// canopy, waiting for a gap (`BRAZIL_NUT` is the grown one).
+pub const YOUNG_BRAZIL_NUT: Recipe = Recipe {
+    log: "base:brazil_nut_log",
+    height: 14.0,
+    width: 1.2,
+    width_loss: 0.07,
+    drift: 2.0,
+    branch_start: 0.55,
+    branch_every: 0.6,
+    branch_count: 2,
+    branch_angle: 60.0,
+    branch_width: 0.55,
+    orders: 1,
+    branch_len: 0.3,
+    leaf_r: 2.0,
+    leaf_ry: 1.2,
+    reach: 8,
+    max_height: 22,
+    flare: 0.2,
+    flare_up: 1.5,
+    ..Recipe::BASE
+};
 
 /// A grown giant sequoia (`RECIPES`' own row).
 pub const SEQUOIA: Recipe = Recipe {
@@ -301,7 +379,7 @@ pub const YOUNG_SEQUOIA: Recipe = Recipe {
 
 /// The young of the trees that grow too big to come from a sapling at once: a planted sequoia
 /// grows into a young one (`YOUNG_SEQUOIA`), not a giant.
-pub const YOUNG: &[Recipe] = &[YOUNG_SEQUOIA];
+pub const YOUNG: &[Recipe] = &[YOUNG_SEQUOIA, YOUNG_BRAZIL_NUT];
 
 /// The recipe a sapling of this log grows by: its young one's, if it has one, else its own.
 pub fn sapling_of(log: &str) -> Option<&'static Recipe> {
