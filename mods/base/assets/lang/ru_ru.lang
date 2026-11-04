@@ -48,6 +48,7 @@ block.base.banded_clay = Полосатая глина
 block.base.weathered_limestone = Выветренный известняк
 block.base.red_sandstone = Красный песчаник
 block.base.snow = Снег
+block.base.snow_layer = Слой снега
 block.base.ice = Лёд
 block.base.brain_coral_block = Блок мозгового коралла
 block.base.staghorn_coral_block = Блок оленерогого коралла

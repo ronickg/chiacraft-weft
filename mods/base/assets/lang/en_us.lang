@@ -97,6 +97,7 @@ block.base.banded_clay = Banded Clay
 block.base.weathered_limestone = Weathered Limestone
 block.base.red_sandstone = Red Sandstone
 block.base.snow = Snow
+block.base.snow_layer = Snow layer
 block.base.ice = Ice
 block.base.brain_coral_block = Brain Coral Block
 block.base.staghorn_coral_block = Staghorn Coral Block
