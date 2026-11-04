@@ -37,7 +37,7 @@ pub fn rgb(c: u32) -> Vec3 {
 }
 
 /// Where on its orbit it is, in turns.
-fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
+pub(super) fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
     let moved = if s.orbit.is_infinite() {
         d.day_turn(time)
     } else if s.orbit == 0.0 {
@@ -49,7 +49,7 @@ fn turn_of(s: &SkyDef, d: &DimensionDef, time: f64) -> f64 {
 }
 
 /// Its frame in the world at `turn`: x toward it, y along its way, z out of the orbit's plane.
-fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
+pub(super) fn frame_of(s: &SkyDef, turn: f64) -> Mat3 {
     Mat3::from_rotation_y(s.heading) * Mat3::from_rotation_x(s.tilt) * Mat3::from_rotation_z((turn * std::f64::consts::TAU) as f32)
 }
 
