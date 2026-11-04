@@ -47,7 +47,20 @@ const fn l(
     shrub_kinds: &'static str,
     young: f32,
 ) -> Layers {
-    Layers { biome, floor, floor_cover, ferns, fern: "", shrubs, shrub_kinds, young, young_kinds: "", tall_grass: 0.0, mushrooms: "", mushroom_cover: 0.0 }
+    Layers {
+        biome,
+        floor,
+        floor_cover,
+        ferns,
+        fern: "",
+        shrubs,
+        shrub_kinds,
+        young,
+        young_kinds: "",
+        tall_grass: 0.0,
+        mushrooms: "",
+        mushroom_cover: 0.0,
+    }
 }
 
 /// Each biome's layers. Floors: Białowieża's leaf litter and moss, Fairbanks' moss carpet,

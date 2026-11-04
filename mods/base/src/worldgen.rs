@@ -369,9 +369,16 @@ fn young_tree(s: &mut Site) {
         .or_else(|| TREE_KINDS.on_biome(s.biome()))
         .and_then(|l| l.pick(h >> 40))
         .unwrap_or(OAK_LOG.id());
-    base_api::trees::young_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
-        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
-    });
+    base_api::trees::young_tree_blocks(
+        log,
+        x,
+        y,
+        z,
+        h >> 8,
+        |x, y, z, state, force| {
+            if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+        },
+    );
 }
 
 /// A shrub at a scatter's site: a clump of the biome's shrub leaves (`SHRUB_KINDS`), one or two
@@ -381,7 +388,12 @@ fn shrub(s: &mut Site) {
         return;
     }
     let h = s.random();
-    let Some(leaves) = SHRUB_KINDS.on_biome(s.biome()).and_then(|l| l.pick(h >> 40)) else { return };
+    let Some(leaves) = SHRUB_KINDS
+        .on_biome(s.biome())
+        .and_then(|l| l.pick(h >> 40))
+    else {
+        return;
+    };
     let tall = vitals::layers::shrub_height(name_of(abi::entry_kind::BIOME, s.biome()));
     let [x, y, z] = s.pos();
     for dy in 0..tall {
@@ -445,16 +457,28 @@ fn giant(s: &mut Site) {
         return;
     }
     let h = s.random();
-    let Some(log) = GIANT_KINDS.on_biome(s.biome()).and_then(|l| l.pick(h >> 40)) else { return };
+    let Some(log) = GIANT_KINDS
+        .on_biome(s.biome())
+        .and_then(|l| l.pick(h >> 40))
+    else {
+        return;
+    };
     let [x, y, z] = s.pos();
     // One in twelve lies fallen, mossy, along the ground (the overworld's: its height is known).
     if (h >> 4).is_multiple_of(12) && s.dimension() == crate::OVERWORLD.id() {
         fallen_giant(s, h);
         return;
     }
-    base_api::trees::giant_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
-        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
-    });
+    base_api::trees::giant_tree_blocks(
+        log,
+        x,
+        y,
+        z,
+        h >> 8,
+        |x, y, z, state, force| {
+            if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+        },
+    );
 }
 
 /// A fallen giant: a mossy trunk three wide lying 14 to 22 long through its site, following the
@@ -689,7 +713,10 @@ fn decorate(g: &mut Gen) {
                             g.set(x, y, z, m);
                         }
                     } else if near < mushroom + ferns {
-                        let fern = FERN_KINDS.on_biome(b).and_then(|l| l.pick(h >> 20)).unwrap_or(FERN.id());
+                        let fern = FERN_KINDS
+                            .on_biome(b)
+                            .and_then(|l| l.pick(h >> 20))
+                            .unwrap_or(FERN.id());
                         g.set(x, y, z, fern);
                     }
                 }

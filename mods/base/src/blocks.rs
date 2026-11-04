@@ -191,7 +191,11 @@ fn grove(r: &mut Registry) {
         .needs_below("#plant_soil")
         .tint(&tints::GRASS)
         .tab(&crate::tabs::NATURAL);
-    r.loot(&SWORD_FERN).pool(Pool::new().when(Cond::Chance(vitals::clothing::FIBRE_CHANCE)).item("plant_fibre"));
+    r.loot(&SWORD_FERN).pool(
+        Pool::new()
+            .when(Cond::Chance(vitals::clothing::FIBRE_CHANCE))
+            .item("plant_fibre"),
+    );
     plant(r, &LUPINE, "lupine");
     log(r, &DOGWOOD_LOG, "dogwood", "base:dogwood_leaves", None);
     r.block(&DOGWOOD_LEAVES)
@@ -205,7 +209,8 @@ fn grove(r: &mut Registry) {
         .redstone_blocker()
         .mineable("shears")
         .tab(&crate::tabs::NATURAL);
-    r.loot(&DOGWOOD_LEAVES).pool(Pool::new().when(Cond::Chance(0.05)).item("stick"));
+    r.loot(&DOGWOOD_LEAVES)
+        .pool(Pool::new().when(Cond::Chance(0.05)).item("stick"));
     // A fallen giant's bark under moss, its end mossy too.
     r.block(&MOSSY_SEQUOIA_LOG)
         .sound_group("wood")
@@ -218,8 +223,22 @@ fn grove(r: &mut Registry) {
         .prop("axis", ["y", "x", "z"])
         .states(|p, s| match p.get("axis") {
             "y" => s.textures("log_sequoia_mossy_top", "log_sequoia_mossy", "log_sequoia_mossy_top"),
-            "x" => s.faces(["log_sequoia_mossy_top", "log_sequoia_mossy_top", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy"]),
-            _ => s.faces(["log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy", "log_sequoia_mossy_top", "log_sequoia_mossy_top"]),
+            "x" => s.faces([
+                "log_sequoia_mossy_top",
+                "log_sequoia_mossy_top",
+                "log_sequoia_mossy",
+                "log_sequoia_mossy",
+                "log_sequoia_mossy",
+                "log_sequoia_mossy",
+            ]),
+            _ => s.faces([
+                "log_sequoia_mossy",
+                "log_sequoia_mossy",
+                "log_sequoia_mossy",
+                "log_sequoia_mossy",
+                "log_sequoia_mossy_top",
+                "log_sequoia_mossy_top",
+            ]),
         })
         .placement(axis_placement)
         .tab(&crate::tabs::NATURAL);
@@ -749,7 +768,8 @@ pub fn register(r: &mut Registry) {
             .redstone_blocker()
             .mineable("shears")
             .tab(&crate::tabs::NATURAL);
-        r.loot(b).pool(Pool::new().when(Cond::Chance(0.05)).item("stick"));
+        r.loot(b)
+            .pool(Pool::new().when(Cond::Chance(0.05)).item("stick"));
     }
     // Grass two blocks tall: the lower half on soil, the upper on the lower; breaking the lower
     // takes the upper with it (it loses its support).
@@ -764,7 +784,11 @@ pub fn register(r: &mut Registry) {
         .no_item();
     r.loot(&TALL_GRASS_DOUBLE)
         .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
-        .pool(Pool::new().when(Cond::Chance(vitals::clothing::FIBRE_CHANCE)).item("plant_fibre"));
+        .pool(
+            Pool::new()
+                .when(Cond::Chance(vitals::clothing::FIBRE_CHANCE))
+                .item("plant_fibre"),
+        );
     // Mushrooms at the foot of trunks (`vitals::layers`); food rows for the ceps and chanterelles
     // are to come.
     for (b, tex) in [(&HONEY_FUNGUS, "honey_fungus"), (&CHANTERELLE, "chanterelle"), (&PORCINI, "porcini")] {
@@ -777,7 +801,11 @@ pub fn register(r: &mut Registry) {
         .sound_group("wood")
         .hardness(0.3)
         .texture(side)
-        .model_box_faces([2.0, 6.0, 8.0], [14.0, 9.0, 16.0], [(side, full), (side, full), (top, full), (top, full), (side, full), (side, full)])
+        .model_box_faces(
+            [2.0, 6.0, 8.0],
+            [14.0, 9.0, 16.0],
+            [(side, full), (side, full), (top, full), (top, full), (side, full), (side, full)],
+        )
         .tab(&crate::tabs::NATURAL);
     // Ferns on the forest floor (`vitals::layers`): bracken.
     r.block(&FERN)
