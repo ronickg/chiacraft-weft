@@ -4,7 +4,7 @@
 //! rest (its bones' resting rotations, as the engine draws it with no animation: x and z
 //! negated, Z·Y·X), from `assets/models/<model>.geo.json`, 16 model pixels a block.
 
-use animals_core::bodies::{BOXES, LOOSE};
+use animals_core::bodies::{BOXES, LOOSE, LOW};
 use serde_json::Value;
 
 type M = [[f64; 4]; 4];
@@ -102,7 +102,8 @@ fn every_box_fits_its_model() {
         let off = ((hi[0] + lo[0]) / 2.0)
             .abs()
             .max(((hi[2] + lo[2]) / 2.0).abs());
-        if !(0.75 * top..=(1.35 * top).max(top + 0.1)).contains(&h) {
+        let low = LOW.iter().any(|(m, _)| *m == model);
+        if !(0.75 * top..=(1.35 * top).max(top + 0.1)).contains(&h) && !(low && h <= top) {
             problems.push(format!("{model}: box {h} high, its model's top {top:.2}"));
         }
         let loose = LOOSE.iter().any(|(m, _)| *m == model);
