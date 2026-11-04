@@ -543,6 +543,8 @@ const MIST_GOLD: vec3<f32> = vec3(1.0, 0.7, 0.36);
 struct FogLight {
     sky: vec3<f32>,
     sun: vec3<f32>,
+    // The sun's light come down through a canopy's leaves, all round (no forward glow).
+    leaf: vec3<f32>,
 }
 
 fn fog_light(dir: vec3<f32>) -> FogLight {
@@ -568,7 +570,8 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.5, warm);
     let sun_part = p.sun * mix(vec3(1.0), MIST_GOLD * 0.65, warm) * light_strength() * phase;
     let k = 0.75 * tint * look_opt(OPT_FOG, 1.0);
-    return FogLight(sky_part * k, sun_part * k);
+    let leaf_part = p.sun * mix(vec3(1.0), MIST_GOLD, warm) * light_strength() * 0.06 * LEAF_LIGHT;
+    return FogLight(sky_part * k, sun_part * k, leaf_part * k);
 }
 
 // 1 where the sun reaches camera-relative `rel` (one tap of the near shadow map, else the far one;
@@ -611,7 +614,10 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let floor = fog_floor(rel);
     let light = fog_light(dir);
     let leafy = min(canopy(), 1.0);
-    let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.3, leafy * 0.85);
+    // In the canopy's shade the mist is lit by what comes through the leaves, warm green, more than
+    // by the sky they hide: the sky's blue alone, tinted green, made it teal (the dawn check on
+    // Plants' rainforest, 11-04).
+    let shaded_sky = light.sky * mix(vec3(1.0), LEAF_LIGHT * 0.2, leafy * 0.85) + light.leaf * leafy;
     // Jittered along the view per pixel, so the shafts' edges don't band.
     let jitter = fract(sin(dot(rel, vec3(12.9898, 78.233, 37.719))) * 43758.547) - 0.5;
     let steps = 12u;
