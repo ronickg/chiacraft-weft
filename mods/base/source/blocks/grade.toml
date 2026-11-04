@@ -473,3 +473,7 @@ saturation = 0.88
 
 [items.ipe_seed]  # outline 0.64 -> 0.40 (new, the tropical forest: pale papery wings, the edge too light)
 outline = 0.62
+
+[items.roasted_cacao]  # darker chocolate than the dried beans, less orange: sat 0.79 -> ~0.6, luma 0.25 -> ~0.22
+saturation = 0.75
+gain = 0.9
