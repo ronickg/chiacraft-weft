@@ -128,6 +128,11 @@ pub struct Player {
     since: Option<Instant>,
     lifted: bool,
     told: Option<Instant>,
+    /// chiacraft, phase 4: the DID this player proved on chain (`did:chia:1…`) and its age in
+    /// days, and a join waiting for that check (name, key, since).
+    did: Option<String>,
+    did_days: Option<u32>,
+    waiting: Option<(String, String, Instant)>,
 }
 
 pub struct Generated {
@@ -214,6 +219,8 @@ pub struct Server {
     configs: Vec<(u32, f64)>,
     /// Who may enter, and what newcomers may do (chiacraft, `admission`).
     pub gate: crate::admission::Gate,
+    /// DID checks done in the background (chiacraft, `admission`).
+    did_checks: (Sender<admission::DidChecked>, Receiver<admission::DidChecked>),
 }
 
 /// Handle the client side uses to reach a running server thread.
@@ -524,6 +531,7 @@ impl Server {
             load_seen: (0, 0),
             configs: crate::config::synced(),
             gate,
+            did_checks: unbounded(),
         }
     }
 
@@ -606,6 +614,9 @@ impl Server {
                 since: None,
                 lifted: false,
                 told: None,
+                did: None,
+                did_days: None,
+                waiting: None,
             });
         }
     }
@@ -743,6 +754,7 @@ impl Server {
         if self.tick % (TPS as u64 * 5) == 0 && self.gate.take_changed() {
             self.send_banned_away(c);
         }
+        self.did_answers(c);
         lap(5, &self.shared);
         let us = start.elapsed().as_micros() as u64;
         self.shared.tick_us.store(us, Ordering::Relaxed);

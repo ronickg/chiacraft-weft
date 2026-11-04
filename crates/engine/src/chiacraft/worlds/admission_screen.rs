@@ -16,6 +16,8 @@ pub struct Admission;
 
 /// Probation lengths the − and + buttons step through, in hours.
 const HOURS: [u32; 8] = [0, 1, 2, 4, 8, 24, 72, 168];
+/// DID ages the − and + buttons step through, in days.
+const DAYS: [u32; 7] = [0, 1, 7, 30, 90, 180, 365];
 
 fn run(c: &mut Ctx, line: String) {
     c.requests.push(Request::SendChat(line));
@@ -90,6 +92,21 @@ impl Screen for Admission {
                                 run(c, format!("/probation containers {}", if k { "off" } else { "on" }))
                             });
                             ui.set_id(id, "probation_containers");
+                        });
+                        // DIDs (phase 4): proven on chain, of some age, so a ban sticks.
+                        let (required, days) = (rules.did_required, rules.did_min_days);
+                        let id = button(ui, cx, "admission.screen.did_required", &[on_off(required)], 260.0, move |c| {
+                            run(c, format!("/didrule required {}", if required { "off" } else { "on" }))
+                        });
+                        ui.set_id(id, "did_required");
+                        ui.container(Style::row().gap(4.0), |ui| {
+                            label(ui, cx, "admission.screen.did_days", &[Arg::Int(days as i64)], "default");
+                            let less = DAYS.iter().rev().find(|d| **d < days).copied().unwrap_or(0);
+                            let more = DAYS.iter().find(|d| **d > days).copied().unwrap_or(days);
+                            let id = button(ui, cx, "admission.screen.less", &[], 30.0, move |c| run(c, format!("/didrule age {less}")));
+                            ui.set_id(id, "did_days_less");
+                            let id = button(ui, cx, "admission.screen.more", &[], 30.0, move |c| run(c, format!("/didrule age {more}")));
+                            ui.set_id(id, "did_days_more");
                         });
                     });
                     // Players here now, and anyone else by name, key or DID.

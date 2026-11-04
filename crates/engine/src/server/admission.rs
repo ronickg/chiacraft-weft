@@ -57,9 +57,30 @@ impl Player {
     }
 
     fn who(&self) -> Who {
-        Who { name: self.name.clone(), key: self.key.clone(), identity: self.identity.clone(), did: None }
+        Who {
+            name: self.name.clone(),
+            key: self.key.clone(),
+            identity: self.identity.clone(),
+            did: self.did.clone(),
+            did_days: self.did_days,
+        }
     }
 }
+
+/// A joining player's DID, as the chain answered (in the background).
+pub(super) struct DidChecked {
+    /// The player's login key.
+    key: String,
+    did: String,
+    /// The key that signed still holds the DID.
+    held: bool,
+    days: Option<u32>,
+    /// The chain answered from its cache, or not at all.
+    why: Option<String>,
+}
+
+/// How long a join waits for its DID check before the rules decide without it.
+const DID_WAIT: std::time::Duration = std::time::Duration::from_secs(25);
 
 /// What probation may keep a player from doing.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -166,7 +187,8 @@ impl Server {
                         .map(|s| s.to_string_lossy().into_owned())
                         .unwrap_or_default();
                     let identity = crate::kv::get(&text, "identity").map(str::to_string);
-                    return Some((Who { name: what.to_string(), key, identity, did: None }, None));
+                    let did = crate::kv::get(&text, "did").map(str::to_string);
+                    return Some((Who { name: what.to_string(), key, identity, did, did_days: None }, None));
                 }
             }
         }
@@ -185,6 +207,97 @@ impl Server {
             .iter()
             .position(|p| p.joined && (p.key == what || p.identity.as_deref() == Some(what)));
         Some((who, here))
+    }
+
+    /// Starts checking the DID player `pi` (login key `key`) claims, if `proof` is one their
+    /// identity's DID's owner key signed: whether it was started.
+    pub(super) fn check_did(&mut self, pi: usize, key: &str, proof: &str) -> bool {
+        let p = &self.players[pi];
+        let Some(identity) = p.identity.clone() else { return false };
+        if proof.is_empty() {
+            return false;
+        }
+        let Some((launcher, owner)) = chiacraft_account::check_did_proof(proof, &identity) else {
+            log::info!("player {key}: a DID proof that doesn't check out; joined without a DID");
+            return false;
+        };
+        let Some(did) = chiacraft_wallet::keys::encode_did(&launcher) else { return false };
+        let tx = self.did_checks.0.clone();
+        let key = key.to_string();
+        let started = std::thread::Builder::new()
+            .name("did check".into())
+            .spawn(move || {
+                let answer = crate::chiacraft::chain::get().and_then(|reader| {
+                    let (record, live) = crate::chiacraft::chain::did(&reader, &did)?;
+                    let peak = reader.status().peak.unwrap_or(0).max(record.checked_height);
+                    let days = record
+                        .launched()
+                        .map(|h| peak.saturating_sub(h) / crate::chiacraft::chain::BLOCKS_A_DAY);
+                    Ok((record.owned_by(owner.into()), days, live))
+                });
+                let checked = match answer {
+                    Ok((held, days, live)) => DidChecked { key, did, held, days, why: (!live).then(|| "from the cache".into()) },
+                    Err(e) => DidChecked { key, did, held: false, days: None, why: Some(e) },
+                };
+                let _ = tx.send(checked);
+            })
+            .is_ok();
+        started
+    }
+
+    /// DID checks that came back: the player's DID is known (or not), a waiting join goes on,
+    /// and a joined player whose DID is banned leaves. Joins that waited too long go on without.
+    pub(super) fn did_answers(&mut self, c: &'static Content) {
+        let mut banned_check = false;
+        while let Ok(d) = self.did_checks.1.try_recv() {
+            let Some(pi) = self
+                .players
+                .iter()
+                .position(|p| p.key == d.key || p.waiting.as_ref().is_some_and(|w| w.1 == d.key))
+            else {
+                continue;
+            };
+            let p = &mut self.players[pi];
+            if d.held {
+                log::info!(
+                    "player {} proved {} ({} days old){}",
+                    d.key,
+                    d.did,
+                    d.days.map_or("?".into(), |x| x.to_string()),
+                    d.why.as_deref().map_or(String::new(), |w| format!(", {w}"))
+                );
+                p.did = Some(d.did);
+                p.did_days = d.days;
+            } else {
+                log::info!(
+                    "player {}: {} isn't theirs on chain{}",
+                    d.key,
+                    d.did,
+                    d.why
+                        .as_deref()
+                        .map_or(String::new(), |w| format!(" ({w})"))
+                );
+            }
+            if let Some((name, key, _)) = p.waiting.take() {
+                self.join(c, pi, name, key);
+            } else {
+                banned_check = true;
+            }
+        }
+        for pi in 0..self.players.len() {
+            if self.players[pi]
+                .waiting
+                .as_ref()
+                .is_some_and(|w| w.2.elapsed() > DID_WAIT)
+                && let Some((name, key, _)) = self.players[pi].waiting.take()
+            {
+                log::info!("{name}: no answer about their DID in time; the rules decide without it");
+                self.join(c, pi, name, key);
+            }
+        }
+        if banned_check {
+            self.send_banned_away(c);
+        }
     }
 
     /// Players here who are banned now (a ban or a followed list changed): sent away.
@@ -522,4 +635,27 @@ pub(super) fn banlist(s: &mut Server, x: &Ctx) -> Vec<Msg> {
             }
         })
         .collect()
+}
+
+/// `/didrule show | required <on|off> | age <days>`: whether players must prove a DID, and how
+/// old it must be (phase 4, slice 6).
+pub(super) fn didrule(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    let a = x.a;
+    let changed = if a.get("required").is_some() {
+        let on = a.text("on") == Some("on");
+        Some(s.gate.edit_rules(|r| r.did_required = on))
+    } else if let Some(days) = a.int("days") {
+        Some(
+            s.gate
+                .edit_rules(|r| r.did_min_days = days.clamp(0, 36_500) as u32),
+        )
+    } else {
+        None
+    };
+    if let Some(Err(e)) = changed {
+        return failed(e);
+    }
+    s.gate.refresh(true);
+    let r = &s.gate.rules;
+    say("did_rule_show", vec![yes_no(r.needs_did()), Arg::Int(r.did_min_days as i64)])
 }

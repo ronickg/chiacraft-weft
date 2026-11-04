@@ -253,6 +253,17 @@ hosting starts and daily (`p2p::fetch_lists`). The owner's screen: pause menu, "
 here). testkit's new script line `chatf <file> <text with {}>`. The check: `tools/checks/admission`
 (two copies, alice and bob), to run through the Tester.
 
+Slices 4 and 6 (2026-11-04, built, not yet seen on testnet11): the engine links the wallet with
+`chain`; `crates/engine/src/chiacraft/chain.rs` holds one `ChainReader` per process, configured at
+start (`chain::configure`, settings `core:chain` = `testnet11` by default, `off`; `mainnet` refused
+in this build; `core:chain_peers`), started by the first `chain::get()`, never from an async task
+(the reader runs its own runtime and `block_on`s), cache `<run dir>/chain/<network>.json`. The
+account keeps its DID's owner key (`Session::link_did`, `did_proof`, `check_did_proof`; text
+`chiacraft did v1`, `sign::did_link_text`). The join carries `did` (protocol 7 also covers it);
+the server checks the proof, then the chain on a thread (`server/admission.rs` `check_did`,
+`did_answers`), waits up to 25 s only when the rules ask for a DID (`Rules::needs_did`), and keeps
+`did` in the player file. `/didrule required on|off`, `/didrule age <days>`, and the screen.
+
 ## Phase 6, sandboxed code mods
 
 Slice 1 (server halves) is built; the design for Ronald to agree is `reports/Sandboxed code

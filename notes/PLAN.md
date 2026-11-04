@@ -220,7 +220,11 @@ The smallest version that works is phases 1-4.
 4. **DIDs and achievements.** Player and world DIDs through sponsors; world ownership both ways;
    achievements signed by the world DID, anchored in batches, opt-in; profile view; admission
    rules (allow lists, probation, DID age, achievements); shared ban lists.
-   Slices (2026-11-03; 1-3 go ahead, 4-7 wait for Ronald's answers on the sponsor). What is already there: `crates/wallet` reads
+   Slices (agreed 2026-11-03, the open points answered as recommended through Planner: the
+   sponsor speaks iroh; ours runs on this Mac from the throwaway testnet11 wallets; it launches
+   world DIDs too, with the owner's DID and the world key written in at launch, at most one player
+   DID and 8 world DIDs per identity a day, and a few test mojos where testnet needs a fee;
+   `testnet11` is the default chain; mainnet stays off). What is already there: `crates/wallet` reads
    DIDs from the chain, launches them for others and makes its own (`chain/did.rs`,
    `chain/sponsor.rs`, `chain/reader.rs`), signs as a DID's owner (`OwnerSigner`) and keeps a
    linked DID in `accounts.json` (`DidLink`); Horizon's sponsor service (`horizon-sponsor`: queue,
@@ -231,8 +235,8 @@ The smallest version that works is phases 1-4.
       join (no restart), set by the owner from the pause menu's "Who May Come In" screen and by
       commands (`/allow`, `/probation`). Rules,
       all of which must pass: open, or only the allow list (by login key, identity or DID);
-      probation for newcomers (see below); DID required and DID at least N days old (slice 6
-      fills these in; until then they refuse nobody). The owner and operators always get in.
+      probation for newcomers (see below); DID required and DID at least N days old (slice 6:
+      `/didrule`, and on the same screen). The owner and operators always get in.
       Default: open, no probation (rule 2). A refusal is a translation key with its arguments, shown
       on the joining player's screen. The world's status answer carries a summary ("allow list",
       "DID 30 days or older"), so the Multiplayer screen shows it before joining. The dedicated
@@ -254,9 +258,9 @@ The smallest version that works is phases 1-4.
       maintainer key, fetches it then and daily while open, and applies its entries as bans, its
       own allow list winning. `/banlist publish` signs the world's bans for good as the owner's
       list. Never on by default. Not yet: lists from a URL.
-   4. *The chain in the game*: the engine links the wallet with `chain`. One chain reader per
-      game, started only when something needs it (getting, linking or checking a DID), on the
-      network the setting `chiacraft:chain` names: `off`, `testnet11` (the default while we test)
+   4. *The chain in the game* (built 2026-11-04, `chiacraft/chain.rs`): the engine links the
+      wallet with `chain`. One chain reader per game or server, started only when something needs
+      it (getting, linking or checking a DID), on the network the setting `core:chain` names: `off`, `testnet11` (the default while we test)
       or `mainnet` (only after Ronald's yes, and a confirmation in the game); peers from the DNS
       introducers or the setting's own nodes; its cache in the run folder. Never in the game loop.
    5. *The sponsor and the account's DID*: `horizon-sponsor` ported as `crates/sponsor`
@@ -270,14 +274,16 @@ The smallest version that works is phases 1-4.
       chain has it (about a minute; the launcher id is saved, so a restart keeps waiting), then
       links it (`DidLink`); "Link a DID I have" finds one these words hold (`OwnerSigner::find`).
       A sponsor gives each identity one player DID and up to 8 world DIDs a day.
-   6. *The join proves the DID*: beside the identity's vouching for the login key, the join
+   6. *The join proves the DID* (built 2026-11-04, not yet seen on testnet11): beside the identity's vouching for the login key, the join
       carries the DID's launcher id, its owner key and that key's signature of `chiacraft did v1
       <launcher> <identity>`. It needn't name the session: the identity is already bound to the
       login key the connection proved, so a replay only proves the same link again. The world
       checks the signature, then on chain that the DID's current owner is that key's address
       (cached per DID and followed, so a transfer is seen; without the chain: the cache, else
-      "unverified", which DID rules treat as no DID). The DID rules of slice 1 start counting;
-      the player list and the bans screen show players' DIDs.
+      "unverified", which DID rules treat as no DID). The check runs on a thread of its own; a
+      join waits for it (25 s at most) only when the world's rules ask for a DID. A DID's age is
+      the chain's height since its launch (4,608 blocks a day). The DID rules of slice 1 start
+      counting, and a ban by DID refuses whoever proves it.
    7. *World DIDs, ownership both ways*: a world can get a DID from a sponsor, launched to the
       owner's address, so the DID stays in the owner's wallet and the world holds only its key.
       Its metadata names the owner's DID and the world's current key and generation, set at

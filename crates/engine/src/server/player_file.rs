@@ -14,7 +14,14 @@ impl Server {
         // The world's admission rules and bans (chiacraft, `admission`), read again when they
         // change. The key is what the connection proved, not what the client claims.
         let trusted = self.trusted(pi, &key);
-        let who = crate::admission::Who { name: name.clone(), key: key.clone(), identity: self.players[pi].identity.clone(), did: None };
+        let p = &self.players[pi];
+        let who = crate::admission::Who {
+            name: name.clone(),
+            key: key.clone(),
+            identity: p.identity.clone(),
+            did: p.did.clone(),
+            did_days: p.did_days,
+        };
         if let crate::admission::Verdict::Refuse(why) = self.gate.verdict(&who, trusted) {
             log::info!("{name} ({key}) is not let in: {}", why.key);
             self.players[pi].conn.send(ToClient::Refused(why));
@@ -184,6 +191,9 @@ pub(super) fn save_player(s: &Storage, p: &Player, d: &Dim) {
     // here (probation), and whether the owner let them off probation.
     if let Some(identity) = &p.identity {
         text.push_str(&format!("identity = {identity}\n"));
+    }
+    if let Some(did) = &p.did {
+        text.push_str(&format!("did = {did}\n"));
     }
     text.push_str(&format!("played = {}\n", p.played_now()));
     if p.lifted {

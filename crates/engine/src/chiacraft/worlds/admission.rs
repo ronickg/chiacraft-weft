@@ -150,6 +150,19 @@ pub struct Rules {
     pub probation: Probation,
     #[serde(default)]
     pub lists: Vec<Following>,
+    /// Only players who prove a DID on chain get in (phase 4, slice 6).
+    #[serde(default)]
+    pub did_required: bool,
+    /// ... and only with a DID at least this many days old (0: any age). Implies a DID.
+    #[serde(default)]
+    pub did_min_days: u32,
+}
+
+impl Rules {
+    /// Whether a join must wait for its DID to be checked on chain.
+    pub fn needs_did(&self) -> bool {
+        self.did_required || self.did_min_days > 0
+    }
 }
 
 /// One ban.
@@ -281,8 +294,10 @@ pub struct Who {
     pub key: String,
     /// The identity that vouched for the login key.
     pub identity: Option<String>,
-    /// A DID the player proved (later slices); none until then.
+    /// A DID the player proved, checked on chain (`did:chia:1…`).
     pub did: Option<String>,
+    /// That DID's age in days, as the chain says.
+    pub did_days: Option<u32>,
 }
 
 impl Who {
@@ -340,6 +355,16 @@ pub fn verdict(rules: &Rules, bans: &Bans, lists: &[BanList], who: &Who, trusted
     if rules.only_listed {
         return Verdict::Refuse(Msg::new("admission.not_listed", Vec::new()));
     }
+    if rules.needs_did() && who.did.is_none() {
+        let key = if rules.did_min_days > 0 { "admission.did_required_days" } else { "admission.did_required" };
+        return Verdict::Refuse(Msg::new(key, vec![Arg::Int(rules.did_min_days as i64)]));
+    }
+    if rules.did_min_days > 0 && who.did_days.unwrap_or(0) < rules.did_min_days {
+        return Verdict::Refuse(Msg::new(
+            "admission.did_too_young",
+            vec![Arg::Int(rules.did_min_days as i64), Arg::Int(who.did_days.unwrap_or(0) as i64)],
+        ));
+    }
     Verdict::Admit
 }
 
@@ -374,6 +399,11 @@ pub fn summary(rules: &Rules) -> Vec<(String, i64)> {
     let mut out = Vec::new();
     if rules.only_listed {
         out.push(("admission.summary.listed".to_string(), 0));
+    }
+    if rules.did_min_days > 0 {
+        out.push(("admission.summary.did_days".to_string(), rules.did_min_days as i64));
+    } else if rules.did_required {
+        out.push(("admission.summary.did".to_string(), 0));
     }
     if rules.probation.on() {
         out.push(("admission.summary.probation".to_string(), rules.probation.hours.ceil() as i64));
@@ -486,6 +516,17 @@ pub fn store_list(world: &Path, list: &BanList) -> Result<bool, String> {
 pub fn held_list(world: &Path, maintainer: &str) -> Option<Vec<u8>> {
     let bytes = std::fs::read(list_path(world, maintainer)?).ok()?;
     (bytes.len() <= MAX_LIST_BYTES).then_some(bytes)
+}
+
+/// Whether the world follows a list it holds no copy of yet (fetched again soon, not daily).
+pub fn lists_missing(world: &Path) -> bool {
+    let rules = load_rules(world);
+    let owners = owners(world);
+    rules
+        .lists
+        .iter()
+        .take(MAX_LISTS)
+        .any(|f| maintainer_of(f, &owners).is_none_or(|m| load_list(world, &m).is_none()))
 }
 
 /// The world's own bans as a list its owner signs: the bans for good (a timed ban isn't for
@@ -662,7 +703,7 @@ mod tests {
     use super::*;
 
     fn who(key: &str, identity: Option<&str>) -> Who {
-        Who { name: "bob".into(), key: key.into(), identity: identity.map(str::to_string), did: None }
+        Who { name: "bob".into(), key: key.into(), identity: identity.map(str::to_string), did: None, did_days: None }
     }
 
     #[test]
@@ -715,6 +756,32 @@ mod tests {
         ban_all(&mut bans, &bob, "", "alice", None);
         assert_eq!(unban(&mut bans, "id1"), 1);
         assert_eq!(unban(&mut bans, "nobody"), 0);
+    }
+
+    #[test]
+    fn did_rules_ask_for_a_proven_did_of_some_age() {
+        let mut rules = Rules { did_required: true, ..Default::default() };
+        let mut bob = who("k1", Some("id1"));
+        let Verdict::Refuse(m) = verdict(&rules, &Bans::default(), &[], &bob, false, 0) else { panic!("admitted") };
+        assert_eq!(m.key, "admission.did_required");
+        bob.did = Some("did:chia:1abc".into());
+        bob.did_days = Some(3);
+        assert_eq!(verdict(&rules, &Bans::default(), &[], &bob, false, 0), Verdict::Admit);
+        rules.did_min_days = 30;
+        let Verdict::Refuse(m) = verdict(&rules, &Bans::default(), &[], &bob, false, 0) else { panic!("admitted") };
+        assert_eq!((m.key.as_str(), &m.args[1]), ("admission.did_too_young", &Arg::Int(3)));
+        bob.did_days = Some(31);
+        assert_eq!(verdict(&rules, &Bans::default(), &[], &bob, false, 0), Verdict::Admit);
+        // The age rule alone asks for a DID too; the allow list and the owner skip both.
+        let young = Rules { did_min_days: 7, ..Default::default() };
+        assert!(young.needs_did());
+        assert!(matches!(verdict(&young, &Bans::default(), &[], &who("k2", None), false, 0), Verdict::Refuse(_)));
+        assert_eq!(verdict(&young, &Bans::default(), &[], &who("k2", None), true, 0), Verdict::Admit);
+        // A banned DID refuses whoever proves it.
+        let mut bans = Bans::default();
+        ban_all(&mut bans, &Who { did: Some("did:chia:1abc".into()), ..Default::default() }, "", "alice", None);
+        let other = Who { key: "k9".into(), did: Some("did:chia:1abc".into()), did_days: Some(99), ..Default::default() };
+        assert!(matches!(verdict(&Rules::default(), &bans, &[], &other, false, 0), Verdict::Refuse(_)));
     }
 
     #[test]

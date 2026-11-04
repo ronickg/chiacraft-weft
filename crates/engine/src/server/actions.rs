@@ -80,13 +80,19 @@ impl Server {
             return;
         }
         match msg {
-            ToServer::Join { name, key, account } => {
+            ToServer::Join { name, key, account, did } => {
                 // The account identity behind the key, when the player's game vouched for it.
                 let identity = if account.is_empty() { None } else { chiacraft_account::check_vouch(&account, &key) };
                 if identity.is_none() && !account.is_empty() {
                     log::warn!("player {name}: the account's vouching for key {key} does not check out; joined without an identity");
                 }
                 self.players[pi].identity = identity;
+                // A DID claimed (chiacraft): checked on chain in the background. When the
+                // world's rules ask for a DID, the join waits for the answer (a few seconds).
+                if self.check_did(pi, &key, &did) && self.gate.rules.needs_did() {
+                    self.players[pi].waiting = Some((name, key, Instant::now()));
+                    return;
+                }
                 self.join(c, pi, name, key)
             }
             ToServer::StartBreak { pos, frame } => {

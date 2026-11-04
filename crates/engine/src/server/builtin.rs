@@ -86,6 +86,7 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
         super::admission::probation,
         p::ADMIN,
     ),
+    ("didrule", "show | required <on:word(on,off)> | age <days:int>", super::admission::didrule, p::ADMIN),
     (
         "banlist",
         "list | follow <from:word> [maintainer:word] | unfollow <what:word> | publish [name:text]",

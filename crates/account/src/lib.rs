@@ -311,7 +311,9 @@ pub fn check_text(identity: &str, text: &str, sig: &str) -> bool {
 pub fn check_did_proof(line: &str, identity: &str) -> Option<([u8; 32], [u8; 32])> {
     let mut parts = line.split(':');
     let (launcher, owner, sig) = (parts.next()?, parts.next()?, parts.next()?);
-    let launcher_bytes: [u8; 32] = chiacraft_wallet::keys::from_hex(launcher)?.try_into().ok()?;
+    let launcher_bytes: [u8; 32] = chiacraft_wallet::keys::from_hex(launcher)?
+        .try_into()
+        .ok()?;
     let owner_key: [u8; 48] = chiacraft_wallet::keys::from_hex(owner)?.try_into().ok()?;
     let sig = chiacraft_wallet::keys::from_hex(sig)?;
     let text = chiacraft_wallet::sign::did_link_text(&chiacraft_wallet::keys::hex(&launcher_bytes), identity);

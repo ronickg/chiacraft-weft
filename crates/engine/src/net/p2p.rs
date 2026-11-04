@@ -558,12 +558,17 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
             h.ticket = Some(t);
         }
         let hw = std::sync::Arc::new(hw);
-        // The ban lists it follows: now, then daily while it is open.
+        // The ban lists it follows: now, then daily while it is open; a list not fetched yet
+        // (its world offline, or not published yet) is asked for again every minute.
         if let Some(dir) = hw.dir.clone() {
             tokio::spawn(async move {
                 while HOSTING.lock().is_some() {
                     fetch_lists(&dir).await;
-                    tokio::time::sleep(Duration::from_secs(24 * 3600)).await;
+                    let d = dir.clone();
+                    let missing = tokio::task::spawn_blocking(move || crate::admission::lists_missing(&d))
+                        .await
+                        .unwrap_or(false);
+                    tokio::time::sleep(Duration::from_secs(if missing { 60 } else { 24 * 3600 })).await;
                 }
             });
         }

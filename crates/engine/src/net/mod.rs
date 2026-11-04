@@ -293,7 +293,10 @@ messages! {
         /// `key`: the player's public key, their identity across sessions and addresses.
         /// `account`: the player's account identity vouching for `key` (`chiacraft_account`
         /// `vouch_line`), or empty; the world checks it and learns the identity behind the key.
-        Join { name: String, key: String, account: String },
+        /// `did`: the account's DID proof (`chiacraft_account` `did_proof`: the DID's owner key
+        /// saying it is this identity's), or empty; the world checks on chain that the key
+        /// still holds the DID (chiacraft, phase 4).
+        Join { name: String, key: String, account: String, did: String },
         /// `frame`: the body it rides and its position relative to that body as the client shows it
         /// (the client shows bodies behind the server; only the relative position agrees), or the
         /// mount it sits on and its seat. `keys`: the movement keys held (`abi::held_keys`).

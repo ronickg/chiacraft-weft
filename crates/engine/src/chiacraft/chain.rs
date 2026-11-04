@@ -16,6 +16,26 @@ use chiacraft_wallet::chain::{self, Bytes32, ChainConfig, ChainNetwork, ChainRea
 
 static READER: parking_lot::Mutex<Option<(ChainNetwork, Arc<ChainReader>)>> = parking_lot::Mutex::new(None);
 
+/// Where and how to read the chain, set at start: the reader starts the first time [`get`] is
+/// asked (a world checking a joining player's DID, the Account screen).
+static CONFIG: parking_lot::Mutex<Option<(std::path::PathBuf, String, Vec<String>)>> = parking_lot::Mutex::new(None);
+
+pub fn configure(run_dir: &Path, choice: &str, peers: Vec<String>) {
+    *CONFIG.lock() = Some((run_dir.to_path_buf(), choice.to_string(), peers));
+}
+
+/// The reader as configured, started now if need be (never from an async task).
+pub fn get() -> Result<Arc<ChainReader>, String> {
+    let (dir, choice, peers) = CONFIG
+        .lock()
+        .clone()
+        .ok_or("the chain isn't set up in this process")?;
+    start(&dir, &choice, peers)
+}
+
+/// Blocks a day on Chia (one every 18.75 s on average).
+pub const BLOCKS_A_DAY: u32 = 4608;
+
 /// How long a DID lookup may take before the cache answers instead.
 pub const LOOKUP: Duration = Duration::from_secs(20);
 
@@ -48,15 +68,15 @@ pub fn start(run_dir: &Path, choice: &str, peers: Vec<String>) -> Result<Arc<Cha
     }
     let mut config = ChainConfig::new(network);
     config.peers = peers;
-    config.cache_file = Some(run_dir.join("chain").join(format!("{}.json", network.name())));
+    config.cache_file = Some(
+        run_dir
+            .join("chain")
+            .join(format!("{}.json", network.name())),
+    );
     // The account's first addresses, both branches: where its DIDs are held (a sponsor launches
     // to the first).
     if let Some(s) = chiacraft_account::current() {
-        config.puzzle_hashes = s
-            .puzzle_hashes(20)
-            .into_iter()
-            .map(Bytes32::from)
-            .collect();
+        config.puzzle_hashes = s.puzzle_hashes(20).into_iter().map(Bytes32::from).collect();
     }
     if let Some(dir) = config.cache_file.as_ref().and_then(|f| f.parent()) {
         let _ = std::fs::create_dir_all(dir);

@@ -7,7 +7,7 @@ list from a world of his own. About four minutes. Nothing here touches rendering
 From the folder holding `target/release/weft` (the worktree), with fresh run folders:
 
 ```sh
-rm -f adm-ticket.txt adm-bob-ticket.txt
+rm -f adm-ticket.txt adm-bob-ticket.txt adm-mark-*
 mkdir -p run-adm-alice/config run-adm-bob/config
 echo "name = alice" > run-adm-alice/config/core.txt
 echo "name = bob" > run-adm-bob/config/core.txt
@@ -15,8 +15,8 @@ echo "name = bob" > run-adm-bob/config/core.txt
 ./target/release/weft --run-dir run-adm-bob --script tools/checks/admission/bob.txt
 ```
 
-Start both within a few seconds of each other: bob waits for alice's ticket, and the waits in the
-two scripts follow each other from there.
+Start them in either order: bob waits for alice's ticket, and from there each copy waits for the
+other's step through `adm-mark-*` files (testkit's `mark` and `await_file`).
 
 ## What to look for
 
@@ -42,8 +42,7 @@ Shots (`adm-*.png`):
 - `adm-bob-6-following`: chat: `"Alice test list" by …: 1 players, version 1`
 - `adm-alice-1`, `adm-alice-2`: the command replies in alice's chat
 
-If the probation lines are missing, bob may have looked at the sky: `look 0 85` is meant to face
-the ground at his feet.
+In testkit a negative pitch faces down: bob's `look 0 -85` faces the ground at his feet.
 
 The owner's screen (pause menu, "Who May Come In") isn't driven by these scripts; open it in
 alice's game to see the rules, bans, allow list and followed lists.

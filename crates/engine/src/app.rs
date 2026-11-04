@@ -390,6 +390,7 @@ impl App {
         crate::saved_worlds::set_settings(&settings);
         if chiacraft_account::current().is_some() {
             net::p2p::start_account(&settings);
+            crate::chiacraft::chain::configure(&settings.run_dir, &settings.chain(), settings.chain_peers());
         }
         let icon = crate::assets::decode_png_file(&engine_assets(self.opts.dev).join("icon.png"))
             .and_then(|(w, h, px)| winit::window::Icon::from_rgba(px, w, h).ok());
