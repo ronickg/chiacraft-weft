@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a saddle seen from the side and slightly above, reading clearly as a saddle: a dark brown leather seat with a raised back, one stirrup hanging below with a metal ring, a few metal studs, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.304,
+   "outline": 0.85,
+   "red_line": 0.24,
+   "fill": 0.4,
+   "passed": true
+  }
+ ]
+}

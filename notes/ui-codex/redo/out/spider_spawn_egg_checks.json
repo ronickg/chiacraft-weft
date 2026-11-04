@@ -1,0 +1,26 @@
+{
+ "kind": "item",
+ "what": "a spawn egg: an upright oval egg, dark brown shell with red speckles, a soft highlight on the upper left, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.558,
+   "outline": 0.77,
+   "red_line": 0.48,
+   "fill": 0.46,
+   "passed": false
+  },
+  {
+   "grid": 0.553,
+   "outline": 0.74,
+   "red_line": 0.27,
+   "fill": 0.36,
+   "passed": true
+  }
+ ]
+}

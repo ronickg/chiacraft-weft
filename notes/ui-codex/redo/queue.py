@@ -384,6 +384,29 @@ REDO5 = {
     "diamond_hoe": HOE3.format(t="diamond", h="leather-wrapped", m="faceted cyan diamond, shaped like the stone one,"),
 }
 
+# batch 6: redos, and creature icons scaled a little by real size (Ronald 11-04: "maybe size should kinda
+# better scale to what animal it is as well a little"): the longest side in px of the 32
+def sized(what, px):
+    return (what.replace(C, "") + f", drawn small: its longest side only about {px} px of the 32 x 32 grid, centred, "
+            "everything round it the flat background color, still clearly readable")
+
+
+EGG_PX = {"chicken": 17, "pig": 22, "sheep": 22, "cow": 26, "zombie": 23, "skeleton": 23, "spider": 21, "creeper": 22}
+SIZE6 = {
+    "repeater": "a repeater seen from slightly above: a thick smooth grey stone slab filling most of the canvas width, "
+                "two small red torches standing on it and a red arrow line between them" + C,
+    "insects": sized("a few insects seen from above: two clear beetles and one cricket, fewer and bigger than a swarm, "
+                     "browns and greens with a highlight each", 19),
+    "wyvern_saddle": "a big riding saddle for a flying wyvern, seen from the side and slightly above, reading clearly "
+                     "as a saddle: a dark red-brown leather seat with a high back and a front horn, a gold buckle strap, "
+                     "one stirrup hanging below, its longest side about 26 px of the 32",
+    "utahraptor_saddle": sized(dict(MISC)["utahraptor_saddle"], 22),
+    "earthworm": sized(dict(MISC)["earthworm"], 16),
+    "grub": sized(dict(MISC)["grub"], 16),
+    "egg": sized(dict(FOOD)["egg"], 18),
+}
+SIZE6.update({f"{a}_spawn_egg": sized(dict(SPAWN)[f"{a}_spawn_egg"], px) for a, px in EGG_PX.items()})
+
 BATCHES = [
     ("1_tools", TOOLS, "base"),
     ("2_armour", ARMOUR, "base"),
@@ -432,6 +455,9 @@ def main():
     json.dump([dict(byname[n], what=w) for n, w in REDO5.items()],
               open(os.path.join(HERE, "batches", "5d_redo.json"), "w"), indent=1)
     print(f"5d_redo: {len(REDO5)}")
+    json.dump([dict(byname[n], what=w) for n, w in SIZE6.items()],
+              open(os.path.join(HERE, "batches", "6b_size.json"), "w"), indent=1)
+    print(f"6b_size: {len(SIZE6)}")
     root = os.path.join(HERE, "..", "..", "..", "mods")
     have = {f[:-4] for m in ("base", "animals") for f in os.listdir(os.path.join(root, m, "assets", "textures", "item"))}
     print("in the game but not queued:", sorted(have - seen) or "none")

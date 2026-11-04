@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a spawn egg: an upright oval egg, pale bone-grey shell with darker grey spots, a soft highlight on the upper left, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.564,
+   "outline": 0.79,
+   "red_line": 0.0,
+   "fill": 0.53,
+   "passed": true
+  }
+ ]
+}

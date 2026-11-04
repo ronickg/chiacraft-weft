@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a metal bucket seen from the front and slightly above, slightly tapered, thick bright warm-silver rim, vertical highlight just left of centre, a dark rope band around the middle, small round handle lugs on both sides, filled to just below the rim with lava: a flat oval red surface with bright orange swirls, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.577,
+   "outline": 0.58,
+   "red_line": 0.04,
+   "fill": 0.58,
+   "passed": true
+  }
+ ]
+}
