@@ -199,7 +199,7 @@ fn check_players(w: &World) {
         });
         let y = st.pos.y;
         let effects = w.component(id, &base_api::VITALS).map_or(0, |v| v.effects);
-        let milestones = w.component(id, &base_api::MILESTONES).copied().unwrap_or(0);
+        let milestones = w.component(id, &base_api::MILESTONES).unwrap_or(0);
         grant_where(w, id, |rule| match *rule {
             Rule::Effect(e) => effects & (1 << e.index()) != 0,
             Rule::Milestone(m) => milestones & m != 0,

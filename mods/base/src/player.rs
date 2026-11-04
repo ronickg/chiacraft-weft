@@ -38,12 +38,12 @@ pub fn register(r: &mut Registry) {
     }
     // Clothes under the armor (`vitals::clothing`): warmth, no protection.
     for (slot, parts, piece) in [
-        (&base_api::HAT, worn_parts::HEAD, "hat"),
-        (&base_api::COAT, worn_parts::BODY | worn_parts::ARMS, "coat"),
-        (&base_api::TROUSERS, worn_parts::BODY | worn_parts::LEGS, "trousers"),
-        (&base_api::SHOES, worn_parts::LEGS, "shoes"),
+        (&base_api::HAT, worn::HEAD, "hat"),
+        (&base_api::COAT, worn::CHEST, "coat"),
+        (&base_api::TROUSERS, worn::LEGS, "trousers"),
+        (&base_api::SHOES, worn::FEET, "shoes"),
         // And a cloak over everything (CONTENT decision 3: nine slots).
-        (&base_api::CLOAK, worn_parts::BODY | worn_parts::ARMS, "cloak"),
+        (&base_api::CLOAK, worn::CHEST, "cloak"),
     ] {
         r.equipment_slot(slot, parts, &format!("slot_{piece}"));
     }

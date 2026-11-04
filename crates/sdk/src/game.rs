@@ -431,6 +431,78 @@ impl World {
         unsafe { (host().weather_now)(self.raw()) }
     }
 
+    /// chiacraft: raining (or snowing) at `pos`: in this dimension, and in that biome when a mod
+    /// says where it rains (`set_rain`).
+    pub fn raining_at(&self, pos: impl Into<BlockPos>) -> bool {
+        let pos = pos.into();
+        unsafe { (host().raining_at)(self.raw(), &pos) != 0 }
+    }
+
+    /// chiacraft: `weather` from now on only in `biomes` of this dimension (none: clear
+    /// everywhere), until the next call: weather by place and season, instead of the dimension's
+    /// own timing. A `/weather` command still wins for its time.
+    pub fn set_rain(&self, biomes: &[u32], weather: impl Into<crate::Id<crate::Weather>>) {
+        unsafe { (host().set_rain)(self.raw(), biomes.as_ptr(), biomes.len() as u32, weather.into().raw()) }
+    }
+
+    /// chiacraft: the air in this dimension's biomes until the next call, for each biome its
+    /// `BiomeAir`, and where the wind blows to (`heading`, degrees clockwise from north, -z).
+    /// Biomes not named are clear and still. Players see it (`scene.weather` in shader packs) and
+    /// mods read it back (`air_at`).
+    pub fn set_air(&self, air: &[crate::BiomeAir], heading: f32) {
+        let biomes: Vec<u32> = air.iter().map(|a| a.biome).collect();
+        let fog: Vec<f32> = air.iter().map(|a| a.fog).collect();
+        let wind: Vec<f32> = air.iter().map(|a| a.wind).collect();
+        let snow: Vec<f32> = air.iter().map(|a| a.snow).collect();
+        let flags: Vec<u32> = air.iter().map(|a| a.flags).collect();
+        unsafe {
+            (host().set_air)(
+                self.raw(),
+                biomes.as_ptr(),
+                fog.as_ptr(),
+                wind.as_ptr(),
+                snow.as_ptr(),
+                flags.as_ptr(),
+                air.len() as u32,
+                heading,
+            )
+        }
+    }
+
+    /// chiacraft: tint colors from now on, over the content's while the world runs (a mod's
+    /// seasons): for each entry a biome (id, as `biome` gives it), a tint kind (another mod's too)
+    /// and its 0xRRGGBB. Players see it: grass and leaves take the new colors, blended across
+    /// biome borders as before. What is not named keeps the content's color; each call replaces
+    /// the last; an empty list goes back to the content's colors.
+    pub fn set_biome_tints(&self, tints: &[(u32, &crate::TintKind, u32)]) {
+        let biomes: Vec<u32> = tints.iter().map(|t| t.0).collect();
+        let kinds: Vec<Str> = tints.iter().map(|t| Str::new(t.1.name())).collect();
+        let colors: Vec<u32> = tints.iter().map(|t| t.2).collect();
+        unsafe { (host().set_biome_tints)(self.raw(), biomes.as_ptr(), kinds.as_ptr(), colors.as_ptr(), tints.len() as u32) }
+    }
+
+    /// chiacraft: the content's color (0xRRGGBB) of `kind` in biome `biome` (id), whatever
+    /// `set_biome_tints` set since: the biome's own, else the kind's default; 0 for an unknown
+    /// kind.
+    pub fn content_tint(&self, biome: u32, kind: &crate::TintKind) -> u32 {
+        unsafe { (host().content_tint)(biome, Str::new(kind.name())) }
+    }
+
+    /// chiacraft: the air set (`set_air`) in the biome at `pos`; clear and still if none was.
+    pub fn air_at(&self, pos: impl Into<BlockPos>) -> crate::BiomeAir {
+        let pos = pos.into();
+        let mut out = [0.0f32; 4];
+        unsafe { (host().air_at)(self.raw(), &pos, &mut out) };
+        crate::BiomeAir { biome: 0, fog: out[0], wind: out[1], snow: out[2], flags: out[3] as u32 }
+    }
+
+    /// chiacraft: how fast this dimension's time of day runs (1 the usual, 0.5 half as fast),
+    /// until set again; a world opened again starts at 1. Only the sky and what follows the day:
+    /// what waits on ticks keeps its pace.
+    pub fn set_day_rate(&self, rate: f32) {
+        unsafe { (host().set_day_rate)(self.raw(), rate) }
+    }
+
     /// Shader effect `effect` on an entity for everyone who sees it, at `strength` (0..1) for
     /// `ticks` (0 ends it): `w.entity_effect(id, &entity_effects::GLOW, 1.0, 200)`, or one of
     /// your own (`Registry::entity_effect`). A new one replaces the last.

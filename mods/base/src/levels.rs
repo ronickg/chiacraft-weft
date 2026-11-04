@@ -43,29 +43,29 @@ pub fn register(r: &mut Registry) {
         .files(&["random/advancement"])
         .category(&sound_categories::UI);
     // Mining, chopping, digging: by how hard the block is.
-    r.on(&BLOCK_BROKEN, |b| {
+    r.on(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             give_xp(&w, e.player, xp::gather(HARDNESS.on_block(e.state).unwrap_or(1.0).max(0.0)));
         }
     });
     // Building: a little a block.
-    r.on(&BLOCK_PLACED, |b| {
+    r.on(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             give_xp(&w, e.player, xp::BUILD);
         }
     });
     // Killing: by the creature's strength (a monster more than a chicken).
-    r.on(&ENTITY_DIED, |b| {
+    r.on(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
-            if d.killer != 0 && d.killer != d.entity && w.players().contains(&d.killer) {
+            if d.source != 0 && d.source != d.entity && w.players().contains(&d.source) {
                 let danger = if w.players().contains(&d.entity) { 3.0 } else { 1.5 };
-                give_xp(&w, d.killer, xp::kill(1, danger));
+                give_xp(&w, d.source, xp::kill(1, danger));
             }
             if w.players().contains(&d.entity) {
-                tombstone(&w, d.entity, d.pos);
+                tombstone(&w, d.entity, d.pos.into());
                 // What killed them and where their things are, for the death screen.
                 crate::death::tell(&w, d);
             }
@@ -97,12 +97,12 @@ pub fn register(r: &mut Registry) {
 
 /// Level ups, and exploring: a biome or dimension seen for the first time.
 fn tick(w: &World) {
-    if w.time() % 20 != 0 {
+    if w.game_time() % 20 != 0 {
         return;
     }
     for id in w.players() {
         let Some(st) = w.entity(id) else { continue };
-        let biome = w.biome([st.pos[0].floor() as i32, st.pos[1].floor() as i32, st.pos[2].floor() as i32]);
+        let biome = w.biome([st.pos.x.floor() as i32, st.pos.y.floor() as i32, st.pos.z.floor() as i32]);
         let dim = w.dimension();
         let creative = w.creative(id);
         let Some(v) = w.component_mut(id, &VITALS) else { continue };
@@ -148,7 +148,7 @@ fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
         *d = 0;
     }
     let inv = w.inventory(player);
-    let carried: Vec<ItemStack> = (0..inv.size()).map(|i| inv.get(i)).collect();
+    let carried: Vec<ItemStack> = (0..inv.len()).map(|i| inv.get(i)).collect();
     if carried.iter().all(|s| s.is_empty()) || w.creative(player) {
         return;
     }
@@ -159,7 +159,7 @@ fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
     };
     let Some(at) = (0..8)
         .map(|dy| [base[0], base[1] + dy, base[2]])
-        .find(|&p| room(w.get(p)))
+        .find(|&p| room(w.block(p)))
     else {
         // Nowhere: the engine drops it all where one died.
         if let Some(d) = w.component_mut(player, &crate::death::DROPPED) {
@@ -167,7 +167,7 @@ fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
         }
         return;
     };
-    w.set(at, TOMBSTONE.id());
+    w.set_block(at, TOMBSTONE.id());
     if let Some(g) = w.component_mut(player, &base_api::GRAVE) {
         // `set` is the dimension + 1: the marker and the grace look for it only there.
         *g = base_api::Grave { x: at[0], y: at[1], z: at[2], set: w.dimension() + 1 };
@@ -182,7 +182,7 @@ fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
         if s.is_empty() {
             continue;
         }
-        if slot >= into.size() {
+        if slot >= into.len() {
             break;
         }
         into.set(slot, s);
@@ -207,7 +207,7 @@ fn tombstone_block(r: &mut Registry) {
         })
         .group("grave", Slots::chest(5))
         .screen(|ui| {
-            crate::window::window(ui, S::col().pad(7.0).gap(4.0), &[], |ui| {
+            crate::window::window(ui, S::column().pad(7.0).gap(4.0), &[], |ui| {
                 ui.group("grave");
                 ui.player_inventory(true);
             });
@@ -305,23 +305,23 @@ fn client(r: &mut Registry) {
             return;
         }
         if big {
-            c.screen_text(0.5, 0.22, "levels.base.up", &[Arg::Int(*level as i64)], 0xffbe45ff, 2.0);
-            c.screen_text(0.5, 0.22 + 0.05, "levels.base.place", &[], 0xf5e4bcff, 1.0);
+            c.draw_screen_text(0.5, 0.22, "levels.base.up", &[Arg::Int(*level as i64)], 0xffbe45ff, 2.0);
+            c.draw_screen_text(0.5, 0.22 + 0.05, "levels.base.place", &[], 0xf5e4bcff, 1.0);
             return;
         }
         // The small one: one line just above the level row over the hotbar (`hud.rs`, HUD_LEVEL),
         // clear of the screen's middle.
         let st = c.state();
         let gh = st.window[1] as f32 / st.gui_scale.max(1.0);
-        c.screen_text(0.5, (gh - TOAST_ABOVE) / gh, "levels.base.toast", &[Arg::Int(*level as i64)], 0xffbe45ff, 1.0);
+        c.draw_screen_text(0.5, (gh - TOAST_ABOVE) / gh, "levels.base.toast", &[Arg::Int(*level as i64)], 0xffbe45ff, 1.0);
     });
     // The stats (the UI redo's stats screen): the level on a badge with the XP bar and the points
     // to place, then each stat as a bar with its value inside, its points and a +.
     r.screen(&SCREEN, |ui| {
         let tabs: [crate::window::Tab; 1] = [("window.base.tab.advancements", |c| {
-            c.client().open_screen(&crate::advancements::SCREEN);
+            c.client().screen_open(&crate::advancements::SCREEN);
         })];
-        crate::window::window_titled(ui, S::col().pad(8.0).gap(4.0), "window.base.tab.stats", &tabs, |ui| {
+        crate::window::window_titled(ui, S::column().pad(8.0).gap(4.0), "window.base.tab.stats", &tabs, |ui| {
             ui.row(S::row().gap(5.0).center(), |ui| {
                 ui.panel("hud_badge", S::row().size(20.0, 24.0).center(), |ui| {
                     ui.text_bind_styled(S::default().no_wrap(), |c, t| {
@@ -329,7 +329,7 @@ fn client(r: &mut Registry) {
                         t.set("levels.base.badge", &[Arg::Int(levels::level_of(v.xp).0 as i64)]);
                     });
                 });
-                ui.column(S::col().gap(2.0), |ui| {
+                ui.column(S::column().gap(2.0), |ui| {
                     ui.row(S::row().gap(6.0).center(), |ui| {
                         ui.text_bind_styled(S::default().class("title").no_wrap(), |c, t| {
                             let Some(v) = c.component(&VITALS) else { return };
@@ -357,7 +357,7 @@ fn client(r: &mut Registry) {
                     });
                 });
             });
-            ui.column(S::col().gap(2.0), |ui| {
+            ui.column(S::column().gap(2.0), |ui| {
                 // The header in the rows' columns: "now" over the values, "after" over what the
                 // waiting points make of them, each lined up as its values are (right).
                 ui.row(S::row().gap(4.0), |ui| {
@@ -455,19 +455,19 @@ fn client(r: &mut Registry) {
                     *PENDING.lock().unwrap() = [0; vitals::stats::STATS];
                 });
             });
-            ui.text_styled(S::col().class("dim").max_w(170.0), "levels.base.after_legend", &[]);
-            ui.text_bind_styled(S::col().class("dim").max_w(170.0), |c, t| {
-                let (Some(v), Some(me)) = (c.component(&VITALS), c.me()) else { return };
+            ui.text_styled(S::column().class("dim").max_w(170.0), "levels.base.after_legend", &[]);
+            ui.text_bind_styled(S::column().class("dim").max_w(170.0), |c, t| {
+                let (Some(v), Some(me)) = (c.component(&VITALS), c.player_state()) else { return };
                 t.set("levels.base.now", &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)]);
             });
-            ui.text_bind_styled(S::col().class("dim").max_w(170.0), |c, t| {
+            ui.text_bind_styled(S::column().class("dim").max_w(170.0), |c, t| {
                 let Some(v) = c.component(&VITALS) else { return };
                 let weight = v.stats()[Stat::Weight.index()];
                 t.set("levels.base.load", &[Arg::Float(v.load as f64, 1), Arg::Int(weight.round() as i64)]);
             });
         });
     });
-    r.key(&OPEN, "P").on_press(|c| {
-        c.open_screen(&SCREEN);
+    r.key(&OPEN, "P").on_press_client(|c| {
+        c.screen_open(&SCREEN);
     });
 }

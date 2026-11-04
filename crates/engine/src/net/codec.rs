@@ -346,7 +346,6 @@ mod tests {
                 sprint: true,
                 flying: false,
                 frame: Some((7, DVec3::ONE)),
-                keys: 0b101_0001,
             },
             ToServer::UseItem { target: Some((IVec3::new(1, 2, 3), 4)) },
             ToServer::Click { slot: 7, button: 1, shift: true },

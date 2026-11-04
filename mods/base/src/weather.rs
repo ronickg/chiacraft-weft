@@ -39,17 +39,17 @@ pub fn register(r: &mut Registry) {
                 Some("dust") => air_flags::DUST,
                 _ => 0,
             };
-            *SET.lock().unwrap() = Some((fog.clamp(0.0, 1.0) as f32, wind.max(0.0), heading, flags, w.time() + SET_TICKS));
+            *SET.lock().unwrap() = Some((fog.clamp(0.0, 1.0) as f32, wind.max(0.0), heading, flags, w.game_time() + SET_TICKS));
             send(&w);
             cmd.reply("command.base.air.set", &[Arg::Int((fog.clamp(0.0, 1.0) * 100.0).round() as i64), Arg::Int(wind.round() as i64)]);
             return;
         }
         let Some(st) = w.entity(cmd.player()) else { return };
-        let id = w.biome(st.pos.map(|v| v.floor() as i32));
+        let id = w.biome(block_pos_of(st.pos));
         let Some(c) = CLIMATE.on_biome(id) else { return };
         // Where the player stands: blended over the biomes round, calmer in a forest
         // (`base_api::air_at`).
-        let here = base_api::air_at(&w, st.pos, 1.8, false, 0, |_| {});
+        let here = base_api::air_at(&w, st.pos.into(), 1.8, false, 0, |_| {});
         let share = Arg::Int((air::fog_share(c.fog, now(&w).2) * 100.0).round() as i64);
         cmd.reply(
             "command.base.air.now",
@@ -66,7 +66,7 @@ pub fn register(r: &mut Registry) {
     r.command("rain", "", |cmd| {
         let w = cmd.world();
         let Some(st) = w.entity(cmd.player()) else { return };
-        let id = w.biome(st.pos.map(|v| v.floor() as i32));
+        let id = w.biome(block_pos_of(st.pos));
         let Some(c) = CLIMATE.on_biome(id) else { return };
         let (day, _, season) = now(&w);
         let share = Arg::Int((climate::rain_share(c.rain, season) * 100.0).round() as i64);
@@ -97,7 +97,7 @@ fn biomes() -> &'static [(u32, Climate)] {
 }
 
 fn tick(w: &World) {
-    if w.time() % EVERY != 0 {
+    if w.game_time() % EVERY != 0 {
         return;
     }
     // Without a calendar, the year's rain.
@@ -110,17 +110,17 @@ fn tick(w: &World) {
             thunder |= climate::thunders(c.celsius, c.seasons, season, key, day);
         }
     }
-    w.set_rain(&wet, thunder);
+    w.set_rain(&wet, if thunder { &weathers::THUNDER } else { &weathers::RAIN });
     // `/weather rain` rains everywhere for its time, whatever the biomes' spells: seen as a player
     // rained on where their biome has no spell today. Then every biome's air counts as raining, so
     // the cold ones snow (a taiga winter drew rain under it).
     // Only a region with players tells (the others would say no, every region ticking this).
     let players = w.players();
     if !players.is_empty() {
-        let manual = w.raining()
+        let manual = w.weather() != weathers::CLEAR.id()
             && players.into_iter().any(|p| {
                 w.entity(p).is_some_and(|st| {
-                    let at = st.pos.map(|v| v.floor() as i32);
+                    let at = block_pos_of(st.pos);
                     w.raining_at(at) && !wet.contains(&w.biome(at))
                 })
             });
@@ -147,7 +147,7 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
     let place = air::Place { celsius: c.celsius, humidity: c.humidity, seasons: c.seasons, rain: c.rain, calendar: season.is_some() };
     let snow = place.snow_lying(key, day, hour);
     if let Some((fog, wind, _, flags, until)) = *SET.lock().unwrap() {
-        if w.time() < until {
+        if w.game_time() < until {
             let snow = if flags & air_flags::SNOWING != 0 { snow.max(0.8) } else { snow };
             return BiomeAir { biome: id, fog, wind, snow, flags: flags | aurora };
         }
@@ -196,7 +196,7 @@ fn sky_flags(id: u32) -> u32 {
 /// Tells the engine the air in every biome.
 fn send(w: &World) {
     let heading = match *SET.lock().unwrap() {
-        Some((_, _, h, _, until)) if w.time() < until => h,
+        Some((_, _, h, _, until)) if w.game_time() < until => h,
         _ => now_heading(w),
     };
     let list: Vec<BiomeAir> = biomes().iter().map(|&(id, c)| air_of(w, id, &c)).collect();

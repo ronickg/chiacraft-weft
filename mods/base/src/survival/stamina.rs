@@ -18,7 +18,7 @@ static HANDHELD: Tag = Tag::named("handheld");
 
 pub fn register(r: &mut Registry) {
     // Mining and chopping: a swing's worth for every block, by how hard it is.
-    r.on(&BLOCK_BROKEN, |b| {
+    r.on(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             let hardness = HARDNESS.on_block(e.state).unwrap_or(1.0).max(0.0);
@@ -26,7 +26,7 @@ pub fn register(r: &mut Registry) {
         }
     });
     // A blow that lands: by what it was struck with (a weapon or tool, else the fist).
-    r.on(&ENTITY_HURT, |b| {
+    r.on(&actions::HURT, |b| {
         let w = b.world();
         for e in b.iter().filter(|e| w.players().contains(&e.source)) {
             let held = w
@@ -87,6 +87,6 @@ pub fn tick(
     v.max_stamina = max_stamina;
     let tired = v.stamina < 1.0 || (v.stamina < SPRINT_AGAIN && st.sprinting == 0);
     if tired || !mods.can_sprint || v.out != 0 {
-        w.add_modifier(id, &attribute::CAN_SPRINT, "base:tired", attr_op::ADD, -1.0, 2);
+        w.attribute_add_modifier(id, &attribute::CAN_SPRINT, "base:tired", attr_op::ADD, -1.0, 2);
     }
 }

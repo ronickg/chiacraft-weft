@@ -485,11 +485,11 @@ impl Tag {
     pub fn on_block(&self, state: u32) -> bool {
         self.lookup.has(ek::BLOCK, state, self.name, &tag_schema)
     }
-    /// On a cell in `state`: on its block, or on the liquid that block stands in (kelp is in
-    /// `#water`). Ask this for what a place is, `on_block` for what a block is.
-    #[inline]
-    pub fn in_cell(&self, state: u32) -> bool {
-        self.on_block(state) || crate::content::held_liquid(state).is_some_and(|l| self.on_block(l))
+    /// On any part of the cell at `pos`: its block, or what else is in the cell with it (the
+    /// water around kelp or in a waterlogged slab is `#water`). Ask this for what a place is,
+    /// `on_block` for what a block is.
+    pub fn at(&self, w: &crate::World, pos: impl Into<crate::abi::BlockPos>) -> bool {
+        w.parts(pos).into_iter().any(|s| self.on_block(s))
     }
     #[inline]
     pub fn on_item(&self, item: u32) -> bool {

@@ -187,7 +187,7 @@ pub fn register(r: &mut Registry) {
         apply(p);
     });
     r.screen(&SCREEN, |ui| {
-        crate::window::window_titled(ui, S::col().pad(8.0).gap(3.0), "video.base.title", &[], |ui| {
+        crate::window::window_titled(ui, S::column().pad(8.0).gap(3.0), "video.base.title", &[], |ui| {
             // The presets, and which one the settings are now.
             ui.row(S::row().gap(3.0).center(), |ui| {
                 ui.text_styled(S::default().w(84.0).no_wrap(), "video.base.quality", &[]);
@@ -225,8 +225,8 @@ pub fn register(r: &mut Registry) {
     });
     // On the settings screen, beside the engine's own.
     r.screen_part(&screens::SETTINGS, "buttons", 0, |ui| {
-        ui.button("video.base.open", S::col().min_w(200.0).self_align(abi::ui_align::CENTER), |c| {
-            c.client().open_screen(&SCREEN);
+        ui.button("video.base.open", S::column().min_w(200.0).self_align(abi::ui_align::CENTER), |c| {
+            c.client().screen_open(&SCREEN);
         });
     });
 }

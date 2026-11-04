@@ -407,14 +407,14 @@ pub fn young_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl
 pub fn grow_tree(w: World, p: [i32; 3], log: u32) {
     let Some(t) = tree_at(log, p[0], p[1], p[2], w.random()) else { return };
     for y in t.y + 1..t.y + t.height {
-        if w.get([t.x, y, t.z]) != 0 {
+        if w.block([t.x, y, t.z]) != 0 {
             return;
         }
     }
     tree_blocks(&t, |x, y, z, s, overwrite| {
-        let cur = w.get([x, y, z]);
+        let cur = w.block([x, y, z]);
         if overwrite || cur == 0 || TALL_GRASS.is(cur) {
-            w.set([x, y, z], s);
+            w.set_block([x, y, z], s);
         }
     });
 }

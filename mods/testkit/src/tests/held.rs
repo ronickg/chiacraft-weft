@@ -26,11 +26,11 @@ async fn pool(t: &T, deep: i32) -> Result<[i32; 3], String> {
 /// seen from low down is behind the top of the block in front).
 fn aim_top(t: &T, p: [i32; 3]) {
     let s = t.state();
-    let eye = [s.pos[0], s.pos[1] + t.c().entity(0).map_or(1.62, |e| e.size[2] as f64), s.pos[2]];
+    let eye = [s.pos.x, s.pos.y + t.c().entity(0).map_or(1.62, |e| e.size.eye as f64), s.pos.z];
     let d = [p[0] as f64 + 0.5 - eye[0], p[1] as f64 + 0.99 - eye[1], p[2] as f64 + 0.5 - eye[2]];
     let yaw = (-d[0]).atan2(-d[2]).to_degrees() as f32;
     let pitch = d[1].atan2((d[0] * d[0] + d[2] * d[2]).sqrt()).to_degrees() as f32;
-    t.c().look(yaw, pitch);
+    t.c().set_look(yaw, pitch);
 }
 
 /// Placing into water fills a slab; out of water it stays dry; the weed goes only into water.
@@ -38,7 +38,7 @@ pub async fn held_water_place(t: T) -> R {
     let f = pool(&t, 1).await?;
     t.op("put me 0 testmod:sea_slab 4").await?;
     t.op("put me 1 testmod:waterweed 4").await?;
-    t.c().select(0);
+    t.c().select_slot(0);
     t.secs(0.2).await?;
     // Onto the pool's floor, through the water: from the edge, the one cell within reach whose
     // ray misses the grass edge wherever in its cell the player stands. The slab, then the weed.
@@ -58,7 +58,7 @@ pub async fn held_water_place(t: T) -> R {
     t.secs(0.3).await?;
     t.check_eq(t.block(cell).await?, SOURCE.to_string(), "the slab's water left");
 
-    t.c().select(1);
+    t.c().select_slot(1);
     t.secs(0.3).await?;
     aim_top(&t, floor);
     t.frames(3).await?;
@@ -104,7 +104,7 @@ pub async fn held_water_break(t: T) -> R {
     t.set(slab, WET).await?;
     t.set(weed, WEED).await?;
     t.op("put me 0 bucket 1").await?;
-    t.c().select(0);
+    t.c().select_slot(0);
     t.secs(0.3).await?;
     t.look_at(slab);
     t.frames(3).await?;
@@ -192,21 +192,21 @@ pub async fn held_water_swim(t: T) -> R {
         "above the top weed's water surface",
     );
     let s = t.state().pos;
-    t.c().teleport([s[0], f[1] as f64 - 3.9, f[2] as f64 + 0.5]);
+    t.c().teleport([s.x, f[1] as f64 - 3.9, f[2] as f64 + 0.5]);
     t.secs(2.5).await?;
     t.check(air(&t) < 300.0, format!("air runs out among the weed: {}", air(&t)));
-    t.c().look(0.0, -10.0);
+    t.c().set_look(0.0, -10.0);
     t.hold("core:sprint", 4.0);
     t.hold("core:forward", 4.0);
     t.secs(0.5).await?;
     let mut swum = 0;
     for _ in 0..120 {
         t.frames(1).await?;
-        swum += t.c().view().me().is_some_and(|m| m.pose == abi::pose::SWIM) as u32;
+        swum += t.c().view().player_state().is_some_and(|m| m.pose == abi::pose::SWIM) as u32;
     }
     t.check(swum > 20, format!("swam through the weed for {swum} frames"));
     t.secs(4.0).await?;
-    let moved = (s[2] - t.state().pos[2]).abs();
+    let moved = (s.z - t.state().pos.z).abs();
     t.check(moved > 3.0, format!("got somewhere through it: {moved:.1} blocks"));
     Ok(())
 }
@@ -229,7 +229,7 @@ pub async fn held_water_mesh(t: T) -> R {
     t.fill(add(f, [2, -3, -10]), add(f, [4, -3, -4]), WET)
         .await?;
     t.secs(1.0).await?;
-    t.c().look(0.0, -45.0);
+    t.c().set_look(0.0, -45.0);
     t.frames(30).await?;
     let above = t.shot("held_above").await?;
     let y = f[1] as f64 - 0.12;
@@ -246,10 +246,10 @@ pub async fn held_water_mesh(t: T) -> R {
     // put a sheet of water's color over the weed, as dark as it is at the far wall.
     t.cmd(&format!("/tp {} {} {}", f[0] as f64 - 3.5, f[1] as f64 - 2.5, f[2] as f64 - 7.0))
         .await?;
-    t.c().look(270.0, 0.0);
+    t.c().set_look(270.0, 0.0);
     t.frames(30).await?;
     t.shot("held_below").await?;
-    t.c().look(0.0, -89.0);
+    t.c().set_look(0.0, -89.0);
     t.cmd(&format!("/tp {} {} {}", f[0] as f64 + 0.5, f[1] as f64 + 2.0, f[2] as f64 - 7.0))
         .await?;
     t.frames(20).await?;

@@ -14,7 +14,7 @@
 //! Here: the vitals component, the difficulty rule, dying, and the tick that runs the parts in
 //! order.
 
-mod body;
+pub mod body;
 mod breath;
 mod camp;
 mod food;
@@ -57,7 +57,7 @@ pub fn register(r: &mut Registry) {
             Verdict::Abstain
         }
     });
-    r.entity_component(&VITALS, Vitals::new(MAX_AIR), component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP);
+    r.entity_component(&VITALS, Vitals::new(MAX_AIR), component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP_ON_RESPAWN);
     r.attach(&PLAYER, &VITALS);
     r.world_tick(tick);
     food::register(r);
@@ -66,7 +66,7 @@ pub fn register(r: &mut Registry) {
     body::register(r);
     // Dying empties the stomach but for a light meal (the one a new player arrives with: Research
     // round 4, H1, so the first death isn't a spiral), and costs part of the XP into the level.
-    r.on(&ENTITY_DIED, |b| {
+    r.on(&actions::DIE, |b| {
         let w = b.world();
         for d in b.iter() {
             let Some(v) = w.component_mut(d.entity, &VITALS) else { continue };
@@ -109,7 +109,7 @@ fn tick(w: &World) {
         }
     }
     let d = base_api::difficulty();
-    let pulse = w.time() % 20 == 0;
+    let pulse = w.game_time() % 20 == 0;
     // The first day runs slow until its dusk (`vitals::calendar::day_rate`); a world opened again
     // starts at the engine's 1, so it is said every second.
     if pulse && base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0) == base_api::calendars::FOUR {

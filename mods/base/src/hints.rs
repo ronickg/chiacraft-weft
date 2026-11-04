@@ -65,7 +65,7 @@ const DUSK_BEFORE: f32 = 2.0;
 
 pub fn register(r: &mut Registry) {
     r.config(&SHOW).bool(true);
-    r.entity_component(&SEEN, 0, component_flags::SAVE | component_flags::KEEP);
+    r.entity_component(&SEEN, 0, component_flags::SAVE | component_flags::KEEP_ON_RESPAWN);
     r.attach(&PLAYER, &SEEN);
     r.entity_component(&WAS_FREEZING, 0, 0);
     r.attach(&PLAYER, &WAS_FREEZING);
@@ -74,7 +74,7 @@ pub fn register(r: &mut Registry) {
     r.world_tick(watch);
     // A campfire built: the night hint has done its work (Ronald, 11-04: "Campfire keeps you
     // safe"; its light keeps monsters from spawning near it).
-    r.on(&BLOCK_PLACED, |b| {
+    r.on(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for c in b.iter() {
             if CAMPFIRE_TAG.on_block(c.state) {
@@ -123,7 +123,7 @@ fn watch(w: &World) {
             continue;
         }
         let inv = w.inventory(id);
-        let items: Vec<u32> = (0..inv.size())
+        let items: Vec<u32> = (0..inv.len())
             .map(|i| inv.get(i))
             .filter(|s| !s.is_empty())
             .map(|s| s.item)

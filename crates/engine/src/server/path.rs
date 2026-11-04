@@ -196,7 +196,7 @@ pub fn steer(nav: &mut Nav, pos: DVec3, blocked: bool) -> Option<([f32; 2], bool
 
 #[cfg(test)]
 mod tests {
-    use weft_abi::{self as abi, Layer, ModId, Model, block_flags as bf};
+    use weft_abi::{self as abi, BlockModel, ModId, RenderLayer, block_flags as bf};
 
     use super::*;
     use crate::content::{AIR, ModMeta, RawBlock, RawRegistrar, RawSignal, RawState};
@@ -210,13 +210,15 @@ mod tests {
             flags: bf::SOLID | bf::OPAQUE,
             filter: [0; 3],
             opacity: 15,
-            layer: Layer::Opaque,
-            model: Model::Cube,
+            layer: RenderLayer::Opaque,
+            model: BlockModel::Cube,
             textures: std::array::from_fn(|_| "t:block/x".to_string()),
+            turns: [0; 6],
             boxes: Vec::new(),
-            collision: Vec::new(),
-            selection: Vec::new(),
-            signal: RawSignal { kind: abi::SignalDesc::DEFAULT.kind, attach: 6, front: 6, delay: 0, mode: 0, head: String::new() },
+            hitbox: Vec::new(),
+            outline: Vec::new(),
+            liquid_walls: 0,
+            signal: RawSignal { kind: abi::SignalDesc::DEFAULT.kind, attach: 6, front: 6, delay: 0, flags: 0, inputs: 0, head: String::new() },
             components: Vec::new(),
         };
         r.blocks.push(RawBlock {
@@ -231,6 +233,10 @@ mod tests {
             retexture: Vec::new(),
             opens: String::new(),
             extra_cells: Vec::new(),
+            derive: None,
+            shares_cell: Vec::new(),
+            model_file: String::new(),
+            model_textures: Vec::new(),
         });
         let c = crate::content::freeze(mods, vec![r]).unwrap_or_else(|e| panic!("{e:?}"));
         let c: &'static Content = Box::leak(Box::new(c));

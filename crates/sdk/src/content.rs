@@ -3847,18 +3847,8 @@ impl Registry {
     }
 }
 
-/// The source state of the liquid a block in `state` stands in (`Block::holds_liquid`), `None`
-/// for one that stands in none (a liquid block too).
-pub fn held_liquid(state: u32) -> Option<u32> {
-    c::HOLDS_LIQUID.on_block(state).map(|b| b.0)
-}
 
-/// The liquid's block state in a cell: the liquid a block there stands in, else `state` itself.
-pub fn liquid_block(state: u32) -> u32 {
-    held_liquid(state).unwrap_or(state)
-}
-
-/// Liquid id of a block state, or of the liquid it stands in (`None` for other blocks).
+/// Liquid id of a liquid block state (`None` for other blocks; a cell's other parts: `World::liquid_in_cell`).
 pub fn liquid_of(state: u32) -> Option<u32> {
     let l = unsafe { (host().liquid_of)(state) };
     (l != u32::MAX).then_some(l)

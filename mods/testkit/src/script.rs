@@ -319,7 +319,7 @@ impl Cond {
     /// Whether it holds now, and what was there instead.
     async fn check(&self, t: &T) -> Result<(bool, String), String> {
         let s = t.state();
-        let feet = [s.pos[0].floor(), s.pos[1].floor(), s.pos[2].floor()];
+        let feet = [s.pos.x.floor(), s.pos.y.floor(), s.pos.z.floor()];
         Ok(match self {
             Cond::Block(p, want) => {
                 let at = [p[0].at(feet[0]) as i32, p[1].at(feet[1]) as i32, p[2].at(feet[2]) as i32];
@@ -327,9 +327,9 @@ impl Cond {
                 (block_matches(&got, want), format!("{got} at {} {} {}", at[0], at[1], at[2]))
             }
             Cond::Near(p, r) => {
-                let at = [p[0].at(s.pos[0]), p[1].at(s.pos[1]), p[2].at(s.pos[2])];
-                let d = ((s.pos[0] - at[0]).powi(2) + (s.pos[1] - at[1]).powi(2) + (s.pos[2] - at[2]).powi(2)).sqrt();
-                (d <= *r, format!("at {:.2} {:.2} {:.2}, {d:.2} away", s.pos[0], s.pos[1], s.pos[2]))
+                let at = [p[0].at(s.pos.x), p[1].at(s.pos.y), p[2].at(s.pos.z)];
+                let d = ((s.pos.x - at[0]).powi(2) + (s.pos.y - at[1]).powi(2) + (s.pos.z - at[2]).powi(2)).sqrt();
+                (d <= *r, format!("at {:.2} {:.2} {:.2}, {d:.2} away", s.pos.x, s.pos.y, s.pos.z))
             }
             Cond::Flag(_, f, want) => (t.flag(*f) == *want, format!("flags {:#x}", s.flags)),
             Cond::Mode(m) => (s.mode == *m, format!("mode {}", s.mode)),
@@ -505,7 +505,7 @@ async fn run_lines(t: T, src: String) -> R {
                 let _ = std::fs::write(rest, t.c().ticket());
             }
             "open" => {
-                t.c().open_world(rest, 1);
+                t.c().world_open(rest, 1);
                 // The old world's client is gone by the next frames; then wait for the new one.
                 t.frames(3).await?;
                 t.until("the world open", Duration::from_secs(60), |t| t.flag(cf::JOINED))
@@ -522,7 +522,7 @@ async fn run_lines(t: T, src: String) -> R {
                 }
                 for _ in 0..9 {
                     t.frames(15).await?;
-                    if t.c().screen() != screen || !t.c().click_ui(query, 0) {
+                    if t.c().screen() != screen || !t.c().ui_click(query, 0) {
                         break;
                     }
                 }
@@ -543,7 +543,7 @@ async fn run_lines(t: T, src: String) -> R {
             }
             "screen" => {
                 let screen = weft_sdk::Screen::generated(rest.to_string());
-                if !t.c().open_screen(screen) {
+                if !t.c().screen_open(screen) {
                     t.fail(format!("no screen {rest}"));
                 }
                 t.screen(rest).await?;
@@ -561,7 +561,7 @@ async fn run_lines(t: T, src: String) -> R {
                     .await?;
             }
             "leave" => {
-                t.c().leave_world();
+                t.c().world_leave();
                 t.screen("core:title").await?;
             }
             "join" => {
@@ -653,7 +653,7 @@ async fn run_lines(t: T, src: String) -> R {
 async fn entities(t: &T, r: f32) -> R {
     let me = t.state().pos;
     let near = t
-        .op(&format!("near {:.0} {:.0} {:.0} {r}", me[0].floor(), me[1].floor(), me[2].floor()))
+        .op(&format!("near {:.0} {:.0} {:.0} {r}", me.x.floor(), me.y.floor(), me.z.floor()))
         .await?;
     let mut ids: Vec<u64> = near
         .split_whitespace()
@@ -661,7 +661,7 @@ async fn entities(t: &T, r: f32) -> R {
         .collect();
     let c = t.c();
     let mine = c.entities();
-    let close = |p: [f64; 3]| (0..3).map(|i| (p[i] - me[i]).powi(2)).sum::<f64>() <= (r as f64).powi(2);
+    let close = |p: weft_sdk::Vec3| (p - me).length_squared() <= (r as f64).powi(2);
     let only_mine: Vec<u64> = mine
         .iter()
         .copied()
@@ -670,9 +670,9 @@ async fn entities(t: &T, r: f32) -> R {
     ids.extend(only_mine);
     weft_sdk::info!(
         "entities: me at {:.2} {:.2} {:.2}, server {} within {r}, client knows {} in all",
-        me[0],
-        me[1],
-        me[2],
+        me.x,
+        me.y,
+        me.z,
         near.split_whitespace().count(),
         mine.len()
     );
@@ -702,13 +702,13 @@ async fn entities(t: &T, r: f32) -> R {
         };
         let client = match c.entity(id) {
             Some(e) => {
-                let feet = [e.pos[0].floor() as i32, e.pos[1].floor() as i32, e.pos[2].floor() as i32];
+                let feet = [e.pos.x.floor() as i32, e.pos.y.floor() as i32, e.pos.z.floor() as i32];
                 let below = [feet[0], feet[1] - 1, feet[2]];
                 format!(
                     "at {:.2} {:.2} {:.2}, health {}, size {:?}, block under {:?}, light {:?}, cube shown {}",
-                    e.pos[0],
-                    e.pos[1],
-                    e.pos[2],
+                    e.pos.x,
+                    e.pos.y,
+                    e.pos.z,
                     e.health,
                     e.size,
                     c.block(below).map(weft_sdk::block_name),

@@ -556,12 +556,11 @@ const OPS: &[(&str, &str, Run)] = &[
         let r = cmd.float("r").ok_or("missing r")?;
         let yaw = (cmd.float("yaw").ok_or("missing yaw")? as f32).to_radians();
         let mut n = 0;
-        for id in w.near([me[0] as f64 + 0.5, me[1] as f64, me[2] as f64 + 0.5], r, None) {
+        for id in w.entities_near([me[0] as f64 + 0.5, me[1] as f64, me[2] as f64 + 0.5], r, None) {
             if id != player
-                && let Some(mut st) = w.entity(id)
+                && w.entity(id).is_some()
             {
-                st.yaw = yaw;
-                w.set_entity(id, &st);
+                w.entity_edit(id).yaw(yaw);
                 n += 1;
             }
         }

@@ -89,7 +89,7 @@ pub fn register(r: &mut Registry) {
         r.shapeless(&crate::recipes::CRAFTING, kind, 1, &inputs, 0);
     }
 
-    r.on(&BLOCK_BROKEN, |b| {
+    r.on(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
             if e.player == 0 || w.creative(e.player) {
@@ -97,7 +97,7 @@ pub fn register(r: &mut Registry) {
             }
             let full = block_name(e.state);
             let name = full.split('[').next().unwrap_or(full);
-            let at = [e.pos[0] as f64 + 0.5, e.pos[1] as f64 + 0.2, e.pos[2] as f64 + 0.5];
+            let at = e.pos.center().offset(0.0, -0.3, 0.0);
             // A bare hand in leaves (not a player's own, placed ones): a stick now and then.
             if e.item == 0 && LEAVES.on_block(e.state) && !full.contains("placed=true") && unit(&w) < f::leaf_stick_extra() {
                 w.spawn_item(at, ItemStack::new(crate::items::STICK.id(), 1));
@@ -134,7 +134,7 @@ fn loose(r: &mut Registry, b: &'static Block, props: &[(&str, u32)], group: &str
         .not_solid()
         .replaceable()
         .hardness(0.0)
-        .needs(2, "")
+        .needs(Dir::Down, "")
         .no_item()
         .tab(&crate::tabs::NATURAL);
     for &(min, max) in boxes {
@@ -151,27 +151,27 @@ fn unit(w: &World) -> f32 {
 /// A rock or a nodule used on a loose rock or nodule on the ground: one strike (`vitals::first`).
 /// Used on the top of anything else, it's put down there.
 fn strike(u: &mut ItemUse) -> bool {
-    let Some((aimed, face)) = u.target() else { return false };
+    let Some((aimed, face)) = u.target_block() else { return false };
     let w = u.world();
     // The stone itself, or the top of what it lies on: a small thing on the ground is easy to aim
     // past (PC run fh4_axe: the ray passed over the nodule to the ground under it).
-    let above = [aimed[0], aimed[1] + 1, aimed[2]];
-    let loose = |q: [i32; 3]| LOOSE_FLINT.is(w.get(q)) || LOOSE_ROCK.is(w.get(q));
+    let above = aimed.above();
+    let loose = |q: BlockPos| LOOSE_FLINT.is(w.block(q)) || LOOSE_ROCK.is(w.block(q));
     let p = if loose(aimed) {
         aimed
-    } else if face == 3 && loose(above) {
+    } else if face == Dir::Up.face() && loose(above) {
         above
     } else {
         return put_down(u, aimed, face);
     };
-    let state = w.get(p);
+    let state = w.block(p);
     let flint = LOOSE_FLINT.is(state);
     let player = u.player();
-    let at = [p[0] as f64 + 0.5, p[1] as f64 + 0.2, p[2] as f64 + 0.5];
-    // Sneaking: the key held, or crouched (the server has both).
-    let sneaking = w.keys(player) & abi::held_keys::SNEAK != 0
-        || w.entity(player)
-            .is_some_and(|e| e.pose == abi::pose::CROUCH);
+    let at = p.center().offset(0.0, -0.3, 0.0);
+    // Sneaking: crouched (the held keys aren't on the server any more).
+    let sneaking = w
+        .entity(player)
+        .is_some_and(|e| e.pose == abi::pose::CROUCH);
     weft_sdk::info!("first: strike at {p:?}, flint {flint}, sneaking {sneaking}");
     if sneaking && flint {
         crate::knapping::open(&w, player, p);
@@ -190,36 +190,31 @@ fn strike(u: &mut ItemUse) -> bool {
         }
     }
     w.play_sound(&STRIKE, at, 1.0);
-    let int = |name: &str| {
-        w.prop(p, name)
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(0)
-    };
     let chance = if flint { f::FLAKE_FROM_FLINT } else { f::FLAKE_FROM_ROCK };
     if unit(&w) < chance {
         w.spawn_item(at, ItemStack::new(SHARP_FLAKE.id(), 1));
         w.play_sound(&CRACK, at, 0.8);
-        let struck = int("struck") + 1;
+        let struck = w.prop_int(p, "struck").unwrap_or(0) + 1;
         if struck >= f::FLAKES_PER_STONE {
-            w.set(p, 0);
+            w.set_block(p, 0);
         } else {
-            w.set_prop(p, "struck", &struck.to_string());
+            w.prop_set(p, "struck", &struck.to_string());
         }
     }
     true
 }
 
-/// A rock or a nodule put down on the top face of the block at `p` (face 3, +Y), where there's
+/// A rock or a nodule put down on the top face of the block at `p` (`Dir::Up`), where there's
 /// room: its loose block, one fewer in hand.
-fn put_down(u: &mut ItemUse, p: [i32; 3], face: u32) -> bool {
+fn put_down(u: &mut ItemUse, p: BlockPos, face: u32) -> bool {
     let w = u.world();
-    let at = [p[0], p[1] + 1, p[2]];
-    if face != 3 || w.get(at) != 0 || state_flags(w.get(p)) & abi::block_flags::SOLID == 0 {
+    let at = p.above();
+    if face != Dir::Up.face() || w.block(at) != 0 || w.block_flags(p) & abi::block_flags::SOLID == 0 {
         return false;
     }
     let s = u.stack();
     let block = if s.item == FLINT.id() { LOOSE_FLINT.id() } else { LOOSE_ROCK.id() };
-    w.set(at, block);
+    w.set_block(at, block);
     if !w.creative(u.player()) {
         u.set_stack(StackData::shrink(s, 1));
     }
@@ -236,7 +231,7 @@ fn hand_part(shape: &str, material: &str, day: u32) -> ItemStack {
 fn knows(w: &World, player: u64, item: u32) -> bool {
     w.creative(player)
         || w.component(player, &crate::discovery::KNOWN)
-            .is_some_and(|k| crate::discovery::held(k, item_name(item)))
+            .is_some_and(|k| crate::discovery::held(&k, item_name(item)))
 }
 
 /// The knapped head a recipe's output is, if it is one.
@@ -266,7 +261,7 @@ pub fn locked_for(w: &World, player: u64, r: &Recipe) -> bool {
 /// preview none), or nothing before one has been made by hand; a tool hafted by hand gets its
 /// parts and the numbers they make. Anything else as it is.
 pub fn finish(w: &World, player: u64, cells: &[ItemStack], made: ItemStack, roll: Option<f32>) -> ItemStack {
-    if made.is_empty() || PART.stack_only(&made).is_some() || PARTS.stack_only(&made).is_some() {
+    if made.is_empty() || PART.on_stack_own(&made).is_some() || PARTS.on_stack_own(&made).is_some() {
         return made;
     }
     if let Some(k) = knapped_of(made.item) {
@@ -287,7 +282,7 @@ pub fn finish(w: &World, player: u64, cells: &[ItemStack], made: ItemStack, roll
                 return made;
             };
             // A head with no part of its own (another mod's?) makes nothing.
-            let Some(of) = PART.stack_only(head) else { return ItemStack::EMPTY };
+            let Some(of) = PART.on_stack_own(head) else { return ItemStack::EMPTY };
             ItemStack::new(head.item, 1).with(&PART, of)
         }
         // A knife: a flake on a short grip.

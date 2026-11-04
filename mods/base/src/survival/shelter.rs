@@ -42,7 +42,7 @@ pub fn room(w: &World, feet: [i32; 3]) -> Option<Room> {
     let mut seen: HashSet<[i32; 3]> = HashSet::new();
     let mut todo: VecDeque<[i32; 3]> = VecDeque::new();
     for start in [feet, [feet[0], feet[1] + 1, feet[2]]] {
-        if open(w.get(start)) && seen.insert(start) {
+        if open(w.block(start)) && seen.insert(start) {
             todo.push_back(start);
         }
     }
@@ -54,7 +54,7 @@ pub fn room(w: &World, feet: [i32; 3]) -> Option<Room> {
         }
         for d in SIDES {
             let q = [p[0] + d[0], p[1] + d[1], p[2] + d[2]];
-            let state = w.get(q);
+            let state = w.block(q);
             if open(state) {
                 if seen.insert(q) {
                     todo.push_back(q);

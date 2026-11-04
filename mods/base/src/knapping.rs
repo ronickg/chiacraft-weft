@@ -53,7 +53,7 @@ pub fn register(r: &mut Registry) {
     r.packet(&HIT, |p, v| hit(&p.world(), p.player(), v));
     r.client_packet(&OPEN, |c, v| {
         *VIEW.lock().unwrap() = Some(v);
-        let opened = c.open_screen(&SCREEN);
+        let opened = c.screen_open(&SCREEN);
         weft_sdk::info!("knapping: screen opened {opened}");
     });
     r.client_packet(&UPDATE, |c, v| {
@@ -71,7 +71,7 @@ pub fn register(r: &mut Registry) {
             *CLOSE_AT.lock().unwrap() = Some(std::time::Instant::now() + END_SHOWN);
         } else {
             *VIEW.lock().unwrap() = None;
-            c.close_screen();
+            c.screen_close();
         }
     });
     r.client_frame(|c| {
@@ -79,7 +79,7 @@ pub fn register(r: &mut Registry) {
         if at.is_some_and(|t| std::time::Instant::now() >= t) {
             *at = None;
             *VIEW.lock().unwrap() = None;
-            c.close_screen();
+            c.screen_close();
         }
     });
     // A nodule at the feet and its screen, without striking (for checks and looks; UI redo).
@@ -98,11 +98,11 @@ pub fn register(r: &mut Registry) {
             .unwrap_or(0) as u32;
         // Air or a plant at the feet (tall grass is common) makes room; anything else doesn't
         // (UI's run t2_knprobe2: grass at the feet left no nodule, and the screen closed).
-        let here = w.get(feet);
+        let here = w.block(feet);
         if here == 0 || state_flags(here) & abi::block_flags::REPLACEABLE != 0 {
-            w.set(feet, LOOSE_FLINT.id());
+            w.set_block(feet, LOOSE_FLINT.id());
         }
-        if !LOOSE_FLINT.is(w.get(feet)) {
+        if !LOOSE_FLINT.is(w.block(feet)) {
             cmd.reply("command.base.knap.no_room", &[]);
             return;
         }
@@ -123,11 +123,11 @@ pub fn register(r: &mut Registry) {
 }
 
 /// `player` starts (or goes on with) knapping the nodule at `pos`.
-pub fn open(w: &World, player: u64, pos: [i32; 3]) {
+pub fn open(w: &World, player: u64, pos: BlockPos) {
     let mut nodules = NODULES.lock().unwrap();
     let knap = match nodules.iter().find(|(p, _)| *p == player) {
-        Some(&(_, k)) if [k.x, k.y, k.z] == pos => k,
-        _ => Knap { shape: 0, removed: 0, x: pos[0], y: pos[1], z: pos[2], broken: 0, done: 0 },
+        Some(&(_, k)) if BlockPos::new(k.x, k.y, k.z) == pos => k,
+        _ => Knap { shape: 0, removed: 0, x: pos.x, y: pos.y, z: pos.z, broken: 0, done: 0 },
     };
     nodules.retain(|(p, _)| *p != player);
     nodules.push((player, knap));
@@ -140,14 +140,13 @@ fn hit(w: &World, player: u64, v: u32) {
     let mut nodules = NODULES.lock().unwrap();
     let Some(i) = nodules.iter().position(|(p, _)| *p == player) else { return };
     let mut k = nodules[i].1;
-    let pos = [k.x, k.y, k.z];
-    let at = [pos[0] as f64 + 0.5, pos[1] as f64 + 0.2, pos[2] as f64 + 0.5];
-    let near = w.entity(player).is_some_and(|e| {
-        let d = [e.pos[0] - at[0], e.pos[1] - at[1], e.pos[2] - at[2]];
-        d.iter().map(|x| x * x).sum::<f64>() <= REACH * REACH
-    });
+    let pos = BlockPos::new(k.x, k.y, k.z);
+    let at = pos.center().offset(0.0, -0.3, 0.0);
+    let near = w
+        .entity(player)
+        .is_some_and(|e| (e.pos - at).length_squared() <= REACH * REACH);
     // The nodule gone (picked up, broken) or left behind: the screen closes.
-    if !near || !LOOSE_FLINT.is(w.get(pos)) {
+    if !near || !LOOSE_FLINT.is(w.block(pos)) {
         nodules.remove(i);
         w.send(player, &CLOSE, &0);
         return;
@@ -168,7 +167,7 @@ fn hit(w: &World, player: u64, v: u32) {
     let head = &KNAPPED[k.shape as usize % KNAPPED.len()];
     if head.keeps(square) {
         // Struck inside the outline: the nodule breaks, a flake is all that's left.
-        w.set(pos, 0);
+        w.set_block(pos, 0);
         w.spawn_item(at, ItemStack::new(SHARP_FLAKE.id(), 1));
         w.play_sound(&CRACK, at, 1.0);
         nodules.remove(i);
@@ -180,7 +179,7 @@ fn hit(w: &World, player: u64, v: u32) {
     k.removed |= 1 << square;
     w.play_sound(&STRIKE, at, 1.0);
     if k.removed & head.away() == head.away() {
-        w.set(pos, 0);
+        w.set_block(pos, 0);
         let left = w
             .inventory(player)
             .insert(knapped_head(w, player, head.shape, true, Some(unit(w))));
@@ -231,7 +230,7 @@ fn screen(ui: &mut Ui) {
     let Some(k) = view() else { return };
     let head = &KNAPPED[k.shape as usize % KNAPPED.len()];
     let ended = k.broken != 0 || k.done != 0;
-    crate::window::window_titled(ui, S::col().pad(7.0).gap(5.0), "knapping.base.title", &[], |ui| {
+    crate::window::window_titled(ui, S::column().pad(7.0).gap(5.0), "knapping.base.title", &[], |ui| {
         ui.row(S::row().gap(1.0).self_align(abi::ui_align::CENTER), |ui| {
             for (i, h) in KNAPPED.iter().enumerate() {
                 let picked = i as u32 == k.shape;
@@ -247,36 +246,43 @@ fn screen(ui: &mut Ui) {
                 });
             }
         });
-        ui.panel("well", S::col().pad(4.0).gap(1.0).self_align(abi::ui_align::CENTER), |ui| {
-            for row in 0..f::KNAP_SIZE {
-                ui.row(S::row().gap(1.0), |ui| {
-                    for col in 0..f::KNAP_SIZE {
-                        let i = row * f::KNAP_SIZE + col;
-                        let keeps = head.keeps(i);
-                        let square = S::default().size(18.0, 18.0);
-                        if k.broken == i as u32 + 1 {
-                            ui.panel("knap_cracked", square, |_| {});
-                        } else if k.removed & (1 << i) != 0 || (k.done != 0 && !keeps) {
-                            ui.panel("knap_gone", square, |_| {});
-                        } else if ended {
-                            // Shown, no longer struck: the freed head lit, or a broken nodule as it lay.
-                            let class = match (k.done != 0, keeps) {
-                                (true, _) => "knap_free",
-                                (false, true) => "knap_head",
-                                (false, false) => "knap_stone",
-                            };
-                            ui.panel(class, square, |_| {});
-                        } else if keeps {
-                            let s = square.class("knap_head").tooltip("knapping.base.keep_tip");
-                            ui.button_with(s, move |c| c.client().send(&HIT, &(i as u32)), |_| {});
-                        } else {
-                            let s = square.class("knap_stone");
-                            ui.button_with(s, move |c| c.client().send(&HIT, &(i as u32)), |_| {});
+        ui.panel(
+            "well",
+            S::column()
+                .pad(4.0)
+                .gap(1.0)
+                .self_align(abi::ui_align::CENTER),
+            |ui| {
+                for row in 0..f::KNAP_SIZE {
+                    ui.row(S::row().gap(1.0), |ui| {
+                        for col in 0..f::KNAP_SIZE {
+                            let i = row * f::KNAP_SIZE + col;
+                            let keeps = head.keeps(i);
+                            let square = S::default().size(18.0, 18.0);
+                            if k.broken == i as u32 + 1 {
+                                ui.panel("knap_cracked", square, |_| {});
+                            } else if k.removed & (1 << i) != 0 || (k.done != 0 && !keeps) {
+                                ui.panel("knap_gone", square, |_| {});
+                            } else if ended {
+                                // Shown, no longer struck: the freed head lit, or a broken nodule as it lay.
+                                let class = match (k.done != 0, keeps) {
+                                    (true, _) => "knap_free",
+                                    (false, true) => "knap_head",
+                                    (false, false) => "knap_stone",
+                                };
+                                ui.panel(class, square, |_| {});
+                            } else if keeps {
+                                let s = square.class("knap_head").tooltip("knapping.base.keep_tip");
+                                ui.button_with(s, move |c| c.client().send(&HIT, &(i as u32)), |_| {});
+                            } else {
+                                let s = square.class("knap_stone");
+                                ui.button_with(s, move |c| c.client().send(&HIT, &(i as u32)), |_| {});
+                            }
                         }
-                    }
-                });
-            }
-        });
+                    });
+                }
+            },
+        );
         let how = if k.done != 0 {
             "knapping.base.freed"
         } else if k.broken != 0 {
@@ -285,7 +291,7 @@ fn screen(ui: &mut Ui) {
             "knapping.base.how"
         };
         ui.text_styled(
-            S::col()
+            S::column()
                 .class("dim")
                 .max_w(150.0)
                 .self_align(abi::ui_align::CENTER),

@@ -41,10 +41,10 @@ static SLOTS: Mutex<Vec<(String, u32)>> = Mutex::new(Vec::new());
 
 pub fn logger(level: sandbox::Level, package: &str, line: &str) {
     let level = match level {
-        sandbox::Level::Error => abi::level::ERROR,
-        sandbox::Level::Warn => abi::level::WARN,
-        sandbox::Level::Info => abi::level::INFO,
-        sandbox::Level::Debug => abi::level::DEBUG,
+        sandbox::Level::Error => abi::log_level::ERROR,
+        sandbox::Level::Warn => abi::log_level::WARN,
+        sandbox::Level::Info => abi::log_level::INFO,
+        sandbox::Level::Debug => abi::log_level::DEBUG,
     };
     let slot = SLOTS
         .lock()
@@ -152,7 +152,7 @@ pub fn client_component(c: Client, name: &str) -> Option<Vec<u8>> {
 }
 
 fn attach_component(r: &mut Registry, kind: &str, c: Comp) {
-    let kind = Entity::generated(kind.to_string());
+    let kind = EntityKind::generated(kind.to_string());
     match c {
         Comp::B8(c) => r.attach(kind, c),
         Comp::B16(c) => r.attach(kind, c),
@@ -201,7 +201,7 @@ fn flag_bits(f: sandbox::ComponentFlags) -> u32 {
         (F::SAVE, component_flags::SAVE),
         (F::SYNC_OWNER, component_flags::SYNC_OWNER),
         (F::SYNC_WATCHERS, component_flags::SYNC_WATCHERS),
-        (F::KEEP, component_flags::KEEP),
+        (F::KEEP, component_flags::KEEP_ON_RESPAWN),
     ]
     .into_iter()
     .filter(|(b, _)| (f & *b) == *b)
@@ -418,7 +418,7 @@ pub fn on_block<'a>(mut b: BlockBuilder<'a>, runs: &Arc<Runs>, id: &str) -> Bloc
         match h {
             Hook::BlockUse(name) if name == id => {
                 b = b.on_use(move |u| {
-                    let (w, ev) = (u.world(), BlockUseEvent { player: u.player(), pos: t3(u.pos()), state: u.state(), face: u.face() });
+                    let (w, ev) = (u.world(), BlockUseEvent { player: u.player(), pos: t3(u.pos()), state: u.state(), face: u.face().face() });
                     rs.with(|inst| inst.block_use(|| Box::new(WorldGame::of(w, &rs)), cb, ev))
                         .unwrap_or(false)
                 });
@@ -441,7 +441,7 @@ pub fn on_block<'a>(mut b: BlockBuilder<'a>, runs: &Arc<Runs>, id: &str) -> Bloc
 
 fn block_update(runs: &Arc<Runs>, cb: u32, e: &mut BlockEvent) {
     let w = e.world();
-    let ev = BlockUpdateEvent { pos: t3(e.pos()), state: e.state(), other: t3(e.other()), entity: e.entity() };
+    let ev = BlockUpdateEvent { pos: t3(e.pos()), state: e.state(), other: t3(e.neighbor()), entity: e.entity() };
     runs.with(|inst| inst.block_update(|| Box::new(WorldGame::of(w, runs)), cb, ev));
 }
 
@@ -461,7 +461,7 @@ pub fn on_item<'a>(mut i: ItemBuilder<'a>, runs: &Arc<Runs>, id: &str) -> ItemBu
                 player,
                 stack: stack(held),
                 slot: w.selected_slot(player),
-                target: u.target().map(|(p, face)| (t3(p), face)),
+                target: u.target_block().map(|(p, face)| (t3(p), face)),
             };
             let Some(result) = rs.with(|inst| inst.item_use(|| Box::new(WorldGame::of(w, &rs)), cb, ev)) else { return false };
             // What the hand holds: only a real item, or nothing; what the stack carries stays.
@@ -508,7 +508,7 @@ pub fn register(r: &mut Registry, runs: &Arc<Runs>) -> Result<(), String> {
                 let Some((_, channel, _)) = runs.channels.iter().find(|(n, ..)| *n == name) else { continue };
                 r.packet(*channel, move |p, data| {
                     let (w, player) = (p.world(), p.player());
-                    if data.len() > sandbox::PACKET_BYTES || !runs.packet_allowed(&name, w.time()) {
+                    if data.len() > sandbox::PACKET_BYTES || !runs.packet_allowed(&name, w.game_time()) {
                         return;
                     }
                     runs.with(|inst| inst.packet(|| Box::new(WorldGame::of(w, &runs)), cb, player, &data));
@@ -527,15 +527,15 @@ pub fn register(r: &mut Registry, runs: &Arc<Runs>) -> Result<(), String> {
             Hook::Event(e) => event(r, e, cb, runs),
             Hook::Question(q) => {
                 let question = match q {
-                    sandbox::Question::BreakBlock => &question::BREAK_BLOCK,
-                    sandbox::Question::PlaceBlock => &question::PLACE_BLOCK,
-                    sandbox::Question::UseBlock => &question::USE_BLOCK,
-                    sandbox::Question::UseItem => &question::USE_ITEM,
-                    sandbox::Question::InteractEntity => &question::INTERACT_ENTITY,
+                    sandbox::Question::BreakBlock => actions::BREAK_BLOCK.as_ref(),
+                    sandbox::Question::PlaceBlock => actions::PLACE_BLOCK.as_ref(),
+                    sandbox::Question::UseBlock => actions::USE_BLOCK.as_ref(),
+                    sandbox::Question::UseItem => actions::USE_ITEM.as_ref(),
+                    sandbox::Question::InteractEntity => actions::INTERACT_ENTITY.as_ref(),
                     sandbox::Question::Attack => &question::ATTACK,
-                    sandbox::Question::Hurt => &question::HURT,
-                    sandbox::Question::PickupItem => &question::PICKUP_ITEM,
-                    sandbox::Question::EnterDimension => &question::ENTER_DIMENSION,
+                    sandbox::Question::Hurt => actions::HURT.as_ref(),
+                    sandbox::Question::PickupItem => actions::PICKUP_ITEM.as_ref(),
+                    sandbox::Question::EnterDimension => actions::ENTER_DIMENSION.as_ref(),
                     sandbox::Question::NaturalSpawn => &question::NATURAL_SPAWN,
                 };
                 r.intercept(question, move |a| {
@@ -580,16 +580,16 @@ fn event(r: &mut Registry, e: sandbox::Event, cb: u32, runs: Arc<Runs>) {
     }
     let block = |c: &abi::BlockChange| EventValue::BlockChange(B { player: c.player, pos: t3(c.pos), state: c.state, item: c.item });
     match e {
-        sandbox::Event::BlockBroken => r.on(&BLOCK_BROKEN, move |b| run(&runs, b.world(), cb, b.iter().map(block).collect())),
-        sandbox::Event::BlockPlaced => r.on(&BLOCK_PLACED, move |b| run(&runs, b.world(), cb, b.iter().map(block).collect())),
-        sandbox::Event::EntityDied => r.on(&ENTITY_DIED, move |b| {
+        sandbox::Event::BlockBroken => r.on(&actions::BREAK_BLOCK, move |b| run(&runs, b.world(), cb, b.iter().map(block).collect())),
+        sandbox::Event::BlockPlaced => r.on(&actions::PLACE_BLOCK, move |b| run(&runs, b.world(), cb, b.iter().map(block).collect())),
+        sandbox::Event::EntityDied => r.on(&actions::DIE, move |b| {
             let batch = b
                 .iter()
-                .map(|d| EventValue::Death(D { entity: d.entity, killer: d.killer, kind: d.kind, cause: d.cause, pos: f3(d.pos) }))
+                .map(|d| EventValue::Death(D { entity: d.entity, killer: d.source, kind: d.kind, cause: d.cause, pos: f3(d.pos) }))
                 .collect();
             run(&runs, b.world(), cb, batch)
         }),
-        sandbox::Event::EntityHurt => r.on(&ENTITY_HURT, move |b| {
+        sandbox::Event::EntityHurt => r.on(&actions::HURT, move |b| {
             let batch = b
                 .iter()
                 .map(|h| EventValue::Hurt(H { entity: h.entity, source: h.source, amount: h.amount, cause: h.cause }))
@@ -602,14 +602,14 @@ fn event(r: &mut Registry, e: sandbox::Event, cb: u32, runs: Arc<Runs>) {
         sandbox::Event::PlayerRespawned => {
             r.on(&PLAYER_RESPAWNED, move |b| run(&runs, b.world(), cb, b.iter().map(|p| EventValue::Player(p.player)).collect()))
         }
-        sandbox::Event::ItemUsed => r.on(&ITEM_USED, move |b| {
+        sandbox::Event::ItemUsed => r.on(&actions::USE_ITEM, move |b| {
             let batch = b
                 .iter()
                 .map(|u| EventValue::ItemUsed(U { player: u.player, stack: stack(u.stack), pos: t3(u.pos), on_block: u.has_target != 0 }))
                 .collect();
             run(&runs, b.world(), cb, batch)
         }),
-        sandbox::Event::ItemPickedUp => r.on(&ITEM_PICKED_UP, move |b| {
+        sandbox::Event::ItemPickedUp => r.on(&actions::PICKUP_ITEM, move |b| {
             let batch = b
                 .iter()
                 .map(|p| EventValue::Pickup(P { player: p.player, stack: stack(p.stack) }))
@@ -619,12 +619,14 @@ fn event(r: &mut Registry, e: sandbox::Event, cb: u32, runs: Arc<Runs>) {
     }
 }
 
-fn t3(p: [i32; 3]) -> (i32, i32, i32) {
-    (p[0], p[1], p[2])
+fn t3(p: impl Into<abi::BlockPos>) -> (i32, i32, i32) {
+    let p = p.into();
+    (p.x, p.y, p.z)
 }
 
-fn f3(p: [f64; 3]) -> (f64, f64, f64) {
-    (p[0], p[1], p[2])
+fn f3(p: impl Into<abi::Vec3>) -> (f64, f64, f64) {
+    let p = p.into();
+    (p.x, p.y, p.z)
 }
 
 fn stack(s: ItemStack) -> sandbox::ItemStack {
@@ -672,7 +674,7 @@ fn invocation(cmd: &ServerCommand, params: &[(String, String)]) -> Invocation {
         let v = match kind.as_str() {
             "int" => cmd.int(name).map(Value::Int),
             "float" => cmd.float(name).map(Value::Float),
-            "targets" => cmd.has(name).then(|| Value::Targets(cmd.targets(name))),
+            "targets" => cmd.given(name).then(|| Value::Targets(cmd.targets(name))),
             "pos" => cmd.pos(name).map(|p| Value::Pos(f3(p))),
             "item" | "block" | "entity" | "dim" => cmd
                 .id(name)
@@ -806,7 +808,7 @@ pub fn with_line(text: &str, f: impl FnOnce(&str, &[Arg])) {
 
 impl Game for WorldGame {
     fn time(&mut self) -> u64 {
-        self.w.time()
+        self.w.game_time()
     }
     fn seed(&mut self) -> u64 {
         self.w.seed()
@@ -818,11 +820,11 @@ impl Game for WorldGame {
         self.w.dimension()
     }
     fn get_block(&mut self, pos: [i32; 3]) -> u32 {
-        self.w.get_loaded(pos).unwrap_or(0)
+        self.w.block_loaded(pos).unwrap_or(0)
     }
     fn set_block(&mut self, pos: [i32; 3], state: u32) -> bool {
         // Only states that exist: the engine indexes its tables with them.
-        !block_name(state).is_empty() && self.w.set(pos, state)
+        !block_name(state).is_empty() && self.w.set_block(pos, state)
     }
     fn light(&mut self, pos: [i32; 3]) -> u32 {
         self.w.light(pos)
@@ -848,13 +850,11 @@ impl Game for WorldGame {
         })
     }
     fn near(&mut self, pos: [f64; 3], radius: f64) -> Vec<u64> {
-        self.w.near(pos, radius, None)
+        self.w.entities_near(pos, radius, None)
     }
     fn teleport(&mut self, id: u64, pos: [f64; 3]) {
-        if let Some(mut e) = self.w.entity(id) {
-            e.pos = pos;
-            e.vel = [0.0; 3];
-            self.w.set_entity(id, &e);
+        if self.w.entity(id).is_some() {
+            drop(self.w.entity_edit(id).pos(pos).velocity([0.0; 3]));
         }
     }
     fn push(&mut self, id: u64, velocity: [f64; 3]) {
@@ -865,13 +865,13 @@ impl Game for WorldGame {
     }
     fn spawn(&mut self, kind: &str, pos: [f64; 3]) -> u64 {
         match find(abi::entry_kind::ENTITY, kind) {
-            Some(k) if kind != "core:player" => self.w.spawn_kind(k, pos),
+            Some(k) if kind != "core:player" => self.w.spawn(k, pos),
             _ => 0,
         }
     }
     fn remove(&mut self, id: u64) {
         if self.w.entity(id).is_some() && !is_player(&self.w, id) {
-            self.w.remove(id)
+            self.w.despawn(id)
         }
     }
     fn creative(&mut self, player: u64) -> bool {
@@ -885,7 +885,7 @@ impl Game for WorldGame {
     }
     fn spawn_item(&mut self, pos: [f64; 3], s: sandbox::ItemStack) {
         if let Some(st) = real_stack(s) {
-            self.w.spawn_item(pos, st)
+            self.w.spawn_item(pos, st);
         }
     }
     fn tell(&mut self, player: u64, key: &str, args: &[WArg]) {
@@ -920,7 +920,7 @@ impl Game for WorldGame {
             .is_some_and(|c| set_component(&self.w, id, c, value))
     }
     fn schedule(&mut self, pos: [i32; 3], ticks: u32) {
-        self.w.schedule(pos, ticks)
+        self.w.schedule_tick(pos, ticks)
     }
     fn send(&mut self, player: u64, channel: &str, data: &[u8]) {
         let Some((_, c, _)) = self.runs.channels.iter().find(|(n, ..)| n == channel) else { return };
@@ -930,7 +930,7 @@ impl Game for WorldGame {
     }
     fn play_sound(&mut self, sound: &str, pos: [f64; 3], volume: f32) {
         if let Some(Effect::Sound(s)) = self.effect(abi::entry_kind::SOUND, sound) {
-            self.w.play_sound(s, pos, volume)
+            drop(self.w.play_sound(s, pos, volume));
         }
     }
     fn spawn_particles(&mut self, particle: &str, pos: [f64; 3], count: u32) {

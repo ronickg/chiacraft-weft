@@ -85,12 +85,12 @@ pub fn occupied(w: &World, cell: [i32; 3]) -> bool {
 
 /// The creatures (players too) whose box reaches within `half` of `mid` each way.
 pub fn in_box(w: &World, mid: [f64; 3], half: f64) -> Vec<u64> {
-    w.near_bodies(mid, half + 3.0)
+    w.targets_near(mid, half + 3.0, None)
         .into_iter()
         .filter(|&id| {
             w.entity(id).is_some_and(|e| {
-                let r = e.size[0] as f64 / 2.0;
-                let (lo, hi) = ([e.pos[0] - r, e.pos[1], e.pos[2] - r], [e.pos[0] + r, e.pos[1] + e.size[1] as f64, e.pos[2] + r]);
+                let r = e.size.width as f64 / 2.0;
+                let (lo, hi) = ([e.pos.x - r, e.pos.y, e.pos.z - r], [e.pos.x + r, e.pos.y + e.size.height as f64, e.pos.z + r]);
                 (0..3).all(|i| lo[i] < mid[i] + half && hi[i] > mid[i] - half)
             })
         })
@@ -125,7 +125,7 @@ pub fn lay(w: &World, foot: [i32; 3], logs: &[[i32; 3]], states: &[u32], d: [i32
             .take_while(|&n| {
                 cells
                     .iter()
-                    .all(|c| gives_way(w.get([c[0], y - n - 1, c[2]])))
+                    .all(|c| gives_way(w.block([c[0], y - n - 1, c[2]])))
             })
             .count() as i32;
         drop.insert(h, sink);
@@ -136,7 +136,7 @@ pub fn lay(w: &World, foot: [i32; 3], logs: &[[i32; 3]], states: &[u32], d: [i32
     for (spot, &state) in spots.iter().zip(states) {
         let Some((at, h)) = spot else { continue };
         let at = [at[0], at[1] - drop[h], at[2]];
-        if !taken.insert(at) || !gives_way(w.get(at)) {
+        if !taken.insert(at) || !gives_way(w.block(at)) {
             continue;
         }
         let piece = if (h / vitals::felling::PIECE) % 2 == 0 { "a" } else { "b" };
@@ -156,11 +156,11 @@ pub fn lay(w: &World, foot: [i32; 3], logs: &[[i32; 3]], states: &[u32], d: [i32
             }
             continue;
         }
-        if w.get(at) != 0 {
+        if w.block(at) != 0 {
             // A plant or leaves in the way: broken as if by nobody, its loot where it was.
             w.break_block(at, ItemStack::EMPTY, 0, true);
         }
-        if w.set(at, lying) {
+        if w.set_block(at, lying) {
             laid += 1;
         }
     }
@@ -178,7 +178,7 @@ pub fn piece(w: &World, from: [i32; 3], state: u32, max: usize) -> Vec<[i32; 3]>
     while let Some([x, y, z]) = todo.pop() {
         for d in [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] {
             let p = [x + d[0], y + d[1], z + d[2]];
-            if seen.insert(p) && same(w.get(p)) {
+            if seen.insert(p) && same(w.block(p)) {
                 out.push(p);
                 if out.len() >= max {
                     return out;

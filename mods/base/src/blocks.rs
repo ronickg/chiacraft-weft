@@ -236,7 +236,7 @@ fn woods(r: &mut Registry) {
         // A fruit that's a food is registered with the foods (`items.rs`), which plants it too.
         if vitals::food::find(&format!("base:{fruit}")).is_none() {
             r.item(Item::generated(fruit.into()))
-                .placed_block(sapling_block)
+                .places(sapling_block)
                 .tab(&crate::tabs::NATURAL);
         }
     }
@@ -341,7 +341,7 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fr
         b.tint(base_api::trees::leaf_tint(vitals::wild::turn(handle.name())))
     };
     b.tag("leaves")
-        .redstone_blocker()
+        .signal_blocker()
         .mineable("shears")
         .tab(&crate::tabs::NATURAL);
     // Vanilla: a sapling one time in 20, oak leaves an apple one time in 200.
@@ -372,7 +372,7 @@ fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'stat
         .states(move |p, s| s.texture(if p.get("bloom") == "1" { open } else { shut }))
         .grows(BLOOM_SECS, 0)
         .on_grow(move |e| {
-            let open = vitals::wild::in_bloom(seasons, base_api::ground_at(&e.world(), e.pos()).season);
+            let open = vitals::wild::in_bloom(seasons, base_api::ground_at(&e.world(), e.pos().to_array()).season);
             let want = if open { "1" } else { "0" };
             if state_prop(e.state(), "bloom") == Some(want) {
                 return;
@@ -382,15 +382,15 @@ fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'stat
             // hour after a season turned, and the world round them never settled (the tropical
             // forest's stall, found on the PC).
             let w = e.world();
-            let [x, y, z] = e.pos();
+            let [x, y, z] = e.pos().to_array();
             let kind = block_name(e.state()).split('[').next().unwrap_or("");
             for dy in -BLOOM_REACH..=BLOOM_REACH {
                 for dz in -BLOOM_REACH..=BLOOM_REACH {
                     for dx in -BLOOM_REACH..=BLOOM_REACH {
                         let p = [x + dx, y + dy, z + dz];
-                        let st = w.get(p);
+                        let st = w.block(p);
                         if block_name(st).split('[').next() == Some(kind) && state_prop(st, "bloom") != Some(want) {
-                            w.set_prop(p, "bloom", want);
+                            w.prop_set(p, "bloom", want);
                         }
                     }
                 }
@@ -558,7 +558,7 @@ pub fn register(r: &mut Registry) {
             .sound_group("stone")
             .hardness(1.2)
             .mineable("pickaxe")
-            .needs_tool(0);
+            .needs_tool_level(0);
         match textures {
             Some((top, side, bottom)) => b.textures(top, side, bottom),
             None => b,
@@ -582,7 +582,7 @@ pub fn register(r: &mut Registry) {
         .friction(0.98)
         .mineable("pickaxe")
         // Itself with a pickaxe (Research round 3, U1: it's the only blue dye).
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tab(&crate::tabs::NATURAL);
     // Water's skin of ice in the cold (`snow.rs`, `vitals::air::freeze_chance`), drawn as ice: it
     // thaws back to water in the warmth, also away from players (`snow::ice_step`). Broken, it's
@@ -606,7 +606,7 @@ pub fn register(r: &mut Registry) {
         .hardness(0.5)
         .friction(0.98)
         .mineable("pickaxe")
-        .needs_tool(0)
+        .needs_tool_level(0)
         .tab(&crate::tabs::NATURAL);
     // Coral: stony, mined with a pickaxe, dropping itself.
     for (block, texture) in [
@@ -619,7 +619,7 @@ pub fn register(r: &mut Registry) {
             .texture(texture)
             .hardness(1.0)
             .mineable("pickaxe")
-            .needs_tool(0)
+            .needs_tool_level(0)
             .tag("coral")
             .tab(&crate::tabs::NATURAL);
     }
@@ -678,7 +678,7 @@ pub fn register(r: &mut Registry) {
             .texture(texture)
             .hardness(3.0)
             .mineable("pickaxe")
-            .needs_tool(tier)
+            .needs_tool_level(tier)
             .drops(drop, 1)
             .tag("ores")
             .tag(&format!("ores/{kind}"))
@@ -791,7 +791,7 @@ pub fn register(r: &mut Registry) {
         .grows(crate::growth::step_secs("base:grazed_grass", 1, 600.0), 9)
         .on_grow(|e| {
             crate::growth::grow(e, "base:grazed_grass", false, |e| {
-                e.world().set(e.pos(), TALL_GRASS.id());
+                e.world().set_block(e.pos(), TALL_GRASS.id());
             })
         });
     plant(r, &DANDELION, "flower_dandelion");
@@ -1021,7 +1021,7 @@ pub fn register(r: &mut Registry) {
             .cull_same()
             .light_opacity(1)
             .tag("leaves")
-            .redstone_blocker()
+            .signal_blocker()
             .mineable("shears")
             .tab(&crate::tabs::NATURAL);
         r.loot(b)

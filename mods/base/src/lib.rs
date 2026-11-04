@@ -138,7 +138,7 @@ fn init(r: &mut Registry) {
     r.dimension(&OVERWORLD)
         .player_spawn()
         // A fair first place: level plains, temperate, by water and woods (`base_api::land::spawn`).
-        .spawn(fair_spawn)
+        .spawn_point(|seed| fair_spawn(seed).into())
         .sky_above(16)
         .day_length(24000)
         .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)

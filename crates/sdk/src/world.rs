@@ -190,6 +190,14 @@ impl World {
         all
     }
 
+    /// The liquid in the cell at `pos`, as its block state: a liquid block, or the liquid in the
+    /// cell with another block (waterlogging: kelp's water). `None` for a cell with none.
+    pub fn liquid_in_cell(&self, pos: impl Into<BlockPos>) -> Option<u32> {
+        self.parts(pos)
+            .into_iter()
+            .find(|&s| crate::content::liquid_of(s).is_some())
+    }
+
     /// Puts another block in a cell with what is there, whatever its shape; `set_block` would replace
     /// all of it. Only one thing in a cell can have a block entity, a circuit, light of its own or
     /// growth: false if there would be two, or the cell isn't loaded.

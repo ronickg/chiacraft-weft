@@ -152,7 +152,10 @@ pub mod shot {
     pub fn top_down(height: f32) -> Shot {
         Shot::new(cf::BODY | cf::HUD, move |a| {
             let e = v(a.eye);
-            a.out = CameraPose { pos: at([e[0], e[1] + height as f64, e[2]]), yaw: 0.0, pitch: -1.5707, ..CameraPose::DEFAULT };
+            // Just short of straight down (upstream's value).
+            #[allow(clippy::approx_constant)]
+            let down = -1.5707;
+            a.out = CameraPose { pos: at([e[0], e[1] + height as f64, e[2]]), yaw: 0.0, pitch: down, ..CameraPose::DEFAULT };
         })
     }
 

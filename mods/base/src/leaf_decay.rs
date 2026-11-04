@@ -32,22 +32,27 @@ struct Due {
 static DUE: Mutex<Due> = Mutex::new(Due { list: Vec::new(), waiting: None });
 
 pub fn register(r: &mut Registry) {
-    r.on(&BLOCK_BROKEN, |b| {
+    r.on(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
-        logs_gone(&w, b.iter().filter(|e| LOGS.on_block(e.state)).map(|e| e.pos));
+        logs_gone(
+            &w,
+            b.iter()
+                .filter(|e| LOGS.on_block(e.state))
+                .map(|e| e.pos.to_array()),
+        );
     });
     // A player's leaves are theirs to keep.
-    r.on(&BLOCK_PLACED, |b| {
+    r.on(&actions::PLACE_BLOCK, |b| {
         let w = b.world();
         for e in b
             .iter()
             .filter(|e| e.player != 0 && TREE_LEAVES.on_block(e.state))
         {
-            w.set_prop(e.pos, "placed", "true");
+            w.prop_set(e.pos, "placed", "true");
         }
     });
     r.world_tick(|w| {
-        let (dim, now) = (w.dimension(), w.time());
+        let (dim, now) = (w.dimension(), w.game_time());
         let ready: Vec<[i32; 3]> = {
             let mut due = DUE.lock().unwrap();
             let Due { list, waiting } = &mut *due;
@@ -78,7 +83,7 @@ pub fn register(r: &mut Registry) {
 /// Logs at `gone` went (chopped, felled, or lifted away by a falling tree, which breaks
 /// nothing): the leaves round them that may have been theirs are looked at again in a while.
 pub fn logs_gone(w: &World, gone: impl Iterator<Item = [i32; 3]>) {
-    let (dim, now) = (w.dimension(), w.time());
+    let (dim, now) = (w.dimension(), w.game_time());
     // A felled giant takes a thousand logs at once, their boxes mostly the same places: each
     // looked at once.
     let mut looked = HashSet::new();
@@ -102,9 +107,9 @@ pub fn logs_gone(w: &World, gone: impl Iterator<Item = [i32; 3]>) {
 
 /// A tree's leaves no player placed.
 pub fn decays(w: &World, p: [i32; 3]) -> bool {
-    TREE_LEAVES.on_block(w.get(p)) && w.prop(p, "placed") != Some("true")
+    TREE_LEAVES.on_block(w.block(p)) && w.prop(p, "placed") != Some("true")
 }
 
 fn log_near(w: &World, [x, y, z]: [i32; 3]) -> bool {
-    (-REACH..=REACH).any(|dy| (-REACH..=REACH).any(|dz| (-REACH..=REACH).any(|dx| LOGS.on_block(w.get([x + dx, y + dy, z + dz])))))
+    (-REACH..=REACH).any(|dy| (-REACH..=REACH).any(|dz| (-REACH..=REACH).any(|dx| LOGS.on_block(w.block([x + dx, y + dy, z + dz])))))
 }

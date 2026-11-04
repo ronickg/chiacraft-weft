@@ -296,6 +296,22 @@ pub fn finish_generated(
     if biomes.iter().any(|&b| b != 0) {
         cube.biomes = Some(Box::new(biomes));
     }
+    // Generated blocks that hold a liquid (kelp, eelgrass) under the terrain's sea stand in its
+    // water (chiacraft): generators write states only, and a cell's water is a part of it.
+    if !uniform
+        && let Some((sea, water)) = def.terrain.as_ref().and_then(|t| t.sea)
+        && pos.y * 16 <= sea
+    {
+        for i in 0..VOLUME {
+            let s = blocks[i];
+            if c.states[s as usize].flags & bf::HOLDS_LIQUID != 0
+                && pos.y * 16 + crate::world::cube::offset(i).y <= sea
+                && cube.extras(i).is_empty()
+            {
+                cube.set_extras(i, vec![water]);
+            }
+        }
+    }
     cube
 }
 

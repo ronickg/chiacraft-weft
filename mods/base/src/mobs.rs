@@ -372,10 +372,9 @@ fn blast(w: &World, id: u64, at: Vec3, radius: f64) {
         let damage = (impact * impact + impact) / 2.0 * 7.0 * radius * 2.0 + 1.0;
         w.damage(other, damage as f32, id, damage_cause::EXPLOSION);
     }
-    // Vanilla's: one going off in a liquid breaks nothing, and liquids don't break at all.
-    // SYNC: ours also spared a blast in a block holding water (`held_liquid`); check that
-    // upstream's waterlogging shows that cell as liquid here.
-    if w.block_flags(block_pos_of(at)) & abi::block_flags::LIQUID == 0 {
+    // Vanilla's: one going off in a liquid breaks nothing (a waterlogged block's cell too), and
+    // liquids don't break at all.
+    if w.liquid_in_cell(block_pos_of(at)).is_none() {
         w.fill(Shape::blast(at, radius, w.random()), 0)
             .keep(Filter::unbreakable())
             .keep(Filter::liquids());

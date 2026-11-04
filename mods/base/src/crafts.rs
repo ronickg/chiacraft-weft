@@ -97,13 +97,13 @@ pub fn strip(u: &mut Use) -> bool {
     let stripped = [("axis", axis), ("felled", felled)]
         .iter()
         .try_fold(stripped, |s, (k, v)| state_with(s, k, v));
-    if !stripped.is_some_and(|s| w.set(pos, s)) {
+    if !stripped.is_some_and(|s| w.set_block(pos, s)) {
         return false;
     }
     if wood == "oak" {
         let at = w
             .entity(player)
-            .map_or([pos[0] as f64 + 0.5, pos[1] as f64 + 1.0, pos[2] as f64 + 0.5], |e| e.pos);
+            .map_or([pos.x as f64 + 0.5, pos.y as f64 + 1.0, pos.z as f64 + 0.5], |e| e.pos.into());
         w.spawn_item(at, ItemStack::new(OAK_BARK.id(), BARK_PER_LOG));
     }
     if !w.creative(player) {
@@ -148,10 +148,10 @@ fn station(
     m.group("output", Slots::single().output())
         .attach_with(&WAITING, Waiting { station: index, done: 0.0, item: 0 })
         .screen(move |ui| {
-            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
+            crate::window::window(ui, S::column().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
-                    ui.column(S::col().gap(2.0), |ui| {
+                    ui.column(S::column().gap(2.0), |ui| {
                         ui.group("input");
                         if c.with.is_some() {
                             ui.group("with");
