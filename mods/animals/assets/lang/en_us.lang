@@ -337,3 +337,12 @@ screen.animals.chip = {0}
 screen.animals.orders_title = Orders
 screen.animals.stance_title = Stance
 screen.animals.whistles = Whistles: {keyname:animals:whistle_follow} follow, {keyname:animals:whistle_stay} stay, {keyname:animals:whistle_come} come, {keyname:animals:whistle_attack} attack, {keyname:animals:whistle_passive} passive
+# The taming plate under the crosshair (UI redo)
+hud.element.animals.taming = Taming
+hud.animals.taming.who = Taming {0}
+hud.animals.taming.bar = Tamed
+hud.animals.taming.percent = {0}%
+hud.animals.taming.asks = Effectiveness {0}% · asks for {1}
+hud.animals.taming.waits = Effectiveness {0}% · asks again in {1}s
+hud.animals.taming.asleep = Effectiveness {0}% · asleep, torpor {1}
+hud.animals.taming.asleep_food = Effectiveness {0}% · asleep, torpor {1} · {2} ×{3}

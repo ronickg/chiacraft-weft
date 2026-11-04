@@ -315,6 +315,10 @@ def build():
     for n, col in stats.items():
         stat_bar(f"stat_{n}", 150, 12, col)
     stat_bar("stat_xp", 220, 8, (155, 79, 224))
+    # A plate behind a HUD element that only shows sometimes (the taming plate): a "bar" whose
+    # background is the tooltip's frame and whose fill is nothing; hidden while its value is < 0.
+    put("hud_plate", fit9(src("c_small", 3), 32, 24, 3), 3)
+    put("hud_plate_fill", np.zeros((2, 2, 4), np.uint8), scaling="stretch")
     # The HUD (`mods/base/src/hud.rs`): each bar a frame and a fill on a canvas the frame's size,
     # which the engine crops to the value (`BAR_*` and `bar_fill` there follow these sizes).
     def bar(name, fill, w, h):

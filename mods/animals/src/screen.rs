@@ -22,8 +22,11 @@ static PLACE: Channel<[u64; 2]> = Channel::named("place_point");
 /// How far the spyglass sees.
 const SPYGLASS_RANGE: f64 = 64.0;
 
+static TAMING_HUD: HudElement = HudElement::named("taming");
+
 pub fn init(r: &mut Registry) {
     r.menu(&ANIMAL_MENU).screen(animal_screen);
+    taming_hud(r);
     r.menu(&SCOUT_MENU).screen(scout_screen);
     r.packet(&PLACE, |p, [id, stat]| animal::place_point(&p.world(), id, p.player(), stat as usize));
     r.item(&SPYGLASS).max_stack(1).tab(&TOOLS).on_use(|u| {
@@ -828,4 +831,82 @@ fn census(w: &World, player: u64, radius: f64) -> Vec<String> {
         lines.push("no animals near".into());
     }
     lines
+}
+
+// ------------------------------------------------------------------ the taming plate
+
+/// How far the taming plate looks for an animal being tamed.
+const TAMING_RANGE: f64 = 12.0;
+/// The plate's size in GUI pixels.
+const PLATE: (f32, f32) = (150.0, 46.0);
+
+/// The nearest animal within reach that the player is taming (fed at least once, not tame yet)
+/// or has knocked out, with its taming and knock-out (synced to whoever sees it).
+fn being_tamed(c: &ClientView) -> Option<(u64, crate::taming::Taming, Option<crate::knockout::Knockout>)> {
+    let me = c.me()?;
+    let client = c.client();
+    client
+        .entities()
+        .into_iter()
+        .filter_map(|id| {
+            let e = client.entity(id)?;
+            let d2: f64 = (0..3).map(|k| (e.pos[k] - me.pos[k]).powi(2)).sum();
+            if d2 > TAMING_RANGE * TAMING_RANGE {
+                return None;
+            }
+            let g = c.component_of(id, &TAMING)?;
+            let k = c.component_of(id, &KNOCKOUT).filter(|k| k.out > 0);
+            (g.feedings > 0 && g.progress < 1.0 || k.is_some()).then_some((d2, id, g, k))
+        })
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, id, g, k)| (id, g, k))
+}
+
+/// Its species, from its entity kind.
+fn species_of(c: &ClientView, id: u64) -> Option<&'static species::Species> {
+    let kind = c.client().entity(id)?.kind;
+    species::SPECIES.iter().find(|s| s.kind.id() == kind)
+}
+
+/// While taming, a plate under the crosshair (ARK's taming bar, in our parts): whom, how far
+/// (the bar and its %), how clean (effectiveness), and what it asks for or, knocked out, how deep
+/// it sleeps and what is in its mouth.
+fn taming_hud(r: &mut Registry) {
+    r.hud_element(&TAMING_HUD, hud_anchor::UNDER_CROSSHAIR, 1, |ui| {
+        ui.row(S::row().size(PLATE.0, PLATE.1), |ui| {
+            ui.progress_bind("hud_plate", S::default().size(PLATE.0, PLATE.1).at(0.0, 0.0), |c| {
+                if being_tamed(c).is_some() { 1.0 } else { -1.0 }
+            });
+            ui.column(S::col().gap(1.0).at(5.0, 3.0), |ui| {
+                ui.text_bind_styled(S::default().class("title").no_wrap(), |c, t| {
+                    let Some(s) = being_tamed(c).and_then(|(id, _, _)| species_of(c, id)) else { return t.text("") };
+                    t.set("hud.animals.taming.who", &[Arg::Key(&format!("entity.animals.{}", s.kind_name()))]);
+                });
+                ui.row(S::row().gap(3.0).center(), |ui| {
+                    ui.text_bind_styled(S::default().w(30.0).no_wrap(), |c, t| {
+                        if being_tamed(c).is_some() { t.set("hud.animals.taming.bar", &[]) } else { t.text("") }
+                    });
+                    ui.progress_bind("life_taming", S::default().size(LIFE_BAR.0, LIFE_BAR.1), |c| {
+                        being_tamed(c).map_or(-1.0, |(_, g, _)| g.progress.clamp(0.0, 1.0))
+                    });
+                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                        let Some((_, g, _)) = being_tamed(c) else { return t.text("") };
+                        t.set("hud.animals.taming.percent", &[Arg::Int((g.progress * 100.0).floor() as i64)]);
+                    });
+                });
+                ui.text_bind_styled(S::default().class("dim").no_wrap(), |c, t| {
+                    let Some((id, g, k)) = being_tamed(c) else { return t.text("") };
+                    let eff = Arg::Int((g.effectiveness * 100.0).round() as i64);
+                    match k {
+                        Some(k) if k.count > 0 => t.set("hud.animals.taming.asleep_food", &[eff, Arg::Int(k.torpor as i64), Arg::Item(k.food), Arg::Int(k.count as i64)]),
+                        Some(k) => t.set("hud.animals.taming.asleep", &[eff, Arg::Int(k.torpor as i64)]),
+                        None => match species_of(c, id).and_then(|s| s.foods.get((g.want as usize).wrapping_sub(1))) {
+                            Some(f) if g.asking > 0 => t.set("hud.animals.taming.asks", &[eff, Arg::Name(&format!("item:{}", f.item))]),
+                            _ => t.set("hud.animals.taming.waits", &[eff, Arg::Int(g.wait.div_ceil(20) as i64)]),
+                        },
+                    }
+                });
+            });
+        });
+    });
 }
