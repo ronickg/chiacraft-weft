@@ -777,9 +777,12 @@ fn animal_screen(ui: &mut Ui) {
                 });
             }
             ui.row(S::row().gap(2.0), |ui| {
-                order_button_w(ui, "screen.animals.share", 20, 32.0);
-                order_button_w(ui, "screen.animals.track", 30, 32.0);
-                order_button_w(ui, "screen.animals.release", 40, 32.0);
+                // Widths for the longest label in either language with 2 GUI px each side
+                // ("Sniff out" / "Взять след", "Release" / "Отпустить"); equal thirds put "Sniff
+                // out" against its edges (the label check, 11-04).
+                order_button_w(ui, "screen.animals.share", 20, 22.0);
+                order_button_w(ui, "screen.animals.track", 30, 39.0);
+                order_button_w(ui, "screen.animals.release", 40, 35.0);
             });
             ui.text_styled(S::default().class("dim").max_w(100.0), "screen.animals.whistles", &[]);
         });

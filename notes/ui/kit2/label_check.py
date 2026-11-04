@@ -153,8 +153,28 @@ def measure(path, scale=2, lang=LANG):
                               vertical_ok=above == below or abs(above - below) == 1 and (fh - CAPS) % 2 == 1,
                               even_face=(fh - CAPS) % 2 == 0, centred=abs(left - right) <= 1,
                               descender_clear=below - desc >= 1 if desc else True))
-    # text that isn't a theme colour but is bright and inside the UI: blur or a stray colour
-    return dict(shot=os.path.basename(path), scale=scale, mixed_blocks=mixed, parts=found)
+    # Clearance: no text pixel within 2 UI px of an outline or a frame (panels, tooltips, HUD
+    # plates as well as the parts above).
+    if PALETTE == "A":
+        import variants
+        edge_cols = [variants.A["OUTLINE"], variants.A["BRONZE_D"], variants.A["BRONZE_HI"]]
+    else:
+        # outlines and a frame's rim lines; not the frame's own face (an open tab is that colour)
+        edge_cols = [k.OUTLINE, k.BRONZE_D, k.BRONZE_HI]
+    edges = near(a, edge_cols, 0)
+    near_edge = edges.copy()
+    for _ in range(2):
+        g = near_edge.copy()
+        g[1:] |= near_edge[:-1]
+        g[:-1] |= near_edge[1:]
+        g[:, 1:] |= near_edge[:, :-1]
+        g[:, :-1] |= near_edge[:, 1:]
+        near_edge = g
+    close = text & near_edge
+    ys, xs = np.nonzero(close)
+    spots = sorted({(int(x) // 8 * 8, int(y) // 8 * 8) for y, x in zip(ys, xs)})
+    return dict(shot=os.path.basename(path), scale=scale, mixed_blocks=mixed, parts=found,
+                text_near_edges=len(spots), near_edge_spots=spots[:20])
 
 
 def main():
@@ -172,7 +192,8 @@ def main():
         r = measure(s, a.scale, a.lang)
         out.append(r)
         bad = [p for p in r["parts"] if not (p["vertical_ok"] and p["centred"] and p["descender_clear"])]
-        print(f"{r['shot']}: {len(r['parts'])} labels measured, {len(bad)} off; blocks not one colour: {r['mixed_blocks']:.4f}")
+        print(f"{r['shot']}: {len(r['parts'])} labels measured, {len(bad)} off; blocks not one colour: {r['mixed_blocks']:.4f};"
+              f" text within 2 px of a border: {r['text_near_edges']} spots {r['near_edge_spots'][:6]}")
         for p in r["parts"]:
             flag = "" if p in [] else ("  OFF" if p in bad else "")
             print(f"   {p['kind']:24s} at {p['box'][0]},{p['box'][1]} face {p['face_rows']} rows: above {p['above']} below {p['below']}"
