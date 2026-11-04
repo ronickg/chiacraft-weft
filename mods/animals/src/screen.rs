@@ -497,17 +497,18 @@ const GENE_LINES: usize = 40;
 /// The Genes page's list: taller, it has the page to itself.
 const GENES_PAGE_H: f32 = 110.0;
 /// The stat names' column: as wide as the longest name in either language ("Выносливость" 42.5 GUI
-/// px: at 34 it was shrunk to 80%, the Russian pass); the bars 20 to make room, so the window still
+/// px: at 34 it was shrunk to 80%, the Russian pass); the bars 18 to make room (and the wild column
+/// 16, so "Дикий" and "Ручной" over their columns keep 2 GUI px between them), so the window still
 /// fits 380 with every column as wide as its words.
 const STAT_NAME_W: f32 = 43.0;
-const STAT_BAR: (f32, f32) = (20.0, 6.0);
+const STAT_BAR: (f32, f32) = (18.0, 6.0);
 /// The stat rows' columns after the bar: the value (right-aligned), wild and tamed points
 /// (centred), then the + (GUI pixels).
 /// ("152%" is 16.5 GUI px)
 const STAT_VALUE_W: f32 = 17.0;
 /// (as wide as their headings, "Wild" 13.5 and "Tamed" 19.5 GUI px: narrower, the row shrank them,
 /// PC runs fit1280 and fit760b)
-const STAT_WILD_W: f32 = 14.0;
+const STAT_WILD_W: f32 = 16.0;
 const STAT_TAMED_W: f32 = 20.0;
 /// A stat row's whole width, for the divider over torpor.
 const STAT_ROW_W: f32 = 8.0 + 3.0 + STAT_NAME_W + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0 + STAT_WILD_W + 3.0 + STAT_TAMED_W + 3.0 + 10.0;
