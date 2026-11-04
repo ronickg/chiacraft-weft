@@ -335,13 +335,44 @@ As Tinkers' Construct 3 does it, which our prototype already proved at 32 px:
   - Each armour piece is a box model (blocky-model) whose texture has regions per part: the shell
     over most of it, straps and rivets as strips, the lining showing at the collar and cuffs.
   - Each region is a map of shade steps painted with its material's ramp, the same way.
-- **Chiacraft's work:**
-  - one shade-step map per part shape, about 40 to start
-  - one ramp and an optional grain per material, about 25
-  - the armour region maps
-  - the grade overlays
-  - The parts are made with Codex at the kind's sockets and turned into maps with `hybrid.py`'s
-    method, then checked like any icon batch.
+- **Chiacraft's work** (its answer, 11-04):
+  - **Eight steps per part, not six:**
+
+    | Step | What it is |
+    |---|---|
+    | 0 | outline, shadow side |
+    | 1 | outline, lit side (the guide's two-tone outline) |
+    | 2–6 | the fill |
+    | 7 | the highlight: metal's near-white bevel, gem sparkles |
+
+    Hue shift lives in each ramp (gold's orange shadows and lemon highlights), so the map holds
+    only brightness. Each layer brings its own outline steps, which gives the guide's "outline per
+    part".
+  - **Detail is the risk, not colour.** Approved icons have 50–150 colours of painted
+    micro-variation, and an earlier palette "cleaning" mangled them. So:
+    - each part's steps are fitted to its own reference drawing, not to one fixed palette
+    - grain stays an overlay
+    - composed icons are compared with the approved full icons before the method is adopted
+  - **Overrides are needed for more than obsidian:**
+    - knapped stone and flint (chipped edges, not a smooth bevel)
+    - gems and diamond (facets and sparkle)
+    - wooden heads against metal ones (grain direction, thickness)
+    - glass
+    - Ronald approved crude-looking wood and stone tools beside polished metal, so those get their
+      own shape variants.
+  - **Sockets** are fixed per kind on the 32 px diagonal. Heads must read at slot size (Ronald's
+    hoe lesson: a blade about 10 × 4–5 px), and the guide's "Learned from Ronald's answers"
+    applies to every part.
+  - **Ramps** come from the 161 approved icons (iron, gold, diamond, wood, stone, leather, bone).
+    New materials (bronze, copper, flint, obsidian, antler, sinew) get a reference icon first, and
+    the ramp comes from that.
+  - **Part maps:** `art.py` draws each part alone, in its socket, in one reference material, and
+    it is snapped the `hybrid.py` way, with the usual checks and the archive.
+  - **Full icons stay** for every fixed item, and as the target the composed tools must match.
+  - **First, one test:** an axe (3 parts) and a sword (4 parts) in 6 materials, composed and shown
+    beside the approved icons for Ronald to judge. Then the full run of about 40 part maps and 25
+    ramps, the armour regions (blocky-model, painted in code with the same maps) and the grade
+    overlays.
 
 ### Data, so packages can add to it
 
