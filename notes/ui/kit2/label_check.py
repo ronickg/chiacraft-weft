@@ -44,6 +44,10 @@ def theme_text_colours(lang=LANG):
     return out
 
 
+# `--baseline ink`: the baseline from each label's own ink, not the Latin capitals' 9 rows (for
+# Russian, whose capitals are 7 px).
+BASELINE_FROM_INK = False
+
 PALETTE = None  # None: kit 2's own; "A": the tones before the Valheim look (`variants.A`)
 
 
@@ -145,7 +149,15 @@ def measure(path, scale=2, lang=LANG):
             it, ib = int(ty.min()), int(ty.max())
             ink_h = ib - it + 1
             fh = y2 - y1 + 1
-            if ink_h >= CAPS:
+            if BASELINE_FROM_INK and ink_h >= 7:
+                # From the ink (any font: Russian's Cyrillic capitals are 7 px, lifted to sit
+                # centred where the Latin 9 are): the top of the ink, and the baseline as the
+                # lowest row inked at least 40% as much as the densest (descenders are sparse).
+                rows = t[:, w0:w1 + 1].sum(1)
+                dense = np.nonzero(rows >= 0.4 * rows.max())[0] + (ya - y1)
+                cap_top, cap_bottom = it, int(dense.max())
+                desc = max(0, ib - cap_bottom)
+            elif ink_h >= CAPS:
                 # capitals: their 9 rows from the top of the ink; below them, descenders
                 cap_top, cap_bottom = it, it + CAPS - 1
                 desc = max(0, ib - cap_bottom)
@@ -198,8 +210,10 @@ def main():
     ap.add_argument("--json")
     ap.add_argument("--palette", help='"A": the tones before the Valheim look')
     ap.add_argument("--lang", default=LANG, help="the lang file whose color.* keys the shot was drawn with")
+    ap.add_argument("--baseline", choices=["caps", "ink"], default="caps", help="ink: each label's baseline from its own ink (Russian)")
     a = ap.parse_args()
-    global PALETTE
+    global PALETTE, BASELINE_FROM_INK
+    BASELINE_FROM_INK = a.baseline == "ink"
     PALETTE = a.palette
     out = []
     for s in a.shots:

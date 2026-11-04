@@ -29,6 +29,7 @@ use crate::SEA;
 
 mod canyons;
 pub mod caves;
+mod craters;
 mod karst;
 mod net;
 
@@ -54,6 +55,8 @@ pub mod salt {
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
     pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const SINKS: u64 = 0x4A9;
+    pub const CRATERS: u64 = 0xC4A7;
     pub const FACE_COAL: u64 = 0x0C0A;
     pub const FACE_IRONSTONE: u64 = 0x0F3A;
     pub const FACE_MAGNETITE: u64 = 0x0F3B;
@@ -184,6 +187,11 @@ pub const DESERT: (f64, f64) = (0.14, 0.0);
 pub const SAVANNA: (f64, f64) = (0.1, 0.1);
 /// Swamp from this temperature and this humidity, on low land.
 pub const SWAMP: (f64, f64) = (0.0, 0.04);
+/// Tropical forest (Ronald, 11-04: "all four"; the third proposal sheet) from this temperature
+/// and this humidity: the hot, wet corner, where the rules fell through to oak "forest" at the
+/// llanos' heat (3.5-5.6% of the land on seeds 1, 7, 42, 1234). The savanna's heat, the forest's
+/// rain; the swamp keeps the low wet land.
+pub const TROPICAL: (f64, f64) = (0.1, 0.07);
 /// Forest from this humidity; birch forest under this temperature and from this humidity.
 pub const FOREST_HUMIDITY: f64 = 0.07;
 pub const BIRCH: (f64, f64) = (0.05, 0.0);
@@ -370,6 +378,33 @@ pub const MOUTH_LIP: i32 = 2;
 /// ring read as paving on the grass).
 pub const MOUTH_LIP_PATCHES: f64 = 0.4;
 
+/// Karst sinkholes (cenotes; Ronald, 11-04: "all four"): in the karst area, round shafts
+/// `SINK_RADIUS` blocks from their middle to their wall, at most one per `SINK_CELL` square, kept
+/// with `SINK_CHANCE` times the area's strength, down to `SINK_FLOOR` blocks under the sea, so
+/// water stands in them at the sea's level; only on land `SINK_LAND` over the sea and
+/// `SINK_CLEAR` blocks clear of the towers' feet.
+pub const SINK_CELL: i32 = 128;
+pub const SINK_CHANCE: f64 = 0.35;
+pub const SINK_RADIUS: (i32, i32) = (6, 11);
+pub const SINK_FLOOR: i32 = 6;
+pub const SINK_LAND: (i32, i32) = (4, 30);
+pub const SINK_CLEAR: i32 = 4;
+
+/// Meteor craters (Ronald, 11-04: "all four"): round bowls, at most one per `CRATER_CELL` square,
+/// kept with `CRATER_CHANCE` where the land at the middle is open and dry (not the cold, the
+/// woods' wet, the mountains or the karst) and over the sea: `CRATER_RADIUS` blocks from the
+/// middle to the rim's crest, `CRATER_DEPTH` radii deep, the rim `CRATER_RIM` blocks high and
+/// blending back into the land by `CRATER_RIM_OUT` radii; all measured from the ground at the
+/// middle, and only where the land round it is level and no river or lake reaches; the last of
+/// the features, after the rivers. Where the floor dips under the sea's level
+/// water stands in it.
+pub const CRATER_CELL: i32 = 640;
+pub const CRATER_CHANCE: f64 = 1.0;
+pub const CRATER_RADIUS: (i32, i32) = (20, 30);
+pub const CRATER_DEPTH: f64 = 0.65;
+pub const CRATER_RIM: (i32, i32) = (5, 8);
+pub const CRATER_RIM_OUT: f64 = 1.8;
+
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
 /// the rain of the nodes upstream within `RIVER_REACH` steps (about 2 km of river).
@@ -469,12 +504,13 @@ pub const OCEAN_CONTINENT: f64 = 0.1;
 /// The land's biome rules in the order they're tried, after the coasts and the mountains, with
 /// the bed under their water: gravel in the north and the birch woods, sand in the warm lands,
 /// mud (dirt) in the swamp.
-pub const RIVER_BEDS: [(&str, &str); 8] = [
+pub const RIVER_BEDS: [(&str, &str); 9] = [
     ("snowy_plains", "gravel"),
     ("taiga", "gravel"),
     ("desert", "sand"),
     ("savanna", "sand"),
     ("swamp", "dirt"),
+    ("tropical_forest", "dirt"),
     ("forest", "sand"),
     ("birch_forest", "gravel"),
     ("plains", "sand"),
@@ -560,6 +596,8 @@ pub fn features() -> Vec<Feature> {
         Feature::new(karst).named("karst"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
+        // Last: a crater is measured from its ground, the rivers' cut included (none reach one).
+        Feature::new(craters).named("craters"),
         // No height: their masks say where the snow drifts and where the sequoias stand (rules
         // ask for them).
         preset::hills(0.0, 64.0)
@@ -591,7 +629,7 @@ fn land_height_at(h: &Here) -> i32 {
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
     let base = base_ground(h);
-    base + canyons::cut(h, base) + karst::add(h, base)
+    base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base)
 }
 
 /// The ground before the karst towers (which stand on it, or rise out of the water over it).
@@ -612,7 +650,8 @@ fn base_ground(h: &Here) -> i32 {
 
 /// The ground's height (Q4) with the rivers: what the engine makes of `features`.
 pub fn height(f: &Fields, x: i32, z: i32) -> i32 {
-    land_height(f, x, z) + rivers(f, x, z)
+    let ground = land_height(f, x, z) + rivers(f, x, z);
+    ground + craters::add(&Here::new(f, x, z), || ground)
 }
 
 /// The mesas' height (Q4) at (`x`, `z`).
@@ -896,10 +935,26 @@ pub fn canyons(f: &Fields, x: i32, z: i32) -> i32 {
     if !canyons::near(&h) { 0 } else { canyons::cut(&h, base_ground(&h)) }
 }
 
-/// What the karst towers add at (`x`, `z`) (Q4), as the engine adds it.
+/// What the karst towers and sinkholes add at (`x`, `z`) (Q4), as the engine adds it.
 pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
     let h = Here::new(f, x, z);
-    if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base_ground(&h)) }
+    let towers = if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base_ground(&h)) };
+    towers + karst::sink(&h, || base_ground(&h))
+}
+
+/// What the meteor craters add at (`x`, `z`) (Q4), as the engine adds it.
+pub fn craters(f: &Fields, x: i32, z: i32) -> i32 {
+    craters::add(&Here::new(f, x, z), || land_height(f, x, z) + rivers(f, x, z))
+}
+
+/// The meteor craters (middle x, z and radius, blocks) within `r` blocks of (`x`, `z`) (blocks).
+pub fn craters_near(f: &Fields, x: i32, z: i32, r: i32) -> Vec<(i32, i32, i32)> {
+    craters::near(f, x, z, r)
+}
+
+/// The karst sinkholes (middle x, z and radius, blocks) within `r` blocks of (`x`, `z`) (blocks).
+pub fn sinks_near(f: &Fields, x: i32, z: i32, r: i32) -> Vec<(i32, i32, i32)> {
+    karst::sinks_near(f, x, z, r)
 }
 
 /// A fair first place (Ronald, 11-04: "All 3: 1, 2, 3"): the nearest spot to the world's middle,
@@ -954,7 +1009,9 @@ pub fn spawn_where(seed: u64, open: &dyn Fn(i32, i32) -> bool) -> [i32; 3] {
             && level(x, z, hh)
             && MOUNTAINS_AREA.value(&f, x * 16, z * 16) < q12(0.2)
             && near(x, z, SPAWN_WATER, 4, &|px, pz| h(px, pz) < SEA && biome(px, pz) != "ocean")
-            && near(x, z, SPAWN_WOODS, 8, &|px, pz| matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove"))
+            && near(x, z, SPAWN_WOODS, 8, &|px, pz| {
+                matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove" | "tropical_forest")
+            })
     };
     let plains = |x: i32, z: i32| biome(x, z) == "plains" && h(x, z) > SEA + 1 && level(x, z, h(x, z));
     let land = |x: i32, z: i32| h(x, z) > SEA + 1;
@@ -1087,6 +1144,8 @@ fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool) -
         "savanna"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
+    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
+        "tropical_forest"
     } else if hu >= at(FOREST_HUMIDITY) {
         "forest"
     } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {
@@ -1357,6 +1416,8 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
         "savanna"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
+    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
+        "tropical_forest"
     } else if hu >= at(FOREST_HUMIDITY) {
         "forest"
     } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {
@@ -1573,6 +1634,28 @@ mod tests {
     }
 
     #[test]
+    fn craters_and_sinkholes_keep_their_shapes() {
+        let f = fields(42);
+        let sites = craters_near(&f, 0, 0, 8000);
+        assert!(sites.len() >= 4, "{} craters in 16 km", sites.len());
+        for &(x, z, r) in &sites {
+            // A bowl at the middle under its rim's crest, nothing past the rim's foot.
+            let deep = height(&f, x * 16, z * 16);
+            for (dx, dz) in [(r, 0), (-r, 0), (0, r), (0, -r)] {
+                let crest = height(&f, (x + dx) * 16, (z + dz) * 16);
+                assert!(crest - deep >= q4(r as f64 * CRATER_DEPTH * 0.8), "crater at {x} {z}: shallow");
+            }
+            assert_eq!(craters(&f, (x + r * 2) * 16, z * 16), 0, "crater at {x} {z}: reaches too far");
+        }
+        let f = fields(1);
+        let sinks = sinks_near(&f, 0, 0, 3000);
+        assert!(!sinks.is_empty(), "no sinkhole in 6 km");
+        for &(x, z, _) in &sinks {
+            assert!(land_height(&f, x * 16, z * 16) <= q4((SEA - SINK_FLOOR) as f64), "sinkhole at {x} {z} holds no water");
+        }
+    }
+
+    #[test]
     fn lakes_only_cut_and_hold_water() {
         let f = fields(1);
         let (mut wet, mut lakes_seen) = (0, 0);
@@ -1688,7 +1771,19 @@ mod tests {
             for (b, s, _) in &shares {
                 assert!(*s < 0.25, "seed {seed}: {b} is {:.1}% of the land", s * 100.0);
             }
-            for biome in ["plains", "forest", "birch_forest", "taiga", "snowy_plains", "desert", "savanna", "swamp", "mountains", "beach"] {
+            for biome in [
+                "plains",
+                "forest",
+                "tropical_forest",
+                "birch_forest",
+                "taiga",
+                "snowy_plains",
+                "desert",
+                "savanna",
+                "swamp",
+                "mountains",
+                "beach",
+            ] {
                 let (share, near) = shares
                     .iter()
                     .find(|e| e.0 == biome)
