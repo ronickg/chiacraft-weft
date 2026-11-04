@@ -903,6 +903,11 @@ average `CRETACEOUS_FLOW` (0.025), each species keeping its share by rarity (a f
 a crocodyliform one time in ten, a utahraptor one in twenty; a crag group a wyvern one in twenty);
 the overworld's are unchanged. The engine's cap (6 passive within 64 blocks of a player) still
 holds a spot to two or three groups, so the rare ones show as a player moves on.
+PC runs aw_cr2 (seven stops of the new land, 75 s each, twice before and twice after): 11 groups
+and 27 animals before, a flock of house sparrows on the Cretaceous's beach among them; 16 groups
+and 39 animals after, no modern ones. Plant eaters still come only as often as their food grows
+(`NATURAL_SPAWN`, its wet and dry seasons), and the engine scans for a spot only 16 blocks above
+and below the player.
 
 **Natural spawning stops at the room** (2026-11-04, the 48-minute PC soak f706e44f: wild grey
 wolves at 21-52 near one spot with room for 16, dying of want again and again). That soak's
