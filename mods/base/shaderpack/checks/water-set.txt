@@ -5,7 +5,7 @@ chat /weather clear
 chat /air 0 2 90 mist
 # Our water in the scenes of the reference set (references/water in chiacraft-archive): a lake at
 # noon, golden hour, in rain and at night, the shallows, under water, and an ocean shore (the last
-# at a spot the tester picks: standing on sand at the water's edge, looking out to sea).
+# on seed 1's coast).
 chat /gamemode spectator
 chat /tp 30000 90 30000
 wait 8
@@ -46,7 +46,7 @@ wait 2
 shot 06_lake_low.png
 # Under water: looking up at the surface, and along the bottom.
 chat /gamemode spectator
-chat /tp 30010 58 30010
+chat /tp 30050 61 30050
 wait 3
 look 30 60
 wait 2
@@ -54,11 +54,14 @@ shot 07_under_up.png
 look 30 -15
 wait 2
 shot 08_under_along.png
-# The ocean shore: the tester's spot (replace these coordinates), standing on the sand.
-chat /tp -5600 70 5600
+# The ocean shore (seed 1's coast, Tester 2's spot): a one-block drop onto the sand at y 64 (from
+# higher up, survival's fall kills), looking out over a wide sound.
+chat /tp 95 66 14098
 wait 8
+chat /gamemode survival
+wait 4
 chat /gamemode creative
-look 0 -8
+look 260 -8
 wait 3
 shot 09_ocean_shore.png
 quit
