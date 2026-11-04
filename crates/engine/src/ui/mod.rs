@@ -404,7 +404,14 @@ impl Ui {
     pub fn scroll_at(&mut self, p: Vec2, lines: f32) -> bool {
         let Some(id) = (0..self.nodes.len())
             .rev()
-            .find(|&i| self.nodes[i].style.scroll && self.nodes[i].rect.contains(p) && self.nodes[i].clip.is_none_or(|c| c.contains(p)))
+            .find(|&i| {
+                self.nodes[i].style.scroll
+                    && self.nodes[i].rect.contains(p)
+                    && self.nodes[i].clip.is_none_or(|c| c.contains(p))
+                    // a screen's root scrolls only when the screen is taller than the window, and
+                    // leaves the wheel to the rest otherwise
+                    && (i != 0 || self.nodes[0].scrollbar.is_some())
+            })
         else {
             return false;
         };
@@ -791,7 +798,9 @@ impl Ui {
         let free_c = if overflow_centres { free } else { free.max(0.0) };
         let (mut pos, spacing) = match style.justify {
             Justify::Start => (-scrolled, style.gap),
-            Justify::Center => (down(free_c / 2.0), style.gap),
+            // Centred, or from the top once it overflows a scrolling node, and scrolled from there
+            // (a screen taller than a small window: its root scrolls, `App::open`).
+            Justify::Center => (down(free_c / 2.0) - scrolled, style.gap),
             // Overflowing content sticks out at the start, the end edge stays put. Scrolling goes
             // from there.
             Justify::End => (free - past_end, style.gap),
