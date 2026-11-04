@@ -578,15 +578,21 @@ impl World {
     }
 
     /// Tint colors from now on, over the content's while the world runs (a mod's seasons): for
-    /// each entry a biome, a tint kind (either may be another mod's) and its 0xRRGGBB. Players see
-    /// it: grass and leaves take the new colors, blended across biome borders as before. What is
-    /// not named keeps the content's color; each call replaces the last; an empty list goes back
-    /// to the content's colors.
-    pub fn set_biome_tints(&self, tints: &[(&crate::Biome, &crate::TintKind, u32)]) {
-        let biomes: Vec<Str> = tints.iter().map(|t| Str::new(t.0.name())).collect();
+    /// each entry a biome (id, as `biome` gives it), a tint kind (another mod's too) and its
+    /// 0xRRGGBB. Players see it: grass and leaves take the new colors, blended across biome borders
+    /// as before. What is not named keeps the content's color; each call replaces the last; an
+    /// empty list goes back to the content's colors.
+    pub fn set_biome_tints(&self, tints: &[(u32, &crate::TintKind, u32)]) {
+        let biomes: Vec<u32> = tints.iter().map(|t| t.0).collect();
         let kinds: Vec<Str> = tints.iter().map(|t| Str::new(t.1.name())).collect();
         let colors: Vec<u32> = tints.iter().map(|t| t.2).collect();
         unsafe { (host().set_biome_tints)(self.raw(), biomes.as_ptr(), kinds.as_ptr(), colors.as_ptr(), tints.len() as u32) }
+    }
+
+    /// The content's color (0xRRGGBB) of `kind` in biome `biome` (id), whatever `set_biome_tints`
+    /// set since: the biome's own, else the kind's default; 0 for an unknown kind.
+    pub fn content_tint(&self, biome: u32, kind: &crate::TintKind) -> u32 {
+        unsafe { (host().content_tint)(biome, Str::new(kind.name())) }
     }
 
     /// The air set (`set_air`) in the biome at `pos`; clear and still if none was.

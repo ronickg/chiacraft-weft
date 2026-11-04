@@ -184,6 +184,7 @@ pub static HOST: Host = Host {
     set_air,
     air_at,
     set_biome_tints,
+    content_tint,
     entity_flash,
     reg_command_permission,
     player_permission,
@@ -2256,7 +2257,17 @@ unsafe extern "C" fn set_air(
     }
 }
 
-unsafe extern "C" fn set_biome_tints(w: *mut abi::WorldCtx, biomes: *const Str, kinds: *const Str, colors: *const u32, len: u32) {
+unsafe extern "C" fn content_tint(biome: u32, kind: Str) -> u32 {
+    let c = content();
+    let kn = unsafe { kind.as_str() };
+    let Some(ki) = c.tint_kinds.iter().position(|x| x.0 == kn) else { return 0 };
+    c.biomes
+        .get(biome as usize)
+        .and_then(|b| b.tints.get(ki).copied())
+        .unwrap_or(c.tint_kinds[ki].1)
+}
+
+unsafe extern "C" fn set_biome_tints(w: *mut abi::WorldCtx, biomes: *const u32, kinds: *const Str, colors: *const u32, len: u32) {
     unsafe {
         let d = dim(w);
         let c = content();
@@ -2275,10 +2286,10 @@ unsafe extern "C" fn set_biome_tints(w: *mut abi::WorldCtx, biomes: *const Str, 
             let (b, kd, col) =
                 (std::slice::from_raw_parts(biomes, n), std::slice::from_raw_parts(kinds, n), std::slice::from_raw_parts(colors, n));
             for i in 0..n {
-                let (bn, kn) = (b[i].as_str(), kd[i].as_str());
-                match (c.biomes.iter().position(|x| x.name == bn), c.tint_kinds.iter().position(|x| x.0 == kn)) {
-                    (Some(bi), Some(ki)) => table[bi * k + ki] = col[i] & 0xff_ffff,
-                    _ => misuse("set_biome_tints", || format!("no biome {bn} or tint kind {kn}")),
+                let (bi, kn) = (b[i] as usize, kd[i].as_str());
+                match (bi < c.biomes.len(), c.tint_kinds.iter().position(|x| x.0 == kn)) {
+                    (true, Some(ki)) => table[bi * k + ki] = col[i] & 0xff_ffff,
+                    _ => misuse("set_biome_tints", || format!("no biome {bi} or tint kind {kn}")),
                 }
             }
             table
