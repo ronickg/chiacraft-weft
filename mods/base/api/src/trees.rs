@@ -312,13 +312,28 @@ pub fn giant_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl
     put(x, y - 1, z, DIRT.id(), true);
 }
 
-/// A young tree of `log` (the understory: in clearings and at a wood's edge), `h` deciding its
-/// height: a trunk two to four high under a small crown of its leaves, a spire for the cone trees,
-/// a ragged ball for the rest. None for palms and flat-topped trees, which grow up in the open.
+/// A young tree of `log` (the understory: in clearings and at a wood's edge), `h` its seed: a
+/// species with a recipe grows a small one of its own shape (`tree_recipes::understory`, within
+/// `UNDERSTORY_REACH`); the rest a trunk two to four high under a small crown of its leaves, a
+/// spire for the cone trees, a ragged ball for the rest. None for palms and flat-topped trees, which grow up in the open.
 /// Calls `put(x, y, z, state, force)` for every block.
 pub fn young_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     let Some(leaves) = TREE_LEAVES.on_block(log).map(|l| l.0) else { return };
     if PALM_TREE.on_block(log) || FLAT_TREE.on_block(log) {
+        return;
+    }
+    // A species with a recipe grows its young from it, small (`tree_recipes::understory`), so a
+    // young oak reads as an oak and a young birch as a birch.
+    let name = block_name(log).split('[').next().unwrap_or("");
+    if let Some(recipe) = crate::tree_recipes::of(name) {
+        let young = crate::tree_recipes::understory(recipe);
+        branchy::grow(&young, x, y, z, h, |x, y, z, part| match part {
+            branchy::Part::Log { axis } => {
+                let along = ["x", "y", "z"][axis as usize];
+                put(x, y, z, state_with(log, "axis", along).unwrap_or(log), true)
+            }
+            branchy::Part::Leaves => put(x, y, z, leaves, false),
+        });
         return;
     }
     let height = 2 + (h % 3) as i32;

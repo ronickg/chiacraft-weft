@@ -142,18 +142,19 @@ VIEWS = [(0, 6, "side"), (35, 24, "3/4")]
 def sheet(sp, trees, refs, out):
     at = atlas(sp)
     young_kind = SPECIES[sp][4]
-    yk = "young:" + sp
-    young_trees = trees.get(yk)
-    if young_trees:
-        yt = young_trees[0]
-        ylabel = "young (YOUNG recipe)"
-    elif young_kind:
-        yt = young(young_kind, 7)
-        ylabel = "young (understory)"
-    else:
-        yt = None
-        ylabel = "young: none"
     grown = trees[sp]
+    # columns: the understory's young (its own recipe, small, when the dump has it; else dev's
+    # ball on a stick), a young recipe's tree, then the grown ones
+    cols = []
+    if trees.get("understory:" + sp):
+        cols += [(f"young (understory), seed {i}", t) for i, t in enumerate(trees["understory:" + sp][:2])]
+    elif young_kind:
+        cols += [("young (dev: ball on a stick)", young(young_kind, 7))]
+    else:
+        cols += [("young: none", None)]
+    if trees.get("young:" + sp):
+        cols += [("young (YOUNG recipe)", trees["young:" + sp][0])]
+    cols += [(f"grown, seed {i}", t) for i, t in enumerate(grown)]
     hmax = max(bbox(t)[1][1] - bbox(t)[0][1] for t in grown)
     wmax = max(max(bbox(t)[1][[0, 2]] - bbox(t)[0][[0, 2]]) for t in grown)
     cell = (300, 460)
@@ -164,19 +165,16 @@ def sheet(sp, trees, refs, out):
     if refs and os.path.exists(os.path.join(refs, sp.split(":")[1] + ".png")):
         ref = Image.open(os.path.join(refs, sp.split(":")[1] + ".png")).convert("RGB")
         ref.thumbnail((520, cell[1] * 2 + 30))
-    cols = 1 + 3
-    W = 20 + cols * cell[0] + (ref.size[0] + 20 if ref else 0)
+    W = 20 + len(cols) * cell[0] + (ref.size[0] + 20 if ref else 0)
     H = 50 + 2 * (cell[1] + 24)
     im = Image.new("RGB", (W, H), (236, 233, 226))
     d = ImageDraw.Draw(im)
     d.text((14, 10), f"{SPECIES[sp][5]}   ({sp}, {ppb:.1f} px a block)", fill=(20, 20, 20), font=font)
     for row, (yaw, pitch, vname) in enumerate(VIEWS):
         y0 = 40 + row * (cell[1] + 24)
-        for c in range(cols):
+        for c, (label, t) in enumerate(cols):
             x0 = 10 + c * cell[0]
-            label = (ylabel if c == 0 else f"grown, seed {c - 1}") + f", {vname}"
-            d.text((x0 + 6, y0), label, fill=(60, 60, 60), font=small)
-            t = yt if c == 0 else grown[c - 1]
+            d.text((x0 + 6, y0), f"{label}, {vname}", fill=(60, 60, 60), font=small)
             if t is None:
                 continue
             # the young at the grown trees' scale, so sizes compare
@@ -186,7 +184,7 @@ def sheet(sp, trees, refs, out):
             d.text((x0 + 6, y0 + cell[1] + 2), f"{hi[1] - lo[1]} high, {hi[0] - lo[0]}x{hi[2] - lo[2]} wide, "
                    f"{sum(1 for b in t if b[3] > 0)} logs", fill=(90, 90, 90), font=small)
     if ref:
-        im.paste(ref, (20 + cols * cell[0], 40))
+        im.paste(ref, (20 + len(cols) * cell[0], 40))
     im.save(out)
     return out
 

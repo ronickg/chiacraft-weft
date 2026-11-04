@@ -6,38 +6,53 @@
 use crate::branchy::Recipe;
 
 pub const RECIPES: &[Recipe] = &[
-    // An oak: a short trunk, a few big limbs out and up, lumpy round clusters, a broad crown.
+    // An oak (Quercus robur): a short stout trunk (2 x 2 on the bigger ones, up to its first
+    // limbs), a few big limbs out and up from low on it, the leader ending inside the crown,
+    // overlapping round clusters: a broad dome wider than it is tall.
     Recipe {
         log: "base:oak_log",
-        height: 7.0,
-        width: 1.1,
-        width_loss: 0.1,
-        branch_start: 0.4,
-        branch_every: 1.1,
-        branch_angle: 55.0,
-        branch_width: 0.75,
-        leaf_r: 2.3,
-        leaf_ry: 1.8,
-        ragged: 0.5,
+        height: 7.5,
+        size_var: 0.25,
+        width: 1.35,
+        width_loss: 0.09,
+        drift: 7.0,
+        droop: 0.0,
+        branch_start: 0.3,
+        branch_every: 0.8,
+        branch_angle: 48.0,
+        branch_width: 0.7,
+        branch_len: 0.7,
+        taper: 0.45,
+        leaf_r: 2.6,
+        leaf_ry: 2.1,
+        ragged: 0.45,
         ..Recipe::BASE
     },
-    // A birch: tall and slim, a pale trunk, short branches steep up, small clusters, narrow.
+    // A birch (Betula pendula): tall and slim, its white trunk straight up through the crown,
+    // short thin branches steep up and drooping at their ends, leaves along them: a narrow oval
+    // crown of fine twigs, no thick wood showing in it.
     Recipe {
         log: "base:birch_log",
-        height: 9.0,
-        width_loss: 0.085,
-        branch_start: 0.3,
-        branch_every: 0.7,
-        branch_angle: 35.0,
-        branch_width: 0.55,
+        height: 10.0,
+        width_loss: 0.07,
+        drift: 4.0,
+        droop: 0.3,
+        branch_start: 0.42,
+        branch_every: 0.9,
+        branch_angle: 48.0,
+        branch_width: 0.4,
         orders: 1,
-        taper: 0.4,
-        leaf_r: 1.5,
-        leaf_ry: 1.5,
+        branch_len: 0.42,
+        taper: 0.6,
+        leaf_r: 1.3,
+        leaf_ry: 1.2,
+        ragged: 0.55,
+        leaf_along: true,
         ..Recipe::BASE
     },
-    // A spruce: a straight trunk to the tip, whorls of branches nearly flat and drooping, shorter
-    // up the tree, needles along their whole length: a ragged cone. Big ones have a 2 x 2 foot.
+    // A spruce (Picea abies): a straight trunk to the tip, regular whorls of five nearly flat
+    // drooping branches from near the ground, shorter up the tree, needles along their whole
+    // length hiding the trunk: a clean, narrow cone. Big ones have a 2 x 2 foot.
     Recipe {
         log: "base:spruce_log",
         height: 11.0,
@@ -45,19 +60,20 @@ pub const RECIPES: &[Recipe] = &[
         width: 1.25,
         width_loss: 0.075,
         leaf_width: 2.0,
-        drift: 2.0,
-        droop: 0.4,
-        branch_start: 0.22,
-        branch_every: 0.9,
-        branch_count: 3,
-        branch_angle: 80.0,
+        drift: 1.0,
+        droop: 0.35,
+        branch_start: 0.12,
+        branch_every: 1.0,
+        branch_count: 5,
+        branch_angle: 82.0,
         branch_width: 0.32,
         orders: 1,
-        branch_len: 0.36,
-        taper: 1.0,
-        leaf_r: 1.1,
+        branch_len: 0.34,
+        taper: 0.95,
+        branch_var: 0.35,
+        leaf_r: 1.2,
         leaf_ry: 0.9,
-        ragged: 0.45,
+        ragged: 0.35,
         leaf_along: true,
         ..Recipe::BASE
     },
@@ -302,6 +318,37 @@ pub const YOUNG_SEQUOIA: Recipe = Recipe {
 /// The young of the trees that grow too big to come from a sapling at once: a planted sequoia
 /// grows into a young one (`YOUNG_SEQUOIA`), not a giant.
 pub const YOUNG: &[Recipe] = &[YOUNG_SEQUOIA];
+
+/// How far a young tree of the understory reaches sideways (its scatter's reach in `worldgen.rs`).
+pub const UNDERSTORY_REACH: i32 = 3;
+
+/// A young tree of the understory (`trees::young_tree_blocks`): the species' own recipe at about
+/// two fifths of its height on a trunk a block wide, so a young oak already reads as an oak and a
+/// young birch as a birch (a ball on a stick read as every species at once, the tree-look audit).
+/// Its branches come closer together, its clusters smaller; one order of branches at most.
+pub fn understory(r: &Recipe) -> Recipe {
+    let height = (r.height * 0.42).clamp(3.5, 8.0);
+    // The share of its width the grown trunk keeps at its top, kept for the young one.
+    let left = (1.0 - r.width_loss * r.height / r.width).clamp(0.2, 0.8);
+    Recipe {
+        height,
+        width: 1.0,
+        width_loss: (1.0 - left) / height,
+        branch_every: (r.branch_every * 0.6).max(0.5),
+        branch_start: (r.branch_start * 0.8).max(0.2),
+        branch_count: r.branch_count.min(4),
+        orders: r.orders.min(1),
+        leaf_r: (r.leaf_r * 0.7).max(1.0),
+        leaf_ry: (r.leaf_ry * 0.75).max(0.9),
+        // fronds (a young palm's) a little shorter
+        frond_len: r.frond_len * 0.6,
+        reach: UNDERSTORY_REACH,
+        max_height: 12,
+        flare: 0.0,
+        lobes: 0.0,
+        ..*r
+    }
+}
 
 /// The recipe a sapling of this log grows by: its young one's, if it has one, else its own.
 pub fn sapling_of(log: &str) -> Option<&'static Recipe> {
