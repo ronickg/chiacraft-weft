@@ -17,6 +17,13 @@ wait 1
 look 0 5
 wait 1
 shot 01_hud_day.png
+# Third person from behind: no crosshair over the player (F5 cycles first, behind, front).
+press core:perspective
+wait 1
+shot 01b_third_person.png
+press core:perspective
+press core:perspective
+wait 0.5
 # Inventory with clothing and armor slots, some items.
 chat /tk put me 41 base:fur_coat
 chat /tk put me 37 base:iron_chestplate
