@@ -1,0 +1,19 @@
+{
+ "kind": "sky",
+ "what": "a cloud layer seen from below for a blocky world: three or four big flat blocky cloud shapes made of square steps, white tops with a light grey underside, no outline, magenta gaps between them",
+ "size": [
+  64,
+  64
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.234,
+   "outline": 1.0,
+   "red_line": 0.0,
+   "fill": 0.54,
+   "passed": true
+  }
+ ]
+}

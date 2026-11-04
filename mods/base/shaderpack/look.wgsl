@@ -24,6 +24,11 @@ fn luma(c: vec3<f32>) -> f32 {
     return dot(c, vec3(0.2126, 0.7152, 0.0722));
 }
 
+// What solid things write in the world image's alpha: nothing, so that what water, glass and ice
+// blend over them leaves their own share there, a mask the reflections effect reads
+// (`mods/base/assets/shaders/post/reflect.wgsl`). The screen never shows the alpha.
+const SOLID_ALPHA: f32 = 0.0;
+
 // ---- the colors of the day ----
 
 struct Palette {

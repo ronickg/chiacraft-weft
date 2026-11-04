@@ -2204,6 +2204,7 @@ impl Client {
         let ticks = (self.smooth_time() % (1 << 20) as f64) as f32;
         Scene {
             view_proj: (cam.proj(aspect) * view).to_cols_array_2d(),
+            inv_view_proj: (cam.proj(aspect) * view).inverse().to_cols_array_2d(),
             right: inv.transform_vector3(Vec3::X).extend(0.0).to_array(),
             up: inv.transform_vector3(Vec3::Y).extend(0.0).to_array(),
             fog_color: self.fog_color(),

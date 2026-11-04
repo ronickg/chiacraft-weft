@@ -434,7 +434,7 @@ fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
     let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
-    return vec4(shade(in, albedo).rgb, 1.0);
+    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
 
 fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4<f32> {
@@ -457,7 +457,7 @@ fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
     if albedo.a <= 0.1 {
         discard;
     }
-    return vec4(shade(in, albedo).rgb, 1.0);
+    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }
 
 @fragment
@@ -533,5 +533,5 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
     if in.blend > 0.0 {
         albedo = mix(albedo, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
     }
-    return vec4(shade(in, albedo).rgb, 1.0);
+    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }

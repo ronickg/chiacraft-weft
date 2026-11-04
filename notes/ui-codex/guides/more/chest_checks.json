@@ -1,0 +1,34 @@
+{
+ "kind": "model_block",
+ "what": "only the closed front face of a wooden chest, filling the canvas: dark walnut planks in a riveted grey-green iron frame with corner brackets, the lid (the top third) and the base meeting at a seam, a small iron lock plate centred on the seam",
+ "size": [
+  32,
+  32
+ ],
+ "full": true,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.533,
+   "outline": 1.4,
+   "red_line": 0.0,
+   "fill": 1.0,
+   "passed": false
+  },
+  {
+   "grid": 0.324,
+   "outline": 0.95,
+   "red_line": 0.0,
+   "fill": 1.0,
+   "passed": false
+  },
+  {
+   "grid": 0.312,
+   "outline": 1.32,
+   "red_line": 0.0,
+   "fill": 1.0,
+   "passed": false
+  }
+ ],
+ "note": "a full chest face: the job asked for it as a cutout by mistake, so the fill check failed it 3 times; cut as a full face from try 1"
+}

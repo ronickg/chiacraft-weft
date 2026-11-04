@@ -102,7 +102,7 @@ impl Post {
     /// Runs the effects over the scene; the last one draws onto the screen and leaves that pass
     /// open for the UI.
     /// `scene` is the buffer the world was drawn with (`gpu_layout::Scene`).
-    pub fn apply(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, scene: Option<BufferId>) {
+    pub fn apply(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, scene: Option<BufferId>, depth: u32) {
         let (Some(pipe), Some((tex, idx, _))) = (self.pipeline, self.targets) else { return };
         let scene = match scene {
             Some(b) => b,
@@ -128,7 +128,8 @@ impl Post {
                 strength: *strength,
                 time,
                 size: [frame.width as f32, frame.height as f32],
-                pad: [0.0; 2],
+                depth,
+                pad: 0,
             })
             .collect();
         let buf = self.params[frame.slot];

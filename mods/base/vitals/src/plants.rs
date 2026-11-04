@@ -61,7 +61,7 @@ const ANY: u8 = 15;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 21] = [
+pub const PLANTS: [Plant; 24] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -104,6 +104,11 @@ pub const PLANTS: [Plant; 21] = [
     p("base:mushroom_brown", "forest mushrooms", (5.0, 10.0, 20.0, 30.0), Water::Moderate, 8.0, SUMMER_AUTUMN, -2.0),
     p("base:mushroom_red", "fly agaric", (5.0, 10.0, 20.0, 30.0), Water::Moderate, 8.0, SUMMER_AUTUMN, -2.0),
     p("base:water_hyacinth", "water hyacinth", (12.0, 25.0, 30.0, 38.0), Water::Wet, 10.0, ANY, -1.0),
+    // Our trees' saplings, at the game's time as the oak's: mesquite, a desert legume that a
+    // frost below about -15 kills; the tropical palms, killed by any frost.
+    p("base:mesquite_sapling", "mesquite", (12.0, 25.0, 38.0, 48.0), Water::Dry, 0.0, ANY, -15.0),
+    p("base:acuri_palm_sapling", "acuri palm (Attalea phalerata)", (15.0, 24.0, 32.0, 40.0), Water::Moderate, 0.0, ANY, 0.0),
+    p("base:moriche_palm_sapling", "moriche palm (Mauritia flexuosa)", (15.0, 24.0, 32.0, 40.0), Water::Wet, 0.0, ANY, 0.0),
 ];
 
 /// Whether air at `air` °C (a night's frost where it stands) hurts it (`Plant::frost`).

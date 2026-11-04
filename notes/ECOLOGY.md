@@ -456,12 +456,39 @@ and cactus.**
   - **The savanna:** 43/100/100/40% from spring to winter.
 - **Checks:** every wild plant grows where it's found, a third of its best in some season, and
   the covers of one ground leave room for the grass (`vitals/src/wild.rs`).
+- **Trees** (2026-11-04):
+  - **Mesquite:** in the desert's washes and the llanos, flat-topped like an acacia. Its leaves
+    are browse, and its pods, June to October, are the desert's biggest single food.
+  - **The acuri palm:** the Pantanal's commonest palm, its nuts falling in the dry season.
+  - **The moriche palm:** along the llanos' streams and in the swamp, its fruit coming from the
+    late dry season into the rains.
+
+  Each has logs, planks, leaves that drop its sapling and its fruit (`mesquite_pod`, `acuri_nut`,
+  `moriche_fruit`, which plant one too), and a sapling that grows by the place (`vitals::plants`).
+  Palms and the tree fern take a new shape, a tall bare trunk under a crown of drooping fronds
+  (`worldgen.rs`, `palm_tree`).
+
+  **The Cretaceous's** (the animals mod's, grown by base's worldgen):
+  - araucarias, flat-crowned, with rich foliage and big cones;
+  - ginkgos, round, deciduous, with fleshy seeds;
+  - swamp cypresses on the floodplain;
+  - scale-leaved conifers on the dry land and rarely on the dunes;
+  - Tempskya, the tree fern;
+  - rotten logs on the forest floor and floodplain, where grubs are food (insects).
+
+  Spruce stays in the fern forest as its pines and podocarps. Each tree's leaves are browse where
+  it grows, its fruit in season (`forage::SOURCES`), and the fallen fruit lies on the ground for
+  animals (`forage::DROPPED`).
+- **Looks:** a grazed tuft shows bitten down (`<plant>_grazed`), a ripe seed head its fruit or
+  seed (`<plant>_ripe`).
+- **Grown plants rest:** a plant at its last age returns from its growth step before reading the
+  air and ground, so a ripe field or bush costs nothing until it's picked or eaten. A ripe one
+  keeps its fruit through a frost now (lingonberries and crowberries really do).
 - **Not yet:**
   - kelp, since the engine has no block standing in water;
-  - the trees (mesquite and pods, palms, the Cretaceous's ginkgo, araucaria, swamp cypress and
-    tree fern) and the rotten log for grubs;
+  - saplings for the Cretaceous's trees: they grow by base's plant rule, which the animals mod
+    can't call;
   - the crops (barley, rye, potato, maize, rice, beans and the rest);
-  - grazed and ripe looks for the tufts and seed heads (one texture for both states for now);
   - none of it seen in the game yet;
   - unloaded plants catch up at today's season, not the season they missed.
 

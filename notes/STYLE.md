@@ -8,6 +8,9 @@ textures **painted by Claude** by rule; the HUD after designs Ronald sends.
 
 ## Where it stands
 
+- Block size decided (2026-11-03): **32 px**, like the items, from Ronald's block style guide
+  (the style guide test, `notes/ui-codex/guides/`). The whole set redone at 32 (the `block-textures`
+  skill) is in the game, merged 2026-11-03; the 64 px set below is the one it replaced.
 - Blocks (2026-11-03): 107 textures at 64 px, generated with Codex (ChatGPT's image model) from
   one prompt, the palette (`notes/texture-test/palette.png`) and the approved tiles, four an image
   (`notes/texture-test/codex/gen_grid.sh`, `gen_sprites.sh` for plants), cut by `grid_cut.py` and
