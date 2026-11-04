@@ -144,12 +144,29 @@ impl Area {
     }
 }
 
+/// Where the biomes stand in the climate fields. The temperature and humidity noises spread
+/// about ±0.28 over nine tenths of the world (their deviation is 0.17, far inside the ±1.4 they
+/// could reach), so every threshold sits inside that and each biome turns up within a few
+/// kilometres (`biome_shares` is tested). The biomes take them in `mods/base/src/worldgen.rs`,
+/// tried in the order of `overworld_biome`; the features' climate ramps below match them.
+/// Snowy plains colder than this, taiga colder than `TAIGA_BELOW`.
+pub const SNOWY_BELOW: f64 = -0.22;
+pub const TAIGA_BELOW: f64 = -0.12;
+/// Desert from this temperature and under this humidity; savanna likewise, after it.
+pub const DESERT: (f64, f64) = (0.14, 0.0);
+pub const SAVANNA: (f64, f64) = (0.1, 0.1);
+/// Swamp from this temperature and this humidity, on low land.
+pub const SWAMP: (f64, f64) = (0.0, 0.04);
+/// Forest from this humidity; birch forest under this temperature and from this humidity.
+pub const FOREST_HUMIDITY: f64 = 0.07;
+pub const BIRCH: (f64, f64) = (0.05, 0.0);
+
 /// Oceans and land masses, this many blocks above or below the sea.
 pub const CONTINENTS: f64 = 18.0;
 
 /// Rolling hills (height, size), flattened in the cold into tundra.
 pub const HILLS: (f64, f64) = (16.0, 110.0);
-pub const HILLS_AREA: Area = Area { all: &[Ramp::Temperature(-0.35, -0.6)], not: true };
+pub const HILLS_AREA: Area = Area { all: &[Ramp::Temperature(-0.15, -0.26)], not: true };
 
 /// Highlands: the land swells up to this many blocks in broad patches inland, and the hills roll
 /// on top, so the temperate lands stand some 30 blocks over the sea in places; not in the cold
@@ -159,15 +176,15 @@ pub const HIGHLANDS_AREA: Area = Area {
     all: &[
         Ramp::Noise { salt: salt::HIGHLANDS, scale: 900.0, from: -0.05, to: 0.3 },
         Ramp::Continent(0.08, 0.3),
-        Ramp::Temperature(-0.6, -0.35),
-        Ramp::Humidity(-0.15, 0.05),
+        Ramp::Temperature(-0.26, -0.15),
+        Ramp::Humidity(-0.12, 0.0),
     ],
     not: false,
 };
 
 /// Sand dunes (height, wavelength) in the hot, dry land.
 pub const DUNES: (f64, f64) = (4.0, 26.0);
-pub const DUNES_AREA: Area = Area { all: &[Ramp::Temperature(0.25, 0.45), Ramp::Humidity(0.1, -0.05)], not: false };
+pub const DUNES_AREA: Area = Area { all: &[Ramp::Temperature(0.12, 0.22), Ramp::Humidity(0.0, -0.08)], not: false };
 
 /// Mountain ranges (height, width between ridge lines), in patches inland; the mountains biome
 /// stands where this area is 0.45 or more (`MOUNTAIN_BIOME`).
@@ -188,8 +205,8 @@ pub const MESA_CLIFF: f64 = 0.12;
 /// Where mesas rise: hot and dry, in patches (the desert and the dry savanna).
 pub const MESA_AREA: Area = Area {
     all: &[
-        Ramp::Temperature(0.15, 0.3),
-        Ramp::Humidity(0.2, 0.02),
+        Ramp::Temperature(0.08, 0.18),
+        Ramp::Humidity(0.06, -0.04),
         Ramp::Noise { salt: salt::MESA_AREA, scale: 520.0, from: -0.15, to: 0.1 },
     ],
     not: false,
@@ -208,7 +225,7 @@ pub const RIVER_COAST: (f64, f64) = (0.35, 0.05);
 /// Rivers fade out far inland, where the continent noise rises from `.0` to `.1`.
 pub const RIVER_INLAND: (f64, f64) = (0.45, 0.62);
 /// No rivers where it's this dry (humidity), all of them from `.1` on.
-pub const RIVER_DRY: (f64, f64) = (-0.45, -0.15);
+pub const RIVER_DRY: (f64, f64) = (-0.25, -0.08);
 /// Rivers rise in the mountains: full where the mountains' area (`MOUNTAINS_AREA`) is up to `.0`,
 /// gone at `.1`; through lower hills and mesas they cut their valleys.
 pub const RIVER_MOUNTAINS: (f64, f64) = (0.1, 0.45);
@@ -241,7 +258,7 @@ pub const RIVER_BEDS: [(&str, &str); 8] = [
 
 /// Snow lies above these heights, by the climate's temperature: (below this temperature, the
 /// line), coldest first; the last band holds for everything warmer.
-pub const SNOW_LINES: [(f64, i32); 3] = [(-0.25, 146), (0.2, 162), (f64::INFINITY, 180)];
+pub const SNOW_LINES: [(f64, i32); 3] = [(-0.15, 146), (0.12, 162), (f64::INFINITY, 180)];
 /// In drifts the snow comes this many blocks lower: patches about `SNOW_DRIFT_SIZE` blocks
 /// across, where the drift noise is over `SNOW_DRIFT_FROM`.
 pub const SNOW_DRIFT: i32 = 9;
@@ -258,11 +275,20 @@ pub const ROCK_FALL: i32 = 4;
 pub const SNOW_FALL: i32 = 3;
 pub const ROCK_DEPTH: i32 = 5;
 pub const ROCK_MAX_DEPTH: i32 = 16;
-/// Rock faces in patches about `ROCK_PATCH` blocks across: cobbles where the patch noise is over
-/// `ROCK_COBBLES`, mossy cobbles under `-ROCK_MOSS` in the woods and the wet, stone between.
+/// What rock a face shows, by its column's climate and height (`rock_set`): the hot, dry land's
+/// strata (`STRATA`), slate in the cold (under `TAIGA_BELOW`), granite on ground this high over
+/// the sea or in the mountains, limestone on the lower cliffs and river banks.
+pub const GRANITE_ABOVE: i32 = 40;
+/// In patches about `ROCK_PATCH` blocks across: where the patch noise is over `ROCK_PATCHES` the
+/// face shows its second rock (stone in slate and limestone, cobbles in granite), under
+/// `-ROCK_MOSS` mossy cobbles in the woods and the wet (limestone) or stone (granite).
 pub const ROCK_PATCH: f64 = 9.0;
-pub const ROCK_COBBLES: f64 = 0.22;
+pub const ROCK_PATCHES: f64 = 0.22;
 pub const ROCK_MOSS: f64 = 0.25;
+/// The mesas' strata from the bottom up, repeating: each layer's rock, 1 to 3 blocks thick by the
+/// world's seed; the layers tilt gently, up to `STRATA_TILT` blocks over some 300.
+pub const STRATA: [&str; 6] = ["sandstone", "ochre_sandstone", "sandstone", "red_sandstone", "ochre_sandstone", "red_sandstone"];
+pub const STRATA_TILT: i32 = 3;
 
 /// The engine's features of the land, in the order they're added; `mesas` and `rivers` go after
 /// them (`land_height`, `rivers`).
@@ -408,18 +434,128 @@ pub fn snowy(f: &Fields, x: i32, z: i32, height: i32) -> bool {
     height >= line || (height >= line - SNOW_DRIFT && drift > q12(SNOW_DRIFT_FROM))
 }
 
-/// Which rock a rock face shows at a block (world blocks): 0 stone, 1 cobbles, 2 mossy cobbles
-/// (only where `mossy`), in patches.
-pub fn rock_kind(seed: u64, [x, y, z]: [i32; 3], mossy: bool) -> u8 {
-    let s = q4(ROCK_PATCH);
-    let v = fixed::perlin3(fixed::seed32(seed, 0x50C4), x * 16, y * 16, z * 16, s, s / 2, s);
-    if v > q12(ROCK_COBBLES) {
-        1
-    } else if mossy && v < -q12(ROCK_MOSS) {
-        2
+/// The rocks a column's face shows (`rock_set`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RockSet {
+    Strata,
+    Slate,
+    Granite,
+    Limestone,
+}
+
+/// The rocks of the face of column (`x`, `z`) (Q4), its ground `height` (blocks) high; `sandy`
+/// faces (sand on top) are strata wherever they are.
+pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet {
+    let here = Here::new(f, x, z);
+    let (t, hu) = (here.temperature(), here.humidity());
+    if sandy || t >= q12(SAVANNA.0) && hu < q12(SAVANNA.1) {
+        RockSet::Strata
+    } else if t < q12(TAIGA_BELOW) {
+        RockSet::Slate
+    } else if height >= SEA + GRANITE_ABOVE || MOUNTAINS_AREA.at(&here) > q12(MOUNTAIN_BIOME) {
+        RockSet::Granite
     } else {
-        0
+        RockSet::Limestone
     }
+}
+
+impl RockSet {
+    /// The block (its name in base) at `pos` (world blocks) of a face of these rocks; mossy cobbles
+    /// only where `mossy`.
+    pub fn block(self, seed: u64, [x, y, z]: [i32; 3], mossy: bool) -> &'static str {
+        if self == RockSet::Strata {
+            return strata(seed, [x, y, z]);
+        }
+        let s = q4(ROCK_PATCH);
+        let v = fixed::perlin3(fixed::seed32(seed, 0x50C4), x * 16, y * 16, z * 16, s, s / 2, s);
+        let (patch, low) = (v > q12(ROCK_PATCHES), v < -q12(ROCK_MOSS));
+        match self {
+            RockSet::Slate if patch => "stone",
+            RockSet::Slate => "slate",
+            RockSet::Granite if patch => "cobblestone",
+            RockSet::Granite if low => "stone",
+            RockSet::Granite => "granite",
+            RockSet::Limestone if patch => "stone",
+            RockSet::Limestone if low && mossy => "mossy_cobblestone",
+            _ => "limestone",
+        }
+    }
+}
+
+/// The mesas' layer at `pos` (world blocks): `STRATA` repeating up the height, each layer 1 to 3
+/// blocks thick by the seed, the whole gently tilted.
+pub fn strata(seed: u64, [x, y, z]: [i32; 3]) -> &'static str {
+    let s = fixed::seed32(seed, 0x57A7);
+    let thick = |i: usize| 1 + (fixed::hash(s, i as i32, 0, 0) % 3) as i32;
+    let period: i32 = (0..STRATA.len()).map(thick).sum();
+    let tilt = (fixed::perlin2(s ^ 1, x * 16, z * 16, 300 * 16) * STRATA_TILT) >> 12;
+    let mut at = (y + tilt).rem_euclid(period);
+    for (i, rock) in STRATA.iter().enumerate() {
+        at -= thick(i);
+        if at < 0 {
+            return rock;
+        }
+    }
+    STRATA[0]
+}
+
+/// The overworld biome the rules in `mods/base/src/land.rs` pick at (`x`, `z`) (Q4), by name, in
+/// their order: for the map preview and the checks here (the engine's own pick is the truth).
+pub fn overworld_biome(f: &Fields, x: i32, z: i32) -> &'static str {
+    let here = Here::new(f, x, z);
+    let h = height(f, x, z) >> 4;
+    let (t, hu, c) = (here.temperature(), here.humidity(), here.continent());
+    let at = |v: f64| q12(v);
+    if h <= SEA - 2 && c < at(OCEAN_CONTINENT) {
+        "ocean"
+    } else if h <= SEA + 1 && c < at(0.1) {
+        if t < at(SNOWY_BELOW) { "snowy_plains" } else { "beach" }
+    } else if MOUNTAINS_AREA.at(&here) > at(MOUNTAIN_BIOME) || snowy(f, x, z, h) {
+        "mountains"
+    } else if t < at(SNOWY_BELOW) {
+        "snowy_plains"
+    } else if t < at(TAIGA_BELOW) {
+        "taiga"
+    } else if t >= at(DESERT.0) && hu < at(DESERT.1) {
+        "desert"
+    } else if t >= at(SAVANNA.0) && hu < at(SAVANNA.1) {
+        "savanna"
+    } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
+        "swamp"
+    } else if hu >= at(FOREST_HUMIDITY) {
+        "forest"
+    } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {
+        "birch_forest"
+    } else {
+        "plains"
+    }
+}
+
+/// Each overworld biome's share of the land (not the sea), sampled every `step` blocks out to
+/// `radius` from the middle, and how near the middle it first turns up (blocks, the larger of
+/// x and z).
+pub fn biome_shares(seed: u64, radius: i32, step: usize) -> Vec<(&'static str, f64, i32)> {
+    let f = Fields { seed };
+    let mut n: Vec<(&'static str, usize, i32)> = Vec::new();
+    let mut land = 0;
+    for z in (-radius..=radius).step_by(step) {
+        for x in (-radius..=radius).step_by(step) {
+            let b = overworld_biome(&f, x * 16, z * 16);
+            if b == "ocean" {
+                continue;
+            }
+            land += 1;
+            let d = x.abs().max(z.abs());
+            match n.iter_mut().find(|e| e.0 == b) {
+                Some(e) => (e.1, e.2) = (e.1 + 1, e.2.min(d)),
+                None => n.push((b, 1, d)),
+            }
+        }
+    }
+    n.sort();
+    n.into_iter()
+        .map(|(b, c, d)| (b, c as f64 / land.max(1) as f64, d))
+        .collect()
 }
 
 #[cfg(test)]
@@ -452,6 +588,13 @@ mod tests {
     }
 
     #[test]
+    fn strata_are_layers_of_their_rocks() {
+        let rocks: Vec<&str> = (0..40).map(|y| strata(5, [0, y, 0])).collect();
+        assert!(rocks.iter().all(|r| STRATA.contains(r)));
+        assert!(STRATA.iter().all(|r| rocks.contains(r)), "{rocks:?}");
+    }
+
+    #[test]
     fn snow_lines_fall_with_the_cold() {
         assert!(
             SNOW_LINES
@@ -460,5 +603,20 @@ mod tests {
         );
         assert_eq!(snow_line(q12(-0.5)), SNOW_LINES[0].1);
         assert_eq!(snow_line(q12(0.9)), SNOW_LINES[2].1);
+    }
+
+    #[test]
+    fn every_biome_turns_up_near_the_middle() {
+        for seed in [1, 2, 3] {
+            let shares = biome_shares(seed, 6000, 48);
+            for biome in ["plains", "forest", "birch_forest", "taiga", "snowy_plains", "desert", "savanna", "swamp", "mountains", "beach"] {
+                let (share, near) = shares
+                    .iter()
+                    .find(|e| e.0 == biome)
+                    .map_or((0.0, i32::MAX), |e| (e.1, e.2));
+                assert!(share >= 0.01, "seed {seed}: {biome} is {:.1}% of the land: {shares:?}", share * 100.0);
+                assert!(near <= 4000, "seed {seed}: the nearest {biome} is {near} blocks out");
+            }
+        }
     }
 }
