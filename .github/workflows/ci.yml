@@ -100,9 +100,11 @@ jobs:
       - name: Animals' rules
         run: mods/animals/web/build.sh && node mods/animals/web/test.mjs
 
-  testkit:
+  # The game and its mods once, as `cargo run --release -- --test ...` runs them; the testkit jobs
+  # share it.
+  game:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -112,30 +114,66 @@ jobs:
           cache-on-failure: true
 
       - name: System libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config xvfb mesa-vulkan-drivers vulkan-tools \
-            libxkbcommon-x11-0 libxcursor1 libxrandr2 libxi6 libx11-xcb1
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
 
-      # The game and its mods, as `cargo run --release -- --test ...` runs them.
       - name: Build
         run: cargo build --release
+
+      # A tar keeps the permission to run the game, which the artifact alone would lose. The mods'
+      # libraries sit beside the game, where it looks for them.
+      - name: Pack
+        run: tar -cf game.tar target/release/weft target/release/*.so
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: game
+          path: game.tar
+          retention-days: 3
+
+  # About 210 tests take over two hours one after the other on software Vulkan, so each job runs
+  # every Nth (`--test-shard i/N`), and the ones that measure the game's speed run on their own.
+  testkit:
+    needs: game
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0/6, 1/6, 2/6, 3/6, 4/6, 5/6, alone]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2t64 xvfb mesa-vulkan-drivers vulkan-tools \
+            libxkbcommon-x11-0 libxcursor1 libxrandr2 libxi6 libx11-xcb1
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: game
+
+      - name: Unpack
+        run: tar -xf game.tar
 
       - name: Software Vulkan
         run: xvfb-run -a vulkaninfo --summary
 
       # Every wait in a test has its own timeout; this is for a game that stops answering.
-      - name: Testkit
+      - name: Testkit ${{ matrix.shard }}
         timeout-minutes: 45
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" target/release/weft --test all
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" target/release/weft --test all --test-shard ${{ matrix.shard }}
+
+      - name: Report name
+        if: always()
+        run: echo "REPORT=testkit-$(echo '${{ matrix.shard }}' | tr / -)" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: testkit-report
+          name: ${{ env.REPORT }}
           path: |
             run/test-reports
             run/test-shots
-            run/test-jobs/*/output.log
             run/logs
           if-no-files-found: ignore
