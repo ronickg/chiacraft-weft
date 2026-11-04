@@ -324,8 +324,8 @@ fn plant(r: &mut Registry, handle: &'static Block, tex: &str) {
 /// Sand and gravel: with nothing under them they fall as an entity and land as a block.
 pub fn register(r: &mut Registry) {
     // The leaves' tint kinds besides foliage (`base_api::trees`), as green as foliage by default.
-    r.tint_kind(&base_api::trees::EVERGREEN, 0x48b518);
-    r.tint_kind(&base_api::trees::YELLOW_LEAVES, 0x48b518);
+    r.tint_kind(&base_api::trees::EVERGREEN, vitals::foliage::muted(vitals::foliage::LEAVES));
+    r.tint_kind(&base_api::trees::YELLOW_LEAVES, vitals::foliage::muted(vitals::foliage::LEAVES));
     r.block(&STONE)
         .sound_group("stone")
         .hardness(1.5)
