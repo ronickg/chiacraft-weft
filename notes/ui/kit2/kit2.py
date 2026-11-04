@@ -22,10 +22,16 @@ REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 # ---------------------------------------------------------------- palette (UI guide, section 1)
 OUTLINE = (40, 24, 12)
 INK_DARK = (58, 36, 22)
-PANEL = (22, 16, 15)
-PANEL_DEEP = (14, 10, 9)
+# Window insides, slots and wells: Ronald's sheet's own tones (he picked A, 2026-11-04: "the dark
+# part of the UI ... looks a bit too dark"). Measured on `Voxel Fantasy Survival UI Suite.png`:
+# window insides V 0.10-0.12, nearly neutral charcoal; slots and insets V 0.20, a soft warm grey,
+# lighter than the panel (kit 2 first had a redder near-black panel and wells darker than it).
+PANEL = (29, 25, 24)
+PANEL_DEEP = (19, 16, 15)
+WELL, WELL_D, WELL_L = (44, 37, 34), (33, 28, 26), (64, 54, 49)
+SLIDER, SLIDER_D, SLIDER_L = (74, 56, 48), (56, 42, 36), (98, 76, 64)
 BRONZE_D, BRONZE, BRONZE_L, BRONZE_HI = (92, 46, 20), (137, 69, 30), (167, 81, 32), (205, 120, 60)
-SLOT, SLOT_D, SLOT_L = (53, 32, 21), (36, 22, 14), (104, 62, 38)
+SLOT, SLOT_D, SLOT_L = (52, 44, 40), (40, 33, 30), (76, 64, 57)
 CREAM, DIM, GOLD_TEXT, ON_ORANGE = (228, 218, 207), (198, 163, 131), (242, 218, 154), (255, 244, 220)
 GLOW, GLOW_D = (255, 221, 32), (243, 171, 31)
 GREEN, GREEN_D, GREEN_L = (138, 200, 15), (85, 125, 10), (193, 237, 66)
@@ -622,8 +628,8 @@ BAR_FILLS = {
 def bar(w, share, fill="health", h=10):
     """A bar: outline, a dark track, the fill with a 1 px light top and dark bottom."""
     a = canvas(w, h, OUTLINE)
-    rect(a, 1, 1, w - 2, h - 2, (39, 30, 26))
-    rect(a, 1, 1, w - 2, 1, (30, 22, 19))
+    rect(a, 1, 1, w - 2, h - 2, WELL_D)
+    rect(a, 1, 1, w - 2, 1, PANEL_DEEP)
     fw = int(round((w - 2) * max(0.0, min(1.0, share))))
     if fw:
         light, base, dark = BAR_FILLS[fill]
@@ -909,10 +915,10 @@ def bar_r(w, share, fill="health", h=10, r=R):
     ring = edge(m)
     inner = m & ~ring
     paint(a, ring, OUTLINE)
-    paint(a, inner, (39, 30, 26))
+    paint(a, inner, WELL_D)
     top = np.zeros_like(m)
     top[1:] = ring[:-1]
-    paint(a, top & inner, (30, 22, 19))
+    paint(a, top & inner, PANEL_DEEP)
     fw = int(round(w * max(0.0, min(1.0, share))))
     if fw:
         light, base, dark = BAR_FILLS[fill]

@@ -160,7 +160,7 @@ def sunken(w, h, face, dark, light, rim=k.OUTLINE):
     return a
 
 
-save("well", sunken(32, 24, (30, 22, 19), (20, 14, 12), (52, 38, 30)), [NINE, border(3)])
+save("well", sunken(32, 24, k.WELL, k.WELL_D, k.WELL_L), [NINE, border(3)])
 save("portrait", sunken(64, 64, (116, 101, 87), (90, 78, 66), (138, 122, 106)), [NINE, border(3)])
 for name in ("tooltip", "hud_plate"):
     a = k.canvas(32, 24)
@@ -170,7 +170,7 @@ for name in ("tooltip", "hud_plate"):
     m2 = m & ~ring
     r2 = k.edge(m2)
     k.paint(a, r2, k.BRONZE_D)
-    k.paint(a, m2 & ~r2, (22, 16, 15))
+    k.paint(a, m2 & ~r2, k.PANEL)
     save(name, a, [NINE, border(3)])
 
 # ---------------------------------------------------------------- slots, inputs, scroll, slider
@@ -182,16 +182,16 @@ ring = k.edge(m)
 k.paint(hl, ring, k.GLOW)
 k.paint(hl, k.edge(m & ~ring), k.GLOW_D)
 save("slot_highlight", hl, [NINE, border(4)])
-save("input", sunken(64, 18, (30, 22, 19), (20, 14, 12), (52, 38, 30)), [NINE, border(3)])
-save("input_focused", sunken(64, 18, (34, 26, 22), (20, 14, 12), (52, 38, 30), k.GLOW), [NINE, border(3)])
-save("scrollbar", sunken(12, 40, (30, 22, 19), (20, 14, 12), (52, 38, 30)), [NINE, border(4)])
+save("input", sunken(64, 18, k.WELL, k.WELL_D, k.WELL_L), [NINE, border(3)])
+save("input_focused", sunken(64, 18, k.WELL, k.WELL_D, k.WELL_L, k.GLOW), [NINE, border(3)])
+save("scrollbar", sunken(12, 40, k.WELL, k.WELL_D, k.WELL_L), [NINE, border(4)])
 for suffix, key in (("", "second"), ("_hover", "second_hover")):
     light, face, shade = k.FACES[key]
     save("scrollbar_handle" + suffix, raised_part(12, 28, light, face, shade, k.GLOW if suffix else k.OUTLINE, shade_px=1),
          [NINE, border(4)])
-# The slider's track fills its whole row (20 GUI px in the settings), so it is a mid-tone groove
-# that reads on the dark panel; dark on the panel's own colour, it vanished (PC shots, 11-04).
-save("slider", sunken(62, 10, (86, 60, 42), (58, 40, 28), (120, 84, 56)), [NINE, border(3)])
+# The slider's track fills its whole row (20 GUI px in the settings): a mid-tone groove at the
+# sheet's own value (V 0.29), so it reads on the panel (dark, it vanished: PC shots, 11-04).
+save("slider", sunken(62, 10, k.SLIDER, k.SLIDER_D, k.SLIDER_L), [NINE, border(3)])
 for suffix, key in (("", "main"), ("_hover", "main_hover")):
     light, face, shade = k.FACES[key]
     save("slider_knob" + suffix, raised_part(14, 20, light, face, shade, k.GLOW if suffix else k.OUTLINE), [NINE, border(4)])
