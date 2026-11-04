@@ -596,14 +596,7 @@ impl WorldRenderer {
         // the ones the camera sees. Its depth row points toward it (reverse depth). Faces nearly
         // edge-on to it are kept either way.
         let to_light = light.row(2).truncate().normalize_or_zero();
-        let sides = [
-            to_light.x > -0.05,
-            to_light.y > -0.05,
-            to_light.z > -0.05,
-            to_light.x < 0.05,
-            to_light.y < 0.05,
-            to_light.z < 0.05,
-        ];
+        let sides = [to_light.x > -0.05, to_light.y > -0.05, to_light.z > -0.05, to_light.x < 0.05, to_light.y < 0.05, to_light.z < 0.05];
         let side = (16 << REGION) as f32;
         let mut draws: Vec<DrawRecord> = Vec::new();
         for (&(f, r), meshes) in &self.regions {
