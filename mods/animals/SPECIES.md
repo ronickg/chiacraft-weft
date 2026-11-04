@@ -2267,18 +2267,18 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | mass | 85 kg | |
 | carries her young | 100 d | 1.77 d |
 | litter or clutch | 1.6 on average | 1-2 |
-| between litters | 1.9 y | rests 6.25 d **set** |
+| between litters | 1.9 y | rests 4.17 d **set** |
 | breeds in | all year, most in spring and summer |  |
 | comfortable in | 8 to 38 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
 | grows up in | 2.5 y | 7.54 d |
 | lives | 17 y | 65.1 d, give or take a fifth; an elder from 80% of it |
 | lives in | solitary | room for 12 **set** within 48 blocks |
 
-**Balance** (uncommon): a generation 9.3 d; a line four deep in 28 d (9 h of play); 1.9 young per mother in 10 days, 8 in her life.
+**Balance** (uncommon): a generation 9.3 d; a line four deep in 28 d (9 h of play); 2.5 young per mother in 10 days, 11 in her life.
 
 - ✓ fourth generation: 27.9 days (want 20-40 days (uncommon))
 - ✓ grown most of its life: grows 7.5 of 65 days (want under a fifth)
-- ✓ young in a life: 8.3 (want 6-40)
+- ✓ young in a life: 11.3 (want 6-40)
 - ✓ litter: 1-2 (want 1-12, fewest first)
 - ✓ room near: 12 (want 3-30)
 

@@ -780,6 +780,12 @@ the cold, the deserts and the forests too, rarer than in the mountains) and 10. 
 from 40 to 84 bytes: one saved before gets its core traits from the wild when it loads, and the
 genes kept in breeding records and eggs keep their old place with the rest after.
 
+*Temperament* (2026-11-04, Ronald's call relayed by Planner): a 17th core trait in every genome,
+`Tp` (calm to skittish, heritable in part as boldness is), in a field of its own (`temper`,
+genome layout 2; one saved before draws it from the wild when it loads, its coat untouched). It
+moves the species' shy distance from 0.6 to 1.4 times (`taming.rs`), and the animal screen shows
+it (UI redo). More effects (how quickly a wild one turns on a hunter, a tame's taming) can follow.
+
 *Eyes* (2026-11-02): every animal's eyes in its own color along its species' range (dogs dark
 brown to amber, cats copper to green, raptors amber to yellow, wyverns gold to red), painted on
 the iris the layers mark, keeping its painted light. Genes decide it outright where they do in

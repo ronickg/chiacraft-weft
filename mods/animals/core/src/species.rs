@@ -2454,10 +2454,11 @@ pub static SPECIES: [Species; 42] = [
             cold_blooded: false,
         },
         // A mother's rest after a litter set shorter than her two years with the cubs, so the wild
-        // replaces its dead (`balance::checks`: six young in a life).
+        // replaces its dead (`balance::checks`: six young in a life); shorter again (100 000
+        // ticks) when a solitary cat's small group, two pairs, died out in its first months.
         // Room near raised so a small wild group of its kind lasts on its own (`web/test.mjs`: two pairs
         // left alone at their room neither die out nor flood); the food web's grazing still holds.
-        tune: Tune { recovery: Some(150_000), crowd: Some(12), ..Tune::NONE },
+        tune: Tune { recovery: Some(100_000), crowd: Some(12), ..Tune::NONE },
         birth_size: 0.12,
         ..BASE
     },

@@ -45,6 +45,9 @@ pub struct Genome {
     pub stage: u8,
     /// Marks life left on it: up to four scars, each a kind (`SCARS`, 0: none) and where.
     pub scars: [u8; 8],
+    /// Two for its temperament, the 17th core trait (`Tp` in `genetics/core.json`, its slot
+    /// `OWN + 16`), as `core` (version 2; `NONE` before).
+    pub temper: [u8; 2],
 }
 
 pub const MIXED: u8 = 255;
@@ -52,9 +55,9 @@ pub const NONE: u8 = 255;
 /// Loci of a species' own (`Genome::genes`); the core traits' slots come after them.
 pub const OWN: usize = 16;
 /// Every slot: a species' own and the core.
-pub const SLOTS: usize = 32;
-/// The genome's layout now.
-pub const VERSION: u8 = 1;
+pub const SLOTS: usize = 33;
+/// The genome's layout now: 1 the core traits, 2 temperament.
+pub const VERSION: u8 = 2;
 
 /// Scar kinds (`Genome::scars`): three raked lines of claws, a ring of tooth marks, a blade's
 /// long line, a burn, torn wing skin.
@@ -81,18 +84,25 @@ pub fn mend(g: &mut Genome) {
         g.core = [NONE; 32];
         g.stage = crate::species::ADULT;
     }
+    if g.version < 2 {
+        g.temper = [NONE; 2];
+    }
 }
 
 impl Genome {
     /// Gene `k` (0, 1) of slot `slot` (a species' own locus, or `OWN` + a core trait).
     fn get(&self, slot: usize, k: usize) -> u8 {
-        if slot < OWN { self.genes[2 * slot + k] } else { self.core[2 * (slot - OWN) + k] }
+        match slot {
+            s if s < OWN => self.genes[2 * s + k],
+            s if s < OWN + 16 => self.core[2 * (s - OWN) + k],
+            _ => self.temper[k],
+        }
     }
     fn set(&mut self, slot: usize, k: usize, v: u8) {
-        if slot < OWN {
-            self.genes[2 * slot + k] = v;
-        } else {
-            self.core[2 * (slot - OWN) + k] = v;
+        match slot {
+            s if s < OWN => self.genes[2 * s + k] = v,
+            s if s < OWN + 16 => self.core[2 * (s - OWN) + k] = v,
+            _ => self.temper[k] = v,
         }
     }
     fn pair(&self, slot: usize) -> [u8; 2] {
@@ -107,6 +117,7 @@ impl Genome {
             female: female as u8,
             genes: [NONE; 32],
             core: [NONE; 32],
+            temper: [NONE; 2],
             version: VERSION,
             stage: crate::species::ADULT,
             ..Genome::default()
@@ -584,9 +595,14 @@ pub fn upgrade(index: usize, g: &mut Genome, pool: &Pool, r: &mut impl Rng) {
         return;
     }
     let Some(file) = SPECIES.get(index).and_then(|s| gene_file(s.name)) else { return };
+    if g.version < 2 {
+        g.temper = [NONE; 2];
+    }
     for l in &file.loci {
         let p = g.pair(l.slot);
-        if l.slot >= OWN || p == [NONE, NONE] {
+        // A genome before the core traits draws them all; one after, only what it lacks (a
+        // version 1 genome its temperament), so its coat stays as it was.
+        if (g.version == 0 && l.slot >= OWN) || p == [NONE, NONE] {
             draw(l, g.female != 0, pool.get(l.slot).filter(|p| !p.is_empty()), g, r);
         }
     }
@@ -1674,6 +1690,76 @@ pub fn mean_size(index: usize) -> f32 {
         .and_then(|g| g.loci.iter().find(|l| l.id == "Sz"))
         .map_or(0.5, |l| l.mean);
     1.0 + s.size_spread * (mean - 0.5) * 2.0
+}
+
+/// One gene of an animal, for its screen (`genes_of`).
+#[derive(Clone, Debug)]
+pub struct GeneLine {
+    /// The locus's id and name (`Ol`, "Olive"), and what it does (`about`).
+    pub id: String,
+    pub name: String,
+    pub about: String,
+    /// A core trait every species has (size, shade, marks, build, temperament), or its own.
+    pub core: bool,
+    /// A quantitative trait: as it shows, 0..1 (its genes and its own chance), and its genes'
+    /// mean (what it passes on). `None` for an allelic locus.
+    pub value: Option<f32>,
+    pub genetic: Option<f32>,
+    /// An allelic locus: its two alleles' names (one for a male's X-linked locus), and the one that
+    /// shows; empty for a quantitative trait.
+    pub alleles: Vec<String>,
+    pub shows: String,
+}
+
+/// Every gene of `genome`, its species' own loci first, then the core traits (`GeneLine`); empty
+/// before it has genes.
+pub fn genes_of(genome: &Genome) -> Vec<GeneLine> {
+    let Some(g) = (genome.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+        .and_then(|s| gene_file(s.name))
+    else {
+        return Vec::new();
+    };
+    let r = Read { g, genome };
+    g.loci
+        .iter()
+        .map(|l| {
+            let mut line = GeneLine {
+                id: l.id.clone(),
+                name: l.name.clone(),
+                about: l.about.clone(),
+                core: l.slot >= OWN,
+                value: None,
+                genetic: None,
+                alleles: Vec::new(),
+                shows: String::new(),
+            };
+            if l.quantitative {
+                line.value = Some(r.qv(&l.id));
+                line.genetic = Some(r.genetic(&l.id));
+            } else {
+                line.alleles = r
+                    .pair(l)
+                    .filter_map(|a| l.alleles.get(a as usize).map(|x| x.a.clone()))
+                    .collect();
+                line.shows = r.shows(&l.id).to_string();
+            }
+            line
+        })
+        .collect()
+}
+
+/// Its temperament as it shows (`Tp`), 0 calm to 1 skittish: how near a walker may come before it
+/// runs (`taming.rs`). 0.5 for a genome without one.
+pub fn temperament(genome: &Genome) -> f32 {
+    let Some(s) = (genome.species as usize)
+        .checked_sub(1)
+        .and_then(|i| SPECIES.get(i))
+    else {
+        return 0.5;
+    };
+    gene_file(s.name).map_or(0.5, |g| Read { g, genome }.qv("Tp"))
 }
 
 /// Its size genes (`Sz`), 0..1: small to big for its kind (what it passes on).

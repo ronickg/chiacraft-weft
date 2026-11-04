@@ -107,7 +107,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
             }
             return true;
         }
-        if (w.time() + id) % 10 == 0 && s.shy > 0.0 && frightened(w, st, s.shy) && !crate::signatures::calm(w, st.pos) {
+        if (w.time() + id) % 10 == 0 && s.shy > 0.0 && frightened(w, st, s.shy * shyness(w, id)) && !crate::signatures::calm(w, st.pos) {
             scare(w, id);
             return true;
         }
@@ -184,6 +184,13 @@ fn near_player(w: &World, st: &EntityState) -> Option<u64> {
 
 fn dist2(a: &EntityState, b: &EntityState) -> f64 {
     crate::dist2(a.pos, b.pos)
+}
+
+/// How far its temperament (`coats::temperament`) moves its kind's shy distance: a calm one (0)
+/// lets a walker come to 0.6 of it, a skittish one (1) runs at 1.4 times it.
+fn shyness(w: &World, id: u64) -> f32 {
+    w.component(id, &crate::coats::GENOME)
+        .map_or(1.0, |g| 0.6 + 0.8 * crate::coats::temperament(g))
 }
 
 /// A player walking upright within `shy` blocks, or running within twice that.
