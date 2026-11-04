@@ -2845,6 +2845,7 @@ fn report_frame(r: &mut Running, dt: f64) {
             };
             let line = b.report(&extra);
             log::info!("{line}");
+            log::info!("{}", b.pacing());
             r.bench_last = b.summary();
             r.bench_line = line;
             r.benches += 1;
