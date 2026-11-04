@@ -91,7 +91,7 @@ SDK gives it Weft's names:
 | `value!`, `Component::named`, `r.entity_component(&C, default, flags)`, `r.attach(&KIND, &C)`, `w.component(id, &C)` | the same (1.1), but by value: `w.component` gives a copy, `w.set_component(id, &C, v)` and `w.update_component(id, &C, \|v\| ..)` write it; at most 256 bytes, the mod's own components only |
 | `w.play_sound(&S, pos, volume)`, `w.spawn_particles(&P, pos).count(n)` | the same (1.1); sounds and particles by full name (`base:ui.advancement`, `core:poof`) |
 | many `w.set` | `w.set_blocks(&[(pos, state)])` (1.1), one call |
-| `r.block(&B).on_use(\|u\| ..).on_neighbor(..).on_scheduled(..)`, `w.schedule(pos, ticks)` | the same (1.2), on the package's own blocks only (from its `defs/blocks`): the callbacks of Weft's block builder without the rest, which is in the definitions |
+| `r.block(&B).on_use(\|u\| ..).on_neighbor(..).on_scheduled(..)`, `w.schedule(pos, ticks)` | the same (1.2), on the package's own blocks only (from its `defs/blocks`): the callbacks of Weft's block builder without the rest, which is in the definitions. A use on the block goes before the held item's, and a block just placed gets a neighbour update for itself |
 | `r.item(&I).on_use(\|u\| ..)`, `u.set_stack(..)` | the same (1.2), on the package's own items (`defs/items`); `u.slot()` is where the stack is |
 | `static C: Channel<T>`, `r.packet(&C, \|p, v\| ..)`, `w.send(player, &C, &v)`, `p.reply(..)` | the same (1.2), the package's own channels, at most 16 KiB a packet and 64 packets a tick handed to the mod; on the wire it is a `Channel<Vec<u8>>`, so a native client mod talks to it with one of those |
 | content builders, screens, HUD, keys, client hooks | not yet: content comes from the package's definitions; client halves come later |

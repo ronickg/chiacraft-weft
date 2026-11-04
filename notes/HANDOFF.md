@@ -353,7 +353,12 @@ a command 0.6 to 0.9, an empty event batch 0.2 to 0.3, a batch of 64 block chang
 ignoring them) to 14 (tally, a component call each): about 0.2 µs per crossing into the mod and
 back. Questions, chain steps and world ticks not measured yet (the test guest needs the wasm32
 target, not on the PC).
-API 1.2 (built; not yet seen in the game): `crates/sandbox/wit/v1.2/mod.wit` adds
+API 1.2 (built, and checked in one game on the Linux PC by Tester 2 at e6866f7b with the `at`
+ABI change: the striker's use on the sky wore it from 3 to 2 ("wears down: 2 left"); using the
+bell while holding the striker rang the bell, not the striker (the block's use goes first); the
+log had "the bell at [16, 95, 0] rang (1)" and, after stone beside it, the neighbour line; no
+strikes or load errors; the scheduled puff wasn't in the shot. Placing a block also gives it a
+neighbour update for itself, Weft's way): `crates/sandbox/wit/v1.2/mod.wit` adds
 `registry.on-block-use`/`on-block-neighbor`/`on-block-scheduled`/`on-item-use` (the package's own
 blocks and items only, `State::own`), `registry.channel`, `world.schedule` and `world.send`, and
 the export `content-hooks` (`block-use`, `block-update`, `item-use`, `packet`). The game binds
