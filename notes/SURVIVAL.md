@@ -673,3 +673,17 @@ content plan; logged in `notes/crew/OVERNIGHT.md`):
 - Not here: animals' fire reach and wind (`comfort.rs`, `eggs.rs`) and the hunters' hunger
   thresholds written twice (`forage.rs`, `hunt.rs`): the animals mod's.
 
+**21. Crafts that wait** (2026-11-04 overnight, `notes/CONTENT.md` decision 6, taken by the content
+plan; logged in `notes/crew/OVERNIGHT.md`; `vitals::crafts`, `mods/base/src/crafts.rs`):
+
+- What takes days in real life takes its time on the growing pace (game days = 0.0645 · real
+  days^0.7), at a station that keeps working unwatched (and catches up when its area loads):
+  a tanning frame brain-tans a raw hide into buckskin leather (3 real days: 2.8 minutes); a
+  tanning pit soaks hides with oak bark into sole leather (a year: 4.0 game days, 8 at a time);
+  a charcoal clamp chars logs into coal (7 days: 5 minutes, 16 at a time, no fuel).
+- Cows, deer and capybaras drop raw hides now, not leather. Buckskin (`#leather`) makes clothes,
+  books and the rain cape; sole leather (`materials/leather`) makes leather armor. Oak bark is
+  peeled from oak logs at the crafting table.
+- Not yet: retting (it waits for a flax plant), dressing furs (pelts come ready), seasoning bow
+  staves, kilns; the stations' faces are placeholders.
+

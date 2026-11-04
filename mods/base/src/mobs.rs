@@ -329,7 +329,8 @@ pub fn register(r: &mut Registry) {
                     .smelted(&crate::recipes::SMELTING),
             ),
         )
-        .pool(Pool::new().items("leather", 0, 2));
+        // A raw hide, to tan (`crafts.rs`).
+        .pool(Pool::new().items("hide", 0, 2));
     // Natural spawning, as rules the engine runs: monsters in the dark (spiders more in deep
     // caves), animals in small herds on grass by day, rarely once the world is loaded.
     r.spawn(&ZOMBIE).light(0, 6).weight(2);
