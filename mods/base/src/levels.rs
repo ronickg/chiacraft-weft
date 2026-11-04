@@ -255,13 +255,14 @@ fn after(v: &base_api::Vitals) -> base_api::Vitals {
 
 /// The stats screen's columns after the bar (GUI pixels): the value now (right-aligned), its unit,
 /// the value after the waiting points (right-aligned), the points waiting (centred).
-/// (as wide as their words in either language: "сейчас" 20.5 and "units" 17.5 GUI px were shrunk
+/// (as wide as their words in either language: "сейчас" 23 and "units" 17.5 GUI px were shrunk
 /// at 18 and 16, the Russian pass)
-const NOW_W: f32 = 21.0;
-/// The stat names' column, as wide as the longest in either language ("Выносливость", 42.5 GUI px).
-const NAME_W: f32 = 43.0;
+const NOW_W: f32 = 24.0;
+/// The stat names' column, as wide as the longest in either language ("Выносливость", 48 GUI px).
+const NAME_W: f32 = 48.0;
 const UNIT_W: f32 = 18.0;
-const AFTER_W: f32 = 18.0;
+/// ("после" is 19 GUI px)
+const AFTER_W: f32 = 20.0;
 const WAITING_W: f32 = 8.0;
 
 /// Level ups waiting to show, the first with the moment it appeared.

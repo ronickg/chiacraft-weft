@@ -1,0 +1,38 @@
+# The same in Russian (--config core:language=ru_ru).
+# The recipe book (Ronald's first-day test): it names the picked recipe at the top, keeps its order
+# after a craft, its Max button and All tab differ, and by hand the table recipes say they need a
+# table. Shots before and after crafting once, by hand and at a table.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 2
+chat /tk give base:oak_log 6
+chat /tk give base:cobblestone 8
+chat /tk give base:stick 4
+wait 1
+press core:inventory
+wait 1.5
+shot bk_01_hands.png
+tap_once core:menu text:Макс.
+wait 1.5
+shot bk_02_hands_after_craft.png
+# a tooltip: the first recipe slot, then a table-only one further down the list
+cursor 0.42 0.354
+wait 1
+shot bk_02b_hover_first.png
+key Escape
+wait 1
+chat /tk set ~ ~1 ~-2 base:crafting_table
+wait 1
+look 0 0
+wait 0.5
+click 1
+wait 1.5
+shot bk_03_table.png
+tap_once core:menu text:Макс.
+wait 1.5
+shot bk_04_table_after_craft.png
+key Escape
+wait 1
+quit

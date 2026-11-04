@@ -12,6 +12,7 @@ mod crops;
 mod death;
 mod discovery;
 mod farming;
+mod felling;
 mod growth;
 mod hints;
 mod hud;
@@ -104,6 +105,7 @@ fn init(r: &mut Registry) {
     seasons::register(r);
     growth::register(r);
     farming::register(r);
+    felling::register(r);
     advancements::register(r);
     hints::register(r);
     death::register(r);

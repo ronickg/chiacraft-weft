@@ -1,6 +1,6 @@
 //! The nearest spots to spawn of a kind, with a camera for a look script: for testers, so a shot
 //! of a lake or a river shows one. Kinds: `lake`, `river` (water at least two blocks deep in the
-//! channel), `coast` (land with the sea beside it), `karst` (a tower), `canyon` (cut 24 or more), `crater`, `sinkhole` (karst), `spawn` (the fair first place) or any overworld biome by name (`desert`,
+//! channel), `coast` (land with the sea beside it), `karst` (a tower), `canyon` (cut 24 or more), `crater`, `sinkhole` (karst), `arch`, `waterfall`, `spawn` (the fair first place) or any overworld biome by name (`desert`,
 //! `sequoia_grove`, ...). Searched in rings outward from the middle every `step` blocks, the
 //! world as the engine builds it (the overworld's fields, its continent scale).
 //!
@@ -33,6 +33,42 @@ fn main() {
         return;
     }
     let h = |x: i32, z: i32| l::height(&f, x * 16, z * 16) >> 4;
+    if kind == "arch" || kind == "waterfall" {
+        // Sites, not a ring search: known by their cells.
+        let mut sites: Vec<(i32, i32, String)> = if kind == "arch" {
+            l::landmarks::arches_near(&f, 0, 0, 6000)
+                .into_iter()
+                .map(|a| {
+                    (
+                        a.x,
+                        a.z,
+                        format!(
+                            "{} arch, {} across, ring from {}, along {}",
+                            if a.base < SEA { "sea" } else { "land" },
+                            2 * a.outer + 1,
+                            a.base,
+                            if a.along_x { "x" } else { "z" }
+                        ),
+                    )
+                })
+                .collect()
+        } else {
+            l::landmarks::waterfalls_near(&f, 0, 0, 6000)
+                .into_iter()
+                .map(|w| (w.spring[0], w.spring[2], format!("spring at y {}, falling at {} {}", w.spring[1], w.front[0], w.front[1])))
+                .collect()
+        };
+        sites.sort_by_key(|&(x, z, _)| x as i64 * x as i64 + z as i64 * z as i64);
+        if sites.is_empty() {
+            println!("no {kind} near spawn on seed {seed}");
+        }
+        for (x, z, what) in sites.into_iter().take(count) {
+            let dist = ((x as f64).powi(2) + (z as f64).powi(2)).sqrt().round();
+            println!("# {kind} at x {x} z {z}: {what}, ground {}, {dist} blocks from spawn", h(x, z));
+            println!("chat /tp {x} {} {}\nidle\nlook 180 -30\nwait 2\nwhere\nshot {kind}_{x}_{z}.png", h(x, z).max(SEA) + 20, z - 30);
+        }
+        return;
+    }
     if kind == "crater" || kind == "sinkhole" {
         // Sites, not a ring search: they are rare and known by their cells.
         let mut sites = if kind == "crater" { l::craters_near(&f, 0, 0, 16_000) } else { l::sinks_near(&f, 0, 0, 6_000) };

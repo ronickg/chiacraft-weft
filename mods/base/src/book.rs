@@ -21,6 +21,8 @@ const TABLE_REACH: i32 = 5;
 /// Recipes on a page of the book: 5 columns of 4.
 const COLS: usize = 5;
 const PER_PAGE: usize = 20;
+/// The tabs a row holds.
+const TABS_PER_ROW: usize = 3;
 /// The most one Craft makes ("all").
 const MAX_BATCH: u32 = 64;
 
@@ -178,8 +180,9 @@ fn table_only(station: Station, r: &Recipe) -> bool {
     station == Station::Hands && !fits_hands(r)
 }
 
-/// The first ingredient `have` lacks for `r`: the item shown for it and how many more it takes.
-fn first_missing(r: &Recipe, have: &[(u32, u32)]) -> Option<(u32, u32)> {
+/// The first ingredient `have` lacks for `r`: the item shown for it, how many more it takes, and
+/// whether any item of a tag would do.
+fn first_missing(r: &Recipe, have: &[(u32, u32)]) -> Option<(u32, u32, bool)> {
     let mut lines: Vec<(u32, u32, u32)> = Vec::new();
     for (n, input) in r.inputs().iter().enumerate() {
         if input.kind == abi::recipe_input_kind::EMPTY {
@@ -190,13 +193,15 @@ fn first_missing(r: &Recipe, have: &[(u32, u32)]) -> Option<(u32, u32)> {
             None => lines.push((n as u32, input.shown, input.count.max(1))),
         }
     }
+    let inputs = r.inputs();
     lines.into_iter().find_map(|(n, shown, need)| {
         let got: u32 = have
             .iter()
             .filter(|(i, _)| r.accepts(n, *i))
             .map(|(_, c)| c)
             .sum();
-        (got < need).then_some((shown, need - got))
+        let tag = matches!(inputs[n as usize].kind, abi::recipe_input_kind::TAG | abi::recipe_input_kind::ANY);
+        (got < need).then_some((shown, need - got, tag))
     })
 }
 
@@ -559,35 +564,44 @@ pub fn book(ui: &mut Ui, station: Station) {
             let name = name_of(out.item);
             ui.text_args("crafting.book.picked", &[Arg::Name(&name)]);
         }
-        ui.row(S::row().gap(1.0), |ui| {
-            for (i, t) in TABS.iter().enumerate() {
-                if station == Station::Hands && *t == PARTS_TAB {
-                    continue;
+        // The tabs in rows of `TABS_PER_ROW`: in one row they were wider than the book, and at a
+        // table, beside the crafting window, "Parts" ran off the screen (Ronald's first-day test).
+        let tabs: Vec<(usize, &str)> = TABS
+            .iter()
+            .copied()
+            .enumerate()
+            .filter(|(_, t)| station != Station::Hands || *t != PARTS_TAB)
+            .collect();
+        for chunk in tabs.chunks(TABS_PER_ROW) {
+            ui.row(S::row().gap(1.0), |ui| {
+                for &(i, t) in chunk {
+                    // The book's own short names (the creative tabs' were too long for it in Russian:
+                    // "Инструменты и приспособления", Playtest B10).
+                    let key = match t {
+                        "" => "crafting.book.all".to_string(),
+                        PARTS_TAB => "crafting.book.parts".to_string(),
+                        t => format!("crafting.book.tab.{}", t.rsplit(':').next().unwrap_or(t)),
+                    };
+                    // Categories (UI redo's class): transparent at rest, a gold outline when open.
+                    ui.button(
+                        &key,
+                        S::default()
+                            .h(12.0)
+                            .pad(2.0)
+                            .class("category")
+                            .selected(i == tab),
+                        move |c| {
+                            edit(|b| {
+                                b.tab = i;
+                                b.page = 0;
+                                b.order.clear();
+                            });
+                            c.client().rebuild_screen();
+                        },
+                    );
                 }
-                let key = match *t {
-                    "" => "crafting.book.all".to_string(),
-                    PARTS_TAB => "crafting.book.parts".to_string(),
-                    t => format!("tab.{}", t.replace(':', ".")),
-                };
-                // Categories (UI redo's class): transparent at rest, a gold outline when open.
-                ui.button(
-                    &key,
-                    S::default()
-                        .h(12.0)
-                        .pad(2.0)
-                        .class("category")
-                        .selected(i == tab),
-                    move |c| {
-                        edit(|b| {
-                            b.tab = i;
-                            b.page = 0;
-                            b.order.clear();
-                        });
-                        c.client().rebuild_screen();
-                    },
-                );
-            }
-        });
+            });
+        }
         // Slots touch: their dark groove is the gap (UI guide).
         ui.column(S::col(), |ui| {
             let start = page * PER_PAGE;
@@ -620,8 +634,9 @@ pub fn book(ui: &mut Ui, station: Station) {
                             s.tooltip_args("crafting.book.can", &[Arg::Name(&name)])
                         } else if table_only(station, r) {
                             s.tooltip_args("crafting.book.needs_table_tip", &[Arg::Name(&name)])
-                        } else if let Some((item, more)) = lack {
-                            s.tooltip_args("crafting.book.lacks", &[Arg::Name(&name), Arg::Int(more as i64), Arg::Name(&name_of(item))])
+                        } else if let Some((item, more, tag)) = lack {
+                            let key = if tag { "crafting.book.lacks_any" } else { "crafting.book.lacks" };
+                            s.tooltip_args(key, &[Arg::Name(&name), Arg::Int(more as i64), Arg::Name(&name_of(item))])
                         } else {
                             s.tooltip_args("crafting.book.missing", &[Arg::Name(&name)])
                         };
@@ -690,7 +705,22 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
             .filter(|(i, _)| r.accepts(n, *i))
             .map(|(_, c)| c)
             .sum();
-        let key = if got >= need { "crafting.book.have" } else { "crafting.book.lack" };
+        // For a tag (any log), what the player has of it, the most they hold: "Oak Log", not the
+        // tag's first item ("Araucaria Log", Ronald's first-day test).
+        let shown = have
+            .iter()
+            .filter(|(i, _)| r.accepts(n, *i))
+            .max_by_key(|(_, c)| *c)
+            .map_or(shown, |(i, _)| *i);
+        // A tag or a pattern the player holds none of: its shown item "or similar" (Playtest B12:
+        // "Acacia Planks: 0/2" where any planks do).
+        let any = matches!(inputs[n as usize].kind, abi::recipe_input_kind::TAG | abi::recipe_input_kind::ANY)
+            && !have.iter().any(|(i, _)| r.accepts(n, *i));
+        let key = match (got >= need, any) {
+            (true, _) => "crafting.book.have",
+            (false, true) => "crafting.book.lack_any",
+            (false, false) => "crafting.book.lack",
+        };
         ui.row(S::row().gap(3.0), |ui| {
             ui.item(shown, 1, S::default().size(16.0, 16.0));
             ui.text_args(key, &[Arg::Name(&name_of(shown)), Arg::Int(got as i64), Arg::Int(need as i64)]);
