@@ -532,13 +532,17 @@ pub fn understory(r: &Recipe) -> Recipe {
         width: 1.0,
         width_loss: (1.0 - left) / height,
         branch_every: (r.branch_every * 0.6).max(0.5),
-        branch_start: (r.branch_start * 0.8).max(0.2),
+        // Young trees branch low and leafy (they shed their low limbs only as they grow): a
+        // giant's young was a bare pole under a small crown, a lollipop.
+        branch_start: (r.branch_start * 0.6).clamp(0.2, 0.4),
         branch_count: r.branch_count.min(4),
         orders: r.orders.min(1),
         leaf_r: (r.leaf_r * 0.7).max(1.0),
         leaf_ry: (r.leaf_ry * 0.75).max(0.9),
         // fronds (a young palm's) a little shorter
         frond_len: r.frond_len * 0.6,
+        // Thin wood as leafy sprays, so a young tree is no knot of logs (the cacao's).
+        twig: if r.leaf_along { r.twig } else { r.twig.max(0.3) },
         reach: UNDERSTORY_REACH,
         max_height: 12,
         flare: 0.0,
