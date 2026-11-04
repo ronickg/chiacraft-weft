@@ -139,6 +139,13 @@ toward the UI's own colours (`notes/STYLE.md`).
 - **Thin plants go muddy at 32 px** (the first cattail almost vanished, the mushroom's spots
   blurred): give them a clear silhouette, a size in px, and few parts. If one still reads
   badly, ask for "a 1-px outline in a darker shade of its own colour".
+- **Blades finer than a game pixel break into dots** when cut (the first two-block grass's upper
+  half, 11-04): ask for "each blade 2 px wide (never 1 px), solid shapes that read at 32 px".
+- **Check a name is free in `tiles/` before a batch**: a new `fern` overwrote the approved
+  Cretaceous fern's tile (11-04). Give a new plant its own name (`bracken`) and let the block point
+  at it.
+- **Two-block plants** (tall grass): put the upper half above the lower in one image (top right
+  over bottom right) and say both continue across the line; check the joining rows meet.
 - **Ores**: the base must be the same stone as `stone.png`; generate the ore in the same image
   as stone, or say "exactly the same stone base as the stone texture".
 - **Families drift between images**: keep a tree, a crop's stages or a colour set in one image,
