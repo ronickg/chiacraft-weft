@@ -14,7 +14,8 @@ textures **painted by Claude** by rule; the HUD after designs Ronald sends.
 - Blocks (2026-11-03): 107 textures at 64 px, generated with Codex (ChatGPT's image model) from
   one prompt, the palette (`notes/texture-test/palette.png`) and the approved tiles, four an image
   (`notes/texture-test/codex/gen_grid.sh`, `gen_sprites.sh` for plants), cut by `grid_cut.py` and
-  put in the game by `install_blocks.py` (see `notes/texture-test/PROMPTS.md`). Still 16 px: the
+  put in the game by `install_blocks.py` (see `notes/texture-test/PROMPTS.md`; those scripts and tiles
+  left the repo 2026-11-04 and are in git history and `/Users/ronald/Coding/chiacraft-archive/images/repo-cleanup/2026-11-04/texture-test/`). Still 16 px: the
   model-mapped ones (torches, redstone dust, repeaters, comparators, levers, buttons, beds, the
   piston's inside), glass, water and lava (animated), the anchor and floater.
 - Creatures are meant to be 64 px a block (the blocky-model skill, `.claude/skills/blocky-model`),
