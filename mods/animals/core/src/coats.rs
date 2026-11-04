@@ -269,7 +269,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 42] = [
+const FILES: [(&str, &str); 46] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -312,6 +312,10 @@ const FILES: [(&str, &str); 42] = [
     ("pinacosaurus", include_str!("../../genetics/pinacosaurus.json")),
     ("iguanodont", include_str!("../../genetics/iguanodont.json")),
     ("crocodyliform", include_str!("../../genetics/crocodyliform.json")),
+    ("citipati", include_str!("../../genetics/citipati.json")),
+    ("confuciusornis", include_str!("../../genetics/confuciusornis.json")),
+    ("gobipteryx", include_str!("../../genetics/gobipteryx.json")),
+    ("cedarosaurus", include_str!("../../genetics/cedarosaurus.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1550,6 +1554,50 @@ fn crocodyliform(r: &Read) -> Look {
     }
 }
 
+/// Citipati: sandy-buff to rufous feathers, darker barred wings and tail fan, pale below, a red
+/// crest (no record of its colors: a dune bird's, est.).
+fn citipati(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.6 { "Rufous".into() } else { "Sandy".into() },
+        base: mix([196.0, 158.0, 112.0], [178.0, 112.0, 70.0], ru),
+        under: [226.0, 212.0, 182.0],
+        ..Look::default()
+    }
+}
+
+/// The early birds: Confuciusornis mottled grey-black and brown with pale-spotted wings (Li et
+/// al. 2018, from its color cells), Gobipteryx a paler sandy brown (no record: a Gobi bird's,
+/// est.); both pale below.
+fn early_bird(r: &Read, gobi: bool) -> Look {
+    let tone = r.qv("Ru");
+    let base =
+        if gobi { mix([170.0, 140.0, 104.0], [186.0, 150.0, 106.0], tone) } else { mix([110.0, 92.0, 74.0], [134.0, 100.0, 72.0], tone) };
+    Look {
+        name: match (gobi, tone > 0.6) {
+            (false, false) => "Grey-brown".into(),
+            (false, true) => "Brown".into(),
+            (true, false) => "Sandy".into(),
+            (true, true) => "Buff".into(),
+        },
+        base,
+        under: [204.0, 194.0, 174.0],
+        ..Look::default()
+    }
+}
+
+/// The sauropod: grey-brown to olive, darker along the top, pale buff below (no record of its
+/// colors: est.).
+fn sauropod(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.6 { "Olive".into() } else { "Grey-brown".into() },
+        base: mix([142.0, 134.0, 110.0], [150.0, 142.0, 98.0], ru),
+        under: [210.0, 200.0, 170.0],
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1814,6 +1862,10 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "pinacosaurus" => ankylosaur(&r, true),
         "iguanodont" => iguanodont(&r),
         "crocodyliform" => crocodyliform(&r),
+        "citipati" => citipati(&r),
+        "confuciusornis" => early_bird(&r, false),
+        "gobipteryx" => early_bird(&r, true),
+        "cedarosaurus" => sauropod(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -2397,7 +2449,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 29] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 32] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -2426,7 +2478,10 @@ const MODEL_LAYERS: [ModelLayers; 29] = model_layers!(
     "jaguar",
     "psittacosaurus",
     "ankylosaur",
-    "iguanodont"
+    "iguanodont",
+    "citipati",
+    "early_bird",
+    "sauropod"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
