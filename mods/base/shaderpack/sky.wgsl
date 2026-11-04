@@ -416,7 +416,10 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // Bodies shine through the tone curve; stars dim in the haze low down.
         // The sun shines through the tone curve; the moon keeps its markings.
         if s.ids.y == SKY_BODY && dot(dir, scene.sun.xyz) > 0.0 {
-            rgb = rgb * 2.2;
+            // Low, it goes orange and less blinding: its near-white square at 2.2 went white
+            // through the curve and washed out the golden hour, and the water's path with it.
+            let g = golden();
+            rgb = rgb * mix(2.2, 1.2, g) * mix(vec3(1.0), vec3(1.0, 0.6, 0.3), g);
         }
         a *= 1.0 - rain_amount() * 0.9;
         rgb = display(rgb);
