@@ -1,0 +1,20 @@
+{
+ "kind": "item",
+ "what": "a diamond pickaxe in the same shape as the attached iron pickaxe: a curved crescent head of faceted cyan diamond with teal shadows, white facet tips and one small sparkle crosswise at the handle's top, both points curving down, a gold collar, the long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, the handle running from the bottom-left corner up toward the top-right. Keep 2 px of empty margin from every canvas side, so no edge is cut flat against the border; the working part follows the tool's diagonal and no edge of it is a straight vertical or horizontal line",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.326,
+   "outline": 0.59,
+   "red_line": 0.09,
+   "fill": 0.31,
+   "vertical": 0,
+   "passed": true
+  }
+ ]
+}

@@ -196,7 +196,7 @@ fn block(p: V) -> (i32, i32, i32) {
 
 /// The blocks so far: each block's part, wood over leaves.
 #[derive(Default)]
-struct Out(std::collections::BTreeMap<(i32, i32, i32), Part>);
+struct Out(std::collections::HashMap<(i32, i32, i32), Part>);
 
 impl Out {
     fn put(&mut self, k: (i32, i32, i32), part: Part) {
@@ -258,7 +258,9 @@ impl Out {
                         ^ (k.1 as i64 as u64).wrapping_mul(19_349_663)
                         ^ (k.2 as i64 as u64).wrapping_mul(83_492_791))
                     .next();
-                    if d > 0.55 && ((h >> 20) % 1000) as f32 / 1000.0 < ragged {
+                    // Holes: most in the outer shell, some deeper in (so a crown isn't a wall).
+                    let hole = ((h >> 20) % 1000) as f32 / 1000.0;
+                    if d > 0.55 && hole < ragged || d > 0.25 && hole < ragged * 0.35 {
                         continue; // a hole in the outer shell
                     }
                     self.put(k, Part::Leaves);
@@ -288,6 +290,7 @@ impl Grow<'_> {
         let mut next_branch = if order == 0 { r.branch_start * len } else { f32::MAX };
         let mut spiral = self.rng.f() * 360.0;
         let mut last = None;
+        let mut needled = None; // the block the last needle cluster sat on: once a block is enough
         // A branch thins to nothing over its own length; the trunk by the recipe's loss.
         let loss = if order == 0 { r.width_loss / self.size } else { width / len.max(STEP) };
         // Under needles (a conifer) the twigs and the trunk's top are all needles, no bare wood.
@@ -297,7 +300,8 @@ impl Grow<'_> {
             if (width >= min_wood || order == 0) && !needle_top {
                 last = Some(self.out.wood(p, d, width >= 1.5, last));
             }
-            if r.leaf_along && (order > 0 || grown > len * 0.3) {
+            if r.leaf_along && (order > 0 || grown > len * 0.3) && needled != Some(block(p)) {
+                needled = Some(block(p));
                 let (lr, lry) = if order == 0 { (1.4, 1.0) } else { (r.leaf_r, r.leaf_ry) };
                 self.out.cluster(p, lr, lry, r.ragged, self.seed); // needles on the twigs and the upper trunk
             }
@@ -386,12 +390,15 @@ pub fn blocks(recipe: &Recipe, seed: u64) -> Vec<(i32, i32, i32, Part)> {
     g.limb(foot, start, width, 0, height.min(MAX_HEIGHT as f32 - 2.0), lean);
     // The reach is measured from the trunk's middle: a 2 x 2's is at 1, so 1 more on the plus side.
     let hi = REACH + if width >= 1.5 { 1 } else { 0 };
-    g.out
+    let mut out: Vec<_> = g
+        .out
         .0
         .into_iter()
         .filter(|&((x, _, z), _)| x >= -REACH && x <= hi && z >= -REACH && z <= hi)
         .map(|((x, y, z), p)| (x, y, z, p))
-        .collect()
+        .collect();
+    out.sort_unstable_by_key(|b| (b.0, b.1, b.2)); // a fixed order, whatever the map's
+    out
 }
 
 /// Grows a tree of `recipe` at (`x`, `y`, `z`) (its base) from `seed`: `put(x, y, z, part)` for

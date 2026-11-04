@@ -92,14 +92,57 @@ pub fn age(w: &World, player: u64) {
 pub fn age_inventory(w: &World, id: u64) {
     let inv = w.inventory(id);
     let now = w.day_time();
-    for slot in 0..inv.size() {
-        let stack = inv.get(slot);
-        if stack.is_empty() || FRESHNESS.on_item(stack.item).is_none() {
+    let size = inv.size();
+    let before: Vec<ItemStack> = (0..size).map(|i| inv.get(i)).collect();
+    let mut after = before.clone();
+    for stack in after.iter_mut() {
+        if !stack.is_empty() && FRESHNESS.on_item(stack.item).is_some() {
+            *stack = aged(*stack, now);
+        }
+    }
+    merge_food(&mut after);
+    for (i, (b, a)) in before.iter().zip(&after).enumerate() {
+        if a != b {
+            inv.set(i as u32, *a);
+        }
+    }
+}
+
+/// Food stacks that differ only in their day stamp and are at the same freshness stage stack
+/// together into the earlier slot, keeping the older day (TerraFirmaCraft's way: a stack never gets
+/// fresher by merging). Picked or crafted food comes in unstamped and was stamped a moment later in
+/// a slot of its own, so three picks sat in three slots (Tester, 11-04). Hot food stays apart until
+/// it cools.
+pub fn merge_food(stacks: &mut [ItemStack]) {
+    let alike = |s: &ItemStack| ItemStack { count: 1, ..s.without(&MADE) };
+    let mergeable =
+        |s: &ItemStack| !s.is_empty() && FRESHNESS.on_item(s.item).is_some() && HOT.stack_only(s).is_none() && MEAL.stack_only(s).is_none();
+    for i in 0..stacks.len() {
+        if !mergeable(&stacks[i]) {
             continue;
         }
-        let new = aged(stack, now);
-        if new != stack {
-            inv.set(slot, new);
+        for j in 0..i {
+            let (t, s) = (stacks[j], stacks[i]);
+            if !mergeable(&t) || alike(&t) != alike(&s) {
+                continue;
+            }
+            let room = max_stack(t.item).saturating_sub(t.count);
+            if room == 0 {
+                continue;
+            }
+            let n = room.min(s.count);
+            let made = match (MADE.stack_only(&t), MADE.stack_only(&s)) {
+                (Some(a), Some(b)) if a > 0 && b > 0 => a.min(b),
+                (Some(a), _) if a > 0 => a,
+                (_, Some(b)) => b,
+                _ => 0,
+            };
+            let merged = t.grow(n);
+            stacks[j] = if made > 0 { merged.with(&MADE, made) } else { merged };
+            stacks[i] = s.shrink(n);
+            if stacks[i].is_empty() {
+                break;
+            }
         }
     }
 }

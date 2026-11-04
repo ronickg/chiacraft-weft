@@ -26,6 +26,11 @@ pub fn register(r: &mut Registry) {
     r.on(&ENTITY_HURT, |b| {
         let w = b.world();
         for e in b.iter().filter(|e| e.cause == damage::ATTACK) {
+            // A blow that killed leaves nothing to bleed: it would carry over the respawn (the
+            // death handler clears bleeding, and this event can come after it).
+            if w.entity(e.entity).is_none_or(|st| st.health <= 0.0) {
+                continue;
+            }
             let heavy = w
                 .component(e.entity, &VITALS)
                 .is_some_and(|v| e.amount * HEALTH_SCALE >= v.max_health * WOUND);
