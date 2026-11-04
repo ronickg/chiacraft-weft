@@ -1,0 +1,4 @@
+# Glacier ice (Terrain, 11-04): three variants beside the plain side, picked at random, so a glacier wall does not show its tile repeating; the bands stay at the same heights in all four, so they join sideways.
+method = random
+tiles = <default> glacier_ice_side/1-3
+symmetry = all
