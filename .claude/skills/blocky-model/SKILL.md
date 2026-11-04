@@ -384,10 +384,16 @@ Animation
          width, chest depth), standing and in flight
    - [ ] quads (wing skin, fins) checked by their cut outline, not their box: a panel's bounding
          box can dip below the ground while its shape doesn't (and the reverse)
-8. **Save a version before each big change** (`<out>_vN/` with the scripts that built it and a
+8. **Never throw away a generated image** (Ronald, 2026-11-04: "never throw away generated images
+   pls so I can also check back"): every render, review shot, before/after sheet, variant and
+   texture tried, the before versions too. Copy them to
+   `/Users/ronald/Coding/chiacraft-archive/images/<work>/<date>/` (e.g. `models-32/2026-11-04/`:
+   sheets, renders, variants, coats, textures before and now, with a README saying what is where)
+   before a scratch folder can be cleared.
+9. **Save a version before each big change** (`<out>_vN/` with the scripts that built it and a
    README on restoring it): users often want to compare or revert. Show the new one next to the
    old one in the viewer ("<name> (before)").
-9. **When the user says something looks wrong** (and can't say what): look up the references
+10. **When the user says something looks wrong** (and can't say what): look up the references
    again, shoot ours in the same flat views, and list the differences as numbers (a span 1.06 times
    the length against 1.4, a forearm too short to reach the ground). Fix the cause (bone lengths,
    part sizes) and refit the poses; adjusting a pose around a wrong skeleton never gets there.
