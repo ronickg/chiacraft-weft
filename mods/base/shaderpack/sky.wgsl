@@ -390,8 +390,8 @@ fn aurora(dir: vec3<f32>) -> vec3<f32> {
 }
 
 // A rainbow opposite the sun while a shower passes with the sun out (Research round 15, 5): the
-// primary bow 40-42.5° from the point opposite the sun, red outside, and a faint second one at
-// 50.5-53.5° with its colours the other way; the sky inside the primary a little brighter. Six flat
+// primary bow 39.5-42.5° from the point opposite the sun, red outside, and a faint second one at
+// 50-53.6° with its colours the other way; the sky inside the primary a little brighter. Six flat
 // bands, pixel-snapped as the aurora is, to suit the blocks (Complementary's pixel rainbow). Only in
 // light rain: a downpour hides the sun, and a thunderstorm makes none. Once the scene carries how
 // wet the land still is (after the sync), it lingers as the rain clears.
@@ -408,22 +408,23 @@ fn rainbow(dir: vec3<f32>) -> vec3<f32> {
     if strength <= 0.0 || dir.y <= 0.0 {
         return vec3(0.0);
     }
-    let d = normalize(floor(dir * 140.0) / 140.0);
+    let d = normalize(floor(dir * 100.0) / 100.0);
     let deg = degrees(acos(clamp(dot(d, -scene.sun.xyz), -1.0, 1.0)));
     var c = vec3(0.0);
-    let one = (deg - 40.0) / (2.5 / 6.0);
+    let one = (deg - 39.5) / (3.0 / 6.0);
     if one >= 0.0 && one < 6.0 {
         c = BOW[u32(one)];
     }
-    let two = (deg - 50.5) / (3.0 / 6.0);
+    let two = (deg - 50.0) / (3.6 / 6.0);
     if two >= 0.0 && two < 6.0 {
-        c = BOW[5u - u32(two)] * 0.4;
+        c = BOW[5u - u32(two)] * 0.45;
     }
     // Inside the bow the sky is lit a little by the light it bends there.
     c += vec3(0.12) * (1.0 - smoothstep(30.0, 40.0, deg));
     // It thins toward the horizon, where less rain lies along the look.
     let p = palette();
-    return c * luma(p.sun) * light_strength() * strength * smoothstep(0.0, 0.06, d.y) * 0.08;
+    // At 0.08 the bow was a faint thread through the shower (the after-rain check, 11-05).
+    return c * luma(p.sun) * light_strength() * strength * smoothstep(0.0, 0.06, d.y) * 0.25;
 }
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.
