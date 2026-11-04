@@ -207,6 +207,7 @@ mod.base.name = Weft
 mod.base.description = The game itself: blocks, items, mobs, the overworld and its machines.
     It is a mod like any other and uses nothing other mods can't.
 mod.base.authors = vortex_so
+menu.version = chiacraft {#c6a383}· on Weft {0} · {1} mods{/}
 menu.news = {align:center}{img:base:icon_settings 16x16}{/align}
     {align:center}Weft is in development.{/align}
 command.base.season = it is now day {1} of {0}

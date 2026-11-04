@@ -524,3 +524,4 @@ block.base.wool.tooltip = С овец или из четырёх нитей.
 block.base.kelp = Ламинария
 item.base.kelp = Ламинария
 item.base.cooked_wild_rice = Варёный дикий рис
+menu.version = chiacraft {#c6a383}· на Weft {0} · модов: {1}{/}
