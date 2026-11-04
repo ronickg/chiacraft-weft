@@ -29,9 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # wasm32: the sandbox's tests build a mod for it.
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
@@ -53,6 +55,14 @@ jobs:
       - name: Tests (chiacraft crates)
         run: cargo nextest run --profile ci -p chiacraft-wallet -p chiacraft-account -p chiacraft-packages --lib
 
+      # tests/sandbox.rs runs a real mod (tests/guest) and is only built with `pack`.
+      - name: Tests (sandbox)
+        run: cargo nextest run --profile ci -p chiacraft-sandbox --features pack
+
+      - name: Tests (store)
+        if: hashFiles('crates/store/Cargo.toml') != ''
+        run: cargo nextest run --profile ci -p chiacraft-store
+
       - name: Tests (engine)
         run: cargo nextest run --profile ci -p weft_engine
 
@@ -65,6 +75,9 @@ jobs:
       # says.
       - name: Tests (survival numbers, animals)
         run: cargo nextest run --profile ci -p vitals -p animals_core
+
+      - name: Tests (base, its API, packages mod)
+        run: cargo nextest run --profile ci -p base -p base_api -p packages
 
   animals-web:
     runs-on: ubuntu-latest

@@ -1,7 +1,8 @@
-# Fuzzes what reads data packages from strangers (crates/packages/fuzz): the manifest, the
-# signature and the definitions, five minutes each, every week. A crash leaves its input as the
-# `fuzz-<target>` artifact; replay it with `cargo +nightly fuzz run <target> <file>` in
-# crates/packages.
+# Fuzzes what takes data and code from strangers, five minutes a target, every week: data
+# packages (crates/packages/fuzz: the manifest, the signature, the definitions) and sandboxed mods
+# (crates/sandbox/fuzz: the component, its storage). A crash leaves its input as the
+# `fuzz-<target>` artifact; replay it with `cargo +nightly fuzz run <target> <file>` in that
+# crate.
 name: Fuzz
 
 on:
@@ -10,7 +11,7 @@ on:
   workflow_dispatch:
   # And when what it fuzzes changes.
   pull_request:
-    paths: ["crates/packages/**", ".github/workflows/fuzz.yml"]
+    paths: ["crates/packages/**", "crates/sandbox/**", ".github/workflows/fuzz.yml"]
 
 permissions:
   contents: read
@@ -20,22 +21,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [manifest, signature, defs]
+        include:
+          - { crate: packages, target: manifest }
+          - { crate: packages, target: signature }
+          - { crate: packages, target: defs }
+          - { crate: sandbox, target: component }
+          - { crate: sandbox, target: storage }
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: crates/packages
+        working-directory: crates/${{ matrix.crate }}
     steps:
       - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: crates/packages/fuzz
+          workspaces: crates/${{ matrix.crate }}/fuzz
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-fuzz
+
+      # From a real component, which random bytes would take long to find.
+      - name: Seed corpus
+        if: matrix.target == 'component'
+        run: mkdir -p fuzz/corpus/component && cp ../../examples/packages/clans/code/server.wasm fuzz/corpus/component/
 
       # The prebuilt cargo-fuzz is a musl binary and would build for musl, where the sanitizer
       # cannot run.
@@ -46,4 +57,4 @@ jobs:
         if: failure()
         with:
           name: fuzz-${{ matrix.target }}
-          path: crates/packages/fuzz/artifacts
+          path: crates/${{ matrix.crate }}/fuzz/artifacts
