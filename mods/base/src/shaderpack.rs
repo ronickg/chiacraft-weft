@@ -109,7 +109,9 @@ fn install(c: &Client) {
         weft_sdk::warn!("shader pack: {}: {e}", dir.display());
         return;
     }
-    let mut changed = false;
+    // New files matter only to the pack in use; a reload for nothing is a risk (a reload while the
+    // world's first terrain is still being built hung a GPU, 2026-11-04).
+    let mut files_changed = false;
     let files = FILES
         .iter()
         .map(|(name, src)| (*name, format!("{LOOK}\n{src}")))
@@ -118,11 +120,12 @@ fn install(c: &Client) {
         let path = dir.join(name);
         if std::fs::read_to_string(&path).ok().as_deref() != Some(text.as_str()) {
             match std::fs::write(&path, &text) {
-                Ok(()) => changed = true,
+                Ok(()) => files_changed = true,
                 Err(e) => weft_sdk::warn!("shader pack: {}: {e}", path.display()),
             }
         }
     }
+    let mut changed = files_changed && SHADER_PACK.get() == ID;
     // `--shader-pack <id>` picks one for this run (a script checking the look).
     if let Some(pack) = weft_sdk::client::launch_option("shader-pack") {
         if SHADER_PACK.get() != pack {
