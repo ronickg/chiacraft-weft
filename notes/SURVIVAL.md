@@ -473,7 +473,9 @@ sword, about 100 XP.
   reindeer and jaguars up to three: `animals_core::hides`), leather from cows and deer, sheep's
   wool, and linen from string, which plant fibre from cutting tall grass (1 in 8) spins into.
   Each piece is sewn with string.
-- Their tooltips say their warmth (`base:warmth`). Placeholder art: tinted leather armor.
+- Their tooltips say their warmth (`base:warmth`). Item icons by the game-art pass (11-04, Ronald's
+  yes), also the stews', preserved foods', fibre's, salt's, bowl's, pot's and rack's; the worn
+  layers and the pot's, rack's and campfire's block faces are still tinted placeholders.
 - Checks (`vitals::balance`): fur holds off the cold on a -5 °C night that freezes one unclothed,
   linen is cooler than bare skin in the desert sun and fur hotter, wet wool warmer than wet linen,
   fur keeps out the wind.
