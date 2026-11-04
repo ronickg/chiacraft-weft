@@ -53,14 +53,6 @@
      "sd": 0.1
     }
    }
-  },
-  "swamp": {
-   "quantitative": {
-    "Tn": {
-     "mean": 0.7,
-     "sd": 0.1
-    }
-   }
   }
  },
  "build": {

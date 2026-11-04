@@ -63,18 +63,18 @@
   }
  },
  "habitats": {
-  "snowy_plains": {
-   "quantitative": {
-    "Pl": {
-     "mean": 0.6,
-     "sd": 0.12
-    }
-   }
-  },
   "taiga": {
    "quantitative": {
     "Pl": {
      "mean": 0.35,
+     "sd": 0.12
+    }
+   }
+  },
+  "snow": {
+   "quantitative": {
+    "Pl": {
+     "mean": 0.6,
      "sd": 0.12
     }
    }

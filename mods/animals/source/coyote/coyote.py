@@ -77,7 +77,7 @@ EYE_STYLE = os.environ.get("COYOTE_EYES", "coyote_yellow")
 SKULL0 = ((-4.0, 24.0, 12.0), (4.0, 31.0, 20.0))  # the fox's space
 SKULL = tuple(tuple(float(v) for v in warp(c)) for c in SKULL0)
 EYE_X, EYE_Y = 2.4 * K, (29.0 + D) * K  # on the face, above the muzzle (warped)
-LID_Z = SKULL[1][2] + 0.35  # the eyelids' hinge line, 0.35 in front of the face: closed, they sit over the eyes
+LID_Z = SKULL[1][2] + 0.15  # the eyelids' hinge line, just in front of the face: closed, they sit over the eyes
 LASH = (52, 30, 22)
 
 
@@ -155,7 +155,7 @@ def bones():
     B = [(n, p, tuple(float(v) for v in warp(pv))) for n, p, pv in B]
     for s, n in ((1, "L"), (-1, "R")):  # the eyelids on the warped face, with the eye's rounding
         x0, x1, top, _ = eye_box(s * EYE_X)
-        B.append((f"eyelid_{n}", "head", ((x0 + x1) / 2, top, LID_Z)))
+        B.append((f"eyelid_{n}", "head", ((x0 + x1) / 2, top + 0.25, LID_Z)))
     return B
 
 
@@ -203,8 +203,11 @@ def elements():
         # The eyelid: a quad the eye's size lying flat inside the head, hinged at the eye's top; a
         # blink swings it down over the eye (-90 about x). Tilted a few degrees into the head, so it
         # is never in the skull's top plane.
+        # A quarter texel bigger all round than the eye: the face isn't whole texels once warped, and
+        # no edge of the eye shows past a closed lid.
         x0, x1, top, bottom = eye_box(s * EYE_X)
-        E.append(el(f"eyelid_{n}", f"eyelid_{n}", (x0, top, LID_Z - (top - bottom)), (x1, top, LID_Z), quad="down", rot=(-4, 0, 0),
+        x0, x1, top, h = x0 - 0.3, x1 + 0.3, top + 0.25, top - bottom + 0.55
+        E.append(el(f"eyelid_{n}", f"eyelid_{n}", (x0, top, LID_Z - h), (x1, top, LID_Z), quad="down", rot=(-4, 0, 0),
                     origin=((x0 + x1) / 2, top, LID_Z)))
     return E
 
