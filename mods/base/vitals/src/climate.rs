@@ -78,7 +78,7 @@ impl Climate {
 // Wind and fog (`air`): each place's seasonal mean wind at 10 m and its days with fog, from airport
 // records, the weather services and the Cretaceous places' modern stand-ins
 // (`reports/ecology/Wind and fog.md`, with which are estimates).
-pub const BIOMES: [Climate; 19] = [
+pub const BIOMES: [Climate; 21] = [
     // The overworld (`mods/base/src/worldgen.rs`).
     c("base:plains", "Manhattan, Kansas (Konza Prairie)", 12.8, 0.42, 14.2, [0.27, 0.27, 0.2, 0.14]).air(
         [3.8, 3.0, 3.0, 3.1],
@@ -141,6 +141,21 @@ pub const BIOMES: [Climate; 19] = [
     c("base:ocean", "Ponta Delgada, the Azores", 18.2, 0.97, 4.1, [0.33, 0.19, 0.38, 0.43]).air(
         [3.1, 2.5, 2.7, 3.4],
         [1.4, 0.7, 0.3, 0.4],
+        Fog::Sea,
+    ),
+    // Warm lagoons and coral reefs (Terrain's, Ronald 11-04): Key West on the Florida Reef Tract
+    // (NOAA 1991-2020), the reef and its lagoon on one station. The sea's heat keeps the days and
+    // nights within a few degrees (humidity from the 5.4 °C day range); rain days from 0.25 mm,
+    // taken a fifth fewer as from 1 mm; the wet season June to October. Trade winds steady
+    // through the dry season; sea fog is rare (estimates).
+    c("base:coral_reef", "Key West, the Florida Reef Tract", 26.1, 0.97, 4.2, [0.15, 0.33, 0.3, 0.16]).air(
+        [4.8, 4.0, 4.3, 4.8],
+        [0.5, 0.2, 0.3, 0.8],
+        Fog::Sea,
+    ),
+    c("base:lagoon", "Key West, the Florida Keys' back-reef lagoon", 26.1, 0.97, 4.2, [0.15, 0.33, 0.3, 0.16]).air(
+        [4.5, 3.8, 4.0, 4.5],
+        [0.5, 0.2, 0.3, 0.8],
         Fog::Sea,
     ),
     c("base:beach", "Faro, Portugal", 18.2, 0.74, 6.2, [0.16, 0.01, 0.16, 0.2]).air([4.1, 3.7, 3.4, 3.8], [1.0, 1.6, 2.1, 2.3], Fog::Dawn),

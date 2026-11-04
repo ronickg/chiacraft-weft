@@ -35,12 +35,14 @@ pub const WAITING: &[(&str, &str)] = &[
     // The Cretaceous's tier 2 and 3.
 ];
 
-/// The biomes the webs are for: every climate but the caves (no web of their own) and the open
-/// sea (its web, gulls and seals, comes later; its fish live in the rivers and lakes).
+/// The biomes the webs are for: every climate but the caves (no web of their own) and the sea: the
+/// open sea and the warm lagoons and reefs, whose webs (gulls, seals, reef fish) come later; their
+/// fish live in the rivers and lakes meanwhile.
 pub fn biomes() -> impl Iterator<Item = &'static str> {
     BIOMES
         .iter()
-        .filter(|c| !c.underground && c.biome != "base:ocean")
+        // The warm sea's lagoons and reefs are sea too: their web (reef fish, turtles) comes with it.
+        .filter(|c| !c.underground && !matches!(c.biome, "base:ocean" | "base:lagoon" | "base:coral_reef"))
         .map(|c| c.biome)
 }
 
