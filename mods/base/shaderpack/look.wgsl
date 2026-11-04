@@ -222,7 +222,57 @@ fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
 fn sun_on_body(rel: vec3<f32>, n: vec3<f32>, sky: f32) -> f32 {
     let guess = smoothstep(0.8, 1.0, sky);
     let mapped = shadow_at(rel, n);
-    return mix(guess, min(mapped.x, smoothstep(0.3, 0.8, sky)), mapped.y);
+    return mix(guess, min(mapped.x, smoothstep(0.3, 0.8, sky)), mapped.y) * cloud_shadow(rel);
+}
+
+// ---- the clouds' shadows (`scene.clouds`, the sky's cloud layer) ----
+
+// The slab is at least this thick (blocks): `sky.wgsl`'s clouds (CLOUD_THICKNESS there).
+const CLOUD_SLAB: f32 = 9.0;
+
+// 1 where cell `cell` (picture cells from `origin`, the camera's) is cloud: the picture's
+// (bindless `tex`, `dims` cells), and as the weather fills them (`fill`) more of the gaps, a hash
+// per cell so they grow as whole cells. The sky's clouds and their shadows both read this.
+fn cloud_cell_of(tex: u32, cell: vec2<f32>, origin: vec2<f32>, dims: vec2<f32>, fill: f32) -> f32 {
+    let at = fract((cell + origin + vec2(0.5)) / dims);
+    if textureSampleLevel(textures[tex], nearest_clamp, at, 0.0).a >= 0.5 {
+        return 1.0;
+    }
+    let w = vec2<i32>(cell + origin);
+    return select(0.0, 1.0, hash3(vec3(w.x, 51, w.y)) < fill);
+}
+
+// How much of the sun the clouds let through to `rel` (camera relative): 1 under open sky, about
+// a fifth under a cloud's middle, soft at its edges. The point is followed toward the light to the
+// slab's middle, where the four nearest cells are blended as the sky draws them, so the shadows
+// are the clouds overhead, drifting with them across near and far land alike (Bliss's moving
+// shade on the hills).
+fn cloud_shadow(rel: vec3<f32>) -> f32 {
+    let c = scene.clouds;
+    let l = light_dir();
+    if c.x < 0.5 || l.y < 0.03 {
+        return 1.0;
+    }
+    let t = (c.z + CLOUD_SLAB * 0.5 - rel.y) / l.y;
+    if t <= 0.0 {
+        return 1.0;
+    }
+    let tex = u32(c.x - 0.5);
+    let dims = vec2<f32>(textureDimensions(textures[tex]));
+    let q = scene.cloud_cells.xy + (rel.xz + l.xz * t) / c.y - vec2(0.5);
+    let base = floor(q);
+    let f = q - base;
+    let u = f * f * (3.0 - 2.0 * f);
+    let o = scene.cloud_cells.zw;
+    let a = cloud_cell_of(tex, base, o, dims, c.w);
+    let b = cloud_cell_of(tex, base + vec2(1.0, 0.0), o, dims, c.w);
+    let d = cloud_cell_of(tex, base + vec2(0.0, 1.0), o, dims, c.w);
+    let e = cloud_cell_of(tex, base + vec2(1.0, 1.0), o, dims, c.w);
+    let cover = mix(mix(a, b, u.x), mix(d, e, u.x), u.y);
+    // Fading in as the light climbs: long low shadows from far clouds would smear across the land.
+    let lift = smoothstep(0.03, 0.15, l.y);
+    // The sky's puffs fill in over this range of the blend at their middle (`cloud_density`).
+    return 1.0 - 0.8 * smoothstep(0.35, 0.6, cover) * lift;
 }
 
 // ---- light on things ----

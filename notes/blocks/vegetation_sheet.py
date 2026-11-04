@@ -74,9 +74,9 @@ d.text((20, y), "3. Shrub leaves: greyed and tinted by the biome as asked (top),
 x = 20
 fol = np.array([0x6F, 0x9A, 0x3C])
 for n in ("leaves_willow", "leaves_juniper", "leaves_creosote"):
-    grey = tint(t(n, "leaves").copy(), np.array([255, 255, 255]))
-    tinted = b.tinted_view(n, "leaves")
-    nat = Image.open(os.path.join(T, n + "_natural.png")).convert("RGBA")
+    
+    tinted = b.tinted_view(n + "_grey", "leaves")
+    nat = Image.open(os.path.join(T, n + ".png")).convert("RGBA")
     sheet.alpha_composite(b.cube(tinted, tinted, 80), (x, y + 34))
     sheet.alpha_composite(b.cube(nat, nat, 80), (x, y + 34 + 180))
     sheet.alpha_composite(tiled(nat, 2, 2), (x + 175, y + 34 + 180))

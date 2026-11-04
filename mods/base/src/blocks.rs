@@ -246,6 +246,9 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fr
         .texture(tex)
         .hardness(0.2)
         .cutout()
+        // Faces between two leaves of one tree kind aren't drawn (each was drawn twice): a crown
+        // keeps its outer shell and its holes (Researcher's performance report, item 9).
+        .cull_same()
         .opacity(1)
         // Its tint by how it turns in autumn (`vitals::wild::LEAVES`).
         .tint(base_api::trees::leaf_tint(vitals::wild::turn(handle.name())))

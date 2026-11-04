@@ -387,6 +387,16 @@ impl T {
         Err(format!("clicking {query} never opened {screen}"))
     }
 
+    /// The UI query of hotbar slot `i` in the open menu: a menu's last nine slots are the hotbar
+    /// (the player's inventory comes last), so its number follows whatever the menu has before
+    /// it (the inventory's clothing slots moved it from 36 to 40).
+    pub fn hotbar(&self, i: u32) -> String {
+        let last = (0..512u32)
+            .rev()
+            .find(|n| self.c().ui_rect(&format!("slot:{n}")).is_some());
+        format!("slot:{}", last.map_or(36 + i, |l| l.saturating_sub(8) + i))
+    }
+
     pub fn click_ui(&self, query: &str, button: u32) -> bool {
         let ok = self.c().click_ui(query, button);
         if !ok {

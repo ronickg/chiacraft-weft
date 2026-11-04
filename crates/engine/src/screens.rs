@@ -636,9 +636,9 @@ impl Screen for SettingsScreen {
                     let scale =
                         if s.gui_scale() == 0 { Arg::Key("settings.gui_scale.auto".into()) } else { Arg::Int(s.gui_scale() as i64) };
                     d.button("settings.gui_scale", &[scale], 300.0, false, |r| {
-                        // Auto, then every scale the window can actually show.
+                        // Auto, then every scale the window can show whole: 1 and the even ones.
                         let max = crate::settings::max_gui_scale(r.stats.window);
-                        let next = if r.settings.gui_scale() >= max { 0 } else { r.settings.gui_scale() + 1 };
+                        let next = crate::settings::next_gui_scale(r.settings.gui_scale(), max);
                         r.settings.set("gui_scale", next as f64);
                     });
                     d.button("settings.vsync", &[on_off(s.vsync())], 300.0, false, |r| {

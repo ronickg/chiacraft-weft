@@ -443,7 +443,7 @@ pub async fn rich_text(t: T) -> R {
         .await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    let Some([x, y, w, h]) = t.c().ui_rect("slot:36") else { return Err("no hotbar slot in the inventory".into()) };
+    let Some([x, y, w, h]) = t.c().ui_rect(&t.hotbar(0)) else { return Err("no hotbar slot in the inventory".into()) };
     t.c().cursor(x + w / 2.0, y + h / 2.0);
     t.frames(4).await?;
     let rune = t.shot("rune").await?;
@@ -603,7 +603,9 @@ pub async fn attack_indicator(t: T) -> R {
     t.c().look(0.0, -40.0);
     t.secs(1.0).await?;
     let (x0, y0, x1, y1) = (0.49, 0.505, 0.51, 0.54);
-    let fill = |c: probe::C| c.iter().all(|&v| v > 200);
+    // The bar's fill is the kit's amber (warm and bright), not white: red high, green middling,
+    // blue low; the ground behind it (grass, dirt) is none of that.
+    let fill = |c: probe::C| c[0] > 170 && c[1] > 80 && c[2] < 110;
     let rest = t.shot("charged").await?;
     t.check(rest.share(x0, y0, x1, y1, fill) < 0.01, "nothing under the crosshair when charged");
     let center = rest.share(0.497, 0.494, 0.503, 0.506, |c| c.iter().all(|&v| v > 150));

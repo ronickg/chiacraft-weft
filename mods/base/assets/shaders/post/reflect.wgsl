@@ -69,12 +69,16 @@ fn apply(p: PostPixel) -> vec4<f32> {
     }
     // Walk out along it, the steps growing, from a random start against banding. Past something
     // thin without a clean hit it keeps going; a hit is narrowed down between the last two steps.
+    // Strength under 0.75 (the Low setting): as strong, in 16 longer steps that reach as far.
+    let cheap = p.strength < 0.75;
+    let steps = select(REFLECT_STEPS, 16, cheap);
+    let grow = select(1.15, 1.5, cheap);
     var step = 0.5;
     var dist = step * (0.5 + reflect_hash(p.uv * p.size));
     var before = 0.0;
     var hit = vec2(-1.0);
     var travelled = 0.0;
-    for (var i = 0; i < REFLECT_STEPS; i++) {
+    for (var i = 0; i < steps; i++) {
         let at = pos + r * dist;
         let s = reflect_project(at);
         if s.w < 0.0 || s.x < 0.0 || s.x > 1.0 || s.y < 0.0 || s.y > 1.0 {
@@ -100,7 +104,7 @@ fn apply(p: PostPixel) -> vec4<f32> {
         }
         before = dist;
         dist += step;
-        step *= 1.15;
+        step *= grow;
     }
     if hit.x < 0.0 {
         return p.color;
@@ -114,6 +118,6 @@ fn apply(p: PostPixel) -> vec4<f32> {
     let near = 1.0 - smoothstep(300.0, 700.0, travelled);
     let fresnel = 0.04 + 0.96 * pow(1.0 - max(dot(-v, n), 0.0), 4.0);
     // The mask is the water's own opacity: low only in clear shallows seen from above.
-    let amount = clamp(fresnel * 0.95 + 0.08, 0.0, 0.97) * smoothstep(0.02, 0.3, water) * edge * near * min(p.strength, 1.0);
+    let amount = clamp(fresnel * 0.95 + 0.08, 0.0, 0.97) * smoothstep(0.02, 0.3, water) * edge * near * select(min(p.strength, 1.0), 1.0, cheap);
     return vec4(mix(p.color.rgb, mirrored, amount), p.color.a);
 }
