@@ -61,6 +61,7 @@ def measure(a):
     mx, mn = c.max(1), c.min(1)
     sat = float(((mx - mn) / np.maximum(mx, 1e-6)).mean())
     return dict(box=round(float(box), 3), cover=round(float(cover), 3), outline=round(float(outline), 3), light=round(light, 3),
+                edge=round(float(L[edge].mean()), 3),
                 luma=round(float(Lv.mean()), 3), sat=round(sat, 3))
 
 

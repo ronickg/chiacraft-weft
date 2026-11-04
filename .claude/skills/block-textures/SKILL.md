@@ -107,6 +107,13 @@ fixed in the grade table first; only a tile wrong in shape or idea is regenerate
   the vanilla band, and draws a tiled before/after of each changed tile. `--with other.toml --dry`
   previews proposals without writing (`notes/blocks/vanilla_proposals.py <packs>` writes the vanilla
   comparison's as `grade_proposed.toml`; approved rows move into `grade.toml`).
+- **Item icons too**: `[item_groups.*]` and `[items.*]` in the same table grade
+  `mods/<mod>/assets/textures/item/` from `mods/<mod>/source/items/tiles/`; the knob `outline` scales
+  an icon's 1-px edge only (our items guide: a dark shade of each part's own colour, 15-45%).
+  `notes/blocks/items_audit.py` checks the set against the guide, our own medians and seven packs.
+- **Ores in a rock** are rows with `base = "<host tile>"` and `overlay = "<name>"`: the overlay
+  (drawn alone on magenta, `mods/base/source/blocks/overlays/`) is laid on the host's own graded tile
+  and variants, so the ore follows the rock's tuning.
 - **Safe with other sessions**: a tile graded for the first time is adopted from the game as its
   source; a game tile someone replaced since the last build (`grade.lock.json`) becomes the new
   source and is graded on top, never silently overwritten. After `blocks.py install`, run the grade.
