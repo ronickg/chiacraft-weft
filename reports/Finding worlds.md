@@ -181,7 +181,14 @@ All of these can be checked locally. None is a single score from anyone.
 Later: Nostr as a second mirror of the same signed listings, gossip heartbeats among listed
 worlds, a CHIP-0035 store for details while a world is offline, and DIG as one more reader.
 
-## For Ronald to decide
+## Ronald's answers (2026-11-04)
+
+"Yes, all four", relayed by Planner: a deposit of 0.0001 TXCH on testnet11 (a setting; the
+mainnet amount is his call later, and spending stays refused off testnet11); only worlds with a
+DID can be listed; no Nostr mirror now; a list kept by us is offered in the finder and never
+followed by default.
+
+## For Ronald to decide (answered above)
 
 1. **The deposit.** Recommended: 0.0001 TXCH on testnet11 now, which is symbolic and lets us test
    the filter. The mainnet amount waits for your decision; 0.01 XCH is our suggestion, about a

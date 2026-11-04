@@ -441,6 +441,14 @@ impl App {
         if chiacraft_account::current().is_some() {
             net::p2p::start_account(&settings);
             crate::chiacraft::chain::configure(&settings.run_dir, &settings.chain(), settings.chain_peers());
+            // The account's first address on that chain, public, in a file: where to send it test
+            // coins (a listing's deposit, phase 5).
+            if let (Some(s), Ok(net)) = (chiacraft_account::current(), crate::chiacraft::chain::network(&settings.chain()))
+                && let Some(ph) = s.first_puzzle_hash()
+            {
+                let address = chiacraft_wallet::chain::address(chiacraft_wallet::chain::Bytes32::from(ph), net);
+                let _ = std::fs::write(s.home.join(format!("address-{}.txt", net.name())), format!("{address}\n"));
+            }
         }
         let icon = crate::assets::decode_png_file(&engine_assets(self.opts.dev).join("icon.png"))
             .and_then(|(w, h, px)| winit::window::Icon::from_rgba(px, w, h).ok());
@@ -1038,6 +1046,23 @@ impl Running {
     }
 
     /// Plays in the world `server` runs in this process.
+    /// A listed world is there to be found: while it is open it is hosted under its own key, the
+    /// one its listing names, without its owner opening it to others on Multiplayer. Otherwise
+    /// every finder saw it offline (finder3, 11-04).
+    fn host_if_listed(&mut self) {
+        if net::p2p::HOSTING.lock().is_some() {
+            return;
+        }
+        if let Some(Game { server: Some(s), identity: Some(id), world, .. }) = &self.game
+            && s.dir
+                .as_deref()
+                .is_some_and(|d| crate::chiacraft::worlds::listing::load(d).is_some())
+        {
+            log::info!("'{world}' is listed: hosting it under its own key {}", id.key());
+            net::host(s, id.clone(), world, &self.settings);
+        }
+    }
+
     fn play_local(&mut self, server: ServerHandle, world: String, identity: Option<Arc<crate::world_address::WorldIdentity>>) {
         crate::admission::set_local_world(server.dir.clone(), identity.clone());
         let (client_conn, server_conn) = net::local_pair();
@@ -1058,6 +1083,7 @@ impl Running {
                 // The synced settings the player changes here are this world's.
                 crate::config::playing_in(Some(server.configs.clone()));
                 self.game = Some(Game { client, server: Some(server), world, identity });
+                self.host_if_listed();
                 self.screens.clear();
                 self.hud.invalidate();
                 self.quads_dirty = true;
@@ -2160,6 +2186,9 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     }
     f3_keys(r);
     toggle_keys(r);
+    if crate::chiacraft::worlds::listing::HOST_NOW.swap(false, std::sync::atomic::Ordering::Relaxed) {
+        r.host_if_listed();
+    }
     if r.packs_pending
         && !r
             .screens
@@ -2249,11 +2278,13 @@ fn start_frame(r: &mut Running, opts: &Options, dt: f64) {
     let links_now = crate::links::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
         + crate::friends::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
         + crate::admission::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
-        + crate::chiacraft::achievements::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
+        + crate::chiacraft::achievements::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
+        + crate::chiacraft::worlds::finder::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
     if links_now != r.links_seen {
         r.links_seen = links_now;
         if r.screens.last().is_some_and(|(s, _)| {
-            ["core:links", "core:multiplayer", "core:friends", "core:admission", "core:account", "core:achievements"].contains(&s.name())
+            ["core:links", "core:multiplayer", "core:friends", "core:admission", "core:account", "core:achievements", "core:finder"]
+                .contains(&s.name())
         }) {
             r.rebuild_all();
         }

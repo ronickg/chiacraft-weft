@@ -63,6 +63,9 @@ impl Screen for Multiplayer {
                     c.requests.push(Request::Open(Box::new(Links)))
                 });
                 ui.set_id(id, "links");
+                // Worlds anyone listed on chain (chiacraft, phase 5).
+                let id = button(ui, cx, "finder.open", &[], 120.0, |c| c.requests.push(Request::Screen("core:finder".into())));
+                ui.set_id(id, "finder");
                 let id = button(ui, cx, "friends.open", &[], 160.0, |c| {
                     c.requests
                         .push(Request::Open(Box::new(crate::friends::Friends)))
