@@ -843,7 +843,9 @@ impl Running {
                     }
                     self.return_home();
                     self.screens.clear();
-                    self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(e)] }));
+                    // A world's refusal at the door (chiacraft, `admission`) in this player's language.
+                    let why = crate::admission::refusal_from_text(&e).map_or(Arg::Text(e), Arg::Msg);
+                    self.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![why] }));
                     return;
                 }
             }

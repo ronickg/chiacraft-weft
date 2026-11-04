@@ -518,6 +518,55 @@ pub fn held_list(world: &Path, maintainer: &str) -> Option<Vec<u8>> {
     (bytes.len() <= MAX_LIST_BYTES).then_some(bytes)
 }
 
+/// The bans that keep the login key `key` out of the world in `world` (its own and the lists it
+/// follows), checked at the door: before the world serves the joining game anything, when only
+/// the connection's key is known. The rest of the rules wait for the join, which proves the
+/// identity and the DID.
+pub fn at_the_door(world: &Path, key: &str) -> Option<Msg> {
+    let gate = Gate::new(Some(world.to_path_buf()));
+    let rules = Rules { only_listed: false, did_required: false, did_min_days: 0, ..gate.rules.clone() };
+    let who = Who { key: key.to_string(), ..Default::default() };
+    match verdict(&rules, &gate.bans, &gate.lists, &who, false, crate::saves::now_secs()) {
+        Verdict::Refuse(m) => Some(m),
+        Verdict::Admit => None,
+    }
+}
+
+/// A refusal as one line of text for a reply that carries only text (the hello's): the lang key
+/// and its text arguments, separated by U+001F. [`refusal_from_text`] reads it back.
+pub fn refusal_text(m: &Msg) -> String {
+    let mut parts = vec![m.key.clone()];
+    parts.extend(m.args.iter().map(|a| match a {
+        Arg::Text(t) => t.replace('\u{1f}', " "),
+        Arg::Int(n) => n.to_string(),
+        Arg::Key(k) => format!("@{k}"),
+        _ => String::new(),
+    }));
+    parts.join("\u{1f}")
+}
+
+/// A refusal written by [`refusal_text`], as a message to show; none for any other text. Only
+/// `admission.` keys, so a world can't make the game say anything else.
+pub fn refusal_from_text(text: &str) -> Option<Msg> {
+    let mut parts = text.split('\u{1f}');
+    let key = parts.next()?;
+    if !key.starts_with("admission.")
+        || !key
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_')
+    {
+        return None;
+    }
+    let args = parts
+        .map(|p| match (p.strip_prefix('@'), p.parse::<i64>()) {
+            (Some(k), _) if k.starts_with("admission.") => Arg::Key(k.to_string()),
+            (_, Ok(n)) => Arg::Int(n),
+            _ => Arg::Text(p.chars().take(200).collect()),
+        })
+        .collect();
+    Some(Msg::new(key, args))
+}
+
 /// Whether the world follows a list it holds no copy of yet (fetched again soon, not daily).
 pub fn lists_missing(world: &Path) -> bool {
     let rules = load_rules(world);
@@ -802,6 +851,19 @@ mod tests {
             .allow
             .push(Allowed { kind: Kind::Key, value: "k1".into(), name: String::new(), added: 0 });
         assert!(probation_for(&rules, &bob, false, Duration::ZERO, false).is_none());
+    }
+
+    #[test]
+    fn refusals_survive_a_text_reply() {
+        let m = Msg::new("admission.banned_for", vec![Arg::Int(3), Arg::Text("grief\u{1f}ing".into())]);
+        let back = refusal_from_text(&refusal_text(&m)).unwrap();
+        assert_eq!(back, Msg::new("admission.banned_for", vec![Arg::Int(3), Arg::Text("grief ing".into())]));
+        let m = Msg::new("admission.banned", vec![Arg::Key("admission.no_reason".into())]);
+        assert_eq!(refusal_from_text(&refusal_text(&m)), Some(m));
+        assert_eq!(refusal_from_text("protocol mismatch: server 7, client 6"), None);
+        assert_eq!(refusal_from_text("menu.quit\u{1f}x"), None);
+        let at = Msg::new("admission.banned", vec![Arg::Key("menu.quit".into())]);
+        assert!(matches!(refusal_from_text(&refusal_text(&at)).unwrap().args[0], Arg::Text(_)));
     }
 
     #[test]

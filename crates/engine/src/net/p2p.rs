@@ -583,7 +583,7 @@ pub fn host(connect: crossbeam_channel::Sender<ServerConn>, world: &'static crat
                     serve_status(conn, world, &hw).await;
                 } else if conn.alpn() == BANS_ALPN {
                     serve_bans(conn, hw.dir.clone()).await;
-                } else if let Err(e) = accept(conn, connect, world, &key).await {
+                } else if let Err(e) = accept(conn, connect, world, &key, hw.dir.clone()).await {
                     log::warn!("incoming player: {e}");
                 }
             });
@@ -821,9 +821,21 @@ async fn accept(
     connect: crossbeam_channel::Sender<ServerConn>,
     world: &'static crate::content::Content,
     me: &str,
+    dir: Option<std::path::PathBuf>,
 ) -> Result<(), String> {
     use crate::content::with;
     let peer = conn.remote_id();
+    // Banned (chiacraft, `admission`): turned away at the door, before anything is served.
+    let banned = match dir {
+        Some(d) => {
+            let key = peer.to_string();
+            tokio::task::spawn_blocking(move || crate::admission::at_the_door(&d, &key))
+                .await
+                .ok()
+                .flatten()
+        }
+        None => None,
+    };
     let (mut send, mut recv) = tokio::time::timeout(Duration::from_secs(10), conn.accept_bi())
         .await
         .map_err(|_| "no hello")?
@@ -844,7 +856,10 @@ async fn accept(
     let offers = with(world, crate::modloader::current_packages);
     // Joins still configuring hold a place until this goes out of scope.
     let place = Configuring::take();
-    let refusal = if place.is_none() {
+    let refusal = if let Some(why) = &banned {
+        log::info!("{peer} is not let in at the door: {}", why.key);
+        crate::admission::refusal_text(why)
+    } else if place.is_none() {
         "the world is busy with other players joining; try again in a minute".to_string()
     } else if proto != PROTOCOL {
         format!("protocol mismatch: server {PROTOCOL}, client {proto}")
