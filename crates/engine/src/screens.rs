@@ -118,6 +118,7 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
         "core:mods" => Box::new(ModList::default()),
         "core:profile" => Box::new(Profile::default()),
         "core:account" => Box::new(crate::account_screen::Account::default()),
+        "core:finder" => Box::new(crate::chiacraft::worlds::finder_screen::FinderScreen),
         "core:achievements" => Box::new(crate::chiacraft::achievements_screen::Achievements),
         "core:admission" => Box::new(crate::chiacraft::worlds::admission_screen::Admission),
         _ => return None,

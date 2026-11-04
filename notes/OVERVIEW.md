@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 70 · ◧ partly built: 21 · □ not built yet: 12 · ◌ planned for later: 6
+■ built and seen working: 70 · ◧ partly built: 22 · □ not built yet: 11 · ◌ planned for later: 6
 
 ## Core next
 
@@ -82,7 +82,7 @@ Worlds with their own addresses, linked by both owners, with portals between the
 | ■ | Friends | Code: `crates/engine/src/chiacraft/worlds/friends.rs`. |
 | ◧ | Leftovers | Arrivals in other dimensions; links carried to a world's new address. |
 | ■ | Admission rules and bans | Phase 4 slices 1-3 built and seen working between two games on the PC (2026-11-04, tools/checks/admission): per world admission.json (open or allow list only, the allow list by login key, identity or DID; probation for newcomers: no building, no containers, for N hours of play, liftable) and bans.json (by login key, identity and DID, timed or for good; banned players are sent away), checked at every join; refusals in the player's language; /ban, /tempban, /unban, /bans, /allow, /probation, /banlist and the owner's "Who May Come In" screen; the status answer shows the rules before joining. Shared ban lists: signed by their maintainer's identity, served by any world holding one (chiacraft/bans/1), followed by a world's address (its owner's list), fetched daily. DID rules (/didrule: DID required, DID age, checked on chain at the join) seen working on testnet11; bans are checked at the hello too. Code: `crates/engine/src/chiacraft/worlds/admission.rs`, `crates/engine/src/server/admission.rs`, `crates/engine/src/chiacraft/worlds/admission_screen.rs`. Docs: `tools/checks/admission/README.md`. |
-| □ | Finding worlds | Phase 5: listings on chain and on DIG, curated lists. |
+| ◧ | Finding worlds | Phase 5. Built: listing a world with a DID on chain (a 0.0001 TXCH deposit, testnet11 only, delisting returns it) and Find Worlds from Multiplayer (listings read by hint, checked both ways, each world asked its status, Join). Not yet seen in a game (tools/checks/finder). Next: details from the world, curated lists (ours offered, never followed by default), ranking. Not now: Nostr, DIG. Code: `crates/wallet/src/chain/listing.rs`, `crates/engine/src/chiacraft/worlds/listing.rs`, `crates/engine/src/chiacraft/worlds/finder.rs`. Docs: `reports/Finding worlds.md`. |
 
 Code: `crates/engine/src/chiacraft/worlds`, `mods/portals`, `crates/engine/src/chiacraft/bridge.rs`. Docs: `notes/PLAN.md`, `reports/World addresses links and portals.md`.
 

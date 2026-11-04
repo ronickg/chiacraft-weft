@@ -354,12 +354,15 @@ The smallest version that works is phases 1-4.
    all four"), in slices, testnet11 only:
    1. *Listing a world*: the owner lists a world that has a DID: a coin at the address holding
       the world DID, locking a deposit (setting `core:listing_deposit`, 0.0001 TXCH), hinted with
-      `sha256("chiacraft worlds v1")`, the world DID's launcher id as its second memo. Delisting
-      spends it back. A 1-mojo listing would be free to spam, so the deposit is the floor.
+      `sha256("chiacraft worlds v1")`; its memos are the tag, the world DID, the owner's DID, the
+      world's key and its generation (an eve world DID shows nothing on chain). Delisting spends
+      it back. A 1-mojo listing would be free to spam, so the deposit is the floor. Built
+      (`chain/listing.rs`, `worlds/listing.rs`, Who May Come In's "Finding this world").
    2. *The finder*: a Multiplayer tab reads the index through the light wallet protocol
       (`RequestPuzzleState`: hinted, unspent, at least the deposit; not the hint RPC, which stops
       at 50,000), keeps only listings whose world DID checks both ways and whose coin sits at the
-      DID's holder, and asks each world's status.
+      DID's holder, and asks each world's status. Built (`worlds/finder.rs`, Find Worlds from
+      Multiplayer; `ChainReader::check_listing`); its check is `tools/checks/finder`.
    3. *Details from the world*: description, tags and language in the status answer, set by the
       owner, cached by the games that see them (a screenshot later).
    4. *Curated lists*: signed world lists, served and followed like ban lists; ours is offered in

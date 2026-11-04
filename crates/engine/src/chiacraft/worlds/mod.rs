@@ -4,6 +4,8 @@
 
 pub mod admission;
 pub mod admission_screen;
+pub mod finder;
+pub mod finder_screen;
 pub mod friends;
 pub mod links;
 pub mod listing;

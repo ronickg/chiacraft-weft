@@ -468,6 +468,20 @@ joining and on change, `ToClient::Revocations`, protocol 11; marked on the profi
 counts at the door). Plural forms for screen text: `chiacraft::plural`. The check:
 `tools/checks/achievements` (two copies, no chain): signing, the profile, the rule, revoking.
 
+## Phase 5: finding worlds (2026-11-04, slices 1-2 built, not yet seen in a game)
+
+An owner lists a world with a DID from Who May Come In ("Finding this world"): a coin of
+`core:listing_deposit` (0.0001 TXCH) at the owner's first address, hinted with
+`sha256("chiacraft worlds v1")`, its memos the world DID, the owner's DID, the world's key and
+generation. The coin is reserved in the chain cache so the wallet never spends it; Delist spends it
+back. Spending is refused off testnet11 (`chain::may_spend`). Find Worlds (Multiplayer) reads the
+unspent hinted coins of at least the deposit through `RequestPuzzleState`, keeps those whose world
+DID and owner DID name each other as the listing says and whose owner holds the coin
+(`ChainReader::check_listing`), and pings each world's key for its status, with a Join button.
+The game writes `<account home>/address-testnet11.txt` so a tester can fund a fresh account (the
+sponsor's gift is too small for a deposit, on purpose). Check: `tools/checks/finder`. Next:
+details from the world (slice 3), curated lists (4), ranking (5).
+
 ## Our DID sponsor (testnet11, since 2026-11-04)
 
 Ronald's yes: "testnet only". It runs on Ronald's Mac from the throwaway testnet11 wallet
