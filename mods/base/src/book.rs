@@ -72,6 +72,10 @@ struct Book {
     tab: usize,
     page: usize,
     picked: Option<u32>,
+    /// The page's order while the book is open (book numbers), so a craft doesn't re-sort it
+    /// (Ronald's first-day test: the first slot stopped being what was just made); set when the
+    /// book opens or its tab changes.
+    order: Vec<u32>,
     pool: Vec<(u32, u32)>,
     /// The menu window the pool was asked for.
     asked: u32,
@@ -86,7 +90,7 @@ type Entry = (Recipe, u32, Option<(u32, u32, u32)>);
 /// The bag as the open book last saw it (`client_frame` above).
 static BAG_SIG: Mutex<u64> = Mutex::new(0);
 
-static BOOK: Mutex<Book> = Mutex::new(Book { tab: 0, page: 0, picked: None, pool: Vec::new(), asked: u32::MAX, ask: None });
+static BOOK: Mutex<Book> = Mutex::new(Book { tab: 0, page: 0, picked: None, order: Vec::new(), pool: Vec::new(), asked: u32::MAX, ask: None });
 
 pub fn register(r: &mut Registry) {
     r.tag("chests", &["chest"]);
@@ -150,15 +154,39 @@ pub fn register(r: &mut Registry) {
 
 // ---------------------------------------------------------------- what a recipe takes
 
-/// The recipes the book shows at `station`: crafting recipes not hidden, small enough for the
-/// 2 x 2 by hand.
+/// The recipes the book shows at `station`: crafting recipes not hidden; by hand also those too
+/// big for the 2 x 2, last, so it says they need a table (Ronald's first-day test: nothing said
+/// "you need a crafting table"; `table_only`).
 fn shown(station: Station) -> Vec<Recipe> {
     let parts = if station == Station::Table { recipes(&crate::parts::PART_RECIPES) } else { Vec::new() };
     recipes(&CRAFTING)
         .into_iter()
-        .filter(|r| !r.hidden() && (station == Station::Table || fits_hands(r)))
+        .filter(|r| !r.hidden())
         .chain(parts)
         .collect()
+}
+
+/// Made only at a table, seen from `station`.
+fn table_only(station: Station, r: &Recipe) -> bool {
+    station == Station::Hands && !fits_hands(r)
+}
+
+/// The first ingredient `have` lacks for `r`: the item shown for it and how many more it takes.
+fn first_missing(r: &Recipe, have: &[(u32, u32)]) -> Option<(u32, u32)> {
+    let mut lines: Vec<(u32, u32, u32)> = Vec::new();
+    for (n, input) in r.inputs().iter().enumerate() {
+        if input.kind == abi::recipe_input_kind::EMPTY {
+            continue;
+        }
+        match lines.iter_mut().find(|l| l.1 == input.shown) {
+            Some(l) => l.2 += input.count.max(1),
+            None => lines.push((n as u32, input.shown, input.count.max(1))),
+        }
+    }
+    lines.into_iter().find_map(|(n, shown, need)| {
+        let got: u32 = have.iter().filter(|(i, _)| r.accepts(n, *i)).map(|(_, c)| c).sum();
+        (got < need).then_some((shown, need - got))
+    })
 }
 
 /// Fits the inventory's 2 x 2: a shape at most 2 wide and 2 high, or 4 ingredients.
@@ -435,6 +463,7 @@ pub fn book(ui: &mut Ui, station: Station) {
             b.pool.clear();
             b.page = 0;
             b.picked = None;
+            b.order.clear();
             // Asked for on the next frame (`client_frame`): a send while a screen is built is
             // lost.
             b.ask = Some(station);
@@ -465,7 +494,7 @@ pub fn book(ui: &mut Ui, station: Station) {
                 .is_some_and(|(o, _)| item_has_tag(o.item, &format!("tab/{t}"))),
         })
         .filter_map(|r| {
-            let n = times(&r, &have, MAX_BATCH);
+            let n = if table_only(station, &r) { 0 } else { times(&r, &have, MAX_BATCH) };
             if creative || n > 0 || crate::discovery::starter(&r) {
                 return Some((r, n, None));
             }
@@ -479,13 +508,30 @@ pub fn book(ui: &mut Ui, station: Station) {
             }
         })
         .collect();
-    // What you can make first, then what you know, then the near misses; otherwise as registered.
-    list.sort_by_key(|(_, n, near)| ((*n == 0) as u8, near.is_some() as u8));
+    // What you can make first, then what you know, then what needs a table, then the near misses;
+    // otherwise as registered. Sorted when the book opens or its tab changes, then kept in that
+    // order while it is open (what becomes makeable or known later goes at the end).
+    let order = BOOK.lock().map(|b| b.order.clone()).unwrap_or_default();
+    if order.is_empty() {
+        list.sort_by_key(|(r, n, near)| ((*n == 0) as u8, table_only(station, r) as u8, near.is_some() as u8));
+        let ids: Vec<u32> = list.iter().map(|(r, _, _)| id_of(r)).collect();
+        edit(|b| b.order = ids);
+    } else {
+        list.sort_by_key(|(r, _, _)| order.iter().position(|&o| o == id_of(r)).unwrap_or(usize::MAX));
+    }
+    // Something picked from the start, so the book names a recipe at once.
+    let picked = picked
+        .filter(|p| list.iter().any(|(r, _, near)| near.is_none() && id_of(r) == *p))
+        .or_else(|| list.iter().find(|(_, _, near)| near.is_none()).map(|(r, _, _)| id_of(r)));
     let pages = list.len().div_ceil(PER_PAGE).max(1);
     let page = page.min(pages - 1);
 
     ui.panel("panel", S::col().pad(7.0).gap(3.0), |ui| {
         ui.text_styled(S::col().class("title"), "crafting.book.title", &[]);
+        // The picked recipe's name, at the top (Ronald's first-day test: the book was icons only).
+        if let Some((out, _)) = picked.and_then(recipe_of).and_then(|r| r.outputs().into_iter().next()) {
+            ui.text_args("crafting.book.picked", &[Arg::Item(out.item)]);
+        }
         ui.row(S::row().gap(1.0), |ui| {
             for (i, t) in TABS.iter().enumerate() {
                 if station == Station::Hands && *t == PARTS_TAB {
@@ -508,6 +554,7 @@ pub fn book(ui: &mut Ui, station: Station) {
                         edit(|b| {
                             b.tab = i;
                             b.page = 0;
+                            b.order.clear();
                         });
                         c.client().rebuild_screen();
                     },
@@ -538,12 +585,20 @@ pub fn book(ui: &mut Ui, station: Station) {
                         let Some((out, _)) = r.outputs().into_iter().next() else { continue };
                         let index = id_of(r);
                         let class = if picked == Some(index) { "slot_highlight" } else { "slot" };
-                        let tip = if *n > 0 { "crafting.book.can" } else { "crafting.book.missing" };
+                        // What it takes, in plain words: a table, or the first thing still lacking.
+                        let lack = first_missing(r, &have);
+                        let s = S::default().size(18.0, 18.0).class(class);
+                        let s = if *n > 0 {
+                            s.tooltip_args("crafting.book.can", &[Arg::Item(out.item)])
+                        } else if table_only(station, r) {
+                            s.tooltip_args("crafting.book.needs_table_tip", &[Arg::Item(out.item)])
+                        } else if let Some((item, more)) = lack {
+                            s.tooltip_args("crafting.book.lacks", &[Arg::Item(out.item), Arg::Int(more as i64), Arg::Item(item)])
+                        } else {
+                            s.tooltip_args("crafting.book.missing", &[Arg::Item(out.item)])
+                        };
                         ui.button_with(
-                            S::default()
-                                .size(18.0, 18.0)
-                                .class(class)
-                                .tooltip_args(tip, &[Arg::Item(out.item)]),
+                            s,
                             move |c| {
                                 edit(|b| b.picked = Some(index));
                                 c.client().rebuild_screen();
