@@ -49,7 +49,7 @@ fn tower(h: &Here, cx: i32, cz: i32) -> Option<Tower> {
     let site = ((fixed::fmix(hash) & 4095) < chance as u32).then(|| {
         let h2 = fixed::fmix(hash ^ 0x9E37);
         let pick = |v: u32, (lo, hi): (i32, i32)| lo + (v % (hi - lo + 1) as u32) as i32;
-        let wide = (h2 >> 20) % KARST_WIDE_ONE_IN == 0;
+        let wide = (h2 >> 20).is_multiple_of(KARST_WIDE_ONE_IN);
         let (r, ht) = if wide { (KARST_WIDE_RADIUS, KARST_WIDE_HEIGHT) } else { (KARST_RADIUS, KARST_HEIGHT) };
         Tower { x, z, radius: pick(h2, r), height: pick(h2 >> 8, ht) }
     });
