@@ -277,6 +277,128 @@ def padded(name, w=48, h=32):
 save("arrow", padded("arrow"), [("scaling", "stretch")])
 save("arrow_fill", padded("arrow_fill"), [("scaling", "stretch")])
 
+
+# ---------------------------------------------------------------- the HUD (Planner, 11-04: "the
+# top-left HUD bars and plates in kit 2, so the HUD matches the Valheim look")
+def hud_bar(w, h, fill=None, frame_px=2):
+    """A HUD bar as on Ronald's sheet: outline, a wood frame (`frame_px` wide: a light ring lit
+    on top, then a dark one), the dark track; with `fill`, the full fill in the track (light top
+    row, dark bottom row). Its rim is 1 + `frame_px` texels, as `hud.rs`'s `bar_fill` counts."""
+    a = k.canvas(w, h)
+    m = k.shape(w, h, k.R)
+    ring = k.edge(m)
+    k.paint(a, ring, k.OUTLINE)
+    m = m & ~ring
+    for i in range(frame_px):
+        f = k.edge(m)
+        if i == 0:
+            k.paint(a, f, k.BRONZE_L)
+            up = np.zeros_like(f)
+            up[1:] = ring[:-1]
+            k.paint(a, f & up, k.BRONZE_HI)
+            dn = np.zeros_like(f)
+            dn[:-1] = ring[1:]
+            k.paint(a, f & dn, k.BRONZE)
+        else:
+            k.paint(a, f, k.BRONZE_D)
+        m = m & ~f
+    track = m
+    k.paint(a, track, k.WELL_D)
+    top = np.zeros_like(track)
+    top[1:] = ~track[:-1]
+    k.paint(a, track & top, k.PANEL_DEEP)
+    if fill:
+        light, base, dark = k.BAR_FILLS[fill]
+        k.paint(a, track, base)
+        t_dn = np.zeros_like(track)
+        t_dn[:-1] = ~track[1:]
+        k.paint(a, track & top, light)
+        k.paint(a, track & t_dn & ~top, dark)
+    return a, track
+
+
+def hud_bar_pair(name, w, h, fill, frame_px=2):
+    frame, _ = hud_bar(w, h, None, frame_px)
+    full, _ = hud_bar(w, h, fill, frame_px)
+    only = full.copy()
+    only[np.all(full == frame, axis=-1)] = 0
+    save(name, frame, [("scaling", "stretch")])
+    save(name + "_fill", only, [("scaling", "stretch")])
+
+
+# Health and stamina 19 texels tall (9.5 GUI px, `hud::BAR`): outline and a 2 px frame round a
+# 13-row track, so the numbers in it have 2 rows above their capitals and 2 below the baseline; XP
+# 8 (4 GUI px) with a 1 px frame round a 4-row track.
+hud_bar_pair("hud_health", 192, 19, "health")
+hud_bar_pair("hud_stamina", 192, 19, "stamina")
+hud_bar_pair("hud_xp", 192, 8, "xp", frame_px=1)
+# The thermometer: the XP bar's frame, its cold-to-hot gradient (the old one's) in the track.
+frame, track = hud_bar(128, 10, None, 1)
+save("hud_temperature", frame, [("scaling", "stretch")])
+src = ARCHIVE if os.path.exists(os.path.join(ARCHIVE, "hud_temperature_fill.png")) else GUI
+grad = np.array(Image.open(os.path.join(src, "hud_temperature_fill.png")).convert("RGBA"))
+row = grad[grad.shape[0] // 2]
+tf = k.canvas(128, 10)
+for y in range(10):
+    tf[y][track[y]] = row[track[y]]
+    tf[y][track[y], 3] = 255
+save("hud_temperature_fill", tf, [("scaling", "stretch")])
+
+
+def shield(w=40, h=48, point_from=24):
+    """The level badge's shield: square shoulders stepped like every corner, sides straight, then
+    curving in to a point (each side's inset grows as t^1.6)."""
+    m = k.shape(w, h, k.R)
+    for y in range(point_from, h):
+        t = (y - point_from + 1) / (h - point_from)
+        inset = int(round((w / 2 - 1) * t ** 1.6))
+        m[y, :inset] = False
+        m[y, w - inset:] = False
+    return m
+
+
+m = shield()
+badge = k.canvas(40, 48)
+ring = k.edge(m)
+k.paint(badge, ring, k.OUTLINE)
+m1 = m & ~ring
+f1 = k.edge(m1)
+k.paint(badge, f1, k.BRONZE_L)
+up = np.zeros_like(m)
+up[1:] = ring[:-1]
+k.paint(badge, f1 & up, k.BRONZE_HI)
+m2 = m1 & ~f1
+f2 = k.edge(m2)
+k.paint(badge, f2, k.BRONZE_D)
+inside = m2 & ~f2
+k.paint(badge, inside, k.PANEL)
+inner_top = np.zeros_like(m)
+inner_top[1:] = ~inside[:-1]
+k.paint(badge, inside & inner_top, k.PANEL_DEEP)
+save("hud_badge", badge, [("scaling", "stretch")])
+
+
+# The hotbar's slots (and the shortcuts' frames, the same part): kit 2's slot with a wood rim, and
+# the chosen one glowing orange, 2 GUI px bigger, as before.
+def hotbar_slot(size, rims, inner=k.SLOT):
+    a = k.canvas(size, size)
+    m = k.shape(size, size, k.R)
+    for colour in rims:
+        r = k.edge(m)
+        k.paint(a, r, colour)
+        m = m & ~r
+    k.paint(a, m, inner)
+    up = np.zeros_like(m)
+    up[1:] = ~m[:-1]
+    lf = np.zeros_like(m)
+    lf[:, 1:] = ~m[:, :-1]
+    k.paint(a, m & (up | lf), k.SLOT_D)
+    return a
+
+
+save("hotbar", hotbar_slot(40, [k.OUTLINE, k.BRONZE, k.OUTLINE]), [NINE, border(5), ("icon", "16")])
+save("hotbar_selected", hotbar_slot(44, [k.OUTLINE, k.GLOW, k.GLOW_D, k.OUTLINE]), [NINE, border(7)])
+
 for name, w, h, gui in WRITTEN:
     print(f"{name:28s} {w}x{h}  {gui}")
 print(len(WRITTEN), "textures", "(dry run)" if DRY else f"written; old ones in {ARCHIVE}")
