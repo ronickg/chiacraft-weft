@@ -183,17 +183,57 @@ def remap(name, wood="planks_oak"):
 
 MECHANICAL = [
     "anchor", "anchor_on", "button", "comparator", "comparator_on", "repeater", "repeater_on", "dispenser_front_vertical",
-    "observer_back_on", "piston_inner", "floater_back", "floater_front", "floater_side", "floater_side_going", "floater_side_stuck",
+    "floater_back", "floater_front", "floater_side", "floater_side_going", "floater_side_stuck",
     "lever", "torch", "redstone_torch", "redstone_torch_off",
     "bed_foot_east", "bed_foot_south", "bed_foot_west", "bed_head_east", "bed_head_north", "bed_head_west",
     "bed_top_foot", "bed_top_foot_90", "bed_top_foot_180", "bed_top_foot_270",
     "bed_top_head_0", "bed_top_head_90", "bed_top_head_180", "bed_top_head_270",
 ]
+def observer_back_on():
+    """The observer's back when it fires: the same back as observer_back, its socket's core lit red
+    with a light rim (the old 16 px picture was a different slab with a red square; 11-04)."""
+    a = tile("observer_back")
+    # brighter than wanted by 1/0.75: the grade darkens the observer's back by 0.75 (grade.toml)
+    lit = (np.array([[0xFF, 0x9A, 0x7A], [0xF0, 0x40, 0x30], [0xC8, 0x1E, 0x1E], [0x7A, 0x10, 0x10]], float) / 0.75).clip(0, 255)
+    for y in range(14, 18):
+        for x in range(14, 18):
+            k = 0 if (y, x) == (14, 14) else 1 if (y == 14 or x == 14) else 3 if (y == 17 or x == 17) else 2
+            a[y, x, :3] = lit[k]
+    for y in range(13, 19):  # the socket's rim catches the light
+        for x in range(13, 19):
+            if not (14 <= y <= 17 and 14 <= x <= 17):
+                a[y, x, :3] = a[y, x, :3] * 0.6 + np.array([0x9A, 0x22, 0x1A]) * 0.4
+    save(a, "observer_back_on")
+
+
+def piston_inner():
+    """Inside the piston's base, under the head: the base's stone (piston_bottom) with a square
+    shaft in the middle, framed in the head's iron, as vanilla's (11-04; the old one was a pale slab)."""
+    a = tile("piston_bottom")
+    iron = tile("piston_top")[0:2, :, :3].reshape(-1, 3).mean(0)  # the frame's iron
+    for y in range(11, 21):
+        for x in range(11, 21):
+            ring = y in (11, 20) or x in (11, 20)
+            if ring:
+                a[y, x, :3] = iron * (1.15 if (y == 11 or x == 11) else 0.75)
+            else:
+                d = min(y - 12, x - 12, 19 - y, 19 - x)
+                a[y, x, :3] = np.array([0x1E, 0x1C, 0x1A]) + (6 - min(d, 3) * 2) * np.array([4, 4, 4])
+    save(a, "piston_inner")
+
+
 # Redstone dust is grey (the game tints it by power): its old picture doubled.
 GREY = ["redstone_dust_dot", "redstone_dust_line"]
 
 
 if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 1:  # just these: python3 derive.py observer_back_on piston_inner
+        for f in sys.argv[1:]:
+            globals()[f]()
+        raise SystemExit
+    observer_back_on()
+    piston_inner()
     worn_farmland()
     clear_glass()
     stained_glass()
