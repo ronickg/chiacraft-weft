@@ -118,6 +118,8 @@ fn init(r: &mut Registry) {
     // eight at midwinter.
     r.dimension(&OVERWORLD)
         .player_spawn()
+        // A fair first place: level plains, temperate, by water and woods (`base_api::land::spawn`).
+        .spawn(fair_spawn)
         .sky_above(16)
         .day_length(24000)
         .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)
@@ -161,4 +163,18 @@ fn init(r: &mut Registry) {
             .phase(0.5)
             .tilt(35.0);
     }
+}
+
+/// The overworld's first place for `seed` (`base_api::land::spawn_where`), out of the caves' mouths
+/// (none in the three by three columns round it); worked out once per seed, as the engine asks on
+/// every join.
+fn fair_spawn(seed: u64) -> [i32; 3] {
+    static KNOWN: std::sync::Mutex<Vec<(u64, [i32; 3])>> = std::sync::Mutex::new(Vec::new());
+    if let Some(&(_, p)) = KNOWN.lock().unwrap().iter().find(|(s, _)| *s == seed) {
+        return p;
+    }
+    let open = |x: i32, z: i32| (-1..=1).all(|dz| (-1..=1).all(|dx| !OVERWORLD.surface_carved(seed, x + dx, z + dz)));
+    let p = base_api::land::spawn_where(seed, &open);
+    KNOWN.lock().unwrap().push((seed, p));
+    p
 }
