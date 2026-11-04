@@ -50,11 +50,16 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
     return Palette(mix(a.zenith, b.zenith, t), mix(a.horizon, b.horizon, t), mix(a.glow, b.glow, t), mix(a.sun, b.sun, t), mix(a.ambient, b.ambient, t));
 }
 
-// The palette by how high the sun stands (`scene.sun.y`, about 0.94 at noon): day, golden hour,
+// The palette by how high the sun stands (`scene.sun.y`, about 0.82 at noon on the leaned path): day, golden hour,
 // sunset, dusk and night, blended between.
 fn palette() -> Palette {
     let e = scene.sun.y;
-    let day = key(vec3(0.09, 0.26, 0.85), vec3(0.42, 0.60, 0.95), vec3(1.0, 0.92, 0.78), vec3(1.15, 0.98, 0.76), vec3(0.20, 0.27, 0.42));
+    // Day, after Bliss's own colours (Ronald's settings, reports/bliss-source in the crew notes): a
+    // greyish blue overhead, about sRGB 64 88 113, going to a pale grey-beige at the horizon
+    // (167 171 157), not a saturated #4A90E2 blue; a warm sun (toward Bliss's 4300 K); and the sky's
+    // light in the shade about a fifth of the sun's (Bliss's is a sixth, which our curve's toe
+    // crushed), still blue, so sun and shade part and the land stops looking flat.
+    let day = key(vec3(0.104, 0.142, 0.188), vec3(0.368, 0.387, 0.324), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.138, 0.197, 0.269));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
     let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
@@ -607,10 +612,9 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     let lights = smoothstep(0.02, 0.22, luma(t));
     let shade = mix(vec3(0.975, 0.99, 1.03), vec3(0.92, 0.96, 1.10), golden());
     t *= mix(shade, mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
-    // Colour held back in the mid-tones and darks (the land), not in what glows bright (lava, fire,
-    // lamps keep their fire).
-    let y = luma(t);
-    t = max(mix(vec3(y), t, mix(1.08, 1.25, smoothstep(0.05, 0.35, y))), vec3(0.0));
+    // No saturation added here: it was 8 to 25 % on top of a picture already twice as colourful as
+    // Bliss's (mean saturation 0.46-0.52 against 0.19-0.29 in its pictures), and it took all the
+    // blue out of grass (sRGB 113 177 56 became 96 181 11).
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034);
     return clamp(t, vec3(0.0), vec3(1.0));
 }
