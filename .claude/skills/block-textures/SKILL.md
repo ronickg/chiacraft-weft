@@ -139,15 +139,21 @@ toward the UI's own colours (`notes/STYLE.md`).
 - **Thin plants go muddy at 32 px** (the first cattail almost vanished, the mushroom's spots
   blurred): give them a clear silhouette, a size in px, and few parts. If one still reads
   badly, ask for "a 1-px outline in a darker shade of its own colour".
-- **Not too dark for the game's grade** (Ronald, 11-04, on the grade review: "Yes, all four",
-  "Yes, both"). Dev's colour grade is darker, toned toward Bliss, and dark tiles read as black holes
-  in it (slate as gaps at a distance, termite mounds, podzol, spruce and sequoia trunks). Keep a
-  tile's own mean luminance (0.2126 R + 0.7152 G + 0.0722 B, 0..1) at about **0.24 or more**, the
-  darkest bark, and stone-family tiles (slate, granite, cobble kin) **near stone's 0.4-0.5**. Very
-  saturated tiles (above about 0.6) read hot in the grade; keep them nearer 0.5. Measure every new
-  tile before showing it, and fix one in code from its drawing with `notes/blocks/regrade.py
-  <in> <out> <gamma> <saturation> [r,g,b pull] [amount]` (gamma below 1 lifts the shadows most), so
-  the approved drawing stays. Obsidian and coal are dark on purpose.
+- **Tile values follow the daytime report** (`reports/Daytime look targets.md`, (e); Ronald, 11-04:
+  "Yes, switch", replacing the earlier "at least 0.24" floor). Measure luma (0.2126 R + 0.7152 G +
+  0.0722 B on sRGB, 0..1) over opaque pixels, tinted tiles with vanilla's plains tints:
+  - tile means from **0.15 to 0.85**; snow and sand near 0.8-0.95, so the top of the range is used;
+  - every pixel at least **30 sRGB codes** (50 for a strict check); obsidian and coal are the exceptions;
+  - **darkness in shade is the shader's job**: don't lift a whole dark tile to make shade readable;
+  - leaves darker than the ground they shade, about 0.25-0.32;
+  - in-tile contrast as the p10-p90 spread in codes: **quiet ground 20-30** (grass top, stone, sand,
+    podzol), **busy blocks 45-80** (cobble, dirt, logs, planks, ores). Ronald, 11-04: "Yes, stone,
+    gravel, planks": stone calmed to 30, gravel to 42, planks given grain at 48.
+  Fix a tile in code from its drawing: `notes/blocks/contrast.py <target> <tile> [variants]` sets
+  the spread, `notes/blocks/regrade.py` the level and saturation. The six tiles lifted for the
+  earlier floor (slate, termite mound, red sandstone, sequoia and spruce bark, podzol) stay until
+  they're re-judged under Lighting's new grade; leaves and grass top wait for it too ("After the
+  grade").
 - **Streaks and stripes never repeat in step from block to block** (Ronald, 11-04, on the karst
   limestone: "Yes, loosen streaks"; the first version put rain streaks in the same columns in every
   variant, and a tall tower looked corrugated). Give each variant its own positions, gaps and
