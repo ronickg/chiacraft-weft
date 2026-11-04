@@ -609,6 +609,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         // Ours: testnet11, run on Ronald's Mac from a throwaway wallet while we test (HANDOFF.md,
         // "Our DID sponsor").
         ConfigDef::text("core:sponsors", "d468728d7e0e3f417c822af6e87ff924c0adbdeeb89a3c0f2d0745b2de40a792"),
+        // chiacraft (phase 5): what listing a world locks, in mojos (0.0001 TXCH; the game spends
+        // only on testnet11). Taken back by delisting.
+        ConfigDef::number("core:listing_deposit", ck::INT, 100_000_000.0, 1.0, 1e15, 1.0),
         // Where others reach this game by address; forward it, TCP and UDP.
         ConfigDef::number("core:server_port", ck::INT, 27182.0, 1.0, 65535.0, 1.0),
         ConfigDef::text("core:resource_packs", ""),

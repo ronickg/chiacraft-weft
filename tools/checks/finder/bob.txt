@@ -1,0 +1,14 @@
+# Phase 5, slices 1-2 on testnet11: the finder's side. Starts with alice.txt, any time after.
+await_file finder-mark-listed 3600
+screen core:multiplayer
+tap_once core:multiplayer id:finder   # Find Worlds: the listings read, checked and asked
+wait 120
+shot finder-bob-1-found.png
+tap_once core:finder id:finder_join0  # alice's world, online, first
+loaded
+wait 5
+shot finder-bob-2-in.png
+leave
+mark finder-mark-bob-done
+wait 5
+quit

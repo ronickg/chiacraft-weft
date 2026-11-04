@@ -270,7 +270,7 @@ fn send_clock(p: &mut Player, dim: &DimSet, tick: u64) {
     }
     if tick % TPS as u64 == 0 || dim.day_moved {
         p.conn
-            .send(ToClient::Time { dim: p.dim, time: dim.day_time() });
+            .send(ToClient::Time { dim: p.dim, time: dim.day_time(), rate: dim.day_rate as f32 });
     }
 }
 

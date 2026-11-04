@@ -36,10 +36,13 @@ spread = 48
 
 [groups.leaves]
 match = ["leaves_*"]
-# Waits for Lighting's Colour 8 (Ronald: leaves and grass "After the grade").
+# Under Colour 9 sunlit foliage measured luma median 143 (target 125-170), its brightest tenth 170-181:
+# a small step down (Ronald, 11-04: "Tints -15% + small step"; the -15% is the biome tints', in Plants).
+gain = 0.94
 
 [groups.grass]
 match = ["grass_top", "tallgrass", "tall_grass_*", "sword_fern", "bracken"]
+gain = 0.94  # with the leaves (Ronald, 11-04: "Tints -15% + small step")
 
 [groups.sand]
 match = ["sand", "red_sand", "*sandstone_*", "sandstone_*"]
@@ -202,6 +205,28 @@ saturation = 0.794
 
 [tiles.planks_mesquite]  # luma 0.26->0.33, sat 0.72->0.72, hue 14->14; ~ acacia_planks (half way)
 gain = 1.302
+
+# Farmland read brick-red on Plants' crop sheet (11-04): hue 14 deg against vanilla's 26 and Pixel Perfection's 21,
+# and darker than both. Turned toward their orange-brown and lifted a little; the wet one keeps its darkness;
+# the worn stages (already less red) turned less, keeping their paler-per-level ladder.
+[tiles.farmland]
+hue = 9.0
+gain = 1.2
+
+[tiles.farmland_wet]
+hue = 9.0
+
+[tiles.farmland_worn_1]
+hue = 7.0
+gain = 1.19
+
+[tiles.farmland_worn_2]
+hue = 4.0
+gain = 1.17
+
+[tiles.farmland_worn_3]
+hue = 1.0
+gain = 1.12
 
 # Ores in the rock faces (Terrain, 11-04; Ronald: "All 3: 1, 2, 3"): the host rock's own graded tile and
 # variants with an ore overlay (mods/base/source/blocks/overlays/) laid on, so the rock reads as the
@@ -431,3 +456,6 @@ outline = 0.883
 [tiles.gold_ore]
 base = "stone"
 overlay = "ore_gold_b"
+
+[items.tepary_beans]  # outline 0.60 -> 0.40 (new, Plants' batch 3: pale beans, the edge too light)
+outline = 0.67

@@ -1,0 +1,36 @@
+# The same in Russian (run with --config core:language=ru_ru): the taps by their Russian labels.
+# UI audit (UI redo session): the title and its menus. Starts in a world, leaves to the title.
+loaded
+wait 2
+leave
+wait 2
+shot 20_title.png
+tap core:title text:Одиночная игра
+wait 1.5
+shot 21_worlds.png
+key Escape
+wait 1
+tap core:title text:Сетевая игра
+wait 1.5
+shot 22_multiplayer.png
+key Escape
+wait 1
+tap core:title text:Настройки
+wait 1.5
+shot 23_settings.png
+# Settings is one scrolling list on this build: two scrolled shots.
+cursor 0.5 0.5
+scroll -6
+wait 1
+shot 24_settings_scrolled.png
+scroll -12
+wait 1
+shot 25_settings_end.png
+key Escape
+wait 1
+tap core:title text:Моды
+wait 1.5
+shot 30_mods.png
+key Escape
+wait 1
+quit

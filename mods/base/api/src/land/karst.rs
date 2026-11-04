@@ -10,7 +10,7 @@ use weft_sdk::noise::fixed::{self, ONE, div_floor, q4, q12, ramp};
 
 use super::{
     Here, KARST_AREA, KARST_CELL, KARST_CHANCE, KARST_CLUSTER, KARST_CLUSTER_SIZE, KARST_HEIGHT, KARST_LONE, KARST_RADIUS,
-    KARST_WIDE_HEIGHT, KARST_WIDE_ONE_IN, KARST_WIDE_RADIUS, salt,
+    KARST_WIDE_HEIGHT, KARST_WIDE_ONE_IN, KARST_WIDE_RADIUS, SINK_CELL, SINK_CHANCE, SINK_CLEAR, SINK_FLOOR, SINK_LAND, SINK_RADIUS, salt,
 };
 use crate::SEA;
 
@@ -97,4 +97,90 @@ pub(super) fn add(h: &Here, base: i32) -> i32 {
         }
     }
     add
+}
+
+/// A sinkhole (cenote): its middle (blocks) and radius.
+#[derive(Clone, Copy)]
+struct Sink {
+    x: i32,
+    z: i32,
+    radius: i32,
+}
+
+thread_local! {
+    static SINKS: RefCell<HashMap<(u64, i32, i32), Option<Sink>>> = RefCell::new(HashMap::new());
+}
+
+/// Cell (`cx`, `cz`)'s sinkhole, if it has one: kept with `SINK_CHANCE` times the karst area's
+/// strength, on land `SINK_LAND` over the sea, clear of the towers' feet by `SINK_CLEAR` blocks.
+fn sink_site(h: &Here, cx: i32, cz: i32) -> Option<Sink> {
+    let key = (h.f.seed, cx, cz);
+    if let Some(hit) = SINKS.with(|c| c.borrow().get(&key).copied()) {
+        return hit;
+    }
+    let hash = fixed::hash(fixed::seed32(h.f.seed, salt::SINKS), cx, 0, cz);
+    let margin = SINK_RADIUS.1 + 2;
+    let span = (SINK_CELL - 2 * margin) as u32;
+    let x = cx * SINK_CELL + margin + (hash % span) as i32;
+    let z = cz * SINK_CELL + margin + ((hash >> 12) % span) as i32;
+    let (qx, qz) = (x * 16, z * 16);
+    let chance = (q12(SINK_CHANCE) * KARST_AREA.value(h.f, qx, qz)) >> 12;
+    let site = ((fixed::fmix(hash) & 4095) < chance as u32)
+        .then(|| {
+            let radius = SINK_RADIUS.0 + (fixed::fmix(hash ^ 0x5174) % (SINK_RADIUS.1 - SINK_RADIUS.0 + 1) as u32) as i32;
+            let here = Here::new(h.f, qx, qz);
+            let ground = super::base_ground(&here);
+            let land = (q4((SEA + SINK_LAND.0) as f64)..=q4((SEA + SINK_LAND.1) as f64)).contains(&ground);
+            let (tx, tz) = (div_floor(x, KARST_CELL).0, div_floor(z, KARST_CELL).0);
+            let clear = (-2..=2).all(|dz| {
+                (-2..=2).all(|dx| {
+                    tower(h, tx + dx, tz + dz).is_none_or(|t| {
+                        let foot = t.radius + t.radius / 2 + 1 + radius + SINK_CLEAR;
+                        (t.x - x).pow(2) + (t.z - z).pow(2) > foot * foot
+                    })
+                })
+            });
+            (land && clear).then_some(Sink { x, z, radius })
+        })
+        .flatten();
+    SINKS.with(|c| {
+        let mut c = c.borrow_mut();
+        if c.len() > 16384 {
+            c.clear();
+        }
+        c.insert(key, site);
+    });
+    site
+}
+
+/// What a sinkhole takes off the ground (`base`, Q4, asked only inside the hole) at a column: inside its radius
+/// down to `SINK_FLOOR` under the sea (the sea's level of water stands in it), a lip a block or
+/// two lower round it.
+pub(super) fn sink(h: &Here, base: impl FnOnce() -> i32) -> i32 {
+    let (bx, bz) = (h.x >> 4, h.z >> 4);
+    let Some(s) = sink_site(h, div_floor(bx, SINK_CELL).0, div_floor(bz, SINK_CELL).0) else { return 0 };
+    let (ex, ez) = ((h.x - s.x * 16) as i64, (h.z - s.z * 16) as i64);
+    let d = ((ex * ex + ez * ez) as u64).isqrt() as i32; // Q4
+    let r = q4(s.radius as f64);
+    if d < r {
+        (q4((SEA - SINK_FLOOR) as f64) - base()).min(0)
+    } else if d < r + q4(2.0) {
+        -((q4(2.0) - (d - r)) / 2).max(0)
+    } else {
+        0
+    }
+}
+
+/// The sinkholes (middle, radius) within `r` blocks of (`x`, `z`) (blocks), for the tools.
+pub(super) fn sinks_near(f: &weft_sdk::noise::fixed::Fields, x: i32, z: i32, r: i32) -> Vec<(i32, i32, i32)> {
+    let h = Here::new(f, x * 16, z * 16);
+    let mut out = Vec::new();
+    for cz in div_floor(z - r, SINK_CELL).0..=div_floor(z + r, SINK_CELL).0 {
+        for cx in div_floor(x - r, SINK_CELL).0..=div_floor(x + r, SINK_CELL).0 {
+            if let Some(s) = sink_site(&h, cx, cz) {
+                out.push((s.x, s.z, s.radius));
+            }
+        }
+    }
+    out
 }

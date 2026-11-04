@@ -152,7 +152,8 @@ impl Server {
             all: true,
         });
         p.conn.send(ToClient::Configs(crate::config::synced()));
-        p.conn.send(ToClient::Time { dim, time });
+        let rate = self.dims[dim as usize].day_rate as f32;
+        p.conn.send(ToClient::Time { dim, time, rate });
         p.conn.send(ToClient::GameMode(mode));
         p.conn.send(ToClient::Permission(permission));
         // Left while dead: still dead, as in vanilla.

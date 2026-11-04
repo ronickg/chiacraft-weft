@@ -28,6 +28,8 @@ use weft_sdk::terrain::{Feature, Mask, preset};
 use crate::SEA;
 
 mod canyons;
+pub mod caves;
+mod craters;
 mod karst;
 mod net;
 
@@ -53,6 +55,12 @@ pub mod salt {
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
     pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const SINKS: u64 = 0x4A9;
+    pub const CRATERS: u64 = 0xC4A7;
+    pub const FACE_COAL: u64 = 0x0C0A;
+    pub const FACE_IRONSTONE: u64 = 0x0F3A;
+    pub const FACE_MAGNETITE: u64 = 0x0F3B;
+    pub const FACE_GOLD: u64 = 0x0A0B;
     pub const FRAY: u64 = 0xF4A;
     pub const CANYONS: u64 = 0xCA1;
     pub const CANYON_AREA: u64 = 0xCA2;
@@ -179,6 +187,11 @@ pub const DESERT: (f64, f64) = (0.14, 0.0);
 pub const SAVANNA: (f64, f64) = (0.1, 0.1);
 /// Swamp from this temperature and this humidity, on low land.
 pub const SWAMP: (f64, f64) = (0.0, 0.04);
+/// Tropical forest (Ronald, 11-04: "all four"; the third proposal sheet) from this temperature
+/// and this humidity: the hot, wet corner, where the rules fell through to oak "forest" at the
+/// llanos' heat (3.5-5.6% of the land on seeds 1, 7, 42, 1234). The savanna's heat, the forest's
+/// rain; the swamp keeps the low wet land.
+pub const TROPICAL: (f64, f64) = (0.1, 0.07);
 /// Forest from this humidity; birch forest under this temperature and from this humidity.
 pub const FOREST_HUMIDITY: f64 = 0.07;
 pub const BIRCH: (f64, f64) = (0.05, 0.0);
@@ -354,6 +367,44 @@ pub const KARST_WIDE_ONE_IN: u32 = 4;
 pub const KARST_WIDE_RADIUS: (i32, i32) = (13, 17);
 pub const KARST_WIDE_HEIGHT: (i32, i32) = (22, 38);
 
+/// Cave mouths that read from the surface (Ronald, 11-04: "all four"): where the engine's
+/// caves take the surface (`caves::Caves::mouth`), a mouth is `MOUTH_MIN` such columns or more in
+/// the five by five round one (a tunnel crossing, not a pinhole); within `MOUTH_LIP` blocks of
+/// one the ground is the column's rock (its walls and a lip round it), and right beside it the
+/// slit widens a block where nothing stands on the ground.
+pub const MOUTH_MIN: usize = 3;
+pub const MOUTH_LIP: i32 = 2;
+/// The lip's outer ring is rock in patches, this share of its columns (the first look: a full
+/// ring read as paving on the grass).
+pub const MOUTH_LIP_PATCHES: f64 = 0.4;
+
+/// Karst sinkholes (cenotes; Ronald, 11-04: "all four"): in the karst area, round shafts
+/// `SINK_RADIUS` blocks from their middle to their wall, at most one per `SINK_CELL` square, kept
+/// with `SINK_CHANCE` times the area's strength, down to `SINK_FLOOR` blocks under the sea, so
+/// water stands in them at the sea's level; only on land `SINK_LAND` over the sea and
+/// `SINK_CLEAR` blocks clear of the towers' feet.
+pub const SINK_CELL: i32 = 128;
+pub const SINK_CHANCE: f64 = 0.35;
+pub const SINK_RADIUS: (i32, i32) = (6, 11);
+pub const SINK_FLOOR: i32 = 6;
+pub const SINK_LAND: (i32, i32) = (4, 30);
+pub const SINK_CLEAR: i32 = 4;
+
+/// Meteor craters (Ronald, 11-04: "all four"): round bowls, at most one per `CRATER_CELL` square,
+/// kept with `CRATER_CHANCE` where the land at the middle is open and dry (not the cold, the
+/// woods' wet, the mountains or the karst) and over the sea: `CRATER_RADIUS` blocks from the
+/// middle to the rim's crest, `CRATER_DEPTH` radii deep, the rim `CRATER_RIM` blocks high and
+/// blending back into the land by `CRATER_RIM_OUT` radii; all measured from the ground at the
+/// middle, and only where the land round it is level and no river or lake reaches; the last of
+/// the features, after the rivers. Where the floor dips under the sea's level
+/// water stands in it.
+pub const CRATER_CELL: i32 = 640;
+pub const CRATER_CHANCE: f64 = 1.0;
+pub const CRATER_RADIUS: (i32, i32) = (20, 30);
+pub const CRATER_DEPTH: f64 = 0.65;
+pub const CRATER_RIM: (i32, i32) = (5, 8);
+pub const CRATER_RIM_OUT: f64 = 1.8;
+
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
 /// the rain of the nodes upstream within `RIVER_REACH` steps (about 2 km of river).
@@ -453,12 +504,13 @@ pub const OCEAN_CONTINENT: f64 = 0.1;
 /// The land's biome rules in the order they're tried, after the coasts and the mountains, with
 /// the bed under their water: gravel in the north and the birch woods, sand in the warm lands,
 /// mud (dirt) in the swamp.
-pub const RIVER_BEDS: [(&str, &str); 8] = [
+pub const RIVER_BEDS: [(&str, &str); 9] = [
     ("snowy_plains", "gravel"),
     ("taiga", "gravel"),
     ("desert", "sand"),
     ("savanna", "sand"),
     ("swamp", "dirt"),
+    ("tropical_forest", "dirt"),
     ("forest", "sand"),
     ("birch_forest", "gravel"),
     ("plains", "sand"),
@@ -544,6 +596,8 @@ pub fn features() -> Vec<Feature> {
         Feature::new(karst).named("karst"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
+        // Last: a crater is measured from its ground, the rivers' cut included (none reach one).
+        Feature::new(craters).named("craters"),
         // No height: their masks say where the snow drifts and where the sequoias stand (rules
         // ask for them).
         preset::hills(0.0, 64.0)
@@ -575,7 +629,7 @@ fn land_height_at(h: &Here) -> i32 {
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
     let base = base_ground(h);
-    base + canyons::cut(h, base) + karst::add(h, base)
+    base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base)
 }
 
 /// The ground before the karst towers (which stand on it, or rise out of the water over it).
@@ -596,7 +650,8 @@ fn base_ground(h: &Here) -> i32 {
 
 /// The ground's height (Q4) with the rivers: what the engine makes of `features`.
 pub fn height(f: &Fields, x: i32, z: i32) -> i32 {
-    land_height(f, x, z) + rivers(f, x, z)
+    let ground = land_height(f, x, z) + rivers(f, x, z);
+    ground + craters::add(&Here::new(f, x, z), || ground)
 }
 
 /// The mesas' height (Q4) at (`x`, `z`).
@@ -880,10 +935,100 @@ pub fn canyons(f: &Fields, x: i32, z: i32) -> i32 {
     if !canyons::near(&h) { 0 } else { canyons::cut(&h, base_ground(&h)) }
 }
 
-/// What the karst towers add at (`x`, `z`) (Q4), as the engine adds it.
+/// What the karst towers and sinkholes add at (`x`, `z`) (Q4), as the engine adds it.
 pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
     let h = Here::new(f, x, z);
-    if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base_ground(&h)) }
+    let towers = if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base_ground(&h)) };
+    towers + karst::sink(&h, || base_ground(&h))
+}
+
+/// What the meteor craters add at (`x`, `z`) (Q4), as the engine adds it.
+pub fn craters(f: &Fields, x: i32, z: i32) -> i32 {
+    craters::add(&Here::new(f, x, z), || land_height(f, x, z) + rivers(f, x, z))
+}
+
+/// The meteor craters (middle x, z and radius, blocks) within `r` blocks of (`x`, `z`) (blocks).
+pub fn craters_near(f: &Fields, x: i32, z: i32, r: i32) -> Vec<(i32, i32, i32)> {
+    craters::near(f, x, z, r)
+}
+
+/// The karst sinkholes (middle x, z and radius, blocks) within `r` blocks of (`x`, `z`) (blocks).
+pub fn sinks_near(f: &Fields, x: i32, z: i32, r: i32) -> Vec<(i32, i32, i32)> {
+    karst::sinks_near(f, x, z, r)
+}
+
+/// A fair first place (Ronald, 11-04: "All 3: 1, 2, 3"): the nearest spot to the world's middle,
+/// searched in rings `SPAWN_STEP` blocks apart out to `SPAWN_REACH`, that is plains (few trees to
+/// spawn in), temperate (`SPAWN_TEMPERATURE`: away from the taiga's cold and the desert's heat),
+/// `SPAWN_RISE` over the sea, level (no neighbour two blocks off more than a block higher or
+/// lower), out of the mountains, with water (a lake or a river, not the sea) within
+/// `SPAWN_WATER` blocks and woods within `SPAWN_WOODS`. The engine's own search took the first
+/// plains column near the middle: on seeds 1, 7, 42 and 1234 that stood 34-54 blocks up a hill,
+/// two of them without water within 96 blocks.
+pub const SPAWN_STEP: i32 = 16;
+pub const SPAWN_REACH: i32 = 1600;
+pub const SPAWN_TEMPERATURE: (f64, f64) = (-0.06, 0.12);
+pub const SPAWN_RISE: (i32, i32) = (2, 30);
+pub const SPAWN_WATER: i32 = 48;
+pub const SPAWN_WOODS: i32 = 64;
+
+/// The first block's column (x, height, z in blocks) of the fair first place for world `seed`,
+/// or, failing that within `SPAWN_REACH`, the first level plains, then the first land above the
+/// sea, on the same rings.
+pub fn spawn(seed: u64) -> [i32; 3] {
+    spawn_where(seed, &|_, _| true)
+}
+
+/// `spawn`, only where `open` (blocks) also holds: what the terrain here can't see, as the
+/// engine's caves (seed 42's first fair place stood over a cave's mouth, PC look fv_new_42: the
+/// player fell 15 blocks).
+pub fn spawn_where(seed: u64, open: &dyn Fn(i32, i32) -> bool) -> [i32; 3] {
+    let f = fields(seed);
+    let h = |x: i32, z: i32| height(&f, x * 16, z * 16) >> 4;
+    let biome = |x: i32, z: i32| overworld_biome(&f, x * 16, z * 16);
+    let level = |x: i32, z: i32, hh: i32| {
+        [(2, 0), (-2, 0), (0, 2), (0, -2)]
+            .iter()
+            .all(|(dx, dz)| (h(x + dx, z + dz) - hh).abs() <= 1)
+    };
+    let near = |x: i32, z: i32, reach: i32, step: i32, hit: &dyn Fn(i32, i32) -> bool| {
+        (0..=reach).step_by(step as usize).any(|d| {
+            (0..16).any(|k| {
+                let a = k as f64 / 16.0 * std::f64::consts::TAU;
+                let (px, pz) = (x + (d as f64 * a.cos()).round() as i32, z + (d as f64 * a.sin()).round() as i32);
+                hit(px, pz)
+            })
+        })
+    };
+    let fair = |x: i32, z: i32| -> bool {
+        let hh = h(x, z);
+        let t = f.temperature(x * 16, z * 16);
+        biome(x, z) == "plains"
+            && (q12(SPAWN_TEMPERATURE.0)..q12(SPAWN_TEMPERATURE.1)).contains(&t)
+            && (SEA + SPAWN_RISE.0..=SEA + SPAWN_RISE.1).contains(&hh)
+            && level(x, z, hh)
+            && MOUNTAINS_AREA.value(&f, x * 16, z * 16) < q12(0.2)
+            && near(x, z, SPAWN_WATER, 4, &|px, pz| h(px, pz) < SEA && biome(px, pz) != "ocean")
+            && near(x, z, SPAWN_WOODS, 8, &|px, pz| {
+                matches!(biome(px, pz), "forest" | "birch_forest" | "taiga" | "sequoia_grove" | "tropical_forest")
+            })
+    };
+    let plains = |x: i32, z: i32| biome(x, z) == "plains" && h(x, z) > SEA + 1 && level(x, z, h(x, z));
+    let land = |x: i32, z: i32| h(x, z) > SEA + 1;
+    for test in [&fair as &dyn Fn(i32, i32) -> bool, &plains, &land] {
+        for r in 0..=SPAWN_REACH / SPAWN_STEP {
+            let n = (r * 8).max(1);
+            for k in 0..n {
+                let a = k as f64 / n as f64 * std::f64::consts::TAU;
+                let (x, z) = ((r * SPAWN_STEP) as f64 * a.cos(), (r * SPAWN_STEP) as f64 * a.sin());
+                let (x, z) = (x.round() as i32, z.round() as i32);
+                if test(x, z) && open(x, z) {
+                    return [x, h(x, z), z];
+                }
+            }
+        }
+    }
+    [0, h(0, 0).max(SEA), 0]
 }
 
 /// Which water a bank belongs to (`bank`).
@@ -999,6 +1144,8 @@ fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool) -
         "savanna"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
+    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
+        "tropical_forest"
     } else if hu >= at(FOREST_HUMIDITY) {
         "forest"
     } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {
@@ -1135,8 +1282,13 @@ pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet
 
 impl RockSet {
     /// The block (its name in base) at `pos` (world blocks) of a face of these rocks; mossy cobbles
-    /// only where `mossy`.
-    pub fn block(self, seed: u64, [x, y, z]: [i32; 3], mossy: bool) -> &'static str {
+    /// only where `mossy`; the rock's ore where it has one (`face_ore`).
+    pub fn block(self, seed: u64, pos: [i32; 3], mossy: bool) -> &'static str {
+        let rock = self.rock(seed, pos, mossy);
+        face_ore(seed, pos, rock).unwrap_or(rock)
+    }
+
+    fn rock(self, seed: u64, [x, y, z]: [i32; 3], mossy: bool) -> &'static str {
         if self == RockSet::Strata {
             return strata(seed, [x, y, z]);
         }
@@ -1157,6 +1309,65 @@ impl RockSet {
             _ => "limestone",
         }
     }
+}
+
+/// Ores in the rock faces (Ronald, 11-04: "All 3: 1, 2, 3"; Art's textures, "Yes, all four"):
+/// what a face shows where its rock carries ore, so a player finds early iron and coal on the
+/// walls of the land, not only underground. Shares of the rock's face blocks (checked by
+/// `face_ores_come_in_their_shares`); crafting's early needs are some 15 to 20 iron (a stone age
+/// kit's metal heads, a bucket, a cooking pot) and coal for the first smelting, and a canyon or
+/// granite face shows hundreds of blocks.
+///
+/// - Coal seams in the banded clay: level runs some `FACE_COAL.1` blocks long, `FACE_COAL.0` of it.
+/// - Ironstone in the red beds: knots of a few blocks, `FACE_IRONSTONE.0` of red sandstone.
+/// - Magnetite specks in granite, `FACE_MAGNETITE.0`, and thin gold-quartz veins, `FACE_GOLD.0`.
+pub const FACE_COAL: (f64, f64) = (0.45, 10.0);
+pub const FACE_IRONSTONE: (f64, f64) = (0.05, 4.0);
+pub const FACE_MAGNETITE: (f64, f64) = (0.022, 1.5);
+pub const FACE_GOLD: (f64, f64) = (0.003, 14.0);
+
+/// The ore block (its name in base) a face of `rock` shows at `pos` (world blocks), if any.
+pub fn face_ore(seed: u64, [x, y, z]: [i32; 3], rock: &str) -> Option<&'static str> {
+    let (bx, by, bz) = (x * 16, y * 16, z * 16);
+    // A noise of `size` blocks (stretched `flat` times along the level) over its threshold for
+    // `share` of the rock: the noise's values spread about evenly over -0.6..0.6 (Q12).
+    let over = |salt: u64, (share, size): (f64, f64), flat: i32| {
+        let s = q4(size);
+        let v = fixed::perlin3(fixed::seed32(seed, salt), bx, by, bz, s * flat, s, s * flat);
+        v > q12(ore_line(share))
+    };
+    match rock {
+        "banded_clay" if over(salt::FACE_COAL, (FACE_COAL.0, 1.0), FACE_COAL.1 as i32) => Some("banded_clay_coal_ore"),
+        "red_sandstone" if over(salt::FACE_IRONSTONE, FACE_IRONSTONE, 1) => Some("red_sandstone_iron_ore"),
+        "granite" => {
+            // Gold in thin veins: near the zero sheet of a slow noise (some 6% of the rock), where
+            // a second noise allows (a fifteenth of the rest).
+            let s = q4(FACE_GOLD.1);
+            let sheet = fixed::perlin3(fixed::seed32(seed, salt::FACE_GOLD), bx, by, bz, s, s, s).abs();
+            if sheet < q12(0.02) && over(salt::FACE_GOLD + 1, (FACE_GOLD.0 * 15.0, 6.0), 1) {
+                Some("granite_gold_ore")
+            } else if over(salt::FACE_MAGNETITE, FACE_MAGNETITE, 1) {
+                Some("granite_iron_ore")
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// The threshold that leaves `share` of a 3D noise over it: measured on `perlin3` (close to a
+/// normal spread a quarter wide), between these points straight.
+fn ore_line(share: f64) -> f64 {
+    const LINES: [(f64, f64); 9] =
+        [(0.003, 0.666), (0.01, 0.582), (0.022, 0.510), (0.05, 0.428), (0.1, 0.374), (0.2, 0.249), (0.3, 0.140), (0.45, 0.017), (0.5, 0.0)];
+    let i = LINES
+        .iter()
+        .position(|&(s, _)| s >= share)
+        .unwrap_or(LINES.len() - 1)
+        .max(1);
+    let ((s0, l0), (s1, l1)) = (LINES[i - 1], LINES[i]);
+    l0 + (l1 - l0) * ((share - s0) / (s1 - s0)).clamp(0.0, 1.0)
 }
 
 /// The mesas' layer at `pos` (world blocks): `STRATA` repeating up the height, each layer 1 to 3
@@ -1205,6 +1416,8 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
         "savanna"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
+    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
+        "tropical_forest"
     } else if hu >= at(FOREST_HUMIDITY) {
         "forest"
     } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {
@@ -1369,6 +1582,43 @@ mod tests {
     }
 
     #[test]
+    fn face_ores_come_in_their_shares() {
+        let n = 200_000;
+        let share = |rock: &str, ore: &str| {
+            let hits = (0..n)
+                .filter(|i| {
+                    let pos = [(i % 211) - 100 + i / 50_000 * 997, 60 + (i / 211) % 80, (i * 31) % 4001 - 2000];
+                    face_ore(1, pos, rock) == Some(ore)
+                })
+                .count();
+            hits as f64 / n as f64
+        };
+        for (rock, ore, want) in [
+            ("banded_clay", "banded_clay_coal_ore", FACE_COAL.0),
+            ("red_sandstone", "red_sandstone_iron_ore", FACE_IRONSTONE.0),
+            ("granite", "granite_iron_ore", FACE_MAGNETITE.0),
+            ("granite", "granite_gold_ore", FACE_GOLD.0),
+        ] {
+            let got = share(rock, ore);
+            assert!((got - want).abs() < want * 0.3, "{ore}: {got:.4} of {rock}, want {want}");
+        }
+        assert_eq!(face_ore(1, [0, 70, 0], "limestone"), None);
+    }
+
+    #[test]
+    fn spawns_are_fair() {
+        for seed in [1, 2, 3, 7, 42, 1234] {
+            let [x, y, z] = spawn(seed);
+            let f = fields(seed);
+            assert_eq!(overworld_biome(&f, x * 16, z * 16), "plains", "seed {seed}: spawn at {x} {z}");
+            assert!((SEA + SPAWN_RISE.0..=SEA + SPAWN_RISE.1).contains(&y), "seed {seed}: spawn {y} high");
+            let t = f.temperature(x * 16, z * 16);
+            assert!((q12(SPAWN_TEMPERATURE.0)..q12(SPAWN_TEMPERATURE.1)).contains(&t), "seed {seed}: too cold or hot");
+            assert!(x.abs().max(z.abs()) <= SPAWN_REACH, "seed {seed}: spawn {x} {z} far out");
+        }
+    }
+
+    #[test]
     fn borders_fray_only_where_the_ground_changes() {
         let f = fields(1);
         let mut frayed = 0;
@@ -1381,6 +1631,28 @@ mod tests {
             }
         }
         assert!(frayed > 0 && frayed < 4_000, "{frayed} frayed columns of 40 000");
+    }
+
+    #[test]
+    fn craters_and_sinkholes_keep_their_shapes() {
+        let f = fields(42);
+        let sites = craters_near(&f, 0, 0, 8000);
+        assert!(sites.len() >= 4, "{} craters in 16 km", sites.len());
+        for &(x, z, r) in &sites {
+            // A bowl at the middle under its rim's crest, nothing past the rim's foot.
+            let deep = height(&f, x * 16, z * 16);
+            for (dx, dz) in [(r, 0), (-r, 0), (0, r), (0, -r)] {
+                let crest = height(&f, (x + dx) * 16, (z + dz) * 16);
+                assert!(crest - deep >= q4(r as f64 * CRATER_DEPTH * 0.8), "crater at {x} {z}: shallow");
+            }
+            assert_eq!(craters(&f, (x + r * 2) * 16, z * 16), 0, "crater at {x} {z}: reaches too far");
+        }
+        let f = fields(1);
+        let sinks = sinks_near(&f, 0, 0, 3000);
+        assert!(!sinks.is_empty(), "no sinkhole in 6 km");
+        for &(x, z, _) in &sinks {
+            assert!(land_height(&f, x * 16, z * 16) <= q4((SEA - SINK_FLOOR) as f64), "sinkhole at {x} {z} holds no water");
+        }
     }
 
     #[test]
@@ -1499,7 +1771,19 @@ mod tests {
             for (b, s, _) in &shares {
                 assert!(*s < 0.25, "seed {seed}: {b} is {:.1}% of the land", s * 100.0);
             }
-            for biome in ["plains", "forest", "birch_forest", "taiga", "snowy_plains", "desert", "savanna", "swamp", "mountains", "beach"] {
+            for biome in [
+                "plains",
+                "forest",
+                "tropical_forest",
+                "birch_forest",
+                "taiga",
+                "snowy_plains",
+                "desert",
+                "savanna",
+                "swamp",
+                "mountains",
+                "beach",
+            ] {
                 let (share, near) = shares
                     .iter()
                     .find(|e| e.0 == biome)

@@ -214,6 +214,32 @@ pub const LEAVES: [(&str, Turn); 17] = [
     ("animals:tempskya_leaves", Turn::Evergreen),
 ];
 
+/// Trees and shrubs whose leaves flower (the bloom look), and the seasons they bloom in, bits spring
+/// first: their leaves show `leaves_<x>_bloom` then (the tinted ones under a tinted `_bloom_overlay`,
+/// so the leaves keep their biome's and season's green), a growth step every few minutes looking at
+/// the season as the wild flowers do. In spring, all from their real flowering: the Pacific dogwood's
+/// white bracts (April-May); the umbrella thorn's cream puffballs, as its rains begin; honey
+/// mesquite's yellow catkins (April-June); the creosote bush's small yellow flowers (February-April);
+/// the willow's catkins (March-April, with the first leaves).
+pub const BLOOMS: [(&str, u8); 5] = [
+    ("base:dogwood_leaves", SP),
+    ("base:acacia_leaves", SP),
+    ("base:mesquite_leaves", SP),
+    ("base:creosote_leaves", SP),
+    ("base:willow_leaves", SP),
+];
+
+/// The seasons `leaves` bloom in (`BLOOMS`), if they do.
+pub fn blooms(leaves: &str) -> Option<u8> {
+    BLOOMS.iter().find(|(l, _)| *l == leaves).map(|&(_, s)| s)
+}
+
+/// Whether leaves blooming in `seasons` (`BLOOMS`) are in flower in `season` (spring 0; `None`: a
+/// world without a calendar, where nothing blooms).
+pub fn in_bloom(seasons: u8, season: Option<usize>) -> bool {
+    season.is_some_and(|s| seasons >> s & 1 != 0)
+}
+
 /// How `leaves` turn (`Turn::Orange` for leaves not listed).
 pub fn turn(leaves: &str) -> Turn {
     LEAVES
@@ -230,7 +256,7 @@ pub const POND_LANDS: [(&str, f32); 2] = [("base:swamp", 0.35), ("animals:floodp
 /// Cordage plants: the chance cutting one gives plant fibre (`clothing`; tall grass gives it a time
 /// in eight). Sedges, cottongrass and cattail leaves were twisted into cord wherever they grow, so
 /// the tundra and the marshes have fibre too (Research round 3, B3).
-pub const FIBRE: [(&str, f32); 3] = [("base:sedge", 0.5), ("base:cottongrass", 0.5), ("base:cattail", 1.0)];
+pub const FIBRE: [(&str, f32); 4] = [("base:sedge", 0.5), ("base:cottongrass", 0.5), ("base:cattail", 1.0), ("base:dune_grass", 0.3)];
 
 /// The most of one ground all its wild plants cover in a biome (the world rolls for them first).
 pub const MOST: f32 = 0.3;
@@ -290,7 +316,7 @@ const fn w(
 /// Covers are shares of the cells of that ground (tall grass covers 5-35% of the turf, berry bushes
 /// 0.4% of the forest's; `forage::GRASS_COVER`): the tundra's sedges and cottongrass are its grass,
 /// the bushes and mushrooms are found, not walked through.
-pub const WILD: [Wild; 27] = [
+pub const WILD: [Wild; 32] = [
     w("base:sedge", Form::Tuft, Ground::Soil, None, SEDGE_LANDS, 0.12),
     w("base:cottongrass", Form::Tuft, Ground::Soil, None, TUNDRA, 0.08),
     w("base:reindeer_lichen", Form::Tuft, Ground::Soil, None, NORTH, 0.05),
@@ -322,6 +348,16 @@ pub const WILD: [Wild; 27] = [
     // Kelp washed up on the beach (wrack, the beach's food: sand fleas and flies on it feed the
     // shorebirds); the kelp standing in the sea is `base:kelp` above.
     w("base:kelp_wrack", Form::Mat, Ground::Sand, Some("base:kelp"), &["base:beach"], 0.03),
+    // The next batch from the research's gaps (part E): the beach's American beachgrass (dunes'
+    // grass, grazed and growing back; cordage) and beach plums; the mountains' black
+    // huckleberries; the desert's chia, a spring seed; dwarf birch in the tundra (hares and
+    // ptarmigan: its leaves in summer, buds and catkins in winter). (The Cretaceous's horsetails
+    // were already in: the animals mod's ground cover, grazed as grass.)
+    w("base:dune_grass", Form::Tuft, Ground::Sand, None, &["base:beach"], 0.1),
+    w("base:beach_plum_bush", Form::Bush, Ground::Sand, Some("base:beach_plums"), &["base:beach"], 0.006),
+    w("base:huckleberry_bush", Form::Bush, Ground::Soil, Some("base:huckleberries"), &["base:mountains"], 0.01),
+    w("base:chia", Form::Ripens, Ground::Sand, Some("base:chia_seeds"), DESERT, 0.02),
+    w("base:dwarf_birch", Form::Still, Ground::Soil, None, &["base:snowy_plains"], 0.02),
 ];
 
 /// How deep the water over a plant rooted on the bed is, from its floor to the surface, in
@@ -403,5 +439,18 @@ mod tests {
                 assert!(all < MOST, "{b}: wild plants cover {:.0}% of its {:?} ground", all * 100.0, p.ground);
             }
         }
+    }
+
+    /// Each blooming tree or shrub is one of the world's leaves, blooms in some season, and nothing
+    /// blooms in a world without a calendar.
+    #[test]
+    fn blooms_are_known_leaves() {
+        for (leaves, seasons) in BLOOMS {
+            assert!(LEAVES.iter().any(|(l, _)| *l == leaves), "{leaves} isn't in LEAVES");
+            assert!(seasons != 0 && seasons < 16, "{leaves}: seasons {seasons:b}");
+            assert!((0..4).any(|s| in_bloom(seasons, Some(s))), "{leaves} never blooms");
+            assert!(!in_bloom(seasons, None), "{leaves} blooms without a calendar");
+        }
+        assert_eq!(blooms("base:oak_leaves"), None);
     }
 }

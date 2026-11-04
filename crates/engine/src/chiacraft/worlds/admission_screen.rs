@@ -152,6 +152,43 @@ impl Screen for Admission {
                             _ => {}
                         }
                     });
+                    // Finding this world (phase 5): listed on chain, a deposit locked.
+                    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
+                        use crate::chiacraft::worlds::listing;
+                        label(ui, cx, "listing.title", &[], "default");
+                        let listed = dir.as_deref().and_then(listing::load);
+                        let deposit = listing::txch(cx.settings.listing_deposit());
+                        match &listed {
+                            Some(l) if l.confirmed => label(ui, cx, "listing.is_listed", &[Arg::Text(listing::txch(l.amount))], "dim"),
+                            Some(_) => label(ui, cx, "listing.is_pending", &[], "dim"),
+                            None => label(ui, cx, "listing.not_listed", &[Arg::Text(deposit)], "dim"),
+                        };
+                        ui.text_bound(
+                            "dim",
+                            Box::new(|_: &Ctx| {
+                                let (key, args) = listing::state();
+                                (key, args.into_iter().map(Arg::Text).collect())
+                            }),
+                        );
+                        match listed {
+                            None => {
+                                let id = button(ui, cx, "listing.list", &[], 200.0, |c| {
+                                    if let Some(dir) = adm::local_world() {
+                                        listing::list(c.settings, dir);
+                                    }
+                                });
+                                ui.set_id(id, "list_world");
+                            }
+                            Some(_) => {
+                                let id = button(ui, cx, "listing.delist", &[], 200.0, |c| {
+                                    if let Some(dir) = adm::local_world() {
+                                        listing::delist(c.settings, dir);
+                                    }
+                                });
+                                ui.set_id(id, "delist_world");
+                            }
+                        }
+                    });
                     // Players here now, and anyone else by name, key or DID.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
                         label(ui, cx, "admission.screen.players", &[], "default");

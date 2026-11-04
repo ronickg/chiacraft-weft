@@ -679,6 +679,7 @@ impl Server {
                 r.gizmo_groups = groups.clone();
             }
             d.time += 1;
+            d.run_day_clock();
             if c.dims[d.id as usize].weather {
                 d.tick_weather();
             }
@@ -926,6 +927,7 @@ impl Server {
                     }
                 }
                 DimEvent::SetTime { dim, time } => self.dims[dim as usize].set_day_time(time),
+                DimEvent::SetDayRate { dim, rate } => self.dims[dim as usize].set_day_rate(rate),
                 DimEvent::SkipTicks { dim, ticks } => {
                     let d = &mut self.dims[dim as usize];
                     d.set_time(d.time.saturating_add(ticks));
@@ -1161,7 +1163,7 @@ impl Server {
         p.conn
             .send(ToClient::Edits { dim: to, specs: dims[to as usize].edits.iter().map(|e| e.spec(c)).collect(), all: true });
         p.conn
-            .send(ToClient::Time { dim: to, time: dims[to as usize].day_time() });
+            .send(ToClient::Time { dim: to, time: dims[to as usize].day_time(), rate: dims[to as usize].day_rate as f32 });
         p.conn.send(ToClient::Weather {
             raining: dims[to as usize].raining,
             thunder: dims[to as usize].thunder,

@@ -22,6 +22,10 @@ pub struct DimSet {
     pub generating: FxHashSet<IVec3>,
     pub time: u64,
     pub day_offset: i64,
+    /// How fast the time of day runs against ticks (`set_day_rate`), and the part of a tick it
+    /// is ahead or behind by so far.
+    pub day_rate: f64,
+    day_rest: f64,
     /// `/time` moved the sky: players hear at once, not at the next second.
     pub day_moved: bool,
     pub raining: bool,
@@ -65,6 +69,8 @@ impl DimSet {
             generating: FxHashSet::default(),
             time: 1000,
             day_offset: 0,
+            day_rate: 1.0,
+            day_rest: 0.0,
             day_moved: false,
             raining: false,
             thunder: false,
@@ -377,6 +383,31 @@ impl DimSet {
         self.day_moved = true;
         for r in &mut self.regions {
             r.day_offset = self.day_offset;
+        }
+    }
+
+    /// How fast the time of day runs from now (`Host::set_day_rate`): players hear at once.
+    pub fn set_day_rate(&mut self, rate: f32) {
+        let rate = if rate.is_finite() { rate.clamp(0.0, 100.0) as f64 } else { 1.0 };
+        if rate != self.day_rate {
+            self.day_rate = rate;
+            self.day_moved = true;
+        }
+    }
+
+    /// After a tick: a day running at another rate than ticks gains or loses the difference.
+    pub fn run_day_clock(&mut self) {
+        if self.day_rate == 1.0 {
+            return;
+        }
+        self.day_rest += self.day_rate - 1.0;
+        let whole = self.day_rest.trunc();
+        if whole != 0.0 {
+            self.day_rest -= whole;
+            self.day_offset += whole as i64;
+            for r in &mut self.regions {
+                r.day_offset = self.day_offset;
+            }
         }
     }
 

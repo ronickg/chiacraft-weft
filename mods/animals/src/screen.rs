@@ -13,6 +13,9 @@ use crate::taming::TAMING;
 
 static ANIMAL_MENU: Menu = Menu::named("animal");
 static SCOUT_MENU: Menu = Menu::named("scout");
+/// The same view opened without the spyglass in hand (`/animal show` on one you don't own): its
+/// title says so (Playtest B6: it said "Through the spyglass" with no spyglass used).
+static LOOK_MENU: Menu = Menu::named("look");
 /// The animal screen's other pages (round 2: what was a wall of text moves to tabs): its genes
 /// and kind, and its family and life. Each is a menu of its own on the same animal; a tab asks
 /// the server to open the page (`PAGE`).
@@ -36,6 +39,7 @@ pub fn init(r: &mut Registry) {
     r.menu(&ANIMAL_MENU).screen(animal_screen);
     taming_hud(r);
     r.menu(&SCOUT_MENU).screen(scout_screen);
+    r.menu(&LOOK_MENU).screen(scout_screen);
     r.menu(&GENES_MENU).screen(genes_screen);
     r.menu(&FAMILY_MENU).screen(family_screen);
     r.packet(&PAGE, |p, [id, page]| {
@@ -66,7 +70,18 @@ pub fn open(w: &World, player: u64, id: u64) -> bool {
         return false;
     }
     let full = crate::commands::can_command(w, id, player) || w.creative(player);
-    w.open_menu(player, if full { &ANIMAL_MENU } else { &SCOUT_MENU }, id);
+    let spyglass = w.inventory(player).get(w.selected_slot(player)).item == SPYGLASS.id();
+    w.open_menu(
+        player,
+        if full {
+            &ANIMAL_MENU
+        } else if spyglass {
+            &SCOUT_MENU
+        } else {
+            &LOOK_MENU
+        },
+        id,
+    );
     true
 }
 
@@ -467,31 +482,47 @@ fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Opt
 }
 
 /// The life bars and stat bars' sizes in GUI pixels (the kit's `life_*` and `stat_q*`), and the
-/// columns beside them: an icon, then the bar, then the value (left column 108 wide: 8 + 3 + 56 + 3 + 38).
+/// columns beside them: an icon, then the bar, then the value (left column `LEFT_W`: 8 + 3 + 56 + 3 + 34).
 const LIFE_BAR: (f32, f32) = (56.0, 6.0);
-const LIFE_VALUE_W: f32 = 38.0;
+const LIFE_VALUE_W: f32 = 34.0;
+/// The Overview's left column (the portrait, name, chips and life), and the window's padding and
+/// the gap between its three columns, GUI px: the whole window is 6 + 104 + 6 + 150 (`STAT_ROW_W`) + 6
+/// + 100 + 6 = 378, inside the 380 a 760 px wide window has at GUI scale 2 (Playtest B9c: at 396 it lost 8 px
+/// each side).
+const LEFT_W: f32 = 104.0;
+const OVERVIEW_PAD: f32 = 6.0;
+const OVERVIEW_GAP: f32 = 6.0;
 /// The genes list (on the Genes page): how many lines it can hold.
 const GENE_LINES: usize = 40;
 /// The Genes page's list: taller, it has the page to itself.
 const GENES_PAGE_H: f32 = 110.0;
-const STAT_BAR: (f32, f32) = (32.0, 6.0);
+/// The stat names' column: as wide as the longest name in either language ("Выносливость" 42.5 GUI
+/// px: at 34 it was shrunk to 80%, the Russian pass); the bars 18 to make room (and the wild column
+/// 16, so "Дикий" and "Ручной" over their columns keep 2 GUI px between them), so the window still
+/// fits 380 with every column as wide as its words.
+const STAT_NAME_W: f32 = 43.0;
+const STAT_BAR: (f32, f32) = (18.0, 6.0);
 /// The stat rows' columns after the bar: the value (right-aligned), wild and tamed points
 /// (centred), then the + (GUI pixels).
-const STAT_VALUE_W: f32 = 18.0;
-const STAT_WILD_W: f32 = 14.0;
+/// ("152%" is 16.5 GUI px)
+const STAT_VALUE_W: f32 = 17.0;
+/// (as wide as their headings, "Wild" 13.5 and "Tamed" 19.5 GUI px: narrower, the row shrank them,
+/// PC runs fit1280 and fit760b)
+const STAT_WILD_W: f32 = 16.0;
 const STAT_TAMED_W: f32 = 20.0;
 /// A stat row's whole width, for the divider over torpor.
-const STAT_ROW_W: f32 = 8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0 + STAT_WILD_W + 3.0 + STAT_TAMED_W + 3.0 + 10.0;
+const STAT_ROW_W: f32 =
+    8.0 + 3.0 + STAT_NAME_W + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0 + STAT_WILD_W + 3.0 + STAT_TAMED_W + 3.0 + 10.0;
 
 /// The screen of a tame animal (`notes/ui/BATCHES.md`, the taming and stats upgrade): who it is
 /// and how it is on the left, its stats as bars in the middle, its coat and orders on the right.
 fn animal_screen(ui: &mut Ui) {
-    window_page(ui, 0, S::row().pad(8.0).gap(10.0), |ui| {
+    window_page(ui, 0, S::row().pad(OVERVIEW_PAD).gap(OVERVIEW_GAP), |ui| {
         // Left: the level on a badge, the name, life, how it feels, and the facts.
-        ui.column(S::col().gap(3.0).w(108.0), |ui| {
+        ui.column(S::col().gap(3.0).w(LEFT_W), |ui| {
             // The animal itself, turning with the mouse, its level on a badge in the corner.
-            ui.panel("portrait", S::row().size(108.0, 70.0), |ui| {
-                ui.entity_model(106.0, 68.0);
+            ui.panel("portrait", S::row().size(LEFT_W, 70.0), |ui| {
+                ui.entity_model(LEFT_W - 2.0, 68.0);
                 ui.panel("hud_badge", S::row().size(20.0, 24.0).center().at(2.0, 2.0), |ui| {
                     ui.text_bind_styled(S::default().no_wrap(), |c, t| {
                         let Some(a) = c.menu_component(&ANIMAL) else { return };
@@ -511,9 +542,9 @@ fn animal_screen(ui: &mut Ui) {
             });
             // Its coat, what its kind does and its temperament, as chips, one under another (a row
             // can't wrap, and "Hunts in packs" alone nearly fills the column).
-            ui.column(S::col().gap(2.0).max_w(108.0), |ui| {
+            ui.column(S::col().gap(2.0).max_w(LEFT_W), |ui| {
                 ui.panel("chip", S::row().pad(2.0), |ui| {
-                    ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
+                    ui.text_bind_styled(S::default().max_w(LEFT_W - 14.0), |c, t| {
                         let Some(look) = c
                             .menu_component(&crate::coats::GENOME)
                             .and_then(|g| crate::coats::phenotype(&g))
@@ -524,7 +555,7 @@ fn animal_screen(ui: &mut Ui) {
                     });
                 });
                 ui.panel("chip", S::row().pad(2.0), |ui| {
-                    ui.text_bind_styled(S::default().max_w(94.0), |c, t| {
+                    ui.text_bind_styled(S::default().max_w(LEFT_W - 14.0), |c, t| {
                         let Some(s) = c.menu_component(&ANIMAL).and_then(|a| a.species()) else { return };
                         t.set("screen.animals.chip", &[Arg::Key(&format!("screen.animals.signature.{}", s.signature))]);
                     });
@@ -594,7 +625,7 @@ fn animal_screen(ui: &mut Ui) {
                 );
             }
             // How it feels in this air, against its comfort, and its condition.
-            ui.text_bind_styled(S::default().max_w(108.0), |c, t| {
+            ui.text_bind_styled(S::default().max_w(LEFT_W), |c, t| {
                 let (Some(a), Some(b)) = (c.menu_component(&ANIMAL), c.menu_component(&crate::comfort::BODY)) else { return };
                 let Some(s) = a.species().filter(|_| b.core > 0.0) else { return };
                 let (lo, hi) = s.bio.comfort;
@@ -639,15 +670,23 @@ fn animal_screen(ui: &mut Ui) {
             });
             // The header in the rows' own columns: name, bar, value, wild, tamed, +. A header
             // lines up as its column's values do (centred over centred counts).
-            ui.row(S::row().gap(3.0), |ui| {
-                ui.row(S::row().w(8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W), |_| {});
-                ui.row(S::row().w(STAT_WILD_W).center(), |ui| {
-                    ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.wild_points", &[])
-                });
-                ui.row(S::row().w(STAT_TAMED_W).center(), |ui| {
-                    ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.tamed_points", &[])
-                });
-                ui.row(S::row().w(10.0), |_| {});
+            // The columns' headings, each centred over its column and free to reach past it into
+            // the empty heading room beside it: in a row the longer Russian ones ("Дикий" 17.5,
+            // "Ручной" 20.5 GUI px) were shrunk to the columns' 14 and 20.
+            ui.row(S::row().size(STAT_ROW_W, 8.5), |ui| {
+                let wild = 8.0 + 3.0 + STAT_NAME_W + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0;
+                let tamed = wild + STAT_WILD_W + 3.0;
+                for (x, w, key) in [(wild, STAT_WILD_W, "screen.animals.wild_points"), (tamed, STAT_TAMED_W, "screen.animals.tamed_points")]
+                {
+                    ui.text_styled(
+                        S::default()
+                            .class("dim")
+                            .no_wrap()
+                            .at_pivot(x + w / 2.0, 0.0, [0.5, 0.0]),
+                        key,
+                        &[],
+                    );
+                }
             });
             for (i, name) in STAT_NAMES.iter().enumerate() {
                 if i == species::TORPOR {
@@ -655,7 +694,7 @@ fn animal_screen(ui: &mut Ui) {
                 }
                 ui.row(S::row().gap(3.0).center(), |ui| {
                     ui.image(&format!("base:gui/stat_icon_{name}"), 8.0, 8.0);
-                    ui.text_styled(S::default().w(34.0).no_wrap(), &format!("stat.animals.{name}"), &[]);
+                    ui.text_styled(S::default().w(STAT_NAME_W).no_wrap(), &format!("stat.animals.{name}"), &[]);
                     ui.row(S::row().size(STAT_BAR.0, STAT_BAR.1), move |ui| {
                         // One bar per quality on the same place: the one matching its wild points shows.
                         for q in 0..5usize {
@@ -1233,7 +1272,8 @@ fn taming_hud(r: &mut Registry) {
                     t.set("hud.animals.taming.who", &[Arg::Key(&format!("entity.animals.{}", s.kind_name()))]);
                 });
                 ui.row(S::row().gap(3.0).center(), |ui| {
-                    ui.text_bind_styled(S::default().w(30.0).no_wrap(), |c, t| {
+                    // as wide as "Приручено" (31 GUI px; at 30 it was shrunk, the Russian pass)
+                    ui.text_bind_styled(S::default().w(32.0).no_wrap(), |c, t| {
                         if being_tamed(c).is_some() { t.set("hud.animals.taming.bar", &[]) } else { t.text("") }
                     });
                     ui.progress_bind("life_taming", S::default().size(LIFE_BAR.0, LIFE_BAR.1), |c| {

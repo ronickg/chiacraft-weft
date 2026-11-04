@@ -127,6 +127,16 @@ grey for its tint), and the small model textures (beds, torches, lever, button, 
 comparator, anchor, floater, observer back, piston inner): the old 16 px picture doubled, each of
 its colours drawn with the matching approved material. Rerun it after a material it uses changes.
 
+Spring bloom on leaves (`notes/blocks/bloom.py a|b <out>`): each tree's flower as small stamps on
+its approved leaf tile, wrapping across the edges. A tinted (grey) leaf blooms as a pair, the
+engine's tinted overlay as on grass_side: `leaves_<x>_bloom` (untinted base: silhouette plus
+flowers in their own colours) and `leaves_<x>_bloom_overlay` (the leaf with the flowers cut out).
+A leaf drawn in its own colours (willow, creosote, juniper) blooms as one tile. Copy the sources
+to source/blocks/tiles and the game folder, then `regrade.py --all` (the leaves group grades them).
+`bloom.py bushes <out>` adds flowers to the fruiting bushes' stage 2 (their drawings kept in
+source/blocks/bloom/, outside the grade); copy the results to the game folder. Cloudberry keeps its
+one flower to a stem.
+
 ## Colour ramps (dark to light)
 
 From Ronald's guide, Part 3 B (measured, then lifted with gamma 0.85). Wood and metal may lean

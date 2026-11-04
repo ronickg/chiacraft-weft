@@ -432,6 +432,13 @@ and cactus.**
   - **The meadows and plains:** clover and wild sunflowers.
   - **The Cretaceous** (the animals mod's blocks, placed by base's decoration): cycads, early
     flowering shrubs and water lilies' kin.
+  - **The next batch** (2026-11-04, the research's part E gaps): the beach's American beachgrass
+    (grazed and growing back, cordage) and beach plums; the mountains' black huckleberries; the
+    desert's chia, its spring seed, and tepary beans, its crop (they feed the soil like beans);
+    and dwarf birch on the snowy plains (leaves in summer, buds and catkins in winter, the
+    ptarmigan's food). The beach's food by season went from 40/40/50/40% to 62/68/82/48%, the
+    desert's spring from 40% to 55% (`mods/animals/SPECIES.md`). Saguaro fruit waits for cactus
+    code; rowan, crab apples, dandelions, wild strawberries and whitebark pine nuts are next.
 
   Each grows by its form (`mods/base/src/wild.rs`):
   - tufts and mats grazed down grow back (lichen over about ten real years);
@@ -534,10 +541,30 @@ and cactus.**
 - **Grown plants rest:** a plant at its last age returns from its growth step before reading the
   air and ground, so a ripe field or bush costs nothing until it's picked or eaten. A ripe one
   keeps its fruit through a frost now (lingonberries and crowberries really do).
+- **The crops** (2026-11-04, `vitals::crops`, `mods/base/src/crops.rs`): beside wheat, barley,
+  winter rye, carrots, potatoes, beetroot, maize, paddy rice, beans, sorghum, pearl millet and
+  cassava, each a `PLANTS` row from the research's warmth, water, middle days and frost, so the
+  one rule places them:
+  - the cool-season ones (barley, rye, carrot, beet, potato) grow in the north's summer and the
+    plains' autumn, and suffer in the heat;
+  - maize, beans, sorghum and millet need about 10 °C and die at a frost; sorghum and millet
+    take the desert's dry ground at half speed;
+  - paddy rice grows only by water;
+  - winter rye is hardy to -30 and ripens only in summer, as it needs a winter's cold to set
+    grain; cassava takes about 13 months.
+
+  Four stages each (wheat keeps its eight). Picked unripe, a crop gives back what sowed it;
+  ripe, its harvest and up to three more seed. Its ripe harvest tires the farmland, and beans
+  feed it a level. The seeds come from tall grass, a time in 16, in the biomes where the
+  research grows each crop without watering; wheat's stays an eighth anywhere. Potatoes bake,
+  corn roasts, the paddy's grain boils into white rice, and any grain bakes into bread. The
+  foods are USDA rows: carrot, potato, baked potato, beetroot, corn, roasted corn, green beans,
+  cooked rice, and cassava, which rots in days and, raw, poisons now and then.
 - **Not yet:**
   - the water plants as food: reeds, lily pads, eelgrass and the kelp standing in the sea
     (2026-11-04) have no `forage::SOURCES` rows yet (the wrack washed up on beaches has);
-  - the crops (barley, rye, potato, maize, rice, beans and the rest);
+  - animals eating the crops and their grain;
+  - beetroot's own seed and cooked cassava, waiting for icons;
   - none of it seen in the game yet;
   - unloaded plants catch up at today's season, not the season they missed.
 

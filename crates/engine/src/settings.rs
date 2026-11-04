@@ -212,6 +212,10 @@ impl Settings {
     pub fn chain_peers(&self) -> Vec<String> {
         list("core:chain_peers")
     }
+    /// What listing a world locks, in mojos (phase 5).
+    pub fn listing_deposit(&self) -> u64 {
+        number("core:listing_deposit").max(1.0) as u64
+    }
     /// DID sponsors' addresses (iroh endpoint ids), tried in order.
     pub fn sponsors(&self) -> Vec<String> {
         list("core:sponsors")
