@@ -53,6 +53,17 @@ before the next one starts.
 | 7 | The rest: app.rs and client/mod.rs (`self.me`, the early list, occlusion), UI, HUD, lang, docs, testkit | app.rs, ui/*, hud.rs, screens, lang, docs | **UI** for screens and the HUD, Upstream for the rest |
 | 8 | All of it: `cargo test --release --workspace`, `--test all` against today's baseline, the sheets, a playtest | | Tester 2 (PC), Tester, the playtesters |
 
+### Lighting's checks (after steps 4 and 6)
+
+- **Shadows (after the render step):** upstream's GPU culling takes opaque terrain off the CPU
+  draw list (`mesh_draws` keeps only structures and the translucent layer). `mesh_draws` must keep
+  an all-layers mode, with our `seen` sides, for the shadow passes. Otherwise terrain stops casting
+  sun shadows in the near and far cascades, and the distant terrain stops casting. Check on the
+  PC: Lighting's shadow looks (near, far, LOD), against dev's shots.
+- **The pack's weather inputs (after the weather step):** `scene.fog_color.w`, `weather.z`,
+  `ground` and `canopy` must stay filled once rain, thunder and snow come from weather ids. Check
+  on the PC with Lighting's weather looks (rain, snow, a storm, under trees).
+
 ---
 
 ## The size of it
@@ -170,7 +181,7 @@ Five upstream rewrites cause most of the conflicts. The tables refer to them by 
 | file | hunks | ours (what we changed) | upstream (what they changed) | resolve | risk |
 |---|---|---|---|---|---|
 | crates/engine/src/client/entity_render.rs | 28 | Mod-painted skins on worker threads (`painted`, `painters`, `paint_skins`, `Skin` bone `builds`), sun-shadow pipe with `draw_shadow`, stack looks (`model_key`, `HELD_LOOK`), riding seat offset, gaits by speed, swim limbs, worn layers by skin layout (`worn_tex_size`), inventory portrait. | R: avatars (`set_avatar`), `model_hand_pipe` with first-person `own_hand`, `effect_slots`, icon sheets, `item_models` keyed by `(item, layers)`, clip-based posing with pose LOD, `pose_ground_item`, `draw_item_runs`. | Take upstream's structure and layered stacks (`layers` replaces our `look`). Re-add painted skins and `builds` (scales into `pose_bones`), `shadow_pipe` with `draw_shadow`, `worn_tex_size`, and riding/gaits as clips or a seat offset in `clips_of`. | high |
-| crates/engine/src/client/world_render.rs | 2 | `camera_sides`, and `mesh_draws(.., seen)` used by our sun-shadow pass (light-facing sides). `terrain_epoch += 1` in `remove` (shadow cache). | GPU-driven culling: the CPU's `mesh_draws` draws only structures and the translucent layer (`first_layer = 2`), the rest goes through `CubeTable`. `remove` also checks `table_only` and calls `table.remove(slots)`. | Take upstream's `remove` and add `terrain_epoch += 1`. Keep `seen` in upstream's `mesh_draws`, plus an all-layers mode for the shadow pass, or opaque terrain stops casting shadows. | high |
+| crates/engine/src/client/world_render.rs | 2 | `camera_sides`, and `mesh_draws(.., seen)` used by our sun-shadow pass (light-facing sides). `terrain_epoch += 1` in `remove` (shadow cache). | GPU-driven culling: the CPU's `mesh_draws` draws only structures and the translucent layer (`first_layer = 2`), the rest goes through `CubeTable`. `remove` also checks `table_only` and calls `table.remove(slots)`. | Take upstream's `remove` and add `terrain_epoch += 1`. Keep `seen` in upstream's `mesh_draws`, plus an all-layers mode for the shadow pass, or opaque terrain stops casting shadows: Lighting's near and far sun cascades and the distant terrain's casting all go through it. | high |
 | crates/engine/src/client/mesher.rs | 3 | Held liquids: draws the liquid source around a block that `holds` one; `liquid(.., drawn)` compares with `liquid_in()`. | P: `draw_block` per part plus `n.extras`; `liquid(.., s, biome)` reads `n.liquid_view`. | Take upstream's `draw_block`/extras and `liquid_view`, and draw `c.source_of(l)` in `draw_block` when `info.holds`. Drops out if holds_liquid moves to parts. | medium |
 | crates/engine/src/client/weather.rs | 1 | Snow wherever a mod's air says `air_flags::SNOWING` (`cold` flag). | W: `kind` from `c.biome_precipitation[biome]`; columns per `PrecipitationDef`. | Take upstream's `kind`, then `if world.air_at(cell).3 & SNOWING != 0 { kind = <core:snow id> }`. The snow id comes from the registry, not a literal 1. | medium |
 | crates/engine/src/ui/font.rs | 5 | Smooth font: per-font cell size (`cell_origin(cell, w, h)`, `cell_w/cell_h/unit/top`), `unifont()` helper, `mono_width`. | Latin diacritics: `ABOVE` rows (`ROWS = CELL + ABOVE`), `STRIDE`/`STRIDE_Y`, inline hex parse with per-glyph metrics, drawn missing box, new `uv`. | Keep our parametrized cells and smooth path. Fold in upstream's `ABOVE` (the bitmap font's `cell_h = ROWS`), diacritic metrics and `missing_box` at `cell_origin(0)`. | medium |
