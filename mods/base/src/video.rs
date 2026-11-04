@@ -5,7 +5,8 @@
 //! high-density one (a Retina MacBook) starts at Medium, the rest at High.
 //!
 //! What each setting does is its owner's: the engine's view and distant-terrain distances, vsync
-//! and fps cap; `core:render_scale` (the world drawn at a share of the pixels, then scaled up),
+//! and fps cap; `core:render_scale` (the world drawn at a share of the pixels, then scaled up; 0
+//! Auto, Distant terrain's),
 //! `core:shadows` and `core:shadow_size` as the engine reads them (Distant terrain and Lighting
 //! add them); the pack's screen effects (`shaderpack.rs`), each off, low or on.
 
@@ -43,8 +44,8 @@ struct Row {
 const PRESETS: [[f64; 11]; 4] = [
     // scale shadows size  reflect contact shafts bloom view lod   vsync cap
     [0.5, 0.0, 1024.0, 0.0, 0.0, 0.0, 0.0, 6.0, 64.0, 1.0, 60.0],
-    [0.75, 1.0, 1024.0, 1.0, 1.0, 1.0, 0.0, 8.0, 128.0, 1.0, 60.0],
-    [1.0, 2.0, 2048.0, 2.0, 2.0, 2.0, 1.0, 12.0, 192.0, 1.0, 0.0],
+    [0.67, 1.0, 1024.0, 1.0, 1.0, 1.0, 0.0, 8.0, 128.0, 1.0, 60.0],
+    [0.0, 2.0, 2048.0, 2.0, 2.0, 2.0, 1.0, 12.0, 192.0, 1.0, 0.0],
     [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 1.0, 16.0, 256.0, 1.0, 0.0],
 ];
 const PRESET_NAMES: [&str; 4] = ["low", "medium", "high", "ultra"];
@@ -60,10 +61,11 @@ fn number(v: f64) -> (String, i64) {
 const ROWS: [Row; 11] = [
     Row {
         key: "render_scale",
-        values: &[0.5, 0.6, 0.75, 0.85, 1.0],
+        // 0 is Auto (Distant terrain's render pass: 0.67 on a high-density screen, 1 elsewhere).
+        values: &[0.0, 0.5, 0.6, 0.67, 0.75, 0.85, 1.0],
         get: || RENDER_SCALE.get() as f64,
         set: |v| RENDER_SCALE.set(v as f32),
-        shown: |v| ("percent".into(), (v * 100.0).round() as i64),
+        shown: |v| if v == 0.0 { word("auto") } else { ("percent".into(), (v * 100.0).round() as i64) },
     },
     Row {
         key: "shadows",

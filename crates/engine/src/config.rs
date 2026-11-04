@@ -526,9 +526,6 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:chat_height_closed", ck::INT, 110.0, 20.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_opacity", ck::INT, 50.0, 0.0, 100.0, 5.0),
         ConfigDef::number("core:vsync", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
-        // The world drawn at this share of the window's pixels, then scaled up; the interface stays
-        // sharp (to build in the render pass: Distant terrain's and the Researcher's plan).
-        ConfigDef::number("core:render_scale", ck::FLOAT, 1.0, 0.5, 1.0, 0.05),
         // Frames a second at most (0: as many as it can draw): less heat and battery, steadier.
         ConfigDef::number("core:fps_cap", ck::INT, 0.0, 0.0, 360.0, 10.0),
         ConfigDef::number("core:fullscreen", ck::BOOL, 0.0, 0.0, 1.0, 0.0),

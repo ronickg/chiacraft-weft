@@ -666,3 +666,4 @@ video.base.vsync = Вертикальная синхронизация
 video.base.vsync.what = Кадры в такт экрану: без разрывов
 video.base.fps_cap = Предел кадров
 video.base.fps_cap.what = Не больше кадров в секунду: тише и прохладнее
+video.base.value.auto = Авто

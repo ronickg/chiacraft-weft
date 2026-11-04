@@ -674,3 +674,4 @@ video.base.vsync = VSync
 video.base.vsync.what = Frames in step with the screen: no tearing
 video.base.fps_cap = Frame cap
 video.base.fps_cap.what = Frames a second at most: cooler and quieter
+video.base.value.auto = Auto
