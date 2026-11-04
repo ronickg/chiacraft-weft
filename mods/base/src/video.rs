@@ -226,10 +226,7 @@ fn new_defaults() {
     let q = QUALITY.get();
     let (contact, shafts) = match PRESETS.get(q as usize) {
         Some(p) => (p[4] as i32, p[6] as i32),
-        None => (
-            if FX_CONTACT.get() == 2 { 0 } else { FX_CONTACT.get() },
-            if FX_SHAFTS.get() == 2 { 1 } else { FX_SHAFTS.get() },
-        ),
+        None => (if FX_CONTACT.get() == 2 { 0 } else { FX_CONTACT.get() }, if FX_SHAFTS.get() == 2 { 1 } else { FX_SHAFTS.get() }),
     };
     weft_sdk::info!("video: new defaults, contact shadows {} -> {contact}, light shafts {} -> {shafts}", FX_CONTACT.get(), FX_SHAFTS.get());
     FX_CONTACT.set(contact);
