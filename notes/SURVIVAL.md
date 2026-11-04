@@ -567,6 +567,9 @@ sword, about 100 XP.
   campfire (two logs, two sticks): no monster appears in its light, and it warms you." A torch or
   a bed no longer stills it.
 - Its light (15) keeps monsters from spawning within about eight blocks (they need light 6 or
-  less). Whether one wandering in from the dark still reaches a player by a fire is checked in
-  Tester's rerun; if they do, the next step is monsters keeping out of a campfire's light.
+  less), but in Tester's clothcook4 run a zombie from the dark walked in and took a player by a
+  fire to 4 health. So monsters keep out of a campfire's light (`mobs.rs`, `keep_from_fire`):
+  one within 8 blocks across (4 up or down) walks out of the ring, and a player inside it isn't
+  chased, shot or blown up; the monster waits at the edge. Zombies, spiders, creepers and
+  skeletons; each looks for a campfire once a second.
 
