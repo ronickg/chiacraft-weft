@@ -288,7 +288,7 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
     let mapped = shadow_at(in.rel, n);
-    return mix(sky, min(mapped.x, smoothstep(0.3, 0.8, in.light.x)), mapped.y);
+    return mix(sky, min(mapped.x, smoothstep(0.3, 0.8, in.light.x)), mapped.y) * cloud_shadow(in.rel);
 }
 
 // The shadow pass (`sun_shadows`): only depth, without the see-through texels of leaves and

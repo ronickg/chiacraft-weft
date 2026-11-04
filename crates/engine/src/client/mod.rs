@@ -2277,6 +2277,8 @@ impl Client {
             eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, self.moon_light()],
             ground: [self.snow_cover, self.snowing, self.dust, self.aurora],
             behind: self.behind,
+            clouds: self.sky.cloud_shade[0],
+            cloud_cells: self.sky.cloud_shade[1],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {

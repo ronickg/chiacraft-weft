@@ -123,14 +123,9 @@ fn vs_clouds(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -
 // 1 where cell `cell` (picture cells from the camera's) is cloud: the picture's, and as rain comes
 // more of the gaps (a hash per cell, so they grow as whole cells), until a storm's deck closes
 // nearly all of them.
+// (`look.wgsl`'s `cloud_cell_of`, which the clouds' shadows read too.)
 fn cloud_cell(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> f32 {
-    let at = fract((cell + s.uv.zw + vec2(0.5)) / dims);
-    if textureSampleLevel(textures[s.ids.x], nearest_clamp, at, 0.0).a >= 0.5 {
-        return 1.0;
-    }
-    let fill = s.axes[0].x * 0.6 + s.axes[0].z * 0.35;
-    let w = vec2<i32>(cell + s.uv.zw);
-    return select(0.0, 1.0, hash3(vec3(w.x, 51, w.y)) < fill);
+    return cloud_cell_of(s.ids.x, cell, s.uv.zw, dims, s.axes[0].x * 0.6 + s.axes[0].z * 0.35);
 }
 
 // How dense the cloud is at `cellp` (picture cells, fractional) and `h` (0 at the slab's bottom,
