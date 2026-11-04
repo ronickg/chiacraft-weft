@@ -301,7 +301,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 22] = [
+pub static SPECIES: [Species; 23] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1669,6 +1669,70 @@ pub static SPECIES: [Species; 22] = [
             ..Tune::NONE
         },
         birth_size: 0.35,
+    },
+    // The coyote (`reports/ecology/Overworld food webs.md`: the middle hunter of the prairie and the
+    // desert, the hare's, the fawn's and the small dog's hunter): a simple wild hunter on its own
+    // model, built on the fox's (`source/coyote`), the dog's family (so it leaves foxes and
+    // chihuahuas be for now).
+    Species {
+        model: "coyote",
+        name: "coyote",
+        binomial: "Canis latrans",
+        family: &CANIDAE,
+        subfamily: "Caninae",
+        breed: None,
+        size: Size::Medium,
+        // Rabbits, hares and rodents first, deer fawns and birds; carrion, insects, fruit.
+        eats: &[(Meat, 0.6), (Fruit, 0.15), (Carrion, 0.15), (Insects, 0.1)],
+        // Mice of a few dozen grams to a hare or a fawn, under half its own mass alone (a family takes
+        // deer).
+        prey: (0.001, 0.4),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [18.0, 150.0, 80.0, 3.5, 1.0, 45.0, 80.0, 60.0, 12.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:beef", 12), favorite("base:chicken", 10), eats("base:berries", 4)],
+        feedings: 0.0,
+        shy: 14.0,
+        fights: true,
+        attacks: &["pounce", "bite"],
+        reach: 0.7,
+        signature: "howl",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.6,
+        // Males 8-20 kg, females 7-18.
+        dimorphism: 1.05,
+        size_spread: 0.2,
+        height: (0.61, "shoulder"),
+        // The prairie and the desert first (its old range), into the woods and the mountains.
+        habitats: &[("base:plains", 1.0), ("base:desert", 1.0), ("base:forest", 0.4), ("base:mountains", 0.4)],
+        bio: Biology {
+            // Southern ones about 11.5 kg, northern ones 18.
+            mass: 13.0,
+            gestation: 63.0,
+            incubation: 0.0,
+            // Many breed in their first winter, at about ten months.
+            maturity: 300.0,
+            // Few live past six in the wild; up to 14.
+            lifespan: 2190.0,
+            interval: 365.0,
+            // Six on average, by its food and how many coyotes are about.
+            litter: 6.0,
+            social: Social::Pack,
+            rarity: Rarity::Common,
+            // Mating in midwinter (January to March), the pups born in spring.
+            breeds: seasons::WINTER,
+            peak: seasons::WINTER,
+            // Est.: from the northern prairie's winters to the Sonoran summer (it lies up in the shade).
+            comfort: (-30.0, 36.0),
+            cold_blooded: false,
+        },
+        tune: Tune::NONE,
+        birth_size: 0.25,
     },
 ];
 

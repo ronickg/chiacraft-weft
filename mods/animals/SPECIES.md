@@ -32,6 +32,7 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | kryptobaatar | *Kryptobaatar dashzevegi* | common | small | 0.05 m | 0.04 kg | solitary | omnivore | wild | 0.53 d | 3 d | 16 d | 1-5 | 24 |
 | priscagama | *Priscagama gobiensis* | common | small | 0.04 m | 0.03 kg | solitary | carnivore | wild | eggs, hatch 1.21 d | 4.01 d | 23 d | 2-6 | 24 |
 | reindeer | *Rangifer tarandus* | common | large | 1.05 m | 120 kg | herd | herbivore | wild | 3.31 d | 4.58 d | 46 d | 1 | 13 |
+| coyote | *Canis latrans* | common | medium | 0.61 m | 13 kg | pack | carnivore | wild | 1.25 d | 3.5 d | 23 d | 2-8 | 12 |
 
 ## Stats at level 1
 
@@ -61,6 +62,7 @@ Damage and speed are each kind's own (1 = 100%).
 | kryptobaatar | 2 | 60 | 15 | 0.2 | 1 | 2 | 30 | 5 | 2 | 30 |
 | priscagama | 2 | 60 | 12 | 0.2 | 1 | 2 | 40 | 5 | 2 | 40 |
 | reindeer | 40 | 260 | 160 | 3 | 1 | 110 | 80 | 80 | 25 | 15 |
+| coyote | 18 | 150 | 80 | 3.5 | 1 | 45 | 80 | 60 | 12 | 30 |
 
 ## dog (chihuahua)
 
@@ -1381,6 +1383,66 @@ Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn at
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.7 |
+
+## coyote
+
+*Canis latrans*, Mammalia › Carnivora › Canidae › Caninae. Model `coyote`, entity `animals:coyote`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:plains` | commonest |
+| `base:desert` | commonest |
+| `base:forest` | 40% |
+| `base:mountains` | 40% |
+
+Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | medium |
+| height (grown, average) | 0.61 m at the shoulder |
+| males against females | 1.05x as tall |
+| size spread (an individual's, either way) | 20% |
+| newborn's size | 25% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 13 kg | |
+| carries her young | 63 d | 1.25 d |
+| litter or clutch | 6 on average | 2-8 |
+| between litters | 1 y | rests 5.07 d |
+| breeds in | winter | out of it, only a tame well cared for |
+| comfortable in | -30 to 36 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 300 d | 3.5 d |
+| lives | 6 y | 23 d, give or take a fifth; an elder from 80% of it |
+| lives in | pack | room for 12 within 48 blocks |
+
+**Balance** (common): a generation 4.7 d; a line four deep in 14 d (5 h of play); 7.9 young per mother in 10 days, 12 in her life.
+
+- ✓ fourth generation: 14.2 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 3.5 of 23 days (want under a fifth)
+- ✓ young in a life: 11.8 (want 6-40)
+- ✓ litter: 2-8 (want 1-12, fewest first)
+- ✓ room near: 12 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | carnivore |
+| eats | meat 60%, fruit 15%, carrion 15%, insects 10% |
+| hunts | 0.1%-40% of its mass alone (0.01-5 kg); at home: cat, hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, base:chicken |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 14 blocks (twice that running) |
+| eats (food points) | `base:beef` 12; `base:chicken` 10, favorite; `base:berries` 4 |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | yes: pounce, bite |
+| reach past its body | 0.7 blocks |
+| signature | howl |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.6 |
 
 ## Shared by every species
 

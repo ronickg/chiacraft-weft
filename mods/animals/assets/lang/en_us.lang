@@ -213,3 +213,6 @@ screen.animals.signature.bask = Basks in the sun; bobs its head and pushes up on
 entity.animals.reindeer = Reindeer
 species.animals.reindeer = reindeer
 screen.animals.signature.crater = Digs through the snow to the lichen below; wanders in great herds
+entity.animals.coyote = Coyote
+species.animals.coyote = coyote
+screen.animals.signature.howl = Howls and yips at dusk; hunts alone or with its family, and takes what it finds

@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 22] = [
+const FILES: [(&str, &str); 23] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -281,6 +281,7 @@ const FILES: [(&str, &str); 22] = [
     ("kryptobaatar", include_str!("../../genetics/kryptobaatar.json")),
     ("priscagama", include_str!("../../genetics/priscagama.json")),
     ("reindeer", include_str!("../../genetics/reindeer.json")),
+    ("coyote", include_str!("../../genetics/coyote.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1200,6 +1201,38 @@ fn reindeer(r: &Read) -> Look {
     }
 }
 
+/// The coyote: grizzled grey to fulvous buff, paler below; the legs, the ears' backs and the muzzle
+/// tawny (its points); greyer and darker in the mountains, more fulvous in the desert; black
+/// coyotes now and then (a dominant black, from dogs).
+fn coyote(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    if r.shows("Kb") == "Kb" {
+        return Look {
+            name: "Black".into(),
+            base: [52.0, 46.0, 44.0],
+            under: [78.0, 70.0, 64.0],
+            points: Some([44.0, 38.0, 36.0]),
+            ..Look::default()
+        };
+    }
+    let base = mix([150.0, 140.0, 126.0], [180.0, 144.0, 104.0], ru);
+    let name = if ru > 0.62 {
+        "Fulvous"
+    } else if ru < 0.38 {
+        "Grey"
+    } else {
+        "Grizzled buff"
+    };
+    Look {
+        name: name.into(),
+        base,
+        under: [232.0, 222.0, 204.0],
+        points: Some(mix([150.0, 120.0, 92.0], [184.0, 124.0, 74.0], ru)),
+        pattern: Some(Pattern { kind: "ticked", color: darken(base, 0.45), amount: 0.5 }),
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1363,6 +1396,7 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "kryptobaatar" => kryptobaatar(&r),
         "priscagama" => lizard(&r),
         "reindeer" => reindeer(&r),
+        "coyote" => coyote(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1944,7 +1978,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 17] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 18] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -1961,7 +1995,8 @@ const MODEL_LAYERS: [ModelLayers; 17] = model_layers!(
     "protoceratops",
     "kryptobaatar",
     "lizard",
-    "reindeer"
+    "reindeer",
+    "coyote"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
