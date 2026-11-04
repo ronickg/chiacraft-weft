@@ -1343,6 +1343,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chiacraft-mod-sdk-client"
+version = "1.2.0"
+dependencies = [
+ "weft_abi",
+ "wit-bindgen",
+]
+
+[[package]]
 name = "chiacraft-packages"
 version = "0.1.0"
 dependencies = [

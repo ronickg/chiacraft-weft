@@ -1,8 +1,11 @@
-//! Trees (`notes/ECOLOGY.md`, part 3), for any mod: a log names its leaves (`TREE_LEAVES`) and its
-//! shape by a tag (`CONE_TREE`, `FLAT_TREE`, `PALM_TREE`; none: round). Base's worldgen grows
+//! Trees (`notes/ECOLOGY.md`, part 3), for any mod: a log names its leaves (`TREE_LEAVES`); a
+//! species with a recipe (`tree_recipes`, by the Animal models session) grows from branches
+//! (`branchy`), the others by a crown shape their log's tag gives (`CONE_TREE`, `FLAT_TREE`,
+//! `PALM_TREE`, `SLIM_TREE`; none: round). In the wild a few lie fallen or stand as stumps. Base's worldgen grows
 //! them where a biome's `tree_kinds` names their logs, and a sapling's growth step grows one in a
 //! live world (`grow_tree`), whichever mod's log it is.
 
+use crate::branchy;
 use weft_sdk::noise::hash;
 use weft_sdk::*;
 
@@ -53,6 +56,8 @@ pub struct TreeAt {
     height: i32,
     /// The way a crooked trunk bends, a twin stands, a fallen one lies.
     lean: (i32, i32),
+    /// Its seed, for a tree grown from branches (`branchy`).
+    seed: u64,
 }
 
 const LEANS: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
@@ -101,7 +106,7 @@ fn shaped(log: u32, x: i32, y: i32, z: i32, h: u64, wild: bool) -> Option<TreeAt
         Crown::Slim => 6 + (h % 3) as i32 + 2 * big,
     };
     let lean = LEANS[(h >> 20) as usize % 4];
-    Some(TreeAt { x, y, z, log, leaves, crown, form, height, lean })
+    Some(TreeAt { x, y, z, log, leaves, crown, form, height, lean, seed: h })
 }
 
 /// Calls `put(x, y, z, state, force)` for every block of the tree.
@@ -125,6 +130,19 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
             return;
         }
         _ => {}
+    }
+    // A species with a recipe grows from branches (`branchy`), its log turned along each limb.
+    let name = block_name(log).split('[').next().unwrap_or("");
+    if let Some(recipe) = crate::tree_recipes::of(name) {
+        branchy::grow(recipe, t.x, t.y, t.z, t.seed, |x, y, z, part| match part {
+            branchy::Part::Log { axis } => {
+                let along = ["x", "y", "z"][axis as usize];
+                put(x, y, z, state_with(log, "axis", along).unwrap_or(log), true)
+            }
+            branchy::Part::Leaves => put(x, y, z, t.leaves, false),
+        });
+        put(t.x, t.y - 1, t.z, DIRT.id(), true);
+        return;
     }
     let top = t.y + t.height;
     // A crooked trunk steps aside once, two or three blocks under its top, and its crown with it.

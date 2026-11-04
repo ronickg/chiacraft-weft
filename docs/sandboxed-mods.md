@@ -103,6 +103,55 @@ Ours, beyond Weft's: `w.tell(player, key, args)` (a line in a player's chat, in 
 Every line a mod shows players is a translation key and arguments, worded by each player's game
 from the package's `assets/lang` files, like Weft's command replies.
 
+## Client halves
+
+A package may also carry `code/client.wasm`, a client half (API 1.2): a component for the world
+`chiacraft:mods/client-mod`, built against `crates/mod-sdk-client`, that runs in each player's
+own game (the host's too). It reads what that game shows the player (`c.me()`, `day_time`,
+`raining`, `creative`, the package's components synced to them, `inventory_slot`, `screen`) and
+adds, with Weft's client names:
+
+- HUD elements and screens: `r.hud_element(&H, hud_anchor::TOP_RIGHT, 0, |ui| ..)`,
+  `r.screen(&S, |ui| ..).pauses()`, built from `ui.panel`, `row`, `column`, `text`, `text_bind`,
+  `progress_bind`, `icons`, `image`, `item`, `spacer`, `button` with `S` styles, `at` included;
+- keys: `r.key(&K, "N").on_press(|c| ..)`, rebindable in Controls;
+- packets from its server half: `r.client_packet(&CH, |c, v| ..)`, and `c.send(&CH, &v)` back;
+- `r.client_frame(|c, seconds| ..)`, every frame (off unless needed).
+
+A HUD element or screen is built as a list of parts the game replays into its own UI, so a
+client half draws with the game's kit: use its classes (`panel`, `tooltip`, `button`, `slot`,
+`hud_frame`, the `hud_health`, `hud_stamina`, `hud_xp` and `hud_temperature` bars; with the UI
+redo also `hud_badge`, `tab` and `category`; text classes `title`, `dim`, `button`, `chat`) and
+it looks like the game. A class the game has no texture for draws as the missing texture. A
+binding (`text_bind`, `progress_bind`, `icons`) may only read; keys, buttons, packets and frames
+may also send, open screens and show lines. It never reaches the account, files or network, and
+the same limits and strikes hold (a failing client half stops in the player's game). Lines it
+shows are translation keys from the package's `assets/lang`; key names too (`key.<package>.<name>`).
+
+`examples/wasm/bell-client` is the bell's client half: a `hud_badge` with the ring count and an
+`hud_xp` bar with the count inside it, fed by the server half on `bell:rings`, and the key N
+asking for it on `bell:ping`. Build it like a server half; `componentize` treats an output named
+`client.wasm` as a client half.
+
+## Personal mods
+
+A player's own client halves, never downloaded and never shared: a minimap, a clock, a tweak.
+Each is a folder like a package's with `package.toml` and `code/client.wasm` (and its
+`assets/lang`), in `<run dir>/personal/<name>/`. `examples/personal/clock` is one.
+
+Each world's owner decides whether they run there: the world rule **Personal Mods** (Off or
+Client Halves; off by default), on Create World and in the world's settings, or `/rule
+personal_mods 1`. Where it is off they don't run, and on joining the player is told which of
+theirs are off ("Your personal mods are off in this world: clock").
+
+A personal mod is written like any client half, with these differences, because it must not
+change what the world and the player's game agree on (the join checks the content's hash):
+- its HUD elements show through shared slots, one per anchor, in their order;
+- its screens open in one shared screen;
+- its keys take the slots Personal Key 1 to 8 in the order they are registered (Shift+Alt+1 to
+  8 unless rebound in Controls), not their own default bindings;
+- it has no server half, channels or components; its lines come from its own `assets/lang`.
+
 ## Limits
 
 | What | Limit |

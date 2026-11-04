@@ -24,7 +24,8 @@ pub static TREES: Component<f32> = Component::named("trees");
 pub static BOULDERS: Component<f32> = Component::named("boulders");
 /// Where a forest stands thick: the chance of a tree per 3 x 3 cell in its stands, on top of
 /// `TREES`, with clearings left open between them. Mature stands hold 170-244 trees a hectare
-/// (Research round 7): a 5 x 5 site at 0.4 is 160, a 3 x 3 one at 0.2 adds 220 in the stands.
+/// (Research round 7): a 5 x 5 site at 0.4 is 160, a 3 x 3 one at 0.12 adds 130 in the stands (the
+/// trees grown from branches are wide: denser, the forest and taiga read as walls of leaves).
 pub static STAND_TREES: Component<f32> = Component::named("stand_trees");
 pub static GRASS_COVER: Component<f32> = Component::named("grass");
 /// The logs of the trees a biome grows, with weights: `"base:birch_log:1 base:oak_log:4"`
@@ -72,7 +73,7 @@ pub fn register(r: &mut Registry) {
         .tag("forest")
         .tag("animals")
         .set(&TREES, 0.4)
-        .set(&STAND_TREES, 0.2)
+        .set(&STAND_TREES, 0.12)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
     r.biome(&BIRCH_FOREST)
@@ -87,7 +88,7 @@ pub fn register(r: &mut Registry) {
         .tag("animals")
         .set(&TREES, 0.45)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:birch_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
-        .set(&STAND_TREES, 0.2)
+        .set(&STAND_TREES, 0.15)
         .set_text(&TREE_KINDS, "base:birch_log");
     r.biome(&TAIGA)
         .set(&CLIMATE, base_api::climate("base:taiga"))
@@ -102,7 +103,7 @@ pub fn register(r: &mut Registry) {
         .tag("animals")
         .set(&TREES, 0.45)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:taiga").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
-        .set(&STAND_TREES, 0.25)
+        .set(&STAND_TREES, 0.12)
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&SNOWY)
         .set(&CLIMATE, base_api::climate("base:snowy_plains"))
@@ -216,7 +217,7 @@ pub fn register(r: &mut Registry) {
     // groves and glades instead of trees spread evenly.
     r.scatter(&TREE_SITES)
         .cell(5)
-        .reach(5)
+        .reach(8)
         .density(&TREES)
         .shape(|s| {
             if STAND_TREES.on_biome(s.biome()).is_some() && stand(s.seed(), s.pos()) < -CLEARING && s.random() % 4 != 0 {
@@ -226,7 +227,7 @@ pub fn register(r: &mut Registry) {
         });
     r.scatter(&STAND_SITES)
         .cell(3)
-        .reach(5)
+        .reach(8)
         .density(&STAND_TREES)
         .shape(|s| {
             if stand(s.seed(), s.pos()) > STAND {

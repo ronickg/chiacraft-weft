@@ -21,8 +21,8 @@ pub(crate) static BROWN_TROUT: Entity = Entity::named("brown_trout");
 pub(crate) static PACU: Entity = Entity::named("pacu");
 pub(crate) static LUNGFISH: Entity = Entity::named("lungfish");
 pub(crate) static LYCOPTERA: Entity = Entity::named("lycoptera");
-/// Each kind and its row in `species::SPECIES`.
-static KINDS: [(&Entity, usize); 4] = [(&BROWN_TROUT, 13), (&PACU, 14), (&LUNGFISH, 35), (&LYCOPTERA, 36)];
+/// The fish's kinds.
+static KINDS: [&Entity; 4] = [&BROWN_TROUT, &PACU, &LUNGFISH, &LYCOPTERA];
 const FLOP: &str = "fish_flop";
 /// How many of a kind may swim within `ROOM_RADIUS` blocks before no more come.
 const ROOM: usize = 6;
@@ -54,7 +54,8 @@ pub fn init(r: &mut Registry) {
             .animations(FLOP)
             .texture("fish/fish"),
     );
-    for (kind, index) in KINDS {
+    for kind in KINDS {
+        let index = crate::species::of(kind);
         r.entity(kind)
             .size(0.35, 0.2)
             .health(3.0)
@@ -174,8 +175,8 @@ fn spawn(w: &World) {
             let Some(y) = (top - 32..top).rev().find(|&y| water(y) && water(y - 1)) else { continue };
             let spot = [x as f64 + 0.5, (y - 1) as f64 + 0.2, z as f64 + 0.5];
             let biome = name_of(abi::entry_kind::BIOME, w.biome([x, y - 1, z]));
-            for (kind, index) in KINDS {
-                let s = &SPECIES[index];
+            for kind in KINDS {
+                let s = &SPECIES[crate::species::of(kind)];
                 let Some(&(_, share)) = s.habitats.iter().find(|(b, _)| *b == biome) else { continue };
                 if random(w) as f32 >= s.bio.rarity.spawn_chance() * share || w.near(spot, ROOM_RADIUS, Some(kind)).len() >= ROOM {
                     continue;
