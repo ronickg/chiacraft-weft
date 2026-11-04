@@ -94,6 +94,7 @@ These are the biggest changes. They live mostly in our crates, but each needed h
 ## 8. Test kit and settings for runs
 
 - **Settings set for a run hold for the whole run** (2fa0beff), **and in the worlds it opens** (b091ac8b), **`--config` and `--no-shadows`** (ee147880). *Why:* scripted PC looks and benches need fixed settings.
+- **The network path in the log** (0a11b0ee): `net: path to <id> relay|direct|mixed <kind>` on every join, portal arrival and player coming in, and again on each change. **A relay-only test setting** (`core:net_relay_only`, on no screen): the endpoint gets no IP transport, so every connection goes through n0's relay. *Why:* Ronald asked whether joins really cross the network, and every two-machine check ran on one home network.
 
 ## 9. Removed
 
