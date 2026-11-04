@@ -28,6 +28,7 @@ use weft_sdk::terrain::{Feature, Mask, preset};
 use crate::SEA;
 
 mod canyons;
+pub mod caves;
 mod karst;
 mod net;
 
@@ -357,6 +358,14 @@ pub const KARST_HEIGHT: (i32, i32) = (16, 36);
 pub const KARST_WIDE_ONE_IN: u32 = 4;
 pub const KARST_WIDE_RADIUS: (i32, i32) = (13, 17);
 pub const KARST_WIDE_HEIGHT: (i32, i32) = (22, 38);
+
+/// Cave mouths that read from the surface (Ronald, 11-04: "all four"): where the engine's
+/// caves take the surface (`caves::Caves::mouth`), a mouth is `MOUTH_MIN` such columns or more in
+/// the five by five round one (a tunnel crossing, not a pinhole); within `MOUTH_LIP` blocks of
+/// one the ground is the column's rock (its walls and a lip round it), and right beside it the
+/// slit widens a block where nothing stands on the ground.
+pub const MOUTH_MIN: usize = 3;
+pub const MOUTH_LIP: i32 = 2;
 
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
