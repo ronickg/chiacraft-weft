@@ -368,6 +368,26 @@ fn three_strikes_stop_it() {
 }
 
 #[test]
+fn stats_count_and_a_stopped_mod_resumes() {
+    let mut w = World::new(None);
+    w.probe("count", None);
+    w.probe("count", None);
+    let st = w.inst.stats();
+    assert_eq!((st.calls, st.strikes), (2, 0));
+    assert!(st.slowest > std::time::Duration::ZERO && st.average_us() > 0.0);
+    for _ in 0..STRIKES {
+        w.probe("panic", None);
+    }
+    let st = w.inst.stats();
+    assert_eq!(st.strikes, STRIKES);
+    assert!(st.stopped.is_some());
+    // An operator's `/mods resume`: it runs again, its memory new.
+    w.inst.resume();
+    assert_eq!(w.probe("count", None), ["probe.count 1"]);
+    assert_eq!(w.inst.stats().strikes, 0);
+}
+
+#[test]
 fn per_call_allowances_hold() {
     let mut w = World::new(None);
     w.probe("flood", None);

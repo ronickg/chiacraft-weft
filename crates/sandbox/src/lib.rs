@@ -1042,17 +1042,59 @@ pub struct Instance {
     live: Option<Live>,
     strikes: VecDeque<Instant>,
     stopped: Option<String>,
+    stats: Stats,
+}
+
+/// What a mod has cost in one world (`/mods`): calls made, their time, the slowest, and strikes.
+#[derive(Clone, Debug, Default)]
+pub struct Stats {
+    pub calls: u64,
+    pub total: Duration,
+    pub slowest: Duration,
+    /// Strikes in the last [`STRIKE_WINDOW`].
+    pub strikes: usize,
+    /// Why it no longer runs here, if it doesn't.
+    pub stopped: Option<String>,
+}
+
+impl Stats {
+    /// Microseconds per call, on average.
+    pub fn average_us(&self) -> f64 {
+        if self.calls == 0 { 0.0 } else { self.total.as_secs_f64() * 1e6 / self.calls as f64 }
+    }
 }
 
 impl Instance {
     /// The mod `m` in a world whose save keeps its storage in `storage_dir` (none: in memory).
     pub fn new(m: Arc<Mod>, storage_dir: Option<PathBuf>) -> Instance {
-        Instance { m, storage_dir, live: None, strikes: VecDeque::new(), stopped: None }
+        Instance { m, storage_dir, live: None, strikes: VecDeque::new(), stopped: None, stats: Stats::default() }
     }
 
     /// Why the mod no longer runs in this world, if it doesn't.
     pub fn stopped(&self) -> Option<&str> {
         self.stopped.as_deref()
+    }
+
+    /// What it has cost here.
+    pub fn stats(&self) -> Stats {
+        let cut = Instant::now().checked_sub(STRIKE_WINDOW);
+        Stats {
+            strikes: self
+                .strikes
+                .iter()
+                .filter(|t| cut.is_none_or(|c| **t > c))
+                .count(),
+            stopped: self.stopped.clone(),
+            ..self.stats.clone()
+        }
+    }
+
+    /// Lets a stopped mod run again here (an operator's `/mods resume`): its strikes are
+    /// forgotten and it starts over on its next call.
+    pub fn resume(&mut self) {
+        self.stopped = None;
+        self.strikes.clear();
+        self.live = None;
     }
 
     fn strike(&mut self, why: String) {
@@ -1090,8 +1132,13 @@ impl Instance {
         if store.set_fuel(fuel).is_err() {
             return None;
         }
+        let started = Instant::now();
         let r = f(&live.bindings, store);
         store.data_mut().game = None;
+        let took = started.elapsed();
+        self.stats.calls += 1;
+        self.stats.total += took;
+        self.stats.slowest = self.stats.slowest.max(took);
         match r {
             Ok(v) => Some(v),
             Err(e) => {

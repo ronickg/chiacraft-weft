@@ -346,8 +346,9 @@ The smallest version that works is phases 1-4.
       halves in `<run dir>/personal/<name>`, run only where the world rule Personal Mods allows
       (off by default, on Create World); joining says which are off. They run through shared
       slots (a HUD element per anchor, a screen, eight keys) so the content stays the same.
-   6. *Operations*: `/mods` (cost, strikes, resume), cached compiled components, a per-tick budget
-      across mods.
+   6. *Operations* (`/mods` built): calls, time, strikes and why one stopped, per mod in this
+      world; `/mods resume <package>` for admins. Later: cached compiled components, a per-tick
+      budget across mods.
 7. **Headless server and administration.** No window or GPU (Weft's CPU terrain path),
    `server.toml`, console, operators and command permissions (today any player can `/give`),
    movement checks, our own relay, load tests (`horizon-bots`).

@@ -189,6 +189,13 @@ Floats are deterministic (NaNs canonicalized, no relaxed SIMD) and there are no 
 - A mod's own call into the world can ask a question or run a chain the mod itself hooks; that
   nested call skips the mod instead of re-entering it.
 
+## Seeing what runs: `/mods`
+
+`/mods` lists the sandboxed server halves running in the world you are in: each one's API
+version, its calls so far, their average and slowest time, and its strikes in the last ten
+minutes, and why one has stopped. An admin starts a stopped one again with `/mods resume
+<package>` (its strikes forgotten, its memory new, its storage kept).
+
 ## Versions
 
 API versions are frozen once released. `crates/sandbox/wit/v1.0/` and `v1.1/` never change

@@ -38,6 +38,8 @@ fn init(r: &mut Registry) {
     personal::register(r);
     // Package Key slots for client halves' keys (slice 4).
     client_half::register_slots(r);
+    // `/mods` (slice 6).
+    sandboxed::register_command(r);
     r.client_command("packages_say", "", |cmd| {
         let Some(text) = LINES.lock().unwrap_or_else(|e| e.into_inner()).pop_front() else { return };
         sandboxed::with_line(&text, |key, args| cmd.reply(key, args));

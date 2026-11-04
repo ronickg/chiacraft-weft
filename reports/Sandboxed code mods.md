@@ -110,8 +110,10 @@ nested callback skips the mod (it is busy) rather than re-entering the store.
    must not change the content the join checks, they run through slots the `packages` mod
    registers the same in every game: a HUD element per anchor, one screen, eight keys; their
    lines are worded from their own `assets/lang`. Sample `examples/personal/clock`.
-6. *Operations*: `/mods` (which run, their cost per tick, strikes, resume a stopped one),
-   ahead-of-time compiled components cached in the store, per-tick budgets across all mods.
+6. *Operations* (`/mods` built): `/mods` lists the server halves in this world with their API,
+   calls, average and slowest time and strikes, and why one stopped; `/mods resume <package>`
+   (admins) starts it again. Not built: ahead-of-time compiled components cached in the store,
+   a per-tick budget across all mods, the same view for client halves.
 
 ## Decisions (agreed 2026-11-03)
 

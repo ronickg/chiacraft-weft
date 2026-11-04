@@ -412,8 +412,13 @@ screen `packages:personal`, keys `packages:personal_1..8` (Shift+Alt+1..8), and 
 that runs their frames and tells the player once per world which are off or on. A personal mod's
 `Half` has its own `Words` (from its `assets/lang`, the player's language over English), and no
 channels or components. Sample `examples/personal/clock` (from `examples/wasm/clock`).
+Slice 6 (built; not yet seen in the game): `/mods` (`sandboxed::register_command`, in this
+mod's init): each server half running in this world (by the bridge's run) with its API, calls,
+average and slowest time and strikes in ten minutes (`Instance::stats`), and why one stopped;
+`/mods resume <package>` for admins (`Instance::resume`). Every `Runs` is kept in `ALL` (weak).
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
-and chain steps, `/mods` (slice 6).
+and chain steps, cached compiled components and a per-tick budget across mods, `/mods` for
+client halves, the engine's settings hazard on a content switch (Planner).
 
 ## Side mods
 

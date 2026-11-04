@@ -74,7 +74,12 @@ pub struct Runs {
     channels: Vec<ModChannel>,
     /// The block and item callbacks the package's builders took (by callback number).
     attached: Mutex<Vec<u32>>,
+    /// The API its code was built for (`1.2`).
+    api: String,
 }
+
+/// Every package's mod in every content built, for `/mods`.
+static ALL: Mutex<Vec<std::sync::Weak<Runs>>> = Mutex::new(Vec::new());
 
 /// A sandboxed mod's component as the SDK holds it: bytes in a size of the next bucket up.
 #[derive(Clone, Copy)]
@@ -327,7 +332,11 @@ pub fn load(r: &mut Registry, package: &str, dir: &Path) -> Result<Option<Arc<Ru
             _ => None,
         })
         .collect();
-    Ok(Some(Arc::new(Runs {
+    let api = chiacraft_packages::code::api_of(&wasm)
+        .ok()
+        .flatten()
+        .map_or_else(|| "1.0".into(), |v| chiacraft_packages::code::text(Some(v)));
+    let runs = Arc::new(Runs {
         m: Arc::new(m),
         package: package.to_string(),
         runs: Mutex::new(Vec::new()),
@@ -335,7 +344,70 @@ pub fn load(r: &mut Registry, package: &str, dir: &Path) -> Result<Option<Arc<Ru
         effects: Mutex::new(Vec::new()),
         channels,
         attached: Mutex::new(Vec::new()),
-    })))
+        api,
+    });
+    let mut all = ALL.lock().unwrap_or_else(|e| e.into_inner());
+    all.retain(|w| w.strong_count() > 0);
+    all.push(Arc::downgrade(&runs));
+    Ok(Some(runs))
+}
+
+/// `/mods [resume <package>]` (slice 6): the sandboxed server halves running in this world, what
+/// they cost and their strikes; an admin resumes one that stopped. Registered in this mod's own
+/// `init`, the same in every game.
+pub fn register_command(r: &mut Registry) {
+    r.command("mods", "[action:word(resume)] [package:word]", |cmd| {
+        let Some((run, _)) = world() else { return };
+        let all: Vec<Arc<Runs>> = ALL
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .filter_map(|w| w.upgrade())
+            .collect();
+        if cmd.text("action") == Some("resume") {
+            if cmd.world().permission(cmd.player()) < permission::ADMIN {
+                cmd.reply("packages.mods.admin", &[]);
+                return;
+            }
+            let wanted = cmd.text("package").unwrap_or("").to_string();
+            let mut done = false;
+            for runs in all.iter().filter(|r| r.package == wanted) {
+                let mut list = runs.runs.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some((_, inst)) = list.iter_mut().find(|(r, _)| *r == run) {
+                    inst.resume();
+                    done = true;
+                }
+            }
+            let key = if done { "packages.mods.resumed" } else { "packages.mods.unknown" };
+            cmd.reply(key, &[Arg::Text(&wanted)]);
+            return;
+        }
+        let mut any = false;
+        for runs in &all {
+            let list = runs.runs.lock().unwrap_or_else(|e| e.into_inner());
+            let Some((_, inst)) = list.iter().find(|(r, _)| *r == run) else { continue };
+            any = true;
+            let st = inst.stats();
+            cmd.reply(
+                "packages.mods.line",
+                &[
+                    Arg::Text(&runs.package),
+                    Arg::Text(&runs.api),
+                    Arg::Int(st.calls as i64),
+                    Arg::Float(st.average_us(), 1),
+                    Arg::Int(st.slowest.as_micros() as i64),
+                    Arg::Int(st.strikes as i64),
+                ],
+            );
+            if let Some(why) = &st.stopped {
+                cmd.reply("packages.mods.stopped", &[Arg::Text(&runs.package), Arg::Text(why)]);
+            }
+        }
+        if !any {
+            cmd.reply("packages.mods.none", &[]);
+        }
+    })
+    .permission(permission::EVERYONE);
 }
 
 /// The package's own block `id` takes the mod's callbacks for it (1.2).
