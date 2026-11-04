@@ -109,6 +109,49 @@ impl Screen for Admission {
                             ui.set_id(id, "did_days_more");
                         });
                     });
+                    // The world's DID (phase 4): named by the owner's DID, naming it back.
+                    ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
+                        use crate::chiacraft::worlds::world_did;
+                        label(ui, cx, "world_did.title", &[], "default");
+                        let held = dir.as_deref().and_then(world_did::load);
+                        match &held {
+                            Some(d) => {
+                                label(ui, cx, "world_did.yours", &[Arg::Text(d.did())], "dim");
+                                if !d.listed {
+                                    label(ui, cx, "world_did.not_listed", &[], "dim");
+                                }
+                            }
+                            None => {
+                                label(ui, cx, "world_did.none", &[], "dim");
+                            }
+                        }
+                        ui.text_bound(
+                            "dim",
+                            Box::new(|_: &Ctx| {
+                                let (key, args) = world_did::state();
+                                (key, args.into_iter().map(Arg::Text).collect())
+                            }),
+                        );
+                        match &held {
+                            None => {
+                                let id = button(ui, cx, "world_did.get", &[], 240.0, |c| {
+                                    if let (Some(dir), Some(identity)) = (adm::local_world(), adm::local_identity()) {
+                                        world_did::get(c.settings, dir, identity);
+                                    }
+                                });
+                                ui.set_id(id, "world_did_get");
+                            }
+                            Some(d) if !d.listed => {
+                                let id = button(ui, cx, "world_did.list", &[], 200.0, |c| {
+                                    if let Some(dir) = adm::local_world() {
+                                        world_did::list(c.settings, dir);
+                                    }
+                                });
+                                ui.set_id(id, "world_did_list");
+                            }
+                            _ => {}
+                        }
+                    });
                     // Players here now, and anyone else by name, key or DID.
                     ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(400.0), |ui| {
                         label(ui, cx, "admission.screen.players", &[], "default");

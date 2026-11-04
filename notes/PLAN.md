@@ -40,10 +40,11 @@ erase what they earned.
      These are the rules `core:entity_send_distance`, `core:entity_activation_distance` and
      `core:inactive_entity_interval`, the `ALWAYS_ACTIVE` flag and `tick_elapsed`. Ronald's
      yes, 11-04: "Yes, later". Offer it once it has run in `dev` a while.
-   - To offer, if Ronald picks 32 a block for worn layers: worn layers mapped by the skin's
-     layout (`client/entity_render.rs`, `worn_tex_size`). A 128 x 64 armour or clothes layer on a
-     64 x 32 skin then maps over all of it, as Minecraft's armour does in 32x packs; one at the
-     layout's width reads as before. One general line and a test (branch `claude/clothes-worn`).
+   - To offer: worn layers mapped by the skin's layout (`client/entity_render.rs`,
+     `worn_tex_size`), in use since Ronald's "all 32" for the player and clothes (11-04). A
+     128 x 64 armour or clothes layer on a 64 x 32 skin then maps over all of it, as Minecraft's
+     armour does in 32x packs; one at the layout's width reads as before. One general line and a
+     test (branch `claude/clothes-worn`).
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 
@@ -282,7 +283,7 @@ The smallest version that works is phases 1-4.
       it (getting, linking or checking a DID), on the network the setting `core:chain` names: `off`, `testnet11` (the default while we test)
       or `mainnet` (only after Ronald's yes, and a confirmation in the game); peers from the DNS
       introducers or the setting's own nodes; its cache in the run folder. Never in the game loop.
-   5. *The sponsor and the account's DID*: `horizon-sponsor` ported as `crates/sponsor`
+   5. *The sponsor and the account's DID* (built 2026-11-04, not yet seen on testnet11): `horizon-sponsor` ported as `crates/sponsor`
       (`chiacraft-sponsor`, not a default member), speaking **iroh** instead of HTTP: ALPN
       `chiacraft/sponsor/1` on its own key, the same JSON and the same signed request (the
       wallet's `sponsor.rs`), so anyone can run one at home with no domain, TLS certificate or open
@@ -292,7 +293,10 @@ The smallest version that works is phases 1-4.
       wallet address (so Sage shows it after importing the words), shows it pending until the
       chain has it (about a minute; the launcher id is saved, so a restart keeps waiting), then
       links it (`DidLink`); "Link a DID I have" finds one these words hold (`OwnerSigner::find`).
-      A sponsor gives each identity one player DID and up to 8 world DIDs a day.
+      A sponsor gives each identity one player DID and up to 8 world DIDs a day. Identities and
+      endpoints cost nothing, so each request carries a proof of work (22 zero bits by default,
+      a second or two of CPU) and the day's budget opens an hour's share at a time (research
+      round 4, P7).
    6. *The join proves the DID* (built 2026-11-04, not yet seen on testnet11): beside the identity's vouching for the login key, the join
       carries the DID's launcher id, its owner key and that key's signature of `chiacraft did v1
       <launcher> <identity>`. It needn't name the session: the identity is already bound to the
@@ -303,7 +307,7 @@ The smallest version that works is phases 1-4.
       join waits for it (25 s at most) only when the world's rules ask for a DID. A DID's age is
       the chain's height since its launch (4,608 blocks a day). The DID rules of slice 1 start
       counting, and a ban by DID refuses whoever proves it.
-   7. *World DIDs, ownership both ways*: a world can get a DID from a sponsor, launched to the
+   7. *World DIDs, ownership both ways* (built 2026-11-04, not yet seen on testnet11): a world can get a DID from a sponsor, launched to the
       owner's address, so the DID stays in the owner's wallet and the world holds only its key.
       Its metadata names the owner's DID and the world's current key and generation, set at
       launch (the player spends nothing). The owner's DID lists its worlds in its metadata (one

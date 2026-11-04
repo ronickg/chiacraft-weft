@@ -13,6 +13,8 @@
 //! - [`cache`]: what the reader learned, kept in one JSON file so it survives restarts and answers
 //!   while no peer is reachable (3.7).
 //! - [`sponsor`]: DIDs launched by a sponsor straight to players' addresses (I9).
+//! - [`world`]: world DIDs (phase 4, slice 7): the world's and the owner's DID metadata, and
+//!   whether a world and its owner DID name each other.
 //! - [`anchor`]: the achievements' daily anchor (I10): a day's Merkle root put on chain as the
 //!   memo of one of the server's own coins, and read back.
 //! - [`tool`]: `chiacraft-wallet-test`, the live test tool an operator runs step by step (I12).
@@ -43,17 +45,20 @@ pub mod source;
 pub mod sponsor;
 pub mod sync;
 pub mod tls;
+#[cfg(feature = "tool")]
 pub mod tool;
 pub mod wallet;
+pub mod world;
 
 pub use cache::{ChainCache, WatchedCoin};
 pub use did::{DidRecord, DidStep};
 pub use offer::{MadeOffer, MakeOffer, OfferGive, OfferSummary};
-pub use reader::{ChainConfig, ChainReader, ChainStatus, CreatedDid, DidLookup, OfferState, Phase, TakeOutcome};
+pub use reader::{ChainConfig, ChainReader, ChainStatus, CreatedDid, DidLookup, OfferState, Phase, TakeOutcome, UpdatedDid};
 pub use source::{ChainSource, PeerSource, PushOutcome};
-pub use sponsor::{EveDid, SponsorBundle};
+pub use sponsor::{EveAsk, EveDid, SponsorBundle};
 pub use sync::{CoinRecord, WalletSync};
 pub use wallet::WalletKeys;
+pub use world::{DidMetadata, OwnerMeta, WorldLink, WorldMeta};
 
 pub use chia_protocol::{Bytes32, Coin, CoinState, SpendBundle};
 
