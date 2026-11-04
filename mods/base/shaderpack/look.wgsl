@@ -558,7 +558,7 @@ fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32, leaf: f32) -> vec3<f32> {
     let dir = rel / max(length(rel), 1e-4);
     let eye = scene.eye.xyz;
     let floor = fog_floor(rel);
-    let light = fog_light(dir) * mix(vec3(1.0), LEAF_LIGHT * 0.2, leaf);
+    let light = fog_light(dir) * mix(vec3(1.0), LEAF_LIGHT * 0.35, leaf * 0.85);
     let steps = 12u;
     var through = 1.0;
     var gained = vec3(0.0);
@@ -647,7 +647,11 @@ fn under_water(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
 }
 
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
-    let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky), under_leaves(sky));
+    // The mist's light eases in over a wider band of the sky light than the surfaces' green: at
+    // 0.2 and a step at 0.8-1 a trunk's misty half under the leaves came out dark green against
+    // its white half in the open (the canopy check's morning, 11-04).
+    let leaf = min(canopy(), 1.0) * (1.0 - smoothstep(0.55, 1.0, sky));
+    let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky), leaf);
     let dist = length(rel);
     if in_water() {
         return under_water(c, rel);
