@@ -79,12 +79,18 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     return out;
 }
 
-// Clouds: each pixel's ray walks the picture's grid between the two planes of the layer, so one
-// triangle draws them however far they reach. From outside the layer a ray crosses few cells even
-// at the horizon, since it soon leaves through the other plane.
+// Clouds: rounded slabs (Complementary Reimagined's idea, written anew). The picture's cells are
+// blended into soft rounded shapes that thin toward the top and bottom of a slab, and each sky
+// pixel's ray takes a few dithered samples through it, gathering light and cover: soft blocky puffs,
+// lit from the sun above and darker underneath, in the sky's own pass.
 // uv: the camera's place in its cell (x, z), the cell in the picture (x, z). extra: cell size,
-// thickness, height over the camera, how far they reach.
-const CLOUD_STEPS: u32 = 128u;
+// thickness, height over the camera, how far they reach. axes[0]: the weather (`sky.rs`): x cover
+// as rain comes, y how dark the undersides go, z a storm's deck.
+const CLOUD_SAMPLES: u32 = 24u;
+// The slab is at least this thick (blocks), whatever the layer's own thickness.
+const CLOUD_THICKNESS: f32 = 9.0;
+// How far one sample looks along the ray at most (blocks): far clouds take no more samples.
+const CLOUD_SPAN: f32 = 400.0;
 
 struct CloudOut {
     @builtin(position) clip: vec4<f32>,
@@ -107,20 +113,34 @@ fn vs_clouds(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -
     return out;
 }
 
-// A cell of the layer is cloud where the picture says, and as rain comes in more of the gaps fill
-// (`axes[0]` x, the engine's cover), until a storm's deck (z) closes nearly all of them.
-fn cloud_at(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> bool {
+// 1 where cell `cell` (picture cells from the camera's) is cloud: the picture's, and as rain comes
+// more of the gaps (a hash per cell, so they grow as whole cells), until a storm's deck closes
+// nearly all of them.
+fn cloud_cell(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> f32 {
     let at = fract((cell + s.uv.zw + vec2(0.5)) / dims);
     if textureSampleLevel(textures[s.ids.x], nearest_clamp, at, 0.0).a >= 0.5 {
-        return true;
+        return 1.0;
     }
-    let fill = s.axes[0].x * 0.75 + s.axes[0].z * 0.3;
-    if fill <= 0.0 {
-        return false;
-    }
-    let w = cell + s.uv.zw;
-    let n = noise3(vec3(w.x * 0.21, 3.7, w.y * 0.21)) * 0.65 + noise3(vec3(w.x * 0.53, 9.1, w.y * 0.53)) * 0.35;
-    return n > 1.0 - fill;
+    let fill = s.axes[0].x * 0.6 + s.axes[0].z * 0.35;
+    let w = vec2<i32>(cell + s.uv.zw);
+    return select(0.0, 1.0, hash3(vec3(w.x, 51, w.y)) < fill);
+}
+
+// How dense the cloud is at `cellp` (picture cells, fractional) and `h` (0 at the slab's bottom,
+// 1 at its top): the four cells about the point blended smoothly, eaten away toward the top and
+// bottom so their edges round.
+fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
+    let q = cellp - vec2(0.5);
+    let base = floor(q);
+    let f = q - base;
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = cloud_cell(s, base, dims);
+    let b = cloud_cell(s, base + vec2(1.0, 0.0), dims);
+    let c = cloud_cell(s, base + vec2(0.0, 1.0), dims);
+    let d = cloud_cell(s, base + vec2(1.0, 1.0), dims);
+    let cover = mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    let middle = 1.0 - pow(abs(h * 2.0 - 1.0), 2.0);
+    return smoothstep(0.35, 0.6, cover - (1.0 - middle) * 0.5);
 }
 
 @fragment
@@ -129,8 +149,9 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     let dir = normalize(mat(sky[0]) * in.at);
     let size = s.extra.x;
     let low = s.extra.z;
+    let thick = max(s.extra.y, CLOUD_THICKNESS);
     let reach = s.extra.w;
-    let high = low + s.extra.y;
+    let high = low + thick;
     var near = 0.0;
     var far = reach / max(length(dir.xz), 0.0001);
     if abs(dir.y) > 0.00001 {
@@ -142,79 +163,64 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     if near >= far {
         discard;
     }
+    far = min(far, near + CLOUD_SPAN);
     let dims = vec2<f32>(f32(s.ids.z), f32(s.ids.w));
-    let start = s.uv.xy + dir.xz * near / size;
-    var cell = floor(start);
-    let turn = sign(dir.xz);
-    let delta = size / max(abs(dir.xz), vec2(0.000001));
-    var next = near + select(start - cell, cell + vec2(1.0) - start, dir.xz > vec2(0.0)) * delta;
-    var t = near;
-    // 0: came in through a plane, 1 and 2: through a side along x or z.
-    var side = 0u;
-    // From inside a cloud, it isn't what is seen.
-    var within = near == 0.0 && cloud_at(s, cell, dims);
-    var hit = false;
-    for (var i = 0u; i < CLOUD_STEPS; i++) {
-        let filled = cloud_at(s, cell, dims);
-        if filled && !within {
-            hit = true;
-            break;
+    let step = (far - near) / f32(CLOUD_SAMPLES);
+    // A different start per pixel, against banding.
+    let jitter = fract(sin(dot(in.clip.xy, vec2(12.9898, 78.233))) * 43758.5453);
+    let p = palette();
+    let lit_sky = open_sky() && !in_liquid();
+    let dark = s.axes[0].y;
+    let mu = max(dot(dir, scene.sun.xyz), 0.0);
+    var through = 1.0;
+    var light = vec3(0.0);
+    var seen = far;
+    for (var i = 0u; i < CLOUD_SAMPLES; i++) {
+        let t = near + (f32(i) + jitter) * step;
+        let rel = dir * t;
+        let h = clamp((rel.y - low) / thick, 0.0, 1.0);
+        let density = cloud_density(s, s.uv.xy + rel.xz / size, h, dims);
+        if density <= 0.0 {
+            continue;
         }
-        within = within && filled;
-        if next.x < next.y {
-            t = next.x;
-            next.x += delta.x;
-            cell.x += turn.x;
-            side = 1u;
+        let a = 1.0 - exp(-density * step * 0.18);
+        // Lit from above, darker underneath (more so in rain), glowing toward the sun.
+        var c = vec3(1.0);
+        if lit_sky {
+            let below = mix(p.horizon * 0.9 + p.ambient * 0.6, p.ambient * 1.6, h) * mix(1.0, 0.4, dark * (1.0 - h));
+            c = below + p.sun * light_strength() * (0.25 + 0.75 * h) * 0.95 * (1.0 - dark * 0.6);
+            c += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength() * (0.4 + 0.6 * h);
         } else {
-            t = next.y;
-            next.y += delta.y;
-            cell.y += turn.y;
-            side = 2u;
+            c = vec3(mix(0.7, 1.0, h));
         }
-        if t >= far {
+        if through > 0.5 && through * (1.0 - a) <= 0.5 {
+            seen = t;
+        }
+        light += through * a * c;
+        through *= 1.0 - a;
+        if through < 0.02 {
             break;
         }
     }
-    if !hit {
+    let alpha_cloud = 1.0 - through;
+    if alpha_cloud < 0.01 {
         discard;
     }
-    // The face the ray came in through, lit by the sun and the sky like blocks are.
-    var n = vec3(-turn.x, 0.0, 0.0);
-    if side == 2u {
-        n = vec3(0.0, 0.0, -turn.y);
-    } else if side == 0u {
-        n = vec3(0.0, select(1.0, -1.0, dir.y > 0.0), 0.0);
-    }
-    let rel = dir * t;
-    let dist = length(rel.xz) / reach;
-    let p = palette();
+    // The engine's color (`sky.rs`) brings rain's grey and thunder's dark; the palette the light.
     var color = s.color.rgb;
-    if open_sky() && !in_liquid() {
-        // The engine dims their color with the day (`sky.rs`); the palette lights them instead.
+    let rel = dir * seen;
+    let dist = length(rel.xz) / reach;
+    if lit_sky {
         let d = clamp(scene.sun.y * 2.0 + 0.5, 0.0, 1.0);
         let dimmed = pow(vec3(d * 0.9 + 0.1, d * 0.9 + 0.1, d * 0.85 + 0.15), vec3(2.2));
         let albedo = s.color.rgb / max(dimmed, vec3(0.005));
-        let ndl = max(dot(n, light_dir()), 0.0);
-        // Undersides take the horizon's color, so they go rose at sunset.
-        var below = mix(p.ambient * 1.6, p.horizon * 0.9 + p.ambient * 0.6, select(0.0, 1.0, n.y < 0.0));
-        // Rain clouds are dark underneath (`axes[0]` y), their sides a little too.
-        below *= mix(1.0, select(0.6, 0.35, n.y < 0.0), s.axes[0].y);
-        var lit = below * (0.85 + 0.15 * n.y) + p.sun * light_strength() * ndl * 0.95;
-        // Toward the sun they glow, and the rim facing it shines.
-        let mu = max(dot(dir, scene.sun.xyz), 0.0);
-        lit += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength();
-        color = albedo * lit;
+        color = albedo * light / alpha_cloud;
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.3, 1.0, dist));
         color = display(fog_through(color, dir * 220.0, 1.0));
     } else {
-        var shade = select(0.9, 0.8, side == 1u);
-        if side == 0u {
-            shade = select(1.0, 0.7, dir.y > 0.0);
-        }
-        color = mix(s.color.rgb * shade, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
+        color = mix(s.color.rgb * light / alpha_cloud, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
     }
-    let alpha = s.color.a * (1.0 - smoothstep(0.8, 1.0, dist));
+    let alpha = s.color.a * alpha_cloud * (1.0 - smoothstep(0.8, 1.0, dist));
     let clip = scene.view_proj * vec4(rel, 1.0);
     return CloudPixel(vec4(color * alpha, alpha), clip.z / clip.w);
 }
