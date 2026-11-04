@@ -96,12 +96,14 @@ struct Row {
     shown: fn(f64) -> (String, i64),
 }
 
-/// The presets, Low to Ultra, per row (in `ROWS` order).
+/// The presets, Low to Ultra, per row (in `ROWS` order). Contact shadows on at Ultra only and
+/// light shafts low below it (Ronald, 11-05, on the speed Researcher's Mac numbers: contact
+/// shadows cost ~2.2 ms under trees, full shafts ~1.1-1.5 ms more than low).
 const PRESETS: [[f64; 12]; 4] = [
     // scale shadows size  reflect contact volume shafts bloom view lod   vsync cap
     [0.5, 0.0, 1024.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 64.0, 1.0, 60.0],
-    [0.67, 1.0, 1024.0, 1.0, 1.0, 1.0, 1.0, 0.0, 8.0, 128.0, 1.0, 60.0],
-    [0.0, 2.0, 2048.0, 2.0, 2.0, 2.0, 2.0, 1.0, 12.0, 192.0, 1.0, 0.0],
+    [0.67, 1.0, 1024.0, 1.0, 0.0, 1.0, 1.0, 0.0, 8.0, 128.0, 1.0, 60.0],
+    [0.0, 2.0, 2048.0, 2.0, 0.0, 2.0, 1.0, 1.0, 12.0, 192.0, 1.0, 0.0],
     [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 2.0, 1.0, 16.0, 256.0, 1.0, 0.0],
 ];
 const PRESET_NAMES: [&str; 4] = ["low", "medium", "high", "ultra"];
@@ -203,17 +205,52 @@ fn step(i: usize, dir: i32) {
     QUALITY.set(4);
 }
 
+/// Which defaults the saved settings have caught up with (`new_defaults`).
+static DEFAULTS: Config<i32> = Config::named("video_defaults");
+
+/// Saved settings take the new defaults once (the engine saves every setting, so a changed
+/// default alone reaches no one who has played): on a preset, its values for the rows whose
+/// defaults changed; on Custom, a row still at its old default takes the new one, a row the
+/// player changed stays. 1: contact shadows off, light shafts low (11-05).
+fn new_defaults() {
+    if DEFAULTS.get() >= 1 || QUALITY.get() < 0 {
+        return;
+    }
+    // A script's or benchmark's `--config` values are meant as given.
+    if ["script", "test", "config"]
+        .iter()
+        .any(|o| weft_sdk::client::launch_option(o).is_some())
+    {
+        return;
+    }
+    let q = QUALITY.get();
+    let (contact, shafts) = match PRESETS.get(q as usize) {
+        Some(p) => (p[4] as i32, p[6] as i32),
+        None => (
+            if FX_CONTACT.get() == 2 { 0 } else { FX_CONTACT.get() },
+            if FX_SHAFTS.get() == 2 { 1 } else { FX_SHAFTS.get() },
+        ),
+    };
+    weft_sdk::info!("video: new defaults, contact shadows {} -> {contact}, light shafts {} -> {shafts}", FX_CONTACT.get(), FX_SHAFTS.get());
+    FX_CONTACT.set(contact);
+    FX_SHAFTS.set(shafts);
+    DEFAULTS.set(1);
+}
+
 pub fn register(r: &mut Registry) {
     r.config(&QUALITY).int(-1, -1, 4);
     r.config(&FX_REFLECT).int(2, 0, 2);
-    r.config(&FX_CONTACT).int(2, 0, 2);
+    // Off by default, low shafts (Ronald, 11-05: "Off by default", "Default to Low").
+    r.config(&FX_CONTACT).int(0, 0, 2);
     // Cheap (Tester 2's PC bench, 11-04: +0.04 ms of effects at 1280x720): low until a preset
     // says otherwise; off on the Low preset until the Mac's Retina numbers are in.
     r.config(&FX_VOLUME).int(1, 0, 2);
-    r.config(&FX_SHAFTS).int(2, 0, 2);
+    r.config(&FX_SHAFTS).int(1, 0, 2);
+    r.config(&DEFAULTS).int(0, 0, 9);
     r.config(&FX_BLOOM).int(1, 0, 1);
     r.config(&RENDER_SCALE_NEXT).float(-1.0, -1.0, 1.0);
     r.config(&SHADOW_SIZE_NEXT).int(0, 0, 4096);
+    r.client_frame(|_| new_defaults());
     // The first run: a preset from the screen (a high-density one draws many more pixels).
     r.client_frame(|c| {
         if QUALITY.get() >= 0 {
