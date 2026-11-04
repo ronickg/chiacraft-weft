@@ -4,7 +4,6 @@
 //!
 //!     cargo run -p base_api --example grove_find -- <seed> <radius>
 use base_api::land as l;
-use weft_sdk::noise::fixed::Fields;
 
 fn main() {
     let a: Vec<i64> = std::env::args()
@@ -13,7 +12,7 @@ fn main() {
         .collect();
     let seed = a.first().copied().unwrap_or(1) as u64;
     let radius = a.get(1).copied().unwrap_or(4000) as i32;
-    let f = Fields { seed };
+    let f = l::fields(seed);
     let grove = |x: i32, z: i32| l::overworld_biome(&f, x * 16, z * 16) == "sequoia_grove";
     let mut best: Vec<(usize, i32, i32)> = Vec::new();
     for z in (-radius..=radius).step_by(32) {
