@@ -18,6 +18,7 @@ mod shaderpack;
 mod sounds;
 mod survival;
 mod weather;
+mod wild;
 mod worldgen;
 
 use weft_sdk::*;
@@ -42,6 +43,7 @@ fn init(r: &mut Registry) {
         r.creative_tab(tab, icon);
     }
     blocks::register(r);
+    wild::register(r);
     items::register(r);
     player::register(r);
     survival::register(r);
