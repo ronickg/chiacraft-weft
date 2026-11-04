@@ -48,6 +48,13 @@ pub fn step_secs(block: &str, steps: u32, game: f32) -> f32 {
 /// A growth step of the plant at `e`: `step` with the chance of its rate there; `last` says
 /// whether this step would be its last stage (the ripe fruit), which waits for its season.
 pub fn grow(e: &mut BlockEvent, block: &str, last: bool, step: impl FnOnce(&mut BlockEvent)) {
+    // Grown (at its last age): nothing to do, so nothing to read. A ripe crop or bush keeps its
+    // fruit until it's picked or eaten, which sets it back and lets it grow again.
+    if let Some(age) = state_prop(e.state(), "age").and_then(|a| a.parse::<u32>().ok())
+        && state_with(e.state(), "age", &(age + 1).to_string()).is_none()
+    {
+        return;
+    }
     let p = plant(block);
     let w = e.world();
     if p.frost > plants::HARDY {

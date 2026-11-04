@@ -183,6 +183,9 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:mushroom_brown | forest mushrooms | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:mushroom_red | fly agaric | 5, 10-20, 30 | Moderate | -2 °C | 8 | 4 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
 | base:water_hyacinth | water hyacinth | 12, 25-30, 38 | Wet | -1 °C | 10 | 5 | plains (su), forest (su), birch_forest (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
+| base:mesquite_sapling | mesquite | 12, 25-38, 48 | Dry | -15 °C | - | the game's | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
+| base:acuri_palm_sapling | acuri palm (Attalea phalerata) | 15, 24-32, 40 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), ocean (su), scrubland (su), floodplain (su au), crags (su) |
+| base:moriche_palm_sapling | moriche palm (Mauritia flexuosa) | 15, 24-32, 40 | Wet | 0 °C | - | the game's | plains (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
 
 ## Wild plants
 
@@ -209,6 +212,7 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | animals:cycad | Still | Soil | animals:cycad_seed | 1.0% | red_dunes, scrubland, floodplain, fern_forest, crags |
 | animals:flowering_shrub | Still | Soil | - | 2.0% | floodplain, scrubland |
 | animals:water_lily | Still | Water | - | 6.0% | floodplain, red_dunes |
+| animals:rotten_log | Log | Soil | - | 0.4% | floodplain, fern_forest |
 
 ## Food in the world
 
@@ -270,6 +274,18 @@ What foraging animals eat of the world's blocks (`vitals::forage`), how much a m
 | animals:cycad | seeds | 3 | stays | always there in animals:red_dunes, animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (summer, autumn), worth 40% of fresh growth |
 | animals:flowering_shrub | leaves | 4 | stays | always there in animals:floodplain, animals:scrubland (spring, summer, autumn), worth 40% of fresh growth |
 | animals:water_lily | water_plants | 5 | stays | always there in animals:floodplain, animals:red_dunes (all year), worth 40% of fresh growth |
+| animals:rotten_log | insects | 3 | stays | always there in animals:floodplain, animals:fern_forest (all year), worth 40% of fresh growth |
+| base:mesquite_leaves | leaves | 4 | stays | always there in base:desert, base:savanna (spring, summer, autumn), worth 40% of fresh growth |
+| base:mesquite_leaves | seeds | 4 | stays | always there in base:desert, base:savanna (summer, autumn), worth 40% of fresh growth |
+| base:acuri_palm_leaves | seeds | 5 | stays | always there in base:swamp (autumn, winter), worth 40% of fresh growth |
+| base:moriche_palm_leaves | fruit | 5 | stays | always there in base:savanna, base:swamp (spring, summer), worth 40% of fresh growth |
+| animals:araucaria_leaves | leaves | 5 | stays | always there in animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (all year), worth 40% of fresh growth |
+| animals:araucaria_leaves | seeds | 4 | stays | always there in animals:scrubland, animals:floodplain, animals:fern_forest, animals:crags (autumn), worth 40% of fresh growth |
+| animals:ginkgo_leaves | leaves | 4 | stays | always there in animals:fern_forest (spring, summer, autumn), worth 40% of fresh growth |
+| animals:ginkgo_leaves | fruit | 4 | stays | always there in animals:fern_forest (autumn), worth 40% of fresh growth |
+| animals:swamp_cypress_leaves | leaves | 3 | stays | always there in animals:floodplain (spring, summer, autumn), worth 40% of fresh growth |
+| animals:scale_conifer_leaves | leaves | 2 | stays | always there in animals:red_dunes, animals:scrubland, animals:crags (all year), worth 40% of fresh growth |
+| animals:tempskya_leaves | leaves | 2 | stays | always there in animals:floodplain, animals:fern_forest (all year), worth 40% of fresh growth |
 
 On the ground, animals eat dropped food of their diet one item a mouthful: every food (the foods table, by its kind and portion) and these seeds; spoiled food only carrion eaters. An item fills an animal by its weight against a meal of a tenth of the animal's mass (`animals_core::needs`).
 
@@ -280,6 +296,11 @@ On the ground, animals eat dropped food of their diet one item a mouthful: every
 | base:acorn | seeds | 20 |
 | base:rice | seeds | 30 |
 | animals:cycad_seed | seeds | 20 |
+| base:mesquite_pod | seeds | 30 |
+| base:acuri_nut | seeds | 30 |
+| base:moriche_fruit | fruit | 50 |
+| animals:araucaria_cone | seeds | 50 |
+| animals:ginkgo_seed | fruit | 10 |
 
 ## Soil and compost
 

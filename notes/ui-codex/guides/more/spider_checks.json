@@ -1,0 +1,34 @@
+{
+ "kind": "monster",
+ "what": "a big cave spider, side view facing right: a dark brown-black body (never pure black, the darkest shade of its own brown) with fine bristles, four visible legs a side bent at the knee, a cluster of small glowing red eyes",
+ "size": [
+  48,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.227,
+   "outline": 0.75,
+   "red_line": 0.63,
+   "fill": 0.59,
+   "passed": false
+  },
+  {
+   "grid": 0.278,
+   "outline": 0.52,
+   "red_line": 0.71,
+   "fill": 0.61,
+   "passed": false
+  },
+  {
+   "grid": 0.574,
+   "outline": 0.72,
+   "red_line": 0.64,
+   "fill": 0.54,
+   "passed": false
+  }
+ ],
+ "note": "failed only the red-line check, 3 times: a red-brown creature's own dark outline looks like the red-brown line the check hunts for (a limit of the check); the last try is shown"
+}

@@ -1,0 +1,19 @@
+{
+ "kind": "model_block",
+ "what": "a standing wooden sign: a pale parchment board with a 2-px warm wooden frame and a plain centre for text, on a short wooden post down to the bottom edge",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.391,
+   "outline": 0.26,
+   "red_line": 0.34,
+   "fill": 0.55,
+   "passed": true
+  }
+ ]
+}

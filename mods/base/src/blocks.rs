@@ -111,7 +111,59 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
         .tab(&crate::tabs::NATURAL);
 }
 
-fn leaves(r: &mut Registry, handle: &'static Block, tex: &str) {
+/// Our trees (`notes/ECOLOGY.md`, part 3): mesquite in the desert's washes and the llanos, flat
+/// topped like an acacia, its pods a summer food; the Pantanal's acuri palm and the llanos'
+/// moriche palm, their fruit falling through their seasons. Wood, its tree's shape, and what its
+/// leaves drop besides its sapling. Their saplings grow by the place (`vitals::plants`).
+const WOODS: [(&str, Option<&str>, &str); 3] = [
+    ("mesquite", Some("flat_tree"), "mesquite_pod"),
+    ("acuri_palm", Some("palm_tree"), "acuri_nut"),
+    ("moriche_palm", Some("palm_tree"), "moriche_fruit"),
+];
+
+/// Our trees' logs, planks, leaves and saplings (`WOODS`), and the fruit their leaves drop, which
+/// plants a sapling too.
+fn woods(r: &mut Registry) {
+    for (wood, shape, fruit) in WOODS {
+        let log_block = Block::generated(format!("{wood}_log"));
+        log(r, log_block, wood, &format!("{wood}_leaves"), shape);
+        planks(r, Block::generated(format!("{wood}_planks")), wood);
+        let sapling = format!("{wood}_sapling");
+        leaves(r, Block::generated(format!("{wood}_leaves")), &format!("leaves_{wood}"), &sapling, Some(fruit));
+        let plant: &'static str = Box::leak(format!("base:{sapling}").into_boxed_str());
+        let sapling_block = Block::generated(sapling);
+        r.block(sapling_block)
+            .sound_group("grass")
+            .texture(&format!("sapling_{wood}"))
+            .plant()
+            .needs_below("#sapling_soil")
+            .growth(crate::growth::step_secs(plant, 1, 470.0), 9)
+            .on_grow(move |e| crate::growth::grow(e, plant, false, |e| worldgen::grow_tree(e.world(), e.pos(), log_block.id())))
+            .tab(&crate::tabs::NATURAL);
+        r.item(Item::generated(fruit.into()))
+            .placed_block(sapling_block)
+            .tab(&crate::tabs::NATURAL);
+    }
+    // Desert and beach trees take root in sand as well.
+    r.tag("sapling_soil", &["#dirt", "#sand"]);
+}
+
+fn planks(r: &mut Registry, h: &'static Block, wood: &str) {
+    r.block(h)
+        .sound_group("wood")
+        .texture(&format!("planks_{wood}"))
+        .hardness(2.0)
+        .mineable("axe")
+        .tag("planks")
+        .tag(&format!("planks/{wood}"))
+        .tag("materials/wood")
+        .set(&FLAMMABLE, 5)
+        .set(&FUEL, 300)
+        .tab(&crate::tabs::BUILDING);
+}
+
+/// Leaves that drop `sapling` (a time in 20) and, for our trees, `fruit` (a time in 20).
+fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fruit: Option<&str>) {
     r.block(handle)
         .sound_group("grass")
         .texture(tex)
@@ -126,7 +178,11 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str) {
     // Vanilla: a sapling one time in 20, oak leaves an apple one time in 200.
     let table = r
         .loot(handle)
-        .pool(Pool::new().when(Cond::Chance(0.05)).item("sapling"));
+        .pool(Pool::new().when(Cond::Chance(0.05)).item(sapling));
+    if let Some(fruit) = fruit {
+        table.pool(Pool::new().when(Cond::Chance(0.05)).item(fruit));
+        return;
+    }
     // Ours: acorns from oak leaves, pine nuts from spruce cones (`vitals::forage::DROPPED`,
     // `food::FOODS`).
     if std::ptr::eq(handle, &OAK_LEAVES) {
@@ -293,22 +349,13 @@ pub fn register(r: &mut Registry) {
     log(r, &SPRUCE_LOG, "spruce", "spruce_leaves", Some("cone_tree"));
     log(r, &ACACIA_LOG, "acacia", "acacia_leaves", Some("flat_tree"));
     for (h, wood) in [(&OAK_PLANKS, "oak"), (&BIRCH_PLANKS, "birch"), (&SPRUCE_PLANKS, "spruce"), (&ACACIA_PLANKS, "acacia")] {
-        r.block(h)
-            .sound_group("wood")
-            .texture(&format!("planks_{wood}"))
-            .hardness(2.0)
-            .mineable("axe")
-            .tag("planks")
-            .tag(&format!("planks/{wood}"))
-            .tag("materials/wood")
-            .set(&FLAMMABLE, 5)
-            .set(&FUEL, 300)
-            .tab(&crate::tabs::BUILDING);
+        planks(r, h, wood);
     }
-    leaves(r, &OAK_LEAVES, "leaves_oak");
-    leaves(r, &BIRCH_LEAVES, "leaves_birch");
-    leaves(r, &SPRUCE_LEAVES, "leaves_spruce");
-    leaves(r, &ACACIA_LEAVES, "leaves_acacia");
+    leaves(r, &OAK_LEAVES, "leaves_oak", "sapling", None);
+    leaves(r, &BIRCH_LEAVES, "leaves_birch", "sapling", None);
+    leaves(r, &SPRUCE_LEAVES, "leaves_spruce", "sapling", None);
+    leaves(r, &ACACIA_LEAVES, "leaves_acacia", "sapling", None);
+    woods(r);
 
     // Vanilla numbers: water steps every 5 ticks and reaches 7 blocks, lava every 30 and 3.
     r.liquid(&WATER)
@@ -373,7 +420,7 @@ pub fn register(r: &mut Registry) {
         .plant()
         .needs_below("#plant_soil")
         .growth(crate::growth::step_secs("base:sapling", 1, 470.0), 9)
-        .on_grow(|e| crate::growth::grow(e, "base:sapling", false, |e| worldgen::grow_tree(e.world(), e.pos())))
+        .on_grow(|e| crate::growth::grow(e, "base:sapling", false, |e| worldgen::grow_tree(e.world(), e.pos(), OAK_LOG.id())))
         .tab(&crate::tabs::NATURAL);
     r.block(&SUGAR_CANE)
         .sound_group("grass")

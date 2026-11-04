@@ -32,6 +32,9 @@ static TREES: Component<f32> = Component::named("trees");
 static GRASS_COVER: Component<f32> = Component::named("grass");
 static TREE_KINDS: Component<BlockList> = Component::named("tree_kinds");
 static FLOWERS: Component<BlockList> = Component::named("flowers");
+/// On a log, the leaves of the tree base's worldgen grows from it; tags `cone_tree`, `flat_tree`,
+/// `palm_tree` give its shape.
+static TREE_LEAVES: Component<BlockRef> = Component::named("tree_leaves");
 /// Share of the ground ferns and horsetails cover (this mod's decoration).
 static FERNS: Component<f32> = Component::named("fern_cover");
 static PLANT_SOIL: Tag = Tag::named("plant_soil");
@@ -73,11 +76,22 @@ pub fn init(r: &mut Registry) {
         .filter(|p| p.block.starts_with("animals:"))
     {
         let block = Block::generated(p.block.into());
+        let name = p.block.split_once(':').map_or(p.block, |(_, n)| n);
+        // A rotten log lies on the ground: a soft, crumbling block, not a plant.
+        if p.form == vitals::wild::Form::Log {
+            r.block(block)
+                .sound_group("base:block.wood")
+                .textures(&format!("{name}_top"), name, &format!("{name}_top"))
+                .hardness(1.0)
+                .mineable("axe")
+                .tab(&NATURAL);
+            continue;
+        }
         r.block(block)
             .sound_group("base:block.grass")
             .plant()
             .needs_below(if p.ground == vitals::wild::Ground::Water { "#water" } else { "#plant_soil" })
-            .texture(p.block.split_once(':').map_or(p.block, |(_, n)| n))
+            .texture(name)
             .tab(&NATURAL);
         if let Some(seed) = p.gives {
             r.loot(block)
@@ -89,6 +103,7 @@ pub fn init(r: &mut Registry) {
         }
     }
     r.tag("plant_soil", &["red_sand"]);
+    woods(r);
 
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
     // Wind-blown red dunes: Velociraptor's, and osmolskae's.
@@ -99,7 +114,9 @@ pub fn init(r: &mut Registry) {
         .under("red_sandstone", 2)
         .tag("dry")
         .tag("hot")
-        .set(&TREES, 0.0)
+        // A rare scale-leaved conifer, drought-hardy, on the dunes.
+        .set(&TREES, 0.003)
+        .set_text(&TREE_KINDS, "animals:scale_conifer_log")
         .set(&GRASS_COVER, vitals::forage::grass_cover("animals:red_dunes").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set(&FERNS, 0.004)
         .set_text(&FLOWERS, "animals:fern");
@@ -113,7 +130,7 @@ pub fn init(r: &mut Registry) {
         .tag("hot")
         .set(&TREES, 0.02)
         .set(&GRASS_COVER, vitals::forage::grass_cover("animals:scrubland").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
-        .set_text(&TREE_KINDS, "base:spruce_log")
+        .set_text(&TREE_KINDS, "animals:scale_conifer_log:3 animals:araucaria_log:1")
         .set(&FERNS, 0.06)
         .set_text(&FLOWERS, "animals:fern");
     // Low, wet ground by the rivers: ferns and horsetails, scattered conifers (Utahraptor's).
@@ -127,7 +144,7 @@ pub fn init(r: &mut Registry) {
         .tag("wet")
         .set(&TREES, 0.04)
         .set(&GRASS_COVER, vitals::forage::grass_cover("animals:floodplain").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
-        .set_text(&TREE_KINDS, "base:spruce_log")
+        .set_text(&TREE_KINDS, "animals:swamp_cypress_log:3 animals:araucaria_log:2 animals:tempskya_log:2")
         .set(&FERNS, 0.35)
         .set_text(&FLOWERS, "animals:fern");
     // Conifers over a floor of ferns.
@@ -140,7 +157,7 @@ pub fn init(r: &mut Registry) {
         .tag("forest")
         .set(&TREES, 0.35)
         .set(&GRASS_COVER, vitals::forage::grass_cover("animals:fern_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
-        .set_text(&TREE_KINDS, "base:spruce_log")
+        .set_text(&TREE_KINDS, "animals:araucaria_log:3 animals:ginkgo_log:2 base:spruce_log:2 animals:tempskya_log:1")
         .set(&FERNS, 0.3)
         .set_text(&FLOWERS, "animals:fern");
     // High rock: the wyverns'.
@@ -151,7 +168,7 @@ pub fn init(r: &mut Registry) {
         .tint(grass, 0x8aa864)
         .tag("mountain")
         .set(&TREES, 0.04)
-        .set_text(&TREE_KINDS, "base:spruce_log")
+        .set_text(&TREE_KINDS, "animals:araucaria_log:1 animals:scale_conifer_log:2")
         .set(&FERNS, 0.05)
         .set_text(&FLOWERS, "animals:fern");
 
@@ -207,6 +224,72 @@ pub fn init(r: &mut Registry) {
         .biome(BiomeRule::new("fern_forest"));
 
     r.decorate(ferns).dimension(&CRETACEOUS);
+}
+
+/// The Cretaceous's trees (`reports/ecology/Cretaceous food webs.md`), which base's worldgen grows
+/// where a biome's `tree_kinds` names them: the araucarias, tall with a flat crown of rich, slow
+/// foliage and big cones; ginkgos, round, deciduous, with fleshy seeds; the floodplain's swamp
+/// cypresses and the dry land's scale-leaved conifers (Cheirolepidiaceae), both cones; and the tree
+/// fern Tempskya, a trunk of roots under a crown of fronds. Wood, shape, what the leaves drop.
+/// No saplings yet: they grow by base's plant rule, which this mod can't call.
+const WOODS: [(&str, Option<&str>, Option<&str>); 5] = [
+    ("araucaria", Some("flat_tree"), Some("araucaria_cone")),
+    ("ginkgo", None, Some("ginkgo_seed")),
+    ("swamp_cypress", Some("cone_tree"), None),
+    ("scale_conifer", Some("cone_tree"), None),
+    ("tempskya", Some("palm_tree"), None),
+];
+
+fn woods(r: &mut Registry) {
+    for (wood, shape, fruit) in WOODS {
+        let side = format!("log_{wood}");
+        let top = format!("log_{wood}_top");
+        let log = r
+            .block(Block::generated(format!("{wood}_log")))
+            .set_text(&TREE_LEAVES, &format!("animals:{wood}_leaves"));
+        let log = match shape {
+            Some(tag) => log.tag(tag),
+            None => log,
+        };
+        log.sound_group("base:block.wood")
+            .hardness(2.0)
+            .mineable("axe")
+            .tag("logs")
+            .tag(&format!("logs/{wood}"))
+            .prop("axis", ["y", "x", "z"])
+            .states(move |p, s| match p.get("axis") {
+                "y" => s.textures(&top, &side, &top),
+                "x" => s.faces([&top, &top, &side, &side, &side, &side]),
+                _ => s.faces([&side, &side, &side, &side, &top, &top]),
+            })
+            .placement(|p, props| {
+                props.set(
+                    "axis",
+                    match p.face() {
+                        0 | 1 => "x",
+                        4 | 5 => "z",
+                        _ => "y",
+                    },
+                )
+            })
+            .tab(&NATURAL);
+        let leaves = Block::generated(format!("{wood}_leaves"));
+        r.block(leaves)
+            .sound_group("base:block.grass")
+            .texture(&format!("leaves_{wood}"))
+            .hardness(0.2)
+            .cutout()
+            .opacity(1)
+            .tint(&tints::FOLIAGE)
+            .tag("leaves")
+            .mineable("shears")
+            .tab(&NATURAL);
+        if let Some(fruit) = fruit {
+            r.loot(leaves)
+                .pool(Pool::new().when(Cond::Chance(0.05)).item(fruit));
+            r.item(Item::generated(fruit.into())).tab(&NATURAL);
+        }
+    }
 }
 
 /// Ferns and horsetails over the ground, as many as the biome's `FERNS`; horsetails where it is

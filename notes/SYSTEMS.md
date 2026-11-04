@@ -141,6 +141,10 @@ built, it gets its row below and its arrows above.
 - **A growing plant, or a new one**: its row in `vitals::plants::PLANTS` from the research
   (`reports/ecology/plants.json`), its block's `.growth(growth::step_secs(..))` and
   `.on_grow(|e| growth::grow(..))` (`blocks.rs`); the sheet.
+- **A tree**: its wood in `WOODS` (`blocks.rs`, or `cretaceous.rs` for the Cretaceous's) with its
+  shape and fruit, its biomes' `tree_kinds`, its sapling's row in `vitals::plants::PLANTS`, its
+  leaves and fruit in `vitals::forage` (`SOURCES` found where it grows, `DROPPED`), textures and
+  names.
 - **A wild plant**: its row in `vitals::wild::WILD` (form, ground, what it gives, where, how
   thick), its growth in `PLANTS` (not for one that stands), its `SOURCES` rows found where it
   grows, its fruit in `FOODS` or `DROPPED`, a texture and a name. The base mod registers and
