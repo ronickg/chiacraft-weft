@@ -26,15 +26,17 @@ const WORLDS_ALPN: &[u8] = b"chiacraft/worlds/1";
 const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// 3: `Join` carries the account's vouching (chiacraft). 4: the hello offers the world's data
 /// packages, which the joining game downloads and loads before it is let in (chiacraft). 5: the
-/// hello may carry a travel ticket from a linked world's portal (chiacraft, `travel`). 6: a world
-/// refuses with a reason in the player's language (`ToClient::Refused`), and its status says
-/// what its admission rules ask (chiacraft, `admission`).
-const PROTOCOL: u32 = 6;
+/// hello may carry a travel ticket from a linked world's portal (chiacraft, `travel`). 6: an offer
+/// says whether the package carries sandboxed code (chiacraft, phase 6). 7: a world refuses with a
+/// reason in the player's language (`ToClient::Refused`), and its status says what its admission
+/// rules ask (chiacraft, `admission`).
+const PROTOCOL: u32 = 7;
 const MAX_FRAME: usize = 64 << 20;
 
-/// A data package the host's world plays with: id, version, hash (hex), size in bytes, and its
-/// signature envelope (empty if unsigned).
-pub type Offer = (String, String, String, u64, String);
+/// A data package the host's world plays with: id, version, hash (hex), size in bytes, its
+/// signature envelope (empty if unsigned), and whether it carries sandboxed code
+/// (`code/server.wasm`; the joining game checks this against the manifest it downloads).
+pub type Offer = (String, String, String, u64, String, bool);
 
 /// Requests on the extra streams a joining game opens to download packages.
 const GET_MANIFEST: u8 = 0;
@@ -1103,7 +1105,7 @@ async fn download(
         return Err(format!("the world wants {} packages, {} MiB: more than this game downloads", missing.len(), total >> 20));
     }
     let mut done = 0u64;
-    for (id, _, hex, size, sig) in missing {
+    for (id, _, hex, size, sig, code) in missing {
         let h = Hash::from_hex(hex).ok_or_else(|| format!("package {id}: a bad hash"))?;
         if *size > MAX_TOTAL_BYTES {
             return Err(format!("package {id} is too big ({size} bytes)"));
@@ -1116,6 +1118,15 @@ async fn download(
             FileManifest::parse(std::str::from_utf8(&text).map_err(|e| e.to_string())?).map_err(|e| format!("package {id}: {e}"))?;
         if &manifest.id != id || manifest.files.iter().map(|f| f.size).sum::<u64>() != *size {
             return Err(format!("package {id}: the manifest doesn't match what the host offered"));
+        }
+        // The player was asked knowing whether it carries code: a host that hid it is refused.
+        if manifest
+            .files
+            .iter()
+            .any(|f| f.path == chiacraft_packages::identity::SERVER_CODE)
+            != *code
+        {
+            return Err(format!("package {id}: the host didn't say truly whether it carries code"));
         }
         for f in &manifest.files {
             if !store.has_blob(&f.hash) {
@@ -1210,7 +1221,7 @@ fn check_offers(offers: &[Offer]) -> Result<(), String> {
     if offers.len() > MAX_OFFERS {
         return Err(format!("the world plays with {} packages: more than this game takes", offers.len()));
     }
-    for (id, version, hash, _, sig) in offers {
+    for (id, version, hash, _, sig, _) in offers {
         let fine = (1..=64).contains(&id.len())
             && id
                 .chars()

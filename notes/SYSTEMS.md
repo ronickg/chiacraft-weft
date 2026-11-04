@@ -84,7 +84,8 @@ built, it gets its row below and its arrows above.
 | Soil, compost | `vitals::soil`, `mods/base/src/farming.rs` | `MAX`, `FEEDS`, `COMPOSTS`, `COMPOST_DAYS` | crops' harvests, dung (grazers), spoiled food (freshness), plant waste | crops' growth on farmland (`growth.rs`), tilling with hoes |
 | Food webs | `animals_core::web` (`gaps`, `WAITING`, `grazing`), `core/tests/places.rs` | `WAITING` rows (the gaps the plan fills), `vitals::forage::GRASS_COVER` | species' diets, prey sizes, habitats, crowds and hunger, `vitals::forage::SOURCES`, the grazed grass's growth, climates | the species sheet's food web table, the check |
 | Capacity | `vitals::forage::season_lushness`, `forage.rs` (`NATURAL_SPAWN`), `animal::arrive` | `SPAWN_FLOOR`, `ARRIVES_FED`, `YOUNG_PERCENT`, `STARVES_SECS` | plants, climates, calendar, breeding seasons | natural spawning, how fed wild ones arrive, young in season, starving |
-| Plants, soil water | `vitals::plants` (`PLANTS`, `rate`, `soil_water`), `base_api::ground_at`, `mods/base/src/growth.rs` | `PLANTS` rows, `GROWING` | climates, rain schedule, calendar, height, water within 4 blocks | the growing blocks' steps (wheat, berry bush, sapling, sugar cane, cactus) |
+| Plants, soil water | `vitals::plants` (`PLANTS`, `rate`, `soil_water`), `base_api::ground_at`, `mods/base/src/growth.rs` | `PLANTS` rows, `GROWING` | climates, rain schedule, calendar, height, water within 4 blocks | the growing blocks' steps (wheat, berry bush, sapling, sugar cane, cactus, the wild plants) |
+| Wild plants | `vitals::wild` (`WILD`, `pick`), `mods/base/src/wild.rs`, `worldgen.rs` (`wild_at`), `cretaceous.rs` | `WILD` rows (form, ground, gives, found, cover), `MOST`, `REACH`, `CROWD` | plants (their growth and frost), the biomes | the world's decoration, foraging (`SOURCES` rows found where they grow), foods (`FOODS`, `DROPPED`), capacity |
 | Rain by season | `mods/base/src/weather.rs`, `vitals::climate::{spell, rains, thunders}` | `rain` per season in `BIOMES` | climates, calendar, the world's seed | the engine (`set_rain`: rain drawn only where it falls), the air (`raining_at`) |
 | Wind and fog, snow, storms | `vitals::air`, `mods/base/src/weather.rs` (`/air`) | `wind`, `fog`, `fog_kind` per biome in `BIOMES`; `DAY_SPREAD`, `DAY_SWING`, `STORM`, `CLEARS`, `SNOWS_BELOW`, `SNOWFALL`, `MELT`, `BLIZZARD`, `DRY`, `DUST`, `FOG_SIGHT` | climates, calendar, rain spells and thunder, the world's seed | the engine (`set_air`: snow drawn where it is cold, `scene.weather`/`ground` for the pack's fog, storms, snow lying, swaying plants), the air (`air_at`: wind chill, fog), hunters and prey (`base_api::sight`) |
 | Calendar, seasons | `vitals::calendar` | `SEASON_DAYS`, `MIDSUMMER` | engine day time | the air, breeding seasons, day length (`.seasons(..)` on dimensions), the HUD clock |
@@ -126,6 +127,10 @@ built, it gets its row below and its arrows above.
 - **A growing plant, or a new one**: its row in `vitals::plants::PLANTS` from the research
   (`reports/ecology/plants.json`), its block's `.growth(growth::step_secs(..))` and
   `.on_grow(|e| growth::grow(..))` (`blocks.rs`); the sheet.
+- **A wild plant**: its row in `vitals::wild::WILD` (form, ground, what it gives, where, how
+  thick), its growth in `PLANTS` (not for one that stands), its `SOURCES` rows found where it
+  grows, its fruit in `FOODS` or `DROPPED`, a texture and a name. The base mod registers and
+  places every row; `wild.rs`'s check says if it can't grow where it's put or crowds the grass.
 - **A food in the world, or a new diet**: its row in `vitals::forage::SOURCES` (and the plant that
   renews it in `vitals::plants`), the species' `eats` from its research; `places.rs` checks
   plant eaters find food at home, and `web.rs` that every food in a diet is in the world and
@@ -160,6 +165,7 @@ built, it gets its row below and its arrows above.
 |---|---|---|
 | The climates are their real places | `vitals/tests/places.rs` | a biome's year mean, seasons or rainiest season drifting from its place's research |
 | Every plant grows somewhere | `vitals/tests/places.rs` | a plant whose warmth or water no biome gives |
+| Wild plants grow where they're put | `vitals/src/wild.rs` | a wild plant under a third of its best in every season of a biome it's found in, a gift that is no food, covers crowding out the grass |
 | Plant eaters find food where they live | `animals/core/tests/places.rs` | a plant eater whose food grows in fewer than two seasons in one of its habitats |
 | Hunters fill up on their prey at home | same | a hunter whose biggest prey at home takes more than ten kills to fill it |
 | Most of every diet is in the game | same | a species with under half its diet growing or on the ground as items |

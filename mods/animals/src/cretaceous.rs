@@ -64,6 +64,30 @@ pub fn init(r: &mut Registry) {
             .needs_below("#plant_soil")
             .tab(&NATURAL);
     }
+    // The Cretaceous's other wild plants (`vitals::wild`; base's decoration puts them, as it does
+    // any mod's): cycads, early flowering shrubs, water lilies' kin floating on its ponds. They
+    // stand as they are; a cycad gives, a time in two, its seed (poisonous to people), which
+    // plants one.
+    for p in vitals::wild::WILD
+        .iter()
+        .filter(|p| p.block.starts_with("animals:"))
+    {
+        let block = Block::generated(p.block.into());
+        r.block(block)
+            .sound_group("base:block.grass")
+            .plant()
+            .needs_below(if p.ground == vitals::wild::Ground::Water { "#water" } else { "#plant_soil" })
+            .texture(p.block.split_once(':').map_or(p.block, |(_, n)| n))
+            .tab(&NATURAL);
+        if let Some(seed) = p.gives {
+            r.loot(block)
+                .pool(Pool::new().entry(Entry::item(p.block)))
+                .pool(Pool::new().when(Cond::Chance(0.5)).item(seed));
+            r.item(Item::generated(seed.into()))
+                .placed_block(block)
+                .tab(&NATURAL);
+        }
+    }
     r.tag("plant_soil", &["red_sand"]);
 
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);

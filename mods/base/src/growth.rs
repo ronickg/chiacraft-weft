@@ -91,7 +91,7 @@ fn frost(e: &mut BlockEvent, block: &str) {
         "base:sugar_cane" | "base:cactus" if w.get(below) == e.state() && w.get(above) != e.state() => {
             w.set(pos, 0);
         }
-        _ => {}
+        _ => crate::wild::frost(e, block),
     }
 }
 

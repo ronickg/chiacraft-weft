@@ -87,6 +87,19 @@ pub fn register(r: &mut Registry) {
         ("cooked_egg", 5, 6.0, ""),
         ("apple_pie", 8, 4.8, ""),
         ("berries", 2, 1.2, ""),
+        // The wild foods (`vitals::wild`): the north's berries, brambles' raspberries, prickly
+        // pears and rose hips; nuts and seeds, small but rich; mushrooms, the red one poisonous.
+        ("lingonberries", 2, 1.2, ""),
+        ("cloudberries", 2, 1.2, ""),
+        ("crowberries", 1, 0.6, ""),
+        ("raspberries", 2, 1.2, ""),
+        ("prickly_pear_fruit", 3, 1.8, ""),
+        ("rose_hip", 1, 0.6, ""),
+        ("hazelnut", 2, 2.4, ""),
+        ("pine_nut", 2, 2.4, ""),
+        ("sunflower_seeds", 2, 2.4, ""),
+        ("mushroom_brown", 1, 0.6, ""),
+        ("mushroom_red", 1, 0.6, ""),
     ] {
         // What a portion holds and how fresh it is (stamped as it ages, `survival/food.rs`): shown in
         // its tooltip.
@@ -105,11 +118,27 @@ pub fn register(r: &mut Registry) {
             .on_use(base_api::eat)
             .tab(&crate::tabs::FOOD);
         let i = if tag.starts_with("cooked_meat/") { i.tag("cooked_meat") } else { i };
-        // Berries are planted like seeds: a new bush.
+        // Berries are planted like seeds: a new bush; so are the wild plants' fruit and seeds.
         let i = if name == "berries" { i.placed_block(&crate::blocks::BERRY_BUSH) } else { i };
+        let i = match crate::wild::planted_by(name) {
+            Some(b) => i.placed_block(b),
+            None => i,
+        };
         if !tag.is_empty() {
             i.tag(tag);
         }
+    }
+    // Seeds animals eat off the ground (`vitals::forage::DROPPED`): acorns, which plant an oak,
+    // and wild rice's grain, which plants wild rice.
+    r.item(Item::generated("acorn".into()))
+        .placed_block(&crate::blocks::SAPLING)
+        .tab(&crate::tabs::NATURAL);
+    let rice = r
+        .item(Item::generated("rice".into()))
+        .tab(&crate::tabs::NATURAL);
+    match crate::wild::planted_by("rice") {
+        Some(b) => drop(rice.placed_block(b)),
+        None => drop(rice),
     }
     r.item(Item::generated("leather".into()))
         .tag("materials/leather")

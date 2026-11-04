@@ -1,0 +1,5 @@
+# CI's test runs (`cargo nextest run --profile ci`): a test still running after a minute is
+# reported as slow, and stopped after five.
+[profile.ci]
+slow-timeout = { period = "60s", terminate-after = 5 }
+fail-fast = false

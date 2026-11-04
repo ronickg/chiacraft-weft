@@ -1,0 +1,128 @@
+# Builds the workspace, lints it and runs every check that has no person in it, on every push to
+# dev and main and every pull request: the unit tests, the mods' checks (including the sheets that fail
+# when SHEET.md or SPECIES.md is stale), the animals' rules through WASM, and the testkit against
+# the real game. Linux has no GPU here: the game draws with Mesa's software Vulkan (lavapipe)
+# into a virtual X screen.
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+
+# A newer push waits for the run before it rather than stopping it, so every run gets to the end
+# and leaves its cache for the next.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: System libraries
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Build
+        run: cargo build --workspace
+
+      # mut_from_ref fires in Weft's own crates/sdk/src/game.rs, which stays as upstream has it.
+      - name: Clippy
+        run: cargo clippy --workspace -- -A clippy::mut_from_ref
+
+      # nextest stops a test that hangs (.config/nextest.toml) and names it.
+      - name: Tests (chiacraft crates)
+        run: cargo nextest run --profile ci -p chiacraft-wallet -p chiacraft-account -p chiacraft-packages --lib
+
+      - name: Tests (engine)
+        run: cargo nextest run --profile ci -p weft_engine
+
+      # nextest doesn't run doc tests.
+      - name: Doc tests (engine)
+        timeout-minutes: 15
+        run: cargo test --doc -p weft_engine
+
+      # Unit tests, tests/places.rs, and tests/sheet.rs: SHEET.md and SPECIES.md are what the code
+      # says.
+      - name: Tests (survival numbers, animals)
+        run: cargo nextest run --profile ci -p vitals -p animals_core
+
+  animals-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The game's own rules compiled to WASM: inheritance, timings, caps, evolution, balance.
+      - name: Animals' rules
+        run: mods/animals/web/build.sh && node mods/animals/web/test.mjs
+
+  testkit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config xvfb mesa-vulkan-drivers vulkan-tools \
+            libxkbcommon-x11-0 libxcursor1 libxrandr2 libxi6 libx11-xcb1
+
+      # The game and its mods, as `cargo run --release -- --test ...` runs them.
+      - name: Build
+        run: cargo build --release
+
+      - name: Software Vulkan
+        run: xvfb-run -a vulkaninfo --summary
+
+      # Every wait in a test has its own timeout; this is for a game that stops answering.
+      - name: Testkit
+        timeout-minutes: 45
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" target/release/weft --test all
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: testkit-report
+          path: |
+            run/test-reports
+            run/test-shots
+            run/test-jobs/*/output.log
+            run/logs
+          if-no-files-found: ignore

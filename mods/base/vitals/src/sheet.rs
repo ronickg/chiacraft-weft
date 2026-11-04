@@ -7,7 +7,7 @@ use std::fmt::Write;
 use crate::effects;
 use crate::food::{self, NUTRIENT_NAMES};
 use crate::stats::{self, Growth};
-use crate::{air, calendar, climate, difficulty, forage, levels, plants, soil, temperature};
+use crate::{air, calendar, climate, difficulty, forage, levels, plants, soil, temperature, wild};
 
 pub fn markdown() -> String {
     let mut w = String::new();
@@ -21,6 +21,7 @@ pub fn markdown() -> String {
     effects_table(&mut w);
     climates(&mut w);
     plant_table(&mut w);
+    wild_table(&mut w);
     forage_table(&mut w);
     soil_table(&mut w);
     difficulties(&mut w);
@@ -162,7 +163,10 @@ fn climates(w: &mut String) {
     );
     for c in climate::BIOMES.iter().filter(|c| !c.underground) {
         let wind = c.wind.map(|v| format!("{v:.1}")).join(" | ");
-        let fog = (0..4).map(|s| format!("{:.0}%", air::fog_share(c.fog, Some(s)) * 100.0)).collect::<Vec<_>>().join(" | ");
+        let fog = (0..4)
+            .map(|s| format!("{:.0}%", air::fog_share(c.fog, Some(s)) * 100.0))
+            .collect::<Vec<_>>()
+            .join(" | ");
         let kind = match c.fog_kind {
             climate::Fog::Dawn => "before dawn to mid morning",
             climate::Fog::Sea => "off the sea, any hour",
@@ -205,6 +209,31 @@ fn plant_table(w: &mut String) {
             p.water,
             if p.frost > plants::HARDY { format!("{} °C", p.frost) } else { "hardy".into() },
             if p.days > 0.0 { format!("{}", p.days) } else { "-".into() }
+        );
+    }
+    let _ = writeln!(w);
+}
+
+fn wild_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Wild plants\n\nWhat the world grows besides grass and trees (`vitals::wild`): how each grows, the ground it stands on, what picking it gives, and the biomes it covers that share of its ground in.\n\n| block | grows | ground | gives | cover | found in |\n|---|---|---|---|---|---|"
+    );
+    for p in &wild::WILD {
+        let found = p
+            .found
+            .iter()
+            .map(|b| b.split(':').nth(1).unwrap_or(b))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let _ = writeln!(
+            w,
+            "| {} | {:?} | {:?} | {} | {:.1}% | {found} |",
+            p.block,
+            p.form,
+            p.ground,
+            p.gives.unwrap_or("-"),
+            p.cover * 100.0
         );
     }
     let _ = writeln!(w);

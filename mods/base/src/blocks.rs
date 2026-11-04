@@ -127,8 +127,14 @@ fn leaves(r: &mut Registry, handle: &'static Block, tex: &str) {
     let table = r
         .loot(handle)
         .pool(Pool::new().when(Cond::Chance(0.05)).item("sapling"));
+    // Ours: acorns from oak leaves, pine nuts from spruce cones (`vitals::forage::DROPPED`,
+    // `food::FOODS`).
     if std::ptr::eq(handle, &OAK_LEAVES) {
-        table.pool(Pool::new().when(Cond::Chance(0.005)).item("apple"));
+        table
+            .pool(Pool::new().when(Cond::Chance(0.005)).item("apple"))
+            .pool(Pool::new().when(Cond::Chance(0.05)).item("acorn"));
+    } else if std::ptr::eq(handle, &SPRUCE_LEAVES) {
+        table.pool(Pool::new().when(Cond::Chance(0.03)).item("pine_nut"));
     }
 }
 
@@ -348,11 +354,17 @@ pub fn register(r: &mut Registry) {
         .tint(&tints::GRASS)
         .no_item()
         .growth(crate::growth::step_secs("base:grazed_grass", 1, 600.0), 9)
-        .on_grow(|e| crate::growth::grow(e, "base:grazed_grass", false, |e| {
-            e.world().set(e.pos(), TALL_GRASS.id());
-        }));
+        .on_grow(|e| {
+            crate::growth::grow(e, "base:grazed_grass", false, |e| {
+                e.world().set(e.pos(), TALL_GRASS.id());
+            })
+        });
     plant(r, &DANDELION, "flower_dandelion");
     plant(r, &ROSE, "flower_rose");
+    // A wild rose gives itself and, a time in four, its hips.
+    r.loot(&ROSE)
+        .pool(Pool::new().entry(Entry::item("rose")))
+        .pool(Pool::new().when(Cond::Chance(0.25)).item("rose_hip"));
     r.block(&SAPLING)
         .sound_group("grass")
         .texture("sapling_oak")
@@ -570,8 +582,16 @@ pub fn register(r: &mut Registry) {
     // Any age gives a berry back to plant again; ripe, two more.
     r.loot(&BERRY_BUSH)
         .pool(Pool::new().entry(Entry::item("berries")))
-        .pool(Pool::new().when(Cond::BlockState("age=3")).entry(Entry::item("berries")))
-        .pool(Pool::new().when(Cond::BlockState("age=3")).entry(Entry::item("berries")));
+        .pool(
+            Pool::new()
+                .when(Cond::BlockState("age=3"))
+                .entry(Entry::item("berries")),
+        )
+        .pool(
+            Pool::new()
+                .when(Cond::BlockState("age=3"))
+                .entry(Entry::item("berries")),
+        );
     // Spoiled food, dung and plant waste rot into compost (`farming.rs`): its level shows as it
     // fills, the top dark and rich when it's ready (placeholder look, `notes/STYLE.md`).
     r.block(&COMPOST_BIN)

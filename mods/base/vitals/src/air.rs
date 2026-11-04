@@ -232,10 +232,15 @@ mod tests {
         for c in BIOMES.iter().filter(|c| !c.underground) {
             for s in 0..4 {
                 let days = 20_000u64;
-                let foggy = (0..days).filter(|&d| fog_day(c.fog, Some(s), 777, d).is_some()).count();
+                let foggy = (0..days)
+                    .filter(|&d| fog_day(c.fog, Some(s), 777, d).is_some())
+                    .count();
                 let share = foggy as f32 / days as f32;
                 assert!((share - fog_share(c.fog, Some(s))).abs() < 0.02, "{} season {s}: fog {share}", c.biome);
-                let mean = (0..days).map(|d| wind(c.wind, Some(s), 777, d, 12.0 + (d % 24) as f32, false)).sum::<f32>() / days as f32;
+                let mean = (0..days)
+                    .map(|d| wind(c.wind, Some(s), 777, d, 12.0 + (d % 24) as f32, false))
+                    .sum::<f32>()
+                    / days as f32;
                 assert!((mean - c.wind[s]).abs() < c.wind[s] * 0.05 + 0.05, "{} season {s}: wind {mean} against {}", c.biome, c.wind[s]);
             }
         }
@@ -257,7 +262,13 @@ mod tests {
         let winter = 3 * calendar::SEASON_DAYS as u64 + 7;
         let summer = calendar::SEASON_DAYS as u64 + 7;
         let years = 0..20u64;
-        let lying = |day: u64| years.clone().map(|y| p.snow_lying(9, day + y * calendar::YEAR_DAYS as u64, 12.0)).sum::<f32>() / 20.0;
+        let lying = |day: u64| {
+            years
+                .clone()
+                .map(|y| p.snow_lying(9, day + y * calendar::YEAR_DAYS as u64, 12.0))
+                .sum::<f32>()
+                / 20.0
+        };
         assert!(lying(winter) > 0.2, "winter {}", lying(winter));
         assert!(lying(summer) < 0.01, "summer {}", lying(summer));
     }
@@ -268,8 +279,13 @@ mod tests {
         assert_eq!(fog_hours(Fog::Dawn, 12.0), 0.0);
         assert!(fog_hours(Fog::Dawn, 6.0) > 0.99);
         assert!(fog_hours(Fog::Sea, 15.0) >= 0.6);
-        let c = BIOMES.iter().find(|c| c.fog_kind == Fog::Dawn && c.fog.iter().any(|&f| f > 0.0)).unwrap();
-        let day = (0..10_000).find(|&d| fog_day(c.fog, Some(2), 5, d).is_some()).unwrap();
+        let c = BIOMES
+            .iter()
+            .find(|c| c.fog_kind == Fog::Dawn && c.fog.iter().any(|&f| f > 0.0))
+            .unwrap();
+        let day = (0..10_000)
+            .find(|&d| fog_day(c.fog, Some(2), 5, d).is_some())
+            .unwrap();
         assert!(fog(c.fog, c.fog_kind, Some(2), 5, day, 6.0, 1.0) > 0.5);
         assert_eq!(fog(c.fog, c.fog_kind, Some(2), 5, day, 6.0, CLEARS.1 + 1.0), 0.0);
     }

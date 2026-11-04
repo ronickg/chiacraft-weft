@@ -293,6 +293,32 @@ The smallest version that works is phases 1-4.
 5. **Finding worlds.** On-chain listing by hint; DIG listings and curated lists; spam ranking.
 6. **Sandboxed code mods.** wasmtime with components (from `horizon-mods`), WIT v1.0 shaped on
    Weft's SDK, server halves then client halves, frozen API versions; personal mods per world.
+   Decided 2026-11-03 (`reports/Sandboxed code mods.md`, "Decisions": Ronald took its
+   recommendations): wasmtime 36 LTS components with the host in our crates and WIT v1.0 frozen
+   once released; code at `code/server.wasm` inside the package; the limits and strikes below;
+   server halves on the host only; Weft mods port through the `weft_sdk` alias; a package's
+   command that clashes is left out and the world still opens; one consent sheet that marks code.
+   In slices:
+   1. *Server halves* (built): `crates/sandbox` (wasmtime 36 LTS components, fuel per call, a
+      500 ms epoch watchdog, 64 MiB memory, per-call counts, storage quotas, three strikes stop a
+      mod in a world), API `chiacraft:mods@1.0.0` (`crates/sandbox/wit/v1.0`, frozen once
+      released), the guest SDK `crates/mod-sdk` with Weft's SDK names (commands, events,
+      questions, chains, world ticks, `World`, handles; storage instead of components). A
+      package carries it as `code/server.wasm`, under its hash and signature; the `packages` mod
+      registers its hooks through Weft's SDK and runs it per world run on the host only, with
+      storage in the world's save. Sample: `clans` (the animals mod's tribes, ported). Author
+      guide `docs/sandboxed-mods.md`.
+   2. *Consent says it is code* (built): protocol 6 offers say whether a package carries code,
+      the join sheet marks it ("runs sandboxed code"), and a package whose manifest says otherwise
+      is refused; a package's clashing command is left out instead of failing the world.
+   3. *More of the SDK*: components, channels, block and item callbacks, sounds and particles,
+      each a new frozen API version beside 1.0.
+   4. *Client halves*: `code/client.wasm`, client calls only (HUD, screens, keys, channels to its
+      server half), a frame budget.
+   5. *Personal mods per world*: the player's own client halves, allowed or not by each world's
+      owner.
+   6. *Operations*: `/mods` (cost, strikes, resume), cached compiled components, a per-tick budget
+      across mods.
 7. **Headless server and administration.** No window or GPU (Weft's CPU terrain path),
    `server.toml`, console, operators and command permissions (today any player can `/give`),
    movement checks, our own relay, load tests (`horizon-bots`).

@@ -31,7 +31,9 @@ pub fn register(r: &mut Registry) {
         let w = cmd.world();
         if let Some(fog) = cmd.float("fog") {
             let wind = cmd.float("wind").unwrap_or(0.0) as f32;
-            let heading = cmd.float("heading").map_or_else(|| now_heading(&w), |h| h as f32);
+            let heading = cmd
+                .float("heading")
+                .map_or_else(|| now_heading(&w), |h| h as f32);
             let flags = match cmd.text("kind") {
                 Some("snow") => air_flags::SNOWING,
                 Some("dust") => air_flags::DUST,

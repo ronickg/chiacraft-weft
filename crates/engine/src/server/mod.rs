@@ -296,7 +296,12 @@ pub struct ServerInfo {
     pub identity: Option<Arc<crate::world_address::WorldIdentity>>,
     /// The world's folder (none for a world that isn't saved).
     pub dir: Option<std::path::PathBuf>,
+    /// Which run of a server this is, counted from 1 in this game: a world opened again is a new
+    /// run (sandboxed mods start over in each).
+    pub run: u64,
 }
+
+static RUNS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 thread_local! {
     static INFO: std::cell::RefCell<Option<Arc<ServerInfo>>> = const { std::cell::RefCell::new(None) };
@@ -350,6 +355,7 @@ pub fn spawn(cfg: ServerConfig, storage: Option<Storage>) -> ServerHandle {
         world_key: cfg.identity.as_ref().map(|i| i.key()),
         identity: cfg.identity.clone(),
         dir: storage.as_ref().map(|s| s.meta.dir.clone()),
+        run: RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1,
     }));
     let world_content = scope.content;
     let dir = storage.as_ref().map(|s| s.meta.dir.clone());

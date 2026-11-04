@@ -40,7 +40,24 @@ Then look for pure black pixels in the world (a NaN usually shows as one; the bl
 black too, so look at where they are) and look at each shot. Test runs pin the shaders' clock, so
 motion (wind, ripples, drifting fog) does not show in shots: watch it in a normal game.
 
-## 3. Known traps (from other packs' bugs)
+## 3. Light shafts: `rays.txt`
+
+Six posts and a beam of leaves between the player and the sun, shot mid afternoon, at golden hour,
+as the sun touches the hills and at golden hour in fog. Run it twice and compare:
+
+```
+./target/release/weft --world rays_$RANDOM --script mods/base/shaderpack/checks/rays.txt --shot-dir on --size 640x360 --shader-pack chiacraft
+./target/release/weft --world rays_$RANDOM --script mods/base/shaderpack/checks/rays.txt --shot-dir off --size 640x360 --shader-pack chiacraft --no-shafts
+```
+
+With them on, beams fan out from the sun between the posts; off, none. They fade as the sun meets
+the horizon and are gone once it has set (the sky still glows then). `--shafts-debug` draws what
+the effect sees instead of the picture: in red how strong it is, in green the bright sky it
+gathered, in blue how near the sun; a plain picture means it gave up everywhere (sun set, behind
+the camera, rain, water). Keep the mouse off the game window while a script runs: it turns the
+view.
+
+## 4. Known traps (from other packs' bugs)
 
 - **Zero vectors**: `normalize` of a flattened or crossed vector that can be zero (looking straight
   down, a squashed quad): add a small offset first. MoltenVK compiles with fast math, so `isnan`
