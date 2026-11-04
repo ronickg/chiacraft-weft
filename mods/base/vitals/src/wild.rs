@@ -38,6 +38,9 @@ pub enum Form {
     Log,
     /// A flat mat lying on the ground (kelp washed up at the tide line).
     Mat,
+    /// A mound standing on the ground, a full block, and in one place in two its crown on it (the
+    /// block `<block>_upper`): a termite mound.
+    Mound,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -246,6 +249,9 @@ pub const FLOWERING: &[&str] = &["animals:floodplain", "animals:scrubland"];
 pub const PONDS: &[&str] = &["animals:floodplain", "animals:red_dunes"];
 /// Where the Cretaceous's trees fall and rot: its forests and the wooded floodplain.
 pub const DEADWOOD: &[&str] = &["animals:floodplain", "animals:fern_forest"];
+/// The Djadokhta's dry lands, where termites built (the report's "termite and ant nests: red
+/// dunes, scrubland").
+pub const TERMITE_LANDS: &[&str] = &["animals:red_dunes", "animals:scrubland"];
 
 const fn w(
     block: &'static str,
@@ -261,7 +267,7 @@ const fn w(
 /// Covers are shares of the cells of that ground (tall grass covers 5-35% of the turf, berry bushes
 /// 0.4% of the forest's; `forage::GRASS_COVER`): the tundra's sedges and cottongrass are its grass,
 /// the bushes and mushrooms are found, not walked through.
-pub const WILD: [Wild; 22] = [
+pub const WILD: [Wild; 23] = [
     w("base:sedge", Form::Tuft, Ground::Soil, None, SEDGE_LANDS, 0.12),
     w("base:cottongrass", Form::Tuft, Ground::Soil, None, TUNDRA, 0.08),
     w("base:reindeer_lichen", Form::Tuft, Ground::Soil, None, NORTH, 0.05),
@@ -283,6 +289,8 @@ pub const WILD: [Wild; 22] = [
     w("animals:flowering_shrub", Form::Still, Ground::Soil, None, FLOWERING, 0.02),
     w("animals:water_lily", Form::Still, Ground::Water, None, PONDS, 0.06),
     w("animals:rotten_log", Form::Log, Ground::Soil, None, DEADWOOD, 0.004),
+    // Termite mounds on the dry lands' red sand and soil, rare: their termites the insect eaters'.
+    w("animals:termite_mound", Form::Mound, Ground::Soil, None, TERMITE_LANDS, 0.003),
     // Kelp washed up on the beach (wrack, the beach's food: sand fleas and flies on it feed the
     // shorebirds). Kelp growing under the sea waits for a block that stands in water.
     w("base:kelp", Form::Mat, Ground::Sand, Some("base:kelp"), &["base:beach"], 0.03),
@@ -316,7 +324,7 @@ mod tests {
     #[test]
     fn every_wild_plant_has_its_numbers() {
         for p in &WILD {
-            if !matches!(p.form, Form::Still | Form::Log | Form::Mat) {
+            if !matches!(p.form, Form::Still | Form::Log | Form::Mat | Form::Mound) {
                 assert!(crate::plants::of(p.block).is_some(), "{}: no row in plants::PLANTS", p.block);
             }
             if let Some(item) = p.gives.filter(|g| *g != p.block) {

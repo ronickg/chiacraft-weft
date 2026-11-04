@@ -72,7 +72,7 @@ pub fn register(r: &mut Registry) {
                 if p.gives.is_some() { b.no_item() } else { b.tab(&crate::tabs::NATURAL) }
             }
             // No base plant lies as a log yet (the Cretaceous's rotten log is the animals mod's).
-            Form::Still | Form::Log => b.texture(name).tab(&crate::tabs::NATURAL),
+            Form::Still | Form::Log | Form::Mound => b.texture(name).tab(&crate::tabs::NATURAL),
             // A flat mat on the ground, a sixteenth high; picked, it gives its plant.
             Form::Mat => b
                 .texture(name)
@@ -188,6 +188,22 @@ pub fn state(i: usize) -> u32 {
             })
             .collect()
     })[i]
+}
+
+/// The crown the world puts on a mound (`Form::Mound`) of state `s`, in one place in two (`roll`
+/// 0..1): its `<block>_upper`, if it is a mound and that block is registered.
+pub fn upper_of(s: u32, roll: f32) -> Option<u32> {
+    static UPPERS: OnceLock<Vec<(u32, u32)>> = OnceLock::new();
+    let uppers = UPPERS.get_or_init(|| {
+        wild::WILD
+            .iter()
+            .filter(|p| p.form == Form::Mound)
+            .filter_map(|p| Some((Block::lookup(p.block)?, Block::lookup(&format!("{}_upper", p.block))?)))
+            .collect()
+    });
+    (roll < 0.5)
+        .then(|| uppers.iter().find(|&&(m, _)| m == s).map(|&(_, u)| u))
+        .flatten()
 }
 
 /// A spreading plant's growth step: a new one nearby on its ground, unless `CROWD` are there.

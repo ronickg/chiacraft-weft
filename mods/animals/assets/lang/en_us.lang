@@ -379,3 +379,5 @@ screen.animals.temper.steady = Steady
 screen.animals.temper.skittish = Skittish
 screen.animals.gene_value = {0} {#c6a383}{1}%{/}
 screen.animals.gene_alleles = {0} {#c6a383}{1} ({2}){/}
+block.animals.termite_mound = Termite Mound
+block.animals.termite_mound_upper = Termite Mound
