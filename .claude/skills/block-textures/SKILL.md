@@ -90,6 +90,34 @@ deep shade of the block's own colour (never black), restrained highlights, top-l
 9. **Approve**: add the approved tiles to `approved.txt`; they become part of the style key.
    Commit the tiles, the batch and the game textures together, one family a commit.
 
+## The grade: tune, don't redraw
+
+Ronald, 11-04: "ideally it should be something we can tune easily without having to like now redo
+every asset of the game if it's too dark or too light or high contrast, low contrast ... but ideally
+something that's quick". So a tile that is too dark, too light, too flat, too busy or off-colour is
+fixed in the grade table first; only a tile wrong in shape or idea is regenerated.
+
+- **Sources stay untouched**: every graded tile's approved drawing (and its CTM variants) lives in
+  `mods/<mod>/source/blocks/tiles/`; the game's tile is built from it.
+- **The table**: `mods/base/source/blocks/grade.toml`, material groups (stone, ore, wood, planks,
+  leaves, grass, sand, soil, clay, plants, liquids) and per-tile rows, with the knobs gamma, gain,
+  contrast or spread (target p10-p90 in codes), saturation, hue and pull. The file explains them.
+- **One command**: `python3 notes/blocks/regrade.py --all [--packs DIR] [--preview out.png]` rebuilds
+  every graded tile in under a second, prints luma, saturation and spread before and after against
+  the vanilla band, and draws a tiled before/after of each changed tile. `--with other.toml --dry`
+  previews proposals without writing (`notes/blocks/vanilla_proposals.py <packs>` writes the vanilla
+  comparison's as `grade_proposed.toml`; approved rows move into `grade.toml`).
+- **Item icons too**: `[item_groups.*]` and `[items.*]` in the same table grade
+  `mods/<mod>/assets/textures/item/` from `mods/<mod>/source/items/tiles/`; the knob `outline` scales
+  an icon's 1-px edge only (our items guide: a dark shade of each part's own colour, 15-45%).
+  `notes/blocks/items_audit.py` checks the set against the guide, our own medians and seven packs.
+- **Ores in a rock** are rows with `base = "<host tile>"` and `overlay = "<name>"`: the overlay
+  (drawn alone on magenta, `mods/base/source/blocks/overlays/`) is laid on the host's own graded tile
+  and variants, so the ore follows the rock's tuning.
+- **Safe with other sessions**: a tile graded for the first time is adopted from the game as its
+  source; a game tile someone replaced since the last build (`grade.lock.json`) becomes the new
+  source and is graded on top, never silently overwritten. After `blocks.py install`, run the grade.
+
 ## Made in code, not generated
 
 `notes/blocks/derive.py` makes what must keep its layout or is a recolour of an approved tile,
@@ -139,6 +167,38 @@ toward the UI's own colours (`notes/STYLE.md`).
 - **Thin plants go muddy at 32 px** (the first cattail almost vanished, the mushroom's spots
   blurred): give them a clear silhouette, a size in px, and few parts. If one still reads
   badly, ask for "a 1-px outline in a darker shade of its own colour".
+- **Tile values follow the daytime report** (`reports/Daytime look targets.md`, (e); Ronald, 11-04:
+  "Yes, switch", replacing the earlier "at least 0.24" floor). Measure luma (0.2126 R + 0.7152 G +
+  0.0722 B on sRGB, 0..1) over opaque pixels, tinted tiles with vanilla's plains tints:
+  - tile means from **0.15 to 0.85**; snow and sand near 0.8-0.95, so the top of the range is used;
+  - every pixel at least **30 sRGB codes** (50 for a strict check); obsidian and coal are the exceptions;
+  - **darkness in shade is the shader's job**: don't lift a whole dark tile to make shade readable;
+  - leaves darker than the ground they shade, about 0.25-0.32;
+  - in-tile contrast as the p10-p90 spread in codes: **quiet ground 20-30** (grass top, stone, sand,
+    podzol), **busy blocks 45-80** (cobble, dirt, logs, planks, ores). Ronald, 11-04: "Yes, stone,
+    gravel, planks": stone calmed to 30, gravel to 42, planks given grain at 48.
+  Fix a tile's level, contrast or colour in the grade table, not in its pixels (see "The grade"). The six tiles lifted for the
+  earlier floor (slate, termite mound, red sandstone, sequoia and spruce bark, podzol) stay until
+  they're re-judged under Lighting's new grade; leaves and grass top wait for it too ("After the
+  grade").
+- **Close to vanilla's colour, so packs and shaders fit** (Ronald, 11-04: "it doesn't have to be
+  one-to-one matching, but it has to be close, because when it's similar, then also the shaders or
+  other resource packs will just fit in seamlessly"). Check every new or changed tile against vanilla
+  1.21.4 and two vanilla-style packs (Faithful 32x, Pixel Perfection CE):
+  `notes/blocks/vanilla_compare.py <worktree> <packs dir> <out>` then `vanilla_sheet.py` for the sheet.
+  Fetch the packs' `assets/minecraft/textures/block/` with a sparse git checkout into the scratchpad
+  (InventivetalentDev/minecraft-assets branch 1.21.4, Faithful-Resource-Pack/Faithful-32x-Java
+  java-latest, Athemis/PixelPerfectionCE master), read them as images only, and never commit them.
+  A tile passes when its mean hue is within 15 deg (coloured tiles only), luma within 0.05 and
+  saturation within 0.10 of the packs' range, tinted tiles measured with vanilla's tints (grass
+  #91BD59, foliage #77AB2F, spruce #619961, birch #80A755, lily pad #208030). Ours without a vanilla
+  twin are compared with their nearest relative (sequoia with spruce, termite mound with terracotta,
+  canyon bands with sandstone and terracotta) and may keep their own identity.
+- **Streaks and stripes never repeat in step from block to block** (Ronald, 11-04, on the karst
+  limestone: "Yes, loosen streaks"; the first version put rain streaks in the same columns in every
+  variant, and a tall tower looked corrugated). Give each variant its own positions, gaps and
+  lengths, ending inside the tile, so a face reads as one weathered surface. Strata that must join
+  sideways (a band's level lines) are the exception: those rows stay fixed and only run across.
 - **Blades finer than a game pixel break into dots** when cut (the first two-block grass's upper
   half, 11-04): ask for "each blade 2 px wide (never 1 px), solid shapes that read at 32 px".
 - **Check a name is free in `tiles/` before a batch**: a new `fern` overwrote the approved

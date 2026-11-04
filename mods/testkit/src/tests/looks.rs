@@ -439,7 +439,7 @@ pub async fn rich_text(t: T) -> R {
     // A fall hurts the player, which the test mod's `{if:testmod:hurt}` shows.
     let s = t.state();
     t.c().teleport([s.pos[0], s.pos[1] + 6.0, s.pos[2]]);
-    t.until("hurt by the fall", Duration::from_secs(5), |t| t.state().health < 20.0)
+    t.until("hurt by the fall", Duration::from_secs(5), |t| t.state().health < super::max_health(t) - 0.5)
         .await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
@@ -655,7 +655,7 @@ pub async fn third_person_shakes(t: T) -> R {
     t.secs(1.0).await?;
     let s = t.state().pos;
     t.c().teleport([s[0], s[1] + 8.0, s[2]]);
-    t.until("hurt by the fall", Duration::from_secs(5), |t| t.state().health < 20.0)
+    t.until("hurt by the fall", Duration::from_secs(5), |t| t.state().health < super::max_health(t) - 0.5)
         .await?;
     let mut most = 0.0f32;
     for i in 0..4 {

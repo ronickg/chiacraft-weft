@@ -298,7 +298,11 @@ fn crown(t: &TreeAt, cx: i32, cz: i32, top: i32, put: &mut impl FnMut(i32, i32, 
 pub fn giant_tree_blocks(log: u32, x: i32, y: i32, z: i32, h: u64, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     let Some(leaves) = TREE_LEAVES.on_block(log).map(|l| l.0) else { return };
     let Some(recipe) = crate::tree_recipes::of(block_name(log).split('[').next().unwrap_or("")) else { return };
+    // The upright trunk in bark all round: its flared foot spreads out at the ground, where an
+    // upright log's top would show its rings (the PC look, 11-04).
+    let bark = state_with(log, "axis", "bark");
     branchy::grow(recipe, x, y, z, h, |x, y, z, part| match part {
+        branchy::Part::Log { axis: 1 } => put(x, y, z, bark.unwrap_or(log), true),
         branchy::Part::Log { axis } => {
             let along = ["x", "y", "z"][axis as usize];
             put(x, y, z, state_with(log, "axis", along).unwrap_or(log), true)

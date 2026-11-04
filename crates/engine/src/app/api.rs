@@ -443,6 +443,7 @@ pub unsafe extern "C" fn client_command(c: *mut abi::ClientCtx, op: u32, text: S
                 }
             }
             op_::RELOAD_ASSETS => r.reload_requested = true,
+            op_::REBUILD_SCREEN => r.handle(vec![Request::Rebuild]),
             op_::POST_EFFECT => return r.post.set(&text, num as f32) as u64,
             op_::BENCH => r.bench = Some(crate::bench::Bench::new(&text, num.max(0.1) as f32)),
             op_::RESPAWN => r.handle(vec![Request::Respawn]),

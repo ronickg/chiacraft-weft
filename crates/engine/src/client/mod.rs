@@ -10,6 +10,7 @@ pub mod modui;
 pub mod particles;
 mod receive;
 pub mod sky;
+pub mod stack_look;
 pub mod terrain;
 pub mod terrain_gpu;
 pub mod textures;
@@ -104,8 +105,9 @@ pub struct ClientEntity {
     pub health: f32,
     pub hurt: f32,
     pub worn: Vec<u32>,
-    /// A player's item in hand, 0 for none.
+    /// A player's item in hand, 0 for none, and that stack's own look (`abi::comp::LOOK`).
     pub held: u32,
+    pub held_look: Option<String>,
     /// Accumulated walk distance and current swing amplitude, for limb animation.
     pub walk: f32,
     /// Blocks actually walked, which limbs at full swing fall behind of.
@@ -1220,11 +1222,11 @@ impl Client {
             } else if refused {
                 self.breaking = None;
             } else if let Some(hit) = self.target {
-                let held = self.held().item;
+                let held = self.held();
                 let time = crate::server::mining_time(
                     c,
                     hit.state,
-                    held,
+                    &held,
                     self.eye_liquid().is_some(),
                     self.player.on_ground,
                     self.attribute(crate::server::extend::MINING_SPEED),
@@ -1891,7 +1893,7 @@ impl Client {
     /// Copies an engine field component into the entity (or the own player) that shows it.
     fn engine_field(&mut self, id: u64, comp: u32, bytes: &[u8]) {
         let c = content();
-        let [health, burning, worn, shape, held, mount] = c.game.field_comps;
+        let [health, burning, worn, shape, held, mount, held_look] = c.game.field_comps;
         let mounted = || {
             let m = bytes
                 .get(..8)
@@ -1955,6 +1957,11 @@ impl Client {
             e.seat_forward = mounted().map_or(0.0, |(_, _, f)| f);
         } else if comp == held {
             e.held = words(bytes).next().map_or(0, u32::from_le_bytes);
+        } else if comp == held_look {
+            e.held_look = std::str::from_utf8(bytes)
+                .ok()
+                .filter(|l| !l.is_empty())
+                .map(str::to_string);
         } else if comp == shape {
             (e.size, e.look, e.scale) = shaped();
         }
@@ -2141,6 +2148,7 @@ impl Client {
             hurt: self.hurt_flash,
             worn,
             held: self.held().item,
+            held_look: crate::stack::look(&self.held()).map(str::to_string),
             walk: self.self_walk,
             walked: self.self_walk,
             swing: self.self_swing,

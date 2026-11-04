@@ -470,6 +470,29 @@ pub fn with_name(stack: ItemStack, name: Option<&str>) -> ItemStack {
 
 static NAME: Tag = Tag::named(abi::comp::NAME);
 
+/// The layers the stack is drawn from (`with_look`), if it has its own look.
+pub fn stack_look(stack: &ItemStack) -> Option<String> {
+    let id = LOOK.id();
+    if stack.data == 0 || id == u32::MAX {
+        return None;
+    }
+    let mut len = 0usize;
+    let p = unsafe { (host().stack_get)(stack.data, id, &mut len) };
+    (!p.is_null()).then(|| String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(p, len) }).into_owned())
+}
+
+/// The stack drawn from layers instead of its item's icon (`None` or empty: the icon again), in
+/// slots and in the hand: back to front, separated by `;`, each a texture
+/// (`base:parts/axe/head/flint`) or a shade map painted with one ramp per region
+/// (`base:parts/axe/head@base:ramps/oak,base:ramps/sinew`). See `abi::comp::LOOK`.
+pub fn with_look(stack: ItemStack, look: Option<&str>) -> ItemStack {
+    let b = look.filter(|l| !l.is_empty()).map(str::as_bytes);
+    let data = unsafe { (host().stack_with)(stack.data, LOOK.id(), b.map_or(abi::Slice::EMPTY, abi::Slice::new), b.is_none() as u32) };
+    ItemStack { data, ..stack }
+}
+
+static LOOK: Tag = Tag::named(abi::comp::LOOK);
+
 pub trait StackData: Sized {
     /// This stack with its own value of `c` set.
     fn with<T: Value>(self, c: &Component<T>, v: T) -> Self;

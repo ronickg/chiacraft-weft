@@ -1,0 +1,91 @@
+# Crafting, history: a part keeps the day it was made and its repairs. Build a stone axe, wear it
+# on a block, take it apart, repair the head with cobblestone, and /inspect the repaired head.
+# One copy, a fresh world. The table menu's slots: assembly 10-13, assembled 14, apart 15, the
+# hotbar 43-51.
+loaded
+idle
+chat /tk mode survival
+until mode survival within 10
+chat /tk fill ~-3 ~-1 ~-3 ~3 ~-1 ~3 base:stone
+chat /tk fill ~-3 ~ ~-3 ~3 ~3 ~3 core:air
+chat /tk set ~ ~1 ~-2 base:crafting_table
+until block ~ ~1 ~-2 base:crafting_table within 10
+look 0 0
+# 1. The parts: a stone head, an oak haft, a cordage lashing (each the first part its materials make).
+chat /tk give base:cobblestone 3
+press core:use
+until screen core:menu within 10
+wait 1
+tap core:menu text:parts
+tap_once core:menu class:slot
+tap core:menu text:all (
+wait 1
+key Escape
+until screen none within 10
+chat /tk give base:oak_log 1
+press core:use
+until screen core:menu within 10
+wait 1
+tap core:menu text:parts
+tap_once core:menu class:slot
+tap core:menu text:all (
+wait 1
+key Escape
+until screen none within 10
+chat /tk give base:string 1
+press core:use
+until screen core:menu within 10
+wait 1
+tap core:menu text:parts
+tap_once core:menu class:slot
+tap core:menu text:all (
+wait 1
+# 2. Build the axe and hold it.
+tap_once core:menu slot:43
+tap_once core:menu slot:10
+tap_once core:menu slot:44
+tap_once core:menu slot:11
+tap_once core:menu slot:45
+tap_once core:menu slot:12
+wait 1
+tap_once core:menu slot:14
+tap_once core:menu slot:43
+wait 1
+key Escape
+until screen none within 10
+key Digit1
+chat /inspect
+until chat built from 3 parts within 5
+# 3. Wear it: chop the crafting table down, then set another.
+hold core:attack 4
+wait 4
+until block ~ ~1 ~-2 core:air within 5
+chat /tk set ~ ~1 ~-2 base:crafting_table
+until block ~ ~1 ~-2 base:crafting_table within 10
+# 4. Apart: head and haft come back worn (the lashing is cut); the haft goes to the hotbar.
+press core:use
+until screen core:menu within 10
+wait 1
+tap_once core:menu slot:43
+tap_once core:menu slot:15
+wait 1
+shot history_apart.png
+tap_once core:menu slot:11
+tap_once core:menu slot:44
+# 5. Repair the head with one cobblestone: the repaired head comes out of the assembled slot.
+chat /tk give base:cobblestone 1
+wait 1
+tap_once core:menu slot:43
+tap_once core:menu slot:11
+wait 1
+shot history_repair.png
+tap_once core:menu slot:14
+tap_once core:menu slot:43
+wait 1
+key Escape
+until screen none within 10
+key Digit1
+chat /inspect
+until chat repaired 1× within 5
+shot history_inspect.png
+quit

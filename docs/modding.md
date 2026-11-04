@@ -247,6 +247,9 @@ Anywhere a block is named as text, `base:furnace[lit=true]` picks a state: in st
 - `max_stack(N)`
 - `durability`
 - `tool("pickaxe")`, `tool_level(tier)`, `mining_speed(speed)`
+- `keeps_broken()`: worn out, it stays in its slot broken instead of vanishing, and works like an empty hand until its damage is lowered (a repair)
+- A stack can carry its own of those numbers, and they win over its item's: `stack.with(&DURABILITY, 412).with(&MINING_SPEED, 3.6).with(&TOOL_LEVEL, 100).with(&ATTACK_DAMAGE, 4.1)` is one axe built from parts (base's crafting), mined, worn and hit with by its own numbers on client and server alike
+- And its own picture: `with_look(stack, Some("base:parts/axe/haft@base:ramps/oak;base:parts/axe/head/flint"))` draws it from layers, back to front, instead of its item's icon, in slots and in hands (other players' too). A layer is a texture used as it is, or a shade map (`<map>@<ramp>,<ramp>...`: red / 36 the step 0-7, green the region) painted with one 8 x 1 ramp per region. Each distinct look is composed once; `stack_look` reads it back
 - `attack_damage`, `attack_speed(per_second)` (hitting before it has recharged does less; a sword is 1.6, and without it an item swings at an empty hand's 4) and `sweeps()` (a full swing on the ground also does 1 damage to what stands next to the target)
 - Advancements read tags, so yours count by tagging them: `cooked_meat` on food, `hostile` and `livestock` on mobs, `logs`, `torches`, `furnaces`, etc etc
 - `no_creative_break()`: in creative it doesn't break blocks, like a sword. Both sides know, so nothing flickers; a rule that depends on more is `question::BREAK_BLOCK`, which is asked when mining starts and tells the client no right away

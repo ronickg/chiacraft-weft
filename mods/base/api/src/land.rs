@@ -27,6 +27,8 @@ use weft_sdk::terrain::{Feature, Mask, preset};
 
 use crate::SEA;
 
+mod canyons;
+mod karst;
 mod net;
 
 /// Salts of our own noises (the engine's are in `weft_noise::fixed::salt`).
@@ -47,6 +49,14 @@ pub mod salt {
     pub const COAST_CLIFFS: u64 = 0xC1F;
     pub const ISLANDS: u64 = 0x151A;
     pub const ARCHIPELAGOS: u64 = 0x151B;
+    pub const KARST: u64 = 0x4A5;
+    pub const KARST_AREA: u64 = 0x4A6;
+    pub const KARST_WOBBLE: u64 = 0x4A7;
+    pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const FRAY: u64 = 0xF4A;
+    pub const CANYONS: u64 = 0xCA1;
+    pub const CANYON_AREA: u64 = 0xCA2;
+    pub const CANYON_WARP: u64 = 0xCA3;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -291,6 +301,59 @@ pub const MESA_AREA: Area = Area {
     not: false,
 };
 
+/// Badland canyons (Tectonic, Lithosphere; Ronald, 11-04: "All 3, in order"): in the hot, dry
+/// land (`CANYON_AREA`; full depth from `CANYON_FULL` of its strength), winding cuts along a
+/// warped line noise's zero lines (`CANYON_SCALE` blocks between, wandering by `CANYON_WARP`),
+/// `CANYON_WIDTH` of the noise wide, cut `CANYON_DEPTH` blocks down in tiers `CANYON_TIER` high
+/// (a steep wall, then a ledge), the floor kept `CANYON_DRY` over the sea. Their walls show the
+/// strata (rock faces).
+pub const CANYON_AREA: Area = Area {
+    all: &[
+        Ramp::Temperature(0.1, 0.16),
+        Ramp::Humidity(0.02, -0.04),
+        Ramp::Noise { salt: salt::CANYON_AREA, scale: 900.0, from: -0.05, to: 0.05 },
+        Ramp::Continent(0.06, 0.14),
+    ],
+    not: false,
+};
+pub const CANYON_FULL: f64 = 0.3;
+pub const CANYON_SCALE: f64 = 700.0;
+pub const CANYON_WARP: (f64, f64) = (90.0, 160.0);
+pub const CANYON_WIDTH: f64 = 0.05;
+pub const CANYON_DEPTH: i32 = 40;
+pub const CANYON_TIER: i32 = 8;
+pub const CANYON_DRY: i32 = 3;
+
+/// Karst towers (Lithosphere; Ha Long Bay, Guilin): in the warm, wet land and its shallow seas
+/// (`KARST_AREA`), steep limestone pillars, at most one per `KARST_CELL` blocks square, in
+/// clusters, `KARST_RADIUS` (or `KARST_WIDE_RADIUS`) blocks from their middle to their foot and
+/// `KARST_HEIGHT` over the water or the ground they stand on, their outline wobbled (Ronald,
+/// 11-04: "All 3, in order").
+pub const KARST_AREA: Area = Area {
+    all: &[
+        Ramp::Temperature(0.02, 0.08),
+        Ramp::Humidity(0.06, 0.12),
+        Ramp::Noise { salt: salt::KARST_AREA, scale: 700.0, from: 0.0, to: 0.12 },
+        Ramp::Continent(-0.12, -0.04),
+    ],
+    not: false,
+};
+pub const KARST_CELL: i32 = 32;
+/// Towers stand in clusters (Planner, 11-04: "clusters of 3-6 towers with a few wider ones"):
+/// where the cluster noise (patches about `KARST_CLUSTER_SIZE` blocks across) runs from
+/// `KARST_CLUSTER.0` to `.1` a cell keeps its tower with `KARST_CHANCE`, elsewhere with
+/// `KARST_LONE`; both times the karst area's strength.
+pub const KARST_CHANCE: f64 = 0.85;
+pub const KARST_LONE: f64 = 0.06;
+pub const KARST_CLUSTER_SIZE: f64 = 140.0;
+pub const KARST_CLUSTER: (f64, f64) = (0.04, 0.14);
+/// Radius and height (blocks); one tower in `KARST_WIDE_ONE_IN` is a wide one.
+pub const KARST_RADIUS: (i32, i32) = (7, 12);
+pub const KARST_HEIGHT: (i32, i32) = (16, 36);
+pub const KARST_WIDE_ONE_IN: u32 = 4;
+pub const KARST_WIDE_RADIUS: (i32, i32) = (13, 17);
+pub const KARST_WIDE_HEIGHT: (i32, i32) = (22, 38);
+
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
 /// the rain of the nodes upstream within `RIVER_REACH` steps (about 2 km of river).
@@ -317,10 +380,19 @@ pub const RIVER_DEPTH: (i32, i32) = (3, 6);
 pub const RIVER_FLOODPLAIN: (i32, i32) = (2, 12);
 /// Then the valley's sides rise to the land over `RIVER_BANKS` blocks, plus
 /// `RIVER_VALLEY_PER_BLOCK` (sixteenths) for each block the land stands over the sea, counted up
-/// to `RIVER_VALLEY_RISE`.
+/// to `RIVER_VALLEY_RISE`. 36, as the lakes' shores (24 left a sixth of the bank in steps of two
+/// blocks or more, 36 a ninth; 48 costs a third more time for little more).
 pub const RIVER_BANKS: i32 = 8;
-pub const RIVER_VALLEY_PER_BLOCK: i32 = 24;
+pub const RIVER_VALLEY_PER_BLOCK: i32 = 36;
 pub const RIVER_VALLEY_RISE: i32 = 60;
+/// River terraces (Tectonic's tiers by a river's distance): the valley sides of the bigger
+/// rivers (flow from `RIVER_TERRACE_FLOW.0`, full at `.1`) climb in benches `RIVER_TERRACE`
+/// blocks high, each flat for all but `RIVER_TERRACE_RISER` of its width: meadows by the water
+/// (Ronald, 11-04: "All 3, in order"). Low steps with wide risers so a player can walk up them:
+/// at 5 blocks with 0.3 risers the walk test stuck at the first one (a 5-block rise in 3).
+pub const RIVER_TERRACE_FLOW: (f64, f64) = (10.0, 40.0);
+pub const RIVER_TERRACE: i32 = 3;
+pub const RIVER_TERRACE_RISER: f64 = 0.5;
 /// Rivers don't carve in the mountains: full where the mountains' area (`MOUNTAINS_AREA`) is up
 /// to `.0`, gone at `.1`. Their rain still runs down, so rivers come out at the mountains' feet.
 pub const RIVER_MOUNTAINS: (f64, f64) = (0.1, 0.45);
@@ -352,10 +424,20 @@ pub const LAKE_STRETCH: (i32, i32) = (16, 34);
 /// The 8 directions a lake can lie in, as (x, z) in 1/64.
 const LAKE_AXES: [(i32, i32); 8] = [(64, 0), (59, 24), (45, 45), (24, 59), (0, 64), (-24, 59), (-45, 45), (-59, 24)];
 pub const LAKE_DEPTH: (i32, i32) = (3, 9);
-/// The shore rises from the water to the land over `LAKE_SHORE` blocks, plus `LAKE_SHORE_PER_BLOCK`
-/// (in sixteenths) for each block the land stands over the sea, counted up to `LAKE_SHORE_RISE`.
+/// A shallow shelf round the shore: over the outer `LAKE_SHELF` of the lake the water is
+/// `LAKE_SHELF_DEPTH` blocks deep (shallowest at the shore), then the bed drops to the bowl, so a
+/// lake reads as a wide turquoise rim round a darker middle (Lighting, 11-04: the bed shows
+/// through only to some 3-4 blocks).
+pub const LAKE_SHELF: f64 = 0.33;
+pub const LAKE_SHELF_DEPTH: (i32, i32) = (1, 2);
+/// The shore: first `LAKE_BEACH` blocks flush with the water (room for reeds and a beach, so
+/// trees don't stand in it), then rising to the land over `LAKE_SHORE` blocks, plus
+/// `LAKE_SHORE_PER_BLOCK` (in sixteenths) for each block the land stands over the sea, counted up
+/// to `LAKE_SHORE_RISE`. At 36 the steepest of the rise is about two blocks in three (Tester 2,
+/// 11-04: at 24 the banks rose in blocky steps where trees came down to the water).
+pub const LAKE_BEACH: i32 = 3;
 pub const LAKE_SHORE: i32 = 10;
-pub const LAKE_SHORE_PER_BLOCK: i32 = 24;
+pub const LAKE_SHORE_PER_BLOCK: i32 = 36;
 pub const LAKE_SHORE_RISE: i32 = 40;
 /// Islands: where the island noise (patches about `LAKE_ISLAND_SIZE` blocks across) is over
 /// `LAKE_ISLANDS`, the bed rises back over the water, up to `LAKE_ISLAND_HEIGHT` blocks; not in
@@ -398,6 +480,17 @@ pub const SNOW_DEPTH: i32 = 2;
 /// `ROCK_MAX_DEPTH` blocks; on sand the whole face is sandstone (the mesas). Snow slides off at
 /// `SNOW_FALL`.
 pub const ROCK_FALL: i32 = 4;
+/// In the hot, dry land's strata (mesas, canyons) a face goes bare from this fall: steps of three
+/// would otherwise take the planting's gravel for steep ground, which read as dark bands in the
+/// canyon walls (canblack, 11-04).
+pub const ROCK_FALL_STRATA: i32 = 3;
+
+impl RockSet {
+    /// The fall from which a face of these rocks goes bare.
+    pub fn bare_from(self) -> i32 {
+        if self == RockSet::Strata { ROCK_FALL_STRATA } else { ROCK_FALL }
+    }
+}
 pub const SNOW_FALL: i32 = 3;
 pub const ROCK_DEPTH: i32 = 5;
 pub const ROCK_MAX_DEPTH: i32 = 16;
@@ -413,7 +506,16 @@ pub const ROCK_PATCHES: f64 = 0.22;
 pub const ROCK_MOSS: f64 = 0.25;
 /// The mesas' strata from the bottom up, repeating: each layer's rock, 1 to 3 blocks thick by the
 /// world's seed; the layers tilt gently, up to `STRATA_TILT` blocks over some 300.
-pub const STRATA: [&str; 6] = ["sandstone", "ochre_sandstone", "sandstone", "red_sandstone", "ochre_sandstone", "red_sandstone"];
+pub const STRATA: [&str; 8] = [
+    "sandstone",
+    "ochre_sandstone",
+    "cream_sandstone",
+    "red_sandstone",
+    "banded_clay",
+    "ochre_sandstone",
+    "cream_sandstone",
+    "red_sandstone",
+];
 pub const STRATA_TILT: i32 = 3;
 
 /// The engine's features of the land, in the order they're added; `mesas` and `rivers` go after
@@ -438,6 +540,8 @@ pub fn features() -> Vec<Feature> {
             .mask(MOUNTAINS_AREA.mask())
             .named("mountains"),
         Feature::new(mesa).named("mesas"),
+        Feature::new(canyons).named("canyons"),
+        Feature::new(karst).named("karst"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
         // No height: their masks say where the snow drifts and where the sequoias stand (rules
@@ -470,6 +574,12 @@ fn land_height_at(h: &Here) -> i32 {
 
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
+    let base = base_ground(h);
+    base + canyons::cut(h, base) + karst::add(h, base)
+}
+
+/// The ground before the karst towers (which stand on it, or rise out of the water over it).
+fn base_ground(h: &Here) -> i32 {
     let (f, x, z) = (h.f, h.x, h.z);
     q4(SEA as f64)
         + shape::continents(f, x, z, q4(CONTINENTS))
@@ -592,7 +702,7 @@ pub fn lakes(f: &Fields, x: i32, z: i32) -> i32 {
 fn lakes_on(h: &Here, ground: i32) -> i32 {
     let (bx, bz) = (h.x >> 4, h.z >> 4);
     let (cx, cz) = (div_floor(bx, LAKE_CELL).0, div_floor(bz, LAKE_CELL).0);
-    let reach = LAKE_RADIUS.1 + ((LAKE_RADIUS.1 * q12(LAKE_WOBBLE)) >> 12) + LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4);
+    let reach = LAKE_RADIUS.1 + ((LAKE_RADIUS.1 * q12(LAKE_WOBBLE)) >> 12) + lake_shore_most();
     let mut cut = 0;
     let mut ground = ground;
     for dz in -1..=1 {
@@ -611,9 +721,14 @@ fn lakes_on(h: &Here, ground: i32) -> i32 {
     cut
 }
 
+/// The widest a lake's shore can be (blocks): the beach and the rise at its widest.
+const fn lake_shore_most() -> i32 {
+    LAKE_BEACH + LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4)
+}
+
 /// How far a lake of this radius (blocks) can reach with its shore at its widest (blocks).
 fn lake_reach_most(radius: i32) -> i32 {
-    radius + ((radius * q12(LAKE_WOBBLE)) >> 12) + LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4)
+    radius + ((radius * q12(LAKE_WOBBLE)) >> 12) + lake_shore_most()
 }
 
 /// A column's distance from a lake's middle and the lake's radius there (both Q4), if it's within
@@ -643,17 +758,25 @@ fn lake_reach(h: &Here, lake: Lake, extra: i32) -> Option<(i32, i32)> {
 /// (`i32::MIN` until then).
 fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
     let sea = q4(SEA as f64);
-    let shore_most = q4((LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4)) as f64);
+    let shore_most = q4((lake_shore_most()) as f64);
     let Some((d, r)) = lake_reach(h, lake, shore_most) else { return 0 };
     if *ground == i32::MIN {
         *ground = ground_at(h);
     }
     let ground = *ground;
     let target = if d < r {
-        // The bowl: a block under the sea at the shore, `depth` in the middle.
+        // The shelf, 1-2 blocks deep, then the bowl down to `depth` in the middle.
         let t = d * ONE / r;
-        let bowl = ONE - ((t * t) >> 12);
-        let bed = sea - 16 - (((q4(lake.depth as f64) - 16) * bowl) >> 12);
+        let edge = q12(1.0 - LAKE_SHELF);
+        let (shallow, shelf) = (q4(LAKE_SHELF_DEPTH.0 as f64), q4(LAKE_SHELF_DEPTH.1 as f64));
+        let bed = if t >= edge {
+            sea - shallow - (((shelf - shallow) * ramp(t, ONE, edge)) >> 12)
+        } else {
+            let u = t * ONE / edge.max(1);
+            let bowl = ONE - ((u * u) >> 12);
+            let deepest = q4(lake.depth as f64).max(shelf);
+            sea - shelf - (((deepest - shelf) * bowl) >> 12)
+        };
         // Islands, clear of the shore.
         let inner = ramp(t, ONE, q12(1.0 - LAKE_ISLAND_SHORE));
         let n =
@@ -662,13 +785,14 @@ fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
         let island = sea - 16 + ((q4((LAKE_ISLAND_HEIGHT + 1) as f64) * lift) >> 12);
         if lift > 0 { bed.max(island) } else { bed }
     } else {
-        // The shore: level with the water at its edge, rising smoothly to the land.
+        // The shore: level with the water for the beach, then rising smoothly to the land.
         let rise = ((ground - sea) >> 4).clamp(0, LAKE_SHORE_RISE);
+        let beach = q4(LAKE_BEACH as f64);
         let width = q4((LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * rise) >> 4)) as f64);
-        if d >= r + width {
+        if d >= r + beach + width {
             return 0;
         }
-        let t = (d - r) * ONE / width;
+        let t = (d - r - beach).max(0) * ONE / width;
         let smooth = (((t * t) >> 12) * (3 * ONE - 2 * t)) >> 12;
         sea + (((ground - sea) * smooth) >> 12)
     };
@@ -721,10 +845,13 @@ pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
         } else if d < flat {
             sea
         } else {
-            // The valley's sides: rising smoothly from the floodplain to the land.
+            // The valley's sides: rising smoothly from the floodplain to the land, in benches
+            // by the bigger rivers.
             let t = (d - flat) * ONE / banks.max(1);
             let smooth = (((t * t) >> 12) * (3 * ONE - 2 * t)) >> 12;
-            sea + (((h0 - sea) * smooth) >> 12)
+            let raise = ((h0 - sea) * smooth) >> 12;
+            let benches = ramp(flow, q12(RIVER_TERRACE_FLOW.0), q12(RIVER_TERRACE_FLOW.1));
+            sea + raise + (((net::terraced(raise) - raise) * benches) >> 12)
         };
         cut = cut.min((((target - h0).min(0)) * deep) >> 12);
     }
@@ -745,6 +872,18 @@ pub fn river_region_stretches(f: &Fields, bx: i32, bz: i32) -> Vec<([i32; 2], [i
         .iter()
         .map(|s| ([s.a[0] >> 4, s.a[1] >> 4], [s.b[0] >> 4, s.b[1] >> 4], s.flow))
         .collect()
+}
+
+/// What the canyons take off the ground at (`x`, `z`) (Q4), as the engine adds it.
+pub fn canyons(f: &Fields, x: i32, z: i32) -> i32 {
+    let h = Here::new(f, x, z);
+    if !canyons::near(&h) { 0 } else { canyons::cut(&h, base_ground(&h)) }
+}
+
+/// What the karst towers add at (`x`, `z`) (Q4), as the engine adds it.
+pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
+    let h = Here::new(f, x, z);
+    if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base_ground(&h)) }
 }
 
 /// Which water a bank belongs to (`bank`).
@@ -899,6 +1038,52 @@ pub fn biome_edge(f: &Fields, x: i32, z: i32, height: i32) -> Option<Edge> {
     None
 }
 
+/// Biome borders that fray (Ronald, 11-04: "All 3: 1, 2, 3"): where two biomes with different
+/// ground meet (the desert's sand against grass, the taiga's podzol, the snowy plains' snow-grass),
+/// the neighbour's ground comes in patches (`FRAY_SIZE` blocks across) over the border band
+/// (`biome_edge`): on the border `FRAY_SHARE` of the ground is the other's, less further in.
+pub const FRAY_SHARE: f64 = 0.55;
+pub const FRAY_SIZE: f64 = 7.0;
+
+/// A biome's ground: its top block and what lies under it (base's biome rules' `surface`).
+pub fn surface_of(biome: &str) -> (&'static str, &'static str) {
+    match biome {
+        "desert" | "beach" => ("sand", "sand"),
+        "taiga" => ("podzol", "dirt"),
+        "snowy_plains" => ("snowy_grass", "dirt"),
+        _ => ("grass", "dirt"),
+    }
+}
+
+/// The ground column (`x`, `z`) (Q4), `height` blocks high, takes from the biome over the border,
+/// if it frays here: its top and under block. Cheap away from the borders that change the ground
+/// (a test of the climate against their thresholds first).
+pub fn fray(f: &Fields, x: i32, z: i32, height: i32) -> Option<(&'static str, &'static str)> {
+    let here = Here::new(f, x, z);
+    let (t, hu) = (here.temperature(), here.humidity());
+    let band = q12(EDGE_BAND);
+    let close = |v: i32, at: f64| (v - q12(at)).abs() < band;
+    let ground_border = close(t, SNOWY_BELOW)
+        || close(t, TAIGA_BELOW)
+        || (close(t, DESERT.0) && hu < q12(DESERT.1) + band)
+        || (close(hu, DESERT.1) && t >= q12(DESERT.0) - band);
+    if !ground_border {
+        return None;
+    }
+    let e = biome_edge(f, x, z, height)?;
+    let own = biome_at(f, x, z, height);
+    // The coasts and the mountains keep their own ground (theirs are height rules, not climate).
+    if matches!(own, "beach" | "ocean" | "mountains") {
+        return None;
+    }
+    let theirs = surface_of(e.to);
+    if surface_of(own) == theirs {
+        return None;
+    }
+    let n = ONE / 2 + f.fbm(salt::FRAY, x, z, q4(FRAY_SIZE), 2) * 2;
+    (n < (q12(FRAY_SHARE) * e.near) >> 12).then_some(theirs)
+}
+
 /// The snow line (blocks) at temperature `t` (Q12): the band's height from `SNOW_LINES`.
 pub fn snow_line(t: i32) -> i32 {
     SNOW_LINES
@@ -922,6 +1107,8 @@ pub enum RockSet {
     Slate,
     Granite,
     Limestone,
+    /// The karst towers: weathered limestone, rain-streaked.
+    Karst,
 }
 
 /// The rocks of the face of column (`x`, `z`) (Q4), its ground `height` (blocks) high; `sandy`
@@ -929,7 +1116,13 @@ pub enum RockSet {
 pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet {
     let here = Here::new(f, x, z);
     let (t, hu) = (here.temperature(), here.humidity());
-    if sandy || t >= q12(SAVANNA.0) && hu < q12(SAVANNA.1) {
+    if sandy {
+        RockSet::Strata
+    } else if KARST_AREA.at(&here) > 0 {
+        // Karst towers are weathered limestone however high they stand, and where the savanna's
+        // strata would be (kclusters: a striped tower at the warm edge).
+        RockSet::Karst
+    } else if t >= q12(SAVANNA.0) && hu < q12(SAVANNA.1) {
         RockSet::Strata
     } else if t < q12(TAIGA_BELOW) {
         RockSet::Slate
@@ -958,6 +1151,9 @@ impl RockSet {
             RockSet::Granite => "granite",
             RockSet::Limestone if patch => "stone",
             RockSet::Limestone if low && mossy => "mossy_cobblestone",
+            RockSet::Karst if patch => "limestone",
+            RockSet::Karst if low && mossy => "mossy_cobblestone",
+            RockSet::Karst => "weathered_limestone",
             _ => "limestone",
         }
     }
@@ -983,8 +1179,12 @@ pub fn strata(seed: u64, [x, y, z]: [i32; 3]) -> &'static str {
 /// The overworld biome the rules in `mods/base/src/land.rs` pick at (`x`, `z`) (Q4), by name, in
 /// their order: for the map preview and the checks here (the engine's own pick is the truth).
 pub fn overworld_biome(f: &Fields, x: i32, z: i32) -> &'static str {
+    biome_at(f, x, z, height(f, x, z) >> 4)
+}
+
+/// `overworld_biome` for ground `h` blocks high, already known.
+fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
     let here = Here::new(f, x, z);
-    let h = height(f, x, z) >> 4;
     let (t, hu, c) = (here.temperature(), here.humidity(), here.continent());
     let at = |v: f64| q12(v);
     if h <= SEA - 2 && c < at(OCEAN_CONTINENT) {
@@ -1116,6 +1316,74 @@ mod tests {
     }
 
     #[test]
+    fn terraces_are_benches_that_never_fill() {
+        let mut last = 0;
+        let mut flat = 0;
+        for raise in 0..q4(60.0) {
+            let t = net::terraced(raise);
+            assert!(t >= last, "benches only climb");
+            assert!(t <= raise + q4(1.0), "a bench stands at most a block over the smooth side");
+            if t == last {
+                flat += 1;
+            }
+            last = t;
+        }
+        assert!(flat > q4(60.0) * 2 / 5, "much of the side is bench: {flat}");
+    }
+
+    #[test]
+    fn karst_towers_stand_in_their_land_only() {
+        let f = fields(1);
+        let (mut towers, mut outside) = (0, 0);
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 12 * 16 - 1200 * 16, (i / 200) * 12 * 16 - 1200 * 16);
+            let add = karst(&f, x, z);
+            assert!((0..=q4(KARST_WIDE_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
+            if add > q4(8.0) {
+                towers += 1;
+                if KARST_AREA.value(&f, x, z) == 0 {
+                    outside += 1;
+                }
+            }
+        }
+        assert!(towers > 0 && outside == 0, "{towers} tower columns, {outside} outside the karst land");
+    }
+
+    #[test]
+    fn canyons_cut_dry_in_their_land_only() {
+        let f = fields(1);
+        let mut deep = 0;
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 16 * 16 - 1600 * 16, (i / 200) * 16 * 16 - 1600 * 16);
+            let cut = canyons(&f, x, z);
+            assert!((-q4(CANYON_DEPTH as f64)..=0).contains(&cut), "{cut}");
+            if cut < 0 {
+                assert!(CANYON_AREA.value(&f, x, z) > 0);
+                assert!(land_height(&f, x, z) >> 4 >= SEA + CANYON_DRY || lakes(&f, x, z) < 0, "a canyon floor under the sea at {x} {z}");
+            }
+            if cut < -q4(20.0) {
+                deep += 1;
+            }
+        }
+        assert!(deep > 0, "no canyon 20 deep in 3.2 km");
+    }
+
+    #[test]
+    fn borders_fray_only_where_the_ground_changes() {
+        let f = fields(1);
+        let mut frayed = 0;
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 8 * 16 - 800 * 16, (i / 200) * 8 * 16 - 800 * 16);
+            let h = height(&f, x, z) >> 4;
+            if let Some((top, _)) = fray(&f, x, z, h) {
+                assert_ne!(top, surface_of(overworld_biome(&f, x, z)).0, "a fray to the same ground at {x} {z}");
+                frayed += 1;
+            }
+        }
+        assert!(frayed > 0 && frayed < 4_000, "{frayed} frayed columns of 40 000");
+    }
+
+    #[test]
     fn lakes_only_cut_and_hold_water() {
         let f = fields(1);
         let (mut wet, mut lakes_seen) = (0, 0);
@@ -1135,7 +1403,7 @@ mod tests {
 
     #[test]
     fn sequoia_groves_are_rare_and_found() {
-        for seed in [1, 2, 3] {
+        for seed in [1, 2, 3, 7, 42, 1234] {
             let shares = biome_shares(seed, 8000, 32);
             let (share, near) = shares
                 .iter()
@@ -1225,8 +1493,12 @@ mod tests {
 
     #[test]
     fn every_biome_turns_up_near_the_middle() {
-        for seed in [1, 2, 3] {
+        // The playtesters' seeds too (7, 42, 1234), at the continent scale of 1800.
+        for seed in [1, 2, 3, 7, 42, 1234] {
             let shares = biome_shares(seed, 6000, 48);
+            for (b, s, _) in &shares {
+                assert!(*s < 0.25, "seed {seed}: {b} is {:.1}% of the land", s * 100.0);
+            }
             for biome in ["plains", "forest", "birch_forest", "taiga", "snowy_plains", "desert", "savanna", "swamp", "mountains", "beach"] {
                 let (share, near) = shares
                     .iter()

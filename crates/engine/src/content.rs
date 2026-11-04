@@ -563,9 +563,11 @@ pub struct Ids {
     pub attack_damage: Option<u32>,
     pub mining_speed: Option<u32>,
     pub tool_level: Option<u32>,
+    pub keep_broken: Option<u32>,
     pub harvest_level: Option<u32>,
     pub damage: Option<u32>,
     pub name: Option<u32>,
+    pub look: Option<u32>,
     pub conductor: Option<u32>,
     pub worn: Option<u32>,
     pub worn_texture: Option<u32>,
@@ -796,6 +798,35 @@ impl Content {
         self.components.get(comps::ITEM, item, comp?)
     }
 
+    /// A number of a stack: the stack's own value of `comp` when it carries one (an item built
+    /// from parts carries its tool numbers), else its item's.
+    pub fn stack_value<T: Copy>(&self, stack: &weft_abi::ItemStack, comp: Option<u32>) -> Option<T> {
+        let comp = comp?;
+        if let Some(b) = crate::stack::value(stack.data, comp)
+            && b.len() == std::mem::size_of::<T>()
+        {
+            return Some(unsafe { std::ptr::read_unaligned(b.as_ptr() as *const T) });
+        }
+        self.item_value(stack.item, Some(comp))
+    }
+
+    /// Worn out and kept (`keep_broken`): it works like an empty hand until it's repaired.
+    pub fn broken(&self, stack: &weft_abi::ItemStack) -> bool {
+        let max = self.max_durability(stack);
+        max > 0 && crate::stack::damage(stack) >= max
+    }
+
+    /// Uses before the stack breaks, 0 for one that doesn't: its own `durability`, else its item's.
+    pub fn max_durability(&self, stack: &weft_abi::ItemStack) -> u32 {
+        match self.stack_value::<u32>(stack, self.ids.durability) {
+            Some(d) => d,
+            None => self
+                .items
+                .get(stack.item as usize)
+                .map_or(0, |d| d.durability),
+        }
+    }
+
     pub fn block_value<T: Copy>(&self, state: u32, comp: Option<u32>) -> Option<T> {
         self.components.get(comps::BLOCK, state, comp?)
     }
@@ -848,13 +879,15 @@ impl Content {
                 .any(|&(mineable, tools)| self.components.has(comps::BLOCK, state, mineable) && self.item_has(tool, tools))
     }
 
-    /// Mining the block with `tool` (0 = hand) harvests it: it needs no tool, or this one fits
-    /// and is of a high enough level.
-    pub fn harvests(&self, state: u32, tool: u32) -> bool {
+    /// Mining the block with `tool` (empty = hand) harvests it: it needs no tool, or this one fits
+    /// and is of a high enough level (the stack's own, for one built from parts).
+    pub fn harvests(&self, state: u32, tool: &weft_abi::ItemStack) -> bool {
+        let empty = weft_abi::ItemStack::EMPTY;
+        let tool = if self.broken(tool) { &empty } else { tool };
         !self.needs_tool(state)
-            || (self.tool_fits(state, tool)
+            || (self.tool_fits(state, tool.item)
                 && self
-                    .item_value::<u32>(tool, self.ids.tool_level)
+                    .stack_value::<u32>(tool, self.ids.tool_level)
                     .unwrap_or(0)
                     >= self.harvest_level(state))
     }
@@ -1484,6 +1517,49 @@ impl TextureList {
     }
 }
 
+/// Every texture a block state draws must be a file in its mod's assets (`textures/<path>.png`):
+/// a missing one would draw as the magenta checker, and quietly (a resource pack can only replace
+/// a texture, not add one). Only what a state shows counts: a state made of boxes draws its boxes'
+/// textures, not the block's default `block/<name>` it was given first (a bed, a piston). Item
+/// textures without a file are only warned about, since an icon can wait for its art. Mods whose
+/// assets folder isn't there (tests) aren't checked.
+fn check_texture_files(mods: &[ModMeta], textures: &TextureList, states: &[StateInfo], errors: &mut Vec<String>) {
+    let mut drawn = vec![false; textures.names.len()];
+    for s in states {
+        let faces: Box<dyn Iterator<Item = u32>> = match s.model {
+            Model::None => Box::new(std::iter::empty()),
+            Model::Boxes => Box::new(s.boxes.iter().flat_map(|b| b.textures)),
+            _ => Box::new(s.textures.into_iter()),
+        };
+        for t in faces {
+            if let Some(d) = drawn.get_mut(t as usize) {
+                *d = true;
+            }
+        }
+    }
+    for (i, name) in textures.names.iter().enumerate() {
+        let Some((ns, rel)) = name.split_once(':') else { continue };
+        let Some(m) = mods.iter().find(|m| m.id == ns) else { continue };
+        if ns == "core" || !m.assets.is_dir() {
+            continue;
+        }
+        if m.assets
+            .join("textures")
+            .join(format!("{rel}.png"))
+            .is_file()
+        {
+            continue;
+        }
+        if rel.starts_with("block/") {
+            if drawn[i] {
+                errors.push(format!("texture {name}: no file textures/{rel}.png in {ns}'s assets (it would draw magenta)"));
+            }
+        } else {
+            log::warn!("texture {name}: no file textures/{rel}.png in {ns}'s assets");
+        }
+    }
+}
+
 type RawBiome = (BiomeDef, usize, Vec<RawValue>, crate::server::terrain::RawRule);
 type RawDim = (DimensionDef, usize, Vec<RawValue>);
 
@@ -1563,6 +1639,7 @@ pub fn freeze(mut mods: Vec<ModMeta>, regs: Vec<RawRegistrar>) -> Result<Content
     let fire_texture = textures.intern("core:block/fire");
     let block_tables = number_blocks(&mods, blocks, &mut textures, &mut errors);
     let item_tables = number_items(&mods, items, &block_tables, &mut textures, &mut errors);
+    check_texture_files(&mods, &textures, &block_tables.states, &mut errors);
     let biome_tables = number_biomes(biomes);
     let dim_tables = number_dimensions(&mods, dims);
     let entities = crate::registry::freeze_entities(&mut games, &mut errors);
@@ -2293,6 +2370,7 @@ fn declare_components(
         (crate::registry::BURNING, "u8"),
         (crate::registry::WORN, "bytes"),
         (crate::registry::HELD, "u32"),
+        (crate::registry::HELD_LOOK, "bytes"),
         (crate::registry::SHAPE, "bytes"),
         (crate::registry::MOUNT, "bytes"),
         (crate::registry::SIMULATED, "u64"),
@@ -2503,9 +2581,11 @@ fn component_ids(components: &Components) -> Ids {
         attack_damage: id(abi::comp::ATTACK_DAMAGE),
         mining_speed: id(abi::comp::MINING_SPEED),
         tool_level: id(abi::comp::TOOL_LEVEL),
+        keep_broken: id(abi::comp::KEEP_BROKEN),
         harvest_level: id(abi::comp::HARVEST_LEVEL),
         damage: id(abi::comp::DAMAGE),
         name: id(abi::comp::NAME),
+        look: id(abi::comp::LOOK),
         conductor: id(abi::comp::CONDUCTOR),
         worn: id(abi::comp::WORN),
         worn_texture: id(abi::comp::WORN_TEXTURE),

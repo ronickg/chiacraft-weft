@@ -12,6 +12,11 @@ use weft_sdk::noise::*;
 use weft_sdk::terrain::*;
 
 pub const SEA: i32 = base_api::SEA;
+/// Water's tint in base's biomes, muted toward the sky it mirrors (Bliss's lakes: saturation 0.10-0.19
+/// at noon; the engine's default 0x3f76e4 is 0.73). The pack multiplies it into what the water
+/// scatters back, 30% in the shallows to 70% deep; the cold biomes and the swamp keep their own.
+const WATER_TINT: u32 = 0x607ca0;
+const OCEAN_WATER_TINT: u32 = 0x557a9e;
 
 static PLANT_SOIL: Tag = Tag::named("plant_soil");
 static CACTUS_SOIL: Tag = Tag::named("cactus_soil");
@@ -82,6 +87,7 @@ pub fn register(r: &mut Registry) {
     // Tags say what a biome is (spawning, decoration and mods ask these, not names).
     let (grass, foliage, water) = (&tints::GRASS, &tints::FOLIAGE, &tints::WATER);
     r.biome(&PLAINS)
+        .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:plains"))
         .set(&BOULDERS, 0.05)
         .surface("grass", "dirt", 3)
@@ -90,6 +96,7 @@ pub fn register(r: &mut Registry) {
         .set(&TREES, 0.025)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:plains").unwrap_or(vitals::forage::GRASS_COVER_ELSE));
     r.biome(&FOREST)
+        .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:forest"))
         .set(&BOULDERS, 0.12)
         .humidity(land::FOREST_HUMIDITY..)
@@ -105,6 +112,7 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
     r.biome(&BIRCH_FOREST)
+        .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:birch_forest"))
         .set(&BOULDERS, 0.1)
         .temperature(..land::BIRCH.0)
@@ -129,7 +137,7 @@ pub fn register(r: &mut Registry) {
         .tint(foliage, 0x68a464)
         .tint(&base_api::trees::EVERGREEN, 0x68a464)
         .tint(&base_api::trees::YELLOW_LEAVES, 0x68a464)
-        .tint(water, 0x3d57d6)
+        .tint(water, 0x5c6c96)
         .tag("forest")
         .tag("cold")
         .tag("animals")
@@ -148,12 +156,13 @@ pub fn register(r: &mut Registry) {
         .tint(foliage, 0x60a17b)
         .tint(&base_api::trees::EVERGREEN, 0x60a17b)
         .tint(&base_api::trees::YELLOW_LEAVES, 0x60a17b)
-        .tint(water, 0x3938c9)
+        .tint(water, 0x585c8c)
         .tag("cold")
         .tag("animals")
         .set(&TREES, 0.03)
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&DESERT)
+        .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:desert"))
         .set(&BOULDERS, 0.04)
         .temperature(land::DESERT.0..)
@@ -171,12 +180,15 @@ pub fn register(r: &mut Registry) {
         .set_text(&TREE_KINDS, "base:mesquite_log");
     // Hot grassland with few trees, between the desert and the forests (wet and dry seasons).
     r.biome(&SAVANNA)
+        .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:savanna"))
         .set(&BOULDERS, 0.04)
         .temperature(land::SAVANNA.0..)
         .humidity(..land::SAVANNA.1)
         .surface("grass", "dirt", 3)
-        .tint(grass, 0xbfb755)
+        // A calmer grass yellow than the desert's: it greens in the rains and goes straw when dry
+        // (`vitals::foliage::rain_tint`; the playtest read 0xbfb755 all year as neon).
+        .tint(grass, 0xa9a565)
         .tint(foliage, 0xaea42a)
         .tint(&base_api::trees::EVERGREEN, 0xaea42a)
         .tint(&base_api::trees::YELLOW_LEAVES, 0xaea42a)
@@ -206,6 +218,7 @@ pub fn register(r: &mut Registry) {
         // The Pantanal's acuri palms on the ground above the flood, a few moriches and oaks.
         .set_text(&TREE_KINDS, "base:acuri_palm_log:3 base:moriche_palm_log:1 base:oak_log:1");
     r.biome(&MOUNTAINS)
+        .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:mountains"))
         .set(&BOULDERS, 0.4)
         .surface("grass", "dirt", 3)
@@ -225,6 +238,7 @@ pub fn register(r: &mut Registry) {
     // with clearings. Spruce and oak stand in for the mixed conifers and the sequoia until their
     // trees come (Voxel dog).
     r.biome(&SEQUOIA_GROVE)
+        .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:sequoia_grove"))
         .temperature(land::SEQUOIA_TEMPERATURE.0..land::SEQUOIA_TEMPERATURE.1)
         .humidity(land::SEQUOIA_HUMIDITY..)
@@ -247,16 +261,19 @@ pub fn register(r: &mut Registry) {
         // Lupine in its sunny gaps and meadows.
         .set_text(&FLOWERS, "base:lupine");
     r.biome(&OCEAN)
+        .tint(water, OCEAN_WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:ocean"))
         .surface("sand", "sand", 3)
         .deep_top("gravel", SEA - 8)
         .tag("ocean");
     r.biome(&BEACH)
+        .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:beach"))
         .surface("sand", "sand", 3)
         .tag("beach");
     // Underground (3D): whole cubes deep under the surface; spiders like it there.
     r.biome(&DEEP_CAVES)
+        .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:deep_caves"))
         .tag("cave")
         .tag("dark");
@@ -359,7 +376,7 @@ pub fn register(r: &mut Registry) {
 
 /// A young tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face.
 fn young_tree(s: &mut Site) {
-    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+    if !site_open(s) {
         return;
     }
     let [x, y, z] = s.pos();
@@ -384,7 +401,7 @@ fn young_tree(s: &mut Site) {
 /// A shrub at a scatter's site: a clump of the biome's shrub leaves (`SHRUB_KINDS`), one or two
 /// high (`vitals::layers::shrub_height`) and one to three across; none on a bare rock face.
 fn shrub(s: &mut Site) {
-    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+    if !site_open(s) {
         return;
     }
     let h = s.random();
@@ -416,6 +433,13 @@ fn shrub(s: &mut Site) {
             }
         }
     }
+}
+
+/// Whether a tree or shrub may stand at a scatter's site: not on a bare rock face, nor at the foot
+/// of a wall (`land::site_on_rock`, `site_under_wall`).
+fn site_open(s: &Site) -> bool {
+    let (seed, dim, pos) = (s.seed(), s.dimension(), s.pos());
+    !crate::land::site_on_rock(seed, dim, pos) && !crate::land::site_under_wall(seed, dim, pos)
 }
 
 /// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet; none
@@ -453,7 +477,7 @@ static GIANT_SITES: Scatter = Scatter::named("giant_trees");
 
 /// A giant of the biome's `GIANT_KINDS` at a scatter's site; none on a bare rock face.
 fn giant(s: &mut Site) {
-    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+    if !site_open(s) {
         return;
     }
     let h = s.random();
@@ -535,7 +559,7 @@ const CLEARING: i32 = 1600;
 /// A tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face
 /// (`land::site_on_rock`).
 fn tree(s: &mut Site) {
-    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+    if !site_open(s) {
         return;
     }
     let [x, y, z] = s.pos();
@@ -688,6 +712,12 @@ fn decorate(g: &mut Gen) {
             let pick = if sandy_shore { wild_at(seed, wx, wz, b, wild::Ground::Shore) } else { None };
             if let Some(s) = pick.or_else(|| ground.and_then(|gr| wild_at(seed, wx, wz, b, gr))) {
                 g.set(x, y, z, s);
+                // A mound's crown on it, in one place in two (`wild::upper_of`).
+                if let Some(u) = crate::wild::upper_of(s, unit(hash(seed ^ 0x7E3, wx as i64, 1, wz as i64)) as f32)
+                    && y + 1 < 16
+                {
+                    g.set(x, y + 1, z, u);
+                }
                 continue;
             }
             if FROZEN.on_biome(b) {

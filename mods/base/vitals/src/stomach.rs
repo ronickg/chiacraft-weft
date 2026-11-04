@@ -175,10 +175,12 @@ impl Stomach {
     }
 }
 
-/// What a new player arrives with in them (Ronald, 11-03, via Planner): a loaf and an apple, 43
-/// units, so the first night is fair (an empty stomach left 40% of max health, and one spider
-/// killed a fresh player). It digests away in half an hour like any meal; dying still empties it.
-pub const ARRIVAL: [&str; 2] = ["base:bread", "base:apple"];
+/// What a new player arrives with in them, and respawns with (SURVIVAL.md steps 11 and 13): a
+/// loaf, an apple and a cooked chicken, 65 units, max health 90 of 100 and stamina 83 (Ronald,
+/// 11-04, "Bigger arrival meal": with the loaf and apple alone, 54, a 9-block fall took 61% of a
+/// fresh player's health in the taiga). Three foods make one well fed until it digests below half;
+/// it wears off like any meal, so hunger still matters from the first hour.
+pub const ARRIVAL: [&str; 3] = ["base:bread", "base:apple", "base:cooked_chicken"];
 
 /// A new player's stomach: `ARRIVAL`, fresh, neither hot nor cooling.
 pub fn arrival() -> Stomach {

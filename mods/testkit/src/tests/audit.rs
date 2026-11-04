@@ -167,7 +167,10 @@ pub async fn ladder_no_fall(t: T) -> R {
     t.until("down", Duration::from_secs(15), |t| t.flag(client::client_flags::ON_GROUND))
         .await?;
     t.secs(0.5).await?;
-    t.check(t.state().health >= 19.0, format!("health after a ladder: {}", t.state().health));
+    // Against the player's own full health: max health follows the stomach (`vitals`), so a
+    // new player's is the arrival meal's, under 20.
+    let h = t.state().health;
+    t.check(super::full(&t, h), format!("health after a ladder: {h}, full {}", super::max_health(&t)));
     Ok(())
 }
 

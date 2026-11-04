@@ -138,52 +138,77 @@ pub fn register(r: &mut Registry) {
                     c.client().open_screen(&crate::advancements::SCREEN);
                 }),
             ];
-            crate::window::window(ui, S::col().pad(7.0).gap(5.0), &tabs, |ui| {
-                ui.row(S::row().gap(1.0), |ui| {
-                    // Armor, and the clothes worn under it beside, the cloak under them.
-                    ui.column(S::col(), |ui| {
-                        for slot in EQUIPMENT.iter() {
-                            ui.group(slot.name());
-                        }
-                    });
-                    ui.column(S::col(), |ui| {
-                        for slot in base_api::CLOTHES.iter() {
-                            ui.group(slot.name());
-                        }
-                        ui.group(base_api::CLOAK.name());
-                    });
-                    ui.player_model(51.0, 72.0);
-                    ui.spacer();
-                    ui.column(S::col().gap(2.0), |ui| {
-                        ui.text_styled(S::default().no_wrap(), "window.base.crafting", &[]);
-                        ui.row(S::row().gap(4.0), |ui| {
-                            ui.group("grid");
-                            ui.recipe_arrow();
-                            ui.group("result");
+            // The recipe book beside it, hand recipes only (`book.rs`).
+            ui.row(S::row().gap(4.0), |ui| {
+                crate::window::window(ui, S::col().pad(7.0).gap(5.0), &tabs, |ui| {
+                    ui.row(S::row().gap(1.0), |ui| {
+                        // Armor, and the clothes worn under it beside, the cloak under them.
+                        ui.column(S::col(), |ui| {
+                            for slot in EQUIPMENT.iter() {
+                                ui.group(slot.name());
+                            }
+                        });
+                        ui.column(S::col(), |ui| {
+                            for slot in base_api::CLOTHES.iter() {
+                                ui.group(slot.name());
+                            }
+                            ui.group(base_api::CLOAK.name());
+                        });
+                        ui.player_model(51.0, 72.0);
+                        ui.spacer();
+                        ui.column(S::col().gap(2.0), |ui| {
+                            ui.text_styled(S::default().no_wrap(), "window.base.crafting", &[]);
+                            ui.row(S::row().gap(4.0), |ui| {
+                                ui.group("grid");
+                                ui.recipe_arrow();
+                                ui.group("result");
+                            });
                         });
                     });
+                    ui.player_inventory(false);
                 });
-                ui.player_inventory(false);
+                // Not in creative: its item picker takes the left side and has every item, and the
+                // picker, the inventory and the book side by side were wider than a 1280 x 720
+                // screen at GUI scale 2 (both ends cut off, the label check, 11-04).
+                if !ui.client().creative() {
+                    crate::book::book(ui, crate::book::Station::Hands);
+                }
             });
         });
 
     r.menu(&CRAFTING)
         .group("grid", Slots::grid(3, 3))
         .group("result", Slots::single().output().large())
+        // Items built from parts (`parts.rs`).
+        .group("assembly", Slots::row(4))
+        .group("assembled", Slots::single().output())
+        .group("apart", Slots::single())
         .player_inventory()
         .recipes(&crate::recipes::CRAFTING)
-        .on_change(craft_result)
-        .on_take(consume_grid)
+        .on_change(|m| {
+            craft_result(m);
+            crate::parts::on_change(m);
+        })
+        .on_take(|m| {
+            if !crate::parts::on_take(m) {
+                consume_grid(m);
+            }
+        })
         .screen(|ui| {
-            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
-                ui.row(S::row().gap(8.0), |ui| {
-                    ui.spacer();
-                    ui.group("grid");
-                    ui.recipe_arrow();
-                    ui.group("result");
-                    ui.spacer();
+            // The recipe book beside it: every recipe, from the bag and the chests near the table.
+            ui.row(S::row().gap(4.0), |ui| {
+                crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
+                    ui.row(S::row().gap(8.0), |ui| {
+                        ui.spacer();
+                        ui.group("grid");
+                        ui.recipe_arrow();
+                        ui.group("result");
+                        ui.spacer();
+                    });
+                    crate::parts::ui(ui);
+                    ui.player_inventory(true);
                 });
-                ui.player_inventory(true);
+                crate::book::book(ui, crate::book::Station::Table);
             });
         });
     r.player_menu(&INVENTORY);
@@ -206,6 +231,10 @@ fn craft_result(m: &MenuCtx) {
 /// Takes one of each ingredient; the last of a stack leaves its `remainder` (a bucket). Crafting
 /// gives XP by how many things went into it.
 fn consume_grid(m: &MenuCtx) {
+    // Only for the grid's own result.
+    if m.group("result").index_of(m.slot()).is_none() {
+        return;
+    }
     let grid = m.group("grid");
     let cells: Vec<ItemStack> = (0..grid.len()).map(|i| grid.get(i)).collect();
     let made = recipe_match(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());

@@ -57,7 +57,7 @@ guide it belongs to, or into `0 Making it.md` if it holds for every kind.
     $P $A block dirt --type "natural cube" --what "rounded brown dirt clods (#3a2926 to #94724b) ..."
     $P $A block poppy --type flower --cutout --what "a red poppy (#d32228) ..."
     $P $A animal wyvern --type "dinosaur" --size 48x32 --what "a wyvern: ..."
-    $P $A batch jobs.json                        # many at once (four at a time): [{kind, name, what, type, ...}]
+    $P $A batch jobs.json                        # many at once (two at a time; ART_JOBS overrides): [{kind, name, what, type, ...}]
     $P $A prompt item NAME ...                   # print the prompt and references instead
     $P $A install item NAME --mod base           # the cut sprite over mods/<mod>/assets/textures/item/NAME.png
 

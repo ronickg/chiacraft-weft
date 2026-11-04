@@ -402,10 +402,14 @@ impl Ui {
 
     /// Scrolls the innermost scrolling node under `p` by `lines` wheel steps; true if one moved.
     pub fn scroll_at(&mut self, p: Vec2, lines: f32) -> bool {
-        let Some(id) = (0..self.nodes.len())
-            .rev()
-            .find(|&i| self.nodes[i].style.scroll && self.nodes[i].rect.contains(p) && self.nodes[i].clip.is_none_or(|c| c.contains(p)))
-        else {
+        let Some(id) = (0..self.nodes.len()).rev().find(|&i| {
+            self.nodes[i].style.scroll
+                    && self.nodes[i].rect.contains(p)
+                    && self.nodes[i].clip.is_none_or(|c| c.contains(p))
+                    // a screen's root scrolls only when the screen is taller than the window, and
+                    // leaves the wheel to the rest otherwise
+                    && (i != 0 || self.nodes[0].scrollbar.is_some())
+        }) else {
             return false;
         };
         // Held to its end, a node counts from there: up is further from it.
@@ -777,14 +781,28 @@ impl Ui {
                 self.nodes[id].scrollbar = Some(Scrollbar { track, offset, max });
             }
         }
+        // A centred thing's odd leftover pixel goes below or right of it, never split: its offset
+        // is rounded down to the UI pixel (`text_unit`) here, not rounded by `snapped` later
+        // (which put half a pixel up, and labels a pixel low in kit 2's buttons, whose faces are
+        // made for it: 2 px of frame above, 3 below).
+        let unit = self.text_unit;
+        let down = |v: f32| if unit > 0.0 { (v / unit + 1e-4).floor() * unit } else { v };
+        // A button's label taller than the room inside its padding (a small button with the
+        // default padding) still centres, sticking out of the padding evenly: clamping its
+        // overflow to nothing put the label on the top padding, 4 UI px low in an 11 px button
+        // (the label check, 11-04). Other containers keep their overflow at the end.
+        let overflow_centres = matches!(self.nodes[id].kind, Kind::Button { .. });
+        let free_c = if overflow_centres { free } else { free.max(0.0) };
         let (mut pos, spacing) = match style.justify {
             Justify::Start => (-scrolled, style.gap),
-            Justify::Center => (free.max(0.0) / 2.0, style.gap),
+            // Centred, or from the top once it overflows a scrolling node, and scrolled from there
+            // (a screen taller than a small window: its root scrolls, `App::open`).
+            Justify::Center => (down(free_c / 2.0) - scrolled, style.gap),
             // Overflowing content sticks out at the start, the end edge stays put. Scrolling goes
             // from there.
             Justify::End => (free - past_end, style.gap),
             Justify::Between if children.len() > 1 => (0.0, style.gap + free.max(0.0) / (children.len() - 1) as f32),
-            Justify::Between => (free.max(0.0) / 2.0, style.gap),
+            Justify::Between => (down(free.max(0.0) / 2.0), style.gap),
         };
         for (i, &c) in children.iter().enumerate() {
             let s = sizes[i];
@@ -796,7 +814,7 @@ impl Ui {
             }
             let off = match align {
                 Align::Start | Align::Stretch => 0.0,
-                Align::Center => (cross_size - cc) / 2.0,
+                Align::Center => down((cross_size - cc) / 2.0),
                 Align::End => cross_size - cc,
             };
             let r = if style.row {

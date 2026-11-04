@@ -26,8 +26,8 @@ use weft_sdk::noise::fixed::{self, Fields, ONE, div_floor, q4, q12, ramp, shape}
 use super::{
     CONTINENTS, HIGHLANDS, HIGHLANDS_AREA, HILLS, HILLS_AREA, Here, LAKE_DEPTH, LAKE_MAX_RISE, LAKE_STRETCH, Lake, MOUNTAINS_AREA,
     RIVER_BANKS, RIVER_DEPTH, RIVER_FLOODPLAIN, RIVER_FLOW, RIVER_HALF_WIDTH, RIVER_MOUNTAINS, RIVER_NODE, RIVER_RAIN, RIVER_REACH,
-    RIVER_REGION, RIVER_ROUTE_HILLS, RIVER_ROUTE_MOUNTAINS, RIVER_SINK_FLOW, RIVER_SINK_RADIUS, RIVER_VALLEY_PER_BLOCK, RIVER_VALLEY_RISE,
-    RIVER_WARP, RIVER_WARP_SCALE, ground_at, lake_reach_most, masked, mesa_at, salt,
+    RIVER_REGION, RIVER_ROUTE_HILLS, RIVER_ROUTE_MOUNTAINS, RIVER_SINK_FLOW, RIVER_SINK_RADIUS, RIVER_TERRACE, RIVER_TERRACE_RISER,
+    RIVER_VALLEY_PER_BLOCK, RIVER_VALLEY_RISE, RIVER_WARP, RIVER_WARP_SCALE, ground_at, lake_reach_most, masked, mesa_at, salt,
 };
 use crate::SEA;
 
@@ -401,4 +401,15 @@ pub(super) fn shape(flow: i32, mountains: i32) -> Shape {
         floodplain: lerp(RIVER_FLOODPLAIN),
         strength: (strength * mountains) >> 12,
     }
+}
+
+/// A valley side's rise (Q4) in benches: flat for all but the last `RIVER_TERRACE_RISER` of each
+/// `RIVER_TERRACE` blocks, which climbs to the next (`super::rivers`).
+pub(super) fn terraced(raise: i32) -> i32 {
+    let step = q4(RIVER_TERRACE as f64);
+    let (k, frac) = div_floor(raise.max(0), step);
+    let bench = step - ((step * q12(RIVER_TERRACE_RISER)) >> 12);
+    let u = ramp(frac, bench, step);
+    let s = (((u * u) >> 12) * (3 * ONE - 2 * u)) >> 12;
+    k * step + ((step * s) >> 12)
 }

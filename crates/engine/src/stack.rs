@@ -93,6 +93,14 @@ pub fn name(stack: &ItemStack) -> Option<String> {
     value(stack.data, c.ids.name?).map(|b| String::from_utf8_lossy(b).into_owned())
 }
 
+/// The layers the stack is drawn from (`abi::comp::LOOK`), if it has its own look.
+pub fn look(stack: &ItemStack) -> Option<&'static str> {
+    let c = crate::content::try_content()?;
+    value(stack.data, c.ids.look?)
+        .and_then(|b| std::str::from_utf8(b).ok())
+        .filter(|l| !l.is_empty())
+}
+
 pub fn with_name(stack: ItemStack, name: Option<&str>) -> ItemStack {
     let Some(comp) = crate::content::try_content().and_then(|c| c.ids.name) else { return stack };
     ItemStack { data: with(stack.data, comp, name.filter(|n| !n.is_empty()).map(str::as_bytes)), ..stack }

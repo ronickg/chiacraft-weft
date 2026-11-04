@@ -50,6 +50,10 @@ impl Lang {
     /// Template for a key. A missing key falls back to English; if that is missing too, the key
     /// itself shows (and is logged once).
     pub fn get<'a>(&'a self, key: &'a str) -> &'a str {
+        // No key: no text (a bound text that set nothing this frame), not a missing one.
+        if key.is_empty() {
+            return "";
+        }
         if let Some(v) = self.entries.get(key).or_else(|| self.fallback.get(key)) {
             return v;
         }

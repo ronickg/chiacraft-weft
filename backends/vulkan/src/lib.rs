@@ -154,6 +154,8 @@ pub struct VulkanBackend {
     capture: Option<(vk::Buffer, Allocation, u32, u32, vk::Format)>,
     device_name: String,
     queries: vk::QueryPool,
+    /// Pipelines compiled before, kept on disk between starts (`load_pipeline_cache`).
+    pipeline_cache: vk::PipelineCache,
     ts_period: f32,
     gpu_times: Vec<f32>,
     /// Where `begin_frame`'s and `end_frame`'s time goes (waiting for the GPU, `vkAcquireNextImageKHR`,
@@ -471,13 +473,7 @@ impl VulkanBackend {
                 allocation_sizes: Default::default(),
             })
             .map_err(err("GPU allocator"))?;
-            let mem = instance.get_physical_device_memory_properties(pdev);
-            let spill = (0..mem.memory_type_count)
-                .filter(|&i| {
-                    let heap = mem.memory_heaps[mem.memory_types[i as usize].heap_index as usize];
-                    !heap.flags.contains(vk::MemoryHeapFlags::DEVICE_LOCAL)
-                })
-                .fold(0, |m, i| m | 1 << i);
+            let spill = spill_types(&instance.get_physical_device_memory_properties(pdev));
 
             let swapchain_fn = khr::swapchain::Device::new(&instance, &device);
             let push_fn = khr::push_descriptor::Device::new(&instance, &device);
@@ -624,6 +620,9 @@ impl VulkanBackend {
                     None,
                 )
                 .map_err(err("query pool"))?;
+            let pipeline_cache = device
+                .create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None)
+                .map_err(err("pipeline cache"))?;
             let mut backend = VulkanBackend {
                 _entry: entry,
                 instance,
@@ -658,6 +657,7 @@ impl VulkanBackend {
                 capture: None,
                 device_name,
                 queries,
+                pipeline_cache,
                 ts_period: props.limits.timestamp_period,
                 gpu_times: Vec::new(),
                 submit_split: SubmitSplit::default(),
@@ -1130,6 +1130,17 @@ fn depth_range() -> vk::ImageSubresourceRange {
     }
 }
 
+/// The memory types off the GPU's own heaps, as a mask of their indices: system memory on a
+/// discrete GPU, none where the GPU shares the system's memory.
+fn spill_types(mem: &vk::PhysicalDeviceMemoryProperties) -> u32 {
+    (0..mem.memory_type_count)
+        .filter(|&i| {
+            let heap = mem.memory_heaps[mem.memory_types[i as usize].heap_index as usize];
+            !heap.flags.contains(vk::MemoryHeapFlags::DEVICE_LOCAL)
+        })
+        .fold(0, |m, i| m | 1 << i)
+}
+
 /// Allocates for `desc`. When the GPU's memory is full, a GPU-only allocation goes to system memory
 /// (`spill`), which the GPU reads over the bus: slower, but the game goes on instead of stopping.
 fn allocate(allocator: &mut Allocator, desc: &AllocationCreateDesc, spill: u32) -> gpu_allocator::Result<Allocation> {
@@ -1546,7 +1557,7 @@ impl Backend for VulkanBackend {
             .push_next(&mut rendering);
         let result = unsafe {
             self.device
-                .create_graphics_pipelines(vk::PipelineCache::null(), &[info], None)
+                .create_graphics_pipelines(self.pipeline_cache, &[info], None)
         };
         unsafe {
             self.device.destroy_shader_module(vs, None);
@@ -1574,7 +1585,7 @@ impl Backend for VulkanBackend {
             .layout(layout);
         let result = unsafe {
             self.device
-                .create_compute_pipelines(vk::PipelineCache::null(), &[info], None)
+                .create_compute_pipelines(self.pipeline_cache, &[info], None)
         };
         unsafe { self.device.destroy_shader_module(cs, None) };
         let raw = result.map_err(|(_, e)| Error(format!("compute pipeline {}: {e:?}", desc.label)))?[0];
@@ -1927,6 +1938,40 @@ impl Backend for VulkanBackend {
         self.capture_requested = true;
     }
 
+    fn pipeline_cache_data(&self) -> Vec<u8> {
+        unsafe { self.device.get_pipeline_cache_data(self.pipeline_cache) }.unwrap_or_default()
+    }
+
+    fn load_pipeline_cache(&mut self, data: &[u8]) {
+        // Vulkan's header: its length (32), version 1, vendor, device, then the cache's UUID. Only
+        // this very driver's own is passed on.
+        let props = unsafe { self.instance.get_physical_device_properties(self.pdev) };
+        let word = |i: usize| {
+            data.get(i..i + 4)
+                .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        };
+        let ours = data.len() > 32
+            && word(0) == Some(32)
+            && word(4) == Some(vk::PipelineCacheHeaderVersion::ONE.as_raw() as u32)
+            && word(8) == Some(props.vendor_id)
+            && word(12) == Some(props.device_id)
+            && data[16..32] == props.pipeline_cache_uuid;
+        if !ours {
+            return;
+        }
+        let Ok(cache) = (unsafe {
+            self.device
+                .create_pipeline_cache(&vk::PipelineCacheCreateInfo::default().initial_data(data), None)
+        }) else {
+            return;
+        };
+        unsafe {
+            self.device
+                .destroy_pipeline_cache(self.pipeline_cache, None)
+        };
+        self.pipeline_cache = cache;
+    }
+
     fn gpu_times(&self) -> &[f32] {
         &self.gpu_times
     }
@@ -1968,6 +2013,8 @@ impl Drop for VulkanBackend {
                 self.device.destroy_fence(f.fence, None);
             }
             self.device.destroy_query_pool(self.queries, None);
+            self.device
+                .destroy_pipeline_cache(self.pipeline_cache, None);
             if let Some((buf, alloc, ..)) = self.capture.take() {
                 self.device.destroy_buffer(buf, None);
                 self.allocator.free(alloc).ok();
@@ -2010,5 +2057,41 @@ impl Drop for VulkanBackend {
             }
             self.instance.destroy_instance(None);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn memory(heaps: &[vk::MemoryHeapFlags], types: &[(vk::MemoryPropertyFlags, u32)]) -> vk::PhysicalDeviceMemoryProperties {
+        let mut mem = vk::PhysicalDeviceMemoryProperties {
+            memory_heap_count: heaps.len() as u32,
+            memory_type_count: types.len() as u32,
+            ..Default::default()
+        };
+        for (i, &flags) in heaps.iter().enumerate() {
+            mem.memory_heaps[i] = vk::MemoryHeap { size: 1 << 30, flags };
+        }
+        for (i, &(property_flags, heap_index)) in types.iter().enumerate() {
+            mem.memory_types[i] = vk::MemoryType { property_flags, heap_index };
+        }
+        mem
+    }
+
+    #[test]
+    fn spill_goes_to_system_memory_only() {
+        use vk::MemoryPropertyFlags as P;
+        let host = P::HOST_VISIBLE | P::HOST_COHERENT;
+        // A discrete GPU (NVIDIA's layout): its own heap, system memory, and the small BAR heap
+        // that is device local too.
+        let discrete = memory(
+            &[vk::MemoryHeapFlags::DEVICE_LOCAL, vk::MemoryHeapFlags::empty(), vk::MemoryHeapFlags::DEVICE_LOCAL],
+            &[(P::empty(), 1), (P::DEVICE_LOCAL, 0), (host, 1), (host | P::HOST_CACHED, 1), (P::DEVICE_LOCAL | host, 2)],
+        );
+        assert_eq!(spill_types(&discrete), 0b01101);
+        // Shared memory (Apple): every heap is the GPU's, so nothing to spill to.
+        let unified = memory(&[vk::MemoryHeapFlags::DEVICE_LOCAL], &[(P::DEVICE_LOCAL, 0), (P::DEVICE_LOCAL | host, 0)]);
+        assert_eq!(spill_types(&unified), 0);
     }
 }

@@ -19,28 +19,35 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 
-# ---------------------------------------------------------------- palette (UI guide, section 1)
-OUTLINE = (40, 24, 12)
+# ---------------------------------------------------------------- palette
+# Ronald's pick, 2026-11-04 ("lets go valheim look its good"): variant 2 of
+# `notes/ui/palettes.md`, Valheim's quiet dark wood with an orange accent. Near-black brown
+# insides, slots and wells a step lighter, a mid-brown wood frame, dark leather-brown buttons, beige
+# text, orange for titles, hover and the selected thing. Every shade here is the one
+# `variants.palette` drew on the sheet he picked from.
+OUTLINE = (14, 10, 7)
 INK_DARK = (58, 36, 22)
-PANEL = (22, 16, 15)
-PANEL_DEEP = (14, 10, 9)
-BRONZE_D, BRONZE, BRONZE_L, BRONZE_HI = (92, 46, 20), (137, 69, 30), (167, 81, 32), (205, 120, 60)
-SLOT, SLOT_D, SLOT_L = (53, 32, 21), (36, 22, 14), (104, 62, 38)
-CREAM, DIM, GOLD_TEXT, ON_ORANGE = (228, 218, 207), (198, 163, 131), (242, 218, 154), (255, 244, 220)
-GLOW, GLOW_D = (255, 221, 32), (243, 171, 31)
+PANEL = (31, 23, 18)
+PANEL_DEEP = (19, 14, 10)
+WELL, WELL_D, WELL_L = (41, 31, 24), (31, 23, 17), (57, 45, 36)
+SLIDER, SLIDER_D, SLIDER_L = (74, 53, 36), (56, 39, 26), (96, 71, 51)
+BRONZE_D, BRONZE, BRONZE_L, BRONZE_HI = (73, 48, 28), (110, 76, 48), (134, 94, 62), (160, 116, 80)
+SLOT, SLOT_D, SLOT_L = (51, 40, 31), (40, 31, 23), (72, 58, 47)
+CREAM, DIM, GOLD_TEXT, ON_ORANGE = (232, 214, 176), (180, 156, 118), (255, 184, 74), (255, 240, 207)
+GLOW, GLOW_D = (255, 161, 60), (217, 134, 45)
 GREEN, GREEN_D, GREEN_L = (138, 200, 15), (85, 125, 10), (193, 237, 66)
 RED_UI = (216, 34, 30)
 
 # Button faces: (light edge, face, shade) per kind and state.
 FACES = {
-    "main": ((236, 150, 64), (200, 108, 22), (138, 70, 12)),
-    "main_hover": ((248, 176, 92), (222, 128, 34), (150, 78, 14)),
-    "main_pressed": ((150, 78, 14), (170, 88, 16), (200, 108, 22)),
-    "second": ((122, 82, 56), (90, 58, 38), (58, 36, 24)),
-    "second_hover": ((146, 100, 68), (110, 72, 46), (66, 42, 28)),
-    "second_pressed": ((58, 36, 24), (70, 46, 30), (90, 58, 38)),
-    "disabled": ((86, 78, 72), (70, 63, 58), (54, 48, 44)),
-    "danger": ((222, 90, 70), (176, 44, 34), (112, 24, 18)),
+    "main": ((144, 90, 47), (122, 74, 36), (83, 48, 20)),
+    "main_hover": ((158, 99, 54), (137, 84, 43), (88, 51, 22)),
+    "main_pressed": ((85, 49, 21), (104, 61, 28), (122, 74, 36)),
+    "second": ((68, 50, 37), (58, 42, 30), (39, 28, 19)),
+    "second_hover": ((75, 56, 42), (65, 48, 35), (42, 29, 20)),
+    "second_pressed": ((41, 29, 20), (49, 35, 25), (58, 42, 30)),
+    "disabled": ((58, 53, 50), (48, 44, 41), (36, 33, 30)),
+    "danger": ((208, 59, 48), (176, 44, 34), (120, 23, 15)),
 }
 TEXT_ON = {"main": ON_ORANGE, "second": CREAM, "disabled": (143, 133, 124), "danger": ON_ORANGE}
 
@@ -92,7 +99,10 @@ class Font:
         draws the old down-right one, for comparison only)."""
         missing = [c for c in s if c not in self.g]
         assert not missing, f"no glyph for {missing!r}"
-        y0 = cap_top - (self.baseline - self.caps)
+        # The cell's baseline is the row under the capitals' last one: capitals take rows
+        # baseline-caps-1 .. baseline-2 of the cell (measured: an "A" drawn at the old offset
+        # inked from cap_top-1, so every label sat a pixel high).
+        y0 = cap_top - (self.baseline - self.caps - 1)
         lead = self.g[s[0]][4] if s else 0
         for col, dy in ((shadow, 1), (color, 0)):
             if col is None:
@@ -619,8 +629,8 @@ BAR_FILLS = {
 def bar(w, share, fill="health", h=10):
     """A bar: outline, a dark track, the fill with a 1 px light top and dark bottom."""
     a = canvas(w, h, OUTLINE)
-    rect(a, 1, 1, w - 2, h - 2, (39, 30, 26))
-    rect(a, 1, 1, w - 2, 1, (30, 22, 19))
+    rect(a, 1, 1, w - 2, h - 2, WELL_D)
+    rect(a, 1, 1, w - 2, 1, PANEL_DEEP)
     fw = int(round((w - 2) * max(0.0, min(1.0, share))))
     if fw:
         light, base, dark = BAR_FILLS[fill]
@@ -661,13 +671,14 @@ def chip(label, kind="plain", h=18):
     return a
 
 
-def keycap(letter, size=18):
-    a = canvas(size, size, OUTLINE)
-    rect(a, 1, 1, size - 2, size - 2, (214, 196, 170))
-    rect(a, 1, 1, size - 2, 1, (240, 228, 208))
-    rect(a, 1, size - 3, size - 2, 2, (160, 136, 110))
-    a[0, 0, 3] = a[0, -1, 3] = a[-1, 0, 3] = a[-1, -1, 3] = 0
-    F.draw(a, letter, (size - F.width(letter)) // 2, 1 + (size - 4 - F.caps) // 2, INK_DARK, None)
+def keycap(letter, size=20, r=3):
+    """A key: light, built like a small button, the letter centred on its face. (Defined before
+    the rounded parts' helpers; it looks them up when it is called.)"""
+    a = canvas(size, size)
+    raised(a, shape(size, size, r), (240, 228, 208), (214, 196, 170), (160, 136, 110))
+    cap_top = centre_caps(2, size - 5, "key")
+    F.draw(a, letter, (size - F.width(letter)) // 2, cap_top, INK_DARK, None)
+    check_label(a, letter, INK_DARK, 2, size - 4, "key")
     return a
 
 
@@ -776,16 +787,60 @@ def raised(a, m, light, face, shade, rim=OUTLINE, pressed=False, shade_px=2):
         down |= d
     down &= inner
     if pressed:
-        paint(a, up | (np.roll(up, 1, 0) & inner), light)  # the sunk edge, 2 px, on top
+        # Sunk: the same face moved down exactly 1 px (2 dark rows on top, 1 at the bottom, where
+        # a raised one has 1 light and 2 shade), so its label moving down 1 px stays centred.
+        paint(a, up | (np.roll(up, 1, 0) & inner), light)
+        bottom = np.zeros_like(m)
+        bottom[:-1] = ring[1:]
+        paint(a, bottom & inner, light)
     else:
         paint(a, down, shade)
         paint(a, up, light)
 
 
-def label_into(a, w, h, label, ico, tcol, shadow, align="center", pad=6, dy=0, top=1, bottom=1):
-    """An icon and a label, their capitals centred in rows top .. h-bottom."""
-    room = h - top - bottom
-    cap_top = top + (room - F.caps) // 2 + dy
+R = 3  # Ronald, 2026-11-04: "i like c with 3px": every part steps its corners 3 px.
+DESCENDER = 2  # PixelOperator's g, p, y reach 2 px under the capitals (measured)
+
+
+def centre_caps(face_top, face_rows, what=""):
+    """Where capitals go in a flat face of `face_rows` rows starting at `face_top`: centred, the
+    same room above and below. Refuses a face that leaves an odd pixel (the label could only sit
+    half a pixel off, the "not centred" Ronald saw) or no room for descenders."""
+    left = face_rows - F.caps
+    assert left >= 2 * DESCENDER - 1, f"{what}: a face of {face_rows} rows has no room for descenders"
+    assert left % 2 == 0, f"{what}: a face of {face_rows} rows leaves an odd pixel round 9 px capitals"
+    return face_top + left // 2
+
+
+def ink_rows(a, color):
+    """The rows a colour's pixels take in a part (for checking where a label really sits)."""
+    m = np.all(a[..., :3] == color, axis=-1) & (a[..., 3] > 0)
+    ys = np.nonzero(m.any(1))[0]
+    return (int(ys.min()), int(ys.max())) if len(ys) else None
+
+
+CHECKS = []  # (part, label, room above the capitals, room below them, descender clearance)
+
+
+def check_label(a, label, color, face_top, face_bottom, part):
+    """Measures a drawn label: its capitals' room above and below inside the face must match,
+    and its descenders must stay inside the face."""
+    rows = ink_rows(a, color)
+    if not rows or not label.strip():
+        return
+    top = rows[0]
+    cap_bottom = top + F.caps - 1
+    above, below = top - face_top, face_bottom - cap_bottom
+    has_desc = any(c in "gjpqy" for c in label)
+    clear = face_bottom - (cap_bottom + DESCENDER) if has_desc else None
+    CHECKS.append((part, label, above, below, clear))
+    assert above == below, f"{part} {label!r}: {above} px above its capitals, {below} below"
+    assert clear is None or clear >= 0, f"{part} {label!r}: descenders leave the face"
+
+
+def label_into(a, w, label, ico, tcol, shadow, face_top, face_rows, align="center", pad=6, dy=0, part="button"):
+    """An icon and a label, the capitals centred in the face (rows face_top .. +face_rows)."""
+    cap_top = centre_caps(face_top, face_rows, part) + dy
     iw = 16 if ico else 0
     gap = 4 if ico and label else 0
     tw = F.width(label)
@@ -793,12 +848,16 @@ def label_into(a, w, h, label, ico, tcol, shadow, align="center", pad=6, dy=0, t
     assert need <= w, f"{label!r} needs {need} px, has {w}"
     x = pad if align == "left" else (w - (iw + gap + tw)) // 2
     if ico:
-        blit(a, icon(ico), x, top + (room - 16) // 2 + dy)
+        # The icon's middle on the capitals' middle.
+        blit(a, icon(ico), x, cap_top + F.caps // 2 - 8)
     if label:
         F.draw(a, label, x + iw + gap, cap_top, tcol, shadow)
+        check_label(a, label, tcol, face_top + dy, face_top + face_rows - 1 + dy, part)
 
 
-def button_r(w, h=22, kind="main", state="normal", label="", ico=None, r=2, align="center", pad=6):
+def button_r(w, h=22, kind="main", state="normal", label="", ico=None, r=R, align="center", pad=6):
+    """A button: outline, a 1 px light edge, the flat face, a 2 px shade. The label centres on the
+    face alone (rows 2 .. h-4): 22 px leaves 17 rows, 4 above and 4 below 9 px capitals."""
     a = canvas(w, h)
     key = {"normal": kind, "hover": kind + "_hover", "pressed": kind + "_pressed"}.get(state, kind)
     if state == "disabled":
@@ -809,30 +868,32 @@ def button_r(w, h=22, kind="main", state="normal", label="", ico=None, r=2, alig
     pressed = state == "pressed"
     raised(a, shape(w, h, r), light, face, shade, GLOW if state == "hover" else OUTLINE, pressed)
     tcol = TEXT_ON["disabled" if state == "disabled" else ("danger" if kind == "danger" else kind)]
-    ic = ico
-    label_into(a, w, h, label, ic, tcol, None if pressed else shade, align, pad, 1 if pressed else 0)
+    label_into(a, w, label, ico, tcol, None if pressed else shade, 2, h - 5, align, pad,
+               1 if pressed else 0, f"button {w}x{h}")
     return a
 
 
-def round_button(size=20, kind="main", state="normal", ico="plus"):
-    """A round icon button (+, -): a circle on the pixel grid, the icon centred."""
+def round_button(size=20, kind="main", state="normal", ico="plus", r=R):
+    """A small icon button (+, -), the icon centred on the face."""
     a = canvas(size, size)
     key = {"normal": kind, "hover": kind + "_hover", "pressed": kind + "_pressed"}.get(state, kind)
     if state == "disabled":
         key = "disabled"
     light, face, shade = FACES[key]
     pressed = state == "pressed"
-    raised(a, shape(size, size, "pill"), light, face, shade, GLOW if state == "hover" else OUTLINE, pressed)
+    raised(a, shape(size, size, r), light, face, shade, GLOW if state == "hover" else OUTLINE, pressed)
     ic = icon(ico)
     if state == "disabled":
         g = ic[..., :3].mean(-1, keepdims=True).astype(np.uint8)
         ic[..., :3] = np.where(ic[..., 3:4] > 0, (g * 0.55 + 40).astype(np.uint8), 0)
-    blit(a, ic, (size - 16) // 2, (size - 16) // 2 - 1 + (1 if pressed else 0))
+    # face rows 2 .. size-4 (between the light edge and the shade)
+    blit(a, ic, (size - 16) // 2, 2 + (size - 5 - 16) // 2 + (1 if pressed else 0))
     return a
 
 
-def tab_r(w, label, active, ico=None, h=22, r=2):
-    """A tab with its top corners stepped; an active one opens into the panel below it."""
+def tab_r(w, label, active, ico=None, h=22, r=R):
+    """A tab, its top corners stepped. An active one stands 2 px taller and opens into the panel;
+    labels centre on the face between the light edge and where the panel's frame starts."""
     a = canvas(w, h)
     top = 0 if active else 2
     m = np.zeros((h, w), bool)
@@ -848,25 +909,26 @@ def tab_r(w, label, active, ico=None, h=22, r=2):
     up = np.zeros_like(m)
     up[1:] = ring[:-1]
     paint(a, up & inner, light)
-    label_into(a, w, h, label, ico, ON_ORANGE if active else DIM, shade, top=top + 1, bottom=1 if active else 2)
+    # inactive: rows top+2 .. h-3 (17 rows); active: the same 17 rows, 2 px higher
+    label_into(a, w, label, ico, ON_ORANGE if active else DIM, shade, top + 2, 17, part="tab")
     return a
 
 
-def bar_r(w, share, fill="health", h=10, r="pill"):
+def bar_r(w, share, fill="health", h=10, r=R):
     """A bar: outline, a dark track, the fill clipped to the same rounded shape."""
     a = canvas(w, h)
     m = shape(w, h, r)
     ring = edge(m)
     inner = m & ~ring
     paint(a, ring, OUTLINE)
-    paint(a, inner, (39, 30, 26))
+    paint(a, inner, WELL_D)
     top = np.zeros_like(m)
     top[1:] = ring[:-1]
-    paint(a, top & inner, (30, 22, 19))
+    paint(a, top & inner, PANEL_DEEP)
     fw = int(round(w * max(0.0, min(1.0, share))))
     if fw:
         light, base, dark = BAR_FILLS[fill]
-        # The fill is the same shape, as long as the share: a fill that stops short of the end
+        # The fill is the same shape, as long as the share: one that stops short of the end
         # still has a rounded end.
         em = np.zeros_like(m)
         fw = max(fw, 2 * len(profile(r, h)) + 2)
@@ -882,7 +944,7 @@ def bar_r(w, share, fill="health", h=10, r="pill"):
     return a
 
 
-def slot_r(size=36, selected=False, r=2):
+def slot_r(size=36, selected=False, r=R):
     """A sunken slot: dark under its top-left outline, light over its bottom-right one."""
     a = canvas(size, size)
     m = shape(size, size, r)
@@ -903,21 +965,23 @@ def slot_r(size=36, selected=False, r=2):
     return a
 
 
-def chip_r(label, kind="plain", h=18, r="pill"):
-    face, rim, col = {"plain": ((42, 32, 27), (104, 62, 38), CREAM), "points": ((122, 64, 22), (170, 96, 40), ON_ORANGE),
-                      "dim": ((32, 24, 20), (78, 54, 38), DIM)}[kind]
-    ends = len(profile(r, h)) if r == "pill" else 0
-    w = F.width(label) + 12 + max(0, ends - 4) * 2
+CHIPS = {"plain": ((90, 73, 61), (56, 44, 35), (70, 56, 45), CREAM),
+         "points": ((195, 130, 78), (122, 74, 36), (152, 96, 52), ON_ORANGE),
+         "dim": ((72, 58, 48), (45, 35, 27), (56, 45, 35), DIM)}
+
+
+def chip_r(label, kind="plain", h=20, r=R):
+    """A chip (a fact, a gene, points to place), built like a small button: outline, a 1 px light
+    edge, the face, a 2 px shade. 20 px leaves a 15-row face: 3 above and 3 below the capitals,
+    and descenders 1 px clear of the shade."""
+    light, face, shade, col = CHIPS[kind]
+    w = F.width(label) + 12
     w += w % 2
     a = canvas(w, h)
-    m = shape(w, h, r)
-    ring = edge(m)
-    paint(a, ring, OUTLINE)
-    m2 = m & ~ring
-    ring2 = edge(m2)
-    paint(a, ring2, rim)
-    paint(a, m2 & ~ring2, face)
-    F.draw(a, label, (w - F.width(label)) // 2, (h - F.caps) // 2, col, None)
+    raised(a, shape(w, h, r), light, face, shade)
+    cap_top = centre_caps(2, h - 5, "chip")
+    F.draw(a, label, (w - F.width(label)) // 2, cap_top, col, None)
+    check_label(a, label, col, 2, h - 4, "chip")
     return a
 
 

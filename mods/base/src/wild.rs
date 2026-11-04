@@ -92,7 +92,7 @@ pub fn register(r: &mut Registry) {
             // A common reed, its purple plumes on top.
             Form::Still if name == "reed" => b.texture("reed").tab(&crate::tabs::NATURAL),
             // No base plant lies as a log yet (the Cretaceous's rotten log is the animals mod's).
-            Form::Still | Form::Log => b.texture(name).tab(&crate::tabs::NATURAL),
+            Form::Still | Form::Log | Form::Mound => b.texture(name).tab(&crate::tabs::NATURAL),
             // Kelp: its top block (no kelp above) shows the fronds' tip, `<name>_top`; a block
             // changing above it sets which it is, so growing, placing and breaking keep it right.
             Form::Column => b
@@ -226,6 +226,22 @@ pub fn state(i: usize) -> u32 {
             })
             .collect()
     })[i]
+}
+
+/// The crown the world puts on a mound (`Form::Mound`) of state `s`, in one place in two (`roll`
+/// 0..1): its `<block>_upper`, if it is a mound and that block is registered.
+pub fn upper_of(s: u32, roll: f32) -> Option<u32> {
+    static UPPERS: OnceLock<Vec<(u32, u32)>> = OnceLock::new();
+    let uppers = UPPERS.get_or_init(|| {
+        wild::WILD
+            .iter()
+            .filter(|p| p.form == Form::Mound)
+            .filter_map(|p| Some((Block::lookup(p.block)?, Block::lookup(&format!("{}_upper", p.block))?)))
+            .collect()
+    });
+    (roll < 0.5)
+        .then(|| uppers.iter().find(|&&(m, _)| m == s).map(|&(_, u)| u))
+        .flatten()
 }
 
 /// A column's growth step (kelp): one more on top while it is still a block below the surface.
