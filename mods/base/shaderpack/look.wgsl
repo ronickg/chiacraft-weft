@@ -63,7 +63,11 @@ fn palette() -> Palette {
     // near black), still blue, so sun and shade part and the land stops looking flat. Then half as
     // bright again (Colour 6): shade under leaves and on walls still read near black by day (Art's
     // regraded tiles, the sun/shade test's walls at sRGB 33 35 45).
-    let day = key(vec3(0.065, 0.115, 0.219), vec3(0.242, 0.323, 0.451), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.375, 0.416, 0.450));
+    // (Colour 8, reports/Daytime look targets.md: values for the day's Lottes curve at exposure 1.3.
+    // A sky a little brighter than before, about sRGB 118 157 196 overhead and 169 188 205 at the
+    // horizon; a 6300 K sun (1.0 0.91 0.81, Bliss's); a neutral-cool fill, blue 1.4x red, which
+    // `light_on` gives a direction.)
+    let day = key(vec3(0.137, 0.289, 0.612), vec3(0.378, 0.538, 0.797), vec3(1.0, 0.92, 0.78), vec3(1.6, 1.456, 1.296), vec3(0.425, 0.475, 0.60));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
     let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
@@ -351,9 +355,13 @@ fn held_light(rel: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
 // `shadow` 1 where the sun reaches it, `ao` the corner shading, `rel` where it is from the camera.
 fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let p = palette();
-    let sky = brightness_curve(light.x);
-    // More of the sky's light comes from above than from the sides, and little from below.
-    let hemi = 0.62 + 0.38 * n.y;
+    // The sky's light falls off steeply under cover (Bliss's lightmap, (L^15 x 2 + L^2.5) / 3: 1 in the
+    // open, 0.39 a step under, 0.21 two): a forest floor sits a few times below open shade, the open
+    // stays as it was.
+    let sky = (pow(light.x, 15.0) * 2.0 + pow(light.x, 2.5)) / 3.0;
+    // More of the sky's light comes from above than from the sides, and less from below: tops 1,
+    // sides 0.75, bottoms 0.5 (Complementary's), so shade still shows form.
+    let hemi = 0.75 + 0.25 * n.y;
     var c = p.ambient * sky * hemi * ao;
     // At golden hour the sky round the low sun glows: a warm fill from its side of the sky, on
     // the faces turned that way; those turned away keep the sky's cool light (Valheim's warm light,
@@ -628,6 +636,18 @@ fn shoulder(x: vec3<f32>) -> vec3<f32> {
 // Jim Hejl's 2015 filmic curve (his published formula): a toe that deepens the darks and a long
 // shoulder that keeps bright skies and sunlit faces from flattening; its output is display-coded,
 // so it is brought back to linear for the sRGB screen.
+// Timothy Lottes's tone curve, our code from his published formula: x^a / (x^(a d) b + c), with b
+// and c solved so that 0.25 maps to 0.25 and 8 to 1 (contrast a 1.05, shoulder d 0.97). Display-
+// linear out, black at black.
+fn lottes(x: vec3<f32>) -> vec3<f32> {
+    let a = 1.05;
+    let ad = 1.0185;
+    let b = 0.98432;
+    let c = 0.69318;
+    let xa = pow(max(x, vec3(1e-6)), vec3(a));
+    return xa / (pow(max(x, vec3(1e-6)), vec3(ad)) * b + vec3(c));
+}
+
 fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
     let v = vec4(c, white);
     let a = 1.425 * v + vec4(0.05);
@@ -653,27 +673,28 @@ fn exposure() -> f32 {
 }
 
 fn display(c: vec3<f32>) -> vec3<f32> {
-    let lin = max(c, vec3(0.0)) * exposure();
-    var t = hejl(lin, 3.0);
-    // By day the curve's toe is lifted a little: it crushed red and green far harder than blue in
-    // dim light, so shade went near black and deep blue (Lighting's sun/shade test, 11-04: cobble
-    // in shade sRGB 8 9 32, the same block in sun 82 84 82; the playtesters' "lapis" trunks). Not
-    // at night: nights stay dark by design.
-    let day = smoothstep(-0.05, 0.15, scene.sun.y);
-    t = max(t, lin / (vec3(1.0) + lin) * 0.5 * day);
+    // By day Timothy Lottes's curve (his published formula, GDC 2016; Complementary's settings:
+    // contrast 1.05, mid-grey 0.25 in and out, peak 8) at exposure 1.3: black stays black (no toe
+    // lift, which raised the black point and halved saturation: Colour 4-7) and the darks keep their
+    // colour, where Hejl's toe crushed them. At night and under water Hejl's as before (nights
+    // dark by design), blended as the sun comes up.
+    let day = smoothstep(-0.05, 0.15, scene.sun.y) * select(1.0, 0.0, in_liquid());
+    let night_t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
+    let day_t = min(lottes(max(c, vec3(0.0)) * 1.3), vec3(1.0));
+    var t = mix(night_t, day_t, day);
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
     let shade = mix(vec3(0.975, 0.99, 1.03), vec3(0.92, 0.96, 1.10), golden());
     t *= mix(shade, mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
-    // The near-black keeps 40 % of its colour: what is left of a dim light's hue is no longer pushed
-    // to a saturated blue (shaded walls went violet). Only the near-black (up to about sRGB 60):
-    // reaching to the mid-darks (Colour 4-6) it drained the forest's leaves, greyer and duller
-    // than Bliss (Ronald: "Bliss, not calm").
+    // The near-black loses some colour: at night 60 % of it (a dim light's hue was pushed to a
+    // saturated blue), by day a quarter below a tenth of luminance (Complementary's).
     let dim = luma(t);
-    t = mix(vec3(dim), t, 0.4 + 0.6 * smoothstep(0.0, 0.05, dim));
-    // No saturation added here: it was 8 to 25 % on top of a picture already twice as colourful as
-    // Bliss's (mean saturation 0.46-0.52 against 0.19-0.29 in its pictures), and it took all the
-    // blue out of grass (sRGB 113 177 56 became 96 181 11).
-    t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034);
+    let keep = mix(0.4 + 0.6 * smoothstep(0.0, 0.05, dim), 0.75 + 0.25 * smoothstep(0.0, 0.1, dim), day);
+    t = mix(vec3(dim), t, keep);
+    // By day a light 1.07 of saturation after the curve (Complementary's), nothing more.
+    let y = luma(t);
+    t = max(mix(vec3(y), t, mix(1.0, 1.07, day)), vec3(0.0));
+    // A cool floor so the night is never pure black; by day black stays black.
+    t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
     return clamp(t, vec3(0.0), vec3(1.0));
 }
