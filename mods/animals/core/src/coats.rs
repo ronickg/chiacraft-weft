@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 7] = [
+const FILES: [(&str, &str); 35] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -266,6 +266,34 @@ const FILES: [(&str, &str); 7] = [
     ("utahraptor", include_str!("../../genetics/utahraptor.json")),
     ("osmolskae", include_str!("../../genetics/osmolskae.json")),
     ("wyvern", include_str!("../../genetics/wyvern.json")),
+    ("hare", include_str!("../../genetics/hare.json")),
+    ("mountain_hare", include_str!("../../genetics/mountain_hare.json")),
+    ("wood_mouse", include_str!("../../genetics/wood_mouse.json")),
+    ("field_vole", include_str!("../../genetics/field_vole.json")),
+    ("white_tailed_deer", include_str!("../../genetics/white_tailed_deer.json")),
+    ("red_deer", include_str!("../../genetics/red_deer.json")),
+    ("brown_trout", include_str!("../../genetics/brown_trout.json")),
+    ("pacu", include_str!("../../genetics/pacu.json")),
+    ("red_fox", include_str!("../../genetics/red_fox.json")),
+    ("arctic_fox", include_str!("../../genetics/arctic_fox.json")),
+    ("raven", include_str!("../../genetics/raven.json")),
+    ("protoceratops", include_str!("../../genetics/protoceratops.json")),
+    ("kryptobaatar", include_str!("../../genetics/kryptobaatar.json")),
+    ("priscagama", include_str!("../../genetics/priscagama.json")),
+    ("reindeer", include_str!("../../genetics/reindeer.json")),
+    ("coyote", include_str!("../../genetics/coyote.json")),
+    ("house_sparrow", include_str!("../../genetics/house_sparrow.json")),
+    ("snow_bunting", include_str!("../../genetics/snow_bunting.json")),
+    ("great_horned_owl", include_str!("../../genetics/great_horned_owl.json")),
+    ("snowy_owl", include_str!("../../genetics/snowy_owl.json")),
+    ("golden_eagle", include_str!("../../genetics/golden_eagle.json")),
+    ("savanna_hawk", include_str!("../../genetics/savanna_hawk.json")),
+    ("turkey_vulture", include_str!("../../genetics/turkey_vulture.json")),
+    ("herring_gull", include_str!("../../genetics/herring_gull.json")),
+    ("yacare_caiman", include_str!("../../genetics/yacare_caiman.json")),
+    ("spectacled_caiman", include_str!("../../genetics/spectacled_caiman.json")),
+    ("grey_wolf", include_str!("../../genetics/grey_wolf.json")),
+    ("jaguar", include_str!("../../genetics/jaguar.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -927,6 +955,494 @@ fn capybara(r: &Read) -> Look {
     }
 }
 
+/// Hares (the brown hare and the mountain hare share these loci): agouti fur grizzled with dark tips
+/// over a white belly, grey-brown to rufous; the mountain hare's white coat (dominant, as the
+/// snowshoe hare's winter-white allele), the brown hare's tail black on top; black very rarely.
+fn hare(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    let tail = (r.shows("Bt") == "Bt").then_some(([40.0, 34.0, 32.0], 1.0));
+    if r.copies("Mel", "mel") == 2 {
+        return Look { name: "Black".into(), base: [58.0, 50.0, 46.0], under: [84.0, 74.0, 66.0], ext: tail, ..Look::default() };
+    }
+    if r.shows("Wi") == "Wi" {
+        return Look {
+            name: "White (winter coat)".into(),
+            base: [234.0, 232.0, 226.0],
+            under: [242.0, 240.0, 234.0],
+            ext: tail,
+            ..Look::default()
+        };
+    }
+    let base = mix([150.0, 128.0, 98.0], [178.0, 116.0, 66.0], ru);
+    let name = if ru > 0.62 {
+        "Rufous brown"
+    } else if ru < 0.38 {
+        "Grey-brown"
+    } else {
+        "Brown"
+    };
+    Look {
+        name: name.into(),
+        base,
+        under: [236.0, 230.0, 216.0],
+        pattern: Some(Pattern { kind: "ticked", color: darken(base, 0.4), amount: 0.6 }),
+        ext: tail,
+        ..Look::default()
+    }
+}
+
+/// Wood mice: warm sandy brown to grey-brown above, sharply grey-white below; albinos very rarely
+/// (recessive).
+fn mouse(r: &Read) -> Look {
+    if r.copies("Al", "al") == 2 {
+        return Look { name: "Albino".into(), base: [236.0, 230.0, 222.0], under: [242.0, 238.0, 232.0], ..Look::default() };
+    }
+    let ru = r.qv("Ru");
+    let base = mix([128.0, 112.0, 96.0], [166.0, 112.0, 66.0], ru);
+    let name = if ru > 0.62 {
+        "Sandy brown"
+    } else if ru < 0.38 {
+        "Grey-brown"
+    } else {
+        "Brown"
+    };
+    Look { name: name.into(), base, under: [220.0, 216.0, 206.0], ..Look::default() }
+}
+
+/// Field voles: dark grey-brown to warm brown above, grey below; black very rarely (recessive).
+fn vole(r: &Read) -> Look {
+    if r.copies("Mel", "mel") == 2 {
+        return Look { name: "Black".into(), base: [48.0, 42.0, 40.0], under: [70.0, 64.0, 60.0], ..Look::default() };
+    }
+    let ru = r.qv("Ru");
+    let base = mix([98.0, 90.0, 80.0], [122.0, 90.0, 60.0], ru);
+    let name = if ru > 0.62 {
+        "Warm brown"
+    } else if ru < 0.38 {
+        "Grey-brown"
+    } else {
+        "Dark brown"
+    };
+    Look { name: name.into(), base, under: [160.0, 156.0, 148.0], ..Look::default() }
+}
+
+/// Deer (the white-tailed and the red deer share these loci): grey-brown to red-brown, the
+/// underside and rump white to buff; piebald now and then (recessive, white patches).
+fn deer(r: &Read) -> Look {
+    let (ru, bu) = (r.qv("Ru"), r.qv("Bu"));
+    let base = mix([128.0, 106.0, 86.0], [164.0, 100.0, 58.0], ru);
+    let name = if ru > 0.62 {
+        "Red-brown"
+    } else if ru < 0.38 {
+        "Grey-brown"
+    } else {
+        "Brown"
+    };
+    let mut look = Look { name: name.into(), base, under: mix([234.0, 228.0, 216.0], [214.0, 186.0, 138.0], bu), ..Look::default() };
+    if r.copies("Pb", "pb") == 2 {
+        look.white = 0.6;
+        look.name += ", piebald";
+    }
+    look
+}
+
+/// Brown trout: olive back and silvery to golden flanks, black spots, and red ones (few to many)
+/// ringed pale.
+fn trout(r: &Read) -> Look {
+    let (gd, rs) = (r.qv("Gd"), r.qv("Rs"));
+    let base = mix([150.0, 150.0, 128.0], [186.0, 148.0, 80.0], gd);
+    Look {
+        name: if gd > 0.6 {
+            "Golden".into()
+        } else if gd < 0.4 {
+            "Silvery".into()
+        } else {
+            "Bronze".into()
+        },
+        base,
+        under: [228.0, 214.0, 170.0],
+        pattern: Some(Pattern { kind: "spotted", color: [44.0, 36.0, 32.0], amount: 1.0 }),
+        pattern2: Some(Pattern { kind: "speckle", color: [176.0, 64.0, 48.0], amount: rs }),
+        ..Look::default()
+    }
+}
+
+/// Pacu: dark grey above and silver, the throat and belly pale to deep orange.
+fn pacu(r: &Read) -> Look {
+    let or = r.qv("Or");
+    Look {
+        name: if or > 0.6 { "Red-bellied".into() } else { "Silver".into() },
+        base: [128.0, 130.0, 128.0],
+        under: mix([214.0, 206.0, 190.0], [214.0, 120.0, 60.0], or),
+        ..Look::default()
+    }
+}
+
+/// Foxes. The red fox: orange-red with black stockings and ear backs (its points); a cross fox (one
+/// copy of the silver allele) with a dark cross over the shoulders, a silver fox (two) black frosted
+/// with silver. The Arctic fox (it has the blue locus): white, or the blue morph's charcoal.
+fn fox(r: &Read) -> Look {
+    if r.locus("Bl").is_some() {
+        return if r.shows("Bl") == "Bl" {
+            Look {
+                name: "Blue".into(),
+                base: [92.0, 90.0, 96.0],
+                under: [118.0, 116.0, 120.0],
+                points: Some([70.0, 66.0, 70.0]),
+                ..Look::default()
+            }
+        } else {
+            Look {
+                name: "White (winter coat)".into(),
+                base: [234.0, 232.0, 226.0],
+                under: [240.0, 238.0, 232.0],
+                points: Some([226.0, 222.0, 214.0]),
+                ..Look::default()
+            }
+        };
+    }
+    let dark = [54.0, 40.0, 36.0];
+    match r.copies("Sv", "sv") {
+        2 => Look {
+            name: "Silver".into(),
+            base: [46.0, 42.0, 44.0],
+            under: [70.0, 66.0, 68.0],
+            points: Some([30.0, 26.0, 26.0]),
+            pattern: Some(Pattern { kind: "speckle", color: [200.0, 200.0, 204.0], amount: 0.8 }),
+            ..Look::default()
+        },
+        n => {
+            let base = mix([210.0, 140.0, 64.0], [204.0, 92.0, 42.0], r.qv("Ru"));
+            let cross = (n == 1).then_some(Pattern { kind: "saddle", color: darken(base, 0.6), amount: 0.8 });
+            Look {
+                name: if n == 1 { "Cross".into() } else { "Red".into() },
+                base,
+                under: [236.0, 228.0, 214.0],
+                points: Some(dark),
+                pattern: cross,
+                ..Look::default()
+            }
+        }
+    }
+}
+
+/// Ravens: black with a blue-purple gloss, strong in some and dull in others; white now and then
+/// (leucistic, recessive: white with pale blue eyes).
+fn raven(r: &Read) -> Look {
+    if r.copies("Le", "le") == 2 {
+        return Look {
+            name: "White".into(),
+            base: [228.0, 226.0, 218.0],
+            under: [234.0, 232.0, 226.0],
+            eye: Some([150.0, 176.0, 196.0]),
+            ..Look::default()
+        };
+    }
+    let gl = r.qv("Gl");
+    Look {
+        name: if gl > 0.62 { "Glossy black".into() } else { "Black".into() },
+        base: mix([34.0, 32.0, 36.0], [38.0, 40.0, 64.0], gl),
+        under: [28.0, 27.0, 32.0],
+        ..Look::default()
+    }
+}
+
+/// Protoceratops: sandy to ochre, pale below, dark bands across the back (no record of its colors:
+/// a dune animal's, est.).
+fn protoceratops(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.62 {
+            "Ochre".into()
+        } else if ru < 0.38 {
+            "Pale sand".into()
+        } else {
+            "Sandy".into()
+        },
+        base: mix([194.0, 168.0, 122.0], [176.0, 120.0, 74.0], ru),
+        under: [220.0, 204.0, 168.0],
+        ..Look::default()
+    }
+}
+
+/// Kryptobaatar: grey-brown to warm brown, pale below (no record of its colors: a small desert
+/// mammal's, est.).
+fn kryptobaatar(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.62 { "Warm brown".into() } else { "Grey-brown".into() },
+        base: mix([124.0, 110.0, 94.0], [146.0, 108.0, 74.0], ru),
+        under: [206.0, 198.0, 182.0],
+        ..Look::default()
+    }
+}
+
+/// Lizards (Priscagama): sandy grey-brown to warm sand, pale below, dark blotches (no record of its
+/// colors: a desert agama's, est.).
+fn lizard(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    Look {
+        name: if ru > 0.62 { "Warm sand".into() } else { "Sandy grey".into() },
+        base: mix([164.0, 148.0, 118.0], [186.0, 142.0, 96.0], ru),
+        under: [218.0, 208.0, 184.0],
+        ..Look::default()
+    }
+}
+
+/// The reindeer: grey-brown, darker in the south's woodland caribou, nearly white in the high
+/// Arctic's; the legs and face dark; a white reindeer now and then (recessive, prized by herders).
+fn reindeer(r: &Read) -> Look {
+    let pl = r.qv("Pl");
+    let points = Some(mix([72.0, 56.0, 46.0], [150.0, 140.0, 128.0], pl * pl));
+    if r.copies("Wr", "wr") == 2 {
+        return Look { name: "White".into(), base: [228.0, 224.0, 214.0], under: [236.0, 232.0, 224.0], ..Look::default() };
+    }
+    let name = if pl > 0.7 {
+        "Pale grey"
+    } else if pl < 0.3 {
+        "Dark brown"
+    } else {
+        "Grey-brown"
+    };
+    Look {
+        name: name.into(),
+        base: mix([118.0, 96.0, 76.0], [196.0, 188.0, 174.0], pl),
+        under: [228.0, 222.0, 208.0],
+        points,
+        ..Look::default()
+    }
+}
+
+/// The coyote: grizzled grey to fulvous buff, paler below; the legs, the ears' backs and the muzzle
+/// tawny (its points); greyer and darker in the mountains, more fulvous in the desert; black
+/// coyotes now and then (a dominant black, from dogs).
+fn coyote(r: &Read) -> Look {
+    let ru = r.qv("Ru");
+    if r.shows("Kb") == "Kb" {
+        return Look {
+            name: "Black".into(),
+            base: [52.0, 46.0, 44.0],
+            under: [78.0, 70.0, 64.0],
+            points: Some([44.0, 38.0, 36.0]),
+            ..Look::default()
+        };
+    }
+    let base = mix([150.0, 140.0, 126.0], [180.0, 144.0, 104.0], ru);
+    let name = if ru > 0.62 {
+        "Fulvous"
+    } else if ru < 0.38 {
+        "Grey"
+    } else {
+        "Grizzled buff"
+    };
+    Look {
+        name: name.into(),
+        base,
+        under: [232.0, 222.0, 204.0],
+        points: Some(mix([150.0, 120.0, 92.0], [184.0, 124.0, 74.0], ru)),
+        pattern: Some(Pattern { kind: "ticked", color: darken(base, 0.45), amount: 0.5 }),
+        ..Look::default()
+    }
+}
+
+/// The small birds: a house sparrow is brown above, grey below, the male with a black bib (his
+/// points) and a chestnut nape, the female plainer; a snow bunting in its winter plumage is buff and
+/// white with a rusty crown, the back streaked dark.
+fn small_bird(r: &Read, bunting: bool) -> Look {
+    let wb = r.qv("Wb");
+    if bunting {
+        let base = mix([196.0, 156.0, 108.0], [214.0, 196.0, 170.0], wb);
+        return Look {
+            name: if wb > 0.6 { "Pale buff".into() } else { "Buff".into() },
+            base,
+            under: [238.0, 236.0, 230.0],
+            points: Some([232.0, 228.0, 220.0]),
+            pattern: Some(Pattern { kind: "ticked", color: [52.0, 44.0, 40.0], amount: 0.6 }),
+            ..Look::default()
+        };
+    }
+    let base = mix([128.0, 92.0, 62.0], [156.0, 116.0, 76.0], wb);
+    let (points, name) = if r.female() { ([168.0, 152.0, 128.0], "Female brown") } else { ([42.0, 36.0, 34.0], "Brown, black bib") };
+    Look {
+        name: name.into(),
+        base,
+        under: mix([170.0, 168.0, 162.0], [196.0, 188.0, 172.0], wb),
+        points: Some(points),
+        pattern: Some(Pattern { kind: "ticked", color: darken(base, 0.5), amount: 0.6 }),
+        ..Look::default()
+    }
+}
+
+/// The owls: a great horned owl mottled grey-brown to rusty or pale, its facial disc rufous (its
+/// points) to grey; a snowy owl white, barred dark on the body and wings, a female heavily, a male
+/// lightly or not at all, its disc white.
+fn owl(r: &Read, snowy: bool) -> Look {
+    let tone = r.qv("Tn");
+    if snowy {
+        let bars = if r.female() { 0.85 } else { 0.25 + 0.3 * tone };
+        return Look {
+            name: if r.female() { "White, barred".into() } else { "White".into() },
+            base: [236.0, 234.0, 228.0],
+            under: [242.0, 240.0, 236.0],
+            points: Some([236.0, 234.0, 228.0]),
+            pattern: Some(Pattern { kind: "streaks", color: [70.0, 60.0, 54.0], amount: bars }),
+            ..Look::default()
+        };
+    }
+    let base = mix([108.0, 98.0, 90.0], [150.0, 112.0, 74.0], tone);
+    Look {
+        name: if tone > 0.62 {
+            "Rusty brown".into()
+        } else if tone < 0.38 {
+            "Grey-brown".into()
+        } else {
+            "Brown".into()
+        },
+        base,
+        under: mix([200.0, 192.0, 178.0], [204.0, 168.0, 124.0], tone),
+        points: Some(mix([150.0, 122.0, 100.0], [184.0, 114.0, 62.0], tone)),
+        pattern: Some(Pattern { kind: "streaks", color: darken(base, 0.55), amount: 0.5 }),
+        ..Look::default()
+    }
+}
+
+/// The eagle's model: a golden eagle dark brown, its crown and nape gold (its points), paler or
+/// darker by its genes; a savanna hawk rufous-cinnamon, finely barred below, its crown greyer.
+fn eagle(r: &Read, hawk: bool) -> Look {
+    let tone = r.qv("Tn");
+    if hawk {
+        let base = mix([168.0, 92.0, 56.0], [196.0, 122.0, 74.0], tone);
+        return Look {
+            name: "Rufous".into(),
+            base,
+            under: mix([182.0, 104.0, 64.0], [204.0, 136.0, 88.0], tone),
+            points: Some([150.0, 120.0, 100.0]),
+            pattern: Some(Pattern { kind: "streaks", color: darken(base, 0.45), amount: 0.45 }),
+            ..Look::default()
+        };
+    }
+    let base = mix([70.0, 52.0, 40.0], [112.0, 82.0, 58.0], tone);
+    Look {
+        name: if tone < 0.35 { "Dark brown".into() } else { "Brown, golden nape".into() },
+        base,
+        under: mix([112.0, 86.0, 64.0], [150.0, 114.0, 80.0], tone),
+        points: Some(mix([180.0, 132.0, 72.0], [214.0, 172.0, 104.0], tone)),
+        ..Look::default()
+    }
+}
+
+/// The turkey vulture: blackish-brown, the coverts edged browner (marks), the flight feathers
+/// silvery below; the bare red head is skin, not plumage, and keeps its color.
+fn vulture(r: &Read) -> Look {
+    let br = r.qv("Br");
+    let base = mix([44.0, 38.0, 40.0], [72.0, 56.0, 46.0], br);
+    Look {
+        name: if br > 0.6 { "Brown-black".into() } else { "Black".into() },
+        base,
+        under: mix([118.0, 116.0, 116.0], [140.0, 132.0, 124.0], br),
+        pattern: Some(Pattern { kind: "ticked", color: [96.0, 74.0, 58.0], amount: 0.5 }),
+        ..Look::default()
+    }
+}
+
+/// The herring gull: white, the back and wings pale grey (its coat), the wingtips black (its
+/// points). (A young one's brown mottling waits for young plumages of their own colors.)
+fn gull(r: &Read) -> Look {
+    let gy = r.qv("Gy");
+    Look {
+        name: if gy > 0.62 { "White, darker grey back".into() } else { "White, grey back".into() },
+        base: mix([186.0, 192.0, 200.0], [140.0, 148.0, 160.0], gy),
+        under: [240.0, 238.0, 234.0],
+        points: Some([38.0, 38.0, 44.0]),
+        ..Look::default()
+    }
+}
+
+/// The caimans: olive grey-brown, the dark bands of the back, the tail and the jaws its points (a
+/// yacare's near black, a spectacled caiman's paler and fewer), the flanks yellower, pale below.
+fn caiman(r: &Read, spectacled: bool) -> Look {
+    let ol = r.qv("Ol");
+    let base =
+        if spectacled { mix([110.0, 110.0, 84.0], [140.0, 134.0, 96.0], ol) } else { mix([78.0, 80.0, 64.0], [104.0, 104.0, 78.0], ol) };
+    Look {
+        name: if ol > 0.6 { "Olive".into() } else { "Dark olive".into() },
+        base,
+        under: [214.0, 206.0, 164.0],
+        points: Some(if spectacled { darken(base, 0.35) } else { darken(base, 0.55) }),
+        ..Look::default()
+    }
+}
+
+/// The grey wolf: grizzled grey (from tawny grey to dark), the saddle darker (a mark), the legs,
+/// ears' backs and muzzle buff (its points), cream below; black wolves (a dominant black, from dogs
+/// long ago, common in the woods) and white Arctic wolves.
+fn wolf(r: &Read) -> Look {
+    let tone = r.qv("Tn");
+    if r.shows("Kb") == "Kb" {
+        return Look {
+            name: "Black".into(),
+            base: [44.0, 40.0, 40.0],
+            under: [70.0, 64.0, 60.0],
+            points: Some([40.0, 36.0, 36.0]),
+            ..Look::default()
+        };
+    }
+    if r.copies("Ar", "ar") == 2 {
+        return Look {
+            name: "White".into(),
+            base: [232.0, 228.0, 218.0],
+            under: [240.0, 236.0, 228.0],
+            points: Some([226.0, 220.0, 206.0]),
+            ..Look::default()
+        };
+    }
+    let base = mix([126.0, 124.0, 118.0], [168.0, 150.0, 124.0], tone);
+    Look {
+        name: if tone > 0.62 {
+            "Tawny grey".into()
+        } else if tone < 0.38 {
+            "Dark grey".into()
+        } else {
+            "Grey".into()
+        },
+        base,
+        under: [228.0, 222.0, 208.0],
+        points: Some(mix([170.0, 156.0, 130.0], [190.0, 160.0, 116.0], tone)),
+        pattern: Some(Pattern { kind: "saddle", color: darken(base, 0.5), amount: 0.7 }),
+        ..Look::default()
+    }
+}
+
+/// The jaguar: golden tan (paler to deeper orange), the rosettes black with darker centers, cream
+/// below; black jaguars (a dominant black, the rosettes still faint in it), now and then.
+fn jaguar(r: &Read) -> Look {
+    let tone = r.qv("Tn");
+    if r.shows("Mb") == "Mb" {
+        return Look {
+            name: "Black".into(),
+            base: [40.0, 34.0, 32.0],
+            under: [54.0, 46.0, 42.0],
+            pattern: Some(Pattern { kind: "rosettes", color: [24.0, 20.0, 20.0], amount: 0.6 }),
+            ..Look::default()
+        };
+    }
+    let base = mix([206.0, 166.0, 98.0], [214.0, 140.0, 58.0], tone);
+    Look {
+        name: if tone > 0.62 {
+            "Deep gold".into()
+        } else if tone < 0.38 {
+            "Pale gold".into()
+        } else {
+            "Gold".into()
+        },
+        base,
+        under: [236.0, 226.0, 204.0],
+        pattern: Some(Pattern { kind: "rosettes", color: [38.0, 30.0, 28.0], amount: 1.0 }),
+        pattern2: Some(Pattern { kind: "spotted", color: [42.0, 34.0, 30.0], amount: 0.5 }),
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1078,6 +1594,31 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "cat" => cat(&r),
         "capybara" => capybara(&r),
         "wyvern" => wyvern(&r),
+        "hare" | "mountain_hare" => hare(&r),
+        "wood_mouse" => mouse(&r),
+        "field_vole" => vole(&r),
+        "white_tailed_deer" | "red_deer" => deer(&r),
+        "brown_trout" => trout(&r),
+        "pacu" => pacu(&r),
+        "red_fox" | "arctic_fox" => fox(&r),
+        "raven" => raven(&r),
+        "protoceratops" => protoceratops(&r),
+        "kryptobaatar" => kryptobaatar(&r),
+        "priscagama" => lizard(&r),
+        "reindeer" => reindeer(&r),
+        "coyote" => coyote(&r),
+        "house_sparrow" => small_bird(&r, false),
+        "snow_bunting" => small_bird(&r, true),
+        "great_horned_owl" => owl(&r, false),
+        "snowy_owl" => owl(&r, true),
+        "golden_eagle" => eagle(&r, false),
+        "savanna_hawk" => eagle(&r, true),
+        "turkey_vulture" => vulture(&r),
+        "herring_gull" => gull(&r),
+        "yacare_caiman" => caiman(&r, false),
+        "spectacled_caiman" => caiman(&r, true),
+        "grey_wolf" => wolf(&r),
+        "jaguar" => jaguar(&r),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1659,7 +2200,34 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 6] = model_layers!("chihuahua", "cat", "capybara", "raptor", "utahraptor", "wyvern");
+const MODEL_LAYERS: [ModelLayers; 26] = model_layers!(
+    "chihuahua",
+    "cat",
+    "capybara",
+    "raptor",
+    "utahraptor",
+    "wyvern",
+    "hare",
+    "mouse",
+    "vole",
+    "deer",
+    "fish",
+    "fox",
+    "raven",
+    "protoceratops",
+    "kryptobaatar",
+    "lizard",
+    "reindeer",
+    "coyote",
+    "small_bird",
+    "owl",
+    "eagle",
+    "vulture",
+    "gull",
+    "caiman",
+    "wolf",
+    "jaguar"
+);
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {
     let mut d = png::Decoder::new(std::io::Cursor::new(png_bytes));

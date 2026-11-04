@@ -20,6 +20,12 @@ BLOCK_UNITS = DENSITY
 SCALE = 16 / DENSITY
 ICON = 16
 
+# Small creatures (a mouse, a vole, a small lizard: a head only 2-3 units across) keep their
+# layout in house units but are painted FINE texels a unit (256 a block): at 64 a block their eye
+# is a whole black side of the head and every face one flat color. Their faces get FINE times the
+# texels; the boxes, the export scale and the engine's size stay the same.
+FINE = 4
+
 # name: (base color, shadow hue). Living and earthen things have warm shadows, stone and metal
 # purple ones, eggshell cool ones.
 MATERIALS = {

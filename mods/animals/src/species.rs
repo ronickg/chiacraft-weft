@@ -29,7 +29,7 @@ impl Deref for Species {
     }
 }
 
-pub static SPECIES: [Species; 7] = [
+pub static SPECIES: [Species; 35] = [
     Species { kind: &crate::dog::CHIHUAHUA, data: &data::SPECIES[0] },
     Species { kind: &crate::cat::CAT, data: &data::SPECIES[1] },
     Species { kind: &crate::capybara::CAPYBARA, data: &data::SPECIES[2] },
@@ -37,6 +37,34 @@ pub static SPECIES: [Species; 7] = [
     Species { kind: &crate::utahraptor::UTAHRAPTOR, data: &data::SPECIES[4] },
     Species { kind: &crate::raptor::OSMOLSKAE, data: &data::SPECIES[5] },
     Species { kind: &crate::wyvern::WYVERN, data: &data::SPECIES[6] },
+    Species { kind: &crate::hare::HARE, data: &data::SPECIES[7] },
+    Species { kind: &crate::hare::MOUNTAIN_HARE, data: &data::SPECIES[8] },
+    Species { kind: &crate::mouse::WOOD_MOUSE, data: &data::SPECIES[9] },
+    Species { kind: &crate::vole::FIELD_VOLE, data: &data::SPECIES[10] },
+    Species { kind: &crate::deer::WHITE_TAILED_DEER, data: &data::SPECIES[11] },
+    Species { kind: &crate::deer::RED_DEER, data: &data::SPECIES[12] },
+    Species { kind: &crate::fish::BROWN_TROUT, data: &data::SPECIES[13] },
+    Species { kind: &crate::fish::PACU, data: &data::SPECIES[14] },
+    Species { kind: &crate::fox::RED_FOX, data: &data::SPECIES[15] },
+    Species { kind: &crate::fox::ARCTIC_FOX, data: &data::SPECIES[16] },
+    Species { kind: &crate::raven::RAVEN, data: &data::SPECIES[17] },
+    Species { kind: &crate::protoceratops::PROTOCERATOPS, data: &data::SPECIES[18] },
+    Species { kind: &crate::kryptobaatar::KRYPTOBAATAR, data: &data::SPECIES[19] },
+    Species { kind: &crate::lizard::PRISCAGAMA, data: &data::SPECIES[20] },
+    Species { kind: &crate::reindeer::REINDEER, data: &data::SPECIES[21] },
+    Species { kind: &crate::coyote::COYOTE, data: &data::SPECIES[22] },
+    Species { kind: &crate::small_bird::HOUSE_SPARROW, data: &data::SPECIES[23] },
+    Species { kind: &crate::small_bird::SNOW_BUNTING, data: &data::SPECIES[24] },
+    Species { kind: &crate::owl::GREAT_HORNED_OWL, data: &data::SPECIES[25] },
+    Species { kind: &crate::owl::SNOWY_OWL, data: &data::SPECIES[26] },
+    Species { kind: &crate::eagle::GOLDEN_EAGLE, data: &data::SPECIES[27] },
+    Species { kind: &crate::eagle::SAVANNA_HAWK, data: &data::SPECIES[28] },
+    Species { kind: &crate::vulture::TURKEY_VULTURE, data: &data::SPECIES[29] },
+    Species { kind: &crate::gull::HERRING_GULL, data: &data::SPECIES[30] },
+    Species { kind: &crate::caiman::YACARE_CAIMAN, data: &data::SPECIES[31] },
+    Species { kind: &crate::caiman::SPECTACLED_CAIMAN, data: &data::SPECIES[32] },
+    Species { kind: &crate::wolf::WOLF, data: &data::SPECIES[33] },
+    Species { kind: &crate::jaguar::JAGUAR, data: &data::SPECIES[34] },
 ];
 
 impl Species {

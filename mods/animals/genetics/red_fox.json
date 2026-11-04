@@ -1,0 +1,127 @@
+{
+ "species": "red_fox",
+ "about": "The red fox (Vulpes vulpes): orange-red with white below and black stockings; a cross fox (one copy of the silver allele) carries a dark cross over the shoulders, a silver fox (two) is black frosted with silver. Paler and sandier in the desert.",
+ "loci": [
+  {
+   "id": "Sv",
+   "name": "Silver",
+   "alleles": [
+    {
+     "a": "Sv",
+     "freq": 0.9,
+     "about": "red"
+    },
+    {
+     "a": "sv",
+     "freq": 0.1,
+     "about": "silver: a cross fox with one copy, a silver fox with two"
+    }
+   ]
+  },
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.6,
+   "sd": 0.15,
+   "about": "yellowish to deep red"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   204,
+   136,
+   40
+  ],
+  [
+   226,
+   170,
+   64
+  ]
+ ],
+ "traits": {
+  "Ho": {
+   "mean": 0.5,
+   "sd": 0.08
+  }
+ },
+ "habitats": {
+  "desert": {
+   "quantitative": {
+    "Ru": {
+     "mean": 0.4,
+     "sd": 0.1
+    },
+    "Dk": {
+     "mean": 0.3,
+     "sd": 0.1
+    }
+   }
+  }
+ },
+ "build": {
+  "Ho": {
+   "bones": [
+    "ear_L",
+    "ear_R"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.4
+  },
+  "Hd": {
+   "bones": [
+    "head",
+    "jaw"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Tl": {
+   "bones": [
+    "tail_0",
+    "tail_1",
+    "tail_2"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.08
+  },
+  "Lg": {
+   "bones": [
+    "leg_FL_upper",
+    "leg_FL_lower",
+    "leg_FR_upper",
+    "leg_FR_lower",
+    "leg_BL_upper",
+    "leg_BL_lower",
+    "leg_BR_upper",
+    "leg_BR_lower"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.05
+  }
+ }
+}

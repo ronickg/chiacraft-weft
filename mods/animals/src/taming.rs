@@ -90,11 +90,13 @@ fn bubble(item: &str) -> String {
 }
 
 /// A goal for wild animals of species `index`, after `animal::upkeep`: running off when
-/// scared, standing still while asking for food, asking when a player is near and calm.
+/// scared, standing still while asking for food, asking when a player is near and calm. One that
+/// is never tamed (`Taming::Wild`: a hare) only runs off.
 pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send + Sync + 'static {
     move |w, id, st| {
         let s = &SPECIES[index];
-        if s.taming != Method::Passive || animal::tamed(w, id) {
+        let wild = s.taming == Method::Wild;
+        if !(s.taming == Method::Passive || wild) || animal::tamed(w, id) {
             return false;
         }
         let Some(t) = w.component(id, &TAMING).copied() else { return false };
@@ -108,6 +110,9 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         if (w.time() + id) % 10 == 0 && s.shy > 0.0 && frightened(w, st, s.shy) && !crate::signatures::calm(w, st.pos) {
             scare(w, id);
             return true;
+        }
+        if wild {
+            return false;
         }
         if t.asking > 0 {
             set(w, id, |t| {
@@ -229,7 +234,7 @@ pub fn hurt(w: &World, id: u64) {
     let passive = w
         .component(id, &ANIMAL)
         .and_then(|a| a.species())
-        .is_some_and(|s| s.taming == Method::Passive);
+        .is_some_and(|s| matches!(s.taming, Method::Passive | Method::Wild));
     if !passive || animal::tamed(w, id) {
         return;
     }

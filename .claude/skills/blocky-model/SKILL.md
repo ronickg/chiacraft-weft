@@ -26,6 +26,10 @@ The numbers are in `scripts/house.py`; build scripts import them instead of choo
   `house.SCALE` (0.25 model pixels a unit). Terrain blocks keep the base game's 16-pixel
   textures; inventory icons come from the `game-art` skill (generated, cut to 24 GUI pixels), and
   held items are box models made from them (see "Items from icons").
+- **Small creatures paint finer** (Ronald, 2026-11-03): when a head is only 2-3 units across (a
+  mouse, a vole, a small lizard), keep the layout in house units but paint `house.FINE` (4)
+  texels a unit, 256 a block, so the face has room for a designed eye and the faces aren't one
+  flat color each. Boxes, export scale and in-game size stay the same.
 - **Real sizes**: research the real thing's measurements and build the average adult (a 20 cm
   chihuahua is 13 units at the shoulder, a 1.5 m Utahraptor 96 at the hip). Individuals differ
   by the engine's per-entity scale (sex, a size gene, growing up), never by another model.

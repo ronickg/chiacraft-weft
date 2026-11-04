@@ -1,6 +1,15 @@
-//! The animals mod: dogs by breed (`dog.rs`: the chihuahua), cats (`cat.rs`), capybaras
-//! (`capybara.rs`), velociraptors of two species (`raptor.rs`), Utahraptors (`utahraptor.rs`) and
-//! wyverns (`wyvern.rs`, a fantasy animal, and their breath: `breath.rs`),
+//! The animals mod: dogs by breed (`dog.rs`: the chihuahua), cats (`cat.rs`), grey wolves
+//! (`wolf.rs`), jaguars (`jaguar.rs`), capybaras (`capybara.rs`), velociraptors of two species
+//! (`raptor.rs`), Utahraptors (`utahraptor.rs`), wyverns (`wyvern.rs`, a fantasy animal, and their
+//! breath: `breath.rs`), and the living world's simple wild creatures (`wild.rs`): hares of two
+//! species (`hare.rs`), wood mice (`mouse.rs`), field voles (`vole.rs`), deer of two species
+//! (`deer.rs`) and foxes of two species, hunters (`fox.rs`), ravens (`raven.rs`), Protoceratops in
+//! herds (`protoceratops.rs`), Kryptobaatar, the Cretaceous's small mammal (`kryptobaatar.rs`), and
+//! its lizard, Priscagama (`lizard.rs`); reindeer in herds (`reindeer.rs`), coyotes, hunters
+//! (`coyote.rs`); birds on the ground and in the air (`birds.rs`): small birds of two species
+//! (`small_bird.rs`), owls of two species (`owl.rs`), eagles and hawks (`eagle.rs`), turkey
+//! vultures (`vulture.rs`) and herring gulls (`gull.rs`); caimans of two species, the water's
+//! hunters (`caiman.rs`); and fish of two species, spawned into the water and swimming (`fish.rs`),
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
 //! (`taming.rs`, `knockout.rs`), commands and tribes (`commands.rs`), signatures
@@ -17,30 +26,53 @@ use weft_sdk::*;
 declare_mod!(deps: ["base"], init: init);
 
 mod animal;
+mod birds;
 mod breath;
 mod breeding;
+mod caiman;
 mod capybara;
 mod cat;
 mod coats;
 mod comfort;
 mod commands;
+mod coyote;
 mod cretaceous;
+mod deer;
 mod dog;
+mod drink;
+mod eagle;
 mod eggs;
 mod evolution;
+mod fish;
 mod forage;
+mod fox;
 mod gateway;
+mod gull;
 mod habitats;
+mod hare;
 mod hunt;
+mod jaguar;
 mod knockout;
+mod kryptobaatar;
+mod lizard;
+mod mouse;
+mod owl;
+mod protoceratops;
 mod raptor;
+mod raven;
+mod reindeer;
 mod riding;
 mod scars;
 mod screen;
 mod signatures;
+mod small_bird;
 mod species;
 mod taming;
 mod utahraptor;
+mod vole;
+mod vulture;
+mod wild;
+mod wolf;
 mod wyvern;
 mod xp;
 
@@ -94,10 +126,33 @@ fn init(r: &mut Registry) {
     raptor::init(r);
     utahraptor::init(r);
     wyvern::init(r);
+    wild::init(r);
+    hare::init(r);
+    mouse::init(r);
+    vole::init(r);
+    deer::init(r);
+    fish::init(r);
+    fox::init(r);
+    raven::init(r);
+    protoceratops::init(r);
+    kryptobaatar::init(r);
+    lizard::init(r);
+    reindeer::init(r);
+    coyote::init(r);
+    birds::init(r);
+    small_bird::init(r);
+    owl::init(r);
+    eagle::init(r);
+    vulture::init(r);
+    gull::init(r);
+    caiman::init(r);
+    wolf::init(r);
+    jaguar::init(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);
     forage::init(r);
+    drink::init(r);
     hunt::init(r);
     screen::init(r);
     taming::init(r);
@@ -123,12 +178,13 @@ fn init(r: &mut Registry) {
         .fullbright();
 }
 
-/// Knocked out: lying down (`index` into `species::SPECIES`; the raptors and the wyvern).
+/// Knocked out: lying down (`index` into `species::SPECIES`; the raptors, the wyvern and the jaguar).
 fn sleep(w: &World, id: u64, index: usize) {
     match index {
         3 | 5 => raptor::sleep(w, id),
         4 => utahraptor::sleep(w, id),
         6 => wyvern::sleep(w, id),
+        34 => jaguar::sleep(w, id),
         _ => {}
     }
 }
@@ -141,6 +197,9 @@ fn wake(w: &World, id: u64, index: usize) {
         3 | 5 => raptor::wake(w, id),
         4 => utahraptor::wake(w, id),
         6 => wyvern::wake(w, id),
+        33 => wolf::wake(w, id),
+        34 => jaguar::wake(w, id),
+        7..=12 | 15 | 16 | 18..=22 | 31 | 32 => wild::wake(w, id),
         _ => {}
     }
 }

@@ -1830,6 +1830,11 @@ pub struct Host {
     pub entity_swing_strength: unsafe extern "C" fn(world: *mut WorldCtx, id: u64) -> f32,
     pub entities_near:
         unsafe extern "C" fn(world: *mut WorldCtx, pos: *const [f64; 3], radius: f64, kind: u32, out: *mut u64, max: usize) -> usize,
+    /// The stack a dropped item carries; empty for any other entity, or none.
+    pub entity_item: unsafe extern "C" fn(world: *mut WorldCtx, id: u64) -> ItemStack,
+    /// What a dropped item carries from now on (fewer: some eaten); an empty stack removes it.
+    /// Nothing for any other entity.
+    pub entity_set_item: unsafe extern "C" fn(world: *mut WorldCtx, id: u64, stack: ItemStack),
     /// An entity's component bytes, null if it has none. Changes are found by comparing with
     /// what was last sent, so writing through the pointer is enough.
     pub component: unsafe extern "C" fn(world: *mut WorldCtx, id: u64, comp: u32) -> *mut u8,

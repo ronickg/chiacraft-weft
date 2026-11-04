@@ -10,6 +10,7 @@ use crate::balance;
 use crate::biology::{self, Biology};
 use crate::evolution;
 use crate::life::{self, DAY};
+use crate::needs;
 use crate::species::{Liking, SPECIES, STAT_NAMES, STATS, Species, TAMED_STEP, WILD_STEP};
 
 /// A number of ticks as in-game days, as short as it reads.
@@ -101,11 +102,73 @@ pub fn markdown() -> String {
     }
     let _ = writeln!(w);
 
+    web(w);
     for s in &SPECIES {
         species(w, s);
     }
     shared(w);
     o
+}
+
+/// Who eats what where (`web.rs`): each biome's plant food by season, its plant eaters, hunters
+/// and carrion eaters, and the web's gaps with what fills them.
+fn web(w: &mut String) {
+    use vitals::food::Category;
+    let _ = writeln!(
+        w,
+        "## The food web
+"
+    );
+    let _ = writeln!(
+        w,
+        "Each biome's web, from the species' habitats and diets and the world's plant food (`core/src/web.rs`). \
+         Plant food is how much of any plant eater's food grows or is found there in each season, against fresh growth \
+         at its best (`vitals::forage`); the farm animals' wild kinds graze every overworld land biome. Grazing: in \
+         the best season for grass, what its grazers eat a day (as many of each as live together, `crowd`, by how \
+         common there) against what its tall grass grows back within the crowd's radius.\n"
+    );
+    let _ =
+        writeln!(w, "| Biome | Plant food (spring, summer, autumn, winter) | Grazing (best season) | Plant eaters | Hunters | Carrion |");
+    let _ = writeln!(w, "|---|---|---|---|---|---|");
+    let names = |f: &dyn Fn(&Species) -> bool, biome: &str| {
+        let v: Vec<String> = SPECIES
+            .iter()
+            .filter(|s| s.habitats.iter().any(|&(b, _)| b == biome) && f(s))
+            .map(name)
+            .collect();
+        if v.is_empty() { "**none**".to_string() } else { v.join(", ") }
+    };
+    for biome in crate::web::biomes() {
+        let food: Vec<String> = (0..4)
+            .map(|i| format!("{:.0}%", 100.0 * crate::web::food_in(Category::plant, biome, i)))
+            .collect();
+        let grazing = crate::web::grazing(biome).map_or("-".to_string(), |g| {
+            format!("{}: eaten {:.0}% of the regrowth", crate::web::SEASONS[g.season], 100.0 * g.eaten / g.regrown.max(1e-6))
+        });
+        let _ = writeln!(
+            w,
+            "| {biome} | {} | {grazing} | {} | {} | {} |",
+            food.join(", "),
+            names(&|s| s.plant_share() >= 0.5, biome),
+            names(&|s| s.hunts() && !s.forages_wild(), biome),
+            names(&|s| s.eats(Category::Carrion), biome)
+        );
+    }
+    let gaps = crate::web::gaps();
+    let _ = writeln!(w, "\n### Gaps in the web\n");
+    if gaps.is_empty() {
+        let _ = writeln!(w, "None.\n");
+        return;
+    }
+    let _ = writeln!(w, "What the webs still lack, and what the plan fills it with (`web::WAITING`):\n");
+    for g in &gaps {
+        let why = crate::web::WAITING
+            .iter()
+            .find(|&&(k, _)| k == g.key)
+            .map_or("**not planned**".to_string(), |&(_, why)| why.to_string());
+        let _ = writeln!(w, "- {}: {why}", g.key);
+    }
+    let _ = writeln!(w);
 }
 
 /// Its breeding season, in words ("spring, summer and autumn, most in spring"; for one of the
@@ -271,6 +334,28 @@ fn species(w: &mut String, s: &Species) {
             s.prey.1 * 100.0
         );
     }
+    // A meal by mass (`needs::fills`): what fills it, and how many of its biggest prey at home.
+    let kills = match needs::kills_to_fill(s) {
+        Some(k) if s.hungry_in_the_wild() && !s.forages_wild() => {
+            if k <= 1.0 { "; its biggest prey at home fills it in one kill".to_string() } else { format!("; its biggest prey at home in {} kills", trim(k as f64, 1)) }
+        }
+        _ => String::new(),
+    };
+    let _ = writeln!(w, "| a meal that fills it | {} kg{kills} |", trim((s.bio.mass * needs::MEAL) as f64, 3));
+    // Water (`needs::drink_lasts`): how much it drinks of what it needs, and how long a drink lasts.
+    let need = needs::litres_a_day(s, s.bio.mass);
+    let drinks = match needs::drink_lasts(s, s.bio.mass) {
+        Some(secs) => format!(
+            "{}% of its {} L a day; a drink lasts {} min, thirsty after {}",
+            trim(needs::drinks(s) as f64 * 100.0, 0),
+            trim(need as f64, 3),
+            trim(secs as f64 / 60.0, 0),
+            trim(secs as f64 * (1.0 - needs::THIRSTY) as f64 / 60.0, 0)
+        ),
+        None if s.in_water() => "never: it lives in the water".to_string(),
+        None => "never".to_string(),
+    };
+    let _ = writeln!(w, "| drinks | {drinks} |");
     // How much of its food grows at home, season by season (`vitals::forage::season_lushness`):
     // how many come there and how fed (`notes/ECOLOGY.md`, part 7).
     if s.forages_wild() {
@@ -348,6 +433,34 @@ fn shared(w: &mut String) {
         biology::ROOM_BY_MASS,
         biology::Social::Pack.room(),
         biology::Social::Herd.room()
+    );
+    let _ = writeln!(w);
+
+    let _ = writeln!(w, "| Hunger (`needs.rs`) | |\n|---|---|");
+    let _ = writeln!(w, "| a meal that fills it | {}% of its mass: a kill, a mouthful off the ground, by mass |", trim(needs::MEAL as f64 * 100.0, 0));
+    let _ = writeln!(w, "| a wild one arrives fed | {}% where its food grows least (or its prey are thinnest), all of it where most |", trim(needs::ARRIVES_FED as f64 * 100.0, 0));
+    let _ = writeln!(w, "| starving, a wild one dies in | {} s on an empty stomach |", needs::STARVES_SECS);
+    let _ = writeln!(
+        w,
+        "| water needed a day | {} · kg^{} L (a mammal's), x{} cold-blooded; a species drinks its share of it (`DRINKS`) |",
+        needs::WATER.0,
+        needs::WATER.1,
+        needs::COLD_BLOODED_WATER
+    );
+    let _ = writeln!(
+        w,
+        "| a drink lasts | {}% of its mass spared, a real day of drinking {} s of play |",
+        trim(needs::SPARE as f64 * 100.0, 0),
+        needs::DAY_SECS
+    );
+    let _ = writeln!(
+        w,
+        "| thirsty | under {}% water, drinking {}% a gulp every {} s until {}%; parched, a wild one dies in {} s |",
+        trim(needs::THIRSTY as f64 * 100.0, 0),
+        trim(needs::GULP as f64 * 100.0, 0),
+        trim(needs::GULP_TICKS as f64 / 20.0, 1),
+        trim(needs::SLAKED as f64 * 100.0, 0),
+        needs::PARCHED_SECS
     );
     let _ = writeln!(w);
 

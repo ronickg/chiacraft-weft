@@ -1,0 +1,84 @@
+{
+ "species": "field_vole",
+ "about": "The field vole (Microtus agrestis): dark grey-brown and shaggy above, grey below; warmer brown in some, greyer in others, greyer still in the snow. Black ones turn up very rarely.",
+ "loci": [
+  {
+   "id": "Mel",
+   "name": "Melanism",
+   "alleles": [
+    {
+     "a": "Mel",
+     "freq": 0.995
+    },
+    {
+     "a": "mel",
+     "freq": 0.005,
+     "about": "black (very rare, recessive)"
+    }
+   ]
+  },
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.45,
+   "sd": 0.15,
+   "about": "grey-brown to warm brown"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   18,
+   12,
+   14
+  ],
+  [
+   30,
+   22,
+   20
+  ]
+ ],
+ "habitats": {
+  "snow": {
+   "quantitative": {
+    "Ru": {
+     "mean": 0.3,
+     "sd": 0.12
+    }
+   }
+  }
+ },
+ "build": {
+  "Hd": {
+   "bones": [
+    "head"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  },
+  "Gt": {
+   "bones": [
+    "spine_0",
+    "spine_1"
+   ],
+   "axes": [
+    1,
+    0.6,
+    0.2
+   ],
+   "range": 0.08
+  }
+ }
+}

@@ -1,0 +1,47 @@
+{
+ "species": "kryptobaatar",
+ "about": "Kryptobaatar (Kryptobaatar dashzevegi): no record of its colors; here a small desert mammal's, grey-brown to warm brown above, pale below.",
+ "loci": [
+  {
+   "id": "Ru",
+   "name": "Redness",
+   "quantitative": true,
+   "mean": 0.45,
+   "sd": 0.15,
+   "about": "grey-brown to warm brown"
+  },
+  {
+   "id": "Sz",
+   "name": "Size",
+   "quantitative": true,
+   "mean": 0.5,
+   "sd": 0.15,
+   "about": "small to big for its kind and sex (inherited, like height in people: many genes, each a little)"
+  }
+ ],
+ "eyes": [
+  [
+   20,
+   14,
+   16
+  ],
+  [
+   34,
+   24,
+   22
+  ]
+ ],
+ "build": {
+  "Hd": {
+   "bones": [
+    "head"
+   ],
+   "axes": [
+    1,
+    1,
+    1
+   ],
+   "range": 0.06
+  }
+ }
+}
