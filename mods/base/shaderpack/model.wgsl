@@ -99,7 +99,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
         // The pack's light; no traced shadow here, the sky light stands in for it.
         let l = unpack_light(inst.light);
         let shadow = sun_on_body(world, normal, l.x);
-        out.color = pow(inst.color * flash, vec3(2.2)) * light_on(normal, l, shadow, 1.0, world);
+        out.color = pow(inst.color * flash, vec3(2.2)) * light_on(normal, l, shadow, 1.0, world, world);
     } else {
         out.color = pow(inst.color * lit * shade * flash, vec3(2.2));
     }

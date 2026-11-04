@@ -42,6 +42,11 @@ bands; hue-shifted ramps (shadows warmer and more saturated, lights toward yello
 color areas; soft edges between colors; never pure black or white. Saturated but natural, chunky
 readable shapes.
 
+In the world (the shader pack, `mods/base/shaderpack/`): Bliss's sky and water with Valheim's air
+and fire. Nights are dark by design, and torches light the way (Ronald, 11-04: he wants players
+to carry a torch, which lights the ground about them as they move). So the night is not
+brightened; a held torch, lantern or campfire is the light, warm with a slight flicker.
+
 ## The HUD and screens: the style brief
 
 Ronald's reference sheets (`notes/ui-reference/`, eight sheets: panels and frames, inventory

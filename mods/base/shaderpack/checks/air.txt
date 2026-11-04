@@ -68,5 +68,6 @@ shot air_5_campfire_night.png
 look 90 -30
 wait 2
 shot air_5_night_away.png
+wait 1
 bench 5 air_night
 quit

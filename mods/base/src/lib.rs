@@ -24,6 +24,7 @@ mod player;
 mod recipes;
 mod redstone;
 mod seasons;
+mod look;
 mod shaderpack;
 mod sounds;
 mod survival;
@@ -107,6 +108,7 @@ fn init(r: &mut Registry) {
     beds::register(r);
     hud::register(r);
     redstone::register(r);
+    look::register(r);
     shaderpack::register(r);
     shaderpack::register_for_scripts(r);
     shaderpack::register_shafts(r);
@@ -144,12 +146,18 @@ fn init(r: &mut Registry) {
             // lit and a shaded side (Ronald, 11-04: "it all seems so flat"). The engine's sun
             // light and shadows follow this body.
             .tilt(35.0);
-        // The moon on the same leaned path, opposite the sun: the night's shadows come from it.
+        // The moon on the same leaned path, lagging the day as the real one does: a turn every 8/7
+        // of a day, so it rises later each night and goes round the sky once against the sun in
+        // the eight days of its phases (one picture a day). Full (day 0) it is opposite the sun and
+        // up all night; at a half moon half the night; new (day 4) it is up with the sun and the
+        // night has none. The night's light and shadows come from it (Ronald, 11-04: a full moon
+        // lights the night, no moon is dark).
         r.sky_body(dim, &MOON)
             .texture("moon_phases")
             .additive()
             .frames(4, 2)
             .size(23.0)
+            .orbit(vitals::calendar::DAY_TICKS as f32 * 8.0 / 7.0)
             .phase(0.5)
             .tilt(35.0);
     }

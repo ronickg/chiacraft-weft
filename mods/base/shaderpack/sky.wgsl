@@ -278,7 +278,7 @@ fn milky_way(dir: vec3<f32>) -> vec3<f32> {
     let mottle = noise3(local * 6.0) * 0.6 + noise3(local * 14.0) * 0.4;
     let lane = smoothstep(0.55, 0.75, noise3(local * 9.0 + vec3(3.0))) * exp(-(d / 0.05) * (d / 0.05));
     let glow = band * (0.4 + 0.8 * mottle) * (1.0 - 0.6 * lane);
-    let clear = (1.0 - rain_amount()) * (1.0 - 0.6 * moon_light()) * smoothstep(0.0, 0.25, dir.y);
+    let clear = (1.0 - rain_amount()) * (1.0 - 0.6 * scene.moon.w) * smoothstep(0.0, 0.25, dir.y);
     return vec3(0.75, 0.78, 0.95) * glow * 0.03 * dark * clear;
 }
 
@@ -307,6 +307,10 @@ fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
     // Under water, the water's own color all round (`look.wgsl`), not the engine's dark fog.
     if in_water() {
         return vec4(display(underwater_color()), 1.0);
+    }
+    // In another liquid (lava): its fog all round (the engine draws the gradient alone then).
+    if s.extra.x > 0.5 {
+        return vec4(scene.fog_color.rgb, 1.0);
     }
     if open_sky() && !in_liquid() {
         var c = sky_color(dir) + milky_way(dir) + aurora(dir);
@@ -411,7 +415,8 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
         // Bodies shine through the tone curve; stars dim in the haze low down.
         // The sun shines through the tone curve; the moon keeps its markings.
         var shape = 1.0;
-        if s.ids.y == SKY_BODY && dot(dir, scene.sun.xyz) > 0.0 {
+        // (Within about 25° of the sun: the moon lags the day now and can stand on its side of the sky.)
+        if s.ids.y == SKY_BODY && dot(dir, scene.sun.xyz) > 0.9 {
             // The sun as a round disc with a soft glow (Bliss's), not the picture's square: that
             // square, about 20° across with a pale border, went white through the curve, washed
             // out the golden hour (and the water's path with it), and turned into a diamond on the

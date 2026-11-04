@@ -4,7 +4,7 @@ Everything you see in the sky is an object registered for a specific dimension, 
 
 ## Note
 Examples that you can copy from:
-- `mods/base/src/lib.rs` has the sun, the moon and the stars
+- `mods/base/src/lib.rs` has the sun, the moon and the stars (the base game's moon lags the day by its phase, a turn every 8/7 of a day: full it is up all night, new only by day; the night's light and shadows follow it)
 - `mods/testmod/src/lib.rs` has Mars, with a sun that doesn't move and two moons that go in opposite directions
 
 ## Quick links

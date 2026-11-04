@@ -2281,6 +2281,7 @@ impl Client {
         // Animated textures follow the game's ticks: between two from the server the client
         // counts on for a second at most, so they stop with the game.
         let ticks = (self.smooth_time() % (1 << 20) as f64) as f32;
+        let hand = self.hand_light(cam);
         Scene {
             view_proj: (cam.proj(aspect) * view).to_cols_array_2d(),
             inv_view_proj: (cam.proj(aspect) * view).inverse().to_cols_array_2d(),
@@ -2296,6 +2297,10 @@ impl Client {
             behind: self.behind,
             clouds: self.sky.cloud_shade[0],
             cloud_cells: self.sky.cloud_shade[1],
+            moon: self.moon(),
+            options: pack_options(),
+            hand: hand.0,
+            hand_light: hand.1,
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
@@ -2332,6 +2337,62 @@ impl Client {
         [v.x, v.y, v.z, v.y.max(0.0)]
     }
 
+    /// The light the player holds (`Scene::hand`, `Scene::hand_light`): where it is relative to
+    /// the camera (by the hand, a little below and in front of the eye, in first person or seen
+    /// from behind) and its levels, the most any state of the held item's block gives (a lit
+    /// campfire, a torch on any face). Zeros when the item gives no light.
+    fn hand_light(&self, cam: &Camera) -> ([f32; 4], [f32; 4]) {
+        let none = ([0.0; 4], [0.0; 4]);
+        let stack = self.held();
+        // Logged when what is held changes, to check the held light from a run's log.
+        static LAST: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(u32::MAX);
+        let changed = LAST.swap(stack.item, std::sync::atomic::Ordering::Relaxed) != stack.item;
+        if stack.is_empty() {
+            if changed {
+                log::info!("held light: nothing held");
+            }
+            return none;
+        }
+        let c = content();
+        let item = c.items.get(stack.item as usize);
+        // The block it places (`ItemDef::block` is that block's first state, not the block), or else
+        // the block of the same name (an item that places itself in more than one form may not
+        // name one).
+        let block = item.and_then(|i| i.block).and_then(|st| c.states.get(st as usize)).map(|st| st.block).or_else(|| {
+            let name = item?.name.as_str();
+            // Item and block names may differ in their namespace ("base:torch" and "torch").
+            let short = |n: &str| n.rsplit(':').next().unwrap_or(n).to_string();
+            let want = short(name);
+            c.blocks
+                .iter()
+                .position(|b| b.name == name || short(&b.name) == want)
+                .map(|b| b as u32)
+        });
+        let Some(def) = block.and_then(|b| c.blocks.get(b as usize)) else {
+            if changed {
+                log::info!("held light: item {} ({}) places no block", stack.item, item.map_or("?", |i| i.name.as_str()));
+            }
+            return none;
+        };
+        let mut light = [0u8; 3];
+        for st in def.first_state..def.first_state + def.states {
+            if let Some(info) = c.states.get(st as usize) {
+                for (l, e) in light.iter_mut().zip(info.light) {
+                    *l = (*l).max(e);
+                }
+            }
+        }
+        if changed {
+            log::info!("held light: item {} block {} levels {:?}", stack.item, def.name, light);
+        }
+        if light == [0; 3] {
+            return none;
+        }
+        let eye = self.camera();
+        let at = (eye.pos - cam.pos).as_vec3() + eye.forward() * 0.35 - Vec3::Y * 0.35;
+        (at.extend(0.0).to_array(), [light[0] as f32 / 15.0, light[1] as f32 / 15.0, light[2] as f32 / 15.0, 0.0])
+    }
+
     /// The sky's sun (`sun`): the first glowing body following the day.
     fn sun_body(&self) -> Option<&'static crate::registry::SkyDef> {
         content()
@@ -2340,6 +2401,43 @@ impl Client {
             .get(self.world.dim as usize)?
             .iter()
             .find(|s| s.kind == weft_abi::sky_kind::BODY && s.glow != 0 && s.orbit.is_infinite())
+    }
+
+    /// The sky's moon (`moon`): the first other body (the base game's sun, then its moon).
+    fn moon_body(&self) -> Option<&'static crate::registry::SkyDef> {
+        let sun = self.sun_body();
+        content()
+            .game
+            .sky
+            .get(self.world.dim as usize)?
+            .iter()
+            .find(|s| s.kind == weft_abi::sky_kind::BODY && !sun.is_some_and(|x| std::ptr::eq(x, *s)))
+    }
+
+    /// Toward the moon where the sky draws it, and in w how much light it gives: its phase
+    /// (`moon_light`, 1 full, 0 new) times how high it stands (none below the horizon). A moon that
+    /// lags the day by its phase is up all night when full, half the night at a half moon and only
+    /// by day when new (`Scene::moon`). Without a moon body, opposite the sun.
+    fn moon(&self) -> [f32; 4] {
+        let d = &content().dims[self.world.dim as usize];
+        if !d.sky_light {
+            return [0.0, -1.0, 0.0, 0.0];
+        }
+        let v = match self.moon_body() {
+            Some(s) => sky::frame_of(s, sky::turn_of(s, d, self.world.time as f64)).x_axis,
+            None => {
+                let s = self.sun();
+                -Vec3::new(s[0], s[1], s[2])
+            }
+        };
+        let up = ((v.y + 0.02) / 0.14).clamp(0.0, 1.0);
+        let up = up * up * (3.0 - 2.0 * up);
+        [v.x, v.y, v.z, self.moon_light() * up]
+    }
+
+    /// The plane the moon turns in (`settled`).
+    fn moon_plane(&self) -> glam::Mat3 {
+        self.moon_body().map_or(SUN_LEAN, |s| sky::frame_of(s, 0.0))
     }
 
     /// The plane the sun turns in (its x and y axes; `settled`).
@@ -2392,9 +2490,14 @@ impl Client {
             }
             self.shadow_size = size;
         }
+        // By day the sun's shadows, by night the moon's where it stands (none when it is down).
         let sun = self.sun();
-        let dir =
-            settled(if sun[1] > -0.06 { Vec3::new(sun[0], sun[1], sun[2]) } else { -Vec3::new(sun[0], sun[1], sun[2]) }, self.sun_plane());
+        let moon = self.moon();
+        let dir = if sun[1] > -0.06 {
+            settled(Vec3::new(sun[0], sun[1], sun[2]), self.sun_plane())
+        } else {
+            settled(Vec3::new(moon[0], moon[1], moon[2]), self.moon_plane())
+        };
         // So low the shadows would run off the map (the pack fades them out above this).
         if dir.y < 0.02 {
             return;
@@ -2640,6 +2743,18 @@ fn shadow_setting(name: &str, default: f64) -> f64 {
 /// The far cascade's reach and depth (blocks): hills a few hundred blocks off have shadows too.
 const FAR_REACH: f32 = 400.0;
 const FAR_DEPTH: f32 = 1200.0;
+
+/// The values of the settings the shader pack reads (`Scene::options`).
+fn pack_options() -> [[f32; 4]; 4] {
+    let mut out = [[0.0; 4]; 4];
+    let names = &content().game.config_names;
+    for (i, name) in crate::packs::pack_options().iter().enumerate().take(16) {
+        if let Some(&id) = names.get(name.as_str()) {
+            out[i / 4][i % 4] = crate::config::get(id) as f32;
+        }
+    }
+    out
+}
 
 /// The sun's path leaned south when the sky has no sun to follow (`Client::sun`).
 const SUN_LEAN: glam::Mat3 = glam::Mat3::from_cols(Vec3::X, Vec3::new(0.0, 0.944, 0.33), Vec3::new(0.0, -0.33, 0.944));
