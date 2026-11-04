@@ -1,0 +1,7 @@
+# An example package with a sandboxed server half built against API 1.1 (components, sounds,
+# particles, set_blocks): code/server.wasm, from examples/wasm/tally.
+format = "1.0"
+id = "tally"
+version = "0.1.0"
+name = "Tally"
+description = "Counts the blocks each player breaks; a chime every tenth; /tally pillar builds a glass pillar."

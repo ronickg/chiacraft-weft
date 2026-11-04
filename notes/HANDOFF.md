@@ -262,20 +262,35 @@ Checked with two copies (run by the Tester session, scripts in the shared notes'
 hosted a world with `--packages examples/packages`; bob, with no packages, was asked, downloaded
 clans (with its code) and gems, and loaded them with no error; on alice's world `/clan create
 Wolves` ran in the sandbox ("clan Wolves founded" in the log, "Clan Wolves founded." in chat), no
-strikes. The invite and join between the two weren't seen yet: the first run's scripts were out of
-step, and in the rerun bob's game froze when alice's invite reached it. That was a deadlock in
-the `packages` mod (the client's `packages:say` handler held its lock while running
-`/packages_say`, which takes it again), fixed; a second possible one (two packages on two region
-threads each waiting for the other's lock through a nested question) is avoided by nested calls
-only trying the lock. Rerun pending (Mac runs paused after the freeze).
+strikes. In the second run bob's game froze when alice's invite reached it: a deadlock in the
+`packages` mod (the client's `packages:say` handler held its lock while running `/packages_say`,
+which takes it again), fixed in 5223d51; a second possible one (two packages on two region threads
+each waiting for the other's lock through a nested question) is avoided by nested calls only
+trying the lock. The third run (Linux PC, two copies, 5223d51, `run/test-results/phase6_pc3/`)
+passed it all: the join sheet listed clans with "runs sandboxed code", bob downloaded and loaded
+it, alice founded Wolves and invited bob, bob joined ("player 7 joined clan Wolves" in alice's
+log), both saw "Your clan: Wolves, 2 members.", alice was told "A new member joined Wolves.", no
+strikes, panics or errors. Not seen: the invite line in bob's chat; it was sent while bob's world
+was still loading in, and a line that reaches a client then may be lost (not looked into).
 Slice 2 (consent marks code), after Ronald agreed the report's decisions: protocol 6, the
 `Offer` tuple's sixth field says whether the package carries `code/server.wasm`
 (`modloader::current_packages`); `download` refuses a package whose manifest says otherwise; the
 join sheet marks it (`join_sheet.code`, `OfferRow.code`). In `content::freeze_commands` a
 package's command whose name is taken is left out with a warning instead of failing the content
 build (code mods keep the old error).
-Left: components and channels in the API (slice 3), client halves (slice 4), personal mods per
-world (slice 5), `/mods` (slice 6).
+Slice 3, API 1.1 (built; not yet seen in the game): `crates/sandbox/wit/v1.1/mod.wit` is 1.0
+plus `registry.component`/`attach` (declarations, `Decl`, compared on restart like hooks),
+`world.get-component`/`set-component`, `set-blocks`, `play-sound`, `spawn-particles`. The host
+binds 1.1 only: a 1.0 component links by wasmtime's semver matching (checked with clans, and a
+test loads its committed wasm). `check_imports` refuses imports outside `chiacraft:mods/*` and
+newer 1.x at load. `crates/mod-sdk` is 1.1.0 (`value!`, `Component`, `entity_component`,
+`attach`, `w.component`/`set_component`/`update_component`, `Sound`, `Particle`, `Burst`,
+`set_blocks`). In `mods/packages`, components register as `Component<[u8; N]>` in buckets of 8
+to 256 (`Comp`); sounds and particles are checked by `find` and made into handles once per name.
+Sample `examples/wasm/tally` (a per-player count of blocks broken, a chime and particles every
+tenth, `/tally pillar` with `set_blocks`), packaged as `examples/packages/tally`.
+Left: 1.2 (block and item callbacks, channels), client halves (slice 4), personal mods per world
+(slice 5), `/mods` (slice 6).
 
 ## Side mods
 

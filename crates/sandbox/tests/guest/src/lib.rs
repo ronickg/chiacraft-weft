@@ -6,12 +6,21 @@ use chiacraft_mod_sdk::*;
 
 declare_mod!(init: init);
 
+value! {
+    pub struct Counter { pub n: u32, pub spare: u32, pub last: u64 }
+}
+static COUNTER: Component<Counter> = Component::named("counter");
+static CLICK: Sound = Sound::named("base:ui.click");
+static FLAME: Particle = Particle::named("base:flame");
+
 thread_local! {
     /// Lost when the mod starts over: shows a strike dropped its memory.
     static CALLS: Cell<u32> = const { Cell::new(0) };
 }
 
 fn init(r: &mut Registry) {
+    r.entity_component(&COUNTER, Counter { n: 5, spare: 0, last: 0 }, component_flags::SAVE | component_flags::KEEP);
+    r.attach(&PLAYER, &COUNTER);
     r.command("probe", "<action:word> [n:int]", |cmd| {
         CALLS.with(|c| c.set(c.get() + 1));
         let w = cmd.world();
@@ -59,6 +68,28 @@ fn init(r: &mut Registry) {
                 let mut r = Registry::__late();
                 r.world_tick(|_| {});
                 cmd.reply("probe.late", &[]);
+            }
+            "comp" => {
+                let t = w.time();
+                w.update_component(cmd.player(), &COUNTER, |c| {
+                    c.n += 1;
+                    c.last = t;
+                });
+                let c = w
+                    .component(cmd.player(), &COUNTER)
+                    .map_or(-1, |c| c.n as i64);
+                cmd.reply("probe.comp", &[Arg::Int(c)]);
+            }
+            "blocks" => {
+                let changes: Vec<([i32; 3], u32)> = (0..5000).map(|i| ([i, 0, 0], 1)).collect();
+                let n = w.set_blocks(&changes);
+                cmd.reply("probe.blocks", &[Arg::Int(n as i64)]);
+            }
+            "effects" => {
+                for _ in 0..100 {
+                    w.play_sound(&CLICK, [0.0, 64.0, 0.0], 1.0);
+                    w.spawn_particles(&FLAME, [0.0, 64.0, 0.0]).count(1000);
+                }
             }
             _ => cmd.reply("probe.unknown", &[]),
         }

@@ -308,8 +308,10 @@ The smallest version that works is phases 1-4.
    2. *Consent says it is code* (built): protocol 6 offers say whether a package carries code,
       the join sheet marks it ("runs sandboxed code"), and a package whose manifest says otherwise
       is refused; a package's clashing command is left out instead of failing the world.
-   3. *More of the SDK*: components, channels, block and item callbacks, sounds and particles,
-      each a new frozen API version beside 1.0.
+   3. *More of the SDK* (1.1 built): API 1.1 adds per-entity components, `set_blocks`, sounds
+      and particles, and imports are checked at load; the host binds the newest 1.x and runs
+      every older one (1.x only adds; wasmtime matches by semver). Sample `tally`. Next, 1.2:
+      block and item callbacks, channels, gizmos.
    4. *Client halves*: `code/client.wasm`, client calls only (HUD, screens, keys, channels to its
       server half), a frame budget.
    5. *Personal mods per world*: the player's own client halves, allowed or not by each world's

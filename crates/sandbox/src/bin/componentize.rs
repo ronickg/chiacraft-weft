@@ -15,6 +15,9 @@ fn main() {
         for (i, h) in m.hooks().iter().enumerate() {
             println!("  {i}: {h:?}");
         }
+        for d in m.decls() {
+            println!("  declares {d:?}");
+        }
         Ok(())
     };
     if let Err(e) = run() {
