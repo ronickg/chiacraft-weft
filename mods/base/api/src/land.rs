@@ -994,6 +994,9 @@ pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet
         RockSet::Strata
     } else if t < q12(TAIGA_BELOW) {
         RockSet::Slate
+    } else if KARST_AREA.at(&here) > 0 {
+        // Karst towers are limestone however high they stand.
+        RockSet::Limestone
     } else if height >= SEA + GRANITE_ABOVE || MOUNTAINS_AREA.at(&here) > q12(MOUNTAIN_BIOME) {
         RockSet::Granite
     } else {
