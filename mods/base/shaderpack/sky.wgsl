@@ -144,7 +144,10 @@ fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
     let d = cloud_cell(s, base + vec2(1.0, 1.0), dims);
     let cover = mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
     let middle = 1.0 - pow(abs(h * 2.0 - 1.0), 2.0);
-    return smoothstep(0.35, 0.6, cover - (1.0 - middle) * 0.5);
+    // A storm's deck is one sheet: rounded puffs would leave lens-shaped gaps where four meet, the
+    // bright sky showing through them.
+    let deck = s.axes[0].z * smoothstep(0.0, 0.4, middle);
+    return max(smoothstep(0.35, 0.6, cover - (1.0 - middle) * 0.5), deck);
 }
 
 @fragment
