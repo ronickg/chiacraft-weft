@@ -345,7 +345,14 @@ by name to whatever command had that name, so a package whose clashing command w
 open another mod's (`/tk give` to everyone); a permission now carries its mod and applies to that
 mod's own command only (`content::freeze_commands`, test
 `a_left_out_command_leaves_its_permission_too`).
-Not yet seen in the game: protocol 8 (a pair run is to come).
+Checked on the Linux PC (Tester 2, c41da9e4, with Phase 4 merged in; logs `~/looktest/p6pair8`):
+bob's join sheet listed clans "runs sandboxed code (mod API 1.0)", tally "(mod API 1.1)" and the
+signed gems; bob downloaded all three, joined, and the clan flow ran as before (2 members); no
+protocol, strike or load errors. `callcost` on that PC (Ryzen 7 9800X3D), microseconds per call:
+a command 0.6 to 0.9, an empty event batch 0.2 to 0.3, a batch of 64 block changes 3.5 (clans,
+ignoring them) to 14 (tally, a component call each): about 0.2 µs per crossing into the mod and
+back. Questions, chain steps and world ticks not measured yet (the test guest needs the wasm32
+target, not on the PC).
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost numbers, 1.2
 (block and item callbacks, channels), client halves (slice 4), personal mods per world (slice
 5), `/mods` (slice 6).
