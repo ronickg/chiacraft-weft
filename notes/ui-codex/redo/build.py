@@ -9,6 +9,7 @@ import html
 import io
 import json
 import os
+import sys
 
 from PIL import Image
 
@@ -17,12 +18,15 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 OUT = os.path.join(HERE, "out")
 TITLES = {"1_tools": "Tools and weapons", "2_armour": "Armour", "3_materials": "Materials, ores and gems",
           "4_food": "Food", "5_plants": "Plants, nuts, berries and seeds", "6_misc": "Containers, tools, creatures, eggs",
-          "7_survival": "Survival's new items (for its branch)",
+          "7_survival": "Survival's new items (left: its branch's placeholders)",
           "2b_redo": "Redos: hoes, leather cap, boots",
           "3b_redo": "Redos: coal, gunpowder, stick, three hoes, five foods",
           "5b_hoes": "Hoes, third try",
           "5c_wild": "New wild foods (for the Voxel dog handoff)",
-          "5d_redo": "Redos: crowberries, beans, barley, rye, melon seeds, diamond hoe"}
+          "5d_redo": "Redos: crowberries, beans, barley, rye, melon seeds, diamond hoe",
+          "6b_size": "Redos and creature sizes: repeater, insects, saddles, worm, grub, eggs",
+          "7b_beans": "Beans, on green",
+          "7c_worm": "Earthworm, a touch bigger"}
 
 
 def uri(im, scale=1):
@@ -33,17 +37,26 @@ def uri(im, scale=1):
     return "data:image/png;base64," + base64.b64encode(b.getvalue()).decode()
 
 
-def thumb(path, size=256):
+def thumb(path, size=192):
+    """A small JPEG of the picture as generated (keeps the page under the 16 MB limit)."""
     im = Image.open(path).convert("RGB")
     im.thumbnail((size, size), Image.NEAREST)
-    return uri(im)
+    b = io.BytesIO()
+    im.save(b, "JPEG", quality=82)
+    return "data:image/jpeg;base64," + base64.b64encode(b.getvalue()).decode()
 
 
 def game_icon(name, mod):
     p = os.path.join(ROOT, "mods", mod, "assets", "textures", "item", name + ".png")
     if not os.path.exists(p):  # Survival's new items live on its branch
         p = os.path.join(ROOT, "mods", "base", "assets", "textures", "item", name + ".png")
-    return Image.open(p).convert("RGBA") if os.path.exists(p) else None
+    if os.path.exists(p):
+        return Image.open(p).convert("RGBA")
+    # Survival's new items: their placeholders live on its branch
+    import subprocess
+    r = subprocess.run(["git", "-C", ROOT, "show", f"refs/heads/claude/survival-clothing-cooking-f0c469:"
+                        f"mods/base/assets/textures/item/{name}.png"], capture_output=True)
+    return Image.open(io.BytesIO(r.stdout)).convert("RGBA") if r.returncode == 0 else None
 
 
 def card(job):
@@ -60,17 +73,18 @@ def card(job):
                else f"failed the checks {len(made)} times; the last try is shown")
     nums = ", ".join(f"{k} {last[k]}" for k in ("grid", "outline", "red_line") if k in last)
     old = game_icon(n, job.get("mod", "base"))
-    old_html = (f'<div class="pic slot"><img src="{uri(old, max(1, 256 // old.width))}" alt=""></div>' if old else
+    sp_uri = uri(sp)
+    old_html = (f'<div class="pic slot"><img src="{uri(old)}" alt=""></div>' if old else
                 '<div class="pic none">new item</div>')
     flag = "" if last.get("passed") else " fail"
     return f"""<article class="card{flag}" id="{n}">
   <header><h3>{html.escape(n.replace('_', ' '))}</h3><span class="tag">{'green' if job.get('green') else ''}</span></header>
   <div class="trio">
     <figure><div class="pic raw{' green' if info.get('green') or job.get('green') else ''}"><img src="{thumb(raw)}" alt=""></div><figcaption>as generated</figcaption></figure>
-    <figure><div class="pic slot"><img src="{uri(sp, 8)}" alt=""></div><figcaption>new, 32 × 32</figcaption></figure>
+    <figure><div class="pic slot"><img src="{sp_uri}" alt=""></div><figcaption>new, 32 × 32</figcaption></figure>
     <figure>{old_html}<figcaption>game now</figcaption></figure>
   </div>
-  <div class="slots">{''.join(f'<span class="slot"><img src="{uri(sp, s)}" width="{16 * s}" height="{16 * s}" alt=""></span>' for s in (2, 3, 4))}</div>
+  <div class="slots">{''.join(f'<span class="slot"><img src="{sp_uri}" width="{16 * s}" height="{16 * s}" alt=""></span>' for s in (2, 3, 4))}</div>
   <p class="checks">{verdict}{(': ' + nums) if nums else ''}</p>
 </article>"""
 
@@ -110,7 +124,14 @@ def sheet(batch, jobs):
                 d.text((bx + 30, y0 + lab + S // 2 - 8), "new item", fill=(0xc2, 0xac, 0x88), font=font)
     os.makedirs(os.path.join(HERE, "sheets"), exist_ok=True)
     path = os.path.join(HERE, "sheets", batch + ".png")
-    im.save(path)
+    b = io.BytesIO()
+    im.save(b, "PNG")
+    if os.path.exists(path) and open(path, "rb").read() != b.getvalue():
+        # a sheet Ronald may have seen: keep the old one for good before it changes (his rule, 11-04)
+        sys.path.insert(0, os.path.join(ROOT, ".claude", "skills", "game-art", "scripts"))
+        import art
+        art.archive(path, f"sheet_{batch}", "sheets")
+    open(path, "wb").write(b.getvalue())
     return path
 
 
@@ -129,8 +150,8 @@ def main():
             t = json.load(open(os.path.join(OUT, j["name"] + "_checks.json")))["tries"]
             if not (t and t[-1].get("passed")) and j["name"] not in failed:
                 failed.append(j["name"])
-        hot_new = "".join(f'<span class="slot"><img src="{uri(Image.open(os.path.join(OUT, j["name"] + "_px.png")), 2)}" width="32" height="32" alt="{j["name"]}" title="{j["name"]}"></span>' for j in made)
-        hot_old = "".join(f'<span class="slot"><img src="{uri(o.resize((32, 32), Image.NEAREST))}" width="32" height="32" alt="{j["name"]}" title="{j["name"]}"></span>'
+        hot_new = "".join(f'<span class="slot"><img src="{uri(Image.open(os.path.join(OUT, j["name"] + "_px.png")))}" width="32" height="32" alt="{j["name"]}" title="{j["name"]}"></span>' for j in made)
+        hot_old = "".join(f'<span class="slot"><img src="{uri(o)}" width="32" height="32" alt="{j["name"]}" title="{j["name"]}"></span>'
                           for j in made if (o := game_icon(j["name"], j.get("mod", "base"))) is not None)
         sections.append(f"""<section id="{b}">
   <h2>{TITLES.get(b, b)} <span class="count">{len(made)} of {len(jobs)}</span></h2>

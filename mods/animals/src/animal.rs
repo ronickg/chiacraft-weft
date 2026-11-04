@@ -153,8 +153,8 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         let a = *a;
         // Its size, from its genes and sex, and how far it has grown (the engine forgets it on
         // loading: set it again).
-        if let Some(g) = w.component(id, &crate::coats::GENOME) {
-            let size = crate::coats::size(g) * crate::breeding::growth(w, id, index);
+        if let Some(g) = crate::coats::size_of(w, id) {
+            let size = g * crate::breeding::growth(w, id, index);
             if w.component(id, &SCALED).is_some_and(|&s| s != size) {
                 w.set_scale(id, size);
                 if let Some(s) = w.component_mut(id, &SCALED) {

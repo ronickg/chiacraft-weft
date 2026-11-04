@@ -137,7 +137,8 @@ built, it gets its row below and its arrows above.
 - **Clothes, or a new material** (`vitals::clothing::MATERIALS`): its clo, heat, wet and wind from
   the research; the items come from the table (`clothing.rs`), with lang (base en, ru) and art;
   `balance.rs`'s clothing checks; the sheet. A new furred species: its row in
-  `animals_core::hides`.
+  `animals_core::hides`. A species people eat: its row in `animals_core::meat` (and a new
+  meat's raw and cooked `FOODS` rows, lang and icons).
 - **A meal, or a new preserved food**: the stew is its ingredients (`vitals::meals`), so a new food
   goes in it as it is; a new preserved food is a `FOODS` row, its `preserve::product` line and an
   item in `cooking.rs`'s `PRODUCTS` and `items.rs`'s food list; the sheet.
@@ -208,5 +209,6 @@ built, it gets its row below and its arrows above.
 | Clothes warm, the pot cooks | `testkit` `clothes_and_stew` | the clothing slots not read by body temperature (`/warmth`), the cooking pot not making a stew |
 | Survival balance | `vitals/src/balance.rs` | foods, stomach, levels and calendar out of balance; clothes that don't warm, cool or keep out the wind as their material should; a stew of three foods not making one well fed; preserved food keeping too little; a rack drying in the damp cold or not in a desert summer |
 | Every hide is a species | `animals/core/src/hides.rs` | a pelt or hide row for a species that isn't there |
+| Every meat is a species and a food | `animals/core/src/meat.rs` | a meat row for a species that isn't there, or a meat with no raw or cooked `FOODS` row |
 | Species balance | `animals/core/src/balance.rs` | species numbers against their facts |
 | The sheets are up to date | `vitals/tests/sheet.rs`, `animals/core/tests/sheet.rs` | a sheet not regenerated after a change |

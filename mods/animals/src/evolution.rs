@@ -13,11 +13,15 @@
 //! genes out of its place's pool, and a tame its owner releases puts its genes in (`count`).
 //!
 //! Pools evolve when they are next needed (up to `CATCH_UP` generations at once), as numbers, not
-//! animals, so a pool far from everyone costs nothing. They are saved in the world
-//! (`mods/animals/pools.json`, through the engine's bridge).
+//! animals, so a pool far from everyone costs nothing. They are saved in the world's animals
+//! folder (through the engine's bridge) in shards of 8 x 8 places (`pools/<x>_<z>.json`), read
+//! when first needed (64 at most open), written when changed on a thread of their own, and a
+//! file that fails to read is kept aside, never written over (`store.rs`). A pool nobody needed
+//! for 400 days is dropped, and starts afresh with its history when next needed.
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Condvar, Mutex, mpsc};
 
 use serde::{Deserialize, Serialize};
 use weft_sdk::*;
@@ -26,6 +30,7 @@ pub use animals_core::evolution::*;
 
 use crate::coats::{self, Pool};
 use crate::species::SPECIES;
+use crate::store;
 
 static COLD: Tag = Tag::named("cold");
 static DRY: Tag = Tag::named("dry");
@@ -55,12 +60,35 @@ struct Local {
     pool: Pool,
 }
 
-/// The pools of the world open now, by `key`, and the folder they are saved in.
+/// The pools of `SHARD` x `SHARD` cells, a file of their own (`pools/<x>_<z>.json` in the world's
+/// animals folder, about 280 KB once explored), by `key`.
+type ShardPools = HashMap<String, Local>;
+
+/// Cells a shard is wide, shards open at once (the least used is put away past this), and the
+/// generations an untouched pool is kept (a place nobody went to in 400 days starts afresh from
+/// its gene file, with its history).
+const SHARD: i64 = 8;
+const OPEN: usize = 64;
+const PRUNE: u64 = 400;
+
+struct Shard {
+    all: ShardPools,
+    dirty: bool,
+    /// False when its file was there but couldn't be read nor moved aside: it is never written
+    /// over (`store::read_json`).
+    writable: bool,
+    /// When it was last used, for putting the least used away.
+    used: u64,
+}
+
+/// The open world's pools, by shard, and the folder they are saved in.
 #[derive(Default)]
 struct Pools {
     dir: String,
-    all: HashMap<String, Local>,
-    dirty: bool,
+    shards: HashMap<(i64, i64), Shard>,
+    uses: u64,
+    /// The latest generation asked for (pools older by `PRUNE` are dropped as shards load).
+    today: u64,
 }
 
 static POOLS: Mutex<Option<Pools>> = Mutex::new(None);
@@ -74,39 +102,222 @@ fn cell_of(pos: [f64; 3]) -> (i64, i64) {
     ((pos[0] / CELL).floor() as i64, (pos[2] / CELL).floor() as i64)
 }
 
-/// Runs `f` on the open world's pools, read from its save the first time (and again when
-/// another world is opened).
+fn shard_of(cell: (i64, i64)) -> (i64, i64) {
+    (cell.0.div_euclid(SHARD), cell.1.div_euclid(SHARD))
+}
+
+fn shard_path(dir: &str, s: (i64, i64)) -> PathBuf {
+    Path::new(dir)
+        .join("pools")
+        .join(format!("{}_{}.json", s.0, s.1))
+}
+
+impl Pools {
+    /// Shard `s`, read from its file the first time (or from a write still on its way there).
+    fn shard(&mut self, s: (i64, i64)) -> &mut Shard {
+        self.uses += 1;
+        let used = self.uses;
+        if !self.shards.contains_key(&s) {
+            if self.shards.len() >= OPEN {
+                self.put_away();
+            }
+            let path = shard_path(&self.dir, s);
+            let (mut all, writable) = match pending(&path).map(|a| (*a).clone()) {
+                Some(all) => (all, true),
+                None => match store::read_json::<ShardPools>(&path) {
+                    store::Read::Fine(all) => (all, true),
+                    store::Read::Missing => (ShardPools::new(), true),
+                    store::Read::Bad { moved } => (ShardPools::new(), moved),
+                },
+            };
+            let before = all.len();
+            let today = self.today;
+            all.retain(|_, l| l.day + PRUNE >= today);
+            let dirty = all.len() != before;
+            self.shards.insert(s, Shard { all, dirty, writable, used });
+        }
+        let shard = self.shards.get_mut(&s).unwrap();
+        shard.used = used;
+        shard
+    }
+
+    /// Puts the least used shard away, writing it first if it changed.
+    fn put_away(&mut self) {
+        let Some(&s) = self
+            .shards
+            .iter()
+            .min_by_key(|(_, sh)| sh.used)
+            .map(|(s, _)| s)
+        else {
+            return;
+        };
+        if let Some(sh) = self.shards.remove(&s)
+            && sh.dirty
+            && sh.writable
+        {
+            write_later(shard_path(&self.dir, s), sh.all);
+        }
+    }
+
+    fn get(&mut self, k: &str, cell: (i64, i64)) -> Option<&Local> {
+        self.shard(shard_of(cell)).all.get(k)
+    }
+
+    /// The pool at `k` to change (its shard is saved after).
+    fn get_mut(&mut self, k: &str, cell: (i64, i64)) -> Option<&mut Local> {
+        let sh = self.shard(shard_of(cell));
+        let l = sh.all.get_mut(k)?;
+        sh.dirty = true;
+        Some(l)
+    }
+
+    fn insert(&mut self, k: String, cell: (i64, i64), l: Local) {
+        let sh = self.shard(shard_of(cell));
+        sh.all.insert(k, l);
+        sh.dirty = true;
+    }
+
+    /// Hands every changed shard to the writer.
+    fn flush(&mut self) {
+        let dir = self.dir.clone();
+        for (&s, sh) in self.shards.iter_mut().filter(|(_, sh)| sh.dirty) {
+            sh.dirty = false;
+            if sh.writable && !dir.is_empty() {
+                write_later(shard_path(&dir, s), sh.all.clone());
+            }
+        }
+    }
+
+    /// A world saved before the shards has its pools in one `pools.json`: spread into the shards
+    /// and written, then the old file renamed (`pools.json.moved-<secs>`). One that fails to read
+    /// is kept aside (`store::read_json`).
+    fn move_old_file(&mut self) {
+        let old = Path::new(&self.dir).join("pools.json");
+        let store::Read::Fine(all) = store::read_json::<ShardPools>(&old) else { return };
+        let n = all.len();
+        for (k, l) in all {
+            let mut words = k.split_whitespace().skip(1);
+            let cell = (words.next().and_then(|v| v.parse().ok()), words.next().and_then(|v| v.parse().ok()));
+            let (Some(x), Some(z)) = cell else { continue };
+            self.insert(k, (x, z), l);
+        }
+        self.flush();
+        wait_for_writes();
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        let moved = old.with_file_name(format!("pools.json.moved-{secs}"));
+        match std::fs::rename(&old, &moved) {
+            Ok(()) => {
+                weft_sdk::info!("animals: {n} gene pools moved from pools.json into pools/ (the old file kept as {})", moved.display())
+            }
+            Err(e) => weft_sdk::warn!("animals: {n} gene pools moved into pools/, but pools.json stays ({e})"),
+        }
+    }
+}
+
+/// Runs `f` on the open world's pools (opened afresh when another world is: the last one's
+/// changes are written first).
 fn with_pools<R>(f: impl FnOnce(&mut Pools) -> R) -> R {
     let mut guard = POOLS.lock().unwrap_or_else(|e| e.into_inner());
     let dir = crate::data_dir();
     if guard.as_ref().is_none_or(|p| p.dir != dir) {
-        let all = std::fs::read_to_string(std::path::Path::new(&dir).join("pools.json"))
-            .ok()
-            .and_then(|t| match serde_json::from_str(&t) {
-                Ok(a) => Some(a),
-                Err(e) => {
-                    weft_sdk::error!("animals pools.json: {e}");
-                    None
-                }
-            })
-            .unwrap_or_default();
-        *guard = Some(Pools { dir, all, dirty: false });
+        if let Some(old) = guard.as_mut() {
+            old.flush();
+        }
+        let mut p = Pools { dir, ..Pools::default() };
+        if !p.dir.is_empty() {
+            p.move_old_file();
+        }
+        *guard = Some(p);
     }
     f(guard.as_mut().unwrap())
 }
 
-/// Writes the pools if they changed (`init`: every thirty seconds).
+// ------------------------------------------------------------------ writing, off the tick
+
+/// Shards on their way to their files, the latest of each; the writer thread takes them from
+/// here, and a shard opened meanwhile is read from here, not from its older file.
+static PENDING: Mutex<Option<HashMap<PathBuf, Arc<ShardPools>>>> = Mutex::new(None);
+static WRITER: Mutex<Option<mpsc::Sender<PathBuf>>> = Mutex::new(None);
+/// Writes handed over and not yet done.
+static WRITING: (Mutex<u32>, Condvar) = (Mutex::new(0), Condvar::new());
+
+/// The shard on its way to `path`, if one is.
+fn pending(path: &Path) -> Option<Arc<ShardPools>> {
+    PENDING
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()?
+        .get(path)
+        .cloned()
+}
+
+/// Writes `all` into `path` on the writer thread: serialised there, atomically
+/// (`store::write_atomic`), so the world's tick never waits on it.
+fn write_later(path: PathBuf, all: ShardPools) {
+    PENDING
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get_or_insert_with(HashMap::new)
+        .insert(path.clone(), Arc::new(all));
+    *WRITING.0.lock().unwrap_or_else(|e| e.into_inner()) += 1;
+    let mut writer = WRITER.lock().unwrap_or_else(|e| e.into_inner());
+    let tx = writer.get_or_insert_with(|| {
+        let (tx, rx) = mpsc::channel::<PathBuf>();
+        std::thread::Builder::new()
+            .name("animals pools".into())
+            .spawn(move || {
+                for path in rx {
+                    write_now(&path);
+                }
+            })
+            .expect("the animals' pool writer starts");
+        tx
+    });
+    if tx.send(path.clone()).is_err() {
+        write_now(&path);
+    }
+}
+
+fn write_now(path: &Path) {
+    if let Some(all) = pending(path) {
+        match serde_json::to_string(&*all) {
+            Ok(text) => {
+                if let Err(e) = store::write_atomic(path, text.as_bytes()) {
+                    weft_sdk::warn!("saving animals pools {}: {e}", path.display());
+                }
+            }
+            Err(e) => weft_sdk::warn!("saving animals pools {}: {e}", path.display()),
+        }
+        // Done with it, unless a newer one came meanwhile (its own write follows).
+        let mut pending = PENDING.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(m) = pending.as_mut()
+            && m.get(path).is_some_and(|a| Arc::ptr_eq(a, &all))
+        {
+            m.remove(path);
+        }
+    }
+    let (n, done) = &WRITING;
+    let mut n = n.lock().unwrap_or_else(|e| e.into_inner());
+    *n = n.saturating_sub(1);
+    done.notify_all();
+}
+
+/// Blocks until every write handed over is done.
+fn wait_for_writes() {
+    let (n, done) = &WRITING;
+    let mut n = n.lock().unwrap_or_else(|e| e.into_inner());
+    while *n > 0 {
+        n = done.wait(n).unwrap_or_else(|e| e.into_inner());
+    }
+}
+
+/// Hands the changed shards to the writer (`init`: every thirty seconds).
 fn save() {
-    let (dir, text) = {
-        let mut guard = POOLS.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(p) = guard.as_mut().filter(|p| p.dirty && !p.dir.is_empty()) else { return };
-        p.dirty = false;
-        (p.dir.clone(), serde_json::to_string(&p.all).unwrap_or_default())
-    };
-    let path = std::path::Path::new(&dir).join("pools.json");
-    let tmp = path.with_extension("json.tmp");
-    if let Err(e) = std::fs::write(&tmp, text).and_then(|()| std::fs::rename(&tmp, &path)) {
-        weft_sdk::warn!("saving animals pools.json: {e}");
+    let mut guard = POOLS.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(p) = guard.as_mut() {
+        p.flush();
     }
 }
 
@@ -132,38 +343,73 @@ pub fn init(r: &mut Registry) {
 /// Species `index`'s pool in a place, evolved to `day` (made from the gene file the first time).
 fn evolved(p: &mut Pools, index: usize, cell: (i64, i64), h: Habitat, day: u64, r: &mut impl coats::Rng) -> Option<Pool> {
     let k = key(index, cell, h);
-    let new = !p.all.contains_key(&k);
+    p.today = p.today.max(day);
+    let new = p.get(&k, cell).is_none();
     if new {
-        // As if it had evolved since the world began (up to `HISTORY` generations).
-        let start = day.saturating_sub(HISTORY);
-        p.all
-            .insert(k.clone(), Local { day: start, pool: coats::wild_pool(index, h.name())? });
-        p.dirty = true;
+        // As if it had evolved since the world began (up to `HISTORY` generations): the species'
+        // history in this habitat (`history`, once for every place found that day), then its
+        // last `OWN` generations here, its neighbors mixing in.
+        let gens = day.min(HISTORY);
+        let own = gens.min(OWN);
+        let pool = history(index, h, gens - own, r)?;
+        p.insert(k.clone(), cell, Local { day: day - own, pool });
     }
-    let from = p.all[&k].day;
-    for _ in 0..day
-        .saturating_sub(from)
-        .min(if new { HISTORY } else { CATCH_UP })
-    {
+    let from = p.get(&k, cell)?.day;
+    for _ in 0..day.saturating_sub(from).min(CATCH_UP) {
         step(p, &k, index, cell, h, r);
     }
-    let local = p.all.get_mut(&k)?;
-    if local.day < day {
-        local.day = day;
-        p.dirty = true;
-    }
+    let local = p.get_mut(&k, cell)?;
+    local.day = local.day.max(day);
     Some(local.pool.clone())
+}
+
+/// Generations a new place evolves itself (with its neighbors) after its habitat's history.
+const OWN: u64 = 10;
+
+/// Species `index`'s pool in habitat `h` after `gens` generations from its gene file, alone: the
+/// start of every new place of that habitat. Kept, so new places share it and the next day's
+/// takes it up a generation on: 300 generations of 200 animals each was a hitch on the game thread for every
+/// species in every new place (P4).
+fn history(index: usize, h: Habitat, gens: u64, r: &mut impl coats::Rng) -> Option<Pool> {
+    static KEPT: Mutex<Option<HashMap<(usize, &'static str), (u64, Pool)>>> = Mutex::new(None);
+    let key = (index, h.name());
+    // Taken up where it was kept (a young world's history grows a generation a day).
+    let kept = KEPT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .and_then(|m| m.get(&key))
+        .filter(|(g, _)| *g <= gens)
+        .cloned();
+    let (from, mut pool) = match kept {
+        Some((g, pool)) if g == gens => return Some(pool),
+        Some(k) => k,
+        None => (0, coats::wild_pool(index, h.name())?),
+    };
+    for _ in from..gens {
+        pool = generation(index, &pool, h, r)?;
+    }
+    KEPT.lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get_or_insert_with(HashMap::new)
+        .insert(key, (gens, pool.clone()));
+    Some(pool)
 }
 
 /// One generation of the pool at `k`, with the neighbors' pools (the places around, any habitat)
 /// mixing in.
 fn step(p: &mut Pools, k: &str, index: usize, cell: (i64, i64), h: Habitat, r: &mut impl coats::Rng) {
-    let Some(mut next) = p.all.get(k).and_then(|l| generation(index, &l.pool, h, r)) else { return };
+    let Some(mut next) = p
+        .get(k, cell)
+        .and_then(|l| generation(index, &l.pool, h, r))
+    else {
+        return;
+    };
     let neighbors: Vec<Pool> = (-1..=1)
         .flat_map(|dx| (-1..=1).map(move |dz| (cell.0 + dx, cell.1 + dz)))
-        .flat_map(|c| HABITATS.map(|h2| key(index, c, h2)))
-        .filter(|n| n != k)
-        .filter_map(|n| p.all.get(&n).map(|l| l.pool.clone()))
+        .flat_map(|c| HABITATS.map(|h2| (key(index, c, h2), c)))
+        .filter(|(n, _)| n != k)
+        .filter_map(|(n, c)| p.get(&n, c).map(|l| l.pool.clone()))
         .collect();
     if !neighbors.is_empty() {
         let share = MIGRATION / neighbors.len() as f32;
@@ -171,10 +417,9 @@ fn step(p: &mut Pools, k: &str, index: usize, cell: (i64, i64), h: Habitat, r: &
             mix_in(&mut next, n, share);
         }
     }
-    if let Some(l) = p.all.get_mut(k) {
+    if let Some(l) = p.get_mut(k, cell) {
         l.pool = next;
         l.day += 1;
-        p.dirty = true;
     }
 }
 
@@ -200,9 +445,8 @@ fn count_at(w: &World, id: u64, pos: [f64; 3], sign: f32) {
     let mut r = coats::world_rng(w);
     with_pools(|p| {
         evolved(p, index, cell, h, day, &mut r)?;
-        let l = p.all.get_mut(&key(index, cell, h))?;
+        let l = p.get_mut(&key(index, cell, h), cell)?;
         coats::count_in(index, &mut l.pool, &g, sign, POPULATION as f32);
-        p.dirty = true;
         weft_sdk::info!("animal {id} {} the wild pool {}", if sign < 0.0 { "left" } else { "joined" }, key(index, cell, h));
         Some(())
     });
@@ -230,10 +474,10 @@ pub fn evolve_here(w: &World, player: u64, count: u32, habitat: Option<Habitat>)
                 for _ in 0..count {
                     step(pools, &k, i, cell, h, &mut r);
                 }
-                if let Some(l) = pools.all.get_mut(&k) {
+                if let Some(l) = pools.get_mut(&k, cell) {
                     l.day = day;
                 }
-                let pool = &pools.all.get(&k)?.pool;
+                let pool = &pools.get(&k, cell)?.pool;
                 Some(format!("{} ({}): {}", SPECIES[i].kind_name(), h.name(), coats::describe_pool(i, pool)))
             })
             .collect()

@@ -163,7 +163,7 @@ fn fly(w: &World, id: u64, st: &EntityState, wings: &Wings) -> bool {
         w.set_look(id, None);
         return false;
     }
-    f.left = f.left.saturating_sub(1);
+    f.left = f.left.saturating_sub(w.tick_elapsed(id));
     let (dx, dz) = (f.to[0] as f64 - st.pos[0], f.to[2] as f64 - st.pos[2]);
     let flat = (dx * dx + dz * dz).sqrt();
     if f.left == 0 || flat < 2.0 {

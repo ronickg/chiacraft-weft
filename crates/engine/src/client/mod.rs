@@ -2326,7 +2326,11 @@ impl Client {
         );
         let light = proj * view;
         while self.shadow_bufs.len() < gpu.frames_in_flight() {
-            self.shadow_bufs.push(gpu.create_buffer(size_of::<Scene>() as u64, weft_render::usage::STORAGE | weft_render::usage::HOST, "shadow scene"));
+            self.shadow_bufs.push(gpu.create_buffer(
+                size_of::<Scene>() as u64,
+                weft_render::usage::STORAGE | weft_render::usage::HOST,
+                "shadow scene",
+            ));
         }
         let mut scene = self.scene(&cam, frame);
         scene.view_proj = light.to_cols_array_2d();

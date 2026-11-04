@@ -89,8 +89,8 @@ fn settle(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let resting = c.rest > 0;
     if resting {
-        c.rest -= 1;
-        c.rested += 1;
+        c.rest = c.rest.saturating_sub(w.tick_elapsed(id) as _);
+        c.rested = c.rested.saturating_add(w.tick_elapsed(id) as _);
     }
     let pose = match (resting, c.rested > LIE_TICKS) {
         (false, _) => 0,

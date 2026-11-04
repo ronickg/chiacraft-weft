@@ -5,7 +5,8 @@
 //! `run/test-reports/report.txt` and exits with the number of failed tests. Screenshots of the
 //! run go to `run/test-shots/` for looking at; checks never compare pictures with references.
 //! `--test all` runs several at once, `--jobs 1` one by one, `--jobs N` for a number; see the game's `main`.
-//! `--test-keep` keeps the test worlds. `weft --world w --script file.txt` runs a line script (see `script.rs`).
+//! `--test-keep` keeps the test worlds. `--watchdog 45` ends a run that draws no frame for 45 s
+//! with exit code 70 and says where it stopped (`watchdog.rs`). `weft --world w --script file.txt` runs a line script (see `script.rs`).
 //! With `TESTKIT_CI=1` (CI's software Vulkan) what `ci-skip.txt` names is left out, by name.
 //! Without those options the mod only registers its message channels.
 
@@ -13,6 +14,7 @@ mod runner;
 mod script;
 mod server;
 mod tests;
+mod watchdog;
 
 use std::sync::OnceLock;
 
@@ -57,6 +59,12 @@ fn init(r: &mut Registry) {
         let what = cmd.text("what").unwrap_or("").to_string();
         cmd.reply("command.testkit.probe", &[Arg::Text(&what), Arg::Key(side)]);
     });
+    // Stops the main thread for n seconds, so the watchdog can be seen working
+    // (`scripts/watchdog.txt`). testkit is never shipped.
+    r.client_command("tk_freeze", "<secs:int>", |cmd| {
+        let secs = cmd.int("secs").unwrap_or(1).clamp(0, 600) as u64;
+        std::thread::sleep(std::time::Duration::from_secs(secs));
+    });
     let (test, script) = (launch_option("test"), launch_option("script"));
     if test.is_none() && script.is_none() {
         return;
@@ -64,7 +72,14 @@ fn init(r: &mut Registry) {
     let _ = PLAN.set((test, script));
     r.client_frame(|c| {
         static STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        watchdog::beat();
         if !STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            if let Some(secs) = launch_option("watchdog")
+                .and_then(|s| s.parse::<f32>().ok())
+                .filter(|s| *s > 0.0)
+            {
+                watchdog::start(secs, format!("{}/test-reports", c.run_dir()));
+            }
             start(c);
         }
         runner::frame(c);

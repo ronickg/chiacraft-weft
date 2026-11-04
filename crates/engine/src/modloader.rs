@@ -537,11 +537,21 @@ pub fn current_packages() -> Vec<crate::net::p2p::Offer> {
             let h = chiacraft_packages::identity::Hash::from_hex(hex)?;
             let manifest = store.manifest(&h).ok()?;
             let size = manifest.files.iter().map(|f| f.size).sum();
-            let code = manifest
+            // The API its code needs, read from the component's imports (unreadable code would
+            // not have loaded here; "?" stands for it so the guest refuses rather than guesses).
+            let api = match manifest
                 .files
                 .iter()
-                .any(|f| f.path == chiacraft_packages::identity::SERVER_CODE);
-            Some((m.id.clone(), m.version.clone(), hex.clone(), size, store.signature(&h).unwrap_or_default(), code))
+                .find(|f| f.path == chiacraft_packages::identity::SERVER_CODE)
+            {
+                None => String::new(),
+                Some(f) => store
+                    .blob_path(&f.hash)
+                    .and_then(|p| std::fs::read(p).ok())
+                    .and_then(|b| chiacraft_packages::code::api_of(&b).ok())
+                    .map_or_else(|| "?".into(), |v| chiacraft_packages::code::text(Some(v.unwrap_or((1, 0))))),
+            };
+            Some((m.id.clone(), m.version.clone(), hex.clone(), size, store.signature(&h).unwrap_or_default(), api))
         })
         .collect()
 }

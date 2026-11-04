@@ -57,6 +57,14 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | base:sunflower_seeds | seeds | 30 | 3 | 6 | 6 | 15 | 3 | 1 | 10 min | 90 + 90 |  |
 | base:mushroom_brown | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 |  |
 | base:mushroom_red | fungi | 50 | 5 | 2 | 2 | 0 | 1 | 46 | 3 min | 3 + 3 | poisonous |
+| animals:venison | meat | 200 | 20 | 44 | 0 | 5 | 0 | 147 | 27 min | 2 + 2 | raw |
+| animals:cooked_venison | meat | 150 | 15 | 45 | 0 | 5 | 0 | 98 | 24 min | 4 + 4 | hot when cooked |
+| animals:hare | meat | 150 | 15 | 33 | 0 | 3 | 0 | 109 | 20 min | 2 + 2 | raw |
+| animals:cooked_hare | meat | 110 | 11 | 36 | 0 | 4 | 0 | 70 | 19 min | 4 + 4 | hot when cooked |
+| animals:trout | fish | 150 | 15 | 31 | 0 | 5 | 0 | 108 | 20 min | 1 + 1 | raw |
+| animals:cooked_trout | fish | 110 | 11 | 25 | 0 | 6 | 0 | 76 | 17 min | 3 + 3 | hot when cooked |
+| animals:pacu | fish | 150 | 15 | 30 | 0 | 3 | 0 | 117 | 17 min | 1 + 1 | raw |
+| animals:cooked_pacu | fish | 110 | 11 | 29 | 0 | 3 | 0 | 79 | 16 min | 3 + 3 | hot when cooked |
 | animals:kibble | meat | 100 | 10 | 25 | 45 | 14 | 4 | 10 | 19 min | 90 + 90 |  |
 
 ## Meals and preserving
@@ -78,6 +86,10 @@ Preserving (`vitals::preserve`): a drying rack dries in 20 min in the best air (
 | base:crowberries (20) | base:dried_berries | - | - | 112 |
 | base:raspberries (4) | base:dried_berries | - | - | 112 |
 | base:prickly_pear_fruit (14) | base:dried_berries | - | - | 112 |
+| animals:venison (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| animals:hare (4) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| animals:trout (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
+| animals:pacu (2) | base:dried_meat | base:smoked_meat | base:salted_meat | 60, 28, 90 |
 
 ## Clothing
 

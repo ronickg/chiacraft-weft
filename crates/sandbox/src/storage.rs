@@ -8,6 +8,8 @@ use std::path::PathBuf;
 pub const MAX_KEYS: usize = 1024;
 pub const MAX_BYTES: u64 = 4 << 20;
 pub const MAX_KEY_CHARS: usize = 64;
+/// Bytes a mod may write in one call: fuel bounds its CPU, not the time a disk write takes.
+pub const MAX_WRITE_PER_CALL: u64 = 1 << 20;
 
 /// A key: 1 to 64 lowercase letters, digits, `_`, `-` and `.`, not starting with a dot.
 pub fn key_ok(key: &str) -> bool {

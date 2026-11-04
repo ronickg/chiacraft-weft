@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a large raptor egg: an upright oval, slightly narrower at the top, pale olive-cream shell with dark brown speckles, a soft highlight on the upper left, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.542,
+   "outline": 0.57,
+   "red_line": 0.0,
+   "fill": 0.43,
+   "passed": true
+  }
+ ]
+}

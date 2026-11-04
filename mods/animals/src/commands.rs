@@ -336,7 +336,7 @@ pub fn act(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send + 
         }
         if o.flee > 0 {
             if let Some(o) = w.component_mut(id, &ORDERS) {
-                o.flee -= 1;
+                o.flee = o.flee.saturating_sub(w.tick_elapsed(id) as _);
             }
             if (w.time() + id) % 20 == 0 {
                 let a = w.random_below(628) as f64 / 100.0;

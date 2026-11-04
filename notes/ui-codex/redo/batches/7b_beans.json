@@ -1,0 +1,10 @@
+[
+ {
+  "kind": "item",
+  "name": "beans",
+  "what": "a handful of five dry kidney beans, clearly bean-shaped and glossy: speckled cream-and-pink-brown ones and two plain dark red ones, each with a small pale eye, a soft shadow under them, centred with 3-5 px of padding (on a flat green background: the beans are pink and red)",
+  "green": true,
+  "pale": false,
+  "mod": "base"
+ }
+]
