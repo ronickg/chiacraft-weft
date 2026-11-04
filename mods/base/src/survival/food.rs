@@ -10,6 +10,27 @@ use weft_sdk::*;
 
 use super::{DT, set};
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::Instant;
+
+/// Server to client: why eating was refused, by its index in `REFUSED` (Tester, 11-04: a full
+/// stomach let nothing be eaten on a 4 s hold, and nothing said why).
+static REFUSED: Channel<u32> = Channel::named("food_refused");
+/// The lines, `food.base.refused.<name>`: no room for it, or every portion's place taken.
+const REFUSALS: [&str; 2] = ["full", "too_many"];
+const FULL: u32 = 0;
+const TOO_MANY: u32 = 1;
+/// A hold asks every tick: the line goes out once in this many ticks a player, and shows this long.
+const REFUSED_EVERY: u64 = 30;
+const REFUSED_SECS: f32 = 2.5;
+const REFUSED_FADE: f32 = 0.5;
+/// Where it shows, a share of the screen's height down: the bed's messages' line.
+const REFUSED_Y: f32 = 0.72;
+/// The tick each player was last told (server), and the line showing (client).
+static TOLD: Mutex<Option<HashMap<u64, u64>>> = Mutex::new(None);
+static SHOWING: Mutex<Option<(u32, Instant)>> = Mutex::new(None);
+
 pub fn register(r: &mut Registry) {
     // Food's stamps, kept and saved with each stack (`age`).
     r.stack_component(&MADE, 0);
@@ -22,19 +43,51 @@ pub fn register(r: &mut Registry) {
         if w.creative(q.entity()) {
             return Verdict::Abstain;
         }
-        let full = if FOOD.on_item(q.item()).is_some() {
-            !base_api::has_room(&w, q.entity(), q.item())
+        let player = q.entity();
+        // How many portions it takes, and whether there's room for it.
+        let (portions, room) = if FOOD.on_item(q.item()).is_some() {
+            (1, base_api::has_room(&w, player, q.item()))
         } else if q.item() == crate::cooking::STEW.id() {
             // A stew all at once: what it holds is on the stack in hand.
-            let held = w
-                .inventory(q.entity())
-                .group("hotbar")
-                .get(w.selected_slot(q.entity()));
-            held.item == q.item() && !base_api::has_room_for_meal(&w, q.entity(), &held)
+            let held = w.inventory(player).group("hotbar").get(w.selected_slot(player));
+            if held.item != q.item() {
+                return Verdict::Abstain;
+            }
+            (meals::ingredients(MEAL.stack_only(&held).unwrap_or(0)).len(), base_api::has_room_for_meal(&w, player, &held))
         } else {
-            false
+            return Verdict::Abstain;
         };
-        if full { Verdict::Deny } else { Verdict::Abstain }
+        let free = w
+            .component(player, &VITALS)
+            .map_or(stomach::PORTIONS, |v| v.stomach().portions.iter().filter(|p| p.food == 0).count());
+        let refused = if !room {
+            FULL
+        } else if free < portions {
+            TOO_MANY
+        } else {
+            return Verdict::Abstain;
+        };
+        let now = w.time();
+        let mut told = TOLD.lock().unwrap();
+        let last = told.get_or_insert_with(HashMap::new).entry(player).or_insert(0);
+        if *last == 0 || now >= *last + REFUSED_EVERY || now < *last {
+            *last = now.max(1);
+            w.send(player, &REFUSED, &refused);
+        }
+        Verdict::Deny
+    });
+    r.client_packet(&REFUSED, |_, why| *SHOWING.lock().unwrap() = Some((why, Instant::now())));
+    r.client_frame(|c| {
+        let mut showing = SHOWING.lock().unwrap();
+        let Some((why, at)) = *showing else { return };
+        let t = at.elapsed().as_secs_f32();
+        if t > REFUSED_SECS {
+            *showing = None;
+            return;
+        }
+        let alpha = ((REFUSED_SECS - t) / REFUSED_FADE).clamp(0.0, 1.0);
+        let key = format!("food.base.refused.{}", REFUSALS[why as usize % REFUSALS.len()]);
+        c.screen_text(0.5, REFUSED_Y, &key, &[], 0xffffff00 | (alpha * 255.0) as u32, 1.0);
     });
     // Opening a chest (or any block's inventory) brings its food's freshness up to date: it has
     // aged all along from its stamp, the stamp just says so now.
