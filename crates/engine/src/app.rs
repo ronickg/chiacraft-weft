@@ -2166,13 +2166,17 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
         r.depth = make_depth(&mut *r.gpu, world.width, world.height);
     }
     if r.quads_dirty {
+        let _s = crate::diag::span("ui quads");
         build_ui_quads(r, scale);
     }
+    let s = crate::diag::span("overlays");
     draw_overlays(r, &info, scale, text_unit);
+    drop(s);
     record_passes(r, &info, &world, scale);
     let capture_now = r.shot_pending;
     let t3 = Instant::now();
     r.prof[3] = t3.duration_since(t2).as_secs_f32() * 1000.0;
+    crate::diag::slow_record(r.prof[3]);
     r.gpu.end_frame(&r.list);
     r.prof[4] = t3.elapsed().as_secs_f32() * 1000.0;
     report_frame(r, dt);
@@ -2739,6 +2743,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
                 .then(|| g.client.menu.as_ref().map(|m| m.owner))
                 .flatten()
                 .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind)));
+            let s = crate::diag::span("preview");
             let tex = g.client.entity_render.draw_preview(
                 &mut *r.gpu,
                 &mut r.list,
@@ -2748,6 +2753,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
                 &worn,
                 subject,
             );
+            drop(s);
             if tex != r.preview_tex {
                 r.preview_tex = tex;
                 r.quads_dirty = true;
@@ -2771,17 +2777,23 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         Target::Surface
     };
     if let Some(g) = &mut r.game {
+        let s = crate::diag::span("terrain gpu");
         g.client
             .gpu_terrain
             .frame(&mut *r.gpu, &mut r.list, info.slot);
+        drop(s);
+        let s = crate::diag::span("particles");
         let cam = g.client.render_camera();
         g.client
             .particles
             .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
+        drop(s);
+        let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
         // The sun's light for shadow maps (packs that use them), which the world's scene samples.
         g.client.prepare_shadows(&mut *r.gpu);
         // A copy of the world for what is seen through it (`water_behind` packs, with post on).
+        drop(s);
         g.client.behind = [0.0; 4];
         if post && crate::packs::water_behind() {
             if let Some([c, d]) = r
@@ -2801,14 +2813,20 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
     if let Some(g) = &mut r.game {
         let worn = g.client.worn();
         let held = g.client.held().item;
+        let s = crate::diag::span("entities preload");
         g.client
             .entity_render
             .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
+        drop(s);
+        let s = crate::diag::span("client render");
         g.client
             .render(&mut *r.gpu, &mut world, world_info, &r.textures);
+        drop(s);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
+        let s = crate::diag::span("shadows");
         g.client
             .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+        drop(s);
         // The opaque world copied, then what is seen through it drawn over it, reading the copy.
         if g.client.behind[2] > 0.5 {
             world.push(Cmd::EndPass);
@@ -2831,6 +2849,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
             .as_ref()
             .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
+        let _s = crate::diag::span("effects");
         r.post
             .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth);
         r.list.push(Cmd::Mark);
@@ -2840,7 +2859,9 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &we
         r.list
             .push(Cmd::BeginPass { color: Some((Target::Surface, None)), depth: None });
     }
+    let s = crate::diag::span("ui draw");
     r.ui.draw(&mut *r.gpu, &mut r.list, info, scale);
+    drop(s);
     r.list.push(Cmd::Mark);
     r.list.push(Cmd::EndPass);
 }

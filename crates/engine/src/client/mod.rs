@@ -2493,8 +2493,10 @@ impl Client {
             .iter()
             .flat_map(|(&id, e)| e.world_light.iter().map(move |(cp, l)| ((id, *cp), *l)))
             .collect();
+        let s = crate::diag::span("render/world");
         self.render
             .draw(gpu, list, frame, &cam, scene_buf, &frames, &lights);
+        drop(s);
         let lit: Vec<u32> = frames
             .iter()
             .map(|(id, _)| {
@@ -2515,6 +2517,7 @@ impl Client {
         late.clear();
         // The sky fills what the opaque world left, and translucent things are seen against it.
         let overlays = self.overlays(&cam);
+        let s = crate::diag::span("render/sky");
         self.sky.draw(
             gpu,
             &mut late,
@@ -2531,6 +2534,7 @@ impl Client {
             self.frame_dt,
             &overlays,
         );
+        drop(s);
         self.render.draw_translucent(&mut late);
         let me = (self.view != 0 && !self.dead && self.mode != GameMode::Spectator).then(|| self.self_entity());
         // In first person the player's body is not drawn, but casts its shadow.
@@ -2558,6 +2562,7 @@ impl Client {
             self.breaking
                 .map(|(f, p, v)| (p, v, self.frame_place(f).origin())),
         );
+        let s = crate::diag::span("render/entities");
         self.entity_render.draw(
             gpu,
             list,
@@ -2579,10 +2584,13 @@ impl Client {
             &self.gizmo_fills,
             &mut hand_late,
         );
+        drop(s);
+        let s = crate::diag::span("render/particles and weather");
         self.particles.draw(list, &mut late, scene_buf);
         let ticks = self.smooth_time();
         self.weather_render
             .draw(gpu, &mut late, frame, &cam, scene_buf, &self.world, self.rain, ticks, self.frame_dt);
+        drop(s);
         self.sky.draw_overlay(&mut hand_late, scene_buf);
         if self.behind[2] > 0.5 {
             // After the copy of the world (the app puts it there).

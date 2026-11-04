@@ -596,3 +596,45 @@ mod native {
         0
     }
 }
+
+// ---------------------------------------------------------------- slow frames, step by step
+
+thread_local! {
+    static SPANS: std::cell::RefCell<Vec<(&'static str, f32)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// A frame record's step a frame times until it is dropped (`span`); only on the frame thread.
+pub struct Span(&'static str, Instant);
+
+/// Times a step of recording the frame: a frame whose record took long logs its steps
+/// (`slow_record`). Nested ones ("render/world") are listed too, before the step they are in.
+pub fn span(name: &'static str) -> Span {
+    Span(name, Instant::now())
+}
+
+impl Drop for Span {
+    fn drop(&mut self) {
+        let ms = self.1.elapsed().as_secs_f32() * 1000.0;
+        SPANS.with(|s| s.borrow_mut().push((self.0, ms)));
+    }
+}
+
+/// Recording frames over this many ms log their steps (`span`).
+const SLOW_RECORD_MS: f32 = 20.0;
+
+/// Ends a frame's record: with `--log frame=debug`, one that took `record_ms` over
+/// `SLOW_RECORD_MS` logs its timed steps, slowest first. The hitches standing still in Ronald's
+/// window (11-04: 25-77 ms frames about once a second, nothing loading) were all in "record".
+pub fn slow_record(record_ms: f32) {
+    let mut spans = SPANS.with(|s| std::mem::take(&mut *s.borrow_mut()));
+    if record_ms < SLOW_RECORD_MS {
+        return;
+    }
+    spans.sort_by(|a, b| b.1.total_cmp(&a.1));
+    let steps: Vec<String> = spans
+        .iter()
+        .filter(|s| s.1 >= 0.05)
+        .map(|(name, ms)| format!("{name} {ms:.2}"))
+        .collect();
+    log::debug!(target: "frame", "slow record {record_ms:.1} ms: {}", steps.join(", "));
+}
