@@ -176,6 +176,8 @@ pub fn register(r: &mut Registry) {
         .block(|b| {
             b.sound_group("wood")
                 .texture("drying_rack")
+                // A frame of sticks: the texture's gaps are see-through.
+                .cutout()
                 .model_box([0.0, 0.0, 0.0], [16.0, 14.0, 16.0])
                 .hardness(1.5)
                 .mineable("axe")
