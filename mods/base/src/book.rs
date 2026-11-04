@@ -433,6 +433,10 @@ pub fn book(ui: &mut Ui, station: Station) {
             // lost.
             b.ask = Some(station);
         }
+        // Parts are made at a table: by hand the Parts tab isn't there, so it's All.
+        if station == Station::Hands && TABS[b.tab] == PARTS_TAB {
+            b.tab = 0;
+        }
         (b.tab, b.page, b.picked, b.pool.clone())
     };
     let have = have(ui, station, &pool);
@@ -478,6 +482,9 @@ pub fn book(ui: &mut Ui, station: Station) {
         ui.text_styled(S::col().class("title"), "crafting.book.title", &[]);
         ui.row(S::row().gap(1.0), |ui| {
             for (i, t) in TABS.iter().enumerate() {
+                if station == Station::Hands && *t == PARTS_TAB {
+                    continue;
+                }
                 let key = match *t {
                     "" => "crafting.book.all".to_string(),
                     PARTS_TAB => "crafting.book.parts".to_string(),
