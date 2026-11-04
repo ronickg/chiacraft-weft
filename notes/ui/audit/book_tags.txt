@@ -10,4 +10,11 @@ wait 1
 press core:inventory
 wait 1.5
 shot bt_01_hands.png
+# The stick's slot (the third row's first, at 1280 x 720): its tooltip, then picked.
+cursor 0.602 0.524
+wait 1
+shot bt_02_stick_tip.png
+click 0
+wait 1
+shot bt_03_stick.png
 quit
