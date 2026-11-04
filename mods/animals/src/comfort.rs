@@ -35,7 +35,7 @@ value! {
 pub static BODY: Component<Body> = Component::named("animal_body");
 /// Where it is heading for comfort, and until when (not saved).
 static SEEK: Component<[f64; 4]> = Component::named("animal_seek");
-static WATER: Tag = Tag::named("water");
+pub(crate) static WATER: Tag = Tag::named("water");
 
 /// The feelings in `Body::feel`'s order, their names in translations.
 pub const FEELINGS: [Feeling; 7] =
@@ -65,13 +65,16 @@ pub fn init(r: &mut Registry) {
     }
 }
 
-/// Its strength from its stomach: full from half fed, down to 40% empty (a wild one is fed).
+/// Its strength from its stomach and its water: full from half fed and half slaked, down to 40%
+/// empty or parched (`drink.rs`), whichever is worse.
 pub fn condition(a: &Animal) -> f32 {
     let max = a.stat(species::FOOD);
     if max <= 0.0 {
         return 1.0;
     }
-    FLOOR + (1.0 - FLOOR) * (a.food as f32 / max * 2.0).min(1.0)
+    let fed = a.food as f32 / max;
+    let watered = 1.0 - a.thirst.clamp(0.0, 1.0);
+    FLOOR + (1.0 - FLOOR) * (fed.min(watered) * 2.0).min(1.0)
 }
 
 /// What its body makes of the air: its species' comfort, wider by its fortitude points.
@@ -228,7 +231,7 @@ fn nearest_fire(w: &World, pos: [f64; 3]) -> Option<[i32; 3]> {
 
 /// Where one can stand in column `x, z` near height `y`: on solid ground (not lava or water), in
 /// air or water.
-fn ground(w: &World, x: i32, y: i32, z: i32) -> Option<i32> {
+pub(crate) fn ground(w: &World, x: i32, y: i32, z: i32) -> Option<i32> {
     (y - 4..=y + 3).rev().find(|&y| {
         let feet = w.get([x, y, z]);
         let below = w.get([x, y - 1, z]);

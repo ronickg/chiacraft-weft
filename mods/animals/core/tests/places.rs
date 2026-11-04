@@ -195,3 +195,46 @@ fn most_of_every_diet_is_in_the_game() {
     }
     report(problems);
 }
+
+/// Drinking is paced for play (`animals_core::needs`): every species that drinks goes at least
+/// `MIN_SECS` between slaked and parched at its grown mass, or it would live at the water's edge.
+#[test]
+fn a_drink_lasts_a_while() {
+    const MIN_SECS: f32 = 600.0;
+    let mut problems = Vec::new();
+    for s in &SPECIES {
+        if let Some(secs) = animals_core::needs::drink_lasts(s, s.bio.mass)
+            && secs < MIN_SECS
+        {
+            problems.push(format!(
+                "{}: a drink lasts it {secs:.0} s (want {MIN_SECS} or more): needs::{{SPARE, DAY_SECS, DRINKS}}",
+                s.name
+            ));
+        }
+    }
+    report(problems);
+}
+
+/// Desert animals barely drink (`notes/ECOLOGY.md`, part 4): one that lives only in dry places
+/// (air under `DRY` humidity: the desert, the red dunes, the scrubland) drinks at most half its
+/// water, the rest from its food, or they would crowd the few pools.
+#[test]
+fn desert_animals_barely_drink() {
+    const DRY: f32 = 0.35;
+    let mut problems = Vec::new();
+    for s in &SPECIES {
+        let dry = s
+            .habitats
+            .iter()
+            .all(|&(b, _)| climate::of(b).is_some_and(|c| c.humidity < DRY));
+        let drinks = animals_core::needs::drinks(s);
+        if dry && drinks > 0.5 {
+            problems.push(format!(
+                "{}: lives only in dry places and drinks {:.0}% of its water (want half or less): needs::DRINKS",
+                s.name,
+                drinks * 100.0
+            ));
+        }
+    }
+    report(problems);
+}

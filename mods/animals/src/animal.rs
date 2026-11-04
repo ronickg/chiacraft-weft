@@ -38,6 +38,8 @@ value! {
         pub tamed: [u8; STATS],
         /// Food now (the food stat is how much it holds).
         pub food: u16,
+        /// How thirsty, 0 slaked to 1 parched (`drink.rs`; `animals_core::needs` for how fast).
+        pub thirst: f32,
         pub xp: u32,
         /// When it was born (`life::birth`: a wild one met grown has an age); 0: not known yet
         /// (saved before animals aged), given one at `upkeep`.
@@ -160,13 +162,14 @@ pub fn upkeep(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
                 }
             }
         }
-        // Its body once a second (`comfort.rs`); a tame gets hungry, faster out of its comfort,
-        // and so does a wild one whose food the world has: a plant eater grazes (`forage.rs`), a
-        // hunter with prey at home hunts (`hunt.rs`).
+        // Its body once a second (`comfort.rs`); a tame gets hungry and thirsty, faster out of
+        // its comfort, and so does a wild one whose food the world has: a plant eater grazes
+        // (`forage.rs`), a hunter with prey at home hunts (`hunt.rs`); both drink (`drink.rs`).
         if !new && (w.time() + id) % 20 == 0 {
             let rate = crate::comfort::upkeep(w, id, &a, st);
             if tamed(w, id) || a.species().is_some_and(|s| s.hungry_in_the_wild()) {
                 hunger(w, id, &a, rate);
+                crate::drink::thirst(w, id, &a, st, rate);
             }
         }
         let (health, speed) = factors(w, id, &a);

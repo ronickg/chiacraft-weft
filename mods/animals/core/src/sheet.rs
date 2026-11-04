@@ -280,6 +280,20 @@ fn species(w: &mut String, s: &Species) {
         _ => String::new(),
     };
     let _ = writeln!(w, "| a meal that fills it | {} kg{kills} |", trim((s.bio.mass * needs::MEAL) as f64, 3));
+    // Water (`needs::drink_lasts`): how much it drinks of what it needs, and how long a drink lasts.
+    let need = needs::litres_a_day(s, s.bio.mass);
+    let drinks = match needs::drink_lasts(s, s.bio.mass) {
+        Some(secs) => format!(
+            "{}% of its {} L a day; a drink lasts {} min, thirsty after {}",
+            trim(needs::drinks(s) as f64 * 100.0, 0),
+            trim(need as f64, 3),
+            trim(secs as f64 / 60.0, 0),
+            trim(secs as f64 * (1.0 - needs::THIRSTY) as f64 / 60.0, 0)
+        ),
+        None if s.in_water() => "never: it lives in the water".to_string(),
+        None => "never".to_string(),
+    };
+    let _ = writeln!(w, "| drinks | {drinks} |");
     // How much of its food grows at home, season by season (`vitals::forage::season_lushness`):
     // how many come there and how fed (`notes/ECOLOGY.md`, part 7).
     if s.forages_wild() {
@@ -364,6 +378,28 @@ fn shared(w: &mut String) {
     let _ = writeln!(w, "| a meal that fills it | {}% of its mass: a kill, a mouthful off the ground, by mass |", trim(needs::MEAL as f64 * 100.0, 0));
     let _ = writeln!(w, "| a wild one arrives fed | {}% where its food grows least (or its prey are thinnest), all of it where most |", trim(needs::ARRIVES_FED as f64 * 100.0, 0));
     let _ = writeln!(w, "| starving, a wild one dies in | {} s on an empty stomach |", needs::STARVES_SECS);
+    let _ = writeln!(
+        w,
+        "| water needed a day | {} · kg^{} L (a mammal's), x{} cold-blooded; a species drinks its share of it (`DRINKS`) |",
+        needs::WATER.0,
+        needs::WATER.1,
+        needs::COLD_BLOODED_WATER
+    );
+    let _ = writeln!(
+        w,
+        "| a drink lasts | {}% of its mass spared, a real day of drinking {} s of play |",
+        trim(needs::SPARE as f64 * 100.0, 0),
+        needs::DAY_SECS
+    );
+    let _ = writeln!(
+        w,
+        "| thirsty | under {}% water, drinking {}% a gulp every {} s until {}%; parched, a wild one dies in {} s |",
+        trim(needs::THIRSTY as f64 * 100.0, 0),
+        trim(needs::GULP as f64 * 100.0, 0),
+        trim(needs::GULP_TICKS as f64 / 20.0, 1),
+        trim(needs::SLAKED as f64 * 100.0, 0),
+        needs::PARCHED_SECS
+    );
     let _ = writeln!(w);
 
     let _ = writeln!(w, "| Breeding and life (`life.rs`) | |\n|---|---|");

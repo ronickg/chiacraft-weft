@@ -34,7 +34,7 @@ pub fn init(r: &mut Registry) {
         }
     });
     r.shaped(&CRAFTING, "spyglass", 1, &["  g", " i ", "i  "], &[('g', "#glass"), ('i', "#ingots/iron")]);
-    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,away,habitats,hungry)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
+    r.command("animal", "[action:word(show,tame,points,wild,here,gift,bite,ko,love,hurry,nest,evolve,fire,frost,lightning,venom,scar,age,speed,census,reset,away,habitats,hungry,thirsty)] [count:int] [habitat:word(grassland,forest,taiga,snow,desert,mountains)]", command)
         .permission(permission::GAME_MASTER);
 }
 
@@ -298,6 +298,14 @@ fn animal_screen(ui: &mut Ui) {
                     Arg::Int(a.bond as i64),
                 ],
             );
+        });
+        // Its water, for one that drinks (`drink.rs`).
+        ui.text_bind(|c, t| {
+            let Some(a) = c.menu_component(&ANIMAL) else { return };
+            if a.species().is_none_or(|s| animals_core::needs::drinks(s) <= 0.0) {
+                return;
+            }
+            t.set("screen.animals.water", &[Arg::Int(((1.0 - a.thirst.clamp(0.0, 1.0)) * 100.0).round() as i64)]);
         });
         // Its body: how it feels in this air against its comfort, and its condition.
         ui.text_bind(|c, t| {
@@ -619,6 +627,13 @@ fn command(cmd: &mut ServerCommand) {
             let share = cmd.int("count").unwrap_or(20).clamp(0, 100) as f32 / 100.0;
             if let Some(a) = w.component_mut(id, &ANIMAL) {
                 a.food = (a.stat(species::FOOD) * share).round() as u16;
+            }
+        }
+        // Its water down to `count` percent (testing drinking: `drink.rs`).
+        "thirsty" => {
+            let share = cmd.int("count").unwrap_or(20).clamp(0, 100) as f32 / 100.0;
+            if let Some(a) = w.component_mut(id, &ANIMAL) {
+                a.thirst = 1.0 - share;
             }
         }
         "age" => {

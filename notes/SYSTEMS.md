@@ -72,6 +72,7 @@ built, it gets its row below and its arrows above.
 | Climates | `vitals::climate::BIOMES`, each from a real place (`reports/ecology/Biome climates.md`) | same | the research | the air, the weather; biomes set it (`base_api::climate` in `worldgen.rs`, `cretaceous.rs`) |
 | Food kinds, diets | `vitals::food::Category`, `Species::eats` | `FOODS` rows, species rows | the research | foraging, the sheets, the animal screen's kind |
 | Foraging | `vitals::forage::SOURCES`, `mods/animals/src/forage.rs` | `SOURCES` rows | diets, plants (grazed grass grows back), hunger | animals' food and condition |
+| Drinking | `animals_core::needs` (`WATER`, `DRINKS`, `drink_lasts`), `mods/animals/src/drink.rs` | `WATER`, `SPARE`, `DAY_SECS`, `THIRSTY`, `SLAKED`, `GULP`, `PARCHED_SECS`, `DRINKS` rows | masses (genes, growth), cold blood, comfort (faster out of it), rain on it, water blocks near | `Animal::thirst`, condition (`comfort::condition`: parched is as weak as starving), wild ones dying of thirst, its screen's water |
 | Food off the ground | `vitals::forage::{DROPPED, dropped}`, `forage.rs` (`ground_food`), `World::dropped_item` | food items' kinds and portions (`FOODS`), `DROPPED`, `needs::MEAL` | dropped items, diets, freshness (spoiled is carrion), masses | animals' food; hunters eat it before hunting; items taken off the ground |
 | Hunting | `Species::{prey, hungry_in_the_wild}`, `OTHER_PREY`, `mods/animals/src/hunt.rs` | `prey` per species row | diets, masses (genes, growth), families, hunger | wild hunters' food, prey running (`wary`), kills (`ENTITY_DIED`) |
 | Hunters' hunger | `animals_core::needs` (`MEAL`, `fills`, `prey_in`), `hunt::prey_lush`, `animal::arrive` | `MEAL`, `ARRIVES_FED`, `STARVES_SECS` | prey at home, their food this season (`forage::season_lush`), masses | how fed a wild hunter arrives, what a kill fills (by the prey's mass against its own) |
@@ -105,7 +106,8 @@ built, it gets its row below and its arrows above.
   panics at start; a biome that sets none is a mild temperate place raining a quarter of the
   days); the species living there (comfort, eggs: `places.rs` checks); the sheet.
 - **A species, or a new one**: its row in `species.rs` with comfort, breeding seasons and
-  habitats (each habitat needs a climate); the species sheet; `places.rs` checks it on its own.
+  habitats (each habitat needs a climate); how much of its water it drinks (`needs::DRINKS`; not
+  listed, all of it); the species sheet; `places.rs` checks it on its own.
 - **A food, or a new food item**: a row in `vitals::food::FOODS` (an item without one can't be
   eaten; the game test `every_food_has_nutrition` fails); `NUTRITION` and `FRESHNESS` on the
   item (`items.rs`); `balance.rs` (well fed from a few foods); the sheet. Its kind and portion
@@ -150,6 +152,8 @@ built, it gets its row below and its arrows above.
 | Plant eaters find food where they live | `animals/core/tests/places.rs` | a plant eater whose food grows in fewer than two seasons in one of its habitats |
 | Hunters fill up on their prey at home | same | a hunter whose biggest prey at home takes more than ten kills to fill it |
 | Most of every diet is in the game | same | a species with under half its diet growing or on the ground as items |
+| A drink lasts a while | same | a species that would be thirsty again in under 10 minutes |
+| Desert animals barely drink | same | a species living only in dry places that drinks over half its water |
 | One growing pace | `animals/core/tests/places.rs` | `vitals::plants::GROWING` and `animals_core::biology::GROWING` apart |
 | Rain follows the shares | `vitals/src/climate.rs` | the rain schedule raining more or less often than a season's share |
 | Every habitat has a climate | `animals/core/tests/places.rs` | a species living in a biome with no climate |

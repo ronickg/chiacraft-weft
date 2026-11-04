@@ -95,10 +95,12 @@ pub fn lush(w: &World, s: &Species, pos: [i32; 3]) -> f32 {
     vitals::forage::lushness(|c| s.eats(c), g.mean_air, g.soil).unwrap_or(1.0)
 }
 
-/// Whether it is foraging (a resting animal settles only when it isn't: hungry, it eats first).
+/// Whether it is foraging or drinking (a resting animal settles only when it isn't: hungry or
+/// thirsty, it eats and drinks first).
 pub fn busy(w: &World, id: u64) -> bool {
-    w.component(id, &FORAGE)
-        .is_some_and(|f| f[3] != 0.0 && !f[0].is_nan())
+    crate::drink::busy(w, id)
+        || w.component(id, &FORAGE)
+            .is_some_and(|f| f[3] != 0.0 && !f[0].is_nan())
 }
 
 /// What it would eat of the block `state`, if anything.
@@ -183,10 +185,14 @@ fn eat_item(w: &World, id: u64, a: &animal::Animal, item: u64, grams: f32) {
     );
 }
 
-/// A goal: hungry, it goes to the nearest food of its diet (on the ground first, then growing)
-/// and eats there; it takes the turn while it does. With nothing near it lets the next goal
+/// A goal: thirsty, it drinks first (`drink::drink`); hungry, it goes to the nearest food of its
+/// diet (on the ground first, then growing) and eats there; it takes the turn while it does. With nothing near it lets the next goal
 /// (wandering) take it elsewhere.
 pub fn forage(w: &World, id: u64, st: &EntityState) -> bool {
+    // Thirst first: water is the more urgent (`drink.rs`).
+    if crate::drink::drink(w, id, st) {
+        return true;
+    }
     let Some(a) = w.component(id, &ANIMAL).copied() else { return false };
     let Some(s) = a.species() else { return false };
     let Some(mut f) = w.component(id, &FORAGE).copied() else { return false };

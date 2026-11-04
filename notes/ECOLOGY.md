@@ -445,7 +445,13 @@ and cactus.**
 - **Diets:** every species' row has its researched diet as shares (`Species::eats`). Its label
   (carnivore, omnivore, herbivore) follows from the plant share.
 - **The sheets:** `SPECIES.md` lists each diet.
-- **Not yet:** taming foods still come from each species' item list; water as a need.
+- **Water (2026-11-03):** each species needs its own water, `0.099 · kg^0.9` litres a day (a
+  cold-blooded one a fifth), and drinks its share of it (`animals_core::needs::DRINKS`: a deer
+  70%, a vole 10%, the desert's Kryptobaatar and lizard 10%, fish none). A drink lasts it the 15%
+  of its mass it can spare over what it drinks a day, a real day being 600 s on the hunger meter's
+  clock: a deer is thirsty every 17 minutes, a vole every 54, the lizard every 4½ hours. The goal is
+  `mods/animals/src/drink.rs`, part 5.
+- **Not yet:** taming foods still come from each species' item list.
 
 
 - **The categories:** grass, leaves, water plants, fruit, seeds, roots, lichen, fungi, insects, meat, fish, carrion and water. Water plants, lichen and fungi came from the research: the capybara lives on water plants, reindeer on lichen in winter, and the taiga's fungi feed rodents and boar.
@@ -500,10 +506,19 @@ and cactus.**
   ground (`places.rs`). Testing: `/tk drop <item> <pos> [count]`. Seen: a hungry deer ate five
   dropped berries (1% of its food each) and wheat seeds; a hungry fox with mice about went for a
   dropped porkchop (+32%); mice ate berries and seeds.
+- **Drinking (2026-11-03):** the animals that get hungry get thirsty too, once a second, faster
+  out of their comfort; rain on them and wading slake them a little. Under half its water an
+  animal walks to the nearest open water within 16 blocks it can stand beside, and drinks a
+  quarter a gulp until slaked, before it forages (`drink.rs`). Parched, it's as weak as starving
+  (`comfort::condition` takes the worse), and a wild one dies of thirst in a game day. Its screen
+  shows its water. The checks: a drink lasts every drinker 10 minutes or more, and one living only
+  in dry places drinks at most half its water (`places.rs`). Testing: `/animal thirsty [percent]`.
+  Seen: a deer at 30% water and 30% food walked to a pool 9 blocks off, drank to full in three
+  gulps, then ate dropped berries; a hare at 20% drank there too.
 - **Not yet:**
-  - **Hunters:** they get hungry in the wild with prey, part 6.
-  - **Drinking.**
-  - **Unloaded areas:** a wild animal's hunger doesn't run while its area is unloaded.
+  - **Unloaded areas:** a wild animal's hunger and thirst don't run while its area is unloaded.
+  - **Remembered water:** an animal finds water only within 16 blocks; a herd doesn't know its
+    waterholes (part of migration, later).
 
 
 - **Hunger:** wild animals get the food meter tames have, using it up at the species' rate.
