@@ -787,7 +787,12 @@ def raised(a, m, light, face, shade, rim=OUTLINE, pressed=False, shade_px=2):
         down |= d
     down &= inner
     if pressed:
-        paint(a, up | (np.roll(up, 1, 0) & inner), light)  # the sunk edge, 2 px, on top
+        # Sunk: the same face moved down exactly 1 px (2 dark rows on top, 1 at the bottom, where
+        # a raised one has 1 light and 2 shade), so its label moving down 1 px stays centred.
+        paint(a, up | (np.roll(up, 1, 0) & inner), light)
+        bottom = np.zeros_like(m)
+        bottom[:-1] = ring[1:]
+        paint(a, bottom & inner, light)
     else:
         paint(a, down, shade)
         paint(a, up, light)

@@ -112,7 +112,8 @@ for prefix, w, h in (("category", 32, 24), ("list_row", 64, 24)):
         else:
             light, face, shade = k.FACES["second" if state == "normal" else "second_hover"]
         a = raised_part(w, h, light, face, shade, k.GLOW if state == "hover" else k.OUTLINE, state == "pressed")
-        save(prefix + suffix, a, [NINE, border(3)])
+        # The chosen one is drawn pressed (sunk 1 px): its label goes down with it.
+        save(prefix + suffix, a, [NINE, border(3)] + ([("selected_offset", "0.5")] if suffix == "" else []))
 
 # ---------------------------------------------------------------- tabs
 # A tab stands on the window's frame (the window draws over its bottom 4 px), so it has no bottom
