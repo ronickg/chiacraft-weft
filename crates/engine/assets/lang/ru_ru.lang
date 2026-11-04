@@ -296,6 +296,10 @@ command.regions.done = регионы {0}
 command.seed.done = сид: {0}
 command.rule.value = {0} = {1}
 command.rule.unknown = нет правила {0}
+command.rule.not_bool = {0}: true или false, а не {1}
+command.rule.not_choice = {0}: одно из {2}, а не {1}
+command.rule.not_number = {0}: число от {2} до {3}, а не {1}
+command.rule.held = {0} задано для этого запуска (--config) и остаётся {1}
 command.error.no_player = нет игрока {0}
 command.error.unknown_selector = неизвестный селектор {0}
 command.error.bad_selector = неверный селектор {0}
