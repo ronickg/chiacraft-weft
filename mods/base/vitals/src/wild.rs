@@ -95,7 +95,7 @@ const SWAMP: &[&str] = &["base:swamp"];
 const MOUNTAINS: &[&str] = &["base:mountains"];
 const BEACH: &[&str] = &["base:beach"];
 
-pub const FLOWERS: [Flower; 45] = [
+pub const FLOWERS: [Flower; 46] = [
     // The Konza Prairie's tallgrass.
     f("base:purple_coneflower", PLAINS, Ground::Soil, SU),
     f("base:black_eyed_susan", PLAINS, Ground::Soil, SU),
@@ -141,6 +141,9 @@ pub const FLOWERS: [Flower; 45] = [
     f("base:alligator_flag", SWAMP, Ground::Soil, SU),
     // Davos's subalpine meadows.
     f("base:alpenrose", MOUNTAINS, Ground::Soil, SU),
+    // The tropical forest's heliconia (lobster-claw), in bloom through Manaus's rains (summer and
+    // autumn, its months six on).
+    f("base:heliconia", &["base:tropical_forest"], Ground::Soil, SU | AU),
     f("base:gentian", MOUNTAINS, Ground::Soil, SP | SU),
     f("base:edelweiss", MOUNTAINS, Ground::Soil, SU),
     f("base:globeflower", MOUNTAINS, Ground::Soil, SU),
@@ -192,7 +195,7 @@ impl Turn {
 /// Every tree's leaves and how they turn: the conifers, palms and the tree fern stay green;
 /// birches and ginkgos go gold; oaks, acacias, mesquite and the swamp cypress (a deciduous conifer)
 /// go russet.
-pub const LEAVES: [(&str, Turn); 19] = [
+pub const LEAVES: [(&str, Turn); 22] = [
     ("base:oak_leaves", Turn::Orange),
     ("base:birch_leaves", Turn::Yellow),
     ("base:spruce_leaves", Turn::Evergreen),
@@ -204,6 +207,9 @@ pub const LEAVES: [(&str, Turn); 19] = [
     // The tropical forest's, evergreen as the forest is.
     ("base:brazil_nut_leaves", Turn::Evergreen),
     ("base:cacao_leaves", Turn::Evergreen),
+    ("base:andiroba_leaves", Turn::Evergreen),
+    ("base:matamata_leaves", Turn::Evergreen),
+    ("base:ipe_leaves", Turn::Evergreen),
     // Drawn in its own colours (white bracts), so its tint isn't used (`blocks.rs`, `grove`).
     ("base:dogwood_leaves", Turn::Orange),
     // The shrubs', in their own colours too (`blocks.rs`).
@@ -224,13 +230,20 @@ pub const LEAVES: [(&str, Turn); 19] = [
 /// white bracts (April-May); the umbrella thorn's cream puffballs, as its rains begin; honey
 /// mesquite's yellow catkins (April-June); the creosote bush's small yellow flowers (February-April);
 /// the willow's catkins (March-April, with the first leaves).
-pub const BLOOMS: [(&str, u8); 5] = [
+pub const BLOOMS: [(&str, u8); 6] = [
     ("base:dogwood_leaves", SP),
     ("base:acacia_leaves", SP),
     ("base:mesquite_leaves", SP),
     ("base:creosote_leaves", SP),
     ("base:willow_leaves", SP),
+    // The golden ipê (Handroanthus serratifolius) flowers leafless at the dry season's end
+    // (August-September at Manaus: the game's spring, its months six on), its whole crown yellow.
+    ("base:ipe_leaves", SP),
 ];
+
+/// Leaves drawn in their own colours, not tinted by the biome: the tropical canopy's, each crown a
+/// different green (Manaus's canopy from above is a patchwork, research's reference 05).
+pub const OWN_COLOURS: [&str; 3] = ["base:andiroba_leaves", "base:matamata_leaves", "base:ipe_leaves"];
 
 /// The seasons `leaves` bloom in (`BLOOMS`), if they do.
 pub fn blooms(leaves: &str) -> Option<u8> {

@@ -242,6 +242,9 @@ pub const RECIPES: &[Recipe] = &[
     // firme): 30-50 m on a dead-straight trunk bare for two thirds, buttressed at the foot, its
     // umbrella crown above the canopy.
     BRAZIL_NUT,
+    ANDIROBA,
+    MATAMATA,
+    IPE,
     // Cacao (Theobroma cacao), the Amazon's understorey tree: 4-8 m, slender, branching low
     // into a few limbs held out under a crown of big drooping leaves.
     Recipe {
@@ -264,12 +267,83 @@ pub const RECIPES: &[Recipe] = &[
     },
 ];
 
+/// The tropical canopy (28-32 blocks): andiroba's broad dark crown on a tall clean trunk.
+pub const ANDIROBA: Recipe = Recipe {
+    log: "base:andiroba_log",
+    height: 28.0,
+    size_var: 0.12,
+    width: 1.3,
+    width_loss: 0.06,
+    drift: 2.0,
+    branch_start: 0.62,
+    branch_every: 0.7,
+    branch_count: 2,
+    branch_angle: 55.0,
+    branch_width: 0.6,
+    orders: 2,
+    branch_len: 0.3,
+    leaf_r: 3.2,
+    leaf_ry: 1.8,
+    ragged: 0.3,
+    reach: 8,
+    max_height: 40,
+    flare: 0.2,
+    flare_up: 1.5,
+    ..Recipe::BASE
+};
+
+/// Matamatá: Manaus's commonest canopy tree, a slimmer trunk and a narrower, rounder crown.
+pub const MATAMATA: Recipe = Recipe {
+    log: "base:matamata_log",
+    height: 26.0,
+    size_var: 0.15,
+    width: 1.0,
+    width_loss: 0.06,
+    drift: 3.0,
+    branch_start: 0.66,
+    branch_every: 0.6,
+    branch_count: 2,
+    branch_angle: 45.0,
+    branch_width: 0.55,
+    orders: 2,
+    branch_len: 0.25,
+    leaf_r: 2.6,
+    leaf_ry: 2.0,
+    ragged: 0.35,
+    reach: 8,
+    max_height: 38,
+    ..Recipe::BASE
+};
+
+/// The golden ipê: a tall straight trunk and a high, open, spreading crown.
+pub const IPE: Recipe = Recipe {
+    log: "base:ipe_log",
+    height: 30.0,
+    size_var: 0.12,
+    width: 1.1,
+    width_loss: 0.06,
+    drift: 2.0,
+    branch_start: 0.7,
+    branch_every: 0.55,
+    branch_count: 3,
+    branch_angle: 50.0,
+    branch_width: 0.55,
+    orders: 2,
+    branch_len: 0.3,
+    leaf_r: 2.8,
+    leaf_ry: 1.4,
+    ragged: 0.45,
+    reach: 8,
+    max_height: 42,
+    ..Recipe::BASE
+};
+
 /// A grown Brazil nut (`RECIPES`' own row), the world's (the giant scatter, `GIANT_KINDS`).
 pub const BRAZIL_NUT: Recipe = Recipe {
     log: "base:brazil_nut_log",
-    height: 38.0,
-    size_var: 0.2,
-    width: 2.4,
+    height: 50.0,
+    size_var: 0.15,
+    width: 3.0,
     width_loss: 0.06,
     leaf_width: 0.7,
     drift: 1.0,
@@ -283,12 +357,13 @@ pub const BRAZIL_NUT: Recipe = Recipe {
     orders: 2,
     branch_len: 0.28,
     taper: 0.4,
-    leaf_r: 2.6,
-    leaf_ry: 1.3,
+    leaf_r: 3.0,
+    leaf_ry: 1.4,
     ragged: 0.3,
+    // The giant scatter's reach (`worldgen.rs`): a crown up to 24 across.
     reach: 12,
-    max_height: 52,
-    flare: 0.5,
+    max_height: 70,
+    flare: 0.55,
     flare_up: 3.0,
     lobes: 0.35,
     ..Recipe::BASE

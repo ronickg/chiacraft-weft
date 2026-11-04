@@ -91,11 +91,16 @@ pub static DOGWOOD_LOG: Block = Block::named("dogwood_log");
 pub static DOGWOOD_LEAVES: Block = Block::named("dogwood_leaves");
 /// The tropical forest's lianas, hanging from the crowns (`worldgen.rs`, `lianas`).
 pub static LIANA: Block = Block::named("liana");
+/// A Brazil nut's buttress fin, and the bromeliads on its limbs (`worldgen.rs`, `giant_foot`).
+pub static BRAZIL_NUT_BUTTRESS: Block = Block::named("brazil_nut_buttress");
+pub static BROMELIAD: Block = Block::named("bromeliad");
 pub static MOSSY_SEQUOIA_LOG: Block = Block::named("mossy_sequoia_log");
 /// Bracken and the woods' ferns, under the trees (`vitals::layers`).
 pub static FERN: Block = Block::named("fern");
 /// The forest floor's blocks (`vitals::layers`): fallen leaves, a moss carpet, stony bare dirt.
 pub static LEAF_LITTER: Block = Block::named("leaf_litter");
+/// The tropical forest's deep litter (`vitals::layers`).
+pub static DEEP_LEAF_LITTER: Block = Block::named("deep_leaf_litter");
 pub static MOSS_BLOCK: Block = Block::named("moss_block");
 pub static COARSE_DIRT: Block = Block::named("coarse_dirt");
 /// The shrubs' own leaves, in their own colours: willow, juniper, creosote bush.
@@ -104,6 +109,9 @@ pub static JUNIPER_LEAVES: Block = Block::named("juniper_leaves");
 pub static CREOSOTE_LEAVES: Block = Block::named("creosote_leaves");
 /// Grass two blocks tall (the prairie's big bluestem, the llanos' grasses): `half` lower, upper.
 pub static TALL_GRASS_DOUBLE: Block = Block::named("tall_grass_double");
+/// The tropical forest's big-leaved plants, two blocks tall (`half` lower, upper).
+pub static BANANA: Block = Block::named("banana");
+pub static PHILODENDRON: Block = Block::named("philodendron");
 /// Mushrooms at the foot of trunks (`vitals::layers`): honey fungus, chanterelles, ceps.
 pub static HONEY_FUNGUS: Block = Block::named("honey_fungus");
 pub static CHANTERELLE: Block = Block::named("chanterelle");
@@ -162,13 +170,19 @@ fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape
 /// (`tree_recipes::SEQUOIA`), its cones planting it.
 /// The tropical forest's (Manaus's terra firme): the Brazil nut, its emergent, grown from branches
 /// (`tree_recipes::BRAZIL_NUT`), its nuts a food; cacao, its understorey tree, its pods a food.
-const WOODS: [(&str, Option<&str>, &str); 6] = [
+/// The tropical forest's canopy, 28-32 blocks up, three of Manaus's commonest trees, each in its
+/// own colours (`vitals::wild::OWN_COLOURS`): andiroba's dark glossy crown, matamatá's olive one
+/// (the commonest tree there), ipê's light green that turns all golden yellow in its spring bloom.
+const WOODS: [(&str, Option<&str>, &str); 9] = [
     ("mesquite", Some("flat_tree"), "mesquite_pod"),
     ("acuri_palm", Some("palm_tree"), "acuri_nut"),
     ("moriche_palm", Some("palm_tree"), "moriche_fruit"),
     ("sequoia", Some("cone_tree"), "sequoia_cone"),
     ("brazil_nut", None, "brazil_nut"),
     ("cacao", None, "cacao_pod"),
+    ("andiroba", None, "andiroba_seed"),
+    ("matamata", None, "matamata_fruit"),
+    ("ipe", None, "ipe_seed"),
 ];
 
 /// The sapling a tree's fruit plants (`WOODS`), for fruit that's a food (`items.rs` registers
@@ -292,16 +306,21 @@ fn planks(r: &mut Registry, h: &'static Block, wood: &str) {
 /// Leaves that drop `sapling` (a time in 20) and, for our trees, `fruit` (a time in 20).
 fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fruit: Option<&str>) {
     let b = r.block(handle).sound_group("grass").texture(tex);
-    bloom(b, handle.name(), leak(format!("{tex}_bloom")), leak(tex.to_string()))
+    let b = bloom(b, handle.name(), leak(format!("{tex}_bloom")), leak(tex.to_string()))
         .hardness(0.2)
         .cutout()
         // Faces between two leaves of one tree kind aren't drawn (each was drawn twice): a crown
         // keeps its outer shell and its holes (Researcher's performance report, item 9).
         .cull_same()
-        .opacity(1)
-        // Its tint by how it turns in autumn (`vitals::wild::LEAVES`).
-        .tint(base_api::trees::leaf_tint(vitals::wild::turn(handle.name())))
-        .tag("leaves")
+        .opacity(1);
+    // Its tint by how it turns in autumn (`vitals::wild::LEAVES`), but for leaves drawn in their
+    // own colours (the tropical canopy's, `vitals::wild::OWN_COLOURS`).
+    let b = if vitals::wild::OWN_COLOURS.contains(&handle.name()) {
+        b
+    } else {
+        b.tint(base_api::trees::leaf_tint(vitals::wild::turn(handle.name())))
+    };
+    b.tag("leaves")
         .redstone_blocker()
         .mineable("shears")
         .tab(&crate::tabs::NATURAL);
@@ -566,6 +585,21 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     r.loot(&LIANA)
         .pool(Pool::new().when(Cond::Chance(0.5)).item("plant_fibre"));
+    // A giant's buttress: a plank of wood flaring from the trunk's foot, its own block so its
+    // grain sweeps up; broken, it gives the log.
+    r.block(&BRAZIL_NUT_BUTTRESS)
+        .sound_group("wood")
+        .textures("log_brazil_nut_top", "buttress_brazil_nut", "log_brazil_nut_top")
+        .hardness(2.0)
+        .mineable("axe")
+        .tab(&crate::tabs::NATURAL);
+    r.loot(&BRAZIL_NUT_BUTTRESS).pool(Pool::new().entry(Entry::item("brazil_nut_log")));
+    // Bromeliads perched on the giants' limbs (epiphytes: rooted in the bark, not the ground).
+    r.block(&BROMELIAD)
+        .sound_group("grass")
+        .texture("bromeliad")
+        .plant()
+        .tab(&crate::tabs::NATURAL);
 
     // Vanilla numbers: water steps every 5 ticks and reaches 7 blocks, lava every 30 and 3.
     r.liquid(&WATER)
@@ -830,6 +864,7 @@ pub fn register(r: &mut Registry) {
     // The forest floor (`vitals::layers`): soil like dirt, so plants grow on it.
     for (b, top, side, bottom, sound) in [
         (&LEAF_LITTER, "leaf_litter_top", "leaf_litter_side", "dirt", "grass"),
+        (&DEEP_LEAF_LITTER, "leaf_litter_deep", "leaf_litter_side", "dirt", "grass"),
         (&MOSS_BLOCK, "moss_block_top", "moss_block_side", "dirt", "grass"),
         (&COARSE_DIRT, "coarse_dirt", "coarse_dirt", "coarse_dirt", "gravel"),
     ] {
@@ -867,6 +902,19 @@ pub fn register(r: &mut Registry) {
         .prop("half", ["lower", "upper"])
         .states(|p, s| s.texture(if p.get("half") == "upper" { "tall_grass_upper" } else { "tall_grass_lower" }))
         .no_item();
+    // Big-leaved plants two blocks tall, in their own colours: the upper half on the lower, which
+    // takes it when broken.
+    r.tag("big_leaf_soil", &["#plant_soil", "banana", "philodendron"]);
+    for (b, name) in [(&BANANA, "banana"), (&PHILODENDRON, "philodendron")] {
+        r.block(b)
+            .sound_group("grass")
+            .plant()
+            .needs_below("#big_leaf_soil")
+            .prop("half", ["lower", "upper"])
+            .states(move |p, s| s.texture(&format!("{name}_{}", p.get("half"))))
+            .no_item();
+        r.loot(b).pool(Pool::new().when(Cond::Chance(vitals::clothing::FIBRE_CHANCE)).item("plant_fibre"));
+    }
     r.loot(&TALL_GRASS_DOUBLE)
         .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
         .pool(

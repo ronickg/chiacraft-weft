@@ -500,6 +500,9 @@ mod tests {
                         .all(|b| b.0 >= -reach && b.0 <= reach + 1 && b.2 >= -reach && b.2 <= reach + 1),
                     "{name} {seed}: out of reach"
                 );
+                // A scatter's shape keeps 4,096 blocks; past that the engine drops the rest
+                // (`dim.rs`), and a giant would lose its crown (the sequoia did).
+                assert!(t.len() <= 4096, "{name} {seed}: {} blocks, over a shape's 4,096", t.len());
             }
         }
     }

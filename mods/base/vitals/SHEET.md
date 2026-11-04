@@ -283,6 +283,9 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | base:mesquite_sapling | mesquite | 12, 25-38, 48 | Dry | -15 °C | - | the game's | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (sp su au), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:brazil_nut_sapling | Brazil nut (Bertholletia excelsa) | 18, 25-32, 38 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), scrubland (su), floodplain (su), crags (su) |
 | base:cacao_sapling | cacao (Theobroma cacao) | 15, 22-30, 35 | Moderate | 0 °C | - | the game's | plains (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), ocean (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
+| base:andiroba_sapling | andiroba (Carapa guianensis) | 18, 24-32, 38 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), scrubland (su), floodplain (su), crags (su) |
+| base:matamata_sapling | matamatá (Eschweilera coriacea) | 18, 24-32, 38 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), scrubland (su), floodplain (su), crags (su) |
+| base:ipe_sapling | golden ipê (Handroanthus serratifolius) | 15, 22-32, 40 | Dry | -1 °C | - | the game's | plains (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (su au), beach (su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
 | base:acuri_palm_sapling | acuri palm (Attalea phalerata) | 15, 24-32, 40 | Moderate | 0 °C | - | the game's | plains (su), desert (su), savanna (sp su au), swamp (su au), tropical_forest (su au wi), ocean (su), scrubland (su), floodplain (su au), crags (su) |
 | base:sequoia_sapling | giant sequoia (Sequoiadendron giganteum) | 5, 15-24, 35 | Moderate | -24 °C | - | the game's | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (su au), swamp (su au), tropical_forest (su au wi), mountains (su), ocean (sp su au wi), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | base:moriche_palm_sapling | moriche palm (Mauritia flexuosa) | 15, 24-32, 40 | Wet | 0 °C | - | the game's | plains (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), tropical_forest (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (su) |
@@ -448,6 +451,8 @@ On the ground, animals eat dropped food of their diet one item a mouthful: every
 | base:moriche_fruit | fruit | 50 |
 | base:brazil_nut | seeds | 30 |
 | base:cacao_pod | fruit | 40 |
+| base:andiroba_seed | seeds | 20 |
+| base:matamata_fruit | seeds | 20 |
 | animals:araucaria_cone | seeds | 50 |
 | animals:ginkgo_seed | fruit | 10 |
 

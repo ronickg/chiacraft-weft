@@ -39,6 +39,10 @@ pub struct Layers {
     /// The share of the biome's trees with lianas hanging from their crowns (the tropical
     /// forest's climbers: a quarter to a half of its canopy trees carry them).
     pub lianas: f32,
+    /// Big-leaved plants two blocks tall (wild bananas, philodendrons), the share of the bare soil
+    /// they take after the ferns, and which, by weight.
+    pub big_leaves: f32,
+    pub big_leaf_kinds: &'static str,
 }
 
 const fn l(
@@ -64,6 +68,8 @@ const fn l(
         mushrooms: "",
         mushroom_cover: 0.0,
         lianas: 0.0,
+        big_leaves: 0.0,
+        big_leaf_kinds: "",
     }
 }
 
@@ -115,7 +121,10 @@ pub const LAYERS: [Layers; 11] = [
         mushroom_cover: 0.06,
         young_kinds: "base:cacao_log:3 base:brazil_nut_log:1 base:acuri_palm_log:1",
         lianas: 0.4,
-        ..l("base:tropical_forest", "base:leaf_litter:3 base:podzol:1", 0.4, 0.1, 0.25, "base:cacao_leaves", 0.3)
+        // Ronald, 11-04: "A + C's giants + some B": a few of B's big-leaved plants on A's floor.
+        big_leaves: 0.03,
+        big_leaf_kinds: "base:philodendron:2 base:banana:1",
+        ..l("base:tropical_forest", "base:deep_leaf_litter:3 base:leaf_litter:1 base:podzol:1", 0.6, 0.1, 0.25, "base:cacao_leaves", 0.3)
     },
 ];
 
