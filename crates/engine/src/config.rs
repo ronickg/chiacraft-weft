@@ -538,6 +538,14 @@ pub fn load_world(saved: &[(String, f64)]) {
                 .map_or(d.default, |s| s.1),
         );
     }
+    // A world rule set for the run (`--config core:mob_spawning=0`) holds in the worlds it opens
+    // too: the world's own value came after it, and the hold (`held_for_run`) then refused the
+    // script's `/rule core:mob_spawning 0`, so monsters spawned in every look on the PC (11-04).
+    for (id, value, _) in OVERRIDES.lock().unwrap().iter() {
+        if def(*id).is_some_and(|d| d.scope == scope::WORLD) {
+            put_value(*id, value);
+        }
+    }
 }
 
 /// Settings the engine itself reads: the client's options, `core:mob_spawning` for worlds, and
