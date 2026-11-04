@@ -961,6 +961,8 @@ impl Running {
         ) {
             Ok(mut client) => {
                 client.sent = load_chat_history(&self.settings.run_dir);
+                // The synced settings the player changes here are this world's.
+                crate::config::playing_in(Some(server.configs.clone()));
                 self.game = Some(Game { client, server: Some(server), world, identity });
                 self.screens.clear();
                 self.hud.invalidate();
@@ -985,6 +987,8 @@ impl Running {
             return;
         }
         let Some(mut g) = self.game.take() else { return };
+        // Away from it: the visited world's rules stay out of it.
+        crate::config::playing_in(None);
         g.client.leave();
         self.gpu.wait_idle();
         g.client.destroy(&mut *self.gpu);
@@ -1037,6 +1041,7 @@ impl Running {
 
     fn leave_world_silent(&mut self) {
         if let Some(mut g) = self.game.take() {
+            crate::config::playing_in(None);
             if g.server.is_none() {
                 // A remote server's synced settings were in force; back to our own.
                 crate::config::left_server(&self.settings.run_dir);
