@@ -184,7 +184,7 @@ struct Placed {
 #[derive(Default)]
 pub struct Hud {
     pub ui: Ui,
-    key: Option<(bool, usize, [u32; 4], usize, bool, u32, u8, (i32, i32), (u32, u32, u8))>,
+    key: Option<(bool, usize, [u32; 4], usize, bool, u32, u8, (i32, i32), (u32, u32, u8), bool)>,
     /// Player overrides from `config/hud.txt` by element name.
     layout: rustc_hash::FxHashMap<String, Placement>,
     file: std::path::PathBuf,
@@ -303,7 +303,19 @@ impl Hud {
         Some((self.ui.nodes[row].rect.y - top - 3.0).max(0.0))
     }
 
-    pub fn update(&mut self, client: &Client, debug: bool, groups: u32, chat_open: bool, lang: &Lang, input: &crate::input::Input) -> bool {
+    /// `menu_open`: a screen other than the chat is open, which the crosshair doesn't show over
+    /// (it stood between the sleeping screen's title and its button, the audit, 11-04).
+    #[allow(clippy::too_many_arguments)]
+    pub fn update(
+        &mut self,
+        client: &Client,
+        debug: bool,
+        groups: u32,
+        chat_open: bool,
+        menu_open: bool,
+        lang: &Lang,
+        input: &crate::input::Input,
+    ) -> bool {
         let chat_visible = if chat_open {
             0
         } else {
@@ -332,6 +344,7 @@ impl Hud {
             client.mode as u8,
             size,
             (held.item, held.data, fade),
+            menu_open,
         );
         if self.key == Some(key) {
             return false;
@@ -357,6 +370,7 @@ impl Hud {
                 .any(|p| p.1.iter().any(|l| line_shown(line_id(l.0), Some(i)))),
             Part::DebugMod(i) => line_shown(mods_debug[i].3, Some(DEBUG_GROUPS.len() + i)),
             Part::DebugHelp => line_shown("help", None),
+            Part::Crosshair => !menu_open || editing,
             _ => true,
         };
         // Everything on the overlay, the engine's elements placed like the mods'.
