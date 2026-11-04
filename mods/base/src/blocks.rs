@@ -20,6 +20,9 @@ pub static SLATE: Block = Block::named("slate");
 pub static LIMESTONE: Block = Block::named("limestone");
 pub static OCHRE_SANDSTONE: Block = Block::named("ochre_sandstone");
 pub static RED_SANDSTONE: Block = Block::named("red_sandstone");
+pub static CREAM_SANDSTONE: Block = Block::named("cream_sandstone");
+pub static BANDED_CLAY: Block = Block::named("banded_clay");
+pub static WEATHERED_LIMESTONE: Block = Block::named("weathered_limestone");
 pub static SNOW: Block = Block::named("snow");
 pub static ICE: Block = Block::named("ice");
 pub static OBSIDIAN: Block = Block::named("obsidian");
@@ -406,6 +409,10 @@ pub fn register(r: &mut Registry) {
         (&LIMESTONE, Some(("limestone_top", "limestone_side", "limestone_top"))),
         (&OCHRE_SANDSTONE, Some(("ochre_sandstone_top", "ochre_sandstone_side", "ochre_sandstone_bottom"))),
         (&RED_SANDSTONE, Some(("red_sandstone_top", "red_sandstone_side", "red_sandstone_bottom"))),
+        // The canyons' strata and the karst towers' faces (Art, 11-04; Ronald: "Yes, loosen streaks").
+        (&CREAM_SANDSTONE, Some(("cream_sandstone_top", "cream_sandstone_side", "cream_sandstone_top"))),
+        (&BANDED_CLAY, Some(("banded_clay_top", "banded_clay_side", "banded_clay_top"))),
+        (&WEATHERED_LIMESTONE, Some(("limestone_top", "weathered_limestone_side", "limestone_top"))),
     ] {
         let b = r
             .block(block)

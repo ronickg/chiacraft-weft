@@ -27,6 +27,7 @@ use weft_sdk::terrain::{Feature, Mask, preset};
 
 use crate::SEA;
 
+mod canyons;
 mod karst;
 mod net;
 
@@ -52,6 +53,9 @@ pub mod salt {
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
     pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const CANYONS: u64 = 0xCA1;
+    pub const CANYON_AREA: u64 = 0xCA2;
+    pub const CANYON_WARP: u64 = 0xCA3;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -296,6 +300,29 @@ pub const MESA_AREA: Area = Area {
     not: false,
 };
 
+/// Badland canyons (Tectonic, Lithosphere; Ronald, 11-04: "All 3, in order"): in the hot, dry
+/// land (`CANYON_AREA`; full depth from `CANYON_FULL` of its strength), winding cuts along a
+/// warped line noise's zero lines (`CANYON_SCALE` blocks between, wandering by `CANYON_WARP`),
+/// `CANYON_WIDTH` of the noise wide, cut `CANYON_DEPTH` blocks down in tiers `CANYON_TIER` high
+/// (a steep wall, then a ledge), the floor kept `CANYON_DRY` over the sea. Their walls show the
+/// strata (rock faces).
+pub const CANYON_AREA: Area = Area {
+    all: &[
+        Ramp::Temperature(0.1, 0.16),
+        Ramp::Humidity(0.02, -0.04),
+        Ramp::Noise { salt: salt::CANYON_AREA, scale: 900.0, from: -0.05, to: 0.05 },
+        Ramp::Continent(0.06, 0.14),
+    ],
+    not: false,
+};
+pub const CANYON_FULL: f64 = 0.3;
+pub const CANYON_SCALE: f64 = 700.0;
+pub const CANYON_WARP: (f64, f64) = (90.0, 160.0);
+pub const CANYON_WIDTH: f64 = 0.05;
+pub const CANYON_DEPTH: i32 = 40;
+pub const CANYON_TIER: i32 = 8;
+pub const CANYON_DRY: i32 = 3;
+
 /// Karst towers (Lithosphere; Ha Long Bay, Guilin): in the warm, wet land and its shallow seas
 /// (`KARST_AREA`), steep limestone pillars, at most one per `KARST_CELL` blocks square, in
 /// clusters, `KARST_RADIUS` (or `KARST_WIDE_RADIUS`) blocks from their middle to their foot and
@@ -452,6 +479,17 @@ pub const SNOW_DEPTH: i32 = 2;
 /// `ROCK_MAX_DEPTH` blocks; on sand the whole face is sandstone (the mesas). Snow slides off at
 /// `SNOW_FALL`.
 pub const ROCK_FALL: i32 = 4;
+/// In the hot, dry land's strata (mesas, canyons) a face goes bare from this fall: steps of three
+/// would otherwise take the planting's gravel for steep ground, which read as dark bands in the
+/// canyon walls (canblack, 11-04).
+pub const ROCK_FALL_STRATA: i32 = 3;
+
+impl RockSet {
+    /// The fall from which a face of these rocks goes bare.
+    pub fn bare_from(self) -> i32 {
+        if self == RockSet::Strata { ROCK_FALL_STRATA } else { ROCK_FALL }
+    }
+}
 pub const SNOW_FALL: i32 = 3;
 pub const ROCK_DEPTH: i32 = 5;
 pub const ROCK_MAX_DEPTH: i32 = 16;
@@ -467,7 +505,16 @@ pub const ROCK_PATCHES: f64 = 0.22;
 pub const ROCK_MOSS: f64 = 0.25;
 /// The mesas' strata from the bottom up, repeating: each layer's rock, 1 to 3 blocks thick by the
 /// world's seed; the layers tilt gently, up to `STRATA_TILT` blocks over some 300.
-pub const STRATA: [&str; 6] = ["sandstone", "ochre_sandstone", "sandstone", "red_sandstone", "ochre_sandstone", "red_sandstone"];
+pub const STRATA: [&str; 8] = [
+    "sandstone",
+    "ochre_sandstone",
+    "cream_sandstone",
+    "red_sandstone",
+    "banded_clay",
+    "ochre_sandstone",
+    "cream_sandstone",
+    "red_sandstone",
+];
 pub const STRATA_TILT: i32 = 3;
 
 /// The engine's features of the land, in the order they're added; `mesas` and `rivers` go after
@@ -492,6 +539,7 @@ pub fn features() -> Vec<Feature> {
             .mask(MOUNTAINS_AREA.mask())
             .named("mountains"),
         Feature::new(mesa).named("mesas"),
+        Feature::new(canyons).named("canyons"),
         Feature::new(karst).named("karst"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
@@ -526,7 +574,7 @@ fn land_height_at(h: &Here) -> i32 {
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
     let base = base_ground(h);
-    base + karst::add(h, base)
+    base + canyons::cut(h, base) + karst::add(h, base)
 }
 
 /// The ground before the karst towers (which stand on it, or rise out of the water over it).
@@ -825,6 +873,12 @@ pub fn river_region_stretches(f: &Fields, bx: i32, bz: i32) -> Vec<([i32; 2], [i
         .collect()
 }
 
+/// What the canyons take off the ground at (`x`, `z`) (Q4), as the engine adds it.
+pub fn canyons(f: &Fields, x: i32, z: i32) -> i32 {
+    let h = Here::new(f, x, z);
+    if !canyons::near(&h) { 0 } else { canyons::cut(&h, base_ground(&h)) }
+}
+
 /// What the karst towers add at (`x`, `z`) (Q4), as the engine adds it.
 pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
     let h = Here::new(f, x, z);
@@ -1006,6 +1060,8 @@ pub enum RockSet {
     Slate,
     Granite,
     Limestone,
+    /// The karst towers: weathered limestone, rain-streaked.
+    Karst,
 }
 
 /// The rocks of the face of column (`x`, `z`) (Q4), its ground `height` (blocks) high; `sandy`
@@ -1016,9 +1072,9 @@ pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet
     if sandy {
         RockSet::Strata
     } else if KARST_AREA.at(&here) > 0 {
-        // Karst towers are limestone however high they stand, and where the savanna's strata
-        // would be (kclusters: a striped tower at the warm edge).
-        RockSet::Limestone
+        // Karst towers are weathered limestone however high they stand, and where the savanna's
+        // strata would be (kclusters: a striped tower at the warm edge).
+        RockSet::Karst
     } else if t >= q12(SAVANNA.0) && hu < q12(SAVANNA.1) {
         RockSet::Strata
     } else if t < q12(TAIGA_BELOW) {
@@ -1048,6 +1104,9 @@ impl RockSet {
             RockSet::Granite => "granite",
             RockSet::Limestone if patch => "stone",
             RockSet::Limestone if low && mossy => "mossy_cobblestone",
+            RockSet::Karst if patch => "limestone",
+            RockSet::Karst if low && mossy => "mossy_cobblestone",
+            RockSet::Karst => "weathered_limestone",
             _ => "limestone",
         }
     }
@@ -1237,6 +1296,25 @@ mod tests {
             }
         }
         assert!(towers > 0 && outside == 0, "{towers} tower columns, {outside} outside the karst land");
+    }
+
+    #[test]
+    fn canyons_cut_dry_in_their_land_only() {
+        let f = fields(1);
+        let mut deep = 0;
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 16 * 16 - 1600 * 16, (i / 200) * 16 * 16 - 1600 * 16);
+            let cut = canyons(&f, x, z);
+            assert!((-q4(CANYON_DEPTH as f64)..=0).contains(&cut), "{cut}");
+            if cut < 0 {
+                assert!(CANYON_AREA.value(&f, x, z) > 0);
+                assert!(land_height(&f, x, z) >> 4 >= SEA + CANYON_DRY || lakes(&f, x, z) < 0, "a canyon floor under the sea at {x} {z}");
+            }
+            if cut < -q4(20.0) {
+                deep += 1;
+            }
+        }
+        assert!(deep > 0, "no canyon 20 deep in 3.2 km");
     }
 
     #[test]
