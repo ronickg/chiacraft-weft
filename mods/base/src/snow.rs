@@ -5,7 +5,7 @@
 //! the cover (`air::SNOW_SAMPLES`, `air::SNOW_REACH`), and each layer block steps down on its own
 //! while there is less snow than it (`air::SNOW_MELT_SECS`, a growth step, so land away from
 //! players melts too and catches up when it loads). Far land shows the cover in the shader
-//! pack's dusting (`snow_on`).
+//! pack's dusting (`snow_on`). The cover is blended over the biomes round a column (`cover_at`).
 
 use vitals::air;
 use weft_sdk::*;
@@ -35,7 +35,7 @@ pub fn register(r: &mut Registry) {
         .on_grow(|e| {
             let w = e.world();
             let pos = e.pos();
-            let Some(snow) = weather::snow_in(w.biome(pos)) else { return };
+            let Some(snow) = cover_at(&w, pos) else { return };
             let have = layers(e.state());
             let want = air::snow_layers(snow);
             if want < have {
@@ -45,9 +45,20 @@ pub fn register(r: &mut Registry) {
     r.world_tick(tick);
 }
 
+/// The snow cover at `pos`, blended over the biomes round it (`vitals::air::AIR_BLEND`), so the
+/// layers thin out across a border instead of stopping at it; `None` before the weather's first
+/// look.
+fn cover_at(w: &World, pos: [i32; 3]) -> Option<f32> {
+    let mid = weather::snow_in(w.biome(pos))?;
+    let ring = air::ring(pos[0], pos[2], air::AIR_BLEND / 2);
+    Some(air::blend(ring.map(|(x, z)| weather::snow_in(w.biome([x, pos[1], z])).unwrap_or(mid))))
+}
+
 /// How many layers `state` (a snow layer's) has.
 fn layers(state: u32) -> u8 {
-    state_prop(state, "layers").and_then(|v| v.parse().ok()).unwrap_or(1)
+    state_prop(state, "layers")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1)
 }
 
 /// A snow layer block of `n` layers, air at none.
@@ -88,7 +99,7 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     }
     let Some((pos, state)) = top else { return };
     let above = [x, pos[1] + 1, z];
-    let Some(snow) = weather::snow_in(w.biome(above)) else { return };
+    let Some(snow) = cover_at(w, above) else { return };
     let want = air::snow_layers(snow);
     if SNOW_LAYER.is(state) {
         let have = layers(state);
