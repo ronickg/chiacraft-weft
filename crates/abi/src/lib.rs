@@ -1342,6 +1342,30 @@ pub struct RecipeInfo {
     pub inputs: u32,
     pub outputs: u32,
     pub flags: u32,
+    /// A shaped recipe's grid, 0 x 0 for a shapeless one.
+    pub width: u32,
+    pub height: u32,
+}
+
+/// One input of a recipe (`Host::recipe_input`).
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct RecipeInput {
+    /// `recipe_input_kind::*`.
+    pub kind: u32,
+    /// How many (millibuckets for a fluid).
+    pub count: u32,
+    /// An item that fits, to show: the item, or a tag's first; 0 for an empty cell or a fluid.
+    pub shown: u32,
+}
+
+pub mod recipe_input_kind {
+    pub const EMPTY: u32 = 0;
+    pub const ITEM: u32 = 1;
+    pub const TAG: u32 = 2;
+    /// One of several items (a tag pattern, `#ingots/*`).
+    pub const ANY: u32 = 3;
+    pub const FLUID: u32 = 4;
 }
 
 pub mod slot_flags {
@@ -1881,6 +1905,11 @@ pub struct Host {
     /// Takes the recipe's inputs out of `stacks` (counts, the matching stacks); 0 if they are not
     /// all there, then nothing changes.
     pub recipe_consume: unsafe extern "C" fn(kind: Str, recipe: u32, stacks: *mut ItemStack, count: u32) -> u32,
+    /// Input `index` of a recipe: a shaped one's grid cells row by row (`RecipeInfo::width` x
+    /// `height`, empty cells too), else its inputs. 0 past the last.
+    pub recipe_input: unsafe extern "C" fn(kind: Str, recipe: u32, index: u32, out: *mut RecipeInput) -> u32,
+    /// Whether `item` fits input `index` (numbered as `recipe_input`).
+    pub recipe_accepts: unsafe extern "C" fn(kind: Str, recipe: u32, index: u32, item: u32) -> u32,
     /// The block state an item places, 0 if none.
     pub item_block: unsafe extern "C" fn(item: u32) -> u32,
 
@@ -3460,6 +3489,8 @@ pub mod client_op {
     /// Runs command `text` (`/tp ~ ~5 ~`) as the player, here if it is a client command, else
     /// on the server; returns an id for `Host::client_command_reply`. The chat stays out of it.
     pub const RUN_COMMAND: u32 = 16;
+    /// Builds the top screen again (a mod's screen whose parts follow its own state).
+    pub const REBUILD_SCREEN: u32 = 17;
 }
 
 /// `Host::client_text` sources.

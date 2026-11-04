@@ -398,6 +398,10 @@ impl InventoryGroup {
     pub fn len(&self) -> u32 {
         self.len
     }
+    /// The inventory slot of its `i`th, for `Inventory::get` and `set`.
+    pub fn slot(&self, i: u32) -> u32 {
+        self.start + i
+    }
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
@@ -1756,10 +1760,21 @@ impl Drop for RecipeKindBuilder<'_> {
     }
 }
 
-/// One recipe of a kind, found by `recipe_find` (or shown by a kind's `display`).
+/// One recipe of a kind, found by `recipe_find` or listed by `recipes` (or shown by a kind's
+/// `display`).
 pub struct Recipe {
     kind: String,
     index: u32,
+}
+
+/// Every recipe of `kind`, in the order they were registered (hidden ones too: `hidden()`).
+pub fn recipes(kind: &RecipeKind) -> Vec<Recipe> {
+    let mut out = Vec::new();
+    let mut info = abi::RecipeInfo::default();
+    while unsafe { (host().recipe_info)(Str::new(kind.name()), out.len() as u32, &mut info) } != 0 {
+        out.push(Recipe { kind: kind.name().to_string(), index: out.len() as u32 });
+    }
+    out
 }
 
 /// The first recipe of `kind` whose inputs, with their counts, are all among `stacks`.
@@ -1774,9 +1789,41 @@ impl Recipe {
         unsafe { (host().recipe_info)(Str::new(&self.kind), self.index, &mut out) };
         out
     }
+    /// Recipe `index` of `kind` (as `recipes` numbers them), if there is one.
+    pub fn at(kind: &RecipeKind, index: u32) -> Option<Recipe> {
+        let mut info = abi::RecipeInfo::default();
+        (unsafe { (host().recipe_info)(Str::new(kind.name()), index, &mut info) } != 0)
+            .then(|| Recipe { kind: kind.name().to_string(), index })
+    }
+    /// Its number in its kind.
+    pub fn index(&self) -> u32 {
+        self.index
+    }
     /// Its time in ticks.
     pub fn time(&self) -> u32 {
         self.info().time
+    }
+    /// Kept out of the recipe viewer.
+    pub fn hidden(&self) -> bool {
+        self.info().flags & abi::recipe_flags::HIDDEN != 0
+    }
+    /// A shaped recipe's grid (width, height); `None` for a shapeless one.
+    pub fn shape(&self) -> Option<(u32, u32)> {
+        let i = self.info();
+        (i.width > 0).then_some((i.width, i.height))
+    }
+    /// Its inputs: a shaped one's cells row by row (empty ones too), else its ingredients.
+    pub fn inputs(&self) -> Vec<abi::RecipeInput> {
+        let mut out = Vec::new();
+        let mut one = abi::RecipeInput::default();
+        while unsafe { (host().recipe_input)(Str::new(&self.kind), self.index, out.len() as u32, &mut one) } != 0 {
+            out.push(one);
+        }
+        out
+    }
+    /// Whether `item` fits input `index` (numbered as `inputs`).
+    pub fn accepts(&self, index: u32, item: u32) -> bool {
+        unsafe { (host().recipe_accepts)(Str::new(&self.kind), self.index, index, item) != 0 }
     }
     /// Its results with their chances; fluids are not stacks and show as empty ones.
     pub fn outputs(&self) -> Vec<(ItemStack, f32)> {

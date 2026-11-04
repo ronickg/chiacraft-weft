@@ -4,6 +4,7 @@
 mod advancements;
 mod beds;
 mod blocks;
+mod book;
 mod clothing;
 mod cooking;
 mod farming;
@@ -54,6 +55,7 @@ fn init(r: &mut Registry) {
     clothing::register(r);
     cooking::register(r);
     recipes::register(r);
+    book::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);

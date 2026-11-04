@@ -25,6 +25,14 @@ erase what they earned.
    engine changes only for identity, the mod sandbox, content switching, the confirm dialog and
    the server mode. Weft is tracked as `upstream` and merged regularly. Weft files stay MPL-2.0,
    ours are MIT. The name players see is chiacraft.
+   Crafting (`notes/CRAFTING.md`) adds small, general engine hooks with our logic kept in base.
+   They are upstream candidates for Weft (Planner's yes, 2026-11-04):
+   - listing a kind's recipes and reading their inputs (`recipes`, `Recipe::inputs`, `accepts`)
+   - a mod screen asking to be rebuilt (`rebuild_screen`), and a button holding parts
+     (`button_with`)
+   - next, for items built from parts: an item's look from its stack (layers of a part sprite and
+     a material ramp), and value chains for mining speed, harvest level and maximum durability
+     per stack
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 

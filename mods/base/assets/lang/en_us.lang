@@ -475,3 +475,20 @@ block.base.moriche_palm_sapling = Moriche Palm Sapling
 item.base.mesquite_pod = Mesquite Pods
 item.base.acuri_nut = Acuri Nut
 item.base.moriche_fruit = Moriche Fruit
+
+# The recipe book beside the crafting grids (book.rs)
+crafting.book.title = Recipes
+crafting.book.all = All
+crafting.book.empty = Nothing here yet
+crafting.book.can = {0}: you can make it
+crafting.book.missing = {0}: something is missing
+crafting.book.prev = <
+crafting.book.next = >
+crafting.book.page = {0}/{1}
+crafting.book.makes = {0} ×{1}
+crafting.book.have = {0}: {1}/{2}
+crafting.book.lack = {color:warning}{0}: {1}/{2}{/}
+crafting.book.needs_table = Needs a crafting table
+crafting.book.craft_one = Craft
+crafting.book.craft_five = Craft 5
+crafting.book.craft_all = All ({0})

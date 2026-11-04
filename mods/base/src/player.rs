@@ -128,28 +128,32 @@ pub fn register(r: &mut Registry) {
         .on_change(craft_result)
         .on_take(consume_grid)
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(5.0), |ui| {
-                ui.row(S::row().gap(1.0), |ui| {
-                    // Armor, and the clothes worn under it beside.
-                    for slots in [&EQUIPMENT, &base_api::CLOTHES] {
-                        ui.column(S::col(), |ui| {
-                            for slot in slots.iter() {
-                                ui.group(slot.name());
-                            }
-                        });
-                    }
-                    ui.player_model(51.0, 72.0);
-                    ui.spacer();
-                    ui.column(S::col().gap(2.0), |ui| {
-                        ui.title();
-                        ui.row(S::row().gap(4.0), |ui| {
-                            ui.group("grid");
-                            ui.recipe_arrow();
-                            ui.group("result");
+            // The recipe book beside it, hand recipes only (`book.rs`).
+            ui.row(S::row().gap(4.0), |ui| {
+                ui.panel("panel", S::col().pad(7.0).gap(5.0), |ui| {
+                    ui.row(S::row().gap(1.0), |ui| {
+                        // Armor, and the clothes worn under it beside.
+                        for slots in [&EQUIPMENT, &base_api::CLOTHES] {
+                            ui.column(S::col(), |ui| {
+                                for slot in slots.iter() {
+                                    ui.group(slot.name());
+                                }
+                            });
+                        }
+                        ui.player_model(51.0, 72.0);
+                        ui.spacer();
+                        ui.column(S::col().gap(2.0), |ui| {
+                            ui.title();
+                            ui.row(S::row().gap(4.0), |ui| {
+                                ui.group("grid");
+                                ui.recipe_arrow();
+                                ui.group("result");
+                            });
                         });
                     });
+                    ui.player_inventory(false);
                 });
-                ui.player_inventory(false);
+                crate::book::book(ui, crate::book::Station::Hands);
             });
         });
 
@@ -161,16 +165,20 @@ pub fn register(r: &mut Registry) {
         .on_change(craft_result)
         .on_take(consume_grid)
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0).stretch(), |ui| {
-                ui.title();
-                ui.row(S::row().gap(8.0), |ui| {
-                    ui.spacer();
-                    ui.group("grid");
-                    ui.recipe_arrow();
-                    ui.group("result");
-                    ui.spacer();
+            // The recipe book beside it: every recipe, from the bag and the chests near the table.
+            ui.row(S::row().gap(4.0), |ui| {
+                ui.panel("panel", S::col().pad(7.0).gap(4.0).stretch(), |ui| {
+                    ui.title();
+                    ui.row(S::row().gap(8.0), |ui| {
+                        ui.spacer();
+                        ui.group("grid");
+                        ui.recipe_arrow();
+                        ui.group("result");
+                        ui.spacer();
+                    });
+                    ui.player_inventory(true);
                 });
-                ui.player_inventory(true);
+                crate::book::book(ui, crate::book::Station::Table);
             });
         });
     r.player_menu(&INVENTORY);

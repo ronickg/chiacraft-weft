@@ -32,6 +32,7 @@ ui.panel("panel", S::col().pad(7.0).gap(4.0), |ui| {
 | `panel(class, s, ..)` | a column with the class's background, `"panel"` is the usual window |
 | `text(key)` | a translation. `text_args(key, &[Arg::Int(5)])` fills `{0}` and the rest, `text_styled(s, key, args)` takes a style too (class, size, one line, `mono`) |
 | `button(key, s, on_click)` | a button with a translated label (`button_args` with arguments); the closure runs on click and can drive the game through `c.client()` (open screens and worlds, quit, change settings), even in the main menu |
+| `button_with(s, on_click, parts)` | a button holding other parts instead of a label, such as an item's icon |
 | `input(value, max, s, on_change)` | a one-line text field; the closure gets the text after every edit |
 | `slider(s, value, on_change)` | a slider at `value` (0..1, read every frame); the closure gets where it is dragged |
 | `item(id, count, s)` | an item's icon with its count |
@@ -95,6 +96,7 @@ r.screen(&ABOUT, |ui| {
 r.client_command("about", "", |c| { c.client().open_screen(&ABOUT); });
 ```
 `open_screen(&ABOUT)` works from a client command, a key or a button, and the command line takes it too as `--screen examplemod:about`.
+A screen is built when it opens. One whose parts follow state of its own (a page, a picked entry) keeps that state itself and calls `c.client().rebuild_screen()` when it changes, and its builder runs again (base's recipe book, `mods/base/src/book.rs`).
 
 Registering an engine screen's handle replaces that screen, so `r.screen(&screens::PAUSE, ..).pauses()` is your own pause screen. The engine's are in `screens::*`: `TITLE`, `PAUSE`, `SETTINGS`, `LANGUAGE`, `CONTROLS`, `SOUND`, `MOD_SETTINGS`, `MODS`, `PROFILE`, `WORLDS`, `CREATE_WORLD`, `MULTIPLAYER`, `RESOURCE_PACKS`, `SHADER_PACKS`, `CHAT` and `DEATH`. The engine's own screens open each other through the same names, so a replaced settings screen is the one the main menu's button opens.
 

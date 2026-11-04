@@ -1,14 +1,24 @@
 # Crafting
 
-Status: proposal, revised 2026-11-04 with Ronald's direction. Nothing is built.
+Status: decided 2026-11-04. Slice 1 is built and waiting for a game run; the rest follows the
+slices at the end.
 
-His direction:
+**Ronald's decision:** "Yes, 1A 2A 3A 4B". So:
+- the grid with a book that fills it
+- recipes found by touching their materials
+- hands-on making only the first time
+- parts at Tinkers' depth and further
+
+His words along the way:
 - "probably something in between MC and Vintage Story"
 - items "broken down into pieces", "maybe up to 10 rarity variants", combined "kinda like
   Tinkers' Construct... take it even further, customization wise"
 - "armor should be pieces too"
-
-Choices 1–3 are with him now. Choice 4, how deep the parts go, is new.
+- On the depth: "i do like the depth if that makes sense".
+- On the first part icons: "pieces also look weird, maybe need to be a few less pieces", then
+  "not 100 percent about less tbh, maybe it can be fixed with textures". So the parts stay, and
+  the icons' look is fixed in the art (below, "Fewer pieces in the picture").
+- "the system should be automatable later on" (below, "Automation later").
 
 - **Research, with sources:**
   - `reports/crafting/Crafting in other games.md`: Valheim, Vintage Story, TerraFirmaCraft,
@@ -242,8 +252,8 @@ trait can depend on the part it's in. Proposed:
   - **The station:** up to 20, from its level and its tools.
   - **In tens:** 72 points is grade 7.
   - **A little luck:** one grade down 10% of the time, one up 17%, two up 3%.
-  - **Grade 10** needs 90+ points: hands-on work with the best material at the best station.
-    Grade 9 can roll up to it.
+  - **Grade 10** needs 92+ points, more than work from memory can reach (40 + 30 + 20): hands-on
+    work with the best material at the best station. Luck can lift a 92-point part from 9.
   - **There are no re-rolls to buy.** Silent Gear's catalyst grinding is a known complaint.
 - **An item's grade is its working part's.** Every part keeps its own, shown in the item's
   tooltip.
@@ -374,6 +384,88 @@ As Tinkers' Construct 3 does it, which our prototype already proved at 32 px:
     ramps, the armour regions (blocky-model, painted in code with the same maps) and the grade
     overlays.
 
+### The art format (for Chiacraft)
+
+- **Parts in the data are not layers in the picture.**
+  - An item keeps all its parts: an axe is head, haft and fitting; a sword is blade, guard,
+    grip and pommel.
+  - Its icon is drawn from at most 2–3 layers, whatever reads at 32 px: an axe as head and haft,
+    with the lashing painted inside the head layer; a sword as blade and hilt, with guard, grip
+    and pommel in one hilt layer.
+  - A layer's map says, for each pixel, which part's material paints it, so the lashing still
+    shows sinew or rawhide, and the hilt still shows a bronze guard on a leather grip.
+- **One layer** is a 32 × 32 PNG on the kind's canvas, at the kind's sockets, plus a small
+  `.json` beside it:
+  - **Red** is the shade step, 0–7, stored as step × 36 (0, 36, ... 252):
+    - 0: the outline, shadow side
+    - 1: the outline, lit side
+    - 2–6: the fill
+    - 7: the highlight
+  - **Green** is the region: which of the item's parts paints the pixel (0 the layer's own part,
+    1 the fitting or the next part, and so on, as the `.json` lists them).
+  - **Alpha** 255 where the layer is, 0 elsewhere.
+  - **The `.json`:** `{ "kind": "base:axe", "layer": "head", "regions": ["head", "fitting"],
+    "steps": 8 }`.
+- **A material** is a strip of 8 colours, one per step, as an 8 × 1 PNG (the guide's ramp with
+  its two outline tones and highlight). An optional grain is a 32 × 32 greyscale PNG where 128
+  leaves a step alone, and darker or lighter moves it one step down or up.
+- **Overrides:** a material can bring a whole painted layer for a shape (flint, obsidian, gems,
+  glass, wooden heads), used instead of the map painted with its ramp.
+- **Grades:** craft quality within one material, never a material tier. 1–2 rough and chipped,
+  3–8 plain, a cleaner edge from 7, 9–10 a glint. Material tiers are the materials themselves.
+- **Sockets** on the 32 × 32 diagonal (handle bottom left, working end top right), as boxes x0,
+  y0 – x1, y1:
+
+  | Kind | Part | Box |
+  |---|---|---|
+  | Sword (the prototype's) | blade | 9, 2 – 29, 22 |
+  | | guard | 6, 15 – 16, 25 |
+  | | grip | 2, 19 – 12, 29 |
+  | | pommel | 1, 25 – 6, 30 |
+  | Axe (today's stone axe icon) | haft | a 2–3 px line from about 2, 29 to 21, 10 |
+  | | head | about 14, 1 – 30, 17 |
+  | | lashing | where they meet, about 16, 8 – 22, 14 |
+
+  The axe boxes are from today's icon; Chiacraft fixes them in the test, and every later head
+  of that kind fits the same box.
+- **First test** (Chiacraft, now):
+  - an axe and a sword
+  - 6 materials: flint, copper, bronze, iron, steel, and gold for the sword
+  - grades 1, 5 and 10
+  - shown beside the approved full icons
+
+### Fewer pieces in the picture
+
+Ronald found the first part icons too busy at 32 px. The parts in the data stay as they are; the
+picture shows fewer pieces (above).
+
+If the art can't make 3–4 parts read and he wants fewer to craft too, the fallback is 2 crafted
+parts per item:
+- tools: a head and a handle, with the lashing, rivets or wedge an ingredient of assembly that
+  sets a trait and its wear, but isn't a slot of its own
+- swords: a blade and a hilt
+- armour: a shell and a lining, with the fastening part of the shell
+
+It's a data change only: kinds lose a slot, the fitting becomes an assembly ingredient with its
+own wear, and nothing else moves. Not taken unless he asks.
+
+### Automation later
+
+Ronald: "the system should be automatable later on". Not built now, but the design leaves room:
+- **One function for every craft.** Crafting and assembly go through one function in base
+  (`book.rs`'s `craft` today, the parts' assembly later) that takes its inputs from a list of
+  slots and gives its outputs to slots. The player's screen and a machine both call it.
+- **Machines feed stations.** Stations are machines (`docs/machines.md`) with input and output
+  slot groups, so hoppers feed them and empty them today, and pipes or conveyors later.
+- **Queues and fuel.** A queue runs without a player nearby when its station has fuel or power
+  (`docs/machines.md`, energy).
+- **An autocrafter block** holds a recipe or a part shape from its owner's book and makes it on
+  a redstone signal or while powered (`docs/redstone.md`).
+- **Machines and grades.** A machine's work is a fixed score, about Good (grade 5) with good
+  materials. Only hands-on work reaches the top grades. So automation saves time without making
+  craftsmanship pointless. A machine-made part's history says so: "made by the autocrafter at
+  ...".
+
 ### Data, so packages can add to it
 
 Base's own rows live in Rust tables in the shared crates, for checks and sheets: Content's
@@ -426,9 +518,9 @@ everything else stay `defs/recipes`, with a station's kind (`kind = "base:workbe
 - **Linings are clothing:** an armour lining's warmth is Survival's clo, so the parts system and
   the cold are one system.
 
-## The choices for Ronald
+## The choices (decided: 1A 2A 3A 4B)
 
-Choices 1–3 are as he has them now, written to his direction.
+Kept as they were put to Ronald, for the reasons.
 
 ### 1. The everyday screen
 
@@ -468,8 +560,20 @@ My recommendation: 1A, 2A, 3A, 4B, built so that A's core comes first.
 Each slice is seen in the game through Tester. Strings are keys; recipes, materials and parts
 are rows.
 
-1. **The screen and nearby chests:** the grid with the book, filling from the bag and chests
-   within 7 blocks, Craft ×N, on today's recipes. The `crafting` crate holds today's recipes.
+1. **The screen and nearby chests** (built 11-04, `mods/base/src/book.rs`, waiting for a game
+   run):
+   - The book sits beside the inventory's 2 × 2 (hand recipes only) and the crafting table.
+   - It has tabs by creative tab, pages, and the recipes you can make first.
+   - Picking one shows its ingredients with have/need.
+   - Craft, Craft 5 and All take from the bag, and at a table also from every chest within 7
+     blocks of it. The grid still works by hand.
+   - The book lists every mod's crafting recipes from the engine, so nothing moved into a crate
+     yet; that comes with parts.
+   - Engine additions: `recipes(kind)`, `Recipe::inputs`, `shape` and `accepts` (host
+     `recipe_input` and `recipe_accepts`), `Client::rebuild_screen` (`client_op::REBUILD_SCREEN`),
+     `Ui::button_with` and `InventoryGroup::slot`.
+   - Not yet: filling the grid itself from the book (Minecraft's ghost placement), and the
+     queue.
 2. **Discovery:** known recipes per player, "?" hints, R and U showing only what you know.
 3. **Stations, add-ons and the queue:** the workbench levels; the queue with sub-parts and
    refunds; cold hands and the warm room.
@@ -477,7 +581,9 @@ are rows.
    - kinds, part shapes, the grade rules and traits in the crate
    - part items with their components
    - the Assemble tab: build, swap, break down
-   - stats from parts through the two engine additions
+   - stats from parts through the two engine hooks (Planner's yes): an item's look from its
+     stack, and per-stack chains for mining speed, harvest level and maximum durability
+   - assembly through the same one craft function a machine will call (automation later)
    - wear and repair per part
    - history (who, when, where)
    - Today's tools become assembled kinds from wood and stone parts. Art: Chiacraft's first part
@@ -486,8 +592,15 @@ are rows.
    Content's stone items).
 6. **Armour from parts:** shell, fastening and lining, with linings as Survival's clothing
    warmth. Worn region textures.
-7. **Further** (4B): part shapes, origin and condition, use improvements, naming and the
-   chronicle, signed history through portals.
+7. **Further** (4B, Ronald's pick), in this order:
+   1. **Part shapes with trade-offs:** a narrow felling head or a bearded one; a long or short
+      blade.
+   2. **Origin and condition count:** seasoned or green wood, prime hides, ore deposits, the
+      bronze ratio.
+   3. **Parts improve with use:** counts per part, worn-in hafts, honed edges that need
+      re-honing.
+   4. **Masterwork naming and the world's chronicle**, deeds in the history.
+   5. **Signed history through portals**, with Phase 4's world DIDs.
 8. **Slow crafts** as machines (the tanning frame first), then **smithing and casting** with
    Content's copper, bronze and iron.
 
@@ -498,6 +611,18 @@ are rows.
 - **Survival:** the pot, rack and campfire stay its own. The lining's warmth uses its clothing
   numbers, and stamina per swing uses its stamina.
 - **UI redo:** styles every screen here: the book, Assemble, the tooltip, the grade colours.
+  Its notes on the mock-up (11-04):
+  - **Classes:** top tabs use class `tab` and sidebar categories class `category`, with
+    `selected(true)` for the open one.
+  - **Font:** PixelOperator Bold, with Pixeloid Sans Bold for Russian.
+  - **Colours:** text is cream `#e4dacf`, dim notes `#c6a383`, and only the recipe name is
+    heading gold `#f2da9a`. Gold is for state only ("can make now"). Have/need is green
+    `#8ac80f` and red `#d8221e`.
+  - **Buttons:** Craft is the main (orange) button; −, +, max and "From memory" are the dark
+    secondary one. "To the forge" and "Quench" are main only when they're the step to take now.
+  - **Placement:** slots are 18 GUI and touch, with no gaps. Labels sit 3 GUI from the frame.
+  - **Heat and shape bars:** `progress_bind` with a frame and a `_fill`. The marks go inside the
+    fill picture, or on a second thin bar, until the `at` ABI change (Phase 6's API 1.2).
 - **Chiacraft (art):** part maps, material ramps and grains, armour regions, grade overlays,
   icons for stations and add-ons.
 - **Phase 4 (DIDs):** signing history entries with world DIDs.
