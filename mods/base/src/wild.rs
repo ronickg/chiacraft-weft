@@ -85,12 +85,23 @@ pub fn register(r: &mut Registry) {
                 .texture(name)
                 .model_box([0.0, 0.0, 0.0], [16.0, 0.5, 16.0])
                 .tab(&crate::tabs::NATURAL),
-            // A reed stands for the reeds sugar cane borrowed its look from.
-            Form::Still if name == "reed" => b.texture("reeds").tab(&crate::tabs::NATURAL),
+            // A common reed, its purple plumes on top.
+            Form::Still if name == "reed" => b.texture("reed").tab(&crate::tabs::NATURAL),
             // No base plant lies as a log yet (the Cretaceous's rotten log is the animals mod's).
             Form::Still | Form::Log => b.texture(name).tab(&crate::tabs::NATURAL),
+            // Kelp: its top block (no kelp above) shows the fronds' tip, `<name>_top`; a block
+            // changing above it sets which it is, so growing, placing and breaking keep it right.
             Form::Column => b
-                .texture(name)
+                .prop("top", ["true", "false"])
+                .states(move |p, s| s.texture(&if p.get("top") == "true" { format!("{name}_top") } else { name.to_string() }))
+                .on_neighbor(move |e| {
+                    let w = e.world();
+                    let [x, y, z] = e.pos();
+                    let top = if block.is(w.get([x, y + 1, z])) { "false" } else { "true" };
+                    if let Some(s) = state_with(e.state(), "top", top).filter(|&s| s != e.state()) {
+                        w.set(e.pos(), s);
+                    }
+                })
                 .growth(growth::step_secs(full, 1, 270.0), light)
                 .on_grow(move |e| growth::grow(e, full, false, grow_up))
                 .tab(&crate::tabs::NATURAL),

@@ -84,10 +84,11 @@ pub const FLOWERING: &[&str] = &["animals:floodplain", "animals:scrubland"];
 pub const PONDS: &[&str] = &["animals:floodplain", "animals:red_dunes"];
 /// Still fresh water in the temperate and boreal lands: white water lilies' (Nymphaea alba, and
 /// N. tetragona into the taiga).
-pub const LAKES: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:swamp", "base:taiga"];
+/// Water lilies on still water; the llanos' and the Pantanal's lagoons have theirs too.
+pub const LAKES: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:swamp", "base:taiga", "base:savanna"];
 /// Common reed (Phragmites australis) rings the temperate and boreal lakes; the swamp's and the
-/// llanos' shores are the cattails' and the wild rice's.
-pub const REEDBEDS: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:taiga"];
+/// llanos' shores are mostly the cattails' and the wild rice's, with a few reeds (`COVER_IN`).
+pub const REEDBEDS: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:taiga", "base:swamp"];
 /// Sheltered sea floor: eelgrass meadows (Zostera) off the beaches.
 pub const SEA_MEADOWS: &[&str] = &["base:ocean", "base:beach"];
 /// Kelp forests: the open sea's rocky and sandy floor.
@@ -150,6 +151,18 @@ pub fn of(block: &str) -> Option<&'static Wild> {
     WILD.iter().find(|p| p.block == block)
 }
 
+/// A plant's cover in one biome where it isn't its usual (`Wild::cover`): reeds in the swamp at
+/// 4%, leaving its shore to the wild rice (spring's grain and the capybaras' food) and the cattails.
+pub const COVER_IN: [(&str, &str, f32); 1] = [("base:reed", "base:swamp", 0.04)];
+
+/// `p`'s cover in `biome`: its own, unless `COVER_IN` gives that biome another.
+pub fn cover_in(p: &Wild, biome: &str) -> f32 {
+    COVER_IN
+        .iter()
+        .find(|&&(b, at, _)| b == p.block && at == biome)
+        .map_or(p.cover, |&(_, _, c)| c)
+}
+
 /// Which wild plant (its index in `WILD`) grows on a cell of `ground` in `biome`, for a roll in
 /// 0..1: the plants of that ground found there, each taking its cover of the rolls in turn.
 pub fn pick(biome: &str, ground: Ground, roll: f32) -> Option<usize> {
@@ -158,7 +171,7 @@ pub fn pick(biome: &str, ground: Ground, roll: f32) -> Option<usize> {
         if p.ground != ground || !p.found.contains(&biome) {
             continue;
         }
-        at += p.cover;
+        at += cover_in(p, biome);
         if roll < at {
             return Some(i);
         }
@@ -198,7 +211,7 @@ mod tests {
                 let all: f32 = WILD
                     .iter()
                     .filter(|q| q.ground == p.ground && q.found.contains(b))
-                    .map(|q| q.cover)
+                    .map(|q| cover_in(q, b))
                     .sum();
                 assert!(all < MOST, "{b}: wild plants cover {:.0}% of its {:?} ground", all * 100.0, p.ground);
             }

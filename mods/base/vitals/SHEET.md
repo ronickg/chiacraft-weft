@@ -220,8 +220,8 @@ What the world grows besides grass and trees (`vitals::wild`): how each grows, t
 | base:mushroom_red | Spreads | Soil | base:mushroom_red | 0.3% | forest, birch_forest, taiga |
 | base:water_hyacinth | Spreads | Water | - | 8.0% | swamp, savanna |
 | base:cattail | Still | Shore | - | 15.0% | swamp, plains, forest, taiga, savanna |
-| base:reed | Still | Shore | - | 12.0% | plains, forest, birch_forest, taiga |
-| base:lily_pad | Still | Water | - | 12.0% | plains, forest, birch_forest, swamp, taiga |
+| base:reed | Still | Shore | - | 12.0% | plains, forest, birch_forest, taiga, swamp (4.0%) |
+| base:lily_pad | Still | Water | - | 12.0% | plains, forest, birch_forest, swamp, taiga, savanna |
 | base:seagrass | Still | Bed | - | 20.0% | ocean, beach |
 | base:kelp | Column | Bed | - | 8.0% | ocean |
 | animals:cycad | Still | Soil | animals:cycad_seed | 1.0% | red_dunes, scrubland, floodplain, fern_forest, crags |

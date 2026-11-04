@@ -302,7 +302,11 @@ fn wild_table(w: &mut String) {
         let found = p
             .found
             .iter()
-            .map(|b| b.split(':').nth(1).unwrap_or(b))
+            .map(|b| {
+                let short = b.split(':').nth(1).unwrap_or(b);
+                let c = wild::cover_in(p, b);
+                if c == p.cover { short.to_string() } else { format!("{short} ({:.1}%)", c * 100.0) }
+            })
             .collect::<Vec<_>>()
             .join(", ");
         let _ =

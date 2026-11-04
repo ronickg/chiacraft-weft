@@ -501,7 +501,9 @@ fn bed(g: &mut Gen, seed: u64, [x, z]: [usize; 2], [wx, wz]: [i32; 2], floor: i3
     for y in floor + 1..=floor + tall {
         let ly = y - oy;
         if (0..16).contains(&ly) && WATER.is(g.get(x, ly as usize, z)) {
-            g.set(x, ly as usize, z, s);
+            // A kelp column's top shows its tip (`wild.rs`, `top`); the blocks under it the stalk.
+            let here = if plant.form == wild::Form::Column && y < floor + tall { state_with(s, "top", "false").unwrap_or(s) } else { s };
+            g.set(x, ly as usize, z, here);
         }
     }
 }
