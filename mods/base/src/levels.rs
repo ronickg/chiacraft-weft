@@ -56,6 +56,8 @@ pub fn register(r: &mut Registry) {
             }
             if w.players().contains(&d.entity) {
                 tombstone(&w, d.entity, d.pos);
+                // What killed them and where their things are, for the death screen.
+                crate::death::tell(&w, d);
             }
         }
     });

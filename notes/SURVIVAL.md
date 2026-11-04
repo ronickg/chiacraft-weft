@@ -578,3 +578,39 @@ sword, about 100 XP.
   at once (air -9.5 °C), the core fell to 34.5 °C by night (Cold, not yet Freezing) and came back
   beside a campfire (air +9.6 °C).
 
+
+**15. Dying and the way back** (2026-11-04 overnight, Research round 4 H1 and the first-hour report;
+chosen without Ronald, logged in `notes/crew/OVERNIGHT.md`; `mods/base/src/death.rs`):
+
+- The death screen is base's own (it replaces the engine's `core:death`): "You Died!", what killed
+  one (`death.base.cause.*`: "Killed by a Zombie", "You froze to death"...), where the tombstone
+  is (x, y, z) or that one carried nothing, Respawn and Save and Quit.
+- After respawning, a line over the hotbar points the way: "Tombstone: 42 m, ahead to the left",
+  until one is within 3 blocks of it or it's gone (`base_api::GRAVE`, synced to its owner).
+- The corpse run (Valheim's): for 3 minutes after respawning, or until the tombstone is reached,
+  no creature hurts one and monsters don't come for one (`vitals::difficulty::GRACE_SECS`); the
+  line says how long is left. Falls, fire, cold and poison still hurt.
+  Once the tombstone is reached the grace lasts 30 s more (`GRACE_AT_GRAVE`): time to take one's
+  things and get away from what killed one. A killing blow no longer leaves one bleeding after
+  the respawn.
+- With the respawn kit (plain clothes, the arrival meal, full stamina: steps 13 and 11).
+- Not yet: a beam or marker in the world at the tombstone (needs the engine), the tombstone
+  crumbling after a while.
+
+**16. Difficulty on Create World, and Gentle's grace** (2026-11-04 overnight, the first-hour report;
+logged in `notes/crew/OVERNIGHT.md`):
+
+- The world rule reads "Survival difficulty" (it read "Survival", like a game mode), and its
+  tooltip says what Gentle does. The Create New World screen doesn't show rules' tooltips yet:
+  that is the engine's (`saves.rs`).
+- Gentle's grace: in a new world's first three nights no monsters appear by themselves
+  (`Difficulty::grace_nights`, counted from the world's first day; normal and harsh 0).
+
+**17. Food stacks** (2026-11-04 overnight, Tester's spring run; logged in `notes/crew/OVERNIGHT.md`):
+
+- Picked or crafted food came in unstamped, was stamped a moment later in a slot of its own, and
+  never stacked (three cattail roots in three slots). Now food stacks that differ only in their
+  day stamp and are at the same freshness stage merge into the earlier slot, keeping the older day
+  (TerraFirmaCraft's way: never fresher by merging; `survival::food::merge_food`). Hot food stays
+  apart until it cools; stews don't stack.
+

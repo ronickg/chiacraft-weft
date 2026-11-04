@@ -344,11 +344,11 @@ A ripe harvest of base:wheat takes a level; base:compost +2, base:dung +1; a sea
 
 ## Difficulty (the `base:difficulty` rule)
 
-| | digests | keeps | harm | can kill | XP lost on death | stamina costs |
-|---|---|---|---|---|---|---|
-| gentle | x0.75 | x1.5 | x0.5 | no, stops at a tenth | 10% | x0.8 |
-| normal | x1 | x1 | x1 | yes | 25% | x1 |
-| harsh | x1.25 | x0.6 | x1.5 | yes | 50% | x1.15 |
+| | digests | keeps | harm | can kill | XP lost on death | stamina costs | first nights without monsters |
+|---|---|---|---|---|---|---|---|
+| gentle | x0.75 | x1.5 | x0.5 | no, stops at a tenth | 10% | x0.8 | 3 |
+| normal | x1 | x1 | x1 | yes | 25% | x1 | 0 |
+| harsh | x1.25 | x0.6 | x1.5 | yes | 50% | x1.15 | 0 |
 
 ## Levels
 

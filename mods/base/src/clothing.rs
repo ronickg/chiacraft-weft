@@ -71,7 +71,11 @@ pub fn register(r: &mut Registry) {
     r.attach(&PLAYER, &DRESSED);
     r.entity_component(&base_api::MILESTONES, 0, component_flags::SAVE | component_flags::KEEP);
     r.attach(&PLAYER, &base_api::MILESTONES);
-    r.entity_component(&base_api::GRAVE, base_api::Grave { x: 0, y: 0, z: 0, set: 0 }, component_flags::SAVE | component_flags::KEEP);
+    r.entity_component(
+        &base_api::GRAVE,
+        base_api::Grave { x: 0, y: 0, z: 0, set: 0 },
+        component_flags::SAVE | component_flags::KEEP | component_flags::SYNC_OWNER,
+    );
     r.attach(&PLAYER, &base_api::GRAVE);
     // A new player arrives in plain clothes, once (Research round 3, B1).
     r.on(&PLAYER_JOINED, |b| {
