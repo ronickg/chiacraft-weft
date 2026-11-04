@@ -505,12 +505,11 @@ fn lakes_on(h: &Here, ground: i32) -> i32 {
     cut
 }
 
-/// One lake's cut at a column near it; `ground` (Q4) is worked out only where the lake reaches
-/// (`i32::MIN` until then).
-fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
-    let sea = q4(SEA as f64);
-    // Stretched along the lake's own direction (`LAKE_STRETCH`), so lakes run long and lie every
-    // way; then its distance from the middle in Q4, as if round.
+/// A column's distance from a lake's middle and the lake's radius there (both Q4), if it's within
+/// `extra` (Q4) of the shore. Lakes run long along their own direction (`LAKE_STRETCH`), so the
+/// distance is measured as if the lake were round; the shore wobbles by a noise as coarse as the
+/// lake is big.
+fn lake_reach(h: &Here, lake: Lake, extra: i32) -> Option<(i32, i32)> {
     let (bx, bz) = (h.x >> 4, h.z >> 4);
     let (ux, uz) = LAKE_AXES[lake.axis as usize];
     let (dx, dz) = ((bx - lake.x) as i64, (bz - lake.z) as i64);
@@ -518,19 +517,23 @@ fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
     let across = (dz * ux as i64 - dx * uz as i64) / 64;
     let across = across * lake.stretch as i64 / 16;
     let d = ((along * along + across * across) as u64).isqrt() as i32 * 16;
-    let shore_most = q4((LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4)) as f64);
     let widest = q4(lake.radius as f64) + ((q4(lake.radius as f64) * q12(LAKE_WOBBLE)) >> 12);
-    if d >= widest + shore_most {
-        return 0;
+    if d >= widest + extra {
+        return None;
     }
-    // The shore wobbles by a noise as coarse as the lake is big.
     let size = q4(lake.radius as f64 * LAKE_WOBBLE_SIZE);
     let wobble = h.f.fbm(salt::LAKE_SHORE, h.x, h.z, size, 4);
     let r = q4(lake.radius as f64) + ((((q4(lake.radius as f64) * wobble) >> 12) * q12(LAKE_WOBBLE)) >> 12);
     let r = r.max(16 * 8);
-    if d >= r + shore_most {
-        return 0;
-    }
+    (d < r + extra).then_some((d, r))
+}
+
+/// One lake's cut at a column near it; `ground` (Q4) is worked out only where the lake reaches
+/// (`i32::MIN` until then).
+fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
+    let sea = q4(SEA as f64);
+    let shore_most = q4((LAKE_SHORE + ((LAKE_SHORE_PER_BLOCK * LAKE_SHORE_RISE) >> 4)) as f64);
+    let Some((d, r)) = lake_reach(h, lake, shore_most) else { return 0 };
     if *ground == i32::MIN {
         *ground = ground_at(h);
     }
@@ -616,6 +619,148 @@ pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
         sea + (((h0 - sea) * smooth) >> 12)
     };
     (((target - h0).min(0)) * deep) >> 12
+}
+
+/// Which water a bank belongs to (`bank`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Water {
+    River,
+    Lake,
+}
+
+/// How a column stands to the nearest river or lake: for plants that grow by water (reeds,
+/// rushes, lily pads, dense bank growth). `in_water`: the column is the river's channel or the
+/// lake itself; `wet`: 1 (`ONE`) in the water and at its edge, falling to 0 at the outer edge of
+/// the bank (`RIVER_BANK`, `LAKE_BANK`), the river's by how strong it runs there.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Bank {
+    pub water: Water,
+    pub in_water: bool,
+    pub wet: i32,
+}
+
+/// The bank band beside a river's channel, in line-noise units (about 0.001 a block), and beside a
+/// lake's shore, in blocks. Both start at the water's level: rivers' and lakes' banks are flush
+/// with the water for their first few blocks, room for reeds.
+pub const RIVER_BANK: f64 = 0.012;
+pub const LAKE_BANK: i32 = 14;
+
+/// The river or lake bank at (`x`, `z`) (Q4), if any; the wetter of the two where both are near.
+/// Cheap enough for a decoration's every column (it never rebuilds the land's height): about a
+/// river line and three climate fields, and the lake sites near.
+pub fn bank(f: &Fields, x: i32, z: i32) -> Option<Bank> {
+    let here = Here::new(f, x, z);
+    let mut best: Option<Bank> = None;
+    let mut take = |b: Bank| {
+        if best.is_none_or(|o| b.wet > o.wet) {
+            best = Some(b);
+        }
+    };
+    // Rivers: the channel's half width as `rivers` has it, without the land.
+    let d = river_line(f, x, z);
+    if d < q12(RIVER_HALF_WIDTH.1 + RIVER_BANK) {
+        let cont = here.continent();
+        let inland = ONE - ramp(cont, q12(RIVER_INLAND.0), q12(RIVER_INLAND.1));
+        let wet = ramp(here.humidity(), q12(RIVER_DRY.0), q12(RIVER_DRY.1));
+        let s = (((inland * wet) >> 12) * (ONE - ramp(MOUNTAINS_AREA.at(&here), q12(RIVER_MOUNTAINS.0), q12(RIVER_MOUNTAINS.1)))) >> 12;
+        if s > 0 {
+            let coast = ramp(cont, q12(RIVER_COAST.0), q12(RIVER_COAST.1));
+            let (lo, hi) = (q12(RIVER_HALF_WIDTH.0), q12(RIVER_HALF_WIDTH.1));
+            let half = (((lo + (((hi - lo) * coast) >> 12)) * s) >> 12).max(1);
+            let strength = ramp(s, 0, q12(RIVER_CREEK));
+            if d < half {
+                take(Bank { water: Water::River, in_water: true, wet: strength });
+            } else if d < half + q12(RIVER_BANK) {
+                let w = ONE - (d - half) * ONE / q12(RIVER_BANK);
+                take(Bank { water: Water::River, in_water: false, wet: (w * strength) >> 12 });
+            }
+        }
+    }
+    // Lakes.
+    let (bx, bz) = (x >> 4, z >> 4);
+    let (cx, cz) = (div_floor(bx, LAKE_CELL).0, div_floor(bz, LAKE_CELL).0);
+    let reach = LAKE_RADIUS.1 + ((LAKE_RADIUS.1 * q12(LAKE_WOBBLE)) >> 12) + LAKE_BANK;
+    for dz in -1..=1 {
+        for dx in -1..=1 {
+            let (_, _, [mx, mz]) = lake_middle(f.seed, cx + dx, cz + dz);
+            if (bx - mx).abs() > reach || (bz - mz).abs() > reach {
+                continue;
+            }
+            let Some(lake) = lake_site(f, cx + dx, cz + dz) else { continue };
+            let Some((d, r)) = lake_reach(&here, lake, q4(LAKE_BANK as f64)) else { continue };
+            if d < r {
+                take(Bank { water: Water::Lake, in_water: true, wet: ONE });
+            } else {
+                take(Bank { water: Water::Lake, in_water: false, wet: ONE - (d - r) * ONE / q4(LAKE_BANK as f64) });
+            }
+        }
+    }
+    best
+}
+
+/// A column near a biome border (`biome_edge`): the biome over it, and how near (`ONE` on the
+/// border, 0 at `EDGE_BAND` of the climate away).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Edge {
+    pub to: &'static str,
+    pub near: i32,
+}
+
+/// How far in the climate fields a biome's edge reaches into its neighbour, for transition
+/// planting (forest thinning into plains, savanna into desert): about 60-100 blocks of ground.
+pub const EDGE_BAND: f64 = 0.03;
+
+/// The biome the climate rules pick for these fields (`overworld_biome` without the coasts).
+fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool) -> &'static str {
+    let at = q12;
+    if mountain || h >= snow_line(t) {
+        "mountains"
+    } else if t < at(SNOWY_BELOW) {
+        "snowy_plains"
+    } else if t < at(TAIGA_BELOW) {
+        "taiga"
+    } else if t >= at(DESERT.0) && hu < at(DESERT.1) {
+        "desert"
+    } else if t >= at(SAVANNA.0) && hu < at(SAVANNA.1) {
+        "savanna"
+    } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
+        "swamp"
+    } else if hu >= at(FOREST_HUMIDITY) {
+        "forest"
+    } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {
+        "birch_forest"
+    } else {
+        "plains"
+    }
+}
+
+/// The nearest other biome by climate at (`x`, `z`) (Q4), ground `height` (blocks) high, if a
+/// border is within `EDGE_BAND`: which it is and how near. Climate borders only (not the coasts'
+/// height rules); the mountains' edge counts where their area crosses `MOUNTAIN_BIOME`.
+pub fn biome_edge(f: &Fields, x: i32, z: i32, height: i32) -> Option<Edge> {
+    let here = Here::new(f, x, z);
+    let (t, hu, c) = (here.temperature(), here.humidity(), here.continent());
+    let m = MOUNTAINS_AREA.at(&here);
+    let line = q12(MOUNTAIN_BIOME);
+    let own = climate_biome(t, hu, c, height, m > line);
+    let band = q12(EDGE_BAND);
+    let mut best: Option<Edge> = None;
+    for k in 1..=3 {
+        let step = band * k / 3;
+        for (dt, dh, dm) in [(step, 0, 0), (-step, 0, 0), (0, step, 0), (0, -step, 0), (0, 0, step), (0, 0, -step)] {
+            let to = climate_biome(t + dt, hu + dh, c, height, m + dm > line);
+            if to != own {
+                let near = ONE - (k - 1) * ONE / 3;
+                if best.is_none_or(|b| near > b.near) {
+                    best = Some(Edge { to, near });
+                }
+            }
+        }
+        if best.is_some() {
+            return best;
+        }
+    }
+    None
 }
 
 /// The snow line (blocks) at temperature `t` (Q12): the band's height from `SNOW_LINES`.
@@ -793,6 +938,42 @@ mod tests {
             }
         }
         assert!(lakes_seen > 0 && wet > 0, "no lake in 2.4 km by 2.4 km ({lakes_seen} cut, {wet} wet)");
+    }
+
+    #[test]
+    fn banks_lie_by_their_water() {
+        let f = Fields { seed: 1 };
+        let (mut river, mut lake) = (0, 0);
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 12 * 16, (i / 200) * 12 * 16);
+            if let Some(b) = bank(&f, x, z) {
+                assert!((0..=ONE).contains(&b.wet));
+                match b.water {
+                    Water::River => river += 1,
+                    Water::Lake => lake += 1,
+                }
+                // In a lake is under the sea's level.
+                if b.water == Water::Lake && b.in_water && lakes(&f, x, z) < 0 {
+                    assert!(height(&f, x, z) >> 4 < SEA + LAKE_ISLAND_HEIGHT + 1);
+                }
+            }
+        }
+        assert!(river > 0 && lake > 0, "{river} river banks, {lake} lake banks");
+    }
+
+    #[test]
+    fn biome_edges_name_another_biome() {
+        let f = Fields { seed: 2 };
+        let mut seen = 0;
+        for i in 0..5_000 {
+            let (x, z) = ((i % 100) * 40 * 16, (i / 100) * 40 * 16);
+            let h = height(&f, x, z) >> 4;
+            if let Some(e) = biome_edge(&f, x, z, h) {
+                assert!((0..=ONE).contains(&e.near));
+                seen += 1;
+            }
+        }
+        assert!(seen > 0);
     }
 
     #[test]

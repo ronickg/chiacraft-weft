@@ -69,8 +69,7 @@ fn main() {
             if l::lakes(&f, x * 16, z * 16) < 0 {
                 if h < SEA - 2 {
                     put(8, (SEA - h) as i64 * 4 + near);
-                } else if h > SEA
-                    && ((after(x + 6, z) < SEA && after(x - 6, z) < SEA) || (after(x, z + 6) < SEA && after(x, z - 6) < SEA))
+                } else if h > SEA && ((after(x + 6, z) < SEA && after(x - 6, z) < SEA) || (after(x, z + 6) < SEA && after(x, z - 6) < SEA))
                 {
                     put(9, h as i64 + near);
                 }
