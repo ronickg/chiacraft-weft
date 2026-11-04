@@ -598,7 +598,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:carrot",
         grams: 60.0,
-        per100: per(88.3, 0.9, 9.6, 0.2, 2.8, 5.9),
+        per100: per(88.3, 0.9, 6.8, 0.2, 2.8, 5.9),
         meal: Meal::Plain,
         raw: false,
         keeps: (20.0, 20.0),
@@ -628,7 +628,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:beetroot",
         grams: 80.0,
-        per100: per(87.6, 1.6, 9.6, 0.2, 2.8, 4.9),
+        per100: per(87.6, 1.6, 6.8, 0.2, 2.8, 4.9),
         meal: Meal::Plain,
         raw: false,
         keeps: (20.0, 20.0),
@@ -638,7 +638,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:corn",
         grams: 100.0,
-        per100: per(76.0, 3.3, 19.0, 1.4, 2.0, 6.8),
+        per100: per(76.0, 3.3, 17.0, 1.4, 2.0, 6.8),
         meal: Meal::Plain,
         raw: false,
         keeps: (2.0, 2.0),
@@ -648,7 +648,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:roasted_corn",
         grams: 100.0,
-        per100: per(73.4, 3.4, 21.0, 1.5, 2.4, 5.5),
+        per100: per(73.4, 3.4, 18.6, 1.5, 2.4, 5.5),
         meal: Meal::Cooked,
         raw: false,
         keeps: (3.0, 3.0),
@@ -658,7 +658,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:beans",
         grams: 100.0,
-        per100: per(90.3, 1.8, 7.0, 0.2, 2.7, 12.2),
+        per100: per(90.3, 1.8, 4.3, 0.2, 2.7, 12.2),
         meal: Meal::Plain,
         raw: false,
         keeps: (5.0, 5.0),
@@ -678,7 +678,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:cassava",
         grams: 100.0,
-        per100: per(59.7, 1.4, 38.1, 0.3, 1.8, 20.6),
+        per100: per(59.7, 1.4, 36.3, 0.3, 1.8, 20.6),
         meal: Meal::Plain,
         raw: false,
         keeps: (2.0, 2.0),

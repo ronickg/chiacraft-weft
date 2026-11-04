@@ -69,15 +69,15 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | animals:pacu | fish | 150 | 15 | 30 | 0 | 3 | 0 | 117 | 17 min | 1 + 1 | raw |
 | animals:cooked_pacu | fish | 110 | 11 | 29 | 0 | 3 | 0 | 79 | 16 min | 3 + 3 | hot when cooked |
 | animals:kibble | meat | 100 | 10 | 25 | 45 | 14 | 4 | 10 | 19 min | 90 + 90 |  |
-| base:carrot | roots | 60 | 6 | 1 | 6 | 0 | 2 | 53 | 3 min | 20 + 20 |  |
+| base:carrot | roots | 60 | 6 | 1 | 4 | 0 | 2 | 53 | 3 min | 20 + 20 |  |
 | base:potato | roots | 170 | 17 | 3 | 30 | 0 | 7 | 135 | 11 min | 30 + 30 |  |
 | base:baked_potato | roots | 140 | 14 | 4 | 30 | 0 | 4 | 105 | 10 min | 3 + 3 | hot when cooked |
-| base:beetroot | roots | 80 | 8 | 1 | 8 | 0 | 3 | 70 | 4 min | 20 + 20 |  |
-| base:corn | seeds | 100 | 10 | 3 | 19 | 1 | 3 | 76 | 8 min | 2 + 2 |  |
-| base:roasted_corn | seeds | 100 | 10 | 3 | 21 | 2 | 3 | 73 | 8 min | 3 + 3 | hot when cooked |
-| base:beans | seeds | 100 | 10 | 2 | 7 | 0 | 4 | 90 | 5 min | 5 + 5 |  |
+| base:beetroot | roots | 80 | 8 | 1 | 5 | 0 | 3 | 70 | 4 min | 20 + 20 |  |
+| base:corn | seeds | 100 | 10 | 3 | 17 | 1 | 3 | 76 | 8 min | 2 + 2 |  |
+| base:roasted_corn | seeds | 100 | 10 | 3 | 19 | 2 | 3 | 73 | 8 min | 3 + 3 | hot when cooked |
+| base:beans | seeds | 100 | 10 | 2 | 4 | 0 | 4 | 90 | 5 min | 5 + 5 |  |
 | base:cooked_rice | seeds | 150 | 15 | 4 | 42 | 0 | 1 | 103 | 11 min | 3 + 3 | hot when cooked |
-| base:cassava | roots | 100 | 10 | 1 | 38 | 0 | 4 | 60 | 7 min | 2 + 2 |  |
+| base:cassava | roots | 100 | 10 | 1 | 36 | 0 | 4 | 60 | 7 min | 2 + 2 |  |
 
 ## Meals and preserving
 
