@@ -104,6 +104,12 @@ again (once or twice) rather than fixed by hand:
 - Glows (the sun, fire, magic) blend into magenta as a pink ring: ask for glows on green, or take
   the pink pixels out after cutting (`r > 200, g < 160, b > 100`).
 
+## Keeping it
+
+Nothing generated is ever thrown away: each try, cut sprite, review sheet and replaced texture goes
+to `/Users/ronald/Coding/chiacraft-archive/images/chiacraft-art/<date>/`, outside the repo, and is
+never deleted (Ronald's rule, 2026-11-04). `art.py` does it on its own.
+
 ## Showing it
 
 Every new set is shown on a page before it goes into the game: as generated, the cut sprite at

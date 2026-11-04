@@ -9,6 +9,7 @@ import html
 import io
 import json
 import os
+import sys
 
 from PIL import Image
 
@@ -110,7 +111,14 @@ def sheet(batch, jobs):
                 d.text((bx + 30, y0 + lab + S // 2 - 8), "new item", fill=(0xc2, 0xac, 0x88), font=font)
     os.makedirs(os.path.join(HERE, "sheets"), exist_ok=True)
     path = os.path.join(HERE, "sheets", batch + ".png")
-    im.save(path)
+    b = io.BytesIO()
+    im.save(b, "PNG")
+    if os.path.exists(path) and open(path, "rb").read() != b.getvalue():
+        # a sheet Ronald may have seen: keep the old one for good before it changes (his rule, 11-04)
+        sys.path.insert(0, os.path.join(ROOT, ".claude", "skills", "game-art", "scripts"))
+        import art
+        art.archive(path, f"sheet_{batch}", "sheets")
+    open(path, "wb").write(b.getvalue())
     return path
 
 
