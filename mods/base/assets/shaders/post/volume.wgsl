@@ -79,7 +79,8 @@ fn apply(p: PostPixel) -> vec4<f32> {
     let canopy = min(scene.canopy.x, 1.0) * select(k, 1.0, k == 0.0);
     let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.004 + 0.02 * scene.weather.z)) * (1.0 - scene.fog_color.w);
     let air = 1.0 - exp(-density * end);
-    let color = mix(vec3(1.0, 0.62, 0.35), vec3(1.0, 0.95, 0.85), smoothstep(0.05, 0.5, sun.y));
+    // Gold while the sun is under about 30° (the fog's MIST_GOLD in look.wgsl), white toward noon.
+    let color = mix(vec3(1.0, 0.62, 0.3), vec3(1.0, 0.95, 0.85), smoothstep(0.1, 0.65, sun.y));
     // Lit air against shade: what shows is the difference the shadow maps make, so a view where all
     // of the air is lit (looking at the sun over open land) gets little of it, beams through gaps
     // the most.

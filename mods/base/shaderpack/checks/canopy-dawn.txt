@@ -1,0 +1,68 @@
+# Canopy, the second round (Planner, 11-04): shafts gold at a low sun, the dawn mist above the
+# crowns lit gold toward the sun and dim away from it, less grain in the shafts, and mist over the
+# flooded forest's water (igapó, Terrain's banks). Seed 1, --view 12, 1280x720, --shader-pack
+# chiacraft, a fresh world. Spectator, absolute /tp, mobs off. Yaw 0 faces -z, 90 -x (west), 180 +z,
+# 270 +x (east, the morning sun); a negative pitch looks down. /air 0.6 0 is a thick fog morning.
+# No `idle` after the first /tp: on tropical-trees 1662f8db the world round spot 1 never went idle.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /time set 1000
+chat /tp 148.5 93 523.5
+loaded
+wait 30
+# 1. Inside the forest (Terrain's spot 1), toward the sun: 07:00, 07:30, 08:30, in the forest's own air.
+look 270 12
+wait 3
+shot dawn_1_0700.png
+chat /time set 1500
+wait 4
+shot dawn_1b_0730.png
+chat /time set 2500
+wait 4
+shot dawn_1c_0830.png
+# 2. The same in thick mist, 07:30; a close look at the shafts' grain.
+chat /air 0.6 0
+chat /time set 1500
+wait 12
+shot dawn_2_0730_mist.png
+look 270 25
+wait 2
+shot dawn_2b_0730_mist_up.png
+wait 1
+bench 4 dawn_mist
+# 3. Over the crowns at 06:30 in the mist: toward the sun, and away.
+chat /time set 500
+chat /tp 20.5 140 464.5
+wait 10
+look 270 -10
+wait 3
+shot dawn_3_above_east.png
+look 90 -10
+wait 2
+shot dawn_3b_above_west.png
+# 4. The flooded forest at 07:00 in the mist, from its banks (ground 67).
+chat /time set 1000
+chat /tp 243.5 69 919.5
+wait 12
+look 270 0
+wait 3
+shot dawn_4_igapo_a.png
+chat /tp 261.5 69 893.5
+wait 10
+look 315 0
+wait 3
+shot dawn_4b_igapo_b.png
+chat /tp -181.5 69 -935.5
+wait 12
+look 180 0
+wait 3
+shot dawn_4c_igapo_c.png
+# 5. The flooded forest at noon, clear.
+chat /air 0 0
+chat /time set 6000
+wait 10
+shot dawn_5_igapo_noon.png
+quit
