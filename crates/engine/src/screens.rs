@@ -462,7 +462,8 @@ pub fn frame(ui: &mut Ui, cx: &BuildCx, title: &str, f: impl FnOnce(&mut Ui)) {
     ui.panel(bg, Style::default().grow().center().pad(12.0).gap(10.0), |ui| {
         // Over the title's picture the title sits on a plate (thin type on the sky and trees was
         // hard to read, Tester's audit, 11-04); in a world the overlay dims what is behind it.
-        let plate = if cx.in_game { None } else { Some(ui.open(Kind::Container { class: Some("tooltip".into()) }, Style::default().pad(4.0))) };
+        let plate =
+            if cx.in_game { None } else { Some(ui.open(Kind::Container { class: Some("tooltip".into()) }, Style::default().pad(4.0))) };
         let t = label(ui, cx, title, &[], "title");
         if let Some(t) = ui.text_mut(t) {
             t.scale = 2.0;
