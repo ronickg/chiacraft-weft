@@ -134,6 +134,11 @@ pub struct Player {
     did: Option<String>,
     did_days: Option<u32>,
     waiting: Option<(String, String, Instant)>,
+    /// The join waits for the DID check, and for the achievements the rules asked about.
+    did_pending: bool,
+    proofs_pending: bool,
+    /// Achievements shown when the world asked: (id, issuer identity hex), checked.
+    achievements: Vec<(String, String)>,
 }
 
 pub struct Generated {
@@ -620,6 +625,9 @@ impl Server {
                 did: None,
                 did_days: None,
                 waiting: None,
+                did_pending: false,
+                proofs_pending: false,
+                achievements: Vec::new(),
             });
         }
     }

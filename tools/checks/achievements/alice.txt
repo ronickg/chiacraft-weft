@@ -1,4 +1,5 @@
-# Phase 4 slices 8-9: worlds sign achievements; the profile shows them. The owner's side.
+# Phase 4: worlds sign achievements; the profile shows them; a world lets in only players with
+# an achievement it signed. The owner's side.
 loaded
 host ach-ticket.txt
 chat /give crafting_table          # her own advancement in her own world: self-signed
@@ -6,8 +7,14 @@ await_file ach-mark-bob-in 300
 chat /give bob crafting_table      # bob's "A Place to Work", signed by alice's world
 wait 5
 mark ach-mark-given
-await_file ach-mark-bob-done 300
+await_file ach-mark-bob-left 300
 screen core:achievements
 wait 2
 shot ach-alice.png
+chat /achievementrule base:timber  # one bob doesn't have
+mark ach-mark-rule1
+await_file ach-mark-bob-refused 300
+chat /achievementrule base:workbench   # the one her world signed him
+mark ach-mark-rule2
+await_file ach-mark-bob-back 300
 quit

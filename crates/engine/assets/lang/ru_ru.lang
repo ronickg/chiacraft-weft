@@ -526,3 +526,7 @@ achievements.no_world_did = подписано владельцем, без DID 
 achievements.line = {0}  ·  {1}  {2}
 achievements.desc = {0}
 achievements.anchored = · в блокчейне с {0}
+admission.achievement_required = В этот мир пускают только игроков, получивших «{0}» в мире, которому он доверяет (сначала — в этом).
+admission.summary.achievement = нужно достижение
+admission.achievement_rule_set = Теперь входят только игроки с достижением {0} (доверенных подписантов: {1})
+admission.achievement_rule_off = От входящих не требуется достижений

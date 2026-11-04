@@ -31,8 +31,9 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// reason in the player's language (`ToClient::Refused`), and its status says what its admission
 /// rules ask (chiacraft, `admission`). 8: an offer says which mod API its code needs instead of
 /// only whether it has code (empty: no code; chiacraft, phase 6). 9: worlds send players their
-/// signed achievements (`ToClient::Achievement`; chiacraft, phase 4).
-const PROTOCOL: u32 = 9;
+/// signed achievements (`ToClient::Achievement`; chiacraft, phase 4). 10: a world asks a joining
+/// game for an achievement its rules need (`AskAchievement`, `Proofs`; chiacraft, phase 4).
+const PROTOCOL: u32 = 10;
 const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its

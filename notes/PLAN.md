@@ -335,8 +335,12 @@ The smallest version that works is phases 1-4.
       root of the day's credentials on chain (the wallet's `anchor`, a spend from the owner's
       wallet; testnet11 for now) and gives each player the inclusion proof for theirs when they
       next join.
-   Later: the admission rule "has achievement X" (the join carrying the credential), revocation
-   lists served by worlds, achievements a sandboxed mod grants.
+   11. *Has achievement X* (built 2026-11-04, not yet seen in a game): an admission rule
+      (`/achievementrule <id> [issuer keys]`): only players who earned it, as a credential signed by
+      this world's owner or an issuer the owner names. The world asks the joining game for that
+      achievement only (`AskAchievement`), the game shows its credentials for it and nothing else
+      (`Proofs`), and the join waits for them as it waits for a DID check.
+   Later: revocation lists served by worlds, achievements a sandboxed mod grants.
 5. **Finding worlds.** On-chain listing by hint; DIG listings and curated lists; spam ranking.
 6. **Sandboxed code mods.** wasmtime with components (from `horizon-mods`), WIT v1.0 shaped on
    Weft's SDK, server halves then client halves, frozen API versions; personal mods per world.

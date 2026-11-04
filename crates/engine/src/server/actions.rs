@@ -53,7 +53,7 @@ impl Server {
     pub(super) fn allowed(&self, pi: usize, msg: &ToServer) -> bool {
         use ToServer as M;
         let p = &self.players[pi];
-        if matches!(msg, M::Join { .. } | M::Leave) {
+        if matches!(msg, M::Join { .. } | M::Leave | M::Proofs(_)) {
             return true;
         }
         let Some(e) = self.dims[p.dim as usize]
@@ -89,11 +89,49 @@ impl Server {
                 self.players[pi].identity = identity;
                 // A DID claimed (chiacraft): checked on chain in the background. When the
                 // world's rules ask for a DID, the join waits for the answer (a few seconds).
-                if self.check_did(pi, &key, &did) && self.gate.rules.needs_did() {
-                    self.players[pi].waiting = Some((name, key, Instant::now()));
+                let did_pending = self.check_did(pi, &key, &did) && self.gate.rules.needs_did();
+                // An achievement the rules ask for: the joining game shows its credentials for it.
+                let ask = self
+                    .gate
+                    .rules
+                    .achievement
+                    .as_ref()
+                    .map(|r| r.id.clone())
+                    .filter(|_| self.players[pi].identity.is_some());
+                let p = &mut self.players[pi];
+                p.did_pending = did_pending;
+                p.proofs_pending = ask.is_some();
+                if let Some(id) = ask {
+                    p.conn.send(ToClient::AskAchievement { id });
+                }
+                if p.did_pending || p.proofs_pending {
+                    p.waiting = Some((name, key, Instant::now()));
                     return;
                 }
                 self.join(c, pi, name, key)
+            }
+            ToServer::Proofs(list) => {
+                if !self.players[pi].proofs_pending {
+                    return;
+                }
+                let me = self.players[pi].identity.clone().unwrap_or_default();
+                let shown: Vec<(String, String)> = list
+                    .iter()
+                    .take(8)
+                    .filter(|j| j.len() <= 8 << 10)
+                    .filter_map(|j| chiacraft_wallet::achievement::Credential::from_json(j).ok())
+                    .filter(|c| c.subject.key == me && c.verify().is_ok())
+                    .map(|c| (c.achievement.id, c.issuer.key))
+                    .collect();
+                log::info!("{} showed {} achievement(s)", self.players[pi].key, shown.len());
+                let p = &mut self.players[pi];
+                p.achievements = shown;
+                p.proofs_pending = false;
+                if !p.did_pending
+                    && let Some((name, key, _)) = p.waiting.take()
+                {
+                    self.join(c, pi, name, key);
+                }
             }
             ToServer::StartBreak { pos, frame } => {
                 let Some((r, _)) = self.region(pi) else { return };

@@ -101,6 +101,18 @@ pub fn keep(path: &Path, me: &str, json: &str) -> Result<bool, String> {
     Ok(true)
 }
 
+/// This account's credentials for achievement `id` (JSON), for a world whose rules ask for it:
+/// only those, at most eight, the newest first.
+pub fn proofs(id: &str) -> Vec<String> {
+    let mut all: Vec<Credential> = load()
+        .credentials
+        .into_iter()
+        .filter(|c| c.achievement.id == id)
+        .collect();
+    all.sort_by_key(|c| std::cmp::Reverse(c.issued));
+    all.iter().take(8).map(Credential::to_json).collect()
+}
+
 /// A day's anchor a world sent for one of this account's achievements: kept on that credential
 /// if its proof leads from the credential to the anchored root.
 pub fn anchored(hash: &str, anchor: &str) {

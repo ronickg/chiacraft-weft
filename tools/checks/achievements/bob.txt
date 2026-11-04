@@ -1,4 +1,5 @@
-# The visitor's side: his achievement arrives signed by alice's world and is kept.
+# The visitor's side: his achievement arrives signed by alice's world and is kept; later her
+# world asks for one at the door.
 join ach-ticket.txt
 loaded
 mark ach-mark-bob-in
@@ -7,5 +8,17 @@ wait 3
 screen core:achievements
 wait 2
 shot ach-bob.png
-mark ach-mark-bob-done
+leave
+mark ach-mark-bob-left
+await_file ach-mark-rule1 300
+join ach-ticket.txt      # refused: the world asks for Timber!, which he hasn't
+wait 8
+shot ach-bob-refused.png
+mark ach-mark-bob-refused
+await_file ach-mark-rule2 300
+join ach-ticket.txt      # his "A Place to Work" from her world is shown at the door: in
+loaded
+wait 3
+shot ach-bob-back.png
+mark ach-mark-bob-back
 quit
