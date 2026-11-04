@@ -104,7 +104,7 @@ fn issuer_did(dir: &std::path::Path, issuer: &[u8; 48]) -> Option<IssuerDid> {
     let did = chiacraft_wallet::keys::encode_did(&launcher)?;
     let issuer_hex = chiacraft_wallet::keys::hex(issuer);
     if let Some((key, owner, sig)) = d.issuer.clone().filter(|(k, _, _)| *k == issuer_hex) {
-        return Some(IssuerDid { did, owner, sig }).filter(|_| !key.is_empty());
+        return (!key.is_empty()).then_some(IssuerDid { did, owner, sig });
     }
     let text = chiacraft_wallet::achievement::issuer_did_text(&launcher, issuer);
     match chiacraft_account::current()?.first_owner_sign(&text) {

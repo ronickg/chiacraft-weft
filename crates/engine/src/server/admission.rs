@@ -225,7 +225,7 @@ impl Server {
         let Some(did) = chiacraft_wallet::keys::encode_did(&launcher) else { return false };
         let tx = self.did_checks.0.clone();
         let key = key.to_string();
-        let started = std::thread::Builder::new()
+        std::thread::Builder::new()
             .name("did check".into())
             .spawn(move || {
                 let answer = crate::chiacraft::chain::get().and_then(|reader| {
@@ -242,8 +242,7 @@ impl Server {
                 };
                 let _ = tx.send(checked);
             })
-            .is_ok();
-        started
+            .is_ok()
     }
 
     /// DID checks that came back: the player's DID is known (or not), a waiting join goes on,
