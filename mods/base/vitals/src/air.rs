@@ -225,6 +225,16 @@ mod tests {
     use super::*;
     use crate::climate::BIOMES;
 
+    /// Every biome the per-biome shares name (aurorae, canopies) has a climate row, so a renamed
+    /// biome can't silently lose its aurora or its light under the leaves.
+    #[test]
+    fn shares_name_real_biomes() {
+        for (name, share) in AURORA.iter().chain(CANOPY.iter()) {
+            assert!(crate::climate::of(name).is_some(), "{name} has no climate row");
+            assert!((0.0..=1.0).contains(share), "{name}: share {share}");
+        }
+    }
+
     /// Over many years a biome has fog on about its share of each season's days, and its wind
     /// averages the season's mean.
     #[test]
