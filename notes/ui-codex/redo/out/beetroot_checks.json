@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a beetroot: a round deep crimson-purple root with a thin tail at the bottom and short green-red stalks on top, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": true,
+ "tries": [
+  {
+   "grid": 0.274,
+   "outline": 0.67,
+   "red_line": 0.01,
+   "fill": 0.34,
+   "passed": true
+  }
+ ]
+}
