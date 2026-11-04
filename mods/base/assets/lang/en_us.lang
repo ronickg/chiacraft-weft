@@ -530,7 +530,7 @@ advancement.base.tame.desc = Tame an animal
 # Where things come from (tooltips)
 menu.base.campfire = Campfire
 item.base.fur.tooltip = From furred wild animals: hares, foxes, wolves, reindeer.
-item.base.plant_fibre.tooltip = From cutting tall grass. Two spin into string.
+item.base.plant_fibre.tooltip = From cutting tall grass, sedge or cattail. Two spin into string.
 item.base.salt.tooltip = Boiled out of a water bucket in a furnace. Salts raw meat.
 item.base.leather.tooltip = From cows and deer.
 item.base.string.tooltip = From spiders, or spun from two plant fibres.
@@ -615,7 +615,7 @@ hud.base.way.6 = to the right
 hud.base.way.7 = ahead to the right
 
 # Rooms (survival/shelter.rs, vitals::shelter)
-hud.base.room = Sheltered · {0} walls, {1} °C
+hud.base.room = Room · {0} walls, {1} °C
 hud.base.wall.log = log
 hud.base.wall.earth = earth
 hud.base.wall.snow = snow
@@ -627,6 +627,8 @@ hud.base.wall.glass = glass
 # Cloaks (clothing.rs, vitals::clothing::CLOAKS)
 item.base.wool_cloak = Wool Cloak
 item.base.fur_robe = Fur Robe
-item.base.rain_cape = Rain Cape
+item.base.rain_cape = Leather Rain Cape
 item.base.rain_cape.tooltip = Rain doesn't make you wet under it.
 death.base.dropped = There was nowhere for a tombstone: your things fell where you died.
+item.base.wool_cloak.tooltip = Worn over clothes and armor. Keeps most of its warmth wet.
+item.base.fur_robe.tooltip = Worn over clothes and armor: the warmest cloak, too warm in summer.

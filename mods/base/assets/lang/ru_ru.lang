@@ -521,7 +521,7 @@ advancement.base.tame.desc = Приручите животное
 # Откуда что берётся (подсказки к предметам)
 menu.base.campfire = Костёр
 item.base.fur.tooltip = С пушных диких зверей: зайцев, лис, волков, северных оленей.
-item.base.plant_fibre.tooltip = Со срезанной высокой травы. Из двух выпрядается нить.
+item.base.plant_fibre.tooltip = Со срезанной высокой травы, осоки или рогоза. Из двух выпрядается нить.
 item.base.salt.tooltip = Вываривается из ведра воды в печи. Ею солят сырое мясо.
 item.base.leather.tooltip = С коров и оленей.
 item.base.string.tooltip = С пауков или спрядена из двух растительных волокон.
@@ -608,7 +608,7 @@ hud.base.way.7 = впереди справа
 hud.base.badge = {0}
 
 # Комнаты (survival/shelter.rs, vitals::shelter)
-hud.base.room = Укрытие · стены: {0}, {1} °C
+hud.base.room = Комната · стены: {0}, {1} °C
 hud.base.wall.log = брёвна
 hud.base.wall.earth = земля
 hud.base.wall.snow = снег
@@ -620,6 +620,8 @@ hud.base.wall.glass = стекло
 # Плащи (clothing.rs, vitals::clothing::CLOAKS)
 item.base.wool_cloak = Шерстяной плащ
 item.base.fur_robe = Меховая накидка
-item.base.rain_cape = Дождевая накидка
+item.base.rain_cape = Кожаная накидка от дождя
 item.base.rain_cape.tooltip = Под ней дождь вас не мочит.
 death.base.dropped = Надгробию негде было встать: ваши вещи упали там, где вы погибли.
+item.base.wool_cloak.tooltip = Носится поверх одежды и доспехов. Мокрым почти не теряет тепла.
+item.base.fur_robe.tooltip = Носится поверх одежды и доспехов: самая тёплая накидка, летом в ней жарко.
