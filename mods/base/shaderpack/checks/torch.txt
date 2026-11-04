@@ -1,0 +1,47 @@
+# Night with a torch (Ronald, 11-04: nights dark by design, torches light the way): the same spot
+# at midnight holding nothing, holding a torch (first and third person), and beside a campfire.
+# Ground in the open with a few trees and rocks to light. Seed 1, --view 12, 1280x720,
+# --shader-pack chiacraft, a fresh world. Creative on the ground (the torch in the hand),
+# mobs off. Yaw 0 faces -z.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /weather clear 99999
+chat /tk mode creative
+chat /time set 6000
+chat /tp -689 120 -122
+loaded
+idle
+wait 10
+chat /tk fill -692 ~-1 -128 -684 ~-1 -118 grass_block
+chat /tk fill -690 ~ -126 -690 ~2 -126 oak_log
+chat /tk fill -686 ~ -127 -686 ~1 -127 cobblestone
+chat /tk fill -684 ~ -124 -684 ~ -124 mossy_cobblestone
+chat /time set 18000
+wait 4
+look 0 -15
+wait 2
+shot torch_1_nothing.png
+bench 4 torch_nothing
+chat /tk put 0 torch
+wait 2
+shot torch_2_held.png
+bench 4 torch_held
+look 90 -15
+wait 1
+shot torch_2b_held_side.png
+key core:perspective
+wait 2
+look 0 -15
+wait 1
+shot torch_3_third_person.png
+key core:perspective
+key core:perspective
+wait 1
+chat /tk put 0 stick
+chat /tk fill -689 ~ -125 -689 ~ -125 campfire
+wait 2
+look 0 -20
+wait 2
+shot torch_4_campfire.png
+quit
