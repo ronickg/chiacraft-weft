@@ -1,6 +1,6 @@
 //! The nearest spots to spawn of a kind, with a camera for a look script: for testers, so a shot
 //! of a lake or a river shows one. Kinds: `lake`, `river` (water at least two blocks deep in the
-//! channel), `coast` (land with the sea beside it), `karst` (a tower), `canyon` (cut 24 or more), `spawn` (the fair first place) or any overworld biome by name (`desert`,
+//! channel), `coast` (land with the sea beside it), `karst` (a tower), `canyon` (cut 24 or more), `crater`, `sinkhole` (karst), `spawn` (the fair first place) or any overworld biome by name (`desert`,
 //! `sequoia_grove`, ...). Searched in rings outward from the middle every `step` blocks, the
 //! world as the engine builds it (the overworld's fields, its continent scale).
 //!
@@ -33,6 +33,31 @@ fn main() {
         return;
     }
     let h = |x: i32, z: i32| l::height(&f, x * 16, z * 16) >> 4;
+    if kind == "crater" || kind == "sinkhole" {
+        // Sites, not a ring search: they are rare and known by their cells.
+        let mut sites = if kind == "crater" { l::craters_near(&f, 0, 0, 16_000) } else { l::sinks_near(&f, 0, 0, 6_000) };
+        sites.sort_by_key(|&(x, z, _)| x as i64 * x as i64 + z as i64 * z as i64);
+        if sites.is_empty() {
+            println!("no {kind} near spawn on seed {seed}");
+        }
+        for (x, z, r) in sites.into_iter().take(count) {
+            let (rim, floor) = (
+                (0..16)
+                    .map(|k| {
+                        let a = k as f64 / 16.0 * std::f64::consts::TAU;
+                        h(x + (a.cos() * r as f64) as i32, z + (a.sin() * r as f64) as i32)
+                    })
+                    .max()
+                    .unwrap(),
+                h(x, z),
+            );
+            let dist = ((x as f64).powi(2) + (z as f64).powi(2)).sqrt().round();
+            println!("# {kind} at x {x} z {z}, radius {r}, floor {floor}, rim up to {rim}, {dist} blocks from spawn");
+            let (cz, cam) = (z - r * 2 - 10, rim + 18);
+            println!("chat /tp {x} {cam} {cz}\nidle\nlook 180 -30\nwait 2\nwhere\nshot {kind}_{x}_{z}.png");
+        }
+        return;
+    }
     let is = |x: i32, z: i32| -> bool {
         match kind.as_str() {
             "lake" | "river" => {

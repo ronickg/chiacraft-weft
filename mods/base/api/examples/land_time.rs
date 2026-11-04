@@ -42,8 +42,9 @@ fn main() {
     let mesa = time("mesas", &|x, z| l::mesa(&f, x, z));
     let lakes = time("lakes", &|x, z| l::lakes(&f, x, z));
     let rivers = time("rivers", &|x, z| l::rivers(&f, x, z));
-    time("karst", &|x, z| l::karst(&f, x, z));
+    time("karst", &|x, z| l::karst(&f, x, z)); // towers and sinkholes
     time("canyons", &|x, z| l::canyons(&f, x, z));
+    time("craters", &|x, z| l::craters(&f, x, z));
     time("bank", &|x, z| l::bank(&f, x, z).map_or(0, |b| b.wet));
     time("edge", &|x, z| l::biome_edge(&f, x, z, 80).map_or(0, |e| e.near));
     time("fray", &|x, z| l::fray(&f, x, z, 70).map_or(0, |g| g.0.len() as i32));
