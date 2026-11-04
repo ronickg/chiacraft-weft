@@ -249,9 +249,10 @@ fn height_line(ui: &mut Ui) {
         let (Some(a), Some(g)) = (c.menu_component(&ANIMAL), c.menu_component(&crate::coats::GENOME)) else { return };
         let Some(s) = a.species() else { return };
         let m = s.height.0 * crate::coats::size(&g);
-        let shown = if m < 1.0 { format!("{:.0} cm", m * 100.0) } else { format!("{m:.2} m") };
+        // The unit in the line's own translation ("cm" stayed English in Russian).
+        let (shown, unit) = if m < 1.0 { (format!("{:.0}", m * 100.0), "cm") } else { (format!("{m:.2}"), "m") };
         let key = if a.stage < animal::ADULT { "screen.animals.height_young" } else { "screen.animals.height" };
-        t.set(key, &[Arg::Text(&shown), Arg::Key(&format!("screen.animals.height.{}", s.height.1))]);
+        t.set(&format!("{key}_{unit}"), &[Arg::Text(&shown), Arg::Key(&format!("screen.animals.height.{}", s.height.1))]);
     });
 }
 
