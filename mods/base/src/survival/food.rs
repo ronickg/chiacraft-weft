@@ -155,19 +155,18 @@ pub fn merge_food(stacks: &mut [ItemStack]) {
 /// A food stack stamped and its freshness moved on, at day time `now`.
 fn aged(stack: ItemStack, now: u64) -> ItemStack {
     let today = (now / calendar::DAY_TICKS) as u32 + 1;
-    let (keeps, cooked) = if let Some(packed) = MEAL.stack_only(&stack) {
-        (meals::keeps(&meals::ingredients(packed)), true)
+    let keeps = if let Some(packed) = MEAL.stack_only(&stack) {
+        meals::keeps(&meals::ingredients(packed))
     } else if let Some(f) = food::find(item_name(stack.item)).map(|f| &food::FOODS[f]) {
-        (f.keeps, f.meal == food::Meal::Cooked)
+        f.keeps
     } else {
         return stack;
     };
     let mut new = stack;
+    // Stamped with today when first seen; hot only where it was cooked (the furnace, the campfire,
+    // the pot stamp it), not here: crafted bread came out hot (integration review).
     if MADE.stack_only(&stack).unwrap_or(0) == 0 {
         new = new.with(&MADE, today);
-        if cooked {
-            new = new.with(&HOT, (now / 20) as u32);
-        }
     }
     let (age, hot) = base_api::food_age(&new, now);
     if HOT.stack_only(&new).is_some() && !hot {
