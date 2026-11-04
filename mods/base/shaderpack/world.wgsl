@@ -568,7 +568,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // of it, so even the shallowest water tints what lies under it.
     let through = exp(-0.28 * depth / max(v.y, 0.2)) * 0.82;
     let r = reflect(-v, n);
-    let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    // The sky toward the horizon more than the ripples' tilt would give: they tipped it up into the
+    // darker blue overhead, where Bliss's lakes mirror the pale, hazy low sky (Tester 2's shots:
+    // our lake's water 0.45 mean brightness against Bliss's 0.62).
+    let refl = sky_color(normalize(vec3(r.x, max(r.y * 0.5, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
     let l = light_dir();
     // Never a zero vector (light exactly behind the eye): its normalize would be NaN.

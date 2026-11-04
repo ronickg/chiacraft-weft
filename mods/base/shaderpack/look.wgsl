@@ -554,7 +554,8 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // The air's own depth, whatever the view distance: with distant terrain the fog's end lies
     // thousands of blocks off, and the haze would barely start where the kept blocks give way to it.
     let reach = min(end, 2500.0);
-    let amount = 1.0 - exp(-dist / (reach * mix(0.9, 0.4, rain)) * mix(0.45, 1.0, thin));
+    // A little hazier than it was (0.9): Bliss's air veils the middle distance more, lighter.
+    let amount = 1.0 - exp(-dist / (reach * mix(0.75, 0.4, rain)) * mix(0.45, 1.0, thin));
     let edge = smoothstep(end * 0.72, end, dist);
     // Valheim's air: lit from behind by the sun, so the haze toward it glows warm (a forward
     // scattering lobe, Henyey-Greenstein) and the side away goes a cool blue-teal, most at a low
