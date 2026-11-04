@@ -55,7 +55,7 @@ pub fn markdown() -> String {
         let _ = writeln!(
             w,
             "| {} | {} | {} | {} | {} | {:.0} | {} | {} | {} | {} | {} |",
-            m.id,
+            if crate::materials::PROVISIONAL.contains(&m.id) { format!("{} (provisional)", m.id) } else { m.id.to_string() },
             roles.join(", "),
             m.density,
             m.bulk,
@@ -69,7 +69,11 @@ pub fn markdown() -> String {
         );
     }
 
-    let _ = writeln!(w, "\n## Traits\n");
+    let _ = writeln!(
+        w,
+        "\nProvisional rows stand in for today's tools until Content plan's decisions 1 and 2 (the ladder replacing Weft's tiers, and what diamond becomes).\n"
+    );
+    let _ = writeln!(w, "## Traits\n");
     let _ = writeln!(w, "| Trait | Effect | When |\n|---|---|---|");
     for t in TRAITS {
         let _ = writeln!(w, "| {} | {:?} | {:?} |", t.id, t.effect, t.when);

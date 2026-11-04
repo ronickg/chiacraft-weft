@@ -126,6 +126,10 @@ pub const MATERIALS: &[Material] = &[
     m("leather", "material.base.leather", &[F, H], 0.9, 1.0, 0, 0.0, 0.0, 0.0, (0.02, 0.0), 90.0, "", Making::Sew),
 ];
 
+/// Rows kept only until Content plan's decisions 1 and 2 (the ladder replacing Weft's tiers, and
+/// what diamond becomes): today's stone and diamond tools.
+pub const PROVISIONAL: &[&str] = &["stone", "diamond"];
+
 /// Material `id`.
 pub fn material(id: &str) -> Option<&'static Material> {
     MATERIALS.iter().find(|m| m.id == id)
