@@ -80,13 +80,21 @@ pub fn turned_axis(axis: &str, along_x: bool) -> &'static str {
 /// nobody is buried in a trunk (fell_hang1 buried the player standing in its way).
 pub fn occupied(w: &World, cell: [i32; 3]) -> bool {
     let mid = [cell[0] as f64 + 0.5, cell[1] as f64 + 0.5, cell[2] as f64 + 0.5];
-    w.near_bodies(mid, 2.5).into_iter().any(|id| {
-        w.entity(id).is_some_and(|e| {
-            let half = e.size[0] as f64 / 2.0;
-            let (lo, hi) = ([e.pos[0] - half, e.pos[1], e.pos[2] - half], [e.pos[0] + half, e.pos[1] + e.size[1] as f64, e.pos[2] + half]);
-            (0..3).all(|i| lo[i] < cell[i] as f64 + 1.0 && hi[i] > cell[i] as f64)
+    !in_box(w, mid, 0.5).is_empty()
+}
+
+/// The creatures (players too) whose box reaches within `half` of `mid` each way.
+pub fn in_box(w: &World, mid: [f64; 3], half: f64) -> Vec<u64> {
+    w.near_bodies(mid, half + 3.0)
+        .into_iter()
+        .filter(|&id| {
+            w.entity(id).is_some_and(|e| {
+                let r = e.size[0] as f64 / 2.0;
+                let (lo, hi) = ([e.pos[0] - r, e.pos[1], e.pos[2] - r], [e.pos[0] + r, e.pos[1] + e.size[1] as f64, e.pos[2] + r]);
+                (0..3).all(|i| lo[i] < mid[i] + half && hi[i] > mid[i] - half)
+            })
         })
-    })
+        .collect()
 }
 
 /// What a lying trunk may take the place of: air, leaves and what breaks at a touch (plants).

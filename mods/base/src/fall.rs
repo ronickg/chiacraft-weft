@@ -62,9 +62,10 @@ struct Fall {
     hurt: HashSet<u64>,
     /// Caught on a trunk it can't knock down: the angle it rests at, when, and the log holding it.
     hung: Option<(f32, u64, [i32; 3])>,
-    /// Its rush and thud have sounded.
+    /// Its rush and thud have sounded; it has reached the ground (nothing hurt after).
     rushed: bool,
     thudded: bool,
+    thudded_ground: bool,
 }
 
 /// A tree that hung up on a trunk and settled there as blocks, leaning (`settle`): what holds it
@@ -192,6 +193,7 @@ pub fn start(
         hung: None,
         rushed: false,
         thudded: false,
+        thudded_ground: false,
     });
     w.play_sound(&CREAK, pivot, n::sound_volume(height as f32));
     true
@@ -266,8 +268,11 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
         w.set_structure_block(f.body, local, 0);
         leaf_off(w, f, p, state, deg, speed);
     }
-    if deg > n::KNOCK_FROM && deg < 90.0 {
+    // Up to the ground (not the bounce): a log moves up to half a block a tick near the end, so
+    // what it passes is tested with a margin (`HURT_REACH`).
+    if deg > n::KNOCK_FROM && !f.thudded_ground {
         hurt(w, f, deg);
+        f.thudded_ground = deg >= 90.0;
     }
     if deg > n::KNOCK_FROM {
         if let Some(holder) = knock(w, f, deg) {
@@ -362,7 +367,7 @@ fn hurt(w: &World, f: &mut Fall, deg: f32) {
     let harm = n::hurt(f.logs.len() as u32);
     for p in f.logs.iter().step_by(step) {
         let at = turn(center(*p), f.pivot, f.axis, deg);
-        for id in w.near_bodies(at, n::HURT_REACH) {
+        for id in crate::felled::in_box(w, at, n::HURT_REACH) {
             if id != f.body && f.hurt.insert(id) {
                 w.damage(id, harm, 0, abi::damage::CRUSH);
             }

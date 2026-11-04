@@ -62,11 +62,12 @@ pub const HANG_BACK: f32 = 4.0;
 pub const HANG_SETTLE_TICKS: u32 = 16;
 
 /// What a falling tree does to a creature in its way (Planner, 11-05): 2 and a tenth of its logs,
-/// at most 20, once; it hits what is this near its logs.
+/// at most 20, once; it hits what is within this of a log's middle each way (half a block and a
+/// little more, for the ticks between).
 pub const HURT_BASE: f32 = 2.0;
 pub const HURT_PER_LOGS: f32 = 10.0;
 pub const HURT_MOST: f32 = 20.0;
-pub const HURT_REACH: f64 = 1.0;
+pub const HURT_REACH: f64 = 0.8;
 
 pub fn hurt(logs: u32) -> f32 {
     (HURT_BASE + logs as f32 / HURT_PER_LOGS).min(HURT_MOST)
