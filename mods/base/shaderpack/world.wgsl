@@ -508,6 +508,29 @@ fn behind_at(uv: vec2<f32>, size: vec2<f32>) -> vec4<f32> {
     return vec4(p.xyz / p.w, 1.0);
 }
 
+// How deep the water is under this surface pixel: from the blocks below (`water_depth`), and where
+// they say nothing (the blocks are known only about 112-128 blocks round the camera, a square, so
+// past it every water read "deep": calm deep teal with a straight edge, seen from high up, the LOD
+// worker's Mac views, 11-05), from the bottom drawn behind it, as long as that bottom is the real
+// cubes and not distant terrain (whose coarse steps showed as dark squares, the fog-far check).
+fn water_depth_seen(in: VOut) -> f32 {
+    let probed = water_depth(in.pos);
+    if probed < f32(WATER_PROBE) + 1.0 || scene.behind.z < 0.5 {
+        return probed;
+    }
+    let end = f32(g.extra.y);
+    let cubes = select(1e9, end - FADE_BAND, end > 0.0);
+    if length(in.rel.xz) >= cubes {
+        return probed;
+    }
+    let size = vec2<f32>(textureDimensions(textures[u32(scene.behind.y)]));
+    let b = behind_at(in.clip.xy / size, size);
+    if b.w < 0.0 || length(b.xz) >= cubes {
+        return probed;
+    }
+    return max(in.rel.y - b.y, 0.0);
+}
+
 // Light playing on the bottom through the waves (`p` world xz): bright crossing lines that drift.
 fn caustics(p: vec2<f32>) -> f32 {
     let t = scene.params.w;
@@ -588,7 +611,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
             let s = rain_rings(in.pos.xz) * rain;
             n = normalize(n + vec3(-s.x, 0.0, -s.y));
         }
-        depth = water_depth(in.pos);
+        depth = water_depth_seen(in);
         shore = shore_distance(in.pos);
     }
     let ndv = max(dot(n, v), 0.02);
