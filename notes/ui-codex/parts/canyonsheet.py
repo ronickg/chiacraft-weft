@@ -34,6 +34,36 @@ AFTER = ["sandstone", "ochre_sandstone", "cream_sandstone", "red_sandstone", "ba
 BEFORE = [b for b in AFTER if b not in ("cream_sandstone", "banded_clay")]
 
 
+def weathered(seed):
+    """The karst towers' weathered limestone (Terrain): the installed limestone side and its 3 variants
+    with their level lines softened and 5-6 vertical rain streaks, 1-2 px wide, 10-20% darker, some a
+    little grey-green, in the same columns in every tile (so they run down a tower whichever variant
+    the game picks); each streak's strength repeats every 32 rows. (The
+    generated tries had no streaks, so this is made in code from the approved limestone.)"""
+    tiles = [rs.tex("limestone_side")] + [rs.load(os.path.join(BLOCK, "limestone_side", f"{k}.png")) for k in (1, 2, 3)]
+    pick = random.Random(seed)
+    streaks = [(c, pick.choice((1, 1, 2)), pick.random() < 0.4) for c in pick.sample(range(32), pick.randint(5, 6))]
+    out = []
+    for i, t in enumerate(tiles):
+        rnd = random.Random(seed + 1 + i)
+        a = t.astype(float)
+        L = rs.parts.lum(a[..., :3]).mean(1)
+        for r in np.nonzero(L < L.mean() - 0.6 * L.std())[0]:  # the level lines, half way to their neighbours
+            a[r, :, :3] = 0.5 * a[r, :, :3] + 0.25 * (a[r - 1, :, :3] + a[(r + 1) % 32, :, :3])
+        for c, w, green in streaks:  # the same columns in every tile, so a streak runs down a tower
+            dark = rnd.uniform(0.80, 0.90)
+            phase, amp = rnd.uniform(0, 2 * np.pi), rnd.uniform(0.3, 0.6)
+            for y in range(32):
+                k = 1 - (1 - dark) * (1 - amp + amp * (0.5 + 0.5 * np.cos(2 * np.pi * y / 32 + phase)))
+                for dx in range(w):
+                    x = (c + dx) % 32
+                    a[y, x, :3] *= k
+                    if green:
+                        a[y, x, :3] *= (0.97, 1.0, 0.94)
+        out.append(a.clip(0, 255).astype(np.uint8))
+    return out
+
+
 def toned(res):
     for name, g in TONE.items():
         if name in res:
@@ -65,11 +95,12 @@ def shade(im, k=0.42, tint=(0.92, 0.96, 1.08)):
 
 def main():
     res = toned(rs.faces())
+    res["weathered_limestone_side"] = weathered(11)
     rs.deliver(res)
     font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 15)
     big = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial Bold.ttf", 20)
     W = 1640
-    im = Image.new("RGB", (W, 3000), (0x1b, 0x13, 0x10))
+    im = Image.new("RGB", (W, 4600), (0x1b, 0x13, 0x10))
     d = ImageDraw.Draw(im)
     d.text((14, 12), "Badland canyon bands: cream sandstone and banded clay, each face with 3 variants (not installed)", fill=(0xf5, 0xe4, 0xbc), font=big)
     y, rnd = 46, random.Random(5)
@@ -98,6 +129,19 @@ def main():
             x += g.width + 24
         d.text((14, y + 708), label, fill=(0xc2, 0xac, 0x88), font=font)
         y += 740
+    # A karst tower, 4 wide and 14 tall: today's limestone side | weathered, mixed as the game would
+    d.text((14, y), "A karst tower, 4 x 14: limestone today | weathered limestone (rain streaks, grey-green in the wet), in sun and the mock shade",
+           fill=(0xff, 0xbe, 0x45), font=big)
+    y += 30
+    lime = [rs.tex("limestone_side")] + [rs.load(os.path.join(BLOCK, "limestone_side", f"{k}.png")) for k in (1, 2, 3)]
+    x = 14
+    for tiles in (lime, res["weathered_limestone_side"]):
+        g = rs.grid(rs.patch(tiles, 14, random.Random(2))[:14], 1).crop((0, 0, 4 * 32, 14 * 32)).resize((4 * 48, 14 * 48), Image.NEAREST)
+        for f in (lambda i: i, shade):
+            im.paste(f(g), (x, y))
+            x += g.width + 16
+        x += 30
+    y += 14 * 48 + 30
     out = os.path.join(HERE, "sheets", "canyon_bands.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     im = im.crop((0, 0, W, y))
