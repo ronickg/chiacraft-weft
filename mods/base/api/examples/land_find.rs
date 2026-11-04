@@ -1,6 +1,6 @@
 //! The nearest spots to spawn of a kind, with a camera for a look script: for testers, so a shot
 //! of a lake or a river shows one. Kinds: `lake`, `river` (water at least two blocks deep in the
-//! channel), `coast` (land with the sea beside it), `karst` (a tower), `canyon` (cut 24 or more) or any overworld biome by name (`desert`,
+//! channel), `coast` (land with the sea beside it), `karst` (a tower), `canyon` (cut 24 or more), `spawn` (the fair first place) or any overworld biome by name (`desert`,
 //! `sequoia_grove`, ...). Searched in rings outward from the middle every `step` blocks, the
 //! world as the engine builds it (the overworld's fields, its continent scale).
 //!
@@ -20,6 +20,18 @@ fn main() {
     let count: usize = a.get(2).and_then(|s| s.parse().ok()).unwrap_or(3);
     let step: i32 = a.get(3).and_then(|s| s.parse().ok()).unwrap_or(16);
     let f = l::fields(seed);
+    if kind == "spawn" {
+        let t = std::time::Instant::now();
+        let [x, y, z] = l::spawn(seed);
+        let ms = t.elapsed().as_millis();
+        println!(
+            "# spawn at x {x} z {z} (ground {y}), {} blocks from the middle, {} ({ms} ms to find)",
+            ((x * x + z * z) as f64).sqrt().round(),
+            l::overworld_biome(&f, x * 16, z * 16)
+        );
+        println!("chat /tp {x} {} {z}", y + 2);
+        return;
+    }
     let h = |x: i32, z: i32| l::height(&f, x * 16, z * 16) >> 4;
     let is = |x: i32, z: i32| -> bool {
         match kind.as_str() {

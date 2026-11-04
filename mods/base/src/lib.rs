@@ -116,6 +116,8 @@ fn init(r: &mut Registry) {
     // eight at midwinter.
     r.dimension(&OVERWORLD)
         .player_spawn()
+        // A fair first place: level plains, temperate, by water and woods (`base_api::land::spawn`).
+        .spawn(base_api::land::spawn)
         .sky_above(16)
         .day_length(24000)
         .seasons(vitals::calendar::YEAR_DAYS, base_api::calendars::FOUR_SWING)
