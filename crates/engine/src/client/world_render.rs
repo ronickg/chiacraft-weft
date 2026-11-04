@@ -179,6 +179,9 @@ fn region_of(key: MeshKey) -> (u64, IVec3) {
     (key.0, key.1 >> REGION)
 }
 
+/// A structure's lean (chiacraft): its pivot (own coordinates) and rotation.
+type Lean = (Vec3, glam::Quat);
+
 /// The draws of one visible mesh (its corner `lo` relative to the camera, `k` its structure or
 /// 0), returning the faces drawn. A face direction can be seen only from the side its normal
 /// points to; contiguous visible runs become one draw.
@@ -1198,7 +1201,9 @@ impl WorldRenderer {
         list.push((key, GpuMesh { faces, face_counts, quads, quad_counts }));
     }
 
-    /// `frames`: structures to draw and where their block (0, 0, 0) is in the world.
+    /// `frames`: structures to draw and where their block (0, 0, 0) is in the world; `leans`:
+    /// those that lean (chiacraft, a falling tree), their pivot (own coordinates) and rotation.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
         gpu: &mut dyn Backend,
@@ -1208,6 +1213,7 @@ impl WorldRenderer {
         scene: BufferId,
         frames: &[(u64, DVec3)],
         lights: &FxHashMap<MeshKey, u32>,
+        leans: &FxHashMap<u64, (Vec3, glam::Quat)>,
     ) {
         self.sort_translucent(gpu, cam.pos, frames);
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
@@ -1233,14 +1239,20 @@ impl WorldRenderer {
             .collect();
         // What a structure's meshes pick: its place and the world's light on that cube of it,
         // full sky until it is known.
-        let mut picks: Vec<(Vec3, u32)> = frame_offsets
+        // And how it leans (chiacraft): its pivot and rotation, upright for most.
+        let lean_of = |k: usize| leans.get(&frames[k].0).copied();
+        let mut picks: Vec<(Vec3, u32, Option<Lean>)> = frame_offsets
             .iter()
-            .map(|o| (*o, crate::world::light::SKY_FULL as u32))
+            .enumerate()
+            .map(|(k, o)| (*o, crate::world::light::SKY_FULL as u32, lean_of(k)))
             .collect();
         let mut cube_pick: FxHashMap<MeshKey, i32> = FxHashMap::default();
         for (&key, &light) in lights {
             if let Some(k) = frames.iter().position(|f| f.0 == key.0) {
-                picks.push((frame_offsets[k], light));
+                // A leaning one's cubes are elsewhere than where the world's light on them was
+                // sampled (a falling trunk's lowest cube is centred in the ground): its own light.
+                let light = if lean_of(k).is_some() { crate::world::light::SKY_FULL as u32 } else { light };
+                picks.push((frame_offsets[k], light, lean_of(k)));
                 cube_pick.insert(key, picks.len() as i32);
             }
         }
@@ -1285,6 +1297,14 @@ impl WorldRenderer {
                         ((key.1 - cam_cube).as_vec3() * 16.0 - cam_frac, 0)
                     } else {
                         let Some(k) = frames.iter().position(|f| f.0 == key.0) else { continue };
+                        // A leaning structure's cubes are elsewhere than their place: drawn
+                        // whole, every face (chiacraft).
+                        if leans.contains_key(&key.0) {
+                            let lo = frame_offsets[k] + key.1.as_vec3() * 16.0 - cam_frac;
+                            let pick = cube_pick.get(&key).copied().unwrap_or(k as i32 + 1);
+                            faces += mesh_draws(&m, key, lo, pick, cam_cube, [true; 6], out);
+                            continue;
+                        }
                         (frame_offsets[k] + key.1.as_vec3() * 16.0 - cam_frac, cube_pick.get(&key).copied().unwrap_or(k as i32 + 1))
                     };
                     let center = lo + Vec3::splat(8.0);
@@ -1404,16 +1424,28 @@ impl WorldRenderer {
             gpu,
             &mut self.offsets,
             frame.slot,
-            picks.len() as u32 + 1,
+            (picks.len() as u32 + 1) * 3,
             16,
             usage::STORAGE,
             "frame offsets",
         );
+        // Three vec4 a structure: its offset and light, its rotation (x, y, z, w) and its pivot
+        // (chiacraft: `world.wgsl`'s `finish` turns a leaning one's vertices about it).
         let offs = gpu.mapped(fbuf);
-        offs[..16].fill(0);
-        for (k, (o, light)) in picks.iter().enumerate() {
-            offs[(k + 1) * 16..(k + 1) * 16 + 12].copy_from_slice(bytemuck::cast_slice(&o.to_array()));
-            offs[(k + 1) * 16 + 12..(k + 1) * 16 + 16].copy_from_slice(&light.to_le_bytes());
+        let put = |offs: &mut [u8], k: usize, o: Vec3, light: u32, lean: Option<Lean>| {
+            let (pivot, rot) = lean.unwrap_or((Vec3::ZERO, glam::Quat::IDENTITY));
+            let at = k * 48;
+            offs[at..at + 12].copy_from_slice(bytemuck::cast_slice(&o.to_array()));
+            offs[at + 12..at + 16].copy_from_slice(&light.to_le_bytes());
+            offs[at + 16..at + 32].copy_from_slice(bytemuck::cast_slice(&rot.to_array()));
+            offs[at + 32..at + 44].copy_from_slice(bytemuck::cast_slice(&pivot.to_array()));
+            // 1 for a leaning one: lit as in the open (`on_body`).
+            let leaning: f32 = if lean.is_some() { 1.0 } else { 0.0 };
+            offs[at + 44..at + 48].copy_from_slice(&leaning.to_le_bytes());
+        };
+        put(offs, 0, Vec3::ZERO, 0, None);
+        for (k, &(o, light, lean)) in picks.iter().enumerate() {
+            put(offs, k + 1, o, light, lean);
         }
         let ibuf = crate::gpu_layout::frame_buffer(gpu, &mut self.indirect, frame.slot, n, 20, usage::INDIRECT, "indirect");
         let origins = Mapped(gpu.mapped(obuf)[..n as usize * 16].as_mut_ptr());

@@ -12,6 +12,8 @@ mod crops;
 mod death;
 mod discovery;
 mod farming;
+mod fall;
+mod felled;
 mod felling;
 mod growth;
 mod hints;
@@ -109,6 +111,7 @@ fn init(r: &mut Registry) {
     growth::register(r);
     farming::register(r);
     felling::register(r);
+    fall::register(r);
     leaf_decay::register(r);
     advancements::register(r);
     hints::register(r);

@@ -16,6 +16,7 @@ pub mod clothing;
 pub mod crafts;
 pub mod crops;
 pub mod difficulty;
+pub mod felling;
 pub mod effects;
 pub mod foliage;
 pub mod food;

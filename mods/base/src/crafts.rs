@@ -20,6 +20,9 @@ static CLAMP_MENU: Menu = Menu::named("charcoal_clamp");
 pub static HIDE: Item = Item::named("hide");
 pub static SOLE_LEATHER: Item = Item::named("sole_leather");
 pub static OAK_BARK: Item = Item::named("oak_bark");
+static AXES: Tag = Tag::named("tools/axe");
+/// Bark an oak log gives when stripped.
+const BARK_PER_LOG: u32 = 2;
 
 value! {
     /// A station's work: which station (`STATIONS` index), how far along (0 to 1), and the item
@@ -47,8 +50,8 @@ pub fn register(r: &mut Registry) {
     r.item(&OAK_BARK)
         .tag("bark_tannin")
         .tab(&crate::tabs::INGREDIENTS);
-    // Bark peeled off an oak log.
-    r.shapeless(&CRAFTING, "oak_bark", 2, &["#logs/oak"], 0);
+    // Bark is peeled off an oak log with an axe (`strip`, Planner, 11-05): one log in the grid
+    // makes planks, as in vanilla.
     r.shaped(&CRAFTING, "tanning_frame", 1, &["sts", "t t", "sts"], &[('s', "#stick"), ('t', "#string")]);
     r.shaped(&CRAFTING, "tanning_pit", 1, &["p p", "p p", "ppp"], &[('p', "#planks")]);
     r.shaped(&CRAFTING, "charcoal_clamp", 1, &["ddd", "dld", "ddd"], &[('d', "dirt"), ('l', "#logs")]);
@@ -59,6 +62,51 @@ pub fn register(r: &mut Registry) {
     station(r, Station::TanningFrame, &TANNING_FRAME, &FRAME_MENU, "wood", "axe", [2.0, 0.0, 2.0], [14.0, 16.0, 14.0]);
     station(r, Station::TanningPit, &TANNING_PIT, &PIT_MENU, "wood", "axe", [0.0, 0.0, 0.0], [16.0, 12.0, 16.0]);
     station(r, Station::CharcoalClamp, &CHARCOAL_CLAMP, &CLAMP_MENU, "gravel", "shovel", [0.0, 0.0, 0.0], [16.0, 12.0, 16.0]);
+}
+
+/// An axe used on a log strips it (Planner, 11-05: "Bark comes from stripping a log with an
+/// axe"): its stripped twin (`stripped_<wood>_log`, `blocks::log`) in its place, lying the same
+/// way, and from an oak log `BARK_PER_LOG` oak bark at the player's feet, the tannin for the pit;
+/// the axe wears by one. Anything else in hand uses the log as usual (places against it).
+pub fn strip(u: &mut Use) -> bool {
+    let (w, player, pos, state) = (u.world(), u.player(), u.pos(), u.state());
+    if player == 0 {
+        return false;
+    }
+    let (hotbar, slot) = (w.inventory(player).group("hotbar"), w.selected_slot(player));
+    let axe = hotbar.get(slot);
+    if !AXES.on_item(axe.item) {
+        return false;
+    }
+    // A state's name carries its props (`base:oak_log[axis=y,..]`): the block's is before them.
+    let name = name_of(abi::entry_kind::BLOCK, block_of(state)).split('[').next().unwrap_or("");
+    let Some(wood) = name
+        .strip_prefix("base:")
+        .and_then(|n| n.strip_suffix("_log"))
+    else {
+        return false;
+    };
+    let Some(stripped) = Block::lookup(&format!("base:stripped_{wood}_log")) else { return false };
+    let axis = state_prop(state, "axis")
+        .filter(|&a| a != "bark")
+        .unwrap_or("y");
+    let felled = state_prop(state, "felled").unwrap_or("no");
+    let stripped = [("axis", axis), ("felled", felled)]
+        .iter()
+        .try_fold(stripped, |s, (k, v)| state_with(s, k, v));
+    if !stripped.is_some_and(|s| w.set(pos, s)) {
+        return false;
+    }
+    if wood == "oak" {
+        let at = w
+            .entity(player)
+            .map_or([pos[0] as f64 + 0.5, pos[1] as f64 + 1.0, pos[2] as f64 + 0.5], |e| e.pos);
+        w.spawn_item(at, ItemStack::new(OAK_BARK.id(), BARK_PER_LOG));
+    }
+    if !w.creative(player) {
+        hotbar.set(slot, crate::felling::worn(axe, 1, DURABILITY.on_item(axe.item).unwrap_or(0)));
+    }
+    true
 }
 
 #[allow(clippy::too_many_arguments)]

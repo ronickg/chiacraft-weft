@@ -317,6 +317,8 @@ fn woods(r: &mut Registry) {
             .tag("logs")
             .tag(&format!("logs/{wood}"))
             .prop("axis", ["y", "x", "z"])
+            // Lying after a felling, in alternating pieces (`felled`): chopped a piece at a time.
+            .prop("felled", ["no", "a", "b"])
             .states(move |p, s| match p.get("axis") {
                 "y" => s.textures(&top, &side, &top),
                 "x" => s.faces([&top, &top, &side, &side, &side, &side]),

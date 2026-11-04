@@ -84,6 +84,14 @@ impl World {
         unsafe { (host().body_go)(self.raw, entity, &pos, ticks) }
     }
 
+    /// A moving structure leans: turned by `rot` (a quaternion x, y, z, w) about `pivot` (a point
+    /// in the world), which clients reach smoothly in `ticks` (send the next pose as one is
+    /// reached, like `body_go`). The identity stands it up. While it leans it is only drawn:
+    /// nothing collides with it, stands on it or picks its blocks (a falling tree).
+    pub fn body_turn(&self, entity: u64, pivot: [f64; 3], rot: [f32; 4], ticks: u32) {
+        unsafe { (host().body_turn)(self.raw, entity, &pivot, &rot, ticks) }
+    }
+
     /// What a comparator reads of the block at `pos` (`signal_read`) may be different now.
     pub fn signal_read_changed(&self, pos: [i32; 3]) {
         unsafe { (host().signal_read_changed)(self.raw, &pos) }

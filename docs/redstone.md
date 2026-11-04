@@ -97,7 +97,7 @@ The rest of the set, each with the properties it needs added for you:
 - `.signal_torch()`, `.signal_repeater()`, `.signal_comparator()`: as in the game.
 - `.signal_read(|w, p| level)`: what a comparator behind the block reads, instead of how full it is. It looks again when the block changes; `w.signal_read_changed(p)` for anything else it depends on.
 - `.signal_floater(breaks)` after `.facing(..)`: a floater; `breaks` makes it break what is in its way. `power` is 0 idle, 1 going, 2 stuck.
-- `w.lift(center, &cells)` takes blocks out of the world into a moving structure, with chests and what is in them, circuits going on. Move it with `set_entity` (a speed) or `w.body_go(id, pos, ticks)`, and `w.put_down(id)` makes it blocks again, on the nearest whole block.
+- `w.lift(center, &cells)` takes blocks out of the world into a moving structure, with chests and what is in them, circuits going on. Move it with `set_entity` (a speed) or `w.body_go(id, pos, ticks)`, and `w.put_down(id)` makes it blocks again, on the nearest whole block. `w.body_turn(id, pivot, rot, ticks)` leans it (chiacraft): turned by a quaternion about a point in the world, eased on clients over `ticks`, only drawn while it leans (nothing collides with it or picks its blocks); the identity stands it up. Base's falling trees use it (`mods/base/src/fall.rs`).
 - `.signal_observer()` and `.signal_piston(head, sticky)`, `.signal_piston_head()`: after `.facing(..)`.
 
 **A model on any face:** those blocks have `attach` and `front` properties. Write the model once for a floor with the front to the north, and `framed_box` turns it, pictures included:

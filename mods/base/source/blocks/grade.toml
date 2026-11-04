@@ -529,3 +529,42 @@ saturation = 0.84
 
 [tiles.leaf_litter_top]  # sat 0.66 -> 0.55, with the soils
 saturation = 0.76
+
+# Stripped logs (the Felling worker, 11-05): each stripped side between its log top and planks, and
+# inside vanilla's stripped log where one exists (oak 0.40-0.58 / 0.42-0.52, birch 0.57-0.70,
+# spruce 0.35-0.36, acacia sat 0.45-0.66).
+[tiles.log_oak_stripped]  # 0.56/0.62 -> ~0.50/0.52
+gain = 0.9
+saturation = 0.8
+
+[tiles.log_birch_stripped]  # luma 0.76 -> ~0.71
+gain = 0.94
+
+[tiles.log_spruce_stripped]  # luma 0.29 -> ~0.33
+gain = 1.15
+
+[tiles.log_acacia_stripped]  # sat 0.74 -> ~0.66
+saturation = 0.85
+
+[tiles.log_dogwood_stripped]  # luma 0.74 -> ~0.63, near its top (0.58)
+gain = 0.85
+
+[tiles.log_acuri_palm_stripped]  # luma 0.63 -> ~0.50, toward its planks (0.42)
+gain = 0.8
+
+[tiles.log_moriche_palm_stripped]  # luma 0.52 -> ~0.48
+gain = 0.93
+
+[tiles.log_cacao_stripped]  # 0.53/0.62 -> ~0.49/0.50, toward its top and planks
+gain = 0.92
+saturation = 0.78
+
+[tiles.log_andiroba_stripped]  # sat 0.73 -> ~0.65, as its planks' row
+saturation = 0.86
+
+[tiles.log_matamata_stripped]  # 0.65/0.51 -> ~0.58/0.44
+gain = 0.9
+saturation = 0.84
+
+[tiles.log_ipe_stripped]  # sat 0.61 -> ~0.55
+saturation = 0.88
