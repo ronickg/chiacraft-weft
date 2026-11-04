@@ -128,6 +128,24 @@ fn cloud_cell(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> f32 {
     return cloud_cell_of(s.ids.x, cell, s.uv.zw, dims, s.axes[0].x * 0.6 + s.axes[0].z * 0.35);
 }
 
+// Henyey-Greenstein's phase for the clouds' light, `g` forward (> 0) or back (< 0).
+fn cloud_hg(mu: f32, g: f32) -> f32 {
+    return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566;
+}
+
+// Where `along` (0 at the slab's bottom, 1 at its top as tall as a storm makes it) is within the
+// cloud at `cellp`: its own height 0..1, over 1 above it. A storm's towers (a cell in five) take
+// the whole height; the rest the bottom third.
+fn cloud_height(s: Sky, cellp: vec2<f32>, along: f32, storm: f32) -> f32 {
+    if storm <= 0.0 {
+        return along;
+    }
+    let cell = vec2<i32>(floor(cellp) + s.uv.zw);
+    let tower = select(0.0, 1.0, hash3(vec3(cell.x, 53, cell.y)) < 0.2);
+    let span = mix(1.0 / mix(1.0, 3.0, storm), 1.0, tower);
+    return along / span;
+}
+
 // How dense the cloud is at `cellp` (picture cells, fractional) and `h` (0 at the slab's bottom,
 // 1 at its top): the four cells about the point blended smoothly, eaten away toward the top and
 // bottom so their edges round.
@@ -156,7 +174,10 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     let low = s.extra.z;
     let thick = max(s.extra.y, CLOUD_THICKNESS);
     let reach = s.extra.w;
-    let high = low + thick;
+    // In a thunderstorm the slab grows: a few cells stand up as towers three times as tall.
+    let storm = scene.weather.w;
+    let tall = thick * mix(1.0, 3.0, storm);
+    let high = low + tall;
     var near = 0.0;
     var far = reach / max(length(dir.xz), 0.0001);
     if abs(dir.y) > 0.00001 {
@@ -196,20 +217,50 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     var through = 1.0;
     var light = vec3(0.0);
     var seen = far;
+    // Lit as a volume (Research round 15, rec. 2; Ronald: "both, a setting", blocky by default):
+    // two taps toward the light through the slab (Beer-Lambert, with a powder term), a two-lobe
+    // phase for the silver lining and the backlit glow, and three octaves of multiple scattering.
+    let l = light_dir();
+    let mu_l = dot(dir, l);
+    let phase = 0.7 * cloud_hg(mu_l, 0.8) + 0.3 * cloud_hg(mu_l, -0.2);
     for (var i = 0u; i < CLOUD_SAMPLES; i++) {
         let t = near + (f32(i) + jitter) * step;
         let rel = dir * t;
-        let h = clamp((rel.y - low) / thick, 0.0, 1.0);
-        let density = cloud_density(s, s.uv.xy + rel.xz / size, h, dims);
+        let cellp = s.uv.xy + rel.xz / size;
+        let h = cloud_height(s, cellp, (rel.y - low) / tall, storm);
+        if h > 1.0 {
+            continue;
+        }
+        var density = cloud_density(s, cellp, h, dims);
         if density <= 0.0 {
             continue;
         }
+        // A storm's deck is lumpy, its density varying cell by cell.
+        let cell = vec2<i32>(floor(cellp - vec2(0.5)) + s.uv.zw);
+        density *= mix(1.0, 0.55 + 0.9 * hash3(vec3(cell.x, 91, cell.y)), storm * 0.8);
         let a = 1.0 - exp(-density * step * 0.18);
-        // Lit from above, darker underneath (more so in rain), glowing toward the sun.
         var c = vec3(1.0);
         if lit_sky {
-            let below = mix(p.horizon * 0.9 + p.ambient * 0.6, p.ambient * 1.6, h) * mix(1.0, 0.4, dark * (1.0 - h));
-            c = below + p.sun * light_strength() * (0.25 + 0.75 * h) * 0.95 * (1.0 - dark * 0.6);
+            // How much of the light reaches here through the cloud toward it.
+            var od = 0.0;
+            for (var j = 1; j <= 2; j++) {
+                let q = rel + l * (thick * 0.45 * f32(j));
+                let qc = s.uv.xy + q.xz / size;
+                let qh = cloud_height(s, qc, (q.y - low) / tall, storm);
+                if qh <= 1.0 && qh >= 0.0 {
+                    od += cloud_density(s, qc, qh, dims) * thick * 0.45 * 0.18;
+                }
+            }
+            var scatter = 0.0;
+            for (var o = 0; o < 3; o++) {
+                let k = pow(0.5, f32(o));
+                scatter += k * exp(-od * k) * mix(1.0, phase * 4.0, k);
+            }
+            let powder = 1.0 - exp(-2.0 * (od + density * 0.5));
+            // Undersides darker by their albedo in a storm, not blackened.
+            let albedo = mix(1.0, mix(0.45, 1.0, h), storm);
+            let below = mix(p.horizon * 0.9 + p.ambient * 0.6, p.ambient * 1.6, h) * mix(1.0, 0.4, dark * (1.0 - h)) * albedo;
+            c = below + p.sun * light_strength() * scatter * mix(0.6, 1.0, powder) * 0.55 * (1.0 - dark * 0.6) * albedo;
             c += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength() * (0.4 + 0.6 * h);
         } else {
             c = vec3(mix(0.7, 1.0, h));
