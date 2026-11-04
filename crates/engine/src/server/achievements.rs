@@ -273,6 +273,7 @@ fn anchor_day(dir: &std::path::Path, day: u64, hashes: &[[u8; 32]]) -> Result<()
     let session = chiacraft_account::current().ok_or("no account is open")?;
     let reader = crate::chiacraft::chain::get()?;
     let network = reader.network();
+    crate::chiacraft::chain::may_spend(network)?;
     let root_hex = chiacraft_wallet::achievement::Anchor::of(day, hashes, 0, network.name()).root;
     let root: [u8; 32] = chiacraft_wallet::keys::from_hex(&root_hex)
         .and_then(|b| b.try_into().ok())

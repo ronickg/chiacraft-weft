@@ -174,6 +174,7 @@ fn list_now(settings: &crate::settings::Settings, dir: &Path, mut d: WorldDid) -
     let listed = record.owner_meta().unwrap_or_default();
     if !listed.lists(world) {
         set("world_did.listing", &[]);
+        crate::chiacraft::chain::may_spend(network)?;
         let meta = DidMetadata::Owner(listed.with_world(world).map_err(|e| e.to_string())?);
         let keys = wallet_keys(&session, network)?;
         // testnet11's mempool may hold a spend with no fee for most of an hour: pay a little
