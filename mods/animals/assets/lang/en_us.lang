@@ -239,3 +239,7 @@ entity.animals.turkey_vulture = Turkey Vulture
 species.animals.turkey_vulture = turkey vulture
 family.animals.cathartidae = New World vulture family
 screen.animals.signature.scent = Soars for hours on still wings and smells the dead from the air
+entity.animals.herring_gull = Herring Gull
+species.animals.herring_gull = herring gull
+family.animals.laridae = gull and tern family
+screen.animals.signature.colony = Nests in loud colonies by the sea and takes whatever the tide leaves

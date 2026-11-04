@@ -103,6 +103,7 @@ pub static CALCARIIDAE: Family = Family { name: "Calcariidae", above: &["Aves", 
 pub static STRIGIDAE: Family = Family { name: "Strigidae", above: &["Aves", "Strigiformes"] };
 pub static ACCIPITRIDAE: Family = Family { name: "Accipitridae", above: &["Aves", "Accipitriformes"] };
 pub static CATHARTIDAE: Family = Family { name: "Cathartidae", above: &["Aves", "Accipitriformes"] };
+pub static LARIDAE: Family = Family { name: "Laridae", above: &["Aves", "Charadriiformes"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -306,7 +307,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 30] = [
+pub static SPECIES: [Species; 31] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -2210,6 +2211,73 @@ pub static SPECIES: [Species; 30] = [
         // and breeds at three, which no line in the game could wait for (`balance::checks`).
         // Roosts of dozens, but spread over a big range by day: room near as a herd's at most.
         tune: Tune { gestation: Some(21_377), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
+        birth_size: 0.3,
+    },
+    // The herring gull (`reports/ecology/Overworld food webs.md`: the coast's hunter and its eater of
+    // the dead): a wild bird on its own model (`source/gull`), on the ground and in the air
+    // (`gull.rs`). No nests yet (Ronald, 2026-11-03): its young come out as fledglings after the
+    // eggs' time.
+    Species {
+        model: "gull",
+        name: "herring_gull",
+        binomial: "Larus argentatus",
+        family: &LARIDAE,
+        subfamily: "Larinae",
+        breed: None,
+        size: Size::Small,
+        // Fish first, crabs and mussels, the strandline's dead, eggs and young birds, insects, scraps.
+        eats: &[(Fish, 0.45), (Carrion, 0.25), (Meat, 0.1), (Insects, 0.1), (Seeds, 0.05), (Fruit, 0.05)],
+        // Small fish and mice to a young rabbit or a duckling, under a third of its mass.
+        prey: (0.005, 0.3),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [8.0, 130.0, 40.0, 1.5, 1.0, 10.0, 70.0, 20.0, 8.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 30.0,
+        foods: &[eats("base:beef", 8), favorite("base:bread", 6), eats("base:rotten_flesh", 6)],
+        feedings: 0.0,
+        shy: 10.0,
+        fights: true,
+        attacks: &[],
+        reach: 0.5,
+        signature: "colony",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.2,
+        // Males a little bigger.
+        dimorphism: 1.05,
+        size_spread: 0.1,
+        // Standing, at the crown.
+        height: (0.45, "crown"),
+        // The beaches and the sea's shore; inland along rivers to fields and dumps.
+        habitats: &[("base:beach", 1.0), ("base:ocean", 0.6), ("base:plains", 0.1), ("base:swamp", 0.2)],
+        bio: Biology {
+            mass: 1.0,
+            gestation: 0.0,
+            // 28-30 days, both parents sitting; the young fly at 35-40 days.
+            incubation: 29.0,
+            // In adult plumage and breeding at four.
+            maturity: 1460.0,
+            // About 12 years on average; over 30 known.
+            lifespan: 4380.0,
+            interval: 365.0,
+            // Three eggs, usually.
+            litter: 3.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            // Laying in April and May, in colonies.
+            breeds: seasons::SPRING,
+            peak: seasons::SPRING,
+            // From the North Sea's winters to the Mediterranean's summer.
+            comfort: (-15.0, 34.0),
+            cold_blooded: false,
+        },
+        // No nests yet: fledglings after the eggs' time. A young gull flies in five or six weeks and
+        // is grown in a year; it waits four years to breed, which no line in the game could wait for
+        // (`balance::checks`).
+        tune: Tune { gestation: Some(16_796), growth: Some(110_000), crowd: Some(24), ..Tune::NONE },
         birth_size: 0.3,
     },
 ];
