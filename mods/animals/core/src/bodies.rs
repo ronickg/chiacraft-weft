@@ -38,7 +38,7 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     ("ankylosaur", (3.0, 1.3)),
     ("iguanodont", (3.8, 2.7)),
     ("citipati", (0.9, 1.7)),
-    ("sauropod", (4.5, 8.0)),
+    ("sauropod", (4.5, 5.5)),
     ("raven", (0.35, 0.35)),
     ("small_bird", (0.2, 0.15)),
     ("owl", (0.4, 0.5)),
@@ -50,6 +50,14 @@ pub const BOXES: &[(&str, (f32, f32))] = &[
     ("egg", (0.1, 0.14)),
     ("nest", (0.9, 0.15)),
 ];
+
+/// Boxes the height rule doesn't hold to, and why.
+pub const LOW: &[(&str, &str)] = &[(
+    "sauropod",
+    "its raised neck reaches 8.6 blocks, above anything a player on the ground can reach (about \
+     5.5); a box that tall found no room under the fern forest's crowns and stood still there \
+     (PC run aw_walk_path), so its box stops at its back and the base of its neck",
+)];
 
 /// Boxes the width rule doesn't hold to, and why: what the model's bounds count isn't body.
 pub const LOOSE: &[(&str, &str)] = &[(

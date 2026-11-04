@@ -941,7 +941,12 @@ rotations) and holds every box to that (0.75-1.35 of the top, 0.75-1.5 of the me
 within 0.3 of the width; the tiniest a tenth of a block more, to click). The wyvern's width is
 excused: its wings are most of its bounds, and its box is its body. Base's vanilla mobs keep
 vanilla's boxes. A long animal's head and tail still stick out of its box (one box can't follow
-a 9-block body); the bigger boxes also need wider gaps to walk through.
+a 9-block body). The bigger boxes need wider gaps to walk through, and the engine's path search
+led every walker one cell wide, so the big animals jammed between trunks (PC run aw_walk:
+cedarosaurs 0-6 blocks in 5 minutes against 5-14 with the old boxes); it now needs room across a
+body's whole footprint (`notes/ENGINE_CHANGES.md`, section 1). The sauropod's box stops at 5.5
+blocks (`bodies::LOW`): its neck reaches 8.6, above any reach from the ground, and a box that tall
+found no room under the fern forest's crowns.
 
 **Far animals keep time** (2026-11-05). With the engine's activation ranges an animal no player
 is within 48 blocks of rests, ticking only every `core:inactive_entity_interval` ticks (20). Its
