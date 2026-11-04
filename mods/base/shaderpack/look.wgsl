@@ -60,8 +60,10 @@ fn palette() -> Palette {
     // of Bliss with Ronald's 4300 K sun, which read overcast and olive here (Tester 2). Values for
     // the day's exposure of 2.2 (`exposure`). A warm sun; the sky's light in the shade about a
     // quarter of the sun's (it was a third; Bliss's is a sixth, which our curve's toe crushes to
-    // near black), still blue, so sun and shade part and the land stops looking flat.
-    let day = key(vec3(0.065, 0.115, 0.219), vec3(0.242, 0.323, 0.451), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.200, 0.222, 0.240));
+    // near black), still blue, so sun and shade part and the land stops looking flat. Then half as
+    // bright again (Colour 6): shade under leaves and on walls still read near black by day (Art's
+    // regraded tiles, the sun/shade test's walls at sRGB 33 35 45).
+    let day = key(vec3(0.065, 0.115, 0.219), vec3(0.242, 0.323, 0.451), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.300, 0.333, 0.360));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
     let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
@@ -656,7 +658,7 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     // in shade sRGB 8 9 32, the same block in sun 82 84 82; the playtesters' "lapis" trunks). Not
     // at night: nights stay dark by design.
     let day = smoothstep(-0.05, 0.15, scene.sun.y);
-    t = max(t, lin / (vec3(1.0) + lin) * 0.3 * day);
+    t = max(t, lin / (vec3(1.0) + lin) * 0.5 * day);
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
     let shade = mix(vec3(0.975, 0.99, 1.03), vec3(0.92, 0.96, 1.10), golden());
