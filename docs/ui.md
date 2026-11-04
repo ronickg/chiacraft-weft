@@ -56,6 +56,7 @@ Layout works like flexbox, and all sizes are in GUI pixels, so the GUI scale in 
 - `w_pct(p)`, `h_pct(p)` size a part in percent of its parent; `min_w`, `min_h`, `max_w` limit it
 - `self_align(abi::ui_align::END)` places one part differently from its siblings
 - `scroll()` lets the children scroll with the wheel, with a bar when they don't fit
+- `at(x, y)` takes a part out of its parent's flow and puts its top left corner at (x, y) from the parent's inner corner, over the parent's other parts: a number inside a bar, a badge on an icon. `at_pivot(x, y, [0.5, 0.5])` puts its middle there instead. A bar with its value inside it: a container of the bar's size holding the `progress_bind` and a `text_bind` with `S::default().at_pivot(w / 2.0, h / 2.0, [0.5, 0.5])`
 - for text: `class("title")` (its color, also `dim`, `button`, `chat`), `scale(2.0)`, `no_wrap()` and `mono()`, which puts every glyph in a digit-wide cell so numbers don't jump (`{mono}..{/mono}` does it for part of a text)
 - for buttons: `disabled(true)` and `selected(true)` (the open tab)
 

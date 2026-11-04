@@ -4,7 +4,7 @@
 //! that needs a newer API before downloading anything; the sandbox checks again when it loads.
 
 /// The mod API this game runs: a component built for 1.x with x up to this loads.
-pub const API: (u32, u32) = (1, 1);
+pub const API: (u32, u32) = (1, 2);
 
 /// The newest `chiacraft:mods` version among a component's imports, as `(major, minor)`; `None`
 /// if it imports none of the API. An import outside the API, a version that doesn't parse, or

@@ -25,6 +25,17 @@ erase what they earned.
    engine changes only for identity, the mod sandbox, content switching, the confirm dialog and
    the server mode. Weft is tracked as `upstream` and merged regularly. Weft files stay MPL-2.0,
    ours are MIT. The name players see is chiacraft.
+
+   **Engine changes we offer back to Weft** (only with Ronald's yes for each):
+   - Sent: the GPU fix, https://github.com/Weft-Rust/Weft/pull/83.
+   - To offer later: entity send and activation ranges (E1, `reports/Research round 2.md`).
+     These are the rules `core:entity_send_distance`, `core:entity_activation_distance` and
+     `core:inactive_entity_interval`, the `ALWAYS_ACTIVE` flag and `tick_elapsed`. Ronald's
+     yes, 11-04: "Yes, later". Offer it once it has run in `dev` a while.
+   - To offer, if Ronald picks 32 a block for worn layers: worn layers mapped by the skin's
+     layout (`client/entity_render.rs`, `worn_tex_size`). A 128 x 64 armour or clothes layer on a
+     64 x 32 skin then maps over all of it, as Minecraft's armour does in 32x packs; one at the
+     layout's width reads as before. One general line and a test (branch `claude/clothes-worn`).
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 
@@ -324,8 +335,10 @@ The smallest version that works is phases 1-4.
       the offer (protocol 8), so the join sheet refuses a too-new mod before downloading (built);
       a `required` flag per package at the next `package.toml` change, optional by default (a
       stopped required mod closes its world to joins and sends its players home); a call-cost
-      benchmark (`callcost`) before a release freezes 1.0. Next, 1.2: block and item callbacks,
-      channels, gizmos.
+      benchmark (`callcost`) before a release freezes 1.0. API 1.2 (built): callbacks on the
+      package's own blocks and items, `schedule`, channels; a second export (`content-hooks`)
+      found at run time so older components still run. Sample `bell`. The mod UI ABI's `at`
+      came with it (Weft mods rebuild once).
    4. *Client halves*: `code/client.wasm`, client calls only (HUD, screens, keys, channels to its
       server half), a frame budget.
    5. *Personal mods per world*: the player's own client halves, allowed or not by each world's

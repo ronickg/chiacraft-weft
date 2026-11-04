@@ -202,7 +202,8 @@ pub unsafe extern "C" fn ui_open(u: *mut abi::UiCtx, node: *const abi::UiNode) {
             scroll: flag(abi::ui_flags::SCROLL),
             fill: None,
             max_h: f32::INFINITY,
-            at: None,
+            // Placed at a point of the parent (`UiNode::at`); a point that isn't finite is none.
+            at: n.at.iter().all(|v| v.is_finite()).then_some(n.at),
         };
         let (lang, input) = (b.lang, b.input);
         let spans = |key: Str, a: abi::Slice<abi::UiArg>| {

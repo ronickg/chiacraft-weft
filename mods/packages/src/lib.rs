@@ -107,11 +107,24 @@ pub unsafe extern "C" fn chiacraft_register_package(host: *const Host, me: ModId
 
 fn register_current(r: &mut Registry) {
     let Some(p) = CURRENT.lock().unwrap().take() else { return };
+    // Someone else's code: a panic while loading it is a load error, not the game's end. Loaded
+    // before the package's blocks and items, which take its callbacks.
+    let code = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| sandboxed::load(r, p.id(), &p.dir))) {
+        Ok(Ok(code)) => code,
+        Ok(Err(e)) => {
+            *CODE_ERROR.lock().unwrap() = Some(e);
+            None
+        }
+        Err(_) => {
+            *CODE_ERROR.lock().unwrap() = Some("loading code/server.wasm failed".into());
+            None
+        }
+    };
     for b in &p.blocks {
-        block(r, &b.id, &b.def);
+        block(r, &b.id, &b.def, code.as_ref());
     }
     for i in &p.items {
-        item(r, &i.id, &i.def);
+        item(r, &i.id, &i.def, code.as_ref());
     }
     for rc in &p.recipes {
         recipe(r, &rc.def);
@@ -120,11 +133,12 @@ fn register_current(r: &mut Registry) {
         let names: Vec<&str> = t.def.entries.iter().map(String::as_str).collect();
         r.tag(&t.id, &names);
     }
-    // Someone else's code: a panic while loading it is a load error, not the game's end.
-    let loaded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| sandboxed::register(r, p.id(), &p.dir)))
-        .unwrap_or_else(|_| Err("loading code/server.wasm failed".into()));
-    if let Err(e) = loaded {
-        *CODE_ERROR.lock().unwrap() = Some(e);
+    if let Some(code) = &code {
+        let registered = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| sandboxed::register(r, code)))
+            .unwrap_or_else(|_| Err("registering code/server.wasm's hooks failed".into()));
+        if let Err(e) = registered {
+            *CODE_ERROR.lock().unwrap() = Some(e);
+        }
     }
 }
 
@@ -134,7 +148,7 @@ fn sound_group(group: &str) -> String {
     format!("{ns}:block.{g}")
 }
 
-fn block(r: &mut Registry, id: &str, d: &BlockDef) {
+fn block(r: &mut Registry, id: &str, d: &BlockDef, code: Option<&std::sync::Arc<sandboxed::Runs>>) {
     let handle = Block::generated(id.to_string());
     let mut b = r.block(handle);
     if let Some(t) = &d.texture {
@@ -196,10 +210,13 @@ fn block(r: &mut Registry, id: &str, d: &BlockDef) {
     if let Some(t) = &d.tab {
         b = b.tab(CreativeTab::generated(t.clone()));
     }
+    if let Some(code) = code {
+        b = sandboxed::on_block(b, code, id);
+    }
     drop(b);
 }
 
-fn item(r: &mut Registry, id: &str, d: &ItemDef) {
+fn item(r: &mut Registry, id: &str, d: &ItemDef, code: Option<&std::sync::Arc<sandboxed::Runs>>) {
     let handle = Item::generated(id.to_string());
     let mut i = r.item(handle);
     if let Some(t) = &d.texture {
@@ -228,6 +245,9 @@ fn item(r: &mut Registry, id: &str, d: &ItemDef) {
     }
     if let Some(t) = &d.tab {
         i = i.tab(CreativeTab::generated(t.clone()));
+    }
+    if let Some(code) = code {
+        i = sandboxed::on_item(i, code, id);
     }
     drop(i);
     for t in &d.tags {
