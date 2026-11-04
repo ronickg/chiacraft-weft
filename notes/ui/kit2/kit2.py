@@ -701,3 +701,249 @@ def divider(w):
     rect(a, 0, 0, w, 1, PANEL_DEEP)
     rect(a, 0, 1, w, 1, (52, 36, 28))
     return a
+
+
+# ---------------------------------------------------------------- rounded parts (Ronald: "can we
+# make it more rounded less just square ? Like some parts if possible ?")
+# Every part below is one shape: a rectangle whose corners step in on the pixel grid by a
+# profile (how far each of the corner's rows is cut), outlined 1 px all round, so the outline
+# keeps one weight whatever the radius. A radius is a profile name: 0 square, 1 one pixel off
+# each corner, 2 and 3 stepped, "pill" a half circle as tall as the part.
+PROFILES = {0: [], 1: [1], 2: [2, 1], 3: [3, 1, 1], 4: [4, 2, 1, 1]}
+
+
+def profile(r, h):
+    """The cut of each corner row: a named radius, or a pill (a half circle of the part's height)."""
+    if r == "pill":
+        rad = h / 2
+        out = []
+        for i in range(int(rad)):
+            dy = rad - (i + 0.5)
+            dx = (rad * rad - dy * dy) ** 0.5
+            out.append(int(round(rad - dx)))
+        while out and out[-1] == 0:
+            out.pop()
+        return out
+    return PROFILES[r]
+
+
+def shape(w, h, r=0, corners="all"):
+    """A w x h mask with its corners stepped in (`corners` "all", or "top" for a tab)."""
+    m = np.ones((h, w), bool)
+    p = profile(r, h if r == "pill" else min(w, h))
+    for i, cut in enumerate(p):
+        if cut <= 0:
+            continue
+        m[i, :cut] = m[i, w - cut:] = False
+        if corners == "all":
+            m[h - 1 - i, :cut] = m[h - 1 - i, w - cut:] = False
+    return m
+
+
+def edge(m):
+    """The mask's own outer ring, 1 px: a pixel with a side neighbour outside it."""
+    p = np.pad(m, 1)
+    inner = p[1:-1, 1:-1] & p[:-2, 1:-1] & p[2:, 1:-1] & p[1:-1, :-2] & p[1:-1, 2:]
+    return m & ~inner
+
+
+def shrink(m, n=1):
+    for _ in range(n):
+        m = m & ~edge(m)
+    return m
+
+
+def paint(a, m, color):
+    a[m, :3] = color
+    a[m, 3] = 255
+
+
+def raised(a, m, light, face, shade, rim=OUTLINE, pressed=False, shade_px=2):
+    """Paints a raised part in mask `m`: the outline, the face, a 1 px light edge under the top
+    outline and a `shade_px` shade over the bottom one, each following the corners' steps.
+    Pressed sinks it: the shade goes on top instead and there is no light edge."""
+    ring = edge(m)
+    inner = m & ~ring
+    paint(a, ring, rim)
+    paint(a, inner, face)
+    up = np.zeros_like(m)
+    up[1:] = ring[:-1]  # a pixel whose upper neighbour is the outline
+    up &= inner
+    down = np.zeros_like(m)
+    for k in range(1, shade_px + 1):
+        d = np.zeros_like(m)
+        d[:-k] = ring[k:]  # the outline k below
+        down |= d
+    down &= inner
+    if pressed:
+        paint(a, up | (np.roll(up, 1, 0) & inner), light)  # the sunk edge, 2 px, on top
+    else:
+        paint(a, down, shade)
+        paint(a, up, light)
+
+
+def label_into(a, w, h, label, ico, tcol, shadow, align="center", pad=6, dy=0, top=1, bottom=1):
+    """An icon and a label, their capitals centred in rows top .. h-bottom."""
+    room = h - top - bottom
+    cap_top = top + (room - F.caps) // 2 + dy
+    iw = 16 if ico else 0
+    gap = 4 if ico and label else 0
+    tw = F.width(label)
+    need = pad * 2 + iw + gap + tw
+    assert need <= w, f"{label!r} needs {need} px, has {w}"
+    x = pad if align == "left" else (w - (iw + gap + tw)) // 2
+    if ico:
+        blit(a, icon(ico), x, top + (room - 16) // 2 + dy)
+    if label:
+        F.draw(a, label, x + iw + gap, cap_top, tcol, shadow)
+
+
+def button_r(w, h=22, kind="main", state="normal", label="", ico=None, r=2, align="center", pad=6):
+    a = canvas(w, h)
+    key = {"normal": kind, "hover": kind + "_hover", "pressed": kind + "_pressed"}.get(state, kind)
+    if state == "disabled":
+        key = "disabled"
+    if kind == "danger":
+        key = "danger"
+    light, face, shade = FACES[key]
+    pressed = state == "pressed"
+    raised(a, shape(w, h, r), light, face, shade, GLOW if state == "hover" else OUTLINE, pressed)
+    tcol = TEXT_ON["disabled" if state == "disabled" else ("danger" if kind == "danger" else kind)]
+    ic = ico
+    label_into(a, w, h, label, ic, tcol, None if pressed else shade, align, pad, 1 if pressed else 0)
+    return a
+
+
+def round_button(size=20, kind="main", state="normal", ico="plus"):
+    """A round icon button (+, -): a circle on the pixel grid, the icon centred."""
+    a = canvas(size, size)
+    key = {"normal": kind, "hover": kind + "_hover", "pressed": kind + "_pressed"}.get(state, kind)
+    if state == "disabled":
+        key = "disabled"
+    light, face, shade = FACES[key]
+    pressed = state == "pressed"
+    raised(a, shape(size, size, "pill"), light, face, shade, GLOW if state == "hover" else OUTLINE, pressed)
+    ic = icon(ico)
+    if state == "disabled":
+        g = ic[..., :3].mean(-1, keepdims=True).astype(np.uint8)
+        ic[..., :3] = np.where(ic[..., 3:4] > 0, (g * 0.55 + 40).astype(np.uint8), 0)
+    blit(a, ic, (size - 16) // 2, (size - 16) // 2 - 1 + (1 if pressed else 0))
+    return a
+
+
+def tab_r(w, label, active, ico=None, h=22, r=2):
+    """A tab with its top corners stepped; an active one opens into the panel below it."""
+    a = canvas(w, h)
+    top = 0 if active else 2
+    m = np.zeros((h, w), bool)
+    m[top:] = shape(w, h - top + (2 if active else 0), r, "top")[:h - top]
+    light, face, shade = (BRONZE_HI, BRONZE, BRONZE_D) if active else ((110, 72, 46), (78, 50, 32), (58, 36, 24))
+    ring = edge(m)
+    if active:
+        ring[h - 1] = False  # open at the bottom: it joins the panel's frame
+        ring[h - 1, 0] = ring[h - 1, w - 1] = m[h - 1, 0]
+    inner = m & ~ring
+    paint(a, ring, OUTLINE)
+    paint(a, inner, face)
+    up = np.zeros_like(m)
+    up[1:] = ring[:-1]
+    paint(a, up & inner, light)
+    label_into(a, w, h, label, ico, ON_ORANGE if active else DIM, shade, top=top + 1, bottom=1 if active else 2)
+    return a
+
+
+def bar_r(w, share, fill="health", h=10, r="pill"):
+    """A bar: outline, a dark track, the fill clipped to the same rounded shape."""
+    a = canvas(w, h)
+    m = shape(w, h, r)
+    ring = edge(m)
+    inner = m & ~ring
+    paint(a, ring, OUTLINE)
+    paint(a, inner, (39, 30, 26))
+    top = np.zeros_like(m)
+    top[1:] = ring[:-1]
+    paint(a, top & inner, (30, 22, 19))
+    fw = int(round(w * max(0.0, min(1.0, share))))
+    if fw:
+        light, base, dark = BAR_FILLS[fill]
+        # The fill is the same shape, as long as the share: a fill that stops short of the end
+        # still has a rounded end.
+        em = np.zeros_like(m)
+        fw = max(fw, 2 * len(profile(r, h)) + 2)
+        em[:, :min(fw, w)] = shape(min(fw, w), h, r)
+        f = inner & em & ~edge(em)
+        paint(a, f, base)
+        up = np.zeros_like(m)
+        up[1:] = ~f[:-1]
+        paint(a, f & up, light)
+        dn = np.zeros_like(m)
+        dn[:-1] = ~f[1:]
+        paint(a, f & dn & ~up, dark)
+    return a
+
+
+def slot_r(size=36, selected=False, r=2):
+    """A sunken slot: dark under its top-left outline, light over its bottom-right one."""
+    a = canvas(size, size)
+    m = shape(size, size, r)
+    ring = edge(m)
+    inner = m & ~ring
+    paint(a, ring, GLOW if selected else OUTLINE)
+    paint(a, inner, SLOT)
+    up = np.zeros_like(m)
+    up[1:] = ring[:-1]
+    lf = np.zeros_like(m)
+    lf[:, 1:] = ring[:, :-1]
+    dn = np.zeros_like(m)
+    dn[:-1] = ring[1:]
+    rt = np.zeros_like(m)
+    rt[:, :-1] = ring[:, 1:]
+    paint(a, (dn | rt) & inner, SLOT_L)
+    paint(a, (up | lf) & inner, SLOT_D)
+    return a
+
+
+def chip_r(label, kind="plain", h=18, r="pill"):
+    face, rim, col = {"plain": ((42, 32, 27), (104, 62, 38), CREAM), "points": ((122, 64, 22), (170, 96, 40), ON_ORANGE),
+                      "dim": ((32, 24, 20), (78, 54, 38), DIM)}[kind]
+    ends = len(profile(r, h)) if r == "pill" else 0
+    w = F.width(label) + 12 + max(0, ends - 4) * 2
+    w += w % 2
+    a = canvas(w, h)
+    m = shape(w, h, r)
+    ring = edge(m)
+    paint(a, ring, OUTLINE)
+    m2 = m & ~ring
+    ring2 = edge(m2)
+    paint(a, ring2, rim)
+    paint(a, m2 & ~ring2, face)
+    F.draw(a, label, (w - F.width(label)) // 2, (h - F.caps) // 2, col, None)
+    return a
+
+
+def panel_r(w, h, r=3):
+    """A window: outline, a 2 px bronze frame lit top-left, a 1 px groove, a 1 px inner bronze
+    line, the dark inside; each ring steps in with the corners, one radius smaller each time."""
+    a = canvas(w, h)
+    m0 = shape(w, h, r)
+    paint(a, m0, OUTLINE)
+    m1 = shrink(m0) & shape(w, h, r)  # inside the outline
+    paint(a, m1, BRONZE)
+    # light on the frame's top and left, dark on its bottom and right
+    up = np.zeros_like(m1)
+    up[1:] = ~m1[:-1]
+    lf = np.zeros_like(m1)
+    lf[:, 1:] = ~m1[:, :-1]
+    dn = np.zeros_like(m1)
+    dn[:-1] = ~m1[1:]
+    rt = np.zeros_like(m1)
+    rt[:, :-1] = ~m1[:, 1:]
+    paint(a, m1 & (dn | rt), BRONZE_D)
+    paint(a, m1 & (up | lf), BRONZE_HI)
+    m3 = shrink(m0, 3)
+    paint(a, m3, PANEL_DEEP)
+    m4 = shrink(m0, 4)
+    paint(a, m4, BRONZE_D)
+    m5 = shrink(m0, 5)
+    paint(a, m5, PANEL)
+    return a
