@@ -14,3 +14,7 @@ log_spruce
 log_spruce_top
 log_birch
 log_birch_top
+seagrass
+lily_pad
+kelp_top
+reed
