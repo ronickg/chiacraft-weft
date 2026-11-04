@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "dried apple rings: three wrinkled pale golden apple rings with red edges, overlapping, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.266,
+   "outline": 0.56,
+   "red_line": 0.0,
+   "fill": 0.24,
+   "passed": true
+  }
+ ]
+}

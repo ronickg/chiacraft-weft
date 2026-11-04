@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a light undyed beige linen with a coarse weave hood, front view, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.409,
+   "outline": 1.0,
+   "red_line": 0.0,
+   "fill": 0.47,
+   "passed": true
+  }
+ ]
+}

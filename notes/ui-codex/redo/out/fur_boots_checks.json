@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a pair of thick shaggy grey-brown fur with a cream trim boots side by side, front view, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.421,
+   "outline": 0.74,
+   "red_line": 0.04,
+   "fill": 0.6,
+   "passed": true
+  }
+ ]
+}

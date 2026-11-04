@@ -18,13 +18,14 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 OUT = os.path.join(HERE, "out")
 TITLES = {"1_tools": "Tools and weapons", "2_armour": "Armour", "3_materials": "Materials, ores and gems",
           "4_food": "Food", "5_plants": "Plants, nuts, berries and seeds", "6_misc": "Containers, tools, creatures, eggs",
-          "7_survival": "Survival's new items (for its branch)",
+          "7_survival": "Survival's new items (left: its branch's placeholders)",
           "2b_redo": "Redos: hoes, leather cap, boots",
           "3b_redo": "Redos: coal, gunpowder, stick, three hoes, five foods",
           "5b_hoes": "Hoes, third try",
           "5c_wild": "New wild foods (for the Voxel dog handoff)",
           "5d_redo": "Redos: crowberries, beans, barley, rye, melon seeds, diamond hoe",
-          "6b_size": "Redos and creature sizes: repeater, insects, saddles, worm, grub, eggs"}
+          "6b_size": "Redos and creature sizes: repeater, insects, saddles, worm, grub, eggs",
+          "7b_beans": "Beans, on green"}
 
 
 def uri(im, scale=1):
@@ -48,7 +49,13 @@ def game_icon(name, mod):
     p = os.path.join(ROOT, "mods", mod, "assets", "textures", "item", name + ".png")
     if not os.path.exists(p):  # Survival's new items live on its branch
         p = os.path.join(ROOT, "mods", "base", "assets", "textures", "item", name + ".png")
-    return Image.open(p).convert("RGBA") if os.path.exists(p) else None
+    if os.path.exists(p):
+        return Image.open(p).convert("RGBA")
+    # Survival's new items: their placeholders live on its branch
+    import subprocess
+    r = subprocess.run(["git", "-C", ROOT, "show", f"refs/heads/claude/survival-clothing-cooking-f0c469:"
+                        f"mods/base/assets/textures/item/{name}.png"], capture_output=True)
+    return Image.open(io.BytesIO(r.stdout)).convert("RGBA") if r.returncode == 0 else None
 
 
 def card(job):
