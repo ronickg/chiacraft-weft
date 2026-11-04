@@ -2,8 +2,8 @@
 
 Status: **decided by Ronald** (11-05, relayed by Planner): "B: about 13-15 min", "Knapping
 screen, then book", "Fire bed + bow drill", "Knapped stone pick, no chopper". Slices 1-3 built
-(`mods/base/src/first.rs`, `knapping.rs`, `firebed.rs`; numbers `vitals::first`), waiting for PC
-runs. The research behind it is `reports/The first hours.md`.
+(`mods/base/src/first.rs`, `knapping.rs`, `firebed.rs`; numbers `vitals::first`; the knapping
+screen's look by UI redo) and seen in PC runs (11-05). The research behind it is `reports/The first hours.md`.
 
 **As built, where it differs from the proposal below:**
 - The fire bed is three sticks and a fibre (the 2 × 2 holds four).
