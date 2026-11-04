@@ -520,6 +520,10 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:lod_distance", ck::INT, 256.0, 0.0, 2048.0, 16.0),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
+        // Sun shadows, for shader packs that draw them: 0 off, 1 the near map only (80 blocks
+        // about the player), 2 near and far (400). The maps' size in texels: 1024, 2048 or 4096.
+        ConfigDef::number("core:shadows", ck::INT, 2.0, 0.0, 2.0, 1.0),
+        ConfigDef::number("core:shadow_size", ck::INT, 2048.0, 1024.0, 4096.0, 1024.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
         ConfigDef::number("core:chat_width", ck::INT, 320.0, 40.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_height", ck::INT, 180.0, 20.0, 1000.0, 10.0),

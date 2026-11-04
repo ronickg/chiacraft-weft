@@ -291,6 +291,12 @@ impl ClientWorld {
     }
 
     /// With a number that changes whenever its blocks do (`Slot::rev`).
+    /// Changes whenever any cube comes, goes or changes (light too): nothing to look at again
+    /// while it stays the same.
+    pub fn revision(&self) -> u32 {
+        self.next_rev
+    }
+
     pub fn cube_rev(&self, p: IVec3) -> Option<(&Arc<Cube>, u32)> {
         self.cubes.get(&p).map(|s| (&s.cube, s.rev))
     }
@@ -535,6 +541,7 @@ impl ClientWorld {
             self.wire_dirty.insert(pos);
         }
         if let Some(slot) = self.cubes.remove(&pos) {
+            self.next_rev += 1;
             self.unloaded.push(slot);
             let col = IVec2::new(pos.x, pos.z);
             if let Some(c) = self.columns.get_mut(&col) {

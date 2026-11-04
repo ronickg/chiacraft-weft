@@ -215,6 +215,14 @@ impl Post {
                 pad: 0,
             })
             .collect();
+        let mut passes = passes;
+        // Merged (`packs::merge_effects`): one pass runs them all, the first's `pad` their count.
+        let n = if n > 1 && crate::packs::merge_effects() {
+            passes[0].pad = n as u32;
+            1
+        } else {
+            n
+        };
         let buf = self.params[frame.slot];
         gpu.mapped(buf)[..passes.len() * size_of::<Pass>()].copy_from_slice(bytemuck::cast_slice(&passes));
         for i in 0..n {
