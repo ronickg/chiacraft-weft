@@ -84,6 +84,8 @@ pub fn register(r: &mut Registry) {
             Form::Still if name == "lily_pad" => b
                 .texture(name)
                 .model_box([0.0, 0.0, 0.0], [16.0, 0.5, 16.0])
+                // A slot shows its own picture, not a half-pixel sliver of the model.
+                .item_texture(name)
                 .tab(&crate::tabs::NATURAL),
             // A common reed, its purple plumes on top.
             Form::Still if name == "reed" => b.texture("reed").tab(&crate::tabs::NATURAL),
