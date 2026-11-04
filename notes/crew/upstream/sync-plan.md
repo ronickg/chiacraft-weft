@@ -6,6 +6,55 @@ into a scratch branch of dev (`scratch/upstream-sync-dry`, dev `26969dd2`, workt
 `.claude/worktrees/syncdry`), the conflicts read, then aborted (`git merge --no-commit 10fdced5`
 there shows them again). Nothing went into dev.
 
+## Refreshed (11-04, before the freeze)
+
+The dry merge again, on dev `af16f181` (241 merges past the first run's `26969dd2`) with upstream
+`ca172ab8` (11 commits past `10fdced5`): scratch branch `scratch/upstream-sync-dry2`, worktree
+`.claude/worktrees/syncdry2`, aborted afterwards. Nothing went into dev.
+
+- **263 files conflict** (was 259): the same 174 textures and **89 code and doc files** (was 85).
+  Dev's 241 merges added no new conflicted file. The 4 new ones come from upstream's new commits:
+  `docs/redstone.md`, base's `en_us.lang` and `ru_ru.lang`, and `mods/testmod/src/lib.rs`.
+- **Hunks grew** where upstream's new features landed: abi lib.rs 12→16, client/mod.rs 26→30,
+  hud.rs 1→5, host.rs 11→12, registry.rs 11→12, dim.rs 25→26, sync.rs 4→5, terrain_gpu.rs 8→9,
+  content.rs 8→9, receive.rs 3→4, world_render.rs 2→3, base lib.rs 1→3, testkit gameplay.rs
+  10→11, visual.rs 1→2. Every other file is as in the tables below.
+- **Upstream's new commits:**
+  - riding: seats, chains, mob and player steering with presets, exits, rider rules, a riding
+    pose carried through teleports and dimensions;
+  - camera modes: freecam and eased transitions; `Client::view` is gone, replaced by registered
+    camera modes and `camera_flags`;
+  - ore variants and exposure, HUD icon effects;
+  - `/attribute`, homes, `/back` (PR #72).
+- **Two new calls these bring** (Planner or Ronald):
+  5. **Riding.** Upstream now has its own riding, broader than ours: seats, chains, steering
+     presets, exits, rules. Ours (2ab12f97 onward) carries the wyverns' flight and the rider's sit
+     pose. **Recommendation: take upstream's riding** and put our flight steering and the wyvern
+     onto its steering presets (Animals).
+  6. **Camera.** **Take upstream's camera modes.** Our view-based code (the crosshair, the sun
+     shadow of one's own body, `shadow_me`, the first-person hand) reads `camera_flags`
+     (HAND, BODY) instead. The crosshair fix for Weft is already reworked that way
+     (`fix/crosshair-third-person-clean` 93227e10, see for-ronald.md).
+- **The Vulkan upload fixes** are still upstream's own, merged cleanly with ours (no change).
+
+### Who works on which area
+
+The order stays as below. Each area is done on one sync branch, built and looked at on the PC
+before the next one starts.
+
+| # | area | files (main ones) | who |
+|---|---|---|---|
+| 1 | abi, sdk, host: both sides' host functions, renamed ones chased through the mods | abi lib.rs, host.rs, sdk/*, registry.rs, content.rs | Upstream |
+| 2 | Positions as `Vec3` (~200 sites), questions and events as `actions::*` (~86), SDK renames | all mods | Upstream for base and testkit; **Animals** for mods/animals; **Terrain** for base_api::land; **Plants** for base_api::trees, branchy and vitals' callers |
+| 3 | Terrain (decision 1: our callbacks beside upstream's expressions), distant terrain (2: our LOD tiles) | server/terrain.rs, sdk/terrain.rs, terrain.wgsl, noise/fixed.rs, client/lod.rs, terrain_gpu.rs, gpu_layout.rs | **Terrain** (worldgen) with **Distant terrain**; looks on seeds 1-3 against dev's |
+| 4 | Weather by id (4), ours registered on it | dim.rs, sync.rs, weather.rs, builtin.rs, regions.rs, base weather and weather_sound | Upstream, with **Lighting** for the sky, fog and pack side |
+| 5 | Cell parts and waterlogging (3), liquids, mining on the server, drops at the feet | dim.rs, liquid.rs, mesher.rs, actions.rs | Upstream |
+| 6 | Entities: upstream's animation clips, riding (5) and camera (6) under our painted skins, bone builds, sit pose, flight, mob sun shadows | entity_render.rs, models.rs, model.rs, client/mod.rs | **Animals** (models, riding, the wyvern), **Lighting** (shadows) |
+| 7 | The rest: app.rs and client/mod.rs (`self.me`, the early list, occlusion), UI, HUD, lang, docs, testkit | app.rs, ui/*, hud.rs, screens, lang, docs | **UI** for screens and the HUD, Upstream for the rest |
+| 8 | All of it: `cargo test --release --workspace`, `--test all` against today's baseline, the sheets, a playtest | | Tester 2 (PC), Tester, the playtesters |
+
+---
+
 ## The size of it
 
 - Merge base `6e4e1685`: upstream is **173 commits** past it, dev **1,294**.
