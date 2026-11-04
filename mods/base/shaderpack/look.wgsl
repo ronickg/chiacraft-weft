@@ -236,7 +236,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     var c = p.ambient * sky * hemi * ao;
     // At golden hour the sky round the low sun glows: a warm fill on everything under it, in the
     // shade too, so the hour reaches the ground and not only the sky.
-    c += p.glow * golden() * 0.22 * sky * hemi * ao;
+    c += p.glow * golden() * 0.35 * sky * hemi * ao;
     // Direct light only where the sky reaches (it keeps caves out of reach of the traced shadow's
     // gaps), and without corner shading: corners are dark where little sky gets in.
     let open = smoothstep(0.5, 0.95, light.x);
@@ -428,10 +428,11 @@ fn shoulder(x: vec3<f32>) -> vec3<f32> {
 // floor so nothing is ever pure black.
 fn display(c: vec3<f32>) -> vec3<f32> {
     var t = shoulder(max(c, vec3(0.0)));
-    let lights = smoothstep(0.15, 0.7, luma(t));
-    t *= mix(vec3(0.96, 0.985, 1.05), mix(vec3(1.0), vec3(1.07, 1.0, 0.88), golden()), lights);
+    // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
+    let lights = smoothstep(0.04, 0.35, luma(t));
+    t *= mix(vec3(0.975, 0.99, 1.03), mix(vec3(1.0), vec3(1.10, 1.0, 0.84), golden()), lights);
     let y = luma(t);
     t = max(mix(vec3(y), t, 0.98), vec3(0.0));
-    t += (vec3(1.0) - t) * vec3(0.0035, 0.004, 0.0065);
+    t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034);
     return clamp(t, vec3(0.0), vec3(1.0));
 }
