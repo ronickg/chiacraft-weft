@@ -359,7 +359,9 @@ pub const BRAZIL_NUT: Recipe = Recipe {
     branch_angle: 62.0,
     branch_width: 0.6,
     orders: 2,
-    branch_len: 0.3,
+    // Limbs scale with the height: shorter, so the umbrella stays inside the giant scatter's
+    // reach (12) and every leaf within LEAF_REACH of a log (at 0.3 a 58-high crown overran both).
+    branch_len: 0.22,
     taper: 0.4,
     leaf_r: 2.8,
     leaf_ry: 1.2,
