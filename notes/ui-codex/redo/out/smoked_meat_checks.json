@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "smoked meat: a dark mahogany-brown smoked cut with a glossy crust and a pale fat edge, tied with string, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.404,
+   "outline": 0.58,
+   "red_line": 0.12,
+   "fill": 0.48,
+   "passed": true
+  }
+ ]
+}

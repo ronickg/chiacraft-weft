@@ -25,6 +25,17 @@ erase what they earned.
    engine changes only for identity, the mod sandbox, content switching, the confirm dialog and
    the server mode. Weft is tracked as `upstream` and merged regularly. Weft files stay MPL-2.0,
    ours are MIT. The name players see is chiacraft.
+
+   **Engine changes we offer back to Weft** (only with Ronald's yes for each):
+   - Sent: the GPU fix, https://github.com/Weft-Rust/Weft/pull/83.
+   - To offer later: entity send and activation ranges (E1, `reports/Research round 2.md`).
+     These are the rules `core:entity_send_distance`, `core:entity_activation_distance` and
+     `core:inactive_entity_interval`, the `ALWAYS_ACTIVE` flag and `tick_elapsed`. Ronald's
+     yes, 11-04: "Yes, later". Offer it once it has run in `dev` a while.
+   - To offer, if Ronald picks 32 a block for worn layers: worn layers mapped by the skin's
+     layout (`client/entity_render.rs`, `worn_tex_size`). A 128 x 64 armour or clothes layer on a
+     64 x 32 skin then maps over all of it, as Minecraft's armour does in 32x packs; one at the
+     layout's width reads as before. One general line and a test (branch `claude/clothes-worn`).
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 

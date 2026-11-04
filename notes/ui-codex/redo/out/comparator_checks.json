@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a comparator seen from slightly above: a thin smooth grey stone slab with three small red torches in a triangle, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.221,
+   "outline": 0.69,
+   "red_line": 0.0,
+   "fill": 0.32,
+   "passed": true
+  }
+ ]
+}

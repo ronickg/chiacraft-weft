@@ -17,7 +17,7 @@ const NEAR_FIRE: f32 = 3.0;
 /// The kind of comfort a block gives, a bit each (each kind counts once).
 pub fn comfort_of(state: u32) -> u32 {
     match block_name(state).split('[').next().unwrap_or("") {
-        "base:lava" | "base:torch" | "base:wall_torch" => 1,
+        "base:lava" | "base:campfire" | "base:torch" | "base:wall_torch" => 1,
         "base:furnace" if state_prop(state, "lit") == Some("true") => 1,
         "base:bed" => 2,
         "base:crafting_table" => 4,

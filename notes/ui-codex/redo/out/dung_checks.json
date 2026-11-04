@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a dung pat: a round flattened dark brown dropping with a lighter rim, a few straw bits, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.547,
+   "outline": 0.76,
+   "red_line": 0.31,
+   "fill": 0.34,
+   "passed": true
+  }
+ ]
+}

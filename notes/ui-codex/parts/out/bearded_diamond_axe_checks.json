@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a bearded diamond axe: a narrow-necked head of faceted cyan diamond with teal shadows and white facet tips, its lower edge dropping into a long hooked beard, one small sparkle, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar band where head meets handle, lying diagonally, handle at the bottom left, head at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.453,
+   "outline": 0.56,
+   "red_line": 0.05,
+   "fill": 0.23,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a repeater seen from slightly above: a thick smooth grey stone slab filling most of the canvas width, two small red torches standing on it and a red arrow line between them, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.349,
+   "outline": 0.61,
+   "red_line": 0.0,
+   "fill": 0.43,
+   "passed": true
+  }
+ ]
+}
