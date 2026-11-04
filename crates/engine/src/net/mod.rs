@@ -462,7 +462,8 @@ messages! {
         /// `jumped`: it jumped since the last one.
         Move { pos: DVec3, yaw: f32, pitch: f32, on_ground: bool, pose: crate::world::Pose, sprint: bool, flying: bool, jumped: bool, frame: Option<(u64, DVec3)> },
         /// Where the mount the player steers went this tick (its client moves it).
-        MountMove { pos: DVec3, yaw: f32, vel: DVec3, on_ground: bool },
+        /// `flies`: its steering flies it this tick (no fall to count).
+        MountMove { pos: DVec3, yaw: f32, vel: DVec3, on_ground: bool, flies: bool },
         /// Off what the player rides (`core:dismount`).
         Dismount,
         /// May it turn on camera mode `mode` (`camera_flags::ASK`)? Answered with `Camera`.

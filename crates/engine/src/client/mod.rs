@@ -274,7 +274,7 @@ fn ride_step(
         let mut pos = m.pos;
         let r = physics::walk(c, block, bodies, mount, &mut pos, &mut drive.vel, drive.on_ground, &ctl, &frame);
         drive.on_ground = r.on_ground;
-        conn.send(ToServer::MountMove { pos, yaw, vel: drive.vel * crate::world::TPS as f64, on_ground: r.on_ground });
+        conn.send(ToServer::MountMove { pos, yaw, vel: drive.vel * crate::world::TPS as f64, on_ground: r.on_ground, flies });
         moved = Some((pos, yaw));
     }
     let (pos, yaw) = moved.unwrap_or((m.pos, m.yaw));

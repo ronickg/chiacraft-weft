@@ -290,7 +290,9 @@ impl Dim {
     }
 
     /// The client of the player steering `mount` moved it.
-    pub fn mount_moved(&mut self, c: &'static Content, player: u64, pos: DVec3, yaw: f32, vel: DVec3, on_ground: bool) {
+    /// `flies`: its steering flew it this tick, which is no fall (a dragon coming down to land).
+    #[allow(clippy::too_many_arguments)]
+    pub fn mount_moved(&mut self, c: &'static Content, player: u64, pos: DVec3, yaw: f32, vel: DVec3, on_ground: bool, flies: bool) {
         let Some(mount) = self
             .entities
             .get(player)
@@ -310,7 +312,7 @@ impl Dim {
         m.moved = (pos - m.pos).with_y(0.0).length() as f32;
         (m.pos, m.yaw, m.vel, m.on_ground) = (pos, yaw, vel, on_ground);
         let k = &c.game.entities[m.kind as usize];
-        let fell = super::entity::track_fall(&mut m.fall, dy, on_ground, m.in_liquid);
+        let fell = super::entity::track_fall(&mut m.fall, dy, on_ground, m.in_liquid || flies);
         let land = fell.and_then(|f| super::entity::fall_damage(k, f));
         if let Some(amount) = land {
             self.damage(c, mount, amount, 0, abi::damage_cause::FALL);

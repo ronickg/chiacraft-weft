@@ -47,7 +47,7 @@ pub fn init(r: &mut Registry) {
 fn register(r: &mut Registry, kind: &'static EntityKind, index: usize, texture: &str) {
     let settle = crate::rest::Settle { chance: 300, ticks: (400, 1200), lie_after: 0 };
     crate::rest::register(r, kind, settle, "raptor", texture, (0.6, 0.9), &[("_rest", &rest_look(kind))]);
-    crate::riding::rideable(r.entity(kind), index, 4.0)
+    crate::riding::rideable(r.entity(kind), index)
         .size(animals_core::bodies::of("raptor").0, animals_core::bodies::of("raptor").1)
         .max_health(14.0)
         .walk_speed(4.0)

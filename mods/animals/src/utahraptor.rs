@@ -26,7 +26,7 @@ pub fn init(r: &mut Registry) {
         animals_core::bodies::of("utahraptor"),
         &[("_rest", "utahraptor_rest")],
     );
-    crate::riding::rideable(r.entity(&UTAHRAPTOR), index, 3.6)
+    crate::riding::rideable(r.entity(&UTAHRAPTOR), index)
         .size(animals_core::bodies::of("utahraptor").0, animals_core::bodies::of("utahraptor").1)
         .max_health(60.0)
         .walk_speed(3.6)

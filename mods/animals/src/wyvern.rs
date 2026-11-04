@@ -32,7 +32,7 @@ pub fn init(r: &mut Registry) {
         (animals_core::bodies::of("wyvern").0, animals_core::bodies::of("wyvern").1 * 0.5),
         &[("_rest", "wyvern_rest")],
     );
-    crate::riding::rideable(r.entity(&WYVERN), index, 5.0)
+    crate::riding::rideable(r.entity(&WYVERN), index)
         .size(animals_core::bodies::of("wyvern").0, animals_core::bodies::of("wyvern").1)
         .max_health(400.0)
         .walk_speed(5.0)

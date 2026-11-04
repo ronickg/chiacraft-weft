@@ -377,12 +377,12 @@ impl Server {
                 }
             }
 
-            ToServer::MountMove { pos, yaw, vel, on_ground } => {
+            ToServer::MountMove { pos, yaw, vel, on_ground, flies } => {
                 if !pos.is_finite() || !vel.is_finite() || !yaw.is_finite() {
                     return;
                 }
                 let Some((r, entity)) = self.region(pi) else { return };
-                r.mount_moved(c, entity, pos, yaw, vel, on_ground);
+                r.mount_moved(c, entity, pos, yaw, vel, on_ground, flies);
             }
             ToServer::Dismount => {
                 let Some((r, entity)) = self.region(pi) else { return };

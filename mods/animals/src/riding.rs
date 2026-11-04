@@ -39,6 +39,11 @@ pub(crate) static FLIGHT: Component<Flight> = Component::named("flight");
 /// Flying faster sprinting, and climbing or coming down at this share of the speed.
 const FLY_SPRINT: f32 = 1.5;
 const FLY_VERTICAL: f32 = 0.7;
+/// Climbing and coming down, blocks a second for each unit of `Species::flight`: `rise` is an
+/// upward speed the engine sets outright, while going ahead builds up against the air's drag, so
+/// at the walking-speed scale a wyvern (flight 8) shot up 28 blocks a second (PC run
+/// aw_sync_wyvern6). About 7 for a held jump now.
+const CLIMB_PER_FLIGHT: f32 = 1.25;
 /// Diving faster than this, blocks a second, with its rider going forward, it glides.
 const GLIDE_BELOW: f32 = -2.0;
 static TOOLS: CreativeTab = CreativeTab::named("base:tools");
@@ -77,6 +82,17 @@ pub fn init(r: &mut Registry) {
         saddles.push((s.kind_name(), saddle));
     }
     let _ = SADDLES.set(saddles);
+    // A flyer coming down under its rider lands; it doesn't fall. The engine counts a steered
+    // mount's way down as a fall (it doesn't know it flies), and a wyvern hurt itself landing.
+    r.intercept(&actions::HURT, |q| {
+        let w = q.world();
+        let id = q.entity();
+        let flies = w
+            .component(id, &ANIMAL)
+            .and_then(|a| a.species())
+            .is_some_and(|s| s.flight > 0.0);
+        if q.query().cause == damage_cause::FALL && flies && rider_of(&w, id).is_some() { Verdict::Deny } else { Verdict::Abstain }
+    });
 }
 
 /// The seat of rideable species `index`, for its kind (`EntityBuilder::seat`): `Species::seat`
@@ -89,9 +105,9 @@ pub fn seat(index: usize) -> Seat {
         .exit(Exit::nearest(2.0))
 }
 
-/// How a rider's keys move rideable species `index`, whose kind walks at `walk` blocks a second
+/// How a rider's keys move rideable species `index`
 /// (`EntityBuilder::steering`): on the client, from the keys and the mount as it is.
-pub fn steering(index: usize, walk: f32) -> Steering {
+pub fn steering(index: usize) -> Steering {
     let flight = SPECIES[index].flight;
     Steering::new(move |i, m| {
         let sprint = i.sprint != 0 && i.forward > 0.0;
@@ -119,7 +135,7 @@ pub fn steering(index: usize, walk: f32) -> Steering {
             speed,
             yaw: if moving { i.yaw } else { f32::NAN },
             flies: 1,
-            rise: climb * walk * speed,
+            rise: climb * CLIMB_PER_FLIGHT * speed,
             ..Steer::DEFAULT
         }
     })
@@ -254,8 +270,8 @@ fn end_ride(w: &World, id: u64) {
     }
 }
 
-/// Kind `b` of species `index` (walking at `walk` blocks a second) made rideable when its species
+/// Kind `b` of species `index` made rideable when its species
 /// is (`Species::seat`): its seat and steering.
-pub fn rideable(b: EntityBuilder<'_>, index: usize, walk: f32) -> EntityBuilder<'_> {
-    if SPECIES[index].seat > 0.0 { b.seat(seat(index)).steering(steering(index, walk)) } else { b }
+pub fn rideable(b: EntityBuilder<'_>, index: usize) -> EntityBuilder<'_> {
+    if SPECIES[index].seat > 0.0 { b.seat(seat(index)).steering(steering(index)) } else { b }
 }

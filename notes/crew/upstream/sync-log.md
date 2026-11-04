@@ -13,3 +13,4 @@ Merge e9c8405c on sync/weft-26.11.2. Things the merge dropped or left for an own
 - base: upstream renamed copper_lamp to golden_lamp (gold recipe); its golden_lamp textures are upstream's 16 px: Art to redraw at 32 px; our 32 px copper_lamp pngs are unused now
 - Upstream bug (a PR candidate for Ronald): client/particles.rs spawn indexed c.states with world.block() of a cell whose cube hadn't arrived (u32::MAX): a panic right after a teleport (SYNC4, world::crater). Fixed in the sync with .get().
 - Upstream bug (a PR candidate): first person cut only bone roles (draw_own_hand, the body in view), not bone_mask: worn layers drawn by bone name kept every bone, so a shirt's torso and sleeves drew at the camera. Fixed in the sync (bones_with, Animals).
+- Upstream candidate: a steered flying mount's flight counted as a fall on the server (mount_moved's track_fall didn't know it flew); MountMove now carries flies.
