@@ -40,22 +40,32 @@ shot ar_4_mist_placed.png
 chat /air 0 0
 wait 10
 shot ar_5_clear_placed.png
-# 2. A shower in the evening, the sun low behind: the rainbow as the rain comes (its amount rises
-#    over a few seconds), then as it clears. High over the platform in the open, spectator.
+# 2. A shower in the evening (10800, about 16:50), from the clouds check's open hill spot under the
+#    clouds (149.5 120 -166.5, spectator): first toward the low sun (yaw 90) to show where it is,
+#    then away from it (yaw 270), where the bow stands about the point opposite the sun (on day 0
+#    the full moon stands there too). The bow as the rain comes (its amount rises over a few
+#    seconds), in full rain, and as it clears.
 chat /tk mode spectator
-chat /tp 40 240 52
-wait 3
+chat /tp 149.5 120 -166.5
+loaded
+idle
+wait 8
 chat /time set 10800
-look 270 12
+look 90 8
 wait 3
+shot ar_6a_toward_sun.png
+look 270 12
+wait 2
 shot ar_6_bow_dry.png
 chat /weather rain 99999
 wait 1
 shot ar_7_bow_rain_1s.png
-wait 1
-shot ar_8_bow_rain_2s.png
-wait 1
+wait 2
 shot ar_9_bow_rain_3s.png
+look 90 8
+wait 1
+shot ar_9b_rain_toward_sun.png
+look 270 12
 wait 8
 shot ar_10_bow_rain_full.png
 chat /weather clear 99999
