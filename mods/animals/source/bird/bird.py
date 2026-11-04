@@ -7,7 +7,9 @@ skill: boxes, cut-out feather panels and a hand-painted texture.
 A bird is laid out in the raven's units (a raven is 40 long), shaped by its knobs (a bigger head,
 a shorter or hooked bill, broader or longer wings, a longer tail, wider body, longer or shorter
 legs), then warped into its own size (`warp`: the legs below `LEG_Y` stretched by `D`, everything
-`K` times bigger). Small birds paint `FINE` texels a unit (`TX`). One build paints both models on
+`K` times bigger). It paints `TX` texels a unit: the house's 32 a block (`house.TX`, 0.5), finer
+(64, 128 a block) for a bird whose eye-bearing face would be under 3 texels at 32 (`house.fine`);
+each bird's module sets it and says why. One build paints both models on
 one texture: standing with the wings folded along the sides, and flying with them open
 (`<model>_fly`, a look its mod puts on while it flies).
 
@@ -25,7 +27,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from house import TX as HOUSE_TX  # noqa: E402
 from ground import lowest  # noqa: E402
 
 TAU = 2 * math.pi
@@ -36,7 +39,7 @@ DEFAULTS = dict(
     name="bird",
     K=1.0,  # drawn this many times the raven's size
     D=0.0,  # the legs this much longer (raven units; negative shorter)
-    TX=1,  # texels a unit (house.FINE for a small bird)
+    TX=HOUSE_TX,  # texels a unit: 32 a block (0.5); a bird with a small head sets its own (`house.fine`)
     head=1.0,  # the skull's size against the raven's
     head_y=0.0,  # the skull raised (raven units)
     neck=True,  # a neck box between the chest and the head (an owl's head sits on its shoulders)
@@ -122,25 +125,59 @@ def geometry(c):
                 fan_z1=-8.0, fold_z1=-4.0, prim_x0=hand_x - 0.2, prim_z1=2.8, fold_y=12.0, fold_h=2.0, u=1.0)  # u: the feathers' wiggles, in raven units
 
 
-def eye_box(c, s):
-    """The eye's texels on the warped skull, as `stamp_eyes` rounds them, in warped units: side
-    eyes (z0, z1, top, bottom), front eyes (x0, x1, top, bottom)."""
-    pat = EYES[c["eyes"]["pattern"]]["pattern"]
-    ph, pw = len(pat), len(pat[0])
-    TX = c["TX"]
+def eye_design(c, face):
+    """The eye design stamped on `face`: a side eye's design mirrored on the west face, so both
+    sides carry it the same way round (highlight and pupil toward the bill)."""
+    name = c["eyes"]["pattern"]
+    if c["eyes"]["kind"] != "side" or face != "west":
+        return name
+    m = name + "~west"
+    if m not in EYES:
+        EYES[m] = dict(EYES[name], pattern=[row[::-1] for row in EYES[name]["pattern"]])
+    return m
+
+
+def eye_grid(c, face):
+    """The skull face that carries the eyes, as `face_frame` cuts it: its texels (w, h), the units
+    a texel (su, sv), and the eye centers in its texels [(cu, cv)] (front eyes: left one first)."""
     (x0, y0, z0), (x1, y1, z1) = (warp(v, c) for v in G["skull"])
-    ey = warp((0, c["eyes"]["y"] + c["head_y"], 0), c)[1]
-    v0 = int(round(TX * (y1 - ey) - ph / 2))
-    top, bottom = y1 - v0 / TX, y1 - (v0 + ph) / TX
+    TX = c["TX"]
+    eyes = c["eyes"]
+    ey = warp((0, eyes["y"] + c["head_y"], 0), c)[1]
+    across = (z1 - z0) if eyes["kind"] == "side" else (x1 - x0)
+    w, h = max(1, int(round(TX * across))), max(1, int(round(TX * (y1 - y0))))
+    su, sv = across / w, (y1 - y0) / h
+    cv = (y1 - ey) / sv
+    if eyes["kind"] == "side":
+        ez = warp((0, 0, eyes["z"]), c)[2]
+        centers = [(((z1 - ez) if face == "east" else (ez - z0)) / su, cv)]
+    else:
+        ex = eyes["x"] * c["K"]
+        centers = [((-ex - x0) / su, cv), ((ex - x0) / su, cv)]
+    return w, h, su, sv, centers
+
+
+def eye_box(c, s):
+    """The eye's texels on the warped skull, exactly as `stamp_eyes` places them (`eye_corner` on
+    the face's own texel grid), in warped units: side eyes (z0, z1, top, bottom), front eyes
+    (x0, x1, top, bottom)."""
+    (x0, y0, z0), (x1, y1, z1) = (warp(v, c) for v in G["skull"])
     if c["eyes"]["kind"] == "side":
-        ez = warp((0, 0, c["eyes"]["z"]), c)[2]
-        cu = TX * ((z1 - ez) if s > 0 else (ez - z0))
-        u0 = int(round(cu - pw / 2))
-        za, zb = (z1 - (u0 + pw) / TX, z1 - u0 / TX) if s > 0 else (z0 + u0 / TX, z0 + (u0 + pw) / TX)
+        face = "east" if s > 0 else "west"
+        w, h, su, sv, centers = eye_grid(c, face)
+        cu, cv = centers[0]
+    else:
+        face = "south"
+        w, h, su, sv, centers = eye_grid(c, face)
+        cu, cv = centers[0 if s < 0 else 1]
+    pat = EYES[eye_design(c, face)]["pattern"]
+    ph, pw = len(pat), len(pat[0])
+    u0, v0 = eye_corner(cu, cv, pat, w)
+    top, bottom = y1 - v0 * sv, y1 - (v0 + ph) * sv
+    if c["eyes"]["kind"] == "side":
+        za, zb = (z1 - (u0 + pw) * su, z1 - u0 * su) if s > 0 else (z0 + u0 * su, z0 + (u0 + pw) * su)
         return za, zb, top, bottom
-    ex = s * c["eyes"]["x"] * c["K"]
-    u0 = int(round(TX * (ex - x0) - pw / 2))
-    return x0 + u0 / TX, x0 + (u0 + pw) / TX, top, bottom
+    return x0 + u0 * su, x0 + (u0 + pw) * su, top, bottom
 
 
 def bones(c):
@@ -279,6 +316,7 @@ def cut_mask(e, p, c):
     g = G
     x, y, z = p[..., 0], p[..., 1], p[..., 2]
     kind = e["cut"]
+    tex = 1.0 / (c["TX"] * c["K"])  # a texel, in the raven's units: wiggles narrower than a few alias into noise
     if kind == "tail":
         L = g["fan_z1"] - g["fan_end"]
         tt = np.clip((g["fan_z1"] - z) / L, 0, 1)  # along the tail, 1 at the tip
@@ -290,15 +328,16 @@ def cut_mask(e, p, c):
             return (np.abs(x) <= fw * (0.6 + 0.35 * tt)) & (tt <= 1 - 0.18 * (np.abs(x) / fw) ** 2)
         if style == "notch":
             return (np.abs(x) <= fw * (0.55 + 0.4 * tt)) & (tt <= 0.9 + 0.1 * np.abs(x) / fw)
-        return (np.abs(x) <= fw * (0.6 + 0.4 * tt)) & (tt <= 0.97 - 0.06 * (np.floor(np.abs(x) * 1.3 / g["u"]) % 2))  # square, feather ends
+        ends = np.floor(np.abs(x) / max(g["u"] / 1.3, 1.5 * tex)) % 2  # square, feather ends: each at least 1.5 texels wide, a texel deep
+        return (np.abs(x) <= fw * (0.6 + 0.4 * tt)) & (tt <= 0.97 - max(0.06, tex / L) * ends)
     if kind == "secondaries":
         u = g["u"]
-        scallop = 0.7 * u * np.abs(np.sin(np.abs(x) * 1.3 / u)) * c["wing"]["chord"]
+        scallop = 0.7 * u * np.abs(np.sin(np.abs(x) * min(1.3 / u, np.pi / (3 * tex)))) * c["wing"]["chord"]  # each scallop 3+ texels
         return z >= g["flight_z0"] + 2.0 * u * c["wing"]["chord"] * np.clip((np.abs(x) - (g["hand_x"] - 6.0 * u)) / (6.0 * u), 0, 1) + scallop
     if kind == "primaries":
         ax = np.abs(x)
         u = g["u"]
-        wig = np.abs(np.sin(ax * 1.1 / u)) * u
+        wig = np.abs(np.sin(ax * min(1.1 / u, np.pi / (3 * tex)))) * u
         x0, x1 = g["prim_x0"], g["prim_end"]
         span = x1 - x0
         t = np.clip((ax - x0) / span, 0, 1)
@@ -314,7 +353,7 @@ def cut_mask(e, p, c):
             return (z >= trail) & (ax <= reach)
         trail = z0 + chord * 0.32 * t + 0.6 * wig
         # The fingers: gaps between the outermost feathers near the tip.
-        fw = 1.6 * u * c["wing"]["chord"]
+        fw = max(1.6 * u * c["wing"]["chord"], 2 * tex)  # a finger and a gap 2+ texels each
         fingers = (t > 0.72) & (np.floor((z - z0) / fw) % 2 == 1) & (ax > x1 - 5.0 * u * (z - z0) / chord)
         end = ax <= x1 - 3.0 * u * np.clip((z - (z1 - 1.8 * u)) / (1.8 * u), 0, 1)
         return (z >= trail) & end & ~fingers
@@ -343,22 +382,20 @@ def paint_face(e, face, boxes, c, tones_, rec, key):
         light_face = "east" if c["eyes"]["kind"] == "side" else "south"
     occ = None if e["quad"] or OPEN(e["name"]) else occlusion(p, R @ n, R @ du, R @ dv, boxes, own=e["name"])
     cap = {}
+    # A head's face under 6 texels keeps its marks: merging into big shapes (a blur 1.1 texels wide)
+    # would hand a 4-texel owl's face, or a sparrow's cheek, all to one color. The body keeps
+    # merging, so its feathers stay big simple areas as they were.
     col = paint_face_smooth(a, tones_, light_face, out=cap, coat=c["feather"], y_world=None, occ=occ, quad=bool(e["quad"]),
-                            seed=sum(map(ord, e["name"] + face)) % 97, tuft=False)
+                            seed=sum(map(ord, e["name"] + face)) % 97, tuft=False,
+                            merge=min(w, h) >= 6 or e["name"] != "skull")
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["cut"]:
         img[..., 3] = np.where(cut_mask(e, pr, c), 255, 0)
     eyes = c["eyes"]
     if e["name"] == "skull" and ((eyes["kind"] == "side" and face in ("east", "west")) or (eyes["kind"] == "front" and face == "south")):
-        (x0, y0, z0), (x1, y1, z1) = (warp(v, c) for v in G["skull"])
-        ey = warp((0, eyes["y"] + c["head_y"], 0), c)[1]
-        if eyes["kind"] == "side":
-            ez = warp((0, 0, eyes["z"]), c)[2]
-            cu = TX * ((z1 - ez) if face == "east" else (ez - z0))
-            stamp_eyes(img, [(cu, TX * (y1 - ey))], eyes["pattern"])
-        else:
-            ex = eyes["x"] * c["K"]
-            stamp_eyes(img, [(TX * (-ex - x0), TX * (y1 - ey)), (TX * (ex - x0), TX * (y1 - ey))], eyes["pattern"])
+        gw, gh, _, _, centers = eye_grid(c, face)
+        assert (gw, gh) == (w, h), (face, gw, gh, w, h)
+        stamp_eyes(img, centers, eye_design(c, face))
     if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
         if eyes["kind"] == "side":
             img[:, 0 if e["name"].endswith("L") else w - 1, :3] = eyes["lash"]
@@ -366,8 +403,9 @@ def paint_face(e, face, boxes, c, tones_, rec, key):
             img[h - 1, :, :3] = eyes["lash"]
     if e["quad"] and e["cut"] in ("primaries", "secondaries", "folded", "tail"):  # the feathers' shafts and edges
         along = (np.abs(pr[..., 0]) if e["cut"] in ("primaries", "secondaries") else pr[..., 2]) / G["u"]
-        img[..., :3] = np.where((np.floor(along * 0.9) % 2 == 0)[..., None], (img[..., :3] * 0.88).astype(np.uint8), img[..., :3])
-    if e["name"].startswith("toes_") and face == "south":  # the claws
+        band = max(1 / 0.9, 1.5 / (TX * c["K"] * G["u"]))  # each shade at least 1.5 texels wide (it was at 64 a block)
+        img[..., :3] = np.where((np.floor(along / band) % 2 == 0)[..., None], (img[..., :3] * 0.88).astype(np.uint8), img[..., :3])
+    if e["name"].startswith("toes_") and face == "south" and h >= 2:  # the claws (not on a toe a texel high: all of it would go dark)
         img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.55).astype(np.uint8)
     if rec is not None:
         roles = [m[3] for m in c["materials"]]
@@ -503,7 +541,7 @@ def build(cfg, out_dir):
     G.update(geometry(c))
     G.update(c.get("layout", {}).get("G", {}))
     (sx0, sy0, sz0), (sx1, sy1, sz1) = (warp(v, c) for v in G["skull"])
-    off = 0.35 if c["TX"] == 1 else 0.15  # the eyelids' hinge just outside the face: closed, they sit over the eyes
+    off = 0.35 if c["TX"] <= 1 else 0.15  # the eyelids' hinge just outside the face: closed, they sit over the eyes
     G["lid"] = (sx1 + off) if c["eyes"]["kind"] == "side" else (sz1 + off)
     tones_ = [tones(m[1], m[2]) for m in c["materials"]]
     B = bones(c)

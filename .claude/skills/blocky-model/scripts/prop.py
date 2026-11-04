@@ -12,7 +12,7 @@ models in this engine take only coarse texture coordinates (a 1/128th of the tex
 sheet on one came out a flat color in the game. Terrain blocks stay the base game's 16-pixel
 textures.
 
-Elements are in units of one texel (house.DENSITY a block), y up, facing +z, centered on the
+Elements are in layout units (house.UNITS a block; painted house.TX texels a unit with `tx`), y up, facing +z, centered on the
 origin at the ground. `area(e, face, p, uu, vv, h)` returns the material per texel (ids into
 `materials`, a list of `house.material(...)` tones); `p` is each texel's position. `cut(e, p)`
 says which texels of a quad (or any face) are solid. Each face is lit, occluded by the other boxes
@@ -36,7 +36,7 @@ def el(name, lo, hi, quad=None, rot=None, origin=None, cut=None, **extra):
             "origin": origin, "cut": cut, **extra}
 
 
-def face_frame(lo, hi, face):
+def face_frame(lo, hi, face, tx=1.0):
     lo, hi = np.array(lo), np.array(hi)
     X, Y, Z = np.eye(3)
     corner, du, dv = {"south": ((lo[0], hi[1], hi[2]), X, -Y), "north": ((hi[0], hi[1], lo[2]), -X, -Y),
@@ -46,7 +46,9 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, int(round(abs(size @ du))), int(round(abs(size @ dv))), n
+    w, h = abs(size @ du), abs(size @ dv)  # in units; in texels at `tx` texels a unit, at least 1
+    tw, th = (max(1, int(round(tx * w))), max(1, int(round(tx * h)))) if w > 0 and h > 0 else (0, 0)
+    return np.array(corner, float), du, dv, tw, th, n
 
 
 def rotm(rot):
@@ -60,7 +62,7 @@ def rotm(rot):
 
 
 def paint(elements, area, materials, coat=(), cut=None, ground=True, width=128, square=False, seed=0, down=None,
-          smooth=0):
+          smooth=0, tx=1.0):
     """Paints every face and packs them. Returns (sheet RGBA, {(element index, face): [u0, v0, u1,
     v1]}); `square` pads the sheet square. `down(e, face, p)`: for boxes stacked into one shape (a
     sloped mound of steps, an ear's layers), 0..1 from the top of the whole shape per texel, or
@@ -70,11 +72,13 @@ def paint(elements, area, materials, coat=(), cut=None, ground=True, width=128, 
     tiles = []
     for i, e in enumerate(elements):
         for face in ([e["quad"]] if e["quad"] else list(FACES)):
-            corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
+            corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face, tx)
             if w == 0 or h == 0:
                 continue
             uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-            p = corner + uu[..., None] * du + vv[..., None] * dv
+            size = np.array(e["hi"]) - np.array(e["lo"])
+            su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+            p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
             R = rotm(e["rot"])
             if e["rot"]:
                 o = np.array(e["origin"], float)

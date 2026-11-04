@@ -10,7 +10,8 @@ rosettes, painted in the most common coat (the game paints every jaguar's from i
 
     ~/.venvs/blocky/bin/python jaguar.py      # writes out/spec.json, out/texture.png
 
-Units are the house's (64 texels a block, 1.56 cm each), y up, it faces +z. A jaguar is about 70 cm
+Units are the house's (64 a block, 1.56 cm each), y up, it faces +z. Painted at the house density,
+32 texels a block (`TX` texels a unit), as the blocks and items are. A jaguar is about 70 cm
 at the shoulder, 1.5 m from the nose to the rump and has a 60 cm tail: here the withers are 45 up,
 the body 96 long, the tail 40; the head a little bigger than life (Hytale's way).
 """
@@ -27,9 +28,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit, swing  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import TX  # noqa: E402
+
+# TX texels a unit: 32 a block (house units, 64 a block). The face that carries the eyes is ~11 by 9
+# texels at 32, well over house.MIN_FACE, so no finer density is needed.
 
 OUT = os.environ.get("JAGUAR_OUT") or os.path.join(HERE, "out")
 
@@ -119,8 +124,24 @@ EYES.update({
                             "OAAAsO",
                             ".OaaO."], colors={"O": _O, "P": _P, "H": _H, "A": (204, 150, 48), "a": (230, 184, 76),
                                                "s": (238, 216, 168)}, halo="round"),  # a big cat's round pupil
+    # At 32 a block the face is 11 texels by 9: an eye is 3 by 3. A big cat's black lid line over
+    # the outer corner, the round pupil with a catchlight toward the outside, amber round it and
+    # below, the fur round it darkened (the face is big enough for a halo). JAGUAR_EYES picks; the
+    # other two are for comparison.
+    "jaguar_px": dict(pattern=[".OO",
+                               "APH",
+                               ".a."], colors={"O": _O, "P": _P, "H": _H, "A": (176, 116, 28), "a": (226, 176, 60)},
+                      halo="round", iris="Aa", mirror=True),
+    "jaguar_px_full": dict(pattern=["aAH",
+                                    "APA",
+                                    "aAa"], colors={"P": _P, "H": _H, "A": (176, 116, 28), "a": (226, 176, 60)},
+                           halo="round", iris="Aa", mirror=True),
+    "jaguar_px_round": dict(pattern=[".O.",
+                                     "APH",
+                                     ".a."], colors={"O": _O, "P": _P, "H": _H, "A": (204, 150, 48), "a": (230, 184, 76)},
+                            halo="round", iris="Aa", mirror=True),
 })
-EYE_STYLE = os.environ.get("JAGUAR_EYES", "jaguar")
+EYE_STYLE = os.environ.get("JAGUAR_EYES", "jaguar_px")
 EYE_Y, EYE_X = 29.5, 4.0  # eye centers on the face
 LID_Z = 0.0  # the eyelids' hinge line, just in front of the placed face (set below, once `place` exists)
 
@@ -159,17 +180,32 @@ def eye_center(cx):
     return place((cx, EYE_Y, SKULL[1][2]), "head")
 
 
+def skull_grid():
+    """The placed skull front's texels: (width, height) and the size of one texel in units (u, v)."""
+    lo, hi = skull_placed()
+    sx, sy = hi[0] - lo[0], hi[1] - lo[1]
+    w, h = max(1, round(TX * sx)), max(1, round(TX * sy))
+    return w, h, sx / w, sy / h
+
+
+def eye_texel(cx):
+    """The eye centered at cat x = cx on the skull's front, in its texels (u, v)."""
+    lo, hi = skull_placed()
+    w, h, su, sv = skull_grid()
+    ex, ey, _ = eye_center(cx)
+    return (ex - lo[0]) / su, (hi[1] - ey) / sv
+
+
 def eye_box(cx):
     """(x0, x1, top, bottom) of the eye centered at cat x = cx, on the placed face, rounded as
-    `stamp_eyes` places it, so the eyelid covers it."""
+    `stamp_eyes` places it, so the eyelid covers it to the texel."""
     pat = EYES[EYE_STYLE]["pattern"]
     ph, pw = len(pat), len(pat[0])
     lo, hi = skull_placed()
-    ex, ey, _ = eye_center(cx)
-    u0 = int(round(ex - lo[0] - pw / 2))
-    v0 = int(round(hi[1] - ey - ph / 2))
-    x0, top = lo[0] + u0, hi[1] - v0
-    return x0, x0 + pw, top, top - ph
+    w, h, su, sv = skull_grid()
+    u0, v0 = eye_corner(*eye_texel(cx), pat, w)
+    x0, top = lo[0] + u0 * su, hi[1] - v0 * sv
+    return x0, x0 + pw * su, top, top - ph * sv
 
 
 def bones():
@@ -269,7 +305,10 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, int(round(abs(size @ du))), int(round(abs(size @ dv))), n
+    w, h = int(round(TX * abs(size @ du))), int(round(TX * abs(size @ dv)))
+    if abs(size @ du) > 0 and abs(size @ dv) > 0:
+        w, h = max(1, w), max(1, h)  # a thin face keeps a texel, or it vanishes
+    return np.array(corner, float), du, dv, w, h, n
 
 
 def rotm(rot):
@@ -291,10 +330,17 @@ def _hash(i, j, s=0):
     return h - np.floor(h)
 
 
-def rosettes(u, v, cell=5.4, solid=False):
+ROSETTE = dict(cell=7.4, inner=1.4, outer=2.6, broken=-0.8)  # the body's rosettes (cat units)
+
+
+def rosettes(u, v, cell=None, solid=False):
     """The jaguar's marks on a face, from its two face coordinates (cat units): in each jittered cell
     a rosette (a broken ring of black round a darker center, often with a spot in it), or a solid
-    spot where `solid` (the head, the legs, the belly). Returns STRIPE, TAN or -1 per texel."""
+    spot where `solid` (the head, the legs, the belly). Returns STRIPE, TAN or -1 per texel.
+    At 32 a block a texel is ~0.9 cat units on the body (~1.5 on the head): a rosette is ~6 texels
+    across, a tan middle 3 across in a ring a texel thick and seldom broken (gaps a texel wide only
+    speckle), a solid spot 1-3 texels, so they read and don't speckle."""
+    cell = cell or ROSETTE["cell"]
     ci, cj = np.floor(u / cell), np.floor(v / cell)
     cu = (ci + 0.3 + 0.4 * _hash(ci, cj, 1)) * cell
     cv = (cj + 0.3 + 0.4 * _hash(ci, cj, 2)) * cell
@@ -305,10 +351,11 @@ def rosettes(u, v, cell=5.4, solid=False):
         r = cell * (0.17 + 0.1 * _hash(ci, cj, 3))
         return np.where(d < r, STRIPE, out)
     ang = np.arctan2(dv, du)
-    broken = np.cos(3 * ang + 6 * _hash(ci, cj, 4)) > -0.5  # the ring broken in places
-    out = np.where(d < 1.35, TAN, out)
-    out = np.where((d >= 1.35) & (d < 2.1) & broken, STRIPE, out)  # a thick ring, as a jaguar's are
-    out = np.where((d < 0.55) & (_hash(ci, cj, 5) > 0.4), STRIPE, out)  # the spot in the middle
+    ri, ro = ROSETTE["inner"], ROSETTE["outer"]
+    broken = np.cos(3 * ang + 6 * _hash(ci, cj, 4)) > ROSETTE["broken"]  # the ring broken in places
+    out = np.where(d < ri, TAN, out)
+    out = np.where((d >= ri) & (d < ro) & broken, STRIPE, out)  # a thick ring, as a jaguar's are
+    out = np.where((d < 0.6) & (_hash(ci, cj, 5) > 0.4), STRIPE, out)  # the spot in the middle
     return out
 
 
@@ -316,7 +363,10 @@ def marks(a, m, where):
     return np.where(where & (m >= 0), m, a)
 
 
-def area(e, face, p, uu, vv):
+SPOT = 4.6  # the solid spots' cell (cat units): 3 texels on the head, 5 on the body and legs
+
+
+def area(e, face, p, uu, vv, along=None):
     """A jaguar, in the cat's units: golden tan, black rosettes with darker centers on the back and
     flanks, solid black spots on the head, the legs and the cream belly; the throat, the muzzle and
     the inner legs cream; the ears black behind with a pale spot; the tail spotted, ringed toward
@@ -333,7 +383,7 @@ def area(e, face, p, uu, vv):
         a = np.where(y < 13.5, WHITE, a)  # the belly
         if face == "down":
             a[:] = WHITE
-            a = marks(a, rosettes(z, x, 3.6, True), np.ones(x.shape, bool))
+            a = marks(a, rosettes(z, x, SPOT, True), np.ones(x.shape, bool))
         if face == "south" and name != "hips":
             a = np.where(np.abs(x) < 4.8 - 0.25 * np.maximum(y - 16, 0), WHITE, a)  # the pale throat and chest
         if face == "north" and name == "hips":
@@ -341,17 +391,17 @@ def area(e, face, p, uu, vv):
     elif name == "skull":
         if face == "south":
             a = np.where((y < 26.5) & (np.abs(x) < 4.8), WHITE, a)  # round the muzzle
-            a = marks(a, rosettes(x, y, 2.8, True), (y > 30.5))  # small spots on the forehead
+            a = marks(a, rosettes(x, y, SPOT, True), (y > 30.5) & (np.abs(x) < 2.2))  # small spots on the forehead, between the eyes
         elif side or face == "up":
-            a = marks(a, rosettes(z if side else x, y if side else z, 3.0, True), np.ones(x.shape, bool))
+            a = marks(a, rosettes(z if side else x, y if side else z, SPOT, True), np.ones(x.shape, bool))
             if side:
                 a = np.where((y < 24) & (z > 16), WHITE, a)
         if face == "down":
             a = np.where(z > 15, WHITE, a)
     elif name in ("muzzle", "jaw"):
         a[:] = WHITE
-        if name == "muzzle" and face in ("east", "west"):
-            a = marks(a, rosettes(z, y, 1.8, True), y > 26.5)  # the whisker spots
+        if name == "muzzle" and face in ("east", "west") and x.shape[1] >= 4:
+            a = marks(a, rosettes(z, y, 1.8, True), y > 26.5)  # the whisker spots (a muzzle side is 2 texels at 32: none)
     elif name == "nose":
         a[:] = NOSE
     elif name == "mouth":
@@ -365,11 +415,11 @@ def area(e, face, p, uu, vv):
             a = np.where((np.abs(x - cx) < 1.1) & (y > 34.2) & (y < 36.0), WHITE, a)
     elif name.startswith("tail_"):
         k = int(name.split("_")[1])
-        along = sum(L for _, L, _ in TAIL[:k]) + (vv if side or face in ("up", "down") else np.zeros_like(vv))
+        along = sum(L for _, L, _ in TAIL[:k]) + along  # from the base, down the tail (cat units)
         if k < 2:
-            a = marks(a, rosettes(along, x if face in ("up", "down") else y, 3.2, True), np.ones(x.shape, bool))
-        else:
-            a = np.where(((along / 2.6) % 1.0) < 0.38, STRIPE, a)  # rings toward the tip
+            a = marks(a, rosettes(along, x if face in ("up", "down") else y, SPOT, True), np.ones(x.shape, bool))
+        else:  # rings toward the tip: a ring 1.4 texels wide every 3.4
+            a = np.where(((along / 3.0) % 1.0) < 0.4, STRIPE, a)
         if face == "down":
             a = np.where(a == COAT, WHITE, a)
         if k == len(TAIL) - 1 and face == "north":
@@ -431,8 +481,11 @@ def paint_face(e, face, boxes):
     if w == 0 or h == 0:
         return None
     size = np.array(e["hi"]) - np.array(e["lo"])
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du * (abs(size @ du) / w) + vv[..., None] * dv * (abs(size @ dv) / h)
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel centers, in texels
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    uu, vv = uu * su, vv * sv  # texel centers, in units across the face
+    p = corner + uu[..., None] * du + vv[..., None] * dv
+    along = (e["hi"][2] - p[..., 2]) / K - 1.2  # a tail segment's own length, from its base (cat units)
     R = rotm(e["rot"])
     if e["rot"]:
         o = np.array(e["origin"])
@@ -445,7 +498,7 @@ def paint_face(e, face, boxes):
         p = np.stack([p[..., 0], e["hi"][1] - vv, np.full(vv.shape, LID_Z)], -1)
         pc = unplace(p, e["bone"])
         light_face, du, dv, n = "south", np.array([1.0, 0, 0]), np.array([0, -1.0, 0]), np.array([0, 0, 1.0])
-    a = area(e, face, pc, uu, vv)
+    a = area(e, face, pc, uu, vv, along)
     occ = None if e["quad"] else occlusion(p, R @ n, R @ du, R @ dv, boxes, own=e["name"])
     stacked = e["name"].startswith("ear_core")  # the ear's boxes, lit as one piece
     down = np.clip((38 - pc[..., 1]) / 5, 0, 1) if stacked else None
@@ -456,19 +509,21 @@ def paint_face(e, face, boxes):
     if e["cut"] == "ear":
         img[..., 3] = np.where(cut_mask(e, pc), 255, 0)
     if e["name"] == "skull" and face == "south":
-        lo, hi = skull_placed()
-        stamp_eyes(img, [(eye_center(cx)[0] - lo[0], hi[1] - eye_center(cx)[1]) for cx in (-EYE_X, EYE_X)], EYE_STYLE)
+        stamp_eyes(img, [eye_texel(cx) for cx in (-EYE_X, EYE_X)], EYE_STYLE)
     if e["name"].startswith("eyelid"):
         img[-1, :, :3] = EYE_DARK
-        img[-2, :, :3] = (img[-2, :, :3] * 0.85).astype(np.uint8)
+        if h >= 5:  # a 3-texel lid at 32: the lash line alone
+            img[-2, :, :3] = (img[-2, :, :3] * 0.85).astype(np.uint8)
     if e["name"] == "muzzle" and face == "south":  # the mouth's line under the nose
         c0 = w // 2
         img[h - 2:h, c0 - 1:c0 + 1, :3] = (110, 66, 62)
         img[h - 1, max(0, c0 - 4):c0 + 4, :3] = (img[h - 1, max(0, c0 - 4):c0 + 4, :3] * 0.7).astype(np.uint8)
     if e["name"] == "jaw" and face == "up":
         img[..., :3] = np.array(BASE[PINK]) * 0.7
-    if e["name"].endswith("_paw") and face == "south":  # four toes
-        for c in range(3, w - 1, 4):
+    if e["name"].endswith("_paw") and face == "south":  # the toes: three at 32 (a paw is 8 texels), four from 11
+        n_toes = 4 if w >= 11 else 3
+        for k in range(1, n_toes):
+            c = int(round(w * k / n_toes - 0.5))
             img[:, c, :3] = (img[:, c, :3] * 0.7).astype(np.uint8)
     if e["name"].endswith("_paw") and face == "down":  # dark pads
         img[h // 2:, w // 4:3 * w // 4, :3] = (70, 52, 50)

@@ -3,7 +3,7 @@
 One model for the brown trout (*Salmo trutta*) and the pacu (*Piaractus mesopotamicus*), the middle
 of the living world's water webs (`notes/ECOLOGY.md`, "The food webs and the species to add"), made
 with the `blocky-model` skill ([.claude/skills/blocky-model](../../../../.claude/skills/blocky-model/SKILL.md))
-from research alone, at the house density (64 texels a block). The recipe is
+from research alone, laid out in house units (64 a block) and painted at 64 texels a block (see below). The recipe is
 [docs/creatures.md](../../../../docs/creatures.md); how fish spawn and swim is `src/fish.rs`.
 
 ## Rebuild
@@ -45,7 +45,9 @@ fins sculling), walk (swimming), run (darting) and flop (stranded, on its side, 
 - **Stranded on its side**, the tail bends about its own x axis (the body's roll turns it upward),
   so it slaps along the ground instead of into it.
 
-Painted finer (Ronald, 2026-11-03): its head is 2.8 units across and the eye filled most of its
-side, so it is painted `house.FINE` (4) texels a unit, 256 a block: a round eye in proportion (a
-gold ring, a black pupil, a catchlight), round spots, finer fin outlines. Boxes, export scale and
-size unchanged.
+Painted finer than the house's 32 a block (2026-11-03): its head's side, where the eye is, would be
+2.5 by 2.1 texels at 32, under `house.MIN_FACE` (3), so it paints at 64 a block (1 texel a unit),
+where that side is 5 by 4. (It was `house.FINE`, 256 a block, until the house went to 32.) The eye
+is 2 by 2: a catchlight up and toward the snout, the black pupil, a gold texel below and behind
+(mirrored on the left side); spots at least a texel across, a dark ray every third texel on the
+bigger fins, the mouth a dark texel line. Boxes, export scale and size unchanged.

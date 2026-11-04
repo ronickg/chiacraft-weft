@@ -21,14 +21,28 @@ a chihuahua.
 
 The numbers are in `scripts/house.py`; build scripts import them instead of choosing their own.
 
-- **One texel density: 64 texels a block** (a block is a meter: a texel is 1.6 cm), for every
-  model: creatures, props, eggs. Lay a model out in units of one texel and export with
-  `house.SCALE` (0.25 model pixels a unit). Terrain blocks are 32 × 32 (decided 2026-11-03, from the style guides in `game-art`); inventory icons come from the `game-art` skill (generated at 32 × 32), and
+- **One texel density: 32 texels a block** (a block is a meter: a texel is 3.1 cm), the same as
+  the blocks and the items (Ronald, 2026-11-03: "Yes, rebuild at 32"), for every model:
+  creatures, props, eggs, nests. Lay a model out in **layout units of 1/64 block** (`house.UNITS`:
+  half a texel, so boxes can sit half a texel apart and poses keep their numbers), export with
+  `house.SCALE` (0.25 model pixels a unit), and paint `house.TX` (0.5) texels a unit: a face's
+  texels are `round(TX * size)`, at least one. A model on its own scale paints
+  `house.texels(scale)` a unit. Terrain blocks are 32 × 32 (decided 2026-11-03, from the style guides in `game-art`); inventory icons come from the `game-art` skill (generated at 32 × 32), and
   items are held as those flat pictures (box models from them are set aside: "Items from icons").
-- **Small creatures paint finer** (Ronald, 2026-11-03): when a head is only 2-3 units across (a
-  mouse, a vole, a small lizard), keep the layout in house units but paint `house.FINE` (4)
-  texels a unit, 256 a block, so the face has room for a designed eye and the faces aren't one
-  flat color each. Boxes, export scale and in-game size stay the same.
+- **Small creatures paint finer** (Ronald: "where 32 would lose them, a vole or a sparrow"): when
+  the face that carries the eyes is under `house.MIN_FACE` (3) texels at 32, paint the least
+  power-of-two multiple of 32 that gives it 3 (`house.fine(face_units)`; `texels(scale, k)`).
+  Today: raven, gull, vulture and fish at 64; mouse, vole, kryptobaatar, small bird and lizard at
+  128; the owl at 64 too (its face is its two big eyes, 4 by 4 texels at 32). Everything else at
+  32, the chihuahua and cat included: Ronald, 2026-11-04, shown both at 32 and finer, "32, one
+  look". A new animal follows the same rule. Boxes, export scale and in-game size stay the same.
+- **Faces at 32 are small** (a wolf's 7 by 6 texels, a cat's 6 by 5, a chihuahua's 5 by 4): eyes
+  are 2-3 texel designs with no halo (`paint.EYES` `px2`, `px3`..., or the animal's own; two front
+  eyes placed with `paint.eye_corner` so they land mirror-symmetric), a mark is a texel or more
+  (stripes 3+ texels apart), and toe grooves, whiskers and lip lines go where the face has no
+  room for them. The painter's filters that merge thin areas (3x3 votes, blurs over a texel) erase
+  one-texel marks: keep them off where a texel is the design. `scripts/render.py` draws a model
+  without Blockbench for before/after sheets.
 - **Real sizes**: research the real thing's measurements and build the average adult (a 20 cm
   chihuahua is 13 units at the shoulder, a 1.5 m Utahraptor 96 at the hip). Individuals differ
   by the engine's per-entity scale (sex, a size gene, growing up), never by another model.
@@ -50,8 +64,6 @@ The numbers are in `scripts/house.py`; build scripts import them instead of choo
 - **Built from source**: every model is `mods/<mod>/source/<thing>/build.py`, which writes its
   assets and asserts the checks (`boxcheck`, `ground.joints`, `ground.pokes`, `ground.gait`).
   Never edit an exported asset by hand.
-- **Models still off the density** (rebuild each to 64, with the review checklist): chihuahua
-  131 texels a block, cat 92, Velociraptor 58, capybara 47, Utahraptor 19.
 
 ## Rules that decide the look
 
@@ -59,7 +71,7 @@ Geometry
 - Only boxes (6 faces) and quads (one flat face, see-through pixels allowed). No spheres, wedges
   or triangles. Fewest boxes that give the silhouette; Hytale caps a model at 255 nodes; aim for
   20-60 parts on a creature.
-- Keep texel density the same everywhere: UV size = face size × density (chiacraft: 64 a block
+- Keep texel density the same everywhere: UV size = face size × density (chiacraft: 32 a block
   for every model, see House style; Hytale 64 for characters and 32 for props; Minecraft 16). Stretch a box only 0.7-1.3× per axis.
   Texture sizes in multiples of 32 (Hytale) / powers of two (Minecraft).
 - **No two faces in the same plane where both can be seen** (z-fighting flickers as the camera
@@ -234,7 +246,7 @@ Animation
   Solve the right limbs as left ones in the mirrored body (its turns' y and z, and its sideways
   shift, negated), so the shoulders' roll and the weight shifting over a planted limb are in the
   solve and nothing slides.
-  Weft plays a walk 0.6 clip seconds per block walked, so a planted foot moves back DENSITY / 0.6
+  Weft plays a walk 0.6 clip seconds per block walked, so a planted foot moves back UNITS / 0.6
   units per clip second, and a gait's clip length is its stride over that. A `run` takes over from
   the walk by speed; both are exported as offsets from the idle (`to_bedrock.LAYERED`), which the
   engine keeps playing under them.
@@ -372,10 +384,16 @@ Animation
          width, chest depth), standing and in flight
    - [ ] quads (wing skin, fins) checked by their cut outline, not their box: a panel's bounding
          box can dip below the ground while its shape doesn't (and the reverse)
-8. **Save a version before each big change** (`<out>_vN/` with the scripts that built it and a
+8. **Never throw away a generated image** (Ronald, 2026-11-04: "never throw away generated images
+   pls so I can also check back"): every render, review shot, before/after sheet, variant and
+   texture tried, the before versions too. Copy them to
+   `/Users/ronald/Coding/chiacraft-archive/images/<work>/<date>/` (e.g. `models-32/2026-11-04/`:
+   sheets, renders, variants, coats, textures before and now, with a README saying what is where)
+   before a scratch folder can be cleared.
+9. **Save a version before each big change** (`<out>_vN/` with the scripts that built it and a
    README on restoring it): users often want to compare or revert. Show the new one next to the
    old one in the viewer ("<name> (before)").
-9. **When the user says something looks wrong** (and can't say what): look up the references
+10. **When the user says something looks wrong** (and can't say what): look up the references
    again, shoot ours in the same flat views, and list the differences as numbers (a span 1.06 times
    the length against 1.4, a forearm too short to reach the ground). Fix the cause (bone lengths,
    part sizes) and refit the poses; adjusting a pose around a wrong skeleton never gets there.
@@ -468,7 +486,7 @@ that and came out looking like a wooden crate with polka dots. What fixed it:
 - **Lay materials as the real thing has them**: stems running round a dish (as an animal turns
   while lining it), an egg's marks gathered at its blunt end, darker marks over paler deeper
   ones, bark along a twig; things kicked out of a scrape land outside its rim.
-- **Small props** (an egg is 10 texels at 64 a block): taper both ends a unit a layer so it reads
+- **Small props** (an egg is 10 units, 5 texels at 32 a block): taper both ends a unit a layer so it reads
   round, keep marks one or two texels (hairlines don't read at this size), and review it scaled
   up six times in a copy of the spec (Blockbench frames tiny models too small to see).
 - **Show a prop as it is used** (a nest with eggs in it, half sunk and leaning as they are laid).
@@ -544,8 +562,12 @@ shades in a short ramp, not noise; a blade brightest toward its point; lit edges
 Run them with `~/.venvs/blocky/bin/python` (Homebrew's Python 3.14 with scipy added; it sees the
 system numpy and Pillow). Homebrew's own `python3` has no scipy and refuses installs.
 
-- `scripts/house.py` — the house style's numbers: `DENSITY` (64), `SCALE`, `ICON`, `MATERIALS`
-  and `material(name)` (tones with the material's shadow hue).
+- `scripts/house.py` — the house style's numbers: `DENSITY` (32 texels a block), `UNITS` (64
+  layout units a block), `SCALE`, `TX` (texels a unit), `texels(scale, k)`, `fine(face_units)`,
+  `MIN_FACE`, `ICON`, `MATERIALS` and `material(name)` (tones with the material's shadow hue).
+- `scripts/render.py spec.json texture.png out.png [--scale s] [--ppb n] [--views 3q,side,head]`
+  — a model drawn flat with its texture (no Blockbench): review shots and before/after sheets at
+  the same size in the world, so densities compare.
 - `scripts/prop.py` — props without a skeleton: `el`, `paint` (`down` lights stacked boxes as one
   piece, `smooth` drops specks), `entity_spec` (see Props).
 

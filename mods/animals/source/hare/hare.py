@@ -5,7 +5,8 @@ its colors are rules (see `area`), painted in the brown hare's coat.
 
     ~/.venvs/blocky/bin/python hare.py      # writes out/spec.json, out/texture.png
 
-Units are texels at the house density (64 a block, 1.56 cm each), y up, the hare faces +z. A brown
+Units are the house's (64 a block, 1.56 cm each), y up, the hare faces +z. Painted at the house
+density, 32 texels a block (`TX` texels a unit), as the blocks and items are. A brown
 hare is 55-65 cm head and body: here 38 from the nose to the rump; the head and ears a little
 bigger than life (Hytale's way), the hind feet as long as they are (15 cm, 10 units).
 
@@ -26,9 +27,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import TX  # noqa: E402
+
+# TX texels a unit: 32 a block (house units, 64 a block). The side of the head, which carries the
+# eye, is 8 by 7 units, 4 by 3.5 texels at 32: over house.MIN_FACE, so no finer density is needed.
 
 OUT = os.environ.get("HARE_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -70,8 +75,21 @@ EYES.update({
                                "APPPA",
                                ".aaa."], colors={"P": (20, 14, 14), "H": (236, 232, 220), "A": (168, 104, 40),
                                                  "a": (210, 152, 64)}, halo="below"),
+    # At 32 a block the side of the head is 4 texels by 4: an eye is 2 by 2, the big dark pupil
+    # with a catchlight toward the front above it and the amber iris before it below (`HARE_EYES`
+    # picks; the other two and the big ones are for comparison). Drawn for the right side (u from
+    # the front); the left gets it mirrored.
+    "hare_px": dict(pattern=["HP",
+                             "AP"], colors={"P": (18, 12, 12), "H": (232, 230, 220), "A": (176, 112, 44)}, halo="none",
+                    iris="A"),
+    "hare_px_light": dict(pattern=["HP",
+                                   "AA"], colors={"P": (18, 12, 12), "H": (232, 230, 220), "A": (176, 112, 44)},
+                          halo="none", iris="A"),
+    "hare_px3": dict(pattern=["HPP",
+                              "AAa"], colors={"P": (18, 12, 12), "H": (232, 230, 220), "A": (176, 112, 44),
+                                              "a": (212, 156, 70)}, halo="none", iris="Aa"),
 })
-EYE_STYLE = os.environ.get("HARE_EYES", "hare_amber")
+EYE_STYLE = os.environ.get("HARE_EYES", "hare_px")
 EYE_RING = os.environ.get("HARE_RING", "0") == "1"  # the brown hare's pale ring round the eye
 SKULL = ((-3.75, 13, 7), (3.75, 20, 15))
 EYE_Z, EYE_Y = 12.0, 17.0  # high on the side, toward the front
@@ -85,16 +103,34 @@ def el(name, bone, lo, hi, quad=None, rot=None, origin=None, cut=None):
                 origin=[float(v) for v in origin] if origin else None, cut=cut)
 
 
+def skull_side():
+    """The side of the skull's texels: (width, height) and the size of one texel in units (u, v)."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h = max(1, round(TX * (z1 - z0))), max(1, round(TX * (y1 - y0)))
+    return w, h, (z1 - z0) / w, (y1 - y0) / h
+
+
+def eye_corner_side(side):
+    """The eye's top-left texel (u0, v0) on one side of the skull: placed on the right side (east,
+    u from the front) and mirrored onto the left (west, u from the back), so both eyes sit at the
+    same place on the head."""
+    pat = EYES[EYE_STYLE]["pattern"]
+    pw = len(pat[0])
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h, su, sv = skull_side()
+    u0, v0 = eye_corner((z1 - EYE_Z) / su - 0.01, (y1 - EYE_Y) / sv, pat)  # a half texel rounds to the front
+    return (u0 if side > 0 else w - u0 - pw), v0
+
+
 def eye_box(side):
-    """(z0, z1, top, bottom) of the eye on one side, rounded as `stamp_eyes` places it."""
+    """(z0, z1, top, bottom) of the eye on one side, in units, exactly where `paint_face` stamps it."""
     pat = EYES[EYE_STYLE]["pattern"]
     ph, pw = len(pat), len(pat[0])
     (x0, y0, z0), (x1, y1, z1) = SKULL
-    cu = (z1 - EYE_Z) if side > 0 else (EYE_Z - z0)
-    u0 = int(round(cu - pw / 2))
-    v0 = int(round(y1 - EYE_Y - ph / 2))
-    za, zb = (z1 - u0 - pw, z1 - u0) if side > 0 else (z0 + u0, z0 + u0 + pw)
-    return za, zb, y1 - v0, y1 - v0 - ph
+    w, h, su, sv = skull_side()
+    u0, v0 = eye_corner_side(side)
+    za, zb = (z1 - (u0 + pw) * su, z1 - u0 * su) if side > 0 else (z0 + u0 * su, z0 + (u0 + pw) * su)
+    return za, zb, y1 - v0 * sv, y1 - (v0 + ph) * sv
 
 
 LEGS = ("FL", "FR", "BL", "BR")
@@ -180,7 +216,10 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, int(round(abs(size @ du))), int(round(abs(size @ dv))), n
+    w, h = int(round(TX * abs(size @ du))), int(round(TX * abs(size @ dv)))
+    if abs(size @ du) > 0 and abs(size @ dv) > 0:
+        w, h = max(1, w), max(1, h)  # a thin face (an ear's tip) keeps a texel, or it vanishes
+    return np.array(corner, float), du, dv, w, h, n
 
 
 def rotm(rot):
@@ -193,7 +232,7 @@ def rotm(rot):
     return Z @ Y @ X
 
 
-def area(e, face, p, uu, vv, h):
+def area(e, face, p, uu, vv, h):  # uu, vv texel centers in texels (h of them down the face)
     """A brown hare's coat: grizzled yellow-brown, darker along the back; the neck, chest and legs
     warmer; the belly and the inside of the legs white; a pale ring round the eye and pale muzzle
     sides; black ear tips; the tail black on top, white below."""
@@ -309,8 +348,10 @@ def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     if w == 0 or h == 0:
         return None
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du + vv[..., None] * dv
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel centers, in texels
+    size = np.array(e["hi"]) - np.array(e["lo"])
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
     R = rotm(e["rot"])
     if e["rot"]:
         o = np.array(e["origin"])
@@ -330,19 +371,21 @@ def paint_face(e, face, boxes):
     if e["cut"] == "ear":
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
     if e["name"] == "skull" and face in ("east", "west"):
-        (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
-        stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
-    if e["name"] == "muzzle" and face == "south":  # the split lip: a line down from the nose, a hint of the incisors
+        pat = EYES[EYE_STYLE]["pattern"]
+        u0, v0 = eye_corner_side(1 if face == "east" else -1)
+        design = EYE_STYLE if face == "east" else EYE_STYLE + "_m"  # the catchlight toward the front on both
+        EYES.setdefault(EYE_STYLE + "_m", dict(EYES[EYE_STYLE], pattern=[row[::-1] for row in pat]))
+        stamp_eyes(img, [(u0 + len(pat[0]) / 2, v0 + len(pat) / 2)], design)
+    if e["name"] == "muzzle" and face == "south" and w >= 4:  # the split lip: a line down from the nose, a hint of the incisors (2 texels at 32: none)
         c = w // 2
         img[2:h - 1, c - 1:c + 1, :3] = (img[2:h - 1, c - 1:c + 1, :3] * 0.78).astype(np.uint8)
         img[h - 1, c - 1:c + 1, :3] = BASE[TEETH]
-    if e["name"] == "nose" and face == "south":  # nostrils as slits
+    if e["name"] == "nose" and face == "south" and h >= 2:  # nostrils as slits (a nose is 1 texel at 32)
         img[0, :, :3] = (img[0, :, :3] * 0.7).astype(np.uint8)
     if e["name"].startswith("eyelid"):
         col_idx = 0 if e["name"].endswith("L") else w - 1
         img[:, col_idx, :3] = LASH
-    if e["name"].endswith("_paw") and face == "south":  # toes: four short claws
+    if e["name"].endswith("_paw") and face == "south" and w >= 4 and h >= 2:  # toes: four short claws (a paw's front is 1-2 by 1 texels at 32: none)
         step = w / 4
         for k in range(1, 4):
             c = int(round(step * k)) - 1

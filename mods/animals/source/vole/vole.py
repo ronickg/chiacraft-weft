@@ -24,10 +24,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit, swing  # noqa: E402
 from ground import lowest  # noqa: E402
-from house import FINE as K  # noqa: E402  texels a unit: a small creature paints finer
+from house import SCALE, fine, texels  # noqa: E402
 
 OUT = os.environ.get("VOLE_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -46,30 +46,53 @@ COAT = (FUR, BACK, BELLY)
 ROLES = [("coat", 0, 0), ("coat", 0, -1.0), ("coat", 1, 0), "fixed", "fixed", "fixed", "fixed"]
 
 # Small black eyes, half in the fur (a vole's are much smaller than a mouse's): a catchlight and a
-# dimmer gloss, darker fur round them. Painted `house.FINE` texels a unit, as the mouse.
+# dimmer gloss, darker fur round them. Painted at 128 a block (`K`), as the mouse.
 EYES.update({
     "vole_bead": dict(pattern=[".PP.",
                                "PHhP",
                                "PhPP",
                                ".PP."], colors={"P": (20, 13, 15), "H": (214, 216, 222), "h": (84, 82, 92)}, halo="round"),
+    # At 128 a block (vole_bead was for 256): 2 texels by 2 on a 6-by-5 side, the catchlight in
+    # the front top corner of a black bead (vole_px_b; vole_px adds the dimmer gloss under it, which
+    # at 2 texels reads as a grey bar); no halo on a 6-texel face, no iris (black).
+    "vole_px": dict(pattern=["HP",
+                             "hP"], colors={"P": (20, 13, 15), "H": (214, 216, 222), "h": (84, 82, 92)}, halo="none", iris=""),
+    "vole_px_b": dict(pattern=["HP",
+                               "PP"], colors={"P": (20, 13, 15), "H": (214, 216, 222)}, halo="none", iris=""),
 })
-EYE_STYLE = os.environ.get("VOLE_EYES", "vole_bead")
+EYE_STYLE = os.environ.get("VOLE_EYES", "vole_px_b")
 SKULL = ((-1.25, 1.7, 1.7), (1.25, 4.0, 4.7))
+# Texels a unit. The eye sits on the skull's side, 3.0 by 2.3 units: 1.2 texels at the house's 32 a
+# block, under `house.MIN_FACE`, so it paints at 128 a block (`fine` gives 4): 2 texels a unit, the
+# side 6 texels by 5.
+K = texels(SCALE, fine(min(SKULL[1][1] - SKULL[0][1], SKULL[1][2] - SKULL[0][2])))
 EYE_Z, EYE_Y = 3.6, 3.1  # high on the side, toward the front
 LID_X = 1.6  # the eyelids' hinge plane, 0.35 outside the head's side: closed, they sit over the eye
 LASH = (40, 26, 22)
+
+
+def side_grid():
+    """The skull side's texels: (width, height) and one texel's size in units (along z, along y)."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h = max(1, round(K * (z1 - z0))), max(1, round(K * (y1 - y0)))
+    return w, h, (z1 - z0) / w, (y1 - y0) / h
+
+
+def eye_center():
+    """The eye's center on the skull's side in its texels, counted from the front edge (both sides
+    are stamped from the front, so the catchlight is toward the front on both)."""
+    w, h, su, sv = side_grid()
+    return (SKULL[1][2] - EYE_Z) / su, (SKULL[1][1] - EYE_Y) / sv
 
 
 def eye_box(side):
     """(z0, z1, top, bottom) of the eye on one side in units, rounded as `stamp_eyes` places it."""
     pat = EYES[EYE_STYLE]["pattern"]
     ph, pw = len(pat), len(pat[0])
+    w, h, su, sv = side_grid()
+    u0, v0 = eye_corner(*eye_center(), pat, w)
     (x0, y0, z0), (x1, y1, z1) = SKULL
-    cu = K * ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0))
-    u0 = int(round(cu - pw / 2))
-    v0 = int(round(K * (y1 - EYE_Y) - ph / 2))
-    za, zb = (z1 - (u0 + pw) / K, z1 - u0 / K) if side > 0 else (z0 + u0 / K, z0 + (u0 + pw) / K)
-    return za, zb, y1 - v0 / K, y1 - (v0 + ph) / K
+    return z1 - (u0 + pw) * su, z1 - u0 * su, y1 - v0 * sv, y1 - (v0 + ph) * sv
 
 # ------------------------------------------------------------------ the model
 
@@ -181,6 +204,7 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
+    # Texels: K a unit, at least one for a face with any size (one rounding to 0 would vanish).
     return np.array(corner, float), du, dv, max(1, int(round(K * abs(size @ du)))), max(1, int(round(K * abs(size @ dv)))), n
 
 
@@ -282,22 +306,27 @@ def paint_face(e, face, boxes):
     if e["cut"] == "ear":
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
     if e["name"] == "skull" and face in ("east", "west"):
-        (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = K * ((z1 - EYE_Z) if face == "east" else (EYE_Z - z0))
-        stamp_eyes(img, [(cu, K * (y1 - EYE_Y))], EYE_STYLE)
-    if e["name"] == "muzzle" and face == "south":  # the pink nose at the tip, the split lip below it
-        c = w // 2
-        img[0:2, max(0, c - 1):c + 1, :3] = BASE[NOSE]
-        img[1, max(0, c - 1):c + 1, :3] = (np.array(BASE[NOSE]) * 0.72).astype(np.uint8)  # the nostrils, a slit
-        img[2:h - 1, c - 1:c, :3] = (img[2:h - 1, c - 1:c, :3] * 0.8).astype(np.uint8)
-        img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.82).astype(np.uint8)
+        # Both sides counted from the front: the west face's texels run back to front, so stamp it
+        # mirrored (the catchlight toward the front on both).
+        stamp_eyes(img if face == "east" else img[:, ::-1], [eye_center()], EYE_STYLE)
+    if e["name"] == "muzzle" and face == "south":  # the pink nose at the tip, the mouth below it
+        # At 128 a block the snout's tip is 3 texels by 3: the nose the middle of its top row, the split lip
+        # and the mouth's shadow under it (the nostril slit needs 6 by 5: dropped).
+        c0, c1 = (w - 1) // 2, w // 2 + 1
+        img[0, c0:c1, :3] = BASE[NOSE]
+        if h >= 3:  # the split lip under the nose
+            img[1:h - 1, c0:c1, :3] = (img[1:h - 1, c0:c1, :3] * 0.8).astype(np.uint8)
+        if h >= 2:
+            img[h - 1, :, :3] = (img[h - 1, :, :3] * 0.82).astype(np.uint8)
     if e["name"] == "muzzle" and face in ("east", "west"):  # the nose's pink carries round the tip
         tip = 0 if face == "east" else w - 1
-        img[0:2, tip, :3] = BASE[NOSE]
+        img[0, tip, :3] = BASE[NOSE]
     if e["name"].startswith("eyelid"):  # closed, the lash line is its lower edge
         img[:, 0 if e["name"].endswith("L") else w - 1, :3] = LASH
-    if e["name"].endswith("_paw") and face == "south":  # tiny dark claws
-        img[h - 1, ::2, :3] = BASE[CLAW]
+    if e["name"].endswith("_paw") and face == "south" and w >= 3:  # tiny dark claws
+        # At 128 a block the hind foot's front is 3 texels by 1 and the front paw's 2 by 1 (no
+        # claws): half-dark, so the toes hint and the foot doesn't turn black.
+        img[h - 1, ::2, :3] = ((img[h - 1, ::2, :3] + np.array(BASE[CLAW])) / 2).astype(np.uint8)
     if LAYERS["rec"] is not None:
         LAYERS["rec"].face(LAYERS["key"], cap["weights"], cap["level"], ROLES, np.clip(np.round(col), 0, 255), img, p,
                            layer_props(e, face, p, a))

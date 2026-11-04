@@ -6,7 +6,9 @@ hand-painted texture) with the blocky-model skill. No concept sheet: its colors 
 
     ../dog/chihuahua/.venv/bin/python raptor.py      # writes out/spec.json, out/texture.png
 
-Units are Blockbench's (1 texel each), y up, the raptor faces +z. A real Velociraptor is about
+Units are its own (exported at 0.3 model pixels a unit, `build.SCALE`: 53 a block), y up, the
+raptor faces +z. Painted at the house density, 32 texels a block (`TX` texels a unit), as the
+blocks and items are. A real Velociraptor is about
 50 cm at the hip and 1.8-2 m long, half of it tail; here the hip is about 29 units up after the
 crouch, the body 23 long, the tail 44, the head 1.2x (Hytale's chunky look).
 """
@@ -23,9 +25,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, pack, paint_face_smooth, occlusion, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, pack, paint_face_smooth, occlusion, stamp_eyes, tones  # noqa: E402
 from rig import fit, swing  # noqa: E402
 from ground import lowest, world  # noqa: E402
+from house import texels  # noqa: E402
+
+TX = texels(0.3)  # texels a unit: the house's 32 a block at the raptor's export scale (build.SCALE)
 
 OUT = os.environ.get("RAPTOR_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -61,7 +66,19 @@ EYES.update({"raptor": dict(pattern=[".OOO.",
                                      "OYPYO",
                                      ".OOO."], colors={"O": (60, 36, 28), "H": (240, 238, 226), "P": (14, 10, 12),
                                                       "Y": (232, 186, 58)}, halo="round")})
-EYE_STYLE = os.environ.get("RAPTOR_EYES", "raptor")
+# At 32 a block the head's side is 7 texels by 4: the eye is the old one's middle, 3 by 2 (a
+# catchlight up and forward, the black pupil, yellow round it), the dark stripe through the eye
+# its outline. Drawn for the right side (east, u running back from the snout); the left side
+# gets it mirrored, so the catchlight is forward on both.
+EYES.update({"raptor_px": dict(pattern=["HPY", "YPY"], colors={"H": (240, 238, 226), "P": (14, 10, 12),
+                                                                "Y": (232, 186, 58)}, halo="none", iris="Y"),
+             "raptor_px_round": dict(pattern=["HPY", "YYY"], colors={"H": (240, 238, 226), "P": (14, 10, 12),
+                                                                      "Y": (232, 186, 58)}, halo="none", iris="Y"),
+             "raptor_px2": dict(pattern=["HP", "YY"], colors={"H": (240, 238, 226), "P": (14, 10, 12),
+                                                               "Y": (232, 186, 58)}, halo="none", iris="Y")})
+for _k in [k for k in EYES if k.startswith("raptor")]:
+    EYES[_k + "_m"] = dict(EYES[_k], pattern=[row[::-1] for row in EYES[_k]["pattern"]])
+EYE_STYLE = os.environ.get("RAPTOR_EYES", "raptor_px")
 EYE_Z, EYE_Y = 25.0, 39.8  # the eye's middle on the side of the head
 SKULL = ((-4, 36, 18), (4, 43, 29))
 LID_X = 4.4  # the eyelids' hinge plane, just outside the head's side (x = 4)
@@ -95,16 +112,32 @@ def el(name, bone, lo, hi, quad=None, rot=None, origin=None, cut=None):
                 origin=[float(v) for v in origin] if origin else None, cut=cut)
 
 
+def skull_grid():
+    """The skull side's texels: (width, height) and the units a texel spans (u along z, v)."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h = max(1, round(TX * (z1 - z0))), max(1, round(TX * (y1 - y0)))
+    return w, h, (z1 - z0) / w, (y1 - y0) / h
+
+
+def eye_corner_side(side):
+    """The eye's top-left texel on one side of the skull (east faces run u along -z, west along
+    +z), as `stamp_eyes` places it."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h, su, sv = skull_grid()
+    cu = ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0)) / su
+    return eye_corner(cu, (y1 - EYE_Y) / sv, EYES[EYE_STYLE]["pattern"], w)
+
+
 def eye_box(side):
-    """(z0, z1, top, bottom) of the eye on one side, rounded as `stamp_eyes` places it."""
+    """(z0, z1, top, bottom) of the eye on one side, in units, rounded as `stamp_eyes` places it,
+    so the eyelid covers it to the texel."""
     pat = EYES[EYE_STYLE]["pattern"]
     ph, pw = len(pat), len(pat[0])
     (x0, y0, z0), (x1, y1, z1) = SKULL
-    cu = (z1 - EYE_Z) if side > 0 else (EYE_Z - z0)  # east faces run u along -z, west along +z
-    u0 = int(round(cu - pw / 2))
-    v0 = int(round(y1 - EYE_Y - ph / 2))
-    za, zb = (z1 - u0 - pw, z1 - u0) if side > 0 else (z0 + u0, z0 + u0 + pw)
-    return za, zb, y1 - v0, y1 - v0 - ph
+    w, h, su, sv = skull_grid()
+    u0, v0 = eye_corner_side(side)
+    za, zb = (z1 - (u0 + pw) * su, z1 - u0 * su) if side > 0 else (z0 + u0 * su, z0 + (u0 + pw) * su)
+    return za, zb, y1 - v0 * sv, y1 - (v0 + ph) * sv
 
 
 def bones():
@@ -181,7 +214,10 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, int(round(abs(size @ du))), int(round(abs(size @ dv))), n
+    w, h = int(round(TX * abs(size @ du))), int(round(TX * abs(size @ dv)))
+    if abs(size @ du) > 0 and abs(size @ dv) > 0:  # a small face is still a texel
+        w, h = max(1, w), max(1, h)
+    return np.array(corner, float), du, dv, w, h, n
 
 
 def rotm(rot):
@@ -195,12 +231,16 @@ def rotm(rot):
 
 
 def bars(t, period=5.0, width=0.32):
-    return ((t / period) % 1.0) < width
+    """Bands across `t` (units): at 32 a block a texel is ~1.7 units, so a band is at least one
+    texel and the period at least three."""
+    period = max(period, 3 / TX)
+    return ((t / period) % 1.0) < max(width, 1 / (TX * period))
 
 
 def area(e, face, p, uu, vv, h):
     """Which material each texel is: a hawk-like coat (rust back with dark bars, sandy flanks,
-    cream belly), a red crest, scaly legs, white teeth along the jaws, dark claws."""
+    cream belly), a red crest, scaly legs, white teeth along the jaws, dark claws. `uu`, `vv` are
+    texel indices (+0.5) on the face, `h` its height in texels; `p` the texels' points in units."""
     name = e["name"]
     x, y, z = p[..., 0], p[..., 1], p[..., 2]
     a = np.full(x.shape, SIDE)
@@ -264,11 +304,12 @@ def area(e, face, p, uu, vv, h):
     elif name.startswith("wing_"):
         a = np.where(y > 22, BACK, SIDE)
         a = np.where(y < 19, TIP, a)  # dark feather tips
-        a = np.where(bars(z, 2.0, 0.2) & (y < 22), BAR, a)  # the feathers' edges
+        # The feathers' edges: a texel line every third texel (every 2 units was finer than a texel).
+        a = np.where((np.floor(uu) % 3 == 1) & (y < 22), BAR, a)
     elif name == "tail_fan":
         a[:] = BACK
         a = np.where(z < e["lo"][2] + 2.5, TIP, a)
-        a = np.where(bars(x + 5, 2.0, 0.25), BAR, a)
+        a = np.where(np.floor(uu) % 3 == 1, BAR, a)  # the feathers' edges, a texel line every third texel
     elif name.startswith("thigh_"):
         a = np.where(t < 0.5, BACK, SIDE) if side else np.full(x.shape, SIDE)
         if face == "down":
@@ -284,19 +325,21 @@ def area(e, face, p, uu, vv, h):
     return a
 
 
-def cut_mask(e, p):
+def cut_mask(e, p, uu, vv, su, sv):
+    """Which texels of a feather panel are there. `p` in units; the ragged tips alternate by texel
+    (`uu`, `vv` texel indices, `su`, `sv` units a texel), a texel deep."""
     x, y, z = p[..., 0], p[..., 1], p[..., 2]
     if e["cut"] == "crest":  # feathers rising from the head back over the neck
         top = 43 + 3.5 * np.clip((z - 13) / 10, 0, 1) - 2.2 * np.clip((z - 24) / 5, 0, 1)
-        top = top + 1.2 * ((np.floor(z) % 3) == 0)
+        top = top + sv * ((np.floor(uu) % 2) == 0)
         return (y <= top) & (z >= 13) & (z <= 29)
     if e["cut"] == "wing":  # feathers fanning down and back from the forearm, ragged tips
         z0, z1 = e["lo"][2], e["hi"][2]
-        bottom = 17 + 5 * np.clip((z - z0) / (z1 - z0), 0, 1) - 1.0 * ((np.floor(z) % 2) == 0)
+        bottom = 17 + 5 * np.clip((z - z0) / (z1 - z0), 0, 1) - sv * ((np.floor(uu) % 2) == 0)
         return y >= bottom
     if e["cut"] == "fan":  # a fan of tail feathers, widest behind the tail's end
         z0, z1 = e["lo"][2], e["hi"][2]
-        half = 1.4 + 3.6 * np.clip((z1 - z) / (z1 - z0), 0, 1) - 0.8 * ((np.floor(z) % 2) == 0)
+        half = 1.4 + 3.6 * np.clip((z1 - z) / (z1 - z0), 0, 1) - su * ((np.floor(vv) % 2) == 0)
         return np.abs(x) <= half
     return np.ones(x.shape, bool)
 
@@ -333,8 +376,10 @@ def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     if w == 0 or h == 0:
         return None
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du + vv[..., None] * dv
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel centers, in texels
+    size = np.array(e["hi"]) - np.array(e["lo"])
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
     R = rotm(e["rot"])
     if e["rot"]:
         o = np.array(e["origin"])
@@ -349,22 +394,23 @@ def paint_face(e, face, boxes):
                             seed=sum(map(ord, e["name"] + face)) % 97)
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["cut"]:
-        img[..., 3] = np.where(cut_mask(e, p), 255, 0)
+        img[..., 3] = np.where(cut_mask(e, p, uu, vv, su, sv), 255, 0)
     if e["name"] == "skull" and face in ("east", "west"):
         (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
-        stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
+        cu = ((z1 - EYE_Z) if face == "east" else (EYE_Z - z0)) / su
+        design = EYE_STYLE + "_m" if face == "west" and EYE_STYLE + "_m" in EYES else EYE_STYLE
+        stamp_eyes(img, [(cu, (y1 - EYE_Y) / sv)], design)
         # A brow ridge over the eye.
         pw = len(EYES[EYE_STYLE]["pattern"][0])
-        u0 = int(round(cu - pw / 2))
-        v0 = int(round(y1 - EYE_Y - len(EYES[EYE_STYLE]["pattern"]) / 2))
+        u0, v0 = eye_corner_side(1 if face == "east" else -1)
         if v0 >= 1:
             img[v0 - 1, max(u0 - 1, 0):u0 + pw + 1, :3] = (img[v0 - 1, max(u0 - 1, 0):u0 + pw + 1, :3] * 0.7).astype(np.uint8)
-    if e["name"] == "snout" and face == "south":  # nostrils
+    if e["name"] == "snout" and face == "south" and w >= 6 and h >= 3:  # nostrils (none at 32: on a front 4 by 2 they read as eyes)
         img[1, [1, w - 2], :3] = (60, 34, 30)
     if e["name"].startswith("eyelid"):  # a closed eye: the lash along the edge that ends up at the bottom
         col_idx = 0 if e["name"].endswith("L") else w - 1
-        img[:, col_idx, :3] = LASH
+        k = 1.0 if w >= 3 else 0.5  # at 32 the lid is 2 texels: a full dark lash would be half of it
+        img[:, col_idx, :3] = np.round(img[:, col_idx, :3] * (1 - k) + np.array(LASH) * k).astype(np.uint8)
     if LAYERS["rec"] is not None:
         LAYERS["rec"].face(LAYERS["key"], cap["weights"], cap["level"], ROLES, np.clip(np.round(col), 0, 255), img, p,
                            layer_props(e, face, p, a))
