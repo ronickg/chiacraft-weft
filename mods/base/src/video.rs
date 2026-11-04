@@ -17,6 +17,9 @@ pub static QUALITY: Config<i32> = Config::named("quality");
 /// The pack's screen effects: 0 off, 1 low (fewer steps), 2 on. Bloom has no low.
 pub static FX_REFLECT: Config<i32> = Config::named("fx_reflect");
 pub static FX_CONTACT: Config<i32> = Config::named("fx_contact");
+/// Light in the air through the shadow maps (Lighting's `volume`, on `look-air`): until that lands,
+/// the engine logs "no such effect" and the row changes nothing.
+pub static FX_VOLUME: Config<i32> = Config::named("fx_volume");
 pub static FX_SHAFTS: Config<i32> = Config::named("fx_shafts");
 pub static FX_BLOOM: Config<i32> = Config::named("fx_bloom");
 
@@ -41,12 +44,12 @@ struct Row {
 }
 
 /// The presets, Low to Ultra, per row (in `ROWS` order).
-const PRESETS: [[f64; 11]; 4] = [
-    // scale shadows size  reflect contact shafts bloom view lod   vsync cap
-    [0.5, 0.0, 1024.0, 0.0, 0.0, 0.0, 0.0, 6.0, 64.0, 1.0, 60.0],
-    [0.67, 1.0, 1024.0, 1.0, 1.0, 1.0, 0.0, 8.0, 128.0, 1.0, 60.0],
-    [0.0, 2.0, 2048.0, 2.0, 2.0, 2.0, 1.0, 12.0, 192.0, 1.0, 0.0],
-    [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 1.0, 16.0, 256.0, 1.0, 0.0],
+const PRESETS: [[f64; 12]; 4] = [
+    // scale shadows size  reflect contact volume shafts bloom view lod   vsync cap
+    [0.5, 0.0, 1024.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.0, 64.0, 1.0, 60.0],
+    [0.67, 1.0, 1024.0, 1.0, 1.0, 0.0, 1.0, 0.0, 8.0, 128.0, 1.0, 60.0],
+    [0.0, 2.0, 2048.0, 2.0, 2.0, 1.0, 2.0, 1.0, 12.0, 192.0, 1.0, 0.0],
+    [1.0, 2.0, 4096.0, 2.0, 2.0, 2.0, 2.0, 1.0, 16.0, 256.0, 1.0, 0.0],
 ];
 const PRESET_NAMES: [&str; 4] = ["low", "medium", "high", "ultra"];
 
@@ -58,7 +61,7 @@ fn number(v: f64) -> (String, i64) {
     (String::new(), v.round() as i64)
 }
 
-const ROWS: [Row; 11] = [
+const ROWS: [Row; 12] = [
     Row {
         key: "render_scale",
         // 0 is Auto (Distant terrain's render pass: 0.67 on a high-density screen, 1 elsewhere).
@@ -83,6 +86,7 @@ const ROWS: [Row; 11] = [
     },
     Row { key: "reflect", values: &[0.0, 1.0, 2.0], get: || FX_REFLECT.get() as f64, set: |v| FX_REFLECT.set(v as i32), shown: off_low_on },
     Row { key: "contact", values: &[0.0, 1.0, 2.0], get: || FX_CONTACT.get() as f64, set: |v| FX_CONTACT.set(v as i32), shown: off_low_on },
+    Row { key: "volume", values: &[0.0, 1.0, 2.0], get: || FX_VOLUME.get() as f64, set: |v| FX_VOLUME.set(v as i32), shown: off_low_on },
     Row { key: "shafts", values: &[0.0, 1.0, 2.0], get: || FX_SHAFTS.get() as f64, set: |v| FX_SHAFTS.set(v as i32), shown: off_low_on },
     Row {
         key: "bloom",
@@ -156,6 +160,8 @@ pub fn register(r: &mut Registry) {
     r.config(&QUALITY).int(-1, -1, 4);
     r.config(&FX_REFLECT).int(2, 0, 2);
     r.config(&FX_CONTACT).int(2, 0, 2);
+    // 2-3 ms at Retina size on the Mac (Lighting's estimate): low until a preset says otherwise.
+    r.config(&FX_VOLUME).int(1, 0, 2);
     r.config(&FX_SHAFTS).int(2, 0, 2);
     r.config(&FX_BLOOM).int(1, 0, 1);
     // The first run: a preset from the screen (a high-density one draws many more pixels).
