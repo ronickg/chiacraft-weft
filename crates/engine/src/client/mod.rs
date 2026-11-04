@@ -1419,6 +1419,9 @@ impl Client {
         if self.render.set_tint_tiles(gpu, (reach * 2 + 1) as u32) {
             self.world.retint_all();
         }
+        if std::mem::take(&mut self.world.tints_changed) {
+            self.render.set_biome_table(gpu, self.world.biome_tints());
+        }
         for (col, tints) in self
             .world
             .take_tints(glam::IVec2::new(center.x, center.z), reach)

@@ -57,6 +57,11 @@ pub enum DimEvent {
         air: Vec<(u32, f32, f32, f32, u32)>,
         heading: f32,
     },
+    /// Every biome's tint colors from now on (`DimSet::set_tints`).
+    SetTints {
+        dim: u32,
+        tints: Vec<u32>,
+    },
     /// A white flash on it for those who see it.
     Flash {
         id: u64,

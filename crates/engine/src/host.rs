@@ -183,6 +183,7 @@ pub static HOST: Host = Host {
     raining_at,
     set_air,
     air_at,
+    set_biome_tints,
     entity_flash,
     reg_command_permission,
     player_permission,
@@ -2252,6 +2253,38 @@ unsafe extern "C" fn set_air(
         };
         d.events
             .push(crate::server::DimEvent::SetAir { dim: d.id, air, heading });
+    }
+}
+
+unsafe extern "C" fn set_biome_tints(w: *mut abi::WorldCtx, biomes: *const Str, kinds: *const Str, colors: *const u32, len: u32) {
+    unsafe {
+        let d = dim(w);
+        let c = content();
+        let k = c.tint_kinds.len();
+        // The whole table, biome by biome (the content's colors where not named): small, and the
+        // client blends from it as it does from the content's.
+        let tints = if len == 0 || c.biomes.is_empty() {
+            Vec::new()
+        } else {
+            let mut table: Vec<u32> = c
+                .biomes
+                .iter()
+                .flat_map(|b| b.tints.iter().copied())
+                .collect();
+            let n = len as usize;
+            let (b, kd, col) =
+                (std::slice::from_raw_parts(biomes, n), std::slice::from_raw_parts(kinds, n), std::slice::from_raw_parts(colors, n));
+            for i in 0..n {
+                let (bn, kn) = (b[i].as_str(), kd[i].as_str());
+                match (c.biomes.iter().position(|x| x.name == bn), c.tint_kinds.iter().position(|x| x.0 == kn)) {
+                    (Some(bi), Some(ki)) => table[bi * k + ki] = col[i] & 0xff_ffff,
+                    _ => misuse("set_biome_tints", || format!("no biome {bn} or tint kind {kn}")),
+                }
+            }
+            table
+        };
+        d.events
+            .push(crate::server::DimEvent::SetTints { dim: d.id, tints });
     }
 }
 

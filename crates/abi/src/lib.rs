@@ -2311,6 +2311,11 @@ pub struct Host {
     /// while a player is near, more for one ticked only now and then
     /// (`core:entity_activation_distance`). What counts down per tick counts down by this.
     pub entity_tick_elapsed: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64) -> u32,
+    /// Tint colors from now on, over the content's while the world runs (a mod's seasons): for
+    /// each of `len` entries a biome, a tint kind (names, either may be another mod's) and its
+    /// 0xRRGGBB. What is not named keeps the content's color; 0 entries: all the content's again.
+    /// Replaces what an earlier call set. Players see it.
+    pub set_biome_tints: unsafe extern "C" fn(world: *mut WorldCtx, biomes: *const Str, kinds: *const Str, colors: *const u32, len: u32),
 }
 
 /// Natural spawning around players (`Host::reg_spawn`). Every two seconds the engine tries a few
