@@ -388,7 +388,17 @@ component through the same byte buckets (`sandboxed::client_component`). The off
 newer half's; "has code" means either half. Sample: `examples/wasm/bell-client` (a `hud_badge`
 with the ring count, an `hud_xp` bar with the count inside it through `at`, the key N), with the
 bell's server half now sending `bell:rings`. Tests `crates/sandbox/tests/client.rs`.
-Slice 5, personal mods (built; not yet seen in the game): `mods/packages/src/personal.rs`. The
+Checked on the Linux PC (Tester 2, aa03294f): alice's side of the client-half pair ran: the
+bell rang and the puff showed above it ("a puff above the bell", seen in the shot; it had been
+inside the block), the join sheet listed the bell "(mod API 1.2)"; but the badge drew as the
+missing texture: `hud_badge` comes with the UI redo, not in `dev` yet, so the sample now uses
+`tooltip`. Bob's side is untested: his game ran out of GPU memory both times on the PC, next to
+vLLM ("allocating 67108864 bytes for quad page: Out of memory", a panic in the Vulkan backend).
+Bob also joined with an empty name although his `core.txt` says `name = bob` (on c41da9e4 it was
+right): not this work's, passed to Planner.
+Slice 5, personal mods (built, and checked in one game on the PC: off by default with "Your
+personal mods are off in this world: clock.", on after `/rule personal_mods 1` with the clock
+showing 07:07 top left, its key in slot 1 hid it, off again; Create World's choice not looked at): `mods/packages/src/personal.rs`. The
 world rule `packages:personal_mods` (choice off/client, off by default, a world rule so it is on
 Create World and synced to players); the player's own client halves from `<run dir>/personal/`
 (up to 16, loaded on the first client frame); slots registered the same in every game so the

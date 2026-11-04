@@ -107,7 +107,7 @@ fn builds_binds_and_acts() {
     assert!(well_formed(&parts));
     let kinds: Vec<PartKind> = parts.iter().map(|p| p.kind).collect();
     assert_eq!(kinds, [PartKind::Panel, PartKind::TextBind, PartKind::Container, PartKind::Progress, PartKind::TextBind]);
-    assert_eq!(parts[0].class, "hud_badge");
+    assert_eq!(parts[0].class, "tooltip");
     assert!(parts[4].style.at.is_some(), "the count sits inside the bar");
     // Nothing heard yet: the bar hides, the line says so.
     assert_eq!(inst.value(game(false), parts[3].bind), -1.0);

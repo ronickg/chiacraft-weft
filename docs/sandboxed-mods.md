@@ -120,8 +120,9 @@ adds, with Weft's client names:
 
 A HUD element or screen is built as a list of parts the game replays into its own UI, so a
 client half draws with the game's kit: use its classes (`panel`, `tooltip`, `button`, `slot`,
-`hotbar`, `hud_badge`, the `hud_health`, `hud_stamina`, `hud_xp` and `hud_temperature` bars,
-`tab`, `category`; text classes `title`, `dim`, `button`, `chat`) and it looks like the game. A
+`hud_frame`, the `hud_health`, `hud_stamina`, `hud_xp` and `hud_temperature` bars; with the UI
+redo also `hud_badge`, `tab` and `category`; text classes `title`, `dim`, `button`, `chat`) and
+it looks like the game. A class the game has no texture for draws as the missing texture. A
 binding (`text_bind`, `progress_bind`, `icons`) may only read; keys, buttons, packets and frames
 may also send, open screens and show lines. It never reaches the account, files or network, and
 the same limits and strikes hold (a failing client half stops in the player's game). Lines it

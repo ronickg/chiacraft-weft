@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 64 · ◧ partly built: 20 · □ not built yet: 14 · ◌ planned for later: 6
+■ built and seen working: 65 · ◧ partly built: 19 · □ not built yet: 14 · ◌ planned for later: 6
 
 ## Core next
 
@@ -90,7 +90,7 @@ Code: `crates/engine/src/chiacraft/worlds`, `mods/portals`, `crates/engine/src/c
 
 ## Running worlds safely
 
-Always-on servers and code mods that can't hurt the player. 0 of 7 parts built.
+Always-on servers and code mods that can't hurt the player. 1 of 7 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -99,7 +99,7 @@ Always-on servers and code mods that can't hurt the player. 0 of 7 parts built.
 | ◧ | Permissions (core) | Operator levels exist, but any player can still /give. |
 | □ | Movement checks | Phase 7. |
 | ◧ | Sandboxed code mods (core) | Phase 6 slices 1 and 2 built and seen between two games (Linux PC): a package's code/server.wasm (a wasmtime component, API chiacraft:mods@1.0.0 shaped on Weft's SDK) downloads with it on join and runs on the world's host under fuel, time and memory limits, per world, with storage in the save; sample clans (the animals mod's tribes). Slice 2: the join sheet marks packages that carry code (protocol 6), and a package's clashing command is left out. Slice 3: API 1.1 (components, set_blocks, sounds, particles) and 1.2 (callbacks on the package's own blocks and items, channels); older mods still run; samples tally, bell. Slice 4: client halves (HUD, screens, keys, packets; parts replayed with the game's kit). Left: personal mods per world, /mods. Code: `crates/sandbox`, `crates/mod-sdk`, `mods/packages/src/sandboxed.rs`, `examples/wasm/clans`. Docs: `docs/sandboxed-mods.md`, `reports/Sandboxed code mods.md`. |
-| ◧ | Personal mods per world | Built, not yet seen in the game: a player's own client halves in <run dir>/personal, run where the world rule Personal Mods allows (off by default); joining says which are off. Sample examples/personal/clock. Code: `mods/packages/src/personal.rs`, `examples/wasm/clock`. Docs: `docs/sandboxed-mods.md`. |
+| ■ | Personal mods per world | Seen in the game (PC, one world): a player's own client halves in <run dir>/personal, run where the world rule Personal Mods allows (off by default); joining says which are off. Sample examples/personal/clock. Code: `mods/packages/src/personal.rs`, `examples/wasm/clock`. Docs: `docs/sandboxed-mods.md`. |
 | □ | Our own relay | Phase 7. |
 
 Code: `crates/engine/src/dedicated.rs`. Docs: `notes/PLAN.md`.

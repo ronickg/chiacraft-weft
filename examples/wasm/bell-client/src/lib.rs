@@ -1,5 +1,5 @@
 //! The bell's client half (API 1.2, `examples/wasm/bell` is its server half): a HUD badge in the
-//! game's kit (`hud_badge`, an `hud_xp` bar with the count inside it, placed with `at`) showing
+//! game's kit (a `tooltip` panel, an `hud_xp` bar with the count inside it, placed with `at`) showing
 //! how often the bell has rung, from what the server half sends on `bell:rings`; the key N pings
 //! the server half, which answers with the count.
 
@@ -23,7 +23,8 @@ thread_local! {
 
 fn init(r: &mut Registry) {
     r.hud_element(&HUD, hud_anchor::TOP_RIGHT, 0, |ui| {
-        ui.panel("hud_badge", S::col().pad(3.0).gap(2.0), |ui| {
+        // `hud_badge` once the UI redo is in; `tooltip` is in every game now.
+        ui.panel("tooltip", S::col().pad(3.0).gap(2.0), |ui| {
             ui.text_bind(|_, out| match COUNT.with(Cell::get) {
                 Some(n) => out.set("bell.hud", &[Arg::Int(n as i64)]),
                 None => out.set("bell.hud_none", &[]),
