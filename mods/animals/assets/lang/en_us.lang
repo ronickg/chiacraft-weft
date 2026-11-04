@@ -379,3 +379,12 @@ screen.animals.temper.steady = Steady
 screen.animals.temper.skittish = Skittish
 screen.animals.gene_value = {0} {#c6a383}{1}%{/}
 screen.animals.gene_alleles = {0} {#c6a383}{1} ({2}){/}
+# Order and stance buttons: the kit's 16 px icon, then a word short enough for the button.
+screen.animals.button.wander = {img:base:icon_wander 8x8} Wander
+screen.animals.button.follow = {img:base:icon_follow 8x8} Follow
+screen.animals.button.stay = {img:base:icon_stay 8x8} Stay
+screen.animals.button.guard = {img:base:icon_guard 8x8} Guard
+screen.animals.button.passive = {img:base:icon_passive 8x8} Passive
+screen.animals.button.neutral = {img:base:icon_neutral 8x8} Neutral
+screen.animals.button.aggressive = {img:base:icon_aggressive 8x8} Attack
+screen.animals.button.assist = {img:base:icon_assist 8x8} Assist

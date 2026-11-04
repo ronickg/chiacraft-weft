@@ -374,3 +374,12 @@ screen.animals.wild_q1 = {#8ac80f}{0}{/}
 screen.animals.wild_q2 = {#2f8de4}{0}{/}
 screen.animals.wild_q3 = {#9b4fe0}{0}{/}
 screen.animals.wild_q4 = {#f0aa28}{0}{/}
+# Order and stance buttons: the kit's 16 px icon, then a word short enough for the button.
+screen.animals.button.wander = {img:base:icon_wander 8x8} Бродить
+screen.animals.button.follow = {img:base:icon_follow 8x8} Следовать
+screen.animals.button.stay = {img:base:icon_stay 8x8} Стоять
+screen.animals.button.guard = {img:base:icon_guard 8x8} Охранять
+screen.animals.button.passive = {img:base:icon_passive 8x8} Мирный
+screen.animals.button.neutral = {img:base:icon_neutral 8x8} Защита
+screen.animals.button.aggressive = {img:base:icon_aggressive 8x8} Атака
+screen.animals.button.assist = {img:base:icon_assist 8x8} Помощник

@@ -230,6 +230,16 @@ for name, fill in FILLS.items():
     only[np.all(full == frame, axis=-1)] = 0
     save(name + "_fill", only, [NINE, border(3)])
 
+# ---------------------------------------------------------------- icons and a divider
+# The 16 px icons (8 GUI px), for labels: `{img:base:icon_follow 8x8} Follow` (the space between is
+# the font's 4 px, the icon-to-text gap of the guide).
+for name in k.ICONS:
+    save("icon_" + name, k.icon(name), [("scaling", "stretch")])
+div = k.canvas(4, 2)
+k.rect(div, 0, 0, 4, 1, k.PANEL_DEEP)
+k.rect(div, 0, 1, 4, 1, (52, 36, 28))
+save("divider", div, [("scaling", "stretch")])
+
 for name, w, h, gui in WRITTEN:
     print(f"{name:28s} {w}x{h}  {gui}")
 print(len(WRITTEN), "textures", "(dry run)" if DRY else f"written; old ones in {ARCHIVE}")

@@ -348,29 +348,34 @@ fn points_share(a: &Animal, i: usize) -> f32 {
     0.15 + 0.85 * ((a.wild[i] as f32 + a.tamed[i] as f32) / 40.0).min(1.0)
 }
 
-/// A bar of the kit (`class`, drawn at its own size) with its value written inside its right end.
+/// A bar of the kit (`class`) and its value beside it, right-aligned in a column of its own, so
+/// the numbers line up and none is written on a bar's fill (kit 2, the UI guide's D).
 fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Option<(f32, String)> + Send + Sync + Clone + 'static) {
     let v2 = value.clone();
-    ui.row(S::row().size(LIFE_BAR.0, LIFE_BAR.1), move |ui| {
-        ui.progress_bind(class, S::default().size(LIFE_BAR.0, LIFE_BAR.1), move |c| value(c).map_or(-1.0, |v| v.0.clamp(0.0, 1.0)));
-        ui.text_bind_styled(
-            S::default()
-                .no_wrap()
-                .at_pivot(LIFE_BAR.0 - 3.0, LIFE_BAR.1 / 2.0, [1.0, 0.5]),
-            move |c, t| match v2(c) {
-                Some((_, s)) => t.text(&s),
-                None => t.text(""),
-            },
-        );
+    ui.progress_bind(class, S::default().size(LIFE_BAR.0, LIFE_BAR.1), move |c| value(c).map_or(-1.0, |v| v.0.clamp(0.0, 1.0)));
+    ui.row(S::row().w(LIFE_VALUE_W).end(), move |ui| {
+        ui.text_bind_styled(S::default().no_wrap(), move |c, t| match v2(c) {
+            Some((_, s)) => t.text(&s),
+            None => t.text(""),
+        });
     });
 }
 
-/// The life bars and stat bars' sizes in GUI pixels (the kit's `life_*` and `stat_q*`).
-const LIFE_BAR: (f32, f32) = (63.0, 6.0);
+/// The life bars and stat bars' sizes in GUI pixels (the kit's `life_*` and `stat_q*`), and the
+/// columns beside them: an icon, then the bar, then the value (left column 108 wide: 8 + 3 + 56 + 3 + 38).
+const LIFE_BAR: (f32, f32) = (56.0, 6.0);
+const LIFE_VALUE_W: f32 = 38.0;
 /// The genes list: how many lines it can hold and how tall it is (it scrolls), GUI pixels.
 const GENE_LINES: usize = 40;
 const GENES_H: f32 = 52.0;
-const STAT_BAR: (f32, f32) = (54.0, 6.0);
+const STAT_BAR: (f32, f32) = (32.0, 6.0);
+/// The stat rows' columns after the bar: the value (right-aligned), wild and tamed points
+/// (centred), then the + (GUI pixels).
+const STAT_VALUE_W: f32 = 18.0;
+const STAT_WILD_W: f32 = 14.0;
+const STAT_TAMED_W: f32 = 20.0;
+/// A stat row's whole width, for the divider over torpor.
+const STAT_ROW_W: f32 = 8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0 + STAT_WILD_W + 3.0 + STAT_TAMED_W + 3.0 + 10.0;
 
 /// The screen of a tame animal (`notes/ui/BATCHES.md`, the taming and stats upgrade): who it is
 /// and how it is on the left, its stats as bars in the middle, its coat and orders on the right.
@@ -398,37 +403,49 @@ fn animal_screen(ui: &mut Ui) {
                     });
                 });
             });
+            // Icons, not names, before the life bars (the stat icons; the bond its heart-paw).
             for (label, class) in [("health", "life_health"), ("food", "life_food"), ("water", "life_water"), ("bond", "life_bond")] {
-                ui.row(S::row().gap(3.0).center(), move |ui| {
-                    ui.text_styled(S::default().w(40.0).no_wrap(), &format!("screen.animals.life.{label}"), &[]);
-                    match label {
-                        "health" => life_bar(ui, class, |c| {
-                            let a = c.menu_component(&ANIMAL)?;
-                            let e = c.menu_owner().and_then(|id| c.client().entity(id))?;
-                            let max = a.stat(species::HEALTH) * crate::comfort::condition(&a);
-                            Some((e.health / max.max(0.1), format!("{:.0} / {:.0}", e.health, max)))
-                        }),
-                        "food" => life_bar(ui, class, |c| {
-                            let a = c.menu_component(&ANIMAL)?;
-                            let max = a.stat(species::FOOD).round();
-                            Some((a.food as f32 / max.max(1.0), format!("{} / {:.0}", a.food, max)))
-                        }),
-                        "water" => life_bar(ui, class, |c| {
-                            let a = c.menu_component(&ANIMAL)?;
-                            if a.species()
-                                .is_none_or(|s| animals_core::needs::drinks(s) <= 0.0)
-                            {
-                                return None;
-                            }
-                            let w = 1.0 - a.thirst.clamp(0.0, 1.0);
-                            Some((w, format!("{:.0}%", w * 100.0)))
-                        }),
-                        _ => life_bar(ui, class, |c| {
-                            let a = c.menu_component(&ANIMAL)?;
-                            Some((a.bond as f32 / 100.0, a.bond.to_string()))
-                        }),
-                    }
-                });
+                ui.row(
+                    S::row()
+                        .gap(3.0)
+                        .center()
+                        .tooltip(&format!("screen.animals.life.{label}")),
+                    move |ui| {
+                        let icon = match label {
+                            "water" => "base:gui/stat_icon_oxygen".to_string(),
+                            "bond" => "base:gui/icon_taming".to_string(),
+                            _ => format!("base:gui/stat_icon_{label}"),
+                        };
+                        ui.image(&icon, 8.0, 8.0);
+                        match label {
+                            "health" => life_bar(ui, class, |c| {
+                                let a = c.menu_component(&ANIMAL)?;
+                                let e = c.menu_owner().and_then(|id| c.client().entity(id))?;
+                                let max = a.stat(species::HEALTH) * crate::comfort::condition(&a);
+                                Some((e.health / max.max(0.1), format!("{:.0} / {:.0}", e.health, max)))
+                            }),
+                            "food" => life_bar(ui, class, |c| {
+                                let a = c.menu_component(&ANIMAL)?;
+                                let max = a.stat(species::FOOD).round();
+                                Some((a.food as f32 / max.max(1.0), format!("{} / {:.0}", a.food, max)))
+                            }),
+                            "water" => life_bar(ui, class, |c| {
+                                let a = c.menu_component(&ANIMAL)?;
+                                if a.species()
+                                    .is_none_or(|s| animals_core::needs::drinks(s) <= 0.0)
+                                {
+                                    return None;
+                                }
+                                let w = 1.0 - a.thirst.clamp(0.0, 1.0);
+                                Some((w, format!("{:.0}%", w * 100.0)))
+                            }),
+                            _ => life_bar(ui, class, |c| {
+                                let a = c.menu_component(&ANIMAL)?;
+                                Some((a.bond as f32 / 100.0, a.bond.to_string()))
+                            }),
+                        }
+                    },
+                );
             }
             // How it feels in this air, against its comfort, and its condition.
             ui.text_bind_styled(S::default().max_w(108.0), |c, t| {
@@ -470,16 +487,22 @@ fn animal_screen(ui: &mut Ui) {
                     });
                 });
             });
-            // The header in the rows' own columns: name, bar, wild, tamed, +.
+            // The header in the rows' own columns: name, bar, value, wild, tamed, +. A header
+            // lines up as its column's values do (centred over centred counts).
             ui.row(S::row().gap(3.0), |ui| {
-                ui.row(S::row().w(8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0), |_| {});
-                ui.row(S::row().w(14.0).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.wild_points", &[]));
-                ui.row(S::row().w(18.0).end(), |ui| {
+                ui.row(S::row().w(8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W), |_| {});
+                ui.row(S::row().w(STAT_WILD_W).center(), |ui| {
+                    ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.wild_points", &[])
+                });
+                ui.row(S::row().w(STAT_TAMED_W).center(), |ui| {
                     ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.tamed_points", &[])
                 });
                 ui.row(S::row().w(10.0), |_| {});
             });
             for (i, name) in STAT_NAMES.iter().enumerate() {
+                if i == species::TORPOR {
+                    ui.image("base:gui/divider", STAT_ROW_W, 1.0);
+                }
                 ui.row(S::row().gap(3.0).center(), |ui| {
                     ui.image(&format!("base:gui/stat_icon_{name}"), 8.0, 8.0);
                     ui.text_styled(S::default().w(34.0).no_wrap(), &format!("stat.animals.{name}"), &[]);
@@ -495,28 +518,26 @@ fn animal_screen(ui: &mut Ui) {
                                 },
                             );
                         }
-                        ui.text_bind_styled(
-                            S::default()
-                                .no_wrap()
-                                .at_pivot(STAT_BAR.0 - 3.0, STAT_BAR.1 / 2.0, [1.0, 0.5]),
-                            move |c, t| {
-                                if let Some(a) = c.menu_component(&ANIMAL) {
-                                    t.text(&shown(&a, i));
-                                }
-                            },
-                        );
                     });
-                    ui.row(S::row().w(14.0).end(), move |ui| {
+                    ui.row(S::row().w(STAT_VALUE_W).end(), move |ui| {
+                        ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
+                            if let Some(a) = c.menu_component(&ANIMAL) {
+                                t.text(&shown(&a, i));
+                            }
+                        });
+                    });
+                    ui.row(S::row().w(STAT_WILD_W).center(), move |ui| {
                         ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
                             if let Some(a) = c.menu_component(&ANIMAL) {
                                 t.set(&format!("screen.animals.wild_q{}", quality(a.wild[i])), &[Arg::Int(a.wild[i] as i64)]);
                             }
                         });
                     });
-                    ui.row(S::row().w(18.0).end(), move |ui| {
+                    ui.row(S::row().w(STAT_TAMED_W).center(), move |ui| {
                         ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
                             if let Some(a) = c.menu_component(&ANIMAL) {
-                                t.text(&a.tamed[i].to_string());
+                                // Torpor takes no points: a dash, not a 0 that looks placeable.
+                                t.text(&if i == species::TORPOR { "-".to_string() } else { a.tamed[i].to_string() });
                             }
                         });
                     });
@@ -614,7 +635,7 @@ fn animal_screen(ui: &mut Ui) {
                 let (row, names) = pair;
                 ui.row(S::row().gap(2.0), move |ui| {
                     for (j, name) in names.iter().enumerate() {
-                        order_button_w(ui, &format!("screen.animals.do.{name}"), (row * 2 + j) as u64, 49.0);
+                        order_button_w(ui, &format!("screen.animals.button.{name}"), (row * 2 + j) as u64, 49.0);
                     }
                 });
             }
@@ -623,7 +644,7 @@ fn animal_screen(ui: &mut Ui) {
                 let (row, names) = pair;
                 ui.row(S::row().gap(2.0), move |ui| {
                     for (j, name) in names.iter().enumerate() {
-                        order_button_w(ui, &format!("screen.animals.stance.{name}"), 10 + (row * 2 + j) as u64, 49.0);
+                        order_button_w(ui, &format!("screen.animals.button.{name}"), 10 + (row * 2 + j) as u64, 49.0);
                     }
                 });
             }
