@@ -451,7 +451,8 @@ def main():
         jobs = json.load(open(sys.argv[2]))
         base = dict(what="", ref="", type="", guide_only=False, cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3, like="", diagonal=False, key="",
                     dir=SCRATCH, mod="base")
-        with ThreadPoolExecutor(4) as ex:
+        # Two at a time by default (the crew's rule for batch scripts on the Mac); ART_JOBS overrides.
+        with ThreadPoolExecutor(int(os.environ.get("ART_JOBS", "2"))) as ex:
             for r in ex.map(lambda j: make(argparse.Namespace(**dict(base, **j))), jobs):
                 print(r, flush=True)
         return

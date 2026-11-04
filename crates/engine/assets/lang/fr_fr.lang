@@ -335,6 +335,10 @@ command.regions.done = régions {0}
 command.seed.done = graine: {0}
 command.rule.value = {0} = {1}
 command.rule.unknown = pas de règle {0}
+command.rule.not_bool = {0} vaut true ou false, pas {1}
+command.rule.not_choice = {0} vaut l'un de {2}, pas {1}
+command.rule.not_number = {0} est un nombre de {2} à {3}, pas {1}
+command.rule.held = {0} est fixé pour cette partie (--config) et reste {1}
 command.error.no_player = pas de joueu.r.se {0}
 command.error.unknown_selector = sélecteur inconnue {0}
 command.error.bad_selector = mauvais sélecteur {0}

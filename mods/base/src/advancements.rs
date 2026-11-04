@@ -258,6 +258,13 @@ fn client(r: &mut Registry) {
             toasts.pop_front();
             return;
         };
+        // Never over a window, as the level up's banner (Tester's scale 6 run: "A Friend" covered
+        // the animal screen's top right and its close button, opened as the animal was tamed): it
+        // waits while a screen is open, and starts over, chime and all, once it closes.
+        if !c.screen().is_empty() {
+            *shown = None;
+            return;
+        }
         let start = *shown.get_or_insert_with(|| {
             c.play_sound(&CHIME, None, 1.0);
             Instant::now()

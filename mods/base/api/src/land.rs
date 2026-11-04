@@ -27,6 +27,7 @@ use weft_sdk::terrain::{Feature, Mask, preset};
 
 use crate::SEA;
 
+mod karst;
 mod net;
 
 /// Salts of our own noises (the engine's are in `weft_noise::fixed::salt`).
@@ -47,6 +48,9 @@ pub mod salt {
     pub const COAST_CLIFFS: u64 = 0xC1F;
     pub const ISLANDS: u64 = 0x151A;
     pub const ARCHIPELAGOS: u64 = 0x151B;
+    pub const KARST: u64 = 0x4A5;
+    pub const KARST_AREA: u64 = 0x4A6;
+    pub const KARST_WOBBLE: u64 = 0x4A7;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -291,6 +295,25 @@ pub const MESA_AREA: Area = Area {
     not: false,
 };
 
+/// Karst towers (Lithosphere; Ha Long Bay, Guilin): in the warm, wet land and its shallow seas
+/// (`KARST_AREA`), steep limestone pillars, one per `KARST_CELL` blocks square where the area
+/// allows (`KARST_CHANCE` at full strength), `KARST_RADIUS` blocks across their foot and
+/// `KARST_HEIGHT` over the water or the ground they stand on, their outline wobbled (Ronald,
+/// 11-04: "All 3, in order").
+pub const KARST_AREA: Area = Area {
+    all: &[
+        Ramp::Temperature(0.02, 0.08),
+        Ramp::Humidity(0.06, 0.12),
+        Ramp::Noise { salt: salt::KARST_AREA, scale: 700.0, from: 0.0, to: 0.12 },
+        Ramp::Continent(-0.12, -0.04),
+    ],
+    not: false,
+};
+pub const KARST_CELL: i32 = 40;
+pub const KARST_CHANCE: f64 = 0.6;
+pub const KARST_RADIUS: (i32, i32) = (5, 11);
+pub const KARST_HEIGHT: (i32, i32) = (16, 36);
+
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
 /// the rain of the nodes upstream within `RIVER_REACH` steps (about 2 km of river).
@@ -322,6 +345,14 @@ pub const RIVER_FLOODPLAIN: (i32, i32) = (2, 12);
 pub const RIVER_BANKS: i32 = 8;
 pub const RIVER_VALLEY_PER_BLOCK: i32 = 36;
 pub const RIVER_VALLEY_RISE: i32 = 60;
+/// River terraces (Tectonic's tiers by a river's distance): the valley sides of the bigger
+/// rivers (flow from `RIVER_TERRACE_FLOW.0`, full at `.1`) climb in benches `RIVER_TERRACE`
+/// blocks high, each flat for all but `RIVER_TERRACE_RISER` of its width: meadows by the water
+/// (Ronald, 11-04: "All 3, in order"). Low steps with wide risers so a player can walk up them:
+/// at 5 blocks with 0.3 risers the walk test stuck at the first one (a 5-block rise in 3).
+pub const RIVER_TERRACE_FLOW: (f64, f64) = (10.0, 40.0);
+pub const RIVER_TERRACE: i32 = 3;
+pub const RIVER_TERRACE_RISER: f64 = 0.5;
 /// Rivers don't carve in the mountains: full where the mountains' area (`MOUNTAINS_AREA`) is up
 /// to `.0`, gone at `.1`. Their rain still runs down, so rivers come out at the mountains' feet.
 pub const RIVER_MOUNTAINS: (f64, f64) = (0.1, 0.45);
@@ -449,6 +480,7 @@ pub fn features() -> Vec<Feature> {
             .mask(MOUNTAINS_AREA.mask())
             .named("mountains"),
         Feature::new(mesa).named("mesas"),
+        Feature::new(karst).named("karst"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
         // No height: their masks say where the snow drifts and where the sequoias stand (rules
@@ -481,6 +513,12 @@ fn land_height_at(h: &Here) -> i32 {
 
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
+    let base = base_ground(h);
+    base + karst::add(h, base)
+}
+
+/// The ground before the karst towers (which stand on it, or rise out of the water over it).
+fn base_ground(h: &Here) -> i32 {
     let (f, x, z) = (h.f, h.x, h.z);
     q4(SEA as f64)
         + shape::continents(f, x, z, q4(CONTINENTS))
@@ -746,10 +784,13 @@ pub fn rivers(f: &Fields, x: i32, z: i32) -> i32 {
         } else if d < flat {
             sea
         } else {
-            // The valley's sides: rising smoothly from the floodplain to the land.
+            // The valley's sides: rising smoothly from the floodplain to the land, in benches
+            // by the bigger rivers.
             let t = (d - flat) * ONE / banks.max(1);
             let smooth = (((t * t) >> 12) * (3 * ONE - 2 * t)) >> 12;
-            sea + (((h0 - sea) * smooth) >> 12)
+            let raise = ((h0 - sea) * smooth) >> 12;
+            let benches = ramp(flow, q12(RIVER_TERRACE_FLOW.0), q12(RIVER_TERRACE_FLOW.1));
+            sea + raise + (((net::terraced(raise) - raise) * benches) >> 12)
         };
         cut = cut.min((((target - h0).min(0)) * deep) >> 12);
     }
@@ -770,6 +811,12 @@ pub fn river_region_stretches(f: &Fields, bx: i32, bz: i32) -> Vec<([i32; 2], [i
         .iter()
         .map(|s| ([s.a[0] >> 4, s.a[1] >> 4], [s.b[0] >> 4, s.b[1] >> 4], s.flow))
         .collect()
+}
+
+/// What the karst towers add at (`x`, `z`) (Q4), as the engine adds it.
+pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
+    let h = Here::new(f, x, z);
+    if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base_ground(&h)) }
 }
 
 /// Which water a bank belongs to (`bank`).
@@ -958,6 +1005,9 @@ pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet
         RockSet::Strata
     } else if t < q12(TAIGA_BELOW) {
         RockSet::Slate
+    } else if KARST_AREA.at(&here) > 0 {
+        // Karst towers are limestone however high they stand.
+        RockSet::Limestone
     } else if height >= SEA + GRANITE_ABOVE || MOUNTAINS_AREA.at(&here) > q12(MOUNTAIN_BIOME) {
         RockSet::Granite
     } else {
@@ -1138,6 +1188,40 @@ mod tests {
             }
         }
         assert!(cliffs > 0 && islands > 0, "{cliffs} cliff columns, {islands} island columns in 3.2 km");
+    }
+
+    #[test]
+    fn terraces_are_benches_that_never_fill() {
+        let mut last = 0;
+        let mut flat = 0;
+        for raise in 0..q4(60.0) {
+            let t = net::terraced(raise);
+            assert!(t >= last, "benches only climb");
+            assert!(t <= raise + q4(1.0), "a bench stands at most a block over the smooth side");
+            if t == last {
+                flat += 1;
+            }
+            last = t;
+        }
+        assert!(flat > q4(60.0) * 2 / 5, "much of the side is bench: {flat}");
+    }
+
+    #[test]
+    fn karst_towers_stand_in_their_land_only() {
+        let f = fields(1);
+        let (mut towers, mut outside) = (0, 0);
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 12 * 16 - 1200 * 16, (i / 200) * 12 * 16 - 1200 * 16);
+            let add = karst(&f, x, z);
+            assert!((0..=q4(KARST_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
+            if add > q4(8.0) {
+                towers += 1;
+                if KARST_AREA.value(&f, x, z) == 0 {
+                    outside += 1;
+                }
+            }
+        }
+        assert!(towers > 0 && outside == 0, "{towers} tower columns, {outside} outside the karst land");
     }
 
     #[test]

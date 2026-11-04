@@ -1,6 +1,6 @@
 //! The nearest spots to spawn of a kind, with a camera for a look script: for testers, so a shot
 //! of a lake or a river shows one. Kinds: `lake`, `river` (water at least two blocks deep in the
-//! channel), `coast` (land with the sea beside it) or any overworld biome by name (`desert`,
+//! channel), `coast` (land with the sea beside it), `karst` (a tower) or any overworld biome by name (`desert`,
 //! `sequoia_grove`, ...). Searched in rings outward from the middle every `step` blocks, the
 //! world as the engine builds it (the overworld's fields, its continent scale).
 //!
@@ -33,6 +33,7 @@ fn main() {
                         .iter()
                         .any(|(dx, dz)| l::overworld_biome(&f, (x + dx) * 16, (z + dz) * 16) == "ocean")
             }
+            "karst" => l::karst(&f, x * 16, z * 16) > 16 * 12,
             b => l::overworld_biome(&f, x * 16, z * 16) == b,
         }
     };

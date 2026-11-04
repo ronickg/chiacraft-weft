@@ -176,7 +176,9 @@ pub fn register(r: &mut Registry) {
         .temperature(land::SAVANNA.0..)
         .humidity(..land::SAVANNA.1)
         .surface("grass", "dirt", 3)
-        .tint(grass, 0xbfb755)
+        // A calmer grass yellow than the desert's: it greens in the rains and goes straw when dry
+        // (`vitals::foliage::rain_tint`; the playtest read 0xbfb755 all year as neon).
+        .tint(grass, 0xa9a565)
         .tint(foliage, 0xaea42a)
         .tint(&base_api::trees::EVERGREEN, 0xaea42a)
         .tint(&base_api::trees::YELLOW_LEAVES, 0xaea42a)
