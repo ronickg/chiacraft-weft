@@ -1774,7 +1774,13 @@ impl Client {
                     .is_some_and(|s| s.liquid_in().is_some() && (r >> 24) % 8 == 0)
             }) {
                 let (below, air) = (self.world.block(p - IVec3::Y), self.world.block(p - IVec3::Y * 2));
-                if c.states[below as usize].flags & weft_abi::block_flags::SOLID != 0 && air == 0 {
+                // A cube not here yet reads `u32::MAX`: no drip (it indexed past the states and
+                // crashed by a tarn's water near the top of what had arrived).
+                if c.states
+                    .get(below as usize)
+                    .is_some_and(|s| s.flags & weft_abi::block_flags::SOLID != 0)
+                    && air == 0
+                {
                     let pos = [p.x as f64 + 0.5, p.y as f64 - 1.05, p.z as f64 + 0.5];
                     bursts.push(weft_abi::ParticleBurst {
                         kind,
