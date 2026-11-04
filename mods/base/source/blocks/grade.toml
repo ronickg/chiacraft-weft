@@ -87,6 +87,9 @@ spread = 75
 gain = 0.88
 spread = 50
 
+[tiles.coral_rubble]  # pale bone-grey, not sand: sat 0.39 -> 0.23 (sand 0.38), luma 0.76
+saturation = 0.6
+
 [groups.liquids]
 match = ["water_*", "lava_*"]
 
