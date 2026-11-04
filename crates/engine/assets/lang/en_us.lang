@@ -693,3 +693,4 @@ finder.offline = offline now
 finder.asking_world = asking…
 finder.listed = listed {0} days ago, {1} TXCH locked
 finder.refresh = Refresh
+world.default_name = New World

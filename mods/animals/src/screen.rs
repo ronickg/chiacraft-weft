@@ -367,14 +367,22 @@ fn signature_line(ui: &mut Ui) {
     });
 }
 
-/// A stat's value as it is read: health with a decimal, damage and speed as a percentage of
-/// the species' own, the rest whole.
+/// A stat's value as it is read: health with a decimal (whole from 100: "369.0" was squeezed in
+/// its column for a big animal, Playtest), damage and speed as a percentage of the species' own,
+/// the rest whole.
 fn shown(a: &Animal, i: usize) -> String {
     match i {
-        species::HEALTH => format!("{:.1}", a.stat(i)),
+        species::HEALTH if a.stat(i) < 100.0 => format!("{:.1}", a.stat(i)),
+        species::HEALTH => format!("{:.0}", a.stat(i)),
         species::DAMAGE | species::SPEED => format!("{:.0}%", a.factor(i) * 100.0),
         _ => format!("{:.0}", a.stat(i)),
     }
+}
+
+/// "now / most" for a life bar, without the spaces from four digits ("1991 / 2050" was squeezed in
+/// its column for a big animal, Playtest).
+fn of(now: f32, most: f32) -> String {
+    if most >= 1000.0 { format!("{now:.0}/{most:.0}") } else { format!("{now:.0} / {most:.0}") }
 }
 
 /// A window as base's (`mods/base/src/window.rs`, the UI redo): the menu's title on an orange tab
@@ -482,25 +490,25 @@ fn life_bar(ui: &mut Ui, class: &'static str, value: impl Fn(&ClientView) -> Opt
 }
 
 /// The life bars and stat bars' sizes in GUI pixels (the kit's `life_*` and `stat_q*`), and the
-/// columns beside them: an icon, then the bar, then the value (left column `LEFT_W`: 8 + 3 + 56 + 3 + 34).
-const LIFE_BAR: (f32, f32) = (56.0, 6.0);
+/// columns beside them: an icon, then the bar, then the value (left column `LEFT_W`: 8 + 3 + 52 + 3 + 34).
+const LIFE_BAR: (f32, f32) = (52.0, 6.0);
 const LIFE_VALUE_W: f32 = 34.0;
 /// The Overview's left column (the portrait, name, chips and life), and the window's padding and
-/// the gap between its three columns, GUI px: the whole window is 6 + 104 + 6 + 150 (`STAT_ROW_W`) + 6
-/// + 100 + 6 = 378, inside the 380 a 760 px wide window has at GUI scale 2 (Playtest B9c: at 396 it lost 8 px
+/// the gap between its three columns, GUI px: the whole window is 6, 100, 6, 155 (`STAT_ROW_W`), 6,
+/// 100 and 6, 379 in all, inside the 380 a 760 px wide window has at GUI scale 2 (Playtest B9c: at 396 it lost 8 px
 /// each side).
-const LEFT_W: f32 = 104.0;
+const LEFT_W: f32 = 100.0;
 const OVERVIEW_PAD: f32 = 6.0;
 const OVERVIEW_GAP: f32 = 6.0;
 /// The genes list (on the Genes page): how many lines it can hold.
 const GENE_LINES: usize = 40;
 /// The Genes page's list: taller, it has the page to itself.
 const GENES_PAGE_H: f32 = 110.0;
-/// The stat names' column: as wide as the longest name in either language ("Выносливость" 42.5 GUI
-/// px: at 34 it was shrunk to 80%, the Russian pass); the bars 18 to make room (and the wild column
+/// The stat names' column: as wide as the longest name in either language ("Выносливость" 48 GUI px
+/// in the Cyrillic drawn for PixelOperator; at 34 it was shrunk to 80%, the Russian pass); the bars 18 to make room (and the wild column
 /// 16, so "Дикий" and "Ручной" over their columns keep 2 GUI px between them), so the window still
 /// fits 380 with every column as wide as its words.
-const STAT_NAME_W: f32 = 43.0;
+const STAT_NAME_W: f32 = 48.0;
 const STAT_BAR: (f32, f32) = (18.0, 6.0);
 /// The stat rows' columns after the bar: the value (right-aligned), wild and tamed points
 /// (centred), then the + (GUI pixels).
@@ -597,14 +605,14 @@ fn animal_screen(ui: &mut Ui) {
                                     .filter(|a| a.species().is_some())?;
                                 let e = c.menu_owner().and_then(|id| c.client().entity(id))?;
                                 let max = a.stat(species::HEALTH) * crate::comfort::condition(&a);
-                                Some((e.health / max.max(0.1), format!("{:.0} / {:.0}", e.health, max)))
+                                Some((e.health / max.max(0.1), of(e.health, max)))
                             }),
                             "food" => life_bar(ui, class, |c| {
                                 let a = c
                                     .menu_component(&ANIMAL)
                                     .filter(|a| a.species().is_some())?;
                                 let max = a.stat(species::FOOD).round();
-                                Some((a.food as f32 / max.max(1.0), format!("{} / {:.0}", a.food, max)))
+                                Some((a.food as f32 / max.max(1.0), of(a.food as f32, max)))
                             }),
                             "water" => life_bar(ui, class, |c| {
                                 let a = c.menu_component(&ANIMAL)?;
@@ -1272,8 +1280,8 @@ fn taming_hud(r: &mut Registry) {
                     t.set("hud.animals.taming.who", &[Arg::Key(&format!("entity.animals.{}", s.kind_name()))]);
                 });
                 ui.row(S::row().gap(3.0).center(), |ui| {
-                    // as wide as "Приручено" (31 GUI px; at 30 it was shrunk, the Russian pass)
-                    ui.text_bind_styled(S::default().w(32.0).no_wrap(), |c, t| {
+                    // as wide as "Приручено" (35 GUI px; narrower it was shrunk, the Russian pass)
+                    ui.text_bind_styled(S::default().w(36.0).no_wrap(), |c, t| {
                         if being_tamed(c).is_some() { t.set("hud.animals.taming.bar", &[]) } else { t.text("") }
                     });
                     ui.progress_bind("life_taming", S::default().size(LIFE_BAR.0, LIFE_BAR.1), |c| {
