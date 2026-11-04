@@ -38,14 +38,14 @@ static LAST_STRIKE: std::sync::Mutex<Vec<(u64, std::time::Instant)>> = std::sync
 pub fn register(r: &mut Registry) {
     // The loose things: small boxes lying on the ground, no collision, gone at a touch.
     let strikes = [("struck", f::FLAKES_PER_STONE - 1)];
-    loose(r, &LOOSE_ROCK, &strikes, "stone", "cobblestone", &[([4.0, 0.0, 5.0], [10.0, 3.0, 11.0]), ([10.0, 0.0, 8.0], [13.0, 1.5, 11.0])]);
+    loose(r, &LOOSE_ROCK, &strikes, "stone", "cobblestone", &[([3.0, 0.0, 3.0], [11.0, 4.0, 11.0]), ([9.0, 0.0, 8.0], [14.0, 2.5, 13.0])]);
     loose(
         r,
         &LOOSE_FLINT,
         &strikes,
         "stone",
         "flint_nodule",
-        &[([5.0, 0.0, 5.0], [10.0, 3.0, 10.0]), ([9.0, 0.0, 9.0], [12.0, 2.0, 12.0])],
+        &[([4.0, 0.0, 4.0], [11.0, 4.0, 11.0]), ([9.0, 0.0, 9.0], [13.0, 2.5, 13.0])],
     );
     loose(r, &FALLEN_BRANCH, &[], "wood", "fallen_branch", &[([1.0, 0.0, 7.0], [15.0, 1.5, 8.5]), ([9.0, 0.0, 8.5], [12.0, 1.0, 12.0])]);
     r.loot(&LOOSE_ROCK).pool(Pool::new().item("rock"));
@@ -151,13 +151,21 @@ fn unit(w: &World) -> f32 {
 /// A rock or a nodule used on a loose rock or nodule on the ground: one strike (`vitals::first`).
 /// Used on the top of anything else, it's put down there.
 fn strike(u: &mut ItemUse) -> bool {
-    let Some((p, face)) = u.target() else { return false };
+    let Some((aimed, face)) = u.target() else { return false };
     let w = u.world();
+    // The stone itself, or the top of what it lies on: a small thing on the ground is easy to aim
+    // past (PC run fh4_axe: the ray passed over the nodule to the ground under it).
+    let above = [aimed[0], aimed[1] + 1, aimed[2]];
+    let loose = |q: [i32; 3]| LOOSE_FLINT.is(w.get(q)) || LOOSE_ROCK.is(w.get(q));
+    let p = if loose(aimed) {
+        aimed
+    } else if face == 3 && loose(above) {
+        above
+    } else {
+        return put_down(u, aimed, face);
+    };
     let state = w.get(p);
-    let (flint, rock) = (LOOSE_FLINT.is(state), LOOSE_ROCK.is(state));
-    if !flint && !rock {
-        return put_down(u, p, face);
-    }
+    let flint = LOOSE_FLINT.is(state);
     let player = u.player();
     let at = [p[0] as f64 + 0.5, p[1] as f64 + 0.2, p[2] as f64 + 0.5];
     let sneaking = w.keys(player) & abi::held_keys::SNEAK != 0;

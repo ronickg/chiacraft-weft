@@ -77,9 +77,19 @@ pub fn register(r: &mut Registry) {
             return Verdict::Abstain;
         }
         let mut drilling = DRILLING.lock().unwrap();
-        if lightable(q.state()) {
+        // The bed itself, or the ground it stands on (small things are easy to aim past).
+        let w = q.world();
+        let above = [q.pos()[0], q.pos()[1] + 1, q.pos()[2]];
+        let bed = if lightable(q.state()) {
+            Some(q.pos())
+        } else if q.state() != 0 && lightable(w.get(above)) {
+            Some(above)
+        } else {
+            None
+        };
+        if let Some(at) = bed {
             drilling.retain(|(p, _)| *p != player);
-            drilling.push((player, q.pos()));
+            drilling.push((player, at));
             return Verdict::Abstain;
         }
         // The hold finishing comes back with nothing aimed at: let it through if a bed was.
