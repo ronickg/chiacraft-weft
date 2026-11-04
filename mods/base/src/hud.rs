@@ -250,7 +250,7 @@ pub fn register(r: &mut Registry) {
         });
     });
     // A framed picture per screen, its key beside it.
-    r.hud_element(&HUD_SHORTCUTS, hud_anchor::TOP_LEFT, 8, |ui| {
+    r.hud_element(&HUD_SHORTCUTS, hud_anchor::TOP_LEFT, 10, |ui| {
         ui.column(S::col().gap(2.0), |ui| {
             for name in SHORTCUTS {
                 ui.row(S::row().gap(3.0).center(), |ui| {
