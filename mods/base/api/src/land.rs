@@ -505,7 +505,16 @@ pub const ROCK_PATCHES: f64 = 0.22;
 pub const ROCK_MOSS: f64 = 0.25;
 /// The mesas' strata from the bottom up, repeating: each layer's rock, 1 to 3 blocks thick by the
 /// world's seed; the layers tilt gently, up to `STRATA_TILT` blocks over some 300.
-pub const STRATA: [&str; 6] = ["sandstone", "ochre_sandstone", "sandstone", "red_sandstone", "ochre_sandstone", "red_sandstone"];
+pub const STRATA: [&str; 8] = [
+    "sandstone",
+    "ochre_sandstone",
+    "cream_sandstone",
+    "red_sandstone",
+    "banded_clay",
+    "ochre_sandstone",
+    "cream_sandstone",
+    "red_sandstone",
+];
 pub const STRATA_TILT: i32 = 3;
 
 /// The engine's features of the land, in the order they're added; `mesas` and `rivers` go after
@@ -1051,6 +1060,8 @@ pub enum RockSet {
     Slate,
     Granite,
     Limestone,
+    /// The karst towers: weathered limestone, rain-streaked.
+    Karst,
 }
 
 /// The rocks of the face of column (`x`, `z`) (Q4), its ground `height` (blocks) high; `sandy`
@@ -1061,9 +1072,9 @@ pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet
     if sandy {
         RockSet::Strata
     } else if KARST_AREA.at(&here) > 0 {
-        // Karst towers are limestone however high they stand, and where the savanna's strata
-        // would be (kclusters: a striped tower at the warm edge).
-        RockSet::Limestone
+        // Karst towers are weathered limestone however high they stand, and where the savanna's
+        // strata would be (kclusters: a striped tower at the warm edge).
+        RockSet::Karst
     } else if t >= q12(SAVANNA.0) && hu < q12(SAVANNA.1) {
         RockSet::Strata
     } else if t < q12(TAIGA_BELOW) {
@@ -1093,6 +1104,9 @@ impl RockSet {
             RockSet::Granite => "granite",
             RockSet::Limestone if patch => "stone",
             RockSet::Limestone if low && mossy => "mossy_cobblestone",
+            RockSet::Karst if patch => "limestone",
+            RockSet::Karst if low && mossy => "mossy_cobblestone",
+            RockSet::Karst => "weathered_limestone",
             _ => "limestone",
         }
     }
