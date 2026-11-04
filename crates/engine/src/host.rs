@@ -249,6 +249,7 @@ pub static HOST: Host = Host {
     dim_column,
     dim_carved,
     dim_surface,
+    entity_tick_elapsed,
 };
 
 unsafe extern "C" fn fall_block(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u64 {
@@ -343,6 +344,16 @@ unsafe extern "C" fn navigate(w: *mut abi::WorldCtx, id: u64, target: *const [f6
 
 unsafe extern "C" fn navigating(w: *mut abi::WorldCtx, id: u64) -> u32 {
     unsafe { dim(w).entities.get(id).is_some_and(|e| e.nav.is_some()) as u32 }
+}
+
+unsafe extern "C" fn entity_tick_elapsed(w: *mut abi::WorldCtx, id: u64) -> u32 {
+    unsafe {
+        let d = dim(w);
+        d.entities
+            .get(id)
+            .filter(|e| e.ticked_at > 0)
+            .map_or(1, |e| d.time.saturating_sub(e.ticked_at).clamp(1, u32::MAX as u64) as u32)
+    }
 }
 
 unsafe extern "C" fn biome_at(w: *mut abi::WorldCtx, pos: *const [i32; 3]) -> u32 {

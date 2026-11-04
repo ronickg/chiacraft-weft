@@ -351,6 +351,39 @@ REDO2 = {
                    "fat edge and a glossy highlight, never grey" + C,
 }
 
+# third try at three hoes (Ronald 11-04: "Yes, retry hoes"): between the hammer and the hook
+HOE3 = ("a {t} hoe: a long plain {h} handle; across its top end one flat {m} blade shaped like a garden hoe, "
+        "about 10 px wide and 4-5 px tall, flat and plain, set at a right angle to the handle so the blade points "
+        "down-left; the blade clearly bigger than the handle is thick, but no block-shaped hammer head" + DIAG)
+REDO3 = {
+    "wood_hoe": HOE3.format(t="wooden", h="wooden", m="warm orange-brown carved wooden"),
+    "stone_hoe": HOE3.format(t="stone", h="wooden", m="chipped warm grey-tan stone, bound on with cream cord,"),
+    "diamond_hoe": HOE3.format(t="diamond", h="leather-wrapped", m="faceted cyan diamond"),
+}
+
+# new wild foods from the Voxel dog handoff's wild plants (Planner 11-04): new item ids, handed to that session
+WILD = [
+    ("cattail_root", "a cattail root: a pale cream-tan starchy rhizome lying diagonally, segmented with faint rings, "
+                     "a few thin brown root hairs, one cut end showing white starchy flesh"),
+    ("cooked_wild_rice", "a wooden bowl of cooked wild rice seen from the front and slightly above: long slender dark "
+                         "brown-black grains, some split open showing pale insides, a soft shine" + C),
+]
+
+# batch 5 redos and the diamond hoe once more (Ronald 11-04: "Yes, as suggested")
+REDO5 = {
+    "crowberries": "a small cluster of six glossy jet-black crowberries, each round berry big enough to see on its own "
+                   "with a blue-grey bloom and a white glint, on a sprig of short needle-like green leaves" + C,
+    "beans": "a handful of five dry kidney beans, clearly bean-shaped and glossy: speckled cream-and-pink-brown ones "
+             "and two plain dark red ones, each with a small pale eye, a soft shadow under them" + C,
+    "barley": "a bundle of ripe barley lying diagonally: three full golden ears with long dark-tipped bristly awns, "
+              "tied with a cord, strong contrast between the golden grains and their darker outline",
+    "rye": "a bundle of ripe rye lying diagonally: three long slender grey-gold ears with fine bristly awns, tied with "
+           "a cord, the grains clearly drawn with a light top and a darker outline, never washed out",
+    "melon_seeds": "a few big flat oval melon seeds, glossy dark brown with a paler rim and a white glint, five seeds "
+                   "spread a little apart on a tiny patch of dark soil" + C,
+    "diamond_hoe": HOE3.format(t="diamond", h="leather-wrapped", m="faceted cyan diamond, shaped like the stone one,"),
+}
+
 BATCHES = [
     ("1_tools", TOOLS, "base"),
     ("2_armour", ARMOUR, "base"),
@@ -359,6 +392,7 @@ BATCHES = [
     ("5_plants", PLANTS + SEEDS, "base"),
     ("6_misc", MISC + SPAWN, "base"),
     ("7_survival", SURVIVAL, "base"),
+    ("5c_wild", WILD, "base"),
 ]
 GREEN = {"sedative", "tranquilizer_dart", "spider_eye", "beetroot", "blackberries", "prickly_pear_fruit",
          "pig_spawn_egg", "sheep_spawn_egg", "earthworm", "dried_berries", "porkchop", "chicken"}
@@ -392,6 +426,12 @@ def main():
     json.dump([dict(byname[n], what=w) for n, w in REDO2.items()],
               open(os.path.join(HERE, "batches", "3b_redo.json"), "w"), indent=1)
     print(f"3b_redo: {len(REDO2)}")
+    json.dump([dict(byname[n], what=w) for n, w in REDO3.items()],
+              open(os.path.join(HERE, "batches", "5b_hoes.json"), "w"), indent=1)
+    print(f"5b_hoes: {len(REDO3)}")
+    json.dump([dict(byname[n], what=w) for n, w in REDO5.items()],
+              open(os.path.join(HERE, "batches", "5d_redo.json"), "w"), indent=1)
+    print(f"5d_redo: {len(REDO5)}")
     root = os.path.join(HERE, "..", "..", "..", "mods")
     have = {f[:-4] for m in ("base", "animals") for f in os.listdir(os.path.join(root, m, "assets", "textures", "item"))}
     print("in the game but not queued:", sorted(have - seen) or "none")

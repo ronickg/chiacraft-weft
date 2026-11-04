@@ -84,6 +84,8 @@ again (once or twice) rather than fixed by hand:
 - **Outline**: the edge is darker than the inside, and not the red-brown line (under 45% of the
   edge). A thing that is red-brown itself (a spider, a brown hide) has its own outline flagged
   as that line: look, and keep it if the outline is its own darker shade.
+  A dark, glossy thing (coal) has bright glints on its edges, so its edge measures lighter than
+  its inside and fails the outline rule too: look, and keep it if it reads right.
 - **Full faces** (a chest front, a workstation face, a cloud or star tile) fill their canvas: make
   them as tiles (`--tile`, blocks without `--cutout`), or the fill check fails them.
 - **Background**: flat magenta (or green) all round, nothing stray on it.

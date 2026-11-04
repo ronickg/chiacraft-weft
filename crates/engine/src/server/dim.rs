@@ -1298,6 +1298,7 @@ impl Dim {
         if !recovering {
             e.hurt_cooldown = 10;
         }
+        e.hurt_at = Some(e.age);
         let mut knocked: Option<[f32; 2]> = None;
         if let Some(from) = knock {
             let d = (e.pos - from).with_y(0.0).normalize_or_zero();
@@ -1594,7 +1595,7 @@ impl Dim {
         };
         let list = &mut self.entities.list;
         let due: Vec<usize> = (0..list.len())
-            .filter(|&i| walks(&list[i]) && list[i].nav.as_ref().is_some_and(|n| n.stale(list[i].age)))
+            .filter(|&i| walks(&list[i]) && !list[i].resting && list[i].nav.as_ref().is_some_and(|n| n.stale(list[i].age)))
             .take(PATHS_PER_TICK)
             .collect();
         let found: Vec<Vec<IVec3>> = due
@@ -1785,11 +1786,49 @@ impl Dim {
         }
     }
 
+    /// Entities no player is near rest: their kind's tick and their path finding run once in
+    /// `core:inactive_entity_interval` ticks, physics still every tick. Players, riders and
+    /// what they ride, block entities, `ALWAYS_ACTIVE` kinds and what burns or was just hurt
+    /// never rest.
+    fn mark_resting(&mut self, c: &Content, players: &[DVec3]) {
+        let near = crate::config::get(c.game.entity_activation_distance);
+        let every = (crate::config::get(c.game.inactive_entity_interval) as u64).max(1);
+        let ridden: FxHashSet<u64> = self
+            .entities
+            .list
+            .iter()
+            .filter_map(|e| e.mount.map(|m| m.0))
+            .collect();
+        let time = self.time;
+        for e in self.entities.list.iter_mut() {
+            e.resting = near > 0.0
+                && (time + e.id) % every != 0
+                && !e.player
+                && e.mount.is_none()
+                && e.anchor.is_none()
+                && e.fire == 0
+                && e.hurt_at.is_none_or(|h| e.age >= h + 100)
+                && !ridden.contains(&e.id)
+                && !c.game.entities[e.kind as usize].is(ef::ALWAYS_ACTIVE)
+                && players
+                    .iter()
+                    .all(|p| (*p - e.pos).length_squared() > near * near);
+        }
+    }
+
     fn tick_entities(&mut self, c: &'static Content) {
+        let players: Vec<DVec3> = self
+            .entities
+            .list
+            .iter()
+            .filter(|e| e.player && !e.removed)
+            .map(|e| e.pos)
+            .collect();
+        self.mark_resting(c, &players);
         // Mod logic: one call per kind and callback with every entity of that kind.
         let mut by_kind: FxHashMap<(u64, u32), Vec<u64>> = FxHashMap::default();
         for e in &self.entities.list {
-            if !e.removed && (!e.player || e.alive()) {
+            if !e.removed && !e.resting && (!e.player || e.alive()) {
                 by_kind
                     .entry((e.block_frame(), e.kind))
                     .or_default()
@@ -1806,6 +1845,19 @@ impl Dim {
                 self.in_frame(frame, |d| d.call(owner, cb, |w| abi::EntityTickArgs { world: w, kind, ids: ids_ptr, count }));
             }
         }
+        // What a resting entity was told to walk or fly at its last tick goes on (a jump was
+        // once).
+        let time = self.time;
+        for e in self.entities.list.iter_mut() {
+            if e.resting {
+                e.walk = e
+                    .walk
+                    .or(e.steering.0.map(|(dir, speed, _)| (dir, speed, false)));
+                e.fly = e.fly.or(e.steering.1);
+            } else {
+                (e.steering, e.ticked_at) = ((e.walk, e.fly), time);
+            }
+        }
         self.run_systems(c);
         for &(owner, cb) in &c.game.world_ticks {
             self.call(owner, cb, |w| abi::WorldTickArgs { world: w });
@@ -1816,13 +1868,6 @@ impl Dim {
         let gravity = c.dims[self.id as usize].gravity as f64;
         let day = self.daylight(c);
         let raining = self.raining;
-        let players: Vec<DVec3> = self
-            .entities
-            .list
-            .iter()
-            .filter(|e| e.player && !e.removed)
-            .map(|e| e.pos)
-            .collect();
         let cubes = &self.space.cubes;
         let block = |p: IVec3| cubes.get(&cube_of(p)).map(|cb| cb.get(local_index(p)));
         // Solid bodies move first, in list order, so riders and whatever they run into see where

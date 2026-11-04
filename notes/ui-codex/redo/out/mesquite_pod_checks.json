@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "mesquite pods: two long flat curved pale tan pods with bumps along the beans inside, lying diagonally",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.366,
+   "outline": 0.81,
+   "red_line": 0.0,
+   "fill": 0.34,
+   "passed": true
+  }
+ ]
+}

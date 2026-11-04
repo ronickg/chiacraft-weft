@@ -113,6 +113,7 @@ built, it gets its row below and its arrows above.
 | Eggs | `mods/animals/src/eggs.rs` | `animals_core::life::EGG_AIR` | air, nests | hatching |
 | Breeding | `mods/animals/src/breeding.rs` | `biology.rs` `breeds`, `peak` | calendar, bond, food | eggs, births, XP |
 | Difficulty | `base_api::DIFFICULTY` (a world rule) | `vitals::difficulty` | Create New World, `/rule difficulty` | player's body, eating, tames |
+| Entity ranges (engine) | `server/sync.rs` (`move_every`), `server/dim.rs` (`mark_resting`) | world rules `core:entity_send_distance` 96, `core:entity_activation_distance` 48, `core:inactive_entity_interval` 20 | players' positions | what each player is sent and how often; animals' and mobs' goals and paths far from players (once a second), `World::tick_elapsed` |
 | Damage causes | `abi::damage` | | | engine death messages (`server/mod.rs`, engine lang en, ru, fr) |
 | HUD | `mods/base/src/hud.rs`, `player.rs` | `hud_element` orders 0-8 | vitals, clock | |
 | UI art | `mods/base/source/ui/install.py` | the kit | generated sheets (`game-art` skill) | `mods/base/assets/textures/gui` |
@@ -170,6 +171,9 @@ built, it gets its row below and its arrows above.
 - **The stats** (names, order, a new one): both the player's (`vitals::stats::NAMES`) and the
   animals' (`STAT_NAMES`) must match (`places.rs` checks); both screens; the sheets.
 - **Difficulty numbers**: `vitals::difficulty`; the sheet.
+- **Anything an animal or mob counts down per tick** (a fuse, a timer, growing up): far from
+  players its kind ticks only once a second, so count down by `w.tick_elapsed(id)`, or keep a
+  due time. Projectiles and what must run every tick are `.always_active()`.
 
 ## Adding a new piece
 

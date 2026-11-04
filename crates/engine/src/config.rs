@@ -480,6 +480,14 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::text("core:shader_pack", ""),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:mob_spawning", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:simulation_distance", ck::INT, 8.0, 2.0, 64.0, 1.0) },
+        // Entities are sent to players within this many blocks (at most the simulation
+        // distance); their moves every tick within a third of it, every 2nd within two
+        // thirds, every 4th beyond.
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:entity_send_distance", ck::INT, 96.0, 16.0, 1024.0, 16.0) },
+        // Entities with no player this near tick their mods and paths only once in
+        // `core:inactive_entity_interval` ticks; 0: all tick every tick.
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:entity_activation_distance", ck::INT, 48.0, 0.0, 512.0, 16.0) },
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:inactive_entity_interval", ck::INT, 20.0, 1.0, 200.0, 1.0) },
     ];
     out.extend(
         keys.iter()

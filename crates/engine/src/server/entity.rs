@@ -45,6 +45,17 @@ pub struct Entity {
     pub selected: u32,
     pub anchor: Option<IVec3>,
     pub sent: Option<(DVec3, f32, f32, crate::world::Pose)>,
+    /// The server tick it last moved (as sent to clients): a player whose move was skipped
+    /// this tick (`server::sync`, far ones every few ticks) gets the one it missed later.
+    pub moved_at: u64,
+    /// Its `age` when it was last hurt: it stays active (`Dim::tick_entities`) a while after.
+    pub hurt_at: Option<u64>,
+    /// Its kind's tick skips it this tick: no player is near (`Dim::tick_entities`).
+    pub resting: bool,
+    /// The time its kind last ticked it (0: not yet).
+    pub ticked_at: u64,
+    /// The `walk` and `fly` its kind's tick gave it last: they go on while it rests.
+    pub steering: (Option<([f32; 2], f32, bool)>, Option<([f32; 3], f32)>),
     /// Worn items as last sent to clients.
     pub worn: Vec<u32>,
     /// The solid body it rides (stands on, or flies above within its carry height).
@@ -128,6 +139,11 @@ impl Entity {
             selected: 0,
             anchor: None,
             sent: None,
+            moved_at: 0,
+            hurt_at: None,
+            resting: false,
+            ticked_at: 0,
+            steering: (None, None),
             worn: Vec::new(),
             frame: None,
             motion: Motion::Free,
