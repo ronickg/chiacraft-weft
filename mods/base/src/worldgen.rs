@@ -254,7 +254,7 @@ pub fn register(r: &mut Registry) {
     // groves and glades instead of trees spread evenly.
     r.scatter(&TREE_SITES)
         .cell(5)
-        .reach(5)
+        .reach(8)
         .density(&TREES)
         .shape(|s| {
             if STAND_TREES.on_biome(s.biome()).is_some() && stand(s.seed(), s.pos()) < -CLEARING && s.random() % 4 != 0 {
@@ -264,7 +264,7 @@ pub fn register(r: &mut Registry) {
         });
     r.scatter(&STAND_SITES)
         .cell(3)
-        .reach(5)
+        .reach(8)
         .density(&STAND_TREES)
         .shape(|s| {
             if stand(s.seed(), s.pos()) > STAND {
