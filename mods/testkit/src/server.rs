@@ -416,6 +416,8 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(format!("{} {}", g.len(), (0..g.len()).filter(|&i| !g.get(i).is_empty()).count()))
     }),
     ("pings", "", |_, _, _, _| Ok(PINGS.load(Ordering::Relaxed).to_string())),
+    // How many players the world has (scripts: `until players 2`).
+    ("players", "", |w, _, _, _| Ok(w.players().len().to_string())),
     ("setprop", "<pos:pos> <prop:word> <value:word>", |w, cmd, _, _| {
         Ok((w.set_prop(pos(cmd, "pos")?, word(cmd, "prop")?, word(cmd, "value")?) as u32).to_string())
     }),

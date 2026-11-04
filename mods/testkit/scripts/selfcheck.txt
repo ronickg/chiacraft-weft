@@ -1,0 +1,28 @@
+# testkit's own check of the script words (expect, until, the step names). One copy, any world.
+# Every expect here should pass; the last block of lines must fail on purpose (see the end).
+loaded
+idle
+chat /tk mode creative
+until mode creative within 10
+chat /tk fill ~-2 ~-1 ~-2 ~2 ~-1 ~2 base:stone
+until block ~ ~-1 ~ stone within 10
+expect block ~1 ~-1 ~1 base:stone
+expect alive
+chat /tk mode survival
+until mode survival within 10
+until on_ground within 20
+expect near ~ ~ ~ 0.5
+expect health > 0
+expect screen none
+expect players 1
+chat hello from the selfcheck
+until chat hello from the selfcheck within 10
+press core:inventory
+until screen core:inventory within 10
+key Escape
+until screen none within 10
+# On purpose: these two must fail, and the report must name lines 25 and 26.
+expect block ~ ~-1 ~ base:dirt
+expect health > 1000
+wait 1
+quit
