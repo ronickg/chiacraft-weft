@@ -378,10 +378,36 @@ enum Piece {
 /// The phrases a coat's name is made of that read as one in a translation ("Dark brown" is one
 /// word in Russian, "and tan" one phrase), longest first; the other words are translated each.
 const COAT_PHRASES: [&str; 30] = [
-    "darker grey back", "breathes lightning", "breathes venom", "breathes frost", "breathes fire", "golden nape",
-    "Grizzled buff", "Glossy black", "Rufous brown", "Female brown", "Sandy brown", "winter coat", "Rusty brown",
-    "Tawny grey", "Sandy grey", "Warm brown", "Dark brown", "Dark olive", "with white", "Light tan", "black bib",
-    "Pale gold", "Pale grey", "Pale sand", "Pale buff", "Warm sand", "Dark grey", "Deep gold", "grey back", "and tan",
+    "darker grey back",
+    "breathes lightning",
+    "breathes venom",
+    "breathes frost",
+    "breathes fire",
+    "golden nape",
+    "Grizzled buff",
+    "Glossy black",
+    "Rufous brown",
+    "Female brown",
+    "Sandy brown",
+    "winter coat",
+    "Rusty brown",
+    "Tawny grey",
+    "Sandy grey",
+    "Warm brown",
+    "Dark brown",
+    "Dark olive",
+    "with white",
+    "Light tan",
+    "black bib",
+    "Pale gold",
+    "Pale grey",
+    "Pale sand",
+    "Pale buff",
+    "Warm sand",
+    "Dark grey",
+    "Deep gold",
+    "grey back",
+    "and tan",
 ];
 
 /// A coat's name ("Fawn sable with white", made in `animals_core::coats` from its genes) as pieces
@@ -391,14 +417,18 @@ fn coat_pieces(name: &str) -> Vec<Piece> {
     let mut out = Vec::new();
     let mut rest = name;
     while !rest.is_empty() {
-        if let Some(p) = COAT_PHRASES.iter().find(|p| {
-            rest.starts_with(**p) && !rest[p.len()..].starts_with(|c: char| c.is_alphabetic() || c == '-')
-        }) {
+        if let Some(p) = COAT_PHRASES
+            .iter()
+            .find(|p| rest.starts_with(**p) && !rest[p.len()..].starts_with(|c: char| c.is_alphabetic() || c == '-'))
+        {
             out.push(Piece::Key(format!("coat.{}", p.replace(' ', "_"))));
             rest = &rest[p.len()..];
             continue;
         }
-        let word: String = rest.chars().take_while(|c| c.is_alphabetic() || *c == '-').collect();
+        let word: String = rest
+            .chars()
+            .take_while(|c| c.is_alphabetic() || *c == '-')
+            .collect();
         if word.is_empty() {
             let sep: String = rest.chars().take_while(|c| !c.is_alphabetic()).collect();
             rest = &rest[sep.len()..];
@@ -1384,7 +1414,9 @@ mod coat_name_tests {
     use super::*;
 
     fn keys(lang: &str) -> std::collections::HashSet<String> {
-        lang.lines().filter_map(|l| l.split_once(" = ").map(|(k, _)| k.trim().to_string())).collect()
+        lang.lines()
+            .filter_map(|l| l.split_once(" = ").map(|(k, _)| k.trim().to_string()))
+            .collect()
     }
 
     /// Every word and phrase of every coat a species can have has its translation in English and
