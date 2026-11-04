@@ -27,12 +27,17 @@ printf "name = bob\nlisting_deposit = 1000000\n" > run-finder-bob/config/core.tx
 
 Alice's log:
 - `world DID did:chia:1… is listed in its owner's DID`
-- the listing pushed, then seen on chain (`listing.json` in her world folder, `confirmed: true`)
+- the listing pushed (if the mempool is full: `listing: the mempool is full, pushing again in a
+  minute`, up to ten times), then seen on chain (`listing.json` in her world folder, `confirmed: true`)
+- `'finder-alice-…' is listed: hosting it under its own key <key>`, then `hosting 'finder-alice-…' at
+  chiacraft://w/<key>…`: a listed world that is open is hosted by itself, under the key its listing
+  names (no need to press Host on Multiplayer)
 - after the delist, the listing gone and its coin spent back to her
 
 Bob's log:
 - `finder: 1 listed worlds check out, 0 left out` (more if others listed on testnet11)
-- `finder: 1 of 1 listed worlds online`
+- `finder: 1 of 1 listed worlds online` (older listings of worlds no one has open show as offline,
+  with no Join button: delisting at the end keeps testnet11 tidy for the next run)
 - `bob joined` in alice's log
 
 Shots:

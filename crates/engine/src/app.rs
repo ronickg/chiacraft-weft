@@ -1037,6 +1037,23 @@ impl Running {
     }
 
     /// Plays in the world `server` runs in this process.
+    /// A listed world is there to be found: while it is open it is hosted under its own key, the
+    /// one its listing names, without its owner opening it to others on Multiplayer. Otherwise
+    /// every finder saw it offline (finder3, 11-04).
+    fn host_if_listed(&mut self) {
+        if net::p2p::HOSTING.lock().is_some() {
+            return;
+        }
+        if let Some(Game { server: Some(s), identity: Some(id), world, .. }) = &self.game
+            && s.dir
+                .as_deref()
+                .is_some_and(|d| crate::chiacraft::worlds::listing::load(d).is_some())
+        {
+            log::info!("'{world}' is listed: hosting it under its own key {}", id.key());
+            net::host(s, id.clone(), world, &self.settings);
+        }
+    }
+
     fn play_local(&mut self, server: ServerHandle, world: String, identity: Option<Arc<crate::world_address::WorldIdentity>>) {
         crate::admission::set_local_world(server.dir.clone(), identity.clone());
         let (client_conn, server_conn) = net::local_pair();
@@ -1057,6 +1074,7 @@ impl Running {
                 // The synced settings the player changes here are this world's.
                 crate::config::playing_in(Some(server.configs.clone()));
                 self.game = Some(Game { client, server: Some(server), world, identity });
+                self.host_if_listed();
                 self.screens.clear();
                 self.hud.invalidate();
                 self.quads_dirty = true;
@@ -2159,6 +2177,9 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     }
     f3_keys(r);
     toggle_keys(r);
+    if crate::chiacraft::worlds::listing::HOST_NOW.swap(false, std::sync::atomic::Ordering::Relaxed) {
+        r.host_if_listed();
+    }
     if r.packs_pending
         && !r
             .screens

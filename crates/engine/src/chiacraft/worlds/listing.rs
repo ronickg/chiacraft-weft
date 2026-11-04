@@ -51,6 +51,37 @@ fn save(world: &Path, l: &Listed) -> Result<(), String> {
 /// What the listing is doing, for the owner's screen: a lang key and its arguments.
 static STATE: parking_lot::Mutex<(String, Vec<String>)> = parking_lot::Mutex::new((String::new(), Vec::new()));
 static BUSY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Raised when a world is listed: the game hosts it now if it is open (`app`), so the key its
+/// listing names answers.
+pub static HOST_NOW: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// What a full mempool answers a spend with no fee (testnet11 at busy times): the same spend,
+/// pushed again a minute later, goes in once it empties.
+const MEMPOOL_FULL: &str = "INVALID_FEE_TOO_CLOSE_TO_ZERO";
+const MEMPOOL_TRIES: u32 = 10;
+
+fn mempool_full(push: &chiacraft_wallet::chain::PushOutcome) -> bool {
+    matches!(push, chiacraft_wallet::chain::PushOutcome::Rejected { error, .. } if error.contains(MEMPOOL_FULL))
+}
+
+/// Pushes with `push` until the mempool takes it or refuses it for another reason, a minute
+/// apart while it is full (finder3, 11-04: the listing was refused once and the check went on
+/// without it).
+fn push_while_full<T>(
+    mut push: impl FnMut() -> Result<(chiacraft_wallet::chain::PushOutcome, T), String>,
+) -> Result<(chiacraft_wallet::chain::PushOutcome, T), String> {
+    let mut tries = 1;
+    loop {
+        let (outcome, value) = push()?;
+        if !mempool_full(&outcome) || tries >= MEMPOOL_TRIES {
+            return Ok((outcome, value));
+        }
+        log::info!("listing: the mempool is full, pushing again in a minute ({tries} of {MEMPOOL_TRIES})");
+        set("listing.mempool_full", &[]);
+        tries += 1;
+        std::thread::sleep(std::time::Duration::from_secs(60));
+    }
+}
 
 fn set(key: &str, args: &[String]) {
     *STATE.lock() = (key.to_string(), args.to_vec());
@@ -118,9 +149,11 @@ pub fn list(settings: &crate::settings::Settings, dir: PathBuf) {
             return Err("the wallet isn't synced with the chain".into());
         }
         let keys = wallet_keys(network)?;
-        let (push, coin) = reader
-            .list_world(&keys, owner, &world, world_did, deposit, 0, std::time::Duration::from_secs(60))
-            .map_err(|e| e.to_string())?;
+        let (push, coin) = push_while_full(|| {
+            reader
+                .list_world(&keys, owner, &world, world_did, deposit, 0, std::time::Duration::from_secs(60))
+                .map_err(|e| e.to_string())
+        })?;
         if matches!(push, chiacraft_wallet::chain::PushOutcome::Rejected { .. }) {
             return Err(format!("the chain refused it: {push:?}"));
         }
@@ -132,6 +165,7 @@ pub fn list(settings: &crate::settings::Settings, dir: PathBuf) {
             confirmed: false,
         };
         save(&dir, &listed)?;
+        HOST_NOW.store(true, std::sync::atomic::Ordering::Relaxed);
         log::info!("listing world {} with a deposit of {} TXCH (coin {})", did.did(), txch(deposit), coin.coin_id());
         // On chain once the finders see it.
         let until = std::time::Instant::now() + std::time::Duration::from_secs(900);
@@ -170,9 +204,12 @@ pub fn delist(settings: &crate::settings::Settings, dir: PathBuf) {
             return Err("the wallet isn't synced with the chain".into());
         }
         let keys = wallet_keys(network)?;
-        let push = reader
-            .delist_world(&keys, coin, 0, std::time::Duration::from_secs(60))
-            .map_err(|e| e.to_string())?;
+        let (push, ()) = push_while_full(|| {
+            reader
+                .delist_world(&keys, coin, 0, std::time::Duration::from_secs(60))
+                .map(|p| (p, ()))
+                .map_err(|e| e.to_string())
+        })?;
         if matches!(push, chiacraft_wallet::chain::PushOutcome::Rejected { .. }) {
             return Err(format!("the chain refused it: {push:?}"));
         }
@@ -199,5 +236,24 @@ mod tests {
         let l = Listed { parent: "11".repeat(32), puzzle_hash: "22".repeat(32), amount: 5, did: "33".repeat(32), confirmed: false };
         let c = l.coin().unwrap();
         assert_eq!((c.parent_coin_info, c.puzzle_hash, c.amount), (Bytes32::new([0x11; 32]), Bytes32::new([0x22; 32]), 5));
+    }
+
+    /// finder3 (11-04): the listing was refused for want of a fee while testnet11's mempool was
+    /// full. That refusal is pushed again; any other is final, and so is a spend that went in.
+    #[test]
+    fn only_a_full_mempool_is_tried_again() {
+        use chiacraft_wallet::chain::PushOutcome;
+        let txid = Bytes32::new([0; 32]);
+        let rejected = |e: &str| PushOutcome::Rejected { txid, error: e.into() };
+        assert!(mempool_full(&rejected("INVALID_FEE_TOO_CLOSE_TO_ZERO")));
+        assert!(!mempool_full(&rejected("DOUBLE_SPEND")));
+        assert!(!mempool_full(&PushOutcome::Accepted { txid }));
+        let mut pushes = 0;
+        let out = push_while_full(|| {
+            pushes += 1;
+            Ok((rejected("DOUBLE_SPEND"), ()))
+        });
+        assert!(matches!(out, Ok((PushOutcome::Rejected { .. }, ()))));
+        assert_eq!(pushes, 1, "a final refusal is not pushed again");
     }
 }

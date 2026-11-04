@@ -71,10 +71,15 @@ impl Screen for FinderScreen {
                                         }
                                     }
                                 });
-                                let address = w.key.clone();
-                                let id =
-                                    button(ui, cx, "multiplayer.join", &[], 60.0, move |c| c.requests.push(Request::Join(address.clone())));
-                                ui.set_id(id, &format!("finder_join{i}"));
+                                // Only a world that answered: an offline one says so above, and
+                                // joining it could only fail ("no addressing information").
+                                if w.status.is_some() {
+                                    let address = w.key.clone();
+                                    let id = button(ui, cx, "multiplayer.join", &[], 60.0, move |c| {
+                                        c.requests.push(Request::Join(address.clone()))
+                                    });
+                                    ui.set_id(id, &format!("finder_join{i}"));
+                                }
                             });
                         });
                     }
