@@ -1,0 +1,43 @@
+# The same in Russian (--config core:language=ru_ru).
+# The knapping screen in kit 2 (UI redo, 11-05): the axe head's nodule, half struck, freed (the
+# half second it stays); then the pick head's, struck inside its outline, broken.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 2
+look 0 -40
+wait 0.5
+chat /knap axe
+wait 1.5
+shot ru_kn_01_axe.png
+tap_once base:knapping class:knap_stone
+wait 0.4
+tap_once base:knapping class:knap_stone
+wait 0.4
+tap_once base:knapping class:knap_stone
+wait 0.4
+tap_once base:knapping class:knap_stone
+wait 0.6
+shot ru_kn_02_half.png
+tap_once base:knapping class:knap_stone
+wait 0.4
+tap_once base:knapping class:knap_stone
+wait 0.4
+tap_once base:knapping class:knap_stone
+wait 0.4
+tap_once base:knapping class:knap_stone
+wait 0.15
+shot ru_kn_03_freed.png
+wait 1.5
+chat /knap pick
+wait 1.5
+shot ru_kn_04_pick.png
+tap_once base:knapping class:knap_head
+wait 0.15
+shot ru_kn_05_broken.png
+wait 1.5
+chat /knap shovel
+wait 1.5
+shot ru_kn_06_shovel.png
+quit
