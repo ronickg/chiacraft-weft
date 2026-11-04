@@ -975,22 +975,26 @@ impl Lod {
         self.split = split;
     }
 
-    /// Asks for the wanted tiles not made yet, or made before columns changed, coarse levels first
-    /// (Distant Horizons' order: the whole view is covered soonest, as a tile costs the same at
-    /// every level), nearest first within a level. A missing tile's parent goes first too: it
-    /// stands in, one level coarser, until the tile is made, rather than a far coarser tile
-    /// that hides every finished one under it, or nothing.
+    /// Asks for the wanted tiles not made yet, or made before columns changed, nearest first in
+    /// tile widths (distance over size): coarse before fine where they are as near, as a tile
+    /// costs the same at every level (Distant Horizons loads coarse first), while the land by the
+    /// camera still comes before the horizon (strictly coarse first left holes beside the player
+    /// for the first seconds). A missing tile's parent goes first too, being half as many widths
+    /// away: it stands in, one level coarser, until the tile is made, rather than a far coarser
+    /// tile that hides every finished one under it, or nothing.
     fn request(&mut self) {
         let c = content();
         let custom = self.custom.clone().unwrap();
         let columns = if self.columns_dim == self.dim { self.columns.clone() } else { Arc::default() };
-        let mut order: Vec<(u32, usize, TileKey)> = Vec::new();
+        let p = self.wanted_at.map_or(glam::DVec2::ZERO, |w| w.0);
+        let widths = |k: TileKey| k.distance(p).0 / k.size() as f64;
+        let mut order: Vec<(f64, TileKey)> = Vec::new();
         let mut parents = FxHashSet::default();
-        for (n, &key) in self.wanted.iter().enumerate() {
+        for &key in &self.wanted {
             if self.ready.contains(&key) && !self.stale.contains(&key) {
                 continue;
             }
-            order.push((key.level, n, key));
+            order.push((widths(key), key));
             // A stale tile still shows as it was: no stand-in for it.
             let up = key.parent();
             if !self.ready.contains(&key)
@@ -999,11 +1003,11 @@ impl Lod {
                 && !key.children().iter().all(|k| self.ready.contains(k))
                 && parents.insert(up)
             {
-                order.push((up.level, n, up));
+                order.push((widths(up), up));
             }
         }
-        order.sort_by_key(|&(level, n, _)| (std::cmp::Reverse(level), n));
-        for (_, _, key) in order {
+        order.sort_by(|a, b| a.0.total_cmp(&b.0).then(b.1.level.cmp(&a.1.level)));
+        for (_, key) in order {
             if self.pending.len() >= IN_FLIGHT {
                 break;
             }
