@@ -299,12 +299,12 @@ pub const RIVER_SINK_RADIUS: (i32, i32) = (24, 80);
 pub const RIVER_RAIN: (f64, f64, f64) = (-0.25, 0.05, 0.15);
 /// Flow, in wet nodes' rain: a dry gully starts at `.0`, the river reaches the water at `.1`
 /// (between, the gully deepens), and it is full size at `.2`.
-pub const RIVER_FLOW: (f64, f64, f64) = (3.0, 10.0, 120.0);
+pub const RIVER_FLOW: (f64, f64, f64) = (2.5, 6.0, 80.0);
 /// The channel's half width and its depth under the sea in the middle, and the floodplain beside
 /// it, flush with the water (blocks; the smallest river's, the full one's).
-pub const RIVER_HALF_WIDTH: (i32, i32) = (2, 9);
+pub const RIVER_HALF_WIDTH: (i32, i32) = (3, 12);
 pub const RIVER_DEPTH: (i32, i32) = (3, 6);
-pub const RIVER_FLOODPLAIN: (i32, i32) = (1, 10);
+pub const RIVER_FLOODPLAIN: (i32, i32) = (2, 12);
 /// Then the valley's sides rise to the land over `RIVER_BANKS` blocks, plus
 /// `RIVER_VALLEY_PER_BLOCK` (sixteenths) for each block the land stands over the sea, counted up
 /// to `RIVER_VALLEY_RISE`.
