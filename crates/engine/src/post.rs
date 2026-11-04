@@ -191,8 +191,17 @@ impl Post {
     /// Runs the effects over the scene; the last one draws onto the screen and leaves that pass
     /// open for the UI. `frame` is the world's size: the screen's, or less (`render_scale`), when
     /// the last pass also scales it up. With no effect on, that is one plain pass.
-    /// `scene` is the buffer the world was drawn with (`gpu_layout::Scene`).
-    pub fn apply(&mut self, gpu: &mut dyn Backend, list: &mut CommandList, frame: &FrameInfo, scene: Option<BufferId>, depth: u32) {
+    /// `scene` is the buffer the world was drawn with (`gpu_layout::Scene`); `scaled`, that the
+    /// world is drawn smaller than the screen.
+    pub fn apply(
+        &mut self,
+        gpu: &mut dyn Backend,
+        list: &mut CommandList,
+        frame: &FrameInfo,
+        scene: Option<BufferId>,
+        depth: u32,
+        scaled: bool,
+    ) {
         let (Some(pipe), Some((tex, idx, _))) = (self.pipeline, self.targets) else { return };
         let scene = match scene {
             Some(b) => b,
@@ -227,12 +236,22 @@ impl Post {
             .collect();
         let mut passes = passes;
         // Merged (`packs::merge_effects`): one pass runs them all, the first's `pad` their count.
-        let n = if n > 1 && crate::packs::merge_effects() {
+        let mut n = if n > 1 && crate::packs::merge_effects() {
             passes[0].pad = n as u32;
             1
         } else {
             n
         };
+        // With the world drawn smaller than the screen, the effects stay at the world's size and a
+        // plain pass (slot 0) scales the last one's image up. As the last pass, an effect drew
+        // straight onto the screen and ran per screen pixel: with the effects merged into one, all
+        // of them, 2.25 times the work at a 0.67 render scale (the Mac's effects after a flight over
+        // water took 6-7.8 ms, Planner 11-04).
+        if scaled && !self.active.is_empty() && n < MAX_PASSES {
+            passes.truncate(n);
+            passes.push(Pass { scene: idx[n % 2], slot: 0, strength: 1.0, pad: 0, ..passes[0] });
+            n += 1;
+        }
         let buf = self.params[frame.slot];
         gpu.mapped(buf)[..passes.len() * size_of::<Pass>()].copy_from_slice(bytemuck::cast_slice(&passes));
         for i in 0..n {
