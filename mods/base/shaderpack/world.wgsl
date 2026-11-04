@@ -364,6 +364,9 @@ fn wave_height(p: vec2<f32>, t: f32, detail: f32) -> f32 {
     h += (noise3(vec3(q.x, t * 0.25, q.y)) - 0.5) * 0.07 * detail;
     let q2 = p * 1.4 + side * t * 0.3;
     h += (noise3(vec3(q2.x, t * 0.4 + 7.0, q2.y)) - 0.5) * 0.03 * detail;
+    // A fine, quick chop close by, where the sun's highlight should sparkle on it.
+    let q3 = p * 3.2 + vec2(t * 0.9, -t * 0.6);
+    h += (noise3(vec3(q3.x, t * 0.8 + 13.0, q3.y)) - 0.5) * 0.024 * detail * detail;
     return h * (0.6 + 0.4 * smoothstep(1.0, 8.0, speed));
 }
 
@@ -524,19 +527,24 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
         shore = shore_distance(in.pos);
     }
     let ndv = max(dot(n, v), 0.02);
-    let fresnel = 0.04 + 0.96 * pow(1.0 - ndv, 4.0);
+    // A near mirror at an ordinary look, as in the reference pictures: most of what it shows is
+    // what it reflects (the screen's reflections, `post/reflect.wgsl`, use the same).
+    let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.5);
     let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos);
-    // What the light in the water sends back up: turquoise in the shallows, deep blue further down,
-    // in the biome's own tint (a swamp's brown-green), with a little of the texture's pattern near.
-    let tint = in.color / max(max(in.color.r, max(in.color.g, in.color.b)), 1e-3);
+    // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
+    // further down so that what it mirrors carries, in a little of the biome's own tint (a swamp's
+    // brown-green; the plain blue of most biomes' water is half taken out), with a little of the
+    // texture's pattern near.
+    let raw = in.color / max(max(in.color.r, max(in.color.g, in.color.b)), 1e-3);
+    let soft = mix(vec3(luma(raw)), raw, 0.5);
+    let tint = soft / max(luma(soft), 0.2) * 0.8;
     let pattern = mix(1.0, clamp(luma(albedo.rgb) / 0.55, 0.8, 1.2), 1.0 - smoothstep(8.0, 24.0, in.dist));
-    // The biome's tint counts for more where it is deep (a swamp's brown-green); the shallows keep
-    // their turquoise.
-    let shallow = vec3(0.06, 0.30, 0.27);
-    let deep = vec3(0.012, 0.05, 0.085);
+    // The biome's tint counts for more where it is deep; the shallows keep their own color.
+    let shallow = vec3(0.07, 0.27, 0.20);
+    let deep = vec3(0.010, 0.040, 0.036);
     let deepness = 1.0 - exp(-0.35 * depth);
-    let scatter = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.3, 0.7, deepness)) * pattern * lit;
+    let scatter = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
     // How much of the bottom shows: the way through the water to it, longer at a slant; never all
     // of it, so even the shallowest water tints what lies under it.
     let through = exp(-0.28 * depth / max(v.y, 0.2)) * 0.82;
@@ -550,7 +558,14 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     let a2 = 0.0016;
     let dd = nh * nh * (a2 - 1.0) + 1.0;
     let spec = a2 / (3.14159 * dd * dd) * (0.02 + 0.98 * pow(1.0 - max(dot(v, hv), 0.0), 5.0)) * 0.25;
-    let glint = palette().sun * light_strength() * min(spec, 40.0) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
+    // Toward a low sun the path stays orange: capped lower, so only its red reaches white.
+    // Sparkle: a much sharper highlight on the fine chop close by, one texel of the surface at a
+    // time (its normal is on the pixel grid there), flickering as the chop moves.
+    let a2s = 0.00012;
+    let ds = nh * nh * (a2s - 1.0) + 1.0;
+    let near = 1.0 - smoothstep(12.0, 40.0, in.dist);
+    let sparkle = a2s / (3.14159 * ds * ds) * 0.02 * near;
+    let glint = palette().sun * light_strength() * min(spec + sparkle, mix(40.0, 8.0, golden())) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
     // Foam where it laps the land, in a wobbling line on the pixel grid.
     let px = floor(in.pos.xz * 16.0) / 16.0;
     let wobble = noise3(vec3(px.x * 2.0, scene.params.w * 0.6, px.y * 2.0));

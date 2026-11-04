@@ -55,7 +55,8 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 fn palette() -> Palette {
     let e = scene.sun.y;
     let day = key(vec3(0.09, 0.26, 0.85), vec3(0.42, 0.60, 0.95), vec3(1.0, 0.92, 0.78), vec3(1.15, 0.98, 0.76), vec3(0.20, 0.27, 0.42));
-    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.78, 0.66, 0.62), vec3(1.0, 0.72, 0.42), vec3(1.45, 0.95, 0.52), vec3(0.22, 0.24, 0.38));
+    // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
@@ -112,7 +113,9 @@ fn light_strength() -> f32 {
 fn sun_glow(dir: vec3<f32>, p: Palette) -> vec3<f32> {
     let mu = max(dot(dir, scene.sun.xyz), 0.0);
     let horizon = 1.0 - clamp(dir.y, 0.0, 1.0);
-    let wide = pow(mu, 5.0) * (0.2 + 0.28 * horizon);
+    // Less of the wide glow in golden hour, so the sky round a low sun stays orange instead of
+    // washing out to white.
+    let wide = pow(mu, 5.0) * (0.2 + 0.28 * horizon) * (1.0 - 0.35 * golden());
     let near = pow(mu, 60.0) * 0.75;
     return p.glow * (wide + near);
 }
@@ -466,9 +469,59 @@ fn haze(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
 }
 
 // `haze` for a point with `sky` (0..1) sky light: fog gathers only out under the sky.
+// The water itself seen from inside it: teal, lit by the sky and the sun above (the engine's water
+// fog is a dark navy). Its fog is blue rather than lava's red, so lava keeps the engine's.
+fn in_water() -> bool {
+    return in_liquid() && scene.fog_color.b > scene.fog_color.r;
+}
+
+fn underwater_color() -> vec3<f32> {
+    let p = palette();
+    let light = p.ambient * 1.4 + p.sun * light_strength() * 0.5;
+    return vec3(0.06, 0.27, 0.25) * light * 2.2;
+}
+
+// Where the water's surface is above the eye under water: the sea's, or just over the eye in a
+// lake higher up.
+fn water_surface() -> f32 {
+    return max(SEA_LEVEL, scene.eye.y + 0.5);
+}
+
+// The water between the eye and a point `rel` away, from inside it: bright teal near the surface,
+// darker as it goes down, clear for about 20 blocks (the engine's water fog is a few), and beams of
+// sunlight slanting down through it, broken up by the waves above. Six steps along the way.
+fn under_water(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let dist = length(rel);
+    let surface = water_surface();
+    let y = scene.eye.y + rel.y;
+    let down = exp(-max(surface - y, 0.0) / 28.0);
+    let fog = underwater_color() * mix(0.35, 1.0, down);
+    var out = mix(c * mix(0.6, 1.0, down), fog, 1.0 - exp(-dist / 18.0));
+    let l = light_dir();
+    if l.y > 0.05 && light_strength() > 0.0 {
+        let reach = min(dist, 32.0);
+        let t = scene.params.w;
+        var beams = 0.0;
+        for (var i = 0; i < 6; i++) {
+            let at = rel * ((f32(i) + 0.5) / 6.0) * (reach / max(dist, 1e-4));
+            let wy = scene.eye.y + at.y;
+            // Straight up the light to the surface: where it came through.
+            let q = (at.xz + scene.eye.xz) + l.xz / l.y * (surface - wy);
+            let n = noise3(vec3(q.x * 0.18, t * 0.06, q.y * 0.18));
+            beams += pow(1.0 - abs(n * 2.0 - 1.0), 6.0) * exp(-max(surface - wy, 0.0) / 20.0);
+        }
+        let p = palette();
+        out += p.sun * light_strength() * vec3(0.55, 0.95, 0.85) * beams * (reach / 6.0) * 0.012;
+    }
+    return out;
+}
+
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     let dist = length(rel);
+    if in_water() {
+        return under_water(c, rel);
+    }
     if in_liquid() || !open_sky() {
         return mix(c, scene.fog_color.rgb, fog_amount(dist, scene.params.x, scene.params.y));
     }
