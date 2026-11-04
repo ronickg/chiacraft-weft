@@ -11,6 +11,10 @@
 //! → 400/403/429 { "error": "…" }
 //! ```
 //!
+//! A request also carries `work`, a nonce that makes the SHA-256 of [`work_text`] start with as
+//! many zero bits as the sponsor asks for (its status says how many): identities cost nothing to
+//! make, so each DID asked for costs some seconds of CPU instead (research round 4, P7).
+//!
 //! The signed text is `chiacraft sponsor v1 <address> <unix seconds>`, signed by the account's
 //! identity key as a Chia signed message (CHIP-0002, [`crate::sign`]). The identity key names who
 //! asked (a sponsor's daily budget per identity); the address is where the DID goes. Nothing in a
@@ -28,6 +32,24 @@ pub fn text(address: &str, time: u64) -> String {
     format!("chiacraft sponsor v1 {address} {time}")
 }
 
+/// What the proof of work hashes: the request's address, time and identity, and the nonce.
+pub fn work_text(address: &str, time: u64, identity: &str, nonce: u64) -> String {
+    format!("chiacraft sponsor work v1 {address} {time} {identity} {nonce}")
+}
+
+/// The zero bits a SHA-256 starts with.
+fn zero_bits(hash: &[u8]) -> u32 {
+    let mut n = 0;
+    for b in hash {
+        if *b == 0 {
+            n += 8;
+        } else {
+            return n + b.leading_zeros();
+        }
+    }
+    n
+}
+
 /// The request's JSON body.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Request {
@@ -36,6 +58,9 @@ pub struct Request {
     pub identity: String,
     pub signature: String,
     pub time: u64,
+    /// The proof of work's nonce ([`work_text`]).
+    #[serde(default)]
+    pub work: u64,
 }
 
 impl Request {
@@ -48,7 +73,25 @@ impl Request {
             identity: signer.identity().hex(),
             signature: crate::keys::hex(&signature),
             time,
+            work: 0,
         })
+    }
+    /// The zero bits this request's proof of work reaches.
+    pub fn work_bits(&self) -> u32 {
+        use sha2::{Digest, Sha256};
+        zero_bits(&Sha256::digest(work_text(&self.address, self.time, &self.identity, self.work).as_bytes()))
+    }
+    /// Find a nonce reaching `bits` zero bits (about 2^bits hashes: 22 bits is a second or two).
+    /// Bits above 40 are refused, so a sponsor can't make a client work forever.
+    pub fn do_work(&mut self, bits: u32) -> Result<()> {
+        if bits > 40 {
+            return Err(Error::new(format!("the sponsor asks for {bits} bits of work, too many")));
+        }
+        self.work = 0;
+        while self.work_bits() < bits {
+            self.work += 1;
+        }
+        Ok(())
     }
     /// Whether the signature is the identity key's over the text (the sponsor's first check).
     pub fn verify(&self) -> bool {
@@ -159,6 +202,12 @@ mod tests {
         let mut late = r.clone();
         late.time += 1;
         assert!(!late.verify());
+        // The proof of work: found, checked, and broken by another nonce.
+        let mut worked = r.clone();
+        worked.do_work(8).unwrap();
+        assert!(worked.work_bits() >= 8 && worked.verify());
+        assert!(worked.clone().do_work(41).is_err());
+        assert_eq!(zero_bits(&[0, 0x1f]), 11);
         let json = r.to_json();
         assert!(json.contains("\"network\":\"testnet11\""), "{json}");
         let back: Request = serde_json::from_str(&json).unwrap();

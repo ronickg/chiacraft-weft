@@ -356,3 +356,31 @@ fn the_sponsors_address_stays_the_same_across_restarts() {
     let _ = std::fs::remove_dir_all(dir);
     let _ = std::fs::remove_dir_all(other);
 }
+
+/// Research round 4, P7: identities cost nothing, so each request costs some CPU, and the day's
+/// budget opens hour by hour.
+#[test]
+fn work_is_asked_for_and_the_budget_opens_by_the_hour() {
+    let dir = scratch("work");
+    let sim = Sim::start().unwrap();
+    let mut config = config(&dir);
+    config.work_bits = 12;
+    let s = sponsor(&sim, config.clone(), &Mnemonic::generate().unwrap(), FUNDS);
+    let player = Player::new();
+    let lazy = player.request();
+    let e = s.request(&lazy, &client(1)).unwrap_err();
+    assert_eq!(e.status, 400, "{}", e.error);
+    assert!(e.error.contains("12 bits"), "{}", e.error);
+    let mut worked = player.request();
+    worked.do_work(12).unwrap();
+    assert!(s.check(&worked, worked.time).is_ok());
+
+    let mut c = config;
+    c.daily_budget_mojos = 2_400;
+    c.hourly_release = true;
+    assert_eq!(chiacraft_sponsor::service::released(&c, 0), 100);
+    assert_eq!(chiacraft_sponsor::service::released(&c, 3600 * 11 + 5), 1_200);
+    assert_eq!(chiacraft_sponsor::service::released(&c, 86_399), 2_400);
+    c.hourly_release = false;
+    assert_eq!(chiacraft_sponsor::service::released(&c, 0), 2_400);
+}

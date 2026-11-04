@@ -38,7 +38,7 @@ answer comes once its bundle is pushed: usually in a few seconds, at most `max_w
 | Request | Answer |
 | --- | --- |
 | `{ "network": "testnet11", "address": "txch1…", "identity": "<96 hex>", "signature": "<192 hex>", "time": <unix seconds> }` | `200 { "did": "did:chia:1…", "launcher": "<64 hex>", "coin": "<64 hex>", "status": "pending" }` |
-| `status` | `200 { network, phase, height, address, balance, spendable, budget_left_today, sponsored_today, pending, queued, fee_per_did, per_endpoint_per_day }` |
+| `status` | `200 { network, phase, height, address, balance, spendable, budget_left_today, sponsored_today, pending, queued, fee_per_did, per_endpoint_per_day, work_bits }` |
 
 **The signature.** The identity key (the game's `chiacraft_wallet::Signer`, identity key 0 by default) signs the
 text
@@ -55,9 +55,17 @@ DID's owner. `launcher` is the DID's id; `coin` is its eve coin (the DID's coin 
 
 | Status | When |
 | --- | --- |
-| `400` | Not JSON or a field missing; larger than 4 KiB; `address` not a testnet11 address; `identity` not a public key; `time` more than `max_skew_seconds` (300) from the sponsor's clock; `signature` not the identity key's signature of the text |
+| `400` | Not JSON or a field missing; larger than 4 KiB; `address` not a testnet11 address; `identity` not a public key; `time` more than `max_skew_seconds` (300) from the sponsor's clock; `signature` not the identity key's signature of the text; `work` short of `work_bits` zero bits (below) |
 | `403` | The identity already has a sponsored DID (the body also carries its `did` and `launcher`); `network` isn't the one served |
-| `429` | A request for this identity is already in progress; the asking endpoint's DIDs for today (`per_endpoint_per_day`); today's budget (`daily_budget_mojos`, UTC day) is spent; too many requests waiting |
+| `429` | A request for this identity is already in progress; the asking endpoint's DIDs for today (`per_endpoint_per_day`); today's budget (`daily_budget_mojos`, UTC day) is spent, or this hour's share of it (`hourly_release`); too many requests waiting |
+
+**What makes a flood cost something.** Identities and endpoint ids cost nothing to make, so the
+per-identity and per-endpoint limits alone let a script take the day's whole budget the moment the
+UTC day turns. So each request carries a proof of work (`work`: a nonce making the SHA-256 of
+`chiacraft sponsor work v1 <address> <time> <identity> <nonce>` start with `work_bits` zero bits,
+22 by default, a second or two of one CPU core; the game reads `work_bits` from `status` first),
+and the day's budget opens an hour's share at a time (`hourly_release`). The daily budget stays
+the cap on everything.
 | `503` | The sponsor isn't synced with the chain; none of its coins was free within `max_wait_seconds` (all in unconfirmed spends, or it is out of funds); the chain refused the bundle |
 
 A DID whose launch isn't confirmed within `drop_after_seconds` is **dropped**: its identity may ask again and its

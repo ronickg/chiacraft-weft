@@ -32,6 +32,9 @@ pub fn config(dir: &std::path::Path) -> Config {
     c.batch_window_ms = 200;
     c.max_wait_seconds = 2;
     c.per_endpoint_per_day = 100;
+    // The proof of work and the hourly release have tests of their own.
+    c.work_bits = 0;
+    c.hourly_release = false;
     c
 }
 

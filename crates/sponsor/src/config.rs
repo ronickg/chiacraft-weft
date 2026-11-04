@@ -87,6 +87,12 @@ pub struct Config {
     /// A launch not confirmed after this many seconds is dropped: its identity may ask again and
     /// its cost goes back to the day's budget.
     pub drop_after_seconds: u64,
+    /// Zero bits of proof of work a request must carry (`chiacraft_wallet::sponsor::work_text`):
+    /// about 2^bits hashes of the asker's CPU per DID. 0: none.
+    pub work_bits: u32,
+    /// The day's budget is released hour by hour (by the end of hour h of the UTC day, (h + 1) /
+    /// 24 of it), so a burst at midnight can't spend the whole day's.
+    pub hourly_release: bool,
     /// The most `fee_per_did` may be (a hard cap: a higher fee refuses to start, and the chain
     /// reader refuses a bundle paying more per DID). Unlimited on testnet11 by default.
     pub max_fee_per_did: u64,
@@ -114,6 +120,8 @@ struct Raw {
     max_wait_seconds: u64,
     drop_after_seconds: u64,
     max_fee_per_did: Option<u64>,
+    work_bits: u32,
+    hourly_release: bool,
 }
 
 impl Default for Raw {
@@ -133,6 +141,8 @@ impl Default for Raw {
             max_batch: None,
             max_queue: 200,
             max_wait_seconds: 120,
+            work_bits: 22,
+            hourly_release: true,
             drop_after_seconds: 3_600,
             max_fee_per_did: None,
         }
@@ -163,6 +173,8 @@ impl TryFrom<Raw> for Config {
             max_wait_seconds: r.max_wait_seconds,
             drop_after_seconds: r.drop_after_seconds,
             max_fee_per_did: r.max_fee_per_did.unwrap_or(d.max_fee_per_did),
+            work_bits: r.work_bits.min(32),
+            hourly_release: r.hourly_release,
         };
         config.check()?;
         Ok(config)

@@ -18,6 +18,8 @@ daily_budget_mojos = 1000000000  # 0.001 TXCH a day: about 199 DIDs at the fee a
 per_endpoint_per_day = 3         # DIDs per asking iroh endpoint a day (Horizon's per_ip_per_day)
 # max_fee_per_did = 100000000    # testnet11: no cap unless set
 max_skew_seconds = 300           # a request's time vs the sponsor's clock
+work_bits = 22                   # proof of work per request: about 2^22 hashes (a second or two)
+hourly_release = true            # the day's budget opens 1/24 per UTC hour: no draining it at midnight
 
 batch_window_ms = 2000           # requests within 2 s of the first go in one bundle
 max_batch = 25

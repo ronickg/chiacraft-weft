@@ -17,6 +17,8 @@ fn mainnet_config(dir: &std::path::Path) -> Config {
     c.data_dir = dir.to_owned();
     c.batch_window_ms = 200;
     c.max_wait_seconds = 2;
+    c.work_bits = 0;
+    c.hourly_release = false;
     c
 }
 

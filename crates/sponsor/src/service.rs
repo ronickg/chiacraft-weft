@@ -69,6 +69,8 @@ pub struct StatusReply {
     pub queued: usize,
     pub fee_per_did: u64,
     pub per_endpoint_per_day: u32,
+    /// The proof of work a request must carry, in zero bits.
+    pub work_bits: u32,
 }
 
 /// A DID this sponsor launched, and where it is.
@@ -251,6 +253,10 @@ impl Sponsor {
         if req.signature.len() != 192 || !req.verify() {
             return Err(Refusal::new(400, "signature: not the identity key's signature of the request"));
         }
+        let bits = self.inner.config.work_bits;
+        if req.work_bits() < bits {
+            return Err(Refusal::new(400, format!("work: this sponsor asks for {bits} bits of proof of work")));
+        }
         Ok((p2, identity.hex()))
     }
 
@@ -288,6 +294,9 @@ impl Sponsor {
             }
             if store.spent_on(day) + q.reserved + cost > config.daily_budget_mojos {
                 return Err(Refusal::new(429, "today's budget is spent: try again tomorrow (UTC)"));
+            }
+            if store.spent_on(day) + q.reserved + cost > released(config, now) {
+                return Err(Refusal::new(429, "this hour's share of today's budget is spent: try again within the hour"));
             }
             if q.jobs.len() >= config.max_queue {
                 return Err(Refusal::new(429, "too many requests waiting: try again soon"));
@@ -337,6 +346,7 @@ impl Sponsor {
             queued: q.jobs.len(),
             fee_per_did: inner.config.fee_per_did,
             per_endpoint_per_day: inner.config.per_endpoint_per_day,
+            work_bits: inner.config.work_bits,
         }
     }
 
@@ -570,4 +580,14 @@ fn check_pending(inner: &Inner, watching: &mut HashSet<String>) {
         inner.reader.unwatch(coin);
         watching.remove(&l.coin);
     }
+}
+
+/// What of today's budget may be spent by `now`: all of it, or with `hourly_release` the hours
+/// begun so far (hour h of the UTC day releases (h + 1) / 24).
+pub fn released(config: &Config, now: u64) -> u64 {
+    if !config.hourly_release {
+        return config.daily_budget_mojos;
+    }
+    let hour = (now % DAY) / 3600;
+    config.daily_budget_mojos / 24 * (hour + 1) + if hour == 23 { config.daily_budget_mojos % 24 } else { 0 }
 }
