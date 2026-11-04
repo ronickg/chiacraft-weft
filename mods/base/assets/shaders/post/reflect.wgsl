@@ -80,15 +80,19 @@ fn apply(p: PostPixel) -> vec4<f32> {
         r = reflect(v, n);
     }
     let fresnel = reflect_fresnel(dot(-v, n));
-    let mask = smoothstep(0.02, 0.3, water) * min(p.strength, 1.0);
+    // Strength under 0.75 (the Low setting): as strong, in 16 longer steps that reach as far.
+    let cheap = p.strength < 0.75;
+    let mask = smoothstep(0.02, 0.3, water) * select(min(p.strength, 1.0), 1.0, cheap);
     // Walk out along it, the steps growing, from a random start against banding. Past something
     // thin without a clean hit it keeps going; a hit is narrowed down between the last two steps.
+    let steps = select(REFLECT_STEPS, 16, cheap);
+    let grow = select(1.15, 1.5, cheap);
     var step = 0.5;
     var dist = step * (0.5 + reflect_hash(p.uv * p.size));
     var before = 0.0;
     var hit = vec2(-1.0);
     var travelled = 0.0;
-    for (var i = 0; i < REFLECT_STEPS; i++) {
+    for (var i = 0; i < steps; i++) {
         let at = pos + r * dist;
         let s = reflect_project(at);
         if s.w < 0.0 || s.x < 0.0 || s.x > 1.0 || s.y < 0.0 || s.y > 1.0 {
@@ -114,7 +118,7 @@ fn apply(p: PostPixel) -> vec4<f32> {
         }
         before = dist;
         dist += step;
-        step *= 1.15;
+        step *= grow;
     }
     if hit.x < 0.0 {
         // Nothing in the way: the sky that way, from the screen where it shows there (its clouds,

@@ -91,7 +91,9 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
 // uv: the camera's place in its cell (x, z), the cell in the picture (x, z). extra: cell size,
 // thickness, height over the camera, how far they reach. axes[0]: the weather (`sky.rs`): x cover
 // as rain comes, y how dark the undersides go, z a storm's deck.
-const CLOUD_SAMPLES: u32 = 24u;
+// Ten are enough with the dithered start (the dither hides the steps); 24 cost Ronald's Mac a
+// great deal at Retina size (reports/performance.md).
+const CLOUD_SAMPLES: u32 = 10u;
 // The slab is at least this thick (blocks), whatever the layer's own thickness.
 const CLOUD_THICKNESS: f32 = 9.0;
 // How far one sample looks along the ray at most (blocks): far clouds take no more samples.
@@ -170,6 +172,22 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     }
     if near >= far {
         discard;
+    }
+    // What the opaque world shows at this pixel (its depth's copy, `scene.behind`, made before the
+    // sky pass): clouds behind a hill or a wall are not marched at all, and the rest stop at it.
+    // The pass writes its depth, so the GPU cannot skip those pixels by itself.
+    if scene.behind.z > 0.5 {
+        let d = textureLoad(textures[u32(scene.behind.y)], vec2<i32>(in.clip.xy), 0).r;
+        if d > 0.0 {
+            let size = vec2<f32>(textureDimensions(textures[u32(scene.behind.y)]));
+            let uv = in.clip.xy / size;
+            let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+            let solid = length(w.xyz / w.w);
+            if solid <= near {
+                discard;
+            }
+            far = min(far, solid);
+        }
     }
     far = min(far, near + CLOUD_SPAN);
     let dims = vec2<f32>(f32(s.ids.z), f32(s.ids.w));

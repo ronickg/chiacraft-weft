@@ -332,12 +332,10 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let c = vi % 4u;
     let w0 = records[f * 4u];
     let w1 = records[f * 4u + 1u];
-    let w2 = records[f * 4u + 2u];
-    let w3 = records[f * 4u + 3u];
-    let dir = lod_dir(w0);
-    let lo = lod_pos(w0, w2) - vec3(0.0, 0.125, 0.0);
-    let size = lod_size(w2, w3);
-    let local = lo + CORNERS[dir * 4u + c] * size;
+    // A box's face, or a far tile's smooth cell (`lod_corner`, in the prelude).
+    let corner = lod_corner(f, c, finish(vec3(0.0), origins[ii]).xyz);
+    let dir = corner.dir;
+    let local = corner.local;
     let pos = finish(local, origins[ii]);
     var out: VOut;
     out.clip = scene.view_proj * pos;
@@ -357,7 +355,7 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let kind = lod_tint(w0);
     var tint = vec3(1.0);
     if kind != 0u {
-        tint = unpack_rgb(biomes[(w1 >> FACE_BIOME_SHIFT) * g.extra.z + kind - 1u]);
+        tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
     out.color = tint * SHADE[dir];

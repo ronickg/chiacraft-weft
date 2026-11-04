@@ -46,6 +46,25 @@ erase what they earned.
    - To offer: room for more worn layers (`client/models.rs`, `MAX_LAYERS` 8 to 12). Armour's
      four, clothes' four and a cloak are nine over the skin, and past 8 the rest were dropped
      silently (the cloak never drew). One constant (branch `claude/cloaks`).
+   - To offer: distant terrain (LOD) fixes, Weft's own LOD (`reports/lod.md`; branch
+     `claude/lod-fixes`):
+     - **Trees per site.** `describe_lod` ran each scatter shape 8 times at the world origin, so
+       far forests were all or nothing by seed. Scatters can now declare a thinning rule
+       (`ScatterBuilder::thin` / `thin_in`: a terrain mask, keep one in N, optionally per biome
+       component) that the engine applies near (`dim::scatter_site`) and on the GPU per real site
+       alike; the canopy sample runs stand on real ground spread over the world.
+     - **Steep faces.** A terrain op `FACES` (`TerrainBuilder::faces(fall, f)`): what bare faces
+       show from a given fall. Distant terrain asks it for steep cells' tops and wall bands, and
+       puts no scattered things there.
+     - **Stable levels.** Split at 4 tile widths, join only past 4.5; a parent stays until all
+       four children are made (no child over its parent); 192 dropped tiles cached; jobs no
+       longer wanted are called off; LOD's mods' heights, meshing and description run on their
+       own low-priority pool, not the one finishing near cubes.
+     - **Smooth far ground.** Tiles from level 3 (8-block cells, about 1 km on) are a heightmap
+       sampled at cell corners, not boxes: a corner grid at the start of the tile's records, a
+       record per cell, skirts at the edges. A prelude helper (`lod_corner`, used by `vs_lod`)
+       morphs odd corners into the next level's shape between 6 and 8 tile widths (CDLOD), so
+       levels meet without seams and swap without a jump; normals from the grid, tints per corner.
 5. **Players are safe in any world.** Downloaded code is sandboxed; servers can never sign
    anything for a player; mods never reach the account.
 
@@ -338,8 +357,18 @@ The smallest version that works is phases 1-4.
       root of the day's credentials on chain (the wallet's `anchor`, a spend from the owner's
       wallet; testnet11 for now) and gives each player the inclusion proof for theirs when they
       next join.
-   Later: the admission rule "has achievement X" (the join carrying the credential), revocation
-   lists served by worlds, achievements a sandboxed mod grants.
+   11. *Has achievement X* (built 2026-11-04, not yet seen in a game): an admission rule
+      (`/achievementrule <id> [issuer keys]`): only players who earned it, as a credential signed by
+      this world's owner or an issuer the owner names. The world asks the joining game for that
+      achievement only (`AskAchievement`), the game shows its credentials for it and nothing else
+      (`Proofs`), and the join waits for them as it waits for a DID check.
+   12. *Withdrawn achievements* (built 2026-11-04, not yet seen in a game): `/revoke <player>
+      <id | *>` adds what this world signed for them to its issuer's revocation list (the wallet's
+      `Revocations`, one per issuer account, kept in its home, signed again one `seq` higher);
+      every player here gets the list on joining and on each change, their profile marks what
+      it withdrew, and it no longer counts at the door.
+   Later: achievements a sandboxed mod grants; other worlds fetching an issuer's list (each
+   world sends its own today).
 5. **Finding worlds.** On-chain listing by hint; DIG listings and curated lists; spam ranking.
 6. **Sandboxed code mods.** wasmtime with components (from `horizon-mods`), WIT v1.0 shaped on
    Weft's SDK, server halves then client halves, frozen API versions; personal mods per world.

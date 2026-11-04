@@ -73,7 +73,7 @@ A biome says once what it is: the climate it likes, its ground, its colors, plus
 static DESERT: Biome = Biome::named("desert");
 r.biome(&DESERT).temperature(0.35..).humidity(..0.0).surface("sand", "sand", 3).under("sandstone", 1).tint(&tints::GRASS, 0xbfb755).tag("dry");
 ```
-- `temperature(..)`, `humidity(..)`: where the climate fits it, as ranges like `0.35..` or `..-0.45` (the fields run about -1.4 to 1.4). Without them it fits anywhere.
+- `temperature(..)`, `humidity(..)`: where the climate fits it, as ranges like `0.35..` or `..-0.45` (the fields could run about -1.4 to 1.4, but nine tenths of a world lies within ±0.28, so a range past ±0.3 is rare: base's are in `base_api::land`). Without them it fits anywhere.
 - `surface(top, filler, depth)`: a top block, `depth` blocks of filler, then the terrain's stone
 - `under(block, layers)`: the lowest layers of filler become another block (sandstone under sand)
 - `deep_top(block, below)`: a different top block where the ground is lower than `below` (gravel on a sea floor)

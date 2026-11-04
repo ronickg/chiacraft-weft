@@ -388,11 +388,23 @@ struct Op {
     size: f64,
     feature: Option<Feature>,
     rule: Option<BiomeRule>,
+    face: abi::Callback,
 }
 
 impl Op {
     fn new(op: u32) -> Op {
-        Op { op, anchor: String::new(), block: String::new(), level: 0, to: 0, value: 0.0, size: 0.0, feature: None, rule: None }
+        Op {
+            op,
+            anchor: String::new(),
+            block: String::new(),
+            level: 0,
+            to: 0,
+            value: 0.0,
+            size: 0.0,
+            feature: None,
+            rule: None,
+            face: abi::Callback::NONE,
+        }
     }
 }
 
@@ -424,6 +436,7 @@ impl TerrainBuilder<'_> {
             size: o.size,
             feature,
             rule,
+            face: o.face,
         };
         unsafe { (host().reg_terrain)(self.raw, &desc) }
         self
@@ -485,6 +498,15 @@ impl TerrainBuilder<'_> {
     pub fn remove_cave_biome(self, biome: &str) -> Self {
         self.send(Op { anchor: biome.to_string(), ..Op::new(op::REMOVE_CAVE_BIOME) })
     }
+
+    /// What steep faces show, for distant terrain, which runs no decorations: where the ground
+    /// falls `fall` blocks or more to its lowest neighbour, `f(face)` turns the block the surface
+    /// rules put there into the one the generator's own passes would (bare rock). No scattered
+    /// things stand on such faces far away. Pure, called from many threads.
+    pub fn faces(self, fall: i32, f: impl Fn(&mut Face) + Send + Sync + 'static) -> Self {
+        let face = callback(move |a: &mut abi::FaceArgs| f(Face::wrap(a)));
+        self.send(Op { level: fall, face, ..Op::new(op::FACES) })
+    }
 }
 
 impl Dimension {
@@ -522,6 +544,8 @@ impl Registry {
             name: scatter.name().to_string(),
             dimensions: String::new(),
             density: String::new(),
+            thin: Vec::new(),
+            thin_biomes: String::new(),
             desc: abi::ScatterDesc::DEFAULT,
             _p: PhantomData,
         }
@@ -545,6 +569,8 @@ pub struct ScatterBuilder<'a> {
     name: String,
     dimensions: String,
     density: String,
+    thin: Vec<abi::MaskStep>,
+    thin_biomes: String,
     desc: abi::ScatterDesc,
     _p: PhantomData<&'a mut Registry>,
 }
@@ -576,6 +602,22 @@ impl ScatterBuilder<'_> {
         self.desc.shape = callback(move |a: &mut abi::ScatterArgs| f(Site::wrap(a)));
         self
     }
+    /// Sites thinned by where they stand: where `mask` is over 0, only one in `keep` stays (by
+    /// `Site::random() % keep == 0`; 0 keeps none). Better than the same test in `shape`:
+    /// distant terrain can't run `shape` at every site, but evaluates this one exactly, so far
+    /// forests have the near ones' groves and glades.
+    pub fn thin(mut self, mask: Mask, keep: u32) -> Self {
+        self.thin.clear();
+        mask.steps(&mut self.thin);
+        self.desc.thin_keep = keep;
+        self
+    }
+    /// `thin` only in biomes that have `component`.
+    pub fn thin_in<T: crate::Value>(self, component: &crate::Component<T>, mask: Mask, keep: u32) -> Self {
+        let mut s = self.thin(mask, keep);
+        s.thin_biomes = component.name().to_string();
+        s
+    }
 }
 
 impl Drop for ScatterBuilder<'_> {
@@ -587,9 +629,57 @@ impl Drop for ScatterBuilder<'_> {
             name: Str::new(&self.name),
             dimensions: Str::new(&self.dimensions),
             density: Str::new(&self.density),
+            thin: Slice::new(&self.thin),
+            thin_biomes: Str::new(&self.thin_biomes),
             ..self.desc
         };
         unsafe { (host().reg_scatter)(self.raw, &desc) }
+    }
+}
+
+/// A steep face's block as distant terrain asks for it (`TerrainBuilder::faces`).
+#[repr(transparent)]
+pub struct Face {
+    args: abi::FaceArgs,
+}
+
+impl Face {
+    fn wrap(a: &mut abi::FaceArgs) -> &mut Face {
+        unsafe { &mut *(a as *mut abi::FaceArgs as *mut Face) }
+    }
+    pub fn seed(&self) -> u64 {
+        self.args.seed
+    }
+    pub fn dimension(&self) -> u32 {
+        self.args.dim
+    }
+    /// The block on the face: its column's top, or one lower down it.
+    pub fn pos(&self) -> [i32; 3] {
+        self.args.pos
+    }
+    pub fn biome(&self) -> u32 {
+        self.args.biome
+    }
+    /// The column's ground height (its top block's y).
+    pub fn height(&self) -> i32 {
+        self.args.height
+    }
+    /// The block the terrain leaves at the top of the column.
+    pub fn surface_block(&self) -> u32 {
+        let [x, _, z] = self.args.pos;
+        unsafe { (host().dim_surface)(self.args.dim, self.args.seed, x, z) }
+    }
+    /// How far the ground falls to its lowest neighbour.
+    pub fn fall(&self) -> i32 {
+        self.args.fall
+    }
+    /// The block the surface rules put there.
+    pub fn block(&self) -> u32 {
+        self.args.block
+    }
+    /// What the face shows instead.
+    pub fn set(&mut self, block: u32) {
+        self.args.block = block;
     }
 }
 

@@ -399,7 +399,14 @@ pub fn scatter_site(
     if weft_noise::unit(h.rotate_left(17)) >= density as f64 || def.carved(seed, x, z) {
         return None;
     }
-    Some((IVec3::new(x, col.height + 1, z), col.biome, hash(h, 1, 2, 3)))
+    let random = hash(h, 1, 2, 3);
+    if s.thin
+        .as_ref()
+        .is_some_and(|t| t.removes(c, seed, x, z, col.biome, random))
+    {
+        return None;
+    }
+    Some((IVec3::new(x, col.height + 1, z), col.biome, random))
 }
 
 /// How far above and below its site a scattered thing may put blocks.

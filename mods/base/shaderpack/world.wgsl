@@ -666,12 +666,10 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     let c = vi % 4u;
     let w0 = records[f * 4u];
     let w1 = records[f * 4u + 1u];
-    let w2 = records[f * 4u + 2u];
-    let w3 = records[f * 4u + 3u];
-    let dir = lod_dir(w0);
-    let lo = lod_pos(w0, w2) - vec3(0.0, 0.125, 0.0);
-    let size = lod_size(w2, w3);
-    let local = lo + CORNERS[dir * 4u + c] * size;
+    // A box's face, or a far tile's smooth cell (`lod_corner`, in the prelude).
+    let corner = lod_corner(f, c, finish(vec3(0.0), origins[ii]).xyz);
+    let dir = corner.dir;
+    let local = corner.local;
     let pos = finish(local, origins[ii]);
     var out: VOut;
     out.clip = scene.view_proj * pos;
@@ -686,18 +684,19 @@ fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V
     out.glow = 0xffffffffu;
     out.slot = 0u;
     out.overlay = 0u;
+    // A little of the near blocks' corner shading: their slopes' sides darker than their tops.
     out.light = vec4(1.0, 0.0, 0.0, 0.0);
     let o = origins[ii] + g.cam_cube;
     out.pos = vec3<f32>(o.xyz * 16) + local;
-    out.normal = NORMAL[dir];
-    out.ao = 1.0;
+    out.normal = corner.normal;
+    out.ao = mix(0.85, 0.95, clamp(corner.normal.y, 0.0, 1.0));
     // Not traced: it is past the blocks the client keeps. Its tint kind, so far water is drawn as
     // water (and far leaves as leaves).
     let kind = lod_tint(w0);
     out.kind = vec4(kind, 1u, 0u, 0u);
     var tint = vec3(1.0);
     if kind != 0u {
-        tint = unpack_rgb(biomes[(w1 >> FACE_BIOME_SHIFT) * g.extra.z + kind - 1u]);
+        tint = unpack_rgb(biomes[corner.biome * g.extra.z + kind - 1u]);
     }
     out.tint = tint;
     out.color = pow(tint, vec3(2.2));
@@ -721,11 +720,13 @@ fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
         albedo = mix(albedo, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
     }
     // Far water is the same water as near: deep there (no blocks are kept that far), with its
-    // Fresnel, the sky, the sun's path, and the water mask that lets the screen's reflections in.
-    // Otherwise it would be a flat grey-blue lit like land, a seam at the edge of the render distance.
+    // Fresnel, the sky and the sun's path. Otherwise it would be a flat grey-blue lit like land, a
+    // seam at the edge of the render distance. It is left out of the screen's reflections (solid in
+    // the mask): looking out to sea, their march over every far-water pixel cost too much
+    // (reports/performance.md).
     if in.kind.x == TINT_WATER {
         let w = water(in, albedo, false);
-        return vec4(w.rgb, max(w.a, 0.5));
+        return vec4(w.rgb, SOLID_ALPHA);
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
 }

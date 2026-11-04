@@ -484,7 +484,10 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Thinner looking up at what is high, so hills stand out against a hazy valley.
     let thin = exp(-max(rel.y, 0.0) / 90.0);
     let rain = rain_amount();
-    let amount = 1.0 - exp(-dist / (end * mix(0.9, 0.4, rain)) * mix(0.45, 1.0, thin));
+    // The air's own depth, whatever the view distance: with distant terrain the fog's end lies
+    // thousands of blocks off, and the haze would barely start where the kept blocks give way to it.
+    let reach = min(end, 2500.0);
+    let amount = 1.0 - exp(-dist / (reach * mix(0.9, 0.4, rain)) * mix(0.45, 1.0, thin));
     let edge = smoothstep(end * 0.72, end, dist);
     return mix(c, color, clamp(max(amount * 0.9, edge), 0.0, 1.0));
 }

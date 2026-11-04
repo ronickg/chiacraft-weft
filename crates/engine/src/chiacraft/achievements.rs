@@ -12,7 +12,7 @@
 
 use std::path::{Path, PathBuf};
 
-use chiacraft_wallet::achievement::Credential;
+use chiacraft_wallet::achievement::{Credential, Revocations};
 use serde::{Deserialize, Serialize};
 
 pub const FILE: &str = "achievements.json";
@@ -36,6 +36,73 @@ pub struct Store {
     pub v: u32,
     #[serde(default)]
     pub credentials: Vec<Credential>,
+    /// Issuers' lists of withdrawn achievements, the newest of each (checked).
+    #[serde(default)]
+    pub revocations: Vec<Revocations>,
+}
+
+impl Store {
+    /// Whether the issuer of `c` withdrew it.
+    pub fn revoked(&self, c: &Credential) -> bool {
+        self.revocations.iter().any(|r| r.revokes(c))
+    }
+}
+
+/// The list of achievements this account withdrew as an issuer (for all its worlds: the issuer is
+/// the account), kept in the account home.
+pub const ISSUED_REVOKED: &str = "revoked.json";
+
+pub fn issuer_list() -> Option<Revocations> {
+    let home = chiacraft_account::current()?.home.clone();
+    let r = Revocations::from_json(&std::fs::read_to_string(home.join(ISSUED_REVOKED)).ok()?).ok()?;
+    r.verify().ok().map(|_| r)
+}
+
+/// Withdraw the achievements with these nonces (this account's): the list signed again, one
+/// `seq` higher. The new list.
+pub fn revoke(nonces: &[String]) -> Result<Revocations, String> {
+    let session = chiacraft_account::current().ok_or("no account is open")?;
+    let old = issuer_list();
+    let mut all = old.as_ref().map(|r| r.revoked.clone()).unwrap_or_default();
+    all.extend(nonces.iter().cloned());
+    let seq = old.map_or(1, |r| r.seq + 1);
+    let r = Revocations::signed(&*session.signer, seq, crate::saves::now_secs(), all).map_err(|e| e.to_string())?;
+    let path = session.home.join(ISSUED_REVOKED);
+    let tmp = path.with_extension("json.new");
+    std::fs::write(&tmp, r.to_json())
+        .and_then(|_| std::fs::rename(&tmp, &path))
+        .map_err(|e| format!("saving the revocations: {e}"))?;
+    Ok(r)
+}
+
+/// An issuer's list a world sent: kept if it checks out and is newer than the one held.
+pub fn revocations_received(json: &str) {
+    let Some(path) = path() else { return };
+    if json.len() > 512 << 10 {
+        return;
+    }
+    let Ok(r) = Revocations::from_json(json) else { return };
+    if r.verify().is_err() {
+        return;
+    }
+    let mut store = load_from(&path);
+    if store
+        .revocations
+        .iter()
+        .any(|h| h.issuer == r.issuer && h.seq >= r.seq)
+    {
+        return;
+    }
+    store.revocations.retain(|h| h.issuer != r.issuer);
+    let withdrawn = store.credentials.iter().filter(|c| r.revokes(c)).count();
+    if withdrawn > 0 {
+        log::info!("{withdrawn} of your achievements were withdrawn by their issuer");
+    }
+    store.revocations.push(r);
+    if let Err(e) = save_to(&path, &store) {
+        log::warn!("{e}");
+    }
+    GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 }
 
 fn path() -> Option<PathBuf> {
@@ -99,6 +166,18 @@ pub fn keep(path: &Path, me: &str, json: &str) -> Result<bool, String> {
     save_to(path, &store)?;
     GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     Ok(true)
+}
+
+/// This account's credentials for achievement `id` (JSON), for a world whose rules ask for it:
+/// only those, at most eight, the newest first.
+pub fn proofs(id: &str) -> Vec<String> {
+    let mut all: Vec<Credential> = load()
+        .credentials
+        .into_iter()
+        .filter(|c| c.achievement.id == id)
+        .collect();
+    all.sort_by_key(|c| std::cmp::Reverse(c.issued));
+    all.iter().take(8).map(Credential::to_json).collect()
 }
 
 /// A day's anchor a world sent for one of this account's achievements: kept on that credential

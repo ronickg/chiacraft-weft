@@ -1,5 +1,5 @@
 //! What a wild animal's body gives for clothes (`vitals::clothing`): furred ones a pelt or a few
-//! (`base:fur`), deer and capybaras their hide as leather (`base:leather`), by their size. Real
+//! (`base:fur`), deer and capybaras a raw hide to tan (`base:hide`), by their size. Real
 //! counts: a winter caribou hide is about one parka's back, a hare's pelt a mitten's worth, so a
 //! fur coat takes a reindeer or several foxes. The animals mod drops them when one dies (`lib.rs`).
 
@@ -13,9 +13,9 @@ pub const HIDES: &[(&str, &str, u32, u32)] = &[
     ("grey_wolf", "base:fur", 2, 2),
     ("jaguar", "base:fur", 2, 3),
     ("reindeer", "base:fur", 2, 3),
-    ("white_tailed_deer", "base:leather", 1, 2),
-    ("red_deer", "base:leather", 1, 3),
-    ("capybara", "base:leather", 1, 1),
+    ("white_tailed_deer", "base:hide", 1, 2),
+    ("red_deer", "base:hide", 1, 3),
+    ("capybara", "base:hide", 1, 1),
 ];
 
 #[cfg(test)]
