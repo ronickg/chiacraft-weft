@@ -27,6 +27,7 @@ use weft_sdk::terrain::{Feature, Mask, preset};
 
 use crate::SEA;
 
+mod canyons;
 mod karst;
 mod net;
 
@@ -51,6 +52,9 @@ pub mod salt {
     pub const KARST: u64 = 0x4A5;
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
+    pub const CANYONS: u64 = 0xCA1;
+    pub const CANYON_AREA: u64 = 0xCA2;
+    pub const CANYON_WARP: u64 = 0xCA3;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -295,6 +299,29 @@ pub const MESA_AREA: Area = Area {
     not: false,
 };
 
+/// Badland canyons (Tectonic, Lithosphere; Ronald, 11-04: "All 3, in order"): in the hot, dry
+/// land (`CANYON_AREA`; full depth from `CANYON_FULL` of its strength), winding cuts along a
+/// warped line noise's zero lines (`CANYON_SCALE` blocks between, wandering by `CANYON_WARP`),
+/// `CANYON_WIDTH` of the noise wide, cut `CANYON_DEPTH` blocks down in tiers `CANYON_TIER` high
+/// (a steep wall, then a ledge), the floor kept `CANYON_DRY` over the sea. Their walls show the
+/// strata (rock faces).
+pub const CANYON_AREA: Area = Area {
+    all: &[
+        Ramp::Temperature(0.1, 0.16),
+        Ramp::Humidity(0.02, -0.04),
+        Ramp::Noise { salt: salt::CANYON_AREA, scale: 900.0, from: -0.05, to: 0.05 },
+        Ramp::Continent(0.06, 0.14),
+    ],
+    not: false,
+};
+pub const CANYON_FULL: f64 = 0.3;
+pub const CANYON_SCALE: f64 = 700.0;
+pub const CANYON_WARP: (f64, f64) = (90.0, 160.0);
+pub const CANYON_WIDTH: f64 = 0.05;
+pub const CANYON_DEPTH: i32 = 40;
+pub const CANYON_TIER: i32 = 8;
+pub const CANYON_DRY: i32 = 3;
+
 /// Karst towers (Lithosphere; Ha Long Bay, Guilin): in the warm, wet land and its shallow seas
 /// (`KARST_AREA`), steep limestone pillars, one per `KARST_CELL` blocks square where the area
 /// allows (`KARST_CHANCE` at full strength), `KARST_RADIUS` blocks across their foot and
@@ -472,6 +499,7 @@ pub fn features() -> Vec<Feature> {
             .mask(MOUNTAINS_AREA.mask())
             .named("mountains"),
         Feature::new(mesa).named("mesas"),
+        Feature::new(canyons).named("canyons"),
         Feature::new(karst).named("karst"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
@@ -506,7 +534,7 @@ fn land_height_at(h: &Here) -> i32 {
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
     let base = base_ground(h);
-    base + karst::add(h, base)
+    base + canyons::cut(h, base) + karst::add(h, base)
 }
 
 /// The ground before the karst towers (which stand on it, or rise out of the water over it).
@@ -800,6 +828,12 @@ pub fn river_region_stretches(f: &Fields, bx: i32, bz: i32) -> Vec<([i32; 2], [i
         .iter()
         .map(|s| ([s.a[0] >> 4, s.a[1] >> 4], [s.b[0] >> 4, s.b[1] >> 4], s.flow))
         .collect()
+}
+
+/// What the canyons take off the ground at (`x`, `z`) (Q4), as the engine adds it.
+pub fn canyons(f: &Fields, x: i32, z: i32) -> i32 {
+    let h = Here::new(f, x, z);
+    if !canyons::near(&h) { 0 } else { canyons::cut(&h, base_ground(&h)) }
 }
 
 /// What the karst towers add at (`x`, `z`) (Q4), as the engine adds it.
@@ -1195,6 +1229,25 @@ mod tests {
             }
         }
         assert!(towers > 0 && outside == 0, "{towers} tower columns, {outside} outside the karst land");
+    }
+
+    #[test]
+    fn canyons_cut_dry_in_their_land_only() {
+        let f = fields(1);
+        let mut deep = 0;
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 16 * 16 - 1600 * 16, (i / 200) * 16 * 16 - 1600 * 16);
+            let cut = canyons(&f, x, z);
+            assert!((-q4(CANYON_DEPTH as f64)..=0).contains(&cut), "{cut}");
+            if cut < 0 {
+                assert!(CANYON_AREA.value(&f, x, z) > 0);
+                assert!(land_height(&f, x, z) >> 4 >= SEA + CANYON_DRY || lakes(&f, x, z) < 0, "a canyon floor under the sea at {x} {z}");
+            }
+            if cut < -q4(20.0) {
+                deep += 1;
+            }
+        }
+        assert!(deep > 0, "no canyon 20 deep in 3.2 km");
     }
 
     #[test]
