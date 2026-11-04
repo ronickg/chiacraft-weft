@@ -23,6 +23,7 @@
 //! leave               # leave the world for the title screen
 //! tap screen query    # once `screen` is open, clicks the element `query` (`id:x`, `text:x`) until it closes or the element goes
 //! tap_once screen query  # the same, one click (a text field, a button that stays)
+//! screen core:multiplayer  # opens a screen by name (an engine screen or a mod's)
 //! mark path           # writes the file (a signal to another copy's await_file)
 //! await_file path 120 # until the file exists, at most 120 s
 //! origin              # later via points are relative to where the player stands now
@@ -164,6 +165,13 @@ pub async fn run(t: T, src: String) -> R {
                 t.frames(15).await?;
                 t.click_ui(query, 0);
                 t.frames(15).await?;
+            }
+            "screen" => {
+                let screen = weft_sdk::Screen::generated(rest.to_string());
+                if !t.c().open_screen(screen) {
+                    t.fail(format!("no screen {rest}"));
+                }
+                t.screen(rest).await?;
             }
             "mark" => {
                 if let Err(e) = std::fs::write(rest, "1") {

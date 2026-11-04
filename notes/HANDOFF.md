@@ -327,6 +327,24 @@ build (code mods keep the old error).
 Left: components and channels in the API (slice 3), client halves (slice 4), personal mods per
 world (slice 5), `/mods` (slice 6).
 
+## Our DID sponsor (testnet11, since 2026-11-04)
+
+Ronald's yes: "testnet only". It runs on Ronald's Mac from the throwaway testnet11 wallet
+(`~/chiacraft-testnet/sponsor.words`, never printed or copied), in `~/chiacraft-testnet-sponsor/`:
+`sponsor.toml` (testnet11, `data_dir` and `words_file`), its own copy of the binary, `sponsor.log`,
+and `data/` (`sponsor.key`, the iroh key behind its address; `sponsor-log.jsonl`, what it launched).
+Its address, the game's default `core:sponsors`, is
+`d468728d7e0e3f417c822af6e87ff924c0adbdeeb89a3c0f2d0745b2de40a792`. Funding address
+`txch124f375vnry5zfk5ss8qv2ucw3ayhhnjz25x7m9w4gspw0rh8u8zs7xhj5x` (top up from a testnet faucet).
+To start it again:
+
+```sh
+cd ~/chiacraft-testnet-sponsor && ./chiacraft-sponsor --config sponsor.toml >> sponsor.log 2>&1 &
+```
+
+Mainnet stays off: the binary refuses mainnet without `allow_mainnet = true`, and that needs
+Ronald's own yes.
+
 ## Side mods
 
 `mods/animals` (MIT, was `mods/chihuahua` until 2026-11-01, so entity ids are `animals:*` now): wild long-haired chihuahuas (a breed of the species dog: `src/dog.rs`, `source/dog/chihuahua`, `species.rs` `breed`), orange tabby cats, small packs of feathered velociraptors (two species: V. mongoliensis on grassland, the paler V. osmolskae on desert sand), groups of capybaras and rare Utahraptors on grassland (spawn rules like pigs', rarer). Cats (`src/cat.rs`) wander and now and then sit, then lie down as a loaf; their source is `source/cat` (built from research alone, see its README). Velociraptors (`src/raptor.rs`, `source/raptor`) wander and now and then rest; they don't hunt yet. Capybaras (`src/capybara.rs`, `source/capybara`) wander slowly, graze, sit and flop down. The design for taming, stats, breeding and genetics is `notes/ANIMALS.md`; its core is built (2026-11-01): every animal spawns with a wild level (1-150) as points on nine stats (`src/species.rs` per species, `src/animal.rs`), health and speed applied as attribute modifiers and damage through the attack damage chain; sneak-use one you own for the animal screen (stats, points, placing tamed points), the spyglass (`animals:spyglass`, crafted from glass and iron) shows any animal's species, sex, stage and level from 64 blocks; Wild chihuahuas, cats and capybaras are tamed by feeding them when they ask (a bubble with the food above them; favorites and kibble tame faster, mistakes lower effectiveness, a clean tame gives bonus levels; `src/taming.rs`). Tames take commands (follow, stay, wander, guard) and stances (passive, neutral, aggressive, assist) from the animal screen, plain right click (follow/stay) and whistle keys (J follow, K stay, H come, G attack, B passive); tribes (`/tribe`, `/tribeinvite`) share tames (`src/commands.rs`). Signatures (`src/signatures.rs`): chihuahuas bark at and mark monsters and track animals by their drops, cats bring gifts, capybaras calm the animals around them. Raptors are tamed by knocking them out (clubs, tranquilizer darts, sedatives; `src/knockout.rs`) and feeding them while out; wild ones fight back in packs. Saddled tame Utahraptors (`src/utahraptor.rs`, `source/utahraptor`: the mount, 1.5 m at the hip; Velociraptors are too small to ride) can be ridden: the engine now has riding (`World::mount`, held keys, a seated pose; docs/modding.md), steered by the mod (`src/riding.rs`). `/animal [show|tame|points N|wild|here]` for testing.

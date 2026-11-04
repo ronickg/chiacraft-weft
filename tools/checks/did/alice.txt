@@ -1,0 +1,18 @@
+# Phase 4, slices 4-7 on testnet11: the owner's side. Run beside bob.txt from the same folder;
+# the copies wait for each other through did-mark-* files. See README.md.
+loaded
+screen core:account
+tap_once core:account id:get_did      # our sponsor launches her DID (about a minute or two)
+wait 240
+shot did-alice-1-account.png
+host did-ticket.txt
+chat /didrule required on
+chat /didrule show
+screen core:admission
+tap_once core:admission id:world_did_get   # the world's DID, then her DID lists it (two spends)
+wait 600
+shot did-alice-2-world.png
+mark did-mark-ready
+await_file did-mark-bob-done 1200
+shot did-alice-3.png
+quit
