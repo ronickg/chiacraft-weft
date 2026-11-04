@@ -54,8 +54,8 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
 // sunset, dusk and night, blended between.
 fn palette() -> Palette {
     let e = scene.sun.y;
-    let day = key(vec3(0.09, 0.26, 0.85), vec3(0.42, 0.60, 0.95), vec3(1.0, 0.92, 0.78), vec3(0.84, 0.78, 0.68), vec3(0.20, 0.27, 0.42));
-    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.78, 0.66, 0.62), vec3(1.0, 0.72, 0.42), vec3(1.15, 0.80, 0.50), vec3(0.22, 0.24, 0.38));
+    let day = key(vec3(0.09, 0.26, 0.85), vec3(0.42, 0.60, 0.95), vec3(1.0, 0.92, 0.78), vec3(1.15, 0.98, 0.76), vec3(0.20, 0.27, 0.42));
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.78, 0.66, 0.62), vec3(1.0, 0.72, 0.42), vec3(1.45, 0.95, 0.52), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
@@ -433,15 +433,25 @@ fn shoulder(x: vec3<f32>) -> vec3<f32> {
 // The grade on top: the darks a little cool and the lights warmer as the sun goes down (warm
 // light, blue shade), colour held back a little (vanilla's, not a saturated look), and a cool
 // floor so nothing is ever pure black.
+// Jim Hejl's 2015 filmic curve (his published formula): a toe that deepens the darks and a long
+// shoulder that keeps bright skies and sunlit faces from flattening; its output is display-coded,
+// so it is brought back to linear for the sRGB screen.
+fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
+    let v = vec4(c, white);
+    let a = 1.425 * v + vec4(0.05);
+    let f = (v * a + vec4(0.004)) / (v * (a + vec4(0.55)) + vec4(0.0491)) - vec4(0.0821);
+    return pow(max(f.rgb / f.w, vec3(0.0)), vec3(2.2));
+}
+
 fn display(c: vec3<f32>) -> vec3<f32> {
-    var t = shoulder(max(c, vec3(0.0)));
+    var t = hejl(max(c, vec3(0.0)) * 1.15, 3.0);
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
     t *= mix(vec3(0.975, 0.99, 1.03), mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
     // Colour held back in the mid-tones and darks (the land), not in what glows bright (lava, fire,
     // lamps keep their fire).
     let y = luma(t);
-    t = max(mix(vec3(y), t, mix(0.98, 1.06, smoothstep(0.35, 0.7, y))), vec3(0.0));
+    t = max(mix(vec3(y), t, mix(1.08, 1.25, smoothstep(0.05, 0.35, y))), vec3(0.0));
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034);
     return clamp(t, vec3(0.0), vec3(1.0));
 }

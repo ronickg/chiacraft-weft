@@ -524,7 +524,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
         shore = shore_distance(in.pos);
     }
     let ndv = max(dot(n, v), 0.02);
-    let fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+    let fresnel = 0.04 + 0.96 * pow(1.0 - ndv, 4.0);
     let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos);
     // What the light in the water sends back up: turquoise in the shallows, deep blue further down,
