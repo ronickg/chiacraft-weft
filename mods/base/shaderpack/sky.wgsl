@@ -415,14 +415,24 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     if open_sky() && !in_liquid() {
         // Bodies shine through the tone curve; stars dim in the haze low down.
         // The sun shines through the tone curve; the moon keeps its markings.
+        var shape = 1.0;
         if s.ids.y == SKY_BODY && dot(dir, scene.sun.xyz) > 0.0 {
-            // Low, it goes orange and less blinding: its near-white square at 2.2 went white
-            // through the curve and washed out the golden hour, and the water's path with it.
+            // The sun as a round disc with a soft glow (Bliss's), not the picture's square: that
+            // square, about 20° across with a pale border, went white through the curve, washed
+            // out the golden hour (and the water's path with it), and turned into a diamond on the
+            // leaned path. White-gold by day, a deep orange low down, the glow gone before the
+            // quad's edges.
+            let half = max(abs(s.uv.zw - s.uv.xy) * 0.5, vec2(1e-4));
+            let r = length((in.uv - (s.uv.xy + s.uv.zw) * 0.5) / half);
+            let disc = 1.0 - smoothstep(0.12, 0.15, r);
+            let halo = exp(-r * 6.0) * (1.0 - smoothstep(0.55, 0.95, r)) * 0.7;
             let g = golden();
-            rgb = rgb * mix(2.2, 1.2, g) * mix(vec3(1.0), vec3(1.0, 0.6, 0.3), g);
+            rgb = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g) * (disc * mix(3.0, 1.5, g) + halo);
+            shape = smoothstep(0.0, 0.004, disc + halo);
         }
         a *= 1.0 - rain_amount() * 0.9;
-        rgb = display(rgb);
+        // `display` lifts black a little: outside the sun's shape nothing may be added.
+        rgb = display(rgb) * shape;
     }
     return vec4(rgb * a, select(a, 0.0, s.ids.w != 0u));
 }
