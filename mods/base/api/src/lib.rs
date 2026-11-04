@@ -632,7 +632,7 @@ pub fn sedate(w: &World, player: u64, amount: f32) {
 }
 
 fn with_body(w: &World, player: u64, f: impl FnOnce(&mut Vitals, f32)) {
-    if w.creative(player) {
+    if w.outside_survival(player) {
         return;
     }
     let Some(v) = w.component_mut(player, &VITALS) else { return };
@@ -683,7 +683,7 @@ pub static GRAVE: Component<Grave> = Component::named("base:grave");
 /// Gives `player` XP for what they did (`vitals::levels::xp`): other mods call it for theirs
 /// (taming, raising young, hatching eggs). Rested raises it; nothing in creative.
 pub fn give_xp(w: &World, player: u64, amount: u64) {
-    if amount == 0 || w.creative(player) {
+    if amount == 0 || w.outside_survival(player) {
         return;
     }
     let Some(v) = w.component_mut(player, &VITALS) else { return };

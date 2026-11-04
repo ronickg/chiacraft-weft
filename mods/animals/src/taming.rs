@@ -373,7 +373,7 @@ fn hearts(w: &World, at: [f64; 3], count: u32) {
 
 /// One of the held item used up (unless in creative).
 pub fn take_one(w: &World, player: u64) {
-    if w.creative(player) {
+    if w.outside_survival(player) {
         return;
     }
     let inv = w.inventory(player);

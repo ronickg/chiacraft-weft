@@ -74,7 +74,7 @@ pub fn init(r: &mut Registry) {
     r.item(&DART).tab(&COMBAT).on_use(|u| {
         let (w, player) = (u.world(), u.player());
         throw_dart(&w, player);
-        if !w.creative(player) {
+        if !w.outside_survival(player) {
             u.set_stack(StackData::shrink(u.stack(), 1));
         }
         true
@@ -343,7 +343,7 @@ pub fn feed(w: &World, id: u64, player: u64) -> bool {
         k.food = held.item;
         k.count += held.count;
     });
-    if !w.creative(player) {
+    if !w.outside_survival(player) {
         inv.set(slot, ItemStack::EMPTY);
     }
     true

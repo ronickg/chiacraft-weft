@@ -119,7 +119,7 @@ fn watch(w: &World) {
     let hour = ((w.day_time() % 24000) as f32 / 1000.0 + 6.0) % 24.0;
     for id in w.players() {
         let Some(st) = w.entity(id) else { continue };
-        if st.age % 20 != 7 || w.creative(id) {
+        if st.age % 20 != 7 || w.outside_survival(id) {
             continue;
         }
         let inv = w.inventory(id);

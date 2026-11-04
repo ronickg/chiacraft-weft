@@ -106,7 +106,7 @@ pub fn strip(u: &mut Use) -> bool {
             .map_or([pos.x as f64 + 0.5, pos.y as f64 + 1.0, pos.z as f64 + 0.5], |e| e.pos.into());
         w.spawn_item(at, ItemStack::new(OAK_BARK.id(), BARK_PER_LOG));
     }
-    if !w.creative(player) {
+    if !w.outside_survival(player) {
         hotbar.set(slot, crate::felling::worn(axe, 1, DURABILITY.on_item(axe.item).unwrap_or(0)));
     }
     true

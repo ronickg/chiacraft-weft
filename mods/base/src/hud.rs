@@ -71,10 +71,10 @@ const THERMOMETER: (f32, f32) = (64.0, 5.0);
 const COLDEST: f32 = 31.0;
 const HOTTEST: f32 = 43.0;
 
-/// The player's vitals, none in creative or while dead (the bars hide: a dead player's are
+/// The player's vitals, none in creative or spectator or while dead (the bars hide: a dead player's are
 /// placeholders, health "0 / -1" over the death screen).
 fn vitals_of(c: &ClientView) -> Option<Vitals> {
-    if c.creative() || c.player_state().is_none_or(|m| m.health <= 0.0) {
+    if c.outside_survival() || c.player_state().is_none_or(|m| m.health <= 0.0) {
         return None;
     }
     c.component(&VITALS)

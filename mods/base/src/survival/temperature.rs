@@ -35,7 +35,7 @@ pub fn register(r: &mut Registry) {
     r.hud_element(&HUD_ROOM, hud_anchor::TOP_LEFT, 8, |ui| {
         // One line, wide enough not to wrap (in a narrow top-left column it broke a letter a line).
         ui.text_bind_styled(S::column().min_w(150.0).no_wrap(), |c, out| match c.component(&ROOM) {
-            Some(r) if r.wall > 0 && !c.creative() => {
+            Some(r) if r.wall > 0 && !c.outside_survival() => {
                 let wall = WALLS[(r.wall as usize - 1).min(WALLS.len() - 1)].name();
                 let gain = format!("{:+}", r.gain);
                 out.set("hud.base.room", &[Arg::Key(&format!("hud.base.wall.{wall}")), Arg::Text(&gain)]);

@@ -141,7 +141,7 @@ pub fn register(r: &mut Registry) {
                     .unwrap()
                     .push((w.dimension(), e.player, None));
             }
-            let survival = by_player && !w.creative(e.player);
+            let survival = by_player && !w.outside_survival(e.player);
             let (hotbar, slot) =
                 if by_player { (Some(w.inventory(e.player).group("hotbar")), w.selected_slot(e.player)) } else { (None, 0) };
             let tool = hotbar.as_ref().map_or(ItemStack::EMPTY, |h| h.get(slot));

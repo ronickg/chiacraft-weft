@@ -132,7 +132,7 @@ fn drill(u: &mut ItemUse, d: Drill) -> bool {
     } else {
         w.play_sound(&TRY, at, 0.6);
     }
-    if !w.creative(player) {
+    if !w.outside_survival(player) {
         let s = u.stack();
         let max = DURABILITY.on_stack(&s).unwrap_or(d.uses);
         u.set_stack(crate::felling::worn(s, 1, max));

@@ -135,7 +135,7 @@ fn tick(w: &World) {
             continue;
         }
         let underwater = breath::underwater(w, &st);
-        let creative = w.creative(id);
+        let creative = w.outside_survival(id);
         let Some(v) = w.component_mut(id, &VITALS) else { continue };
         breath::breathe(w, id, v, underwater && !creative);
         if creative {

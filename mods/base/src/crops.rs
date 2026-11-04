@@ -86,7 +86,7 @@ pub fn register(r: &mut Registry) {
     r.on(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter().filter(|e| e.player != 0 && TALL_GRASS.is(e.state)) {
-            if w.creative(e.player) || unit(w.random()) >= crops::WILD_SEED_CHANCE {
+            if w.outside_survival(e.player) || unit(w.random()) >= crops::WILD_SEED_CHANCE {
                 continue;
             }
             let biome = name_of(abi::entry_kind::BIOME, w.biome(e.pos));
@@ -185,7 +185,7 @@ fn top(r: &mut Registry, c: &'static Crop, from: u32) {
                 }
                 let below = b.pos.below();
                 let tool = if b.item == 0 { ItemStack::EMPTY } else { ItemStack::new(b.item, 1) };
-                w.break_block(below, tool, b.player, !w.creative(b.player));
+                w.break_block(below, tool, b.player, !w.outside_survival(b.player));
             }),
     );
 }

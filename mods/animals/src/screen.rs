@@ -44,7 +44,7 @@ pub fn init(r: &mut Registry) {
     r.menu(&FAMILY_MENU).screen(family_screen);
     r.packet(&PAGE, |p, [id, page]| {
         let (w, player) = (p.world(), p.player());
-        if !animal::ensure_rolled(&w, id) || !(crate::commands::can_command(&w, id, player) || w.creative(player)) {
+        if !animal::ensure_rolled(&w, id) || !(crate::commands::can_command(&w, id, player) || w.outside_survival(player)) {
             return;
         }
         let menu = [&ANIMAL_MENU, &GENES_MENU, &FAMILY_MENU][(page as usize).min(2)];
@@ -69,7 +69,7 @@ pub fn open(w: &World, player: u64, id: u64) -> bool {
     if w.component(id, &ANIMAL).is_none() || !animal::ensure_rolled(w, id) {
         return false;
     }
-    let full = crate::commands::can_command(w, id, player) || w.creative(player);
+    let full = crate::commands::can_command(w, id, player) || w.outside_survival(player);
     let spyglass = w.inventory(player).get(w.selected_slot(player)).item == SPYGLASS.id();
     w.open_menu(
         player,
@@ -92,7 +92,7 @@ pub fn interact(w: &World, id: u64, player: u64) -> bool {
     let sneaking = w
         .entity(player)
         .is_some_and(|p| p.pose == abi::pose::CROUCH);
-    if held == SPYGLASS.id() || (sneaking && (crate::commands::can_command(w, id, player) || w.creative(player))) {
+    if held == SPYGLASS.id() || (sneaking && (crate::commands::can_command(w, id, player) || w.outside_survival(player))) {
         return open(w, player, id);
     }
     false

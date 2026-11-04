@@ -277,14 +277,14 @@ fn step(w: &World, f: &mut Fall, now: u64) -> bool {
         hurt(w, f, deg);
         f.thudded_ground = deg >= 90.0;
     }
-    if deg > n::KNOCK_FROM {
-        if let Some(holder) = knock(w, f, deg) {
-            // It leans back a little onto what caught it and rests there.
-            let rest = (deg - n::HANG_BACK).max(n::KNOCK_FROM);
-            w.body_turn(f.body, f.pivot, quat(f.axis, rest), n::HANG_SETTLE_TICKS / 2);
-            f.hung = Some((rest, now, holder));
-            return true;
-        }
+    if deg > n::KNOCK_FROM
+        && let Some(holder) = knock(w, f, deg)
+    {
+        // It leans back a little onto what caught it and rests there.
+        let rest = (deg - n::HANG_BACK).max(n::KNOCK_FROM);
+        w.body_turn(f.body, f.pivot, quat(f.axis, rest), n::HANG_SETTLE_TICKS / 2);
+        f.hung = Some((rest, now, holder));
+        return true;
     }
     if t < end {
         return true;
@@ -406,10 +406,10 @@ fn settle(w: &World, f: &Fall, deg: f32, holder: [i32; 3]) {
     };
     for (&p, &state) in f.logs.iter().zip(&f.states) {
         let state = state_with(state, "axis", axis).unwrap_or(state);
-        if let Some(cell) = put(p, state) {
-            if base.is_none_or(|b| cell[1] < b[1]) {
-                base = Some(cell);
-            }
+        if let Some(cell) = put(p, state)
+            && base.is_none_or(|b| cell[1] < b[1])
+        {
+            base = Some(cell);
         }
     }
     for &(p, state) in &f.leaves {

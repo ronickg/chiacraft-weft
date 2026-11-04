@@ -40,7 +40,7 @@ pub fn register(r: &mut Registry) {
 
 /// Spends stamina on an action (nothing in creative).
 fn spend(w: &World, player: u64, amount: f32) {
-    if w.creative(player) {
+    if w.outside_survival(player) {
         return;
     }
     let mods = w

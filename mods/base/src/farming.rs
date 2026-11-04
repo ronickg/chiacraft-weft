@@ -58,7 +58,7 @@ pub fn till(u: &mut ItemUse) -> bool {
         return false;
     }
     w.set_block(p, FARMLAND.id());
-    if !w.creative(u.player()) {
+    if !w.outside_survival(u.player()) {
         u.set_stack(u.stack().add_wear(1));
     }
     true
@@ -74,7 +74,7 @@ fn fertilize(u: &mut ItemUse) -> bool {
         return false;
     }
     wear(&w, p, -(levels as i32));
-    if !w.creative(u.player()) {
+    if !w.outside_survival(u.player()) {
         u.set_stack(StackData::shrink(u.stack(), 1));
     }
     true
@@ -114,7 +114,7 @@ pub fn bin(u: &mut Use) -> bool {
     let spoiled = FRESHNESS.on_stack_own(&held) == Some(freshness::SPOILED);
     let Some(adds) = (if spoiled { Some(soil::SPOILED) } else { soil::composts(item_name(held.item)) }) else { return false };
     w.prop_set(p, "level", &(level + adds).min(soil::BIN_FULL).to_string());
-    if !w.creative(player) {
+    if !w.outside_survival(player) {
         inv.set(slot, StackData::shrink(held, 1));
     }
     true

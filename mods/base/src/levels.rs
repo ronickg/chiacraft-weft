@@ -104,7 +104,7 @@ fn tick(w: &World) {
         let Some(st) = w.entity(id) else { continue };
         let biome = w.biome([st.pos.x.floor() as i32, st.pos.y.floor() as i32, st.pos.z.floor() as i32]);
         let dim = w.dimension();
-        let creative = w.creative(id);
+        let creative = w.outside_survival(id);
         let Some(v) = w.component_mut(id, &VITALS) else { continue };
         let mut found = 0;
         if (biome as usize) < v.visited.len() * 32 && v.visited[biome as usize / 32] & 1 << (biome % 32) == 0 {
@@ -136,7 +136,7 @@ fn tick(w: &World) {
 /// What one carried goes into a tombstone where one died (the first open space at or over the
 /// spot), before the engine drops what's left.
 fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
-    if !w.creative(player) {
+    if !w.outside_survival(player) {
         crate::clothing::set_aside(w, player);
     }
     // This death's tombstone or none: never the last one's (integration review: dying in lava
@@ -149,7 +149,7 @@ fn tombstone(w: &World, player: u64, pos: [f64; 3]) {
     }
     let inv = w.inventory(player);
     let carried: Vec<ItemStack> = (0..inv.len()).map(|i| inv.get(i)).collect();
-    if carried.iter().all(|s| s.is_empty()) || w.creative(player) {
+    if carried.iter().all(|s| s.is_empty()) || w.outside_survival(player) {
         return;
     }
     // Into air, or water, lava or anything a block replaces (tall grass, snow), up to 8 above.

@@ -875,7 +875,7 @@ impl Game for WorldGame {
         }
     }
     fn creative(&mut self, player: u64) -> bool {
-        self.w.creative(player)
+        self.w.outside_survival(player)
     }
     fn give(&mut self, owner: u64, s: sandbox::ItemStack) -> sandbox::ItemStack {
         match real_stack(s) {

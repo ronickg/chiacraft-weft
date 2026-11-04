@@ -129,7 +129,7 @@ pub fn register(r: &mut Registry) {
     r.on(&PLAYER_RESPAWNED, |b| {
         let w = b.world();
         for p in b.iter() {
-            if w.creative(p.player) {
+            if w.outside_survival(p.player) {
                 continue;
             }
             let kept = w.component(p.player, &KEPT).unwrap_or([0; 5]);

@@ -116,7 +116,7 @@ pub fn init(r: &mut Registry) {
         let side = [[-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1]][face as usize % 6];
         let w = u.world();
         w.spawn(&NEST, [(p[0] + side[0]) as f64 + 0.5, (p[1] + side[1]) as f64, (p[2] + side[2]) as f64 + 0.5]);
-        if !w.creative(u.player()) {
+        if !w.outside_survival(u.player()) {
             u.set_stack(StackData::shrink(u.stack(), 1));
         }
         true

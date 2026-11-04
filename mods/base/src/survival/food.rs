@@ -40,7 +40,7 @@ pub fn register(r: &mut Registry) {
     // at the end).
     r.intercept(&actions::USE_ITEM, |q| {
         let w = q.world();
-        if w.creative(q.entity()) {
+        if w.outside_survival(q.entity()) {
             return Verdict::Abstain;
         }
         let player = q.entity();

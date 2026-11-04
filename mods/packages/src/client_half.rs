@@ -379,7 +379,7 @@ impl ClientGame for PlayerGame {
         self.c.view().raining()
     }
     fn creative(&mut self) -> bool {
-        self.c.view().creative()
+        self.c.view().outside_survival()
     }
     fn component(&mut self, name: &str) -> Option<Vec<u8>> {
         // A personal mod has no components of its own in any world.

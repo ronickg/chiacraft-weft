@@ -92,7 +92,7 @@ pub fn register(r: &mut Registry) {
     r.on(&actions::BREAK_BLOCK, |b| {
         let w = b.world();
         for e in b.iter() {
-            if e.player == 0 || w.creative(e.player) {
+            if e.player == 0 || w.outside_survival(e.player) {
                 continue;
             }
             let full = block_name(e.state);
@@ -215,7 +215,7 @@ fn put_down(u: &mut ItemUse, p: BlockPos, face: u32) -> bool {
     let s = u.stack();
     let block = if s.item == FLINT.id() { LOOSE_FLINT.id() } else { LOOSE_ROCK.id() };
     w.set_block(at, block);
-    if !w.creative(u.player()) {
+    if !w.outside_survival(u.player()) {
         u.set_stack(StackData::shrink(s, 1));
     }
     true
@@ -229,7 +229,7 @@ fn hand_part(shape: &str, material: &str, day: u32) -> ItemStack {
 
 /// Whether `player` may make the knapped head `r` makes from memory: once they've held one.
 fn knows(w: &World, player: u64, item: u32) -> bool {
-    w.creative(player)
+    w.outside_survival(player)
         || w.component(player, &crate::discovery::KNOWN)
             .is_some_and(|k| crate::discovery::held(&k, item_name(item)))
 }

@@ -223,7 +223,7 @@ fn client(r: &mut Registry) {
                 out.text("");
                 return;
             };
-            if c.creative() || me.health <= 0.0 {
+            if c.outside_survival() || me.health <= 0.0 {
                 out.text("");
                 return;
             }

@@ -80,7 +80,7 @@ fn bandage(u: &mut ItemUse) -> bool {
     v.bleed = 0.0;
     st.health = (st.health + BANDAGE_HEALS / HEALTH_SCALE).min(max);
     w.entity_edit(player).health(st.health);
-    if !w.creative(player) {
+    if !w.outside_survival(player) {
         u.set_stack(u.stack().shrink(1));
     }
     true
