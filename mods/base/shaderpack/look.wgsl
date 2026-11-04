@@ -756,9 +756,9 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let mie = (0.4e-4 + 2.0e-4 * scene.weather.z + 0.8e-4 * min(canopy(), 1.0)) * k;
     let far = dist * smoothstep(90.0, 450.0, dist);
     // Rain's own mist starts at the eye (Ronald, 11-05: "when raining shouldn't it be more
-    // misty??"): rain alone a soft veil (things fade out by about 375 blocks), a thunderstorm down
-    // to about 100.
-    let downpour = rain * (0.008 + 0.022 * scene.weather.w);
+    // misty??"): rain alone a soft veil (a third gone at 100 blocks), a thunderstorm down to about
+    // 150 (at twice that, a thunderstorm went white).
+    let downpour = rain * (0.004 + 0.016 * scene.weather.w);
     let veil = vec3(1.0) - exp(-((rayleigh + vec3(mie)) * far + vec3(downpour) * dist));
     // Only the last sixth of the view hands over to the sky's colour where the terrain ends.
     let edge = smoothstep(end * 0.84, end, dist);
