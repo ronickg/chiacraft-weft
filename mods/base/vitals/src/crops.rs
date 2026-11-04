@@ -55,7 +55,7 @@ const COOL: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base
 /// The crops. The grains are sown from their seed and give their grain; carrots, potatoes,
 /// beetroot and cassava from the root itself (cassava really from stem cuttings, beetroot from
 /// seed: a seed of its own waits for an icon); paddy rice's grain is its seed.
-pub const CROPS: [Crop; 14] = [
+pub const CROPS: [Crop; 15] = [
     c("base:wheat", "base:wheat_seeds", "base:wheat", (1, 1), 7, Soil::Tires, &[]),
     c(
         "base:barley",
@@ -89,6 +89,9 @@ pub const CROPS: [Crop; 14] = [
         Soil::Feeds,
         &["base:plains", "base:forest", "base:savanna", "base:mountains"],
     ),
+    // Tepary beans: the Sonoran desert's own bean, sown dry into the July monsoon and picked in
+    // September and October; a dry bean sows itself.
+    c("base:tepary_beans", "base:tepary_beans", "base:tepary_beans", (1, 3), 3, Soil::Feeds, &["base:desert"]),
     c("base:sorghum", "base:sorghum_seeds", "base:sorghum", (1, 1), 3, Soil::Tires, &["base:savanna", "base:plains", "base:desert"])
         .tall(2),
     c("base:millet", "base:millet_seeds", "base:millet", (1, 1), 3, Soil::Tires, &["base:savanna", "base:desert"]).tall(2),

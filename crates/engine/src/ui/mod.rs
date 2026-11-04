@@ -699,6 +699,10 @@ impl Ui {
                         text::layout_with(&t.spans, font, Some(inner.w / (t.scale * unit)), t.line.unwrap_or(font.line_height), t.mono);
                 } else if t.layout.width > 0.0 {
                     t.scale = (inner.w / (t.layout.width * unit)).max(0.25);
+                    // Squeezed text is smaller than the UI's one size (UI guide: one font, one
+                    // size): said once per text, so a check run lists every box too narrow for its
+                    // words in that language (the Russian pass, 11-04).
+                    squeezed(&text::plain_text(&t.spans), t.scale, inner.w);
                 }
             }
             return;
@@ -854,4 +858,20 @@ impl Ui {
         walk(self, 0, p, false, &mut best);
         best
     }
+}
+
+/// Logs, once per text and box width, that a no-wrap text was shrunk to fit a box narrower than its words.
+fn squeezed(text: &str, scale: f32, width: f32) {
+    thread_local! {
+        static SAID: std::cell::RefCell<rustc_hash::FxHashSet<String>> = Default::default();
+    }
+    if text.trim().is_empty() {
+        return;
+    }
+    SAID.with(|s| {
+        // per text and box: the same words can be too wide for one box and fit another
+        if s.borrow_mut().insert(format!("{text}\u{0}{width:.1}")) {
+            log::warn!("ui: \"{text}\" squeezed to {:.0}% to fit {width:.1} GUI px", scale * 100.0);
+        }
+    });
 }

@@ -19,8 +19,18 @@ static FANFARE: Sound = Sound::named("level_up");
 pub static TOMBSTONE: Block = Block::named("tombstone");
 static TOMBSTONE_MENU: Menu = Menu::named("tombstone");
 
-/// Seconds a level up's banner shows.
+/// Seconds a level up's banner shows (a milestone's, every `MILESTONE` levels), and its small toast
+/// (the others), and how far above the window's bottom the toast's text starts (GUI px: over the
+/// hotbar, 23, the level row, 12, and 2 of air, its line 8.5).
 const BANNER_SECS: f32 = 4.0;
+const TOAST_SECS: f32 = 2.5;
+const TOAST_ABOVE: f32 = 23.0 + 12.0 + 2.0 + 8.5;
+const MILESTONE: u32 = 5;
+
+/// A level that gets the big banner.
+fn milestone(level: u32) -> bool {
+    level.is_multiple_of(MILESTONE)
+}
 
 /// Points to place: a level's each, less those placed.
 pub fn unspent(v: &base_api::Vitals) -> u32 {
@@ -245,8 +255,12 @@ fn after(v: &base_api::Vitals) -> base_api::Vitals {
 
 /// The stats screen's columns after the bar (GUI pixels): the value now (right-aligned), its unit,
 /// the value after the waiting points (right-aligned), the points waiting (centred).
-const NOW_W: f32 = 18.0;
-const UNIT_W: f32 = 16.0;
+/// (as wide as their words in either language: "сейчас" 20.5 and "units" 17.5 GUI px were shrunk
+/// at 18 and 16, the Russian pass)
+const NOW_W: f32 = 21.0;
+/// The stat names' column, as wide as the longest in either language ("Выносливость", 42.5 GUI px).
+const NAME_W: f32 = 43.0;
+const UNIT_W: f32 = 18.0;
 const AFTER_W: f32 = 18.0;
 const WAITING_W: f32 = 8.0;
 
@@ -261,7 +275,15 @@ const POINTS_FULL: f32 = 20.0;
 const BAR_BASE: f32 = 0.3;
 
 fn client(r: &mut Registry) {
-    r.client_packet(&LEVEL_UP, |_, level| BANNERS.lock().unwrap().push((level, None)));
+    r.client_packet(&LEVEL_UP, |_, level| {
+        let mut banners = BANNERS.lock().unwrap();
+        // Level ups early come every few chops: a small one not shown yet gives way to the next
+        // (Ronald's first-day test, 11-04: "Level 3!", "Level 4!" over the screen's middle).
+        if !milestone(level) {
+            banners.retain(|&(l, shown)| milestone(l) || shown.is_some());
+        }
+        banners.push((level, None));
+    });
     r.client_frame(|c| {
         let mut banners = BANNERS.lock().unwrap();
         let Some((level, shown)) = banners.first_mut() else { return };
@@ -272,16 +294,25 @@ fn client(r: &mut Registry) {
             *shown = None;
             return;
         }
+        let big = milestone(*level);
         let start = *shown.get_or_insert_with(|| {
-            c.play_sound(&FANFARE, None, 1.0);
+            c.play_sound(&FANFARE, None, if big { 1.0 } else { 0.5 });
             Instant::now()
         });
-        if start.elapsed().as_secs_f32() > BANNER_SECS {
+        if start.elapsed().as_secs_f32() > if big { BANNER_SECS } else { TOAST_SECS } {
             banners.remove(0);
             return;
         }
-        c.screen_text(0.5, 0.22, "levels.base.up", &[Arg::Int(*level as i64)], 0xffbe45ff, 2.0);
-        c.screen_text(0.5, 0.22 + 0.05, "levels.base.place", &[], 0xf5e4bcff, 1.0);
+        if big {
+            c.screen_text(0.5, 0.22, "levels.base.up", &[Arg::Int(*level as i64)], 0xffbe45ff, 2.0);
+            c.screen_text(0.5, 0.22 + 0.05, "levels.base.place", &[], 0xf5e4bcff, 1.0);
+            return;
+        }
+        // The small one: one line just above the level row over the hotbar (`hud.rs`, HUD_LEVEL),
+        // clear of the screen's middle.
+        let st = c.state();
+        let gh = st.window[1] as f32 / st.gui_scale.max(1.0);
+        c.screen_text(0.5, (gh - TOAST_ABOVE) / gh, "levels.base.toast", &[Arg::Int(*level as i64)], 0xffbe45ff, 1.0);
     });
     // The stats (the UI redo's stats screen): the level on a badge with the XP bar and the points
     // to place, then each stat as a bar with its value inside, its points and a +.
@@ -329,7 +360,7 @@ fn client(r: &mut Registry) {
                 // The header in the rows' columns: "now" over the values, "after" over what the
                 // waiting points make of them, each lined up as its values are (right).
                 ui.row(S::row().gap(4.0), |ui| {
-                    ui.row(S::row().w(8.0 + 4.0 + 40.0 + 4.0 + STAT_BAR.0), |_| {});
+                    ui.row(S::row().w(8.0 + 4.0 + NAME_W + 4.0 + STAT_BAR.0), |_| {});
                     ui.row(S::row().w(NOW_W).end(), |ui| ui.text_styled(S::default().class("dim").no_wrap(), "levels.base.now_head", &[]));
                     ui.row(S::row().w(UNIT_W), |_| {});
                     ui.row(S::row().w(AFTER_W).end(), |ui| {
@@ -339,7 +370,7 @@ fn client(r: &mut Registry) {
                 for (i, stat) in stats::ALL.into_iter().enumerate() {
                     ui.row(S::row().gap(4.0).center(), |ui| {
                         ui.image(&format!("base:gui/stat_icon_{}", stat.name()), 8.0, 8.0);
-                        ui.text_styled(S::default().w(40.0).no_wrap(), &format!("stat.base.{}", stat.name()), &[]);
+                        ui.text_styled(S::default().w(NAME_W).no_wrap(), &format!("stat.base.{}", stat.name()), &[]);
                         ui.progress_bind(
                             Box::leak(format!("stat_{}", stat.name()).into_boxed_str()),
                             S::default().size(STAT_BAR.0, STAT_BAR.1),

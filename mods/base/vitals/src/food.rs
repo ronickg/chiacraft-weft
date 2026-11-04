@@ -380,6 +380,28 @@ pub const FOODS: &[Food] = &[
         poison: 0.0,
         category: Category::Fruit,
     },
+    // Black huckleberries (USDA's wild blueberries stand in) and beach plums (USDA's plums stand
+    // in, the wild fruit tarter), a handful each.
+    Food {
+        name: "base:huckleberries",
+        grams: 100.0,
+        per100: per(84.2, 0.7, 12.1, 0.3, 2.4, 9.7),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (5.0, 5.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
+    Food {
+        name: "base:beach_plums",
+        grams: 100.0,
+        per100: per(87.2, 0.7, 10.0, 0.3, 1.4, 9.5),
+        meal: Meal::Cooling,
+        raw: false,
+        keeps: (5.0, 5.0),
+        poison: 0.0,
+        category: Category::Fruit,
+    },
     // Prickly pear fruit (tunas, USDA), a large one.
     Food {
         name: "base:prickly_pear_fruit",
@@ -422,6 +444,29 @@ pub const FOODS: &[Food] = &[
         meal: Meal::Plain,
         raw: false,
         keeps: (60.0, 60.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    // Chia seeds (USDA's Salvia hispanica stands in for the desert's columbariae), a handful
+    // (30 g): fat, protein and a great deal of fibre, keeping a year; tepary beans, dry (estimates
+    // near the common bean's dry seed: about 24% protein, 17% fibre), a handful (50 g).
+    Food {
+        name: "base:chia_seeds",
+        grams: 30.0,
+        per100: per(5.8, 16.5, 7.7, 30.7, 34.4, 1.6),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (365.0, 365.0),
+        poison: 0.0,
+        category: Category::Seeds,
+    },
+    Food {
+        name: "base:tepary_beans",
+        grams: 50.0,
+        per100: per(10.0, 23.6, 43.0, 1.4, 17.0, 0.0),
+        meal: Meal::Plain,
+        raw: false,
+        keeps: (365.0, 365.0),
         poison: 0.0,
         category: Category::Seeds,
     },
