@@ -212,6 +212,7 @@ pub static HOST: Host = Host {
     client_sound_set: crate::app::api::client_sound_set,
     client_sound_stop: crate::app::api::client_sound_stop,
     client_sound_playing: crate::app::api::client_sound_playing,
+    set_day_rate,
     reg_spawn,
     biome_at,
     navigate,
@@ -1025,6 +1026,14 @@ unsafe extern "C" fn set_time(w: *mut abi::WorldCtx, time: u64) {
         let d = dim(w);
         d.events
             .push(crate::server::DimEvent::SetTime { dim: d.id, time })
+    }
+}
+
+unsafe extern "C" fn set_day_rate(w: *mut abi::WorldCtx, rate: f32) {
+    unsafe {
+        let d = dim(w);
+        d.events
+            .push(crate::server::DimEvent::SetDayRate { dim: d.id, rate })
     }
 }
 

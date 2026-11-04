@@ -66,8 +66,9 @@ impl Client {
             ToClient::Saved { dim, cubes } if dim == self.world.dim => fwd.push(terrain::In::Saved(cubes)),
             ToClient::Edits { dim, specs, all } if dim == self.world.dim => fwd.push(terrain::In::Edits { specs, all }),
             ToClient::Signals { dim, frame, changes } if dim == self.world.dim => self.wires.power_changed(frame, &changes),
-            ToClient::Time { dim, time } if dim == self.world.dim => {
+            ToClient::Time { dim, time, rate } if dim == self.world.dim => {
                 self.world.time = time;
+                self.day_rate = rate;
                 self.since_time = 0;
             }
             ToClient::Teleport { dim, pos, frame } => self.teleported(dim, pos, frame, fwd),
