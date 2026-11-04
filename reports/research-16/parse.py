@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Research round 15: BENCH lines -> per-pass GPU ms tables, and each effect's cost as (all - no_<fx>).
+"""Research round 16: BENCH lines -> per-pass GPU ms tables, and each effect's cost as (all - no_<fx>).
 usage: parse.py bench.txt [more bench.txt...]   (one file per window size)"""
 import re, sys
 PARTS = ["upload", "compute", "shadows", "world", "translucent", "effects", "ui", "rest"]

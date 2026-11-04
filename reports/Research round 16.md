@@ -1,4 +1,4 @@
-# Research round 15: where the frame goes, and what would make it faster
+# Research round 16: where the frame goes, and what would make it faster
 
 Researcher, 2026-11-05, for Planner, Lighting and Distant terrain. Ronald asked: "get a resercher to check our currnet shader code and lod stuff and check for speed improvements". Later, relayed by Planner: "u can also check out voxy and distant horzions code and also horiztion the rust mc ports code for some ideas as well".
 
@@ -9,9 +9,9 @@ Researcher, 2026-11-05, for Planner, Lighting and Distant terrain. Ronald asked:
 - `post.rs` and `post.wgsl`;
 - the shadow passes (`client/mod.rs`, `world_render.rs`);
 - distant terrain (`lod.rs`, `terrain_gpu.rs`, `gpu_layout.rs`, `fs_lod`);
-- the source of Voxy, Distant Horizons and Horizon (that section is in [research-15/sources.md](research-15/sources.md)).
+- the source of Voxy, Distant Horizons and Horizon (that section is in [research-16/sources.md](research-16/sources.md)).
 
-**Files:** raw bench lines in `reports/research-15/pc/` and the parser in `reports/research-15/parse.py`. Scripts in `~/Coding/chiacraft-archive/tester-tools/scripts/r15_*_2026-11-05.txt`, shots in `~/Coding/chiacraft-archive/images/researcher/2026-11-05/r15/` (`r15_scenes_3456.jpg` is the five views).
+**Files:** raw bench lines in `reports/research-16/pc/` and the parser in `reports/research-16/parse.py`. Scripts in `~/Coding/chiacraft-archive/tester-tools/scripts/r15_*_2026-11-05.txt`, shots in `~/Coding/chiacraft-archive/images/researcher/2026-11-05/r15/` (`r15_scenes_3456.jpg` is the five views). Those archive files keep the `r15_` prefix they were made with: this round was drafted as 15 and renumbered when the weather Researcher's report took that number.
 
 ## The short answer
 
@@ -69,7 +69,7 @@ PC, RTX 5090, 3456×2234 at full scale, ms of GPU per frame. "Mac" is the estima
 | shadows off (pass plus all sampling) | 0.36 | 0.41 | 0.41 | 0.33 | 0.41 | 0.8–0.9 |
 | of which the far map (near only instead of both) | 0.09 | 0.02 | 0.09 | 0.09 | 0.10 | |
 
-The same at 1920×1080: whole frame 0.76–1.07 ms; all effects 0.18–0.37 (shafts 0.15 toward the sun, volume 0.04–0.10, bloom 0.03–0.05, reflect 0.02–0.06); shadows 0.14–0.19. At 1280×720: whole frame 0.51–0.69 ms, all effects 0.09–0.17, shadows 0.09–0.13. Full tables: `python3 reports/research-15/parse.py reports/research-15/pc/*.txt`.
+The same at 1920×1080: whole frame 0.76–1.07 ms; all effects 0.18–0.37 (shafts 0.15 toward the sun, volume 0.04–0.10, bloom 0.03–0.05, reflect 0.02–0.06); shadows 0.14–0.19. At 1280×720: whole frame 0.51–0.69 ms, all effects 0.09–0.17, shadows 0.09–0.13. Full tables: `python3 reports/research-16/parse.py reports/research-16/pc/*.txt`.
 
 Bad weather and a moving camera are in their own sections below.
 
@@ -184,7 +184,7 @@ What it shows:
 
 ## Ideas from Voxy, Distant Horizons and Horizon
 
-Full comparison, licences and file paths: [research-15/sources.md](research-15/sources.md). Short version:
+Full comparison, licences and file paths: [research-16/sources.md](research-16/sources.md). Short version:
 - **Licences.** Voxy's licence is "All rights reserved" (ideas only); Distant Horizons is LGPL v3 (ideas only); Horizon (github.com/horizon-rust/horizon, the Rust Minecraft rewrite Ronald meant) is MIT.
 - **Taken into the ranking:** coarse-first loading, a level of tolerance, the old mesh kept until the new one is in, and many high-priority mesh threads (#4, #7); camera-facing face ranges per tile (#8); two-phase depth occlusion and cave culling (#12); a request budget that follows the mesher queue, and an upload time budget (both part of #4).
 - **Not taken:**

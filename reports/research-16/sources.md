@@ -1,4 +1,4 @@
-# Research round 15: Voxy, Distant Horizons and Horizon, read from source
+# Research round 16: Voxy, Distant Horizons and Horizon, read from source
 
 Ronald (relayed by Planner, 11-05): "u can also check out voxy and distant horzions code and also horiztion the rust mc ports code for some ideas as well".
 
