@@ -10,3 +10,4 @@ Merge e9c8405c on sync/weft-26.11.2. Things the merge dropped or left for an own
 - base parts tools: set stack `layers` (not only `core:look`): slot icons (ui/render.rs:783) and held items (HELD_LOOK now carries layers) read layers; keep a core:look fallback for saved stacks
 - base shaderpack model.wgsl: upstream's hand and entity-effect hooks, keep fs_shadow (Lighting); mobs cast no sun shadow until then
 - world_render.rs:1407 LOD fade for CubeTable-culled solid cubes (Lighting + Distant terrain)
+- base: upstream renamed copper_lamp to golden_lamp (gold recipe); its golden_lamp textures are upstream's 16 px: Art to redraw at 32 px; our 32 px copper_lamp pngs are unused now

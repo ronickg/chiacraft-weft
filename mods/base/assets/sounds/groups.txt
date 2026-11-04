@@ -6,4 +6,4 @@ dirt: base:dirt base:clay base:farmland base:podzol base:charcoal_clamp
 snow: base:snow base:snowy_grass
 ice: base:ice
 leaves: #leaves
-metal: base:iron_block base:gold_block base:copper_lamp
+metal: base:iron_block base:gold_block base:golden_lamp
