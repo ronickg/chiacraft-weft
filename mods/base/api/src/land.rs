@@ -53,6 +53,7 @@ pub mod salt {
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
     pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const FRAY: u64 = 0xF4A;
     pub const CANYONS: u64 = 0xCA1;
     pub const CANYON_AREA: u64 = 0xCA2;
     pub const CANYON_WARP: u64 = 0xCA3;
@@ -1037,6 +1038,52 @@ pub fn biome_edge(f: &Fields, x: i32, z: i32, height: i32) -> Option<Edge> {
     None
 }
 
+/// Biome borders that fray (Ronald, 11-04: "All 3: 1, 2, 3"): where two biomes with different
+/// ground meet (the desert's sand against grass, the taiga's podzol, the snowy plains' snow-grass),
+/// the neighbour's ground comes in patches (`FRAY_SIZE` blocks across) over the border band
+/// (`biome_edge`): on the border `FRAY_SHARE` of the ground is the other's, less further in.
+pub const FRAY_SHARE: f64 = 0.55;
+pub const FRAY_SIZE: f64 = 7.0;
+
+/// A biome's ground: its top block and what lies under it (base's biome rules' `surface`).
+pub fn surface_of(biome: &str) -> (&'static str, &'static str) {
+    match biome {
+        "desert" | "beach" => ("sand", "sand"),
+        "taiga" => ("podzol", "dirt"),
+        "snowy_plains" => ("snowy_grass", "dirt"),
+        _ => ("grass", "dirt"),
+    }
+}
+
+/// The ground column (`x`, `z`) (Q4), `height` blocks high, takes from the biome over the border,
+/// if it frays here: its top and under block. Cheap away from the borders that change the ground
+/// (a test of the climate against their thresholds first).
+pub fn fray(f: &Fields, x: i32, z: i32, height: i32) -> Option<(&'static str, &'static str)> {
+    let here = Here::new(f, x, z);
+    let (t, hu) = (here.temperature(), here.humidity());
+    let band = q12(EDGE_BAND);
+    let close = |v: i32, at: f64| (v - q12(at)).abs() < band;
+    let ground_border = close(t, SNOWY_BELOW)
+        || close(t, TAIGA_BELOW)
+        || (close(t, DESERT.0) && hu < q12(DESERT.1) + band)
+        || (close(hu, DESERT.1) && t >= q12(DESERT.0) - band);
+    if !ground_border {
+        return None;
+    }
+    let e = biome_edge(f, x, z, height)?;
+    let own = biome_at(f, x, z, height);
+    // The coasts and the mountains keep their own ground (theirs are height rules, not climate).
+    if matches!(own, "beach" | "ocean" | "mountains") {
+        return None;
+    }
+    let theirs = surface_of(e.to);
+    if surface_of(own) == theirs {
+        return None;
+    }
+    let n = ONE / 2 + f.fbm(salt::FRAY, x, z, q4(FRAY_SIZE), 2) * 2;
+    (n < (q12(FRAY_SHARE) * e.near) >> 12).then_some(theirs)
+}
+
 /// The snow line (blocks) at temperature `t` (Q12): the band's height from `SNOW_LINES`.
 pub fn snow_line(t: i32) -> i32 {
     SNOW_LINES
@@ -1132,8 +1179,12 @@ pub fn strata(seed: u64, [x, y, z]: [i32; 3]) -> &'static str {
 /// The overworld biome the rules in `mods/base/src/land.rs` pick at (`x`, `z`) (Q4), by name, in
 /// their order: for the map preview and the checks here (the engine's own pick is the truth).
 pub fn overworld_biome(f: &Fields, x: i32, z: i32) -> &'static str {
+    biome_at(f, x, z, height(f, x, z) >> 4)
+}
+
+/// `overworld_biome` for ground `h` blocks high, already known.
+fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
     let here = Here::new(f, x, z);
-    let h = height(f, x, z) >> 4;
     let (t, hu, c) = (here.temperature(), here.humidity(), here.continent());
     let at = |v: f64| q12(v);
     if h <= SEA - 2 && c < at(OCEAN_CONTINENT) {
@@ -1315,6 +1366,21 @@ mod tests {
             }
         }
         assert!(deep > 0, "no canyon 20 deep in 3.2 km");
+    }
+
+    #[test]
+    fn borders_fray_only_where_the_ground_changes() {
+        let f = fields(1);
+        let mut frayed = 0;
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 8 * 16 - 800 * 16, (i / 200) * 8 * 16 - 800 * 16);
+            let h = height(&f, x, z) >> 4;
+            if let Some((top, _)) = fray(&f, x, z, h) {
+                assert_ne!(top, surface_of(overworld_biome(&f, x, z)).0, "a fray to the same ground at {x} {z}");
+                frayed += 1;
+            }
+        }
+        assert!(frayed > 0 && frayed < 4_000, "{frayed} frayed columns of 40 000");
     }
 
     #[test]
