@@ -561,13 +561,17 @@ fn animal_screen(ui: &mut Ui) {
                         ui.image(&icon, 8.0, 8.0);
                         match label {
                             "health" => life_bar(ui, class, |c| {
-                                let a = c.menu_component(&ANIMAL).filter(|a| a.species().is_some())?;
+                                let a = c
+                                    .menu_component(&ANIMAL)
+                                    .filter(|a| a.species().is_some())?;
                                 let e = c.menu_owner().and_then(|id| c.client().entity(id))?;
                                 let max = a.stat(species::HEALTH) * crate::comfort::condition(&a);
                                 Some((e.health / max.max(0.1), format!("{:.0} / {:.0}", e.health, max)))
                             }),
                             "food" => life_bar(ui, class, |c| {
-                                let a = c.menu_component(&ANIMAL).filter(|a| a.species().is_some())?;
+                                let a = c
+                                    .menu_component(&ANIMAL)
+                                    .filter(|a| a.species().is_some())?;
                                 let max = a.stat(species::FOOD).round();
                                 Some((a.food as f32 / max.max(1.0), format!("{} / {:.0}", a.food, max)))
                             }),
