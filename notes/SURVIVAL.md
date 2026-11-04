@@ -593,3 +593,12 @@ chosen without Ronald, logged in `notes/crew/OVERNIGHT.md`; `mods/base/src/death
 - With the respawn kit (plain clothes, the arrival meal, full stamina: steps 13 and 11).
 - Not yet: a beam or marker in the world at the tombstone (needs the engine), the tombstone
   crumbling after a while.
+
+**16. Difficulty on Create World, and Gentle's grace** (2026-11-04 overnight, the first-hour report;
+logged in `notes/crew/OVERNIGHT.md`):
+
+- The world rule reads "Survival difficulty" (it read "Survival", like a game mode), and its
+  tooltip says what Gentle does. The Create New World screen doesn't show rules' tooltips yet:
+  that is the engine's (`saves.rs`).
+- Gentle's grace: in a new world's first three nights no monsters appear by themselves
+  (`Difficulty::grace_nights`, counted from the world's first day; normal and harsh 0).
