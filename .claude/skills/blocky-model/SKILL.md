@@ -23,9 +23,8 @@ The numbers are in `scripts/house.py`; build scripts import them instead of choo
 
 - **One texel density: 64 texels a block** (a block is a meter: a texel is 1.6 cm), for every
   model: creatures, props, eggs. Lay a model out in units of one texel and export with
-  `house.SCALE` (0.25 model pixels a unit). Terrain blocks keep the base game's 16-pixel
-  textures; inventory icons come from the `game-art` skill (generated, cut to 24 GUI pixels), and
-  held items are box models made from them (see "Items from icons").
+  `house.SCALE` (0.25 model pixels a unit). Terrain blocks are 32 × 32 (decided 2026-11-03, from the style guides in `game-art`); inventory icons come from the `game-art` skill (generated at 32 × 32), and
+  items are held as those flat pictures (box models from them are set aside: "Items from icons").
 - **Small creatures paint finer** (Ronald, 2026-11-03): when a head is only 2-3 units across (a
   mouse, a vole, a small lizard), keep the layout in house units but paint `house.FINE` (4)
   texels a unit, 256 a block, so the face has room for a designed eye and the faces aren't one
@@ -37,7 +36,9 @@ The numbers are in `scripts/house.py`; build scripts import them instead of choo
   quarter steps, ambient occlusion from the boxes, light lower near the ground). Never paint
   light, outlines or shadows by hand; designed features (eyes, toes, blotches) are areas that the
   same light then shades.
-- **Colors**: `house.MATERIALS`, natural and a little muted, the shadow hue by substance (warm for
+- **Colors**: an animal's or monster's look (coat colors, markings, face) is agreed first as a concept
+  sprite with the `game-art` skill (`guides/4 Animals`, Part 4 says what carries over to a box
+  model); then `house.MATERIALS`, natural and a little muted, the shadow hue by substance (warm for
   anything alive or earthen, purple for stone and metal, cool for eggshell). No pure black or
   white. An animal's coat comes from its genes on the client (see "Coats on the fly"); paint the
   model in its species' most common coat.
@@ -477,6 +478,11 @@ scrape, each also with eggs) and `mods/animals/source/egg` (`build.py --variants
 on one layout).
 
 ## Items from icons (held models)
+
+Set aside for now (2026-11-03): Ronald wants items flat, as in Minecraft. The tools' models,
+made the way below for all 25 tools, are in `mods/base/source/items/tools.py` (one layout per
+kind, each tier's finish), built and shot in Blockbench by `bb_items.py`; they write nothing into
+the game until run, and the icons themselves come from the `game-art` skill.
 
 Items (tools, weapons, food) are 3D box models drawn in the hand, made from their inventory icon
 (the `game-art` skill: Ronald generates the icons, Claude cuts them). The model doesn't copy the

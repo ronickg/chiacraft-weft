@@ -1,0 +1,74 @@
+[
+ {
+  "id": "wood_pickaxe",
+  "kind": "item",
+  "group": "Tools",
+  "w": 32,
+  "h": 32,
+  "grid": 0.156,
+  "colors": 174
+ },
+ {
+  "id": "iron_axe",
+  "kind": "item",
+  "group": "Tools",
+  "w": 32,
+  "h": 32,
+  "grid": 0.228,
+  "colors": 131
+ },
+ {
+  "id": "diamond_shovel",
+  "kind": "item",
+  "group": "Tools",
+  "w": 32,
+  "h": 32,
+  "grid": 0.221,
+  "colors": 124
+ },
+ {
+  "id": "stone_sword",
+  "kind": "item",
+  "group": "Weapons",
+  "w": 32,
+  "h": 32,
+  "grid": 0.049,
+  "colors": 90
+ },
+ {
+  "id": "gold_sword",
+  "kind": "item",
+  "group": "Weapons",
+  "w": 32,
+  "h": 32,
+  "grid": 0.129,
+  "colors": 106
+ },
+ {
+  "id": "club",
+  "kind": "item",
+  "group": "Weapons",
+  "w": 32,
+  "h": 32,
+  "grid": 0.093,
+  "colors": 129
+ },
+ {
+  "id": "iron_chestplate",
+  "kind": "item",
+  "group": "Armour",
+  "w": 32,
+  "h": 32,
+  "grid": 0.057,
+  "colors": 188
+ },
+ {
+  "id": "diamond_helmet",
+  "kind": "item",
+  "group": "Armour",
+  "w": 32,
+  "h": 32,
+  "grid": 0.059,
+  "colors": 170
+ }
+]

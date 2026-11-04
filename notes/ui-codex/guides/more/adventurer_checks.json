@@ -1,0 +1,19 @@
+{
+ "kind": "monster",
+ "what": "the player, an adventurer, side view facing right: a warm green tunic with a leather belt and pouch, brown trousers and boots, a short travelling cape, a pickaxe in hand, warm skin, an expressive face",
+ "size": [
+  32,
+  48
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.252,
+   "outline": 0.63,
+   "red_line": 0.15,
+   "fill": 0.46,
+   "passed": true
+  }
+ ]
+}

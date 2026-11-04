@@ -34,6 +34,8 @@ pub enum Form {
     Spreads,
     /// It stands as it is.
     Still,
+    /// A fallen log lying on the ground, a full block, rotting (grubs live in it).
+    Log,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -75,6 +77,8 @@ pub const PRAIRIE: &[&str] = &["base:plains"];
 pub const CYCAD_LANDS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:floodplain", "animals:fern_forest", "animals:crags"];
 pub const FLOWERING: &[&str] = &["animals:floodplain", "animals:scrubland"];
 pub const PONDS: &[&str] = &["animals:floodplain", "animals:red_dunes"];
+/// Where the Cretaceous's trees fall and rot: its forests and the wooded floodplain.
+pub const DEADWOOD: &[&str] = &["animals:floodplain", "animals:fern_forest"];
 
 const fn w(
     block: &'static str,
@@ -90,7 +94,7 @@ const fn w(
 /// Covers are shares of the cells of that ground (tall grass covers 5-35% of the turf, berry bushes
 /// 0.4% of the forest's; `forage::GRASS_COVER`): the tundra's sedges and cottongrass are its grass,
 /// the bushes and mushrooms are found, not walked through.
-pub const WILD: [Wild; 19] = [
+pub const WILD: [Wild; 20] = [
     w("base:sedge", Form::Tuft, Ground::Soil, None, SEDGE_LANDS, 0.12),
     w("base:cottongrass", Form::Tuft, Ground::Soil, None, TUNDRA, 0.08),
     w("base:reindeer_lichen", Form::Tuft, Ground::Soil, None, NORTH, 0.05),
@@ -110,6 +114,7 @@ pub const WILD: [Wild; 19] = [
     w("animals:cycad", Form::Still, Ground::Soil, Some("animals:cycad_seed"), CYCAD_LANDS, 0.01),
     w("animals:flowering_shrub", Form::Still, Ground::Soil, None, FLOWERING, 0.02),
     w("animals:water_lily", Form::Still, Ground::Water, None, PONDS, 0.06),
+    w("animals:rotten_log", Form::Log, Ground::Soil, None, DEADWOOD, 0.004),
 ];
 // Kelp waits: the engine has no block that stands in water yet.
 
@@ -141,7 +146,7 @@ mod tests {
     #[test]
     fn every_wild_plant_has_its_numbers() {
         for p in &WILD {
-            if p.form != Form::Still {
+            if !matches!(p.form, Form::Still | Form::Log) {
                 assert!(crate::plants::of(p.block).is_some(), "{}: no row in plants::PLANTS", p.block);
             }
             if let Some(item) = p.gives.filter(|g| *g != p.block) {

@@ -506,9 +506,10 @@ const OPS: &[(&str, &str, Run)] = &[
         Ok(String::new())
     }),
     ("survey", "<r:int>", |w, cmd, _, me| {
-        // Biomes of every block within `r` of the player, and where glow crystals are.
+        // Biomes of every block within `r` of the player, and where glow crystals are (when the
+        // test mod that has them is loaded).
         let r: i32 = int(cmd, "r")?;
-        let crystal = Block::lookup("testmod:glow_crystal").ok_or("no crystal block")?;
+        let crystal = Block::lookup("testmod:glow_crystal").map(block_of);
         let cave = Tag::named("cave");
         let mut biomes: std::collections::BTreeMap<&str, u32> = Default::default();
         let (mut in_cave, mut elsewhere) = (0, 0);
@@ -517,7 +518,7 @@ const OPS: &[(&str, &str, Run)] = &[
                 for x in me[0] - r..=me[0] + r {
                     let b = w.biome([x, y, z]);
                     *biomes.entry(name_of(ek::BIOME, b)).or_default() += 1;
-                    if block_of(w.get([x, y, z])) == block_of(crystal) {
+                    if crystal.is_some_and(|c| block_of(w.get([x, y, z])) == c) {
                         if cave.on_biome(b) { in_cave += 1 } else { elsewhere += 1 }
                     }
                 }

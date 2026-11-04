@@ -58,6 +58,8 @@ pub const BROWSE: f32 = 0.4;
 const GREEN: u8 = 1 | 2 | 4;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
+const SPRING_SUMMER: u8 = 1 | 2;
+const AUTUMN: u8 = 4;
 const AUTUMN_WINTER: u8 = 4 | 8;
 const WINTER: u8 = 8;
 const ALL_YEAR: u8 = 15;
@@ -77,9 +79,12 @@ const TURF: &[&str] = &[
 ];
 /// Where oaks grow (the plains' and swamp's few trees are oaks, the forest's mostly).
 const OAKS: &[&str] = &["base:forest", "base:plains", "base:swamp"];
+const MESQUITE: &[&str] = &["base:desert", "base:savanna"];
+const ARAUCARIAS: &[&str] = &["animals:scrubland", "animals:floodplain", "animals:fern_forest", "animals:crags"];
+const SCALE_CONIFERS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:crags"];
 const BIRCHES: &[&str] = &["base:forest", "base:birch_forest"];
 
-pub const SOURCES: [Source; 54] = [
+pub const SOURCES: [Source; 66] = [
     s("base:tall_grass", None, Category::Grass, 10, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
     s("base:berry_bush", Some(3), Category::Fruit, 8, Eaten::Age(1), Some("base:berry_bush")),
     browse("base:oak_leaves", Category::Leaves, 4, OAKS, GREEN),
@@ -187,12 +192,32 @@ pub const SOURCES: [Source; 54] = [
     browse("animals:cycad", Category::Seeds, 3, wild::CYCAD_LANDS, SUMMER_AUTUMN),
     browse("animals:flowering_shrub", Category::Leaves, 4, wild::FLOWERING, GREEN),
     browse("animals:water_lily", Category::WaterPlants, 5, wild::PONDS, ALL_YEAR),
+    // Grubs and beetles in the rotten logs, all year.
+    browse("animals:rotten_log", Category::Insects, 3, wild::DEADWOOD, ALL_YEAR),
+    // Our trees (`worldgen.rs`, `cretaceous.rs`), as browse where they grow: mesquite's leaves
+    // and, June to October, its pods (the desert's biggest single food); the acuri palm's nuts
+    // in the Pantanal's dry season and the moriche's fruit from the llanos' late dry season
+    // into the rains.
+    browse("base:mesquite_leaves", Category::Leaves, 4, MESQUITE, GREEN),
+    browse("base:mesquite_leaves", Category::Seeds, 4, MESQUITE, SUMMER_AUTUMN),
+    browse("base:acuri_palm_leaves", Category::Seeds, 5, &["base:swamp"], AUTUMN_WINTER),
+    browse("base:moriche_palm_leaves", Category::Fruit, 5, &["base:savanna", "base:swamp"], SPRING_SUMMER),
+    // The Cretaceous's: araucaria, rich foliage and big cones late in the wet season; ginkgo
+    // leaves and their fleshy seeds in autumn; swamp cypress, deciduous; the scale-leaved
+    // conifers and Tempskya's fronds, poor all year.
+    browse("animals:araucaria_leaves", Category::Leaves, 5, ARAUCARIAS, ALL_YEAR),
+    browse("animals:araucaria_leaves", Category::Seeds, 4, ARAUCARIAS, AUTUMN),
+    browse("animals:ginkgo_leaves", Category::Leaves, 4, &["animals:fern_forest"], GREEN),
+    browse("animals:ginkgo_leaves", Category::Fruit, 4, &["animals:fern_forest"], AUTUMN),
+    browse("animals:swamp_cypress_leaves", Category::Leaves, 3, &["animals:floodplain"], GREEN),
+    browse("animals:scale_conifer_leaves", Category::Leaves, 2, SCALE_CONIFERS, ALL_YEAR),
+    browse("animals:tempskya_leaves", Category::Leaves, 2, wild::DEADWOOD, ALL_YEAR),
 ];
 
 /// Food on the ground (`notes/ECOLOGY.md`, parts 5 and 8): items animals eat that aren't a
 /// player's food (`food::FOODS` has those, each with its kind and weight): grain and seeds, as
 /// they fall from a field or a hand. By name, kind and grams.
-pub const DROPPED: [(&str, Category, f32); 5] = [
+pub const DROPPED: [(&str, Category, f32); 10] = [
     // A handful of seed, and an ear's grain.
     ("base:wheat_seeds", Category::Seeds, 10.0),
     ("base:wheat", Category::Seeds, 50.0),
@@ -201,6 +226,13 @@ pub const DROPPED: [(&str, Category, f32); 5] = [
     ("base:acorn", Category::Seeds, 20.0),
     ("base:rice", Category::Seeds, 30.0),
     ("animals:cycad_seed", Category::Seeds, 20.0),
+    // Our trees' fruit as it falls: a handful of mesquite pods, an acuri palm's nut, a moriche
+    // palm's fruit; the Cretaceous's araucaria cones and ginkgo seeds.
+    ("base:mesquite_pod", Category::Seeds, 30.0),
+    ("base:acuri_nut", Category::Seeds, 30.0),
+    ("base:moriche_fruit", Category::Fruit, 50.0),
+    ("animals:araucaria_cone", Category::Seeds, 50.0),
+    ("animals:ginkgo_seed", Category::Fruit, 10.0),
 ];
 
 /// What a dropped item `name` is to animals: its kind of food and grams (a food's portion,

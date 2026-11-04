@@ -1,0 +1,1002 @@
+[
+ {
+  "id": "wood_pickaxe",
+  "kind": "item",
+  "group": "Tools",
+  "w": 32,
+  "h": 32,
+  "grid": 0.183,
+  "colors": 155,
+  "tries": [
+   {
+    "grid": 0.601,
+    "outline": 0.6,
+    "red_line": 0.12,
+    "fill": 0.29,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "iron_axe",
+  "kind": "item",
+  "group": "Tools",
+  "w": 32,
+  "h": 32,
+  "grid": 0.141,
+  "colors": 171,
+  "tries": [
+   {
+    "grid": 0.56,
+    "outline": 0.49,
+    "red_line": 0.05,
+    "fill": 0.28,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "diamond_shovel",
+  "kind": "item",
+  "group": "Tools",
+  "w": 32,
+  "h": 32,
+  "grid": 0.123,
+  "colors": 159,
+  "tries": [
+   {
+    "grid": 0.546,
+    "outline": 0.45,
+    "red_line": 0.05,
+    "fill": 0.27,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "stone_sword",
+  "kind": "item",
+  "group": "Weapons",
+  "w": 32,
+  "h": 32,
+  "grid": 0.049,
+  "colors": 121,
+  "tries": [
+   {
+    "grid": 0.422,
+    "outline": 0.52,
+    "red_line": 0.17,
+    "fill": 0.35,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "gold_sword",
+  "kind": "item",
+  "group": "Weapons",
+  "w": 32,
+  "h": 32,
+  "grid": 0.135,
+  "colors": 111,
+  "tries": [
+   {
+    "grid": 0.554,
+    "outline": 0.75,
+    "red_line": 0.01,
+    "fill": 0.23,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "club",
+  "kind": "item",
+  "group": "Weapons",
+  "w": 32,
+  "h": 32,
+  "grid": 0.173,
+  "colors": 158,
+  "tries": [
+   {
+    "grid": 0.581,
+    "outline": 0.61,
+    "red_line": 0.18,
+    "fill": 0.34,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "iron_chestplate",
+  "kind": "item",
+  "group": "Armour",
+  "w": 32,
+  "h": 32,
+  "grid": 0.065,
+  "colors": 147,
+  "tries": [
+   {
+    "grid": 0.573,
+    "outline": 0.53,
+    "red_line": 0.04,
+    "fill": 0.57,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "diamond_helmet",
+  "kind": "item",
+  "group": "Armour",
+  "w": 32,
+  "h": 32,
+  "grid": 0.063,
+  "colors": 185,
+  "tries": [
+   {
+    "grid": 0.556,
+    "outline": 0.58,
+    "red_line": 0.0,
+    "fill": 0.53,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "leather_boots",
+  "kind": "item",
+  "group": "Armour",
+  "w": 32,
+  "h": 32,
+  "grid": 0.063,
+  "colors": 112,
+  "tries": [
+   {
+    "grid": 0.349,
+    "outline": 0.68,
+    "red_line": 0.27,
+    "fill": 0.51,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "iron_ingot",
+  "kind": "item",
+  "group": "Ingots",
+  "w": 32,
+  "h": 32,
+  "grid": 0.045,
+  "colors": 83,
+  "tries": [
+   {
+    "grid": 0.522,
+    "outline": 0.42,
+    "red_line": 0.0,
+    "fill": 0.38,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "raw_gold",
+  "kind": "item",
+  "group": "Ingots",
+  "w": 32,
+  "h": 32,
+  "grid": 0.06,
+  "colors": 197,
+  "tries": [
+   {
+    "grid": 0.511,
+    "outline": 0.59,
+    "red_line": 0.03,
+    "fill": 0.45,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "diamond",
+  "kind": "item",
+  "group": "Gems",
+  "w": 32,
+  "h": 32,
+  "grid": 0.212,
+  "colors": 127,
+  "tries": [
+   {
+    "grid": 0.569,
+    "outline": 0.76,
+    "red_line": 0.0,
+    "fill": 0.35,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "amber",
+  "kind": "item",
+  "group": "Gems",
+  "w": 32,
+  "h": 32,
+  "grid": 0.054,
+  "colors": 137,
+  "tries": [
+   {
+    "grid": 0.54,
+    "outline": 0.81,
+    "red_line": 0.0,
+    "fill": 0.5,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "coal",
+  "kind": "item",
+  "group": "Gems",
+  "w": 32,
+  "h": 32,
+  "grid": 0.109,
+  "colors": 66,
+  "tries": [
+   {
+    "grid": 0.526,
+    "outline": 1.27,
+    "red_line": 0.0,
+    "fill": 0.36,
+    "passed": false
+   },
+   {
+    "grid": 0.561,
+    "outline": 0.8,
+    "red_line": 0.0,
+    "fill": 0.43,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "redstone",
+  "kind": "item",
+  "group": "Gems",
+  "w": 32,
+  "h": 32,
+  "grid": 0.145,
+  "colors": 95,
+  "tries": [
+   {
+    "grid": 0.546,
+    "outline": 0.71,
+    "red_line": 0.0,
+    "fill": 0.21,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "stick",
+  "kind": "item",
+  "group": "Crafting materials",
+  "w": 32,
+  "h": 32,
+  "grid": 0.048,
+  "colors": 53,
+  "tries": [
+   {
+    "grid": 0.591,
+    "outline": 0.56,
+    "red_line": 0.17,
+    "fill": 0.13,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "feather",
+  "kind": "item",
+  "group": "Crafting materials",
+  "w": 32,
+  "h": 32,
+  "grid": 0.055,
+  "colors": 70,
+  "tries": [
+   {
+    "grid": 0.3,
+    "outline": 0.52,
+    "red_line": 0.0,
+    "fill": 0.31,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "leather",
+  "kind": "item",
+  "group": "Crafting materials",
+  "w": 32,
+  "h": 32,
+  "grid": 0.049,
+  "colors": 116,
+  "tries": [
+   {
+    "grid": 0.493,
+    "outline": 0.72,
+    "red_line": 0.27,
+    "fill": 0.48,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "string",
+  "kind": "item",
+  "group": "Crafting materials",
+  "w": 32,
+  "h": 32,
+  "grid": 0.191,
+  "colors": 83,
+  "tries": [
+   {
+    "grid": 0.58,
+    "outline": 0.5,
+    "red_line": 0.0,
+    "fill": 0.25,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "bone",
+  "kind": "item",
+  "group": "Crafting materials",
+  "w": 32,
+  "h": 32,
+  "grid": 0.164,
+  "colors": 67,
+  "tries": [
+   {
+    "grid": 0.544,
+    "outline": 0.54,
+    "red_line": 0.0,
+    "fill": 0.27,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "apple",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.043,
+  "colors": 152,
+  "tries": [
+   {
+    "grid": 0.424,
+    "outline": 0.71,
+    "red_line": 0.0,
+    "fill": 0.48,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "bread",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.051,
+  "colors": 146,
+  "tries": [
+   {
+    "grid": 0.402,
+    "outline": 0.6,
+    "red_line": 0.13,
+    "fill": 0.5,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "cooked_trout",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.206,
+  "colors": 191,
+  "tries": [
+   {
+    "grid": 0.602,
+    "outline": 0.52,
+    "red_line": 0.0,
+    "fill": 0.32,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "melon_slice",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.052,
+  "colors": 182,
+  "tries": [
+   {
+    "grid": 0.447,
+    "outline": 0.5,
+    "red_line": 0.0,
+    "fill": 0.46,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "apple_pie",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.078,
+  "colors": 216,
+  "tries": [
+   {
+    "grid": 0.503,
+    "outline": 0.69,
+    "red_line": 0.0,
+    "fill": 0.49,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "beef",
+  "kind": "item",
+  "group": "Food",
+  "w": 32,
+  "h": 32,
+  "grid": 0.049,
+  "colors": 148,
+  "tries": [
+   {
+    "grid": 0.414,
+    "outline": 0.8,
+    "red_line": 0.0,
+    "fill": 0.44,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "water_bucket",
+  "kind": "item",
+  "group": "Containers",
+  "w": 32,
+  "h": 32,
+  "grid": 0.061,
+  "colors": 151,
+  "tries": [
+   {
+    "grid": 0.424,
+    "outline": 0.68,
+    "red_line": 0.02,
+    "fill": 0.54,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "lava_bucket",
+  "kind": "item",
+  "group": "Containers",
+  "w": 32,
+  "h": 32,
+  "grid": 0.249,
+  "colors": 197,
+  "tries": [
+   {
+    "grid": 0.599,
+    "outline": 0.72,
+    "red_line": 0.04,
+    "fill": 0.61,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "sedative",
+  "kind": "item",
+  "group": "Containers",
+  "w": 32,
+  "h": 32,
+  "grid": 0.056,
+  "colors": 103,
+  "tries": [
+   {
+    "grid": 0.315,
+    "outline": 1.25,
+    "red_line": 0.0,
+    "fill": 0.38,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "book",
+  "kind": "item",
+  "group": "Paper and books",
+  "w": 32,
+  "h": 32,
+  "grid": 0.193,
+  "colors": 151,
+  "tries": [
+   {
+    "grid": 0.591,
+    "outline": 0.78,
+    "red_line": 0.25,
+    "fill": 0.53,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "paper",
+  "kind": "item",
+  "group": "Paper and books",
+  "w": 32,
+  "h": 32,
+  "grid": 0.048,
+  "colors": 85,
+  "tries": [
+   {
+    "grid": 0.371,
+    "outline": 0.58,
+    "red_line": 0.0,
+    "fill": 0.43,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "spyglass",
+  "kind": "item",
+  "group": "Small tricky objects",
+  "w": 32,
+  "h": 32,
+  "grid": 0.174,
+  "colors": 165,
+  "tries": [
+   {
+    "grid": 0.603,
+    "outline": 0.7,
+    "red_line": 0.06,
+    "fill": 0.26,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "torch",
+  "kind": "item",
+  "group": "Small tricky objects",
+  "w": 32,
+  "h": 32,
+  "grid": 0.057,
+  "colors": 79,
+  "tries": [
+   {
+    "grid": 0.305,
+    "outline": 0.54,
+    "red_line": 0.0,
+    "fill": 0.21,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "lever",
+  "kind": "item",
+  "group": "Small tricky objects",
+  "w": 32,
+  "h": 32,
+  "grid": 0.052,
+  "colors": 120,
+  "tries": [
+   {
+    "grid": 0.335,
+    "outline": 0.52,
+    "red_line": 0.11,
+    "fill": 0.3,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "raptor_egg",
+  "kind": "item",
+  "group": "Soft and organic",
+  "w": 32,
+  "h": 32,
+  "grid": 0.091,
+  "colors": 110,
+  "tries": [
+   {
+    "grid": 0.543,
+    "outline": 0.61,
+    "red_line": 0.0,
+    "fill": 0.39,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "utahraptor_saddle",
+  "kind": "item",
+  "group": "Soft and organic",
+  "w": 32,
+  "h": 32,
+  "grid": 0.179,
+  "colors": 153,
+  "tries": [
+   {
+    "grid": 0.578,
+    "outline": 0.79,
+    "red_line": 0.36,
+    "fill": 0.31,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "mushroom_red",
+  "kind": "item",
+  "group": "Soft and organic",
+  "w": 32,
+  "h": 32,
+  "grid": 0.269,
+  "colors": 139,
+  "tries": [
+   {
+    "grid": 0.564,
+    "outline": 0.63,
+    "red_line": 0.01,
+    "fill": 0.45,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "earthworm",
+  "kind": "item",
+  "group": "Soft and organic",
+  "w": 32,
+  "h": 32,
+  "grid": 0.051,
+  "colors": 75,
+  "tries": [
+   {
+    "grid": 0.291,
+    "outline": 0.74,
+    "red_line": 0.0,
+    "fill": 0.23,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "arrow",
+  "kind": "item",
+  "group": "Arrows and charms",
+  "w": 32,
+  "h": 32,
+  "grid": 0.098,
+  "colors": 63,
+  "tries": [
+   {
+    "grid": 0.512,
+    "outline": 0.62,
+    "red_line": 0.2,
+    "fill": 0.08,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "tranquilizer_dart",
+  "kind": "item",
+  "group": "Arrows and charms",
+  "w": 32,
+  "h": 32,
+  "grid": 0.131,
+  "colors": 109,
+  "tries": [
+   {
+    "grid": 0.597,
+    "outline": 0.78,
+    "red_line": 0.05,
+    "fill": 0.15,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "stone",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.177,
+  "colors": 37,
+  "tries": [
+   {
+    "grid": 0.346,
+    "empty": 0,
+    "seam": 3.0,
+    "passed": false
+   },
+   {
+    "grid": 0.599,
+    "empty": 0,
+    "seam": 3.85,
+    "passed": false
+   },
+   {
+    "grid": 0.611,
+    "empty": 0,
+    "seam": 2.0,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "dirt",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.079,
+  "colors": 32,
+  "tries": [
+   {
+    "grid": 0.59,
+    "empty": 0,
+    "seam": 1.48,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "cobblestone",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.313,
+  "colors": 64,
+  "tries": [
+   {
+    "grid": 0.561,
+    "empty": 0,
+    "seam": 1.93,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "grass_top",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.045,
+  "colors": 59,
+  "tries": [
+   {
+    "grid": 0.602,
+    "empty": 0,
+    "seam": 0.81,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "grass_side",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.098,
+  "colors": 109,
+  "tries": [
+   {
+    "grid": 0.581,
+    "empty": 0,
+    "seam": 2.34,
+    "passed": false
+   },
+   {
+    "grid": 0.569,
+    "empty": 0,
+    "seam": 2.28,
+    "passed": false
+   },
+   {
+    "grid": 0.589,
+    "empty": 0,
+    "seam": 2.03,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "log_oak",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.136,
+  "colors": 58,
+  "tries": [
+   {
+    "grid": 0.573,
+    "empty": 0,
+    "seam": 0.8,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "planks_oak",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.062,
+  "colors": 74,
+  "tries": [
+   {
+    "grid": 0.563,
+    "empty": 0,
+    "seam": 2.57,
+    "passed": false
+   },
+   {
+    "grid": 0.375,
+    "empty": 0,
+    "seam": 1.12,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "iron_ore",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.045,
+  "colors": 131,
+  "tries": [
+   {
+    "grid": 0.331,
+    "empty": 0,
+    "seam": 0.92,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "leaves_oak",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.044,
+  "colors": 100,
+  "tries": [
+   {
+    "grid": 0.265,
+    "outline": 0.86,
+    "red_line": 0.0,
+    "fill": 0.82,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "flower_rose",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.07,
+  "colors": 60,
+  "tries": [
+   {
+    "grid": 0.452,
+    "outline": 0.79,
+    "red_line": 0.0,
+    "fill": 0.21,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "crafting_table_front",
+  "kind": "block",
+  "group": "block",
+  "w": 32,
+  "h": 32,
+  "grid": 0.265,
+  "colors": 189,
+  "tries": [
+   {
+    "grid": 0.608,
+    "empty": 0,
+    "seam": 1.35,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "capybara",
+  "kind": "animal",
+  "group": "animal",
+  "w": 48,
+  "h": 32,
+  "grid": 0.089,
+  "colors": 143,
+  "tries": [
+   {
+    "grid": 0.517,
+    "outline": 0.58,
+    "red_line": 0.1,
+    "fill": 0.54,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "chihuahua",
+  "kind": "animal",
+  "group": "animal",
+  "w": 48,
+  "h": 32,
+  "grid": 0.065,
+  "colors": 115,
+  "tries": [
+   {
+    "grid": 0.312,
+    "outline": 0.68,
+    "red_line": 0.0,
+    "fill": 0.17,
+    "passed": true
+   }
+  ]
+ },
+ {
+  "id": "utahraptor",
+  "kind": "animal",
+  "group": "animal",
+  "w": 48,
+  "h": 32,
+  "grid": 0.052,
+  "colors": 247,
+  "tries": [
+   {
+    "grid": 0.257,
+    "outline": 0.74,
+    "red_line": 0.02,
+    "fill": 0.33,
+    "passed": true
+   }
+  ]
+ }
+]

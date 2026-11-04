@@ -1,7 +1,7 @@
 //! The wild plants (`notes/ECOLOGY.md`, part 3; the numbers in `vitals::wild`, their growth in
 //! `vitals::plants`): every `base:` row of `vitals::wild::WILD` as a block, growing by its form.
-//! Tufts and mats grazed down grow back, bushes ripen their fruit through four stages, fruit and
-//! seed heads ripen in their season, mushrooms and water hyacinth spread near the old ones, the
+//! Tufts and mats grazed down (a bitten look) grow back, bushes ripen their fruit through four
+//! stages, fruit and seed heads ripen in their season (a ripe look), mushrooms and water hyacinth spread near the old ones, the
 //! rest stand. What picking one gives plants it again. `worldgen.rs` puts them where they grow.
 
 use std::sync::OnceLock;
@@ -45,7 +45,7 @@ pub fn register(r: &mut Registry) {
             // Grazed down (age 0) and grown back (age 1); the world makes them grown.
             Form::Tuft => b
                 .prop("age", 0..=1)
-                .texture(name)
+                .states(move |p, s| s.texture(&if p.get("age") == "0" { format!("{name}_grazed") } else { name.to_string() }))
                 .no_item()
                 .growth(growth::step_secs(full, 1, 600.0), light)
                 .on_grow(move |e| growth::grow(e, full, false, |e| growth::next_age(e, 1))),
@@ -60,7 +60,7 @@ pub fn register(r: &mut Registry) {
                 }),
             Form::Ripens => b
                 .prop("age", 0..=1)
-                .texture(name)
+                .states(move |p, s| s.texture(&if p.get("age") == "1" { format!("{name}_ripe") } else { name.to_string() }))
                 .no_item()
                 .growth(growth::step_secs(full, 1, 300.0), light)
                 .on_grow(move |e| growth::grow(e, full, true, |e| growth::next_age(e, 1))),
@@ -71,7 +71,8 @@ pub fn register(r: &mut Registry) {
                     .on_grow(move |e| growth::grow(e, full, true, |e| spread(e, full)));
                 if p.gives.is_some() { b.no_item() } else { b.tab(&crate::tabs::NATURAL) }
             }
-            Form::Still => b.texture(name).tab(&crate::tabs::NATURAL),
+            // No base plant lies as a log yet (the Cretaceous's rotten log is the animals mod's).
+            Form::Still | Form::Log => b.texture(name).tab(&crate::tabs::NATURAL),
         };
         drop(b);
         // Picking gives what plants it again: one at any stage, two more when ripe.
