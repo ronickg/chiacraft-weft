@@ -127,8 +127,8 @@ pub const SNOW_MELT_WARM: f32 = 8.0;
 
 /// Still water freezes (Planner, 11-04: tarns, lakes and ponds get a skin of ice and thaw in the
 /// warmth, by the snow's rule): near players (the snow layers' sampler) the open top of still
-/// water turns to ice where the air there is under `FREEZE_BELOW` °C, every visit from
-/// `FREEZE_HARD` and colder, fewer nearer freezing; ice lying on water thaws back as snow melts
+/// water turns to lake ice (`base:lake_ice`) where the air there is under `FREEZE_BELOW` °C, every visit
+/// from `FREEZE_HARD` and colder, fewer nearer freezing; it thaws back to water as snow melts
 /// (`melt_chance`), on a visit or on its own every `ICE_THAW_SECS` on average (caught up when its
 /// land loads).
 pub const FREEZE_BELOW: f32 = 0.0;

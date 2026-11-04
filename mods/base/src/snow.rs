@@ -11,7 +11,7 @@
 use vitals::air;
 use weft_sdk::*;
 
-use crate::blocks::{ICE, WATER};
+use crate::blocks::{ICE, LAKE_ICE, WATER};
 use crate::weather;
 
 pub static SNOW_LAYER: Block = Block::named("snow_layer");
@@ -53,18 +53,13 @@ fn freezes(w: &World, pos: [i32; 3]) -> bool {
     (w.random_below(1 << 16) as f32) < air::freeze_chance(here.celsius) * (1 << 16) as f32
 }
 
-/// Whether the block at `pos` lies on water: a skin of ice, which may thaw (not ice set on land).
-fn on_water(w: &World, pos: [i32; 3]) -> bool {
-    w.get_loaded([pos[0], pos[1] - 1, pos[2]])
-        .is_some_and(|s| WATER.is(s))
-}
-
-/// A growth step of ice (`blocks.rs`, `air::ICE_THAW_SECS`): a skin on water thaws in the warmth,
-/// also away from players.
+/// A growth step of water's skin of ice (`LAKE_ICE`, `air::ICE_THAW_SECS`): it thaws in the
+/// warmth, also away from players. Over water or over the ground of a shallow edge alike (the first
+/// look's last skins, over a river's one-deep edges, never thawed while it asked for water under).
 pub fn ice_step(e: &mut BlockEvent) {
     let w = e.world();
     let pos = e.pos();
-    if on_water(&w, pos) && melts(&w, pos) {
+    if melts(&w, pos) {
         w.set(pos, WATER.id());
     }
 }
@@ -133,11 +128,11 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     // Open still water freezes in the cold; a skin of ice on water thaws in the warmth.
     if state == WATER.id() {
         if w.sky_light(above) >= 15 && freezes(w, pos) {
-            w.set(pos, ICE.id());
+            w.set(pos, LAKE_ICE.id());
         }
         return;
     }
-    if ICE.is(state) && on_water(w, pos) && melts(w, pos) {
+    if LAKE_ICE.is(state) && melts(w, pos) {
         w.set(pos, WATER.id());
         return;
     }
@@ -157,7 +152,8 @@ fn column(w: &World, x: i32, y: i32, z: i32) {
     }
     let flags = state_flags(state);
     // Snow lies on the ground, on leaves and on ice.
-    let ground = |state: u32| state_flags(state) & abi::block_flags::OPAQUE != 0 || LEAVES.on_block(state) || ICE.is(state);
+    let ground =
+        |state: u32| state_flags(state) & abi::block_flags::OPAQUE != 0 || LEAVES.on_block(state) || ICE.is(state) || LAKE_ICE.is(state);
     if ground(state) {
         // Open sky over it: snow falls there.
         if w.sky_light(above) >= 15 {

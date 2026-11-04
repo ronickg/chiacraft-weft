@@ -25,6 +25,7 @@ pub static BANDED_CLAY: Block = Block::named("banded_clay");
 pub static WEATHERED_LIMESTONE: Block = Block::named("weathered_limestone");
 pub static SNOW: Block = Block::named("snow");
 pub static ICE: Block = Block::named("ice");
+pub static LAKE_ICE: Block = Block::named("lake_ice");
 pub static OBSIDIAN: Block = Block::named("obsidian");
 pub static COAL_ORE: Block = Block::named("coal_ore");
 pub static IRON_ORE: Block = Block::named("iron_ore");
@@ -557,10 +558,22 @@ pub fn register(r: &mut Registry) {
         .mineable("pickaxe")
         // Itself with a pickaxe (Research round 3, U1: it's the only blue dye).
         .needs_tool(0)
-        // A skin of it on water thaws in the warmth (`snow::ice_step`, `vitals::air`).
-        .growth(vitals::air::ICE_THAW_SECS, 0)
-        .on_grow(crate::snow::ice_step)
         .tab(&crate::tabs::NATURAL);
+    // Water's skin of ice in the cold (`snow.rs`, `vitals::air::freeze_chance`), drawn as ice: it
+    // thaws back to water in the warmth, also away from players (`snow::ice_step`). Broken, it's
+    // gone (the water under it stays); ice set by a player is `ICE`, which keeps.
+    r.block(&LAKE_ICE)
+        .sound_group("glass")
+        .texture("ice")
+        .hardness(0.5)
+        .translucent()
+        .opacity(2)
+        .friction(0.98)
+        .mineable("pickaxe")
+        .drops_nothing()
+        .no_item()
+        .growth(vitals::air::ICE_THAW_SECS, 0)
+        .on_grow(crate::snow::ice_step);
     // Packed by its own weight: opaque, slippery like ice, mined with a pickaxe.
     r.block(&GLACIER_ICE)
         .sound_group("glass")
