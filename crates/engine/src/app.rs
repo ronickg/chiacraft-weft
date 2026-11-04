@@ -574,6 +574,18 @@ impl App {
     }
 }
 
+/// The size the 3D world is drawn at this frame: the screen's times `core:render_scale` (the
+/// screen effects' last pass scales it up and the UI is drawn over it whole), or the screen's when
+/// there is no world or no post pipeline to scale it with.
+fn world_frame(r: &Running, info: &weft_render::FrameInfo) -> weft_render::FrameInfo {
+    let s = crate::settings::render_scale(r.window.scale_factor());
+    if s >= 0.999 || r.game.is_none() || !r.post.can_scale() {
+        return weft_render::FrameInfo { ..*info };
+    }
+    let scaled = |v: u32| ((v as f32 * s).round() as u32).max(1);
+    weft_render::FrameInfo { width: scaled(info.width), height: scaled(info.height), slot: info.slot }
+}
+
 fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
     let t = gpu
         .create_texture(&TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: Format::Depth32, render_target: true }, "depth");
@@ -583,7 +595,8 @@ fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
 impl Running {
     fn gui_scale(&self) -> f32 {
         let max = crate::settings::max_gui_scale(self.gpu.surface_size());
-        let s = if self.settings.gui_scale() == 0 { max } else { self.settings.gui_scale().min(max) };
+        // A scale set before scales were kept even (3, 5...) is shown at the even one below it.
+        let s = if self.settings.gui_scale() == 0 { max } else { crate::settings::even_scale(self.settings.gui_scale()).min(max) };
         s as f32
     }
 
@@ -2048,6 +2061,14 @@ struct UiCallbacks {
 /// One frame. Returns true when the app should quit.
 fn frame(r: &mut Running, opts: &Options) -> bool {
     r.retired = None;
+    // The fps cap: what is left of this frame's share of a second, slept away.
+    let cap = r.settings.fps_cap();
+    if cap > 0 {
+        let share = std::time::Duration::from_secs_f64(1.0 / cap as f64);
+        if let Some(rest) = share.checked_sub(r.last.elapsed()) {
+            std::thread::sleep(rest);
+        }
+    }
     let now = Instant::now();
     let dt = (now - r.last).as_secs_f64();
     r.last = now;
@@ -2106,15 +2127,16 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     let Some(info) = r.gpu.begin_frame() else { return false };
     let t2 = Instant::now();
     r.prof[2] = t2.duration_since(t).as_secs_f32() * 1000.0;
-    if (r.depth.1, r.depth.2) != (info.width, info.height) {
+    let world = world_frame(r, &info);
+    if (r.depth.1, r.depth.2) != (world.width, world.height) {
         r.gpu.destroy_texture(r.depth.0);
-        r.depth = make_depth(&mut *r.gpu, info.width, info.height);
+        r.depth = make_depth(&mut *r.gpu, world.width, world.height);
     }
     if r.quads_dirty {
         build_ui_quads(r, scale);
     }
     draw_overlays(r, &info, scale, text_unit);
-    record_passes(r, &info, scale);
+    record_passes(r, &info, &world, scale);
     let capture_now = r.shot_pending;
     let t3 = Instant::now();
     r.prof[3] = t3.duration_since(t2).as_secs_f32() * 1000.0;
@@ -2673,7 +2695,8 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
     }
 }
 
-fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
+/// `info` is the screen's frame, `world` the size the 3D world is drawn at (`world_frame`).
+fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &weft_render::FrameInfo, scale: f32) {
     r.list.clear();
     if let Some(g) = r.game.as_mut().filter(|_| !r.screens.is_empty()) {
         if let Some(&([x, y, w, h], whose)) = r.previews.first() {
@@ -2702,9 +2725,18 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
         let [r, g, b, _rain] = g.client.fog_color();
         [r, g, b, 1.0]
     });
-    // Screen effects need the world in an image they can read.
-    let post = r.post.on() && r.game.is_some();
-    let world_target = if post { Target::Texture(r.post.scene_target(&mut *r.gpu, info.width, info.height)) } else { Target::Surface };
+    // Screen effects need the world in an image they can read, and so does a world drawn smaller
+    // than the screen (`render_scale`), which their last pass scales up.
+    let scaled = (world_info.width, world_info.height) != (info.width, info.height);
+    let post = (r.post.on() || scaled) && r.game.is_some();
+    let world_target = if post {
+        Target::Texture(
+            r.post
+                .scene_target(&mut *r.gpu, world_info.width, world_info.height),
+        )
+    } else {
+        Target::Surface
+    };
     if let Some(g) = &mut r.game {
         g.client
             .gpu_terrain
@@ -2719,7 +2751,10 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
         // A copy of the world for what is seen through it (`water_behind` packs, with post on).
         g.client.behind = [0.0; 4];
         if post && crate::packs::water_behind() {
-            if let Some([c, d]) = r.post.behind_targets(&mut *r.gpu, info.width, info.height) {
+            if let Some([c, d]) = r
+                .post
+                .behind_targets(&mut *r.gpu, world_info.width, world_info.height)
+            {
                 g.client.behind = [c as f32, d as f32, 1.0, 0.0];
             }
         }
@@ -2736,16 +2771,18 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
         g.client
             .entity_render
             .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
-        g.client.render(&mut *r.gpu, &mut world, info, &r.textures);
+        g.client
+            .render(&mut *r.gpu, &mut world, world_info, &r.textures);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
-        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
+        g.client
+            .render_shadows(&mut *r.gpu, &mut r.list, world_info);
         // The opaque world copied, then what is seen through it drawn over it, reading the copy.
         if g.client.behind[2] > 0.5 {
             world.push(Cmd::EndPass);
             if let Some(scene) = g.client.scene_buffer(info.slot) {
                 let depth = r.gpu.texture_index(r.depth.0);
                 r.post
-                    .copy_behind(&mut *r.gpu, &mut world, info, scene, depth);
+                    .copy_behind(&mut *r.gpu, &mut world, world_info, scene, depth);
             }
             world.push(Cmd::BeginPass { color: Some((world_target, None)), depth: Some((r.depth.0, None)) });
             world.append(&mut g.client.late_out);
@@ -2761,7 +2798,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             .as_ref()
             .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
-        r.post.apply(&mut *r.gpu, &mut r.list, info, scene, depth);
+        r.post
+            .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth);
         r.list.push(Cmd::Mark);
     } else {
         r.list.push(Cmd::Mark);
