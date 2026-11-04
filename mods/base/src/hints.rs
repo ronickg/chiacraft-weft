@@ -227,6 +227,6 @@ fn client(r: &mut Registry) {
         }
         let alpha = ((SHOW_SECS - since) / FADE_SECS).clamp(0.0, 1.0);
         let args: Vec<Arg> = args.iter().map(|&a| Arg::Int(a)).collect();
-        c.screen_text(0.5, HINT_Y, key, &args, 0xffe8c000 | (alpha * 255.0) as u32, 1.0);
+        c.screen_text(0.5, HINT_Y, key, &args, 0xe4dacf00 | (alpha * 255.0) as u32, 1.0);
     });
 }
