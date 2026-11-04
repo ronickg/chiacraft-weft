@@ -2349,8 +2349,14 @@ impl Client {
         // The block it places, or else the block of the same name (an item that places itself in
         // more than one form may not name one).
         let block = item.and_then(|i| i.block).or_else(|| {
-            let name = &item?.name;
-            c.blocks.iter().position(|b| &b.name == name).map(|b| b as u32)
+            let name = item?.name.as_str();
+            // Item and block names may differ in their namespace ("base:torch" and "torch").
+            let short = |n: &str| n.rsplit(':').next().unwrap_or(n).to_string();
+            let want = short(name);
+            c.blocks
+                .iter()
+                .position(|b| b.name == name || short(&b.name) == want)
+                .map(|b| b as u32)
         });
         let Some(def) = block.and_then(|b| c.blocks.get(b as usize)) else {
             if changed {
