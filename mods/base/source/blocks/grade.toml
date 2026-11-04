@@ -180,6 +180,7 @@ saturation = 1.857
 
 [tiles.coarse_dirt]  # luma 0.30->0.36, sat 0.56->0.56, hue 19->19; ~ coarse_dirt
 gain = 1.175
+saturation = 0.8  # walked-on ground (11-04): sat 0.56 -> 0.48, inside vanilla's 0.35-0.50
 
 [tiles.moss_block_top]  # luma 0.29->0.39, sat 0.58->0.58, hue 90->90; ~ moss_block
 gain = 1.332
@@ -505,3 +506,26 @@ overlay = "ore_gold_b"
 
 [items.tepary_beans]  # outline 0.60 -> 0.40 (new, Plants' batch 3: pale beans, the edge too light)
 outline = 0.67
+
+# Walked-on ground (Planner, 11-04: the red sand floor read very saturated orange in the PC looks).
+# Vanilla's red sand is 0.83 and Pixel Perfection's 0.50; ours moves to the middle, with base's graded
+# red sandstone (0.62), so a canyon floor and its walls match. The Cretaceous copies (animals) had no rows.
+[tiles."animals:red_sand"]  # luma 0.45 -> 0.47, sat 0.75 -> 0.63; ~ red_sand (0.46-0.60, 0.50-0.83)
+saturation = 0.76
+gain = 1.04
+
+[tiles."animals:red_sandstone_top"]  # as base's red_sandstone_top: sat 0.73 -> 0.62
+saturation = 0.75
+
+[tiles."animals:red_sandstone_bottom"]  # as base's red_sandstone_bottom
+saturation = 0.75
+
+[tiles."animals:red_sandstone_side"]  # luma 0.40 -> 0.43, sat 0.74 -> 0.61, as base's side
+saturation = 0.74
+gain = 1.08
+
+[tiles.dirt]  # sat 0.54 -> 0.48, inside vanilla's 0.35-0.50
+saturation = 0.84
+
+[tiles.leaf_litter_top]  # sat 0.66 -> 0.55, with the soils
+saturation = 0.76
