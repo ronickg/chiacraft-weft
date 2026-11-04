@@ -324,7 +324,9 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         let albedo = max(s.color.rgb / max(dimmed, vec3(0.005)), vec3(0.55, 0.58, 0.64) * scene.weather.w);
         color = albedo * light / alpha_cloud;
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.3, 1.0, dist));
-        color = display(fog_through(color, dir * 220.0, 1.0));
+        // The rainbow stands in the falling rain under the clouds, in front of them: drawn in the sky
+        // alone, the shower's clouds hid it (the after-rain check from under the clouds, 11-05).
+        color = display(fog_through(color + rainbow(dir), dir * 220.0, 1.0));
     } else {
         color = mix(s.color.rgb * light / alpha_cloud, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
     }
