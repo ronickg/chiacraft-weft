@@ -163,8 +163,10 @@ impl AreaFill {
             let st = &c.states[s as usize];
             if st.liquid.is_some() { self.keep_liquids } else { self.keep_unbreakable && st.hardness < 0.0 }
         };
+        // Kept liquids include those blocks stand in: the block goes, its liquid stays.
+        let wet = |s: u32| self.keep_liquids && c.states[s as usize].holds.is_some();
         let (_, far) = self.reach(cp);
-        let mut out = if far <= self.radius * self.radius && !cube.palette().iter().any(|&s| keep(s)) {
+        let mut out = if far <= self.radius * self.radius && !cube.palette().iter().any(|&s| keep(s) || wet(s)) {
             if cube.palette() == [self.state] {
                 return None;
             }
@@ -180,7 +182,7 @@ impl AreaFill {
                 let p = base + crate::world::cube::offset(i);
                 if self.inside(p) {
                     if old != self.state && !keep(old) {
-                        *s = self.state;
+                        *s = if wet(old) { c.left(old) } else { self.state };
                         changed = true;
                     }
                 } else if old != self.state && crate::world::DIRS.iter().any(|&d| self.inside(p + d)) {
@@ -365,7 +367,7 @@ pub fn relight_after(
     lost_light: &[IVec3],
 ) -> usize {
     let st = &c.states[state as usize];
-    if st.opacity == 0 && st.light == [0; 3] && st.liquid.is_none() {
+    if st.opacity == 0 && st.light == [0; 3] && st.liquid_in().is_none() {
         relight_opened(c, dim, cubes, dirty, changed, lost_light)
     } else {
         relight_around(c, dim, cubes, dirty, changed)

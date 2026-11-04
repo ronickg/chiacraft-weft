@@ -341,5 +341,13 @@ pub trait Backend: Send {
     fn gpu_times(&self) -> &[f32] {
         &[]
     }
+    /// The driver's compiled pipelines, to keep on disk and hand back to `load_pipeline_cache`
+    /// next start, when pipelines made again skip most of their compiling. Empty if it keeps none.
+    fn pipeline_cache_data(&self) -> Vec<u8> {
+        Vec::new()
+    }
+    /// What an earlier `pipeline_cache_data` gave, before any pipeline is made. Data from another
+    /// driver or device is ignored.
+    fn load_pipeline_cache(&mut self, _data: &[u8]) {}
     fn wait_idle(&mut self);
 }

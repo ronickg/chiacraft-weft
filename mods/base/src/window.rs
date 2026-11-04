@@ -24,8 +24,9 @@ pub fn window_titled(ui: &mut Ui, s: S, title: &str, tabs: &[Tab], body: impl Fn
 }
 
 fn framed(ui: &mut Ui, s: S, title: Option<&str>, tabs: &[Tab], body: impl FnOnce(&mut Ui)) {
-    // The tabs stand on the frame: the column's gap of -2 tucks their bottom under its top line.
-    ui.column(S::col().stretch().gap(-2.0), |ui| {
+    // The tabs stand on the frame: the column's gap tucks their bottom 3 UI px under its top
+    // line, which leaves an even 12 rows of face round a label's 9 px capitals (kit 2, UI guide D).
+    ui.column(S::col().stretch().gap(-1.5), |ui| {
         ui.row(S::row().gap(2.0).pad(0.0), |ui| {
             ui.row(S::row().w(6.0), |_| {});
             ui.panel("tab_pressed", S::row().pad(TAB_PAD).h(TAB_H).center(), |ui| match title {

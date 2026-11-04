@@ -7,7 +7,7 @@
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use wasmtime::component::{Component, HasSelf, Linker};
 use wasmtime::{Store, StoreLimits};
@@ -16,7 +16,7 @@ use crate::{Arg, ItemStack, Level, STRIKE_WINDOW, STRIKES, clip, clip_args, engi
 
 mod bindings {
     wasmtime::component::bindgen!({
-        path: "wit/v1.2",
+        path: "wit/v1.3",
         world: "client-mod",
         with: {
             "chiacraft:mods/types": crate::bindings::chiacraft::mods::types,
@@ -38,6 +38,42 @@ pub const ANCHORS: &[&str] =
 const SHOWS: u32 = 8;
 const SENDS: u32 = 32;
 const HOOKS: usize = 128;
+/// Frames a client half's cost is kept for ([`ClientInstance::cost`]): about four seconds.
+pub const FRAMES: usize = 240;
+
+/// What a client half costs the player's game (`/client_mods`): its calls into the sandbox and
+/// their time (starting it included), over the last [`FRAMES`] frames and since it loaded.
+#[derive(Clone, Debug, Default)]
+pub struct Cost {
+    /// Calls since it loaded, their time, the slowest.
+    pub calls: u64,
+    pub total: Duration,
+    pub slowest: Duration,
+    /// Frames counted in the figures below (up to [`FRAMES`]).
+    pub frames: usize,
+    /// Its time in a frame on average over those frames, and in the worst of them.
+    pub per_frame: Duration,
+    pub worst_frame: Duration,
+    /// Its calls in a frame, on average.
+    pub calls_per_frame: f64,
+    /// Strikes in the last [`STRIKE_WINDOW`].
+    pub strikes: usize,
+    /// Why it no longer runs, if it doesn't.
+    pub stopped: Option<String>,
+}
+
+/// The running count behind [`Cost`].
+#[derive(Default)]
+struct Meter {
+    calls: u64,
+    total: Duration,
+    slowest: Duration,
+    /// This frame so far.
+    frame: Duration,
+    frame_calls: u32,
+    /// The last frames: (time, calls).
+    recent: VecDeque<(Duration, u32)>,
+}
 
 /// The player's game's side of one call into a client half.
 pub trait ClientGame: Send {
@@ -350,11 +386,58 @@ pub struct ClientInstance {
     live: Option<Live>,
     strikes: VecDeque<Instant>,
     stopped: Option<String>,
+    meter: Meter,
 }
 
 impl ClientInstance {
     pub fn new(m: Arc<ClientMod>) -> ClientInstance {
-        ClientInstance { m, live: None, strikes: VecDeque::new(), stopped: None }
+        ClientInstance { m, live: None, strikes: VecDeque::new(), stopped: None, meter: Meter::default() }
+    }
+
+    /// The package this half is of.
+    pub fn package(&self) -> &str {
+        &self.m.package
+    }
+
+    /// A frame is over: what this half cost in it joins the last [`FRAMES`].
+    pub fn end_frame(&mut self) {
+        let m = &mut self.meter;
+        if m.recent.len() >= FRAMES {
+            m.recent.pop_front();
+        }
+        m.recent.push_back((m.frame, m.frame_calls));
+        m.frame = Duration::ZERO;
+        m.frame_calls = 0;
+    }
+
+    /// Its time in each of the last frames, oldest first (every half's line up: each frame
+    /// ends for all of them).
+    pub fn frame_times(&self) -> Vec<Duration> {
+        self.meter.recent.iter().map(|f| f.0).collect()
+    }
+
+    /// What it has cost so far.
+    pub fn cost(&self) -> Cost {
+        let m = &self.meter;
+        let frames = m.recent.len();
+        let time: Duration = m.recent.iter().map(|f| f.0).sum();
+        let calls: u64 = m.recent.iter().map(|f| f.1 as u64).sum();
+        let now = Instant::now();
+        Cost {
+            calls: m.calls,
+            total: m.total,
+            slowest: m.slowest,
+            frames,
+            per_frame: if frames == 0 { Duration::ZERO } else { time / frames as u32 },
+            worst_frame: m.recent.iter().map(|f| f.0).max().unwrap_or_default(),
+            calls_per_frame: if frames == 0 { 0.0 } else { calls as f64 / frames as f64 },
+            strikes: self
+                .strikes
+                .iter()
+                .filter(|t| now.duration_since(**t) <= STRIKE_WINDOW)
+                .count(),
+            stopped: self.stopped.clone(),
+        }
     }
 
     pub fn stopped(&self) -> Option<&str> {
@@ -390,6 +473,24 @@ impl ClientInstance {
         if self.stopped.is_some() {
             return None;
         }
+        let start = Instant::now();
+        let r = self.call_timed(game, fuel, f);
+        let took = start.elapsed();
+        let m = &mut self.meter;
+        m.calls += 1;
+        m.total += took;
+        m.slowest = m.slowest.max(took);
+        m.frame += took;
+        m.frame_calls += 1;
+        r
+    }
+
+    fn call_timed<T>(
+        &mut self,
+        game: Box<dyn ClientGame>,
+        fuel: u64,
+        f: impl FnOnce(&ClientBindings, &mut Store<ClientState>) -> wasmtime::Result<T>,
+    ) -> Option<T> {
         if self.live.is_none() {
             match self.m.instantiate(None) {
                 Ok((live, hooks)) if hooks == self.m.hooks => self.live = Some(live),

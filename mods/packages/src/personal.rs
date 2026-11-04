@@ -122,7 +122,9 @@ fn load_all(run_dir: &Path) -> Vec<Personal> {
             Ok(m) => {
                 let hooks = m.hooks().to_vec();
                 info!("personal mod {name}: {} registrations", hooks.len());
-                out.push(Personal { name, half: Arc::new(Half::personal(Arc::new(m), Words::load(&d))), hooks });
+                let half = Arc::new(Half::personal(Arc::new(m), Words::load(&d)));
+                crate::client_half::track(&half);
+                out.push(Personal { name, half, hooks });
             }
             Err(e) => warn!("personal mod {name}: {e}"),
         }

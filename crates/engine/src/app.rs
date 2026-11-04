@@ -203,6 +203,30 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
         }
         None => vec![Msg::new("command.music.no_device", Vec::new())],
     }),
+    // What this client hears now, most important first (also in the log, for scripts).
+    ("sounds", "", |r, _| match &r.audio {
+        Some(a) => {
+            let (playing, held) = a.counts();
+            log::info!("sounds: {playing} playing, {held} held, {} played, {} dropped", a.played, a.dropped);
+            let mut out =
+                vec![Msg::new("command.sounds.count", vec![Arg::Int(playing as i64), Arg::Int(held as i64), Arg::Int(a.dropped as i64)])];
+            for (name, volume, looped, waiting) in a.describe() {
+                log::info!(
+                    "sound: {name} volume {volume:.2}{}{}",
+                    if looped { " loop" } else { "" },
+                    if waiting { " reading" } else { "" }
+                );
+                let key = match (looped, waiting) {
+                    (_, true) => "command.sounds.reading",
+                    (true, _) => "command.sounds.loop",
+                    _ => "command.sounds.one",
+                };
+                out.push(Msg::new(key, vec![Arg::Text(name), Arg::Float(volume as f64, 2)]));
+            }
+            out
+        }
+        None => vec![Msg::new("command.music.no_device", Vec::new())],
+    }),
 ];
 
 pub(crate) struct Running {
@@ -388,6 +412,13 @@ impl App {
         if let Some(v) = self.opts.view {
             crate::config::override_for_run("core:view_distance", &v.to_string());
         }
+        // `--config "core:lod_distance=0,core:shader_pack="`: settings for this run only, as the
+        // file writes them (benchmarks varying one thing at a time).
+        if let Some(list) = api::launch_options().get("config") {
+            for (name, value) in list.split(',').filter_map(|kv| kv.split_once('=')) {
+                crate::config::override_for_run(name.trim(), value.trim());
+            }
+        }
         let mut settings = Settings::new(&self.opts.run_dir);
         log::info!("player name '{}' (setting core:name)", settings.name());
         // Links between worlds, and the inbox for them, open while the game runs (chiacraft).
@@ -429,6 +460,13 @@ impl App {
             debug: self.opts.gpu_debug,
         })
         .map_err(|e| e.to_string())?;
+        // The pipelines the driver compiled last time, before any is made (saved at exit).
+        let cache = self.opts.cache_dir.join("pipelines.bin");
+        if let Ok(data) = std::fs::read(&cache) {
+            gpu.load_pipeline_cache(&data);
+            log::info!("pipeline cache: {} KB from the last start", data.len() / 1024);
+        }
+        let _ = PIPELINE_CACHE.set(cache);
 
         let mut roots: Vec<(String, PathBuf)> = vec![("core".into(), engine_assets(self.opts.dev))];
         // Code mods' and data packages' assets alike.
@@ -567,16 +605,52 @@ impl App {
     }
 }
 
+/// The size the 3D world is drawn at this frame: the screen's times `core:render_scale` (the
+/// screen effects' last pass scales it up and the UI is drawn over it whole), or the screen's when
+/// there is no world or no post pipeline to scale it with.
+fn world_frame(r: &Running, info: &weft_render::FrameInfo) -> weft_render::FrameInfo {
+    let s = crate::settings::render_scale(r.window.scale_factor());
+    if s >= 0.999 || r.game.is_none() || !r.post.can_scale() {
+        return weft_render::FrameInfo { ..*info };
+    }
+    let scaled = |v: u32| ((v as f32 * s).round() as u32).max(1);
+    weft_render::FrameInfo { width: scaled(info.width), height: scaled(info.height), slot: info.slot }
+}
+
 fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
     let t = gpu
         .create_texture(&TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: Format::Depth32, render_target: true }, "depth");
     (t, w, h)
 }
 
+/// Where the driver's compiled pipelines are kept between starts (`Backend::pipeline_cache_data`).
+static PIPELINE_CACHE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Keeps the driver's compiled pipelines for the next start: the shaders then skip most of their
+/// compiling (on the Mac, MoltenVK's translation too). Written aside and moved, never half.
+fn save_pipeline_cache(gpu: &dyn Backend) {
+    let Some(path) = PIPELINE_CACHE.get() else { return };
+    let data = gpu.pipeline_cache_data();
+    if data.is_empty() {
+        return;
+    }
+    let tmp = path.with_extension("bin.tmp");
+    let saved = path
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|_| std::fs::write(&tmp, &data))
+        .and_then(|_| std::fs::rename(&tmp, path));
+    match saved {
+        Ok(()) => log::debug!("pipeline cache: {} KB saved", data.len() / 1024),
+        Err(e) => log::warn!("pipeline cache {}: {e}", path.display()),
+    }
+}
+
 impl Running {
     fn gui_scale(&self) -> f32 {
         let max = crate::settings::max_gui_scale(self.gpu.surface_size());
-        let s = if self.settings.gui_scale() == 0 { max } else { self.settings.gui_scale().min(max) };
+        // A scale set before scales were kept even (3, 5...) is shown at the even one below it.
+        let s = if self.settings.gui_scale() == 0 { max } else { crate::settings::even_scale(self.settings.gui_scale()).min(max) };
         s as f32
     }
 
@@ -2025,6 +2099,7 @@ impl ApplicationHandler for App {
             r.gpu.wait_idle();
             r.leave_world_silent();
             r.close_home();
+            save_pipeline_cache(&*r.gpu);
             drop(r.gpu);
         }
     }
@@ -2041,6 +2116,14 @@ struct UiCallbacks {
 /// One frame. Returns true when the app should quit.
 fn frame(r: &mut Running, opts: &Options) -> bool {
     r.retired = None;
+    // The fps cap: what is left of this frame's share of a second, slept away.
+    let cap = r.settings.fps_cap();
+    if cap > 0 {
+        let share = std::time::Duration::from_secs_f64(1.0 / cap as f64);
+        if let Some(rest) = share.checked_sub(r.last.elapsed()) {
+            std::thread::sleep(rest);
+        }
+    }
     let now = Instant::now();
     let dt = (now - r.last).as_secs_f64();
     r.last = now;
@@ -2099,18 +2182,32 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     let Some(info) = r.gpu.begin_frame() else { return false };
     let t2 = Instant::now();
     r.prof[2] = t2.duration_since(t).as_secs_f32() * 1000.0;
-    if (r.depth.1, r.depth.2) != (info.width, info.height) {
+    let world = world_frame(r, &info);
+    if (r.depth.1, r.depth.2) != (world.width, world.height) {
+        log::info!(
+            "world drawn at {}x{} of the window's {}x{} (render scale {:.2}, density {:.1})",
+            world.width,
+            world.height,
+            info.width,
+            info.height,
+            crate::settings::render_scale(r.window.scale_factor()),
+            r.window.scale_factor()
+        );
         r.gpu.destroy_texture(r.depth.0);
-        r.depth = make_depth(&mut *r.gpu, info.width, info.height);
+        r.depth = make_depth(&mut *r.gpu, world.width, world.height);
     }
     if r.quads_dirty {
+        let _s = crate::diag::span("ui quads");
         build_ui_quads(r, scale);
     }
+    let s = crate::diag::span("overlays");
     draw_overlays(r, &info, scale, text_unit);
-    record_passes(r, &info, scale);
+    drop(s);
+    record_passes(r, &info, &world, scale);
     let capture_now = r.shot_pending;
     let t3 = Instant::now();
     r.prof[3] = t3.duration_since(t2).as_secs_f32() * 1000.0;
+    crate::diag::slow_record(r.prof[3]);
     r.gpu.end_frame(&r.list);
     r.prof[4] = t3.elapsed().as_secs_f32() * 1000.0;
     report_frame(r, dt);
@@ -2666,7 +2763,8 @@ fn draw_overlays(r: &mut Running, info: &weft_render::FrameInfo, scale: f32, tex
     }
 }
 
-fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
+/// `info` is the screen's frame, `world` the size the 3D world is drawn at (`world_frame`).
+fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, world_info: &weft_render::FrameInfo, scale: f32) {
     r.list.clear();
     if let Some(g) = r.game.as_mut().filter(|_| !r.screens.is_empty()) {
         if let Some(&([x, y, w, h], whose)) = r.previews.first() {
@@ -2676,6 +2774,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
                 .then(|| g.client.menu.as_ref().map(|m| m.owner))
                 .flatten()
                 .and_then(|id| g.client.entities.get(&id).map(|e| (id, e.kind)));
+            let s = crate::diag::span("preview");
             let tex = g.client.entity_render.draw_preview(
                 &mut *r.gpu,
                 &mut r.list,
@@ -2685,6 +2784,7 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
                 &worn,
                 subject,
             );
+            drop(s);
             if tex != r.preview_tex {
                 r.preview_tex = tex;
                 r.quads_dirty = true;
@@ -2695,34 +2795,82 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
         let [r, g, b, _rain] = g.client.fog_color();
         [r, g, b, 1.0]
     });
-    // Screen effects need the world in an image they can read.
-    let post = r.post.on() && r.game.is_some();
-    let world_target = if post { Target::Texture(r.post.scene_target(&mut *r.gpu, info.width, info.height)) } else { Target::Surface };
+    // Screen effects need the world in an image they can read, and so does a world drawn smaller
+    // than the screen (`render_scale`), which their last pass scales up.
+    let scaled = (world_info.width, world_info.height) != (info.width, info.height);
+    let post = (r.post.on() || scaled) && r.game.is_some();
+    let world_target = if post {
+        Target::Texture(
+            r.post
+                .scene_target(&mut *r.gpu, world_info.width, world_info.height),
+        )
+    } else {
+        Target::Surface
+    };
     if let Some(g) = &mut r.game {
+        let s = crate::diag::span("terrain gpu");
         g.client
             .gpu_terrain
             .frame(&mut *r.gpu, &mut r.list, info.slot);
+        drop(s);
+        let s = crate::diag::span("particles");
         let cam = g.client.render_camera();
         g.client
             .particles
             .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
+        drop(s);
+        let s = crate::diag::span("wires and sun");
         g.client.update_wires(&mut *r.gpu, &r.textures);
         // The sun's light for shadow maps (packs that use them), which the world's scene samples.
         g.client.prepare_shadows(&mut *r.gpu);
+        // A copy of the world for what is seen through it (`water_behind` packs, with post on).
+        drop(s);
+        g.client.behind = [0.0; 4];
+        if post && crate::packs::water_behind() {
+            if let Some([c, d]) = r
+                .post
+                .behind_targets(&mut *r.gpu, world_info.width, world_info.height)
+            {
+                g.client.behind = [c as f32, d as f32, 1.0, 0.0];
+            }
+        }
     }
+    // GPU time parts (`bench::GPU_PARTS`): terrain made and particles simulated so far, then the
+    // shadow map.
+    r.list.push(Cmd::Mark);
     let mut world = std::mem::take(&mut r.world_list);
     world.clear();
     world.push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
     if let Some(g) = &mut r.game {
         let worn = g.client.worn();
         let held = g.client.held().item;
+        let s = crate::diag::span("entities preload");
         g.client
             .entity_render
             .preload(&mut *r.gpu, &r.assets, &g.client.entities, &g.client.entity_components, &worn, held);
-        g.client.render(&mut *r.gpu, &mut world, info, &r.textures);
+        drop(s);
+        let s = crate::diag::span("client render");
+        g.client
+            .render(&mut *r.gpu, &mut world, world_info, &r.textures);
+        drop(s);
         // The shadow map once the models are posed, ahead of the world's pass that samples it.
-        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
+        let s = crate::diag::span("shadows");
+        g.client
+            .render_shadows(&mut *r.gpu, &mut r.list, world_info);
+        drop(s);
+        // The opaque world copied, then what is seen through it drawn over it, reading the copy.
+        if g.client.behind[2] > 0.5 {
+            world.push(Cmd::EndPass);
+            if let Some(scene) = g.client.scene_buffer(info.slot) {
+                let depth = r.gpu.texture_index(r.depth.0);
+                r.post
+                    .copy_behind(&mut *r.gpu, &mut world, world_info, scene, depth);
+            }
+            world.push(Cmd::BeginPass { color: Some((world_target, None)), depth: Some((r.depth.0, None)) });
+            world.append(&mut g.client.late_out);
+        }
     }
+    r.list.push(Cmd::Mark);
     world.push(Cmd::EndPass);
     r.list.append(&mut world);
     r.world_list = world;
@@ -2732,13 +2880,19 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             .as_ref()
             .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
-        r.post.apply(&mut *r.gpu, &mut r.list, info, scene, depth);
+        let _s = crate::diag::span("effects");
+        r.post
+            .apply(&mut *r.gpu, &mut r.list, world_info, scene, depth, scaled);
+        r.list.push(Cmd::Mark);
     } else {
+        r.list.push(Cmd::Mark);
         // The UI pipeline has no depth, so it cannot draw in a pass that has one.
         r.list
             .push(Cmd::BeginPass { color: Some((Target::Surface, None)), depth: None });
     }
+    let s = crate::diag::span("ui draw");
     r.ui.draw(&mut *r.gpu, &mut r.list, info, scale);
+    drop(s);
     r.list.push(Cmd::Mark);
     r.list.push(Cmd::EndPass);
 }
@@ -2776,6 +2930,7 @@ fn report_frame(r: &mut Running, dt: f64) {
             };
             let line = b.report(&extra);
             log::info!("{line}");
+            log::info!("{}", b.pacing());
             r.bench_last = b.summary();
             r.bench_line = line;
             r.benches += 1;

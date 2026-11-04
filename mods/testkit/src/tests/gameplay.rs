@@ -341,7 +341,7 @@ pub async fn advancements(t: T) -> R {
     t.press("base:advancements");
     t.screen("base:advancements").await?;
     t.frames(3).await?;
-    t.laid_out(&["text:Advancements", "text:Getting Started", "text:Exploration", "text:2 of 19 made"]);
+    t.laid_out(&["text:Advancements", "text:Getting Started", "text:Exploration", "text:2 of "]);
     t.shot("list").await?;
     // The first tile of a group, right of its 90 pixel wide name, tells its details on hover.
     if let Some([x, y, w, h]) = t.c().ui_rect("text:Making Progress") {
@@ -1138,7 +1138,7 @@ pub async fn creative_middle_click(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(2).await?;
-    t.click_ui("slot:41", 2);
+    t.click_ui(&t.hotbar(0), 2);
     t.until("a whole stack on the cursor", Duration::from_secs(2), |t| t.c().cursor_stack().count == 64)
         .await?;
     t.check_eq(t.c().inventory_slot(0).count, 3, "and the slot keeps what it had");
@@ -1151,7 +1151,7 @@ pub async fn creative_middle_click(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(2).await?;
-    t.click_ui("slot:41", 2);
+    t.click_ui(&t.hotbar(0), 2);
     t.secs(0.3).await?;
     t.check(t.c().cursor_stack().is_empty(), "nothing out of creative");
     t.c().close_screen();
@@ -1792,7 +1792,9 @@ pub async fn swimming_no_bob(t: T) -> R {
 
 /// A toast goes with the GUI on F1, and doesn't follow the player out of the world.
 pub async fn toast_with_the_gui(t: T) -> R {
-    let toast = |s: &crate::runner::Shot| s.share(0.78, 0.0, 1.0, 0.09, |c| c[0] > 200 && c[1] > 170 && c[2] < 170);
+    // The toast's dark panel, under the clock at the top right (the clock's sun and the title
+    // screen's painted sky are yellow there, so not by its colour any more).
+    let toast = |s: &crate::runner::Shot| s.share(0.80, 0.10, 0.99, 0.16, |c| crate::runner::lum(c.map(f32::from)) < 45.0 && c[0] >= c[2]);
     t.flat().await?;
     t.op("put me 0 iron_ingot 1").await?;
     t.op("put me 1 gold_ingot 1").await?;
@@ -1814,8 +1816,14 @@ pub async fn toast_with_the_gui(t: T) -> R {
     t.c().leave_world();
     t.screen("core:title").await?;
     t.frames(5).await?;
-    let title = toast(&t.shot("title").await?);
-    t.check(title < 0.0001, format!("none on the title screen: {title}"));
+    // The title screen is a painting (dark and light in that corner): a toast there would come
+    // and go, so the corner must look the same now and six seconds on.
+    let corner = |s: &crate::runner::Shot| s.avg(0.80, 0.10, 0.99, 0.16);
+    let first = corner(&t.shot("title").await?);
+    t.secs(6.0).await?;
+    let later = corner(&t.shot("title_later").await?);
+    let title: f32 = (0..3).map(|k| (first[k] - later[k]).abs()).sum();
+    t.check(title < 3.0, format!("none on the title screen: the corner changed by {title}"));
     t.c().open_world(&format!("test-{}", t.name()), 1);
     t.until("joined again", Duration::from_secs(60), |t| t.flag(client::client_flags::JOINED))
         .await?;

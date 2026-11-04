@@ -25,6 +25,7 @@ pub const BUILTIN: &[(&str, &str)] = &[
     (abi::comp::ATTACK_DAMAGE, "f32"),
     (abi::comp::MINING_SPEED, "f32"),
     (abi::comp::TOOL_LEVEL, "u32"),
+    (abi::comp::KEEP_BROKEN, ""),
     (abi::comp::HARVEST_LEVEL, "u32"),
     (abi::comp::DAMAGE, "u32"),
     (abi::comp::HARDNESS, "f32"),
@@ -36,6 +37,7 @@ pub const BUILTIN: &[(&str, &str)] = &[
     (abi::comp::SUPPORT_FACE, "u8"),
     (abi::comp::SUPPORT, "tag"),
     (abi::comp::SUPPORT_NEAR, "tag"),
+    (abi::comp::HOLDS_LIQUID, "block"),
     (abi::comp::SPREADS_TO, "tag"),
     (abi::comp::SPREAD_TIME, "f32"),
     (abi::comp::SPREAD_LIGHT, "u32"),
@@ -47,6 +49,7 @@ pub const BUILTIN: &[(&str, &str)] = &[
     (abi::comp::WORN, <abi::Worn as abi::Schema>::SCHEMA),
     (abi::comp::WORN_TEXTURE, "str"),
     (abi::comp::WEAR_PER_HIT, "u32"),
+    (abi::comp::LOOK, "bytes"),
     (abi::attribute::MAX_HEALTH, "f64"),
 ];
 

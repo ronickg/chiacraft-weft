@@ -889,7 +889,13 @@ pub static SPECIES: [Species; 46] = [
         size_spread: 0.1,
         height: (0.30, "shoulder"),
         // The boreal forest, birch woods, the tundra and the Alps (700-3,800 m).
-        habitats: &[("base:taiga", 1.0), ("base:birch_forest", 1.0), ("base:snowy_plains", 0.75), ("base:mountains", 0.75)],
+        habitats: &[
+            ("base:taiga", 1.0),
+            ("base:birch_forest", 1.0),
+            ("base:snowy_plains", 0.75),
+            ("base:mountains", 0.75),
+            ("base:sequoia_grove", 0.3),
+        ],
         bio: Biology {
             mass: 3.0,
             gestation: 50.0,
@@ -1004,6 +1010,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:snowy_plains", 0.8),
             ("base:mountains", 0.8),
             ("base:swamp", 0.6),
+            ("base:sequoia_grove", 1.0),
         ],
         bio: Biology {
             mass: 0.035,
@@ -1106,7 +1113,7 @@ pub static SPECIES: [Species; 46] = [
         height: (0.95, "shoulder"),
         // Europe's deer of the forests (Białowieża), birch woods and the Alps, wintering lower in the
         // woods, summering high.
-        habitats: &[("base:forest", 1.0), ("base:birch_forest", 0.8), ("base:mountains", 0.8)],
+        habitats: &[("base:forest", 1.0), ("base:birch_forest", 0.8), ("base:mountains", 0.8), ("base:sequoia_grove", 0.8)],
         bio: Biology {
             mass: 160.0,
             gestation: 250.0,
@@ -1272,6 +1279,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:plains", 0.6),
             ("base:desert", 0.4),
             ("base:beach", 0.4),
+            ("base:sequoia_grove", 0.6),
         ],
         bio: Biology {
             mass: 5.5,
@@ -1391,6 +1399,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:desert", 0.4),
             ("base:plains", 0.3),
             ("base:beach", 0.3),
+            ("base:sequoia_grove", 0.8),
         ],
         bio: Biology {
             mass: 1.2,
@@ -1676,7 +1685,7 @@ pub static SPECIES: [Species; 46] = [
         size_spread: 0.2,
         height: (0.61, "shoulder"),
         // The prairie and the desert first (its old range), into the woods and the mountains.
-        habitats: &[("base:plains", 1.0), ("base:desert", 1.0), ("base:forest", 0.4), ("base:mountains", 0.4)],
+        habitats: &[("base:plains", 1.0), ("base:desert", 1.0), ("base:forest", 0.4), ("base:mountains", 0.4), ("base:sequoia_grove", 0.6)],
         bio: Biology {
             // Southern ones about 11.5 kg, northern ones 18.
             mass: 13.0,
@@ -1861,6 +1870,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:desert", 0.6),
             ("base:swamp", 0.6),
             ("base:savanna", 0.4),
+            ("base:sequoia_grove", 0.8),
         ],
         bio: Biology {
             mass: 1.4,
@@ -1978,6 +1988,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:snowy_plains", 0.3),
             ("base:forest", 0.3),
             ("base:birch_forest", 0.3),
+            ("base:sequoia_grove", 0.3),
         ],
         bio: Biology {
             mass: 4.5,
@@ -2091,6 +2102,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:plains", 0.6),
             ("base:forest", 0.3),
             ("base:mountains", 0.3),
+            ("base:sequoia_grove", 0.4),
         ],
         bio: Biology {
             mass: 1.4,
@@ -2369,6 +2381,7 @@ pub static SPECIES: [Species; 46] = [
             ("base:mountains", 0.5),
             ("base:snowy_plains", 0.4),
             ("base:plains", 0.1),
+            ("base:sequoia_grove", 0.3),
         ],
         bio: Biology {
             mass: 42.0,

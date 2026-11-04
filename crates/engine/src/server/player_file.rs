@@ -22,6 +22,7 @@ impl Server {
             identity: p.identity.clone(),
             did: p.did.clone(),
             did_days: p.did_days,
+            achievements: p.achievements.clone(),
         };
         if let crate::admission::Verdict::Refuse(why) = self.gate.verdict(&who, trusted) {
             log::info!("{name} ({key}) is not let in: {}", why.key);

@@ -217,6 +217,8 @@ impl Client {
             ToClient::Disconnect(reason) => self.disconnected = Some(reason),
             ToClient::Achievement(json) => crate::chiacraft::achievements::received(&json),
             ToClient::AchievementAnchor { hash, anchor } => crate::chiacraft::achievements::anchored(&hash, &anchor),
+            ToClient::Revocations(json) => crate::chiacraft::achievements::revocations_received(&json),
+            ToClient::AskAchievement { id } => self.send(crate::net::ToServer::Proofs(crate::chiacraft::achievements::proofs(&id))),
             ToClient::Refused(why) => {
                 self.disconnected = Some(why.key.clone());
                 self.refused = Some(why);
@@ -298,6 +300,7 @@ impl Client {
                     hurt: 0.0,
                     worn: Vec::new(),
                     held: 0,
+                    held_look: None,
                     walk: 0.0,
                     walked: 0.0,
                     swing: 0.0,

@@ -368,8 +368,8 @@ pub struct Game {
     pub world_ticks: Vec<(ModId, Callback)>,
     /// `abi::comp::NAME` as an entity component.
     pub name_comp: u32,
-    /// `HEALTH`, `BURNING`, `WORN`, `SHAPE`, `HELD`, `MOUNT`.
-    pub field_comps: [u32; 6],
+    /// `HEALTH`, `BURNING`, `WORN`, `SHAPE`, `HELD`, `MOUNT`, `HELD_LOOK`.
+    pub field_comps: [u32; 7],
     /// `SIMULATED`.
     pub simulated_comp: u32,
     /// Entity components with `SYNC_WATCHERS` / `SYNC_MENU`.
@@ -425,6 +425,10 @@ pub struct SoundDef {
     pub volume: f32,
     pub pitch: [f32; 2],
     pub range: f32,
+    /// Which sounds keep playing when too many play at once (`audio::VOICES`): higher first.
+    pub priority: i32,
+    /// At most this many at once, 0 = no cap of its own.
+    pub voices: u32,
 }
 
 #[derive(Clone)]
@@ -984,6 +988,9 @@ pub struct RawScatter {
     pub reach: i32,
     pub density: String,
     pub shape: Callback,
+    pub thin: Vec<weft_abi::MaskStep>,
+    pub thin_keep: u32,
+    pub thin_biomes: String,
 }
 
 #[derive(Clone)]
@@ -1219,6 +1226,9 @@ pub const BURNING: &str = "core:burning";
 pub const WORN: &str = "core:worn";
 pub const SHAPE: &str = "core:shape";
 pub const HELD: &str = "core:held";
+/// The look (`abi::comp::LOOK`, text) of a player's item in hand, empty for none: apart from
+/// `HELD`, which mods read as a `u32`.
+pub const HELD_LOOK: &str = "core:held_look";
 /// What it rides (`u64`, 0 for nothing) and the seat's height (`f32`), so clients put riders on
 /// their mounts.
 pub const MOUNT: &str = "core:mount";
@@ -1703,6 +1713,7 @@ pub fn freeze(
         (SHAPE, 20, own, shape),
         (HELD, 4, shown, vec![0; 4]),
         (MOUNT, 16, own, vec![0; 16]),
+        (HELD_LOOK, 0, shown, Vec::new()),
         (SIMULATED, 8, save, vec![0; 8]),
     ] {
         components.push(RawComponent {
@@ -1726,7 +1737,7 @@ pub fn freeze(
     g.modifiers_comp = g.component_names[MODIFIERS];
     g.timers_comp = g.component_names[TIMERS];
     g.name_comp = g.component_names[abi::comp::NAME];
-    g.field_comps = [HEALTH, BURNING, WORN, SHAPE, HELD, MOUNT].map(|n| g.component_names[n]);
+    g.field_comps = [HEALTH, BURNING, WORN, SHAPE, HELD, MOUNT, HELD_LOOK].map(|n| g.component_names[n]);
     g.simulated_comp = g.component_names[SIMULATED];
     let with_flag = |f: u32| {
         g.components
@@ -2061,7 +2072,7 @@ impl Game {
 
 /// Sounds the engine plays itself (files in its own assets, packs may replace them).
 fn engine_sounds() -> Vec<(usize, SoundDef)> {
-    let one = |name: &str, file: &str, category: &str, volume: f32, pitch: [f32; 2]| {
+    let one = |name: &str, file: &str, category: &str, volume: f32, pitch: [f32; 2], priority: i32, voices: u32| {
         (
             0,
             SoundDef {
@@ -2072,12 +2083,15 @@ fn engine_sounds() -> Vec<(usize, SoundDef)> {
                 volume,
                 pitch,
                 range: 16.0,
+                priority,
+                voices,
             },
         )
     };
     vec![
-        one("core:ui.click", "core:ui/click", "core:ui", 0.6, [1.0, 1.0]),
-        one("core:item.pickup", "core:item/pickup", "core:players", 0.4, [1.4, 2.2]),
+        // A click is never crowded out; pickups come in bursts.
+        one("core:ui.click", "core:ui/click", "core:ui", 0.6, [1.0, 1.0], 100, 2),
+        one("core:item.pickup", "core:item/pickup", "core:players", 0.4, [1.4, 2.2], 0, 4),
     ]
 }
 

@@ -219,6 +219,7 @@ pub unsafe extern "C" fn client_state(c: *mut abi::ClientCtx, out: *mut abi::Cli
                 flags |= cf::PAUSED;
             }
             s.sounds = r.audio.as_ref().map_or(0, |a| a.played);
+            (s.voices, s.handles) = r.audio.as_ref().map_or((0, 0), |a| a.counts());
             s.flags = flags;
             s.frame = r.frame_no;
             s.dt = r.frame_dt;
@@ -270,6 +271,7 @@ pub unsafe extern "C" fn client_state(c: *mut abi::ClientCtx, out: *mut abi::Cli
             (s.lod_tiles, s.lod_pending) = (shown as u32, pending as u32);
             s.entities = cl.entities.len() as u32;
             s.particles = cl.particles.len() as u32;
+            (s.rain, s.thunder, s.wind, s.snowing, s.lightnings) = cl.weather_now();
         }
         *out = s;
     }
@@ -441,6 +443,7 @@ pub unsafe extern "C" fn client_command(c: *mut abi::ClientCtx, op: u32, text: S
                 }
             }
             op_::RELOAD_ASSETS => r.reload_requested = true,
+            op_::REBUILD_SCREEN => r.handle(vec![Request::Rebuild]),
             op_::POST_EFFECT => return r.post.set(&text, num as f32) as u64,
             op_::BENCH => r.bench = Some(crate::bench::Bench::new(&text, num.max(0.1) as f32)),
             op_::RESPAWN => r.handle(vec![Request::Respawn]),
@@ -696,5 +699,48 @@ pub unsafe extern "C" fn client_play_sound(c: *mut abi::ClientCtx, sound: u32, p
         let pos = (!pos.is_null()).then(|| DVec3::from_array(*pos));
         r.ui_sounds
             .push(crate::audio::Play { sound, pos, volume, pitch });
+    }
+}
+
+pub unsafe extern "C" fn client_sound_start(c: *mut abi::ClientCtx, start: *const abi::SoundStart) -> u64 {
+    unsafe {
+        let Some(r) = run(c) else { return 0 };
+        let (Some(a), Some(s)) = (r.audio.as_mut(), start.as_ref()) else { return 0 };
+        if crate::content::content()
+            .game
+            .sounds
+            .get(s.sound as usize)
+            .is_none()
+        {
+            return 0;
+        }
+        let pos = (s.flags & abi::sound_start::POSITIONED != 0).then(|| DVec3::from_array(s.pos));
+        let play = crate::audio::Play { sound: s.sound, pos, volume: s.volume, pitch: s.pitch };
+        a.start(play, s.flags & abi::sound_start::LOOP != 0, s.fade)
+    }
+}
+
+pub unsafe extern "C" fn client_sound_set(c: *mut abi::ClientCtx, handle: u64, change: *const abi::SoundChange) {
+    unsafe {
+        let Some(r) = run(c) else { return };
+        if let (Some(a), Some(ch)) = (r.audio.as_mut(), change.as_ref()) {
+            a.change(handle, ch);
+        }
+    }
+}
+
+pub unsafe extern "C" fn client_sound_stop(c: *mut abi::ClientCtx, handle: u64, fade: f32) {
+    unsafe {
+        if let Some(a) = run(c).and_then(|r| r.audio.as_mut()) {
+            a.stop(handle, fade);
+        }
+    }
+}
+
+pub unsafe extern "C" fn client_sound_playing(c: *mut abi::ClientCtx, handle: u64) -> u32 {
+    unsafe {
+        run(c)
+            .and_then(|r| r.audio.as_ref())
+            .is_some_and(|a| a.playing(handle)) as u32
     }
 }

@@ -53,7 +53,7 @@ impl Server {
     pub(super) fn allowed(&self, pi: usize, msg: &ToServer) -> bool {
         use ToServer as M;
         let p = &self.players[pi];
-        if matches!(msg, M::Join { .. } | M::Leave) {
+        if matches!(msg, M::Join { .. } | M::Leave | M::Proofs(_)) {
             return true;
         }
         let Some(e) = self.dims[p.dim as usize]
@@ -89,11 +89,56 @@ impl Server {
                 self.players[pi].identity = identity;
                 // A DID claimed (chiacraft): checked on chain in the background. When the
                 // world's rules ask for a DID, the join waits for the answer (a few seconds).
-                if self.check_did(pi, &key, &did) && self.gate.rules.needs_did() {
-                    self.players[pi].waiting = Some((name, key, Instant::now()));
+                let did_pending = self.check_did(pi, &key, &did) && self.gate.rules.needs_did();
+                // An achievement the rules ask for: the joining game shows its credentials for it.
+                let ask = self
+                    .gate
+                    .rules
+                    .achievement
+                    .as_ref()
+                    .map(|r| r.id.clone())
+                    .filter(|_| self.players[pi].identity.is_some());
+                let p = &mut self.players[pi];
+                p.did_pending = did_pending;
+                p.proofs_pending = ask.is_some();
+                if let Some(id) = ask {
+                    p.conn.send(ToClient::AskAchievement { id });
+                }
+                if p.did_pending || p.proofs_pending {
+                    p.waiting = Some((name, key, Instant::now()));
                     return;
                 }
                 self.join(c, pi, name, key)
+            }
+            ToServer::Proofs(list) => {
+                if !self.players[pi].proofs_pending {
+                    return;
+                }
+                let me = self.players[pi].identity.clone().unwrap_or_default();
+                // What this world's issuer withdrew doesn't count.
+                let withdrawn = crate::chiacraft::achievements::issuer_list();
+                let shown: Vec<(String, String)> = list
+                    .iter()
+                    .take(8)
+                    .filter(|j| j.len() <= 8 << 10)
+                    .filter_map(|j| chiacraft_wallet::achievement::Credential::from_json(j).ok())
+                    .filter(|c| c.subject.key == me && c.verify().is_ok())
+                    .filter(|c| !withdrawn.as_ref().is_some_and(|r| r.revokes(c)))
+                    .map(|c| (c.achievement.id, c.issuer.key))
+                    .collect();
+                let name = self.players[pi]
+                    .waiting
+                    .as_ref()
+                    .map_or_else(|| self.players[pi].name.clone(), |w| w.0.clone());
+                log::info!("{name} showed {} achievement(s)", shown.len());
+                let p = &mut self.players[pi];
+                p.achievements = shown;
+                p.proofs_pending = false;
+                if !p.did_pending
+                    && let Some((name, key, _)) = p.waiting.take()
+                {
+                    self.join(c, pi, name, key);
+                }
             }
             ToServer::StartBreak { pos, frame } => {
                 let Some((r, _)) = self.region(pi) else { return };
@@ -143,7 +188,7 @@ impl Server {
                 p.last_y = pos.y;
                 let Some((r, entity)) = self.region(pi) else { return };
                 let state = r.get(pos.floor().as_ivec3());
-                let in_liquid = state.is_some_and(|s| c.states[s as usize].liquid.is_some());
+                let in_liquid = state.is_some_and(|s| c.states[s as usize].liquid_in().is_some());
                 let climbing = state.is_some_and(|s| c.states[s as usize].flags & abi::block_flags::CLIMBABLE != 0);
                 // A rider doesn't fall: its mount does.
                 let seated = r.entities.get(entity).is_some_and(|e| e.mount.is_some());
@@ -206,7 +251,7 @@ impl Server {
                         .map_or(now, |m| m.2);
                     let need = d
                         .get(pos)
-                        .map_or(0.0, |s| dim::mining_time(c, s, held.item, head_wet, on_ground, speed))
+                        .map_or(0.0, |s| dim::mining_time(c, s, &held, head_wet, on_ground, speed))
                         * crate::world::TPS as f32;
                     let too_soon = !creative && ((now - started) as f32 + 2.0) < need * 0.7;
                     let keeps = creative && c.no_creative_break(held.item);
@@ -672,11 +717,18 @@ pub(super) fn wear(c: &Content, d: &mut Dim, player: u64, slot: u32, amount: u32
     else {
         return;
     };
-    let Some(def) = c.items.get(stack.item as usize) else { return };
-    if def.durability == 0 || stack.is_empty() {
+    let max = c.max_durability(&stack);
+    if max == 0 || stack.is_empty() {
         return;
     }
     let damage = crate::stack::damage(&stack) + amount;
-    let next = if damage >= def.durability { ItemStack::EMPTY } else { crate::stack::with_damage(stack, damage) };
+    let next = if damage < max {
+        crate::stack::with_damage(stack, damage)
+    } else if c.item_has(stack.item, c.ids.keep_broken) {
+        // Kept, broken, until it's repaired.
+        crate::stack::with_damage(stack, max)
+    } else {
+        ItemStack::EMPTY
+    };
     d.entities.set_slot(player, slot, next);
 }

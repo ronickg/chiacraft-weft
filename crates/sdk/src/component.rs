@@ -408,6 +408,12 @@ impl Tag {
     pub fn on_block(&self, state: u32) -> bool {
         self.lookup.has(ek::BLOCK, state, self.name, &no_schema)
     }
+    /// On a cell in `state`: on its block, or on the liquid that block stands in (kelp is in
+    /// `#water`). Ask this for what a place is, `on_block` for what a block is.
+    #[inline]
+    pub fn in_cell(&self, state: u32) -> bool {
+        self.on_block(state) || crate::content::held_liquid(state).is_some_and(|l| self.on_block(l))
+    }
     #[inline]
     pub fn on_item(&self, item: u32) -> bool {
         self.lookup.has(ek::ITEM, item, self.name, &no_schema)
@@ -464,6 +470,29 @@ pub fn with_name(stack: ItemStack, name: Option<&str>) -> ItemStack {
 
 static NAME: Tag = Tag::named(abi::comp::NAME);
 
+/// The layers the stack is drawn from (`with_look`), if it has its own look.
+pub fn stack_look(stack: &ItemStack) -> Option<String> {
+    let id = LOOK.id();
+    if stack.data == 0 || id == u32::MAX {
+        return None;
+    }
+    let mut len = 0usize;
+    let p = unsafe { (host().stack_get)(stack.data, id, &mut len) };
+    (!p.is_null()).then(|| String::from_utf8_lossy(unsafe { std::slice::from_raw_parts(p, len) }).into_owned())
+}
+
+/// The stack drawn from layers instead of its item's icon (`None` or empty: the icon again), in
+/// slots and in the hand: back to front, separated by `;`, each a texture
+/// (`base:parts/axe/head/flint`) or a shade map painted with one ramp per region
+/// (`base:parts/axe/head@base:ramps/oak,base:ramps/sinew`). See `abi::comp::LOOK`.
+pub fn with_look(stack: ItemStack, look: Option<&str>) -> ItemStack {
+    let b = look.filter(|l| !l.is_empty()).map(str::as_bytes);
+    let data = unsafe { (host().stack_with)(stack.data, LOOK.id(), b.map_or(abi::Slice::EMPTY, abi::Slice::new), b.is_none() as u32) };
+    ItemStack { data, ..stack }
+}
+
+static LOOK: Tag = Tag::named(abi::comp::LOOK);
+
 pub trait StackData: Sized {
     /// This stack with its own value of `c` set.
     fn with<T: Value>(self, c: &Component<T>, v: T) -> Self;
@@ -517,6 +546,7 @@ pub static TINT_FACES: Component<u8> = Component::named(abi::comp::TINT_FACES);
 pub static SUPPORT_FACE: Component<u8> = Component::named(abi::comp::SUPPORT_FACE);
 pub static SUPPORT: Component<TagRef> = Component::named(abi::comp::SUPPORT);
 pub static SUPPORT_NEAR: Component<TagRef> = Component::named(abi::comp::SUPPORT_NEAR);
+pub static HOLDS_LIQUID: Component<BlockRef> = Component::named(abi::comp::HOLDS_LIQUID);
 pub static SPREADS_TO: Component<TagRef> = Component::named(abi::comp::SPREADS_TO);
 pub static SPREAD_TIME: Component<f32> = Component::named(abi::comp::SPREAD_TIME);
 pub static SPREAD_LIGHT: Component<u32> = Component::named(abi::comp::SPREAD_LIGHT);

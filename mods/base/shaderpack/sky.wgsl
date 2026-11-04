@@ -91,7 +91,9 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
 // uv: the camera's place in its cell (x, z), the cell in the picture (x, z). extra: cell size,
 // thickness, height over the camera, how far they reach. axes[0]: the weather (`sky.rs`): x cover
 // as rain comes, y how dark the undersides go, z a storm's deck.
-const CLOUD_SAMPLES: u32 = 24u;
+// Ten are enough with the dithered start (the dither hides the steps); 24 cost Ronald's Mac a
+// great deal at Retina size (reports/performance.md).
+const CLOUD_SAMPLES: u32 = 10u;
 // The slab is at least this thick (blocks), whatever the layer's own thickness.
 const CLOUD_THICKNESS: f32 = 9.0;
 // How far one sample looks along the ray at most (blocks): far clouds take no more samples.
@@ -121,14 +123,9 @@ fn vs_clouds(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -
 // 1 where cell `cell` (picture cells from the camera's) is cloud: the picture's, and as rain comes
 // more of the gaps (a hash per cell, so they grow as whole cells), until a storm's deck closes
 // nearly all of them.
+// (`look.wgsl`'s `cloud_cell_of`, which the clouds' shadows read too.)
 fn cloud_cell(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> f32 {
-    let at = fract((cell + s.uv.zw + vec2(0.5)) / dims);
-    if textureSampleLevel(textures[s.ids.x], nearest_clamp, at, 0.0).a >= 0.5 {
-        return 1.0;
-    }
-    let fill = s.axes[0].x * 0.6 + s.axes[0].z * 0.35;
-    let w = vec2<i32>(cell + s.uv.zw);
-    return select(0.0, 1.0, hash3(vec3(w.x, 51, w.y)) < fill);
+    return cloud_cell_of(s.ids.x, cell, s.uv.zw, dims, s.axes[0].x * 0.6 + s.axes[0].z * 0.35);
 }
 
 // How dense the cloud is at `cellp` (picture cells, fractional) and `h` (0 at the slab's bottom,
@@ -170,6 +167,22 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     }
     if near >= far {
         discard;
+    }
+    // What the opaque world shows at this pixel (its depth's copy, `scene.behind`, made before the
+    // sky pass): clouds behind a hill or a wall are not marched at all, and the rest stop at it.
+    // The pass writes its depth, so the GPU cannot skip those pixels by itself.
+    if scene.behind.z > 0.5 {
+        let d = textureLoad(textures[u32(scene.behind.y)], vec2<i32>(in.clip.xy), 0).r;
+        if d > 0.0 {
+            let size = vec2<f32>(textureDimensions(textures[u32(scene.behind.y)]));
+            let uv = in.clip.xy / size;
+            let w = scene.inv_view_proj * vec4(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
+            let solid = length(w.xyz / w.w);
+            if solid <= near {
+                discard;
+            }
+            far = min(far, solid);
+        }
     }
     far = min(far, near + CLOUD_SPAN);
     let dims = vec2<f32>(f32(s.ids.z), f32(s.ids.w));
@@ -291,6 +304,10 @@ fn aurora(dir: vec3<f32>) -> vec3<f32> {
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.
 fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
+    // Under water, the water's own color all round (`look.wgsl`), not the engine's dark fog.
+    if in_water() {
+        return vec4(display(underwater_color()), 1.0);
+    }
     if open_sky() && !in_liquid() {
         var c = sky_color(dir) + milky_way(dir) + aurora(dir);
         if dir.y < 0.0 {
@@ -393,11 +410,24 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     if open_sky() && !in_liquid() {
         // Bodies shine through the tone curve; stars dim in the haze low down.
         // The sun shines through the tone curve; the moon keeps its markings.
+        var shape = 1.0;
         if s.ids.y == SKY_BODY && dot(dir, scene.sun.xyz) > 0.0 {
-            rgb = rgb * 2.2;
+            // The sun as a round disc with a soft glow (Bliss's), not the picture's square: that
+            // square, about 20° across with a pale border, went white through the curve, washed
+            // out the golden hour (and the water's path with it), and turned into a diamond on the
+            // leaned path. White-gold by day, a deep orange low down, the glow gone before the
+            // quad's edges.
+            let half = max(abs(s.uv.zw - s.uv.xy) * 0.5, vec2(1e-4));
+            let r = length((in.uv - (s.uv.xy + s.uv.zw) * 0.5) / half);
+            let disc = 1.0 - smoothstep(0.12, 0.15, r);
+            let halo = exp(-r * 6.0) * (1.0 - smoothstep(0.55, 0.95, r)) * 0.7;
+            let g = golden();
+            rgb = mix(vec3(1.0, 0.96, 0.86), vec3(1.0, 0.52, 0.2), g) * (disc * mix(3.0, 1.5, g) + halo);
+            shape = smoothstep(0.0, 0.004, disc + halo);
         }
         a *= 1.0 - rain_amount() * 0.9;
-        rgb = display(rgb);
+        // `display` lifts black a little: outside the sun's shape nothing may be added.
+        rgb = display(rgb) * shape;
     }
     return vec4(rgb * a, select(a, 0.0, s.ids.w != 0u));
 }
