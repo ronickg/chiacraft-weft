@@ -520,11 +520,12 @@ pub const YOUNG: &[Recipe] = &[YOUNG_SEQUOIA, YOUNG_BRAZIL_NUT];
 pub const UNDERSTORY_REACH: i32 = 3;
 
 /// A young tree of the understory (`trees::young_tree_blocks`): the species' own recipe at about
-/// two fifths of its height on a trunk a block wide, so a young oak already reads as an oak and a
+/// a third of its height on a trunk a block wide, so a young oak already reads as an oak and a
 /// young birch as a birch (a ball on a stick read as every species at once, the tree-look audit).
-/// Its branches come closer together, its clusters smaller; one order of branches at most.
+/// Its branches come closer together, its clusters about half as wide (bigger ones closed the
+/// forest floor, the PC look); one order of branches at most.
 pub fn understory(r: &Recipe) -> Recipe {
-    let height = (r.height * 0.42).clamp(3.5, 8.0);
+    let height = (r.height * 0.36).clamp(3.0, 7.0);
     // The share of its width the grown trunk keeps at its top, kept for the young one.
     let left = (1.0 - r.width_loss * r.height / r.width).clamp(0.2, 0.8);
     Recipe {
@@ -537,8 +538,8 @@ pub fn understory(r: &Recipe) -> Recipe {
         branch_start: (r.branch_start * 0.6).clamp(0.2, 0.4),
         branch_count: r.branch_count.min(4),
         orders: r.orders.min(1),
-        leaf_r: (r.leaf_r * 0.7).max(1.0),
-        leaf_ry: (r.leaf_ry * 0.75).max(0.9),
+        leaf_r: (r.leaf_r * 0.55).max(0.9),
+        leaf_ry: (r.leaf_ry * 0.7).max(0.9),
         // fronds (a young palm's) a little shorter
         frond_len: r.frond_len * 0.6,
         // Thin wood as leafy sprays, so a young tree is no knot of logs (the cacao's).
