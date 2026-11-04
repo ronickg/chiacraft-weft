@@ -351,6 +351,7 @@ pub fn register(r: &mut Registry) {
 /// runs back down once the player is 7 away. A radius 3 blast at the end.
 fn creeper() -> ai::Goals {
     ai::Goals::new()
+        .then(keep_from_fire())
         .then(|w: &World, id: u64, st: &EntityState| {
             let near = ai::nearest_player(w, st, 7.0);
             let d2 = near
@@ -406,6 +407,7 @@ fn blast(w: &World, id: u64, at: [f64; 3], radius: f64) {
 fn skeleton() -> ai::Goals {
     ai::Goals::new()
         .then(ai::watch_player(16.0))
+        .then(keep_from_fire())
         .then(|w: &World, id: u64, st: &EntityState| {
             let Some((_, p)) = ai::nearest_player(w, st, 15.0) else { return false };
             let Some(reload) = w.component_mut(id, &FUSE) else { return false };
@@ -488,11 +490,83 @@ fn panic(w: &World, h: &Hurt) {
     }
 }
 
+/// Blocks from a campfire monsters keep out of, across and up or down (Ronald, 11-04: "Campfire
+/// keeps you safe"; its light 15 is 7 or more out to here, and monsters spawn only at 6 or less).
+const FIRE_RING: i32 = 8;
+const FIRE_RING_UP: i32 = 4;
+/// Ticks between a monster's looks for a campfire.
+const FIRE_LOOK: u64 = 20;
+
+static CAMPFIRES: Tag = Tag::named("campfires");
+/// The campfire near each monster as it last looked (when, and where if any).
+static FIRES_SEEN: std::sync::Mutex<Option<std::collections::HashMap<u64, (u64, Option<[i32; 3]>)>>> = std::sync::Mutex::new(None);
+
+/// The campfire within the ring of `pos`, if any.
+fn campfire_near(w: &World, pos: [f64; 3]) -> Option<[i32; 3]> {
+    let p = pos.map(|v| v.floor() as i32);
+    for dy in -FIRE_RING_UP..=FIRE_RING_UP {
+        for dz in -FIRE_RING..=FIRE_RING {
+            for dx in -FIRE_RING..=FIRE_RING {
+                let at = [p[0] + dx, p[1] + dy, p[2] + dz];
+                if CAMPFIRES.on_block(w.get(at)) {
+                    return Some(at);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// `campfire_near` for entity `id` (a monster, or the player it's after), looked up again once a
+/// second.
+fn fire_for(w: &World, id: u64, pos: [f64; 3]) -> Option<[i32; 3]> {
+    let now = w.time();
+    let mut seen = FIRES_SEEN.lock().unwrap();
+    let map = seen.get_or_insert_with(Default::default);
+    if let Some(&(at, fire)) = map.get(&id)
+        && now < at + FIRE_LOOK
+    {
+        return fire;
+    }
+    if map.len() > 4096 {
+        map.retain(|_, (at, _)| now < *at + FIRE_LOOK * 10);
+    }
+    let fire = campfire_near(w, pos);
+    map.insert(id, (now, fire));
+    fire
+}
+
+/// Monsters keep out of a campfire's light: one inside the ring walks out of it, and a player
+/// inside it isn't chased, shot or blown up; the monster waits at the edge, watching.
+fn keep_from_fire() -> impl ai::Goal {
+    move |w: &World, id: u64, st: &EntityState| {
+        if let Some(f) = fire_for(w, id, st.pos) {
+            let (dx, dz) = (st.pos[0] - (f[0] as f64 + 0.5), st.pos[2] - (f[2] as f64 + 0.5));
+            let len = (dx * dx + dz * dz).sqrt().max(0.1);
+            let out = (FIRE_RING + 3) as f64;
+            w.navigate(id, [f[0] as f64 + 0.5 + dx / len * out, st.pos[1], f[2] as f64 + 0.5 + dz / len * out], 1.0);
+            return true;
+        }
+        // The player's own campfire, looked for once a second (players' ids share the map), or a
+        // player back from the dead on their way to their tombstone (`death.rs`).
+        match ai::target(w, id, st, 35.0) {
+            Some((p, ps)) if crate::death::in_grace(w, p) || fire_for(w, p, ps.pos).is_some() => {
+                if w.navigating(id) {
+                    w.navigate(id, st.pos, 1.0);
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
 /// Monsters chase the player they are after and hit it when in reach (`ai::melee`, once a
 /// second). Otherwise they wander.
 fn hostile(reach: f64) -> ai::Goals {
     ai::Goals::new()
         .then(ai::watch_player(8.0))
+        .then(keep_from_fire())
         .then(ai::melee(reach))
         .then(ai::follow_player(35.0, 1.0))
         .then(ai::wander(0.6, 10.0))

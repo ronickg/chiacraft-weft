@@ -32,3 +32,7 @@ required-features = ["pack"]
 [[test]]
 name = "sandbox"
 required-features = ["pack"]
+
+# Client halves (API 1.2): the bell's committed client.wasm against a fake player's game.
+[[test]]
+name = "client"

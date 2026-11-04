@@ -622,6 +622,14 @@ impl Ui {
         self.leaf(node(k::ENTITY, S::default().size(w, h)))
     }
 
+    /// The open menu's own entity (an animal's screen: the animal), turning with the mouse like
+    /// the player's figure. One 3D preview shows per screen.
+    pub fn entity_model(&mut self, w: f32, h: f32) {
+        let mut n = node(k::ENTITY, S::default().size(w, h));
+        n.text = Str::new("menu");
+        self.leaf(n)
+    }
+
     pub fn spacer(&mut self) {
         self.leaf(node(k::SPACER, S::default().grow()))
     }

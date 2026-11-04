@@ -123,6 +123,29 @@ fn register_component(r: &mut Registry, name: &str, size: u32, default: &[u8], f
     }
 }
 
+/// Every sandboxed component registered in this game, newest first: a client half reads the
+/// player's own value through them (its bucket is known only here).
+static COMPONENTS: Mutex<Vec<(String, Comp)>> = Mutex::new(Vec::new());
+
+/// The player's own value of the sandboxed component `name` on the client, its bucket's bytes.
+pub fn client_component(c: Client, name: &str) -> Option<Vec<u8>> {
+    let comp = COMPONENTS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .find(|(n, _)| n == name)
+        .map(|(_, c)| *c)?;
+    let v = c.view();
+    match comp {
+        Comp::B8(c) => v.component(c).map(|b| b.to_vec()),
+        Comp::B16(c) => v.component(c).map(|b| b.to_vec()),
+        Comp::B32(c) => v.component(c).map(|b| b.to_vec()),
+        Comp::B64(c) => v.component(c).map(|b| b.to_vec()),
+        Comp::B128(c) => v.component(c).map(|b| b.to_vec()),
+        Comp::B256(c) => v.component(c).map(|b| b.to_vec()),
+    }
+}
+
 fn attach_component(r: &mut Registry, kind: &str, c: Comp) {
     let kind = Entity::generated(kind.to_string());
     match c {
@@ -281,6 +304,10 @@ pub fn load(r: &mut Registry, package: &str, dir: &Path) -> Result<Option<Arc<Ru
             Decl::Component { name, size, flags, default } => {
                 let c = register_component(r, name, *size, default, flag_bits(*flags));
                 comps.push((name.clone(), c));
+                COMPONENTS
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(0, (name.clone(), c));
             }
             Decl::Attach { kind, component } => {
                 if let Some((_, c)) = comps.iter().find(|(n, _)| n == component) {
@@ -661,7 +688,7 @@ fn real_stack(s: sandbox::ItemStack) -> Option<ItemStack> {
 }
 
 /// A mod's line arguments as the SDK's: its texts are kept here while the line is sent.
-fn args_text(key: &str, args: &[WArg]) -> String {
+pub fn line_text(key: &str, args: &[WArg]) -> String {
     let mut out = key.replace('\n', " ");
     for a in args {
         out.push('\n');
@@ -791,7 +818,7 @@ impl Game for WorldGame {
     }
     fn tell(&mut self, player: u64, key: &str, args: &[WArg]) {
         if self.w.players().contains(&player) {
-            self.w.send(player, &SAY, &args_text(key, args));
+            self.w.send(player, &SAY, &line_text(key, args));
         }
     }
     fn player_key(&mut self, player: u64) -> String {
@@ -803,7 +830,7 @@ impl Game for WorldGame {
         }
         // SAFETY: `cmd` is the command this callback runs, alive until it returns (see the type).
         let cmd = unsafe { &mut *(self.cmd as *mut ServerCommand) };
-        with_line(&args_text(key, args), |key, args| cmd.reply(key, args));
+        with_line(&line_text(key, args), |key, args| cmd.reply(key, args));
     }
 
     fn get_component(&mut self, id: u64, name: &str) -> Option<Vec<u8>> {
@@ -890,7 +917,7 @@ mod tests {
 
     #[test]
     fn lines_survive_the_trip() {
-        let text = args_text(
+        let text = line_text(
             "clans.invite",
             &[WArg::Text("a\nb".into()), WArg::Int(-3), WArg::Float((1.5, 2)), WArg::Key("k".into()), WArg::Item(7)],
         );

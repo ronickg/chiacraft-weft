@@ -29,7 +29,7 @@ impl Deref for Species {
     }
 }
 
-pub static SPECIES: [Species; 41] = [
+pub static SPECIES: [Species; 46] = [
     Species { kind: &crate::dog::CHIHUAHUA, data: &data::SPECIES[0] },
     Species { kind: &crate::cat::CAT, data: &data::SPECIES[1] },
     Species { kind: &crate::capybara::CAPYBARA, data: &data::SPECIES[2] },
@@ -71,6 +71,11 @@ pub static SPECIES: [Species; 41] = [
     Species { kind: &crate::ankylosaur::GASTONIA, data: &data::SPECIES[38] },
     Species { kind: &crate::ankylosaur::PINACOSAURUS, data: &data::SPECIES[39] },
     Species { kind: &crate::iguanodont::IGUANODONT, data: &data::SPECIES[40] },
+    Species { kind: &crate::caiman::CROCODYLIFORM, data: &data::SPECIES[41] },
+    Species { kind: &crate::citipati::CITIPATI, data: &data::SPECIES[42] },
+    Species { kind: &crate::early_bird::CONFUCIUSORNIS, data: &data::SPECIES[43] },
+    Species { kind: &crate::early_bird::GOBIPTERYX, data: &data::SPECIES[44] },
+    Species { kind: &crate::sauropod::CEDAROSAURUS, data: &data::SPECIES[45] },
 ];
 
 impl Species {
@@ -84,6 +89,26 @@ impl Species {
         let name = weft_sdk::item_name(item);
         self.foods.iter().enumerate().find(|(_, f)| f.item == name)
     }
+}
+
+/// The row in `SPECIES` of the species whose entity kind is `kind` (each creature's code finds its
+/// own by its kind, never by a number kept by hand: Research round 5, item 7).
+pub fn of(kind: &Entity) -> usize {
+    SPECIES
+        .iter()
+        .position(|s| std::ptr::eq(s.kind, kind))
+        .unwrap_or_else(|| panic!("{} is no species' kind (species.rs SPECIES)", kind.path()))
+}
+
+/// Rows whose entity kind isn't their species' (its name, or a breed's own kind), as when the list
+/// above and `animals_core::species::SPECIES` fall out of order.
+pub fn problems() -> Vec<String> {
+    SPECIES
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.breed.is_none() && !s.kind.path().ends_with(s.name))
+        .map(|(i, s)| format!("animals species.rs row {i}: kind {} with the row of {}", s.kind.path(), s.name))
+        .collect()
 }
 
 /// Whether some species eats `item`: offered to one that doesn't, it is disliked.

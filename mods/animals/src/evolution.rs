@@ -447,7 +447,7 @@ fn count_at(w: &World, id: u64, pos: [f64; 3], sign: f32) {
         evolved(p, index, cell, h, day, &mut r)?;
         let l = p.get_mut(&key(index, cell, h), cell)?;
         coats::count_in(index, &mut l.pool, &g, sign, POPULATION as f32);
-        weft_sdk::info!("animal {id} {} the wild pool {}", if sign < 0.0 { "left" } else { "joined" }, key(index, cell, h));
+        weft_sdk::debug!("animal {id} {} the wild pool {}", if sign < 0.0 { "left" } else { "joined" }, key(index, cell, h));
         Some(())
     });
 }

@@ -11,6 +11,7 @@ pub(crate) static CAPYBARA: Entity = Entity::named("capybara");
 const TEXTURE: &str = "capybara/capybara";
 
 pub fn init(r: &mut Registry) {
+    let index = crate::species::of(&CAPYBARA);
     // Settling down: its poses, drawn in place of it (`rest.rs`).
     crate::rest::register(
         r,
@@ -37,12 +38,12 @@ pub fn init(r: &mut Registry) {
         })
         .goals(
             Goals::new()
-                .then(crate::animal::upkeep(2))
-                .then(crate::taming::behave(2))
+                .then(crate::animal::upkeep(index))
+                .then(crate::taming::behave(index))
                 .then(crate::hunt::wary)
                 .then(crate::signatures::calm_aura)
-                .then(crate::commands::act(2))
-                .then(crate::breeding::behave(2))
+                .then(crate::commands::act(index))
+                .then(crate::breeding::behave(index))
                 .then(crate::rest::settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)

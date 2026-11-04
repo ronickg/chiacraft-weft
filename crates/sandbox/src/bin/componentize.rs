@@ -17,6 +17,20 @@ fn main() {
             .and_then(|code| code.parent())
             .and_then(|dir| chiacraft_packages::read_manifest(dir).ok())
             .map_or_else(|| "componentize".to_string(), |m| m.id);
+        // `client.wasm` is a client half (the world client-mod), anything else a server half.
+        if std::path::Path::new(to)
+            .file_name()
+            .is_some_and(|n| n == "client.wasm")
+        {
+            let m = chiacraft_sandbox::client::ClientMod::load(&package, &component)
+                .map_err(|e| format!("the client half doesn't load: {e}"))?;
+            std::fs::write(to, &component).map_err(|e| format!("{to}: {e}"))?;
+            println!("{to}: {} bytes, a client half, registers:", component.len());
+            for (i, h) in m.hooks().iter().enumerate() {
+                println!("  {i}: {h:?}");
+            }
+            return Ok(());
+        }
         let m = chiacraft_sandbox::Mod::load(&package, &component).map_err(|e| format!("the component doesn't load: {e}"))?;
         std::fs::write(to, &component).map_err(|e| format!("{to}: {e}"))?;
         println!("{to}: {} bytes, registers:", component.len());

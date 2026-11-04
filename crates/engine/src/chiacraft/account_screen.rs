@@ -62,6 +62,61 @@ impl Screen for Account {
                 }
             });
 
+            // The account's DID (phase 4): from a sponsor, or one these words hold.
+            let did = s.did();
+            if did.is_some() && crate::chiacraft::did::state().0.is_empty() {
+                crate::chiacraft::did::watch(cx.settings);
+            }
+            ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(360.0), |ui| {
+                label(ui, cx, "account.did.title", &[], "default");
+                match did
+                    .as_ref()
+                    .and_then(|d| d.launcher_id())
+                    .and_then(|l| chiacraft_wallet::keys::encode_did(&l))
+                {
+                    Some(text) => {
+                        label(ui, cx, "account.did.yours", &[Arg::Text(text)], "dim");
+                    }
+                    None => {
+                        label(ui, cx, "account.did.none", &[], "dim");
+                    }
+                }
+                ui.text_bound(
+                    "dim",
+                    Box::new(|_: &Ctx| {
+                        let (key, args) = crate::chiacraft::did::state();
+                        (key, args.into_iter().map(Arg::Text).collect())
+                    }),
+                );
+                if did.is_none() {
+                    let get = button(ui, cx, "account.did.get", &[], 200.0, |c| {
+                        crate::chiacraft::did::get(c.settings);
+                        c.requests.push(Request::Rebuild);
+                    });
+                    ui.set_id(get, "get_did");
+                    label(ui, cx, "account.did.link_hint", &[], "dim");
+                    let input = ui.add(Kind::input("", 100), Style::default().h(18.0).w(344.0));
+                    ui.set_id(input, "link_did");
+                    let link = button(ui, cx, "account.did.link", &[], 160.0, |c| {
+                        let text = c.input_text("link_did").unwrap_or_default();
+                        crate::chiacraft::did::link(c.settings, &text);
+                        c.requests.push(Request::Rebuild);
+                    });
+                    ui.set_id(link, "link");
+                } else {
+                    let unlink = button(ui, cx, "account.did.unlink", &[], 160.0, |c| {
+                        let result = chiacraft_account::current().map(|s| s.unlink_did());
+                        update(c, |a| {
+                            a.note = match result {
+                                Some(Err(e)) => Some(("account.error", e)),
+                                _ => None,
+                            };
+                        });
+                    });
+                    ui.set_id(unlink, "unlink_did");
+                }
+            });
+
             if show_words {
                 ui.panel("panel", Style::default().pad(8.0).gap(4.0).w(360.0), |ui| match s.words() {
                     Ok(words) => {

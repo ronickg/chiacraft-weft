@@ -25,5 +25,5 @@ static BODY: Body = Body {
 };
 
 pub fn init(r: &mut Registry) {
-    wild::register(r, &[(&GASTONIA, 38), (&PINACOSAURUS, 39)], &BODY);
+    wild::register(r, &[&GASTONIA, &PINACOSAURUS], &BODY);
 }

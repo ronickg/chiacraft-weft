@@ -261,6 +261,11 @@ def build(a):
              "description.\n\n")
     if not key:  # no style key of ours for this kind yet: say so rather than describe a missing image
         t = t.replace(", the style key:", " (none attached yet, so follow the words):")
+    extra = [r for r in (getattr(a, "like", "") or "").split(",") if r]
+    if extra:  # our own drawings to match in shape (never another game's or pack's art)
+        refs = [r for r in refs if r] + extra
+        t = t.replace("\n\nThe ", "\n\nAlso attached, just before the grid: " + str(len(extra)) +
+                      " of our own drawing(s) to match in shape, size and layout exactly; only the material differs.\n\nThe ", 1)
     refs = list(dict.fromkeys(r for r in refs if r))  # each image once
     return t + TAIL.format(name=a.name), refs + [grid_image(w, h)], (w, h), full
 
@@ -316,7 +321,28 @@ def snap(path, w, h, full, green=False):
     return out
 
 
-def check(path, w, h, full, green=False, pale=False, kind="item"):
+def vertical_runs(sprite, longest=6):
+    """Straight vertical edges (an opaque pixel with nothing to its right, `longest`+ px down one
+    column): a tool's working part cut flat against the canvas side, which Ronald rejects."""
+    import numpy as np
+    m = sprite[..., 3] > 0
+    edge = m & ~np.pad(m, ((0, 0), (0, 1)))[:, 1:]
+    out = []
+    for x in range(m.shape[1]):
+        y = 0
+        while y < m.shape[0]:
+            if edge[y, x]:
+                y0 = y
+                while y < m.shape[0] and edge[y, x]:
+                    y += 1
+                if y - y0 >= longest:
+                    out.append((x, y0, y - 1))
+            else:
+                y += 1
+    return out
+
+
+def check(path, w, h, full, green=False, pale=False, kind="item", diagonal=False):
     """`0 Making it.md`'s checks: chunky pixels on one grid; for sprites an outline darker than the
     inside (unless the thing is pale itself), not the red-brown line, a sensible fill; for full tiles
     no empty cell and no seam. Returns (passed, numbers)."""
@@ -351,6 +377,9 @@ def check(path, w, h, full, green=False, pale=False, kind="item"):
     if kind in ("ui", "effect", "sky"):  # glows, frames and particles: no outline rule, any fill
         return bool(ok and res["fill"] > 0.01), res
     ok &= (res["outline"] < 0.9 or pale) and res["red_line"] < 0.45 and 0.04 < res["fill"] < 0.85
+    if diagonal:  # a tool: its working part follows the diagonal, never a flat vertical edge
+        res["vertical"] = len(vertical_runs(sprite))
+        ok &= res["vertical"] == 0
     return bool(ok), res
 
 
@@ -375,7 +404,7 @@ def make(a):
             tries.append({"made": False})
             continue
         archive(out, f"{a.name}__try{k + 1}", "generated")  # every try, passed or not
-        ok, res = check(out, w, h, full, a.green, a.pale, a.kind)
+        ok, res = check(out, w, h, full, a.green, a.pale, a.kind, getattr(a, "diagonal", False))
         tries.append(dict(res, passed=ok))
         if ok:
             break
@@ -411,7 +440,7 @@ def install(a):
 def main():
     if len(sys.argv) > 2 and sys.argv[1] == "batch":
         jobs = json.load(open(sys.argv[2]))
-        base = dict(what="", ref="", type="", guide_only=False, cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3,
+        base = dict(what="", ref="", type="", guide_only=False, cutout=False, size="48x32", tile=False, green=False, pale=False, tries=3, like="", diagonal=False,
                     dir=SCRATCH, mod="base")
         with ThreadPoolExecutor(4) as ex:
             for r in ex.map(lambda j: make(argparse.Namespace(**dict(base, **j))), jobs):
@@ -442,6 +471,8 @@ def main():
     ap.add_argument("--green", action="store_true", help="on green: the thing is purple, pink or magenta")
     ap.add_argument("--pale", action="store_true", help="a pale thing whose outline may be light (paper, feather)")
     ap.add_argument("--guide-only", action="store_true", help="ui: no UI sheets of Ronald's attached, only the guide's words and our approved parts")
+    ap.add_argument("--diagonal", action="store_true", help="a tool: fail any straight vertical edge (the working part must follow the diagonal)")
+    ap.add_argument("--like", default="", help="our own drawing(s), comma-separated paths, to match in shape (a chosen design)")
     ap.add_argument("--tries", type=int, default=3)
     ap.add_argument("--dir", default=SCRATCH)
     ap.add_argument("--mod", default="base", help="install: the mod whose texture it replaces")

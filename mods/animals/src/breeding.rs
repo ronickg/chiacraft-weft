@@ -240,7 +240,7 @@ fn wild_love(w: &World, id: u64, index: usize, a: &Animal, b: &Breeding, kin: &[
             b.love = LOVE_TICKS;
         }
     }
-    weft_sdk::info!("wild {} {id} and {mate} in love", s.name);
+    weft_sdk::debug!("wild {} {id} and {mate} in love", s.name);
 }
 
 /// Its area was away (unloaded) for `away` ticks (`animal::catch_up`): its timers have run on (a
@@ -295,7 +295,7 @@ pub fn fed(w: &World, id: u64, player: u64) -> bool {
         b.growing -= b.growing / 10;
     } else if b.love == 0 && b.rest == 0 && b.carrying == 0 && a.bond >= BOND && life::can_breed(a.stage) && (in_season || cared) {
         b.love = LOVE_TICKS;
-        weft_sdk::info!("animal {id} in love");
+        weft_sdk::debug!("animal {id} in love");
     } else {
         return false;
     }
@@ -363,7 +363,7 @@ fn mated(w: &World, id: u64, mate: u64, index: usize) {
         (b.love, b.rest) = (0, MALE_REST);
     }
     hearts(w, id, 7);
-    weft_sdk::info!("animal {id} mated with {mate}");
+    weft_sdk::debug!("animal {id} mated with {mate}");
 }
 
 /// A young one keeps within three blocks of its mother, while she is near.

@@ -8,7 +8,7 @@
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use base_api::{GRAVE, VITALS};
 use vitals::effects::Effect;
@@ -183,33 +183,67 @@ fn watch(w: &World) {
     }
 }
 
+/// Where the hint line sits, a share of the window's height down: over the crosshair's lower
+/// half and clear of the chat in the bottom left (at 0.78 the two overlapped, Tester 2 11-04).
+const HINT_Y: f32 = 0.64;
 /// Seconds a hint stays, and fades at the end.
 const SHOW_SECS: f32 = 6.0;
 const FADE_SECS: f32 = 0.6;
 
-/// Hints waiting, the first with when it appeared.
-static QUEUE: Mutex<VecDeque<(Hint, Option<Instant>)>> = Mutex::new(VecDeque::new());
+/// Hints waiting (lang key and arguments), the first with when it appeared.
+static QUEUE: Mutex<VecDeque<(String, Vec<i64>, Option<Instant>)>> = Mutex::new(VecDeque::new());
+/// The last frame's time, for pausing a hint while a screen is open.
+static LAST_FRAME: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// Queues a hint on the client, unless hints are off or the same one is waiting already.
+fn queue(key: String, args: Vec<i64>) {
+    if !SHOW.get() {
+        return;
+    }
+    let mut q = QUEUE.lock().unwrap();
+    if !q.iter().any(|(k, _, _)| *k == key) {
+        q.push_back((key, args, None));
+    }
+}
 
 fn client(r: &mut Registry) {
     r.client_packet(&HINT, |_, h| {
-        if SHOW.get() {
-            let mut q = QUEUE.lock().unwrap();
-            // The same hint twice in a row (freezing again) waits for nothing.
-            if !q.iter().any(|(o, _)| o.hint == h.hint) {
-                q.push_back((h, None));
-            }
+        queue(format!("hint.base.{}", HINTS[h.hint as usize % HINTS.len()]), vec![h.a as i64, h.b as i64]);
+    });
+    // Any mod's hint (`base_api::hint`).
+    r.client_packet(&base_api::HINT_TEXT, |_, text| {
+        let mut parts = text.split('\t');
+        let key = parts.next().unwrap_or("").to_string();
+        let args = parts.filter_map(|a| a.parse().ok()).collect();
+        if !key.is_empty() {
+            queue(key, args);
         }
     });
     r.client_frame(|c| {
         let mut q = QUEUE.lock().unwrap();
-        let Some((h, at)) = q.front_mut() else { return };
+        let now = Instant::now();
+        let dt = LAST_FRAME
+            .lock()
+            .unwrap()
+            .replace(now)
+            .map_or(Duration::ZERO, |l| now - l);
+        let Some((key, args, at)) = q.front_mut() else { return };
+        // Not over a screen (it ran across the inventory's grid): it waits until the screen
+        // closes, and one already showing pauses (its start moves on with the time), so a
+        // hint shown once per player is never used up unseen.
+        if !c.screen().is_empty() {
+            if let Some(a) = at {
+                *a += dt;
+            }
+            return;
+        }
         let since = at.get_or_insert_with(Instant::now).elapsed().as_secs_f32();
         if since > SHOW_SECS {
             q.pop_front();
             return;
         }
         let alpha = ((SHOW_SECS - since) / FADE_SECS).clamp(0.0, 1.0);
-        let key = format!("hint.base.{}", HINTS[h.hint as usize % HINTS.len()]);
-        c.screen_text(0.5, 0.78, &key, &[Arg::Int(h.a as i64), Arg::Int(h.b as i64)], 0xffe8c000 | (alpha * 255.0) as u32, 1.0);
+        let args: Vec<Arg> = args.iter().map(|&a| Arg::Int(a)).collect();
+        c.screen_text(0.5, HINT_Y, key, &args, 0xe4dacf00 | (alpha * 255.0) as u32, 1.0);
     });
 }

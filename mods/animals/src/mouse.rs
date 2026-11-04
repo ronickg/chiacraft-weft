@@ -22,5 +22,5 @@ static BODY: Body = Body {
 };
 
 pub fn init(r: &mut Registry) {
-    wild::register(r, &[(&WOOD_MOUSE, 9)], &BODY);
+    wild::register(r, &[&WOOD_MOUSE], &BODY);
 }

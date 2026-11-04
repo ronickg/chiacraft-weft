@@ -12,8 +12,8 @@ use weft_sdk::*;
 
 pub(crate) static RAPTOR: Entity = Entity::named("raptor");
 pub(crate) static OSMOLSKAE: Entity = Entity::named("velociraptor_osmolskae");
-/// Each species: its kind, its row in `species::SPECIES`, its texture.
-static KINDS: [(&Entity, usize, &str); 2] = [(&RAPTOR, 3, "raptor/raptor"), (&OSMOLSKAE, 5, "raptor/osmolskae")];
+/// Each species: its kind and its texture.
+static KINDS: [(&Entity, &str); 2] = [(&RAPTOR, "raptor/raptor"), (&OSMOLSKAE, "raptor/osmolskae")];
 
 /// How near a pack keeps together: helping, hunting, fighting better.
 const PACK_RANGE: f64 = 8.0;
@@ -37,8 +37,8 @@ pub fn init(r: &mut Registry) {
             .min(3);
         m.value *= 1.0 + 0.1 * pack as f64;
     });
-    for (kind, index, texture) in KINDS {
-        register(r, kind, index, texture);
+    for (kind, texture) in KINDS {
+        register(r, kind, crate::species::of(kind), texture);
     }
 }
 
@@ -95,7 +95,7 @@ fn rest_look(kind: &Entity) -> String {
 /// The kind of raptor `id` is.
 fn kind_of(w: &World, id: u64) -> Option<&'static Entity> {
     let k = w.entity(id)?.kind;
-    KINDS.iter().map(|(e, _, _)| *e).find(|e| e.id() == k)
+    KINDS.iter().map(|(e, _)| *e).find(|e| e.id() == k)
 }
 
 fn is_tame_raptor(w: &World, id: u64) -> bool {

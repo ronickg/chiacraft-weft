@@ -108,7 +108,7 @@ static ALL: [Advancement; 27] = [
 /// Server to the player who made it: the index into `ALL`.
 static MADE: Channel<u32> = Channel::named("advancement_made");
 static CHIME: Sound = Sound::named("ui.advancement");
-static SCREEN: Screen = Screen::named("advancements");
+pub static SCREEN: Screen = Screen::named("advancements");
 static OPEN: Key = Key::named("advancements");
 
 const TOAST_SECS: f32 = 5.0;
@@ -286,9 +286,11 @@ fn client(r: &mut Registry) {
     // Built when the screen opens, from what the player has made by then.
     r.screen(&SCREEN, |ui| {
         let done = ui.client().component(&ADVANCEMENTS).map_or(0, |a| a.done);
-        ui.panel("panel", S::col().pad(8.0).gap(6.0), |ui| {
+        let tabs: [crate::window::Tab; 1] = [("window.base.tab.stats", |c| {
+            c.client().open_screen(&crate::levels::SCREEN);
+        })];
+        crate::window::window_titled(ui, S::col().pad(8.0).gap(6.0), "advancements.base.title", &tabs, |ui| {
             ui.row(S::row().gap(8.0), |ui| {
-                ui.text_styled(S::col().class("title").scale(1.5).no_wrap(), "advancements.base.title", &[]);
                 ui.spacer();
                 ui.text_bind_styled(S::col().class("dim").no_wrap(), |v, out| {
                     let done = v

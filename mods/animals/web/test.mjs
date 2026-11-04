@@ -254,10 +254,12 @@ for (const x of species) {
 }
 
 console.log("Evolution");
-for (const [name, h, want] of [["raptor", "snow", "lighter"], ["raptor", "forest", "darker"], ["raptor", "desert", "sandier"]]) {
+// Each run seeded by itself, so species added elsewhere (whose checks draw seeds first) don't
+// shuffle its luck.
+for (const [k, [name, h, want]] of [["raptor", "snow", "lighter"], ["raptor", "forest", "darker"], ["raptor", "desert", "sandier"]].entries()) {
   const avg = r => r.sample.map(a => a.look.average).reduce((a, b) => a.map((v, i) => v + b[i] / r.sample.length), [0, 0, 0]);
-  const start = call({ op: "evolve", species: idx(name), habitat: h, generations: 0, seed: s() });
-  const end = call({ op: "evolve", species: idx(name), habitat: h, generations: 300, seed: s() });
+  const start = call({ op: "evolve", species: idx(name), habitat: h, generations: 0, seed: 1000 + 10 * k });
+  const end = call({ op: "evolve", species: idx(name), habitat: h, generations: 300, seed: 1001 + 10 * k });
   const bg = end.background, dist = c => Math.hypot(...c.map((v, i) => v - bg[i]));
   const [d0, d1] = [dist(avg(start)), dist(avg(end))];
   check(`${name} in ${h} turns ${want} (closer to the ground)`, d1 < d0, `distance to ground ${d0.toFixed(0)} -> ${d1.toFixed(0)} after 300 generations`);

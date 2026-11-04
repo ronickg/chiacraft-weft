@@ -334,7 +334,7 @@ fn failed(e: String) -> Vec<Msg> {
 }
 
 fn short(v: &str) -> String {
-    if v.len() > 20 { format!("{}…", &v[..16]) } else { v.to_string() }
+    if v.chars().count() > 20 { format!("{}…", v.chars().take(16).collect::<String>()) } else { v.to_string() }
 }
 
 /// `/ban <who> [reason]`.

@@ -911,13 +911,12 @@ impl UiRenderer {
             let layout = super::text::layout(&super::text::plain(&stack.count.to_string()), &self.font, None);
             let mut none = Vec::new();
             // In the icon's bottom right, clear of the slot's frame: the digits' ink two font
-            // pixels inside the icon's right and bottom edges, their shadow one. The pen ends one
-            // pixel inside (the last glyph's own spacing is the other); the ink stands on the row
-            // above the baseline, font pixel 14 of the line.
+            // pixels inside the icon's right and bottom edges, their shadow one (a line's width
+            // is its ink); the ink stands on the row above the baseline, font pixel 14 of the line.
             let (ix, iy) = (r.x + (r.w - i) / 2.0, r.y + (r.h - i) / 2.0);
             self.glyph_run(
                 &layout.items,
-                (ix + i - layout.width * px - px).round(),
+                (ix + i - layout.width * px - 2.0 * px).round(),
                 (iy + i - 15.0 * px).round(),
                 px,
                 0xF4EAD8FF,

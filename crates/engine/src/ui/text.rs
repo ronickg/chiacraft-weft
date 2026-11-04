@@ -869,6 +869,26 @@ pub fn layout_with(spans: &[Span], font: &Font, max_width: Option<f32>, line_hei
             }
         }
     }
+    // One line of glyphs: its box is its ink, without the first glyph's lead-in or the last
+    // one's spacing after it, so a label centred in a button or tab is centred by its letters.
+    if lines.is_empty() && max_width.is_none() {
+        let glyph = |it: &Placed| match *it {
+            Placed::Glyph { x, ch, .. } if ch != ' ' => Some((x, font.glyph(ch))),
+            _ => None,
+        };
+        let first = out.items.first().and_then(glyph);
+        let last = out.items.last().and_then(glyph);
+        if let (Some((_, g0)), Some((lx, gl))) = (first, last) {
+            let lead = g0.bearing.max(0.0);
+            let end = lx + gl.bearing + gl.width;
+            if lead > 0.0 || end < x {
+                for it in &mut out.items {
+                    *it.pos().0 -= lead;
+                }
+                x = (end - lead).max(0.0);
+            }
+        }
+    }
     lines.push((line_start, x, line_align));
     max_x = max_x.max(x);
     out.width = max_x;

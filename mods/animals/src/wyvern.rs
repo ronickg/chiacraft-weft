@@ -17,13 +17,13 @@ const TEXTURE: &str = "wyvern/wyvern";
 /// Its box: about its body (the neck and tail reach well out of it), as tall as its shoulders.
 const SIZE: (f32, f32) = (3.4, 4.0);
 /// Its row in `species::SPECIES`.
-const INDEX: usize = 6;
 
 /// How near a player can come before a wild one goes for them, in blocks; near its nest, further.
 const TERRITORY: f64 = 14.0;
 const NEST_TERRITORY: f64 = 24.0;
 
 pub fn init(r: &mut Registry) {
+    let index = crate::species::of(&WYVERN);
     // Settling down: its poses, drawn in place of it (`rest.rs`).
     crate::rest::register(
         r,
@@ -55,16 +55,16 @@ pub fn init(r: &mut Registry) {
         })
         .goals(
             Goals::new()
-                .then(crate::animal::upkeep(INDEX))
+                .then(crate::animal::upkeep(index))
                 .then(crate::breath::behave)
-                .then(crate::riding::ridden(INDEX))
+                .then(crate::riding::ridden(index))
                 .then(breathe_at_foe)
-                .then(crate::knockout::behave(INDEX))
+                .then(crate::knockout::behave(index))
                 .then(guard)
                 .then(crate::hunt::hunt)
-                .then(crate::commands::act(INDEX))
-                .then(crate::breeding::behave(INDEX))
-                .then(crate::eggs::nest(INDEX))
+                .then(crate::commands::act(index))
+                .then(crate::breeding::behave(index))
+                .then(crate::eggs::nest(index))
                 .then(crate::rest::settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)

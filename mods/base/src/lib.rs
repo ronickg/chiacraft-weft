@@ -6,6 +6,7 @@ mod beds;
 mod blocks;
 mod clothing;
 mod cooking;
+mod death;
 mod farming;
 mod growth;
 mod hints;
@@ -22,6 +23,7 @@ mod sounds;
 mod survival;
 mod weather;
 mod wild;
+mod window;
 mod worldgen;
 
 use weft_sdk::*;
@@ -63,6 +65,7 @@ fn init(r: &mut Registry) {
     farming::register(r);
     advancements::register(r);
     hints::register(r);
+    death::register(r);
     beds::register(r);
     hud::register(r);
     redstone::register(r);
