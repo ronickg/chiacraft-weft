@@ -1,6 +1,6 @@
 {
  "kind": "item",
- "what": "a spawn egg: an upright oval egg, dark brown shell with big cream patches, a soft highlight on the upper left, centred with 3-5 px of padding",
+ "what": "a spawn egg: an upright oval egg, dark brown shell with big cream patches, a soft highlight on the upper left, drawn small: its longest side only about 26 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
  "size": [
   32,
   32
@@ -9,17 +9,10 @@
  "green": false,
  "tries": [
   {
-   "grid": 0.377,
-   "outline": 0.42,
-   "red_line": 0.48,
-   "fill": 0.45,
-   "passed": false
-  },
-  {
-   "grid": 0.557,
-   "outline": 0.4,
-   "red_line": 0.3,
-   "fill": 0.43,
+   "grid": 0.256,
+   "outline": 0.46,
+   "red_line": 0.27,
+   "fill": 0.48,
    "passed": true
   }
  ]

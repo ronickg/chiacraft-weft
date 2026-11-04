@@ -25,7 +25,8 @@ TITLES = {"1_tools": "Tools and weapons", "2_armour": "Armour", "3_materials": "
           "5c_wild": "New wild foods (for the Voxel dog handoff)",
           "5d_redo": "Redos: crowberries, beans, barley, rye, melon seeds, diamond hoe",
           "6b_size": "Redos and creature sizes: repeater, insects, saddles, worm, grub, eggs",
-          "7b_beans": "Beans, on green"}
+          "7b_beans": "Beans, on green",
+          "7c_worm": "Earthworm, a touch bigger"}
 
 
 def uri(im, scale=1):

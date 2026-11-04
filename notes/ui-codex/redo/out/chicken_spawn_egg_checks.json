@@ -1,6 +1,6 @@
 {
  "kind": "item",
- "what": "a spawn egg: an upright oval egg, cream shell with red speckles, a soft highlight on the upper left, centred with 3-5 px of padding",
+ "what": "a spawn egg: an upright oval egg, cream shell with red speckles, a soft highlight on the upper left, drawn small: its longest side only about 17 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
  "size": [
   32,
   32
@@ -9,10 +9,10 @@
  "green": false,
  "tries": [
   {
-   "grid": 0.568,
-   "outline": 0.43,
+   "grid": 0.35,
+   "outline": 0.52,
    "red_line": 0.0,
-   "fill": 0.42,
+   "fill": 0.22,
    "passed": true
   }
  ]

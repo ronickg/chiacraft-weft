@@ -1,6 +1,6 @@
 {
  "kind": "item",
- "what": "a beetle grub: a plump curled C-shaped cream-white larva with a small orange-brown head, centred with 3-5 px of padding",
+ "what": "a beetle grub: a plump curled C-shaped cream-white larva with a small orange-brown head, drawn small: its longest side only about 16 px of the 32 x 32 grid, centred, everything round it the flat background color, still clearly readable",
  "size": [
   32,
   32
@@ -9,10 +9,10 @@
  "green": false,
  "tries": [
   {
-   "grid": 0.559,
-   "outline": 0.53,
+   "grid": 0.538,
+   "outline": 0.51,
    "red_line": 0.0,
-   "fill": 0.37,
+   "fill": 0.19,
    "passed": true
   }
  ]
