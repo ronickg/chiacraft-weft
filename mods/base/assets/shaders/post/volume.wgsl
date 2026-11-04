@@ -67,12 +67,18 @@ fn apply(p: PostPixel) -> vec4<f32> {
     // Toward the sun the air glows most (Henyey-Greenstein, g 0.65), a little all round.
     let g = 0.65;
     let mu = dot(dir, sun.xyz);
-    let phase = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) * 0.25 + 0.15;
+    let phase = min((1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) * 0.25, 1.2) + 0.1;
     // Thin air by day, thicker in fog and with the sun low.
     let low = 1.0 - smoothstep(0.1, 0.5, sun.y);
-    let density = (0.0025 + 0.004 * low + 0.03 * scene.weather.z) * (1.0 - scene.fog_color.w);
+    // Thin: at 0.0025-0.0065 it washed the sky round a low sun white (Tester 2's golden hour); the
+    // beams should show where the shadow maps cut them, not fill the air.
+    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z) * (1.0 - scene.fog_color.w);
     let air = 1.0 - exp(-density * end);
     let color = mix(vec3(1.0, 0.62, 0.35), vec3(1.0, 0.95, 0.85), smoothstep(0.05, 0.5, sun.y));
-    let glow = color * lit * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * 0.9;
-    return vec4(p.color.rgb + glow * (vec3(1.0) - p.color.rgb * 0.6), p.color.a);
+    // Lit air against shade: what shows is the difference the shadow maps make, so a view where all
+    // of the air is lit (looking at the sun over open land) gets little of it, beams through gaps
+    // the most.
+    let beams = lit * (1.0 - lit) * 4.0;
+    let glow = color * mix(lit * 0.35, lit, beams) * air * phase * day * select(min(p.strength, 1.0), 1.0, cheap) * 0.6;
+    return vec4(p.color.rgb + glow * (vec3(1.0) - p.color.rgb * 0.7), p.color.a);
 }

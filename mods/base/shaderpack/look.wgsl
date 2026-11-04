@@ -66,8 +66,9 @@ fn palette() -> Palette {
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
-    // Valheim's night: a deep blue-teal in the shade, so firelight's orange stands out against it.
-    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.025, 0.045, 0.10), vec3(0.009, 0.020, 0.046));
+    // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
+    // Valheim's, mixed with the orange of a fire into olive on the ground: Tester 2's campfire.)
+    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.025, 0.04, 0.10), vec3(0.010, 0.017, 0.050));
     var p: Palette;
     if e > 0.08 {
         p = blend(golden, day, smoothstep(0.08, 0.28, e));
@@ -296,14 +297,15 @@ fn block_light(b: vec3<f32>, pos: vec3<f32>) -> vec3<f32> {
     }
     // Wider pools than the levels alone give (Valheim's fires light a wide ring of ground): the
     // dim edge of a torch's reach brought up.
-    let curve = pow(vec3(brightness_curve(b.x), brightness_curve(b.y), brightness_curve(b.z)), vec3(0.8));
+    let curve = pow(vec3(brightness_curve(b.x), brightness_curve(b.y), brightness_curve(b.z)), vec3(0.9));
     // White light (torches, lanterns) is warmed; colored light keeps its color.
     let grey = 1.0 - (m - min(min(b.x, b.y), b.z)) / m;
     let warm = mix(vec3(1.0), mix(vec3(1.0, 0.56, 0.26), vec3(1.0, 0.82, 0.62), m * m), grey);
     let t = scene.params.w;
     let q = floor(pos * 0.5);
     let flicker = 1.0 + 0.045 * sin(t * 7.3 + q.x * 1.7 + q.z * 2.3) + 0.03 * sin(t * 13.1 + q.y * 3.1);
-    return curve * warm * 1.55 * flicker;
+    // A little less than the levels alone gave: wider at 1.55, the middle of the pool went yellow.
+    return curve * warm * 1.4 * flicker;
 }
 
 // How much a surface with normal `n` faces the sun. With the sun low its light wraps a little
