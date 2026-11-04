@@ -73,7 +73,9 @@ and `textures/entity/<mod>/<animal>.png`. It takes care of what the engine needs
 
 Register it like the cat (`mods/animals/src/cat.rs`, the simplest) or the chihuahua (`mods/animals/src/dog.rs`): `.model_file("<animal>")`,
 `.animations("<animal>[_sit|_lie]")`, `.texture("<mod>/<animal>")`, and a hitbox `.size(..)`
-about the model's footprint. Bones named `head` follow where the creature looks; don't name
+about the model's footprint: in the animals mod, a row in `animals_core::bodies::BOXES` by model
+(height about the model's top, width about the geometric mean of its width and length, the model
+centred), held to the model by `mods/animals/core/tests/boxes.rs`. Bones named `head` follow where the creature looks; don't name
 bones `leg0`..`leg3` unless you want the engine's own leg swing (an animation with `walk` turns
 it off anyway).
 
