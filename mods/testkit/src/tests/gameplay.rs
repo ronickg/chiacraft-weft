@@ -187,9 +187,10 @@ pub async fn armor(t: T) -> R {
     }
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    // The inventory menu: the 2x2 grid (0-3), its result (4), the eight equipment slots (armor's
-    // four and the clothes' four, 5-12), the main inventory (13-39), then the hotbar (40-48).
-    for i in 40..44 {
+    // The inventory menu: the 2x2 grid (0-3), its result (4), the nine equipment slots (armor's
+    // four, the clothes' four and the cloak, 5-13), the main inventory (14-40), then the hotbar
+    // (41-49).
+    for i in 41..45 {
         t.c().key("ShiftLeft", 0.3);
         t.frames(1).await?;
         t.click_ui(&format!("slot:{i}"), 0);
@@ -198,8 +199,8 @@ pub async fn armor(t: T) -> R {
     t.until("armor worn", Duration::from_secs(5), |t| (36..40).all(|s| !t.c().inventory_slot(s).is_empty()))
         .await?;
     // The player's inventory by group name: four equipment slots, all filled; the hotbar empty.
-    // Armor's four and the clothes' four, the arrival clothes on.
-    t.check_eq(t.op("group me core:equipment").await?, "8 8".to_string(), "equipment group (slots, filled)");
+    // Armor's four, the clothes' four and the cloak; the arrival clothes on, no cloak.
+    t.check_eq(t.op("group me core:equipment").await?, "9 8".to_string(), "equipment group (slots, filled)");
     t.check_eq(t.op("group me base:head").await?, "1 1".to_string(), "the head slot");
     t.check_eq(t.op("group me hotbar").await?, "9 0".to_string(), "hotbar group");
     t.shot("worn").await?;
@@ -1998,4 +1999,30 @@ pub async fn clothes_and_stew(t: T) -> R {
     let left = t.op(&format!("slot {} 0", at(pot))).await?;
     t.check(left.starts_with('-'), format!("the beef went into the stew: {left}"));
     Ok(())
+}
+
+/// The calendar follows the world's day, after a time jump and in creative too: the date the HUD and
+/// the seasonal tints read (`Vitals::date`) is day 49 of the year, winter by the calendar's
+/// seasons (Tester 2 11-04: after `/time set` in creative it stayed on its old day).
+pub async fn calendar_follows_time(t: T) -> R {
+    let mode = |t: T, m: &'static str| async move { t.op(&format!("mode {m}")).await };
+    mode(t.clone(), "creative").await?;
+    let day: u64 = 48;
+    let at = day * vitals::calendar::DAY_TICKS + 6000;
+    t.op(&format!("time {at}")).await?;
+    let moved = t
+        .until("the date follows the jump", Duration::from_secs(3), |t| {
+            t.c()
+                .view()
+                .component(&VITALS)
+                .is_some_and(|v| v.date as u64 == day + 1)
+        })
+        .await;
+    let season = vitals::calendar::date(at).season;
+    t.check(season == vitals::calendar::Season::Winter, format!("day 49 is {season:?} by the calendar, winter wanted"));
+    // Back to the world's first day (spring's 8th) and survival, for the tests after.
+    t.op(&format!("time {}", vitals::calendar::START_DAY as u64 * vitals::calendar::DAY_TICKS + 6000))
+        .await?;
+    mode(t.clone(), "survival").await?;
+    moved
 }

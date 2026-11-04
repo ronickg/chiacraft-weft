@@ -23,6 +23,7 @@ pub mod meals;
 pub mod plants;
 pub mod preserve;
 pub mod sheet;
+pub mod shelter;
 pub mod soil;
 pub mod stamina;
 pub mod stats;

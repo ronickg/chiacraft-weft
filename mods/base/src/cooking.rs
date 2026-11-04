@@ -269,7 +269,9 @@ fn roast_step(w: &World, id: u64, s: &mut Roasting) -> bool {
         .with(&MADE, crate::survival::made_for(used, keeps, now))
         .with(&HOT, (now / 20) as u32)
         .with(&FRESHNESS, freshness::HOT);
-    let fits = out_now.is_empty() || (out_now.stacks_with(&made) && out_now.count + made.count <= max_stack(made.item));
+    // Into a slot already holding some, the new one takes the stamps there (its own, a second
+    // later, would never stack: the campfire cooked one steak and stopped, integration review).
+    let fits = out_now.is_empty() || (out_now.item == made.item && out_now.count + made.count <= max_stack(made.item));
     if !fits {
         return false;
     }
@@ -361,7 +363,14 @@ fn tick_racks(b: &mut SystemBatch<Drying>) {
         let rate = if smoking {
             preserve::smoke_rate()
         } else {
-            let air = base_api::air_at(&w, [pos[0] as f64 + 0.5, pos[1] as f64, pos[2] as f64 + 0.5], 1.0, false, 0, |_| {});
+            let air = base_api::air_at(
+                &w,
+                [pos[0] as f64 + 0.5, pos[1] as f64, pos[2] as f64 + 0.5],
+                1.0,
+                false,
+                vitals::temperature::FIRE_REACH,
+                |_| {},
+            );
             // The still air: wind chill is a body's, food on a rack doesn't fall below the air (the
             // wind's drying is `dry_rate`'s breeze).
             preserve::dry_rate(air.still, air.humidity, air.wind, air.raining && air.open_sky)

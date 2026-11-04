@@ -128,6 +128,7 @@ pub fn all() -> Vec<TestDef> {
         gameplay::food,
         gameplay::every_food_has_nutrition,
         gameplay::clothes_and_stew,
+        gameplay::calendar_follows_time,
         gameplay::drop_and_pickup,
         gameplay::sounds,
         extend::events_batched,

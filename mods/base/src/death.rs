@@ -10,6 +10,9 @@ use base_api::GRAVE;
 use vitals::difficulty::{GRACE_AT_GRAVE, GRACE_SECS, GRAVE_REACHED};
 use weft_sdk::*;
 
+/// 1 when a player's last death left no tombstone (nowhere to put one) and the engine dropped what
+/// they carried where they died; for the death screen.
+pub static DROPPED: Component<u8> = Component::named("base:dropped");
 /// Seconds left of the grace after respawning (0: none), synced to show on the HUD.
 pub static GRACE: Component<f32> = Component::named("base:grace");
 /// Server to the one who died: what killed them (`death.base.cause.<x>`), the killer's name key if
@@ -22,11 +25,15 @@ struct Death {
     cause: String,
     killer: String,
     grave: Option<[i32; 3]>,
+    /// No tombstone: what one carried fell where one died.
+    dropped: bool,
 }
 static LAST: Mutex<Option<Death>> = Mutex::new(None);
 
 pub fn register(r: &mut Registry) {
     r.entity_component(&GRACE, 0.0, component_flags::SAVE | component_flags::KEEP | component_flags::SYNC_OWNER);
+    r.entity_component(&DROPPED, 0, component_flags::KEEP);
+    r.attach(&PLAYER, &DROPPED);
     r.attach(&PLAYER, &GRACE);
     // Back from the dead: monsters leave one be until the tombstone is reached.
     r.on(&PLAYER_RESPAWNED, |b| {
@@ -80,10 +87,11 @@ pub fn tell(w: &World, d: &abi::Death) {
         (dm::BLEED, _) => "bleed",
         _ => "generic",
     };
+    let dropped = w.component(d.entity, &DROPPED).is_some_and(|x| *x != 0);
     let grave = w
         .component(d.entity, &GRAVE)
         .filter(|g| g.set != 0)
-        .map_or("-\t-\t-".to_string(), |g| format!("{}\t{}\t{}", g.x, g.y, g.z));
+        .map_or(if dropped { "dropped\t-\t-".to_string() } else { "-\t-\t-".to_string() }, |g| format!("{}\t{}\t{}", g.x, g.y, g.z));
     let text = format!("death.base.cause.{cause}\t{}\t{grave}", killer.unwrap_or_default());
     w.send(d.entity, &DIED, &text);
 }
@@ -99,7 +107,13 @@ fn watch(w: &World) {
         if st.health <= 0.0 {
             continue;
         }
-        let Some(g) = w.component(id, &GRAVE).filter(|g| g.set != 0) else {
+        // Only where the tombstone is (`set` is its dimension + 1): elsewhere the grace runs down and
+        // the marker waits (integration review: a respawn in another dimension found none and cut
+        // the grace).
+        let Some(g) = w
+            .component(id, &GRAVE)
+            .filter(|g| g.set == w.dimension() + 1)
+        else {
             if let Some(gr) = w.component_mut(id, &GRACE) {
                 *gr = (*gr - 1.0).max(0.0);
             }
@@ -142,6 +156,7 @@ fn client(r: &mut Registry) {
                 .to_string(),
             killer: p.get(1).copied().unwrap_or("").to_string(),
             grave: num(2).zip(num(3)).zip(num(4)).map(|((x, y), z)| [x, y, z]),
+            dropped: p.get(2) == Some(&"dropped"),
         });
     });
     // The death screen, the engine's with what happened.
@@ -175,9 +190,19 @@ fn client(r: &mut Registry) {
                         }
                     });
                     ui.panel("well", S::col().pad(5.0).stretch(), |ui| {
-                        ui.text_bind_styled(S::col().max_w(216.0), |_, out| match LAST.lock().unwrap().as_ref().and_then(|d| d.grave) {
-                            Some([x, y, z]) => out.set("death.base.grave", &[Arg::Int(x as i64), Arg::Int(y as i64), Arg::Int(z as i64)]),
-                            None => out.set("death.base.no_grave", &[]),
+                        ui.text_bind_styled(S::col().max_w(216.0), |_, out| {
+                            let (grave, dropped) = LAST
+                                .lock()
+                                .unwrap()
+                                .as_ref()
+                                .map_or((None, false), |d| (d.grave, d.dropped));
+                            match (grave, dropped) {
+                                (Some([x, y, z]), _) => {
+                                    out.set("death.base.grave", &[Arg::Int(x as i64), Arg::Int(y as i64), Arg::Int(z as i64)])
+                                }
+                                (None, true) => out.set("death.base.dropped", &[]),
+                                (None, false) => out.set("death.base.no_grave", &[]),
+                            }
                         });
                     });
                     ui.row(S::row().gap(6.0).self_align(abi::ui_align::CENTER), |ui| {

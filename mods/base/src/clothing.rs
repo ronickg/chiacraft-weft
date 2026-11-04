@@ -28,6 +28,27 @@ fn sewn_from(material: &str) -> &'static str {
     }
 }
 
+/// Clothes and the cloak a player wore when they died (item ids, the four clothing slots then the
+/// cloak), put back on at the respawn.
+static KEPT: Component<[u32; 5]> = Component::named("base:kept_clothes");
+
+/// Takes the clothes and the cloak off a dying player and keeps them for the respawn, before the
+/// tombstone takes the rest and the engine drops what's left (`levels.rs`).
+pub fn set_aside(w: &World, player: u64) {
+    let Some(slots) = w.inventory(player).find_group(EQUIPMENT_GROUP) else { return };
+    let mut kept = [0u32; 5];
+    for (i, k) in kept.iter_mut().enumerate() {
+        let at = 4 + i as u32;
+        if at < slots.len() {
+            *k = slots.get(at).item;
+            slots.set(at, ItemStack::EMPTY);
+        }
+    }
+    if let Some(c) = w.component_mut(player, &KEPT) {
+        *c = kept;
+    }
+}
+
 /// Puts the arrival clothes (`vitals::clothing::ARRIVAL`) on `player` if no clothes are worn.
 fn dress(w: &World, player: u64) {
     let Some(slots) = w.inventory(player).find_group(EQUIPMENT_GROUP) else { return };
@@ -42,6 +63,17 @@ fn dress(w: &World, player: u64) {
         }
     }
 }
+
+/// What each cloak is sewn from, its shape (`X` the material, `s` string), and how far out it's drawn
+/// (over armor's 1).
+fn cloak_recipe(name: &str) -> (&'static str, &'static [&'static str]) {
+    match name {
+        "wool_cloak" => ("wool", &["XsX", " X "]),
+        "fur_robe" => ("#pelts", &["XXX", "XsX"]),
+        _ => ("#materials/leather", &["XsX", "XXX"]),
+    }
+}
+const CLOAK_INFLATE: f32 = 1.2;
 
 /// A piece's shape in the grid by how much material it takes (`X`, with `vitals::clothing::STRING`
 /// of string `s`): each piece of a material its own, so a hat and boots of the same stuff differ.
@@ -89,14 +121,30 @@ pub fn register(r: &mut Registry) {
             dress(&w, p.player);
         }
     });
-    // And comes back in them when the tombstone kept what they wore (Research round 4, H1: dying
-    // naked at night was a spiral). Only with no clothes on.
+    r.entity_component(&KEPT, [0; 5], component_flags::SAVE | component_flags::KEEP);
+    r.attach(&PLAYER, &KEPT);
+    // Back from the dead in what one wore: the tombstone leaves clothes and the cloak out (`set_aside`),
+    // so a death costs no clothes and gives none (integration review: each death was a free set);
+    // with nothing worn, the plain arrival set (Research round 4, H1).
     r.on(&PLAYER_RESPAWNED, |b| {
         let w = b.world();
         for p in b.iter() {
-            if !w.creative(p.player) {
-                dress(&w, p.player);
+            if w.creative(p.player) {
+                continue;
             }
+            let kept = w.component(p.player, &KEPT).copied().unwrap_or([0; 5]);
+            if let Some(slots) = w.inventory(p.player).find_group(EQUIPMENT_GROUP) {
+                for (i, &item) in kept.iter().enumerate() {
+                    let at = 4 + i as u32;
+                    if item != 0 && at < slots.len() && slots.get(at).is_empty() {
+                        slots.set(at, ItemStack::new(item, 1));
+                    }
+                }
+            }
+            if let Some(k) = w.component_mut(p.player, &KEPT) {
+                *k = [0; 5];
+            }
+            dress(&w, p.player);
         }
     });
     r.item(&FUR).tag("pelts").tab(&crate::tabs::INGREDIENTS);
@@ -111,6 +159,23 @@ pub fn register(r: &mut Registry) {
     r.shapeless(&CRAFTING, "string", 1, &vec!["#plant_fibre"; clothing::FIBRE_PER_STRING as usize], 0);
     r.shaped(&CRAFTING, "cloth", 1, &["sss"], &[('s', "#string")]);
 
+    for c in &clothing::CLOAKS {
+        let warmth = Warmth {
+            cold: c.cold.round() as u32,
+            heat: c.heat.round() as i32,
+            wet: (c.wet_keeps * 100.0).round() as u32,
+            wind: (c.windproof * clothing::CLOAK_COVERS * 100.0).round() as u32,
+        };
+        r.item(Item::generated(c.name.into()))
+            .max_stack(1)
+            .set(&WARMTH, warmth)
+            .tag("clothes")
+            .tag("cloaks")
+            .wearable(&base_api::CLOAK, CLOAK_INFLATE, &format!("clothes/{}", c.name))
+            .tab(&crate::tabs::COMBAT);
+        let (from, rows) = cloak_recipe(c.name);
+        r.shaped(&CRAFTING, c.name, 1, rows, &[('X', from), ('s', "#string")]);
+    }
     for m in &MATERIALS {
         for (piece, name) in PIECES.iter().enumerate() {
             let share = PIECE_SHARE[piece];
@@ -118,7 +183,8 @@ pub fn register(r: &mut Registry) {
                 cold: (m.cold() * share).round() as u32,
                 heat: (m.heat * share).round() as i32,
                 wet: (m.wet_keeps * 100.0).round() as u32,
-                wind: (m.windproof * 100.0).round() as u32,
+                // The piece's share of the wind it stops (a fur hat 12%, not the suit's 80%).
+                wind: (m.windproof * share * 100.0).round() as u32,
             };
             // Trousers are the inner layer of the skin's layout, like leggings.
             let layer = if piece == 2 { 2 } else { 1 };

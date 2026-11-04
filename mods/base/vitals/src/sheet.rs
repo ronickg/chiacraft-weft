@@ -7,7 +7,7 @@ use std::fmt::Write;
 use crate::effects;
 use crate::food::{self, NUTRIENT_NAMES};
 use crate::stats::{self, Growth};
-use crate::{air, calendar, climate, clothing, difficulty, forage, levels, meals, plants, preserve, soil, temperature, wild};
+use crate::{air, calendar, climate, clothing, difficulty, forage, levels, meals, plants, preserve, shelter, soil, temperature, wild};
 
 pub fn markdown() -> String {
     let mut w = String::new();
@@ -20,6 +20,7 @@ pub fn markdown() -> String {
     foods(&mut w);
     cooking(&mut w);
     clothes(&mut w);
+    rooms(&mut w);
     effects_table(&mut w);
     climates(&mut w);
     plant_table(&mut w);
@@ -128,6 +129,21 @@ fn cooking(w: &mut String) {
     let _ = writeln!(w);
 }
 
+fn rooms(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Rooms\n\nAn enclosed space (`vitals::shelter`; up to {} blocks of air, none open to the sky) shuts out the wind, lets in its walls' share of the day's swing, and keeps {} °C over the air outside empty, or a fire's gain by its walls with a fire in it (full up to {} blocks of air, at least {:.0}% in a bigger room; never less than the fire gives beside it).\n\n| wall | a fire in the room | the day's swing let in |\n|---|---|---|",
+        shelter::ROOM_MAX,
+        shelter::EMPTY_ROOM,
+        shelter::ROOM_FULL,
+        shelter::BIG_ROOM_SHARE * 100.0
+    );
+    for wall in shelter::WALLS {
+        let _ = writeln!(w, "| {} | +{} °C | {:.0}% |", wall.name(), wall.fire_gain(), wall.swing() * 100.0);
+    }
+    let _ = writeln!(w);
+}
+
 fn clothes(w: &mut String) {
     let _ = writeln!(
         w,
@@ -157,6 +173,24 @@ fn clothes(w: &mut String) {
             m.windproof * 100.0,
             m.makes,
             m.from
+        );
+    }
+    let _ = writeln!(
+        w,
+        "\nCloaks, in a slot of their own over clothes and armor (covering {:.0}% of the body against the wind):\n\n| cloak | cold °C | heat °C | kept wet | windproof | keeps the rain off | from |\n|---|---|---|---|---|---|---|",
+        clothing::CLOAK_COVERS * 100.0
+    );
+    for c in clothing::CLOAKS {
+        let _ = writeln!(
+            w,
+            "| {} | {} | {} | {:.0}% | {:.0}% | {} | {} |",
+            c.name,
+            c.cold,
+            c.heat,
+            c.wet_keeps * 100.0,
+            c.windproof * 100.0,
+            if c.keeps_dry { "yes" } else { "no" },
+            c.from
         );
     }
     let _ = writeln!(w);
