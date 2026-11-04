@@ -53,6 +53,10 @@ pub mod salt {
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
     pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const FACE_COAL: u64 = 0x0C0A;
+    pub const FACE_IRONSTONE: u64 = 0x0F3A;
+    pub const FACE_MAGNETITE: u64 = 0x0F3B;
+    pub const FACE_GOLD: u64 = 0x0A0B;
     pub const CANYONS: u64 = 0xCA1;
     pub const CANYON_AREA: u64 = 0xCA2;
     pub const CANYON_WARP: u64 = 0xCA3;
@@ -1088,8 +1092,13 @@ pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet
 
 impl RockSet {
     /// The block (its name in base) at `pos` (world blocks) of a face of these rocks; mossy cobbles
-    /// only where `mossy`.
-    pub fn block(self, seed: u64, [x, y, z]: [i32; 3], mossy: bool) -> &'static str {
+    /// only where `mossy`; the rock's ore where it has one (`face_ore`).
+    pub fn block(self, seed: u64, pos: [i32; 3], mossy: bool) -> &'static str {
+        let rock = self.rock(seed, pos, mossy);
+        face_ore(seed, pos, rock).unwrap_or(rock)
+    }
+
+    fn rock(self, seed: u64, [x, y, z]: [i32; 3], mossy: bool) -> &'static str {
         if self == RockSet::Strata {
             return strata(seed, [x, y, z]);
         }
@@ -1110,6 +1119,65 @@ impl RockSet {
             _ => "limestone",
         }
     }
+}
+
+/// Ores in the rock faces (Ronald, 11-04: "All 3: 1, 2, 3"; Art's textures, "Yes, all four"):
+/// what a face shows where its rock carries ore, so a player finds early iron and coal on the
+/// walls of the land, not only underground. Shares of the rock's face blocks (checked by
+/// `face_ores_come_in_their_shares`); crafting's early needs are some 15 to 20 iron (a stone age
+/// kit's metal heads, a bucket, a cooking pot) and coal for the first smelting, and a canyon or
+/// granite face shows hundreds of blocks.
+///
+/// - Coal seams in the banded clay: level runs some `FACE_COAL.1` blocks long, `FACE_COAL.0` of it.
+/// - Ironstone in the red beds: knots of a few blocks, `FACE_IRONSTONE.0` of red sandstone.
+/// - Magnetite specks in granite, `FACE_MAGNETITE.0`, and thin gold-quartz veins, `FACE_GOLD.0`.
+pub const FACE_COAL: (f64, f64) = (0.45, 10.0);
+pub const FACE_IRONSTONE: (f64, f64) = (0.05, 4.0);
+pub const FACE_MAGNETITE: (f64, f64) = (0.022, 1.5);
+pub const FACE_GOLD: (f64, f64) = (0.003, 14.0);
+
+/// The ore block (its name in base) a face of `rock` shows at `pos` (world blocks), if any.
+pub fn face_ore(seed: u64, [x, y, z]: [i32; 3], rock: &str) -> Option<&'static str> {
+    let (bx, by, bz) = (x * 16, y * 16, z * 16);
+    // A noise of `size` blocks (stretched `flat` times along the level) over its threshold for
+    // `share` of the rock: the noise's values spread about evenly over -0.6..0.6 (Q12).
+    let over = |salt: u64, (share, size): (f64, f64), flat: i32| {
+        let s = q4(size);
+        let v = fixed::perlin3(fixed::seed32(seed, salt), bx, by, bz, s * flat, s, s * flat);
+        v > q12(ore_line(share))
+    };
+    match rock {
+        "banded_clay" if over(salt::FACE_COAL, (FACE_COAL.0, 1.0), FACE_COAL.1 as i32) => Some("banded_clay_coal_ore"),
+        "red_sandstone" if over(salt::FACE_IRONSTONE, FACE_IRONSTONE, 1) => Some("red_sandstone_iron_ore"),
+        "granite" => {
+            // Gold in thin veins: near the zero sheet of a slow noise (some 6% of the rock), where
+            // a second noise allows (a fifteenth of the rest).
+            let s = q4(FACE_GOLD.1);
+            let sheet = fixed::perlin3(fixed::seed32(seed, salt::FACE_GOLD), bx, by, bz, s, s, s).abs();
+            if sheet < q12(0.02) && over(salt::FACE_GOLD + 1, (FACE_GOLD.0 * 15.0, 6.0), 1) {
+                Some("granite_gold_ore")
+            } else if over(salt::FACE_MAGNETITE, FACE_MAGNETITE, 1) {
+                Some("granite_iron_ore")
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// The threshold that leaves `share` of a 3D noise over it: measured on `perlin3` (close to a
+/// normal spread a quarter wide), between these points straight.
+fn ore_line(share: f64) -> f64 {
+    const LINES: [(f64, f64); 9] =
+        [(0.003, 0.666), (0.01, 0.582), (0.022, 0.510), (0.05, 0.428), (0.1, 0.374), (0.2, 0.249), (0.3, 0.140), (0.45, 0.017), (0.5, 0.0)];
+    let i = LINES
+        .iter()
+        .position(|&(s, _)| s >= share)
+        .unwrap_or(LINES.len() - 1)
+        .max(1);
+    let ((s0, l0), (s1, l1)) = (LINES[i - 1], LINES[i]);
+    l0 + (l1 - l0) * ((share - s0) / (s1 - s0)).clamp(0.0, 1.0)
 }
 
 /// The mesas' layer at `pos` (world blocks): `STRATA` repeating up the height, each layer 1 to 3
@@ -1315,6 +1383,30 @@ mod tests {
             }
         }
         assert!(deep > 0, "no canyon 20 deep in 3.2 km");
+    }
+
+    #[test]
+    fn face_ores_come_in_their_shares() {
+        let n = 200_000;
+        let share = |rock: &str, ore: &str| {
+            let hits = (0..n)
+                .filter(|i| {
+                    let pos = [(i % 211) - 100 + i / 50_000 * 997, 60 + (i / 211) % 80, (i * 31) % 4001 - 2000];
+                    face_ore(1, pos, rock) == Some(ore)
+                })
+                .count();
+            hits as f64 / n as f64
+        };
+        for (rock, ore, want) in [
+            ("banded_clay", "banded_clay_coal_ore", FACE_COAL.0),
+            ("red_sandstone", "red_sandstone_iron_ore", FACE_IRONSTONE.0),
+            ("granite", "granite_iron_ore", FACE_MAGNETITE.0),
+            ("granite", "granite_gold_ore", FACE_GOLD.0),
+        ] {
+            let got = share(rock, ore);
+            assert!((got - want).abs() < want * 0.3, "{ore}: {got:.4} of {rock}, want {want}");
+        }
+        assert_eq!(face_ore(1, [0, 70, 0], "limestone"), None);
     }
 
     #[test]

@@ -29,6 +29,11 @@ pub static OBSIDIAN: Block = Block::named("obsidian");
 pub static COAL_ORE: Block = Block::named("coal_ore");
 pub static IRON_ORE: Block = Block::named("iron_ore");
 pub static GOLD_ORE: Block = Block::named("gold_ore");
+// Ores in the rock faces (`base_api::land::face_ore`; Art's textures, Ronald: "Yes, all four").
+pub static BANDED_CLAY_COAL_ORE: Block = Block::named("banded_clay_coal_ore");
+pub static RED_SANDSTONE_IRON_ORE: Block = Block::named("red_sandstone_iron_ore");
+pub static GRANITE_GOLD_ORE: Block = Block::named("granite_gold_ore");
+pub static GRANITE_IRON_ORE: Block = Block::named("granite_iron_ore");
 pub static DIAMOND_ORE: Block = Block::named("diamond_ore");
 pub static OAK_LOG: Block = Block::named("oak_log");
 pub static BIRCH_LOG: Block = Block::named("birch_log");
@@ -479,6 +484,25 @@ pub fn register(r: &mut Registry) {
         .tag("ores")
         .tag("ores/gold")
         .tab(&crate::tabs::NATURAL);
+    // The faces' ores: like the ores underground (a pickaxe, the same tools and drops), each in
+    // its host rock's own look.
+    for (block, texture, drop, tier, kind) in [
+        (&BANDED_CLAY_COAL_ORE, "banded_clay_coal_ore", "coal", 0, "coal"),
+        (&RED_SANDSTONE_IRON_ORE, "red_sandstone_iron_ore", "raw_iron", tool_tier::STONE, "iron"),
+        (&GRANITE_IRON_ORE, "granite_iron_ore", "raw_iron", tool_tier::STONE, "iron"),
+        (&GRANITE_GOLD_ORE, "granite_gold_ore", "raw_gold", tool_tier::IRON, "gold"),
+    ] {
+        r.block(block)
+            .sound_group("stone")
+            .texture(texture)
+            .hardness(3.0)
+            .mineable("pickaxe")
+            .needs_tool(tier)
+            .drops(drop, 1)
+            .tag("ores")
+            .tag(&format!("ores/{kind}"))
+            .tab(&crate::tabs::NATURAL);
+    }
     r.block(&DIAMOND_ORE)
         .sound_group("stone")
         .hardness(3.0)

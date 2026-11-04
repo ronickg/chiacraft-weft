@@ -176,6 +176,10 @@ fn rock(name: &str) -> u32 {
         "weathered_limestone" => WEATHERED_LIMESTONE.id(),
         "cobblestone" => COBBLESTONE.id(),
         "mossy_cobblestone" => MOSSY_COBBLESTONE.id(),
+        "banded_clay_coal_ore" => BANDED_CLAY_COAL_ORE.id(),
+        "red_sandstone_iron_ore" => RED_SANDSTONE_IRON_ORE.id(),
+        "granite_gold_ore" => GRANITE_GOLD_ORE.id(),
+        "granite_iron_ore" => GRANITE_IRON_ORE.id(),
         _ => STONE.id(),
     }
 }
