@@ -500,6 +500,13 @@ sword, about 100 XP.
   hour as it digests. One spider at dusk had killed a fresh player in 11 s. Dying leaves the same
   light meal (step 13). The rule stays: food sets how much of the stat is reached.
 - A new player also starts with full stamina (it started at 0 and took 14 s to fill).
+- **A bigger arrival meal** (2026-11-04, Ronald: "Bigger arrival meal"): the loaf and apple and a
+  cooked chicken, 65 units: max health 90 and stamina 83 of 100, wearing off as it digests. The
+  world playtest's taiga deaths were falls, not the cold (Plants' PC runs: a naked player there
+  freezes in about 5½ minutes dry, 3¾ wet, as `balance` wants), but with the light meal's 54 max
+  health one 9-block fall took 61% of a fresh player's health. Three foods make one well fed
+  until it digests below half. Respawning gives the same meal (step 13): a death still costs XP and
+  the walk to the tombstone, and respawning at 54 in the cold was the spiral step 13 is against.
 
 **12. Research round 3's survival fixes** (2026-11-04, decided by Ronald via Planner; `reports/Research round 3.md`):
 
