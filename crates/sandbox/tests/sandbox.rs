@@ -336,10 +336,25 @@ fn storage_is_kept_and_contained() {
 }
 
 #[test]
+fn writes_per_call_are_capped() {
+    let mut w = World::new(None);
+    assert_eq!(w.probe("write_flood", None), ["probe.written 4"]);
+    // The next call has its own allowance.
+    assert_eq!(w.probe("write_flood", None), ["probe.written 4"]);
+}
+
+#[test]
 fn registering_after_init_is_refused() {
     let mut w = World::new(None);
     assert_eq!(w.probe("late", None), ["probe.late"]);
     assert!(w.inst.stopped().is_none());
+}
+
+#[test]
+fn one_api_version() {
+    let (major, minor) = chiacraft_packages::code::API;
+    assert_eq!(API, format!("{major}.{minor}.0"));
+    assert!(include_str!("../wit/v1.1/mod.wit").contains(&format!("package chiacraft:mods@{API};")));
 }
 
 #[test]

@@ -1347,6 +1347,7 @@ dependencies = [
  "blake3",
  "serde",
  "toml 1.1.8+spec-1.1.0",
+ "wasmparser 0.239.0",
 ]
 
 [[package]]
@@ -1354,6 +1355,7 @@ name = "chiacraft-sandbox"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "chiacraft-packages",
  "wasmtime",
  "wit-component 0.239.0",
 ]

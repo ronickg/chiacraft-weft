@@ -50,6 +50,14 @@ fn init(r: &mut Registry) {
                 let back = storage::get_text("n").unwrap_or_default();
                 cmd.reply("probe.loaded", &[Arg::Text(&back)]);
             }
+            "write_flood" => {
+                // 1 MiB a call at most, however it is split.
+                let chunk = vec![7u8; 256 << 10];
+                let ok = (0..8)
+                    .filter(|i| storage::set(&format!("w{}", i % 2), &chunk).is_ok())
+                    .count();
+                cmd.reply("probe.written", &[Arg::Int(ok as i64)]);
+            }
             "bad_key" => {
                 let e = storage::set("../escape", b"x").unwrap_err();
                 cmd.reply("probe.refused", &[Arg::Text(&e)]);

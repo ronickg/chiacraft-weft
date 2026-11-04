@@ -288,7 +288,13 @@ newer 1.x at load. `crates/mod-sdk` is 1.1.0 (`value!`, `Component`, `entity_com
 `set_blocks`). In `mods/packages`, components register as `Component<[u8; N]>` in buckets of 8
 to 256 (`Comp`); sounds and particles are checked by `find` and made into handles once per name.
 Sample `examples/wasm/tally` (a per-player count of blocks broken, a chime and particles every
-tenth, `/tally pillar` with `set_blocks`), packaged as `examples/packages/tally`.
+tenth, `/tally pillar` with `set_blocks`), packaged as `examples/packages/tally`. Checked in one game on the Linux PC (Tester 2, with
+the protocol 7 work below in the build): `/tally` 0, `/tally pillar` built 5 glass blocks with
+one `set_blocks`, digging logged "has broken 10 blocks" up to 90 and told the player every tenth,
+`/tally` 94, and after leaving and opening the world again still 94 (the component saved, `KEEP`);
+no strikes or load errors. The particles weren't visible in the shots (a dark shaft), the chime
+isn't in the log: neither is confirmed. Script `tally.txt` in the shared notes' `phase6/`
+(testkit: negative pitch looks down, `hold` doesn't wait).
 Left: 1.2 (block and item callbacks, channels), client halves (slice 4), personal mods per world
 (slice 5), `/mods` (slice 6).
 

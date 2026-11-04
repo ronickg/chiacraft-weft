@@ -40,9 +40,8 @@ use bindings::chiacraft::mods::{command, log as mod_log, names, registry, storag
 pub use bindings::exports::chiacraft::mods::hooks::{BlockChange, Death, EventValue, Hurt, Invocation, ItemUsed, Pickup, Value, Verdict};
 
 /// The API version this game serves.
+/// Its version is `chiacraft_packages::code::API`; a test checks the two agree.
 pub const API: &str = "1.1.0";
-/// The API's minor version: a component built for 1.x with x above it is refused at load.
-const API_MINOR: u32 = 1;
 /// Strikes within this long stop a mod in a world.
 pub const STRIKE_WINDOW: Duration = Duration::from_secs(600);
 pub const STRIKES: usize = 3;
@@ -118,6 +117,90 @@ pub trait Game: Send {
     }
     fn play_sound(&mut self, _sound: &str, _pos: [f64; 3], _volume: f32) {}
     fn spawn_particles(&mut self, _particle: &str, _pos: [f64; 3], _count: u32) {}
+}
+
+/// A game with nothing in it, for tools and benchmarks: every call answers empty.
+pub struct NullGame;
+
+impl Game for NullGame {
+    fn time(&mut self) -> u64 {
+        0
+    }
+    fn seed(&mut self) -> u64 {
+        0
+    }
+    fn random(&mut self) -> u64 {
+        0
+    }
+    fn dimension(&mut self) -> u32 {
+        0
+    }
+    fn get_block(&mut self, _: [i32; 3]) -> u32 {
+        0
+    }
+    fn set_block(&mut self, _: [i32; 3], _: u32) -> bool {
+        false
+    }
+    fn light(&mut self, _: [i32; 3]) -> u32 {
+        0
+    }
+    fn biome(&mut self, _: [i32; 3]) -> u32 {
+        0
+    }
+    fn players(&mut self) -> Vec<u64> {
+        Vec::new()
+    }
+    fn entity(&mut self, _: u64) -> Option<EntityState> {
+        None
+    }
+    fn near(&mut self, _: [f64; 3], _: f64) -> Vec<u64> {
+        Vec::new()
+    }
+    fn teleport(&mut self, _: u64, _: [f64; 3]) {}
+    fn push(&mut self, _: u64, _: [f64; 3]) {}
+    fn damage(&mut self, _: u64, _: f32, _: u64, _: u32) -> bool {
+        false
+    }
+    fn spawn(&mut self, _: &str, _: [f64; 3]) -> u64 {
+        0
+    }
+    fn remove(&mut self, _: u64) {}
+    fn creative(&mut self, _: u64) -> bool {
+        false
+    }
+    fn give(&mut self, _: u64, stack: ItemStack) -> ItemStack {
+        stack
+    }
+    fn spawn_item(&mut self, _: [f64; 3], _: ItemStack) {}
+    fn tell(&mut self, _: u64, _: &str, _: &[Arg]) {}
+    fn player_key(&mut self, _: u64) -> String {
+        String::new()
+    }
+    fn reply(&mut self, _: &str, _: &[Arg]) {}
+    fn block_name(&mut self, _: u32) -> String {
+        String::new()
+    }
+    fn block_state(&mut self, _: &str) -> Option<u32> {
+        None
+    }
+    fn prop(&mut self, _: u32, _: &str) -> Option<String> {
+        None
+    }
+    fn with_prop(&mut self, _: u32, _: &str, _: &str) -> Option<u32> {
+        None
+    }
+    fn item_name(&mut self, _: u32) -> String {
+        String::new()
+    }
+    fn item_id(&mut self, _: &str) -> Option<u32> {
+        None
+    }
+    fn entity_kind(&mut self, _: u32) -> String {
+        String::new()
+    }
+    fn entity_kind_id(&mut self, _: &str) -> Option<u32> {
+        None
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -217,6 +300,8 @@ struct Counts {
     spawns: u32,
     sounds: u32,
     bursts: u32,
+    /// Bytes `storage.set` was asked to write.
+    stored: u64,
 }
 
 impl State {
@@ -600,6 +685,10 @@ impl mod_storage::Host for State {
         self.storage.get(&key)
     }
     fn set(&mut self, key: String, value: Vec<u8>) -> Result<(), String> {
+        self.counts.stored += value.len() as u64;
+        if self.counts.stored > storage::MAX_WRITE_PER_CALL {
+            return Err(format!("at most {} MiB written per call", storage::MAX_WRITE_PER_CALL >> 20));
+        }
         self.storage.set(&key, value)
     }
     fn remove(&mut self, key: String) {
@@ -677,8 +766,8 @@ impl Mod {
         if wasm.len() > engine::MAX_COMPONENT_BYTES {
             return Err(format!("code/server.wasm is bigger than {} MiB", engine::MAX_COMPONENT_BYTES >> 20));
         }
+        check_imports(wasm)?;
         let component = compiled(wasm)?;
-        check_imports(&component)?;
         let linker = linker()?;
         let mut m = Mod { package: package.to_string(), component, linker, registered: Registered::default() };
         let live = m.instantiate(Storage::memory(), None)?;
@@ -725,21 +814,15 @@ impl Mod {
 }
 
 /// A component may import only this API, in a version this game has: anything else (WASI, a
-/// newer 1.x, 2.0) is refused at load with a reason, before linking.
-fn check_imports(component: &Component) -> Result<(), String> {
-    let engine = engine::engine()?;
-    for (name, _) in component.component_type().imports(engine) {
-        let Some(rest) = name.strip_prefix("chiacraft:mods/") else {
-            return Err(format!("it imports {}, which no sandboxed mod gets (files, network, clocks)", clip(name, 80)));
-        };
-        let version = rest.split_once('@').map(|(_, v)| v).unwrap_or("");
-        let mut parts = version.split('.').map(|p| p.parse::<u32>().ok());
-        match (parts.next().flatten(), parts.next().flatten()) {
-            (Some(1), Some(minor)) if minor <= API_MINOR => {}
-            _ => return Err(format!("it was built for API {version}; this game runs {API}: a newer game runs it")),
+/// newer 1.x, 2.0) is refused at load with a reason, before it is compiled.
+fn check_imports(wasm: &[u8]) -> Result<(), String> {
+    use chiacraft_packages::code;
+    match code::api_of(wasm)? {
+        Some(v) if !code::runs(v) => {
+            Err(format!("it was built for API {}; this game runs {API}: a newer game runs it", code::text(Some(v))))
         }
+        _ => Ok(()),
     }
-    Ok(())
 }
 
 /// Why a call failed, in words.
