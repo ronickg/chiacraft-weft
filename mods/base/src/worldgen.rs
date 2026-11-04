@@ -39,6 +39,16 @@ pub static FLOWERS: Component<BlockList> = Component::named("flowers");
 /// height, not averaged with the small trees.
 pub static GIANT_TREES: Component<f32> = Component::named("giant_trees");
 pub static GIANT_KINDS: Component<BlockList> = Component::named("giant_kinds");
+/// The layers under the trees (`vitals::layers`, `notes/VEGETATION.md`), as data on the biome:
+/// floor blocks swapped in for the top block in patches, by weight, and the share they cover;
+/// ferns on the bare soil; shrub clumps per 4 x 4 cell in thickets, made of these leaves.
+pub static FLOOR: Component<BlockList> = Component::named("floor");
+pub static FLOOR_COVER: Component<f32> = Component::named("floor_cover");
+pub static FERNS: Component<f32> = Component::named("ferns");
+pub static SHRUBS: Component<f32> = Component::named("shrubs");
+pub static SHRUB_KINDS: Component<BlockList> = Component::named("shrub_kinds");
+/// Young trees of the biome's `TREE_KINDS`, the chance per 5 x 5 cell, out of the thick stands.
+pub static YOUNG_TREES: Component<f32> = Component::named("young_trees");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
 pub use base_api::trees::{TREE_LEAVES, grow_tree};
 use base_api::trees::{tree_blocks, wild_tree_at};
@@ -250,6 +260,23 @@ pub fn register(r: &mut Registry) {
             .replace("#stone_ore_replaceables");
     }
 
+    // The layers under the trees, each biome's (`vitals::layers`).
+    for l in &vitals::layers::LAYERS {
+        let b = || Target::Biome(l.biome);
+        if !l.floor.is_empty() {
+            r.set_text_on(b(), &FLOOR, l.floor);
+            r.set_on(b(), &FLOOR_COVER, l.floor_cover);
+        }
+        r.set_on(b(), &FERNS, l.ferns);
+        if l.young > 0.0 {
+            r.set_on(b(), &YOUNG_TREES, l.young);
+        }
+        if l.shrubs > 0.0 {
+            r.set_on(b(), &SHRUBS, l.shrubs);
+            r.set_text_on(b(), &SHRUB_KINDS, l.shrub_kinds);
+        }
+    }
+
     // The overworld's shape, its snow and its bare rock (`land.rs`), before the plants below.
     crate::land::terrain(r);
 
@@ -283,7 +310,68 @@ pub fn register(r: &mut Registry) {
         .reach(3)
         .density(&BOULDERS)
         .shape(boulder);
+    // Shrubs where a biome has them (`SHRUBS`): a low clump of leaves per 4 x 4 cell, only in
+    // thickets (a noise some 24 blocks across), so they stand in groups with open ground between.
+    r.scatter(&SHRUB_SITES)
+        .cell(4)
+        .reach(1)
+        .density(&SHRUBS)
+        .thin(Mask::Noise { salt: 0x5B2B, scale: 24.0, octaves: 1, from: 0.0, to: 0.0 }.not(), 0)
+        .shape(shrub);
+    // Young trees where light comes in: in clearings and at the stands' edges, none deep in a
+    // stand (`stand_over`).
+    r.scatter(&YOUNG_SITES)
+        .cell(5)
+        .reach(2)
+        .density(&YOUNG_TREES)
+        .thin(stand_over(STAND), 0)
+        .shape(young_tree);
     r.decorate(decorate);
+}
+
+/// A young tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face.
+fn young_tree(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
+    let [x, y, z] = s.pos();
+    let h = s.random();
+    let log = TREE_KINDS.on_biome(s.biome()).and_then(|l| l.pick(h >> 40)).unwrap_or(OAK_LOG.id());
+    base_api::trees::young_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
+        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+    });
+}
+
+/// A shrub at a scatter's site: a clump of the biome's shrub leaves (`SHRUB_KINDS`), one or two
+/// high (`vitals::layers::shrub_height`) and one to three across; none on a bare rock face.
+fn shrub(s: &mut Site) {
+    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+        return;
+    }
+    let h = s.random();
+    let Some(leaves) = SHRUB_KINDS.on_biome(s.biome()).and_then(|l| l.pick(h >> 40)) else { return };
+    let tall = vitals::layers::shrub_height(name_of(abi::entry_kind::BIOME, s.biome()));
+    let [x, y, z] = s.pos();
+    for dy in 0..tall {
+        for dz in -1..=1i32 {
+            for dx in -1..=1i32 {
+                let side = dx.abs() + dz.abs();
+                // The middle always; its sides most of the time low down, less above; corners
+                // seldom, and only low.
+                let bit = hash(h, dx as i64, dy as i64, dz as i64) & 15;
+                let keep = match (dy, side) {
+                    (_, 0) => true,
+                    (0, 1) => bit < 11,
+                    (0, _) => bit < 4,
+                    (_, 1) => bit < 5,
+                    _ => false,
+                };
+                if keep {
+                    s.put([x + dx, y + dy, z + dz], leaves);
+                }
+            }
+        }
+    }
 }
 
 /// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet; none
@@ -332,6 +420,10 @@ fn giant(s: &mut Site) {
     });
 }
 static BOULDER_SITES: Scatter = Scatter::named("boulders");
+static SHRUB_SITES: Scatter = Scatter::named("shrubs");
+static YOUNG_SITES: Scatter = Scatter::named("young_trees");
+static LOGS: Tag = Tag::named("logs");
+static LEAVES: Tag = Tag::named("leaves");
 static WET: Tag = Tag::named("wet");
 static WOODS: Tag = Tag::named("forest");
 
@@ -469,6 +561,24 @@ fn decorate(g: &mut Gen) {
                 || near
                     .iter()
                     .any(|&(nx, nz, c)| c.height == col.height && pond(seed, nx, nz, c.height, c.biome));
+            // Floor patches (`FLOOR`): a forest's leaf litter and bare dirt, the dry lands' gravel,
+            // in clumps (a noise some 6 blocks across holds them, with holes), twice as thick under
+            // the crowns and half in the open.
+            let below = match FLOOR.on_biome(b) {
+                Some(floor) if y >= 1 && !shore && (PLANT_SOIL.on_block(below) || SAND_TAG.on_block(below)) => {
+                    let cover = FLOOR_COVER.on_biome(b).unwrap_or(0.0) as f64 * if under_crown(g, x, y, z) { 2.0 } else { 0.5 };
+                    let patch = fixed::perlin2(fixed::seed32(seed, 0xF1C0), wx * 16, wz * 16, 6 * 16) > 0;
+                    let fh = hash(seed ^ 0xF1C, wx as i64, 0, wz as i64);
+                    match floor.pick(fh >> 32) {
+                        Some(f) if patch && unit(fh) < 2.0 * cover && f != below => {
+                            g.set(x, y - 1, z, f);
+                            f
+                        }
+                        _ => below,
+                    }
+                }
+                _ => below,
+            };
             let ground = if PLANT_SOIL.on_block(below) {
                 Some(if shore { wild::Ground::Shore } else { wild::Ground::Soil })
             } else if SAND_TAG.on_block(below) {
@@ -498,6 +608,12 @@ fn decorate(g: &mut Gen) {
                     }
                 } else if roll < flower_chance + grass_chance {
                     g.set(x, y, z, TALL_GRASS.id());
+                } else if let Some(ferns) = FERNS.on_biome(b).filter(|&f| f > 0.0) {
+                    // Ferns on the bare soil (`FERNS`), three times as thick round a trunk.
+                    let thick = if beside_log(g, x, y, z) { 3.0 } else { 1.0 };
+                    if unit(hash(seed ^ 0xFE4, wx as i64, 0, wz as i64)) < (ferns * thick) as f64 {
+                        g.set(x, y, z, FERN.id());
+                    }
                 }
             } else if SAND_TAG.on_block(below)
                 && roll < flower_chance
@@ -529,6 +645,22 @@ fn decorate(g: &mut Gen) {
             }
         }
     }
+}
+
+/// Whether leaves hang over this spot of the cube (a tree's crown, a shrub), looking up to the
+/// cube's top.
+fn under_crown(g: &mut Gen, x: usize, y: usize, z: usize) -> bool {
+    (y + 1..16).any(|k| LEAVES.on_block(g.get(x, k, z)))
+}
+
+/// Whether a trunk stands beside this spot of the cube (the four sides and the corners).
+fn beside_log(g: &mut Gen, x: usize, y: usize, z: usize) -> bool {
+    (-1..=1i32).any(|dz| {
+        (-1..=1i32).any(|dx| {
+            let (nx, nz) = (x as i32 + dx, z as i32 + dz);
+            (0..16).contains(&nx) && (0..16).contains(&nz) && LOGS.on_block(g.get(nx as usize, y, nz as usize))
+        })
+    })
 }
 
 /// Whether clay lies under still water at this column of `biome`'s: in 4 x 4 patches, half the
