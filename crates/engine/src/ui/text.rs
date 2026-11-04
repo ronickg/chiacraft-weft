@@ -434,10 +434,13 @@ pub fn format(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>) {
 }
 
 /// A translation `key` with `args`; an empty key shows its one argument as it is (ready text
-/// from code, like a ticket or a profile line).
+/// from code, like a ticket or a profile line), and nothing without one (a mod's bound text that
+/// set nothing this frame: it showed "{0}", Playtest B2).
 pub fn message(key: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>) {
     if key.is_empty() {
-        format("{0}", args, cx, out);
+        if !args.is_empty() {
+            format("{0}", args, cx, out);
+        }
     } else {
         format(cx.lang.get(key), args, cx, out);
     }
