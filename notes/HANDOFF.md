@@ -459,8 +459,14 @@ question, `Shared.grants`, with the owner's account as issuer and the world DID'
 `did.json`; `achievements/issued.jsonl`; the daily anchor behind the world rule
 `anchor_achievements`, `achievements/anchors.json`, proofs sent on join), `achievements_screen.rs`
 (Profile > Achievements). The base mod asks the bridge in `advancements.rs` `grant_where`.
-World rules `sign_achievements` (on) and `anchor_achievements` (off). Protocol 9. The check:
-`tools/checks/achievements` (two copies, no chain).
+World rules `sign_achievements` (on) and `anchor_achievements` (off). Protocol 9. Slices 8-9 and
+the join-name fix passed on the Mac (Tester, c030a1d1). Then, on claude/phase4-achievement-rule:
+`/achievementrule <id> [issuers]` (`Rules.achievement`; the world asks the joining game for that
+achievement only, `AskAchievement` / `Proofs`, the join waiting as for a DID; protocol 10) and
+`/revoke <player> <id | *>` (the issuer account's `revoked.json` in its home, sent to players on
+joining and on change, `ToClient::Revocations`, protocol 11; marked on the profile; no longer
+counts at the door). Plural forms for screen text: `chiacraft::plural`. The check:
+`tools/checks/achievements` (two copies, no chain): signing, the profile, the rule, revoking.
 
 ## Our DID sponsor (testnet11, since 2026-11-04)
 
