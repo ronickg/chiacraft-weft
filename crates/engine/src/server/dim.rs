@@ -2476,7 +2476,7 @@ impl Dim {
         self.block_dust(c, p, state);
         self.sound(c.states[state as usize].sounds[0], p.as_dvec3() + DVec3::splat(0.5), 1.0, 0.0);
         if drops {
-            self.drop_block_loot(c, p, state, tool, true, None);
+            self.drop_mined(c, p, state, tool, None, player);
         }
         self.emit_engine(c, abi::event::BLOCK_BROKEN, &abi::BlockChange { player, pos: p.to_array(), state, item: tool.item });
         true
@@ -2503,7 +2503,7 @@ impl Dim {
         self.block_dust(c, p, state);
         self.sound(c.states[state as usize].sounds[0], p.as_dvec3() + DVec3::splat(0.5), 1.0, 0.0);
         if drops {
-            self.drop_block_loot(c, p, state, tool, true, name.as_deref());
+            self.drop_mined(c, p, state, tool, name.as_deref(), player);
         }
         self.emit_engine(c, abi::event::BLOCK_BROKEN, &abi::BlockChange { player, pos: p.to_array(), state, item: tool.item });
         true
@@ -2829,15 +2829,52 @@ impl Dim {
     /// (support, liquids), which always harvests.
     /// `own_name`: what a renamed block entity was called, given back to the block's item.
     pub fn drop_block_loot(&mut self, c: &'static Content, p: IVec3, state: u32, tool: ItemStack, mined: bool, own_name: Option<&str>) {
+        self.drop_block_loot_at(c, p, state, tool, mined, own_name, p.as_dvec3() + DVec3::splat(0.5));
+    }
+
+    /// `drop_block_loot` with the items appearing at `at` (this dimension's own coordinates).
+    #[allow(clippy::too_many_arguments)]
+    fn drop_block_loot_at(
+        &mut self,
+        c: &'static Content,
+        p: IVec3,
+        state: u32,
+        tool: ItemStack,
+        mined: bool,
+        own_name: Option<&str>,
+        at: DVec3,
+    ) -> Vec<u64> {
         let b = c.block_of(state);
         let own_item = c
             .items
             .iter()
             .position(|i| i.block == Some(b.first_state))
             .map(|i| i as u32);
+        let mut spawned = Vec::new();
         for s in self.roll_loot(c, &b.name, &crate::loot::Ctx { tool, mined: if mined { state } else { 0 }, state, ..Default::default() }) {
             let s = if Some(s.item) == own_item { crate::stack::with_name(s, own_name) } else { s };
-            self.spawn_item(c, p.as_dvec3() + DVec3::splat(0.5), s);
+            spawned.push(self.spawn_item(c, at, s));
+        }
+        spawned
+    }
+
+    /// What `player` breaks drops at their feet, picked up a moment later (or left there with a
+    /// full inventory). Thrown from the block, a log chopped at eye height landed on the stump,
+    /// wedged in the trunk or slid down the slope, two blocks off and out of the 1.5-block reach
+    /// (first-day playtest and chop_where, 11-04).
+    fn drop_mined(&mut self, c: &'static Content, p: IVec3, state: u32, tool: ItemStack, own_name: Option<&str>, player: u64) {
+        let Some(feet) = self
+            .entities
+            .get(player)
+            .map(|e| self.place.to_local(e.pos))
+        else {
+            self.drop_block_loot(c, p, state, tool, true, own_name);
+            return;
+        };
+        for id in self.drop_block_loot_at(c, p, state, tool, true, own_name, feet + DVec3::Y * 0.25) {
+            if let Some(e) = self.entities.get_mut(id) {
+                e.vel = DVec3::Y;
+            }
         }
     }
 }
