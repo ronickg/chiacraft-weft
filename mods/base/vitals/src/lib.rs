@@ -15,6 +15,7 @@ pub mod climate;
 pub mod clothing;
 pub mod difficulty;
 pub mod effects;
+pub mod foliage;
 pub mod food;
 pub mod forage;
 pub mod levels;

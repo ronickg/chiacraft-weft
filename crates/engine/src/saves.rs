@@ -774,8 +774,10 @@ impl Screen for WorldSelect {
                             ],
                         );
                         let (name, dir) = (w.name.clone(), w.dir.clone());
+                        // A list's row (`list_row`: dark at rest, a gold rim when selected), not
+                        // a column of main buttons.
                         let b = ui.button(
-                            "button",
+                            "list_row",
                             Style::default().pad(4.0).stretch().gap(2.0),
                             Rc::new(move |c: &mut Ctx| {
                                 if let Some(s) = c.screen::<WorldSelect>() {

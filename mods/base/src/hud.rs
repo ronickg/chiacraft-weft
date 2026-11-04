@@ -37,9 +37,14 @@ const THERMOMETER: (f32, f32) = (64.0, 5.0);
 const COLDEST: f32 = 31.0;
 const HOTTEST: f32 = 43.0;
 
-/// The player's vitals, none in creative (the bars hide).
+/// The player's vitals, none in creative or while dead (the bars hide: a dead player's are
+/// placeholders, health "0 / -1" over the death screen).
 fn vitals_of(c: &ClientView) -> Option<Vitals> {
-    if c.creative() { None } else { c.component(&VITALS) }
+    if c.creative() || c.me().is_none_or(|m| m.health <= 0.0) {
+        return None;
+    }
+    c.component(&VITALS)
+        .filter(|v| v.max_health > 0.0 && v.max_stamina > 0.0)
 }
 
 /// The screens a key opens, each with its picture (`gui/hud_<name>.png`) and its key

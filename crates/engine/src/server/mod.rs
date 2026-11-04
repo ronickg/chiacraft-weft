@@ -855,6 +855,7 @@ impl Server {
                     }
                 }
                 DimEvent::SetAir { dim, air, heading } => self.dims[dim as usize].set_air(air, heading),
+                DimEvent::SetTints { dim, tints } => self.dims[dim as usize].set_tints(tints),
                 DimEvent::SetRain { dim, biomes, thunder } => {
                     // Only where it rains at all.
                     if c.dims[dim as usize].weather {
