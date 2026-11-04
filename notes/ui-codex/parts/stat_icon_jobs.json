@@ -1,0 +1,74 @@
+[
+ {
+  "kind": "ui",
+  "name": "stat_icon_health",
+  "type": "hud icon",
+  "size": "16x16",
+  "green": false,
+  "what": "a 16 x 16 stat icon of a heart, its main colour #e0302a with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel"
+ },
+ {
+  "kind": "ui",
+  "name": "stat_icon_stamina",
+  "type": "hud icon",
+  "size": "16x16",
+  "green": false,
+  "what": "a 16 x 16 stat icon of a lightning bolt, its main colour #c48232 with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel"
+ },
+ {
+  "kind": "ui",
+  "name": "stat_icon_food",
+  "type": "hud icon",
+  "size": "16x16",
+  "green": false,
+  "what": "a 16 x 16 stat icon of a roast drumstick, its main colour #b4783c with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel"
+ },
+ {
+  "kind": "ui",
+  "name": "stat_icon_damage",
+  "type": "hud icon",
+  "size": "16x16",
+  "green": false,
+  "what": "a 16 x 16 stat icon of three diagonal claw marks, its main colour #b44632 with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel"
+ },
+ {
+  "kind": "ui",
+  "name": "stat_icon_speed",
+  "type": "hud icon",
+  "size": "16x16",
+  "green": false,
+  "what": "a 16 x 16 stat icon of a running paw print with motion lines, its main colour #6eaa50 with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel"
+ },
+ {
+  "kind": "ui",
+  "name": "stat_icon_weight",
+  "type": "hud icon",
+  "size": "16x16",
+  "green": false,
+  "what": "a 16 x 16 stat icon of a heavy kettlebell weight, its main colour #966e50 with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel"
+ },
+ {
+  "kind": "ui",
+  "name": "stat_icon_oxygen",
+  "type": "hud icon",
+  "size": "16x16",
+  "green": false,
+  "what": "a 16 x 16 stat icon of two air bubbles, one large and one small, its main colour #4696dc with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel"
+ },
+ {
+  "kind": "ui",
+  "name": "stat_icon_torpor",
+  "type": "hud icon",
+  "size": "16x16",
+  "green": true,
+  "what": "a 16 x 16 stat icon of a crescent moon with a small zzz, its main colour #9b4fe0 with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel"
+ },
+ {
+  "kind": "ui",
+  "name": "stat_icon_fortitude",
+  "type": "hud icon",
+  "size": "16x16",
+  "green": false,
+  "what": "a 16 x 16 stat icon of a round-topped shield, its main colour #8c96aa with a lighter top-left and a darker outline in its own hue, one clear chunky shape filling most of the 16 px, readable on a dark brown panel (#1d1714) with no slot or frame behind it, no gold, a single highlight pixel"
+ }
+]
