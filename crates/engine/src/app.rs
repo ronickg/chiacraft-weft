@@ -595,7 +595,8 @@ fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
 impl Running {
     fn gui_scale(&self) -> f32 {
         let max = crate::settings::max_gui_scale(self.gpu.surface_size());
-        let s = if self.settings.gui_scale() == 0 { max } else { self.settings.gui_scale().min(max) };
+        // A scale set before scales were kept even (3, 5...) is shown at the even one below it.
+        let s = if self.settings.gui_scale() == 0 { max } else { crate::settings::even_scale(self.settings.gui_scale()).min(max) };
         s as f32
     }
 
