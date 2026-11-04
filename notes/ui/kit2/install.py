@@ -401,6 +401,20 @@ def hotbar_slot(size, rims, inner=k.SLOT, h=None):
 
 save("hotbar", hotbar_slot(40, [k.OUTLINE, k.BRONZE, k.OUTLINE]), [NINE, border(5), ("icon", "16")])
 save("hotbar_selected", hotbar_slot(44, [k.OUTLINE, k.GLOW, k.GLOW_D, k.OUTLINE]), [NINE, border(7)])
+# The level row above the hotbar (`hud.rs`, HUD_LEVEL; Ronald, 11-04: "1: above the hotbar"): the
+# XP bar as wide as the hotbar (360 texels) with a 1 px frame, and the chips on it, 32 x 22 and built
+# like kit 2's buttons (outline, 1 px light, the face, 2 px shade, outline: a 17-row face, the
+# number 4 above and 4 below): the level's in the plain chip's colours, the points' in the orange
+# ones, and a lit copy of the points chip with its outline in the glow for its pulse. Each is a
+# gauge in the HUD (full or hidden), so its fill is itself.
+hud_bar_pair("hud_xpbar", 360, 8, "xp", frame_px=1)
+for name, kind, lit in (("hud_level_chip", "plain", False), ("hud_points_chip", "points", False), ("hud_points_chip_lit", "points", True)):
+    light, face, shade = k.CHIPS[kind][:3]
+    chip = k.canvas(32, 22)
+    k.raised(chip, k.shape(32, 22, k.R), light, face, shade, rim=k.GLOW if lit else k.OUTLINE)
+    save(name, chip, [("scaling", "stretch")])
+    save(name + "_fill", chip, [("scaling", "stretch")])
+
 # The HUD's food tiles (`hud.rs`, `food_tile`): the hotbar's slot, drawn as a gauge (full, or
 # hidden when there is no food for it), and the bar under each: outline round a green 4-row track.
 # 44 x 52: the picture (32) and the minutes' line under it inside the rim (`hud.rs`, FOOD_TILE).
