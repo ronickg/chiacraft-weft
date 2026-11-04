@@ -38,6 +38,7 @@ pub mod salt {
     pub const HIGHLANDS: u64 = 0x416A;
     pub const SNOW_DRIFT: u64 = 0x5A0D;
     pub const MOUNTAIN_AREA: u64 = 0x44;
+    pub const SEQUOIA: u64 = 0x5E0A;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -163,6 +164,28 @@ pub const SWAMP: (f64, f64) = (0.0, 0.04);
 /// Forest from this humidity; birch forest under this temperature and from this humidity.
 pub const FOREST_HUMIDITY: f64 = 0.07;
 pub const BIRCH: (f64, f64) = (0.05, 0.0);
+
+/// Giant sequoia groves (Ronald, 11-04: "the massive Giant sequoia"): the Sierra Nevada's west
+/// slope, groves of 1-1,000 ha among the mixed conifers at 1,400-2,100 m, where the winters are
+/// cool and snowy and the summers dry, in moist draws with deep soil (Giant Forest's climate,
+/// `vitals::climate`). Here: temperate (`SEQUOIA_TEMPERATURE`), not dry (`SEQUOIA_HUMIDITY` and
+/// up), on the mountains' front slopes `SEQUOIA_RISE` blocks over the sea, in grove patches:
+/// where `SEQUOIA_AREA` is over `SEQUOIA_GROVE`. Its ramps are the grove noise's patches (some
+/// 260 blocks across), the mountains' own area noise just short of the mountains biome (their
+/// foothills), and inland.
+pub const SEQUOIA_TEMPERATURE: (f64, f64) = (-0.12, 0.1);
+pub const SEQUOIA_HUMIDITY: f64 = 0.0;
+pub const SEQUOIA_RISE: (i32, i32) = (28, 85);
+pub const SEQUOIA_GROVE: f64 = 0.5;
+pub const SEQUOIA_AREA: Area = Area {
+    all: &[
+        Ramp::Noise { salt: salt::SEQUOIA, scale: 260.0, from: 0.02, to: 0.15 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: -0.08, to: -0.03 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: 0.08, to: 0.05 },
+        Ramp::Continent(0.15, 0.25),
+    ],
+    not: false,
+};
 
 /// Oceans and land masses, this many blocks above or below the sea.
 pub const CONTINENTS: f64 = 18.0;
@@ -345,7 +368,11 @@ pub fn features() -> Vec<Feature> {
         Feature::new(mesa).named("mesas"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
-        // No height: its mask is where snow drifts (the snow rules ask for it).
+        // No height: their masks say where the snow drifts and where the sequoias stand (rules
+        // ask for them).
+        preset::hills(0.0, 64.0)
+            .mask(SEQUOIA_AREA.mask())
+            .named("sequoia_groves"),
         preset::hills(0.0, 64.0)
             .mask(Mask::noise(SNOW_DRIFT_SIZE, -0.2, 0.2).salt(salt::SNOW_DRIFT))
             .named("snow_drift"),
@@ -711,10 +738,12 @@ pub struct Edge {
 pub const EDGE_BAND: f64 = 0.03;
 
 /// The biome the climate rules pick for these fields (`overworld_biome` without the coasts).
-fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool) -> &'static str {
+fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool) -> &'static str {
     let at = q12;
     if mountain || h >= snow_line(t) {
         "mountains"
+    } else if grove && sequoia_fits(t, hu, h) {
+        "sequoia_grove"
     } else if t < at(SNOWY_BELOW) {
         "snowy_plains"
     } else if t < at(TAIGA_BELOW) {
@@ -742,13 +771,14 @@ pub fn biome_edge(f: &Fields, x: i32, z: i32, height: i32) -> Option<Edge> {
     let (t, hu, c) = (here.temperature(), here.humidity(), here.continent());
     let m = MOUNTAINS_AREA.at(&here);
     let line = q12(MOUNTAIN_BIOME);
-    let own = climate_biome(t, hu, c, height, m > line);
+    let grove = SEQUOIA_AREA.at(&here) > q12(SEQUOIA_GROVE);
+    let own = climate_biome(t, hu, c, height, m > line, grove);
     let band = q12(EDGE_BAND);
     let mut best: Option<Edge> = None;
     for k in 1..=3 {
         let step = band * k / 3;
         for (dt, dh, dm) in [(step, 0, 0), (-step, 0, 0), (0, step, 0), (0, -step, 0), (0, 0, step), (0, 0, -step)] {
-            let to = climate_biome(t + dt, hu + dh, c, height, m + dm > line);
+            let to = climate_biome(t + dt, hu + dh, c, height, m + dm > line, grove);
             if to != own {
                 let near = ONE - (k - 1) * ONE / 3;
                 if best.is_none_or(|b| near > b.near) {
@@ -857,6 +887,8 @@ pub fn overworld_biome(f: &Fields, x: i32, z: i32) -> &'static str {
         if t < at(SNOWY_BELOW) { "snowy_plains" } else { "beach" }
     } else if MOUNTAINS_AREA.at(&here) > at(MOUNTAIN_BIOME) || snowy(f, x, z, h) {
         "mountains"
+    } else if sequoia_fits(t, hu, h) && SEQUOIA_AREA.at(&here) > at(SEQUOIA_GROVE) {
+        "sequoia_grove"
     } else if t < at(SNOWY_BELOW) {
         "snowy_plains"
     } else if t < at(TAIGA_BELOW) {
@@ -874,6 +906,14 @@ pub fn overworld_biome(f: &Fields, x: i32, z: i32) -> &'static str {
     } else {
         "plains"
     }
+}
+
+/// Whether the climate and the height (blocks) fit a sequoia grove (its rule but the grove patches).
+fn sequoia_fits(t: i32, hu: i32, h: i32) -> bool {
+    t >= q12(SEQUOIA_TEMPERATURE.0)
+        && t < q12(SEQUOIA_TEMPERATURE.1)
+        && hu >= q12(SEQUOIA_HUMIDITY)
+        && (SEA + SEQUOIA_RISE.0..=SEA + SEQUOIA_RISE.1).contains(&h)
 }
 
 /// Each overworld biome's share of the land (not the sea), sampled every `step` blocks out to
@@ -938,6 +978,19 @@ mod tests {
             }
         }
         assert!(lakes_seen > 0 && wet > 0, "no lake in 2.4 km by 2.4 km ({lakes_seen} cut, {wet} wet)");
+    }
+
+    #[test]
+    fn sequoia_groves_are_rare_and_found() {
+        for seed in [1, 2, 3] {
+            let shares = biome_shares(seed, 8000, 32);
+            let (share, near) = shares
+                .iter()
+                .find(|e| e.0 == "sequoia_grove")
+                .map_or((0.0, i32::MAX), |e| (e.1, e.2));
+            assert!(share > 0.0005 && share < 0.03, "seed {seed}: sequoia groves are {:.2}% of the land", share * 100.0);
+            assert!(near <= 6000, "seed {seed}: the nearest grove is {near} blocks out");
+        }
     }
 
     #[test]

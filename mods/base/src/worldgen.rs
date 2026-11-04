@@ -49,6 +49,7 @@ pub static DESERT: Biome = Biome::named("desert");
 pub static SAVANNA: Biome = Biome::named("savanna");
 pub static SWAMP: Biome = Biome::named("swamp");
 pub static MOUNTAINS: Biome = Biome::named("mountains");
+pub static SEQUOIA_GROVE: Biome = Biome::named("sequoia_grove");
 pub static OCEAN: Biome = Biome::named("ocean");
 pub static BEACH: Biome = Biome::named("beach");
 pub static DEEP_CAVES: Biome = Biome::named("deep_caves");
@@ -195,6 +196,26 @@ pub fn register(r: &mut Registry) {
         .set(&STAND_TREES, 0.08)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:mountains").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:spruce_log");
+    // Giant sequoia groves on the mountains' front slopes (`base_api::land::SEQUOIA_AREA`, Giant
+    // Forest's climate): the giants scattered among mixed conifers and black oaks over deep soil,
+    // with clearings. Spruce and oak stand in for the mixed conifers and the sequoia until their
+    // trees come (Voxel dog).
+    r.biome(&SEQUOIA_GROVE)
+        .set(&CLIMATE, base_api::climate("base:sequoia_grove"))
+        .temperature(land::SEQUOIA_TEMPERATURE.0..land::SEQUOIA_TEMPERATURE.1)
+        .humidity(land::SEQUOIA_HUMIDITY..)
+        .set(&BOULDERS, 0.08)
+        .surface("grass", "dirt", 5)
+        .tint(grass, 0x7fa95a)
+        .tint(foliage, 0x4d8a3c)
+        .tint(&base_api::trees::EVERGREEN, 0x4d8a3c)
+        .tint(&base_api::trees::YELLOW_LEAVES, 0x6d9a3c)
+        .tag("forest")
+        .tag("animals")
+        .set(&TREES, 0.12)
+        .set(&STAND_TREES, 0.1)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:sequoia_grove").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        .set_text(&TREE_KINDS, "base:spruce_log:3 base:oak_log:1");
     r.biome(&OCEAN)
         .set(&CLIMATE, base_api::climate("base:ocean"))
         .surface("sand", "sand", 3)
