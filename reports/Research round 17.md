@@ -252,3 +252,203 @@ Rows that only the base mod reads (fireflies, motes, moon size, sky events) need
   - Spring to Life fireflies: https://www.nintendolife.com/news/2025/03/minecrafts-latest-update-is-now-live-here-are-the-patch-notes
 - **Sky: Children of the Light:** https://80.lv/articles/how-to-design-emotional-game-environments-for-sky-children-of-the-light/
 - **Stardew:** https://stardewvalleywiki.com/Green_Rain
+
+---
+
+# Addendum: sky events with gameplay (2026-11-05)
+
+Ronald chose "Gameplay too" for sky events. The master setting defaults to Subtle and the moon stays at 1× (Planner, relayed). This addendum designs:
+- **the blood moon**: more and bolder monsters;
+- **meteor showers**: fallen stars to find, with meteoric iron;
+- **aurora storms**: kept as looks only.
+
+It also says where their numbers live, the rows they add to `notes/SYSTEMS.md`, and the owners.
+
+**What was read:**
+- `notes/SYSTEMS.md`, `notes/SURVIVAL.md` (steps 11, 14 and 15: the fair first night, "Campfire keeps you safe", dying and the way back) and `notes/PLAN.md`;
+- `mods/base/src/mobs.rs` (the four monsters, their spawn rules, `keep_from_fire`);
+- the engine's natural spawner (`crates/engine/src/server/dim.rs:1700-1790`: every 40 ticks, 4 tries per player 20-45 blocks out, light 0-6, category caps within 64 blocks; `core:hostile` cap 8 (`registry.rs:1378`); the `question::NATURAL_SPAWN` veto);
+- `vitals::{calendar, difficulty, levels}`, the crafting materials (`mods/base/crafting/SHEET.md`), the craters in `base_api::land` (`CRATER_*`), and the moon (`lib.rs`: 8 phases, full on day 0 mod 8).
+
+## The rules this keeps
+
+These come from `notes/SURVIVAL.md` and round 17's restraint rules:
+- **"Campfire keeps you safe"** holds on every night, blood moon included. Event monsters spawn only at light 6 or less and stay out of a campfire's ring (`keep_from_fire`). A blood moon is a night to sit by the fire, not a night that breaks the promise.
+- **No death spiral.** The respawn grace (`GRACE_SECS` 180) and the tombstone run hold. Gentle's first three nights stay free of monsters (`grace_nights`).
+- **Rare and announced.** Each event is foretold at the night hint's hour, two game hours before sunset (the same slot as `hints.rs` `night`). The sky shows it from dusk.
+- **Real-world anchors**, as in the rest of the game:
+  - a blood moon is a total lunar eclipse, which happens only at a full moon;
+  - meteor showers come on fixed dates each year, as the Perseids and Geminids do;
+  - meteoric iron is iron-nickel that people worked cold before smelting (Inuit blades from the Cape York meteorite; Tutankhamun's dagger, about 11 % nickel);
+  - aurora storms come most near the equinoxes.
+- **One event a night at most,** and the same on every machine: a hash of the world's seed and the day, as rain's `climate::spell` is.
+
+## 1. The blood moon (a total eclipse of the full moon)
+
+**When:**
+- **Only on a full moon** (day mod 8 = 0).
+- **Frequency:** `BLOOD_MOON_CHANCE` = 1 in 3 full moons. That is about 2-3 a year (a year is 56 days, 7 full moons), about once every 24 days, or 8 real hours of play. For comparison, Terraria's is 1 in 9 nights, which would be every 3 hours of play: too often for a survival game with long builds.
+- **Not before** `BLOOD_MOON_FROM_DAY` 16 (the second full moon after a new world's start on day 7), and never in gentle's grace nights.
+- **Totality:** from `BLOOD_MOON_HOURS` (22.0, 2.0). The moon reddens over the hour before and clears over the hour after, so the event runs 21:00-03:00.
+
+**Announcement and look:**
+- **Two game hours before sunset:** "The full moon will rise dark red tonight. Monsters walk boldly under it: stay by your fire." (`hint.base.blood_moon`, en and ru)
+- **At dusk** the moon rises copper. In totality it is a deep red disc, and the night is as dark as a new moon's: the moon's light goes, a red cast stays.
+- **Pack side:** the sky event value (air-flag bits 24-31, round 17 rec. 5) drives the pack's moon colour, the night light and a faint red grade (`base:fx_sky_events` = looks).
+
+**Gameplay** (`base:fx_sky_events` = on and difficulty above gentle; on gentle the look only):
+- **More monsters.** A second category, `base:blood_moon`, with its own cap `BLOOD_MOON_CAP` 6, on top of the hostile 8, so up to 14 within 64 blocks.
+  - Its spawn rules are registered like the normal ones: light 0-6, the same biomes.
+  - The base mod's `NATURAL_SPAWN` interceptor turns them down outside totality. That needs no engine change; the engine already asks.
+  - The weights favour pack hunters and keep griefing low:
+
+    | monster | weight |
+    |---|---|
+    | zombie | 3 |
+    | spider | 3 |
+    | skeleton | 2 |
+    | creeper | 1 (fewer craters in bases) |
+
+- **Bolder monsters:**
+  - event monsters spawn with +20 % max health (`BLOOD_MOON_HEALTH` 1.2) and +10 % speed (`BLOOD_MOON_SPEED` 1.1), as attribute modifiers;
+  - their sight reach for players is ×1.5 (`hostile(reach)` × `BLOOD_MOON_REACH`);
+  - **no extra damage**: the danger is numbers and pace, not one-hit deaths.
+- **Red eyes:** an emissive eye mask (`_e`) on each monster model, shown while the event flag is set (art and the entity shader).
+- **Dawn:** at 03:00 the leftover event monsters walk away from players and despawn once out of sight (or at 40 blocks). Daylight ends them for good.
+- **Harsh:** cap 8 and health ×1.35. **Gentle:** looks only. Both go in `vitals::difficulty` (`blood_moon_cap`, `blood_moon_health`).
+
+**Rewards:**
+- XP ×1.5 for kills in totality (`BLOOD_MOON_XP`, through `levels::xp::kill`).
+- An advancement, **"Red Night"**: see a blood moon through to 03:00 without dying.
+- A rare drop worth having: 1 in 8 event monsters drops one **"eclipse ash"**, a dye or ingredient for a red-black cloak dye (`clothing`). It's cosmetic, so it never becomes a grind.
+
+**Animals (Animals mod):** herds bunch closer and run sooner during totality (`hunt::wary` × 1.5). Wolves howl once at totality (the voices system).
+
+## 2. Meteor showers and fallen stars
+
+**When** (`METEOR_SHOWERS`, by calendar date, every year):
+
+| shower | dates (real equivalent) | peak night |
+|---|---|---|
+| summer | summer days 9-11 (the Perseids, mid-August) | day 10 |
+| winter | winter days 2-4 (the Geminids, mid-December) | day 3 |
+
+- **Peak night:** shooting stars ×20 (Solas-like streaks) from 23:00 to dawn.
+- **Each side of the peak:** shooting stars ×6.
+- **A lone fireball:** `FIREBALL_CHANCE` = 1 clear night in 20 brings a single bright fireball that lands.
+- Rain and cloud hide the streaks but not the landings: you hear the boom.
+
+**Announcement:**
+- **Peak:** "The sky is restless tonight: stars will fall after midnight." (`hint.base.meteor_shower`)
+- **A lone fireball** has no warning; that is the point of it.
+
+**What falls: a meteorite.**
+- **Landings** (`METEOR_LANDINGS`):
+  - 1-2 per player on the peak night, 0-1 on a side night, 1 for a fireball;
+  - each lands 48-160 blocks from the player (`METEOR_REACH`), under the open sky (sky light 15), on land;
+  - never in water (over water it splashes and sinks, lost);
+  - never within 24 blocks of a player-placed block or a campfire (no griefing, `METEOR_CLEAR`).
+- **What the player sees and hears:** a streak across the sky toward the impact point (pack, from the event value plus the landing's place), then a boom heard after the distance's delay (`weather_sound::thunder_delay`).
+- **On the ground:**
+  - a scorched pit 3-5 blocks across: grass turns to coarse dirt, nothing set alight;
+  - 1-3 `base:meteorite` blocks with a black fusion crust, glowing hot: light 9 fading to 0 over `METEORITE_COOLS` = 1 game hour;
+  - smoke for 5 real minutes, a column to walk toward;
+  - touching it hot burns, like a campfire.
+- **Old impacts:** worldgen's craters (`CRATER_*`, one per 640-block square) hold buried meteorites. 1 crater in 3 has 2-5 `base:meteorite` blocks 2-6 under its floor (`CRATER_METEORITES`). So a daytime player can dig for it too: the Vintage Story idea, with no event needed.
+
+**What it gives: meteoric iron.**
+- A `base:meteorite` block mines at stone hardness with a flint-tier pick or better (`harvest` 100). It drops 1-3 `meteoric_iron` lumps (`METEORITE_DROPS`), plus stone.
+- **Meteoric iron** is a new crafting material row in `mods/base/crafting` (`materials.rs`):
+  - roles: working and fitting;
+  - 7.9 g/cm³, harvest 200, uses 240, speed 6.5, damage 2;
+  - trait `cold_worked`.
+- It is **hammered cold** at a stone anvil or a hammer station, **with no furnace or bloomery**, as the Inuit worked Cape York's iron.
+- **Its place in the progression:** a lucky early step to iron-tier cutting edges (a knife, an axe or a spear head) before the player can smelt. It comes in small amounts:
+  - a shower night gives about 2-6 lumps a player;
+  - a crater gives 4-15.
+  - A head takes 2 lumps, so 1-3 heads a night: enough to matter, not enough to skip copper and bronze for armour, tools in bulk, or anything that needs ingots.
+- It sits between bronze and wrought iron, below steel (VS's meteoric iron sits above iron, but there it needs an iron pick; ours rewards the night walk instead).
+- **Risk and reward:** the stars fall at night, when monsters are out. Going to a smoke column after midnight is a choice, made safer with a torch and a campfire near the impact.
+
+**Advancements:**
+- **"Starfall"**: pick up meteoric iron.
+- **"Wish Upon"**: be outside under a shower's peak.
+
+## 3. Aurora storms: looks only
+
+**When:**
+- `AURORA_STORM_CHANCE` = 1 clear night in 30, about 2 a year.
+- ×2 within 4 days of either equinox (spring day 7, autumn day 7), the Russell-McPherron effect that makes real geomagnetic storms likeliest then.
+- Never on a blood moon or a meteor peak.
+
+**Look:**
+- The aurora reaches south of its usual biomes: full in the north as now, 0.6 in the birch forest and temperate plains, 0.2 further south. It is brighter, picks a rarer palette (red-violet, round 17 rec. 3), and lights the snow a little.
+- Dusk line: "The north is glowing tonight."
+
+**Gameplay: none.** It is a reward for being outside, not a hazard. Two events with gameplay are enough to learn.
+- The only hook is an advancement, **"Sky on Fire"**: see an aurora storm.
+- A later idea, if Ronald wants one: compasses, if we add them, swing on such nights, as real ones do in a geomagnetic storm.
+
+## Where the numbers live
+
+**A new module, `mods/base/vitals/src/events.rs`.** It belongs beside `calendar` and `difficulty`, since events are calendar dates, moon phases and a difficulty's share. It holds:
+- every constant above:
+  - `BLOOD_MOON_CHANCE`, `BLOOD_MOON_FROM_DAY`, `BLOOD_MOON_HOURS`;
+  - `BLOOD_MOON_CAP`, `BLOOD_MOON_HEALTH`, `BLOOD_MOON_SPEED`, `BLOOD_MOON_REACH`, `BLOOD_MOON_XP`;
+  - `METEOR_SHOWERS`, `FIREBALL_CHANCE`, `METEOR_LANDINGS`, `METEOR_REACH`, `METEOR_CLEAR`;
+  - `METEORITE_COOLS`, `METEORITE_DROPS`;
+  - `AURORA_STORM_CHANCE`, `EQUINOX_BOOST`;
+- one function, `tonight(seed, day) -> Option<Event>`. It is deterministic like `climate::spell` and applies the priorities: blood moon, then a shower's peak, then an aurora storm, then a fireball.
+
+Per-difficulty values go in `vitals::difficulty` (`blood_moon_cap`, `blood_moon_health`, `blood_moon_gameplay`).
+
+**Checks** in `vitals::balance` (or a test in `events.rs`):
+- over 100 simulated years:
+  - blood moons 2-3 a year, only on full moons, none before day 16;
+  - 2 showers a year on their dates;
+  - aurora storms 1-3 a year;
+  - never two events a night;
+- the cap and multipliers keep a player in arrival clothes by a campfire unharmed (the same check as step 14's);
+- the meteoric iron a night gives is under the iron a crafted tool set needs (the check against crafting's early needs, as with the faces' ores).
+
+**Other places:**
+- `CRATER_METEORITES` goes in `base_api::land` beside the other crater numbers.
+- The material row goes in `mods/base/crafting` (`materials.rs`).
+- After the numbers change, regenerate the sheets (`vitals --bin sheet`, `crafting --bin sheet`).
+
+## Rows for `notes/SYSTEMS.md`
+
+| System | Code | Numbers | Reads | Read by |
+|---|---|---|---|---|
+| Sky events | `vitals::events`, `mods/base/src/events.rs` (dusk lines, the event flag, landings) | `events.rs` constants; `difficulty` (`blood_moon_*`) | the calendar (date, hour), the moon's phase (day mod 8), the world's seed, difficulty and gentle's grace nights, the rain where the player stands (streaks hidden), the biomes' aurora shares | monsters (blood moon spawning and strength), the pack (air-flag bits 24-31: moon colour, night light, streaks, aurora reach), hints (the dusk lines), advancements, weather sound (the impact boom), animals (wariness, howls) |
+| Monsters on a blood moon | `mods/base/src/mobs.rs` (the `base:blood_moon` category and its rules, the `NATURAL_SPAWN` veto outside totality, the modifiers, the dawn walk-off) | `BLOOD_MOON_CAP`, `_HEALTH`, `_SPEED`, `_REACH`, weights | sky events, light (0-6), campfires (`keep_from_fire`), the respawn grace | players' nights, XP (`BLOOD_MOON_XP`), eclipse ash drops |
+| Meteorites, meteoric iron | `mods/base/src/events.rs` (landings), `blocks.rs` (`base:meteorite`, hot and cooling), `base_api::land` craters (`CRATER_METEORITES`), `mods/base/crafting` (`meteoric_iron`) | `METEOR_*`, `METEORITE_*`, `CRATER_METEORITES`, the material row | sky events, open sky and players' builds (where it may land), worldgen's craters | crafting (iron-tier heads before smelting), advancements, the smoke and glow (pack and particles) |
+
+Also update the **"When you change something, check"** list with one line: *A sky event or its numbers*: `vitals::events`' checks (frequency, no two a night), the first-night check by a campfire, and crafting's early iron.
+
+## Owners
+
+| piece | owner | needs the engine? |
+|---|---|---|
+| `vitals::events` (the schedule, numbers, checks) and `events.rs` (dusk lines, the event flag, landings, the meteorite block) | a base worker: **First hours** (it owns hints, the first nights and the campfire rule), or a new "Sky events" worker | no (`NATURAL_SPAWN` and categories exist); the flag to the pack needs round 17's small engine change (air-flag bits into `scene`) |
+| Blood-moon monsters (category, modifiers, dawn walk-off) | **First hours** (`mobs.rs` is base's; Planner's note named Animals, but the four monsters live in base) | no |
+| Animals' wariness and howls on a blood moon | **Animals** | no |
+| Meteoric iron (material row, cold working, heads) | **Survival** or whoever owns crafting (`mods/base/crafting`) | no |
+| Crater meteorites | **Worldgen** | no |
+| Looks: moon colour and darkness, red cast, streaks and the landing trail, hot glow, aurora storm reach and palette | **Lighting** | the same air-flag change |
+| Art: meteorite block (crust, hot glow `_e`), meteoric iron lump, eclipse ash, monster eye masks | **Art** (the `game-art` and `block-textures` skills) | no |
+| Strings (dusk lines, advancements, items), en and ru | each owner with its piece | no |
+
+**Order:**
+1. `vitals::events` with its checks and the dusk lines, using today's look (the existing aurora plus the shooting stars).
+2. The blood moon (base monsters, then Lighting's look).
+3. Meteor landings, the meteorite block and meteoric iron, then crater meteorites.
+4. The aurora storm look, alongside Lighting's rec. 3.
+
+Each step gets a PC run through Tester 2's queue: a world with `/tk time` set to a blood moon or shower night, with spawning on.
+
+**Sources for this addendum:**
+- Terraria's blood moon is 1 in 9 nights, never at a new moon, and decided at dusk: [Blood Moon](https://terraria.wiki.gg/wiki/Blood_Moon).
+- Terraria's meteorites fall at about 2 % a night, with ore and Meteor Heads at the site: [Meteorite](https://terraria.wiki.gg/wiki/Meteorites).
+- Vintage Story's meteoric iron comes from crash sites, needs a tier-4 pick, and outperforms iron: [Meteoric iron](https://wiki.vintagestory.at/Meteoric_iron).
+- Tutankhamun's blade is meteoric iron at about 10.8-12.8 % nickel: [Eos](https://eos.org/articles/pharaohs-iron-dagger-made-from-a-meteorite-study-confirms).
