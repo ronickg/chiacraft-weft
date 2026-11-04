@@ -167,7 +167,12 @@ pub fn register(r: &mut Registry) {
                     });
                     ui.player_inventory(false);
                 });
-                crate::book::book(ui, crate::book::Station::Hands);
+                // Not in creative: its item picker takes the left side and has every item, and the
+                // picker, the inventory and the book side by side were wider than a 1280 x 720
+                // screen at GUI scale 2 (both ends cut off, the label check, 11-04).
+                if !ui.client().creative() {
+                    crate::book::book(ui, crate::book::Station::Hands);
+                }
             });
         });
 

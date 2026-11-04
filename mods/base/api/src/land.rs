@@ -27,6 +27,7 @@ use weft_sdk::terrain::{Feature, Mask, preset};
 
 use crate::SEA;
 
+mod karst;
 mod net;
 
 /// Salts of our own noises (the engine's are in `weft_noise::fixed::salt`).
@@ -47,6 +48,9 @@ pub mod salt {
     pub const COAST_CLIFFS: u64 = 0xC1F;
     pub const ISLANDS: u64 = 0x151A;
     pub const ARCHIPELAGOS: u64 = 0x151B;
+    pub const KARST: u64 = 0x4A5;
+    pub const KARST_AREA: u64 = 0x4A6;
+    pub const KARST_WOBBLE: u64 = 0x4A7;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -291,6 +295,25 @@ pub const MESA_AREA: Area = Area {
     not: false,
 };
 
+/// Karst towers (Lithosphere; Ha Long Bay, Guilin): in the warm, wet land and its shallow seas
+/// (`KARST_AREA`), steep limestone pillars, one per `KARST_CELL` blocks square where the area
+/// allows (`KARST_CHANCE` at full strength), `KARST_RADIUS` blocks across their foot and
+/// `KARST_HEIGHT` over the water or the ground they stand on, their outline wobbled (Ronald,
+/// 11-04: "All 3, in order").
+pub const KARST_AREA: Area = Area {
+    all: &[
+        Ramp::Temperature(0.02, 0.08),
+        Ramp::Humidity(0.06, 0.12),
+        Ramp::Noise { salt: salt::KARST_AREA, scale: 700.0, from: 0.0, to: 0.12 },
+        Ramp::Continent(-0.12, -0.04),
+    ],
+    not: false,
+};
+pub const KARST_CELL: i32 = 40;
+pub const KARST_CHANCE: f64 = 0.6;
+pub const KARST_RADIUS: (i32, i32) = (5, 11);
+pub const KARST_HEIGHT: (i32, i32) = (16, 36);
+
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
 /// the rain of the nodes upstream within `RIVER_REACH` steps (about 2 km of river).
@@ -457,6 +480,7 @@ pub fn features() -> Vec<Feature> {
             .mask(MOUNTAINS_AREA.mask())
             .named("mountains"),
         Feature::new(mesa).named("mesas"),
+        Feature::new(karst).named("karst"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
         // No height: their masks say where the snow drifts and where the sequoias stand (rules
@@ -489,6 +513,12 @@ fn land_height_at(h: &Here) -> i32 {
 
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
+    let base = base_ground(h);
+    base + karst::add(h, base)
+}
+
+/// The ground before the karst towers (which stand on it, or rise out of the water over it).
+fn base_ground(h: &Here) -> i32 {
     let (f, x, z) = (h.f, h.x, h.z);
     q4(SEA as f64)
         + shape::continents(f, x, z, q4(CONTINENTS))
@@ -783,6 +813,12 @@ pub fn river_region_stretches(f: &Fields, bx: i32, bz: i32) -> Vec<([i32; 2], [i
         .collect()
 }
 
+/// What the karst towers add at (`x`, `z`) (Q4), as the engine adds it.
+pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
+    let h = Here::new(f, x, z);
+    if KARST_AREA.at(&h) == 0 { 0 } else { karst::add(&h, base_ground(&h)) }
+}
+
 /// Which water a bank belongs to (`bank`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Water {
@@ -969,6 +1005,9 @@ pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet
         RockSet::Strata
     } else if t < q12(TAIGA_BELOW) {
         RockSet::Slate
+    } else if KARST_AREA.at(&here) > 0 {
+        // Karst towers are limestone however high they stand.
+        RockSet::Limestone
     } else if height >= SEA + GRANITE_ABOVE || MOUNTAINS_AREA.at(&here) > q12(MOUNTAIN_BIOME) {
         RockSet::Granite
     } else {
@@ -1165,6 +1204,24 @@ mod tests {
             last = t;
         }
         assert!(flat > q4(60.0) * 2 / 5, "much of the side is bench: {flat}");
+    }
+
+    #[test]
+    fn karst_towers_stand_in_their_land_only() {
+        let f = fields(1);
+        let (mut towers, mut outside) = (0, 0);
+        for i in 0..40_000 {
+            let (x, z) = ((i % 200) * 12 * 16 - 1200 * 16, (i / 200) * 12 * 16 - 1200 * 16);
+            let add = karst(&f, x, z);
+            assert!((0..=q4(KARST_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
+            if add > q4(8.0) {
+                towers += 1;
+                if KARST_AREA.value(&f, x, z) == 0 {
+                    outside += 1;
+                }
+            }
+        }
+        assert!(towers > 0 && outside == 0, "{towers} tower columns, {outside} outside the karst land");
     }
 
     #[test]
