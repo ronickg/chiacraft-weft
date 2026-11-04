@@ -562,9 +562,11 @@ fn fog_light(dir: vec3<f32>) -> FogLight {
     // Sunlight through mist turns gold well before golden hour, while the sun is under about 30°
     // (the refs' dawn shafts, 16; low sun scattered through haze loses its blue): with golden
     // hour's colour alone the 07:30 shafts in a rainforest's mist read grey-white (canopy sheet).
-    let warm = 1.0 - smoothstep(0.08, 0.55, scene.sun.y);
+    // Dimmer too: thick mist lit at the sun's full strength toward it clipped to white, and white
+    // shows no colour (the dawn check's 07:30 mist, luma p50 170, saturation 0.03).
+    let warm = 1.0 - smoothstep(0.1, 0.65, scene.sun.y);
     let sky_part = (p.ambient * 1.25 + p.horizon * 0.2) * mix(1.0, 0.5, warm);
-    let sun_part = p.sun * mix(vec3(1.0), MIST_GOLD, warm * 0.9) * light_strength() * phase;
+    let sun_part = p.sun * mix(vec3(1.0), MIST_GOLD * 0.65, warm) * light_strength() * phase;
     let k = 0.75 * tint * look_opt(OPT_FOG, 1.0);
     return FogLight(sky_part * k, sun_part * k);
 }
