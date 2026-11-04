@@ -1931,10 +1931,12 @@ fn pattern(kind: &str, p: [f32; 3], u: f32, s: i32, m: &Marks) -> f32 {
         "streaks" => band((y + 1.5 * noise3(z * 0.08, x * 0.2, 0.0, s)) / 4.5, w(0.3)),
         "rosettes" => {
             let (cx, cy, cz) = ((x / 4.0).floor(), (y / 4.0).floor(), (z / 4.0).floor());
-            if hash3(cx as i32, cy as i32, cz as i32, s) > 0.55 + 0.6 * d {
+            if hash3(cx as i32, cy as i32, cz as i32, s) > 0.7 + 0.6 * d {
                 return 0.0;
             }
-            let (dx, dz, dy) = (x - (cx + 0.5) * 4.0, z - (cz + 0.5) * 4.0, (y - (cy + 0.5) * 4.0) * 0.6);
+            // A ring a little longer along the body than tall, inside its cell: squeezing the height
+            // (as it was) drew rings taller than the cell, cut by it into vertical streaks.
+            let (dx, dz, dy) = (x - (cx + 0.5) * 4.0, (z - (cz + 0.5) * 4.0) * 0.85, y - (cy + 0.5) * 4.0);
             let dist = (dx * dx + dy * dy + dz * dz).sqrt();
             smooth(dist, 0.6, 0.8) * (1.0 - smooth(dist, 1.5, 1.7))
         }
