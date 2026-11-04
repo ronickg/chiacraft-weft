@@ -1,6 +1,6 @@
 {
  "kind": "item",
- "what": "a stone hoe: a flat blade set at a right angle to the shaft, made of chunky chipped warm grey-tan stone with rough bumpy edges, no shine, bound with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "what": "a stone hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of chunky chipped warm grey-tan stone with rough bumpy edges, no shine, bound with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
  "size": [
   32,
   32
@@ -9,10 +9,10 @@
  "green": false,
  "tries": [
   {
-   "grid": 0.297,
-   "outline": 0.53,
-   "red_line": 0.09,
-   "fill": 0.2,
+   "grid": 0.281,
+   "outline": 0.55,
+   "red_line": 0.06,
+   "fill": 0.24,
    "passed": true
   }
  ]

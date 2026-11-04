@@ -17,7 +17,8 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 OUT = os.path.join(HERE, "out")
 TITLES = {"1_tools": "Tools and weapons", "2_armour": "Armour", "3_materials": "Materials, ores and gems",
           "4_food": "Food", "5_plants": "Plants, nuts, berries and seeds", "6_misc": "Containers, tools, creatures, eggs",
-          "7_survival": "Survival's new items (for its branch)"}
+          "7_survival": "Survival's new items (for its branch)",
+          "2b_redo": "Redos: hoes, leather cap, boots"}
 
 
 def uri(im, scale=1):
@@ -44,8 +45,8 @@ def game_icon(name, mod):
 def card(job):
     n = job["name"]
     raw, px = os.path.join(OUT, n + ".png"), os.path.join(OUT, n + "_px.png")
-    if not os.path.exists(px):
-        return f'<article class="card" id="{n}"><header><h3>{n.replace("_", " ")}</h3></header><p class="checks">not made yet</p></article>'
+    if not os.path.exists(px) or not os.path.exists(raw):
+        return f'<article class="card" id="{n}"><header><h3>{n.replace("_", " ")}</h3></header><p class="checks">{'being remade' if os.path.exists(px) else 'not made yet'}</p></article>'
     sp = Image.open(px).convert("RGBA")
     info = json.load(open(os.path.join(OUT, n + "_checks.json")))
     tries = info["tries"]
@@ -114,8 +115,9 @@ def main():
     for b in sorted(f[:-5] for f in os.listdir(os.path.join(HERE, "batches")) if f.endswith(".json")):
         jobs = json.load(open(os.path.join(HERE, "batches", b + ".json")))
         made = [j for j in jobs if os.path.exists(os.path.join(OUT, j["name"] + "_px.png"))]
-        total += len(jobs)
-        done += len(made)
+        if not b.endswith("_redo"):  # redos remake icons already counted in their own batch
+            total += len(jobs)
+            done += len(made)
         if not made:
             continue
         print("sheet:", sheet(b, jobs))

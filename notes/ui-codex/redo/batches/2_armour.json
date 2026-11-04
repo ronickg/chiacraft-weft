@@ -2,7 +2,7 @@
  {
   "kind": "item",
   "name": "leather_helmet",
-  "what": "a soft warm-brown leather with stitching helmet, front view: a rounded dome narrowing to the chin, a horizontal eye slit, centred",
+  "what": "a soft leather cap, front view: a rounded brown leather cap with stitched panels, a short brim and ear flaps, open face (no visor, no eye slit), centred",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -26,7 +26,7 @@
  {
   "kind": "item",
   "name": "leather_boots",
-  "what": "a pair of soft warm-brown leather with stitching boots side by side, front view, a dark gap between them, centred",
+  "what": "a pair of soft warm-brown leather with stitching boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -58,7 +58,7 @@
  {
   "kind": "item",
   "name": "iron_boots",
-  "what": "a pair of warm-silver plate with a near-white highlight, gold trim boots side by side, front view, a dark gap between them, centred",
+  "what": "a pair of warm-silver plate with a near-white highlight, gold trim boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -90,7 +90,7 @@
  {
   "kind": "item",
   "name": "gold_boots",
-  "what": "a pair of ornate lemon-gold plate with orange-brown shadows and red cloth boots side by side, front view, a dark gap between them, centred",
+  "what": "a pair of ornate lemon-gold plate with orange-brown shadows and red cloth boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -122,7 +122,7 @@
  {
   "kind": "item",
   "name": "diamond_boots",
-  "what": "a pair of cyan diamond plates with white facet tips over dark leather boots side by side, front view, a dark gap between them, centred",
+  "what": "a pair of cyan diamond plates with white facet tips over dark leather boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
   "green": false,
   "pale": false,
   "mod": "base"

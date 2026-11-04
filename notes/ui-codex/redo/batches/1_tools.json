@@ -18,7 +18,7 @@
  {
   "kind": "item",
   "name": "iron_pickaxe",
-  "what": "a iron pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, on a handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "what": "an iron pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, on a handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -58,7 +58,7 @@
  {
   "kind": "item",
   "name": "iron_axe",
-  "what": "a iron axe: a broad wedge-shaped blade flaring to a long straight edge, made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, on a handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "what": "an iron axe: a broad wedge-shaped blade flaring to a long straight edge, made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, on a handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -98,7 +98,7 @@
  {
   "kind": "item",
   "name": "iron_shovel",
-  "what": "a iron shovel: a rounded spade blade made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, on a handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "what": "an iron shovel: a rounded spade blade made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, on a handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -122,7 +122,7 @@
  {
   "kind": "item",
   "name": "wood_hoe",
-  "what": "a wooden hoe: a flat blade set at a right angle to the shaft, made of warm orange-brown wood with clear grain, crudely carved, lashed with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "what": "a wooden hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of warm orange-brown wood with clear grain, crudely carved, lashed with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -130,7 +130,7 @@
  {
   "kind": "item",
   "name": "stone_hoe",
-  "what": "a stone hoe: a flat blade set at a right angle to the shaft, made of chunky chipped warm grey-tan stone with rough bumpy edges, no shine, bound with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "what": "a stone hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of chunky chipped warm grey-tan stone with rough bumpy edges, no shine, bound with cream cord, on a plain wooden handle, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -138,7 +138,7 @@
  {
   "kind": "item",
   "name": "iron_hoe",
-  "what": "a iron hoe: a flat blade set at a right angle to the shaft, made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, on a handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "what": "an iron hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, on a handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -146,7 +146,7 @@
  {
   "kind": "item",
   "name": "gold_hoe",
-  "what": "a gold hoe: a flat blade set at a right angle to the shaft, made of shiny lemon-gold with orange-brown shadows and small white glints, a gold collar with its own brown-gold outline, on a handle wrapped in red-brown leather with gold bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "what": "a gold hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of shiny lemon-gold with orange-brown shadows and small white glints, a gold collar with its own brown-gold outline, on a handle wrapped in red-brown leather with gold bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -154,7 +154,7 @@
  {
   "kind": "item",
   "name": "diamond_hoe",
-  "what": "a diamond hoe: a flat blade set at a right angle to the shaft, made of faceted cyan diamond with teal shadows, white facet tips and one small sparkle, a gold collar, on a handle wrapped in red-brown leather with gold bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "what": "a diamond hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the shaft and reading clearly at slot size, made of faceted cyan diamond with teal shadows, white facet tips and one small sparkle, a gold collar, on a handle wrapped in red-brown leather with gold bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
   "green": false,
   "pale": false,
   "mod": "base"
@@ -178,7 +178,7 @@
  {
   "kind": "item",
   "name": "iron_sword",
-  "what": "a iron sword: a straight blade made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, a cross-guard, on a short handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+  "what": "an iron sword: a straight blade made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, a cross-guard, on a short handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
   "green": false,
   "pale": false,
   "mod": "base"

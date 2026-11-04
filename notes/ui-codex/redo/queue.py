@@ -30,10 +30,11 @@ SHAPE = {
     "pickaxe": "pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of {m}, on a {h}",
     "axe": "axe: a broad wedge-shaped blade flaring to a long straight edge, made of {m}, on a {h}",
     "shovel": "shovel: a rounded spade blade made of {m}, on a {h}",
-    "hoe": "hoe: a flat blade set at a right angle to the shaft, made of {m}, on a {h}",
+    "hoe": "hoe: a big flat blade, about a third of the canvas wide, set at a right angle across the top of the "
+           "shaft and reading clearly at slot size, made of {m}, on a {h}",
     "sword": "sword: a straight blade made of {m}, a cross-guard, on a short {h}",
 }
-TOOLS = [(f"{t}_{k}", f"a {t if t != 'wood' else 'wooden'} " + SHAPE[k].format(m=m, h=h) + DIAG)
+TOOLS = [(f"{t}_{k}", f"{'an' if t == 'iron' else 'a'} {t if t != 'wood' else 'wooden'} " + SHAPE[k].format(m=m, h=h) + DIAG)
          for k in SHAPE for t, (m, h) in TIER.items()]
 TOOLS += [
     ("club", "a heavy wooden club: a thick knobbly warm-brown wooden head with a few sharp stone chips set into it, "
@@ -59,11 +60,19 @@ PIECE = {
                   "a brown leather belt at the waist, centred",
     "leggings": "{m} leggings, front view: a brown leather belt with a small buckle, two plated legs with knee plates, "
                 "a dark gap between the legs, centred",
-    "boots": "a pair of {m} boots side by side, front view, a dark gap between them, centred",
+    "boots": "a pair of {m} boots side by side, seen from the front and a little from the side so each boot's foot "
+             "and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
 }
+LEATHER_CAP = ("a soft leather cap, front view: a rounded brown leather cap with stitched panels, a short brim and "
+               "ear flaps, open face (no visor, no eye slit), centred")
 ARMOUR = [(f"{t}_{p}", PIECE[p].format(m=m) if t != "leather" else PIECE[p].format(m=m).replace("plated", "leather")
            .replace("plates", "panels").replace("plate", "panel"))
           for t, m in ARM.items() for p in PIECE]
+ARMOUR = [(n, LEATHER_CAP if n == "leather_helmet" else w) for n, w in ARMOUR]
+
+# redos Ronald asked for (11-04): the hoes with bigger heads; the leather helmet as a soft cap and
+# the boots with visible feet
+REDO = [f"{t}_hoe" for t in TIER] + ["leather_helmet"] + [f"{t}_boots" for t in ARM]
 
 # ---------------------------------------------------------------- materials, ores, gems (04, 05, 06, 09)
 
@@ -350,6 +359,9 @@ def main():
                          "mod": mod_of(n)})
         json.dump(jobs, open(os.path.join(HERE, "batches", name + ".json"), "w"), indent=1)
         print(f"{name}: {len(jobs)}")
+    byname = {j["name"]: j for b, _, _ in BATCHES for j in json.load(open(os.path.join(HERE, "batches", b + ".json")))}
+    json.dump([byname[n] for n in REDO], open(os.path.join(HERE, "batches", "2b_redo.json"), "w"), indent=1)
+    print(f"2b_redo: {len(REDO)}")
     root = os.path.join(HERE, "..", "..", "..", "mods")
     have = {f[:-4] for m in ("base", "animals") for f in os.listdir(os.path.join(root, m, "assets", "textures", "item"))}
     print("in the game but not queued:", sorted(have - seen) or "none")
