@@ -2273,6 +2273,7 @@ impl Client {
         // Animated textures follow the game's ticks: between two from the server the client
         // counts on for a second at most, so they stop with the game.
         let ticks = (self.smooth_time() % (1 << 20) as f64) as f32;
+        let hand = self.hand_light(cam);
         Scene {
             view_proj: (cam.proj(aspect) * view).to_cols_array_2d(),
             inv_view_proj: (cam.proj(aspect) * view).inverse().to_cols_array_2d(),
@@ -2288,6 +2289,8 @@ impl Client {
             behind: self.behind,
             clouds: self.sky.cloud_shade[0],
             cloud_cells: self.sky.cloud_shade[1],
+            hand: hand.0,
+            hand_light: hand.1,
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
@@ -2322,6 +2325,35 @@ impl Client {
             }
         };
         [v.x, v.y, v.z, v.y.max(0.0)]
+    }
+
+    /// The light the player holds (`Scene::hand`, `Scene::hand_light`): where it is relative to
+    /// the camera (by the hand, a little below and in front of the eye, in first person or seen
+    /// from behind) and its levels, the most any state of the held item's block gives (a lit
+    /// campfire, a torch on any face). Zeros when the item gives no light.
+    fn hand_light(&self, cam: &Camera) -> ([f32; 4], [f32; 4]) {
+        let none = ([0.0; 4], [0.0; 4]);
+        let stack = self.held();
+        if stack.is_empty() {
+            return none;
+        }
+        let c = content();
+        let Some(block) = c.items.get(stack.item as usize).and_then(|i| i.block) else { return none };
+        let Some(def) = c.blocks.get(block as usize) else { return none };
+        let mut light = [0u8; 3];
+        for st in def.first_state..def.first_state + def.states {
+            if let Some(info) = c.states.get(st as usize) {
+                for (l, e) in light.iter_mut().zip(info.light) {
+                    *l = (*l).max(e);
+                }
+            }
+        }
+        if light == [0; 3] {
+            return none;
+        }
+        let eye = self.camera();
+        let at = (eye.pos - cam.pos).as_vec3() + eye.forward() * 0.35 - Vec3::Y * 0.35;
+        (at.extend(0.0).to_array(), [light[0] as f32 / 15.0, light[1] as f32 / 15.0, light[2] as f32 / 15.0, 0.0])
     }
 
     /// The sky's sun (`sun`): the first glowing body following the day.

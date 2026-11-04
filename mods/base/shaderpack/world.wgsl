@@ -308,7 +308,7 @@ fn fs_shadow(in: VOut) {
 
 fn surface_light(in: VOut, n: vec3<f32>) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
-    var light = in.color * light_on(n, in.light, shadow, in.ao, in.pos);
+    var light = in.color * light_on(n, in.light, shadow, in.ao, in.pos, in.rel);
     // Leaves and plants let some sun through when it is behind them.
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
         let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
@@ -547,7 +547,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // what it reflects (the screen's reflections, `post/reflect.wgsl`, use the same).
     let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.5);
     let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
-    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos);
+    let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
     // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
     // further down so that what it mirrors carries, in a little of the biome's own tint (a swamp's
     // brown-green; the plain blue of most biomes' water is half taken out), with a little of the

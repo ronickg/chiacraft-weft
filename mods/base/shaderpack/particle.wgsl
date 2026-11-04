@@ -42,7 +42,7 @@ fn shade(in: VOut) -> vec4<f32> {
     var color = unpack_color(in.data.x);
     color = particle_shade(in.data.y >> PARTICLE_SLOT_SHIFT, ParticleFrag(in.quad, albedo, color, in.life, scene.params.w));
     if in.data.w != 0xffffffffu {
-        color = vec4(color.rgb * light_round(unpack_light(in.data.w), vec3(0.0)), color.a);
+        color = vec4(color.rgb * light_round(unpack_light(in.data.w), vec3(0.0), in.rel), color.a);
     } else {
         // Fullbright particles (sparks, flames) glow.
         color = vec4(color.rgb * 1.5, color.a);

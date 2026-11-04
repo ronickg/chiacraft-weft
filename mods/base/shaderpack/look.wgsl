@@ -144,7 +144,9 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
     c += vec3(0.55, 0.22, 0.05) * toward;
     c += sun_glow(dir, p);
-    let moon = pow(max(-mu, 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y);
+    // The glow about the moon as bright as its phase (`moon_light`): on a new moon there is no moon
+    // in the sky, and its glow alone read as a dark-blue ring (the world playtester's nights).
+    let moon = pow(max(-mu, 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y) * moon_light();
     c += vec3(0.05, 0.07, 0.12) * moon;
     if dir.y < 0.0 {
         // Below the horizon it darkens a little toward the ground the haze stands on.
@@ -316,9 +318,27 @@ fn sun_facing(n: vec3<f32>) -> f32 {
     return max((dot(n, light_dir()) + wrap) / (1.0 + wrap), 0.0);
 }
 
+// The light the player holds (`scene.hand`, `scene.hand_light`: a torch, a lantern) at `rel`
+// (camera relative) on a surface facing `n`, as block light levels per channel: it falls off a
+// level a block, as placed torches do, and is a little weaker on faces turned away (`n` zero: no
+// facing, particles). Nights are dark by design and torches light the way (Ronald, 11-04).
+fn held_light(rel: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
+    let l = scene.hand_light.rgb;
+    if max(max(l.x, l.y), l.z) <= 0.0 {
+        return vec3(0.0);
+    }
+    let to = scene.hand.xyz - rel;
+    let d = length(to);
+    var facing = 0.85;
+    if dot(n, n) > 0.5 {
+        facing = mix(0.5, 1.0, clamp(dot(n, to / max(d, 1e-3)), 0.0, 1.0));
+    }
+    return max(l - vec3(d / 15.0), vec3(0.0)) * facing;
+}
+
 // Light arriving at a surface with normal `n`. `light` is the world's (sky, red, green, blue, 0..1),
-// `shadow` 1 where the sun reaches it, `ao` the corner shading.
-fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>) -> vec3<f32> {
+// `shadow` 1 where the sun reaches it, `ao` the corner shading, `rel` where it is from the camera.
+fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let p = palette();
     let sky = brightness_curve(light.x);
     // More of the sky's light comes from above than from the sides, and little from below.
@@ -335,7 +355,8 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // gaps), and without corner shading: corners are dark where little sky gets in.
     let open = smoothstep(0.5, 0.95, light.x);
     c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
-    c += block_light(light.yzw, pos) * mix(0.5, 1.0, ao);
+    // A held torch's light where it is brighter than the placed lights there (no doubling).
+    c += block_light(max(light.yzw, held_light(rel, n)), pos) * mix(0.5, 1.0, ao);
     // A floor so caves are never quite black: the dimension's own and the Brightness setting.
     let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
     c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
@@ -343,12 +364,12 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
 }
 
 // For what has no normal to speak of (particles, rain, the hand): half the direct light.
-fn light_round(light: vec4<f32>, pos: vec3<f32>) -> vec3<f32> {
+fn light_round(light: vec4<f32>, pos: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
     let p = palette();
     let sky = brightness_curve(light.x);
     var c = p.ambient * sky * 0.85;
     c += p.sun * light_strength() * 0.5 * smoothstep(0.5, 0.95, light.x);
-    c += block_light(light.yzw, pos);
+    c += block_light(max(light.yzw, held_light(rel, vec3(0.0))), pos);
     c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
     return c;
 }

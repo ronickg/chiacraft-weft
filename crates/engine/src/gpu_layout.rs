@@ -600,6 +600,12 @@ gpu_struct! {
         /// Where the camera is under it: x and z (in `xy`) its place in its cell, 0..1, and the
         /// cell in the picture (`zw`), as the sky's cloud pass reads them.
         pub cloud_cells: [f32; 4],
+        /// The light the player holds (a torch, a lantern), for packs' dynamic light: xyz where it
+        /// is (camera relative, by the hand), w unused.
+        pub hand: [f32; 4],
+        /// Its light per channel (r, g, b) as block light levels 0..1 (a torch 14/15); zeros
+        /// when what is held gives none. It falls off like block light, a level a block.
+        pub hand_light: [f32; 4],
     }
 }
 
