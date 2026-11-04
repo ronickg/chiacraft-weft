@@ -396,11 +396,19 @@ impl T {
 
     /// The UI query of hotbar slot `i` in the open menu: a menu's last nine slots are the hotbar
     /// (the player's inventory comes last), so its number follows whatever the menu has before
-    /// it (the inventory's clothing slots moved it from 36 to 40).
+    /// it (the inventory's clothing slots moved it from 36 to 40), except the other hand's slot, numbered after it.
     pub fn hotbar(&self, i: u32) -> String {
-        let last = (0..512u32)
-            .rev()
-            .find(|n| self.c().ui_rect(&format!("slot:{n}")).is_some());
+        let rect = |n: u32| self.c().ui_rect(&format!("slot:{n}"));
+        let mut last = (0..512u32).rev().find(|&n| rect(n).is_some());
+        // Weft numbers the other hand's slot last, past the hotbar: when the highest slot isn't
+        // in the row of the one before it, it is that, and the hotbar ends one earlier.
+        if let Some(l) = last.filter(|&l| l > 9) {
+            if let (Some(a), Some(b)) = (rect(l), rect(l - 1)) {
+                if (a.y - b.y).abs() > 0.001 {
+                    last = Some(l - 1);
+                }
+            }
+        }
         format!("slot:{}", last.map_or(36 + i, |l| l.saturating_sub(8) + i))
     }
 
