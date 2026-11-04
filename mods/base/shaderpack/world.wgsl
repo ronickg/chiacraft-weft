@@ -366,7 +366,7 @@ fn wave_height(p: vec2<f32>, t: f32, detail: f32) -> f32 {
     h += (noise3(vec3(q2.x, t * 0.4 + 7.0, q2.y)) - 0.5) * 0.03 * detail;
     // A fine, quick chop close by, where the sun's highlight should sparkle on it.
     let q3 = p * 3.2 + vec2(t * 0.9, -t * 0.6);
-    h += (noise3(vec3(q3.x, t * 0.8 + 13.0, q3.y)) - 0.5) * 0.014 * detail * detail;
+    h += (noise3(vec3(q3.x, t * 0.8 + 13.0, q3.y)) - 0.5) * 0.024 * detail * detail;
     return h * (0.6 + 0.4 * smoothstep(1.0, 8.0, speed));
 }
 
@@ -559,7 +559,13 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     let dd = nh * nh * (a2 - 1.0) + 1.0;
     let spec = a2 / (3.14159 * dd * dd) * (0.02 + 0.98 * pow(1.0 - max(dot(v, hv), 0.0), 5.0)) * 0.25;
     // Toward a low sun the path stays orange: capped lower, so only its red reaches white.
-    let glint = palette().sun * light_strength() * min(spec, mix(40.0, 8.0, golden())) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
+    // Sparkle: a much sharper highlight on the fine chop close by, one texel of the surface at a
+    // time (its normal is on the pixel grid there), flickering as the chop moves.
+    let a2s = 0.00012;
+    let ds = nh * nh * (a2s - 1.0) + 1.0;
+    let near = 1.0 - smoothstep(12.0, 40.0, in.dist);
+    let sparkle = a2s / (3.14159 * ds * ds) * 0.02 * near;
+    let glint = palette().sun * light_strength() * min(spec + sparkle, mix(40.0, 8.0, golden())) * shadow * smoothstep(0.0, 0.1, l.y + 0.05);
     // Foam where it laps the land, in a wobbling line on the pixel grid.
     let px = floor(in.pos.xz * 16.0) / 16.0;
     let wobble = noise3(vec3(px.x * 2.0, scene.params.w * 0.6, px.y * 2.0));
