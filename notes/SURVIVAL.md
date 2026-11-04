@@ -628,7 +628,11 @@ numbers are `reports/content/Building and workstations.md` B3; `vitals::shelter`
   empty; with a fire it warms by its walls (log, earth, snow +25 °C; plank, stone +16; hide,
   glass +12), fully up to 60 blocks of air and down to 40% in a bigger room, never less than the
   fire gives beside it.
-- The HUD says "Room · log walls, +18 °C" while in one.
+- The HUD says "Room · log walls, +8 °C" while in one: what the room adds over the same air in the
+  open (with a fire, over the fire's own warmth there).
+- Seen in the game (Tester 2, rooms3, 11-04, a winter midnight, 30 blocks up): outside 7.8 °C;
+  a log room 12.4 empty, 30.4 with a campfire; stone 26.2, wool 22.8 with one; a 3×3 gap through
+  a wall ends the room (the line goes; the campfire 2 blocks off still warms the air to 22).
 - Checks (`vitals::balance`): a fire in a log cabin keeps a player in arrival clothes
   comfortable on a -20 °C night; logs keep a fire's heat better than stone, stone than hide; an
   earthen room is cooler than a desert afternoon.
