@@ -22,12 +22,14 @@ pub fn strength(seasons: f32) -> f32 {
 
 /// The look each season pulls toward, grass then foliage (0xRRGGBB), and how far each goes at
 /// its fullest.
-const FRESH: (u32, u32) = (0x98d860, 0xa8d85a);
-const FRESH_AMOUNT: (f32, f32) = (0.35, 0.35);
+const FRESH: (u32, u32) = (0xa0e060, 0xb0e060);
+const FRESH_AMOUNT: (f32, f32) = (0.45, 0.45);
 const AUTUMN_GRASS: u32 = 0xb0a058;
 const AUTUMN_AMOUNT: (f32, f32) = (0.45, 0.75);
-const WINTER: (u32, u32) = (0x908860, 0x6e6648);
-const WINTER_AMOUNT: (f32, f32) = (0.5, 0.6);
+// Winter: grass gone the color of hay, the leaves that turned a dry grey-brown (until trees can
+// stand bare).
+const WINTER: (u32, u32) = (0x9a8f62, 0x7a6a4e);
+const WINTER_AMOUNT: (f32, f32) = (0.6, 0.75);
 
 /// The color of `base` (the biome's own, 0xRRGGBB) on `day` of the year (0 at spring's start, a
 /// fraction for the hour; `YEAR_DAYS` long) where the year has `strength` (`strength`).
