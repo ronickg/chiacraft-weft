@@ -388,3 +388,7 @@ screen.animals.button.passive = {img:base:icon_passive 8x8} Passive
 screen.animals.button.neutral = {img:base:icon_neutral 8x8} Neutral
 screen.animals.button.aggressive = {img:base:icon_aggressive 8x8} Attack
 screen.animals.button.assist = {img:base:icon_assist 8x8} Assist
+screen.animals.after = {#8ac80f}{0}{/}
+screen.animals.keep = Keep points
+screen.animals.undo = {img:base:icon_undo 8x8} Undo
+screen.animals.after_legend = Green: what the points you place make, until you keep them.

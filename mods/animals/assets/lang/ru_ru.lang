@@ -383,3 +383,7 @@ screen.animals.button.passive = {img:base:icon_passive 8x8} Мирный
 screen.animals.button.neutral = {img:base:icon_neutral 8x8} Защита
 screen.animals.button.aggressive = {img:base:icon_aggressive 8x8} Атака
 screen.animals.button.assist = {img:base:icon_assist 8x8} Помощник
+screen.animals.after = {#8ac80f}{0}{/}
+screen.animals.keep = Оставить очки
+screen.animals.undo = {img:base:icon_undo 8x8} Отменить
+screen.animals.after_legend = Зелёным: что дадут распределённые очки, пока вы их не оставите.

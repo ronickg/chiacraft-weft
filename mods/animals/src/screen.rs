@@ -333,6 +333,26 @@ fn window(ui: &mut Ui, s: S, body: impl FnOnce(&mut Ui)) {
     });
 }
 
+/// Tamed points placed on the animal screen and not kept yet, for the animal they were placed on
+/// (round 2: see a point before you keep it). This client's only: Keep sends them, Undo drops them.
+static PENDING: std::sync::Mutex<(u64, [u8; species::STATS])> = std::sync::Mutex::new((0, [0; species::STATS]));
+
+/// The points waiting for animal `id`: none if they were placed on another, or if there are more
+/// than it has to place.
+fn pending(id: u64, a: &Animal) -> [u8; species::STATS] {
+    let (on, p) = *PENDING.lock().unwrap();
+    if on != id || p.iter().map(|&n| n as u32).sum::<u32>() > a.unspent as u32 { [0; species::STATS] } else { p }
+}
+
+/// The animal as it would be with the waiting points placed.
+fn after(id: u64, a: &Animal) -> Animal {
+    let mut b = *a;
+    for (i, n) in pending(id, a).into_iter().enumerate() {
+        b.tamed[i] += n;
+    }
+    b
+}
+
 /// Wild points' quality, by a stat's wild points: the bar's colour (`stat_q0`..`stat_q4`, grey few,
 /// then green, blue, purple, gold). A wild one's level is spread over nine stats, so 20 in one
 /// is rare.
@@ -479,10 +499,15 @@ fn animal_screen(ui: &mut Ui) {
                 ui.text_styled(S::default().class("title").no_wrap(), "screen.animals.stats", &[]);
                 ui.panel("chip_points", S::row().pad(2.0), |ui| {
                     ui.text_bind_styled(S::default().no_wrap(), |c, t| {
-                        let Some(a) = c.menu_component(&ANIMAL) else { return };
+                        let (Some(a), Some(id)) = (c.menu_component(&ANIMAL), c.menu_owner()) else { return };
+                        let waiting: u32 = pending(id, &a).iter().map(|&n| n as u32).sum();
                         t.set(
                             "screen.animals.points_chip",
-                            &[Arg::Int(a.unspent as i64), Arg::Int(a.tamed_points() as i64), Arg::Int(animal::MAX_TAMED_POINTS as i64)],
+                            &[
+                                Arg::Int(a.unspent as i64 - waiting as i64),
+                                Arg::Int(a.tamed_points() as i64 + waiting as i64),
+                                Arg::Int(animal::MAX_TAMED_POINTS as i64),
+                            ],
                         );
                     });
                 });
@@ -521,7 +546,10 @@ fn animal_screen(ui: &mut Ui) {
                     });
                     ui.row(S::row().w(STAT_VALUE_W).end(), move |ui| {
                         ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
-                            if let Some(a) = c.menu_component(&ANIMAL) {
+                            let (Some(a), Some(id)) = (c.menu_component(&ANIMAL), c.menu_owner()) else { return };
+                            if pending(id, &a)[i] > 0 {
+                                t.set("screen.animals.after", &[Arg::Text(&shown(&after(id, &a), i))]);
+                            } else {
                                 t.text(&shown(&a, i));
                             }
                         });
@@ -535,9 +563,14 @@ fn animal_screen(ui: &mut Ui) {
                     });
                     ui.row(S::row().w(STAT_TAMED_W).center(), move |ui| {
                         ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
-                            if let Some(a) = c.menu_component(&ANIMAL) {
-                                // Torpor takes no points: a dash, not a 0 that looks placeable.
-                                t.text(&if i == species::TORPOR { "-".to_string() } else { a.tamed[i].to_string() });
+                            let (Some(a), Some(id)) = (c.menu_component(&ANIMAL), c.menu_owner()) else { return };
+                            // Torpor takes no points: a dash, not a 0 that looks placeable.
+                            if i == species::TORPOR {
+                                return t.text("-");
+                            }
+                            match pending(id, &a)[i] {
+                                0 => t.text(&a.tamed[i].to_string()),
+                                n => t.set("screen.animals.after", &[Arg::Text(&(a.tamed[i] + n).to_string())]),
                             }
                         });
                     });
@@ -549,8 +582,14 @@ fn animal_screen(ui: &mut Ui) {
                                 .pad(0.5)
                                 .tooltip("screen.animals.place"),
                             move |c| {
-                                if let Some(id) = c.menu_owner() {
-                                    c.client().send(&PLACE, &[id, i as u64]);
+                                let (Some(a), Some(id)) = (c.menu_component(&ANIMAL), c.menu_owner()) else { return };
+                                let waiting: u32 = pending(id, &a).iter().map(|&n| n as u32).sum();
+                                if waiting < a.unspent as u32 {
+                                    let mut p = PENDING.lock().unwrap();
+                                    if p.0 != id {
+                                        *p = (id, [0; species::STATS]);
+                                    }
+                                    p.1[i] += 1;
                                 }
                             },
                         );
@@ -559,7 +598,24 @@ fn animal_screen(ui: &mut Ui) {
                     }
                 });
             }
-            ui.text_styled(S::default().class("dim").max_w(150.0), "screen.animals.quality_legend", &[]);
+            // Keep sends the waiting points (one place each, as the + used to); Undo drops them.
+            ui.row(S::row().gap(3.0), |ui| {
+                ui.button("screen.animals.keep", S::default().min_w(60.0).h(11.0), |c| {
+                    let (Some(a), Some(id)) = (c.menu_component(&ANIMAL), c.menu_owner()) else { return };
+                    let p = pending(id, &a);
+                    *PENDING.lock().unwrap() = (0, [0; species::STATS]);
+                    for (i, n) in p.into_iter().enumerate() {
+                        for _ in 0..n {
+                            c.client().send(&PLACE, &[id, i as u64]);
+                        }
+                    }
+                });
+                ui.button("screen.animals.undo", S::default().class("button_secondary").min_w(44.0).h(11.0), |_| {
+                    *PENDING.lock().unwrap() = (0, [0; species::STATS]);
+                });
+            });
+            ui.text_styled(S::default().class("dim").max_w(STAT_ROW_W), "screen.animals.after_legend", &[]);
+            ui.text_styled(S::default().class("dim").max_w(STAT_ROW_W), "screen.animals.quality_legend", &[]);
         });
         // Right: its coat and what its kind does, then its orders.
         ui.column(S::col().gap(3.0).w(100.0), |ui| {
