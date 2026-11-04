@@ -59,7 +59,9 @@ pub fn tint(base: u32, part: Part, day: f32, strength: f32) -> u32 {
 /// (the tropics) but its seasons' rain does (the llanos: 0.11 to 0.7), the grass greens in the
 /// rains and goes to straw in the dry season. Places whose warmth turns them (`strength`) keep that.
 pub fn rain_strength(seasons: f32, rain: [f32; 4]) -> f32 {
-    let (lo, hi) = rain.iter().fold((f32::MAX, 0.0f32), |(l, h), &r| (l.min(r), h.max(r)));
+    let (lo, hi) = rain
+        .iter()
+        .fold((f32::MAX, 0.0f32), |(l, h), &r| (l.min(r), h.max(r)));
     if hi <= 0.0 {
         return 0.0;
     }
@@ -83,7 +85,9 @@ pub fn rain_tint(base: u32, day: f32, rain: [f32; 4], strength: f32) -> u32 {
     let (i, t) = (pos.floor() as usize % 4, pos.fract());
     let t = t * t * (3.0 - 2.0 * t);
     let now = rain[i] + (rain[(i + 1) % 4] - rain[i]) * t;
-    let (lo, hi) = rain.iter().fold((f32::MAX, 0.0f32), |(l, h), &r| (l.min(r), h.max(r)));
+    let (lo, hi) = rain
+        .iter()
+        .fold((f32::MAX, 0.0f32), |(l, h), &r| (l.min(r), h.max(r)));
     let wet = if hi > lo { (now - lo) / (hi - lo) } else { 0.5 };
     let mut c = rgb(base);
     c = mix(c, rgb(RAINY_GRASS), wet * RAIN_AMOUNT.0 * strength);
