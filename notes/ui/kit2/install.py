@@ -91,7 +91,8 @@ def button_set(prefix, kind):
             key = "disabled"
         light, face, shade = k.FACES[key]
         a = raised_part(64, 20, light, face, shade, k.GLOW if state == "hover" else k.OUTLINE, state == "pressed")
-        save(prefix + suffix, a, [NINE, border(3)])
+        # A chosen button (a list's selected row) is drawn pressed, sunk 1 px: its label goes too.
+        save(prefix + suffix, a, [NINE, border(3)] + ([("selected_offset", "0.5")] if suffix == "" else []))
 
 
 button_set("button", "main")
