@@ -81,6 +81,8 @@ fn cut_when_apart(material: &str) -> bool {
 }
 
 pub fn register(r: &mut Registry) {
+    r.entity_component(&SKILLS, Skills { xp: [0; 6] }, component_flags::SAVE | component_flags::SYNC_OWNER | component_flags::KEEP);
+    r.attach(&PLAYER, &SKILLS);
     r.stack_component(&PART, 0);
     r.stack_component(&PARTS, 0);
     r.recipe_kind(&PART_RECIPES).inputs(3, 1).outputs(1, 1);
@@ -152,23 +154,43 @@ pub fn register(r: &mut Registry) {
 
 // ---------------------------------------------------------------- making parts
 
+value! {
+    /// A player's experience in each craft (`crafting::skills::SKILLS`), in parts made.
+    pub struct Skills { pub xp: [u32; 6] }
+}
+pub static SKILLS: Component<Skills> = Component::named("base:craft_skills");
+
 /// Grade points for a part made from the book (`crafting::grades`): the material's share, work
-/// from memory (skills come later: a beginner's 10) and a crafting table's.
-fn points(material: &str) -> grades::Points {
+/// from memory by the maker's skill in its craft, and a crafting table's.
+fn points(material: &str, skill: u32) -> grades::Points {
     let material = match material {
         "diamond" | "steel" => 30,
         "flint" | "obsidian" | "wrought_iron" | "bronze" | "oak" | "mesquite" => 24,
         _ => 20,
     };
-    grades::Points { material, work: grades::work_from_memory(0), station: 10 }
+    grades::Points { material, work: grades::work_from_memory(skill), station: 10 }
 }
 
-/// A part recipe's result, made: its material from the recipe, its grade rolled with `u` (0..1).
-pub fn finish(r: &Recipe, out: ItemStack, u: f32) -> ItemStack {
+/// A part recipe's result, made by `player`: its material from the recipe, its grade rolled with
+/// `u` (0..1) by their skill in its craft, which the making then raises.
+pub fn finish(w: &World, player: u64, r: &Recipe, out: ItemStack, u: f32) -> ItemStack {
     let Some(material) = r.value(&PART_MATERIAL) else { return out };
-    let id = material_of(material).map_or("", |m| m.id);
-    let grade = grades::roll(points(id), u) as u32;
-    out.with(&PART, PartOf { material, grade, worn: 0 })
+    let Some(m) = material_of(material) else { return out };
+    let craft = crafting::skills::index(m.making);
+    let xp = w.component(player, &SKILLS).map_or(0, |s| s.xp[craft]);
+    let grade = grades::roll(points(m.id, crafting::skills::level(xp)), u);
+    if let Some(s) = w.component_mut(player, &SKILLS) {
+        s.xp[craft] = s.xp[craft].saturating_add(crafting::skills::xp_for(grade));
+    }
+    out.with(&PART, PartOf { material, grade: grade as u32, worn: 0 })
+}
+
+/// The skill a part recipe uses, as (its name's key, the local player's level), for the book.
+pub fn skill_of(view: &ClientView, r: &Recipe) -> Option<(&'static str, u32)> {
+    let m = material_of(r.value(&PART_MATERIAL)?)?;
+    let i = crafting::skills::index(m.making);
+    let xp = view.component(&SKILLS).map_or(0, |s| s.xp[i]);
+    Some((crafting::skills::SKILLS[i].1, crafting::skills::level(xp)))
 }
 
 /// A part recipe's material's name key.

@@ -13,6 +13,7 @@ pub mod kinds;
 pub mod looks;
 pub mod materials;
 pub mod sheet;
+pub mod skills;
 pub mod traits;
 
 pub use combine::{Part, ToolStats, combine};

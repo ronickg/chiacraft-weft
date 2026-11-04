@@ -319,7 +319,7 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
             }
             // A part gets its material and a rolled grade (`parts.rs`).
             let out = if r.kind() == crate::parts::PART_RECIPES.name() {
-                crate::parts::finish(r, out, (w.random() >> 40) as f32 / (1u64 << 24) as f32)
+                crate::parts::finish(w, player, r, out, (w.random() >> 40) as f32 / (1u64 << 24) as f32)
             } else {
                 out
             };
@@ -527,6 +527,9 @@ fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)])
     // A part: of what, and the grade it's likely to come out (`parts.rs`).
     if let Some(key) = crate::parts::material_key(r) {
         ui.text_args("crafting.parts.of", &[Arg::Key(key)]);
+    }
+    if let Some((skill, level)) = crate::parts::skill_of(&ui.client(), r) {
+        ui.text_args("crafting.parts.skill", &[Arg::Key(skill), Arg::Int(level as i64)]);
     }
     // Each distinct ingredient once, with the total it takes.
     let inputs = r.inputs();

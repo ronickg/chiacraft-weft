@@ -93,3 +93,11 @@ change any of them in the morning.
       a guard matches its blade, and our bronze tools are drawn that way.
     - Alternative: shift bronze toward yellow, real tin bronze's colour, and redraw the bronze
       heads to match.
+19. **Six crafting skills, one per way of making a part:** knapping, carving, casting,
+    smithing, handwork, sewing.
+    - Chosen: each part made gives 1 experience, 2 if it's above Sound. Level n needs 5 × the nth
+      triangle number, so level 10 is about 275 parts of that craft. The level sets work from
+      memory (10 + 2 a level, at most 30), so a master's book work makes about Good to Fine, and
+      only hands-on work goes higher.
+    - Skills are kept through death.
+    - Alternative: one crafting level for everything (Survival's XP level), or faster levels.

@@ -639,7 +639,12 @@ are rows.
    - **Today's materials only:** wood, stone, bone, iron, gold, diamond, string, leather.
      Content's flint, sinew and bronze come with its step 1.
    - **Test:** `mods/testkit/scripts/crafting_parts.txt`.
-3. **Discovery** (built 11-04, `mods/base/src/discovery.rs`, waiting for a game run):
+3. **Skills** (built 11-04, `crafting::skills`, `parts.rs`):
+   - One skill per craft (knapping, carving, casting, smithing, handwork, sewing), rising with
+     every part made.
+   - A skill's level is work from memory, capped at 30.
+   - The book shows the skill and level for a part.
+4. **Discovery** (built 11-04, `mods/base/src/discovery.rs`, waiting for a game run):
    - **Held items:** saved per player as a bitset, kept through death.
    - **The book:** shows a recipe once all its ingredients have been held, and a "?" with "2 of
      3" once some have. Creative shows all.
@@ -652,9 +657,9 @@ are rows.
    - Near misses show as "2 of 3", with the missing ingredient as "?".
    - R and U show only what you know.
    - Slice 1's book shows every recipe until then.
-4. **Stations, add-ons and the queue:** the workbench levels; the queue with sub-parts and
+5. **Stations, add-ons and the queue:** the workbench levels; the queue with sub-parts and
    refunds; cold hands and the warm room.
-5. **The rest of the parts core** (4A):
+6. **The rest of the parts core** (4A):
    - kinds, part shapes, the grade rules and traits in the crate
    - part items with their components
    - the Assemble tab: build, swap, break down
@@ -665,11 +670,11 @@ are rows.
    - history (who, when, where)
    - Today's tools become assembled kinds from wood and stone parts. Art: Chiacraft's first part
      maps and ramps.
-6. **Knapping**, the first hands-on game: flint, chert and obsidian heads and points (needs
+7. **Knapping**, the first hands-on game: flint, chert and obsidian heads and points (needs
    Content's stone items).
-7. **Armour from parts:** shell, fastening and lining, with linings as Survival's clothing
+8. **Armour from parts:** shell, fastening and lining, with linings as Survival's clothing
    warmth. Worn region textures.
-8. **Further** (4B, Ronald's pick), in this order:
+9. **Further** (4B, Ronald's pick), in this order:
    1. **Part shapes with trade-offs:** a narrow felling head or a bearded one; a long or short
       blade.
    2. **Origin and condition count:** seasoned or green wood, prime hides, ore deposits, the
@@ -678,7 +683,7 @@ are rows.
       re-honing.
    4. **Masterwork naming and the world's chronicle**, deeds in the history.
    5. **Signed history through portals**, with Phase 4's world DIDs.
-9. **Slow crafts** as machines (the tanning frame first), then **smithing and casting** with
+10. **Slow crafts** as machines (the tanning frame first), then **smithing and casting** with
    Content's copper, bronze and iron.
 
 ## Who does what
