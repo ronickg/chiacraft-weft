@@ -376,19 +376,43 @@ pub fn open(run_dir: &Path) -> Result<&'static Session, String> {
         .map_err(Clone::clone)
 }
 
+/// A headless server's own identity, the way a player has an account: an account named
+/// "Server", made once and kept in the server's folder (`<run dir>/server-account`, or
+/// `CHIACRAFT_ACCOUNT_HOME`), always in the encrypted file store (a server has no keystore to
+/// ask; `CHIACRAFT_WALLET_PASSPHRASE` locks it). Its worlds' keys and certificates come from it
+/// as a player's do, so a server needs nobody's account. Opened once per process, like [`open`];
+/// a game process opens one or the other.
+pub fn open_server(run_dir: &Path) -> Result<&'static Session, String> {
+    use_file_store();
+    let home = std::env::var_os("CHIACRAFT_ACCOUNT_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| run_dir.join("server-account"));
+    SESSION
+        .get_or_init(|| start_at(home, SERVER_NAME))
+        .as_ref()
+        .map_err(Clone::clone)
+}
+
+/// The name a server's own account is made with.
+pub const SERVER_NAME: &str = "Server";
+
 /// The open account, if [`open`] succeeded.
 pub fn current() -> Option<&'static Session> {
     SESSION.get().and_then(|s| s.as_ref().ok())
 }
 
 fn start(run_dir: &Path) -> Result<Session, String> {
-    let home = home(run_dir);
+    start_at(home(run_dir), DEFAULT_NAME)
+}
+
+/// Opens the account in `home`, making one called `name` the first time.
+fn start_at(home: PathBuf, name: &str) -> Result<Session, String> {
     let file_only = !OS_KEYSTORE.load(Ordering::Relaxed);
     let choice = StoreChoice::for_home(&home, SERVICE, file_only);
     let mut accounts = Accounts::load(&home, choice.clone()).map_err(|e| format!("opening the account in {}: {e}", home.display()))?;
     let made = accounts.current().is_none();
     let info = accounts
-        .ensure_default(DEFAULT_NAME)
+        .ensure_default(name)
         .map_err(|e| format!("making an account: {e}"))?;
     if made {
         log::info!("made a new account ({}), kept in the {} store", info.fingerprint, info.store);
