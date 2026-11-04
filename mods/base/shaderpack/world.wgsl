@@ -508,22 +508,6 @@ fn behind_at(uv: vec2<f32>, size: vec2<f32>) -> vec4<f32> {
     return vec4(p.xyz / p.w, 1.0);
 }
 
-// How deep the water is under this surface pixel: from the world drawn behind it (the bottom's
-// height below the surface) where there is one, else from the blocks below (`water_depth`). The
-// blocks are known only about 112 blocks round the camera and cube by cube, so seen from high up
-// a lagoon's shallows came out in squares, with a straight edge where they ended (the world
-// playtester's far islands, 11-04).
-fn water_depth_seen(in: VOut) -> f32 {
-    if scene.behind.z > 0.5 {
-        let size = vec2<f32>(textureDimensions(textures[u32(scene.behind.y)]));
-        let b = behind_at(in.clip.xy / size, size);
-        if b.w > 0.0 {
-            return max(in.rel.y - b.y, 0.0);
-        }
-    }
-    return water_depth(in.pos);
-}
-
 // Light playing on the bottom through the waves (`p` world xz): bright crossing lines that drift.
 fn caustics(p: vec2<f32>) -> f32 {
     let t = scene.params.w;
@@ -598,7 +582,7 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
             let s = rain_rings(in.pos.xz) * rain;
             n = normalize(n + vec3(-s.x, 0.0, -s.y));
         }
-        depth = water_depth_seen(in);
+        depth = water_depth(in.pos);
         shore = shore_distance(in.pos);
     }
     let ndv = max(dot(n, v), 0.02);
