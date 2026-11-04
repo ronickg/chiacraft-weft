@@ -89,6 +89,29 @@ Each biome's real place (`reports/ecology/Biome climates.md`), year mean, humidi
 | animals:fern_forest | the Yixian Formation, Liaoning | 10 | 0.8 | 10 | -4 | 27 | 25% | 45% | 30% | 15% |
 | animals:crags | the Sevier highlands, Utah | 15 | 0.6 | 8 | 2 | 31 | 25% | 40% | 25% | 15% |
 
+## Wind and fog
+
+Each place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from 45% to 155% of the mean, a quarter more mid afternoon than before dawn, 1.8 times under a thunderstorm; still fog clears from 3.5 to 7 m/s, sea fog from 9 to 14. Under 1 °C what falls is snow; a day of it lays 0.4 of a deep cover and each degree of a day's mean above freezing melts 0.05; falling snow in 6 to 12 m/s of wind is a blizzard, dry ground (humidity under 0.35) lifts dust from 7 to 11 m/s. Out in the open the wind chills the cold (the wind chill index, 10 °C and under), and in thick fog animals see 35% as far.
+
+| biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |
+|---|---|---|---|---|---|---|---|---|---|
+| base:plains | 3.8 | 3.0 | 3.0 | 3.1 | 6% | 6% | 7% | 9% | before dawn to mid morning |
+| base:forest | 2.5 | 2.0 | 2.4 | 3.0 | 6% | 5% | 18% | 12% | before dawn to mid morning |
+| base:birch_forest | 1.5 | 1.1 | 1.4 | 1.6 | 2% | 3% | 3% | 2% | before dawn to mid morning |
+| base:taiga | 2.3 | 2.0 | 1.5 | 1.1 | 2% | 3% | 8% | 9% | ice fog, cold nights and the dark |
+| base:snowy_plains | 5.3 | 5.3 | 6.1 | 6.0 | 29% | 51% | 32% | 20% | off the sea, any hour |
+| base:desert | 2.3 | 2.6 | 1.6 | 1.4 | 0% | 0% | 0% | 0% | before dawn to mid morning |
+| base:savanna | 1.5 | 1.2 | 1.2 | 1.6 | 1% | 3% | 2% | 0% | before dawn to mid morning |
+| base:swamp | 3.5 | 2.9 | 2.9 | 3.6 | 3% | 4% | 6% | 5% | before dawn to mid morning |
+| base:mountains | 2.4 | 2.7 | 2.2 | 1.7 | 2% | 1% | 3% | 3% | before dawn to mid morning |
+| base:ocean | 3.1 | 2.5 | 2.7 | 3.4 | 2% | 1% | 0% | 0% | off the sea, any hour |
+| base:beach | 4.1 | 3.7 | 3.4 | 3.8 | 1% | 2% | 2% | 3% | before dawn to mid morning |
+| animals:red_dunes | 4.5 | 3.5 | 3.3 | 2.8 | 0% | 0% | 0% | 0% | before dawn to mid morning |
+| animals:scrubland | 3.8 | 3.2 | 2.9 | 2.5 | 1% | 1% | 1% | 0% | before dawn to mid morning |
+| animals:floodplain | 2.5 | 2.5 | 2.0 | 1.8 | 2% | 1% | 2% | 5% | before dawn to mid morning |
+| animals:fern_forest | 2.8 | 2.0 | 1.8 | 1.8 | 2% | 4% | 7% | 2% | before dawn to mid morning |
+| animals:crags | 4.5 | 3.7 | 3.7 | 3.7 | 5% | 1% | 3% | 7% | before dawn to mid morning |
+
 ## Plants
 
 What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants and crops.md`): the air it grows in (from, best, to), its water, the frost that kills it (or its fruit, or its stalk to the base), its real days to harvest and the game's minutes at the best rate, and where and in which seasons it grows at least a third of its best (sp, su, au, wi; marked * where that season's nights freeze it), with each biome's rain and warmth.

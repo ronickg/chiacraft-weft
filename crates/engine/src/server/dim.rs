@@ -51,6 +51,12 @@ pub enum DimEvent {
         biomes: Vec<u32>,
         thunder: bool,
     },
+    /// The air in its biomes from now on (`DimSet::set_air`).
+    SetAir {
+        dim: u32,
+        air: Vec<(u32, f32, f32, f32, u32)>,
+        heading: f32,
+    },
     /// A white flash on it for those who see it.
     Flash {
         id: u64,
@@ -132,6 +138,8 @@ pub struct Dim {
     pub thunder: bool,
     /// The biomes it rains in when a mod says where (`DimSet::set_rain`); `None`: everywhere.
     pub rain_in: Option<Arc<Vec<u32>>>,
+    /// The air a mod set in the dimension's biomes (`DimSet::air`).
+    pub air: Arc<(Vec<(u32, f32, f32, f32, u32)>, f32)>,
     rng: Rng,
     /// Cubes whose copy on disk holds entities or ticks, written again even if nothing else
     /// changed: what left them must not come back from there.
@@ -651,6 +659,7 @@ impl Dim {
             raining: false,
             thunder: false,
             rain_in: None,
+            air: Arc::default(),
             on_disk: Default::default(),
             rng: Rng(weft_noise::mix(seed ^ id as u64)),
             players: None,

@@ -1,0 +1,3 @@
+# Generated originals, run logs, the rebuilt style key and previews stay local; the 32 px tiles are kept.
+gen/
+preview/

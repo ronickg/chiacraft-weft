@@ -436,6 +436,7 @@ gpu_struct! {
         /// Camera right and up in world space (particle billboards).
         pub right: [f32; 4],
         pub up: [f32; 4],
+        /// Linear rgb; w how hard it rains, 0..1 (shader packs).
         pub fog_color: [f32; 4],
         /// x fog start, y fog end, z daylight 0..1, w seconds (shader effects).
         pub params: [f32; 4],
@@ -447,6 +448,16 @@ gpu_struct! {
         /// dimension without sky light). For shader packs' shadows; follows the day, whatever
         /// bodies mods put in the sky.
         pub sun: [f32; 4],
+        /// x and y the wind where the player is along the world's x and z (m/s, the way it
+        /// blows), z how foggy it is there (0..1), w how hard it thunders (0..1); from a mod's
+        /// weather (`set_air`), still and clear without one. For shader packs.
+        pub weather: [f32; 4],
+        /// The camera in the world: x and z wrapped every 8192 blocks (enough for noise to tile
+        /// unseen), y as it is; w unused. For shader packs.
+        pub eye: [f32; 4],
+        /// Where the player is: x snow lying on the ground (0..1), y how much of what falls is
+        /// snow, z how much dust blows (0..1); from a mod's weather (`set_air`). For shader packs.
+        pub ground: [f32; 4],
     }
 }
 
@@ -785,6 +796,9 @@ bindings! {
     }
     post "post.wgsl" {
         PASSES "passes": "array<Pass>",
+        // The frame the world was drawn with (all zero without one): where the sun is on the
+        // screen, the weather, for effects such as light shafts.
+        SCENE "scene": "Scene",
     }
 }
 

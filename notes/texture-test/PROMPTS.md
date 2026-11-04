@@ -1,3 +1,6 @@
+> Superseded (2026-11-03): blocks are now 32 px from Ronald's master prompt, in `notes/blocks/`
+> (the `block-textures` skill). This folder is the 64 px round, kept for its history.
+
 # Block texture test: ChatGPT prompts
 
 Attach with the master prompt (new chat):

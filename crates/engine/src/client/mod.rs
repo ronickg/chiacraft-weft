@@ -21,7 +21,7 @@ pub mod world_render;
 use std::time::Instant;
 
 use crate::gpu_layout::Scene;
-use glam::{DVec3, IVec3, Vec3};
+use glam::{DVec3, IVec3, Vec2, Vec3};
 use rustc_hash::{FxHashMap, FxHashSet};
 use weft_abi::{ItemStack, block_flags as bf};
 use weft_render::{Backend, BufferId, CommandList, FrameInfo};
@@ -416,6 +416,15 @@ pub struct Client {
     /// How much of it there is by now, 0..1 over about five seconds.
     rain: f32,
     thunder: f32,
+    /// The fog (0..1) and the wind (m/s, x and z, where it blows to) where the player is, eased
+    /// over a few seconds (`ToClient::Air`).
+    fog: f32,
+    wind: Vec2,
+    /// Snow lying where the player is (0..1), and how much of what falls there is snow and how
+    /// much dust blows, all eased (`air_flags`).
+    snow_cover: f32,
+    snowing: f32,
+    dust: f32,
     frame_dt: f32,
     /// Seconds left of a lightning's flash.
     lightning: f32,
@@ -681,6 +690,11 @@ impl Client {
             weather: (false, false),
             rain: 0.0,
             thunder: 0.0,
+            fog: 0.0,
+            wind: Vec2::ZERO,
+            snow_cover: 0.0,
+            snowing: 0.0,
+            dust: 0.0,
             lightning: 0.0,
             using: None,
             burning: false,
@@ -2135,6 +2149,17 @@ impl Client {
         let target = if here && self.weather.1 { 1.0 } else { 0.0 };
         self.thunder += (target - self.thunder).clamp(-dt / 5.0, dt / 5.0);
         self.lightning = (self.lightning - dt).max(0.0);
+        // The air where the player is: fog rolls in over a few seconds (the weather itself changes
+        // it slowly), the wind turns in seconds.
+        let (fog, speed, cover, flags) = self.world.air_at(self.player.pos.floor().as_ivec3());
+        self.fog += (fog - self.fog).clamp(-dt / 8.0, dt / 8.0);
+        self.snow_cover += (cover - self.snow_cover).clamp(-dt / 20.0, dt / 20.0);
+        let on = |f: u32| if flags & f != 0 { 1.0 } else { 0.0 };
+        self.snowing += (on(weft_abi::air_flags::SNOWING) - self.snowing).clamp(-dt / 5.0, dt / 5.0);
+        self.dust += (on(weft_abi::air_flags::DUST) - self.dust).clamp(-dt / 5.0, dt / 5.0);
+        let heading = self.world.air.1.to_radians();
+        let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
+        self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
         if here && self.weather.1 && self.chance() < dt / 12.0 {
             self.lightning = 0.15;
         }
@@ -2185,6 +2210,9 @@ impl Client {
             params: [fog_start, fog_end, self.daylight(), crate::shaders::time()],
             light: [content().dims[self.world.dim as usize].ambient as f32 / 15.0, self.brightness, ticks, 0.0],
             sun: self.sun(),
+            weather: [self.wind.x, self.wind.y, self.fog, self.thunder],
+            eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, 0.0],
+            ground: [self.snow_cover, self.snowing, self.dust, 0.0],
         }
     }
 
@@ -2322,8 +2350,14 @@ impl Client {
         list.push(weft_render::Cmd::Mark);
     }
 
+    /// Linear rgb, and in w how hard it rains (0..1) for shader packs.
+    /// The buffer this frame's world was drawn with (`gpu_layout::Scene`), once it was.
+    pub fn scene_buffer(&self, slot: usize) -> Option<weft_render::BufferId> {
+        self.scene_bufs.get(slot).copied()
+    }
+
     pub fn fog_color(&self) -> [f32; 4] {
-        self.fog_linear().extend(1.0).to_array()
+        self.fog_linear().extend(self.rain.clamp(0.0, 1.0)).to_array()
     }
 }
 

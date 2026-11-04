@@ -1,0 +1,537 @@
+// chiacraft's blocks and liquids: the engine's world shader with the pack's light. Plants and leaves
+// move in the wind, and water shows the sky with a glint of the sun.
+
+var<private> AO: array<f32, 4> = array<f32, 4>(0.45, 0.64, 0.82, 1.0);
+var<private> NORMAL: array<vec3<f32>, 6> = array<vec3<f32>, 6>(
+    vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, -1.0), vec3(0.0, 0.0, 1.0),
+);
+
+// The engine's tint kinds come first, in this order (`content.rs`).
+const TINT_GRASS: u32 = 1u;
+const TINT_FOLIAGE: u32 = 2u;
+const TINT_WATER: u32 = 3u;
+
+struct VOut {
+    @builtin(position) clip: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+    // Textures (bindless indices) of this frame and the next.
+    @location(1) @interpolate(flat) layer: u32,
+    // The tint, white under an overlay (which takes it).
+    @location(2) color: vec3<f32>,
+    @location(3) light: vec4<f32>,
+    @location(4) dist: f32,
+    @location(5) @interpolate(flat) layer2: u32,
+    @location(6) @interpolate(flat) blend: f32,
+    // Overlay texture + 1 (0: none) and the tint it takes.
+    @location(7) @interpolate(flat) overlay: u32,
+    @location(8) tint: vec3<f32>,
+    // Glow mask texture (LabPBR emission), all ones: none.
+    @location(9) @interpolate(flat) glow: u32,
+    // Block shader slot of the texture, 0 none, and the block coordinates for it.
+    @location(10) @interpolate(flat) slot: u32,
+    @location(11) pos: vec3<f32>,
+    @location(12) @interpolate(flat) size: f32,
+    // Facing, camera-relative position, the corner shading alone.
+    @location(13) normal: vec3<f32>,
+    @location(14) rel: vec3<f32>,
+    @location(15) ao: f32,
+    // x tint kind, y 1 for a moving structure's blocks (not traced), z 1 for plants lit from above.
+    @location(16) @interpolate(flat) kind: vec4<u32>,
+}
+
+fn shader_of(tex: u32) -> u32 {
+    if tex >= arrayLength(&tex_shader) {
+        return 0u;
+    }
+    return tex_shader[tex];
+}
+
+fn glow_of(tex: u32) -> u32 {
+    if tex >= arrayLength(&glow_map) {
+        return 0xffffffffu;
+    }
+    return glow_map[tex];
+}
+
+fn unpack_rgb(c: u32) -> vec3<f32> {
+    return vec3<f32>(f32((c >> 16u) & 255u), f32((c >> 8u) & 255u), f32(c & 255u)) / 255.0;
+}
+
+fn column_tint(x: i32, z: i32, tint: u32) -> u32 {
+    let t = i32(g.ids.w);
+    let tx = ((x >> 4u) % t + t) % t;
+    let tz = ((z >> 4u) % t + t) % t;
+    let i = g.ids.z + u32(tz * t + tx) * 256u + u32((z & 15) * 16 + (x & 15));
+    return biomes[i * g.extra.z + tint - 1u];
+}
+
+fn tint_color(tint: u32, biome: u32, x: i32, z: i32) -> vec3<f32> {
+    if tint == 0u {
+        return vec3(1.0);
+    }
+    var sum = vec3(0.0);
+    var n = 0.0;
+    for (var k = 0; k < 4; k++) {
+        let c = column_tint(x - 1 + (k & 1), z - 1 + (k >> 1u), tint);
+        if c != 0u {
+            sum += unpack_rgb(c);
+            n += 1.0;
+        }
+    }
+    if n > 0.0 {
+        return sum / n;
+    }
+    return unpack_rgb(biomes[biome * g.extra.z + tint - 1u]);
+}
+
+struct Frame {
+    a: u32,
+    b: u32,
+    blend: f32,
+    size: f32,
+}
+
+fn texture_frame(name: u32) -> Frame {
+    let base = tex_info[name * 2u];
+    let info = tex_info[name * 2u + 1u];
+    let size = f32(tex_info[frames[0] * 2u + name]);
+    if info == 0u {
+        return Frame(base, base, 0.0, size);
+    }
+    let count = info & 65535u;
+    let total = f32((info >> 16u) & 32767u);
+    let ticks = scene.light.z;
+    let t = ticks - floor(ticks / total) * total;
+    var acc = 0.0;
+    for (var i = 0u; i < count; i++) {
+        let e = frames[base + i];
+        let d = f32(e >> 16u);
+        if t < acc + d || i + 1u == count {
+            let next = frames[base + (i + 1u) % count];
+            var f = 0.0;
+            if (info >> 31u) == 1u {
+                f = (t - acc) / d;
+            }
+            return Frame(e & 65535u, next & 65535u, f, size);
+        }
+        acc += d;
+    }
+    return Frame(base, base, 0.0, size);
+}
+
+fn on_body(l: vec4<f32>, k: i32) -> vec4<f32> {
+    if k == 0 {
+        return l;
+    }
+    let w = unpack_light(bitcast<u32>(offsets[k].w));
+    return vec4(min(l.x, w.x), max(l.yzw, w.yzw));
+}
+
+fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
+    let pos = vec3<f32>(origin.xyz) * 16.0 + local - g.cam_frac.xyz + offsets[origin.w].xyz;
+    return vec4(pos, 1.0);
+}
+
+// ---- wind ----
+
+// How far the wind moves what stands at `p` (world blocks) now; a function of the place alone, so
+// leaves sharing a corner move together and show no cracks.
+// How far the wind moves what sways at `p`: a lean the way it blows, stronger in its gusts, and a
+// flutter that quickens with it. Calm air keeps a little life in the leaves.
+fn wind(p_world: vec3<f32>) -> vec3<f32> {
+    // Far from spawn the sines would get huge arguments and lose their place (foliage jumps on
+    // fast-math backends): positions are taken within 4096 blocks, a seam once every 4096.
+    let p = vec3(p_world.x - floor(p_world.x / 4096.0) * 4096.0, p_world.y, p_world.z - floor(p_world.z / 4096.0) * 4096.0);
+    let t = scene.params.w;
+    let w = wind_now();
+    let speed = length(w);
+    let dir = select(vec2(1.0, 0.0), w / max(speed, 1e-4), speed > 0.01);
+    // A fresh breeze (9 m/s) bends things as far as they go, a gale a little further.
+    let s = clamp(speed / 9.0, 0.0, 1.6);
+    let g = gust(p);
+    let q = t * (1.0 + 0.8 * s);
+    let a = sin(q * 1.7 + p.x * 0.63 + p.z * 0.41 + p.y * 0.2) * 0.6 + sin(q * 2.9 + p.x * 1.21 - p.z * 0.83) * 0.25;
+    let b = sin(q * 1.3 + p.z * 0.71 - p.x * 0.37) * 0.5 + sin(q * 3.4 + p.z * 1.4 + p.x * 0.6) * 0.2;
+    let flutter = vec3(a, 0.0, b) * (0.35 + 0.65 * s) * g;
+    let lean = vec3(dir.x, 0.0, dir.y) * s * g * 1.3;
+    return flutter + lean;
+}
+
+@vertex
+fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
+    let f = vi / 4u;
+    let w0 = records[f * 4u];
+    let w1 = records[f * 4u + 1u];
+    let w2 = records[f * 4u + 2u];
+    let w3 = records[f * 4u + 3u];
+    let a = face_ao(w0);
+    let flip = a.x + a.z < a.y + a.w;
+    var c = vi % 4u;
+    if flip {
+        c = (c + 1u) % 4u;
+    }
+    let dir = face_dir(w0);
+    let local = face_pos(w0) + CORNERS[dir * 4u + c];
+    var pos = finish(local, origins[ii]);
+    let o = origins[ii] + g.cam_cube;
+    let world = vec3<f32>(o.xyz * 16) + local;
+    let tint_kind = (w0 >> FACE_TINT_SHIFT) & TINT_MASK;
+    // Leaves sway a little.
+    if tint_kind == TINT_FOLIAGE && origins[ii].w == 0 {
+        pos = vec4(pos.xyz + wind(world) * 0.035, 1.0);
+    }
+    var out: VOut;
+    out.clip = scene.view_proj * pos;
+    out.dist = length(pos.xyz);
+    out.rel = pos.xyz;
+    out.uv = UVS[c];
+    let tex_id = w1 & FACE_TEX_MASK;
+    let fr = texture_frame(tex_id);
+    out.size = fr.size;
+    out.layer = fr.a;
+    out.layer2 = fr.b;
+    out.blend = fr.blend;
+    out.glow = glow_of(fr.a);
+    out.light = on_body(corner_light(w2, w3, c), origins[ii].w);
+    out.slot = shader_of(tex_id);
+    out.pos = world;
+    out.normal = NORMAL[dir];
+    out.ao = AO[a[c]];
+    out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), 0u, 0u);
+    var tint = vec3(1.0);
+    if tint_kind != 0u {
+        tint = tint_color(tint_kind, w1 >> FACE_BIOME_SHIFT, o.x * 16 + i32(local.x), o.z * 16 + i32(local.z));
+    }
+    out.tint = tint;
+    let ov = frames[g.extra.x + tex_id];
+    if ov != 0u {
+        out.overlay = texture_frame(ov - 1u).a + 1u;
+        out.color = vec3(1.0);
+    } else {
+        out.overlay = 0u;
+        // The tint is a gamma-space color; the pack lights in linear light.
+        out.color = pow(tint, vec3(2.2));
+    }
+    return out;
+}
+
+@vertex
+fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
+    let q = vi / 4u;
+    let c = vi % 4u;
+    let base = q * 8u;
+    let p0 = quad_pos(records[base]);
+    let p1 = quad_pos(records[base + 1u]);
+    let p2 = quad_pos(records[base + 2u]);
+    let p3 = quad_pos(records[base + 3u]);
+    let local = quad_pos(records[base + c]);
+    let w4 = records[base + 4u];
+    let uvw = records[base + 5u];
+    let uv = quad_uv_fine(uvw, records[base], records[base + 1u], records[base + 2u], records[base + 3u]);
+    var uvs = array<vec2<f32>, 4>(vec2(uv.x, uv.w), vec2(uv.z, uv.w), vec2(uv.z, uv.y), vec2(uv.x, uv.y));
+    // A quad squashed to nothing has no normal: up then, never NaN.
+    let n = normalize(cross(p1 - p0, p2 - p1) + vec3(0.0, 1e-6, 0.0));
+    let flat_ = ((uvw >> QUAD_TINT_SHIFT) & QUAD_FLAT) != 0u;
+    let tint_kind = (uvw >> QUAD_TINT_SHIFT) & TINT_MASK;
+    var pos = finish(local, origins[ii]);
+    let o = origins[ii] + g.cam_cube;
+    let world = vec3<f32>(o.xyz * 16) + local;
+    // Grass and flowers bend at the top and stay rooted.
+    if (tint_kind == TINT_GRASS || tint_kind == TINT_FOLIAGE || flat_) && tint_kind != TINT_WATER && origins[ii].w == 0 {
+        let lo = min(min(p0.y, p1.y), min(p2.y, p3.y));
+        let hi = max(max(p0.y, p1.y), max(p2.y, p3.y));
+        let up = clamp((local.y - lo) / max(hi - lo, 0.001), 0.0, 1.0) * step(0.2, hi - lo);
+        pos = vec4(pos.xyz + wind(floor(world) + vec3(0.5)) * 0.11 * up, 1.0);
+    }
+    var out: VOut;
+    out.clip = scene.view_proj * pos;
+    out.dist = length(pos.xyz);
+    out.rel = pos.xyz;
+    out.uv = uvs[c];
+    let tex_id = w4 & FACE_TEX_MASK;
+    let fr = texture_frame(tex_id);
+    out.size = fr.size;
+    out.layer = fr.a;
+    out.layer2 = fr.b;
+    out.blend = fr.blend;
+    out.glow = glow_of(fr.a);
+    out.light = on_body(corner_light(records[base + 6u], records[base + 7u], c), origins[ii].w);
+    out.slot = shader_of(tex_id);
+    out.pos = world;
+    // Crossed plants are lit as if they faced up, like the ground they grow from.
+    out.normal = select(n, vec3(0.0, 1.0, 0.0), flat_);
+    out.ao = 1.0;
+    out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), select(0u, 1u, flat_), 0u);
+    var tint = vec3(1.0);
+    if tint_kind != 0u {
+        tint = tint_color(tint_kind, w4 >> FACE_BIOME_SHIFT, o.x * 16 + i32(round(local.x)), o.z * 16 + i32(round(local.z)));
+    }
+    out.tint = tint;
+    let ov = frames[g.extra.x + tex_id];
+    if ov != 0u {
+        out.overlay = texture_frame(ov - 1u).a + 1u;
+        out.color = vec3(1.0);
+    } else {
+        out.overlay = 0u;
+        // The tint is a gamma-space color; the pack lights in linear light.
+        out.color = pow(tint, vec3(2.2));
+    }
+    return out;
+}
+
+// ---- sun shadows ----
+
+// Shade from the sky light alone: dark under cover, open where the sky reaches. Shadows traced
+// through the blocks (`shadows.wgsl`, not shipped) cost a walk per pixel that stalled a laptop's
+// whole screen (GPU hang, kernel watchdog panic): they stay out of the pack until they are made
+// cheap enough and measured. This file must not even name the engine's block lookup: its name
+// anywhere in it makes the engine upload the blocks around the camera every frame.
+fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
+    return smoothstep(0.75, 1.0, in.light.x);
+}
+
+// ---- shading ----
+
+fn surface_light(in: VOut, n: vec3<f32>) -> vec3<f32> {
+    let shadow = sun_shadow(in, n);
+    var light = in.color * light_on(n, in.light, shadow, in.ao, in.pos);
+    // Leaves and plants let some sun through when it is behind them.
+    if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
+        let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
+        light += in.color * palette().sun * light_strength() * pow(back, 3.0) * 0.35 * shadow * smoothstep(0.5, 0.95, in.light.x);
+    }
+    return light;
+}
+
+fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
+    let n = normalize(in.normal);
+    var albedo = albedo_in;
+    // Snow lying on the tops of blocks and leaves (not on plants, which it buries).
+    if in.kind.z == 0u {
+        let snow = snow_on(n, in.pos, in.light.x);
+        albedo = vec4(mix(albedo.rgb, vec3(0.86, 0.9, 0.95), snow), albedo.a);
+    }
+    var light = surface_light(in, n);
+    if in.glow != 0xffffffffu {
+        let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
+        light = max(light, select(pow(in.tint, vec3(2.2)), vec3(1.0), in.overlay != 0u) * e * 1.7);
+    }
+    var lit: vec4<f32>;
+    if in.slot == 0u {
+        lit = vec4(albedo.rgb * light, albedo.a);
+    } else {
+        lit = block_shade(in.slot, BlockPixel(in.uv, albedo, light, in.pos, scene.params.w));
+    }
+    // Out in the rain, the ground goes dark and wet, with a little of the sky on it (not plants).
+    let wet = rain_amount() * smoothstep(0.85, 1.0, in.light.x) * smoothstep(0.3, 0.9, n.y) * select(1.0, 0.0, in.kind.z != 0u || in.kind.x == TINT_FOLIAGE);
+    if wet > 0.0 {
+        let v = -normalize(in.rel);
+        let sheen = pow(1.0 - max(dot(n, v), 0.0), 5.0) * 0.12;
+        lit = vec4(lit.rgb * mix(1.0, 0.7, wet) + sky_color(reflect(-v, n)) * sheen * wet, lit.a);
+    }
+    return vec4(display(haze_lit(lit.rgb, in.rel, in.light.x)), lit.a);
+}
+
+// ---- water ----
+
+// Ripples as sums of waves, sampled on the texture's pixel grid so they stay blocky.
+fn ripple_normal(p: vec2<f32>) -> vec3<f32> {
+    let q = floor(p * 16.0) / 16.0;
+    let t = scene.params.w;
+    var d = vec2(0.0);
+    let dirs = array<vec2<f32>, 4>(vec2(0.8, 0.6), vec2(-0.5, 0.86), vec2(0.97, -0.24), vec2(-0.3, -0.95));
+    let freq = array<f32, 4>(1.3, 2.1, 3.7, 5.3);
+    let speed = array<f32, 4>(1.1, 1.5, 2.3, 2.9);
+    let amp = array<f32, 4>(0.09, 0.05, 0.025, 0.015);
+    for (var i = 0u; i < 4u; i++) {
+        let k = dot(q, dirs[i]) * freq[i] + t * speed[i];
+        d += dirs[i] * cos(k) * freq[i] * amp[i];
+    }
+    return normalize(vec3(-d.x, 1.0, -d.y));
+}
+
+// Rain on water: each drop's ring spreads and fades in its own cell, at its own time. The slope
+// it gives the surface, on the texture's pixel grid.
+fn rain_rings(p: vec2<f32>) -> vec2<f32> {
+    let q = floor(p * 16.0) / 16.0 / 0.8;
+    let base = floor(q);
+    var slope = vec2(0.0);
+    for (var j = -1; j <= 1; j++) {
+        for (var i = -1; i <= 1; i++) {
+            let cell = vec2<i32>(base) + vec2(i, j);
+            let h = hash3(vec3(cell.x, 7, cell.y));
+            let k = hash3(vec3(cell.x, 13, cell.y));
+            let t = fract(scene.params.w * 0.9 + h * 7.31);
+            let v = q - (vec2<f32>(cell) + vec2(0.2 + 0.6 * h, 0.2 + 0.6 * k));
+            let d = length(v);
+            let x = d - t * 1.1;
+            let wave = sin(x * 26.0) * exp(-x * x * 70.0) * (1.0 - t) * (1.0 - t);
+            slope += v / max(d, 1e-3) * wave;
+        }
+    }
+    return slope * 0.3;
+}
+
+fn water(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
+    let v = -normalize(in.rel);
+    var n = normalize(in.normal);
+    if n.y > 0.5 {
+        n = ripple_normal(in.pos.xz);
+        let rain = rain_amount() * smoothstep(0.85, 1.0, in.light.x);
+        if rain > 0.0 {
+            let s = rain_rings(in.pos.xz) * rain;
+            n = normalize(n + vec3(-s.x, 0.0, -s.y));
+        }
+    }
+    let ndv = dot(n, v);
+    if ndv <= 0.0 || in_liquid() {
+        return shade(in, albedo);
+    }
+    let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
+    let body = albedo.rgb * in.color * light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos);
+    let fresnel = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);
+    let r = reflect(-v, n);
+    // The sky it shows, darker where little sky reaches it.
+    let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
+    let glint = palette().sun * light_strength() * pow(max(dot(r, light_dir()), 0.0), 350.0) * 14.0 * shadow;
+    let f = clamp(fresnel * 0.9 + 0.08, 0.0, 1.0);
+    let c = mix(body, refl, f) + glint;
+    let a = clamp(mix(albedo.a, 1.0, f) + luma(glint), 0.0, 1.0);
+    return vec4(display(haze_lit(c, in.rel, in.light.x)), a);
+}
+
+// ---- texture sampling (the engine's) ----
+
+fn nearest_uv(size: f32, uv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec2<f32> {
+    let inv_s = 1.0 / size;
+    let t = uv * size;
+    let r = round(t);
+    let inv_pp = inverseSqrt(max(du * du + dv * dv, vec2(1e-10))) * inv_s;
+    let off = clamp((t - r) * inv_pp + 0.5, vec2(0.0), vec2(1.0));
+    return (r - 0.5 + off) * inv_s;
+}
+
+fn sample(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4<f32> {
+    let a = textureSampleGrad(textures[in.layer], linear_mipped, nuv, du, dv);
+    if in.blend <= 0.0 {
+        return a;
+    }
+    let b = textureSampleGrad(textures[in.layer2], linear_mipped, nuv, du, dv);
+    return mix(a, b, in.blend);
+}
+
+fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4<f32> {
+    if in.overlay == 0u {
+        return albedo;
+    }
+    let ov = textureSampleGrad(textures[in.overlay - 1u], linear_mipped, nuv, du, dv);
+    return vec4(mix(albedo.rgb, ov.rgb * pow(in.tint, vec3(2.2)), ov.a), albedo.a);
+}
+
+@fragment
+fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    return vec4(shade(in, albedo).rgb, 1.0);
+}
+
+fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4<f32> {
+    let size = in.size;
+    let lod = max(log2(max(min(length(du * size), length(dv * size)), 1e-6)), 0.0);
+    let a = textureSampleLevel(textures[in.layer], linear_mipped, nuv, lod);
+    if in.blend <= 0.0 {
+        return a;
+    }
+    let b = textureSampleLevel(textures[in.layer2], linear_mipped, nuv, lod);
+    return mix(a, b, in.blend);
+}
+
+@fragment
+fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    if albedo.a <= 0.1 {
+        discard;
+    }
+    return vec4(shade(in, albedo).rgb, 1.0);
+}
+
+@fragment
+fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    let albedo = with_overlay(in, sample(in, nuv, du, dv), nuv, du, dv);
+    if in.kind.x == TINT_WATER {
+        return water(in, albedo);
+    }
+    return shade(in, albedo);
+}
+
+// Distant terrain (`client::lod`): faces of boxes in the average color of their texture, under
+// open sky.
+@vertex
+fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
+    let f = vi / 4u;
+    let c = vi % 4u;
+    let w0 = records[f * 4u];
+    let w1 = records[f * 4u + 1u];
+    let w2 = records[f * 4u + 2u];
+    let w3 = records[f * 4u + 3u];
+    let dir = lod_dir(w0);
+    let lo = lod_pos(w0, w2) - vec3(0.0, 0.125, 0.0);
+    let size = lod_size(w2, w3);
+    let local = lo + CORNERS[dir * 4u + c] * size;
+    let pos = finish(local, origins[ii]);
+    var out: VOut;
+    out.clip = scene.view_proj * pos;
+    out.dist = length(pos.xyz);
+    out.rel = pos.xyz;
+    out.uv = pos.xz;
+    let fr = texture_frame(w1 & FACE_TEX_MASK);
+    out.size = fr.size;
+    out.layer = fr.a;
+    out.layer2 = fr.b;
+    out.blend = fr.blend;
+    out.glow = 0xffffffffu;
+    out.slot = 0u;
+    out.overlay = 0u;
+    out.light = vec4(1.0, 0.0, 0.0, 0.0);
+    let o = origins[ii] + g.cam_cube;
+    out.pos = vec3<f32>(o.xyz * 16) + local;
+    out.normal = NORMAL[dir];
+    out.ao = 1.0;
+    // Not traced: it is past the blocks the client keeps.
+    out.kind = vec4(0u, 1u, 0u, 0u);
+    let kind = lod_tint(w0);
+    var tint = vec3(1.0);
+    if kind != 0u {
+        tint = unpack_rgb(biomes[(w1 >> FACE_BIOME_SHIFT) * g.extra.z + kind - 1u]);
+    }
+    out.tint = tint;
+    out.color = pow(tint, vec3(2.2));
+    return out;
+}
+
+@fragment
+fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
+    let half = i32(g.extra.w);
+    let col = vec2<i32>(floor(in.pos.xz / 16.0));
+    let d = col - g.cam_cube.xz;
+    if abs(d.x) <= half && abs(d.y) <= half {
+        let w = 2 * half + 1;
+        let i = u32(((col.y % w) + w) % w * w + ((col.x % w) + w) % w);
+        if ((lod_mask[i / 32u] >> (i % 32u)) & 1u) != 0u {
+            discard;
+        }
+    }
+    var albedo = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
+    if in.blend > 0.0 {
+        albedo = mix(albedo, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    }
+    return vec4(shade(in, albedo).rgb, 1.0);
+}

@@ -812,6 +812,7 @@ impl Server {
                         self.set_permission(pi, level);
                     }
                 }
+                DimEvent::SetAir { dim, air, heading } => self.dims[dim as usize].set_air(air, heading),
                 DimEvent::SetRain { dim, biomes, thunder } => {
                     // Only where it rains at all.
                     if c.dims[dim as usize].weather {
@@ -1094,6 +1095,8 @@ impl Server {
             thunder: dims[to as usize].thunder,
             only: dims[to as usize].rain_here().map(|o| o.to_vec()),
         });
+        p.conn
+            .send(ToClient::Air { air: dims[to as usize].air.0.clone(), heading: dims[to as usize].air.1 });
         if to == c.void_dim && from != to as usize {
             p.conn.send(ToClient::Chat(void_note(c)));
         }

@@ -1,0 +1,350 @@
+// chiacraft's look, put in front of every file of the pack (`mods/base/src/shaderpack.rs`): the
+// colors of the day, the sky, how light falls on things, the haze and the final grade. Everything
+// is worked out in linear light above 1 where it is bright, and `display` brings it to the screen.
+
+// ---- what kind of frame this is ----
+
+// A dimension without sky light gets the sun straight up and nothing above the horizon
+// (`Client::sun`): the pack then leaves its sky and fog to the engine.
+fn open_sky() -> bool {
+    return !(scene.sun.x == 0.0 && scene.sun.z == 0.0);
+}
+
+// With the eye in a liquid the engine's fog no longer starts at 0.6 of its end.
+fn in_liquid() -> bool {
+    return abs(scene.params.x - 0.6 * scene.params.y) > 0.5;
+}
+
+// How hard it rains, 0..1 (the engine puts it beside the fog's color).
+fn rain_amount() -> f32 {
+    return clamp(scene.fog_color.w, 0.0, 1.0);
+}
+
+fn luma(c: vec3<f32>) -> f32 {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+// ---- the colors of the day ----
+
+struct Palette {
+    // The sky straight up and at the horizon.
+    zenith: vec3<f32>,
+    horizon: vec3<f32>,
+    // The glow around the sun (or the moon).
+    glow: vec3<f32>,
+    // Direct light from the sun or the moon, and the light from the whole sky.
+    sun: vec3<f32>,
+    ambient: vec3<f32>,
+}
+
+fn key(z: vec3<f32>, h: vec3<f32>, g: vec3<f32>, s: vec3<f32>, a: vec3<f32>) -> Palette {
+    return Palette(z, h, g, s, a);
+}
+
+fn blend(a: Palette, b: Palette, t: f32) -> Palette {
+    return Palette(mix(a.zenith, b.zenith, t), mix(a.horizon, b.horizon, t), mix(a.glow, b.glow, t), mix(a.sun, b.sun, t), mix(a.ambient, b.ambient, t));
+}
+
+// The palette by how high the sun stands (`scene.sun.y`, about 0.94 at noon): day, golden hour,
+// sunset, dusk and night, blended between.
+fn palette() -> Palette {
+    let e = scene.sun.y;
+    let day = key(vec3(0.09, 0.26, 0.85), vec3(0.42, 0.60, 0.95), vec3(1.0, 0.92, 0.78), vec3(0.84, 0.78, 0.68), vec3(0.20, 0.27, 0.42));
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.78, 0.66, 0.62), vec3(1.0, 0.72, 0.42), vec3(1.15, 0.80, 0.50), vec3(0.22, 0.24, 0.38));
+    let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
+    let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
+    // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
+    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.025, 0.04, 0.10), vec3(0.010, 0.017, 0.050));
+    var p: Palette;
+    if e > 0.08 {
+        p = blend(golden, day, smoothstep(0.08, 0.28, e));
+    } else if e > -0.02 {
+        p = blend(sunset, golden, smoothstep(-0.02, 0.08, e));
+    } else if e > -0.14 {
+        p = blend(dusk, sunset, smoothstep(-0.14, -0.02, e));
+    } else {
+        p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
+    }
+    // Overcast: grey and dim, and the sun no more than a brighter part of the sky.
+    let r = rain_amount();
+    let grey = vec3(luma(p.horizon)) * vec3(0.92, 0.95, 1.0);
+    p.zenith = mix(p.zenith, grey * 0.75, r * 0.85);
+    p.horizon = mix(p.horizon, grey, r * 0.85);
+    p.glow = p.glow * (1.0 - r * 0.8);
+    p.ambient = mix(p.ambient, vec3(luma(p.ambient + p.sun * 0.4)) * vec3(0.95, 0.97, 1.0), r * 0.85);
+    p.sun = p.sun * (1.0 - r * 0.9);
+    return p;
+}
+
+// Where direct light comes from: the sun while it is up, then the moon opposite it.
+fn light_dir() -> vec3<f32> {
+    return select(-scene.sun.xyz, scene.sun.xyz, scene.sun.y > -0.06);
+}
+
+// How much of the palette's direct light there is: it fades out as the sun sets and the moon comes
+// up a little after.
+fn light_strength() -> f32 {
+    let e = scene.sun.y;
+    return select(smoothstep(0.06, 0.2, -e), smoothstep(-0.04, 0.05, e), e > -0.06);
+}
+
+// ---- the sky ----
+
+fn sun_glow(dir: vec3<f32>, p: Palette) -> vec3<f32> {
+    let mu = max(dot(dir, scene.sun.xyz), 0.0);
+    let horizon = 1.0 - clamp(dir.y, 0.0, 1.0);
+    let wide = pow(mu, 5.0) * (0.28 + 0.4 * horizon);
+    let near = pow(mu, 60.0) * 0.9;
+    return p.glow * (wide + near);
+}
+
+// The sky in `dir` (unit, world): horizon to zenith, the warm side toward the sun at sunset and the
+// purple opposite, the glow round the sun, a faint one round the moon.
+fn sky_color(dir: vec3<f32>) -> vec3<f32> {
+    let p = palette();
+    let h = clamp(dir.y, 0.0, 1.0);
+    var c = mix(p.horizon, p.zenith, pow(h, 0.4));
+    let mu = dot(dir, scene.sun.xyz);
+    let low = 1.0 - smoothstep(0.0, 0.2, abs(scene.sun.y));
+    // Away from the sun the sunset sky goes rose and violet.
+    let away = (0.5 - 0.5 * mu) * (1.0 - h) * low;
+    c = mix(c, c * vec3(0.95, 0.72, 1.12) + vec3(0.04, 0.0, 0.05), away * 0.7);
+    // Toward it, a warmer band low on the horizon.
+    let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
+    c += vec3(0.55, 0.22, 0.05) * toward;
+    c += sun_glow(dir, p);
+    let moon = pow(max(-mu, 0.0), 24.0) * smoothstep(-0.05, -0.25, scene.sun.y);
+    c += vec3(0.05, 0.07, 0.12) * moon;
+    if dir.y < 0.0 {
+        // Below the horizon it darkens a little toward the ground the haze stands on.
+        c = mix(c, p.horizon * 0.6 + p.ambient * 0.2, smoothstep(0.0, 0.4, -dir.y));
+    }
+    return c;
+}
+
+// ---- light on things ----
+
+// Block light (red, green and blue levels 0..1) as color: warm firelight, whiter right at the
+// source, with a slow flicker that runs across the world.
+fn block_light(b: vec3<f32>, pos: vec3<f32>) -> vec3<f32> {
+    let m = max(max(b.x, b.y), b.z);
+    if m <= 0.0 {
+        return vec3(0.0);
+    }
+    let curve = vec3(brightness_curve(b.x), brightness_curve(b.y), brightness_curve(b.z));
+    // White light (torches, lanterns) is warmed; colored light keeps its color.
+    let grey = 1.0 - (m - min(min(b.x, b.y), b.z)) / m;
+    let warm = mix(vec3(1.0), mix(vec3(1.0, 0.56, 0.26), vec3(1.0, 0.82, 0.62), m * m), grey);
+    let t = scene.params.w;
+    let q = floor(pos * 0.5);
+    let flicker = 1.0 + 0.045 * sin(t * 7.3 + q.x * 1.7 + q.z * 2.3) + 0.03 * sin(t * 13.1 + q.y * 3.1);
+    return curve * warm * 1.55 * flicker;
+}
+
+// How much a surface with normal `n` faces the sun. With the sun low its light wraps a little
+// over the tops, which are otherwise only grazed: the warm ground of the golden hour.
+fn sun_facing(n: vec3<f32>) -> f32 {
+    let wrap = 0.45 * (1.0 - smoothstep(0.05, 0.3, abs(scene.sun.y)));
+    return max((dot(n, light_dir()) + wrap) / (1.0 + wrap), 0.0);
+}
+
+// Light arriving at a surface with normal `n`. `light` is the world's (sky, red, green, blue, 0..1),
+// `shadow` 1 where the sun reaches it, `ao` the corner shading.
+fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>) -> vec3<f32> {
+    let p = palette();
+    let sky = brightness_curve(light.x);
+    // More of the sky's light comes from above than from the sides, and little from below.
+    let hemi = 0.62 + 0.38 * n.y;
+    var c = p.ambient * sky * hemi * ao;
+    // Direct light only where the sky reaches (it keeps caves out of reach of the traced shadow's
+    // gaps), and without corner shading: corners are dark where little sky gets in.
+    let open = smoothstep(0.5, 0.95, light.x);
+    c += p.sun * light_strength() * sun_facing(n) * shadow * open * mix(0.75, 1.0, ao);
+    c += block_light(light.yzw, pos) * mix(0.5, 1.0, ao);
+    // A floor so caves are never quite black: the dimension's own and the Brightness setting.
+    let floor_light = max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y));
+    c += vec3(floor_light) * vec3(0.85, 0.9, 1.0) * ao;
+    return c;
+}
+
+// For what has no normal to speak of (particles, rain, the hand): half the direct light.
+fn light_round(light: vec4<f32>, pos: vec3<f32>) -> vec3<f32> {
+    let p = palette();
+    let sky = brightness_curve(light.x);
+    var c = p.ambient * sky * 0.85;
+    c += p.sun * light_strength() * 0.5 * smoothstep(0.5, 0.95, light.x);
+    c += block_light(light.yzw, pos);
+    c += vec3(max(brightness_curve(scene.light.x) * 0.25, mix(0.006, 0.03, scene.light.y)));
+    return c;
+}
+
+// ---- the air: wind and fog (`scene.weather`, from the weather in `mods/base/src/weather.rs`) ----
+
+// Sea level in chiacraft's worlds (`base_api::SEA`): low fog lies on it and in the valleys.
+const SEA_LEVEL: f32 = 63.0;
+
+fn hash3(p: vec3<i32>) -> f32 {
+    var h = bitcast<u32>(p.x) * 73856093u ^ bitcast<u32>(p.y) * 19349663u ^ bitcast<u32>(p.z) * 83492791u;
+    h = (h ^ (h >> 16u)) * 0x45d9f3bu;
+    h = (h ^ (h >> 16u)) * 0x45d9f3bu;
+    h = h ^ (h >> 16u);
+    return f32(h & 0xffffffu) / 16777215.0;
+}
+
+// Smooth noise 0..1: random values at whole points, blended between.
+fn noise3(p: vec3<f32>) -> f32 {
+    let i = vec3<i32>(floor(p));
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = mix(mix(hash3(i), hash3(i + vec3(1, 0, 0)), u.x), mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), u.x), u.y);
+    let b = mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), u.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), u.x), u.y);
+    return mix(a, b, u.z);
+}
+
+// The wind where the player is: m/s along the world's x and z, the way it blows.
+fn wind_now() -> vec2<f32> {
+    return scene.weather.xy;
+}
+
+// How hard the wind pushes at `p` now, about 1 for its mean: gusts are bands of stronger wind that
+// sweep across the land the way it blows, so a field bends in waves.
+fn gust(p: vec3<f32>) -> f32 {
+    let w = wind_now();
+    let speed = length(w);
+    let dir = select(vec2(1.0, 0.0), w / max(speed, 1e-4), speed > 0.01);
+    let t = scene.params.w;
+    let along = dot(p.xz, dir) - t * max(speed, 1.0) * 0.9;
+    let band = noise3(vec3(along / 14.0, t * 0.05, dot(p.xz, vec2(-dir.y, dir.x)) / 30.0));
+    return 0.55 + 1.1 * smoothstep(0.35, 0.85, band);
+}
+
+// Where the fog lies: on the ground about the player (a few blocks under the eye), or on the sea
+// if that is higher. Valleys under it fill, hills stand out of it.
+fn fog_floor() -> f32 {
+    return max(SEA_LEVEL, scene.eye.y - 5.0);
+}
+
+// How foggy the air is at `p` (world): a layer lying on the ground and in the valleys, broken into
+// banks that drift with the wind and thin out higher up. 0 in clear weather. Per block.
+// A storm's share of the fog (blowing snow or dust: `scene.ground` y and z): it fills the air
+// high up and races with the wind instead of lying low.
+fn storm() -> f32 {
+    return clamp(max(scene.ground.y * smoothstep(5.0, 9.0, length(wind_now())), scene.ground.z), 0.0, 1.0);
+}
+
+fn fog_density(p: vec3<f32>) -> f32 {
+    let f = scene.weather.z;
+    let s = storm();
+    let h = p.y - fog_floor();
+    let low = exp(-max(h - 3.0, 0.0) / mix(7.0, 40.0, s));
+    let high = exp(-max(h, 0.0) / 45.0);
+    let drift = vec3(wind_now().x, 0.0, wind_now().y) * scene.params.w * mix(0.6, 2.0, s);
+    let q = p - drift;
+    let shape = noise3(q * vec3(1.0 / 38.0, 1.0 / 12.0, 1.0 / 38.0)) * 0.7 + noise3(q * vec3(1.0 / 15.0, 1.0 / 8.0, 1.0 / 15.0)) * 0.3;
+    let eaten = noise3(q * vec3(1.0 / 6.0, 1.0 / 4.0, 1.0 / 6.0) + vec3(0.0, scene.params.w * 0.04, 0.0));
+    let banks = smoothstep(0.45, 0.66, shape - 0.25 * eaten + 0.12);
+    // Deep under it, in the ground, there is none.
+    let open = smoothstep(-24.0, -10.0, h);
+    return f * open * (low * (mix(0.05, 0.7, s) + mix(1.7, 0.6, s) * banks) + 0.06 * high) * 0.11;
+}
+
+// Light the fog sends toward the eye: the sky's from all around, the sun's mostly forward, so it
+// glows white-gold looking toward the sun.
+fn fog_light(dir: vec3<f32>) -> vec3<f32> {
+    let p = palette();
+    let mu = dot(dir, light_dir());
+    let g = 0.6;
+    let hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566;
+    let phase = hg * 2.5 + 0.3;
+    // Droplets are white, snow whiter, dust the color of sand.
+    let tint = mix(mix(vec3(0.9), vec3(1.0, 1.0, 1.03), scene.ground.y), vec3(0.95, 0.68, 0.42), scene.ground.z);
+    return ((p.ambient * 1.25 + p.horizon * 0.2) + p.sun * light_strength() * phase) * 0.9 * tint;
+}
+
+// The fog between the eye and a point `rel` away (camera relative), walked in a few steps that are
+// closer together near the eye; `sky` (0..1) the sky light at the point, so caves stay clear.
+fn fog_through(c: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    if scene.weather.z < 0.005 || in_liquid() || !open_sky() || sky <= 0.0 {
+        return c;
+    }
+    let dist = min(length(rel), 220.0);
+    let dir = rel / max(length(rel), 1e-4);
+    let eye = scene.eye.xyz;
+    let light = fog_light(dir);
+    let steps = 12u;
+    var through = 1.0;
+    var gained = vec3(0.0);
+    var last = 0.0;
+    for (var i = 1u; i <= steps; i++) {
+        let k = f32(i) / f32(steps);
+        let at = dist * (exp(2.2 * k) - 1.0) / (exp(2.2) - 1.0);
+        let step = at - last;
+        let d = fog_density(eye + dir * (at - step * 0.5)) * sky;
+        let kept = exp(-d * step);
+        gained += through * (1.0 - kept) * light;
+        through *= kept;
+        last = at;
+    }
+    return c * through + gained;
+}
+
+// How much snow lies on a surface with normal `n` at `pos` (world) with `sky` light: on what
+// faces up under the open sky, in patches that join up as it deepens.
+fn snow_on(n: vec3<f32>, pos: vec3<f32>, sky: f32) -> f32 {
+    let deep = scene.ground.x;
+    if deep <= 0.0 {
+        return 0.0;
+    }
+    let q = vec3<i32>(floor(pos * 16.0));
+    let spot = noise3(pos * 0.35) * 0.8 + hash3(q) * 0.2;
+    return smoothstep(0.85, 1.0, sky) * smoothstep(0.55, 0.9, n.y) * smoothstep(1.0 - deep * 1.3, 1.05 - deep * 1.3, spot);
+}
+
+// ---- haze and fog ----
+
+// The air between the eye and a point `rel` away (camera relative): a haze the color of the sky
+// behind it that thickens with distance and thins with height, full where the terrain ends. In a
+// liquid or a dimension without sky, the engine's fog.
+fn haze(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    return haze_lit(c, rel, 1.0);
+}
+
+// `haze` for a point with `sky` (0..1) sky light: fog gathers only out under the sky.
+fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
+    let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
+    let dist = length(rel);
+    if in_liquid() || !open_sky() {
+        return mix(c, scene.fog_color.rgb, fog_amount(dist, scene.params.x, scene.params.y));
+    }
+    let dir = rel / max(dist, 1e-4);
+    let end = scene.params.y;
+    // Straight down there is no level direction left: never a zero vector (its normalize is NaN,
+    // and the Mac's fast math has no safety net).
+    let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
+    let color = sky_color(normalize(air));
+    // Thinner looking up at what is high, so hills stand out against a hazy valley.
+    let thin = exp(-max(rel.y, 0.0) / 90.0);
+    let rain = rain_amount();
+    let amount = 1.0 - exp(-dist / (end * mix(0.9, 0.4, rain)) * mix(0.45, 1.0, thin));
+    let edge = smoothstep(end * 0.72, end, dist);
+    return mix(c, color, clamp(max(amount * 0.9, edge), 0.0, 1.0));
+}
+
+// ---- to the screen ----
+
+// Light as it is up to `KNEE`, then a soft shoulder that never quite reaches white: the darks
+// stay as vanilla shows them and only what is brighter than the screen is folded back in.
+const KNEE: f32 = 0.6;
+
+fn shoulder(x: vec3<f32>) -> vec3<f32> {
+    let over = max(x - vec3(KNEE), vec3(0.0));
+    return min(x, vec3(KNEE)) + (1.0 - KNEE) * (vec3(1.0) - exp(-over / (1.0 - KNEE)));
+}
+
+// The tone curve and a little more color: linear light for the sRGB screen.
+fn display(c: vec3<f32>) -> vec3<f32> {
+    var t = shoulder(max(c, vec3(0.0)));
+    let y = luma(t);
+    t = max(mix(vec3(y), t, 1.06), vec3(0.0));
+    return clamp(t, vec3(0.0), vec3(1.0));
+}
