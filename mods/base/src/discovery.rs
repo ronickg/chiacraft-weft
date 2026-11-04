@@ -60,12 +60,13 @@ pub fn held(known: &Known, name: &str) -> bool {
         .all(|&b| known.bits[(b / 64) as usize] & (1 << (b % 64)) != 0)
 }
 
-/// How a recipe stands for a player who has held `items`: (ingredients held, ingredients). Each
-/// different ingredient counts once; it's held if any item it takes was.
-pub fn standing(r: &Recipe, items: &[u32]) -> (u32, u32) {
+/// How a recipe stands for a player who has held `items`: (ingredients held, ingredients, an
+/// item of the first one not held). Each different ingredient counts once; it's held if any item
+/// it takes was.
+pub fn standing(r: &Recipe, items: &[u32]) -> (u32, u32, Option<u32>) {
     let inputs = r.inputs();
     let mut seen: Vec<u32> = Vec::new();
-    let (mut have, mut all) = (0, 0);
+    let (mut have, mut all, mut missing) = (0, 0, None);
     for (i, input) in inputs.iter().enumerate() {
         if input.kind == abi::recipe_input_kind::EMPTY || seen.contains(&input.shown) {
             continue;
@@ -74,9 +75,21 @@ pub fn standing(r: &Recipe, items: &[u32]) -> (u32, u32) {
         all += 1;
         if items.iter().any(|&item| r.accepts(i as u32, item)) {
             have += 1;
+        } else if missing.is_none() && input.shown != 0 {
+            missing = Some(input.shown);
         }
     }
-    (have, all)
+    (have, all, missing)
+}
+
+/// Recipes everyone knows from the start, whatever they've held: what a first night needs.
+const STARTERS: &[&str] = &["base:stick", "base:crafting_table", "base:campfire", "base:torch", "base:string", "base:cloth"];
+
+/// Whether `r` is known from the start: planks of any wood, and the `STARTERS`.
+pub fn starter(r: &Recipe) -> bool {
+    r.outputs()
+        .first()
+        .is_some_and(|(o, _)| item_has_tag(o.item, "planks") || STARTERS.contains(&item_name(o.item)))
 }
 
 /// Every item the local player has held, by id (for the book: built once per screen).

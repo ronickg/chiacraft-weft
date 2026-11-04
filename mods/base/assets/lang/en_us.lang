@@ -593,7 +593,7 @@ material.base.sinew = Sinew
 material.base.rawhide = Rawhide
 material.base.birch_tar = Birch Tar
 material.base.leather = Leather
-crafting.book.near = Something you could make: you've held {0} of its {1} materials
+crafting.book.near = Something you could make: you've held {0} of its {1} materials. Still to find: {2}
 crafting.book.unknown = ?
 item.base.part_self_stave = Self Bow Stave
 item.base.part_short_stave = Short Bow Stave
@@ -611,3 +611,7 @@ skill.base.handwork = Handwork
 skill.base.sewing = Sewing
 tagged.base.part = {color:title}{if:value.grade==1}Crude{/if}{if:value.grade==2}Rough +{/if}{if:value.grade==3}Plain{/if}{if:value.grade==4}Sound +{/if}{if:value.grade==5}Good{/if}{if:value.grade==6}Fine +{/if}{if:value.grade==7}Superior{/if}{if:value.grade==8}Exquisite +{/if}{if:value.grade==9}Masterwork{/if}{if:value.grade==10}Legendary ☼{/if}{/}{if:value.made_day>0} · made on day {value.made_day}{/if}{if:value.repairs>0} · repaired {value.repairs}×{/if}
 tagged.base.parts = {color:title}{if:value.grade==1}Crude{/if}{if:value.grade==2}Rough +{/if}{if:value.grade==3}Plain{/if}{if:value.grade==4}Sound +{/if}{if:value.grade==5}Good{/if}{if:value.grade==6}Fine +{/if}{if:value.grade==7}Superior{/if}{if:value.grade==8}Exquisite +{/if}{if:value.grade==9}Masterwork{/if}{if:value.grade==10}Legendary ☼{/if}{/} · built from parts
+# The recipe viewer (R, U) shows every recipe; the book shows what you know.
+recipes.made_by = {0}: all recipes
+recipes.uses = {0}: all uses
+recipes.all = All recipes

@@ -593,7 +593,7 @@ material.base.sinew = Жилы
 material.base.rawhide = Сыромятная кожа
 material.base.birch_tar = Берёзовый дёготь
 material.base.leather = Кожа
-crafting.book.near = Это можно сделать: из {1} материалов вы держали {0}
+crafting.book.near = Это можно сделать: из {1} материалов вы держали {0}. Ещё найти: {2}
 crafting.book.unknown = ?
 item.base.part_self_stave = Цельная заготовка лука
 item.base.part_short_stave = Короткая заготовка лука
@@ -611,3 +611,7 @@ skill.base.handwork = Ручная работа
 skill.base.sewing = Шитьё
 tagged.base.part = {color:title}{if:value.grade==1}Грубое{/if}{if:value.grade==2}Неровное +{/if}{if:value.grade==3}Простое{/if}{if:value.grade==4}Добротное +{/if}{if:value.grade==5}Хорошее{/if}{if:value.grade==6}Тонкое +{/if}{if:value.grade==7}Превосходное{/if}{if:value.grade==8}Изысканное +{/if}{if:value.grade==9}Шедевр{/if}{if:value.grade==10}Легендарное ☼{/if}{/}{if:value.made_day>0} · сделано в день {value.made_day}{/if}{if:value.repairs>0} · чинилось {value.repairs}×{/if}
 tagged.base.parts = {color:title}{if:value.grade==1}Грубое{/if}{if:value.grade==2}Неровное +{/if}{if:value.grade==3}Простое{/if}{if:value.grade==4}Добротное +{/if}{if:value.grade==5}Хорошее{/if}{if:value.grade==6}Тонкое +{/if}{if:value.grade==7}Превосходное{/if}{if:value.grade==8}Изысканное +{/if}{if:value.grade==9}Шедевр{/if}{if:value.grade==10}Легендарное ☼{/if}{/} · собрано из деталей
+# The recipe viewer (R, U) shows every recipe; the book shows what you know.
+recipes.made_by = {0}: все рецепты
+recipes.uses = {0}: все применения
+recipes.all = Все рецепты
