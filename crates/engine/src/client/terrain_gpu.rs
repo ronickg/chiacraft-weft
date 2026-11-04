@@ -212,7 +212,9 @@ pub fn describe_lod(c: &Content, dim: u32, seed: u64) -> Option<(Vec<i32>, Vec<u
                         .unwrap_or(0),
                 );
                 for b in blocks {
-                    *(if b.force == 0 { &mut states } else { &mut forced }).entry(b.state).or_default() += 1;
+                    *(if b.force == 0 { &mut states } else { &mut forced })
+                        .entry(b.state)
+                        .or_default() += 1;
                 }
             }
             if tops.is_empty() {
