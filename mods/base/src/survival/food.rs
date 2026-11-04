@@ -42,7 +42,9 @@ pub fn register(r: &mut Registry) {
         let w = q.world();
         let be = w.block_entity(q.pos());
         if be != 0 {
-            age_inventory(&w, be);
+            // Stacks merge only in a chest: a pot takes one of each slot for a stew and a rack
+            // dries each slot apart (integration review: merging broke both).
+            age_inventory(&w, be, crate::blocks::CHEST.is(q.state()));
         }
         Verdict::Abstain
     });
@@ -85,11 +87,12 @@ pub fn effects(v: &mut Vitals, s: &stomach::Stomach, capacity: f32) {
 /// a stew by its shortest-keeping ingredient, `meals::keeps`); hot food cools after a while and
 /// then stacks with the day's.
 pub fn age(w: &World, player: u64) {
-    age_inventory(w, player);
+    age_inventory(w, player, true);
 }
 
-/// `age` for every food stack in an inventory (a player's, a chest's).
-pub fn age_inventory(w: &World, id: u64) {
+/// `age` for every food stack in an inventory (a player's, a chest's, a machine's), merging stacks
+/// alike (`merge_food`) when `merge`.
+pub fn age_inventory(w: &World, id: u64, merge: bool) {
     let inv = w.inventory(id);
     let now = w.day_time();
     let size = inv.size();
@@ -100,7 +103,9 @@ pub fn age_inventory(w: &World, id: u64) {
             *stack = aged(*stack, now);
         }
     }
-    merge_food(&mut after);
+    if merge {
+        merge_food(&mut after);
+    }
     for (i, (b, a)) in before.iter().zip(&after).enumerate() {
         if a != b {
             inv.set(i as u32, *a);
