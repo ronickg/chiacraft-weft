@@ -40,9 +40,12 @@ pub mod bindings {
     });
 }
 
-use bindings::chiacraft::mods::{client as wclient, client_registry, log as wlog, names, types, ui as wui};
+use bindings::chiacraft::mods::{client as wclient, client_registry, names, types, ui as wui};
 #[doc(hidden)]
 pub use bindings::exports::chiacraft::mods::client_hooks::Guest as __Guest;
+use chiacraft_mod_common::value_from;
+/// What this SDK shares with the server SDK (`chiacraft-mod-common`).
+pub use chiacraft_mod_common::{Arg, ItemStack, Payload, Value, value};
 #[doc(hidden)]
 pub use types::Arg as __WireArg;
 #[doc(hidden)]
@@ -120,11 +123,8 @@ thread_local! {
 
 fn push(id: u32, cb: Callback) {
     CALLBACKS.with(|c| {
-        let mut c = c.borrow_mut();
-        if id as usize == c.len() {
-            c.push(cb);
-        } else {
-            error!("the game numbered callback {id}, expected {}", c.len());
+        if let Err(expected) = chiacraft_mod_common::number(&mut c.borrow_mut(), id, cb) {
+            error!("the game numbered callback {id}, expected {expected}");
         }
     });
 }
@@ -237,16 +237,7 @@ pub fn __frame(id: u32, seconds: f32) {
 
 // ------------------------------------------------------------------ logging
 
-#[doc(hidden)]
-pub fn __log(level: u32, args: std::fmt::Arguments) {
-    let level = match level {
-        0 => wlog::Level::Error,
-        1 => wlog::Level::Warn,
-        2 => wlog::Level::Info,
-        _ => wlog::Level::Debug,
-    };
-    wlog::write(level, &std::fmt::format(args));
-}
+chiacraft_mod_common::__glue!(bindings::chiacraft::mods::log, bindings::chiacraft::mods::types);
 
 #[macro_export]
 macro_rules! error { ($($t:tt)*) => { $crate::__log(0, format_args!($($t)*)) } }
@@ -259,77 +250,6 @@ macro_rules! debug { ($($t:tt)*) => { $crate::__log(3, format_args!($($t)*)) } }
 
 // ------------------------------------------------------------------ values
 
-/// One argument of a line players read (Weft's `Arg`).
-#[derive(Clone, Copy, Debug)]
-pub enum Arg<'a> {
-    Text(&'a str),
-    Key(&'a str),
-    Int(i64),
-    Float(f64, u32),
-    Item(u32),
-    Name(&'a str),
-}
-
-fn wire_args(args: &[Arg]) -> Vec<types::Arg> {
-    args.iter()
-        .map(|a| match *a {
-            Arg::Text(s) => types::Arg::Text(s.into()),
-            Arg::Key(s) => types::Arg::Key(s.into()),
-            Arg::Int(v) => types::Arg::Int(v),
-            Arg::Float(v, d) => types::Arg::Float((v, d)),
-            Arg::Item(i) => types::Arg::Item(i),
-            Arg::Name(s) => types::Arg::Name(s.into()),
-        })
-        .collect()
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct ItemStack {
-    pub item: u32,
-    pub count: u32,
-    pub data: u32,
-}
-
-impl ItemStack {
-    pub fn is_empty(&self) -> bool {
-        self.item == 0 || self.count == 0
-    }
-}
-
-/// Plain data a component or packet holds (Weft's `Value`): `repr(C)`, `Copy`, no padding.
-///
-/// # Safety
-/// Every byte pattern of its size must be a valid value, and it has no padding.
-pub unsafe trait Value: Copy + 'static {}
-
-macro_rules! primitive {
-    ($($t:ty),*) => { $(unsafe impl Value for $t {})* };
-}
-primitive!(u8, i8, u16, i16, u32, i32, u64, i64, f32, f64);
-unsafe impl<T: Value, const N: usize> Value for [T; N] {}
-
-/// A component's or packet's struct, as Weft's `value!` writes it.
-#[macro_export]
-macro_rules! value {
-    ($(#[$m:meta])* $vis:vis struct $name:ident { $($(#[$fm:meta])* $fvis:vis $field:ident : $ty:ty),* $(,)? }) => {
-        $(#[$m])*
-        #[repr(C)]
-        #[derive(Clone, Copy, Debug, PartialEq)]
-        $vis struct $name { $($(#[$fm])* $fvis $field: $ty),* }
-        unsafe impl $crate::Value for $name {}
-    };
-}
-
-fn value_from<T: Value>(b: &[u8]) -> Option<T> {
-    // SAFETY: any bytes of the size are a valid `Value`.
-    (b.len() >= std::mem::size_of::<T>()).then(|| unsafe { std::ptr::read_unaligned(b.as_ptr() as *const T) })
-}
-
-fn value_bytes<T: Value>(v: &T) -> Vec<u8> {
-    // SAFETY: `Value` is plain data without padding.
-    unsafe { std::slice::from_raw_parts(v as *const T as *const u8, std::mem::size_of::<T>()) }.to_vec()
-}
-
 /// A component of the package's, read on the client when it is synced to its owner or watchers
 /// (the server half declares it).
 pub struct Component<T: Value> {
@@ -340,50 +260,6 @@ pub struct Component<T: Value> {
 impl<T: Value> Component<T> {
     pub const fn named(name: &'static str) -> Self {
         Component { name, _t: PhantomData }
-    }
-}
-
-/// What a channel carries (Weft's `Payload`): `String`, `Vec<u8>`, `()`, or any [`Value`].
-pub trait Payload: Sized + 'static {
-    fn encode(&self) -> Vec<u8>;
-    fn decode(bytes: &[u8]) -> Option<Self>;
-}
-
-impl<T: Value> Payload for T {
-    fn encode(&self) -> Vec<u8> {
-        value_bytes(self)
-    }
-    fn decode(bytes: &[u8]) -> Option<T> {
-        (bytes.len() == std::mem::size_of::<T>())
-            .then(|| value_from(bytes))
-            .flatten()
-    }
-}
-
-impl Payload for String {
-    fn encode(&self) -> Vec<u8> {
-        self.as_bytes().to_vec()
-    }
-    fn decode(bytes: &[u8]) -> Option<String> {
-        String::from_utf8(bytes.to_vec()).ok()
-    }
-}
-
-impl Payload for Vec<u8> {
-    fn encode(&self) -> Vec<u8> {
-        self.clone()
-    }
-    fn decode(bytes: &[u8]) -> Option<Vec<u8>> {
-        Some(bytes.to_vec())
-    }
-}
-
-impl Payload for () {
-    fn encode(&self) -> Vec<u8> {
-        Vec::new()
-    }
-    fn decode(_: &[u8]) -> Option<()> {
-        Some(())
     }
 }
 

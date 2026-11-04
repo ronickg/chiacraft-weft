@@ -1,0 +1,21 @@
+[
+ {
+  "kind": "item",
+  "name": "fb_part_self_stave",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "what": "an unstrung long bow stave without its string: a tall slender gently curved stave of warm orange-brown wood with clear grain, a red-brown leather grip wrapped round its middle, small horn-coloured tips with string notches, lying diagonally from the bottom left to the top right, centred with 3-5 px of padding, on its own"
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_short_stave",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "what": "an unstrung short bow stave without its string: a short thick strongly curved stave of warm orange-brown wood, a red-brown leather grip wrapped round its middle, horn-coloured tips with string notches, lying diagonally, centred with 3-5 px of padding, on its own"
+ },
+ {
+  "kind": "item",
+  "name": "fb_part_bowstring",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/notes/ui-codex/parts/out",
+  "what": "a loose bowstring on its own: a thin pale cream twisted cord laid in a loose loop, with a small tied loop at each end, a soft brown outline so it reads on any background",
+  "pale": true
+ }
+]

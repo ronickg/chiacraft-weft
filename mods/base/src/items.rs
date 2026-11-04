@@ -191,9 +191,19 @@ pub fn register(r: &mut Registry) {
             let tag = ARMOR_SLOTS[slot];
             // Leggings are the inner layer, drawn closer to the body.
             let (inflate, layer) = if slot == 2 { (0.5, 2) } else { (1.0, 1) };
+            // Its warmth line too (leather is hide; metal is cold in snow and hot in the sun).
+            let mut worn = vitals::clothing::Worn::default();
+            worn.armor(mat, slot as usize);
+            let warmth = base_api::Warmth {
+                cold: worn.cold.round().max(0.0) as u32,
+                heat: worn.heat.round() as i32,
+                wet: if worn.cold > 0.0 { (worn.cold_wet / worn.cold * 100.0).round() as u32 } else { 0 },
+                wind: (worn.windproof * 100.0).round() as u32,
+            };
             r.item(Item::generated(format!("{mat}_{piece}")))
                 .durability(durability * dur)
                 .set(&ARMOR, Armor { points, toughness })
+                .set(&base_api::WARMTH, warmth)
                 .tag(tag)
                 .tag(&format!("{tag}/{mat}"))
                 .wearable(crate::player::EQUIPMENT[slot as usize], inflate, &format!("armor/{mat}_{layer}"))

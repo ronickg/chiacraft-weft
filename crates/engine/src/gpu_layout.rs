@@ -455,10 +455,12 @@ gpu_struct! {
         /// weather (`set_air`), still and clear without one. For shader packs.
         pub weather: [f32; 4],
         /// The camera in the world: x and z wrapped every 8192 blocks (enough for noise to tile
-        /// unseen), y as it is; w unused. For shader packs.
+        /// unseen), y as it is; w the moon's light by its phase (1 full, 0 new: vanilla's eight,
+        /// the phase the sky's moon shows). For shader packs.
         pub eye: [f32; 4],
         /// Where the player is: x snow lying on the ground (0..1), y how much of what falls is
-        /// snow, z how much dust blows (0..1); from a mod's weather (`set_air`). For shader packs.
+        /// snow, z how much dust blows (0..1), w how strong an aurora is on clear nights (0..1);
+        /// from a mod's weather (`set_air`). For shader packs.
         pub ground: [f32; 4],
         /// From camera-relative positions to the shadow map's clip space (`sun_shadows` packs):
         /// x and y -1..1 across the map (texel row 0 at y -1), z reverse depth along the light.

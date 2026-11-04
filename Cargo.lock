@@ -159,6 +159,7 @@ version = "0.1.0"
 dependencies = [
  "animals_core",
  "base_api",
+ "chiacraft-bridge",
  "serde",
  "serde_json",
  "vitals",
@@ -1335,9 +1336,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "chiacraft-bridge"
+version = "26.10.4"
+dependencies = [
+ "weft_abi",
+]
+
+[[package]]
+name = "chiacraft-mod-common"
+version = "1.2.0"
+
+[[package]]
 name = "chiacraft-mod-sdk"
 version = "1.2.0"
 dependencies = [
+ "chiacraft-mod-common",
  "weft_abi",
  "wit-bindgen",
 ]
@@ -1346,6 +1359,7 @@ dependencies = [
 name = "chiacraft-mod-sdk-client"
 version = "1.2.0"
 dependencies = [
+ "chiacraft-mod-common",
  "weft_abi",
  "wit-bindgen",
 ]
@@ -5227,6 +5241,7 @@ dependencies = [
 name = "packages"
 version = "0.1.0"
 dependencies = [
+ "chiacraft-bridge",
  "chiacraft-packages",
  "chiacraft-sandbox",
  "weft_sdk",
@@ -5495,6 +5510,7 @@ dependencies = [
 name = "portals"
 version = "0.1.0"
 dependencies = [
+ "chiacraft-bridge",
  "weft_sdk",
 ]
 

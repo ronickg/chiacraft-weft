@@ -15,6 +15,8 @@ use std::sync::Arc;
 use chiacraft_wallet::chain::{self, Bytes32, ChainNetwork, DidMetadata, WalletKeys, WorldMeta};
 use serde::{Deserialize, Serialize};
 
+use crate::chiacraft::did::{short, short_did};
+
 pub const FILE: &str = "did.json";
 
 /// A world's DID as the world keeps it.
@@ -244,19 +246,6 @@ pub fn check(world_did: &str, owner_did: &str, key: &str, generation: u32) -> Re
         .or_else(|| owner.current().map(|c| c.puzzle_hash))
         .unwrap_or_default();
     Ok(chain::world::world_link_expecting(&world, &owner, &expected, launched_to).holds())
-}
-
-fn short(s: &str) -> String {
-    s.chars().take(12).collect()
-}
-
-fn short_did(d: &str) -> String {
-    let c: Vec<char> = d.chars().collect();
-    if c.len() > 24 {
-        format!("{}…{}", c[..16].iter().collect::<String>(), c[c.len() - 6..].iter().collect::<String>())
-    } else {
-        d.to_string()
-    }
 }
 
 #[cfg(test)]

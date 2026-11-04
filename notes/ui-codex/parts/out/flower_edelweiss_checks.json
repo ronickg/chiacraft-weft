@@ -1,0 +1,26 @@
+{
+ "kind": "block",
+ "what": "edelweiss: a small woolly grey-white plant with narrow fuzzy leaves and two or three white felty star-shaped flower heads with yellow-grey centres, 10-14 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.31,
+   "outline": 0.95,
+   "red_line": 0.0,
+   "fill": 0.05,
+   "passed": false
+  },
+  {
+   "grid": 0.445,
+   "outline": 0.85,
+   "red_line": 0.0,
+   "fill": 0.06,
+   "passed": true
+  }
+ ]
+}

@@ -725,6 +725,16 @@ impl WorldRenderer {
         true
     }
 
+    /// Every biome's tint colors from now on (`ClientWorld::biome_tints`), for blocks whose
+    /// column has no blended colors yet and for distant terrain.
+    pub fn set_biome_table(&mut self, gpu: &mut dyn Backend, table: Vec<u32>) {
+        if table.len() != self.biome_table.len() || table == self.biome_table {
+            return;
+        }
+        gpu.write_buffer(self.biomes, 0, bytemuck::cast_slice(&table));
+        self.biome_table = table;
+    }
+
     pub fn upload_tints(&mut self, gpu: &mut dyn Backend, col: glam::IVec2, tints: &super::world::ColumnTints) {
         let t = self.tint_tiles as i32;
         let slot = (col.x.rem_euclid(t) + col.y.rem_euclid(t) * t) as usize;

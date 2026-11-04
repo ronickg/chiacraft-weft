@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "leadplant: a small grey-green shrub with fine feathery grey leaves and several upright spikes of dark purple flowers with orange tips, 18-22 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.51,
+   "outline": 1.01,
+   "red_line": 0.0,
+   "fill": 0.16,
+   "passed": false
+  },
+  {
+   "grid": 0.553,
+   "outline": 1.0,
+   "red_line": 0.0,
+   "fill": 0.16,
+   "passed": false
+  },
+  {
+   "grid": 0.528,
+   "outline": 0.93,
+   "red_line": 0.0,
+   "fill": 0.24,
+   "passed": false
+  }
+ ]
+}

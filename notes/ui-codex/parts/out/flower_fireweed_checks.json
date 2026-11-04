@@ -1,0 +1,33 @@
+{
+ "kind": "block",
+ "what": "fireweed: two or three tall stems with long narrow willow-like leaves, ending in spires of bright magenta-pink four-petalled flowers, opening from the bottom up, 26-30 px tall; the flowers in their real colours, the leaves and stems natural green (not tinted), standing on the bottom edge, centred, see-through around it, in the style, pixel size and light of the attached plants from my game",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": "cyan",
+ "tries": [
+  {
+   "grid": 0.213,
+   "outline": 1.13,
+   "red_line": 0.0,
+   "fill": 0.22,
+   "passed": false
+  },
+  {
+   "grid": 0.56,
+   "outline": 1.06,
+   "red_line": 0.0,
+   "fill": 0.24,
+   "passed": false
+  },
+  {
+   "grid": 0.194,
+   "outline": 0.84,
+   "red_line": 0.01,
+   "fill": 0.22,
+   "passed": true
+  }
+ ]
+}

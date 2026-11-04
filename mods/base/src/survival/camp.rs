@@ -17,14 +17,15 @@ const NEAR_FIRE: f32 = 3.0;
 /// The kind of comfort a block gives, a bit each (each kind counts once).
 pub fn comfort_of(state: u32) -> u32 {
     match block_name(state).split('[').next().unwrap_or("") {
-        "base:lava" | "base:campfire" | "base:torch" | "base:wall_torch" => 1,
+        "base:lava" | "base:campfire" => 1,
         "base:furnace" if state_prop(state, "lit") == Some("true") => 1,
         "base:bed" => 2,
         "base:crafting_table" => 4,
         "base:chest" => 8,
         "base:wool" | "base:hay_bale" => 16,
         "base:dandelion" | "base:rose" => 32,
-        "base:glowstone" | "base:redstone_lamp" | "base:copper_lamp" => 64,
+        // A torch is a light, not a fire.
+        "base:glowstone" | "base:redstone_lamp" | "base:copper_lamp" | "base:torch" | "base:wall_torch" => 64,
         "base:bookshelf" => 128,
         _ => 0,
     }
@@ -32,7 +33,8 @@ pub fn comfort_of(state: u32) -> u32 {
 
 /// This second's camp: near a fire, sheltered, resting and rested.
 pub fn rest(v: &mut Vitals, st: &EntityState, here: &Air, comfort: u32) {
-    let near_fire = here.fire >= NEAR_FIRE;
+    // By a real fire: a torch warms a little but isn't one to rest by.
+    let near_fire = here.hearth >= NEAR_FIRE;
     let sheltered = here.sky < 13 && !here.underground;
     v.comfort = 1 + comfort.count_ones() as u8;
     if (sheltered && near_fire) || st.pose == abi::pose::SLEEP {

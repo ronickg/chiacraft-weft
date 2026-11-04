@@ -14,6 +14,8 @@ struct VOut {
     @location(0) at: vec3<f32>,
     @location(1) uv: vec2<f32>,
     @location(2) @interpolate(flat) index: u32,
+    // A star's number (stars only).
+    @location(3) @interpolate(flat) star: u32,
 }
 
 fn mat(s: Sky) -> mat3x3<f32> {
@@ -41,6 +43,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     let s = sky[ii];
     var out: VOut;
     out.index = ii;
+    out.star = 0u;
     if s.ids.y == SKY_BODY {
         let c = CORNER[vi % 6u];
         let local = vec3(1.0, (0.5 - c.y) * 2.0 * s.extra.x, (c.x - 0.5) * 2.0 * s.extra.x);
@@ -55,7 +58,8 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
         let a = unit(star * 4u + 1u) * 6.2831853;
         let r = sqrt(1.0 - z * z);
         let toward = vec3(r * cos(a), z, r * sin(a));
-        let size = s.uv.x * (0.6 + 0.4 * unit(star * 4u + 2u)) * 2.0;
+        // The bright ones bigger (`star_look` picks the same brightness).
+        let size = s.uv.x * (0.6 + 0.4 * unit(star * 4u + 2u)) * 2.0 * (0.85 + 0.9 * pow(unit(star * 9u + 5u), 3.0));
         let turn = unit(star * 4u + 3u) * 6.2831853;
         var side = cross(toward, vec3(0.0, 1.0, 0.0));
         if dot(side, side) < 0.001 {
@@ -69,6 +73,7 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
         out.clip = far_point(dir);
         out.at = dir;
         out.uv = CORNER[vi % 6u];
+        out.star = star;
     } else {
         let p = vec2<f32>(f32((vi << 1u) & 2u), f32(vi & 2u)) * 2.0 - 1.0;
         // The overlay of a liquid goes over everything, the hand too; depth 1 is the near plane.
@@ -79,12 +84,18 @@ fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut 
     return out;
 }
 
-// Clouds: each pixel's ray walks the picture's grid between the two planes of the layer, so one
-// triangle draws them however far they reach. From outside the layer a ray crosses few cells even
-// at the horizon, since it soon leaves through the other plane.
+// Clouds: rounded slabs (Complementary Reimagined's idea, written anew). The picture's cells are
+// blended into soft rounded shapes that thin toward the top and bottom of a slab, and each sky
+// pixel's ray takes a few dithered samples through it, gathering light and cover: soft blocky puffs,
+// lit from the sun above and darker underneath, in the sky's own pass.
 // uv: the camera's place in its cell (x, z), the cell in the picture (x, z). extra: cell size,
-// thickness, height over the camera, how far they reach.
-const CLOUD_STEPS: u32 = 128u;
+// thickness, height over the camera, how far they reach. axes[0]: the weather (`sky.rs`): x cover
+// as rain comes, y how dark the undersides go, z a storm's deck.
+const CLOUD_SAMPLES: u32 = 24u;
+// The slab is at least this thick (blocks), whatever the layer's own thickness.
+const CLOUD_THICKNESS: f32 = 9.0;
+// How far one sample looks along the ray at most (blocks): far clouds take no more samples.
+const CLOUD_SPAN: f32 = 400.0;
 
 struct CloudOut {
     @builtin(position) clip: vec4<f32>,
@@ -107,9 +118,37 @@ fn vs_clouds(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -
     return out;
 }
 
-fn cloud_at(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> bool {
+// 1 where cell `cell` (picture cells from the camera's) is cloud: the picture's, and as rain comes
+// more of the gaps (a hash per cell, so they grow as whole cells), until a storm's deck closes
+// nearly all of them.
+fn cloud_cell(s: Sky, cell: vec2<f32>, dims: vec2<f32>) -> f32 {
     let at = fract((cell + s.uv.zw + vec2(0.5)) / dims);
-    return textureSampleLevel(textures[s.ids.x], nearest_clamp, at, 0.0).a >= 0.5;
+    if textureSampleLevel(textures[s.ids.x], nearest_clamp, at, 0.0).a >= 0.5 {
+        return 1.0;
+    }
+    let fill = s.axes[0].x * 0.6 + s.axes[0].z * 0.35;
+    let w = vec2<i32>(cell + s.uv.zw);
+    return select(0.0, 1.0, hash3(vec3(w.x, 51, w.y)) < fill);
+}
+
+// How dense the cloud is at `cellp` (picture cells, fractional) and `h` (0 at the slab's bottom,
+// 1 at its top): the four cells about the point blended smoothly, eaten away toward the top and
+// bottom so their edges round.
+fn cloud_density(s: Sky, cellp: vec2<f32>, h: f32, dims: vec2<f32>) -> f32 {
+    let q = cellp - vec2(0.5);
+    let base = floor(q);
+    let f = q - base;
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = cloud_cell(s, base, dims);
+    let b = cloud_cell(s, base + vec2(1.0, 0.0), dims);
+    let c = cloud_cell(s, base + vec2(0.0, 1.0), dims);
+    let d = cloud_cell(s, base + vec2(1.0, 1.0), dims);
+    let cover = mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    let middle = 1.0 - pow(abs(h * 2.0 - 1.0), 2.0);
+    // A storm's deck is one sheet: rounded puffs would leave lens-shaped gaps where four meet, the
+    // bright sky showing through them.
+    let deck = s.axes[0].z * smoothstep(0.0, 0.4, middle);
+    return max(smoothstep(0.35, 0.6, cover - (1.0 - middle) * 0.5), deck);
 }
 
 @fragment
@@ -118,8 +157,9 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     let dir = normalize(mat(sky[0]) * in.at);
     let size = s.extra.x;
     let low = s.extra.z;
+    let thick = max(s.extra.y, CLOUD_THICKNESS);
     let reach = s.extra.w;
-    let high = low + s.extra.y;
+    let high = low + thick;
     var near = 0.0;
     var far = reach / max(length(dir.xz), 0.0001);
     if abs(dir.y) > 0.00001 {
@@ -131,85 +171,128 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
     if near >= far {
         discard;
     }
+    far = min(far, near + CLOUD_SPAN);
     let dims = vec2<f32>(f32(s.ids.z), f32(s.ids.w));
-    let start = s.uv.xy + dir.xz * near / size;
-    var cell = floor(start);
-    let turn = sign(dir.xz);
-    let delta = size / max(abs(dir.xz), vec2(0.000001));
-    var next = near + select(start - cell, cell + vec2(1.0) - start, dir.xz > vec2(0.0)) * delta;
-    var t = near;
-    // 0: came in through a plane, 1 and 2: through a side along x or z.
-    var side = 0u;
-    // From inside a cloud, it isn't what is seen.
-    var within = near == 0.0 && cloud_at(s, cell, dims);
-    var hit = false;
-    for (var i = 0u; i < CLOUD_STEPS; i++) {
-        let filled = cloud_at(s, cell, dims);
-        if filled && !within {
-            hit = true;
-            break;
+    let step = (far - near) / f32(CLOUD_SAMPLES);
+    // A different start per pixel, against banding.
+    let jitter = fract(sin(dot(in.clip.xy, vec2(12.9898, 78.233))) * 43758.5453);
+    let p = palette();
+    let lit_sky = open_sky() && !in_liquid();
+    let dark = s.axes[0].y;
+    let mu = max(dot(dir, scene.sun.xyz), 0.0);
+    var through = 1.0;
+    var light = vec3(0.0);
+    var seen = far;
+    for (var i = 0u; i < CLOUD_SAMPLES; i++) {
+        let t = near + (f32(i) + jitter) * step;
+        let rel = dir * t;
+        let h = clamp((rel.y - low) / thick, 0.0, 1.0);
+        let density = cloud_density(s, s.uv.xy + rel.xz / size, h, dims);
+        if density <= 0.0 {
+            continue;
         }
-        within = within && filled;
-        if next.x < next.y {
-            t = next.x;
-            next.x += delta.x;
-            cell.x += turn.x;
-            side = 1u;
+        let a = 1.0 - exp(-density * step * 0.18);
+        // Lit from above, darker underneath (more so in rain), glowing toward the sun.
+        var c = vec3(1.0);
+        if lit_sky {
+            let below = mix(p.horizon * 0.9 + p.ambient * 0.6, p.ambient * 1.6, h) * mix(1.0, 0.4, dark * (1.0 - h));
+            c = below + p.sun * light_strength() * (0.25 + 0.75 * h) * 0.95 * (1.0 - dark * 0.6);
+            c += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength() * (0.4 + 0.6 * h);
         } else {
-            t = next.y;
-            next.y += delta.y;
-            cell.y += turn.y;
-            side = 2u;
+            c = vec3(mix(0.7, 1.0, h));
         }
-        if t >= far {
+        if through > 0.5 && through * (1.0 - a) <= 0.5 {
+            seen = t;
+        }
+        light += through * a * c;
+        through *= 1.0 - a;
+        if through < 0.02 {
             break;
         }
     }
-    if !hit {
+    let alpha_cloud = 1.0 - through;
+    if alpha_cloud < 0.01 {
         discard;
     }
-    // The face the ray came in through, lit by the sun and the sky like blocks are.
-    var n = vec3(-turn.x, 0.0, 0.0);
-    if side == 2u {
-        n = vec3(0.0, 0.0, -turn.y);
-    } else if side == 0u {
-        n = vec3(0.0, select(1.0, -1.0, dir.y > 0.0), 0.0);
-    }
-    let rel = dir * t;
-    let dist = length(rel.xz) / reach;
-    let p = palette();
+    // The engine's color (`sky.rs`) brings rain's grey and thunder's dark; the palette the light.
     var color = s.color.rgb;
-    if open_sky() && !in_liquid() {
-        // The engine dims their color with the day (`sky.rs`); the palette lights them instead.
+    let rel = dir * seen;
+    let dist = length(rel.xz) / reach;
+    if lit_sky {
         let d = clamp(scene.sun.y * 2.0 + 0.5, 0.0, 1.0);
         let dimmed = pow(vec3(d * 0.9 + 0.1, d * 0.9 + 0.1, d * 0.85 + 0.15), vec3(2.2));
         let albedo = s.color.rgb / max(dimmed, vec3(0.005));
-        let ndl = max(dot(n, light_dir()), 0.0);
-        // Undersides take the horizon's color, so they go rose at sunset.
-        let below = mix(p.ambient * 1.6, p.horizon * 0.9 + p.ambient * 0.6, select(0.0, 1.0, n.y < 0.0));
-        var lit = below * (0.85 + 0.15 * n.y) + p.sun * light_strength() * ndl * 0.95;
-        // Toward the sun they glow, and the rim facing it shines.
-        let mu = max(dot(dir, scene.sun.xyz), 0.0);
-        lit += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength();
-        color = albedo * lit;
+        color = albedo * light / alpha_cloud;
         color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.3, 1.0, dist));
         color = display(fog_through(color, dir * 220.0, 1.0));
     } else {
-        var shade = select(0.9, 0.8, side == 1u);
-        if side == 0u {
-            shade = select(1.0, 0.7, dir.y > 0.0);
-        }
-        color = mix(s.color.rgb * shade, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
+        color = mix(s.color.rgb * light / alpha_cloud, scene.fog_color.rgb, smoothstep(0.5, 1.0, dist));
     }
-    let alpha = s.color.a * (1.0 - smoothstep(0.8, 1.0, dist));
+    let alpha = s.color.a * alpha_cloud * (1.0 - smoothstep(0.8, 1.0, dist));
     let clip = scene.view_proj * vec4(rel, 1.0);
     return CloudPixel(vec4(color * alpha, alpha), clip.z / clip.w);
+}
+
+// A star as the pack sees it: round, of its own brightness (few bright, many faint) and color (its
+// temperature: orange, white, blue-white), twinkling more low down, and showing only once the sky
+// is dark enough for it (the brightest first at dusk). rgb tints, a scales the engine's star.
+fn star_look(star: u32, uv: vec2<f32>, dir: vec3<f32>) -> vec4<f32> {
+    let bright = pow(unit(star * 9u + 5u), 3.0);
+    let warmth = unit(star * 9u + 6u);
+    var tint = mix(vec3(1.0, 0.62, 0.38), vec3(1.0), smoothstep(0.0, 0.3, warmth));
+    tint = mix(tint, vec3(0.66, 0.8, 1.0), smoothstep(0.55, 1.0, warmth));
+    // Stars are a pixel or two across: no shape of their own, the size tells the bright ones.
+    let shape = 1.0;
+    let speed = 2.0 + 3.0 * unit(star * 9u + 7u);
+    let twinkle = 1.0 - (0.08 + 0.2 * (1.0 - clamp(dir.y, 0.0, 1.0))) * (0.5 + 0.5 * sin(scene.params.w * speed + unit(star * 9u + 8u) * 40.0));
+    let dark = smoothstep(0.05, -0.18, scene.sun.y);
+    let needs = 1.0 - (0.25 + 0.75 * bright);
+    let shows = smoothstep(needs, needs + 0.15, dark);
+    return vec4(tint, shape * (1.0 + 1.6 * bright) * twinkle * shows);
+}
+
+// The Milky Way: a faint band across the night, fixed among the stars (it turns with the sky, as the
+// sun does), mottled, with dark lanes along its middle; washed out by a bright moon and haze low down.
+fn milky_way(dir: vec3<f32>) -> vec3<f32> {
+    let dark = smoothstep(-0.08, -0.25, scene.sun.y);
+    if dark <= 0.0 || dir.y <= 0.0 {
+        return vec3(0.0);
+    }
+    let a = atan2(scene.sun.y, scene.sun.x);
+    let local = vec3(dir.x * cos(a) + dir.y * sin(a), -dir.x * sin(a) + dir.y * cos(a), dir.z);
+    let d = dot(local, normalize(vec3(0.25, 0.35, 0.9)));
+    let band = exp(-(d / 0.16) * (d / 0.16));
+    let mottle = noise3(local * 6.0) * 0.6 + noise3(local * 14.0) * 0.4;
+    let lane = smoothstep(0.55, 0.75, noise3(local * 9.0 + vec3(3.0))) * exp(-(d / 0.05) * (d / 0.05));
+    let glow = band * (0.4 + 0.8 * mottle) * (1.0 - 0.6 * lane);
+    let clear = (1.0 - rain_amount()) * (1.0 - 0.6 * moon_light()) * smoothstep(0.0, 0.25, dir.y);
+    return vec3(0.75, 0.78, 0.95) * glow * 0.03 * dark * clear;
+}
+
+// An aurora on clear nights where the place lies under the auroral oval (`scene.ground.w`, by
+// latitude): curtains of ridged noise in the northern sky, green low and purple higher up, drifting
+// slowly, on a coarse grid of directions so they stay blocky.
+fn aurora(dir: vec3<f32>) -> vec3<f32> {
+    let strength = scene.ground.w * smoothstep(-0.1, -0.25, scene.sun.y) * (1.0 - rain_amount()) * (1.0 - scene.weather.z);
+    if strength <= 0.0 || dir.y <= 0.02 {
+        return vec3(0.0);
+    }
+    let d = floor(dir * 160.0) / 160.0;
+    let north = smoothstep(-0.1, 0.6, -d.z);
+    let t = scene.params.w;
+    // On a ceiling over the land, so the curtains run along the sky and close toward the horizon.
+    let p = d.xz / max(d.y, 0.05);
+    let ridge = 1.0 - abs(noise3(vec3(p.x * 0.35 + t * 0.03, t * 0.05, p.y * 0.12)) * 2.0 - 1.0);
+    let curtain = pow(ridge, 6.0) * (0.6 + 0.4 * noise3(vec3(p.x * 1.3, t * 0.2, p.y * 0.4)));
+    let height = smoothstep(0.02, 0.15, d.y) * (1.0 - smoothstep(0.35, 0.75, d.y));
+    let color = mix(vec3(0.1, 0.9, 0.45), vec3(0.55, 0.25, 0.85), smoothstep(0.15, 0.55, d.y));
+    return color * curtain * height * north * strength * 0.12;
 }
 
 // Vanilla's sky is a disc 16 blocks above the eye fading into fog with distance.
 fn gradient(dir: vec3<f32>, s: Sky) -> vec4<f32> {
     if open_sky() && !in_liquid() {
-        var c = sky_color(dir);
+        var c = sky_color(dir) + milky_way(dir) + aurora(dir);
         if dir.y < 0.0 {
             // From below sea level, vanilla's dark of the void.
             c *= 1.0 - s.uv.x * smoothstep(0.0, 0.08, -dir.y);
@@ -302,6 +385,11 @@ fn fs(in: VOut) -> @location(0) vec4<f32> {
     var c = sky_shade(s.ids.z, SkyPixel(dir, local, uv, albedo, vec4(s.color.rgb, 1.0), scene.params.z, scene.params.w));
     var a = c.a * s.color.a;
     var rgb = c.rgb;
+    if s.ids.y == SKY_STARS && open_sky() && !in_liquid() {
+        let star = star_look(in.star, in.uv, dir);
+        rgb *= star.rgb;
+        a *= star.a;
+    }
     if open_sky() && !in_liquid() {
         // Bodies shine through the tone curve; stars dim in the haze low down.
         // The sun shines through the tone curve; the moon keeps its markings.

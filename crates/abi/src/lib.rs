@@ -346,6 +346,8 @@ pub mod air_flags {
     pub const SNOWING: u32 = 1;
     /// Dust or sand blows (the fog is dust).
     pub const DUST: u32 = 2;
+    /// Bits 8 to 15: how strong an aurora is on clear nights there, 0 to 255.
+    pub const AURORA_SHIFT: u32 = 8;
 }
 
 pub mod block_flags {
@@ -2311,6 +2313,14 @@ pub struct Host {
     /// while a player is near, more for one ticked only now and then
     /// (`core:entity_activation_distance`). What counts down per tick counts down by this.
     pub entity_tick_elapsed: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64) -> u32,
+    /// Tint colors from now on, over the content's while the world runs (a mod's seasons): for
+    /// each of `len` entries a biome (id), a tint kind (name, either may be another mod's) and its
+    /// 0xRRGGBB. What is not named keeps the content's color; 0 entries: all the content's again.
+    /// Replaces what an earlier call set. Players see it.
+    pub set_biome_tints: unsafe extern "C" fn(world: *mut WorldCtx, biomes: *const u32, kinds: *const Str, colors: *const u32, len: u32),
+    /// The content's color (0xRRGGBB) of tint kind `kind` in biome `biome` (id): the biome's own,
+    /// else the kind's default; 0 for an unknown kind.
+    pub content_tint: unsafe extern "C" fn(biome: u32, kind: Str) -> u32,
 }
 
 /// Natural spawning around players (`Host::reg_spawn`). Every two seconds the engine tries a few

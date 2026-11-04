@@ -70,6 +70,8 @@ fn palette() -> Palette {
     } else {
         p = blend(night, dusk, smoothstep(-0.3, -0.14, e));
     }
+    // A new moon's night is darker than a full moon's.
+    p.ambient *= mix(1.0, mix(0.55, 1.0, moon_light()), smoothstep(-0.14, -0.3, e));
     // Overcast: grey and dim, and the sun no more than a brighter part of the sky.
     let r = rain_amount();
     let grey = vec3(luma(p.horizon)) * vec3(0.92, 0.95, 1.0);
@@ -81,6 +83,18 @@ fn palette() -> Palette {
     return p;
 }
 
+// How much of golden hour and sunset there is: 0 by day and at night, 1 with the sun just above the
+// horizon. The grade warms with it, and the glowing sky lights the ground.
+fn golden() -> f32 {
+    let e = scene.sun.y;
+    return (1.0 - smoothstep(0.08, 0.35, e)) * smoothstep(-0.06, 0.03, e);
+}
+
+// The moon's light by its phase: 1 full, 0 new (`scene.eye.w`, the engine's).
+fn moon_light() -> f32 {
+    return clamp(scene.eye.w, 0.0, 1.0);
+}
+
 // Where direct light comes from: the sun while it is up, then the moon opposite it.
 fn light_dir() -> vec3<f32> {
     return select(-scene.sun.xyz, scene.sun.xyz, scene.sun.y > -0.06);
@@ -90,7 +104,7 @@ fn light_dir() -> vec3<f32> {
 // up a little after.
 fn light_strength() -> f32 {
     let e = scene.sun.y;
-    return select(smoothstep(0.06, 0.2, -e), smoothstep(-0.04, 0.05, e), e > -0.06);
+    return select(smoothstep(0.06, 0.2, -e) * mix(0.2, 1.0, moon_light()), smoothstep(-0.04, 0.05, e), e > -0.06);
 }
 
 // ---- the sky ----
@@ -113,7 +127,7 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     let low = 1.0 - smoothstep(0.0, 0.2, abs(scene.sun.y));
     // Away from the sun the sunset sky goes rose and violet.
     let away = (0.5 - 0.5 * mu) * (1.0 - h) * low;
-    c = mix(c, c * vec3(0.95, 0.72, 1.12) + vec3(0.04, 0.0, 0.05), away * 0.7);
+    c = mix(c, c * vec3(0.97, 0.80, 1.06) + vec3(0.03, 0.0, 0.03), away * 0.4);
     // Toward it, a warmer band low on the horizon.
     let toward = pow(max(mu, 0.0), 2.0) * pow(1.0 - h, 3.0) * low;
     c += vec3(0.55, 0.22, 0.05) * toward;
@@ -227,6 +241,9 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // More of the sky's light comes from above than from the sides, and little from below.
     let hemi = 0.62 + 0.38 * n.y;
     var c = p.ambient * sky * hemi * ao;
+    // At golden hour the sky round the low sun glows: a warm fill on everything under it, in the
+    // shade too, so the hour reaches the ground and not only the sky.
+    c += p.glow * golden() * 0.35 * sky * hemi * ao;
     // Direct light only where the sky reaches (it keeps caves out of reach of the traced shadow's
     // gaps), and without corner shading: corners are dark where little sky gets in.
     let open = smoothstep(0.5, 0.95, light.x);
@@ -413,9 +430,16 @@ fn shoulder(x: vec3<f32>) -> vec3<f32> {
 }
 
 // The tone curve and a little more color: linear light for the sRGB screen.
+// The grade on top: the darks a little cool and the lights warmer as the sun goes down (warm
+// light, blue shade), colour held back a little (vanilla's, not a saturated look), and a cool
+// floor so nothing is ever pure black.
 fn display(c: vec3<f32>) -> vec3<f32> {
     var t = shoulder(max(c, vec3(0.0)));
+    // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
+    let lights = smoothstep(0.02, 0.22, luma(t));
+    t *= mix(vec3(0.975, 0.99, 1.03), mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
     let y = luma(t);
-    t = max(mix(vec3(y), t, 1.06), vec3(0.0));
+    t = max(mix(vec3(y), t, 0.98), vec3(0.0));
+    t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034);
     return clamp(t, vec3(0.0), vec3(1.0));
 }

@@ -12,6 +12,11 @@ use crate::species::{SPECIES, Species};
 /// of fresh grass is its 2-3% of dry matter.
 pub const MEAL: f32 = 0.1;
 
+/// A wild one goes after food (grazing, `forage.rs`; hunting, `hunt.rs`) under this share of its
+/// food, and stops when this full.
+pub const HUNGRY: f32 = 0.6;
+pub const FULL: f32 = 0.95;
+
 /// The share of natural spawns that still come where nothing grows this season (`forage.rs`):
 /// animals live through a winter or a drought, fewer and thinner.
 pub const SPAWN_FLOOR: f32 = 0.2;

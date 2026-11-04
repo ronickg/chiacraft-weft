@@ -42,7 +42,9 @@ pub fn register(r: &mut Registry) {
         let w = q.world();
         let be = w.block_entity(q.pos());
         if be != 0 {
-            age_inventory(&w, be);
+            // Stacks merge only in a chest: a pot takes one of each slot for a stew and a rack
+            // dries each slot apart (integration review: merging broke both).
+            age_inventory(&w, be, crate::blocks::CHEST.is(q.state()));
         }
         Verdict::Abstain
     });
@@ -80,16 +82,17 @@ pub fn effects(v: &mut Vitals, s: &stomach::Stomach, capacity: f32) {
     set(v, Effect::FoodPoisoning, v.sick > 0.0);
 }
 
-/// Stamps the food one carries with the day it was made (cooked food fresh off the fire as hot,
-/// with the second) and moves its freshness on as it ages: stale, then spoiled (`food::freshness`;
+/// Stamps the food one carries with the day it was made (what was cooked came hot off the fire,
+/// stamped there) and moves its freshness on as it ages: stale, then spoiled (`food::freshness`;
 /// a stew by its shortest-keeping ingredient, `meals::keeps`); hot food cools after a while and
 /// then stacks with the day's.
 pub fn age(w: &World, player: u64) {
-    age_inventory(w, player);
+    age_inventory(w, player, true);
 }
 
-/// `age` for every food stack in an inventory (a player's, a chest's).
-pub fn age_inventory(w: &World, id: u64) {
+/// `age` for every food stack in an inventory (a player's, a chest's, a machine's), merging stacks
+/// alike (`merge_food`) when `merge`.
+pub fn age_inventory(w: &World, id: u64, merge: bool) {
     let inv = w.inventory(id);
     let now = w.day_time();
     let size = inv.size();
@@ -100,7 +103,9 @@ pub fn age_inventory(w: &World, id: u64) {
             *stack = aged(*stack, now);
         }
     }
-    merge_food(&mut after);
+    if merge {
+        merge_food(&mut after);
+    }
     for (i, (b, a)) in before.iter().zip(&after).enumerate() {
         if a != b {
             inv.set(i as u32, *a);
@@ -150,19 +155,18 @@ pub fn merge_food(stacks: &mut [ItemStack]) {
 /// A food stack stamped and its freshness moved on, at day time `now`.
 fn aged(stack: ItemStack, now: u64) -> ItemStack {
     let today = (now / calendar::DAY_TICKS) as u32 + 1;
-    let (keeps, cooked) = if let Some(packed) = MEAL.stack_only(&stack) {
-        (meals::keeps(&meals::ingredients(packed)), true)
+    let keeps = if let Some(packed) = MEAL.stack_only(&stack) {
+        meals::keeps(&meals::ingredients(packed))
     } else if let Some(f) = food::find(item_name(stack.item)).map(|f| &food::FOODS[f]) {
-        (f.keeps, f.meal == food::Meal::Cooked)
+        f.keeps
     } else {
         return stack;
     };
     let mut new = stack;
+    // Stamped with today when first seen; hot only where it was cooked (the furnace, the campfire,
+    // the pot stamp it), not here: crafted bread came out hot (integration review).
     if MADE.stack_only(&stack).unwrap_or(0) == 0 {
         new = new.with(&MADE, today);
-        if cooked {
-            new = new.with(&HOT, (now / 20) as u32);
-        }
     }
     let (age, hot) = base_api::food_age(&new, now);
     if HOT.stack_only(&new).is_some() && !hot {

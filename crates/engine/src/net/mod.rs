@@ -246,6 +246,9 @@ messages! {
         /// snow lying 0..1, `air_flags`), and where the wind blows to, degrees clockwise from
         /// north (-z).
         Air { air: Vec<(u32, f32, f32, f32, u32)>, heading: f32 },
+        /// Every biome's tint colors (a mod's, `set_biome_tints`): biome by biome, one 0xRRGGBB
+        /// per tint kind; empty for the content's.
+        Tints { tints: Vec<u32> },
         /// A white flash on an entity.
         Flash(u64),
         /// Someone else's arm swings: a hit, a use, mining.
