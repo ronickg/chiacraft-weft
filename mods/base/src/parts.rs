@@ -18,8 +18,9 @@ use crafting::{KINDS, Kind, MATERIALS, Role, SHAPES, code, grades, kind_of, mate
 use weft_sdk::*;
 
 value! {
-    /// A part item's own: its material, grade (1-10) and the uses it has worn.
-    pub struct PartOf { pub material: u32, pub grade: u32, pub worn: u32 }
+    /// A part item's own: its material, grade (1-10), the uses it has worn, and its history so
+    /// far: the day it was made (`vitals::calendar`) and how often it's been repaired.
+    pub struct PartOf { pub material: u32, pub grade: u32, pub worn: u32, pub made_day: u32, pub repairs: u32 }
 }
 value! {
     /// An item's parts, slot by slot (codes, `crafting::code`), as many as `n`.
@@ -31,6 +32,10 @@ value! {
         pub materials: [u32; 4],
         pub grades: [u32; 4],
         pub worn: [u32; 4],
+        pub made_days: [u32; 4],
+        pub repairs: [u32; 4],
+        /// The item's grade: its working part's (for its tooltip).
+        pub grade: u32,
     }
 }
 pub static PART: Component<PartOf> = Component::named("base:part");
@@ -182,7 +187,8 @@ pub fn finish(w: &World, player: u64, r: &Recipe, out: ItemStack, u: f32) -> Ite
     if let Some(s) = w.component_mut(player, &SKILLS) {
         s.xp[craft] = s.xp[craft].saturating_add(crafting::skills::xp_for(grade));
     }
-    out.with(&PART, PartOf { material, grade: grade as u32, worn: 0 })
+    let made_day = (w.day_time() / vitals::calendar::DAY_TICKS) as u32;
+    out.with(&PART, PartOf { material, grade: grade as u32, worn: 0, made_day, repairs: 0 })
 }
 
 /// The skill a part recipe uses, as (its name's key, the local player's level), for the book.
@@ -208,7 +214,7 @@ fn shape_id(item: u32) -> Option<&'static str> {
 }
 
 /// The kind and its parts the stacks in `slots` build, if they build one.
-fn build(stacks: &[ItemStack]) -> Option<(&'static Kind, Vec<(Part, u32)>)> {
+fn build(stacks: &[ItemStack]) -> Option<(&'static Kind, Vec<(Part, PartOf)>)> {
     let parts: Vec<(&'static str, PartOf)> = stacks
         .iter()
         .filter(|s| !s.is_empty())
@@ -239,14 +245,14 @@ fn build(stacks: &[ItemStack]) -> Option<(&'static Kind, Vec<(Part, u32)>)> {
         })?;
         let m = material_of(p.material)?;
         let shape = SHAPES.iter().find(|s| s.kind == kind.id && s.id == *id)?;
-        out.push((Part { slot: slot.name, shape: shape.id, material: m.id, grade: p.grade.clamp(1, 10) as u8 }, p.worn));
+        out.push((Part { slot: slot.name, shape: shape.id, material: m.id, grade: p.grade.clamp(1, 10) as u8 }, *p));
     }
     Some((kind, out))
 }
 
 /// The tool `parts` make, with its numbers on the stack. Its wear so far is its most worn part's
 /// share (each part keeps its own).
-fn tool_stack(kind: &Kind, parts: &[(Part, u32)], stats: &ToolStats) -> ItemStack {
+fn tool_stack(kind: &Kind, parts: &[(Part, PartOf)], stats: &ToolStats) -> ItemStack {
     let mut p = Parts {
         kind: code(kind.id),
         n: parts.len() as u32,
@@ -255,13 +261,26 @@ fn tool_stack(kind: &Kind, parts: &[(Part, u32)], stats: &ToolStats) -> ItemStac
         materials: [0; 4],
         grades: [0; 4],
         worn: [0; 4],
+        made_days: [0; 4],
+        repairs: [0; 4],
+        grade: 0,
     };
-    for (i, (part, worn)) in parts.iter().enumerate().take(4) {
+    let working = kind
+        .slots
+        .iter()
+        .find(|s| s.role == Role::Working)
+        .map(|s| s.name);
+    for (i, (part, of)) in parts.iter().enumerate().take(4) {
         p.slots[i] = code(part.slot);
         p.shapes[i] = code(part.shape);
         p.materials[i] = code(part.material);
         p.grades[i] = part.grade as u32;
-        p.worn[i] = *worn;
+        p.worn[i] = of.worn;
+        p.made_days[i] = of.made_day;
+        p.repairs[i] = of.repairs;
+        if Some(part.slot) == working {
+            p.grade = part.grade as u32;
+        }
     }
     let uses = stats.weakest().map_or(1.0, |l| l.uses).max(1.0) as u32;
     // Wear so far: the largest share any wearing part has used.
@@ -272,7 +291,7 @@ fn tool_stack(kind: &Kind, parts: &[(Part, u32)], stats: &ToolStats) -> ItemStac
                 .life
                 .iter()
                 .find(|l| l.slot == part.slot)
-                .map(|l| *worn as f32 / l.uses.max(1.0))
+                .map(|l| worn.worn as f32 / l.uses.max(1.0))
         })
         .fold(0.0f32, f32::max);
     let stack = ItemStack::new(Item::generated(kind.id.to_string()).id(), 1)
@@ -375,7 +394,12 @@ fn apart_into(stack: &ItemStack, cut: bool) -> Vec<ItemStack> {
             continue;
         }
         let worn = (p.worn[i] as f32).max(share * life) as u32;
-        out.push(ItemStack::new(part_item(part.shape).id(), 1).with(&PART, PartOf { material: p.materials[i], grade: p.grades[i], worn }));
+        out.push(
+            ItemStack::new(part_item(part.shape).id(), 1).with(
+                &PART,
+                PartOf { material: p.materials[i], grade: p.grades[i], worn, made_day: p.made_days[i], repairs: p.repairs[i] },
+            ),
+        );
     }
     out
 }
@@ -420,7 +444,7 @@ fn repair_part(part: &ItemStack, with: &ItemStack) -> Option<ItemStack> {
     }
     let life = crafting::combine::life_of(role_of_item(part.item)?, m.id, p.grade as u8);
     let back = (life * crafting::combine::repair_share(m.id)).ceil() as u32;
-    Some(ItemStack { count: 1, ..*part }.with(&PART, PartOf { worn: p.worn.saturating_sub(back.max(1)), ..p }))
+    Some(ItemStack { count: 1, ..*part }.with(&PART, PartOf { worn: p.worn.saturating_sub(back.max(1)), repairs: p.repairs + 1, ..p }))
 }
 
 /// A tool with one unit of a material: its most worn part of that material repaired, the tool

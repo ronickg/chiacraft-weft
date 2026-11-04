@@ -101,3 +101,14 @@ change any of them in the morning.
       only hands-on work goes higher.
     - Skills are kept through death.
     - Alternative: one crafting level for everything (Survival's XP level), or faster levels.
+20. **History, first piece: numbers only.**
+    - Chosen: each part records the day it was made and its repairs, carried through building
+      and taking apart. A tool records its grade. The tooltip shows the grade's name (with its +
+      mark, ☼ for Legendary), the day made and the repairs.
+    - Who made it, where, deeds and the last 8 entries need text on items and a player's name,
+      which the engine doesn't offer a mod yet. That's the next piece: a `{text:...}` tooltip
+      placeholder and a player-name lookup.
+    - Alternative: build those two engine hooks first and do history in one go.
+    - Engine, along the way: tooltips now show lines for the stack's own components (a part's
+      grade, a tool's attack damage), and the durability line uses the stack's own maximum. It
+      used the item's, which was wrong for tools built from parts.

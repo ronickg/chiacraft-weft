@@ -609,3 +609,5 @@ skill.base.casting = Литьё
 skill.base.smithing = Кузнечное дело
 skill.base.handwork = Ручная работа
 skill.base.sewing = Шитьё
+tagged.base.part = {color:title}{if:value.grade==1}Грубое{/if}{if:value.grade==2}Неровное +{/if}{if:value.grade==3}Простое{/if}{if:value.grade==4}Добротное +{/if}{if:value.grade==5}Хорошее{/if}{if:value.grade==6}Тонкое +{/if}{if:value.grade==7}Превосходное{/if}{if:value.grade==8}Изысканное +{/if}{if:value.grade==9}Шедевр{/if}{if:value.grade==10}Легендарное ☼{/if}{/}{if:value.made_day>0} · сделано в день {value.made_day}{/if}{if:value.repairs>0} · чинилось {value.repairs}×{/if}
+tagged.base.parts = {color:title}{if:value.grade==1}Грубое{/if}{if:value.grade==2}Неровное +{/if}{if:value.grade==3}Простое{/if}{if:value.grade==4}Добротное +{/if}{if:value.grade==5}Хорошее{/if}{if:value.grade==6}Тонкое +{/if}{if:value.grade==7}Превосходное{/if}{if:value.grade==8}Изысканное +{/if}{if:value.grade==9}Шедевр{/if}{if:value.grade==10}Легендарное ☼{/if}{/} · собрано из деталей

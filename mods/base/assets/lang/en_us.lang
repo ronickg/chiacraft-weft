@@ -609,3 +609,5 @@ skill.base.casting = Casting
 skill.base.smithing = Smithing
 skill.base.handwork = Handwork
 skill.base.sewing = Sewing
+tagged.base.part = {color:title}{if:value.grade==1}Crude{/if}{if:value.grade==2}Rough +{/if}{if:value.grade==3}Plain{/if}{if:value.grade==4}Sound +{/if}{if:value.grade==5}Good{/if}{if:value.grade==6}Fine +{/if}{if:value.grade==7}Superior{/if}{if:value.grade==8}Exquisite +{/if}{if:value.grade==9}Masterwork{/if}{if:value.grade==10}Legendary ☼{/if}{/}{if:value.made_day>0} · made on day {value.made_day}{/if}{if:value.repairs>0} · repaired {value.repairs}×{/if}
+tagged.base.parts = {color:title}{if:value.grade==1}Crude{/if}{if:value.grade==2}Rough +{/if}{if:value.grade==3}Plain{/if}{if:value.grade==4}Sound +{/if}{if:value.grade==5}Good{/if}{if:value.grade==6}Fine +{/if}{if:value.grade==7}Superior{/if}{if:value.grade==8}Exquisite +{/if}{if:value.grade==9}Masterwork{/if}{if:value.grade==10}Legendary ☼{/if}{/} · built from parts

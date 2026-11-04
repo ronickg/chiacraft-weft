@@ -644,7 +644,12 @@ are rows.
      every part made.
    - A skill's level is work from memory, capped at 30.
    - The book shows the skill and level for a part.
-4. **Discovery** (built 11-04, `mods/base/src/discovery.rs`, waiting for a game run):
+4. **History, first piece** (built 11-04):
+   - Parts carry the day they were made and their repairs, through building and taking apart.
+   - The tooltip shows a part's or tool's grade name, the day made and the repairs.
+   - Not yet: maker, place, deeds, the last 8 entries. These need text on stacks and a player's
+     name (engine hooks).
+5. **Discovery** (built 11-04, `mods/base/src/discovery.rs`, waiting for a game run):
    - **Held items:** saved per player as a bitset, kept through death.
    - **The book:** shows a recipe once all its ingredients have been held, and a "?" with "2 of
      3" once some have. Creative shows all.
@@ -657,9 +662,9 @@ are rows.
    - Near misses show as "2 of 3", with the missing ingredient as "?".
    - R and U show only what you know.
    - Slice 1's book shows every recipe until then.
-5. **Stations, add-ons and the queue:** the workbench levels; the queue with sub-parts and
+6. **Stations, add-ons and the queue:** the workbench levels; the queue with sub-parts and
    refunds; cold hands and the warm room.
-6. **The rest of the parts core** (4A):
+7. **The rest of the parts core** (4A):
    - kinds, part shapes, the grade rules and traits in the crate
    - part items with their components
    - the Assemble tab: build, swap, break down
@@ -670,11 +675,11 @@ are rows.
    - history (who, when, where)
    - Today's tools become assembled kinds from wood and stone parts. Art: Chiacraft's first part
      maps and ramps.
-7. **Knapping**, the first hands-on game: flint, chert and obsidian heads and points (needs
+8. **Knapping**, the first hands-on game: flint, chert and obsidian heads and points (needs
    Content's stone items).
-8. **Armour from parts:** shell, fastening and lining, with linings as Survival's clothing
+9. **Armour from parts:** shell, fastening and lining, with linings as Survival's clothing
    warmth. Worn region textures.
-9. **Further** (4B, Ronald's pick), in this order:
+10. **Further** (4B, Ronald's pick), in this order:
    1. **Part shapes with trade-offs:** a narrow felling head or a bearded one; a long or short
       blade.
    2. **Origin and condition count:** seasoned or green wood, prime hides, ore deposits, the
@@ -683,7 +688,7 @@ are rows.
       re-honing.
    4. **Masterwork naming and the world's chronicle**, deeds in the history.
    5. **Signed history through portals**, with Phase 4's world DIDs.
-10. **Slow crafts** as machines (the tanning frame first), then **smithing and casting** with
+11. **Slow crafts** as machines (the tanning frame first), then **smithing and casting** with
    Content's copper, bronze and iron.
 
 ## Who does what
