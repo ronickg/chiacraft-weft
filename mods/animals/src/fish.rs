@@ -143,8 +143,8 @@ fn swim(w: &World, id: u64, st: &EntityState, index: usize) -> bool {
         set(w, id, s);
         return true;
     }
-    s.left -= 1;
-    s.flee = s.flee.saturating_sub(1);
+    s.left = s.left.saturating_sub(w.tick_elapsed(id) as _);
+    s.flee = s.flee.saturating_sub(w.tick_elapsed(id) as _);
     let speed = if s.flee > 0 { 1.0 } else { 0.3 };
     w.fly(id, [(d[0] / dist) as f32, (d[1] / dist) as f32, (d[2] / dist) as f32], speed);
     set(w, id, s);

@@ -116,7 +116,7 @@ pub fn behave(index: usize) -> impl Fn(&World, u64, &EntityState) -> bool + Send
         }
         if t.asking > 0 {
             set(w, id, |t| {
-                t.asking -= 1;
+                t.asking = t.asking.saturating_sub(w.tick_elapsed(id) as _);
                 if t.asking == 0 {
                     t.wait = WAIT_TICKS.0 + w.random_below(WAIT_TICKS.1 - WAIT_TICKS.0);
                 }

@@ -145,7 +145,7 @@ pub fn start(w: &World, id: u64, target: u64) -> bool {
 /// rearing on the ground).
 pub fn behave(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(b) = w.component_mut(id, &BREATH) else { return false };
-    b.cooldown = b.cooldown.saturating_sub(1);
+    b.cooldown = b.cooldown.saturating_sub(w.tick_elapsed(id) as _);
     if b.t == 0 {
         return false;
     }
