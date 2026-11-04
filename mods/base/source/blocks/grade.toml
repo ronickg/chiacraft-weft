@@ -732,3 +732,9 @@ gain = 0.965
 
 [items.flint]  # outline 0.51 -> 0.40 (the first hours: a pale chalky rind, the edge too light)
 outline = 0.79
+
+[items.fire_bed]  # outline 0.55 -> 0.40 (the first hours: pale tinder round the sticks)
+outline = 0.72
+
+[items.hand_drill]  # outline 0.47 -> 0.40 (pale dry wood)
+outline = 0.86
