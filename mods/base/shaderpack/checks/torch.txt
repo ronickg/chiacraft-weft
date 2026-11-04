@@ -25,10 +25,12 @@ wait 4
 look 0 -15
 wait 2
 shot torch_1_nothing.png
+wait 1
 bench 4 torch_nothing
 chat /tk put me 0 torch
 wait 2
 shot torch_2_held.png
+wait 1
 bench 4 torch_held
 look 90 -15
 wait 1
