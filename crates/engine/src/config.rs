@@ -518,6 +518,9 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:view_distance", ck::INT, 12.0, 2.0, 64.0, 1.0),
         // Distant terrain beyond the view (`client::lod`), in cubes; 0 off.
         ConfigDef::number("core:lod_distance", ck::INT, 256.0, 0.0, 2048.0, 16.0),
+        // The 3D world's share of the window's pixels each way (`app::world_frame`), the UI
+        // always whole; 0 picks it by the screen (fewer on high-density ones).
+        ConfigDef::number("core:render_scale", ck::FLOAT, 0.0, 0.0, 1.0, 0.05),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
