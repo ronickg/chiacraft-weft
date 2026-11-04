@@ -37,24 +37,55 @@ pub struct Plant {
     /// The seasons its last stage (the ripe fruit) can come in (`calendar` order as bits, spring
     /// 1); all four: any.
     pub ripens: u8,
+    /// The air, °C, that kills it (a crop), its fruit (a bush) or its stalk down to the base (cane,
+    /// cactus), from its research; `HARDY`: frost never hurts it.
+    pub frost: f32,
 }
 
-const fn p(block: &'static str, real: &'static str, warmth: (f32, f32, f32, f32), water: Water, days: f32, ripens: u8) -> Plant {
-    Plant { block, real, base: warmth.0, best: (warmth.1, warmth.2), max: warmth.3, water, days, ripens }
+/// Frost never hurts it (an oak sapling, the grass).
+pub const HARDY: f32 = f32::NEG_INFINITY;
+
+const fn p(
+    block: &'static str,
+    real: &'static str,
+    warmth: (f32, f32, f32, f32),
+    water: Water,
+    days: f32,
+    ripens: u8,
+    frost: f32,
+) -> Plant {
+    Plant { block, real, base: warmth.0, best: (warmth.1, warmth.2), max: warmth.3, water, days, ripens, frost }
 }
 
 const ANY: u8 = 15;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
 pub const PLANTS: [Plant; 6] = [
-    p("base:wheat", "spring wheat", (0.0, 15.0, 23.0, 34.0), Water::Moderate, 110.0, ANY),
-    p("base:berry_bush", "blueberry", (7.0, 20.0, 26.0, 32.0), Water::Moderate, 75.0, SUMMER_AUTUMN),
-    p("base:sugar_cane", "sugar cane", (12.0, 22.0, 30.0, 38.0), Water::Wet, 0.0, ANY),
-    p("base:cactus", "saguaro", (10.0, 25.0, 40.0, 50.0), Water::Dry, 0.0, ANY),
-    p("base:sapling", "oak", (5.0, 18.0, 28.0, 38.0), Water::Moderate, 0.0, ANY),
+    // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
+    // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
+    // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
+    // sprouts again); a saguaro takes brief frost down to about -7.
+    p("base:wheat", "spring wheat", (0.0, 15.0, 23.0, 34.0), Water::Moderate, 110.0, ANY, -2.0),
+    p("base:berry_bush", "blueberry", (7.0, 20.0, 26.0, 32.0), Water::Moderate, 75.0, SUMMER_AUTUMN, -2.0),
+    p("base:sugar_cane", "sugar cane", (12.0, 22.0, 30.0, 38.0), Water::Wet, 0.0, ANY, -1.0),
+    p("base:cactus", "saguaro", (10.0, 25.0, 40.0, 50.0), Water::Dry, 0.0, ANY, -7.0),
+    p("base:sapling", "oak", (5.0, 18.0, 28.0, 38.0), Water::Moderate, 0.0, ANY, HARDY),
     // Grazed grass growing back to tall grass: 15-21 days in spring (`vitals::forage`).
-    p("base:grazed_grass", "prairie grass", (5.0, 15.0, 30.0, 40.0), Water::Moderate, 18.0, ANY),
+    p("base:grazed_grass", "prairie grass", (5.0, 15.0, 30.0, 40.0), Water::Moderate, 18.0, ANY, HARDY),
 ];
+
+/// Whether air at `air` °C (a night's frost where it stands) hurts it (`Plant::frost`).
+pub fn frosted(p: &Plant, air: f32) -> bool {
+    air < p.frost
+}
+
+/// The coldest air of the middle day of `season` in a biome's climate, °C (its nights' low).
+pub fn season_low(c: &Climate, season: usize) -> f32 {
+    let day = (season as u32 * calendar::SEASON_DAYS + calendar::SEASON_DAYS / 2) as f32;
+    (0..24)
+        .map(|h| climate::air(c, day, h as f32 + 0.5))
+        .fold(f32::INFINITY, f32::min)
+}
 
 /// The plant that grows as this block.
 pub fn of(block: &str) -> Option<&'static Plant> {

@@ -1778,16 +1778,15 @@ pub static SPECIES: [Species; 34] = [
         // Standing, at the crown.
         height: (0.1, "crown"),
         // Wherever people farm and build, from the prairie to the desert's towns and the coast; few in
-        // the deep woods and the north.
+        // the deep woods. Not in the birch woods' and the Alps' winters, where it lives only on what
+        // people leave (`web`: nothing of its diet there then).
         habitats: &[
             ("base:plains", 1.0),
             ("base:savanna", 0.6),
             ("base:desert", 0.5),
             ("base:beach", 0.5),
             ("base:forest", 0.4),
-            ("base:birch_forest", 0.4),
             ("base:swamp", 0.3),
-            ("base:mountains", 0.3),
         ],
         bio: Biology {
             mass: 0.03,
@@ -2161,8 +2160,9 @@ pub static SPECIES: [Species; 34] = [
         subfamily: "",
         breed: None,
         size: Size::Small,
-        // Carrion almost only, found by smell; now and then a newborn or a stranded fish, rotting fruit.
-        eats: &[(Carrion, 0.9), (Meat, 0.05), (Fruit, 0.05)],
+        // Carrion almost only, found by smell; rotting fruit now and then (the rare newborn it kills is
+        // left out: it hunts nothing here).
+        eats: &[(Carrion, 0.95), (Fruit, 0.05)],
         prey: (0.0, 0.0),
         taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
@@ -2436,8 +2436,9 @@ pub static SPECIES: [Species; 34] = [
         // Hoofed animals above all (red and roe deer, moose and reindeer, boar, bison calves), hares
         // and beavers; carrion, its own kills' and others'.
         eats: &[(Meat, 0.85), (Carrion, 0.15)],
-        // A hare to a deer near twice its mass alone (a pack takes moose and bison).
-        prey: (0.02, 2.0),
+        // A hare to a deer or a caribou near three times its mass alone (lone wolves kill caribou; a
+        // pack takes moose, elk and bison).
+        prey: (0.02, 3.0),
         taming: Taming::Passive,
         //     health stamina food damage speed weight oxygen torpor fortitude
         base: [30.0, 220.0, 120.0, 6.0, 1.0, 60.0, 80.0, 90.0, 20.0],

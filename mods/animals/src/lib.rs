@@ -39,6 +39,7 @@ mod coyote;
 mod cretaceous;
 mod deer;
 mod dog;
+mod drink;
 mod eagle;
 mod eggs;
 mod evolution;
@@ -149,6 +150,7 @@ fn init(r: &mut Registry) {
     animal::init(r);
     comfort::init(r);
     forage::init(r);
+    drink::init(r);
     hunt::init(r);
     screen::init(r);
     taming::init(r);

@@ -65,6 +65,8 @@ pub static HOST: Host = Host {
     entity_attack,
     entity_look_at,
     entities_near,
+    entity_item,
+    entity_set_item,
     entities_near_bodies,
     in_liquid,
     entity_swing_strength,
@@ -765,6 +767,34 @@ unsafe extern "C" fn entities_near_bodies(w: *mut abi::WorldCtx, pos: *const [f6
             *out.add(i) = *id;
         }
         ids.len()
+    }
+}
+
+unsafe extern "C" fn entity_item(w: *mut abi::WorldCtx, id: u64) -> ItemStack {
+    unsafe {
+        dim(w)
+            .entities
+            .get(id)
+            .filter(|e| !e.removed)
+            .map_or(ItemStack::EMPTY, |e| e.item)
+    }
+}
+
+unsafe extern "C" fn entity_set_item(w: *mut abi::WorldCtx, id: u64, stack: ItemStack) {
+    unsafe {
+        // Only a dropped item (one that carries a stack) changes; an empty one is gone, as when
+        // it's picked up.
+        if let Some(e) = dim(w)
+            .entities
+            .get_mut(id)
+            .filter(|e| !e.removed && !e.item.is_empty())
+        {
+            if stack.is_empty() {
+                e.removed = true;
+            } else {
+                e.item = stack;
+            }
+        }
     }
 }
 

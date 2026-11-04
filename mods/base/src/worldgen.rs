@@ -57,7 +57,7 @@ pub fn register(r: &mut Registry) {
         .tag("animals")
         .tag("spawn_biome")
         .set(&TREES, 0.025)
-        .set(&GRASS_COVER, 0.25);
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:plains").unwrap_or(vitals::forage::GRASS_COVER_ELSE));
     r.biome(&FOREST)
         .set(&CLIMATE, base_api::climate("base:forest"))
         .humidity(0.25..)
@@ -67,7 +67,7 @@ pub fn register(r: &mut Registry) {
         .tag("forest")
         .tag("animals")
         .set(&TREES, 0.4)
-        .set(&GRASS_COVER, 0.12)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:birch_log:1 base:oak_log:4");
     r.biome(&BIRCH_FOREST)
         .set(&CLIMATE, base_api::climate("base:birch_forest"))
@@ -79,7 +79,7 @@ pub fn register(r: &mut Registry) {
         .tag("forest")
         .tag("animals")
         .set(&TREES, 0.45)
-        .set(&GRASS_COVER, 0.12)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:birch_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:birch_log");
     r.biome(&TAIGA)
         .set(&CLIMATE, base_api::climate("base:taiga"))
@@ -92,7 +92,7 @@ pub fn register(r: &mut Registry) {
         .tag("cold")
         .tag("animals")
         .set(&TREES, 0.45)
-        .set(&GRASS_COVER, 0.08)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:taiga").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&SNOWY)
         .set(&CLIMATE, base_api::climate("base:snowy_plains"))
@@ -128,7 +128,7 @@ pub fn register(r: &mut Registry) {
         .tag("hot")
         .tag("animals")
         .set(&TREES, 0.04)
-        .set(&GRASS_COVER, 0.35)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:savanna").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:acacia_log");
     // Warm, wet lowland: still, dark water, low trees.
     r.biome(&SWAMP)
@@ -142,7 +142,7 @@ pub fn register(r: &mut Registry) {
         .tag("wet")
         .tag("animals")
         .set(&TREES, 0.12)
-        .set(&GRASS_COVER, 0.2);
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:swamp").unwrap_or(vitals::forage::GRASS_COVER_ELSE));
     r.biome(&MOUNTAINS)
         .set(&CLIMATE, base_api::climate("base:mountains"))
         .surface("grass", "dirt", 3)
@@ -152,7 +152,7 @@ pub fn register(r: &mut Registry) {
         .tag("mountain")
         .tag("animals")
         .set(&TREES, 0.06)
-        .set(&GRASS_COVER, 0.05)
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:mountains").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&OCEAN)
         .set(&CLIMATE, base_api::climate("base:ocean"))
@@ -259,7 +259,13 @@ fn tree_at(log: u32, x: i32, y: i32, z: i32, h: u64) -> Option<TreeAt> {
     let leaves = TREE_LEAVES.on_block(log)?.0;
     let cone = CONE_TREE.on_block(log);
     let flat = FLAT_TREE.on_block(log);
-    let height = if cone { 6 + (h % 4) as i32 } else if flat { 5 + (h % 2) as i32 } else { 4 + (h % 3) as i32 };
+    let height = if cone {
+        6 + (h % 4) as i32
+    } else if flat {
+        5 + (h % 2) as i32
+    } else {
+        4 + (h % 3) as i32
+    };
     Some(TreeAt { x, y, z, log, leaves, cone, flat, height })
 }
 
@@ -362,7 +368,9 @@ fn decorate(g: &mut Gen) {
             if FROZEN.on_biome(b) {
                 continue;
             }
-            let grass_chance = GRASS_COVER.on_biome(b).unwrap_or(0.05) as f64;
+            let grass_chance = GRASS_COVER
+                .on_biome(b)
+                .unwrap_or(vitals::forage::GRASS_COVER_ELSE) as f64;
             // What is under the lowest layer takes a look at the terrain: only if anything would grow.
             if y == 0 && roll >= grass_chance.max(0.08) {
                 continue;

@@ -526,6 +526,13 @@ const OPS: &[(&str, &str, Run)] = &[
         let list: Vec<String> = biomes.iter().map(|(n, k)| format!("{n}={k}")).collect();
         Ok(format!("{} | crystals {in_cave} {elsewhere}", list.join(" ")))
     }),
+    ("drop", "<item:item> <pos:pos> [count:int]", |w, cmd, _, _| {
+        // One dropped stack there (food for animals to find: `animals` forage.rs).
+        let p = pos(cmd, "pos")?;
+        let count: u32 = int(cmd, "count").unwrap_or(1).clamp(1, 64);
+        w.spawn_item([p[0] as f64 + 0.5, p[1] as f64 + 0.2, p[2] as f64 + 0.5], ItemStack::new(id(cmd, "item")?, count));
+        Ok(format!("dropped {count}"))
+    }),
     ("drops", "<n:int>", |w, cmd, _, me| {
         // `n` dropped stacks of a few kinds (blocks and sprites) in a grid north of the
         // player, 1.1 apart so they do not merge.

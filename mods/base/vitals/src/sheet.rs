@@ -145,7 +145,7 @@ fn climates(w: &mut String) {
 fn plant_table(w: &mut String) {
     let _ = writeln!(
         w,
-        "## Plants\n\nWhat each growing plant needs (`vitals::plants`, from `reports/ecology/Plants and crops.md`): the air it grows in (from, best, to), its water, its real days to harvest and the game's minutes at the best rate, and where and in which seasons it grows at least a third of its best (sp, su, au, wi), with each biome's rain and warmth.\n\n| plant | real plant | °C | water | real days | minutes | grows |\n|---|---|---|---|---|---|---|"
+        "## Plants\n\nWhat each growing plant needs (`vitals::plants`, from `reports/ecology/Plants and crops.md`): the air it grows in (from, best, to), its water, the frost that kills it (or its fruit, or its stalk to the base), its real days to harvest and the game's minutes at the best rate, and where and in which seasons it grows at least a third of its best (sp, su, au, wi; marked * where that season's nights freeze it), with each biome's rain and warmth.\n\n| plant | real plant | °C | water | frost | real days | minutes | grows |\n|---|---|---|---|---|---|---|---|"
     );
     const SHORT: [&str; 4] = ["sp", "su", "au", "wi"];
     for p in &plants::PLANTS {
@@ -154,9 +154,9 @@ fn plant_table(w: &mut String) {
             .iter()
             .filter(|c| !c.underground)
             .filter_map(|c| {
-                let seasons: Vec<&str> = (0..4)
+                let seasons: Vec<String> = (0..4)
                     .filter(|&s| plants::season_rate(p, c, s) >= 0.33)
-                    .map(|s| SHORT[s])
+                    .map(|s| if plants::frosted(p, plants::season_low(c, s)) { format!("{}*", SHORT[s]) } else { SHORT[s].to_string() })
                     .collect();
                 (!seasons.is_empty()).then(|| format!("{} ({})", c.biome.split(':').nth(1).unwrap_or(c.biome), seasons.join(" ")))
             })
@@ -164,7 +164,7 @@ fn plant_table(w: &mut String) {
             .join(", ");
         let _ = writeln!(
             w,
-            "| {} | {} | {}, {}-{}, {} | {:?} | {} | {minutes} | {grows} |",
+            "| {} | {} | {}, {}-{}, {} | {:?} | {} | {} | {minutes} | {grows} |",
             p.block,
             p.real,
             p.base,
@@ -172,6 +172,7 @@ fn plant_table(w: &mut String) {
             p.best.1,
             p.max,
             p.water,
+            if p.frost > plants::HARDY { format!("{} °C", p.frost) } else { "hardy".into() },
             if p.days > 0.0 { format!("{}", p.days) } else { "-".into() }
         );
     }
@@ -209,6 +210,13 @@ fn forage_table(w: &mut String) {
             }
         };
         let _ = writeln!(w, "| {block} | {} | {} | {eaten} | {back} |", f.category.name(), f.food);
+    }
+    let _ = writeln!(
+        w,
+        "\nOn the ground, animals eat dropped food of their diet one item a mouthful: every food (the foods table, by its kind and portion) and these seeds; spoiled food only carrion eaters. An item fills an animal by its weight against a meal of a tenth of the animal's mass (`animals_core::needs`).\n\n| item | kind | grams |\n|---|---|---|"
+    );
+    for (item, c, grams) in forage::DROPPED {
+        let _ = writeln!(w, "| {item} | {} | {grams} |", c.name());
     }
     let _ = writeln!(w);
 }

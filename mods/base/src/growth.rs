@@ -3,7 +3,10 @@
 //! and the soil's water from the last days' rain), and goes ahead with that chance. So wheat
 //! rests through winter and a drought, berries ripen only in their season, and a field by water
 //! keeps growing when the rain stops. Unloaded plants catch up at today's season. `/growth` says
-//! how a crop would grow where you stand.
+//! how a crop would grow where you stand. Frost hurts the tender ones (`vitals::plants`, `frost`):
+//! a growth step in air colder than the plant takes (a night's frost where it stands; a fire
+//! nearby keeps it off) kills spring wheat, takes a berry bush's fruit, and kills a cane's or a
+//! cactus's stalk down to its base, which grows again in spring.
 
 use vitals::plants::{self, Plant};
 use weft_sdk::*;
@@ -47,6 +50,14 @@ pub fn step_secs(block: &str, steps: u32, game: f32) -> f32 {
 pub fn grow(e: &mut BlockEvent, block: &str, last: bool, step: impl FnOnce(&mut BlockEvent)) {
     let p = plant(block);
     let w = e.world();
+    if p.frost > plants::HARDY {
+        let at = e.pos().map(|v| v as f64 + 0.5);
+        let air = base_api::air_at(&w, [at[0], at[1] - 0.5, at[2]], 0.5, false, 3, |_| {}).celsius;
+        if plants::frosted(p, air) {
+            frost(e, block);
+            return;
+        }
+    }
     let ground = base_api::ground_at(&w, e.pos());
     if last && !plants::ripens_in(p, ground.season) {
         return;
@@ -59,6 +70,29 @@ pub fn grow(e: &mut BlockEvent, block: &str, last: bool, step: impl FnOnce(&mut 
         return;
     }
     step(e);
+}
+
+/// What a frost does to the plant at `e` (`grow`).
+fn frost(e: &mut BlockEvent, block: &str) {
+    let w = e.world();
+    let pos = e.pos();
+    let below = [pos[0], pos[1] - 1, pos[2]];
+    let above = [pos[0], pos[1] + 1, pos[2]];
+    match block {
+        // The crop dies; the farmland stays.
+        "base:wheat" => {
+            w.set(pos, 0);
+        }
+        // The flowers and fruit die; the bush lives.
+        "base:berry_bush" if age(e) > 1 => {
+            w.set_prop(pos, "age", "1");
+        }
+        // The stalk dies from the top, down to the base, which sprouts again in spring.
+        "base:sugar_cane" | "base:cactus" if w.get(below) == e.state() && w.get(above) != e.state() => {
+            w.set(pos, 0);
+        }
+        _ => {}
+    }
 }
 
 /// The block's `age` one on, up to `max`.
