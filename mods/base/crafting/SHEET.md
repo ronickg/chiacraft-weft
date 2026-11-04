@@ -28,6 +28,8 @@ Points: material up to 40, work up to 40 (from memory up to 30, a machine 22), s
 | obsidian | working | 2.4 | 1.8 | 100 | 40 | 3.2 | 1.5 | - | - | razor |
 | bone | working, holding | 1.9 | 1.5 | 50 | 90 | 2.5 | 0.5 | uses +5%, speed +0% | - | tough |
 | antler | working, holding | 1.9 | 1.5 | 50 | 90 | 2.5 | 0.5 | uses +8%, speed +0% | - | tough |
+| stone | working | 2.7 | 1.8 | 100 | 70 | 3 | 1 | - | - | common |
+| diamond | working | 3.5 | 1 | 300 | 1500 | 8 | 3 | - | - | - |
 | copper | working, fitting | 8.96 | 1 | 150 | 150 | 5 | 1.5 | - | 120 uses | soft |
 | bronze | working, fitting | 8.8 | 1 | 200 | 250 | 7 | 2 | - | 220 uses | recastable |
 | wrought_iron | working, fitting | 7.7 | 1 | 220 | 275 | 7 | 2 | - | 260 uses | weldable |
