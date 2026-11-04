@@ -664,15 +664,15 @@ fn animal_screen(ui: &mut Ui) {
             });
             // The header in the rows' own columns: name, bar, value, wild, tamed, +. A header
             // lines up as its column's values do (centred over centred counts).
-            ui.row(S::row().gap(3.0), |ui| {
-                ui.row(S::row().w(8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W), |_| {});
-                ui.row(S::row().w(STAT_WILD_W).center(), |ui| {
-                    ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.wild_points", &[])
-                });
-                ui.row(S::row().w(STAT_TAMED_W).center(), |ui| {
-                    ui.text_styled(S::default().class("dim").no_wrap(), "screen.animals.tamed_points", &[])
-                });
-                ui.row(S::row().w(10.0), |_| {});
+            // The columns' headings, each centred over its column and free to reach past it into
+            // the empty heading room beside it: in a row the longer Russian ones ("Дикий" 17.5,
+            // "Ручной" 20.5 GUI px) were shrunk to the columns' 14 and 20.
+            ui.row(S::row().size(STAT_ROW_W, 8.5), |ui| {
+                let wild = 8.0 + 3.0 + 34.0 + 3.0 + STAT_BAR.0 + 3.0 + STAT_VALUE_W + 3.0;
+                let tamed = wild + STAT_WILD_W + 3.0;
+                for (x, w, key) in [(wild, STAT_WILD_W, "screen.animals.wild_points"), (tamed, STAT_TAMED_W, "screen.animals.tamed_points")] {
+                    ui.text_styled(S::default().class("dim").no_wrap().at_pivot(x + w / 2.0, 0.0, [0.5, 0.0]), key, &[]);
+                }
             });
             for (i, name) in STAT_NAMES.iter().enumerate() {
                 if i == species::TORPOR {
