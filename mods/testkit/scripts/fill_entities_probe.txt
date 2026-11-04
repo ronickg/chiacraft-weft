@@ -1,7 +1,8 @@
-# Entities spawned on ground a big /tk fill just changed aren't drawn, though the server has
-# them (Tester 2, 11-04). Logs each one as the server and the client have it ("entities:" lines:
-# position, block under, light, whether the client knows it at all), with shots looking down
-# at them, from above, after leaving and coming back, and a control without the fill.
+# Logs each entity as the server and the client have it ("entities:" lines: position, block
+# under, light, or MISSING when the client doesn't know it), with shots looking down at them.
+# Written for "animals spawned after a big /tk fill aren't drawn" (11-04), which turned out to be
+# wild animals running from the player: within 2 s they were 10-20 blocks off, at the cleared
+# ground's edge or out of view. The world is frozen right after they spawn so they stay put.
 # Positive pitch looks up: these look down.
 loaded
 wait 3
@@ -18,11 +19,14 @@ chat /tk spawn animals:grey_wolf ~0 ~ ~6
 chat /tk spawn animals:jaguar ~4 ~ ~6
 chat /tk spawn animals:raptor ~-4 ~ ~10
 chat /tk spawn animals:capybara ~4 ~ ~11
+chat /tick freeze
 wait 2
 entities 20
 look 180 -25
 wait 1
 shot fill_a_down.png
+# Unfrozen for 10 s: where they run.
+chat /tick unfreeze
 wait 10
 entities 20
 look 180 -25
@@ -34,25 +38,4 @@ look 180 -60
 wait 2
 entities 32
 shot fill_c_above.png
-chat /tp ~ ~-12 ~
-# 3. Away (beyond the send distance) and back: the client forgets and spawns them again.
-chat /tp ~200 ~ ~
-wait 4
-chat /tp ~-200 ~ ~
-wait 4
-entities 20
-look 180 -25
-wait 1
-shot fill_d_back.png
-# 4. Control, 60 blocks to +x on untouched ground: the same animals, no fill.
-chat /tp ~60 ~ ~
-wait 3
-where control
-chat /tk spawn animals:grey_wolf ~0 ~ ~6
-chat /tk spawn animals:capybara ~4 ~ ~8
-wait 2
-entities 12
-look 180 -25
-wait 1
-shot fill_e_control.png
 quit
