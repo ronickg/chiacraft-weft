@@ -557,3 +557,15 @@ sword, about 100 XP.
 - Not done here: R and U with nothing hovered (the engine's `app.rs` `recipe_keys` only looks
   under the cursor in a screen), the death screen's cause, the HUD labels (the UI session).
 
+**14. The first night: "Campfire keeps you safe"** (Ronald, 2026-11-04, via Planner):
+
+- Normal monsters stay. A fresh player in arrival clothes on the plains died to one zombie in the
+  first night (Tester's runs); the answer is the campfire, not weaker nights.
+- The night hint comes each evening at dusk (16:00 to 18:00, two game hours before dark) until the
+  player builds a campfire: "Night falls at 18:00, and monsters come out in the dark. Build a
+  campfire (two logs, two sticks): no monster appears in its light, and it warms you." A torch or
+  a bed no longer stills it.
+- Its light (15) keeps monsters from spawning within about eight blocks (they need light 6 or
+  less). Whether one wandering in from the dark still reaches a player by a fire is checked in
+  Tester's rerun; if they do, the next step is monsters keeping out of a campfire's light.
+

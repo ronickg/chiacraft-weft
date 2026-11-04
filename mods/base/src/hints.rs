@@ -49,7 +49,12 @@ static LOG_TAG: Tag = Tag::named("logs");
 static TABLE_TAG: Tag = Tag::named("crafting_tables");
 static FURNACE_TAG: Tag = Tag::named("furnaces");
 static RAW_MEAT_TAG: Tag = Tag::named("raw_meat");
-static FIRE_TAGS: [Tag; 3] = [Tag::named("campfires"), Tag::named("torches"), Tag::named("beds")];
+static CAMPFIRE_TAG: Tag = Tag::named("campfires");
+/// The evening the night hint was last shown (the day count; not saved).
+static NIGHT_SHOWN: Component<u32> = Component::named("hints_night_shown");
+/// The hours the night hint shows in: from two game hours before dark (sunset is 18:00 in spring,
+/// monsters need the dark after it), so a fresh player has time to build a fire.
+const DUSK: std::ops::Range<f32> = 16.0..18.0;
 
 pub fn register(r: &mut Registry) {
     r.config(&SHOW).bool(true);
@@ -57,12 +62,15 @@ pub fn register(r: &mut Registry) {
     r.attach(&PLAYER, &SEEN);
     r.entity_component(&WAS_FREEZING, 0, 0);
     r.attach(&PLAYER, &WAS_FREEZING);
+    r.entity_component(&NIGHT_SHOWN, u32::MAX, 0);
+    r.attach(&PLAYER, &NIGHT_SHOWN);
     r.world_tick(watch);
-    // A fire, a torch or a bed placed: night holds nothing new to tell.
+    // A campfire built: the night hint has done its work (Ronald, 11-04: "Campfire keeps you
+    // safe"; its light keeps monsters from spawning near it).
     r.on(&BLOCK_PLACED, |b| {
         let w = b.world();
         for c in b.iter() {
-            if FIRE_TAGS.iter().any(|t| t.on_block(c.state)) {
+            if CAMPFIRE_TAG.on_block(c.state) {
                 mark(&w, c.player, NIGHT);
             }
         }
@@ -130,8 +138,15 @@ fn watch(w: &World) {
         if logs && !table {
             once(w, id, TABLE);
         }
-        if (16.0..20.0).contains(&hour) {
-            once(w, id, NIGHT);
+        // Each evening at dusk until a campfire is built.
+        if DUSK.contains(&hour) && !seen(w, id, NIGHT) {
+            let day = (w.day_time() / 24000) as u32;
+            if let Some(shown) = w.component_mut(id, &NIGHT_SHOWN)
+                && *shown != day
+            {
+                *shown = day;
+                w.send(id, &HINT, &Hint { hint: NIGHT, a: 0, b: 0 });
+            }
         }
         if has(&RAW_MEAT_TAG) {
             once(w, id, RAW_MEAT);
