@@ -149,10 +149,14 @@ fn air_of(w: &World, id: u32, c: &Climate) -> BiomeAir {
 /// Biome `id`'s share in a per-biome list (`air::AURORA`, `air::CANOPY`) as 0 to 255, 0 for one
 /// not listed; `ids` caches the list's biome ids.
 fn share_of(ids: &'static OnceLock<Vec<(u32, u32)>>, list: &[(&str, f32)], id: u32) -> u32 {
-    ids.get_or_init(|| list.iter().map(|&(name, s)| (Biome::generated(name.to_string()).id(), (s.clamp(0.0, 1.0) * 255.0) as u32)).collect())
-        .iter()
-        .find(|a| a.0 == id)
-        .map_or(0, |a| a.1)
+    ids.get_or_init(|| {
+        list.iter()
+            .map(|&(name, s)| (Biome::generated(name.to_string()).id(), (s.clamp(0.0, 1.0) * 255.0) as u32))
+            .collect()
+    })
+    .iter()
+    .find(|a| a.0 == id)
+    .map_or(0, |a| a.1)
 }
 
 /// How strong an aurora is in biome `id` on clear nights (`air::AURORA`, by latitude), and how
