@@ -46,11 +46,13 @@ ROLES = [("coat", 0, 0), ("coat", 0, -1.2), ("coat", 1, 0), ("coat", 0.3, -0.6),
 
 # Eyes on the sides of the head: a dark ring, an amber-brown iris round a dark pupil, a catchlight.
 EYES.update({
-    "proto": dict(pattern=[".OOO.",
-                           "OPPHO",
-                           "OIPPO",
-                           ".OOO."], colors={"O": (42, 32, 26), "P": (20, 16, 14), "H": (226, 226, 222),
-                                             "I": (150, 104, 48)}, halo="none"),
+    "proto": dict(pattern=["..OOO..",
+                           ".OHPPO.",
+                           "OIHPPIO",
+                           "OIPPPIO",
+                           ".OIaIO.",
+                           "..OOO.."], colors={"O": (42, 32, 26), "P": (20, 16, 14), "H": (226, 226, 222),
+                                               "I": (150, 104, 48), "a": (190, 138, 64)}, halo="below"),
 })
 EYE_STYLE = os.environ.get("PROTO_EYES", "proto")
 SKULL = ((-6.5, 26.0, 24.0), (6.5, 40.0, 43.0))
@@ -125,8 +127,9 @@ def elements():
          el("nasal", "head", (-1.8, 37.6, 44.5), (1.8, 40.4, 48.5)),  # the bump on the nose
          el("mouth", "head", (-3.4, 26.6, 40), (3.4, 28.4, 50)),
          el("jaw", "jaw", (-4.6, 22.5, 29), (4.6, 27.0, 49.5)),  # shorter than the upper beak
-         # The frill: a plate rising up and back over the neck from the back of the skull.
-         el("frill", "head", (-10.5, 34.5, 21.8), (10.5, 55, 24.4), rot=(-52, 0, 0), origin=FRILL0)]
+         # The frill: a shield rising up and back over the neck from the back of the skull, thick
+         # enough to read as a plate from the side (a thin one read as a stick).
+         el("frill", "head", (-10.5, 34.5, 19.6), (10.5, 50.5, 24.6), rot=(-60, 0, 0), origin=FRILL0)]
     for s, n in ((1, "L"), (-1, "R")):
         x0, x1 = sorted((s * 6.0, s * 8.4))
         E.append(el(f"jugal_{n.lower()}", "head", (x0, 24.5, 33), (x1, 30, 38)))  # the cheek flange under the eye
