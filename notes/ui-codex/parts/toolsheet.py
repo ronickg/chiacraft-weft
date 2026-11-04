@@ -46,8 +46,8 @@ def angle(a):
 
 
 KIND = sys.argv[1] if len(sys.argv) > 1 else "pickaxe"
-PREFIX = {"pickaxe": "pick2", "shovel": "fix"}[KIND]
-NEW = lambda m: f"{PREFIX}_{m}_{KIND}"
+PREFIX = {"pickaxe": "pick2", "shovel": "fix", "hoe": "hoeL"}[KIND]
+NEW = (lambda m: "hoeL_iron_1" if m == "iron" else f"hoeL_{m}") if KIND == "hoe" else (lambda m: f"{PREFIX}_{m}_{KIND}")
 OUTNAME = f"{KIND}s_redrawn.png"
 
 
@@ -98,7 +98,7 @@ def main():
         a = tf.drawn(NEW(m))
         angles[m] = angle(a)
         new.append((Image.fromarray(a), f"{m}" + (" (new)" if m not in GAME else ""), vruns(a)))
-    row(f"2. New {KIND}s: one design, a margin, no vertical edge", new)
+    row((f"2. New {KIND}s: one L-shaped design (blade to one side), no vertical edge" if KIND == "hoe" else f"2. New {KIND}s: one design, a margin, no vertical edge"), new)
     other = []
     for m in MATS:
                 other.append((tf.anchored(NEW(m), NEW("iron") if m in CRUDE else NEW("wood"), "axe"), f"{m}, {'wrapped' if m in CRUDE else 'wood'} handle"))
