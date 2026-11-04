@@ -28,6 +28,7 @@ use weft_sdk::terrain::{Feature, Mask, preset};
 use crate::SEA;
 
 mod canyons;
+pub mod caves;
 mod craters;
 mod karst;
 mod net;
@@ -365,6 +366,17 @@ pub const KARST_HEIGHT: (i32, i32) = (16, 36);
 pub const KARST_WIDE_ONE_IN: u32 = 4;
 pub const KARST_WIDE_RADIUS: (i32, i32) = (13, 17);
 pub const KARST_WIDE_HEIGHT: (i32, i32) = (22, 38);
+
+/// Cave mouths that read from the surface (Ronald, 11-04: "all four"): where the engine's
+/// caves take the surface (`caves::Caves::mouth`), a mouth is `MOUTH_MIN` such columns or more in
+/// the five by five round one (a tunnel crossing, not a pinhole); within `MOUTH_LIP` blocks of
+/// one the ground is the column's rock (its walls and a lip round it), and right beside it the
+/// slit widens a block where nothing stands on the ground.
+pub const MOUTH_MIN: usize = 3;
+pub const MOUTH_LIP: i32 = 2;
+/// The lip's outer ring is rock in patches, this share of its columns (the first look: a full
+/// ring read as paving on the grass).
+pub const MOUTH_LIP_PATCHES: f64 = 0.4;
 
 /// Karst sinkholes (cenotes; Ronald, 11-04: "all four"): in the karst area, round shafts
 /// `SINK_RADIUS` blocks from their middle to their wall, at most one per `SINK_CELL` square, kept

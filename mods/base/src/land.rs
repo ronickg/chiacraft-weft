@@ -89,6 +89,7 @@ pub fn terrain(r: &mut Registry) {
         });
 
     r.decorate(rock_faces).dimension(&crate::OVERWORLD);
+    r.decorate(cave_mouths).dimension(&crate::OVERWORLD);
     r.decorate(fray_borders).dimension(&crate::OVERWORLD);
 }
 
@@ -278,6 +279,103 @@ fn fray_borders(g: &mut Gen) {
                 let y = (wy - oy) as usize;
                 if SOIL.contains(&g.get(x, y, z)) {
                     g.set(x, y, z, rock(if wy == h { top } else { under }));
+                }
+            }
+        }
+    }
+}
+
+/// Cave mouths that read from the surface (`base_api::land::MOUTH_MIN`, `MOUTH_LIP`): where the
+/// engine's caves open the ground (a tunnel grazing it leaves a slit a block or two wide in the
+/// grass), the walls of the opening and a lip round it are the column's rock, and right beside it
+/// the slit widens a block where nothing stands on the ground. After the rock faces, before the
+/// borders' fray and the plants. Every block is decided by its column and the columns round it
+/// (the caves' copy in `base_api::land::caves`), and a widened block only where the block over
+/// it is in the same cube, so neighbouring cubes agree.
+fn cave_mouths(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let [ox, oy, oz] = g.origin();
+    let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
+    let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
+    // The surface and the few blocks under it.
+    if oy > max_h || oy + 15 < min_h - 4 || max_h <= SEA {
+        return;
+    }
+    let seed = g.seed();
+    // The columns round the cube (as far as a mouth's reach and its five by five) and their
+    // cells' corners.
+    const M: i32 = l::MOUTH_LIP + 2;
+    const N: i32 = 16 + 2 * M;
+    let mut heights = std::collections::HashMap::new();
+    let mut height = |g: &Gen, x: i32, z: i32| {
+        *heights
+            .entry((x, z))
+            .or_insert_with(|| g.column(x, z).height)
+    };
+    let mut caves = l::caves::Caves::over(seed, (ox - M, ox + 16 + M), (oz - M, oz + 16 + M), (min_h.max(SEA) - 8, max_h + 8));
+    let mut open = vec![false; (N * N) as usize];
+    for j in 0..N {
+        for i in 0..N {
+            let (x, z) = (ox - M + i, oz - M + j);
+            let h = height(g, x, z);
+            if h <= SEA {
+                continue;
+            }
+            let (gx, gz) = (x.div_euclid(4) * 4, z.div_euclid(4) * 4);
+            let corners = [height(g, gx, gz), height(g, gx + 4, gz), height(g, gx, gz + 4), height(g, gx + 4, gz + 4)];
+            open[(j * N + i) as usize] = caves.mouth(x, z, h, corners);
+        }
+    }
+    if !open.iter().any(|&o| o) {
+        return;
+    }
+    let at = |i: i32, j: i32| (0..N).contains(&i) && (0..N).contains(&j) && open[(j * N + i) as usize];
+    // A mouth: enough open columns in its five by five.
+    let mouth = |i: i32, j: i32| {
+        at(i, j)
+            && (-2..=2)
+                .flat_map(|b| (-2..=2).map(move |a| (a, b)))
+                .filter(|&(a, b)| at(i + a, j + b))
+                .count()
+                >= l::MOUTH_MIN
+    };
+    let soil = [GRASS.id(), SNOWY_GRASS.id(), PODZOL.id(), SAND.id(), DIRT.id(), GRAVEL.id(), STONE.id()];
+    for z in 0..16i32 {
+        for x in 0..16i32 {
+            let (i, j) = (x + M, z + M);
+            // How near a mouth (Chebyshev, blocks): 0 in one.
+            let Some(near) =
+                (0..=l::MOUTH_LIP).find(|&d| (-d..=d).any(|b| (-d..=d).any(|a| (a.abs() == d || b.abs() == d) && mouth(i + a, j + b))))
+            else {
+                continue;
+            };
+            let (wx, wz) = (ox + x, oz + z);
+            if near == l::MOUTH_LIP
+                && (noise::fixed::hash(noise::fixed::seed32(seed, 0x30C7), wx, 0, wz) & 4095) >= (l::MOUTH_LIP_PATCHES * 4096.0) as u32
+            {
+                continue;
+            }
+            let h = height(g, wx, wz);
+            let col = cols[(z * 16 + x) as usize];
+            let set = rocks(g, wx, wz, h, g.surface_block(wx, wz));
+            let mossy = WET.on_biome(col.biome) || WOODS.on_biome(col.biome);
+            // The rock: in the mouth its walls four deep, beside it three, at the lip's edge the top.
+            let deep = match near {
+                0 => 4,
+                1 => 3,
+                _ => 1,
+            };
+            for wy in (h - deep + 1).max(oy)..=h.min(oy + 15) {
+                let y = (wy - oy) as usize;
+                if soil.contains(&g.get(x as usize, y, z as usize)) {
+                    g.set(x as usize, y, z as usize, rock(set.block(seed, [wx, wy, wz], mossy)));
+                }
+            }
+            // Right beside a mouth the slit widens a block, where nothing stands on the ground.
+            if near == 1 && h > oy && h < oy + 15 {
+                let y = (h - oy) as usize;
+                if g.get(x as usize, y + 1, z as usize) == 0 {
+                    g.set(x as usize, y, z as usize, 0);
                 }
             }
         }
