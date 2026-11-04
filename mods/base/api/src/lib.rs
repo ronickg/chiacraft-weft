@@ -9,6 +9,7 @@ use weft_sdk::*;
 
 pub mod branchy;
 pub mod grow;
+pub mod land;
 pub mod tree_recipes;
 pub mod trees;
 
