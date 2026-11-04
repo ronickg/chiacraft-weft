@@ -269,7 +269,9 @@ fn roast_step(w: &World, id: u64, s: &mut Roasting) -> bool {
         .with(&MADE, crate::survival::made_for(used, keeps, now))
         .with(&HOT, (now / 20) as u32)
         .with(&FRESHNESS, freshness::HOT);
-    let fits = out_now.is_empty() || (out_now.stacks_with(&made) && out_now.count + made.count <= max_stack(made.item));
+    // Into a slot already holding some, the new one takes the stamps there (its own, a second
+    // later, would never stack: the campfire cooked one steak and stopped, integration review).
+    let fits = out_now.is_empty() || (out_now.item == made.item && out_now.count + made.count <= max_stack(made.item));
     if !fits {
         return false;
     }
