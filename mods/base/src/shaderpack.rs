@@ -3,10 +3,9 @@
 //! pick another one or none in the video settings. Each file goes out with `look.wgsl` in front:
 //! the colors of the day, the sky, the light and the grade the files share.
 //!
-//! Not registered yet. Turning a pack on in the first frames, before the server let the player
-//! in, hung the GPU (an NVIDIA Xid 109; on an Apple M3 Max the whole machine restarted): the
-//! shaders themselves were fine. Both this module and the engine now wait for the join; the
-//! installer goes on once the look is tuned and has had one careful run on a Mac.
+//! It waits for the join: turning a pack on in the first frames, before the server let the player
+//! in, hung the GPU (an NVIDIA Xid 109; on an Apple M3 Max the whole machine restarted), and the
+//! engine now holds such a reload back too. Checked on an RTX 5090 and an M3 Max (2026-11-04).
 
 use std::path::Path;
 use std::sync::Once;
@@ -56,7 +55,6 @@ pub fn register_for_scripts(r: &mut Registry) {
     });
 }
 
-#[allow(dead_code)]
 pub fn register(r: &mut Registry) {
     static ONCE: Once = Once::new();
     // After the join: a reload before it hung the GPU (the engine now holds one back itself).

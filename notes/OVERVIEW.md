@@ -32,7 +32,7 @@ Weft, the voxel engine we forked: world, rendering, interface, modding. We chang
 | | Part | Notes |
 |---|---|---|
 | ■ | World and simulation | Cubic chunks, regions ticked in parallel that catch up on time away, saves, dimensions. Docs: `docs/architecture.html`. |
-| ■ | Rendering | GPU terrain, coloured light, connected textures, shader packs, sky. Ours: items held as models, sharp UI scaling, and chiacraft's own shader pack (mods/base/shaderpack: a palette by time of day, golden hours, fog, wind; its installer still off until it has run on a Mac). Docs: `docs/sky.md`, `docs/shaders.md`, `docs/ctm.md`, `docs/textures.md`, `docs/models.md`, `docs/resourcepacks.md`. |
+| ■ | Rendering | GPU terrain, coloured light, connected textures, shader packs, sky. Ours: items held as models, sharp UI scaling, and chiacraft's own shader pack (mods/base/shaderpack: a palette by time of day, golden hours, fog, storms, snow, wind), installed and turned on the first time the game is played (checked on an RTX 5090 and an M3 Max). Docs: `docs/sky.md`, `docs/shaders.md`, `docs/ctm.md`, `docs/textures.md`, `docs/models.md`, `docs/resourcepacks.md`. |
 | ■ | Interface | Screens, HUD elements, nine-slice parts. Ours: world rules on Create New World. Docs: `docs/ui.md`. |
 | ■ | Modding SDK | Content builders, events, interceptors, value chains, settings and world rules, translations. Docs: `docs/modding.md`, `docs/localization.md`. |
 | ■ | World generation | Docs: `docs/worldgen.md`. |
