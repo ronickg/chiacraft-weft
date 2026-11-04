@@ -116,6 +116,28 @@ pub fn site_on_rock(seed: u64, dimension: u32, [x, _, z]: [i32; 3]) -> bool {
     rock_face(fall)
 }
 
+/// Whether a scatter's site in the overworld stands at the foot of a wall: ground `WALL_RISE` or
+/// more blocks higher within `WALL_REACH` (a karst tower, a cliff, a rock face), where a tree's
+/// crown would press against the rock; trees and shrubs skip it, boulders (fallen rock) don't.
+pub fn site_under_wall(seed: u64, dimension: u32, [x, _, z]: [i32; 3]) -> bool {
+    if dimension != crate::OVERWORLD.id() {
+        return false;
+    }
+    let h = crate::OVERWORLD.column(seed, x, z).height;
+    let r = WALL_REACH;
+    (-r..=r).any(|dz| {
+        (-r..=r).any(|dx| {
+            (dx != 0 || dz != 0)
+                && (dx.abs() == r || dz.abs() == r || dx.abs() + dz.abs() == 1)
+                && crate::OVERWORLD.column(seed, x + dx, z + dz).height - h >= WALL_RISE
+        })
+    })
+}
+
+/// A wall this many blocks over a site's ground, this near, keeps trees off it (`site_under_wall`).
+pub const WALL_RISE: i32 = 4;
+pub const WALL_REACH: i32 = 2;
+
 /// How far the ground of column (`wx`, `wz`), `height` high, falls to its lowest neighbour.
 pub fn fall(g: &Gen, wx: i32, wz: i32, height: i32) -> i32 {
     [(1, 0), (-1, 0), (0, 1), (0, -1)]
