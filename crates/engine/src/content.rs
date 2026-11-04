@@ -1615,7 +1615,11 @@ fn merge_registrars(mods: &[ModMeta], regs: Vec<RawRegistrar>, errors: &mut Vec<
     let mut biome_tints = Vec::new();
     let mut games = Vec::new();
     for r in regs {
-        games.push(r.game);
+        let mut game = r.game;
+        game.package = mods
+            .get(r.owner.0 as usize)
+            .is_some_and(|m| m.package.is_some());
+        games.push(game);
         tint_kinds.extend(r.tint_kinds);
         biome_tints.extend(
             r.biome_tints

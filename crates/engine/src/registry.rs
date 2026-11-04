@@ -406,7 +406,8 @@ pub struct Game {
     pub music: Vec<MusicDef>,
     /// Natural spawning rules, in mod load order.
     pub spawns: Vec<SpawnRule>,
-    /// Settings by id (sorted by name), see `config.rs`.
+    /// Settings by id (sorted by name; the data packages' after the rest, chiacraft), see
+    /// `config.rs`.
     pub configs: Vec<crate::config::ConfigDef>,
     pub config_names: FxHashMap<String, u32>,
     /// Mods' setting handles (their id cells) and the ids they have in this content: written
@@ -668,6 +669,9 @@ pub struct RawRecipe {
 
 #[derive(Default, Clone)]
 pub struct RawGame {
+    /// Registered for a data package (chiacraft): its settings and key bindings sort after the
+    /// code mods' (`freeze`), so a package never moves another setting's id.
+    pub package: bool,
     pub entities: Vec<RawEntity>,
     pub components: Vec<RawComponent>,
     /// (owner, kind, hook, callback); hook 0 is the tick.
@@ -1365,7 +1369,13 @@ pub fn freeze(
         CategoryDef { name: "core:passive".into(), cap: 6, despawn: 0.0 },
     ];
     let mut entity_ticks: Vec<(ModId, String, Callback)> = Vec::new();
+    // Settings and key bindings data packages registered (chiacraft): sorted after the rest.
+    let mut from_packages: rustc_hash::FxHashSet<String> = Default::default();
     for r in raws {
+        if r.package {
+            from_packages.extend(r.configs.iter().map(|(_, d)| d.name.clone()));
+            from_packages.extend(r.keys.iter().map(|(action, _)| format!("core:key.{action}")));
+        }
         entity_ticks.extend(r.client_entity_ticks);
         sounds.extend(r.sounds);
         music.extend(r.music);
@@ -1493,7 +1503,14 @@ pub fn freeze(
             .into_iter()
             .map(|d| (0, d)),
     );
-    configs.sort_by(|a, b| a.1.name.cmp(&b.1.name));
+    // By name, the data packages' last (chiacraft), as their blocks and items are: then the
+    // engine's and the code mods' settings have the same ids in every content this game builds.
+    // Switching content re-keys the game's values by name, but a mod's handle it only named
+    // (`weft_sdk::settings::VIEW_DISTANCE`, `Config::named("core:...")`) keeps the id it first
+    // resolved: a package's setting sorting among the engine's would move those.
+    configs.sort_by(|a, b| {
+        (from_packages.contains(&a.1.name), &a.1.name).cmp(&(from_packages.contains(&b.1.name), &b.1.name))
+    });
     for (cell, d) in configs {
         if g.config_names.contains_key(&d.name) {
             errors.push(format!("setting {} registered twice", d.name));
@@ -1507,6 +1524,7 @@ pub fn freeze(
         g.config_names.insert(d.name.clone(), id);
         g.configs.push(d);
     }
+
     g.mob_spawning = g.config_names["core:mob_spawning"];
     g.simulation_distance = g.config_names["core:simulation_distance"];
     g.entity_send_distance = g.config_names["core:entity_send_distance"];
