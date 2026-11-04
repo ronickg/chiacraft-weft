@@ -9,6 +9,7 @@ wait 240
 shot did-bob-2-account.png
 join did-ticket.txt      # his DID is checked on chain at the join: he gets in
 loaded
+chat /tk mode creative
 wait 5
 shot did-bob-3-in.png
 leave

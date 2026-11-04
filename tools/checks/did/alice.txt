@@ -1,6 +1,7 @@
 # Phase 4, slices 4-7 on testnet11: the owner's side. Run beside bob.txt from the same folder;
 # the copies wait for each other through did-mark-* files. See README.md.
 loaded
+chat /tk mode creative                 # her waits are long: no freezing to death at night
 screen core:account
 tap_once core:account id:get_did      # our sponsor launches her DID (about a minute or two)
 wait 240
