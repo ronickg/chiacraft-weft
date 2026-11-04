@@ -765,6 +765,8 @@ pub fn register(r: &mut Registry) {
         .sound_group("mud")
         .textures("dung_pat_top", "dung_pat_side", "dung_pat_top")
         .model_box([2.0, 0.0, 2.0], [14.0, 1.5, 14.0])
+        // Its top's corners are clear (Art's tile), so the grass shows round the pat.
+        .cutout()
         .plant()
         .needs_below("#plant_soil")
         .no_item()
