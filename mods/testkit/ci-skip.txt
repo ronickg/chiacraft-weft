@@ -1,0 +1,13 @@
+# What CI leaves out, read only with TESTKIT_CI=1 (CI's software Vulkan, llvmpipe, draws a few
+# frames a second). Each line: a test, test/scenario or test/scenario/check, then why and since
+# when. The rest still run on a real GPU: run these there now and then (`--test` with the names).
+# A skipped name is in the log and the report as SKIP, never left out silently.
+scene/water_flow                       reads ring 6 still air a second after the water; slow round trips take longer (2026-11-04)
+scene/sand_and_support/falling         the sand lands before the first slow count reply (2026-11-04)
+inventory_hotkeys                      a double click is two clicks 4 frames apart, beyond the double-click window at a few fps (2026-11-04)
+debug_lines                            2 s waits on screens that lay out slowly (2026-11-04)
+edit_while_loading                     measures how quick the game is (2026-11-04)
+sprint_and_sneak_modes                 speed ratios over wall-clock holds (2026-11-04)
+presses_never_wait                     frame latency (2026-11-04)
+attack_charge                          the charge grows over the slow gaps between frames (2026-11-04)
+persistence/speed                      the 40 tick modifier runs out before the slow read (2026-11-04)
