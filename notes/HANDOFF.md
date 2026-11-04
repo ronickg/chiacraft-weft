@@ -394,8 +394,13 @@ inside the block), the join sheet listed the bell "(mod API 1.2)"; but the badge
 missing texture: `hud_badge` comes with the UI redo, not in `dev` yet, so the sample now uses
 `tooltip`. Bob's side is untested: his game ran out of GPU memory both times on the PC, next to
 vLLM ("allocating 67108864 bytes for quad page: Out of memory", a panic in the Vulkan backend).
-Bob also joined with an empty name although his `core.txt` says `name = bob` (on c41da9e4 it was
-right): not this work's, passed to Planner.
+Bob also joined with an empty name although his `core.txt` says `name = bob`. That was this
+work's: the bell's client half registered a key, a key's binding is a setting, and the engine
+numbers settings by name per content while their values sit in one table by id, so the content
+switch on joining shifted `core:name` onto an empty slot. Fixed: client halves' keys take shared
+Package Key slots (`client_half::register_slots`, Ctrl+Shift+1 to 8), registered the same in
+every game, and the player is told which key is which on entering a world. The engine's general
+hazard (anything that changes the settings on a content switch) is passed to Planner.
 Slice 5, personal mods (built, and checked in one game on the PC: off by default with "Your
 personal mods are off in this world: clock.", on after `/rule personal_mods 1` with the clock
 showing 07:07 top left, its key in slot 1 hid it, off again; Create World's choice not looked at): `mods/packages/src/personal.rs`. The
