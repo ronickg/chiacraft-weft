@@ -361,7 +361,7 @@ pub fn register(r: &mut Registry) {
 
 /// A young tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face.
 fn young_tree(s: &mut Site) {
-    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+    if !site_open(s) {
         return;
     }
     let [x, y, z] = s.pos();
@@ -386,7 +386,7 @@ fn young_tree(s: &mut Site) {
 /// A shrub at a scatter's site: a clump of the biome's shrub leaves (`SHRUB_KINDS`), one or two
 /// high (`vitals::layers::shrub_height`) and one to three across; none on a bare rock face.
 fn shrub(s: &mut Site) {
-    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+    if !site_open(s) {
         return;
     }
     let h = s.random();
@@ -418,6 +418,13 @@ fn shrub(s: &mut Site) {
             }
         }
     }
+}
+
+/// Whether a tree or shrub may stand at a scatter's site: not on a bare rock face, nor at the foot
+/// of a wall (`land::site_on_rock`, `site_under_wall`).
+fn site_open(s: &Site) -> bool {
+    let (seed, dim, pos) = (s.seed(), s.dimension(), s.pos());
+    !crate::land::site_on_rock(seed, dim, pos) && !crate::land::site_under_wall(seed, dim, pos)
 }
 
 /// A boulder at a scatter's site: a lumpy heap, cobbles and stone, some mossy where it's wet; none
@@ -455,7 +462,7 @@ static GIANT_SITES: Scatter = Scatter::named("giant_trees");
 
 /// A giant of the biome's `GIANT_KINDS` at a scatter's site; none on a bare rock face.
 fn giant(s: &mut Site) {
-    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+    if !site_open(s) {
         return;
     }
     let h = s.random();
@@ -537,7 +544,7 @@ const CLEARING: i32 = 1600;
 /// A tree of the biome's kinds (`TREE_KINDS`) at a scatter's site; none on a bare rock face
 /// (`land::site_on_rock`).
 fn tree(s: &mut Site) {
-    if crate::land::site_on_rock(s.seed(), s.dimension(), s.pos()) {
+    if !site_open(s) {
         return;
     }
     let [x, y, z] = s.pos();
