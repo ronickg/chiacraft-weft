@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a crude flint axe: a chunky knapped grey-brown flint head with chipped faceted edges and a few lighter flake scars, lashed to a plain wooden handle with tan sinew cord wound many times, lying diagonally, handle at the bottom left, head at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.601,
+   "outline": 0.57,
+   "red_line": 0.08,
+   "fill": 0.26,
+   "passed": true
+  }
+ ]
+}

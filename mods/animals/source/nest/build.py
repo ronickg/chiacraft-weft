@@ -31,7 +31,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", "..", "..", ".."))
 SKILL = os.path.join(REPO, ".claude", "skills", "blocky-model", "scripts")
 sys.path.insert(0, SKILL)
-from house import SCALE, material  # noqa: E402
+from house import SCALE, TX, material  # noqa: E402
 from prop import el, entity_spec, paint, rotm  # noqa: E402
 
 ASSETS = os.path.join(HERE, "..", "..", "assets")
@@ -300,7 +300,7 @@ def build(variant, out, eggs=False):
             return egg.area(p, egg.CHOSEN, origin=e["at"], yaw=e["yaw"]) + len(MATERIALS)
         return area(e, f, p, uu, vv, h, variant)
 
-    sheet, uv = paint(E, paint_area, mats, coat=SOFT, cut=cut, width=256, seed=3, down=down, smooth=1)
+    sheet, uv = paint(E, paint_area, mats, coat=SOFT, cut=cut, width=256, seed=3, down=down, smooth=1, tx=TX)
     Image.fromarray(sheet, "RGBA").save(os.path.join(out, "texture.png"))
     spec = entity_spec(E, uv, sheet, "nest")
     with open(os.path.join(out, "spec.json"), "w") as f:

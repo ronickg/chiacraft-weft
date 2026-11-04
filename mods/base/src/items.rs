@@ -71,50 +71,32 @@ pub fn register(r: &mut Registry) {
     r.tag("bread", &["bread"]);
     r.tag("apple", &["apple"]);
 
-    for (name, hunger, saturation, tag) in [
-        ("apple", 4, 2.4, ""),
-        ("bread", 5, 6.0, ""),
-        ("porkchop", 3, 1.8, "raw_meat/pork"),
-        ("cooked_porkchop", 8, 12.8, "cooked_meat/pork"),
-        ("beef", 3, 1.8, "raw_meat/beef"),
-        ("cooked_beef", 8, 12.8, "cooked_meat/beef"),
-        ("rotten_flesh", 4, 0.8, ""),
-        ("chicken", 2, 1.2, "raw_meat/chicken"),
-        ("cooked_chicken", 6, 7.2, "cooked_meat/chicken"),
-        ("mutton", 2, 1.2, "raw_meat/mutton"),
-        ("cooked_mutton", 6, 9.6, "cooked_meat/mutton"),
-        ("spider_eye", 2, 3.2, ""),
-        ("cooked_egg", 5, 6.0, ""),
-        ("apple_pie", 8, 4.8, ""),
-        ("berries", 2, 1.2, ""),
-        // Preserved (`cooking.rs`, `vitals::preserve`).
-        ("dried_meat", 6, 7.2, ""),
-        ("smoked_meat", 7, 9.6, ""),
-        ("salted_meat", 6, 6.0, ""),
-        ("dried_apple", 3, 2.4, ""),
-        ("dried_berries", 2, 1.6, ""),
-        // The wild foods (`vitals::wild`): the north's berries, brambles' raspberries, prickly
-        // pears and rose hips; nuts and seeds, small but rich; mushrooms, the red one poisonous.
-        ("lingonberries", 2, 1.2, ""),
-        ("cloudberries", 2, 1.2, ""),
-        ("crowberries", 1, 0.6, ""),
-        ("raspberries", 2, 1.2, ""),
-        ("prickly_pear_fruit", 3, 1.8, ""),
-        ("rose_hip", 1, 0.6, ""),
-        ("hazelnut", 2, 2.4, ""),
-        ("pine_nut", 2, 2.4, ""),
-        ("sunflower_seeds", 2, 2.4, ""),
-        ("mushroom_brown", 1, 0.6, ""),
-        ("mushroom_red", 1, 0.6, ""),
-    ] {
+    // Every food of the base game is a row of the vitals' food table (`vitals::food::FOODS`), the one
+    // list: its nutrition, freshness and tags come from there. The base game's hunger and
+    // saturation (only the tooltip's food icons read them) follow its size: a unit is 10 g.
+    for f in vitals::food::FOODS
+        .iter()
+        .filter(|f| f.name.starts_with("base:"))
+    {
+        let name = &f.name["base:".len()..];
+        let hunger = ((f.units() / 4.0).round() as u32).clamp(1, 10);
+        let saturation = hunger as f32 * 1.2;
+        // Raw meat with a cooked row pairs with it by name (`#raw_meat/beef` smelts into
+        // `#cooked_meat/beef`), so cooking, salting, drying and stews take any meat.
+        let cooked_of = name
+            .strip_prefix("cooked_")
+            .filter(|raw| vitals::food::find(&format!("base:{raw}")).is_some());
+        let raw_with_cooked = f.raw && vitals::food::find(&format!("base:cooked_{name}")).is_some();
+        let tag = match (cooked_of, raw_with_cooked) {
+            (Some(raw), _) => format!("cooked_meat/{raw}"),
+            (None, true) => format!("raw_meat/{name}"),
+            _ => String::new(),
+        };
+        let tag = tag.as_str();
         // What a portion holds and how fresh it is (stamped as it ages, `survival/food.rs`): shown in
         // its tooltip.
-        let n = vitals::food::find(name).map_or([0.0; 6], |f| {
-            let f = &vitals::food::FOODS[f];
-            let g = f.portion();
-            [f.units(), g[0], g[1], g[2], g[3], g[4]]
-        });
-        let [units, protein, energy, fat, greens, water] = n.map(|v| v.round() as u16);
+        let g = f.portion();
+        let [units, protein, energy, fat, greens, water] = [f.units(), g[0], g[1], g[2], g[3], g[4]].map(|v| v.round() as u16);
         let i = r
             .item(Item::generated(name.into()))
             .set(&FOOD, Food { hunger, saturation })
@@ -124,10 +106,11 @@ pub fn register(r: &mut Registry) {
             .on_use(base_api::eat)
             .tab(&crate::tabs::FOOD);
         let i = if tag.starts_with("cooked_meat/") { i.tag("cooked_meat") } else { i };
+        // Dried, smoked or salted (`vitals::preserve`).
+        let i = if vitals::preserve::PRODUCTS.contains(&f.name) { i.tag("preserved") } else { i };
         // Any raw meat salts (`cooking.rs`).
         let i = if tag.starts_with("raw_meat/") { i.tag("raw_meat") } else { i };
         // Berries are planted like seeds: a new bush; so are the wild plants' fruit and seeds.
-        let i = if name == "berries" { i.placed_block(&crate::blocks::BERRY_BUSH) } else { i };
         let i = match crate::wild::planted_by(name) {
             Some(b) => i.placed_block(b),
             None => i,
@@ -143,6 +126,7 @@ pub fn register(r: &mut Registry) {
         .tab(&crate::tabs::NATURAL);
     let rice = r
         .item(Item::generated("rice".into()))
+        .tag("rice")
         .tab(&crate::tabs::NATURAL);
     match crate::wild::planted_by("rice") {
         Some(b) => drop(rice.placed_block(b)),

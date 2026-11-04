@@ -107,6 +107,10 @@ pub static LARIDAE: Family = Family { name: "Laridae", above: &["Aves", "Charadr
 pub static ALLIGATORIDAE: Family = Family { name: "Alligatoridae", above: &["Reptilia", "Crocodylia"] };
 pub static CERATODONTIDAE: Family = Family { name: "Ceratodontidae", above: &["Sarcopterygii", "Dipnoi"] };
 pub static LYCOPTERIDAE: Family = Family { name: "Lycopteridae", above: &["Actinopterygii", "Osteoglossomorpha"] };
+pub static PSITTACOSAURIDAE: Family = Family { name: "Psittacosauridae", above: &["Dinosauria", "Ceratopsia"] };
+pub static POLACANTHIDAE: Family = Family { name: "Polacanthidae", above: &["Dinosauria", "Ankylosauria"] };
+pub static ANKYLOSAURIDAE: Family = Family { name: "Ankylosauridae", above: &["Dinosauria", "Ankylosauria"] };
+pub static STYRACOSTERNA: Family = Family { name: "Styracosterna", above: &["Dinosauria", "Ornithopoda"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -119,6 +123,23 @@ pub struct Food {
     /// Points of food it gives.
     pub food: u16,
     pub liking: Liking,
+}
+
+/// Taming foods outside the eater's diet (`reports/Research round 3.md`, C5): a hand-fed food whose
+/// kind (`vitals::forage::dropped`: the food table's, or a dropped seed's) isn't in its `eats`.
+/// Kibble is every species' (`taming.rs`); an item neither table knows is left out (ferns and
+/// seeds of the Cretaceous's plants, which the tables don't list as foods).
+pub fn foods_off_diet() -> Vec<String> {
+    SPECIES
+        .iter()
+        .flat_map(|s| s.foods.iter().map(move |f| (s, f)))
+        .filter(|(_, f)| f.item != "animals:kibble")
+        .filter_map(|(s, f)| {
+            let (c, _) = vitals::forage::dropped(f.item, false)?;
+            (!s.eats(c))
+                .then(|| format!("{}: is hand-fed {} ({c:?}), which isn't in its diet (species.rs foods against eats)", s.name, f.item))
+        })
+        .collect()
 }
 
 const fn eats(item: &'static str, food: u16) -> Food {
@@ -137,7 +158,12 @@ pub const OTHER_PREY: [(&str, f32); 4] = [("base:chicken", 1.0), ("base:pig", 80
 /// The hunters that take bigger prey together than alone, and how big, as shares of one's mass:
 /// grey wolves kill moose, elk and bison, ten times a wolf (`reports/ecology/Overworld food webs.md`:
 /// "packs take moose and elk"; the hunting is `hunt.rs`).
-pub const PACK_PREY: &[(&str, f32)] = &[("grey_wolf", 10.0)];
+pub const PACK_PREY: &[(&str, f32)] = &[
+    ("grey_wolf", 10.0),
+    // Utahraptors in a group went after an iguanodont many times their mass (the Stikes Quarry
+    // block: an adult, juveniles and hatchlings caught with one).
+    ("utahraptor", 15.0),
+];
 /// How many of its kind hunt together as a pack (itself among them).
 pub const PACK: u32 = 3;
 
@@ -337,7 +363,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 37] = [
+pub static SPECIES: [Species; 41] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -481,7 +507,7 @@ pub static SPECIES: [Species; 37] = [
         subfamily: "Hydrochoerinae",
         breed: None,
         size: Size::Medium,
-        eats: &[(Grass, 0.75), (WaterPlants, 0.2), (Fruit, 0.05)],
+        eats: &[(Grass, 0.7), (WaterPlants, 0.2), (Seeds, 0.05), (Fruit, 0.05)],
         prey: (0.0, 0.0),
         taming: Taming::Passive,
         // It holds its breath for five minutes.
@@ -513,8 +539,9 @@ pub static SPECIES: [Species; 37] = [
         dimorphism: 0.97,
         size_spread: 0.08,
         height: (0.56, "shoulder"),
-        // Savannas, flooded grasslands and swamps of South America, always near water.
-        habitats: &[("base:swamp", 1.0), ("base:savanna", 0.8), ("base:forest", 0.2)],
+        // Savannas, flooded grasslands and swamps of South America, always near water (not the
+        // forest, whose climate is a German beech wood's: B10).
+        habitats: &[("base:swamp", 1.0), ("base:savanna", 0.8)],
         bio: Biology {
             mass: 50.0,
             gestation: 140.0,
@@ -776,7 +803,7 @@ pub static SPECIES: [Species; 37] = [
         breed: None,
         size: Size::Small,
         // Grasses most of the year, herbs and crops, twigs and bark in winter.
-        eats: &[(Grass, 0.6), (Leaves, 0.3), (Roots, 0.1)],
+        eats: &[(Grass, 0.55), (Leaves, 0.25), (Roots, 0.1), (Seeds, 0.05), (Fruit, 0.05)],
         prey: (0.0, 0.0),
         taming: Taming::Wild,
         //     health stamina food damage speed weight oxygen torpor fortitude
@@ -837,14 +864,14 @@ pub static SPECIES: [Species; 37] = [
         breed: None,
         size: Size::Small,
         // Grasses and herbs in summer; in winter birch, willow and heather twigs and bark.
-        eats: &[(Grass, 0.4), (Leaves, 0.55), (Lichen, 0.05)],
+        eats: &[(Grass, 0.4), (Leaves, 0.5), (Fruit, 0.05), (Lichen, 0.05)],
         prey: (0.0, 0.0),
         taming: Taming::Wild,
         base: [5.0, 120.0, 40.0, 0.5, 1.0, 13.0, 60.0, 20.0, 5.0],
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 30.0,
-        foods: &[eats("base:wheat", 8), eats("base:wheat_seeds", 2), favorite("base:apple", 10), favorite("base:berries", 6)],
+        foods: &[eats("base:crowberries", 4), favorite("base:lingonberries", 6)],
         feedings: 0.0,
         shy: 12.0,
         fights: false,
@@ -972,7 +999,7 @@ pub static SPECIES: [Species; 37] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 30.0,
-        foods: &[eats("base:wheat", 6), eats("base:wheat_seeds", 3), favorite("base:apple", 6)],
+        foods: &[eats("base:wheat", 6), eats("base:wheat_seeds", 3), favorite("base:sunflower_seeds", 6)],
         feedings: 0.0,
         shy: 5.0,
         fights: false,
@@ -1494,7 +1521,7 @@ pub static SPECIES: [Species; 37] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 15.0,
-        foods: &[eats("animals:fern", 8), eats("base:wheat", 8), favorite("base:berries", 10)],
+        foods: &[eats("animals:fern", 8), eats("base:wheat", 8), favorite("animals:cycad_seed", 10)],
         feedings: 0.0,
         shy: 12.0,
         fights: false,
@@ -1626,7 +1653,7 @@ pub static SPECIES: [Species; 37] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 40.0,
-        foods: &[eats("base:wheat_seeds", 2), favorite("base:berries", 4)],
+        foods: &[favorite("base:spider_eye", 4)],
         feedings: 0.0,
         shy: 5.0,
         fights: false,
@@ -1686,7 +1713,7 @@ pub static SPECIES: [Species; 37] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 15.0,
-        foods: &[eats("base:wheat", 10), favorite("base:berries", 6), favorite("base:apple", 12)],
+        foods: &[eats("base:mushroom_brown", 8)],
         feedings: 0.0,
         shy: 18.0,
         fights: false,
@@ -2231,7 +2258,7 @@ pub static SPECIES: [Species; 37] = [
         wild_step: WILD_STEP,
         tamed_step: TAMED_STEP,
         hunger: 40.0,
-        foods: &[eats("base:beef", 10), favorite("base:rotten_flesh", 10)],
+        foods: &[favorite("base:rotten_flesh", 10)],
         feedings: 0.0,
         shy: 16.0,
         fights: false,
@@ -2774,6 +2801,259 @@ pub static SPECIES: [Species; 37] = [
         // A small fish of a short life: grown in its first season, and schools that keep to a
         // room a pond holds (the balance checks' growth and room).
         tune: Tune { growth: Some(70_000), crowd: Some(30), ..Tune::NONE },
+        birth_size: 0.1,
+    },
+    // Psittacosaurus (`reports/ecology/Cretaceous food webs.md`: the Jehol's "dominant" plant eater,
+    // the commonest dinosaur of the Yixian, and the Utahraptor's prey where it is rare): wild, the
+    // young in groups of one age (Zhao et al. 2014), on its hind legs (`source/psittacosaurus`).
+    Species {
+        model: "psittacosaurus",
+        name: "psittacosaurus",
+        binomial: "Psittacosaurus lujiatunensis",
+        family: &PSITTACOSAURIDAE,
+        subfamily: "",
+        breed: None,
+        size: Size::Medium,
+        // Tough plants ground with stomach stones, even as hatchlings (Wang et al. 2025): leaves and
+        // fronds first, seeds and nuts, some fruit.
+        eats: &[(Leaves, 0.6), (Seeds, 0.3), (Fruit, 0.1)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [22.0, 160.0, 80.0, 1.5, 1.1, 45.0, 70.0, 45.0, 14.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 15.0,
+        foods: &[eats("animals:fern", 8), eats("animals:ginkgo_seed", 8), favorite("base:berries", 10)],
+        feedings: 0.0,
+        shy: 12.0,
+        fights: false,
+        attacks: &[],
+        reach: 1.0,
+        signature: "herd",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.05,
+        size_spread: 0.1,
+        height: (0.5, "hip"),
+        // The Yixian's forests and lake shores first; the floodplain and the scrub less often.
+        habitats: &[("animals:fern_forest", 1.0), ("animals:floodplain", 0.3), ("animals:scrubland", 0.3)],
+        bio: Biology {
+            mass: 25.0,
+            gestation: 0.0,
+            // No record; Protoceratops's 83 days (Erickson et al. 2017), for a smaller egg.
+            incubation: 75.0,
+            // Growth lines: grown at about 9 to 11 (Erickson et al. 2009); breeding before that, as
+            // dinosaurs did, at about four (est.).
+            maturity: 1460.0,
+            lifespan: 4015.0,
+            interval: 365.0,
+            // Clutches are big: a nest of 24 young with an adult (Meng et al. 2004).
+            litter: 12.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            // The Jehol's seasons: its young hatch into the wet summer (est.).
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The Jehol's cool, seasonal forests (a mean year near 10 °C: Amiot et al. 2011).
+            comfort: (0.0, 32.0),
+            cold_blooded: false,
+        },
+        // The commonest animal of its forest and the hunters' food: a common species' pace, a wild
+        // clutch's young kept to what a mother raises, and a room that lets a small group last
+        // (`web/test.mjs`).
+        tune: Tune { growth: Some(144_000), litter: Some((3, 8)), crowd: Some(20), ..Tune::NONE },
+        birth_size: 0.15,
+    },
+    // Gastonia (`reports/ecology/Cretaceous food webs.md`: "among the most common dinosaur fossils
+    // in the Cedar Mountain Formation", found with the Utahraptor): a polacanthid ankylosaur,
+    // armoured, so the Utahraptor takes its young (`source/ankylosaur`, its own colors).
+    Species {
+        model: "ankylosaur",
+        name: "gastonia",
+        binomial: "Gastonia burgei",
+        family: &POLACANTHIDAE,
+        subfamily: "",
+        breed: None,
+        size: Size::Large,
+        // Low plants: ferns, horsetails, cycads' fronds, a little fruit and seed.
+        eats: &[(Leaves, 0.9), (Fruit, 0.05), (Seeds, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [120.0, 300.0, 400.0, 6.0, 0.8, 600.0, 200.0, 400.0, 60.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 12.0,
+        foods: &[eats("animals:fern", 10), favorite("animals:cycad_seed", 12)],
+        feedings: 0.0,
+        shy: 8.0,
+        fights: false,
+        attacks: &[],
+        reach: 1.5,
+        signature: "herd",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.03,
+        size_spread: 0.1,
+        height: (1.25, "hip"),
+        // The Yellow Cat floodplain first; its bonebeds suggest groups (one formed in a drought or
+        // a flood).
+        habitats: &[("animals:floodplain", 1.0), ("animals:scrubland", 0.3), ("animals:fern_forest", 0.3)],
+        bio: Biology {
+            mass: 1900.0,
+            gestation: 0.0,
+            // No record; a big ornithischian's egg, longer than Protoceratops's 83 days (est.).
+            incubation: 100.0,
+            // No record of its growth lines; breeding at about six, before it is fully grown, as
+            // dinosaurs did (est.), and living about 25 years.
+            maturity: 2190.0,
+            lifespan: 9125.0,
+            interval: 365.0,
+            // No record of a clutch (est., as Protoceratops's).
+            litter: 10.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The floodplain's monsoon heat and its dry spells.
+            comfort: (8.0, 38.0),
+            cold_blooded: false,
+        },
+        // A big plant eater at a common species' pace, its young what the hunters take, a wild
+        // clutch kept to what a mother raises, and a room that lets a small group last
+        // (`web/test.mjs`).
+        tune: Tune { growth: Some(144_000), litter: Some((1, 4)), crowd: Some(12), ..Tune::NONE },
+        birth_size: 0.1,
+    },
+    // Pinacosaurus (`reports/ecology/Cretaceous food webs.md`: the scrubland's big plant eater,
+    // "dominant" at Bayan Mandahu, mostly juveniles in groups killed together by sandstorms:
+    // Currie et al. 2011): an ankylosaurid with a tail club, on the same model in its own colors.
+    Species {
+        model: "ankylosaur",
+        name: "pinacosaurus",
+        binomial: "Pinacosaurus grangeri",
+        family: &ANKYLOSAURIDAE,
+        subfamily: "",
+        breed: None,
+        size: Size::Large,
+        // Low plants, perhaps pulpy fruit, roots and a few insects (speculative).
+        eats: &[(Leaves, 0.8), (Fruit, 0.1), (Roots, 0.05), (Insects, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [120.0, 300.0, 400.0, 6.0, 0.8, 600.0, 200.0, 400.0, 60.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 12.0,
+        foods: &[eats("animals:fern", 10), favorite("base:berries", 12)],
+        feedings: 0.0,
+        shy: 8.0,
+        fights: false,
+        attacks: &[],
+        reach: 1.5,
+        signature: "herd",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.03,
+        size_spread: 0.1,
+        height: (1.25, "hip"),
+        // The Gobi's scrub first, the dunes less often, and now and then the rocky crags' foot
+        // (the only plant eater there big enough for the wyvern).
+        habitats: &[("animals:scrubland", 1.0), ("animals:red_dunes", 0.5), ("animals:crags", 0.2)],
+        bio: Biology {
+            mass: 1900.0,
+            gestation: 0.0,
+            // No record; a big ornithischian's egg, longer than Protoceratops's 83 days (est.).
+            incubation: 100.0,
+            // No record of its growth lines; breeding at about six, before it is fully grown, as
+            // dinosaurs did (est.), and living about 25 years.
+            maturity: 2190.0,
+            lifespan: 9125.0,
+            interval: 365.0,
+            // No record of a clutch (est., as Protoceratops's).
+            litter: 10.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The Djadokhta's semi-arid seasons: hot days, cold nights.
+            comfort: (0.0, 40.0),
+            cold_blooded: false,
+        },
+        // A big plant eater at a common species' pace, its young what the hunters take, a wild
+        // clutch kept to what a mother raises, and a room that lets a small group last
+        // (`web/test.mjs`).
+        tune: Tune { growth: Some(144_000), litter: Some((1, 4)), crowd: Some(12), ..Tune::NONE },
+        birth_size: 0.1,
+    },
+    // The iguanodont (`reports/ecology/Cretaceous food webs.md`: the floodplain's and the forest's big
+    // plant eater, what the Utahraptor was caught hunting in the Stikes Quarry block): Iguanacolossus
+    // fortis standing for the Yellow Cat's iguanodonts and the Yixian's Jinzhousaurus, wild for now
+    // (a tame beast of burden later: tier 1), in herds (`source/iguanodont`).
+    Species {
+        model: "iguanodont",
+        name: "iguanodont",
+        binomial: "Iguanacolossus fortis",
+        family: &STYRACOSTERNA,
+        subfamily: "",
+        breed: None,
+        size: Size::Large,
+        // Browse up to about 4 m: ferns, horsetails, conifers and cycads; a few seeds and fruit.
+        eats: &[(Leaves, 0.85), (Seeds, 0.1), (Fruit, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [150.0, 400.0, 600.0, 8.0, 1.0, 800.0, 250.0, 500.0, 50.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 12.0,
+        foods: &[eats("animals:fern", 10), favorite("animals:cycad_seed", 14)],
+        feedings: 0.0,
+        shy: 10.0,
+        fights: false,
+        attacks: &[],
+        reach: 2.0,
+        signature: "herd",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.9,
+        dimorphism: 1.03,
+        size_spread: 0.1,
+        height: (2.2, "hip"),
+        // The Yellow Cat floodplain first, the fern forest (as Jinzhousaurus) less often.
+        habitats: &[("animals:floodplain", 1.0), ("animals:fern_forest", 0.6)],
+        bio: Biology {
+            mass: 4000.0,
+            gestation: 0.0,
+            // No record; a big ornithopod's egg, longer than Protoceratops's 83 days (est.).
+            incubation: 110.0,
+            // Growth lines of its kin (Iguanodon, Tenontosaurus): grown at about ten, breeding
+            // before that, at about seven (est.); living about 30 years.
+            maturity: 2555.0,
+            lifespan: 10950.0,
+            interval: 365.0,
+            // No record of a clutch (est.).
+            litter: 12.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // The floodplain's monsoon heat and dry spells, the forest's cooler seasons.
+            comfort: (4.0, 38.0),
+            cold_blooded: false,
+        },
+        // A big plant eater at a common species' pace, its young what the hunters take, a wild
+        // clutch kept to what a mother raises, and a room that lets a small group last
+        // (`web/test.mjs`).
+        tune: Tune { growth: Some(144_000), litter: Some((1, 3)), crowd: Some(12), ..Tune::NONE },
         birth_size: 0.1,
     },
 ];

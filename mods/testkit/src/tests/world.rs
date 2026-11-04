@@ -712,6 +712,11 @@ pub async fn persistence(t: T) -> R {
     t.frames(5).await?;
     t.check_eq(crate::server::SECRET.stack_only(&t.c().inventory_slot(0)), None, "client never sees the secret");
     t.check_eq(value(&t.op("attr me core:movement_speed").await?), 1.0, "speed without modifiers");
+    // The survival vitals lower max health with the stomach (`base:fed`): an empty stomach keeps it
+    // still through the reload, and the modifier is checked against what it was before.
+    t.cmd("/feed 0").await?;
+    t.frames(3).await?;
+    let base = value(&t.op("attr me core:max_health").await?);
     t.op("attr_mod me core:movement_speed testkit:haste 1 0.5 40")
         .await?;
     t.op("attr_mod me core:max_health testkit:vigor 0 10 0")
@@ -721,7 +726,7 @@ pub async fn persistence(t: T) -> R {
         t.check_eq(value(&speed), 1.5, "speed with +50% of base");
         t.check(speed.contains("testkit:haste"), format!("explained: {speed}"));
     }
-    t.check_eq(value(&t.op("attr me core:max_health").await?), 30.0, "max health +10");
+    t.check_eq(value(&t.op("attr me core:max_health").await?), base + 10.0, "max health +10");
     t.secs(2.5).await?;
     t.check_eq(value(&t.op("attr me core:movement_speed").await?), 1.0, "the 40 tick modifier ran out");
     // A timer due after the reload is saved with the player and fires there.
@@ -748,7 +753,7 @@ pub async fn persistence(t: T) -> R {
         "the chest kept its coal",
     );
     t.check_eq(t.op("secret me 0").await?, "none".into(), "the secret was not");
-    t.check_eq(value(&t.op("attr me core:max_health").await?), 30.0, "max health modifier after reload");
+    t.check_eq(value(&t.op("attr me core:max_health").await?), base + 10.0, "max health modifier after reload");
     let mut now = rings;
     for _ in 0..40 {
         now = t.op("rings").await?.parse().unwrap_or(0);
@@ -763,11 +768,12 @@ pub async fn persistence(t: T) -> R {
     t.cmd("/rule testkit:count_marks 0").await?;
     // One maximum everywhere: /heal fills to it and the client hears the same.
     t.cmd("/heal").await?;
-    t.check_eq(t.op("health").await?, "30".to_string(), "healed to the modified maximum");
-    t.until("the client has 30", Duration::from_secs(2), |t| t.state().health == 30.0)
+    let healed: f64 = t.op("health").await?.parse().unwrap_or(f64::NAN);
+    t.check((healed - (base + 10.0)).abs() < 0.01, format!("healed to the modified maximum: {healed}, want {}", base + 10.0));
+    t.until("the client has the modified maximum", Duration::from_secs(2), |t| (t.state().health as f64 - (base + 10.0)).abs() < 0.01)
         .await?;
     t.op("attr_rm me core:max_health testkit:vigor").await?;
-    t.check_eq(value(&t.op("attr me core:max_health").await?), 20.0, "removed");
+    t.check_eq(value(&t.op("attr me core:max_health").await?), base, "removed");
     t.sync_inventory().await
 }
 

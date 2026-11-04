@@ -1,6 +1,6 @@
 //! `callcost <component or module.wasm> [calls]`: times each kind of call a mod registered
 //! (commands with no arguments, events with empty and 64-entry batches, questions, chain steps,
-//! world ticks) over `calls` calls (default 20000), against [`NullGame`], and prints the
+//! world ticks, block and item uses, block updates, packets) over `calls` calls (default 20000), against [`NullGame`], and prints the
 //! microseconds per call. A core module (straight from `cargo build`) is made into a component
 //! first. Release builds only give numbers worth reading.
 use std::sync::Arc;
@@ -51,6 +51,17 @@ fn main() {
                 inst.modify(game, cb, q, 8.0, 8.0);
             }),
             Hook::WorldTick => time("world tick", &mut inst, &mut |inst| inst.world_tick(game, cb)),
+            Hook::BlockUse(b) => time(&format!("use {b}"), &mut inst, &mut |inst| {
+                inst.block_use(game, cb, BlockUseEvent { player: 1, pos: (0, 64, 0), state: 1, face: 1 });
+            }),
+            Hook::BlockNeighbor(b) | Hook::BlockScheduled(b) => time(&format!("update {b}"), &mut inst, &mut |inst| {
+                inst.block_update(game, cb, BlockUpdateEvent { pos: (0, 64, 0), state: 1, other: (0, 65, 0), entity: 0 })
+            }),
+            Hook::ItemUse(i) => time(&format!("use {i}"), &mut inst, &mut |inst| {
+                let stack = ItemStack { item: 1, count: 1, data: 0 };
+                inst.item_use(game, cb, ItemUseEvent { player: 1, stack, slot: 0, target: None });
+            }),
+            Hook::Channel(c) => time(&format!("packet on {c}, 64 bytes"), &mut inst, &mut |inst| inst.packet(game, cb, 1, &[0; 64])),
         }
     }
     if let Some(why) = inst.stopped() {

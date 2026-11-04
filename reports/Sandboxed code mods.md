@@ -90,8 +90,13 @@ nested callback skips the mod (it is busy) rather than re-entering the store.
    `init`, values by bytes of at most 256 in buckets of the SDK's `[u8; N]`, the mod's own
    only), `set-blocks`, sounds and particles; a component's imports are checked at load (this API
    only, no newer 1.x than the game's). One set of host bindings serves every 1.x, since 1.x only
-   adds and wasmtime matches 1.x by semver. Sample `tally`. Next, as 1.2: block and item
-   callbacks (`on_use`, `on_neighbor`), channels (with client halves), gizmos.
+   adds and wasmtime matches 1.x by semver. Sample `tally`. API 1.2 (built): callbacks on
+   the package's own blocks (`on_use`, `on_neighbor`, `on_scheduled`, with `schedule`) and items
+   (`on_use`, with the slot so a later version can reach what the stack carries, for parts-based
+   items), and channels (`packet`, `send`). They are a second export, `content-hooks`, looked up
+   at run time: the game's own world (`host`) exports `hooks` only, so 1.0 and 1.1 components
+   still instantiate (checked with clans and tally). Sample `bell`. With 1.2 the mod UI ABI got
+   `at` (a part placed at a point of its parent), so Weft mods rebuilt once for both.
 4. *Client halves*: `code/client.wasm` in the same package, run in the player's game with
    client calls only (HUD lines, screens built from the SDK's UI parts, keys, channels to its
    server half), the same limits plus a frame budget. Downloaded on join like the rest.

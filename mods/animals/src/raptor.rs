@@ -15,28 +15,12 @@ pub(crate) static OSMOLSKAE: Entity = Entity::named("velociraptor_osmolskae");
 /// Each species: its kind, its row in `species::SPECIES`, its texture.
 static KINDS: [(&Entity, usize, &str); 2] = [(&RAPTOR, 3, "raptor/raptor"), (&OSMOLSKAE, 5, "raptor/osmolskae")];
 
-value! {
-    #[derive(Default)]
-    /// What a raptor is doing (not saved: it just settles down again).
-    pub struct Raptor {
-        /// Ticks left resting (0: up and about).
-        pub rest: u32,
-        /// Ticks rested so far.
-        pub rested: u32,
-        /// The look applied, 1 + pose (0: none yet).
-        pub look: u32,
-    }
-}
-
-static STATE: Component<Raptor> = Component::named("raptor_state");
-
 /// How near a pack keeps together: helping, hunting, fighting better.
 const PACK_RANGE: f64 = 8.0;
 const AID_RANGE: f64 = 16.0;
 /// What a pack hunts.
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(&STATE, Raptor::default(), 0);
     // Tamed raptors fight better together: a tenth more damage for each other tame raptor of
     // its species within 8 blocks, up to three.
     r.modify(&chain::ATTACK_DAMAGE, stage::MULTIPLY, |m| {
@@ -58,16 +42,11 @@ pub fn init(r: &mut Registry) {
     }
 }
 
-/// One species: the kind, and its resting pose (a look) drawn in place of it lying down.
+/// One species: the kind, and its resting pose (a look) drawn in place of it lying down
+/// (`rest.rs`).
 fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str) {
-    drop(
-        r.entity(Entity::generated(rest_look(kind)))
-            .size(0.6, 0.9)
-            .passive()
-            .model_file("raptor")
-            .animations("raptor_rest")
-            .texture(texture),
-    );
+    let settle = crate::rest::Settle { chance: 300, ticks: (400, 1200), lie_after: 0 };
+    crate::rest::register(r, kind, settle, "raptor", texture, (0.6, 0.9), &[("_rest", &rest_look(kind))]);
     r.entity(kind)
         .size(0.6, 0.9)
         .health(14.0)
@@ -77,7 +56,6 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
         .model_file("raptor")
         .animations("raptor")
         .texture(texture)
-        .attach(&STATE)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
             if !crate::screen::interact(&w, id, player)
@@ -97,7 +75,7 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
                 .then(crate::commands::act(index))
                 .then(crate::breeding::behave(index))
                 .then(crate::eggs::nest(index))
-                .then(settle)
+                .then(crate::rest::settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)
                 .then(crate::forage::forage)
@@ -105,9 +83,7 @@ fn register(r: &mut Registry, kind: &'static Entity, index: usize, texture: &str
         )
         .on_hurt(|w, h| {
             crate::taming::hurt(w, h.entity);
-            if let Some(c) = w.component_mut(h.entity, &STATE) {
-                c.rest = 0;
-            }
+            crate::rest::stop(w, h.entity);
         });
 }
 
@@ -122,57 +98,8 @@ fn kind_of(w: &World, id: u64) -> Option<&'static Entity> {
     KINDS.iter().map(|(e, _, _)| *e).find(|e| e.id() == k)
 }
 
-/// Every tick: now and then lie down to rest for a while, and show the pose.
-fn settle(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(c) = w.component_mut(id, &STATE) else { return false };
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(300) == 0 {
-        c.rest = 400 + w.random_below(1200);
-        c.rested = 0;
-    }
-    let resting = c.rest > 0;
-    if resting {
-        c.rest = c.rest.saturating_sub(w.tick_elapsed(id) as _);
-        c.rested = c.rested.saturating_add(w.tick_elapsed(id) as _);
-    }
-    let pose = resting as u32;
-    if c.look != pose + 1 {
-        c.look = pose + 1;
-        let look = kind_of(w, id)
-            .filter(|_| resting)
-            .map(|k| format!("animals:{}", rest_look(k)));
-        w.set_look(id, look.as_deref());
-    }
-    if resting && w.navigating(id) {
-        w.navigate(id, st.pos, 0.0);
-    }
-    resting
-}
-
-/// Up from resting, to follow or fight.
-pub fn wake(w: &World, id: u64) {
-    if let Some(c) = w.component_mut(id, &STATE)
-        && (c.rest > 0 || c.look > 1)
-    {
-        c.rest = 0;
-        c.look = 1;
-        w.set_look(id, None);
-    }
-}
-
 fn is_tame_raptor(w: &World, id: u64) -> bool {
     kind_of(w, id).is_some() && crate::animal::tamed(w, id)
-}
-
-/// Knocked out: lying as it rests.
-pub fn sleep(w: &World, id: u64) {
-    if let Some(c) = w.component_mut(id, &STATE)
-        && c.look != 2
-    {
-        c.rest = 0;
-        c.look = 2;
-        let look = kind_of(w, id).map(|k| format!("animals:{}", rest_look(k)));
-        w.set_look(id, look.as_deref());
-    }
 }
 
 /// `id` (wild) was hurt by `at`, or goes after it: the wild ones of its kind near it join in

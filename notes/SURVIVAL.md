@@ -473,7 +473,10 @@ sword, about 100 XP.
   reindeer and jaguars up to three: `animals_core::hides`), leather from cows and deer, sheep's
   wool, and linen from string, which plant fibre from cutting tall grass (1 in 8) spins into.
   Each piece is sewn with string.
-- Their tooltips say their warmth (`base:warmth`). Placeholder art: tinted leather armor.
+- Their tooltips say their warmth (`base:warmth`). Item icons by the game-art pass (11-04, Ronald's
+  yes), also the stews', preserved foods', fibre's, salt's, bowl's, pot's, rack's and campfire's,
+  with the three blocks' faces and the clothing slot outlines; the worn layers are being painted
+  in code by the Animal models session.
 - Checks (`vitals::balance`): fur holds off the cold on a -5 °C night that freezes one unclothed,
   linen is cooler than bare skin in the desert sun and fur hotter, wet wool warmer than wet linen,
   fur keeps out the wind.
@@ -494,6 +497,76 @@ sword, about 100 XP.
 
 - A new player arrives with a loaf and an apple in them (`vitals::stomach::ARRIVAL`, 43 units):
   max health 54 and stamina 75 of 100 instead of an empty stomach's 40, wearing off over half an
-  hour as it digests. One spider at dusk had killed a fresh player in 11 s. Dying still empties
-  the stomach. The rule stays: food sets how much of the stat is reached.
+  hour as it digests. One spider at dusk had killed a fresh player in 11 s. Dying leaves the same
+  light meal (step 13). The rule stays: food sets how much of the stat is reached.
 - A new player also starts with full stamina (it started at 0 and took 14 s to fill).
+
+**12. Research round 3's survival fixes** (2026-11-04, decided by Ronald via Planner; `reports/Research round 3.md`):
+
+- **B1, a first week one can live through.** A new player arrives in plain clothes once
+  (`vitals::clothing::ARRIVAL`: a linen hood, a wool sweater, buckskin trousers, moccasins, 11 °C,
+  about 0.9 clo), put in the empty clothing slots on first joining (`base:dressed`). A **campfire**
+  (three logs, four sticks, no stone) heats like lava (+20 °C beside it), counts as a fire for rest,
+  and smokes food on a rack above it; it burns without fuel and gives light. A new world with
+  seasons begins on spring's 8th day (`vitals::calendar::START_DAY`, a quarter of the year from
+  midwinter): on a run's first tick a clock still in day 0's first half moves there (only a new
+  world's is), so the engine's day length agrees. The dead's vitals don't tick (Tester 11-04).
+- **D1, spoiled food never comes back.** The pot, the rack and the crafting grid refuse spoiled
+  food. What is made of stale food starts as far through its own life as its stalest part was
+  (`survival::made_for`): a half-gone beef makes a half-gone stew. Carrying the oldest age as it
+  stands would spoil a fresh stew at once for an old apple, so the share of life is carried.
+- **B3, clothes within reach.** Hide and wool pieces take 1, 2, 1, 1 of their material (fur and
+  linen 2, 4, 3, 2), each sewn with 1, 2, 1, 1 string, and a string is 2 plant fibre. Each piece
+  has its own shape in the grid, since a hat and boots of the same stuff took the same things.
+- **C1.** Leather armor is hide: the same warmth, wet share and windproofing as a hide coat
+  (`clothing::armor_cloth`). Armor and clothes stack.
+- **B5.** Plant frost (`growth.rs`) and drying read the still air: wind chill is what a body loses.
+  The animals session does eggs.
+- **B6.** Meals warm by the warmest dish, not the sum (four hot steaks are +4 °C, not +16), and
+  cooling food only widens the hot side of comfort, it doesn't chill one in the cold.
+- The rack dries every raw meat and fish and every fruit that doesn't keep half as long as dried
+  fruit already (rose hips don't need it); `preserve::PRODUCTS`.
+- **U1.** Ice drops itself when mined with a pickaxe (the only blue dye).
+- **T1.** Base `ru_ru` has every key `en_us` has (106 added).
+- Checks (`vitals::balance`): arrival clothes 8 to 14 °C and not freezing on a plains night at the
+  world's start; four hot steaks warm as one; leather armor and hide clothes alike.
+- Not done from round 3: B7 (the warm effects' water use), B8 (salt from sea water only), B12 (a
+  cheaper pot), the stations in the recipe viewer, "from" lines on fur, fibre and salt, the
+  compost bin's drawn textures, first-week advancements.
+
+**13. The first hour and the first death** (2026-11-04, Research round 4, H1 and H2, via Planner):
+
+- **H1, no death spiral.** Respawning brings back the plain arrival clothes when none are worn
+  (the tombstone keeps what one wore), the stomach holds the arrival meal instead of nothing, and
+  stamina comes back full. After respawning a hint says where the tombstone is (x and z, kept in
+  `base_api::GRAVE`). The death screen's cause is the engine's (`core:death`, not done here).
+- **The campfire** is made in the inventory's 2x2 grid (two sticks over two logs) and cooks:
+  a slot in, a slot out, whatever a furnace cooks of food at 1.5 times its time, no fuel; what it
+  cooks comes off hot, as far along as the raw food was. It still burns without fuel.
+- **Hints** (`hints.rs`): eleven lines under the crosshair for six seconds, from the player's
+  state once a second, each once per player (saved, kept through death), freezing each time it
+  starts, the tombstone each death; the player's own setting turns them off (`base:hints`, Mod
+  Settings). Logs, a crafting table, night coming with no fire, cold, freezing, wet in cool air,
+  an empty stomach, raw meat with no furnace yet, the tombstone, too hot, resting by a fire
+  under a roof. A hint isn't shown for what one has already done (logs held, a fire placed, a
+  furnace had). Not here: the recipe keys' hint and the taming hint (engine and animals).
+- **A "Surviving" advancement group**: Hearth (place a campfire), Spun (string), Tailor (craft a
+  piece of clothing), A Night In (rested), Hot Meal (eat food still hot), One Pot (a stew), Put
+  By (a preserved food), A Friend (tame: the animals mod calls `base_api::milestone(w, player,
+  base_api::milestones::TAME)`).
+- **"Comes from" tooltips** on fur, plant fibre, salt, leather, string and wool.
+- Not done here: R and U with nothing hovered (the engine's `app.rs` `recipe_keys` only looks
+  under the cursor in a screen), the death screen's cause, the HUD labels (the UI session).
+
+**14. The first night: "Campfire keeps you safe"** (Ronald, 2026-11-04, via Planner):
+
+- Normal monsters stay. A fresh player in arrival clothes on the plains died to one zombie in the
+  first night (Tester's runs); the answer is the campfire, not weaker nights.
+- The night hint comes each evening at dusk (16:00 to 18:00, two game hours before dark) until the
+  player builds a campfire: "Night falls at 18:00, and monsters come out in the dark. Build a
+  campfire (two logs, two sticks): no monster appears in its light, and it warms you." A torch or
+  a bed no longer stills it.
+- Its light (15) keeps monsters from spawning within about eight blocks (they need light 6 or
+  less). Whether one wandering in from the dark still reaches a player by a fire is checked in
+  Tester's rerun; if they do, the next step is monsters keeping out of a campfire's light.
+

@@ -9,39 +9,18 @@ use weft_sdk::*;
 
 pub(crate) static CAPYBARA: Entity = Entity::named("capybara");
 const TEXTURE: &str = "capybara/capybara";
-/// Resting this long (thirty seconds), a sitting capybara lies down.
-const LIE_TICKS: u32 = 600;
-
-value! {
-    #[derive(Default)]
-    /// What a capybara is doing (not saved: it just settles down again).
-    pub struct Capybara {
-        /// Ticks left resting (0: up and about).
-        pub rest: u32,
-        /// Ticks rested so far.
-        pub rested: u32,
-        /// The look applied, 1 + pose (0: none yet).
-        pub look: u32,
-    }
-}
-
-static STATE: Component<Capybara> = Component::named("capybara_state");
-
-const LOOKS: [(&str, &str); 3] = [("", ""), ("_sit", "capybara_sit"), ("_lie", "capybara_lie")];
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(&STATE, Capybara::default(), 0);
-    // The poses, drawn in place of a capybara sitting or lying down.
-    for (suffix, kind) in &LOOKS[1..] {
-        drop(
-            r.entity(Entity::generated(kind.to_string()))
-                .size(0.7, 0.6)
-                .passive()
-                .model_file("capybara")
-                .animations(&format!("capybara{suffix}"))
-                .texture(TEXTURE),
-        );
-    }
+    // Settling down: its poses, drawn in place of it (`rest.rs`).
+    crate::rest::register(
+        r,
+        &CAPYBARA,
+        crate::rest::Settle { chance: 300, ticks: (400, 1200), lie_after: 600 },
+        "capybara",
+        TEXTURE,
+        (0.7, 0.6),
+        &[("_sit", "capybara_sit"), ("_lie", "capybara_lie")],
+    );
     r.entity(&CAPYBARA)
         .size(0.7, 0.6)
         .health(12.0)
@@ -50,7 +29,6 @@ pub fn init(r: &mut Registry) {
         .model_file("capybara")
         .animations("capybara")
         .texture(TEXTURE)
-        .attach(&STATE)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
             if !crate::screen::interact(&w, id, player) && !crate::taming::feed(&w, id, player) {
@@ -65,7 +43,7 @@ pub fn init(r: &mut Registry) {
                 .then(crate::signatures::calm_aura)
                 .then(crate::commands::act(2))
                 .then(crate::breeding::behave(2))
-                .then(settle)
+                .then(crate::rest::settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)
                 .then(crate::forage::forage)
@@ -73,52 +51,6 @@ pub fn init(r: &mut Registry) {
         )
         .on_hurt(|w, h| {
             crate::taming::hurt(w, h.entity);
-            if let Some(c) = w.component_mut(h.entity, &STATE) {
-                c.rest = 0;
-            }
+            crate::rest::stop(w, h.entity);
         });
-}
-
-/// Every tick: now and then settle down for a while (sit, then lie), and show the pose.
-fn settle(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(c) = w.component_mut(id, &STATE) else { return false };
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(300) == 0 {
-        c.rest = 400 + w.random_below(1200);
-        c.rested = 0;
-    }
-    let resting = c.rest > 0;
-    if resting {
-        c.rest = c.rest.saturating_sub(w.tick_elapsed(id) as _);
-        c.rested = c.rested.saturating_add(w.tick_elapsed(id) as _);
-    }
-    let pose = match (resting, c.rested > LIE_TICKS) {
-        (false, _) => 0,
-        (true, false) => 1,
-        (true, true) => 2,
-    };
-    if c.look != pose + 1 {
-        c.look = pose + 1;
-        let kind = LOOKS[pose as usize].1;
-        w.set_look(
-            id,
-            (!kind.is_empty())
-                .then(|| format!("animals:{kind}"))
-                .as_deref(),
-        );
-    }
-    if resting && w.navigating(id) {
-        w.navigate(id, st.pos, 0.0);
-    }
-    resting
-}
-
-/// Up from resting, to follow or fight.
-pub fn wake(w: &World, id: u64) {
-    if let Some(c) = w.component_mut(id, &STATE)
-        && (c.rest > 0 || c.look > 1)
-    {
-        c.rest = 0;
-        c.look = 1;
-        w.set_look(id, None);
-    }
 }

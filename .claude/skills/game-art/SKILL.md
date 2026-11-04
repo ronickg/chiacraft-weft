@@ -120,7 +120,7 @@ come out as a pink ring on magenta, so take those pixels out after cutting. The 
 (`guides/6 UI/`) is the style; the master prompt below predates it and matches it.
 
 Master prompt, pasted once per chat, with the reference sheet for that kind of part
-(`notes/ui-reference/`) and every approved part attached (the approved slot at least):
+(Ronald's sheets: `guides/6 UI/UI Prompt References/`; his two mockups stay in `notes/ui-reference/`) and every approved part attached (the approved slot at least):
 
 ```text
 You are making UI assets for my game, one component at a time. Keep everything in this chat in one consistent style.
