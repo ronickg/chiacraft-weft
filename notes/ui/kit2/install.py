@@ -189,7 +189,9 @@ for suffix, key in (("", "second"), ("_hover", "second_hover")):
     light, face, shade = k.FACES[key]
     save("scrollbar_handle" + suffix, raised_part(12, 28, light, face, shade, k.GLOW if suffix else k.OUTLINE, shade_px=1),
          [NINE, border(4)])
-save("slider", sunken(62, 10, (30, 22, 19), (20, 14, 12), (52, 38, 30)), [NINE, border(3)])
+# The slider's track fills its whole row (20 GUI px in the settings), so it is a mid-tone groove
+# that reads on the dark panel; dark on the panel's own colour, it vanished (PC shots, 11-04).
+save("slider", sunken(62, 10, (86, 60, 42), (58, 40, 28), (120, 84, 56)), [NINE, border(3)])
 for suffix, key in (("", "main"), ("_hover", "main_hover")):
     light, face, shade = k.FACES[key]
     save("slider_knob" + suffix, raised_part(14, 20, light, face, shade, k.GLOW if suffix else k.OUTLINE), [NINE, border(4)])
