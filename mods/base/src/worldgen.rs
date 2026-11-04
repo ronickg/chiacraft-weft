@@ -2,6 +2,7 @@
 //! places in every dimension whose biomes ask for them) and plants (a decoration).
 
 use base_api::CLIMATE;
+use base_api::land;
 use vitals::wild;
 use weft_sdk::*;
 
@@ -66,7 +67,7 @@ pub fn register(r: &mut Registry) {
     r.biome(&FOREST)
         .set(&CLIMATE, base_api::climate("base:forest"))
         .set(&BOULDERS, 0.12)
-        .humidity(0.25..)
+        .humidity(land::FOREST_HUMIDITY..)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x79c05a)
         .tint(foliage, 0x59ae30)
@@ -81,8 +82,8 @@ pub fn register(r: &mut Registry) {
     r.biome(&BIRCH_FOREST)
         .set(&CLIMATE, base_api::climate("base:birch_forest"))
         .set(&BOULDERS, 0.1)
-        .temperature(..0.1)
-        .humidity(0.05..)
+        .temperature(..land::BIRCH.0)
+        .humidity(land::BIRCH.1..)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x88bb67)
         .tint(foliage, 0x6ba941)
@@ -97,7 +98,7 @@ pub fn register(r: &mut Registry) {
     r.biome(&TAIGA)
         .set(&CLIMATE, base_api::climate("base:taiga"))
         .set(&BOULDERS, 0.25)
-        .temperature(..-0.15)
+        .temperature(..land::TAIGA_BELOW)
         .surface("podzol", "dirt", 3)
         .tint(grass, 0x86b783)
         .tint(foliage, 0x68a464)
@@ -115,7 +116,7 @@ pub fn register(r: &mut Registry) {
         .set(&CLIMATE, base_api::climate("base:snowy_plains"))
         .set(&BOULDERS, 0.2)
         .snows()
-        .temperature(..-0.45)
+        .temperature(..land::SNOWY_BELOW)
         .surface("snowy_grass", "dirt", 3)
         .frozen("ice")
         .tint(grass, 0x80b497)
@@ -130,8 +131,8 @@ pub fn register(r: &mut Registry) {
     r.biome(&DESERT)
         .set(&CLIMATE, base_api::climate("base:desert"))
         .set(&BOULDERS, 0.04)
-        .temperature(0.35..)
-        .humidity(..0.0)
+        .temperature(land::DESERT.0..)
+        .humidity(..land::DESERT.1)
         .surface("sand", "sand", 3)
         .under("sandstone", 1)
         .tint(grass, 0xbfb755)
@@ -147,8 +148,8 @@ pub fn register(r: &mut Registry) {
     r.biome(&SAVANNA)
         .set(&CLIMATE, base_api::climate("base:savanna"))
         .set(&BOULDERS, 0.04)
-        .temperature(0.2..)
-        .humidity(..0.2)
+        .temperature(land::SAVANNA.0..)
+        .humidity(..land::SAVANNA.1)
         .surface("grass", "dirt", 3)
         .tint(grass, 0xbfb755)
         .tint(foliage, 0xaea42a)
@@ -163,8 +164,8 @@ pub fn register(r: &mut Registry) {
     // Warm, wet lowland: still, dark water, low trees.
     r.biome(&SWAMP)
         .set(&CLIMATE, base_api::climate("base:swamp"))
-        .temperature(-0.05..)
-        .humidity(0.1..)
+        .temperature(land::SWAMP.0..)
+        .humidity(land::SWAMP.1..)
         .surface("grass", "dirt", 3)
         .tint(grass, 0x6a7039)
         .tint(foliage, 0x6a7039)

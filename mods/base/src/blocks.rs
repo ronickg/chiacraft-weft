@@ -13,6 +13,13 @@ pub static SAND: Block = Block::named("sand");
 pub static GRAVEL: Block = Block::named("gravel");
 pub static CLAY: Block = Block::named("clay");
 pub static SANDSTONE: Block = Block::named("sandstone");
+// The rock faces' stones (`land.rs`): granite on warm mountains, slate in the cold, limestone on
+// temperate cliffs, ochre and red sandstone in the mesas' strata.
+pub static GRANITE: Block = Block::named("granite");
+pub static SLATE: Block = Block::named("slate");
+pub static LIMESTONE: Block = Block::named("limestone");
+pub static OCHRE_SANDSTONE: Block = Block::named("ochre_sandstone");
+pub static RED_SANDSTONE: Block = Block::named("red_sandstone");
 pub static SNOW: Block = Block::named("snow");
 pub static ICE: Block = Block::named("ice");
 pub static OBSIDIAN: Block = Block::named("obsidian");
@@ -284,6 +291,25 @@ pub fn register(r: &mut Registry) {
         .mineable("pickaxe")
         .needs_tool(0)
         .tab(&crate::tabs::BUILDING);
+    for (block, textures) in [
+        (&GRANITE, None),
+        (&SLATE, Some(("slate_top", "slate_side", "slate_top"))),
+        (&LIMESTONE, Some(("limestone_top", "limestone_side", "limestone_top"))),
+        (&OCHRE_SANDSTONE, Some(("ochre_sandstone_top", "ochre_sandstone_side", "ochre_sandstone_bottom"))),
+        (&RED_SANDSTONE, Some(("red_sandstone_top", "red_sandstone_side", "red_sandstone_bottom"))),
+    ] {
+        let b = r
+            .block(block)
+            .sound_group("stone")
+            .hardness(1.2)
+            .mineable("pickaxe")
+            .needs_tool(0);
+        match textures {
+            Some((top, side, bottom)) => b.textures(top, side, bottom),
+            None => b,
+        }
+        .tab(&crate::tabs::BUILDING);
+    }
     r.block(&SNOW)
         .sound_group("sand")
         .hardness(0.2)

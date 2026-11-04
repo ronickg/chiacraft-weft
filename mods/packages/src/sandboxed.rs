@@ -896,6 +896,13 @@ impl Game for WorldGame {
     fn player_key(&mut self, player: u64) -> String {
         crate::ask("player_key", &player.to_string())
     }
+    fn grant_achievement(&mut self, player: u64, id: &str, title: &str, description: &str, icon: Option<&str>) {
+        // The engine's bridge signs it (chiacraft, phase 4: `achievements`); tabs and lines would
+        // split the question.
+        let clean = |s: &str| s.replace(['\t', '\n', '\r'], " ");
+        let arg = format!("{player}\t{}\t{}\t{}\t{}", clean(id), clean(title), clean(description), icon.map(clean).unwrap_or_default());
+        crate::ask("achievement", &arg);
+    }
     fn reply(&mut self, key: &str, args: &[WArg]) {
         if self.cmd == 0 {
             return;
