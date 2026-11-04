@@ -63,9 +63,14 @@ deep shade of the block's own colour (never black), restrained highlights, top-l
    | `crop` | crop stages | cut out (drawn to read 4 times in a # shape) |
    | `cutout` | ladder, glass frame: fills the square, open parts magenta | cut out |
    | `flat` | lily pads, water hyacinth (seen from above) | cut out |
-4. **Generate**: `python3 notes/blocks/blocks.py gen batches/<x>.tsv [image ...]` (4 Codex runs at
-   once, a fresh `codex exec` each, so nothing drifts; an image that exists is skipped, delete it
-   to redo). Look at each `gen/<image>.png`.
+   | `fleaves` | leaves with flowers or fruit drawn in (dogwood) | cut out like leaves, kept in their own colours (a tint would turn the flowers green) |
+4. **Generate**: `python3 notes/blocks/blocks.py gen batches/<x>.tsv [image ...]` (2 Codex runs at
+   once, the crew's limit; run it niced, a fresh `codex exec` each, so nothing drifts; an image that exists is skipped, delete it
+   to redo). Look at each `gen/<image>.png`. The approved key holds no plants yet, so for plants and
+   for a family that must match a texture (a tree's mossy bark, a column's top) attach the game's own
+   with `BLOCK_LIKE=kelp,cattail,/abs/path/bark.png` (names from the mods or `tiles/`, or absolute
+   paths), and say the batch's `BLOCK_LIKE` in its first comment line. A column's top must start its
+   stalk where the block below ends it: check the bottom row's pixels and shift the tile if needed.
 5. **Cut**: `python3 notes/blocks/blocks.py cut batches/<x>.tsv` writes `tiles/<name>.png`.
 6. **Preview**: `python3 notes/blocks/blocks.py preview batches/<x>.tsv` writes
    `preview/<x>.png`: each tile flat, and as it stands in the world (a cube with its own sides
