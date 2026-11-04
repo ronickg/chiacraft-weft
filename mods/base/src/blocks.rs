@@ -212,7 +212,7 @@ fn grove(r: &mut Registry) {
     log(r, &DOGWOOD_LOG, "dogwood", "base:dogwood_leaves", None);
     // The dogwood is white with its bracts in spring and plain green the rest of the year
     // (`vitals::wild::BLOOMS`), both drawn in their own colours.
-    let b = r.block(&DOGWOOD_LEAVES).sound_group("grass");
+    let b = tree_leaves(r.block(&DOGWOOD_LEAVES).sound_group("grass"));
     bloom(b, DOGWOOD_LEAVES.name(), "leaves_dogwood", "leaves_dogwood_green")
         .hardness(0.2)
         .cutout()
@@ -273,7 +273,7 @@ fn planks(r: &mut Registry, h: &'static Block, wood: &str) {
 
 /// Leaves that drop `sapling` (a time in 20) and, for our trees, `fruit` (a time in 20).
 fn leaves(r: &mut Registry, handle: &'static Block, tex: &str, sapling: &str, fruit: Option<&str>) {
-    let b = r.block(handle).sound_group("grass").texture(tex);
+    let b = tree_leaves(r.block(handle).sound_group("grass").texture(tex));
     bloom(b, handle.name(), leak(format!("{tex}_bloom")), leak(tex.to_string()))
         .hardness(0.2)
         .cutout()
@@ -321,6 +321,12 @@ fn bloom<'a>(b: BlockBuilder<'a>, leaves: &str, open: &'static str, shut: &'stat
                 e.world().set_prop(e.pos(), "bloom", want);
             }
         })
+}
+
+/// A tree's leaves: they decay once no log is near (`leaf_decay`), unless a player placed them
+/// (`placed`, set as they are placed). The shrubs' leaves have no logs and keep.
+fn tree_leaves(b: BlockBuilder<'_>) -> BlockBuilder<'_> {
+    b.prop("placed", ["false", "true"]).tag("tree_leaves")
 }
 
 /// A name kept for the game's life (registration's textures).
