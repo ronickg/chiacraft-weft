@@ -60,7 +60,8 @@ fn palette() -> Palette {
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
-    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.025, 0.04, 0.10), vec3(0.010, 0.017, 0.050));
+    // Valheim's night: a deep blue-teal in the shade, so firelight's orange stands out against it.
+    let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.025, 0.045, 0.10), vec3(0.009, 0.020, 0.046));
     var p: Palette;
     if e > 0.08 {
         p = blend(golden, day, smoothstep(0.08, 0.28, e));
@@ -287,7 +288,9 @@ fn block_light(b: vec3<f32>, pos: vec3<f32>) -> vec3<f32> {
     if m <= 0.0 {
         return vec3(0.0);
     }
-    let curve = vec3(brightness_curve(b.x), brightness_curve(b.y), brightness_curve(b.z));
+    // Wider pools than the levels alone give (Valheim's fires light a wide ring of ground): the
+    // dim edge of a torch's reach brought up.
+    let curve = pow(vec3(brightness_curve(b.x), brightness_curve(b.y), brightness_curve(b.z)), vec3(0.8));
     // White light (torches, lanterns) is warmed; colored light keeps its color.
     let grey = 1.0 - (m - min(min(b.x, b.y), b.z)) / m;
     let warm = mix(vec3(1.0), mix(vec3(1.0, 0.56, 0.26), vec3(1.0, 0.82, 0.62), m * m), grey);
@@ -312,9 +315,13 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // More of the sky's light comes from above than from the sides, and little from below.
     let hemi = 0.62 + 0.38 * n.y;
     var c = p.ambient * sky * hemi * ao;
-    // At golden hour the sky round the low sun glows: a warm fill on everything under it, in the
-    // shade too, so the hour reaches the ground and not only the sky.
-    c += p.glow * golden() * 0.35 * sky * hemi * ao;
+    // At golden hour the sky round the low sun glows: a warm fill from its side of the sky, on
+    // the faces turned that way; those turned away keep the sky's cool light (Valheim's warm light,
+    // blue shade).
+    let l = light_dir();
+    let side = normalize(vec3(l.x, 0.0, l.z) + vec3(1e-4, 0.0, 0.0));
+    let toward = clamp(dot(n, side) * 0.5 + 0.5, 0.0, 1.0);
+    c += p.glow * golden() * 0.35 * mix(0.3, 1.1, toward) * sky * hemi * ao;
     // Direct light only where the sky reaches (it keeps caves out of reach of the traced shadow's
     // gaps), and without corner shading: corners are dark where little sky gets in.
     let open = smoothstep(0.5, 0.95, light.x);
@@ -539,7 +546,20 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let reach = min(end, 2500.0);
     let amount = 1.0 - exp(-dist / (reach * mix(0.9, 0.4, rain)) * mix(0.45, 1.0, thin));
     let edge = smoothstep(end * 0.72, end, dist);
-    return mix(c, color, clamp(max(amount * 0.9, edge), 0.0, 1.0));
+    // Valheim's air: lit from behind by the sun, so the haze toward it glows warm (a forward
+    // scattering lobe, Henyey-Greenstein) and the side away goes a cool blue-teal, most at a low
+    // sun. Toward the far end it hands back to the sky's own color, which the terrain fades into.
+    let p = palette();
+    let mu = dot(dir, light_dir());
+    let g = 0.7;
+    let lobe = min((1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566, 0.9);
+    let near_end = 1.0 - edge;
+    var lit = color + p.glow * light_strength() * lobe * mix(0.25, 0.7, golden()) * (1.0 - rain) * near_end;
+    lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
+    // The far loses its colour before the haze covers it: far ridges go pale and grey-blue while the
+    // near stays rich.
+    let pale = mix(c, vec3(luma(c)), clamp(amount * 1.2, 0.0, 0.7));
+    return mix(pale, lit, clamp(max(amount * 0.9, edge), 0.0, 1.0));
 }
 
 // ---- to the screen ----
@@ -580,7 +600,8 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     var t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
-    t *= mix(vec3(0.975, 0.99, 1.03), mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
+    let shade = mix(vec3(0.975, 0.99, 1.03), vec3(0.92, 0.96, 1.10), golden());
+    t *= mix(shade, mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
     // Colour held back in the mid-tones and darks (the land), not in what glows bright (lava, fire,
     // lamps keep their fire).
     let y = luma(t);
