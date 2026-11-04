@@ -667,9 +667,18 @@ pub fn frame(c: &Client) {
             return;
         }
         if run.warmup > 0 {
-            // Each run's screenshots only.
+            // Each run's screenshots only in test-shots; the last run's move to
+            // test-shots-old/<time> (never deleted: Ronald looks back at them).
             if run.warmup == 3 {
-                let _ = std::fs::remove_dir_all(format!("{}/test-shots", c.run_dir()));
+                let dir = format!("{}/test-shots", c.run_dir());
+                if std::path::Path::new(&dir).exists() {
+                    let stamp = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_or(0, |d| d.as_secs());
+                    let old = format!("{}/test-shots-old", c.run_dir());
+                    let _ = std::fs::create_dir_all(&old);
+                    let _ = std::fs::rename(&dir, format!("{old}/{stamp}"));
+                }
             }
             run.warmup -= 1;
             return;
