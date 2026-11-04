@@ -123,13 +123,40 @@ fn on_body(l: vec4<f32>, k: i32) -> vec4<f32> {
     if k == 0 {
         return l;
     }
-    let w = unpack_light(bitcast<u32>(offsets[k].w));
+    let w = unpack_light(bitcast<u32>(offsets[k * 3].w));
+    // A leaning one (a falling tree) lit its own blocks as if nothing stood beside them, so a
+    // trunk under its crown came out dark: lit as in the open.
+    if offsets[k * 3 + 2].w > 0.5 {
+        return max(l, w);
+    }
     return vec4(min(l.x, w.x), max(l.yzw, w.yzw));
 }
 
+// `v` turned by quaternion `q` (x, y, z, w).
+fn quat_turn(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
+    let t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
+
+// Each structure has three vec4 in `offsets`: its offset (and light), its rotation and its pivot
+// in its own coordinates (a leaning body, a falling tree; upright for the rest). Its faces'
+// normals turn with it (`body_normal`).
 fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
-    let pos = vec3<f32>(origin.xyz) * 16.0 + local - g.cam_frac.xyz + offsets[origin.w].xyz;
+    var at = vec3<f32>(origin.xyz) * 16.0 + local;
+    let k = origin.w;
+    if k != 0 {
+        let pivot = offsets[k * 3 + 2].xyz;
+        at = quat_turn(offsets[k * 3 + 1], at - pivot) + pivot;
+    }
+    let pos = at - g.cam_frac.xyz + offsets[k * 3].xyz;
     return vec4(pos, 1.0);
+}
+
+fn body_normal(n: vec3<f32>, k: i32) -> vec3<f32> {
+    if k == 0 {
+        return n;
+    }
+    return quat_turn(offsets[k * 3 + 1], n);
 }
 
 // ---- wind ----
@@ -195,7 +222,11 @@ fn vs_face(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.light = on_body(corner_light(w2, w3, c), origins[ii].w);
     out.slot = shader_of(tex_id);
     out.pos = world;
-    out.normal = NORMAL[dir];
+    // A structure's blocks: where they are in the world (its own coordinates, turned and moved).
+    if origins[ii].w != 0 {
+        out.pos = pos.xyz + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
+    }
+    out.normal = body_normal(NORMAL[dir], origins[ii].w);
     out.ao = AO[a[c]];
     out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), 0u, 0u);
     var tint = vec3(1.0);
@@ -258,8 +289,12 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     out.light = on_body(corner_light(records[base + 6u], records[base + 7u], c), origins[ii].w);
     out.slot = shader_of(tex_id);
     out.pos = world;
+    // A structure's blocks: where they are in the world (its own coordinates, turned and moved).
+    if origins[ii].w != 0 {
+        out.pos = pos.xyz + vec3<f32>(g.cam_cube.xyz * 16) + g.cam_frac.xyz;
+    }
     // Crossed plants are lit as if they faced up, like the ground they grow from.
-    out.normal = select(n, vec3(0.0, 1.0, 0.0), flat_);
+    out.normal = body_normal(select(n, vec3(0.0, 1.0, 0.0), flat_), origins[ii].w);
     out.ao = 1.0;
     out.kind = vec4(tint_kind, select(0u, 1u, origins[ii].w != 0), select(0u, 1u, flat_), 0u);
     var tint = vec3(1.0);
@@ -288,7 +323,10 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
 fn sun_shadow(in: VOut, n: vec3<f32>) -> f32 {
     let sky = smoothstep(0.75, 1.0, in.light.x);
     let mapped = shadow_at(in.rel, n);
-    return mix(sky, min(mapped.x, smoothstep(0.3, 0.8, in.light.x)), mapped.y) * cloud_shadow(in.rel);
+    // Under a forest's canopy the map's gaps let the sun through where the leaves cut the sky light
+    // (`light_on`'s sunflecks).
+    let c = min(canopy(), 1.0);
+    return mix(sky, min(mapped.x, smoothstep(mix(0.3, 0.15, c), mix(0.8, 0.5, c), in.light.x)), mapped.y) * cloud_shadow(in.rel);
 }
 
 // The shadow pass (`sun_shadows`): only depth, without the see-through texels of leaves and
@@ -306,13 +344,14 @@ fn fs_shadow(in: VOut) {
 
 // ---- shading ----
 
-fn surface_light(in: VOut, n: vec3<f32>) -> vec3<f32> {
+// `paint` the tint the light takes (a biome's grass and leaf colour, `in.color`; white under snow).
+fn surface_light(in: VOut, n: vec3<f32>, paint: vec3<f32>) -> vec3<f32> {
     let shadow = sun_shadow(in, n);
-    var light = in.color * light_on(n, in.light, shadow, in.ao, in.pos, in.rel);
+    var light = paint * light_on(n, in.light, shadow, in.ao, in.pos, in.rel);
     // Leaves and plants let some sun through when it is behind them.
     if in.kind.x == TINT_FOLIAGE || in.kind.z != 0u {
         let back = max(-dot(normalize(in.rel), light_dir()), 0.0);
-        light += in.color * palette().sun * light_strength() * pow(back, 3.0) * 0.35 * shadow * smoothstep(0.5, 0.95, in.light.x);
+        light += paint * palette().sun * light_strength() * pow(back, 3.0) * 0.35 * shadow * smoothstep(0.5, 0.95, in.light.x);
     }
     return light;
 }
@@ -320,12 +359,16 @@ fn surface_light(in: VOut, n: vec3<f32>) -> vec3<f32> {
 fn shade(in: VOut, albedo_in: vec4<f32>) -> vec4<f32> {
     let n = normalize(in.normal);
     var albedo = albedo_in;
-    // Snow lying on the tops of blocks and leaves (not on plants, which it buries).
+    // Snow lying on the tops of blocks and leaves (not on plants, which it buries). The biome's
+    // tint goes onto the light (`in.color`), so the snow takes it off there too: tinted with the
+    // grass colour, snow on grass tops and leaves came out green, and past the snow layers the
+    // land stayed green at any cover (Terrain's edge look, 11-04).
+    var snow = 0.0;
     if in.kind.z == 0u {
-        let snow = snow_on(n, in.pos, in.light.x);
+        snow = snow_on(n, in.pos, in.light.x);
         albedo = vec4(mix(albedo.rgb, vec3(0.86, 0.9, 0.95), snow), albedo.a);
     }
-    var light = surface_light(in, n);
+    var light = surface_light(in, n, mix(in.color, vec3(1.0), snow));
     if in.glow != 0xffffffffu {
         let e = textureSampleLevel(textures[in.glow], nearest_clamp, in.uv, 0.0).r;
         light = max(light, select(pow(in.tint, vec3(2.2)), vec3(1.0), in.overlay != 0u) * e * 1.7);
@@ -640,8 +683,7 @@ fn with_overlay(in: VOut, albedo: vec4<f32>, nuv: vec2<f32>, du: vec2<f32>, dv: 
     return vec4(mix(albedo.rgb, ov.rgb * pow(in.tint, vec3(2.2)), ov.a), albedo.a);
 }
 
-@fragment
-fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
+fn opaque(in: VOut) -> vec4<f32> {
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
@@ -661,7 +703,55 @@ fn sample_cutout(in: VOut, nuv: vec2<f32>, du: vec2<f32>, dv: vec2<f32>) -> vec4
 }
 
 @fragment
+fn fs_opaque(in: VOut) -> @location(0) vec4<f32> {
+    return opaque(in);
+}
+
+@fragment
 fn fs_cutout(in: VOut) -> @location(0) vec4<f32> {
+    let du = dpdx(in.uv);
+    let dv = dpdy(in.uv);
+    let nuv = nearest_uv(in.size, in.uv, du, dv);
+    let albedo = with_overlay(in, sample_cutout(in, nuv, du, dv), nuv, du, dv);
+    if albedo.a <= 0.1 {
+        discard;
+    }
+    return vec4(shade(in, albedo).rgb, SOLID_ALPHA);
+}
+
+// Where the cubes end, they fade into distant terrain over this many blocks (as the engine's
+// `FADE_BAND`), so the edge isn't a line (Distant Horizons' fade).
+const FADE_BAND: f32 = 24.0;
+
+// Whether this pixel, near where the cubes end (`g.extra.y` blocks across from the camera), is
+// left to distant terrain: more of them the nearer the end, in a fine noise over the screen
+// (interleaved gradient noise). A cube's pixel and the distant terrain's at the same place agree,
+// so one of the two always draws it.
+fn faded(in: VOut) -> bool {
+    let end = f32(g.extra.y);
+    if end <= 0.0 {
+        return false;
+    }
+    let f = clamp((length(in.rel.xz) - (end - FADE_BAND)) / FADE_BAND, 0.0, 1.0);
+    let p = floor(in.clip.xy);
+    return fract(52.9829189 * fract(0.06711056 * p.x + 0.00583715 * p.y)) < f;
+}
+
+// The cubes near where they end (the engine draws only those meshes with these, so the rest keep
+// early depth).
+@fragment
+fn fs_opaque_fade(in: VOut) -> @location(0) vec4<f32> {
+    if faded(in) {
+        discard;
+    }
+    return opaque(in);
+}
+
+@fragment
+fn fs_cutout_fade(in: VOut) -> @location(0) vec4<f32> {
+    if faded(in) {
+        discard;
+    }
     let du = dpdx(in.uv);
     let dv = dpdy(in.uv);
     let nuv = nearest_uv(in.size, in.uv, du, dv);
@@ -684,8 +774,8 @@ fn fs_translucent(in: VOut) -> @location(0) vec4<f32> {
     return shade(in, albedo);
 }
 
-// Distant terrain (`client::lod`): faces of boxes in the average color of their texture, under
-// open sky.
+// Distant terrain (`client::lod`): faces of boxes with their blocks' textures, laid over the
+// world block by block (`lod_albedo`), under open sky.
 @vertex
 fn vs_lod(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
     let f = vi / 4u;
@@ -755,20 +845,47 @@ fn fs_lod_shadow(in: VOut) {
 
 @fragment
 fn fs_lod(in: VOut) -> @location(0) vec4<f32> {
-    if lod_hidden(in) {
+    // Where cubes show the ground they stand there, except for the pixels they leave as they fade.
+    if lod_hidden(in) && !faded(in) {
         discard;
     }
-    var albedo = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
-    if in.blend > 0.0 {
-        albedo = mix(albedo, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    // A texture per block, laid from the world position on the face's plane (top
+    // faces and gentle slopes by x and z, walls by their side and height, up the right way), its
+    // gradients from that unbroken position so block borders don't jump to a coarse mip. Far off
+    // the mips make it the average color it was drawn in before (Distant Horizons 3.2 textures
+    // its near levels the same way).
+    let top = in.pos.xz;
+    let east = vec2(in.pos.z, -in.pos.y);
+    let south = vec2(in.pos.x, -in.pos.y);
+    let dt = vec4(dpdx(top), dpdy(top));
+    let de = vec4(dpdx(east), dpdy(east));
+    let ds = vec4(dpdx(south), dpdy(south));
+    let n = abs(in.normal);
+    var at = top;
+    var d = dt;
+    if n.y < 0.5 {
+        if n.x > n.z {
+            at = east;
+            d = de;
+        } else {
+            at = south;
+            d = ds;
+        }
     }
+    var avg = textureSampleLevel(textures[in.layer], linear_mipped, vec2(0.5), 16.0);
+    if in.blend > 0.0 {
+        avg = mix(avg, textureSampleLevel(textures[in.layer2], linear_mipped, vec2(0.5), 16.0), in.blend);
+    }
+    let t = sample(in, fract(at), d.xy, d.zw);
+    // A cutout's clear texels (leaves' gaps) show the average, not their unset color.
+    var albedo = vec4(mix(avg.rgb, t.rgb, t.a), avg.a);
     // Far water is the same water as near: deep there (no blocks are kept that far), with its
     // Fresnel, the sky and the sun's path. Otherwise it would be a flat grey-blue lit like land, a
     // seam at the edge of the render distance. It is left out of the screen's reflections (solid in
     // the mask): looking out to sea, their march over every far-water pixel cost too much
     // (reports/performance.md).
     if in.kind.x == TINT_WATER {
-        let w = water(in, albedo, false);
+        let w = water(in, avg, false);
         return vec4(w.rgb, SOLID_ALPHA);
     }
     return vec4(shade(in, albedo).rgb, SOLID_ALPHA);

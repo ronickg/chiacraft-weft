@@ -17,7 +17,17 @@ there shows them again). Nothing went into dev.
   questions and events as `actions::*`). This isn't an afternoon's merge. My estimate is several days for
   one session, or one session per area (below) with a person checking each in the game.
 
-## Decisions needed first (Ronald or Planner)
+## Decided (Ronald, 11-04)
+
+- **When:** "Later, after the tropical round". The sync runs on a quiet dev, area by area, in the
+  order below.
+- **The four calls:** "Yes, all four":
+  1. Terrain: keep our callback path beside upstream's expression features.
+  2. Distant terrain: keep our LOD tiles.
+  3. Waterlogging: take upstream's, and move base's water-holding blocks onto it.
+  4. Weather: take upstream's weather by id, with ours registered on it in base.
+
+## The decisions as they were put (with the reasons)
 
 1. **Terrain.** Upstream turned custom terrain features into expression trees and dropped the
    callback features, `Fields` and `shape` that all of `base_api::land` (rivers, continents, coasts,

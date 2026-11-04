@@ -166,6 +166,9 @@ impl Mapped {
     }
 }
 
+/// Blocks over which the cubes fade into distant terrain, before `lod_fade`.
+const FADE_BAND: f32 = 24.0;
+
 /// Meshes are kept in regions of this many cubes a side (log2), culled as a whole first.
 const REGION: i32 = 3;
 /// Meshes in view up to which the frame thread culls and writes the draws itself (`draw`): about
@@ -175,6 +178,9 @@ const SERIAL_CULL: usize = 24_576;
 fn region_of(key: MeshKey) -> (u64, IVec3) {
     (key.0, key.1 >> REGION)
 }
+
+/// A structure's lean (chiacraft): its pivot (own coordinates) and rotation.
+type Lean = (Vec3, glam::Quat);
 
 /// The draws of one visible mesh (its corner `lo` relative to the camera, `k` its structure or
 /// 0), returning the faces drawn. A face direction can be seen only from the side its normal
@@ -320,6 +326,14 @@ pub struct WorldRenderer {
     face_pipes: [PipelineId; 3],
     quad_pipes: [PipelineId; 3],
     lod_pipe: PipelineId,
+    /// Faces opaque, faces cutout, quads opaque, quads cutout for the cubes near where they end,
+    /// when the pack's `world.wgsl` has `fs_opaque_fade`: dithered away toward `lod_fade`, distant
+    /// terrain taking the pixels they leave (Distant Horizons' fade), so the edge isn't a line.
+    /// Only those meshes, so the rest keep early depth (no `discard`).
+    fade_pipes: Option<[PipelineId; 4]>,
+    /// How far from the camera (blocks, across) the cubes end while distant terrain is shown; 0:
+    /// no fade. Cubes past it aren't drawn.
+    pub lod_fade: u32,
     /// Distant terrain tiles (`lod`): their quads (in `faces`, four words like a face), count,
     /// the heights they span and the records before its faces; the ones to draw this frame; and the columns whose cubes show
     /// their ground (`Lod::mask`, half its width), where their pixels are left to the cubes.
@@ -429,6 +443,7 @@ impl WorldRenderer {
     ) -> Result<WorldRenderer, String> {
         let (shader, slots) = world_shader(assets).map_err(|e| e.0)?;
         let (face_pipes, quad_pipes, lod_pipe) = Self::pipelines(gpu, &shader)?;
+        let fade_pipes = Self::fade_pipelines(gpu, &shader);
         let shadow_pipes = Self::shadow_pipelines(gpu, &shader);
         let lod_shadow_pipe = Self::lod_shadow_pipeline(gpu, &shader, shadow_pipes.is_some());
         let tex_shader = shader_table(gpu, c, textures, &slots);
@@ -467,6 +482,8 @@ impl WorldRenderer {
             face_pipes,
             quad_pipes,
             lod_pipe,
+            fade_pipes,
+            lod_fade: 0,
             lod: FxHashMap::default(),
             lod_draw: Vec::new(),
             lod_half: 0,
@@ -555,6 +572,44 @@ impl WorldRenderer {
         ];
         let lod = make("distant terrain", "vs_lod", "fs_lod", depth_write, Blend::None, true)?;
         Ok((faces, quads, lod))
+    }
+
+    /// `fade_pipes`: None when the pack has no `fs_opaque_fade` (and `fs_cutout_fade`) or one
+    /// fails.
+    fn fade_pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Option<[PipelineId; 4]> {
+        if !crate::packs::pack_uses("world.wgsl", "fs_opaque_fade") {
+            return None;
+        }
+        let depth = Some(DepthState { write: true, compare: Compare::GreaterEqual });
+        let mut made = Vec::new();
+        for (label, vs, fs) in [
+            ("faces opaque fading", "vs_face", "fs_opaque_fade"),
+            ("faces cutout fading", "vs_face", "fs_cutout_fade"),
+            ("quads opaque fading", "vs_quad", "fs_opaque_fade"),
+            ("quads cutout fading", "vs_quad", "fs_cutout_fade"),
+        ] {
+            match gpu.create_pipeline(&PipelineDesc {
+                label,
+                shader,
+                vertex: vs,
+                fragment: Some(fs),
+                color: Some(Format::Surface),
+                depth,
+                blend: Blend::None,
+                cull_back: true,
+                topology: Topology::Triangles,
+            }) {
+                Ok(p) => made.push(p),
+                Err(e) => {
+                    log::error!("world shader {fs}: {}", e.0);
+                    for p in made {
+                        gpu.destroy_pipeline(p);
+                    }
+                    return None;
+                }
+            }
+        }
+        made.try_into().ok()
     }
 
     /// The shadow pass's pipelines when the shader pack asks for sun shadows: depth only, the
@@ -791,10 +846,12 @@ impl WorldRenderer {
                     .into_iter()
                     .flatten()
                     .chain(self.lod_shadow_pipe.take())
+                    .chain(self.fade_pipes.take().into_iter().flatten())
                 {
                     gpu.destroy_pipeline(p);
                 }
                 if let Ok((s, _)) = world_shader(assets) {
+                    self.fade_pipes = Self::fade_pipelines(gpu, &s);
                     self.shadow_pipes = Self::shadow_pipelines(gpu, &s);
                     self.lod_shadow_pipe = Self::lod_shadow_pipeline(gpu, &s, self.shadow_pipes.is_some());
                     self.terrain_epoch += 1;
@@ -898,6 +955,7 @@ impl WorldRenderer {
             .chain([self.lod_pipe])
             .chain(self.shadow_pipes.take().into_iter().flatten())
             .chain(self.lod_shadow_pipe.take())
+            .chain(self.fade_pipes.take().into_iter().flatten())
         {
             gpu.destroy_pipeline(p);
         }
@@ -1143,7 +1201,9 @@ impl WorldRenderer {
         list.push((key, GpuMesh { faces, face_counts, quads, quad_counts }));
     }
 
-    /// `frames`: structures to draw and where their block (0, 0, 0) is in the world.
+    /// `frames`: structures to draw and where their block (0, 0, 0) is in the world; `leans`:
+    /// those that lean (chiacraft, a falling tree), their pivot (own coordinates) and rotation.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
         gpu: &mut dyn Backend,
@@ -1153,6 +1213,7 @@ impl WorldRenderer {
         scene: BufferId,
         frames: &[(u64, DVec3)],
         lights: &FxHashMap<MeshKey, u32>,
+        leans: &FxHashMap<u64, (Vec3, glam::Quat)>,
     ) {
         self.sort_translucent(gpu, cam.pos, frames);
         let aspect = frame.width as f32 / frame.height.max(1) as f32;
@@ -1160,11 +1221,12 @@ impl WorldRenderer {
         let cam_block = cam.pos.floor();
         let cam_cube: IVec3 = cam_block.as_ivec3() >> 4i32;
         let cam_frac = (cam.pos - (cam_cube * 16).as_dvec3()).as_vec3();
+        let fade = if self.fade_pipes.is_some() { self.lod_fade } else { 0 };
         let globals = Globals {
             cam_frac: [cam_frac.x, cam_frac.y, cam_frac.z, 0.0],
             ids: [0, 0, (self.biome_table.len() / crate::content::content().tint_kinds.len()) as u32, self.tint_tiles],
             cam_cube: cam_cube.extend(0).to_array(),
-            extra: [self.overlays, 0, crate::content::content().tint_kinds.len() as u32, self.lod_half],
+            extra: [self.overlays, fade, crate::content::content().tint_kinds.len() as u32, self.lod_half],
         };
         let gbuf = self.globals[frame.slot];
         gpu.mapped(gbuf)[..size_of::<Globals>()].copy_from_slice(bytemuck::bytes_of(&globals));
@@ -1177,14 +1239,20 @@ impl WorldRenderer {
             .collect();
         // What a structure's meshes pick: its place and the world's light on that cube of it,
         // full sky until it is known.
-        let mut picks: Vec<(Vec3, u32)> = frame_offsets
+        // And how it leans (chiacraft): its pivot and rotation, upright for most.
+        let lean_of = |k: usize| leans.get(&frames[k].0).copied();
+        let mut picks: Vec<(Vec3, u32, Option<Lean>)> = frame_offsets
             .iter()
-            .map(|o| (*o, crate::world::light::SKY_FULL as u32))
+            .enumerate()
+            .map(|(k, o)| (*o, crate::world::light::SKY_FULL as u32, lean_of(k)))
             .collect();
         let mut cube_pick: FxHashMap<MeshKey, i32> = FxHashMap::default();
         for (&key, &light) in lights {
             if let Some(k) = frames.iter().position(|f| f.0 == key.0) {
-                picks.push((frame_offsets[k], light));
+                // A leaning one's cubes are elsewhere than where the world's light on them was
+                // sampled (a falling trunk's lowest cube is centred in the ground): its own light.
+                let light = if lean_of(k).is_some() { crate::world::light::SKY_FULL as u32 } else { light };
+                picks.push((frame_offsets[k], light, lean_of(k)));
                 cube_pick.insert(key, picks.len() as i32);
             }
         }
@@ -1229,11 +1297,37 @@ impl WorldRenderer {
                         ((key.1 - cam_cube).as_vec3() * 16.0 - cam_frac, 0)
                     } else {
                         let Some(k) = frames.iter().position(|f| f.0 == key.0) else { continue };
+                        // A leaning structure's cubes are elsewhere than their place: drawn
+                        // whole, every face (chiacraft).
+                        if leans.contains_key(&key.0) {
+                            let lo = frame_offsets[k] + key.1.as_vec3() * 16.0 - cam_frac;
+                            let pick = cube_pick.get(&key).copied().unwrap_or(k as i32 + 1);
+                            faces += mesh_draws(&m, key, lo, pick, cam_cube, [true; 6], out);
+                            continue;
+                        }
                         (frame_offsets[k] + key.1.as_vec3() * 16.0 - cam_frac, cube_pick.get(&key).copied().unwrap_or(k as i32 + 1))
                     };
                     let center = lo + Vec3::splat(8.0);
+                    // Near where the cubes end (`lod_fade`): past it left to distant terrain, in
+                    // the band before it drawn fading.
+                    let mut fading = false;
+                    if fade > 0 && key.0 == 0 {
+                        let (a, b) = (glam::Vec2::new(lo.x, lo.z), glam::Vec2::new(lo.x + 16.0, lo.z + 16.0));
+                        let near = glam::Vec2::ZERO.clamp(a, b).length();
+                        let far = a.abs().max(b.abs()).length();
+                        if near > fade as f32 {
+                            continue;
+                        }
+                        fading = far > fade as f32 - FADE_BAND;
+                    }
                     if planes.iter().all(|pl| pl.dot(center.extend(1.0)) > -13.86) {
+                        let from = out.len();
                         faces += mesh_draws(&m, key, lo, k, cam_cube, camera_sides(lo), out);
+                        if fading {
+                            for d in out[from..].iter_mut().filter(|d| d.1 < 2) {
+                                d.0 |= 2;
+                            }
+                        }
                     }
                 }
                 faces
@@ -1245,9 +1339,10 @@ impl WorldRenderer {
         // of each run go, so the near-to-far order holds inside runs without a sort.
         let seen_parts = &parts[..seen.len()];
         let pages = self.faces.pages.len().max(self.quads.pages.len()).max(1);
-        // Opaque and cutout runs; translucent ones are sorted far to near over all of them.
-        let nb = 4 * pages;
-        let bucket = |d: &DrawRecord| (d.1 as usize * 2 + d.0 as usize) * pages + d.2 as usize;
+        // Opaque and cutout runs, then the same fading (kind 2 and 3, `fade_pipes`); translucent
+        // ones are sorted far to near over all of them.
+        let nb = 8 * pages;
+        let bucket = |d: &DrawRecord| ((d.0 as usize >> 1) * 4 + d.1 as usize * 2 + (d.0 & 1) as usize) * pages + d.2 as usize;
         let counts: Vec<Vec<u32>> = seen_parts
             .par_iter()
             .with_min_len(split)
@@ -1329,16 +1424,28 @@ impl WorldRenderer {
             gpu,
             &mut self.offsets,
             frame.slot,
-            picks.len() as u32 + 1,
+            (picks.len() as u32 + 1) * 3,
             16,
             usage::STORAGE,
             "frame offsets",
         );
+        // Three vec4 a structure: its offset and light, its rotation (x, y, z, w) and its pivot
+        // (chiacraft: `world.wgsl`'s `finish` turns a leaning one's vertices about it).
         let offs = gpu.mapped(fbuf);
-        offs[..16].fill(0);
-        for (k, (o, light)) in picks.iter().enumerate() {
-            offs[(k + 1) * 16..(k + 1) * 16 + 12].copy_from_slice(bytemuck::cast_slice(&o.to_array()));
-            offs[(k + 1) * 16 + 12..(k + 1) * 16 + 16].copy_from_slice(&light.to_le_bytes());
+        let put = |offs: &mut [u8], k: usize, o: Vec3, light: u32, lean: Option<Lean>| {
+            let (pivot, rot) = lean.unwrap_or((Vec3::ZERO, glam::Quat::IDENTITY));
+            let at = k * 48;
+            offs[at..at + 12].copy_from_slice(bytemuck::cast_slice(&o.to_array()));
+            offs[at + 12..at + 16].copy_from_slice(&light.to_le_bytes());
+            offs[at + 16..at + 32].copy_from_slice(bytemuck::cast_slice(&rot.to_array()));
+            offs[at + 32..at + 44].copy_from_slice(bytemuck::cast_slice(&pivot.to_array()));
+            // 1 for a leaning one: lit as in the open (`on_body`).
+            let leaning: f32 = if lean.is_some() { 1.0 } else { 0.0 };
+            offs[at + 44..at + 48].copy_from_slice(&leaning.to_le_bytes());
+        };
+        put(offs, 0, Vec3::ZERO, 0, None);
+        for (k, &(o, light, lean)) in picks.iter().enumerate() {
+            put(offs, k + 1, o, light, lean);
         }
         let ibuf = crate::gpu_layout::frame_buffer(gpu, &mut self.indirect, frame.slot, n, 20, usage::INDIRECT, "indirect");
         let origins = Mapped(gpu.mapped(obuf)[..n as usize * 16].as_mut_ptr());
@@ -1374,7 +1481,9 @@ impl WorldRenderer {
         let mut start = 0;
         for (b, &t) in totals.iter().enumerate() {
             if t > 0 {
-                runs.push(((b / pages % 2) as u8, (b / pages / 2) as u8, (b % pages) as u32, start, t));
+                // Kinds 4 and 5: faces and quads fading.
+                let fading = b / pages / 4;
+                runs.push(((b / pages % 2 + 4 * fading) as u8, (b / pages / 2 % 2) as u8, (b % pages) as u32, start, t));
             }
             start += t;
         }
@@ -1412,12 +1521,13 @@ impl WorldRenderer {
         }
         list.push(Cmd::IndexBuffer(self.quad_index));
         for &(kind, layer, page, start, count) in &self.runs[range] {
-            let (pipe, buf) = if kind == 0 {
-                (self.face_pipes[layer as usize], self.faces.pages[page as usize].0)
-            } else if kind == 3 {
-                (self.lod_pipe, self.faces.pages[page as usize].0)
-            } else {
-                (self.quad_pipes[layer as usize], self.quads.pages[page as usize].0)
+            let (pipe, buf) = match (kind, self.fade_pipes) {
+                (0, _) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
+                (3, _) => (self.lod_pipe, self.faces.pages[page as usize].0),
+                (4, Some(f)) => (f[layer as usize], self.faces.pages[page as usize].0),
+                (5, Some(f)) => (f[2 + layer as usize], self.quads.pages[page as usize].0),
+                (4, None) => (self.face_pipes[layer as usize], self.faces.pages[page as usize].0),
+                _ => (self.quad_pipes[layer as usize], self.quads.pages[page as usize].0),
             };
             list.pipeline(pipe);
             use crate::gpu_layout::bind::world as b;

@@ -29,6 +29,11 @@ pub static OBSIDIAN: Block = Block::named("obsidian");
 pub static COAL_ORE: Block = Block::named("coal_ore");
 pub static IRON_ORE: Block = Block::named("iron_ore");
 pub static GOLD_ORE: Block = Block::named("gold_ore");
+// Coral for the warm reefs and lagoons (Art's blocks; `land.rs` coral).
+pub static BRAIN_CORAL_BLOCK: Block = Block::named("brain_coral_block");
+pub static STAGHORN_CORAL_BLOCK: Block = Block::named("staghorn_coral_block");
+pub static PORITES_CORAL_BLOCK: Block = Block::named("porites_coral_block");
+pub static CORAL_RUBBLE: Block = Block::named("coral_rubble");
 /// The floor of glaciers in the high valleys (`land.rs`, `base_api::land::glacier`; Art's tiles).
 pub static GLACIER_ICE: Block = Block::named("glacier_ice");
 // Ores in the rock faces (`base_api::land::face_ore`; Art's textures, Ronald: "Yes, all four").
@@ -135,25 +140,32 @@ fn axis_placement(p: &Place, props: &mut Props) {
 
 /// A log that grows into a tree of `leaves` (a cone, like a spruce, when `cone`).
 /// `shape`: the tree's tag (`cone_tree`, `flat_tree`; none: round), `worldgen::tree_blocks`.
+/// Each has a stripped twin, `stripped_<wood>_log` (`wood` `<wood>_stripped`, no `leaves`), its
+/// wood's log for recipes, which an axe used on it makes (`crafts::strip`).
 fn log(r: &mut Registry, handle: &'static Block, wood: &str, leaves: &str, shape: Option<&str>) {
+    if !leaves.is_empty() {
+        log(r, Block::generated(format!("stripped_{wood}_log")), &format!("{wood}_stripped"), "", None);
+    }
     let side = format!("log_{wood}");
     let top = format!("log_{wood}_top");
-    let b = r
-        .block(handle)
-        .set_text(&crate::worldgen::TREE_LEAVES, leaves);
+    let b = r.block(handle);
+    let b = if leaves.is_empty() { b } else { b.set_text(&crate::worldgen::TREE_LEAVES, leaves) };
     let b = match shape {
         Some(tag) => b.tag(tag),
         None => b,
     };
+    let b = if leaves.is_empty() { b } else { b.on_use(crate::crafts::strip) };
     b.sound_group("wood")
         .hardness(2.0)
         .mineable("axe")
         .tag("logs")
-        .tag(&format!("logs/{wood}"))
+        .tag(&format!("logs/{}", wood.trim_end_matches("_stripped")))
         .set(&FLAMMABLE, 5)
         .set(&FUEL, 300)
         // `bark`: bark on every face, for a trunk whose top shows (a giant's flared foot).
         .prop("axis", ["y", "x", "z", "bark"])
+        // Lying after a felling, in alternating pieces (`felled`): chopped a piece at a time.
+        .prop("felled", ["no", "a", "b"])
         .states(move |p, s| match p.get("axis") {
             "y" => s.textures(&top, &side, &top),
             "x" => s.faces([&top, &top, &side, &side, &side, &side]),
@@ -552,6 +564,29 @@ pub fn register(r: &mut Registry) {
         .friction(0.98)
         .mineable("pickaxe")
         .needs_tool(0)
+        .tab(&crate::tabs::NATURAL);
+    // Coral: stony, mined with a pickaxe, dropping itself.
+    for (block, texture) in [
+        (&BRAIN_CORAL_BLOCK, "brain_coral_block"),
+        (&STAGHORN_CORAL_BLOCK, "staghorn_coral_block"),
+        (&PORITES_CORAL_BLOCK, "porites_coral_block"),
+    ] {
+        r.block(block)
+            .sound_group("stone")
+            .texture(texture)
+            .hardness(1.0)
+            .mineable("pickaxe")
+            .needs_tool(0)
+            .tag("coral")
+            .tab(&crate::tabs::NATURAL);
+    }
+    // Broken coral and sand: loose, a shovel's.
+    r.block(&CORAL_RUBBLE)
+        .sound_group("gravel")
+        .texture("coral_rubble")
+        .hardness(0.6)
+        .mineable("shovel")
+        .tag("coral")
         .tab(&crate::tabs::NATURAL);
     r.block(&OBSIDIAN)
         .immovable()

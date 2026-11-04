@@ -79,6 +79,23 @@ impl Client {
                     e.world_light = lights.into_iter().collect();
                 }
             }
+            ToClient::BodyLean { frame, pivot, rot, ticks } => {
+                if let Some(e) = self.entities.get_mut(&frame) {
+                    let to = glam::Quat::from_array(rot).normalize();
+                    e.lean = if to.abs_diff_eq(glam::Quat::IDENTITY, 1e-6) {
+                        None
+                    } else {
+                        let from = e.lean.map_or(glam::Quat::IDENTITY, |l| l.now());
+                        Some(super::Lean {
+                            pivot: glam::Vec3::from_array(pivot),
+                            from,
+                            to,
+                            secs: ticks as f32 / crate::world::TPS as f32,
+                            t: 0.0,
+                        })
+                    };
+                }
+            }
             ToClient::Swing { used_item } => {
                 self.swing_arm();
                 if used_item && !self.held().is_empty() {
@@ -323,6 +340,7 @@ impl Client {
                     seat_forward: 0.0,
                     structure: None,
                     world_light: Default::default(),
+                    lean: None,
                 },
             );
         }

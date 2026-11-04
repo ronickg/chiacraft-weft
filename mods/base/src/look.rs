@@ -18,10 +18,13 @@ pub static LOOK_HAZE: Config<f32> = Config::named("look_haze");
 pub static LOOK_FOG: Config<f32> = Config::named("look_fog");
 pub static NIGHT_LIGHT: Config<f32> = Config::named("night_light");
 pub static NIGHT_MOON: Config<f32> = Config::named("night_moon");
+pub static LOOK_CANOPY: Config<f32> = Config::named("look_canopy");
+pub static LOOK_SHAFTS: Config<f32> = Config::named("look_shafts");
 
 /// The pack's `options` line: the settings in the order `look.wgsl` reads them.
 pub const OPTIONS: &str = "base:look_exposure, base:look_sun, base:look_sun_warmth, base:look_fill, base:look_fill_cool, \
-base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon";
+base:look_contrast, base:look_saturation, base:look_shade, base:look_haze, base:look_fog, base:night_light, base:night_moon, \
+base:look_canopy, base:look_shafts";
 
 pub fn register(r: &mut Registry) {
     // By day: how bright the picture is taken, the sun's strength and warmth (-1 whiter, +1 toward
@@ -41,4 +44,9 @@ pub fn register(r: &mut Registry) {
     // By night (dark by design): the night's sky light and the moon's light.
     r.config(&NIGHT_LIGHT).float(1.0, 0.3, 2.0);
     r.config(&NIGHT_MOON).float(1.0, 0.3, 2.0);
+    // Under a forest's canopy (how closed it is comes from the biome, `vitals::air::CANOPY`): how
+    // dim and green the shade under the leaves is, with its sunflecks, and how strong the light
+    // shafts through the crown gaps are.
+    r.config(&LOOK_CANOPY).float(1.0, 0.2, 2.0);
+    r.config(&LOOK_SHAFTS).float(1.0, 0.2, 3.0);
 }

@@ -24,6 +24,7 @@ pub fn markdown() -> String {
     clothes(&mut w);
     rooms(&mut w);
     waiting(&mut w);
+    felling_table(&mut w);
     effects_table(&mut w);
     climates(&mut w);
     plant_table(&mut w);
@@ -129,6 +130,54 @@ fn cooking(w: &mut String) {
             .map(|p| format!("{:.0}", food::FOODS[p].keeps.0 + food::FOODS[p].keeps.1))
             .collect();
         let _ = writeln!(w, "| {} ({:.0}) | {} | {} |", f.name, f.keeps.0 + f.keeps.1, made.join(" | "), keeps.join(", "));
+    }
+    let _ = writeln!(w);
+}
+
+fn felling_table(w: &mut String) {
+    use crate::felling::{self, LONGEST_SECS, PAST_TIER, SHEET_TREES, TIERS};
+    let _ = write!(
+        w,
+        "## Felling\n\nAn axe at a tree's foot fells it in one chop that takes logs^{} times one log's (`vitals::felling`), with the axe's own speed on top. Each tier of axe takes trees up to a size for their wood; past it a tree still falls, {} times slower, and gives nothing. A tree that loses its foot, or a log of its trunk, by any means falls (none stands in the air); bare hands and other tools chop the foot as slowly as an axe past its tier, and as fruitlessly. Never more than {} min. Felled, a tree within its tier lies on the ground in pieces of {} logs, each cut as long as felling a tree of its logs takes; the axe wears by logs^{} for a felling or a piece. A tree falls as itself: a {} s creak, then {:.1} s for one 10 high ({}-{} s, by the square root of its height), its leaves breaking off past {}° until {:.0}% have, the rest bursting on the ground; on the way leaves and branches in its path break, and a trunk it strikes falls too if the falling tree has {}x its logs. Seconds for a typical axe of each tier (a log is hardness 2), * past its tier:\n\n| tier | harvest | takes up to | speed |",
+        felling::GROWTH,
+        PAST_TIER,
+        LONGEST_SECS / 60.0,
+        felling::PIECE,
+        felling::GROWTH,
+        felling::CREAK_TICKS as f32 / crate::TICKS as f32,
+        felling::FALL_SECS.0,
+        felling::FALL_SECS.1,
+        felling::FALL_SECS.2,
+        felling::SHED_FROM,
+        felling::SHED_SHARE * 100.0,
+        felling::KNOCK_FELLS
+    );
+    for (name, logs) in SHEET_TREES {
+        let _ = write!(w, " {name} ({logs}) |");
+    }
+    let _ = write!(w, "\n|---|---|---|---|");
+    for _ in SHEET_TREES {
+        let _ = write!(w, "---|");
+    }
+    let _ = writeln!(w);
+    // Bare hands and every tool but an axe: slow and fruitless at the foot (Planner, 11-05).
+    let _ = write!(w, "| bare hands, other tools | - | none | 1 |");
+    for &(_, logs) in SHEET_TREES {
+        let secs = felling::seconds(felling::by_hand(logs), felling::log_secs(2.0, 1.0));
+        let time = if secs < 120.0 { format!("{secs:.0} s") } else { format!("{:.0} min", secs / 60.0) };
+        let _ = write!(w, " {time} * |");
+    }
+    let _ = writeln!(w);
+    for t in TIERS {
+        let _ = write!(w, "| {} | {} | {} logs | {} |", t.name, t.harvest, t.logs, t.speed);
+        let one = felling::log_secs(2.0, t.speed);
+        for &(_, logs) in SHEET_TREES {
+            let f = felling::felling(logs, t.harvest);
+            let secs = felling::seconds(f, one);
+            let time = if secs < 120.0 { format!("{secs:.0} s") } else { format!("{:.0} min", secs / 60.0) };
+            let _ = write!(w, " {time}{} |", if f.fruitful { "" } else { " *" });
+        }
+        let _ = writeln!(w);
     }
     let _ = writeln!(w);
 }
@@ -289,7 +338,7 @@ fn climates(w: &mut String) {
     let _ = writeln!(w);
     let _ = writeln!(
         w,
-        "## Wind and fog\n\nEach place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from {:.0}% to {:.0}% of the mean, a quarter more mid afternoon than before dawn, {:.1} times under a thunderstorm; still fog clears from {} to {} m/s, sea fog from {} to {}. Under {} °C what falls is snow; a day of it lays {} of a deep cover and each degree of a day's mean above freezing melts {}; falling snow in {} to {} m/s of wind is a blizzard, dry ground (humidity under {}) lifts dust from {} to {} m/s. Out in the open the wind chills the cold (the wind chill index, 10 °C and under), and in thick fog animals see {:.0}% as far.\n\n| biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |\n|---|---|---|---|---|---|---|---|---|---|",
+        "## Wind and fog\n\nEach place's mean wind in m/s and its share of days with fog, in spring, summer, autumn and winter (`reports/ecology/Wind and fog.md`), and when its fog lies (`vitals::air`). A day blows from {:.0}% to {:.0}% of the mean, a quarter more mid afternoon than before dawn, {:.1} times under a thunderstorm; still fog clears from {} to {} m/s, sea fog from {} to {}. Under {} °C what falls is snow; a day of it lays {} of a deep cover and each degree of a day's mean above freezing melts {}; near players it lies as snow layers (an eighth of a block each) from {} of a cover, {} of them when deep, burying plants from {}, a column looked at every {:.0} s and a layer melting in {:.0} s; falling snow in {} to {} m/s of wind is a blizzard; a place's air is its own and its neighbours' over a band {} blocks wide, and deep in a closed forest ({} blocks in from the edge) the wind is {:.0}% of the open's, with its chill and blizzard; dry ground (humidity under {}) lifts dust from {} to {} m/s. Out in the open the wind chills the cold (the wind chill index, 10 °C and under), and in thick fog animals see {:.0}% as far.\n\n| biome | wind: spring | summer | autumn | winter | fog: spring | summer | autumn | winter | fog lies |\n|---|---|---|---|---|---|---|---|---|---|",
         air::DAY_SPREAD.0 * 100.0,
         air::DAY_SPREAD.1 * 100.0,
         air::STORM,
@@ -300,8 +349,16 @@ fn climates(w: &mut String) {
         air::SNOWS_BELOW,
         air::SNOWFALL,
         air::MELT,
+        air::SNOW_LAYER_FROM,
+        air::SNOW_LAYERS_DEEP,
+        air::SNOW_BURIES,
+        air::snow_visit_secs(),
+        air::SNOW_MELT_SECS,
         air::BLIZZARD.0,
         air::BLIZZARD.1,
+        air::AIR_BLEND,
+        air::FOREST_EDGE,
+        (1.0 - air::FOREST_CALM) * 100.0,
         air::DRY,
         air::DUST.0,
         air::DUST.1,

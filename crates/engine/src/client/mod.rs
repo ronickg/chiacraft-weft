@@ -151,6 +151,27 @@ pub struct ClientEntity {
     pub structure: Option<Box<ClientWorld>>,
     /// The world's light on a moving structure, by its cubes, as the server worked it out.
     pub world_light: rustc_hash::FxHashMap<IVec3, u32>,
+    /// How a moving structure leans (chiacraft, `ToClient::BodyLean`): only drawn, never
+    /// collided with or picked, while it does.
+    pub lean: Option<Lean>,
+}
+
+/// A moving structure leaning (chiacraft, a falling tree): turned about `pivot` (its own
+/// coordinates) from `from` to `to` over `secs`, `t` of them gone.
+#[derive(Clone, Copy, Debug)]
+pub struct Lean {
+    pub pivot: Vec3,
+    pub from: glam::Quat,
+    pub to: glam::Quat,
+    pub secs: f32,
+    pub t: f32,
+}
+
+impl Lean {
+    /// The rotation shown now.
+    pub fn now(&self) -> glam::Quat {
+        if self.secs <= 0.0 { self.to } else { self.from.slerp(self.to, (self.t / self.secs).min(1.0)) }
+    }
 }
 
 /// A picked up item reaches the taker's feet in three ticks (vanilla's pickup animation).
@@ -455,6 +476,8 @@ pub struct Client {
     dust: f32,
     /// How strong an aurora is where the player is (a mod's air, `air_flags::AURORA_SHIFT`).
     aurora: f32,
+    /// How closed the canopy is where the player is (a mod's air, `air_flags::CANOPY_SHIFT`).
+    canopy: f32,
     frame_dt: f32,
     /// Seconds left of a lightning's flash.
     lightning: f32,
@@ -746,6 +769,7 @@ impl Client {
             snowing: 0.0,
             dust: 0.0,
             aurora: 0.0,
+            canopy: 0.0,
             lightning: 0.0,
             lightnings: 0,
             using: None,
@@ -1056,6 +1080,10 @@ impl Client {
                 let mut push = DVec3::ZERO;
                 for (&id, e) in &self.entities {
                     let k = &c.game.entities[e.kind as usize];
+                    // A leaning body (chiacraft) is only drawn.
+                    if k.is(weft_abi::entity_flags::SOLID) && e.lean.is_some() {
+                        continue;
+                    }
                     if k.is(weft_abi::entity_flags::SOLID) {
                         let (now, delta) = (e.known(at), e.known(at) - e.known(at - 1.0));
                         let aabb = physics::Aabb::around(now, k.width as f64 / 2.0, k.height as f64);
@@ -1365,6 +1393,9 @@ impl Client {
             } else {
                 e.pos.lerp(e.target, k)
             };
+            if let Some(l) = &mut e.lean {
+                l.t += dt as f32;
+            }
             let mut dyaw = e.target_yaw - e.yaw;
             dyaw = (dyaw + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
             e.yaw += dyaw * k as f32;
@@ -2013,6 +2044,7 @@ impl Client {
         let structures: Vec<(u64, physics::Transform, &dyn physics::Blocks)> = self
             .entities
             .iter()
+            .filter(|(_, e)| e.lean.is_none())
             .filter_map(|(&id, e)| {
                 e.structure
                     .as_deref()
@@ -2173,6 +2205,7 @@ impl Client {
             seat_forward: 0.0,
             structure: None,
             world_light: Default::default(),
+            lean: None,
         }
     }
 
@@ -2233,6 +2266,8 @@ impl Client {
         self.dust += (on(weft_abi::air_flags::DUST) - self.dust).clamp(-dt / 5.0, dt / 5.0);
         let aurora = ((flags >> weft_abi::air_flags::AURORA_SHIFT) & 255) as f32 / 255.0;
         self.aurora += (aurora - self.aurora).clamp(-dt / 20.0, dt / 20.0);
+        let canopy = ((flags >> weft_abi::air_flags::CANOPY_SHIFT) & 255) as f32 / 255.0;
+        self.canopy += (canopy - self.canopy).clamp(-dt / 10.0, dt / 10.0);
         let heading = self.world.air.1.to_radians();
         let wind = Vec2::new(heading.sin(), -heading.cos()) * speed;
         self.wind += (wind - self.wind) * (1.0 - (-dt / 4.0).exp());
@@ -2304,6 +2339,7 @@ impl Client {
             options: pack_options(),
             hand: hand.0,
             hand_light: hand.1,
+            canopy: [self.canopy, 0.0, 0.0, 0.0],
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow_far_view_proj: self.shadow_far.0.to_cols_array_2d(),
             shadow_far: match self.shadow_far_map {
@@ -2611,9 +2647,15 @@ impl Client {
             .iter()
             .flat_map(|(&id, e)| e.world_light.iter().map(move |(cp, l)| ((id, *cp), *l)))
             .collect();
+        // How each leans (chiacraft): its pivot and rotation now.
+        let leans: rustc_hash::FxHashMap<u64, (Vec3, glam::Quat)> = self
+            .entities
+            .iter()
+            .filter_map(|(&id, e)| e.lean.map(|l| (id, (l.pivot, l.now()))))
+            .collect();
         let s = crate::diag::span("render/world");
         self.render
-            .draw(gpu, list, frame, &cam, scene_buf, &frames, &lights);
+            .draw(gpu, list, frame, &cam, scene_buf, &frames, &lights, &leans);
         drop(s);
         let lit: Vec<u32> = frames
             .iter()

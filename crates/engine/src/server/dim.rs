@@ -173,8 +173,12 @@ pub struct Dim {
     pub gizmo_groups: Arc<[String]>,
 }
 
-/// A solid entity for physics. A structure collides as its blocks, an empty one not at all.
+/// A solid entity for physics. A structure collides as its blocks, an empty one not at all, nor
+/// one that leans (chiacraft: only drawn, `World::body_turn`).
 fn physics_body<'a>(c: &Content, e: &Entity, built: Option<&'a Box<Space>>, delta: DVec3) -> Option<crate::physics::Body<'a>> {
+    if built.is_some_and(|s| s.lean.is_some()) {
+        return None;
+    }
     let k = &c.game.entities[e.kind as usize];
     let aabb = built.map_or(Some(e.aabb(c)), |s| s.structure_box(e.pos))?;
     let blocks = built.map(|s| (&**s as &dyn crate::physics::Blocks, crate::physics::Transform::of(e.pos)));

@@ -67,6 +67,11 @@ pub struct Space {
     /// A moving structure's block bounds (inclusive) and cubes to light again.
     pub bounds: Option<(IVec3, IVec3)>,
     pub relight: FxHashSet<IVec3>,
+    /// How a moving structure leans (chiacraft, `World::body_turn`): its pivot (its own
+    /// coordinates) and rotation (x, y, z, w); `None` upright. While it leans it is only drawn.
+    pub lean: Option<([f32; 3], [f32; 4])>,
+    /// It was told to lean this tick, reaching it in this many ticks (sent to watchers).
+    pub lean_moved: Option<u32>,
 }
 
 impl crate::physics::Blocks for Space {

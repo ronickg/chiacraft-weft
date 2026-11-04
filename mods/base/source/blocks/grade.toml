@@ -72,6 +72,24 @@ gain = 0.95
 spread = 20               # and a little less blue than the group, to sit with the top
 saturation = 1.2
 
+[groups.coral]
+match = ["*_coral_block"]
+
+[tiles.brain_coral_block]  # luma 0.35 -> 0.43, hue 343 -> 336; ~ brain_coral_block (0.45-0.47, 324-327)
+gain = 1.23
+hue = -7
+spread = 75
+
+[tiles.staghorn_coral_block]  # a busy block, spread 109 -> 75 (report: busy 45-80)
+spread = 75
+
+[tiles.porites_coral_block]  # darker than sand (0.83) and lumpier: luma 0.58 -> 0.51, spread 40 -> 50
+gain = 0.88
+spread = 50
+
+[tiles.coral_rubble]  # pale bone-grey, not sand: sat 0.39 -> 0.23 (sand 0.38), luma 0.76
+saturation = 0.6
+
 [groups.liquids]
 match = ["water_*", "lava_*"]
 
@@ -162,6 +180,7 @@ saturation = 1.857
 
 [tiles.coarse_dirt]  # luma 0.30->0.36, sat 0.56->0.56, hue 19->19; ~ coarse_dirt
 gain = 1.175
+saturation = 0.8  # walked-on ground (11-04): sat 0.56 -> 0.48, inside vanilla's 0.35-0.50
 
 [tiles.moss_block_top]  # luma 0.29->0.39, sat 0.58->0.58, hue 90->90; ~ moss_block
 gain = 1.332
@@ -501,3 +520,65 @@ saturation = 0.88
 
 [items.ipe_seed]  # outline 0.64 -> 0.40 (new, the tropical forest: pale papery wings, the edge too light)
 outline = 0.62
+
+# Walked-on ground (Planner, 11-04: the red sand floor read very saturated orange in the PC looks).
+# Vanilla's red sand is 0.83 and Pixel Perfection's 0.50; ours moves to the middle, with base's graded
+# red sandstone (0.62), so a canyon floor and its walls match. The Cretaceous copies (animals) had no rows.
+[tiles."animals:red_sand"]  # luma 0.45 -> 0.47, sat 0.75 -> 0.63; ~ red_sand (0.46-0.60, 0.50-0.83)
+saturation = 0.76
+gain = 1.04
+
+[tiles."animals:red_sandstone_top"]  # as base's red_sandstone_top: sat 0.73 -> 0.62
+saturation = 0.75
+
+[tiles."animals:red_sandstone_bottom"]  # as base's red_sandstone_bottom
+saturation = 0.75
+
+[tiles."animals:red_sandstone_side"]  # luma 0.40 -> 0.43, sat 0.74 -> 0.61, as base's side
+saturation = 0.74
+gain = 1.08
+
+[tiles.dirt]  # sat 0.54 -> 0.48, inside vanilla's 0.35-0.50
+saturation = 0.84
+
+[tiles.leaf_litter_top]  # sat 0.66 -> 0.55, with the soils
+saturation = 0.76
+
+# Stripped logs (the Felling worker, 11-05): each stripped side between its log top and planks, and
+# inside vanilla's stripped log where one exists (oak 0.40-0.58 / 0.42-0.52, birch 0.57-0.70,
+# spruce 0.35-0.36, acacia sat 0.45-0.66).
+[tiles.log_oak_stripped]  # 0.56/0.62 -> ~0.50/0.52
+gain = 0.9
+saturation = 0.8
+
+[tiles.log_birch_stripped]  # luma 0.76 -> ~0.71
+gain = 0.94
+
+[tiles.log_spruce_stripped]  # luma 0.29 -> ~0.33
+gain = 1.15
+
+[tiles.log_acacia_stripped]  # sat 0.74 -> ~0.66
+saturation = 0.85
+
+[tiles.log_dogwood_stripped]  # luma 0.74 -> ~0.63, near its top (0.58)
+gain = 0.85
+
+[tiles.log_acuri_palm_stripped]  # luma 0.63 -> ~0.50, toward its planks (0.42)
+gain = 0.8
+
+[tiles.log_moriche_palm_stripped]  # luma 0.52 -> ~0.48
+gain = 0.93
+
+[tiles.log_cacao_stripped]  # 0.53/0.62 -> ~0.49/0.50, toward its top and planks
+gain = 0.92
+saturation = 0.78
+
+[tiles.log_andiroba_stripped]  # sat 0.73 -> ~0.65, as its planks' row
+saturation = 0.86
+
+[tiles.log_matamata_stripped]  # 0.65/0.51 -> ~0.58/0.44
+gain = 0.9
+saturation = 0.84
+
+[tiles.log_ipe_stripped]  # sat 0.61 -> ~0.55
+saturation = 0.88
