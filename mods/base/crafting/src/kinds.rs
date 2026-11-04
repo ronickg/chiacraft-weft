@@ -134,11 +134,6 @@ pub const SHAPES: &[Shape] = &[
     sh("grip", "knife", "grip", 60.0, (1.0, 1.0, 1.0, 0.0)),
     sh("grip", "sword", "grip", 80.0, (1.0, 1.0, 1.0, 0.0)),
     sh("shaft", "spear", "shaft", 700.0, (1.0, 1.0, 1.0, 1.0)),
-    // Bows: a long self stave draws heavy; a short one is quick and light.
-    sh("self_stave", "bow", "stave", 400.0, (1.0, 1.0, 1.0, 0.0)),
-    sh("short_stave", "bow", "stave", 280.0, (1.0, 1.15, 0.85, 0.0)),
-    sh("grip", "bow", "grip", 40.0, (1.0, 1.0, 1.0, 0.0)),
-    sh("bowstring", "bow", "string", 2.0, (1.0, 1.0, 1.0, 0.0)),
     // Fittings and extras.
     sh("lashing", "axe", "fitting", 5.0, (1.0, 1.0, 1.0, 0.0)),
     sh("lashing", "pickaxe", "fitting", 5.0, (1.0, 1.0, 1.0, 0.0)),
@@ -148,6 +143,11 @@ pub const SHAPES: &[Shape] = &[
     sh("lashing", "spear", "fitting", 4.0, (1.0, 1.0, 1.0, 0.0)),
     sh("bar_guard", "sword", "guard", 20.0, (1.0, 1.0, 1.0, 0.0)),
     sh("round_pommel", "sword", "pommel", 15.0, (1.0, 1.02, 1.0, 0.0)),
+    // Bows: a long self stave draws heavy; a short one is quick and light.
+    sh("self_stave", "bow", "stave", 400.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("short_stave", "bow", "stave", 280.0, (1.0, 1.15, 0.85, 0.0)),
+    sh("grip", "bow", "grip", 40.0, (1.0, 1.0, 1.0, 0.0)),
+    sh("bowstring", "bow", "string", 2.0, (1.0, 1.0, 1.0, 0.0)),
 ];
 
 impl Shape {

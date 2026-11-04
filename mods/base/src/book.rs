@@ -75,12 +75,14 @@ struct Book {
     pool: Vec<(u32, u32)>,
     /// The menu window the pool was asked for.
     asked: u32,
+    /// The station whose chests are still to be asked for.
+    ask: Option<Station>,
 }
 
 /// The bag as the open book last saw it (`client_frame` above).
 static BAG_SIG: Mutex<u64> = Mutex::new(0);
 
-static BOOK: Mutex<Book> = Mutex::new(Book { tab: 0, page: 0, picked: None, pool: Vec::new(), asked: u32::MAX });
+static BOOK: Mutex<Book> = Mutex::new(Book { tab: 0, page: 0, picked: None, pool: Vec::new(), asked: u32::MAX, ask: None });
 
 pub fn register(r: &mut Registry) {
     r.tag("chests", &["chest"]);
@@ -111,6 +113,9 @@ pub fn register(r: &mut Registry) {
     // The book is built when its screen opens; the bag can change after (an item given, moved,
     // picked up), so it's built again when it does.
     r.client_frame(|c| {
+        if let Some(station) = BOOK.lock().ok().and_then(|mut b| b.ask.take()) {
+            c.send(&POOL_ASK, &[station as u64]);
+        }
         let open = BOOK.lock().map_or(u32::MAX, |b| b.asked);
         let window = c.menu().map_or(u32::MAX, |m| m[1]);
         if open == u32::MAX || window != open {
@@ -133,6 +138,7 @@ pub fn register(r: &mut Registry) {
     r.client_packet(&POOL, |c, bytes| {
         if let Ok(mut b) = BOOK.lock() {
             b.pool = decode(&bytes);
+            weft_sdk::info!("crafting: the book counts {} kinds of item from chests", b.pool.len());
         }
         c.rebuild_screen();
     });
@@ -423,7 +429,9 @@ pub fn book(ui: &mut Ui, station: Station) {
             b.pool.clear();
             b.page = 0;
             b.picked = None;
-            client.send(&POOL_ASK, &[station as u64]);
+            // Asked for on the next frame (`client_frame`): a send while a screen is built is
+            // lost.
+            b.ask = Some(station);
         }
         (b.tab, b.page, b.picked, b.pool.clone())
     };
