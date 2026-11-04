@@ -364,7 +364,10 @@ pub fn register(r: &mut Registry) {
     }
 
     // The layers under the trees, each biome's (`vitals::layers`).
-    for l in vitals::layers::LAYERS.iter().filter(|l| !vitals::layers::PENDING.contains(&l.biome)) {
+    for l in vitals::layers::LAYERS
+        .iter()
+        .filter(|l| !vitals::layers::PENDING.contains(&l.biome))
+    {
         let b = || Target::Biome(l.biome);
         if !l.floor.is_empty() {
             r.set_text_on(b(), &FLOOR, l.floor);
@@ -464,17 +467,10 @@ fn young_tree(s: &mut Site) {
         .or_else(|| TREE_KINDS.on_biome(s.biome()))
         .and_then(|l| l.pick(h >> 40))
         .unwrap_or(OAK_LOG.id());
-    base_api::trees::young_tree_blocks(
-        log,
-        x,
-        y,
-        z,
-        h >> 8,
-        |x, y, z, state, force| {
-            let state = made_leaves(state);
-            if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
-        },
-    );
+    base_api::trees::young_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
+        let state = made_leaves(state);
+        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+    });
 }
 
 /// A shrub at a scatter's site: a clump of the biome's shrub leaves (`SHRUB_KINDS`), one or two
@@ -582,23 +578,16 @@ fn giant(s: &mut Site) {
     if brazil {
         giant_foot(s, [x, y, z], h);
     }
-    base_api::trees::giant_tree_blocks(
-        log,
-        x,
-        y,
-        z,
-        h >> 8,
-        |x, y, z, state, force| {
-            if climbers && LEAVES.on_block(state) {
-                crown.push([x, y, z]);
-            }
-            if brazil && matches!(state_prop(state, "axis"), Some("x" | "z")) {
-                limbs.push([x, y, z]);
-            }
-            let state = made_leaves(state);
-            if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
-        },
-    );
+    base_api::trees::giant_tree_blocks(log, x, y, z, h >> 8, |x, y, z, state, force| {
+        if climbers && LEAVES.on_block(state) {
+            crown.push([x, y, z]);
+        }
+        if brazil && matches!(state_prop(state, "axis"), Some("x" | "z")) {
+            limbs.push([x, y, z]);
+        }
+        let state = made_leaves(state);
+        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+    });
     lianas(s, &crown, y, h);
     // Bromeliads on one limb block in five.
     for (k, &[x, y, z]) in limbs.iter().enumerate() {

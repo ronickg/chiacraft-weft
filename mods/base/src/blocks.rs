@@ -409,7 +409,9 @@ pub fn made_leaves(state: u32) -> u32 {
             })
             .collect()
     });
-    open.iter().find(|(shut, _)| *shut == state).map_or(state, |&(_, open)| open)
+    open.iter()
+        .find(|(shut, _)| *shut == state)
+        .map_or(state, |&(_, open)| open)
 }
 
 /// A tree's leaves: they decay once no log is near (`leaf_decay`), unless a player placed them
@@ -683,7 +685,8 @@ pub fn register(r: &mut Registry) {
         .hardness(2.0)
         .mineable("axe")
         .tab(&crate::tabs::NATURAL);
-    r.loot(&BRAZIL_NUT_BUTTRESS).pool(Pool::new().entry(Entry::item("brazil_nut_log")));
+    r.loot(&BRAZIL_NUT_BUTTRESS)
+        .pool(Pool::new().entry(Entry::item("brazil_nut_log")));
     // Bromeliads perched on the giants' limbs (epiphytes: rooted in the bark, not the ground).
     r.block(&BROMELIAD)
         .sound_group("grass")
@@ -1003,7 +1006,11 @@ pub fn register(r: &mut Registry) {
             .prop("half", ["lower", "upper"])
             .states(move |p, s| s.texture(&format!("{name}_{}", p.get("half"))))
             .no_item();
-        r.loot(b).pool(Pool::new().when(Cond::Chance(vitals::clothing::FIBRE_CHANCE)).item("plant_fibre"));
+        r.loot(b).pool(
+            Pool::new()
+                .when(Cond::Chance(vitals::clothing::FIBRE_CHANCE))
+                .item("plant_fibre"),
+        );
     }
     r.loot(&TALL_GRASS_DOUBLE)
         .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))

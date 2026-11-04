@@ -517,20 +517,32 @@ mod tests {
         let wide = Recipe { reach: 100, max_height: 200, ..BRAZIL_NUT };
         for seed in 0..20 {
             let t = blocks(&wide, seed);
-            let far = |part: fn(&Part) -> bool| t.iter().filter(|b| part(&b.3)).map(|b| b.0.abs().max(b.2.abs())).max().unwrap_or(0);
+            let far = |part: fn(&Part) -> bool| {
+                t.iter()
+                    .filter(|b| part(&b.3))
+                    .map(|b| b.0.abs().max(b.2.abs()))
+                    .max()
+                    .unwrap_or(0)
+            };
             let wood = far(|p| matches!(p, Part::Log { .. }));
             let leaves = far(|p| *p == Part::Leaves);
             let top = t.iter().map(|b| b.1).max().unwrap_or(0);
             let kept = blocks(&BRAZIL_NUT, seed);
-            let logs: std::collections::HashSet<_> =
-                kept.iter().filter(|b| matches!(b.3, Part::Log { .. })).map(|b| (b.0, b.1, b.2)).collect();
+            let logs: std::collections::HashSet<_> = kept
+                .iter()
+                .filter(|b| matches!(b.3, Part::Log { .. }))
+                .map(|b| (b.0, b.1, b.2))
+                .collect();
             let d = LEAF_REACH;
             let orphans = kept
                 .iter()
                 .filter(|b| b.3 == Part::Leaves)
                 .filter(|&&(x, y, z, _)| !(-d..=d).any(|dy| (-d..=d).any(|dz| (-d..=d).any(|dx| logs.contains(&(x + dx, y + dy, z + dz))))))
                 .count();
-            eprintln!("seed {seed}: wood out to {wood}, leaves to {leaves}, top {top}; trimmed {} blocks, {orphans} leaves with no log", kept.len());
+            eprintln!(
+                "seed {seed}: wood out to {wood}, leaves to {leaves}, top {top}; trimmed {} blocks, {orphans} leaves with no log",
+                kept.len()
+            );
         }
     }
 
