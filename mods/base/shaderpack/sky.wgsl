@@ -192,7 +192,7 @@ fn fs_clouds(in: CloudOut) -> CloudPixel {
         let mu = max(dot(dir, scene.sun.xyz), 0.0);
         lit += p.glow * (pow(mu, 3.0) * 0.5 + pow(mu, 12.0) * 0.8) * light_strength();
         color = albedo * lit;
-        color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0), dir.z))), smoothstep(0.3, 1.0, dist));
+        color = mix(color, sky_color(normalize(vec3(dir.x, max(dir.y, 0.0) + 1e-3, dir.z))), smoothstep(0.3, 1.0, dist));
         color = display(fog_through(color, dir * 220.0, 1.0));
     } else {
         var shade = select(0.9, 0.8, side == 1u);

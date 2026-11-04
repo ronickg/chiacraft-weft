@@ -318,7 +318,9 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     }
     let dir = rel / max(dist, 1e-4);
     let end = scene.params.y;
-    let air = vec3(dir.x, max(dir.y, 0.0) * 0.35, dir.z);
+    // Straight down there is no level direction left: never a zero vector (its normalize is NaN,
+    // and the Mac's fast math has no safety net).
+    let air = vec3(dir.x, max(dir.y, 0.0) * 0.35 + 1e-3, dir.z);
     let color = sky_color(normalize(air));
     // Thinner looking up at what is high, so hills stand out against a hazy valley.
     let thin = exp(-max(rel.y, 0.0) / 90.0);

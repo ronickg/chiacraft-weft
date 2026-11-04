@@ -138,7 +138,10 @@ fn finish(local: vec3<f32>, origin: vec4<i32>) -> vec4<f32> {
 // leaves sharing a corner move together and show no cracks.
 // How far the wind moves what sways at `p`: a lean the way it blows, stronger in its gusts, and a
 // flutter that quickens with it. Calm air keeps a little life in the leaves.
-fn wind(p: vec3<f32>) -> vec3<f32> {
+fn wind(p_world: vec3<f32>) -> vec3<f32> {
+    // Far from spawn the sines would get huge arguments and lose their place (foliage jumps on
+    // fast-math backends): positions are taken within 4096 blocks, a seam once every 4096.
+    let p = vec3(p_world.x - floor(p_world.x / 4096.0) * 4096.0, p_world.y, p_world.z - floor(p_world.z / 4096.0) * 4096.0);
     let t = scene.params.w;
     let w = wind_now();
     let speed = length(w);
@@ -226,7 +229,8 @@ fn vs_quad(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     let uvw = records[base + 5u];
     let uv = quad_uv_fine(uvw, records[base], records[base + 1u], records[base + 2u], records[base + 3u]);
     var uvs = array<vec2<f32>, 4>(vec2(uv.x, uv.w), vec2(uv.z, uv.w), vec2(uv.z, uv.y), vec2(uv.x, uv.y));
-    let n = normalize(cross(p1 - p0, p2 - p1));
+    // A quad squashed to nothing has no normal: up then, never NaN.
+    let n = normalize(cross(p1 - p0, p2 - p1) + vec3(0.0, 1e-6, 0.0));
     let flat_ = ((uvw >> QUAD_TINT_SHIFT) & QUAD_FLAT) != 0u;
     let tint_kind = (uvw >> QUAD_TINT_SHIFT) & TINT_MASK;
     var pos = finish(local, origins[ii]);
