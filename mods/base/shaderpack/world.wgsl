@@ -564,6 +564,12 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // vertical) and darker toward the sides, where it mirrors the water below. Tester 2's shots
     // had it a flat dark navy looking up while the water around was teal.
     // (Either face: from below it is usually the downward one, its normal pointing at the eye.)
+    // A water face seen from inside the water that is not its surface: one the mesher draws where
+    // the water meets a cube not loaded yet (at a chunk edge). Water inside water is not there; it
+    // showed as flat dark-cyan boxes standing in the sea (Plants' reef, coral_under_w).
+    if in_water() && abs(in.normal.y) <= 0.5 {
+        discard;
+    }
     if in_water() && abs(in.normal.y) > 0.5 && v.y < 0.0 {
         let window = smoothstep(0.55, 0.85, -v.y);
         let sky = mix(0.6, 2.4, window) * mix(0.15, 1.0, brightness_curve(in.light.x));

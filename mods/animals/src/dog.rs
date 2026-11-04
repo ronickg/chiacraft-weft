@@ -171,7 +171,7 @@ fn upkeep(w: &World, id: u64, _st: &EntityState) -> bool {
     // A tame told to stay sits (once it is there).
     let sitting = d.tamed != 0 && commands::command(w, id) == commands::STAY && !w.navigating(id);
     let Some(s) = w.component_mut(id, &SEEN) else { return false };
-    s.sat = if sitting { s.sat.saturating_add(1) } else { 0 };
+    s.sat = if sitting { s.sat.saturating_add(w.tick_elapsed(id)) } else { 0 };
     let pose = match (sitting, s.sat > LIE_TICKS) {
         (false, _) => Pose::Stand,
         (true, false) => Pose::Sit,
