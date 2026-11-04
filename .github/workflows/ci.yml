@@ -29,9 +29,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # wasm32: the sandbox's tests build a mod for it.
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
@@ -51,7 +53,24 @@ jobs:
 
       # nextest stops a test that hangs (.config/nextest.toml) and names it.
       - name: Tests (chiacraft crates)
-        run: cargo nextest run --profile ci -p chiacraft-wallet -p chiacraft-account -p chiacraft-packages --lib
+        run: cargo nextest run --profile ci -p chiacraft-account -p chiacraft-packages --lib
+
+      # Every tests/*.rs, the chain ones on chia-sdk-test's simulator (`sim`): throwaway keys, no
+      # network. chain_live.rs only runs with HORIZON_CHAIN_LIVE=1, which CI never sets.
+      - name: Tests (wallet)
+        run: cargo nextest run --profile ci -p chiacraft-wallet --features sim
+
+      - name: Tests (sponsor)
+        if: hashFiles('crates/sponsor/Cargo.toml') != ''
+        run: cargo nextest run --profile ci -p chiacraft-sponsor --features service
+
+      # tests/sandbox.rs runs a real mod (tests/guest) and is only built with `pack`.
+      - name: Tests (sandbox)
+        run: cargo nextest run --profile ci -p chiacraft-sandbox --features pack
+
+      - name: Tests (store)
+        if: hashFiles('crates/store/Cargo.toml') != ''
+        run: cargo nextest run --profile ci -p chiacraft-store
 
       - name: Tests (engine)
         run: cargo nextest run --profile ci -p weft_engine
@@ -65,6 +84,32 @@ jobs:
       # says.
       - name: Tests (survival numbers, animals)
         run: cargo nextest run --profile ci -p vitals -p animals_core
+
+      - name: Tests (base, its API, packages mod)
+        run: cargo nextest run --profile ci -p base -p base_api -p packages
+
+  # Is the code getting bloated (reports/code-health/README.md): the report goes into the run's
+  # summary and an artifact. It fails nothing yet. Runs wherever CI runs: dev lives on the Mac, so
+  # pull requests are where it is seen.
+  code-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the growth table needs the fork point and upstream's history
+      - name: Upstream refs
+        run: git fetch --no-tags https://github.com/VortexSo4/Weft master:refs/remotes/upstream/master || true
+      - name: Report
+        run: |
+          python3 -I reports/code-health/health.py --json health.json > health.md
+          cat health.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: code-health
+          path: |
+            health.md
+            health.json
 
   animals-web:
     runs-on: ubuntu-latest
@@ -87,9 +132,11 @@ jobs:
       - name: Animals' rules
         run: mods/animals/web/build.sh && node mods/animals/web/test.mjs
 
-  testkit:
+  # The game and its mods once, as `cargo run --release -- --test ...` runs them; the testkit jobs
+  # share it.
+  game:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -99,30 +146,73 @@ jobs:
           cache-on-failure: true
 
       - name: System libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev pkg-config xvfb mesa-vulkan-drivers vulkan-tools \
-            libxkbcommon-x11-0 libxcursor1 libxrandr2 libxi6 libx11-xcb1
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
 
-      # The game and its mods, as `cargo run --release -- --test ...` runs them.
       - name: Build
         run: cargo build --release
+
+      # A tar keeps the permission to run the game, which the artifact alone would lose. The mods'
+      # libraries sit beside the game, where it looks for them.
+      - name: Pack
+        run: tar -cf game.tar target/release/weft target/release/*.so
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: game
+          path: game.tar
+          retention-days: 3
+
+  # About 210 tests take over two hours one after the other on software Vulkan, so each job runs
+  # every Nth (`--test-shard i/N`), and the ones that measure the game's speed run on their own.
+  testkit:
+    needs: game
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0/6, 1/6, 2/6, 3/6, 4/6, 5/6, alone]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2t64 xvfb mesa-vulkan-drivers vulkan-tools \
+            libxkbcommon-x11-0 libxcursor1 libxrandr2 libxi6 libx11-xcb1
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: game
+
+      - name: Unpack
+        run: tar -xf game.tar
 
       - name: Software Vulkan
         run: xvfb-run -a vulkaninfo --summary
 
-      # Every wait in a test has its own timeout; this is for a game that stops answering.
-      - name: Testkit
+      # Every wait in a test has its own timeout; this is for a game that stops answering. The
+      # packages tests need the examples' packages; the other tests don't mind them. TESTKIT_CI
+      # leaves out what mods/testkit/ci-skip.txt names (timing a few frames a second can't meet),
+      # each a SKIP line in the log and the report.
+      - name: Testkit ${{ matrix.shard }}
         timeout-minutes: 45
-        run: xvfb-run -a -s "-screen 0 1920x1080x24" target/release/weft --test all
+        env:
+          TESTKIT_CI: "1"
+        run: >-
+          xvfb-run -a -s "-screen 0 1920x1080x24"
+          target/release/weft --packages examples/packages --test all --test-shard ${{ matrix.shard }}
+
+      - name: Report name
+        if: always()
+        run: echo "REPORT=testkit-$(echo '${{ matrix.shard }}' | tr / -)" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: testkit-report
+          name: ${{ env.REPORT }}
           path: |
-            run/test-reports
+            run/test-reports/report.txt
             run/test-shots
-            run/test-jobs/*/output.log
             run/logs
           if-no-files-found: ignore

@@ -28,6 +28,13 @@ fn guest() -> &'static [u8] {
 struct Seen {
     tells: Vec<String>,
     replies: Vec<String>,
+    /// Player 7's value of each component.
+    components: std::collections::HashMap<String, Vec<u8>>,
+    sets: u32,
+    sounds: u32,
+    particles: Vec<u32>,
+    scheduled: Vec<u32>,
+    sent: Vec<(String, Vec<u8>)>,
 }
 
 fn text(key: &str, args: &[Arg]) -> String {
@@ -64,6 +71,7 @@ impl Game for Fake {
         if pos == [1, 2, 3] { 9 } else { 0 }
     }
     fn set_block(&mut self, _: [i32; 3], _: u32) -> bool {
+        self.0.lock().unwrap().sets += 1;
         true
     }
     fn light(&mut self, _: [i32; 3]) -> u32 {
@@ -130,6 +138,37 @@ impl Game for Fake {
     fn entity_kind_id(&mut self, _: &str) -> Option<u32> {
         None
     }
+    fn get_component(&mut self, id: u64, name: &str) -> Option<Vec<u8>> {
+        // Player 7 carries every component, from its default (here: what `init` declared).
+        (id == 7).then(|| self.0.lock().unwrap().components.get(name).cloned())?
+    }
+    fn set_component(&mut self, id: u64, name: &str, value: &[u8]) -> bool {
+        id == 7
+            && self
+                .0
+                .lock()
+                .unwrap()
+                .components
+                .insert(name.to_string(), value.to_vec())
+                .is_some()
+    }
+    fn play_sound(&mut self, _: &str, _: [f64; 3], volume: f32) {
+        assert!((0.0..=4.0).contains(&volume));
+        self.0.lock().unwrap().sounds += 1;
+    }
+    fn spawn_particles(&mut self, _: &str, _: [f64; 3], count: u32) {
+        self.0.lock().unwrap().particles.push(count);
+    }
+    fn schedule(&mut self, _: [i32; 3], ticks: u32) {
+        self.0.lock().unwrap().scheduled.push(ticks);
+    }
+    fn send(&mut self, _: u64, channel: &str, data: &[u8]) {
+        self.0
+            .lock()
+            .unwrap()
+            .sent
+            .push((channel.to_string(), data.to_vec()));
+    }
 }
 
 struct World {
@@ -140,7 +179,17 @@ struct World {
 impl World {
     fn new(storage: Option<PathBuf>) -> World {
         let m = Arc::new(Mod::load("probe", guest()).unwrap());
-        World { inst: Instance::new(m, storage), seen: Arc::default() }
+        let seen: Arc<Mutex<Seen>> = Arc::default();
+        // The game gives player 7 the declared components at their defaults.
+        for d in m.decls() {
+            if let Decl::Component { name, default, .. } = d {
+                seen.lock()
+                    .unwrap()
+                    .components
+                    .insert(name.clone(), default.clone());
+            }
+        }
+        World { inst: Instance::new(m, storage), seen }
     }
 
     fn game(&self) -> impl Fn() -> Box<dyn Game> + use<> {
@@ -173,6 +222,100 @@ fn registers_in_order() {
             Hook::WorldTick,
         ]
     );
+}
+
+#[test]
+fn declares_components_and_attaches() {
+    let m = Mod::load("probe", guest()).unwrap();
+    let mut default = 5u32.to_le_bytes().to_vec();
+    default.resize(16, 0);
+    assert_eq!(
+        m.decls(),
+        &[
+            Decl::Component { name: "probe:counter".into(), size: 16, flags: ComponentFlags::SAVE | ComponentFlags::KEEP, default },
+            Decl::Attach { kind: "core:player".into(), component: "probe:counter".into() },
+        ]
+    );
+}
+
+#[test]
+fn components_hold_values_per_entity() {
+    let mut w = World::new(None);
+    assert_eq!(w.probe("comp", None), ["probe.comp 6"]);
+    assert_eq!(w.probe("comp", None), ["probe.comp 7"]);
+    let v = w.seen.lock().unwrap().components["probe:counter"].clone();
+    assert_eq!(v.len(), 16);
+    assert_eq!(u64::from_le_bytes(v[8..16].try_into().unwrap()), 100, "the time it was last changed");
+}
+
+#[test]
+fn batched_blocks_and_effects_keep_their_allowances() {
+    let mut w = World::new(None);
+    assert_eq!(w.probe("blocks", None), ["probe.blocks 4096"]);
+    assert_eq!(w.seen.lock().unwrap().sets, 4096);
+    w.probe("effects", None);
+    let seen = w.seen.lock().unwrap();
+    assert_eq!(seen.sounds, 64);
+    assert_eq!(seen.particles.len(), 64);
+    assert!(seen.particles.iter().all(|&c| c == 256));
+}
+
+#[test]
+fn registers_its_blocks_items_and_channels() {
+    let m = Mod::load("probe", guest()).unwrap();
+    let tail: Vec<&Hook> = m.hooks().iter().skip(5).collect();
+    assert_eq!(
+        tail,
+        [
+            &Hook::BlockUse("probe:bell".into()),
+            &Hook::BlockScheduled("probe:bell".into()),
+            &Hook::ItemUse("probe:wand".into()),
+            &Hook::Channel("probe:pings".into()),
+        ]
+    );
+}
+
+#[test]
+fn block_item_and_packet_calls() {
+    let mut w = World::new(None);
+    let used = |y| BlockUseEvent { player: 7, pos: (0, y, 0), state: 1, face: 1 };
+    assert!(w.inst.block_use(w.game(), 5, used(3)));
+    assert!(!w.inst.block_use(w.game(), 5, used(-3)));
+    let ev = BlockUpdateEvent { pos: (0, 3, 0), state: 1, other: (0, 3, 0), entity: 0 };
+    w.inst.block_update(w.game(), 6, ev);
+    {
+        let seen = w.seen.lock().unwrap();
+        assert_eq!(seen.tells, ["probe.rang 3", "probe.rang -3", "probe.scheduled 3"]);
+        // A tick at least 1 away.
+        assert_eq!(seen.scheduled, [1, 1]);
+    }
+    let stack = ItemStack { item: 9, count: 5, data: 0 };
+    let r = w
+        .inst
+        .item_use(w.game(), 7, ItemUseEvent { player: 7, stack, slot: 0, target: None });
+    assert!(r.handled);
+    assert_eq!(r.stack.map(|s| s.count), Some(4));
+    w.inst.packet(w.game(), 8, 7, b"hi");
+    let seen = w.seen.lock().unwrap();
+    assert_eq!(seen.sent.len(), 32, "32 sends a call");
+    assert_eq!(seen.sent[0], ("probe:pings".to_string(), b"pong hi".to_vec()));
+}
+
+#[test]
+fn a_component_built_for_1_1_still_loads() {
+    let wasm = std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/packages/tally/code/server.wasm")).unwrap();
+    let m = Mod::load("tally", &wasm).unwrap();
+    assert_eq!(m.hooks().len(), 2);
+    assert_eq!(m.decls().len(), 2);
+}
+
+#[test]
+fn a_component_built_for_1_0_still_loads() {
+    // The clans package's server half, built with the 1.0 SDK and committed.
+    let wasm = std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/packages/clans/code/server.wasm")).unwrap();
+    let m = Mod::load("clans", &wasm).unwrap();
+    assert_eq!(m.hooks().len(), 3);
+    assert!(m.decls().is_empty());
 }
 
 #[test]
@@ -254,10 +397,25 @@ fn storage_is_kept_and_contained() {
 }
 
 #[test]
+fn writes_per_call_are_capped() {
+    let mut w = World::new(None);
+    assert_eq!(w.probe("write_flood", None), ["probe.written 4"]);
+    // The next call has its own allowance.
+    assert_eq!(w.probe("write_flood", None), ["probe.written 4"]);
+}
+
+#[test]
 fn registering_after_init_is_refused() {
     let mut w = World::new(None);
     assert_eq!(w.probe("late", None), ["probe.late"]);
     assert!(w.inst.stopped().is_none());
+}
+
+#[test]
+fn one_api_version() {
+    let (major, minor) = chiacraft_packages::code::API;
+    assert_eq!(API, format!("{major}.{minor}.0"));
+    assert!(include_str!("../wit/v1.2/mod.wit").contains(&format!("package chiacraft:mods@{API};")));
 }
 
 #[test]

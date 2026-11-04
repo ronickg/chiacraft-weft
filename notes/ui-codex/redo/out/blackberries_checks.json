@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a small cluster of glossy black-purple bramble berries made of tiny round drupelets, two or three green leaves, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": true,
+ "tries": [
+  {
+   "grid": 0.205,
+   "outline": 0.88,
+   "red_line": 0.0,
+   "fill": 0.36,
+   "passed": true
+  }
+ ]
+}

@@ -11,6 +11,7 @@ pub mod coats;
 pub mod evolution;
 pub mod hides;
 pub mod life;
+pub mod meat;
 pub mod needs;
 pub mod sheet;
 pub mod species;

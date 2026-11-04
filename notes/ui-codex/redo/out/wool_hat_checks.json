@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a soft knitted cream-white wool with a visible stitch pattern hat, front view, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.524,
+   "outline": 0.58,
+   "red_line": 0.0,
+   "fill": 0.56,
+   "passed": true
+  }
+ ]
+}

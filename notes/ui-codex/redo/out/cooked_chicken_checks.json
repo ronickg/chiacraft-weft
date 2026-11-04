@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a roast chicken leg: golden-brown crisp skin and a pale bone end, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.566,
+   "outline": 0.62,
+   "red_line": 0.08,
+   "fill": 0.38,
+   "passed": true
+  }
+ ]
+}

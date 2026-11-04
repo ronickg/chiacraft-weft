@@ -21,26 +21,29 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use wasmtime::component::{Component, HasSelf, Linker};
+use wasmtime::component::{Component, HasSelf, Linker, TypedFunc};
 use wasmtime::{Store, StoreLimits, Trap};
 
 pub use storage::Storage;
 
 mod bindings {
     wasmtime::component::bindgen!({
-        path: "wit/v1.0",
-        world: "server-mod",
+        path: "wit/v1.2",
+        world: "host",
     });
 }
 
-use bindings::ServerMod;
-pub use bindings::chiacraft::mods::registry::{Chain, Event, Question};
-pub use bindings::chiacraft::mods::types::{Arg, EntityState, ItemStack, Query};
+use bindings::Host_ as ServerMod;
+pub use bindings::chiacraft::mods::registry::{Chain, ComponentFlags, Event, Question};
+pub use bindings::chiacraft::mods::types::{
+    Arg, BlockUpdateEvent, BlockUseEvent, EntityState, ItemStack, ItemUseEvent, ItemUseResult, Query,
+};
 use bindings::chiacraft::mods::{command, log as mod_log, names, registry, storage as mod_storage, types, world};
 pub use bindings::exports::chiacraft::mods::hooks::{BlockChange, Death, EventValue, Hurt, Invocation, ItemUsed, Pickup, Value, Verdict};
 
 /// The API version this game serves.
-pub const API: &str = "1.0.0";
+/// Its version is `chiacraft_packages::code::API`; a test checks the two agree.
+pub const API: &str = "1.2.0";
 /// Strikes within this long stop a mod in a world.
 pub const STRIKE_WINDOW: Duration = Duration::from_secs(600);
 pub const STRIKES: usize = 3;
@@ -57,6 +60,18 @@ const NEAR_MAX: usize = 256;
 const TEXT_CHARS: usize = 1024;
 const ARGS: usize = 16;
 const HOOKS: usize = 256;
+const SOUNDS: u32 = 64;
+const BURSTS: u32 = 64;
+const PARTICLES: u32 = 256;
+const COMPONENTS: usize = 64;
+const ATTACHES: usize = 256;
+pub const COMPONENT_BYTES: u32 = 256;
+const SCHEDULES: u32 = 256;
+const MAX_SCHEDULE: u32 = 72_000;
+const SENDS: u32 = 32;
+pub const PACKET_BYTES: usize = 16 << 10;
+/// Packets a mod is handed per channel and tick; the game drops the rest.
+pub const PACKETS_PER_TICK: u32 = 64;
 
 // ------------------------------------------------------------------ what the game provides
 
@@ -97,6 +112,109 @@ pub trait Game: Send {
     fn item_id(&mut self, name: &str) -> Option<u32>;
     fn entity_kind(&mut self, id: u32) -> String;
     fn entity_kind_id(&mut self, name: &str) -> Option<u32>;
+
+    // 1.1. Defaults so a game written for 1.0 still builds: nothing carries components, no
+    // sounds or particles.
+    /// An entity's value of component `name` (a full name, one the mod declared).
+    fn get_component(&mut self, _id: u64, _name: &str) -> Option<Vec<u8>> {
+        None
+    }
+    /// Sets it; `value` is exactly the component's size. False if the entity doesn't carry it.
+    fn set_component(&mut self, _id: u64, _name: &str, _value: &[u8]) -> bool {
+        false
+    }
+    fn play_sound(&mut self, _sound: &str, _pos: [f64; 3], _volume: f32) {}
+    fn spawn_particles(&mut self, _particle: &str, _pos: [f64; 3], _count: u32) {}
+
+    // 1.2, defaults likewise.
+    /// A scheduled tick for the block at `pos` in `ticks`.
+    fn schedule(&mut self, _pos: [i32; 3], _ticks: u32) {}
+    /// Bytes to a player's game on channel `channel` (a full name the mod registered).
+    fn send(&mut self, _player: u64, _channel: &str, _data: &[u8]) {}
+}
+
+/// A game with nothing in it, for tools and benchmarks: every call answers empty.
+pub struct NullGame;
+
+impl Game for NullGame {
+    fn time(&mut self) -> u64 {
+        0
+    }
+    fn seed(&mut self) -> u64 {
+        0
+    }
+    fn random(&mut self) -> u64 {
+        0
+    }
+    fn dimension(&mut self) -> u32 {
+        0
+    }
+    fn get_block(&mut self, _: [i32; 3]) -> u32 {
+        0
+    }
+    fn set_block(&mut self, _: [i32; 3], _: u32) -> bool {
+        false
+    }
+    fn light(&mut self, _: [i32; 3]) -> u32 {
+        0
+    }
+    fn biome(&mut self, _: [i32; 3]) -> u32 {
+        0
+    }
+    fn players(&mut self) -> Vec<u64> {
+        Vec::new()
+    }
+    fn entity(&mut self, _: u64) -> Option<EntityState> {
+        None
+    }
+    fn near(&mut self, _: [f64; 3], _: f64) -> Vec<u64> {
+        Vec::new()
+    }
+    fn teleport(&mut self, _: u64, _: [f64; 3]) {}
+    fn push(&mut self, _: u64, _: [f64; 3]) {}
+    fn damage(&mut self, _: u64, _: f32, _: u64, _: u32) -> bool {
+        false
+    }
+    fn spawn(&mut self, _: &str, _: [f64; 3]) -> u64 {
+        0
+    }
+    fn remove(&mut self, _: u64) {}
+    fn creative(&mut self, _: u64) -> bool {
+        false
+    }
+    fn give(&mut self, _: u64, stack: ItemStack) -> ItemStack {
+        stack
+    }
+    fn spawn_item(&mut self, _: [f64; 3], _: ItemStack) {}
+    fn tell(&mut self, _: u64, _: &str, _: &[Arg]) {}
+    fn player_key(&mut self, _: u64) -> String {
+        String::new()
+    }
+    fn reply(&mut self, _: &str, _: &[Arg]) {}
+    fn block_name(&mut self, _: u32) -> String {
+        String::new()
+    }
+    fn block_state(&mut self, _: &str) -> Option<u32> {
+        None
+    }
+    fn prop(&mut self, _: u32, _: &str) -> Option<String> {
+        None
+    }
+    fn with_prop(&mut self, _: u32, _: &str, _: &str) -> Option<u32> {
+        None
+    }
+    fn item_name(&mut self, _: u32) -> String {
+        String::new()
+    }
+    fn item_id(&mut self, _: &str) -> Option<u32> {
+        None
+    }
+    fn entity_kind(&mut self, _: u32) -> String {
+        String::new()
+    }
+    fn entity_kind_id(&mut self, _: &str) -> Option<u32> {
+        None
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -128,11 +246,52 @@ fn log(level: Level, package: &str, line: &str) {
 /// One registration of a mod's `init`, in order: its index is the callback's number.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Hook {
-    Command { name: String, usage: String, permission: u32 },
+    Command {
+        name: String,
+        usage: String,
+        permission: u32,
+    },
     Event(Event),
     Question(Question),
-    Modify { chain: Chain, stage: u32 },
+    Modify {
+        chain: Chain,
+        stage: u32,
+    },
     WorldTick,
+    /// 1.2: the package's own block or item, or channel, by full name.
+    BlockUse(String),
+    BlockNeighbor(String),
+    BlockScheduled(String),
+    ItemUse(String),
+    Channel(String),
+}
+
+impl Hook {
+    /// Called through `content-hooks` (1.2), which a component must then export.
+    fn needs_content_hooks(&self) -> bool {
+        matches!(self, Hook::BlockUse(_) | Hook::BlockNeighbor(_) | Hook::BlockScheduled(_) | Hook::ItemUse(_) | Hook::Channel(_))
+    }
+}
+
+/// A declaration of `init` that calls nothing back (1.1): a component, or a kind carrying one.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Decl {
+    /// `name` is the full name, `<package>:<name>`.
+    Component { name: String, size: u32, flags: ComponentFlags, default: Vec<u8> },
+    /// `component` is the full name.
+    Attach { kind: String, component: String },
+}
+
+/// What a mod registered in `init`: its numbered hooks and its declarations.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Registered {
+    pub hooks: Vec<Hook>,
+    pub decls: Vec<Decl>,
+}
+
+/// A component's or command's own name: lowercase letters, digits and `_`, 1 to 32.
+fn local_name_ok(name: &str) -> bool {
+    command_name_ok(name)
 }
 
 /// A command name the game would take: lowercase letters, digits and `_`, 1 to 32.
@@ -157,7 +316,11 @@ struct State {
     package: String,
     game: Option<Box<dyn Game>>,
     /// The registrations while `init` runs.
-    registering: Option<Vec<Hook>>,
+    registering: Option<Registered>,
+    /// The components the mod declared, by full name, with their sizes.
+    components: Vec<(String, u32)>,
+    /// The channels it registered, by full name (1.2).
+    channels: Vec<String>,
     storage: Storage,
     limits: StoreLimits,
     counts: Counts,
@@ -171,11 +334,26 @@ struct Counts {
     replies: u32,
     block_sets: u32,
     spawns: u32,
+    sounds: u32,
+    bursts: u32,
+    /// Bytes `storage.set` was asked to write.
+    stored: u64,
+    schedules: u32,
+    sends: u32,
 }
 
 impl State {
     fn new(package: &str, storage: Storage) -> State {
-        State { package: package.to_string(), game: None, registering: None, storage, limits: engine::limits(), counts: Counts::default() }
+        State {
+            package: package.to_string(),
+            game: None,
+            registering: None,
+            components: Vec::new(),
+            channels: Vec::new(),
+            storage,
+            limits: engine::limits(),
+            counts: Counts::default(),
+        }
     }
 
     fn game(&mut self) -> Option<&mut (dyn Game + 'static)> {
@@ -237,14 +415,68 @@ impl mod_log::Host for State {
 
 impl State {
     fn register(&mut self, hook: Hook) -> Result<u32, String> {
-        let Some(list) = self.registering.as_mut() else {
+        let Some(reg) = self.registering.as_mut() else {
             return Err("registering is only possible while `init` runs".into());
         };
+        let list = &mut reg.hooks;
         if list.len() >= HOOKS {
             return Err(format!("at most {HOOKS} registrations"));
         }
         list.push(hook);
         Ok(list.len() as u32 - 1)
+    }
+
+    fn declare(&mut self, decl: Decl) -> Result<(), String> {
+        let Some(reg) = self.registering.as_mut() else {
+            return Err("declaring is only possible while `init` runs".into());
+        };
+        let (components, attaches) = reg
+            .decls
+            .iter()
+            .fold((0, 0), |(c, a), d| if matches!(d, Decl::Component { .. }) { (c + 1, a) } else { (c, a + 1) });
+        match &decl {
+            Decl::Component { name, size, .. } => {
+                if components >= COMPONENTS {
+                    return Err(format!("at most {COMPONENTS} components"));
+                }
+                if reg
+                    .decls
+                    .iter()
+                    .any(|d| matches!(d, Decl::Component { name: n, .. } if n == name))
+                {
+                    return Err(format!("component `{name}` is declared twice"));
+                }
+                self.components.push((name.clone(), *size));
+            }
+            Decl::Attach { .. } => {
+                if attaches >= ATTACHES {
+                    return Err(format!("at most {ATTACHES} attaches"));
+                }
+            }
+        }
+        reg.decls.push(decl);
+        Ok(())
+    }
+
+    /// `name` as a full name of the package's own content (`<package>:<path>`, `ruby` for
+    /// short): callbacks go on the package's own blocks and items only.
+    fn own(&self, name: &str, what: &str) -> Result<String, String> {
+        let full = if name.contains(':') { name.to_string() } else { format!("{}:{name}", self.package) };
+        let ok = full.len() <= 128
+            && full.split_once(':').is_some_and(|(ns, path)| {
+                ns == self.package
+                    && !path.is_empty()
+                    && path
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "_/".contains(c))
+            });
+        if ok { Ok(full) } else { Err(format!("`{}` is no {what} of this package's own", clip(name, 64))) }
+    }
+
+    /// The full name and size of the mod's component called `name` (its own name, or the full one).
+    fn component(&self, name: &str) -> Option<(String, u32)> {
+        let full = if name.contains(':') { name.to_string() } else { format!("{}:{name}", self.package) };
+        self.components.iter().find(|(n, _)| *n == full).cloned()
     }
 }
 
@@ -259,8 +491,9 @@ impl registry::Host for State {
         if permission > 4 {
             return Err(format!("command `{name}`: permission is 0 to 4"));
         }
-        if let Some(list) = &self.registering
-            && list
+        if let Some(reg) = &self.registering
+            && reg
+                .hooks
                 .iter()
                 .any(|h| matches!(h, Hook::Command { name: n, .. } if *n == name))
         {
@@ -286,6 +519,72 @@ impl registry::Host for State {
     fn world_tick(&mut self) -> u32 {
         self.register(Hook::WorldTick).unwrap_or(u32::MAX)
     }
+
+    fn on_block_use(&mut self, block: String) -> Result<u32, String> {
+        let b = self.own(&block, "block")?;
+        self.register(Hook::BlockUse(b))
+    }
+
+    fn on_block_neighbor(&mut self, block: String) -> Result<u32, String> {
+        let b = self.own(&block, "block")?;
+        self.register(Hook::BlockNeighbor(b))
+    }
+
+    fn on_block_scheduled(&mut self, block: String) -> Result<u32, String> {
+        let b = self.own(&block, "block")?;
+        self.register(Hook::BlockScheduled(b))
+    }
+
+    fn on_item_use(&mut self, item: String) -> Result<u32, String> {
+        let i = self.own(&item, "item")?;
+        self.register(Hook::ItemUse(i))
+    }
+
+    fn channel(&mut self, name: String) -> Result<u32, String> {
+        if !local_name_ok(&name) {
+            return Err(format!("channel `{}`: use 1 to 32 lowercase letters, digits and `_`", clip(&name, 40)));
+        }
+        let full = format!("{}:{name}", self.package);
+        if self.channels.contains(&full) {
+            return Err(format!("channel `{name}` is registered twice"));
+        }
+        let id = self.register(Hook::Channel(full.clone()))?;
+        self.channels.push(full);
+        Ok(id)
+    }
+
+    fn component(&mut self, name: String, size: u32, flags: ComponentFlags, mut default: Vec<u8>) -> Result<(), String> {
+        if !local_name_ok(&name) {
+            return Err(format!("component `{}`: use 1 to 32 lowercase letters, digits and `_`", clip(&name, 40)));
+        }
+        if !(1..=COMPONENT_BYTES).contains(&size) {
+            return Err(format!("component `{name}`: 1 to {COMPONENT_BYTES} bytes"));
+        }
+        if default.len() > size as usize {
+            return Err(format!("component `{name}`: its default is bigger than {size} bytes"));
+        }
+        default.resize(size as usize, 0);
+        let full = format!("{}:{name}", self.package);
+        self.declare(Decl::Component { name: full, size, flags, default })
+    }
+
+    fn attach(&mut self, kind: String, component: String) -> Result<(), String> {
+        let Some((full, _)) = State::component(self, &component) else {
+            return Err(format!("attach: `{}` is no component of this mod (declare it first)", clip(&component, 64)));
+        };
+        let kind_ok = kind.len() <= 128
+            && kind.split_once(':').is_some_and(|(ns, n)| {
+                !ns.is_empty()
+                    && !n.is_empty()
+                    && kind
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "_:/.".contains(c))
+            });
+        if !kind_ok {
+            return Err(format!("attach: `{}` is not a full kind name (`core:player`, `base:pig`)", clip(&kind, 64)));
+        }
+        self.declare(Decl::Attach { kind, component: full })
+    }
 }
 
 impl world::Host for State {
@@ -303,6 +602,13 @@ impl world::Host for State {
     }
     fn get_block(&mut self, p: types::BlockPos) -> u32 {
         self.game().map_or(0, |g| g.get_block(pos(p)))
+    }
+    fn set_blocks(&mut self, changes: Vec<(types::BlockPos, u32)>) -> u32 {
+        changes
+            .into_iter()
+            .take(BLOCK_SETS as usize + 1)
+            .filter(|(p, s)| world::Host::set_block(self, *p, *s))
+            .count() as u32
     }
     fn set_block(&mut self, p: types::BlockPos, state: u32) -> bool {
         self.counts.block_sets += 1;
@@ -388,6 +694,62 @@ impl world::Host for State {
     fn player_key(&mut self, player: u64) -> String {
         self.game().map_or(String::new(), |g| g.player_key(player))
     }
+
+    fn get_component(&mut self, id: u64, component: String) -> Option<Vec<u8>> {
+        let (full, size) = State::component(self, &component)?;
+        let mut v = self.game()?.get_component(id, &full)?;
+        v.resize(size as usize, 0);
+        Some(v)
+    }
+    fn set_component(&mut self, id: u64, component: String, mut value: Vec<u8>) -> bool {
+        let Some((full, size)) = State::component(self, &component) else { return false };
+        if value.len() > size as usize {
+            return false;
+        }
+        value.resize(size as usize, 0);
+        self.game()
+            .is_some_and(|g| g.set_component(id, &full, &value))
+    }
+    fn play_sound(&mut self, sound: String, p: types::Vec3, volume: f32) {
+        self.counts.sounds += 1;
+        if self.counts.sounds > SOUNDS || sound.len() > 128 || !volume.is_finite() {
+            return;
+        }
+        if let (Some(p), Some(g)) = (finite(p), self.game()) {
+            g.play_sound(&sound, p, volume.clamp(0.0, 4.0))
+        }
+    }
+    fn spawn_particles(&mut self, particle: String, p: types::Vec3, count: u32) {
+        self.counts.bursts += 1;
+        if self.counts.bursts > BURSTS || particle.len() > 128 || count == 0 {
+            return;
+        }
+        if let (Some(p), Some(g)) = (finite(p), self.game()) {
+            g.spawn_particles(&particle, p, count.min(PARTICLES))
+        }
+    }
+    fn schedule(&mut self, p: types::BlockPos, ticks: u32) {
+        self.counts.schedules += 1;
+        if self.counts.schedules > SCHEDULES {
+            return;
+        }
+        if let Some(g) = self.game() {
+            g.schedule(pos(p), ticks.clamp(1, MAX_SCHEDULE))
+        }
+    }
+    fn send(&mut self, player: u64, channel: String, data: Vec<u8>) {
+        self.counts.sends += 1;
+        if self.counts.sends > SENDS || data.len() > PACKET_BYTES {
+            return;
+        }
+        let full = if channel.contains(':') { channel } else { format!("{}:{channel}", self.package) };
+        if !self.channels.contains(&full) {
+            return;
+        }
+        if let Some(g) = self.game() {
+            g.send(player, &full, &data)
+        }
+    }
 }
 
 impl names::Host for State {
@@ -432,6 +794,10 @@ impl mod_storage::Host for State {
         self.storage.get(&key)
     }
     fn set(&mut self, key: String, value: Vec<u8>) -> Result<(), String> {
+        self.counts.stored += value.len() as u64;
+        if self.counts.stored > storage::MAX_WRITE_PER_CALL {
+            return Err(format!("at most {} MiB written per call", storage::MAX_WRITE_PER_CALL >> 20));
+        }
         self.storage.set(&key, value)
     }
     fn remove(&mut self, key: String) {
@@ -462,14 +828,14 @@ pub struct Mod {
     package: String,
     component: Component,
     linker: Arc<Linker<State>>,
-    hooks: Vec<Hook>,
+    registered: Registered,
 }
 
 impl std::fmt::Debug for Mod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Mod")
             .field("package", &self.package)
-            .field("hooks", &self.hooks)
+            .field("registered", &self.registered)
             .finish()
     }
 }
@@ -509,11 +875,12 @@ impl Mod {
         if wasm.len() > engine::MAX_COMPONENT_BYTES {
             return Err(format!("code/server.wasm is bigger than {} MiB", engine::MAX_COMPONENT_BYTES >> 20));
         }
+        check_imports(wasm)?;
         let component = compiled(wasm)?;
         let linker = linker()?;
-        let mut m = Mod { package: package.to_string(), component, linker, hooks: Vec::new() };
+        let mut m = Mod { package: package.to_string(), component, linker, registered: Registered::default() };
         let live = m.instantiate(Storage::memory(), None)?;
-        m.hooks = live.hooks;
+        m.registered = live.registered;
         Ok(m)
     }
 
@@ -523,7 +890,12 @@ impl Mod {
 
     /// What `init` registered: a hook's index is its callback number.
     pub fn hooks(&self) -> &[Hook] {
-        &self.hooks
+        &self.registered.hooks
+    }
+
+    /// What `init` declared (1.1): components and the kinds carrying them.
+    pub fn decls(&self) -> &[Decl] {
+        &self.registered.decls
     }
 
     /// A new instance with its `init` run.
@@ -536,17 +908,37 @@ impl Mod {
         store
             .set_fuel(engine::fuel::INIT)
             .map_err(|e| e.to_string())?;
-        let bindings = ServerMod::instantiate(&mut store, &self.component, &self.linker).map_err(|e| why(&e))?;
+        let instance = self
+            .linker
+            .instantiate(&mut store, &self.component)
+            .map_err(|e| why(&e))?;
+        let hooks = ServerMod::new(&mut store, &instance).map_err(|e| why(&e))?;
+        let content = ContentHooks::find(&mut store, &self.component, &instance)?;
         store.data_mut().game = game;
-        store.data_mut().registering = Some(Vec::new());
-        let r = bindings.chiacraft_mods_hooks().call_init(&mut store);
+        store.data_mut().registering = Some(Registered::default());
+        let r = hooks.chiacraft_mods_hooks().call_init(&mut store);
         store.data_mut().game = None;
-        let hooks = store.data_mut().registering.take().unwrap_or_default();
+        let registered = store.data_mut().registering.take().unwrap_or_default();
         match r {
-            Ok(Ok(())) => Ok(Live { store, bindings, hooks }),
+            Ok(Ok(())) if content.is_none() && registered.hooks.iter().any(Hook::needs_content_hooks) => {
+                Err("init: it registers block, item or channel callbacks but exports no content-hooks (build it with the 1.2 SDK)".into())
+            }
+            Ok(Ok(())) => Ok(Live { store, bindings: Exports { hooks, content }, registered }),
             Ok(Err(e)) => Err(format!("init: {}", clip(&e, 512))),
             Err(e) => Err(format!("init: {}", why(&e))),
         }
+    }
+}
+
+/// A component may import only this API, in a version this game has: anything else (WASI, a
+/// newer 1.x, 2.0) is refused at load with a reason, before it is compiled.
+fn check_imports(wasm: &[u8]) -> Result<(), String> {
+    use chiacraft_packages::code;
+    match code::api_of(wasm)? {
+        Some(v) if !code::runs(v) => {
+            Err(format!("it was built for API {}; this game runs {API}: a newer game runs it", code::text(Some(v))))
+        }
+        _ => Ok(()),
     }
 }
 
@@ -568,8 +960,75 @@ fn why(e: &wasmtime::Error) -> String {
 
 struct Live {
     store: Store<State>,
-    bindings: ServerMod,
-    hooks: Vec<Hook>,
+    bindings: Exports,
+    registered: Registered,
+}
+
+/// What a component exports: `hooks` always, `content-hooks` from 1.2 on.
+struct Exports {
+    hooks: ServerMod,
+    content: Option<ContentHooks>,
+}
+
+impl Exports {
+    fn chiacraft_mods_hooks(&self) -> &bindings::exports::chiacraft::mods::hooks::Guest {
+        self.hooks.chiacraft_mods_hooks()
+    }
+}
+
+/// `content-hooks` (1.2), found at run time so that older components, which lack it, still
+/// instantiate through the game's `host` world.
+struct ContentHooks {
+    block_use: TypedFunc<(u32, BlockUseEvent), (bool,)>,
+    block_update: TypedFunc<(u32, BlockUpdateEvent), ()>,
+    item_use: TypedFunc<(u32, ItemUseEvent), (ItemUseResult,)>,
+    packet: TypedFunc<(u32, u64, Vec<u8>), ()>,
+}
+
+impl ContentHooks {
+    fn find(
+        store: &mut Store<State>,
+        component: &Component,
+        instance: &wasmtime::component::Instance,
+    ) -> Result<Option<ContentHooks>, String> {
+        let engine = engine::engine()?;
+        let Some(name) = component
+            .component_type()
+            .exports(engine)
+            .map(|(n, _)| n.to_string())
+            .find(|n| n.starts_with("chiacraft:mods/content-hooks@1."))
+        else {
+            return Ok(None);
+        };
+        let missing = |f: &str| format!("its content-hooks lacks {f}");
+        let iface = instance
+            .get_export_index(&mut *store, None, &name)
+            .ok_or_else(|| missing("itself"))?;
+        let func = |store: &mut Store<State>, f: &str| {
+            instance
+                .get_export_index(&mut *store, Some(&iface), f)
+                .ok_or_else(|| missing(f))
+        };
+        let (u, b, i, p) = (func(store, "block-use")?, func(store, "block-update")?, func(store, "item-use")?, func(store, "packet")?);
+        let typed = |e: wasmtime::Error| format!("its content-hooks doesn't fit API {API}: {}", why(&e));
+        Ok(Some(ContentHooks {
+            block_use: instance.get_typed_func(&mut *store, u).map_err(typed)?,
+            block_update: instance.get_typed_func(&mut *store, b).map_err(typed)?,
+            item_use: instance.get_typed_func(&mut *store, i).map_err(typed)?,
+            packet: instance.get_typed_func(&mut *store, p).map_err(typed)?,
+        }))
+    }
+}
+
+/// Calls a typed export and lets the component clean up after it.
+fn typed<P, R>(f: &TypedFunc<P, R>, store: &mut Store<State>, params: P) -> wasmtime::Result<R>
+where
+    P: wasmtime::component::ComponentNamedList + wasmtime::component::Lower + Send + Sync,
+    R: wasmtime::component::ComponentNamedList + wasmtime::component::Lift + Send + Sync,
+{
+    let r = f.call(&mut *store, params)?;
+    f.post_return(&mut *store)?;
+    Ok(r)
 }
 
 // ------------------------------------------------------------------ a mod in one world
@@ -617,12 +1076,7 @@ impl Instance {
 
     /// Runs `f` on the live instance with `game` installed and `fuel` to spend. `None` if the mod
     /// doesn't run here or the call failed (a strike).
-    fn call<T>(
-        &mut self,
-        game: Box<dyn Game>,
-        fuel: u64,
-        f: impl FnOnce(&ServerMod, &mut Store<State>) -> wasmtime::Result<T>,
-    ) -> Option<T> {
+    fn call<T>(&mut self, game: Box<dyn Game>, fuel: u64, f: impl FnOnce(&Exports, &mut Store<State>) -> wasmtime::Result<T>) -> Option<T> {
         if self.stopped.is_some() {
             return None;
         }
@@ -661,7 +1115,7 @@ impl Instance {
             None => Ok(Storage::memory()),
         };
         match storage.and_then(|s| self.m.instantiate(s, Some(game))) {
-            Ok(live) if live.hooks != self.m.hooks => {
+            Ok(live) if live.registered != self.m.registered => {
                 let why = "registered other things than when it loaded".to_string();
                 log(Level::Error, &self.m.package, &format!("{why}; stopped in this world"));
                 self.stopped = Some(why);
@@ -713,6 +1167,48 @@ impl Instance {
     pub fn world_tick(&mut self, game: impl Fn() -> Box<dyn Game>, callback: u32) {
         self.ensure(&game);
         self.call(game(), engine::fuel::TICK, |b, s| b.chiacraft_mods_hooks().call_world_tick(s, callback));
+    }
+
+    /// A player used one of the package's blocks (1.2): whether the use did something.
+    pub fn block_use(&mut self, game: impl Fn() -> Box<dyn Game>, callback: u32, used: BlockUseEvent) -> bool {
+        self.ensure(&game);
+        self.call(game(), engine::fuel::EVENT, |b, s| match &b.content {
+            Some(c) => typed(&c.block_use, s, (callback, used)).map(|(v,)| v),
+            None => Ok(false),
+        })
+        .unwrap_or(false)
+    }
+
+    /// A neighbour of one of the package's blocks changed, or its scheduled tick came (1.2).
+    pub fn block_update(&mut self, game: impl Fn() -> Box<dyn Game>, callback: u32, update: BlockUpdateEvent) {
+        self.ensure(&game);
+        self.call(game(), engine::fuel::TICK, |b, s| match &b.content {
+            Some(c) => typed(&c.block_update, s, (callback, update)),
+            None => Ok(()),
+        });
+    }
+
+    /// A player used one of the package's items (1.2); a failed call did nothing.
+    pub fn item_use(&mut self, game: impl Fn() -> Box<dyn Game>, callback: u32, used: ItemUseEvent) -> ItemUseResult {
+        self.ensure(&game);
+        self.call(game(), engine::fuel::EVENT, |b, s| match &b.content {
+            Some(c) => typed(&c.item_use, s, (callback, used)).map(|(v,)| v),
+            None => Ok(ItemUseResult { handled: false, stack: None }),
+        })
+        .unwrap_or(ItemUseResult { handled: false, stack: None })
+    }
+
+    /// Bytes a player's game sent on one of the mod's channels (1.2). The caller keeps to
+    /// [`PACKETS_PER_TICK`] and [`PACKET_BYTES`].
+    pub fn packet(&mut self, game: impl Fn() -> Box<dyn Game>, callback: u32, player: u64, data: &[u8]) {
+        if data.len() > PACKET_BYTES {
+            return;
+        }
+        self.ensure(&game);
+        self.call(game(), engine::fuel::EVENT, |b, s| match &b.content {
+            Some(c) => typed(&c.packet, s, (callback, player, data.to_vec())),
+            None => Ok(()),
+        });
     }
 
     fn ensure(&mut self, game: &impl Fn() -> Box<dyn Game>) {

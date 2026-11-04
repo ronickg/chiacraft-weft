@@ -162,7 +162,8 @@ fn alarm_range(a: &animal::Animal) -> f64 {
 pub fn alarm(w: &World, id: u64, st: &EntityState) -> bool {
     let Some(sig) = w.component(id, &SIGNATURE).copied() else { return false };
     if sig.mark_ticks > 0 {
-        set(w, id, |s| s.mark_ticks -= 1);
+        let e = w.tick_elapsed(id);
+        set(w, id, |s| s.mark_ticks = s.mark_ticks.saturating_sub(e));
         if sig.mark_ticks % 10 == 0
             && let Some(m) = w.entity(sig.marked)
         {
@@ -245,7 +246,8 @@ pub fn tracking(w: &World, id: u64, st: &EntityState) -> bool {
         set(w, id, |s| s.track = 0);
         return false;
     }
-    set(w, id, |s| s.track_ticks -= 1);
+    let e = w.tick_elapsed(id);
+    set(w, id, |s| s.track_ticks = s.track_ticks.saturating_sub(e));
     if (w.time() + id) % 10 != 0 {
         return true;
     }
@@ -308,13 +310,14 @@ pub fn gifts(w: &World, id: u64, st: &EntityState) -> bool {
         if sig.timer == 0 {
             let wait = GIFT_TICKS.0 + w.random_below(GIFT_TICKS.1 - GIFT_TICKS.0);
             set(w, id, |s| s.timer = (wait as f32 * (1.0 - a.bond as f32 / 200.0)) as u32);
-        } else if sig.timer == 1 {
+        } else if sig.timer <= w.tick_elapsed(id) {
             set(w, id, |s| {
                 s.timer = 0;
                 s.carrying = 1;
             });
         } else {
-            set(w, id, |s| s.timer -= 1);
+            let e = w.tick_elapsed(id);
+            set(w, id, |s| s.timer -= e);
         }
         return false;
     }

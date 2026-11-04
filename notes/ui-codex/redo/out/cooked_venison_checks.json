@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "cooked venison: a dark brown seared lean steak with grill marks, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.571,
+   "outline": 0.89,
+   "red_line": 0.27,
+   "fill": 0.4,
+   "passed": true
+  }
+ ]
+}

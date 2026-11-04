@@ -2,7 +2,7 @@ pub mod api;
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use glam::Vec2;
 use weft_abi as abi;
@@ -263,6 +263,8 @@ pub(crate) struct Running {
     /// F1: the world alone, until a screen opens or F1 again.
     hud_off: bool,
     reload_requested: bool,
+    /// Since when a requested reload has been held back while the world opens.
+    reload_held: Option<Instant>,
     /// The settings in effect, and the config changes seen (`apply_settings`).
     applied: Applied,
     /// Packs changed while their screen was open (`apply_settings`).
@@ -390,6 +392,7 @@ impl App {
         crate::saved_worlds::set_settings(&settings);
         if chiacraft_account::current().is_some() {
             net::p2p::start_account(&settings);
+            crate::chiacraft::chain::configure(&settings.run_dir, &settings.chain(), settings.chain_peers());
         }
         let icon = crate::assets::decode_png_file(&engine_assets(self.opts.dev).join("icon.png"))
             .and_then(|(w, h, px)| winit::window::Icon::from_rgba(px, w, h).ok());
@@ -514,6 +517,7 @@ impl App {
             f3_combo: None,
             hud_off: false,
             reload_requested: false,
+            reload_held: None,
             packs_pending: false,
             applied: Applied { packs: packs_now, ..Default::default() },
             config_seen: u64::MAX,
@@ -750,7 +754,7 @@ impl Running {
                                 creator,
                                 problem,
                                 trusted,
-                                code: o.5,
+                                api: o.5.clone(),
                             }
                         })
                         .collect();
@@ -921,6 +925,7 @@ impl Running {
 
     /// Plays in the world `server` runs in this process.
     fn play_local(&mut self, server: ServerHandle, world: String, identity: Option<Arc<crate::world_address::WorldIdentity>>) {
+        crate::admission::set_local_world(server.dir.clone());
         let (client_conn, server_conn) = net::local_pair();
         let _ = server.connect.send(server_conn);
         let key = net::p2p::player_key(&self.settings.run_dir);
@@ -2029,13 +2034,20 @@ fn frame(r: &mut Running, opts: &Options) -> bool {
     if r.input.pressed("core:reload") {
         r.reload_requested = true;
     }
-    // Not while a world is opening and the server has not let the player in yet: a reload in
-    // those frames left the GPU on work it never finished (NVIDIA: Xid 109; Apple: a hang the
-    // whole machine went down with). It waits for the join.
-    let joining = r.game.as_ref().is_some_and(|g| !g.client.joined);
-    if r.reload_requested && !joining {
-        r.reload_requested = false;
-        reload_assets(r, opts);
+    // Not while a world is opening: a reload before the server let the player in, and once
+    // (2026-11-04) one just after while the first terrain was still being built, left the GPU on
+    // work it never finished (NVIDIA: Xid 109; Apple: a hang the whole machine went down with).
+    // It waits for the join and the first terrain, but never more than 15 s after the join.
+    if r.reload_requested {
+        let joined = r.game.as_ref().is_none_or(|g| g.client.joined);
+        let settled = r.game.is_none() || r.load_state().0;
+        // Counted from the join.
+        let waited = joined && r.reload_held.get_or_insert_with(Instant::now).elapsed() > Duration::from_secs(15);
+        if joined && (settled || waited) {
+            r.reload_requested = false;
+            r.reload_held = None;
+            reload_assets(r, opts);
+        }
     }
     window_keys(r);
     r.screen_input(scale, &mut requests);
@@ -2083,12 +2095,13 @@ fn start_frame(r: &mut Running, opts: &Options, dt: f64) {
     r.frame_no += 1;
     // Link requests and answers arrive in the background: the links screen shows them as they do.
     let links_now = crate::links::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
-        + crate::friends::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
+        + crate::friends::GENERATION.load(std::sync::atomic::Ordering::Relaxed)
+        + crate::admission::GENERATION.load(std::sync::atomic::Ordering::Relaxed);
     if links_now != r.links_seen {
         r.links_seen = links_now;
         if r.screens
             .last()
-            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends"].contains(&s.name()))
+            .is_some_and(|(s, _)| ["core:links", "core:multiplayer", "core:friends", "core:admission"].contains(&s.name()))
         {
             r.rebuild_all();
         }
@@ -2407,6 +2420,7 @@ fn world_keys(r: &mut Running) {
 fn handle_disconnect(r: &mut Running) {
     if let Some(reason) = r.game.as_ref().and_then(|g| g.client.disconnected.clone()) {
         log::info!("disconnected: {reason}");
+        let refused = r.game.as_ref().and_then(|g| g.client.refused.clone());
         r.leave_world_silent();
         r.screens.clear();
         if let Some(origin) = r.came_from.take() {
@@ -2419,7 +2433,8 @@ fn handle_disconnect(r: &mut Running) {
         } else {
             r.open(screens::engine("core:title"));
         }
-        r.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![Arg::Text(reason)] }));
+        let why = refused.map_or(Arg::Text(reason), Arg::Msg);
+        r.open(Box::new(screens::Message { title: "multiplayer.disconnected".into(), args: vec![why] }));
     }
 }
 
@@ -2647,6 +2662,8 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
             .particles
             .simulate(&mut *r.gpu, &mut r.list, info.slot, &r.textures, &g.client.world, &cam);
         g.client.update_wires(&mut *r.gpu, &r.textures);
+        // The sun's shadow map first, for packs that use it.
+        g.client.render_shadows(&mut *r.gpu, &mut r.list, info);
     }
     r.list
         .push(Cmd::BeginPass { color: Some((world_target, Some(clear))), depth: Some((r.depth.0, Some(0.0))) });
@@ -2660,7 +2677,10 @@ fn record_passes(r: &mut Running, info: &weft_render::FrameInfo, scale: f32) {
     }
     r.list.push(Cmd::EndPass);
     if post {
-        let scene = r.game.as_ref().and_then(|g| g.client.scene_buffer(info.slot));
+        let scene = r
+            .game
+            .as_ref()
+            .and_then(|g| g.client.scene_buffer(info.slot));
         let depth = r.gpu.texture_index(r.depth.0);
         r.post.apply(&mut *r.gpu, &mut r.list, info, scene, depth);
     } else {

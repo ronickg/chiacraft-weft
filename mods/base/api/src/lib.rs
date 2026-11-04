@@ -509,7 +509,9 @@ pub fn eat_meal(u: &mut ItemUse) -> bool {
     let roll = w.random_below(1000) as f32 / 1000.0;
     let Some(v) = w.component_mut(u.player(), &VITALS) else { return false };
     let mut s = v.stomach();
-    if s.eat_meal(&foods, fresh.quality(), if hot { 0.0 } else { vitals::food::HOT_FOR }, v.capacity()).is_err() {
+    if s.eat_meal(&foods, fresh.quality(), if hot { 0.0 } else { vitals::food::HOT_FOR }, v.capacity())
+        .is_err()
+    {
         return false;
     }
     v.set_stomach(&s);

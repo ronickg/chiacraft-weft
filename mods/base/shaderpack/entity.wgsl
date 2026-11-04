@@ -146,7 +146,7 @@ fn box_vertex(b: Box, v: u32) -> VOut {
         }
         let n = normalize(vec3(dot(b.rows[0].xyz, d), dot(b.rows[1].xyz, d), dot(b.rows[2].xyz, d)) + vec3(0.0, 1e-6, 0.0));
         let l = unpack_light(b.ids2.y);
-        let light = light_on(n, l, smoothstep(0.8, 1.0, l.x), 1.0, world) * mix(0.8, 1.0, shade);
+        let light = light_on(n, l, sun_on_body(world, n, l.x), 1.0, world) * mix(0.8, 1.0, shade);
         out.color = vec4(pow(tint * mix(vec3(1.0), vec3(1.0, 0.4, 0.4), hurt), vec3(2.2)) * light, 1.0);
     } else {
         out.color = vec4(pow(tint * lit * shade * mix(vec3(1.0), vec3(1.0, 0.4, 0.4), hurt), vec3(2.2)), 1.0);

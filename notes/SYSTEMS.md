@@ -108,6 +108,7 @@ built, it gets its row below and its arrows above.
 | Eggs | `mods/animals/src/eggs.rs` | `animals_core::life::EGG_AIR` | air, nests | hatching |
 | Breeding | `mods/animals/src/breeding.rs` | `biology.rs` `breeds`, `peak` | calendar, bond, food | eggs, births, XP |
 | Difficulty | `base_api::DIFFICULTY` (a world rule) | `vitals::difficulty` | Create New World, `/rule difficulty` | player's body, eating, tames |
+| Entity ranges (engine) | `server/sync.rs` (`move_every`), `server/dim.rs` (`mark_resting`) | world rules `core:entity_send_distance` 96, `core:entity_activation_distance` 48, `core:inactive_entity_interval` 20 | players' positions | what each player is sent and how often; animals' and mobs' goals and paths far from players (once a second), `World::tick_elapsed` |
 | Damage causes | `abi::damage` | | | engine death messages (`server/mod.rs`, engine lang en, ru, fr) |
 | HUD | `mods/base/src/hud.rs`, `player.rs` | `hud_element` orders 0-8 | vitals, clock | |
 | UI art | `mods/base/source/ui/install.py` | the kit | generated sheets (`game-art` skill) | `mods/base/assets/textures/gui` |
@@ -131,7 +132,8 @@ built, it gets its row below and its arrows above.
 - **Clothes, or a new material** (`vitals::clothing::MATERIALS`): its clo, heat, wet and wind from
   the research; the items come from the table (`clothing.rs`), with lang (base en, ru) and art;
   `balance.rs`'s clothing checks; the sheet. A new furred species: its row in
-  `animals_core::hides`.
+  `animals_core::hides`. A species people eat: its row in `animals_core::meat` (and a new
+  meat's raw and cooked `FOODS` rows, lang and icons).
 - **A meal, or a new preserved food**: the stew is its ingredients (`vitals::meals`), so a new food
   goes in it as it is; a new preserved food is a `FOODS` row, its `preserve::product` line and an
   item in `cooking.rs`'s `PRODUCTS` and `items.rs`'s food list; the sheet.
@@ -165,6 +167,9 @@ built, it gets its row below and its arrows above.
 - **The stats** (names, order, a new one): both the player's (`vitals::stats::NAMES`) and the
   animals' (`STAT_NAMES`) must match (`places.rs` checks); both screens; the sheets.
 - **Difficulty numbers**: `vitals::difficulty`; the sheet.
+- **Anything an animal or mob counts down per tick** (a fuse, a timer, growing up): far from
+  players its kind ticks only once a second, so count down by `w.tick_elapsed(id)`, or keep a
+  due time. Projectiles and what must run every tick are `.always_active()`.
 
 ## Adding a new piece
 
@@ -199,5 +204,6 @@ built, it gets its row below and its arrows above.
 | Clothes warm, the pot cooks | `testkit` `clothes_and_stew` | the clothing slots not read by body temperature (`/warmth`), the cooking pot not making a stew |
 | Survival balance | `vitals/src/balance.rs` | foods, stomach, levels and calendar out of balance; clothes that don't warm, cool or keep out the wind as their material should; a stew of three foods not making one well fed; preserved food keeping too little; a rack drying in the damp cold or not in a desert summer |
 | Every hide is a species | `animals/core/src/hides.rs` | a pelt or hide row for a species that isn't there |
+| Every meat is a species and a food | `animals/core/src/meat.rs` | a meat row for a species that isn't there, or a meat with no raw or cooked `FOODS` row |
 | Species balance | `animals/core/src/balance.rs` | species numbers against their facts |
 | The sheets are up to date | `vitals/tests/sheet.rs`, `animals/core/tests/sheet.rs` | a sheet not regenerated after a change |

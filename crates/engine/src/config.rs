@@ -468,12 +468,26 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::text("core:debug_lines", ""),
         ConfigDef::text("core:name", &user),
         ConfigDef::text("core:relays", ""),
+        // chiacraft (phase 4): the Chia network DIDs are read from (`off`, `testnet11`; mainnet
+        // only once Ronald says yes), own full nodes instead of the DNS introducers (`host:port`,
+        // comma separated), and DID sponsors' addresses, tried in order.
+        ConfigDef::text("core:chain", "testnet11"),
+        ConfigDef::text("core:chain_peers", ""),
+        ConfigDef::text("core:sponsors", ""),
         // Where others reach this game by address; forward it, TCP and UDP.
         ConfigDef::number("core:server_port", ck::INT, 27182.0, 1.0, 65535.0, 1.0),
         ConfigDef::text("core:resource_packs", ""),
         ConfigDef::text("core:shader_pack", ""),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:mob_spawning", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:simulation_distance", ck::INT, 8.0, 2.0, 64.0, 1.0) },
+        // Entities are sent to players within this many blocks (at most the simulation
+        // distance); their moves every tick within a third of it, every 2nd within two
+        // thirds, every 4th beyond.
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:entity_send_distance", ck::INT, 96.0, 16.0, 1024.0, 16.0) },
+        // Entities with no player this near tick their mods and paths only once in
+        // `core:inactive_entity_interval` ticks; 0: all tick every tick.
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:entity_activation_distance", ck::INT, 48.0, 0.0, 512.0, 16.0) },
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:inactive_entity_interval", ck::INT, 20.0, 1.0, 200.0, 1.0) },
     ];
     out.extend(
         keys.iter()

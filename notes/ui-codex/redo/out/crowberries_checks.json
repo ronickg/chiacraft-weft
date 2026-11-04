@@ -1,0 +1,33 @@
+{
+ "kind": "item",
+ "what": "a small cluster of six glossy jet-black crowberries, each round berry big enough to see on its own with a blue-grey bloom and a white glint, on a sprig of short needle-like green leaves, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.612,
+   "outline": 1.1,
+   "red_line": 0.06,
+   "fill": 0.55,
+   "passed": false
+  },
+  {
+   "grid": 0.233,
+   "outline": 1.45,
+   "red_line": 0.04,
+   "fill": 0.5,
+   "passed": false
+  },
+  {
+   "grid": 0.26,
+   "outline": 1.83,
+   "red_line": 0.0,
+   "fill": 0.48,
+   "passed": false
+  }
+ ]
+}

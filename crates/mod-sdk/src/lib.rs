@@ -21,8 +21,15 @@
 //!
 //! What differs from Weft's SDK: only server code (no content builders, screens or client hooks
 //! yet: content comes from the package's definitions); a handle's id is looked up by name in the
-//! world the mod runs in; per-entity components become [`storage`]; and a few calls of our own
-//! ([`World::tell`], [`World::player_key`], [`World::teleport`]).
+//! world the mod runs in; a component's value is read and set by value
+//! ([`World::component`], [`World::set_component`], [`World::update_component`]) rather than by
+//! reference; and a few calls of our own ([`World::tell`], [`World::player_key`],
+//! [`World::teleport`], [`storage`]).
+//!
+//! API 1.1: components, `set_blocks`, sounds and particles. API 1.2 (this SDK): callbacks on the
+//! package's own blocks and items (`r.block(&B).on_use(..)`, `r.item(&I).on_use(..)`), channels
+//! (`r.packet`, `w.send`) and `w.schedule`. A mod built with it needs a game that runs 1.2; one
+//! built with an older SDK runs in every later 1.x game.
 //!
 //! Build with `cargo build --release --target wasm32-unknown-unknown`, then
 //! `cargo run -p chiacraft-sandbox --features pack --bin componentize -- <module.wasm>
@@ -35,7 +42,7 @@ use std::rc::Rc;
 #[doc(hidden)]
 pub mod bindings {
     wit_bindgen::generate!({
-        path: "../sandbox/wit/v1.0",
+        path: "../sandbox/wit/v1.2",
         world: "server-mod",
         pub_export_macro: true,
         export_macro_name: "__export",
@@ -44,14 +51,26 @@ pub mod bindings {
 }
 
 use bindings::chiacraft::mods::{command as wcommand, log as wlog, names, registry, storage as wstorage, types, world as wworld};
+#[doc(hidden)]
+pub use bindings::exports::chiacraft::mods::content_hooks::Guest as __ContentGuest;
 use bindings::exports::chiacraft::mods::hooks as whooks;
 #[doc(hidden)]
 pub use bindings::exports::chiacraft::mods::hooks::{
     EventValue as __EventValue, Guest as __Guest, Invocation as __Invocation, Value as __Value, Verdict as __Verdict,
 };
+#[doc(hidden)]
+pub use types::{
+    BlockUpdateEvent as __BlockUpdate, BlockUseEvent as __BlockUse, ItemUseEvent as __ItemUse, ItemUseResult as __ItemUseResult,
+};
+
+/// Permission levels (`permission::EVERYONE` .. `permission::OWNER`), value-chain stages and
+/// component flags: Weft's own, so each has one name. A sandboxed component takes `SAVE`,
+/// `SYNC_OWNER`, `SYNC_WATCHERS` and `KEEP` (`SYNC_MENU` is for machines' menus, which a sandboxed
+/// mod has none of).
+pub use weft_abi::{component_flags, permission, stage};
 
 /// The API version this SDK builds for.
-pub const API: &str = "1.0.0";
+pub const API: &str = "1.2.0";
 
 // ------------------------------------------------------------------ entry point
 
@@ -88,16 +107,37 @@ macro_rules! declare_mod {
                 $crate::__world_tick(callback)
             }
         }
+        impl $crate::__ContentGuest for __ChiacraftMod {
+            fn block_use(callback: u32, used: $crate::__BlockUse) -> bool {
+                $crate::__block_use(callback, used)
+            }
+            fn block_update(callback: u32, update: $crate::__BlockUpdate) {
+                $crate::__block_update(callback, update)
+            }
+            fn item_use(callback: u32, used: $crate::__ItemUse) -> $crate::__ItemUseResult {
+                $crate::__item_use(callback, used)
+            }
+            fn packet(callback: u32, player: u64, data: Vec<u8>) {
+                $crate::__packet(callback, player, data)
+            }
+        }
         $crate::bindings::__export!(__ChiacraftMod with_types_in $crate::bindings);
     };
 }
 
 type CommandFn = Rc<dyn Fn(&mut ServerCommand)>;
 type EventFn = Rc<dyn Fn(&[__EventValue])>;
+type BlockUseFn = Rc<dyn Fn(&mut Use) -> bool>;
+type ItemUseFn = Rc<dyn Fn(&mut ItemUse) -> bool>;
+type PacketFn = Rc<dyn Fn(&Packet, &[u8])>;
 
 enum Callback {
     Command(CommandFn),
     Event(EventFn),
+    BlockUse(BlockUseFn),
+    BlockUpdate(Rc<dyn Fn(&mut BlockEvent)>),
+    ItemUse(ItemUseFn),
+    Packet(PacketFn),
     Question(Rc<dyn Fn(&Ask) -> Verdict>),
     Modify(Rc<dyn Fn(&mut Modify)>),
     Tick(Rc<dyn Fn(&World)>),
@@ -184,6 +224,51 @@ pub fn __world_tick(id: u32) {
         _ => None,
     }) {
         f(&World { _p: PhantomData });
+    }
+}
+
+#[doc(hidden)]
+pub fn __block_use(id: u32, u: __BlockUse) -> bool {
+    let Some(f) = callback(id, |c| match c {
+        Callback::BlockUse(f) => Some(f.clone()),
+        _ => None,
+    }) else {
+        return false;
+    };
+    f(&mut Use { player: u.player, pos: p3(u.pos), state: u.state, face: u.face })
+}
+
+#[doc(hidden)]
+pub fn __block_update(id: u32, u: __BlockUpdate) {
+    if let Some(f) = callback(id, |c| match c {
+        Callback::BlockUpdate(f) => Some(f.clone()),
+        _ => None,
+    }) {
+        f(&mut BlockEvent { pos: p3(u.pos), state: u.state, other: p3(u.other), entity: u.entity });
+    }
+}
+
+#[doc(hidden)]
+pub fn __item_use(id: u32, u: __ItemUse) -> __ItemUseResult {
+    let Some(f) = callback(id, |c| match c {
+        Callback::ItemUse(f) => Some(f.clone()),
+        _ => None,
+    }) else {
+        return __ItemUseResult { handled: false, stack: None };
+    };
+    let stack: ItemStack = u.stack.into();
+    let mut used = ItemUse { player: u.player, stack, slot: u.slot, target: u.target.map(|(p, face)| (p3(p), face)), changed: false };
+    let handled = f(&mut used);
+    __ItemUseResult { handled, stack: used.changed.then(|| used.stack.into()) }
+}
+
+#[doc(hidden)]
+pub fn __packet(id: u32, player: u64, data: Vec<u8>) {
+    if let Some(f) = callback(id, |c| match c {
+        Callback::Packet(f) => Some(f.clone()),
+        _ => None,
+    }) {
+        f(&Packet { player }, &data);
     }
 }
 
@@ -463,20 +548,6 @@ pub mod chain {
     pub static ATTACK_DAMAGE: Chain = Chain(C::AttackDamage);
 }
 
-pub mod stage {
-    pub const ADD: u32 = 100;
-    pub const MULTIPLY: u32 = 200;
-    pub const FINAL: u32 = 300;
-}
-
-pub mod permission {
-    pub const EVERYONE: u32 = 0;
-    pub const MODERATOR: u32 = 1;
-    pub const GAME_MASTER: u32 = 2;
-    pub const ADMIN: u32 = 3;
-    pub const HOST: u32 = 4;
-}
-
 /// A named thing of the game's content, looked up in the world the mod runs in. Each world has
 /// its own ids, but a mod runs anew in each world, so a looked-up id is kept.
 struct Lookup {
@@ -627,6 +698,280 @@ impl Registry {
     pub fn world_tick(&mut self, f: impl Fn(&World) + 'static) {
         let id = registry::world_tick();
         push(id, Callback::Tick(Rc::new(f)));
+    }
+
+    /// A per-entity value of this mod's (Weft's `entity_component`, 1.1): at most 256 bytes,
+    /// `flags` from [`component_flags`]. Entities get it through [`Registry::attach`].
+    pub fn entity_component<T: Value>(&mut self, c: &Component<T>, default: T, flags: u32) {
+        let mut f = registry::ComponentFlags::empty();
+        for (bit, flag) in [
+            (component_flags::SAVE, registry::ComponentFlags::SAVE),
+            (component_flags::SYNC_OWNER, registry::ComponentFlags::SYNC_OWNER),
+            (component_flags::SYNC_WATCHERS, registry::ComponentFlags::SYNC_WATCHERS),
+            (component_flags::KEEP, registry::ComponentFlags::KEEP),
+        ] {
+            if flags & bit != 0 {
+                f = f | flag;
+            }
+        }
+        if let Err(e) = registry::component(c.name, std::mem::size_of::<T>() as u32, f, &value_bytes(&default)) {
+            self.errors.push(e);
+        }
+    }
+
+    /// Every entity of `kind` carries component `c` (Weft's `attach`, 1.1).
+    pub fn attach<T: Value>(&mut self, kind: &Entity, c: &Component<T>) {
+        if let Err(e) = registry::attach(kind.name(), c.name) {
+            self.errors.push(e);
+        }
+    }
+
+    /// Callbacks on one of the package's own blocks (Weft's block builder, its callbacks only,
+    /// 1.2): `r.block(&LAMP).on_use(|u| ..)`. The block itself comes from `defs/blocks`.
+    pub fn block<'a>(&'a mut self, block: &Block) -> BlockCallbacks<'a> {
+        BlockCallbacks { reg: self, name: block.name().to_string() }
+    }
+
+    /// Callbacks on one of the package's own items (1.2): `r.item(&WAND).on_use(|u| ..)`.
+    pub fn item<'a>(&'a mut self, item: &Item) -> ItemCallbacks<'a> {
+        ItemCallbacks { reg: self, name: item.name().to_string() }
+    }
+
+    /// What players' games send on `channel` (Weft's `packet`, 1.2). Its native counterpart on a
+    /// client is a `Channel<Vec<u8>>` of the same full name: the bytes are `T`'s encoding.
+    pub fn packet<T: Payload>(&mut self, channel: &Channel<T>, f: impl Fn(&Packet, T) + 'static) {
+        match registry::channel(channel.local()) {
+            Ok(id) => push(
+                id,
+                Callback::Packet(Rc::new(move |p: &Packet, data: &[u8]| {
+                    if let Some(v) = T::decode(data) {
+                        f(p, v)
+                    }
+                })),
+            ),
+            Err(e) => self.errors.push(e),
+        }
+    }
+}
+
+/// Callbacks being put on a block (1.2).
+pub struct BlockCallbacks<'a> {
+    reg: &'a mut Registry,
+    name: String,
+}
+
+impl BlockCallbacks<'_> {
+    /// A player used (right-clicked) it: true if that did something.
+    pub fn on_use(self, f: impl Fn(&mut Use) -> bool + 'static) -> Self {
+        match registry::on_block_use(&self.name) {
+            Ok(id) => push(id, Callback::BlockUse(Rc::new(f))),
+            Err(e) => self.reg.errors.push(e),
+        }
+        self
+    }
+    /// A neighbour changed (`e.other()`).
+    pub fn on_neighbor(self, f: impl Fn(&mut BlockEvent) + 'static) -> Self {
+        match registry::on_block_neighbor(&self.name) {
+            Ok(id) => push(id, Callback::BlockUpdate(Rc::new(f))),
+            Err(e) => self.reg.errors.push(e),
+        }
+        self
+    }
+    /// A tick scheduled with `w.schedule` came.
+    pub fn on_scheduled(self, f: impl Fn(&mut BlockEvent) + 'static) -> Self {
+        match registry::on_block_scheduled(&self.name) {
+            Ok(id) => push(id, Callback::BlockUpdate(Rc::new(f))),
+            Err(e) => self.reg.errors.push(e),
+        }
+        self
+    }
+}
+
+/// Callbacks being put on an item (1.2).
+pub struct ItemCallbacks<'a> {
+    reg: &'a mut Registry,
+    name: String,
+}
+
+impl ItemCallbacks<'_> {
+    /// A player used it: true if that did something. `u.set_stack(..)` changes what is left in
+    /// the hand.
+    pub fn on_use(self, f: impl Fn(&mut ItemUse) -> bool + 'static) -> Self {
+        match registry::on_item_use(&self.name) {
+            Ok(id) => push(id, Callback::ItemUse(Rc::new(f))),
+            Err(e) => self.reg.errors.push(e),
+        }
+        self
+    }
+}
+
+/// A player using a block (Weft's `Use`, 1.2).
+pub struct Use {
+    player: u64,
+    pos: [i32; 3],
+    state: u32,
+    face: u32,
+}
+
+impl Use {
+    pub fn world(&self) -> World {
+        World { _p: PhantomData }
+    }
+    pub fn player(&self) -> u64 {
+        self.player
+    }
+    pub fn pos(&self) -> [i32; 3] {
+        self.pos
+    }
+    pub fn state(&self) -> u32 {
+        self.state
+    }
+    pub fn face(&self) -> u32 {
+        self.face
+    }
+}
+
+/// A block told something happened (Weft's `BlockEvent`, 1.2).
+pub struct BlockEvent {
+    pos: [i32; 3],
+    state: u32,
+    other: [i32; 3],
+    entity: u64,
+}
+
+impl BlockEvent {
+    pub fn world(&self) -> World {
+        World { _p: PhantomData }
+    }
+    pub fn pos(&self) -> [i32; 3] {
+        self.pos
+    }
+    pub fn state(&self) -> u32 {
+        self.state
+    }
+    /// The neighbour that changed (its own position for a scheduled tick).
+    pub fn other(&self) -> [i32; 3] {
+        self.other
+    }
+    /// Its block entity, 0 if none.
+    pub fn entity(&self) -> u64 {
+        self.entity
+    }
+}
+
+/// A player using an item (Weft's `ItemUse`, 1.2).
+pub struct ItemUse {
+    player: u64,
+    stack: ItemStack,
+    slot: u32,
+    target: Option<([i32; 3], u32)>,
+    changed: bool,
+}
+
+impl ItemUse {
+    pub fn world(&self) -> World {
+        World { _p: PhantomData }
+    }
+    pub fn player(&self) -> u64 {
+        self.player
+    }
+    /// The block it was used on and the face, if any.
+    pub fn target(&self) -> Option<([i32; 3], u32)> {
+        self.target
+    }
+    pub fn stack(&self) -> ItemStack {
+        self.stack
+    }
+    /// Where the stack is in the player's inventory (ours).
+    pub fn slot(&self) -> u32 {
+        self.slot
+    }
+    /// What is left in the hand (its item and count; what the stack carries stays).
+    pub fn set_stack(&mut self, s: ItemStack) {
+        self.stack = s;
+        self.changed = true;
+    }
+}
+
+/// A message on a channel, typed (Weft's `Channel<T>`, 1.2): `Channel::named("boost")` is the
+/// package's `<package>:boost`.
+pub struct Channel<T: Payload> {
+    name: &'static str,
+    _t: PhantomData<fn() -> T>,
+}
+
+impl<T: Payload> Channel<T> {
+    pub const fn named(name: &'static str) -> Self {
+        Channel { name, _t: PhantomData }
+    }
+    pub fn name(&self) -> &str {
+        self.name
+    }
+    /// The name within the package.
+    fn local(&self) -> &str {
+        self.name.rsplit(':').next().unwrap_or(self.name)
+    }
+}
+
+/// What a channel carries (Weft's `Payload`): `String`, `Vec<u8>`, `()`, or any [`Value`].
+pub trait Payload: Sized + 'static {
+    fn encode(&self) -> Vec<u8>;
+    fn decode(bytes: &[u8]) -> Option<Self>;
+}
+
+impl<T: Value> Payload for T {
+    fn encode(&self) -> Vec<u8> {
+        value_bytes(self)
+    }
+    fn decode(bytes: &[u8]) -> Option<T> {
+        (bytes.len() == std::mem::size_of::<T>())
+            .then(|| value_from(bytes))
+            .flatten()
+    }
+}
+
+impl Payload for String {
+    fn encode(&self) -> Vec<u8> {
+        self.as_bytes().to_vec()
+    }
+    fn decode(bytes: &[u8]) -> Option<String> {
+        String::from_utf8(bytes.to_vec()).ok()
+    }
+}
+
+impl Payload for Vec<u8> {
+    fn encode(&self) -> Vec<u8> {
+        self.clone()
+    }
+    fn decode(bytes: &[u8]) -> Option<Vec<u8>> {
+        Some(bytes.to_vec())
+    }
+}
+
+impl Payload for () {
+    fn encode(&self) -> Vec<u8> {
+        Vec::new()
+    }
+    fn decode(_: &[u8]) -> Option<()> {
+        Some(())
+    }
+}
+
+/// A packet from a player's game (Weft's `Packet`, 1.2).
+pub struct Packet {
+    player: u64,
+}
+
+impl Packet {
+    pub fn world(&self) -> World {
+        World { _p: PhantomData }
+    }
+    pub fn player(&self) -> u64 {
+        self.player
+    }
+    /// Answers the sender on `channel`.
+    pub fn reply<R: Payload>(&self, channel: &Channel<R>, value: &R) {
+        self.world().send(self.player, channel, value);
     }
 }
 
@@ -923,6 +1268,46 @@ impl World {
     pub fn player_key(&self, player: u64) -> String {
         wworld::player_key(player)
     }
+    /// Many blocks at once (1.1): how many changed.
+    pub fn set_blocks(&self, changes: &[([i32; 3], u32)]) -> u32 {
+        let list: Vec<((i32, i32, i32), u32)> = changes
+            .iter()
+            .map(|(p, s)| ((p[0], p[1], p[2]), *s))
+            .collect();
+        wworld::set_blocks(&list)
+    }
+    /// An entity's value of one of this mod's components (Weft's `component`, by value; 1.1).
+    pub fn component<T: Value>(&self, id: u64, c: &Component<T>) -> Option<T> {
+        wworld::get_component(id, c.name).and_then(|b| value_from(&b))
+    }
+    /// Sets it (1.1); false if the entity doesn't carry it.
+    pub fn set_component<T: Value>(&self, id: u64, c: &Component<T>, value: T) -> bool {
+        wworld::set_component(id, c.name, &value_bytes(&value))
+    }
+    /// Changes it in place, the way Weft's `component_mut` is used (1.1); false if the entity
+    /// doesn't carry it.
+    pub fn update_component<T: Value>(&self, id: u64, c: &Component<T>, f: impl FnOnce(&mut T)) -> bool {
+        let Some(mut v) = self.component(id, c) else { return false };
+        f(&mut v);
+        self.set_component(id, c, v)
+    }
+    /// A sound at `pos` (Weft's `play_sound`, 1.1).
+    pub fn play_sound(&self, sound: &Sound, pos: [f64; 3], volume: f32) {
+        wworld::play_sound(sound.0, (pos[0], pos[1], pos[2]), volume);
+    }
+    /// Particles at `pos` (Weft's `spawn_particles`, 1.1): `.count(n)`, sent when dropped.
+    pub fn spawn_particles(&self, kind: &Particle, pos: [f64; 3]) -> Burst {
+        Burst { kind: kind.0, pos, count: 1 }
+    }
+    /// A tick for the block at `pos` in `ticks`, which its `on_scheduled` gets (Weft's
+    /// `schedule`, 1.2).
+    pub fn schedule(&self, pos: [i32; 3], ticks: u32) {
+        wworld::schedule((pos[0], pos[1], pos[2]), ticks);
+    }
+    /// `value` to `player`'s game on `channel` (Weft's `send`, 1.2).
+    pub fn send<T: Payload>(&self, player: u64, channel: &Channel<T>, value: &T) {
+        wworld::send(player, channel.local(), &value.encode());
+    }
     /// The value of property `name` of the block at `pos`.
     pub fn prop(&self, pos: [i32; 3], name: &str) -> Option<String> {
         state_prop(self.get(pos), name)
@@ -936,6 +1321,106 @@ impl World {
             }
             None => false,
         }
+    }
+}
+
+// ------------------------------------------------------------------ components, sounds, particles (1.1)
+
+/// Plain data a component holds (Weft's `Value`): `repr(C)`, `Copy`, no pointers. Primitives and
+/// arrays of them are; structs with [`value!`].
+///
+/// # Safety
+/// Every byte pattern of its size must be a valid value (no `bool`, `char` or enums inside), and
+/// it has no padding the game might keep.
+pub unsafe trait Value: Copy + 'static {}
+
+macro_rules! primitive {
+    ($($t:ty),*) => { $(unsafe impl Value for $t {})* };
+}
+primitive!(u8, i8, u16, i16, u32, i32, u64, i64, f32, f64);
+unsafe impl<T: Value, const N: usize> Value for [T; N] {}
+
+/// A component's struct, as Weft's `value!` writes it: `repr(C)`, `Copy`.
+///
+/// ```ignore
+/// value! {
+///     #[derive(Default)]
+///     pub struct Tribe { pub id: [u8; 16], pub name: [u8; 24] }
+/// }
+/// ```
+#[macro_export]
+macro_rules! value {
+    ($(#[$m:meta])* $vis:vis struct $name:ident { $($(#[$fm:meta])* $fvis:vis $field:ident : $ty:ty),* $(,)? }) => {
+        $(#[$m])*
+        #[repr(C)]
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        $vis struct $name { $($(#[$fm])* $fvis $field: $ty),* }
+        unsafe impl $crate::Value for $name {}
+    };
+}
+
+fn value_bytes<T: Value>(v: &T) -> Vec<u8> {
+    // SAFETY: `Value` is plain data without padding.
+    unsafe { std::slice::from_raw_parts(v as *const T as *const u8, std::mem::size_of::<T>()) }.to_vec()
+}
+
+fn value_from<T: Value>(b: &[u8]) -> Option<T> {
+    // SAFETY: any bytes of the size are a valid `Value`.
+    (b.len() >= std::mem::size_of::<T>()).then(|| unsafe { std::ptr::read_unaligned(b.as_ptr() as *const T) })
+}
+
+/// A per-entity value of this mod's, by its own name (Weft's `Component`); `size_of::<T>()` at
+/// most 256 bytes.
+pub struct Component<T: Value> {
+    name: &'static str,
+    _t: PhantomData<fn() -> T>,
+}
+
+impl<T: Value> Component<T> {
+    pub const fn named(name: &'static str) -> Self {
+        Component { name, _t: PhantomData }
+    }
+    pub fn name(&self) -> &str {
+        self.name
+    }
+}
+
+/// A sound, by full name (`Sound::named("base:block.stone.break")`).
+pub struct Sound(&'static str);
+
+impl Sound {
+    pub const fn named(name: &'static str) -> Sound {
+        Sound(name)
+    }
+}
+
+/// A particle kind, by full name.
+pub struct Particle(&'static str);
+
+impl Particle {
+    pub const fn named(name: &'static str) -> Particle {
+        Particle(name)
+    }
+}
+
+/// Particles being made (Weft's `Burst`): sent when dropped.
+pub struct Burst {
+    kind: &'static str,
+    pos: [f64; 3],
+    count: u32,
+}
+
+impl Burst {
+    /// How many (1 to 256).
+    pub fn count(mut self, n: u32) -> Self {
+        self.count = n;
+        self
+    }
+}
+
+impl Drop for Burst {
+    fn drop(&mut self) {
+        wworld::spawn_particles(self.kind, (self.pos[0], self.pos[1], self.pos[2]), self.count);
     }
 }
 

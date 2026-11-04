@@ -3,3 +3,8 @@
 [profile.ci]
 slow-timeout = { period = "60s", terminate-after = 5 }
 fail-fast = false
+
+# The sandbox's first test builds its test mod for wasm32 first, from nothing on a cold cache.
+[[profile.ci.overrides]]
+filter = "package(chiacraft-sandbox)"
+slow-timeout = { period = "60s", terminate-after = 15 }

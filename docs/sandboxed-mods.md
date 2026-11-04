@@ -73,9 +73,10 @@ clans/
 Start a game with `--packages examples/packages` and a new world plays with it; players who join
 download it.
 
-## What a mod can do (API 1.0)
+## What a mod can do (API 1.2)
 
-The contract is `crates/sandbox/wit/v1.0/mod.wit`. The SDK gives it Weft's names:
+The contract is `crates/sandbox/wit/v1.2/mod.wit` (1.0 and the calls 1.1 and 1.2 added). The
+SDK gives it Weft's names:
 
 | Weft's SDK | Sandboxed SDK |
 |---|---|
@@ -87,8 +88,13 @@ The contract is `crates/sandbox/wit/v1.0/mod.wit`. The SDK gives it Weft's names
 | `w.get`, `set`, `time`, `seed`, `random`, `random_below`, `dimension`, `light`, `biome`, `players`, `entity`, `near`, `push`, `damage`, `spawn`, `remove`, `creative`, `inventory(..).insert`, `spawn_item`, `prop`, `set_prop` | the same |
 | `Block::named`, `Item::named`, `Entity::named`, `.id()`, `.is(state)`, `block_name`, `item_name`, `state_prop`, `state_with` | the same; ids are looked up in the world the mod runs in |
 | `info!`, `warn!`, ... | the same, in the game's log under the package's name |
-| components (`w.component(..)`) | not yet: keep per-player data in `storage`, by `w.player_key(player)` |
-| content builders, screens, HUD, keys, channels, client hooks | not yet: content comes from the package's definitions; client halves come later |
+| `value!`, `Component::named`, `r.entity_component(&C, default, flags)`, `r.attach(&KIND, &C)`, `w.component(id, &C)` | the same (1.1), but by value: `w.component` gives a copy, `w.set_component(id, &C, v)` and `w.update_component(id, &C, \|v\| ..)` write it; at most 256 bytes, the mod's own components only |
+| `w.play_sound(&S, pos, volume)`, `w.spawn_particles(&P, pos).count(n)` | the same (1.1); sounds and particles by full name (`base:ui.advancement`, `core:poof`) |
+| many `w.set` | `w.set_blocks(&[(pos, state)])` (1.1), one call |
+| `r.block(&B).on_use(\|u\| ..).on_neighbor(..).on_scheduled(..)`, `w.schedule(pos, ticks)` | the same (1.2), on the package's own blocks only (from its `defs/blocks`): the callbacks of Weft's block builder without the rest, which is in the definitions. A use on the block goes before the held item's, and a block just placed gets a neighbour update for itself |
+| `r.item(&I).on_use(\|u\| ..)`, `u.set_stack(..)` | the same (1.2), on the package's own items (`defs/items`); `u.slot()` is where the stack is |
+| `static C: Channel<T>`, `r.packet(&C, \|p, v\| ..)`, `w.send(player, &C, &v)`, `p.reply(..)` | the same (1.2), the package's own channels, at most 16 KiB a packet and 64 packets a tick handed to the mod; on the wire it is a `Channel<Vec<u8>>`, so a native client mod talks to it with one of those |
+| content builders, screens, HUD, keys, client hooks | not yet: content comes from the package's definitions; client halves come later |
 
 Ours, beyond Weft's: `w.tell(player, key, args)` (a line in a player's chat, in their language),
 `w.player_key(player)` (who they are, the same in every world), `w.teleport(id, pos)`, and
@@ -105,9 +111,9 @@ from the package's `assets/lang` files, like Weft's command replies.
 | Wall time per call | 500 ms (a backstop; fuel ends calls long before) |
 | Memory | 64 MiB |
 | Component size | 16 MiB (`code/server.wasm`) |
-| Per call | 64 log lines, 32 tells, 32 replies, 4096 block changes, 64 spawns; `near` within 64 blocks, 256 entities |
-| Storage | 1024 keys, 4 MiB in all, keys of `a-z 0-9 _ - .` |
-| Registrations | 256; commands of `a-z 0-9 _`, not the engine's (`/op`, `/give`, `/tp`, ...); a name another mod or package already has is left out (a warning in the log) and the world still opens |
+| Per call | 64 log lines, 32 tells, 32 replies, 4096 block changes (`set_blocks` included), 64 spawns, 64 sounds, 64 particle bursts of at most 256, 256 scheduled ticks (up to an hour ahead), 32 sends of 16 KiB; `near` within 64 blocks, 256 entities |
+| Storage | 1024 keys, 4 MiB in all, 1 MiB written per call, keys of `a-z 0-9 _ - .` |
+| Registrations | 256 hooks, 64 components, 256 attaches; commands of `a-z 0-9 _`, not the engine's (`/op`, `/give`, `/tp`, ...); a name another mod or package already has is left out (a warning in the log) and the world still opens |
 
 A call that runs out of fuel, traps (a panic is a trap) or grows its memory past the cap is a
 **strike**: the mod's memory is dropped and it starts over with `init` (its storage stays). Three
@@ -132,6 +138,16 @@ Floats are deterministic (NaNs canonicalized, no relaxed SIMD) and there are no 
 
 ## Versions
 
-API versions are frozen once released: `crates/sandbox/wit/v1.0/` never changes, and a
-component built against 1.0 keeps loading in every later game. A new version is a new folder
-beside it.
+API versions are frozen once released. `crates/sandbox/wit/v1.0/` and `v1.1/` never change
+after that. A 1.x version only adds calls, so the game binds the newest it has, and a component
+built for an older 1.x links unchanged (wasmtime matches 1.x imports and exports by semver). A
+component is refused when it loads, with the reason in the log, if it imports anything but this
+API (WASI, say) or a newer 1.x than the game runs. The host's offer names the API each package's
+code needs, so a game too old for it refuses on joining, before downloading anything; the join
+sheet shows the version ("runs sandboxed code (mod API 1.1)"). A change that removes or alters a call would
+be 2.0, which nothing plans.
+
+The SDK builds for the newest version (1.2): a mod built with it needs a game that runs 1.2.
+`examples/packages/clans` is built for 1.0, `tally` for 1.1, `bell` for 1.2. The callbacks 1.2
+added are a second export of the component, `content-hooks`, which the game looks for at run
+time, so a component built for 1.0 or 1.1, which lacks it, still runs.

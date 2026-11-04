@@ -305,15 +305,8 @@ fn wild_table(w: &mut String) {
             .map(|b| b.split(':').nth(1).unwrap_or(b))
             .collect::<Vec<_>>()
             .join(", ");
-        let _ = writeln!(
-            w,
-            "| {} | {:?} | {:?} | {} | {:.1}% | {found} |",
-            p.block,
-            p.form,
-            p.ground,
-            p.gives.unwrap_or("-"),
-            p.cover * 100.0
-        );
+        let _ =
+            writeln!(w, "| {} | {:?} | {:?} | {} | {:.1}% | {found} |", p.block, p.form, p.ground, p.gives.unwrap_or("-"), p.cover * 100.0);
     }
     let _ = writeln!(w);
 }

@@ -127,6 +127,68 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
     return c;
 }
 
+// ---- the sun's shadows (the engine's shadow map, `pack.cfg` sun_shadows) ----
+
+// How much of the sun reaches `rel` (camera relative) on a surface facing `n`, from the shadow
+// map: x 1 lit to 0 in shadow (a 3x3 of texels softens the edge), y how far to trust it, 1 well
+// inside the map and fading to 0 at its edge and where it holds nothing this frame (the caller
+// then guesses as it would without one).
+fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
+    if scene.shadow.z < 0.5 {
+        return vec2(1.0, 0.0);
+    }
+    let texel = scene.shadow.w;
+    // Off the surface along its normal so it does not shade itself, twice as far where the light
+    // grazes it (Complementary's and Photon's normal offset), and a hair along the light.
+    let ndl = clamp(dot(n, light_dir()), 0.0, 1.0);
+    let c = scene.shadow_view_proj * vec4(rel + n * texel * 1.2 * (2.0 - ndl), 1.0);
+    let ndc = c.xyz / c.w;
+    // The nearer of the box's edge and its round reach (80 blocks), so the corners fade too.
+    let reach = max(max(abs(ndc.x), abs(ndc.y)), length(rel.xz) / 80.0);
+    if reach > 0.97 || ndc.z <= 0.0 || ndc.z >= 1.0 {
+        return vec2(1.0, 0.0);
+    }
+    let size = i32(scene.shadow.y);
+    let at = vec2<i32>((ndc.xy * 0.5 + 0.5) * f32(size));
+    let index = u32(scene.shadow.x);
+    // A few hundredths of a block along the light, more on surfaces the light grazes, in the map's
+    // depth (it spans 400 blocks): no floating shadows at the foot of things.
+    let slope = min(sqrt(max(1.0 - ndl * ndl, 0.0)) / max(ndl, 0.05), 4.0);
+    let bias = (0.03 + texel * 0.5 * slope) / 400.0;
+    // A 4x4 of the map about the point; each of the 3x3 taps takes the nearest to the light of its
+    // texel and the ones right and below. That closes the one-texel cracks between neighbouring
+    // meshes, through which sunlight would draw thin dotted lines across a shadow.
+    var map: array<f32, 16>;
+    for (var j = 0; j < 4; j++) {
+        for (var i = 0; i < 4; i++) {
+            let t = clamp(at + vec2(i - 1, j - 1), vec2(0), vec2(size - 1));
+            map[j * 4 + i] = textureLoad(textures[index], t, 0).r;
+        }
+    }
+    var lit = 0.0;
+    for (var j = 0; j < 3; j++) {
+        for (var i = 0; i < 3; i++) {
+            let k = j * 4 + i;
+            // Reverse depth: what the light meets first is the larger.
+            let nearest = max(max(map[k], map[k + 1]), max(map[k + 4], map[k + 5]));
+            lit += select(0.0, 1.0, nearest <= ndc.z + bias);
+        }
+    }
+    lit /= 9.0;
+    // Near its edge it hands over to the caller's guess, and so it does as the light nears the
+    // horizon (long smeared shadows, then the swap from the sun to the moon).
+    let low = smoothstep(0.02, 0.06, light_dir().y);
+    return vec2(lit, (1.0 - smoothstep(0.85, 0.97, reach)) * low);
+}
+
+// The sun on a mob or a model at `rel` facing `n` with sky light `sky`: the shadow map where it
+// reaches (they stand in the shadows of trees and houses), the sky light alone elsewhere.
+fn sun_on_body(rel: vec3<f32>, n: vec3<f32>, sky: f32) -> f32 {
+    let guess = smoothstep(0.8, 1.0, sky);
+    let mapped = shadow_at(rel, n);
+    return mix(guess, min(mapped.x, smoothstep(0.3, 0.8, sky)), mapped.y);
+}
+
 // ---- light on things ----
 
 // Block light (red, green and blue levels 0..1) as color: warm firelight, whiter right at the

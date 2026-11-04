@@ -1951,7 +1951,10 @@ pub async fn dedicated_server(t: T) -> R {
 pub async fn clothes_and_stew(t: T) -> R {
     t.flat().await?;
     t.op("mode survival").await?;
-    for (i, piece) in ["fur_hat", "fur_coat", "fur_trousers", "fur_boots"].iter().enumerate() {
+    for (i, piece) in ["fur_hat", "fur_coat", "fur_trousers", "fur_boots"]
+        .iter()
+        .enumerate()
+    {
         t.op(&format!("put me {} {piece}", 40 + i)).await?;
     }
     let fur = vitals::clothing::find("fur").map_or(0.0, |m| m.cold());

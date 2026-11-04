@@ -1,0 +1,26 @@
+{
+ "kind": "item",
+ "what": "a small heap of gunpowder: a soft cone of near-black charcoal-grey grains with clearly lighter grey and a few sulphur-yellow specks, a light top-left side and a dark lower-right side, strong contrast, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.462,
+   "outline": 1.29,
+   "red_line": 0.0,
+   "fill": 0.25,
+   "passed": false
+  },
+  {
+   "grid": 0.552,
+   "outline": 0.88,
+   "red_line": 0.0,
+   "fill": 0.29,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a spyglass lying diagonally from the bottom left (eyepiece) to the top right (lens): a copper-and-leather tube in three segments that get wider toward the lens, a pale blue glint on the lens",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.586,
+   "outline": 0.57,
+   "red_line": 0.02,
+   "fill": 0.25,
+   "passed": true
+  }
+ ]
+}

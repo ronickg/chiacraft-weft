@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a drying rack: a small wooden A-frame rack with crossbars, three strips of meat hanging from it, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.273,
+   "outline": 0.58,
+   "red_line": 0.06,
+   "fill": 0.39,
+   "passed": true
+  }
+ ]
+}

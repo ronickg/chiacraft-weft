@@ -95,17 +95,24 @@ pub(crate) fn mass(w: &World, id: u64) -> Option<f32> {
     let e = w.entity(id)?;
     let size = w.component(id, &ANIMAL).and_then(|a| {
         let index = (a.species as usize).checked_sub(1)?;
-        let g = w.component(id, &crate::coats::GENOME)?;
-        Some(crate::coats::size(g) * crate::breeding::growth(w, id, index))
+        Some(crate::coats::size_of(w, id)? * crate::breeding::growth(w, id, index))
     });
     kind_mass(e.kind, size)
 }
 
-/// The family of `id`, if it's one of the species.
+/// The family of `id`, if it's one of the species: by its animal record, or by its kind before it
+/// has one (one spawned this tick, which a packmate otherwise took for prey).
 fn family(w: &World, id: u64) -> Option<&'static str> {
     w.component(id, &ANIMAL)
         .and_then(|a| a.species())
         .map(|s| s.family.name)
+        .or_else(|| {
+            let kind = w.entity(id)?.kind;
+            SPECIES
+                .iter()
+                .find(|s| s.kind.id() == kind)
+                .map(|s| s.family.name)
+        })
 }
 
 /// A goal for wild hunters: hungry, it goes after the nearest prey it can take; it takes the turn
@@ -155,18 +162,23 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
         return false;
     }
     let own = mass(w, id).unwrap_or(s.bio.mass);
+    // A pack's kind with others of it near hunts together: bigger prey (`Species::takes_with`).
+    let pack = if s.pack_prey().is_some() { pack_near(w, id, st) } else { 1 };
     let prey = w
         .near_bodies(st.pos, LOOK * base_api::sight(w, st.pos) as f64)
         .into_iter()
         .filter(|&t| t != id && family(w, t) != Some(s.family.name))
         .filter_map(|t| Some((t, w.entity(t)?, mass(w, t)?)))
-        .filter(|(_, e, kg)| e.health > 0.0 && s.takes(own, *kg))
+        .filter(|(_, e, kg)| e.health > 0.0 && s.takes_with(own, *kg, pack))
         .min_by(|a, b| dist2(a.1.pos, st.pos).total_cmp(&dist2(b.1.pos, st.pos)));
     let Some((t, _, kg)) = prey else {
         w.component_mut(id, &HUNT).map(|c| *c = h);
         return false;
     };
-    weft_sdk::info!("{} {id} hunts {} ({kg:.1} kg)", s.name, t);
+    weft_sdk::info!("{} {id} hunts {} ({kg:.1} kg, a pack of {pack})", s.name, t);
+    if pack >= species::PACK && !s.takes(own, kg) {
+        rally(w, id, st, t, now);
+    }
     h = [t, now, now + LOOK_EVERY];
     w.component_mut(id, &HUNT).map(|c| *c = h);
     if knockout {
@@ -175,6 +187,34 @@ pub fn hunt(w: &World, id: u64, st: &EntityState) -> bool {
     }
     crate::commands::fight(w, id, st, t);
     true
+}
+
+/// Blocks within which a pack's kind hunt together.
+const PACK_RANGE: f64 = 16.0;
+
+/// How many wild ones of `id`'s kind are near it, itself among them.
+fn pack_near(w: &World, id: u64, st: &EntityState) -> u32 {
+    let kind = w.entity(id).map(|e| e.kind);
+    w.near(st.pos, PACK_RANGE, None)
+        .into_iter()
+        .filter(|&o| o == id || (w.entity(o).map(|e| e.kind) == kind && !animal::tamed(w, o)))
+        .count() as u32
+}
+
+/// Big prey only a pack takes: the others of the pack near that aren't hunting already go after it
+/// too, so it isn't one wolf against a red deer.
+fn rally(w: &World, id: u64, st: &EntityState, target: u64, now: u64) {
+    let kind = w.entity(id).map(|e| e.kind);
+    for o in w.near(st.pos, PACK_RANGE, None) {
+        if o == id || w.entity(o).map(|e| e.kind) != kind || animal::tamed(w, o) {
+            continue;
+        }
+        if let Some(c) = w.component_mut(o, &HUNT)
+            && c[0] == 0
+        {
+            *c = [target, now, now + LOOK_EVERY];
+        }
+    }
 }
 
 /// A goal for wild animals: a hunter near that could take it, and it runs the other way.
@@ -198,7 +238,7 @@ pub fn wary(w: &World, id: u64, st: &EntityState) -> bool {
         .filter_map(|t| {
             let s = w.component(t, &ANIMAL)?.species()?;
             let e = w.entity(t)?;
-            s.takes(mass(w, t)?, me).then_some(e)
+            s.takes_at_most(mass(w, t)?, me).then_some(e) // a pack's kind with its pack's reach
         })
         .min_by(|a, b| dist2(a.pos, st.pos).total_cmp(&dist2(b.pos, st.pos)));
     let Some(h) = hunter else { return false };

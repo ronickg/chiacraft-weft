@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a small heap of seeds: small oval pale tan wheat grains on a tiny patch of dark soil, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.527,
+   "outline": 0.69,
+   "red_line": 0.0,
+   "fill": 0.24,
+   "passed": true
+  }
+ ]
+}

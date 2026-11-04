@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a fried egg seen from above: a white with a frilled golden-brown edge and a round yellow yolk with a glint, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.199,
+   "outline": 0.63,
+   "red_line": 0.0,
+   "fill": 0.48,
+   "passed": true
+  }
+ ]
+}

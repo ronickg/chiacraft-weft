@@ -42,8 +42,13 @@ pub fn host(
                 .map(|v| (me, v))
         })
         .unwrap_or_default();
-    let hw = p2p::HostWorld { identity, name: name.to_string(), shared: server.shared.clone(), inbox };
+    let hw = p2p::HostWorld { identity, name: name.to_string(), shared: server.shared.clone(), inbox, dir: server.dir.clone() };
     p2p::host(server.connect.clone(), server.content, hw, settings);
+}
+
+/// Fetches the ban lists the world in `dir` follows (chiacraft, `admission`), in the background.
+pub fn fetch_ban_lists(dir: std::path::PathBuf) {
+    p2p::fetch_ban_lists(dir);
 }
 
 pub fn start_join(ticket: &str, settings: &crate::settings::Settings) -> Result<p2p::Joining, String> {
@@ -276,6 +281,9 @@ messages! {
         Animate(Vec<(u64, String, bool)>),
         /// A player's own skin (PNG), for their entity.
         Skin { entity: u64, png: Vec<u8> },
+        /// Not let in, or sent away, with the reason in the player's own language (chiacraft:
+        /// admission rules and bans). The connection ends after it.
+        Refused(crate::ui::text::Msg),
     }
 }
 
@@ -285,7 +293,10 @@ messages! {
         /// `key`: the player's public key, their identity across sessions and addresses.
         /// `account`: the player's account identity vouching for `key` (`chiacraft_account`
         /// `vouch_line`), or empty; the world checks it and learns the identity behind the key.
-        Join { name: String, key: String, account: String },
+        /// `did`: the account's DID proof (`chiacraft_account` `did_proof`: the DID's owner key
+        /// saying it is this identity's), or empty; the world checks on chain that the key
+        /// still holds the DID (chiacraft, phase 4).
+        Join { name: String, key: String, account: String, did: String },
         /// `frame`: the body it rides and its position relative to that body as the client shows it
         /// (the client shows bodies behind the server; only the relative position agrees), or the
         /// mount it sits on and its seat. `keys`: the movement keys held (`abi::held_keys`).
