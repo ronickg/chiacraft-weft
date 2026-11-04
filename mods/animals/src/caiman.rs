@@ -25,5 +25,5 @@ static BODY: Body = Body {
 };
 
 pub fn init(r: &mut Registry) {
-    wild::register(r, &[(&YACARE_CAIMAN, 31), (&SPECTACLED_CAIMAN, 32)], &BODY);
+    wild::register(r, &[&YACARE_CAIMAN, &SPECTACLED_CAIMAN], &BODY);
 }

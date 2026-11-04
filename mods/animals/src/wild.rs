@@ -44,7 +44,7 @@ pub fn init(r: &mut Registry) {
 }
 
 /// Registers `kinds` (each an entity and its row in `species::SPECIES`) on one `body`.
-pub fn register(r: &mut Registry, kinds: &[(&'static Entity, usize)], body: &'static Body) {
+pub fn register(r: &mut Registry, kinds: &[&'static Entity], body: &'static Body) {
     let (look, (w, h)) = body.rest;
     drop(
         r.entity(Entity::generated(look.to_string()))
@@ -54,7 +54,8 @@ pub fn register(r: &mut Registry, kinds: &[(&'static Entity, usize)], body: &'st
             .animations(look)
             .texture(body.texture),
     );
-    for &(kind, index) in kinds {
+    for &kind in kinds {
+        let index = crate::species::of(kind);
         r.entity(kind)
             .size(body.size.0, body.size.1)
             .health(body.health)

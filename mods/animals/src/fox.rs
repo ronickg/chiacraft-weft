@@ -25,5 +25,5 @@ static BODY: Body = Body {
 };
 
 pub fn init(r: &mut Registry) {
-    wild::register(r, &[(&RED_FOX, 15), (&ARCTIC_FOX, 16)], &BODY);
+    wild::register(r, &[&RED_FOX, &ARCTIC_FOX], &BODY);
 }

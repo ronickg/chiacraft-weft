@@ -64,8 +64,8 @@ fn fly_look(wings: &Wings) -> String {
     format!("{}_fly", wings.model)
 }
 
-/// Registers `kinds` (each an entity and its row in `species::SPECIES`) on one body.
-pub fn register(r: &mut Registry, kinds: &[(&'static Entity, usize)], wings: &'static Wings) {
+/// Registers `kinds` (each a species' entity kind) on one body.
+pub fn register(r: &mut Registry, kinds: &[&'static Entity], wings: &'static Wings) {
     // In the air: the wings open and beating.
     let look = fly_look(wings);
     drop(
@@ -76,7 +76,8 @@ pub fn register(r: &mut Registry, kinds: &[(&'static Entity, usize)], wings: &'s
             .animations(&look)
             .texture(wings.texture),
     );
-    for &(kind, index) in kinds {
+    for &kind in kinds {
+        let index = crate::species::of(kind);
         r.entity(kind)
             .size(wings.size.0, wings.size.1)
             .health(wings.health)

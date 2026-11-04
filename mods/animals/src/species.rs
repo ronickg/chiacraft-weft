@@ -86,6 +86,26 @@ impl Species {
     }
 }
 
+/// The row in `SPECIES` of the species whose entity kind is `kind` (each creature's code finds its
+/// own by its kind, never by a number kept by hand: Research round 5, item 7).
+pub fn of(kind: &Entity) -> usize {
+    SPECIES
+        .iter()
+        .position(|s| std::ptr::eq(s.kind, kind))
+        .unwrap_or_else(|| panic!("{} is no species' kind (species.rs SPECIES)", kind.path()))
+}
+
+/// Rows whose entity kind isn't their species' (its name, or a breed's own kind), as when the list
+/// above and `animals_core::species::SPECIES` fall out of order.
+pub fn problems() -> Vec<String> {
+    SPECIES
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.breed.is_none() && !s.kind.path().ends_with(s.name))
+        .map(|(i, s)| format!("animals species.rs row {i}: kind {} with the row of {}", s.kind.path(), s.name))
+        .collect()
+}
+
 /// Whether some species eats `item`: offered to one that doesn't, it is disliked.
 pub fn anyone_eats(item: u32) -> bool {
     SPECIES.iter().any(|s| s.food(item).is_some())

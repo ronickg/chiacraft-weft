@@ -23,5 +23,5 @@ static BODY: Body = Body {
 };
 
 pub fn init(r: &mut Registry) {
-    wild::register(r, &[(&PROTOCERATOPS, 18)], &BODY);
+    wild::register(r, &[&PROTOCERATOPS], &BODY);
 }

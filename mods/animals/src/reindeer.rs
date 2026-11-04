@@ -23,5 +23,5 @@ static BODY: Body = Body {
 };
 
 pub fn init(r: &mut Registry) {
-    wild::register(r, &[(&REINDEER, 21)], &BODY);
+    wild::register(r, &[&REINDEER], &BODY);
 }
