@@ -30,13 +30,13 @@ bench 4 torch_held
 look 90 -15
 wait 1
 shot torch_2b_held_side.png
-key core:perspective
+key f5
 wait 2
 look 0 -15
 wait 1
 shot torch_3_third_person.png
-key core:perspective
-key core:perspective
+key f5
+key f5
 wait 1
 chat /tk put me 0 stick
 chat /tk fill -689 ~ -125 -689 ~ -125 campfire
