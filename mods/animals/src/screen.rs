@@ -447,8 +447,7 @@ fn animal_screen(ui: &mut Ui) {
                     ui.row(S::row().w(14.0).end(), move |ui| {
                         ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
                             if let Some(a) = c.menu_component(&ANIMAL) {
-                                let color = ["", "{#8ac80f}", "{#2f8de4}", "{#9b4fe0}", "{#f0aa28}"][quality(a.wild[i])];
-                                t.text(&format!("{color}{}", a.wild[i]));
+                                t.set(&format!("screen.animals.wild_q{}", quality(a.wild[i])), &[Arg::Int(a.wild[i] as i64)]);
                             }
                         });
                     });
