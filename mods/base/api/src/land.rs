@@ -1127,6 +1127,19 @@ mod tests {
         assert_eq!(snow_line(q12(0.9)), SNOW_LINES[2].1);
     }
 
+    /// Tester 2 found no desert in 114 spots out to 18,000 blocks on seed 1 while the desert's
+    /// threshold sat at 0.35 (past the temperature noise's 95th percentile); the grid over the
+    /// same reach must find a share near the real world's.
+    #[test]
+    fn deserts_across_18_km_of_seed_1() {
+        let shares = biome_shares(1, 18_000, 96);
+        let share = |b: &str| shares.iter().find(|e| e.0 == b).map_or(0.0, |e| e.1);
+        assert!(share("desert") > 0.04 && share("desert") < 0.16, "desert is {:.1}% of the land: {shares:?}", share("desert") * 100.0);
+        for (b, s, _) in &shares {
+            assert!(*s < 0.3, "{b} is {:.1}% of the land", s * 100.0);
+        }
+    }
+
     #[test]
     fn every_biome_turns_up_near_the_middle() {
         for seed in [1, 2, 3] {
