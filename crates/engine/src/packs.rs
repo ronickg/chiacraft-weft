@@ -117,7 +117,11 @@ pub fn pack_options() -> Vec<String> {
         .lines()
         .filter_map(|l| l.split_once('='))
         .filter(|(k, _)| k.trim() == "options")
-        .flat_map(|(_, v)| v.split(',').map(|n| n.trim().to_string()).collect::<Vec<_>>())
+        .flat_map(|(_, v)| {
+            v.split(',')
+                .map(|n| n.trim().to_string())
+                .collect::<Vec<_>>()
+        })
         .filter(|n| !n.is_empty())
         .take(16)
         .collect();

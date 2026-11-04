@@ -2358,16 +2358,20 @@ impl Client {
         // The block it places (`ItemDef::block` is that block's first state, not the block), or else
         // the block of the same name (an item that places itself in more than one form may not
         // name one).
-        let block = item.and_then(|i| i.block).and_then(|st| c.states.get(st as usize)).map(|st| st.block).or_else(|| {
-            let name = item?.name.as_str();
-            // Item and block names may differ in their namespace ("base:torch" and "torch").
-            let short = |n: &str| n.rsplit(':').next().unwrap_or(n).to_string();
-            let want = short(name);
-            c.blocks
-                .iter()
-                .position(|b| b.name == name || short(&b.name) == want)
-                .map(|b| b as u32)
-        });
+        let block = item
+            .and_then(|i| i.block)
+            .and_then(|st| c.states.get(st as usize))
+            .map(|st| st.block)
+            .or_else(|| {
+                let name = item?.name.as_str();
+                // Item and block names may differ in their namespace ("base:torch" and "torch").
+                let short = |n: &str| n.rsplit(':').next().unwrap_or(n).to_string();
+                let want = short(name);
+                c.blocks
+                    .iter()
+                    .position(|b| b.name == name || short(&b.name) == want)
+                    .map(|b| b as u32)
+            });
         let Some(def) = block.and_then(|b| c.blocks.get(b as usize)) else {
             if changed {
                 log::info!("held light: item {} ({}) places no block", stack.item, item.map_or("?", |i| i.name.as_str()));
