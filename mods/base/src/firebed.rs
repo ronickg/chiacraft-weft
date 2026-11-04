@@ -125,6 +125,7 @@ fn drill(u: &mut ItemUse, d: Drill) -> bool {
     let open = (1..=f::ROOF_REACH).all(|k| w.get([pos[0], pos[1] + k, pos[2]]) == 0);
     let wet = open && w.raining_at(pos);
     let u01 = (w.random() >> 40) as f32 / (1u64 << 24) as f32;
+    weft_sdk::info!("firebed: {} at {pos:?}: open {open}, raining {}, roll {u01:.2} of {}", d.item, w.raining_at(pos), d.chance);
     if !wet && u01 < d.chance {
         w.set(pos, crate::cooking::CAMPFIRE.id());
         crate::hints::fire_lit(&w, player);
