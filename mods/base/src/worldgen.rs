@@ -802,7 +802,10 @@ fn tree(s: &mut Site) {
         .unwrap_or(OAK_LOG.id());
     let h = s.random();
     // In a treefall gap no canopy tree stands: one lies fallen, or young growth comes up.
-    if let Some(inside) = TREEFALL.on_biome(s.biome()).and_then(|share| in_gap(s.seed(), x, z, share, GAP_MARGIN)) {
+    if let Some(inside) = TREEFALL
+        .on_biome(s.biome())
+        .and_then(|share| in_gap(s.seed(), x, z, share, GAP_MARGIN))
+    {
         if inside {
             gap_growth(s, log, [x, y, z], h);
         }
