@@ -268,15 +268,8 @@ fn decorate(g: &mut Gen) {
             if col.height < SEA {
                 let shore = shore_biome(g, wx, wz, col.biome);
                 let floor = col.height - oy;
-                if col.height >= SEA - CLAY_DEPTH && (0..16).contains(&floor) {
-                    let share = match name_of(abi::entry_kind::BIOME, shore) {
-                        "base:swamp" => 0.5,
-                        "base:ocean" | "base:beach" => 0.0,
-                        _ => 0.2,
-                    };
-                    if unit(hash(seed ^ 0xC1A, (wx >> 2) as i64, 0, (wz >> 2) as i64)) < share {
-                        g.set(x, floor as usize, z, CLAY.id());
-                    }
+                if col.height >= SEA - CLAY_DEPTH && (0..16).contains(&floor) && clay(seed, wx, wz, shore) {
+                    g.set(x, floor as usize, z, CLAY.id());
                 }
                 if col.height >= SEA - WILD_WATER_DEPTH {
                     for top in [SEA, SEA - 1] {
@@ -320,6 +313,9 @@ fn decorate(g: &mut Gen) {
                 && near.iter().all(|(_, _, c)| c.height >= col.height)
             {
                 g.set(x, y - 1, z, WATER.id());
+                if y >= 2 && clay(seed, wx, wz, b) {
+                    g.set(x, y - 2, z, CLAY.id());
+                }
                 if let Some(s) = wild_at(seed, wx, wz, b, wild::Ground::Water) {
                     g.set(x, y, z, s);
                 }
@@ -379,6 +375,17 @@ fn decorate(g: &mut Gen) {
             }
         }
     }
+}
+
+/// Whether clay lies under still water at this column of `biome`'s: in 4 x 4 patches, half the
+/// swamp's floor, a fifth of other inland water's, none under the sea (sand there).
+fn clay(seed: u64, wx: i32, wz: i32, biome: u32) -> bool {
+    let share = match name_of(abi::entry_kind::BIOME, biome) {
+        "base:swamp" => 0.5,
+        "base:ocean" | "base:beach" => 0.0,
+        _ => 0.2,
+    };
+    unit(hash(seed ^ 0xC1A, (wx >> 2) as i64, 0, (wz >> 2) as i64)) < share
 }
 
 /// Water clay lies under is this deep at most.
