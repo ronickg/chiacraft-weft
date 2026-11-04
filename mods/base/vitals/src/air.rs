@@ -125,6 +125,22 @@ pub const SNOW_MELT_SECS: f32 = 20.0;
 /// sampler near players melts it no faster).
 pub const SNOW_MELT_WARM: f32 = 8.0;
 
+/// Still water freezes (Planner, 11-04: tarns, lakes and ponds get a skin of ice and thaw in the
+/// warmth, by the snow's rule): near players (the snow layers' sampler) the open top of still
+/// water turns to lake ice (`base:lake_ice`) where the air there is under `FREEZE_BELOW` °C, every visit
+/// from `FREEZE_HARD` and colder, fewer nearer freezing; it thaws back to water as snow melts
+/// (`melt_chance`), on a visit or on its own every `ICE_THAW_SECS` on average (caught up when its
+/// land loads).
+pub const FREEZE_BELOW: f32 = 0.0;
+pub const FREEZE_HARD: f32 = -6.0;
+pub const ICE_THAW_SECS: f32 = 30.0;
+
+/// The chance a visit freezes open still water at `celsius` (the air there): 0 from freezing up,
+/// 1 from `FREEZE_HARD` down.
+pub fn freeze_chance(celsius: f32) -> f32 {
+    ((FREEZE_BELOW - celsius) / (FREEZE_BELOW - FREEZE_HARD)).clamp(0.0, 1.0)
+}
+
 /// The chance a melt step takes a layer at `celsius` (the air where it lies): 0 in a frost, 1 from
 /// `SNOW_MELT_WARM`.
 pub fn melt_chance(celsius: f32) -> f32 {
@@ -416,6 +432,15 @@ mod tests {
         assert_eq!(melt_chance(SNOW_MELT_WARM * 2.0), 1.0);
         assert!((melt_chance(SNOW_MELT_WARM / 2.0) - 0.5).abs() < 1e-6);
         assert!(SNOW_MELT_SECS * 3.0 / melt_chance(12.0) <= 120.0);
+        // Ice: none forms at or over freezing, all of it in a hard frost; it never forms and
+        // thaws at the same warmth.
+        assert_eq!(freeze_chance(2.0), 0.0);
+        assert_eq!(freeze_chance(FREEZE_BELOW), 0.0);
+        assert_eq!(freeze_chance(FREEZE_HARD - 1.0), 1.0);
+        for c in -20..=20 {
+            let c = c as f32;
+            assert!(freeze_chance(c) == 0.0 || melt_chance(c) == 0.0, "{c} °C both freezes and thaws");
+        }
         // The scan reaches the ground below a player on a hill and above one in a valley; plants
         // are buried by a cover that has layers.
         const { assert!(SNOW_SCAN >= 32 && SNOW_BURIES >= 1 && SNOW_BURIES <= 8) };

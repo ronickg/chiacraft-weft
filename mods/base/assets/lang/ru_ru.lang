@@ -51,6 +51,7 @@ block.base.red_sandstone = Красный песчаник
 block.base.snow = Снег
 block.base.snow_layer = Слой снега
 block.base.ice = Лёд
+block.base.lake_ice = Озёрный лёд
 block.base.brain_coral_block = Блок мозгового коралла
 block.base.staghorn_coral_block = Блок оленерогого коралла
 block.base.porites_coral_block = Блок коралла поритес

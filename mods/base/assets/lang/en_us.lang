@@ -100,6 +100,7 @@ block.base.red_sandstone = Red Sandstone
 block.base.snow = Snow
 block.base.snow_layer = Snow layer
 block.base.ice = Ice
+block.base.lake_ice = Lake ice
 block.base.brain_coral_block = Brain Coral Block
 block.base.staghorn_coral_block = Staghorn Coral Block
 block.base.porites_coral_block = Porites Coral Block
