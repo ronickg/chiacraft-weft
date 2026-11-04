@@ -553,6 +553,8 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::text("core:resource_packs", ""),
         ConfigDef::text("core:shader_pack", ""),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:mob_spawning", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
+        // chiacraft: the world signs an achievement credential for each player who earns one.
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:sign_achievements", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:simulation_distance", ck::INT, 8.0, 2.0, 64.0, 1.0) },
         // Entities are sent to players within this many blocks (at most the simulation
         // distance); their moves every tick within a third of it, every 2nd within two

@@ -1,6 +1,7 @@
 //! Authoritative simulation. Runs on its own thread; single player talks to it through the
 //! in-process transport. Each dimension is a set of regions ticked in parallel.
 
+mod achievements;
 mod actions;
 mod admission;
 pub mod area;
@@ -181,6 +182,8 @@ pub struct Shared {
     /// Where players load cubes (dim, center, radius, up, down), for generation jobs to skip
     /// cubes a fast player already left behind.
     pub views: parking_lot::RwLock<Vec<(u32, View)>>,
+    /// Achievements mods granted this tick (chiacraft, `achievements`): the server signs them.
+    pub grants: parking_lot::Mutex<Vec<crate::chiacraft::achievements::Grant>>,
 }
 
 pub const PHASES: [&str; 6] = ["insert", "messages", "regions", "request", "sync", "rest"];
@@ -755,6 +758,7 @@ impl Server {
             self.send_banned_away(c);
         }
         self.did_answers(c);
+        self.sign_achievements();
         lap(5, &self.shared);
         let us = start.elapsed().as_micros() as u64;
         self.shared.tick_us.store(us, Ordering::Relaxed);

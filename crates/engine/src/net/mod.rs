@@ -284,6 +284,9 @@ messages! {
         /// Not let in, or sent away, with the reason in the player's own language (chiacraft:
         /// admission rules and bans). The connection ends after it.
         Refused(crate::ui::text::Msg),
+        /// An achievement credential the world signed for this player (chiacraft: JSON,
+        /// `chiacraft_wallet::achievement::Credential`), to keep.
+        Achievement(String),
     }
 }
 
