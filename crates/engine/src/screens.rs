@@ -460,10 +460,17 @@ pub fn frame(ui: &mut Ui, cx: &BuildCx, title: &str, f: impl FnOnce(&mut Ui)) {
     let bg = if cx.in_game { "overlay" } else { "background" };
     ui.root_style(Style::default().stretch());
     ui.panel(bg, Style::default().grow().center().pad(12.0).gap(10.0), |ui| {
+        // Over the title's picture the title sits on a plate (thin type on the sky and trees was
+        // hard to read, Tester's audit, 11-04); in a world the overlay dims what is behind it.
+        let plate =
+            if cx.in_game { None } else { Some(ui.open(Kind::Container { class: Some("tooltip".into()) }, Style::default().pad(4.0))) };
         let t = label(ui, cx, title, &[], "title");
         if let Some(t) = ui.text_mut(t) {
             t.scale = 2.0;
             t.wrap = false;
+        }
+        if plate.is_some() {
+            ui.close();
         }
         f(ui);
     });
@@ -504,16 +511,22 @@ impl Screen for Title {
                         open(c, "core:multiplayer")
                     });
                     ui.nodes[mp].style.grow = 1.0;
-                    let face = face_texture(cx);
+                    // The player's face from their skin, or with no skin yet the Singleplayer
+                    // figure (the face of a skin that isn't there was a blank square: Tester's
+                    // audit, 11-04).
+                    let skin = cx.settings.run_dir.join("skins").join("skin.png");
+                    let face = if skin.exists() { Some(face_texture(cx)) } else { cx.look.texture("menu_singleplayer", "") };
                     let p = ui.button(
                         "button_secondary",
                         Style::default().w(20.0).h(20.0),
                         Rc::new(|c: &mut Ctx| open(c, "core:profile")),
                         |ui| {
-                            ui.add(
-                                Kind::Image { texture: face, color: 0xFFFFFFFF },
-                                Style::default().w(8.0).h(8.0).at(6.0, 6.0, [0.0, 0.0]),
-                            );
+                            if let Some(face) = face {
+                                ui.add(
+                                    Kind::Image { texture: face, color: 0xFFFFFFFF },
+                                    Style::default().w(8.0).h(8.0).at(6.0, 6.0, [0.0, 0.0]),
+                                );
+                            }
                         },
                     );
                     ui.nodes[p].tooltip = Some(cx.t("menu.profile", &[]));
