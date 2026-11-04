@@ -88,3 +88,8 @@ change any of them in the morning.
       palettes, until Chiacraft draws them.
     - Reverting is one commit if he picks another direction.
     - Alternative: keep the cut-up stone-axe placeholders until he picks.
+18. **Bronze's ramp stays close to copper's.**
+    - Chosen: Chiacraft's ramps are the means of the approved painted tools in each material, so
+      a guard matches its blade, and our bronze tools are drawn that way.
+    - Alternative: shift bronze toward yellow, real tin bronze's colour, and redraw the bronze
+      heads to match.
