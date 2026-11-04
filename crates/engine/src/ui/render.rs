@@ -110,6 +110,10 @@ fn face_of(skin: &crate::assets::Image) -> Option<Vec<u8>> {
 /// scale that isn't a whole number, or not the same both ways. A box smaller than the image is
 /// left alone (a thumbnail, a picture shown small on purpose).
 fn uneven_stretch(r: Rect, pixels: [f32; 2]) -> bool {
+    // A 1x1 or 2x2 picture is a solid fill (an overlay, a panel's colour): any stretch is fine.
+    if pixels[0] <= 2.0 && pixels[1] <= 2.0 {
+        return false;
+    }
     if pixels[0] <= 0.0 || pixels[1] <= 0.0 || r.w < pixels[0] || r.h < pixels[1] {
         return false;
     }
@@ -1397,6 +1401,7 @@ mod slicing_tests {
         assert!(uneven_stretch(r(72.0, 72.0), [48.0, 48.0]));
         assert!(uneven_stretch(r(96.0, 48.0), [48.0, 48.0]));
         assert!(!uneven_stretch(r(24.0, 24.0), [48.0, 48.0]));
+        assert!(!uneven_stretch(r(3456.0, 2234.0), [1.0, 1.0]));
         assert_eq!(parse_gui("scaling = tile\nturn = random", [32.0, 32.0]), Slicing::Tile { size: [32.0, 32.0], turn: true });
     }
 }

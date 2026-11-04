@@ -240,6 +240,39 @@ k.rect(div, 0, 0, 4, 1, k.PANEL_DEEP)
 k.rect(div, 0, 1, 4, 1, (52, 36, 28))
 save("divider", div, [("scaling", "stretch")])
 
+# ---------------------------------------------------------------- the crosshair and the recipe arrow
+# The crosshair's box is 9 GUI px (18 UI px): drawn at that, a cream plus, its arms 4 px, a 1 px
+# outline (the old one was 36 px, 4 texels a GUI pixel: 1.5 screen px each at GUI scale 6).
+xh = k.canvas(18, 18)
+plus = np.zeros((18, 18), bool)
+plus[7:11, 2:16] = True
+plus[2:16, 7:11] = True
+ring = np.zeros_like(plus)
+for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+    ring |= np.roll(np.roll(plus, dy, 0), dx, 1)
+k.paint(xh, ring & ~plus, k.OUTLINE)
+k.paint(xh, plus, (240, 230, 214))
+k.paint(xh, plus & np.roll(~plus, 1, 0), (255, 250, 240))
+save("crosshair", xh, [("scaling", "stretch")])
+
+# The recipe arrow's box is 24 x 16 GUI px (`ui::RECIPE_ARROW`): its 48 x 28 picture and 50 x 28
+# fill are drawn into 48 x 32, so they were squashed. Same pictures, 2 empty rows above and below,
+# the fill trimmed to the arrow's 48 columns.
+def padded(name, w=48, h=32):
+    src = np.array(Image.open(os.path.join(ARCHIVE if os.path.exists(os.path.join(ARCHIVE, name + ".png")) else GUI, name + ".png")).convert("RGBA"))
+    sh, sw = src.shape[:2]
+    if (sw, sh) == (w, h):
+        return src
+    out = k.canvas(w, h)
+    x0 = (sw - w) // 2
+    y0 = (h - sh) // 2
+    out[y0:y0 + sh] = src[:, x0:x0 + w]
+    return out
+
+
+save("arrow", padded("arrow"), [("scaling", "stretch")])
+save("arrow_fill", padded("arrow_fill"), [("scaling", "stretch")])
+
 for name, w, h, gui in WRITTEN:
     print(f"{name:28s} {w}x{h}  {gui}")
 print(len(WRITTEN), "textures", "(dry run)" if DRY else f"written; old ones in {ARCHIVE}")
