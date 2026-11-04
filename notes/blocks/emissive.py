@@ -1,8 +1,8 @@
 """Emission masks (`<texture>_e.png`: red x alpha is how much a pixel glows) for "glow in the dark"
-(research round 17, rec. 4; Ronald's fantasy picks, 11-05). Restraint: gem ores only, the gem flecks only,
+(research round 17, rec. 4; Ronald's fantasy picks, 11-05). Restraint: the gem ores and redstone, their flecks only,
 dimly; plain stone never glows. The pack scales emission by darkness, so by day they look as before.
 
-    python3 notes/blocks/emissive.py ores [--also redstone_ore]   # diamond_ore_e.png (redstone only if asked)
+    python3 notes/blocks/emissive.py ores      # diamond_ore_e.png and redstone_ore_e.png (Ronald, 11-05: "Redstone too")
     python3 notes/blocks/emissive.py plant <rule> <tile> <out _e.png>   # a plant's mask (rules in PLANTS)
 """
 import os
@@ -62,7 +62,7 @@ def mask(tile, pick, strength, plant=False, faint=None):
 
 def main():
     if sys.argv[1] == "ores":
-        names = ["diamond_ore"] + (sys.argv[3:] if len(sys.argv) > 2 and sys.argv[2] == "--also" else [])
+        names = list(ORES)
         for n in names:
             pick, s = ORES[n]
             out, share = mask(os.path.join(GAME, n + ".png"), pick, s)
