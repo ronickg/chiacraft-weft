@@ -161,11 +161,13 @@ fn watch_now(settings: &crate::settings::Settings, launcher: [u8; 32], owner: [u
     Ok(())
 }
 
-fn short(s: &str) -> String {
+/// A sponsor's key as players read it: its first 12 characters.
+pub(crate) fn short(s: &str) -> String {
     s.chars().take(12).collect()
 }
 
-fn short_did(d: &str) -> String {
+/// A DID as players read it: its first 16 and last 6 characters when it is longer than 24.
+pub(crate) fn short_did(d: &str) -> String {
     let c: Vec<char> = d.chars().collect();
     if c.len() > 24 {
         format!("{}…{}", c[..16].iter().collect::<String>(), c[c.len() - 6..].iter().collect::<String>())

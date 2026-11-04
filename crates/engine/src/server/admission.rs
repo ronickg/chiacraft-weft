@@ -65,6 +65,7 @@ impl Player {
             identity: self.identity.clone(),
             did: self.did.clone(),
             did_days: self.did_days,
+            achievements: self.achievements.clone(),
         }
     }
 }
@@ -190,7 +191,7 @@ impl Server {
                         .unwrap_or_default();
                     let identity = crate::kv::get(&text, "identity").map(str::to_string);
                     let did = crate::kv::get(&text, "did").map(str::to_string);
-                    return Some((Who { name: what.to_string(), key, identity, did, did_days: None }, None));
+                    return Some((Who { name: what.to_string(), key, identity, did, ..Default::default() }, None));
                 }
             }
         }
@@ -226,7 +227,7 @@ impl Server {
         let Some(did) = chiacraft_wallet::keys::encode_did(&launcher) else { return false };
         let tx = self.did_checks.0.clone();
         let key = key.to_string();
-        let started = std::thread::Builder::new()
+        std::thread::Builder::new()
             .name("did check".into())
             .spawn(move || {
                 let answer = crate::chiacraft::chain::get().and_then(|reader| {
@@ -243,8 +244,7 @@ impl Server {
                 };
                 let _ = tx.send(checked);
             })
-            .is_ok();
-        started
+            .is_ok()
     }
 
     /// DID checks that came back: the player's DID is known (or not), a waiting join goes on,
@@ -280,10 +280,13 @@ impl Server {
                         .map_or(String::new(), |w| format!(" ({w})"))
                 );
             }
-            if let Some((name, key, _)) = p.waiting.take() {
-                self.join(c, pi, name, key);
-            } else {
+            p.did_pending = false;
+            if p.waiting.is_none() {
                 banned_check = true;
+            } else if !p.proofs_pending
+                && let Some((name, key, _)) = p.waiting.take()
+            {
+                self.join(c, pi, name, key);
             }
         }
         for pi in 0..self.players.len() {
@@ -293,7 +296,9 @@ impl Server {
                 .is_some_and(|w| w.2.elapsed() > DID_WAIT)
                 && let Some((name, key, _)) = self.players[pi].waiting.take()
             {
-                log::info!("{name}: no answer about their DID in time; the rules decide without it");
+                log::info!("{name}: no answer about their DID or achievements in time; the rules decide without them");
+                self.players[pi].did_pending = false;
+                self.players[pi].proofs_pending = false;
                 self.join(c, pi, name, key);
             }
         }
@@ -660,4 +665,72 @@ pub(super) fn didrule(s: &mut Server, x: &Ctx) -> Vec<Msg> {
     s.gate.refresh(true);
     let r = &s.gate.rules;
     say("did_rule_show", vec![yes_no(r.needs_did()), Arg::Int(r.did_min_days as i64)])
+}
+
+/// `/achievementrule <id> [issuer keys…] | off | show`: only players who earned achievement `id`
+/// (`base:workbench`) get in, as a credential signed by this world's owner or by one of the
+/// identity keys given (phase 4).
+pub(super) fn achievementrule(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    let a = x.a;
+    if a.get("off").is_some() {
+        if let Err(e) = s.gate.edit_rules(|r| r.achievement = None) {
+            return failed(e);
+        }
+        return say("achievement_rule_off", Vec::new());
+    }
+    if let Some(id) = a.text("id") {
+        let id = id.trim().to_string();
+        let owner = s
+            .cfg
+            .identity
+            .as_ref()
+            .and_then(|i| i.cert.owner.split_once(':').map(|(o, _)| o.to_string()))
+            .or_else(|| chiacraft_account::current().map(|s| s.identity_hex()));
+        let mut from: Vec<String> = owner.into_iter().collect();
+        for k in a.text("from").unwrap_or("").split_whitespace() {
+            if adm::kind_of(k) != Kind::Identity {
+                return say("not_an_identity", vec![text(k)]);
+            }
+            if !from.iter().any(|f| f == k) {
+                from.push(k.to_string());
+            }
+        }
+        // The base game's titles are `advancement.<namespace>.<name>`.
+        let title = id
+            .split_once(':')
+            .map_or_else(|| id.clone(), |(ns, n)| format!("advancement.{ns}.{n}"));
+        let (rule_id, trusted) = (id.clone(), from.len());
+        let r = s
+            .gate
+            .edit_rules(|r| r.achievement = Some(adm::AchievementRule { id: rule_id, title, from }));
+        if let Err(e) = r {
+            return failed(e);
+        }
+        log::info!("only players with the achievement {id} get in now ({trusted} issuers trusted)");
+        return say("achievement_rule_set", vec![text(&id), Arg::Int(trusted as i64)]);
+    }
+    s.gate.refresh(true);
+    match &s.gate.rules.achievement {
+        Some(r) => say("achievement_rule_set", vec![text(&r.id), Arg::Int(r.from.len() as i64)]),
+        None => say("achievement_rule_off", Vec::new()),
+    }
+}
+
+/// `/revoke <who> <achievement id | *>`: withdraws what this world signed for that player (phase
+/// 4): its issuer's revocation list grows, every player here gets it, and it no longer counts at
+/// the door.
+pub(super) fn revoke(s: &mut Server, x: &Ctx) -> Vec<Msg> {
+    let what = x.a.text("who").unwrap_or("").to_string();
+    let id = x.a.text("id").unwrap_or("").to_string();
+    let Some((who, _)) = s.whom(&what) else {
+        return say("unknown_player", vec![text(&what)]);
+    };
+    let Some(identity) = who.identity else {
+        return say("no_identity", vec![text(&what)]);
+    };
+    match s.revoke_achievements(&identity, &id) {
+        Ok(0) => say("nothing_to_revoke", vec![text(&what), text(&id)]),
+        Ok(n) => say("revoked", vec![text(&what), text(&id), Arg::Int(n as i64)]),
+        Err(e) => failed(e),
+    }
 }

@@ -118,6 +118,7 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
         "core:mods" => Box::new(ModList::default()),
         "core:profile" => Box::new(Profile::default()),
         "core:account" => Box::new(crate::account_screen::Account::default()),
+        "core:achievements" => Box::new(crate::chiacraft::achievements_screen::Achievements),
         "core:admission" => Box::new(crate::chiacraft::worlds::admission_screen::Admission),
         _ => return None,
     })
@@ -343,6 +344,12 @@ impl Screen for Profile {
                     label(ui, cx, "profile.account_backup", &[], "dim");
                 }
                 button(ui, cx, "profile.account", &[], 160.0, |c| c.requests.push(Request::Screen("core:account".into())));
+                // What worlds signed for this account (chiacraft, phase 4).
+                let n = crate::chiacraft::achievements::load().credentials.len();
+                let id = button(ui, cx, "profile.achievements", &[Arg::Int(n as i64)], 160.0, |c| {
+                    c.requests.push(Request::Screen("core:achievements".into()))
+                });
+                ui.set_id(id, "achievements");
                 ui.add(Kind::Container { class: None }, Style::default().h(4.0));
                 label(ui, cx, "profile.skin", &[], "default");
                 label(ui, cx, "profile.skin_hint", &[], "dim");
@@ -629,9 +636,9 @@ impl Screen for SettingsScreen {
                     let scale =
                         if s.gui_scale() == 0 { Arg::Key("settings.gui_scale.auto".into()) } else { Arg::Int(s.gui_scale() as i64) };
                     d.button("settings.gui_scale", &[scale], 300.0, false, |r| {
-                        // Auto, then every scale the window can actually show.
+                        // Auto, then every scale the window can show whole: 1 and the even ones.
                         let max = crate::settings::max_gui_scale(r.stats.window);
-                        let next = if r.settings.gui_scale() >= max { 0 } else { r.settings.gui_scale() + 1 };
+                        let next = crate::settings::next_gui_scale(r.settings.gui_scale(), max);
                         r.settings.set("gui_scale", next as f64);
                     });
                     d.button("settings.vsync", &[on_off(s.vsync())], 300.0, false, |r| {

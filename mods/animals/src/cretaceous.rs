@@ -86,7 +86,7 @@ pub fn init(r: &mut Registry) {
         // block again.
         if p.form == vitals::wild::Form::Mound {
             let upper = Block::generated(format!("{name}_upper"));
-            for (b, side) in [(block, name.to_string()), (upper, format!("{name}_upper_side"))] {
+            for (b, side) in [(block, format!("{name}_side")), (upper, format!("{name}_upper_side"))] {
                 r.block(b)
                     .sound_group("base:block.gravel")
                     .textures(&format!("{name}_top"), &side, &format!("{name}_top"))
@@ -310,6 +310,8 @@ fn woods(r: &mut Registry) {
             .texture(&format!("leaves_{wood}"))
             .hardness(0.2)
             .cutout()
+            // Faces between two leaves of one kind aren't drawn, as base's (`blocks.rs`).
+            .cull_same()
             .opacity(1)
             .tint(base_api::trees::leaf_tint(vitals::wild::turn(&format!("animals:{wood}_leaves"))))
             .tag("leaves")

@@ -1,0 +1,4 @@
+# Chiacraft's three variants beside the plain sand, picked at random and turned four ways, so ground of it doesn't show its tile repeating.
+method = random
+tiles = <default> sand/1-3
+symmetry = all

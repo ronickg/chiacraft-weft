@@ -1,8 +1,10 @@
 //! The wild plants (`notes/ECOLOGY.md`, part 3; the numbers in `vitals::wild`, their growth in
 //! `vitals::plants`): every `base:` row of `vitals::wild::WILD` as a block, growing by its form.
 //! Tufts and mats grazed down (a bitten look) grow back, bushes ripen their fruit through four
-//! stages, fruit and seed heads ripen in their season (a ripe look), mushrooms and water hyacinth spread near the old ones, the
-//! rest stand. What picking one gives plants it again. `worldgen.rs` puts them where they grow.
+//! stages, fruit and seed heads ripen in their season (a ripe look), mushrooms and water hyacinth spread near the old ones, kelp
+//! grows up towards the surface, the rest stand. What picking one gives plants it again. Plants of
+//! the bed stand in the water (`holds_liquid`): breaking one leaves the water. `worldgen.rs` puts
+//! them where they grow.
 
 use std::sync::OnceLock;
 
@@ -28,6 +30,11 @@ fn short(block: &'static str) -> &'static str {
 }
 
 pub fn register(r: &mut Registry) {
+    // What plants of the bed root in, and what kelp stands on: the bed or kelp under it.
+    r.tag("water_bed", &["#dirt", "#sand", "gravel", "clay"]);
+    // What the shore's plants (reeds, cattails, wild rice) root in: soil or a sandy shore.
+    r.tag("shore_soil", &["#plant_soil", "#sand"]);
+    r.tag("kelp_soil", &["#water_bed", "kelp"]);
     for (_, p) in mine() {
         let name = short(p.block);
         let block = Block::generated(name.into());
@@ -35,12 +42,16 @@ pub fn register(r: &mut Registry) {
         let b = match p.ground {
             Ground::Soil => b.needs_below("#plant_soil"),
             Ground::Sand => b.needs_below("#sand"),
-            Ground::Shore => b.needs_below("#plant_soil").needs_near_support("#water"),
+            Ground::Shore => b.needs_below("#shore_soil").needs_near_support("#water"),
             Ground::Water => b.needs_below("#water"),
+            Ground::Bed => b
+                .needs_below(if p.form == Form::Column { "#kelp_soil" } else { "#water_bed" })
+                .holds_liquid(&crate::blocks::WATER),
         };
         let full = p.block;
-        // Spreading plants come up in the shade too (mushrooms); the others need daylight.
-        let light = if p.ground == Ground::Soil && p.form == Form::Spreads { 0 } else { 9 };
+        // Spreading plants come up in the shade too (mushrooms), and the bed's under water that
+        // dims the light; the others need daylight.
+        let light = if p.ground == Ground::Soil && p.form == Form::Spreads || p.ground == Ground::Bed { 0 } else { 9 };
         let b = match p.form {
             // Grazed down (age 0) and grown back (age 1); the world makes them grown.
             Form::Tuft => b
@@ -71,11 +82,38 @@ pub fn register(r: &mut Registry) {
                     .on_grow(move |e| growth::grow(e, full, true, |e| spread(e, full)));
                 if p.gives.is_some() { b.no_item() } else { b.tab(&crate::tabs::NATURAL) }
             }
+            // A lily pad lies flat on the water.
+            Form::Still if name == "lily_pad" => b
+                .texture(name)
+                .model_box([0.0, 0.0, 0.0], [16.0, 0.5, 16.0])
+                // A slot shows its own picture, not a half-pixel sliver of the model.
+                .item_texture(name)
+                .tab(&crate::tabs::NATURAL),
+            // A common reed, its purple plumes on top.
+            Form::Still if name == "reed" => b.texture("reed").tab(&crate::tabs::NATURAL),
             // No base plant lies as a log yet (the Cretaceous's rotten log is the animals mod's).
             Form::Still | Form::Log | Form::Mound => b.texture(name).tab(&crate::tabs::NATURAL),
-            // A flat mat on the ground, a sixteenth high; picked, it gives its plant.
+            // Kelp: its top block (no kelp above) shows the fronds' tip, `<name>_top`; a block
+            // changing above it sets which it is, so growing, placing and breaking keep it right.
+            Form::Column => b
+                .prop("top", ["true", "false"])
+                .states(move |p, s| s.texture(&if p.get("top") == "true" { format!("{name}_top") } else { name.to_string() }))
+                .on_neighbor(move |e| {
+                    let w = e.world();
+                    let [x, y, z] = e.pos();
+                    let top = if block.is(w.get([x, y + 1, z])) { "false" } else { "true" };
+                    if let Some(s) = state_with(e.state(), "top", top).filter(|&s| s != e.state()) {
+                        w.set(e.pos(), s);
+                    }
+                })
+                .growth(growth::step_secs(full, 1, 270.0), light)
+                .on_grow(move |e| growth::grow(e, full, false, grow_up))
+                // Picked, it gives a handful of kelp, the food (`items.rs` registers its item).
+                .no_item(),
+            // A flat mat on the ground, a sixteenth high; picked, it gives its plant. Wrack is
+            // kelp washed up, drawn as kelp.
             Form::Mat => b
-                .texture(name)
+                .texture(if name == "kelp_wrack" { "kelp" } else { name })
                 .model_box([0.0, 0.0, 0.0], [16.0, 1.0, 16.0])
                 .no_item(),
         };
@@ -206,6 +244,18 @@ pub fn upper_of(s: u32, roll: f32) -> Option<u32> {
         .flatten()
 }
 
+/// A column's growth step (kelp): one more on top while it is still a block below the surface.
+fn grow_up(e: &mut BlockEvent) {
+    let w = e.world();
+    let [x, y, z] = e.pos();
+    let (above, over) = ([x, y + 1, z], [x, y + 2, z]);
+    // A water source, the first of its states.
+    let still = |p| w.get(p) == crate::blocks::WATER.id();
+    if still(above) && still(over) {
+        w.set(above, e.state());
+    }
+}
+
 /// A spreading plant's growth step: a new one nearby on its ground, unless `CROWD` are there.
 fn spread(e: &mut BlockEvent, block: &str) {
     let w = e.world();
@@ -231,7 +281,7 @@ fn spread(e: &mut BlockEvent, block: &str) {
     let below = w.get([at[0], at[1] - 1, at[2]]);
     let ground = wild::of(block).map(|p| p.ground);
     let fits = match ground {
-        Some(Ground::Water) => WATER.on_block(below),
+        Some(Ground::Water) => WATER.in_cell(below),
         _ => PLANT_SOIL.on_block(below),
     };
     if w.get(at) == 0 && fits {

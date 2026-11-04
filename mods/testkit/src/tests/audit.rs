@@ -51,7 +51,7 @@ pub async fn death_is_a_state(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(3).await?;
-    t.click_ui("slot:36", 0);
+    t.click_ui(&t.hotbar(0), 0);
     t.until("on the cursor", Duration::from_secs(2), |t| t.c().inventory_slot(0).is_empty())
         .await?;
     t.cmd("/kill").await?;
@@ -61,7 +61,9 @@ pub async fn death_is_a_state(t: T) -> R {
     t.check_eq(t.op("inv me").await?, String::new(), "picked up nothing, carried nothing");
     let f = t.feet();
     let near = t.op(&format!("near {} 8", at(f))).await?;
-    t.check(near.matches("core:item").count() >= 2, format!("the cursor fell with the rest: {near}"));
+    // The cursor's stack falls loose; the rest falls loose too, or (Survival) into a tombstone.
+    let kept = near.matches("core:item").count() >= 2 || (near.contains("core:item") && near.contains("tombstone"));
+    t.check(kept, format!("the cursor fell with the rest: {near}"));
     // And leaving doesn't undo it.
     reopen(&t, 1).await?;
     t.screen("core:death").await?;
@@ -106,7 +108,7 @@ pub async fn leaving_keeps_cursor(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(3).await?;
-    t.click_ui("slot:36", 0);
+    t.click_ui(&t.hotbar(0), 0);
     t.until("on the cursor", Duration::from_secs(2), |t| t.c().inventory_slot(0).is_empty())
         .await?;
     reopen(&t, 1).await?;
@@ -193,7 +195,7 @@ pub async fn shift_click_skips_grid(t: T) -> R {
     t.press("core:inventory");
     t.screen("core:menu").await?;
     t.frames(3).await?;
-    let Some([x, y, w, h]) = t.c().ui_rect("slot:36") else { return Err("no slot 36".into()) };
+    let Some([x, y, w, h]) = t.c().ui_rect(&t.hotbar(0)) else { return Err("no hotbar slot".into()) };
     t.c().cursor(x + w / 2.0, y + h / 2.0);
     t.frames(2).await?;
     t.hold("core:sprint", 0.3);

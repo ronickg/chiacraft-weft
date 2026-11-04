@@ -777,14 +777,20 @@ impl Ui {
                 self.nodes[id].scrollbar = Some(Scrollbar { track, offset, max });
             }
         }
+        // A centred thing's odd leftover pixel goes below or right of it, never split: its offset
+        // is rounded down to the UI pixel (`text_unit`) here, not rounded by `snapped` later
+        // (which put half a pixel up, and labels a pixel low in kit 2's buttons, whose faces are
+        // made for it: 2 px of frame above, 3 below).
+        let unit = self.text_unit;
+        let down = |v: f32| if unit > 0.0 { (v / unit + 1e-4).floor() * unit } else { v };
         let (mut pos, spacing) = match style.justify {
             Justify::Start => (-scrolled, style.gap),
-            Justify::Center => (free.max(0.0) / 2.0, style.gap),
+            Justify::Center => (down(free.max(0.0) / 2.0), style.gap),
             // Overflowing content sticks out at the start, the end edge stays put. Scrolling goes
             // from there.
             Justify::End => (free - past_end, style.gap),
             Justify::Between if children.len() > 1 => (0.0, style.gap + free.max(0.0) / (children.len() - 1) as f32),
-            Justify::Between => (free.max(0.0) / 2.0, style.gap),
+            Justify::Between => (down(free.max(0.0) / 2.0), style.gap),
         };
         for (i, &c) in children.iter().enumerate() {
             let s = sizes[i];
@@ -796,7 +802,7 @@ impl Ui {
             }
             let off = match align {
                 Align::Start | Align::Stretch => 0.0,
-                Align::Center => (cross_size - cc) / 2.0,
+                Align::Center => down((cross_size - cc) / 2.0),
                 Align::End => cross_size - cc,
             };
             let r = if style.row {

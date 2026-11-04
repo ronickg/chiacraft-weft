@@ -1,2 +1,3 @@
-scaling = stretch
+scaling = nine_slice
+border = 2
 size = 7 10

@@ -33,7 +33,8 @@ pub fn register(r: &mut Registry) {
     r.attach(&PLAYER, &ROOM);
     // "Sheltered · log walls, +18 °C" (over the air outside), under the vitals' bars while in a room.
     r.hud_element(&HUD_ROOM, hud_anchor::TOP_LEFT, 8, |ui| {
-        ui.text_bind(|c, out| match c.component(&ROOM) {
+        // One line, wide enough not to wrap (in a narrow top-left column it broke a letter a line).
+        ui.text_bind_styled(S::col().min_w(150.0).no_wrap(), |c, out| match c.component(&ROOM) {
             Some(r) if r.wall > 0 && !c.creative() => {
                 let wall = WALLS[(r.wall as usize - 1).min(WALLS.len() - 1)].name();
                 let gain = format!("{:+}", r.gain);

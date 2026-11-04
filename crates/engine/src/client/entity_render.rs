@@ -40,8 +40,35 @@ const MAX_BUILD_BONES: usize = 64;
 /// A kind's painter: its component, the mod and the mod's callback.
 type Painter = (u32, weft_abi::ModId, weft_abi::Callback);
 
-/// Skins painted a frame at most: many animals coming into view at once spread over frames.
-const PAINTS_PER_FRAME: usize = 8;
+/// Skins being painted at once (`paint_skins`): many animals coming into view at once queue up
+/// behind them.
+const PAINTS_IN_FLIGHT: usize = 8;
+
+/// A texture painted over, as read: RGBA (shared with the painters) and size; none if unreadable.
+type SkinBase = Option<(std::sync::Arc<Vec<u8>>, [u32; 2])>;
+
+/// A skin a painter finished on `skin_painters()`: `bones` none if its callback failed.
+struct PaintDone {
+    id: u64,
+    generation: u32,
+    from: Vec<u8>,
+    rgba: Vec<u8>,
+    size: [u32; 2],
+    bones: Option<Vec<(String, [f32; 3])>>,
+}
+
+/// Where mods' skin painters run: two threads of normal priority (what comes into view), apart
+/// from the loading queues.
+fn skin_painters() -> &'static rayon::ThreadPool {
+    static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
+    POOL.get_or_init(|| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(2)
+            .thread_name(|i| format!("skin paint {i}"))
+            .build()
+            .expect("skin paint pool")
+    })
+}
 
 /// What the first person view holds: the item (or the bare arm) and how it moves.
 pub struct Hand {
@@ -100,7 +127,12 @@ pub struct EntityRenderer {
     /// Each kind with a painter: its component, the mod and its callback (made on first use).
     painters: Option<FxHashMap<u32, Painter>>,
     /// Textures painted over, as read: RGBA and size, by name.
-    skin_bases: FxHashMap<String, Option<(Vec<u8>, [u32; 2])>>,
+    skin_bases: FxHashMap<String, SkinBase>,
+    /// Entities whose skin is being painted, what finishes (`paint_skins`), and which reading of
+    /// the textures they were painted over (`reload` counts up; older ones are dropped).
+    painting: rustc_hash::FxHashSet<u64>,
+    paint_done: (std::sync::mpsc::Sender<PaintDone>, std::sync::mpsc::Receiver<PaintDone>),
+    paint_generation: u32,
     /// The local player's entity.
     pub local: u64,
     glows: FxHashMap<String, (TextureId, u32)>,
@@ -113,16 +145,16 @@ pub struct EntityRenderer {
     seen_kinds: Vec<bool>,
     seen_items: Vec<bool>,
     /// Item models drawn instanced: pipelines for the world and the hand, each item's boxes
-    /// (first, count) in `item_boxes`, the GPU copy (buffer, capacity, boxes uploaded) and the
-    /// texture generation they were made with.
+    /// (first, count) in `item_boxes` by `model_key`, the GPU copy (buffer, capacity, boxes
+    /// uploaded) and the texture generation they were made with.
     item_pipe: PipelineId,
     hand_item_pipe: PipelineId,
-    item_models: FxHashMap<u32, (u32, u32)>,
+    item_models: FxHashMap<u64, (u32, u32)>,
     item_boxes: Vec<GpuBox>,
     item_buf: Option<(BufferId, u32, usize)>,
     item_generation: u64,
-    /// This frame's item instances: (item, instance).
-    instances: Vec<(u32, GpuBox)>,
+    /// This frame's item instances: (model key, instance).
+    instances: Vec<(u64, GpuBox)>,
 }
 
 fn shader(assets: &Assets) -> Result<Shader, ShaderError> {
@@ -191,6 +223,9 @@ impl EntityRenderer {
             frame_builds: Vec::new(),
             painters: None,
             skin_bases: FxHashMap::default(),
+            painting: Default::default(),
+            paint_done: std::sync::mpsc::channel(),
+            paint_generation: 0,
             local: 0,
             glows: FxHashMap::default(),
             kind_shaders,
@@ -340,6 +375,8 @@ impl EntityRenderer {
         self.models.reload(gpu, assets);
         // Painted skins are painted again over the textures as read now.
         self.skin_bases.clear();
+        self.painting.clear();
+        self.paint_generation = self.paint_generation.wrapping_add(1);
         for (_, p) in self.painted.drain() {
             gpu.destroy_texture(p.tex.0);
         }
@@ -450,7 +487,9 @@ impl EntityRenderer {
         held: u32,
     ) {
         let c = content();
+        let s = crate::diag::span("preload/skins");
         self.paint_skins(gpu, assets, entities, comps);
+        drop(s);
         self.load_sprite(assets, held);
         // Each kind and item looked at once per frame, without listing thousands of entities.
         let mut seen = std::mem::take(&mut self.seen_kinds);
@@ -488,7 +527,11 @@ impl EntityRenderer {
     }
 
     /// Paints the skins mods paint (`Host::reg_entity_skin`) of entities whose component is new
-    /// or changed, a few a frame, and forgets those of entities gone.
+    /// or changed, and forgets those of entities gone. The painters run on `skin_painters()` (the
+    /// SDK has them `Send + Sync`): a coat took 0.3-2.5 ms, a big model's 18-42 ms (the animals'
+    /// wyvern, 1024 x 544), and eight a frame on this thread made 20-60 ms frames whenever animals
+    /// came into view (the Mac lag runs, 11-04). Each is shown when done, over the plain texture
+    /// until then.
     fn paint_skins(
         &mut self,
         gpu: &mut dyn Backend,
@@ -519,54 +562,23 @@ impl EntityRenderer {
             keep
         });
         self.builds.retain(|id, _| entities.contains_key(id));
-        let mut budget = PAINTS_PER_FRAME;
-        for (&id, e) in entities {
-            let Some(&(comp, owner, cb)) = painters.get(&e.kind) else { continue };
-            let Some(from) = comps.get(&(id, comp)) else { continue };
-            if budget == 0 {
-                break;
-            }
-            if self.painted.get(&id).is_some_and(|p| p.from == *from) {
+        // What the painters finished: shown if the entity is still here and the textures weren't
+        // read again since (`reload`).
+        while let Ok(done) = self.paint_done.1.try_recv() {
+            if done.generation != self.paint_generation {
                 continue;
             }
-            budget -= 1;
-            let texture = &c.game.entities[e.kind as usize].texture;
-            let base = self.skin_bases.entry(texture.clone()).or_insert_with(|| {
-                let img = assets
-                    .read(texture, "textures", "png")
-                    .and_then(|b| decode_png(&b))?;
-                Some((img.rgba, [img.width, img.height]))
-            });
-            let Some((rgba, size)) = base else { continue };
-            let mut rgba = rgba.clone();
-            let mut bones = [weft_abi::BoneScale { name: [0; 32], scale: [1.0; 3] }; MAX_BUILD_BONES];
-            let mut args = weft_abi::SkinArgs {
-                data: weft_abi::Slice::new(from),
-                rgba: rgba.as_mut_ptr(),
-                width: size[0],
-                height: size[1],
-                bones: bones.as_mut_ptr(),
-                bone_cap: MAX_BUILD_BONES as u32,
-                bone_count: 0,
-            };
-            if !crate::host::invoke(owner, cb, &mut args) {
-                continue;
-            }
-            let set: Vec<(String, [f32; 3])> = bones[..(args.bone_count as usize).min(MAX_BUILD_BONES)]
-                .iter()
-                .filter(|b| b.scale.iter().all(|v| v.is_finite()))
-                .map(|b| {
-                    let end = b.name.iter().position(|&c| c == 0).unwrap_or(b.name.len());
-                    (String::from_utf8_lossy(&b.name[..end]).into_owned(), b.scale.map(|v| v.clamp(0.2, 5.0)))
-                })
-                .collect();
+            self.painting.remove(&done.id);
+            let (Some(set), Some(e)) = (done.bones, entities.get(&done.id)) else { continue };
             if set.is_empty() {
-                self.builds.remove(&id);
+                self.builds.remove(&done.id);
             } else {
-                self.builds.insert(id, Build { bones: set, resolved: None });
+                self.builds
+                    .insert(done.id, Build { bones: set, resolved: None });
             }
-            let tex = match self.painted.remove(&id) {
-                Some(p) if p.tex.2 == *size => p.tex,
+            let size = done.size;
+            let tex = match self.painted.remove(&done.id) {
+                Some(p) if p.tex.2 == size => p.tex,
                 old => {
                     if let Some(p) = old {
                         gpu.destroy_texture(p.tex.0);
@@ -575,12 +587,60 @@ impl EntityRenderer {
                         &TextureDesc { width: size[0], height: size[1], mips: 1, format: Format::Rgba8Srgb, render_target: false },
                         "painted skin",
                     );
-                    (t, gpu.texture_index(t), *size)
+                    (t, gpu.texture_index(t), size)
                 }
             };
-            gpu.write_texture(tex.0, 0, &rgba);
+            gpu.write_texture(tex.0, 0, &done.rgba);
+            let texture = c.game.entities[e.kind as usize].texture.clone();
             self.painted
-                .insert(id, Painted { from: from.clone(), texture: texture.clone(), tex });
+                .insert(done.id, Painted { from: done.from, texture, tex });
+        }
+        for (&id, e) in entities {
+            if self.painting.len() >= PAINTS_IN_FLIGHT {
+                break;
+            }
+            let Some(&(comp, owner, cb)) = painters.get(&e.kind) else { continue };
+            let Some(from) = comps.get(&(id, comp)) else { continue };
+            // One at a time each: a value that changed while it was painted is painted again
+            // once that one is shown.
+            if self.painting.contains(&id) || self.painted.get(&id).is_some_and(|p| p.from == *from) {
+                continue;
+            }
+            let texture = &c.game.entities[e.kind as usize].texture;
+            let base = self.skin_bases.entry(texture.clone()).or_insert_with(|| {
+                let img = assets
+                    .read(texture, "textures", "png")
+                    .and_then(|b| decode_png(&b))?;
+                Some((std::sync::Arc::new(img.rgba), [img.width, img.height]))
+            });
+            let Some((rgba, size)) = base.clone() else { continue };
+            self.painting.insert(id);
+            let (from, tx, generation) = (from.clone(), self.paint_done.0.clone(), self.paint_generation);
+            skin_painters().spawn(move || {
+                let mut rgba = rgba.as_ref().clone();
+                let mut bones = [weft_abi::BoneScale { name: [0; 32], scale: [1.0; 3] }; MAX_BUILD_BONES];
+                let mut args = weft_abi::SkinArgs {
+                    data: weft_abi::Slice::new(&from),
+                    rgba: rgba.as_mut_ptr(),
+                    width: size[0],
+                    height: size[1],
+                    bones: bones.as_mut_ptr(),
+                    bone_cap: MAX_BUILD_BONES as u32,
+                    bone_count: 0,
+                };
+                let painted = crate::host::invoke(owner, cb, &mut args);
+                let set = painted.then(|| {
+                    bones[..(args.bone_count as usize).min(MAX_BUILD_BONES)]
+                        .iter()
+                        .filter(|b| b.scale.iter().all(|v| v.is_finite()))
+                        .map(|b| {
+                            let end = b.name.iter().position(|&c| c == 0).unwrap_or(b.name.len());
+                            (String::from_utf8_lossy(&b.name[..end]).into_owned(), b.scale.map(|v| v.clamp(0.2, 5.0)))
+                        })
+                        .collect()
+                });
+                let _ = tx.send(PaintDone { id, generation, from, rgba, size, bones: set });
+            });
         }
     }
 
@@ -593,47 +653,26 @@ impl EntityRenderer {
         let img = assets
             .read(&name, "textures", "png")
             .and_then(|b| decode_png(&b));
-        let sprite = img.map(|img| {
-            let size = img.width;
-            // Animated strips: the first frame.
-            let solid = |x: i64, y: i64| {
-                (0..size as i64).contains(&x)
-                    && (0..size as i64).contains(&y)
-                    && img
-                        .rgba
-                        .get((y as usize * size as usize + x as usize) * 4 + 3)
-                        .is_some_and(|&a| a >= 128)
-            };
-            let pixels = (0..size * size)
-                .map(|i| ((i % size) as i64, (i / size) as i64))
-                .filter(|&(x, y)| solid(x, y))
-                .map(|(x, y)| {
-                    (
-                        x as u8,
-                        y as u8,
-                        solid(x - 1, y) as u32
-                            | (solid(x + 1, y) as u32) << 1
-                            | (solid(x, y + 1) as u32) << 2
-                            | (solid(x, y - 1) as u32) << 3,
-                    )
-                })
-                .collect();
-            Sprite { size, pixels }
-        });
+        let sprite = img.map(|img| sprite_of(img.width, &img.rgba));
         self.sprites.insert(name, sprite);
     }
 
     /// An item's model as boxes in the unit cube, made once: a block item's shape, else its
-    /// sprite one texel thick (flat when the sprite could not be read). (first box, count).
-    fn item_model(&mut self, textures: &GameTextures, item: u32) -> Option<(u32, u32)> {
-        if let Some(&m) = self.item_models.get(&item) {
-            return Some(m);
+    /// sprite one texel thick (flat when the sprite could not be read); a stack with a look of
+    /// its own (`abi::comp::LOOK`) is that picture. (model key, (first box, count)).
+    fn item_model(&mut self, textures: &GameTextures, item: u32, look: Option<&str>) -> Option<(u64, (u32, u32))> {
+        let look = look.and_then(|l| textures.look(l));
+        let key = model_key(item, look);
+        if let Some(&m) = self.item_models.get(&key) {
+            return Some((key, m));
         }
         let c = content();
         let first = self.item_boxes.len();
         let white = Vec4::new(1.0, 1.0, 1.0, 0.0);
         let looks = super::looks::current();
         let sprite = match looks.item_draw(c, item) {
+            _ if c.items.get(item as usize).is_none() || item == 0 => return None,
+            _ if look.is_some() => look,
             ItemDraw::Model(model) => {
                 boxes_shape(&mut self.item_boxes, textures, Mat4::IDENTITY, model, &c.states[0], white);
                 None
@@ -651,9 +690,18 @@ impl EntityRenderer {
         };
         if let Some(t) = sprite {
             let l = textures.texture(t);
-            match sprite_name(item)
-                .and_then(|n| self.sprites.get(&n))
-                .and_then(|s| s.as_ref())
+            // A look's pixels come with its texture, once it has loaded (a load remakes models).
+            let own = look
+                .and_then(|t| textures.look_pixels(t))
+                .map(|(size, rgba)| sprite_of(size, &rgba));
+            let from_file = || {
+                sprite_name(item)
+                    .and_then(|n| self.sprites.get(&n))
+                    .and_then(|s| s.as_ref())
+            };
+            match own
+                .as_ref()
+                .or_else(|| look.is_none().then(from_file).flatten())
             {
                 Some(sp) => {
                     let n = sp.size as f32;
@@ -684,8 +732,8 @@ impl EntityRenderer {
             }
         }
         let m = (first as u32, (self.item_boxes.len() - first) as u32);
-        self.item_models.insert(item, m);
-        Some(m)
+        self.item_models.insert(key, m);
+        Some((key, m))
     }
 
     /// Item models made since the last upload go to the GPU; a new texture generation remakes
@@ -924,8 +972,8 @@ impl EntityRenderer {
         posed.clear();
         let mut frame_builds = std::mem::take(&mut self.frame_builds);
         frame_builds.clear();
-        // Who holds something: its place in `posed`, the item and its light.
-        let mut holders: Vec<(usize, u32, u32)> = Vec::new();
+        // Who holds something: its place in `posed`, the item, its look and its light.
+        let mut holders: Vec<(usize, u32, Option<&str>, u32)> = Vec::new();
         // The player's own body in first person only casts its shadow (`shadow_me`).
         for (id, e, shadow_only) in entities
             .iter()
@@ -945,8 +993,8 @@ impl EntityRenderer {
             // Below zero the model's shader flashes white instead of red.
             let hurt = if e.flash > 0.0 { -1.0 } else { (e.hurt / 0.5).clamp(0.0, 1.0) };
             if !e.item.is_empty() {
-                if let Some(m) = self.item_model(textures, e.item.item) {
-                    instances.push((e.item.item, item_instance(ground_transform(base, e.age, e.item.item), m.0, hurt, lit)));
+                if let Some((key, m)) = self.item_model(textures, e.item.item, crate::stack::look(&e.item)) {
+                    instances.push((key, item_instance(ground_transform(base, e.age, e.item.item), m.0, hurt, lit)));
                 }
                 continue;
             }
@@ -1078,7 +1126,7 @@ impl EntityRenderer {
                 shadow_only,
             });
             if e.held != 0 && !sleeping && !shadow_only {
-                holders.push((posed.len() - 1, e.held, lit));
+                holders.push((posed.len() - 1, e.held, e.held_look.as_deref(), lit));
             }
         }
         let vb = scene_buf;
@@ -1086,7 +1134,7 @@ impl EntityRenderer {
         let first_bone = self.models.bones_so_far();
         self.models.add_many(&posed, &frame_builds);
         let (mut at, mut next) = (first_bone, 0);
-        for (holder, item, lit) in holders {
+        for (holder, item, look, lit) in holders {
             at += posed[next..holder]
                 .iter()
                 .filter_map(|p| self.models.kinds.get(p.kind as usize))
@@ -1106,8 +1154,8 @@ impl EntityRenderer {
                 continue;
             };
             let arm = self.models.bone(at + i) * Mat4::from_translation(Vec3::from_array(parts[i].pivot));
-            if let Some(m) = self.item_model(textures, item) {
-                instances.push((item, item_instance(held_transform(arm, item), m.0, 0.0, lit)));
+            if let Some((key, m)) = self.item_model(textures, item, look) {
+                instances.push((key, item_instance(held_transform(arm, item), m.0, 0.0, lit)));
             }
         }
         self.posed = posed;
@@ -1237,8 +1285,8 @@ impl EntityRenderer {
             match hand_transform(cam, &h, pose.unwrap_or(Mat4::IDENTITY)) {
                 Some(m) => {
                     hand_item = self
-                        .item_model(textures, h.stack.item)
-                        .map(|(first, n)| (item_instance(m, first, 0.0, shade(cam.pos)), n))
+                        .item_model(textures, h.stack.item, crate::stack::look(&h.stack))
+                        .map(|(_, (first, n))| (item_instance(m, first, 0.0, shade(cam.pos)), n))
                 }
                 None => {
                     // The arm is the player model's own right arm bone.
@@ -1291,9 +1339,9 @@ impl EntityRenderer {
             list.bind(crate::gpu_layout::bind::entity::ITEM_BOXES, ib);
             let mut i = 0;
             while i < instances.len() {
-                let item = instances[i].0;
-                let run = instances[i..].iter().take_while(|x| x.0 == item).count();
-                let boxes_per = self.item_models.get(&item).map_or(0, |m| m.1);
+                let key = instances[i].0;
+                let run = instances[i..].iter().take_while(|x| x.0 == key).count();
+                let boxes_per = self.item_models.get(&key).map_or(0, |m| m.1);
                 list.push(Cmd::Draw {
                     vertices: boxes_per * 36,
                     instances: run as u32,
@@ -1375,6 +1423,35 @@ fn fire_boxes(out: &mut Vec<GpuBox>, textures: &GameTextures, base: Vec3, width:
             ..Default::default()
         });
     }
+}
+
+/// Opaque pixels of a picture (a strip's first frame) and their neighbors.
+fn sprite_of(size: u32, rgba: &[u8]) -> Sprite {
+    let solid = |x: i64, y: i64| {
+        (0..size as i64).contains(&x)
+            && (0..size as i64).contains(&y)
+            && rgba
+                .get((y as usize * size as usize + x as usize) * 4 + 3)
+                .is_some_and(|&a| a >= 128)
+    };
+    let pixels = (0..size * size)
+        .map(|i| ((i % size) as i64, (i / size) as i64))
+        .filter(|&(x, y)| solid(x, y))
+        .map(|(x, y)| {
+            (
+                x as u8,
+                y as u8,
+                solid(x - 1, y) as u32 | (solid(x + 1, y) as u32) << 1 | (solid(x, y + 1) as u32) << 2 | (solid(x, y - 1) as u32) << 3,
+            )
+        })
+        .collect();
+    Sprite { size, pixels }
+}
+
+/// Item models by item and, for a stack with a look of its own, that look's texture id: one
+/// item drawn from many looks has a model per look.
+fn model_key(item: u32, look: Option<u32>) -> u64 {
+    item as u64 | look.map_or(0, |t| t as u64 + 1) << 32
 }
 
 /// Texture a held item is drawn from as a solid sprite: its icon, or the texture of a plant block.

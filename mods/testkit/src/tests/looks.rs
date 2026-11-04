@@ -443,7 +443,7 @@ pub async fn rich_text(t: T) -> R {
         .await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    let Some([x, y, w, h]) = t.c().ui_rect("slot:36") else { return Err("no hotbar slot in the inventory".into()) };
+    let Some([x, y, w, h]) = t.c().ui_rect(&t.hotbar(0)) else { return Err("no hotbar slot in the inventory".into()) };
     t.c().cursor(x + w / 2.0, y + h / 2.0);
     t.frames(4).await?;
     let rune = t.shot("rune").await?;
@@ -486,6 +486,9 @@ pub async fn sky(t: T) -> R {
     t.world(5).await?;
     t.op("mode creative").await?;
     t.c().look(0.0, 89.0);
+    // Without the GUI: a popup's letters (a level up) would count as stars.
+    t.press("core:hide_hud");
+    t.frames(4).await?;
     let bright = |c: probe::C| c.iter().all(|&v| v > 215);
     t.op("time 6000").await?;
     t.secs(0.6).await?;
@@ -513,8 +516,10 @@ pub async fn sky(t: T) -> R {
     t.probe("the moon overhead", moon, moon > 0.4);
     let stars = night.share(0.0, 0.0, 1.0, 0.3, |c| c.iter().all(|&v| v > 60));
     t.probe("stars at night", stars, stars > 0.0005);
-    // Looking at the sunset and away from it.
-    t.op("time 12400").await?;
+    // Looking at the sunset and away from it, at the equinox: the day's length follows the
+    // seasons, and a new world starts in late winter, when the sun has set long before 12400.
+    // `time` keeps the day, so this is day 7 at 12100, just as its 12 hour day ends.
+    t.op("time 180100").await?;
     t.c().look(90.0, 8.0);
     t.secs(0.6).await?;
     let west = t.shot("sunset").await?;
@@ -525,6 +530,7 @@ pub async fn sky(t: T) -> R {
     let (w, e) = (west.share(0.0, 0.3, 1.0, 0.5, warm), east.share(0.0, 0.3, 1.0, 0.5, warm));
     t.note(format!("warm sky: toward the sunset {w:.3}, away {e:.3}"));
     t.check(w > e + 0.02, format!("a sunset on its side: {w:.3}, away {e:.3}"));
+    t.press("core:hide_hud");
     Ok(())
 }
 
@@ -597,7 +603,9 @@ pub async fn attack_indicator(t: T) -> R {
     t.c().look(0.0, -40.0);
     t.secs(1.0).await?;
     let (x0, y0, x1, y1) = (0.49, 0.505, 0.51, 0.54);
-    let fill = |c: probe::C| c.iter().all(|&v| v > 200);
+    // The bar's fill is the kit's amber (warm and bright), not white: red high, green middling,
+    // blue low; the ground behind it (grass, dirt) is none of that.
+    let fill = |c: probe::C| c[0] > 170 && c[1] > 80 && c[2] < 110;
     let rest = t.shot("charged").await?;
     t.check(rest.share(x0, y0, x1, y1, fill) < 0.01, "nothing under the crosshair when charged");
     let center = rest.share(0.497, 0.494, 0.503, 0.506, |c| c.iter().all(|&v| v > 150));

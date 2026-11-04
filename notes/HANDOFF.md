@@ -429,7 +429,7 @@ the bell "(mod API 1.2)"; `/mods` answered ("bell (mod API 1.2): 1 calls, 121.0 
 Found and fixed after it: the input registered key bindings only at start, so a key a package
 brings on joining was unknown on the joining game (`content_changed` in `app.rs` now registers
 the new content's keys with the player's bindings); the badge's text wrapped a letter a line (it
-needs `no_wrap` in a HUD panel). Bob's HUD after alice's ring and his key: rerun pending. Not covered: other kinds of
+needs `no_wrap` in a HUD panel). Checked on the PC (Tester 2, 47a8be49, two copies at 480x270 beside vLLM): the whole pair. Bob joined as "bob" and downloaded bell, clans, gems and tally; alice's use rang the bell and the puff showed above it; the badge "Bell: 2 rings" on one line over the bar "2/10", in both games; bob's key: "You listen for the bell." in his chat and "player 2 pinged: ping" in alice's log; `/mods` gave the bell's and clans' calls with 0 strikes. Two rings from one use: the script held use 0.3 s and the engine repeats use every 0.2 s while it is held (the script now holds 0.15 s). Not covered: other kinds of
 handle cells (blocks, items, sounds) when a content built earlier comes back.
 Slice 5, personal mods (built, and checked in one game on the PC: off by default with "Your
 personal mods are off in this world: clock.", on after `/rule personal_mods 1` with the clock
@@ -447,8 +447,31 @@ mod's init): each server half running in this world (by the bridge's run) with i
 average and slowest time and strikes in ten minutes (`Instance::stats`), and why one stopped;
 `/mods resume <package>` for admins (`Instance::resume`). Every `Runs` is kept in `ALL` (weak).
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
-and chain steps, cached compiled components and a per-tick budget across mods, `/mods` for
-client halves, the engine's settings hazard on a content switch (Planner).
+and chain steps, cached compiled components and a per-tick budget across mods.
+What a client half costs a frame (Planner, for Ronald's lag work; built, not yet seen in the
+game): `ClientInstance` times every call (`Meter`), a frame ends for every half in the packages
+mod's `client_frame` (`client_half::register`; halves kept in `HALVES`, weak), and `cost()`
+gives the time a frame on average and in the worst of the last `FRAMES` (240), calls a frame,
+the slowest call and strikes. `/client_mods` (a client command) lists each half's, personal
+ones marked, and all together. Test `counts_its_cost_by_frame` (tests/client.rs).
+
+## Phase 4: achievements (2026-11-04 overnight, built, not yet seen in a game)
+
+Slices 8-10. `crates/engine/src/chiacraft/achievements.rs` (the player's store, `achievements.json`
+in the account home; `received`, `anchored`; `check_issuer`, the world DID confirmed both ways),
+`server/achievements.rs` (the server signs what mods grant through the bridge's `achievement`
+question, `Shared.grants`, with the owner's account as issuer and the world DID's proof kept in
+`did.json`; `achievements/issued.jsonl`; the daily anchor behind the world rule
+`anchor_achievements`, `achievements/anchors.json`, proofs sent on join), `achievements_screen.rs`
+(Profile > Achievements). The base mod asks the bridge in `advancements.rs` `grant_where`.
+World rules `sign_achievements` (on) and `anchor_achievements` (off). Protocol 9. Slices 8-9 and
+the join-name fix passed on the Mac (Tester, c030a1d1). Then, on claude/phase4-achievement-rule:
+`/achievementrule <id> [issuers]` (`Rules.achievement`; the world asks the joining game for that
+achievement only, `AskAchievement` / `Proofs`, the join waiting as for a DID; protocol 10) and
+`/revoke <player> <id | *>` (the issuer account's `revoked.json` in its home, sent to players on
+joining and on change, `ToClient::Revocations`, protocol 11; marked on the profile; no longer
+counts at the door). Plural forms for screen text: `chiacraft::plural`. The check:
+`tools/checks/achievements` (two copies, no chain): signing, the profile, the rule, revoking.
 
 ## Our DID sponsor (testnet11, since 2026-11-04)
 
@@ -498,6 +521,12 @@ poses, taming, sitting, love, and a puppy born to two dogs in love (with a local
 dogs in love: aiming `press core:use` at wandering dogs from a script is too hit and miss). If the
 game aborts at start with "unable to open IOSurface kernel service", the Mac has run out of
 IOSurface clients (leaked by hung `simctl` runs); only a reboot clears it.
+
+Server identity (2026-11-04, branch `claude/server-identity-519f6e`, off `dev`): `weft --server`
+exited with "has no address of its own: no account is open". `chiacraft_account::open_server`
+opens (making it once) an account called "Server" in `<run dir>/server-account` (file store),
+and `dedicated.rs` opens it before the world's key; the world's keys and certificate derive from it
+as from a player's account. Phase 7's part (an owner certifying their server) is in the plan.
 
 ## Next steps
 

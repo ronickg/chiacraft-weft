@@ -3,6 +3,9 @@
 //! keeps is where a game keeps it (`config/`, `saves/`). `config/whitelist.txt`, keys one a line,
 //! limits who may join; without it anyone can, and nobody may do more than play until `op`.
 //! `config/disabled_mods.txt`, ids one a line, leaves mods out as the mods screen does.
+//! `server-account/` is the server's own identity (chiacraft, `chiacraft_account::open_server`):
+//! made on the first start, its worlds' keys and certificates come from it, so the server's
+//! addresses stay the same across restarts and need nobody's account.
 
 use std::io::BufRead;
 
@@ -38,7 +41,10 @@ pub fn run(opts: Options) -> Result<(), String> {
     for m in meta.missing_mods(content()) {
         log::warn!("the world was played with mod {m}, which is not loaded");
     }
-    // The world's own key (chiacraft): its address, which players join by.
+    // The world's own key (chiacraft): its address, which players join by. A server has an
+    // identity of its own (`server-account` in its folder) that its worlds' keys come from, as a
+    // player's account is for their worlds; nobody's account is needed to run one.
+    chiacraft_account::open_server(&opts.run_dir).map_err(|e| format!("the server's identity: {e}"))?;
     let identity =
         std::sync::Arc::new(crate::world_address::for_world(&mut meta).map_err(|e| format!("'{name}' has no address of its own: {e}"))?);
     let storage = saves::Storage::open(meta.clone(), content());

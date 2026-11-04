@@ -219,6 +219,17 @@ pub fn server_values() -> std::sync::Arc<ServerValues> {
     ))
 }
 
+/// The values of the server this game's player is playing in, when it runs in this process:
+/// the synced settings the game changes (a mod, the settings screen) go to it too, or the host's
+/// changes would never reach the world or its other players. None while on a remote server or
+/// visiting another world (a visited world's rules must not reach home).
+static PLAYING: Mutex<Option<std::sync::Arc<ServerValues>>> = Mutex::new(None);
+
+/// The player is now in the world whose server keeps `v` (None: no world run here).
+pub fn playing_in(v: Option<std::sync::Arc<ServerValues>>) {
+    *PLAYING.lock().unwrap() = v;
+}
+
 /// This thread reads and writes the synced settings in `v` from now on (`None`: the game's).
 pub fn for_thread(v: Option<std::sync::Arc<ServerValues>>) {
     SERVER.with(|s| *s.borrow_mut() = v);
@@ -292,6 +303,12 @@ pub fn put(id: u32, v: f64) {
         if slot.swap(bits, Ordering::Relaxed) != bits {
             GENERATION.fetch_add(1, Ordering::Relaxed);
         }
+        if d.synced()
+            && let Some(server) = PLAYING.lock().unwrap().as_ref()
+            && let Some(s) = server.0.get(id as usize)
+        {
+            s.store(bits, Ordering::Relaxed);
+        }
     }
 }
 
@@ -305,13 +322,31 @@ pub fn put_text(id: u32, v: &str) {
 
 /// Sets a value and saves it where its scope keeps it (a world's are saved with the world).
 pub fn set(id: u32, v: f64) {
+    if held_for_run(id) {
+        return;
+    }
     put(id, v);
     save_of(id);
 }
 
 pub fn set_text(id: u32, v: &str) {
+    if held_for_run(id) {
+        return;
+    }
     put_text(id, v);
     save_of(id);
+}
+
+/// Whether `id` was set for this run (`override_for_run`): it keeps that value however it is
+/// changed after. The test kit put back vsync, a view of 12 and no shader pack when each test
+/// began, so every lag bench (11-04) ran with vsync on, `--view 8` at 12 and without the pack,
+/// whatever its `--no-vsync`, `--view` or `--config` said.
+fn held_for_run(id: u32) -> bool {
+    let held = OVERRIDES.lock().unwrap().iter().any(|o| o.0 == id);
+    if held {
+        log::debug!("config {}: kept as set for this run", def(id).map_or("?", |d| d.name.as_str()));
+    }
+    held
 }
 
 fn save_of(id: u32) {
@@ -333,7 +368,8 @@ pub fn set_automated(on: bool) {
     AUTOMATED.store(on, Ordering::Relaxed);
 }
 
-/// A value for this run only (`--view`, `--no-vsync`), as the file writes it.
+/// A value for this run only (`--view`, `--no-vsync`, `--config`), as the file writes it; it
+/// holds for the run (`held_for_run`).
 pub fn override_for_run(name: &str, value: &str) {
     let Some(id) = by_name(name) else { return };
     let saved = shown(id);
@@ -518,14 +554,23 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::number("core:view_distance", ck::INT, 12.0, 2.0, 64.0, 1.0),
         // Distant terrain beyond the view (`client::lod`), in cubes; 0 off.
         ConfigDef::number("core:lod_distance", ck::INT, 256.0, 0.0, 2048.0, 16.0),
+        // The 3D world's share of the window's pixels each way (`app::world_frame`), the UI
+        // always whole; 0 picks it by the screen (fewer on high-density ones).
+        ConfigDef::number("core:render_scale", ck::FLOAT, 0.0, 0.0, 1.0, 0.05),
         // Blocks clouds float above where their dimension puts them.
         ConfigDef::number("core:cloud_height", ck::INT, 0.0, 0.0, 512.0, 8.0),
+        // Sun shadows, for shader packs that draw them: 0 off, 1 the near map only (80 blocks
+        // about the player), 2 near and far (400). The maps' size in texels: 1024, 2048 or 4096.
+        ConfigDef::number("core:shadows", ck::INT, 2.0, 0.0, 2.0, 1.0),
+        ConfigDef::number("core:shadow_size", ck::INT, 2048.0, 1024.0, 4096.0, 1024.0),
         // Vanilla's: in GUI pixels, and percent of the dark behind the text.
         ConfigDef::number("core:chat_width", ck::INT, 320.0, 40.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_height", ck::INT, 180.0, 20.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_height_closed", ck::INT, 110.0, 20.0, 1000.0, 10.0),
         ConfigDef::number("core:chat_opacity", ck::INT, 50.0, 0.0, 100.0, 5.0),
         ConfigDef::number("core:vsync", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
+        // Frames a second at most (0: as many as it can draw): less heat and battery, steadier.
+        ConfigDef::number("core:fps_cap", ck::INT, 0.0, 0.0, 360.0, 10.0),
         ConfigDef::number("core:fullscreen", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:terrain_gpu", ck::BOOL, 1.0, 0.0, 1.0, 0.0),
         ConfigDef::number("core:terrain_check", ck::BOOL, 0.0, 0.0, 1.0, 0.0),
@@ -553,6 +598,11 @@ pub fn engine_configs(keys: &[(String, String)]) -> Vec<ConfigDef> {
         ConfigDef::text("core:resource_packs", ""),
         ConfigDef::text("core:shader_pack", ""),
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:mob_spawning", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
+        // chiacraft: the world signs an achievement credential for each player who earns one.
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:sign_achievements", ck::BOOL, 1.0, 0.0, 1.0, 0.0) },
+        // chiacraft: the owner's game commits each day's achievements to the chain (one spend from
+        // the owner's wallet a day); off unless the owner turns it on.
+        ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:anchor_achievements", ck::BOOL, 0.0, 0.0, 1.0, 0.0) },
         ConfigDef { scope: scope::WORLD, ..ConfigDef::number("core:simulation_distance", ck::INT, 8.0, 2.0, 64.0, 1.0) },
         // Entities are sent to players within this many blocks (at most the simulation
         // distance); their moves every tick within a third of it, every 2nd within two

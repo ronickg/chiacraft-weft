@@ -236,6 +236,6 @@ pub(crate) fn ground(w: &World, x: i32, y: i32, z: i32) -> Option<i32> {
         let feet = w.get([x, y, z]);
         let below = w.get([x, y - 1, z]);
         let solid = below != 0 && !w.in_liquid([x as f64 + 0.5, y as f64 - 0.5, z as f64 + 0.5]);
-        (feet == 0 || WATER.on_block(feet)) && solid && w.get([x, y + 1, z]) == 0
+        (feet == 0 || WATER.in_cell(feet)) && solid && w.get([x, y + 1, z]) == 0
     })
 }

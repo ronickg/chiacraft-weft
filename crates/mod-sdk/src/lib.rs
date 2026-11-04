@@ -42,7 +42,7 @@ use std::rc::Rc;
 #[doc(hidden)]
 pub mod bindings {
     wit_bindgen::generate!({
-        path: "../sandbox/wit/v1.2",
+        path: "../sandbox/wit/v1.3",
         world: "server-mod",
         pub_export_macro: true,
         export_macro_name: "__export",
@@ -50,7 +50,7 @@ pub mod bindings {
     });
 }
 
-use bindings::chiacraft::mods::{command as wcommand, log as wlog, names, registry, storage as wstorage, types, world as wworld};
+use bindings::chiacraft::mods::{command as wcommand, names, registry, storage as wstorage, types, world as wworld};
 #[doc(hidden)]
 pub use bindings::exports::chiacraft::mods::content_hooks::Guest as __ContentGuest;
 use bindings::exports::chiacraft::mods::hooks as whooks;
@@ -58,6 +58,9 @@ use bindings::exports::chiacraft::mods::hooks as whooks;
 pub use bindings::exports::chiacraft::mods::hooks::{
     EventValue as __EventValue, Guest as __Guest, Invocation as __Invocation, Value as __Value, Verdict as __Verdict,
 };
+/// What this SDK shares with the client SDK (`chiacraft-mod-common`).
+pub use chiacraft_mod_common::{Arg, ItemStack, Payload, Value, value};
+use chiacraft_mod_common::{value_bytes, value_from};
 #[doc(hidden)]
 pub use types::{
     BlockUpdateEvent as __BlockUpdate, BlockUseEvent as __BlockUse, ItemUseEvent as __ItemUse, ItemUseResult as __ItemUseResult,
@@ -70,7 +73,7 @@ pub use types::{
 pub use weft_abi::{component_flags, permission, stage};
 
 /// The API version this SDK builds for.
-pub const API: &str = "1.2.0";
+pub const API: &str = "1.3.0";
 
 // ------------------------------------------------------------------ entry point
 
@@ -150,11 +153,8 @@ thread_local! {
 
 fn push(id: u32, cb: Callback) {
     CALLBACKS.with(|c| {
-        let mut c = c.borrow_mut();
-        if id as usize == c.len() {
-            c.push(cb);
-        } else {
-            error!("the game numbered callback {id}, expected {}", c.len());
+        if let Err(expected) = chiacraft_mod_common::number(&mut c.borrow_mut(), id, cb) {
+            error!("the game numbered callback {id}, expected {expected}");
         }
     });
 }
@@ -274,16 +274,7 @@ pub fn __packet(id: u32, player: u64, data: Vec<u8>) {
 
 // ------------------------------------------------------------------ logging
 
-#[doc(hidden)]
-pub fn __log(level: u32, args: std::fmt::Arguments) {
-    let level = match level {
-        0 => wlog::Level::Error,
-        1 => wlog::Level::Warn,
-        2 => wlog::Level::Info,
-        _ => wlog::Level::Debug,
-    };
-    wlog::write(level, &std::fmt::format(args));
-}
+chiacraft_mod_common::__glue!(bindings::chiacraft::mods::log, bindings::chiacraft::mods::types);
 
 #[macro_export]
 macro_rules! error { ($($t:tt)*) => { $crate::__log(0, format_args!($($t)*)) } }
@@ -299,53 +290,6 @@ macro_rules! trace { ($($t:tt)*) => { $crate::__log(3, format_args!($($t)*)) } }
 // ------------------------------------------------------------------ shared values
 
 pub use types::Query;
-
-/// One argument of a line players read (Weft's `Arg`).
-#[derive(Clone, Copy, Debug)]
-pub enum Arg<'a> {
-    /// Shown as it is.
-    Text(&'a str),
-    /// A translation key, worded too.
-    Key(&'a str),
-    Int(i64),
-    /// A number with this many decimals.
-    Float(f64, u32),
-    Item(u32),
-    /// A display name, as `{name:..}` writes it.
-    Name(&'a str),
-}
-
-fn wire_args(args: &[Arg]) -> Vec<types::Arg> {
-    args.iter()
-        .map(|a| match *a {
-            Arg::Text(s) => types::Arg::Text(s.into()),
-            Arg::Key(s) => types::Arg::Key(s.into()),
-            Arg::Int(v) => types::Arg::Int(v),
-            Arg::Float(v, d) => types::Arg::Float((v, d)),
-            Arg::Item(i) => types::Arg::Item(i),
-            Arg::Name(s) => types::Arg::Name(s.into()),
-        })
-        .collect()
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct ItemStack {
-    pub item: u32,
-    pub count: u32,
-    pub data: u32,
-}
-
-impl ItemStack {
-    pub const EMPTY: ItemStack = ItemStack { item: 0, count: 0, data: 0 };
-
-    pub fn new(item: u32, count: u32) -> ItemStack {
-        ItemStack { item, count, data: 0 }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.item == 0 || self.count == 0
-    }
-}
 
 impl From<types::ItemStack> for ItemStack {
     fn from(s: types::ItemStack) -> ItemStack {
@@ -913,50 +857,6 @@ impl<T: Payload> Channel<T> {
     }
 }
 
-/// What a channel carries (Weft's `Payload`): `String`, `Vec<u8>`, `()`, or any [`Value`].
-pub trait Payload: Sized + 'static {
-    fn encode(&self) -> Vec<u8>;
-    fn decode(bytes: &[u8]) -> Option<Self>;
-}
-
-impl<T: Value> Payload for T {
-    fn encode(&self) -> Vec<u8> {
-        value_bytes(self)
-    }
-    fn decode(bytes: &[u8]) -> Option<T> {
-        (bytes.len() == std::mem::size_of::<T>())
-            .then(|| value_from(bytes))
-            .flatten()
-    }
-}
-
-impl Payload for String {
-    fn encode(&self) -> Vec<u8> {
-        self.as_bytes().to_vec()
-    }
-    fn decode(bytes: &[u8]) -> Option<String> {
-        String::from_utf8(bytes.to_vec()).ok()
-    }
-}
-
-impl Payload for Vec<u8> {
-    fn encode(&self) -> Vec<u8> {
-        self.clone()
-    }
-    fn decode(bytes: &[u8]) -> Option<Vec<u8>> {
-        Some(bytes.to_vec())
-    }
-}
-
-impl Payload for () {
-    fn encode(&self) -> Vec<u8> {
-        Vec::new()
-    }
-    fn decode(_: &[u8]) -> Option<()> {
-        Some(())
-    }
-}
-
 /// A packet from a player's game (Weft's `Packet`, 1.2).
 pub struct Packet {
     player: u64,
@@ -1264,6 +1164,14 @@ impl World {
     pub fn tell(&self, player: u64, key: &str, args: &[Arg]) {
         wworld::tell(player, key, &wire_args(args));
     }
+    /// The player earned an achievement here (1.3): the world signs a credential for them that
+    /// outlives the world (`docs/sandboxed-mods.md`, "Achievements"). `id` is the mod's own name
+    /// (the package's namespace goes in front); `title` and `description` are the package's lang
+    /// keys or text; `icon` an item's full name. Granting it again signs it again: keep who has
+    /// what in `storage`.
+    pub fn grant_achievement(&self, player: u64, id: &str, title: &str, description: &str, icon: Option<&str>) {
+        wworld::grant_achievement(player, id, title, description, icon);
+    }
     /// Who a player is: their key, the same in every world (ours).
     pub fn player_key(&self, player: u64) -> String {
         wworld::player_key(player)
@@ -1325,49 +1233,6 @@ impl World {
 }
 
 // ------------------------------------------------------------------ components, sounds, particles (1.1)
-
-/// Plain data a component holds (Weft's `Value`): `repr(C)`, `Copy`, no pointers. Primitives and
-/// arrays of them are; structs with [`value!`].
-///
-/// # Safety
-/// Every byte pattern of its size must be a valid value (no `bool`, `char` or enums inside), and
-/// it has no padding the game might keep.
-pub unsafe trait Value: Copy + 'static {}
-
-macro_rules! primitive {
-    ($($t:ty),*) => { $(unsafe impl Value for $t {})* };
-}
-primitive!(u8, i8, u16, i16, u32, i32, u64, i64, f32, f64);
-unsafe impl<T: Value, const N: usize> Value for [T; N] {}
-
-/// A component's struct, as Weft's `value!` writes it: `repr(C)`, `Copy`.
-///
-/// ```ignore
-/// value! {
-///     #[derive(Default)]
-///     pub struct Tribe { pub id: [u8; 16], pub name: [u8; 24] }
-/// }
-/// ```
-#[macro_export]
-macro_rules! value {
-    ($(#[$m:meta])* $vis:vis struct $name:ident { $($(#[$fm:meta])* $fvis:vis $field:ident : $ty:ty),* $(,)? }) => {
-        $(#[$m])*
-        #[repr(C)]
-        #[derive(Clone, Copy, Debug, PartialEq)]
-        $vis struct $name { $($(#[$fm])* $fvis $field: $ty),* }
-        unsafe impl $crate::Value for $name {}
-    };
-}
-
-fn value_bytes<T: Value>(v: &T) -> Vec<u8> {
-    // SAFETY: `Value` is plain data without padding.
-    unsafe { std::slice::from_raw_parts(v as *const T as *const u8, std::mem::size_of::<T>()) }.to_vec()
-}
-
-fn value_from<T: Value>(b: &[u8]) -> Option<T> {
-    // SAFETY: any bytes of the size are a valid `Value`.
-    (b.len() >= std::mem::size_of::<T>()).then(|| unsafe { std::ptr::read_unaligned(b.as_ptr() as *const T) })
-}
 
 /// A per-entity value of this mod's, by its own name (Weft's `Component`); `size_of::<T>()` at
 /// most 256 bytes.

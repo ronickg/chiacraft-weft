@@ -130,6 +130,9 @@ pub struct VulkanBackend {
     swapchain_fn: khr::swapchain::Device,
     push_fn: khr::push_descriptor::Device,
     allocator: ManuallyDrop<Allocator>,
+    /// The memory types outside the GPU's own heaps (system memory), where a GPU-only allocation goes
+    /// when the GPU's memory is full (`allocate`). None on a GPU that shares the system's memory.
+    spill: u32,
     swapchain: Option<Swapchain>,
     frames: Vec<Frame>,
     slot: usize,
@@ -151,8 +154,25 @@ pub struct VulkanBackend {
     capture: Option<(vk::Buffer, Allocation, u32, u32, vk::Format)>,
     device_name: String,
     queries: vk::QueryPool,
+    /// Pipelines compiled before, kept on disk between starts (`load_pipeline_cache`).
+    pipeline_cache: vk::PipelineCache,
     ts_period: f32,
     gpu_times: Vec<f32>,
+    /// Where `begin_frame`'s and `end_frame`'s time goes (waiting for the GPU, `vkAcquireNextImageKHR`,
+    /// recording, `vkQueueSubmit2`, `vkQueuePresentKHR`), logged each second (`log_submit`):
+    /// whether the frame waits for the GPU, for the display or works.
+    submit_split: SubmitSplit,
+}
+
+#[derive(Default)]
+struct SubmitSplit {
+    /// This frame's `begin_frame`: waiting for the slot's last frame on the GPU, and the acquire.
+    begun: [f32; 2],
+    sum: [f64; 5],
+    max: [f32; 5],
+    frames: u32,
+    since: Option<std::time::Instant>,
+    mode: i32,
 }
 
 // Raw Vulkan handles are plain integers/pointers that may be used from any thread as long as access
@@ -336,10 +356,24 @@ impl VulkanBackend {
                 .device_name_as_c_str()
                 .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            log::info!("GPU: {device_name}");
             let mut indexing = vk::PhysicalDeviceDescriptorIndexingProperties::default();
-            let mut props2 = vk::PhysicalDeviceProperties2::default().push_next(&mut indexing);
+            let mut driver = vk::PhysicalDeviceDriverProperties::default();
+            let mut props2 = vk::PhysicalDeviceProperties2::default()
+                .push_next(&mut indexing)
+                .push_next(&mut driver);
             instance.get_physical_device_properties2(pdev, &mut props2);
+            // Which driver too: on a Mac MoltenVK or Mesa's KosmicKrisp can stand behind the
+            // same GPU, and runs comparing them must say which they had.
+            let text = |s: Result<&std::ffi::CStr, _>| {
+                s.map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_default()
+            };
+            log::info!(
+                "GPU: {device_name}, driver {} {} ({:?})",
+                text(driver.driver_name_as_c_str()),
+                text(driver.driver_info_as_c_str()),
+                driver.driver_id
+            );
             let images = indexing
                 .max_per_stage_descriptor_update_after_bind_sampled_images
                 .min(indexing.max_descriptor_set_update_after_bind_sampled_images);
@@ -439,6 +473,7 @@ impl VulkanBackend {
                 allocation_sizes: Default::default(),
             })
             .map_err(err("GPU allocator"))?;
+            let spill = spill_types(&instance.get_physical_device_memory_properties(pdev));
 
             let swapchain_fn = khr::swapchain::Device::new(&instance, &device);
             let push_fn = khr::push_descriptor::Device::new(&instance, &device);
@@ -585,6 +620,9 @@ impl VulkanBackend {
                     None,
                 )
                 .map_err(err("query pool"))?;
+            let pipeline_cache = device
+                .create_pipeline_cache(&vk::PipelineCacheCreateInfo::default(), None)
+                .map_err(err("pipeline cache"))?;
             let mut backend = VulkanBackend {
                 _entry: entry,
                 instance,
@@ -597,6 +635,7 @@ impl VulkanBackend {
                 swapchain_fn,
                 push_fn,
                 allocator: ManuallyDrop::new(allocator),
+                spill,
                 swapchain: None,
                 frames,
                 slot: 0,
@@ -618,8 +657,10 @@ impl VulkanBackend {
                 capture: None,
                 device_name,
                 queries,
+                pipeline_cache,
                 ts_period: props.limits.timestamp_period,
                 gpu_times: Vec::new(),
+                submit_split: SubmitSplit::default(),
             };
             backend.recreate_swapchain()?;
             Ok(backend)
@@ -628,6 +669,46 @@ impl VulkanBackend {
 
     pub fn device_name(&self) -> &str {
         &self.device_name
+    }
+
+    /// Adds a frame to `submit_split`; once a second, with `--log frame=debug`, a line of where
+    /// the frame's GPU calls spent it: in `begin_frame` (the app's "acquire") waiting for this
+    /// slot's frame before last to finish on the GPU (long when the GPU is the bottleneck: the
+    /// 3456 x 2234 rows, 11-04) and acquiring an image; in `end_frame` (the app's "submit")
+    /// recording our commands, `vkQueueSubmit2` (on MoltenVK the Metal encoding, and waiting for a
+    /// drawable to draw into: the display) and `vkQueuePresentKHR`.
+    fn log_submit(&mut self, began: std::time::Instant, queued: std::time::Instant, submitted: std::time::Instant) {
+        let now = std::time::Instant::now();
+        let s = &mut self.submit_split;
+        let ends = [queued - began, submitted - queued, now - submitted].map(|d| d.as_secs_f32() * 1000.0);
+        let parts = [s.begun[0], s.begun[1], ends[0], ends[1], ends[2]];
+        for ((sum, max), p) in s.sum.iter_mut().zip(&mut s.max).zip(parts) {
+            *sum += p as f64;
+            *max = max.max(p);
+        }
+        s.frames += 1;
+        let since = *s.since.get_or_insert(began);
+        if now - since < std::time::Duration::from_secs(1) {
+            return;
+        }
+        let n = s.frames.max(1) as f64;
+        log::debug!(
+            target: "frame",
+            "submit split: gpu wait {:.2} (max {:.2}), acquire {:.2} (max {:.2}), record {:.2} (max {:.2}), queue {:.2} (max {:.2}), present {:.2} (max {:.2}) ms over {} frames, {:?}",
+            s.sum[0] / n,
+            s.max[0],
+            s.sum[1] / n,
+            s.max[1],
+            s.sum[2] / n,
+            s.max[2],
+            s.sum[3] / n,
+            s.max[3],
+            s.sum[4] / n,
+            s.max[4],
+            s.frames,
+            vk::PresentModeKHR::from_raw(s.mode)
+        );
+        *s = SubmitSplit { mode: s.mode, since: Some(now), ..SubmitSplit::default() };
     }
 
     unsafe fn recreate_swapchain(&mut self) -> Result<(), Error> {
@@ -706,6 +787,10 @@ impl VulkanBackend {
                     None,
                 )
                 .map_err(err("vkCreateSwapchainKHR"))?;
+            if self.submit_split.mode != mode.as_raw() || old.is_none() {
+                log::info!("swapchain: {}x{}, {count} images, present mode {mode:?} (vsync {})", extent.width, extent.height, self.vsync);
+            }
+            self.submit_split.mode = mode.as_raw();
             if let Some(old) = old {
                 self.destroy_swapchain(old);
             }
@@ -870,6 +955,7 @@ impl VulkanBackend {
                 let (buffer, alloc) = raw_buffer(
                     &self.device,
                     &mut self.allocator,
+                    self.spill,
                     chunk,
                     vk::BufferUsageFlags::TRANSFER_SRC,
                     MemoryLocation::CpuToGpu,
@@ -1044,9 +1130,43 @@ fn depth_range() -> vk::ImageSubresourceRange {
     }
 }
 
+/// The memory types off the GPU's own heaps, as a mask of their indices: system memory on a
+/// discrete GPU, none where the GPU shares the system's memory.
+fn spill_types(mem: &vk::PhysicalDeviceMemoryProperties) -> u32 {
+    (0..mem.memory_type_count)
+        .filter(|&i| {
+            let heap = mem.memory_heaps[mem.memory_types[i as usize].heap_index as usize];
+            !heap.flags.contains(vk::MemoryHeapFlags::DEVICE_LOCAL)
+        })
+        .fold(0, |m, i| m | 1 << i)
+}
+
+/// Allocates for `desc`. When the GPU's memory is full, a GPU-only allocation goes to system memory
+/// (`spill`), which the GPU reads over the bus: slower, but the game goes on instead of stopping.
+fn allocate(allocator: &mut Allocator, desc: &AllocationCreateDesc, spill: u32) -> gpu_allocator::Result<Allocation> {
+    match allocator.allocate(desc) {
+        Err(gpu_allocator::AllocationError::OutOfMemory)
+            if desc.location == MemoryLocation::GpuOnly && desc.requirements.memory_type_bits & spill != 0 =>
+        {
+            log::warn!(
+                target: "vulkan",
+                "GPU memory is full: {} ({} bytes) goes to system memory",
+                desc.name,
+                desc.requirements.size
+            );
+            let mut desc = desc.clone();
+            desc.requirements.memory_type_bits &= spill;
+            desc.location = MemoryLocation::Unknown;
+            allocator.allocate(&desc)
+        }
+        r => r,
+    }
+}
+
 fn raw_buffer(
     device: &ash::Device,
     allocator: &mut Allocator,
+    spill: u32,
     size: u64,
     usage: vk::BufferUsageFlags,
     location: MemoryLocation,
@@ -1062,15 +1182,9 @@ fn raw_buffer(
             )
             .expect("vkCreateBuffer");
         let requirements = device.get_buffer_memory_requirements(buffer);
-        let alloc = allocator
-            .allocate(&AllocationCreateDesc {
-                name,
-                requirements,
-                location,
-                linear: true,
-                allocation_scheme: AllocationScheme::GpuAllocatorManaged,
-            })
-            .unwrap_or_else(|e| panic!("allocating {size} bytes for {name}: {e}"));
+        let desc =
+            AllocationCreateDesc { name, requirements, location, linear: true, allocation_scheme: AllocationScheme::GpuAllocatorManaged };
+        let alloc = allocate(allocator, &desc, spill).unwrap_or_else(|e| panic!("allocating {size} bytes for {name}: {e}"));
         device
             .bind_buffer_memory(buffer, alloc.memory(), alloc.offset())
             .expect("bind buffer memory");
@@ -1208,7 +1322,7 @@ impl Backend for VulkanBackend {
         } else {
             MemoryLocation::GpuOnly
         };
-        let (raw, alloc) = raw_buffer(&self.device, &mut self.allocator, size, flags, location, label);
+        let (raw, alloc) = raw_buffer(&self.device, &mut self.allocator, self.spill, size, flags, location, label);
         BufferId(self.buffers.insert(Buffer { raw, alloc, size }))
     }
 
@@ -1273,16 +1387,15 @@ impl Backend for VulkanBackend {
                 )
                 .expect("vkCreateImage");
             let requirements = self.device.get_image_memory_requirements(image);
-            let alloc = self
-                .allocator
-                .allocate(&AllocationCreateDesc {
-                    name: label,
-                    requirements,
-                    location: MemoryLocation::GpuOnly,
-                    linear: false,
-                    allocation_scheme: AllocationScheme::GpuAllocatorManaged,
-                })
-                .unwrap_or_else(|e| panic!("allocating texture {label}: {e}"));
+            let alloc_desc = AllocationCreateDesc {
+                name: label,
+                requirements,
+                location: MemoryLocation::GpuOnly,
+                linear: false,
+                allocation_scheme: AllocationScheme::GpuAllocatorManaged,
+            };
+            let alloc =
+                allocate(&mut self.allocator, &alloc_desc, self.spill).unwrap_or_else(|e| panic!("allocating texture {label}: {e}"));
             self.device
                 .bind_image_memory(image, alloc.memory(), alloc.offset())
                 .expect("bind image memory");
@@ -1444,7 +1557,7 @@ impl Backend for VulkanBackend {
             .push_next(&mut rendering);
         let result = unsafe {
             self.device
-                .create_graphics_pipelines(vk::PipelineCache::null(), &[info], None)
+                .create_graphics_pipelines(self.pipeline_cache, &[info], None)
         };
         unsafe {
             self.device.destroy_shader_module(vs, None);
@@ -1472,7 +1585,7 @@ impl Backend for VulkanBackend {
             .layout(layout);
         let result = unsafe {
             self.device
-                .create_compute_pipelines(vk::PipelineCache::null(), &[info], None)
+                .create_compute_pipelines(self.pipeline_cache, &[info], None)
         };
         unsafe { self.device.destroy_shader_module(cs, None) };
         let raw = result.map_err(|(_, e)| Error(format!("compute pipeline {}: {e:?}", desc.label)))?[0];
@@ -1489,7 +1602,9 @@ impl Backend for VulkanBackend {
     }
 
     fn begin_frame(&mut self) -> Option<FrameInfo> {
+        let t0 = std::time::Instant::now();
         self.ensure_slot_ready();
+        let t1 = std::time::Instant::now();
         if self.dirty_swapchain || self.swapchain.is_none() {
             if let Err(e) = unsafe { self.recreate_swapchain() } {
                 log::error!("{e}");
@@ -1502,6 +1617,7 @@ impl Backend for VulkanBackend {
             self.swapchain_fn
                 .acquire_next_image(sc.raw, u64::MAX, acquired, vk::Fence::null())
         };
+        self.submit_split.begun = [t1 - t0, t1.elapsed()].map(|d| d.as_secs_f32() * 1000.0);
         match result {
             Ok((index, suboptimal)) => {
                 if suboptimal {
@@ -1523,6 +1639,9 @@ impl Backend for VulkanBackend {
 
     fn end_frame(&mut self, list: &CommandList) {
         let Some(image_index) = self.image_index.take() else { return };
+        let began = std::time::Instant::now();
+        let queued;
+        let submitted;
         let frame_cmd = self.frames[self.slot].cmd;
         let frame_pool = self.frames[self.slot].pool;
         unsafe {
@@ -1745,6 +1864,7 @@ impl Backend for VulkanBackend {
                 let (buf, alloc) = raw_buffer(
                     &self.device,
                     &mut self.allocator,
+                    self.spill,
                     (w * h * 4) as u64,
                     vk::BufferUsageFlags::TRANSFER_DST,
                     MemoryLocation::GpuToCpu,
@@ -1787,6 +1907,7 @@ impl Backend for VulkanBackend {
                 .command_buffer_infos(&cmds)
                 .signal_semaphore_infos(&signals);
             self.device.reset_fences(&[frame.fence]).ok();
+            queued = std::time::Instant::now();
             if let Err(e) = self
                 .device
                 .queue_submit2(self.queue, &[submit], frame.fence)
@@ -1794,6 +1915,7 @@ impl Backend for VulkanBackend {
                 log::error!("vkQueueSubmit2: {e:?}");
             }
             frame.waited = false;
+            submitted = std::time::Instant::now();
 
             let swapchains = [self.swapchain.as_ref().unwrap().raw];
             let indices = [image_index];
@@ -1809,10 +1931,45 @@ impl Backend for VulkanBackend {
             }
         }
         self.slot = (self.slot + 1) % FRAMES;
+        self.log_submit(began, queued, submitted);
     }
 
     fn request_capture(&mut self) {
         self.capture_requested = true;
+    }
+
+    fn pipeline_cache_data(&self) -> Vec<u8> {
+        unsafe { self.device.get_pipeline_cache_data(self.pipeline_cache) }.unwrap_or_default()
+    }
+
+    fn load_pipeline_cache(&mut self, data: &[u8]) {
+        // Vulkan's header: its length (32), version 1, vendor, device, then the cache's UUID. Only
+        // this very driver's own is passed on.
+        let props = unsafe { self.instance.get_physical_device_properties(self.pdev) };
+        let word = |i: usize| {
+            data.get(i..i + 4)
+                .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        };
+        let ours = data.len() > 32
+            && word(0) == Some(32)
+            && word(4) == Some(vk::PipelineCacheHeaderVersion::ONE.as_raw() as u32)
+            && word(8) == Some(props.vendor_id)
+            && word(12) == Some(props.device_id)
+            && data[16..32] == props.pipeline_cache_uuid;
+        if !ours {
+            return;
+        }
+        let Ok(cache) = (unsafe {
+            self.device
+                .create_pipeline_cache(&vk::PipelineCacheCreateInfo::default().initial_data(data), None)
+        }) else {
+            return;
+        };
+        unsafe {
+            self.device
+                .destroy_pipeline_cache(self.pipeline_cache, None)
+        };
+        self.pipeline_cache = cache;
     }
 
     fn gpu_times(&self) -> &[f32] {
@@ -1856,6 +2013,8 @@ impl Drop for VulkanBackend {
                 self.device.destroy_fence(f.fence, None);
             }
             self.device.destroy_query_pool(self.queries, None);
+            self.device
+                .destroy_pipeline_cache(self.pipeline_cache, None);
             if let Some((buf, alloc, ..)) = self.capture.take() {
                 self.device.destroy_buffer(buf, None);
                 self.allocator.free(alloc).ok();
@@ -1898,5 +2057,41 @@ impl Drop for VulkanBackend {
             }
             self.instance.destroy_instance(None);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn memory(heaps: &[vk::MemoryHeapFlags], types: &[(vk::MemoryPropertyFlags, u32)]) -> vk::PhysicalDeviceMemoryProperties {
+        let mut mem = vk::PhysicalDeviceMemoryProperties {
+            memory_heap_count: heaps.len() as u32,
+            memory_type_count: types.len() as u32,
+            ..Default::default()
+        };
+        for (i, &flags) in heaps.iter().enumerate() {
+            mem.memory_heaps[i] = vk::MemoryHeap { size: 1 << 30, flags };
+        }
+        for (i, &(property_flags, heap_index)) in types.iter().enumerate() {
+            mem.memory_types[i] = vk::MemoryType { property_flags, heap_index };
+        }
+        mem
+    }
+
+    #[test]
+    fn spill_goes_to_system_memory_only() {
+        use vk::MemoryPropertyFlags as P;
+        let host = P::HOST_VISIBLE | P::HOST_COHERENT;
+        // A discrete GPU (NVIDIA's layout): its own heap, system memory, and the small BAR heap
+        // that is device local too.
+        let discrete = memory(
+            &[vk::MemoryHeapFlags::DEVICE_LOCAL, vk::MemoryHeapFlags::empty(), vk::MemoryHeapFlags::DEVICE_LOCAL],
+            &[(P::empty(), 1), (P::DEVICE_LOCAL, 0), (host, 1), (host | P::HOST_CACHED, 1), (P::DEVICE_LOCAL | host, 2)],
+        );
+        assert_eq!(spill_types(&discrete), 0b01101);
+        // Shared memory (Apple): every heap is the GPU's, so nothing to spill to.
+        let unified = memory(&[vk::MemoryHeapFlags::DEVICE_LOCAL], &[(P::DEVICE_LOCAL, 0), (P::DEVICE_LOCAL | host, 0)]);
+        assert_eq!(spill_types(&unified), 0);
     }
 }

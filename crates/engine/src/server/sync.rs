@@ -89,11 +89,12 @@ impl Server {
                 .inventories
                 .get(&p.entity)
                 .and_then(|i| i.get(e.selected as usize))
-                .map_or(0, |s| s.item);
+                .copied()
+                .unwrap_or(ItemStack::EMPTY);
             let need = dim::mining_time(
                 c,
                 state,
-                held,
+                &held,
                 r.head_in_liquid(c, e),
                 e.on_ground,
                 r.attribute(c, e.id, extend::MINING_SPEED, false) as f32,

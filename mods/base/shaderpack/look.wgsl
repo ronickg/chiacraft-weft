@@ -50,15 +50,25 @@ fn blend(a: Palette, b: Palette, t: f32) -> Palette {
     return Palette(mix(a.zenith, b.zenith, t), mix(a.horizon, b.horizon, t), mix(a.glow, b.glow, t), mix(a.sun, b.sun, t), mix(a.ambient, b.ambient, t));
 }
 
-// The palette by how high the sun stands (`scene.sun.y`, about 0.94 at noon): day, golden hour,
+// The palette by how high the sun stands (`scene.sun.y`, about 0.82 at noon on the leaned path): day, golden hour,
 // sunset, dusk and night, blended between.
 fn palette() -> Palette {
     let e = scene.sun.y;
-    let day = key(vec3(0.09, 0.26, 0.85), vec3(0.42, 0.60, 0.95), vec3(1.0, 0.92, 0.78), vec3(0.84, 0.78, 0.68), vec3(0.20, 0.27, 0.42));
-    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.78, 0.66, 0.62), vec3(1.0, 0.72, 0.42), vec3(1.15, 0.80, 0.50), vec3(0.22, 0.24, 0.38));
+    // Day, after Bliss's own colours (reports in the crew notes, bliss-source.md): a muted blue
+    // overhead, about sRGB 50 92 148 (it was 6 139 237), going to a light grey-blue at the horizon
+    // (155 178 202), as Bliss's default sky; not a saturated #4A90E2 blue, and not the grey-beige
+    // of Bliss with Ronald's 4300 K sun, which read overcast and olive here (Tester 2). Values for
+    // the day's exposure of 2.2 (`exposure`). A warm sun; the sky's light in the shade about a
+    // quarter of the sun's (it was a third; Bliss's is a sixth, which our curve's toe crushes to
+    // near black), still blue, so sun and shade part and the land stops looking flat.
+    let day = key(vec3(0.065, 0.115, 0.219), vec3(0.242, 0.323, 0.451), vec3(1.0, 0.92, 0.78), vec3(1.27, 1.016, 0.737), vec3(0.155, 0.222, 0.303));
+    // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
+    let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
     let dusk = key(vec3(0.045, 0.05, 0.16), vec3(0.30, 0.15, 0.27), vec3(0.45, 0.20, 0.25), vec3(0.0, 0.0, 0.0), vec3(0.10, 0.09, 0.17));
     // Night is dark and blue, a little lighter than vanilla's, so lanterns carry the scene.
+    // Night is dark and blue, so firelight's orange stands out against it. (A blue-teal shade, as
+    // Valheim's, mixed with the orange of a fire into olive on the ground: Tester 2's campfire.)
     let night = key(vec3(0.006, 0.010, 0.030), vec3(0.025, 0.035, 0.070), vec3(0.10, 0.13, 0.22), vec3(0.025, 0.04, 0.10), vec3(0.010, 0.017, 0.050));
     var p: Palette;
     if e > 0.08 {
@@ -112,8 +122,10 @@ fn light_strength() -> f32 {
 fn sun_glow(dir: vec3<f32>, p: Palette) -> vec3<f32> {
     let mu = max(dot(dir, scene.sun.xyz), 0.0);
     let horizon = 1.0 - clamp(dir.y, 0.0, 1.0);
-    let wide = pow(mu, 5.0) * (0.28 + 0.4 * horizon);
-    let near = pow(mu, 60.0) * 0.9;
+    // Less of the wide glow in golden hour, so the sky round a low sun stays orange instead of
+    // washing out to white.
+    let wide = pow(mu, 5.0) * (0.2 + 0.28 * horizon) * (1.0 - 0.35 * golden());
+    let near = pow(mu, 60.0) * 0.75;
     return p.glow * (wide + near);
 }
 
@@ -147,32 +159,34 @@ fn sky_color(dir: vec3<f32>) -> vec3<f32> {
 // map: x 1 lit to 0 in shadow (a 3x3 of texels softens the edge), y how far to trust it, 1 well
 // inside the map and fading to 0 at its edge and where it holds nothing this frame (the caller
 // then guesses as it would without one).
-fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
-    if scene.shadow.z < 0.5 {
+// One cascade of the sun's shadows: its matrix `m`, `info` (bindless index, size, 1 when it holds
+// this frame's, the blocks a texel covers), its round reach and depth (blocks).
+fn shadow_in(m: mat4x4<f32>, info: vec4<f32>, round: f32, depth: f32, rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
+    if info.z < 0.5 {
         return vec2(1.0, 0.0);
     }
-    let texel = scene.shadow.w;
+    let texel = info.w;
     // Off the surface along its normal so it does not shade itself, twice as far where the light
     // grazes it (Complementary's and Photon's normal offset), and a hair along the light.
     let ndl = clamp(dot(n, light_dir()), 0.0, 1.0);
-    let c = scene.shadow_view_proj * vec4(rel + n * texel * 1.2 * (2.0 - ndl), 1.0);
+    let c = m * vec4(rel + n * texel * 1.2 * (2.0 - ndl), 1.0);
     let ndc = c.xyz / c.w;
-    // The nearer of the box's edge and its round reach (80 blocks), so the corners fade too.
-    let reach = max(max(abs(ndc.x), abs(ndc.y)), length(rel.xz) / 80.0);
+    // The nearer of the box's edge and its round reach, so the corners fade too.
+    let reach = max(max(abs(ndc.x), abs(ndc.y)), length(rel.xz) / round);
     if reach > 0.97 || ndc.z <= 0.0 || ndc.z >= 1.0 {
         return vec2(1.0, 0.0);
     }
-    let size = i32(scene.shadow.y);
+    let size = i32(info.y);
     // Rows run down the map as y runs up the light's view: the engine's shaders draw with y up, the
     // way the screen effects read the screen (`0.5 - ndc.y * 0.5`). Read the other way up, every
     // shadow was mirrored across the camera's row of the map, and one side of open ground lay in
     // the mirror image of the ground itself.
     let at = vec2<i32>(vec2(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * f32(size));
-    let index = u32(scene.shadow.x);
+    let index = u32(info.x);
     // A few hundredths of a block along the light, more on surfaces the light grazes, in the map's
-    // depth (it spans 400 blocks): no floating shadows at the foot of things.
+    // depth: no floating shadows at the foot of things.
     let slope = min(sqrt(max(1.0 - ndl * ndl, 0.0)) / max(ndl, 0.05), 4.0);
-    let bias = (0.03 + texel * 0.5 * slope) / 400.0;
+    let bias = (0.03 + texel * 0.5 * slope) / depth;
     // A 4x4 of the map about the point; each of the 3x3 taps takes the nearest to the light of its
     // texel and the ones right and below. That closes the one-texel cracks between neighbouring
     // meshes, through which sunlight would draw thin dotted lines across a shadow.
@@ -199,12 +213,78 @@ fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
     return vec2(lit, (1.0 - smoothstep(0.85, 0.97, reach)) * low);
 }
 
+// How much of the sun reaches `rel` (camera relative) facing `n`: the near cascade's map (80 blocks
+// about the player, fine) where it holds, the far one's (400 blocks, coarser) beyond, handing over
+// smoothly; x 1 lit to 0 in shadow, y how far to trust it.
+fn shadow_at(rel: vec3<f32>, n: vec3<f32>) -> vec2<f32> {
+    let near = shadow_in(scene.shadow_view_proj, scene.shadow, 80.0, 400.0, rel, n);
+    if near.y >= 0.999 {
+        return near;
+    }
+    let far = shadow_in(scene.shadow_far_view_proj, scene.shadow_far, 400.0, 1200.0, rel, n);
+    let trust = max(near.y, far.y);
+    if trust <= 0.0 {
+        return vec2(1.0, 0.0);
+    }
+    return vec2(mix(far.x, near.x, near.y / trust), trust);
+}
+
 // The sun on a mob or a model at `rel` facing `n` with sky light `sky`: the shadow map where it
 // reaches (they stand in the shadows of trees and houses), the sky light alone elsewhere.
 fn sun_on_body(rel: vec3<f32>, n: vec3<f32>, sky: f32) -> f32 {
     let guess = smoothstep(0.8, 1.0, sky);
     let mapped = shadow_at(rel, n);
-    return mix(guess, min(mapped.x, smoothstep(0.3, 0.8, sky)), mapped.y);
+    return mix(guess, min(mapped.x, smoothstep(0.3, 0.8, sky)), mapped.y) * cloud_shadow(rel);
+}
+
+// ---- the clouds' shadows (`scene.clouds`, the sky's cloud layer) ----
+
+// The slab is at least this thick (blocks): `sky.wgsl`'s clouds (CLOUD_THICKNESS there).
+const CLOUD_SLAB: f32 = 9.0;
+
+// 1 where cell `cell` (picture cells from `origin`, the camera's) is cloud: the picture's
+// (bindless `tex`, `dims` cells), and as the weather fills them (`fill`) more of the gaps, a hash
+// per cell so they grow as whole cells. The sky's clouds and their shadows both read this.
+fn cloud_cell_of(tex: u32, cell: vec2<f32>, origin: vec2<f32>, dims: vec2<f32>, fill: f32) -> f32 {
+    let at = fract((cell + origin + vec2(0.5)) / dims);
+    if textureSampleLevel(textures[tex], nearest_clamp, at, 0.0).a >= 0.5 {
+        return 1.0;
+    }
+    let w = vec2<i32>(cell + origin);
+    return select(0.0, 1.0, hash3(vec3(w.x, 51, w.y)) < fill);
+}
+
+// How much of the sun the clouds let through to `rel` (camera relative): 1 under open sky, about
+// a fifth under a cloud's middle, soft at its edges. The point is followed toward the light to the
+// slab's middle, where the four nearest cells are blended as the sky draws them, so the shadows
+// are the clouds overhead, drifting with them across near and far land alike (Bliss's moving
+// shade on the hills).
+fn cloud_shadow(rel: vec3<f32>) -> f32 {
+    let c = scene.clouds;
+    let l = light_dir();
+    if c.x < 0.5 || l.y < 0.03 {
+        return 1.0;
+    }
+    let t = (c.z + CLOUD_SLAB * 0.5 - rel.y) / l.y;
+    if t <= 0.0 {
+        return 1.0;
+    }
+    let tex = u32(c.x - 0.5);
+    let dims = vec2<f32>(textureDimensions(textures[tex]));
+    let q = scene.cloud_cells.xy + (rel.xz + l.xz * t) / c.y - vec2(0.5);
+    let base = floor(q);
+    let f = q - base;
+    let u = f * f * (3.0 - 2.0 * f);
+    let o = scene.cloud_cells.zw;
+    let a = cloud_cell_of(tex, base, o, dims, c.w);
+    let b = cloud_cell_of(tex, base + vec2(1.0, 0.0), o, dims, c.w);
+    let d = cloud_cell_of(tex, base + vec2(0.0, 1.0), o, dims, c.w);
+    let e = cloud_cell_of(tex, base + vec2(1.0, 1.0), o, dims, c.w);
+    let cover = mix(mix(a, b, u.x), mix(d, e, u.x), u.y);
+    // Fading in as the light climbs: long low shadows from far clouds would smear across the land.
+    let lift = smoothstep(0.03, 0.15, l.y);
+    // The sky's puffs fill in over this range of the blend at their middle (`cloud_density`).
+    return 1.0 - 0.8 * smoothstep(0.35, 0.6, cover) * lift;
 }
 
 // ---- light on things ----
@@ -216,14 +296,17 @@ fn block_light(b: vec3<f32>, pos: vec3<f32>) -> vec3<f32> {
     if m <= 0.0 {
         return vec3(0.0);
     }
-    let curve = vec3(brightness_curve(b.x), brightness_curve(b.y), brightness_curve(b.z));
+    // Wider pools than the levels alone give (Valheim's fires light a wide ring of ground): the
+    // dim edge of a torch's reach brought up.
+    let curve = pow(vec3(brightness_curve(b.x), brightness_curve(b.y), brightness_curve(b.z)), vec3(0.9));
     // White light (torches, lanterns) is warmed; colored light keeps its color.
     let grey = 1.0 - (m - min(min(b.x, b.y), b.z)) / m;
     let warm = mix(vec3(1.0), mix(vec3(1.0, 0.56, 0.26), vec3(1.0, 0.82, 0.62), m * m), grey);
     let t = scene.params.w;
     let q = floor(pos * 0.5);
     let flicker = 1.0 + 0.045 * sin(t * 7.3 + q.x * 1.7 + q.z * 2.3) + 0.03 * sin(t * 13.1 + q.y * 3.1);
-    return curve * warm * 1.55 * flicker;
+    // A little less than the levels alone gave: wider at 1.55, the middle of the pool went yellow.
+    return curve * warm * 1.4 * flicker;
 }
 
 // How much a surface with normal `n` faces the sun. With the sun low its light wraps a little
@@ -241,9 +324,13 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // More of the sky's light comes from above than from the sides, and little from below.
     let hemi = 0.62 + 0.38 * n.y;
     var c = p.ambient * sky * hemi * ao;
-    // At golden hour the sky round the low sun glows: a warm fill on everything under it, in the
-    // shade too, so the hour reaches the ground and not only the sky.
-    c += p.glow * golden() * 0.35 * sky * hemi * ao;
+    // At golden hour the sky round the low sun glows: a warm fill from its side of the sky, on
+    // the faces turned that way; those turned away keep the sky's cool light (Valheim's warm light,
+    // blue shade).
+    let l = light_dir();
+    let side = normalize(vec3(l.x, 0.0, l.z) + vec3(1e-4, 0.0, 0.0));
+    let toward = clamp(dot(n, side) * 0.5 + 0.5, 0.0, 1.0);
+    c += p.glow * golden() * 0.35 * mix(0.3, 1.1, toward) * sky * hemi * ao;
     // Direct light only where the sky reaches (it keeps caves out of reach of the traced shadow's
     // gaps), and without corner shading: corners are dark where little sky gets in.
     let open = smoothstep(0.5, 0.95, light.x);
@@ -398,9 +485,60 @@ fn haze(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
 }
 
 // `haze` for a point with `sky` (0..1) sky light: fog gathers only out under the sky.
+// The water itself seen from inside it: teal, lit by the sky and the sun above (the engine's water
+// fog is a dark navy). Its fog is blue rather than lava's red, so lava keeps the engine's.
+fn in_water() -> bool {
+    return in_liquid() && scene.fog_color.b > scene.fog_color.r;
+}
+
+fn underwater_color() -> vec3<f32> {
+    let p = palette();
+    let light = p.ambient * 1.4 + p.sun * light_strength() * 0.5;
+    // A murky green-teal (Bliss's under water), not the bright cyan step 2 showed.
+    return vec3(0.040, 0.19, 0.15) * light * 1.8;
+}
+
+// Where the water's surface is above the eye under water: the sea's, or just over the eye in a
+// lake higher up.
+fn water_surface() -> f32 {
+    return max(SEA_LEVEL, scene.eye.y + 0.5);
+}
+
+// The water between the eye and a point `rel` away, from inside it: bright teal near the surface,
+// darker as it goes down, clear for about 20 blocks (the engine's water fog is a few), and beams of
+// sunlight slanting down through it, broken up by the waves above. Six steps along the way.
+fn under_water(c: vec3<f32>, rel: vec3<f32>) -> vec3<f32> {
+    let dist = length(rel);
+    let surface = water_surface();
+    let y = scene.eye.y + rel.y;
+    let down = exp(-max(surface - y, 0.0) / 28.0);
+    let fog = underwater_color() * mix(0.35, 1.0, down);
+    var out = mix(c * mix(0.6, 1.0, down), fog, 1.0 - exp(-dist / 18.0));
+    let l = light_dir();
+    if l.y > 0.05 && light_strength() > 0.0 {
+        let reach = min(dist, 32.0);
+        let t = scene.params.w;
+        var beams = 0.0;
+        for (var i = 0; i < 6; i++) {
+            let at = rel * ((f32(i) + 0.5) / 6.0) * (reach / max(dist, 1e-4));
+            let wy = scene.eye.y + at.y;
+            // Straight up the light to the surface: where it came through.
+            let q = (at.xz + scene.eye.xz) + l.xz / l.y * (surface - wy);
+            let n = noise3(vec3(q.x * 0.18, t * 0.06, q.y * 0.18));
+            beams += pow(1.0 - abs(n * 2.0 - 1.0), 6.0) * exp(-max(surface - wy, 0.0) / 20.0);
+        }
+        let p = palette();
+        out += p.sun * light_strength() * vec3(0.55, 0.95, 0.85) * beams * (reach / 6.0) * 0.012;
+    }
+    return out;
+}
+
 fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     let c = fog_through(c_in, rel, smoothstep(0.25, 0.75, sky));
     let dist = length(rel);
+    if in_water() {
+        return under_water(c, rel);
+    }
     if in_liquid() || !open_sky() {
         return mix(c, scene.fog_color.rgb, fog_amount(dist, scene.params.x, scene.params.y));
     }
@@ -413,9 +551,25 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // Thinner looking up at what is high, so hills stand out against a hazy valley.
     let thin = exp(-max(rel.y, 0.0) / 90.0);
     let rain = rain_amount();
-    let amount = 1.0 - exp(-dist / (end * mix(0.9, 0.4, rain)) * mix(0.45, 1.0, thin));
+    // The air's own depth, whatever the view distance: with distant terrain the fog's end lies
+    // thousands of blocks off, and the haze would barely start where the kept blocks give way to it.
+    let reach = min(end, 2500.0);
+    let amount = 1.0 - exp(-dist / (reach * mix(0.9, 0.4, rain)) * mix(0.45, 1.0, thin));
     let edge = smoothstep(end * 0.72, end, dist);
-    return mix(c, color, clamp(max(amount * 0.9, edge), 0.0, 1.0));
+    // Valheim's air: lit from behind by the sun, so the haze toward it glows warm (a forward
+    // scattering lobe, Henyey-Greenstein) and the side away goes a cool blue-teal, most at a low
+    // sun. Toward the far end it hands back to the sky's own color, which the terrain fades into.
+    let p = palette();
+    let mu = dot(dir, light_dir());
+    let g = 0.7;
+    let lobe = min((1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5) / 12.566, 0.9);
+    let near_end = 1.0 - edge;
+    var lit = color + p.glow * light_strength() * lobe * mix(0.25, 0.7, golden()) * (1.0 - rain) * near_end;
+    lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
+    // The far loses its colour before the haze covers it: far ridges go pale and grey-blue while the
+    // near stays rich.
+    let pale = mix(c, vec3(luma(c)), clamp(amount * 1.2, 0.0, 0.7));
+    return mix(pale, lit, clamp(max(amount * 0.9, edge), 0.0, 1.0));
 }
 
 // ---- to the screen ----
@@ -433,13 +587,42 @@ fn shoulder(x: vec3<f32>) -> vec3<f32> {
 // The grade on top: the darks a little cool and the lights warmer as the sun goes down (warm
 // light, blue shade), colour held back a little (vanilla's, not a saturated look), and a cool
 // floor so nothing is ever pure black.
+// Jim Hejl's 2015 filmic curve (his published formula): a toe that deepens the darks and a long
+// shoulder that keeps bright skies and sunlit faces from flattening; its output is display-coded,
+// so it is brought back to linear for the sRGB screen.
+fn hejl(c: vec3<f32>, white: f32) -> vec3<f32> {
+    let v = vec4(c, white);
+    let a = 1.425 * v + vec4(0.05);
+    let f = (v * a + vec4(0.004)) / (v * (a + vec4(0.55)) + vec4(0.0491)) - vec4(0.0821);
+    return pow(max(f.rgb / f.w, vec3(0.0)), vec3(2.2));
+}
+
+// How bright the picture is taken: the filmic curve deepens the mid-tones, so by day it is opened
+// up to keep them where they were, and more as night falls and under water, the eye adjusting.
+fn exposure() -> f32 {
+    // Under water a little less than in lava's glare (3.0 there): it washed the water to cyan.
+    if in_water() {
+        return 2.2;
+    }
+    if in_liquid() {
+        return 3.0;
+    }
+    // By day 2.2 (it was 1.7): with less of the sky's light in the shade (Colour 1) the picture went
+    // darker than Bliss's (mean brightness 0.55 against about 0.6, shallows dark navy). Golden hour
+    // keeps 1.7, its palette made for it.
+    let day = mix(1.7, 2.2, smoothstep(0.1, 0.35, scene.sun.y));
+    return mix(day, 4.0, smoothstep(0.0, -0.2, scene.sun.y));
+}
+
 fn display(c: vec3<f32>) -> vec3<f32> {
-    var t = shoulder(max(c, vec3(0.0)));
+    var t = hejl(max(c, vec3(0.0)) * exposure(), 3.0);
     // Only true darks go cool (most daylit ground is mid-tone and keeps its color).
     let lights = smoothstep(0.02, 0.22, luma(t));
-    t *= mix(vec3(0.975, 0.99, 1.03), mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
-    let y = luma(t);
-    t = max(mix(vec3(y), t, 0.98), vec3(0.0));
+    let shade = mix(vec3(0.975, 0.99, 1.03), vec3(0.92, 0.96, 1.10), golden());
+    t *= mix(shade, mix(vec3(1.0), vec3(1.12, 1.0, 0.82), golden()), lights);
+    // No saturation added here: it was 8 to 25 % on top of a picture already twice as colourful as
+    // Bliss's (mean saturation 0.46-0.52 against 0.19-0.29 in its pictures), and it took all the
+    // blue out of grass (sRGB 113 177 56 became 96 181 11).
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034);
     return clamp(t, vec3(0.0), vec3(1.0));
 }

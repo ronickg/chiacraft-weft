@@ -297,23 +297,24 @@ pub async fn inventory_crafting(t: T) -> R {
     t.op("put me 0 oak_log 16").await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    // Menu slots: 0-3 grid, 4 result, 5-8 armor, 9-35 main, 36-44 hotbar.
+    // Menu slots: 0-3 grid, 4 result, 5-12 armor and clothes, 13-39 main, 40-48 the hotbar
+    // (`t.hotbar`, which finds it).
     let (log, planks) = (id("base:oak_log"), id("base:oak_planks"));
-    t.click_ui("slot:36", 0);
+    t.click_ui(&t.hotbar(0), 0);
     t.until("logs on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == log)
         .await?;
     t.click_ui("slot:0", 1);
     t.until("planks in the result", Duration::from_secs(5), |t| t.c().menu_slot(4).item == planks)
         .await?;
     t.check_eq(t.c().menu_slot(4).count, 4, "planks from one log");
-    t.click_ui("slot:36", 0);
+    t.click_ui(&t.hotbar(0), 0);
     t.until("cursor empty", Duration::from_secs(5), |t| t.c().cursor_stack().is_empty())
         .await?;
     t.shot("grid").await?;
     t.click_ui("slot:4", 0);
     t.until("planks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == planks)
         .await?;
-    t.click_ui("slot:37", 0);
+    t.click_ui(&t.hotbar(1), 0);
     t.until("planks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(1).item == planks)
         .await?;
     t.c().close_screen();
@@ -335,7 +336,7 @@ pub async fn creative_inventory(t: T) -> R {
     if t.click_ui(&format!("item:{stone}"), 0) {
         t.until("bricks on the cursor", Duration::from_secs(5), |t| t.c().cursor_stack().item == stone)
             .await?;
-        t.click_ui("slot:36", 0);
+        t.click_ui(&t.hotbar(0), 0);
         t.until("bricks in the hotbar", Duration::from_secs(5), |t| t.c().inventory_slot(0).item == stone)
             .await?;
     }
@@ -427,7 +428,9 @@ pub async fn chat(t: T) -> R {
     t.world(3).await?;
     t.press("core:command");
     t.screen("core:chat").await?;
-    t.until("the command list", Duration::from_secs(2), |t| t.c().ui_rect("text:gamemode").is_some())
+    // The list itself (its first ten, alphabetical: with every mod's commands "gamemode" is
+    // not among them any more).
+    t.until("the command list", Duration::from_secs(2), |t| t.c().ui_rect("class:suggest").is_some())
         .await?;
     t.check_eq(t.c().input_text(), "/".to_string(), "the line");
     // A mod's key does not fire while the chat has the input.
@@ -560,7 +563,7 @@ pub async fn recipe_viewer(t: T) -> R {
     t.op("put me 0 iron_ingot 3").await?;
     t.press("core:inventory");
     t.screen("core:menu").await?;
-    let Some([x, y, w, h]) = t.c().ui_rect("slot:36") else { return Err("no hotbar slot".into()) };
+    let Some([x, y, w, h]) = t.c().ui_rect(&t.hotbar(0)) else { return Err("no hotbar slot".into()) };
     t.c().cursor(x + w / 2.0, y + h / 2.0);
     t.frames(3).await?;
     t.press("core:recipes");
@@ -606,7 +609,7 @@ pub async fn recipe_viewer(t: T) -> R {
     // A kind laid out by its mod, with a fluid.
     t.op("put me 1 diamond 1").await?;
     t.frames(3).await?;
-    let Some([x, y, w, h]) = t.c().ui_rect("slot:37") else { return Err("no hotbar slot".into()) };
+    let Some([x, y, w, h]) = t.c().ui_rect(&t.hotbar(1)) else { return Err("no hotbar slot".into()) };
     t.c().cursor(x + w / 2.0, y + h / 2.0);
     t.frames(3).await?;
     t.press("core:uses");

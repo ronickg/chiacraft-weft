@@ -246,6 +246,20 @@ pub fn problems() -> Vec<String> {
         }
     }
 
+    // Crafts that wait (`crafts`): a buckskin while one eats (2 to 4 minutes), a charcoal clamp a
+    // few minutes (4 to 6), sole leather most of a game week (3 to 5 game days), as CONTENT.md has
+    // them.
+    for (station, lo, hi) in [
+        (crate::crafts::Station::TanningFrame, 120.0, 240.0),
+        (crate::crafts::Station::CharcoalClamp, 240.0, 360.0),
+        (crate::crafts::Station::TanningPit, 3.0 * crate::DAY_SECS, 5.0 * crate::DAY_SECS),
+    ] {
+        let secs = crate::crafts::craft(station).secs();
+        if !(lo..=hi).contains(&secs) {
+            out.push(format!("{} takes {secs:.0} s ({lo:.0} to {hi:.0} wanted)", station.name()));
+        }
+    }
+
     // Freezing takes a full new player in two to five minutes at normal difficulty.
     let freeze = 1.0 / Effect::Freezing.modifiers().health_loss;
     if !(120.0..=300.0).contains(&freeze) {

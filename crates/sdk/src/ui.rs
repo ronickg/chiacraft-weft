@@ -648,6 +648,16 @@ impl Ui {
         self.with(n, |ui| ui.text_styled(S::col().class("button").no_wrap(), key, args));
     }
 
+    /// A button holding any parts (an item's icon, a row of them) instead of a label.
+    pub fn button_with(&mut self, s: S, f: impl Fn(&ClientView) + Send + Sync + 'static, parts: impl FnOnce(&mut Ui)) {
+        let mut n = node(k::BUTTON, s);
+        n.on_click = callback(move |a: &mut abi::UiArgs| f(&ClientView { raw: a.client }));
+        if n.class.len == 0 {
+            n.class = Str::new("button");
+        }
+        self.with(n, parts);
+    }
+
     /// A one-line text field starting with `value` (at most `max` characters, 0 for any);
     /// `on_change` gets the text after every edit.
     pub fn input(&mut self, value: &str, max: u32, s: S, on_change: impl Fn(&ClientView, &str) + Send + Sync + 'static) {

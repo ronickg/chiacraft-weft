@@ -132,8 +132,10 @@ pub fn register(r: &mut Registry) {
         Some(b) => drop(rice.placed_block(b)),
         None => drop(rice),
     }
+    // Buckskin, brain-tanned from a hide at a tanning frame (`crafts.rs`): clothes and books. Leather
+    // armor is sole leather's (`materials/leather`), bark-tanned for days in a pit.
     r.item(Item::generated("leather".into()))
-        .tag("materials/leather")
+        .tag("leather")
         .tab(&crate::tabs::INGREDIENTS);
     // paper (from sugar cane) and books (paper and leather) make bookshelves
     for name in ["bone", "string", "sugar", "gunpowder", "feather", "arrow", "egg", "paper", "book"] {

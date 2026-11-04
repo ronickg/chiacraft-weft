@@ -628,7 +628,11 @@ numbers are `reports/content/Building and workstations.md` B3; `vitals::shelter`
   empty; with a fire it warms by its walls (log, earth, snow +25 °C; plank, stone +16; hide,
   glass +12), fully up to 60 blocks of air and down to 40% in a bigger room, never less than the
   fire gives beside it.
-- The HUD says "Room · log walls, +18 °C" while in one.
+- The HUD says "Room · log walls, +8 °C" while in one: what the room adds over the same air in the
+  open (with a fire, over the fire's own warmth there).
+- Seen in the game (Tester 2, rooms3, 11-04, a winter midnight, 30 blocks up): outside 7.8 °C;
+  a log room 12.4 empty, 30.4 with a campfire; stone 26.2, wool 22.8 with one; a 3×3 gap through
+  a wall ends the room (the line goes; the campfire 2 blocks off still warms the air to 22).
 - Checks (`vitals::balance`): a fire in a log cabin keeps a player in arrival clothes
   comfortable on a -20 °C night; logs keep a fire's heat better than stone, stone than hide; an
   earthen room is cooler than a desert afternoon.
@@ -668,4 +672,18 @@ content plan; logged in `notes/crew/OVERNIGHT.md`):
   shows its warmth.
 - Not here: animals' fire reach and wind (`comfort.rs`, `eggs.rs`) and the hunters' hunger
   thresholds written twice (`forage.rs`, `hunt.rs`): the animals mod's.
+
+**21. Crafts that wait** (2026-11-04 overnight, `notes/CONTENT.md` decision 6, taken by the content
+plan; logged in `notes/crew/OVERNIGHT.md`; `vitals::crafts`, `mods/base/src/crafts.rs`):
+
+- What takes days in real life takes its time on the growing pace (game days = 0.0645 · real
+  days^0.7), at a station that keeps working unwatched (and catches up when its area loads):
+  a tanning frame brain-tans a raw hide into buckskin leather (3 real days: 2.8 minutes); a
+  tanning pit soaks hides with oak bark into sole leather (a year: 4.0 game days, 8 at a time);
+  a charcoal clamp chars logs into coal (7 days: 5 minutes, 16 at a time, no fuel).
+- Cows, deer and capybaras drop raw hides now, not leather. Buckskin (`#leather`) makes clothes,
+  books and the rain cape; sole leather (`materials/leather`) makes leather armor. Oak bark is
+  peeled from oak logs at the crafting table.
+- Not yet: retting (it waits for a flax plant), dressing furs (pelts come ready), seasoning bow
+  staves, kilns; the stations' faces are placeholders.
 
