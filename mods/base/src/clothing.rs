@@ -23,7 +23,7 @@ fn sewn_from(material: &str) -> &'static str {
     match material {
         "fur" => "#pelts",
         "wool" => "wool",
-        "hide" => "#materials/leather",
+        "hide" => "#leather",
         _ => "#cloth",
     }
 }
@@ -70,7 +70,7 @@ fn cloak_recipe(name: &str) -> (&'static str, &'static [&'static str]) {
     match name {
         "wool_cloak" => ("wool", &["XsX", " X "]),
         "fur_robe" => ("#pelts", &["XXX", "XsX"]),
-        _ => ("#materials/leather", &["XsX", "XXX"]),
+        _ => ("#leather", &["XsX", "XXX"]),
     }
 }
 const CLOAK_INFLATE: f32 = 1.2;

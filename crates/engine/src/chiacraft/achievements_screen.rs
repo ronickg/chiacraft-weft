@@ -46,7 +46,12 @@ impl Screen for Achievements {
                             Some(d) => label(ui, cx, "achievements.did", &[Arg::Text(d)], "dim"),
                             None => label(ui, cx, "achievements.no_did", &[], "dim"),
                         };
-                        label(ui, cx, "achievements.count", &[Arg::Int(store.credentials.len() as i64)], "default");
+                        let n = store.credentials.len() as i64;
+                        let form = super::plural(&cx.settings.language(), n);
+                        let key = format!("achievements.count.{form}");
+                        // A language without that form uses its `other`.
+                        let key = if cx.lang.has(&key) { key } else { "achievements.count.other".into() };
+                        label(ui, cx, &key, &[Arg::Int(n)], "default");
                     });
                     if store.credentials.is_empty() {
                         label(ui, cx, "achievements.none", &[], "dim");
@@ -99,6 +104,9 @@ impl Screen for Achievements {
                                 );
                                 if !c.achievement.description.is_empty() {
                                     label(ui, cx, "achievements.desc", &[shown(cx, &c.achievement.description)], "dim");
+                                }
+                                if store.revoked(c) {
+                                    label(ui, cx, "achievements.withdrawn", &[], "dim");
                                 }
                             }
                         });

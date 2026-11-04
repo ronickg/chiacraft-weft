@@ -459,8 +459,14 @@ question, `Shared.grants`, with the owner's account as issuer and the world DID'
 `did.json`; `achievements/issued.jsonl`; the daily anchor behind the world rule
 `anchor_achievements`, `achievements/anchors.json`, proofs sent on join), `achievements_screen.rs`
 (Profile > Achievements). The base mod asks the bridge in `advancements.rs` `grant_where`.
-World rules `sign_achievements` (on) and `anchor_achievements` (off). Protocol 9. The check:
-`tools/checks/achievements` (two copies, no chain).
+World rules `sign_achievements` (on) and `anchor_achievements` (off). Protocol 9. Slices 8-9 and
+the join-name fix passed on the Mac (Tester, c030a1d1). Then, on claude/phase4-achievement-rule:
+`/achievementrule <id> [issuers]` (`Rules.achievement`; the world asks the joining game for that
+achievement only, `AskAchievement` / `Proofs`, the join waiting as for a DID; protocol 10) and
+`/revoke <player> <id | *>` (the issuer account's `revoked.json` in its home, sent to players on
+joining and on change, `ToClient::Revocations`, protocol 11; marked on the profile; no longer
+counts at the door). Plural forms for screen text: `chiacraft::plural`. The check:
+`tools/checks/achievements` (two copies, no chain): signing, the profile, the rule, revoking.
 
 ## Our DID sponsor (testnet11, since 2026-11-04)
 
@@ -510,6 +516,12 @@ poses, taming, sitting, love, and a puppy born to two dogs in love (with a local
 dogs in love: aiming `press core:use` at wandering dogs from a script is too hit and miss). If the
 game aborts at start with "unable to open IOSurface kernel service", the Mac has run out of
 IOSurface clients (leaked by hung `simctl` runs); only a reboot clears it.
+
+Server identity (2026-11-04, branch `claude/server-identity-519f6e`, off `dev`): `weft --server`
+exited with "has no address of its own: no account is open". `chiacraft_account::open_server`
+opens (making it once) an account called "Server" in `<run dir>/server-account` (file store),
+and `dedicated.rs` opens it before the world's key; the world's keys and certificate derive from it
+as from a player's account. Phase 7's part (an owner certifying their server) is in the plan.
 
 ## Next steps
 

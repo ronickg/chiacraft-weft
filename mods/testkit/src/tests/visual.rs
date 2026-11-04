@@ -521,6 +521,7 @@ pub async fn multiplayer(t: T) -> R {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut child = std::process::Command::new(exe)
         .args(["--run-dir", &dir, "--script", &script, "--size", "640x360"])
+        .args(crate::package_args())
         .spawn()
         .map_err(|e| format!("cannot start the second client: {e}"))?;
     let heard = t

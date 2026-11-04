@@ -124,40 +124,30 @@ fn old_height(f: &Fields, x: i32, z: i32) -> i32 {
 /// A column's colour as its biome rule (`mods/base/src/land.rs`) would pick it, and what it counts
 /// as: 0 land, 1 river water, 2 mesa, 3 snow, 4 rock face, 5 sea.
 fn colour(f: &Fields, x: i32, z: i32, h: i32, rock: bool, after: bool) -> ([u8; 3], usize) {
-    let (t, hu, cont) = (f.temperature(x, z), f.humidity(x, z), f.continent(x, z));
-    let inside = |v: i32, lo: f64, hi: f64| v >= q12(lo) && v < q12(hi);
-    let inf = f64::INFINITY;
+    let (t, cont) = (f.temperature(x, z), f.continent(x, z));
     if h < SEA {
         let deep = ((SEA - h) * 6).min(120) as u8;
         let ocean = h <= SEA - 2 && (!after || cont < q12(l::OCEAN_CONTINENT));
         return if ocean || h <= SEA - 2 && !after { ([30, 70u8.saturating_sub(deep / 3), 200 - deep], 5) } else { ([40, 120, 230], 1) };
     }
     if h <= SEA + 1 && cont < q12(0.1) {
-        return (if t < q12(-0.45) { [235, 240, 245] } else { [220, 205, 150] }, 0);
+        return (if t < q12(l::SNOWY_BELOW) { [235, 240, 245] } else { [220, 205, 150] }, 0);
     }
     if after && l::snowy(f, x, z, h) {
         return if rock { ([125, 125, 130], 4) } else { ([250, 252, 255], 3) };
     }
-    let mountain = l::MOUNTAINS_AREA.value(f, x, z) > q12(l::MOUNTAIN_BIOME);
     let mesa = after && l::mesa(f, x, z) > q4(4.0);
-    let base: [u8; 3] = if mountain {
-        if h > 130 { [130, 130, 130] } else { [105, 140, 100] }
-    } else if t < q12(-0.45) {
-        [215, 225, 225]
-    } else if t < q12(-0.15) {
-        [60, 100, 70]
-    } else if inside(t, 0.35, inf) && hu < 0 {
-        [220, 200, 130]
-    } else if inside(t, 0.2, inf) && hu < q12(0.2) {
-        [170, 165, 80]
-    } else if t >= q12(-0.05) && hu >= q12(0.1) && h <= SEA + 12 && cont >= q12(0.1) {
-        [90, 105, 60]
-    } else if hu >= q12(0.25) {
-        [55, 125, 45]
-    } else if t < q12(0.1) && hu >= q12(0.05) {
-        [110, 160, 90]
-    } else {
-        [125, 175, 85]
+    let base: [u8; 3] = match l::overworld_biome(f, x, z) {
+        "mountains" if h > 130 => [130, 130, 130],
+        "mountains" => [105, 140, 100],
+        "snowy_plains" => [215, 225, 225],
+        "taiga" => [60, 100, 70],
+        "desert" => [220, 200, 130],
+        "savanna" => [170, 165, 80],
+        "swamp" => [90, 105, 60],
+        "forest" => [55, 125, 45],
+        "birch_forest" => [110, 160, 90],
+        _ => [125, 175, 85],
     };
     if rock {
         let sand = base == [220, 200, 130];

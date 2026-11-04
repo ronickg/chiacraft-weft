@@ -4,6 +4,7 @@
 //! `base:mountains`, `base:snow_1`, the features `mountains`, `mesas`, `rivers`).
 
 use base_api::land::{self as l, SNOW_LINES};
+use weft_sdk::noise::fixed::Fields;
 use weft_sdk::terrain::*;
 use weft_sdk::*;
 
@@ -71,7 +72,15 @@ pub fn terrain(r: &mut Registry) {
         t = t.biome(rule);
     }
     t.cave_biome("deep_caves", 24, 96.0, 0.25)
-        .caves(Caves::new("lava", i32::MIN, 11));
+        .caves(Caves::new("lava", i32::MIN, 11))
+        // Distant terrain runs no decorations: it asks this what its steep faces show.
+        .faces(l::SNOW_FALL, |f| {
+            let [x, _, z] = f.pos();
+            let rocks = l::rock_set(&Fields { seed: f.seed() }, x * 16, z * 16, f.height(), SAND.is(f.surface_block()));
+            if let Some(rock) = bare(f.seed(), f.pos(), f.block(), f.fall(), f.biome(), rocks) {
+                f.set(rock);
+            }
+        });
 
     r.decorate(rock_faces).dimension(&crate::OVERWORLD);
 }
@@ -110,27 +119,39 @@ pub fn fall(g: &Gen, wx: i32, wz: i32, height: i32) -> i32 {
         .unwrap_or(0)
 }
 
-/// What a rock face makes of `block` at `pos` in `biome`, if it's soil that goes bare there
-/// (`fall` blocks to the lowest neighbour); `None` keeps it. On a sandy face (`sandy`: the
-/// column's top is sand) stone and sand alike are sandstone.
-fn bare(seed: u64, pos: [i32; 3], block: u32, fall: i32, biome: u32, sandy: bool) -> Option<u32> {
+/// What a rock face makes of `block` at `pos` in `biome`, if it's soil or stone that goes bare
+/// there (`fall` blocks to the lowest neighbour); `None` keeps it. The face shows its column's
+/// rocks (`rocks`, `base_api::land::rock_set`): strata, slate, granite or limestone in patches.
+fn bare(seed: u64, pos: [i32; 3], block: u32, fall: i32, biome: u32, rocks: l::RockSet) -> Option<u32> {
+    let face = |pos| rock(rocks.block(seed, pos, WET.on_biome(biome) || WOODS.on_biome(biome)));
     if fall >= l::SNOW_FALL && SNOW.is(block) && fall < l::ROCK_FALL {
-        return Some(STONE.id());
+        return Some(face(pos));
     }
-    if fall < l::ROCK_FALL || SANDSTONE.is(block) {
+    if fall < l::ROCK_FALL {
         return None;
     }
-    if SAND.is(block) || sandy && STONE.is(block) {
-        return Some(SANDSTONE.id());
-    }
-    if ![GRASS.id(), SNOWY_GRASS.id(), DIRT.id(), PODZOL.id(), SNOW.id(), GRAVEL.id()].contains(&block) {
-        return None;
-    }
-    Some(match l::rock_kind(seed, pos, WET.on_biome(biome) || WOODS.on_biome(biome)) {
-        1 => COBBLESTONE.id(),
-        2 => MOSSY_COBBLESTONE.id(),
+    let soil = [GRASS.id(), SNOWY_GRASS.id(), DIRT.id(), PODZOL.id(), SNOW.id(), GRAVEL.id(), SAND.id(), SANDSTONE.id(), STONE.id()];
+    soil.contains(&block).then(|| face(pos))
+}
+
+/// A rock's block by its name in `base_api::land`.
+fn rock(name: &str) -> u32 {
+    match name {
+        "granite" => GRANITE.id(),
+        "slate" => SLATE.id(),
+        "limestone" => LIMESTONE.id(),
+        "sandstone" => SANDSTONE.id(),
+        "ochre_sandstone" => OCHRE_SANDSTONE.id(),
+        "red_sandstone" => RED_SANDSTONE.id(),
+        "cobblestone" => COBBLESTONE.id(),
+        "mossy_cobblestone" => MOSSY_COBBLESTONE.id(),
         _ => STONE.id(),
-    })
+    }
+}
+
+/// The rocks of column (`wx`, `wz`)'s face, its top being `top`.
+fn rocks(g: &Gen, wx: i32, wz: i32, height: i32, top: u32) -> l::RockSet {
+    l::rock_set(&Fields { seed: g.seed() }, wx * 16, wz * 16, height, SAND.is(top))
 }
 
 /// The block at the top of column (`wx`, `wz`) once its face went bare: what a decoration in the
@@ -141,13 +162,17 @@ pub fn surface_block(g: &Gen, wx: i32, wz: i32) -> u32 {
         return top;
     }
     let c = g.column(wx, wz);
-    bare(g.seed(), [wx, c.height, wz], top, fall(g, wx, wz, c.height), c.biome, SAND.is(top)).unwrap_or(top)
+    let fall = fall(g, wx, wz, c.height);
+    if fall < l::SNOW_FALL {
+        return top;
+    }
+    bare(g.seed(), [wx, c.height, wz], top, fall, c.biome, rocks(g, wx, wz, c.height, top)).unwrap_or(top)
 }
 
 /// Steep faces go bare: where the ground falls `ROCK_FALL` blocks or more to a neighbour, its soil
-/// is rock in patches as far down as the face shows (sand and the stone under it are sandstone),
-/// so cliffs and mesas show rock, not grass over a band of dirt; snow slides off from
-/// `SNOW_FALL`. Before the plants (`worldgen::decorate`), which then find no soil there.
+/// and stone are rock as far down as the face shows, the column's own (`rock_set`): the mesas'
+/// strata, slate in the cold, granite high up, limestone on the low cliffs, each in patches with
+/// stone or cobbles; snow slides off from `SNOW_FALL`. Before the plants (`worldgen::decorate`), which then find no soil there.
 fn rock_faces(g: &mut Gen) {
     let Some(&cols) = g.columns() else { return };
     let seed = g.seed();
@@ -169,11 +194,11 @@ fn rock_faces(g: &mut Gen) {
             if fall < l::SNOW_FALL {
                 continue;
             }
-            let sandy = SAND.is(g.surface_block(wx, wz));
+            let set = rocks(g, wx, wz, h, g.surface_block(wx, wz));
             let depth = fall.clamp(l::ROCK_DEPTH, l::ROCK_MAX_DEPTH);
             for wy in (h - depth).max(oy)..=h.min(oy + 15) {
                 let y = (wy - oy) as usize;
-                if let Some(rock) = bare(seed, [wx, wy, wz], g.get(x, y, z), fall, col.biome, sandy) {
+                if let Some(rock) = bare(seed, [wx, wy, wz], g.get(x, y, z), fall, col.biome, set) {
                     g.set(x, y, z, rock);
                 }
             }

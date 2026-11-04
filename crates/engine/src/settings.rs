@@ -14,6 +14,17 @@ pub struct Settings {
     pub read_only: bool,
 }
 
+/// The 3D world's share of the window's pixels each way: the setting, or on auto (0) two
+/// thirds on a high-density screen (`density`, physical pixels per point, 2 on Retina), where
+/// shading every pixel cost several times what it bought, and all of them elsewhere.
+pub fn render_scale(density: f64) -> f32 {
+    let set = number("core:render_scale") as f32;
+    if set > 0.0 {
+        return set.clamp(0.5, 1.0);
+    }
+    if density >= 1.5 { 0.67 } else { 1.0 }
+}
+
 /// The largest GUI scale a window shows whole (vanilla's 320x240 per step); auto uses it.
 /// The GUI pixels every screen needs to fit whole (chiacraft: the widest and tallest window, the
 /// animal screen at about 385 x 300 with its tab, and a margin round it). The automatic scale,

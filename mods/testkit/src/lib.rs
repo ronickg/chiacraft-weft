@@ -89,6 +89,16 @@ fn init(r: &mut Registry) {
 /// Tests of how quick the game is, which other processes on the machine would fail.
 const ALONE: &[&str] = &["edit_while_loading", "skiff_smooth"];
 
+/// This game's `--packages` options, for a copy of it a test starts: a copy loading other content
+/// is refused as running different mods.
+pub(crate) fn package_args() -> Vec<String> {
+    let args: Vec<String> = std::env::args().collect();
+    args.windows(2)
+        .filter(|w| w[0] == "--packages")
+        .flat_map(|w| w.to_vec())
+        .collect()
+}
+
 /// What CI leaves out (`ci-skip.txt`: a test, `test/scenario` or `test/check` and why), only with
 /// `TESTKIT_CI=1`: software rendering draws a few frames a second, and these count on more.
 pub fn ci_skip(name: &str) -> Option<&'static str> {
