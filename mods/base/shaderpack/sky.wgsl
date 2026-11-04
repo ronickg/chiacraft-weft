@@ -412,10 +412,12 @@ fn cirrus(c: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     let p = palette();
     let t = scene.params.w;
     let at = dir.xz / dir.y * 2000.0 + scene.eye.xz + wind_now() * t * 6.0;
-    let q = at / vec2(900.0, 260.0);
+    // Even both ways: stretched along one axis its wisps fanned out from the sun like a warp.
+    let q = at / 600.0;
     let n = noise3(vec3(q, t * 0.002)) * 0.6 + noise3(vec3(q * 2.7 + 13.0, t * 0.003)) * 0.3 + noise3(vec3(q * 7.1 + 41.0, 0.0)) * 0.1;
     let rain = rain_amount();
-    let cover = smoothstep(0.55 - 0.25 * rain, 0.85, n) * smoothstep(0.02, 0.2, dir.y);
+    // Gone toward the horizon, where the plane's texture crowds into streaks.
+    let cover = smoothstep(0.55 - 0.25 * rain, 0.85, n) * smoothstep(0.12, 0.4, dir.y);
     let mu = max(dot(dir, light_dir()), 0.0);
     let lit = p.horizon * 0.6 + p.ambient * 0.8 + p.sun * light_strength() * 0.35 + p.glow * pow(mu, 4.0) * light_strength() * 0.8;
     return mix(c, lit, cover * 0.55);
