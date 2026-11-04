@@ -304,7 +304,7 @@ pub fn of(block: &str, age: Option<u8>, eats: impl Fn(Category) -> bool, season:
 /// `cretaceous.rs` read it): the grass that grazers eat and that grows back. A biome not listed
 /// gets the world's default (`GRASS_COVER_ELSE`) wherever its ground takes plants; frozen ground
 /// and sand take none (`grass_grows`).
-pub const GRASS_COVER: [(&str, f32); 12] = [
+pub const GRASS_COVER: [(&str, f32); 13] = [
     ("base:plains", 0.25),
     ("base:forest", 0.12),
     ("base:birch_forest", 0.12),
@@ -314,6 +314,8 @@ pub const GRASS_COVER: [(&str, f32); 12] = [
     ("base:mountains", 0.05),
     // The groves' floor is duff and ferns; the grass is in the clearings and the meadows.
     ("base:sequoia_grove", 0.06),
+    // The rainforest's canopy shades out grass: a little in its gaps.
+    ("base:tropical_forest", 0.03),
     ("animals:red_dunes", 0.0),
     ("animals:scrubland", 0.1),
     ("animals:floodplain", 0.05),
