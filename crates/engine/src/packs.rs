@@ -80,6 +80,12 @@ pub fn sun_shadows() -> bool {
     pack_flag("sun_shadows")
 }
 
+/// The chosen pack's `pack.cfg` says `water_behind = true`: the world is copied before what is seen
+/// through it is drawn, for water that bends and tints what lies under it (`scene.behind`).
+pub fn water_behind() -> bool {
+    pack_flag("water_behind")
+}
+
 /// `name = true` in the chosen shader pack's `pack.cfg`.
 fn pack_flag(name: &str) -> bool {
     let Some(dir) = SHADER_PACK.read().unwrap().clone() else { return false };

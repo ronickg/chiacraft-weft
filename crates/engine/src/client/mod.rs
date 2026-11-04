@@ -411,6 +411,11 @@ pub struct Client {
     /// particles, then cracks, gizmo fills and the hand.
     late: CommandList,
     hand_late: CommandList,
+    /// The world's copy for what is seen through (`gpu_layout::Scene::behind`), set by the app each
+    /// frame; and with it on, what is drawn after the opaque world goes into `late_out` for the app
+    /// to put after the copy instead of into the frame's list.
+    pub behind: [f32; 4],
+    pub late_out: CommandList,
     /// Seconds until the next dust piece from the block being hit, and until its next knock.
     hit_dust: f32,
     hit_sound: f32,
@@ -666,6 +671,8 @@ impl Client {
             self_look: None,
             late: CommandList::default(),
             hand_late: CommandList::default(),
+            behind: [0.0; 4],
+            late_out: CommandList::default(),
             hit_dust: 0.0,
             hit_sound: 0.0,
             sounds: Vec::new(),
@@ -2246,6 +2253,7 @@ impl Client {
             weather: [self.wind.x, self.wind.y, self.fog, self.thunder],
             eye: [cam.pos.x.rem_euclid(8192.0) as f32, cam.pos.y as f32, cam.pos.z.rem_euclid(8192.0) as f32, self.moon_light()],
             ground: [self.snow_cover, self.snowing, self.dust, self.aurora],
+            behind: self.behind,
             shadow_view_proj: self.shadow.0.to_cols_array_2d(),
             shadow: match self.shadow_map {
                 Some(t) if self.shadow.1 => [self.shadow_index(t) as f32, SHADOW_SIZE as f32, 1.0, 2.0 * SHADOW_REACH / SHADOW_SIZE as f32],
@@ -2487,8 +2495,15 @@ impl Client {
         self.weather_render
             .draw(gpu, &mut late, frame, &cam, scene_buf, &self.world, self.rain, ticks, self.frame_dt);
         self.sky.draw_overlay(&mut hand_late, scene_buf);
-        list.append(&mut late);
-        list.append(&mut hand_late);
+        if self.behind[2] > 0.5 {
+            // After the copy of the world (the app puts it there).
+            self.late_out.clear();
+            self.late_out.append(&mut late);
+            self.late_out.append(&mut hand_late);
+        } else {
+            list.append(&mut late);
+            list.append(&mut hand_late);
+        }
         (self.late, self.hand_late) = (late, hand_late);
         list.push(weft_render::Cmd::Mark);
     }
