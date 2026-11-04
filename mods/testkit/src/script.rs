@@ -47,6 +47,9 @@
 //! players 2           # at least 2 players in the world (the host's view)
 //! ```
 //!
+//! `/tk time <ticks>` sets the world's whole clock (day 0 + ticks), so it also undoes a `/season`
+//! before it: set the time first, then the season (or use `/time set`, which keeps the day).
+//!
 //! Before the first step the whole script is read: an unknown command or a condition that can't
 //! be read fails the run at once, with every bad line, instead of minutes in.
 
@@ -509,11 +512,17 @@ async fn run_lines(t: T, src: String) -> R {
             "until" => {
                 let (text, secs) = split_within(rest);
                 let cond = Cond::parse(text)?;
-                let deadline = Instant::now() + Duration::from_secs_f32(secs);
+                let waited = Instant::now();
+                let deadline = waited + Duration::from_secs_f32(secs);
                 loop {
                     let (ok, seen) = cond.check(&t).await?;
                     if ok {
-                        weft_sdk::info!("script: line {} until {text}: after {:.1} s", n + 1, started.elapsed().as_secs_f32());
+                        weft_sdk::info!(
+                            "script: line {} until {text}: met after {:.1} s ({:.1} s into the script)",
+                            n + 1,
+                            waited.elapsed().as_secs_f32(),
+                            started.elapsed().as_secs_f32()
+                        );
                         break;
                     }
                     if Instant::now() > deadline {
