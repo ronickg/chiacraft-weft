@@ -13,7 +13,7 @@ use weft_sdk::*;
 
 static LEVEL_UP: Channel<u32> = Channel::named("level_up");
 static PLACE: Channel<u32> = Channel::named("place_stat");
-static SCREEN: Screen = Screen::named("stats");
+pub static SCREEN: Screen = Screen::named("stats");
 static OPEN: Key = Key::named("stats");
 static FANFARE: Sound = Sound::named("level_up");
 pub static TOMBSTONE: Block = Block::named("tombstone");
@@ -177,8 +177,7 @@ fn tombstone_block(r: &mut Registry) {
         })
         .group("grave", Slots::chest(5))
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0), &[], |ui| {
                 ui.group("grave");
                 ui.player_inventory(true);
             });
@@ -199,6 +198,13 @@ fn shown(stat: Stat, value: f32) -> String {
 /// Level ups waiting to show, the first with the moment it appeared.
 static BANNERS: Mutex<Vec<(u32, Option<Instant>)>> = Mutex::new(Vec::new());
 
+/// The stats screen's bars (the kit's `stat_<name>`, 150 x 12 pixels) in GUI pixels, and the
+/// points that fill one: a bar shows the points placed in a stat.
+const STAT_BAR: (f32, f32) = (75.0, 6.0);
+const POINTS_FULL: f32 = 20.0;
+/// A stat's bar with no points placed: a third full, so it reads as the stat, growing with points.
+const BAR_BASE: f32 = 0.3;
+
 fn client(r: &mut Registry) {
     r.client_packet(&LEVEL_UP, |_, level| BANNERS.lock().unwrap().push((level, None)));
     r.client_frame(|c| {
@@ -215,41 +221,71 @@ fn client(r: &mut Registry) {
         c.screen_text(0.5, 0.22, "levels.base.up", &[Arg::Int(*level as i64)], 0xffbe45ff, 2.0);
         c.screen_text(0.5, 0.22 + 0.05, "levels.base.place", &[], 0xf5e4bcff, 1.0);
     });
-    // The stats: each one's value, the points in it, and a + while there are points to place.
+    // The stats (the UI redo's stats screen): the level on a badge with the XP bar and the points
+    // to place, then each stat as a bar with its value inside, its points and a +.
     r.screen(&SCREEN, |ui| {
-        ui.panel("panel", S::col().pad(8.0).gap(4.0), |ui| {
-            ui.row(S::row().gap(8.0), |ui| {
-                ui.text_bind_styled(S::col().class("title").scale(1.5).no_wrap(), |c, t| {
-                    let Some(v) = c.component(&VITALS) else { return };
-                    t.set("levels.base.title", &[Arg::Int(levels::level_of(v.xp).0 as i64)]);
+        let tabs: [crate::window::Tab; 1] = [("window.base.tab.advancements", |c| {
+            c.client().open_screen(&crate::advancements::SCREEN);
+        })];
+        crate::window::window_titled(ui, S::col().pad(8.0).gap(4.0), "window.base.tab.stats", &tabs, |ui| {
+            ui.row(S::row().gap(5.0).center(), |ui| {
+                ui.panel("hud_badge", S::row().size(20.0, 24.0).center(), |ui| {
+                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                        let Some(v) = c.component(&VITALS) else { return };
+                        t.set("levels.base.badge", &[Arg::Int(levels::level_of(v.xp).0 as i64)]);
+                    });
                 });
-                ui.spacer();
-                ui.text_bind_styled(S::col().class("dim").no_wrap(), |c, t| {
-                    let Some(v) = c.component(&VITALS) else { return };
-                    let (level, into) = levels::level_of(v.xp);
-                    t.set(
-                        "levels.base.progress",
-                        &[Arg::Int(into as i64), Arg::Int(levels::to_next(level) as i64), Arg::Int(unspent(&v) as i64)],
-                    );
+                ui.column(S::col().gap(2.0), |ui| {
+                    ui.row(S::row().gap(6.0).center(), |ui| {
+                        ui.text_bind_styled(S::default().class("title").no_wrap(), |c, t| {
+                            let Some(v) = c.component(&VITALS) else { return };
+                            t.set("levels.base.title", &[Arg::Int(levels::level_of(v.xp).0 as i64)]);
+                        });
+                        ui.panel("chip_points", S::row().pad(2.0), |ui| {
+                            ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                                let Some(v) = c.component(&VITALS) else { return };
+                                t.set("levels.base.points", &[Arg::Int(unspent(&v) as i64)]);
+                            });
+                        });
+                    });
+                    ui.row(S::row().gap(4.0).center(), |ui| {
+                        ui.progress_bind("stat_xp", S::default().size(110.0, 4.0), |c| {
+                            let Some(v) = c.component(&VITALS) else { return -1.0 };
+                            let (level, into) = levels::level_of(v.xp);
+                            (2.0 + into as f32 / levels::to_next(level).max(1) as f32 * 216.0) / 220.0
+                        });
+                        ui.text_bind_styled(S::default().class("dim").no_wrap(), |c, t| {
+                            let Some(v) = c.component(&VITALS) else { return };
+                            let (level, into) = levels::level_of(v.xp);
+                            t.set("levels.base.xp", &[Arg::Int(into as i64), Arg::Int(levels::to_next(level) as i64)]);
+                        });
+                    });
                 });
             });
-            ui.panel("well", S::col().pad(6.0).gap(3.0), |ui| {
+            ui.column(S::col().gap(2.0), |ui| {
                 for (i, stat) in stats::ALL.into_iter().enumerate() {
-                    ui.row(S::row().gap(6.0).center(), |ui| {
-                        ui.text_styled(S::default().w(70.0).no_wrap(), &format!("stat.base.{}", stat.name()), &[]);
-                        ui.text_bind_styled(S::default().w(50.0).no_wrap(), move |c, t| {
-                            let Some(v) = c.component(&VITALS) else { return };
-                            t.text(&shown(stat, v.stats()[i]));
+                    ui.row(S::row().gap(4.0).center(), |ui| {
+                        ui.image(&format!("base:gui/stat_icon_{}", stat.name()), 8.0, 8.0);
+                        ui.text_styled(S::default().w(40.0).no_wrap(), &format!("stat.base.{}", stat.name()), &[]);
+                        ui.row(S::row().size(STAT_BAR.0, STAT_BAR.1), |ui| {
+                            ui.progress_bind(Box::leak(format!("stat_{}", stat.name()).into_boxed_str()), S::default().size(STAT_BAR.0, STAT_BAR.1), move |c| {
+                                let Some(v) = c.component(&VITALS) else { return -1.0 };
+                                (2.0 + (BAR_BASE + (1.0 - BAR_BASE) * (v.points[i] as f32 / POINTS_FULL).min(1.0)) * 146.0) / 150.0
+                            });
+                            ui.text_bind_styled(S::default().no_wrap().at_pivot(STAT_BAR.0 - 3.0, STAT_BAR.1 / 2.0, [1.0, 0.5]), move |c, t| {
+                                let Some(v) = c.component(&VITALS) else { return };
+                                t.text(&shown(stat, v.stats()[i]));
+                            });
                         });
-                        ui.text_bind_styled(S::default().w(30.0).no_wrap(), move |c, t| {
-                            let Some(v) = c.component(&VITALS) else { return };
-                            t.text(&v.points[i].to_string());
+                        ui.row(S::row().w(12.0).end(), move |ui| {
+                            ui.text_bind_styled(S::default().no_wrap(), move |c, t| {
+                                let Some(v) = c.component(&VITALS) else { return };
+                                t.text(&v.points[i].to_string());
+                            });
                         });
                         ui.button(
                             "levels.base.plus",
-                            S::default()
-                                .size(14.0, 12.0)
-                                .tooltip(&format!("stat.base.{}.desc", stat.name())),
+                            S::default().size(10.0, 9.0).pad(0.5).tooltip(&format!("stat.base.{}.desc", stat.name())),
                             move |c| {
                                 c.client().send(&PLACE, &(i as u32));
                             },
@@ -257,11 +293,11 @@ fn client(r: &mut Registry) {
                     });
                 }
             });
-            ui.text_bind_styled(S::col().class("dim").no_wrap(), |c, t| {
+            ui.text_bind_styled(S::col().class("dim").max_w(170.0), |c, t| {
                 let (Some(v), Some(me)) = (c.component(&VITALS), c.me()) else { return };
                 t.set("levels.base.now", &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)]);
             });
-            ui.text_bind_styled(S::col().class("dim").no_wrap(), |c, t| {
+            ui.text_bind_styled(S::col().class("dim").max_w(170.0), |c, t| {
                 let Some(v) = c.component(&VITALS) else { return };
                 let weight = v.stats()[Stat::Weight.index()];
                 t.set("levels.base.load", &[Arg::Float(v.load as f64, 1), Arg::Int(weight.round() as i64)]);

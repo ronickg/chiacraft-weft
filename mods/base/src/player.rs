@@ -128,7 +128,15 @@ pub fn register(r: &mut Registry) {
         .on_change(craft_result)
         .on_take(consume_grid)
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(5.0), |ui| {
+            let tabs: [crate::window::Tab; 2] = [
+                ("window.base.tab.stats", |c| {
+                    c.client().open_screen(&crate::levels::SCREEN);
+                }),
+                ("window.base.tab.advancements", |c| {
+                    c.client().open_screen(&crate::advancements::SCREEN);
+                }),
+            ];
+            crate::window::window(ui, S::col().pad(7.0).gap(5.0), &tabs, |ui| {
                 ui.row(S::row().gap(1.0), |ui| {
                     // Armor, and the clothes worn under it beside.
                     for slots in [&EQUIPMENT, &base_api::CLOTHES] {
@@ -141,7 +149,7 @@ pub fn register(r: &mut Registry) {
                     ui.player_model(51.0, 72.0);
                     ui.spacer();
                     ui.column(S::col().gap(2.0), |ui| {
-                        ui.title();
+                        ui.text_styled(S::default().no_wrap(), "window.base.crafting", &[]);
                         ui.row(S::row().gap(4.0), |ui| {
                             ui.group("grid");
                             ui.recipe_arrow();
@@ -161,8 +169,7 @@ pub fn register(r: &mut Registry) {
         .on_change(craft_result)
         .on_take(consume_grid)
         .screen(|ui| {
-            ui.panel("panel", S::col().pad(7.0).gap(4.0).stretch(), |ui| {
-                ui.title();
+            crate::window::window(ui, S::col().pad(7.0).gap(4.0).stretch(), &[], |ui| {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.group("grid");

@@ -11,6 +11,7 @@ mod farming;
 mod growth;
 mod hints;
 mod hud;
+mod window;
 mod items;
 mod levels;
 mod machines;

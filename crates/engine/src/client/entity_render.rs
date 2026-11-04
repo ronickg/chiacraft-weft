@@ -808,11 +808,16 @@ impl EntityRenderer {
         size: [u32; 2],
         look: glam::Vec2,
         worn: &[u32],
+        subject: Option<(u64, u32)>,
     ) -> Option<u32> {
         let c = content();
         if size[0] == 0 || size[1] == 0 {
             return None;
         }
+        // The local player (the inventory's figure), or another entity (a menu's own, such as an
+        // animal's screen), fitted to the frame by its size and seen from three quarters.
+        let (entity, kind) = subject.unwrap_or((self.local, c.game.player_kind));
+        let Some(def) = c.game.entities.get(kind as usize) else { return None };
         if self.preview_target.is_none_or(|t| t.2 != size) {
             if let Some((col, dep, ..)) = self.preview_target.take() {
                 gpu.destroy_texture(col);
@@ -826,10 +831,19 @@ impl EntityRenderer {
         let (col, dep, _, index) = self.preview_target?;
         let (x, y, w, h) = (0.0, 0.0, size[0] as f32, size[1] as f32);
         let (sw, sh) = (w, h);
-        let s = h / 2.4;
+        let player = subject.is_none();
+        // Pixels a block: the player as before; another kind by its height and its length, about
+        // twice its width for a four-legged one, with room around.
+        let s = if player {
+            h / 2.4
+        } else {
+            let (bw, bh) = (def.width.max(0.1), def.height.max(0.1));
+            (h * 0.8 / bh).min(w * 0.8 / (bw * 2.2).max(bh))
+        };
         let (cx, feet) = (x + w / 2.0, y + h - h * 0.08);
-        let head = feet - 1.5 * s;
-        let yaw = std::f32::consts::PI + ((look.x - cx) / (s * 1.6)).atan() * 0.7;
+        let head = feet - if player { 1.5 } else { def.height * 0.8 } * s;
+        let turn = if player { 0.0 } else { 0.7 };
+        let yaw = std::f32::consts::PI + turn + ((look.x - cx) / (s * 1.6)).atan() * 0.7;
         let pitch = ((head - look.y) / (s * 1.6)).atan() * 0.5;
         let proj = Mat4::from_cols(
             Vec4::new(2.0 * s / sw, 0.0, 0.0, 0.0),
@@ -837,11 +851,11 @@ impl EntityRenderer {
             Vec4::new(0.0, 0.0, 0.1, 0.0),
             Vec4::new(2.0 * cx / sw - 1.0, 1.0 - 2.0 * feet / sh, 0.5, 1.0),
         );
-        let layers = self.layers(c.game.player_kind, self.local, worn, FULL_LIGHT, 0.0);
+        let layers = self.layers(kind, entity, if player { worn } else { &[] }, FULL_LIGHT, 0.0);
         self.models.begin();
         let root = Mat4::from_rotation_y(yaw) * Mat4::from_scale(Vec3::splat(1.0 / 16.0));
         self.models.add(
-            c.game.player_kind,
+            kind,
             root,
             &crate::model::Motion {
                 pitch,

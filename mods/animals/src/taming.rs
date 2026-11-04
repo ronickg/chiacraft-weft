@@ -48,10 +48,10 @@ const ASK_RANGE: f64 = 5.0;
 const MISTAKE: f32 = 0.1;
 const HURT: f32 = 0.15;
 
-const FRESH: Taming = Taming { progress: 0.0, effectiveness: 1.0, feedings: 0, wait: 0, asking: 0, scared: 0, want: 0 };
+pub const FRESH: Taming = Taming { progress: 0.0, effectiveness: 1.0, feedings: 0, wait: 0, asking: 0, scared: 0, want: 0 };
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(&TAMING, FRESH, component_flags::SAVE | component_flags::SYNC_MENU);
+    r.entity_component(&TAMING, FRESH, component_flags::SAVE | component_flags::SYNC_MENU | component_flags::SYNC_WATCHERS);
     for s in &SPECIES {
         r.attach(s.kind, &TAMING);
     }
