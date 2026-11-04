@@ -41,3 +41,13 @@ change any of them in the morning.
    - Alternative: start higher, so early parts feel better.
 10. **The book's categories use UI redo's `category` class.**
     - Chosen: the top tabs stay for Inventory and Crafting.
+11. **The look hook (`core:look`) is built in full**, other players' held items included.
+    - Chosen: their look travels as a new synced field, `core:held_look`, since mods read
+      `core:held` as an item id. A map pixel takes its colour from the ramp and its alpha from
+      the map.
+    - Alternative: local player only, leaving others' held tools plain.
+12. **Placeholder part art is committed** (`textures/parts/axe/...`, `textures/ramps/...`).
+    - Chosen: cut from today's stone axe icon, so the hook can be tested before Chiacraft's art.
+      Chiacraft's files replace them at the same paths.
+    - Alternative: test with no art (the look would fall back to the plain icon, testing
+      nothing).

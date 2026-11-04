@@ -450,7 +450,7 @@ As Tinkers' Construct 3 does it, which our prototype already proved at 32 px:
   - grades 1, 5 and 10
   - shown beside the approved full icons
 
-### The engine hook for looks (to build)
+### The engine hook for looks (built 11-04, waiting for a PC run)
 
 One stack component, `core:look`, says how a stack is drawn: its layers back to front, each
 `<texture>` (painted, used as it is) or `<map>@<ramp>,<ramp>...` (a shade map painted with one
@@ -468,6 +468,19 @@ names the textures). The engine:
 
 It's rendering, so it goes to the PC first. It's general: any mod can draw a stack from layers.
 An upstream candidate (PLAN.md rule 4).
+
+How it was built:
+- **Composing:** `client/stack_look.rs` (`compose`, a pure function with a test).
+- **Textures:** `Source::Look` entries in `client/textures.rs`, lazy, cached by text, at most
+  4096.
+- **Icons:** `stack_item_icon` in `ui/render.rs`.
+- **Held and dropped models:** keyed by (item, look) in `client/entity_render.rs`.
+- **Other players:** their held look travels as `core:held_look`.
+- **SDK:** `with_look`, `stack_look`.
+- **Base:** writes a tool's look when it's assembled (`parts::look_text`). Placeholder axe layers
+  stand in for Chiacraft's.
+- **Not yet:** looks in rich-text item icons (they have only an item id), and a look on loose
+  part items.
 
 ### Fewer pieces in the picture
 
