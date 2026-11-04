@@ -80,25 +80,63 @@ pub fn register(r: &mut Registry) {
                 .no_item(),
         };
         drop(b);
-        // Picking gives what plants it again: one at any stage, a bush or a seed head two more when
-        // ripe. (Nothing at all out of season waits for spring's other plant food: the cattail's
-        // root and fibre, `notes/ECOLOGY.md`.)
-        if let Some(gives) = p.gives.map(short) {
-            let ripe = match p.form {
-                Form::Bush => Some("age=3"),
-                Form::Ripens => Some("age=1"),
-                _ => None,
-            };
-            let table = r.loot(block).pool(Pool::new().entry(Entry::item(gives)));
-            if let Some(ripe) = ripe {
-                table.pool(
-                    Pool::new()
+        // Picking gives what plants it again: a bush or a seed head three when ripe and nothing out
+        // of season, the others one; a cordage plant fibre besides (`wild::FIBRE`).
+        let fibre = wild::FIBRE
+            .iter()
+            .find(|(b, _)| *b == p.block)
+            .map(|&(_, chance)| chance);
+        if p.gives.is_some() || fibre.is_some() {
+            let mut table = r.loot(block);
+            if let Some(gives) = p.gives.map(short) {
+                let ripe = match p.form {
+                    Form::Bush => Some("age=3"),
+                    Form::Ripens => Some("age=1"),
+                    _ => None,
+                };
+                table = table.pool(match ripe {
+                    Some(ripe) => Pool::new()
                         .when(Cond::BlockState(ripe))
-                        .entry(Entry::item(gives).count(2, 2)),
-                );
+                        .entry(Entry::item(gives).count(3, 3)),
+                    None => Pool::new().entry(Entry::item(gives)),
+                });
+            }
+            if let Some(chance) = fibre {
+                table.pool(Pool::new().when(Cond::Chance(chance)).item("plant_fibre"));
             }
         }
     }
+    flowers(r);
+}
+
+/// Each biome's wild flowers (`vitals::wild::FLOWERS`): plants that stand and give themselves.
+fn flowers(r: &mut Registry) {
+    for f in &wild::FLOWERS {
+        let name = short(f.block);
+        r.block(Block::generated(name.into()))
+            .sound_group("grass")
+            .plant()
+            .needs_below(if f.ground == Ground::Sand { "#sand" } else { "#plant_soil" })
+            .texture(name)
+            .tab(&crate::tabs::NATURAL);
+    }
+}
+
+/// A flower of `biome` on `ground` for the world to put (`worldgen.rs`), `kind` choosing among
+/// them; `None`: the biome has none of its own there.
+pub fn flower(biome: &str, ground: Ground, kind: u64) -> Option<u32> {
+    static IDS: OnceLock<Vec<u32>> = OnceLock::new();
+    let ids = IDS.get_or_init(|| {
+        wild::FLOWERS
+            .iter()
+            .map(|f| Block::lookup(f.block).unwrap_or(u32::MAX))
+            .collect()
+    });
+    let here: Vec<usize> = (0..wild::FLOWERS.len())
+        .filter(|&i| wild::FLOWERS[i].ground == ground && wild::FLOWERS[i].found.contains(&biome))
+        .collect();
+    let i = *here.get(kind as usize % here.len().max(1))?;
+    (ids[i] != u32::MAX).then_some(ids[i])
 }
 
 /// The block a picked item of that name plants again, if any (`items.rs`): a wild plant that
