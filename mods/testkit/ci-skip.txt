@@ -25,3 +25,4 @@ redstone_observer                      a pulse a few ticks long, missed between 
 ride_frames                            no tick-sized jumps, frame by frame (2026-11-05)
 body_chest                             a chest kept at its block on a moving structure, frame by frame (2026-11-05)
 body_sneak_edge                        sneaking at a moving structure's edge, frame by frame (2026-11-05)
+recipe_viewer                          opens its screen a few frames at a time; passes on the Mac's GPU at c1afd614 (2026-11-05)
