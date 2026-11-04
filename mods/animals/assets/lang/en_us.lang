@@ -373,6 +373,7 @@ screen.animals.wild_q3 = {#9b4fe0}{0}{/}
 screen.animals.wild_q4 = {#f0aa28}{0}{/}
 menu.animals.animal = Your animal
 menu.animals.scout = Through the spyglass
+menu.animals.look = A closer look
 screen.animals.temper = {0}
 screen.animals.temper.calm = Calm
 screen.animals.temper.steady = Steady
