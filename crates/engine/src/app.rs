@@ -204,7 +204,20 @@ pub(crate) const CLIENT_COMMANDS: &[(&str, &str, fn(&mut Running, &crate::comman
         None => vec![Msg::new("command.music.no_device", Vec::new())],
     }),
     // What this client hears now, most important first (also in the log, for scripts).
-    ("sounds", "", |r, _| match &r.audio {
+    ("sounds", "[which:word]", |r, args| match &r.audio {
+        Some(a) if args.text("which") == Some("recent") => {
+            // The last sounds started, newest first (also in the log): one-shots that already ended.
+            let mut out = Vec::new();
+            for (name, volume, looped) in a.recent() {
+                log::info!("sound recent: {name} volume {volume:.2}{}", if looped { " loop" } else { "" });
+                let key = if looped { "command.sounds.loop" } else { "command.sounds.one" };
+                out.push(Msg::new(key, vec![Arg::Text(name), Arg::Float(volume as f64, 2)]));
+            }
+            if out.is_empty() {
+                out.push(Msg::new("command.sounds.none_recent", Vec::new()));
+            }
+            out
+        }
         Some(a) => {
             let (playing, held) = a.counts();
             log::info!("sounds: {playing} playing, {held} held, {} played, {} dropped", a.played, a.dropped);

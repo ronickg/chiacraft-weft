@@ -40,7 +40,7 @@ pub fn init(r: &mut Registry) {
     r.menu(&FAMILY_MENU).screen(family_screen);
     r.packet(&PAGE, |p, [id, page]| {
         let (w, player) = (p.world(), p.player());
-        if w.component(id, &ANIMAL).is_none() || !(crate::commands::can_command(&w, id, player) || w.creative(player)) {
+        if !animal::ensure_rolled(&w, id) || !(crate::commands::can_command(&w, id, player) || w.creative(player)) {
             return;
         }
         let menu = [&ANIMAL_MENU, &GENES_MENU, &FAMILY_MENU][(page as usize).min(2)];
@@ -62,7 +62,7 @@ pub fn init(r: &mut Registry) {
 /// Opens the animal screen for its owner (or anyone in creative), else the scout view. True if
 /// `id` is an animal.
 pub fn open(w: &World, player: u64, id: u64) -> bool {
-    if w.component(id, &ANIMAL).is_none() {
+    if w.component(id, &ANIMAL).is_none() || !animal::ensure_rolled(w, id) {
         return false;
     }
     let full = crate::commands::can_command(w, id, player) || w.creative(player);
@@ -561,13 +561,17 @@ fn animal_screen(ui: &mut Ui) {
                         ui.image(&icon, 8.0, 8.0);
                         match label {
                             "health" => life_bar(ui, class, |c| {
-                                let a = c.menu_component(&ANIMAL)?;
+                                let a = c
+                                    .menu_component(&ANIMAL)
+                                    .filter(|a| a.species().is_some())?;
                                 let e = c.menu_owner().and_then(|id| c.client().entity(id))?;
                                 let max = a.stat(species::HEALTH) * crate::comfort::condition(&a);
                                 Some((e.health / max.max(0.1), format!("{:.0} / {:.0}", e.health, max)))
                             }),
                             "food" => life_bar(ui, class, |c| {
-                                let a = c.menu_component(&ANIMAL)?;
+                                let a = c
+                                    .menu_component(&ANIMAL)
+                                    .filter(|a| a.species().is_some())?;
                                 let max = a.stat(species::FOOD).round();
                                 Some((a.food as f32 / max.max(1.0), format!("{} / {:.0}", a.food, max)))
                             }),
@@ -777,9 +781,12 @@ fn animal_screen(ui: &mut Ui) {
                 });
             }
             ui.row(S::row().gap(2.0), |ui| {
-                order_button_w(ui, "screen.animals.share", 20, 32.0);
-                order_button_w(ui, "screen.animals.track", 30, 32.0);
-                order_button_w(ui, "screen.animals.release", 40, 32.0);
+                // Widths for the longest label in either language with 2 GUI px each side
+                // ("Sniff out" / "Взять след", "Release" / "Отпустить"); equal thirds put "Sniff
+                // out" against its edges (the label check, 11-04).
+                order_button_w(ui, "screen.animals.share", 20, 22.0);
+                order_button_w(ui, "screen.animals.track", 30, 39.0);
+                order_button_w(ui, "screen.animals.release", 40, 35.0);
             });
             ui.text_styled(S::default().class("dim").max_w(100.0), "screen.animals.whistles", &[]);
         });
@@ -1046,6 +1053,10 @@ fn command(cmd: &mut ServerCommand) {
         cmd.reply("command.animals.none", &[]);
         return;
     };
+    // Every action on one goes by its species and stats ("wild" resets them on purpose).
+    if cmd.text("action") != Some("wild") {
+        animal::ensure_rolled(&w, id);
+    }
     match cmd.text("action").unwrap_or("show") {
         "tame" => {
             crate::taming::tame(&w, id, player, 0.0);

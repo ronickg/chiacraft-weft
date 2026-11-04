@@ -1,0 +1,34 @@
+[
+ {
+  "name": "rock_cream_sandstone_side",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/mods/base/assets/textures/block/ochre_sandstone_side.png",
+  "what": "the side of a pale cream sandstone in the style of the attached ochre sandstone side (the same fine grain, size of pits and light) but pale cream, whiter and less yellow than ordinary sandstone (#c8b898 #dccdad #ebdfc4 #f4ecd8). One even band colour across the whole tile (it is one layer of a stacked canyon wall): fine horizontal grain and a few small pits, NO darker bands through the middle, and a slightly darker 1-2 px line along the bottom edge only. The left and right edges must meet so the band runs unbroken along a long wall. Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_cream_sandstone_top",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/mods/base/assets/textures/block/ochre_sandstone_top.png",
+  "what": "the top of a pale cream sandstone: exactly like the attached ochre sandstone top (the same smooth fine grain, faint soft ripples, low contrast and light) but pale cream, whiter and less yellow than ordinary sandstone (#ccbc9c #dfd0b0 #ede2c8 #f6eedc). Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_banded_clay_side",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/mods/base/assets/textures/block/red_sandstone_side.png",
+  "what": "the side of a banded clay rock (badlands terracotta) in the fine grain of the attached red sandstone side: thin horizontal stripes 2-3 px tall in brown, burnt orange and tan (#8a5a3a #a46a44 #bc8256 #cc9a6c), LOW contrast between stripes so the block reads as one layer from afar, every stripe running straight across the whole width, a slightly darker 1-2 px line along the bottom edge. The left and right edges must meet so every stripe runs unbroken along a long wall; no vertical cracks. Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out"
+ },
+ {
+  "name": "rock_banded_clay_top",
+  "like": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/mods/base/assets/textures/block/red_sandstone_top.png",
+  "what": "the top of a banded clay rock (badlands terracotta) seen from above: a smooth, fine-grained hard clay in mixed tan and burnt orange (#a46a44 #b87c52 #c89466 #d4a678) with faint soft mottling, low contrast, no stripes, like the attached red sandstone top's grain. Seamless on all four edges, every cell filled, no border.",
+  "kind": "block",
+  "type": "natural cube",
+  "dir": "/Users/ronald/Coding/chiacraft-weft/.claude/worktrees/art-canyon/notes/ui-codex/parts/out"
+ }
+]

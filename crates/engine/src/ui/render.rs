@@ -706,6 +706,8 @@ impl UiRenderer {
             if pass && shadow.is_none() {
                 continue;
             }
+            // The shadow is one font pixel straight down (the UI guide's rule): down and right,
+            // it made every label's visible group lean right by half a pixel.
             let off = if pass { px * self.font.pixel } else { 0.0 };
             for (index, it) in items.iter().enumerate() {
                 match *it {
@@ -721,7 +723,7 @@ impl UiRenderer {
                         // Whole physical pixels: centered text starts mid-pixel, and nearest sampling
                         // at texel borders would drop or double glyph columns.
                         self.quads.push(Quad {
-                            p0: [(x + (gx + g.bearing) * px + off).round(), (y + (gy + self.font.top) * px + off).round()],
+                            p0: [(x + (gx + g.bearing) * px).round(), (y + (gy + self.font.top) * px + off).round()],
                             u: [w, 0.0],
                             v: [0.0, self.font.height * px],
                             uv,
