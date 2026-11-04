@@ -11,7 +11,7 @@ use std::sync::{Mutex, OnceLock, RwLock};
 
 use weft_abi::{config_kind as ck, config_scope as scope};
 
-use crate::content::{Content, content};
+use crate::content::content;
 
 #[derive(Clone, Debug)]
 pub struct ConfigDef {
@@ -116,58 +116,15 @@ static OVERRIDES: Mutex<Vec<(u32, String, String)>> = Mutex::new(Vec::new());
 /// Values of the remote server this player is on, kept the same way until leaving it.
 static FROM_SERVER: Mutex<Vec<(u32, String, String)>> = Mutex::new(Vec::new());
 
-/// Room for the settings of data packages in contents built later than the first (chiacraft):
-/// their ids follow every code mod's, and another world's packages may have more.
-const PACKAGE_ROOM: usize = 1024;
-
 fn values() -> &'static [AtomicU64] {
     VALUES.get_or_init(|| {
-        let c = content();
-        c.game
+        content()
+            .game
             .configs
             .iter()
             .map(|d| AtomicU64::new(d.default.to_bits()))
-            .chain((0..PACKAGE_ROOM).map(|_| AtomicU64::new(0)))
             .collect()
     })
-}
-
-/// The game switches from content `old` to `new` (chiacraft: another world's data packages).
-/// The engine's and the code mods' settings keep their ids in every content; the packages'
-/// come after them and may differ, so their values are set again by name: what `old` had for
-/// the same setting, else the default.
-pub fn content_changed(old: &Content, new: &Content) {
-    let from = new.game.package_configs_from as usize;
-    let by_name: std::collections::HashMap<&str, (u64, String)> = {
-        let t = TEXTS.read().unwrap();
-        old.game
-            .configs
-            .iter()
-            .enumerate()
-            .skip(old.game.package_configs_from as usize)
-            .filter_map(|(id, d)| {
-                let v = values().get(id)?.load(Ordering::Relaxed);
-                Some((d.name.as_str(), (v, t.get(id).cloned().unwrap_or_default())))
-            })
-            .collect()
-    };
-    let mut t = TEXTS.write().unwrap();
-    let len = new.game.configs.len().max(t.len());
-    t.resize(len, String::new());
-    for (id, d) in new.game.configs.iter().enumerate().skip(from) {
-        let (v, text) = by_name
-            .get(d.name.as_str())
-            .cloned()
-            .unwrap_or((d.default.to_bits(), d.text.clone()));
-        match values().get(id) {
-            Some(slot) => slot.store(v, Ordering::Relaxed),
-            None => log::warn!("setting {} has no room ({} settings at most)", d.name, values().len()),
-        }
-        if let Some(slot) = t.get_mut(id) {
-            *slot = text;
-        }
-    }
-    GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
 /// A server's own values of the settings it decides (chiacraft). The values above are the game's:

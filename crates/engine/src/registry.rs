@@ -410,9 +410,6 @@ pub struct Game {
     /// `config.rs`.
     pub configs: Vec<crate::config::ConfigDef>,
     pub config_names: FxHashMap<String, u32>,
-    /// The first id of a data package's setting (chiacraft): the ids below it are the engine's
-    /// and the code mods', the same in every content this game builds.
-    pub package_configs_from: u32,
 }
 
 #[derive(Clone)]
@@ -1503,9 +1500,11 @@ pub fn freeze(
             .into_iter()
             .map(|d| (0, d)),
     );
-    // By name, the data packages' last (chiacraft): ids are what the game's settings and every
-    // mod's handles keep, and switching to a world with other packages must not move the
-    // engine's or the code mods' (a world whose package added a key once moved `core:name`).
+    // By name, the data packages' last (chiacraft), as their blocks and items are: then the
+    // engine's and the code mods' settings have the same ids in every content this game builds.
+    // Switching content re-keys the game's values by name, but a mod's handle it only named
+    // (`weft_sdk::settings::VIEW_DISTANCE`, `Config::named("core:...")`) keeps the id it first
+    // resolved: a package's setting sorting among the engine's would move those.
     configs.sort_by(|a, b| {
         (from_packages.contains(&a.1.name), &a.1.name).cmp(&(from_packages.contains(&b.1.name), &b.1.name))
     });
@@ -1519,11 +1518,7 @@ pub fn freeze(
         g.config_names.insert(d.name.clone(), id);
         g.configs.push(d);
     }
-    g.package_configs_from = g
-        .configs
-        .iter()
-        .take_while(|d| !from_packages.contains(&d.name))
-        .count() as u32;
+
     g.mob_spawning = g.config_names["core:mob_spawning"];
     g.simulation_distance = g.config_names["core:simulation_distance"];
     g.entity_send_distance = g.config_names["core:entity_send_distance"];

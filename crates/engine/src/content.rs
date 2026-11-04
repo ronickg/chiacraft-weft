@@ -650,14 +650,7 @@ pub fn with<R>(c: &'static Content, f: impl FnOnce() -> R) -> R {
 }
 
 pub(crate) fn set(c: &'static Content) {
-    let old = CONTENT.swap(c as *const Content as *mut Content, std::sync::atomic::Ordering::AcqRel);
-    // SAFETY: only this function stores there, a `&'static Content`.
-    if let Some(old) = (!old.is_null()).then(|| unsafe { &*old })
-        && !std::ptr::eq(old, c)
-    {
-        // The data packages' settings may sit at other ids now (chiacraft).
-        crate::config::content_changed(old, c);
-    }
+    CONTENT.store(c as *const Content as *mut Content, std::sync::atomic::Ordering::Release);
 }
 
 /// Color (0xRRGGBB) of a tint kind on items, which have no biome: the kind's default.

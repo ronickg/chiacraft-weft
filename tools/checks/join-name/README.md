@@ -3,9 +3,10 @@
 The bug (Phase 6, aa03294f): bob joined alice's world as "" although his `core:name` is `bob`.
 Settings' ids came from sorting every setting by name, key bindings included (`core:key.<action>`),
 so a world whose data package registers a key (the bell's client half) moved `core:name`'s id;
-the game's values stayed at the old ids, and bob's game read the slot beside it. Now a package's
-settings and keys sort after all the others (`registry::freeze`), and switching content sets the
-packages' values again by name (`config::content_changed`).
+the game's values stayed at the old ids, and bob's game read the slot beside it. Phase 6 made switching
+content re-key the values by name (`config::content_switched`); and a package's settings and keys
+sort after all the others (`registry::freeze`), so the engine's and the code mods' ids never move,
+which keeps right the handles mods only named and resolved once.
 
 Two copies, from the folder holding `target/release/weft`, about a minute:
 
