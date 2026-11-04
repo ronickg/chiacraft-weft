@@ -111,15 +111,17 @@ impl LodJob {
     }
 }
 
-/// LOD's own threads, at low priority: its mods' heights and meshing never hold up the pool that
-/// finishes the near cubes (joining and flying wait on those).
+/// LOD's own threads, apart from the pool that finishes the near cubes: half the cores (3 to 8),
+/// at normal priority. At 3 low-priority threads its mods' heights and meshing waited on the
+/// cubes' terrain (about 20 tiles a second for the 800 of a view, the coarse boxes standing for
+/// half a minute); Distant Horizons gives its LOD half the cores at the highest priority.
 pub fn pool() -> &'static rayon::ThreadPool {
     static POOL: std::sync::OnceLock<rayon::ThreadPool> = std::sync::OnceLock::new();
     POOL.get_or_init(|| {
+        let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
         rayon::ThreadPoolBuilder::new()
-            .num_threads(3)
+            .num_threads((cores / 2).clamp(3, 8))
             .thread_name(|i| format!("distant terrain {i}"))
-            .start_handler(|_| crate::lower_priority())
             .build()
             .expect("distant terrain pool")
     })
@@ -753,7 +755,9 @@ impl Lod {
         }
         // Shown: each wanted tile when made, else its children when all four are, else its
         // nearest made ancestor, which then stands in for every wanted tile under it: a child
-        // shows only with its three siblings, never over its parent.
+        // shows only with its three siblings, never over its parent. A missing tile's parent is
+        // asked for first (`request`), so the stand-in is one level coarser and hides at most its
+        // three siblings, not every finished tile of a far coarser one.
         let mut keep = FxHashSet::default();
         let mut made = Vec::new();
         let mut standing = FxHashSet::default();
@@ -770,6 +774,9 @@ impl Lod {
                 continue;
             }
             missing += 1;
+            if key.level < MAX_LEVEL {
+                keep.insert(key.parent());
+            }
             let mut a = key;
             while a.level < MAX_LEVEL {
                 a = a.parent();
@@ -968,12 +975,33 @@ impl Lod {
         self.split = split;
     }
 
-    /// Asks for the nearest wanted tiles not made yet, or made before columns changed.
+    /// Asks for the wanted tiles not made yet, or made before columns changed, coarse levels first
+    /// (Distant Horizons' order: the whole view is covered soonest, as a tile costs the same at
+    /// every level), nearest first within a level. A missing tile's parent goes first too: it
+    /// stands in, one level coarser, until the tile is made, rather than a far coarser tile
+    /// that hides every finished one under it, or nothing.
     fn request(&mut self) {
         let c = content();
         let custom = self.custom.clone().unwrap();
         let columns = if self.columns_dim == self.dim { self.columns.clone() } else { Arc::default() };
-        for &key in &self.wanted {
+        let mut order: Vec<(u32, usize, TileKey)> = Vec::new();
+        let mut parents = FxHashSet::default();
+        for (n, &key) in self.wanted.iter().enumerate() {
+            if self.ready.contains(&key) && !self.stale.contains(&key) {
+                continue;
+            }
+            order.push((key.level, n, key));
+            let up = key.parent();
+            if key.level < MAX_LEVEL
+                && !self.ready.contains(&up)
+                && !key.children().iter().all(|k| self.ready.contains(k))
+                && parents.insert(up)
+            {
+                order.push((up.level, n, up));
+            }
+        }
+        order.sort_by_key(|&(level, n, _)| (std::cmp::Reverse(level), n));
+        for (_, _, key) in order {
             if self.pending.len() >= IN_FLIGHT {
                 break;
             }
