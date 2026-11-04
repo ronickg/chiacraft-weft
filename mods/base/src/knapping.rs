@@ -96,8 +96,15 @@ pub fn register(r: &mut Registry) {
                     .position(|k| k.kind == h || k.shape == h || (h == "pick" && k.kind == "pickaxe"))
             })
             .unwrap_or(0) as u32;
-        if w.get(feet) == 0 {
+        // Air or a plant at the feet (tall grass is common) makes room; anything else doesn't
+        // (UI's run t2_knprobe2: grass at the feet left no nodule, and the screen closed).
+        let here = w.get(feet);
+        if here == 0 || state_flags(here) & abi::block_flags::REPLACEABLE != 0 {
             w.set(feet, LOOSE_FLINT.id());
+        }
+        if !LOOSE_FLINT.is(w.get(feet)) {
+            cmd.reply("command.base.knap.no_room", &[]);
+            return;
         }
         open(&w, player, feet);
         if shape != 0
@@ -271,6 +278,13 @@ fn screen(ui: &mut Ui) {
         } else {
             "knapping.base.how"
         };
-        ui.text_styled(S::col().class("dim").max_w(150.0).self_align(abi::ui_align::CENTER), how, &[]);
+        ui.text_styled(
+            S::col()
+                .class("dim")
+                .max_w(150.0)
+                .self_align(abi::ui_align::CENTER),
+            how,
+            &[],
+        );
     });
 }

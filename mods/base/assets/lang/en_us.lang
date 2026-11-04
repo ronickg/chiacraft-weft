@@ -1074,3 +1074,4 @@ item.base.hand_drill = Hand Drill
 item.base.hand_drill.tooltip = Two sticks, spun between the palms. Hold it on a fire bed: 10 s, and it often fails.
 block.base.campfire_laid = Laid Campfire
 block.base.campfire_laid.tooltip = Two logs and two sticks, not lit yet. Hold a bow drill or hand drill on it for an ember.
+command.base.knap.no_room = No room for a nodule here: stand on open ground.
