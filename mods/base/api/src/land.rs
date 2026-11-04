@@ -199,7 +199,8 @@ pub const SWAMP: (f64, f64) = (0.0, 0.04);
 /// Tropical forest (Ronald, 11-04: "all four"; the third proposal sheet) from this temperature
 /// and this humidity: the hot, wet corner, where the rules fell through to oak "forest" at the
 /// llanos' heat (3.5-5.6% of the land on seeds 1, 7, 42, 1234). The savanna's heat, the forest's
-/// rain; the swamp keeps the low wet land.
+/// rain; it takes the low wet land in its climate before the swamp (Ronald: "Yes, take the low
+/// land"), the swamp keeping the low wet land of its own, cooler or drier climate.
 pub const TROPICAL: (f64, f64) = (0.1, 0.07);
 /// Forest from this humidity; birch forest under this temperature and from this humidity.
 pub const FOREST_HUMIDITY: f64 = 0.07;
@@ -596,8 +597,8 @@ pub const RIVER_BEDS: [(&str, &str); 9] = [
     ("taiga", "gravel"),
     ("desert", "sand"),
     ("savanna", "sand"),
-    ("swamp", "dirt"),
     ("tropical_forest", "dirt"),
+    ("swamp", "dirt"),
     ("forest", "sand"),
     ("birch_forest", "gravel"),
     ("plains", "sand"),
@@ -1245,10 +1246,12 @@ fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool) -
         "desert"
     } else if t >= at(SAVANNA.0) && hu < at(SAVANNA.1) {
         "savanna"
+    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
+        // Before the swamp: the tropical forest takes its low wet land too (Ronald: "Yes, take
+        // the low land"), so the flooded forest has room along its rivers.
+        "tropical_forest"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
-    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
-        "tropical_forest"
     } else if hu >= at(FOREST_HUMIDITY) {
         "forest"
     } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {
@@ -1566,10 +1569,12 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
         "desert"
     } else if t >= at(SAVANNA.0) && hu < at(SAVANNA.1) {
         "savanna"
+    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
+        // Before the swamp: the tropical forest takes its low wet land too (Ronald: "Yes, take
+        // the low land"), so the flooded forest has room along its rivers.
+        "tropical_forest"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
-    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
-        "tropical_forest"
     } else if hu >= at(FOREST_HUMIDITY) {
         "forest"
     } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {

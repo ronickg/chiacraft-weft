@@ -1,6 +1,6 @@
 //! The nearest spots to spawn of a kind, with a camera for a look script: for testers, so a shot
 //! of a lake or a river shows one. Kinds: `lake`, `river` (water at least two blocks deep in the
-//! channel), `coast` (land with the sea beside it), `karst` (a tower), `canyon` (cut 24 or more), `crater`, `sinkhole` (karst), `arch`, `waterfall`, `spawn` (the fair first place) or any overworld biome by name (`desert`,
+//! channel), `coast` (land with the sea beside it), `karst` (a tower), `canyon` (cut 24 or more), `crater`, `sinkhole` (karst), `arch`, `waterfall`, `glacier`, `flooded` (the tropical forest's still water), `spawn` (the fair first place) or any overworld biome by name (`desert`,
 //! `sequoia_grove`, ...). Searched in rings outward from the middle every `step` blocks, the
 //! world as the engine builds it (the overworld's fields, its continent scale).
 //!
@@ -107,6 +107,11 @@ fn main() {
                         .any(|(dx, dz)| l::overworld_biome(&f, (x + dx) * 16, (z + dz) * 16) == "ocean")
             }
             "karst" => l::karst(&f, x * 16, z * 16) > 16 * 12,
+            "glacier" => {
+                let mut ground = |x: i32, z: i32| h(x, z);
+                l::glacier(&f, x, z, h(x, z), &mut ground)
+            }
+            "flooded" => l::tropical_water(&f, x, z, h(x, z)).is_some(),
             "canyon" => l::canyons(&f, x * 16, z * 16) < -16 * 24,
             b => l::overworld_biome(&f, x * 16, z * 16) == b,
         }
