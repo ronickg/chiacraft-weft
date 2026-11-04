@@ -484,6 +484,8 @@ pub fn fight_at(w: &World, id: u64, st: &EntityState, t: u64, speed: f32) {
     let species = w.component(id, &ANIMAL).and_then(|a| a.species());
     // At least a lunge: the path ends a block and a half short of a target that stands still.
     let reach = ((st.size[0] + e.size[0]) as f64 / 2.0 + species.map_or(0.8, |s| s.reach) as f64).max(LUNGE);
+    // Running prey down, a pack bites at its flanks and hindquarters as it runs: a block further.
+    let reach = if speed > 1.4 { reach + 1.0 } else { reach };
     let flat = (e.pos[0] - st.pos[0]).powi(2) + (e.pos[2] - st.pos[2]).powi(2);
     if flat < reach * reach && (e.pos[1] - st.pos[1]).abs() < 2.0 + st.size[1] as f64 / 2.0 && w.attack(id, t) {
         let attacks = species.map_or(&[][..], |s| s.attacks);
