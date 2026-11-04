@@ -115,7 +115,7 @@ Round 2 of the parts was "too yellow everywhere". The rule:
 
 Ronald found the smooth Alegreya "off and not well positioned". The text is now a **pixel font on the UI's own grid**:
 
-- **Faces:** PixelOperator (CC0, his sheet's pick) for Latin, with Pixeloid Sans (OFL; Reserved Font Name, so never call our bake "Pixeloid") for Cyrillic, in the same weight. Both are in `mods/base/source/ui/fonts/` with their licences. Minecraftia (paid for commercial use) and VCR OSD Mono (private use only) can't ship.
+- **Faces (Ronald picked "A bold"):** PixelOperator Bold (CC0, his sheet's pick) for Latin, with Pixeloid Sans Bold (OFL; Reserved Font Name, so never call our bake "Pixeloid") for Cyrillic, in the same weight. Both are in `mods/base/source/ui/fonts/` with their licences. Minecraftia (paid for commercial use) and VCR OSD Mono (private use only) can't ship.
 - **One pixel:** one design pixel of the font is one font pixel, which is half a GUI pixel: the same pixel as the frames and the 32 px items. The engine already rounds text so a font pixel covers whole screen pixels. At GUI scale 2 and 4 everything lines up; at odd scales (3) a UI pixel is 1.5 screen pixels and text and frames can't both be exact.
 - **Baking:** `font_bake.py --pixel FONT.ttf --also CYRILLIC.ttf` finds the design size (the smallest size with no grey pixels), keeps glyphs black-and-white, puts the second font's glyphs on the first one's baseline, and writes `pixel = 1`, `line`, `sharp = true` into `default.font`.
 - **The line:** capitals plus the same room above them as below the baseline (descender + 1 pixel). PixelOperator: capitals 9, line 17. Text then sits centred in a button or tab with even padding.

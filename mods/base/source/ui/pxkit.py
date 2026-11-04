@@ -259,6 +259,27 @@ def build():
     knob = src("c_knob")
     put("slider_knob", knob, scaling="stretch")
     put("slider_knob_hover", glow(brighter(knob, 1.1), GOLD1), scaling="stretch")
+    # The HUD (`mods/base/src/hud.rs`): each bar a frame and a fill on a canvas the frame's size,
+    # which the engine crops to the value (`BAR_*` and `bar_fill` there follow these sizes).
+    def bar(name, fill, w, h):
+        fr = fit9(src("c_bars", 0), w, h, 3)
+        put(name, fr, scaling="stretch")
+        canvas = np.zeros_like(fr)
+        canvas[2:h - 2, 2:w - 2] = fit9(fill, w - 4, h - 4, 2)
+        put(name + "_fill", canvas, scaling="stretch")
+
+    bar("hud_health", src("c_bars", 1, toned=False), 192, 14)
+    bar("hud_stamina", src("c_bars", 2), 192, 14)
+    bar("hud_xp", src("c_bars", 3, toned=False), 192, 8)
+    badge = src("c_badge")
+    put("hud_badge", badge[:48, :40] if badge.shape[0] >= 48 else fit9(badge, 40, 48, 8), scaling="stretch")
+    temp = src("c_temp", 0, toned=False)
+    track = fit9(src("c_bars", 0), 128, 10, 3)
+    put("hud_temperature", track, scaling="stretch")
+    canvas = np.zeros_like(track)
+    inner = temp[2:-2, 2:-2]  # the gradient inside its rim, bands kept whole by a nearest resize
+    canvas[2:8, 2:126] = np.array(Image.fromarray(inner).resize((124, 6), Image.NEAREST))
+    put("hud_temperature_fill", canvas, scaling="stretch")
     return out
 
 

@@ -2342,6 +2342,23 @@ fn world_keys(r: &mut Running) {
             r.open(Box::new(crate::game_screens::Chat::new(if command { "/" } else { "" })));
             r.input.typed.clear();
         }
+        // The recipe keys in the game itself: what the held item is made from (or used in), or
+        // with an empty hand every recipe, by kind.
+        else if let Some(uses) = [("core:recipes", false), ("core:uses", true)]
+            .into_iter()
+            .find(|(a, _)| r.input.pressed(a))
+            .map(|(_, u)| u)
+        {
+            let held = r.game.as_ref().map(|g| g.client.held()).unwrap_or_default();
+            let view = if held.item != 0 {
+                crate::game_screens::RecipeView::item(held.item, uses)
+            } else {
+                let mut kinds: Vec<String> = content().game.recipe_kinds.iter().cloned().collect();
+                kinds.sort();
+                crate::game_screens::RecipeView::new(crate::game_screens::RecipeQuery::Kinds(kinds))
+            };
+            r.open(Box::new(view));
+        }
     }
     let (top_chat, top_menu) = r
         .screens
