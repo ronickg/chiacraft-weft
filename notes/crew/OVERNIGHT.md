@@ -80,3 +80,11 @@ change any of them in the morning.
     `parts/<kind>/<shape>.png` maps. Then a felling and a bearded axe head each have their own
     drawing.
     - Alternative: by layer only (`parts/axe/head/...`), which can't tell two head shapes apart.
+17. **Chiacraft's part art is installed in the game now**, before Ronald's morning pick, so the
+    look hook is tested on the real drawings.
+    - Installed: tool heads in 9 materials, the four hafts, sword blades, the hilt, wood, bone and
+      antler ramps, put under the shape-named paths.
+    - Metal, sinew, rawhide and birch-tar ramps are placeholders from the archived prototype's
+      palettes, until Chiacraft draws them.
+    - Reverting is one commit if he picks another direction.
+    - Alternative: keep the cut-up stone-axe placeholders until he picks.

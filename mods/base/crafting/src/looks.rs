@@ -114,8 +114,17 @@ pub const LOOKS: &[KindLook] = &[
     },
     KindLook {
         kind: "sword",
-        socket: [8.1, 23.4],
-        anchors: &[],
+        socket: [7.6, 23.8],
+        anchors: &[
+            ("wood", [7.6, 23.8]),
+            ("stone", [8.3, 23.2]),
+            ("copper", [7.5, 23.6]),
+            ("bronze", [8.0, 23.1]),
+            ("iron", [7.6, 23.8]),
+            ("steel", [14.0, 17.3]),
+            ("gold", [8.0, 23.1]),
+            ("diamond", [9.0, 23.3]),
+        ],
         layers: &[
             Layer { name: "blade", regions: &["blade"], area: [6, 0, 31, 26], moves: false, painted: true },
             Layer { name: "hilt", regions: &["grip", "guard", "pommel"], area: [0, 17, 15, 31], moves: true, painted: false },
