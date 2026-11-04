@@ -17,17 +17,18 @@ look 0 0
 press core:use
 until screen core:menu within 10
 wait 1
-shot book_table_open
+shot book_table_open.png
 tap core:menu text:tools
 wait 1
-shot book_table_tools
-tap core:menu class:slot
+shot book_table_tools.png
+tap_once core:menu class:slot
 wait 1
-shot book_table_picked
+shot book_table_picked.png
 tap core:menu text:all (
 wait 1
 chat /tk inv me
-shot book_table_after
+until chat base:iron_shovel within 5
+shot book_table_after.png
 key Escape
 until screen none within 10
 quit

@@ -9,15 +9,16 @@ chat /tk inv me
 press core:inventory
 until screen core:menu within 10
 wait 1
-shot book_hands_open
+shot book_hands_open.png
 # The first recipe is the one you can make: oak planks from the log.
-tap core:menu class:slot
+tap_once core:menu class:slot
 wait 1
-shot book_hands_picked
+shot book_hands_picked.png
 tap core:menu text:all (
 wait 1
 chat /tk inv me
-shot book_hands_after
+until chat base:oak_planks within 5
+shot book_hands_after.png
 key Escape
 until screen none within 10
 quit

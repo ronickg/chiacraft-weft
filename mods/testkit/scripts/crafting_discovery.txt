@@ -8,7 +8,7 @@ until mode survival within 10
 press core:inventory
 until screen core:menu within 10
 wait 1
-shot discovery_empty
+shot discovery_empty.png
 key Escape
 until screen none within 10
 # A log: planks are makeable now; what needs a material not held yet is a "?" naming it.
@@ -17,9 +17,9 @@ wait 3
 press core:inventory
 until screen core:menu within 10
 wait 1
-shot discovery_log
+shot discovery_log.png
 # Make planks; what takes planks and something held shows, the rest a "?".
-tap core:menu class:slot
+tap_once core:menu class:slot
 tap core:menu text:all (
 wait 3
 key Escape
@@ -27,7 +27,7 @@ until screen none within 10
 press core:inventory
 until screen core:menu within 10
 wait 1
-shot discovery_planks
+shot discovery_planks.png
 key Escape
 until screen none within 10
 quit

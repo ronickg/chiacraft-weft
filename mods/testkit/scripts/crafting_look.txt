@@ -18,10 +18,10 @@ until screen core:menu within 10
 wait 1
 tap core:menu text:parts
 wait 1
-shot parts_tab
-tap core:menu class:slot
+shot parts_tab.png
+tap_once core:menu class:slot
 wait 1
-shot parts_head_picked
+shot parts_head_picked.png
 tap core:menu text:all (
 wait 1
 key Escape
@@ -32,9 +32,9 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap core:menu class:slot
+tap_once core:menu class:slot
 wait 1
-shot parts_haft_picked
+shot parts_haft_picked.png
 tap core:menu text:all (
 wait 1
 key Escape
@@ -45,12 +45,12 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap core:menu class:slot
+tap_once core:menu class:slot
 wait 1
 tap core:menu text:all (
 wait 1
 chat /tk inv me
-shot parts_made
+shot parts_made.png
 # 4. Build: head, haft and lashing from the hotbar into the assembly slots, take the axe.
 tap_once core:menu slot:43
 tap_once core:menu slot:10
@@ -59,30 +59,31 @@ tap_once core:menu slot:11
 tap_once core:menu slot:45
 tap_once core:menu slot:12
 wait 1
-shot parts_assembly
+shot parts_assembly.png
 tap_once core:menu slot:14
 tap_once core:menu slot:43
 wait 1
-shot parts_built
+shot parts_built.png
 chat /tk slot me 0
+until chat base:axe within 5
 key Escape
 until screen none within 10
 # 5. The axe's composed icon in the inventory and the hotbar, then held.
 press core:inventory
 until screen core:menu within 10
 wait 1
-shot look_inventory
+shot look_inventory.png
 key Escape
 until screen none within 10
 key Digit1
 wait 1
-shot look_held_first
+shot look_held_first.png
 look 0 -30
 wait 1
-shot look_held_down
+shot look_held_down.png
 press core:perspective
 wait 1
-shot look_held_third
+shot look_held_third.png
 press core:perspective
 press core:perspective
 wait 1

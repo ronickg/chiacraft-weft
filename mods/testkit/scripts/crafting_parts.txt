@@ -18,10 +18,10 @@ until screen core:menu within 10
 wait 1
 tap core:menu text:parts
 wait 1
-shot parts_tab
-tap core:menu class:slot
+shot parts_tab.png
+tap_once core:menu class:slot
 wait 1
-shot parts_head_picked
+shot parts_head_picked.png
 tap core:menu text:all (
 wait 1
 key Escape
@@ -32,9 +32,9 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap core:menu class:slot
+tap_once core:menu class:slot
 wait 1
-shot parts_haft_picked
+shot parts_haft_picked.png
 tap core:menu text:all (
 wait 1
 key Escape
@@ -45,12 +45,13 @@ press core:use
 until screen core:menu within 10
 wait 1
 tap core:menu text:parts
-tap core:menu class:slot
+tap_once core:menu class:slot
 wait 1
 tap core:menu text:all (
 wait 1
 chat /tk inv me
-shot parts_made
+until chat base:part_lashing within 5
+shot parts_made.png
 # 4. Build: head, haft and lashing from the hotbar into the assembly slots, take the axe.
 tap_once core:menu slot:43
 tap_once core:menu slot:10
@@ -59,12 +60,13 @@ tap_once core:menu slot:11
 tap_once core:menu slot:45
 tap_once core:menu slot:12
 wait 1
-shot parts_assembly
+shot parts_assembly.png
 tap_once core:menu slot:14
 tap_once core:menu slot:43
 wait 1
-shot parts_built
+shot parts_built.png
 chat /tk slot me 0
+until chat base:axe within 5
 key Escape
 until screen none within 10
 # 5. Apart: the axe into the apart slot; head and haft come back, the lashing is cut.
@@ -74,7 +76,7 @@ wait 1
 tap_once core:menu slot:43
 tap_once core:menu slot:15
 wait 1
-shot parts_apart
+shot parts_apart.png
 key Escape
 until screen none within 10
 chat /tk inv me

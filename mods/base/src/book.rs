@@ -77,6 +77,9 @@ struct Book {
     asked: u32,
 }
 
+/// The bag as the open book last saw it (`client_frame` above).
+static BAG_SIG: Mutex<u64> = Mutex::new(0);
+
 static BOOK: Mutex<Book> = Mutex::new(Book { tab: 0, page: 0, picked: None, pool: Vec::new(), asked: u32::MAX });
 
 pub fn register(r: &mut Registry) {
@@ -92,7 +95,40 @@ pub fn register(r: &mut Registry) {
     });
     r.packet(&POOL_ASK, |p, v| {
         let w = p.world();
-        p.reply(&POOL, &encode(&chest_totals(&w, p.player(), Station::from(v[0]))));
+        let station = Station::from(v[0]);
+        let pool = chest_totals(&w, p.player(), station);
+        // What the book will count besides the bag (asked when a crafting screen opens).
+        if station == Station::Table {
+            let table = table_near(&w, p.player());
+            let chests = table.map_or(0, |t| chests_near(&w, t).len());
+            weft_sdk::info!(
+                "crafting: book at {station:?}: table {table:?}, {chests} chests within {CHEST_REACH}, {} kinds of item in them",
+                pool.len()
+            );
+        }
+        p.reply(&POOL, &encode(&pool));
+    });
+    // The book is built when its screen opens; the bag can change after (an item given, moved,
+    // picked up), so it's built again when it does.
+    r.client_frame(|c| {
+        let open = BOOK.lock().map_or(u32::MAX, |b| b.asked);
+        let window = c.menu().map_or(u32::MAX, |m| m[1]);
+        if open == u32::MAX || window != open {
+            return;
+        }
+        let v = c.view();
+        let mut stacks = v.inventory_group(BAG_GROUPS[0]);
+        stacks.extend(v.inventory_group(BAG_GROUPS[1]));
+        let sig = stacks
+            .iter()
+            .fold(0xcbf2_9ce4_8422_2325u64, |h, s| (h ^ ((s.item as u64) << 32 | s.count as u64)).wrapping_mul(0x100_0000_01b3));
+        let changed = BAG_SIG
+            .lock()
+            .map(|mut last| std::mem::replace(&mut *last, sig) != sig)
+            .unwrap_or(false);
+        if changed {
+            c.rebuild_screen();
+        }
     });
     r.client_packet(&POOL, |c, bytes| {
         if let Ok(mut b) = BOOK.lock() {
