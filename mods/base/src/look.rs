@@ -34,7 +34,7 @@ pub fn register(r: &mut Registry) {
     r.config(&LOOK_FILL).float(1.0, 0.5, 2.0);
     r.config(&LOOK_FILL_COOL).float(0.0, -1.0, 1.0);
     r.config(&LOOK_CONTRAST).float(1.0, 0.8, 1.3);
-    r.config(&LOOK_SATURATION).float(1.07, 0.8, 1.4);
+    r.config(&LOOK_SATURATION).float(1.0, 0.7, 1.3);
     r.config(&LOOK_SHADE).float(1.0, 0.5, 2.0);
     r.config(&LOOK_HAZE).float(1.0, 0.0, 2.0);
     r.config(&LOOK_FOG).float(1.0, 0.0, 2.0);

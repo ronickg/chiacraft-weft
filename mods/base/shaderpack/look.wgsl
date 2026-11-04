@@ -94,7 +94,7 @@ fn palette() -> Palette {
     let sun_hue = select(mix(vec3(1.0, 0.91, 0.81), vec3(1.0, 0.97, 0.94), -warmth), mix(vec3(1.0, 0.91, 0.81), vec3(1.0, 0.74, 0.52), warmth), warmth >= 0.0);
     let cool = look_opt(OPT_FILL_COOL, 0.0);
     let fill_hue = select(mix(vec3(0.85, 0.95, 1.2), vec3(1.0, 1.0, 1.0), -cool), mix(vec3(0.85, 0.95, 1.2), vec3(0.7, 0.92, 1.45), cool), cool >= 0.0);
-    let day = key(vec3(0.137, 0.289, 0.612), vec3(0.378, 0.538, 0.797), vec3(1.0, 0.92, 0.78), sun_hue * 1.6 * look_opt(OPT_SUN, 1.0), fill_hue * 0.5 * look_opt(OPT_FILL, 1.0));
+    let day = key(vec3(0.137, 0.289, 0.612), vec3(0.378, 0.538, 0.797), vec3(1.0, 0.92, 0.78), sun_hue * 1.92 * look_opt(OPT_SUN, 1.0), fill_hue * 0.3 * look_opt(OPT_FILL, 1.0));
     // Golden hour is orange, not white: a warm horizon, an orange glow and sun.
     let golden = key(vec3(0.11, 0.25, 0.78), vec3(0.92, 0.62, 0.42), vec3(1.0, 0.58, 0.26), vec3(1.55, 0.80, 0.38), vec3(0.22, 0.24, 0.38));
     let sunset = key(vec3(0.08, 0.10, 0.38), vec3(1.05, 0.46, 0.34), vec3(1.0, 0.50, 0.26), vec3(1.50, 0.76, 0.38), vec3(0.27, 0.22, 0.36));
@@ -628,7 +628,9 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // thousands of blocks off, and the haze would barely start where the kept blocks give way to it.
     let reach = min(end, 2500.0);
     // A little hazier than it was (0.9): Bliss's air veils the middle distance more, lighter.
-    let amount = 1.0 - exp(-dist / (reach * mix(0.75, 0.4, rain)) * mix(0.45, 1.0, thin) * look_opt(OPT_HAZE, 1.0));
+    // (Half as thick as it was: with it off a forest frame's darkest twentieth went 35 -> 25 and its
+    // saturation 0.41 -> 0.57; the haze was the grey veil over the middle distance, Colour 9.)
+    let amount = 1.0 - exp(-dist / (reach * mix(0.75, 0.4, rain)) * mix(0.45, 1.0, thin) * 0.5 * look_opt(OPT_HAZE, 1.0));
     let edge = smoothstep(end * 0.72, end, dist);
     // Valheim's air: lit from behind by the sun, so the haze toward it glows warm (a forward
     // scattering lobe, Henyey-Greenstein) and the side away goes a cool blue-teal, most at a low
@@ -642,7 +644,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
     // The far loses its colour before the haze covers it: far ridges go pale and grey-blue while the
     // near stays rich.
-    let pale = mix(c, vec3(luma(c)), clamp(amount * 1.2, 0.0, 0.7));
+    let pale = mix(c, vec3(luma(c)), clamp(amount * 0.6, 0.0, 0.35));
     return mix(pale, lit, clamp(max(amount * 0.9, edge), 0.0, 1.0));
 }
 
@@ -668,8 +670,9 @@ fn shoulder(x: vec3<f32>) -> vec3<f32> {
 // and c solved so that 0.25 maps to 0.25 and 8 to 1 (contrast a 1.05, shoulder d 0.97). Display-
 // linear out, black at black.
 fn lottes(x: vec3<f32>) -> vec3<f32> {
-    // The contrast knob scales a (1.05 as made); b and c follow from it.
-    let a = 1.05 * look_opt(OPT_CONTRAST, 1.0);
+    // The contrast knob scales a (1.2 as made: Complementary's 1.05 read flat, Colour 9); b and c
+    // follow from it.
+    let a = 1.2 * look_opt(OPT_CONTRAST, 1.0);
     let ad = a * 0.97;
     let mid = 0.25;
     let peak = 8.0;
@@ -723,9 +726,9 @@ fn display(c: vec3<f32>) -> vec3<f32> {
     let dim = luma(t);
     let keep = mix(0.4 + 0.6 * smoothstep(0.0, 0.05, dim), 0.75 + 0.25 * smoothstep(0.0, 0.1, dim), day);
     t = mix(vec3(dim), t, keep);
-    // By day a light 1.07 of saturation after the curve (Complementary's), nothing more.
+    // By day 1.2 of saturation after the curve (Colour 9; 1.07, Complementary's, read pale here).
     let y = luma(t);
-    t = max(mix(vec3(y), t, mix(1.0, look_opt(OPT_SATURATION, 1.07), day)), vec3(0.0));
+    t = max(mix(vec3(y), t, mix(1.0, 1.2 * look_opt(OPT_SATURATION, 1.0), day)), vec3(0.0));
     // A cool floor so the night is never pure black; by day black stays black.
     t += (vec3(1.0) - t) * vec3(0.0018, 0.002, 0.0034) * (1.0 - day);
     return clamp(t, vec3(0.0), vec3(1.0));

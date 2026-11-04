@@ -72,7 +72,7 @@ fn reflect_swell(p: vec2<f32>, t: f32, dist: f32, glance: f32) -> vec3<f32> {
 // How much of what it shows water mirrors at the angle it is seen at (the pack's `water` uses the
 // same): a near mirror at an ordinary look across it, as in the reference pictures.
 fn reflect_fresnel(ndv: f32) -> f32 {
-    return 0.08 + 0.92 * pow(1.0 - clamp(ndv, 0.0, 1.0), 2.5);
+    return 0.08 + 0.92 * pow(1.0 - clamp(ndv, 0.0, 1.0), 2.0);
 }
 
 // Where `rel` (camera relative) lands on the screen, and its depth there.

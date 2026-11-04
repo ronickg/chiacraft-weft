@@ -159,8 +159,8 @@ chiacraft's pack reads these settings (`mods/base/src/look.rs`; Mod Settings in 
 | `base:look_sun_warmth` | 0, -1..1 | the sun's colour: -1 whiter, +1 toward a 4300 K orange (0: 6300 K) |
 | `base:look_fill` | 1, 0.5-2 | the sky's light in the shade by day |
 | `base:look_fill_cool` | 0, -1..1 | the shade's colour: -1 neutral, +1 bluer (0: blue 1.4x red) |
-| `base:look_contrast` | 1, 0.8-1.3 | the day curve's contrast (Lottes's a, 1.05 as made) |
-| `base:look_saturation` | 1.07, 0.8-1.4 | saturation after the curve, by day |
+| `base:look_contrast` | 1, 0.8-1.3 | the day curve's contrast (Lottes's a, 1.2 as made) |
+| `base:look_saturation` | 1, 0.7-1.3 | saturation after the curve, by day (1.2 as made) |
 | `base:look_shade` | 1, 0.5-2 | how fast the sky's light fades under leaves and roofs (more: darker forest floors) |
 | `base:look_haze` | 1, 0-2 | the haze over distance |
 | `base:look_fog` | 1, 0-2 | how bright fog is |

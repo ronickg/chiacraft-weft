@@ -545,7 +545,8 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     let ndv = max(dot(n, v), 0.02);
     // A near mirror at an ordinary look, as in the reference pictures: most of what it shows is
     // what it reflects (the screen's reflections, `post/reflect.wgsl`, use the same).
-    let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.5);
+    // (^2: more of a mirror at a slant, toward Bliss's pale sky-mirror lakes; Water 12.)
+    let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.0);
     let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos, in.rel);
     // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
@@ -563,7 +564,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     // brightness, a dark navy).
     let deep = vec3(0.022, 0.072, 0.066);
     let deepness = 1.0 - exp(-0.35 * depth);
-    let scatter = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
+    let scatter_raw = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
+    // The water's own colour 40 % toward grey: at a slant ours read 0.31 saturation against Bliss's
+    // 0.10-0.19 (Terrain's water sheet; Water 12).
+    let scatter = mix(vec3(luma(scatter_raw)), scatter_raw, 0.6);
     // How much of the bottom shows: the way through the water to it, longer at a slant; never all
     // of it, so even the shallowest water tints what lies under it.
     let through = exp(-0.28 * depth / max(v.y, 0.2)) * 0.82;
