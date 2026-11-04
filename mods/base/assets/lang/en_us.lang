@@ -1063,3 +1063,5 @@ item.base.bow_drill = Bow Drill
 item.base.bow_drill.tooltip = Two sticks and a string. Hold it on a fire bed: an ember in about 6 s, most times.
 item.base.hand_drill = Hand Drill
 item.base.hand_drill.tooltip = Two sticks, spun between the palms. Hold it on a fire bed: 10 s, and it often fails.
+block.base.campfire_laid = Laid Campfire
+block.base.campfire_laid.tooltip = Two logs and two sticks, not lit yet. Hold a bow drill or hand drill on it for an ember.

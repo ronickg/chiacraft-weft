@@ -14,8 +14,9 @@ runs. The research behind it is `reports/The first hours.md`.
   axe head, 2 side by side a pick head, 2 stacked a shovel blade), from memory. It's instant;
   a craft time waits for the book's queue.
 - No shaved-haft step: the stick in the hafting recipe is the haft (`branch` wood).
-- The lit bed becomes today's campfire. Today's campfire recipe (two logs, two sticks) still
-  places a lit one; lighting it with the drill is Survival's campfire, for later.
+- The lit bed becomes today's campfire. Today's campfire recipe (two logs, two sticks) lays it
+  unlit (`campfire_laid`), lit by the drill too: one rule for fire (Planner, 11-05). Flint and
+  steel, and a torch, light it once they exist.
 
 Ronald (11-05): "you can't just punch down a tree. You first got to get a rock, and then if you
 want to create an axe, well, what do you need for axe? ... wood, sticks, you need ropes." And:

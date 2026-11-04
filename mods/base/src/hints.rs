@@ -276,3 +276,8 @@ fn client(r: &mut Registry) {
         c.screen_text(0.5, HINT_Y, key, &args, 0xe4dacf00 | (alpha * 255.0) as u32, 1.0);
     });
 }
+
+/// A fire lit by `player` (`firebed.rs`): the night hint has done its work, as for one placed.
+pub fn fire_lit(w: &World, player: u64) {
+    mark(w, player, NIGHT);
+}
