@@ -155,7 +155,7 @@ fn palette() -> Palette {
     let storm = scene.weather.w;
     let grey = vec3(luma(p.horizon)) * vec3(0.9, 0.94, 1.0);
     p.zenith = mix(p.zenith, grey * (0.72 - 0.32 * storm), r * 0.85);
-    p.horizon = mix(p.horizon, grey * (1.0 - 0.3 * storm), r * 0.85);
+    p.horizon = mix(p.horizon, grey * (1.0 - 0.45 * storm), r * 0.85);
     p.glow = p.glow * (1.0 - r * 0.8);
     p.ambient = mix(p.ambient, vec3(luma(p.ambient + p.sun * 0.25)) * vec3(0.93, 0.97, 1.02) * (1.0 - 0.35 * storm), r * 0.85);
     p.sun = p.sun * (1.0 - r * 0.9);
@@ -764,7 +764,7 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     // 150 (at twice that, a thunderstorm went white).
     // Its mist mainly in the distance, as Bliss's: next to none within about 20 blocks, so the near
     // land keeps its colour (it began at the eye and the whole land went grey).
-    let downpour = rain * (0.0035 + 0.008 * scene.weather.w);
+    let downpour = rain * (0.0035 + 0.0055 * scene.weather.w);
     let wet_far = max(dist - 20.0, 0.0) * smoothstep(10.0, 60.0, dist);
     let veil = vec3(1.0) - exp(-((rayleigh + vec3(mie)) * far + vec3(downpour) * wet_far));
     // Only the last sixth of the view hands over to the sky's colour where the terrain ends.
@@ -781,7 +781,9 @@ fn haze_lit(c_in: vec3<f32>, rel: vec3<f32>, sky: f32) -> vec3<f32> {
     lit = mix(lit, lit * vec3(0.86, 0.97, 1.08), (0.5 - 0.5 * mu) * golden() * 0.6 * near_end);
     // Rain's mist is as dark as the rain's sky, darker in a thunderstorm: lit as a clear day's
     // air, a storm's mist was pale under a dark sky.
-    lit *= mix(1.0, 0.7 - 0.3 * scene.weather.w, rain);
+    // (The sky's colour it starts from is already the rain's; darker than it, the land under a
+    // storm's horizon met a bright band of sky.)
+    lit *= mix(1.0, 0.82 - 0.1 * scene.weather.w, rain);
     // Far ridges still lose a little colour (as before, but only where the veil has begun), then
     // the veil per channel (its blue thicker than its red), then the handover at the end.
     // In rain everything takes a little grey-blue wash, near too.
