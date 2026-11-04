@@ -20,6 +20,8 @@ static HUD_TEMPERATURE: HudElement = HudElement::named("temperature");
 /// GUI pixel), drawn at exactly its size so its pixels stay whole. The XP bar is thinner.
 const BAR: (f32, f32) = (96.0, 7.0);
 const BAR_XP: (f32, f32) = (96.0, 4.0);
+/// How far a bar's numbers end from its right end, GUI pixels: its rim (1) and two of padding.
+const BAR_TEXT_INSET: f32 = 3.0;
 /// The level badge beside the bars (`hud_badge`, 40 x 48 pixels).
 const BADGE: (f32, f32) = (20.0, 24.0);
 
@@ -57,22 +59,23 @@ pub fn register(r: &mut Registry) {
                 });
             });
             ui.column(S::col().gap(1.0), |ui| {
-                ui.row(S::row().gap(3.0).center(), |ui| {
+                // The numbers inside the bar's right end, as on Ronald's sheet.
+                ui.row(S::row().size(BAR.0, BAR.1), |ui| {
                     ui.progress_bind("hud_health", S::default().size(BAR.0, BAR.1), |c| {
                         let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return -1.0 };
                         bar_fill(me.health * HEALTH_SCALE / v.max_health.max(1.0))
                     });
-                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                    ui.text_bind_styled(S::default().no_wrap().at_pivot(BAR.0 - BAR_TEXT_INSET, BAR.1 / 2.0, [1.0, 0.5]), |c, t| {
                         let (Some(v), Some(me)) = (vitals_of(c), c.me()) else { return t.text("") };
                         t.set("hud.base.bar_value", &[Arg::Int((me.health * HEALTH_SCALE).round() as i64), Arg::Int(v.max_health.round() as i64)]);
                     });
                 });
-                ui.row(S::row().gap(3.0).center(), |ui| {
+                ui.row(S::row().size(BAR.0, BAR.1), |ui| {
                     ui.progress_bind("hud_stamina", S::default().size(BAR.0, BAR.1), |c| {
                         let Some(v) = vitals_of(c) else { return -1.0 };
                         bar_fill(v.stamina / v.max_stamina.max(1.0))
                     });
-                    ui.text_bind_styled(S::default().no_wrap(), |c, t| {
+                    ui.text_bind_styled(S::default().no_wrap().at_pivot(BAR.0 - BAR_TEXT_INSET, BAR.1 / 2.0, [1.0, 0.5]), |c, t| {
                         let Some(v) = vitals_of(c) else { return t.text("") };
                         t.set("hud.base.bar_value", &[Arg::Int(v.stamina.round() as i64), Arg::Int(v.max_stamina.round() as i64)]);
                     });
