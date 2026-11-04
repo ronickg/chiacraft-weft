@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a carrot: a bright orange tapering root with faint rings, lying diagonally, a green leaf tuft at the top right",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.349,
+   "outline": 0.58,
+   "red_line": 0.0,
+   "fill": 0.3,
+   "passed": true
+  }
+ ]
+}

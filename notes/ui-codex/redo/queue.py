@@ -324,6 +324,33 @@ SURVIVAL += [
                     + C),
 ]
 
+# second redos (Ronald 11-04: "Approve, redo those 3"; and one more try at the hoes that read as hammers)
+HOE2 = ("a {t} hoe: a long plain {h_short} handle and, across its top end, one thin flat blade like a garden hoe, "
+        "about a third of the canvas wide and only 3 px thick, set at a right angle to the handle and bent "
+        "downward, made of {m}; not a hammer, no block-shaped head" + DIAG)
+REDO2 = {
+    "coal": "a lump of coal: a chunky faceted lump of deep glossy black-brown (the darkest shade of its own brown, never "
+            "pure black) with bright blue-grey glints along its upper-left facet edges, strong contrast" + C,
+    "gunpowder": "a small heap of gunpowder: a soft cone of near-black charcoal-grey grains with clearly lighter grey "
+                 "and a few sulphur-yellow specks, a light top-left side and a dark lower-right side, strong contrast" + C,
+    "stick": "a wooden stick: a slightly crooked warm-brown twig a full 3 px thick from end to end, with grain, a small "
+             "knot and a lighter top edge" + DIAG,
+    "wood_hoe": HOE2.format(t="wooden", h_short="wooden", m="warm orange-brown carved wood"),
+    "stone_hoe": HOE2.format(t="stone", h_short="wooden", m="chipped warm grey-tan stone bound with cream cord"),
+    "diamond_hoe": HOE2.format(t="diamond", h_short="leather-wrapped", m="faceted cyan diamond with white facet tips"),
+    # batch 4 (Ronald: "Approve, redo those 5")
+    "venison": "raw venison: a lean deep dark-red steak with a clear darker red-brown outline, a thin cream fat edge "
+               "and soft marbling, glossy highlight on the upper left" + C,
+    "spider_eye": "a spider eye: a glossy dark red eyeball seen from the front, a big black slit pupil in an amber "
+                  "iris, a white glint on the upper left and a few thin dark red veins, clearly an eye" + C,
+    "kibble": "a small sack of kibble: a tied cream-tan burlap sack, open at the top showing round brown pet-food "
+              "pellets, a few pellets spilled in front" + C,
+    "hare": "a raw hare: a whole skinned hare carcass lying diagonally, head at the top right with long ears laid "
+            "back, long hind legs at the bottom left, dark red meat with a clear outline, reading as a hare",
+    "cooked_beef": "a cooked steak: a warm rich brown seared steak with darker brown grill stripes, a crisp golden "
+                   "fat edge and a glossy highlight, never grey" + C,
+}
+
 BATCHES = [
     ("1_tools", TOOLS, "base"),
     ("2_armour", ARMOUR, "base"),
@@ -362,6 +389,9 @@ def main():
     byname = {j["name"]: j for b, _, _ in BATCHES for j in json.load(open(os.path.join(HERE, "batches", b + ".json")))}
     json.dump([byname[n] for n in REDO], open(os.path.join(HERE, "batches", "2b_redo.json"), "w"), indent=1)
     print(f"2b_redo: {len(REDO)}")
+    json.dump([dict(byname[n], what=w) for n, w in REDO2.items()],
+              open(os.path.join(HERE, "batches", "3b_redo.json"), "w"), indent=1)
+    print(f"3b_redo: {len(REDO2)}")
     root = os.path.join(HERE, "..", "..", "..", "mods")
     have = {f[:-4] for m in ("base", "animals") for f in os.listdir(os.path.join(root, m, "assets", "textures", "item"))}
     print("in the game but not queued:", sorted(have - seen) or "none")

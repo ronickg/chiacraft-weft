@@ -18,7 +18,8 @@ OUT = os.path.join(HERE, "out")
 TITLES = {"1_tools": "Tools and weapons", "2_armour": "Armour", "3_materials": "Materials, ores and gems",
           "4_food": "Food", "5_plants": "Plants, nuts, berries and seeds", "6_misc": "Containers, tools, creatures, eggs",
           "7_survival": "Survival's new items (for its branch)",
-          "2b_redo": "Redos: hoes, leather cap, boots"}
+          "2b_redo": "Redos: hoes, leather cap, boots",
+          "3b_redo": "Redos: coal, gunpowder, stick, three hoes, five foods"}
 
 
 def uri(im, scale=1):
