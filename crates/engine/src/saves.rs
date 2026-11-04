@@ -884,7 +884,8 @@ impl Screen for CreateWorld {
         frame(ui, cx, "world.create", |ui| {
             ui.panel("panel", Style::default().pad(8.0).gap(4.0).stretch().w(260.0), |ui| {
                 label(ui, cx, "world.name", &[], "default");
-                let name = ui.add(Kind::input("New World", 32), Style::default().h(18.0).stretch());
+                // The default name in the player's language (it was "New World" in every one).
+                let name = ui.add(Kind::input(cx.lang.get("world.default_name"), 32), Style::default().h(18.0).stretch());
                 ui.set_id(name, "name");
                 label(ui, cx, "world.seed", &[], "default");
                 let seed = ui.add(Kind::input("", 32), Style::default().h(18.0).stretch());
