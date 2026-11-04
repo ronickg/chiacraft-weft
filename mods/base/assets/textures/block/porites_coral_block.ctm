@@ -1,0 +1,4 @@
+# Coral reef (Terrain, 11-04): three variants beside the plain tile, picked at random, so a reef top does not show its tile repeating.
+method = random
+tiles = <default> porites_coral_block/1-3
+symmetry = all

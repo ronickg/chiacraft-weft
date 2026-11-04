@@ -72,6 +72,21 @@ gain = 0.95
 spread = 20               # and a little less blue than the group, to sit with the top
 saturation = 1.2
 
+[groups.coral]
+match = ["*_coral_block"]
+
+[tiles.brain_coral_block]  # luma 0.35 -> 0.43, hue 343 -> 336; ~ brain_coral_block (0.45-0.47, 324-327)
+gain = 1.23
+hue = -7
+spread = 75
+
+[tiles.staghorn_coral_block]  # a busy block, spread 109 -> 75 (report: busy 45-80)
+spread = 75
+
+[tiles.porites_coral_block]  # darker than sand (0.83) and lumpier: luma 0.58 -> 0.51, spread 40 -> 50
+gain = 0.88
+spread = 50
+
 [groups.liquids]
 match = ["water_*", "lava_*"]
 
