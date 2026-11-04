@@ -43,7 +43,8 @@ fn vitals_of(c: &ClientView) -> Option<Vitals> {
     if c.creative() || c.me().is_none_or(|m| m.health <= 0.0) {
         return None;
     }
-    c.component(&VITALS).filter(|v| v.max_health > 0.0 && v.max_stamina > 0.0)
+    c.component(&VITALS)
+        .filter(|v| v.max_health > 0.0 && v.max_stamina > 0.0)
 }
 
 /// The screens a key opens, each with its picture (`gui/hud_<name>.png`) and its key

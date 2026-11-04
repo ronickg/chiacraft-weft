@@ -149,37 +149,43 @@ fn client(r: &mut Registry) {
         // The UI redo: a dark red-brown vignette (`death`), and in its middle a window with the
         // title, what happened, where the tombstone is, and the two ways on.
         ui.panel("death", S::col().center().stretch(), |ui| {
-            ui.panel("panel", S::col().pad(10.0).gap(6.0).w(240.0).self_align(abi::ui_align::CENTER), |ui| {
-                ui.text_styled(
-                    S::col()
-                        .class("title")
-                        .scale(2.0)
-                        .no_wrap()
-                        .self_align(abi::ui_align::CENTER),
-                    "death.title",
-                    &[],
-                );
-                ui.text_bind_styled(S::col().self_align(abi::ui_align::CENTER), |_, out| {
-                    let last = LAST.lock().unwrap();
-                    match last.as_ref() {
-                        Some(d) if !d.killer.is_empty() => out.set(&d.cause, &[Arg::Key(&d.killer)]),
-                        Some(d) => out.set(&d.cause, &[]),
-                        None => out.set("death.base.cause.generic", &[]),
-                    }
-                });
-                ui.panel("well", S::col().pad(5.0).stretch(), |ui| {
-                    ui.text_bind_styled(S::col().max_w(216.0), |_, out| {
-                        match LAST.lock().unwrap().as_ref().and_then(|d| d.grave) {
-                            Some([x, y, z]) => out.set("death.base.grave", &[Arg::Int(x as i64), Arg::Int(y as i64), Arg::Int(z as i64)]),
-                            None => out.set("death.base.no_grave", &[]),
+            ui.panel(
+                "panel",
+                S::col()
+                    .pad(10.0)
+                    .gap(6.0)
+                    .w(240.0)
+                    .self_align(abi::ui_align::CENTER),
+                |ui| {
+                    ui.text_styled(
+                        S::col()
+                            .class("title")
+                            .scale(2.0)
+                            .no_wrap()
+                            .self_align(abi::ui_align::CENTER),
+                        "death.title",
+                        &[],
+                    );
+                    ui.text_bind_styled(S::col().self_align(abi::ui_align::CENTER), |_, out| {
+                        let last = LAST.lock().unwrap();
+                        match last.as_ref() {
+                            Some(d) if !d.killer.is_empty() => out.set(&d.cause, &[Arg::Key(&d.killer)]),
+                            Some(d) => out.set(&d.cause, &[]),
+                            None => out.set("death.base.cause.generic", &[]),
                         }
                     });
-                });
-                ui.row(S::row().gap(6.0).self_align(abi::ui_align::CENTER), |ui| {
-                    ui.button("death.respawn", S::col().min_w(110.0), |c| c.client().respawn());
-                    ui.button("menu.save_quit", S::col().class("button_secondary").min_w(110.0), |c| c.client().leave_world());
-                });
-            });
+                    ui.panel("well", S::col().pad(5.0).stretch(), |ui| {
+                        ui.text_bind_styled(S::col().max_w(216.0), |_, out| match LAST.lock().unwrap().as_ref().and_then(|d| d.grave) {
+                            Some([x, y, z]) => out.set("death.base.grave", &[Arg::Int(x as i64), Arg::Int(y as i64), Arg::Int(z as i64)]),
+                            None => out.set("death.base.no_grave", &[]),
+                        });
+                    });
+                    ui.row(S::row().gap(6.0).self_align(abi::ui_align::CENTER), |ui| {
+                        ui.button("death.respawn", S::col().min_w(110.0), |c| c.client().respawn());
+                        ui.button("menu.save_quit", S::col().class("button_secondary").min_w(110.0), |c| c.client().leave_world());
+                    });
+                },
+            );
         });
     })
     .keep_on_escape()
