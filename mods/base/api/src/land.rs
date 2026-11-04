@@ -48,6 +48,7 @@ pub mod salt {
     pub const HIGHLANDS: u64 = 0x416A;
     pub const SNOW_DRIFT: u64 = 0x5A0D;
     pub const MOUNTAIN_AREA: u64 = 0x44;
+    pub const RANGE_GAPS: u64 = 0x45;
     pub const SEQUOIA: u64 = 0x5E0A;
     pub const COAST_CLIFFS: u64 = 0xC1F;
     pub const ISLANDS: u64 = 0x151A;
@@ -213,9 +214,10 @@ pub const SEQUOIA_RISE: (i32, i32) = (28, 85);
 pub const SEQUOIA_GROVE: f64 = 0.5;
 pub const SEQUOIA_AREA: Area = Area {
     all: &[
-        Ramp::Noise { salt: salt::SEQUOIA, scale: 260.0, from: 0.02, to: 0.15 },
-        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: -0.08, to: -0.03 },
-        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: 0.08, to: 0.05 },
+        Ramp::Noise { salt: salt::SEQUOIA, scale: 260.0, from: -0.06, to: 0.08 },
+        // A range's flank, on the one side: just outside its band.
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH * 0.5, to: RANGE_WIDTH * 0.8 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH * 3.2, to: RANGE_WIDTH * 2.2 },
         Ramp::Continent(0.15, 0.25),
     ],
     not: false,
@@ -291,11 +293,28 @@ pub const DUNES: (f64, f64) = (4.0, 26.0);
 pub const DUNES_AREA: Area =
     Area { all: &[Ramp::Temperature(0.12, 0.22), Ramp::Humidity(0.0, -0.08), Ramp::Continent(0.01, 0.07)], not: false };
 
-/// Mountain ranges (height, width between ridge lines), in patches inland; the mountains biome
-/// stands where this area is 0.45 or more (`MOUNTAIN_BIOME`).
+/// Mountains (height, width between ridge lines); the mountains biome stands where their area is
+/// 0.45 or more (`MOUNTAIN_BIOME`).
 pub const MOUNTAINS: (f64, f64) = (150.0, 260.0);
-pub const MOUNTAINS_AREA: Area =
-    Area { all: &[Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: -0.1, to: 0.3 }, Ramp::Continent(0.0, 0.2)], not: false };
+/// Mountain ranges (Ronald, 11-04: "all three", the fourth sheet; they were patches, ovals a few
+/// hundred blocks across): along the zero lines of a noise `RANGE_SCALE` blocks across, which wind
+/// and branch over the land, strongest on the line and gone `RANGE_WIDTH` either side of it, so a
+/// range rises to its spine; broken where a second noise is under `-RANGE_GAPS`. Inland only.
+/// About the same share of the land as the patches (17-18% at the biome's strength, against
+/// 15.5-17%). The engine's masks give it (both ramps of one noise make the band), no cost.
+/// Saved worlds made before get seams where new chunks meet saved ones (accepted for dev).
+pub const RANGE_SCALE: f64 = 1600.0;
+pub const RANGE_WIDTH: f64 = 0.11;
+pub const RANGE_GAPS: f64 = 0.15;
+pub const MOUNTAINS_AREA: Area = Area {
+    all: &[
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: -RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::RANGE_GAPS, scale: 2600.0, from: -RANGE_GAPS, to: -RANGE_GAPS + 0.15 },
+        Ramp::Continent(0.0, 0.2),
+    ],
+    not: false,
+};
 pub const MOUNTAIN_BIOME: f64 = 0.45;
 
 /// Mesas: flat-topped hills `MESA_HEIGHT` blocks high in `MESA_TIERS` tiers, patches about
