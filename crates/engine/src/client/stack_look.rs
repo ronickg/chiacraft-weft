@@ -8,6 +8,14 @@
 pub fn compose(look: &str, read: impl Fn(&str) -> Option<(u32, Vec<u8>)>) -> Option<(u32, Vec<u8>)> {
     let mut out: Option<(u32, Vec<u8>)> = None;
     for layer in look.split(';').map(str::trim).filter(|l| !l.is_empty()) {
+        // `+dx,dy` at the end moves the layer that many pixels (a handle meeting its head).
+        let (layer, shift) = match layer
+            .rsplit_once('+')
+            .and_then(|(l, at)| Some((l, parse_shift(at)?)))
+        {
+            Some((l, at)) => (l, at),
+            None => (layer, [0, 0]),
+        };
         let (name, ramps) = match layer.split_once('@') {
             Some((map, ramps)) => (map, Some(ramps)),
             None => (layer, None),
@@ -28,10 +36,15 @@ pub fn compose(look: &str, read: impl Fn(&str) -> Option<(u32, Vec<u8>)>) -> Opt
             continue;
         }
         let px = &px[..bytes];
+        // Where pixel `i` of this layer lands on the canvas, if it's on it.
+        let at = |i: usize| -> Option<usize> {
+            let (x, y) = ((i as u32 % w) as i32 + shift[0], (i as u32 / w) as i32 + shift[1]);
+            ((0..w as i32).contains(&x) && (0..w as i32).contains(&y)).then(|| (y as u32 * w + x as u32) as usize * 4)
+        };
         let Some(ramps) = ramps else {
-            for (o, p) in canvas.chunks_exact_mut(4).zip(px.chunks_exact(4)) {
-                if p[3] > 0 {
-                    o.copy_from_slice(p);
+            for (i, p) in px.chunks_exact(4).enumerate() {
+                if let (true, Some(o)) = (p[3] > 0, at(i)) {
+                    canvas[o..o + 4].copy_from_slice(p);
                 }
             }
             continue;
@@ -47,23 +60,39 @@ pub fn compose(look: &str, read: impl Fn(&str) -> Option<(u32, Vec<u8>)>) -> Opt
                 ramp
             })
             .collect();
-        for (o, p) in canvas.chunks_exact_mut(4).zip(px.chunks_exact(4)) {
-            if p[3] == 0 {
-                continue;
-            }
+        for (i, p) in px.chunks_exact(4).enumerate() {
+            let Some(o) = at(i).filter(|_| p[3] != 0) else { continue };
             // A region without a ramp leaves what is below.
             let Some(Some((rw, rp))) = ramps.get(p[1] as usize) else { continue };
             let x = (p[0] as u32 / 36).min(7).min(rw - 1) as usize;
             // The ramp gives the colour, the map where the layer is.
-            o.copy_from_slice(&[rp[x * 4], rp[x * 4 + 1], rp[x * 4 + 2], p[3]]);
+            canvas[o..o + 4].copy_from_slice(&[rp[x * 4], rp[x * 4 + 1], rp[x * 4 + 2], p[3]]);
         }
     }
     out
 }
 
+/// `dx,dy` in whole pixels.
+fn parse_shift(at: &str) -> Option<[i32; 2]> {
+    let (x, y) = at.split_once(',')?;
+    Some([x.trim().parse().ok()?, y.trim().parse().ok()?])
+}
+
 #[cfg(test)]
 mod tests {
     use super::compose;
+
+    #[test]
+    fn a_layer_moves() {
+        // One pixel at (0, 0), moved one right and one down; off the canvas it's dropped.
+        let one = vec![9, 9, 9, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let read = |n: &str| (n == "t:one").then(|| (2, one.clone()));
+        let (_, px) = compose("t:one+1,1", read).unwrap();
+        assert_eq!(&px[12..16], &[9, 9, 9, 255]);
+        assert_eq!(&px[0..4], &[0, 0, 0, 0]);
+        let (_, px) = compose("t:one+-1,0", read).unwrap();
+        assert!(px.iter().all(|&b| b == 0));
+    }
 
     #[test]
     fn layers_paint_over_each_other() {

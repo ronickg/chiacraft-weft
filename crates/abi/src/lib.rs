@@ -288,7 +288,8 @@ pub mod comp {
     /// How one stack is drawn, as text (UTF-8): layers back to front, separated by `;`. A layer is
     /// a texture (`base:parts/axe/head/flint`, painted as it is) or `<map>@<ramp>,<ramp>...`: a
     /// shade map whose red / 36 is the step (0..7) and green the region, painted with that
-    /// region's ramp (an 8 x 1 texture, one colour per step). Without it the item's icon shows.
+    /// region's ramp (an 8 x 1 texture, one colour per step). `+dx,dy` after a layer moves it that
+    /// many pixels (a handle meeting its head's anchor). Without it the item's icon shows.
     pub const LOOK: &str = "core:look";
     /// Blocks connecting energy networks.
     pub const CONDUCTOR: &str = "conductor";

@@ -277,18 +277,23 @@ pub fn look_text(kind: &str, parts: &[Part]) -> String {
         .and_then(|k| k.slots.iter().find(|s| s.role == Role::Working))
         .map(|s| s.name);
     let material = |slot: &str| parts.iter().find(|p| p.slot == slot).map(|p| p.material);
+    // Heads never move: the handle shifts to meet its head's anchor.
+    let shift = working
+        .and_then(material)
+        .map_or([0, 0], |m| crafting::looks::shift(kind, m));
     look.layers
         .iter()
         .filter_map(|layer| {
+            let at = if layer.moves && shift != [0, 0] { format!("+{},{}", shift[0], shift[1]) } else { String::new() };
             if let Some(w) = working.filter(|w| layer.regions.contains(w)) {
-                return Some(crafting::looks::painted(kind, layer.name, material(w)?));
+                return Some(crafting::looks::painted(kind, layer.name, material(w)?) + &at);
             }
             let ramps: Vec<String> = layer
                 .regions
                 .iter()
                 .map(|r| material(r).map(crafting::looks::ramp))
                 .collect::<Option<_>>()?;
-            Some(format!("{}@{}", crafting::looks::map(kind, layer.name), ramps.join(",")))
+            Some(format!("{}@{}{at}", crafting::looks::map(kind, layer.name), ramps.join(",")))
         })
         .collect::<Vec<_>>()
         .join(";")

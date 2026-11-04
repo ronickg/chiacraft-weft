@@ -59,3 +59,12 @@ change any of them in the morning.
     - Near misses show as "?" with "you've held 2 of its 3 materials". They can't be picked yet.
     - Alternative: an exact list of item names (needs a variable-size component, which the engine
       doesn't have).
+14. **Heads stay put and handles move to meet them** (Chiacraft's rule, which made built icons
+    match the approved ones pixel for pixel).
+    - Chosen: each kind's handle socket is where it meets the iron head, which the handles were
+      drawn against. Each material's head anchor shifts the handle by whole pixels (`+dx,dy` in
+      `core:look`).
+    - Wooden heads are drawn once as "wood" and shared by every wood; wrought iron's drawings are
+      named "iron".
+    - Alternative: a painted head per wood species, and a socket point stored with each handle
+      drawing.
