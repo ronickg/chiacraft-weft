@@ -1,6 +1,8 @@
 //! Listing a world (`notes/PLAN.md`, phase 5; `reports/Finding worlds.md`): a coin at the address
-//! that holds the world's DID, locking a deposit, whose first memo (its hint) is [`tag`] and second
-//! the world DID's launcher id. Any game asks any full node for the unspent coins hinted with the
+//! that holds the world's DID, locking a deposit, whose memos are [`tag`] (its hint), the world
+//! DID's launcher id, the owner DID's, the world's key and its generation: what the world DID was
+//! launched with, which the chain doesn't show while it is eve, so a finder can check it
+//! (`ChainReader::check_listing`) and knows the world's address. Any game asks any full node for the unspent coins hinted with the
 //! tag that hold at least the deposit ([`listings`]), and keeps those whose DID checks out. The
 //! owner delists by spending the coin back ([`build_delist`]), which returns the deposit.
 //!
@@ -34,6 +36,7 @@ pub fn build(
     keys: &WalletKeys,
     coin: Coin,
     owner: Bytes32,
+    world: &super::WorldMeta,
     world_did: Bytes32,
     deposit: u64,
     fee: u64,
@@ -49,7 +52,13 @@ pub fn build(
     }
     let mut ctx = SpendContext::new();
     let memos = ctx
-        .memos(&vec![Bytes::from(tag().to_vec()), Bytes::from(world_did.to_vec())])
+        .memos(&vec![
+            Bytes::from(tag().to_vec()),
+            Bytes::from(world_did.to_vec()),
+            Bytes::from(world.owner.to_vec()),
+            Bytes::from(world.key.to_vec()),
+            Bytes::from(world.generation.to_be_bytes().to_vec()),
+        ])
         .map_err(failed("listing"))?;
     let mut spends = Spends::new(keys.primary());
     spends.add(coin);
@@ -96,6 +105,9 @@ pub fn build_delist(keys: &WalletKeys, listing: Coin, fee: u64) -> Result<(Vec<C
 pub struct Listing {
     pub coin: Coin,
     pub world_did: Bytes32,
+    /// What the listing says the world DID was launched with: the owner DID, the world's key (its
+    /// address) and generation.
+    pub world: super::WorldMeta,
     pub created: u32,
 }
 
@@ -127,15 +139,16 @@ pub async fn listings<S: ChainSource>(source: &S, min_amount: u64, max: usize) -
     let mut out = Vec::new();
     for s in states {
         let created = s.created_height.unwrap_or(0);
-        if let Some(did) = second_memo(source, s.coin, created).await? {
-            out.push(Listing { coin: s.coin, world_did: did, created });
+        if let Some((world_did, world)) = memos_of(source, s.coin, created).await? {
+            out.push(Listing { coin: s.coin, world_did, world, created });
         }
     }
     Ok(out)
 }
 
-/// The second memo of the CREATE_COIN that made `coin` (the world DID), if its first is [`tag`].
-async fn second_memo<S: ChainSource>(source: &S, coin: Coin, created: u32) -> Result<Option<Bytes32>> {
+/// The world DID and what it names, from the memos of the CREATE_COIN that made `coin`, if the
+/// first is [`tag`] and the rest are well formed.
+async fn memos_of<S: ChainSource>(source: &S, coin: Coin, created: u32) -> Result<Option<(Bytes32, super::WorldMeta)>> {
     let (puzzle, solution) = source
         .puzzle_and_solution(coin.parent_coin_info, created)
         .await?;
@@ -151,12 +164,20 @@ async fn second_memo<S: ChainSource>(source: &S, coin: Coin, created: u32) -> Re
         }
         let chia_puzzle_types::Memos::Some(node) = cc.memos else { continue };
         let Ok(memos) = Vec::<Bytes>::from_clvm(&*ctx, node) else { continue };
-        if memos.first().map(|m| m.as_ref()) == Some(tag().as_ref())
-            && let Some(did) = memos
-                .get(1)
+        if memos.first().map(|m| m.as_ref()) != Some(tag().as_ref()) {
+            continue;
+        }
+        let b32 = |i: usize| {
+            memos
+                .get(i)
                 .and_then(|d| <[u8; 32]>::try_from(d.as_ref()).ok())
-        {
-            return Ok(Some(Bytes32::new(did)));
+        };
+        let generation = memos
+            .get(4)
+            .and_then(|g| <[u8; 4]>::try_from(g.as_ref()).ok())
+            .map(u32::from_be_bytes);
+        if let (Some(did), Some(owner), Some(key), Some(generation)) = (b32(1), b32(2), b32(3), generation) {
+            return Ok(Some((Bytes32::new(did), super::WorldMeta { owner: Bytes32::new(owner), key, generation })));
         }
     }
     Ok(None)

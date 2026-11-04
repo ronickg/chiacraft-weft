@@ -7,7 +7,7 @@
 
 use chiacraft_wallet::{
     Mnemonic,
-    chain::{Bytes32, ChainConfig, ChainNetwork, ChainReader, PushOutcome, WalletKeys, sim::Sim},
+    chain::{Bytes32, ChainConfig, ChainNetwork, ChainReader, PushOutcome, WalletKeys, WorldMeta, sim::Sim},
 };
 use std::time::Duration;
 
@@ -42,9 +42,10 @@ fn a_listing_is_found_by_its_deposit_and_delisting_takes_it_off() {
     let r = reader(&sim, owner.puzzle_hashes());
     assert!(until(|| r.spendable_balance() == 3 * DEPOSIT));
     let world_did = Bytes32::new([5; 32]);
+    let world = WorldMeta { owner: Bytes32::new([4; 32]), key: [3; 32], generation: 2 };
 
     let (push, coin) = r
-        .list_world(&owner, owner.primary(), world_did, DEPOSIT, 0, WAIT)
+        .list_world(&owner, owner.primary(), &world, world_did, DEPOSIT, 0, WAIT)
         .unwrap();
     assert!(!matches!(push, PushOutcome::Rejected { .. }), "{push:?}");
     assert_eq!((coin.puzzle_hash, coin.amount), (owner.primary(), DEPOSIT));
@@ -57,7 +58,9 @@ fn a_listing_is_found_by_its_deposit_and_delisting_takes_it_off() {
         !found.is_empty()
     }));
     assert_eq!(found.len(), 1);
-    assert_eq!((found[0].coin, found[0].world_did), (coin, world_did));
+    assert_eq!((found[0].coin, found[0].world_did, found[0].world), (coin, world_did, world));
+    // Made-up DIDs: the listing doesn't check out.
+    assert!(!other.check_listing(&found[0], WAIT).unwrap_or(false));
 
     // The listing is reserved: what the wallet may spend leaves it out.
     assert!(until(|| r.spendable_balance() == 2 * DEPOSIT));
@@ -67,7 +70,7 @@ fn a_listing_is_found_by_its_deposit_and_delisting_takes_it_off() {
     sim.fund(junk.primary(), DEPOSIT);
     let jr = reader(&sim, junk.puzzle_hashes());
     assert!(until(|| jr.spendable_balance() == DEPOSIT));
-    jr.list_world(&junk, junk.primary(), Bytes32::new([6; 32]), DEPOSIT / 100, 0, WAIT)
+    jr.list_world(&junk, junk.primary(), &world, Bytes32::new([6; 32]), DEPOSIT / 100, 0, WAIT)
         .unwrap();
     std::thread::sleep(Duration::from_secs(2));
     let again = other.listings(DEPOSIT, 100, WAIT).unwrap();

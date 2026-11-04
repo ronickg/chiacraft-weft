@@ -102,6 +102,7 @@ pub fn list(settings: &crate::settings::Settings, dir: PathBuf) {
             .filter(|d| d.listed)
             .ok_or("get this world a DID first (and let your DID list it)")?;
         let world_did = Bytes32::from(hex32(&did.launcher).ok_or("a damaged did.json")?);
+        let world = did.meta().ok_or("a damaged did.json")?;
         let session = chiacraft_account::current().ok_or("no account is open")?;
         let owner = Bytes32::from(
             session
@@ -118,7 +119,7 @@ pub fn list(settings: &crate::settings::Settings, dir: PathBuf) {
         }
         let keys = wallet_keys(network)?;
         let (push, coin) = reader
-            .list_world(&keys, owner, world_did, deposit, 0, std::time::Duration::from_secs(60))
+            .list_world(&keys, owner, &world, world_did, deposit, 0, std::time::Duration::from_secs(60))
             .map_err(|e| e.to_string())?;
         if matches!(push, chiacraft_wallet::chain::PushOutcome::Rejected { .. }) {
             return Err(format!("the chain refused it: {push:?}"));

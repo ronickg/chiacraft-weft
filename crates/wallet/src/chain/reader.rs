@@ -932,10 +932,12 @@ impl ChainReader {
     /// `keys`' addresses: the one holding the world DID) hinted with the listing tag, naming
     /// `world_did`, made from the smallest spendable coin that covers it and `fee`. Pushed; the
     /// listing coin is reserved (no coin selection spends it) until [`Self::delist_world`].
+    #[allow(clippy::too_many_arguments)]
     pub fn list_world(
         &self,
         keys: &WalletKeys,
         owner: Bytes32,
+        world: &super::WorldMeta,
         world_did: Bytes32,
         deposit: u64,
         fee: u64,
@@ -965,7 +967,7 @@ impl ChainReader {
             .min_by_key(|c| c.amount)
             .copied()
             .ok_or_else(|| Error::new(format!("no coin of at least {need} mojos to list the world with")))?;
-        let (coin_spends, signature, listing) = super::listing::build(keys, coin, owner, world_did, deposit, fee)?;
+        let (coin_spends, signature, listing) = super::listing::build(keys, coin, owner, world, world_did, deposit, fee)?;
         let push = self.run(timeout, async { source.push(SpendBundle::new(coin_spends, signature)).await })?;
         if !matches!(push, PushOutcome::Rejected { .. }) {
             let mut s = self.state();
@@ -1004,6 +1006,17 @@ impl ChainReader {
         if s.cache.reserved.insert(hex32(coin_id)) {
             s.save();
         }
+    }
+
+    /// Whether a listing is what it says (phase 5): its world DID was launched with the world it
+    /// names to the listing's own address (or its revealed metadata names it), the owner DID it
+    /// names lists that world DID, and that owner DID is held by the listing's address too. Two
+    /// DID reads, live where a peer answers.
+    pub fn check_listing(&self, l: &super::listing::Listing, timeout: Duration) -> Result<bool> {
+        let world = self.resolve_did(l.world_did, timeout)?.record;
+        let owner = self.resolve_did(l.world.owner, timeout)?.record;
+        let link = super::world::world_link_expecting(&world, &owner, &l.world, l.coin.puzzle_hash);
+        Ok(link.holds() && link.world == Some(l.world) && owner.owned_by(l.coin.puzzle_hash))
     }
 
     /// The listings on chain holding at least `min_amount`, the newest `max` (phase 5).
