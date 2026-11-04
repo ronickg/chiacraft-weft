@@ -527,18 +527,22 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
         shore = shore_distance(in.pos);
     }
     let ndv = max(dot(n, v), 0.02);
-    // Mirror-like at an ordinary look, as water is: most of what it shows is what it reflects.
-    let fresnel = 0.06 + 0.94 * pow(1.0 - ndv, 3.0);
+    // A near mirror at an ordinary look, as in the reference pictures: most of what it shows is
+    // what it reflects (the screen's reflections, `post/reflect.wgsl`, use the same).
+    let fresnel = 0.08 + 0.92 * pow(1.0 - ndv, 2.5);
     let shadow = sun_shadow(in, vec3(0.0, 1.0, 0.0));
     let lit = light_on(vec3(0.0, 1.0, 0.0), in.light, shadow, 1.0, in.pos);
-    // What the light in the water sends back up: turquoise in the shallows, deep blue further down,
-    // in the biome's own tint (a swamp's brown-green), with a little of the texture's pattern near.
-    let tint = in.color / max(max(in.color.r, max(in.color.g, in.color.b)), 1e-3);
+    // What the light in the water sends back up: a muted teal-green, light in the shallows and dark
+    // further down so that what it mirrors carries, in a little of the biome's own tint (a swamp's
+    // brown-green; the plain blue of most biomes' water is half taken out), with a little of the
+    // texture's pattern near.
+    let raw = in.color / max(max(in.color.r, max(in.color.g, in.color.b)), 1e-3);
+    let soft = mix(vec3(luma(raw)), raw, 0.5);
+    let tint = soft / max(luma(soft), 0.2) * 0.8;
     let pattern = mix(1.0, clamp(luma(albedo.rgb) / 0.55, 0.8, 1.2), 1.0 - smoothstep(8.0, 24.0, in.dist));
-    // The biome's tint counts for more where it is deep (a swamp's brown-green); the shallows keep
-    // their turquoise.
-    let shallow = vec3(0.06, 0.30, 0.27);
-    let deep = vec3(0.012, 0.055, 0.065);
+    // The biome's tint counts for more where it is deep; the shallows keep their own color.
+    let shallow = vec3(0.07, 0.27, 0.20);
+    let deep = vec3(0.010, 0.040, 0.036);
     let deepness = 1.0 - exp(-0.35 * depth);
     let scatter = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
     // How much of the bottom shows: the way through the water to it, longer at a slant; never all
