@@ -2339,11 +2339,25 @@ impl Client {
         static LAST: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(u32::MAX);
         let changed = LAST.swap(stack.item, std::sync::atomic::Ordering::Relaxed) != stack.item;
         if stack.is_empty() {
+            if changed {
+                log::info!("held light: nothing held");
+            }
             return none;
         }
         let c = content();
-        let Some(block) = c.items.get(stack.item as usize).and_then(|i| i.block) else { return none };
-        let Some(def) = c.blocks.get(block as usize) else { return none };
+        let item = c.items.get(stack.item as usize);
+        // The block it places, or else the block of the same name (an item that places itself in
+        // more than one form may not name one).
+        let block = item.and_then(|i| i.block).or_else(|| {
+            let name = &item?.name;
+            c.blocks.iter().position(|b| &b.name == name).map(|b| b as u32)
+        });
+        let Some(def) = block.and_then(|b| c.blocks.get(b as usize)) else {
+            if changed {
+                log::info!("held light: item {} ({}) places no block", stack.item, item.map_or("?", |i| i.name.as_str()));
+            }
+            return none;
+        };
         let mut light = [0u8; 3];
         for st in def.first_state..def.first_state + def.states {
             if let Some(info) = c.states.get(st as usize) {
@@ -2353,7 +2367,7 @@ impl Client {
             }
         }
         if changed {
-            log::info!("held light: item {} block {} levels {:?}", stack.item, block, light);
+            log::info!("held light: item {} block {} levels {:?}", stack.item, def.name, light);
         }
         if light == [0; 3] {
             return none;
