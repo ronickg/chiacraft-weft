@@ -590,6 +590,7 @@ name = "base"
 version = "26.10.4"
 dependencies = [
  "base_api",
+ "crafting",
  "vitals",
  "weft_sdk",
 ]
