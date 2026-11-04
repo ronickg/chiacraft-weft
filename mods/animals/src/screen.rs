@@ -1469,7 +1469,9 @@ mod gene_name_tests {
     #[test]
     fn every_gene_name_has_a_translation() {
         let keys = |lang: &str| -> std::collections::HashSet<String> {
-            lang.lines().filter_map(|l| l.split_once(" = ").map(|(k, _)| k.trim().to_string())).collect()
+            lang.lines()
+                .filter_map(|l| l.split_once(" = ").map(|(k, _)| k.trim().to_string()))
+                .collect()
         };
         let (en, ru) = (keys(include_str!("../assets/lang/en_us.lang")), keys(include_str!("../assets/lang/ru_ru.lang")));
         let mut seed = 777u32;
