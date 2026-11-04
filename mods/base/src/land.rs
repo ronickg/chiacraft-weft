@@ -90,6 +90,7 @@ pub fn terrain(r: &mut Registry) {
 
     r.decorate(rock_faces).dimension(&crate::OVERWORLD);
     r.decorate(fray_borders).dimension(&crate::OVERWORLD);
+    r.decorate(landmarks).dimension(&crate::OVERWORLD);
 }
 
 static WET: Tag = Tag::named("wet");
@@ -279,6 +280,48 @@ fn fray_borders(g: &mut Gen) {
                 if SOIL.contains(&g.get(x, y, z)) {
                     g.set(x, y, z, rock(if wy == h { top } else { under }));
                 }
+            }
+        }
+    }
+}
+
+/// Landmarks built from blocks (`base_api::land::landmarks`): natural arches of their land's rock
+/// and sea-cliff waterfalls, each cube its part. A waterfall is put as the engine's water settles
+/// on its own: the spring a source, the block in front of it flowing (amount 7, `drop_off` 1),
+/// under that a falling column down to the sea's surface, which doesn't spread over the sea.
+fn landmarks(g: &mut Gen) {
+    let [ox, oy, oz] = g.origin();
+    let seed = g.seed();
+    let f = l::fields(seed);
+    let inside = |x: i32, y: i32, z: i32| (ox..ox + 16).contains(&x) && (oy..oy + 16).contains(&y) && (oz..oz + 16).contains(&z);
+    for a in l::landmarks::arches_near(&f, ox + 8, oz + 8, 9) {
+        let (x0, x1, z0, z1, top) = a.reach();
+        if top < oy || a.base - 48 > oy + 15 {
+            continue;
+        }
+        for wz in z0.max(oz)..=z1.min(oz + 15) {
+            for wx in x0.max(ox)..=x1.min(ox + 15) {
+                let ground = g.column(wx, wz).height;
+                for wy in oy..oy + 16 {
+                    if a.holds(wx, wy, wz, ground) {
+                        g.set((wx - ox) as usize, (wy - oy) as usize, (wz - oz) as usize, rock(a.rocks.block(seed, [wx, wy, wz], false)));
+                    }
+                }
+            }
+        }
+    }
+    let water = WATER.id();
+    for w in l::landmarks::waterfalls_near(&f, ox + 8, oz + 8, 9) {
+        let [sx, sy, sz] = w.spring;
+        if inside(sx, sy, sz) {
+            g.set((sx - ox) as usize, (sy - oy) as usize, (sz - oz) as usize, water);
+        }
+        let [fx, fz] = w.front;
+        for wy in (SEA + 1)..=sy {
+            if inside(fx, wy, fz) {
+                // The front: flowing, amount 7; under it falling.
+                let state = if wy == sy { water + 1 } else { water + 8 };
+                g.set((fx - ox) as usize, (wy - oy) as usize, (fz - oz) as usize, state);
             }
         }
     }
