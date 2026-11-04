@@ -2347,9 +2347,10 @@ impl Client {
         }
         let c = content();
         let item = c.items.get(stack.item as usize);
-        // The block it places, or else the block of the same name (an item that places itself in
-        // more than one form may not name one).
-        let block = item.and_then(|i| i.block).or_else(|| {
+        // The block it places (`ItemDef::block` is that block's first state, not the block), or else
+        // the block of the same name (an item that places itself in more than one form may not
+        // name one).
+        let block = item.and_then(|i| i.block).and_then(|st| c.states.get(st as usize)).map(|st| st.block).or_else(|| {
             let name = item?.name.as_str();
             // Item and block names may differ in their namespace ("base:torch" and "torch").
             let short = |n: &str| n.rsplit(':').next().unwrap_or(n).to_string();
