@@ -20,6 +20,9 @@ const PAGE_BYTES: u64 = 64 << 20;
 /// How far from the camera, in blocks, translucent quads are kept sorted far to near. Past that
 /// overlaps are too small to tell.
 const SORT_REACH: f64 = 48.0;
+/// Translucent quads re-sorted in one go up to which the frame thread sorts them itself
+/// (`sort_translucent`), not the pool.
+const PARALLEL_SORT: usize = 16_384;
 /// A cube holds at most 6 * 4096 faces; plants and boxes add a few quads per block.
 const MAX_QUADS_PER_DRAW: u32 = 6 * 4096 * 2;
 
@@ -968,9 +971,10 @@ impl WorldRenderer {
         }
         self.sorted_from = Some(at);
         let began = std::time::Instant::now();
-        let redone: Vec<MeshKey> = self
+        // Which cubes to redo, picked here (a distance each), then sorted.
+        let mut work: Vec<(MeshKey, &mut SortedQuads, IVec3)> = self
             .sorted
-            .par_iter_mut()
+            .iter_mut()
             .filter_map(|(key, s)| {
                 let origin = if key.0 == 0 { DVec3::ZERO } else { frames.iter().find(|f| f.0 == key.0)?.1 };
                 let here = cam - origin - (key.1 * 16).as_dvec3();
@@ -982,15 +986,26 @@ impl WorldRenderer {
                     return None;
                 }
                 s.seen_from = Some(block);
-                let eye = (here * 32.0).as_ivec3();
-                s.quads.sort_unstable_by_key(|q| {
-                    let m = crate::gpu_layout::quad_middle(q);
-                    let d = [m[0] - eye.x, m[1] - eye.y, m[2] - eye.z].map(|v| v as i64);
-                    std::cmp::Reverse(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])
-                });
-                Some(*key)
+                Some((*key, s, (here * 32.0).as_ivec3()))
             })
             .collect();
+        let sort = |(_, s, eye): &mut (MeshKey, &mut SortedQuads, IVec3)| {
+            let eye = *eye;
+            s.quads.sort_by_cached_key(|q| {
+                let m = crate::gpu_layout::quad_middle(q);
+                let d = [m[0] - eye.x, m[1] - eye.y, m[2] - eye.z].map(|v| v as i64);
+                std::cmp::Reverse(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])
+            });
+        };
+        // A few thousand quads (a lake, a window) sort here in a fraction of a millisecond; handed
+        // to the pool they waited for a worker to wake and get a core, up to 15 ms on a busy Mac
+        // (the lag runs, 11-04). Only a sea's worth goes to every core.
+        if work.iter().map(|w| w.1.quads.len()).sum::<usize>() < PARALLEL_SORT {
+            work.iter_mut().for_each(sort);
+        } else {
+            work.par_iter_mut().for_each(sort);
+        }
+        let redone: Vec<MeshKey> = work.into_iter().map(|w| w.0).collect();
         let mut quads = 0;
         for key in &redone {
             let s = &self.sorted[key];
