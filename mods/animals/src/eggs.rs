@@ -144,9 +144,14 @@ fn item_of(index: usize) -> Option<&'static Item> {
 /// Where a nest's eggs stand: on the floor of its dish (the slabs round its middle are 1.5 to
 /// 2.5 units up, `source/nest`), pushed a little into it.
 const NEST_FLOOR: f64 = 1.0 / 64.0;
-/// How far an egg sits in the ground, as its relatives laid them (a quarter of a Velociraptor
-/// egg's 10 units, more for bigger eggs); in a nest, into its soft floor, less.
-const SINK: f64 = 2.5 / 64.0;
+/// Where an egg put down at `at` rests: on the ground there, its bottom on the block's top. It
+/// once sank a quarter into the ground as its relatives laid them, but an entity can't stand
+/// partly inside a block: it fell through the grass to the stone below and suffocated in a tick
+/// (B7, the creatures playtest: no utahraptor egg ever hatched). A nest's eggs sit on its floor
+/// (`nest_spot`).
+fn egg_rest(at: [f64; 3]) -> [f64; 3] {
+    at
+}
 
 /// A free spot in the nest at `n`: the middle, else round it.
 fn nest_spot(w: &World, n: [f64; 3]) -> [f64; 3] {
@@ -268,15 +273,10 @@ pub fn lay(w: &World, at: [f64; 3], young: &[Young], owner: Option<[u8; 64]>) {
     }
 }
 
-/// An egg put down at `at`: a quarter sunk into the ground, leaning (its model leans forward) with
-/// its top toward the nest's middle, or any way outside a nest.
+/// An egg put down at `at`: resting on the ground (`egg_rest`), leaning (its model leans forward)
+/// with its top toward the nest's middle, or any way outside a nest.
 fn spawn_egg(w: &World, at: [f64; 3], egg: &Egg, owner: Option<[u8; 64]>) -> u64 {
-    let size = (egg.species as usize)
-        .checked_sub(1)
-        .filter(|&i| i < SPECIES.len())
-        .map_or(1.0, egg_size);
-    let sink = if nest_near(w, at, 0.8).is_some() { 0.0 } else { SINK * size as f64 };
-    let id = w.spawn(&EGG_ENTITY, [at[0], at[1] - sink, at[2]]);
+    let id = w.spawn(&EGG_ENTITY, egg_rest(at));
     if id == 0 {
         return 0;
     }
@@ -378,7 +378,7 @@ fn incubate(w: &World, id: u64, st: &EntityState) -> bool {
     }
     let nest = in_nest(w, st.pos);
     // The air itself: wind chill is what a body loses, and an egg never falls below the air (B5).
-    let air = base_api::air_at(w, st.pos, 0.3, st.in_liquid != 0, 3, |_| {}).still;
+    let air = base_api::air_at(w, st.pos, 0.3, st.in_liquid != 0, vitals::temperature::FIRE_REACH, |_| {}).still;
     let step = match life::develops(life::egg_air(air, nest)) {
         false => 0,
         true if nest => 40,
@@ -460,9 +460,11 @@ fn place(u: &mut ItemUse) -> bool {
 
 /// `/animal hurry` (for testing): every egg near `at` hatches within a second.
 pub fn hurry(w: &World, at: [f64; 3]) {
+    // Nothing left: it hatches at its next step whatever the air (with a little left, an egg in
+    // air too cool to develop never did, B7's playtest).
     for id in w.near(at, 16.0, Some(&EGG_ENTITY)) {
         if let Some(e) = w.component_mut(id, &EGG) {
-            e.left = e.left.min(20);
+            e.left = 0;
         }
     }
 }
@@ -486,4 +488,18 @@ pub fn nest_now(w: &World, player: u64) -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An egg laid on grass (the mother's feet on the block's top, y 107) rests on that top, not in
+    /// the block (B7).
+    #[test]
+    fn an_egg_laid_on_grass_sits_on_the_block() {
+        let [_, y, _] = egg_rest([22.8, 107.0, -3.7]);
+        assert_eq!(y, 107.0);
+        assert!(y.fract() == 0.0 && y >= 107.0, "the egg's bottom {y} is inside the block under it");
+    }
 }

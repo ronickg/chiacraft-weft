@@ -14,20 +14,25 @@ pub mod calendar;
 pub mod climate;
 pub mod clothing;
 pub mod crops;
+pub mod crafts;
 pub mod difficulty;
 pub mod effects;
+pub mod foliage;
 pub mod food;
 pub mod forage;
+pub mod layers;
 pub mod levels;
 pub mod meals;
 pub mod plants;
 pub mod preserve;
 pub mod sheet;
+pub mod shelter;
 pub mod soil;
 pub mod stamina;
 pub mod stats;
 pub mod stomach;
 pub mod temperature;
+pub mod weather_sound;
 pub mod wild;
 
 /// Ticks a second, as the game's.

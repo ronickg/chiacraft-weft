@@ -24,7 +24,7 @@ pub fn register(r: &mut Registry) {
     // Sugar cane's uses: sugar, and paper for books, which make bookshelves (camp comfort).
     r.shapeless(C, "sugar", 1, &["#sugar_cane"], 0);
     r.shaped(C, "paper", 3, &["###"], &[('#', "#sugar_cane")]);
-    r.shapeless(C, "book", 1, &["#paper", "#paper", "#paper", "#materials/leather"], 0);
+    r.shapeless(C, "book", 1, &["#paper", "#paper", "#paper", "#leather"], 0);
     r.shaped(C, "bookshelf", 1, &["###", "bbb", "###"], &[('#', "#planks"), ('b', "#book")]);
     // Eggs: fried in the furnace, or baked into a pie with an apple, sugar and wheat.
     r.shapeless(S, "cooked_egg", 1, &["#egg"], 200);

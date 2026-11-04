@@ -104,6 +104,39 @@ pub fn piece_of(item: &str) -> Option<(&'static Material, usize)> {
     Some((find(m)?, PIECES.iter().position(|&x| x == p)?))
 }
 
+/// A cloak, worn over everything in a slot of its own (`notes/CONTENT.md` decision 3, taken
+/// overnight 11-04: two layers and a cloak, nine slots). The research's cloaks: a wool cloak +4, a
+/// hare-skin or fur robe +8, a gut parka or oiled cape +1 that keeps the rain off.
+#[derive(Clone, Copy, Debug)]
+pub struct Cloak {
+    /// Its item (`base:wool_cloak`).
+    pub name: &'static str,
+    /// Degrees of cold and heat insulation.
+    pub cold: f32,
+    pub heat: f32,
+    pub wet_keeps: f32,
+    /// The share of the wind it stops, over the body it covers (`CLOAK_COVERS`).
+    pub windproof: f32,
+    /// Rain doesn't make one wet under it (water still does).
+    pub keeps_dry: bool,
+    pub from: &'static str,
+}
+
+pub const CLOAKS: [Cloak; 3] = [
+    Cloak { name: "wool_cloak", cold: 4.0, heat: -1.0, wet_keeps: 0.6, windproof: 0.3, keeps_dry: false, from: "sheep's wool" },
+    Cloak { name: "fur_robe", cold: 8.0, heat: -3.0, wet_keeps: 0.3, windproof: 0.6, keeps_dry: false, from: "pelts" },
+    Cloak { name: "rain_cape", cold: 1.0, heat: 0.0, wet_keeps: 1.0, windproof: 0.5, keeps_dry: true, from: "leather" },
+];
+
+/// The share of the body a cloak covers, for the wind it stops.
+pub const CLOAK_COVERS: f32 = 0.6;
+
+/// A cloak by its item's name (`base:fur_robe`).
+pub fn cloak_of(item: &str) -> Option<&'static Cloak> {
+    let n = item.split_once(':').map_or(item, |(_, n)| n);
+    CLOAKS.iter().find(|c| c.name == n)
+}
+
 /// What a body has on, summed over its armor and its clothes.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Worn {
@@ -113,6 +146,8 @@ pub struct Worn {
     pub cold_wet: f32,
     /// The share of the wind stopped, 0 to 1 (each piece over its share of the body).
     pub windproof: f32,
+    /// Rain doesn't wet one (a rain cape).
+    pub dry_in_rain: bool,
 }
 
 impl Worn {
@@ -137,6 +172,15 @@ impl Worn {
         self.heat += m.heat * share;
         self.cold_wet += m.cold() * share * m.wet_keeps;
         self.windproof = (self.windproof + m.windproof * share).min(1.0);
+    }
+
+    /// Puts on a cloak over everything.
+    pub fn cloak(&mut self, c: &Cloak) {
+        self.cold += c.cold;
+        self.heat += c.heat;
+        self.cold_wet += c.cold * c.wet_keeps;
+        self.windproof = (self.windproof + c.windproof * CLOAK_COVERS).min(1.0);
+        self.dry_in_rain |= c.keeps_dry;
     }
 
     /// A full set of clothes of one material.

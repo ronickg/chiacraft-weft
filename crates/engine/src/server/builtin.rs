@@ -73,7 +73,7 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
     ("weather", "clear [ticks:int] | rain [ticks:int] | thunder [ticks:int]", weather, p::GAME_MASTER),
     ("op", "<who:targets> [level:int]", op, p::ADMIN),
     ("deop", "<who:targets>", deop, p::ADMIN),
-    ("rule", "[name:word(#core:rules)] [value:int]", rule, p::ADMIN),
+    ("rule", "[name:word(#core:rules)] [value:word]", rule, p::ADMIN),
     // chiacraft: admission rules and bans (`server::admission`).
     ("ban", "<who:word> [reason:text]", super::admission::ban, p::ADMIN),
     ("tempban", "<who:word> <time:word> [reason:text]", super::admission::tempban, p::ADMIN),
@@ -86,6 +86,8 @@ pub const COMMANDS: &[(&str, &str, Handler, u32)] = &[
         super::admission::probation,
         p::ADMIN,
     ),
+    ("revoke", "<who:word> <id:word>", super::admission::revoke, p::ADMIN),
+    ("achievementrule", "show | off | <id:word> [from:text]", super::admission::achievementrule, p::ADMIN),
     ("didrule", "show | required <on:word(on,off)> | age <days:int>", super::admission::didrule, p::ADMIN),
     (
         "banlist",
@@ -410,8 +412,20 @@ fn rule(_s: &mut Server, x: &Ctx) -> Vec<Msg> {
     else {
         return say("rule.unknown", vec![text(name)]);
     };
-    if let Some(v) = a.int("value") {
-        crate::config::set(id, v as f64);
+    if let Some(typed) = a.text("value") {
+        let Some(v) = d.read(typed) else {
+            let (name, typed) = (text(&d.name), text(typed));
+            return match d.kind {
+                weft_abi::config_kind::BOOL => say("rule.not_bool", vec![name, typed]),
+                weft_abi::config_kind::CHOICE => say("rule.not_choice", vec![name, typed, text(&d.choices.join(", "))]),
+                _ => say("rule.not_number", vec![name, typed, text(&d.show(d.min)), text(&d.show(d.max))]),
+            };
+        };
+        // Set for this run (`--config`): it stays as it is, and says so.
+        if crate::config::held_for_run(id) {
+            return say("rule.held", vec![text(&d.name), text(&d.show(crate::config::get(id)))]);
+        }
+        crate::config::set(id, v);
     }
     value(id, d)
 }

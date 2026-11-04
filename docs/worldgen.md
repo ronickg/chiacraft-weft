@@ -8,7 +8,7 @@ Examples to copy from:
 - `mods/testmod/src/lib.rs`: Mars, a planet made only from terrain presets, `void`, an island written by hand, and a biome, a rock needle and boulders added to base's overworld
 - `mods/testmod/src/looks.rs`: an obelisk structure standing in another mod's desert
 - `mods/base/src/worldgen.rs`: the overworld, with biomes, caves, trees and flowers
-- `mods/base/src/land.rs` and `mods/base/api/src/land.rs`: the overworld's shape: rivers and mesas as `Feature::new` (a river rebuilds the other features' height to know how deep to cut), snow by rules on height and temperature, bare rock on steep faces as a decoration
+- `mods/base/src/land.rs` and `mods/base/api/src/land.rs`: the overworld's shape: lakes, rivers and mesas as `Feature::new` (rivers follow a drainage network worked out a region at a time and kept, `land/net.rs`, and rebuild the other features' height to know how deep to cut), snow by rules on height and temperature, bare rock on steep faces as a decoration
 
 ## Quick links
 [how generation works](#how-generation-works) | [ores](#ores) | [structures](#structures) | [spawns](#spawns) | [biomes](#biomes) | [dimensions](#dimensions) | [terrain](#terrain) | [trees](#trees-and-other-scattered-things) | [decorations](#decorations) | [changing another mod's terrain](#changing-another-mods-terrain) | [writing a generator](#writing-a-generator)
@@ -73,13 +73,13 @@ A biome says once what it is: the climate it likes, its ground, its colors, plus
 static DESERT: Biome = Biome::named("desert");
 r.biome(&DESERT).temperature(0.35..).humidity(..0.0).surface("sand", "sand", 3).under("sandstone", 1).tint(&tints::GRASS, 0xbfb755).tag("dry");
 ```
-- `temperature(..)`, `humidity(..)`: where the climate fits it, as ranges like `0.35..` or `..-0.45` (the fields run about -1.4 to 1.4). Without them it fits anywhere.
+- `temperature(..)`, `humidity(..)`: where the climate fits it, as ranges like `0.35..` or `..-0.45` (the fields could run about -1.4 to 1.4, but nine tenths of a world lies within ±0.28, so a range past ±0.3 is rare: base's are in `base_api::land`). Without them it fits anywhere.
 - `surface(top, filler, depth)`: a top block, `depth` blocks of filler, then the terrain's stone
 - `under(block, layers)`: the lowest layers of filler become another block (sandstone under sand)
 - `deep_top(block, below)`: a different top block where the ground is lower than `below` (gravel on a sea floor)
 - `bare_above(y)`: plain stone above this height
 - `frozen(block)`: the water surface turns into this block, and the biome gets the tag `frozen` (base grows no flowers there)
-- `tint(&kind, color)`: what blocks tinted with that kind take here, `tints::GRASS`, `FOLIAGE`, `WATER` or a mod's own kind. Kinds you don't give keep their default. To color another mod's biome with your kind, `r.biome_tint(&biome, &kind, color)`.
+- `tint(&kind, color)`: what blocks tinted with that kind take here, `tints::GRASS`, `FOLIAGE`, `WATER` or a mod's own kind. Kinds you don't give keep their default. To color another mod's biome with your kind, `r.biome_tint(&biome, &kind, color)`. While the world runs a mod can change them (seasons, say): `w.set_biome_tints(&[(biome_id, &kind, color)])` replaces what it set before (the rest keep the content's color, an empty list puts all back), and players' clients blend the new colors across biome borders as before; `w.content_tint(biome_id, &kind)` gives the content's color to start from.
 - `snows()`: rain falls as snow here
 
 Tags (`tag("animals")`) are how everything else asks what a biome is, since spawns, ores and structures look at tags and never at names. `set(&COMPONENT, value)` attaches data, like how many trees base grows there.
@@ -130,6 +130,8 @@ r.terrain(&MARS)
 ```
 `stone` is the block the ground is made of and `base_height` the ground height when nothing is added. Blocks and biomes are given by name, like everywhere else: yours without a prefix, other mods' as `base:sand`.
 
+`continent_scale(blocks)` sets how wide land masses and seas are: the continent noise's scale, 900 blocks when not given. Everything that reads continentalness follows it (the `continents` preset, `Mask::Continent`, rules' `continent(..)`, and a `Feature::new`'s `fields`), on the CPU and the GPU alike. Base's overworld uses 1800. Changing it reshapes the whole dimension, so chunks an existing world already saved won't line up with new ones at their edges.
+
 ### Features
 A feature adds height to every column. These come ready:
 
@@ -178,7 +180,7 @@ r.scatter(&TREE_SITES).cell(5).reach(3).density(&TREES).shape(|s| {
 });
 ```
 - `cell(n)`: one spot per `n` x `n` blocks at most
-- `reach(n)`: how far the shape goes sideways from its spot (up and down it may go 32 and 16)
+- `reach(n)`: how far the shape goes sideways from its spot (up and down it may go 96 and 16)
 - `density(&COMPONENT)`: a biome component, 0 to 1, the chance of a spot per cell; biomes without it get none
 - `shape(f)`: the blocks, in world coordinates. `s.biome()` and `s.random()` (the same bits every time) pick the kind. It runs again for each cube the thing reaches, so it has to be pure
 - `dimension(&D)`: only there
@@ -198,6 +200,8 @@ for z in 0..16usize { for x in 0..16usize {
     }
 }}
 ```
+Underwater plants go into the water's cells as blocks that stand in it (`holds_liquid`, see the modding guide): `g.set(x, y, z, KELP.id())` over a water cell replaces the water with kelp that is still a water source, so the sea stays whole around it, flows nothing and is swum through. Put them only where water is (`WATER.is(g.get(x, y, z))`), on a floor they can stand on, and stack them up to the cell below the surface; one at the surface still has the water's surface drawn over it. The base mod does this for its plants of the bed (`vitals::wild`, ground `Bed`: eelgrass in the shallows, kelp further out, each in its `depths`) in `worldgen.rs` `bed()`, beside the lily pads floating on still water and the reeds and cattails at its edge.
+
 `g.column(x, z)` gives any other column in world coordinates, and `g.surface_carved(x, z)` says whether a cave opened the ground there. `g.get` only sees this cube, so when `y` is 0 the ground is out of its reach: `g.surface_block(x, z)` (world coordinates) says what the terrain left at the top of a column, 0 if nothing. How much grows where is data on the biome (the components `grass` and `flowers`), which another mod can attach to any biome with `r.set_on(Target::Biome("base:forest"), &COMPONENT, value)`.
 
 ## Changing another mod's terrain
@@ -220,7 +224,7 @@ Because rules are tried in order, a new biome goes in next to the rule it takes 
 | `mask_feature(name, mask)` | limits a named feature further, its mask is multiplied by yours |
 | `cave_biome(..)`, `remove_cave_biome(biome)` | the same for underground biomes |
 
-| `sea`, `caves`, `stone`, `base_height` | replace the owner's setting, the last mod in load order wins |
+| `sea`, `caves`, `stone`, `base_height`, `continent_scale` | replace the owner's setting, the last mod in load order wins |
 
 An edit whose target isn't there (a typo, or a rule another mod already removed) is skipped with a warning in the log, so a mod made for an older version of base still loads. A dimension generated by hand, like testmod's `void`, has no rules to edit; there a mod can still add ores, scatters, decorations, structures and spawns, and tag its biomes.
 

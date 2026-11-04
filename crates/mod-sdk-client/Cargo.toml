@@ -7,6 +7,8 @@ rust-version.workspace = true
 description = "Write sandboxed chiacraft client halves in Rust: Weft's client SDK names (HUD, screens, keys, client packets) over the chiacraft:mods@1.2.0 client-mod world, built for wasm32-unknown-unknown (docs/sandboxed-mods.md)"
 
 [dependencies]
+# What both SDKs share: values, line arguments, item stacks, logging.
+chiacraft-mod-common = { path = "../mod-common" }
 wit-bindgen = { version = "0.57.1", default-features = false, features = ["macros", "realloc"] }
 # Weft's ui_align, ui_justify, ui_dir and ui_flags, re-exported: one name each.
 weft_abi = { path = "../abi" }

@@ -1,0 +1,114 @@
+# The block tiles' grade: how each approved drawing is turned into the game's tile.
+#
+# Sources stay untouched in mods/<mod>/source/blocks/tiles/ (CTM variants too); the game's tiles in
+# mods/<mod>/assets/textures/block/ are built from them by `python3 notes/blocks/regrade.py --all`.
+# A tile too dark, too light, too flat or too busy is fixed here, not redrawn (Ronald, 11-04: "something
+# we can tune easily without having to ... redo every asset"); only a tile wrong in shape or idea is
+# regenerated. Edit a number, rerun, look at the preview it writes.
+#
+# Knobs, applied in this order, all neutral by default:
+#   gamma      = 1.0    rgb ** gamma; below 1 lifts the shadows most
+#   gain       = 1.0    rgb * gain; the tile's brightness
+#   contrast   = 1.0    luminance spread around the tile's mean (hue and mean kept)
+#   spread     = <n>    instead of contrast: the p10-p90 spread wanted, in sRGB codes
+#                       (reports/Daytime look targets.md: quiet ground 20-30, busy blocks 45-80)
+#   saturation = 1.0    mixes each pixel toward its own grey (1 keeps, 0 greys)
+#   hue        = 0.0    degrees, turned in HSV
+#   pull       = [r, g, b], pull_amount = 0..1: a share of each pixel's grey taken in that colour
+#
+# A tile takes its group's knobs, then its own row's on top (a row's knob replaces the group's).
+# Tile keys: "name" for base, "animals:name" for the animals mod; a key covers its CTM variants.
+# Each group's `match` lists names; a trailing * matches any ending.
+
+[groups.stone]
+match = ["stone", "cobblestone", "mossy_cobblestone", "stonebrick", "granite*", "slate_*", "limestone_*", "weathered_limestone_side", "deepslate*", "andesite", "diorite"]
+
+[groups.ore]
+match = ["*_ore"]
+
+[groups.wood]
+match = ["log_*"]
+
+[groups.planks]
+match = ["planks_*"]
+# Ronald, 11-04: "Yes, stone, gravel, planks": busy blocks get grain (report: 45-80).
+spread = 48
+
+[groups.leaves]
+match = ["leaves_*"]
+# Waits for Lighting's Colour 8 (Ronald: leaves and grass "After the grade").
+
+[groups.grass]
+match = ["grass_top", "tallgrass", "tall_grass_*", "sword_fern", "bracken"]
+
+[groups.sand]
+match = ["sand", "red_sand", "*sandstone_*", "sandstone_*"]
+
+[groups.soil]
+match = ["dirt", "coarse_dirt", "podzol", "gravel", "farmland*", "moss_block_*", "leaf_litter_*", "clay"]
+
+[groups.clay]
+match = ["banded_clay_*", "termite_mound*"]
+
+[groups.plants]
+match = ["sapling_*", "mushroom_*", "honey_fungus", "chanterelle", "porcini", "lupine", "kelp*", "seagrass", "reed*", "cattail", "lily_pad"]
+
+[groups.liquids]
+match = ["water_*", "lava_*"]
+
+# --- per-tile rows ----------------------------------------------------------------------------------
+
+# Lifted for the darker grade (Ronald, 11-04: "Yes, all four", "Yes, both"); they stay until they're
+# re-judged under Lighting's new grade.
+[tiles.slate_side]
+gamma = 0.74
+saturation = 0.85
+pull = [118, 132, 126]
+pull_amount = 0.25
+
+[tiles.slate_top]
+gamma = 0.74
+saturation = 0.85
+pull = [118, 132, 126]
+pull_amount = 0.25
+
+[tiles."animals:termite_mound_side"]
+gamma = 0.8
+saturation = 0.88
+
+[tiles."animals:termite_mound_upper_side"]
+gamma = 0.8
+saturation = 0.88
+
+[tiles."animals:termite_mound_top"]
+gamma = 0.8
+saturation = 0.88
+
+[tiles.red_sandstone_side]
+gamma = 0.82
+saturation = 0.8
+
+[tiles.log_sequoia]
+gamma = 0.85
+saturation = 0.85
+
+[tiles.log_spruce]
+gamma = 0.85
+
+[tiles.podzol]
+gamma = 0.85
+saturation = 0.95
+
+# The block reads as one material with its lifted side (Planner, 11-04).
+[tiles.red_sandstone_top]
+saturation = 0.75
+
+[tiles.red_sandstone_bottom]
+saturation = 0.75
+
+# Quiet ground and calmer gravel (Ronald, 11-04: "Yes, stone, gravel, planks").
+[tiles.stone]
+spread = 30
+
+[tiles.gravel]
+spread = 42

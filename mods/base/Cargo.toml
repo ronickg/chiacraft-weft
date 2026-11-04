@@ -11,3 +11,4 @@ crate-type = ["cdylib"]
 weft_sdk.workspace = true
 base_api.workspace = true
 vitals.workspace = true
+crafting.workspace = true

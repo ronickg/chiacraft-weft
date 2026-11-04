@@ -24,6 +24,24 @@ shot 01b_third_person.png
 press core:perspective
 press core:perspective
 wait 0.5
+# First, before any other animal: a raptor (tamed by knocking out) ahead, knocked out, and the
+# taming plate under the crosshair; then away from it (40 blocks), out of the plate's reach.
+chat /tk spawn animals:raptor ~ ~ ~-3
+wait 2
+look 0 -20
+wait 1
+chat /animal ko
+wait 2
+shot 16a_taming_plate.png
+# The teleport keeps its height: in creative, so a lower ground there is no fatal fall; back to
+# survival once landed (the inventory and workstation shots are survival's).
+chat /tk mode creative
+chat /tp ~40 ~ ~
+wait 3
+chat /tk mode survival
+wait 4
+loaded
+look 0 5
 # Inventory with clothing and armor slots, some items.
 chat /tk put me 41 base:fur_coat
 chat /tk put me 37 base:iron_chestplate
@@ -156,15 +174,6 @@ wait 0.5
 look 326 -5
 wait 0.5
 shot 17_animal_world_hud.png
-# A raptor (tamed by knocking out) behind the player, knocked out: the taming plate under the
-# crosshair.
-chat /tk spawn animals:raptor ~ ~ ~4
-wait 3
-look 180 -15
-wait 0.5
-chat /animal ko
-wait 2
-shot 16a_taming_plate.png
 # Hurt, cold and night, last (a night mob killed the player when it came earlier): the HUD's
 # bars, effects and clock under load. Shot after 3 s, before anything comes.
 chat /tk mode survival
@@ -177,4 +186,8 @@ shot 02_hud_hurt_cold_night.png
 chat /tk hurt_me 100
 wait 2
 shot 18_death.png
+# Respawned: the way to the tombstone over the hotbar.
+tap core:death text:Respawn
+wait 3
+shot 19_grave_hud.png
 quit

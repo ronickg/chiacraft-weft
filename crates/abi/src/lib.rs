@@ -252,6 +252,9 @@ pub mod comp {
     pub const SNOWY: &str = "snowy";
     pub const MINING_SPEED: &str = "mining_speed";
     pub const TOOL_LEVEL: &str = "tool_level";
+    /// On an item: worn out, it stays where it is, broken, instead of vanishing, and works like an
+    /// empty hand until it's repaired (its damage lowered).
+    pub const KEEP_BROKEN: &str = "keep_broken";
     /// The block drops its loot only to a fitting tool of at least this level (0 = any tier).
     pub const HARVEST_LEVEL: &str = "harvest_level";
     pub const DAMAGE: &str = "damage";
@@ -279,9 +282,20 @@ pub mod comp {
     /// Block: the tag one of the supporting block's horizontal neighbors needs (`tag`, sugar
     /// cane: `#water`), unless the support is the same block.
     pub const SUPPORT_NEAR: &str = "support_near";
+    /// Block: the liquid it stands in (`block`, the liquid's name): the cell is a still source of
+    /// it as well, which flows, is swum in and stays when the block goes (kelp, a waterlogged
+    /// slab). A state of the same block one property apart without it is its dry twin, which
+    /// placing into the liquid fills and a bucket drains.
+    pub const HOLDS_LIQUID: &str = "holds_liquid";
     /// The own name of one stack or block entity (UTF-8), as a player gave it: shown instead of
     /// the item's or block's, and carried from the stack to the placed block and back.
     pub const NAME: &str = "core:name";
+    /// How one stack is drawn, as text (UTF-8): layers back to front, separated by `;`. A layer is
+    /// a texture (`base:parts/axe/head/flint`, painted as it is) or `<map>@<ramp>,<ramp>...`: a
+    /// shade map whose red / 36 is the step (0..7) and green the region, painted with that
+    /// region's ramp (an 8 x 1 texture, one colour per step). `+dx,dy` after a layer moves it that
+    /// many pixels (a handle meeting its head's anchor). Without it the item's icon shows.
+    pub const LOOK: &str = "core:look";
     /// Blocks connecting energy networks.
     pub const CONDUCTOR: &str = "conductor";
     /// Entity component, layout `Energy`.
@@ -346,6 +360,8 @@ pub mod air_flags {
     pub const SNOWING: u32 = 1;
     /// Dust or sand blows (the fog is dust).
     pub const DUST: u32 = 2;
+    /// Bits 8 to 15: how strong an aurora is on clear nights there, 0 to 255.
+    pub const AURORA_SHIFT: u32 = 8;
 }
 
 pub mod block_flags {
@@ -701,8 +717,26 @@ pub struct ScatterDesc {
     pub density: Str,
     /// `ScatterArgs`. Pure: called once for each cube the site reaches.
     pub shape: Callback,
+    /// Sites thinned by where they stand, before `shape` runs: where this mask (postfix steps,
+    /// as a terrain feature's) is over 0, only one site in `thin_keep` stays (by its random bits;
+    /// 0: none). The engine applies it near and in distant terrain alike, which can't run `shape`
+    /// at every site. Empty: no thinning.
+    pub thin: Slice<MaskStep>,
+    pub thin_keep: u32,
+    /// A biome component: thinning only in biomes that have it. Empty: in all.
+    pub thin_biomes: Str,
 }
-defaults!(ScatterDesc { name: Str::EMPTY, dimensions: Str::EMPTY, cell: 8, reach: 0, density: Str::EMPTY, shape: Callback::NONE });
+defaults!(ScatterDesc {
+    name: Str::EMPTY,
+    dimensions: Str::EMPTY,
+    cell: 8,
+    reach: 0,
+    density: Str::EMPTY,
+    shape: Callback::NONE,
+    thin: Slice::EMPTY,
+    thin_keep: 0,
+    thin_biomes: Str::EMPTY
+});
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -1342,6 +1376,30 @@ pub struct RecipeInfo {
     pub inputs: u32,
     pub outputs: u32,
     pub flags: u32,
+    /// A shaped recipe's grid, 0 x 0 for a shapeless one.
+    pub width: u32,
+    pub height: u32,
+}
+
+/// One input of a recipe (`Host::recipe_input`).
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct RecipeInput {
+    /// `recipe_input_kind::*`.
+    pub kind: u32,
+    /// How many (millibuckets for a fluid).
+    pub count: u32,
+    /// An item that fits, to show: the item, or a tag's first; 0 for an empty cell or a fluid.
+    pub shown: u32,
+}
+
+pub mod recipe_input_kind {
+    pub const EMPTY: u32 = 0;
+    pub const ITEM: u32 = 1;
+    pub const TAG: u32 = 2;
+    /// One of several items (a tag pattern, `#ingots/*`).
+    pub const ANY: u32 = 3;
+    pub const FLUID: u32 = 4;
 }
 
 pub mod slot_flags {
@@ -1887,6 +1945,11 @@ pub struct Host {
     /// Takes the recipe's inputs out of `stacks` (counts, the matching stacks); 0 if they are not
     /// all there, then nothing changes.
     pub recipe_consume: unsafe extern "C" fn(kind: Str, recipe: u32, stacks: *mut ItemStack, count: u32) -> u32,
+    /// Input `index` of a recipe: a shaped one's grid cells row by row (`RecipeInfo::width` x
+    /// `height`, empty cells too), else its inputs. 0 past the last.
+    pub recipe_input: unsafe extern "C" fn(kind: Str, recipe: u32, index: u32, out: *mut RecipeInput) -> u32,
+    /// Whether `item` fits input `index` (numbered as `recipe_input`).
+    pub recipe_accepts: unsafe extern "C" fn(kind: Str, recipe: u32, index: u32, item: u32) -> u32,
     /// The block state an item places, 0 if none.
     pub item_block: unsafe extern "C" fn(item: u32) -> u32,
 
@@ -2311,6 +2374,25 @@ pub struct Host {
     /// while a player is near, more for one ticked only now and then
     /// (`core:entity_activation_distance`). What counts down per tick counts down by this.
     pub entity_tick_elapsed: unsafe extern "C" fn(world: *mut WorldCtx, entity: u64) -> u32,
+    /// Tint colors from now on, over the content's while the world runs (a mod's seasons): for
+    /// each of `len` entries a biome (id), a tint kind (name, either may be another mod's) and its
+    /// 0xRRGGBB. What is not named keeps the content's color; 0 entries: all the content's again.
+    /// Replaces what an earlier call set. Players see it.
+    pub set_biome_tints: unsafe extern "C" fn(world: *mut WorldCtx, biomes: *const u32, kinds: *const Str, colors: *const u32, len: u32),
+    /// The content's color (0xRRGGBB) of tint kind `kind` in biome `biome` (id): the biome's own,
+    /// else the kind's default; 0 for an unknown kind.
+    pub content_tint: unsafe extern "C" fn(biome: u32, kind: Str) -> u32,
+    /// Client: starts a sound only this client hears and returns its handle, for
+    /// `client_sound_set` and `client_sound_stop`; 0 if there is no sound device or no such
+    /// event. A `sound_start::LOOP` one plays until stopped; others end by themselves.
+    pub client_sound_start: unsafe extern "C" fn(client: *mut ClientCtx, start: *const SoundStart) -> u64,
+    /// Eases its volume, pitch, place or muffle (`SoundChange`); nothing for a handle that ended.
+    pub client_sound_set: unsafe extern "C" fn(client: *mut ClientCtx, handle: u64, change: *const SoundChange),
+    /// Fades it out over `fade` seconds, then it ends.
+    pub client_sound_stop: unsafe extern "C" fn(client: *mut ClientCtx, handle: u64, fade: f32),
+    /// 1 while it plays (or its file is still being read); 0 once it ended, was stopped, or
+    /// gave way to a sound that matters more (`SoundDesc::priority`).
+    pub client_sound_playing: unsafe extern "C" fn(client: *mut ClientCtx, handle: u64) -> u32,
 }
 
 /// Natural spawning around players (`Host::reg_spawn`). Every two seconds the engine tries a few
@@ -2439,6 +2521,13 @@ pub struct SoundDesc {
     /// `core:creatures`, `core:players`, `core:ambient`, `core:music`, `core:ui`, or one from
     /// `Host::reg_sound_category`.
     pub category_name: Str,
+    /// Which sounds keep playing when too many play at once: higher first, then the louder
+    /// where the listener is. A new sound that matters less than every playing one is not
+    /// played; else it replaces the one that matters least.
+    pub priority: i32,
+    /// At most this many of this event at once (0: no cap of its own); one more replaces the
+    /// quietest of them, or is not played if it would be the quietest.
+    pub voices: u32,
 }
 defaults!(SoundDesc {
     name: Str::EMPTY,
@@ -2447,8 +2536,61 @@ defaults!(SoundDesc {
     volume: 1.0,
     pitch: [1.0, 1.0],
     range: 16.0,
-    category_name: Str::EMPTY
+    category_name: Str::EMPTY,
+    priority: 0,
+    voices: 0
 });
+
+/// A sound a client starts with a handle (`Host::client_sound_start`).
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SoundStart {
+    /// The event (`find` with `entry_kind::SOUND`).
+    pub sound: u32,
+    /// Where it is, with `sound_start::POSITIONED`; else it is heard as if in the head (UI,
+    /// weather beds).
+    pub pos: [f64; 3],
+    /// Times the event's volume.
+    pub volume: f32,
+    /// Playback speed; 0 picks one from the event's range.
+    pub pitch: f32,
+    /// Seconds it fades in from silence.
+    pub fade: f32,
+    pub flags: u32,
+}
+defaults!(SoundStart { sound: 0, pos: [0.0; 3], volume: 1.0, pitch: 0.0, fade: 0.0, flags: 0 });
+
+pub mod sound_start {
+    /// At `SoundStart::pos`.
+    pub const POSITIONED: u32 = 1;
+    /// Starts again from the beginning when it ends, until stopped.
+    pub const LOOP: u32 = 2;
+}
+
+/// What `Host::client_sound_set` changes of a playing sound: the parts named in `what`
+/// (`sound_change`), each eased over `secs`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SoundChange {
+    pub what: u32,
+    /// Times the event's volume, like `SoundStart::volume`.
+    pub volume: f32,
+    /// Playback speed, 1 = as recorded.
+    pub pitch: f32,
+    /// Where it is now (positioned sounds only).
+    pub pos: [f64; 3],
+    /// Low-pass cutoff in Hz: muffled through walls or indoors; 20000 and above is clear.
+    pub lowpass: f32,
+    pub secs: f32,
+}
+defaults!(SoundChange { what: 0, volume: 1.0, pitch: 1.0, pos: [0.0; 3], lowpass: 20_000.0, secs: 0.0 });
+
+pub mod sound_change {
+    pub const VOLUME: u32 = 1;
+    pub const PITCH: u32 = 2;
+    pub const POS: u32 = 4;
+    pub const LOWPASS: u32 = 8;
+}
 
 /// When background music may play; 0 = always.
 pub mod music_when {
@@ -3329,6 +3471,17 @@ pub struct ClientState {
     /// Distant terrain tiles made and shown, and asked for and not back yet.
     pub lod_tiles: u32,
     pub lod_pending: u32,
+    /// The weather where the player is, eased as it is drawn: rain and thunder 0..1, the wind
+    /// (m/s, x and z: where it blows to), snow falling 0..1, and lightning flashes seen so far
+    /// (a new one is a flash this frame).
+    pub rain: f32,
+    pub thunder: f32,
+    pub wind: [f32; 2],
+    pub snowing: f32,
+    pub lightnings: u32,
+    /// Sounds playing now, and of them those started with a handle (`client_sound_start`).
+    pub voices: u32,
+    pub handles: u32,
 }
 defaults!(ClientState {
     flags: 0,
@@ -3374,6 +3527,13 @@ defaults!(ClientState {
     gpu_mismatches: 0,
     lod_tiles: 0,
     lod_pending: 0,
+    rain: 0.0,
+    thunder: 0.0,
+    wind: [0.0; 2],
+    snowing: 0.0,
+    lightnings: 0,
+    voices: 0,
+    handles: 0,
 });
 
 /// `Host::client_input` operations. Keys and buttons are held for `x` seconds (0 = one tap).
@@ -3466,6 +3626,8 @@ pub mod client_op {
     /// Runs command `text` (`/tp ~ ~5 ~`) as the player, here if it is a client command, else
     /// on the server; returns an id for `Host::client_command_reply`. The chat stays out of it.
     pub const RUN_COMMAND: u32 = 16;
+    /// Builds the top screen again (a mod's screen whose parts follow its own state).
+    pub const REBUILD_SCREEN: u32 = 17;
 }
 
 /// `Host::client_text` sources.
@@ -3584,6 +3746,8 @@ defaults!(FeatureDesc { name: Str::EMPTY, preset: 0, params: [0.0; 4], height: C
 #[repr(C)]
 pub struct FeatureArgs {
     pub seed: u64,
+    /// The dimension's continent scale (Q4, `terrain_op::CONTINENT_SCALE`), for the fields.
+    pub continent_scale: i32,
     pub x: i32,
     pub z: i32,
     /// Output: the height added at (x, z) at full strength.
@@ -3689,6 +3853,30 @@ pub mod terrain_op {
     pub const CAVE_BIOME: u32 = 13;
     /// The cave biome `anchor` goes away.
     pub const REMOVE_CAVE_BIOME: u32 = 14;
+    /// What steep faces show where the generator's own passes make them bare (rock): `face`
+    /// (`FaceArgs`) for ground falling `level` blocks or more to a neighbour. Distant terrain,
+    /// which runs no decorations, asks it, and puts no scattered things there.
+    pub const FACES: u32 = 15;
+    /// `value`: how many blocks across the continent noise's land and sea are (900 when not
+    /// given). Larger makes bigger land masses and seas; every mask and rule on continentalness
+    /// follows it.
+    pub const CONTINENT_SCALE: u32 = 16;
+}
+
+/// A steep column's top as distant terrain sees it (`terrain_op::FACES`).
+#[repr(C)]
+pub struct FaceArgs {
+    pub seed: u64,
+    pub dim: u32,
+    /// The block at the face: its column's top, or lower down the face.
+    pub pos: [i32; 3],
+    /// The column's ground height (its top block's y).
+    pub height: i32,
+    pub biome: u32,
+    /// How far the ground falls to its lowest neighbour (estimated from a coarse grid).
+    pub fall: i32,
+    /// The block there before (the surface rules'); output: what the face shows.
+    pub block: u32,
 }
 
 /// One part of a dimension's terrain (`Host::reg_terrain`). The mod that owns the dimension
@@ -3709,6 +3897,8 @@ pub struct TerrainDesc {
     pub size: f64,
     pub feature: FeatureDesc,
     pub rule: BiomeRuleDesc,
+    /// `FACES`: `FaceArgs`.
+    pub face: Callback,
 }
 defaults!(TerrainDesc {
     dimension: Str::EMPTY,
@@ -3720,7 +3910,8 @@ defaults!(TerrainDesc {
     value: 0.0,
     size: 0.0,
     feature: FeatureDesc::DEFAULT,
-    rule: BiomeRuleDesc::DEFAULT
+    rule: BiomeRuleDesc::DEFAULT,
+    face: Callback::NONE
 });
 
 /// One command argument; kinds in `command_value`.

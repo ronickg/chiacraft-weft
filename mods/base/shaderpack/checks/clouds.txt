@@ -1,0 +1,49 @@
+loaded
+idle
+chat /tk mode creative
+chat /weather clear
+# Plains (Tester 2's spot): open sky for the clouds, grass for the seasons.
+chat /gamemode spectator
+chat /tp -450 145 535
+wait 8
+chat /gamemode creative
+wait 3
+chat /time set 6000
+# Clouds drift with the wind: a light easterly, then a strong southerly; two shots 4 s apart each.
+chat /air 0 2 90 mist
+look 0 25
+wait 3
+shot 01_light_wind_a.png
+wait 4
+shot 02_light_wind_b.png
+chat /air 0 12 180 mist
+wait 3
+shot 03_strong_wind_a.png
+wait 4
+shot 04_strong_wind_b.png
+# Rain coming: more cover and dark undersides; then a storm's deck.
+chat /air 0 5 90 mist
+chat /weather rain
+wait 8
+look 0 20
+shot 05_rain.png
+chat /weather thunder
+wait 8
+shot 06_storm.png
+chat /weather clear
+wait 8
+shot 07_cleared.png
+# The grass through the year (a new world starts on spring's 8th): looking down at it.
+look 0 -40
+wait 2
+shot 08_grass_spring.png
+chat /time set 342000
+wait 3
+shot 09_grass_summer.png
+chat /time set 438000
+wait 3
+shot 10_grass_autumn.png
+chat /time set 246000
+wait 3
+shot 11_grass_winter.png
+quit

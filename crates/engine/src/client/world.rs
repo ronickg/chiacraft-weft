@@ -62,6 +62,10 @@ pub struct ClientWorld {
     /// lying 0..1, `air_flags`) sorted by biome, and where the wind blows to, degrees clockwise
     /// from north.
     pub air: (Vec<(u32, f32, f32, f32, u32)>, f32),
+    /// Every biome's tint colors as a mod set them (`ToClient::Tints`), biome by biome, one per
+    /// tint kind; none: the content's. `tints_changed` until the renderer took them.
+    pub tints: Option<Vec<u32>>,
+    pub tints_changed: bool,
     /// Dirty cubes whose six neighbors are all known: meshable now. Kept up to date as cubes
     /// come and go, so a frame never walks every dirty cube (tens of thousands while loading).
     ready: FxHashSet<IVec3>,
@@ -151,6 +155,11 @@ const BLEND: i32 = 4;
 /// About 9 us each, blended on every core; while loading, columns get redone as neighbors
 /// arrive.
 const TINTS_PER_FRAME: usize = 256;
+/// Fewer than twice this many items, the frame thread does a parallel step itself: each item
+/// costs about a microsecond, while handing them to the pool means waiting for a worker to wake
+/// and get a core (milliseconds on a busy Mac). `start_jobs` runs three times a frame, mostly
+/// with a handful of cubes.
+const PAR_MIN: usize = 128;
 
 /// Grass, foliage and water colors of one block column, 0xFFRRGGBB.
 /// Blended colors of a column: per block (z, x), one per tint kind.
@@ -165,6 +174,9 @@ impl ClientWorld {
             time: 0,
             rain_in: None,
             air: (Vec::new(), 0.0),
+            tints: None,
+            // A new world (another dimension) starts from the content's colors.
+            tints_changed: true,
             ready: FxHashSet::default(),
             order: Vec::new(),
             order_center: IVec3::ZERO,
@@ -284,6 +296,12 @@ impl ClientWorld {
     }
 
     /// With a number that changes whenever its blocks do (`Slot::rev`).
+    /// Changes whenever any cube comes, goes or changes (light too): nothing to look at again
+    /// while it stays the same.
+    pub fn revision(&self) -> u32 {
+        self.next_rev
+    }
+
     pub fn cube_rev(&self, p: IVec3) -> Option<(&Arc<Cube>, u32)> {
         self.cubes.get(&p).map(|s| (&s.cube, s.rev))
     }
@@ -380,6 +398,7 @@ impl ClientWorld {
         let cubes = &self.cubes;
         let masks: Vec<(IVec3, u32)> = resent
             .par_iter()
+            .with_min_len(PAR_MIN)
             .filter_map(|(p, old)| {
                 cubes
                     .get(p)
@@ -390,6 +409,7 @@ impl ClientWorld {
         b.touched.extend(masks);
         let mut members: Vec<IVec3> = std::mem::take(&mut b.touched)
             .into_par_iter()
+            .with_min_len(PAR_MIN)
             .flat_map_iter(|(p, mask)| around(p, mask))
             .filter(|p| self.cubes.contains_key(p))
             .collect();
@@ -403,6 +423,7 @@ impl ClientWorld {
         let cubes = &self.cubes;
         let todo: Vec<(IVec3, Option<bool>)> = members
             .par_iter()
+            .with_min_len(PAR_MIN)
             .map(|&p| {
                 let new_air = cubes[&p].cube.uniform_state() == Some(AIR)
                     && fresh
@@ -528,6 +549,7 @@ impl ClientWorld {
             self.wire_dirty.insert(pos);
         }
         if let Some(slot) = self.cubes.remove(&pos) {
+            self.next_rev += 1;
             self.unloaded.push(slot);
             let col = IVec2::new(pos.x, pos.z);
             if let Some(c) = self.columns.get_mut(&col) {
@@ -605,6 +627,33 @@ impl ClientWorld {
         }
     }
 
+    /// Every biome's tint colors from now on (`tints`, empty or of the wrong length: the
+    /// content's); every column is blended again.
+    pub fn set_tints(&mut self, tints: Vec<u32>) {
+        let c = content();
+        let ok = !c.biomes.is_empty() && tints.len() == c.biomes.len() * c.tint_kinds.len();
+        let tints = ok.then_some(tints);
+        if tints != self.tints {
+            self.tints = tints;
+            self.tints_changed = true;
+            self.retint_all();
+        }
+    }
+
+    /// Every biome's tint colors, biome by biome: the mod's or the content's.
+    pub fn biome_tints(&self) -> Vec<u32> {
+        let c = content();
+        match &self.tints {
+            Some(t) => t.clone(),
+            None if c.biomes.is_empty() => c.tint_kinds.iter().map(|k| k.1).collect(),
+            None => c
+                .biomes
+                .iter()
+                .flat_map(|b| b.tints.iter().copied())
+                .collect(),
+        }
+    }
+
     pub fn retint_all(&mut self) {
         self.tints_dirty.extend(self.columns.keys().copied());
     }
@@ -653,11 +702,11 @@ impl ClientWorld {
         for gz in 0..W {
             for gx in 0..W {
                 let id = biome_at(gx as i32 - BLEND, gz as i32 - BLEND) as usize;
-                let tints = c
-                    .biomes
-                    .get(id)
-                    .or(c.biomes.first())
-                    .map_or(&defaults[..], |b| &b.tints[..]);
+                let id = if id < c.biomes.len() { id } else { 0 };
+                let tints = match &self.tints {
+                    Some(t) => &t[id * k..(id + 1) * k],
+                    None => c.biomes.get(id).map_or(&defaults[..], |b| &b.tints[..]),
+                };
                 for (t, rgb) in tints.iter().enumerate() {
                     line[gx * k + t] = [rgb >> 16 & 255, rgb >> 8 & 255, rgb & 255];
                 }
@@ -787,6 +836,7 @@ impl ClientWorld {
         let cubes = &self.cubes;
         let jobs: Vec<(IVec3, [Option<Arc<Cube>>; 27], u32, u32)> = start
             .par_iter()
+            .with_min_len(PAR_MIN)
             .map(|&pos| {
                 let around = std::array::from_fn(|i| {
                     cubes

@@ -500,6 +500,13 @@ sword, about 100 XP.
   hour as it digests. One spider at dusk had killed a fresh player in 11 s. Dying leaves the same
   light meal (step 13). The rule stays: food sets how much of the stat is reached.
 - A new player also starts with full stamina (it started at 0 and took 14 s to fill).
+- **A bigger arrival meal** (2026-11-04, Ronald: "Bigger arrival meal"): the loaf and apple and a
+  cooked chicken, 65 units: max health 90 and stamina 83 of 100, wearing off as it digests. The
+  world playtest's taiga deaths were falls, not the cold (Plants' PC runs: a naked player there
+  freezes in about 5½ minutes dry, 3¾ wet, as `balance` wants), but with the light meal's 54 max
+  health one 9-block fall took 61% of a fresh player's health. Three foods make one well fed
+  until it digests below half. Respawning gives the same meal (step 13): a death still costs XP and
+  the walk to the tombstone, and respawning at 54 in the cold was the spiral step 13 is against.
 
 **12. Research round 3's survival fixes** (2026-11-04, decided by Ronald via Planner; `reports/Research round 3.md`):
 
@@ -536,8 +543,9 @@ sword, about 100 XP.
 
 **13. The first hour and the first death** (2026-11-04, Research round 4, H1 and H2, via Planner):
 
-- **H1, no death spiral.** Respawning brings back the plain arrival clothes when none are worn
-  (the tombstone keeps what one wore), the stomach holds the arrival meal instead of nothing, and
+- **H1, no death spiral.** One respawns in the clothes and cloak one wore (the tombstone leaves
+  them out, `clothing::set_aside`; it once took them and each death gave a new plain set), or in
+  the plain arrival clothes with none, the stomach holds the arrival meal instead of nothing, and
   stamina comes back full. After respawning a hint says where the tombstone is (x and z, kept in
   `base_api::GRAVE`). The death screen's cause is the engine's (`core:death`, not done here).
 - **The campfire** is made in the inventory's 2x2 grid (two sticks over two logs) and cooks:
@@ -562,8 +570,8 @@ sword, about 100 XP.
 
 - Normal monsters stay. A fresh player in arrival clothes on the plains died to one zombie in the
   first night (Tester's runs); the answer is the campfire, not weaker nights.
-- The night hint comes each evening at dusk (16:00 to 18:00, two game hours before dark) until the
-  player builds a campfire: "Night falls at 18:00, and monsters come out in the dark. Build a
+- The night hint comes each evening two game hours before the season's sunset (by the calendar's
+  daylight, as the clock has it) until the player builds a campfire: "Night falls at 18:00, and monsters come out in the dark. Build a
   campfire (two logs, two sticks): no monster appears in its light, and it warms you." A torch or
   a bed no longer stills it.
 - Its light (15) keeps monsters from spawning within about eight blocks (they need light 6 or
@@ -613,4 +621,76 @@ logged in `notes/crew/OVERNIGHT.md`):
   day stamp and are at the same freshness stage merge into the earlier slot, keeping the older day
   (TerraFirmaCraft's way: never fresher by merging; `survival::food::merge_food`). Hot food stays
   apart until it cools; stews don't stack.
+
+**18. Rooms** (2026-11-04 overnight, `notes/CONTENT.md` decision 7, taken by the content plan; the
+numbers are `reports/content/Building and workstations.md` B3; `vitals::shelter`,
+`survival/shelter.rs`):
+
+- A room is the air around a player found by a flood fill of the open blocks once a second: if it
+  reaches open sky or grows past 400 blocks, it's the outdoors. Its wall faces are classed by what
+  they're made of (logs; earth, sand, clay; snow; planks and other wood; stone and brick; wool,
+  leaves and hay as hide; glass).
+- In a room the wind is shut out, the walls let in their share of the day's swing (earth and
+  stone 15%, logs 40%, planks 60%, hide, snow and glass 90%), and it keeps 2 °C over the outside
+  empty; with a fire it warms by its walls (log, earth, snow +25 °C; plank, stone +16; hide,
+  glass +12), fully up to 60 blocks of air and down to 40% in a bigger room, never less than the
+  fire gives beside it.
+- The HUD says "Room · log walls, +8 °C" while in one: what the room adds over the same air in the
+  open (with a fire, over the fire's own warmth there).
+- Seen in the game (Tester 2, rooms3, 11-04, a winter midnight, 30 blocks up): outside 7.8 °C;
+  a log room 12.4 empty, 30.4 with a campfire; stone 26.2, wool 22.8 with one; a 3×3 gap through
+  a wall ends the room (the line goes; the campfire 2 blocks off still warms the air to 22).
+- Checks (`vitals::balance`): a fire in a log cabin keeps a player in arrival clothes
+  comfortable on a -20 °C night; logs keep a fire's heat better than stone, stone than hide; an
+  earthen room is cooler than a desert afternoon.
+- Not yet: rooms for tames and eggs (only players' air uses them), doors counted as openings
+  when open (an open door already lets the fill out), body heat in a small room, snow walls
+  melting, thatch roofs' extra.
+
+**19. Two layers and a cloak** (2026-11-04 overnight, `notes/CONTENT.md` decision 3, taken by the
+content plan; logged in `notes/crew/OVERNIGHT.md`):
+
+- Nine equipment slots: armor's four, the clothes' four under it, and a cloak over everything
+  (`base_api::CLOAK`), shown under the clothes' column in the inventory.
+- Three cloaks (`vitals::clothing::CLOAKS`, from the content research): a wool cloak (+4 °C,
+  keeps 60% wet), a fur robe (+8, -3 in the heat), a rain cape (+1; rain doesn't make one wet
+  under it, water still does). A cloak covers 60% of the body against the wind.
+- Recipes: wool cloak 3 wool and a string, fur robe 5 pelts and a string, rain cape 5 leather and
+  a string. Placeholder art (tinted leather) until the art pass; the worn layer draws over armor.
+- Not yet: the research's other cloaks (bison robe, down cloak, the Cretaceous's feather cloak,
+  a gut parka once there's gut), and a cloak as bedding.
+
+**20. The integration review's fixes** (2026-11-04 overnight, `reports/integration-review.md`):
+
+- The campfire and the furnace put a new result into an output slot by item, keeping the stamps
+  already there (the campfire cooked one steak and stopped); the furnace stamps what it cooks hot,
+  and nothing else does (crafted bread came out hot).
+- Death keeps the clothes and cloak worn (the tombstone sets them aside, the respawn puts them
+  back); no new arrival set while something is worn.
+- Food stacks merge only in players' inventories and chests, never in a pot or a rack.
+- A death's own tombstone or none: `GRAVE` is cleared first, a tombstone goes into water, lava or
+  a replaceable block too, and with nowhere for one the death screen says the things fell where
+  one died; `Grave::set` is the dimension + 1.
+- Rest needs a real fire (heat 0.7 and up: a campfire, a lit furnace, lava); a torch is a lamp.
+  The heat table and the fire reaches (players 7 blocks, everything else 3, for cost) are
+  `vitals::temperature` constants.
+- Death clears food poisoning and rest.
+- The HUD line reads "air"; a clothing piece's tooltip gives its own share of the wind; armor
+  shows its warmth.
+- Not here: animals' fire reach and wind (`comfort.rs`, `eggs.rs`) and the hunters' hunger
+  thresholds written twice (`forage.rs`, `hunt.rs`): the animals mod's.
+
+**21. Crafts that wait** (2026-11-04 overnight, `notes/CONTENT.md` decision 6, taken by the content
+plan; logged in `notes/crew/OVERNIGHT.md`; `vitals::crafts`, `mods/base/src/crafts.rs`):
+
+- What takes days in real life takes its time on the growing pace (game days = 0.0645 · real
+  days^0.7), at a station that keeps working unwatched (and catches up when its area loads):
+  a tanning frame brain-tans a raw hide into buckskin leather (3 real days: 2.8 minutes); a
+  tanning pit soaks hides with oak bark into sole leather (a year: 4.0 game days, 8 at a time);
+  a charcoal clamp chars logs into coal (7 days: 5 minutes, 16 at a time, no fuel).
+- Cows, deer and capybaras drop raw hides now, not leather. Buckskin (`#leather`) makes clothes,
+  books and the rain cape; sole leather (`materials/leather`) makes leather armor. Oak bark is
+  peeled from oak logs at the crafting table.
+- Not yet: retting (it waits for a flax plant), dressing furs (pelts come ready), seasoning bow
+  staves, kilns; the stations' faces are placeholders.
 

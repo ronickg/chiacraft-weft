@@ -27,7 +27,7 @@ const FILES: [(&str, &str); 6] = [
 ];
 
 // Water writes depth, so the reflections effect finds its surface.
-const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\ntranslucent_depth = true\nsun_shadows = true\n";
+const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\ntranslucent_depth = true\nsun_shadows = true\nwater_behind = true\nmerge_effects = true\n";
 
 /// Only `--shader-pack <id>` (a script checking a look; tests reset packs when they start, so
 /// it is turned on after that), `--shader-pack-after <secs>` seconds into the run (0 by
@@ -63,34 +63,42 @@ pub fn register_for_scripts(r: &mut Registry) {
     });
 }
 
-/// The pack's screen effects (`assets/shaders/post/`: packs cannot add passes), on while
-/// chiacraft's pack is the one chosen, off with any other or none: water reflections first (only
-/// the first effect sees the water in the image's alpha), contact shadows, then the light shafts.
-/// `--no-reflect`, `--no-contact` and `--no-shafts` leave one out (a script comparing the look),
-/// `--shafts-debug` shows what the shafts see.
+/// The pack's screen effects (`assets/shaders/post/`: packs cannot add passes), at the strengths
+/// the video settings ask (`video.rs`: off, low, on) while chiacraft's pack is the one chosen, off
+/// with any other or none: water reflections first (only the first effect sees the water in the
+/// image's alpha), contact shadows, light in the air (`volume`, Lighting's), the light shafts,
+/// then bloom. `--no-reflect`, `--no-contact`, `--no-volume`, `--no-shafts` and `--no-bloom` leave
+/// one out (a script comparing the look), `--shafts-debug` shows what the shafts see.
 pub fn register_shafts(r: &mut Registry) {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    static ON: AtomicBool = AtomicBool::new(false);
+    use std::sync::Mutex;
+    // What each effect was last set to (strength), so a change of setting or pack applies once.
+    static APPLIED: Mutex<[f32; 5]> = Mutex::new([-1.0; 5]);
     r.client_frame(|c| {
-        // Out of a world: turned on again at the next join.
+        // Out of a world: set again at the next join.
         if c.state().flags & weft_sdk::client::client_flags::JOINED == 0 {
-            ON.store(false, Ordering::Relaxed);
+            *APPLIED.lock().unwrap() = [-1.0; 5];
             return;
         }
-        let want = SHADER_PACK.get() == ID;
-        if ON.swap(want, Ordering::Relaxed) == want {
-            return;
-        }
+        let pack = SHADER_PACK.get() == ID;
         let option = |name: &str| weft_sdk::client::launch_option(name).is_some();
-        let effects = [
-            ("reflect", !option("no-reflect"), 1.0),
-            ("contact", !option("no-contact"), 1.0),
-            ("shafts", !option("no-shafts"), if option("shafts-debug") { 2.0 } else { 1.0 }),
+        // The video settings (`video.rs`): 0 off, 1 low (fewer steps: strength 0.5), 2 on.
+        let level = |v: i32| [0.0, 0.5, 1.0][v.clamp(0, 2) as usize];
+        let want = [
+            ("reflect", !option("no-reflect"), level(crate::video::FX_REFLECT.get())),
+            ("contact", !option("no-contact"), level(crate::video::FX_CONTACT.get())),
+            ("volume", !option("no-volume"), level(crate::video::FX_VOLUME.get())),
+            ("shafts", !option("no-shafts"), if option("shafts-debug") { 2.0 } else { level(crate::video::FX_SHAFTS.get()) }),
+            ("bloom", !option("no-bloom"), if crate::video::FX_BLOOM.get() > 0 { 1.0 } else { 0.0 }),
         ];
-        for (name, allowed, strength) in effects {
-            let on = want && allowed;
-            let known = c.post_effect(name, if on { strength } else { 0.0 });
-            weft_sdk::info!("screen effect {name} {}{}", if on { "on" } else { "off" }, if known { "" } else { " (no such effect)" });
+        let mut applied = APPLIED.lock().unwrap();
+        for (k, (name, allowed, strength)) in want.into_iter().enumerate() {
+            let s = if pack && allowed { strength } else { 0.0 };
+            if applied[k] == s {
+                continue;
+            }
+            applied[k] = s;
+            let known = c.post_effect(name, s);
+            weft_sdk::info!("screen effect {name} at {s}{}", if known { "" } else { " (no such effect)" });
         }
     });
 }

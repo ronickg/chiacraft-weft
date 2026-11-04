@@ -15,6 +15,8 @@ use std::sync::Arc;
 use chiacraft_wallet::chain::{self, Bytes32, ChainNetwork, DidMetadata, WalletKeys, WorldMeta};
 use serde::{Deserialize, Serialize};
 
+use crate::chiacraft::did::{short, short_did};
+
 pub const FILE: &str = "did.json";
 
 /// A world's DID as the world keeps it.
@@ -30,6 +32,10 @@ pub struct WorldDid {
     /// The owner's DID lists it (seen on chain).
     #[serde(default)]
     pub listed: bool,
+    /// The proof the world's achievements carry (slice 8): the issuer key (hex), the DID owner
+    /// key (hex) and its signature of `issuer_did_text`, made once.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<(String, String, String)>,
 }
 
 impl WorldDid {
@@ -52,7 +58,7 @@ pub fn load(world: &Path) -> Option<WorldDid> {
     serde_json::from_slice(&std::fs::read(world.join(FILE)).ok()?).ok()
 }
 
-fn save(world: &Path, d: &WorldDid) -> Result<(), String> {
+pub fn save(world: &Path, d: &WorldDid) -> Result<(), String> {
     let tmp = world.join(format!("{FILE}.new"));
     std::fs::write(&tmp, serde_json::to_vec_pretty(d).map_err(|e| e.to_string())?)
         .and_then(|_| std::fs::rename(&tmp, world.join(FILE)))
@@ -132,6 +138,7 @@ pub fn get(settings: &crate::settings::Settings, dir: PathBuf, identity: Arc<cra
                         key: ask.key.clone(),
                         generation: ask.generation,
                         listed: false,
+                        issuer: None,
                     };
                     save(&dir, &d)?;
                     log::info!("world DID {} from sponsor {}", d.did(), short(sponsor));
@@ -169,6 +176,7 @@ fn list_now(settings: &crate::settings::Settings, dir: &Path, mut d: WorldDid) -
     let listed = record.owner_meta().unwrap_or_default();
     if !listed.lists(world) {
         set("world_did.listing", &[]);
+        crate::chiacraft::chain::may_spend(network)?;
         let meta = DidMetadata::Owner(listed.with_world(world).map_err(|e| e.to_string())?);
         let keys = wallet_keys(&session, network)?;
         // testnet11's mempool may hold a spend with no fee for most of an hour: pay a little
@@ -240,19 +248,6 @@ pub fn check(world_did: &str, owner_did: &str, key: &str, generation: u32) -> Re
     Ok(chain::world::world_link_expecting(&world, &owner, &expected, launched_to).holds())
 }
 
-fn short(s: &str) -> String {
-    s.chars().take(12).collect()
-}
-
-fn short_did(d: &str) -> String {
-    let c: Vec<char> = d.chars().collect();
-    if c.len() > 24 {
-        format!("{}…{}", c[..16].iter().collect::<String>(), c[c.len() - 6..].iter().collect::<String>())
-    } else {
-        d.to_string()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,7 +257,14 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("chiacraft-world-did-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         assert_eq!(load(&dir), None);
-        let d = WorldDid { launcher: "11".repeat(32), owner: "22".repeat(32), key: "33".repeat(32), generation: 2, listed: false };
+        let d = WorldDid {
+            launcher: "11".repeat(32),
+            owner: "22".repeat(32),
+            key: "33".repeat(32),
+            generation: 2,
+            listed: false,
+            issuer: None,
+        };
         save(&dir, &d).unwrap();
         assert_eq!(load(&dir), Some(d.clone()));
         let m = d.meta().unwrap();

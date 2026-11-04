@@ -116,8 +116,9 @@ def tone(a, to=0.072, pull=0.55, sat=0.78, val=0.84, lo=0.068, hi=0.19, min_s=0.
 
 
 def disabled(a):
-    """Grey-brown and flat: most of the color out, darker, the light kept."""
-    return hsv_map(a, lambda h, s, v: (0.07, s * 0.25, v * 0.72))
+    """Grey-brown, flat and dim: most of the color out and much darker, so it reads as off (a
+    lighter one looked washed out over the title's painting)."""
+    return hsv_map(a, lambda h, s, v: (0.07, s * 0.2, v * 0.5))
 
 
 def pressed(a):
@@ -237,8 +238,16 @@ def build():
     put("advancement_tile", slot, 4)
     put("advancement_tile_done", glow(slot, GOLD1), 4)
     panel = src("c_panel")
-    for n in ("panel", "sidebar", "news"):
+    for n in ("panel", "news"):
         put(n, panel, 9)
+    # The title's menu bar over the painting (engine `screens.rs`, Title): a dark band, no frame,
+    # fading a little to the right, with a thin bronze line on its right edge.
+    band = np.zeros((8, 64, 4), np.uint8)
+    band[..., :3] = (22, 16, 15)
+    band[..., 3] = np.linspace(215, 165, 64).astype(np.uint8)[None, :]
+    band[:, -2, :3], band[:, -2, 3] = (120, 72, 40), 230
+    band[:, -1, :3], band[:, -1, 3] = (40, 24, 16), 200
+    put("sidebar", band, scaling="stretch")
     put("well", fit9(src("c_small", 2), 32, 24, 4), 4)
     put("tooltip", fit9(src("c_small", 3), 32, 24, 3), 3)
     btn = fit9(src("c_buttons", 0), 64, 20, 5)
@@ -246,6 +255,47 @@ def build():
     put("button_hover", glow(brighter(btn, 1.08), GOLD1), 5)
     put("button_pressed", pressed(btn), 5)
     put("button_disabled", disabled(btn), 5)
+    # Behind a 3D portrait (the animal screen): the well's frame round a lighter warm backdrop,
+    # brightest in the middle, so dark coats (a black wolf) read.
+    portrait = fit9(src("c_small", 2), 64, 64, 4).copy()
+    yy, xx = np.mgrid[0:56, 0:56]
+    r = np.sqrt(((xx - 27.5) / 28) ** 2 + ((yy - 27.5) / 28) ** 2).clip(0, 1)
+    inner = np.stack([118 - 40 * r, 102 - 36 * r, 88 - 32 * r], -1)
+    portrait[4:60, 4:60, :3] = inner.astype(np.uint8)
+    portrait[4:60, 4:60, 3] = 255
+    put("portrait", portrait, 4)
+    # The menus' background outside the game (the title, worlds, settings): a painted landscape
+    # (`px/title/`, three made 2026-11-04; title_1, golden hour, chosen overnight), cut to 16:9
+    # and stretched to the window.
+    from PIL import Image as _I
+    scene = _I.open(os.path.join(HERE, "px", "title", "title_1.png")).convert("RGBA")
+    h = scene.width * 9 // 16
+    top = (scene.height - h) // 3
+    scene = np.array(scene.crop((0, top, scene.width, top + h)))
+    save("background", scene, scaling="stretch")
+    with open(os.path.join(OUT, "background.gui"), "w") as f:
+        f.write("scaling = stretch\n")
+    out["background"] = scene
+    # A row of a list (the worlds): `list_row`, a dark plate with a bronze rim, lighter on hover,
+    # a gold rim when selected (a selected button is drawn with `_pressed`).
+    row = fit9(src("c_small", 2), 64, 24, 4)
+    put("list_row", row, 4)
+    put("list_row_hover", brighter(row, 1.3), 4)
+    put("list_row_pressed", glow(brighter(row, 1.2), GOLD1), 4)
+    put("list_row_disabled", disabled(row), 4)
+    # the secondary button (dark brown): `S::default().class("button_secondary")`
+    b2 = fit9(src("c_buttons", 1), 64, 20, 5)
+    put("button_secondary", b2, 5)
+    put("button_secondary_hover", glow(brighter(b2, 1.15), GOLD1), 5)
+    put("button_secondary_pressed", pressed(b2), 5)
+    put("button_secondary_disabled", disabled(b2), 5)
+    # behind the death screen: dark red-brown, darker at the edges
+    yy, xx = np.mgrid[0:64, 0:64]
+    r = np.sqrt(((xx - 31.5) / 32) ** 2 + ((yy - 31.5) / 32) ** 2)
+    death = np.zeros((64, 64, 4), np.uint8)
+    death[..., 0], death[..., 1], death[..., 2] = 52, 14, 10
+    death[..., 3] = np.clip(150 + 90 * r, 0, 235).astype(np.uint8)
+    put("death", death, scaling="stretch")
     q = red(btn)
     put("button_quit", q, 5)
     put("button_quit_hover", glow(brighter(q, 1.1), GOLD1), 5)

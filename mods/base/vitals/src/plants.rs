@@ -61,7 +61,7 @@ const ANY: u8 = 15;
 const SUMMER: u8 = 2;
 const SUMMER_AUTUMN: u8 = 2 | 4;
 
-pub const PLANTS: [Plant; 39] = [
+pub const PLANTS: [Plant; 41] = [
     // Frost (`reports/ecology/Plants and crops.md`, A1): spring wheat is sensitive (a hard frost,
     // about -2 °C, kills it; winter wheat, hardy, comes later); a blueberry's dormant bush is
     // hardy but its flowers and fruit die at -2; sugar cane takes none (the stalk dies, the base
@@ -86,6 +86,9 @@ pub const PLANTS: [Plant; 39] = [
     p("base:cassava", "cassava", (12.0, 25.0, 29.0, 37.0), Water::Moderate, 390.0, ANY, 0.0),
     p("base:berry_bush", "blueberry", (7.0, 20.0, 26.0, 32.0), Water::Moderate, 75.0, SUMMER_AUTUMN, -2.0),
     p("base:sugar_cane", "sugar cane", (12.0, 22.0, 30.0, 38.0), Water::Wet, 0.0, ANY, -1.0),
+    // Kelp (Laminaria, Saccharina): cold-water seaweed, growing best at 5-15 °C and failing
+    // past about 20; it stands under water, so frost never reaches it.
+    p("base:kelp", "kelp (Laminaria)", (0.0, 5.0, 15.0, 22.0), Water::Wet, 0.0, ANY, HARDY),
     p("base:cactus", "saguaro", (10.0, 25.0, 40.0, 50.0), Water::Dry, 0.0, ANY, -7.0),
     p("base:sapling", "oak", (5.0, 18.0, 28.0, 38.0), Water::Moderate, 0.0, ANY, HARDY),
     // Grazed grass growing back to tall grass: 15-21 days in spring (`vitals::forage`).
@@ -125,6 +128,10 @@ pub const PLANTS: [Plant; 39] = [
     // frost below about -15 kills; the tropical palms, killed by any frost.
     p("base:mesquite_sapling", "mesquite", (12.0, 25.0, 38.0, 48.0), Water::Dry, 0.0, ANY, -15.0),
     p("base:acuri_palm_sapling", "acuri palm (Attalea phalerata)", (15.0, 24.0, 32.0, 40.0), Water::Moderate, 0.0, ANY, 0.0),
+    // The giant sequoia: the Sierra Nevada's western slopes at 1,400-2,000 m, growing from about
+    // 5 degrees, best in a mild summer, hardy to about -24 under snow; its seedlings need the
+    // soil kept moist (Weatherspoon 1990, Silvics of North America).
+    p("base:sequoia_sapling", "giant sequoia (Sequoiadendron giganteum)", (5.0, 15.0, 24.0, 35.0), Water::Moderate, 0.0, ANY, -24.0),
     p("base:moriche_palm_sapling", "moriche palm (Mauritia flexuosa)", (15.0, 24.0, 32.0, 40.0), Water::Wet, 0.0, ANY, 0.0),
     // The Cretaceous's saplings (the animals mod's), at the game's time: its greenhouse warmth
     // suits them all; living kin give the frost they take (Araucaria about -5, ginkgo hardy, the

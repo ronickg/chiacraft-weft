@@ -314,6 +314,8 @@ fn mistake(w: &World, id: u64, st: &EntityState, scares: bool) {
 /// `id` becomes `player`'s, with `floor(level * effectiveness / 2)` bonus levels placed on
 /// random stats (never torpor).
 pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
+    // Its level first: the bonus levels and the XP go by it.
+    crate::animal::ensure_rolled(w, id);
     // Out of the wild: its genes leave its place's pool.
     if !crate::animal::tamed(w, id) {
         crate::evolution::count(w, id, -1.0);
@@ -337,7 +339,15 @@ pub fn tame(w: &World, id: u64, player: u64, effectiveness: f32) {
         weft_sdk::info!("animal {id} tamed at {:.0}%: {bonus} bonus levels, now level {}", effectiveness * 100.0, a.level());
         let level = a.level();
         crate::xp::tamed(w, player, level);
-        // Survival's "A Friend" advancement (`base_api::milestones`).
+        // The first time this player tames one: how to give it orders (a line under the
+        // crosshair, `base_api::hint`), then Survival's "A Friend" advancement
+        // (`base_api::milestones`), which also marks that they have.
+        let first = w
+            .component(player, &base_api::MILESTONES)
+            .is_some_and(|m| m & base_api::milestones::TAME == 0);
+        if first {
+            base_api::hint(w, player, "hint.animals.tamed", &[]);
+        }
         base_api::milestone(w, player, base_api::milestones::TAME);
     }
     set(w, id, |t| *t = FRESH);

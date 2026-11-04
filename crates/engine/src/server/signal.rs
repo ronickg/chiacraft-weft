@@ -1616,7 +1616,9 @@ impl Dim {
                 continue;
             }
             let info = &c.states[here as usize];
-            if info.liquid.is_some() {
+            // A block standing in a liquid moves dry, the liquid staying; one that can't be dry
+            // (kelp) is washed off like a plant.
+            if info.liquid.is_some() || info.holds.is_some() && !c.drained.contains_key(&here) {
                 broken.push(at);
                 continue;
             }
@@ -1761,7 +1763,12 @@ impl Dim {
                 }
                 let Some(state) = self.get(n) else { continue };
                 let info = &c.states[state as usize];
-                if state == AIR || info.flags & bf::SOLID != 0 || info.liquid.is_some() {
+                // What can't be dry (kelp) doesn't ride: it breaks off, its liquid staying.
+                if state == AIR
+                    || info.flags & bf::SOLID != 0
+                    || info.liquid.is_some()
+                    || info.holds.is_some() && !c.drained.contains_key(&state)
+                {
                     continue;
                 }
                 let held_by = |f: u8| moved.contains(&(n + DIRS[f as usize]));
@@ -1831,6 +1838,19 @@ impl Dim {
         let head = plan.p + DIRS[plan.dir as usize];
         for &b in &plan.broken {
             if let Some(there) = self.get(b) {
+                // A source that a block coming into it will stand in stays: it lands in it
+                // (a slab pushed on into water, wet).
+                let stands_in = |m: &IVec3| {
+                    *m + plan.step == b
+                        && self.get(*m).is_some_and(|s| {
+                            let dry = c.drained.get(&s).copied().unwrap_or(s);
+                            c.placed_into(dry, there)
+                                .is_some_and(|w| c.states[w as usize].holds.is_some())
+                        })
+                };
+                if plan.moved.iter().any(stands_in) {
+                    continue;
+                }
                 if c.states[there as usize].liquid.is_none() {
                     self.drop_block_loot(c, b, there, abi::ItemStack::EMPTY, false, None);
                 }

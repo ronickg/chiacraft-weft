@@ -69,7 +69,7 @@ pub fn thirst(w: &World, id: u64, a: &Animal, st: &EntityState, rate: f32) {
 
 /// Whether the block at `pos` is open water to drink from: its surface, air above it.
 fn open_water(w: &World, pos: [i32; 3]) -> bool {
-    crate::comfort::WATER.on_block(w.get(pos)) && w.get([pos[0], pos[1] + 1, pos[2]]) == 0
+    crate::comfort::WATER.in_cell(w.get(pos)) && w.get([pos[0], pos[1] + 1, pos[2]]) == 0
 }
 
 /// The nearest place within `LOOK` blocks where it can stand on dry ground beside open water.
@@ -88,7 +88,7 @@ fn nearest_water(w: &World, pos: [f64; 3]) -> Option<[f64; 3]> {
                 for (sx, sz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
                     let (x, z) = (at[0] + sx, at[2] + sz);
                     let Some(y) = crate::comfort::ground(w, x, at[1] + 1, z) else { continue };
-                    if (y - (at[1] + 1)).abs() > 1 || crate::comfort::WATER.on_block(w.get([x, y, z])) {
+                    if (y - (at[1] + 1)).abs() > 1 || crate::comfort::WATER.in_cell(w.get([x, y, z])) {
                         continue;
                     }
                     let spot = [x as f64 + 0.5, y as f64, z as f64 + 0.5];
@@ -105,8 +105,13 @@ fn nearest_water(w: &World, pos: [f64; 3]) -> Option<[f64; 3]> {
 
 /// Whether it is drinking or on its way to water (a resting animal settles only when it isn't).
 pub fn busy(w: &World, id: u64) -> bool {
-    w.component(id, &DRINK)
-        .is_some_and(|d| d[3] != 0.0 && !d[0].is_nan())
+    // As foraging (`forage::busy`): a trip left from before it was slaked isn't one.
+    let thirsty = w
+        .component(id, &ANIMAL)
+        .is_some_and(|a| a.thirst > 1.0 - animals_core::needs::SLAKED);
+    thirsty
+        && w.component(id, &DRINK)
+            .is_some_and(|d| d[3] != 0.0 && !d[0].is_nan())
 }
 
 /// A goal (run first by the forage goal, `forage::forage`): thirsty, it goes to the nearest water

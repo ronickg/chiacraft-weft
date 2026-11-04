@@ -229,6 +229,13 @@ fn grant_where(w: &World, player: u64, met: impl Fn(&Rule) -> bool) {
         if a.done & bit == 0 && met(&adv.rule) {
             a.done |= bit;
             w.send(player, &MADE, &(i as u32));
+            // chiacraft: the world signs it for the player, a credential that outlives the world.
+            let arg = format!(
+                "{player}\tbase:{id}\tadvancement.base.{id}\tadvancement.base.{id}.desc\t{icon}",
+                id = adv.id,
+                icon = adv.icon.name()
+            );
+            crate::bridge("achievement", &arg);
             base_api::give_xp(w, player, vitals::levels::xp::ADVANCEMENT);
         }
     }
@@ -251,6 +258,13 @@ fn client(r: &mut Registry) {
             toasts.pop_front();
             return;
         };
+        // Never over a window, as the level up's banner (Tester's scale 6 run: "A Friend" covered
+        // the animal screen's top right and its close button, opened as the animal was tamed): it
+        // waits while a screen is open, and starts over, chime and all, once it closes.
+        if !c.screen().is_empty() {
+            *shown = None;
+            return;
+        }
         let start = *shown.get_or_insert_with(|| {
             c.play_sound(&CHIME, None, 1.0);
             Instant::now()

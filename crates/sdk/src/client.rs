@@ -187,6 +187,12 @@ impl Client {
         self.command(abi::client_op::CLOSE_SCREEN, "", 0.0);
     }
 
+    /// Builds the top screen again, for a screen whose parts follow state of its own (a page, a
+    /// selection): its builder runs anew.
+    pub fn rebuild_screen(&self) {
+        self.command(abi::client_op::REBUILD_SCREEN, "", 0.0);
+    }
+
     pub fn reload_assets(&self) {
         self.command(abi::client_op::RELOAD_ASSETS, "", 0.0);
     }
@@ -575,6 +581,24 @@ impl World {
                 heading,
             )
         }
+    }
+
+    /// Tint colors from now on, over the content's while the world runs (a mod's seasons): for
+    /// each entry a biome (id, as `biome` gives it), a tint kind (another mod's too) and its
+    /// 0xRRGGBB. Players see it: grass and leaves take the new colors, blended across biome borders
+    /// as before. What is not named keeps the content's color; each call replaces the last; an
+    /// empty list goes back to the content's colors.
+    pub fn set_biome_tints(&self, tints: &[(u32, &crate::TintKind, u32)]) {
+        let biomes: Vec<u32> = tints.iter().map(|t| t.0).collect();
+        let kinds: Vec<Str> = tints.iter().map(|t| Str::new(t.1.name())).collect();
+        let colors: Vec<u32> = tints.iter().map(|t| t.2).collect();
+        unsafe { (host().set_biome_tints)(self.raw(), biomes.as_ptr(), kinds.as_ptr(), colors.as_ptr(), tints.len() as u32) }
+    }
+
+    /// The content's color (0xRRGGBB) of `kind` in biome `biome` (id), whatever `set_biome_tints`
+    /// set since: the biome's own, else the kind's default; 0 for an unknown kind.
+    pub fn content_tint(&self, biome: u32, kind: &crate::TintKind) -> u32 {
+        unsafe { (host().content_tint)(biome, Str::new(kind.name())) }
     }
 
     /// The air set (`set_air`) in the biome at `pos`; clear and still if none was.

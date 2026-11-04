@@ -106,9 +106,11 @@ pub fn template(c: &Content, kind: u32) -> Option<&[(IVec3, u32)]> {
 
 impl Dim {
     /// Takes the block at `p` out: nothing of it is broken, what is next to it just hears it is gone.
-    /// What it has as an entity comes along, not attached to any place for now.
+    /// What it has as an entity comes along, not attached to any place for now. A block standing
+    /// in a liquid comes out dry if it can be, the liquid staying.
     pub fn take_block(&mut self, c: &'static Content, p: IVec3) -> Option<(u32, Option<u64>, Moved)> {
         let state = self.get(p)?;
+        let state = c.drained.get(&state).copied().unwrap_or(state);
         let entity = self.anchored(p);
         if entity.is_some() {
             self.entities.anchors.remove(&(self.frame, p));
@@ -597,7 +599,12 @@ impl Dim {
                 let first = c.block_of(state).first_state;
                 self.write_block(c, at, first + ((there - first) | (state - first)), true);
             }
-            Some(there) if there == AIR || c.states[there as usize].flags & abi::block_flags::REPLACEABLE != 0 => {
+            // Into a liquid it can stand in, standing in it.
+            Some(there)
+                if (there == AIR || c.states[there as usize].flags & abi::block_flags::REPLACEABLE != 0)
+                    && c.placed_into(state, there).is_some() =>
+            {
+                let state = c.placed_into(state, there).unwrap_or(state);
                 if c.states[state as usize].signal.kind == abi::signal_kind::OBSERVER {
                     self.space.signals.moved_observers.insert(at);
                 }

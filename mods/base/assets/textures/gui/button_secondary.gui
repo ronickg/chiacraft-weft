@@ -1,0 +1,4 @@
+scaling = nine_slice
+border = 1.5
+selected_offset = 0.5
+size = 32 10

@@ -118,6 +118,7 @@ pub fn named(name: &str) -> Option<Box<dyn Screen>> {
         "core:mods" => Box::new(ModList::default()),
         "core:profile" => Box::new(Profile::default()),
         "core:account" => Box::new(crate::account_screen::Account::default()),
+        "core:achievements" => Box::new(crate::chiacraft::achievements_screen::Achievements),
         "core:admission" => Box::new(crate::chiacraft::worlds::admission_screen::Admission),
         _ => return None,
     })
@@ -343,6 +344,12 @@ impl Screen for Profile {
                     label(ui, cx, "profile.account_backup", &[], "dim");
                 }
                 button(ui, cx, "profile.account", &[], 160.0, |c| c.requests.push(Request::Screen("core:account".into())));
+                // What worlds signed for this account (chiacraft, phase 4).
+                let n = crate::chiacraft::achievements::load().credentials.len();
+                let id = button(ui, cx, "profile.achievements", &[Arg::Int(n as i64)], 160.0, |c| {
+                    c.requests.push(Request::Screen("core:achievements".into()))
+                });
+                ui.set_id(id, "achievements");
                 ui.add(Kind::Container { class: None }, Style::default().h(4.0));
                 label(ui, cx, "profile.skin", &[], "default");
                 label(ui, cx, "profile.skin_hint", &[], "dim");
@@ -487,16 +494,27 @@ impl Screen for Title {
                     ui.add(Kind::Image { texture: logo, color: 0xFFFFFFFF }, Style::default().w(size[0] * k).h(size[1] * k));
                 }
                 ui.spacer();
+                // The first way in is the main button, the rest `button_secondary` (the engine's own
+                // is a copy of its button; base's is the dark one).
                 icon_button(ui, cx, "button", "menu_singleplayer", "menu.singleplayer", &[], 156.0, |c| open(c, "core:worlds"));
                 // The profile is a square beside Multiplayer: the face of the player's skin.
                 ui.container(Style::row().gap(4.0).stretch(), |ui| {
-                    let mp =
-                        icon_button(ui, cx, "button", "menu_multiplayer", "menu.multiplayer", &[], 132.0, |c| open(c, "core:multiplayer"));
+                    let mp = icon_button(ui, cx, "button_secondary", "menu_multiplayer", "menu.multiplayer", &[], 132.0, |c| {
+                        open(c, "core:multiplayer")
+                    });
                     ui.nodes[mp].style.grow = 1.0;
                     let face = face_texture(cx);
-                    let p = ui.button("button", Style::default().w(20.0).h(20.0), Rc::new(|c: &mut Ctx| open(c, "core:profile")), |ui| {
-                        ui.add(Kind::Image { texture: face, color: 0xFFFFFFFF }, Style::default().w(8.0).h(8.0).at(6.0, 6.0, [0.0, 0.0]));
-                    });
+                    let p = ui.button(
+                        "button_secondary",
+                        Style::default().w(20.0).h(20.0),
+                        Rc::new(|c: &mut Ctx| open(c, "core:profile")),
+                        |ui| {
+                            ui.add(
+                                Kind::Image { texture: face, color: 0xFFFFFFFF },
+                                Style::default().w(8.0).h(8.0).at(6.0, 6.0, [0.0, 0.0]),
+                            );
+                        },
+                    );
                     ui.nodes[p].tooltip = Some(cx.t("menu.profile", &[]));
                     ui.set_id(p, "profile");
                 });
@@ -504,8 +522,10 @@ impl Screen for Title {
                 if chiacraft_account::current().is_some_and(|s| s.wants_backup()) {
                     button(ui, cx, "menu.write_words", &[], 156.0, |c| open(c, "core:account"));
                 }
-                icon_button(ui, cx, "button", "menu_mods", "menu.mods", &[Arg::Int(cx.mods as i64)], 156.0, |c| open(c, "core:mods"));
-                icon_button(ui, cx, "button", "menu_settings", "menu.settings", &[], 156.0, |c| open(c, "core:settings"));
+                icon_button(ui, cx, "button_secondary", "menu_mods", "menu.mods", &[Arg::Int(cx.mods as i64)], 156.0, |c| {
+                    open(c, "core:mods")
+                });
+                icon_button(ui, cx, "button_secondary", "menu_settings", "menu.settings", &[], 156.0, |c| open(c, "core:settings"));
                 parts(ui, cx, "core:title", "buttons");
                 ui.add(Kind::Container { class: None }, Style::default().h(6.0));
                 let quit = button(ui, cx, "menu.quit", &[], 156.0, |c| c.requests.push(Request::Quit));
@@ -599,7 +619,10 @@ impl Screen for SettingsScreen {
                     pad: [8.0; 4],
                     gap: 6.0,
                     align: abi::ui_align::STRETCH,
-                    width: 320.0,
+                    // Its rows are 300 wide (two of 147 and a gap of 6): 300 + its padding (16) and
+                    // the scrollbar's room (14) keep them whole; at 320 they ran under the
+                    // scrollbar and past the left edge (the label check, 11-04).
+                    width: 334.0,
                     height: 0.0,
                     grow: 1.0,
                     min: [0.0, 40.0],
@@ -616,9 +639,9 @@ impl Screen for SettingsScreen {
                     let scale =
                         if s.gui_scale() == 0 { Arg::Key("settings.gui_scale.auto".into()) } else { Arg::Int(s.gui_scale() as i64) };
                     d.button("settings.gui_scale", &[scale], 300.0, false, |r| {
-                        // Auto, then every scale the window can actually show.
+                        // Auto, then every scale the window can show whole: 1 and the even ones.
                         let max = crate::settings::max_gui_scale(r.stats.window);
-                        let next = if r.settings.gui_scale() >= max { 0 } else { r.settings.gui_scale() + 1 };
+                        let next = crate::settings::next_gui_scale(r.settings.gui_scale(), max);
                         r.settings.set("gui_scale", next as f64);
                     });
                     d.button("settings.vsync", &[on_off(s.vsync())], 300.0, false, |r| {

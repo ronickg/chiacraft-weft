@@ -290,3 +290,9 @@ mod tests {
         assert_eq!(fog(c.fog, c.fog_kind, Some(2), 5, day, 6.0, CLEARS.1 + 1.0), 0.0);
     }
 }
+
+/// Aurorae on clear nights, by the real place's latitude: the auroral oval lies at about 60-75°
+/// north, so the biomes whose place is under it get them (the taiga, Fairbanks at 64.8°, one of the
+/// best aurora places on Earth; the snowy plains, Utqiaġvik at 71.3°), the birch forest (Moscow,
+/// 55.8°) a rare faint one. How strong, 0..1 (`reports/sky-weather-life.md`).
+pub const AURORA: [(&str, f32); 3] = [("base:taiga", 1.0), ("base:snowy_plains", 1.0), ("base:birch_forest", 0.2)];

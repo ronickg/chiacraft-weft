@@ -434,10 +434,13 @@ pub fn format(template: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>) {
 }
 
 /// A translation `key` with `args`; an empty key shows its one argument as it is (ready text
-/// from code, like a ticket or a profile line).
+/// from code, like a ticket or a profile line), and nothing without one (a mod's bound text that
+/// set nothing this frame: it showed "{0}", Playtest B2).
 pub fn message(key: &str, args: &[Arg], cx: &Ctx, out: &mut Vec<Span>) {
     if key.is_empty() {
-        format("{0}", args, cx, out);
+        if !args.is_empty() {
+            format("{0}", args, cx, out);
+        }
     } else {
         format(cx.lang.get(key), args, cx, out);
     }
@@ -876,10 +879,17 @@ pub fn layout_with(spans: &[Span], font: &Font, max_width: Option<f32>, line_hei
             Placed::Glyph { x, ch, .. } if ch != ' ' => Some((x, font.glyph(ch))),
             _ => None,
         };
-        let first = out.items.first().and_then(glyph);
+        // A line may start with an inline image (an icon before a button's word): then there is
+        // no glyph lead-in to take off, but the last glyph's spacing after it still goes, or the
+        // label sat a pixel off centre (the label check, 11-04).
+        let starts_with_image = matches!(out.items.first(), Some(Placed::Image { .. }));
+        let lead = match out.items.first().and_then(glyph) {
+            Some((_, g0)) => Some(g0.bearing.max(0.0)),
+            None if starts_with_image => Some(0.0),
+            None => None,
+        };
         let last = out.items.last().and_then(glyph);
-        if let (Some((_, g0)), Some((lx, gl))) = (first, last) {
-            let lead = g0.bearing.max(0.0);
+        if let (Some(lead), Some((lx, gl))) = (lead, last) {
             let end = lx + gl.bearing + gl.width;
             if lead > 0.0 || end < x {
                 for it in &mut out.items {

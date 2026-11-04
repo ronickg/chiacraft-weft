@@ -18,6 +18,8 @@ pub enum Ground {
     Shore,
     /// Floating on still, shallow water.
     Water,
+    /// Rooted on the bottom under still water, standing in it (`depths` says how deep).
+    Bed,
 }
 
 /// How it grows.
@@ -36,8 +38,14 @@ pub enum Form {
     Still,
     /// A fallen log lying on the ground, a full block, rotting (grubs live in it).
     Log,
+    /// A stalk standing in water, growing up a block at a time until one below the surface
+    /// (kelp); the world makes it a random height of that.
+    Column,
     /// A flat mat lying on the ground (kelp washed up at the tide line).
     Mat,
+    /// A mound standing on the ground, a full block, and in one place in two its crown on it (the
+    /// block `<block>_upper`): a termite mound.
+    Mound,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -184,7 +192,7 @@ impl Turn {
 /// Every tree's leaves and how they turn: the conifers, palms and the tree fern stay green;
 /// birches and ginkgos go gold; oaks, acacias, mesquite and the swamp cypress (a deciduous conifer)
 /// go russet.
-pub const LEAVES: [(&str, Turn); 12] = [
+pub const LEAVES: [(&str, Turn); 17] = [
     ("base:oak_leaves", Turn::Orange),
     ("base:birch_leaves", Turn::Yellow),
     ("base:spruce_leaves", Turn::Evergreen),
@@ -192,6 +200,13 @@ pub const LEAVES: [(&str, Turn); 12] = [
     ("base:mesquite_leaves", Turn::Orange),
     ("base:acuri_palm_leaves", Turn::Evergreen),
     ("base:moriche_palm_leaves", Turn::Evergreen),
+    ("base:sequoia_leaves", Turn::Evergreen),
+    // Drawn in its own colours (white bracts), so its tint isn't used (`blocks.rs`, `grove`).
+    ("base:dogwood_leaves", Turn::Orange),
+    // The shrubs', in their own colours too (`blocks.rs`).
+    ("base:willow_leaves", Turn::Yellow),
+    ("base:juniper_leaves", Turn::Evergreen),
+    ("base:creosote_leaves", Turn::Evergreen),
     ("animals:araucaria_leaves", Turn::Evergreen),
     ("animals:ginkgo_leaves", Turn::Yellow),
     ("animals:swamp_cypress_leaves", Turn::Orange),
@@ -244,8 +259,22 @@ pub const PRAIRIE: &[&str] = &["base:plains"];
 pub const CYCAD_LANDS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:floodplain", "animals:fern_forest", "animals:crags"];
 pub const FLOWERING: &[&str] = &["animals:floodplain", "animals:scrubland"];
 pub const PONDS: &[&str] = &["animals:floodplain", "animals:red_dunes"];
+/// Still fresh water in the temperate and boreal lands: white water lilies' (Nymphaea alba, and
+/// N. tetragona into the taiga).
+/// Water lilies on still water; the llanos' and the Pantanal's lagoons have theirs too.
+pub const LAKES: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:swamp", "base:taiga", "base:savanna"];
+/// Common reed (Phragmites australis) rings the temperate and boreal lakes; the swamp's and the
+/// llanos' shores are mostly the cattails' and the wild rice's, with a few reeds (`COVER_IN`).
+pub const REEDBEDS: &[&str] = &["base:plains", "base:forest", "base:birch_forest", "base:taiga", "base:swamp"];
+/// Sheltered sea floor: eelgrass meadows (Zostera) off the beaches.
+pub const SEA_MEADOWS: &[&str] = &["base:ocean", "base:beach"];
+/// Kelp forests: the open sea's rocky and sandy floor.
+pub const KELP_FORESTS: &[&str] = &["base:ocean"];
 /// Where the Cretaceous's trees fall and rot: its forests and the wooded floodplain.
 pub const DEADWOOD: &[&str] = &["animals:floodplain", "animals:fern_forest"];
+/// The Djadokhta's dry lands, where termites built (the report's "termite and ant nests: red
+/// dunes, scrubland").
+pub const TERMITE_LANDS: &[&str] = &["animals:red_dunes", "animals:scrubland"];
 
 const fn w(
     block: &'static str,
@@ -261,7 +290,7 @@ const fn w(
 /// Covers are shares of the cells of that ground (tall grass covers 5-35% of the turf, berry bushes
 /// 0.4% of the forest's; `forage::GRASS_COVER`): the tundra's sedges and cottongrass are its grass,
 /// the bushes and mushrooms are found, not walked through.
-pub const WILD: [Wild; 22] = [
+pub const WILD: [Wild; 27] = [
     w("base:sedge", Form::Tuft, Ground::Soil, None, SEDGE_LANDS, 0.12),
     w("base:cottongrass", Form::Tuft, Ground::Soil, None, TUNDRA, 0.08),
     w("base:reindeer_lichen", Form::Tuft, Ground::Soil, None, NORTH, 0.05),
@@ -278,19 +307,47 @@ pub const WILD: [Wild; 22] = [
     w("base:mushroom_brown", Form::Spreads, Ground::Soil, Some("base:mushroom_brown"), FOREST_FLOOR, 0.006),
     w("base:mushroom_red", Form::Spreads, Ground::Soil, Some("base:mushroom_red"), AGARICS, 0.003),
     w("base:water_hyacinth", Form::Spreads, Ground::Water, None, WETLANDS, 0.08),
-    w("base:cattail", Form::Still, Ground::Shore, Some("base:cattail_root"), MARSHES, 0.1),
+    w("base:cattail", Form::Still, Ground::Shore, Some("base:cattail_root"), MARSHES, 0.15),
+    w("base:reed", Form::Still, Ground::Shore, None, REEDBEDS, 0.12),
+    w("base:lily_pad", Form::Still, Ground::Water, None, LAKES, 0.12),
+    w("base:seagrass", Form::Still, Ground::Bed, None, SEA_MEADOWS, 0.2),
+    // Kelp standing in the sea; picked, a handful of kelp (`food::FOODS`).
+    w("base:kelp", Form::Column, Ground::Bed, Some("base:kelp"), KELP_FORESTS, 0.08),
     w("animals:cycad", Form::Still, Ground::Soil, Some("animals:cycad_seed"), CYCAD_LANDS, 0.01),
     w("animals:flowering_shrub", Form::Still, Ground::Soil, None, FLOWERING, 0.02),
     w("animals:water_lily", Form::Still, Ground::Water, None, PONDS, 0.06),
     w("animals:rotten_log", Form::Log, Ground::Soil, None, DEADWOOD, 0.004),
+    // Termite mounds on the dry lands' red sand and soil, rare: their termites the insect eaters'.
+    w("animals:termite_mound", Form::Mound, Ground::Soil, None, TERMITE_LANDS, 0.003),
     // Kelp washed up on the beach (wrack, the beach's food: sand fleas and flies on it feed the
-    // shorebirds). Kelp growing under the sea waits for a block that stands in water.
-    w("base:kelp", Form::Mat, Ground::Sand, Some("base:kelp"), &["base:beach"], 0.03),
+    // shorebirds); the kelp standing in the sea is `base:kelp` above.
+    w("base:kelp_wrack", Form::Mat, Ground::Sand, Some("base:kelp"), &["base:beach"], 0.03),
 ];
+
+/// How deep the water over a plant rooted on the bed is, from its floor to the surface, in
+/// blocks: eelgrass in the shallows, kelp further out.
+pub fn depths(block: &str) -> std::ops::RangeInclusive<i32> {
+    match block {
+        "base:kelp" => 6..=20,
+        _ => 1..=6,
+    }
+}
 
 /// A wild plant by its block's full name.
 pub fn of(block: &str) -> Option<&'static Wild> {
     WILD.iter().find(|p| p.block == block)
+}
+
+/// A plant's cover in one biome where it isn't its usual (`Wild::cover`): reeds in the swamp at
+/// 4%, leaving its shore to the wild rice (spring's grain and the capybaras' food) and the cattails.
+pub const COVER_IN: [(&str, &str, f32); 1] = [("base:reed", "base:swamp", 0.04)];
+
+/// `p`'s cover in `biome`: its own, unless `COVER_IN` gives that biome another.
+pub fn cover_in(p: &Wild, biome: &str) -> f32 {
+    COVER_IN
+        .iter()
+        .find(|&&(b, at, _)| b == p.block && at == biome)
+        .map_or(p.cover, |&(_, _, c)| c)
 }
 
 /// Which wild plant (its index in `WILD`) grows on a cell of `ground` in `biome`, for a roll in
@@ -301,7 +358,7 @@ pub fn pick(biome: &str, ground: Ground, roll: f32) -> Option<usize> {
         if p.ground != ground || !p.found.contains(&biome) {
             continue;
         }
-        at += p.cover;
+        at += cover_in(p, biome);
         if roll < at {
             return Some(i);
         }
@@ -316,7 +373,7 @@ mod tests {
     #[test]
     fn every_wild_plant_has_its_numbers() {
         for p in &WILD {
-            if !matches!(p.form, Form::Still | Form::Log | Form::Mat) {
+            if !matches!(p.form, Form::Still | Form::Log | Form::Mat | Form::Mound) {
                 assert!(crate::plants::of(p.block).is_some(), "{}: no row in plants::PLANTS", p.block);
             }
             if let Some(item) = p.gives.filter(|g| *g != p.block) {
@@ -341,7 +398,7 @@ mod tests {
                 let all: f32 = WILD
                     .iter()
                     .filter(|q| q.ground == p.ground && q.found.contains(b))
-                    .map(|q| q.cover)
+                    .map(|q| cover_in(q, b))
                     .sum();
                 assert!(all < MOST, "{b}: wild plants cover {:.0}% of its {:?} ground", all * 100.0, p.ground);
             }

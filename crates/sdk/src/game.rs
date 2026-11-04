@@ -267,6 +267,9 @@ impl World {
         (!p.is_null()).then(|| unsafe { &*(p as *const T) })
     }
     /// The component to write; changes are saved and synced like any other.
+    // The bytes live in the host, not in `World` (a handle to it), as every `&self` call that
+    // changes the world.
+    #[allow(clippy::mut_from_ref)]
     pub fn component_mut<T: Value>(&self, id: u64, c: &Component<T>) -> Option<&mut T> {
         let p = unsafe { (host().component)(self.raw(), id, c.id()) };
         (!p.is_null()).then(|| unsafe { &mut *(p as *mut T) })
@@ -397,6 +400,10 @@ pub struct InventoryGroup {
 impl InventoryGroup {
     pub fn len(&self) -> u32 {
         self.len
+    }
+    /// The inventory slot of its `i`th, for `Inventory::get` and `set`.
+    pub fn slot(&self, i: u32) -> u32 {
+        self.start + i
     }
     pub fn is_empty(&self) -> bool {
         self.len == 0
@@ -1023,6 +1030,10 @@ impl MenuCtx {
     pub fn owner(&self) -> u64 {
         self.args.owner
     }
+    /// The slot this call is about (the one taken from, for `on_take`), as the menu numbers them.
+    pub fn slot(&self) -> u32 {
+        self.args.slot
+    }
     /// Slot group `name` of this menu.
     pub fn group(&self, name: &str) -> MenuGroup<'_> {
         let mut out = [0u32; 3];
@@ -1042,6 +1053,10 @@ pub struct MenuGroup<'a> {
 impl MenuGroup<'_> {
     pub fn len(&self) -> u32 {
         self.len
+    }
+    /// Where menu slot `slot` (`MenuCtx::slot`) is in this group, if it is one of its.
+    pub fn index_of(&self, slot: u32) -> Option<u32> {
+        (slot >= self.start && slot < self.start + self.len).then(|| slot - self.start)
     }
     /// Its width as laid out (a 3 x 3 grid has 3).
     pub fn cols(&self) -> u32 {
@@ -1756,10 +1771,21 @@ impl Drop for RecipeKindBuilder<'_> {
     }
 }
 
-/// One recipe of a kind, found by `recipe_find` (or shown by a kind's `display`).
+/// One recipe of a kind, found by `recipe_find` or listed by `recipes` (or shown by a kind's
+/// `display`).
 pub struct Recipe {
     kind: String,
     index: u32,
+}
+
+/// Every recipe of `kind`, in the order they were registered (hidden ones too: `hidden()`).
+pub fn recipes(kind: &RecipeKind) -> Vec<Recipe> {
+    let mut out = Vec::new();
+    let mut info = abi::RecipeInfo::default();
+    while unsafe { (host().recipe_info)(Str::new(kind.name()), out.len() as u32, &mut info) } != 0 {
+        out.push(Recipe { kind: kind.name().to_string(), index: out.len() as u32 });
+    }
+    out
 }
 
 /// The first recipe of `kind` whose inputs, with their counts, are all among `stacks`.
@@ -1774,9 +1800,45 @@ impl Recipe {
         unsafe { (host().recipe_info)(Str::new(&self.kind), self.index, &mut out) };
         out
     }
+    /// Recipe `index` of `kind` (as `recipes` numbers them), if there is one.
+    pub fn at(kind: &RecipeKind, index: u32) -> Option<Recipe> {
+        let mut info = abi::RecipeInfo::default();
+        (unsafe { (host().recipe_info)(Str::new(kind.name()), index, &mut info) } != 0)
+            .then(|| Recipe { kind: kind.name().to_string(), index })
+    }
+    /// Its number in its kind.
+    pub fn index(&self) -> u32 {
+        self.index
+    }
+    /// Its kind's name (`base:crafting`).
+    pub fn kind(&self) -> &str {
+        &self.kind
+    }
     /// Its time in ticks.
     pub fn time(&self) -> u32 {
         self.info().time
+    }
+    /// Kept out of the recipe viewer.
+    pub fn hidden(&self) -> bool {
+        self.info().flags & abi::recipe_flags::HIDDEN != 0
+    }
+    /// A shaped recipe's grid (width, height); `None` for a shapeless one.
+    pub fn shape(&self) -> Option<(u32, u32)> {
+        let i = self.info();
+        (i.width > 0).then_some((i.width, i.height))
+    }
+    /// Its inputs: a shaped one's cells row by row (empty ones too), else its ingredients.
+    pub fn inputs(&self) -> Vec<abi::RecipeInput> {
+        let mut out = Vec::new();
+        let mut one = abi::RecipeInput::default();
+        while unsafe { (host().recipe_input)(Str::new(&self.kind), self.index, out.len() as u32, &mut one) } != 0 {
+            out.push(one);
+        }
+        out
+    }
+    /// Whether `item` fits input `index` (numbered as `inputs`).
+    pub fn accepts(&self, index: u32, item: u32) -> bool {
+        unsafe { (host().recipe_accepts)(Str::new(&self.kind), self.index, index, item) != 0 }
     }
     /// Its results with their chances; fluids are not stacks and show as empty ones.
     pub fn outputs(&self) -> Vec<(ItemStack, f32)> {

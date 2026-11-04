@@ -23,6 +23,9 @@ pub const FULL: [f32; NUTRIENTS] = [100.0, 250.0, 50.0, 25.0, 500.0];
 pub struct Per100 {
     pub water: f32,
     pub protein: f32,
+    /// Available carbohydrate, without the fiber: USDA's "carbohydrate, by difference" counts
+    /// the fiber too, so it is that minus `fiber` (or water, protein, carbs, fat and fiber add up
+    /// to more than 100 g, `balance`).
     pub carbs: f32,
     pub fat: f32,
     pub fiber: f32,
@@ -126,7 +129,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:apple",
         grams: 180.0,
-        per100: per(85.6, 0.3, 13.8, 0.2, 2.4, 4.6),
+        per100: per(85.6, 0.3, 11.4, 0.2, 2.4, 4.6),
         meal: Meal::Cooling,
         raw: false,
         keeps: (20.0, 20.0),
@@ -186,7 +189,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:chicken",
         grams: 300.0,
-        per100: per(68.6, 18.6, 0.0, 15.0, 0.0, 0.0),
+        per100: per(66.0, 18.6, 0.0, 15.1, 0.0, 0.0),
         meal: Meal::Plain,
         raw: true,
         keeps: (2.0, 2.0),
@@ -258,7 +261,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:apple_pie",
         grams: 200.0,
-        per100: per(52.0, 2.4, 37.1, 12.5, 1.6, 1.7),
+        per100: per(52.4, 1.9, 32.4, 12.5, 1.6, 1.7),
         meal: Meal::Cooked,
         raw: false,
         keeps: (4.0, 4.0),
@@ -269,7 +272,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:berries",
         grams: 100.0,
-        per100: per(84.2, 0.7, 14.5, 0.3, 2.4, 9.7),
+        per100: per(84.2, 0.7, 12.1, 0.3, 2.4, 9.7),
         meal: Meal::Cooling,
         raw: false,
         keeps: (6.0, 6.0),
@@ -314,7 +317,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:dried_apple",
         grams: 40.0,
-        per100: per(31.8, 0.9, 65.9, 0.3, 8.7, 3.9),
+        per100: per(31.8, 0.9, 57.2, 0.3, 8.7, 3.9),
         meal: Meal::Plain,
         raw: false,
         keeps: (56.0, 56.0),
@@ -325,7 +328,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:dried_berries",
         grams: 30.0,
-        per100: per(15.0, 2.5, 80.0, 2.5, 7.5, 2.0),
+        per100: per(15.0, 2.5, 72.5, 2.5, 7.5, 2.0),
         meal: Meal::Plain,
         raw: false,
         keeps: (56.0, 56.0),
@@ -339,7 +342,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:lingonberries",
         grams: 100.0,
-        per100: per(87.3, 0.5, 12.0, 0.1, 3.6, 14.0),
+        per100: per(87.3, 0.5, 8.4, 0.1, 3.6, 14.0),
         meal: Meal::Cooling,
         raw: false,
         keeps: (20.0, 20.0),
@@ -349,7 +352,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:cloudberries",
         grams: 100.0,
-        per100: per(85.0, 2.4, 8.6, 0.8, 6.3, 100.0),
+        per100: per(85.0, 2.4, 2.3, 0.8, 6.3, 100.0),
         meal: Meal::Cooling,
         raw: false,
         keeps: (3.0, 3.0),
@@ -370,7 +373,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:raspberries",
         grams: 100.0,
-        per100: per(85.8, 1.2, 11.9, 0.7, 6.5, 26.2),
+        per100: per(85.8, 1.2, 5.4, 0.7, 6.5, 26.2),
         meal: Meal::Cooling,
         raw: false,
         keeps: (2.0, 2.0),
@@ -381,7 +384,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:prickly_pear_fruit",
         grams: 100.0,
-        per100: per(87.6, 0.7, 9.6, 0.5, 3.6, 14.0),
+        per100: per(87.6, 0.7, 6.0, 0.5, 3.6, 14.0),
         meal: Meal::Cooling,
         raw: false,
         keeps: (7.0, 7.0),
@@ -393,7 +396,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:rose_hip",
         grams: 30.0,
-        per100: per(58.7, 1.6, 38.2, 0.3, 24.1, 426.0),
+        per100: per(58.7, 1.6, 14.1, 0.3, 24.1, 426.0),
         meal: Meal::Cooling,
         raw: false,
         keeps: (30.0, 30.0),
@@ -405,7 +408,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:hazelnut",
         grams: 30.0,
-        per100: per(5.3, 15.0, 16.7, 60.8, 9.7, 6.3),
+        per100: per(5.3, 15.0, 7.0, 60.8, 9.7, 6.3),
         meal: Meal::Plain,
         raw: false,
         keeps: (60.0, 60.0),
@@ -415,7 +418,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:pine_nut",
         grams: 30.0,
-        per100: per(2.3, 13.7, 13.1, 68.4, 3.7, 0.8),
+        per100: per(2.3, 13.7, 9.4, 68.4, 3.7, 0.8),
         meal: Meal::Plain,
         raw: false,
         keeps: (60.0, 60.0),
@@ -425,7 +428,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:sunflower_seeds",
         grams: 30.0,
-        per100: per(4.7, 20.8, 20.0, 51.5, 8.6, 1.4),
+        per100: per(4.7, 20.8, 11.4, 51.5, 8.6, 1.4),
         meal: Meal::Plain,
         raw: false,
         keeps: (90.0, 90.0),
@@ -460,7 +463,7 @@ pub const FOODS: &[Food] = &[
     Food {
         name: "base:cooked_wild_rice",
         grams: 150.0,
-        per100: per(73.9, 4.0, 21.3, 0.3, 1.8, 0.0),
+        per100: per(73.9, 4.0, 19.5, 0.3, 1.8, 0.0),
         meal: Meal::Cooked,
         raw: false,
         keeps: (3.0, 3.0),

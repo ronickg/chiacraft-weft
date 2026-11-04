@@ -435,7 +435,7 @@ fn registering_after_init_is_refused() {
 fn one_api_version() {
     let (major, minor) = chiacraft_packages::code::API;
     assert_eq!(API, format!("{major}.{minor}.0"));
-    assert!(include_str!("../wit/v1.2/mod.wit").contains(&format!("package chiacraft:mods@{API};")));
+    assert!(include_str!("../wit/v1.3/mod.wit").contains(&format!("package chiacraft:mods@{API};")));
 }
 
 #[test]

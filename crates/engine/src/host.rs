@@ -93,6 +93,8 @@ pub static HOST: Host = Host {
     recipe_output,
     recipe_value,
     recipe_consume,
+    recipe_input,
+    recipe_accepts,
     item_block,
     ui_open: crate::client::modui::ui_open,
     ui_close: crate::client::modui::ui_close,
@@ -183,6 +185,8 @@ pub static HOST: Host = Host {
     raining_at,
     set_air,
     air_at,
+    set_biome_tints,
+    content_tint,
     entity_flash,
     reg_command_permission,
     player_permission,
@@ -204,6 +208,10 @@ pub static HOST: Host = Host {
     play_animation,
     play_sound,
     client_play_sound: crate::app::api::client_play_sound,
+    client_sound_start: crate::app::api::client_sound_start,
+    client_sound_set: crate::app::api::client_sound_set,
+    client_sound_stop: crate::app::api::client_sound_stop,
+    client_sound_playing: crate::app::api::client_sound_playing,
     reg_spawn,
     biome_at,
     navigate,
@@ -401,6 +409,8 @@ unsafe extern "C" fn reg_sound(r: *mut abi::Registrar, d: *const abi::SoundDesc)
             volume: d.volume,
             pitch: [d.pitch[0].min(d.pitch[1]).max(0.01), d.pitch[0].max(d.pitch[1]).max(0.01)],
             range: d.range.max(1.0),
+            priority: d.priority,
+            voices: d.voices,
         };
         reg(r).game.sounds.push((d.cell as usize, def));
     }
@@ -1294,8 +1304,50 @@ unsafe extern "C" fn recipe_find(kind: Str, stacks: *const ItemStack, count: u32
 unsafe extern "C" fn recipe_info(kind: Str, recipe: u32, out: *mut abi::RecipeInfo) -> u32 {
     let Some(r) = recipe_at(kind, recipe) else { return 0 };
     let flags = if r.hidden { abi::recipe_flags::HIDDEN } else { 0 };
-    unsafe { *out = abi::RecipeInfo { time: r.time, inputs: r.inputs.len() as u32, outputs: r.outputs.len() as u32, flags } };
+    let (width, height) = r.shaped.as_ref().map_or((0, 0), |s| (s.0, s.1));
+    unsafe {
+        *out = abi::RecipeInfo { time: r.time, inputs: r.inputs.len() as u32, outputs: r.outputs.len() as u32, flags, width, height }
+    };
     1
+}
+
+/// Input `index` of a recipe and how many: a shaped one's cells (all of them), else its inputs.
+fn recipe_cell(r: &registry::Recipe, index: u32) -> Option<(&registry::Ingredient, u32)> {
+    match &r.shaped {
+        Some((_, _, cells)) => cells.get(index as usize).map(|c| (c, 1)),
+        None => r
+            .inputs
+            .get(index as usize)
+            .map(|i| (i, r.input_counts.get(index as usize).copied().unwrap_or(1))),
+    }
+}
+
+unsafe extern "C" fn recipe_input(kind: Str, recipe: u32, index: u32, out: *mut abi::RecipeInput) -> u32 {
+    use abi::recipe_input_kind as k;
+    use registry::Ingredient;
+    let c = content();
+    let Some((ing, count)) = recipe_at(kind, recipe).and_then(|r| recipe_cell(r, index)) else { return 0 };
+    let first_tagged = |t: u32| {
+        (1..c.items.len() as u32)
+            .find(|&i| c.components.has(crate::components::ITEM, i, t))
+            .unwrap_or(0)
+    };
+    let (what, shown) = match ing {
+        Ingredient::Empty => (k::EMPTY, 0),
+        Ingredient::Item(i) => (k::ITEM, *i),
+        Ingredient::Tag(t) => (k::TAG, first_tagged(*t)),
+        Ingredient::Any(list) => (k::ANY, list.first().copied().unwrap_or(0)),
+        Ingredient::Fluid(_) => (k::FLUID, 0),
+    };
+    unsafe { *out = abi::RecipeInput { kind: what, count, shown } };
+    1
+}
+
+unsafe extern "C" fn recipe_accepts(kind: Str, recipe: u32, index: u32, item: u32) -> u32 {
+    let c = content();
+    recipe_at(kind, recipe)
+        .and_then(|r| recipe_cell(r, index))
+        .is_some_and(|(ing, _)| !matches!(ing, registry::Ingredient::Empty) && ing.matches(item, &c.components)) as u32
 }
 
 unsafe extern "C" fn recipe_output(kind: Str, recipe: u32, index: u32, stack: *mut ItemStack, chance: *mut f32) -> u32 {
@@ -1673,6 +1725,9 @@ unsafe extern "C" fn reg_scatter(r: *mut abi::Registrar, d: *const abi::ScatterD
             reach: d.reach,
             density: d.density.as_str().to_string(),
             shape: d.shape,
+            thin: d.thin.as_slice().to_vec(),
+            thin_keep: d.thin_keep,
+            thin_biomes: d.thin_biomes.as_str().to_string(),
         });
     }
 }
@@ -1911,7 +1966,7 @@ unsafe extern "C" fn reg_liquid_reaction(r: *mut abi::Registrar, d: *const abi::
 unsafe extern "C" fn liquid_of(state: u32) -> u32 {
     try_content()
         .and_then(|c| c.states.get(state as usize))
-        .and_then(|s| s.liquid)
+        .and_then(|s| s.liquid_in())
         .map_or(u32::MAX, |l| l as u32)
 }
 
@@ -2252,6 +2307,48 @@ unsafe extern "C" fn set_air(
         };
         d.events
             .push(crate::server::DimEvent::SetAir { dim: d.id, air, heading });
+    }
+}
+
+unsafe extern "C" fn content_tint(biome: u32, kind: Str) -> u32 {
+    let c = content();
+    let kn = unsafe { kind.as_str() };
+    let Some(ki) = c.tint_kinds.iter().position(|x| x.0 == kn) else { return 0 };
+    c.biomes
+        .get(biome as usize)
+        .and_then(|b| b.tints.get(ki).copied())
+        .unwrap_or(c.tint_kinds[ki].1)
+}
+
+unsafe extern "C" fn set_biome_tints(w: *mut abi::WorldCtx, biomes: *const u32, kinds: *const Str, colors: *const u32, len: u32) {
+    unsafe {
+        let d = dim(w);
+        let c = content();
+        let k = c.tint_kinds.len();
+        // The whole table, biome by biome (the content's colors where not named): small, and the
+        // client blends from it as it does from the content's.
+        let tints = if len == 0 || c.biomes.is_empty() {
+            Vec::new()
+        } else {
+            let mut table: Vec<u32> = c
+                .biomes
+                .iter()
+                .flat_map(|b| b.tints.iter().copied())
+                .collect();
+            let n = len as usize;
+            let (b, kd, col) =
+                (std::slice::from_raw_parts(biomes, n), std::slice::from_raw_parts(kinds, n), std::slice::from_raw_parts(colors, n));
+            for i in 0..n {
+                let (bi, kn) = (b[i] as usize, kd[i].as_str());
+                match (bi < c.biomes.len(), c.tint_kinds.iter().position(|x| x.0 == kn)) {
+                    (true, Some(ki)) => table[bi * k + ki] = col[i] & 0xff_ffff,
+                    _ => misuse("set_biome_tints", || format!("no biome {bi} or tint kind {kn}")),
+                }
+            }
+            table
+        };
+        d.events
+            .push(crate::server::DimEvent::SetTints { dim: d.id, tints });
     }
 }
 

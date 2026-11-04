@@ -5,6 +5,7 @@ mod audit;
 mod bodies;
 mod extend;
 mod gameplay;
+mod held;
 mod liquids;
 mod looks;
 mod packages;
@@ -128,6 +129,7 @@ pub fn all() -> Vec<TestDef> {
         gameplay::food,
         gameplay::every_food_has_nutrition,
         gameplay::clothes_and_stew,
+        gameplay::calendar_follows_time,
         gameplay::drop_and_pickup,
         gameplay::sounds,
         extend::events_batched,
@@ -140,6 +142,11 @@ pub fn all() -> Vec<TestDef> {
         extend::facing_placement,
         liquids::mod_liquid_bucket,
         liquids::mod_sand_soil,
+        held::held_water_place,
+        held::held_water_break,
+        held::held_water_piston,
+        held::held_water_swim,
+        held::held_water_mesh,
         sync::menu_sync,
         visual::held_items,
         visual::hide_hud,

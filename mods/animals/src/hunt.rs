@@ -30,9 +30,8 @@ static WARY: Component<u64> = Component::named("animal_wary");
 /// a dust storm close both in (`base_api::sight`).
 const LOOK: f64 = 16.0;
 const WATCH: f64 = 10.0;
-/// It hunts under this share of its food, until this full (as foraging, `forage.rs`).
-const HUNGRY: f32 = 0.6;
-const FULL: f32 = 0.95;
+/// It hunts under this share of its food, until this full (as foraging, `needs`).
+use animals_core::needs::{FULL, HUNGRY};
 /// Ticks: a chase it gives up, between looks, and a flight.
 const GIVE_UP: u64 = 600;
 const LOOK_EVERY: u64 = 60;
