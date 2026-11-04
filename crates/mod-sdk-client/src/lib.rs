@@ -435,7 +435,6 @@ pub mod hud_anchor {
     pub const HOTBAR_RIGHT: &str = "hotbar_right";
     pub const ABOVE_HOTBAR: &str = "above_hotbar";
     pub const UNDER_CROSSHAIR: &str = "under_crosshair";
-    pub const CENTER: &str = "center";
 }
 
 /// An item's full name, to show it.

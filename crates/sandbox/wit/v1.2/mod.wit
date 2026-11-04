@@ -475,8 +475,8 @@ interface client {
 /// callback's number, as `registry` does.
 interface client-registry {
     /// A HUD element `<package>:<name>`, at `anchor` (Weft's `hud_anchor`: `top_left`,
-    /// `top_right`, `bottom_left`, `bottom_right`, `hotbar_left`, `hotbar_right`,
-    /// `under_crosshair`, `center`), `order` within it. Its parts come from `client-hooks.build`.
+    /// `top_right`, `bottom_left`, `bottom_right`, `hotbar`, `hotbar_left`, `hotbar_right`,
+    /// `above_hotbar`, `under_crosshair`), `order` within it. Its parts come from `client-hooks.build`.
     hud-element: func(name: string, anchor: string, order: s32) -> result<u32, string>;
     /// A screen `<package>:<name>`, its parts from `client-hooks.build`; `pauses` stops a world
     /// played alone while it shows.

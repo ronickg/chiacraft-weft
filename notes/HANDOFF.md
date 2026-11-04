@@ -388,8 +388,17 @@ component through the same byte buckets (`sandboxed::client_component`). The off
 newer half's; "has code" means either half. Sample: `examples/wasm/bell-client` (a `hud_badge`
 with the ring count, an `hud_xp` bar with the count inside it through `at`, the key N), with the
 bell's server half now sending `bell:rings`. Tests `crates/sandbox/tests/client.rs`.
+Slice 5, personal mods (built; not yet seen in the game): `mods/packages/src/personal.rs`. The
+world rule `packages:personal_mods` (choice off/client, off by default, a world rule so it is on
+Create World and synced to players); the player's own client halves from `<run dir>/personal/`
+(up to 16, loaded on the first client frame); slots registered the same in every game so the
+content hash is unchanged: a HUD element per anchor (`personal_<anchor>`, order 1000), the
+screen `packages:personal`, keys `packages:personal_1..8` (Shift+Alt+1..8), and a client frame
+that runs their frames and tells the player once per world which are off or on. A personal mod's
+`Half` has its own `Words` (from its `assets/lang`, the player's language over English), and no
+channels or components. Sample `examples/personal/clock` (from `examples/wasm/clock`).
 Left: the `required` flag (agreed: at the next `package.toml` change), callcost for questions
-and chain steps, personal mods per world (slice 5), `/mods` (slice 6).
+and chain steps, `/mods` (slice 6).
 
 ## Side mods
 

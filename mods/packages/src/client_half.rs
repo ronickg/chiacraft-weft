@@ -17,10 +17,25 @@ type Named<T> = (String, &'static T);
 
 /// The client half of one package in one content build: its instance, and the channels and
 /// screens it names, as the SDK's handles.
-struct Half {
-    inst: Shared,
+pub(crate) struct Half {
+    pub(crate) inst: Shared,
     channels: Mutex<Vec<Named<Channel<Vec<u8>>>>>,
     screens: Vec<(String, &'static Screen)>,
+    /// A personal mod (slice 5): its own lines, worded here from its `assets/lang` (it is no
+    /// content, so the game's language files don't have them), and no channels or components.
+    pub(crate) personal: Option<crate::personal::Words>,
+}
+
+impl Half {
+    /// A personal mod's client half.
+    pub(crate) fn personal(m: Arc<ClientMod>, words: crate::personal::Words) -> Half {
+        Half {
+            inst: Arc::new(Mutex::new(ClientInstance::new(m))),
+            channels: Mutex::new(Vec::new()),
+            screens: Vec::new(),
+            personal: Some(words),
+        }
+    }
 }
 
 impl Half {
@@ -52,7 +67,12 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
             _ => None,
         })
         .collect();
-    let half = Arc::new(Half { inst: Arc::new(Mutex::new(ClientInstance::new(m.clone()))), channels: Mutex::new(Vec::new()), screens });
+    let half = Arc::new(Half {
+        inst: Arc::new(Mutex::new(ClientInstance::new(m.clone()))),
+        channels: Mutex::new(Vec::new()),
+        screens,
+        personal: None,
+    });
     for (i, hook) in m.hooks().iter().enumerate() {
         let cb = i as u32;
         let h = half.clone();
@@ -106,11 +126,11 @@ pub fn load(r: &mut Registry, package: &str, dir: &std::path::Path) -> Result<()
     Ok(())
 }
 
-fn lock(h: &Half) -> std::sync::MutexGuard<'_, ClientInstance> {
+pub(crate) fn lock(h: &Half) -> std::sync::MutexGuard<'_, ClientInstance> {
     h.inst.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-fn game(c: Client, act: bool, h: &Arc<Half>) -> Box<dyn ClientGame> {
+pub(crate) fn game(c: Client, act: bool, h: &Arc<Half>) -> Box<dyn ClientGame> {
     Box::new(PlayerGame { c, act, half: h.clone() })
 }
 
@@ -150,6 +170,14 @@ fn style(p: &Part) -> S {
     out
 }
 
+/// A line's key and arguments as the UI takes them: a personal mod's worded here, as one text.
+fn worded(h: &Half, key: &str, a: &[WArg]) -> (String, Vec<WArg>) {
+    match h.personal.as_ref().and_then(|w| w.line(key, a)) {
+        Some(text) => ("packages.line".to_string(), vec![WArg::Text(text)]),
+        None => (key.to_string(), a.to_vec()),
+    }
+}
+
 /// A part's arguments as the SDK's (texts borrowed from the part).
 fn args(a: &[WArg]) -> Vec<Arg<'_>> {
     a.iter()
@@ -164,7 +192,7 @@ fn args(a: &[WArg]) -> Vec<Arg<'_>> {
         .collect()
 }
 
-fn build(ui: &mut Ui, h: &Arc<Half>, cb: u32) {
+pub(crate) fn build(ui: &mut Ui, h: &Arc<Half>, cb: u32) {
     let view = ui.client();
     let parts = lock(h).build(game(view.client(), false, h), cb);
     let mut i = 0;
@@ -192,11 +220,15 @@ fn replay(ui: &mut Ui, parts: &[Part], i: usize, h: &Arc<Half>) -> usize {
         PartKind::Container if p.style.row => ui.row(s, children),
         PartKind::Container => ui.column(s, children),
         PartKind::Panel => ui.panel(class(&p.class), s, children),
-        PartKind::Text => ui.text_styled(s, &p.text, &args(&p.args)),
+        PartKind::Text => {
+            let (key, a) = worded(h, &p.text, &p.args);
+            ui.text_styled(s, &key, &args(&a))
+        }
         PartKind::TextBind => {
             let h = h.clone();
             ui.text_bind_styled(s, move |view, out| {
                 let (key, a) = lock(&h).text(game(view.client(), false, &h), bind);
+                let (key, a) = worded(&h, &key, &a);
                 out.set(&key, &args(&a));
             });
         }
@@ -216,8 +248,9 @@ fn replay(ui: &mut Ui, parts: &[Part], i: usize, h: &Arc<Half>) -> usize {
         }
         PartKind::Spacer => ui.spacer(),
         PartKind::Button => {
+            let (key, a) = worded(h, &p.text, &p.args);
             let h = h.clone();
-            ui.button_args(&p.text, &args(&p.args), s, move |view| lock(&h).click(game(view.client(), true, &h), bind));
+            ui.button_args(&key, &args(&a), s, move |view| lock(&h).click(game(view.client(), true, &h), bind));
         }
     }
     after
@@ -263,6 +296,10 @@ impl ClientGame for PlayerGame {
         self.c.view().creative()
     }
     fn component(&mut self, name: &str) -> Option<Vec<u8>> {
+        // A personal mod has no components of its own in any world.
+        if self.half.personal.is_some() {
+            return None;
+        }
         // The player's own value, of the size its bucket has (`sandboxed::Comp`).
         crate::sandboxed::client_component(self.c, name)
     }
@@ -277,10 +314,15 @@ impl ClientGame for PlayerGame {
         self.act
     }
     fn send(&mut self, channel: &str, data: &[u8]) {
-        self.c.send(self.half.channel(channel), &data.to_vec());
+        // A personal mod has no server half to send to.
+        if self.half.personal.is_none() {
+            self.c.send(self.half.channel(channel), &data.to_vec());
+        }
     }
     fn open_screen(&mut self, name: &str) {
-        if let Some((_, s)) = self.half.screens.iter().find(|(n, _)| n == name) {
+        if self.half.personal.is_some() {
+            crate::personal::open_screen(self.c, &self.half, name);
+        } else if let Some((_, s)) = self.half.screens.iter().find(|(n, _)| n == name) {
             self.c.open_screen(s);
         }
     }
@@ -288,7 +330,8 @@ impl ClientGame for PlayerGame {
         self.c.close_screen();
     }
     fn show(&mut self, key: &str, args: &[WArg]) {
-        crate::show_line(&self.c, crate::sandboxed::line_text(key, args));
+        let (key, args) = worded(&self.half, key, args);
+        crate::show_line(&self.c, crate::sandboxed::line_text(&key, &args));
     }
 
     fn block_name(&mut self, state: u32) -> String {

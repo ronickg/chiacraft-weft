@@ -11,6 +11,7 @@
 //! `sandboxed`.
 
 mod client_half;
+mod personal;
 mod sandboxed;
 
 use std::collections::VecDeque;
@@ -33,6 +34,8 @@ fn init(r: &mut Registry) {
     // A sandboxed mod's line for this player goes through a command of this mod's own, whose
     // reply the client shows in its own language.
     r.client_packet(&sandboxed::SAY, show_line);
+    // Personal mods (slice 5): the world rule and the shared slots their parts and keys use.
+    personal::register(r);
     r.client_command("packages_say", "", |cmd| {
         let Some(text) = LINES.lock().unwrap_or_else(|e| e.into_inner()).pop_front() else { return };
         sandboxed::with_line(&text, |key, args| cmd.reply(key, args));

@@ -104,9 +104,12 @@ nested callback skips the mod (it is busy) rather than re-entering the store.
    (Weft's UI parts as data) the game replays into its own UI, so mods draw with the UI redo's
    kit; bindings may only read. Downloaded on join like the rest; the offer's API is the newer
    half's. Sample: the bell's client half.
-5. *Personal mods per world*: a player's own client-half packages (minimap, tweaks), installed by
-   them, never downloaded; each world's owner allows them or not (`world.txt`), and the join tells
-   the player which of theirs are off there.
+5. *Personal mods per world* (built; Ronald: "Yes, as planned"): a player's own client halves
+   in `<run dir>/personal/<name>`, never downloaded; the world rule `packages:personal_mods` (off
+   by default, on Create World) allows them, and joining tells the player which are off. As they
+   must not change the content the join checks, they run through slots the `packages` mod
+   registers the same in every game: a HUD element per anchor, one screen, eight keys; their
+   lines are worded from their own `assets/lang`. Sample `examples/personal/clock`.
 6. *Operations*: `/mods` (which run, their cost per tick, strikes, resume a stopped one),
    ahead-of-time compiled components cached in the store, per-tick budgets across all mods.
 

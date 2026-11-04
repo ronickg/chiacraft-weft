@@ -33,18 +33,8 @@ use bindings::chiacraft::mods::{client as wclient, client_registry};
 
 /// Parts one build may have, and the anchors a HUD element may take.
 pub const PARTS: usize = 512;
-pub const ANCHORS: &[&str] = &[
-    "top_left",
-    "top_right",
-    "bottom_left",
-    "bottom_right",
-    "hotbar",
-    "hotbar_left",
-    "hotbar_right",
-    "above_hotbar",
-    "under_crosshair",
-    "center",
-];
+pub const ANCHORS: &[&str] =
+    &["top_left", "top_right", "bottom_left", "bottom_right", "hotbar", "hotbar_left", "hotbar_right", "above_hotbar", "under_crosshair"];
 const SHOWS: u32 = 8;
 const SENDS: u32 = 32;
 const HOOKS: usize = 128;

@@ -132,6 +132,25 @@ shows are translation keys from the package's `assets/lang`; key names too (`key
 asking for it on `bell:ping`. Build it like a server half; `componentize` treats an output named
 `client.wasm` as a client half.
 
+## Personal mods
+
+A player's own client halves, never downloaded and never shared: a minimap, a clock, a tweak.
+Each is a folder like a package's with `package.toml` and `code/client.wasm` (and its
+`assets/lang`), in `<run dir>/personal/<name>/`. `examples/personal/clock` is one.
+
+Each world's owner decides whether they run there: the world rule **Personal Mods** (Off or
+Client Halves; off by default), on Create World and in the world's settings, or `/rule
+personal_mods 1`. Where it is off they don't run, and on joining the player is told which of
+theirs are off ("Your personal mods are off in this world: clock").
+
+A personal mod is written like any client half, with these differences, because it must not
+change what the world and the player's game agree on (the join checks the content's hash):
+- its HUD elements show through shared slots, one per anchor, in their order;
+- its screens open in one shared screen;
+- its keys take the slots Personal Key 1 to 8 in the order they are registered (Shift+Alt+1 to
+  8 unless rebound in Controls), not their own default bindings;
+- it has no server half, channels or components; its lines come from its own `assets/lang`.
+
 ## Limits
 
 | What | Limit |
