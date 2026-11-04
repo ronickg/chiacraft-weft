@@ -1331,6 +1331,7 @@ version = "0.1.0"
 dependencies = [
  "chiacraft-wallet",
  "log",
+ "parking_lot 0.13.0",
 ]
 
 [[package]]
@@ -1356,6 +1357,24 @@ dependencies = [
  "blake3",
  "wasmtime",
  "wit-component 0.239.0",
+]
+
+[[package]]
+name = "chiacraft-sponsor"
+version = "0.1.0"
+dependencies = [
+ "chia-protocol",
+ "chia-puzzle-types",
+ "chia-sdk-driver",
+ "chia-sdk-types",
+ "chiacraft-wallet",
+ "iroh",
+ "log",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tokio",
+ "toml 1.1.8+spec-1.1.0",
 ]
 
 [[package]]
@@ -8351,6 +8370,7 @@ dependencies = [
  "bytemuck",
  "chiacraft-account",
  "chiacraft-packages",
+ "chiacraft-wallet",
  "crossbeam-channel",
  "glam 0.34.1",
  "iroh",
