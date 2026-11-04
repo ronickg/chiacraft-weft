@@ -200,6 +200,10 @@ impl Settings {
     pub fn server_port(&self) -> u16 {
         number("core:server_port") as u16
     }
+    /// Every connection through the relay only (`core:net_relay_only`, a test setting).
+    pub fn net_relay_only(&self) -> bool {
+        number("core:net_relay_only") != 0.0
+    }
     /// Extra iroh relay URLs; empty uses the public defaults.
     pub fn relays(&self) -> Vec<String> {
         list("core:relays")
