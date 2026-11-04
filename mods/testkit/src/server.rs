@@ -529,6 +529,23 @@ const OPS: &[(&str, &str, Run)] = &[
         let list: Vec<String> = biomes.iter().map(|(n, k)| format!("{n}={k}")).collect();
         Ok(format!("{} | crystals {in_cave} {elsewhere}", list.join(" ")))
     }),
+    ("turn", "<r:float> <yaw:float>", |w, cmd, player, me| {
+        // Every creature within `r` of the player faces `yaw` degrees (0 faces -z, 90 -x): side-on
+        // shots and aimed hits on long animals (the hitbox check, `animals_core::bodies`).
+        let r = cmd.float("r").ok_or("missing r")?;
+        let yaw = (cmd.float("yaw").ok_or("missing yaw")? as f32).to_radians();
+        let mut n = 0;
+        for id in w.near([me[0] as f64 + 0.5, me[1] as f64, me[2] as f64 + 0.5], r, None) {
+            if id != player
+                && let Some(mut st) = w.entity(id)
+            {
+                st.yaw = yaw;
+                w.set_entity(id, &st);
+                n += 1;
+            }
+        }
+        Ok(n.to_string())
+    }),
     ("drop", "<item:item> <pos:pos> [count:int]", |w, cmd, _, _| {
         // One dropped stack there (food for animals to find: `animals` forage.rs).
         let p = pos(cmd, "pos")?;

@@ -25,7 +25,7 @@ pub fn init(r: &mut Registry) {
         &[("_sit", "wolf_sit"), ("_lie", "wolf_lie")],
     );
     r.entity(&WOLF)
-        .size(0.6, 0.85)
+        .size(animals_core::bodies::of("wolf").0, animals_core::bodies::of("wolf").1)
         .health(30.0)
         .speed(5.5)
         .attack_damage(6.0)

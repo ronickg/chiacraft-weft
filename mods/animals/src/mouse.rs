@@ -12,7 +12,6 @@ pub(crate) static WOOD_MOUSE: Entity = Entity::named("wood_mouse");
 static BODY: Body = Body {
     model: "mouse",
     texture: "mouse/mouse",
-    size: (0.2, 0.15),
     health: 2.0,
     // Scurrying about, darting off at about 3 m/s.
     speed: 3.0,

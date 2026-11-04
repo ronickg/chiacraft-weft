@@ -14,7 +14,6 @@ pub(crate) static GOBIPTERYX: Entity = Entity::named("gobipteryx");
 static WINGS: Wings = Wings {
     model: "early_bird",
     texture: "early_bird/early_bird",
-    size: (0.35, 0.35),
     fly_size: (0.7, 0.25),
     health: 6.0,
     // No record: a crow-sized bird's walk and flight (est.).

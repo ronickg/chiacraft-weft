@@ -15,7 +15,6 @@ pub(crate) static ARCTIC_FOX: Entity = Entity::named("arctic_fox");
 static BODY: Body = Body {
     model: "fox",
     texture: "fox/fox",
-    size: (0.45, 0.6),
     health: 10.0,
     // Trotting about, galloping after prey or away from a wolf.
     speed: 4.5,

@@ -738,3 +738,7 @@ outline = 0.72
 
 [items.hand_drill]  # outline 0.47 -> 0.40 (pale dry wood)
 outline = 0.86
+
+[items.roasted_cacao]  # darker chocolate than the dried beans, less orange: sat 0.79 -> ~0.6, luma 0.25 -> ~0.22
+saturation = 0.75
+gain = 0.9

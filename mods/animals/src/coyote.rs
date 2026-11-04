@@ -14,7 +14,6 @@ pub(crate) static COYOTE: Entity = Entity::named("coyote");
 static BODY: Body = Body {
     model: "coyote",
     texture: "coyote/coyote",
-    size: (0.55, 0.8),
     health: 18.0,
     // Trotting far, running at up to 65 km/h.
     speed: 5.0,

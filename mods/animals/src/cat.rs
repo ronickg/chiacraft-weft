@@ -22,7 +22,7 @@ pub fn init(r: &mut Registry) {
         &[("_sit", "cat_sit"), ("_lie", "cat_lie")],
     );
     r.entity(&CAT)
-        .size(0.35, 0.44)
+        .size(animals_core::bodies::of("cat").0, animals_core::bodies::of("cat").1)
         .health(6.0)
         .speed(3.0)
         .attack_damage(1.0)

@@ -12,7 +12,6 @@ pub(crate) static PRISCAGAMA: Entity = Entity::named("priscagama");
 static BODY: Body = Body {
     model: "lizard",
     texture: "lizard/lizard",
-    size: (0.2, 0.1),
     health: 2.0,
     // A dash of a few metres a second (est., as agamas').
     speed: 3.5,
