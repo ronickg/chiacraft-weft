@@ -558,7 +558,10 @@ fn water(in: VOut, albedo: vec4<f32>, see_through: bool) -> vec4<f32> {
     let pattern = mix(1.0, clamp(luma(albedo.rgb) / 0.55, 0.8, 1.2), 1.0 - smoothstep(8.0, 24.0, in.dist));
     // The biome's tint counts for more where it is deep; the shallows keep their own color.
     let shallow = vec3(0.07, 0.27, 0.20);
-    let deep = vec3(0.010, 0.040, 0.036);
+    // Deep water a murky teal, not near black: the light scattered back from inside it (Bliss's
+    // "dirt" scatter) keeps it lit looking down (Tester 2's COL5 shots: deep water at 0.35 mean
+    // brightness, a dark navy).
+    let deep = vec3(0.022, 0.072, 0.066);
     let deepness = 1.0 - exp(-0.35 * depth);
     let scatter = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.15, 0.35, deepness)) * pattern * lit;
     // How much of the bottom shows: the way through the water to it, longer at a slant; never all
