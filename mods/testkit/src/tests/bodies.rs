@@ -587,6 +587,9 @@ pub async fn neutral_mobs(t: T) -> R {
             .is_some_and(|e| e.health < super::max_health(t) - 0.5)
     })
     .await?;
+    // Gone before the next test, and the player healed: a sentry left beside them could kill them.
+    t.op(&format!("remove {sentry}")).await?;
+    t.op("heal").await?;
     Ok(())
 }
 
