@@ -34,8 +34,8 @@ chat /tk put me 0 stick
 look 0 40
 wait 2
 shot moon_1c_full_sky.png
-# 2. The full moon low in the west before dawn (day 8, 21500: 03:30; 23000 is already day in summer).
-chat /time set 213500
+# 2. The full moon low in the west late in the night (day 8, 02:00: later it is already light in summer).
+chat /time set 212000
 wait 4
 look 90 -8
 wait 2
@@ -44,8 +44,8 @@ chat /tk put me 0 torch
 wait 2
 shot moon_2b_full_low_torch.png
 chat /tk put me 0 stick
-# 3. A thin waning crescent before dawn (day 3, 21000: 03:00).
-chat /time set 93000
+# 3. A thin waning crescent late in the night (day 3, 02:00).
+chat /time set 92000
 wait 4
 look 0 -12
 wait 2
