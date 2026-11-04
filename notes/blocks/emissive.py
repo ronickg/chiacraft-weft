@@ -20,16 +20,20 @@ ORES = {
     "diamond_ore": (lambda r, g, b: (b - r > 35) & (g - r > 25), (0.30, 0.65)),
     "redstone_ore": (lambda r, g, b: (r - g > 60) & (r - b > 40), (0.25, 0.55)),
 }
-# plants: the pixels that glow (the cap, the flecks, the crystal), and a faint rest (stems, the lichen's crust)
+# plants: the pixels that glow (threads, caps, flecks), and a faint rest (the mushroom stems)
 # that glows at FAINT so the shape shows in the dark
 FAINT = 0.12
+NONE = lambda r, g, b, a: np.zeros_like(a, bool)
 PLANTS = {
-    "foxfire": (lambda r, g, b, a: (a > 0) & (g > 120) & (g >= r) & (g - b > 25),
-                lambda r, g, b, a: (a > 0) & (g > 120) & (abs(g - b) <= 25), (0.35, 0.80)),
+    # Plants' names and shapes (notes/NIGHT_GLOW.md): only the threads, the caps, the gold flecks glow
+    "foxfire": (lambda r, g, b, a: (a > 0) & ((r + g + b) / 3 > 120) & (b - r > 8), NONE, (0.30, 0.70)),
+    "glow_mycena": (lambda r, g, b, a: (a > 0) & (g > 120) & (g >= r) & (g - b > 25),
+                    lambda r, g, b, a: (a > 0) & (g > 120) & (abs(g - b) <= 25), (0.35, 0.80)),
+    "goblins_gold": (lambda r, g, b, a: (a > 0) & (g > 150) & (r > 120) & (g - b > 60), NONE, (0.35, 0.75)),
+    # round 1, approved by Ronald (glow_mycena_small uses glow_mycena's rule)
     "glow_lichen": (lambda r, g, b, a: (a > 0) & (b > 110) & (g > 120) & (b - r > 25),
                     lambda r, g, b, a: (a > 0) & (g > 90) & (g - r > 5), (0.40, 0.80)),
-    "glow_crystal": (lambda r, g, b, a: (a > 0) & ((r + g + b) / 3 > 120) & ((b - r > 15) | ((r + g + b) / 3 > 200)),
-                     lambda r, g, b, a: np.zeros_like(a, bool), (0.15, 0.75)),
+    "glow_crystal": (lambda r, g, b, a: (a > 0) & ((r + g + b) / 3 > 120) & ((b - r > 15) | ((r + g + b) / 3 > 200)), NONE, (0.15, 0.75)),
 }
 
 
