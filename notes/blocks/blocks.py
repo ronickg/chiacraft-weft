@@ -42,6 +42,8 @@ KINDS = {
     "framed": ("A 1-px bevelled frame around the face, light on the top and left of the frame, shadow on the bottom and right.", False, False, False),
     "face": ("One picture filling the whole face, seen straight on.", False, False, False),
     "leaves": ("Overlapping individual leaves 3-5 px long, with gaps of flat solid magenta covering 25-35% of the tile, tileable.", False, True, True),
+    # Leaves with flowers or fruit drawn in: cut out like leaves but kept in their own colours (no tint).
+    "fleaves": ("Overlapping individual leaves 3-5 px long, with gaps of flat solid magenta covering 25-35% of the tile, tileable.", False, True, False),
     "plant": (PLANT, False, True, False),
     "tplant": (PLANT + " Light green, it is tinted by the biome in the game.", False, True, True),
     "crop": ("A row of stalks rising from the bottom edge that reads well when the texture is placed 4 times in a # shape. " + PLANT, False, True, False),
@@ -93,7 +95,7 @@ def like_sheet(names):
     s = 192
     sheet = Image.new("RGB", (len(names) * s, s), (255, 0, 255))
     for i, n in enumerate(names):
-        path = next((os.path.join(d, n + ".png") for d in MODS.values() if os.path.exists(os.path.join(d, n + ".png"))),
+        path = n if os.path.isabs(n) else next((os.path.join(d, n + ".png") for d in MODS.values() if os.path.exists(os.path.join(d, n + ".png"))),
                     os.path.join(TILES, n + ".png"))
         t = Image.open(path).convert("RGBA").resize((s, s), Image.NEAREST)
         sheet.paste(t, (i * s, 0), t)
@@ -111,7 +113,7 @@ def gen(rows):
         refs += ["-i", like_sheet(like)]
         style = style.replace("Match their pixel size, shading and colour.",
                               "Match their pixel size, shading and colour. The third image shows textures already in the game "
-                              f"({', '.join(like)}, left to right): match their pixel size, outline and shading.")
+                              f"({', '.join(os.path.basename(n).split('.')[0] for n in like)}, left to right): match their pixel size, outline and shading.")
 
     def one(row):
         image, entries = row
@@ -240,7 +242,7 @@ def preview(rows, name):
         flat = Image.new("RGBA", (192, 192), (156, 198, 224, 255) if KINDS[e["kind"]][2] else (0, 0, 0, 0))
         flat.alpha_composite(t.resize((192, 192), Image.NEAREST))
         sheet.paste(flat, (x, y), flat)
-        if KINDS[e["kind"]][2] and e["kind"] != "leaves":
+        if KINDS[e["kind"]][2] and e["kind"] not in ("leaves", "fleaves"):
             if ground:
                 sheet.paste(ground, (x + 200, y + a // 2), ground)
             s = t.resize((int(1.4 * a), int(1.4 * a)), Image.NEAREST)
