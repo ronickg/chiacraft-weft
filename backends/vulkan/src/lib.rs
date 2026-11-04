@@ -473,13 +473,7 @@ impl VulkanBackend {
                 allocation_sizes: Default::default(),
             })
             .map_err(err("GPU allocator"))?;
-            let mem = instance.get_physical_device_memory_properties(pdev);
-            let spill = (0..mem.memory_type_count)
-                .filter(|&i| {
-                    let heap = mem.memory_heaps[mem.memory_types[i as usize].heap_index as usize];
-                    !heap.flags.contains(vk::MemoryHeapFlags::DEVICE_LOCAL)
-                })
-                .fold(0, |m, i| m | 1 << i);
+            let spill = spill_types(&instance.get_physical_device_memory_properties(pdev));
 
             let swapchain_fn = khr::swapchain::Device::new(&instance, &device);
             let push_fn = khr::push_descriptor::Device::new(&instance, &device);
@@ -1134,6 +1128,17 @@ fn depth_range() -> vk::ImageSubresourceRange {
         base_array_layer: 0,
         layer_count: 1,
     }
+}
+
+/// The memory types off the GPU's own heaps, as a mask of their indices: system memory on a
+/// discrete GPU, none where the GPU shares the system's memory.
+fn spill_types(mem: &vk::PhysicalDeviceMemoryProperties) -> u32 {
+    (0..mem.memory_type_count)
+        .filter(|&i| {
+            let heap = mem.memory_heaps[mem.memory_types[i as usize].heap_index as usize];
+            !heap.flags.contains(vk::MemoryHeapFlags::DEVICE_LOCAL)
+        })
+        .fold(0, |m, i| m | 1 << i)
 }
 
 /// Allocates for `desc`. When the GPU's memory is full, a GPU-only allocation goes to system memory
@@ -2052,5 +2057,41 @@ impl Drop for VulkanBackend {
             }
             self.instance.destroy_instance(None);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn memory(heaps: &[vk::MemoryHeapFlags], types: &[(vk::MemoryPropertyFlags, u32)]) -> vk::PhysicalDeviceMemoryProperties {
+        let mut mem = vk::PhysicalDeviceMemoryProperties {
+            memory_heap_count: heaps.len() as u32,
+            memory_type_count: types.len() as u32,
+            ..Default::default()
+        };
+        for (i, &flags) in heaps.iter().enumerate() {
+            mem.memory_heaps[i] = vk::MemoryHeap { size: 1 << 30, flags };
+        }
+        for (i, &(property_flags, heap_index)) in types.iter().enumerate() {
+            mem.memory_types[i] = vk::MemoryType { property_flags, heap_index };
+        }
+        mem
+    }
+
+    #[test]
+    fn spill_goes_to_system_memory_only() {
+        use vk::MemoryPropertyFlags as P;
+        let host = P::HOST_VISIBLE | P::HOST_COHERENT;
+        // A discrete GPU (NVIDIA's layout): its own heap, system memory, and the small BAR heap
+        // that is device local too.
+        let discrete = memory(
+            &[vk::MemoryHeapFlags::DEVICE_LOCAL, vk::MemoryHeapFlags::empty(), vk::MemoryHeapFlags::DEVICE_LOCAL],
+            &[(P::empty(), 1), (P::DEVICE_LOCAL, 0), (host, 1), (host | P::HOST_CACHED, 1), (P::DEVICE_LOCAL | host, 2)],
+        );
+        assert_eq!(spill_types(&discrete), 0b01101);
+        // Shared memory (Apple): every heap is the GPU's, so nothing to spill to.
+        let unified = memory(&[vk::MemoryHeapFlags::DEVICE_LOCAL], &[(P::DEVICE_LOCAL, 0), (P::DEVICE_LOCAL | host, 0)]);
+        assert_eq!(spill_types(&unified), 0);
     }
 }
