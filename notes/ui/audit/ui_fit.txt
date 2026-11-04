@@ -1,0 +1,46 @@
+# UI fit (Ronald: "the menu is too big on my small screen, it should always fit"): the biggest
+# screens at the window size given (--size), automatic GUI scale. Fresh world name each run.
+loaded
+idle
+chat /tk mode survival
+chat /tk time 6000
+wait 2
+press core:inventory
+wait 1.5
+shot fit_inventory.png
+key Escape
+wait 0.5
+chat /tk set ~2 ~1 ~ base:chest
+chat /tk put ~2 ~1 ~ 0 base:oak_log 32
+chat /tk menu base:chest ~2 ~1 ~
+wait 1.5
+shot fit_chest.png
+key Escape
+wait 0.5
+chat /tk spawn animals:grey_wolf ~ ~ ~-4
+wait 2
+look 0 -10
+chat /animal tame
+wait 1
+chat /animal show
+wait 1.5
+shot fit_animal.png
+key Escape
+wait 0.5
+press base:stats
+wait 1.5
+shot fit_stats.png
+key Escape
+wait 0.5
+leave
+wait 2
+shot fit_title.png
+tap core:title text:Singleplayer
+wait 1.5
+shot fit_worlds.png
+key Escape
+wait 1
+tap core:title text:Settings
+wait 1.5
+shot fit_settings.png
+quit
