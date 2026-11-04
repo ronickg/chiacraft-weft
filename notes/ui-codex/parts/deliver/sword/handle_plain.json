@@ -1,0 +1,9 @@
+{
+ "kind": "base:sword",
+ "layer": "hilt",
+ "override": true,
+ "regions": [
+  "hilt"
+ ],
+ "steps": 8
+}

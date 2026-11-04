@@ -228,3 +228,54 @@ def main(which=("axe", "sword")):
 
 if __name__ == "__main__":
     main(sys.argv[1:] or ("axe", "sword"))
+
+
+# ---------------------------------------------------------------- v3: heads stay where they're drawn
+
+def seams_only(rgba, lab, own):
+    """Soften the dark lines between parts only where two different drawings meet (`own` False
+    marks pixels from the handle's drawing next to the head's); the hand-painted outline stays."""
+    out = rgba.astype(float)
+    m = lab > 0
+    L = parts.lum(out[..., :3])
+    lp = np.pad(lab, 1)
+    nb = [lp[:-2, 1:-1], lp[2:, 1:-1], lp[1:-1, :-2], lp[1:-1, 2:]]
+    pad = np.pad(m, 1)
+    edge = m & ~(pad[:-2, 1:-1] & pad[2:, 1:-1] & pad[1:-1, :-2] & pad[1:-1, 2:])
+    for k in (1, 2, 3):
+        inner = (lab == k) & ~edge
+        if not inner.any():
+            continue
+        med, medL = np.median(out[..., :3][inner], 0), np.median(L[inner])
+        for y, x in zip(*np.where((lab == k) & ~edge & ~own)):
+            if any(n[y, x] not in (0, k) for n in nb) and L[y, x] < medL * 0.72:
+                out[y, x, :3] = shade(med, 0.82)
+    out[..., 3] = np.where(m, 255, 0)
+    return Image.fromarray(out.clip(0, 255).astype(np.uint8))
+
+
+def anchored(head_name, handle_name, kind):
+    """A head (or blade) where its own drawing has it, on another drawing's handle moved so its
+    socket meets the head's base. With its own handle this is the drawn icon itself."""
+    a, lab, base = (drawn(head_name),) + regions(drawn(head_name), kind)
+    img = np.zeros((32, 32, 4), float)
+    lab_out = np.zeros((32, 32), int)
+    own = np.ones((32, 32), bool)
+    if handle_name == head_name:
+        hl = lab == HANDLE
+        img[hl] = a[hl]
+    else:
+        h = drawn(handle_name)
+        hlab, hbase = regions(h, kind)
+        dx, dy = int(round(base[0] - hbase[0])), int(round(base[1] - hbase[1]))
+        h2, hl2 = shift(h, dy, dx), shift(hlab, dy, dx)
+        hl = hl2 == HANDLE
+        img[hl] = h2[hl]
+        own[hl] = False
+    lab_out[hl] = HANDLE
+    for k in (JOINT, WORK):
+        sel = lab == k
+        img[sel] = a[sel]
+        lab_out[sel] = k
+        own[sel] = True
+    return seams_only(img, lab_out, own) if handle_name != head_name else Image.fromarray(img.clip(0, 255).astype(np.uint8))
