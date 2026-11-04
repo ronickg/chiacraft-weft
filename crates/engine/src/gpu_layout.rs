@@ -613,6 +613,9 @@ gpu_struct! {
         /// Its light per channel (r, g, b) as block light levels 0..1 (a torch 14/15); zeros
         /// when what is held gives none. It falls off like block light, a level a block.
         pub hand_light: [f32; 4],
+        /// Where the player is: x how closed a forest's canopy is (0 open sky to 1 a rainforest's;
+        /// a mod's air, `air_flags::CANOPY_SHIFT`), for packs' light under the leaves; yzw unused.
+        pub canopy: [f32; 4],
     }
 }
 
