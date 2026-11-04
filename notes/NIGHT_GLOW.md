@@ -82,6 +82,11 @@ which is the world's and the same for every player.
 - **Light:** the levels, 2-3, sit under Vintage Story's glow worms (7) and near Minecraft's
   firefly bush (2), as the research asks. They go in `vitals::wild::GLOW`, the way
   `wild::FIBRE` holds the fibre chances.
+- **Art (claude/art-glow, approved):**
+  - The block uses `glow_mycena_small`: a clump of about 10 px, since Mycena caps are 1-3 cm.
+  - The larger `glow_mycena` (about 15 px) stays in the textures, unused for now.
+  - Art's `glow_lichen` and `glow_crystal` get no blocks.
+  - foxfire and goblins_gold come next from Art, as seamless top textures for a 16x1x16 mat.
 - **Giving:** foxfire gives nothing (it is the wood's rot); glow mycena gives itself, like the
   mushrooms. Neither is food.
 - **Frost:** both die back at a frost and come again from the next warm spell, as the mushrooms
