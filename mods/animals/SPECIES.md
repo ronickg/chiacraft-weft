@@ -33,6 +33,8 @@ Written from the game's species table (`core/src/species.rs`) by `core/src/sheet
 | priscagama | *Priscagama gobiensis* | common | small | 0.04 m | 0.03 kg | solitary | carnivore | wild | eggs, hatch 1.21 d | 4.01 d | 23 d | 2-6 | 24 |
 | reindeer | *Rangifer tarandus* | common | large | 1.05 m | 120 kg | herd | herbivore | wild | 3.31 d | 4.58 d | 46 d | 1 | 13 |
 | coyote | *Canis latrans* | common | medium | 0.61 m | 13 kg | pack | carnivore | wild | 1.25 d | 3.5 d | 23 d | 2-8 | 12 |
+| house_sparrow | *Passer domesticus* | common | small | 0.1 m | 0.03 kg | herd | omnivore | wild | 0.36 d | 2.75 d | 14 d | 2-6 | 24 |
+| snow_bunting | *Plectrophenax nivalis* | common | small | 0.1 m | 0.035 kg | herd | omnivore | wild | 0.37 d | 2.75 d | 14 d | 2-7 | 24 |
 
 ## Stats at level 1
 
@@ -63,6 +65,8 @@ Damage and speed are each kind's own (1 = 100%).
 | priscagama | 2 | 60 | 12 | 0.2 | 1 | 2 | 40 | 5 | 2 | 40 |
 | reindeer | 40 | 260 | 160 | 3 | 1 | 110 | 80 | 80 | 25 | 15 |
 | coyote | 18 | 150 | 80 | 3.5 | 1 | 45 | 80 | 60 | 12 | 30 |
+| house_sparrow | 2 | 60 | 15 | 0.2 | 1 | 1 | 40 | 5 | 2 | 20 |
+| snow_bunting | 2 | 60 | 15 | 0.2 | 1 | 1.2 | 40 | 5 | 3 | 20 |
 
 ## dog (chihuahua)
 
@@ -111,7 +115,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | passive |
 | diet | carnivore |
 | eats | meat 40%, carrion 20%, insects 15%, fruit 15%, seeds 10% |
-| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, base:chicken |
+| hunts | 0.8%-80% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, base:chicken |
 | feedings to tame at level 1 | 4 (2.5x at level 150) |
 | scared by a walking player within | 3 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:porkchop` 10; `base:chicken` 8; `base:mutton` 8; `base:cooked_beef` 20, favorite; `base:cooked_porkchop` 20, favorite; `base:cooked_chicken` 16, favorite; `base:cooked_mutton` 16, favorite; `base:bone` 5, favorite; `animals:kibble` 30, kibble |
@@ -173,7 +177,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 2% of spawn 
 | how | passive |
 | diet | carnivore |
 | eats | meat 80%, insects 10%, carrion 5%, fish 5% |
-| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, base:chicken |
+| hunts | 0.5%-40% of its mass alone (0.02-2 kg); at home: wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, base:chicken |
 | feedings to tame at level 1 | 5 (2.5x at level 150) |
 | scared by a walking player within | 6 blocks (twice that running) |
 | eats (food points) | `base:beef` 8; `base:mutton` 8; `base:egg` 6; `base:cooked_beef` 14; `base:cooked_mutton` 14; `base:chicken` 10, favorite; `base:cooked_chicken` 16, favorite; `animals:kibble` 30, kibble |
@@ -1015,7 +1019,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | wild |
 | diet | carnivore |
 | eats | meat 50%, fruit 20%, insects 15%, carrion 15% |
-| hunts | 0.4%-80% of its mass alone (0.02-4 kg); at home: hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, base:chicken |
+| hunts | 0.4%-80% of its mass alone (0.02-4 kg); at home: hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, base:chicken |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
@@ -1073,7 +1077,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | wild |
 | diet | carnivore |
 | eats | meat 55%, carrion 25%, fruit 10%, insects 5%, fish 5% |
-| hunts | 0.4%-100% of its mass alone (0.01-4 kg); at home: mountain_hare, field_vole, brown_trout, raven, base:chicken |
+| hunts | 0.4%-100% of its mass alone (0.01-4 kg); at home: mountain_hare, field_vole, brown_trout, raven, snow_bunting, base:chicken |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 10 blocks (twice that running) |
 | eats (food points) | `base:chicken` 10; `base:beef` 10; `base:berries` 6, favorite |
@@ -1137,7 +1141,7 @@ Spawns by day on grass, snow or sand, in groups of 1 (solitary), at 0.8% of spaw
 | how | wild |
 | diet | carnivore |
 | eats | carrion 40%, meat 20%, insects 15%, seeds 15%, fruit 10% |
-| hunts | 1.0%-10% of its mass alone (0.01-0 kg); at home: wood_mouse, field_vole |
+| hunts | 1.0%-10% of its mass alone (0.01-0 kg); at home: wood_mouse, field_vole, house_sparrow, snow_bunting |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
 | eats (food points) | `base:beef` 10; `base:wheat_seeds` 2; `base:rotten_flesh` 8, favorite |
@@ -1430,7 +1434,7 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | how | wild |
 | diet | carnivore |
 | eats | meat 60%, fruit 15%, carrion 15%, insects 10% |
-| hunts | 0.1%-40% of its mass alone (0.01-5 kg); at home: cat, hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, base:chicken |
+| hunts | 0.1%-40% of its mass alone (0.01-5 kg); at home: cat, hare, mountain_hare, wood_mouse, field_vole, brown_trout, raven, house_sparrow, snow_bunting, base:chicken |
 | feedings to tame at level 1 | 0 (2.5x at level 150) |
 | scared by a walking player within | 14 blocks (twice that running) |
 | eats (food points) | `base:beef` 12; `base:chicken` 10, favorite; `base:berries` 4 |
@@ -1440,6 +1444,129 @@ Spawns by day on grass, snow or sand, in groups of 2-3 (pack), at 2% of spawn at
 | fights | yes: pounce, bite |
 | reach past its body | 0.7 blocks |
 | signature | howl |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.6 |
+
+## house_sparrow
+
+*Passer domesticus*, Aves › Passeriformes › Passeridae › Passerinae. Model `small_bird`, entity `animals:house_sparrow`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:plains` | commonest |
+| `base:savanna` | 60% |
+| `base:desert` | 50% |
+| `base:beach` | 50% |
+| `base:forest` | 40% |
+| `base:birch_forest` | 40% |
+| `base:swamp` | 30% |
+| `base:mountains` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.1 m at the crown |
+| males against females | 1.02x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 60% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 0.03 kg | |
+| carries her young | 0 d | 0.36 d **set** |
+| litter or clutch | 4.5 on average | 2-6 |
+| between litters | 100 d | rests 1.39 d |
+| breeds in | spring and summer, most in spring | out of it, only a tame well cared for |
+| comfortable in | -25 to 38 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 300 d | 2.75 d **set** |
+| lives | 3 y | 14 d **set**, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 24 **set** within 48 blocks |
+
+**Balance** (common): a generation 3.5 d; a line four deep in 10 d (3 h of play); 22.8 young per mother in 10 days, 19 in her life.
+
+- ✓ fourth generation: 10.4 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 2.8 of 14 days (want under a fifth)
+- ✓ young in a life: 19.3 (want 6-40)
+- ✓ litter: 2-6 (want 1-12, fewest first)
+- ✓ room near: 24 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | omnivore |
+| eats | seeds 60%, insects 30%, fruit 10% |
+| its food grows at home (spring/summer/autumn/winter) | plains 6/50/40/0%, savanna 38/48/63/19%, desert 40/40/40/40%, beach 11/40/43/19%, forest 3/57/40/0%, birch_forest 0/52/40/0%, swamp 8/40/44/0%, mountains 0/42/40/0% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 8 blocks (twice that running) |
+| eats (food points) | `base:wheat_seeds` 2; `base:berries` 3, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.2 blocks |
+| signature | flock |
+| ridden | no |
+| flies ridden | no |
+| camouflage (cost of a coat that stands out) | 0.6 |
+
+## snow_bunting
+
+*Plectrophenax nivalis*, Aves › Passeriformes › Calcariidae › . Model `small_bird`, entity `animals:snow_bunting`.
+
+| Where it lives | how common there |
+|---|---|
+| `base:snowy_plains` | commonest |
+| `base:mountains` | 40% |
+| `base:taiga` | 30% |
+
+Spawns by day on grass, snow or sand, in groups of 3-5 (herd), at 2% of spawn attempts that pick it where commonest (common).
+
+| Body | |
+|---|---|
+| size class | small |
+| height (grown, average) | 0.1 m at the crown |
+| males against females | 1.03x as tall |
+| size spread (an individual's, either way) | 10% |
+| newborn's size | 60% of grown |
+
+| Life | real | in the game |
+|---|---|---|
+| mass | 0.035 kg | |
+| carries her young | 0 d | 0.37 d **set** |
+| litter or clutch | 5 on average | 2-7 |
+| between litters | 1 y | rests 2.5 d **set** |
+| breeds in | summer | out of it, only a tame well cared for |
+| comfortable in | -40 to 18 °C air | seeks shade, water or warmth outside it; a tame eats faster, far outside loses health |
+| grows up in | 300 d | 2.75 d **set** |
+| lives | 3 y | 14 d **set**, give or take a fifth; an elder from 80% of it |
+| lives in | herd | room for 24 **set** within 48 blocks |
+
+**Balance** (common): a generation 3.5 d; a line four deep in 10 d (3 h of play); 15.7 young per mother in 10 days, 13 in her life.
+
+- ✓ fourth generation: 10.5 days (want 10-25 days (common))
+- ✓ grown most of its life: grows 2.8 of 14 days (want under a fifth)
+- ✓ young in a life: 13.2 (want 6-40)
+- ✓ litter: 2-7 (want 1-12, fewest first)
+- ✓ room near: 24 (want 3-30)
+
+| Taming and food | |
+|---|---|
+| how | wild |
+| diet | omnivore |
+| eats | seeds 40%, insects 30%, grass 15%, leaves 10%, fruit 5% |
+| its food grows at home (spring/summer/autumn/winter) | snowy_plains 40/40/40/40%, mountains 40/70/40/40%, taiga 40/62/40/40% |
+| feedings to tame at level 1 | 0 (2.5x at level 150) |
+| scared by a walking player within | 8 blocks (twice that running) |
+| eats (food points) | `base:wheat_seeds` 2; `base:berries` 3, favorite |
+
+| Fighting, riding, the wild | |
+|---|---|
+| fights | no |
+| reach past its body | 0.2 blocks |
+| signature | flock |
 | ridden | no |
 | flies ridden | no |
 | camouflage (cost of a coat that stands out) | 0.6 |

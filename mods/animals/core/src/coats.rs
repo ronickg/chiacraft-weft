@@ -258,7 +258,7 @@ fn with_core(mut g: GeneFile, core: &GeneFile, name: &str) -> GeneFile {
 
 const CORE: &str = include_str!("../../genetics/core.json");
 
-const FILES: [(&str, &str); 23] = [
+const FILES: [(&str, &str); 25] = [
     ("dog", include_str!("../../genetics/dog.json")),
     ("cat", include_str!("../../genetics/cat.json")),
     ("capybara", include_str!("../../genetics/capybara.json")),
@@ -282,6 +282,8 @@ const FILES: [(&str, &str); 23] = [
     ("priscagama", include_str!("../../genetics/priscagama.json")),
     ("reindeer", include_str!("../../genetics/reindeer.json")),
     ("coyote", include_str!("../../genetics/coyote.json")),
+    ("house_sparrow", include_str!("../../genetics/house_sparrow.json")),
+    ("snow_bunting", include_str!("../../genetics/snow_bunting.json")),
 ];
 
 /// A species' gene file (by `Species::name`).
@@ -1233,6 +1235,34 @@ fn coyote(r: &Read) -> Look {
     }
 }
 
+/// The small birds: a house sparrow is brown above, grey below, the male with a black bib (his
+/// points) and a chestnut nape, the female plainer; a snow bunting in its winter plumage is buff and
+/// white with a rusty crown, the back streaked dark.
+fn small_bird(r: &Read, bunting: bool) -> Look {
+    let wb = r.qv("Wb");
+    if bunting {
+        let base = mix([196.0, 156.0, 108.0], [214.0, 196.0, 170.0], wb);
+        return Look {
+            name: if wb > 0.6 { "Pale buff".into() } else { "Buff".into() },
+            base,
+            under: [238.0, 236.0, 230.0],
+            points: Some([232.0, 228.0, 220.0]),
+            pattern: Some(Pattern { kind: "ticked", color: [52.0, 44.0, 40.0], amount: 0.6 }),
+            ..Look::default()
+        };
+    }
+    let base = mix([128.0, 92.0, 62.0], [156.0, 116.0, 76.0], wb);
+    let (points, name) = if r.female() { ([168.0, 152.0, 128.0], "Female brown") } else { ([42.0, 36.0, 34.0], "Brown, black bib") };
+    Look {
+        name: name.into(),
+        base,
+        under: mix([170.0, 168.0, 162.0], [196.0, 188.0, 172.0], wb),
+        points: Some(points),
+        pattern: Some(Pattern { kind: "ticked", color: darken(base, 0.5), amount: 0.6 }),
+        ..Look::default()
+    }
+}
+
 /// Dromaeosaurs: feather colors of ground birds (every raptor species has these loci).
 fn raptor(r: &Read) -> Look {
     let (pigment, mut name): (Rgb, String) = match r.shows("Pg") {
@@ -1397,6 +1427,8 @@ pub fn phenotype(genome: &Genome) -> Option<Look> {
         "priscagama" => lizard(&r),
         "reindeer" => reindeer(&r),
         "coyote" => coyote(&r),
+        "house_sparrow" => small_bird(&r, false),
+        "snow_bunting" => small_bird(&r, true),
         _ => raptor(&r),
     };
     core(&r, &mut look);
@@ -1978,7 +2010,7 @@ macro_rules! model_layers {
 }
 
 type ModelLayers = (&'static str, [&'static [u8]; 4], &'static str);
-const MODEL_LAYERS: [ModelLayers; 18] = model_layers!(
+const MODEL_LAYERS: [ModelLayers; 19] = model_layers!(
     "chihuahua",
     "cat",
     "capybara",
@@ -1996,7 +2028,8 @@ const MODEL_LAYERS: [ModelLayers; 18] = model_layers!(
     "kryptobaatar",
     "lizard",
     "reindeer",
-    "coyote"
+    "coyote",
+    "small_bird"
 );
 
 fn decode(png_bytes: &[u8]) -> Option<(usize, usize, Vec<u8>)> {

@@ -3,9 +3,9 @@
 //! wyverns (`wyvern.rs`, a fantasy animal, and their breath: `breath.rs`), and the living world's
 //! simple wild creatures (`wild.rs`): hares of two species (`hare.rs`), wood mice (`mouse.rs`),
 //! field voles (`vole.rs`), deer of two species (`deer.rs`) and foxes of two species, hunters
-//! (`fox.rs`), ravens on the ground and in the air (`raven.rs`), Protoceratops in herds
+//! (`fox.rs`), ravens (`raven.rs`), Protoceratops in herds
 //! (`protoceratops.rs`), Kryptobaatar, the Cretaceous's small mammal (`kryptobaatar.rs`), and its lizard,
-//! Priscagama (`lizard.rs`); reindeer in herds (`reindeer.rs`), coyotes, hunters (`coyote.rs`); and fish
+//! Priscagama (`lizard.rs`); reindeer in herds (`reindeer.rs`), coyotes, hunters (`coyote.rs`); birds on the ground and in the air (`birds.rs`): small birds of two species (`small_bird.rs`); and fish
 //! of two species, spawned into the water and swimming (`fish.rs`),
 //! each placed in the tree of life (`species.rs`), and what they
 //! share: species as data (`species.rs`), each animal's level and stats (`animal.rs`), taming
@@ -23,6 +23,7 @@ use weft_sdk::*;
 declare_mod!(deps: ["base"], init: init);
 
 mod animal;
+mod birds;
 mod breath;
 mod breeding;
 mod capybara;
@@ -55,6 +56,7 @@ mod riding;
 mod scars;
 mod screen;
 mod signatures;
+mod small_bird;
 mod species;
 mod taming;
 mod utahraptor;
@@ -126,6 +128,8 @@ fn init(r: &mut Registry) {
     lizard::init(r);
     reindeer::init(r);
     coyote::init(r);
+    birds::init(r);
+    small_bird::init(r);
     breath::init(r);
     animal::init(r);
     comfort::init(r);

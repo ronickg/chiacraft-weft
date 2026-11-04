@@ -98,6 +98,8 @@ pub static CORVIDAE: Family = Family { name: "Corvidae", above: &["Aves", "Passe
 pub static DJADOCHTATHERIIDAE: Family = Family { name: "Djadochtatheriidae", above: &["Mammalia", "Multituberculata"] };
 pub static PRISCAGAMIDAE: Family = Family { name: "Priscagamidae", above: &["Reptilia", "Squamata"] };
 pub static PROTOCERATOPSIDAE: Family = Family { name: "Protoceratopsidae", above: &["Dinosauria", "Ceratopsia"] };
+pub static PASSERIDAE: Family = Family { name: "Passeridae", above: &["Aves", "Passeriformes"] };
+pub static CALCARIIDAE: Family = Family { name: "Calcariidae", above: &["Aves", "Passeriformes"] };
 pub static DROMAEOSAURIDAE: Family = Family { name: "Dromaeosauridae", above: &["Dinosauria", "Theropoda"] };
 /// Not a real family: wyverns are fantasy animals, placed under "Fantasy" so they never pass
 /// for real ones. The names follow how real ones are made (a family in -idae, a subfamily in
@@ -301,7 +303,7 @@ impl Species {
 pub const WILD_STEP: [f32; STATS] = [0.2, 0.1, 0.1, 0.05, 0.01, 0.02, 0.1, 0.06, 0.05];
 pub const TAMED_STEP: [f32; STATS] = [0.1, 0.1, 0.1, 0.04, 0.015, 0.04, 0.1, 0.0, 0.05];
 
-pub static SPECIES: [Species; 23] = [
+pub static SPECIES: [Species; 25] = [
     Species {
         model: "chihuahua",
         name: "dog",
@@ -1733,6 +1735,140 @@ pub static SPECIES: [Species; 23] = [
         },
         tune: Tune::NONE,
         birth_size: 0.25,
+    },
+    // The small birds (`reports/ecology/Overworld food webs.md`: the songbirds of every land biome, the
+    // cat's, the owl's and the hawk's prey): two wild species on one model (`source/small_bird`), on
+    // the ground and in the air (`small_bird.rs`). No nests yet (Ronald, 2026-11-03): as the raven's,
+    // their young come out as fledglings after the eggs' time.
+    Species {
+        model: "small_bird",
+        name: "house_sparrow",
+        binomial: "Passer domesticus",
+        family: &PASSERIDAE,
+        subfamily: "Passerinae",
+        breed: None,
+        size: Size::Small,
+        // Seeds and grain first, insects (most of what the nestlings get), buds and berries.
+        eats: &[(Seeds, 0.6), (Insects, 0.3), (Fruit, 0.1)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        //     health stamina food damage speed weight oxygen torpor fortitude
+        base: [2.0, 60.0, 15.0, 0.2, 1.0, 1.0, 40.0, 5.0, 2.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 20.0,
+        foods: &[eats("base:wheat_seeds", 2), favorite("base:berries", 3)],
+        feedings: 0.0,
+        shy: 8.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.2,
+        signature: "flock",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.6,
+        dimorphism: 1.02,
+        size_spread: 0.1,
+        // Standing, at the crown.
+        height: (0.1, "crown"),
+        // Wherever people farm and build, from the prairie to the desert's towns and the coast; few in
+        // the deep woods and the north.
+        habitats: &[
+            ("base:plains", 1.0),
+            ("base:savanna", 0.6),
+            ("base:desert", 0.5),
+            ("base:beach", 0.5),
+            ("base:forest", 0.4),
+            ("base:birch_forest", 0.4),
+            ("base:swamp", 0.3),
+            ("base:mountains", 0.3),
+        ],
+        bio: Biology {
+            mass: 0.03,
+            gestation: 0.0,
+            // 11-14 days, both parents sitting; the young fly at about two weeks.
+            incubation: 12.0,
+            // Breeding in its first spring.
+            maturity: 300.0,
+            // Most live about three years; up to 13.
+            lifespan: 1095.0,
+            // Two to four broods a summer.
+            interval: 100.0,
+            // 4-5 eggs.
+            litter: 4.5,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            breeds: seasons::WET,
+            peak: seasons::SPRING,
+            // From the prairie's winters (it roosts in holes and huddles) to the Sonoran heat.
+            comfort: (-25.0, 38.0),
+            cold_blooded: false,
+        },
+        // No nests yet: the young come out as fledglings after the eggs' time. Its life paced as the
+        // mouse's (a small animal's derived span is too short for a line to be bred), growing up a
+        // fifth of it; many live close together, at feeders and in hedges (`balance::checks`).
+        tune: Tune { gestation: Some(8_665), growth: Some(66_000), lifespan: Some(336_000), crowd: Some(24), ..Tune::NONE },
+        birth_size: 0.6,
+    },
+    Species {
+        model: "small_bird",
+        name: "snow_bunting",
+        binomial: "Plectrophenax nivalis",
+        family: &CALCARIIDAE,
+        subfamily: "",
+        breed: None,
+        size: Size::Small,
+        // Seeds of grasses and sedges, their shoots and willow buds, insects in the Arctic summer
+        // (what the young are raised on).
+        eats: &[(Seeds, 0.4), (Insects, 0.3), (Grass, 0.15), (Leaves, 0.1), (Fruit, 0.05)],
+        prey: (0.0, 0.0),
+        taming: Taming::Wild,
+        base: [2.0, 60.0, 15.0, 0.2, 1.0, 1.2, 40.0, 5.0, 3.0],
+        wild_step: WILD_STEP,
+        tamed_step: TAMED_STEP,
+        hunger: 20.0,
+        foods: &[eats("base:wheat_seeds", 2), favorite("base:berries", 3)],
+        feedings: 0.0,
+        shy: 8.0,
+        fights: false,
+        attacks: &[],
+        reach: 0.2,
+        signature: "flock",
+        seat: 0.0,
+        seat_forward: 0.0,
+        flight: 0.0,
+        camouflage: 0.6,
+        dimorphism: 1.03,
+        size_spread: 0.1,
+        // The model's (the house sparrow's): the bunting is as big.
+        height: (0.1, "crown"),
+        // The high Arctic's tundra and the fells, wintering south into the taiga's edge.
+        habitats: &[("base:snowy_plains", 1.0), ("base:mountains", 0.4), ("base:taiga", 0.3)],
+        bio: Biology {
+            mass: 0.035,
+            gestation: 0.0,
+            // 12-13 days; the young leave the nest at 12-14.
+            incubation: 12.5,
+            maturity: 300.0,
+            // Two or three years on average; up to 8.
+            lifespan: 1095.0,
+            interval: 365.0,
+            // 4-6 eggs.
+            litter: 5.0,
+            social: Social::Herd,
+            rarity: Rarity::Common,
+            // Laying in June, in the Arctic's short summer.
+            breeds: seasons::SUMMER,
+            peak: seasons::SUMMER,
+            // A songbird of the Arctic winter, panting above about 10 degrees in the sun.
+            comfort: (-40.0, 18.0),
+            cold_blooded: false,
+        },
+        // No nests yet: the young come out as fledglings after the eggs' time; paced as the sparrow,
+        // a second brood in a long summer, flocks close together (`balance::checks`).
+        tune: Tune { gestation: Some(8_935), growth: Some(66_000), lifespan: Some(336_000), recovery: Some(60_000), crowd: Some(24), ..Tune::NONE },
+        birth_size: 0.6,
     },
 ];
 
