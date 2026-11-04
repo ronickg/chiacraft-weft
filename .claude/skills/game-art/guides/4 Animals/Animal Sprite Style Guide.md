@@ -194,7 +194,8 @@ The cards show the reference's faces, fur and markings, cut flat from its skins.
 ## Part 4: Our animals are box models
 
 In the game our animals (capybara, chihuahua, cat, Velociraptor, Utahraptor, wyvern) are box
-models with a painted texture, built by the `blocky-model` skill: boxes, 64 texels a block, the
+models with a painted texture, built by the `blocky-model` skill: boxes, 32 texels a block (as the
+blocks and items; very small creatures finer), the
 light baked in by its painter (`paint.py`). An image model can't lay out a model's texture, so
 the sprite rules above are for concept sprites only. What carries over to the models:
 
