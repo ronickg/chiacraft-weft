@@ -92,6 +92,12 @@ pub static JUNIPER_LEAVES: Block = Block::named("juniper_leaves");
 pub static CREOSOTE_LEAVES: Block = Block::named("creosote_leaves");
 /// Grass two blocks tall (the prairie's big bluestem, the llanos' grasses): `half` lower, upper.
 pub static TALL_GRASS_DOUBLE: Block = Block::named("tall_grass_double");
+/// Mushrooms at the foot of trunks (`vitals::layers`): honey fungus, chanterelles, ceps.
+pub static HONEY_FUNGUS: Block = Block::named("honey_fungus");
+pub static CHANTERELLE: Block = Block::named("chanterelle");
+pub static PORCINI: Block = Block::named("porcini");
+/// A shelf fungus on bark, on the north side of a dead trunk (`base_api::trees`).
+pub static BRACKET_FUNGUS: Block = Block::named("bracket_fungus");
 
 /// Log axis along the clicked face, like vanilla.
 fn axis_placement(p: &Place, props: &mut Props) {
@@ -756,6 +762,20 @@ pub fn register(r: &mut Registry) {
     r.loot(&TALL_GRASS_DOUBLE)
         .pool(Pool::new().when(Cond::Chance(0.125)).item("wheat_seeds"))
         .pool(Pool::new().when(Cond::Chance(vitals::clothing::FIBRE_CHANCE)).item("plant_fibre"));
+    // Mushrooms at the foot of trunks (`vitals::layers`); food rows for the ceps and chanterelles
+    // are to come.
+    for (b, tex) in [(&HONEY_FUNGUS, "honey_fungus"), (&CHANTERELLE, "chanterelle"), (&PORCINI, "porcini")] {
+        plant(r, b, tex);
+    }
+    // A shelf on the north side of a trunk: the box against the cell's south face, where the bark
+    // is; its top and bottom show the half disc, its front and ends the ridged bands.
+    let (top, side, full) = ("bracket_fungus_top", "bracket_fungus_side", [0.0, 0.0, 16.0, 16.0]);
+    r.block(&BRACKET_FUNGUS)
+        .sound_group("wood")
+        .hardness(0.3)
+        .texture(side)
+        .model_box_faces([2.0, 6.0, 8.0], [14.0, 9.0, 16.0], [(side, full), (side, full), (top, full), (top, full), (side, full), (side, full)])
+        .tab(&crate::tabs::NATURAL);
     // Ferns on the forest floor (`vitals::layers`): bracken.
     r.block(&FERN)
         .sound_group("grass")

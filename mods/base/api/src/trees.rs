@@ -37,6 +37,8 @@ pub fn leaf_tint(turn: vitals::wild::Turn) -> &'static TintKind {
 
 static DIRT: Block = Block::named("base:dirt");
 static TALL_GRASS: Block = Block::named("base:tall_grass");
+/// A shelf fungus on dead wood, on a trunk's north side (base's `bracket_fungus`).
+static BRACKET_FUNGUS: Block = Block::named("base:bracket_fungus");
 
 /// A tree's crown, by its log's tag.
 #[derive(Clone, Copy, PartialEq)]
@@ -140,6 +142,10 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
             for k in 0..3 + t.height % 3 {
                 put(t.x + t.lean.0 * k, t.y, t.z + t.lean.1 * k, lying, false);
             }
+            // Shelf fungus on its north side, on half of them.
+            if t.seed >> 30 & 1 == 0 {
+                put(t.x + t.lean.0, t.y, t.z + t.lean.1 - 1, BRACKET_FUNGUS.id(), false);
+            }
             return;
         }
         // A bare trunk three to six high, a stub of a branch near its top.
@@ -150,12 +156,19 @@ pub fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
             }
             let axis = if t.lean.0 != 0 { "x" } else { "z" };
             put(t.x + t.lean.0, top - 2, t.z + t.lean.1, state_with(log, "axis", axis).unwrap_or(log), false);
+            // Shelf fungus rotting it, on its north side, on half of them.
+            if t.seed >> 30 & 1 == 0 {
+                put(t.x, t.y + 1 + (t.seed >> 31 & 1) as i32, t.z - 1, BRACKET_FUNGUS.id(), false);
+            }
             put(t.x, t.y - 1, t.z, DIRT.id(), true);
             return;
         }
         Form::Stump => {
             for y in t.y..t.y + 1 + t.height % 2 {
                 put(t.x, y, t.z, log, true);
+            }
+            if t.seed >> 30 & 1 == 0 {
+                put(t.x, t.y, t.z - 1, BRACKET_FUNGUS.id(), false);
             }
             put(t.x, t.y - 1, t.z, DIRT.id(), true);
             return;

@@ -66,7 +66,7 @@ Built (2026-11-04, branches `vegetation-layers`, then `sequoia`): all five, with
 blocks (leaf litter, moss block, coarse dirt), bracken, the two-block grass, and willow, juniper and
 creosote leaves in their own colours (Ronald: "Yes, Art's picks"). Per biome also `FERN_KINDS`
 (the grove's sword fern), `YOUNG_KINDS` (the grove's dogwoods, firs and sequoias) and
-`TALL_GRASS_SHARE`. Mushrooms round trunks are still to do.
+`TALL_GRASS_SHARE`. Mushrooms at the foot of trunks (`MUSHROOMS`, `MUSHROOM_COVER`: honey fungus, chanterelles, ceps) and bracket fungus on snags, stumps and fallen logs came with Art's mushrooms; the redrawn creosote and juniper too.
 
 ## Cost
 

@@ -53,6 +53,9 @@ pub static YOUNG_TREES: Component<f32> = Component::named("young_trees");
 pub static YOUNG_KINDS: Component<BlockList> = Component::named("young_kinds");
 /// The biome's fern (`FERN`, bracken, where unset).
 pub static FERN_KINDS: Component<BlockList> = Component::named("fern_kinds");
+/// Mushrooms at the foot of trunks: which, and their share of the bare soil beside a trunk.
+pub static MUSHROOMS: Component<BlockList> = Component::named("mushrooms");
+pub static MUSHROOM_COVER: Component<f32> = Component::named("mushroom_cover");
 /// The share of a biome's tall grass that grows two blocks tall (`TALL_GRASS_DOUBLE`).
 pub static TALL_GRASS_SHARE: Component<f32> = Component::named("tall_grass_share");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
@@ -288,6 +291,10 @@ pub fn register(r: &mut Registry) {
         }
         if !l.fern.is_empty() {
             r.set_text_on(b(), &FERN_KINDS, l.fern);
+        }
+        if l.mushroom_cover > 0.0 {
+            r.set_text_on(b(), &MUSHROOMS, l.mushrooms);
+            r.set_on(b(), &MUSHROOM_COVER, l.mushroom_cover);
         }
         if l.tall_grass > 0.0 {
             r.set_on(b(), &TALL_GRASS_SHARE, l.tall_grass);
@@ -670,10 +677,18 @@ fn decorate(g: &mut Gen) {
                     } else {
                         g.set(x, y, z, TALL_GRASS.id());
                     }
-                } else if let Some(ferns) = FERNS.on_biome(b).filter(|&f| f > 0.0) {
-                    // Ferns on the bare soil (`FERNS`), three times as thick round a trunk.
-                    let thick = if beside_log(g, x, y, z) { 3.0 } else { 1.0 };
-                    if unit(hash(seed ^ 0xFE4, wx as i64, 0, wz as i64)) < (ferns * thick) as f64 {
+                } else {
+                    // The bare soil: mushrooms at the foot of a trunk (`MUSHROOMS`), then ferns
+                    // (`FERNS`), three times as thick round a trunk.
+                    let trunk = beside_log(g, x, y, z);
+                    let near = unit(hash(seed ^ 0xFE4, wx as i64, 0, wz as i64));
+                    let mushroom = MUSHROOM_COVER.on_biome(b).filter(|_| trunk).unwrap_or(0.0) as f64;
+                    let ferns = FERNS.on_biome(b).unwrap_or(0.0) as f64 * if trunk { 3.0 } else { 1.0 };
+                    if near < mushroom {
+                        if let Some(m) = MUSHROOMS.on_biome(b).and_then(|l| l.pick(h >> 20)) {
+                            g.set(x, y, z, m);
+                        }
+                    } else if near < mushroom + ferns {
                         let fern = FERN_KINDS.on_biome(b).and_then(|l| l.pick(h >> 20)).unwrap_or(FERN.id());
                         g.set(x, y, z, fern);
                     }

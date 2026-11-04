@@ -32,6 +32,10 @@ pub struct Layers {
     /// The share of the tall grass that grows two blocks tall (the prairie's big bluestem, the
     /// llanos' grasses).
     pub tall_grass: f32,
+    /// Mushrooms at the foot of trunks, by weight, and the share of the bare soil beside a trunk
+    /// they take (before the ferns).
+    pub mushrooms: &'static str,
+    pub mushroom_cover: f32,
 }
 
 const fn l(
@@ -43,7 +47,7 @@ const fn l(
     shrub_kinds: &'static str,
     young: f32,
 ) -> Layers {
-    Layers { biome, floor, floor_cover, ferns, fern: "", shrubs, shrub_kinds, young, young_kinds: "", tall_grass: 0.0 }
+    Layers { biome, floor, floor_cover, ferns, fern: "", shrubs, shrub_kinds, young, young_kinds: "", tall_grass: 0.0, mushrooms: "", mushroom_cover: 0.0 }
 }
 
 /// Each biome's layers. Floors: Białowieża's leaf litter and moss, Fairbanks' moss carpet,
@@ -54,9 +58,23 @@ const fn l(
 /// Sonora's creosote bush.
 pub const LAYERS: [Layers; 10] = [
     Layers { tall_grass: 0.4, ..l("base:plains", "base:coarse_dirt", 0.03, 0.0, 0.06, "base:oak_leaves", 0.0) },
-    l("base:forest", "base:leaf_litter:3 base:moss_block:1", 0.25, 0.05, 0.2, "base:oak_leaves:3 base:birch_leaves:1", 0.15),
-    l("base:birch_forest", "base:leaf_litter", 0.15, 0.06, 0.18, "base:birch_leaves:2 base:oak_leaves:1", 0.25),
-    l("base:taiga", "base:moss_block:3 base:podzol:1", 0.2, 0.03, 0.16, "base:willow_leaves:2 base:juniper_leaves:1", 0.25),
+    // Mushrooms round trunks: Białowieża's honey fungus on the oaks' roots and ceps; Moscow's
+    // chanterelles under birches; the taiga's chanterelles and ceps under spruce.
+    Layers {
+        mushrooms: "base:honey_fungus:3 base:porcini:2 base:mushroom_brown:1",
+        mushroom_cover: 0.12,
+        ..l("base:forest", "base:leaf_litter:3 base:moss_block:1", 0.25, 0.05, 0.2, "base:oak_leaves:3 base:birch_leaves:1", 0.15)
+    },
+    Layers {
+        mushrooms: "base:chanterelle:3 base:honey_fungus:1 base:mushroom_red:1",
+        mushroom_cover: 0.12,
+        ..l("base:birch_forest", "base:leaf_litter", 0.15, 0.06, 0.18, "base:birch_leaves:2 base:oak_leaves:1", 0.25)
+    },
+    Layers {
+        mushrooms: "base:chanterelle:2 base:porcini:2 base:mushroom_red:1",
+        mushroom_cover: 0.1,
+        ..l("base:taiga", "base:moss_block:3 base:podzol:1", 0.2, 0.03, 0.16, "base:willow_leaves:2 base:juniper_leaves:1", 0.25)
+    },
     l("base:snowy_plains", "", 0.0, 0.0, 0.1, "base:willow_leaves", 0.0),
     Layers { tall_grass: 0.5, ..l("base:savanna", "base:coarse_dirt", 0.04, 0.0, 0.05, "base:acacia_leaves", 0.0) },
     l("base:swamp", "base:moss_block", 0.08, 0.02, 0.12, "base:oak_leaves", 0.0),
@@ -67,6 +85,8 @@ pub const LAYERS: [Layers; 10] = [
     // gaps, few shrubs (`blocks.rs`, `grove`).
     Layers {
         fern: "base:sword_fern",
+        mushrooms: "base:honey_fungus",
+        mushroom_cover: 0.06,
         young_kinds: "base:dogwood_log:3 base:spruce_log:1 base:sequoia_log:1",
         ..l("base:sequoia_grove", "base:podzol:2 base:leaf_litter:1", 0.2, 0.1, 0.06, "base:dogwood_leaves", 0.2)
     },
@@ -102,6 +122,9 @@ mod tests {
             assert!(l.floor_cover == 0.0 || !l.floor.is_empty(), "{}: a floor cover with no blocks", l.biome);
             assert!((0.0..=0.5).contains(&l.young), "{}: young trees", l.biome);
             assert!((0.0..=1.0).contains(&l.tall_grass), "{}: tall grass share", l.biome);
+            // Mushrooms and ferns round a trunk share its bare soil.
+            assert!(l.mushroom_cover + l.ferns * 3.0 < 0.6, "{}: mushrooms and ferns crowd the trunks", l.biome);
+            assert!(l.mushroom_cover == 0.0 || !l.mushrooms.is_empty(), "{}: mushrooms with no kinds", l.biome);
             assert!(crate::climate::of(l.biome).is_some(), "{}: no climate", l.biome);
         }
     }
