@@ -102,6 +102,25 @@ impl Bench {
         [(1000.0 / avg.max(1e-3)) as f32, avg as f32, p99, gpu as f32, srv as f32]
     }
 
+    /// How evenly frames came: the share of frame times that took 1, 2, 3 and more of a 120 Hz
+    /// display's refreshes (under 12.5, 12.5-20.8, 20.8-29.2 and over 29.2 ms). An average of
+    /// 10.6 ms (Ronald's window, 11-04) was mostly 8.3 ms frames with a fifth at 16.7: the
+    /// stutter the average hides.
+    pub fn pacing(&self) -> String {
+        let n = self.frames.len().max(1) as f32;
+        let mut bins = [0u32; 4];
+        for &f in &self.frames {
+            bins[match f {
+                f if f < 12.5 => 0,
+                f if f < 20.8 => 1,
+                f if f < 29.2 => 2,
+                _ => 3,
+            }] += 1;
+        }
+        let [a, b, c, d] = bins.map(|v| v as f32 * 100.0 / n);
+        format!("PACING {} | refreshes per frame at 120 Hz: 1 {a:.1}%, 2 {b:.1}%, 3 {c:.1}%, 4+ {d:.1}%", self.label)
+    }
+
     pub fn report(&mut self, extra: &str) -> String {
         let n = self.frames.len().max(1) as f64;
         let mut sorted = self.frames.clone();
