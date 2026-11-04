@@ -259,6 +259,19 @@ def build():
     knob = src("c_knob")
     put("slider_knob", knob, scaling="stretch")
     put("slider_knob_hover", glow(brighter(knob, 1.1), GOLD1), scaling="stretch")
+    # Tabs and category rows: buttons of their own class (`S::default().class("tab")`), the open
+    # one `selected(true)`, which the engine draws with `_pressed`.
+    tab_on = fit9(src("c_tabs", 0), 48, 16, (6, 5, 6, 2))
+    tab_off = fit9(src("c_tabs", 1), 48, 16, (6, 5, 6, 2))
+    put("tab", tab_off, (6, 5, 6, 2))
+    put("tab_hover", brighter(tab_off, 1.2), (6, 5, 6, 2))
+    put("tab_pressed", tab_on, (6, 5, 6, 2))
+    put("tab_disabled", disabled(tab_off), (6, 5, 6, 2))
+    box = fit9(src("c_small", 2), 32, 24, 4)
+    put("category", np.zeros_like(box), 4)
+    put("category_hover", box, 4)
+    put("category_pressed", glow(box, GOLD1), 4)
+    put("category_disabled", np.zeros_like(box), 4)
     # The HUD (`mods/base/src/hud.rs`): each bar a frame and a fill on a canvas the frame's size,
     # which the engine crops to the value (`BAR_*` and `bar_fill` there follow these sizes).
     def bar(name, fill, w, h):
