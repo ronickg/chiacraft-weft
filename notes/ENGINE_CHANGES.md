@@ -30,6 +30,7 @@ for now is bug fixes only, written and opened by him.
 | A content switch registers the keys its content brings (47a8be49) | New keys were missing after a switch | Maybe |
 | Under water the sky's gradient is drawn (2562a0cd) | Navy streaks where the sea floor ends | Maybe |
 | Sky pictures upright on a leaned sun path (81ff2dcc) | The moon drew as a tilted diamond | With the leaned path only |
+| Paths for bodies wider than a block: room across the whole footprint, at the entity's own size and scale (`server/path.rs` `footprint`, `find(.., width)`; a899c90e) | The A* gave every walker a one-cell body, so wide mobs were led between trunks they can't pass and jammed (our big animals, 2-4.5 wide, barely moved in forests) | Yes, a bug fix: vanilla's pathing sizes nodes by the mob's width. With a unit test (`a_wide_body_goes_round_a_gap_it_cannot_pass`) |
 | clippy allows for `mut_from_ref` (0d111b9a, d7ff2255) | A newer clippy made them errors | Trivial |
 | Client: water drips (a solid block under water, air under that) read the block under with `get`: a cube not arrived yet is `u32::MAX` (`client/mod.rs`) | It indexed past the block states and crashed the client a second after arriving by a tarn (water above the sea's level, near the top of what had arrived) | Yes: a plain bug fix |
 
