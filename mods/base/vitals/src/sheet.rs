@@ -23,6 +23,7 @@ pub fn markdown() -> String {
     effects_table(&mut w);
     climates(&mut w);
     plant_table(&mut w);
+    crop_table(&mut w);
     wild_table(&mut w);
     forage_table(&mut w);
     soil_table(&mut w);
@@ -297,6 +298,21 @@ fn plant_table(w: &mut String) {
     let _ = writeln!(w);
 }
 
+fn crop_table(w: &mut String) {
+    let _ = writeln!(
+        w,
+        "## Crops\n\nWhat each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to {} more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in {:.0}.\n\n| crop | sown from | ripe gives | stages | soil | wild seed in |\n|---|---|---|---|---|---|",
+        crate::crops::EXTRA_SEEDS,
+        1.0 / crate::crops::WILD_SEED_CHANCE
+    );
+    for c in &crate::crops::CROPS {
+        let wild = if c.wild.is_empty() { "tall grass anywhere".to_string() } else { c.wild.join(", ") };
+        let _ =
+            writeln!(w, "| {} | {} | {} {}-{} | {} | {:?} | {wild} |", c.block, c.seed, c.gives, c.count.0, c.count.1, c.ripe + 1, c.soil);
+    }
+    let _ = writeln!(w);
+}
+
 fn wild_table(w: &mut String) {
     let _ = writeln!(
         w,
@@ -377,13 +393,24 @@ fn soil_table(w: &mut String) {
         .join(", ");
     let _ = writeln!(
         w,
-        "\nA ripe harvest of {} takes a level; {feeds}; a season unplanted (about {:.0} game days, at grass's rate) gives one back. A compost bin fills in {} steps: spoiled food {}, {composts}; full, it rots into compost in about {:.0} minutes.\n",
-        soil::TIRES.join(", "),
+        "\nA ripe harvest of {} takes a level, of {} gives one back; {feeds}; a season unplanted (about {:.0} game days, at grass's rate) gives one back. A compost bin fills in {} steps: spoiled food {}, {composts}; full, it rots into compost in about {:.0} minutes.\n",
+        crops(crate::crops::Soil::Tires),
+        crops(crate::crops::Soil::Feeds),
         soil::FALLOW_SECS / crate::DAY_SECS,
         soil::BIN_FULL,
         soil::SPOILED,
         soil::compost_secs() / 60.0
     );
+}
+
+/// The crops that leave the soil so, by name.
+fn crops(soil: crate::crops::Soil) -> String {
+    crate::crops::CROPS
+        .iter()
+        .filter(|c| c.soil == soil)
+        .map(|c| c.block)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn difficulties(w: &mut String) {

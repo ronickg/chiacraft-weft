@@ -6,6 +6,7 @@ mod beds;
 mod blocks;
 mod clothing;
 mod cooking;
+mod crops;
 mod death;
 mod farming;
 mod growth;
@@ -50,6 +51,7 @@ fn init(r: &mut Registry) {
     }
     blocks::register(r);
     wild::register(r);
+    crops::register(r);
     items::register(r);
     player::register(r);
     survival::register(r);

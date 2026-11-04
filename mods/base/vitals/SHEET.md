@@ -69,6 +69,15 @@ A portion, its kind for the animals' diets, what it holds of each nutrient, how 
 | animals:pacu | fish | 150 | 15 | 30 | 0 | 3 | 0 | 117 | 17 min | 1 + 1 | raw |
 | animals:cooked_pacu | fish | 110 | 11 | 29 | 0 | 3 | 0 | 79 | 16 min | 3 + 3 | hot when cooked |
 | animals:kibble | meat | 100 | 10 | 25 | 45 | 14 | 4 | 10 | 19 min | 90 + 90 |  |
+| base:carrot | roots | 60 | 6 | 1 | 6 | 0 | 2 | 53 | 3 min | 20 + 20 |  |
+| base:potato | roots | 170 | 17 | 3 | 30 | 0 | 7 | 135 | 11 min | 30 + 30 |  |
+| base:baked_potato | roots | 140 | 14 | 4 | 30 | 0 | 4 | 105 | 10 min | 3 + 3 | hot when cooked |
+| base:beetroot | roots | 80 | 8 | 1 | 8 | 0 | 3 | 70 | 4 min | 20 + 20 |  |
+| base:corn | seeds | 100 | 10 | 3 | 19 | 1 | 3 | 76 | 8 min | 2 + 2 |  |
+| base:roasted_corn | seeds | 100 | 10 | 3 | 21 | 2 | 3 | 73 | 8 min | 3 + 3 | hot when cooked |
+| base:beans | seeds | 100 | 10 | 2 | 7 | 0 | 4 | 90 | 5 min | 5 + 5 |  |
+| base:cooked_rice | seeds | 150 | 15 | 4 | 42 | 0 | 1 | 103 | 11 min | 3 + 3 | hot when cooked |
+| base:cassava | roots | 100 | 10 | 1 | 38 | 0 | 4 | 60 | 7 min | 2 + 2 |  |
 
 ## Meals and preserving
 
@@ -183,6 +192,17 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | plant | real plant | °C | water | frost | real days | minutes | grows |
 |---|---|---|---|---|---|---|---|
 | base:wheat | spring wheat | 0, 15-23, 34 | Moderate | -2 °C | 110 | 26 | plains (su au), forest (su au), birch_forest (su au), taiga (su), savanna (su au), swamp (au), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
+| base:barley | barley | 0, 15-20, 32 | Moderate | -4 °C | 105 | 25 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
+| base:rye | winter rye | 0, 12-20, 30 | Moderate | -30 °C | 300 | 52 | plains (au), forest (su au), birch_forest (su au), taiga (su), mountains (su au), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
+| base:carrots | carrot | 4, 16-21, 30 | Moderate | -5 °C | 95 | 23 | plains (au), forest (su au), birch_forest (su), taiga (su), mountains (su), ocean (sp su au wi), beach (au), floodplain (au), fern_forest (su au), crags (su au) |
+| base:potatoes | potato | 7, 15-20, 30 | Moderate | -1 °C | 135 | 30 | plains (au), forest (su au), birch_forest (su), taiga (su), mountains (su), ocean (sp su au wi), beach (au), floodplain (au), fern_forest (su au), crags (su au) |
+| base:beetroots | beetroot | 4.5, 15-20, 30 | Moderate | -3 °C | 72 | 19 | plains (au), forest (su au), birch_forest (su), taiga (su), mountains (su), ocean (sp su au wi), beach (au wi), floodplain (au), fern_forest (su au), crags (su au) |
+| base:maize | maize | 10, 24-30, 38 | Moderate | 0 °C | 150 | 32 | plains (su), forest (su), birch_forest (su), savanna (sp su au), swamp (su au), ocean (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
+| base:paddy_rice | paddy rice | 10, 25-30, 35 | Wet | 0 °C | 120 | 28 | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
+| base:beans | common bean | 10, 18-25, 30 | Moderate | 0 °C | 100 | 24 | plains (su), forest (su), birch_forest (su), taiga (su), savanna (au), swamp (au), mountains (su), ocean (sp su au wi), beach (au), floodplain (au), fern_forest (su), crags (su au) |
+| base:sorghum | sorghum | 8, 27-34, 42 | Dry | 0 °C | 125 | 28 | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au wi), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su au) |
+| base:millet | pearl millet | 10, 30-34, 45 | Dry | 0 °C | 105 | 25 | plains (su), forest (su), birch_forest (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au), ocean (su au), beach (su au), red_dunes (su), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
+| base:cassava | cassava | 12, 25-29, 37 | Moderate | 0 °C | 390 | 63 | plains (su), savanna (sp su au), swamp (su au), ocean (su au), scrubland (su), floodplain (su au), fern_forest (su), crags (su) |
 | base:berry_bush | blueberry | 7, 20-26, 32 | Moderate | -2 °C | 75 | 20 | plains (su), forest (su), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (su au wi), beach (au), scrubland (su), floodplain (su au), fern_forest (su), crags (su au) |
 | base:sugar_cane | sugar cane | 12, 22-30, 38 | Wet | -1 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
 | base:cactus | saguaro | 10, 25-40, 50 | Dry | -7 °C | - | the game's | plains (su), forest (su), birch_forest (su), taiga (su), desert (sp su au), savanna (sp su au wi), swamp (sp su au wi), ocean (sp su au), beach (sp su au), red_dunes (su), scrubland (su), floodplain (sp su au), fern_forest (su), crags (su) |
@@ -210,6 +230,25 @@ What each growing plant needs (`vitals::plants`, from `reports/ecology/Plants an
 | animals:ginkgo_sapling | ginkgo | 5, 15-26, 36 | Moderate | hardy | - | the game's | plains (su au), forest (su au), birch_forest (su), taiga (su), savanna (sp su au), swamp (su au), mountains (su), ocean (sp su au wi), beach (au wi), scrubland (su), floodplain (su au), fern_forest (su au), crags (su au) |
 | animals:swamp_cypress_sapling | swamp cypress (Taxodioxylon) | 8, 20-30, 40 | Wet | -15 °C | - | the game's | plains (sp su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), ocean (sp su au wi), beach (sp su au wi), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au wi), fern_forest (su), crags (sp su au) |
 | animals:scale_conifer_sapling | scale-leaved conifer (Cheirolepidiaceae) | 8, 20-32, 42 | Dry | -5 °C | - | the game's | plains (su au), forest (su), birch_forest (su), taiga (su), desert (sp su au wi), savanna (sp su au wi), swamp (sp su au wi), mountains (su), ocean (sp su au wi), beach (sp su au), red_dunes (sp su au), scrubland (sp su au), floodplain (sp su au), fern_forest (su), crags (sp su au) |
+
+## Crops
+
+What each crop is sown from and gives ripe (`vitals::crops`; how it grows is its plants row): picked unripe it gives back what sowed it, ripe its harvest and, with a seed of its own, up to 3 more seed. Its ripe harvest tires or feeds the farmland under it. Broken tall grass in the biomes listed gives one of their crops' seed a time in 16.
+
+| crop | sown from | ripe gives | stages | soil | wild seed in |
+|---|---|---|---|---|---|
+| base:wheat | base:wheat_seeds | base:wheat 1-1 | 8 | Tires | tall grass anywhere |
+| base:barley | base:barley_seeds | base:barley 1-1 | 4 | Tires | base:taiga, base:mountains, base:plains, base:birch_forest |
+| base:rye | base:rye_seeds | base:rye 1-1 | 4 | Tires | base:taiga, base:birch_forest, base:plains, base:mountains |
+| base:carrots | base:carrot | base:carrot 1-3 | 4 | Tires | base:plains, base:forest, base:birch_forest, base:taiga, base:mountains |
+| base:potatoes | base:potato | base:potato 1-3 | 4 | Tires | base:plains, base:forest, base:birch_forest, base:taiga, base:mountains |
+| base:beetroots | base:beetroot | base:beetroot 1-2 | 4 | Tires | base:plains, base:forest, base:birch_forest, base:taiga, base:mountains |
+| base:maize | base:maize_seeds | base:corn 1-2 | 4 | Tires | base:plains, base:forest, base:savanna |
+| base:paddy_rice | base:rice_seeds | base:rice_seeds 1-3 | 4 | Tires | base:swamp, base:savanna |
+| base:beans | base:bean_seeds | base:beans 1-2 | 4 | Feeds | base:plains, base:forest, base:savanna, base:mountains |
+| base:sorghum | base:sorghum_seeds | base:sorghum 1-1 | 4 | Tires | base:savanna, base:plains, base:desert |
+| base:millet | base:millet_seeds | base:millet 1-1 | 4 | Tires | base:savanna, base:desert |
+| base:cassava | base:cassava | base:cassava 1-3 | 4 | Tires | base:savanna, base:swamp |
 
 ## Wild plants
 
@@ -340,7 +379,7 @@ Farmland's fertility (`vitals::soil`): how fast crops grow at each level, what w
 | 1 | 47% |
 | 0 | 20% |
 
-A ripe harvest of base:wheat takes a level; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
+A ripe harvest of base:wheat, base:barley, base:rye, base:carrots, base:potatoes, base:beetroots, base:maize, base:paddy_rice, base:sorghum, base:millet, base:cassava takes a level, of base:beans gives one back; base:compost +2, base:dung +1; a season unplanted (about 14 game days, at grass's rate) gives one back. A compost bin fills in 7 steps: spoiled food 2, base:dung 2, base:rotten_flesh 2, base:oak_leaves 1, base:birch_leaves 1, base:spruce_leaves 1, base:acacia_leaves 1, base:sapling 1, base:wheat_seeds 1, base:wheat 1; full, it rots into compost in about 23 minutes.
 
 ## Difficulty (the `base:difficulty` rule)
 

@@ -13,6 +13,7 @@ pub mod balance;
 pub mod calendar;
 pub mod climate;
 pub mod clothing;
+pub mod crops;
 pub mod difficulty;
 pub mod effects;
 pub mod food;

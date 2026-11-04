@@ -62,8 +62,8 @@ fn frost(e: &mut BlockEvent, block: &str) {
     let below = [pos[0], pos[1] - 1, pos[2]];
     let above = [pos[0], pos[1] + 1, pos[2]];
     match block {
-        // The crop dies; the farmland stays.
-        "base:wheat" => {
+        // A crop dies; the farmland stays.
+        b if vitals::crops::of(b).is_some() => {
             w.set(pos, 0);
         }
         // The stalk dies from the top, down to the base, which sprouts again in spring.
