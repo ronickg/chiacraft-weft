@@ -33,6 +33,8 @@ pub static TREE_LEAVES: Component<BlockRef> = Component::named("tree_leaves");
 pub static CONE_TREE: Tag = Tag::named("cone_tree");
 /// A tall bare trunk under one wide, flat crown (the acacia).
 pub static FLAT_TREE: Tag = Tag::named("flat_tree");
+/// A taller bare trunk under a crown of fronds that droop at their tips (palms, tree ferns).
+pub static PALM_TREE: Tag = Tag::named("palm_tree");
 static FROZEN: Tag = Tag::named("frozen");
 static DRY: Tag = Tag::named("dry");
 static FOREST_TAG: Tag = Tag::named("forest");
@@ -118,7 +120,10 @@ pub fn register(r: &mut Registry) {
         .tint(grass, 0xbfb755)
         .tint(foliage, 0xaea42a)
         .tag("dry")
-        .tag("hot");
+        .tag("hot")
+        // Mesquite along the washes.
+        .set(&TREES, 0.008)
+        .set_text(&TREE_KINDS, "base:mesquite_log");
     // Hot grassland with few trees, between the desert and the forests (wet and dry seasons).
     r.biome(&SAVANNA)
         .set(&CLIMATE, base_api::climate("base:savanna"))
@@ -131,7 +136,8 @@ pub fn register(r: &mut Registry) {
         .tag("animals")
         .set(&TREES, 0.04)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:savanna").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
-        .set_text(&TREE_KINDS, "base:acacia_log");
+        // Acacias and mesquite in the open, moriche palms along the streams (morichales).
+        .set_text(&TREE_KINDS, "base:acacia_log:3 base:mesquite_log:1 base:moriche_palm_log:2");
     // Warm, wet lowland: still, dark water, low trees.
     r.biome(&SWAMP)
         .set(&CLIMATE, base_api::climate("base:swamp"))
@@ -144,7 +150,9 @@ pub fn register(r: &mut Registry) {
         .tag("wet")
         .tag("animals")
         .set(&TREES, 0.12)
-        .set(&GRASS_COVER, vitals::forage::grass_cover("base:swamp").unwrap_or(vitals::forage::GRASS_COVER_ELSE));
+        .set(&GRASS_COVER, vitals::forage::grass_cover("base:swamp").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
+        // The Pantanal's acuri palms on the ground above the flood, a few moriches and oaks.
+        .set_text(&TREE_KINDS, "base:acuri_palm_log:3 base:moriche_palm_log:1 base:oak_log:1");
     r.biome(&MOUNTAINS)
         .set(&CLIMATE, base_api::climate("base:mountains"))
         .surface("grass", "dirt", 3)
@@ -253,6 +261,7 @@ struct TreeAt {
     leaves: u32,
     cone: bool,
     flat: bool,
+    palm: bool,
     height: i32,
 }
 
@@ -261,14 +270,17 @@ fn tree_at(log: u32, x: i32, y: i32, z: i32, h: u64) -> Option<TreeAt> {
     let leaves = TREE_LEAVES.on_block(log)?.0;
     let cone = CONE_TREE.on_block(log);
     let flat = FLAT_TREE.on_block(log);
+    let palm = PALM_TREE.on_block(log);
     let height = if cone {
         6 + (h % 4) as i32
+    } else if palm {
+        6 + (h % 3) as i32
     } else if flat {
         5 + (h % 2) as i32
     } else {
         4 + (h % 3) as i32
     };
-    Some(TreeAt { x, y, z, log, leaves, cone, flat, height })
+    Some(TreeAt { x, y, z, log, leaves, cone, flat, palm, height })
 }
 
 /// Calls `put(x, y, z, state, force)` for every block of the tree.
@@ -276,6 +288,20 @@ fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     let (log, leaves) = (t.log, t.leaves);
     let top = t.y + t.height;
     match t.cone {
+        _ if t.palm => {
+            // A tuft on top, fronds out two blocks each way, their tips a block lower.
+            put(t.x, top, t.z, leaves, false);
+            for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                for k in 1..=2 {
+                    put(t.x + dx * k, top - 1, t.z + dz * k, leaves, false);
+                }
+                put(t.x + dx * 3, top - 2, t.z + dz * 3, leaves, false);
+            }
+            for (dx, dz) in [(1, 1), (1, -1), (-1, 1), (-1, -1)] {
+                put(t.x + dx, top - 1, t.z + dz, leaves, false);
+                put(t.x + dx * 2, top - 2, t.z + dz * 2, leaves, false);
+            }
+        }
         _ if t.flat => {
             // One wide flat layer on the trunk's top, a small one over its middle.
             for (y, r2) in [(top, 10), (top + 1, 2)] {
@@ -323,9 +349,9 @@ fn tree_blocks(t: &TreeAt, mut put: impl FnMut(i32, i32, i32, u32, bool)) {
     put(t.x, t.y - 1, t.z, DIRT.id(), true);
 }
 
-/// Places a tree into a live world (saplings). Checks for room first.
-pub fn grow_tree(w: World, p: [i32; 3]) {
-    let Some(t) = tree_at(OAK_LOG.id(), p[0], p[1], p[2], w.random()) else { return };
+/// Places a tree of `log` into a live world (saplings). Checks for room first.
+pub fn grow_tree(w: World, p: [i32; 3], log: u32) {
+    let Some(t) = tree_at(log, p[0], p[1], p[2], w.random()) else { return };
     for y in t.y + 1..t.y + t.height {
         if w.get([t.x, y, t.z]) != 0 {
             return;
