@@ -2393,6 +2393,9 @@ pub struct Host {
     /// 1 while it plays (or its file is still being read); 0 once it ended, was stopped, or
     /// gave way to a sound that matters more (`SoundDesc::priority`).
     pub client_sound_playing: unsafe extern "C" fn(client: *mut ClientCtx, handle: u64) -> u32,
+    /// How fast this dimension's time of day runs: 1 the usual, 0.5 a day twice as long, 0 the
+    /// sky still. Players' clocks run at the same pace; what waits on ticks keeps its own.
+    pub set_day_rate: unsafe extern "C" fn(world: *mut WorldCtx, rate: f32),
 }
 
 /// Natural spawning around players (`Host::reg_spawn`). Every two seconds the engine tries a few

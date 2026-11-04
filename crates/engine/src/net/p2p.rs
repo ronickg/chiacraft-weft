@@ -34,7 +34,7 @@ const BANS_ALPN: &[u8] = b"chiacraft/bans/1";
 /// signed achievements (`ToClient::Achievement`; chiacraft, phase 4). 10: a world asks a joining
 /// game for an achievement its rules need (`AskAchievement`, `Proofs`; chiacraft, phase 4). 11: a
 /// world sends its issuer's revocation list (`ToClient::Revocations`; chiacraft, phase 4).
-const PROTOCOL: u32 = 11;
+const PROTOCOL: u32 = 12;
 const MAX_FRAME: usize = 64 << 20;
 
 /// A data package the host's world plays with: id, version, hash (hex), size in bytes, its
