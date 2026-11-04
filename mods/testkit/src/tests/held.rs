@@ -22,34 +22,49 @@ async fn pool(t: &T, deep: i32) -> Result<[i32; 3], String> {
     Ok(f)
 }
 
+/// Looks at the middle of the top of block `p` (`look_at` aims at its middle, which on a floor
+/// seen from low down is behind the top of the block in front).
+fn aim_top(t: &T, p: [i32; 3]) {
+    let s = t.state();
+    let eye = [s.pos[0], s.pos[1] + t.c().entity(0).map_or(1.62, |e| e.size[2] as f64), s.pos[2]];
+    let d = [p[0] as f64 + 0.5 - eye[0], p[1] as f64 + 0.99 - eye[1], p[2] as f64 + 0.5 - eye[2]];
+    let yaw = (-d[0]).atan2(-d[2]).to_degrees() as f32;
+    let pitch = d[1].atan2((d[0] * d[0] + d[2] * d[2]).sqrt()).to_degrees() as f32;
+    t.c().look(yaw, pitch);
+}
+
 /// Placing into water fills a slab; out of water it stays dry; the weed goes only into water.
 pub async fn held_water_place(t: T) -> R {
-    let f = pool(&t, 2).await?;
+    let f = pool(&t, 1).await?;
     t.op("put me 0 testmod:sea_slab 4").await?;
     t.op("put me 1 testmod:waterweed 4").await?;
     t.c().select(0);
     t.secs(0.2).await?;
-    // Onto the pool's floor, through the water. Cells whose ray from the eye misses the pool's
-    // grass edge and the slab, wherever in its cell the player stands.
-    t.look_at(add(f, [3, -3, -3]));
+    // Onto the pool's floor, through the water: from the edge, the one cell within reach whose
+    // ray misses the grass edge wherever in its cell the player stands. The slab, then the weed.
+    let (floor, cell) = (add(f, [2, -2, -2]), add(f, [2, -1, -2]));
+    aim_top(&t, floor);
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check_eq(t.block(add(f, [3, -2, -3])).await?, WET.to_string(), "a slab placed into water stands in it");
+    t.check_eq(t.block(cell).await?, WET.to_string(), "a slab placed into water stands in it");
     t.look_at(add(f, [-2, -1, 0]));
     t.frames(3).await?;
     t.secs(0.3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
     t.check_eq(t.block(add(f, [-2, 0, 0])).await?, DRY.to_string(), "a slab placed on land is dry");
+    t.set(cell, "air").await?;
+    t.secs(0.3).await?;
+    t.check_eq(t.block(cell).await?, SOURCE.to_string(), "the slab's water left");
 
     t.c().select(1);
     t.secs(0.3).await?;
-    t.look_at(add(f, [2, -3, -2]));
+    aim_top(&t, floor);
     t.frames(3).await?;
     t.press("core:use");
     t.secs(0.4).await?;
-    t.check_eq(t.block(add(f, [2, -2, -2])).await?, WEED.to_string(), "the weed placed into water");
+    t.check_eq(t.block(cell).await?, WEED.to_string(), "the weed placed into water");
     t.look_at(add(f, [-3, -1, 1]));
     t.frames(3).await?;
     t.secs(0.3).await?;
