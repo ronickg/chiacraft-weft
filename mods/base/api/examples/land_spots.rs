@@ -35,7 +35,7 @@ fn main() {
                     best[k] = (score, x, z);
                 }
             };
-            let temperate = t > q12(-0.15) && t < q12(0.2) && !mountain(x, z);
+            let temperate = t > q12(l::TAIGA_BELOW) && t < q12(l::SAVANNA.0) && !mountain(x, z);
             // 0: a river in a valley, inland, in the temperate woods and plains.
             if h < SEA && (SEA + 10..=SEA + 30).contains(&h0) && cont > q12(0.2) && temperate {
                 put(0, (h0 - SEA) as i64 * 4 + near);
@@ -46,7 +46,7 @@ fn main() {
             }
             // 2: a mesa's high tier in the desert.
             let m = l::mesa(&f, x * 16, z * 16) >> 4;
-            if m >= 20 && t >= q12(0.35) && hu < 0 {
+            if m >= 20 && l::overworld_biome(&f, x * 16, z * 16) == "desert" {
                 put(2, m as i64 * 8 + fall as i64 * 4 + near);
             }
             // 3: a snow cap on a high peak.
@@ -58,7 +58,7 @@ fn main() {
                 put(4, fall as i64 * 8 + near);
             }
             // 5: highlands: rolling forest well over the sea, away from the mountains.
-            if temperate && hu >= q12(0.25) && h >= SEA + 24 && h - h0 >= 8 && cont > q12(0.2) {
+            if temperate && hu >= q12(l::FOREST_HUMIDITY) && h >= SEA + 24 && h - h0 >= 8 && cont > q12(0.2) {
                 put(5, (h - h0) as i64 * 4 + h as i64 + near);
             }
         }
