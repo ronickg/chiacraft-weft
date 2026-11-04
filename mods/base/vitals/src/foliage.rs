@@ -64,17 +64,23 @@ const AUTUMN_AMOUNT: (f32, f32) = (0.45, 0.75);
 // an older, lighter brown they came out olive and read as early autumn: the world playtest).
 const WINTER: (u32, u32) = (0x9a8f62, 0x66574a);
 const WINTER_AMOUNT: (f32, f32) = (0.6, 0.9);
+/// Where winter's look starts greening, in seasons from spring's start: winter's last quarter (3.5
+/// days), gone by spring's first day.
+const WINTER_ENDS: f32 = 3.75;
 
 /// The color of `base` (the biome's own, 0xRRGGBB, already `muted`) on `day` of the year (0 at spring's start, a
 /// fraction for the hour; `YEAR_DAYS` long) where the year has `strength` (`strength`).
 pub fn tint(base: u32, part: Part, day: f32, strength: f32) -> u32 {
     let d = day.rem_euclid(YEAR_DAYS as f32);
     let q = YEAR_DAYS as f32 / 4.0;
-    // Fresh green peaks halfway through spring; the leaves turn from late summer, are at their
-    // most colored late in autumn and fall into winter's dull look, which lasts to spring.
-    let fresh = bump(d, 0.1 * q, 0.5 * q, 1.3 * q);
+    // Fresh green from spring's first day to its peak halfway through; the leaves turn from late
+    // summer, are at their most colored late in autumn and fall into winter's dull look, which
+    // greens again over winter's last quarter, so spring's first day is green: every world starts
+    // on it (the world playtest, 11-04: forests and lakesides khaki and grey-brown at "Spring 1",
+    // when winter's look still faded over spring's first 3.5 days).
+    let fresh = bump(d, 0.0, 0.5 * q, 1.3 * q);
     let autumn = smoothstep(1.85 * q, 2.6 * q, d) * (1.0 - smoothstep(2.9 * q, 3.25 * q, d));
-    let winter = smoothstep(2.9 * q, 3.3 * q, d).max(1.0 - smoothstep(0.0, 0.25 * q, d));
+    let winter = smoothstep(2.9 * q, 3.3 * q, d) * (1.0 - smoothstep(WINTER_ENDS * q, 4.0 * q, d));
     let pick = |look: (u32, u32)| if part == Part::Grass { look.0 } else { look.1 };
     let amount = |a: (f32, f32)| if part == Part::Grass { a.0 } else { a.1 };
     let autumn_look = match part {
@@ -264,6 +270,15 @@ mod tests {
                     assert!(line.contains("muted("), "{file}: {name}'s {kind} tint isn't muted: {line}");
                 }
             }
+        }
+    }
+
+    /// Every world starts on spring's first day: its leaves are green then, not winter's.
+    #[test]
+    fn spring_starts_green() {
+        for day in [0.0, 0.25, 1.0] {
+            let c = rgb(tint(OAK, OAK_LEAVES, day, 1.0));
+            assert!(c[1] > c[0] * 1.3, "day {day}: {c:?}");
         }
     }
 
