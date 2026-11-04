@@ -78,7 +78,7 @@ impl Climate {
 // Wind and fog (`air`): each place's seasonal mean wind at 10 m and its days with fog, from airport
 // records, the weather services and the Cretaceous places' modern stand-ins
 // (`reports/ecology/Wind and fog.md`, with which are estimates).
-pub const BIOMES: [Climate; 17] = [
+pub const BIOMES: [Climate; 18] = [
     // The overworld (`mods/base/src/worldgen.rs`).
     c("base:plains", "Manhattan, Kansas (Konza Prairie)", 12.8, 0.42, 14.2, [0.27, 0.27, 0.2, 0.14]).air(
         [3.8, 3.0, 3.0, 3.1],
@@ -119,6 +119,13 @@ pub const BIOMES: [Climate; 17] = [
     c("base:mountains", "Davos, 1,594 m", 6.0, 0.63, 8.8, [0.32, 0.45, 0.31, 0.29]).air(
         [2.4, 2.7, 2.2, 1.7],
         [1.5, 1.0, 2.5, 2.5],
+        Fog::Dawn,
+    ),
+    // Giant sequoia groves (Ronald, 11-04): the Sierra Nevada's west slope, cool snowy winters and
+    // dry summers. Wind and fog are estimates for a sheltered montane forest (no station record).
+    c("base:sequoia_grove", "Giant Forest, Sequoia National Park, 1,721 m", 10.4, 0.49, 8.4, [0.2, 0.05, 0.1, 0.24]).air(
+        [2.0, 1.8, 1.6, 1.8],
+        [3.0, 1.0, 2.0, 4.0],
         Fog::Dawn,
     ),
     c("base:ocean", "Ponta Delgada, the Azores", 18.2, 0.97, 4.1, [0.33, 0.19, 0.38, 0.43]).air(
