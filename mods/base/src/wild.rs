@@ -32,6 +32,8 @@ fn short(block: &'static str) -> &'static str {
 pub fn register(r: &mut Registry) {
     // What plants of the bed root in, and what kelp stands on: the bed or kelp under it.
     r.tag("water_bed", &["#dirt", "#sand", "gravel", "clay"]);
+    // What the shore's plants (reeds, cattails, wild rice) root in: soil or a sandy shore.
+    r.tag("shore_soil", &["#plant_soil", "#sand"]);
     r.tag("kelp_soil", &["#water_bed", "kelp"]);
     for (_, p) in mine() {
         let name = short(p.block);
@@ -40,7 +42,7 @@ pub fn register(r: &mut Registry) {
         let b = match p.ground {
             Ground::Soil => b.needs_below("#plant_soil"),
             Ground::Sand => b.needs_below("#sand"),
-            Ground::Shore => b.needs_below("#plant_soil").needs_near_support("#water"),
+            Ground::Shore => b.needs_below("#shore_soil").needs_near_support("#water"),
             Ground::Water => b.needs_below("#water"),
             Ground::Bed => b
                 .needs_below(if p.form == Form::Column { "#kelp_soil" } else { "#water_bed" })

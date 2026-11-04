@@ -376,7 +376,14 @@ fn decorate(g: &mut Gen) {
                 if col.height >= SEA - WILD_WATER_DEPTH {
                     for top in [SEA, SEA - 1] {
                         let y = top + 1 - oy;
-                        if (1..16).contains(&y) && g.get(x, y as usize, z) == 0 && WATER.is(g.get(x, y as usize - 1, z)) {
+                        if !(0..16).contains(&y) || g.get(x, y as usize, z) != 0 {
+                            continue;
+                        }
+                        // The water it floats on: in this cube, or, on the cube's floor, the sea's
+                        // surface (y 63 tops a cube, so a plant on it is always the next cube's),
+                        // water unless the biome freezes it.
+                        let water = if y >= 1 { WATER.is(g.get(x, y as usize - 1, z)) } else { top == SEA && !FROZEN.on_biome(col.biome) };
+                        if water {
                             if let Some(s) = wild_at(seed, wx, wz, shore, wild::Ground::Water) {
                                 g.set(x, y as usize, z, s);
                             }
@@ -455,7 +462,11 @@ fn decorate(g: &mut Gen) {
             } else {
                 None
             };
-            if let Some(s) = ground.and_then(|gr| wild_at(seed, wx, wz, b, gr)) {
+            // A sandy lake or river shore grows the shore's reeds too, else its sand's own plants
+            // (a beach's washed-up kelp).
+            let sandy_shore = shore && ground == Some(wild::Ground::Sand);
+            let pick = if sandy_shore { wild_at(seed, wx, wz, b, wild::Ground::Shore) } else { None };
+            if let Some(s) = pick.or_else(|| ground.and_then(|gr| wild_at(seed, wx, wz, b, gr))) {
                 g.set(x, y, z, s);
                 continue;
             }
