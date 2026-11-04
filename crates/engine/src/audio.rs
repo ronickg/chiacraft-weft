@@ -763,7 +763,11 @@ impl Audio {
                 v.wait = None;
                 v.started = Instant::now();
                 self.played += 1;
-                let name = content().game.sounds.get(sound as usize).map_or_else(String::new, |d| d.name.clone());
+                let name = content()
+                    .game
+                    .sounds
+                    .get(sound as usize)
+                    .map_or_else(String::new, |d| d.name.clone());
                 if self.recent.len() >= RECENT {
                     self.recent.pop_front();
                 }
