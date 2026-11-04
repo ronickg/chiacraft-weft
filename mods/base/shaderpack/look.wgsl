@@ -68,10 +68,10 @@ const LEAF_LIGHT: vec3<f32> = vec3(0.6, 1.0, 0.5);
 
 fn under_leaves(sky_light: f32) -> f32 {
     // Not in deep cover (a cave in the forest): the leaves' light is from what the sky reaches.
-    // Faint down to a sky light of 0.1: from 0.35 the foot of a rainforest giant, between its
-    // buttresses under its thick crown, went near black at noon (frame luma 0.03-0.06, the world
-    // playtester's GIANT_F); a cave, with no sky light at all, stays dark.
-    return min(canopy(), 1.0) * (1.0 - smoothstep(0.8, 1.0, sky_light)) * smoothstep(0.08, 0.4, sky_light);
+    // Faint down to a sky light of about 0.05: from 0.35 the foot of a rainforest giant, between
+    // its buttresses under its thick crown, went near black at noon (frame luma 0.03-0.06, the
+    // world playtester's GIANT_F); a cave, with no sky light at all, stays dark.
+    return min(canopy(), 1.0) * (1.0 - smoothstep(0.8, 1.0, sky_light)) * smoothstep(0.03, 0.3, sky_light);
 }
 
 // ---- the colors of the day ----
@@ -426,7 +426,7 @@ fn light_on(n: vec3<f32>, light: vec4<f32>, shadow: f32, ao: f32, pos: vec3<f32>
     // green and soft (a rainforest's floor gets 1-2 % of the sun, more of it this way than from the
     // sky). Without it the floor of Plants' rainforest sat at luma 12-17 at noon, under the daytime
     // targets' 15-60 for deep forest shade (Lighting's canopy check, 11-04).
-    c += p.sun * light_strength() * 0.035 * LEAF_LIGHT * under * hemi * ao;
+    c += p.sun * light_strength() * 0.045 * LEAF_LIGHT * under * hemi * ao;
     // At golden hour the sky round the low sun glows: a warm fill from its side of the sky, on
     // the faces turned that way; those turned away keep the sky's cool light (Valheim's warm light,
     // blue shade).
