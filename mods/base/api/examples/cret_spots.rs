@@ -11,7 +11,10 @@ use base_api::land as l;
 use weft_sdk::noise::fixed::q12;
 
 fn main() {
-    let a: Vec<i64> = std::env::args().skip(1).filter_map(|s| s.parse().ok()).collect();
+    let a: Vec<i64> = std::env::args()
+        .skip(1)
+        .filter_map(|s| s.parse().ok())
+        .collect();
     let seed = a.first().copied().unwrap_or(1) as u64;
     let (cx, cz) = (a.get(1).copied().unwrap_or(0) as i32, a.get(2).copied().unwrap_or(0) as i32);
     let f = l::fields(seed);
@@ -47,7 +50,11 @@ fn main() {
                 for (x, z) in [(cx + i, cz - r), (cx + i, cz + r), (cx - r, cz + i), (cx + r, cz + i)] {
                     let (name, h) = biome(x, z);
                     // Well inside: the same biome 12 blocks round.
-                    if name == want && [(12, 0), (-12, 0), (0, 12), (0, -12)].iter().all(|&(dx, dz)| biome(x + dx, z + dz).0 == want) {
+                    if name == want
+                        && [(12, 0), (-12, 0), (0, 12), (0, -12)]
+                            .iter()
+                            .all(|&(dx, dz)| biome(x + dx, z + dz).0 == want)
+                    {
                         println!("{want:12} x {x} z {z} ground {h}, {r} blocks out: chat /tp {x}.5 {} {z}.5", h.max(SEA) + 2);
                         break 'search;
                     }
