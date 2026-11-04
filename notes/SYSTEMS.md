@@ -192,6 +192,7 @@ built, it gets its row below and its arrows above.
 | Eggs hatch where and when they're laid | same | eggs that can't develop in a nest in a habitat in the breeding season |
 | The stats are the same nine | same | players' and animals' stats out of step |
 | Every food has nutrition | `testkit` `every_food_has_nutrition` | food items that can't be eaten |
+| Clothes warm, the pot cooks | `testkit` `clothes_and_stew` | the clothing slots not read by body temperature (`/warmth`), the cooking pot not making a stew |
 | Survival balance | `vitals/src/balance.rs` | foods, stomach, levels and calendar out of balance; clothes that don't warm, cool or keep out the wind as their material should; a stew of three foods not making one well fed; preserved food keeping too little; a rack drying in the damp cold or not in a desert summer |
 | Every hide is a species | `animals/core/src/hides.rs` | a pelt or hide row for a species that isn't there |
 | Species balance | `animals/core/src/balance.rs` | species numbers against their facts |

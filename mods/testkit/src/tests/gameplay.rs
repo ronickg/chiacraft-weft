@@ -1944,3 +1944,38 @@ pub async fn dedicated_server(t: T) -> R {
     t.c().close_screen();
     Ok(())
 }
+
+/// Clothes and stews (`vitals::clothing`, `vitals::meals`): a full set of fur in the clothing
+/// slots (after the hotbar, the main inventory and armor's four) comes to the fur set's warmth, and
+/// a cooking pot with fuel turns beef, an apple, bread and a bowl into a stew.
+pub async fn clothes_and_stew(t: T) -> R {
+    t.flat().await?;
+    t.op("mode survival").await?;
+    for (i, piece) in ["fur_hat", "fur_coat", "fur_trousers", "fur_boots"].iter().enumerate() {
+        t.op(&format!("put me {} {piece}", 40 + i)).await?;
+    }
+    let fur = vitals::clothing::find("fur").map_or(0.0, |m| m.cold());
+    let reply = t.cmd("/warmth").await?;
+    t.check(reply.contains(&format!("{fur:.1} °C cold")), format!("a full set of fur comes to {fur} °C: {reply}"));
+    for i in 40..44 {
+        t.op(&format!("put me {i} stick 0")).await?;
+    }
+
+    let pot = add(t.feet(), [2, 0, 0]);
+    t.set(pot, "base:cooking_pot").await?;
+    for (slot, item) in [(0, "beef"), (1, "apple"), (2, "bread"), (4, "bowl"), (5, "coal")] {
+        t.op(&format!("put {} {slot} {item}", at(pot))).await?;
+    }
+    let mut stew = String::new();
+    for _ in 0..30 {
+        stew = t.op(&format!("slot {} 6", at(pot))).await?;
+        if stew.starts_with("base:stew") {
+            break;
+        }
+        t.secs(1.0).await?;
+    }
+    t.check(stew.starts_with("base:stew"), format!("the pot's output after its cooking: {stew}"));
+    let left = t.op(&format!("slot {} 0", at(pot))).await?;
+    t.check(left.starts_with('-'), format!("the beef went into the stew: {left}"));
+    Ok(())
+}
