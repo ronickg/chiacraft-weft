@@ -73,24 +73,29 @@ pub fn register(r: &mut Registry) {
             }
             // No base plant lies as a log yet (the Cretaceous's rotten log is the animals mod's).
             Form::Still | Form::Log => b.texture(name).tab(&crate::tabs::NATURAL),
+            // A flat mat on the ground, a sixteenth high; picked, it gives its plant.
+            Form::Mat => b
+                .texture(name)
+                .model_box([0.0, 0.0, 0.0], [16.0, 1.0, 16.0])
+                .no_item(),
         };
         drop(b);
-        // Picking gives what plants it again: one at any stage, two more when ripe.
+        // Picking gives what plants it again: one at any stage, a bush or a seed head two more when
+        // ripe. (Nothing at all out of season waits for spring's other plant food: the cattail's
+        // root and fibre, `notes/ECOLOGY.md`.)
         if let Some(gives) = p.gives.map(short) {
+            let ripe = match p.form {
+                Form::Bush => Some("age=3"),
+                Form::Ripens => Some("age=1"),
+                _ => None,
+            };
             let table = r.loot(block).pool(Pool::new().entry(Entry::item(gives)));
-            if matches!(p.form, Form::Bush | Form::Ripens) {
-                let ripe = if p.form == Form::Bush { "age=3" } else { "age=1" };
-                table
-                    .pool(
-                        Pool::new()
-                            .when(Cond::BlockState(ripe))
-                            .entry(Entry::item(gives)),
-                    )
-                    .pool(
-                        Pool::new()
-                            .when(Cond::BlockState(ripe))
-                            .entry(Entry::item(gives)),
-                    );
+            if let Some(ripe) = ripe {
+                table.pool(
+                    Pool::new()
+                        .when(Cond::BlockState(ripe))
+                        .entry(Entry::item(gives).count(2, 2)),
+                );
             }
         }
     }
@@ -105,7 +110,8 @@ pub fn planted_by(item: &str) -> Option<&'static Block> {
 }
 
 /// The state the world makes each wild plant in (`worldgen.rs`, any mod's: the Cretaceous's are
-/// the animals mod's), by its index in `WILD`: tufts grown, bushes and seed heads unripe;
+/// the animals mod's), by its index in `WILD`: tufts grown, bushes and seed heads unripe but for
+/// fruit that holds over winter (`wild::HOLDS_FRUIT`);
 /// `u32::MAX` for one not registered.
 pub fn state(i: usize) -> u32 {
     static STATES: OnceLock<Vec<u32>> = OnceLock::new();
@@ -114,7 +120,12 @@ pub fn state(i: usize) -> u32 {
             .iter()
             .map(|p| {
                 let Some(id) = Block::lookup(p.block) else { return u32::MAX };
-                if p.form == Form::Tuft { state_with(id, "age", "1").unwrap_or(id) } else { id }
+                match p.form {
+                    Form::Tuft => state_with(id, "age", "1").unwrap_or(id),
+                    // Fruit that holds on the plant over winter is there whenever you come.
+                    Form::Bush if wild::HOLDS_FRUIT.contains(&p.block) => state_with(id, "age", "3").unwrap_or(id),
+                    _ => id,
+                }
             })
             .collect()
     })[i]

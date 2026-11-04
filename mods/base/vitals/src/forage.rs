@@ -84,9 +84,9 @@ const ARAUCARIAS: &[&str] = &["animals:scrubland", "animals:floodplain", "animal
 const SCALE_CONIFERS: &[&str] = &["animals:red_dunes", "animals:scrubland", "animals:crags"];
 const BIRCHES: &[&str] = &["base:forest", "base:birch_forest"];
 
-pub const SOURCES: [Source; 66] = [
+pub const SOURCES: [Source; 67] = [
     s("base:tall_grass", None, Category::Grass, 10, Eaten::Becomes("base:grazed_grass"), Some("base:grazed_grass")),
-    s("base:berry_bush", Some(3), Category::Fruit, 8, Eaten::Age(1), Some("base:berry_bush")),
+    wild("base:berry_bush", 3, Category::Fruit, 8, Eaten::Age(1), wild::FORESTS),
     browse("base:oak_leaves", Category::Leaves, 4, OAKS, GREEN),
     browse("base:birch_leaves", Category::Leaves, 4, &["base:forest", "base:birch_forest"], GREEN),
     // Evergreen: a winter's browse (and the tundra's few trees).
@@ -192,6 +192,8 @@ pub const SOURCES: [Source; 66] = [
     browse("animals:cycad", Category::Seeds, 3, wild::CYCAD_LANDS, SUMMER_AUTUMN),
     browse("animals:flowering_shrub", Category::Leaves, 4, wild::FLOWERING, GREEN),
     browse("animals:water_lily", Category::WaterPlants, 5, wild::PONDS, ALL_YEAR),
+    // Kelp washed up on the beach, all year.
+    browse("base:kelp", Category::WaterPlants, 4, &["base:beach"], ALL_YEAR),
     // Grubs and beetles in the rotten logs, all year.
     browse("animals:rotten_log", Category::Insects, 3, wild::DEADWOOD, ALL_YEAR),
     // Our trees (`worldgen.rs`, `cretaceous.rs`), as browse where they grow: mesquite's leaves

@@ -34,7 +34,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", "..", "..", ".."))
 SKILL = os.path.join(REPO, ".claude", "skills", "blocky-model", "scripts")
 sys.path.insert(0, SKILL)
-from house import SCALE, material  # noqa: E402
+from house import SCALE, TX, material  # noqa: E402
 from prop import el, entity_spec, paint  # noqa: E402
 
 ASSETS = os.path.join(HERE, "..", "..", "assets")
@@ -115,7 +115,7 @@ def build(kind, out):
     os.makedirs(out, exist_ok=True)
     E = elements()
     down = lambda e, face, p: np.clip((HEIGHT - p[..., 1]) / HEIGHT, 0, 1)  # lit as one piece
-    sheet, uv = paint(E, lambda e, f, p, uu, vv, h: area(p, kind), materials(kind), ground=False, width=32, down=down)
+    sheet, uv = paint(E, lambda e, f, p, uu, vv, h: area(p, kind), materials(kind), ground=False, width=32, down=down, tx=TX)
     return E, sheet, uv
 
 

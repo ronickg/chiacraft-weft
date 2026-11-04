@@ -933,7 +933,15 @@ impl UiRenderer {
         let mut none = Vec::new();
         // The capitals' top three font pixels inside the slot's corner, and three from its left.
         let top = 14.0 - self.font.caps;
-        self.glyph_run(&layout.items, (r.x + 3.0 * px).round(), (r.y + 3.0 * px - top * px).round(), px, 0xE4DACFE0, Some(0x28180CFF), &mut none);
+        self.glyph_run(
+            &layout.items,
+            (r.x + 3.0 * px).round(),
+            (r.y + 3.0 * px - top * px).round(),
+            px,
+            0xE4DACFE0,
+            Some(0x28180CFF),
+            &mut none,
+        );
     }
 
     /// The hovered node's tooltip next to the mouse (physical pixels), drawn every frame on top:

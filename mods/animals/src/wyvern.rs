@@ -19,37 +19,21 @@ const SIZE: (f32, f32) = (3.4, 4.0);
 /// Its row in `species::SPECIES`.
 const INDEX: usize = 6;
 
-value! {
-    #[derive(Default)]
-    /// What a wyvern is doing (not saved: it just settles down again).
-    pub struct Wyvern {
-        /// Ticks left resting (0: up and about).
-        pub rest: u32,
-        /// The look applied, 1 + pose (0: none yet).
-        pub look: u32,
-    }
-}
-
-static STATE: Component<Wyvern> = Component::named("wyvern_state");
-
-const LOOKS: [(&str, &str); 2] = [("", ""), ("_rest", "wyvern_rest")];
 /// How near a player can come before a wild one goes for them, in blocks; near its nest, further.
 const TERRITORY: f64 = 14.0;
 const NEST_TERRITORY: f64 = 24.0;
 
 pub fn init(r: &mut Registry) {
-    r.entity_component(&STATE, Wyvern::default(), 0);
-    // Lying down, drawn in place of one resting.
-    for (suffix, kind) in &LOOKS[1..] {
-        drop(
-            r.entity(Entity::generated(kind.to_string()))
-                .size(SIZE.0, SIZE.1 * 0.5)
-                .passive()
-                .model_file("wyvern")
-                .animations(&format!("wyvern{suffix}"))
-                .texture(TEXTURE),
-        );
-    }
+    // Settling down: its poses, drawn in place of it (`rest.rs`).
+    crate::rest::register(
+        r,
+        &WYVERN,
+        crate::rest::Settle { chance: 500, ticks: (800, 2400), lie_after: 0 },
+        "wyvern",
+        TEXTURE,
+        (SIZE.0, SIZE.1 * 0.5),
+        &[("_rest", "wyvern_rest")],
+    );
     r.entity(&WYVERN)
         .size(SIZE.0, SIZE.1)
         .health(400.0)
@@ -60,7 +44,6 @@ pub fn init(r: &mut Registry) {
         .model_file("wyvern")
         .animations("wyvern")
         .texture(TEXTURE)
-        .attach(&STATE)
         .on_interact(|e| {
             let (w, id, player) = (e.world(), e.entity(), e.other());
             if !crate::screen::interact(&w, id, player)
@@ -82,7 +65,7 @@ pub fn init(r: &mut Registry) {
                 .then(crate::commands::act(INDEX))
                 .then(crate::breeding::behave(INDEX))
                 .then(crate::eggs::nest(INDEX))
-                .then(settle)
+                .then(crate::rest::settle)
                 .then(crate::commands::hold)
                 .then(crate::comfort::seek)
                 .then(crate::forage::forage)
@@ -90,9 +73,7 @@ pub fn init(r: &mut Registry) {
         )
         .on_hurt(|w, h| {
             crate::taming::hurt(w, h.entity);
-            if let Some(c) = w.component_mut(h.entity, &STATE) {
-                c.rest = 0;
-            }
+            crate::rest::stop(w, h.entity);
         });
 }
 
@@ -113,7 +94,7 @@ fn guard(w: &World, id: u64, st: &EntityState) -> bool {
         .is_empty();
     if let Some((p, _)) = ai::nearest_player(w, st, if nest { NEST_TERRITORY } else { TERRITORY }) {
         weft_sdk::info!("wyvern {id} goes for player {p}");
-        wake(w, id);
+        crate::rest::wake(w, id);
         crate::knockout::anger(w, id, p);
     }
     false
@@ -138,53 +119,4 @@ fn breathe_at_foe(w: &World, id: u64, st: &EntityState) -> bool {
         crate::breath::start(w, id, foe);
     }
     false
-}
-
-/// Every tick: now and then lie down to rest for a while, and show the pose.
-fn settle(w: &World, id: u64, st: &EntityState) -> bool {
-    let Some(c) = w.component_mut(id, &STATE) else { return false };
-    if c.rest == 0 && !w.navigating(id) && !crate::forage::busy(w, id) && w.random_below(500) == 0 {
-        c.rest = 800 + w.random_below(2400);
-    }
-    let resting = c.rest > 0;
-    if resting {
-        c.rest = c.rest.saturating_sub(w.tick_elapsed(id) as _);
-    }
-    let pose = resting as u32;
-    if c.look != pose + 1 {
-        c.look = pose + 1;
-        let kind = LOOKS[pose as usize].1;
-        w.set_look(
-            id,
-            (!kind.is_empty())
-                .then(|| format!("animals:{kind}"))
-                .as_deref(),
-        );
-    }
-    if resting && w.navigating(id) {
-        w.navigate(id, st.pos, 0.0);
-    }
-    resting
-}
-
-/// Up from resting, to follow, fight or carry a rider.
-pub fn wake(w: &World, id: u64) {
-    if let Some(c) = w.component_mut(id, &STATE)
-        && (c.rest > 0 || c.look > 1)
-    {
-        c.rest = 0;
-        c.look = 1;
-        w.set_look(id, None);
-    }
-}
-
-/// Knocked out: lying down.
-pub fn sleep(w: &World, id: u64) {
-    if let Some(c) = w.component_mut(id, &STATE)
-        && c.look != 2
-    {
-        c.rest = 0;
-        c.look = 2;
-        w.set_look(id, Some("animals:wyvern_rest"));
-    }
 }

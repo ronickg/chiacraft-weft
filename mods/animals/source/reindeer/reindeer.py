@@ -7,7 +7,8 @@ ears small and round. Its colors are rules (see `area`), painted in a wild reind
 
     ~/.venvs/blocky/bin/python reindeer.py     # writes out/spec.json, out/texture.png
 
-Units are texels at the house density (64 a block, 1.56 cm each), y up, it faces +z. Laid out
+Units are 1/64 of a block (1.56 cm each), y up, it faces +z; painted at the house density, 32
+texels a block (`TX` texels a unit), as the blocks and items are. Laid out
 in the deer's space (withers 60) and scaled by K = 1.12: the withers 67 up (1.05 m), the body 122
 from the nose to the tail (1.9 m). Both sexes carry antlers (the only deer whose females do): a
 bull's big, a cow's smaller, by the build gene for horns (`genetics/reindeer.json`).
@@ -25,9 +26,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import TX  # noqa: E402
+
+# Texels a unit: 0.5, the house's 32 a block (a house-unit model, scaled by K before painting). 32,
+# not finer: the head's side, which carries the eye, is 8 texels by 7 at 32 (house.MIN_FACE is 3).
 
 OUT = os.environ.get("REINDEER_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -57,8 +62,14 @@ EYES.update({
                                    "OIIPPO",
                                    ".OOOO."], colors={"O": (32, 24, 22), "P": (16, 12, 12), "H": (226, 228, 232),
                                                       "I": (96, 62, 40)}, halo="below"),
+    # At 32 a block the head's side is 8 texels by 7: the eye is 2 by 2, near-black, the catchlight
+    # up and forward (toward the light; `_m` is the other side's), the brown glow low and back.
+    "reindeer_px": dict(pattern=["HP", "PI"], colors={"P": (16, 12, 12), "H": (226, 228, 232), "I": (96, 62, 40)},
+                        halo="none", iris="I"),
+    "reindeer_px_m": dict(pattern=["PH", "IP"], colors={"P": (16, 12, 12), "H": (226, 228, 232), "I": (96, 62, 40)},
+                          halo="none", iris="I"),
 })
-EYE_STYLE = os.environ.get("REINDEER_EYES", "reindeer_dark")
+EYE_STYLE = os.environ.get("REINDEER_EYES", "reindeer_px")
 
 # In the deer's space (scaled by K when the model is built).
 SKULL0 = ((-7.0, 60.0, 32.0), (7.0, 72.0, 46.0))
@@ -93,16 +104,37 @@ def rod(name, bone, start, rot, length, w, back=0.4):
     return e, s + rotm(rot) @ np.array([0, length - 0.6, 0])
 
 
+def eye_style(side):
+    """The eye design on the head's east (side > 0) or west side: mirrored on the west, so both
+    catchlights face forward."""
+    return EYE_STYLE + "_m" if side < 0 and EYE_STYLE + "_m" in EYES else EYE_STYLE
+
+
+def skull_grid():
+    """The (scaled) skull side's texels: (width, height) and the size of one texel in units (u, v)."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h = max(1, round(TX * (z1 - z0))), max(1, round(TX * (y1 - y0)))
+    return w, h, (z1 - z0) / w, (y1 - y0) / h
+
+
+def eye_center(side):
+    """The eye's center on the skull's east (side > 0) or west side, in that face's texels."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h, su, sv = skull_grid()
+    return ((z1 - EYE_Z) if side > 0 else (EYE_Z - z0)) / su, (y1 - EYE_Y) / sv
+
+
 def eye_box(side):
-    """The eye's texels on the (scaled) skull's side: z from, z to, top, bottom."""
-    pat = EYES[EYE_STYLE]["pattern"]
+    """The painted eye on the (scaled) skull's side, in units: z from, z to, top, bottom; rounded
+    exactly as `stamp_eyes` places it, so the eyelid covers it to the texel."""
+    pat = EYES[eye_style(side)]["pattern"]
     ph, pw = len(pat), len(pat[0])
     (x0, y0, z0), (x1, y1, z1) = SKULL
-    cu = (z1 - EYE_Z) if side > 0 else (EYE_Z - z0)
-    u0 = int(round(cu - pw / 2))
-    v0 = int(round(y1 - EYE_Y - ph / 2))
-    za, zb = (z1 - u0 - pw, z1 - u0) if side > 0 else (z0 + u0, z0 + u0 + pw)
-    return za, zb, y1 - v0, y1 - v0 - ph
+    w, h, su, sv = skull_grid()
+    u0, v0 = eye_corner(*eye_center(side), pat, w)
+    za, zb = (z1 - (u0 + pw) * su, z1 - u0 * su) if side > 0 else (z0 + u0 * su, z0 + (u0 + pw) * su)
+    top = y1 - v0 * sv
+    return za, zb, top, top - ph * sv
 
 
 LEGS = ("FL", "FR", "BL", "BR")
@@ -242,14 +274,16 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(abs(size @ du)))), max(1, int(round(abs(size @ dv)))), n
+    # At TX texels a unit; never under 1 (an antler's 1-unit point is a texel, not nothing).
+    return np.array(corner, float), du, dv, max(1, int(round(TX * abs(size @ du)))), max(1, int(round(TX * abs(size @ dv)))), n
 
 
 def area(e, face, p, uu, vv, h):
     """A wild reindeer's coat, in the deer's space (`p` / K): grey-brown, darker along the back;
     the neck, the mane and the chest cream; a dark band along the flank above the white belly; the
     rump white round the short tail; the legs and face dark brown, white socks above the broad dark
-    hooves; the nose furred grey; bone antlers."""
+    hooves; the nose furred grey; bone antlers. `uu`, `vv` and `h` are in texels (`t` the fraction
+    down the face)."""
     name = e["name"]
     p = p / K
     x, y, z = p[..., 0], p[..., 1], p[..., 2]
@@ -282,8 +316,10 @@ def area(e, face, p, uu, vv, h):
             a[:] = PALE
         elif side:
             a = np.where(z > 41.5, LEG, FUR)  # darker toward the muzzle
-            d = np.hypot(z - EYE_Z0, (y - EYE_Y0) * 1.1)
-            a = np.where((d > 2.9) & (d < 4.0), LEG, a)  # the dark round the eye
+            za, zb, top, bottom = (v / K for v in eye_box(1 if face == "east" else -1))  # the painted eye
+            d = np.hypot(np.maximum(np.abs(z - (za + zb) / 2) - (zb - za) / 2, 0),
+                         np.maximum(np.abs(y - (top + bottom) / 2) - (top - bottom) / 2, 0))
+            a = np.where((d > 0) & (d < 0.65 / (TX * K)), LEG, a)  # the dark round it: the texels beside it, not diagonal
         elif face == "north":
             a[:] = FUR
     elif name == "muzzle":
@@ -348,8 +384,9 @@ def cut_mask(e, p):
     local = (p - o) @ rotm(e["rot"]) / K  # back into the neck's frame, the deer's space
     along, depth = local[..., 1], local[..., 2]
     u = np.clip((along - 3.5) / 21.0, 0, 1)
-    lock = np.abs(((along * 1.2) % 3.0) - 1.5) / 1.5  # points every few texels
-    tip = 8.8 + 4.6 * np.sin(math.pi * u) ** 0.7 - 1.6 * lock
+    period = max(2.5, 3 / (TX * K))  # a lock every 3 texels or more (finer ones alias at 32)
+    lock = np.abs(((along / period) % 1.0) - 0.5) * 2  # points every few texels
+    tip = 8.8 + 4.6 * np.sin(math.pi * u) ** 0.7 - max(1.6, 1 / (TX * K)) * lock  # notches a texel deep
     return depth <= tip
 
 
@@ -381,8 +418,9 @@ def layer_props(e, face, p, a):
 def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     size = np.array(e["hi"]) - np.array(e["lo"])
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du * (abs(size @ du) / w) + vv[..., None] * dv * (abs(size @ dv) / h)
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel centers, in texels
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
     R = rotm(e["rot"])
     if e["rot"]:
         o = np.array(e["origin"])
@@ -400,22 +438,26 @@ def paint_face(e, face, boxes):
     col = paint_face_smooth(a, TONES, light_face, out=cap, coat=COAT,
                             y_world=p[..., 1] if not e["name"].startswith(ANTLER_PARTS) else None,
                             occ=occ, quad=bool(e["quad"]), seed=sum(map(ord, e["name"] + face)) % 97, down=down,
-                            tuft=e["name"] not in ("skull", "muzzle", "nose"))
+                            tuft=e["name"] not in ("skull", "muzzle", "nose"), merge=e["name"] != "skull")  # keep the eye ring
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["cut"]:
         img[..., 3] = np.where(cut_mask(e, p), 255, 0)
     if e["name"] == "skull" and face in ("east", "west"):
-        (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
-        stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
+        s = 1 if face == "east" else -1
+        stamp_eyes(img, [eye_center(s)], eye_style(s))
     if e["name"] == "nose" and face == "south":  # nostrils as slits, the split lip
         c = w // 2
-        img[2, [c - 4, c - 3, c + 2, c + 3], :3] = (82, 66, 58)
-        img[h - 3:h, c - 1:c + 1, :3] = (img[h - 3:h, c - 1:c + 1, :3] * 0.72).astype(np.uint8)
+        if w >= 10 and h >= 4:
+            img[2, [c - 4, c - 3, c + 2, c + 3], :3] = (82, 66, 58)
+            img[h - 3:h, c - 1:c + 1, :3] = (img[h - 3:h, c - 1:c + 1, :3] * 0.72).astype(np.uint8)
+        elif w >= 3 and h >= 3:  # at 32 the nose is 5 texels by 3: a nostril at each edge, the lip a middle texel
+            img[1, [0, w - 1], :3] = (82, 66, 58)
+            if w % 2:
+                img[h - 1, c, :3] = (img[h - 1, c, :3] * 0.72).astype(np.uint8)
     if e["name"].startswith("eyelid"):
         col_idx = 0 if e["name"].endswith("L") else w - 1
         img[:, col_idx, :3] = LASH
-    if e["name"].endswith("_paw") and face == "south":  # the cloven hoof: a split line
+    if e["name"].endswith("_paw") and face == "south" and w >= 3 and w % 2:  # the cloven hoof: a split line, on a middle texel
         c = w // 2
         img[:, c, :3] = (img[:, c, :3] * 0.6).astype(np.uint8)
     if LAYERS["rec"] is not None:

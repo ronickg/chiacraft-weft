@@ -6,7 +6,8 @@ bands across the back and tail.
 
     ~/.venvs/blocky/bin/python protoceratops.py      # writes out/spec.json, out/texture.png
 
-Units are texels at the house density (64 a block, 1.56 cm each), y up, it faces +z. An adult
+Units are the house's (64 a block, 1.56 cm each), y up, it faces +z; painted at the house density,
+32 texels a block (`TX`, half a texel a unit), as the blocks and items are. An adult
 *Protoceratops andrewsi* is about 1.8 m long and 0.6 m at the hips: here 126 from the beak to the
 tail's tip, the hips 38 up; the head (beak, cheek flanges, the frill over the neck) a little bigger
 than life.
@@ -24,9 +25,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.normpath(os.path.join(HERE, "..", "..", "..", "..", ".claude", "skills", "blocky-model", "scripts"))
 sys.path.insert(0, SKILL)
 from layers import Recorder, bounds as layer_bounds  # noqa: E402
-from paint import EYES, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
+from paint import EYES, eye_corner, occlusion, pack, paint_face_smooth, stamp_eyes, tones  # noqa: E402
 from rig import fit  # noqa: E402
 from ground import lowest  # noqa: E402
+from house import TX  # noqa: E402
+
+# TX: texels a unit, 0.5 (32 a block). The eye's face, the skull's side, is 10 by 7 texels at 32 (the
+# house rule wants 3 or more), so it paints at 32.
 
 OUT = os.environ.get("PROTO_OUT") or os.path.join(HERE, "out")
 TAU = 2 * math.pi
@@ -54,10 +59,24 @@ EYES.update({
                            "..OOO.."], colors={"O": (42, 32, 26), "P": (20, 16, 14), "H": (226, 226, 222),
                                                "I": (150, 104, 48), "a": (190, 138, 64)}, halo="below"),
 })
-EYE_STYLE = os.environ.get("PROTO_EYES", "proto")
+# At 32 a block the skull's side is 10 texels by 7: the eye is a few texels, the same parts (a dark
+# rim, the amber iris round a dark pupil, a catchlight up and forward). Each is stamped as seen on
+# the left side; the right side's is its mirror, so both catchlights point forward.
+_O, _P, _H, _I, _a = (42, 32, 26), (20, 16, 14), (226, 226, 222), (150, 104, 48), (190, 138, 64)
+EYES.update({
+    "proto_px": dict(pattern=["HP", "IP"], colors={"P": _P, "H": _H, "I": _I}, halo="none", iris="I"),
+    "proto_px3": dict(pattern=["HPI", "IPa"], colors={"P": _P, "H": _H, "I": _I, "a": _a}, halo="none", iris="Ia"),
+    "proto_px_rim": dict(pattern=["OHPO", "OIPO"], colors={"O": _O, "P": _P, "H": _H, "I": _I}, halo="none", iris="I"),
+    "proto_px3_rim": dict(pattern=["OOO", "HPI", "OIO"], colors={"O": _O, "P": _P, "H": _H, "I": _I}, halo="none",
+                          iris="I"),
+})
+for _k in [k for k in EYES if k.startswith("proto_px")]:
+    EYES[_k + "_m"] = dict(EYES[_k], pattern=[row[::-1] for row in EYES[_k]["pattern"]])
+EYE_STYLE = os.environ.get("PROTO_EYES", "proto_px_rim")  # the old ringed eye, 4 by 2: reads best from afar
 SKULL = ((-6.5, 26.0, 24.0), (6.5, 40.0, 43.0))
 EYE_Z, EYE_Y = 37.5, 35.0
 LID_X = 6.9  # the eyelids' hinge plane, just outside the head's side
+NOSTRIL = (35.0, 47.5)  # (y, z) of the nostril on the snout's sides
 
 # ------------------------------------------------------------------ the model
 
@@ -77,15 +96,36 @@ def rotm(rot):
     return Z @ Y @ X
 
 
+def skull_grid():
+    """The skull's side in texels: (width along z, height) and the units a texel spans (u, v)."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h = max(1, round(TX * (z1 - z0))), max(1, round(TX * (y1 - y0)))
+    return w, h, (z1 - z0) / w, (y1 - y0) / h
+
+
+def eye_style(side):
+    """The design on that side (+1 left, the east face; -1 right): the right one mirrored."""
+    return EYE_STYLE + ("_m" if side < 0 and EYE_STYLE + "_m" in EYES else "")
+
+
+def eye_center(side):
+    """The eye's center on the skull's side (east face for side > 0, west otherwise), in its texels."""
+    (x0, y0, z0), (x1, y1, z1) = SKULL
+    w, h, su, sv = skull_grid()
+    cu = (z1 - EYE_Z) if side > 0 else (EYE_Z - z0)
+    return cu / su, (y1 - EYE_Y) / sv
+
+
 def eye_box(side):
-    pat = EYES[EYE_STYLE]["pattern"]
+    """(z0, z1, top, bottom) of the painted eye, from the same corner `stamp_eyes` uses, so the
+    eyelid covers it to the texel."""
+    pat = EYES[eye_style(side)]["pattern"]
     ph, pw = len(pat), len(pat[0])
     (x0, y0, z0), (x1, y1, z1) = SKULL
-    cu = (z1 - EYE_Z) if side > 0 else (EYE_Z - z0)
-    u0 = int(round(cu - pw / 2))
-    v0 = int(round(y1 - EYE_Y - ph / 2))
-    za, zb = (z1 - u0 - pw, z1 - u0) if side > 0 else (z0 + u0, z0 + u0 + pw)
-    return za, zb, y1 - v0, y1 - v0 - ph
+    w, h, su, sv = skull_grid()
+    u0, v0 = eye_corner(*eye_center(side), pat, w)
+    za, zb = (z1 - (u0 + pw) * su, z1 - u0 * su) if side > 0 else (z0 + u0 * su, z0 + (u0 + pw) * su)
+    return za, zb, y1 - v0 * sv, y1 - (v0 + ph) * sv
 
 
 LEGS = ("FL", "FR", "BL", "BR")
@@ -169,7 +209,8 @@ def face_frame(lo, hi, face):
     ax, sgn = FACES[face]
     n = np.zeros(3)
     n[ax] = sgn
-    return np.array(corner, float), du, dv, max(1, int(round(abs(size @ du)))), max(1, int(round(abs(size @ dv)))), n
+    # Its size in texels at TX (a face of any size is at least a texel, or it would vanish).
+    return np.array(corner, float), du, dv, max(1, int(round(TX * abs(size @ du)))), max(1, int(round(TX * abs(size @ dv)))), n
 
 
 def pebbles(e, face, p):
@@ -270,8 +311,9 @@ def layer_props(e, face, p, a):
 def paint_face(e, face, boxes):
     corner, du, dv, w, h, n = face_frame(e["lo"], e["hi"], face)
     size = np.array(e["hi"]) - np.array(e["lo"])
-    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
-    p = corner + uu[..., None] * du * (abs(size @ du) / w) + vv[..., None] * dv * (abs(size @ dv) / h)
+    uu, vv = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)  # texel centers, in texels
+    su, sv = abs(size @ du) / w, abs(size @ dv) / h  # units a texel
+    p = corner + (uu * su)[..., None] * du + (vv * sv)[..., None] * dv
     R = rotm(e["rot"])
     if e["rot"]:
         o = np.array(e["origin"])
@@ -286,16 +328,17 @@ def paint_face(e, face, boxes):
                             seed=sum(map(ord, e["name"] + face)) % 97, tuft=False, merge=False)
     img = np.dstack([np.clip(np.round(col), 0, 255), np.full((h, w), 255)]).astype(np.uint8)
     if e["name"] == "skull" and face in ("east", "west"):
-        (x0, y0, z0), (x1, y1, z1) = SKULL
-        cu = (z1 - EYE_Z) if face == "east" else (EYE_Z - z0)
-        stamp_eyes(img, [(cu, y1 - EYE_Y)], EYE_STYLE)
-    if e["name"] == "snout" and face in ("east", "west"):  # the nostril, a slit high on the snout
-        r, c = 3, (w - 4 if face == "east" else 3)
-        img[r, c - 1:c + 1, :3] = (46, 34, 28)
+        side = 1 if face == "east" else -1
+        stamp_eyes(img, [eye_center(side)], eye_style(side))
+    if e["name"] == "snout" and face in ("east", "west"):  # the nostril, a texel high on the snout, near its front
+        lo, hi = e["lo"], e["hi"]
+        r = min(h - 1, int((hi[1] - NOSTRIL[0]) / sv))
+        c = min(w - 1, int(((hi[2] - NOSTRIL[1]) if face == "east" else (NOSTRIL[1] - lo[2])) / su))
+        img[r, c, :3] = (46, 34, 28)
     if e["name"].startswith("eyelid"):
         col_idx = 0 if e["name"].endswith("L") else w - 1
         img[:, col_idx, :3] = LASH
-    if e["name"].endswith("_paw") and face == "south":  # toes: grooves on the front
+    if e["name"].endswith("_paw") and face == "south" and w >= 5:  # toes: grooves on the front (a paw is 3 texels at 32: none)
         for c in range(2, w - 1, 2):
             img[:, c, :3] = (img[:, c, :3] * 0.72).astype(np.uint8)
     if LAYERS["rec"] is not None:

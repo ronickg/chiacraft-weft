@@ -48,12 +48,19 @@ and `textures/entity/<mod>/<animal>.png`. It takes care of what the engine needs
 - **Facing**: Bedrock models look along -Z; Blockbench's Hytale format along +Z. Turned 180°.
 - **Tilted boxes**: the engine only rotates bones, so every tilted box gets its own `_tilt` bone.
 - **Size and detail**: the house style (the skill's "House style", `scripts/house.py`) is one
-  texel density for every model, 64 a block (a block is a meter): lay the model out in texel
-  units at the real average adult's size and export with `house.SCALE` (0.25). Individuals then
+  texel density for every model, **32 texels a block**, the same as the blocks and items (a block
+  is a meter). Lay the model out in units of 1/64 block at the real average adult's size, export
+  with `house.SCALE` (0.25) and paint `house.TX` (0.5) texels a unit. Small creatures whose face
+  would be under 3 texels paint at 64 or 128 (`house.fine`; today the raven, gull, vulture and
+  fish at 64, the mouse, vole, kryptobaatar, small bird and lizard at 128). Individuals then
   differ around it with the engine's per-entity scale (`World::set_scale`), from their size gene
   and sex (`coats::size`; the species' `dimorphism`, `size_spread` and `height` in `species.rs`).
-  The five animals so far predate the rule (their own scales, 19 to 131 texels a block) and are
-  to be rebuilt to it.
+  The chihuahua, cat, both raptors and the capybara keep their own layout scales and paint
+  `house.texels(scale)` a unit, so they are at 32 too.
+- **Coats**: every build writes its coat layers (`genetics/layers/<model>`) in its texture's
+  layout, so a new texture size needs no code change; `cargo run -p animals_core --example
+  coat_sheet -- <species> <texture.png> <out>` paints a dozen wild coats (the last few young) as
+  the game does, to look at on the model.
 - **Props** (nests, eggs, anything without a skeleton) are entities built with the skill's
   `prop.py`, not block models (block models here take only coarse texture coordinates).
 - **Fur panels**: both sides of a flat panel get the picture (mirrored to line up).

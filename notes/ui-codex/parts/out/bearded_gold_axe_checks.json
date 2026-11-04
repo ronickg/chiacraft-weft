@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a bearded golden axe: a narrow-necked lemon-gold head with orange-brown shadows whose lower edge drops into a long hooked beard, small white glints, on a long handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, a gold collar band where head meets handle, lying diagonally, handle at the bottom left, head at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.454,
+   "outline": 0.55,
+   "red_line": 0.01,
+   "fill": 0.21,
+   "passed": true
+  }
+ ]
+}

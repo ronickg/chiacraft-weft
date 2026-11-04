@@ -36,6 +36,8 @@ pub enum Form {
     Still,
     /// A fallen log lying on the ground, a full block, rotting (grubs live in it).
     Log,
+    /// A flat mat lying on the ground (kelp washed up at the tide line).
+    Mat,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -51,6 +53,15 @@ pub struct Wild {
     /// The share of the ground of its kind it covers there.
     pub cover: f32,
 }
+
+/// Bushes whose fruit holds on the plant over winter into spring (lingonberries under the snow,
+/// crowberries for geese and ptarmigan in spring): the world makes them ripe.
+pub const HOLDS_FRUIT: [&str; 2] = ["base:lingonberry_bush", "base:crowberry_bush"];
+
+/// Where still ponds lie, and in what share of the ground's 8 x 8 cells: the Pantanal's and the
+/// Cedar Mountain floodplain's standing water, a block deep, for their floating plants and the
+/// wild rice and cattails on their shores (the world's other water is the sea's, with beaches).
+pub const POND_LANDS: [(&str, f32); 2] = [("base:swamp", 0.35), ("animals:floodplain", 0.2)];
 
 /// The most of one ground all its wild plants cover in a biome (the world rolls for them first).
 pub const MOST: f32 = 0.3;
@@ -68,6 +79,8 @@ pub const WOODS: &[&str] = &["base:forest", "base:birch_forest", "base:plains"];
 pub const BRAMBLES: &[&str] = &["base:forest", "base:birch_forest", "base:plains", "base:taiga", "base:mountains"];
 pub const FOREST_FLOOR: &[&str] = &["base:forest", "base:birch_forest", "base:taiga", "base:mountains"];
 pub const AGARICS: &[&str] = &["base:forest", "base:birch_forest", "base:taiga"];
+/// Where the berry bush (blueberries) grows: the forests' floor.
+pub const FORESTS: &[&str] = &["base:forest", "base:birch_forest", "base:taiga"];
 pub const WETLANDS: &[&str] = &["base:swamp", "base:savanna"];
 pub const MARSHES: &[&str] = &["base:swamp", "base:plains", "base:forest", "base:taiga", "base:savanna"];
 pub const DESERT: &[&str] = &["base:desert"];
@@ -94,11 +107,12 @@ const fn w(
 /// Covers are shares of the cells of that ground (tall grass covers 5-35% of the turf, berry bushes
 /// 0.4% of the forest's; `forage::GRASS_COVER`): the tundra's sedges and cottongrass are its grass,
 /// the bushes and mushrooms are found, not walked through.
-pub const WILD: [Wild; 20] = [
+pub const WILD: [Wild; 22] = [
     w("base:sedge", Form::Tuft, Ground::Soil, None, SEDGE_LANDS, 0.12),
     w("base:cottongrass", Form::Tuft, Ground::Soil, None, TUNDRA, 0.08),
     w("base:reindeer_lichen", Form::Tuft, Ground::Soil, None, NORTH, 0.05),
     w("base:clover", Form::Tuft, Ground::Soil, None, MEADOWS, 0.03),
+    w("base:berry_bush", Form::Bush, Ground::Soil, Some("base:berries"), FORESTS, 0.004),
     w("base:lingonberry_bush", Form::Bush, Ground::Soil, Some("base:lingonberries"), BOREAL, 0.01),
     w("base:cloudberry_bush", Form::Bush, Ground::Soil, Some("base:cloudberries"), TUNDRA, 0.006),
     w("base:crowberry_bush", Form::Bush, Ground::Soil, Some("base:crowberries"), NORTH, 0.012),
@@ -115,8 +129,10 @@ pub const WILD: [Wild; 20] = [
     w("animals:flowering_shrub", Form::Still, Ground::Soil, None, FLOWERING, 0.02),
     w("animals:water_lily", Form::Still, Ground::Water, None, PONDS, 0.06),
     w("animals:rotten_log", Form::Log, Ground::Soil, None, DEADWOOD, 0.004),
+    // Kelp washed up on the beach (wrack, the beach's food: sand fleas and flies on it feed the
+    // shorebirds). Kelp growing under the sea waits for a block that stands in water.
+    w("base:kelp", Form::Mat, Ground::Sand, Some("base:kelp"), &["base:beach"], 0.03),
 ];
-// Kelp waits: the engine has no block that stands in water yet.
 
 /// A wild plant by its block's full name.
 pub fn of(block: &str) -> Option<&'static Wild> {
@@ -146,7 +162,7 @@ mod tests {
     #[test]
     fn every_wild_plant_has_its_numbers() {
         for p in &WILD {
-            if !matches!(p.form, Form::Still | Form::Log) {
+            if !matches!(p.form, Form::Still | Form::Log | Form::Mat) {
                 assert!(crate::plants::of(p.block).is_some(), "{}: no row in plants::PLANTS", p.block);
             }
             if let Some(item) = p.gives.filter(|g| *g != p.block) {

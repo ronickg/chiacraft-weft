@@ -6,6 +6,8 @@
 
 use weft_sdk::*;
 
+use crate::dist2;
+
 use crate::animal::{self, ANIMAL, OWNER};
 use crate::species::{self, SPECIES};
 
@@ -409,10 +411,6 @@ pub fn hold(w: &World, id: u64, st: &EntityState) -> bool {
     }
 }
 
-fn dist2(a: [f64; 3], b: [f64; 3]) -> f64 {
-    (0..3).map(|i| (a[i] - b[i]).powi(2)).sum()
-}
-
 /// What `id` should be fighting: the one it is on while that is still worth it, else (now and
 /// then) whatever its stance says: what hit its owner, what its owner hit (assist), monsters
 /// nearby (aggressive, or in the guarded area).
@@ -477,10 +475,17 @@ const LUNGE: f64 = 1.6;
 /// After `t`, striking when in reach (the engine keeps the pace of its attacks), each hit shown
 /// by one of its species' attacks (a bite, a swipe...), at random.
 pub fn fight(w: &World, id: u64, st: &EntityState, t: u64) {
+    fight_at(w, id, st, t, 1.4);
+}
+
+/// `fight` at `speed` times its kind's speed while it closes in (a pack runs its prey down).
+pub fn fight_at(w: &World, id: u64, st: &EntityState, t: u64, speed: f32) {
     let Some(e) = w.entity(t) else { return };
     let species = w.component(id, &ANIMAL).and_then(|a| a.species());
     // At least a lunge: the path ends a block and a half short of a target that stands still.
     let reach = ((st.size[0] + e.size[0]) as f64 / 2.0 + species.map_or(0.8, |s| s.reach) as f64).max(LUNGE);
+    // Running prey down, a pack bites at its flanks and hindquarters as it runs: a block further.
+    let reach = if speed > 1.4 { reach + 1.0 } else { reach };
     let flat = (e.pos[0] - st.pos[0]).powi(2) + (e.pos[2] - st.pos[2]).powi(2);
     if flat < reach * reach && (e.pos[1] - st.pos[1]).abs() < 2.0 + st.size[1] as f64 / 2.0 && w.attack(id, t) {
         let attacks = species.map_or(&[][..], |s| s.attacks);
@@ -489,7 +494,7 @@ pub fn fight(w: &World, id: u64, st: &EntityState, t: u64) {
         }
     }
     if (w.time() + id) % 5 == 0 || !w.navigating(id) {
-        w.navigate(id, e.pos, 1.4);
+        w.navigate(id, e.pos, speed);
     }
 }
 
