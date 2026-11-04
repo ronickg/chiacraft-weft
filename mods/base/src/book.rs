@@ -48,7 +48,21 @@ static CHESTS: Tag = Tag::named("chests");
 static TABLES: Tag = Tag::named("crafting_tables");
 
 /// The book's tabs: all, then base's creative tabs.
-const TABS: [&str; 7] = ["", "base:tools", "base:combat", "base:food", "base:building", "base:functional", "base:ingredients"];
+const TABS: [&str; 8] = ["", "base:tools", "base:combat", "base:food", "base:building", "base:functional", "base:ingredients", PARTS_TAB];
+/// The tab of part recipes (at a table).
+const PARTS_TAB: &str = "parts";
+/// Book numbers of part recipes start here; below are crafting recipes'.
+const PART_IDS: u32 = 1 << 20;
+
+/// The recipe with book number `id`.
+fn recipe_of(id: u32) -> Option<Recipe> {
+    if id >= PART_IDS { Recipe::at(&crate::parts::PART_RECIPES, id - PART_IDS) } else { Recipe::at(&CRAFTING, id) }
+}
+
+/// A recipe's book number.
+fn id_of(r: &Recipe) -> u32 {
+    if r.kind() == crate::parts::PART_RECIPES.name() { PART_IDS + r.index() } else { r.index() }
+}
 
 /// The client's book: which tab, page and recipe, and the chests' contents last sent.
 struct Book {
@@ -68,7 +82,7 @@ pub fn register(r: &mut Registry) {
         let w = p.world();
         let player = p.player();
         let station = Station::from(v[2]);
-        if let Some(recipe) = Recipe::at(&CRAFTING, v[0] as u32) {
+        if let Some(recipe) = recipe_of(v[0] as u32) {
             craft(&w, player, station, &recipe, (v[1] as u32).clamp(1, MAX_BATCH));
         }
         p.reply(&POOL, &encode(&chest_totals(&w, player, station)));
@@ -90,9 +104,11 @@ pub fn register(r: &mut Registry) {
 /// The recipes the book shows at `station`: crafting recipes not hidden, small enough for the
 /// 2 x 2 by hand.
 fn shown(station: Station) -> Vec<Recipe> {
+    let parts = if station == Station::Table { recipes(&crate::parts::PART_RECIPES) } else { Vec::new() };
     recipes(&CRAFTING)
         .into_iter()
         .filter(|r| !r.hidden() && (station == Station::Table || fits_hands(r)))
+        .chain(parts)
         .collect()
 }
 
@@ -296,6 +312,12 @@ fn craft(w: &World, player: u64, station: Station, r: &Recipe, count: u32) -> u3
             if out.is_empty() || chance < 1.0 && roll(player, made) >= chance {
                 continue;
             }
+            // A part gets its material and a rolled grade (`parts.rs`).
+            let out = if r.kind() == crate::parts::PART_RECIPES.name() {
+                crate::parts::finish(r, out, (w.random() >> 40) as f32 / (1u64 << 24) as f32)
+            } else {
+                out
+            };
             let left = w.inventory(player).insert(out);
             if !left.is_empty() {
                 w.spawn_item(pos, left);
@@ -367,11 +389,13 @@ pub fn book(ui: &mut Ui, station: Station) {
     let have = have(ui, station, &pool);
     let mut list: Vec<(Recipe, u32)> = shown(station)
         .into_iter()
-        .filter(|r| {
-            tab == 0
-                || r.outputs()
-                    .first()
-                    .is_some_and(|(o, _)| item_has_tag(o.item, &format!("tab/{}", TABS[tab])))
+        .filter(|r| match TABS[tab] {
+            "" => true,
+            PARTS_TAB => r.kind() == crate::parts::PART_RECIPES.name(),
+            t => r
+                .outputs()
+                .first()
+                .is_some_and(|(o, _)| item_has_tag(o.item, &format!("tab/{t}"))),
         })
         .map(|r| {
             let n = times(&r, &have, MAX_BATCH);
@@ -387,7 +411,11 @@ pub fn book(ui: &mut Ui, station: Station) {
         ui.text_styled(S::col().class("title"), "crafting.book.title", &[]);
         ui.row(S::row().gap(1.0), |ui| {
             for (i, t) in TABS.iter().enumerate() {
-                let key = if t.is_empty() { "crafting.book.all".to_string() } else { format!("tab.{}", t.replace(':', ".")) };
+                let key = match *t {
+                    "" => "crafting.book.all".to_string(),
+                    PARTS_TAB => "crafting.book.parts".to_string(),
+                    t => format!("tab.{}", t.replace(':', ".")),
+                };
                 // Categories (UI redo's class): transparent at rest, a gold outline when open.
                 ui.button(
                     &key,
@@ -417,7 +445,7 @@ pub fn book(ui: &mut Ui, station: Station) {
                 ui.row(S::row(), |ui| {
                     for (r, n) in row {
                         let Some((out, _)) = r.outputs().into_iter().next() else { continue };
-                        let index = r.index();
+                        let index = id_of(r);
                         let class = if picked == Some(index) { "slot_highlight" } else { "slot" };
                         let tip = if *n > 0 { "crafting.book.can" } else { "crafting.book.missing" };
                         ui.button_with(
@@ -448,7 +476,7 @@ pub fn book(ui: &mut Ui, station: Station) {
                 });
             });
         }
-        if let Some(r) = picked.and_then(|i| Recipe::at(&CRAFTING, i)) {
+        if let Some(r) = picked.and_then(recipe_of) {
             picked_recipe(ui, station, &r, &have);
         }
     });
@@ -458,11 +486,15 @@ pub fn book(ui: &mut Ui, station: Station) {
 fn picked_recipe(ui: &mut Ui, station: Station, r: &Recipe, have: &[(u32, u32)]) {
     let Some((out, _)) = r.outputs().into_iter().next() else { return };
     let can = times(r, have, MAX_BATCH);
-    let index = r.index();
+    let index = id_of(r);
     ui.row(S::row().gap(3.0), |ui| {
         ui.item(out.item, out.count, S::default().size(16.0, 16.0));
         ui.text_args("crafting.book.makes", &[Arg::Item(out.item), Arg::Int(out.count as i64)]);
     });
+    // A part: of what, and the grade it's likely to come out (`parts.rs`).
+    if let Some(key) = crate::parts::material_key(r) {
+        ui.text_args("crafting.parts.of", &[Arg::Key(key)]);
+    }
     // Each distinct ingredient once, with the total it takes.
     let inputs = r.inputs();
     let mut lines: Vec<(u32, u32, u32)> = Vec::new(); // (input number, shown item, total)

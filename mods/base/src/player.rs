@@ -160,10 +160,21 @@ pub fn register(r: &mut Registry) {
     r.menu(&CRAFTING)
         .group("grid", Slots::grid(3, 3))
         .group("result", Slots::single().output().large())
+        // Items built from parts (`parts.rs`).
+        .group("assembly", Slots::row(4))
+        .group("assembled", Slots::single().output())
+        .group("apart", Slots::single())
         .player_inventory()
         .recipes(&crate::recipes::CRAFTING)
-        .on_change(craft_result)
-        .on_take(consume_grid)
+        .on_change(|m| {
+            craft_result(m);
+            crate::parts::on_change(m);
+        })
+        .on_take(|m| {
+            if !crate::parts::on_take(m) {
+                consume_grid(m);
+            }
+        })
         .screen(|ui| {
             // The recipe book beside it: every recipe, from the bag and the chests near the table.
             ui.row(S::row().gap(4.0), |ui| {
@@ -176,6 +187,7 @@ pub fn register(r: &mut Registry) {
                         ui.group("result");
                         ui.spacer();
                     });
+                    crate::parts::ui(ui);
                     ui.player_inventory(true);
                 });
                 crate::book::book(ui, crate::book::Station::Table);
@@ -201,6 +213,10 @@ fn craft_result(m: &MenuCtx) {
 /// Takes one of each ingredient; the last of a stack leaves its `remainder` (a bucket). Crafting
 /// gives XP by how many things went into it.
 fn consume_grid(m: &MenuCtx) {
+    // Only for the grid's own result.
+    if m.group("result").index_of(m.slot()).is_none() {
+        return;
+    }
     let grid = m.group("grid");
     let cells: Vec<ItemStack> = (0..grid.len()).map(|i| grid.get(i)).collect();
     let made = recipe_match(&crate::recipes::CRAFTING, &cells, grid.cols(), grid.rows());

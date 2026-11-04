@@ -1027,6 +1027,10 @@ impl MenuCtx {
     pub fn owner(&self) -> u64 {
         self.args.owner
     }
+    /// The slot this call is about (the one taken from, for `on_take`), as the menu numbers them.
+    pub fn slot(&self) -> u32 {
+        self.args.slot
+    }
     /// Slot group `name` of this menu.
     pub fn group(&self, name: &str) -> MenuGroup<'_> {
         let mut out = [0u32; 3];
@@ -1046,6 +1050,10 @@ pub struct MenuGroup<'a> {
 impl MenuGroup<'_> {
     pub fn len(&self) -> u32 {
         self.len
+    }
+    /// Where menu slot `slot` (`MenuCtx::slot`) is in this group, if it is one of its.
+    pub fn index_of(&self, slot: u32) -> Option<u32> {
+        (slot >= self.start && slot < self.start + self.len).then(|| slot - self.start)
     }
     /// Its width as laid out (a 3 x 3 grid has 3).
     pub fn cols(&self) -> u32 {
@@ -1798,6 +1806,10 @@ impl Recipe {
     /// Its number in its kind.
     pub fn index(&self) -> u32 {
         self.index
+    }
+    /// Its kind's name (`base:crafting`).
+    pub fn kind(&self) -> &str {
+        &self.kind
     }
     /// Its time in ticks.
     pub fn time(&self) -> u32 {

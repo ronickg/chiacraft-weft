@@ -15,6 +15,7 @@ mod items;
 mod levels;
 mod machines;
 mod mobs;
+mod parts;
 mod player;
 mod recipes;
 mod redstone;
@@ -57,6 +58,7 @@ fn init(r: &mut Registry) {
     cooking::register(r);
     recipes::register(r);
     book::register(r);
+    parts::register(r);
     sounds::register(r);
     mobs::register(r);
     worldgen::register(r);

@@ -597,15 +597,32 @@ are rows.
      `Ui::button_with` and `InventoryGroup::slot`.
    - Not yet: filling the grid itself from the book (Minecraft's ghost placement), and the
      queue.
-2. **Discovery:** known recipes per player, saved.
+2. **Parts, first piece** (built 11-04, `mods/base/src/parts.rs`, waiting for a game run):
+   - **Part items:** one per shape (`base:part_<shape>`), carrying material, grade and wear.
+   - **Making them:** from the book's Parts tab at a crafting table (`base:parts` recipes, each
+     naming its material). The grade is rolled from material, work from memory and the station.
+     Wooden heads come from planks; hafts, grips and shafts are split from a log of their wood.
+   - **Kind items** (`base:axe` ...) carry their parts and their own tool numbers on the stack
+     (the engine hook).
+   - **The table's row:** four assembly slots, the tool they make, and an "apart" slot that
+     takes a tool back into its parts. Lashings are cut; wedges and rivets come back.
+   - **Not yet:**
+     - the look hook (every part and kind shows a plain icon for now)
+     - broken items that stay
+     - history
+     - per-part repair
+   - **Today's materials only:** wood, stone, bone, iron, gold, diamond, string, leather.
+     Content's flint, sinew and bronze come with its step 1.
+   - **Test:** `mods/testkit/scripts/crafting_parts.txt`.
+3. **Discovery:** known recipes per player, saved.
    - A recipe unlocks once you've touched all its ingredients, as Valheim does. Minecraft's book,
      which unlocks on the first, floods (the Researcher, 11-04).
    - Near misses show as "2 of 3", with the missing ingredient as "?".
    - R and U show only what you know.
    - Slice 1's book shows every recipe until then.
-3. **Stations, add-ons and the queue:** the workbench levels; the queue with sub-parts and
+4. **Stations, add-ons and the queue:** the workbench levels; the queue with sub-parts and
    refunds; cold hands and the warm room.
-4. **Parts, core** (4A):
+5. **The rest of the parts core** (4A):
    - kinds, part shapes, the grade rules and traits in the crate
    - part items with their components
    - the Assemble tab: build, swap, break down
@@ -616,11 +633,11 @@ are rows.
    - history (who, when, where)
    - Today's tools become assembled kinds from wood and stone parts. Art: Chiacraft's first part
      maps and ramps.
-5. **Knapping**, the first hands-on game: flint, chert and obsidian heads and points (needs
+6. **Knapping**, the first hands-on game: flint, chert and obsidian heads and points (needs
    Content's stone items).
-6. **Armour from parts:** shell, fastening and lining, with linings as Survival's clothing
+7. **Armour from parts:** shell, fastening and lining, with linings as Survival's clothing
    warmth. Worn region textures.
-7. **Further** (4B, Ronald's pick), in this order:
+8. **Further** (4B, Ronald's pick), in this order:
    1. **Part shapes with trade-offs:** a narrow felling head or a bearded one; a long or short
       blade.
    2. **Origin and condition count:** seasoned or green wood, prime hides, ore deposits, the
@@ -629,7 +646,7 @@ are rows.
       re-honing.
    4. **Masterwork naming and the world's chronicle**, deeds in the history.
    5. **Signed history through portals**, with Phase 4's world DIDs.
-8. **Slow crafts** as machines (the tanning frame first), then **smithing and casting** with
+9. **Slow crafts** as machines (the tanning frame first), then **smithing and casting** with
    Content's copper, bronze and iron.
 
 ## Who does what
