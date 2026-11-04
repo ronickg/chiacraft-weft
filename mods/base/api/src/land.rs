@@ -33,6 +33,7 @@ mod craters;
 mod karst;
 pub mod landmarks;
 mod net;
+mod reefs;
 
 /// Salts of our own noises (the engine's are in `weft_noise::fixed::salt`).
 pub mod salt {
@@ -48,6 +49,7 @@ pub mod salt {
     pub const HIGHLANDS: u64 = 0x416A;
     pub const SNOW_DRIFT: u64 = 0x5A0D;
     pub const MOUNTAIN_AREA: u64 = 0x44;
+    pub const RANGE_GAPS: u64 = 0x45;
     pub const SEQUOIA: u64 = 0x5E0A;
     pub const COAST_CLIFFS: u64 = 0xC1F;
     pub const ISLANDS: u64 = 0x151A;
@@ -56,6 +58,10 @@ pub mod salt {
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
     pub const KARST_CLUSTER: u64 = 0x4A8;
+    pub const REEFS: u64 = 0x4EEF;
+    pub const IGAPO: u64 = 0x16A;
+    pub const IGARAPE: u64 = 0x16B;
+    pub const IGARAPE_WARP: u64 = 0x16C;
     pub const ARCHES: u64 = 0xA2C;
     pub const FALLS: u64 = 0xFA11;
     pub const SINKS: u64 = 0x4A9;
@@ -193,7 +199,8 @@ pub const SWAMP: (f64, f64) = (0.0, 0.04);
 /// Tropical forest (Ronald, 11-04: "all four"; the third proposal sheet) from this temperature
 /// and this humidity: the hot, wet corner, where the rules fell through to oak "forest" at the
 /// llanos' heat (3.5-5.6% of the land on seeds 1, 7, 42, 1234). The savanna's heat, the forest's
-/// rain; the swamp keeps the low wet land.
+/// rain; it takes the low wet land in its climate before the swamp (Ronald: "Yes, take the low
+/// land"), the swamp keeping the low wet land of its own, cooler or drier climate.
 pub const TROPICAL: (f64, f64) = (0.1, 0.07);
 /// Forest from this humidity; birch forest under this temperature and from this humidity.
 pub const FOREST_HUMIDITY: f64 = 0.07;
@@ -213,9 +220,10 @@ pub const SEQUOIA_RISE: (i32, i32) = (28, 85);
 pub const SEQUOIA_GROVE: f64 = 0.5;
 pub const SEQUOIA_AREA: Area = Area {
     all: &[
-        Ramp::Noise { salt: salt::SEQUOIA, scale: 260.0, from: 0.02, to: 0.15 },
-        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: -0.08, to: -0.03 },
-        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: 0.08, to: 0.05 },
+        Ramp::Noise { salt: salt::SEQUOIA, scale: 260.0, from: -0.06, to: 0.08 },
+        // A range's flank, on the one side: just outside its band.
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH * 0.5, to: RANGE_WIDTH * 0.8 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH * 3.2, to: RANGE_WIDTH * 2.2 },
         Ramp::Continent(0.15, 0.25),
     ],
     not: false,
@@ -291,11 +299,28 @@ pub const DUNES: (f64, f64) = (4.0, 26.0);
 pub const DUNES_AREA: Area =
     Area { all: &[Ramp::Temperature(0.12, 0.22), Ramp::Humidity(0.0, -0.08), Ramp::Continent(0.01, 0.07)], not: false };
 
-/// Mountain ranges (height, width between ridge lines), in patches inland; the mountains biome
-/// stands where this area is 0.45 or more (`MOUNTAIN_BIOME`).
+/// Mountains (height, width between ridge lines); the mountains biome stands where their area is
+/// 0.45 or more (`MOUNTAIN_BIOME`).
 pub const MOUNTAINS: (f64, f64) = (150.0, 260.0);
-pub const MOUNTAINS_AREA: Area =
-    Area { all: &[Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: 700.0, from: -0.1, to: 0.3 }, Ramp::Continent(0.0, 0.2)], not: false };
+/// Mountain ranges (Ronald, 11-04: "all three", the fourth sheet; they were patches, ovals a few
+/// hundred blocks across): along the zero lines of a noise `RANGE_SCALE` blocks across, which wind
+/// and branch over the land, strongest on the line and gone `RANGE_WIDTH` either side of it, so a
+/// range rises to its spine; broken where a second noise is under `-RANGE_GAPS`. Inland only.
+/// About the same share of the land as the patches (17-18% at the biome's strength, against
+/// 15.5-17%). The engine's masks give it (both ramps of one noise make the band), no cost.
+/// Saved worlds made before get seams where new chunks meet saved ones (accepted for dev).
+pub const RANGE_SCALE: f64 = 1600.0;
+pub const RANGE_WIDTH: f64 = 0.11;
+pub const RANGE_GAPS: f64 = 0.15;
+pub const MOUNTAINS_AREA: Area = Area {
+    all: &[
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: -RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::MOUNTAIN_AREA, scale: RANGE_SCALE, from: RANGE_WIDTH, to: 0.0 },
+        Ramp::Noise { salt: salt::RANGE_GAPS, scale: 2600.0, from: -RANGE_GAPS, to: -RANGE_GAPS + 0.15 },
+        Ramp::Continent(0.0, 0.2),
+    ],
+    not: false,
+};
 pub const MOUNTAIN_BIOME: f64 = 0.45;
 
 /// Mesas: flat-topped hills `MESA_HEIGHT` blocks high in `MESA_TIERS` tiers, patches about
@@ -424,6 +449,52 @@ pub const FALL_CELL: i32 = 256;
 pub const FALL_CHANCE: f64 = 0.3;
 pub const FALL_CLIFF: i32 = 8;
 
+/// Glaciers (Ronald, 11-04: "all three", the fourth sheet; Art's glacier ice): in the mountains'
+/// high valleys, `GLACIER_BELOW` blocks under the snow line or higher, on ground falling a block
+/// at most to its neighbours and lying `GLACIER_HOLLOW` blocks or more under the ground
+/// `GLACIER_REACH` round it (a valley's floor, not a ridge); its top `GLACIER_THICK` blocks ice.
+pub const GLACIER_BELOW: i32 = 10;
+pub const GLACIER_HOLLOW: i32 = 2;
+pub const GLACIER_REACH: i32 = 8;
+pub const GLACIER_THICK: i32 = 3;
+
+/// The tropical forest's water (Ronald, 11-04: "A + C's giants + some B"; Plants' sheet): still
+/// water at the sea's level, the level the rivers and the sea hold, so it stays put: the ground
+/// over it is taken away and the block at the sea's level (and one under, where deep) is water.
+/// Flooded forest (igapó): on ground `IGAPO_RISE` or less over the sea, in patches `IGAPO_SIZE`
+/// blocks across where their noise is over `IGAPO_PATCHES` (more by a river's or a lake's bank,
+/// `bank`), a block deep and two in the patches' middles, the trees standing in it. Igarapés:
+/// narrow, winding creeks along a noise's zero line (`IGARAPE_SCALE` across, `IGARAPE_WIDTH`
+/// either side), a block deep, on ground `IGARAPE_RISE` or less over the sea.
+pub const IGAPO_RISE: i32 = 3;
+pub const IGAPO_SIZE: f64 = 36.0;
+pub const IGAPO_PATCHES: f64 = 0.0;
+pub const IGARAPE_SCALE: f64 = 140.0;
+pub const IGARAPE_WIDTH: f64 = 0.03;
+pub const IGARAPE_RISE: i32 = 4;
+
+/// Warm shallow seas (Ronald, 11-04: "all three", Terrain's fourth sheet; `land::reefs`): off coasts
+/// where the sea is warm (temperature `REEF_WARM`, the savanna's heat), from `REEF_SHORE` blocks
+/// out a lagoon whose floor is `REEF_LAGOON` blocks under the surface, from `REEF_OUT.0` to
+/// `REEF_OUT.1` blocks out a reef 2 under it in patches (`REEF_PATCH_SIZE` blocks, where their
+/// noise is over `REEF_PATCHES`), and a slope down to `REEF_SLOPE` blocks out. The biomes
+/// `lagoon` and `coral_reef` take those depths in warm water.
+pub const REEF_WARM: (f64, f64) = (0.06, 0.12);
+/// The biomes' rules: warm from this temperature (the middle of `REEF_WARM`), near the coasts
+/// (continent under `REEF_COAST`).
+pub const REEF_WARM_RULE: f64 = 0.09;
+pub const REEF_COAST: f64 = 0.15;
+pub const REEF_SHORE: i32 = 4;
+pub const REEF_LAGOON: (i32, i32) = (3, 5);
+pub const REEF_OUT: (i32, i32) = (28, 40);
+pub const REEF_PATCH_SIZE: f64 = 20.0;
+pub const REEF_PATCHES: f64 = -0.02;
+pub const REEF_SLOPE: i32 = 48;
+/// Coral rubble (Art's): in the reef's gaps and a band this wide on its landward side.
+pub const REEF_RUBBLE: i32 = 4;
+pub const REEF_REGION: i32 = 128;
+pub const REEF_STEP: i32 = 4;
+
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
 /// the rain of the nodes upstream within `RIVER_REACH` steps (about 2 km of river).
@@ -528,8 +599,8 @@ pub const RIVER_BEDS: [(&str, &str); 9] = [
     ("taiga", "gravel"),
     ("desert", "sand"),
     ("savanna", "sand"),
-    ("swamp", "dirt"),
     ("tropical_forest", "dirt"),
+    ("swamp", "dirt"),
     ("forest", "sand"),
     ("birch_forest", "gravel"),
     ("plains", "sand"),
@@ -613,6 +684,7 @@ pub fn features() -> Vec<Feature> {
         Feature::new(mesa).named("mesas"),
         Feature::new(canyons).named("canyons"),
         Feature::new(karst).named("karst"),
+        Feature::new(reefs).named("reefs"),
         Feature::new(lakes).named("lakes"),
         Feature::new(rivers).named("rivers"),
         // Last: a crater is measured from its ground, the rivers' cut included (none reach one).
@@ -648,7 +720,7 @@ fn land_height_at(h: &Here) -> i32 {
 /// The ground before the lakes and the rivers.
 fn ground_at(h: &Here) -> i32 {
     let base = base_ground(h);
-    base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base)
+    base + canyons::cut(h, base) + karst::add(h, base) + karst::sink(h, || base) + reefs::add(h, base)
 }
 
 /// The ground before the karst towers (which stand on it, or rise out of the water over it).
@@ -961,6 +1033,32 @@ pub fn karst(f: &Fields, x: i32, z: i32) -> i32 {
     towers + karst::sink(&h, || base_ground(&h))
 }
 
+/// What the warm seas' lagoons and reefs add at (`x`, `z`) (Q4), as the engine adds it.
+pub fn reefs(f: &Fields, x: i32, z: i32) -> i32 {
+    let h = Here::new(f, x, z);
+    if reefs::warm(&h) < q12(0.5) {
+        return 0;
+    }
+    reefs::add(&h, base_ground(&h))
+}
+
+/// Whether column (`x`, `z`) (Q4), `height` (blocks) high, is a warm sea's reef top (`true`) or
+/// lagoon floor (`false`): where the biomes `coral_reef` and `lagoon` stand.
+pub fn reef_part(f: &Fields, x: i32, z: i32, height: i32) -> Option<bool> {
+    reefs::part(&Here::new(f, x, z), height)
+}
+
+/// Whether the reef itself stands at column (`x`, `z`) (Q4): coral there, not on natural
+/// shallows that only share its depth (and its biome's name).
+pub fn reef_top(f: &Fields, x: i32, z: i32) -> bool {
+    reefs::top(&Here::new(f, x, z))
+}
+
+/// Whether column (`x`, `z`) (Q4) is the reef's rubble: its gaps and its landward edge.
+pub fn reef_rubble(f: &Fields, x: i32, z: i32) -> bool {
+    reefs::rubble(&Here::new(f, x, z))
+}
+
 /// What the meteor craters add at (`x`, `z`) (Q4), as the engine adds it.
 pub fn craters(f: &Fields, x: i32, z: i32) -> i32 {
     craters::add(&Here::new(f, x, z), || land_height(f, x, z) + rivers(f, x, z))
@@ -1161,10 +1259,12 @@ fn climate_biome(t: i32, hu: i32, c: i32, h: i32, mountain: bool, grove: bool) -
         "desert"
     } else if t >= at(SAVANNA.0) && hu < at(SAVANNA.1) {
         "savanna"
+    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
+        // Before the swamp: the tropical forest takes its low wet land too (Ronald: "Yes, take
+        // the low land"), so the flooded forest has room along its rivers.
+        "tropical_forest"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
-    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
-        "tropical_forest"
     } else if hu >= at(FOREST_HUMIDITY) {
         "forest"
     } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {
@@ -1248,6 +1348,53 @@ pub fn fray(f: &Fields, x: i32, z: i32, height: i32) -> Option<(&'static str, &'
     }
     let n = ONE / 2 + f.fbm(salt::FRAY, x, z, q4(FRAY_SIZE), 2) * 2;
     (n < (q12(FRAY_SHARE) * e.near) >> 12).then_some(theirs)
+}
+
+/// Whether column (`x`, `z`) (blocks), `h` high, is a glacier's floor (`GLACIER_*`), `ground`
+/// giving the height of any column (the engine's, in a decoration).
+pub fn glacier(f: &Fields, x: i32, z: i32, h: i32, ground: &mut dyn FnMut(i32, i32) -> i32) -> bool {
+    let here = Here::new(f, x * 16, z * 16);
+    if MOUNTAINS_AREA.at(&here) <= q12(MOUNTAIN_BIOME) || h < snow_line(here.temperature()) - GLACIER_BELOW {
+        return false;
+    }
+    if [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        .iter()
+        .any(|&(dx, dz)| (h - ground(x + dx, z + dz)).abs() > 1)
+    {
+        return false;
+    }
+    let r = GLACIER_REACH;
+    let round: i32 = [(r, 0), (-r, 0), (0, r), (0, -r), (r, r), (-r, -r), (r, -r), (-r, r)]
+        .iter()
+        .map(|&(dx, dz)| ground(x + dx, z + dz))
+        .sum();
+    round >= 8 * (h + GLACIER_HOLLOW)
+}
+
+/// How deep under the sea's level the tropical forest's still water stands at column (`x`, `z`)
+/// (blocks), `h` high, if any (`IGAPO_*`, `IGARAPE_*`): 1 or 2. Whether its ground may go (nothing
+/// standing on it) is the decoration's to see.
+pub fn tropical_water(f: &Fields, x: i32, z: i32, h: i32) -> Option<i32> {
+    if h < SEA || h > SEA + IGAPO_RISE.max(IGARAPE_RISE) {
+        return None;
+    }
+    let (qx, qz) = (x * 16, z * 16);
+    if h <= SEA + IGAPO_RISE {
+        let wet = bank(f, qx, qz).map_or(0, |b| b.wet);
+        let n = f.fbm(salt::IGAPO, qx, qz, q4(IGAPO_SIZE), 3) + (wet >> 3);
+        if n > q12(IGAPO_PATCHES) {
+            return Some(if n > q12(IGAPO_PATCHES + 0.12) { 2 } else { 1 });
+        }
+    }
+    if h <= SEA + IGARAPE_RISE {
+        let w = q4(40.0);
+        let wx = qx + ((f.fbm(salt::IGARAPE_WARP, qx, qz, q4(90.0), 2) * w) >> 12);
+        let wz = qz + ((f.fbm(salt::IGARAPE_WARP + 1, qx, qz, q4(90.0), 2) * w) >> 12);
+        if f.fbm(salt::IGARAPE, wx, wz, q4(IGARAPE_SCALE), 2).abs() < q12(IGARAPE_WIDTH) {
+            return Some(1);
+        }
+    }
+    None
 }
 
 /// The snow line (blocks) at temperature `t` (Q12): the band's height from `SNOW_LINES`.
@@ -1417,7 +1564,9 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
     let here = Here::new(f, x, z);
     let (t, hu, c) = (here.temperature(), here.humidity(), here.continent());
     let at = |v: f64| q12(v);
-    if h <= SEA - 2 && c < at(OCEAN_CONTINENT) {
+    if let Some(top) = reefs::part(&here, h) {
+        if top { "coral_reef" } else { "lagoon" }
+    } else if h <= SEA - 2 && c < at(OCEAN_CONTINENT) {
         "ocean"
     } else if h <= SEA + 1 && c < at(0.1) {
         if t < at(SNOWY_BELOW) { "snowy_plains" } else { "beach" }
@@ -1433,10 +1582,12 @@ fn biome_at(f: &Fields, x: i32, z: i32, h: i32) -> &'static str {
         "desert"
     } else if t >= at(SAVANNA.0) && hu < at(SAVANNA.1) {
         "savanna"
+    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
+        // Before the swamp: the tropical forest takes its low wet land too (Ronald: "Yes, take
+        // the low land"), so the flooded forest has room along its rivers.
+        "tropical_forest"
     } else if t >= at(SWAMP.0) && hu >= at(SWAMP.1) && h <= SEA + 12 && c >= at(0.1) {
         "swamp"
-    } else if t >= at(TROPICAL.0) && hu >= at(TROPICAL.1) {
-        "tropical_forest"
     } else if hu >= at(FOREST_HUMIDITY) {
         "forest"
     } else if t < at(BIRCH.0) && hu >= at(BIRCH.1) {

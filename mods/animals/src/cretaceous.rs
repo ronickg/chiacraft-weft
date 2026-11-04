@@ -247,7 +247,22 @@ pub fn init(r: &mut Registry) {
     for f in base_api::land::features() {
         t = t.feature(f);
     }
+    // The warm seas' lagoons and reefs as the overworld's (`base_api::land::reef_part`); the
+    // coral blocks are the overworld's decoration, the Cretaceous's reefs are bare (its own reef
+    // builders, rudist clams, if anyone draws them).
     t.biome(
+        BiomeRule::new("base:coral_reef")
+            .height(SEA - 2..=SEA - 2)
+            .temperature(base_api::land::REEF_WARM_RULE..)
+            .continent(..base_api::land::REEF_COAST),
+    )
+    .biome(
+        BiomeRule::new("base:lagoon")
+            .height(SEA - base_api::land::REEF_LAGOON.1..=SEA - base_api::land::REEF_LAGOON.0)
+            .temperature(base_api::land::REEF_WARM_RULE..)
+            .continent(..base_api::land::REEF_COAST),
+    )
+    .biome(
         BiomeRule::new("base:ocean")
             .height(..=SEA - 2)
             .continent(..base_api::land::OCEAN_CONTINENT),

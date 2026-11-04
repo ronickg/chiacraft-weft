@@ -26,7 +26,21 @@ pub fn terrain(r: &mut Registry) {
     // Biomes bring their climate and surface; rules only add where else they must hold. The sea
     // is the ocean's out to the coast; water inland (rivers, lakes) belongs to the land around it
     // and lies on its own bed (`RIVER_BEDS`).
+    // Warm shallow seas first (`base_api::land::reef_part`): the reef's top 2 under the surface,
+    // the lagoon's floor 3-5 under, in warm water near the coasts.
     t = t
+        .biome(
+            BiomeRule::new("coral_reef")
+                .height(SEA - 2..=SEA - 2)
+                .temperature(l::REEF_WARM_RULE..)
+                .continent(..l::REEF_COAST),
+        )
+        .biome(
+            BiomeRule::new("lagoon")
+                .height(SEA - l::REEF_LAGOON.1..=SEA - l::REEF_LAGOON.0)
+                .temperature(l::REEF_WARM_RULE..)
+                .continent(..l::REEF_COAST),
+        )
         .biome(
             BiomeRule::new("ocean")
                 .height(..=SEA - 2)
@@ -90,8 +104,11 @@ pub fn terrain(r: &mut Registry) {
 
     r.decorate(rock_faces).dimension(&crate::OVERWORLD);
     r.decorate(cave_mouths).dimension(&crate::OVERWORLD);
+    r.decorate(glaciers).dimension(&crate::OVERWORLD);
     r.decorate(fray_borders).dimension(&crate::OVERWORLD);
+    r.decorate(coral).dimension(&crate::OVERWORLD);
     r.decorate(landmarks).dimension(&crate::OVERWORLD);
+    r.decorate(tropical_water).dimension(&crate::OVERWORLD);
 }
 
 static WET: Tag = Tag::named("wet");
@@ -420,6 +437,136 @@ fn landmarks(g: &mut Gen) {
                 // The front: flowing, amount 7; under it falling.
                 let state = if wy == sy { water + 1 } else { water + 8 };
                 g.set((fx - ox) as usize, (wy - oy) as usize, (fz - oz) as usize, state);
+            }
+        }
+    }
+}
+
+/// Glaciers in the mountains' high valleys (`base_api::land::glacier`): the top
+/// `GLACIER_THICK` blocks of a valley's floor glacier ice, under the snow. After the rock faces.
+fn glaciers(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let [ox, oy, oz] = g.origin();
+    let max_h = cols.iter().map(|c| c.height).max().unwrap_or(0);
+    let min_h = cols.iter().map(|c| c.height).min().unwrap_or(0);
+    // High ground only: the lowest snow line less the glaciers' reach under it.
+    let lowest = SNOW_LINES.iter().map(|&(_, line)| line).min().unwrap_or(0) - l::GLACIER_BELOW;
+    if max_h < lowest || oy > max_h || oy + 15 < min_h - l::GLACIER_THICK {
+        return;
+    }
+    let f = l::fields(g.seed());
+    // Which columns are a glacier's floor, from the heights alone; then the ice.
+    let mut floors = Vec::new();
+    {
+        let mut heights = std::collections::HashMap::new();
+        let mut ground = |x: i32, z: i32| {
+            *heights
+                .entry((x, z))
+                .or_insert_with(|| g.column(x, z).height)
+        };
+        for z in 0..16i32 {
+            for x in 0..16i32 {
+                let h = cols[(z * 16 + x) as usize].height;
+                if h < lowest || h < oy || h - l::GLACIER_THICK >= oy + 16 {
+                    continue;
+                }
+                if l::glacier(&f, ox + x, oz + z, h, &mut ground) {
+                    floors.push((x as usize, z as usize, h));
+                }
+            }
+        }
+    }
+    for (x, z, h) in floors {
+        for wy in (h - l::GLACIER_THICK + 1).max(oy)..=h.min(oy + 15) {
+            let y = (wy - oy) as usize;
+            if g.get(x, y, z) != 0 {
+                g.set(x, y, z, GLACIER_ICE.id());
+            }
+        }
+    }
+}
+
+/// The tropical forest's still water (`base_api::land::tropical_water`): flooded forest by the
+/// rivers and winding igarapés on the low floor, at the sea's level so it stays put. The ground
+/// over that level goes where nothing stands on it (a trunk keeps its ground: the trees stand on
+/// mounds in the water; the block over the ground must be in the same cube to be seen); the
+/// block at the sea's level and one under it where deep are water whatever stands on them (under
+/// kept ground it is a closed pocket). Before the plants.
+fn tropical_water(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let tropical = crate::worldgen::TROPICAL_FOREST.id();
+    let [ox, oy, oz] = g.origin();
+    if !cols.iter().any(|c| c.biome == tropical) || oy > SEA + l::IGAPO_RISE.max(l::IGARAPE_RISE) || oy + 15 < SEA - 1 {
+        return;
+    }
+    let f = l::fields(g.seed());
+    for z in 0..16i32 {
+        for x in 0..16i32 {
+            let col = cols[(z * 16 + x) as usize];
+            let h = col.height;
+            if col.biome != tropical {
+                continue;
+            }
+            let (wx, wz) = (ox + x, oz + z);
+            let Some(depth) = l::tropical_water(&f, wx, wz, h) else { continue };
+            let (xu, zu) = (x as usize, z as usize);
+            // The ground over the sea's level, unless something stands on it.
+            if h > SEA && h >= oy && h < oy + 15 && g.get(xu, (h + 1 - oy) as usize, zu) == 0 {
+                for wy in (SEA + 1).max(oy)..=h {
+                    g.set(xu, (wy - oy) as usize, zu, 0);
+                }
+            }
+            for wy in (SEA - depth + 1)..=SEA {
+                if (oy..oy + 16).contains(&wy) {
+                    g.set(xu, (wy - oy) as usize, zu, WATER.id());
+                }
+            }
+        }
+    }
+}
+
+/// Coral (`base_api::land::REEF_*`; Art's blocks): the reef's top and the block under it coral, in
+/// patches of brain, staghorn and porites coral, where the reef itself stands (`reef_top`; natural
+/// shallows at its depth share its biome's name, not its coral); single coral heads on the
+/// lagoon's floor; coral rubble in the reef's gaps and on its landward edge.
+fn coral(g: &mut Gen) {
+    let Some(&cols) = g.columns() else { return };
+    let (reef, lagoon) = (crate::worldgen::CORAL_REEF.id(), crate::worldgen::LAGOON.id());
+    let [ox, oy, oz] = g.origin();
+    if oy > SEA || oy + 15 < SEA - 8 || !cols.iter().any(|c| c.biome == reef || c.biome == lagoon) {
+        return;
+    }
+    let seed = g.seed();
+    let f = l::fields(seed);
+    let kinds = [BRAIN_CORAL_BLOCK.id(), STAGHORN_CORAL_BLOCK.id(), PORITES_CORAL_BLOCK.id()];
+    for z in 0..16usize {
+        for x in 0..16usize {
+            let col = cols[z * 16 + x];
+            let (wx, wz) = (ox + x as i32, oz + z as i32);
+            let pick = noise::fixed::perlin2(noise::fixed::seed32(seed, 0xC07A), wx * 16, wz * 16, 9 * 16);
+            let kind = kinds[if pick < -600 {
+                0
+            } else if pick < 700 {
+                1
+            } else {
+                2
+            }];
+            let h = col.height;
+            let mut put = |wy: i32, block: u32| {
+                if (oy..oy + 16).contains(&wy) {
+                    g.set(x, (wy - oy) as usize, z, block);
+                }
+            };
+            if col.biome == reef && l::reef_top(&f, wx * 16, wz * 16) {
+                put(h, kind);
+                put(h - 1, kind);
+            } else if (col.biome == reef || col.biome == lagoon || col.biome == crate::worldgen::OCEAN.id())
+                && l::reef_rubble(&f, wx * 16, wz * 16)
+            {
+                put(h, CORAL_RUBBLE.id());
+            } else if col.biome == lagoon && noise::fixed::hash(noise::fixed::seed32(seed, 0xC07B), wx, 0, wz) % 1000 < 25 {
+                // A head on the sand, in the water.
+                put(h + 1, kind);
             }
         }
     }

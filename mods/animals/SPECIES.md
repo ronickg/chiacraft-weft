@@ -139,8 +139,8 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 What the webs still lack, and what the plan fills it with (`web::WAITING`):
 
 - herring_gull: no prey in base:ocean: the open sea's web: its fish (later; the gull hunts on the beach meanwhile)
-- base:tropical_forest: no hunters: **not planned**
-- base:tropical_forest: no a carrion eater: **not planned**
+- base:tropical_forest: no hunters: the tropical forest's animals (jaguar, ocelot, harpy eagle)
+- base:tropical_forest: no a carrion eater: the tropical forest's animals (king vulture)
 
 ## dog (chihuahua)
 

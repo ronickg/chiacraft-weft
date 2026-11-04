@@ -1,0 +1,74 @@
+# The same in Russian (--config core:language=ru_ru).
+# UI audit (UI redo, 11-04): the screens no other audit opens. In the world: a portal (its owner
+# chooses where it leads) and the pause menu's "Who May Come In". At the title: Multiplayer's
+# Links, Friends and Find Worlds, the Profile and its Account, and Create New World (its default
+# name and the world rules, Personal Mods among them).
+loaded
+idle
+chat /tk mode creative
+chat /tk time 6000
+wait 2
+chat /tk set ~ ~1 ~-2 portals:portal
+wait 1
+look 0 0
+wait 0.5
+click 1
+wait 1.5
+shot 40_portal.png
+key Escape
+wait 1
+key Escape
+wait 1
+shot 41_pause.png
+tap core:pause text:Кто может войти
+wait 1.5
+shot 42_admission.png
+key Escape
+wait 1
+key Escape
+wait 1
+leave
+wait 2
+tap core:title text:Сетевая игра
+wait 1.5
+tap core:multiplayer text:Связи
+wait 1.5
+shot 43_links.png
+key Escape
+wait 1
+tap core:multiplayer text:Друзья
+wait 1.5
+shot 44_friends.png
+key Escape
+wait 1
+tap core:multiplayer text:Найти миры
+wait 3
+shot 45_finder.png
+key Escape
+wait 1
+key Escape
+wait 1
+tap core:title id:profile
+wait 1.5
+shot 46_profile.png
+tap core:profile text:Аккаунт
+wait 1.5
+shot 47_account.png
+key Escape
+wait 1
+key Escape
+wait 1
+tap core:title text:Одиночная игра
+wait 1.5
+tap core:worlds text:Создать новый мир
+wait 1.5
+shot 48_create_world.png
+cursor 0.5 0.5
+scroll -12
+wait 1
+shot 49_create_world_end.png
+key Escape
+wait 1
+key Escape
+wait 1
+quit

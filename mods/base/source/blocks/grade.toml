@@ -61,6 +61,35 @@ match = ["observer_*"]
 # Closer to vanilla's dark observer, in our sage stone (Planner, 11-04: the observer and piston pass).
 gain = 0.8
 
+[groups.glacier]
+match = ["glacier_ice_*"]
+# Terrain's glacier ice (11-04): a little bluer and darker, toward the middle of vanilla's packed ice
+# (luma 0.69-0.82, sat 0.35-0.43, hue 193-219): luma 0.81 -> 0.77, sat 0.26 -> 0.35.
+saturation = 1.35
+gain = 0.95
+
+[tiles.glacier_ice_side]  # flattened for irregular layers (glacier_bands.py): grain back to quiet ground's 20,
+spread = 20               # and a little less blue than the group, to sit with the top
+saturation = 1.2
+
+[groups.coral]
+match = ["*_coral_block"]
+
+[tiles.brain_coral_block]  # luma 0.35 -> 0.43, hue 343 -> 336; ~ brain_coral_block (0.45-0.47, 324-327)
+gain = 1.23
+hue = -7
+spread = 75
+
+[tiles.staghorn_coral_block]  # a busy block, spread 109 -> 75 (report: busy 45-80)
+spread = 75
+
+[tiles.porites_coral_block]  # darker than sand (0.83) and lumpier: luma 0.58 -> 0.51, spread 40 -> 50
+gain = 0.88
+spread = 50
+
+[tiles.coral_rubble]  # pale bone-grey, not sand: sat 0.39 -> 0.23 (sand 0.38), luma 0.76
+saturation = 0.6
+
 [groups.liquids]
 match = ["water_*", "lava_*"]
 
