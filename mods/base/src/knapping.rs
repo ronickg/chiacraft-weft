@@ -13,7 +13,7 @@ use crafting::{code, grades, skills};
 use vitals::first::{self as f, KNAPPED};
 use weft_sdk::*;
 
-use crate::first::{FLINT, LOOSE_FLINT, SHARP_FLAKE};
+use crate::first::{LOOSE_FLINT, SHARP_FLAKE};
 use crate::parts::{PART, PartOf, SKILLS};
 
 value! {
@@ -215,48 +215,62 @@ pub fn knapped_head(w: &World, player: u64, shape: &str, by_hand: bool, roll: Op
         .with(&PART, PartOf { material: code("flint"), grade: grade as u32, worn: 0, made_day, repairs: 0 })
 }
 
-/// The screen: the heads to pick, the nodule's squares (the outline's lit), a line on how.
+/// The screen (kit 2, UI redo): the heads to pick as categories, the nodule in a well, a line on how.
+/// The squares: `knap_stone` the chalky cortex to strike away (hover: a strike mark), `knap_head`
+/// the head's outline in dark flint (hover: a red crack, and a warning tooltip), `knap_gone` a
+/// hollow where one was struck; for the half second the screen stays at the end, `knap_cracked`
+/// the square that broke it and `knap_free` the freed head (`notes/ui/kit2/knap.py`).
 fn screen(ui: &mut Ui) {
-    let Some(k) = *VIEW.lock().unwrap() else { return };
+    let Some(k) = view() else { return };
     let head = &KNAPPED[k.shape as usize % KNAPPED.len()];
-    crate::window::window(ui, S::col().pad(8.0).gap(5.0), &[], |ui| {
-        ui.text_styled(S::col().class("title"), "knapping.base.title", &[]);
-        ui.row(S::row().gap(2.0), |ui| {
+    let ended = k.broken != 0 || k.done != 0;
+    crate::window::window_titled(ui, S::col().pad(7.0).gap(5.0), "knapping.base.title", &[], |ui| {
+        ui.row(S::row().gap(1.0).self_align(abi::ui_align::CENTER), |ui| {
             for (i, h) in KNAPPED.iter().enumerate() {
                 let picked = i as u32 == k.shape;
+                // Once a square is struck the head is chosen.
                 let s = S::default()
-                    .h(13.0)
-                    .class(if picked { "button" } else { "button_secondary" })
+                    .h(12.0)
+                    .pad(2.0)
+                    .class("category")
                     .selected(picked)
-                    .disabled(k.removed != 0 && !picked);
+                    .disabled((k.removed != 0 || ended) && !picked);
                 ui.button(&format!("item.base.part_{}", h.shape), s, move |c| {
                     c.client().send(&HIT, &(PICK + i as u32));
                 });
             }
         });
-        ui.column(S::col().gap(1.0).center(), |ui| {
+        ui.panel("well", S::col().pad(4.0).gap(1.0).self_align(abi::ui_align::CENTER), |ui| {
             for row in 0..f::KNAP_SIZE {
                 ui.row(S::row().gap(1.0), |ui| {
                     for col in 0..f::KNAP_SIZE {
                         let i = row * f::KNAP_SIZE + col;
-                        let class = if head.keeps(i) { "slot_highlight" } else { "slot" };
-                        let s = S::default().size(18.0, 18.0).class(class);
-                        if k.removed & (1 << i) != 0 {
-                            // Struck away: an empty space.
-                            ui.column(S::col().size(18.0, 18.0), |_| {});
+                        let keeps = head.keeps(i);
+                        let square = S::default().size(18.0, 18.0);
+                        if k.broken == i as u32 + 1 {
+                            ui.panel("knap_cracked", square, |_| {});
+                        } else if k.removed & (1 << i) != 0 || (k.done != 0 && !keeps) {
+                            ui.panel("knap_gone", square, |_| {});
+                        } else if ended {
+                            ui.panel(if k.done != 0 { "knap_free" } else { "knap_head" }, square, |_| {});
+                        } else if keeps {
+                            let s = square.class("knap_head").tooltip("knapping.base.keep_tip");
+                            ui.button_with(s, move |c| c.client().send(&HIT, &(i as u32)), |_| {});
                         } else {
-                            ui.button_with(
-                                s,
-                                move |c| {
-                                    c.client().send(&HIT, &(i as u32));
-                                },
-                                |ui| ui.item(FLINT.id(), 1, S::default()),
-                            );
+                            let s = square.class("knap_stone");
+                            ui.button_with(s, move |c| c.client().send(&HIT, &(i as u32)), |_| {});
                         }
                     }
                 });
             }
         });
-        ui.text_styled(S::col().class("dim").max_w(150.0), "knapping.base.how", &[]);
+        let how = if k.done != 0 {
+            "knapping.base.freed"
+        } else if k.broken != 0 {
+            "knapping.base.broke"
+        } else {
+            "knapping.base.how"
+        };
+        ui.text_styled(S::col().class("dim").max_w(150.0).self_align(abi::ui_align::CENTER), how, &[]);
     });
 }
