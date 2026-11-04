@@ -7,7 +7,7 @@ idle
 chat /tk mode survival
 until mode survival within 10
 chat /tk fill ~-3 ~-1 ~-3 ~3 ~-1 ~3 base:stone
-chat /tk fill ~-3 ~ ~-3 ~3 ~3 ~3 base:air
+chat /tk fill ~-3 ~ ~-3 ~3 ~3 ~3 core:air
 chat /tk set ~ ~1 ~-2 base:crafting_table
 until block ~ ~1 ~-2 base:crafting_table within 10
 look 0 0
@@ -49,7 +49,7 @@ tap core:menu class:slot
 wait 1
 tap core:menu text:all (
 wait 1
-chat /tk inv @s
+chat /tk inv me
 shot parts_made
 # 4. Build: head, haft and lashing from the hotbar into the assembly slots, take the axe.
 tap_once core:menu slot:43
@@ -64,7 +64,7 @@ tap_once core:menu slot:14
 tap_once core:menu slot:43
 wait 1
 shot parts_built
-chat /tk slot @s 0
+chat /tk slot me 0
 key Escape
 until screen none within 10
 # 5. Apart: the axe into the apart slot; head and haft come back, the lashing is cut.
@@ -77,5 +77,5 @@ wait 1
 shot parts_apart
 key Escape
 until screen none within 10
-chat /tk inv @s
+chat /tk inv me
 quit

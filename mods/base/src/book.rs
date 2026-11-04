@@ -44,6 +44,9 @@ static POOL_ASK: Channel<[u64; 1]> = Channel::named("crafting_pool_ask");
 /// What the chests hold, as (item, count) pairs of little-endian u32s.
 static POOL: Channel<Vec<u8>> = Channel::named("crafting_pool");
 
+/// The player's bag, hotbar first: base's groups of the player's inventory (`player.rs`).
+const BAG_GROUPS: [&str; 2] = ["hotbar", "main"];
+
 static CHESTS: Tag = Tag::named("chests");
 static TABLES: Tag = Tag::named("crafting_tables");
 
@@ -232,7 +235,9 @@ fn chests_near(w: &World, table: [i32; 3]) -> Vec<u64> {
 /// The slots crafting at `station` takes from, bag first. `None` at a table with no table near.
 fn sources(w: &World, player: u64, station: Station) -> Option<Vec<Source>> {
     let mut out = Vec::new();
-    for group in [HOTBAR_GROUP, INVENTORY_GROUP] {
+    // The player's own groups, as base names them (`player.rs`); `core:hotbar` and
+    // `core:inventory` are only what a menu calls them.
+    for group in [BAG_GROUPS[0], BAG_GROUPS[1]] {
         if let Some(g) = w.inventory(player).find_group(group) {
             out.extend((0..g.len()).map(|i| Source { owner: player, slot: g.slot(i) }));
         }
@@ -349,8 +354,8 @@ fn roll(player: u64, n: u32) -> f32 {
 /// What the player has to craft with here: the bag, and at a table the chests' totals.
 fn have(ui: &Ui, station: Station, pool: &[(u32, u32)]) -> Vec<(u32, u32)> {
     let v = ui.client();
-    let mut stacks = v.inventory_group(HOTBAR_GROUP);
-    stacks.extend(v.inventory_group(INVENTORY_GROUP));
+    let mut stacks = v.inventory_group(BAG_GROUPS[0]);
+    stacks.extend(v.inventory_group(BAG_GROUPS[1]));
     let mut out = totals(stacks);
     if station == Station::Table {
         for &(item, n) in pool {
