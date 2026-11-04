@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn the_bow_drill_beats_the_hand_drill() {
         assert!(ember_secs(BOW_DRILL) < 15.0 && ember_secs(HAND_DRILL) > 2.0 * ember_secs(BOW_DRILL));
-        assert!(BOW_DRILL.uses > HAND_DRILL.uses);
+        const { assert!(BOW_DRILL.uses > HAND_DRILL.uses) };
     }
 
     #[test]

@@ -236,7 +236,7 @@ fn hand_part(shape: &str, material: &str, day: u32) -> ItemStack {
 fn knows(w: &World, player: u64, item: u32) -> bool {
     w.creative(player)
         || w.component(player, &crate::discovery::KNOWN)
-            .is_some_and(|k| crate::discovery::held(&k, item_name(item)))
+            .is_some_and(|k| crate::discovery::held(k, item_name(item)))
 }
 
 /// The knapped head a recipe's output is, if it is one.
