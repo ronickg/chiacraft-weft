@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """The giant sequoia's shapes sheet: grown trees from branches (`tree_recipes::SEQUOIA`) and young
 ones (`YOUNG_SEQUOIA`), from the side and the first from below, each with a 2-block player at its
-foot for scale. Stand-in looks (the spruce's log tinted red-brown, its leaves) until Chiacraft's
-bark and foliage.
+foot for scale. Chiacraft's bark, log end and foliage (the foliage in the grove's tint).
 
     cargo run -p base_api --example sequoia_dump -- 4 > sequoias.json
     ~/.venvs/blocky/bin/python mods/base/source/trees/sequoia_sheet.py sequoias.json out.png
@@ -22,7 +21,7 @@ from render import render, view_matrix  # noqa: E402
 
 BLOCKS = os.path.join(REPO, "mods", "base", "assets", "textures", "block")
 BARK = (176, 96, 66)  # the spruce's log tinted toward a sequoia's red-brown
-LEAF = (92, 128, 76)
+LEAF = (0x4D, 0x8A, 0x3C)  # the grove's evergreen tint (worldgen.rs, sequoia_grove)
 PLAYER = (40, 90, 190)
 
 
@@ -36,9 +35,9 @@ def tex(name, tint=None):
 
 def atlas():
     a = np.zeros((32, 128, 4), np.uint8)
-    a[:, 0:32] = tex("log_spruce.png", BARK)
-    a[:, 32:64] = tex("log_spruce_top.png", BARK)
-    lv = tex("leaves_spruce.png").astype(float)
+    a[:, 0:32] = tex("log_sequoia.png")
+    a[:, 32:64] = tex("log_sequoia_top.png")
+    lv = tex("leaves_sequoia.png").astype(float)
     lv[..., :3] = lv[..., :3] * np.array(LEAF) / 255.0
     a[:, 64:96] = lv.astype(np.uint8)
     a[:, 96:128] = (*PLAYER, 255)
@@ -80,7 +79,7 @@ def main(src, out):
     cols = max(len(v) for _, v in rows) + 1
     sheet = Image.new("RGB", (120 + cols * cell[0], 50 + len(rows) * cell[1]), (236, 233, 226))
     d = ImageDraw.Draw(sheet)
-    d.text((10, 10), "giant sequoia grown from branches (stand-in bark and leaves); blue: a 2-block player", fill=(20, 20, 20), font=font)
+    d.text((10, 10), "giant sequoia grown from branches (Chiacraft's bark and foliage); blue: a 2-block player", fill=(20, 20, 20), font=font)
     for r, (label, ts) in enumerate(rows):
         d.text((10, 50 + r * cell[1] + cell[1] // 2), label, fill=(20, 20, 20), font=font)
         views = [(t, 25, 6, ppb) for t in ts] + [(ts[0], 35, 18, 16.0)]
