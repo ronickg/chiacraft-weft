@@ -116,8 +116,9 @@ def tone(a, to=0.072, pull=0.55, sat=0.78, val=0.84, lo=0.068, hi=0.19, min_s=0.
 
 
 def disabled(a):
-    """Grey-brown and flat: most of the color out, darker, the light kept."""
-    return hsv_map(a, lambda h, s, v: (0.07, s * 0.25, v * 0.72))
+    """Grey-brown, flat and dim: most of the color out and much darker, so it reads as off (a
+    lighter one looked washed out over the title's painting)."""
+    return hsv_map(a, lambda h, s, v: (0.07, s * 0.2, v * 0.5))
 
 
 def pressed(a):
@@ -275,6 +276,13 @@ def build():
     with open(os.path.join(OUT, "background.gui"), "w") as f:
         f.write("scaling = stretch\n")
     out["background"] = scene
+    # A row of a list (the worlds): `list_row`, a dark plate with a bronze rim, lighter on hover,
+    # a gold rim when selected (a selected button is drawn with `_pressed`).
+    row = fit9(src("c_small", 2), 64, 24, 4)
+    put("list_row", row, 4)
+    put("list_row_hover", brighter(row, 1.3), 4)
+    put("list_row_pressed", glow(brighter(row, 1.2), GOLD1), 4)
+    put("list_row_disabled", disabled(row), 4)
     # the secondary button (dark brown): `S::default().class("button_secondary")`
     b2 = fit9(src("c_buttons", 1), 64, 20, 5)
     put("button_secondary", b2, 5)
