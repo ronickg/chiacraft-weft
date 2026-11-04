@@ -1,0 +1,61 @@
+# The light under a rainforest's canopy (Ronald picked "the real Amazon", 11-04): a dim green floor
+# with sunflecks, mist in the crowns in the morning, light shafts through the crown gaps. Plants'
+# tall trees aren't in yet, so a closed canopy is built here: four layers of oak leaves 28-31
+# blocks over the ground (y 115-118) across 37 x 37 blocks, with a few crown gaps, in the tropical
+# forest at x 48 z 464 (ground 87, Terrain's inland spot). Seed 1, --view 12, 1280x720,
+# --shader-pack chiacraft, a fresh world. Spectator, absolute /tp, mobs off.
+# Yaw 0 faces -z, 270 faces +x (east, toward the morning sun); a negative pitch looks down.
+loaded
+idle
+chat /rule core:mob_spawning 0
+chat /tk mode spectator
+chat /weather clear 99999
+chat /time set 6000
+chat /tp 48 100 464
+loaded
+idle
+wait 10
+chat /tk fill 30 115 446 66 118 482 oak_leaves
+chat /tk fill 44 115 456 45 118 457 air
+chat /tk fill 54 115 466 56 118 467 air
+chat /tk fill 40 115 470 40 118 471 air
+chat /tk fill 58 115 452 59 118 452 air
+chat /tk fill 50 115 474 51 118 474 air
+chat /tp 48 89.6 468
+wait 6
+# 1. Noon: the floor and the trunks in the canopy's shade, sunflecks under the gaps.
+look 0 -8
+wait 3
+shot canopy_1_noon.png
+look 0 -50
+wait 2
+shot canopy_1b_noon_floor.png
+look 0 60
+wait 2
+shot canopy_1c_noon_up.png
+# 2. Mid morning (09:00) with the morning's mist (/air: fog 0.6, still): shafts toward the sun.
+chat /air 0.6 0
+chat /time set 3000
+wait 10
+look 270 10
+wait 3
+shot canopy_2_morning_shafts.png
+look 0 -8
+wait 2
+shot canopy_2b_morning.png
+# 3. Early (07:30), the sun low, the same mist.
+chat /time set 1500
+wait 4
+look 270 8
+wait 3
+shot canopy_3_early_shafts.png
+wait 1
+bench 4 canopy_early
+# 4. From above the canopy at dawn: the mist lying on the crowns.
+chat /tp 20 128 464
+wait 4
+look 270 -12
+wait 3
+shot canopy_4_above_dawn.png
+chat /air 0 0
+quit

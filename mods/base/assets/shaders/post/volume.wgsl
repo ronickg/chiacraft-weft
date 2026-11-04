@@ -72,7 +72,12 @@ fn apply(p: PostPixel) -> vec4<f32> {
     let low = 1.0 - smoothstep(0.1, 0.5, sun.y);
     // Thin: at 0.0025-0.0065 it washed the sky round a low sun white (Tester 2's golden hour); the
     // beams should show where the shadow maps cut them, not fill the air.
-    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z) * (1.0 - scene.fog_color.w);
+    // Under a forest's canopy (`scene.canopy`, from the biome's air) the air is damp and the beams
+    // through the crown gaps are the look: thicker air, more in morning mist. Its knob is the
+    // pack's 14th option (`base:look_shafts`, `mods/base/src/look.rs`).
+    let k = scene.options[3].y;
+    let canopy = min(scene.canopy.x, 1.0) * select(k, 1.0, k == 0.0);
+    let density = (0.0012 + 0.002 * low + 0.03 * scene.weather.z + canopy * (0.004 + 0.02 * scene.weather.z)) * (1.0 - scene.fog_color.w);
     let air = 1.0 - exp(-density * end);
     let color = mix(vec3(1.0, 0.62, 0.35), vec3(1.0, 0.95, 0.85), smoothstep(0.05, 0.5, sun.y));
     // Lit air against shade: what shows is the difference the shadow maps make, so a view where all

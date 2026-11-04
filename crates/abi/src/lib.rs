@@ -362,6 +362,9 @@ pub mod air_flags {
     pub const DUST: u32 = 2;
     /// Bits 8 to 15: how strong an aurora is on clear nights there, 0 to 255.
     pub const AURORA_SHIFT: u32 = 8;
+    /// Bits 16 to 23: how closed a forest's canopy is there, 0 (open sky) to 255 (a rainforest's),
+    /// for shader packs' light under the leaves.
+    pub const CANOPY_SHIFT: u32 = 16;
 }
 
 pub mod block_flags {
