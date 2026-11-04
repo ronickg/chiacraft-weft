@@ -581,6 +581,12 @@ impl App {
     }
 }
 
+fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
+    let t = gpu
+        .create_texture(&TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: Format::Depth32, render_target: true }, "depth");
+    (t, w, h)
+}
+
 /// Where the driver's compiled pipelines are kept between starts (`Backend::pipeline_cache_data`).
 static PIPELINE_CACHE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
@@ -602,12 +608,6 @@ fn save_pipeline_cache(gpu: &dyn Backend) {
         Ok(()) => log::debug!("pipeline cache: {} KB saved", data.len() / 1024),
         Err(e) => log::warn!("pipeline cache {}: {e}", path.display()),
     }
-}
-
-fn make_depth(gpu: &mut dyn Backend, w: u32, h: u32) -> (TextureId, u32, u32) {
-    let t = gpu
-        .create_texture(&TextureDesc { width: w.max(1), height: h.max(1), mips: 1, format: Format::Depth32, render_target: true }, "depth");
-    (t, w, h)
 }
 
 impl Running {
