@@ -1,0 +1,9 @@
+# Bob has no packages: joining downloads alice's (the bell among them) and switches content.
+join name-ticket.txt
+tap core:join_sheet id:download
+loaded
+wait 3
+shot name-bob.png
+mark name-mark-bob-in
+await_file name-mark-done 120
+quit
