@@ -471,11 +471,15 @@ fn water(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     // in the biome's own tint (a swamp's brown-green), with a little of the texture's pattern near.
     let tint = in.color / max(max(in.color.r, max(in.color.g, in.color.b)), 1e-3);
     let pattern = mix(1.0, clamp(luma(albedo.rgb) / 0.55, 0.8, 1.2), 1.0 - smoothstep(8.0, 24.0, in.dist));
-    let shallow = vec3(0.08, 0.26, 0.24);
+    // The biome's tint counts for more where it is deep (a swamp's brown-green); the shallows keep
+    // their turquoise.
+    let shallow = vec3(0.06, 0.30, 0.27);
     let deep = vec3(0.012, 0.05, 0.085);
-    let scatter = mix(shallow, deep, 1.0 - exp(-0.35 * depth)) * mix(vec3(1.0), tint, 0.6) * pattern * lit;
-    // How much of the bottom shows: the way through the water to it, longer at a slant.
-    let through = exp(-0.28 * depth / max(v.y, 0.2));
+    let deepness = 1.0 - exp(-0.35 * depth);
+    let scatter = mix(shallow, deep, deepness) * mix(vec3(1.0), tint, mix(0.3, 0.7, deepness)) * pattern * lit;
+    // How much of the bottom shows: the way through the water to it, longer at a slant; never all
+    // of it, so even the shallowest water tints what lies under it.
+    let through = exp(-0.28 * depth / max(v.y, 0.2)) * 0.82;
     let r = reflect(-v, n);
     let refl = sky_color(normalize(vec3(r.x, max(r.y, 0.03), r.z))) * mix(0.15, 1.0, brightness_curve(in.light.x));
     // The sun's glitter: a narrow highlight (GGX) on the waves, so it lies in a path toward the sun.
@@ -490,10 +494,10 @@ fn water(in: VOut, albedo: vec4<f32>) -> vec4<f32> {
     // Foam where it laps the land, in a wobbling line on the pixel grid.
     let px = floor(in.pos.xz * 16.0) / 16.0;
     let wobble = noise3(vec3(px.x * 2.0, scene.params.w * 0.6, px.y * 2.0));
-    let foam = (1.0 - smoothstep(0.04, 0.16 + 0.14 * wobble, shore)) * 0.55;
+    let foam = (1.0 - smoothstep(0.06, 0.22 + 0.16 * wobble, shore)) * 0.7;
     let lost = (1.0 - fresnel) * through;
     let a = clamp(max(1.0 - lost, max(luma(glint), foam)), 0.02, 1.0);
-    let c = (refl * fresnel + scatter * (1.0 - fresnel) * (1.0 - through) + glint + lit * 0.8 * foam) / a;
+    let c = (refl * fresnel + scatter * (1.0 - fresnel) * (1.0 - through) + glint + (lit * 0.9 + vec3(0.03)) * foam) / a;
     return vec4(display(haze_lit(c, in.rel, in.light.x)), a);
 }
 
