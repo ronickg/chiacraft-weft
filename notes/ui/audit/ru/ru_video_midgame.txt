@@ -14,7 +14,11 @@ key Escape
 wait 1
 tap core:pause text:Настройки
 wait 1
-tap core:settings text:Графика и качество
+# At the bottom of the settings: scrolled to.
+cursor 0.5 0.5
+scroll -40
+wait 1
+tap_once core:settings text:Графика и качество
 wait 1.5
 tap_once base:video text:Низкое
 wait 1

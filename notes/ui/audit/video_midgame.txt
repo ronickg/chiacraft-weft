@@ -13,7 +13,11 @@ key Escape
 wait 1
 tap core:pause text:Settings
 wait 1
-tap core:settings text:Video and Quality
+# At the bottom of the settings: scrolled to.
+cursor 0.5 0.5
+scroll -40
+wait 1
+tap_once core:settings text:Video and Quality
 wait 1.5
 tap_once base:video text:Low
 wait 1
