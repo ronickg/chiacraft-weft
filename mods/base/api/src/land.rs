@@ -51,6 +51,7 @@ pub mod salt {
     pub const KARST: u64 = 0x4A5;
     pub const KARST_AREA: u64 = 0x4A6;
     pub const KARST_WOBBLE: u64 = 0x4A7;
+    pub const KARST_CLUSTER: u64 = 0x4A8;
 }
 
 /// One factor of where a feature applies: 0 at `from`, 1 at `to` (Q12 after `q12`).
@@ -296,8 +297,8 @@ pub const MESA_AREA: Area = Area {
 };
 
 /// Karst towers (Lithosphere; Ha Long Bay, Guilin): in the warm, wet land and its shallow seas
-/// (`KARST_AREA`), steep limestone pillars, one per `KARST_CELL` blocks square where the area
-/// allows (`KARST_CHANCE` at full strength), `KARST_RADIUS` blocks across their foot and
+/// (`KARST_AREA`), steep limestone pillars, at most one per `KARST_CELL` blocks square, in
+/// clusters, `KARST_RADIUS` (or `KARST_WIDE_RADIUS`) blocks from their middle to their foot and
 /// `KARST_HEIGHT` over the water or the ground they stand on, their outline wobbled (Ronald,
 /// 11-04: "All 3, in order").
 pub const KARST_AREA: Area = Area {
@@ -309,10 +310,21 @@ pub const KARST_AREA: Area = Area {
     ],
     not: false,
 };
-pub const KARST_CELL: i32 = 40;
-pub const KARST_CHANCE: f64 = 0.6;
-pub const KARST_RADIUS: (i32, i32) = (5, 11);
+pub const KARST_CELL: i32 = 32;
+/// Towers stand in clusters (Planner, 11-04: "clusters of 3-6 towers with a few wider ones"):
+/// where the cluster noise (patches about `KARST_CLUSTER_SIZE` blocks across) runs from
+/// `KARST_CLUSTER.0` to `.1` a cell keeps its tower with `KARST_CHANCE`, elsewhere with
+/// `KARST_LONE`; both times the karst area's strength.
+pub const KARST_CHANCE: f64 = 0.85;
+pub const KARST_LONE: f64 = 0.06;
+pub const KARST_CLUSTER_SIZE: f64 = 140.0;
+pub const KARST_CLUSTER: (f64, f64) = (0.04, 0.14);
+/// Radius and height (blocks); one tower in `KARST_WIDE_ONE_IN` is a wide one.
+pub const KARST_RADIUS: (i32, i32) = (7, 12);
 pub const KARST_HEIGHT: (i32, i32) = (16, 36);
+pub const KARST_WIDE_ONE_IN: u32 = 4;
+pub const KARST_WIDE_RADIUS: (i32, i32) = (13, 17);
+pub const KARST_WIDE_HEIGHT: (i32, i32) = (22, 38);
 
 /// Rivers run where rain gathers (`net`): over nodes `RIVER_NODE` blocks apart, each draining
 /// to its steepest neighbour, worked out `RIVER_REGION` nodes square at a time. A node's flow is
@@ -1001,13 +1013,16 @@ pub enum RockSet {
 pub fn rock_set(f: &Fields, x: i32, z: i32, height: i32, sandy: bool) -> RockSet {
     let here = Here::new(f, x, z);
     let (t, hu) = (here.temperature(), here.humidity());
-    if sandy || t >= q12(SAVANNA.0) && hu < q12(SAVANNA.1) {
+    if sandy {
+        RockSet::Strata
+    } else if KARST_AREA.at(&here) > 0 {
+        // Karst towers are limestone however high they stand, and where the savanna's strata
+        // would be (kclusters: a striped tower at the warm edge).
+        RockSet::Limestone
+    } else if t >= q12(SAVANNA.0) && hu < q12(SAVANNA.1) {
         RockSet::Strata
     } else if t < q12(TAIGA_BELOW) {
         RockSet::Slate
-    } else if KARST_AREA.at(&here) > 0 {
-        // Karst towers are limestone however high they stand.
-        RockSet::Limestone
     } else if height >= SEA + GRANITE_ABOVE || MOUNTAINS_AREA.at(&here) > q12(MOUNTAIN_BIOME) {
         RockSet::Granite
     } else {
@@ -1213,7 +1228,7 @@ mod tests {
         for i in 0..40_000 {
             let (x, z) = ((i % 200) * 12 * 16 - 1200 * 16, (i / 200) * 12 * 16 - 1200 * 16);
             let add = karst(&f, x, z);
-            assert!((0..=q4(KARST_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
+            assert!((0..=q4(KARST_WIDE_HEIGHT.1 as f64 + 9.0)).contains(&add), "{add}");
             if add > q4(8.0) {
                 towers += 1;
                 if KARST_AREA.value(&f, x, z) == 0 {
