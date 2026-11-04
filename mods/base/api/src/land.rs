@@ -352,6 +352,12 @@ pub const LAKE_STRETCH: (i32, i32) = (16, 34);
 /// The 8 directions a lake can lie in, as (x, z) in 1/64.
 const LAKE_AXES: [(i32, i32); 8] = [(64, 0), (59, 24), (45, 45), (24, 59), (0, 64), (-24, 59), (-45, 45), (-59, 24)];
 pub const LAKE_DEPTH: (i32, i32) = (3, 9);
+/// A shallow shelf round the shore: over the outer `LAKE_SHELF` of the lake the water is
+/// `LAKE_SHELF_DEPTH` blocks deep (shallowest at the shore), then the bed drops to the bowl, so a
+/// lake reads as a wide turquoise rim round a darker middle (Lighting, 11-04: the bed shows
+/// through only to some 3-4 blocks).
+pub const LAKE_SHELF: f64 = 0.33;
+pub const LAKE_SHELF_DEPTH: (i32, i32) = (1, 2);
 /// The shore: first `LAKE_BEACH` blocks flush with the water (room for reeds and a beach, so
 /// trees don't stand in it), then rising to the land over `LAKE_SHORE` blocks, plus
 /// `LAKE_SHORE_PER_BLOCK` (in sixteenths) for each block the land stands over the sea, counted up
@@ -659,10 +665,18 @@ fn lake_cut(h: &Here, lake: Lake, ground: &mut i32) -> i32 {
     }
     let ground = *ground;
     let target = if d < r {
-        // The bowl: a block under the sea at the shore, `depth` in the middle.
+        // The shelf, 1-2 blocks deep, then the bowl down to `depth` in the middle.
         let t = d * ONE / r;
-        let bowl = ONE - ((t * t) >> 12);
-        let bed = sea - 16 - (((q4(lake.depth as f64) - 16) * bowl) >> 12);
+        let edge = q12(1.0 - LAKE_SHELF);
+        let (shallow, shelf) = (q4(LAKE_SHELF_DEPTH.0 as f64), q4(LAKE_SHELF_DEPTH.1 as f64));
+        let bed = if t >= edge {
+            sea - shallow - (((shelf - shallow) * ramp(t, ONE, edge)) >> 12)
+        } else {
+            let u = t * ONE / edge.max(1);
+            let bowl = ONE - ((u * u) >> 12);
+            let deepest = q4(lake.depth as f64).max(shelf);
+            sea - shelf - (((deepest - shelf) * bowl) >> 12)
+        };
         // Islands, clear of the shore.
         let inner = ramp(t, ONE, q12(1.0 - LAKE_ISLAND_SHORE));
         let n =
