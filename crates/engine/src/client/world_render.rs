@@ -262,7 +262,7 @@ impl Solid {
         let casts = c
             .states
             .iter()
-            .map(|st| st.opacity > 0 && st.liquid.is_none())
+            .map(|st| st.opacity > 0 && st.liquid_in().is_none())
             .collect();
         let mut s = Solid { buf: gpu.create_buffer(4, usage::STORAGE, "solid"), on: false, held: Vec::new(), tags: Vec::new(), casts };
         s.set_on(gpu, crate::packs::pack_uses("world.wgsl", "solid_at"));

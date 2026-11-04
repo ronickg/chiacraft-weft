@@ -4,7 +4,7 @@ Written by `notes/overview/build.py` from `notes/overview/pieces.json`; edit tha
 
 **The goal.** Players open their own worlds, find other people's without any central service, link them with portals and walk between them; missing mods download on the way; identity and achievements live on Chia. The game in those worlds: survival in the Valheim spirit with real temperatures and seasons, and animals to tame, breed and raise, from real facts.
 
-■ built and seen working: 64 · ◧ partly built: 17 · □ not built yet: 16 · ◌ planned for later: 6
+■ built and seen working: 64 · ◧ partly built: 18 · □ not built yet: 16 · ◌ planned for later: 6
 
 ## Core next
 
@@ -23,7 +23,7 @@ What's missing that the rest leans on (marked `core` in the data).
 
 ## Engine
 
-Weft, the voxel engine we forked: world, rendering, interface, modding. We change it only where our goals need it. 8 of 8 parts built.
+Weft, the voxel engine we forked: world, rendering, interface, modding. We change it only where our goals need it. 8 of 9 parts built.
 
 | | Part | Notes |
 |---|---|---|
@@ -35,6 +35,7 @@ Weft, the voxel engine we forked: world, rendering, interface, modding. We chang
 | ■ | Machines and redstone | Docs: `docs/machines.md`, `docs/redstone.md`. |
 | ■ | Creatures and riding | Blockbench models with animations, per-animal scale. Ours: riding. Docs: `docs/creatures.md`. |
 | ■ | Seasons | Day length through the year per dimension (`.seasons`). Docs: `docs/sky.md`. |
+| ◧ | Blocks that stand in water | Ours, generic (2026-11-04): `.holds_liquid(&WATER)` makes a block's states stand in still water (kelp, seagrass, waterlogged slabs). The cell is a source of it for flow, swimming, drowning, light, fog, rain, drips, fish and #water supports; breaking, pistons, fills and mods' set leave the water; placing fills a dry twin, buckets drain it. Unit tests in server/liquid.rs, testkit held_water_*; testmod's waterweed and sea slab. Waiting: Tester's runs; kelp and seagrass themselves (Voxel dog handoff). Code: `crates/engine/src/server/liquid.rs`, `crates/engine/src/content.rs`, `crates/engine/src/client/mesher.rs`, `mods/testkit/src/tests/held.rs`. Docs: `docs/modding.md`, `docs/worldgen.md`. |
 
 Code: `crates/engine`, `crates/render`, `crates/sdk`, `crates/abi`, `crates/noise`, `crates/app`. Docs: `README.md`, `docs/architecture.html`, `docs/modding.md`.
 

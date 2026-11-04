@@ -11,7 +11,8 @@ static WATER_LIKE: Tag = Tag::named("water");
 pub fn underwater(w: &World, st: &EntityState) -> bool {
     let eye = [st.pos[0], st.pos[1] + st.size[2] as f64, st.pos[2]];
     let eye_block = [eye[0].floor() as i32, eye[1].floor() as i32, eye[2].floor() as i32];
-    WATER_LIKE.on_block(w.get(eye_block)) && w.in_liquid(eye)
+    // In a block standing in water (kelp) too.
+    WATER_LIKE.in_cell(w.get(eye_block)) && w.in_liquid(eye)
 }
 
 /// A tick's breath: used under water (`drowning`), else what was used comes back.

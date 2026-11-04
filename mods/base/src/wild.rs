@@ -145,7 +145,7 @@ fn spread(e: &mut BlockEvent, block: &str) {
     let below = w.get([at[0], at[1] - 1, at[2]]);
     let ground = wild::of(block).map(|p| p.ground);
     let fits = match ground {
-        Some(Ground::Water) => WATER.on_block(below),
+        Some(Ground::Water) => WATER.in_cell(below),
         _ => PLANT_SOIL.on_block(below),
     };
     if w.get(at) == 0 && fits {

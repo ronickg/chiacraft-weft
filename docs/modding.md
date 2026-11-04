@@ -303,6 +303,20 @@ Another mod's liquid: `r.change_liquid(&WATER).fog(0x204020, 12.0)`, also `overl
 
 Reactions: `r.liquid_reaction("#hot", "#water").source_block("obsidian")`.
 
+#### Blocks standing in a liquid
+`.holds_liquid(&WATER)` on a block (or on some of its states) makes it stand in still water, like kelp, seagrass or a waterlogged slab. The cell is then two things at once: the block, and a source of the liquid around it.
+- **Flow**: it spreads like a source, counts as one for `renewable`, and nothing flows into it or washes it away. Reactions see its liquid (`#water` touching lava makes obsidian).
+- **Going away**: breaking it, losing its support, a piston, an explosion that keeps liquids, a fill or a mod's `w.set(pos, air)` all leave the liquid behind (`set` air once more to empty it).
+- **Placing**: a block that only ever stands in it (no dry state) can be placed only into a source of that liquid.
+- **Dry twin**: give it on some states only, and each of those states' twin one property apart becomes its dry state. Placing it into a source picks the wet state, a bucket drains the wet state to the dry one and pours back into it, and a piston moves it dry (the liquid stays). One without a dry twin is broken by a piston instead:
+  ```rust
+  r.block(&SEA_SLAB).prop("waterlogged", ["false", "true"]).model_box([0.0; 3], [16.0, 8.0, 16.0])
+      .states(|p, s| if p.is("waterlogged", "true") { s.holds_liquid(&WATER) } else { s });
+  r.block(&KELP).plant().needs_below("#kelp_soil").holds_liquid(&WATER);
+  ```
+- **Everything else** treats it as the liquid too: swimming, drowning (`Tag::in_cell`), drag (the slower of the two), light (it absorbs at least as much as the liquid), fog, sound under water, rain and drips, fish, mob paths, and `#water` supports (sugar cane beside it, a lily pad on it).
+- **In code**: `liquid_of(state)` names its liquid, `held_liquid(state)` gives the liquid's source state and `liquid_block(state)` that or the state itself. Ask `TAG.in_cell(state)` for what a place is ("is this water?") and `TAG.on_block(state)` for what a block is. testmod's `waterweed` and `sea_slab` are small working examples.
+
 ### World
 - `r.biome(..)` with its climate, surface and tints (`.temperature(0.35..).surface(..).tint(&tints::GRASS, ..)`); terrain rules inherit them
 - `r.dimension(..)` (`spawn`, `height`, `gravity`, `fixed_time`, `sky`, `bare`, or `generator` + `column` to fill it in code)

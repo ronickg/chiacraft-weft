@@ -36,6 +36,7 @@ pub const BUILTIN: &[(&str, &str)] = &[
     (abi::comp::SUPPORT_FACE, "u8"),
     (abi::comp::SUPPORT, "tag"),
     (abi::comp::SUPPORT_NEAR, "tag"),
+    (abi::comp::HOLDS_LIQUID, "block"),
     (abi::comp::SPREADS_TO, "tag"),
     (abi::comp::SPREAD_TIME, "f32"),
     (abi::comp::SPREAD_LIGHT, "u32"),

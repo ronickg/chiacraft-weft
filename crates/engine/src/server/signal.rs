@@ -1616,7 +1616,9 @@ impl Dim {
                 continue;
             }
             let info = &c.states[here as usize];
-            if info.liquid.is_some() {
+            // A block standing in a liquid moves dry, the liquid staying; one that can't be dry
+            // (kelp) is washed off like a plant.
+            if info.liquid.is_some() || info.holds.is_some() && !c.drained.contains_key(&here) {
                 broken.push(at);
                 continue;
             }
@@ -1761,7 +1763,12 @@ impl Dim {
                 }
                 let Some(state) = self.get(n) else { continue };
                 let info = &c.states[state as usize];
-                if state == AIR || info.flags & bf::SOLID != 0 || info.liquid.is_some() {
+                // What can't be dry (kelp) doesn't ride: it breaks off, its liquid staying.
+                if state == AIR
+                    || info.flags & bf::SOLID != 0
+                    || info.liquid.is_some()
+                    || info.holds.is_some() && !c.drained.contains_key(&state)
+                {
                     continue;
                 }
                 let held_by = |f: u8| moved.contains(&(n + DIRS[f as usize]));

@@ -197,6 +197,8 @@ for z in 0..16usize { for x in 0..16usize {
     }
 }}
 ```
+Underwater plants go into the water's cells as blocks that stand in it (`holds_liquid`, see the modding guide): `g.set(x, y, z, KELP.id())` over a water cell replaces the water with kelp that is still a water source, so the sea stays whole around it, flows nothing and is swum through. Put them only where water is (`WATER.is(g.get(x, y, z))`), on a floor they can stand on, and stack them up to the cell below the surface; one at the surface still has the water's surface drawn over it.
+
 `g.column(x, z)` gives any other column in world coordinates, and `g.surface_carved(x, z)` says whether a cave opened the ground there. `g.get` only sees this cube, so when `y` is 0 the ground is out of its reach: `g.surface_block(x, z)` (world coordinates) says what the terrain left at the top of a column, 0 if nothing. How much grows where is data on the biome (the components `grass` and `flowers`), which another mod can attach to any biome with `r.set_on(Target::Biome("base:forest"), &COMPONENT, value)`.
 
 ## Changing another mod's terrain

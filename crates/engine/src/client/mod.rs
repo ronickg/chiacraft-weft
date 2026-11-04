@@ -1685,7 +1685,7 @@ impl Client {
             if let Some(kind) = drip.filter(|_| {
                 c.states
                     .get(state as usize)
-                    .is_some_and(|s| s.liquid.is_some() && (r >> 24) % 8 == 0)
+                    .is_some_and(|s| s.liquid_in().is_some() && (r >> 24) % 8 == 0)
             }) {
                 let (below, air) = (self.world.block(p - IVec3::Y), self.world.block(p - IVec3::Y * 2));
                 if c.states[below as usize].flags & weft_abi::block_flags::SOLID != 0 && air == 0 {
@@ -1806,7 +1806,7 @@ impl Client {
         let liquid = self
             .world
             .block_or_air(eye)
-            .and_then(|s| c.states[s as usize].liquid)
+            .and_then(|s| c.states[s as usize].liquid_in())
             .map(|l| c.liquids[l as usize].temperature);
         crate::audio::Listener {
             pos: cam.pos,

@@ -16,7 +16,8 @@
         {"name": "World generation", "status": "built", "docs": ["docs/worldgen.md"]},
         {"name": "Machines and redstone", "status": "built", "docs": ["docs/machines.md", "docs/redstone.md"]},
         {"name": "Creatures and riding", "status": "built", "note": "Blockbench models with animations, per-animal scale. Ours: riding.", "docs": ["docs/creatures.md"]},
-        {"name": "Seasons", "status": "built", "note": "Day length through the year per dimension (`.seasons`).", "docs": ["docs/sky.md"]}
+        {"name": "Seasons", "status": "built", "note": "Day length through the year per dimension (`.seasons`).", "docs": ["docs/sky.md"]},
+        {"name": "Blocks that stand in water", "status": "partial", "note": "Ours, generic (2026-11-04): `.holds_liquid(&WATER)` makes a block's states stand in still water (kelp, seagrass, waterlogged slabs). The cell is a source of it for flow, swimming, drowning, light, fog, rain, drips, fish and #water supports; breaking, pistons, fills and mods' set leave the water; placing fills a dry twin, buckets drain it. Unit tests in server/liquid.rs, testkit held_water_*; testmod's waterweed and sea slab. Waiting: Tester's runs; kelp and seagrass themselves (Voxel dog handoff).", "code": ["crates/engine/src/server/liquid.rs", "crates/engine/src/content.rs", "crates/engine/src/client/mesher.rs", "mods/testkit/src/tests/held.rs"], "docs": ["docs/modding.md", "docs/worldgen.md"]}
       ]
     },
     {
