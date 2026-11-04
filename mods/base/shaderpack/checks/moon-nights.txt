@@ -13,21 +13,21 @@ chat /tp -689 120 -122
 loaded
 idle
 wait 10
-chat /tk fill -692 ~-1 -128 -684 ~-1 -118 grass_block
+chat /tk fill -692 ~-1 -128 -684 ~-1 -118 grass
 chat /tk fill -690 ~ -126 -690 ~2 -126 oak_log
 chat /tk fill -686 ~ -127 -686 ~1 -127 cobblestone
 chat /tk fill -684 ~ -124 -684 ~ -124 mossy_cobblestone
-chat /tk put 0 stick
+chat /tk put me 0 stick
 # 1. Full moon high (day 8, midnight).
 chat /time set 210000
 wait 4
 look 0 -12
 wait 2
 shot moon_1_full_high.png
-chat /tk put 0 torch
+chat /tk put me 0 torch
 wait 2
 shot moon_1b_full_high_torch.png
-chat /tk put 0 stick
+chat /tk put me 0 stick
 look 0 40
 wait 2
 shot moon_1c_full_sky.png
@@ -37,20 +37,20 @@ wait 4
 look 90 -8
 wait 2
 shot moon_2_full_low.png
-chat /tk put 0 torch
+chat /tk put me 0 torch
 wait 2
 shot moon_2b_full_low_torch.png
-chat /tk put 0 stick
+chat /tk put me 0 stick
 # 3. A thin waning crescent before dawn (day 3, 22000).
 chat /time set 94000
 wait 4
 look 0 -12
 wait 2
 shot moon_3_crescent.png
-chat /tk put 0 torch
+chat /tk put me 0 torch
 wait 2
 shot moon_3b_crescent_torch.png
-chat /tk put 0 stick
+chat /tk put me 0 stick
 look 270 30
 wait 2
 shot moon_3c_crescent_sky.png
@@ -61,11 +61,11 @@ look 0 -12
 wait 2
 shot moon_4_new.png
 bench 4 moon_new_nothing
-chat /tk put 0 torch
+chat /tk put me 0 torch
 wait 2
 shot moon_4b_new_torch.png
 bench 4 moon_new_torch
-chat /tk put 0 stick
+chat /tk put me 0 stick
 # 5. Full moon in rain (day 8, midnight).
 chat /time set 210000
 chat /weather rain 99999
@@ -73,7 +73,7 @@ wait 6
 look 0 -12
 wait 2
 shot moon_5_full_rain.png
-chat /tk put 0 torch
+chat /tk put me 0 torch
 wait 2
 shot moon_5b_full_rain_torch.png
 quit

@@ -13,7 +13,7 @@ chat /tp -689 120 -122
 loaded
 idle
 wait 10
-chat /tk fill -692 ~-1 -128 -684 ~-1 -118 grass_block
+chat /tk fill -692 ~-1 -128 -684 ~-1 -118 grass
 chat /tk fill -690 ~ -126 -690 ~2 -126 oak_log
 chat /tk fill -686 ~ -127 -686 ~1 -127 cobblestone
 chat /tk fill -684 ~ -124 -684 ~ -124 mossy_cobblestone
@@ -23,7 +23,7 @@ look 0 -15
 wait 2
 shot torch_1_nothing.png
 bench 4 torch_nothing
-chat /tk put 0 torch
+chat /tk put me 0 torch
 wait 2
 shot torch_2_held.png
 bench 4 torch_held
@@ -38,7 +38,7 @@ shot torch_3_third_person.png
 key core:perspective
 key core:perspective
 wait 1
-chat /tk put 0 stick
+chat /tk put me 0 stick
 chat /tk fill -689 ~ -125 -689 ~ -125 campfire
 wait 2
 look 0 -20
