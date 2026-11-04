@@ -1,6 +1,8 @@
-# Builds the workspace, lints it and runs the unit tests on every push to main and every pull
-# request. Linux is enough: nothing here opens a window or needs a GPU, so the in-game testkit
-# tests (`--test ...`) are left out.
+# Builds the workspace, lints it and runs every check that has no person in it, on every push to
+# main and every pull request: the unit tests, the mods' checks (including the sheets that fail
+# when SHEET.md or SPECIES.md is stale), the animals' rules through WASM, and the testkit against
+# the real game. Linux has no GPU here: the game draws with Mesa's software Vulkan (lavapipe)
+# into a virtual X screen.
 name: CI
 
 on:
@@ -12,6 +14,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -19,7 +24,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -41,3 +46,61 @@ jobs:
 
       - name: Tests (engine)
         run: cargo test -p weft_engine
+
+      # Unit tests, tests/places.rs, and tests/sheet.rs: SHEET.md and SPECIES.md are what the code
+      # says.
+      - name: Tests (survival numbers, animals)
+        run: cargo test -p vitals -p animals_core
+
+  animals-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The game's own rules compiled to WASM: inheritance, timings, caps, evolution, balance.
+      - name: Animals' rules
+        run: mods/animals/web/build.sh && node mods/animals/web/test.mjs
+
+  testkit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config xvfb mesa-vulkan-drivers vulkan-tools \
+            libxkbcommon-x11-0 libxcursor1 libxrandr2 libxi6 libx11-xcb1
+
+      # The game and its mods, as `cargo run --release -- --test ...` runs them.
+      - name: Build
+        run: cargo build --release
+
+      - name: Software Vulkan
+        run: xvfb-run -a vulkaninfo --summary
+
+      - name: Testkit
+        run: xvfb-run -a -s "-screen 0 1920x1080x24" target/release/weft --test all
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: testkit-report
+          path: |
+            run/test-reports
+            run/test-shots
+            run/test-jobs/*/output.log
+            run/logs
+          if-no-files-found: ignore
