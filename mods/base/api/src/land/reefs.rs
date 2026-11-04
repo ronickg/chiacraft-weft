@@ -130,3 +130,13 @@ pub(super) fn part(h: &Here, height: i32) -> Option<bool> {
         _ => None,
     }
 }
+
+/// Whether the reef itself stands at a column (its top made by `add`, not natural shallows at
+/// the same depth): warm sea, `REEF_OUT` blocks from the shore, in a patch.
+pub(super) fn top(h: &Here) -> bool {
+    if warm(h) < q12(0.5) || base_ground(h) >= q4(SEA as f64) {
+        return false;
+    }
+    shore_distance(h).is_some_and(|d| (REEF_OUT.0..=REEF_OUT.1).contains(&d))
+        && h.f.fbm(salt::REEFS, h.x, h.z, q4(REEF_PATCH_SIZE), 3) > q12(REEF_PATCHES)
+}

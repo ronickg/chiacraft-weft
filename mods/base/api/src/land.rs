@@ -1046,6 +1046,12 @@ pub fn reef_part(f: &Fields, x: i32, z: i32, height: i32) -> Option<bool> {
     reefs::part(&Here::new(f, x, z), height)
 }
 
+/// Whether the reef itself stands at column (`x`, `z`) (Q4): coral there, not on natural
+/// shallows that only share its depth (and its biome's name).
+pub fn reef_top(f: &Fields, x: i32, z: i32) -> bool {
+    reefs::top(&Here::new(f, x, z))
+}
+
 /// What the meteor craters add at (`x`, `z`) (Q4), as the engine adds it.
 pub fn craters(f: &Fields, x: i32, z: i32) -> i32 {
     craters::add(&Here::new(f, x, z), || land_height(f, x, z) + rivers(f, x, z))
