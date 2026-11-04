@@ -1,0 +1,36 @@
+loaded
+idle
+chat /tk mode creative
+chat /weather clear
+chat /air 0 2 90 mist
+chat /gamemode spectator
+chat /tp 30000 90 30000
+wait 8
+chat /tk fill ~-2 ~-1 ~-2 ~2 ~-1 ~2 stone
+chat /gamemode creative
+wait 1
+chat /time set 6000
+look 30 -12
+wait 4
+shot 1_lake_noon.png
+chat /time set 11300
+look 60 -8
+wait 3
+shot 2_lake_golden.png
+look 120 -8
+wait 2
+shot 3_lake_golden_side.png
+chat /gamemode spectator
+chat /tp 30000 66 30000
+wait 3
+chat /tk fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 stone
+chat /gamemode creative
+chat /time set 6000
+look 30 -3
+wait 3
+shot 4_low_noon.png
+chat /time set 11300
+look 60 -2
+wait 3
+shot 5_low_golden.png
+quit

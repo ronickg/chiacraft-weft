@@ -1,7 +1,8 @@
 // Light shafts (chiacraft's shader pack turns them on, `mods/base/src/shaderpack.rs`): from each
-// pixel toward the sun on the screen, how much bright sky lies along the way. Trees, hills and
-// clouds in front of the sun are dark and cut it into rays; strongest with the sun low and in
-// fog, gone at night and in rain.
+// pixel toward the sun on the screen, how much bright open sky lies along the way. The world's
+// depth says what is sky (nothing drawn there), so trees, hills, clouds and even sunlit snow in
+// front of the sun cut it into rays; strongest with the sun low and in fog, gone at night and in
+// rain.
 
 const SHAFT_STEPS: i32 = 40;
 
@@ -54,10 +55,12 @@ fn apply(p: PostPixel) -> vec4<f32> {
     var lit = 0.0;
     for (var i = 0; i < SHAFT_STEPS; i++) {
         uv += step;
-        let c = textureSampleLevel(textures[p.scene], linear_clamp, clamp(uv, vec2(0.0), vec2(1.0)), 0.0).rgb;
-        // Only the bright: the sky about the sun, not lit ground.
-        // At sunset the disc alone is that bright: then the glowing sky round it counts too.
-        lit += smoothstep(bright * mix(0.6, 0.38, low), bright * mix(0.95, 0.82, low), shaft_luma(c)) * decay;
+        let at_uv = clamp(uv, vec2(0.0), vec2(1.0));
+        let c = textureSampleLevel(textures[p.scene], linear_clamp, at_uv, 0.0).rgb;
+        // Only open sky (nothing drawn: depth 0), and of it the bright, round the sun; at sunset
+        // the disc alone is that bright, so then the glowing sky about it counts too.
+        let sky = select(0.0, 1.0, post_depth(p, at_uv) <= 0.0);
+        lit += sky * smoothstep(bright * mix(0.6, 0.38, low), bright * mix(0.95, 0.82, low), shaft_luma(c)) * decay;
         decay *= 0.955;
     }
     lit /= f32(SHAFT_STEPS) * 0.45;

@@ -486,7 +486,8 @@ impl WorldRenderer {
 
     fn pipelines(gpu: &mut dyn Backend, shader: &Shader) -> Result<([PipelineId; 3], [PipelineId; 3], PipelineId), String> {
         let depth_write = Some(DepthState { write: true, compare: Compare::GreaterEqual });
-        let depth_read = Some(DepthState { write: false, compare: Compare::GreaterEqual });
+        // See-through blocks only test depth, unless the shader pack wants their surface in it.
+        let depth_read = Some(DepthState { write: crate::packs::translucent_depth(), compare: Compare::GreaterEqual });
         let mut make = |label: &str, vs: &str, fs: &str, depth, blend, cull| {
             gpu.create_pipeline(&PipelineDesc {
                 label,

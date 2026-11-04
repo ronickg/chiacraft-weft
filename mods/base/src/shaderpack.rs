@@ -26,7 +26,8 @@ const FILES: [(&str, &str); 6] = [
     ("weather.wgsl", include_str!("../shaderpack/weather.wgsl")),
 ];
 
-const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\n";
+// Water writes depth, so the reflections effect finds its surface.
+const CFG: &str = "name = chiacraft\ndescription = Sun and shadows, sky, haze and water\ntranslucent_depth = true\n";
 
 /// Only `--shader-pack <id>` (a script checking a look; tests reset packs when they start, so
 /// it is turned on after that), `--shader-pack-after <secs>` seconds into the run (0 by
@@ -55,8 +56,11 @@ pub fn register_for_scripts(r: &mut Registry) {
     });
 }
 
-/// The pack's light shafts (`assets/shaders/post/shafts.wgsl`, a screen effect: packs cannot
-/// add passes): on while chiacraft's pack is the one chosen, off with any other or none.
+/// The pack's screen effects (`assets/shaders/post/`: packs cannot add passes), on while
+/// chiacraft's pack is the one chosen, off with any other or none: water reflections first (only
+/// the first effect sees the water in the image's alpha), contact shadows, then the light shafts.
+/// `--no-reflect`, `--no-contact` and `--no-shafts` leave one out (a script comparing the look),
+/// `--shafts-debug` shows what the shafts see.
 pub fn register_shafts(r: &mut Registry) {
     use std::sync::atomic::{AtomicBool, Ordering};
     static ON: AtomicBool = AtomicBool::new(false);
@@ -66,13 +70,20 @@ pub fn register_shafts(r: &mut Registry) {
             ON.store(false, Ordering::Relaxed);
             return;
         }
-        // `--no-shafts`: a script comparing the look with and without them.
-        let want = SHADER_PACK.get() == ID && weft_sdk::client::launch_option("no-shafts").is_none();
-        if ON.swap(want, Ordering::Relaxed) != want {
-            // `--shafts-debug`: the effect shows what it sees instead (`shafts.wgsl`).
-            let on = if weft_sdk::client::launch_option("shafts-debug").is_some() { 2.0 } else { 1.0 };
-            let known = c.post_effect("shafts", if want { on } else { 0.0 });
-            weft_sdk::info!("light shafts {}{}", if want { "on" } else { "off" }, if known { "" } else { " (no such effect)" });
+        let want = SHADER_PACK.get() == ID;
+        if ON.swap(want, Ordering::Relaxed) == want {
+            return;
+        }
+        let option = |name: &str| weft_sdk::client::launch_option(name).is_some();
+        let effects = [
+            ("reflect", !option("no-reflect"), 1.0),
+            ("contact", !option("no-contact"), 1.0),
+            ("shafts", !option("no-shafts"), if option("shafts-debug") { 2.0 } else { 1.0 }),
+        ];
+        for (name, allowed, strength) in effects {
+            let on = want && allowed;
+            let known = c.post_effect(name, if on { strength } else { 0.0 });
+            weft_sdk::info!("screen effect {name} {}{}", if on { "on" } else { "off" }, if known { "" } else { " (no such effect)" });
         }
     });
 }

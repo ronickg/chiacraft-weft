@@ -433,6 +433,8 @@ gpu_struct! {
     /// their own camera.
     pub struct Scene as "Scene" {
         pub view_proj: [[f32; 4]; 4],
+        /// Its inverse: from the screen back to camera-relative positions (screen effects).
+        pub inv_view_proj: [[f32; 4]; 4],
         /// Camera right and up in world space (particle billboards).
         pub right: [f32; 4],
         pub up: [f32; 4],
@@ -694,7 +696,9 @@ gpu_struct! {
         pub strength: f32,
         pub time: f32,
         pub size: [f32; 2],
-        pub pad: [f32; 2],
+        /// Bindless index of the world's depth (reverse Z: 0 is the far plane, the sky).
+        pub depth: u32,
+        pub pad: u32,
     }
 }
 
