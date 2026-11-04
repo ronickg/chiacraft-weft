@@ -1,0 +1,16 @@
+# The style key: approved 32 px tiles (tiles/<name>.png), attached to every request.
+stone
+dirt
+sand
+gravel
+cobblestone
+mossy_cobblestone
+deepslate
+grass_top
+log_oak
+log_oak_top
+leaves_oak
+log_spruce
+log_spruce_top
+log_birch
+log_birch_top
