@@ -137,7 +137,6 @@ Each biome's web, from the species' habitats and diets and the world's plant foo
 What the webs still lack, and what the plan fills it with (`web::WAITING`):
 
 - herring_gull: no prey in base:ocean: the open sea's web: its fish (later; the gull hunts on the beach meanwhile)
-- cedarosaurus: no predator: hunting the young of big animals (later): a grown sauropod had none
 
 ## dog (chihuahua)
 
