@@ -1,0 +1,130 @@
+[
+ {
+  "kind": "item",
+  "name": "leather_helmet",
+  "what": "a soft leather cap, front view: a rounded brown leather cap with stitched panels, a short brim and ear flaps, open face (no visor, no eye slit), centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "leather_chestplate",
+  "what": "a soft warm-brown leather with stitching chestpanel, front view: a breastpanel with rounded shoulder panels, a collar at the neck, a brown leather belt at the waist, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "leather_leggings",
+  "what": "soft warm-brown leather with stitching leggings, front view: a brown leather belt with a small buckle, two leather legs with knee panels, a dark gap between the legs, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "leather_boots",
+  "what": "a pair of soft warm-brown leather with stitching boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "iron_helmet",
+  "what": "a warm-silver plate with a near-white highlight, gold trim helmet, front view: a rounded dome narrowing to the chin, a horizontal eye slit, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "iron_chestplate",
+  "what": "a warm-silver plate with a near-white highlight, gold trim chestplate, front view: a breastplate with rounded shoulder plates, a collar at the neck, a brown leather belt at the waist, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "iron_leggings",
+  "what": "warm-silver plate with a near-white highlight, gold trim leggings, front view: a brown leather belt with a small buckle, two plated legs with knee plates, a dark gap between the legs, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "iron_boots",
+  "what": "a pair of warm-silver plate with a near-white highlight, gold trim boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "gold_helmet",
+  "what": "a ornate lemon-gold plate with orange-brown shadows and red cloth helmet, front view: a rounded dome narrowing to the chin, a horizontal eye slit, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "gold_chestplate",
+  "what": "a ornate lemon-gold plate with orange-brown shadows and red cloth chestplate, front view: a breastplate with rounded shoulder plates, a collar at the neck, a brown leather belt at the waist, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "gold_leggings",
+  "what": "ornate lemon-gold plate with orange-brown shadows and red cloth leggings, front view: a brown leather belt with a small buckle, two plated legs with knee plates, a dark gap between the legs, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "gold_boots",
+  "what": "a pair of ornate lemon-gold plate with orange-brown shadows and red cloth boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "diamond_helmet",
+  "what": "a cyan diamond plates with white facet tips over dark leather helmet, front view: a rounded dome narrowing to the chin, a horizontal eye slit, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "diamond_chestplate",
+  "what": "a cyan diamond plates with white facet tips over dark leather chestplate, front view: a breastplate with rounded shoulder plates, a collar at the neck, a brown leather belt at the waist, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "diamond_leggings",
+  "what": "cyan diamond plates with white facet tips over dark leather leggings, front view: a brown leather belt with a small buckle, two plated legs with knee plates, a dark gap between the legs, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ },
+ {
+  "kind": "item",
+  "name": "diamond_boots",
+  "what": "a pair of cyan diamond plates with white facet tips over dark leather boots side by side, seen from the front and a little from the side so each boot's foot and toe show clearly at the bottom, shin pieces above, a dark gap between them, centred",
+  "green": false,
+  "pale": false,
+  "mod": "base"
+ }
+]

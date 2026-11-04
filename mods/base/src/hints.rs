@@ -80,7 +80,8 @@ pub fn register(r: &mut Registry) {
 }
 
 fn seen(w: &World, player: u64, hint: u32) -> bool {
-    w.component(player, &SEEN).is_some_and(|s| s & (1 << hint) != 0)
+    w.component(player, &SEEN)
+        .is_some_and(|s| s & (1 << hint) != 0)
 }
 
 /// Marks a hint seen without showing it (what it would say is already known).
@@ -107,7 +108,11 @@ fn watch(w: &World) {
             continue;
         }
         let inv = w.inventory(id);
-        let items: Vec<u32> = (0..inv.size()).map(|i| inv.get(i)).filter(|s| !s.is_empty()).map(|s| s.item).collect();
+        let items: Vec<u32> = (0..inv.size())
+            .map(|i| inv.get(i))
+            .filter(|s| !s.is_empty())
+            .map(|s| s.item)
+            .collect();
         let has = |t: &Tag| items.iter().any(|&i| t.on_item(i));
         let (logs, table) = (has(&LOG_TAG), has(&TABLE_TAG));
         if logs {

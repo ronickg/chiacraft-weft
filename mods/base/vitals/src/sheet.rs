@@ -139,7 +139,11 @@ fn clothes(w: &mut String) {
         temperature::WET_CHILL,
         clothing::STRING,
         clothing::FIBRE_PER_STRING,
-        clothing::ARRIVAL.iter().map(|(m, p)| format!("{m} {}", clothing::PIECES[*p])).collect::<Vec<_>>().join(", ")
+        clothing::ARRIVAL
+            .iter()
+            .map(|(m, p)| format!("{m} {}", clothing::PIECES[*p]))
+            .collect::<Vec<_>>()
+            .join(", ")
     );
     for m in clothing::MATERIALS {
         let _ = writeln!(
@@ -305,15 +309,8 @@ fn wild_table(w: &mut String) {
             .map(|b| b.split(':').nth(1).unwrap_or(b))
             .collect::<Vec<_>>()
             .join(", ");
-        let _ = writeln!(
-            w,
-            "| {} | {:?} | {:?} | {} | {:.1}% | {found} |",
-            p.block,
-            p.form,
-            p.ground,
-            p.gives.unwrap_or("-"),
-            p.cover * 100.0
-        );
+        let _ =
+            writeln!(w, "| {} | {:?} | {:?} | {} | {:.1}% | {found} |", p.block, p.form, p.ground, p.gives.unwrap_or("-"), p.cover * 100.0);
     }
     let _ = writeln!(w);
 }

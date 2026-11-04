@@ -61,7 +61,10 @@ const CATCH_UP: u32 = 24000;
 pub fn register(r: &mut Registry) {
     r.stack_component(&MEAL, 0);
     r.stack_component(&MEAL_NUTRITION, 0);
-    r.item(&BOWL).tag("bowl").max_stack(16).tab(&crate::tabs::FOOD);
+    r.item(&BOWL)
+        .tag("bowl")
+        .max_stack(16)
+        .tab(&crate::tabs::FOOD);
     r.item(&STEW)
         .tag("stew")
         .max_stack(1)
@@ -102,7 +105,10 @@ pub fn register(r: &mut Registry) {
                 ui.row(S::row().gap(8.0), |ui| {
                     ui.spacer();
                     ui.group("input");
-                    ui.recipe_arrow_bind(|c| c.menu_component(&ROASTING).map_or(0.0, |s| ratio(s.cook, s.cook_max)));
+                    ui.recipe_arrow_bind(|c| {
+                        c.menu_component(&ROASTING)
+                            .map_or(0.0, |s| ratio(s.cook, s.cook_max))
+                    });
                     ui.group("output");
                     ui.spacer();
                 });
@@ -111,14 +117,25 @@ pub fn register(r: &mut Registry) {
         });
 
     r.entity_component(&COOKING, Cooking { burn: 0, burn_max: 0, cook: 0, cooking: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
-    r.entity_component(&DRYING, Drying { done: [0; 4], items: [0; 4], wait: 0, smoking: 0 }, component_flags::SAVE | component_flags::SYNC_MENU);
+    r.entity_component(
+        &DRYING,
+        Drying { done: [0; 4], items: [0; 4], wait: 0, smoking: 0 },
+        component_flags::SAVE | component_flags::SYNC_MENU,
+    );
     r.system(&COOKING, tick_pots);
     r.system(&DRYING, tick_racks);
 
     r.machine(&COOKING_POT, &POT_MENU)
         .block(|b| {
             b.sound_group("stone")
-                .faces(["cooking_pot_side", "cooking_pot_side", "cooking_pot_top", "cooking_pot_side", "cooking_pot_side", "cooking_pot_side"])
+                .faces([
+                    "cooking_pot_side",
+                    "cooking_pot_side",
+                    "cooking_pot_top",
+                    "cooking_pot_side",
+                    "cooking_pot_side",
+                    "cooking_pot_side",
+                ])
                 .model_box([2.0, 0.0, 2.0], [14.0, 10.0, 14.0])
                 .hardness(3.0)
                 .mineable("pickaxe")
@@ -138,11 +155,15 @@ pub fn register(r: &mut Registry) {
                     ui.column(S::col().gap(2.0), |ui| {
                         ui.group("bowl");
                         ui.progress_bind_dir("flame", S::default().size(14.0, 14.0), abi::ui_dir::UP, |c| {
-                            c.menu_component(&COOKING).map_or(0.0, |s| ratio(s.burn, s.burn_max))
+                            c.menu_component(&COOKING)
+                                .map_or(0.0, |s| ratio(s.burn, s.burn_max))
                         });
                         ui.group("fuel");
                     });
-                    ui.recipe_arrow_bind(|c| c.menu_component(&COOKING).map_or(0.0, |s| ratio(s.cook, meals::COOK_TICKS)));
+                    ui.recipe_arrow_bind(|c| {
+                        c.menu_component(&COOKING)
+                            .map_or(0.0, |s| ratio(s.cook, meals::COOK_TICKS))
+                    });
                     ui.group("output");
                     ui.spacer();
                 });
@@ -170,7 +191,8 @@ pub fn register(r: &mut Registry) {
                     ui.column(S::col().gap(2.0), |ui| {
                         ui.group("rack");
                         ui.progress_bind("attack_bar", S::default().size(72.0, 4.0), |c| {
-                            c.menu_component(&DRYING).map_or(0.0, |s| *s.done.iter().max().unwrap_or(&0) as f32 / 1000.0)
+                            c.menu_component(&DRYING)
+                                .map_or(0.0, |s| *s.done.iter().max().unwrap_or(&0) as f32 / 1000.0)
                         });
                     });
                     ui.spacer();
@@ -241,7 +263,10 @@ fn roast_step(w: &World, id: u64, s: &mut Roasting) -> bool {
     };
     let keeps = food_of(out.item).map_or((1.0, 1.0), |f| food::FOODS[f].keeps);
     let used = crate::survival::life_used(&st, now).unwrap_or(0.0);
-    let made = out.with(&MADE, crate::survival::made_for(used, keeps, now)).with(&HOT, (now / 20) as u32).with(&FRESHNESS, freshness::HOT);
+    let made = out
+        .with(&MADE, crate::survival::made_for(used, keeps, now))
+        .with(&HOT, (now / 20) as u32)
+        .with(&FRESHNESS, freshness::HOT);
     let fits = out_now.is_empty() || (out_now.stacks_with(&made) && out_now.count + made.count <= max_stack(made.item));
     if !fits {
         return false;
@@ -275,7 +300,11 @@ fn pot_step(w: &World, id: u64, s: &mut Cooking) -> bool {
     // Spoiled food doesn't go in (Research round 3, D1).
     let now = w.day_time();
     let good = |st: &ItemStack| food_of(st.item).is_some() && !crate::survival::spoiled(st, now);
-    let foods: Vec<usize> = (0..ings.len()).map(|i| ings.get(i)).filter(&good).filter_map(|st| food_of(st.item)).collect();
+    let foods: Vec<usize> = (0..ings.len())
+        .map(|i| ings.get(i))
+        .filter(&good)
+        .filter_map(|st| food_of(st.item))
+        .collect();
     let can = foods.len() >= meals::MIN && !bowl.get(0).is_empty() && output.get(0).is_empty();
     let key = meals::pack(&foods) as u32 ^ (meals::pack(&foods) >> 32) as u32;
     if key != s.cooking {

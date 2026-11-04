@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a tranquilizer dart lying diagonally: a slim wooden shaft, a thin pale steel needle tip at the top right, a small glass vial of lavender liquid behind the tip, a tuft of red feathers at the bottom left",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": true,
+ "tries": [
+  {
+   "grid": 0.321,
+   "outline": 0.84,
+   "red_line": 0.0,
+   "fill": 0.1,
+   "passed": true
+  }
+ ]
+}

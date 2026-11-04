@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "an arrow lying diagonally, thin wooden shaft, small pale steel arrowhead at the top right, cream-and-brown feather fletching at the bottom left",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.594,
+   "outline": 0.58,
+   "red_line": 0.03,
+   "fill": 0.09,
+   "passed": true
+  }
+ ]
+}

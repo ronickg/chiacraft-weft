@@ -30,8 +30,8 @@ use vitals::{difficulty, levels, stomach};
 use weft_sdk::*;
 
 pub use breath::MAX_AIR;
-pub(crate) use food::{crafted, life_used, made_for, spoiled};
 pub use camp::REST_SECS;
+pub(crate) use food::{crafted, life_used, made_for, spoiled};
 
 /// A tick, in seconds.
 const DT: f32 = 1.0 / 20.0;
@@ -73,7 +73,8 @@ fn tick(w: &World) {
     // A brand-new world with seasons begins on spring's 8th day (`vitals::calendar::START_DAY`):
     // its clock is moved there in its first second, so the engine's day length and every calendar
     // agree.
-    if w.time() < 20 && w.day_time() == w.time() && base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0) == base_api::calendars::FOUR {
+    if w.time() < 20 && w.day_time() == w.time() && base_api::SEASONS.on_dimension(w.dimension()).unwrap_or(0) == base_api::calendars::FOUR
+    {
         w.set_day_time(w.day_time() + vitals::calendar::START_DAY as u64 * vitals::calendar::DAY_TICKS);
     }
     let d = base_api::difficulty();

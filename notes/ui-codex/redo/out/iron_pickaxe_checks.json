@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a iron pickaxe: a curved crescent head spanning about two-thirds of the canvas, made of bright warm-silver iron with a near-white top bevel and a soft warm-grey outline, a gold collar band, on a handle wrapped in red-brown leather with gold cross-bands and a round gold pommel, lying diagonally, handle at the bottom left, tip at the top right, filling the canvas corner to corner",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.509,
+   "outline": 0.7,
+   "red_line": 0.07,
+   "fill": 0.3,
+   "passed": true
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a soft leather cap, front view: a rounded brown leather cap with stitched panels, a short brim and ear flaps, open face (no visor, no eye slit), centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.254,
+   "outline": 0.6,
+   "red_line": 0.34,
+   "fill": 0.48,
+   "passed": true
+  }
+ ]
+}

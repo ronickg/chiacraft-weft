@@ -23,6 +23,8 @@ pub fn run(opts: Options) -> Result<(), String> {
         config::override_for_run("core:view_distance", &v.to_string());
     }
     let settings = Settings::new(&opts.run_dir);
+    // Joining players' DIDs are read from this chain (chiacraft), when the world asks for them.
+    crate::chiacraft::chain::configure(&settings.run_dir, &settings.chain(), settings.chain_peers());
 
     let name = opts.world.as_deref().unwrap_or("world");
     let saves_dir = settings.saves_dir();

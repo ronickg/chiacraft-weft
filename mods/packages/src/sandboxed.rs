@@ -12,7 +12,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
-use chiacraft_sandbox::{self as sandbox, Arg as WArg, EntityState as WEntity, EventValue, Game, Hook, Instance, Invocation, Mod, Value};
+use chiacraft_sandbox::{
+    self as sandbox, Arg as WArg, Decl, EntityState as WEntity, EventValue, Game, Hook, Instance, Invocation, Mod, Value,
+};
 use weft_sdk::abi::{self, Str};
 use weft_sdk::*;
 
@@ -60,6 +62,114 @@ struct Runs {
     m: Arc<Mod>,
     package: String,
     runs: Mutex<Vec<(u64, Instance)>>,
+    /// The mod's components (1.1), registered with the content this `Runs` belongs to.
+    comps: Comps,
+    /// Sounds and particles the mod has named, as the SDK's handles (made once each).
+    effects: Mutex<Vec<(String, Effect)>>,
+}
+
+/// A sandboxed mod's component as the SDK holds it: bytes in a size of the next bucket up.
+#[derive(Clone, Copy)]
+enum Comp {
+    B8(&'static Component<[u8; 8]>),
+    B16(&'static Component<[u8; 16]>),
+    B32(&'static Component<[u8; 32]>),
+    B64(&'static Component<[u8; 64]>),
+    B128(&'static Component<[u8; 128]>),
+    B256(&'static Component<[u8; 256]>),
+}
+
+type Comps = Vec<(String, Comp)>;
+
+#[derive(Clone, Copy)]
+enum Effect {
+    Sound(&'static Sound),
+    Particle(&'static Particle),
+}
+
+/// At most this many sound and particle names a mod may use.
+const EFFECTS: usize = 256;
+
+fn padded<const N: usize>(default: &[u8]) -> [u8; N] {
+    let mut v = [0u8; N];
+    let n = default.len().min(N);
+    v[..n].copy_from_slice(&default[..n]);
+    v
+}
+
+/// Registers a component of `size` bytes in the smallest bucket that holds it.
+fn register_component(r: &mut Registry, name: &str, size: u32, default: &[u8], flags: u32) -> Comp {
+    fn one<const N: usize>(r: &mut Registry, name: &'static str, default: &[u8], flags: u32) -> &'static Component<[u8; N]> {
+        let c: &'static Component<[u8; N]> = Box::leak(Box::new(Component::named(name)));
+        r.entity_component(c, padded::<N>(default), flags);
+        c
+    }
+    let name: &'static str = Box::leak(name.to_string().into_boxed_str());
+    match size {
+        0..=8 => Comp::B8(one(r, name, default, flags)),
+        9..=16 => Comp::B16(one(r, name, default, flags)),
+        17..=32 => Comp::B32(one(r, name, default, flags)),
+        33..=64 => Comp::B64(one(r, name, default, flags)),
+        65..=128 => Comp::B128(one(r, name, default, flags)),
+        _ => Comp::B256(one(r, name, default, flags)),
+    }
+}
+
+fn attach_component(r: &mut Registry, kind: &str, c: Comp) {
+    let kind = Entity::generated(kind.to_string());
+    match c {
+        Comp::B8(c) => r.attach(kind, c),
+        Comp::B16(c) => r.attach(kind, c),
+        Comp::B32(c) => r.attach(kind, c),
+        Comp::B64(c) => r.attach(kind, c),
+        Comp::B128(c) => r.attach(kind, c),
+        Comp::B256(c) => r.attach(kind, c),
+    }
+}
+
+fn get_component(w: &World, id: u64, c: Comp) -> Option<Vec<u8>> {
+    match c {
+        Comp::B8(c) => w.component(id, c).map(|v| v.to_vec()),
+        Comp::B16(c) => w.component(id, c).map(|v| v.to_vec()),
+        Comp::B32(c) => w.component(id, c).map(|v| v.to_vec()),
+        Comp::B64(c) => w.component(id, c).map(|v| v.to_vec()),
+        Comp::B128(c) => w.component(id, c).map(|v| v.to_vec()),
+        Comp::B256(c) => w.component(id, c).map(|v| v.to_vec()),
+    }
+}
+
+fn set_component(w: &World, id: u64, c: Comp, value: &[u8]) -> bool {
+    fn one<const N: usize>(w: &World, id: u64, c: &'static Component<[u8; N]>, value: &[u8]) -> bool {
+        match w.component_mut(id, c) {
+            Some(v) => {
+                *v = padded::<N>(value);
+                true
+            }
+            None => false,
+        }
+    }
+    match c {
+        Comp::B8(c) => one(w, id, c, value),
+        Comp::B16(c) => one(w, id, c, value),
+        Comp::B32(c) => one(w, id, c, value),
+        Comp::B64(c) => one(w, id, c, value),
+        Comp::B128(c) => one(w, id, c, value),
+        Comp::B256(c) => one(w, id, c, value),
+    }
+}
+
+/// Weft's flags for the sandbox's.
+fn flag_bits(f: sandbox::ComponentFlags) -> u32 {
+    use sandbox::ComponentFlags as F;
+    [
+        (F::SAVE, component_flags::SAVE),
+        (F::SYNC_OWNER, component_flags::SYNC_OWNER),
+        (F::SYNC_WATCHERS, component_flags::SYNC_WATCHERS),
+        (F::KEEP, component_flags::KEEP),
+    ]
+    .into_iter()
+    .filter(|(b, _)| (f & *b) == *b)
+    .fold(0, |acc, (_, bit)| acc | bit)
 }
 
 thread_local! {
@@ -142,7 +252,28 @@ pub fn register(r: &mut Registry, package: &str, dir: &Path) -> Result<(), Strin
         }
     }
     let hooks = m.hooks().to_vec();
-    let runs = Arc::new(Runs { m: Arc::new(m), package: package.to_string(), runs: Mutex::new(Vec::new()) });
+    // Components first (1.1): they are content, registered with the package's.
+    let mut comps: Comps = Vec::new();
+    for d in m.decls() {
+        match d {
+            Decl::Component { name, size, flags, default } => {
+                let c = register_component(r, name, *size, default, flag_bits(*flags));
+                comps.push((name.clone(), c));
+            }
+            Decl::Attach { kind, component } => {
+                if let Some((_, c)) = comps.iter().find(|(n, _)| n == component) {
+                    attach_component(r, kind, *c);
+                }
+            }
+        }
+    }
+    let runs = Arc::new(Runs {
+        m: Arc::new(m),
+        package: package.to_string(),
+        runs: Mutex::new(Vec::new()),
+        comps,
+        effects: Mutex::new(Vec::new()),
+    });
     for (i, hook) in hooks.into_iter().enumerate() {
         let cb = i as u32;
         let runs = runs.clone();
@@ -153,7 +284,7 @@ pub fn register(r: &mut Registry, package: &str, dir: &Path) -> Result<(), Strin
                     let call = invocation(cmd, &params);
                     let w = cmd.world();
                     let cmd_ptr = cmd as *mut ServerCommand as usize;
-                    runs.with(|inst| inst.command(|| Box::new(WorldGame { w, cmd: cmd_ptr }), cb, &call));
+                    runs.with(|inst| inst.command(|| Box::new(WorldGame { w, cmd: cmd_ptr, runs: runs.clone() }), cb, &call));
                 })
                 .permission(permission);
             }
@@ -174,7 +305,7 @@ pub fn register(r: &mut Registry, package: &str, dir: &Path) -> Result<(), Strin
                 r.intercept(question, move |a| {
                     let w = a.world();
                     let q = query(a.query());
-                    match runs.with(|inst| inst.question(|| Box::new(WorldGame::of(w)), cb, q)) {
+                    match runs.with(|inst| inst.question(|| Box::new(WorldGame::of(w, &runs)), cb, q)) {
                         Some(sandbox::Verdict::Allow) => Verdict::Allow,
                         Some(sandbox::Verdict::Deny) => Verdict::Deny,
                         _ => Verdict::Abstain,
@@ -190,14 +321,14 @@ pub fn register(r: &mut Registry, package: &str, dir: &Path) -> Result<(), Strin
                     let w = m.world();
                     let q = query(m.query());
                     let (base, value) = (m.base, m.value);
-                    if let Some(v) = runs.with(|inst| inst.modify(|| Box::new(WorldGame::of(w)), cb, q, base, value)) {
+                    if let Some(v) = runs.with(|inst| inst.modify(|| Box::new(WorldGame::of(w, &runs)), cb, q, base, value)) {
                         m.value = v;
                     }
                 });
             }
             Hook::WorldTick => r.world_tick(move |w| {
                 let w = *w;
-                runs.with(|inst| inst.world_tick(|| Box::new(WorldGame::of(w)), cb));
+                runs.with(|inst| inst.world_tick(|| Box::new(WorldGame::of(w, &runs)), cb));
             }),
         }
     }
@@ -206,9 +337,9 @@ pub fn register(r: &mut Registry, package: &str, dir: &Path) -> Result<(), Strin
 
 fn event(r: &mut Registry, e: sandbox::Event, cb: u32, runs: Arc<Runs>) {
     use sandbox::{BlockChange as B, Death as D, Hurt as H, ItemUsed as U, Pickup as P};
-    fn run(runs: &Runs, w: World, cb: u32, batch: Vec<EventValue>) {
+    fn run(runs: &Arc<Runs>, w: World, cb: u32, batch: Vec<EventValue>) {
         if !batch.is_empty() {
-            runs.with(|inst| inst.event(|| Box::new(WorldGame::of(w)), cb, &batch));
+            runs.with(|inst| inst.event(|| Box::new(WorldGame::of(w, runs)), cb, &batch));
         }
     }
     let block = |c: &abi::BlockChange| EventValue::BlockChange(B { player: c.player, pos: t3(c.pos), state: c.state, item: c.item });
@@ -329,6 +460,8 @@ fn invocation(cmd: &ServerCommand, params: &[(String, String)]) -> Invocation {
 /// command sound.
 struct WorldGame {
     w: World,
+    /// The mod's components and effects.
+    runs: Arc<Runs>,
     /// The `ServerCommand` being run, as an address (0: none).
     cmd: usize,
 }
@@ -338,8 +471,35 @@ struct WorldGame {
 unsafe impl Send for WorldGame {}
 
 impl WorldGame {
-    fn of(w: World) -> WorldGame {
-        WorldGame { w, cmd: 0 }
+    fn of(w: World, runs: &Arc<Runs>) -> WorldGame {
+        WorldGame { w, cmd: 0, runs: runs.clone() }
+    }
+
+    fn comp(&self, name: &str) -> Option<Comp> {
+        self.runs
+            .comps
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, c)| *c)
+    }
+
+    /// The SDK's handle for a sound or particle the game has, made once per name.
+    fn effect(&self, kind: u32, name: &str) -> Option<Effect> {
+        let mut effects = self.runs.effects.lock().unwrap_or_else(|e| e.into_inner());
+        let sound = kind == abi::entry_kind::SOUND;
+        if let Some((_, e)) = effects
+            .iter()
+            .find(|(n, e)| n == name && matches!(e, Effect::Sound(_)) == sound)
+        {
+            return Some(*e);
+        }
+        if effects.len() >= EFFECTS || find(kind, name).is_none() {
+            return None;
+        }
+        let e =
+            if sound { Effect::Sound(Sound::generated(name.to_string())) } else { Effect::Particle(Particle::generated(name.to_string())) };
+        effects.push((name.to_string(), e));
+        Some(e)
     }
 }
 
@@ -509,6 +669,24 @@ impl Game for WorldGame {
         with_line(&args_text(key, args), |key, args| cmd.reply(key, args));
     }
 
+    fn get_component(&mut self, id: u64, name: &str) -> Option<Vec<u8>> {
+        get_component(&self.w, id, self.comp(name)?)
+    }
+    fn set_component(&mut self, id: u64, name: &str, value: &[u8]) -> bool {
+        self.comp(name)
+            .is_some_and(|c| set_component(&self.w, id, c, value))
+    }
+    fn play_sound(&mut self, sound: &str, pos: [f64; 3], volume: f32) {
+        if let Some(Effect::Sound(s)) = self.effect(abi::entry_kind::SOUND, sound) {
+            self.w.play_sound(s, pos, volume)
+        }
+    }
+    fn spawn_particles(&mut self, particle: &str, pos: [f64; 3], count: u32) {
+        if let Some(Effect::Particle(p)) = self.effect(abi::entry_kind::PARTICLE, particle) {
+            self.w.spawn_particles(p, pos).count(count);
+        }
+    }
+
     fn block_name(&mut self, state: u32) -> String {
         block_name(state).to_string()
     }
@@ -559,8 +737,7 @@ mod tests {
         let p = params("[action:word(create,join,leave,info)] [name:text] | <who:targets> <n:int>");
         let names: Vec<&str> = p
             .iter()
-            .map(|(n, k)| [n.as_str(), k.as_str()])
-            .flatten()
+            .flat_map(|(n, k)| [n.as_str(), k.as_str()])
             .collect();
         assert_eq!(names, ["action", "word", "name", "text", "who", "targets", "n", "int"]);
     }

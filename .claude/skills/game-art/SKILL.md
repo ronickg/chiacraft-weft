@@ -34,6 +34,10 @@ reference images are cut from a resource pack: read them, don't attach them. `ar
 our own style key, `Our key.png` in the guide's folder (approved sets of ours), and warns when a
 kind has none yet.
 
+**Ronald's answers are lessons.** After every batch he approves or sends back, write what his answer
+taught into the guide (for items, the "Learned from Ronald's answers" list in the item guide's section
+A, which goes into every prompt), so the next generation gets it right the first time.
+
 When a lesson is learned (a prompt that works, a check that catches a drift), write it into the
 guide it belongs to, or into `0 Making it.md` if it holds for every kind.
 

@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a raw trout: a whole fish lying diagonally, head at the bottom left, olive-green speckled back, a pink stripe along the side, silver belly",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.347,
+   "outline": 0.67,
+   "red_line": 0.0,
+   "fill": 0.29,
+   "passed": true
+  }
+ ]
+}

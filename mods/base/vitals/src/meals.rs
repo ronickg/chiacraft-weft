@@ -31,7 +31,11 @@ pub fn cooked(food: usize) -> usize {
 /// The ingredients of a stew (`FOODS` indexes), packed in a stack's component: 16 bits each,
 /// index + 1, 0 for none.
 pub fn pack(foods: &[usize]) -> u64 {
-    foods.iter().take(MAX).enumerate().fold(0, |p, (i, &f)| p | ((f as u64 + 1) << (16 * i)))
+    foods
+        .iter()
+        .take(MAX)
+        .enumerate()
+        .fold(0, |p, (i, &f)| p | ((f as u64 + 1) << (16 * i)))
 }
 
 pub fn unpack(packed: u64) -> Vec<usize> {

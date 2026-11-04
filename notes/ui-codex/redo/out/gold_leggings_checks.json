@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "ornate lemon-gold plate with orange-brown shadows and red cloth leggings, front view: a brown leather belt with a small buckle, two plated legs with knee plates, a dark gap between the legs, centred",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.221,
+   "outline": 0.47,
+   "red_line": 0.19,
+   "fill": 0.33,
+   "passed": true
+  }
+ ]
+}

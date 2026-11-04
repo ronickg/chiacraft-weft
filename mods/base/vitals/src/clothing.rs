@@ -44,10 +44,26 @@ impl Material {
 /// (1.2); hide: buckskin (0.8); linen: cap, shirt and trousers (0.5), loose enough with its hat to
 /// shade one in the sun (between the research's linen, 0, and its desert robe, +6).
 pub const MATERIALS: [Material; 4] = [
-    Material { name: "fur", clo: 2.5, heat: -9.0, wet_keeps: 0.3, windproof: 0.8, from: "pelts of furred wild animals", makes: [2, 4, 3, 2] },
+    Material {
+        name: "fur",
+        clo: 2.5,
+        heat: -9.0,
+        wet_keeps: 0.3,
+        windproof: 0.8,
+        from: "pelts of furred wild animals",
+        makes: [2, 4, 3, 2],
+    },
     Material { name: "wool", clo: 1.2, heat: -2.0, wet_keeps: 0.6, windproof: 0.3, from: "sheep's wool", makes: [1, 2, 1, 1] },
     Material { name: "hide", clo: 0.8, heat: -1.0, wet_keeps: 0.3, windproof: 0.7, from: "leather", makes: [1, 2, 1, 1] },
-    Material { name: "linen", clo: 0.5, heat: 4.0, wet_keeps: 0.2, windproof: 0.1, from: "plant fibre spun and woven", makes: [2, 4, 3, 2] },
+    Material {
+        name: "linen",
+        clo: 0.5,
+        heat: 4.0,
+        wet_keeps: 0.2,
+        windproof: 0.1,
+        from: "plant fibre spun and woven",
+        makes: [2, 4, 3, 2],
+    },
 ];
 
 /// The four pieces, head to feet, as items are named (`<material>_<piece>`).

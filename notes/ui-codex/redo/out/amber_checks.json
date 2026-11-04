@@ -1,0 +1,26 @@
+{
+ "kind": "item",
+ "what": "a chunk of amber: a rounded glossy honey-orange resin lump that looks translucent, a tiny dark insect inside, a pale yellow highlight on the upper left, centred with 3-5 px of padding",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.251,
+   "outline": 0.94,
+   "red_line": 0.0,
+   "fill": 0.44,
+   "passed": false
+  },
+  {
+   "grid": 0.334,
+   "outline": 0.75,
+   "red_line": 0.0,
+   "fill": 0.34,
+   "passed": true
+  }
+ ]
+}

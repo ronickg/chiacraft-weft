@@ -102,7 +102,9 @@ pub fn problems() -> Vec<String> {
 
     // Clothes (`clothing`): fur against a winter night, linen in the desert sun, wool wet.
     let wearing = |m: &str| {
-        let w = crate::clothing::find(m).map(crate::clothing::Worn::set).unwrap_or_default();
+        let w = crate::clothing::find(m)
+            .map(crate::clothing::Worn::set)
+            .unwrap_or_default();
         Body { cold_insulation: w.cold, heat_insulation: w.heat, wet_cold_insulation: w.cold_wet, ..person }
     };
     let night = Place { hour: 3.0, ..noon(-5.0) };
@@ -157,7 +159,9 @@ pub fn problems() -> Vec<String> {
             }
         }
     }
-    let dries_in = |celsius: f32, humidity: f32, wind: f32| 1.0 / crate::preserve::dry_rate(celsius, humidity, wind, false).max(1e-9) / crate::DAY_SECS;
+    let dries_in = |celsius: f32, humidity: f32, wind: f32| {
+        1.0 / crate::preserve::dry_rate(celsius, humidity, wind, false).max(1e-9) / crate::DAY_SECS
+    };
     if dries_in(32.0, 0.18, 2.6) > 2.0 {
         out.push("a rack in a desert summer takes over two game days".into());
     }

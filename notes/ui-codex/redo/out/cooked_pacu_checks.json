@@ -1,0 +1,19 @@
+{
+ "kind": "item",
+ "what": "a cooked pacu: a deep-bodied round fish lying diagonally, golden-brown roasted skin with char marks",
+ "size": [
+  32,
+  32
+ ],
+ "full": false,
+ "green": false,
+ "tries": [
+  {
+   "grid": 0.272,
+   "outline": 0.71,
+   "red_line": 0.0,
+   "fill": 0.4,
+   "passed": true
+  }
+ ]
+}

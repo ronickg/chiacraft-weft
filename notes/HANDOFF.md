@@ -230,6 +230,43 @@ the trip ("on the way"); both added each other from the link; alice joined bob's
 Friends screen; bob gave his world a new address; alice's saved entry followed it. Test scripts:
 build scripts that contain addresses with Python, not sed (`&` in the replacement).
 
+## Phase 4: admission rules, bans and ban lists (built 2026-11-03, seen working 2026-11-04)
+
+Slices 1-3 of phase 4 (`notes/PLAN.md`). `crates/engine/src/chiacraft/worlds/admission.rs`: the
+world's `admission.json` (`Rules`: `only_listed`, `allow`, `probation`, `lists`) and `bans.json`
+(`Bans`), the verdict on a join (`verdict`: bans, then the allow list, then followed lists, then
+"allow list only"; the owner and operators always in), probation (`probation_for`), signed ban lists
+(`BanList`, text `chiacraft ban list v1`, the account's `sign_text`/`check_text`), copies kept in the
+world's `banlists/` (newer `seq` wins; `owners.json` maps a followed world's key to its certified
+owner), and `Gate`, the server's view of all of it, read again when the files change.
+`crates/engine/src/server/admission.rs`: `trusted` (the world certificate's owner, ops; connection
+order only for a world without a certificate), `may`/`barred` (probation on breaking, placing, and
+containers a block keeps, checked in `actions.rs` and `open_menu`), `send_banned_away` (every 5 s
+when the files changed, and on `/ban`), and the commands `/ban`, `/tempban`, `/unban`, `/bans`,
+`/allow`, `/probation`, `/banlist` (ADMIN). The join (`player_file.rs`) asks the gate instead of
+`whitelist.txt` (a dedicated server's whitelist becomes the allow list once); player files keep
+`identity`, `played` (seconds) and `probation = lifted`. Protocol 7: `ToClient::Refused(Msg)` (the
+reason in the player's language), the status answer carries the rules' summary (shown in the saved
+worlds list), and worlds serve ban lists on `chiacraft/bans/1` and fetch the ones they follow when
+hosting starts and daily (`p2p::fetch_lists`). The owner's screen: pause menu, "Who May Come In"
+(`admission_screen.rs`), which acts through the same commands. Unit tests in `admission.rs` (not run
+here). testkit's new script line `chatf <file> <text with {}>`. The check: `tools/checks/admission`
+(two copies, alice and bob, stepping together through `mark`/`await_file`): passed on the PC
+(Tester 2, 20e4522): probation refused bob's digging, the ban sent him away and refused him, the
+allow list refused then admitted him, the owner lifted his probation, and his own world fetched
+alice's published list from hers.
+
+Slices 4 and 6 (2026-11-04, built, not yet seen on testnet11): the engine links the wallet with
+`chain`; `crates/engine/src/chiacraft/chain.rs` holds one `ChainReader` per process, configured at
+start (`chain::configure`, settings `core:chain` = `testnet11` by default, `off`; `mainnet` refused
+in this build; `core:chain_peers`), started by the first `chain::get()`, never from an async task
+(the reader runs its own runtime and `block_on`s), cache `<run dir>/chain/<network>.json`. The
+account keeps its DID's owner key (`Session::link_did`, `did_proof`, `check_did_proof`; text
+`chiacraft did v1`, `sign::did_link_text`). The join carries `did` (protocol 7 also covers it);
+the server checks the proof, then the chain on a thread (`server/admission.rs` `check_did`,
+`did_answers`), waits up to 25 s only when the rules ask for a DID (`Rules::needs_did`), and keeps
+`did` in the player file. `/didrule required on|off`, `/didrule age <days>`, and the screen.
+
 ## Phase 6, sandboxed code mods
 
 Slice 1 (server halves) is built; the design for Ronald to agree is `reports/Sandboxed code
@@ -262,20 +299,35 @@ Checked with two copies (run by the Tester session, scripts in the shared notes'
 hosted a world with `--packages examples/packages`; bob, with no packages, was asked, downloaded
 clans (with its code) and gems, and loaded them with no error; on alice's world `/clan create
 Wolves` ran in the sandbox ("clan Wolves founded" in the log, "Clan Wolves founded." in chat), no
-strikes. The invite and join between the two weren't seen yet: the first run's scripts were out of
-step, and in the rerun bob's game froze when alice's invite reached it. That was a deadlock in
-the `packages` mod (the client's `packages:say` handler held its lock while running
-`/packages_say`, which takes it again), fixed; a second possible one (two packages on two region
-threads each waiting for the other's lock through a nested question) is avoided by nested calls
-only trying the lock. Rerun pending (Mac runs paused after the freeze).
+strikes. In the second run bob's game froze when alice's invite reached it: a deadlock in the
+`packages` mod (the client's `packages:say` handler held its lock while running `/packages_say`,
+which takes it again), fixed in 5223d51; a second possible one (two packages on two region threads
+each waiting for the other's lock through a nested question) is avoided by nested calls only
+trying the lock. The third run (Linux PC, two copies, 5223d51, `run/test-results/phase6_pc3/`)
+passed it all: the join sheet listed clans with "runs sandboxed code", bob downloaded and loaded
+it, alice founded Wolves and invited bob, bob joined ("player 7 joined clan Wolves" in alice's
+log), both saw "Your clan: Wolves, 2 members.", alice was told "A new member joined Wolves.", no
+strikes, panics or errors. Not seen: the invite line in bob's chat; it was sent while bob's world
+was still loading in, and a line that reaches a client then may be lost (not looked into).
 Slice 2 (consent marks code), after Ronald agreed the report's decisions: protocol 6, the
 `Offer` tuple's sixth field says whether the package carries `code/server.wasm`
 (`modloader::current_packages`); `download` refuses a package whose manifest says otherwise; the
 join sheet marks it (`join_sheet.code`, `OfferRow.code`). In `content::freeze_commands` a
 package's command whose name is taken is left out with a warning instead of failing the content
 build (code mods keep the old error).
-Left: components and channels in the API (slice 3), client halves (slice 4), personal mods per
-world (slice 5), `/mods` (slice 6).
+Slice 3, API 1.1 (built; not yet seen in the game): `crates/sandbox/wit/v1.1/mod.wit` is 1.0
+plus `registry.component`/`attach` (declarations, `Decl`, compared on restart like hooks),
+`world.get-component`/`set-component`, `set-blocks`, `play-sound`, `spawn-particles`. The host
+binds 1.1 only: a 1.0 component links by wasmtime's semver matching (checked with clans, and a
+test loads its committed wasm). `check_imports` refuses imports outside `chiacraft:mods/*` and
+newer 1.x at load. `crates/mod-sdk` is 1.1.0 (`value!`, `Component`, `entity_component`,
+`attach`, `w.component`/`set_component`/`update_component`, `Sound`, `Particle`, `Burst`,
+`set_blocks`). In `mods/packages`, components register as `Component<[u8; N]>` in buckets of 8
+to 256 (`Comp`); sounds and particles are checked by `find` and made into handles once per name.
+Sample `examples/wasm/tally` (a per-player count of blocks broken, a chime and particles every
+tenth, `/tally pillar` with `set_blocks`), packaged as `examples/packages/tally`.
+Left: 1.2 (block and item callbacks, channels), client halves (slice 4), personal mods per world
+(slice 5), `/mods` (slice 6).
 
 ## Side mods
 

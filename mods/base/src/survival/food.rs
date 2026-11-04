@@ -26,7 +26,10 @@ pub fn register(r: &mut Registry) {
             !base_api::has_room(&w, q.entity(), q.item())
         } else if q.item() == crate::cooking::STEW.id() {
             // A stew all at once: what it holds is on the stack in hand.
-            let held = w.inventory(q.entity()).group("hotbar").get(w.selected_slot(q.entity()));
+            let held = w
+                .inventory(q.entity())
+                .group("hotbar")
+                .get(w.selected_slot(q.entity()));
             held.item == q.item() && !base_api::has_room_for_meal(&w, q.entity(), &held)
         } else {
             false
@@ -186,4 +189,3 @@ pub fn crafted(cells: &[ItemStack], result: ItemStack, now: u64) -> ItemStack {
     }
     if used > 0.0 { result.with(&MADE, made_for(used, keeps, now)) } else { result }
 }
-

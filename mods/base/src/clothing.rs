@@ -96,8 +96,13 @@ pub fn register(r: &mut Registry) {
         }
     });
     r.item(&FUR).tag("pelts").tab(&crate::tabs::INGREDIENTS);
-    r.item(&PLANT_FIBRE).tag("plant_fibre").tab(&crate::tabs::INGREDIENTS);
-    r.item(&CLOTH).tag("cloth").set(&base_api::FLAMMABLE, 30).tab(&crate::tabs::INGREDIENTS);
+    r.item(&PLANT_FIBRE)
+        .tag("plant_fibre")
+        .tab(&crate::tabs::INGREDIENTS);
+    r.item(&CLOTH)
+        .tag("cloth")
+        .set(&base_api::FLAMMABLE, 30)
+        .tab(&crate::tabs::INGREDIENTS);
     // Fibre spun into string, string woven into linen (three to a cloth).
     r.shapeless(&CRAFTING, "string", 1, &vec!["#plant_fibre"; clothing::FIBRE_PER_STRING as usize], 0);
     r.shaped(&CRAFTING, "cloth", 1, &["sss"], &[('s', "#string")]);

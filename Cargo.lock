@@ -1331,11 +1331,12 @@ version = "0.1.0"
 dependencies = [
  "chiacraft-wallet",
  "log",
+ "parking_lot 0.13.0",
 ]
 
 [[package]]
 name = "chiacraft-mod-sdk"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "wit-bindgen",
 ]
@@ -8351,6 +8352,7 @@ dependencies = [
  "bytemuck",
  "chiacraft-account",
  "chiacraft-packages",
+ "chiacraft-wallet",
  "crossbeam-channel",
  "glam 0.34.1",
  "iroh",
