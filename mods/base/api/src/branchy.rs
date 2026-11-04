@@ -508,6 +508,32 @@ mod tests {
         }
     }
 
+    /// The Brazil nut's reach, measured (run with `--ignored`): how far its wood and leaves grow
+    /// when nothing trims them, its top, and how many leaves its trimmed crown leaves without a log.
+    #[test]
+    #[ignore]
+    fn brazil_nut_extent() {
+        use crate::tree_recipes::BRAZIL_NUT;
+        let wide = Recipe { reach: 100, max_height: 200, ..BRAZIL_NUT };
+        for seed in 0..20 {
+            let t = blocks(&wide, seed);
+            let far = |part: fn(&Part) -> bool| t.iter().filter(|b| part(&b.3)).map(|b| b.0.abs().max(b.2.abs())).max().unwrap_or(0);
+            let wood = far(|p| matches!(p, Part::Log { .. }));
+            let leaves = far(|p| *p == Part::Leaves);
+            let top = t.iter().map(|b| b.1).max().unwrap_or(0);
+            let kept = blocks(&BRAZIL_NUT, seed);
+            let logs: std::collections::HashSet<_> =
+                kept.iter().filter(|b| matches!(b.3, Part::Log { .. })).map(|b| (b.0, b.1, b.2)).collect();
+            let d = LEAF_REACH;
+            let orphans = kept
+                .iter()
+                .filter(|b| b.3 == Part::Leaves)
+                .filter(|&&(x, y, z, _)| !(-d..=d).any(|dy| (-d..=d).any(|dz| (-d..=d).any(|dx| logs.contains(&(x + dx, y + dy, z + dz))))))
+                .count();
+            eprintln!("seed {seed}: wood out to {wood}, leaves to {leaves}, top {top}; trimmed {} blocks, {orphans} leaves with no log", kept.len());
+        }
+    }
+
     #[test]
     fn every_species_grows_a_tree_within_its_reach() {
         for r in RECIPES {
@@ -527,6 +553,9 @@ mod tests {
                         .all(|b| b.0 >= -reach && b.0 <= reach + 1 && b.2 >= -reach && b.2 <= reach + 1),
                     "{name} {seed}: out of reach"
                 );
+                // A scatter's shape keeps 4,096 blocks; past that the engine drops the rest
+                // (`dim.rs`), and a giant would lose its crown (the sequoia did).
+                assert!(t.len() <= 4096, "{name} {seed}: {} blocks, over a shape's 4,096", t.len());
             }
         }
     }

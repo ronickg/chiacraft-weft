@@ -64,8 +64,13 @@ pub static FERN_KINDS: Component<BlockList> = Component::named("fern_kinds");
 /// Mushrooms at the foot of trunks: which, and their share of the bare soil beside a trunk.
 pub static MUSHROOMS: Component<BlockList> = Component::named("mushrooms");
 pub static MUSHROOM_COVER: Component<f32> = Component::named("mushroom_cover");
+/// The share of a biome's trees with lianas hanging from their crowns (`vitals::layers`).
+pub static LIANAS: Component<f32> = Component::named("lianas");
 /// The share of a biome's tall grass that grows two blocks tall (`TALL_GRASS_DOUBLE`).
 pub static TALL_GRASS_SHARE: Component<f32> = Component::named("tall_grass_share");
+/// Big-leaved plants two blocks tall (`vitals::layers`): the share of the bare soil, and which.
+pub static BIG_LEAVES: Component<f32> = Component::named("big_leaves");
+pub static BIG_LEAF_KINDS: Component<BlockList> = Component::named("big_leaf_kinds");
 // The trees' vocabulary and shapes are `base_api::trees`, so any mod's saplings grow them.
 pub use base_api::trees::{TREE_LEAVES, grow_tree};
 use base_api::trees::{tree_blocks, wild_tree_at};
@@ -229,12 +234,15 @@ pub fn register(r: &mut Registry) {
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:swamp").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
         // The Pantanal's acuri palms on the ground above the flood, a few moriches and oaks.
         .set_text(&TREE_KINDS, "base:acuri_palm_log:3 base:moriche_palm_log:1 base:oak_log:1");
-    // Rainforest (Ronald, 11-04: "all four"): a dense canopy over palms; its trees, undergrowth,
-    // lianas and Manaus's climate are Plants' (`vitals`), these are a start.
+    // Rainforest (Ronald, 11-04: "all four"; its look "A + C's giants + some B"), Manaus's terra
+    // firme: a canopy at 28-32 of matamatá, andiroba and a few golden ipês, each crown its own
+    // colour (`vitals::wild::OWN_COLOURS`); Brazil nuts as the buttressed emergents over it (the
+    // giant scatter, about five a hectare), young ones, cacao and palms under it; its floor,
+    // shrubs, big leaves and lianas are its `vitals::layers` row.
     r.biome(&TROPICAL_FOREST)
         .tint(water, 0x5d7f6a)
         .set(&CLIMATE, base_api::climate("base:tropical_forest"))
-        .set(&BOULDERS, 0.04)
+        .set(&BOULDERS, 0.01)
         .temperature(land::TROPICAL.0..)
         .humidity(land::TROPICAL.1..)
         .surface("grass", "dirt", 3)
@@ -248,7 +256,12 @@ pub fn register(r: &mut Registry) {
         .set(&TREES, 0.6)
         .set(&STAND_TREES, 0.15)
         .set(&GRASS_COVER, vitals::forage::grass_cover("base:tropical_forest").unwrap_or(vitals::forage::GRASS_COVER_ELSE))
-        .set_text(&TREE_KINDS, "base:acuri_palm_log:2 base:moriche_palm_log:2 base:oak_log:3");
+        .set_text(
+            &TREE_KINDS,
+            "base:matamata_log:6 base:andiroba_log:5 base:ipe_log:1 base:cacao_log:3 base:brazil_nut_log:2 base:acuri_palm_log:1 base:moriche_palm_log:1",
+        )
+        .set(&GIANT_TREES, 0.3)
+        .set_text(&GIANT_KINDS, "base:brazil_nut_log");
     r.biome(&MOUNTAINS)
         .tint(water, WATER_TINT)
         .set(&CLIMATE, base_api::climate("base:mountains"))
@@ -351,7 +364,7 @@ pub fn register(r: &mut Registry) {
     }
 
     // The layers under the trees, each biome's (`vitals::layers`).
-    for l in &vitals::layers::LAYERS {
+    for l in vitals::layers::LAYERS.iter().filter(|l| !vitals::layers::PENDING.contains(&l.biome)) {
         let b = || Target::Biome(l.biome);
         if !l.floor.is_empty() {
             r.set_text_on(b(), &FLOOR, l.floor);
@@ -377,6 +390,13 @@ pub fn register(r: &mut Registry) {
         if l.shrubs > 0.0 {
             r.set_on(b(), &SHRUBS, l.shrubs);
             r.set_text_on(b(), &SHRUB_KINDS, l.shrub_kinds);
+        }
+        if l.lianas > 0.0 {
+            r.set_on(b(), &LIANAS, l.lianas);
+        }
+        if l.big_leaves > 0.0 {
+            r.set_on(b(), &BIG_LEAVES, l.big_leaves);
+            r.set_text_on(b(), &BIG_LEAF_KINDS, l.big_leaf_kinds);
         }
     }
 
@@ -451,6 +471,7 @@ fn young_tree(s: &mut Site) {
         z,
         h >> 8,
         |x, y, z, state, force| {
+            let state = made_leaves(state);
             if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
         },
     );
@@ -466,6 +487,7 @@ fn shrub(s: &mut Site) {
     let Some(leaves) = SHRUB_KINDS
         .on_biome(s.biome())
         .and_then(|l| l.pick(h >> 40))
+        .map(made_leaves)
     else {
         return;
     };
@@ -546,10 +568,19 @@ fn giant(s: &mut Site) {
         return;
     };
     let [x, y, z] = s.pos();
-    // One in twelve lies fallen, mossy, along the ground (the overworld's: its height is known).
-    if (h >> 4).is_multiple_of(12) && s.dimension() == crate::OVERWORLD.id() {
+    // One sequoia in twelve lies fallen, mossy, along the ground (the overworld's: its height is
+    // known).
+    if (h >> 4).is_multiple_of(12) && s.dimension() == crate::OVERWORLD.id() && Block::lookup("base:sequoia_log") == Some(log) {
         fallen_giant(s, h);
         return;
+    }
+    let mut crown = Vec::new();
+    let mut limbs = Vec::new();
+    let climbers = LIANAS.on_biome(s.biome()).is_some();
+    let brazil = Block::lookup("base:brazil_nut_log") == Some(log);
+    // A Brazil nut stands on a mound of its own roots, its buttresses round its foot.
+    if brazil {
+        giant_foot(s, [x, y, z], h);
     }
     base_api::trees::giant_tree_blocks(
         log,
@@ -558,9 +589,99 @@ fn giant(s: &mut Site) {
         z,
         h >> 8,
         |x, y, z, state, force| {
+            if climbers && LEAVES.on_block(state) {
+                crown.push([x, y, z]);
+            }
+            if brazil && matches!(state_prop(state, "axis"), Some("x" | "z")) {
+                limbs.push([x, y, z]);
+            }
+            let state = made_leaves(state);
             if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
         },
     );
+    lianas(s, &crown, y, h);
+    // Bromeliads on one limb block in five.
+    for (k, &[x, y, z]) in limbs.iter().enumerate() {
+        if hash(h, 0xB20, k as i64, 0) % 5 == 0 {
+            s.put([x, y + 1, z], BROMELIAD.id());
+        }
+    }
+}
+
+/// A Brazil nut's foot (Ronald, 11-04: "C's giants"): a low mound of its roots, up to two blocks
+/// high and six out, topped with leaf litter, and four to six plank buttresses radiating from the
+/// trunk, four to six high at it and stepping down to one, three to six blocks out.
+fn giant_foot(s: &mut Site, [x, y, z]: [i32; 3], h: u64) {
+    const TRUNK: f32 = 1.5;
+    for dz in -6..=6i32 {
+        for dx in -6..=6i32 {
+            let d = ((dx * dx + dz * dz) as f32).sqrt();
+            let rise = (2.2 - (d - TRUNK).max(0.0) / 2.2) as i32;
+            for dy in 0..rise {
+                let top = dy + 1 == rise;
+                s.put([x + dx, y + dy, z + dz], if top { LEAF_LITTER.id() } else { DIRT.id() });
+            }
+        }
+    }
+    let fins = 4 + hash(h, 0xB21, 0, 0) % 3;
+    let turn = (hash(h, 0xB22, 0, 0) % 360) as f32;
+    for k in 0..fins {
+        let angle = (turn + k as f32 * 360.0 / fins as f32 + (hash(h, 0xB23, k as i64, 0) % 30) as f32).to_radians();
+        let (dx, dz) = (angle.cos(), angle.sin());
+        let len = 3 + (hash(h, 0xB24, k as i64, 0) % 4) as i32;
+        let tall = 4 + (hash(h, 0xB25, k as i64, 0) % 3) as i32;
+        for step in 0..len {
+            let r = TRUNK + 0.5 + step as f32;
+            let (fx, fz) = (x + (dx * r).round() as i32, z + (dz * r).round() as i32);
+            let up = (tall - tall * step / len).max(1);
+            for dy in 0..up {
+                s.force([fx, y + dy, fz], BRAZIL_NUT_BUTTRESS.id());
+            }
+        }
+    }
+}
+
+/// Lianas hanging from a tree's crown (`LIANAS`, the share of trees that carry them): two to four
+/// columns from the underside of the crown, three to twelve long, stopping two above the ground;
+/// one in three a loop (Ronald, 11-04: "ropes and loops"), running on two or three blocks at its
+/// foot and back up a few, as a monkey-ladder liana sags between two holds.
+fn lianas(s: &mut Site, crown: &[[i32; 3]], ground: i32, h: u64) {
+    let Some(share) = LIANAS.on_biome(s.biome()) else { return };
+    if crown.is_empty() || (hash(h, 0x11A, 0, 0) & 1023) as f32 / 1024.0 >= share {
+        return;
+    }
+    // The crown's lowest leaf in each column it covers (a map: a crown has hundreds of leaves,
+    // and every column of cubes runs its shape again).
+    let mut by_column: std::collections::HashMap<(i32, i32), i32> = std::collections::HashMap::new();
+    for &[x, y, z] in crown {
+        by_column
+            .entry((x, z))
+            .and_modify(|low| *low = (*low).min(y))
+            .or_insert(y);
+    }
+    let mut lowest: Vec<[i32; 3]> = by_column.into_iter().map(|((x, z), y)| [x, y, z]).collect();
+    lowest.sort_unstable();
+    let count = 2 + hash(h, 0x11B, 0, 0) % 3;
+    for k in 0..count {
+        let r = hash(h, 0x11C, k as i64, 0);
+        let [x, top, z] = lowest[(r % lowest.len() as u64) as usize];
+        let len = 3 + ((r >> 16) % 10) as i32;
+        let bottom = (top - len).max(ground + 2);
+        for y in (bottom..top).rev() {
+            s.put([x, y, z], LIANA.id());
+        }
+        if (r >> 32) % 3 == 0 {
+            let (dx, dz) = [(1, 0), (-1, 0), (0, 1), (0, -1)][((r >> 36) % 4) as usize];
+            let run = 2 + ((r >> 40) % 2) as i32;
+            for k in 1..=run {
+                s.put([x + dx * k, bottom, z + dz * k], LIANA.id());
+            }
+            let rise = 2 + ((r >> 44) % 4) as i32;
+            for y in bottom + 1..(bottom + 1 + rise).min(top) {
+                s.put([x + dx * run, y, z + dz * run], LIANA.id());
+            }
+        }
+    }
 }
 
 /// A fallen giant: a mossy trunk three wide lying 14 to 22 long through its site, following the
@@ -625,8 +746,18 @@ fn tree(s: &mut Site) {
         .on_biome(s.biome())
         .and_then(|l| l.pick(s.random() >> 40))
         .unwrap_or(OAK_LOG.id());
-    let Some(t) = wild_tree_at(log, x, y, z, s.random() >> 32) else { return };
-    tree_blocks(&t, |x, y, z, state, force| if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) });
+    let h = s.random();
+    let Some(t) = wild_tree_at(log, x, y, z, h >> 32) else { return };
+    let mut crown = Vec::new();
+    let climbers = LIANAS.on_biome(s.biome()).is_some();
+    tree_blocks(&t, |x, y, z, state, force| {
+        if climbers && LEAVES.on_block(state) {
+            crown.push([x, y, z]);
+        }
+        let state = made_leaves(state);
+        if force { s.force([x, y, z], state) } else { s.put([x, y, z], state) }
+    });
+    lianas(s, &crown, y, h);
 }
 
 /// Plants, after the terrain and trees filled the cube.
@@ -820,6 +951,14 @@ fn decorate(g: &mut Gen) {
                             .and_then(|l| l.pick(h >> 20))
                             .unwrap_or(FERN.id());
                         g.set(x, y, z, fern);
+                    } else if near < mushroom + ferns + BIG_LEAVES.on_biome(b).unwrap_or(0.0) as f64
+                        && y + 1 < 16
+                        && g.get(x, y + 1, z) == 0
+                        && let Some(big) = BIG_LEAF_KINDS.on_biome(b).and_then(|l| l.pick(h >> 20))
+                    {
+                        // A big-leaved plant two blocks tall (`BIG_LEAVES`).
+                        g.set(x, y, z, state_with(big, "half", "lower").unwrap_or(big));
+                        g.set(x, y + 1, z, state_with(big, "half", "upper").unwrap_or(big));
                     }
                 }
             } else if SAND_TAG.on_block(below)

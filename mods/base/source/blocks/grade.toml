@@ -507,6 +507,20 @@ overlay = "ore_gold_b"
 [items.tepary_beans]  # outline 0.60 -> 0.40 (new, Plants' batch 3: pale beans, the edge too light)
 outline = 0.67
 
+# The tropical forest (11-04): cacao's pale bark down into our logs' range (0.24-0.36); its grey bark
+# and the Brazil nut's are the species' own (identity, like the sequoia), so they keep it.
+[tiles.log_cacao]  # luma 0.43 -> 0.36
+gain = 0.84
+
+[tiles.log_cacao_top]  # luma 0.52 -> 0.47
+gain = 0.9
+
+[tiles.planks_andiroba]  # sat 0.68 -> 0.60, into jungle planks' band (0.49-0.52 +0.10)
+saturation = 0.88
+
+[items.ipe_seed]  # outline 0.64 -> 0.40 (new, the tropical forest: pale papery wings, the edge too light)
+outline = 0.62
+
 # Walked-on ground (Planner, 11-04: the red sand floor read very saturated orange in the PC looks).
 # Vanilla's red sand is 0.83 and Pixel Perfection's 0.50; ours moves to the middle, with base's graded
 # red sandstone (0.62), so a canyon floor and its walls match. The Cretaceous copies (animals) had no rows.
